@@ -1,7 +1,8 @@
 #include "physics_geometry_manager.h"
-#include "engine/fs/file_system.h"
+#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "engine/string.h"
 #include "engine/vec.h"
 #include "physics/physics_system.h"
@@ -106,9 +107,10 @@ PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManager& resource_man
 PhysicsGeometry::~PhysicsGeometry() = default;
 
 
-bool PhysicsGeometry::load(FS::IFile& file)
+bool PhysicsGeometry::load(u64 size, const u8* mem)
 {
 	Header header;
+	InputMemoryStream file(mem, size);
 	file.read(&header, sizeof(header));
 	if (header.m_magic != HEADER_MAGIC)
 	{

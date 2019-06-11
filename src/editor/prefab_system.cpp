@@ -7,12 +7,12 @@
 #include "engine/array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/matrix.h"
+#include "engine/os.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/resource.h"
@@ -587,7 +587,7 @@ public:
 		u64 prefab = getPrefab(entity);
 		if (prefab != 0) entity = getPrefabRoot(entity);
 
-		FS::OSOutputFile file;
+		OS::OutputFile file;
 		if (!file.open(path.c_str()))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path.c_str();
@@ -613,7 +613,7 @@ public:
 			Transform tr = m_universe->getTransform(entity);
 			m_editor.destroyEntities(&entities[0], entities.size());
 			auto* res = m_editor.getEngine().getResourceManager().load<PrefabResource>(path);
-			FS::FileSystem& fs = m_editor.getEngine().getFileSystem();
+			FileSystem& fs = m_editor.getEngine().getFileSystem();
 			while (fs.hasWork()) fs.updateAsyncTransactions();
 			instantiatePrefab(*res, tr.pos, tr.rot, tr.scale);
 

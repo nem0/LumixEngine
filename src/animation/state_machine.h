@@ -14,11 +14,11 @@ namespace Lumix
 class Animation;
 struct AnimationSystem;
 class Engine;
-class InputBlob;
+class InputMemoryStream;
 struct LocalRigidTransform;
 struct BoneMask;
 class Model;
-class OutputBlob;
+class OutputMemoryStream;
 struct Pose;
 class Path;
 
@@ -71,8 +71,8 @@ struct Component
 		, uid(-1) {}
 	virtual ~Component() {}
 	virtual ComponentInstance* createInstance(IAllocator& allocator) = 0;
-	virtual void serialize(OutputBlob& blob);
-	virtual void deserialize(InputBlob& blob, Container* parent, int version);
+	virtual void serialize(OutputMemoryStream& blob);
+	virtual void deserialize(InputMemoryStream& blob, Container* parent, int version);
 	virtual Component* getByUID(int _uid) { return (uid == _uid) ? this : nullptr; }
 
 	ControllerResource& controller;
@@ -86,8 +86,8 @@ struct Node : public Component
 	Node(ControllerResource& controller, Component::Type type, IAllocator& _allocator);
 	~Node();
 
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent, int version) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob, Container* parent, int version) override;
 
 	IAllocator& allocator;
 	Array<Edge*> out_edges;
@@ -102,8 +102,8 @@ struct Container : public Node
 	Container(ControllerResource& controller, Component::Type type, IAllocator& _allocator);
 	~Container();
 
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent, int version) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob, Container* parent, int version) override;
 	Component* getChildByUID(int uid);
 	Component* getByUID(int _uid) override;
 
@@ -117,8 +117,8 @@ struct Edge : public Component
 	Edge(ControllerResource& controller, IAllocator& allocator);
 	~Edge();
 	ComponentInstance* createInstance(IAllocator& allocator) override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent, int version) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob, Container* parent, int version) override;
 
 	Condition condition;
 	Node* from = nullptr;
@@ -144,8 +144,8 @@ struct AnimationNode : public Node
 {
 	AnimationNode(ControllerResource& controller, IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent, int version) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob, Container* parent, int version) override;
 
 	Array<u32> animations_hashes;
 	float speed_multiplier = 1;
@@ -182,8 +182,8 @@ struct Blend1DNode : public Container
 {
 	Blend1DNode(ControllerResource& controller, IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent, int version) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob, Container* parent, int version) override;
 
 	struct Item
 	{
@@ -220,8 +220,8 @@ struct LayersNode : public Container
 {
 	LayersNode(ControllerResource& controller, IAllocator& allocator);
 	ComponentInstance* createInstance(IAllocator& allocator) override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent, int version) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob, Container* parent, int version) override;
 
 	u32 masks[16];
 };
@@ -252,8 +252,8 @@ struct StateMachine : public Container
 	StateMachine(ControllerResource& controller, IAllocator& _allocator);
 
 	ComponentInstance* createInstance(IAllocator& allocator) override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob, Container* parent, int version) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob, Container* parent, int version) override;
 
 	struct Entry
 	{

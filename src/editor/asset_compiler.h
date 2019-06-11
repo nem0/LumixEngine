@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-class OutputBlob;
+class OutputMemoryStream;
 class Path;
 struct ResourceType;
 class StudioApp;

@@ -58,8 +58,8 @@ public:
 	virtual void destroy() {}
 	virtual bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) = 0;
 	virtual void onGUI() {}
-	virtual void serialize(OutputBlob& blob) = 0;
-	virtual void deserialize(InputBlob& blob) = 0;
+	virtual void serialize(OutputMemoryStream& blob) = 0;
+	virtual void deserialize(InputMemoryStream& blob) = 0;
 	virtual bool hitTest(const ImVec2& on_canvas_pos) const { return false; }
 	virtual bool isNode() const = 0;
 	virtual bool isContainer() const { return false; }
@@ -94,8 +94,8 @@ public:
 	void destroy() override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	void onGUI() override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob) override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void addEdge(Edge* edge) { m_edges.push(edge); }
 	void addInEdge(Edge* edge) { m_in_edges.push(edge); }
@@ -134,8 +134,8 @@ public:
 	Component* childrenHitTest(const ImVec2& pos);
 	Component* getChildByUID(int uid);
 	Component* getSelectedComponent() const { return m_selected_component; }
-	void deserialize(InputBlob& blob) override;
-	void serialize(OutputBlob& blob) override;
+	void deserialize(InputMemoryStream& blob) override;
+	void serialize(OutputMemoryStream& blob) override;
 	void compile() override;
 	Component* getByUID(int uid) override;
 	virtual void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) {}
@@ -169,8 +169,8 @@ public:
 	void destroy() override;
 	void onGUI() override;
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob) override;
 	void compile() override;
 	bool hitTest(const ImVec2& on_canvas_pos) const override;
 	const char* getExpression() const { return m_expression; }
@@ -217,7 +217,7 @@ public:
 	void compile() override;
 	void onGUI() override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
-	void deserialize(InputBlob& blob) override;
+	void deserialize(InputMemoryStream& blob) override;
 	void addAnimation(int idx);
 	void removeAnimation(int idx);
 	Array<AnimationProxy>& getAnimations() { return m_animations; }
@@ -244,8 +244,8 @@ public:
 
 	void compile() override;
 	void onGUI() override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob) override;
 	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
 	void dropSlot(const char* name, u32 slot, const ImVec2& canvas_screen_pos) override;
 
@@ -273,8 +273,8 @@ public:
 	void compile() override;
 	void onGUI() override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
-	void serialize(OutputBlob& blob) override;
-	void deserialize(InputBlob& blob) override;
+	void serialize(OutputMemoryStream& blob) override;
+	void deserialize(InputMemoryStream& blob) override;
 	void drawInside(ImDrawList* draw, const ImVec2& canvas_screen_pos) override;
 	RootNode* getRootNode() const { return m_root_node; }
 	void removeChild(Component* component) override;
@@ -323,8 +323,8 @@ public:
 		Anim::ComponentInstance* runtime,
 		Container* current) override;
 	void debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim::ComponentInstance* runtime) override;
-	void deserialize(InputBlob& blob) override;
-	void serialize(OutputBlob& blob) override;
+	void deserialize(InputMemoryStream& blob) override;
+	void serialize(OutputMemoryStream& blob) override;
 	EntryNode* getEntryNode() const { return m_entry_node; }
 	void removeChild(Component* component) override;
 	void compile() override;
@@ -499,8 +499,8 @@ public:
 		const StaticString<32>& getName() const { return name; }
 		void setName(const StaticString<32>& name);
 
-		/*void serialize(OutputBlob& blob);
-		void deserialize(InputBlob& blob);*/
+		/*void serialize(OutputMemoryStream& blob);
+		void deserialize(InputMemoryStream& blob);*/
 
 		struct Value
 		{
@@ -569,8 +569,8 @@ public:
 		IAllocator& allocator);
 	~ControllerResource();
 
-	void serialize(OutputBlob& blob);
-	bool deserialize(InputBlob& blob, Engine& engine, IAllocator& allocator);
+	void serialize(OutputMemoryStream& blob);
+	bool deserialize(InputMemoryStream& blob, Engine& engine, IAllocator& allocator);
 	Component* getRoot() { return m_root; }
 	
 	const Array<AnimationSlot>& getAnimationSlots() const { return m_animation_slots; }

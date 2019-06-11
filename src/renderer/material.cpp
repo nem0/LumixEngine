@@ -1,6 +1,6 @@
 #include "renderer/material.h"
 #include "engine/crc32.h"
-#include "engine/fs/file_system.h"
+#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/path_utils.h"

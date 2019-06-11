@@ -8,12 +8,7 @@ namespace Lumix
 {
 
 
-namespace FS
-{
 class FileSystem;
-}
-
-
 class Path;
 class Resource;
 struct ResourceType;
@@ -78,7 +73,7 @@ public:
 	explicit ResourceManagerHub(IAllocator& allocator);
 	~ResourceManagerHub();
 
-	void init(FS::FileSystem& fs);
+	void init(FileSystem& fs);
 
 	IAllocator& getAllocator() { return m_allocator; }
 	ResourceManager* get(ResourceType type);
@@ -100,13 +95,13 @@ public:
 	void removeUnreferenced();
 	void enableUnload(bool enable);
 
-	FS::FileSystem& getFileSystem() { return *m_file_system; }
+	FileSystem& getFileSystem() { return *m_file_system; }
 
 private:
 	Resource* load(ResourceManager& manager, const Path& path);
 	IAllocator& m_allocator;
 	ResourceManagerTable m_resource_managers;
-	FS::FileSystem* m_file_system;
+	FileSystem* m_file_system;
 	LoadHook* m_load_hook;
 };
 

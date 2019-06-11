@@ -8,9 +8,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/disk_file_device.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/job_system.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -18,6 +16,7 @@
 #include "engine/lumix.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/thread.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/prefab.h"
@@ -90,8 +89,8 @@ static bool saveAsDDS(const char* path, const u8* image_data, int image_width, i
 	void* data = crn_compress(comp_params, mipmap_params, size);
 	if (!data) return false;
 
-	FS::OsFile file;
-	if (file.open(path, FS::Mode::CREATE_AND_WRITE))
+	OS::OutputFile file;
+	if (file.open(path))
 	{
 		file.write(data, size);
 		file.close();
@@ -212,7 +211,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void saveMaterial(Material* material)
 	{
-		if (FS::IFile* file = m_app.getAssetBrowser().beginSaveResource(*material)) {
+		if (IOutputStream* file = m_app.getAssetBrowser().beginSaveResource(*material)) {
 			bool success = true;
 			if (!material->save(*file))
 			{
@@ -1144,8 +1143,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 			if (PathUtils::hasExtension(m_in_path, "dds"))
 			{
-				FS::OsFile file;
-				if (!file.open(m_in_path, FS::Mode::OPEN_AND_READ))
+				OS::InputFile file;
+				if (!file.open(m_in_path))
 				{
 					OS::copyFile("models/editor/tile_texture.dds", out_path);
 					g_log_error.log("Editor") << "Failed to load " << m_in_path;
@@ -1232,7 +1231,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	bool compileJPEG(FS::OsFile& src, FS::OsFile& dst, const Meta& meta)
+	bool compileJPEG(OS::InputFile& src, OS::OutputFile& dst, const Meta& meta)
 	{
 		Array<u8> tmp(m_app.getWorldEditor().getAllocator());
 		tmp.resize((int)src.size());
@@ -1303,10 +1302,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		FS::OsFile srcf;
-		FS::OsFile dstf;
-		if (!srcf.open(src.c_str(), FS::Mode::OPEN_AND_READ)) return false;
-		if (!dstf.open(dst, FS::Mode::CREATE_AND_WRITE)) {
+		OS::InputFile srcf;
+		OS::OutputFile dstf;
+		if (!srcf.open(src.c_str())) return false;
+		if (!dstf.open(dst)) {
 			srcf.close();
 			return false;
 		}
@@ -1418,8 +1417,8 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		lua_State* L = luaL_newstate();
 		luaL_openlibs(L);
 
-		FS::OsFile file;
-		if (!file.open(path[0] == '/' ? path + 1 : path, FS::Mode::OPEN_AND_READ)) return;
+		OS::InputFile file;
+		if (!file.open(path[0] == '/' ? path + 1 : path)) return;
 		
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		Array<u8> content(allocator);
@@ -1629,7 +1628,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			return false;
 		}
 
-		FS::OsFile file;
 		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 		if (!OS::makePath(path) && !OS::dirExists(path))
@@ -1643,7 +1641,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		}
 		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID((EntityRef)cmp.entity);
 		path << probe_guid << postfix << ".dds";
-		if (!file.open(path, FS::Mode::CREATE_AND_WRITE))
+		OS::OutputFile file;
+		if (!file.open(path))
 		{
 			g_log_error.log("Editor") << "Failed to create " << path;
 			crn_free_block(compressed_data);
@@ -2001,8 +2000,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h) override
 	{
 		Path path(path_cstr);
-		FS::OSFileStream file;
-		if (!file.open(path, FS::Mode::CREATE_AND_WRITE)) return false;
+		OS::OutputFile file;
+		if (!file.open(path_cstr)) return false;
 
 		if (!Texture::saveTGA(&file, w, h, 4, (const u8*)pixels, path, engine.getAllocator())) {
 			file.close();
@@ -2656,8 +2655,8 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 
 		PathUtils::FileInfo info(normalized_material_path);
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
-		FS::OsFile file;
-		if (!file.open(hm_path, FS::Mode::CREATE_AND_WRITE))
+		OS::OutputFile file;
+		if (!file.open(hm_path))
 		{
 			g_log_error.log("Editor") << "Failed to create heightmap " << hm_path;
 			return false;
@@ -2672,22 +2671,22 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 			file.close();
 		}
 
-		if (!file.open(normalized_material_path, FS::Mode::CREATE_AND_WRITE))
+		if (!file.open(normalized_material_path))
 		{
 			g_log_error.log("Editor") << "Failed to create material " << normalized_material_path;
 			OS::deleteFile(hm_path);
 			return false;
 		}
 
-		file.writeText(R"#(
+		file << R"#(
 			shader "pipelines/terrain.shd"
-			texture ")#");
-		file.writeText(info.m_basename);
-		file.writeText(R"#(.raw"
+			texture ")#";
+		file << info.m_basename;
+		file << R"#(.raw"
 			texture "/textures/common/white.tga"
 			texture ""
 			texture ""
-		)#");
+		)#";
 
 		file.close();
 		return true;

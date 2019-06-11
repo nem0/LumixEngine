@@ -25,6 +25,164 @@ static struct
 } G;
 
 
+InputFile::InputFile()
+{
+	m_handle = (void*)INVALID_HANDLE_VALUE;
+	static_assert(sizeof(m_handle) >= sizeof(HANDLE), "");
+}
+
+
+OutputFile::OutputFile()
+{
+    m_is_error = false;
+	m_handle = (void*)INVALID_HANDLE_VALUE;
+	static_assert(sizeof(m_handle) >= sizeof(HANDLE), "");
+}
+
+
+InputFile::~InputFile()
+{
+	ASSERT((HANDLE)m_handle == INVALID_HANDLE_VALUE);
+}
+
+
+OutputFile::~OutputFile()
+{
+	ASSERT((HANDLE)m_handle == INVALID_HANDLE_VALUE);
+}
+
+
+bool OutputFile::open(const char* path)
+{
+	m_handle = (HANDLE)::CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	m_is_error = INVALID_HANDLE_VALUE != m_handle;
+    return m_is_error;
+}
+
+
+bool InputFile::open(const char* path)
+{
+	m_handle = (HANDLE)::CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	return INVALID_HANDLE_VALUE != m_handle;
+}
+
+
+void OutputFile::flush()
+{
+	ASSERT(nullptr != m_handle);
+	FlushFileBuffers((HANDLE)m_handle);
+}
+
+
+void OutputFile::close()
+{
+	if (INVALID_HANDLE_VALUE != (HANDLE)m_handle)
+	{
+		::CloseHandle((HANDLE)m_handle);
+		m_handle = (void*)INVALID_HANDLE_VALUE;
+	}
+}
+
+
+void InputFile::close()
+{
+	if (INVALID_HANDLE_VALUE != (HANDLE)m_handle)
+	{
+		::CloseHandle((HANDLE)m_handle);
+		m_handle = (void*)INVALID_HANDLE_VALUE;
+	}
+}
+
+
+bool OutputFile::write(const void* data, u64 size)
+{
+	ASSERT(INVALID_HANDLE_VALUE != (HANDLE)m_handle);
+	u64 written = 0;
+	::WriteFile((HANDLE)m_handle, data, (DWORD)size, (LPDWORD)&written, nullptr);
+	m_is_error = m_is_error || size != written;
+    return m_is_error;
+}
+
+bool InputFile::read(void* data, u64 size)
+{
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
+	DWORD readed = 0;
+	BOOL success = ::ReadFile((HANDLE)m_handle, data, (DWORD)size, (LPDWORD)&readed, nullptr);
+	return success && size == readed;
+}
+
+u64 InputFile::size() const
+{
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
+	return ::GetFileSize((HANDLE)m_handle, 0);
+}
+
+
+u64 OutputFile::pos()
+{
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
+	return ::SetFilePointer((HANDLE)m_handle, 0, nullptr, FILE_CURRENT);
+}
+
+
+u64 InputFile::pos()
+{
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
+	return ::SetFilePointer((HANDLE)m_handle, 0, nullptr, FILE_CURRENT);
+}
+
+
+bool InputFile::seek(u64 pos)
+{
+	ASSERT(INVALID_HANDLE_VALUE != m_handle);
+	LARGE_INTEGER dist;
+	dist.QuadPart = pos;
+	return ::SetFilePointer((HANDLE)m_handle, dist.u.LowPart, &dist.u.HighPart, FILE_BEGIN) != INVALID_SET_FILE_POINTER;
+}
+
+
+OutputFile& OutputFile::operator <<(const char* text)
+{
+	write(text, stringLength(text));
+	return *this;
+}
+
+
+OutputFile& OutputFile::operator <<(i32 value)
+{
+	char buf[20];
+	toCString(value, buf, lengthOf(buf));
+	write(buf, stringLength(buf));
+	return *this;
+}
+
+
+OutputFile& OutputFile::operator <<(u32 value)
+{
+	char buf[20];
+	toCString(value, buf, lengthOf(buf));
+	write(buf, stringLength(buf));
+	return *this;
+}
+
+
+OutputFile& OutputFile::operator <<(u64 value)
+{
+	char buf[30];
+	toCString(value, buf, lengthOf(buf));
+	write(buf, stringLength(buf));
+	return *this;
+}
+
+
+OutputFile& OutputFile::operator <<(float value)
+{
+	char buf[128];
+	toCString(value, buf, lengthOf(buf), 7);
+	write(buf, stringLength(buf));
+	return *this;
+}
+
 
 static void fromWChar(char* out, int size, const WCHAR* in)
 {

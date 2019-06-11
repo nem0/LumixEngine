@@ -1,5 +1,5 @@
 #include "json_serializer.h"
-#include "engine/fs/file_system.h"
+#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/path.h"

@@ -28,7 +28,7 @@ public:
 	ResourceType getType() const override { return TYPE; }
 
 	void unload() override;
-	bool load(u64 size, void* mem) override;
+	bool load(u64 size, const u8* mem) override;
 	bool save(JsonSerializer& serializer);
 	
 	void setTexture(const Path& path);

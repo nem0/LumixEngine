@@ -13,7 +13,7 @@ namespace Lumix
 
 class Animation;
 struct IAllocator;
-class OutputBlob;
+class OutputMemoryStream;
 
 
 namespace Anim
@@ -31,7 +31,7 @@ struct RunningContext
 	struct ComponentInstance* current;
 	struct Edge* edge;
 	AnimSet* anim_set;
-	OutputBlob* event_stream;
+	OutputMemoryStream* event_stream;
 	EntityRef controller;
 };
 

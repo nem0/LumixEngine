@@ -2,7 +2,7 @@
 
 
 #include "engine/delegate_list.h"
-#include "engine/fs/file_system.h"
+#include "engine/file_system.h"
 #include "engine/path.h"
 
 
@@ -104,7 +104,7 @@ private:
 	u16 m_ref_count;
 	u16 m_failed_dep_count;
 	State m_current_state;
-	FS::AsyncHandle m_async_op;
+	FileSystem::AsyncHandle m_async_op;
 }; // class Resource
 
 

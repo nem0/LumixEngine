@@ -102,6 +102,7 @@ class LUMIX_ENGINE_API InputMemoryStream final : public IInputStream
 		void rewind() { m_pos = 0; }
 		u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
 
+        using IInputStream::read;
 	private:
 		const u8* m_data;
 		u64 m_size;

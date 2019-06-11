@@ -3,7 +3,6 @@
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/iplugin.h"
 #include "engine/math_utils.h"
@@ -11,6 +10,7 @@
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/serializer.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "engine/vec.h"
 #include "imgui/imgui.h"
@@ -117,7 +117,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		float f;
-		OutputBlob blob(&f, sizeof(f));
+		OutputMemoryStream blob(&f, sizeof(f));
 		prop.getValue(cmp, m_index, blob);
 
 		if (attrs.is_radians) f = Math::radiansToDegrees(f);
@@ -135,7 +135,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		int value;
-		OutputBlob blob(&value, sizeof(value));
+		OutputMemoryStream blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 
 		if (ImGui::InputInt(prop.name, &value))
@@ -149,7 +149,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	{
 		ComponentUID cmp = getComponent();
 		EntityPtr entity;
-		OutputBlob blob(&entity, sizeof(entity));
+		OutputMemoryStream blob(&entity, sizeof(entity));
 		prop.getValue(cmp, m_index, blob);
 
 		char buf[128];
@@ -204,7 +204,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		IVec2 value;
-		OutputBlob blob(&value, sizeof(value));
+		OutputMemoryStream blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 		if (ImGui::DragInt2(prop.name, &value.x))
 		{
@@ -218,7 +218,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		Vec2 value;
-		OutputBlob blob(&value, sizeof(value));
+		OutputMemoryStream blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 		if (ImGui::DragFloat2(prop.name, &value.x))
 		{
@@ -233,7 +233,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec3 value;
-		OutputBlob blob(&value, sizeof(value));
+		OutputMemoryStream blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 
 		if (attrs.is_color)
@@ -261,7 +261,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec4 value;
-		OutputBlob blob(&value, sizeof(value));
+		OutputMemoryStream blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 
 		if (attrs.is_color)
@@ -286,7 +286,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		bool value;
-		OutputBlob blob(&value, sizeof(value));
+		OutputMemoryStream blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 
 		if (ImGui::CheckboxEx(prop.name, &value))
@@ -301,7 +301,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
-		OutputBlob blob(&tmp, sizeof(tmp));
+		OutputMemoryStream blob(&tmp, sizeof(tmp));
 		prop.getValue(cmp, m_index, blob);
 
 		Attributes attrs = getAttributes(prop);
@@ -328,7 +328,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		char tmp[1024];
-		OutputBlob blob(&tmp, sizeof(tmp));
+		OutputMemoryStream blob(&tmp, sizeof(tmp));
 		prop.getValue(cmp, m_index, blob);
 
 		if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
@@ -354,11 +354,11 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			Vec2 next_tangent;
 		};
 
-		OutputBlob blob(m_editor.getAllocator());
+		OutputMemoryStream blob(m_editor.getAllocator());
 		prop.getValue(cmp, -1, blob);
 		blob.reserve(blob.getPos() + sizeof(Point));
 		int count;
-		InputBlob input(blob);
+		InputMemoryStream input(blob);
 		input.read(count);
 		count /= 3;
 		Point* points = (Point*)input.skip(sizeof(Point) * count);
@@ -397,7 +397,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			}
 			points[0].p.x = 0;
 			points[count - 1].p.x = prop.getMaxX();
-			m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), blob.getPos());
+			m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), (int)blob.getPos());
 		}
 	}
 
@@ -478,7 +478,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 		ComponentUID cmp = getComponent();
 		int value;
-		OutputBlob blob(&value, sizeof(value));
+		OutputMemoryStream blob(&value, sizeof(value));
 		prop.getValue(cmp, m_index, blob);
 		int count = prop.getEnumCount(cmp);
 
@@ -537,7 +537,7 @@ static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Enti
 		cmp.type = cmp_type;
 		cmp.entity = entities[0];
 		cmp.scene = app.getWorldEditor().getUniverse()->getScene(cmp_type);
-		OutputBlob blob(&b, sizeof(b));
+		OutputMemoryStream blob(&b, sizeof(b));
 		enabled_prop->getValue(cmp, -1, blob);
 		if(ImGui::Checkbox(cmp_type_name, &b))
 		{

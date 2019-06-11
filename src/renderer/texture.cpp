@@ -1,8 +1,8 @@
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/path_utils.h"
+#include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
@@ -238,7 +238,7 @@ static void saveTGA(Texture& texture)
 		return;
 	}
 
-	FS::OSOutputFile file;
+	OS::OutputFile file;
 	if (!file.open(texture.getPath().c_str())) {
 		g_log_error.log("Renderer") << "Failed to create file " << texture.getPath();
 		return;
@@ -263,7 +263,7 @@ void Texture::save()
 	PathUtils::getExtension(ext, 5, getPath().c_str());
 	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
-		FS::OSOutputFile file;
+		OS::OutputFile file;
 		if (!file.open(getPath().c_str())) {
 			g_log_error.log("Renderer") << "Failed to create file " << getPath();
 			return;

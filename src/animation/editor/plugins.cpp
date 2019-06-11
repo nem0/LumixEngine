@@ -10,10 +10,10 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
 #include "engine/hash_map.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
@@ -100,9 +100,9 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		char full_path[MAX_PATH_LENGTH];
 		if (!OS::getSaveFilename(full_path, lengthOf(full_path), "Property animation\0*.anp\0", "anp")) return false;
 
-		FS::OsFile file;
+		OS::OutputFile file;
 		WorldEditor& editor = m_app.getWorldEditor();
-		if (!file.open(full_path, FS::Mode::CREATE_AND_WRITE))
+		if (!file.open(full_path))
 		{
 			g_log_error.log("Animation") << "Failed to create " << full_path;
 			return false;
@@ -167,7 +167,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	void savePropertyAnimation(PropertyAnimation& anim)
 	{
-		if (FS::IFile* file = m_app.getAssetBrowser().beginSaveResource(anim))
+		if (IOutputStream* file = m_app.getAssetBrowser().beginSaveResource(anim))
 		{
 			bool success = true;
 			JsonSerializer serializer(*file, anim.getPath());

@@ -7,6 +7,7 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
+#include "engine/stream.h"
 
 
 namespace Lumix 
@@ -64,7 +65,7 @@ class PluginManagerImpl final : public PluginManager
 		}
 
 
-		void serialize(OutputBlob& serializer) override
+		void serialize(OutputMemoryStream& serializer) override
 		{
 			for (int i = 0, c = m_plugins.size(); i < c; ++i)
 			{
@@ -73,7 +74,7 @@ class PluginManagerImpl final : public PluginManager
 		}
 
 
-		void deserialize(InputBlob& serializer) override
+		void deserialize(InputMemoryStream& serializer) override
 		{
 			for (int i = 0, c = m_plugins.size(); i < c; ++i)
 			{

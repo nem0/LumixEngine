@@ -1,5 +1,4 @@
 #include "physics/physics_scene.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/job_system.h"
@@ -11,6 +10,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "physics/physics_geometry_manager.h"
@@ -1783,7 +1783,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void getRagdollData(EntityRef entity, OutputBlob& blob) override
+	void getRagdollData(EntityRef entity, OutputMemoryStream& blob) override
 	{
 		auto& ragdoll = m_ragdolls[entity];
 		serializeRagdollBone(ragdoll, ragdoll.root, blob);
@@ -1800,7 +1800,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void setRagdollData(EntityRef entity, InputBlob& blob) override
+	void setRagdollData(EntityRef entity, InputMemoryStream& blob) override
 	{
 		auto& ragdoll = m_ragdolls[entity];
 		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, blob));
@@ -3916,7 +3916,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void serializeActor(OutputBlob& serializer, RigidActor* actor)
+	void serializeActor(OutputMemoryStream& serializer, RigidActor* actor)
 	{
 		serializer.write(actor->layer);
 		auto* px_actor = actor->physx_actor;
@@ -3975,7 +3975,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void serialize(OutputBlob& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write(m_layers_count);
 		serializer.write(m_layers_names);
@@ -4053,7 +4053,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 	}
 
-	void serializeRagdollJoint(RagdollBone* bone, OutputBlob& serializer)
+	void serializeRagdollJoint(RagdollBone* bone, OutputMemoryStream& serializer)
 	{
 		serializer.write(bone->parent_joint != nullptr);
 		if (!bone->parent_joint) return;
@@ -4152,7 +4152,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializeRagdollJoint(bone, serializer);
 	}
 
-	void serializeRagdollBone(const Ragdoll& ragdoll, RagdollBone* bone, OutputBlob& serializer)
+	void serializeRagdollBone(const Ragdoll& ragdoll, RagdollBone* bone, OutputMemoryStream& serializer)
 	{
 		if (!bone)
 		{
@@ -4192,7 +4192,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeRagdollJoint(RagdollBone* bone, InputBlob& serializer)
+	void deserializeRagdollJoint(RagdollBone* bone, InputMemoryStream& serializer)
 	{
 		bool has_joint;
 		serializer.read(has_joint);
@@ -4330,7 +4330,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, InputBlob& serializer)
+	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, InputMemoryStream& serializer)
 	{
 		int pose_bone_idx;
 		serializer.read(pose_bone_idx);
@@ -4454,7 +4454,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void serializeRagdolls(OutputBlob& serializer)
+	void serializeRagdolls(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_ragdolls.size());
 		for (const Ragdoll& ragdoll : m_ragdolls)
@@ -4466,7 +4466,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void serializeVehicles(OutputBlob& serializer)
+	void serializeVehicles(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_vehicles.size());
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
@@ -4487,7 +4487,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void serializeJoints(OutputBlob& serializer)
+	void serializeJoints(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_joints.size());
 		for (int i = 0; i < m_joints.size(); ++i)
@@ -4549,7 +4549,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeActors(InputBlob& serializer)
+	void deserializeActors(InputMemoryStream& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -4607,7 +4607,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeControllers(InputBlob& serializer)
+	void deserializeControllers(InputMemoryStream& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -4649,7 +4649,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeVehicles(InputBlob& serializer)
+	void deserializeVehicles(InputMemoryStream& serializer)
 	{
 		const int vehicles_count = serializer.read<int>();
 		m_vehicles.rehash(vehicles_count);
@@ -4675,7 +4675,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeRagdolls(InputBlob& serializer)
+	void deserializeRagdolls(InputMemoryStream& serializer)
 	{
 		int count;
 		serializer.read(count);
@@ -4697,7 +4697,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeJoints(InputBlob& serializer)
+	void deserializeJoints(InputMemoryStream& serializer)
 	{
 		int count;
 		serializer.read(count);
@@ -4797,7 +4797,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserializeTerrains(InputBlob& serializer)
+	void deserializeTerrains(InputMemoryStream& serializer)
 	{
 		i32 count;
 		serializer.read(count);
@@ -4823,7 +4823,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(InputMemoryStream& serializer) override
 	{
 		serializer.read(m_layers_count);
 		serializer.read(m_layers_names);

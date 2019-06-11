@@ -1,8 +1,7 @@
 #include "engine/engine.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/job_system.h"
@@ -10,6 +9,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math_utils.h"
+#include "engine/os.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
@@ -391,7 +391,7 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 
 
-static FS::OSOutputFile g_error_file;
+static OS::OutputFile g_error_file;
 static bool g_is_error_file_open = false;
 
 
@@ -428,7 +428,7 @@ public:
 	void operator=(const EngineImpl&) = delete;
 	EngineImpl(const EngineImpl&) = delete;
 
-	EngineImpl(const char* working_dir, FS::FileSystem* fs, IAllocator& allocator)
+	EngineImpl(const char* working_dir, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
@@ -460,7 +460,7 @@ public:
 		luaL_openlibs(m_state);
 		registerLuaAPI();
 
-		m_file_system = FS::FileSystem::create(working_dir, m_allocator);
+		m_file_system = FileSystem::create(working_dir, m_allocator);
 
 		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
@@ -850,8 +850,8 @@ public:
 		auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
 		auto* path = LuaWrapper::checkArg<const char*>(L, 3);
 		if (!lua_isfunction(L, 4)) LuaWrapper::argError(L, 4, "function");
-		FS::FileSystem& fs = engine->getFileSystem();
-		FS::ContentCallback cb;
+		FileSystem& fs = engine->getFileSystem();
+		FileSystem::ContentCallback cb;
 		struct Callback
 		{
 			~Callback()
@@ -1189,7 +1189,7 @@ public:
 		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
 		if (m_input_system) InputSystem::destroy(*m_input_system);
-		FS::FileSystem::destroy(m_file_system);
+		FileSystem::destroy(m_file_system);
 
 		m_prefab_resource_manager.destroy();
 		lua_close(m_state);
@@ -1268,7 +1268,7 @@ public:
 	}
 
 
-	FS::FileSystem& getFileSystem() override { return *m_file_system; }
+	FileSystem& getFileSystem() override { return *m_file_system; }
 
 	void startGame(Universe& context) override
 	{
@@ -1433,7 +1433,7 @@ public:
 	}
 
 
-	u32 serialize(Universe& ctx, IOutputStream& serializer) override
+	u32 serialize(Universe& ctx, OutputMemoryStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
@@ -1442,7 +1442,7 @@ public:
 		serializePluginList(serializer);
 		serializerSceneVersions(serializer, ctx);
 		m_path_manager.serialize(serializer);
-		int pos = serializer.getPos();
+		int pos = (int)serializer.getPos();
 		ctx.serialize(serializer);
 		m_plugin_manager->serialize(serializer);
 		serializer.write((i32)ctx.getScenes().size());
@@ -1451,12 +1451,12 @@ public:
 			serializer.writeString(scene->getPlugin().getName());
 			scene->serialize(serializer);
 		}
-		u32 crc = crc32((const u8*)serializer.getData() + pos, serializer.getPos() - pos);
+		u32 crc = crc32((const u8*)serializer.getData() + pos, (int)serializer.getPos() - pos);
 		return crc;
 	}
 
 
-	bool deserialize(Universe& ctx, IInputStream& serializer) override
+	bool deserialize(Universe& ctx, InputMemoryStream& serializer) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
@@ -1572,7 +1572,7 @@ private:
 	IAllocator& m_allocator;
 	PageAllocator m_page_allocator;
 
-	FS::FileSystem* m_file_system;
+	FileSystem* m_file_system;
 
 	ResourceManagerHub m_resource_manager;
 	
@@ -1598,11 +1598,9 @@ private:
 };
 
 
-Engine* Engine::create(const char* working_dir,
-	FS::FileSystem* fs,
-	IAllocator& allocator)
+Engine* Engine::create(const char* working_dir, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, EngineImpl)(working_dir, fs, allocator);
+	return LUMIX_NEW(allocator, EngineImpl)(working_dir, allocator);
 }
 
 

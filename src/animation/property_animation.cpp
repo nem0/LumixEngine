@@ -67,9 +67,10 @@ bool PropertyAnimation::save(JsonSerializer& serializer)
 }
 
 
-bool PropertyAnimation::load(FS::IFile& file)
+bool PropertyAnimation::load(u64 size, const u8* mem)
 {
 	auto& manager = (PropertyAnimationManager&)getResourceManager();
+	InputMemoryStream file(mem, size);
 	JsonDeserializer serializer(file, getPath(), manager.getAllocator());
 	if (serializer.isError()) return false;
 	

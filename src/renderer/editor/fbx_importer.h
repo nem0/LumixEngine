@@ -2,11 +2,11 @@
 
 
 #include "engine/array.h"
-#include "engine/blob.h"
-#include "engine/fs/os_file.h"
 #include "engine/geometry.h"
 #include "engine/matrix.h"
+#include "engine/os.h"
 #include "engine/quat.h"
+#include "engine/stream.h"
 #include "engine/string.h"
 #include "ofbx.h"
 
@@ -122,7 +122,7 @@ struct FBXImporter
 		bool import_physics = false;
 		int lod = 0;
 		int submesh = -1;
-		OutputBlob vertex_data;
+		OutputMemoryStream vertex_data;
 		Array<int> indices;
 		AABB aabb;
 		float radius_squared;
@@ -150,7 +150,7 @@ private:
 	void sortBones();
 	void gatherBones(const ofbx::IScene& scene);
 	void gatherAnimations(const ofbx::IScene& scene);
-	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputBlob* blob) const;
+	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg);
 	void gatherMeshes(ofbx::IScene* scene);
 	
@@ -175,8 +175,8 @@ private:
 	int getAttributeCount(const ofbx::Mesh& mesh) const;
 	bool areIndices16Bit(const ImportMesh& mesh) const;
 	void writeModelHeader();
-	void writePhysicsHeader(FS::OsFile& file) const;
-	void writePhysicsTriMesh(FS::OsFile& file);
+	void writePhysicsHeader(OS::OutputFile& file) const;
+	void writePhysicsTriMesh(OS::OutputFile& file);
 	bool writePhysics(const char* basename, const char* output_dir);
 
 	
@@ -187,7 +187,7 @@ private:
 	Array<const ofbx::Object*> bones;
 	ofbx::IScene* scene;
 	float lods_distances[4] = {-10, -100, -1000, -10000};
-	FS::OsFile out_file;
+	OS::OutputFile out_file;
 	float time_scale = 1.0f;
 	float position_error = 0.1f;
 	float rotation_error = 0.01f;

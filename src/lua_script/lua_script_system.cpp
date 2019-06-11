@@ -2,7 +2,6 @@
 #include "animation/animation_scene.h"
 #include "engine/array.h"
 #include "engine/binary_array.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/debug/debug.h"
 #include "engine/engine.h"
@@ -16,6 +15,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
+#include "engine/stream.h"
 #include "engine/string.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
@@ -426,7 +426,7 @@ namespace Lumix
 		}
 
 
-		void getScriptData(EntityRef entity, OutputBlob& blob) override
+		void getScriptData(EntityRef entity, OutputMemoryStream& blob) override
 		{
 			auto* scr = m_scripts[entity];
 			blob.write(scr->m_scripts.size());
@@ -450,7 +450,7 @@ namespace Lumix
 		}
 
 
-		void setScriptData(EntityRef entity, InputBlob& blob) override
+		void setScriptData(EntityRef entity, InputMemoryStream& blob) override
 		{
 			auto* scr = m_scripts[entity];
 			int count;
@@ -600,7 +600,7 @@ namespace Lumix
 			LUMIX_FORCE_INLINE void get(const Reflection::Property<T>& prop)
 			{
 				T v;
-				OutputBlob blob(&v, sizeof(v));
+				OutputMemoryStream blob(&v, sizeof(v));
 				prop.getValue(cmp, -1, blob);
 				LuaWrapper::push(L, v);
 			}
@@ -617,7 +617,7 @@ namespace Lumix
 			void visit(const Reflection::Property<Path>& prop) override
 			{
 				char buf[1024];
-				OutputBlob blob(buf, sizeof(buf));
+				OutputMemoryStream blob(buf, sizeof(buf));
 				prop.getValue(cmp, -1, blob);
 				LuaWrapper::push(L, buf);
 			}
@@ -625,7 +625,7 @@ namespace Lumix
 			void visit(const Reflection::Property<const char*>& prop) override
 			{
 				char buf[1024];
-				OutputBlob blob(buf, sizeof(buf));
+				OutputMemoryStream blob(buf, sizeof(buf));
 				prop.getValue(cmp, -1, blob);
 				LuaWrapper::push(L, buf);
 			}
@@ -660,7 +660,7 @@ namespace Lumix
 			LUMIX_FORCE_INLINE void set(const Reflection::Property<T>& prop)
 			{
 				auto v = LuaWrapper::checkArg<T>(L, 3);
-				InputBlob blob(&v, sizeof(v));
+				InputMemoryStream blob(&v, sizeof(v));
 				prop.setValue(cmp, -1, blob);
 			}
 
@@ -676,14 +676,14 @@ namespace Lumix
 			void visit(const Reflection::Property<Path>& prop) override
 			{
 				auto* v = LuaWrapper::checkArg<const char*>(L, 3);
-				InputBlob blob(v, stringLength(v) + 1);
+				InputMemoryStream blob(v, stringLength(v) + 1);
 				prop.setValue(cmp, -1, blob);
 			}
 			
 			void visit(const Reflection::Property<const char*>& prop) override
 			{
 				auto* v = LuaWrapper::checkArg<const char*>(L, 3);
-				InputBlob blob(v, stringLength(v) + 1);
+				InputMemoryStream blob(v, stringLength(v) + 1);
 				prop.setValue(cmp, -1, blob);
 			}
 
@@ -1405,7 +1405,7 @@ namespace Lumix
 		}
 
 
-		void serialize(OutputBlob& serializer) override
+		void serialize(OutputMemoryStream& serializer) override
 		{
 			serializer.write(m_scripts.size());
 			for (auto iter = m_scripts.begin(), end = m_scripts.end(); iter != end; ++iter)
@@ -1439,7 +1439,7 @@ namespace Lumix
 		}
 
 
-		void deserialize(InputBlob& serializer) override
+		void deserialize(InputMemoryStream& serializer) override
 		{
 			int len = serializer.read<int>();
 			m_scripts.rehash(len);
@@ -1678,9 +1678,9 @@ namespace Lumix
 		{
 			if (!m_animation_scene) return;
 
-			InputBlob blob(m_animation_scene->getEventStream());
+			InputMemoryStream blob(m_animation_scene->getEventStream());
 			u32 lua_call_type = crc32("lua_call");
-			while (blob.getPosition() < blob.getSize())
+			while (blob.getPosition() < blob.size())
 			{
 				u32 type;
 				u8 size;
@@ -1829,7 +1829,7 @@ namespace Lumix
 		}
 
 
-		void serializeScript(EntityRef entity, int scr_index, OutputBlob& blob) override
+		void serializeScript(EntityRef entity, int scr_index, OutputMemoryStream& blob) override
 		{
 			auto& scr = m_scripts[entity]->m_scripts[scr_index];
 			blob.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
@@ -1853,7 +1853,7 @@ namespace Lumix
 		}
 
 
-		void deserializeScript(EntityRef entity, int scr_index, InputBlob& blob) override
+		void deserializeScript(EntityRef entity, int scr_index, InputMemoryStream& blob) override
 		{
 			auto& scr = m_scripts[entity]->m_scripts[scr_index];
 			int count;

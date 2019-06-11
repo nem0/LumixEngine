@@ -5,11 +5,10 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/disk_file_device.h"
-#include "engine/fs/os_file.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
+#include "engine/os.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
@@ -55,9 +54,9 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 		char full_path[MAX_PATH_LENGTH];
 		if (!OS::getSaveFilename(full_path, lengthOf(full_path), "Sprite\0*.spr\0", "spr")) return false;
 		
-		FS::OsFile file;
+		OS::OutputFile file;
 		WorldEditor& editor = app.getWorldEditor();
-		if (!file.open(full_path, FS::Mode::CREATE_AND_WRITE))
+		if (!file.open(full_path))
 		{
 			g_log_error.log("GUI") << "Failed to create " << full_path;
 			return false;
@@ -182,7 +181,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 
 	void saveSprite(Sprite& sprite)
 	{
-		if (FS::IFile* file = app.getAssetBrowser().beginSaveResource(sprite))
+		if (IOutputStream* file = app.getAssetBrowser().beginSaveResource(sprite))
 		{
 			JsonSerializer serializer(*file, sprite.getPath());
 			bool success = true;
@@ -333,7 +332,7 @@ private:
 		void set(GUIScene* scene, EntityRef e, const char* prop_name)
 		{
 			prop = Reflection::getProperty(GUI_RECT_TYPE, prop_name);
-			OutputBlob blob(&value, sizeof(value));
+			OutputMemoryStream blob(&value, sizeof(value));
 			prop->getValue({ e, GUI_RECT_TYPE, scene }, -1, blob);
 		}
 	} m_copy_position_buffer[8];

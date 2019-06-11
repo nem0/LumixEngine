@@ -13,9 +13,7 @@
 #include "engine/debug/debug.h"
 #include "engine/default_allocator.h"
 #include "engine/engine.h"
-#include "engine/fs/disk_file_device.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/input_system.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
@@ -283,7 +281,8 @@ public:
 
 		char data_dir_path[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
-		m_engine = Engine::create(current_dir, nullptr, m_allocator);
+		m_engine = Engine::create(current_dir, m_allocator);
+		m_engine->getFileSystem().setDataDir(data_dir_path);
 		createLua();
 
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
@@ -384,11 +383,11 @@ public:
 
 	bool makeFile(const char* path, const char* content) override
 	{
-		FS::OsFile file;
-		if (!file.open(path, FS::Mode::CREATE_AND_WRITE)) return false;
-		bool success = file.writeText(content);
+		OS::OutputFile file;
+		if (!file.open(path)) return false;
+		file << content;
 		file.close();
-		return success;
+		return file.isError();
 	}
 
 
@@ -1843,7 +1842,7 @@ public:
 
 		g_log_info.log("Editor") << "Trying to reload plugin " << m_watched_plugin.basename;
 
-		OutputBlob blob(m_allocator);
+		OutputMemoryStream blob(m_allocator);
 		blob.reserve(16 * 1024);
 		PluginManager& plugin_manager = m_editor->getEngine().getPluginManager();
 		void* lib = plugin_manager.getLibrary(m_watched_plugin.plugin);
@@ -1868,7 +1867,7 @@ public:
 			return;
 		}
 
-		InputBlob input_blob(blob);
+		InputMemoryStream input_blob(blob);
 		m_watched_plugin.plugin->createScenes(*universe);
 		for (IScene* scene : universe->getScenes())
 		{
@@ -2260,8 +2259,8 @@ public:
 				if (!parser.next()) break;
 				char tmp[MAX_PATH_LENGTH];
 				parser.getCurrent(tmp, lengthOf(tmp));
-				FS::OsFile file;
-				if (file.open(tmp, FS::Mode::OPEN_AND_READ))
+				OS::InputFile file;
+				if (file.open(tmp))
 				{
 					auto size = file.size();
 					auto* src = (char*)m_allocator.allocate(size + 1);
@@ -2440,8 +2439,8 @@ public:
 			return;
 		}
 
-		FS::OsFile file;
-		if (!file.open(dest, FS::Mode::CREATE_AND_WRITE))
+		OS::OutputFile file;
+		if (!file.open(dest))
 		{
 			g_log_error.log("Editor") << "Could not create " << dest;
 			return;
@@ -2465,9 +2464,9 @@ public:
 
 		for (auto& info : infos)
 		{
-			FS::OsFile src;
+			OS::InputFile src;
 			size_t src_size = OS::getFileSize(info.path);
-			if (!src.open(info.path, FS::Mode::OPEN_AND_READ))
+			if (!src.open(info.path))
 			{
 				file.close();
 				g_log_error.log("Editor") << "Could not open " << info.path;
@@ -2521,9 +2520,9 @@ public:
 	void loadLuaPlugin(const char* dir, const char* filename)
 	{
 		StaticString<MAX_PATH_LENGTH> path(dir, filename);
-		FS::OsFile file;
+		OS::InputFile file;
 
-		if (file.open(path, FS::Mode::OPEN_AND_READ))
+		if (file.open(path))
 		{
 			const int size = (int)file.size();
 			Array<u8> src(m_engine->getAllocator());

@@ -115,6 +115,23 @@ public:
 	}
 
 
+	void operator=(Array&& rhs)
+	{
+		ASSERT(&m_allocator == &rhs.m_allocator);
+		if (this != &rhs)
+		{
+			callDestructors(m_data, m_data + m_size);
+			m_allocator.deallocate_aligned(m_data);
+			m_data = rhs.m_data;
+			m_capacity = rhs.m_capacity;
+			m_size = rhs.m_size;
+			rhs.m_data = nullptr;
+			rhs.m_capacity = 0;
+			rhs.m_size = 0;
+		}
+	}
+
+
 	void free()
 	{
 		clear();

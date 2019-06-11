@@ -114,6 +114,12 @@ template <int size> struct StaticString
 
 	void operator=(const char* str) { copyString(data, str); }
 
+	void add(char value)
+	{
+		char tmp[2] = {value, 0};
+		catString(data, size, tmp);
+	}
+
 	void add(float value)
 	{
 		int len = stringLength(data);

@@ -3,10 +3,10 @@
 
 #include "engine/lumix.h"
 #include "engine/array.h"
-#include "engine/blob.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/simd.h"
+#include "engine/stream.h"
 
 
 namespace Lumix
@@ -41,7 +41,7 @@ public:
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
-	const OutputBlob& getBytecode() const { return m_bytecode; }
+	const OutputMemoryStream& getBytecode() const { return m_bytecode; }
 	int getEmitByteOffset() const { return m_emit_byte_offset; }
 	int getOutputByteOffset() const { return m_output_byte_offset; }
 	int getChannelsCount() const { return m_channels_count; }
@@ -51,7 +51,7 @@ public:
 	void setMaterial(const Path& path);
 
 private:
-	OutputBlob m_bytecode;
+	OutputMemoryStream m_bytecode;
 	int m_emit_byte_offset;
 	int m_output_byte_offset;
 	int m_channels_count;
@@ -72,8 +72,8 @@ public:
 	ParticleEmitter(EntityPtr entity, IAllocator& allocator);
 	~ParticleEmitter();
 
-	void serialize(OutputBlob& blob);
-	void deserialize(InputBlob& blob, ResourceManagerHub& manager);
+	void serialize(IOutputStream& blob);
+	void deserialize(IInputStream& blob, ResourceManagerHub& manager);
 	void update(float dt);
 	void emit(const float* args);
 	void fillInstanceData(const DVec3& cam_pos, float* data);
@@ -98,12 +98,12 @@ private:
 		float value = 0;
 	};
 
-	void execute(InputBlob& blob, int particle_index);
+	void execute(InputMemoryStream& blob, int particle_index);
 	void kill(int particle_index);
-	float readSingleValue(InputBlob& blob) const;
+	float readSingleValue(InputMemoryStream& blob) const;
 
 	IAllocator& m_allocator;
-	OutputBlob m_emit_buffer;
+	OutputMemoryStream m_emit_buffer;
 	Constant m_constants[16];
 	int m_constants_count = 0;
 	Channel m_channels[16];

@@ -1208,7 +1208,7 @@ struct GUISceneImpl final : public GUIScene
 	}
 
 
-	void serialize(OutputBlob& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write(m_rects.size());
 		for (GUIRect* rect : m_rects)
@@ -1252,7 +1252,7 @@ struct GUISceneImpl final : public GUIScene
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(InputMemoryStream& serializer) override
 	{
 		clear();
 		int count = serializer.read<int>();

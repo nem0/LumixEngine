@@ -2,10 +2,10 @@
 #include "animation/animation.h"
 #include "animation/controller.h"
 #include "animation/events.h"
-#include "engine/blob.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include <cmath>
@@ -19,13 +19,13 @@ namespace Anim
 {
 
 
-void Component::serialize(OutputBlob& blob)
+void Component::serialize(OutputMemoryStream& blob)
 {
 	blob.write(uid);
 }
 
 
-void Component::deserialize(InputBlob& blob, Container* parent, int version)
+void Component::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	blob.read(uid);
 }
@@ -123,7 +123,7 @@ ComponentInstance* Edge::createInstance(IAllocator& allocator)
 }
 
 
-void Edge::serialize(OutputBlob& blob)
+void Edge::serialize(OutputMemoryStream& blob)
 {
 	Component::serialize(blob);
 	blob.write(from ? from->uid : -1);
@@ -134,7 +134,7 @@ void Edge::serialize(OutputBlob& blob)
 }
 
 
-void Edge::deserialize(InputBlob& blob, Container* parent, int version)
+void Edge::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	Component::deserialize(blob, parent, version);
 	int uid;
@@ -171,7 +171,7 @@ Node::Node(ControllerResource& controller, Component::Type type, IAllocator& _al
 }
 
 
-void Node::serialize(OutputBlob& blob)
+void Node::serialize(OutputMemoryStream& blob)
 {
 	Component::serialize(blob);
 	blob.write(runtime_events.count);
@@ -195,7 +195,7 @@ void Node::serialize(OutputBlob& blob)
 }
 
 
-static void deserializeEventQueue(InputBlob& blob, int version, EventArray* events)
+static void deserializeEventQueue(InputMemoryStream& blob, int version, EventArray* events)
 {
 	blob.read(events->count);
 	if (events->count > 0)
@@ -222,7 +222,7 @@ static void deserializeEventQueue(InputBlob& blob, int version, EventArray* even
 }
 
 
-void Node::deserialize(InputBlob& blob, Container* parent, int version)
+void Node::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	Component::deserialize(blob, parent, version);
 	blob.read(runtime_events.count);
@@ -430,14 +430,14 @@ ComponentInstance* LayersNode::createInstance(IAllocator& allocator)
 }
 
 
-void LayersNode::serialize(OutputBlob& blob)
+void LayersNode::serialize(OutputMemoryStream& blob)
 {
 	Container::serialize(blob);
 	blob.write(masks, sizeof(masks));
 }
 
 
-void LayersNode::deserialize(InputBlob& blob, Container* parent, int version)
+void LayersNode::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	Container::deserialize(blob, parent, version);
 	blob.read(masks, sizeof(masks));
@@ -457,7 +457,7 @@ ComponentInstance* Blend1DNode::createInstance(IAllocator& allocator)
 }
 
 
-void Blend1DNode::serialize(OutputBlob& blob)
+void Blend1DNode::serialize(OutputMemoryStream& blob)
 {
 	Container::serialize(blob);
 	blob.write(items.size());
@@ -470,7 +470,7 @@ void Blend1DNode::serialize(OutputBlob& blob)
 }
 
 
-void Blend1DNode::deserialize(InputBlob& blob, Container* parent, int version)
+void Blend1DNode::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	Container::deserialize(blob, parent, version);
 	int count;
@@ -494,7 +494,7 @@ AnimationNode::AnimationNode(ControllerResource& controller, IAllocator& allocat
 }
 
 
-void AnimationNode::serialize(OutputBlob& blob)
+void AnimationNode::serialize(OutputMemoryStream& blob)
 {
 	Node::serialize(blob);
 	blob.write(animations_hashes.size());
@@ -510,7 +510,7 @@ void AnimationNode::serialize(OutputBlob& blob)
 }
 
 
-void AnimationNode::deserialize(InputBlob& blob, Container* parent, int version)
+void AnimationNode::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	Node::deserialize(blob, parent, version);
 
@@ -833,7 +833,7 @@ StateMachine::StateMachine(ControllerResource& controller, IAllocator& _allocato
 }
 
 
-void StateMachine::serialize(OutputBlob& blob)
+void StateMachine::serialize(OutputMemoryStream& blob)
 {
 	Container::serialize(blob);
 	blob.write(entries.size());
@@ -849,7 +849,7 @@ void StateMachine::serialize(OutputBlob& blob)
 }
 
 
-void StateMachine::deserialize(InputBlob& blob, Container* parent, int version)
+void StateMachine::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	Container::deserialize(blob, parent, version);
 	int count;
@@ -912,7 +912,7 @@ Component* Container::getByUID(int _uid)
 }
 
 
-void Container::serialize(OutputBlob& blob)
+void Container::serialize(OutputMemoryStream& blob)
 {
 	Node::serialize(blob);
 	blob.write(children.size());
@@ -924,7 +924,7 @@ void Container::serialize(OutputBlob& blob)
 }
 
 
-void Container::deserialize(InputBlob& blob, Container* parent, int version)
+void Container::deserialize(InputMemoryStream& blob, Container* parent, int version)
 {
 	Node::deserialize(blob, parent, version);
 	int size;

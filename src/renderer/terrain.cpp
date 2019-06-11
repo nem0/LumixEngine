@@ -1,6 +1,6 @@
 #include "terrain.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
@@ -8,7 +8,7 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/engine.h"
+#include "engine/stream.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
@@ -407,7 +407,7 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene& scene)
+void Terrain::deserialize(IInputStream& serializer, Universe& universe, RenderScene& scene)
 {
 	serializer.read(m_entity);
 	serializer.read(m_layer_mask);
@@ -440,7 +440,7 @@ void Terrain::deserialize(InputBlob& serializer, Universe& universe, RenderScene
 }
 
 	
-void Terrain::serialize(OutputBlob& serializer)
+void Terrain::serialize(IOutputStream& serializer)
 {
 	serializer.write(m_entity);
 	serializer.write(m_layer_mask);

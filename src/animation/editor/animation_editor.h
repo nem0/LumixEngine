@@ -46,7 +46,7 @@ public:
 	
 	virtual ~IAnimationEditor() {}
 	virtual IAllocator& getAllocator() = 0;
-	virtual OutputBlob& getCopyBuffer() = 0;
+	virtual OutputMemoryStream& getCopyBuffer() = 0;
 	virtual void executeCommand(IEditorCommand& command) = 0;
 	virtual void setContainer(Container* container) = 0;
 	virtual bool isEditorOpen() = 0;

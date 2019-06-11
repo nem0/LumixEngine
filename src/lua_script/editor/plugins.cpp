@@ -7,17 +7,17 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/array.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/file_system.h"
-#include "engine/fs/os_file.h"
+#include "engine/file_system.h"
 #include "engine/iallocator.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/reflection.h"
+#include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "lua_script/lua_script_manager.h"
@@ -138,7 +138,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 		bool merge(IEditorCommand& command) override { return false; }
 
 
-		OutputBlob blob;
+		OutputMemoryStream blob;
 		LuaScriptScene* scene;
 		EntityPtr entity;
 		int scr_index;
@@ -180,7 +180,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 		{
 			if (entity.isValid()) {
 				scene->insertScript((EntityRef)entity, scr_index);
-				InputBlob input(blob);
+				InputMemoryStream input(blob);
 				scene->deserializeScript((EntityRef)entity, scr_index, input);
 			}
 		}
@@ -205,7 +205,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 
 		bool merge(IEditorCommand& command) override { return false; }
 
-		OutputBlob blob;
+		OutputMemoryStream blob;
 		LuaScriptScene* scene;
 		EntityPtr entity;
 		int scr_index;
@@ -567,8 +567,8 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
 		if (ImGui::Button("Save"))
 		{
-			FS::OSFileStream file;
-			if (!file.open(resource->getPath(), FS::Mode::CREATE_AND_WRITE))
+			OS::OutputFile file;
+			if (!file.open(resource->getPath().c_str()))
 			{
 				g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
 				return;
@@ -770,9 +770,9 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 				char tmp[MAX_PATH_LENGTH];
 				if (OS::getOpenFilename(tmp, MAX_PATH_LENGTH, "Scripts\0*.lua\0", nullptr))
 				{
-					FS::OsFile file;
+					OS::InputFile file;
 					IAllocator& allocator = app.getWorldEditor().getAllocator();
-					if (file.open(tmp, FS::Mode::OPEN_AND_READ))
+					if (file.open(tmp))
 					{
 						size_t size = file.size();
 						Array<char> data(allocator);
@@ -884,9 +884,9 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 			char full_path[MAX_PATH_LENGTH];
 			if (OS::getSaveFilename(full_path, lengthOf(full_path), "Lua script\0*.lua\0", "lua"))
 			{
-				FS::OsFile file;
+				OS::OutputFile file;
 				WorldEditor& editor = app.getWorldEditor();
-				if (file.open(full_path, FS::Mode::CREATE_AND_WRITE))
+				if (file.open(full_path))
 				{
 					new_created = true;
 					editor.makeRelative(buf, lengthOf(buf), full_path);

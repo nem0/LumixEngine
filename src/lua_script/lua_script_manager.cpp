@@ -1,7 +1,7 @@
 #include "lua_script_manager.h"
 
 #include "engine/log.h"
-#include "engine/fs/file_system.h"
+#include "engine/file_system.h"
 
 
 namespace Lumix
@@ -27,7 +27,7 @@ void LuaScript::unload()
 }
 
 
-bool LuaScript::load(u64 size, void* mem)
+bool LuaScript::load(u64 size, const u8* mem)
 {
 	m_source_code.set((const char*)mem, (int)size);
 	m_size = size;

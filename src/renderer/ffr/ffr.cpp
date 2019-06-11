@@ -1,10 +1,10 @@
 #include "ffr.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/math_utils.h"
 #include "engine/mt/sync.h"
+#include "engine/stream.h"
 #include <Windows.h>
 #include <gl/GL.h>
 #include "renderdoc_app.h"
@@ -1417,7 +1417,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	checkThread();
 	DDS::Header hdr;
 
-	InputBlob blob(input, input_size);
+	InputMemoryStream blob(input, input_size);
 	blob.read(&hdr, sizeof(hdr));
 
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
