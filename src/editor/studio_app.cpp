@@ -390,7 +390,7 @@ public:
 	bool makeFile(const char* path, const char* content) override
 	{
 		OS::OutputFile file;
-		if (!file.open(path)) return false;
+		if (!m_engine->getFileSystem().open(path, &file)) return false;
 		file << content;
 		file.close();
 		return file.isError();
@@ -2282,7 +2282,7 @@ public:
 				char tmp[MAX_PATH_LENGTH];
 				parser.getCurrent(tmp, lengthOf(tmp));
 				OS::InputFile file;
-				if (file.open(tmp))
+				if (m_engine->getFileSystem().open(tmp, &file))
 				{
 					auto size = file.size();
 					auto* src = (char*)m_allocator.allocate(size + 1);
@@ -2336,7 +2336,7 @@ public:
 
 	void packDataScan(const char* dir_path, AssociativeArray<u32, PackFileInfo>& infos)
 	{
-		auto* iter = OS::createFileIterator(dir_path, m_allocator);
+		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
 		OS::FileInfo info;
 		while (OS::getNextFile(iter, &info))
 		{
@@ -2488,7 +2488,7 @@ public:
 		{
 			OS::InputFile src;
 			size_t src_size = OS::getFileSize(info.path);
-			if (!src.open(info.path))
+			if (!m_editor->getEngine().getFileSystem().open(info.path, &src))
 			{
 				file.close();
 				g_log_error.log("Editor") << "Could not open " << info.path;
@@ -2544,7 +2544,7 @@ public:
 		StaticString<MAX_PATH_LENGTH> path(dir, filename);
 		OS::InputFile file;
 
-		if (file.open(path))
+		if (m_engine->getFileSystem().open(path, &file))
 		{
 			const int size = (int)file.size();
 			Array<u8> src(m_engine->getAllocator());
@@ -2568,15 +2568,7 @@ public:
 	void scanUniverses()
 	{
 		m_universes.clear();
-		const char* data_dir = m_engine->getFileSystem().getBasePath();
-		StaticString<MAX_PATH_LENGTH> unv_path;
-		if (data_dir[0]) {
-			unv_path << data_dir << "universes";
-		}
-		else {
-			unv_path << "universes";
-		}
-		auto* iter = OS::createFileIterator(unv_path, m_allocator);
+		auto* iter = m_engine->getFileSystem().createFileIterator("universes");
 		OS::FileInfo info;
 		while (OS::getNextFile(iter, &info))
 		{
@@ -2594,7 +2586,7 @@ public:
 
 	void findLuaPlugins(const char* dir)
 	{
-		auto* iter = OS::createFileIterator(dir, m_allocator);
+		auto* iter = m_engine->getFileSystem().createFileIterator(dir);
 		OS::FileInfo info;
 		while (OS::getNextFile(iter, &info))
 		{

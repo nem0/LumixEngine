@@ -567,8 +567,9 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
 		if (ImGui::Button("Save"))
 		{
+			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 			OS::OutputFile file;
-			if (!file.open(resource->getPath().c_str()))
+			if (!fs.open(resource->getPath().c_str(), &file))
 			{
 				g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
 				return;

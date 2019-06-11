@@ -106,8 +106,9 @@ struct AssetCompilerImpl : AssetCompiler
 	~AssetCompilerImpl()
 	{
 		OS::OutputFile file;
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		// TODO make this safe - i.e. handle case when program gets interrupted while writing the file
-		if (file.open(".lumix/assets/_list.txt")) {
+		if (fs.open(".lumix/assets/_list.txt", &file)) {
 			file << "resources = {\n";
 			for (auto& i : m_resources) {
 				for (const Path& j : i) {
@@ -191,7 +192,8 @@ struct AssetCompilerImpl : AssetCompiler
 	
 	void processDir(const char* dir, int base_length, u64 list_last_modified)
 	{
-		auto* iter = OS::createFileIterator(dir, m_app.getWorldEditor().getAllocator());
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		auto* iter = fs.createFileIterator(dir);
 		OS::FileInfo info;
 		while (getNextFile(iter, &info))
 		{
@@ -238,7 +240,8 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		OS::InputFile file;
 		const char* list_path = ".lumix/assets/_list.txt";
-		if(file.open(list_path)) {
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (fs.open(list_path, &file)) {
 			Array<char> content(m_app.getWorldEditor().getAllocator());
 			content.resize((int)file.size());
 			file.read(content.begin(), content.byte_size());
@@ -365,7 +368,8 @@ struct AssetCompilerImpl : AssetCompiler
 		OS::InputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 		
-		if (!file.open(meta_path)) return nullptr;
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (!fs.open(meta_path, &file)) return nullptr;
 
 		Array<char> buf(m_app.getWorldEditor().getAllocator());
 		buf.resize((int)file.size());
@@ -401,7 +405,8 @@ struct AssetCompilerImpl : AssetCompiler
 		OS::OutputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 				
-		if (!file.open(meta_path)) {
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (!fs.open(meta_path, &file)) {
 			g_log_error.log("Editor") << "Could not create " << meta_path;
 			return;
 		}

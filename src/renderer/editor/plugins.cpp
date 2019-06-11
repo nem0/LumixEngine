@@ -1136,6 +1136,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		void execute() {
 			IAllocator& allocator = m_allocator;
 
+			// TODO base path
+			ASSERT(false);
+
+
 			int image_width, image_height;
 			u32 hash = crc32(m_in_path);
 			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
@@ -1304,8 +1308,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		OS::InputFile srcf;
 		OS::OutputFile dstf;
-		if (!srcf.open(src.c_str())) return false;
-		if (!dstf.open(dst)) {
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (!fs.open(src.c_str(), &srcf)) return false;
+		if (!fs.open(dst, &dstf)) {
 			srcf.close();
 			return false;
 		}
