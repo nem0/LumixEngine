@@ -279,10 +279,9 @@ public:
 		char current_dir[MAX_PATH_LENGTH];
 		OS::getCurrentDirectory(current_dir, lengthOf(current_dir));
 
-		char data_dir_path[MAX_PATH_LENGTH] = {};
-		checkDataDirCommandLine(data_dir_path, lengthOf(data_dir_path));
-		m_engine = Engine::create(current_dir, m_allocator);
-		m_engine->getFileSystem().setDataDir(data_dir_path);
+		char data_dir[MAX_PATH_LENGTH] = {};
+		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
+		m_engine = Engine::create(data_dir[0] ? data_dir : current_dir, m_allocator);
 		createLua();
 
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
@@ -758,11 +757,22 @@ public:
 			right_pos.x += half_size.x + ImGui::GetStyle().FramePadding.x;
 			if (ImGui::BeginChild("left", half_size, true))
 			{
-				if (ImGui::Button("New Universe")) m_is_welcome_screen_open = false;
-
+				ImGui::Text("Working directory: %s", m_engine->getFileSystem().getBasePath());
+				ImGui::SameLine();
+				if (ImGui::Button("Change...")) {
+					char dir[MAX_PATH_LENGTH];
+					if (OS::getOpenDirectory(dir, lengthOf(dir), ".")) {
+						m_engine->getFileSystem().setBasePath(dir);
+						scanUniverses();
+					}
+				}
 				ImGui::Separator();
+				if (ImGui::Button("New universe")) m_is_welcome_screen_open = false;
 				ImGui::Text("Open universe:");
 				ImGui::Indent();
+				if(m_universes.empty()) {
+					ImGui::Text("No universes found");
+				}
 				for (auto& univ : m_universes)
 				{
 					if (ImGui::MenuItem(univ.data))
@@ -2546,7 +2556,15 @@ public:
 	void scanUniverses()
 	{
 		m_universes.clear();
-		auto* iter = OS::createFileIterator("universes/", m_allocator);
+		const char* data_dir = m_engine->getFileSystem().getBasePath();
+		StaticString<MAX_PATH_LENGTH> unv_path;
+		if (data_dir[0]) {
+			unv_path << data_dir << "universes";
+		}
+		else {
+			unv_path << "universes";
+		}
+		auto* iter = OS::createFileIterator(unv_path, m_allocator);
 		OS::FileInfo info;
 		while (OS::getNextFile(iter, &info))
 		{
