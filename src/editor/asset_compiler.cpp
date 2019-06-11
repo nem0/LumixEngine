@@ -441,6 +441,8 @@ struct AssetCompilerImpl : AssetCompiler
 		const char* filepath = getResourceFilePath(res.getPath().c_str());
 
 		if (!OS::fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
+		if (startsWith(filepath, ".lumix/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
+
 		const u32 hash = res.getPath().getHash();
 		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
 		const PathUtils::FileInfo info(filepath);
