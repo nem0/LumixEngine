@@ -274,14 +274,21 @@ public:
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
 
-		checkWorkingDirector();
+		checkWorkingDirectory();
+
+		char saved_data_dir[MAX_PATH_LENGTH] = {};
+		OS::InputFile cfg_file;
+		if (cfg_file.open(".lumixuser")) {
+			cfg_file.read(saved_data_dir, Math::minimum(lengthOf(saved_data_dir), (int)cfg_file.size()));
+			cfg_file.close();
+		}
 
 		char current_dir[MAX_PATH_LENGTH];
 		OS::getCurrentDirectory(current_dir, lengthOf(current_dir));
 
 		char data_dir[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
-		m_engine = Engine::create(data_dir[0] ? data_dir : current_dir, m_allocator);
+		m_engine = Engine::create(data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir), m_allocator);
 		createLua();
 
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
@@ -762,6 +769,11 @@ public:
 				if (ImGui::Button("Change...")) {
 					char dir[MAX_PATH_LENGTH];
 					if (OS::getOpenDirectory(dir, lengthOf(dir), ".")) {
+						OS::OutputFile cfg_file;
+						if (cfg_file.open(".lumixuser")) {
+							cfg_file << dir;
+							cfg_file.close();
+						}
 						m_engine->getFileSystem().setBasePath(dir);
 						scanUniverses();
 					}
@@ -2620,7 +2632,7 @@ public:
 	Vec2 getMouseMove() const override { return m_mouse_move; }
 
 
-	static void checkWorkingDirector()
+	static void checkWorkingDirectory()
 	{
 		if (!OS::fileExists("../LumixStudio.lnk")) return;
 
@@ -2734,7 +2746,6 @@ public:
 	Debug::Allocator m_allocator;
 	Engine* m_engine;
 	OS::WindowHandle m_window;
-
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
 	Array<Action*> m_toolbar_actions;
