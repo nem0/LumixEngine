@@ -15,7 +15,6 @@ class Engine;
 struct Font;
 struct FontAtlas;
 class FontManager;
-class LIFOAllocator;
 class MaterialManager;
 class ModelManager;
 class Path;

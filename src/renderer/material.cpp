@@ -7,7 +7,6 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"

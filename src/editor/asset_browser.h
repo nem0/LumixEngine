@@ -12,8 +12,6 @@
 namespace Lumix
 {
 
-namespace FS { struct IFile; }
-
 class Material;
 class WorldEditor;
 struct Action;

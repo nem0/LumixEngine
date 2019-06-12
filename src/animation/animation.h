@@ -7,12 +7,6 @@
 namespace Lumix
 {
 
-namespace FS
-{
-	class FileSystem;
-	struct IFile;
-}
-
 class Model;
 struct Pose;
 struct Quat;

@@ -18,7 +18,6 @@ struct AABB;
 class Engine;
 struct Frustum;
 struct IAllocator;
-class LIFOAllocator;
 class Material;
 struct Mesh;
 class Model;

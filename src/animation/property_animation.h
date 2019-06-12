@@ -8,12 +8,6 @@ namespace Lumix
 {
 
 
-namespace FS
-{
-	class FileSystem;
-	struct IFile;
-}
-
 namespace Reflection
 {
 	struct  PropertyBase;

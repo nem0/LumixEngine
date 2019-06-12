@@ -28,7 +28,6 @@
 #include "renderer.h"
 #include "render_scene.h"
 #include "shader.h"
-#include "shader_manager.h"
 #include "terrain.h"
 #include "texture.h"
 #include "texture_manager.h"

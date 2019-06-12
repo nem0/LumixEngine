@@ -22,7 +22,6 @@
 #include "renderer/culling_system.h"
 #include "renderer/font_manager.h"
 #include "renderer/material.h"
-#include "renderer/material_manager.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
 #include "renderer/pipeline.h"
@@ -257,7 +256,7 @@ public:
 	void clear() override
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
+		auto* material_manager = rm.get(Material::TYPE);
 
 		
 		for (TextMesh* text_mesh : m_text_meshes)
@@ -3329,7 +3328,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void modelLoaded(Model* model, EntityRef entity)
 	{
 		auto& rm = m_engine.getResourceManager();
-		auto* material_manager = static_cast<MaterialManager*>(rm.get(Material::TYPE));
 
 		auto& r = m_model_instances[entity.index];
 
@@ -3486,7 +3484,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		if (old_model)
 		{
 			auto& rm = old_model->getResourceManager();
-			auto* material_manager = static_cast<MaterialManager*>(rm.getOwner().get(Material::TYPE));
 			
 			removeFromModelEntityMap(old_model, entity);
 

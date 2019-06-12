@@ -70,12 +70,6 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 };
 
 
-namespace FS
-{
-class FileSystem;
-}
-
-
 class Animation;
 class Engine;
 class JsonSerializer;

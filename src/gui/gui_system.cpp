@@ -15,7 +15,6 @@
 #include "gui/sprite_manager.h"
 #include "renderer/font_manager.h"
 #include "renderer/material.h"
-#include "renderer/material_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/render_scene.h"

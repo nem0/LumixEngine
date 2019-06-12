@@ -42,12 +42,6 @@ static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_
 static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
 
 
-namespace FS
-{
-class FileSystem;
-}
-
-
 class Animation;
 class Engine;
 class JsonSerializer;
