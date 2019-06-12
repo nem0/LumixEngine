@@ -269,8 +269,7 @@ TraceTask::TraceTask(IAllocator& allocator)
 
 
 int TraceTask::task() {
-	ULONG res = ProcessTrace(&open_handle, 1, nullptr, nullptr);
-	res = res;
+	ProcessTrace(&open_handle, 1, nullptr, nullptr);
 	return 0;
 }
 

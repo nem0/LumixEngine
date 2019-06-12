@@ -476,18 +476,16 @@ void Material::onBeforeReady()
 	m_texture_count = Math::minimum(m_texture_count, m_shader->m_texture_slot_count);
 
 	
-	if(m_shader != nullptr) {
-		m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);
-		m_render_data->color = m_color;
-		m_render_data->emission = m_emission;
-		m_render_data->metallic = m_metallic;
-		m_render_data->render_states = m_render_states;
-		m_render_data->roughness = m_roughness;
-		m_render_data->shader = m_shader->m_render_data;
-		m_render_data->textures_count = m_texture_count;
-		for(int i = 0; i < m_texture_count; ++i) {
-			m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : ffr::INVALID_TEXTURE;
-		}
+	m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);
+	m_render_data->color = m_color;
+	m_render_data->emission = m_emission;
+	m_render_data->metallic = m_metallic;
+	m_render_data->render_states = m_render_states;
+	m_render_data->roughness = m_roughness;
+	m_render_data->shader = m_shader->m_render_data;
+	m_render_data->textures_count = m_texture_count;
+	for(int i = 0; i < m_texture_count; ++i) {
+		m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : ffr::INVALID_TEXTURE;
 	}
 }
 

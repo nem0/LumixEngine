@@ -992,7 +992,7 @@ namespace Lumix
 				allocator.deallocate(ptr);
 				return nullptr;
 			}
-			if (nsize > 0 && ptr == nullptr) return allocator.allocate(nsize);
+			if (ptr == nullptr) return allocator.allocate(nsize);
 
 			void* new_mem = allocator.allocate(nsize);
 			copyMemory(new_mem, ptr, Math::minimum(osize, nsize));

@@ -51,8 +51,8 @@ template <typename F>
 void forEach(uint count, F& f)
 {
 	struct Data {
-		volatile i32 offset = 0;
 		F* f;
+		volatile i32 offset = 0;
 		uint count;
 	} data;
 	data.count = count;

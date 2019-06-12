@@ -1770,7 +1770,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	serializer.write("cmp_end", 0);
 
 	for(int i  = 0; i < meshes.size(); ++i) {
-		serializer.write("prefab", prefab | ((u64)(i + 1) << 32));
+		serializer.write("prefab", prefab | (((u64)i + 1) << 32));
 		const EntityRef root = {0};		
 		serializer.write("parent", root);
 		static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
