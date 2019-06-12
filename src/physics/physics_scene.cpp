@@ -4554,7 +4554,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		i32 count;
 		serializer.read(count);
 		m_actors.rehash(count);
-		for (int i = 0; i < count; ++i) {
+		for (int j = 0; j < count; ++j) {
 			EntityRef entity;
 			serializer.read(entity);
 			RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
@@ -4569,8 +4569,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC
 				? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform)
 				: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
-			int count = serializer.read<int>();
-			for (int i = 0; i < count; ++i)
+			int geoms_count = serializer.read<int>();
+			for (int i = 0; i < geoms_count; ++i)
 			{
 				int type = serializer.read<int>();
 				int index = serializer.read<int>();
@@ -4973,7 +4973,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			{
 				PxFilterData fd0 = shape->getSimulationFilterData();
 				PxFilterData fd1 = controller.m_filter_data;
-				if (!(fd0.word0 & fd1.word1) || !(fd0.word0 & fd1.word1)) return PxQueryHitType::eNONE;
+				if (!(fd0.word0 & fd1.word1) || !(fd0.word1 & fd1.word0)) return PxQueryHitType::eNONE;
 				return PxQueryHitType::eBLOCK;
 			}
 

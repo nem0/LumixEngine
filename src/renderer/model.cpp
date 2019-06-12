@@ -302,8 +302,6 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 				vertex_decl->addAttribute(2, ffr::AttributeType::FLOAT, false, false);
 				break;
 			case Mesh::AttributeSemantic::NORMAL:
-				vertex_decl->addAttribute(4, ffr::AttributeType::U8, true, true);
-				break;
 			case Mesh::AttributeSemantic::TANGENT:
 				vertex_decl->addAttribute(4, ffr::AttributeType::U8, true, true);
 				break;

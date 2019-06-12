@@ -3363,10 +3363,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		while (m_mesh_sort_data.size() < m_model_instances.size()) {
 			m_mesh_sort_data.emplace();
 		}
-		if(r.meshes) {
-			m_mesh_sort_data[entity.index].layer = r.meshes[0].layer;
-			m_mesh_sort_data[entity.index].sort_key = r.meshes[0].sort_key;
-		}
+		m_mesh_sort_data[entity.index].layer = r.meshes[0].layer;
+		m_mesh_sort_data[entity.index].sort_key = r.meshes[0].sort_key;
 	}
 
 
