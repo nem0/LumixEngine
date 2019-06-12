@@ -4,7 +4,6 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "renderer/texture.h"
-#include "renderer/texture_manager.h"
 #include "renderer/renderer.h"
 
 

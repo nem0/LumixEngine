@@ -11,12 +11,6 @@ namespace Lumix
 {
 
 
-template <typename T> class DelegateList;
-
-
-namespace Fiber { enum class SwitchReason; }
-
-
 namespace Profiler
 {
 

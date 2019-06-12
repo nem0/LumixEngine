@@ -9,7 +9,6 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "renderer/renderer.h"
-#include "renderer/shader_manager.h"
 #include "renderer/texture.h"
 #include <lua.hpp>
 #include <lauxlib.h>

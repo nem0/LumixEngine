@@ -13,10 +13,6 @@ struct lua_State;
 namespace Lumix
 {
 
-namespace FS
-{
-struct IFile;
-}
 
 class Renderer;
 struct ShaderRenderData;

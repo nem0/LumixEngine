@@ -371,7 +371,7 @@ static void flipVertical(u32* image, int width, int height)
 }
 
 
-bool Texture::loadTGA(IInputStream& file, TGAHeader& header, Array<u8>& data, const char* path)
+static bool loadTGA(IInputStream& file, TGAHeader& header, Array<u8>& data, const char* path)
 {
 	PROFILE_FUNCTION();
 	file.read(&header, sizeof(header));

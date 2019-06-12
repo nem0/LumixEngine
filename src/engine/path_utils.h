@@ -16,22 +16,6 @@ namespace PathUtils
 	LUMIX_ENGINE_API bool hasExtension(const char* filename, const char* ext);
 	LUMIX_ENGINE_API bool replaceExtension(char* path, const char* ext);
 	LUMIX_ENGINE_API bool isAbsolute(const char* path);
-		
-
-	struct LUMIX_ENGINE_API PathDirectory
-	{
-		explicit PathDirectory(const char* path)
-		{
-			getDir(m_dir, sizeof(m_dir), path);
-		}
-
-		operator const char*()
-		{
-			return m_dir;
-		}
-
-		char m_dir[MAX_PATH_LENGTH];
-	};
 
 
 	struct LUMIX_ENGINE_API FileInfo

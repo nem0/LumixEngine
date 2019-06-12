@@ -10,10 +10,6 @@ namespace Lumix
 struct IInputStream;
 struct IOutputStream;
 class Renderer;
-namespace FS
-{
-	class FileSystem;
-}
 
 #pragma pack(1)
 struct TGAHeader
@@ -73,7 +69,6 @@ class LUMIX_RENDERER_API Texture final : public Resource
 			const u8* image_dest,
 			const Path& path,
 			IAllocator& allocator);
-		static bool loadTGA(IInputStream& file, TGAHeader& header, Array<u8>& data, const char* path);
 
 		static const ResourceType TYPE;
 

@@ -29,13 +29,6 @@ class ResourceManagerHub;
 class InputMemoryStream;
 
 
-namespace FS
-{
-class FileSystem;
-struct IFile;
-}
-
-
 struct LUMIX_RENDERER_API RayCastModelHit
 {
 	bool is_hit;
