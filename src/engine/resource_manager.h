@@ -48,7 +48,7 @@ protected:
 	virtual void destroyResource(Resource& resource) = 0;
 	Resource* get(const Path& path);
 
-private:
+protected:
 	IAllocator& m_allocator;
 	ResourceTable m_resources;
 	ResourceManagerHub* m_owner;

@@ -22,7 +22,6 @@ class Texture;
 
 class LUMIX_RENDERER_API Material final : public Resource
 {
-	friend class MaterialManager;
 public:
 	static const int MAX_TEXTURE_COUNT = 16;
 

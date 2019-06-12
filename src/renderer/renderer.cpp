@@ -21,14 +21,11 @@
 #include "renderer/draw2d.h"
 #include "renderer/font_manager.h"
 #include "renderer/material.h"
-#include "renderer/material_manager.h"
 #include "renderer/model.h"
-#include "renderer/model_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
-#include "renderer/shader_manager.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
@@ -61,6 +58,28 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 enum { TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024 };
 
 
+template <typename T>
+struct RenderResourceManager : public ResourceManager
+{
+	RenderResourceManager(Renderer& renderer, IAllocator& allocator) 
+		: ResourceManager(allocator)
+		, m_renderer(renderer)
+	{}
+
+
+	Resource* createResource(const Path& path) override
+	{
+		return LUMIX_NEW(m_allocator, T)(path, *this, m_renderer, m_allocator);
+	}
+
+
+	void destroyResource(Resource& resource) override
+	{
+		LUMIX_DELETE(m_allocator, &resource);
+	}
+
+	Renderer& m_renderer;
+};
 
 
 struct GPUProfiler
@@ -865,9 +884,6 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ModelManager& getModelManager() override { return m_model_manager; }
-	MaterialManager& getMaterialManager() override { return m_material_manager; }
-	ShaderManager& getShaderManager() override { return m_shader_manager; }
 	TextureManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
 // TODO
@@ -992,10 +1008,10 @@ struct RendererImpl final : public Renderer
 	TextureManager m_texture_manager;
 	PipelineResourceManager m_pipeline_manager;
 	ParticleEmitterResourceManager m_particle_emitter_manager;
-	MaterialManager m_material_manager;
 	FontManager* m_font_manager;
-	ShaderManager m_shader_manager;
-	ModelManager m_model_manager;
+	RenderResourceManager<Material> m_material_manager;
+	RenderResourceManager<Model> m_model_manager;
+	RenderResourceManager<Shader> m_shader_manager;
 	bool m_vsync;
 	Pipeline* m_main_pipeline;
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
