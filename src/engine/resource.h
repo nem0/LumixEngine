@@ -43,6 +43,7 @@ public:
 	typedef DelegateList<void(State, State, Resource&)> ObserverCallback;
 
 public:
+	virtual ~Resource();
 	virtual ResourceType getType() const = 0;
 	State getState() const { return m_current_state; }
 
@@ -66,7 +67,6 @@ public:
 
 protected:
 	Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
-	virtual ~Resource();
 
 	virtual void onBeforeReady() {}
 	virtual void onBeforeEmpty() {}

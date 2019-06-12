@@ -3766,8 +3766,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	m_model_instances.reserve(5000);
 	m_mesh_sort_data.reserve(5000);
 
-	MaterialManager& manager = m_renderer.getMaterialManager();
-
 	m_render_cmps_mask = 0;
 	for (auto& i : COMPONENT_INFOS)
 	{
