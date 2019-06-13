@@ -1,6 +1,6 @@
 #include "engine/engine.h"
 #include "engine/crc32.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/file_system.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
@@ -8,7 +8,7 @@
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
@@ -733,7 +733,7 @@ public:
 			else if (equalStrings(parameter_name, "pitch"))
 			{
 				const float angle = LuaWrapper::toType<float>(L, -1);
-				const Quat rot(Vec3(1, 0, 0), Math::degreesToRadians(angle)); 
+				const Quat rot(Vec3(1, 0, 0), degreesToRadians(angle)); 
 				ctx->setRotation(e, rot);
 			}
 			else if (equalStrings(parameter_name, "rotation"))
@@ -1310,7 +1310,7 @@ public:
 
 	void setTimeMultiplier(float multiplier) override
 	{
-		m_time_multiplier = Math::maximum(multiplier, 0.001f);
+		m_time_multiplier = maximum(multiplier, 0.001f);
 	}
 
 

@@ -8,10 +8,7 @@
 #include "engine/universe/component.h"
 
 
-#define LUMIX_PROP_FULL(Scene, Getter, Setter) \
-	&Scene::Getter, #Scene "::" #Getter, &Scene::Setter, #Scene "::" #Setter
-#define LUMIX_PROP(Scene, Property) \
-	&Scene::get##Property, #Scene "::get" #Property, &Scene::set##Property, #Scene "::set" #Property
+#define LUMIX_PROP(Scene, Property) &Scene::get##Property, &Scene::set##Property
 #define LUMIX_ENUM_VALUE(value) EnumValue(#value, (int)value)
 #define LUMIX_FUNC(Func)\
 	&Func, #Func
@@ -69,8 +66,6 @@ struct PropertyBase
 	virtual void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const = 0;
 
 	const char* name;
-	const char* getter_code = "";
-	const char* setter_code = "";
 };
 
 
@@ -479,6 +474,37 @@ struct BlobProperty : IBlobProperty
 	Tuple<Attributes...> attributes;
 	Getter getter;
 	Setter setter;
+};
+
+
+template <typename T, typename CmpGetter, typename PtrType, typename... Attributes>
+struct VarProperty : Property<T>
+{
+	void visit(IAttributeVisitor& visitor) const override
+	{
+		apply([&](auto& x) { visitor.visit(x); }, attributes);
+	}
+
+	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
+	{
+		using C = typename ClassOf<CmpGetter>::Type;
+		C* inst = static_cast<C*>(cmp.scene);
+		auto& c = (inst->*cmp_getter)((EntityRef)cmp.entity);
+		auto& v = c.*ptr;
+		stream.write(v);
+	}
+
+	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
+	{
+		using C = typename ClassOf<CmpGetter>::Type;
+		C* inst = static_cast<C*>(cmp.scene);
+		auto& c = (inst->*cmp_getter)((EntityRef)cmp.entity);
+		stream.read(c.*ptr);
+	}
+
+	CmpGetter cmp_getter;
+	PtrType ptr;
+	Tuple<Attributes...> attributes;
 };
 
 
@@ -983,28 +1009,24 @@ auto component(const char* name, Props... props)
 
 
 template <typename Getter, typename Setter, typename... Attributes>
-auto blob_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Attributes... attributes)
+auto blob_property(const char* name, Getter getter, Setter setter, Attributes... attributes)
 {
 	BlobProperty<Getter, Setter, Attributes...> p;
 	p.attributes = makeTuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
-	p.getter_code = getter_code;
-	p.setter_code = setter_code;
 	p.name = name;
 	return p;
 }
 
 
 template <typename Getter, typename Setter, typename Counter>
-auto sampled_func_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Counter counter, float max_x)
+auto sampled_func_property(const char* name, Getter getter, Setter setter, Counter counter, float max_x)
 {
 	using R = typename ResultOf<Getter>::Type;
 	SampledFuncProperty<Getter, Setter, Counter> p;
 	p.getter = getter;
 	p.setter = setter;
-	p.getter_code = getter_code;
-	p.setter_code = setter_code;
 	p.counter = counter;
 	p.name = name;
 	p.max_x = max_x;
@@ -1012,29 +1034,39 @@ auto sampled_func_property(const char* name, Getter getter, const char* getter_c
 }
 
 
+template <typename CmpGetter, typename PtrType, typename... Attributes>
+auto var_property(const char* name, CmpGetter getter, PtrType ptr, Attributes... attributes)
+{
+	using T = typename ResultOf<PtrType>::Type;
+	VarProperty<T, CmpGetter, PtrType, Attributes...> p;
+	p.attributes = makeTuple(attributes...);
+	p.cmp_getter = getter;
+	p.ptr = ptr;
+	p.name = name;
+	return p;
+}
+
+
+
 template <typename Getter, typename Setter, typename... Attributes>
-auto property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Attributes... attributes)
+auto property(const char* name, Getter getter, Setter setter, Attributes... attributes)
 {
 	using R = typename ResultOf<Getter>::Type;
 	CommonProperty<R, Getter, Setter, Attributes...> p;
 	p.attributes = makeTuple(attributes...);
 	p.getter = getter;
 	p.setter = setter;
-	p.getter_code = getter_code;
-	p.setter_code = setter_code;
 	p.name = name;
 	return p;
 }
 
 
 template <typename Getter, typename Setter, typename Descriptor, typename... Attributes>
-auto enum_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Descriptor desc, Attributes... attributes)
+auto enum_property(const char* name, Getter getter, Setter setter, Descriptor desc, Attributes... attributes)
 {
 	EnumProperty<Getter, Setter, Descriptor> p;
 	p.getter = getter;
 	p.setter = setter;
-	p.getter_code = getter_code;
-	p.setter_code = setter_code;
 	p.descriptor = desc;
 	p.name = name;
 	return p;
@@ -1042,13 +1074,11 @@ auto enum_property(const char* name, Getter getter, const char* getter_code, Set
 
 
 template <typename Getter, typename Setter, typename Counter, typename Namer, typename... Attributes>
-auto dyn_enum_property(const char* name, Getter getter, const char* getter_code, Setter setter, const char* setter_code, Counter counter, Namer namer, Attributes... attributes)
+auto dyn_enum_property(const char* name, Getter getter, Setter setter, Counter counter, Namer namer, Attributes... attributes)
 {
 	DynEnumProperty<Getter, Setter, Counter, Namer> p;
 	p.getter = getter;
 	p.setter = setter;
-	p.getter_code = getter_code;
-	p.setter_code = setter_code;
 	p.namer = namer;
 	p.counter = counter;
 	p.name = name;

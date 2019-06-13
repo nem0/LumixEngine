@@ -2,7 +2,7 @@
 #include "engine/crc32.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/mt/sync.h"
 #include "engine/stream.h"
 #include <Windows.h>
@@ -1522,8 +1522,8 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 					}
 					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
 					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-					width = Math::maximum(1, width >> 1);
-					height = Math::maximum(1, height >> 1);
+					width = maximum(1, width >> 1);
+					height = maximum(1, height >> 1);
 					size = DDS::sizeDXTC(width, height, internal_format);
 				}
 			}
@@ -1555,8 +1555,8 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 					else {
 						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, &unpacked[0]));
 					}
-					width = Math::maximum(1, width >> 1);
-					height = Math::maximum(1, height >> 1);
+					width = maximum(1, width >> 1);
+					height = maximum(1, height >> 1);
 					size = width * height * li->blockBytes;
 				}
 			}
@@ -1576,8 +1576,8 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 					else {
 						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, &data[0]));
 					}
-					width = Math::maximum(1, width >> 1);
-					height = Math::maximum(1, height >> 1);
+					width = maximum(1, width >> 1);
+					height = maximum(1, height >> 1);
 					size = width * height * li->blockBytes;
 				}
 				CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE));

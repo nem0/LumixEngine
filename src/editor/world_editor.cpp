@@ -15,7 +15,7 @@
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
@@ -1768,7 +1768,7 @@ public:
 	{
 		if (!m_go_to_parameters.m_is_active) return;
 
-		float t = Math::easeInOut(m_go_to_parameters.m_t);
+		float t = easeInOut(m_go_to_parameters.m_t);
 		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
 		DVec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
 		Quat rot;
@@ -2001,8 +2001,8 @@ public:
 
 		Vec2 min = m_rect_selection_start;
 		Vec2 max = m_mouse_pos;
-		if (min.x > max.x) Math::swap(min.x, max.x);
-		if (min.y > max.y) Math::swap(min.y, max.y);
+		if (min.x > max.x) swap(min.x, max.x);
+		if (min.y > max.y) swap(min.y, max.y);
 		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
 		m_render_interface->getRenderables(entities, frustum);
 		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);*/
@@ -2116,7 +2116,7 @@ public:
 
 		void create(EntityRef entity)
 		{
-			EntityGUID guid = { is_random ? Math::randGUID() : ++nonrandom_guid };
+			EntityGUID guid = { is_random ? randGUID() : ++nonrandom_guid };
 			insert(guid, entity);
 		}
 
@@ -2783,25 +2783,19 @@ public:
 	void toggleGameMode() override
 	{
 		ASSERT(m_universe);
-		if (m_is_game_mode)
-		{
+		if (m_is_game_mode) {
 			stopGameMode(true);
+			return;
 		}
-		else
-		{
-			ASSERT(false);
-			// TODO
-			/*
-			m_selected_entity_on_game_mode = m_selected_entities.empty() ? INVALID_ENTITY : m_selected_entities[0];
-			auto& fs = m_engine->getFileSystem();
-			m_game_mode_file = fs.open(fs.getMemoryDevice(), Path(""), FS::Mode::WRITE);
-			save(*m_game_mode_file);
-			m_is_game_mode = true;
-			beginCommandGroup(0);
-			endCommandGroup();
-			m_game_mode_commands = 2;
-			m_engine->startGame(*m_universe);*/
-		}
+
+		m_selected_entity_on_game_mode = m_selected_entities.empty() ? INVALID_ENTITY : m_selected_entities[0];
+		m_game_mode_file.clear();
+		save(m_game_mode_file);
+		m_is_game_mode = true;
+		beginCommandGroup(0);
+		endCommandGroup();
+		m_game_mode_commands = 2;
+		m_engine->startGame(*m_universe);
 	}
 
 
@@ -2977,7 +2971,7 @@ public:
 		const Vec3 dir = m_viewport.rot.rotate(Vec3(0, 0, 1));
 		m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
 		const double len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-		m_go_to_parameters.m_speed = Math::maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
+		m_go_to_parameters.m_speed = maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
 		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = m_viewport.rot;
 	}
 
@@ -3123,7 +3117,7 @@ public:
 		m_viewport.rot.set(0, 0, 0, 1);
 		m_viewport.w = -1;
 		m_viewport.h = -1;
-		m_viewport.fov = Math::degreesToRadians(30.f);
+		m_viewport.fov = degreesToRadians(30.f);
 		m_viewport.near = 0.1f;
 		m_viewport.far = 100000.f;
 
@@ -3324,13 +3318,13 @@ public:
 		Quat rot = m_viewport.rot;
 		const Quat old_rot = rot;
 
-		float yaw = -Math::signum(x) * (Math::pow(Math::abs((float)x / m_mouse_sensitivity.x), 1.2f));
+		float yaw = -signum(x) * (pow(abs((float)x / m_mouse_sensitivity.x), 1.2f));
 		Quat yaw_rot(Vec3(0, 1, 0), yaw);
 		rot = yaw_rot * rot;
 		rot.normalize();
 
 		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-		float pitch = -Math::signum(y) * (Math::pow(Math::abs((float)y / m_mouse_sensitivity.y), 1.2f));
+		float pitch = -signum(y) * (pow(abs((float)y / m_mouse_sensitivity.y), 1.2f));
 		const Quat pitch_rot(pitch_axis, pitch);
 		rot = pitch_rot * rot;
 		rot.normalize();
@@ -3644,7 +3638,7 @@ public:
 		}
 		m_go_to_parameters.m_speed = 2.0f;
 		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(1, 0, 0), -Math::PI * 0.5f);
+		m_go_to_parameters.m_to_rot = Quat(Vec3(1, 0, 0), -PI * 0.5f);
 	}
 
 
@@ -3661,7 +3655,7 @@ public:
 		}
 		m_go_to_parameters.m_speed = 2.0f;
 		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), Math::PI);
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), PI);
 	}
 
 
@@ -3678,7 +3672,7 @@ public:
 		}
 		m_go_to_parameters.m_speed = 2.0f;
 		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -Math::PI * 0.5f);
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -PI * 0.5f);
 	}
 
 

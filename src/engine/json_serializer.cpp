@@ -1,7 +1,7 @@
 #include "json_serializer.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/path.h"
 #include "engine/stream.h"
 #include <cstdlib>
@@ -394,7 +394,7 @@ void JsonDeserializer::deserialize(const char* label, Path& value, const Path& d
 	else
 	{
 		char tmp[MAX_PATH_LENGTH];
-		int size = Math::minimum(lengthOf(tmp) - 1, m_token_size);
+		int size = minimum(lengthOf(tmp) - 1, m_token_size);
 		copyMemory(tmp, m_token, size);
 		tmp[size] = '\0';
 		value = tmp;
@@ -412,7 +412,7 @@ void JsonDeserializer::deserialize(Path& value, const Path& default_value)
 	else
 	{
 		char tmp[MAX_PATH_LENGTH];
-		int size = Math::minimum(lengthOf(tmp) - 1, m_token_size);
+		int size = minimum(lengthOf(tmp) - 1, m_token_size);
 		copyMemory(tmp, m_token, size);
 		tmp[size] = '\0';
 		value = tmp;
@@ -429,7 +429,7 @@ void JsonDeserializer::deserialize(char* value, int max_length, const char* defa
 	}
 	else
 	{
-		int size = Math::minimum(max_length - 1, m_token_size);
+		int size = minimum(max_length - 1, m_token_size);
 		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
@@ -530,7 +530,7 @@ void JsonDeserializer::deserialize(const char* label,
 	}
 	else
 	{
-		int size = Math::minimum(max_length - 1, m_token_size);
+		int size = minimum(max_length - 1, m_token_size);
 		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
@@ -572,7 +572,7 @@ void JsonDeserializer::deserializeArrayBegin()
 
 void JsonDeserializer::deserializeRawString(char* buffer, int max_length)
 {
-	int size = Math::minimum(max_length - 1, m_token_size);
+	int size = minimum(max_length - 1, m_token_size);
 	copyMemory(buffer, m_token, size);
 	buffer[size] = '\0';
 	deserializeToken();
@@ -614,7 +614,7 @@ void JsonDeserializer::deserializeArrayItem(char* value, int max_length, const c
 	deserializeArrayComma();
 	if (m_is_string_token)
 	{
-		int size = Math::minimum(max_length - 1, m_token_size);
+		int size = minimum(max_length - 1, m_token_size);
 		copyMemory(value, m_token, size);
 		value[size] = '\0';
 		deserializeToken();
@@ -913,7 +913,7 @@ void JsonDeserializer::deserializeLabel(const char* label)
 float JsonDeserializer::tokenToFloat()
 {
 	char tmp[64];
-	int size = Math::minimum((int)sizeof(tmp) - 1, m_token_size);
+	int size = minimum((int)sizeof(tmp) - 1, m_token_size);
 	copyMemory(tmp, m_token, size);
 	tmp[size] = '\0';
 	return (float)atof(tmp);
@@ -923,7 +923,7 @@ float JsonDeserializer::tokenToFloat()
 float JsonDeserializer::tokenToDouble()
 {
 	char tmp[64];
-	int size = Math::minimum((int)sizeof(tmp) - 1, m_token_size);
+	int size = minimum((int)sizeof(tmp) - 1, m_token_size);
 	copyMemory(tmp, m_token, size);
 	tmp[size] = '\0';
 	return (float)atof(tmp);

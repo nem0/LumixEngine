@@ -180,7 +180,7 @@ struct InputDecl
 		int size = 0;
 		for (const auto& input : inputs)
 		{
-			if(input.type != EMPTY) size = Math::maximum(size, input.offset + getSize(input.type));
+			if(input.type != EMPTY) size = maximum(size, input.offset + getSize(input.type));
 		}
 		return size;
 	}

@@ -1,5 +1,5 @@
 #include "engine/array.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/log.h"

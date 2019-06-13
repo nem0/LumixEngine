@@ -2,7 +2,7 @@
 
 #include "engine/lumix.h"
 #include "engine/iplugin.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/string.h"
 #include "ffr/ffr.h"
 
@@ -12,17 +12,11 @@ namespace Lumix
 
 
 class Engine;
-struct Font;
-struct FontAtlas;
 class FontManager;
-class ModelManager;
 class Path;
 class Pipeline;
 class ResourceManager;
-class Shader;
-class ShaderManager;
 class TextureManager;
-template <typename T> class Array;
 
 
 class LUMIX_RENDERER_API Renderer : public IPlugin 
@@ -65,8 +59,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual int getShaderDefinesCount() const = 0;
 		virtual FontManager& getFontManager() = 0;
 		virtual TextureManager& getTextureManager() = 0;
-		virtual void setMainPipeline(Pipeline* pipeline) = 0;
-		virtual Pipeline* getMainPipeline() = 0;
 		
 		virtual IAllocator& getAllocator() = 0;
 		virtual MemRef allocate(uint size) = 0;

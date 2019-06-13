@@ -2,7 +2,7 @@
 
 
 #include "engine/delegate.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 
@@ -29,24 +29,13 @@ struct PipelineResource : Resource
 {
 	static ResourceType TYPE;
 
-	PipelineResource(const Path& path, ResourceManager& owner, IAllocator& allocator);
+	PipelineResource(const Path& path, ResourceManager& owner, Renderer& renderer, IAllocator& allocator);
 
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 	ResourceType getType() const override { return TYPE; }
 
 	Array<char> content;
-};
-
-
-struct PipelineResourceManager : ResourceManager
-{
-	PipelineResourceManager(IAllocator& allocator);
-
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-	IAllocator& m_allocator;
 };
 
 

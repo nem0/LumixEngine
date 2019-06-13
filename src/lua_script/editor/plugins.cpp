@@ -821,7 +821,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow))) --autocomplete_selected;
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) insert_value = autocomplete[autocomplete_selected].c_str();
 				if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) ImGui::CloseCurrentPopup();
-				autocomplete_selected = Math::clamp(autocomplete_selected, 0, autocomplete.size() - 1);
+				autocomplete_selected = clamp(autocomplete_selected, 0, autocomplete.size() - 1);
 				for (int i = 0, c = autocomplete.size(); i < c; ++i)
 				{
 					const char* value = autocomplete[i].c_str();

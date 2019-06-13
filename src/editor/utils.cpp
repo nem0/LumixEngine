@@ -1,5 +1,5 @@
 #include "utils.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
 #include "engine/reflection.h"
@@ -144,7 +144,7 @@ void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, Enti
 			const char* c = path.c_str();
 			while (*c && *c != ':') ++c;
 			if (*c == ':') {
-				copyString(buf, Math::minimum(max_size, int(c - path.c_str() + 1)), path.c_str());
+				copyString(buf, minimum(max_size, int(c - path.c_str() + 1)), path.c_str());
 				return;
 			}
 

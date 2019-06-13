@@ -1,7 +1,7 @@
 #include "particle_system.h"
 #include "engine/crc32.h"
 #include "engine/lua_wrapper.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -20,22 +20,13 @@ namespace Lumix
 {
 
 
-Resource* ParticleEmitterResourceManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, ParticleEmitterResource)(path, *this, m_allocator);
-}
-
-
-void ParticleEmitterResourceManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<ParticleEmitterResource*>(&resource));
-}
-
-
 const ResourceType ParticleEmitterResource::TYPE = ResourceType("particle_emitter");
 
 
-ParticleEmitterResource::ParticleEmitterResource(const Path& path, ResourceManager& manager, IAllocator& allocator)
+ParticleEmitterResource::ParticleEmitterResource(const Path& path
+	, ResourceManager& manager
+	, Renderer& renderer
+	, IAllocator& allocator)
 	: Resource(path, manager, allocator)
 	, m_bytecode(allocator)
 	, m_material(nullptr)
@@ -458,7 +449,7 @@ void ParticleEmitter::emit(const float* args)
 	const int channels_count = m_resource->getChannelsCount();
 	if (m_particles_count == m_capacity)
 	{
-		int new_capacity = Math::maximum(16, m_capacity << 1);
+		int new_capacity = maximum(16, m_capacity << 1);
 		for (int i = 0; i < channels_count; ++i)
 		{
 			m_channels[i].data = (float*)m_allocator.reallocate_aligned(m_channels[i].data, new_capacity * sizeof(float), 16);
@@ -492,7 +483,7 @@ void ParticleEmitter::emit(const float* args)
 				const float from = readSingleValue(blob);
 				const float to = readSingleValue(blob);
 				
-				m_channels[dst_idx].data[m_particles_count] = Math::randFloat(from, to);
+				m_channels[dst_idx].data[m_particles_count] = randFloat(from, to);
 				break;
 			}
 			default:

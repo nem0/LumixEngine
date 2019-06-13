@@ -1,12 +1,11 @@
 #include "animation/animation.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/profiler.h"
-#include "engine/quat.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 
@@ -59,7 +58,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 
 	int frame = (int)(time * m_fps);
 	float rcp_fps = 1.0f / m_fps;
-	frame = Math::clamp(frame, 0, m_frame_count);
+	frame = clamp(frame, 0, m_frame_count);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 
@@ -120,7 +119,7 @@ LocalRigidTransform Animation::getBoneTransform(float time, int bone_idx) const
 	LocalRigidTransform ret;
 	int frame = (int)(time * m_fps);
 	float rcp_fps = 1.0f / m_fps;
-	frame = Math::clamp(frame, 0, m_frame_count);
+	frame = clamp(frame, 0, m_frame_count);
 
 	const Bone& bone = m_bones[bone_idx];
 	if (frame < m_frame_count)
@@ -172,7 +171,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 
 	int frame = (int)(time * m_fps);
 	float rcp_fps = 1.0f / m_fps;
-	frame = Math::clamp(frame, 0, m_frame_count);
+	frame = clamp(frame, 0, m_frame_count);
 	Vec3* pos = pose.positions;
 	Quat* rot = pose.rotations;
 

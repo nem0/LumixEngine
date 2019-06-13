@@ -2,7 +2,6 @@
 
 
 #include "engine/iallocator.h"
-#include "engine/math_utils.h"
 
 
 namespace Lumix
@@ -24,7 +23,7 @@ namespace Lumix
 		explicit Queue(IAllocator& allocator)
 			: m_allocator(allocator)
 		{
-			ASSERT(Math::isPowOfTwo(count));
+			ASSERT(isPowOfTwo(count));
 			m_buffer = (T*)(m_allocator.allocate(sizeof(T) * count));
 			m_wr = m_rd = 0;
 		}

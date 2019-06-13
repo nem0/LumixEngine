@@ -1,7 +1,7 @@
 #include "audio_device.h"
 #include "engine/engine.h"
 #include "engine/log.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include <cmath>
 #include <dsound.h>
 

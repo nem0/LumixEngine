@@ -623,7 +623,7 @@ ComponentInstance* NodeInstance::checkOutEdges(Node& node, RunningContext& rc)
 	}
 	if (options_count > 0)
 	{
-		Edge* edge = options[Math::rand(0, options_count - 1)];
+		Edge* edge = options[rand(0, options_count - 1)];
 		ComponentInstance* new_item = edge->createInstance(*rc.allocator);
 		queueExitEvents(rc);
 		new_item->enter(rc, this);
@@ -652,7 +652,7 @@ struct AnimationNodeInstance : public NodeInstance
 	{
 		time = 0;
 		if (node.animations_hashes.empty()) return;
-		int idx = Math::rand() % node.animations_hashes.size();
+		int idx = rand() % node.animations_hashes.size();
 		auto iter = anim_set.find(node.animations_hashes[idx]);
 		resource = iter.isValid() ? iter.value() : nullptr;
 	}
@@ -689,7 +689,7 @@ struct AnimationNodeInstance : public NodeInstance
 			time = fmod(time, length);
 			if (node.new_on_loop && !node.animations_hashes.empty())
 			{
-				int idx = Math::rand() % node.animations_hashes.size();
+				int idx = rand() % node.animations_hashes.size();
 				resource = (*rc.anim_set)[node.animations_hashes[idx]];
 			}
 		}
@@ -726,7 +726,7 @@ struct AnimationNodeInstance : public NodeInstance
 		{
 			float yaw = *(float*)&rc.input[root_rotation_input_offset];
 			float max_yaw_diff = time_delta * node.max_root_rotation_speed;
-			yaw = Math::clamp(yaw, -max_yaw_diff, max_yaw_diff);
+			yaw = clamp(yaw, -max_yaw_diff, max_yaw_diff);
 			root_motion.rot = Quat({ 0, 1, 0 }, yaw);
 		}
 
@@ -741,7 +741,7 @@ struct AnimationNodeInstance : public NodeInstance
 		queueEnterEvents(rc);
 		time = 0;
 		if (node.animations_hashes.empty()) return;
-		int idx = Math::rand() % node.animations_hashes.size();
+		int idx = rand() % node.animations_hashes.size();
 		auto iter = rc.anim_set->find(node.animations_hashes[idx]);
 		resource = iter.isValid() ? iter.value() : nullptr;
 	}

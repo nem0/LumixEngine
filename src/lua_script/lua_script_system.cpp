@@ -3,7 +3,7 @@
 #include "engine/array.h"
 #include "engine/binary_array.h"
 #include "engine/crc32.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/iallocator.h"
@@ -995,7 +995,7 @@ namespace Lumix
 			if (ptr == nullptr) return allocator.allocate(nsize);
 
 			void* new_mem = allocator.allocate(nsize);
-			copyMemory(new_mem, ptr, Math::minimum(osize, nsize));
+			copyMemory(new_mem, ptr, minimum(osize, nsize));
 			allocator.deallocate(ptr);
 			return new_mem;
 		}

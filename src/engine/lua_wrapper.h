@@ -2,7 +2,7 @@
 
 
 #include "engine/log.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/metaprogramming.h"
 #include "engine/path.h"
 #include <lua.hpp>

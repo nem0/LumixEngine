@@ -4,7 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/geometry.h"
 #include "engine/path.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "editor/world_editor.h"
 #include "imgui/imgui.h"
 

@@ -4,7 +4,7 @@
 #include "engine/geometry.h"
 #include "engine/lifo_allocator.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -112,7 +112,7 @@ void Terrain::setGrassTypeDensity(int index, int density)
 {
 	forceGrassUpdate();
 	GrassType& type = m_grass_types[index];
-	type.m_density = Math::clamp(density, 0, 50);
+	type.m_density = clamp(density, 0, 50);
 }
 
 
@@ -141,7 +141,7 @@ void Terrain::setGrassTypeDistance(int index, float distance)
 {
 	forceGrassUpdate();
 	GrassType& type = m_grass_types[index];
-	type.m_distance = Math::clamp(distance, 1.0f, FLT_MAX);
+	type.m_distance = clamp(distance, 1.0f, FLT_MAX);
 }
 
 
@@ -230,13 +230,13 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 
 	const float grass_quad_size_hm_space = GRASS_QUAD_SIZE / m_scale.x;
 	const Vec2 quad_size = {
-		Math::minimum(grass_quad_size_hm_space, m_heightmap->width - quad_pos.x),
-		Math::minimum(grass_quad_size_hm_space, m_heightmap->height - quad_pos.y)
+		minimum(grass_quad_size_hm_space, m_heightmap->width - quad_pos.x),
+		minimum(grass_quad_size_hm_space, m_heightmap->height - quad_pos.y)
 	};
 
 	struct { float x, y; void* type; } hashed_patch = { quad_pos.x, quad_pos.y, patch.m_type };
 	const u32 hash = crc32(&hashed_patch, sizeof(hashed_patch));
-	Math::seedRandom(hash);
+	seedRandom(hash);
 	const int max_idx = splat_map->width * splat_map->height;
 
 	const Vec2 step = quad_size * (1 / (float)patch.m_type->m_density);
@@ -250,15 +250,15 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 			);
 
 			int tx = int(sm_pos.x) + int(sm_pos.y) * splat_map->width;
-			tx = Math::clamp(tx, 0, max_idx - 1);
+			tx = clamp(tx, 0, max_idx - 1);
 
 			const u32 pixel_value = ((u32*)&splat_map->data[0])[tx];
 
 			const int ground_mask = (pixel_value >> 16) & 0xffff;
 			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;
 
-			const float x = (quad_pos.x + dx + step.x * Math::randFloat(-0.5f, 0.5f)) * m_scale.x;
-			const float z = (quad_pos.y + dy + step.y * Math::randFloat(-0.5f, 0.5f)) * m_scale.z;
+			const float x = (quad_pos.x + dx + step.x * randFloat(-0.5f, 0.5f)) * m_scale.x;
+			const float z = (quad_pos.y + dy + step.y * randFloat(-0.5f, 0.5f)) * m_scale.z;
 			const Vec3 instance_rel_pos(x, getHeight(x, z), z);
 			Quat instance_rel_rot;
 			
@@ -266,20 +266,20 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 			{
 				case GrassType::RotationMode::Y_UP:
 				{
-					instance_rel_rot = Quat(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
+					instance_rel_rot = Quat(Vec3(0, 1, 0), randFloat(0, PI * 2));
 				}
 				break;
 				case GrassType::RotationMode::ALL_RANDOM:
 				{
-					const Vec3 random_axis(Math::randFloat(-1, 1), Math::randFloat(-1, 1), Math::randFloat(-1, 1));
-					const float random_angle = Math::randFloat(0, Math::PI * 2);
+					const Vec3 random_axis(randFloat(-1, 1), randFloat(-1, 1), randFloat(-1, 1));
+					const float random_angle = randFloat(0, PI * 2);
 					instance_rel_rot = Quat(random_axis.normalized(), random_angle);
 				}
 				break;
 				case GrassType::RotationMode::ALIGN_WITH_NORMAL:
 				{
 					const Vec3 normal = getNormal(x, z);
-					const Quat random_base(Vec3(0, 1, 0), Math::randFloat(0, Math::PI * 2));
+					const Quat random_base(Vec3(0, 1, 0), randFloat(0, PI * 2));
 					const Quat to_normal = Quat::vec3ToVec3({0, 1, 0}, normal);
 					instance_rel_rot = to_normal * random_base;
 				}
@@ -288,7 +288,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 			}
 
 			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
-			instance_data.pos_scale.set(instance_rel_pos, Math::randFloat(0.9f, 1.1f));
+			instance_data.pos_scale.set(instance_rel_pos, randFloat(0.9f, 1.1f));
 			instance_data.rot = instance_rel_rot;
 			instance_data.normal = Vec4(getNormal(x, z), 0);
 		}
@@ -316,7 +316,7 @@ void Terrain::updateGrass(int view, const DVec3& camera_pos)
 	int grass_distance = 0;
 	for (auto& type : m_grass_types)
 	{
-		grass_distance = Math::maximum(grass_distance, int(type.m_distance / GRASS_QUAD_RADIUS + 0.99f));
+		grass_distance = maximum(grass_distance, int(type.m_distance / GRASS_QUAD_RADIUS + 0.99f));
 	}
 
 	float from_quad_x = cx - grass_distance * GRASS_QUAD_SIZE;
@@ -329,10 +329,10 @@ void Terrain::updateGrass(int view, const DVec3& camera_pos)
 	for (int i = quads.size() - 1; i >= 0; --i)
 	{
 		GrassQuad* quad = quads[i];
-		old_bounds[0] = Math::minimum(old_bounds[0], quad->pos.x);
-		old_bounds[1] = Math::maximum(old_bounds[1], quad->pos.x);
-		old_bounds[2] = Math::minimum(old_bounds[2], quad->pos.z);
-		old_bounds[3] = Math::maximum(old_bounds[3], quad->pos.z);
+		old_bounds[0] = minimum(old_bounds[0], quad->pos.x);
+		old_bounds[1] = maximum(old_bounds[1], quad->pos.x);
+		old_bounds[2] = minimum(old_bounds[2], quad->pos.z);
+		old_bounds[3] = maximum(old_bounds[3], quad->pos.z);
 		if (quad->pos.x < from_quad_x || quad->pos.x > to_quad_x || quad->pos.z < from_quad_z ||
 			quad->pos.z > to_quad_z)
 		{
@@ -341,8 +341,8 @@ void Terrain::updateGrass(int view, const DVec3& camera_pos)
 		}
 	}
 
-	from_quad_x = Math::maximum(0.0f, from_quad_x);
-	from_quad_z = Math::maximum(0.0f, from_quad_z);
+	from_quad_x = maximum(0.0f, from_quad_x);
+	from_quad_z = maximum(0.0f, from_quad_z);
 
 	for (float quad_z = from_quad_z; quad_z <= to_quad_z; quad_z += GRASS_QUAD_SIZE)
 	{
@@ -371,13 +371,13 @@ void Terrain::updateGrass(int view, const DVec3& camera_pos)
 				generateGrassTypeQuad(patch, terrain_tr, {quad_x / m_scale.x, quad_z / m_scale.z});
 				for (auto instance_data : patch.instance_data)
 				{
-					min_y = Math::minimum(instance_data.pos_scale.y, min_y);
-					max_y = Math::maximum(instance_data.pos_scale.y, max_y);
+					min_y = minimum(instance_data.pos_scale.y, min_y);
+					max_y = maximum(instance_data.pos_scale.y, max_y);
 				}
 			}
 
 			quad->pos.y = (max_y + min_y) * 0.5f;
-			quad->radius = Math::maximum((max_y - min_y) * 0.5f, GRASS_QUAD_SIZE) * Math::SQRT2;
+			quad->radius = maximum((max_y - min_y) * 0.5f, GRASS_QUAD_SIZE) * SQRT2;
 
 		}
 	}
@@ -545,7 +545,7 @@ float Terrain::getHeight(int x, int z) const
 
 	Texture* t = m_heightmap;
 	ASSERT(t->bytes_per_pixel == 2);
-	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
+	int idx = clamp(x, 0, m_width) + clamp(z, 0, m_height) * m_width;
 	return m_scale.y * DIV64K * ((u16*)t->getData())[idx];
 }
 
@@ -571,7 +571,7 @@ void Terrain::setHeight(int x, int z, float h)
 
 	Texture* t = m_heightmap;
 	ASSERT(t->bytes_per_pixel == 2);
-	int idx = Math::clamp(x, 0, m_width) + Math::clamp(z, 0, m_height) * m_width;
+	int idx = clamp(x, 0, m_width) + clamp(z, 0, m_height) * m_width;
 	((u16*)t->getData())[idx] = (u16)(h * (65535.0f / m_scale.y));
 }
 
@@ -591,7 +591,7 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 
 	Vec3 start;
 	const Vec3 size(m_width * m_scale.x, m_scale.y * 65535.0f, m_height * m_scale.x);
-	if (!Math::getRayAABBIntersection(rel_origin, rel_dir, Vec3::ZERO, size, start)) return hit;
+	if (!getRayAABBIntersection(rel_origin, rel_dir, Vec3::ZERO, size, start)) return hit;
 
 	int hx = (int)(start.x / m_scale.x);
 	int hz = (int)(start.z / m_scale.x);
@@ -599,10 +599,10 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 	float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / rel_dir.x;
 	float next_z = fabs(rel_dir.z) < 0.01f ? hz : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
 
-	float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.x);
-	float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_scale.x / Math::abs(rel_dir.z);
-	int step_x = (int)Math::signum(rel_dir.x);
-	int step_z = (int)Math::signum(rel_dir.z);
+	float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_scale.x / abs(rel_dir.x);
+	float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_scale.x / abs(rel_dir.z);
+	int step_x = (int)signum(rel_dir.x);
+	int step_z = (int)signum(rel_dir.z);
 
 	while (hx >= 0 && hz >= 0 && hx + step_x < m_width && hz + step_z < m_height) {
 		float t;
@@ -612,14 +612,14 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 		Vec3 p1(x + m_scale.x, getHeight(x + m_scale.x, z), z);
 		Vec3 p2(x + m_scale.x, getHeight(x + m_scale.x, z + m_scale.x), z + m_scale.x);
 		Vec3 p3(x, getHeight(x, z + m_scale.x), z + m_scale.x);
-		if (Math::getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, &t)) {
+		if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p1, p2, &t)) {
 			hit.is_hit = true;
 			hit.origin = origin;
 			hit.dir = dir;
 			hit.t = t;
 			return hit;
 		}
-		if (Math::getRayTriangleIntersection(rel_origin, rel_dir, p0, p2, p3, &t)) {
+		if (getRayTriangleIntersection(rel_origin, rel_dir, p0, p2, p3, &t)) {
 			hit.is_hit = true;
 			hit.origin = origin;
 			hit.dir = dir;

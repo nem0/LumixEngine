@@ -6,7 +6,7 @@
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
 #include "engine/profiler.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 
 
 namespace Lumix

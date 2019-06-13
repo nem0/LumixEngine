@@ -5,7 +5,6 @@
 #include "engine/array.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/simd.h"
 #include "engine/stream.h"
 
 
@@ -15,20 +14,7 @@ namespace Lumix
 
 struct DVec3;
 class Material;
-
-
-class ParticleEmitterResourceManager final : public ResourceManager
-{
-public:
-	ParticleEmitterResourceManager(IAllocator& allocator) 
-		: ResourceManager(allocator)
-		, m_allocator(allocator) {}
-
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-private:
-	IAllocator& m_allocator;
-};
+class Renderer;
 
 
 class ParticleEmitterResource final : public Resource
@@ -36,7 +22,7 @@ class ParticleEmitterResource final : public Resource
 public:
 	static const ResourceType TYPE;
 
-	ParticleEmitterResource(const Path& path, ResourceManager& manager, IAllocator& allocator);
+	ParticleEmitterResource(const Path& path, ResourceManager& manager, Renderer& renderer, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;

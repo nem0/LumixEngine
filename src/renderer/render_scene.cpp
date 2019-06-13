@@ -8,7 +8,7 @@
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
@@ -62,55 +62,6 @@ struct Decal : public DecalInfo
 	EntityPtr prev_decal = INVALID_ENTITY;
 	EntityPtr next_decal = INVALID_ENTITY;
 	Vec3 half_extents;
-};
-
-
-struct GlobalLight
-{
-	Vec3 m_diffuse_color;
-	float m_diffuse_intensity;
-	float m_indirect_intensity;
-	Vec3 m_fog_color;
-	float m_fog_density;
-	float m_fog_bottom;
-	float m_fog_height;
-	EntityRef m_entity;
-	Vec4 m_cascades;
-};
-
-
-struct Camera
-{
-	EntityRef entity;
-	float fov;
-	float aspect;
-	float near;
-	float far;
-	float ortho_size;
-	float screen_width;
-	float screen_height;
-	bool is_ortho;
-};
-
-
-struct EnvironmentProbe
-{
-	enum Flags
-	{
-		REFLECTION = 1 << 0,
-		OVERRIDE_GLOBAL_SIZE = 1 << 1,
-		ENABLED = 1 << 2
-	};
-
-	Texture* texture;
-	Texture* irradiance;
-	Texture* radiance;
-	float radius;
-	u64 guid;
-	FlagSet<Flags, u32> flags;
-	u16 radiance_size = 128;
-	u16 irradiance_size = 32;
-	u16 reflection_size = 1024;
 };
 
 
@@ -397,7 +348,7 @@ public:
 	{
 		if (is_ortho) return 1;
 
-		const float lod_multiplier = fov / Math::degreesToRadians(60);
+		const float lod_multiplier = fov / degreesToRadians(60);
 		return lod_multiplier  * lod_multiplier;
 	}
 
@@ -559,7 +510,7 @@ public:
 	{
 		BoneAttachment& attachment = m_bone_attachments[entity];
 		Vec3 euler = rot;
-		euler.x = Math::clamp(euler.x, -Math::PI * 0.5f, Math::PI * 0.5f);
+		euler.x = clamp(euler.x, -PI * 0.5f, PI * 0.5f);
 		attachment.relative_transform.rot.fromEuler(euler);
 		m_is_updating_attachments = true;
 		updateBoneAttachment(attachment);
@@ -1623,10 +1574,9 @@ public:
 		camera.is_ortho = false;
 		camera.ortho_size = 10;
 		camera.entity = entity;
-		camera.fov = Math::degreesToRadians(60);
+		camera.fov = degreesToRadians(60);
 		camera.screen_width = 800;
 		camera.screen_height = 600;
-		camera.aspect = 800.0f / 600.0f;
 		camera.near = 0.1f;
 		camera.far = 10000.0f;
 		m_cameras.insert(entity, camera);
@@ -1715,7 +1665,13 @@ public:
 	}
 
 
-	const PointLight& getPointLight(EntityRef entity) override
+	GlobalLight& getGlobalLight(EntityRef entity) override
+	{
+		return m_global_lights[entity];
+	}
+
+
+	PointLight& getPointLight(EntityRef entity) override
 	{
 		return m_point_lights[entity];
 	}
@@ -2102,8 +2058,8 @@ public:
 		if (texture->data.empty()) return 0;
 		if (texture->bytes_per_pixel != 4) return 0;
 		
-		x = Math::clamp(x, 0, texture->width - 1);
-		y = Math::clamp(y, 0, texture->height - 1);
+		x = clamp(x, 0, texture->width - 1);
+		y = clamp(y, 0, texture->height - 1);
 
 		return ((u32*)&texture->data[0])[x + y * texture->width];
 	}
@@ -2279,18 +2235,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setLightCastShadows(EntityRef entity, bool cast_shadows) override
-	{
-		m_point_lights[entity].cast_shadows = cast_shadows;
-	}
-
-
-	bool getLightCastShadows(EntityRef entity) override
-	{
-		return m_point_lights[entity].cast_shadows;
-	}
-
-
 	void getModelInstanceEntities(const ShiftedFrustum& frustum, Array<EntityRef>& entities) override
 	{
 		/*PROFILE_FUNCTION();
@@ -2313,13 +2257,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	float getCameraLODMultiplier(EntityRef camera)
 	{
 		float lod_multiplier;
-		if (isCameraOrtho(camera))
+		if (getCamera(camera).is_ortho)
 		{
 			lod_multiplier = 1;
 		}
 		else
 		{
-			lod_multiplier = getCameraFOV(camera) / Math::degreesToRadians(60);
+			lod_multiplier = getCamera(camera).fov / degreesToRadians(60);
 			lod_multiplier *= lod_multiplier;
 		}
 		return lod_multiplier;
@@ -2343,12 +2287,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	float getCameraFOV(EntityRef camera) override { return m_cameras[camera].fov; }
-	void setCameraFOV(EntityRef camera, float fov) override { m_cameras[camera].fov = fov; }
-	void setCameraNearPlane(EntityRef camera, float near_plane) override { m_cameras[camera].near = Math::maximum(near_plane, 0.00001f); }
-	float getCameraNearPlane(EntityRef camera) override { return m_cameras[camera].near; }
-	void setCameraFarPlane(EntityRef camera, float far_plane) override { m_cameras[camera].far = far_plane; }
-	float getCameraFarPlane(EntityRef camera) override { return m_cameras[camera].far; }
 	float getCameraScreenWidth(EntityRef camera) override { return m_cameras[camera].screen_width; }
 	float getCameraScreenHeight(EntityRef camera) override { return m_cameras[camera].screen_height; }
 
@@ -2366,6 +2304,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		ASSERT(false);
 		return {};
 	}
+
+
+	Camera& getCamera(EntityRef entity) override { return m_cameras[entity]; }
+
 
 
 	Matrix getCameraProjection(EntityRef entity) override
@@ -2396,7 +2338,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		auto& cam = m_cameras[{camera.index}];
 		cam.screen_width = (float)w;
 		cam.screen_height = (float)h;
-		cam.aspect = w / (float)h;
 	}
 
 
@@ -2405,12 +2346,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		auto& cam = m_cameras[{camera.index}];
 		return Vec2(cam.screen_width, cam.screen_height);
 	}
-
-
-	float getCameraOrthoSize(EntityRef camera) override { return m_cameras[{camera.index}].ortho_size; }
-	void setCameraOrthoSize(EntityRef camera, float value) override { m_cameras[{camera.index}].ortho_size = value; }
-	bool isCameraOrtho(EntityRef camera) override { return m_cameras[{camera.index}].is_ortho; }
-	void setCameraOrtho(EntityRef camera, bool is_ortho) override { m_cameras[{camera.index}].is_ortho = is_ortho; }
 
 
 	const Array<DebugTriangle>& getDebugTriangles() const override { return m_debug_triangles; }
@@ -2425,7 +2360,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
-		static const float STEP = (Math::PI / 180.0f) * 360.0f / COLS;
+		static const float STEP = (PI / 180.0f) * 360.0f / COLS;
 		int p2 = COLS >> 1;
 		int r2 = ROWS >> 1;
 		float prev_ci = 1;
@@ -2480,7 +2415,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		const Vec3 z_vec = transform.rot * Vec3(0, 0, 1);
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
-		static const float STEP = Math::degreesToRadians(360.0f) / COLS;
+		static const float STEP = degreesToRadians(360.0f) / COLS;
 		for (int y = 0; y < ROWS >> 1; ++y)
 		{
 			float cy = cos(y * STEP);
@@ -2519,7 +2454,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
-		static const float STEP = (Math::PI / 180.0f) * 360.0f / COLS;
+		static const float STEP = (PI / 180.0f) * 360.0f / COLS;
 		int p2 = COLS >> 1;
 		int yfrom = top ? 0 : -(ROWS >> 1);
 		int yto = top ? ROWS >> 1 : 0;
@@ -2599,7 +2534,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		const DVec3 top = bottom + Vec3(0, height, 0);
 		for (int i = 1; i <= 32; ++i)
 		{
-			const float a = i / 32.0f * 2 * Math::PI;
+			const float a = i / 32.0f * 2 * PI;
 			const float x = cosf(a) * radius;
 			const float z = sinf(a) * radius;
 			addDebugLine(bottom + x_vec * x + z_vec * z,
@@ -2631,7 +2566,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		Vec3 top = bottom + y_vec * height;
 		for (int i = 1; i <= 32; ++i)
 		{
-			float a = i / 32.0f * 2 * Math::PI;
+			float a = i / 32.0f * 2 * PI;
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
 			addDebugLine(bottom + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color, life);
@@ -2657,7 +2592,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		const DVec3 top = position + up;
 		for (int i = 1; i <= 32; ++i)
 		{
-			float a = i / 32.0f * 2 * Math::PI;
+			float a = i / 32.0f * 2 * PI;
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
 			addDebugLine(position + x_vec * x + z_vec * z,
@@ -2845,7 +2780,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		x_vec.normalize();
 		for (int i = 1; i <= 64; ++i)
 		{
-			float a = i / 64.0f * 2 * Math::PI;
+			float a = i / 64.0f * 2 * PI;
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
 			addDebugLine(center + x_vec * x + z_vec * z, center + x_vec * prevx + z_vec * prevz, color, life);
@@ -2886,7 +2821,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		DVec3 prev_p = base_center + axis0;
 		for (int i = 1; i <= 32; ++i)
 		{
-			float angle = i / 32.0f * 2 * Math::PI;
+			float angle = i / 32.0f * 2 * PI;
 			const Vec3 x = cosf(angle) * axis0;
 			const Vec3 z = sinf(angle) * axis1;
 			const DVec3 p = base_center + x + z;
@@ -2951,7 +2886,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			
 			Vec3 intersection;
 			const Vec3 rel_pos = (origin - pos).toFloat();
-			if (Math::getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection)) {
+			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection)) {
 				RayCastModelHit new_hit = r.model->castRay(rel_pos / scale, dir, r.pose);
 				if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
 					new_hit.entity = entity;
@@ -2987,72 +2922,12 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void setShadowmapCascades(EntityRef entity, const Vec4& value) override
 	{
 		Vec4 valid_value = value;
-		valid_value.x = Math::maximum(valid_value.x, 0.02f);
-		valid_value.y = Math::maximum(valid_value.x + 0.01f, valid_value.y);
-		valid_value.z = Math::maximum(valid_value.y + 0.01f, valid_value.z);
-		valid_value.w = Math::maximum(valid_value.z + 0.01f, valid_value.w);
+		valid_value.x = maximum(valid_value.x, 0.02f);
+		valid_value.y = maximum(valid_value.x + 0.01f, valid_value.y);
+		valid_value.z = maximum(valid_value.y + 0.01f, valid_value.z);
+		valid_value.w = maximum(valid_value.z + 0.01f, valid_value.w);
 
 		m_global_lights[entity].m_cascades = valid_value;
-	}
-
-
-	void setFogDensity(EntityRef entity, float density) override
-	{
-		m_global_lights[entity].m_fog_density = density;
-	}
-
-
-	void setFogColor(EntityRef entity, const Vec3& color) override
-	{
-		m_global_lights[entity].m_fog_color = color;
-	}
-
-
-	float getFogDensity(EntityRef entity) override
-	{
-		return m_global_lights[entity].m_fog_density;
-	}
-
-
-	float getFogBottom(EntityRef entity) override
-	{
-		return m_global_lights[entity].m_fog_bottom;
-	}
-
-
-	void setFogBottom(EntityRef entity, float bottom) override
-	{
-		m_global_lights[entity].m_fog_bottom = bottom;
-	}
-
-
-	float getFogHeight(EntityRef entity) override
-	{
-		return m_global_lights[entity].m_fog_height;
-	}
-
-
-	void setFogHeight(EntityRef entity, float height) override
-	{
-		m_global_lights[entity].m_fog_height = height;
-	}
-
-
-	Vec3 getFogColor(EntityRef entity) override
-	{
-		return m_global_lights[entity].m_fog_color;
-	}
-
-
-	float getLightAttenuation(EntityRef entity) override
-	{
-		return m_point_lights[entity].attenuation_param;
-	}
-
-
-	void setLightAttenuation(EntityRef entity, float attenuation) override
-	{
-		m_point_lights[entity].attenuation_param = attenuation;
 	}
 
 
@@ -3066,66 +2941,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	{
 		m_point_lights[entity].range = value;
 		m_culling_system->setRadius(entity, value);
-	}
-
-
-	void setPointLightIntensity(EntityRef entity, float intensity) override
-	{
-		m_point_lights[entity].intensity = intensity;
-	}
-
-
-	void setGlobalLightIntensity(EntityRef entity, float intensity) override
-	{
-		m_global_lights[entity].m_diffuse_intensity = intensity;
-	}
-
-
-	void setGlobalLightIndirectIntensity(EntityRef entity, float intensity) override
-	{
-		m_global_lights[entity].m_indirect_intensity = intensity;
-	}
-
-
-	void setPointLightColor(EntityRef entity, const Vec3& color) override
-	{
-		m_point_lights[entity].color = color;
-	}
-
-
-	void setGlobalLightColor(EntityRef entity, const Vec3& color) override
-	{
-		m_global_lights[entity].m_diffuse_color = color;
-	}
-
-	
-	float getPointLightIntensity(EntityRef entity) override
-	{
-		return m_point_lights[entity].intensity;
-	}
-
-
-	float getGlobalLightIntensity(EntityRef entity) override
-	{
-		return m_global_lights[entity].m_diffuse_intensity;
-	}
-
-
-	float getGlobalLightIndirectIntensity(EntityRef entity) override
-	{
-		return m_global_lights[entity].m_indirect_intensity;
-	}
-
-
-	Vec3 getPointLightColor(EntityRef entity) override
-	{
-		return m_point_lights[entity].color;
-	}
-
-
-	Vec3 getGlobalLightColor(EntityRef entity) override
-	{
-		return m_global_lights[entity].m_diffuse_color;
 	}
 
 
@@ -3200,7 +3015,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			out.reflection = probe.texture && probe.texture->isReady() ? probe.texture->handle : ffr::INVALID_TEXTURE;
 		}
 	}
-		
+	
+
+	EnvironmentProbe& getEnvironmentProbe(EntityRef entity) override
+	{
+		return m_environment_probes[entity];
+	}
+
 	
 	void enableEnvironmentProbe(EntityRef entity, bool enable) override
 	{
@@ -3214,18 +3035,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	int getEnvironmentProbeIrradianceSize(EntityRef entity) override
-	{
-		return m_environment_probes[entity].irradiance_size;
-	}
-
-
-	void setEnvironmentProbeIrradianceSize(EntityRef entity, int size) override
-	{
-		m_environment_probes[entity].irradiance_size = size;
-	}
-
-
 	float getEnvironmentProbeRadius(EntityRef entity) override
 	{
 		return m_environment_probes[entity].radius;
@@ -3235,18 +3044,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void setEnvironmentProbeRadius(EntityRef entity, float radius) override
 	{
 		m_environment_probes[entity].radius = radius;
-	}
-
-
-	int getEnvironmentProbeRadianceSize(EntityRef entity) override
-	{
-		return m_environment_probes[entity].radiance_size;
-	}
-
-
-	void setEnvironmentProbeRadianceSize(EntityRef entity, int size) override
-	{
-		m_environment_probes[entity].radiance_size = size;
 	}
 
 
@@ -3510,18 +3307,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	float getLightFOV(EntityRef entity) override
-	{
-		return m_point_lights[entity].fov;
-	}
-
-
-	void setLightFOV(EntityRef entity, float fov) override
-	{
-		m_point_lights[entity].fov = fov;
-	}
-
-
 	void createGlobalLight(EntityRef entity)
 	{
 		GlobalLight light;
@@ -3548,7 +3333,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		light.entity = entity;
 		light.color.set(1, 1, 1);
 		light.intensity = 1;
-		light.fov = Math::degreesToRadians(360);
+		light.fov = degreesToRadians(360);
 		light.cast_shadows = false;
 		light.attenuation_param = 2;
 		light.range = 10;
@@ -3575,7 +3360,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		decal.entity = entity;
 		decal.half_extents.set(1, 1, 1);
 		updateDecalInfo(decal);
-		const DVec3 pos = m_universe.getPosition(entity);
 
 		m_universe.onComponentCreated(entity, DECAL_TYPE, this);
 	}
@@ -3593,7 +3377,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 		probe.radius = 1;
 		probe.flags.set(EnvironmentProbe::ENABLED);
-		probe.guid = Math::randGUID();
+		probe.guid = randGUID();
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}

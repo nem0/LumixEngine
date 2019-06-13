@@ -7,7 +7,7 @@
 #include "engine/engine.h"
 #include "engine/iallocator.h"
 #include "engine/lua_wrapper.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"

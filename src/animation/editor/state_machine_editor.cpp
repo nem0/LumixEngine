@@ -314,7 +314,7 @@ static ImVec2 drawNode(ImDrawList* draw, const char* label, const ImVec2 pos, bo
 {
 	float text_width = ImGui::CalcTextSize(label).x;
 	ImVec2 size;
-	size.x = Math::maximum(50.0f, text_width + ImGui::GetStyle().FramePadding.x * 2);
+	size.x = maximum(50.0f, text_width + ImGui::GetStyle().FramePadding.x * 2);
 	size.y = ImGui::GetTextLineHeightWithSpacing() * 2;
 	ImVec2 from = pos;
 	ImVec2 to = from + size;
@@ -551,7 +551,7 @@ bool Edge::hitTest(const ImVec2& on_canvas_pos) const
 
 	ImVec2 dif = a - b;
 	float len_squared = dif.x * dif.x + dif.y * dif.y;
-	float t = Math::clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
+	float t = clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
 	const ImVec2 projection = a + (b - a) * t;
 	ImVec2 dist_vec = on_canvas_pos - projection;
 
@@ -584,7 +584,7 @@ struct Blend1DNode::RootEdge : public Component
 
 		ImVec2 dif = a - b;
 		float len_squared = dif.x * dif.x + dif.y * dif.y;
-		float t = Math::clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
+		float t = clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
 		const ImVec2 projection = a + (b - a) * t;
 		ImVec2 dist_vec = on_canvas_pos - projection;
 
@@ -1080,7 +1080,7 @@ void Blend1DNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Anim:
 	ImVec2 p = canvas_screen_pos + pos;
 	p = p + ImVec2(5, ImGui::GetTextLineHeightWithSpacing() * 1.5f);
 	draw->AddRect(p, p + ImVec2(size.x - 10, 5), 0xfff00fff);
-	float t = Math::clamp(runtime->getTime() / runtime->getLength(), 0.0f, 1.0f);
+	float t = clamp(runtime->getTime() / runtime->getLength(), 0.0f, 1.0f);
 	draw->AddRectFilled(p, p + ImVec2((size.x - 10) * t, 5), 0xfff00fff);
 }
 
@@ -1202,7 +1202,7 @@ void AnimationNode::debug(ImDrawList* draw, const ImVec2& canvas_screen_pos, Ani
 	ImVec2 p = canvas_screen_pos + pos;
 	p = p + ImVec2(5, ImGui::GetTextLineHeightWithSpacing() * 1.5f);
 	draw->AddRect(p, p + ImVec2(size.x - 10, 5), 0xfff00fff);
-	float t = Math::clamp(runtime->getTime() / runtime->getLength(), 0.0f, 1.0f);
+	float t = clamp(runtime->getTime() / runtime->getLength(), 0.0f, 1.0f);
 	draw->AddRectFilled(p, p + ImVec2((size.x - 10) * t, 5), 0xfff00fff);
 }
 
@@ -1317,10 +1317,10 @@ void AnimationNode::onGUI()
 
 	if (root_rotation_input != -1)
 	{
-		float deg = Math::radiansToDegrees(node->max_root_rotation_speed);
+		float deg = radiansToDegrees(node->max_root_rotation_speed);
 		if (ImGui::DragFloat("Max root rotation speed (deg/s)", &deg))
 		{
-			node->max_root_rotation_speed = Math::degreesToRadians(deg);
+			node->max_root_rotation_speed = degreesToRadians(deg);
 		}
 	}
 
@@ -1359,7 +1359,7 @@ struct EntryEdge : public Component
 
 		ImVec2 dif = a - b;
 		float len_squared = dif.x * dif.x + dif.y * dif.y;
-		float t = Math::clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
+		float t = clamp(dot(on_canvas_pos - a, b - a) / len_squared, 0.0f, 1.0f);
 		const ImVec2 projection = a + (b - a) * t;
 		ImVec2 dist_vec = on_canvas_pos - projection;
 

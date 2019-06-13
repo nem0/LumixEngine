@@ -3,7 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/iplugin.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 
 
 #ifdef STATIC_PLUGINS

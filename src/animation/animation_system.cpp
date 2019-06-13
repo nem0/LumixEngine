@@ -30,8 +30,6 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	AnimSetProperty() 
 	{ 
 		name = "Default set"; 
-		getter_code = "AnimationScene::getControllerDefaultSet";
-		setter_code = "AnimationScene::setControllerDefaultSet";
 	}
 
 
@@ -114,7 +112,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 		component("property_animator", 
 			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
 				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE)),
-			property("Enabled", LUMIX_PROP_FULL(AnimationScene, isPropertyAnimatorEnabled, enablePropertyAnimator))
+			property("Enabled", &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator)
 		),
 		component("anim_controller",
 			property("Source", LUMIX_PROP(AnimationScene, ControllerSource),

@@ -3,9 +3,8 @@
 
 #include "engine/array.h"
 #include "engine/geometry.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/os.h"
-#include "engine/quat.h"
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "ofbx.h"

@@ -2,8 +2,7 @@
 #include "animation/animation.h"
 #include "engine/crc32.h"
 #include "engine/log.h"
-#include "engine/matrix.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/prefab.h"
@@ -371,13 +370,13 @@ static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, FBXImport
 	{
 		ofbx::Vec3 v = vertices[i];
 			
-		min.x = Math::minimum(min.x, v.x);
-		min.y = Math::minimum(min.y, v.y);
-		min.z = Math::minimum(min.z, v.z);
+		min.x = minimum(min.x, v.x);
+		min.y = minimum(min.y, v.y);
+		min.z = minimum(min.z, v.z);
 			
-		max.x = Math::maximum(max.x, v.x);
-		max.y = Math::maximum(max.y, v.y);
-		max.z = Math::maximum(max.z, v.z);
+		max.x = maximum(max.x, v.x);
+		max.y = maximum(max.y, v.y);
+		max.z = maximum(max.z, v.z);
 	}
 
 	Vec3 center;
@@ -450,14 +449,14 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 			blob.write(pos);
 
 			float sq_len = pos.squaredLength();
-			radius_squared = Math::maximum(radius_squared, sq_len);
+			radius_squared = maximum(radius_squared, sq_len);
 
-			aabb.min.x = Math::minimum(aabb.min.x, pos.x);
-			aabb.min.y = Math::minimum(aabb.min.y, pos.y);
-			aabb.min.z = Math::minimum(aabb.min.z, pos.z);
-			aabb.max.x = Math::maximum(aabb.max.x, pos.x);
-			aabb.max.y = Math::maximum(aabb.max.y, pos.y);
-			aabb.max.z = Math::maximum(aabb.max.z, pos.z);
+			aabb.min.x = minimum(aabb.min.x, pos.x);
+			aabb.min.y = minimum(aabb.min.y, pos.y);
+			aabb.min.z = minimum(aabb.min.z, pos.z);
+			aabb.max.x = maximum(aabb.max.x, pos.x);
+			aabb.max.y = maximum(aabb.max.y, pos.y);
+			aabb.max.z = maximum(aabb.max.z, pos.z);
 
 			if (normals) writePackedVec3(normals[i], transform_matrix, &blob);
 			if (uvs) writeUV(uvs[i], &blob);
@@ -531,7 +530,7 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
 			mesh.submesh = mat_count > 1 ? j : -1;
 			mesh.lod = detectMeshLOD(mesh);
-			min_lod = Math::minimum(min_lod, mesh.lod);
+			min_lod = minimum(min_lod, mesh.lod);
 		}
 	}
 	if (min_lod != 1) return;
@@ -978,7 +977,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
 		: FbxTime::GetFrameRate(mode));
 		*/
-		for (int i = 0; i < Math::maximum(1, anim.splits.size()); ++i)
+		for (int i = 0; i < maximum(1, anim.splits.size()); ++i)
 		{
 			FBXImporter::ImportAnimation::Split whole_anim_split;
 			whole_anim_split.to_frame = all_frames_count;
@@ -1359,7 +1358,7 @@ void FBXImporter::writeGeometry(int mesh_idx)
 		write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 	}
 	aabb.merge(import_mesh.aabb);
-	radius_squared = Math::maximum(radius_squared, import_mesh.radius_squared);
+	radius_squared = maximum(radius_squared, import_mesh.radius_squared);
 
 	write(import_mesh.vertex_data.getPos());
 	write(import_mesh.vertex_data.getData(), import_mesh.vertex_data.getPos());
@@ -1400,7 +1399,7 @@ void FBXImporter::writeGeometry()
 			write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 		}
 		aabb.merge(import_mesh.aabb);
-		radius_squared = Math::maximum(radius_squared, import_mesh.radius_squared);
+		radius_squared = maximum(radius_squared, import_mesh.radius_squared);
 	}
 
 	if (create_billboard_lod)

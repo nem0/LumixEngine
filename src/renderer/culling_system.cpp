@@ -5,7 +5,7 @@
 #include "engine/iallocator.h"
 #include "engine/job_system.h"
 #include "engine/lumix.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/mt/atomic.h"
 #include "engine/page_allocator.h"
 #include "engine/profiler.h"
@@ -331,7 +331,7 @@ struct CullingSystemImpl final : public CullingSystem
 							result = list.push();
 						}
 						const int rem_space = lengthOf(result->entities) - result->header.count;
-						const int step = Math::minimum(to_cpy, rem_space);
+						const int step = minimum(to_cpy, rem_space);
 						memcpy(result->entities + result->header.count, cell.entities + src_offset, step * sizeof(cell.entities[0]));
 						src_offset += step;
 						result->header.count += step;

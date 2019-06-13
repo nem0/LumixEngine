@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 

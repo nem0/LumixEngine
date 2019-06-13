@@ -7,7 +7,7 @@
 #include "engine/engine.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
@@ -114,7 +114,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 
 		if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return;
 		ImVec2 size;
-		size.x = Math::minimum(ImGui::GetContentRegionAvailWidth(), texture->width * 2.0f);
+		size.x = minimum(ImGui::GetContentRegionAvailWidth(), texture->width * 2.0f);
 		size.y = size.x / texture->width * texture->height;
 		float scale = size.x / texture->width;
 		ImGui::Dummy(size);
@@ -290,7 +290,7 @@ private:
 			const float SIZE = 5;
 			float dx = pos.x - mouse_pos.x;
 			float dy = pos.y - mouse_pos.y;
-			bool is_hovered = Math::abs(dx) < SIZE && Math::abs(dy) < SIZE;
+			bool is_hovered = abs(dx) < SIZE && abs(dy) < SIZE;
 			
 			draw.AddRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? 0xffffffff : 0x77ffFFff);
 			draw.AddRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), 0xff777777);

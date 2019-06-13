@@ -5,9 +5,9 @@
 #include "engine/flag_set.h"
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/string.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "engine/resource.h"
 #include "ffr/ffr.h"
 #include "renderer.h"
@@ -19,13 +19,11 @@ struct lua_State;
 namespace Lumix
 {
 
-struct Frustum;
 class Material;
 struct Mesh;
 class Model;
 struct Pose;
 class Renderer;
-class ResourceManagerHub;
 class InputMemoryStream;
 
 

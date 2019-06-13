@@ -4,7 +4,7 @@
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -97,7 +97,7 @@ struct OutputStream final : public PxOutputStream
 	{
 		if (size + (int)count > capacity)
 		{
-			int new_capacity = Math::maximum(size + (int)count, capacity + 4096);
+			int new_capacity = maximum(size + (int)count, capacity + 4096);
 			u8* new_data = (u8*)allocator.allocate(sizeof(u8) * new_capacity);
 			copyMemory(new_data, data, size);
 			allocator.deallocate(data);
@@ -880,8 +880,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		auto* joint = getD6Joint(entity);
 		auto px_limit = joint->getSwingLimit();
-		px_limit.yAngle = Math::maximum(0.0f, limit.x);
-		px_limit.zAngle = Math::maximum(0.0f, limit.y);
+		px_limit.yAngle = maximum(0.0f, limit.x);
+		px_limit.zAngle = maximum(0.0f, limit.y);
 		joint->setSwingLimit(px_limit);
 	}
 
@@ -1517,7 +1517,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		auto& render_scene = *static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		const PxRenderBuffer& rb = m_scene->getRenderBuffer();
-		const PxU32 num_lines = Math::minimum(100000U, rb.getNbLines());
+		const PxU32 num_lines = minimum(100000U, rb.getNbLines());
 		if (num_lines)
 		{
 			const PxDebugLine* PX_RESTRICT lines = rb.getLines();
@@ -1896,7 +1896,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 					d6->setMotion(PxD6Axis::eSWING2, PxD6Motion::eLIMITED);
 					d6->setProjectionAngularTolerance(0.01f);
 					d6->setProjectionLinearTolerance(0.1f);
-					d6->setSwingLimit(PxJointLimitCone(Math::degreesToRadians(30), Math::degreesToRadians(30)));
+					d6->setSwingLimit(PxJointLimitCone(degreesToRadians(30), degreesToRadians(30)));
 				}
 				break;
 			default: ASSERT(false); break;
@@ -2178,7 +2178,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		if (!m_is_game_running || paused) return;
 
-		time_delta = Math::minimum(1 / 20.0f, time_delta);
+		time_delta = minimum(1 / 20.0f, time_delta);
 		updateVehicles(time_delta);
 		simulateScene(time_delta);
 		fetchResults();
@@ -2867,23 +2867,23 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void addCollisionLayer() override { m_layers_count = Math::minimum(lengthOf(m_layers_names), m_layers_count + 1); }
+	void addCollisionLayer() override { m_layers_count = minimum(lengthOf(m_layers_names), m_layers_count + 1); }
 
 
 	void removeCollisionLayer() override
 	{
-		m_layers_count = Math::maximum(0, m_layers_count - 1);
+		m_layers_count = maximum(0, m_layers_count - 1);
 		for (auto* actor : m_actors)
 		{
-			actor->layer = Math::minimum(m_layers_count - 1, actor->layer);
+			actor->layer = minimum(m_layers_count - 1, actor->layer);
 		}
 		for (auto& controller : m_controllers)
 		{
-			controller.m_layer = Math::minimum(m_layers_count - 1, controller.m_layer);
+			controller.m_layer = minimum(m_layers_count - 1, controller.m_layer);
 		}
 		for (auto& terrain : m_terrains)
 		{
-			terrain.m_layer = Math::minimum(m_layers_count - 1, terrain.m_layer);
+			terrain.m_layer = minimum(m_layers_count - 1, terrain.m_layer);
 		}
 
 		updateFilterData();

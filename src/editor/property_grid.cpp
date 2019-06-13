@@ -5,14 +5,14 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/iplugin.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "imgui/imgui.h"
 #include "utils.h"
 #include <cmath>
@@ -120,11 +120,11 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		OutputMemoryStream blob(&f, sizeof(f));
 		prop.getValue(cmp, m_index, blob);
 
-		if (attrs.is_radians) f = Math::radiansToDegrees(f);
+		if (attrs.is_radians) f = radiansToDegrees(f);
 		if (ImGui::DragFloat(prop.name, &f, 1, attrs.min, attrs.max))
 		{
-			f = Math::clamp(f, attrs.min, attrs.max);
-			if (attrs.is_radians) f = Math::degreesToRadians(f);
+			f = clamp(f, attrs.min, attrs.max);
+			if (attrs.is_radians) f = degreesToRadians(f);
 			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &f, sizeof(f));
 		}
 	}
@@ -158,7 +158,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		
 		float item_w = ImGui::CalcItemWidth();
 		auto& style = ImGui::GetStyle();
-		float text_width = Math::maximum(50.0f, item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2);
+		float text_width = maximum(50.0f, item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2);
 
 		auto pos = ImGui::GetCursorPos();
 		pos.x += text_width;
@@ -245,10 +245,10 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		}
 		else
 		{
-			if (attrs.is_radians) value = Math::radiansToDegrees(value);
+			if (attrs.is_radians) value = radiansToDegrees(value);
 			if (ImGui::DragFloat3(prop.name, &value.x, 1, attrs.min, attrs.max))
 			{
-				if (attrs.is_radians) value = Math::degreesToRadians(value);
+				if (attrs.is_radians) value = degreesToRadians(value);
 				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
 			}
 		}
@@ -369,8 +369,8 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (changed_idx >= 0)
 		{
 			changed = true;
-			points[changed_idx].p.x = Math::clamp(points[changed_idx].p.x, 0.0f, 1.0f);
-			points[changed_idx].p.y = Math::clamp(points[changed_idx].p.y, 0.0f, 1.0f);
+			points[changed_idx].p.x = clamp(points[changed_idx].p.x, 0.0f, 1.0f);
+			points[changed_idx].p.y = clamp(points[changed_idx].p.y, 0.0f, 1.0f);
 		}
 		if (new_count != count)
 		{
@@ -766,13 +766,13 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 	Universe* universe = m_editor.getUniverse();
 	Quat rot = universe->getRotation(entities[0]);
 	Vec3 old_euler = rot.toEuler();
-	Vec3 euler = Math::radiansToDegrees(old_euler);
+	Vec3 euler = radiansToDegrees(old_euler);
 	if (ImGui::DragFloat3("Rotation", &euler.x))
 	{
 		if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
-		euler.x = Math::degreesToRadians(Math::clamp(euler.x, -90.0f, 90.0f));
-		euler.y = Math::degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);
-		euler.z = Math::degreesToRadians(fmodf(euler.z + 180, 360.0f) - 180);
+		euler.x = degreesToRadians(clamp(euler.x, -90.0f, 90.0f));
+		euler.y = degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);
+		euler.z = degreesToRadians(fmodf(euler.z + 180, 360.0f) - 180);
 		rot.fromEuler(euler);
 		
 		Array<Quat> rots(m_editor.getAllocator());
