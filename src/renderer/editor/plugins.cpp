@@ -28,7 +28,6 @@
 #include "engine/viewport.h"
 #include "fbx_importer.h"
 #include "game_view.h"
-#include "renderer/draw2d.h"
 #include "renderer/culling_system.h"
 #include "renderer/ffr/ffr.h"
 #include "renderer/font_manager.h"
@@ -45,7 +44,6 @@
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
-#include <cmath>
 #include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
 #include <crnlib.h>
@@ -479,7 +477,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		createPreviewUniverse();
 		createTileUniverse();
 		m_viewport.is_ortho = false;
-		m_viewport.fov = Math::degreesToRadians(60.f);
+		m_viewport.fov = degreesToRadians(60.f);
 		m_viewport.near = 0.1f;
 		m_viewport.far = 10000.f;
 	}
@@ -598,9 +596,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		m_tile.universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
-		render_scene->setGlobalLightIntensity(light_entity, 1);
-		render_scene->setGlobalLightIndirectIntensity(light_entity, 1);
-
+		render_scene->getGlobalLight(light_entity).m_diffuse_intensity = 1;
+		render_scene->getGlobalLight(light_entity).m_indirect_intensity = 1;
+		
 		m_tile.pipeline->setScene(render_scene);
 	}
 
@@ -620,7 +618,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		auto light_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		m_universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
-		render_scene->setGlobalLightIntensity(light_entity, 1);
+		render_scene->getGlobalLight(light_entity).m_diffuse_intensity = 1;
 
 		m_pipeline->setScene(render_scene);
 	}
@@ -692,14 +690,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				DVec3 pos = m_viewport.pos;
 				Quat rot = m_viewport.rot;
 
-				float yaw = -Math::signum(delta.x) * (Math::pow(Math::abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
+				float yaw = -signum(delta.x) * (::pow(abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
 				Quat yaw_rot(Vec3(0, 1, 0), yaw);
 				rot = yaw_rot * rot;
 				rot.normalize();
 
 				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 				float pitch =
-					-Math::signum(delta.y) * (Math::pow(Math::abs((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
+					-signum(delta.y) * (::pow(abs((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
 				Quat pitch_rot(pitch_axis, pitch);
 				rot = pitch_rot * rot;
 				rot.normalize();
@@ -957,7 +955,7 @@ Engine& engine = m_app.getWorldEditor().getEngine();
 
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / Math::SQRT2;
+		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
 		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
 		mtx.inverse();
 		m_tile.universe->setMatrix(m_tile.camera_entity, mtx);
@@ -1002,7 +1000,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / Math::SQRT2;
+		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
 		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
 		mtx.inverse();
 		if (in_mtx) {
@@ -1012,7 +1010,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		viewport.is_ortho = false;
 		viewport.far = 10000.f;
 		viewport.near = 0.1f;
-		viewport.fov = Math::degreesToRadians(60.f);
+		viewport.fov = degreesToRadians(60.f);
 		viewport.h = AssetBrowser::TILE_SIZE;
 		viewport.w = AssetBrowser::TILE_SIZE;
 		viewport.pos = DVec3(eye.x, eye.y, eye.z);
@@ -1712,7 +1710,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
 		Viewport viewport;
 		viewport.is_ortho = false;
-		viewport.fov = Math::degreesToRadians(90.f);
+		viewport.fov = degreesToRadians(90.f);
 		viewport.near = 0.1f;
 		viewport.far = 10000.f;
 		viewport.w = TEXTURE_SIZE;
@@ -1794,8 +1792,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		int reflection_size = TEXTURE_SIZE;
 
 		if (scene->isEnvironmentProbeCustomSize(entity)) {
-			irradiance_size = scene->getEnvironmentProbeIrradianceSize(entity);
-			radiance_size = scene->getEnvironmentProbeRadianceSize(entity);
+			irradiance_size = scene->getEnvironmentProbe(entity).irradiance_size;
+			radiance_size = scene->getEnvironmentProbe(entity).radiance_size;
 			reflection_size = scene->getEnvironmentProbeReflectionSize(entity);
 		}
 
@@ -2126,13 +2124,13 @@ struct RenderInterfaceImpl final : public RenderInterface
 	Vec2 getCameraScreenSize(EntityRef entity) override { return m_render_scene->getCameraScreenSize(entity); }
 
 
-	float getCameraOrthoSize(EntityRef entity) override { return m_render_scene->getCameraOrthoSize(entity); }
+	float getCameraOrthoSize(EntityRef entity) override { return m_render_scene->getCamera(entity).ortho_size; }
 
 
-	bool isCameraOrtho(EntityRef entity) override { return m_render_scene->isCameraOrtho(entity); }
+	bool isCameraOrtho(EntityRef entity) override { return m_render_scene->getCamera(entity).is_ortho; }
 
 
-	float getCameraFOV(EntityRef entity) override { return m_render_scene->getCameraFOV(entity); }
+	float getCameraFOV(EntityRef entity) override { return m_render_scene->getCamera(entity).fov; }
 
 
 	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Pose* pose) override
@@ -2327,12 +2325,12 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				if (!tex.isValid()) tex = *default_texture;
 				ffr::bindTextures(&tex, 1);
 
-				const uint h = uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f));
+				const uint h = uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f));
 
-				ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-					height - uint(Math::maximum(pcmd->ClipRect.y, 0.0f)) - h,
-					uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-					uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+				ffr::scissor(uint(maximum(pcmd->ClipRect.x, 0.0f)),
+					height - uint(maximum(pcmd->ClipRect.y, 0.0f)) - h,
+					uint(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
+					uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 
 				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::UINT32);
 		
@@ -2561,13 +2559,13 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 
 	static Vec3 minCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::minimum(a.x, b.x), Math::minimum(a.y, b.y), Math::minimum(a.z, b.z));
+		return Vec3(minimum(a.x, b.x), minimum(a.y, b.y), minimum(a.z, b.z));
 	}
 
 
 	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
 	{
-		return Vec3(Math::maximum(a.x, b.x), Math::maximum(a.y, b.y), Math::maximum(a.z, b.z));
+		return Vec3(maximum(a.x, b.x), maximum(a.y, b.y), maximum(a.z, b.z));
 	}
 
 

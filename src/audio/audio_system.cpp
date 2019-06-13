@@ -19,7 +19,7 @@ static void registerProperties(IAllocator& allocator)
 	using namespace Reflection;
 	static auto audio_scene = scene("audio",
 		component("ambient_sound",
-			property("3D", LUMIX_PROP_FULL(AudioScene, isAmbientSound3D, setAmbientSound3D)),
+			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
 			dyn_enum_property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClipIndex), &AudioScene::getClipCount, &AudioScene::getClipName)
 		),
 		component("audio_listener"),

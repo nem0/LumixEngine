@@ -1,4 +1,3 @@
-#include "draw2d.h"
 #include "ffr/ffr.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -7,14 +6,13 @@
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/simd.h"
 #include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
@@ -30,9 +28,9 @@
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
-#include "texture_manager.h"
 #include <algorithm>
 #include <cmath>
+#include <malloc.h> // TODO
 #include <Windows.h> // TODO
 
 namespace Lumix
@@ -155,7 +153,7 @@ struct MTBucketArray
 				break;
 			}
 			
-			const int s = Math::minimum(m_counts[e], MAX_COUNT - m_counts[b]);
+			const int s = minimum(m_counts[e], MAX_COUNT - m_counts[b]);
 			memcpy(&m_keys_mem[b * BUCKET_SIZE + m_counts[b] * sizeof(T)], &m_keys_mem[e * BUCKET_SIZE + (m_counts[e] - s) * sizeof(T)], s * sizeof(T));
 			memcpy(&m_values_mem[b * BUCKET_SIZE + m_counts[b] * sizeof(T)], &m_values_mem[e * BUCKET_SIZE + (m_counts[e] - s) * sizeof(T)], s * sizeof(T));
 			m_counts[b] += s;
@@ -199,24 +197,7 @@ bool PipelineResource::load(u64 size, const u8* mem)
 }
 
 
-PipelineResourceManager::PipelineResourceManager(IAllocator& allocator)
-	: ResourceManager(allocator)
-	, m_allocator(allocator)
-{}
-
-
-Resource* PipelineResourceManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, PipelineResource)(path, *this, m_allocator);
-}
-
-
-void PipelineResourceManager::destroyResource(Resource& resource)
-{
-	return LUMIX_DELETE(m_allocator, static_cast<PipelineResource*>(&resource));
-}
-
-PipelineResource::PipelineResource(const Path& path, ResourceManager& owner, IAllocator& allocator)
+PipelineResource::PipelineResource(const Path& path, ResourceManager& owner, Renderer&, IAllocator& allocator)
 	: Resource(path, owner, allocator)
 	, content(allocator) 
 {}
@@ -632,9 +613,9 @@ struct PipelineImpl final : Pipeline
 		if(global_light.isValid()) {
 			EntityRef gl = (EntityRef)global_light;
 			global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
-			global_state.light_color = m_scene->getGlobalLightColor(gl);
-			global_state.light_intensity = m_scene->getGlobalLightIntensity(gl);
-			global_state.light_indirect_intensity = m_scene->getGlobalLightIndirectIntensity(gl);
+			global_state.light_color = m_scene->getGlobalLight(gl).m_diffuse_color;
+			global_state.light_intensity = m_scene->getGlobalLight(gl).m_diffuse_intensity;
+			global_state.light_indirect_intensity = m_scene->getGlobalLight(gl).m_indirect_intensity;
 		}
 
 		prepareShadowCameras(global_state);
@@ -850,10 +831,10 @@ struct PipelineImpl final : Pipeline
 					for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++) {
 						if (0 == pcmd->ElemCount) continue;
 			
-						ffr::scissor(uint(Math::maximum(pcmd->ClipRect.x, 0.0f)),
-							uint(Math::maximum(pcmd->ClipRect.y, 0.0f)),
-							uint(Math::minimum(pcmd->ClipRect.z, 65535.0f) - Math::maximum(pcmd->ClipRect.x, 0.0f)),
-							uint(Math::minimum(pcmd->ClipRect.w, 65535.0f) - Math::maximum(pcmd->ClipRect.y, 0.0f)));
+						ffr::scissor(uint(maximum(pcmd->ClipRect.x, 0.0f)),
+							uint(maximum(pcmd->ClipRect.y, 0.0f)),
+							uint(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
+							uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 			
 						const Texture* atlas_texture = pipeline->m_renderer.getFontManager().getAtlasTexture();
 						ffr::TextureHandle texture_id = atlas_texture->handle;
@@ -1669,7 +1650,7 @@ struct PipelineImpl final : Pipeline
 		const int cols = shadowmap_width / tile_width;
 		const int rows = shadowmap_height / tile_height;
 		PointLight lights[16];
-		const int max_count = Math::maximum(lengthOf(lights), cols * rows);
+		const int max_count = maximum(lengthOf(lights), cols * rows);
 		const int count = pipeline->m_scene->getClosestShadowcastingPointLights(cp.pos, max_count, lights);
 
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
@@ -2391,10 +2372,10 @@ struct PipelineImpl final : Pipeline
 					const IVec2 to_unclamped = to;
 					const IVec4 from_to_sup(from_unclamped, to_unclamped);
 					
-					from.x = Math::clamp(from.x, 0, 1024 / s);
-					from.y = Math::clamp(from.y, 0, 1024 / s);
-					to.x = Math::clamp(to.x, 0, 1024 / s);
-					to.y = Math::clamp(to.y, 0, 1024 / s);
+					from.x = clamp(from.x, 0, 1024 / s);
+					from.y = clamp(from.y, 0, 1024 / s);
+					to.x = clamp(to.x, 0, 1024 / s);
+					to.y = clamp(to.y, 0, 1024 / s);
 
 					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
 						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
@@ -2705,7 +2686,7 @@ struct PipelineImpl final : Pipeline
 							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 							const PointLight& pl = scene->getPointLight(e);
-							*intersecting = frustum.intersectNearPlane(tr.pos, pl.range * Math::SQRT3);
+							*intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
 							if (*intersecting) {
 								WRITE(tr.rot);
 								WRITE(lpos);
@@ -2826,7 +2807,7 @@ struct PipelineImpl final : Pipeline
 									const DVec3 pos = entity_data[e.index].pos;
 									const DVec3 rel_pos = pos - camera_pos;
 									const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-									const u32 depth_bits = Math::floatFlip(*(u32*)&squared_length);
+									const u32 depth_bits = floatFlip(*(u32*)&squared_length);
 									const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
 									result.push(key, subrenderable);
 								}
@@ -2905,7 +2886,7 @@ struct PipelineImpl final : Pipeline
 			const int step = (size + jobs_count - 1) / jobs_count;
 			int offset = 0;
 			for(int i = 0; i < jobs_count; ++i) {
-				const int count = Math::minimum(step, size - offset);
+				const int count = minimum(step, size - offset);
 				if (count <= 0) break;
 				CreateCommands& ctx = create_commands[i];
 				ctx.renderables = renderables + offset;

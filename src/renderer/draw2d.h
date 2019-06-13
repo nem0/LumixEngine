@@ -2,7 +2,7 @@
 
 
 #include "engine/array.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "imgui/imgui.h"
 
 // ImDraw2D and dependencies from imgui + refactored

@@ -12,8 +12,9 @@ namespace Debug
 {
 
 
-void LUMIX_ENGINE_API debugBreak();
-void LUMIX_ENGINE_API debugOutput(const char* message);
+LUMIX_ENGINE_API void debugBreak();
+LUMIX_ENGINE_API void debugOutput(const char* message);
+LUMIX_ENGINE_API void enableFloatingPointTraps(bool enable);
 
 
 class StackNode;

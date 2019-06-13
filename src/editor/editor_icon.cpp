@@ -1,6 +1,5 @@
 #include "editor_icon.h"
-#include "engine/math_utils.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -288,7 +287,7 @@ struct EditorIconsImpl final : public EditorIcons
 			const DVec3 position = universe.getPosition(icon.entity);
 			const float distance = (position - vp.pos).toFloat().length();
 			float scale_factor = MIN_SCALE_FACTOR + distance;
-			scale_factor = Math::clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
+			scale_factor = clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
 			icon.scale = tan(vp.fov * 0.5f) * distance / scale_factor;
 			
 			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);

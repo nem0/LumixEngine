@@ -169,7 +169,7 @@ void SceneView::update(float)
 					 screen_y <= m_screen_y + m_height;
 	if (!is_inside) return;
 
-	m_camera_speed = Math::maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
+	m_camera_speed = maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
 	float speed = m_camera_speed;
 	if (ImGui::GetIO().KeyShift) speed *= 10;

@@ -10,7 +10,7 @@
 #include "editor/world_editor.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/default_allocator.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -23,7 +23,6 @@
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
-#include "engine/quat.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/timer.h"
@@ -279,7 +278,7 @@ public:
 		char saved_data_dir[MAX_PATH_LENGTH] = {};
 		OS::InputFile cfg_file;
 		if (cfg_file.open(".lumixuser")) {
-			cfg_file.read(saved_data_dir, Math::minimum(lengthOf(saved_data_dir), (int)cfg_file.size()));
+			cfg_file.read(saved_data_dir, minimum(lengthOf(saved_data_dir), (int)cfg_file.size()));
 			cfg_file.close();
 		}
 
@@ -2495,9 +2494,9 @@ public:
 				return;
 			}
 			u8 buf[4096];
-			for (; src_size > 0; src_size -= Math::minimum(sizeof(buf), src_size))
+			for (; src_size > 0; src_size -= minimum(sizeof(buf), src_size))
 			{
-				size_t batch_size = Math::minimum(sizeof(buf), src_size);
+				size_t batch_size = minimum(sizeof(buf), src_size);
 				if (!src.read(buf, batch_size))
 				{
 					file.close();

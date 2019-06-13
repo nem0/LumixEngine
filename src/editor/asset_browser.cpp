@@ -319,7 +319,7 @@ void AssetBrowser::fileColumn()
 
 	float w = ImGui::GetContentRegionAvailWidth();
 	int columns = m_show_thumbnails ? (int)w / TILE_SIZE : 1;
-	columns = Math::maximum(columns, 1);
+	columns = maximum(columns, 1);
 	int tile_count = m_filtered_file_infos.empty() ? m_file_infos.size() : m_filtered_file_infos.size();
 	int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
 	ImGuiListClipper clipper(row_count);
@@ -512,7 +512,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::PushID(str_id);
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
-	float text_width = Math::maximum(
+	float text_width = maximum(
 		50.0f, item_w - ImGui::CalcTextSize(" ... ").x - style.FramePadding.x * 2);
 
 	
@@ -526,7 +526,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	while (*c && c - buf < max_size && *c != ':') ++c;
 	if(*c == ':') {
 		char tmp[64];
-		copyString(tmp, Math::minimum(lengthOf(tmp), int(c - buf) + 1), buf); 
+		copyString(tmp, minimum(lengthOf(tmp), int(c - buf) + 1), buf); 
 		ImGui::Text("%s", tmp);
 	}
 	else {
@@ -684,14 +684,14 @@ void AssetBrowser::openInExternalEditor(const char* path) const
 void AssetBrowser::goBack()
 {
 	if (m_history_index < 1) return;
-	m_history_index = Math::maximum(0, m_history_index - 1);
+	m_history_index = maximum(0, m_history_index - 1);
 	selectResource(m_history[m_history_index], false);
 }
 
 
 void AssetBrowser::goForward()
 {
-	m_history_index = Math::minimum(m_history_index + 1, m_history.size() - 1);
+	m_history_index = minimum(m_history_index + 1, m_history.size() - 1);
 	selectResource(m_history[m_history_index], false);
 }
 

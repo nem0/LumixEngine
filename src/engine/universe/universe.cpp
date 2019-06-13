@@ -2,7 +2,7 @@
 #include "engine/crc32.h"
 #include "engine/iplugin.h"
 #include "engine/log.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"

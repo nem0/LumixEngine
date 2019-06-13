@@ -1,6 +1,6 @@
 #include "viewport.h"
 #include "engine/geometry.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 
 
 namespace Lumix

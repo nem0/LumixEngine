@@ -4,7 +4,7 @@
 #include "engine/iallocator.h"
 #include "engine/lumix.h"
 #include "engine/metaprogramming.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/string.h"
 
 
@@ -558,7 +558,7 @@ namespace Lumix
 
 		void init(size_type ids_count = s_default_ids_count)
 		{
-			ASSERT(Math::isPowOfTwo(ids_count));
+			ASSERT(isPowOfTwo(ids_count));
 			m_table = (node_type*)m_allocator.allocate(sizeof(node_type) * ids_count);
 			for(node_type* i = m_table; i < &m_table[ids_count]; ++i) {
 				i->m_next = m_sentinel;
@@ -589,7 +589,7 @@ namespace Lumix
 		{
 			size_type old_size = m_size;
 			size_type old_ids_count = m_max_id;
-			size_type pow2_ids_count = Math::nextPow2(ids_count);
+			size_type pow2_ids_count = nextPow2(ids_count);
 			size_type new_ids_count = pow2_ids_count < 512 ? pow2_ids_count * 4 : pow2_ids_count * 2;
 			node_type* old = m_table;
 

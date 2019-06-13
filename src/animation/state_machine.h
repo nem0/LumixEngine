@@ -152,7 +152,7 @@ struct AnimationNode : public Node
 	bool looped = true;
 	bool new_on_loop = true;
 	int root_rotation_input_offset = -1;
-	float max_root_rotation_speed = Math::degreesToRadians(90);
+	float max_root_rotation_speed = degreesToRadians(90);
 };
 
 

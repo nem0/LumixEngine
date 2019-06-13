@@ -4,7 +4,7 @@
 #include "engine/fibers.h"
 #include "engine/iallocator.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
@@ -453,7 +453,7 @@ bool init(IAllocator& allocator)
 		decl.idx = i;
 	}
 
-	int count = Math::maximum(1, int(MT::getCPUsCount()));
+	int count = maximum(1, int(MT::getCPUsCount()));
 	for (int i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
 		if (task->create("Worker", false)) {

@@ -12,7 +12,6 @@
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
-#include "renderer/draw2d.h"
 #include "renderer/font_manager.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"

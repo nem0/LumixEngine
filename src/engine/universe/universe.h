@@ -5,8 +5,7 @@
 #include "engine/delegate_list.h"
 #include "engine/iplugin.h"
 #include "engine/lumix.h"
-#include "engine/matrix.h"
-#include "engine/quat.h"
+#include "engine/math.h"
 #include "engine/string.h"
 
 

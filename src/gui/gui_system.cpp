@@ -5,7 +5,7 @@
 #include "engine/iallocator.h"
 #include "engine/input_system.h"
 #include "engine/lua_wrapper.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
@@ -78,14 +78,14 @@ struct GUISystemImpl final : public GUISystem
 					ColorAttribute())
 			),
 			component("gui_image",
-				property("Enabled", LUMIX_PROP_FULL(GUIScene, isImageEnabled, enableImage)),
+				property("Enabled", &GUIScene::isImageEnabled, &GUIScene::enableImage),
 				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA),
 					ColorAttribute()),
 				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite),
 					ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
 			),
 			component("gui_rect",
-				property("Enabled", LUMIX_PROP_FULL(GUIScene, isRectEnabled, enableRect)),
+				property("Enabled", &GUIScene::isRectEnabled, &GUIScene::enableRect),
 				property("Clip content", LUMIX_PROP(GUIScene, RectClip)),
 				property("Top Points", LUMIX_PROP(GUIScene, RectTopPoints)),
 				property("Top Relative", LUMIX_PROP(GUIScene, RectTopRelative)),

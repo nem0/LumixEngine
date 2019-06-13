@@ -4,8 +4,7 @@
 #include "occlusion_buffer.h"
 #include "engine/array.h"
 #include "engine/geometry.h"
-#include "engine/matrix.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/profiler.h"
 #include "engine/universe/universe.h"
 #include "renderer/model.h"
@@ -75,12 +74,12 @@ bool OcclusionBuffer::isOccluded(const Transform& world_transform, const AABB& a
 
 	for (int i = 1; i < lengthOf(vertices); ++i)
 	{
-		min.x = Math::minimum(vertices[i].x, min.x);
-		min.y = Math::minimum(vertices[i].y, min.y);
-		min.z = Math::minimum(vertices[i].z, min.z);
+		min.x = minimum(vertices[i].x, min.x);
+		min.y = minimum(vertices[i].y, min.y);
+		min.z = minimum(vertices[i].z, min.z);
 
-		max.x = Math::maximum(vertices[i].x, max.x);
-		max.y = Math::maximum(vertices[i].y, max.y);
+		max.x = maximum(vertices[i].x, max.x);
+		max.y = maximum(vertices[i].y, max.y);
 	}
 
 	if (max.x < 0) return false;
@@ -88,10 +87,10 @@ bool OcclusionBuffer::isOccluded(const Transform& world_transform, const AABB& a
 	if (min.x >= 1) return false;
 	if (min.y >= 1) return false;
 
-	int min_x = Math::maximum(0, int(min.x * (WIDTH - 1) + 0.5f));
-	int max_x = Math::minimum(WIDTH - 1, int(max.x * (WIDTH - 1) + 0.5f));
-	int min_y = Math::maximum(0, int(min.y * (HEIGHT - 1) + 0.5f));
-	int max_y = Math::minimum(HEIGHT - 1, int(max.y * (HEIGHT - 1) + 0.5f));
+	int min_x = maximum(0, int(min.x * (WIDTH - 1) + 0.5f));
+	int max_x = minimum(WIDTH - 1, int(max.x * (WIDTH - 1) + 0.5f));
+	int min_y = maximum(0, int(min.y * (HEIGHT - 1) + 0.5f));
+	int max_y = minimum(HEIGHT - 1, int(max.y * (HEIGHT - 1) + 0.5f));
 
 	int z = int(min.z * Z_SCALE);
 
@@ -146,7 +145,7 @@ void OcclusionBuffer::buildHierarchy()
 			int* end = mip + w;
 			while (mip != end)
 			{
-				*mip = Math::maximum(prev_mip[0], prev_mip[1], prev_mip[prev_w], prev_mip[prev_w + 1]);
+				*mip = maximum(prev_mip[0], prev_mip[1], prev_mip[prev_w], prev_mip[prev_w + 1]);
 				++mip;
 				prev_mip += 2;
 			}
@@ -161,9 +160,9 @@ LUMIX_FORCE_INLINE void rasterizeProjectedTriangle(Vec3(&v)[3], int* depth)
 	bool is_backface = n.z <= 0;
 	if (is_backface) return;
 
-	if (v[0].y > v[2].y) Math::swap(v[0], v[2]);
-	if (v[0].y > v[1].y) Math::swap(v[0], v[1]);
-	if (v[1].y > v[2].y) Math::swap(v[1], v[2]);
+	if (v[0].y > v[2].y) swap(v[0], v[2]);
+	if (v[0].y > v[1].y) swap(v[0], v[1]);
+	if (v[1].y > v[2].y) swap(v[1], v[2]);
 
 	int width = WIDTH;
 	int height = HEIGHT;
@@ -185,7 +184,7 @@ LUMIX_FORCE_INLINE void rasterizeProjectedTriangle(Vec3(&v)[3], int* depth)
 		Vec3 left_p = dl > dr ? v[2] : v[1];
 		int dz_left = int((left_p.z - v[0].z) * Z_SCALE / (left_p.y - (v[0].y + 0.5f / HEIGHT)) / HEIGHT);
 		int z_left = int(v[0].z * Z_SCALE) + (dz_left >> 1);
-		if (dl > dr) Math::swap(dl, dr);
+		if (dl > dr) swap(dl, dr);
 		int left = p0.x * XY_SCALE + (dl >> 1);
 		int right = p0.x * XY_SCALE + (dr >> 1);
 		for (int y = p0.y; y <= p1.y; ++y)
@@ -210,7 +209,7 @@ LUMIX_FORCE_INLINE void rasterizeProjectedTriangle(Vec3(&v)[3], int* depth)
 	Vec3 left_p = dl > dr ? v[0] : v[1];
 	int dz_left = -int((left_p.z - v[2].z) * Z_SCALE / (left_p.y - (v[2].y - 0.5f / HEIGHT)) / HEIGHT);
 
-	if (dl > dr) Math::swap(dl, dr);
+	if (dl > dr) swap(dl, dr);
 	int left = p2.x * XY_SCALE + (dl >> 1);
 	int right = p2.x * XY_SCALE + (dr >> 1);
 	int z_left = int(v[2].z * Z_SCALE) + (dz_left >> 1);

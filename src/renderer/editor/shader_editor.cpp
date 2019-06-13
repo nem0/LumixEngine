@@ -2,7 +2,7 @@
 #include "editor/utils.h"
 #include "engine/crc32.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/stream.h"
@@ -1829,7 +1829,7 @@ void ShaderEditor::load()
 	for(auto* node : m_vertex_nodes)
 	{
 		loadNodeConnections(blob, *node);
-		m_last_node_id = Math::maximum(int(node->m_id + 1), int(m_last_node_id));
+		m_last_node_id = maximum(int(node->m_id + 1), int(m_last_node_id));
 	}
 
 	blob.read(size);
@@ -1841,7 +1841,7 @@ void ShaderEditor::load()
 	for (auto* node : m_fragment_nodes)
 	{
 		loadNodeConnections(blob, *node);
-		m_last_node_id = Math::maximum(int(node->m_id + 1), int(m_last_node_id));
+		m_last_node_id = maximum(int(node->m_id + 1), int(m_last_node_id));
 	}
 }
 

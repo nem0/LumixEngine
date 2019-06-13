@@ -2,8 +2,7 @@
 
 
 #include "engine/lumix.h"
-#include "engine/quat.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 
 
 namespace Lumix

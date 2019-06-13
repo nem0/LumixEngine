@@ -1,8 +1,7 @@
 #include "renderer/pose.h"
-#include "engine/matrix.h"
-#include "engine/quat.h"
+#include "engine/math.h"
 #include "engine/profiler.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "renderer/model.h"
 
 
@@ -31,7 +30,7 @@ void Pose::blend(Pose& rhs, float weight)
 {
 	ASSERT(count == rhs.count);
 	if (weight <= 0.001f) return;
-	weight = Math::clamp(weight, 0.0f, 1.0f);
+	weight = clamp(weight, 0.0f, 1.0f);
 	float inv = 1.0f - weight;
 	for (int i = 0, c = count; i < c; ++i)
 	{

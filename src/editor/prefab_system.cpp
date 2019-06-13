@@ -11,7 +11,7 @@
 #include "engine/iplugin.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"

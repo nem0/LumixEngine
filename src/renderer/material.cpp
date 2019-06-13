@@ -473,7 +473,7 @@ void Material::onBeforeReady()
 	for (int i = m_shader->m_texture_slot_count; i < m_texture_count; ++i) {
 		setTexture(i, nullptr);
 	}
-	m_texture_count = Math::minimum(m_texture_count, m_shader->m_texture_slot_count);
+	m_texture_count = minimum(m_texture_count, m_shader->m_texture_slot_count);
 
 	
 	m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);

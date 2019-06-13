@@ -1,8 +1,6 @@
 #include "editor/gizmo.h"
-#include "engine/math_utils.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/os.h"
-#include "engine/quat.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "render_interface.h"
@@ -169,7 +167,7 @@ struct GizmoImpl final : public Gizmo
 					break;
 				case Mode::ROTATE:
 					if (m_is_dragging && m_active == i) {
-						float angle_degrees = Math::radiansToDegrees(m_angle_accum);
+						float angle_degrees = radiansToDegrees(m_angle_accum);
 						StaticString<128> tmp("", angle_degrees, " deg");
 						Vec2 screen_delta = (m_start_mouse_pos - p).normalized();
 						Vec2 text_pos = m_start_mouse_pos + screen_delta * 15;
@@ -354,7 +352,7 @@ struct GizmoImpl final : public Gizmo
 		u16* indices = ptrs.indices;
 		RenderData::Vertex* vertices = ptrs.vertices;
 
-		const float ANGLE_STEP = Math::degreesToRadians(1.0f / 100.0f * 360.0f);
+		const float ANGLE_STEP = degreesToRadians(1.0f / 100.0f * 360.0f);
 		Vec3 n = crossProduct(a, b) * 0.05f;
 		int offset = -1;
 		for (int i = 0; i < 25; ++i) {
@@ -436,7 +434,7 @@ struct GizmoImpl final : public Gizmo
 	void renderArc(RenderData* data, const Vec3& pos, const Vec3& n, const Vec3& origin, float angle, u32 color) const
 	{
 		
-		const int count = Math::clamp(int(fabs(angle) / 0.1f), 1, 50);
+		const int count = clamp(int(fabs(angle) / 0.1f), 1, 50);
 		const DataPtrs ptrs = reserve(data, Matrix::IDENTITY, false, count + 2, count * 3);
 		u16* indices = ptrs.indices;
 		RenderData::Vertex* vertices = ptrs.vertices;
@@ -567,20 +565,20 @@ struct GizmoImpl final : public Gizmo
 
 		const Vec3 rel_origin = (origin - camera_pos).toFloat();
 		float t, tmin = FLT_MAX;
-		bool hit = Math::getRayTriangleIntersection(rel_origin, dir, pos, pos + x, pos + y, &t);
+		bool hit = getRayTriangleIntersection(rel_origin, dir, pos, pos + x, pos + y, &t);
 		Axis transform_axis = Axis::NONE;
 		if (hit)
 		{
 			tmin = t;
 			transform_axis = Axis::XY;
 		}
-		hit = Math::getRayTriangleIntersection(rel_origin, dir, pos, pos + y, pos + z, &t);
+		hit = getRayTriangleIntersection(rel_origin, dir, pos, pos + y, pos + z, &t);
 		if (hit && t < tmin)
 		{
 			tmin = t;
 			transform_axis = Axis::YZ;
 		}
-		hit = Math::getRayTriangleIntersection(rel_origin, dir, pos, pos + x, pos + z, &t);
+		hit = getRayTriangleIntersection(rel_origin, dir, pos, pos + x, pos + z, &t);
 		if (hit && t < tmin)
 		{
 			transform_axis = Axis::XZ;
@@ -591,9 +589,9 @@ struct GizmoImpl final : public Gizmo
 			return transform_axis;
 		}
 
-		float x_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getXVector());
-		float y_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getYVector());
-		float z_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getZVector());
+		float x_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getXVector());
+		float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getYVector());
+		float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getZVector());
 
 		float influenced_dist = scale * INFLUENCE_DISTANCE;
 		if (x_dist > influenced_dist && y_dist > influenced_dist && z_dist > influenced_dist)
@@ -624,9 +622,9 @@ struct GizmoImpl final : public Gizmo
 		const Matrix mtx = gizmo_tr.rot.toMatrix() * scale_mtx;
 		const Vec3 pos = (gizmo_tr.pos - camera_pos).toFloat();
 		const Vec3 rel_origin = (origin - camera_pos).toFloat();
-		const float x_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getXVector());
-		const float y_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getYVector());
-		const float z_dist = Math::getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getZVector());
+		const float x_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getXVector());
+		const float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getYVector());
+		const float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + mtx.getZVector());
 
 		float influenced_dist = scale * INFLUENCE_DISTANCE;
 		if (x_dist > influenced_dist && y_dist > influenced_dist && z_dist > influenced_dist)
@@ -655,7 +653,7 @@ struct GizmoImpl final : public Gizmo
 		const Vec3 rel_origin = (origin - camera_pos).toFloat();
 
 		Vec3 hit;
-		if (Math::getRaySphereIntersection(rel_origin, dir, pos, scale, hit)) {
+		if (getRaySphereIntersection(rel_origin, dir, pos, scale, hit)) {
 			const Vec3 x = gizmo_tr.rot * Vec3(1, 0, 0);
 			const float x_dist = fabs(dotProduct(hit, x) - dotProduct(x, pos));
 
@@ -775,7 +773,7 @@ struct GizmoImpl final : public Gizmo
 			}
 			float t;
 			const Vec3 rel_origin = (origin - gizmo_tr.pos).toFloat();
-			if (Math::getRayPlaneIntersecion(rel_origin, dir, Vec3(0), plane_normal, t))
+			if (getRayPlaneIntersecion(rel_origin, dir, Vec3(0), plane_normal, t))
 			{
 				return origin + dir * t;
 			}
@@ -818,8 +816,8 @@ struct GizmoImpl final : public Gizmo
 		
 		const Vec3 side = crossProduct(axis, start_delta);
 
-		const float y = Math::clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
-		const float x = Math::clamp(dotProduct(delta, side), -1.0f, 1.0f);
+		const float y = clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
+		const float x = clamp(dotProduct(delta, side), -1.0f, 1.0f);
 
 		return atan2(x, y);
 		/*
@@ -830,12 +828,12 @@ struct GizmoImpl final : public Gizmo
 			if (m_rel_accum.x + m_rel_accum.y > 50)
 			{
 				m_rel_accum.x = m_rel_accum.y = 0;
-				return Math::degreesToRadians(float(getStep()));
+				return degreesToRadians(float(getStep()));
 			}
 			else if (m_rel_accum.x + m_rel_accum.y < -50)
 			{
 				m_rel_accum.x = m_rel_accum.y = 0;
-				return -Math::degreesToRadians(float(getStep()));
+				return -degreesToRadians(float(getStep()));
 			}
 			else
 			{
@@ -882,7 +880,7 @@ struct GizmoImpl final : public Gizmo
 		m_mouse_pos = m_editor.getMousePos();
 
 		m_angle_accum += angle;
-		m_angle_accum = Math::angleDiff(m_angle_accum, 0);
+		m_angle_accum = angleDiff(m_angle_accum, 0);
 
 		if (m_editor.getSelectedEntities()[0] == m_entities[m_active])
 		{

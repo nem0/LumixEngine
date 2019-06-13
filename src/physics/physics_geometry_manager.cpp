@@ -4,7 +4,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "physics/physics_system.h"
 #include <PxPhysicsAPI.h>
 
@@ -30,7 +30,7 @@ struct OutputStream final : public physx::PxOutputStream
 	{
 		if (size + (int)count > capacity)
 		{
-			int new_capacity = Math::maximum(size + (int)count, capacity + 4096);
+			int new_capacity = maximum(size + (int)count, capacity + 4096);
 			u8* new_data = (u8*)allocator.allocate(sizeof(u8) * new_capacity);
 			copyMemory(new_data, data, size);
 			allocator.deallocate(data);

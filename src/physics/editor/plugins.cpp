@@ -9,7 +9,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/path_utils.h"
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
@@ -218,21 +218,21 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		dir = dir * (1.0f / SEGMENT_COUNT);
 		float dir_len = dir.length();
 		Vec3 right(0, -dir.z, dir.y);
-		if (Math::abs(right.y) < 0.001f && Math::abs(right.z) < 0.001f)
+		if (abs(right.y) < 0.001f && abs(right.z) < 0.001f)
 		{
 			right.set(dir.z, 0, -dir.x);
 		}
 		right.normalize();
 		Vec3 up = crossProduct(dir, right).normalized();
-		right *= Math::minimum(1.0f, 5 * dir_len);
-		up *= Math::minimum(1.0f, 5 * dir_len);
+		right *= minimum(1.0f, 5 * dir_len);
+		up *= minimum(1.0f, 5 * dir_len);
 
 		Vec3 force = phy_scene->getDistanceJointLinearForce(entity);
 
-		float t = Math::minimum(force.length() / 10.0f, 1.0f);
+		float t = minimum(force.length() / 10.0f, 1.0f);
 		u32 color = 0xff000000 + (u32(t * 0xff) << 16) + u32((1 - t) * 0xff);
 		render_scene->addDebugLine(pos + right, pos, color, 0);
-		static const float ANGLE_STEP = Math::PI * 2 * float(TWIST_COUNT) / SEGMENT_COUNT;
+		static const float ANGLE_STEP = PI * 2 * float(TWIST_COUNT) / SEGMENT_COUNT;
 		float c = cosf(0);
 		float s = sinf(0);
 		for (int i = 0; i < SEGMENT_COUNT; ++i)
@@ -443,7 +443,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
 			{
 				auto* layer_name = scene->getCollisionLayerName(i);
-				basic_offset = Math::maximum(basic_offset, ImGui::CalcTextSize(layer_name).x);
+				basic_offset = maximum(basic_offset, ImGui::CalcTextSize(layer_name).x);
 			}
 			basic_offset += ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().WindowPadding.x;
 
@@ -828,10 +828,10 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 		{
 			scene.setRagdollBoneTransform(bone_handle, transform.getRigidPart());
 		}
-		Vec3 euler_angles = Math::radiansToDegrees(transform.rot.toEuler());
+		Vec3 euler_angles = radiansToDegrees(transform.rot.toEuler());
 		if (ImGui::DragFloat3("Rotation", &euler_angles.x))
 		{
-			transform.rot.fromEuler(Math::degreesToRadians(euler_angles));
+			transform.rot.fromEuler(degreesToRadians(euler_angles));
 			scene.setRagdollBoneTransform(bone_handle, transform.getRigidPart());
 		}
 
@@ -879,20 +879,20 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 				if (ImGui::DragFloat("Linear limit", &linear_limit.value)) d6->setLinearLimit(linear_limit);
 
 				auto swing_limit = d6->getSwingLimit();
-				Vec2 tmp = {Math::radiansToDegrees(swing_limit.yAngle), Math::radiansToDegrees(swing_limit.zAngle)};
+				Vec2 tmp = {radiansToDegrees(swing_limit.yAngle), radiansToDegrees(swing_limit.zAngle)};
 				if (ImGui::DragFloat2("Swing limit", &tmp.x))
 				{
-					swing_limit.yAngle = Math::degreesToRadians(tmp.x);
-					swing_limit.zAngle = Math::degreesToRadians(tmp.y);
+					swing_limit.yAngle = degreesToRadians(tmp.x);
+					swing_limit.zAngle = degreesToRadians(tmp.y);
 					d6->setSwingLimit(swing_limit);
 				}
 
 				auto twist_limit = d6->getTwistLimit();
-				tmp = {Math::radiansToDegrees(twist_limit.lower), Math::radiansToDegrees(twist_limit.upper)};
+				tmp = {radiansToDegrees(twist_limit.lower), radiansToDegrees(twist_limit.upper)};
 				if (ImGui::DragFloat2("Twist limit", &tmp.x))
 				{
-					twist_limit.lower = Math::degreesToRadians(tmp.x);
-					twist_limit.upper = Math::degreesToRadians(tmp.y);
+					twist_limit.lower = degreesToRadians(tmp.x);
+					twist_limit.upper = degreesToRadians(tmp.y);
 					d6->setTwistLimit(twist_limit);
 				}
 

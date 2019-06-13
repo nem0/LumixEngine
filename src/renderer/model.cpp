@@ -10,7 +10,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "renderer/material.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"

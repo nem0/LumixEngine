@@ -1,6 +1,6 @@
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/input_system.h"
@@ -153,7 +153,6 @@ public:
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path(m_pipeline_path));
 		m_pipeline = Pipeline::create(*renderer, pres, m_pipeline_define, m_engine->getAllocator());
-		renderer->setMainPipeline(m_pipeline);
 
 		while (m_engine->getFileSystem().hasWork())
 		{

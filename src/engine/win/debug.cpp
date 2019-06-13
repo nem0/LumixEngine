@@ -1,13 +1,14 @@
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/mt/atomic.h"
 #include "engine/os.h"
 #include "engine/string.h"
 #include <windows.h>
 #pragma warning (push)
-#pragma warning (disable: 4091)                             // declaration of 'xx' hides previous local declaration
+#pragma warning (disable: 4091) // declaration of 'xx' hides previous local declaration
 #include <DbgHelp.h>
 #pragma warning (pop)
 #include <mapi.h>
+#include <cfloat>
 #include <cstdlib>
 #include <cstdio>
 #include "engine/default_allocator.h"
@@ -26,6 +27,21 @@ namespace Lumix
 
 namespace Debug
 {
+
+
+void enableFloatingPointTraps(bool enable)
+{
+	unsigned int cw = _control87(0, 0) & MCW_EM;
+	if (enable)
+	{
+		cw &= ~(_EM_OVERFLOW | _EM_ZERODIVIDE | _EM_INVALID | _EM_DENORMAL); // can not enable _EM_INEXACT because it is common in QT
+	}
+	else
+	{
+		cw |= _EM_OVERFLOW | _EM_INVALID | _EM_DENORMAL; // can not enable _EM_INEXACT because it is common in QT
+	}
+	_control87(cw, MCW_EM);
+}
 
 
 void debugOutput(const char* message)

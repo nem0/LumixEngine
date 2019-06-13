@@ -216,10 +216,10 @@ private:
 		Rectangle getBoundingRectangle(int texture_size) const
 		{
 			Rectangle r;
-			r.from_x = Math::maximum(0, int(texture_size * (m_local_pos.x - m_radius) - 0.5f));
-			r.from_y = Math::maximum(0, int(texture_size * (m_local_pos.z - m_radius) - 0.5f));
-			r.to_x = Math::minimum(texture_size, int(texture_size * (m_local_pos.x + m_radius) + 0.5f));
-			r.to_y = Math::minimum(texture_size, int(texture_size * (m_local_pos.z + m_radius) + 0.5f));
+			r.from_x = maximum(0, int(texture_size * (m_local_pos.x - m_radius) - 0.5f));
+			r.from_y = maximum(0, int(texture_size * (m_local_pos.z - m_radius) - 0.5f));
+			r.to_x = minimum(texture_size, int(texture_size * (m_local_pos.x + m_radius) + 0.5f));
+			r.to_y = minimum(texture_size, int(texture_size * (m_local_pos.z + m_radius) + 0.5f));
 			return r;
 		}
 
@@ -280,7 +280,7 @@ private:
 		float dist =
 			sqrt((texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
 				 (texture_size * item.m_local_pos.z - 0.5f - j) * (texture_size * item.m_local_pos.z - 0.5f - j));
-		return 1.0f - Math::minimum(dist / (texture_size * item.m_radius), 1.0f);
+		return 1.0f - minimum(dist / (texture_size * item.m_radius), 1.0f);
 	}
 
 
@@ -357,7 +357,7 @@ private:
 					{
 						if (data[offset] == m_texture_idx)
 						{
-							data[offset + 1] += Math::minimum(255 - data[offset + 1], add);
+							data[offset + 1] += minimum(255 - data[offset + 1], add);
 						}
 						else
 						{
@@ -451,7 +451,7 @@ private:
 					(texture_size * item.m_local_pos.z - 0.5f - j) * (texture_size * item.m_local_pos.z - 0.5f - j));
 				float t = (dist - texture_size * item.m_radius * item.m_amount) /
 						  (texture_size * item.m_radius * (1 - item.m_amount));
-				t = Math::clamp(1 - t, 0.0f, 1.0f);
+				t = clamp(1 - t, 0.0f, 1.0f);
 				u16 old_value = ((u16*)&data[0])[offset];
 				((u16*)&data[0])[offset] = (u16)(m_flat_height * t + old_value * (1-t));
 			}
@@ -493,7 +493,7 @@ private:
 		Rectangle rect = item.getBoundingRectangle(texture_size);
 
 		const float STRENGTH_MULTIPLICATOR = 256.0f;
-		float amount = Math::maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
+		float amount = maximum(item.m_amount * item.m_amount * STRENGTH_MULTIPLICATOR, 1.0f);
 
 		for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
 		{
@@ -504,8 +504,8 @@ private:
 
 				int add = int(attenuation * amount);
 				u16 x = ((u16*)texture->getData())[(i + j * texture_size)];
-				x += m_action_type == TerrainEditor::RAISE_HEIGHT ? Math::minimum(add, 0xFFFF - x)
-														   : Math::maximum(-add, -x);
+				x += m_action_type == TerrainEditor::RAISE_HEIGHT ? minimum(add, 0xFFFF - x)
+														   : maximum(-add, -x);
 				((u16*)&data[0])[offset] = x;
 			}
 		}
@@ -518,7 +518,7 @@ private:
 		int bpp = texture->bytes_per_pixel;
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
-		m_new_data.resize(bpp * Math::maximum(1, (rect.to_x - rect.from_x) * (rect.to_y - rect.from_y)));
+		m_new_data.resize(bpp * maximum(1, (rect.to_x - rect.from_x) * (rect.to_y - rect.from_y)));
 		copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
 
 		for (int item_index = 0; item_index < m_items.size(); ++item_index)
@@ -641,22 +641,22 @@ private:
 	{
 		int s = texture->width;
 		Item& item = m_items[0];
-		rect.from_x = Math::maximum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), 0);
-		rect.from_y = Math::maximum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), 0);
-		rect.to_x = Math::minimum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), texture->width);
-		rect.to_y = Math::minimum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), texture->height);
+		rect.from_x = maximum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), 0);
+		rect.from_y = maximum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), 0);
+		rect.to_x = minimum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), texture->width);
+		rect.to_y = minimum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), texture->height);
 		for (int i = 1; i < m_items.size(); ++i)
 		{
 			Item& item = m_items[i];
-			rect.from_x = Math::minimum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), rect.from_x);
-			rect.to_x = Math::maximum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), rect.to_x);
-			rect.from_y = Math::minimum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), rect.from_y);
-			rect.to_y = Math::maximum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), rect.to_y);
+			rect.from_x = minimum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), rect.from_x);
+			rect.to_x = maximum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), rect.to_x);
+			rect.from_y = minimum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), rect.from_y);
+			rect.to_y = maximum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), rect.to_y);
 		}
-		rect.from_x = Math::maximum(rect.from_x, 0);
-		rect.to_x = Math::minimum(rect.to_x, texture->width);
-		rect.from_y = Math::maximum(rect.from_y, 0);
-		rect.to_y = Math::minimum(rect.to_y, texture->height);
+		rect.from_x = maximum(rect.from_x, 0);
+		rect.to_x = minimum(rect.to_x, texture->width);
+		rect.from_y = maximum(rect.from_y, 0);
+		rect.to_y = minimum(rect.to_y, texture->height);
 	}
 
 
@@ -764,7 +764,7 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	m_is_rotate_x = false;
 	m_is_rotate_y = false;
 	m_is_rotate_z = false;
-	m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, Math::PI * 2);
+	m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, PI * 2);
 
 	editor.universeDestroyed().bind<TerrainEditor, &TerrainEditor::onUniverseDestroyed>(this);
 }
@@ -775,13 +775,13 @@ void TerrainEditor::nextTerrainTexture()
 	Material* material = getMaterial();
 	if (!material) return;
 	Texture* tex = material->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
-	if (tex) m_texture_idx = Math::minimum(tex->layers - 1, m_texture_idx + 1);
+	if (tex) m_texture_idx = minimum(tex->layers - 1, m_texture_idx + 1);
 }
 
 
 void TerrainEditor::prevTerrainTexture()
 {
-	m_texture_idx = Math::maximum(0, m_texture_idx - 1);
+	m_texture_idx = maximum(0, m_texture_idx - 1);
 }
 
 
@@ -792,7 +792,7 @@ void TerrainEditor::increaseBrushSize()
 		++m_terrain_brush_size;
 		return;
 	}
-	m_terrain_brush_size = Math::minimum(100.0f, m_terrain_brush_size + 10);
+	m_terrain_brush_size = minimum(100.0f, m_terrain_brush_size + 10);
 }
 
 
@@ -800,10 +800,10 @@ void TerrainEditor::decreaseBrushSize()
 {
 	if (m_terrain_brush_size < 10)
 	{
-		m_terrain_brush_size = Math::maximum(MIN_BRUSH_SIZE, m_terrain_brush_size - 1.0f);
+		m_terrain_brush_size = maximum(MIN_BRUSH_SIZE, m_terrain_brush_size - 1.0f);
 		return;
 	}
-	m_terrain_brush_size = Math::maximum(MIN_BRUSH_SIZE, m_terrain_brush_size - 10.0f);
+	m_terrain_brush_size = maximum(MIN_BRUSH_SIZE, m_terrain_brush_size - 10.0f);
 }
 
 
@@ -811,7 +811,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const DVec
 {
 	PROFILE_FUNCTION();
 	constexpr int SLICE_COUNT = 30;
-	constexpr float angle_step = Math::PI * 2 / SLICE_COUNT;
+	constexpr float angle_step = PI * 2 / SLICE_COUNT;
 	if (m_action_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl) {
 		scene.addDebugCross(center, 1.0f, 0xff0000ff, 0);
 		return;
@@ -1019,8 +1019,8 @@ static void getProjections(const Vec3& axis,
 	for(int i = 1; i < 8; ++i)
 	{
 		float dot = dotProduct(vertices[i], axis);
-		min = Math::minimum(dot, min);
-		max = Math::maximum(dot, max);
+		min = minimum(dot, min);
+		max = maximum(dot, max);
 	}
 }
 
@@ -1143,12 +1143,12 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 		auto& meshes = scene->getModelInstanceInfos(frustum, camera_pos, camera.entity, ~0ULL);
 
 		Vec2 size = scene->getTerrainSize(m_component.entity);
-		float scale = 1.0f - Math::maximum(0.01f, m_terrain_brush_strength);
+		float scale = 1.0f - maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
-			float angle = Math::randFloat(0, Math::PI * 2);
-			float dist = Math::randFloat(0, 1.0f) * m_terrain_brush_size;
-			float y = Math::randFloat(m_y_spread.x, m_y_spread.y);
+			float angle = randFloat(0, PI * 2);
+			float dist = randFloat(0, 1.0f) * m_terrain_brush_size;
+			float y = randFloat(m_y_spread.x, m_y_spread.y);
 			Vec3 pos(hit_pos.x + cos(angle) * dist, 0, hit_pos.z + sin(angle) * dist);
 			Vec3 terrain_pos = inv_terrain_matrix.transformPoint(pos);
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
@@ -1171,28 +1171,28 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 				{
 					if (m_is_rotate_x)
 					{
-						float angle = Math::randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
+						float angle = randFloat(m_rotate_x_spread.x, m_rotate_x_spread.y);
 						Quat q(Vec3(1, 0, 0), angle);
 						rot = q * rot;
 					}
 
 					if (m_is_rotate_y)
 					{
-						float angle = Math::randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
+						float angle = randFloat(m_rotate_y_spread.x, m_rotate_y_spread.y);
 						Quat q(Vec3(0, 1, 0), angle);
 						rot = q * rot;
 					}
 
 					if (m_is_rotate_z)
 					{
-						float angle = Math::randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
+						float angle = randFloat(m_rotate_z_spread.x, m_rotate_z_spread.y);
 						Quat q(rot.rotate(Vec3(0, 0, 1)), angle);
 						rot = q * rot;
 					}
 				}
 
-				float size = Math::randFloat(m_size_spread.x, m_size_spread.y);
-				int random_idx = Math::rand(0, m_selected_prefabs.size() - 1);
+				float size = randFloat(m_size_spread.x, m_size_spread.y);
+				int random_idx = rand(0, m_selected_prefabs.size() - 1);
 				if (!m_selected_prefabs[random_idx]) continue;
 				EntityRef entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
 				if (entity.isValid())
@@ -1495,12 +1495,12 @@ void TerrainEditor::onGUI()
 			if (m_is_rotate_x)
 			{
 				Vec2 tmp = m_rotate_x_spread;
-				tmp.x = Math::radiansToDegrees(tmp.x);
-				tmp.y = Math::radiansToDegrees(tmp.y);
+				tmp.x = radiansToDegrees(tmp.x);
+				tmp.y = radiansToDegrees(tmp.y);
 				if (ImGui::DragFloat2("Rotate X spread", &tmp.x))
 				{
-					m_rotate_x_spread.x = Math::degreesToRadians(tmp.x);
-					m_rotate_x_spread.y = Math::degreesToRadians(tmp.y);
+					m_rotate_x_spread.x = degreesToRadians(tmp.x);
+					m_rotate_x_spread.y = degreesToRadians(tmp.y);
 				}
 			}
 			if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y))
@@ -1510,12 +1510,12 @@ void TerrainEditor::onGUI()
 			if (m_is_rotate_y)
 			{
 				Vec2 tmp = m_rotate_y_spread;
-				tmp.x = Math::radiansToDegrees(tmp.x);
-				tmp.y = Math::radiansToDegrees(tmp.y);
+				tmp.x = radiansToDegrees(tmp.x);
+				tmp.y = radiansToDegrees(tmp.y);
 				if (ImGui::DragFloat2("Rotate Y spread", &tmp.x))
 				{
-					m_rotate_y_spread.x = Math::degreesToRadians(tmp.x);
-					m_rotate_y_spread.y = Math::degreesToRadians(tmp.y);
+					m_rotate_y_spread.x = degreesToRadians(tmp.x);
+					m_rotate_y_spread.y = degreesToRadians(tmp.y);
 				}
 			}
 			if(ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
@@ -1525,18 +1525,18 @@ void TerrainEditor::onGUI()
 			if (m_is_rotate_z)
 			{
 				Vec2 tmp = m_rotate_z_spread;
-				tmp.x = Math::radiansToDegrees(tmp.x);
-				tmp.y = Math::radiansToDegrees(tmp.y);
+				tmp.x = radiansToDegrees(tmp.x);
+				tmp.y = radiansToDegrees(tmp.y);
 				if (ImGui::DragFloat2("Rotate Z spread", &tmp.x))
 				{
-					m_rotate_z_spread.x = Math::degreesToRadians(tmp.x);
-					m_rotate_z_spread.y = Math::degreesToRadians(tmp.y);
+					m_rotate_z_spread.x = degreesToRadians(tmp.x);
+					m_rotate_z_spread.y = degreesToRadians(tmp.y);
 				}
 			}
 			ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
-			m_size_spread.x = Math::minimum(m_size_spread.x, m_size_spread.y);
+			m_size_spread.x = minimum(m_size_spread.x, m_size_spread.y);
 			ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
-			m_y_spread.x = Math::minimum(m_y_spread.x, m_y_spread.y);
+			m_y_spread.x = minimum(m_y_spread.x, m_y_spread.y);
 		}
 		break;
 		default: ASSERT(false); break;

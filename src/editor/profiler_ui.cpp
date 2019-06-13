@@ -3,14 +3,14 @@
 #include "engine/file_system.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/mt/atomic.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/timer.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "imgui/imgui.h"
 #include "utils.h"
@@ -628,7 +628,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		y += 20;
 		if (!ctx->open) continue;
 
-		float h = Math::maximum(20.f, ctx->rows * 20.f);
+		float h = maximum(20.f, ctx->rows * 20.f);
 		StaticString<256> name(ctx->name, (u64)ctx);
 		ctx->rows = 0;
 
@@ -781,7 +781,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			case Profiler::EventType::END_BLOCK:
 				if (level >= 0) {
-					ctx->rows = Math::maximum(ctx->rows, level + 1);
+					ctx->rows = maximum(ctx->rows, level + 1);
 					Profiler::EventHeader start_header;
 					read(*ctx, open_blocks[level].offset, start_header);
 					const char* name;
@@ -837,7 +837,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			p += header.size;
 		}
-		ctx->rows = Math::maximum(ctx->rows, level + 1);
+		ctx->rows = maximum(ctx->rows, level + 1);
 		while (level >= 0) {
 			Profiler::EventHeader start_header;
 			read(*ctx, open_blocks[level].offset, start_header);

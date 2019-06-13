@@ -3,7 +3,7 @@
 #include "engine/array.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/job_system.h"
@@ -18,7 +18,6 @@
 #include "engine/timer.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
-#include "renderer/draw2d.h"
 #include "renderer/font_manager.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -31,6 +30,8 @@
 #include "renderer/texture_manager.h"
 
 #include <Windows.h>
+#undef near
+#undef far
 #include "gl/GL.h"
 #include "ffr/ffr.h"
 #include <cstdio>
@@ -224,8 +225,6 @@ struct BoneProperty : Reflection::IEnumProperty
 	BoneProperty() 
 	{ 
 		name = "Bone"; 
-		getter_code = "RenderScene::getBoneAttachmentBone";
-		setter_code = "RenderScene::setBoneAttachmentBone";
 	}
 
 
@@ -304,62 +303,46 @@ static void registerProperties(IAllocator& allocator)
 			BoneProperty()
 		),
 		component("environment_probe",
-			property("Enabled", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeEnabled, enableEnvironmentProbe)),
+			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
 			property("Radius", LUMIX_PROP(RenderScene, EnvironmentProbeRadius)),
-			property("Enabled reflection", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeReflectionEnabled, enableEnvironmentProbeReflection)),
-			property("Override global size", LUMIX_PROP_FULL(RenderScene, isEnvironmentProbeCustomSize, enableEnvironmentProbeCustomSize)),
-			property("Radiance size", LUMIX_PROP(RenderScene, EnvironmentProbeRadianceSize)),
-			property("Irradiance size", LUMIX_PROP(RenderScene, EnvironmentProbeIrradianceSize))
+			property("Enabled reflection", &RenderScene::isEnvironmentProbeReflectionEnabled, &RenderScene::enableEnvironmentProbeReflection),
+			property("Override global size", &RenderScene::isEnvironmentProbeCustomSize, &RenderScene::enableEnvironmentProbeCustomSize),
+			var_property("Radiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::radiance_size),
+			var_property("Irradiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::irradiance_size)
 		),
 		component("particle_emitter",
 			property("Resource", LUMIX_PROP(RenderScene, ParticleEmitterPath),
 				ResourceAttribute("Particle emitter (*.par)", ParticleEmitterResource::TYPE))
 		),
 		component("camera",
-			property("Orthographic size", LUMIX_PROP(RenderScene, CameraOrthoSize), 
-				MinAttribute(0)),
-			property("Orthographic", LUMIX_PROP_FULL(RenderScene, isCameraOrtho, setCameraOrtho)),
-			property("FOV", LUMIX_PROP(RenderScene, CameraFOV),
-				RadiansAttribute()),
-			property("Near", LUMIX_PROP(RenderScene, CameraNearPlane), 
-				MinAttribute(0)),
-			property("Far", LUMIX_PROP(RenderScene, CameraFarPlane), 
-				MinAttribute(0))
+			var_property("FOV", &RenderScene::getCamera, &Camera::fov, RadiansAttribute()),
+			var_property("Near", &RenderScene::getCamera, &Camera::near, MinAttribute(0)),
+			var_property("Far", &RenderScene::getCamera, &Camera::far, MinAttribute(0)),
+			var_property("Orthographic", &RenderScene::getCamera, &Camera::is_ortho),
+			var_property("Orthographic size", &RenderScene::getCamera, &Camera::ortho_size, MinAttribute(0))
 		),
 		component("model_instance",
-			property("Enabled", LUMIX_PROP_FULL(RenderScene, isModelInstanceEnabled, enableModelInstance)),
+			property("Enabled", &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
 				ResourceAttribute("Mesh (*.msh)", Model::TYPE))
 		),
 		component("global_light",
-			property("Color", LUMIX_PROP(RenderScene, GlobalLightColor),
-				ColorAttribute()),
-			property("Intensity", LUMIX_PROP(RenderScene, GlobalLightIntensity), 
-				MinAttribute(0)),
-			property("Indirect intensity", LUMIX_PROP(RenderScene, GlobalLightIndirectIntensity), MinAttribute(0)),
-			property("Fog density", LUMIX_PROP(RenderScene, FogDensity),
-				ClampAttribute(0, 1)),
-			property("Fog bottom", LUMIX_PROP(RenderScene, FogBottom)),
-			property("Fog height", LUMIX_PROP(RenderScene, FogHeight), 
-				MinAttribute(0)),
-			property("Fog color", LUMIX_PROP(RenderScene, FogColor),
-				ColorAttribute()),
+			var_property("Color", &RenderScene::getGlobalLight, &GlobalLight::m_diffuse_color, ColorAttribute()),
+			var_property("Intensity", &RenderScene::getGlobalLight, &GlobalLight::m_diffuse_intensity, MinAttribute(0)),
+			var_property("Indirect intensity", &RenderScene::getGlobalLight, &GlobalLight::m_indirect_intensity, MinAttribute(0)),
+			var_property("Fog density", &RenderScene::getGlobalLight, &GlobalLight::m_fog_density, ClampAttribute(0, 1)),
+			var_property("Fog bottom", &RenderScene::getGlobalLight, &GlobalLight::m_fog_bottom),
+			var_property("Fog height", &RenderScene::getGlobalLight, &GlobalLight::m_fog_height, MinAttribute(0)),
+			var_property("Fog color", &RenderScene::getGlobalLight, &GlobalLight::m_fog_color, ColorAttribute()),
 			property("Shadow cascades", LUMIX_PROP(RenderScene, ShadowmapCascades))
 		),
 		component("point_light",
-			property("Color", LUMIX_PROP(RenderScene, PointLightColor),
-				ColorAttribute()),
-			property("Intensity", LUMIX_PROP(RenderScene, PointLightIntensity), 
-				MinAttribute(0)),
-			property("FOV", LUMIX_PROP(RenderScene, LightFOV), 
-				ClampAttribute(0, 360),
-				RadiansAttribute()),
-			property("Attenuation", LUMIX_PROP(RenderScene, LightAttenuation),
-				ClampAttribute(0, 1000)),
-			property("Range", LUMIX_PROP(RenderScene, LightRange), 
-				MinAttribute(0)),
-			property("Cast shadows", LUMIX_PROP(RenderScene, LightCastShadows), 
-				MinAttribute(0))
+			var_property("Cast shadows", &RenderScene::getPointLight, &PointLight::cast_shadows),
+			var_property("Intensity", &RenderScene::getPointLight, &PointLight::intensity, MinAttribute(0)),
+			var_property("FOV", &RenderScene::getPointLight, &PointLight::fov, ClampAttribute(0, 360), RadiansAttribute()),
+			var_property("Attenuation", &RenderScene::getPointLight, &PointLight::attenuation_param, ClampAttribute(0, 100)),
+			var_property("Color", &RenderScene::getPointLight, &PointLight::color, ColorAttribute()),
+			property("Range", LUMIX_PROP(RenderScene, LightRange), MinAttribute(0))
 		),
 		component("text_mesh",
 			property("Text", LUMIX_PROP(RenderScene, TextMeshText)),
@@ -368,7 +351,7 @@ static void registerProperties(IAllocator& allocator)
 			property("Font Size", LUMIX_PROP(RenderScene, TextMeshFontSize)),
 			property("Color", LUMIX_PROP(RenderScene, TextMeshColorRGBA),
 				ColorAttribute()),
-			property("Camera-oriented", LUMIX_PROP_FULL(RenderScene, isTextMeshCameraOriented, setTextMeshCameraOriented))
+			property("Camera-oriented", &RenderScene::isTextMeshCameraOriented, &RenderScene::setTextMeshCameraOriented)
 		),
 		component("decal",
 			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),
@@ -403,15 +386,14 @@ struct RendererImpl final : public Renderer
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_texture_manager(*this, m_allocator)
-		, m_pipeline_manager(m_allocator)
+		, m_pipeline_manager(*this, m_allocator)
 		, m_model_manager(*this, m_allocator)
-		, m_particle_emitter_manager(m_allocator)
+		, m_particle_emitter_manager(*this, m_allocator)
 		, m_material_manager(*this, m_allocator)
 		, m_shader_manager(*this, m_allocator)
 		, m_font_manager(nullptr)
 		, m_shader_defines(m_allocator)
 		, m_vsync(true)
-		, m_main_pipeline(nullptr)
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
 	{
@@ -872,25 +854,8 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void setMainPipeline(Pipeline* pipeline) override
-	{
-		m_main_pipeline = pipeline;
-	}
-
-
-	Pipeline* getMainPipeline() override
-	{
-		return m_main_pipeline;
-	}
-
-
 	TextureManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
-// TODO
-	/*
-	const bgfx::VertexDecl& getBasicVertexDecl() const override { static bgfx::VertexDecl v; return v; }
-	const bgfx::VertexDecl& getBasic2DVertexDecl() const override { static bgfx::VertexDecl v; return v; }
-	*/
 
 	void createScenes(Universe& ctx) override
 	{
@@ -904,11 +869,7 @@ struct RendererImpl final : public Renderer
 	Engine& getEngine() override { return m_engine; }
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
-// TODO
-	/*
-	const bgfx::UniformHandle& getMaterialColorUniform() const override { static bgfx::UniformHandle v; return v; }
-	const bgfx::UniformHandle& getRoughnessMetallicEmissionUniform() const override { static bgfx::UniformHandle v; return v; }
-	*/
+
 	void makeScreenshot(const Path& filename) override {  }
 	void resize(int w, int h) override {  }
 
@@ -1006,14 +967,13 @@ struct RendererImpl final : public Renderer
 	Array<ShaderDefine> m_shader_defines;
 	Array<StaticString<32>> m_layers;
 	TextureManager m_texture_manager;
-	PipelineResourceManager m_pipeline_manager;
-	ParticleEmitterResourceManager m_particle_emitter_manager;
 	FontManager* m_font_manager;
 	RenderResourceManager<Material> m_material_manager;
 	RenderResourceManager<Model> m_model_manager;
+	RenderResourceManager<ParticleEmitterResource> m_particle_emitter_manager;
+	RenderResourceManager<PipelineResource> m_pipeline_manager;
 	RenderResourceManager<Shader> m_shader_manager;
 	bool m_vsync;
-	Pipeline* m_main_pipeline;
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_setup_jobs_done = JobSystem::INVALID_HANDLE;

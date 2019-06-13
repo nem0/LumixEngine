@@ -3,7 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/flag_set.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/iplugin.h"
 #include "ffr/ffr.h"
 
@@ -14,14 +14,15 @@ struct lua_State;
 namespace Lumix
 {
 
+
 struct AABB;
+struct CullResult;
 class Engine;
 struct Frustum;
 struct IAllocator;
 class Material;
 struct Mesh;
 class Model;
-struct CullResult;
 class Path;
 struct Pose;
 struct RayCastModelHit;
@@ -33,7 +34,19 @@ class Texture;
 class Universe;
 template <typename T> class Array;
 template <typename T, typename T2> class AssociativeArray;
-template <typename T> class DelegateList;
+
+
+struct Camera
+{
+	EntityRef entity;
+	float fov;
+	float near;
+	float far;
+	float ortho_size;
+	float screen_width;
+	float screen_height;
+	bool is_ortho;
+};
 
 
 struct TerrainInfo
@@ -47,6 +60,20 @@ struct TerrainInfo
 };
 
 
+struct GlobalLight
+{
+	Vec3 m_diffuse_color;
+	float m_diffuse_intensity;
+	float m_indirect_intensity;
+	Vec3 m_fog_color;
+	float m_fog_density;
+	float m_fog_bottom;
+	float m_fog_height;
+	EntityRef m_entity;
+	Vec4 m_cascades;
+};
+
+
 struct PointLight
 {
 	Vec3 color;
@@ -56,6 +83,27 @@ struct PointLight
 	float attenuation_param;
 	float range;
 	bool cast_shadows;
+};
+
+
+struct EnvironmentProbe
+{
+	enum Flags
+	{
+		REFLECTION = 1 << 0,
+		OVERRIDE_GLOBAL_SIZE = 1 << 1,
+		ENABLED = 1 << 2
+	};
+
+	Texture* texture;
+	Texture* irradiance;
+	Texture* radiance;
+	float radius;
+	u64 guid;
+	FlagSet<Flags, u32> flags;
+	int radiance_size = 128;
+	int irradiance_size = 32;
+	int reflection_size = 1024;
 };
 
 
@@ -137,6 +185,7 @@ struct DebugPoint
 	float life;
 };
 
+
 enum class RenderableTypes : u8 {
 	MESH_GROUP,
 	MESH,
@@ -147,6 +196,7 @@ enum class RenderableTypes : u8 {
 
 	COUNT
 };
+
 
 struct TextMeshVertex
 {
@@ -250,21 +300,12 @@ public:
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 	virtual const Array<DebugPoint>& getDebugPoints() const = 0;
 
+	virtual Camera& getCamera(EntityRef entity) = 0;
 	virtual Matrix getCameraProjection(EntityRef entity) = 0;
 	virtual Matrix getCameraViewProjection(EntityRef entity) = 0;
-	virtual float getCameraFOV(EntityRef entity) = 0;
-	virtual void setCameraFOV(EntityRef entity, float fov) = 0;
-	virtual void setCameraFarPlane(EntityRef entity, float far) = 0;
-	virtual void setCameraNearPlane(EntityRef entity, float near) = 0;
-	virtual float getCameraFarPlane(EntityRef entity) = 0;
-	virtual float getCameraNearPlane(EntityRef entity) = 0;
 	virtual float getCameraScreenWidth(EntityRef entity) = 0;
 	virtual float getCameraScreenHeight(EntityRef entity) = 0;
 	virtual void setCameraScreenSize(EntityRef entity, int w, int h) = 0;
-	virtual bool isCameraOrtho(EntityRef entity) = 0;
-	virtual void setCameraOrtho(EntityRef entity, bool is_ortho) = 0;
-	virtual float getCameraOrthoSize(EntityRef entity) = 0;
-	virtual void setCameraOrthoSize(EntityRef entity, float value) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 
 	virtual void setParticleEmitterPath(EntityRef entity, const Path& path) = 0;
@@ -322,44 +363,18 @@ public:
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 
-	virtual const PointLight& getPointLight(EntityRef entity) = 0;
+	virtual GlobalLight& getGlobalLight(EntityRef entity) = 0;
+	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, int max_count, PointLight* lights) = 0;
-	virtual void setLightCastShadows(EntityRef entity, bool cast_shadows) = 0;
-	virtual bool getLightCastShadows(EntityRef entity) = 0;
-	virtual float getLightAttenuation(EntityRef entity) = 0;
-	virtual void setLightAttenuation(EntityRef entity, float attenuation) = 0;
-	virtual float getLightFOV(EntityRef entity) = 0;
-	virtual void setLightFOV(EntityRef entity, float fov) = 0;
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
-	virtual void setPointLightIntensity(EntityRef entity, float intensity) = 0;
-	virtual void setGlobalLightIntensity(EntityRef entity, float intensity) = 0;
-	virtual void setGlobalLightIndirectIntensity(EntityRef entity, float intensity) = 0;
-	virtual void setPointLightColor(EntityRef entity, const Vec3& color) = 0;
-	virtual void setGlobalLightColor(EntityRef entity, const Vec3& color) = 0;
-	virtual void setFogDensity(EntityRef entity, float density) = 0;
-	virtual void setFogColor(EntityRef entity, const Vec3& color) = 0;
-	virtual float getPointLightIntensity(EntityRef entity) = 0;
 	virtual EntityRef getPointLightEntity(EntityRef entity) const = 0;
 	virtual EntityRef getGlobalLightEntity(EntityRef entity) const = 0;
-	virtual float getGlobalLightIntensity(EntityRef entity) = 0;
-	virtual float getGlobalLightIndirectIntensity(EntityRef entity) = 0;
-	virtual Vec3 getPointLightColor(EntityRef entity) = 0;
-	virtual Vec3 getGlobalLightColor(EntityRef entity) = 0;
-	virtual float getFogDensity(EntityRef entity) = 0;
-	virtual float getFogBottom(EntityRef entity) = 0;
-	virtual float getFogHeight(EntityRef entity) = 0;
-	virtual void setFogBottom(EntityRef entity, float value) = 0;
-	virtual void setFogHeight(EntityRef entity, float value) = 0;
-	virtual Vec3 getFogColor(EntityRef entity) = 0;
 
+	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
 	virtual void getEnvironmentProbes(Array<EnvProbeInfo>& probes) = 0;
-	virtual int getEnvironmentProbeIrradianceSize(EntityRef entity) = 0;
-	virtual void setEnvironmentProbeIrradianceSize(EntityRef entity, int size) = 0;
-	virtual int getEnvironmentProbeRadianceSize(EntityRef entity) = 0;
-	virtual void setEnvironmentProbeRadianceSize(EntityRef entity, int size) = 0;
 	virtual int getEnvironmentProbeReflectionSize(EntityRef entity) = 0;
 	virtual void setEnvironmentProbeReflectionSize(EntityRef entity, int size) = 0;
 	virtual bool isEnvironmentProbeReflectionEnabled(EntityRef entity) = 0;

@@ -10,7 +10,7 @@ local binary_api_dir = iif(ide_dir == "vs2019", "vs2017", ide_dir)
 
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
-local build_app = true
+local build_app = false
 local build_studio = true
 local build_game = false
 local working_dir = nil
@@ -87,8 +87,8 @@ newoption {
 }
 
 newoption {
-	trigger = "no-app",
-	description = "Do not build app."
+	trigger = "with-app",
+	description = "Do build app."
 }
 
 newoption {
@@ -174,8 +174,8 @@ if _OPTIONS["no-studio"] then
 end
 
 
-if _OPTIONS["no-app"] then
-	build_app = false
+if _OPTIONS["with-app"] then
+	build_app = true
 end
 
 newoption {

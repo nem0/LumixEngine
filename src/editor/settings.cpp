@@ -1,5 +1,5 @@
 #include "settings.h"
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/file_system.h"
 #include "engine/engine.h"
 #include "engine/log.h"

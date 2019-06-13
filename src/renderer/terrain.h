@@ -2,10 +2,8 @@
 
 
 #include "engine/array.h"
-#include "engine/associative_array.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/resource.h"
-#include "engine/vec.h"
 #include "ffr/ffr.h"
 
 

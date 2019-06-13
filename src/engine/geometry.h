@@ -1,7 +1,7 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 
 
 namespace Lumix

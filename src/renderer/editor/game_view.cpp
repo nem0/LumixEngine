@@ -80,7 +80,6 @@ GameView::GameView(StudioApp& app)
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW", engine.getAllocator());
-	renderer->setMainPipeline(m_pipeline);
 
 	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
 	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);

@@ -2,7 +2,7 @@
 
 
 #include "engine/lumix.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 
 
 struct lua_State;

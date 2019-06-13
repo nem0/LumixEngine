@@ -1,6 +1,6 @@
 #include "draw2d.h"
 
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #define STBRP_ASSERT(x)    ASSERT(x)
 #ifndef IMGUI_DISABLE_STB_RECT_PACK_IMPLEMENTATION
 #define STBRP_STATIC
@@ -136,8 +136,8 @@ void Draw2D::PushClipRect(Vec2 cr_min, Vec2 cr_max, bool intersect_with_current_
 		if (cr.z > current.z) cr.z = current.z;
 		if (cr.w > current.w) cr.w = current.w;
 	}
-	cr.z = Math::maximum(cr.x, cr.z);
-	cr.w = Math::maximum(cr.y, cr.w);
+	cr.z = maximum(cr.x, cr.z);
+	cr.w = maximum(cr.y, cr.w);
 
 	_ClipRectStack.push(cr);
 	UpdateClipRect();
@@ -581,7 +581,7 @@ void Draw2D::PathArcToFast(const Vec2& centre, float radius, int amin, int amax)
 	{
 		for (int i = 0; i < circle_vtx_count; i++)
 		{
-			const float a = ((float)i / (float)circle_vtx_count) * 2 * Math::PI;
+			const float a = ((float)i / (float)circle_vtx_count) * 2 * PI;
 			circle_vtx[i].x = cosf(a);
 			circle_vtx[i].y = sinf(a);
 		}
@@ -669,8 +669,8 @@ void Draw2D::PathBezierCurveTo(const Vec2& p2, const Vec2& p3, const Vec2& p4, i
 void Draw2D::PathRect(const Vec2& a, const Vec2& b, float rounding, int rounding_corners)
 {
 	float r = rounding;
-	r = Math::minimum(r, fabsf(b.x - a.x) * (((rounding_corners&(1 | 2)) == (1 | 2)) || ((rounding_corners&(4 | 8)) == (4 | 8)) ? 0.5f : 1.0f) - 1.0f);
-	r = Math::minimum(r, fabsf(b.y - a.y) * (((rounding_corners&(1 | 8)) == (1 | 8)) || ((rounding_corners&(2 | 4)) == (2 | 4)) ? 0.5f : 1.0f) - 1.0f);
+	r = minimum(r, fabsf(b.x - a.x) * (((rounding_corners&(1 | 2)) == (1 | 2)) || ((rounding_corners&(4 | 8)) == (4 | 8)) ? 0.5f : 1.0f) - 1.0f);
+	r = minimum(r, fabsf(b.y - a.y) * (((rounding_corners&(1 | 8)) == (1 | 8)) || ((rounding_corners&(2 | 4)) == (2 | 4)) ? 0.5f : 1.0f) - 1.0f);
 
 	if (r <= 0.0f || rounding_corners == 0)
 	{
@@ -792,7 +792,7 @@ void Draw2D::AddCircle(const Vec2& centre, float radius, u32 col, int num_segmen
 	if ((col & IM_COL32_A_MASK) == 0)
 		return;
 
-	const float a_max = Math::PI*2.0f * ((float)num_segments - 1.0f) / (float)num_segments;
+	const float a_max = PI*2.0f * ((float)num_segments - 1.0f) / (float)num_segments;
 	PathArcTo(centre, radius - 0.5f, 0.0f, a_max, num_segments);
 	PathStroke(col, true, thickness);
 }
@@ -802,7 +802,7 @@ void Draw2D::AddCircleFilled(const Vec2& centre, float radius, u32 col, int num_
 	if ((col & IM_COL32_A_MASK) == 0)
 		return;
 
-	const float a_max = Math::PI*2.0f * ((float)num_segments - 1.0f) / (float)num_segments;
+	const float a_max = PI*2.0f * ((float)num_segments - 1.0f) / (float)num_segments;
 	PathArcTo(centre, radius, 0.0f, a_max, num_segments);
 	PathFill(col);
 }
@@ -832,10 +832,10 @@ void Draw2D::AddText(const Font* font, float font_size, const Vec2& pos, u32 col
 	Vec4 clip_rect = _ClipRectStack.back();
 	if (cpu_fine_clip_rect)
 	{
-		clip_rect.x = Math::maximum(clip_rect.x, cpu_fine_clip_rect->x);
-		clip_rect.y = Math::maximum(clip_rect.y, cpu_fine_clip_rect->y);
-		clip_rect.z = Math::minimum(clip_rect.z, cpu_fine_clip_rect->z);
-		clip_rect.w = Math::minimum(clip_rect.w, cpu_fine_clip_rect->w);
+		clip_rect.x = maximum(clip_rect.x, cpu_fine_clip_rect->x);
+		clip_rect.y = maximum(clip_rect.y, cpu_fine_clip_rect->y);
+		clip_rect.z = minimum(clip_rect.z, cpu_fine_clip_rect->z);
+		clip_rect.w = minimum(clip_rect.w, cpu_fine_clip_rect->w);
 	}
 	font->RenderText(this, font_size, pos, col, clip_rect, text_begin, text_end, wrap_width, cpu_fine_clip_rect != NULL);
 }
@@ -894,7 +894,7 @@ void Font::BuildLookupTable()
 {
 	int max_codepoint = 0;
 	for (int i = 0; i != Glyphs.size(); i++)
-		max_codepoint = Math::maximum(max_codepoint, (int)Glyphs[i].Codepoint);
+		max_codepoint = maximum(max_codepoint, (int)Glyphs[i].Codepoint);
 
 	ASSERT(Glyphs.size() < 0xFFFF); // -1 is reserved
 	IndexXAdvance.clear();
@@ -1201,7 +1201,7 @@ Vec2 Font::CalcTextSizeA(float size, float max_width, float wrap_width, const ch
 		{
 			if (c == '\n')
 			{
-				text_size.x = Math::maximum(text_size.x, line_width);
+				text_size.x = maximum(text_size.x, line_width);
 				text_size.y += line_height;
 				line_width = 0.0f;
 				continue;
@@ -1806,7 +1806,7 @@ bool    FontAtlas::Build()
 	stbrp_pack_rects((stbrp_context*)spc.pack_info, &extra_rects[0], extra_rects.size());
 	for (int i = 0; i < extra_rects.size(); i++)
 		if (extra_rects[i].was_packed)
-			TexHeight = Math::maximum(TexHeight, extra_rects[i].y + extra_rects[i].h);
+			TexHeight = maximum(TexHeight, extra_rects[i].y + extra_rects[i].h);
 
 	// Allocate packing character data and flag packed characters buffer as non-packed (x0=y0=x1=y1=0)
 	int buf_packedchars_n = 0, buf_rects_n = 0, buf_ranges_n = 0;
@@ -1855,7 +1855,7 @@ bool    FontAtlas::Build()
 		// Extend texture height
 		for (int i = 0; i < n; i++)
 			if (tmp.Rects[i].was_packed)
-				TexHeight = Math::maximum(TexHeight, tmp.Rects[i].y + tmp.Rects[i].h);
+				TexHeight = maximum(TexHeight, tmp.Rects[i].y + tmp.Rects[i].h);
 	}
 	ASSERT(buf_rects_n == total_glyph_count);
 	ASSERT(buf_packedchars_n == total_glyph_count);

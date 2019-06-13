@@ -1,6 +1,6 @@
 #include "engine/file_system.h"
 #include "engine/log.h"
-#include "engine/math_utils.h"
+#include "engine/math.h"
 #include "engine/path_utils.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
@@ -9,7 +9,7 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "renderer/texture_manager.h"
-#include <cmath>
+
 
 namespace Lumix
 {
@@ -167,7 +167,7 @@ unsigned int Texture::compareTGA(IInputStream* file1, IInputStream* file2, int d
 	{
 		for (int j = 0; j < color_mode; ++j)
 		{
-			if (Math::abs(img1[i + j] - img2[i + j]) > difference)
+			if (abs(img1[i + j] - img2[i + j]) > difference)
 			{
 				++different_pixel_count;
 				break;
@@ -323,7 +323,7 @@ bool loadRaw(Texture& texture, IInputStream& file, IAllocator& allocator)
 	PROFILE_FUNCTION();
 	size_t size = file.size() - 3;
 	texture.bytes_per_pixel = 2;
-	texture.width = (int)sqrt(size / texture.bytes_per_pixel);
+	texture.width = (int)sqrt(int(size / texture.bytes_per_pixel));
 	texture.height = texture.width;
 
 	if (texture.data_reference)
@@ -545,7 +545,7 @@ bool Texture::loadTGA(IInputStream& file)
 				const u8* row_end = cursor + header.width * bytes_per_pixel;
 				while(cursor != row_end)
 				{
-					Math::swap(cursor[0], cursor[2]);
+					swap(cursor[0], cursor[2]);
 					cursor += 4;
 				}
 			}

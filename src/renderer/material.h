@@ -3,7 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/resource.h"
-#include "engine/vec.h"
+#include "engine/math.h"
 #include "ffr/ffr.h"
 
 

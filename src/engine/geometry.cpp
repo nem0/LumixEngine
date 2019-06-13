@@ -1,6 +1,5 @@
 #include "geometry.h"
-#include "engine/math_utils.h"
-#include "engine/matrix.h"
+#include "engine/math.h"
 #include "engine/simd.h"
 #include <cmath>
 #include <cstring>
@@ -495,13 +494,13 @@ void AABB::getCorners(const Matrix& matrix, Vec3* points) const
 
 Vec3 AABB::minCoords(const Vec3& a, const Vec3& b)
 {
-	return Vec3(Math::minimum(a.x, b.x), Math::minimum(a.y, b.y), Math::minimum(a.z, b.z));
+	return Vec3(minimum(a.x, b.x), minimum(a.y, b.y), minimum(a.z, b.z));
 }
 
 
 Vec3 AABB::maxCoords(const Vec3& a, const Vec3& b)
 {
-	return Vec3(Math::maximum(a.x, b.x), Math::maximum(a.y, b.y), Math::maximum(a.z, b.z));
+	return Vec3(maximum(a.x, b.x), maximum(a.y, b.y), maximum(a.z, b.z));
 }
 
 
