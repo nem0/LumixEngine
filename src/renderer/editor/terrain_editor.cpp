@@ -813,7 +813,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const DVec
 	constexpr int SLICE_COUNT = 30;
 	constexpr float angle_step = PI * 2 / SLICE_COUNT;
 	if (m_action_type == TerrainEditor::FLAT_HEIGHT && ImGui::GetIO().KeyCtrl) {
-		scene.addDebugCross(center, 1.0f, 0xff0000ff, 0);
+		scene.addDebugCross(center, 1.0f, 0xff0000ff);
 		return;
 	}
 
@@ -834,7 +834,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const DVec
 
 		const DVec3 from = terrain_transform.transform(local_from);
 		const DVec3 to = terrain_transform.transform(local_to);
-		scene.addDebugLine(from, to, 0xffff0000, 0);
+		scene.addDebugLine(from, to, 0xffff0000);
 	}
 }
 

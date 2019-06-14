@@ -572,48 +572,8 @@ public:
 		PROFILE_FUNCTION();
 
 		m_time += dt;
-		for (int i = m_debug_triangles.size() - 1; i >= 0; --i)
-		{
-			float life = m_debug_triangles[i].life;
-			if (life < 0)
-			{
-				m_debug_triangles.eraseFast(i);
-			}
-			else
-			{
-				life -= dt;
-				m_debug_triangles[i].life = life;
-			}
-		}
-
-		for(int i = m_debug_lines.size() - 1; i >= 0; --i)
-		{
-			float life = m_debug_lines[i].life;
-			if(life < 0)
-			{
-				m_debug_lines.eraseFast(i);
-			}
-			else
-			{
-				life -= dt;
-				m_debug_lines[i].life = life;
-			}
-		}
-
-
-		for (int i = m_debug_points.size() - 1; i >= 0; --i)
-		{
-			float life = m_debug_points[i].life;
-			if (life < 0)
-			{
-				m_debug_points.eraseFast(i);
-			}
-			else
-			{
-				life -= dt;
-				m_debug_points[i].life = life;
-			}
-		}
+		m_debug_lines.clear();
+		m_debug_triangles.clear();
 
 		if (m_is_game_running && !paused)
 		{
@@ -2350,13 +2310,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	const Array<DebugTriangle>& getDebugTriangles() const override { return m_debug_triangles; }
 	const Array<DebugLine>& getDebugLines() const override { return m_debug_lines; }
-	const Array<DebugPoint>& getDebugPoints() const override { return m_debug_points; }
 
 
 	void addDebugSphere(const DVec3& center,
 		float radius,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
@@ -2382,24 +2340,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 							 DVec3(center.x + radius * ci * cy1,
 								  center.y + radius * sy1,
 								  center.z + radius * si * cy1),
-							 color,
-							 life);
+							 color);
 				addDebugLine(DVec3(center.x + radius * ci * cy,
 								  center.y + radius * sy,
 								  center.z + radius * si * cy),
 							 DVec3(center.x + radius * prev_ci * cy,
 								  center.y + radius * sy,
 								  center.z + radius * prev_si * cy),
-							 color,
-							 life);
+							 color);
 				addDebugLine(DVec3(center.x + radius * prev_ci * cy1,
 								  center.y + radius * sy1,
 								  center.z + radius * prev_si * cy1),
 							 DVec3(center.x + radius * ci * cy1,
 								  center.y + radius * sy1,
 								  center.z + radius * si * cy1),
-							 color,
-							 life);
+							 color);
 				prev_ci = ci;
 				prev_si = si;
 			}
@@ -2407,7 +2362,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugHalfSphere(const RigidTransform& transform, float radius, bool top, u32 color, float life)
+	void addDebugHalfSphere(const RigidTransform& transform, float radius, bool top, u32 color)
 	{
 		const DVec3 center = transform.pos;
 		const Vec3 x_vec = transform.rot * Vec3(1, 0, 0);
@@ -2436,13 +2391,11 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 				addDebugLine(
 					center + radius * (x_vec * ci * cy + z_vec * si * cy + y_offset),
 					center + radius * (x_vec * prev_ci * cy + z_vec * prev_si * cy + y_offset),
-					color,
-					life);
+					color);
 				addDebugLine(
 					center + radius * (x_vec * ci * cy + z_vec * si * cy + y_offset),
 					center + radius * (x_vec * ci * cy1 + z_vec * si * cy1 + y_offset1),
-					color,
-					life);
+					color);
 				prev_ci = ci;
 				prev_si = si;
 			}
@@ -2450,7 +2403,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugHalfSphere(const DVec3& center, float radius, bool top, u32 color, float life)
+	void addDebugHalfSphere(const DVec3& center, float radius, bool top, u32 color)
 	{
 		static const int COLS = 36;
 		static const int ROWS = COLS >> 1;
@@ -2477,24 +2430,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 					DVec3(center.x + radius * ci * cy1,
 					center.y + radius * sy1,
 					center.z + radius * si * cy1),
-					color,
-					life);
+					color);
 				addDebugLine(DVec3(center.x + radius * ci * cy,
 					center.y + radius * sy,
 					center.z + radius * si * cy),
 					DVec3(center.x + radius * prev_ci * cy,
 					center.y + radius * sy,
 					center.z + radius * prev_si * cy),
-					color,
-					life);
+					color);
 				addDebugLine(DVec3(center.x + radius * prev_ci * cy1,
 					center.y + radius * sy1,
 					center.z + radius * prev_si * cy1),
 					DVec3(center.x + radius * ci * cy1,
 					center.y + radius * sy1,
 					center.z + radius * si * cy1),
-					color,
-					life);
+					color);
 				prev_ci = ci;
 				prev_si = si;
 			}
@@ -2505,26 +2455,23 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void addDebugTriangle(const DVec3& p0,
 		const DVec3& p1,
 		const DVec3& p2,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
 		DebugTriangle& tri = m_debug_triangles.emplace();
 		tri.p0 = p0;
 		tri.p1 = p1;
 		tri.p2 = p2;
 		tri.color = ARGBToABGR(color);
-		tri.life = life;
 	}
 
 
 	void addDebugCapsule(const DVec3& position,
 		float height,
 		float radius,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
-		addDebugHalfSphere(position + Vec3(0, radius, 0), radius, false, color, life);
-		addDebugHalfSphere(position + Vec3(0, radius + height, 0), radius, true, color, life);
+		addDebugHalfSphere(position + Vec3(0, radius, 0), radius, false, color);
+		addDebugHalfSphere(position + Vec3(0, radius + height, 0), radius, true, color);
 
 		Vec3 z_vec(0, 0, 1.0f);
 		Vec3 x_vec(1.0f, 0, 0);
@@ -2539,8 +2486,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			const float z = sinf(a) * radius;
 			addDebugLine(bottom + x_vec * x + z_vec * z,
 				top + x_vec * x + z_vec * z,
-				color,
-				life);
+				color);
 		}
 	}
 
@@ -2548,8 +2494,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void addDebugCapsule(const RigidTransform& transform,
 		float height,
 		float radius,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
 		/*Vec3 x_vec = transform.getXVector();
 		Vec3 y_vec = transform.getYVector();
@@ -2580,8 +2525,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void addDebugCylinder(const DVec3& position,
 								  const Vec3& up,
 								  float radius,
-								  u32 color,
-								  float life) override
+								  u32 color) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
 		Vec3 x_vec = crossProduct(up, z_vec);
@@ -2597,16 +2541,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			float z = sinf(a) * radius;
 			addDebugLine(position + x_vec * x + z_vec * z,
 						 position + x_vec * prevx + z_vec * prevz,
-						 color,
-						 life);
+						 color);
 			addDebugLine(top + x_vec * x + z_vec * z,
 						 top + x_vec * prevx + z_vec * prevz,
-						 color,
-						 life);
+						 color);
 			addDebugLine(position + x_vec * x + z_vec * z,
 						 top + x_vec * x + z_vec * z,
-						 color,
-						 life);
+						 color);
 			prevx = x;
 			prevz = z;
 		}
@@ -2617,31 +2558,29 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		const Vec3& dir,
 		const Vec3& up,
 		const Vec3& right,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
-		addDebugLine(pos + dir + up + right, pos + dir + up - right, color, life);
-		addDebugLine(pos - dir + up + right, pos - dir + up - right, color, life);
-		addDebugLine(pos + dir + up + right, pos - dir + up + right, color, life);
-		addDebugLine(pos + dir + up - right, pos - dir + up - right, color, life);
+		addDebugLine(pos + dir + up + right, pos + dir + up - right, color);
+		addDebugLine(pos - dir + up + right, pos - dir + up - right, color);
+		addDebugLine(pos + dir + up + right, pos - dir + up + right, color);
+		addDebugLine(pos + dir + up - right, pos - dir + up - right, color);
 
-		addDebugLine(pos + dir - up + right, pos + dir - up - right, color, life);
-		addDebugLine(pos - dir - up + right, pos - dir - up - right, color, life);
-		addDebugLine(pos + dir - up + right, pos - dir - up + right, color, life);
-		addDebugLine(pos + dir - up - right, pos - dir - up - right, color, life);
+		addDebugLine(pos + dir - up + right, pos + dir - up - right, color);
+		addDebugLine(pos - dir - up + right, pos - dir - up - right, color);
+		addDebugLine(pos + dir - up + right, pos - dir - up + right, color);
+		addDebugLine(pos + dir - up - right, pos - dir - up - right, color);
 
-		addDebugLine(pos + dir + up + right, pos + dir - up + right, color, life);
-		addDebugLine(pos + dir + up - right, pos + dir - up - right, color, life);
-		addDebugLine(pos - dir + up + right, pos - dir - up + right, color, life);
-		addDebugLine(pos - dir + up - right, pos - dir - up - right, color, life);
+		addDebugLine(pos + dir + up + right, pos + dir - up + right, color);
+		addDebugLine(pos + dir + up - right, pos + dir - up - right, color);
+		addDebugLine(pos - dir + up + right, pos - dir - up + right, color);
+		addDebugLine(pos - dir + up - right, pos - dir - up - right, color);
 
 	}
 
 
 	void addDebugCubeSolid(const DVec3& min,
 		const DVec3& max,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
 		DVec3 a = min;
 		DVec3 b = min;
@@ -2649,19 +2588,19 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		b.x = max.x;
 		c.z = min.z;
-		addDebugTriangle(a, c, b, color, life);
+		addDebugTriangle(a, c, b, color);
 		b.x = min.x;
 		b.y = max.y;
-		addDebugTriangle(a, b, c, color, life);
+		addDebugTriangle(a, b, c, color);
 
 		b = max;
 		c = max;
 		a.z = max.z;
 		b.y = min.y;
-		addDebugTriangle(a, b, c, color, life);
+		addDebugTriangle(a, b, c, color);
 		b.x = min.x;
 		b.y = max.y;
-		addDebugTriangle(a, c, b, color, life);
+		addDebugTriangle(a, c, b, color);
 
 		a = min;
 		b = min;
@@ -2669,19 +2608,19 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		b.x = max.x;
 		c.y = min.y;
-		addDebugTriangle(a, b, c, color, life);
+		addDebugTriangle(a, b, c, color);
 		b.x = min.x;
 		b.z = max.z;
-		addDebugTriangle(a, c, b, color, life);
+		addDebugTriangle(a, c, b, color);
 
 		b = max;
 		c = max;
 		a.y = max.y;
 		b.z = min.z;
-		addDebugTriangle(a, c, b, color, life);
+		addDebugTriangle(a, c, b, color);
 		b.x = min.x;
 		b.z = max.z;
-		addDebugTriangle(a, b, c, color, life);
+		addDebugTriangle(a, b, c, color);
 
 		a = min;
 		b = min;
@@ -2689,88 +2628,87 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 		b.y = max.y;
 		c.x = min.x;
-		addDebugTriangle(a, c, b, color, life);
+		addDebugTriangle(a, c, b, color);
 		b.y = min.y;
 		b.z = max.z;
-		addDebugTriangle(a, b, c, color, life);
+		addDebugTriangle(a, b, c, color);
 
 		b = max;
 		c = max;
 		a.x = max.x;
 		b.z = min.z;
-		addDebugTriangle(a, b, c, color, life);
+		addDebugTriangle(a, b, c, color);
 		b.y = min.y;
 		b.z = max.z;
-		addDebugTriangle(a, c, b, color, life);
+		addDebugTriangle(a, c, b, color);
 	}
 
 
 
 	void addDebugCube(const DVec3& min,
 		const DVec3& max,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
 		DVec3 a = min;
 		DVec3 b = min;
 		b.x = max.x;
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		a = DVec3(b.x, b.y, max.z);
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		b = DVec3(min.x, a.y, a.z);
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		a = DVec3(b.x, b.y, min.z);
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 
 		a = min;
 		a.y = max.y;
 		b = a;
 		b.x = max.x;
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		a = DVec3(b.x, b.y, max.z);
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		b = DVec3(min.x, a.y, a.z);
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		a = DVec3(b.x, b.y, min.z);
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 
 		a = min;
 		b = a;
 		b.y = max.y;
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		a.x = max.x;
 		b.x = max.x;
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		a.z = max.z;
 		b.z = max.z;
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 		a.x = min.x;
 		b.x = min.x;
-		addDebugLine(a, b, color, life);
+		addDebugLine(a, b, color);
 	}
 
 
-	void addDebugFrustum(const ShiftedFrustum& frustum, u32 color, float life) override
+	void addDebugFrustum(const ShiftedFrustum& frustum, u32 color) override
 	{
 		const DVec3 o = frustum.origin;
-		addDebugLine(o + frustum.points[0], o + frustum.points[1], color, life);
-		addDebugLine(o + frustum.points[1], o + frustum.points[2], color, life);
-		addDebugLine(o + frustum.points[2], o + frustum.points[3], color, life);
-		addDebugLine(o + frustum.points[3], o + frustum.points[0], color, life);
+		addDebugLine(o + frustum.points[0], o + frustum.points[1], color);
+		addDebugLine(o + frustum.points[1], o + frustum.points[2], color);
+		addDebugLine(o + frustum.points[2], o + frustum.points[3], color);
+		addDebugLine(o + frustum.points[3], o + frustum.points[0], color);
 
-		addDebugLine(o + frustum.points[4], o + frustum.points[5], color, life);
-		addDebugLine(o + frustum.points[5], o + frustum.points[6], color, life);
-		addDebugLine(o + frustum.points[6], o + frustum.points[7], color, life);
-		addDebugLine(o + frustum.points[7], o + frustum.points[4], color, life);
+		addDebugLine(o + frustum.points[4], o + frustum.points[5], color);
+		addDebugLine(o + frustum.points[5], o + frustum.points[6], color);
+		addDebugLine(o + frustum.points[6], o + frustum.points[7], color);
+		addDebugLine(o + frustum.points[7], o + frustum.points[4], color);
 
-		addDebugLine(o + frustum.points[0], o + frustum.points[4], color, life);
-		addDebugLine(o + frustum.points[1], o + frustum.points[5], color, life);
-		addDebugLine(o + frustum.points[2], o + frustum.points[6], color, life);
-		addDebugLine(o + frustum.points[3], o + frustum.points[7], color, life);
+		addDebugLine(o + frustum.points[0], o + frustum.points[4], color);
+		addDebugLine(o + frustum.points[1], o + frustum.points[5], color);
+		addDebugLine(o + frustum.points[2], o + frustum.points[6], color);
+		addDebugLine(o + frustum.points[3], o + frustum.points[7], color);
 	}
 
 
-	void addDebugCircle(const DVec3& center, const Vec3& up, float radius, u32 color, float life) override
+	void addDebugCircle(const DVec3& center, const Vec3& up, float radius, u32 color) override
 	{
 		Vec3 z_vec(-up.y, up.x, 0);
 		Vec3 x_vec = crossProduct(up, z_vec);
@@ -2783,30 +2721,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			float a = i / 64.0f * 2 * PI;
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
-			addDebugLine(center + x_vec * x + z_vec * z, center + x_vec * prevx + z_vec * prevz, color, life);
+			addDebugLine(center + x_vec * x + z_vec * z, center + x_vec * prevx + z_vec * prevz, color);
 			prevx = x;
 			prevz = z;
 		}
 	}
 
 
-	void addDebugCross(const DVec3& center, float size, u32 color, float life) override
+	void addDebugCross(const DVec3& center, float size, u32 color) override
 	{
-		addDebugLine(center, DVec3(center.x - size, center.y, center.z), color, life);
-		addDebugLine(center, DVec3(center.x + size, center.y, center.z), color, life);
-		addDebugLine(center, DVec3(center.x, center.y - size, center.z), color, life);
-		addDebugLine(center, DVec3(center.x, center.y + size, center.z), color, life);
-		addDebugLine(center, DVec3(center.x, center.y, center.z - size), color, life);
-		addDebugLine(center, DVec3(center.x, center.y, center.z + size), color, life);
-	}
-
-
-	void addDebugPoint(const DVec3& pos, u32 color, float life) override
-	{
-		DebugPoint& point = m_debug_points.emplace();
-		point.pos = pos;
-		point.color = ARGBToABGR(color);
-		point.life = life;
+		addDebugLine(center, DVec3(center.x - size, center.y, center.z), color);
+		addDebugLine(center, DVec3(center.x + size, center.y, center.z), color);
+		addDebugLine(center, DVec3(center.x, center.y - size, center.z), color);
+		addDebugLine(center, DVec3(center.x, center.y + size, center.z), color);
+		addDebugLine(center, DVec3(center.x, center.y, center.z - size), color);
+		addDebugLine(center, DVec3(center.x, center.y, center.z + size), color);
 	}
 
 
@@ -2814,8 +2743,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		const Vec3& dir,
 		const Vec3& axis0,
 		const Vec3& axis1,
-		u32 color,
-		float life) override
+		u32 color) override
 	{
 		const DVec3 base_center = vertex + dir;
 		DVec3 prev_p = base_center + axis0;
@@ -2825,8 +2753,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			const Vec3 x = cosf(angle) * axis0;
 			const Vec3 z = sinf(angle) * axis1;
 			const DVec3 p = base_center + x + z;
-			addDebugLine(p, prev_p, color, life);
-			addDebugLine(vertex, p, color, life);
+			addDebugLine(p, prev_p, color);
+			addDebugLine(vertex, p, color);
 			prev_p = p;
 		}
 	}
@@ -2838,13 +2766,34 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) override
+	void addDebugLine(const DVec3& from, const DVec3& to, u32 color) override 
 	{
 		DebugLine& line = m_debug_lines.emplace();
 		line.from = from;
 		line.to = to;
 		line.color = ARGBToABGR(color);
-		line.life = life;
+	}
+
+
+	DebugTriangle* addDebugTriangles(int count)
+	{
+		const int new_size = m_debug_triangles.size() + count;
+		if (new_size < m_debug_triangles.capacity()) {
+			m_debug_triangles.reserve(maximum(new_size, m_debug_triangles.capacity() * 3 / 2));
+		}
+		m_debug_triangles.resize(new_size);
+		return &m_debug_triangles[new_size - count];
+	}
+
+
+	DebugLine* addDebugLines(int count) override
+	{
+		const int new_size = m_debug_lines.size() + count;
+		if (new_size < m_debug_lines.capacity()) {
+			m_debug_lines.reserve(maximum(new_size, m_debug_lines.capacity() * 3 / 2));
+		}
+		m_debug_lines.resize(new_size);
+		return &m_debug_lines[new_size - count];
 	}
 
 
@@ -3464,7 +3413,6 @@ private:
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
-	Array<DebugPoint> m_debug_points;
 
 	float m_time;
 	float m_lod_multiplier;
@@ -3527,7 +3475,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_decals(m_allocator)
 	, m_debug_triangles(m_allocator)
 	, m_debug_lines(m_allocator)
-	, m_debug_points(m_allocator)
 	, m_active_global_light_entity(INVALID_ENTITY)
 	, m_active_camera(INVALID_ENTITY)
 	, m_is_grass_enabled(true)
