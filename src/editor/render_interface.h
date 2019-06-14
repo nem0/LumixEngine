@@ -47,9 +47,9 @@ public:
 	virtual ImTextureID loadTexture(const Path& path) = 0;
 	virtual bool isValid(ImTextureID texture) = 0;
 	virtual void unloadTexture(ImTextureID handle) = 0;
-	virtual void addDebugCube(const DVec3& minimum, const DVec3& maximum, u32 color, float life) = 0;
-	virtual void addDebugCross(const DVec3& pos, float size, u32 color, float life) = 0;
-	virtual void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) = 0;
+	virtual void addDebugCube(const DVec3& minimum, const DVec3& maximum, u32 color) = 0;
+	virtual void addDebugCross(const DVec3& pos, float size, u32 color) = 0;
+	virtual void addDebugLine(const DVec3& from, const DVec3& to, u32 color) = 0;
 	virtual WorldEditor::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;

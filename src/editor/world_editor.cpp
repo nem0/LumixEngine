@@ -1740,7 +1740,7 @@ public:
 				aabb.merge(entity_aabb);
 			}
 
-			m_render_interface->addDebugCube(m_viewport.pos + aabb.min, m_viewport.pos + aabb.max, 0xffffff00, 0);
+			m_render_interface->addDebugCube(m_viewport.pos + aabb.min, m_viewport.pos + aabb.max, 0xffffff00);
 			return;
 		}
 
@@ -1802,7 +1802,7 @@ public:
 		if (!hit.is_hit) return;
 
 		const DVec3 snap_pos = getClosestVertex(hit);
-		m_render_interface->addDebugCross(snap_pos, 1, 0xfff00fff, 0);
+		m_render_interface->addDebugCross(snap_pos, 1, 0xfff00fff);
 		// TODO
 	}
 

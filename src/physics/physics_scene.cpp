@@ -1518,26 +1518,28 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		auto& render_scene = *static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		const PxRenderBuffer& rb = m_scene->getRenderBuffer();
 		const PxU32 num_lines = minimum(100000U, rb.getNbLines());
-		if (num_lines)
-		{
+		if (num_lines) {
 			const PxDebugLine* PX_RESTRICT lines = rb.getLines();
+			DebugLine* tmp = render_scene.addDebugLines(num_lines);
 			for (PxU32 i = 0; i < num_lines; ++i)
 			{
 				const PxDebugLine& line = lines[i];
-				Vec3 from = fromPhysx(line.pos0);
-				Vec3 to = fromPhysx(line.pos1);
-				render_scene.addDebugLine(DVec3(from), DVec3(to), line.color0, 0);
+				tmp[i].from = DVec3(fromPhysx(line.pos0));
+				tmp[i].to = DVec3(fromPhysx(line.pos1));
+				tmp[i].color = line.color0;
 			}
 		}
 		const PxU32 num_tris = rb.getNbTriangles();
-		if (num_tris)
-		{
+		if (num_tris) {
 			const PxDebugTriangle* PX_RESTRICT tris = rb.getTriangles();
+			DebugTriangle* tmp = render_scene.addDebugTriangles(num_tris);
 			for (PxU32 i = 0; i < num_tris; ++i)
 			{
 				const PxDebugTriangle& tri = tris[i];
-				render_scene.addDebugTriangle(
-					DVec3(fromPhysx(tri.pos0)), DVec3(fromPhysx(tri.pos1)), DVec3(fromPhysx(tri.pos2)), tri.color0, 0);
+				tmp[i].p0 = DVec3(fromPhysx(tri.pos0));
+				tmp[i].p1 = DVec3(fromPhysx(tri.pos1));
+				tmp[i].p2 = DVec3(fromPhysx(tri.pos2));
+				tmp[i].color = tri.color0;
 			}
 		}
 	}

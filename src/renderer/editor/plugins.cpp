@@ -2066,9 +2066,9 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	void addDebugCross(const DVec3& pos, float size, u32 color, float life) override
+	void addDebugCross(const DVec3& pos, float size, u32 color) override
 	{
-		m_render_scene->addDebugCross(pos, size, color, life);
+		m_render_scene->addDebugCross(pos, size, color);
 	}
 
 
@@ -2080,15 +2080,15 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	void addDebugLine(const DVec3& from, const DVec3& to, u32 color, float life) override
+	void addDebugLine(const DVec3& from, const DVec3& to, u32 color) override
 	{
-		m_render_scene->addDebugLine(from, to, color, life);
+		m_render_scene->addDebugLine(from, to, color);
 	}
 
 
-	void addDebugCube(const DVec3& minimum, const DVec3& maximum, u32 color, float life) override
+	void addDebugCube(const DVec3& minimum, const DVec3& maximum, u32 color) override
 	{
-		m_render_scene->addDebugCube(minimum, maximum, color, life);
+		m_render_scene->addDebugCube(minimum, maximum, color);
 	}
 
 
@@ -2553,7 +2553,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		const float range = scene->getLightRange((EntityRef)light.entity);
 
 		const DVec3 pos = universe.getPosition((EntityRef)light.entity);
-		scene->addDebugSphere(pos, range, 0xff0000ff, 0);
+		scene->addDebugSphere(pos, range, 0xff0000ff);
 	}
 
 
@@ -2580,18 +2580,18 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		const Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
 		const Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
 
-		scene->addDebugLine(pos, pos + dir, 0xff0000ff, 0);
-		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff, 0);
-		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff, 0);
+		scene->addDebugLine(pos, pos + dir, 0xff0000ff);
+		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff);
+		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff);
+		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff);
+		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff);
 
-		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff, 0);
-		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff, 0);
-		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff, 0);
+		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff);
+		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff);
+		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff);
+		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff);
 
-		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff, 0);
+		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff);
 	}
 
 
@@ -2604,7 +2604,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		const Vec3 x = tr.rot * Vec3(1, 0, 0) * half_extents.x;
 		const Vec3 y = tr.rot * Vec3(0, 1, 0) * half_extents.y;
 		const Vec3 z = tr.rot * Vec3(0, 0, 1) * half_extents.z;
-		scene->addDebugCube(tr.pos, x, y, z, 0xff0000ff, 0);
+		scene->addDebugCube(tr.pos, x, y, z, 0xff0000ff);
 	}
 
 
@@ -2612,7 +2612,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 
-		scene->addDebugFrustum(scene->getCameraFrustum((EntityRef)cmp.entity), 0xffff0000, 0);
+		scene->addDebugFrustum(scene->getCameraFrustum((EntityRef)cmp.entity), 0xffff0000);
 	}
 
 

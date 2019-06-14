@@ -244,7 +244,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 
 			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 			if (!scene) return true;
-			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
+			scene->addDebugSphere(pos, radius, 0xff0000ff);
 			return true;
 		}
 		else if (cmp.type == CHORUS_ZONE_TYPE)
@@ -256,7 +256,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 
 			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 			if (!scene) return true;
-			scene->addDebugSphere(pos, radius, 0xff0000ff, 0);
+			scene->addDebugSphere(pos, radius, 0xff0000ff);
 			return true;
 		}
 
