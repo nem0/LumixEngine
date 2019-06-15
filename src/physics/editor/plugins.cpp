@@ -939,6 +939,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 
 	void onWindowGUI() override
 	{
+		if (!m_is_window_open) return;
 		if (ImGui::Begin("Physics", &m_is_window_open))
 		{
 			onLayersGUI();
