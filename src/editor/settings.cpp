@@ -71,14 +71,16 @@ static void shortcutInput(OS::Keycode& shortcut)
 
 	char tmp[32];
 	OS::getKeyName(shortcut, tmp, sizeof(tmp));
-	StaticString<50> button_label(tmp);
+	StaticString<50> button_label(tmp[0] || shortcut == OS::Keycode::INVALID ? tmp : "Unknown");
 	button_label << "###" << (i64)&shortcut;
 
 	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = OS::Keycode::INVALID;
 
 	if (ImGui::IsItemHovered()) {
 		for (int i = 0; i < (int)OS::Keycode::MAX; ++i) {
-			if (OS::isKeyDown((OS::Keycode)i)) {
+			const auto kc= (OS::Keycode)i;
+			const bool is_mouse = kc == OS::Keycode::LBUTTON || kc == OS::Keycode::RBUTTON || kc == OS::Keycode::MBUTTON;
+			if (OS::isKeyDown(kc) && !is_mouse) {
 				shortcut = (OS::Keycode)i;
 				break;
 			}
