@@ -426,7 +426,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		if (handler.invoke(m_app, x, y, hit)) return;
 	}
 
-	if (PathUtils::hasExtension(path, "msh"))
+	if (PathUtils::hasExtension(path, "fbx"))
 	{
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
 
