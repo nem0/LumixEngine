@@ -1360,7 +1360,7 @@ void FBXImporter::writeGeometry(int mesh_idx)
 	aabb.merge(import_mesh.aabb);
 	radius_squared = maximum(radius_squared, import_mesh.radius_squared);
 
-	write(import_mesh.vertex_data.getPos());
+	write((i32)import_mesh.vertex_data.getPos());
 	write(import_mesh.vertex_data.getData(), import_mesh.vertex_data.getPos());
 
 	write(sqrtf(radius_squared) * bounding_shape_scale);
@@ -1415,7 +1415,7 @@ void FBXImporter::writeGeometry()
 	for (const ImportMesh& import_mesh : meshes)
 	{
 		if (!import_mesh.import) continue;
-		write(import_mesh.vertex_data.getPos());
+		write((i32)import_mesh.vertex_data.getPos());
 		write(import_mesh.vertex_data.getData(), import_mesh.vertex_data.getPos());
 	}
 	writeBillboardVertices(aabb);
