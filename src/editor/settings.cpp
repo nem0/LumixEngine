@@ -177,12 +177,25 @@ Settings::~Settings()
 bool Settings::load()
 {
 	auto L = m_state;
-	bool has_settings = OS::fileExists(SETTINGS_PATH);
-	bool errors = luaL_loadfile(L, has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH) != 0;
-	errors = errors || lua_pcall(L, 0, 0, 0) != 0;
-	if (errors)
-	{
-		g_log_error.log("Editor") << SETTINGS_PATH << ": " << lua_tostring(L, -1);
+	const bool has_settings = OS::fileExists(SETTINGS_PATH);
+	OS::InputFile file;
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
+	if (!fs.open(path, &file)) {
+		g_log_error.log("Editor") << "Failed to open " << path;
+		return false;
+	}
+
+	Array<char> buf(m_app.getWorldEditor().getAllocator());
+	buf.resize((int)file.size());
+	if (!file.read(buf.begin(), buf.byte_size())) {
+		g_log_error.log("Editor") << "Failed to read " << path;
+		return false;
+	}
+	file.close();
+	StringView content(buf.begin(), buf.size());
+	if (!LuaWrapper::execute(L, content, "settings", 0)) {
+		g_log_error.log("Editor") << path << ": " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}
