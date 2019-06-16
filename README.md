@@ -34,6 +34,8 @@ Who is using it?
 * [dear imgui](https://github.com/ocornut/imgui)
 * [stb](https://github.com/nothings/stb)
 * [cmft](https://github.com/dariomanesku/cmft)
+* [lent](https://github.com/nem0/lent/)
+* [lucy](https://github.com/nem0/lucy_job_system)
 
 Project generator
 
