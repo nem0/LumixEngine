@@ -56,8 +56,8 @@ public:
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		OS::copyFile(src.c_str(), dst);
-		return true;
+		FileSystem& fs = app.getWorldEditor().getEngine().getFileSystem();
+		return fs.copyFile(src.c_str(), dst);
 	}
 
 

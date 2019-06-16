@@ -51,7 +51,8 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		return OS::copyFile(src.c_str(), dst);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		return fs.copyFile(src.c_str(), dst);
 	}
 
 

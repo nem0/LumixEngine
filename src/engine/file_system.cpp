@@ -72,7 +72,6 @@ struct FileSystemImpl final : public FileSystem
 		, m_last_id(0)
 		, m_semaphore(0, 0xffFF)
 	{
-		OS::setCurrentDirectory(base_path);
 		m_base_path = base_path;
 		if (!endsWith(base_path, "/") && !endsWith(base_path, "\\")) {
 			m_base_path << '/';

@@ -1,4 +1,5 @@
 #include "editor_icon.h"
+#include "engine/engine.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/reflection.h"
@@ -211,12 +212,13 @@ struct EditorIconsImpl final : public EditorIcons
 			}
 		}
 		m_render_interface = render_interface;
+		FileSystem& fs = m_editor.getEngine().getFileSystem();
 		if (m_render_interface)
 		{
 			for (int i = 0; i < lengthOf(ICONS); ++i)
 			{
 				StaticString<MAX_PATH_LENGTH> tmp("editor/models/", ICONS[i], "_3d.fbx");
-				m_is_3d[i] = OS::fileExists(tmp);
+				m_is_3d[i] = fs.fileExists(tmp);
 				if (m_is_3d[i])
 				{
 					Path path(tmp);

@@ -550,6 +550,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (PathUtils::hasExtension(src.c_str(), "fbx")) {
 			const char* filepath = getResourceFilePath(src.c_str());
 			FBXImporter::ImportConfig cfg;
+			cfg.base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
 			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
 			const Meta meta = getMeta(Path(filepath));
 			cfg.mesh_scale = meta.scale;
