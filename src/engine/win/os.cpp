@@ -866,10 +866,13 @@ void copyToClipboard(const char* text)
 }
 
 
-bool shellExecuteOpen(const char* path)
+ExecuteOpenResult shellExecuteOpen(const char* path)
 {
 	const WCharStr<MAX_PATH_LENGTH> wpath(path);
-	return (uintptr_t)ShellExecute(NULL, NULL, wpath, NULL, NULL, SW_SHOW) > 32;
+	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, NULL, NULL, SW_SHOW);
+	if (res > 32) return ExecuteOpenResult::SUCCESS;
+	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
+	return ExecuteOpenResult::OTHER_ERROR;
 }
 
 
