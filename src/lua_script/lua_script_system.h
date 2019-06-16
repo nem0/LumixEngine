@@ -26,6 +26,7 @@ public:
 		{
 			BOOLEAN,
 			FLOAT,
+			INT,
 			ENTITY,
 			RESOURCE,
 			STRING,

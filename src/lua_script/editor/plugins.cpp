@@ -484,6 +484,18 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 							}
 						}
 						break;
+						case LuaScriptScene::Property::INT:
+						{
+							int f = atoi(buf);
+							if (ImGui::DragInt(property_name, &f))
+							{
+								toCString(f, buf, sizeof(buf));
+								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
+									editor, entity, j, property_name, buf, allocator);
+								editor.executeCommand(cmd);
+							}
+						}
+						break;
 						case LuaScriptScene::Property::ENTITY:
 						{
 							EntityPtr e;
