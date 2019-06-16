@@ -131,7 +131,7 @@ struct FBXImporter
 
 	FBXImporter(IAllocator& allocator);
 	~FBXImporter();
-	bool setSource(const char* filename);
+	bool setSource(const char* base_dir, const char* filename);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
 	void writeAnimations(const char* src, const ImportConfig& cfg);
 	void writeSubmodels(const char* src, const ImportConfig& cfg);

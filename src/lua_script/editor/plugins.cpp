@@ -610,7 +610,8 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		if (type == LuaScript::TYPE)
 		{
-			return OS::copyFile("models/editor/tile_lua_script.dds", out_path);
+			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+			return fs.copyFile("models/editor/tile_lua_script.dds", out_path);
 		}
 		return false;
 	}

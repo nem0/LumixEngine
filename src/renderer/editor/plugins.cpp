@@ -520,8 +520,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		iter.value().push(path_obj);
 
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+
 		if(meta.split) {
-			m_fbx_importer.setSource(path[0] == '/' ? path + 1 : path);
+			m_fbx_importer.setSource(fs.getBasePath(), path[0] == '/' ? path + 1 : path);
 			const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
 			for (int i = 0; i < meshes.size(); ++i) {
 				char mesh_name[256];
@@ -555,7 +557,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const Meta meta = getMeta(Path(filepath));
 			cfg.mesh_scale = meta.scale;
 			const PathUtils::FileInfo src_info(filepath);
-			m_fbx_importer.setSource(filepath);
+			m_fbx_importer.setSource(cfg.base_path, filepath);
 			if (m_fbx_importer.getMeshes().empty()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
 					g_log_error.log("Editor") << "No meshes with materials found in " << src.c_str();
@@ -1057,8 +1059,9 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Material::TYPE) return OS::copyFile("models/editor/tile_material.dds", out_path);
-		if (type == Shader::TYPE) return OS::copyFile("models/editor/tile_shader.dds", out_path);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (type == Material::TYPE) return fs.copyFile("models/editor/tile_material.dds", out_path);
+		if (type == Shader::TYPE) return fs.copyFile("models/editor/tile_shader.dds", out_path);
 
 		if (type != Model::TYPE && type != PrefabResource::TYPE) return false;
 
@@ -1136,14 +1139,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	struct TextureTileJob
 	{
-		TextureTileJob(IAllocator& allocator) : m_allocator(allocator) {}
+		TextureTileJob(FileSystem& filesystem, IAllocator& allocator) 
+			: m_allocator(allocator) 
+			, m_filesystem(filesystem)
+		{}
 
 		void execute() {
 			IAllocator& allocator = m_allocator;
-
-			// TODO base path
-			ASSERT(false);
-
 
 			int image_width, image_height;
 			u32 hash = crc32(m_in_path);
@@ -1155,7 +1157,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				OS::InputFile file;
 				if (!file.open(m_in_path))
 				{
-					OS::copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					g_log_error.log("Editor") << "Failed to load " << m_in_path;
 					return;
 				}
@@ -1169,7 +1171,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				bool success = crn_decompress_dds_to_images(&data[0], data.size(), raw_img, desc);
 				if (!success)
 				{
-					OS::copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
 				image_width = desc.m_width;
@@ -1192,7 +1194,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (!data)
 				{
 					g_log_error.log("Editor") << "Failed to load " << m_in_path;
-					OS::copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
 				stbir_resize_uint8(data,
@@ -1221,6 +1223,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		IAllocator& m_allocator;
+		FileSystem& m_filesystem;
 		StaticString<MAX_PATH_LENGTH> m_in_path; 
 		StaticString<MAX_PATH_LENGTH> m_out_path; 
 	};
@@ -1230,9 +1233,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		if (type == Texture::TYPE) {
 			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-			auto* job = LUMIX_NEW(allocator, TextureTileJob)(allocator);
-			job->m_in_path = in_path;
-			job->m_out_path = out_path;
+			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+			auto* job = LUMIX_NEW(allocator, TextureTileJob)(fs, allocator);
+			job->m_in_path = fs.getBasePath();
+			job->m_in_path << in_path;
+			job->m_out_path = fs.getBasePath();
+			job->m_out_path << out_path;
 			JobSystem::run(job, &TextureTileJob::execute, nullptr);
 			return true;
 		}
