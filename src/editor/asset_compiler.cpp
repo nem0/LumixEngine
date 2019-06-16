@@ -214,7 +214,7 @@ struct AssetCompilerImpl : AssetCompiler
 				catString(fullpath, "/");
 				catString(fullpath, info.filename);
 
-				if (OS::getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
+				if (fs.getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
 					addResource(fullpath);
 				}
 			}

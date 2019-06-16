@@ -770,7 +770,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		
 		const u32 hash = crc32(mat_src);
 
-		const StaticString<MAX_PATH_LENGTH> path(cfg.output_dir, hash, ".res");
+		const StaticString<MAX_PATH_LENGTH> path(cfg.base_path, cfg.output_dir, hash, ".res");
 		if (!out_file.open(path))
 		{
 			g_log_error.log("FBX") << "Failed to create " << path;
@@ -985,7 +985,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 			int frame_count = split->to_frame - split->from_frame;
 
-			StaticString<MAX_PATH_LENGTH> tmp(src_info.m_dir, anim.output_filename, split->name, ".ani");
+			StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, src_info.m_dir, anim.output_filename, split->name, ".ani");
 			if (!out_file.open(tmp))
 			{
 				g_log_error.log("FBX") << "Failed to create " << tmp;
@@ -1810,7 +1810,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		getImportMeshName(meshes[i], name);
 		StaticString<MAX_PATH_LENGTH> hash_str(name, ":", src);
 		makeLowercase(hash_str.data, stringLength(hash_str), hash_str);
-		const StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, crc32(hash_str), ".res");
+		const StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, crc32(hash_str), ".res");
 		OS::makePath(cfg.output_dir);
 		if (!out_file.open(out_path)) {
 			g_log_error.log("FBX") << "Failed to create " << out_path;
@@ -1857,7 +1857,7 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 	if (!import_any_mesh) return;
 
 	qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
-	StaticString<MAX_PATH_LENGTH> out_path(cfg.output_dir, output_mesh_filename, ext);
+	StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, output_mesh_filename, ext);
 	OS::makePath(cfg.output_dir);
 	if (!out_file.open(out_path))
 	{

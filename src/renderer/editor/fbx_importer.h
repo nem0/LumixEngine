@@ -25,6 +25,7 @@ struct FBXImporter
 			BOTTOM
 		};
 		const char* output_dir;
+		const char* base_path;
 		float mesh_scale;
 		Origin origin = Origin::SOURCE;
 	};
