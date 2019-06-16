@@ -160,7 +160,7 @@ public:
 		, m_events(m_allocator)
 		, m_fps_timer(nullptr)
 	{
-		JobSystem::init(m_allocator);
+		JobSystem::init(MT::getCPUsCount(), m_allocator);
 	}
 
 

@@ -434,7 +434,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 }
 
 
-bool init(IAllocator& allocator)
+bool init(u8 workers_count, IAllocator& allocator)
 {
 	ASSERT(!g_system);
 
@@ -453,7 +453,7 @@ bool init(IAllocator& allocator)
 		decl.idx = i;
 	}
 
-	int count = maximum(1, int(MT::getCPUsCount()));
+	int count = maximum(1, int(workers_count));
 	for (int i = 0; i < count; ++i) {
 		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
 		if (task->create("Worker", false)) {

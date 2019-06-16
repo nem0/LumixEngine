@@ -19,7 +19,7 @@ using SignalHandle = u32;
 constexpr u8 ANY_WORKER = 0xff;
 constexpr u32 INVALID_HANDLE = 0xffFFffFF;
 
-LUMIX_ENGINE_API bool init(IAllocator& allocator);
+LUMIX_ENGINE_API bool init(u8 workers_count, IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 LUMIX_ENGINE_API int getWorkersCount();
 
