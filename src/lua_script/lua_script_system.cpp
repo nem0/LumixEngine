@@ -557,6 +557,7 @@ namespace Lumix
 			LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", f);
 			LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
 			LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
+			LuaWrapper::createSystemVariable(L, "Editor", "INT_PROPERTY", Property::INT);
 			LuaWrapper::createSystemVariable(L, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
 			LuaWrapper::createSystemVariable(L, "Editor", "RESOURCE_PROPERTY", Property::RESOURCE);
 		}
@@ -1265,6 +1266,12 @@ namespace Lumix
 				{
 					float val = (float)lua_tonumber(scr.m_state, -1);
 					toCString(val, out, max_size, 8);
+				}
+				break;
+				case Property::INT:
+				{
+					int val = (int )lua_tointeger(scr.m_state, -1);
+					toCString(val, out, max_size);
 				}
 				break;
 				case Property::ENTITY:
