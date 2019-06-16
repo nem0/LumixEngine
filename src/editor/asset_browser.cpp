@@ -288,9 +288,10 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	{
 		ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
 		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
-		if (OS::fileExists(path))
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (fs.fileExists(path))
 		{
-			if (OS::getLastModified(path) >= OS::getLastModified(tile.filepath))
+			if (fs.getLastModified(path) >= fs.getLastModified(tile.filepath))
 			{
 				tile.tex = ri->loadTexture(Path(path));
 			}
