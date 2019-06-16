@@ -104,19 +104,21 @@ static bool saveAsDDS(const char* path, const u8* image_data, int image_width, i
 
 struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
-	FontPlugin(StudioApp& app) : app(app) 
-	{ 
+	FontPlugin(StudioApp& app) 
+		: m_app(app) 
+	{
 		app.getAssetCompiler().registerExtension("ttf", FontResource::TYPE); 
 	}
 	
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = app.getAssetCompiler().getCompiledDir();
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
 		const u32 hash = crc32(src.c_str());
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		OS::copyFile(src.c_str(), dst);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		fs.copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -126,7 +128,7 @@ struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	ResourceType getResourceType() const override { return FontResource::TYPE; }
 
-	StudioApp& app;
+	StudioApp& m_app;
 };
 
 
@@ -143,7 +145,8 @@ struct PipelinePlugin final : AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		OS::copyFile(src.c_str(), dst);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		fs.copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -167,7 +170,8 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		OS::copyFile(src.c_str(), dst);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		fs.copyFile(src.c_str(), dst);
 		return true;
 	}
 	
@@ -202,7 +206,8 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		OS::copyFile(src.c_str(), dst);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		fs.copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -578,7 +583,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		OS::copyFile(src.c_str(), dst);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		fs.copyFile(src.c_str(), dst);
 		return true;
 	}
 
@@ -1508,7 +1514,8 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		return OS::copyFile(src.c_str(), dst);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		return fs.copyFile(src.c_str(), dst);
 	}
 
 

@@ -72,6 +72,7 @@ struct FileSystemImpl final : public FileSystem
 		, m_last_id(0)
 		, m_semaphore(0, 0xffFF)
 	{
+		OS::setCurrentDirectory(base_path);
 		m_base_path = base_path;
 		if (!endsWith(base_path, "/") && !endsWith(base_path, "\\")) {
 			m_base_path << '/';
@@ -103,6 +104,7 @@ struct FileSystemImpl final : public FileSystem
 
 	void setBasePath(const char* dir) override
 	{ 
+		OS::setCurrentDirectory(dir);
 		m_base_path = dir; 
 		if (!endsWith(dir, "/") && !endsWith(dir, "\\")) {
 			m_base_path << '/';
@@ -158,6 +160,28 @@ struct FileSystemImpl final : public FileSystem
 		ASSERT(file);
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
 		return file->open(full_path);
+	}
+
+
+	bool copyFile(const char* from, const char* to) override
+	{
+		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
+		StaticString<MAX_PATH_LENGTH> full_path_to(m_base_path, to);
+		return OS::copyFile(full_path_from, full_path_to);
+	}
+
+
+	bool fileExists(const char* path) override
+	{
+		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		return OS::fileExists(full_path);
+	}
+
+
+	u64 getLastModified(const char* path) override
+	{
+		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		return OS::getLastModified(full_path);
 	}
 
 

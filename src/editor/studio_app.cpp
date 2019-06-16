@@ -2657,11 +2657,12 @@ public:
 	void loadIcons()
 	{
 		RenderInterface& render_interface = *m_editor->getRenderInterface();
+		FileSystem& fs = m_engine->getFileSystem();
 		for (auto* action : m_actions)
 		{
 			char tmp[MAX_PATH_LENGTH];
 			action->getIconPath(tmp, lengthOf(tmp));
-			if (OS::fileExists(tmp))
+			if (fs.fileExists(tmp))
 			{
 				action->icon = render_interface.loadTexture(Path(tmp));
 			}

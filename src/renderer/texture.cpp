@@ -647,10 +647,10 @@ bool Texture::load(u64 size, const u8* mem)
 	setFlag(Flags::CLAMP, flags & (u32)Flags::CLAMP);
 
 	bool loaded = false;
-	if (equalStrings(ext, "dds")) {
+	if (equalIStrings(ext, "dds")) {
 		loaded = loadDDS(*this, file);
 	}
-	else if (equalStrings(ext, "raw")) {
+	else if (equalIStrings(ext, "raw")) {
 		loaded = loadRaw(*this, file, allocator);
 	}
 	else {

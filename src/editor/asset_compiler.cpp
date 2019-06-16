@@ -440,17 +440,18 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		const char* filepath = getResourceFilePath(res.getPath().c_str());
 
-		if (!OS::fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
-		if (startsWith(filepath, ".lumix/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (!fs.fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
+		if (startsWith(filepath, ".lumix/assets/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 		const u32 hash = res.getPath().getHash();
 		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
 		const PathUtils::FileInfo info(filepath);
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 
-		if (!OS::fileExists(dst_path)
-			|| OS::getLastModified(dst_path) < OS::getLastModified(filepath)
-			|| OS::getLastModified(dst_path) < OS::getLastModified(meta_path)
+		if (!fs.fileExists(dst_path)
+			|| fs.getLastModified(dst_path) < fs.getLastModified(filepath)
+			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
 			MT::SpinLock lock(m_to_compile_mutex);
@@ -580,6 +581,9 @@ int AssetCompilerTask::task()
 			if (compiled) {
 				MT::SpinLock lock(m_compiler.m_compiled_mutex);
 				m_compiler.m_compiled.push(p);
+			}
+			else {
+				g_log_error.log("Editor") << "Failed to compile resource " << p;
 			}
 		}
 	}

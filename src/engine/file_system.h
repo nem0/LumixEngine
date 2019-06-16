@@ -32,6 +32,9 @@ public:
 
 	virtual ~FileSystem() {}
 
+	virtual u64 getLastModified(const char* path) = 0;
+	virtual bool copyFile(const char* from, const char* to) = 0;
+	virtual bool fileExists(const char* path) = 0;
 	virtual OS::FileIterator* createFileIterator(const char* dir) = 0;
 	virtual bool open(const char* path, OS::InputFile* file) = 0;
 	virtual bool open(const char* path, OS::OutputFile* file) = 0;
