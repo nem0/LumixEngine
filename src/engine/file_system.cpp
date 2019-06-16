@@ -104,7 +104,6 @@ struct FileSystemImpl final : public FileSystem
 
 	void setBasePath(const char* dir) override
 	{ 
-		OS::setCurrentDirectory(dir);
 		m_base_path = dir; 
 		if (!endsWith(dir, "/") && !endsWith(dir, "\\")) {
 			m_base_path << '/';

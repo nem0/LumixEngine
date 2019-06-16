@@ -1592,10 +1592,11 @@ public:
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
 		const int dpi = OS::getDPI();
 		float font_scale = dpi / 96.f;
-		m_font = io.Fonts->AddFontFromFileTTF(
-			"editor/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale);
-		m_bold_font =
-			io.Fonts->AddFontFromFileTTF("editor/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale);
+		FileSystem& fs = getWorldEditor().getEngine().getFileSystem();
+		const StaticString<MAX_PATH_LENGTH> font_path(fs.getBasePath(), "editor/fonts/OpenSans-Regular.ttf");
+		const StaticString<MAX_PATH_LENGTH> bold_font_path(fs.getBasePath(), "editor/fonts/OpenSans-Regular.ttf");
+		m_font = io.Fonts->AddFontFromFileTTF(font_path, (float)m_settings.m_font_size * font_scale);
+		m_bold_font = io.Fonts->AddFontFromFileTTF(bold_font_path, (float)m_settings.m_font_size * font_scale);
 
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;

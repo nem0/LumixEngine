@@ -304,8 +304,7 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 
 		const u64 list_last_modified = OS::getLastModified(list_path);
-		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
-		processDir(base_path, stringLength(base_path), list_last_modified);
+		processDir("", 0, list_last_modified);
 	}
 
 
