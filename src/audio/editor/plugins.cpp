@@ -94,7 +94,8 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Clip::TYPE) return OS::copyFile("models/editor/tile_audio.dds", out_path);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (type == Clip::TYPE) return fs.copyFile("models/editor/tile_audio.dds", out_path);
 		return false;
 	}
 

@@ -558,7 +558,7 @@ FBXImporter::FBXImporter(IAllocator& allocator)
 }
 
 
-bool FBXImporter::setSource(const char* filename)
+bool FBXImporter::setSource(const char* base_dir, const char* filename)
 {
 	if(scene) {
 		scene->destroy();
@@ -570,7 +570,8 @@ bool FBXImporter::setSource(const char* filename)
 	}
 
 	OS::InputFile file;
-	if (!file.open(filename)) return false;
+	StaticString<MAX_PATH_LENGTH> fullpath(base_dir, filename);
+	if (!file.open(fullpath)) return false;
 
 	Array<u8> data(allocator);
 	data.resize((int)file.size());
@@ -585,7 +586,7 @@ bool FBXImporter::setSource(const char* filename)
 	scene = ofbx::load(&data[0], data.size());
 	if (!scene)
 	{
-		g_log_error.log("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError();
+		g_log_error.log("FBX") << "Failed to import \"" << fullpath << ": " << ofbx::getError();
 		return false;
 	}
 

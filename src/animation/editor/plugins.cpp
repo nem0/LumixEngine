@@ -76,7 +76,8 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Animation::TYPE) return OS::copyFile("models/editor/tile_animation.dds", out_path);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (type == Animation::TYPE) return fs.copyFile("models/editor/tile_animation.dds", out_path);
 		return false;
 	}
 
@@ -305,7 +306,8 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Anim::ControllerResource::TYPE) return OS::copyFile("models/editor/tile_animation_graph.dds", out_path);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		if (type == Anim::ControllerResource::TYPE) return fs.copyFile("models/editor/tile_animation_graph.dds", out_path);
 		return false;
 	}
 
