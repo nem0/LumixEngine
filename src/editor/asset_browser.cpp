@@ -677,7 +677,13 @@ void AssetBrowser::openInExternalEditor(const char* path) const
 {
 	StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getFileSystem().getBasePath());
 	full_path << path;
-	OS::shellExecuteOpen(full_path);
+	const OS::ExecuteOpenResult res = OS::shellExecuteOpen(full_path);
+	if (res == OS::ExecuteOpenResult::NO_ASSOCIATION) {
+		g_log_error.log("Editor") << full_path << " is not associated with any app.";
+	}
+	else if (res == OS::ExecuteOpenResult::OTHER_ERROR) {
+		g_log_error.log("Editor") << "Failed to open " << full_path << " in exeternal editor.";
+	}
 }
 
 

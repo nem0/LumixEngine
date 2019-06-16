@@ -15,6 +15,13 @@ namespace OS
 
 enum class Keycode : u8;
 
+enum class ExecuteOpenResult : int
+{
+	SUCCESS,
+	NO_ASSOCIATION,
+	OTHER_ERROR
+};
+
 enum class MouseButton : int 
 {
     LEFT = 0,
@@ -144,7 +151,7 @@ LUMIX_ENGINE_API void getCurrentDirectory(char* buffer, int buffer_size);
 LUMIX_ENGINE_API bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file);
 LUMIX_ENGINE_API bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension);
 LUMIX_ENGINE_API bool getOpenDirectory(char* out, int max_size, const char* starting_dir);
-LUMIX_ENGINE_API bool shellExecuteOpen(const char* path);
+LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(const char* path);
 LUMIX_ENGINE_API void copyToClipboard(const char* text);
 
 LUMIX_ENGINE_API bool deleteFile(const char* path);
