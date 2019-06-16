@@ -742,6 +742,7 @@ public:
 		m_log_ui->update(time_delta);
 
 		guiEndFrame();
+		m_mouse_move.set(0, 0);
 	}
 
 
