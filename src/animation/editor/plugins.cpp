@@ -336,10 +336,10 @@ struct AnimablePropertyGridPlugin : PropertyGrid::IPlugin
 		if (!animation->isReady()) return;
 
 		ImGui::Checkbox("Preview", &m_is_playing);
-		float time = scene->getAnimableTime(entity);
+		float time = scene->getAnimable(entity).time;
 		if (ImGui::SliderFloat("Time", &time, 0, animation->getLength()))
 		{
-			scene->setAnimableTime(entity, time);
+			scene->getAnimable(entity).time = time;
 			scene->updateAnimable(entity, 0);
 		}
 

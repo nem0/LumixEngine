@@ -23,6 +23,27 @@ struct SoundAnimationEvent
 };
 
 
+struct EchoZone
+{
+	EntityRef entity;
+	float radius;
+	float delay;
+};
+
+
+struct ChorusZone
+{
+	EntityRef entity;
+	float radius;
+	float delay;
+	float wet_dry_mix;
+	float depth;
+	float feedback;
+	float frequency;
+	i32 phase;
+};
+
+
 class AudioScene : public IScene
 {
 public:
@@ -55,15 +76,8 @@ public:
 	virtual void removeClip(ClipInfo* clip) = 0;
 	virtual void setClip(int clip_id, const Path& path) = 0;
 
-	virtual float getEchoZoneRadius(EntityRef entity) = 0;
-	virtual void setEchoZoneRadius(EntityRef entity, float radius) = 0;
-	virtual float getEchoZoneDelay(EntityRef entity) = 0;
-	virtual void setEchoZoneDelay(EntityRef entity, float delay) = 0;
-
-	virtual float getChorusZoneDelay(EntityRef entity) = 0;
-	virtual void setChorusZoneDelay(EntityRef entity, float delay) = 0;
-	virtual float getChorusZoneRadius(EntityRef entity) = 0;
-	virtual void setChorusZoneRadius(EntityRef entity, float radius) = 0;
+	virtual EchoZone& getEchoZone(EntityRef entity) = 0;
+	virtual ChorusZone& getChorusZone(EntityRef entity) = 0;
 
 	virtual ClipInfo* getAmbientSoundClip(EntityRef entity) = 0;
 	virtual int getAmbientSoundClipIndex(EntityRef entity) = 0;

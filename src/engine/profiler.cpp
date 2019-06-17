@@ -1,6 +1,7 @@
+#include "engine/array.h"
 #include "engine/fibers.h"
 #include "engine/hash_map.h"
-#include "engine/log.h"
+#include "engine/default_allocator.h"
 #include "engine/timer.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
@@ -24,7 +25,28 @@ namespace Profiler
 {
 
 
-/********/
+struct ThreadContext
+{
+	ThreadContext(IAllocator& allocator) 
+		: buffer(allocator)
+		, open_blocks(allocator)
+	{
+		buffer.resize(1024 * 512);
+		open_blocks.reserve(64);
+	}
+
+	Array<const char*> open_blocks;
+	Array<u8> buffer;
+	uint begin = 0;
+	uint end = 0;
+	uint rows = 0;
+	bool open = false;
+	MT::SpinMutex mutex;
+	StaticString<64> name;
+	bool show_in_profiler = false;
+	u32 thread_id;
+};
+
 
 // TODO this has to be defined somewhere
 #define SWITCH_CONTEXT_OPCODE 36
@@ -54,6 +76,7 @@ struct CSwitch
 	uint32_t           NewThreadWaitTime;
 	uint32_t                    Reserved;
 };
+
 
 struct TraceTask : MT::Task {
 	TraceTask(IAllocator& allocator);
@@ -288,7 +311,7 @@ void TraceTask::callback(PEVENT_RECORD event) {
 };
 
 
-void recordInt(const char* key, int value)
+void pushInt(const char* key, int value)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	IntRecord r;
@@ -299,7 +322,7 @@ void recordInt(const char* key, int value)
 
 
 
-void recordString(const char* value)
+void pushString(const char* value)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	write(*ctx, EventType::STRING, (u8*)value, stringLength(value) + 1);
@@ -326,7 +349,7 @@ void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link)
 {
 	GPUBlock data;
 	data.timestamp = timestamp;
-	data.name = name;
+	copyString(data.name, name);
 	data.profiler_link = profiler_link;
 	write(g_instance.global_context, EventType::BEGIN_GPU_BLOCK, data);
 }
@@ -471,7 +494,6 @@ void showInProfiler(bool show)
 }
 
 
-
 void setThreadName(const char* name)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
@@ -481,22 +503,61 @@ void setThreadName(const char* name)
 }
 
 
-ThreadContext& getGlobalContext()
-{
-	return g_instance.global_context;
-}
-
-
-Array<ThreadContext*>& lockContexts()
+GlobalState::GlobalState()
 {
 	g_instance.mutex.lock();
-	return g_instance.contexts;
 }
 
 
-void unlockContexts()
+GlobalState::~GlobalState()
 {
+	ASSERT(local_readers_count == 0);
 	g_instance.mutex.unlock();
+}
+
+
+int GlobalState::threadsCount() const
+{
+	return g_instance.contexts.size();
+}
+
+
+const char* GlobalState::getThreadName(int idx) const
+{
+	ThreadContext* ctx = g_instance.contexts[idx];
+	MT::SpinLock lock(ctx->mutex);
+	return ctx->name;
+}
+
+
+ThreadState::ThreadState(GlobalState& reader, int thread_idx)
+	: reader(reader)
+	, thread_idx(thread_idx)
+{
+	++reader.local_readers_count;
+	ThreadContext& ctx = thread_idx >= 0 ? *g_instance.contexts[thread_idx] : g_instance.global_context;
+
+	ctx.mutex.lock();
+	buffer = ctx.buffer.begin();
+	buffer_size = ctx.buffer.size();
+	begin = ctx.begin;
+	end = ctx.end;
+	thread_id = ctx.thread_id;
+	name = ctx.name;
+	open = ctx.open;
+	rows = ctx.rows;
+	show = ctx.show_in_profiler;
+}
+
+
+ThreadState::~ThreadState()
+{
+	ThreadContext& ctx = thread_idx >= 0 ? *g_instance.contexts[thread_idx] : g_instance.global_context;
+	ctx.open = open;
+	ctx.rows = rows;
+	ctx.show_in_profiler = show;
+	ctx.mutex.unlock();
+	--reader.local_readers_count;
 }
 
 

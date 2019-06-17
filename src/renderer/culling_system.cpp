@@ -7,6 +7,7 @@
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/mt/atomic.h"
+#include "engine/mt/thread.h"
 #include "engine/page_allocator.h"
 #include "engine/profiler.h"
 #include "engine/simd.h"
@@ -254,7 +255,7 @@ struct CullingSystemImpl final : public CullingSystem
 		const Sphere* LUMIX_RESTRICT end = cell.spheres + cell.header.count;
 		const EntityPtr* LUMIX_RESTRICT sphere_to_entity_map = cell.entities;
 
-		Profiler::recordInt("objects", cell.header.count);
+		Profiler::pushInt("objects", cell.header.count);
 		const float4 px = f4Load(frustum.xs);
 		const float4 py = f4Load(frustum.ys);
 		const float4 pz = f4Load(frustum.zs);

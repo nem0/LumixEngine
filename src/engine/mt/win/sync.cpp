@@ -1,7 +1,9 @@
+#include "engine/iallocator.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/thread.h"
 #include "engine/profiler.h"
+#include "engine/string.h"
 #include "engine/win/simple_win.h"
 #include <intrin.h>
 

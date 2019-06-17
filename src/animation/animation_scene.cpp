@@ -107,16 +107,6 @@ struct AnimationSceneImpl final : public AnimationScene
 	};
 
 
-	struct Animable
-	{
-		float time;
-		float time_scale;
-		float start_time;
-		Animation* animation;
-		EntityRef entity;
-	};
-
-
 	AnimationSceneImpl(Engine& engine, IPlugin& anim_system, Universe& universe, IAllocator& allocator)
 		: m_universe(universe)
 		, m_engine(engine)
@@ -383,15 +373,9 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	float getAnimableTime(EntityRef entity) override
+	Animable& getAnimable(EntityRef entity) override
 	{
-		return m_animables[entity].time;
-	}
-
-
-	void setAnimableTime(EntityRef entity, float time) override
-	{
-		m_animables[entity].time = time;
+		return m_animables[entity];
 	}
 
 
@@ -617,12 +601,6 @@ struct AnimationSceneImpl final : public AnimationScene
 
 
 	EntityPtr getSharedControllerParent(EntityRef entity) override { return m_shared_controllers[entity].parent; }
-
-
-	float getAnimableTimeScale(EntityRef entity) override { return m_animables[entity].time_scale; }
-	void setAnimableTimeScale(EntityRef entity, float time_scale) override { m_animables[entity].time_scale = time_scale; }
-	float getAnimableStartTime(EntityRef entity) override { return m_animables[entity].start_time; }
-	void setAnimableStartTime(EntityRef entity, float time) override { m_animables[entity].start_time = time; }
 
 
 	void setControllerSource(EntityRef entity, const Path& path) override

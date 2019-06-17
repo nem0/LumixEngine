@@ -5,6 +5,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
+#include "engine/mt/thread.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
