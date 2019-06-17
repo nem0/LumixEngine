@@ -239,7 +239,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		if (cmp.type == ECHO_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getEchoZoneRadius(entity);
+			float radius = audio_scene->getEchoZone(entity).radius;
 			Universe& universe = audio_scene->getUniverse();
 			const DVec3 pos = universe.getPosition(entity);
 
@@ -251,7 +251,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		else if (cmp.type == CHORUS_ZONE_TYPE)
 		{
 			auto* audio_scene = static_cast<AudioScene*>(cmp.scene);
-			float radius = audio_scene->getChorusZoneRadius(entity);
+			float radius = audio_scene->getChorusZone(entity).radius;
 			Universe& universe = audio_scene->getUniverse();
 			const DVec3 pos = universe.getPosition(entity);
 

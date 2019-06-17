@@ -24,15 +24,12 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("audio_listener"),
 		component("echo_zone",
-			property("Radius", LUMIX_PROP(AudioScene, EchoZoneRadius),
-				MinAttribute(0)),
-			property("Delay (ms)", LUMIX_PROP(AudioScene, EchoZoneDelay),
-				MinAttribute(0))),
+			var_property("Radius", &AudioScene::getEchoZone, &EchoZone::radius, MinAttribute(0)),
+			var_property("Delay (ms)", &AudioScene::getEchoZone, &EchoZone::delay, MinAttribute(0))
+		),
 		component("chorus_zone",
-			property("Radius", LUMIX_PROP(AudioScene, ChorusZoneRadius),
-				MinAttribute(0)),
-			property("Delay (ms)", LUMIX_PROP(AudioScene, ChorusZoneDelay),
-				MinAttribute(0))
+			var_property("Radius", &AudioScene::getChorusZone, &ChorusZone::radius, MinAttribute(0)),
+			var_property("Delay (ms)", &AudioScene::getChorusZone, &ChorusZone::delay, MinAttribute(0))
 		)
 	);
 	registerScene(audio_scene);

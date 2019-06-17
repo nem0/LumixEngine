@@ -122,10 +122,8 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 		component("animable",
 			property("Animation", LUMIX_PROP(AnimationScene, Animation),
 				ResourceAttribute("Animation (*.ani)", Animation::TYPE)),
-			property("Start time", LUMIX_PROP(AnimationScene, AnimableStartTime),
-				MinAttribute(0)),
-			property("Time scale", LUMIX_PROP(AnimationScene, AnimableTimeScale),
-				MinAttribute(0))
+			var_property("Start time", &AnimationScene::getAnimable, &Animable::start_time, MinAttribute(0)),
+			var_property("Time scale", &AnimationScene::getAnimable, &Animable::time_scale, MinAttribute(0))
 		),
 		component("shared_anim_controller",
 			property("Parent", LUMIX_PROP(AnimationScene, SharedControllerParent))

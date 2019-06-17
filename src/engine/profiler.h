@@ -1,10 +1,7 @@
 #pragma once
 
 
-#include "engine/array.h"
 #include "engine/lumix.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
 
 
 namespace Lumix
@@ -14,6 +11,44 @@ namespace Lumix
 namespace Profiler
 {
 
+// writing API
+
+LUMIX_ENGINE_API void pause(bool paused);
+
+LUMIX_ENGINE_API void setThreadName(const char* name);
+LUMIX_ENGINE_API void showInProfiler(bool show);
+
+LUMIX_ENGINE_API void beginBlock(const char* name_literal);
+LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
+LUMIX_ENGINE_API void endBlock();
+LUMIX_ENGINE_API void frame();
+LUMIX_ENGINE_API void pushJobInfo(u32 signal_on_finish, u32 precondition);
+LUMIX_ENGINE_API void pushString(const char* value);
+LUMIX_ENGINE_API void pushInt(const char* key_literal, int value);
+
+LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
+LUMIX_ENGINE_API void endGPUBlock(u64 timestamp);
+LUMIX_ENGINE_API void gpuFrame();
+LUMIX_ENGINE_API void link(i64 link);
+LUMIX_ENGINE_API i64 createNewLinkID();
+
+LUMIX_ENGINE_API void beforeFiberSwitch();
+LUMIX_ENGINE_API int getOpenBlocksSize();
+LUMIX_ENGINE_API i32 beginFiberWait(u32 job_system_signal, void* open_blocks);
+LUMIX_ENGINE_API void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks);
+LUMIX_ENGINE_API float getLastFrameDuration();
+
+struct Scope
+{
+	explicit Scope(const char* name_literal) { beginBlock(name_literal); }
+	~Scope() { endBlock(); }
+};
+
+
+// reading API
+
+LUMIX_ENGINE_API bool contextSwitchesEnabled();
+LUMIX_ENGINE_API u64 frequency();
 
 struct ContextSwitchRecord
 {
@@ -45,32 +80,9 @@ struct FiberWaitRecord
 };
 
 
-struct ThreadContext
-{
-	ThreadContext(IAllocator& allocator) 
-		: buffer(allocator)
-		, open_blocks(allocator)
-	{
-		buffer.resize(1024 * 512);
-		open_blocks.reserve(64);
-	}
-
-	Array<const char*> open_blocks;
-	Array<u8> buffer;
-	uint begin = 0;
-	uint end = 0;
-	uint rows = 0;
-	bool open = false;
-	MT::SpinMutex mutex;
-	StaticString<64> name;
-	bool show_in_profiler = false;
-	u32 thread_id;
-};
-
-
 struct GPUBlock
 {
-	StaticString<32> name;
+	char name[32];
 	u64 timestamp;
 	i64 profiler_link;
 };
@@ -104,42 +116,34 @@ struct EventHeader
 #pragma pack()
 
 
-LUMIX_ENGINE_API void setThreadName(const char* name);
-LUMIX_ENGINE_API void showInProfiler(bool show);
+LUMIX_ENGINE_API struct GlobalState {
+	GlobalState();
+	~GlobalState();
+	
+	int threadsCount() const;
+	const char* getThreadName(int idx) const;
 
-LUMIX_ENGINE_API u64 frequency();
-LUMIX_ENGINE_API void pause(bool paused);
-
-LUMIX_ENGINE_API void beginBlock(const char* name);
-LUMIX_ENGINE_API void blockColor(u8 r, u8 g, u8 b);
-LUMIX_ENGINE_API void endBlock();
-LUMIX_ENGINE_API void pushJobInfo(u32 signal_on_finish, u32 precondition);
-LUMIX_ENGINE_API void frame();
-LUMIX_ENGINE_API void recordString(const char* value);
-LUMIX_ENGINE_API void recordInt(const char* key, int value);
-
-LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
-LUMIX_ENGINE_API void endGPUBlock(u64 timestamp);
-LUMIX_ENGINE_API void gpuFrame();
-LUMIX_ENGINE_API void link(i64 link);
-LUMIX_ENGINE_API i64 createNewLinkID();
+	int local_readers_count = 0;
+};
 
 
-LUMIX_ENGINE_API void beforeFiberSwitch();
-LUMIX_ENGINE_API int getOpenBlocksSize();
-LUMIX_ENGINE_API i32 beginFiberWait(u32 job_system_signal, void* open_blocks);
-LUMIX_ENGINE_API void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks);
-LUMIX_ENGINE_API float getLastFrameDuration();
+LUMIX_ENGINE_API struct ThreadState {
+	ThreadState(GlobalState& reader, int thread_idx);
+	~ThreadState();
 
-LUMIX_ENGINE_API bool contextSwitchesEnabled();
-LUMIX_ENGINE_API ThreadContext& getGlobalContext();
-LUMIX_ENGINE_API Array<ThreadContext*>& lockContexts();
-LUMIX_ENGINE_API void unlockContexts();
+	GlobalState& reader;
+	int thread_idx;
 
-struct Scope
-{
-	explicit Scope(const char* name) { beginBlock(name); }
-	~Scope() { endBlock(); }
+	const char* name;
+	const u8* buffer;
+	uint buffer_size;
+	uint begin;
+	uint end;
+	u32 thread_id;
+
+	bool show;
+	bool open;
+	uint rows;
 };
 
 

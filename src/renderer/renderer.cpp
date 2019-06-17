@@ -96,9 +96,6 @@ struct GPUProfiler
 	};
 
 
-	static constexpr int BUFFER_SIZE = 4096;
-
-
 	GPUProfiler(IAllocator& allocator) 
 		: m_queries(allocator)
 		, m_pool(allocator)
@@ -122,19 +119,12 @@ struct GPUProfiler
 
 	void init()
 	{
-		auto tmp = [&]() {
-			ffr::QueryHandle q = ffr::createQuery();
-			ffr::queryTimestamp(q);
-			const u64 cpu_timestamp = Timer::getRawTimestamp();
-			const u64 gpu_timestamp = ffr::getQueryResult(q);
-			m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (Timer::getFrequency() / double(1'000'000'000)));
-			auto xx = toCPUTimestamp(gpu_timestamp);
-			ffr::destroy(q);
-		};
-		tmp();
-		tmp();
-		tmp();
-		tmp();
+		ffr::QueryHandle q = ffr::createQuery();
+		ffr::queryTimestamp(q);
+		const u64 cpu_timestamp = Timer::getRawTimestamp();
+		const u64 gpu_timestamp = ffr::getQueryResult(q);
+		m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (Timer::getFrequency() / double(1'000'000'000)));
+		ffr::destroy(q);
 	}
 
 

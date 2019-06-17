@@ -11,6 +11,7 @@ struct lua_State;
 namespace Lumix
 {
 
+class Animation;
 struct IAllocator;
 class OutputMemoryStream;
 class Path;
@@ -20,6 +21,16 @@ namespace Anim
 struct ComponentInstance;
 class ControllerResource;
 }
+
+
+struct Animable
+{
+	float time;
+	float time_scale;
+	float start_time;
+	Animation* animation;
+	EntityRef entity;
+};
 
 
 struct AnimationScene : public IScene
@@ -36,14 +47,9 @@ struct AnimationScene : public IScene
 	virtual class Animation* getAnimableAnimation(EntityRef entity) = 0;
 	virtual Path getAnimation(EntityRef entity) = 0;
 	virtual void setAnimation(EntityRef entity, const Path& path) = 0;
-	virtual float getAnimableTime(EntityRef entity) = 0;
-	virtual void setAnimableTime(EntityRef entity, float time) = 0;
 	virtual void updateAnimable(EntityRef entity, float time_delta) = 0;
 	virtual void updateController(EntityRef entity, float time_delta) = 0;
-	virtual float getAnimableTimeScale(EntityRef entity) = 0;
-	virtual void setAnimableTimeScale(EntityRef entity, float time_scale) = 0;
-	virtual float getAnimableStartTime(EntityRef entity) = 0;
-	virtual void setAnimableStartTime(EntityRef entity, float time) = 0;
+	virtual Animable& getAnimable(EntityRef entity) = 0;
 	virtual u8* getControllerInput(EntityRef entity) = 0;
 	virtual void setControllerInput(EntityRef entity, int input_idx, int value) = 0;
 	virtual void setControllerInput(EntityRef entity, int input_idx, float value) = 0;

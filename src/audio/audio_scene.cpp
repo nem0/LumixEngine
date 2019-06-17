@@ -39,25 +39,6 @@ struct Listener
 };
 
 
-struct EchoZone
-{
-	EntityRef entity;
-	float radius;
-	float delay;
-};
-
-struct ChorusZone
-{
-	EntityRef entity;
-	float radius;
-	float delay;
-	float wet_dry_mix;
-	float depth;
-	float feedback;
-	float frequency;
-	i32 phase;
-};
-
 struct AmbientSound
 {
 	EntityRef entity;
@@ -427,36 +408,19 @@ struct AudioSceneImpl final : public AudioScene
 	}
 
 
-	float getEchoZoneDelay(EntityRef entity) override
-	{
-		return m_echo_zones[entity].delay;
-	}
-
-
-	void setEchoZoneDelay(EntityRef entity, float delay) override
-	{
-		m_echo_zones[entity].delay = delay;
-	}
-
-
-	float getEchoZoneRadius(EntityRef entity) override
-	{
-		return m_echo_zones[entity].radius;
-	}
-	
-	
-	void setEchoZoneRadius(EntityRef entity, float radius) override
-	{
-		m_echo_zones[entity].radius = radius;
-	}
-
-
 	void destroyEchoZone(EntityRef entity)
 	{
 		int idx = m_echo_zones.find(entity);
 		m_echo_zones.eraseAt(idx);
 		m_universe.onComponentDestroyed(entity, ECHO_ZONE_TYPE, this);
 	}
+
+	
+	EchoZone& getEchoZone(EntityRef entity) override
+	{
+		return m_echo_zones[entity];
+	}
+
 
 	void createChorusZone(EntityRef entity)
 	{
@@ -473,27 +437,9 @@ struct AudioSceneImpl final : public AudioScene
 	}
 
 
-	float getChorusZoneDelay(EntityRef entity) override
+	ChorusZone& getChorusZone(EntityRef entity) override
 	{
-		return m_chorus_zones[entity].delay;
-	}
-
-
-	void setChorusZoneDelay(EntityRef entity, float delay) override
-	{
-		m_chorus_zones[entity].delay = delay;
-	}
-
-
-	float getChorusZoneRadius(EntityRef entity) override
-	{
-		return m_chorus_zones[entity].radius;
-	}
-
-
-	void setChorusZoneRadius(EntityRef entity, float radius) override
-	{
-		m_chorus_zones[entity].radius = radius;
+		return m_chorus_zones[entity];
 	}
 
 

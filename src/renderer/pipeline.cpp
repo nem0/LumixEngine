@@ -2194,9 +2194,9 @@ struct PipelineImpl final : Pipeline
 					page = next;
 				}
 				#undef READ
-				Profiler::recordInt("drawcalls", stats.draw_call_count);
-				Profiler::recordInt("instances", stats.instance_count);
-				Profiler::recordInt("triangles", stats.triangle_count);
+				Profiler::pushInt("drawcalls", stats.draw_call_count);
+				Profiler::pushInt("instances", stats.instance_count);
+				Profiler::pushInt("triangles", stats.triangle_count);
 			}
 
 			u32 m_define_mask = 0;
@@ -2449,7 +2449,7 @@ struct PipelineImpl final : Pipeline
 		void radixSort(u64* _keys, u64* _values, int size)
 		{
 			PROFILE_FUNCTION();
-			Profiler::recordInt("count", size);
+			Profiler::pushInt("count", size);
 			if(size == 0) return;
 			// from https://github.com/bkaradzic/bx
 			enum {
@@ -2541,7 +2541,7 @@ struct PipelineImpl final : Pipeline
 
 				PROFILE_BLOCK("create cmds");
 				CreateCommands* ctx = (CreateCommands*)data;
-				Profiler::recordInt("num", ctx->count);
+				Profiler::pushInt("num", ctx->count);
 				Renderer& renderer = ctx->cmd->m_pipeline->m_renderer;
 				const Universe& universe = ctx->cmd->m_pipeline->m_scene->getUniverse();
 				
@@ -2836,7 +2836,7 @@ struct PipelineImpl final : Pipeline
 					}
 				}
 				result.end();
-				Profiler::recordInt("count", total);
+				Profiler::pushInt("count", total);
 			});
 		}
 
