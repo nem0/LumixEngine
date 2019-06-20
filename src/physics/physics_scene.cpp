@@ -2229,7 +2229,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		u8 mask = 0;
 		for (EntityPtr e = m_universe.getFirstChild(entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e)) {
 			if (m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) {
-				Wheel& w = m_wheels[(EntityRef)e];
+				const Wheel& w = m_wheels[(EntityRef)e];
 				wheels_entities[(int)w.slot] = e;
 				mask |= 1 << (int)w.slot;
 			}
@@ -2251,7 +2251,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		{
 			for (int i = 0; i < 4; i++) {
 				const EntityRef e = (EntityRef)wheels_entities[i];
-				Wheel& wheel = m_wheels[e];
+				const Wheel& wheel = m_wheels[e];
 				wheels[(int)wheel.slot].mMass = wheel.mass;
 				wheels[(int)wheel.slot].mMOI = wheel.moi;
 				wheels[(int)wheel.slot].mRadius = wheel.radius;
@@ -4556,7 +4556,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		i32 count;
 		serializer.read(count);
-		m_actors.rehash(count);
+		m_actors.reserve(count);
 		for (int j = 0; j < count; ++j) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -4655,7 +4655,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void deserializeVehicles(InputMemoryStream& serializer)
 	{
 		const int vehicles_count = serializer.read<int>();
-		m_vehicles.rehash(vehicles_count);
+		m_vehicles.reserve(vehicles_count);
 		for (int i = 0; i < vehicles_count; ++i) {
 			const EntityRef e = serializer.read<EntityRef>();
 			Vehicle& v = m_vehicles.insert(e, {});
@@ -4664,7 +4664,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 
 		const int wheels_count = serializer.read<int>();
-		m_wheels.rehash(wheels_count);
+		m_wheels.reserve(wheels_count);
 		for (int i = 0; i < wheels_count; ++i) {
 			const EntityRef e = serializer.read<EntityRef>();
 			Wheel& w = m_wheels.insert(e, {});
@@ -4682,7 +4682,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		int count;
 		serializer.read(count);
-		m_ragdolls.rehash(count);
+		m_ragdolls.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
 			EntityRef entity;

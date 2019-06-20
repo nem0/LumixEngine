@@ -10,756 +10,388 @@
 
 namespace Lumix
 {
-	template <class K, class V>
-	struct HashNode
+
+
+template<class Key> 
+struct HashFunc
+{
+	static u32 get(const Key& key);
+};
+
+// https://gist.github.com/badboy/6267743
+template<>
+struct HashFunc<u64>
+{
+	static u32 get(const u64& key)
 	{
-		typedef HashNode<K, V> my_node;
+		u64 tmp = (~key) + (key << 18);
+		tmp = tmp ^ (tmp >> 31);
+		tmp = tmp * 21;
+		tmp = tmp ^ (tmp >> 11);
+		tmp = tmp + (tmp << 6);
+		tmp = tmp ^ (tmp >> 22);
+		return (u32)tmp;
+	}
+};
 
-		HashNode(const K& key, V&& value)
-			: m_key(key)
-			, m_value(Move(value))
-			, m_next(nullptr)
-		{}
 
-		HashNode(const K& key, const V& value)
-			: m_key(key)
-			, m_value(value)
-			, m_next(nullptr)
-		{}
-
-		HashNode(const my_node& src) = delete;
-
-		explicit HashNode(my_node&& src)
-			: m_key(src.m_key)
-			, m_value(Move(src.m_value))
-			, m_next(src.m_next)
-		{}
-
-		K m_key;
-		V m_value;
-		my_node* m_next;
-	};
-
-	template<class Key> 
-	struct HashFunc
+template<>
+struct HashFunc<i32>
+{
+	static u32 get(const i32& key)
 	{
-		static u32 get(const Key& key);
-	};
+		u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
+		x = ((x >> 16) ^ x) * 0x45d9f3b;
+		x = ((x >> 16) ^ x);
+		return x;
+	}
+};
 
-	// https://gist.github.com/badboy/6267743
-	template<>
-	struct HashFunc<u64>
+template<>
+struct HashFunc<ComponentType>
+{
+	static u32 get(const ComponentType& key)
 	{
-		static u32 get(const u64& key)
-		{
-			u64 tmp = (~key) + (key << 18);
+		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
+		return HashFunc<i32>::get(key.index);
+	}
+};
+
+template<>
+struct HashFunc<EntityRef>
+{
+	static u32 get(const EntityRef& key)
+	{
+		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
+		return HashFunc<i32>::get(key.index);
+	}
+};
+
+template<>
+struct HashFunc<u32>
+{
+	static u32 get(const u32& key)
+	{
+		u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
+		x = ((x >> 16) ^ x) * 0x45d9f3b;
+		x = ((x >> 16) ^ x);
+		return x;
+	}
+};
+
+template<typename T>
+struct HashFunc<T*>
+{
+	static u32 get(const void* key)
+	{
+		#ifdef PLATFORM64
+			u64 tmp = (u64)key;
+			tmp = (~tmp) + (tmp << 18);
 			tmp = tmp ^ (tmp >> 31);
 			tmp = tmp * 21;
 			tmp = tmp ^ (tmp >> 11);
 			tmp = tmp + (tmp << 6);
 			tmp = tmp ^ (tmp >> 22);
 			return (u32)tmp;
-		}
-	};
-
-
-	template<>
-	struct HashFunc<i32>
-	{
-		static u32 get(const i32& key)
-		{
-			u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
+		#else
+			size_t x = ((i32(key) >> 16) ^ i32(key)) * 0x45d9f3b;
 			x = ((x >> 16) ^ x) * 0x45d9f3b;
 			x = ((x >> 16) ^ x);
 			return x;
-		}
-	};
+		#endif
+	}
+};
 
-	template<>
-	struct HashFunc<ComponentType>
+template<>
+struct HashFunc<char*>
+{
+	static u32 get(const char* key)
 	{
-		static u32 get(const ComponentType& key)
-		{
-			static_assert(sizeof(i32) == sizeof(key.index), "Check this");
-			return HashFunc<i32>::get(key.index);
+		u32 result = 0x55555555;
+
+		while (*key) 
+		{ 
+			result ^= *key++;
+			result = ((result << 5) | (result >> 27));
 		}
+
+		return result;
+	}
+};
+
+template<class Key, class Value, class Hasher = HashFunc<Key>>
+class HashMap
+{
+private:
+	struct Slot {
+		u8 key_mem[sizeof(Key)];
+		bool valid;
+		//u8 padding[3];
 	};
 
-	template<>
-	struct HashFunc<EntityRef>
+	template <typename HM, typename K, typename V>
+	struct iterator_base {
+		HM* hm;
+		uint idx;
+
+		template <typename HM, typename K, typename V>
+		bool operator !=(const iterator_base<HM, K, V>& rhs) const {
+			ASSERT(hm == rhs.hm);
+			return idx != rhs.idx;
+		}
+
+		template <typename HM, typename K, typename V>
+		bool operator ==(const iterator_base<HM, K, V>& rhs) const {
+			ASSERT(hm == rhs.hm);
+			return idx == rhs.idx;
+		}
+
+		void operator++() { 
+			const Slot* keys = hm->m_keys;
+			for(uint i = idx + 1, c = hm->m_capacity; i < c; ++i) {
+				if(keys[i].valid) {
+					idx = i;
+					return;
+				}
+			}
+			idx = hm->m_capacity;
+		}
+
+		K& key() {
+			ASSERT(hm->m_keys[idx].valid);
+			return *((Key*)hm->m_keys[idx].key_mem);
+		}
+
+		const V& value() const {
+			ASSERT(hm->m_keys[idx].valid);
+			return hm->m_values[idx];
+		}
+
+		V& value() {
+			ASSERT(hm->m_keys[idx].valid);
+			return hm->m_values[idx];
+		}
+
+		V& operator*() {
+			ASSERT(hm->m_keys[idx].valid);
+			return hm->m_values[idx];
+		}
+
+		bool isValid() const { return idx != hm->m_capacity; }
+	};
+
+public:
+	using iterator = iterator_base<HashMap, Key, Value>;
+	using const_iterator = iterator_base<const HashMap, const Key, const Value>;
+
+	HashMap(IAllocator& allocator) 
+		: m_allocator(allocator) 
 	{
-		static u32 get(const EntityRef& key)
-		{
-			static_assert(sizeof(i32) == sizeof(key.index), "Check this");
-			return HashFunc<i32>::get(key.index);
-		}
-	};
+		init(8, true); 
+	}
 
-	template<>
-	struct HashFunc<u32>
+	HashMap(uint size, IAllocator& allocator) 
+		: m_allocator(allocator) 
 	{
-		static u32 get(const u32& key)
-		{
-			u32 x = ((key >> 16) ^ key) * 0x45d9f3b;
-			x = ((x >> 16) ^ x) * 0x45d9f3b;
-			x = ((x >> 16) ^ x);
-			return x;
+		init(size, true); 
+	}
+
+	iterator begin() {
+		for (uint i = 0, c = m_capacity; i < c; ++i) {
+			if (m_keys[i].valid) return { this, i };
 		}
-	};
+		return { this, m_capacity };
+	}
 
-	template<typename T>
-	struct HashFunc<T*>
-	{
-		static u32 get(const void* key)
-		{
-			#ifdef PLATFORM64
-				u64 tmp = (u64)key;
-				tmp = (~tmp) + (tmp << 18);
-				tmp = tmp ^ (tmp >> 31);
-				tmp = tmp * 21;
-				tmp = tmp ^ (tmp >> 11);
-				tmp = tmp + (tmp << 6);
-				tmp = tmp ^ (tmp >> 22);
-				return (u32)tmp;
-			#else
-				size_t x = ((i32(key) >> 16) ^ i32(key)) * 0x45d9f3b;
-				x = ((x >> 16) ^ x) * 0x45d9f3b;
-				x = ((x >> 16) ^ x);
-				return x;
-			#endif
+	const_iterator begin() const {
+		for (uint i = 0, c = m_capacity; i < c; ++i) {
+			if (m_keys[i].valid) return { this, i };
 		}
-	};
+		return { this, m_capacity };
+	}
 
-	template<>
-	struct HashFunc<char*>
-	{
-		static u32 get(const char* key)
-		{
-			u32 result = 0x55555555;
+	iterator end() { return iterator { this, m_capacity }; }
+	const_iterator end() const { return const_iterator { this, m_capacity }; }
 
-			while (*key) 
-			{ 
-				result ^= *key++;
-				result = ((result << 5) | (result >> 27));
+	void clear() {
+		for(uint i = 0, c = m_capacity; i < c; ++i) {
+			if (m_keys[i].valid) {
+				((Key*)m_keys[i].key_mem)->~Key();
+				m_values[i].~Value();
+				m_keys[i].valid = false;
 			}
-
-			return result;
 		}
-	};
+		m_allocator.deallocate(m_keys);
+		m_allocator.deallocate(m_values);
+		init(8, true);
+	}
 
-	template<class K, class T, class Hasher = HashFunc<K>>
-	class HashMap
-	{
-	public:
-		typedef T value_type;
-		typedef K key_type;
-		typedef Hasher hasher_type;
-		typedef HashMap<key_type, value_type, hasher_type> my_type;
-		typedef HashNode<key_type, value_type> node_type;
-		typedef u32 size_type;
+	const_iterator find(const Key& key) const {
+		return { this, findPos(key) };
+	}
 
-		friend class HashMapIterator;
-		friend class ConstHashMapIterator;
+	iterator find(const Key& key) {
+		return { this, findPos(key) };
+	}
+	
+	Value& operator[](const Key& key) {
+		const uint pos = findPos(key);
+		ASSERT(pos < m_capacity);
+		return m_values[pos];
+	}
+	
+	const Value& operator[](const Key& key) const {
+		const uint pos = findPos(key);
+		ASSERT(pos < m_capacity);
+		return m_values[pos];
+	}
 
-		static const size_type s_default_ids_count = 8;
-
-		template <class U, class S, class _Hasher>
-		class HashMapIterator
-		{
-		public:
-			typedef U key_type;
-			typedef S value_type;
-			typedef _Hasher hasher_type;
-			typedef HashNode<key_type, value_type> node_type;
-			typedef HashMap<key_type, value_type, hasher_type> hm_type;
-			typedef HashMapIterator<key_type, value_type, hasher_type> my_type;
-
-			friend hm_type;
-
-			HashMapIterator()
-				: m_hash_map(nullptr)
-				, m_current_node(nullptr)
-			{
-			}
-
-			HashMapIterator(const my_type& src)
-				: m_hash_map(src.m_hash_map)
-				, m_current_node(src.m_current_node)
-			{
-			}
-
-			HashMapIterator(node_type* node, hm_type* hm)
-				: m_hash_map(hm)
-				, m_current_node(node)
-			{
-			}
-
-			~HashMapIterator()
-			{
-			}
-
-			bool isValid() const
-			{
-				return nullptr != m_current_node && m_hash_map->m_sentinel != m_current_node;
-			}
-
-			key_type& key()
-			{
-				return m_current_node->m_key;
-			}
-
-			value_type& value()
-			{
-				return m_current_node->m_value;
-			}
-
-			const value_type& value() const
-			{
-				return m_current_node->m_value;
-			}
-
-			value_type& operator*()
-			{
-				return value();
-			}
-
-			my_type& operator++()
-			{
-				return preInc();
-			}
-
-			my_type operator++(int)
-			{
-				return postInc();
-			}
-
-			bool operator==(const my_type& it) const
-			{
-				return it.m_current_node == m_current_node;
-			}
-
-			bool operator!=(const my_type& it) const
-			{
-				return it.m_current_node != m_current_node;
-			}
-
-		private:
-			my_type& preInc()
-			{
-				m_current_node = m_hash_map->next(m_current_node);
-				return *this;
-			}
-
-			my_type postInc()
-			{
-				my_type p = *this;
-				m_current_node = m_hash_map->next(m_current_node);
-				return p;
-			}
-
-			hm_type* m_hash_map;
-			node_type* m_current_node;
-		};
-
-		template <class U, class S, class _Hasher>
-		class ConstHashMapIterator
-		{
-		public:
-			typedef U key_type;
-			typedef S value_type;
-			typedef _Hasher hasher_type;
-			typedef HashNode<key_type, value_type> node_type;
-			typedef HashMap<key_type, value_type, hasher_type> hm_type;
-			typedef ConstHashMapIterator<key_type, value_type, hasher_type> my_type;
-
-			friend hm_type;
-
-			ConstHashMapIterator()
-				: m_hash_map(nullptr)
-				, m_current_node(nullptr)
-			{
-			}
-
-			ConstHashMapIterator(const my_type& src)
-				: m_hash_map(src.m_hash_map)
-				, m_current_node(src.m_current_node)
-			{
-			}
-
-			ConstHashMapIterator(node_type* node, const hm_type* hm)
-				: m_hash_map(hm)
-				, m_current_node(node)
-			{
-			}
-
-			~ConstHashMapIterator()
-			{
-			}
-
-			bool isValid() const
-			{
-				return nullptr != m_current_node && m_hash_map->m_sentinel != m_current_node;
-			}
-
-			const key_type& key() const
-			{
-				return m_current_node->m_key;
-			}
-
-			const value_type& value() const
-			{
-				return m_current_node->m_value;
-			}
-
-			const value_type& operator*() const
-			{
-				return value();
-			}
-
-			my_type& operator++()
-			{
-				return preInc();
-			}
-
-			my_type operator++(int)
-			{
-				return postInc();
-			}
-
-			bool operator==(const my_type& it) const
-			{
-				return it.m_current_node == m_current_node;
-			}
-
-			bool operator!=(const my_type& it) const
-			{
-				return it.m_current_node != m_current_node;
-			}
-
-		private:
-			my_type& preInc()
-			{
-				m_current_node = m_hash_map->next(m_current_node);
-				return *this;
-			}
-
-			my_type postInc()
-			{
-				my_type p = *this;
-				m_current_node = m_hash_map->next(m_current_node);
-				return p;
-			}
-
-			const hm_type* m_hash_map;
-			node_type* m_current_node;
-		};
-
-		typedef HashMapIterator<key_type, value_type, hasher_type> iterator;
-		typedef ConstHashMapIterator<key_type, value_type, hasher_type> constIterator;
-
-		explicit HashMap(IAllocator& allocator)
-			: m_allocator(allocator)
-		{
-			initSentinel();
-			init();
+	Value& insert(const Key& key, Value&& value) {
+		uint pos = Hasher::get(key) & m_mask;
+		while (m_keys[pos].valid) ++pos;
+		if(pos == m_capacity) {
+			pos = 0;
+			while (m_keys[pos].valid) ++pos;
 		}
 
-		HashMap(size_type buckets, IAllocator& allocator)
-			: m_allocator(allocator)
-		{
-			initSentinel();
-			init(buckets);
+		new (NewPlaceholder(), m_keys[pos].key_mem) Key(key);
+		new (NewPlaceholder(), &m_values[pos]) Value(value);
+		++m_size;
+		m_keys[pos].valid = true;
+
+		if (m_size > m_capacity * 3 / 4) {
+			grow(m_capacity << 1);
 		}
 
-		explicit HashMap(const my_type& src)
-			: m_allocator(src.m_allocator)
-		{
-			initSentinel();
-			init(src.m_max_id);
-			copyTableUninitialized(src.m_table, src.m_sentinel, src.m_max_id);
+		return m_values[pos];
+	}
 
-			m_mask = src.m_mask;
-			m_size = src.m_size;
+	iterator insert(const Key& key, const Value& value) {
+		uint pos = Hasher::get(key) & m_mask;
+		while (m_keys[pos].valid) ++pos;
+		if(pos == m_capacity) {
+			pos = 0;
+			while (m_keys[pos].valid) ++pos;
 		}
 
-		~HashMap()
-		{
-			for (node_type* n = first(); m_sentinel != n;)
-			{
-				node_type* dest = n;
-				n = next(n);
-				destruct(dest);
-				if (dest < m_table || dest > &m_table[m_max_id - 1])
-					m_allocator.deallocate(dest);
-			}
+		new (NewPlaceholder(), m_keys[pos].key_mem) Key(key);
+		new (NewPlaceholder(), &m_values[pos]) Value(value);
+		++m_size;
+		m_keys[pos].valid = true;
 
-			m_allocator.deallocate(m_table);
-			m_table = nullptr;
-			m_size = 0;
-			m_max_id = 0;
-			m_mask = 0;
+		if (m_size > m_capacity * 3 / 4) {
+			grow(m_capacity << 1);
 		}
 
-		size_type size() const { return m_size; }
-		bool empty() const { return 0 == m_size; }
+		return { this, pos };
+	}
 
-		float loadFactor() const { return float(m_size / m_max_id); }
-		float maxLoadFactor() const { return 0.75f; }
+	void erase(const iterator& key) {
+		ASSERT(key.isValid());
 
-		my_type& operator=(const my_type& src)
-		{
-			if(this != &src)
-			{
-				clear();
-				init(src.m_max_id);
-				copyTableUninitialized(src.m_table, src.m_sentinel, src.m_max_id);
+		Slot* keys = m_keys;
+		uint pos = key.idx;
+		((Key*)keys[pos].key_mem)->~Key();
+		m_values[pos].~Value();
+		keys[pos].valid = false;
+		--m_size;
 
-				m_mask = src.m_mask;
-				m_size = src.m_size;
-			}
-
-			return *this;
+		const uint mask = m_mask;
+		while (keys[pos + 1].valid) {
+			rehash(pos);
+			++pos;
 		}
+	}
 
-		value_type& operator[](const key_type& key) const
-		{
-			node_type* n = _find(key);
-			ASSERT(m_sentinel != n);
-			return n->m_value;
-		}
+	void erase(const Key& key) {
+		const uint pos = findPos(key);
+		if (m_keys[pos].valid) erase({this, pos});
+	}
 
-		void insert(const key_type& key, const value_type& val)
-		{
-			size_type pos = getPosition(key);
-			construct(getEmptyNode(pos), key, val);
-			m_size++;
-			checkSize();
-		}
+	bool empty() const { return m_size == 0; }
+	uint size() const { return m_size; }
 
-		value_type& insert(const key_type& key, value_type&& val)
-		{
-			size_type pos = getPosition(key);
-			node_type* node = construct(getEmptyNode(pos), key, Move(val));
-			m_size++;
-			checkSize();
-			return node->m_value;
-		}
+	void reserve(uint new_capacity) {
+		if (new_capacity > m_capacity) grow(new_capacity);
+	}
 
-		iterator erase(iterator it)
-		{
-			ASSERT(it.isValid());
-
-			size_type idx = getPosition(it.m_current_node->m_key);
-			node_type* n = &m_table[idx];
-			node_type* prev = nullptr;
-			node_type* next_it = nullptr;
-
-			while(nullptr != n && m_sentinel != n->m_next)
-			{
-				if(n == it.m_current_node)
-				{
-					next_it = next(n);
-					deleteNode(n, prev);
-
-					--m_size;
-					return iterator(next_it, this);
-				}
-
-				prev = n;
-				n = n->m_next;
-			}
-
-			return iterator(m_sentinel, this);
-		}
-
-		size_type erase(const key_type& key)
-		{
-			size_type count = 0;
-			size_type idx = getPosition(key);
-			node_type* n = &m_table[idx];
-			node_type* prev = nullptr;
-
-			while(nullptr != n && m_sentinel != n->m_next)
-			{
-				if(key == n->m_key)
-				{
-					deleteNode(n, prev);
-
-					count++;
-					--m_size;
-				}
-				else
-				{
-					prev = n;
-					n = n->m_next;
-				}
-			}
-
-			return count;
-		}
-
-		void clear()
-		{
-			for(node_type* n = first(); m_sentinel != n; )
-			{
-				node_type* dest = n;
-				n = next(n);
-				destruct(dest);
-				if(dest < m_table || dest > &m_table[m_max_id - 1])
-					m_allocator.deallocate(dest);
-			}
-
-			m_allocator.deallocate(m_table);
-			m_table = nullptr;
-			m_size = 0;
-			m_max_id = 0;
-			m_mask = 0;
-			init();
-		}
-
-		void rehash(size_type ids_count)
-		{
-			if (m_max_id < ids_count)
-			{
-				grow(ids_count);
+private:
+	void grow(uint new_capacity) {
+		HashMap<Key, Value, Hasher> tmp(new_capacity, m_allocator);
+		if (m_size > 0) {
+			for(auto iter = begin(); iter.isValid(); ++iter) {
+				tmp.insert(iter.key(), static_cast<Value&&>(iter.value()));
 			}
 		}
 
-		iterator begin() { return iterator(first(), this); }
-		iterator end() { return iterator(m_sentinel, this); }
+		swap(m_capacity, tmp.m_capacity);
+		swap(m_size, tmp.m_size);
+		swap(m_mask, tmp.m_mask);
+		swap(m_keys, tmp.m_keys);
+		swap(m_values, tmp.m_values);
+	}
 
-		constIterator begin() const { return constIterator(first(), this); }
-		constIterator end() const { return constIterator(m_sentinel, this); }
-
-		iterator find(const key_type& key) { return iterator(_find(key), this); }
-		constIterator find(const key_type& key) const { return constIterator(_find(key), this); }
-
-		value_type& at(const key_type& key)
-		{
-			node_type* n = _find(key);
-			return n->m_value;
+	uint findEmptySlot(const Key& key, uint end_pos) const {
+		const uint mask = m_mask;
+		uint pos = Hasher::get(key) & mask;
+		while (m_keys[pos].valid && pos != end_pos) ++pos;
+		if (pos == m_capacity) {
+			pos = 0;
+			while (m_keys[pos].valid && pos != end_pos) ++pos;
 		}
-		
-	private:
-		void checkSize()
-		{
-			if(loadFactor() > maxLoadFactor())
-			{
-				grow(m_max_id);
+		return pos;
+	}
+
+	void rehash(uint pos) {
+		Key& key = *((Key*)m_keys[pos].key_mem);
+		const uint rehashed_pos = findEmptySlot(key, pos);
+		if (rehashed_pos != pos) {
+			new (NewPlaceholder(), m_keys[rehashed_pos].key_mem) Key(static_cast<Key&&>(key));
+			new (NewPlaceholder(), &m_values[rehashed_pos]) Value(static_cast<Value&&>(m_values[pos]));
+			
+			((Key*)m_keys[pos].key_mem)->~Key();
+			m_values[pos].~Value();
+			m_keys[pos].valid = false;
+		}
+	}
+
+	uint findPos(const Key& key) const {
+		uint pos = Hasher::get(key) & m_mask;
+		const Slot* LUMIX_RESTRICT keys = m_keys;
+		while (keys[pos].valid) {
+			if (*((Key*)keys[pos].key_mem) == key) return pos;
+			++pos;
+		}
+		pos = 0;
+		while (keys[pos].valid) {
+			if (*((Key*)keys[pos].key_mem) == key) return pos;
+			++pos;
+		}
+		return m_capacity;
+	}
+
+	void init(uint capacity, bool all_invalid) {
+		ASSERT(isPowOfTwo(capacity));
+		m_size = 0;
+		m_mask = capacity - 1;
+		m_keys = (Slot*)m_allocator.allocate(sizeof(Slot) * (capacity + 1));
+		m_values = (Value*)m_allocator.allocate(sizeof(Value) * capacity);
+		m_capacity = capacity;
+		if (all_invalid) {
+			for(uint i = 0; i < capacity; ++i) {
+				m_keys[i].valid = false;
 			}
 		}
+		m_keys[capacity].valid = false;
+	}
 
-		size_type getPosition(const key_type& key) const
-		{
-			size_type pos = Hasher::get(key) & m_mask;
-			ASSERT(pos < m_max_id);
-			return pos;
-		}
+	IAllocator& m_allocator;
+	Slot* m_keys;
+	Value* m_values;
+	uint m_capacity;
+	uint m_size;
+	uint m_mask;
+};
 
-		void init(size_type ids_count = s_default_ids_count)
-		{
-			ASSERT(isPowOfTwo(ids_count));
-			m_table = (node_type*)m_allocator.allocate(sizeof(node_type) * ids_count);
-			for(node_type* i = m_table; i < &m_table[ids_count]; ++i) {
-				i->m_next = m_sentinel;
-			}
 
-			m_mask = (ids_count - 1);
-			m_max_id = ids_count;
-			m_size = 0;
-		}
-
-		void copyTable(node_type* src, const node_type* src_sentinel, size_type ids_count)
-		{
-			for (size_type i = 0; i < ids_count; i++)
-			{
-				node_type* n = &src[i];
-				while (nullptr != n && src_sentinel != n->m_next)
-				{
-					i32 pos = getPosition(n->m_key);
-					node_type* new_node = getEmptyNode(pos);
-					copyMemory(new_node, n, sizeof(node_type));
-					new_node->m_next = nullptr;
-					n = n->m_next;
-				}
-			}
-		}
-
-		void grow(size_type ids_count)
-		{
-			size_type old_size = m_size;
-			size_type old_ids_count = m_max_id;
-			size_type pow2_ids_count = nextPow2(ids_count);
-			size_type new_ids_count = pow2_ids_count < 512 ? pow2_ids_count * 4 : pow2_ids_count * 2;
-			node_type* old = m_table;
-
-			init(new_ids_count);
-			copyTable(old, m_sentinel, old_ids_count);
-
-			m_size = old_size;
-			for (size_type i = 0; i < old_ids_count; ++i)
-			{
-				node_type* n = &old[i];
-				if (n->m_next && n->m_next != m_sentinel)
-				{
-					n = n->m_next;
-					while (n && n->m_next != m_sentinel)
-					{
-						node_type* old_n = n;
-						n = n->m_next;
-						m_allocator.deallocate(old_n);
-					}
-				}
-			}
-			m_allocator.deallocate(old);
-		}
-
-		node_type* construct(node_type* where, const key_type& key, value_type&& val)
-		{
-			return new(NewPlaceholder(), where) node_type(key, Move(val));
-		}
-
-		node_type* construct(node_type* where, const key_type& key, const value_type& val)
-		{
-			return new(NewPlaceholder(), where) node_type(key, val);
-		}
-
-		void destruct(node_type* n)
-		{
-			(void)n; /// to avoid a bug in VS 2013 - n is unused warning
-			n->~node_type();
-		}
-
-		void initSentinel()
-		{
-			m_sentinel = reinterpret_cast<node_type*>(m_sentinel_mem);
-			m_sentinel->m_next = m_sentinel;
-		}
-
-		node_type* getEmptyNode(size_type pos)
-		{
-			node_type* node = &m_table[pos];
-			while (m_sentinel != node->m_next && nullptr != node->m_next)
-			{
-				node = node->m_next;
-			}
-
-			if (node->m_next == m_sentinel) {
-				node->m_next = nullptr;
-				return node;
-			}
-
-			node_type* new_node = (node_type*)m_allocator.allocate(sizeof(node_type));
-			new_node->m_next = m_sentinel;
-			node->m_next = new_node;
-			return new_node;
-		}
-
-		node_type* first() const
-		{
-			if(0 == m_size)
-				return m_sentinel;
-
-			for(size_type i = 0; i < m_max_id; i++)
-				if(m_table[i].m_next != m_sentinel)
-					return &m_table[i];
-
-			return m_sentinel;
-		}
-
-		node_type* next(node_type* n) const
-		{
-			if(0 == m_size || m_sentinel == n)
-				return m_sentinel;
-
-			node_type* next = n->m_next;
-			if((nullptr == next || m_sentinel == next))
-			{
-				size_type idx = getPosition(n->m_key) + 1;
-				for(size_type i = idx; i < m_max_id; i++)
-					if(m_table[i].m_next != m_sentinel)
-						return &m_table[i];
-
-				return m_sentinel;
-			}
-			return next;
-		}
-
-		node_type* _find(const key_type& key) const
-		{
-			size_type pos = getPosition(key);
-			for(node_type* n = &m_table[pos]; nullptr != n && m_sentinel != n->m_next; n = n->m_next)
-			{
-				if(n->m_key == key)
-					return n;
-			}
-
-			return m_sentinel;
-		}
-
-		void deleteNode(node_type*& n, node_type* prev)
-		{
-			if(nullptr == prev)
-			{
-				node_type* next = n->m_next;
-				destruct(n);
-				
-				if (next) {
-					new (NewPlaceholder(), n) node_type(Move(*next));
-					destruct(next);
-				}
-				else {
-					n->m_next = m_sentinel;
-				}
-				m_allocator.deallocate(next);
-			}
-			else
-			{
-				prev->m_next = n->m_next;
-				destruct(n);
-				m_allocator.deallocate(n);
-				n = prev->m_next;
-			}
-		}
-
-		void copyTableUninitialized(node_type* src, const node_type* src_sentinel, size_type ids_count)
-		{
-			for(size_type i = 0; i < ids_count; i++)
-			{
-				node_type* n = &src[i];
-				while(nullptr != n && src_sentinel != n->m_next)
-				{
-					size_type pos = getPosition(n->m_key);
-					node_type* new_node = getEmptyNode(pos);
-					construct(new_node, n->m_key, n->m_value);
-					new_node->m_next = nullptr;
-					n = n->m_next;
-				}
-			}
-		}
-
-		void destructTable(node_type* src, const node_type* src_sentinel, size_type ids_count)
-		{
-			for(size_type i = 0; i < ids_count; i++)
-			{
-				node_type* n = &src[i];
-				while(nullptr != n && src_sentinel != n->m_next)
-				{
-					node_type* destr = n;
-					n = n->m_next;
-					destruct(destr);
-					if(destr < src || destr > &src[ids_count - 1])
-						m_allocator.deallocate(destr);
-				}
-			}
-		}
-
-		node_type* m_table;
-		char m_sentinel_mem[sizeof(node_type)];
-		node_type* m_sentinel;
-		size_type m_size;
-		size_type m_mask;
-		size_type m_max_id;
-		IAllocator& m_allocator;
-	};
 } // namespace Lumix
