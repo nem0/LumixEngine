@@ -3,15 +3,14 @@
 #include <PxPhysicsAPI.h>
 
 #include "cooking/PxCooking.h"
-#include "engine/base_proxy_allocator.h"
 #include "engine/log.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
+#include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "physics/physics_geometry_manager.h"
+#include "physics/physics_geometry.h"
 #include "physics/physics_scene.h"
 #include "renderer/texture.h"
-#include <cstdlib>
 
 
 namespace Lumix
@@ -186,6 +185,27 @@ namespace Lumix
 	};
 
 
+	struct PhysicsGeometryManager final : public ResourceManager
+	{
+		PhysicsGeometryManager(PhysicsSystem& system, IAllocator& allocator)
+			: ResourceManager(allocator)
+			, m_allocator(allocator)
+			, m_system(system)
+		{}
+
+		Resource* createResource(const Path& path) override {
+			return LUMIX_NEW(m_allocator, PhysicsGeometry)(path, *this, m_system, m_allocator);
+		}
+
+		void destroyResource(Resource& resource) override {
+			LUMIX_DELETE(m_allocator, static_cast<PhysicsGeometry*>(&resource));
+		}
+
+		IAllocator& m_allocator;
+		PhysicsSystem& m_system;
+	};
+
+
 	struct PhysicsSystemImpl final : public PhysicsSystem
 	{
 		explicit PhysicsSystemImpl(Engine& engine)
@@ -269,7 +289,7 @@ namespace Lumix
 		physx::PxCooking* m_cooking;
 		PhysicsGeometryManager m_manager;
 		Engine& m_engine;
-		BaseProxyAllocator m_allocator;
+		IAllocator& m_allocator;
 	};
 
 

@@ -1,7 +1,7 @@
 #include "engine/array.h"
 #include "engine/fibers.h"
 #include "engine/hash_map.h"
-#include "engine/default_allocator.h"
+#include "engine/allocator.h"
 #include "engine/timer.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
@@ -398,14 +398,6 @@ void beforeFiberSwitch()
 }
 
 
-int getOpenBlocksSize()
-{
-	ThreadContext* ctx = g_instance.getThreadContext();
-	const int count = ctx->open_blocks.size();
-	return count * sizeof(const char*) + sizeof(count);
-}
-
-
 void pushJobInfo(u32 signal_on_finish, u32 precondition)
 {
 	JobRecord r;
@@ -416,38 +408,39 @@ void pushJobInfo(u32 signal_on_finish, u32 precondition)
 }
 
 
-i32 beginFiberWait(u32 job_system_signal, void* open_blocks)
+FiberSwitchData beginFiberWait(u32 job_system_signal)
 {
 	FiberWaitRecord r;
 	r.id = MT::atomicIncrement(&g_instance.fiber_wait_id);
 	r.job_system_signal = job_system_signal;
 
+	FiberSwitchData res;
+
 	ThreadContext* ctx = g_instance.getThreadContext();
-	const int count = ctx->open_blocks.size();
-	memcpy(open_blocks, &count, sizeof(count));
-	memcpy((u8*)open_blocks + sizeof(count), ctx->open_blocks.begin(), count * sizeof(const char*));
+	res.count = ctx->open_blocks.size();
+	res.id = r.id;
+	memcpy(res.blocks, ctx->open_blocks.begin(), minimum(res.count, lengthOf(res.blocks)) * sizeof(const char*));
 	write(*ctx, EventType::BEGIN_FIBER_WAIT, r);
-	return r.id;
+	return res;
 }
 
 
-void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks)
+void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
 	FiberWaitRecord r;
-	r.id = wait_id;
+	r.id = switch_data.id;
 	r.job_system_signal = job_system_signal;
 
 	write(*ctx, EventType::END_FIBER_WAIT, r);
-	int count;
-	memcpy(&count, open_blocks, sizeof(count));
+	const int count = switch_data.count;
 	
-	u8* ptr = (u8*)open_blocks + sizeof(count);
 	for (int i = 0; i < count; ++i) {
-		const char* name;
-		memcpy(&name, ptr, sizeof(name));
-		ptr += sizeof(name);
-		beginBlock(name);
+		if(i < lengthOf(switch_data.blocks)) {
+			beginBlock(switch_data.blocks[i]);
+		} else {
+			beginBlock("N/A");
+		}
 	}
 }
 

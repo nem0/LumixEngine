@@ -1,7 +1,7 @@
 #include "engine/file_system.h"
 
+#include "engine/allocator.h"
 #include "engine/array.h"
-#include "engine/base_proxy_allocator.h"
 #include "engine/delegate_list.h"
 #include "engine/flag_set.h"
 #include "engine/mt/sync.h"
@@ -86,8 +86,6 @@ struct FileSystemImpl final : public FileSystem
 		m_task->destroy();
 		LUMIX_DELETE(m_allocator, m_task);
 	}
-
-	BaseProxyAllocator& getAllocator() { return m_allocator; }
 
 
 	bool hasWork() override
@@ -212,7 +210,7 @@ struct FileSystemImpl final : public FileSystem
 		}
 	}
 
-	BaseProxyAllocator m_allocator;
+	IAllocator& m_allocator;
 	FSTask* m_task;
 	StaticString<MAX_PATH_LENGTH> m_base_path;
 	Array<AsyncItem> m_queue;
@@ -287,7 +285,7 @@ FileSystem* FileSystem::create(const char* base_path, IAllocator& allocator)
 
 void FileSystem::destroy(FileSystem* fs)
 {
-	LUMIX_DELETE(static_cast<FileSystemImpl*>(fs)->getAllocator().getSourceAllocator(), fs);
+	LUMIX_DELETE(static_cast<FileSystemImpl*>(fs)->m_allocator, fs);
 }
 
 

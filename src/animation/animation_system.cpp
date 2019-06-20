@@ -3,14 +3,10 @@
 #include "animation/animation.h"
 #include "animation/property_animation.h"
 #include "animation/controller.h"
-#include "engine/base_proxy_allocator.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
-#include "engine/stream.h"
+#include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "renderer/model.h"
-#include <cfloat>
-#include <cmath>
 
 
 namespace Lumix
@@ -74,6 +70,26 @@ class JsonSerializer;
 class Universe;
 
 
+template <typename T>
+struct AnimResourceManager final : public ResourceManager
+{
+	explicit AnimResourceManager(IAllocator& allocator)
+		: ResourceManager(allocator)
+		, m_allocator(allocator)
+	{}
+
+	Resource* createResource(const Path& path) override {
+		return LUMIX_NEW(m_allocator, T)(path, *this, m_allocator);
+	}
+
+	void destroyResource(Resource& resource) override {
+		LUMIX_DELETE(m_allocator, static_cast<T*>(&resource));
+	}
+
+	IAllocator& m_allocator;
+};
+
+
 struct AnimationSystemImpl final : public IPlugin
 {
 	void operator=(const AnimationSystemImpl&) = delete;
@@ -89,10 +105,9 @@ struct AnimationSystemImpl final : public IPlugin
 
 	IAllocator& m_allocator;
 	Engine& m_engine;
-	AnimationManager m_animation_manager;
-	PropertyAnimationManager m_property_animation_manager;
-	Anim::ControllerManager m_controller_manager;
-
+	AnimResourceManager<Animation> m_animation_manager;
+	AnimResourceManager<PropertyAnimation> m_property_animation_manager;
+	AnimResourceManager<Anim::ControllerResource> m_controller_manager;
 };
 
 

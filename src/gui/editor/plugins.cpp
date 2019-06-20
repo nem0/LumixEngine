@@ -15,7 +15,7 @@
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "gui/gui_scene.h"
-#include "gui/sprite_manager.h"
+#include "gui/sprite.h"
 #include "imgui/imgui.h"
 #include "renderer/draw2d.h"
 #include "renderer/ffr/ffr.h"

@@ -8,7 +8,7 @@
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
-#include "physics/physics_geometry_manager.h"
+#include "physics/physics_geometry.h"
 #include "renderer/model.h"
 #include <cfloat>
 #include <cmath>

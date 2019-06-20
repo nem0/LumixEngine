@@ -1,4 +1,4 @@
-#include "lua_script_manager.h"
+#include "lua_script.h"
 
 #include "engine/log.h"
 #include "engine/file_system.h"
@@ -32,28 +32,6 @@ bool LuaScript::load(u64 size, const u8* mem)
 	m_source_code.set((const char*)mem, (int)size);
 	m_size = size;
 	return true;
-}
-
-
-LuaScriptManager::LuaScriptManager(IAllocator& allocator)
-	: ResourceManager(allocator)
-	, m_allocator(allocator)
-{
-}
-
-
-LuaScriptManager::~LuaScriptManager() = default;
-
-
-Resource* LuaScriptManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, LuaScript)(path, *this, m_allocator);
-}
-
-
-void LuaScriptManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<LuaScript*>(&resource));
 }
 
 

@@ -3,7 +3,6 @@
 
 #include "engine/lumix.h"
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 
 
 namespace physx
@@ -18,28 +17,6 @@ namespace Lumix
 
 
 class PhysicsSystem;
-
-
-class PhysicsGeometryManager final : public ResourceManager
-{
-	public:
-		PhysicsGeometryManager(PhysicsSystem& system, IAllocator& allocator)
-			: ResourceManager(allocator)
-			, m_allocator(allocator)
-			, m_system(system)
-		{}
-		~PhysicsGeometryManager() {}
-		IAllocator& getAllocator() { return m_allocator; }
-		PhysicsSystem& getSystem() { return m_system; }
-
-	protected:
-		Resource* createResource(const Path& path) override;
-		void destroyResource(Resource& resource) override;
-
-	private:
-		IAllocator& m_allocator;
-		PhysicsSystem& m_system;
-};
 
 
 class PhysicsGeometry final : public Resource
@@ -62,7 +39,7 @@ class PhysicsGeometry final : public Resource
 		};
 
 	public:
-		PhysicsGeometry(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+		PhysicsGeometry(const Path& path, ResourceManager& resource_manager, PhysicsSystem& system, IAllocator& allocator);
 		~PhysicsGeometry();
 
 		ResourceType getType() const override { return TYPE; }
@@ -73,7 +50,8 @@ class PhysicsGeometry final : public Resource
 		physx::PxConvexMesh* convex_mesh;
 
 	private:
-		IAllocator& getAllocator();
+		PhysicsSystem& system;
+		IAllocator& allocator;
 
 		void unload() override;
 		bool load(u64 size, const u8* mem) override;

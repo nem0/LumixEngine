@@ -1,6 +1,6 @@
 #include "animation/property_animation.h"
 #include "engine/crc32.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/reflection.h"
@@ -9,24 +9,13 @@
 namespace Lumix
 {
 
-	
-Resource* PropertyAnimationManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, PropertyAnimation)(path, *this, m_allocator);
-}
-
-
-void PropertyAnimationManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<PropertyAnimation*>(&resource));
-}
-
 
 const ResourceType PropertyAnimation::TYPE("property_animation");
 
 
 PropertyAnimation::PropertyAnimation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
+	, m_allocator(allocator)
 	, fps(30)
 	, curves(allocator)
 {
@@ -35,8 +24,7 @@ PropertyAnimation::PropertyAnimation(const Path& path, ResourceManager& resource
 
 PropertyAnimation::Curve& PropertyAnimation::addCurve()
 {
-	auto& manager = (PropertyAnimationManager&)getResourceManager();
-	return curves.emplace(manager.getAllocator());
+	return curves.emplace(m_allocator);
 }
 
 
@@ -69,16 +57,15 @@ bool PropertyAnimation::save(JsonSerializer& serializer)
 
 bool PropertyAnimation::load(u64 size, const u8* mem)
 {
-	auto& manager = (PropertyAnimationManager&)getResourceManager();
 	InputMemoryStream file(mem, size);
-	JsonDeserializer serializer(file, getPath(), manager.getAllocator());
+	JsonDeserializer serializer(file, getPath(), m_allocator);
 	if (serializer.isError()) return false;
 	
 	serializer.deserializeArrayBegin();
 	while (!serializer.isArrayEnd())
 	{
 		serializer.nextArrayItem();
-		Curve& curve = curves.emplace(manager.getAllocator());
+		Curve& curve = curves.emplace(m_allocator);
 		serializer.deserializeObjectBegin();
 		u32 prop_hash = 0;
 		while (!serializer.isObjectEnd())

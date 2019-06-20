@@ -1,5 +1,5 @@
 #include "string.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include <cmath>
 #include <cstring>
 

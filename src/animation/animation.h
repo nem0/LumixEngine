@@ -1,8 +1,8 @@
 #pragma once
 
+#include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 
 namespace Lumix
 {
@@ -11,25 +11,6 @@ class Model;
 struct Pose;
 struct Quat;
 struct Vec3;
-
-
-class AnimationManager final : public ResourceManager
-{
-public:
-	explicit AnimationManager(IAllocator& allocator)
-		: ResourceManager(allocator)
-		, m_allocator(allocator)
-	{}
-	~AnimationManager() {}
-	IAllocator& getAllocator() { return m_allocator; }
-
-protected:
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-private:
-	IAllocator& m_allocator;
-};
 
 
 struct BoneMask
@@ -70,12 +51,11 @@ class Animation final : public Resource
 		int getBoneIndex(u32 name) const;
 
 	private:
-		IAllocator& getAllocator() const;
-
 		void unload() override;
 		bool load(u64 size, const u8* mem) override;
 
 	private:
+		IAllocator& m_allocator;
 		int	m_frame_count;
 		struct Bone
 		{

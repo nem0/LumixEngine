@@ -2,7 +2,6 @@
 
 
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 
 
 namespace Lumix
@@ -43,22 +42,8 @@ public:
 	static const ResourceType TYPE;
 
 private:
-	Texture* m_texture;
-};
-
-
-class SpriteManager final : public ResourceManager
-{
-friend class Sprite;
-public:
-	SpriteManager(IAllocator& allocator);
-
-private:
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-private:
 	IAllocator& m_allocator;
+	Texture* m_texture;
 };
 
 

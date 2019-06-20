@@ -14,7 +14,7 @@
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
-#include "physics/physics_geometry_manager.h"
+#include "physics/physics_geometry.h"
 #include "physics/physics_scene.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"

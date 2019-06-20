@@ -1,4 +1,4 @@
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"

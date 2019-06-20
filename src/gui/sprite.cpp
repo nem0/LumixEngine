@@ -1,10 +1,9 @@
-#include "sprite_manager.h"
+#include "sprite.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "renderer/texture.h"
-#include "renderer/renderer.h"
 
 
 namespace Lumix
@@ -16,6 +15,7 @@ const ResourceType Sprite::TYPE("sprite");
 
 Sprite::Sprite(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
+	, m_allocator(allocator)
 	, m_texture(nullptr)
 {
 }
@@ -66,10 +66,8 @@ bool Sprite::save(JsonSerializer& serializer)
 
 bool Sprite::load(u64 size, const u8* mem)
 {
-	auto& manager = (SpriteManager&)getResourceManager();
-	IAllocator& allocator = manager.m_allocator;
 	InputMemoryStream file(mem, size);
-	JsonDeserializer serializer(file, getPath(), allocator);
+	JsonDeserializer serializer(file, getPath(), m_allocator);
 	serializer.deserializeObjectBegin();
 	while (!serializer.isObjectEnd())
 	{
@@ -109,25 +107,6 @@ bool Sprite::load(u64 size, const u8* mem)
 		}
 	}
 	return true;
-}
-
-
-SpriteManager::SpriteManager(IAllocator& allocator)
-	: ResourceManager(allocator)
-	, m_allocator(allocator)
-{
-}
-
-
-Resource* SpriteManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, Sprite)(path, *this, m_allocator);
-}
-
-
-void SpriteManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<Sprite*>(&resource));
 }
 
 

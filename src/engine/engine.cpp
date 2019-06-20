@@ -422,6 +422,27 @@ static void logErrorToFile(const char*, const char* message)
 }
 
 
+struct PrefabResourceManager final : public ResourceManager
+{
+	explicit PrefabResourceManager(IAllocator& allocator)
+		: m_allocator(allocator)
+		, ResourceManager(allocator)
+	{}
+
+	Resource* createResource(const Path& path) override
+	{
+		return LUMIX_NEW(m_allocator, PrefabResource)(path, *this, m_allocator);
+	}
+
+	void destroyResource(Resource& resource) override
+	{
+		return LUMIX_DELETE(m_allocator, &static_cast<PrefabResource&>(resource));
+	}
+
+	IAllocator& m_allocator;
+};
+
+
 class EngineImpl final : public Engine
 {
 public:

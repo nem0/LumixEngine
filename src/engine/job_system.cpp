@@ -2,7 +2,7 @@
 #include "engine/array.h"
 #include "engine/engine.h"
 #include "engine/fibers.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/mt/atomic.h"
@@ -10,7 +10,7 @@
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 #include "engine/profiler.h"
-#include <malloc.h> // TODO
+
 
 namespace Lumix
 {
@@ -545,16 +545,14 @@ void wait(SignalHandle handle)
 			}
 		}, handle, false, nullptr, 0);
 		
-		const int open_size = Profiler::getOpenBlocksSize();
-		void* mem = _alloca(open_size);
-		const i32 wait_id = Profiler::beginFiberWait(handle, mem);
+		const Profiler::FiberSwitchData& switch_data = Profiler::beginFiberWait(handle);
 		FiberDecl* new_fiber = g_system->m_free_fibers.back();
 		g_system->m_free_fibers.pop();
 		getWorker()->m_current_fiber = new_fiber;
 		Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 		getWorker()->m_current_fiber = this_fiber;
 		g_system->m_sync.exit();
-		Profiler::endFiberWait(handle, wait_id, mem);
+		Profiler::endFiberWait(handle, switch_data);
 		
 		#ifndef NDEBUG
 			g_system->m_sync.enter();

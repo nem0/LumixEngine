@@ -1,8 +1,7 @@
 #include "audio_system.h"
-#include "animation/animation_scene.h"
 #include "audio_device.h"
 #include "audio_scene.h"
-#include "clip_manager.h"
+#include "clip.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/reflection.h"
@@ -36,6 +35,26 @@ static void registerProperties(IAllocator& allocator)
 }
 
 
+struct ClipManager final : public ResourceManager
+{
+	explicit ClipManager(IAllocator& allocator)
+		: ResourceManager(allocator)
+		, m_allocator(allocator)
+	{
+	}
+
+	Resource* createResource(const Path& path) override {
+		return LUMIX_NEW(m_allocator, Clip)(path, *this, m_allocator);
+	}
+
+	void destroyResource(Resource& resource) override {
+		LUMIX_DELETE(m_allocator, static_cast<Clip*>(&resource));
+	}
+
+	IAllocator& m_allocator;
+};
+
+
 struct AudioSystemImpl final : public AudioSystem
 {
 	explicit AudioSystemImpl(Engine& engine)
@@ -64,7 +83,6 @@ struct AudioSystemImpl final : public AudioSystem
 
 	Engine& getEngine() override { return m_engine; }
 	AudioDevice& getDevice() override { return *m_device; }
-	ClipManager& getClipManager() override { return m_manager; }
 
 
 	const char* getName() const override { return "audio"; }

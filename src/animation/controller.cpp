@@ -245,20 +245,6 @@ ComponentInstance* ControllerResource::createInstance(IAllocator& allocator) con
 }
 
 
-
-Resource* ControllerManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, ControllerResource)(path, *this, m_allocator);
-}
-
-
-void ControllerManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, (ControllerResource*)&resource);
-}
-
-
-
 } // namespace Anim
 
 

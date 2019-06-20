@@ -32,10 +32,15 @@ LUMIX_ENGINE_API void gpuFrame();
 LUMIX_ENGINE_API void link(i64 link);
 LUMIX_ENGINE_API i64 createNewLinkID();
 
+struct FiberSwitchData {
+	i32 id;
+	const char* blocks[16];
+	int count;
+};
+
 LUMIX_ENGINE_API void beforeFiberSwitch();
-LUMIX_ENGINE_API int getOpenBlocksSize();
-LUMIX_ENGINE_API i32 beginFiberWait(u32 job_system_signal, void* open_blocks);
-LUMIX_ENGINE_API void endFiberWait(u32 job_system_signal, i32 wait_id, const void* open_blocks);
+LUMIX_ENGINE_API FiberSwitchData beginFiberWait(u32 job_system_signal);
+LUMIX_ENGINE_API void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data);
 LUMIX_ENGINE_API float getLastFrameDuration();
 
 struct Scope

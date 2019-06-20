@@ -1,5 +1,4 @@
-#include "physics_geometry_manager.h"
-#include "engine/file_system.h"
+#include "physics_geometry.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
@@ -82,23 +81,13 @@ struct InputStream final : public physx::PxInputStream
 };
 
 
-Resource* PhysicsGeometryManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, PhysicsGeometry)(path, *this, m_allocator);
-}
-
-
-void PhysicsGeometryManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<PhysicsGeometry*>(&resource));
-}
-
-
 const ResourceType PhysicsGeometry::TYPE("physics");
 
 
-PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
+PhysicsGeometry::PhysicsGeometry(const Path& path, ResourceManager& resource_manager, PhysicsSystem& system, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
+	, system(system)
+	, allocator(allocator)
 	, convex_mesh(nullptr)
 	, tri_mesh(nullptr)
 {
@@ -124,10 +113,8 @@ bool PhysicsGeometry::load(u64 size, const u8* mem)
 		return false;
 	}
 
-	PhysicsSystem& system = static_cast<PhysicsGeometryManager&>(m_resource_manager).getSystem();
-
 	i32 num_verts;
-	Array<Vec3> verts(getAllocator());
+	Array<Vec3> verts(allocator);
 	file.read(&num_verts, sizeof(num_verts));
 	verts.resize(num_verts);
 	file.read(&verts[0], sizeof(verts[0]) * verts.size());
@@ -141,7 +128,7 @@ bool PhysicsGeometry::load(u64 size, const u8* mem)
 		meshDesc.points.data = &verts[0];
 		meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
 
-		OutputStream writeBuffer(getAllocator());
+		OutputStream writeBuffer(allocator);
 		bool status = system.getCooking()->cookConvexMesh(meshDesc, writeBuffer);
 		if (!status)
 		{
@@ -156,7 +143,7 @@ bool PhysicsGeometry::load(u64 size, const u8* mem)
 	else
 	{
 		u32 num_indices;
-		Array<u32> tris(getAllocator());
+		Array<u32> tris(allocator);
 		file.read(&num_indices, sizeof(num_indices));
 		tris.resize(num_indices);
 		file.read(&tris[0], sizeof(tris[0]) * tris.size());
@@ -170,7 +157,7 @@ bool PhysicsGeometry::load(u64 size, const u8* mem)
 		meshDesc.triangles.stride = 3 * sizeof(physx::PxU32);
 		meshDesc.triangles.data = &tris[0];
 
-		OutputStream writeBuffer(getAllocator());
+		OutputStream writeBuffer(allocator);
 		if (!system.getCooking()->cookTriangleMesh(meshDesc, writeBuffer))
 		{
 			tri_mesh = nullptr;
@@ -184,12 +171,6 @@ bool PhysicsGeometry::load(u64 size, const u8* mem)
 
 	m_size = file.size();
 	return true;
-}
-
-
-IAllocator& PhysicsGeometry::getAllocator()
-{
-	return static_cast<PhysicsGeometryManager&>(m_resource_manager).getAllocator();
 }
 
 
