@@ -11,7 +11,7 @@
 #include <cfloat>
 #include <cstdlib>
 #include <cstdio>
-#include "engine/default_allocator.h"
+#include "engine/allocator.h"
 
 
 #pragma comment(lib, "DbgHelp.lib")

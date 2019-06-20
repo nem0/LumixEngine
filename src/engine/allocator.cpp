@@ -1,4 +1,4 @@
-#include "engine/default_allocator.h"
+#include "engine/allocator.h"
 #include <cstdlib>
 #ifndef _WIN32
 	#include <cstring>
@@ -73,6 +73,63 @@ namespace Lumix
 		return newptr;
 	}
 #endif
+
+	
+BaseProxyAllocator::BaseProxyAllocator(IAllocator& source)
+	: m_source(source)
+{
+	m_allocation_count = 0;
+}
+
+BaseProxyAllocator::~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
+
+
+void* BaseProxyAllocator::allocate_aligned(size_t size, size_t align)
+{
+	MT::atomicIncrement(&m_allocation_count);
+	return m_source.allocate_aligned(size, align);
+}
+
+
+void BaseProxyAllocator::deallocate_aligned(void* ptr)
+{
+	if(ptr)
+	{
+		MT::atomicDecrement(&m_allocation_count);
+		m_source.deallocate_aligned(ptr);
+	}
+}
+
+
+void* BaseProxyAllocator::reallocate_aligned(void* ptr, size_t size, size_t align)
+{
+	if (!ptr) MT::atomicIncrement(&m_allocation_count);
+	if (size == 0) MT::atomicDecrement(&m_allocation_count);
+	return m_source.reallocate_aligned(ptr, size, align);
+}
+
+
+void* BaseProxyAllocator::allocate(size_t size)
+{
+	MT::atomicIncrement(&m_allocation_count);
+	return m_source.allocate(size);
+}
+
+void BaseProxyAllocator::deallocate(void* ptr)
+{
+	if (ptr)
+	{
+		MT::atomicDecrement(&m_allocation_count);
+		m_source.deallocate(ptr);
+	}
+}
+
+void* BaseProxyAllocator::reallocate(void* ptr, size_t size)
+{
+	if (!ptr) MT::atomicIncrement(&m_allocation_count);
+	if (size == 0) MT::atomicDecrement(&m_allocation_count);
+	return m_source.reallocate(ptr, size);
+}
 
 
 } // namespace Lumix

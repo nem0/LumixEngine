@@ -5,6 +5,7 @@
 	#include <new>
 #endif
 #include "engine/lumix.h"
+#include "engine/mt/atomic.h"
 
 
 namespace Lumix
@@ -54,4 +55,34 @@ struct LUMIX_ENGINE_API IAllocator
 };
 
 
+class LUMIX_ENGINE_API DefaultAllocator final : public IAllocator
+{
+public:
+	void* allocate(size_t n) override;
+	void deallocate(void* p) override;
+	void* reallocate(void* ptr, size_t size) override;
+	void* allocate_aligned(size_t size, size_t align) override;
+	void deallocate_aligned(void* ptr) override;
+	void* reallocate_aligned(void* ptr, size_t size, size_t align) override;
+};
+
+
+class BaseProxyAllocator final : public IAllocator
+{
+public:
+	explicit BaseProxyAllocator(IAllocator& source);
+	~BaseProxyAllocator();
+
+	void* allocate_aligned(size_t size, size_t align) override;
+	void deallocate_aligned(void* ptr) override;
+	void* reallocate_aligned(void* ptr, size_t size, size_t align) override;
+	void* allocate(size_t size) override;
+	void deallocate(void* ptr) override;
+	void* reallocate(void* ptr, size_t size) override;
+	IAllocator& getSourceAllocator() { return m_source; }
+
+private:
+	IAllocator& m_source;
+	volatile i32 m_allocation_count;
+};
 } // namespace Lumix

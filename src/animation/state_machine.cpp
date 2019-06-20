@@ -4,10 +4,7 @@
 #include "animation/events.h"
 #include "engine/engine.h"
 #include "engine/log.h"
-#include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "renderer/model.h"
-#include "renderer/pose.h"
 #include <cmath>
 
 

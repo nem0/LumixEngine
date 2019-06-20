@@ -2,7 +2,7 @@
 #include "engine/array.h"
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/job_system.h"
 #include "engine/lumix.h"
 #include "engine/math.h"

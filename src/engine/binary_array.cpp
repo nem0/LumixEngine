@@ -1,5 +1,5 @@
 #include "binary_array.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/string.h"
 
 

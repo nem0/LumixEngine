@@ -10,7 +10,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -20,7 +20,7 @@
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
-#include "lua_script/lua_script_manager.h"
+#include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
 #include <cstdlib>
 

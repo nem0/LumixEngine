@@ -1,9 +1,6 @@
-#include "gui_scene.h"
-#include "gui_system.h"
-#include "sprite_manager.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/input_system.h"
 #include "engine/log.h"
 #include "engine/os.h"
@@ -12,11 +9,12 @@
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
+#include "gui_scene.h"
+#include "gui_system.h"
 #include "renderer/font_manager.h"
 #include "renderer/pipeline.h"
-#include "renderer/renderer.h"
-#include "renderer/render_scene.h"
 #include "renderer/texture.h"
+#include "sprite.h"
 #include <cmath>
 
 

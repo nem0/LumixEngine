@@ -73,160 +73,21 @@ struct InputDecl
 	int constants_count = 0;
 
 
-	int inputFromLinearIdx(int idx) const
-	{
-		for (int i = 0; i < lengthOf(inputs); ++i)
-		{
-			if (inputs[i].type == EMPTY) continue;
-			if (idx == 0) return i;
-			--idx;
-		}
-		return -1;
-	}
+	static int getSize(Type type);
 
-
-	int inputToLinearIdx(int idx) const
-	{
-		int linear = 0;
-		for (int i = 0; i < lengthOf(inputs); ++i)
-		{
-			if (i == idx) return inputs[i].type == EMPTY ? -1 : linear;
-			if (inputs[i].type == EMPTY) continue;
-			++linear;
-		}
-		return -1;
-	}
-
-
-	void removeInput(int index)
-	{
-		inputs[index].type = EMPTY;
-		--inputs_count;
-	}
-
-
-	void removeConstant(int index)
-	{
-		constants[index].type = EMPTY;
-		--constants_count;
-	}
-
-
-	void moveConstant(int old_idx, int new_idx)
-	{
-		if (old_idx == new_idx) return;
-		ASSERT(constants[new_idx].type == EMPTY);
-		constants[new_idx] = constants[old_idx];
-		constants[old_idx].type = EMPTY;
-	}
-
-
-	void moveInput(int old_idx, int new_idx)
-	{
-		if (old_idx == new_idx) return;
-		ASSERT(inputs[new_idx].type == EMPTY);
-		inputs[new_idx] = inputs[old_idx];
-		inputs[old_idx].type = EMPTY;
-		recalculateOffsets();
-	}
-
-
-	int addInput()
-	{
-		ASSERT(inputs_count < lengthOf(inputs));
-		
-		for (int i = 0; i < lengthOf(inputs); ++i)
-		{
-			if (inputs[i].type == EMPTY)
-			{
-				inputs[i].name = "";
-				inputs[i].type = BOOL;
-				++inputs_count;
-				recalculateOffsets();
-				return i;
-			}
-		}
-		return -1;
-	}
-
-
-	int addConstant()
-	{
-		ASSERT(constants_count < lengthOf(constants));
-
-		for (int i = 0; i < lengthOf(constants); ++i)
-		{
-			if (constants[i].type == EMPTY)
-			{
-				constants[i].name = "";
-				constants[i].type = BOOL;
-				++constants_count;
-				return i;
-			}
-		}
-		return -1;
-	}
-
-
-	int getInputsCount() const
-	{
-		return inputs_count;
-	}
-
-
-	int getSize() const
-	{
-		if (inputs_count == 0) return 0;
-		int size = 0;
-		for (const auto& input : inputs)
-		{
-			if(input.type != EMPTY) size = maximum(size, input.offset + getSize(input.type));
-		}
-		return size;
-	}
-
-	static int getSize(Type type)
-	{
-		switch (type)
-		{
-			case FLOAT: return sizeof(float);
-			case INT: return sizeof(int);
-			case BOOL: return sizeof(bool);
-			default: ASSERT(false); return 1;
-		}
-	}
-
-	void recalculateOffsets()
-	{
-		if (inputs_count == 0) return;
-		int last_offset = 0;
-		for(auto& input : inputs)
-		{ 
-			if (input.type == EMPTY) continue;
-			input.offset = last_offset;
-			last_offset += getSize(input.type);
-		}
-	}
-
-	int getInputIdx(const char* name, int size) const
-	{
-		for (int i = 0; i < lengthOf(inputs); ++i)
-		{
-			if (inputs[i].type == Type::EMPTY) continue;
-			if (strncmp(inputs[i].name, name, size) == 0) return i;
-		}
-		return -1;
-	}
-
-
-	int getConstantIdx(const char* name, int size) const
-	{
-		for (int i = 0; i < lengthOf(constants); ++i)
-		{
-			if (constants[i].type != Type::EMPTY && strncmp(constants[i].name, name, size) == 0) return i;
-		}
-		return -1;
-	}
+	int inputFromLinearIdx(int idx) const;
+	int inputToLinearIdx(int idx) const;
+	void removeInput(int index);
+	void removeConstant(int index);
+	void moveConstant(int old_idx, int new_idx);
+	void moveInput(int old_idx, int new_idx);
+	int addInput();
+	int addConstant();
+	int getInputsCount() const { return inputs_count; }
+	int getSize() const;
+	void recalculateOffsets();
+	int getInputIdx(const char* name, int size) const;
+	int getConstantIdx(const char* name, int size) const;
 };
 
 

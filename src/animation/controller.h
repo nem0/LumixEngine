@@ -2,7 +2,6 @@
 
 
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 #include "state_machine.h"
 
 
@@ -12,25 +11,6 @@ namespace Lumix
 
 namespace Anim
 {
-
-
-class ControllerManager final : public ResourceManager
-{
-public:
-	explicit ControllerManager(IAllocator& allocator)
-		: ResourceManager(allocator)
-		, m_allocator(allocator)
-	{}
-	~ControllerManager() {}
-	IAllocator& getAllocator() const { return m_allocator; }
-
-protected:
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-private:
-	IAllocator& m_allocator;
-};
 
 
 class ControllerResource : public Resource

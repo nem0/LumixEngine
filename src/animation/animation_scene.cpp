@@ -4,11 +4,11 @@
 #include "animation/controller.h"
 #include "animation/events.h"
 #include "animation/property_animation.h"
-#include "engine/base_proxy_allocator.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
 #include "engine/job_system.h"
+#include "engine/mt/atomic.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -18,8 +18,6 @@
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
-#include <cfloat>
-#include <cmath>
 
 
 namespace Lumix

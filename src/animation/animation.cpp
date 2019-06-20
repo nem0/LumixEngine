@@ -1,9 +1,7 @@
 #include "animation/animation.h"
-#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/profiler.h"
-#include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/math.h"
 #include "renderer/model.h"
@@ -24,23 +22,12 @@ enum class Version
 };
 
 
-Resource* AnimationManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, Animation)(path, *this, m_allocator);
-}
-
-
-void AnimationManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<Animation*>(&resource));
-}
-
-
 const ResourceType Animation::TYPE("animation");
 
 
 Animation::Animation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
+	, m_allocator(allocator)
 	, m_frame_count(0)
 	, m_fps(30)
 	, m_mem(allocator)
@@ -287,12 +274,6 @@ bool Animation::load(u64 mem_size, const u8* mem)
 
 	m_size = file.size();
 	return true;
-}
-
-
-IAllocator& Animation::getAllocator() const
-{
-	return static_cast<AnimationManager&>(m_resource_manager).getAllocator();
 }
 
 

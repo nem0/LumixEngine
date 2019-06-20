@@ -2,7 +2,7 @@
 #include "audio_device.h"
 #include "audio_scene.h"
 #include "audio_system.h"
-#include "clip_manager.h"
+#include "clip.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/studio_app.h"

@@ -14,7 +14,7 @@
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
-#include "physics/physics_geometry_manager.h"
+#include "physics/physics_geometry.h"
 #include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"

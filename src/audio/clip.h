@@ -38,24 +38,4 @@ private:
 };
 
 
-class ClipManager final : public ResourceManager
-{
-public:
-	explicit ClipManager(IAllocator& allocator)
-		: ResourceManager(allocator)
-		, m_allocator(allocator)
-	{
-	}
-
-	~ClipManager() {}
-
-protected:
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-private:
-	IAllocator& m_allocator;
-};
-
-
 } // namespace Lumix

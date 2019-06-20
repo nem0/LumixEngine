@@ -2,10 +2,10 @@
 #include "animation/animation_scene.h"
 #include "audio_device.h"
 #include "audio_system.h"
-#include "clip_manager.h"
+#include "clip.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/reflection.h"
@@ -13,7 +13,6 @@
 #include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
-#include "lua_script/lua_script_system.h"
 
 namespace Lumix
 {

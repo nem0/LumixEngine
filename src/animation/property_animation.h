@@ -1,39 +1,14 @@
 #pragma once
 
-#include "engine/math.h"
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
+
 
 namespace Lumix
 {
 
 
-namespace Reflection
-{
-	struct  PropertyBase;
-}
-
-
 class JsonSerializer;
-
-
-class PropertyAnimationManager final : public ResourceManager
-{
-public:
-	explicit PropertyAnimationManager(IAllocator& allocator)
-		: ResourceManager(allocator)
-		, m_allocator(allocator)
-	{}
-	~PropertyAnimationManager() {}
-	IAllocator& getAllocator() { return m_allocator; }
-
-protected:
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-private:
-	IAllocator& m_allocator;
-};
+namespace Reflection { struct  PropertyBase; }
 
 
 class PropertyAnimation final : public Resource
@@ -56,13 +31,13 @@ public:
 	Curve& addCurve();
 	bool save(JsonSerializer& serializer);
 
+	IAllocator& m_allocator;
 	Array<Curve> curves;
 	int fps;
 
 	static const ResourceType TYPE;
 
 private:
-	IAllocator& getAllocator() const;
 
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;

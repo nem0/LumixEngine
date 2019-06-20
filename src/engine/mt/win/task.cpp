@@ -1,5 +1,5 @@
 #include "engine/lumix.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 #include "engine/win/simple_win.h"

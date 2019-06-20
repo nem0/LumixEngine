@@ -2,7 +2,6 @@
 
 
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 #include "engine/string.h"
 
 
@@ -26,21 +25,6 @@ public:
 
 private:
 	string m_source_code;
-};
-
-
-class LuaScriptManager final : public ResourceManager
-{
-public:
-	explicit LuaScriptManager(IAllocator& allocator);
-	~LuaScriptManager();
-
-protected:
-	Resource* createResource(const Path& path) override;
-	void destroyResource(Resource& resource) override;
-
-private:
-	IAllocator& m_allocator;
 };
 
 

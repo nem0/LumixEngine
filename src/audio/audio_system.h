@@ -14,7 +14,6 @@ class AudioDevice;
 class AudioSystem : public IPlugin
 {
 	public:
-		virtual class ClipManager& getClipManager() = 0;
 		virtual AudioDevice& getDevice() = 0;
 		virtual Engine& getEngine() = 0;
 };

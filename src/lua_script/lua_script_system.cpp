@@ -6,7 +6,7 @@
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/log.h"
@@ -19,7 +19,7 @@
 #include "engine/string.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
-#include "lua_script/lua_script_manager.h"
+#include "lua_script/lua_script.h"
 
 
 namespace Lumix
@@ -35,6 +35,26 @@ namespace Lumix
 		FLAGS,
 
 		LATEST
+	};
+
+
+	struct LuaScriptManager final : public ResourceManager
+	{
+		LuaScriptManager::LuaScriptManager(IAllocator& allocator)
+			: ResourceManager(allocator)
+			, m_allocator(allocator)
+		{
+		}
+
+		Resource* createResource(const Path& path) override {
+			return LUMIX_NEW(m_allocator, LuaScript)(path, *this, m_allocator);
+		}
+
+		void destroyResource(Resource& resource) override {
+			LUMIX_DELETE(m_allocator, static_cast<LuaScript*>(&resource));
+		}
+
+		IAllocator& m_allocator;
 	};
 
 

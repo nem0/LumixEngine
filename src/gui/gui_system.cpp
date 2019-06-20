@@ -2,7 +2,7 @@
 #include "engine/crc32.h"
 #include "engine/delegate.h"
 #include "engine/engine.h"
-#include "engine/iallocator.h"
+#include "engine/allocator.h"
 #include "engine/input_system.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
@@ -12,7 +12,7 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
-#include "gui/sprite_manager.h"
+#include "gui/sprite.h"
 #include "renderer/font_manager.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
@@ -20,7 +20,6 @@
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include <imgui/imgui.h>
 
 
 namespace Lumix
@@ -28,6 +27,26 @@ namespace Lumix
 
 
 struct GUISystemImpl;
+
+
+struct SpriteManager final : public ResourceManager
+{
+	SpriteManager(IAllocator& allocator)
+		: ResourceManager(allocator)
+		, m_allocator(allocator)
+	{
+	}
+
+	Resource* createResource(const Path& path) override {
+		return LUMIX_NEW(m_allocator, Sprite)(path, *this, m_allocator);
+	}
+
+	void destroyResource(Resource& resource) override {
+		LUMIX_DELETE(m_allocator, static_cast<Sprite*>(&resource));
+	}
+
+	IAllocator& m_allocator;
+};
 
 
 struct GUISystemImpl final : public GUISystem

@@ -14,8 +14,6 @@
 #include "engine/engine.h"
 #include "imgui/imgui.h"
 #include "utils.h"
-#include <cstdlib>
-#include <cmath>
 #include <inttypes.h>
 
 

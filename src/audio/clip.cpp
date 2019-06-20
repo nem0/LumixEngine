@@ -1,5 +1,5 @@
-#include "clip_manager.h"
-#include "engine/iallocator.h"
+#include "clip.h"
+#include "engine/allocator.h"
 #include "engine/lumix.h"
 #include "engine/profiler.h"
 #include "engine/resource.h"
@@ -34,18 +34,6 @@ bool Clip::load(u64 size, const u8* mem)
 	free(output);
 
 	return true;
-}
-
-
-Resource* ClipManager::createResource(const Path& path)
-{
-	return LUMIX_NEW(m_allocator, Clip)(path, *this, m_allocator);
-}
-
-
-void ClipManager::destroyResource(Resource& resource)
-{
-	LUMIX_DELETE(m_allocator, static_cast<Clip*>(&resource));
 }
 
 
