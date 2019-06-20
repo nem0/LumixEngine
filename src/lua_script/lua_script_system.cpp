@@ -1469,7 +1469,7 @@ namespace Lumix
 		void deserialize(InputMemoryStream& serializer) override
 		{
 			int len = serializer.read<int>();
-			m_scripts.rehash(len);
+			m_scripts.reserve(len);
 			for (int i = 0; i < len; ++i)
 			{
 				auto& allocator = m_system.m_allocator;

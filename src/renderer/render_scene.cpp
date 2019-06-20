@@ -1163,7 +1163,7 @@ public:
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		int count;
 		serializer.read(count);
-		m_decals.rehash(count);
+		m_decals.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[MAX_PATH_LENGTH];
@@ -1318,7 +1318,7 @@ public:
 	{
 		i32 size;
 		serializer.read(size);
-		m_cameras.rehash(size);
+		m_cameras.reserve(size);
 		for (int i = 0; i < size; ++i)
 		{
 			Camera camera;
@@ -1373,7 +1373,7 @@ public:
 	{
 		i32 size = 0;
 		serializer.read(size);
-		m_point_lights.rehash(size);
+		m_point_lights.reserve(size);
 		for (int i = 0; i < size; ++i) {
 			PointLight light;
 			serializer.read(light);
