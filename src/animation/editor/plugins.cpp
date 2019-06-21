@@ -11,10 +11,10 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/hash_map.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/reflection.h"
+#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "renderer/model.h"
@@ -169,10 +169,13 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	void savePropertyAnimation(PropertyAnimation& anim)
 	{
-		if (IOutputStream* file = m_app.getAssetBrowser().beginSaveResource(anim))
+		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(anim))
 		{
 			bool success = true;
-			JsonSerializer serializer(*file, anim.getPath());
+			struct : ISaveEntityGUIDMap {
+				EntityGUID get(EntityPtr entity) override { ASSERT(false); return INVALID_ENTITY_GUID; }
+			} dummy_map;
+			TextSerializer serializer(*file, dummy_map);
 			if (!anim.save(serializer))
 			{
 				success = false;

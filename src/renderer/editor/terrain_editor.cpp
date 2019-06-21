@@ -7,7 +7,6 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
@@ -16,6 +15,7 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "physics/physics_scene.h"
@@ -105,68 +105,6 @@ struct PaintTerrainCommand final : public IEditorCommand
 		item.m_radius = radius / terrain_size;
 		item.m_amount = rel_amount;
 		item.m_color = color;
-	}
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("type", (int)m_action_type);
-		serializer.serialize("texture_idx", m_texture_idx);
-		serializer.serialize("grass_mask", m_grass_mask);
-		serializer.beginArray("items");
-		for (int i = 0; i < m_items.size(); ++i)
-		{
-			serializer.serializeArrayItem(m_items[i].m_amount);
-			serializer.serializeArrayItem(m_items[i].m_local_pos.x);
-			serializer.serializeArrayItem(m_items[i].m_local_pos.z);
-			serializer.serializeArrayItem(m_items[i].m_radius);
-			serializer.serializeArrayItem(m_items[i].m_color.x);
-			serializer.serializeArrayItem(m_items[i].m_color.y);
-			serializer.serializeArrayItem(m_items[i].m_color.z);
-		}
-		serializer.endArray();
-		serializer.beginArray("mask");
-		for (int i = 0; i < m_mask.size(); ++i)
-		{
-			serializer.serializeArrayItem((bool)m_mask[i]);
-		}
-		serializer.endArray();
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		m_items.clear();
-		int action_type;
-		serializer.deserialize("type", action_type, 0);
-		m_action_type = (TerrainEditor::ActionType)action_type;
-		serializer.deserialize("texture_idx", m_texture_idx, 0);
-		serializer.deserialize("grass_mask", m_grass_mask, 0);
-		serializer.deserializeArrayBegin("items");
-		while (!serializer.isArrayEnd())
-		{
-			Item& item = m_items.emplace();
-			serializer.deserializeArrayItem(item.m_amount, 0);
-			serializer.deserializeArrayItem(item.m_local_pos.x, 0);
-			serializer.deserializeArrayItem(item.m_local_pos.z, 0);
-			serializer.deserializeArrayItem(item.m_radius, 0);
-			serializer.deserializeArrayItem(item.m_color.x, 0);
-			serializer.deserializeArrayItem(item.m_color.y, 0);
-			serializer.deserializeArrayItem(item.m_color.z, 0);
-		}
-		serializer.deserializeArrayEnd();
-
-		serializer.deserializeArrayBegin("mask");
-		m_mask.clear();
-		int i = 0;
-		while (!serializer.isArrayEnd())
-		{
-			bool b;
-			serializer.deserialize(b, true);
-			m_mask[i] = b;
-			++i;
-		}
-		serializer.deserializeArrayEnd();
 	}
 
 

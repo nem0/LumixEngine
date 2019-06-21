@@ -1057,26 +1057,6 @@ public:
 	}
 
 
-	void loadAndExecuteCommands()
-	{
-		char filename[MAX_PATH_LENGTH];
-		if (OS::getOpenFilename(filename, lengthOf(filename), "JSON files\0*.json\0", nullptr))
-		{
-			m_editor->executeUndoStack(Path(filename));
-		}
-	}
-
-
-	void saveUndoStack()
-	{
-		char filename[MAX_PATH_LENGTH];
-		if (OS::getSaveFilename(filename, lengthOf(filename), "JSON files\0*.json\0", "json"))
-		{
-			m_editor->saveUndoStack(Path(filename));
-		}
-	}
-
-
 	void removeAction(Action* action) override
 	{
 		m_actions.eraseItem(action);
@@ -1284,8 +1264,6 @@ public:
 		doMenuItem(*getAction("toggleMeasure"), true);
 		doMenuItem(*getAction("snapDown"), is_any_entity_selected);
 		doMenuItem(*getAction("autosnapDown"), true);
-		if (ImGui::MenuItem("Save commands")) saveUndoStack();
-		if (ImGui::MenuItem("Load commands")) loadAndExecuteCommands();
 		doMenuItem(*getAction("pack_data"), true);
 		ImGui::EndMenu();
 	}
@@ -2219,16 +2197,10 @@ public:
 	}
 
 
-	void executeUndoStack(const char* path) { m_editor->executeUndoStack(Path(path)); }
-
-
 	void saveUniverseAs(const char* basename, bool save_path) { m_editor->saveUniverse(basename, save_path); }
 
 
 	void saveUniverse() { save(); }
-
-
-	bool runTest(const char* dir, const char* name) { return m_editor->runTest(dir, name); }
 
 
 	void createLua()
@@ -2253,8 +2225,6 @@ public:
 		REGISTER_FUNCTION(newUniverse);
 		REGISTER_FUNCTION(saveUniverse);
 		REGISTER_FUNCTION(saveUniverseAs);
-		REGISTER_FUNCTION(runTest);
-		REGISTER_FUNCTION(executeUndoStack);
 		REGISTER_FUNCTION(exitWithCode);
 		REGISTER_FUNCTION(exitGameMode);
 

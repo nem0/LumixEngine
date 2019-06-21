@@ -11,7 +11,6 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/allocator.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/os.h"
@@ -60,15 +59,6 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 		}
 
 
-		void serialize(JsonSerializer& serializer) override { serializer.serialize("entity", entity); }
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserialize("entity", entity, INVALID_ENTITY);
-		}
-
-
 		const char* getType() override { return "add_script"; }
 
 
@@ -113,22 +103,6 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 		void undo() override
 		{
 			if (entity.isValid()) scene->moveScript((EntityRef)entity, up ? scr_index - 1 : scr_index + 1, !up);
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("entity", entity);
-			serializer.serialize("scr_index", scr_index);
-			serializer.serialize("up", up);
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserialize("entity", entity, INVALID_ENTITY);
-			serializer.deserialize("scr_index", scr_index, 0);
-			serializer.deserialize("up", up, false);
 		}
 
 
@@ -183,20 +157,6 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 				InputMemoryStream input(blob);
 				scene->deserializeScript((EntityRef)entity, scr_index, input);
 			}
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("entity", entity);
-			serializer.serialize("scr_index", scr_index);
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserialize("entity", entity, INVALID_ENTITY);
-			serializer.deserialize("scr_index", scr_index, 0);
 		}
 
 
@@ -280,30 +240,6 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 			{
 				scene->setPropertyValue((EntityRef)entity, script_index, property_name.c_str(), old_value.c_str());
 			}
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("entity", entity);
-			serializer.serialize("script_index", script_index);
-			serializer.serialize("property_name", property_name.c_str());
-			serializer.serialize("value", value.c_str());
-			serializer.serialize("old_value", old_value.c_str());
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserialize("entity", entity, INVALID_ENTITY);
-			serializer.deserialize("script_index", script_index, 0);
-			char buf[256];
-			serializer.deserialize("property_name", buf, lengthOf(buf), "");
-			property_name = buf;
-			serializer.deserialize("value", buf, lengthOf(buf), "");
-			value = buf;
-			serializer.deserialize("old_value", buf, lengthOf(buf), "");
-			old_value = buf;
 		}
 
 

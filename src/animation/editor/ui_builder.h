@@ -304,8 +304,6 @@ struct SetCommand : PathCommand<RootGetter>
 		this->root_getter().accept(v);
 	}
 
-	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
-	void deserialize(JsonDeserializer& serializer) override { ASSERT(false); }
 	const char* getType() override { return "set_property"; }
 	
 
@@ -370,8 +368,6 @@ struct AddArrayItemCommand : PathCommand<RootGetter>
 		this->root_getter().accept(v);
 	}
 
-	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
-	void deserialize(JsonDeserializer& serializer) override { ASSERT(false); }
 	const char* getType() override { return "add_array_item"; }
 	bool merge(IEditorCommand& command) override { return false; }
 
@@ -585,8 +581,6 @@ struct RemoveArrayItemCommand : PathCommand<RootGetter>
 		this->root_getter().accept(v);
 	}
 
-	void serialize(JsonSerializer& serializer) override { ASSERT(false); }
-	void deserialize(JsonDeserializer& serializer) override { ASSERT(false); }
 	const char* getType() override { return "remove_array_item"; }
 	bool merge(IEditorCommand& command) override { return false; }
 

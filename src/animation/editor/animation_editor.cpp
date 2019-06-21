@@ -94,8 +94,6 @@ struct BeginGroupCommand final : IEditorCommand
 
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
-	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "begin_group"; }
 };
@@ -108,8 +106,6 @@ struct EndGroupCommand final : IEditorCommand
 
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
-	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "end_group"; }
 
@@ -154,19 +150,6 @@ struct MoveAnimNodeCommand : IEditorCommand
 		return true;
 	}
 
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
 
 	ControllerResource& m_controller;
 	int m_node_uid;
@@ -214,19 +197,6 @@ struct CreateAnimNodeCommand : IEditorCommand
 
 	bool merge(IEditorCommand& command) override { return false; }
 
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
 
 	ControllerResource& m_controller;
 	int m_container_uid;
@@ -280,17 +250,6 @@ struct DestroyAnimEdgeCommand : IEditorCommand
 
 	bool merge(IEditorCommand& command) override { return false; }
 
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		ASSERT(false);
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		ASSERT(false);
-	}
 
 	ControllerResource& m_controller;
 	int m_edge_uid;
@@ -350,19 +309,6 @@ struct DestroyNodeCommand : IEditorCommand
 	bool merge(IEditorCommand& command) override { return false; }
 
 
-	void serialize(JsonSerializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
-
 	ControllerResource& m_controller;
 	int m_node_uid;
 	OutputMemoryStream m_original_values;
@@ -403,19 +349,6 @@ struct CreateAnimEdgeCommand : IEditorCommand
 
 	bool merge(IEditorCommand& command) override { return false; }
 
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		// TODO
-		ASSERT(false);
-	}
 
 	ControllerResource& m_controller;
 	int m_from_uid;

@@ -13,7 +13,6 @@
 #include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/iplugin.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
@@ -65,8 +64,6 @@ struct BeginGroupCommand final : public IEditorCommand
 
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
-	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "begin_group"; }
 };
@@ -79,8 +76,6 @@ struct EndGroupCommand final : public IEditorCommand
 
 	bool execute() override { return true; }
 	void undo() override { ASSERT(false); }
-	void serialize(JsonSerializer& serializer) override {}
-	void deserialize(JsonDeserializer& serializer) override {}
 	bool merge(IEditorCommand& command) override { ASSERT(false); return false; }
 	const char* getType() override { return "end_group"; }
 
@@ -105,28 +100,6 @@ public:
 					 editor.getAllocator())
 		, m_editor(editor)
 	{
-	}
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("name", m_new_name.c_str());
-		serializer.serialize("entity", m_entity);
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		char name[100];
-		serializer.deserialize("name", name, sizeof(name), "");
-		m_new_name = name;
-		serializer.deserialize("entity", m_entity, INVALID_ENTITY);
-		if (m_entity.isValid()) {
-			m_old_name = m_editor.getUniverse()->getEntityName((EntityRef)m_entity);
-		}
-		else {
-			m_old_name = "";
-		}
 	}
 
 
@@ -241,55 +214,6 @@ public:
 				m_old_rotations.push(universe->getRotation(entities[i]));
 			}
 		}
-	}
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("count", m_entities.size());
-		serializer.beginArray("entities");
-		for (int i = 0; i < m_entities.size(); ++i)
-		{
-			serializer.serializeArrayItem(m_entities[i]);
-			serializer.serializeArrayItem(m_new_positions[i].x);
-			serializer.serializeArrayItem(m_new_positions[i].y);
-			serializer.serializeArrayItem(m_new_positions[i].z);
-			serializer.serializeArrayItem(m_new_rotations[i].x);
-			serializer.serializeArrayItem(m_new_rotations[i].y);
-			serializer.serializeArrayItem(m_new_rotations[i].z);
-			serializer.serializeArrayItem(m_new_rotations[i].w);
-		}
-		serializer.endArray();
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		Universe* universe = m_editor.getUniverse();
-		int count;
-		serializer.deserialize("count", count, 0);
-		m_entities.resize(count);
-		m_new_positions.resize(count);
-		m_new_rotations.resize(count);
-		m_old_positions.resize(count);
-		m_old_rotations.resize(count);
-		serializer.deserializeArrayBegin("entities");
-		for (int i = 0; i < m_entities.size(); ++i)
-		{
-			serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
-			serializer.deserializeArrayItem(m_new_positions[i].x, 0);
-			serializer.deserializeArrayItem(m_new_positions[i].y, 0);
-			serializer.deserializeArrayItem(m_new_positions[i].z, 0);
-			serializer.deserializeArrayItem(m_new_rotations[i].x, 0);
-			serializer.deserializeArrayItem(m_new_rotations[i].y, 0);
-			serializer.deserializeArrayItem(m_new_rotations[i].z, 0);
-			serializer.deserializeArrayItem(m_new_rotations[i].w, 0);
-			if(m_entities[i].isValid()) {
-				m_old_positions[i] = universe->getPosition((EntityRef)m_entities[i]);
-				m_old_rotations[i] = universe->getRotation((EntityRef)m_entities[i]);
-			}
-		}
-		serializer.deserializeArrayEnd();
 	}
 
 
@@ -413,47 +337,6 @@ public:
 	}
 
 
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("count", m_entities.size());
-		serializer.beginArray("entities");
-		for (int i = 0; i < m_entities.size(); ++i)
-		{
-			serializer.serializeArrayItem(m_entities[i]);
-			serializer.serializeArrayItem(m_new_positions[i].x);
-			serializer.serializeArrayItem(m_new_positions[i].y);
-			serializer.serializeArrayItem(m_new_positions[i].z);
-		}
-		serializer.endArray();
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		Universe* universe = m_editor.getUniverse();
-		int count;
-		serializer.deserialize("count", count, 0);
-		m_entities.resize(count);
-		m_new_positions.resize(count);
-		m_old_positions.resize(count);
-		serializer.deserializeArrayBegin("entities");
-		for (int i = 0; i < m_entities.size(); ++i)
-		{
-			serializer.deserializeArrayItem(m_entities[i], INVALID_ENTITY);
-			serializer.deserializeArrayItem(m_new_positions[i].x, 0);
-			serializer.deserializeArrayItem(m_new_positions[i].y, 0);
-			serializer.deserializeArrayItem(m_new_positions[i].z, 0);
-			if (m_entities[i].isValid()) {
-				m_old_positions[i] = universe->getPosition((EntityRef)m_entities[i]);
-			}
-			else {
-				m_old_positions[i] = DVec3(0);
-			}
-		}
-		serializer.deserializeArrayEnd();
-	}
-
-
 	bool execute() override
 	{
 		Universe* universe = m_editor.getUniverse();
@@ -564,51 +447,6 @@ public:
 			m_old_scales.push(universe->getScale(entities[i]));
 			m_new_scales.push(scales[i]);
 		}
-	}
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.beginArray("new_scales");
-		for (int i = 0; i < m_new_scales.size(); ++i)
-		{
-			serializer.serializeArrayItem(m_new_scales[i]);
-		}
-		serializer.endArray();
-		serializer.beginArray("entities");
-		for (int i = 0; i < m_entities.size(); ++i)
-		{
-			serializer.serializeArrayItem(m_entities[i]);
-		}
-		serializer.endArray();
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		Universe* universe = m_editor.getUniverse();
-		serializer.deserializeArrayBegin("new_scales");
-		while (!serializer.isArrayEnd())
-		{
-			float scale;
-			serializer.deserializeArrayItem(scale, 1);
-			m_new_scales.push(scale);
-		}
-		serializer.deserializeArrayEnd();
-		serializer.deserializeArrayBegin("entities");
-		while (!serializer.isArrayEnd())
-		{
-			EntityPtr entity;
-			serializer.deserializeArrayItem(entity, INVALID_ENTITY);
-			m_entities.push(entity);
-			if (entity.isValid()) {
-				m_old_scales.push(universe->getScale((EntityRef)entity));
-			}
-			else {
-				m_old_scales.push(1);
-			}
-		}
-		serializer.deserializeArrayEnd();
 	}
 
 
@@ -760,30 +598,6 @@ public:
 	}
 
 
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("inedx", m_index);
-		serializer.serialize("entity_index", m_component.entity);
-		serializer.serialize("component_type", Reflection::getComponentTypeHash(m_component.type));
-		serializer.serialize("property_name_hash", crc32(m_property->name));
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		serializer.deserialize("inedx", m_index, 0);
-		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
-		u32 hash;
-		serializer.deserialize("component_type", hash, 0);
-		m_component.type = Reflection::getComponentTypeFromHash(hash);
-		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
-		u32 property_name_hash;
-		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_property =
-			static_cast<const Reflection::IArrayProperty*>(Reflection::getProperty(m_component.type, property_name_hash));
-	}
-
-
 	bool execute() override
 	{
 		m_property->removeItem(m_component, m_index);
@@ -830,29 +644,6 @@ public:
 		, m_property(&property)
 		, m_editor(editor)
 	{
-	}
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("inedx", m_index);
-		serializer.serialize("entity_index", m_component.entity);
-		serializer.serialize("component_type", Reflection::getComponentTypeHash(m_component.type));
-		serializer.serialize("property_name_hash", crc32(m_property->name));
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		serializer.deserialize("inedx", m_index, 0);
-		serializer.deserialize("entity_index", m_component.entity, INVALID_ENTITY);
-		u32 hash;
-		serializer.deserialize("component_type", hash, 0);
-		m_component.type = Reflection::getComponentTypeFromHash(hash);
-		m_component.scene = m_editor.getUniverse()->getScene(m_component.type);
-		u32 property_name_hash;
-		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_property = (const Reflection::IArrayProperty*)Reflection::getProperty(m_component.type, property_name_hash);
 	}
 
 
@@ -939,55 +730,6 @@ public:
 
 		m_index = index;
 		m_new_value.write(data, size);
-	}
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("index", m_index);
-		serializer.beginArray("entities");
-		for (EntityPtr entity : m_entities)
-		{
-			serializer.serializeArrayItem(entity);
-		}
-		serializer.endArray();
-		serializer.serialize("component_type", Reflection::getComponentTypeHash(m_component_type));
-		serializer.beginArray("data");
-		for (int i = 0; i < m_new_value.getPos(); ++i)
-		{
-			serializer.serializeArrayItem((int)((const u8*)m_new_value.getData())[i]);
-		}
-		serializer.endArray();
-		serializer.serialize("property_name_hash", crc32(m_property->name));
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		serializer.deserialize("index", m_index, 0);
-		serializer.deserializeArrayBegin("entities");
-		while (!serializer.isArrayEnd())
-		{
-			EntityPtr entity;
-			serializer.deserializeArrayItem(entity, INVALID_ENTITY);
-			m_entities.push(entity);
-		}
-		serializer.deserializeArrayEnd();
-		u32 hash;
-		serializer.deserialize("component_type", hash, 0);
-		m_component_type = Reflection::getComponentTypeFromHash(hash);
-		serializer.deserializeArrayBegin("data");
-		m_new_value.clear();
-		while (!serializer.isArrayEnd())
-		{
-			int data;
-			serializer.deserializeArrayItem(data, 0);
-			m_new_value.write((u8)data);
-		}
-		serializer.deserializeArrayEnd();
-		u32 property_name_hash;
-		serializer.deserialize("property_name_hash", property_name_hash, 0);
-		m_property = Reflection::getProperty(m_component_type, property_name_hash);
 	}
 
 
@@ -1098,37 +840,6 @@ private:
 		}
 
 
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("component_type", Reflection::getComponentTypeHash(m_type));
-			serializer.beginArray("entities");
-			for (int i = 0; i < m_entities.size(); ++i)
-			{
-				serializer.serializeArrayItem(m_entities[i]);
-			}
-			serializer.endArray();
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			u32 hash;
-			serializer.deserialize("component_type", hash, 0);
-			m_type = Reflection::getComponentTypeFromHash(hash);
-			m_entities.clear();
-			serializer.deserializeArrayBegin("entities");
-			while (!serializer.isArrayEnd())
-			{
-				EntityPtr e;
-				serializer.deserializeArrayItem(e, INVALID_ENTITY);
-				if (e.isValid()) {
-					m_entities.push((EntityRef)e);
-				}
-			}
-			serializer.deserializeArrayEnd();
-		}
-
-
 		bool merge(IEditorCommand&) override { return false; }
 
 
@@ -1185,20 +896,6 @@ private:
 			, m_parent(parent)
 			, m_child(child)
 		{
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("parent", m_parent);
-			serializer.serialize("child", m_child);
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserialize("parent", m_parent, INVALID_ENTITY);
-			serializer.deserialize("child", m_child, INVALID_ENTITY);
 		}
 
 
@@ -1288,60 +985,6 @@ private:
 				m_entities.push((EntityRef)e);
 				pushChildren((EntityRef)e);
 			}
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("count", m_entities.size());
-			serializer.beginArray("entities");
-			for (int i = 0; i < m_entities.size(); ++i)
-			{
-				serializer.serializeArrayItem(m_entities[i]);
-				serializer.serializeArrayItem(m_transformations[i].pos.x);
-				serializer.serializeArrayItem(m_transformations[i].pos.y);
-				serializer.serializeArrayItem(m_transformations[i].pos.z);
-				serializer.serializeArrayItem(m_transformations[i].rot.x);
-				serializer.serializeArrayItem(m_transformations[i].rot.y);
-				serializer.serializeArrayItem(m_transformations[i].rot.z);
-				serializer.serializeArrayItem(m_transformations[i].rot.w);
-				serializer.serializeArrayItem(m_transformations[i].scale);
-			}
-			serializer.endArray();
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			int count;
-			serializer.deserialize("count", count, 0);
-			serializer.deserializeArrayBegin("entities");
-			m_entities.reserve(count);
-			m_transformations.reserve(count);
-			for (int i = 0; i < count; ++i) {
-				EntityPtr e;
-				serializer.deserializeArrayItem(e, INVALID_ENTITY);
-				if(e.isValid()) {
-					m_entities.push((EntityRef)e);
-					Transform tr = m_transformations.emplace();
-					serializer.deserializeArrayItem(tr.pos.x, 0);
-					serializer.deserializeArrayItem(tr.pos.y, 0);
-					serializer.deserializeArrayItem(tr.pos.z, 0);
-					serializer.deserializeArrayItem(tr.rot.x, 0);
-					serializer.deserializeArrayItem(tr.rot.y, 0);
-					serializer.deserializeArrayItem(tr.rot.z, 0);
-					serializer.deserializeArrayItem(tr.rot.w, 1);
-					if (serializer.isArrayEnd())
-					{
-						tr.scale = 1;
-					}
-					else
-					{
-						serializer.deserializeArrayItem(tr.scale, 1);
-					}
-				}
-			}
-			serializer.deserializeArrayEnd();
 		}
 
 
@@ -1536,37 +1179,6 @@ private:
 		}
 
 
-		void serialize(JsonSerializer& serializer) override 
-		{
-			serializer.beginArray("entities");
-			for (EntityRef entity : m_entities)
-			{
-				serializer.serializeArrayItem(entity);
-			}
-			serializer.endArray();
-			serializer.serialize("component_type", Reflection::getComponentTypeHash(m_cmp_type));
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserializeArrayBegin("entities");
-			while (!serializer.isArrayEnd())
-			{
-				EntityPtr entity;
-				serializer.deserializeArrayItem(entity, INVALID_ENTITY);
-				if(entity.isValid()) {
-					m_entities.push((EntityRef)entity);
-				}
-			}
-			serializer.deserializeArrayEnd();
-
-			u32 hash;
-			serializer.deserialize("component_type", hash, 0);
-			m_cmp_type = Reflection::getComponentTypeFromHash(hash);
-		}
-
-
 		void undo() override
 		{
 			ComponentUID cmp;
@@ -1662,22 +1274,6 @@ private:
 			((WorldEditorImpl&)m_editor).m_entity_map.create(e);
 			m_editor.selectEntities(&e, 1, false);
 			return true;
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("pos_x", m_position.x);
-			serializer.serialize("pos_y", m_position.y);
-			serializer.serialize("pos_z", m_position.z);
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserialize("pos_x", m_position.x, 0);
-			serializer.deserialize("pos_y", m_position.y, 0);
-			serializer.deserialize("pos_z", m_position.z, 0);
 		}
 
 
@@ -3534,34 +3130,6 @@ public:
 	}
 
 
-	void saveUndoStack(const Path& path) override
-	{
-		if (m_undo_stack.empty()) return;
-
-		OS::OutputFile file;
-		if (file.open(path.c_str()))
-		{
-			JsonSerializer serializer(file, path);
-			serializer.beginObject();
-			serializer.beginArray("commands");
-			for (int i = 0; i < m_undo_stack.size(); ++i)
-			{
-				serializer.beginObject();
-				serializer.serialize("undo_command_type", m_undo_stack[i]->getType());
-				m_undo_stack[i]->serialize(serializer);
-				serializer.endObject();
-			}
-			serializer.endArray();
-			serializer.endObject();
-			file.close();
-		}
-		else
-		{
-			logError("Editor") << "Could not save commands to " << path;
-		}
-	}
-
-
 	IEditorCommand* createEditorCommand(u32 command_type) override
 	{
 		int index = m_editor_command_creators.find(command_type);
@@ -3576,46 +3144,6 @@ public:
 	void registerEditorCommandCreator(const char* command_type, EditorCommandCreator creator) override
 	{
 		m_editor_command_creators.insert(crc32(command_type), creator);
-	}
-
-
-	bool executeUndoStack(const Path& path) override
-	{
-		destroyUndoStack();
-		m_undo_index = -1;
-		FileSystem& fs = m_engine->getFileSystem();
-		OS::InputFile file;
-		if (fs.open(path.c_str(), &file))
-		{
-			JsonDeserializer serializer(file, path, m_allocator);
-			serializer.deserializeObjectBegin();
-			serializer.deserializeArrayBegin("commands");
-			while (!serializer.isArrayEnd())
-			{
-				serializer.nextArrayItem();
-				serializer.deserializeObjectBegin();
-				char type_name[256];
-				serializer.deserialize("undo_command_type", type_name, lengthOf(type_name), "");
-				IEditorCommand* command = createEditorCommand(crc32(type_name));
-				if (!command)
-				{
-					logError("Editor") << "Unknown command " << type_name << " in " << path;
-					destroyUndoStack();
-					m_undo_index = -1;
-					file.close();
-					return false;
-				}
-				command->deserialize(serializer);
-				while (fs.hasWork()) fs.updateAsyncTransactions();
-				executeCommand(command);
-				serializer.deserializeObjectEnd();
-			}
-			serializer.deserializeArrayEnd();
-			serializer.deserializeObjectEnd();
-			file.close();
-			return true;
-		}
-		return false;
 	}
 
 
@@ -3675,88 +3203,6 @@ public:
 		int count = 0;
 		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) ++count;
 		return count;
-	}
-
-
-	bool runTest(const char* dir, const char* name) override
-	{
-		FileSystem& fs = m_engine->getFileSystem();
-		while (fs.hasWork()) fs.updateAsyncTransactions();
-		newUniverse();
-		Path undo_stack_path(dir, name, ".json");
-		executeUndoStack(undo_stack_path);
-
-		OutputMemoryStream blob0(m_allocator);
-		OutputMemoryStream blob1(m_allocator);
-		Universe& tpl_universe = m_engine->createUniverse(true);
-		PrefabSystem* prefab_system = PrefabSystem::create(*this);
-		EntityGUIDMap entity_guid_map(m_allocator);
-		bool is_same = deserialize(tpl_universe, "unit_tests/editor", name, *prefab_system, entity_guid_map, m_allocator);
-		if (!is_same) goto end;
-		if (getEntitiesCount(tpl_universe) != getEntitiesCount(*m_universe))
-		{
-			is_same = false;
-			goto end;
-		}
-
-		for (EntityPtr e_ptr = tpl_universe.getFirstEntity(); e_ptr.isValid(); e_ptr = tpl_universe.getNextEntity((EntityRef)e_ptr))
-		{
-			const EntityRef e = (EntityRef)e_ptr;
-			EntityGUID guid = entity_guid_map.get(e);
-			EntityPtr other_entity_ptr = m_entity_map.get(guid);
-			if (!other_entity_ptr.isValid())
-			{
-				is_same = false;
-				goto end;
-			}
-
-			EntityRef other_entity = (EntityRef)other_entity_ptr;
-			for (ComponentUID cmp = tpl_universe.getFirstComponent(e); cmp.isValid(); cmp = tpl_universe.getNextComponent(cmp))
-			{
-				if (!m_universe->hasComponent(other_entity, cmp.type))
-				{
-					is_same = false;
-					goto end;
-				}
-
-				ComponentUID other_cmp = m_universe->getComponent(other_entity, cmp.type);
-
-				const Reflection::ComponentBase* base = Reflection::getComponent(cmp.type);
-				struct : Reflection::ISimpleComponentVisitor
-				{
-					void visitProperty(const Reflection::PropertyBase& prop) override
-					{
-						blob0->clear();
-						blob1->clear();
-						prop.getValue(cmp, index, *blob0);
-						prop.getValue(other_cmp, index, *blob1);
-						if (blob0->getPos() != blob1->getPos() 
-							|| compareMemory(blob0->getData(), blob1->getData(), blob0->getPos()) != 0)
-						{
-							*is_same = false;
-						}
-					}
-					int index = -1;
-					bool* is_same;
-					ComponentUID cmp;
-					ComponentUID other_cmp;
-					OutputMemoryStream* blob0;
-					OutputMemoryStream* blob1;
-				} visitor;
-				visitor.is_same = &is_same;
-				visitor.cmp = cmp;
-				visitor.other_cmp = other_cmp;
-				visitor.blob0 = &blob0;
-				visitor.blob1 = &blob1;
-				base->visit(visitor);
-				if (!is_same) goto end;
-			}
-		}
-
-		end:
-			m_engine->destroyUniverse(tpl_universe);
-			PrefabSystem::destroy(prefab_system);
-			return is_same;
 	}
 
 
@@ -3864,43 +3310,6 @@ public:
 		, m_entities(editor.getAllocator())
 		, m_identity(identity)
 	{
-	}
-
-
-	void serialize(JsonSerializer& serializer) override
-	{
-		serializer.serialize("pos_x", m_position.x);
-		serializer.serialize("pos_y", m_position.y);
-		serializer.serialize("pos_z", m_position.z);
-		serializer.serialize("identity", m_identity);
-		serializer.serialize("size", (int)m_copy_buffer.getPos());
-		serializer.beginArray("data");
-		for (int i = 0; i < m_copy_buffer.getPos(); ++i)
-		{
-			serializer.serializeArrayItem((i32)((const u8*)m_copy_buffer.getData())[i]);
-		}
-		serializer.endArray();
-	}
-
-
-	void deserialize(JsonDeserializer& serializer) override
-	{
-		serializer.deserialize("pos_x", m_position.x, 0);
-		serializer.deserialize("pos_y", m_position.y, 0);
-		serializer.deserialize("pos_z", m_position.z, 0);
-		serializer.deserialize("identity", m_identity, false);
-		int size;
-		serializer.deserialize("size", size, 0);
-		serializer.deserializeArrayBegin("data");
-		m_copy_buffer.clear();
-		m_copy_buffer.reserve(size);
-		for (int i = 0; i < size; ++i)
-		{
-			i32 data;
-			serializer.deserializeArrayItem(data, 0);
-			m_copy_buffer.write((u8)data);
-		}
-		serializer.deserializeArrayEnd();
 	}
 
 

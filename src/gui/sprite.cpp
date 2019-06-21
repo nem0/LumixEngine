@@ -1,7 +1,7 @@
 #include "sprite.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
+#include "engine/serializer.h"
 #include "engine/stream.h"
 #include "renderer/texture.h"
 
@@ -47,18 +47,16 @@ void Sprite::setTexture(const Path& path)
 }
 
 
-bool Sprite::save(JsonSerializer& serializer)
+bool Sprite::save(TextSerializer& serializer)
 {
 	if (!isReady()) return false;
 
-	serializer.beginObject();
-	serializer.serialize("type", type == PATCH9 ? "patch9" : "simple");
-	serializer.serialize("top", top);
-	serializer.serialize("bottom", bottom);
-	serializer.serialize("left", left);
-	serializer.serialize("right", right);
-	serializer.serialize("texture", m_texture ? m_texture->getPath().c_str() : "");
-	serializer.endObject();
+	serializer.write("type", type == PATCH9 ? "patch9" : "simple");
+	serializer.write("top", top);
+	serializer.write("bottom", bottom);
+	serializer.write("left", left);
+	serializer.write("right", right);
+	serializer.write("texture", m_texture ? m_texture->getPath().c_str() : "");
 
 	return true;
 }
@@ -67,45 +65,20 @@ bool Sprite::save(JsonSerializer& serializer)
 bool Sprite::load(u64 size, const u8* mem)
 {
 	InputMemoryStream file(mem, size);
-	JsonDeserializer serializer(file, getPath(), m_allocator);
-	serializer.deserializeObjectBegin();
-	while (!serializer.isObjectEnd())
-	{
-		char tmp[32];
-		serializer.deserializeLabel(tmp, lengthOf(tmp));
-		if (equalIStrings(tmp, "type"))
-		{
-			serializer.deserialize(tmp, lengthOf(tmp), "");
-			type = equalIStrings(tmp, "patch9") ? PATCH9 : SIMPLE;
-		}
-		else if (equalIStrings(tmp, "top"))
-		{
-			serializer.deserialize(top, 0);
-		}
-		else if (equalIStrings(tmp, "bottom"))
-		{
-			serializer.deserialize(bottom, 0);
-		}
-		else if (equalIStrings(tmp, "left"))
-		{
-			serializer.deserialize(left, 0);
-		}
-		else if (equalIStrings(tmp, "right"))
-		{
-			serializer.deserialize(right, 0);
-		}
-		else if (equalIStrings(tmp, "texture"))
-		{
-			char texture_path[MAX_PATH_LENGTH];
-			serializer.deserialize(texture_path, lengthOf(texture_path), "");
-			ResourceManagerHub& mng = m_resource_manager.getOwner();
-			m_texture = texture_path[0] != '\0' ? mng.load<Texture>(Path(texture_path)) : nullptr;
-		}
-		else
-		{
-			logError("gui") << "Unknown label " << tmp << " in " << getPath();
-		}
-	}
+	struct : ILoadEntityGUIDMap {
+		EntityPtr get(EntityGUID guid) override { ASSERT(false); return INVALID_ENTITY; }
+	} dummy_map;
+	TextDeserializer serializer(file, dummy_map);
+	char tmp[MAX_PATH_LENGTH];
+	serializer.read(tmp, lengthOf(tmp));
+	type = equalStrings(tmp, "simple") ? SIMPLE : PATCH9; 
+	serializer.read(&top);
+	serializer.read(&bottom);
+	serializer.read(&left);
+	serializer.read(&right);
+	serializer.read(tmp, lengthOf(tmp));
+	ResourceManagerHub& mng = m_resource_manager.getOwner();
+	m_texture = tmp[0] != '\0' ? mng.load<Texture>(Path(tmp)) : nullptr;
 	return true;
 }
 

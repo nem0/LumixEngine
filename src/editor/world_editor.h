@@ -175,9 +175,6 @@ public:
 	virtual void makeRelative(char* relative, int max_size, const char* absolute) const = 0;
 	virtual void makeAbsolute(char* absolute, int max_size, const char* relative) const = 0;
 
-	virtual void saveUndoStack(const Path& path) = 0;
-	virtual bool executeUndoStack(const Path& path) = 0;
-	virtual bool runTest(const char* dir, const char* name) = 0;
 	virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;

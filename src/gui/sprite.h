@@ -8,8 +8,8 @@ namespace Lumix
 {
 
 
-class JsonSerializer;
 class Renderer;
+struct TextSerializer;
 class Texture;
 
 
@@ -28,7 +28,7 @@ public:
 
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
-	bool save(JsonSerializer& serializer);
+	bool save(TextSerializer& serializer);
 	
 	void setTexture(const Path& path);
 	Texture* getTexture() const { return m_texture; }

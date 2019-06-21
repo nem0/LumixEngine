@@ -593,33 +593,34 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 }
 
 
-IOutputStream* AssetBrowser::beginSaveResource(Resource& resource)
+OutputMemoryStream* AssetBrowser::beginSaveResource(Resource& resource)
 {
-	// use temporary because otherwise the resource is reloaded during saving
-	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
-	OS::OutputFile* f = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), OS::OutputFile);
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-	if (!fs.open(tmp_path, f))
-	{
-		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), f);
-		logError("Editor") << "Could not save file " << resource.getPath().c_str();
-		return nullptr;
-	}
-	return f;
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	return LUMIX_NEW(allocator, OutputMemoryStream)(allocator);
 }
 
 
-void AssetBrowser::endSaveResource(Resource& resource, IOutputStream& file, bool success)
+void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& stream, bool success)
 {
-	static_cast<OS::OutputFile&>(file).close();
-	LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &file);
-
 	if (!success) return;
+	
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	// use temporary because otherwise the resource is reloaded during saving
+	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
+	OS::OutputFile f;
+	if (!fs.open(tmp_path, &f))
+	{
+		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &stream);
+		logError("Editor") << "Could not save file " << resource.getPath().c_str();
+		return;
+	}
+	f.write(stream.getData(), stream.getPos());
+	f.close();
+	LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &stream);
 
 	auto& engine = m_app.getWorldEditor().getEngine();
 	StaticString<MAX_PATH_LENGTH> src_full_path;
 	StaticString<MAX_PATH_LENGTH> dest_full_path;
-	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
 	src_full_path.data[0] = 0;
 	dest_full_path.data[0] = 0;
 	src_full_path << engine.getFileSystem().getBasePath() << tmp_path;

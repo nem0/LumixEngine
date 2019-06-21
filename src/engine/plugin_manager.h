@@ -10,7 +10,6 @@ namespace Lumix
 	class Engine;
 	class InputMemoryStream;
 	struct IPlugin;
-	class JsonSerializer;
 	class OutputMemoryStream;
 	class Universe;
 	template <typename T> class Array;
