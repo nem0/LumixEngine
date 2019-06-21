@@ -207,7 +207,7 @@ static void uniform(lua_State* L, const char* name, const char* type)
 	}
 	else
 	{
-		g_log_error.log("Renderer") << "Unknown uniform type " << type << " in " << shader->getPath().c_str();
+		logError("Renderer") << "Unknown uniform type " << type << " in " << shader->getPath().c_str();
 	}*/
 }
 
@@ -229,7 +229,7 @@ static void alpha_blending(lua_State* L, const char* mode)
 	}
 	else
 	{
-		g_log_error.log("Renderer") << "Uknown blend mode " << mode << " in " << shader->getPath().c_str();
+		logError("Renderer") << "Uknown blend mode " << mode << " in " << shader->getPath().c_str();
 	}*/
 }
 
@@ -272,7 +272,7 @@ int texture_slot(lua_State* L)
 	lua_pop(L, 1);
 
 	if(shader->m_texture_slot_count >= lengthOf(shader->m_texture_slots)) {
-		g_log_error.log("Renderer") << "Too many texture slots in " << shader->getPath();
+		logError("Renderer") << "Too many texture slots in " << shader->getPath();
 		return 0;
 	}
 
@@ -392,14 +392,14 @@ int include(lua_State* L)
 	lua_pop(L, 1);
 
 	if (!shader->m_render_data->include.empty()) {
-		g_log_error.log("Renderer") << "More than 1 include in " << shader->getPath() << ". Max is 1.";
+		logError("Renderer") << "More than 1 include in " << shader->getPath() << ". Max is 1.";
 		return 0;
 	}
 
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 	OS::InputFile file;
 	if (!fs.open(path, &file)) {
-		g_log_error.log("Renderer") << "Failed to open include " << path << " included from " << shader->getPath();
+		logError("Renderer") << "Failed to open include " << path << " included from " << shader->getPath();
 		return 0;
 	}
 

@@ -153,7 +153,7 @@ namespace Lumix
 	{
 		void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line) override
 		{
-			g_log_error.log("Physics") << message;
+			logError("Physics") << message;
 		}
 	};
 
@@ -165,7 +165,7 @@ namespace Lumix
 			void* allocate(size_t size, const char*, const char*, int) override
 			{
 				void* ret = _aligned_malloc(size, 16);
-				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
+				// logInfo("Physics") << "Allocated " << size << " bytes for " << typeName << "
 				// from " << filename << "(" << line << ")";
 				ASSERT(ret);
 				return ret;
@@ -175,7 +175,7 @@ namespace Lumix
 			void* allocate(size_t size, const char*, const char*, int) override
 			{
 				void* ret = aligned_alloc(16, size);
-				// g_log_info.log("Physics") << "Allocated " << size << " bytes for " << typeName << "
+				// logInfo("Physics") << "Allocated " << size << " bytes for " << typeName << "
 				// from " << filename << "(" << line << ")";
 				ASSERT(ret);
 				return ret;

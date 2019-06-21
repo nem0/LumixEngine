@@ -1,4 +1,5 @@
 #include "audio_device.h"
+#include "engine/allocator.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -92,7 +93,7 @@ struct AudioDeviceImpl final : public AudioDevice
 		auto coinitialize_result = CoInitialize(nullptr);
 		if (!SUCCEEDED(coinitialize_result))
 		{
-			g_log_error.log("Audio") << "CoInitialize failed. Error code: " << (u32)coinitialize_result;
+			logError("Audio") << "CoInitialize failed. Error code: " << (u32)coinitialize_result;
 			ASSERT(false);
 			return false;
 		}
@@ -100,14 +101,14 @@ struct AudioDeviceImpl final : public AudioDevice
 		m_library = LoadLibrary("dsound.dll");
 		if (!m_library)
 		{
-			g_log_error.log("Audio") << "Failed to load dsound.dll.";
+			logError("Audio") << "Failed to load dsound.dll.";
 			return false;
 		}
 		auto* dsoundCreate =
 			(decltype(DirectSoundCreate8)*)GetProcAddress(m_library, "DirectSoundCreate8");
 		if (!dsoundCreate)
 		{
-			g_log_error.log("Audio") << "Failed to get DirectSoundCreate8 from dsound.dll.";
+			logError("Audio") << "Failed to get DirectSoundCreate8 from dsound.dll.";
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -116,7 +117,7 @@ struct AudioDeviceImpl final : public AudioDevice
 		auto create_result = dsoundCreate(0, &m_direct_sound, nullptr);
 		if (!SUCCEEDED(create_result))
 		{
-			g_log_error.log("Audio") << "Failed to create DirectSound. Error code: " << (u32)create_result;
+			logError("Audio") << "Failed to create DirectSound. Error code: " << (u32)create_result;
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -126,7 +127,7 @@ struct AudioDeviceImpl final : public AudioDevice
 		auto result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer())
 		{
-			g_log_error.log("Audio") << "Failed to initialize the primary buffer.";
+			logError("Audio") << "Failed to initialize the primary buffer.";
 			ASSERT(false);
 			m_direct_sound->Release();
 			FreeLibrary(m_library);
@@ -511,7 +512,7 @@ struct AudioDeviceImpl final : public AudioDevice
 
 		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
 		{
-			g_log_error.log("Audio") << "Failed to unlock buffer.";
+			logError("Audio") << "Failed to unlock buffer.";
 		}
 	}
 
@@ -620,7 +621,7 @@ AudioDevice* AudioDevice::create(Engine& engine)
 	if (!device->init(engine))
 	{
 		LUMIX_DELETE(engine.getAllocator(), device);
-		g_log_warning.log("Audio") << "Using null device";
+		logWarning("Audio") << "Using null device";
 		return &g_null_device;
 	}
 	return device;

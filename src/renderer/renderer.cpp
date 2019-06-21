@@ -45,7 +45,7 @@
 		gl; \
 		GLenum err = glGetError(); \
 		if (err != GL_NO_ERROR) { \
-			g_log_error.log("Renderer") << "OpenGL error " << err; \
+			logError("Renderer") << "OpenGL error " << err; \
 		} \
 	} while(0)
 
@@ -621,7 +621,7 @@ struct RendererImpl final : public Renderer
 		slice.buffer = m_transient_buffer;
 		slice.offset = MT::atomicAdd(&m_transient_buffer_offset, size);
 		if (slice.offset + size > TRANSIENT_BUFFER_SIZE) {
-			g_log_error.log("Renderer") << "Out of transient memory";
+			logError("Renderer") << "Out of transient memory";
 			ASSERT(false);
 			slice.size = 0;
 			slice.ptr = nullptr;
@@ -875,7 +875,7 @@ struct RendererImpl final : public Renderer
 
 		if (m_shader_defines.size() >= MAX_SHADER_DEFINES) {
 			ASSERT(false);
-			g_log_error.log("Renderer") << "Too many shader defines.";
+			logError("Renderer") << "Too many shader defines.";
 		}
 
 		m_shader_defines.emplace(define);

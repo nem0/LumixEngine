@@ -1,6 +1,7 @@
 #include "render_scene.h"
 
 #include "engine/array.h"
+#include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -17,7 +18,6 @@
 #include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/culling_system.h"
 #include "renderer/font_manager.h"
@@ -126,7 +126,7 @@ struct TextMesh
 	Font* getFont() const { return m_font; }
 	int getFontSize() const { return m_font_size; }
 
-	string text;
+	String text;
 	u32 color = 0xff000000;
 	FlagSet<Flags, u32> m_flags;
 
@@ -2082,13 +2082,13 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		OS::InputFile file1, file2;
 		if (!file1.open(path))
 		{
-			g_log_error.log("render_test") << "Failed to open " << path;
+			logError("render_test") << "Failed to open " << path;
 			return 0xffffFFFF;
 		}
 		else if (!file2.open(path_preimage))
 		{
 			file1.close();
-			g_log_error.log("render_test") << "Failed to open " << path_preimage;
+			logError("render_test") << "Failed to open " << path_preimage;
 			return 0xffffFFFF;
 		}
 		unsigned int result = Texture::compareTGA(&file1, &file2, min_diff, scene->m_allocator);

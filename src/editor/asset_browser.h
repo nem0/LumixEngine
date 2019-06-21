@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/associative_array.h"
 #include "engine/hash_map.h"
 #include "engine/delegate_list.h"
 #include "engine/path.h"

@@ -1,6 +1,7 @@
 #include "engine/engine.h"
-#include "engine/flag_set.h"
 #include "engine/allocator.h"
+#include "engine/associative_array.h"
+#include "engine/flag_set.h"
 #include "engine/input_system.h"
 #include "engine/log.h"
 #include "engine/os.h"
@@ -80,7 +81,7 @@ struct GUIText
 	Font* getFont() const { return m_font; }
 
 
-	string text;
+	String text;
 	GUIScene::TextHAlign horizontal_align = GUIScene::TextHAlign::LEFT;
 	u32 color = 0xff000000;
 
@@ -882,7 +883,7 @@ struct GUISceneImpl final : public GUIScene
 					}
 					else
 					{
-						g_log_error.log("GUI") << "Too many buttons pressed at once";
+						logError("GUI") << "Too many buttons pressed at once";
 					}
 				}
 			}

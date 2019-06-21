@@ -5,6 +5,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/geometry.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -13,7 +14,6 @@
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
 #include "imgui/imgui.h"
@@ -58,7 +58,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 		WorldEditor& editor = app.getWorldEditor();
 		if (!file.open(full_path))
 		{
-			g_log_error.log("GUI") << "Failed to create " << full_path;
+			logError("GUI") << "Failed to create " << full_path;
 			return false;
 		}
 
@@ -188,7 +188,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 			if (!sprite.save(serializer))
 			{
 				success = false;
-				g_log_error.log("Editor") << "Could not save file " << sprite.getPath().c_str();
+				logError("Editor") << "Could not save file " << sprite.getPath().c_str();
 			}
 			app.getAssetBrowser().endSaveResource(sprite, *file, success);
 		}

@@ -316,7 +316,7 @@ void Blend1DNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 	time = 0;
 	if (node.items.size() > lengthOf(instances))
 	{
-		g_log_error.log("Animation") << "Too many nodes in Blend1D, only " << lengthOf(instances) << " are used.";
+		logError("Animation") << "Too many nodes in Blend1D, only " << lengthOf(instances) << " are used.";
 	}
 	for (int i = 0; i < node.items.size() && i < lengthOf(instances); ++i)
 	{
@@ -394,7 +394,7 @@ void LayersNodeInstance::enter(RunningContext& rc, ComponentInstance* from)
 	time = 0;
 	if (node.children.size() > lengthOf(layers))
 	{
-		g_log_error.log("Animation") << "Too many layers in LayerNode, only " << lengthOf(layers) << " are used.";
+		logError("Animation") << "Too many layers in LayerNode, only " << lengthOf(layers) << " are used.";
 	}
 	for (int i = 0; i < node.children.size() && i < lengthOf(layers); ++i)
 	{

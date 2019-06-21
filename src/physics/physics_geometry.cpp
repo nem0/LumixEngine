@@ -103,13 +103,13 @@ bool PhysicsGeometry::load(u64 size, const u8* mem)
 	file.read(&header, sizeof(header));
 	if (header.m_magic != HEADER_MAGIC)
 	{
-		g_log_warning.log("Physics") << "Corrupted geometry " << getPath().c_str();
+		logWarning("Physics") << "Corrupted geometry " << getPath().c_str();
 		return false;
 	}
 
 	if(header.m_version > (u32)Versions::LAST)
 	{
-		g_log_warning.log("Physics") << "Unsupported version of geometry " << getPath().c_str();
+		logWarning("Physics") << "Unsupported version of geometry " << getPath().c_str();
 		return false;
 	}
 

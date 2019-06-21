@@ -1,4 +1,5 @@
 #include "engine/allocator.h"
+#include "engine/mt/atomic.h"
 #include <cstdlib>
 #ifndef _WIN32
 	#include <cstring>

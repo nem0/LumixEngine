@@ -182,20 +182,20 @@ bool Settings::load()
 	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
 	if (!fs.open(path, &file)) {
-		g_log_error.log("Editor") << "Failed to open " << path;
+		logError("Editor") << "Failed to open " << path;
 		return false;
 	}
 
 	Array<char> buf(m_app.getWorldEditor().getAllocator());
 	buf.resize((int)file.size());
 	if (!file.read(buf.begin(), buf.byte_size())) {
-		g_log_error.log("Editor") << "Failed to read " << path;
+		logError("Editor") << "Failed to read " << path;
 		return false;
 	}
 	file.close();
 	StringView content(buf.begin(), buf.size());
 	if (!LuaWrapper::execute(L, content, "settings", 0)) {
-		g_log_error.log("Editor") << path << ": " << lua_tostring(L, -1);
+		logError("Editor") << path << ": " << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		return false;
 	}

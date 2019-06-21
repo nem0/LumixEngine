@@ -359,7 +359,7 @@ serializer.deserializeArrayBegin();
 			}
 			else
 			{
-				g_log_warning.log("Renderer") << "Unknown label \"" << label << "\"";
+				logWarning("Renderer") << "Unknown label \"" << label << "\"";
 			}
 		}
 		serializer.deserializeObjectEnd();
@@ -712,7 +712,7 @@ int texture(lua_State* L)
 			material->setTexturePath(idx, Path(texture_path));
 		}
 		else {
-			g_log_error.log("Renderer") << material->getPath() << " texture's source is not a string.";
+			logError("Renderer") << material->getPath() << " texture's source is not a string.";
 			lua_pop(L, 1);
 			return 0;
 		}
@@ -825,14 +825,14 @@ bool Material::load(u64 size, const u8* mem)
 		}
 		else
 		{
-			g_log_error.log("Renderer") << "Unknown parameter " << label << " in material " << getPath();
+			logError("Renderer") << "Unknown parameter " << label << " in material " << getPath();
 		}
 	}
 	serializer.deserializeObjectEnd();
 	*/
 	if (!m_shader)
 	{
-		g_log_error.log("Renderer") << "Material " << getPath() << " without a shader";
+		logError("Renderer") << "Material " << getPath() << " without a shader";
 		return false;
 	}
 

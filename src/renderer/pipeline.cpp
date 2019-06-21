@@ -1,4 +1,5 @@
 #include "ffr/ffr.h"
+#include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -15,7 +16,6 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "culling_system.h"
 #include "font_manager.h"
 #include "material.h"
@@ -327,7 +327,7 @@ struct PipelineImpl final : Pipeline
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != 0)
 			{
-				g_log_error.log("lua") << lua_tostring(m_lua_state, -1);
+				logError("lua") << lua_tostring(m_lua_state, -1);
 				lua_pop(m_lua_state, 1);
 			}
 		}
@@ -358,7 +358,7 @@ struct PipelineImpl final : Pipeline
 		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp.data), m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -368,7 +368,7 @@ struct PipelineImpl final : Pipeline
 		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -406,7 +406,7 @@ struct PipelineImpl final : Pipeline
 
 		if (errors)
 		{
-			g_log_error.log("Renderer") << lua_tostring(m_lua_state, -1);
+			logError("Renderer") << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -451,7 +451,7 @@ struct PipelineImpl final : Pipeline
 			luaL_loadbuffer(m_lua_state, content, content_size, m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -461,7 +461,7 @@ struct PipelineImpl final : Pipeline
 		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
 		if (errors)
 		{
-			g_log_error.log("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -905,7 +905,7 @@ struct PipelineImpl final : Pipeline
 		{
 			if (equalStrings(i.name, name)) return i.value;
 		}
-		g_log_error.log("Renderer") << "Uknown texture format " << name;
+		logError("Renderer") << "Uknown texture format " << name;
 		return ffr::TextureFormat::RGBA8;
 	}
 
@@ -960,21 +960,21 @@ struct PipelineImpl final : Pipeline
 			lua_pushnil(L);
 			while (lua_next(L, 2) != 0) {
 				if(lua_type(L, -1) != LUA_TNUMBER) {
-					g_log_error.log("Renderer") << "Incorrect global textures arguments of renderTerrains";
+					logError("Renderer") << "Incorrect global textures arguments of renderTerrains";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
 					return 0;
 				}
 
 				if(lua_type(L, -2) != LUA_TSTRING) {
-					g_log_error.log("Renderer") << "Incorrect global textures arguments of renderTerrains";
+					logError("Renderer") << "Incorrect global textures arguments of renderTerrains";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
 					return 0;
 				}
 			
 				if (cmd->m_global_textures_count > lengthOf(cmd->m_global_textures)) {
-					g_log_error.log("Renderer") << "Too many textures in renderTerrains call";
+					logError("Renderer") << "Too many textures in renderTerrains call";
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 					lua_pop(L, 2);
 					return 0;
@@ -1061,7 +1061,7 @@ struct PipelineImpl final : Pipeline
 					const int instances_count = blob.read<int>();
 					const Renderer::TransientSlice transient = m_pipeline->m_renderer.allocTransient(byte_size);
 					if ((int)transient.size < byte_size) {
-						g_log_warning.log("Renderer") << "Not enough memory reserved to render all particles.";
+						logWarning("Renderer") << "Not enough memory reserved to render all particles.";
 						break;
 					}
 
@@ -2139,7 +2139,7 @@ struct PipelineImpl final : Pipeline
 
 								const Renderer::TransientSlice transient = m_pipeline->m_renderer.allocTransient(byte_size);
 								if ((int)transient.size < byte_size) {
-									g_log_warning.log("Renderer") << "Not enough memory reserved to render grass.";
+									logWarning("Renderer") << "Not enough memory reserved to render grass.";
 									break;
 								}
 
@@ -2253,11 +2253,11 @@ struct PipelineImpl final : Pipeline
 		const int rb_count = lua_gettop(L);
 		int rbs[16];
 		if(rb_count > lengthOf(rbs)) {
-			g_log_error.log("Renderer") << "Too many render buffers in " << pipeline->getPath();	
+			logError("Renderer") << "Too many render buffers in " << pipeline->getPath();	
 			return 0;
 		}
 		if(rb_count <= 0) {
-			g_log_error.log("Renderer") << "createFramebuffer without arguments in " << pipeline->getPath();
+			logError("Renderer") << "createFramebuffer without arguments in " << pipeline->getPath();
 			return 0;
 		}
 
@@ -3055,7 +3055,7 @@ struct PipelineImpl final : Pipeline
 
 		if (lua_pcall(m_lua_state, 0, 0, 0) != 0)
 		{
-			g_log_warning.log("Renderer") << lua_tostring(m_lua_state, -1);
+			logWarning("Renderer") << lua_tostring(m_lua_state, -1);
 			lua_pop(m_lua_state, 1);
 		}
 		lua_pop(m_lua_state, 1);

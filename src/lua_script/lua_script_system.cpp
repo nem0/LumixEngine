@@ -1,6 +1,7 @@
 #include "lua_script_system.h"
 #include "animation/animation_scene.h"
 #include "engine/array.h"
+#include "engine/associative_array.h"
 #include "engine/binary_array.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
@@ -254,7 +255,7 @@ namespace Lumix
 
 					if (errors)
 					{
-						g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
+						logError("Lua Script") << script.m_script->getPath() << ": "
 							<< lua_tostring(script.m_state, -1);
 						lua_pop(script.m_state, 1);
 						continue;
@@ -267,7 +268,7 @@ namespace Lumix
 					errors = errors || lua_pcall(script.m_state, 0, 0, 0) != 0; // [env]
 					if (errors)
 					{
-						g_log_error.log("Lua Script") << script.m_script->getPath() << ": "
+						logError("Lua Script") << script.m_script->getPath() << ": "
 							<< lua_tostring(script.m_state, -1);
 						lua_pop(script.m_state, 1);
 					}
@@ -286,7 +287,7 @@ namespace Lumix
 					}
 					else {
 						if (lua_pcall(script.m_state, 0, 0, 0) != 0) {
-							g_log_error.log("Lua Script") << lua_tostring(script.m_state, -1);
+							logError("Lua Script") << lua_tostring(script.m_state, -1);
 							lua_pop(script.m_state, 1);
 						}
 					}
@@ -415,7 +416,7 @@ namespace Lumix
 
 			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != 0)
 			{
-				g_log_warning.log("Lua Script") << lua_tostring(script.m_state, -1);
+				logWarning("Lua Script") << lua_tostring(script.m_state, -1);
 				lua_pop(script.m_state, 1);
 			}
 			lua_pop(script.m_state, 1);
@@ -952,7 +953,7 @@ namespace Lumix
 			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
 			if (errors)
 			{
-				g_log_error.log("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
+				logError("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
 				lua_pop(state, 1);
 				return;
 			}
@@ -965,7 +966,7 @@ namespace Lumix
 
 			if (errors)
 			{
-				g_log_error.log("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
+				logError("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
 				lua_pop(state, 1);
 			}
 		}
@@ -1067,7 +1068,7 @@ namespace Lumix
 			{
 				if (lua_pcall(inst.m_state, 0, 0, 0) != 0)
 				{
-					g_log_error.log("Lua Script") << lua_tostring(inst.m_state, -1);
+					logError("Lua Script") << lua_tostring(inst.m_state, -1);
 					lua_pop(inst.m_state, 1);
 				}
 				lua_pop(inst.m_state, 1);
@@ -1146,7 +1147,7 @@ namespace Lumix
 
 				if (lua_pcall(instance.m_state, 0, 0, 0) != 0)
 				{
-					g_log_error.log("Lua Script") << lua_tostring(instance.m_state, -1);
+					logError("Lua Script") << lua_tostring(instance.m_state, -1);
 					lua_pop(instance.m_state, 1);
 				}
 			}
@@ -1551,14 +1552,14 @@ namespace Lumix
 
 					if (lua_pcall(timer.state, 0, 0, 0) != 0)
 					{
-						g_log_error.log("Lua Script") << lua_tostring(timer.state, -1);
+						logError("Lua Script") << lua_tostring(timer.state, -1);
 						lua_pop(timer.state, 1);
 					}
 					timers_to_remove[timers_to_remove_count] = i;
 					++timers_to_remove_count;
 					if (timers_to_remove_count >= lengthOf(timers_to_remove))
 					{
-						g_log_error.log("Lua Script") << "Too many lua timers in one frame, some are not executed";
+						logError("Lua Script") << "Too many lua timers in one frame, some are not executed";
 						break;
 					}
 				}
@@ -1639,7 +1640,7 @@ namespace Lumix
 			
 			if (lua_pcall(L, 1, 0, 0) != 0)// [lua_event, environment]
 			{
-				g_log_error.log("Lua Script") << lua_tostring(L, -1);
+				logError("Lua Script") << lua_tostring(L, -1);
 				lua_pop(L, 1); // []
 			}
 			lua_pop(L, 2); // []
@@ -1691,7 +1692,7 @@ namespace Lumix
 				lua_pushnumber(update_item.state, time_delta);
 				if (lua_pcall(update_item.state, 1, 0, 0) != 0)
 				{
-					g_log_error.log("Lua Script") << lua_tostring(update_item.state, -1);
+					logError("Lua Script") << lua_tostring(update_item.state, -1);
 					lua_pop(update_item.state, 1);
 				}
 				lua_pop(update_item.state, 1);
@@ -1721,7 +1722,7 @@ namespace Lumix
 					if (size + 1 > sizeof(tmp))
 					{
 						blob.skip(size);
-						g_log_error.log("Lua Script") << "Skipping lua_call animation event because it is too big.";
+						logError("Lua Script") << "Skipping lua_call animation event because it is too big.";
 					}
 					else
 					{
@@ -1905,7 +1906,7 @@ namespace Lumix
 
 		LuaScriptSystemImpl& m_system;
 		HashMap<EntityRef, ScriptComponent*> m_scripts;
-		AssociativeArray<u32, string> m_property_names;
+		AssociativeArray<u32, String> m_property_names;
 		Array<CallbackData> m_input_handlers;
 		Universe& m_universe;
 		Array<CallbackData> m_updates;

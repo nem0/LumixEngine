@@ -1,4 +1,5 @@
 #include "physics/physics_scene.h"
+#include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/job_system.h"
@@ -1381,7 +1382,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void createRigidActor(EntityRef entity)
 	{
 		if (m_actors.find(entity).isValid()) {
-			g_log_error.log("Physics") << "Entity " << entity.index << " already has rigid actor";
+			logError("Physics") << "Entity " << entity.index << " already has rigid actor";
 			return;
 		}
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
@@ -2235,7 +2236,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			}
 		}
 		if (mask != 0b1111) {
-			g_log_error.log("Physics") << "Vehicle " << entity.index << " does not have exactly one wheel in each slot.";
+			logError("Physics") << "Vehicle " << entity.index << " does not have exactly one wheel in each slot.";
 			return nullptr;
 		}
 
@@ -2459,7 +2460,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 			PxVehicleWheelsSimData* wheel_sim_data = setupWheelsSimulationData(entity);
 			if (!wheel_sim_data) {
-				g_log_error.log("Physics") << "Failed to init vehicle " << entity.index;
+				logError("Physics") << "Failed to init vehicle " << entity.index;
 				continue;
 			}
 
@@ -2864,7 +2865,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			}
 			else
 			{
-				g_log_error.log("Physics") << "Could not create PhysX heightfield " << terrain.m_heightmap->getPath();
+				logError("Physics") << "Could not create PhysX heightfield " << terrain.m_heightmap->getPath();
 			}
 		}
 	}
@@ -4851,7 +4852,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		auto* actor = m_actors[entity];
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			g_log_warning.log("Physics") << "Trying to get speed of static object";
+			logWarning("Physics") << "Trying to get speed of static object";
 			return Vec3::ZERO;
 		}
 
@@ -4866,7 +4867,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		auto* actor = m_actors[entity];
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			g_log_warning.log("Physics") << "Trying to get speed of static object";
+			logWarning("Physics") << "Trying to get speed of static object";
 			return 0;
 		}
 
@@ -4884,7 +4885,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			g_log_warning.log("Physics") << "Trying to put static object to sleep";
+			logWarning("Physics") << "Trying to put static object to sleep";
 			return;
 		}
 
@@ -4902,7 +4903,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			g_log_warning.log("Physics") << "Trying to apply force to static object #" << entity.index;
+			logWarning("Physics") << "Trying to apply force to static object #" << entity.index;
 			return;
 		}
 
@@ -4920,7 +4921,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			g_log_warning.log("Physics") << "Trying to apply force to static object #" << entity.index;
+			logWarning("Physics") << "Trying to apply force to static object #" << entity.index;
 			return;
 		}
 
@@ -5111,7 +5112,7 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		}
 		else
 		{
-			g_log_error.log("Physics") << "Could not create PhysX mesh " << resource->getPath().c_str();
+			logError("Physics") << "Could not create PhysX mesh " << resource->getPath().c_str();
 		}
 	}
 }

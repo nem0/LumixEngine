@@ -361,8 +361,8 @@ public:
 					: controller(_controller)
 					, name("", _controller.m_allocator) {}
 
-				void setName(const string& name);
-				const string& getName() const { return name; }
+				void setName(const String& name);
+				const String& getName() const { return name; }
 
 				template <typename T>
 				void accept(T& visitor)
@@ -371,7 +371,7 @@ public:
 				}
 
 			private:
-				string name;
+				String name;
 				ControllerResource& controller;
 		};
 

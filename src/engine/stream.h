@@ -1,6 +1,5 @@
 #pragma once
 
-#include "array.h"
 #include "lumix.h"
 
 
@@ -9,6 +8,7 @@ namespace Lumix
 
 
 struct IAllocator;
+class String;
 
 
 struct LUMIX_ENGINE_API IOutputStream
@@ -60,7 +60,7 @@ class LUMIX_ENGINE_API OutputMemoryStream final : public IOutputStream
 		const void* getData() const { return m_data; }
 		void* getMutableData() { return m_data; }
 		u64 getPos() const { return m_pos; }
-		void write(const string& string);
+		void write(const String& string);
 		template <class T> void write(const T& value);
 		void clear();
 		void* skip(int size);
@@ -92,7 +92,7 @@ class LUMIX_ENGINE_API InputMemoryStream final : public IInputStream
 		explicit InputMemoryStream(const OutputMemoryStream& blob);
 
 		bool read(void* data, u64 size) override;
-		bool read(string& string);
+		bool read(String& string);
 		const void* skip(u64 size);
 		const void* getData() const { return (const void*)m_data; }
 		const void* getBuffer() const override { return m_data; }

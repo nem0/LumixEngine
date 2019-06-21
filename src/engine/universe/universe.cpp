@@ -491,7 +491,7 @@ void Universe::setParent(EntityPtr new_parent, EntityRef child)
 	bool would_create_cycle = new_parent.isValid() && isDescendant(child, (EntityRef)new_parent);
 	if (would_create_cycle)
 	{
-		g_log_error.log("Engine") << "Hierarchy can not contains a cycle.";
+		logError("Engine") << "Hierarchy can not contains a cycle.";
 		return;
 	}
 
@@ -752,7 +752,7 @@ EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 	deserializer.read(&version);
 	if (version > (int)PrefabVersion::LAST)
 	{
-		g_log_error.log("Engine") << "Prefab " << prefab.getPath() << " has unsupported version.";
+		logError("Engine") << "Prefab " << prefab.getPath() << " has unsupported version.";
 		return INVALID_ENTITY;
 	}
 	int count;

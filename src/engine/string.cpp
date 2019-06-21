@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-string::string(IAllocator& allocator)
+String::String(IAllocator& allocator)
 	: m_allocator(allocator)
 {
 	m_cstr = nullptr;
@@ -16,7 +16,7 @@ string::string(IAllocator& allocator)
 }
 
 
-string::string(const string& rhs, int start, i32 length)
+String::String(const String& rhs, int start, i32 length)
 	: m_allocator(rhs.m_allocator)
 {
 	m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
@@ -26,7 +26,7 @@ string::string(const string& rhs, int start, i32 length)
 }
 
 
-string::string(const char* rhs, i32 length, IAllocator& allocator)
+String::String(const char* rhs, i32 length, IAllocator& allocator)
 	: m_allocator(allocator)
 {
 	m_size = length;
@@ -36,7 +36,7 @@ string::string(const char* rhs, i32 length, IAllocator& allocator)
 }
 
 
-string::string(const string& rhs)
+String::String(const String& rhs)
 	: m_allocator(rhs.m_allocator)
 {
 	m_cstr = (char*)m_allocator.allocate((rhs.m_size + 1) * sizeof(char));
@@ -46,7 +46,17 @@ string::string(const string& rhs)
 }
 
 
-string::string(const char* rhs, IAllocator& allocator)
+String::String(String&& rhs)
+	: m_allocator(rhs.m_allocator)
+{
+	m_cstr = rhs.m_cstr;
+	m_size = rhs.m_size;
+	rhs.m_cstr = nullptr;
+	rhs.m_size = 0;
+}
+
+
+String::String(const char* rhs, IAllocator& allocator)
 	: m_allocator(allocator)
 {
 	m_size = stringLength(rhs);
@@ -55,17 +65,17 @@ string::string(const char* rhs, IAllocator& allocator)
 }
 
 
-string::~string() { m_allocator.deallocate(m_cstr); }
+String::~String() { m_allocator.deallocate(m_cstr); }
 
 
-char string::operator[](int index) const
+char String::operator[](int index) const
 {
 	ASSERT(index >= 0 && index < m_size);
 	return m_cstr[index];
 }
 
 
-void string::set(const char* rhs, int size)
+void String::set(const char* rhs, int size)
 {
 	if (rhs < m_cstr || rhs >= m_cstr + m_size)
 	{
@@ -78,7 +88,7 @@ void string::set(const char* rhs, int size)
 }
 
 
-void string::operator=(const string& rhs)
+void String::operator=(const String& rhs)
 {
 	if (&rhs != this)
 	{
@@ -90,7 +100,7 @@ void string::operator=(const string& rhs)
 }
 
 
-void string::operator=(const char* rhs)
+void String::operator=(const char* rhs)
 {
 	if (rhs < m_cstr || rhs >= m_cstr + m_size)
 	{
@@ -110,49 +120,49 @@ void string::operator=(const char* rhs)
 }
 
 
-bool string::operator!=(const string& rhs) const
+bool String::operator!=(const String& rhs) const
 {
 	return compareString(m_cstr, rhs.m_cstr) != 0;
 }
 
 
-bool string::operator!=(const char* rhs) const
+bool String::operator!=(const char* rhs) const
 {
 	return compareString(m_cstr, rhs) != 0;
 }
 
 
-bool string::operator==(const string& rhs) const
+bool String::operator==(const String& rhs) const
 {
 	return compareString(m_cstr, rhs.m_cstr) == 0;
 }
 
 
-bool string::operator==(const char* rhs) const
+bool String::operator==(const char* rhs) const
 {
 	return compareString(m_cstr, rhs) == 0;
 }
 
 
-bool string::operator<(const string& rhs) const
+bool String::operator<(const String& rhs) const
 {
 	return compareString(m_cstr, rhs.m_cstr) < 0;
 }
 
 
-bool string::operator>(const string& rhs) const
+bool String::operator>(const String& rhs) const
 {
 	return compareString(m_cstr, rhs.m_cstr) > 0;
 }
 
 
-string string::substr(int start, int length) const
+String String::substr(int start, int length) const
 {
-	return string(*this, start, length);
+	return String(*this, start, length);
 }
 
 
-void string::resize(int size)
+void String::resize(int size)
 {
 	ASSERT(size > 0);
 	if (size <= 0) return;
@@ -163,7 +173,13 @@ void string::resize(int size)
 }
 
 
-string& string::cat(const char* value, int length)
+String& String::cat(const StringView& value)
+{
+	return cat(value.begin, value.length());
+}
+
+
+String& String::cat(const char* value, int length)
 {
 	if (value < m_cstr || value >= m_cstr + m_size)
 	{
@@ -188,7 +204,7 @@ string& string::cat(const char* value, int length)
 }
 
 
-string& string::cat(float value)
+String& String::cat(float value)
 {
 	char tmp[40];
 	toCString(value, tmp, 30, 10);
@@ -197,14 +213,14 @@ string& string::cat(float value)
 }
 
 
-string& string::cat(char* value)
+String& String::cat(char* value)
 {
 	cat((const char*)value);
 	return *this;
 }
 
 
-void string::eraseAt(int position)
+void String::eraseAt(int position)
 {
 	if (position < 0 || position >= m_size) return;
 	moveMemory(m_cstr + position, m_cstr + position + 1, m_size - position - 1);
@@ -213,7 +229,7 @@ void string::eraseAt(int position)
 }
 
 
-void string::insert(int position, const char* value)
+void String::insert(int position, const char* value)
 {
 	if (m_cstr)
 	{
@@ -237,7 +253,7 @@ void string::insert(int position, const char* value)
 }
 
 
-string& string::cat(const char* rhs)
+String& String::cat(const char* rhs)
 {
 	if (rhs < m_cstr || rhs >= m_cstr + m_size)
 	{
@@ -846,7 +862,7 @@ static bool increment(const char* output, char* end, bool is_space_after)
 	}
 	if (carry && is_space_after)
 	{
-		char* c = end + 1; // including '\0' at the end of the string
+		char* c = end + 1; // including '\0' at the end of the String
 		while (c >= output)
 		{
 			*(c + 1) = *c;

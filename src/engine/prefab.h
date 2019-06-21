@@ -2,7 +2,6 @@
 
 
 #include "engine/resource.h"
-#include "engine/stream.h"
 
 
 namespace Lumix

@@ -184,7 +184,7 @@ public:
 	using iterator = iterator_base<HashMap, Key, Value>;
 	using const_iterator = iterator_base<const HashMap, const Key, const Value>;
 
-	HashMap(IAllocator& allocator) 
+	explicit HashMap(IAllocator& allocator) 
 		: m_allocator(allocator) 
 	{
 		init(8, true); 

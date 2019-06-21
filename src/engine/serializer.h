@@ -13,7 +13,7 @@ class OutputMemoryStream;
 struct LocalRigidTransform;
 struct Quat;
 struct RigidTransform;
-class string;
+class String;
 struct Transform;
 struct Vec3;
 struct Vec4;
@@ -95,7 +95,7 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(u8* value) = 0;
 	virtual void read(i8* value) = 0;
 	virtual void read(char* value, int max_size) = 0;
-	virtual void read(string* value) = 0;
+	virtual void read(String* value) = 0;
 	virtual EntityPtr getEntity(EntityGUID guid) = 0;
 };
 
@@ -163,7 +163,7 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	void read(u8* value)  override;
 	void read(i8* value)  override;
 	void read(char* value, int max_size)  override;
-	void read(string* value)  override;
+	void read(String* value)  override;
 	EntityPtr getEntity(EntityGUID guid) override;
 
 	void skip();

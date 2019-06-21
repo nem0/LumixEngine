@@ -288,7 +288,7 @@ ComponentType getComponentType(const char* id)
 	auto& cmp_types = getComponentTypes();
 	if (types.size() == ComponentType::MAX_TYPES_COUNT)
 	{
-		g_log_error.log("Engine") << "Too many component types";
+		logError("Engine") << "Too many component types";
 		return INVALID_COMPONENT_TYPE;
 	}
 

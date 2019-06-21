@@ -490,7 +490,7 @@ void Edge::onGUI()
 		m_expression_error = engine_edge->condition.compile(m_expression, m_controller.getEngineResource()->m_input_decl);
 		if (m_expression_error != Anim::Condition::Error::NONE)
 		{
-			g_log_error.log("Animation") << "Failed to compile condition " << m_expression;
+			logError("Animation") << "Failed to compile condition " << m_expression;
 		}
 	}
 
@@ -1850,7 +1850,7 @@ bool ControllerResource::deserialize(InputMemoryStream& blob, Engine& engine, IA
 			for (int j = 0; j < bone_count; ++j)
 			{
 				Mask::Bone& bone = mask.bones.emplace(mask.controller);
-				string bone_name(m_allocator);
+				String bone_name(m_allocator);
 				blob.read(bone_name);
 				bone.setName(bone_name);
 			}
@@ -1885,7 +1885,7 @@ bool ControllerResource::deserialize(InputMemoryStream& blob, Engine& engine, IA
 }
 
 
-void ControllerResource::Mask::Bone::setName(const string& _name)
+void ControllerResource::Mask::Bone::setName(const String& _name)
 {
 	for (int i = 0; i < controller.m_masks.size(); ++i)
 	{

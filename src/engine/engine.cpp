@@ -5,7 +5,6 @@
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
 #include "engine/job_system.h"
-#include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
@@ -404,8 +403,11 @@ public:
 #pragma pack()
 
 
-static void showLogInVS(const char* system, const char* message)
+static void showLogInVS(LogLevel level, const char* system, const char* message)
 {
+	if(level == LogLevel::ERROR) {
+		Debug::debugOutput("error: ");
+	}
 	Debug::debugOutput(system);
 	Debug::debugOutput(" : ");
 	Debug::debugOutput(message);
@@ -413,8 +415,9 @@ static void showLogInVS(const char* system, const char* message)
 }
 
 
-static void logErrorToFile(const char*, const char* message)
+static void logToFile(LogLevel level, const char*, const char* message)
 {
+	if (level != LogLevel::ERROR) return;
 	if (!g_is_error_file_open) return;
 	g_error_file.write(message, stringLength(message));
 	g_error_file.flush();
@@ -458,21 +461,19 @@ public:
 		, m_is_game_running(false)
 		, m_last_time_delta(0)
 		, m_time(0)
-		, m_path_manager(m_allocator)
+		, m_path_manager(PathManager::create(m_allocator))
 		, m_time_multiplier(1.0f)
 		, m_paused(false)
 		, m_next_frame(false)
 	{
-		g_log_info.log("Core") << "Creating engine...";
+		logInfo("Core") << "Creating engine...";
 		Profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
 		g_is_error_file_open = g_error_file.open("error.log");
 
-		g_log_error.getCallback().bind<logErrorToFile>();
-		g_log_info.getCallback().bind<showLogInVS>();
-		g_log_warning.getCallback().bind<showLogInVS>();
-		g_log_error.getCallback().bind<showLogInVS>();
+		getLogCallback().bind<logToFile>();
+		getLogCallback().bind<showLogInVS>();
 
 		m_platform_data = {};
 		m_state = luaL_newstate();
@@ -490,7 +491,7 @@ public:
 		m_plugin_manager = PluginManager::create(*this);
 		m_input_system = InputSystem::create(*this);
 
-		g_log_info.log("Core") << "Engine created.";
+		logInfo("Core") << "Engine created.";
 	}
 
 
@@ -520,7 +521,7 @@ public:
 		if (!scene) return false;
 		if (universe->hasComponent(entity, cmp_type))
 		{
-			g_log_error.log("Lua Script") << "Component " << type << " already exists in entity " << entity.index;
+			logError("Lua Script") << "Component " << type << " already exists in entity " << entity.index;
 			return false;
 		}
 
@@ -694,7 +695,7 @@ public:
 		void notSupported(const Reflection::PropertyBase& prop)
 		{
 			if (!equalStrings(property_name, prop.name)) return;
-			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
+			logError("Lua Script") << "Property " << prop.name << " has unsupported type";
 		}
 
 
@@ -852,8 +853,8 @@ public:
 	static Universe* LUA_createUniverse(EngineImpl* engine) { return &engine->createUniverse(false); }
 	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe) { engine->destroyUniverse(*universe); }
 	static Universe* LUA_getSceneUniverse(IScene* scene) { return &scene->getUniverse(); }
-	static void LUA_logError(const char* text) { g_log_error.log("Lua Script") << text; }
-	static void LUA_logInfo(const char* text) { g_log_info.log("Lua Script") << text; }
+	static void LUA_logError(const char* text) { logError("Lua Script") << text; }
+	static void LUA_logInfo(const char* text) { logInfo("Lua Script") << text; }
 	static void LUA_pause(Engine* engine, bool pause) { engine->pause(pause); }
 	static void LUA_nextFrame(Engine* engine) { engine->nextFrame(); }
 	static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
@@ -880,7 +881,7 @@ public:
 			{
 				if (!success)
 				{
-					g_log_error.log("Engine") << "Failed to open universe " << path;
+					logError("Engine") << "Failed to open universe " << path;
 				}
 				else
 				{
@@ -899,7 +900,7 @@ public:
 
 					if (!engine->deserialize(*universe, blob))
 					{
-						g_log_error.log("Engine") << "Failed to deserialize universe " << path;
+						logError("Engine") << "Failed to deserialize universe " << path;
 					}
 					else
 					{
@@ -911,7 +912,7 @@ public:
 
 						if (lua_pcall(L, 0, 0, 0) != 0)
 						{
-							g_log_error.log("Engine") << lua_tostring(L, -1);
+							logError("Engine") << lua_tostring(L, -1);
 							lua_pop(L, 1);
 						}
 					}
@@ -1140,13 +1141,13 @@ public:
 		lua_getglobal(m_state, "package");
 		if (lua_type(m_state, -1) != LUA_TTABLE)
 		{
-			g_log_error.log("Engine") << "Lua \"package\" is not a table";
+			logError("Engine") << "Lua \"package\" is not a table";
 			return;
 		}
 		lua_getfield(m_state, -1, "searchers");
 		if (lua_type(m_state, -1) != LUA_TTABLE)
 		{
-			g_log_error.log("Engine") << "Lua \"package.searchers\" is not a table";
+			logError("Engine") << "Lua \"package.searchers\" is not a table";
 			return;
 		}
 		int numLoaders = 0;
@@ -1177,14 +1178,14 @@ public:
 		auto* file = fs.open(Path(tmp), FS::Mode::OPEN_AND_READ);
 		if (!file)
 		{
-			g_log_error.log("Engine") << "Failed to open file " << tmp;
+			logError("Engine") << "Failed to open file " << tmp;
 			StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
 			msg << tmp;
 			lua_pushstring(L, msg);
 		}
 		else if (luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), tmp) != 0)
 		{
-			g_log_error.log("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
+			logError("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
 		}
 		if (file) fs.close(*file);
 		return 1;*/
@@ -1210,6 +1211,7 @@ public:
 		lua_close(m_state);
 
 		g_error_file.close();
+		PathManager::destroy(*m_path_manager);
 	}
 
 
@@ -1419,7 +1421,7 @@ public:
 			serializer.read(version);
 			if (version != scene->getVersion())
 			{
-				g_log_error.log("Core") << "Plugin " << scene->getPlugin().getName() << " has incompatible version";
+				logError("Core") << "Plugin " << scene->getPlugin().getName() << " has incompatible version";
 				return false;
 			}
 		}
@@ -1437,7 +1439,7 @@ public:
 			serializer.readString(tmp, sizeof(tmp));
 			if (!m_plugin_manager->getPlugin(tmp))
 			{
-				g_log_error.log("Core") << "Missing plugin " << tmp;
+				logError("Core") << "Missing plugin " << tmp;
 				return false;
 			}
 		}
@@ -1453,7 +1455,7 @@ public:
 		serializer.write(header);
 		serializePluginList(serializer);
 		serializerSceneVersions(serializer, ctx);
-		m_path_manager.serialize(serializer);
+		m_path_manager->serialize(serializer);
 		int pos = (int)serializer.getPos();
 		ctx.serialize(serializer);
 		m_plugin_manager->serialize(serializer);
@@ -1474,13 +1476,13 @@ public:
 		serializer.read(header);
 		if (header.m_magic != SERIALIZED_ENGINE_MAGIC)
 		{
-			g_log_error.log("Core") << "Wrong or corrupted file";
+			logError("Core") << "Wrong or corrupted file";
 			return false;
 		}
 		if (!hasSerializedPlugins(serializer)) return false;
 		if (!hasSupportedSceneVersions(serializer, ctx)) return false;
 
-		m_path_manager.deserialize(serializer);
+		m_path_manager->deserialize(serializer);
 		ctx.deserialize(serializer);
 		m_plugin_manager->deserialize(serializer);
 		i32 scene_count;
@@ -1492,7 +1494,7 @@ public:
 			IScene* scene = ctx.getScene(crc32(tmp));
 			scene->deserialize(serializer);
 		}
-		m_path_manager.clear();
+		m_path_manager->clear();
 		return true;
 	}
 
@@ -1516,12 +1518,12 @@ public:
 		PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
 		if (!prefab)
 		{
-			g_log_error.log("Editor") << "Cannot instantiate null prefab.";
+			logError("Editor") << "Cannot instantiate null prefab.";
 			return 0;
 		}
 		if (!prefab->isReady())
 		{
-			g_log_error.log("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
+			logError("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
 			return 0;
 		}
 		EntityPtr entity = universe->instantiatePrefab(*prefab, position, {0, 0, 0, 1}, 1);
@@ -1562,21 +1564,21 @@ public:
 	{
 		if (luaL_loadbuffer(m_state, src, src_length, path) != 0)
 		{
-			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
+			logError("Engine") << path << ": " << lua_tostring(m_state, -1);
 			lua_pop(m_state, 1);
 			return;
 		}
 
 		if (lua_pcall(m_state, 0, 0, 0) != 0)
 		{
-			g_log_error.log("Engine") << path << ": " << lua_tostring(m_state, -1);
+			logError("Engine") << path << ": " << lua_tostring(m_state, -1);
 			lua_pop(m_state, 1);
 		}
 	}
 
 
 	lua_State* getState() override { return m_state; }
-	PathManager& getPathManager() override{ return m_path_manager; }
+	PathManager& getPathManager() override{ return *m_path_manager; }
 	float getLastTimeDelta() const override { return m_last_time_delta / m_time_multiplier; }
 	double getTime() const override { return m_time; }
 
@@ -1602,7 +1604,7 @@ private:
 	bool m_paused;
 	bool m_next_frame;
 	PlatformData m_platform_data;
-	PathManager m_path_manager;
+	PathManager* m_path_manager;
 	lua_State* m_state;
 	HashMap<int, Resource*> m_lua_resources;
 	int m_last_lua_resource_idx;

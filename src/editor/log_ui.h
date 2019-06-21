@@ -2,6 +2,7 @@
 
 
 #include "engine/array.h"
+#include "engine/log.h"
 #include "engine/mt/sync.h"
 #include "engine/string.h"
 
@@ -26,15 +27,6 @@ class LUMIX_EDITOR_API LogUI
 		bool m_is_open;
 
 	private:
-		enum Type
-		{
-			INFO,
-			WARNING,
-			ERROR,
-
-			COUNT
-		};
-
 		struct Notification
 		{
 			explicit Notification(IAllocator& alloc)
@@ -43,14 +35,12 @@ class LUMIX_EDITOR_API LogUI
 			}
 			float time;
 			int uid;
-			string message;
+			String message;
 		};
 
 	private:
-		void onInfo(const char* system, const char* message);
-		void onWarning(const char* system, const char* message);
-		void onError(const char* system, const char* message);
-		void push(Type type, const char* message);
+		void onLog(LogLevel level, const char* system, const char* message);
+		void push(LogLevel level, const char* message);
 		void showNotifications();
 
 	private:
@@ -60,14 +50,14 @@ class LUMIX_EDITOR_API LogUI
 				: text(allocator)
 			{}
 
-			string text;
-			Type type;
+			String text;
+			LogLevel level;
 		};
 
 		IAllocator& m_allocator;
 		Array<Message> m_messages;
 		Array<Notification> m_notifications;
-		int m_new_message_count[COUNT];
+		int m_new_message_count[(int)LogLevel::COUNT];
 		u8 m_level_filter;
 		int m_last_uid;
 		bool m_move_notifications_to_front;

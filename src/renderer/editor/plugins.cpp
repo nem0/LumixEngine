@@ -9,6 +9,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/geometry.h"
 #include "engine/job_system.h"
 #include "engine/json_serializer.h"
 #include "engine/log.h"
@@ -25,7 +26,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "renderer/culling_system.h"
@@ -219,7 +219,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (!material->save(*file))
 			{
 				success = false;
-				g_log_error.log("Editor") << "Could not save file " << material->getPath().c_str();
+				logError("Editor") << "Could not save file " << material->getPath().c_str();
 			}
 			m_app.getAssetBrowser().endSaveResource(*material, *file, success);
 		}
@@ -560,10 +560,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_fbx_importer.setSource(cfg.base_path, filepath);
 			if (m_fbx_importer.getMeshes().empty()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-					g_log_error.log("Editor") << "No meshes with materials found in " << src.c_str();
+					logError("Editor") << "No meshes with materials found in " << src.c_str();
 				}
 				else {
-					g_log_error.log("Editor") << "No meshes found in " << src.c_str();
+					logError("Editor") << "No meshes found in " << src.c_str();
 				}
 			}
 
@@ -897,7 +897,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Resource* resource = m_tile.queue.front();
 		if (resource->isFailure()) {
-			g_log_error.log("Editor") << "Failed to load " << resource->getPath();
+			logError("Editor") << "Failed to load " << resource->getPath();
 			popTileQueue();
 			return;
 		}
@@ -1158,7 +1158,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (!file.open(m_in_path))
 				{
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
-					g_log_error.log("Editor") << "Failed to load " << m_in_path;
+					logError("Editor") << "Failed to load " << m_in_path;
 					return;
 				}
 				Array<u8> data(allocator);
@@ -1193,7 +1193,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				auto data = stbi_load(m_in_path, &image_width, &image_height, &image_comp, 4);
 				if (!data)
 				{
-					g_log_error.log("Editor") << "Failed to load " << m_in_path;
+					logError("Editor") << "Failed to load " << m_in_path;
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
@@ -1211,7 +1211,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (!saveAsDDS(m_out_path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE))
 			{
-				g_log_error.log("Editor") << "Failed to save " << m_out_path;
+				logError("Editor") << "Failed to save " << m_out_path;
 			}
 		}
 
@@ -1486,14 +1486,14 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 
 		if (lua_load(L, reader, &ctx, path) != 0) {
-			g_log_error.log("Engine") << path << ": " << lua_tostring(L, -1);
+			logError("Engine") << path << ": " << lua_tostring(L, -1);
 			lua_pop(L, 2);
 			lua_close(L);
 			return;
 		}
 
 		if (lua_pcall(L, 0, 0, -2) != 0) {
-			g_log_error.log("Engine") << lua_tostring(L, -1);
+			logError("Engine") << lua_tostring(L, -1);
 			lua_pop(L, 2);
 			lua_close(L);
 			return;
@@ -1641,7 +1641,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		void* compressed_data = crn_compress(comp_params, mipmap_params, size);
 		if (!compressed_data)
 		{
-			g_log_error.log("Editor") << "Failed to compress the probe.";
+			logError("Editor") << "Failed to compress the probe.";
 			return false;
 		}
 
@@ -1649,19 +1649,19 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 		if (!OS::makePath(path) && !OS::dirExists(path))
 		{
-			g_log_error.log("Editor") << "Failed to create " << path;
+			logError("Editor") << "Failed to create " << path;
 		}
 		path << "/probes/";
 		if (!OS::makePath(path) && !OS::dirExists(path))
 		{
-			g_log_error.log("Editor") << "Failed to create " << path;
+			logError("Editor") << "Failed to create " << path;
 		}
 		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID((EntityRef)cmp.entity);
 		path << probe_guid << postfix << ".dds";
 		OS::OutputFile file;
 		if (!file.open(path))
 		{
-			g_log_error.log("Editor") << "Failed to create " << path;
+			logError("Editor") << "Failed to create " << path;
 			crn_free_block(compressed_data);
 			return false;
 		}
@@ -1711,7 +1711,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0') {
-			g_log_error.log("Editor") << "Universe must be saved before environment probe can be generated.";
+			logError("Editor") << "Universe must be saved before environment probe can be generated.";
 			return;
 		}
 
@@ -2675,7 +2675,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 		OS::OutputFile file;
 		if (!file.open(hm_path))
 		{
-			g_log_error.log("Editor") << "Failed to create heightmap " << hm_path;
+			logError("Editor") << "Failed to create heightmap " << hm_path;
 			return false;
 		}
 		else
@@ -2690,7 +2690,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 
 		if (!file.open(normalized_material_path))
 		{
-			g_log_error.log("Editor") << "Failed to create material " << normalized_material_path;
+			logError("Editor") << "Failed to create material " << normalized_material_path;
 			OS::deleteFile(hm_path);
 			return false;
 		}

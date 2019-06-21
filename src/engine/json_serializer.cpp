@@ -1,9 +1,11 @@
 #include "json_serializer.h"
+#include "engine/allocator.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/path.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 #include <cstdlib>
 
 
@@ -11,35 +13,40 @@ namespace Lumix
 {
 
 
-class ErrorProxy
+void JsonDeserializer::logError(const char* msg)
 {
-public:
-	explicit ErrorProxy(JsonDeserializer& serializer)
-		: m_log(g_log_error, "serializer", serializer.m_allocator)
+	m_is_error = true;
+	const char* c = m_data;
+	int line = 0;
+	int column = 0;
+	while (c < m_token)
 	{
-		serializer.m_is_error = true;
-		const char* c = serializer.m_data;
-		int line = 0;
-		int column = 0;
-		while (c < serializer.m_token)
+		if (*c == '\n')
 		{
-			if (*c == '\n')
-			{
-				++line;
-				column = 0;
-			}
-			++column;
-			++c;
+			++line;
+			column = 0;
 		}
-
-		m_log << serializer.m_path << "(line " << (line + 1) << ", column " << column << "): ";
+		++column;
+		++c;
 	}
-	LogProxy& log() { return m_log; }
 
-private:
-	LogProxy m_log;
+	Lumix::logError("serializer") << m_path << "(line " << (line + 1) << ", column " << column << "): " << msg;
+}
+
+struct ErrorProxy {
+	ErrorProxy(JsonDeserializer& deserializer) 
+		: deserializer(deserializer)
+		, msg(deserializer.m_allocator)
+	{}
+
+	~ErrorProxy() {
+		deserializer.logError(msg.c_str());
+	}
+
+	String& log() { return msg; }
+	String msg;
+	JsonDeserializer& deserializer;
 };
-
 
 JsonSerializer::JsonSerializer(IOutputStream& file, const Path& path)
 	: m_file(file)
@@ -499,7 +506,7 @@ bool JsonDeserializer::isObjectEnd()
 {
 	if (m_token == m_data + m_data_size)
 	{
-		ErrorProxy(*this).log() << "Unexpected end of file while looking for the end of an object.";
+		logError("Unexpected end of file while looking for the end of an object.");
 		return true;
 	}
 
@@ -554,9 +561,11 @@ void JsonDeserializer::expectToken(char expected_token)
 		char tmp[2];
 		tmp[0] = expected_token;
 		tmp[1] = 0;
-		ErrorProxy(*this).log() << "Unexpected token \""
-								<< string(m_token, m_token_size, m_allocator) << "\", expected "
-								<< tmp << ".";
+		ErrorProxy(*this).log().cat("Unexpected token \"")
+								.cat(StringView(m_token, m_token_size))
+								.cat("\", expected ")
+								.cat(tmp)
+								.cat(".");
 		deserializeToken();
 	}
 }
@@ -593,7 +602,7 @@ bool JsonDeserializer::isArrayEnd()
 {
 	if (m_token == m_data + m_data_size)
 	{
-		ErrorProxy(*this).log() << "Unexpected end of file while looking for the end of an array.";
+		logError("Unexpected end of file while looking for the end of an array.");
 		return true;
 	}
 
@@ -621,9 +630,9 @@ void JsonDeserializer::deserializeArrayItem(char* value, int max_length, const c
 	}
 	else
 	{
-		ErrorProxy(*this).log() << "Unexpected token \""
-								<< string(m_token, m_token_size, m_allocator)
-								<< "\", expected string.";
+		ErrorProxy(*this).log().cat("Unexpected token \"")
+								.cat(StringView(m_token, m_token_size))
+								.cat("\", expected string.");
 		deserializeToken();
 		copyString(value, max_length, default_value);
 	}
@@ -783,7 +792,7 @@ void JsonDeserializer::deserializeToken()
 		}
 		if (token_end == m_data + m_data_size)
 		{
-			ErrorProxy(*this).log() << "Unexpected end of file while looking for \".";
+			logError("Unexpected end of file while looking for \".");
 			m_token_size = 0;
 		}
 		else
@@ -838,9 +847,9 @@ void JsonDeserializer::deserializeLabel(char* label, int max_length)
 	}
 	if (!m_is_string_token)
 	{
-		ErrorProxy(*this).log() << "Unexpected token \""
-								<< string(m_token, m_token_size, m_allocator)
-								<< "\", expected string.";
+		ErrorProxy(*this).log() .cat("Unexpected token \"")
+								.cat(StringView(m_token, m_token_size))
+								.cat("\", expected string.");
 		deserializeToken();
 	}
 	copyNString(label, max_length, m_token, m_token_size);
@@ -883,24 +892,28 @@ void JsonDeserializer::deserializeLabel(const char* label)
 	}
 	if (!m_is_string_token)
 	{
-		ErrorProxy(*this).log() << "Unexpected token \""
-								<< string(m_token, m_token_size, m_allocator)
-								<< "\", expected string.";
+		ErrorProxy(*this).log().cat("Unexpected token \"")
+								.cat(StringView(m_token, m_token_size))
+								.cat("\", expected string.");
 		deserializeToken();
 	}
 	if (compareStringN(label, m_token, m_token_size) != 0)
 	{
-		ErrorProxy(*this).log() << "Unexpected label \""
-								<< string(m_token, m_token_size, m_allocator) << "\", expected \""
-								<< label << "\".";
+		ErrorProxy(*this).log().cat("Unexpected label \"")
+								.cat(StringView(m_token, m_token_size))
+								.cat("\", expected \"")
+								.cat(label)
+								.cat("\".");
 		deserializeToken();
 	}
 	deserializeToken();
 	if (m_is_string_token || m_token_size != 1 || m_token[0] != ':')
 	{
-		ErrorProxy(*this).log() << "Unexpected label \""
-								<< string(m_token, m_token_size, m_allocator) << "\", expected \""
-								<< label << "\".";
+		ErrorProxy(*this).log().cat("Unexpected label \"")
+								.cat(StringView(m_token, m_token_size))
+								.cat("\", expected \"")
+								.cat(label)
+								.cat("\".");
 		deserializeToken();
 	}
 	deserializeToken();

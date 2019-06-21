@@ -5,7 +5,6 @@
 	#include <new>
 #endif
 #include "engine/lumix.h"
-#include "engine/mt/atomic.h"
 
 
 namespace Lumix

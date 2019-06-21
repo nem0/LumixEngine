@@ -1,4 +1,5 @@
 #include "ffr.h"
+#include "engine/array.h"
 #include "engine/crc32.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
@@ -700,7 +701,7 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 			gl; \
 			GLenum err = glGetError(); \
 			if (err != GL_NO_ERROR) { \
-				g_log_error.log("Renderer") << "OpenGL error " << err; \
+				logError("Renderer") << "OpenGL error " << err; \
 			/*	ASSERT(false);/**/ \
 			} \
 		} while(false)
@@ -791,7 +792,7 @@ static int load_gl(void* device_contex)
 		do { \
 			name = (prototype)wglGetProcAddress(#name); \
 			if (!name) { \
-				g_log_error.log("Renderer") << "Failed to load GL function " #name "."; \
+				logError("Renderer") << "Failed to load GL function " #name "."; \
 				return 0; \
 			} \
 		} while(0)
@@ -1423,7 +1424,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
-		g_log_error.log("renderer") << "Wrong dds format or corrupted dds.";
+		logError("renderer") << "Wrong dds format or corrupted dds.";
 		return false;
 	}
 
@@ -1601,7 +1602,7 @@ ProgramHandle allocProgramHandle()
 	MT::SpinLock lock(g_ffr.handle_mutex);
 
 	if(g_ffr.programs.isFull()) {
-		g_log_error.log("Renderer") << "FFR is out of free program slots.";
+		logError("Renderer") << "FFR is out of free program slots.";
 		return INVALID_PROGRAM;
 	}
 	const int id = g_ffr.programs.alloc();
@@ -1616,7 +1617,7 @@ BufferHandle allocBufferHandle()
 	MT::SpinLock lock(g_ffr.handle_mutex);
 
 	if(g_ffr.buffers.isFull()) {
-		g_log_error.log("Renderer") << "FFR is out of free buffer slots.";
+		logError("Renderer") << "FFR is out of free buffer slots.";
 		return INVALID_BUFFER;
 	}
 	const int id = g_ffr.buffers.alloc();
@@ -1631,7 +1632,7 @@ TextureHandle allocTextureHandle()
 	MT::SpinLock lock(g_ffr.handle_mutex);
 
 	if(g_ffr.textures.isFull()) {
-		g_log_error.log("Renderer") << "FFR is out of free texture slots.";
+		logError("Renderer") << "FFR is out of free texture slots.";
 		return INVALID_TEXTURE;
 	}
 	const int id = g_ffr.textures.alloc();
@@ -1814,7 +1815,7 @@ UniformHandle allocUniform(const char* name, UniformType type, int count)
 	}
 
 	if(g_ffr.uniforms.isFull()) {
-		g_log_error.log("Renderer") << "FFR is out of free uniform slots.";
+		logError("Renderer") << "FFR is out of free uniform slots.";
 		return INVALID_UNIFORM;
 	}
 	const int id = g_ffr.uniforms.alloc();
@@ -1841,7 +1842,7 @@ bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* type
 	enum { MAX_SHADERS_PER_PROGRAM = 16 };
 
 	if (num > MAX_SHADERS_PER_PROGRAM) {
-		g_log_error.log("Renderer") << "Too many shaders per program in " << name;
+		logError("Renderer") << "Too many shaders per program in " << name;
 		return false;
 	}
 
@@ -1876,10 +1877,10 @@ bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* type
 				Array<char> log_buf(*g_ffr.allocator);
 				log_buf.resize(log_len);
 				CHECK_GL(glGetShaderInfoLog(shd, log_len, &log_len, &log_buf[0]));
-				g_log_error.log("Renderer") << name << " - " << shaderTypeToString(types[i]) << ": " << &log_buf[0];
+				logError("Renderer") << name << " - " << shaderTypeToString(types[i]) << ": " << &log_buf[0];
 			}
 			else {
-				g_log_error.log("Renderer") << "Failed to compile shader " << name << " - " << shaderTypeToString(types[i]);
+				logError("Renderer") << "Failed to compile shader " << name << " - " << shaderTypeToString(types[i]);
 			}
 			CHECK_GL(glDeleteShader(shd));
 			return false;
@@ -1900,10 +1901,10 @@ bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* type
 			Array<char> log_buf(*g_ffr.allocator);
 			log_buf.resize(log_len);
 			CHECK_GL(glGetProgramInfoLog(prg, log_len, &log_len, &log_buf[0]));
-			g_log_error.log("Renderer") << name << ": " << &log_buf[0];
+			logError("Renderer") << name << ": " << &log_buf[0];
 		}
 		else {
-			g_log_error.log("Renderer") << "Failed to link program " << name;
+			logError("Renderer") << "Failed to link program " << name;
 		}
 		CHECK_GL(glDeleteProgram(prg));
 		return false;
@@ -1915,7 +1916,7 @@ bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* type
 	CHECK_GL(glGetProgramiv(prg, GL_ACTIVE_UNIFORMS, &uniforms_count));
 	if(uniforms_count > lengthOf(g_ffr.programs[id].uniforms)) {
 		uniforms_count = lengthOf(g_ffr.programs[id].uniforms);
-		g_log_error.log("Renderer") << "Too many uniforms per program, not all will be used.";
+		logError("Renderer") << "Too many uniforms per program, not all will be used.";
 	}
 	g_ffr.programs[id].uniforms_count = 0;
 	for(int i = 0; i < uniforms_count; ++i) {
@@ -1963,10 +1964,10 @@ static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum seve
 {
 	if(GL_DEBUG_TYPE_PUSH_GROUP == type || type == GL_DEBUG_TYPE_POP_GROUP) return;
 	if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_PERFORMANCE) {
-		g_log_error.log("GL") << message;
+		logError("GL") << message;
 	}
 	else {
-		//g_log_info.log("GL") << message;
+		//logInfo("GL") << message;
 	}
 }
 
