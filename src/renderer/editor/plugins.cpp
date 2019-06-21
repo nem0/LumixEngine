@@ -11,7 +11,6 @@
 #include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/job_system.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
@@ -214,7 +213,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void saveMaterial(Material* material)
 	{
-		if (IOutputStream* file = m_app.getAssetBrowser().beginSaveResource(*material)) {
+		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(*material)) {
 			bool success = true;
 			if (!material->save(*file))
 			{

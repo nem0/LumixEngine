@@ -9,7 +9,6 @@
 #include "engine/engine.h"
 #include "engine/hash_map.h"
 #include "engine/iplugin.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
@@ -142,36 +141,6 @@ class PrefabSystemImpl final : public PrefabSystem
 			destroyEntityRecursive(universe.getFirstChild(e));
 			universe.destroyEntity(e);
 			editor.destroyEntityGUID(e);
-		}
-
-
-		void serialize(JsonSerializer& serializer) override
-		{
-			serializer.serialize("position_x", position.x);
-			serializer.serialize("position_y", position.y);
-			serializer.serialize("position_z", position.z);
-			serializer.serialize("rotation_x", rotation.x);
-			serializer.serialize("rotation_y", rotation.y);
-			serializer.serialize("rotation_z", rotation.z);
-			serializer.serialize("rotation_w", rotation.w);
-			serializer.serialize("scale", scale);
-			serializer.serialize("path", prefab->getPath().c_str());
-		}
-
-
-		void deserialize(JsonDeserializer& serializer) override
-		{
-			serializer.deserialize("position_x", position.x, 0);
-			serializer.deserialize("position_y", position.y, 0);
-			serializer.deserialize("position_z", position.z, 0);
-			serializer.deserialize("rotation_x", rotation.x, 0);
-			serializer.deserialize("rotation_y", rotation.y, 0);
-			serializer.deserialize("rotation_z", rotation.z, 0);
-			serializer.deserialize("rotation_w", rotation.w, 0);
-			serializer.deserialize("scale", scale, 0);
-			char path[MAX_PATH_LENGTH];
-			serializer.deserialize("path_hash", path, lengthOf(path), "");
-			prefab = editor.getEngine().getResourceManager().load<PrefabResource>(Path(path));
 		}
 
 

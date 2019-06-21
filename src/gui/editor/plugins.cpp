@@ -6,13 +6,13 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
+#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
@@ -181,9 +181,12 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 
 	void saveSprite(Sprite& sprite)
 	{
-		if (IOutputStream* file = app.getAssetBrowser().beginSaveResource(sprite))
+		if (OutputMemoryStream* file = app.getAssetBrowser().beginSaveResource(sprite))
 		{
-			JsonSerializer serializer(*file, sprite.getPath());
+			struct : ISaveEntityGUIDMap {
+				EntityGUID get(EntityPtr entity) override { return INVALID_ENTITY_GUID; }
+			} dummy_map;
+			TextSerializer serializer(*file, dummy_map);
 			bool success = true;
 			if (!sprite.save(serializer))
 			{

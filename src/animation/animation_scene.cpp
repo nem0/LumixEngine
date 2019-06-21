@@ -24,6 +24,9 @@
 namespace Lumix
 {
 
+class Animation;
+class Engine;
+class Universe;
 
 enum class AnimationSceneVersion
 {
@@ -39,12 +42,6 @@ static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animabl
 static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
 static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
-
-
-class Animation;
-class Engine;
-class JsonSerializer;
-class Universe;
 
 
 struct AnimationSceneImpl final : public AnimationScene

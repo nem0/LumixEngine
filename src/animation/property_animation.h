@@ -7,7 +7,7 @@ namespace Lumix
 {
 
 
-class JsonSerializer;
+struct TextSerializer;
 namespace Reflection { struct  PropertyBase; }
 
 
@@ -29,7 +29,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 	Curve& addCurve();
-	bool save(JsonSerializer& serializer);
+	bool save(TextSerializer& serializer);
 
 	IAllocator& m_allocator;
 	Array<Curve> curves;

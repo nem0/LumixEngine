@@ -13,11 +13,12 @@
 namespace Lumix
 {
 
-class Material;
-class WorldEditor;
 struct Action;
 class FileSystemWatcher;
+class Material;
+class OutputMemoryStream;
 class StudioApp;
+class WorldEditor;
 
 
 class LUMIX_EDITOR_API AssetBrowser
@@ -52,8 +53,8 @@ public:
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
 	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
-	IOutputStream* beginSaveResource(Resource& resource);
-	void endSaveResource(Resource& resource, IOutputStream& file, bool success);
+	OutputMemoryStream* beginSaveResource(Resource& resource);
+	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);
 
 public:
 	bool m_is_open;

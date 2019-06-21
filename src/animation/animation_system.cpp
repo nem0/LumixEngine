@@ -12,6 +12,9 @@
 namespace Lumix
 {
 
+class Animation;
+class Engine;
+class Universe;
 
 enum class AnimationSceneVersion
 {
@@ -62,12 +65,6 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 		return res->m_sets_names[index];
 	}
 };
-
-
-class Animation;
-class Engine;
-class JsonSerializer;
-class Universe;
 
 
 template <typename T>

@@ -1,9 +1,9 @@
 #include "animation/property_animation.h"
 #include "engine/crc32.h"
 #include "engine/allocator.h"
-#include "engine/json_serializer.h"
 #include "engine/log.h"
 #include "engine/reflection.h"
+#include "engine/serializer.h"
 
 
 namespace Lumix
@@ -28,28 +28,22 @@ PropertyAnimation::Curve& PropertyAnimation::addCurve()
 }
 
 
-bool PropertyAnimation::save(JsonSerializer& serializer)
+bool PropertyAnimation::save(TextSerializer& serializer)
 {
 	if (!isReady()) return false;
 
-	serializer.beginArray();
+	serializer.write("count", curves.size());
 	for (Curve& curve : curves)
 	{
-		serializer.beginObject();
-		serializer.serialize("component", Reflection::getComponent(curve.cmp_type)->name);
-		serializer.serialize("property", curve.property->name);
-		serializer.beginArray("keys");
+		serializer.write("component", Reflection::getComponent(curve.cmp_type)->name);
+		serializer.write("property", curve.property->name);
+		serializer.write("keys_count", curve.frames.size());
 		for (int i = 0; i < curve.frames.size(); ++i)
 		{
-			serializer.beginObject();
-			serializer.serialize("frame", curve.frames[i]);
-			serializer.serialize("value", curve.values[i]);
-			serializer.endObject();
+			serializer.write("frame", curve.frames[i]);
+			serializer.write("value", curve.values[i]);
 		}
-		serializer.endArray();
-		serializer.endObject();
 	}
-	serializer.endArray();
 
 	return true;
 }
@@ -58,82 +52,30 @@ bool PropertyAnimation::save(JsonSerializer& serializer)
 bool PropertyAnimation::load(u64 size, const u8* mem)
 {
 	InputMemoryStream file(mem, size);
-	JsonDeserializer serializer(file, getPath(), m_allocator);
-	if (serializer.isError()) return false;
+	struct : ILoadEntityGUIDMap { 
+		EntityPtr get(EntityGUID guid) override { ASSERT(false); return INVALID_ENTITY; }
+	} dummy_map;
+	TextDeserializer serializer(file, dummy_map);
 	
-	serializer.deserializeArrayBegin();
-	while (!serializer.isArrayEnd())
-	{
-		serializer.nextArrayItem();
+	int count;
+	serializer.read(&count);
+	for (int i = 0; i < count; ++i) {
 		Curve& curve = curves.emplace(m_allocator);
-		serializer.deserializeObjectBegin();
-		u32 prop_hash = 0;
-		while (!serializer.isObjectEnd())
-		{
-			char tmp[32];
-			serializer.deserializeLabel(tmp, lengthOf(tmp));
-			if (equalIStrings(tmp, "component"))
-			{
-				serializer.deserialize(tmp, lengthOf(tmp), "");
-				curve.cmp_type = Reflection::getComponentType(tmp);
-			}
-			else if (equalIStrings(tmp, "property"))
-			{
-				serializer.deserialize(tmp, lengthOf(tmp), "");
-				prop_hash = crc32(tmp);
-			}
-			else if (equalIStrings(tmp, "keys"))
-			{
-				serializer.deserializeArrayBegin();
-				while (!serializer.isArrayEnd())
-				{
-					serializer.nextArrayItem();
-					serializer.deserializeObjectBegin();
-					while (!serializer.isObjectEnd())
-					{
-						serializer.deserializeLabel(tmp, lengthOf(tmp));
-						if (equalIStrings(tmp, "frame"))
-						{
-							int frame;
-							serializer.deserialize(frame, 0);
-							curve.frames.push(frame);
-						}
-						else if (equalIStrings(tmp, "value"))
-						{
-							float value;
-							serializer.deserialize(value, 0);
-							curve.values.push(value);
-						}
-						else
-						{
-							logError("Animation") << "Unknown key " << tmp;
-							curves.clear();
-							return false;
-						}
-					}
-					if (curve.values.size() != curve.frames.size())
-					{
-						logError("Animation") << "Key without " << (curve.values.size() < curve.frames.size() ? "value" : "frame");
-						curves.clear();
-						return false;
-					}
-
-					serializer.deserializeObjectEnd();
-				}
-				serializer.deserializeArrayEnd();
-			}
-			else
-			{
-				logError("Animation") << "Unknown key " << tmp;
-				curves.clear();
-				return false;
-			}
+		char tmp[32];
+		serializer.read(tmp, lengthOf(tmp));
+		curve.cmp_type = Reflection::getComponentType(tmp);
+		serializer.read(tmp, lengthOf(tmp));
+		u32 prop_hash = crc32(tmp);
+		
+		int keys_count;
+		serializer.read(&keys_count);
+		curve.frames.resize(keys_count);
+		curve.values.resize(keys_count);
+		for (int j = 0; j < keys_count; ++j) {
+			serializer.read(&curve.frames[i]);
+			serializer.read(&curve.values[i]);
 		}
-		serializer.deserializeObjectEnd();
-		curve.property = Reflection::getProperty(curve.cmp_type, prop_hash);
 	}
-	serializer.deserializeArrayEnd();
-
 	return true;
 }
 
