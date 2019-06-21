@@ -9,11 +9,11 @@
 #include "engine/math.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
+#include "engine/os.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "culling_system.h"
@@ -230,7 +230,6 @@ struct PipelineImpl final : Pipeline
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
 	{
-		m_timer = Timer::create(m_allocator);
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
@@ -315,7 +314,6 @@ struct PipelineImpl final : Pipeline
 		for(ShaderRef& shader : m_shaders) {
 			shader.res->getResourceManager().unload(*shader.res);
 		}
-		Timer::destroy(m_timer);
 		if (m_resource) m_resource->getResourceManager().unload(*m_resource);
 	}
 
@@ -605,7 +603,7 @@ struct PipelineImpl final : Pipeline
 		global_state.camera_inv_view = view.fastInverted();
 		global_state.camera_view_projection = projection * view;
 		global_state.camera_inv_view_projection = global_state.camera_view_projection.inverted();
-		global_state.time = m_timer->getTimeSinceStart();
+		global_state.time = m_timer.getTimeSinceStart();
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 
@@ -3175,7 +3173,7 @@ struct PipelineImpl final : Pipeline
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
-	Timer* m_timer;
+	OS::Timer m_timer;
 	ffr::BufferHandle m_global_state_buffer;
 	ffr::BufferHandle m_pass_state_buffer;
 	CameraParams m_shadow_camera_params[4];

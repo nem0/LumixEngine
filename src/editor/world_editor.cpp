@@ -26,7 +26,6 @@
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/stream.h"
-#include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "ieditor_command.h"
@@ -3027,7 +3026,7 @@ public:
 			return;
 		}
 
-		Timer* timer = Timer::create(m_allocator);
+		OS::Timer timer;
 		g_log_info.log("Editor") << "Parsing universe...";
 		InputMemoryStream blob(file.getBuffer(), (int)file.size());
 		u32 hash = 0;
@@ -3048,7 +3047,6 @@ public:
 		}
 		if (crc32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
 		{
-			Timer::destroy(timer);
 			g_log_error.log("Editor") << "Corrupted file.";
 			newUniverse();
 			m_is_loading = false;
@@ -3058,13 +3056,12 @@ public:
 		if (m_engine->deserialize(*m_universe, blob))
 		{
 			m_prefab_system->deserialize(blob);
-			g_log_info.log("Editor") << "Universe parsed in " << timer->getTimeSinceStart() << " seconds";
+			g_log_info.log("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
 		}
 		else
 		{
 			newUniverse();
 		}
-		Timer::destroy(timer);
 		m_is_loading = false;
 	}
 
@@ -3128,17 +3125,15 @@ public:
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
-		const char* plugins[] = { "steam" 
+		const char* plugins[] = { ""
 			#ifdef LUMIXENGINE_PLUGINS
 				, LUMIXENGINE_PLUGINS
 			#endif
 		};
 
 		PluginManager& plugin_manager = m_engine->getPluginManager();
-		for (auto* plugin_name : plugins)
-		{
-			if (!plugin_manager.load(plugin_name))
-			{
+		for (auto* plugin_name : plugins) {
+			if (plugin_name[0] && !plugin_manager.load(plugin_name)) {
 				g_log_info.log("Editor") << plugin_name << " plugin has not been loaded";
 			}
 		}

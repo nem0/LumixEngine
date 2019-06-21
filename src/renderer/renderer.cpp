@@ -15,7 +15,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/timer.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "renderer/font_manager.h"
@@ -113,7 +112,7 @@ struct GPUProfiler
 
 	u64 toCPUTimestamp(u64 gpu_timestamp) const
 	{
-		return u64(gpu_timestamp * (Timer::getFrequency() / double(1'000'000'000))) + m_gpu_to_cpu_offset;
+		return u64(gpu_timestamp * (OS::Timer::getFrequency() / double(1'000'000'000))) + m_gpu_to_cpu_offset;
 	}
 
 
@@ -121,9 +120,9 @@ struct GPUProfiler
 	{
 		ffr::QueryHandle q = ffr::createQuery();
 		ffr::queryTimestamp(q);
-		const u64 cpu_timestamp = Timer::getRawTimestamp();
+		const u64 cpu_timestamp = OS::Timer::getRawTimestamp();
 		const u64 gpu_timestamp = ffr::getQueryResult(q);
-		m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (Timer::getFrequency() / double(1'000'000'000)));
+		m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (OS::Timer::getFrequency() / double(1'000'000'000)));
 		ffr::destroy(q);
 	}
 
