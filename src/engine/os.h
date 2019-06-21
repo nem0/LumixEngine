@@ -376,6 +376,23 @@ enum class Keycode : u8
 	INVALID = 0,
 	MAX = 0xff
 };
+	
+
+struct LUMIX_ENGINE_API Timer
+{
+	Timer();
+
+	float tick();
+	float getTimeSinceStart();
+	float getTimeSinceTick();
+
+	static u64 getRawTimestamp();
+	static u64 getFrequency();
+
+	u64 frequency;
+	u64 last_tick;
+	u64 first_tick;
+};
 
 
 } // namespace OS

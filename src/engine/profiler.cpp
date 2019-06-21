@@ -2,11 +2,11 @@
 #include "engine/fibers.h"
 #include "engine/hash_map.h"
 #include "engine/allocator.h"
-#include "engine/timer.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
+#include "engine/os.h"
 #include "profiler.h"
 #include <cstring>
 
@@ -92,7 +92,6 @@ static struct Instance
 {
 	Instance()
 		: contexts(allocator)
-		, timer(Timer::create(allocator))
 		, trace_task(allocator)
 		, global_context(allocator)
 	{
@@ -104,7 +103,6 @@ static struct Instance
 	{
 		CloseTrace(trace_task.open_handle);
 		trace_task.destroy();
-		Timer::destroy(timer);
 	}
 
 
@@ -162,7 +160,7 @@ static struct Instance
 	DefaultAllocator allocator;
 	Array<ThreadContext*> contexts;
 	MT::SpinMutex mutex;
-	Timer* timer;
+	OS::Timer timer;
 	bool paused = false;
 	bool context_switches_enabled = false;
 	u64 paused_time = 0;
@@ -224,7 +222,7 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 #pragma pack()
 	v.header.type = type;
 	v.header.size = sizeof(v);
-	v.header.time = Timer::getRawTimestamp();
+	v.header.time = OS::Timer::getRawTimestamp();
 	v.value = value;
 
 	MT::SpinLock lock(ctx.mutex);
@@ -257,7 +255,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	header.type = type;
 	ASSERT(sizeof(header) + size <= 0xffff);
 	header.size = u16(sizeof(header) + size);
-	header.time = Timer::getRawTimestamp();
+	header.time = OS::Timer::getRawTimestamp();
 
 	MT::SpinLock lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
@@ -457,7 +455,7 @@ void endBlock()
 
 u64 frequency()
 {
-	return g_instance.timer->getFrequency();
+	return g_instance.timer.getFrequency();
 }
 
 
@@ -469,7 +467,7 @@ bool contextSwitchesEnabled()
 
 void frame()
 {
-	const u64 n = Timer::getRawTimestamp();
+	const u64 n = OS::Timer::getRawTimestamp();
 	if (g_instance.last_frame_time != 0) {
 		g_instance.last_frame_duration = n - g_instance.last_frame_time;
 	}
@@ -557,7 +555,7 @@ ThreadState::~ThreadState()
 void pause(bool paused)
 {
 	g_instance.paused = paused;
-	if (paused) g_instance.paused_time = Timer::getRawTimestamp();
+	if (paused) g_instance.paused_time = OS::Timer::getRawTimestamp();
 }
 
 

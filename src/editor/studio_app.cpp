@@ -24,7 +24,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "engine/viewport.h"
 #include "imgui/imgui.h"
@@ -157,7 +156,6 @@ public:
 		, m_allocator(m_main_allocator)
 		, m_universes(m_allocator)
 		, m_events(m_allocator)
-		, m_fps_timer(nullptr)
 	{
 		JobSystem::init(MT::getCPUsCount(), m_allocator);
 	}
@@ -240,14 +238,14 @@ public:
 		update();
 
 		if (m_sleep_when_inactive && OS::getFocused() != m_window) {
-			const float frame_time = m_fps_timer->tick();
+			const float frame_time = m_fps_timer.tick();
 			const float wanted_fps = 5.0f;
 
 			if (frame_time < 1 / wanted_fps) {
 				PROFILE_BLOCK("sleep");
 				MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
 			}
-			m_fps_timer->tick();
+			m_fps_timer.tick();
 		}
 
 		Profiler::frame();
@@ -329,13 +327,11 @@ public:
 		m_sleep_when_inactive = shouldSleepWhenInactive();
 
 		checkScriptCommandLine();
-		m_fps_timer = Timer::create(m_allocator);
 	}
 
 
 	~StudioAppImpl()
 	{
-		Timer::destroy(m_fps_timer);
 		if (m_watched_plugin.watcher) FileSystemWatcher::destroy(m_watched_plugin.watcher);
 
 		saveSettings();
@@ -2762,7 +2758,7 @@ public:
 	Settings m_settings;
 	Array<OS::Event> m_events;
 	Vec2 m_mouse_move;
-	Timer* m_fps_timer;
+	OS::Timer m_fps_timer;
 	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];

@@ -9,7 +9,6 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/timer.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "imgui/imgui.h"
@@ -105,8 +104,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 		m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 		m_filter[0] = 0;
 		m_resource_filter[0] = 0;
-
-		m_timer = Timer::create(engine.getAllocator());
 	}
 
 
@@ -119,7 +116,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 
 		m_allocation_root->clear(m_allocator);
 		LUMIX_DELETE(m_allocator, m_allocation_root);
-		Timer::destroy(m_timer);
 	}
 
 
@@ -203,7 +199,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	char m_resource_filter[100];
 	Array<Log> m_logs;
 	Engine& m_engine;
-	Timer* m_timer;
+	OS::Timer m_timer;
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
 	bool m_gpu_open = false;
@@ -528,7 +524,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	if (ImGui::Checkbox("Pause", &m_is_paused)) {
 		Profiler::pause(m_is_paused);
 		m_view_offset = 0;
-		m_paused_time = Timer::getRawTimestamp();
+		m_paused_time = OS::Timer::getRawTimestamp();
 	}
 
 	Profiler::GlobalState global;
@@ -563,7 +559,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	}
 
 
-	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : Timer::getRawTimestamp();
+	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : OS::Timer::getRawTimestamp();
 	const u64 view_start = view_end < m_zoom ? 0 : view_end - m_zoom;
 	float h = 0;
 	for (int i = 0; i < contexts_count; ++i) {
@@ -997,7 +993,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		m_is_paused = true;
 		Profiler::pause(m_is_paused);
 		m_view_offset = 0;
-		m_paused_time = Timer::getRawTimestamp();
+		m_paused_time = OS::Timer::getRawTimestamp();
 	}
 
 	if (ImGui::CollapsingHeader("Visible blocks")) {

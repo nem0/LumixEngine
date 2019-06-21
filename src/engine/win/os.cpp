@@ -1055,5 +1055,64 @@ void* getLibrarySymbol(void* handle, const char* name)
 	return (void*)GetProcAddress((HMODULE)handle, name);
 }
 
+Timer::Timer()
+{
+	LARGE_INTEGER f, n;
+
+	QueryPerformanceFrequency(&f);
+	QueryPerformanceCounter(&n);
+	first_tick = last_tick = n.QuadPart;
+}
+
+
+float Timer::getTimeSinceStart()
+{
+	LARGE_INTEGER n;
+	QueryPerformanceCounter(&n);
+	const u64 tick = n.QuadPart;
+	float delta = static_cast<float>((double)(tick - first_tick) / (double)frequency);
+	return delta;
+}
+
+
+float Timer::getTimeSinceTick()
+{
+	LARGE_INTEGER n;
+	QueryPerformanceCounter(&n);
+	const u64 tick = n.QuadPart;
+	float delta = static_cast<float>((double)(tick - last_tick) / (double)frequency);
+	return delta;
+}
+
+
+float Timer::tick()
+{
+	LARGE_INTEGER n;
+	QueryPerformanceCounter(&n);
+	const u64 tick = n.QuadPart;
+	float delta = static_cast<float>((double)(tick - last_tick) / (double)frequency);
+	last_tick = tick;
+	return delta;
+}
+
+
+u64 Timer::getFrequency()
+{
+	static u64 freq = []() {
+		LARGE_INTEGER f;
+		QueryPerformanceFrequency(&f);
+		return f.QuadPart;
+	}();
+	return freq;
+}
+
+
+u64 Timer::getRawTimestamp()
+{
+	LARGE_INTEGER tick;
+	QueryPerformanceCounter(&tick);
+	return tick.QuadPart;
+}
+
 
 } // namespace Lumix::OS

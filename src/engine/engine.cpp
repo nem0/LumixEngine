@@ -18,7 +18,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/timer.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include <imgui/imgui.h>
@@ -485,8 +484,6 @@ public:
 		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
 
-		m_timer = Timer::create(m_allocator);
-		m_fps_timer = Timer::create(m_allocator);
 		m_fps_frame = 0;
 		Reflection::init(m_allocator);
 
@@ -1205,8 +1202,6 @@ public:
 		}
 
 		Reflection::shutdown();
-		Timer::destroy(m_timer);
-		Timer::destroy(m_fps_timer);
 		PluginManager::destroy(m_plugin_manager);
 		if (m_input_system) InputSystem::destroy(*m_input_system);
 		FileSystem::destroy(m_file_system);
@@ -1339,12 +1334,12 @@ public:
 	{
 		PROFILE_FUNCTION();
 		++m_fps_frame;
-		if (m_fps_timer->getTimeSinceTick() > 0.5f)
+		if (m_fps_timer.getTimeSinceTick() > 0.5f)
 		{
-			m_fps = m_fps_frame / m_fps_timer->tick();
+			m_fps = m_fps_frame / m_fps_timer.tick();
 			m_fps_frame = 0;
 		}
-		float dt = m_timer->tick() * m_time_multiplier;
+		float dt = m_timer.tick() * m_time_multiplier;
 		if (m_next_frame)
 		{
 			m_paused = false;
@@ -1596,8 +1591,8 @@ private:
 	PluginManager* m_plugin_manager;
 	PrefabResourceManager m_prefab_resource_manager;
 	InputSystem* m_input_system;
-	Timer* m_timer;
-	Timer* m_fps_timer;
+	OS::Timer m_timer;
+	OS::Timer m_fps_timer;
 	int m_fps_frame;
 	float m_time_multiplier;
 	float m_fps;
