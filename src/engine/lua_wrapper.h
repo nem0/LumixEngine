@@ -5,6 +5,7 @@
 #include "engine/math.h"
 #include "engine/metaprogramming.h"
 #include "engine/path.h"
+#include "engine/string.h"
 #include <lua.hpp>
 #include <lauxlib.h> // must be after lua.hpp
 
@@ -76,7 +77,7 @@ inline bool pcall(lua_State* L, int nargs)
 	lua_pushcfunction(L, traceback);
 	lua_insert(L, -2 - nargs);
 	if (lua_pcall(L, nargs, 0, -2 - nargs) != 0) {
-		g_log_error.log("Engine") << lua_tostring(L, -1);
+		logError("Engine") << lua_tostring(L, -1);
 		lua_pop(L, 2);
 		return false;
 	}
@@ -92,13 +93,13 @@ inline bool execute(lua_State* L
 {
 	lua_pushcfunction(L, traceback);
 	if (luaL_loadbuffer(L, content.begin, content.length(), name) != 0) {
-		g_log_error.log("Engine") << name << ": " << lua_tostring(L, -1);
+		logError("Engine") << name << ": " << lua_tostring(L, -1);
 		lua_pop(L, 2);
 		return false;
 	}
 
 	if (lua_pcall(L, 0, nresults, -2) != 0) {
-		g_log_error.log("Engine") << lua_tostring(L, -1);
+		logError("Engine") << lua_tostring(L, -1);
 		lua_pop(L, 2);
 		return false;
 	}
@@ -914,14 +915,13 @@ template <typename C, typename T, T t> int wrapMethod(lua_State* L)
 }
 
 
-
 template <typename C, typename T, T t> int wrapMethodClosure(lua_State* L)
 {
 	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
 	if (!isType<C>(L, index))
 	{
-		g_log_error.log("Lua") << "Invalid Lua closure";
+		logError("Lua") << "Invalid Lua closure";
 		ASSERT(false);
 		return 0;
 	}

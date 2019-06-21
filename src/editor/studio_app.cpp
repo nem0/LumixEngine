@@ -13,6 +13,7 @@
 #include "engine/allocator.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/geometry.h"
 #include "engine/input_system.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
@@ -25,7 +26,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "imgui/imgui.h"
 #include "log_ui.h"
 #include "profiler_ui.h"
@@ -65,7 +65,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0; // [env]
 		if (errors)
 		{
-			g_log_error.log("Editor") << filename << ": " << lua_tostring(L, -1);
+			logError("Editor") << filename << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
 		}
 		lua_pop(L, 1); // []
@@ -108,7 +108,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 		{
 			if (lua_pcall(L, 0, 0, 0) != 0)
 			{
-				g_log_error.log("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
+				logError("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
 				lua_pop(L, 1);
 			}
 		}
@@ -536,14 +536,14 @@ public:
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->type, string(label, m_allocator));
+		m_component_labels.insert(plugin->type, String(label, m_allocator));
 	}
 
 
 	void registerComponent(const char* id, IAddComponentPlugin& plugin) override
 	{
 		addPlugin(plugin);
-		m_component_labels.insert(Reflection::getComponentType(id), string(plugin.getLabel(), m_allocator));
+		m_component_labels.insert(Reflection::getComponentType(id), String(plugin.getLabel(), m_allocator));
 	}
 
 
@@ -583,7 +583,7 @@ public:
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
 
-		m_component_labels.insert(plugin->type, string(label, m_allocator));
+		m_component_labels.insert(plugin->type, String(label, m_allocator));
 	}
 
 
@@ -868,7 +868,7 @@ public:
 	{
 		if (m_editor->isGameMode())
 		{
-			g_log_error.log("Editor") << "Could not save while the game is running";
+			logError("Editor") << "Could not save while the game is running";
 			return;
 		}
 
@@ -909,7 +909,7 @@ public:
 	{
 		if (m_editor->isGameMode())
 		{
-			g_log_error.log("Editor") << "Could not save while the game is running";
+			logError("Editor") << "Could not save while the game is running";
 			return;
 		}
 
@@ -1798,7 +1798,7 @@ public:
 
 			if (!loaded_plugin)
 			{
-				g_log_error.log("Editor") << "Could not load plugin " << src << " requested by command line";
+				logError("Editor") << "Could not load plugin " << src << " requested by command line";
 			}
 			else if (is_full_path && !m_watched_plugin.watcher)
 			{
@@ -1858,7 +1858,7 @@ public:
 
 		if (!copyPlugin(src, m_watched_plugin.iteration, copy_path)) return;
 
-		g_log_info.log("Editor") << "Trying to reload plugin " << m_watched_plugin.basename;
+		logInfo("Editor") << "Trying to reload plugin " << m_watched_plugin.basename;
 
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(16 * 1024);
@@ -1881,7 +1881,7 @@ public:
 		m_watched_plugin.plugin = plugin_manager.load(copy_path);
 		if (!m_watched_plugin.plugin)
 		{
-			g_log_error.log("Editor") << "Failed to load plugin " << copy_path << ". Reload failed.";
+			logError("Editor") << "Failed to load plugin " << copy_path << ". Reload failed.";
 			return;
 		}
 
@@ -1893,7 +1893,7 @@ public:
 			scene->deserialize(input_blob);
 			if (m_editor->isGameMode()) scene->startGame();
 		}
-		g_log_info.log("Editor") << "Finished reloading plugin.";
+		logInfo("Editor") << "Finished reloading plugin.";
 	}
 
 
@@ -2026,7 +2026,7 @@ public:
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 		if (errors)
 		{
-			g_log_error.log("Editor") << script_name << ": " << lua_tostring(L, -1);
+			logError("Editor") << script_name << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
 		}
 	}
@@ -2119,7 +2119,7 @@ public:
 		void notSupported(const Reflection::PropertyBase& prop)
 		{
 			if (!equalStrings(property_name, prop.name)) return;
-			g_log_error.log("Lua Script") << "Property " << prop.name << " has unsupported type";
+			logError("Lua Script") << "Property " << prop.name << " has unsupported type";
 		}
 
 
@@ -2290,7 +2290,7 @@ public:
 				}
 				else
 				{
-					g_log_error.log("Editor") << "Could not open " << tmp;
+					logError("Editor") << "Could not open " << tmp;
 				}
 				break;
 			}
@@ -2453,14 +2453,14 @@ public:
 
 		if (infos.size() == 0)
 		{
-			g_log_error.log("Editor") << "No files found while trying to create " << dest;
+			logError("Editor") << "No files found while trying to create " << dest;
 			return;
 		}
 
 		OS::OutputFile file;
 		if (!file.open(dest))
 		{
-			g_log_error.log("Editor") << "Could not create " << dest;
+			logError("Editor") << "Could not create " << dest;
 			return;
 		}
 
@@ -2487,7 +2487,7 @@ public:
 			if (!m_editor->getEngine().getFileSystem().open(info.path, &src))
 			{
 				file.close();
-				g_log_error.log("Editor") << "Could not open " << info.path;
+				logError("Editor") << "Could not open " << info.path;
 				return;
 			}
 			u8 buf[4096];
@@ -2497,7 +2497,7 @@ public:
 				if (!src.read(buf, batch_size))
 				{
 					file.close();
-					g_log_error.log("Editor") << "Could not read " << info.path;
+					logError("Editor") << "Could not read " << info.path;
 					return;
 				}
 				file.write(buf, batch_size);
@@ -2521,7 +2521,7 @@ public:
 			StaticString<MAX_PATH_LENGTH> src(src_dir, file);
 			if (!OS::copyFile(src, tmp))
 			{
-				g_log_error.log("Editor") << "Failed to copy " << src << " to " << tmp;
+				logError("Editor") << "Failed to copy " << src << " to " << tmp;
 			}
 		}
 
@@ -2529,7 +2529,7 @@ public:
 		{
 			if (!plugin->packData(m_pack.dest_dir))
 			{
-				g_log_error.log("Editor") << "Plugin " << plugin->getName() << " failed to pack data.";
+				logError("Editor") << "Plugin " << plugin->getName() << " failed to pack data.";
 			}
 		}
 	}
@@ -2556,7 +2556,7 @@ public:
 		}
 		else
 		{
-			g_log_warning.log("Editor") << "Failed to open " << path;
+			logWarning("Editor") << "Failed to open " << path;
 		}
 	}
 
@@ -2743,7 +2743,7 @@ public:
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 	Array<StaticString<MAX_PATH_LENGTH>> m_universes;
 	AddCmpTreeNode m_add_cmp_root;
-	HashMap<ComponentType, string> m_component_labels;
+	HashMap<ComponentType, String> m_component_labels;
 	WorldEditor* m_editor;
 	Action* m_custom_pivot_action;
 	bool m_confirm_exit;

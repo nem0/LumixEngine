@@ -2,7 +2,6 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
-#include "engine/lifo_allocator.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/profiler.h"

@@ -1,6 +1,5 @@
 #include "engine/log.h"
 #include "engine/lumix.h"
-#include "engine/path.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 
@@ -22,7 +21,7 @@ void ResourceManager::destroy()
 		Resource* resource = iter.value();
 		if (!resource->isEmpty())
 		{
-			g_log_error.log("Engine") << "Leaking resource " << resource->getPath().c_str() << "\n";
+			logError("Engine") << "Leaking resource " << resource->getPath().c_str() << "\n";
 		}
 		destroyResource(*resource);
 	}

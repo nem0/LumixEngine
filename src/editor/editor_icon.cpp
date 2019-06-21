@@ -1,11 +1,11 @@
 #include "editor_icon.h"
 #include "engine/engine.h"
+#include "engine/geometry.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "render_interface.h"
 #include "world_editor.h"
 #include <cmath>

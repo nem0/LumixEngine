@@ -8,12 +8,12 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/geometry.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/path_utils.h"
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "physics/physics_geometry.h"
 #include "physics/physics_scene.h"
 #include "renderer/model.h"
@@ -383,7 +383,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
 			if (!OS::copyFile(tmp, dest))
 			{
-				g_log_error.log("Physics") << "Failed to copy " << tmp << " to " << dest;
+				logError("Physics") << "Failed to copy " << tmp << " to " << dest;
 				return false;
 			}
 		}

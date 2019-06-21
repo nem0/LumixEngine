@@ -108,7 +108,7 @@ struct LUMIX_RENDERER_API Mesh
 	FlagSet<Flags, u8> flags;
 	u32 sort_key;
 	u8 layer;
-	string name;
+	String name;
 	Material* material;
 	RenderData* render_data;
 	static u32 s_last_sort_key;
@@ -162,8 +162,8 @@ public:
 		{
 		}
 
-		string name;
-		string parent;
+		String name;
+		String parent;
 		LocalRigidTransform transform;
 		LocalRigidTransform relative_transform;
 		LocalRigidTransform inv_bind_transform;

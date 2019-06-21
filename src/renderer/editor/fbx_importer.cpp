@@ -586,7 +586,7 @@ bool FBXImporter::setSource(const char* base_dir, const char* filename)
 	scene = ofbx::load(&data[0], data.size());
 	if (!scene)
 	{
-		g_log_error.log("FBX") << "Failed to import \"" << fullpath << ": " << ofbx::getError();
+		logError("FBX") << "Failed to import \"" << fullpath << ": " << ofbx::getError();
 		return false;
 	}
 
@@ -653,7 +653,7 @@ bool FBXImporter::writeBillboardMaterial(const char* output_dir, const char* src
 	PathBuilder output_material_name(output_dir, hash, ".res");
 	if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE))
 	{
-		g_log_error.log("FBX") << "Failed to create " << output_material_name;
+		logError("FBX") << "Failed to create " << output_material_name;
 		return false;
 	}
 	file << "{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"\n";
@@ -743,7 +743,7 @@ void FBXImporter::writeTextures(const char* fbx_path, const ImportConfig& cfg)
 			int image_width, image_height, image_comp;
 			stbi_uc* data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
 			if (!data) {
-				g_log_error.log("Renderer") << "Could not load image " << tex.src;
+				logError("Renderer") << "Could not load image " << tex.src;
 				continue;
 			}
 			
@@ -774,7 +774,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		const StaticString<MAX_PATH_LENGTH> path(cfg.base_path, cfg.output_dir, hash, ".res");
 		if (!out_file.open(path))
 		{
-			g_log_error.log("FBX") << "Failed to create " << path;
+			logError("FBX") << "Failed to create " << path;
 			continue;
 		}
 
@@ -989,7 +989,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, src_info.m_dir, anim.output_filename, split->name, ".ani");
 			if (!out_file.open(tmp))
 			{
-				g_log_error.log("FBX") << "Failed to create " << tmp;
+				logError("FBX") << "Failed to create " << tmp;
 				continue;
 			}
 			Animation::Header header;
@@ -1708,7 +1708,7 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 	OS::OutputFile file;
 	if (!file.open(phy_path))
 	{
-		g_log_error.log("Editor") << "Could not create file " << phy_path;
+		logError("Editor") << "Could not create file " << phy_path;
 		return false;
 	}
 
@@ -1814,7 +1814,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		const StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, crc32(hash_str), ".res");
 		OS::makePath(cfg.output_dir);
 		if (!out_file.open(out_path)) {
-			g_log_error.log("FBX") << "Failed to create " << out_path;
+			logError("FBX") << "Failed to create " << out_path;
 			return;
 		}
 
@@ -1862,7 +1862,7 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 	OS::makePath(cfg.output_dir);
 	if (!out_file.open(out_path))
 	{
-		g_log_error.log("FBX") << "Failed to create " << out_path;
+		logError("FBX") << "Failed to create " << out_path;
 		return;
 	}
 

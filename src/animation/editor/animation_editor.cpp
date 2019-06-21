@@ -621,7 +621,7 @@ void AnimationEditor::duplicateMask(int index)
 		auto* cmd = LUMIX_NEW(allocator, AddArrayItemCommand<decltype(root_getter)>)(root_getter, "masks", new_mask_index, "bones");
 		executeCommand(*cmd);
 
-		auto* cmd2 = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), string>)(root_getter, clone.bones[bone_index].getName(), bone.getName(), "masks", new_mask_index, "bones", bone_index, "name");
+		auto* cmd2 = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), String>)(root_getter, clone.bones[bone_index].getName(), bone.getName(), "masks", new_mask_index, "bones", bone_index, "name");
 		executeCommand(*cmd2);
 	}
 	endCommandGroup();
@@ -792,7 +792,7 @@ void AnimationEditor::save()
 		file.close();
 	}
 	else {
-		g_log_error.log("Animation") << "Failed to create file " << m_path;
+		logError("Animation") << "Failed to create file " << m_path;
 	}
 }
 
@@ -863,7 +863,7 @@ void AnimationEditor::load()
 		file.close();
 	}
 	else {
-		g_log_error.log("Animation") << "Failed to open file " << m_path;
+		logError("Animation") << "Failed to open file " << m_path;
 	}
 }
 

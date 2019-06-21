@@ -172,46 +172,48 @@ struct StringView
 	{
 	}
 
-	size_t length() const { return end - begin; }
+	uint length() const { return uint(end - begin); }
 
 	const char* begin;
 	const char* end;
 };
 
 
-class LUMIX_ENGINE_API string
+class LUMIX_ENGINE_API String
 {
 public:
-	explicit string(IAllocator& allocator);
-	string(const string& rhs, int start, i32 length);
-	string(const char* rhs, i32 length, IAllocator& allocator);
-	string(const string& rhs);
-	string(const char* rhs, IAllocator& allocator);
-	~string();
+	explicit String(IAllocator& allocator);
+	String(const String& rhs, int start, i32 length);
+	String(const char* rhs, i32 length, IAllocator& allocator);
+	String(const String& rhs);
+	String(String&& rhs);
+	String(const char* rhs, IAllocator& allocator);
+	~String();
 
 	void resize(int size);
 	char* getData() { return m_cstr; }
 	char operator[](int index) const;
 	void set(const char* rhs, int size);
-	void operator=(const string& rhs);
+	void operator=(const String& rhs);
 	void operator=(const char* rhs);
-	bool operator!=(const string& rhs) const;
+	bool operator!=(const String& rhs) const;
 	bool operator!=(const char* rhs) const;
-	bool operator==(const string& rhs) const;
+	bool operator==(const String& rhs) const;
 	bool operator==(const char* rhs) const;
-	bool operator<(const string& rhs) const;
-	bool operator>(const string& rhs) const;
+	bool operator<(const String& rhs) const;
+	bool operator>(const String& rhs) const;
 	int length() const { return m_size; }
 	const char* c_str() const { return m_cstr; }
-	string substr(int start, int length) const;
-	string& cat(const char* value, int length);
-	string& cat(float value);
-	string& cat(char* value);
-	string& cat(const char* value);
+	String substr(int start, int length) const;
+	String& cat(const char* value, int length);
+	String& cat(float value);
+	String& cat(const StringView& value);
+	String& cat(char* value);
+	String& cat(const char* value);
 	void insert(int position, const char* value);
 	void eraseAt(int position);
 
-	template <class V> string& cat(V value)
+	template <class V> String& cat(V value)
 	{
 		char tmp[30];
 		toCString(value, tmp, 30);

@@ -602,7 +602,7 @@ IOutputStream* AssetBrowser::beginSaveResource(Resource& resource)
 	if (!fs.open(tmp_path, f))
 	{
 		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), f);
-		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
+		logError("Editor") << "Could not save file " << resource.getPath().c_str();
 		return nullptr;
 	}
 	return f;
@@ -629,7 +629,7 @@ void AssetBrowser::endSaveResource(Resource& resource, IOutputStream& file, bool
 
 	if (!OS::moveFile(src_full_path, dest_full_path))
 	{
-		g_log_error.log("Editor") << "Could not save file " << resource.getPath().c_str();
+		logError("Editor") << "Could not save file " << resource.getPath().c_str();
 	}
 }
 
@@ -680,10 +680,10 @@ void AssetBrowser::openInExternalEditor(const char* path) const
 	full_path << path;
 	const OS::ExecuteOpenResult res = OS::shellExecuteOpen(full_path);
 	if (res == OS::ExecuteOpenResult::NO_ASSOCIATION) {
-		g_log_error.log("Editor") << full_path << " is not associated with any app.";
+		logError("Editor") << full_path << " is not associated with any app.";
 	}
 	else if (res == OS::ExecuteOpenResult::OTHER_ERROR) {
-		g_log_error.log("Editor") << "Failed to open " << full_path << " in exeternal editor.";
+		logError("Editor") << "Failed to open " << full_path << " in exeternal editor.";
 	}
 }
 

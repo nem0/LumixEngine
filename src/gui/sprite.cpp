@@ -103,7 +103,7 @@ bool Sprite::load(u64 size, const u8* mem)
 		}
 		else
 		{
-			g_log_error.log("gui") << "Unknown label " << tmp << " in " << getPath();
+			logError("gui") << "Unknown label " << tmp << " in " << getPath();
 		}
 	}
 	return true;

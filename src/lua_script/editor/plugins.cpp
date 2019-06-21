@@ -324,9 +324,9 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 
 
 		WorldEditor& editor;
-		string property_name;
-		string value;
-		string old_value;
+		String property_name;
+		String value;
+		String old_value;
 		EntityPtr entity;
 		int script_index;
 	};
@@ -584,7 +584,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			OS::OutputFile file;
 			if (!fs.open(resource->getPath().c_str(), &file))
 			{
-				g_log_warning.log("Lua Script") << "Could not save " << resource->getPath();
+				logWarning("Lua Script") << "Could not save " << resource->getPath();
 				return;
 			}
 
@@ -693,7 +693,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 				}
 				else if (*next == '\0')
 				{
-					autocomplete.push(string(name, app.getWorldEditor().getAllocator()));
+					autocomplete.push(String(name, app.getWorldEditor().getAllocator()));
 				}
 				else
 				{
@@ -739,8 +739,8 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 					that->autocomplete.size(),
 					sizeof(that->autocomplete[0]),
 					[](const void* a, const void* b) {
-					const char* a_str = ((const string*)a)->c_str();
-					const char* b_str = ((const string*)b)->c_str();
+					const char* a_str = ((const String*)a)->c_str();
+					const char* b_str = ((const String*)b)->c_str();
 					return compareString(a_str, b_str);
 				});
 			}
@@ -775,7 +775,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 
 				if (errors)
 				{
-					g_log_error.log("Lua Script") << lua_tostring(L, -1);
+					logError("Lua Script") << lua_tostring(L, -1);
 					lua_pop(L, 1);
 				}
 			}
@@ -800,13 +800,13 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 
 						if (errors)
 						{
-							g_log_error.log("Lua Script") << lua_tostring(L, -1);
+							logError("Lua Script") << lua_tostring(L, -1);
 							lua_pop(L, 1);
 						}
 					}
 					else
 					{
-						g_log_error.log("Lua Script") << "Failed to open file " << tmp;
+						logError("Lua Script") << "Failed to open file " << tmp;
 					}
 				}
 			}
@@ -852,7 +852,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 
 
 	StudioApp& app;
-	Array<string> autocomplete;
+	Array<String> autocomplete;
 	bool open;
 	bool open_autocomplete = false;
 	int autocomplete_selected = 1;
@@ -909,7 +909,7 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 				}
 				else
 				{
-					g_log_error.log("Lua Script") << "Failed to create " << buf;
+					logError("Lua Script") << "Failed to create " << buf;
 				}
 			}
 		}

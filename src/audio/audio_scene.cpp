@@ -3,6 +3,7 @@
 #include "audio_device.h"
 #include "audio_system.h"
 #include "clip.h"
+#include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/allocator.h"

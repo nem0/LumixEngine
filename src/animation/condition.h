@@ -2,9 +2,7 @@
 
 
 #include "engine/array.h"
-#include "engine/hash_map.h"
 #include "engine/lumix.h"
-#include <cstring>
 
 
 namespace Lumix
@@ -14,13 +12,15 @@ namespace Lumix
 class Animation;
 struct IAllocator;
 class OutputMemoryStream;
+template<class Key> struct HashFunc;
+template <typename K, typename V, typename H> class HashMap;
 
 
 namespace Anim
 {
 
 
-typedef HashMap<u32, Animation*> AnimSet;
+using AnimSet = HashMap<u32, Animation*, HashFunc<u32>>;
 
 
 struct RunningContext

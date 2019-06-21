@@ -1,69 +1,61 @@
 #pragma once
 
 
-#include "engine/allocator.h"
-#include "engine/delegate_list.h"
 #include "engine/lumix.h"
-#include "engine/string.h"
+
+
+#define LUMIX_FATAL(cond) Lumix::fatal((cond), #cond);
+
 
 namespace Lumix
 {
-	class Log;
-	class Path;
 
-	class LUMIX_ENGINE_API LogProxy
-	{
-		friend class Log;
-		public:
-			LogProxy(Log& log, const char* system, IAllocator& allocator);
-			~LogProxy();
 
-			LogProxy& operator <<(const char* message);
-			LogProxy& operator <<(float message);
-			LogProxy& operator <<(i32 message);
-			LogProxy& operator <<(u32 message);
-			LogProxy& operator <<(u64 message);
-			LogProxy& operator <<(const string& path);
-			LogProxy& operator <<(const Path& path);
-			LogProxy& substring(const char* str, int start, int length);
+struct IAllocator;
+struct Log;
+class Path;
+class String;
+template <typename T> class DelegateList;
 
-		private:
-			IAllocator& m_allocator;
-			string m_system;
-			string m_message;
-			Log& m_log;
+enum class LogLevel {
+	INFO,
+	WARNING,
+	ERROR,
 
-			LogProxy(const LogProxy&);
-			void operator = (const LogProxy&);
-	};
+	COUNT
+};
 
-	class LUMIX_ENGINE_API Log
-	{
-		public:
-			typedef DelegateList<void (const char*, const char*)> Callback;
+using LogCallback = DelegateList<void (LogLevel, const char*, const char*)>;
 
-		public:
-			Log() : m_callbacks(m_allocator) {}
 
-			LogProxy log(const char* system);
-			Callback& getCallback();
-		
-		private:
-			Log(const Log&);
-			void operator =(const Log&);
+class LUMIX_ENGINE_API LogProxy {
+	public:
+		LogProxy(Log* log, const char* system);
+		~LogProxy();
 
-		private:
-			DefaultAllocator m_allocator;
-			Callback m_callbacks;
-	};
+		LogProxy& operator <<(const char* message);
+		LogProxy& operator <<(float message);
+		LogProxy& operator <<(i32 message);
+		LogProxy& operator <<(u32 message);
+		LogProxy& operator <<(u64 message);
+		LogProxy& operator <<(const String& path);
+		LogProxy& operator <<(const Path& path);
+			
+	private:
+		Log* log;
+		const char* system;
 
-	void LUMIX_ENGINE_API fatal(bool cond, const char* msg);
+		LogProxy(const LogProxy&) = delete;
+		void operator = (const LogProxy&) = delete;
+};
 
-	extern Log LUMIX_ENGINE_API g_log_info;
-	extern Log LUMIX_ENGINE_API g_log_warning;
-	extern Log LUMIX_ENGINE_API g_log_error;
 
-	#define LUMIX_FATAL(cond) Lumix::fatal((cond), #cond);
+LUMIX_ENGINE_API void fatal(bool cond, const char* msg);
+LUMIX_ENGINE_API LogProxy logInfo(const char* system);
+LUMIX_ENGINE_API LogProxy logWarning(const char* system);
+LUMIX_ENGINE_API LogProxy logError(const char* system);
+LUMIX_ENGINE_API LogCallback& getLogCallback();
+
 
 } // namespace Lumix
 

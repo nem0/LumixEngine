@@ -389,7 +389,7 @@ struct SerializeVisitor
 	void visit(const char* name, int value) { blob->write(value); }
 	void visit(const char* name, float value) { blob->write(value); }
 	void visit(const char* name, u32 value) { blob->write(value); }
-	void visit(const char* name, const string& value) { blob->write(value); }
+	void visit(const char* name, const String& value) { blob->write(value); }
 	void visit(const char* name, const Path& value) { blob->writeString(value.c_str()); }
 	template <int N>
 	void visit(const char* name, const StaticString<N>& value) { blob->write(value); }
@@ -439,7 +439,7 @@ struct DeserializeVisitor
 	void visit(const char* name, int& value) { blob->read(value); }
 	void visit(const char* name, float& value) { blob->read(value); }
 	void visit(const char* name, u32& value) { blob->read(value); }
-	void visit(const char* name, string& value) { blob->read(value); }
+	void visit(const char* name, String& value) { blob->read(value); }
 	void visit(const char* name, Path& value) 
 	{ 
 		char tmp[MAX_PATH_LENGTH];
@@ -605,7 +605,7 @@ struct UIVisitor
 	{
 	}
 
-	void visit(const char* name, string& value)
+	void visit(const char* name, String& value)
 	{
 		char tmp[1024];
 		copyString(tmp, value.c_str());
@@ -613,10 +613,10 @@ struct UIVisitor
 		{
 			PathItem p(name, parent);
 			IAllocator& allocator = editor.getAllocator();
-			auto* cmd = LUMIX_NEW(allocator, SetCommand<RootGetter, string>)(root_getter
+			auto* cmd = LUMIX_NEW(allocator, SetCommand<RootGetter, String>)(root_getter
 				, &p
-				, string(value.c_str(), allocator)
-				, string(tmp, allocator));
+				, String(value.c_str(), allocator)
+				, String(tmp, allocator));
 			editor.executeCommand(*cmd);
 		}
 	}

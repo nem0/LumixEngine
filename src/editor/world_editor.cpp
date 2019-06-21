@@ -27,7 +27,6 @@
 #include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
-#include "engine/viewport.h"
 #include "ieditor_command.h"
 #include "render_interface.h"
 
@@ -169,8 +168,8 @@ public:
 private:
 	WorldEditor& m_editor;
 	EntityPtr m_entity;
-	string m_new_name;
-	string m_old_name;
+	String m_new_name;
+	String m_old_name;
 };
 
 
@@ -2073,7 +2072,7 @@ public:
 
 	void saveUniverse(const char* basename, bool save_path) override
 	{
-		g_log_info.log("Editor") << "Saving universe " << basename << "...";
+		logInfo("Editor") << "Saving universe " << basename << "...";
 		
 		StaticString<MAX_PATH_LENGTH> dir(m_engine->getFileSystem().getBasePath(), "universes/");
 		OS::makePath(dir);
@@ -2084,7 +2083,7 @@ public:
 			file.close();
 		}
 		else {
-			g_log_error.log("Editor") << "Failed to save universe " << basename;
+			logError("Editor") << "Failed to save universe " << basename;
 		}
 
 		serialize(basename);
@@ -2212,7 +2211,7 @@ public:
 			IScene* scene = universe.getScene(crc32(plugin_name));
 			if (!scene)
 			{
-				g_log_error.log("Editor") << "Could not open " << filepath << " since there is not plugin " << plugin_name;
+				logError("Editor") << "Could not open " << filepath << " since there is not plugin " << plugin_name;
 				return false;
 			}
 
@@ -2320,7 +2319,7 @@ public:
 				file.close();
 			}
 			else {
-				g_log_error.log("Editor") << "Failed to save " << path;
+				logError("Editor") << "Failed to save " << path;
 			}
 		};
 		for (IScene* scene : m_universe->getScenes())
@@ -2406,7 +2405,7 @@ public:
 		*(Header*)blob.getData() = header;
 		file.write(blob.getData(), blob.getPos());
 
-		g_log_info.log("editor") << "Universe saved";
+		logInfo("editor") << "Universe saved";
 	}
 
 
@@ -2981,7 +2980,7 @@ public:
 		destroyUniverse();
 		createUniverse();
 		m_universe->setName(basename);
-		g_log_info.log("Editor") << "Loading universe " << basename << "...";
+		logInfo("Editor") << "Loading universe " << basename << "...";
 		if (!deserialize(*m_universe, "universes/", basename, *m_prefab_system, m_entity_map, m_allocator)) newUniverse();
 		m_editor_icons->refresh();
 	}
@@ -2991,7 +2990,7 @@ public:
 	{
 		destroyUniverse();
 		createUniverse();
-		g_log_info.log("Editor") << "Universe created.";
+		logInfo("Editor") << "Universe created.";
 	}
 
 
@@ -3020,14 +3019,14 @@ public:
 		Header header;
 		if (file.size() < sizeof(header))
 		{
-			g_log_error.log("Editor") << "Corrupted file.";
+			logError("Editor") << "Corrupted file.";
 			newUniverse();
 			m_is_loading = false;
 			return;
 		}
 
 		OS::Timer timer;
-		g_log_info.log("Editor") << "Parsing universe...";
+		logInfo("Editor") << "Parsing universe...";
 		InputMemoryStream blob(file.getBuffer(), (int)file.size());
 		u32 hash = 0;
 		blob.read(hash);
@@ -3047,7 +3046,7 @@ public:
 		}
 		if (crc32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
 		{
-			g_log_error.log("Editor") << "Corrupted file.";
+			logError("Editor") << "Corrupted file.";
 			newUniverse();
 			m_is_loading = false;
 			return;
@@ -3056,7 +3055,7 @@ public:
 		if (m_engine->deserialize(*m_universe, blob))
 		{
 			m_prefab_system->deserialize(blob);
-			g_log_info.log("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
+			logInfo("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
 		}
 		else
 		{
@@ -3134,7 +3133,7 @@ public:
 		PluginManager& plugin_manager = m_engine->getPluginManager();
 		for (auto* plugin_name : plugins) {
 			if (plugin_name[0] && !plugin_manager.load(plugin_name)) {
-				g_log_info.log("Editor") << plugin_name << " plugin has not been loaded";
+				logInfo("Editor") << plugin_name << " plugin has not been loaded";
 			}
 		}
 
@@ -3558,7 +3557,7 @@ public:
 		}
 		else
 		{
-			g_log_error.log("Editor") << "Could not save commands to " << path;
+			logError("Editor") << "Could not save commands to " << path;
 		}
 	}
 
@@ -3600,7 +3599,7 @@ public:
 				IEditorCommand* command = createEditorCommand(crc32(type_name));
 				if (!command)
 				{
-					g_log_error.log("Editor") << "Unknown command " << type_name << " in " << path;
+					logError("Editor") << "Unknown command " << type_name << " in " << path;
 					destroyUndoStack();
 					m_undo_index = -1;
 					file.close();

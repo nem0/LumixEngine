@@ -4,6 +4,7 @@
 #include "condition.h"
 #include "engine/array.h"
 #include "engine/lumix.h"
+#include "engine/math.h"
 #include "events.h"
 
 

@@ -1,6 +1,5 @@
 #include "engine/resource.h"
 #include "engine/crc32.h"
-#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/path.h"
@@ -75,7 +74,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success)
 
 	if (!success)
 	{
-		g_log_error.log("Core") << "Could not open " << getPath().c_str();
+		logError("Core") << "Could not open " << getPath().c_str();
 		ASSERT(m_empty_dep_count > 0);
 		--m_empty_dep_count;
 		++m_failed_dep_count;

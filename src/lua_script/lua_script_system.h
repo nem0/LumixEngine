@@ -41,7 +41,7 @@ public:
 		u32 name_hash;
 		Type type;
 		ResourceType resource_type;
-		string stored_value;
+		String stored_value;
 	};
 
 

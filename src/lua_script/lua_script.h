@@ -24,7 +24,7 @@ public:
 	static const ResourceType TYPE;
 
 private:
-	string m_source_code;
+	String m_source_code;
 };
 
 

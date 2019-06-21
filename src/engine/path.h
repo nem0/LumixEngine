@@ -1,7 +1,6 @@
 #pragma once
 
-#include "engine/associative_array.h"
-#include "engine/mt/sync.h"
+#include "engine/lumix.h"
 
 
 namespace Lumix
@@ -13,15 +12,6 @@ struct IInputStream;
 struct IOutputStream;
 
 
-class PathInternal
-{
-public:
-	char m_path[MAX_PATH_LENGTH];
-	u32 m_id;
-	volatile i32 m_ref_count;
-};
-
-
 class LUMIX_ENGINE_API Path
 {
 public:
@@ -31,58 +21,36 @@ public:
 	Path(const char* s1, const char* s2, const char* s3);
 	explicit Path(u32 hash);
 	explicit Path(const char* path);
-	void operator=(const Path& rhs);
-	void operator=(const char* rhs);
-	bool operator==(const Path& rhs) const
-	{
-		return m_data->m_id == rhs.m_data->m_id;
-	}
-	bool operator!=(const Path& rhs) const
-	{
-		return m_data->m_id != rhs.m_data->m_id;
-	}
-
 	~Path();
 
-	u32 getHash() const { return m_data->m_id; }
-	const char* c_str() const { return m_data->m_path; }
+	void operator=(const Path& rhs);
+	void operator=(const char* rhs);
+	bool operator==(const Path& rhs) const;
+	bool operator!=(const Path& rhs) const;
 
 	int length() const;
-	bool isValid() const { return m_data->m_path[0] != '\0'; }
+	u32 getHash() const;
+	const char* c_str() const;
+	bool isValid() const;
 
 private:
-	PathInternal* m_data;
+	class PathInternal* m_data;
 };
 
 
-class LUMIX_ENGINE_API PathManager
+struct LUMIX_ENGINE_API PathManager
 {
-	friend class Path;
+	static PathManager* create(IAllocator& allocator);
+	static void destroy(PathManager& obj);
+	static const Path& PathManager::getEmptyPath();
+	
+	virtual ~PathManager() {};
 
-public:
-	explicit PathManager(IAllocator& allocator);
-	~PathManager();
+	virtual void serialize(IOutputStream& serializer) = 0;
+	virtual void deserialize(IInputStream& serializer) = 0;
 
-	void serialize(IOutputStream& serializer);
-	void deserialize(IInputStream& serializer);
-
-	void clear();
-	static const Path& getEmptyPath();
-
-private:
-	PathInternal* getPath(u32 hash, const char* path);
-	PathInternal* getPath(u32 hash);
-	PathInternal* getPathMultithreadUnsafe(u32 hash, const char* path);
-	void incrementRefCount(PathInternal* path);
-	void decrementRefCount(PathInternal* path);
-
-private:
-	IAllocator& m_allocator;
-	AssociativeArray<u32, PathInternal*> m_paths;
-	MT::SpinMutex m_mutex;
-	Path* m_empty_path;
+	virtual void clear() = 0;
 };
-
 
 
 } // namespace Lumix

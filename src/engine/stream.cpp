@@ -1,4 +1,5 @@
 #include "stream.h"
+#include "engine/allocator.h"
 #include "engine/string.h"
 #include <cstring>
 
@@ -165,7 +166,7 @@ void OutputMemoryStream::operator =(const OutputMemoryStream& rhs)
 }
 	
 
-void OutputMemoryStream::write(const string& string)
+void OutputMemoryStream::write(const String& string)
 {
 	writeString(string.c_str());
 }
@@ -292,7 +293,7 @@ bool InputMemoryStream::read(void* data, u64 size)
 }
 
 
-bool InputMemoryStream::read(string& string)
+bool InputMemoryStream::read(String& string)
 {
 	i32 size;
 	IInputStream::read(size);

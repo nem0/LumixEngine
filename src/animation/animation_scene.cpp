@@ -4,6 +4,7 @@
 #include "animation/controller.h"
 #include "animation/events.h"
 #include "animation/property_animation.h"
+#include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
@@ -307,7 +308,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		Controller& controller = m_controllers.get(entity);
 		if (!controller.root)
 		{
-			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
+			logWarning("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
 			return;
 		}
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
@@ -318,7 +319,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 		else
 		{
-			g_log_warning.log("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
+			logWarning("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
 		}
 	}
 
@@ -328,7 +329,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		Controller& controller = m_controllers.get(entity);
 		if (!controller.root)
 		{
-			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
+			logWarning("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
 			return;
 		}
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
@@ -338,7 +339,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 		else
 		{
-			g_log_warning.log("Animation") << "Trying to set int to " << decl.inputs[input_idx].name;
+			logWarning("Animation") << "Trying to set int to " << decl.inputs[input_idx].name;
 		}
 	}
 
@@ -348,7 +349,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		Controller& controller = m_controllers.get(entity);
 		if (!controller.root)
 		{
-			g_log_warning.log("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
+			logWarning("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
 			return;
 		}
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
@@ -358,7 +359,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 		else
 		{
-			g_log_warning.log("Animation") << "Trying to set bool to " << decl.inputs[input_idx].name;
+			logWarning("Animation") << "Trying to set bool to " << decl.inputs[input_idx].name;
 		}
 	}
 

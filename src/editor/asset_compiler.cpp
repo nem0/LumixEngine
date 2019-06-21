@@ -129,7 +129,7 @@ struct AssetCompilerImpl : AssetCompiler
 			file.close();	
 		}
 		else {
-			g_log_error.log("Editor") << "Could not save .lumix/assets/_list.txt";
+			logError("Editor") << "Could not save .lumix/assets/_list.txt";
 		}
 
 		ASSERT(m_plugins.empty());
@@ -250,12 +250,12 @@ struct AssetCompilerImpl : AssetCompiler
 			lua_State* L = luaL_newstate();
 			[&](){
 				if (luaL_loadbuffer(L, content.begin(), content.byte_size(), "lumix_asset_list") != 0) {
-					g_log_error.log("Editor") << list_path << ": " << lua_tostring(L, -1);
+					logError("Editor") << list_path << ": " << lua_tostring(L, -1);
 					return;
 				}
 
 				if (lua_pcall(L, 0, 0, 0) != 0) {
-					g_log_error.log("Editor") << list_path << ": " << lua_tostring(L, -1);
+					logError("Editor") << list_path << ": " << lua_tostring(L, -1);
 					return;
 				}
 
@@ -279,7 +279,7 @@ struct AssetCompilerImpl : AssetCompiler
 				lua_pushnil(L);
 				while (lua_next(L, -2) != 0) {
 					if (!lua_isstring(L, -2) || !lua_istable(L, -1)) {
-						g_log_error.log("Editor") << "Invalid dependencies in _list.txt";
+						logError("Editor") << "Invalid dependencies in _list.txt";
 						lua_pop(L, 1);
 						continue;
 					}
@@ -380,13 +380,13 @@ struct AssetCompilerImpl : AssetCompiler
 
 		lua_State* L = luaL_newstate();
 		if (luaL_loadbuffer(L, buf.begin(), buf.byte_size(), meta_path) != 0) {
-			g_log_error.log("Editor") << meta_path << ": " << lua_tostring(L, -1);
+			logError("Editor") << meta_path << ": " << lua_tostring(L, -1);
 			lua_close(L);
 			return false;
 		}
 
 		if (lua_pcall(L, 0, 0, 0) != 0) {
-			g_log_error.log("Engine") << meta_path << ": " << lua_tostring(L, -1);
+			logError("Engine") << meta_path << ": " << lua_tostring(L, -1);
 			lua_close(L);
 			return false;
 		}
@@ -406,7 +406,7 @@ struct AssetCompilerImpl : AssetCompiler
 				
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		if (!fs.open(meta_path, &file)) {
-			g_log_error.log("Editor") << "Could not create " << meta_path;
+			logError("Editor") << "Could not create " << meta_path;
 			return;
 		}
 
@@ -582,7 +582,7 @@ int AssetCompilerTask::task()
 				m_compiler.m_compiled.push(p);
 			}
 			else {
-				g_log_error.log("Editor") << "Failed to compile resource " << p;
+				logError("Editor") << "Failed to compile resource " << p;
 			}
 		}
 	}

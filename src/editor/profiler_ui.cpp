@@ -93,7 +93,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 	ProfilerUIImpl(Debug::Allocator& allocator, Engine& engine)
 		: m_main_allocator(allocator)
 		, m_resource_manager(engine.getResourceManager())
-		, m_logs(allocator)
 		, m_engine(engine)
 	{
 		m_allocation_size_from = 0;
@@ -197,7 +196,6 @@ struct ProfilerUIImpl final : public ProfilerUI
 	u64 m_zoom = DEFAULT_ZOOM;
 	char m_filter[100];
 	char m_resource_filter[100];
-	Array<Log> m_logs;
 	Engine& m_engine;
 	OS::Timer m_timer;
 	float m_autopause = -33.3333f;

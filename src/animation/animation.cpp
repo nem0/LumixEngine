@@ -231,12 +231,12 @@ bool Animation::load(u64 mem_size, const u8* mem)
 	file.read(&header, sizeof(header));
 	if (header.magic != HEADER_MAGIC)
 	{
-		g_log_error.log("Animation") << getPath() << " is not an animation file";
+		logError("Animation") << getPath() << " is not an animation file";
 		return false;
 	}
 	if (header.version <= (int)Version::COMPRESSION)
 	{
-		g_log_error.log("Animation") << "Unsupported animation version " << (int)header.version << " ("
+		logError("Animation") << "Unsupported animation version " << (int)header.version << " ("
 									 << getPath() << ")";
 		return false;
 	}

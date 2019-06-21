@@ -1,6 +1,7 @@
 #include "serializer.h"
 #include "engine/math.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 
 
 namespace Lumix
@@ -419,7 +420,7 @@ static int getStringLength(const InputMemoryStream& blob)
 }
 
 
-void TextDeserializer::read(string* value)
+void TextDeserializer::read(String* value)
 {
 	skip();
 	value->resize(getStringLength(blob) + 1);

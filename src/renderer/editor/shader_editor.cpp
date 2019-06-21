@@ -1488,7 +1488,7 @@ void ShaderEditor::generate(const char* path, ShaderType shader_type)
 	OS::OutputFile file;
 	if(!file.open(sc_path))
 	{
-		g_log_error.log("Editor") << "Could not create file " << sc_path;
+		logError("Editor") << "Could not create file " << sc_path;
 		return;
 	}
 
@@ -1639,7 +1639,7 @@ void ShaderEditor::save(const char* path)
 	OS::OutputFile file;
 	if(!file.open(path)) 
 	{
-		g_log_error.log("Editor") << "Could not save shader " << path;
+		logError("Editor") << "Could not save shader " << path;
 		return;
 	}
 
@@ -1678,7 +1678,7 @@ void ShaderEditor::save(const char* path)
 	file.close();
 	if (!success)
 	{
-		g_log_error.log("Editor") << "Could not save shader " << path;
+		logError("Editor") << "Could not save shader " << path;
 	}
 }
 
@@ -1798,7 +1798,7 @@ void ShaderEditor::load()
 	OS::InputFile file;
 	if (!file.open(path))
 	{
-		g_log_error.log("Editor") << "Failed to load shader " << path;
+		logError("Editor") << "Failed to load shader " << path;
 		return;
 	}
 
@@ -1807,7 +1807,7 @@ void ShaderEditor::load()
 	data.resize(data_size);
 	if (!file.read(&data[0], data_size))
 	{
-		g_log_error.log("Editor") << "Failed to load shader " << path;
+		logError("Editor") << "Failed to load shader " << path;
 		file.close();
 		return;
 	}
@@ -2162,7 +2162,7 @@ void ShaderEditor::generateMain(const char* path)
 	OS::OutputFile file;
 	if (!file.open(shd_path))
 	{
-		g_log_error.log("Editor") << "Could not generate " << shd_path;
+		logError("Editor") << "Could not generate " << shd_path;
 		return;
 	}
 

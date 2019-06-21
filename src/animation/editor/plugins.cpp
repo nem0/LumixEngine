@@ -106,7 +106,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		WorldEditor& editor = m_app.getWorldEditor();
 		if (!file.open(full_path))
 		{
-			g_log_error.log("Animation") << "Failed to create " << full_path;
+			logError("Animation") << "Failed to create " << full_path;
 			return false;
 		}
 
@@ -176,7 +176,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			if (!anim.save(serializer))
 			{
 				success = false;
-				g_log_error.log("Editor") << "Could not save file " << anim.getPath().c_str();
+				logError("Editor") << "Could not save file " << anim.getPath().c_str();
 			}
 			m_app.getAssetBrowser().endSaveResource(anim, *file, success);
 		}

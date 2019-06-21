@@ -58,7 +58,7 @@ void Texture::setFlags(u32 flags)
 {
 	if (isReady() && this->flags != flags)
 	{
-		g_log_warning.log("Renderer") << "Trying to set different flags for texture " << getPath().c_str()
+		logWarning("Renderer") << "Trying to set different flags for texture " << getPath().c_str()
 									  << ". They are ignored.";
 		return;
 	}
@@ -144,14 +144,14 @@ unsigned int Texture::compareTGA(IInputStream* file1, IInputStream* file2, int d
 		header1.dataType != header2.dataType ||
 		header1.imageDescriptor != header2.imageDescriptor)
 	{
-		g_log_error.log("Renderer") << "Trying to compare textures with different formats";
+		logError("Renderer") << "Trying to compare textures with different formats";
 		return 0xffffFFFF;
 	}
 
 	int color_mode = header1.bitsPerPixel / 8;
 	if (header1.dataType != 2)
 	{
-		g_log_error.log("Renderer") << "Unsupported texture format";
+		logError("Renderer") << "Unsupported texture format";
 		return 0xffffFFFF;
 	}
 
@@ -192,7 +192,7 @@ bool Texture::saveTGA(IOutputStream* file,
 {
 	if (bytes_per_pixel != 4)
 	{
-		g_log_error.log("Renderer") << "Texture " << path.c_str() << " could not be saved, unsupported TGA format";
+		logError("Renderer") << "Texture " << path.c_str() << " could not be saved, unsupported TGA format";
 		return false;
 	}
 
@@ -233,7 +233,7 @@ static void saveTGA(Texture& texture)
 {
 	if (texture.data.empty())
 	{
-		g_log_error.log("Renderer") << "Texture " << texture.getPath().c_str()
+		logError("Renderer") << "Texture " << texture.getPath().c_str()
 									<< " could not be saved, no data was loaded";
 		return;
 	}
@@ -241,7 +241,7 @@ static void saveTGA(Texture& texture)
 	OS::OutputFile file;
 	FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
 	if (!fs.open(texture.getPath().c_str(), &file)) {
-		g_log_error.log("Renderer") << "Failed to create file " << texture.getPath();
+		logError("Renderer") << "Failed to create file " << texture.getPath();
 		return;
 	}
 
@@ -267,7 +267,7 @@ void Texture::save()
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		OS::OutputFile file;
 		if (!fs.open(getPath().c_str(), &file)) {
-			g_log_error.log("Renderer") << "Failed to create file " << getPath();
+			logError("Renderer") << "Failed to create file " << getPath();
 			return;
 		}
 
@@ -280,7 +280,7 @@ void Texture::save()
 	}
 	else
 	{
-		g_log_error.log("Renderer") << "Texture " << getPath().c_str() << " can not be saved - unsupported format";
+		logError("Renderer") << "Texture " << getPath().c_str() << " can not be saved - unsupported format";
 	}
 }
 
@@ -380,13 +380,13 @@ static bool loadTGA(IInputStream& file, TGAHeader& header, Array<u8>& data, cons
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2 && header.dataType != 10)
 	{
-		g_log_error.log("Renderer") << "Unsupported texture format " << path;
+		logError("Renderer") << "Unsupported texture format " << path;
 		return false;
 	}
 
 	if (bytes_per_pixel < 3)
 	{
-		g_log_error.log("Renderer") << "Unsupported color mode " << path;
+		logError("Renderer") << "Unsupported color mode " << path;
 		return false;
 	}
 
@@ -468,13 +468,13 @@ bool Texture::loadTGA(IInputStream& file)
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2 && header.dataType != 10)
 	{
-		g_log_error.log("Renderer") << "Unsupported texture format " << getPath().c_str();
+		logError("Renderer") << "Unsupported texture format " << getPath().c_str();
 		return false;
 	}
 
 	if (bytes_per_pixel < 3)
 	{
-		g_log_error.log("Renderer") << "Unsupported color mode " << getPath().c_str();
+		logError("Renderer") << "Unsupported color mode " << getPath().c_str();
 		return false;
 	}
 
@@ -657,7 +657,7 @@ bool Texture::load(u64 size, const u8* mem)
 		loaded = loadTGA(file);
 	}
 	if (!loaded) {
-		g_log_warning.log("Renderer") << "Error loading texture " << getPath();
+		logWarning("Renderer") << "Error loading texture " << getPath();
 		return false;
 	}
 

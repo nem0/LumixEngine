@@ -319,14 +319,14 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 	#undef DEFINE_LUA_FUNC
 
 	if(luaL_loadbuffer(L, (const char*)mem, size, getPath().c_str()) != 0) {
-		g_log_error.log("Renderer") << lua_tostring(L, -1);
+		logError("Renderer") << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		lua_close(L);
 		return false;
 	}
 
 	if (lua_pcall(L, 0, 0, 0) != 0) {
-		g_log_error.log("Renderer") << lua_tostring(L, -1);
+		logError("Renderer") << lua_tostring(L, -1);
 		lua_pop(L, 1);
 		lua_close(L);
 		return false;
@@ -340,7 +340,7 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 		lua_rawseti(L, -2, 1);
 
 		if(lua_pcall(L, 1, 0, 0) != 0) {
-			g_log_error.log("Renderer") << lua_tostring(L, -1);
+			logError("Renderer") << lua_tostring(L, -1);
 			lua_pop(L, 1);
 			lua_close(L);
 			return false;
@@ -377,7 +377,7 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 	lua_getfield(L, LUA_GLOBALSINDEX, "output");
 	if(lua_isfunction(L, -1)) {
 		if(lua_pcall(L, 0, 0, 0) != 0) {
-			g_log_error.log("Renderer") << lua_tostring(L, -1);
+			logError("Renderer") << lua_tostring(L, -1);
 			lua_pop(L, 1);
 			lua_close(L);
 			return false;
@@ -393,7 +393,7 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 	lua_close(L);
 
 	if (!m_material) {
-		g_log_error.log("Renderer") << getPath() << " has no material.";
+		logError("Renderer") << getPath() << " has no material.";
 		return false;
 	}
 	return true;

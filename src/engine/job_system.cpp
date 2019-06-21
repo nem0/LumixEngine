@@ -300,7 +300,7 @@ void enableBackupWorker(bool enable)
 		task->m_enabled.trigger();
 	}
 	else {
-		g_log_error.log("Engine") << "Job system backup worker failed to initialize.";
+		logError("Engine") << "Job system backup worker failed to initialize.";
 		LUMIX_DELETE(g_system->m_allocator, task);
 	}
 }
@@ -463,7 +463,7 @@ bool init(u8 workers_count, IAllocator& allocator)
 			task->setAffinityMask((u64)1 << i);
 		}
 		else {
-			g_log_error.log("Engine") << "Job system worker failed to initialize.";
+			logError("Engine") << "Job system worker failed to initialize.";
 			LUMIX_DELETE(allocator, task);
 		}
 	}

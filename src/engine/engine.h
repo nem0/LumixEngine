@@ -18,7 +18,7 @@ class InputSystem;
 class OutputMemoryStream;
 class PageAllocator;
 class Path;
-class PathManager;
+struct PathManager;
 class PluginManager;
 class ResourceManagerHub;
 class Universe;

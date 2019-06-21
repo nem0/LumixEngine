@@ -1,4 +1,5 @@
 #include "log_ui.h"
+#include "engine/delegate_list.h"
 #include "engine/log.h"
 #include "engine/os.h"
 #include "imgui/imgui.h"
@@ -18,11 +19,9 @@ LogUI::LogUI(IAllocator& allocator)
 	, m_are_notifications_hovered(false)
 	, m_move_notifications_to_front(false)
 {
-	g_log_info.getCallback().bind<LogUI, &LogUI::onInfo>(this);
-	g_log_error.getCallback().bind<LogUI, &LogUI::onError>(this);
-	g_log_warning.getCallback().bind<LogUI, &LogUI::onWarning>(this);
+	getLogCallback().bind<LogUI, &LogUI::onLog>(this);
 
-	for (int i = 0; i < COUNT; ++i)
+	for (int i = 0; i < (int)LogLevel::COUNT; ++i)
 	{
 		m_new_message_count[i] = 0;
 	}
@@ -31,9 +30,7 @@ LogUI::LogUI(IAllocator& allocator)
 
 LogUI::~LogUI()
 {
-	g_log_info.getCallback().unbind<LogUI, &LogUI::onInfo>(this);
-	g_log_error.getCallback().unbind<LogUI, &LogUI::onError>(this);
-	g_log_warning.getCallback().unbind<LogUI, &LogUI::onWarning>(this);
+	getLogCallback().unbind<LogUI, &LogUI::onLog>(this);
 }
 
 
@@ -62,36 +59,21 @@ int LogUI::addNotification(const char* text)
 }
 
 
-void LogUI::push(Type type, const char* message)
+void LogUI::push(LogLevel level, const char* message)
 {
 	MT::SpinLock lock(m_guard);
-	++m_new_message_count[type];
+	++m_new_message_count[(int)level];
 	Message& msg = m_messages.emplace(m_allocator);
 	msg.text = message;
-	msg.type = type;
+	msg.level = level;
 
-	if (type == ERROR)
-	{
-		addNotification(message);
-	}
+	if (level == LogLevel::ERROR) addNotification(message);
 }
 
 
-void LogUI::onInfo(const char* system, const char* message)
+void LogUI::onLog(LogLevel level, const char* system, const char* message)
 {
-	push(INFO, message);
-}
-
-
-void LogUI::onWarning(const char* system, const char* message)
-{
-	push(WARNING, message);
-}
-
-
-void LogUI::onError(const char* system, const char* message)
-{
-	push(ERROR, message);
+	push(level, message);
 }
 
 
@@ -155,7 +137,7 @@ void LogUI::update(float time_delta)
 
 int LogUI::getUnreadErrorCount() const
 {
-	return m_new_message_count[ERROR];
+	return m_new_message_count[(int)LogLevel::ERROR];
 }
 
 
@@ -193,7 +175,7 @@ void LogUI::onGUI()
 		{
 			for (int i = 0; i < m_messages.size(); ++i)
 			{
-				if ((m_level_filter & (1 << m_messages[i].type)) == 0) continue;
+				if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) continue;
 				const char* msg = m_messages[i].text.c_str();
 				if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 				{
@@ -239,11 +221,11 @@ void LogUI::onGUI()
 				Array<Message> filtered_messages(m_allocator);
 				for (int i = 0; i < m_messages.size(); ++i)
 				{
-					if ((m_level_filter & (1 << m_messages[i].type)) == 0) {
+					if ((m_level_filter & (1 << (int)m_messages[i].level)) == 0) {
 						filtered_messages.emplace(m_messages[i]);
 					}
 					else {
-						m_new_message_count[m_messages[i].type] = 0;
+						m_new_message_count[(int)m_messages[i].level] = 0;
 					}
 				}
 				m_messages.swap(filtered_messages);

@@ -2,6 +2,7 @@
 #include "state_machine.h"
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
 
 namespace Lumix

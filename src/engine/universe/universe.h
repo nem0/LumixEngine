@@ -6,7 +6,6 @@
 #include "engine/iplugin.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
-#include "engine/string.h"
 
 
 namespace Lumix

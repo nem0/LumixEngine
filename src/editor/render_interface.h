@@ -2,19 +2,22 @@
 
 
 #include "engine/lumix.h"
-#include "engine/geometry.h"
-#include "engine/path.h"
 #include "engine/math.h"
 #include "editor/world_editor.h"
-#include "imgui/imgui.h"
+
+struct ImFont;
+using ImTextureID = void*;
 
 
 namespace Lumix
 {
 
 
-enum class RenderableTypes : u8;
+struct AABB;
 struct Pose;
+class Path;
+enum class RenderableTypes : u8;
+struct ShiftedFrustum;
 
 
 class RenderInterface

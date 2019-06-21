@@ -106,14 +106,14 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 						}
 						else
 						{
-							g_log_error.log("Animation") << "Unknown key " << tmp;
+							logError("Animation") << "Unknown key " << tmp;
 							curves.clear();
 							return false;
 						}
 					}
 					if (curve.values.size() != curve.frames.size())
 					{
-						g_log_error.log("Animation") << "Key without " << (curve.values.size() < curve.frames.size() ? "value" : "frame");
+						logError("Animation") << "Key without " << (curve.values.size() < curve.frames.size() ? "value" : "frame");
 						curves.clear();
 						return false;
 					}
@@ -124,7 +124,7 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 			}
 			else
 			{
-				g_log_error.log("Animation") << "Unknown key " << tmp;
+				logError("Animation") << "Unknown key " << tmp;
 				curves.clear();
 				return false;
 			}

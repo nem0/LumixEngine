@@ -59,7 +59,7 @@ class LUMIX_ENGINE_API JsonSerializer
 
 class LUMIX_ENGINE_API JsonDeserializer
 {
-	friend class ErrorProxy;
+	friend struct ErrorProxy;
 public:
 	JsonDeserializer(IInputStream& file, const Path& path, IAllocator& allocator);
 	void operator=(const JsonDeserializer&) = delete;
@@ -110,6 +110,7 @@ private:
 	float tokenToFloat();
 	float tokenToDouble();
 	void expectToken(char expected_token);
+	void logError(const char* msg);
 
 private:
 	bool m_is_first_in_block;

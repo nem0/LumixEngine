@@ -424,7 +424,7 @@ public:
 		deserializer.read(&version);
 		if (version > (int)PrefabVersion::LAST)
 		{
-			g_log_error.log("Editor") << "Prefab " << prefab_res.getPath() << " has unsupported version.";
+			logError("Editor") << "Prefab " << prefab_res.getPath() << " has unsupported version.";
 			return INVALID_ENTITY;
 		}
 		int count;
@@ -591,7 +591,7 @@ public:
 		OS::OutputFile file;
 		if (!fs.open(path.c_str(), &file))
 		{
-			g_log_error.log("Editor") << "Failed to create " << path.c_str();
+			logError("Editor") << "Failed to create " << path.c_str();
 			return;
 		}
 

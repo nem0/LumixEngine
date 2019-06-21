@@ -78,12 +78,12 @@ bool ControllerResource::deserialize(InputMemoryStream& blob, int& version)
 	blob.read(header);
 	if (header.magic != Header::FILE_MAGIC)
 	{
-		g_log_error.log("Animation") << getPath().c_str() << " is not an animation controller file.";
+		logError("Animation") << getPath().c_str() << " is not an animation controller file.";
 		return false;
 	}
 	if (header.version > (int)Version::LAST)
 	{
-		g_log_error.log("Animation") << getPath().c_str() << " has unsupported version.";
+		logError("Animation") << getPath().c_str() << " has unsupported version.";
 		return false;
 	}
 
