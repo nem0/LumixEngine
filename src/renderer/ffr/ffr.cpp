@@ -955,7 +955,7 @@ void useProgram(ProgramHandle handle)
 }
 
 
-void bindTextures(const TextureHandle* handles, int count)
+void bindTextures(const TextureHandle* handles, int offset, int count)
 {
 	GLuint gl_handles[64];
 	ASSERT(count <= lengthOf(gl_handles));
@@ -973,7 +973,7 @@ void bindTextures(const TextureHandle* handles, int count)
 			}
 		}
 
-		CHECK_GL(glBindTextures(0, count, gl_handles));
+		CHECK_GL(glBindTextures(offset, count, gl_handles));
 	}
 }
 

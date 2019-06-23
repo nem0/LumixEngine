@@ -72,8 +72,8 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 				mat4 u_pass_view_projection;
 				mat4 u_pass_inv_view_projection;
 			};
-			uniform samplerCube u_irradiancemap;
-			uniform samplerCube u_radiancemap;
+			layout (binding=14) uniform samplerCube u_irradiancemap;
+			layout (binding=15) uniform samplerCube u_radiancemap;
 			)#";
 
 		const char* codes[64];

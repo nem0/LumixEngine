@@ -618,14 +618,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 		m_pipeline = Pipeline::create(*renderer, pres, "PREVIEW",  engine.getAllocator());
 
-		auto mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		const EntityRef mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
 		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
 		m_mesh = mesh_entity;
 		m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
+		const EntityRef env_probe = m_universe->createEntity({}, Quat::IDENTITY);
+		m_universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		render_scene->setEnvironmentProbeRadius(env_probe, 10e6);
+
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		auto light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
+		const EntityRef light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
 		m_universe->createComponent(ENVIRONMENT_TYPE, light_entity);
 		render_scene->getEnvironment(light_entity).m_diffuse_intensity = 1;
 		render_scene->getEnvironment(light_entity).m_indirect_intensity = 1;
@@ -2345,7 +2349,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(uint)(intptr_t)pcmd->TextureId} : *default_texture;
 				if (!tex.isValid()) tex = *default_texture;
-				ffr::bindTextures(&tex, 1);
+				ffr::bindTextures(&tex, 0, 1);
 
 				const uint h = uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f));
 

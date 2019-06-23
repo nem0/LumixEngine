@@ -841,7 +841,7 @@ struct PipelineImpl final : Pipeline
 						if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
 						if(!texture_id.isValid()) texture_id = atlas_texture->handle;
 
-						ffr::bindTextures(&texture_id, 1);
+						ffr::bindTextures(&texture_id, 0, 1);
 
 						ffr::drawTriangles(num_indices);
 
@@ -1190,7 +1190,7 @@ struct PipelineImpl final : Pipeline
 			void execute() override 
 			{
 				PROFILE_FUNCTION();
-				ffr::bindTextures(m_textures_handles, m_textures_count);
+				ffr::bindTextures(m_textures_handles, m_offset, m_textures_count);
 				for(int i = 0; i < m_textures_count; ++i) {
 					ffr::setUniform1i(m_textures_uniforms[i], i + m_offset);
 				}
@@ -1302,7 +1302,7 @@ struct PipelineImpl final : Pipeline
 				for (const EnvProbeInfo& probe : m_probes) {
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
 					ffr::TextureHandle handles[2] = { probe.radiance, probe.irradiance };
-					ffr::bindTextures(handles, 2);
+					ffr::bindTextures(handles, 14, 2);
 					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
 					ffr::drawTriangles(36);
 				}
@@ -1452,7 +1452,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::setState(m_render_state);
 
-				ffr::bindTextures(m_textures_handles, m_textures_count);
+				ffr::bindTextures(m_textures_handles, 0, m_textures_count);
 
 				for(int i = 0; i < m_uniforms_count; ++i) {
 					ffr::setUniform4f(m_uniforms[i].handle, &m_uniforms[i].value.x);
@@ -1814,7 +1814,7 @@ struct PipelineImpl final : Pipeline
 				ffr::VertexDecl decl;
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST | blend_state);
-				ffr::bindTextures(&m_atlas, 1);
+				ffr::bindTextures(&m_atlas, 0, 1);
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 				decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
@@ -2023,8 +2023,8 @@ struct PipelineImpl final : Pipeline
 								const uint size = instances_count * instance_decl.size;
 
 								ShaderRenderData* shader = material->shader;
-								ffr::bindTextures(nullptr, 16);
-								ffr::bindTextures(material->textures, material->textures_count);
+								ffr::bindTextures(nullptr, 0, 16);
+								ffr::bindTextures(material->textures, 0, material->textures_count);
 
 								const Shader::Program& prog = Shader::getProgram(shader, instanced_mask);
 								if(prog.handle.isValid()) {
@@ -2071,7 +2071,7 @@ struct PipelineImpl final : Pipeline
 								model_mtx.multiply3x3(scale);
 
 								ShaderRenderData* shader = material->shader;
-								ffr::bindTextures(material->textures, material->textures_count);
+								ffr::bindTextures(material->textures, 0, material->textures_count);
 
 								const Shader::Program& prog = Shader::getProgram(shader, skinned_mask);
 								if(prog.handle.isValid()) {
@@ -2105,7 +2105,7 @@ struct PipelineImpl final : Pipeline
 								READ(u16, instances_count);
 
 								ShaderRenderData* shader = material->shader;
-								ffr::bindTextures(material->textures, material->textures_count);
+								ffr::bindTextures(material->textures, 0, material->textures_count);
 
 								const u8* instance_data = cmd;
 								cmd += decal_instance_decl.size * instances_count;
@@ -2160,7 +2160,7 @@ struct PipelineImpl final : Pipeline
 									for (uint i = 0; i < mesh->vertex_decl.attributes_count; ++i) {
 										attribute_map[i] = prg.attribute_by_semantics[(int)mesh->attributes_semantic[i]];
 									}
-									ffr::bindTextures(material->textures, material->textures_count);
+									ffr::bindTextures(material->textures, 0, material->textures_count);
 									ffr::setVertexBuffer(&mesh->vertex_decl
 										, mesh->vertex_buffer_handle
 										, 0
@@ -2352,7 +2352,7 @@ struct PipelineImpl final : Pipeline
 				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
 				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
 
-				ffr::bindTextures(inst.material->textures, inst.material->textures_count);
+				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count);
 
 				ffr::setState(state);
 				const int loc = ffr::getUniformLocation(p.handle, m_pipeline->m_lod_uniform);
@@ -3234,7 +3234,7 @@ void Pipeline::renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle m
 		if(!prog.handle.isValid()) continue;
 
 		const Material::RenderData* mat_rd = material->getRenderData();
-		ffr::bindTextures(mat_rd->textures, mat_rd->textures_count);
+		ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
 
 		int attribute_map[16];
 		const Mesh::RenderData* rd = mesh.render_data;
