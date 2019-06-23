@@ -201,6 +201,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
 	bool m_gpu_open = false;
+	bool m_show_frames = true;
 	struct {
 		u32 signal;
 		float x, y;
@@ -528,6 +529,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	Profiler::GlobalState global;
 	const int contexts_count = global.threadsCount();
 	if (ImGui::BeginMenu("Advanced")) {
+		ImGui::Checkbox("Show frames", &m_show_frames);
 		ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
 		if (ImGui::MenuItem("Reset zoom")) m_zoom = DEFAULT_ZOOM;
 		bool do_autopause = m_autopause > 0;
@@ -956,7 +958,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				case Profiler::EventType::GPU_FRAME:
 					break;
 				case Profiler::EventType::FRAME:
-					if (header.time >= view_start && header.time <= view_end) {
+					if (header.time >= view_start && header.time <= view_end && m_show_frames) {
 						const float t = float((header.time - view_start) / double(view_end - view_start));
 						const float x = a.x * (1 - t) + b.x * t;
 						dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), 0xffff0000);

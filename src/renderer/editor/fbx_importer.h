@@ -187,7 +187,7 @@ private:
 	Array<const ofbx::Object*> bones;
 	ofbx::IScene* scene;
 	float lods_distances[4] = {-10, -100, -1000, -10000};
-	OS::OutputFile out_file;
+	OutputMemoryStream out_file;
 	float time_scale = 1.0f;
 	float position_error = 0.1f;
 	float rotation_error = 0.01f;
