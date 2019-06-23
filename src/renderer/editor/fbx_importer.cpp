@@ -1755,7 +1755,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	};
 	OS::OutputFile file;
 	PathUtils::FileInfo file_info(src);
-	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
+	StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, file_info.m_dir, "/", file_info.m_basename, ".fab");
 	if (!file.open(tmp)) return;
 
 	OutputMemoryStream blob(allocator);
