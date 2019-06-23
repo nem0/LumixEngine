@@ -129,6 +129,8 @@ struct GPUProfiler
 
 	void clear()
 	{
+		m_queries.clear();
+
 		for(const ffr::QueryHandle h : m_pool) {
 			ffr::destroy(h);
 		}
