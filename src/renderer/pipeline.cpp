@@ -1953,10 +1953,15 @@ struct PipelineImpl final : Pipeline
 		ffr::StencilOps stencil_zfail = ffr::StencilOps::KEEP;
 		ffr::StencilOps stencil_zpass = ffr::StencilOps::KEEP;
 
-		u64 rs = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
 		char tmp[64];
+		u64 rs = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
 		if (LuaWrapper::getOptionalStringField(L, idx, "blending", tmp, lengthOf(tmp))) {
-			rs = tmp[0] ? ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA) : 0;
+			if(equalIStrings(tmp, "add")) {
+				rs |= ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
+			}
+			else if(equalIStrings(tmp, "alpha")) {
+				rs |= ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+			}
 		}
 
 		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)ffr::StateFlags::DEPTH_TEST, true);
