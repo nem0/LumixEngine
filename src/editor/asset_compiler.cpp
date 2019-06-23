@@ -421,7 +421,7 @@ struct AssetCompilerImpl : AssetCompiler
 		char ext[16];
 		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
 		const u32 hash = crc32(ext);
-		MT::SpinLock lock(m_plugin_mutex);
+		MT::CriticalSectionLock lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
 		if (!iter.isValid()) return false;
 		return iter.value()->compile(src);
@@ -473,7 +473,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	Path popCompiledResource()
 	{
-		MT::SpinLock lock(m_compiled_mutex);
+		MT::CriticalSectionLock lock(m_compiled_mutex);
 		if(m_compiled.empty()) return Path();
 		const Path p = m_compiled.back();
 		m_compiled.pop();
@@ -499,7 +499,7 @@ struct AssetCompilerImpl : AssetCompiler
 			if (!p.isValid()) break;
 
 			// this can take some time, spinmutex is probably not the best option
-			MT::SpinLock lock(m_compiled_mutex);
+			MT::CriticalSectionLock lock(m_compiled_mutex);
 
 			for (Resource* r : m_to_compile_subresources[p]) {
 				m_load_hook.continueLoad(*r);
@@ -511,7 +511,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void removePlugin(IPlugin& plugin) override
 	{
-		MT::SpinLock lock(m_plugin_mutex);
+		MT::CriticalSectionLock lock(m_plugin_mutex);
 		bool removed;
 		do {
 			removed = false;
@@ -533,7 +533,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const char** i = extensions;
 		while(*i) {
 			const u32 hash = crc32(*i);
-			MT::SpinLock lock(m_plugin_mutex);
+			MT::CriticalSectionLock lock(m_plugin_mutex);
 			m_plugins.insert(hash, &plugin);
 			++i;
 		}
@@ -548,8 +548,8 @@ struct AssetCompilerImpl : AssetCompiler
 
 	MT::Semaphore m_semaphore;
 	MT::SpinMutex m_to_compile_mutex;
-	MT::SpinMutex m_compiled_mutex;
-	MT::SpinMutex m_plugin_mutex;
+	MT::CriticalSection m_compiled_mutex;
+	MT::CriticalSection m_plugin_mutex;
 	HashMap<Path, Array<Resource*>> m_to_compile_subresources; 
 	HashMap<Path, Array<Path>> m_dependencies;
 	Array<Path> m_to_compile;
@@ -581,7 +581,7 @@ int AssetCompilerTask::task()
 			const bool compiled = m_compiler.compile(p);
 			MT::atomicDecrement(&m_to_compile_count);
 			if (compiled) {
-				MT::SpinLock lock(m_compiler.m_compiled_mutex);
+				MT::CriticalSectionLock lock(m_compiler.m_compiled_mutex);
 				m_compiler.m_compiled.push(p);
 			}
 			else {
