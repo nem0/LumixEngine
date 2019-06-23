@@ -44,9 +44,15 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	}
 
 
-	AssetCompiler::CompileResult compile(const Path& src) override
+	bool compile(const Path& src) override
 	{
-		return AssetCompiler::CompileResult::COPY_AS_IS;
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		return fs.copyFile(src.c_str(), dst);
 	}
 
 

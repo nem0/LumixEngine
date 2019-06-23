@@ -424,17 +424,7 @@ struct AssetCompilerImpl : AssetCompiler
 		MT::CriticalSectionLock lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
 		if (!iter.isValid()) return false;
-		const CompileResult res = iter.value()->compile(src);
-		if (res == CompileResult::COPY_AS_IS) {
-			const PathUtils::FileInfo fi(src.c_str());
-			const StaticString<MAX_PATH_LENGTH> dst_dir(m_app.getAssetCompiler().getCompiledDir(), fi.m_dir);
-			const StaticString<MAX_PATH_LENGTH> dst(dst_dir, fi.m_basename, ".", fi.m_extension);
-
-			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-			fs.makePath(dst_dir);
-			return fs.copyFile(src.c_str(), dst);
-		}
-		return res != CompileResult::FAILED;
+		return iter.value()->compile(src);
 	}
 	
 
@@ -454,7 +444,8 @@ struct AssetCompilerImpl : AssetCompiler
 		if (!fs.fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 		if (startsWith(filepath, ".lumix/assets/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
-		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", res.getPath().c_str());
+		const u32 hash = res.getPath().getHash();
+		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
 		const PathUtils::FileInfo info(filepath);
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 
