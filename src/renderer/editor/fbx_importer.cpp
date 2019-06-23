@@ -6,6 +6,7 @@
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/prefab.h"
+#include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "physics/physics_geometry.h"
@@ -558,12 +559,15 @@ FBXImporter::FBXImporter(IAllocator& allocator)
 	, meshes(allocator)
 	, animations(allocator)
 	, bones(allocator)
+	, out_file(allocator)
 {
+	out_file.reserve(1024 * 1024);
 }
 
 
 bool FBXImporter::setSource(const char* base_dir, const char* filename)
 {
+	PROFILE_FUNCTION();
 	if(scene) {
 		scene->destroy();
 		scene = nullptr;	
@@ -727,6 +731,7 @@ static bool saveAsDDS(const u8* image_data,
 
 void FBXImporter::writeTextures(const char* fbx_path, const ImportConfig& cfg)
 {
+	PROFILE_FUNCTION();
 	const PathUtils::FileInfo fbx_info(fbx_path);
 	for (const ImportMaterial& mat : materials) {
 		for (int i = 0; i < lengthOf(mat.textures); ++i) {
@@ -762,6 +767,7 @@ void FBXImporter::writeTextures(const char* fbx_path, const ImportConfig& cfg)
 
 void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 {
+	PROFILE_FUNCTION()
 	for (const ImportMaterial& material : materials) {
 		if (!material.import) continue;
 
@@ -776,11 +782,13 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		const u32 hash = crc32(mat_src);
 
 		const StaticString<MAX_PATH_LENGTH> path(cfg.base_path, cfg.output_dir, hash, ".res");
-		if (!out_file.open(path))
+		OS::OutputFile f;
+		if (!f.open(path))
 		{
 			logError("FBX") << "Failed to create " << path;
 			continue;
 		}
+		out_file.clear();
 
 		writeString("shader \"pipelines/standard.shd\"\n");
 		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
@@ -806,7 +814,10 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			<< "," << diffuse_color.b
 			<< ",1}\n";*/
 
-		out_file.close();
+		if (!f.write(out_file.getData(), out_file.getPos())) {
+			logError("FBX") << "Failed to write " << path;
+		}
+		f.close();
 		OS::copyFile(path, mat_src);
 	}
 	writeBillboardMaterial(cfg.output_dir, src);
@@ -950,6 +961,7 @@ static int getDepth(const ofbx::Object* bone)
 
 void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 {
+	PROFILE_FUNCTION();
 	const PathUtils::FileInfo src_info(src);
 
 	for (int anim_idx = 0; anim_idx < animations.size(); ++anim_idx)
@@ -991,11 +1003,14 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			int frame_count = split->to_frame - split->from_frame;
 
 			StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, src_info.m_dir, anim.output_filename, split->name, ".ani");
-			if (!out_file.open(tmp))
+			OS::OutputFile f;
+			if (!f.open(tmp))
 			{
 				logError("FBX") << "Failed to create " << tmp;
 				continue;
 			}
+			out_file.clear();
+
 			Animation::Header header;
 			header.magic = Animation::HEADER_MAGIC;
 			header.version = 3;
@@ -1066,7 +1081,12 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 					}
 				}
 			}
-			out_file.close();
+
+			if (!f.write(out_file.getData(), out_file.getPos())) {
+				logError("FBX") << "Failed to write " << tmp;
+			}
+
+			f.close();
 		}
 	}
 }
@@ -1808,6 +1828,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 
 void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 {
+	PROFILE_FUNCTION();
 	postprocessMeshes(cfg);
 
 	for (int i = 0; i < meshes.size(); ++i) {
@@ -1817,11 +1838,13 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		makeLowercase(hash_str.data, stringLength(hash_str), hash_str);
 		const StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, crc32(hash_str), ".res");
 		OS::makePath(cfg.output_dir);
-		if (!out_file.open(out_path)) {
+		OS::OutputFile f;
+		if (!f.open(out_path)) {
 			logError("FBX") << "Failed to create " << out_path;
 			return;
 		}
 
+		out_file.clear();
 		writeModelHeader();
 		writeMeshes("", src, i);
 		writeGeometry(i);
@@ -1840,13 +1863,18 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		write(lod_count);
 		write(to_mesh);
 		write(factor);
-		out_file.close();
+
+		if (!f.write(out_file.getData(), out_file.getPos())) {
+			logError("FBX") << "Failed to write " << out_path;
+		}
+		f.close();
 	}
 }
 
 
 void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg)
 {
+	PROFILE_FUNCTION();
 	postprocessMeshes(cfg);
 
 	auto cmpMeshes = [](const void* a, const void* b) -> int {
@@ -1864,18 +1892,23 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 	qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
 	StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, output_mesh_filename, ext);
 	OS::makePath(cfg.output_dir);
-	if (!out_file.open(out_path))
+	OS::OutputFile f;
+	if (!f.open(out_path))
 	{
 		logError("FBX") << "Failed to create " << out_path;
 		return;
 	}
-
+	out_file.clear();
 	writeModelHeader();
 	writeMeshes(output_mesh_filename, src, -1);
 	writeGeometry();
 	writeSkeleton(cfg);
 	writeLODs();
-	out_file.close();
+	
+	if (!f.write(out_file.getData(), out_file.getPos())) {
+		logError("FBX") << "Failed to write " << out_path;
+	}
+	f.close();
 }
 
 

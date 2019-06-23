@@ -100,7 +100,7 @@ bool OutputFile::write(const void* data, u64 size)
 	u64 written = 0;
 	::WriteFile((HANDLE)m_handle, data, (DWORD)size, (LPDWORD)&written, nullptr);
 	m_is_error = m_is_error || size != written;
-    return m_is_error;
+    return !m_is_error;
 }
 
 bool InputFile::read(void* data, u64 size)

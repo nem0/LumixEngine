@@ -12,6 +12,7 @@
 #include "engine/mt/task.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
+#include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 
@@ -575,6 +576,8 @@ int AssetCompilerTask::task()
 			return p;
 		}();
 		if (p.isValid()) {
+			PROFILE_BLOCK("compile asset");
+			Profiler::pushString(p.c_str());
 			const bool compiled = m_compiler.compile(p);
 			MT::atomicDecrement(&m_to_compile_count);
 			if (compiled) {
