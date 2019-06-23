@@ -13,7 +13,7 @@
 	</Type>
 
 	<Type Name="Lumix::Path">
-		<DisplayString>{m_data->m_path}</DisplayString>
+		<DisplayString>{m_data->m_path,na}</DisplayString>
 	</Type>
 	
 	<Type Name="Lumix::HashMap&lt;*,*&gt;">
