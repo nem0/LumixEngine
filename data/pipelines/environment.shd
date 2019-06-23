@@ -37,7 +37,7 @@ fragment_shader [[
 		float depth = texture(u_gbuffer_depth, screen_uv).x;
 
 		vec3 albedo = gb0.rgb;
-		vec3 normal = gb1.rgb;
+		vec3 normal = gb1.rgb * 2 - 1;
 		float roughness = gb0.w;
 		float metallic = gb1.w;
 		float emission = unpackEmission(gb2.x);
@@ -49,7 +49,8 @@ fragment_shader [[
 		vec3 indirect = PBR_ComputeIndirectLight(albedo, roughness, metallic, normal, V);
 		float alpha = 1 - saturate(length(wpos - u_pos_radius.xyz) / u_pos_radius.w);
 		//alpha *= alpha;
-		o_color = vec4(indirect * alpha, alpha);
+		o_color = vec4(indirect * alpha * u_light_indirect_intensity, alpha);
+		//o_color = vec4(1, 0, 0, 1);
 		//o_color = vec4(abs(u_camera_pos), 1);
 		//o_color = vec4(1, 0, 0, 1);
 	}

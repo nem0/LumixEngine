@@ -598,10 +598,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 		m_tile.pipeline = Pipeline::create(*renderer, pres, "", engine.getAllocator());
 
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		const EntityRef env_probe = m_tile.universe->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_tile.universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		render_scene->setEnvironmentProbeRadius(env_probe, 1e3);
+
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		m_tile.universe->createComponent(ENVIRONMENT_TYPE, light_entity);
 		render_scene->getEnvironment(light_entity).m_diffuse_intensity = 1;
 		render_scene->getEnvironment(light_entity).m_indirect_intensity = 1;
