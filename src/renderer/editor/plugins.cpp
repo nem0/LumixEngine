@@ -881,9 +881,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			--m_tile.frame_countdown;
 			if (m_tile.frame_countdown == -1) {
 				m_tile.universe->destroyEntity((EntityRef)m_tile.mesh_entity);
-				StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", m_tile.path_hash, ".dds");
-				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 				Engine& engine = m_app.getWorldEditor().getEngine();
+				FileSystem& fs = engine.getFileSystem();
+				StaticString<MAX_PATH_LENGTH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
+				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 				renderer->destroy(m_tile.texture);
 			}
