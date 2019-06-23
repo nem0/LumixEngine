@@ -184,7 +184,7 @@ void GameView::onFullscreenGUI()
 		vp.h = (int)size.y;
 		m_pipeline->getScene()->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
 		m_pipeline->setViewport(vp);
-		m_pipeline->render();
+		m_pipeline->render(false);
 		m_texture_handle = m_pipeline->getOutput();
 		if (ffr::isOriginBottomLeft())
 		{
@@ -329,7 +329,7 @@ void GameView::onWindowGUI()
 				vp.h = (int)size.y;
 				m_pipeline->getScene()->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
 				m_pipeline->setViewport(vp);
-				m_pipeline->render();
+				m_pipeline->render(false);
 				m_texture_handle = m_pipeline->getOutput();
 
 				if(m_texture_handle.isValid()) {

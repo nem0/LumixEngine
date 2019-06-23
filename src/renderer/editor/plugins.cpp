@@ -655,7 +655,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_viewport.w = (int)image_size.x;
 		m_viewport.h = (int)image_size.y;
 		m_pipeline->setViewport(m_viewport);
-		m_pipeline->render();
+		m_pipeline->render(false);
 		m_preview = m_pipeline->getOutput();
 		ImGui::Image((void*)(uintptr_t)m_preview.value, image_size);
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
@@ -1027,7 +1027,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		viewport.pos = DVec3(eye.x, eye.y, eye.z);
 		viewport.rot = mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
-		m_tile.pipeline->render();
+		m_tile.pipeline->render(false);
 
 		struct Cmd : Renderer::RenderJob
 		{
@@ -1757,7 +1757,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			viewport.pos = probe_position;
 			viewport.rot = mtx.getRotation();
 			m_pipeline->setViewport(viewport);
-			m_pipeline->render();
+			m_pipeline->render(false);
 
 			const ffr::TextureHandle res = m_pipeline->getOutput();
 			ASSERT(res.isValid());

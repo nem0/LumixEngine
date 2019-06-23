@@ -561,7 +561,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	bool render() override 
+	bool render(bool only_2d) override 
 	{ 
 		PROFILE_FUNCTION();
 
@@ -616,7 +616,9 @@ struct PipelineImpl final : Pipeline
 			global_state.light_indirect_intensity = m_scene->getEnvironment(gl).m_indirect_intensity;
 		}
 
-		prepareShadowCameras(global_state);
+		if (!only_2d) {
+			prepareShadowCameras(global_state);
+		}
 
 		struct StartFrameCmd : Renderer::RenderJob {
 			void execute() override {
