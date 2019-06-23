@@ -499,7 +499,7 @@ struct PipelineImpl final : Pipeline
 			const int shadowmap_width = 1024;
 
 			const Universe& universe = m_scene->getUniverse();
-			const EntityPtr light = m_scene->getActiveGlobalLight();
+			const EntityPtr light = m_scene->getActiveEnvironment();
 			const Vec4 cascades = light.isValid() ? m_scene->getShadowmapCascades((EntityRef)light) : Vec4(3, 10, 60, 150);
 			const Matrix light_mtx = light.isValid() ? universe.getRelativeMatrix((EntityRef)light, m_viewport.pos) : Matrix::IDENTITY;
 
@@ -607,13 +607,13 @@ struct PipelineImpl final : Pipeline
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 
-		const EntityPtr global_light = m_scene->getActiveGlobalLight();
+		const EntityPtr global_light = m_scene->getActiveEnvironment();
 		if(global_light.isValid()) {
 			EntityRef gl = (EntityRef)global_light;
 			global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
-			global_state.light_color = m_scene->getGlobalLight(gl).m_diffuse_color;
-			global_state.light_intensity = m_scene->getGlobalLight(gl).m_diffuse_intensity;
-			global_state.light_indirect_intensity = m_scene->getGlobalLight(gl).m_indirect_intensity;
+			global_state.light_color = m_scene->getEnvironment(gl).m_diffuse_color;
+			global_state.light_intensity = m_scene->getEnvironment(gl).m_diffuse_intensity;
+			global_state.light_indirect_intensity = m_scene->getEnvironment(gl).m_indirect_intensity;
 		}
 
 		prepareShadowCameras(global_state);

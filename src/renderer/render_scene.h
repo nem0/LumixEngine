@@ -60,7 +60,7 @@ struct TerrainInfo
 };
 
 
-struct GlobalLight
+struct Environment
 {
 	Vec3 m_diffuse_color;
 	float m_diffuse_intensity;
@@ -222,8 +222,8 @@ public:
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;
-	virtual EntityPtr getActiveGlobalLight() = 0;
-	virtual void setActiveGlobalLight(EntityRef entity) = 0;
+	virtual EntityPtr getActiveEnvironment() = 0;
+	virtual void setActiveEnvironment(EntityRef entity) = 0;
 	virtual Vec4 getShadowmapCascades(EntityRef entity) = 0;
 	virtual void setShadowmapCascades(EntityRef entity, const Vec4& value) = 0;
 
@@ -319,13 +319,11 @@ public:
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 
-	virtual GlobalLight& getGlobalLight(EntityRef entity) = 0;
+	virtual Environment& getEnvironment(EntityRef entity) = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, int max_count, PointLight* lights) = 0;
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
-	virtual EntityRef getPointLightEntity(EntityRef entity) const = 0;
-	virtual EntityRef getGlobalLightEntity(EntityRef entity) const = 0;
 
 	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;

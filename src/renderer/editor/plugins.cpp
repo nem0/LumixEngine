@@ -57,7 +57,7 @@ static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain"
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
-static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
+static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
@@ -602,9 +602,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		m_tile.universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
-		render_scene->getGlobalLight(light_entity).m_diffuse_intensity = 1;
-		render_scene->getGlobalLight(light_entity).m_indirect_intensity = 1;
+		m_tile.universe->createComponent(ENVIRONMENT_TYPE, light_entity);
+		render_scene->getEnvironment(light_entity).m_diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).m_indirect_intensity = 1;
 		
 		m_tile.pipeline->setScene(render_scene);
 	}
@@ -626,9 +626,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		auto light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
-		m_universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
-		render_scene->getGlobalLight(light_entity).m_diffuse_intensity = 1;
-		render_scene->getGlobalLight(light_entity).m_indirect_intensity = 1;
+		m_universe->createComponent(ENVIRONMENT_TYPE, light_entity);
+		render_scene->getEnvironment(light_entity).m_diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).m_indirect_intensity = 1;
 
 		m_pipeline->setScene(render_scene);
 	}
@@ -2655,7 +2655,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 			showPointLightGizmo(cmp);
 			return true;
 		}
-		if (cmp.type == GLOBAL_LIGHT_TYPE)
+		if (cmp.type == ENVIRONMENT_TYPE)
 		{
 			showGlobalLightGizmo(cmp);
 			return true;
@@ -2794,7 +2794,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 
 		m_app.registerComponent("camera", "Render/Camera");
-		m_app.registerComponent("global_light", "Render/Global light");
+		m_app.registerComponent("environment", "Render/Environment");
 
 		m_app.registerComponentWithResource(
 			"model_instance", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
