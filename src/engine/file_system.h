@@ -38,6 +38,7 @@ public:
 	virtual OS::FileIterator* createFileIterator(const char* dir) = 0;
 	virtual bool open(const char* path, OS::InputFile* file) = 0;
 	virtual bool open(const char* path, OS::OutputFile* file) = 0;
+	virtual bool makePath(const char* path) = 0;
 
 	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;
