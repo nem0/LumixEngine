@@ -623,9 +623,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_mesh = mesh_entity;
 		m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
-		auto light_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		Matrix mtx;
+		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
+		auto light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
 		m_universe->createComponent(GLOBAL_LIGHT_TYPE, light_entity);
 		render_scene->getGlobalLight(light_entity).m_diffuse_intensity = 1;
+		render_scene->getGlobalLight(light_entity).m_indirect_intensity = 1;
 
 		m_pipeline->setScene(render_scene);
 	}
@@ -1238,7 +1241,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			job->m_in_path << in_path;
 			job->m_out_path = fs.getBasePath();
 			job->m_out_path << out_path;
-			JobSystem::run(job, &TextureTileJob::execute, nullptr);
+			JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
+			JobSystem::runEx(job, &TextureTileJob::execute, &signal, m_tile_signal, JobSystem::getWorkersCount() - 1);
+			m_tile_signal = signal;
 			return true;
 		}
 		return false;
@@ -1413,6 +1418,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 
 	StudioApp& m_app;
+	JobSystem::SignalHandle m_tile_signal = JobSystem::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
 };
