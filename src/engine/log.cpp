@@ -49,6 +49,7 @@ LogProxy::LogProxy(Log* log, const char* system)
 LogProxy::~LogProxy()
 {
 	g_callback.invoke(log->level, system, log->message.c_str());
+	log->message = "";
 }
 
 
