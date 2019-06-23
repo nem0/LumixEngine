@@ -2188,12 +2188,15 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
-	void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum, RenderableTypes type) override
+	void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum) override
 	{
-		CullResult* renderables = m_render_scene->getRenderables(frustum, type);
-		while (renderables) {
-			for (int i = 0; i < renderables->header.count; ++i) {
-				entities.push(renderables->entities[i]);
+		for (int i = 0; i < (int)RenderableTypes::COUNT; ++i) {
+			CullResult* renderables = m_render_scene->getRenderables(frustum, (RenderableTypes)i);
+			while (renderables) {
+				for (int i = 0; i < renderables->header.count; ++i) {
+					entities.push(renderables->entities[i]);
+				}
+				renderables = renderables->header.next;
 			}
 		}
 	}
