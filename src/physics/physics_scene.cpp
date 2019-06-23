@@ -5032,6 +5032,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	HashMap<EntityRef, Wheel> m_wheels;
 	PxVehicleDrivableSurfaceToTireFrictionPairs* m_vehicle_frictions;
 	PxBatchQuery* m_vehicle_batch_query;
+	u8 m_vehicle_query_mem[sizeof(PxRaycastQueryResult) * 64 + sizeof(PxRaycastHit) * 64];
 	PxRaycastQueryResult* m_vehicle_results;
 	u64 m_physics_cmps_mask;
 
@@ -5075,8 +5076,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor =
 		PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
-	u8* mem = (u8*)impl->m_allocator.allocate(sizeof(PxRaycastQueryResult) * 64 + sizeof(PxRaycastHit) * 64);
-	impl->m_vehicle_batch_query = impl->createVehicleBatchQuery(mem);
+	impl->m_vehicle_batch_query = impl->createVehicleBatchQuery(impl->m_vehicle_query_mem);
 	return impl;
 }
 
