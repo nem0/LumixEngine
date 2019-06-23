@@ -729,42 +729,6 @@ static bool saveAsDDS(const u8* image_data,
 }
 
 
-void FBXImporter::writeTextures(const char* fbx_path, const ImportConfig& cfg)
-{
-	PROFILE_FUNCTION();
-	const PathUtils::FileInfo fbx_info(fbx_path);
-	for (const ImportMaterial& mat : materials) {
-		for (int i = 0; i < lengthOf(mat.textures); ++i) {
-			const ImportTexture& tex = mat.textures[i];
-
-			if (!tex.fbx) continue;
-			if (!tex.import) continue;
-
-			PathUtils::FileInfo tex_info(tex.src);
-			makeLowercase(tex_info.m_basename, lengthOf(tex_info.m_basename), tex_info.m_basename);
-
-			const StaticString<MAX_PATH_LENGTH> tex_path(fbx_path, "|", tex_info.m_basename, ".tex");
-			const u32 hash = crc32(tex_path);
-			const StaticString<MAX_PATH_LENGTH> dst_path(cfg.output_dir, hash, ".res");
-
-			if (OS::fileExists(dst_path)) continue;
-
-			int image_width, image_height, image_comp;
-			stbi_uc* data = stbi_load(tex.src, &image_width, &image_height, &image_comp, 4);
-			if (!data) {
-				logError("Renderer") << "Could not load image " << tex.src;
-				continue;
-			}
-			
-			const bool is_normal_map = i == FBXImporter::ImportTexture::NORMAL;
-
-			saveAsDDS(data, image_width, image_height, image_comp == 4, is_normal_map, dst_path);
-			stbi_image_free(data);
-		}
-	}
-}
-
-
 void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION()

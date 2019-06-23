@@ -137,7 +137,6 @@ struct FBXImporter
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
 	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg);
-	void writeTextures(const char* fbx_path, const ImportConfig& cfg);
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
 	static void getImportMeshName(const ImportMesh& mesh, char (&name)[256]);
