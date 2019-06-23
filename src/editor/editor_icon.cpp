@@ -18,7 +18,7 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType PHYSICAL_CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
-static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
+static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 
@@ -145,7 +145,7 @@ struct EditorIconsImpl final : public EditorIcons
 				icon.type = IconType::CAMERA;
 				break;
 			}
-			if(cmp.type == GLOBAL_LIGHT_TYPE || cmp.type == POINT_LIGHT_TYPE)
+			if(cmp.type == ENVIRONMENT_TYPE || cmp.type == POINT_LIGHT_TYPE)
 			{
 				icon.type = IconType::LIGHT;
 				break;

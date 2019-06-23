@@ -48,7 +48,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
-static const ComponentType GLOBAL_LIGHT_TYPE = Reflection::getComponentType("global_light");
+static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
@@ -629,9 +629,9 @@ public:
 	}
 
 
-	void serializeGlobalLight(ISerializer& serializer, EntityRef entity)
+	void serializeEnvironment(ISerializer& serializer, EntityRef entity)
 	{
-		GlobalLight& light = m_global_lights[entity];
+		Environment& light = m_environments[entity];
 		serializer.write("cascades", light.m_cascades);
 		serializer.write("diffuse_color", light.m_diffuse_color);
 		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
@@ -643,9 +643,9 @@ public:
 	}
 
 
-	void deserializeGlobalLight(IDeserializer& serializer, EntityRef entity, int scene_version)
+	void deserializeEnvironment(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		GlobalLight light;
+		Environment light;
 		light.m_entity = entity;
 		serializer.read(&light.m_cascades);
 		serializer.read(&light.m_diffuse_color);
@@ -655,8 +655,8 @@ public:
 		serializer.read(&light.m_fog_color);
 		serializer.read(&light.m_fog_density);
 		serializer.read(&light.m_fog_height);
-		m_global_lights.insert(entity, light);
-		m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this);
+		m_environments.insert(entity, light);
+		m_universe.onComponentCreated(light.m_entity, ENVIRONMENT_TYPE, this);
 		m_active_global_light_entity = entity;
 	}
 	
@@ -1085,8 +1085,8 @@ public:
 			serializer.write(pl);
 		}
 
-		serializer.write((i32)m_global_lights.size());
-		for (const GlobalLight& light : m_global_lights)
+		serializer.write((i32)m_environments.size());
+		for (const Environment& light : m_environments)
 		{
 			serializer.write(light);
 		}
@@ -1385,10 +1385,10 @@ public:
 
 		serializer.read(size);
 		for (int i = 0; i < size; ++i) {
-			GlobalLight light;
+			Environment light;
 			serializer.read(light);
-			m_global_lights.insert(light.m_entity, light);
-			m_universe.onComponentCreated(light.m_entity, GLOBAL_LIGHT_TYPE, this);
+			m_environments.insert(light.m_entity, light);
+			m_universe.onComponentCreated(light.m_entity, ENVIRONMENT_TYPE, this);
 		}
 		serializer.read(m_active_global_light_entity);
 	}
@@ -1458,15 +1458,15 @@ public:
 	}
 
 
-	void destroyGlobalLight(EntityRef entity)
+	void destroyEnvironment(EntityRef entity)
 	{
-		m_universe.onComponentDestroyed(entity, GLOBAL_LIGHT_TYPE, this);
+		m_universe.onComponentDestroyed(entity, ENVIRONMENT_TYPE, this);
 
 		if ((EntityPtr)entity == m_active_global_light_entity)
 		{
 			m_active_global_light_entity = INVALID_ENTITY;
 		}
-		m_global_lights.erase(entity);
+		m_environments.erase(entity);
 	}
 
 
@@ -1625,9 +1625,9 @@ public:
 	}
 
 
-	GlobalLight& getGlobalLight(EntityRef entity) override
+	Environment& getEnvironment(EntityRef entity) override
 	{
-		return m_global_lights[entity];
+		return m_environments[entity];
 	}
 
 
@@ -2864,7 +2864,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	
 	Vec4 getShadowmapCascades(EntityRef entity) override
 	{
-		return m_global_lights[entity].m_cascades;
+		return m_environments[entity].m_cascades;
 	}
 
 
@@ -2876,7 +2876,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		valid_value.z = maximum(valid_value.y + 0.01f, valid_value.z);
 		valid_value.w = maximum(valid_value.z + 0.01f, valid_value.w);
 
-		m_global_lights[entity].m_cascades = valid_value;
+		m_environments[entity].m_cascades = valid_value;
 	}
 
 
@@ -2893,27 +2893,15 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	}
 
 
-	void setActiveGlobalLight(EntityRef entity) override
+	void setActiveEnvironment(EntityRef entity) override
 	{
 		m_active_global_light_entity = entity;
 	}
 
 
-	EntityPtr getActiveGlobalLight() override
+	EntityPtr getActiveEnvironment() override
 	{
 		return m_active_global_light_entity;
-	}
-
-
-	EntityRef getPointLightEntity(EntityRef entity) const override
-	{
-		return m_point_lights[entity].entity;
-	}
-
-
-	EntityRef getGlobalLightEntity(EntityRef entity) const override
-	{
-		return m_global_lights[entity].m_entity;
 	}
 
 
@@ -3256,9 +3244,9 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	IAllocator& getAllocator() override { return m_allocator; }
 
 
-	void createGlobalLight(EntityRef entity)
+	void createEnvironment(EntityRef entity)
 	{
-		GlobalLight light;
+		Environment light;
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 0;
@@ -3269,10 +3257,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		light.m_fog_bottom = 0.0f;
 		light.m_fog_height = 10.0f;
 
-		if (m_global_lights.empty()) m_active_global_light_entity = entity;
+		if (m_environments.empty()) m_active_global_light_entity = entity;
 
-		m_global_lights.insert(entity, light);
-		m_universe.onComponentCreated(entity, GLOBAL_LIGHT_TYPE, this);
+		m_environments.insert(entity, light);
+		m_universe.onComponentCreated(entity, ENVIRONMENT_TYPE, this);
 	}
 
 
@@ -3402,7 +3390,7 @@ private:
 	HashMap<EntityRef, Decal> m_decals;
 	Array<ModelInstance> m_model_instances;
 	Array<MeshSortData> m_mesh_sort_data;
-	HashMap<EntityRef, GlobalLight> m_global_lights;
+	HashMap<EntityRef, Environment> m_environments;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera;
 	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
@@ -3444,7 +3432,7 @@ static struct
 	void (RenderSceneImpl::*destroyer)(EntityRef);
 } COMPONENT_INFOS[] = {
 	COMPONENT_TYPE(MODEL_INSTANCE_TYPE, ModelInstance),
-	COMPONENT_TYPE(GLOBAL_LIGHT_TYPE, GlobalLight),
+	COMPONENT_TYPE(ENVIRONMENT_TYPE, Environment),
 	COMPONENT_TYPE(POINT_LIGHT_TYPE, PointLight),
 	COMPONENT_TYPE(DECAL_TYPE, Decal),
 	COMPONENT_TYPE(CAMERA_TYPE, Camera),
@@ -3471,7 +3459,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_text_meshes(m_allocator)
 	, m_terrains(m_allocator)
 	, m_point_lights(m_allocator)
-	, m_global_lights(m_allocator)
+	, m_environments(m_allocator)
 	, m_decals(m_allocator)
 	, m_debug_triangles(m_allocator)
 	, m_debug_lines(m_allocator)
@@ -3532,8 +3520,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(setGlobalLODMultiplier);
 	REGISTER_FUNCTION(getGlobalLODMultiplier);
 	REGISTER_FUNCTION(getCameraViewProjection);
-	REGISTER_FUNCTION(getGlobalLightEntity);
-	REGISTER_FUNCTION(getActiveGlobalLight);
+	REGISTER_FUNCTION(getActiveEnvironment);
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);

@@ -1429,6 +1429,7 @@ public:
 				if (dropped_entity != entity)
 				{
 					m_editor->makeParent(entity, dropped_entity);
+					ImGui::EndDragDropTarget();
 					if (node_open) ImGui::TreePop();
 					return;
 				}
@@ -1520,8 +1521,7 @@ public:
 				ImGui::PopItemWidth();
 			}
 			ImGui::EndChild();
-			// TODO uncomment once it's fixed in imgui
-			/*if (ImGui::BeginDragDropTarget())
+			if (ImGui::BeginDragDropTarget())
 			{
 				if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
 				{
@@ -1529,7 +1529,7 @@ public:
 					m_editor->makeParent(INVALID_ENTITY, dropped_entity);
 				}
 				ImGui::EndDragDropTarget();
-			}*/
+			}
 		}
 		ImGui::End();
 	}
