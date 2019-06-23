@@ -298,7 +298,7 @@ public:
 
 		const uint mask = m_mask;
 		while (keys[pos + 1].valid) {
-			rehash(pos);
+			rehash(pos + 1);
 			++pos;
 		}
 	}
@@ -352,6 +352,7 @@ private:
 			((Key*)m_keys[pos].key_mem)->~Key();
 			m_values[pos].~Value();
 			m_keys[pos].valid = false;
+			m_keys[rehashed_pos].valid = true;
 		}
 	}
 
