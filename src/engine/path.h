@@ -12,6 +12,14 @@ struct IInputStream;
 struct IOutputStream;
 
 
+struct PathInternal
+{
+	char m_path[MAX_PATH_LENGTH];
+	u32 m_id;
+	volatile i32 m_ref_count;
+};
+
+
 class LUMIX_ENGINE_API Path
 {
 public:
@@ -34,7 +42,7 @@ public:
 	bool isValid() const;
 
 private:
-	class PathInternal* m_data;
+	PathInternal* m_data;
 };
 
 
