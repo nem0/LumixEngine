@@ -709,7 +709,7 @@ private:
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 		
 		EntityPtr parent = scene->getUniverse().getParent(entity);
-		GUIScene::Rect parent_rect = scene->getRectOnCanvas((EntityRef)parent, canvas_size);
+		GUIScene::Rect parent_rect = scene->getRectOnCanvas(parent, canvas_size);
 		GUIScene::Rect child_rect = scene->getRectOnCanvas(entity, canvas_size);
 
 		m_editor->beginCommandGroup(crc32("make_gui_rect_relative"));
