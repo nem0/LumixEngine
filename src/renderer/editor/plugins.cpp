@@ -576,7 +576,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
 			m_fbx_importer.writeMaterials(filepath, cfg);
 			m_fbx_importer.writeAnimations(filepath, cfg);
-			m_fbx_importer.writeTextures(filepath, cfg);
 			return true;
 		}
 
