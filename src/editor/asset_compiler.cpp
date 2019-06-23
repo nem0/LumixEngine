@@ -94,7 +94,8 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_to_compile_subresources(app.getWorldEditor().getAllocator())
 		, m_dependencies(app.getWorldEditor().getAllocator())
 	{
-		m_watcher = FileSystemWatcher::create(".", app.getWorldEditor().getAllocator());
+		FileSystem& fs = app.getWorldEditor().getEngine().getFileSystem();
+		m_watcher = FileSystemWatcher::create(fs.getBasePath(), app.getWorldEditor().getAllocator());
 		m_watcher->getCallback().bind<AssetCompilerImpl, &AssetCompilerImpl::onFileChanged>(this);
 		m_task.create("Asset compiler", true);
 		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
