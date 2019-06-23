@@ -747,7 +747,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 				}
 			}
 			if(insert_value) ImGui::SetKeyboardFocusHere();
-			ImGui::InputTextMultiline("",
+			ImGui::InputTextMultiline("##repl",
 				buf,
 				lengthOf(buf),
 				ImVec2(-1, -1),

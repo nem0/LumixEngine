@@ -559,10 +559,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_fbx_importer.setSource(cfg.base_path, filepath);
 			if (m_fbx_importer.getMeshes().empty()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-					logError("Editor") << "No meshes with materials found in " << src.c_str();
+					logError("Editor") << "No meshes with materials found in " << src;
 				}
 				else {
-					logError("Editor") << "No meshes found in " << src.c_str();
+					logError("Editor") << "No meshes found in " << src;
 				}
 			}
 
