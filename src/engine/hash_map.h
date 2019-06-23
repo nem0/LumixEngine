@@ -196,6 +196,19 @@ public:
 		init(size, true); 
 	}
 
+	~HashMap()
+	{
+		for(uint i = 0, c = m_capacity; i < c; ++i) {
+			if (m_keys[i].valid) {
+				((Key*)m_keys[i].key_mem)->~Key();
+				m_values[i].~Value();
+				m_keys[i].valid = false;
+			}
+		}
+		m_allocator.deallocate(m_keys);
+		m_allocator.deallocate(m_values);
+	}
+
 	iterator begin() {
 		for (uint i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) return { this, i };

@@ -141,6 +141,10 @@ void FBXImporter::gatherMaterials(const ofbx::Object* node, const char* src_dir)
 				}
 			}
 
+			char tmp[MAX_PATH_LENGTH];
+			PathUtils::normalize(tex.src, tmp, lengthOf(tmp));
+			tex.src = tmp;
+
 			tex.import = true;
 			tex.to_dds = true;
 		};
@@ -766,8 +770,8 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		
 		const PathUtils::FileInfo src_info(src);
 
-		const StaticString<MAX_PATH_LENGTH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
-		if(OS::fileExists(mat_src)) continue;
+		const StaticString<MAX_PATH_LENGTH + 128> mat_src(cfg.base_path, src_info.m_dir, mat_name, ".mat");
+		if (OS::fileExists(mat_src)) continue;
 		
 		const u32 hash = crc32(mat_src);
 
