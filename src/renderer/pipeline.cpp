@@ -2823,9 +2823,18 @@ struct PipelineImpl final : Pipeline
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
 									const u32 bucket = bucket_map[mesh.layer];
-									if (bucket < 0xffFF) {
-										// TODO sort by depth bucket
-										result.push(mi.meshes[mesh_idx].sort_key | ((u64)bucket << 56), e.index | type_mask | ((u64)mesh_idx << 40));
+									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
+									if (bucket < 0xff) {
+										const u64 key = ((u64)mi.meshes[mesh_idx].sort_key << 32) | ((u64)bucket << 56);
+										result.push(key, subrenderable);
+									
+									} else if (bucket < 0xffFF) {
+										const DVec3 pos = entity_data[e.index].pos;
+										const DVec3 rel_pos = pos - camera_pos;
+										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
+										const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+										result.push(key, subrenderable);
 									}
 								}
 							}
