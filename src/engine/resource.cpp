@@ -137,7 +137,8 @@ void Resource::doLoad()
 	FileSystem::ContentCallback cb;
 	cb.bind<Resource, &Resource::fileLoaded>(this);
 
-	const StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", m_path.c_str());
+	const u32 hash = m_path.getHash();
+	const StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", hash, ".res");
 
 	m_async_op = fs.getContent(Path(res_path), cb);
 }
