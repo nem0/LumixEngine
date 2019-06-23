@@ -400,8 +400,10 @@ void AssetBrowser::detailsGUI()
 
 		const AssetCompiler& compiler = m_app.getAssetCompiler();
 		ResourceType resource_type = compiler.getResourceType(path);
-		IPlugin* plugin = m_plugins.get(resource_type);
-		plugin->onGUI(m_selected_resource);
+		auto iter = m_plugins.find(resource_type);
+		if(iter.isValid()) {
+			iter.value()->onGUI(m_selected_resource);
+		}
 	}
 	ImGui::End();
 }
@@ -637,7 +639,10 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 
 bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height) const
 {
-	IPlugin* plugin = m_plugins.get(type);
+	auto iter = m_plugins.find(type);
+	if (!iter.isValid()) return false;
+
+	IPlugin* plugin = iter.value();
 	if (plugin->canCreateResource() && ImGui::Selectable("New"))
 	{
 		char path[MAX_PATH_LENGTH];

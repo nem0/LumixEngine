@@ -95,7 +95,7 @@ private:
 	Array<int> m_filtered_file_infos;
 	Array<Path> m_history;
 	int m_history_index;
-	AssociativeArray<ResourceType, IPlugin*> m_plugins;
+	HashMap<ResourceType, IPlugin*> m_plugins;
 	Resource* m_selected_resource;
 	WorldEditor& m_editor;
 	int m_current_type;

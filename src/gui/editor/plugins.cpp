@@ -440,12 +440,12 @@ private:
 				}
 			}
 
-			Viewport vp;
+			Viewport vp = {};
 			vp.w = (int)size.x;
 			vp.h = (int)size.y;
 			m_pipeline->setViewport(vp);
 			
-			if (m_pipeline->render()) {
+			if (m_pipeline->render(true)) {
 				m_texture_handle = m_pipeline->getOutput();
 
 				if(m_texture_handle.isValid()) {

@@ -593,7 +593,7 @@ void SceneView::onWindowGUI()
 		vp.h = (int)size.y;
 		m_editor.setViewport(vp);
 		m_pipeline->setViewport(vp);
-		m_pipeline->render();
+		m_pipeline->render(false);
 		m_editor.inputFrame();
 
 		m_texture_handle = m_pipeline->getOutput();
