@@ -1275,7 +1275,8 @@ struct PipelineImpl final : Pipeline
 
 			void setup() override
 			{
-				m_pipeline->getScene()->getEnvironmentProbes(m_probes);
+				RenderScene* scene = m_pipeline->getScene();
+				scene->getEnvironmentProbes(m_probes);
 			}
 
 
@@ -1300,7 +1301,7 @@ struct PipelineImpl final : Pipeline
 				const DVec3 cam_pos = m_camera_params.pos;
 				for (const EnvProbeInfo& probe : m_probes) {
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
-					ffr::TextureHandle handles[2] = { probe.radiance, probe.irradiance };
+					ffr::TextureHandle handles[2] = { probe.irradiance, probe.radiance };
 					ffr::bindTextures(handles, 14, 2);
 					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
 					
