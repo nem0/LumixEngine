@@ -1297,13 +1297,18 @@ struct PipelineImpl final : Pipeline
 				ffr::setIndexBuffer(m_ib);
 				ffr::useProgram(prog.handle);
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::CULL_BACK) | blend_state);
 				const DVec3 cam_pos = m_camera_params.pos;
 				for (const EnvProbeInfo& probe : m_probes) {
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
 					ffr::TextureHandle handles[2] = { probe.radiance, probe.irradiance };
 					ffr::bindTextures(handles, 14, 2);
 					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
+					
+					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius);
+					const u64 state = intersecting
+						? (u64)ffr::StateFlags::CULL_FRONT
+						: (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK;
+					ffr::setState(state | blend_state);
 					ffr::drawTriangles(36);
 				}
 				ffr::popDebugGroup();

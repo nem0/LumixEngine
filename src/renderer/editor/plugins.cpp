@@ -623,9 +623,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_mesh = mesh_entity;
 		m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
-		const EntityRef env_probe = m_universe->createEntity({}, Quat::IDENTITY);
+		const EntityRef env_probe = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
 		m_universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
-		render_scene->setEnvironmentProbeRadius(env_probe, 10e6);
+		render_scene->setEnvironmentProbeRadius(env_probe, 1e3);
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});

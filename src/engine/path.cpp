@@ -16,15 +16,6 @@ struct PathManagerImpl;
 static PathManagerImpl* g_path_manager = nullptr;
 
 
-class PathInternal
-{
-public:
-	char m_path[MAX_PATH_LENGTH];
-	u32 m_id;
-	volatile i32 m_ref_count;
-};
-
-
 struct PathManagerImpl : PathManager
 {
 	PathManagerImpl::PathManagerImpl(IAllocator& allocator)
