@@ -12,23 +12,22 @@
 		</Expand>
 	</Type>
 
-  <Type Name="Lumix::HashMap&lt;*,*&gt;">
+	<Type Name="Lumix::Path">
+		<DisplayString>{m_data->m_path}</DisplayString>
+	</Type>
+	
+	<Type Name="Lumix::HashMap&lt;*,*&gt;">
     <DisplayString>{{ size={m_size} }}</DisplayString>
     <Expand>
       <Item Name="[size]" ExcludeView="simple">m_size</Item>
       <CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
         <Variable Name="i" InitialValue="0" />
-        <Variable Name="j" InitialValue="m_table" />
+        <Variable Name="k" InitialValue="m_keys" />
         <Loop>
-          <Break Condition="i == m_max_id" />
-          <Exec>j = &amp;m_table[i]</Exec>
-          <Loop>
-            <Break Condition="j == 0" />
-            <Break Condition="j == m_sentinel" />
-            <Break Condition="j-&gt;m_next == m_sentinel" />
-            <Item Name="[{j-&gt;m_key}]">j-&gt;m_value</Item>
-            <Exec>j = j-&gt;m_next</Exec>
-          </Loop>
+          <Break Condition="i == m_capacity" />
+          <If Condition="m_keys[i].valid">
+            <Item Name="[{*($T1*)m_keys[i].key_mem}]">m_values[i]</Item>
+          </If>
           <Exec>++i</Exec>
         </Loop>
       </CustomListItems>
