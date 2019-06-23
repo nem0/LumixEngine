@@ -1589,9 +1589,7 @@ public:
 
 	void rectSelect()
 	{
-        ASSERT(false);
-        // TODO
-		/*Array<EntityRef> entities(m_allocator);
+		Array<EntityRef> entities(m_allocator);
 
 		Vec2 min = m_rect_selection_start;
 		Vec2 max = m_mouse_pos;
@@ -1599,7 +1597,7 @@ public:
 		if (min.y > max.y) swap(min.y, max.y);
 		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
 		m_render_interface->getRenderables(entities, frustum);
-		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);*/
+		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
 	}
 
 
