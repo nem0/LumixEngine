@@ -134,9 +134,9 @@ struct FBXImporter
 	bool setSource(const char* base_dir, const char* filename);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
 	void writeAnimations(const char* src, const ImportConfig& cfg);
-	void writeSubmodels(const char* src, const ImportConfig& cfg);
+	void writeSubmodels(const char* dir, const char* basename, const ImportConfig& cfg);
 	void writePrefab(const char* src, const ImportConfig& cfg);
-	void writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg);
+	void writeModel(const char* dir, const char* basename, const char* ext, const ImportConfig& cfg);
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
 	static void getImportMeshName(const ImportMesh& mesh, char (&name)[256]);
@@ -156,7 +156,6 @@ private:
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
 	void writeString(const char* str);
-	bool writeBillboardMaterial(const char* output_dir, const char* src);
 	bool isSkinned(const ofbx::Mesh& mesh) const { return !ignore_skeleton && mesh.getGeometry()->getSkin() != nullptr; }
 	int getVertexSize(const ofbx::Mesh& mesh) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ofbx::Mesh* mesh) const;
@@ -164,11 +163,9 @@ private:
 	Quat fixRootOrientation(const Quat& v) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;
-	void writeBillboardVertices(const AABB& aabb);
 	void writeGeometry();
 	void writeGeometry(int mesh_idx);
-	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset, const char* mesh_output_filename);
-	void writeMeshes(const char* mesh_output_filename, const char* src, int mesh_idx);
+	void writeMeshes(const char* src, int mesh_idx);
 	void writeSkeleton(const ImportConfig& cfg);
 	void writeLODs();
 	int getAttributeCount(const ofbx::Mesh& mesh) const;
@@ -196,7 +193,6 @@ private:
 	bool ignore_skeleton = false;
 	bool import_vertex_colors = true;
 	bool make_convex = false;
-	bool create_billboard_lod = false;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;
 };

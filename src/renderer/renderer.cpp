@@ -315,7 +315,7 @@ static void registerProperties(IAllocator& allocator)
 		component("model_instance",
 			property("Enabled", &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
-				ResourceAttribute("Mesh (*.msh)", Model::TYPE))
+				ResourceAttribute("Mesh (*.fbx)", Model::TYPE))
 		),
 		component("global_light",
 			var_property("Color", &RenderScene::getGlobalLight, &GlobalLight::m_diffuse_color, ColorAttribute()),
@@ -359,7 +359,7 @@ static void registerProperties(IAllocator& allocator)
 				MinAttribute(0)),
 			array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
 				property("Mesh", LUMIX_PROP(RenderScene, GrassPath),
-					ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
+					ResourceAttribute("Mesh (*.fbx)", Model::TYPE)),
 				property("Distance", LUMIX_PROP(RenderScene, GrassDistance),
 					MinAttribute(1)),
 				property("Density", LUMIX_PROP(RenderScene, GrassDensity)),

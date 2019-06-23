@@ -29,10 +29,16 @@ struct HashFunc<ResourceType>
 
 struct AssetCompiler
 {
+	enum class CompileResult {
+		FAILED,
+		COMPILED,
+		COPY_AS_IS
+	};
+
 	struct IPlugin
 	{
 		virtual ~IPlugin() {}
-		virtual bool compile(const Path& src) = 0;
+		virtual CompileResult compile(const Path& src) = 0;
 		virtual void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources);
 	};
 

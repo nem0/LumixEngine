@@ -109,16 +109,9 @@ struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		app.getAssetCompiler().registerExtension("ttf", FontResource::TYPE); 
 	}
 	
-	bool compile(const Path& src) override
+	AssetCompiler::CompileResult compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return AssetCompiler::CompileResult::COPY_AS_IS;
 	}
 
 	void onGUI(Resource* resource) override {}
@@ -137,16 +130,9 @@ struct PipelinePlugin final : AssetCompiler::IPlugin
 		: m_app(app)
 	{}
 
-	bool compile(const Path& src) override
+	AssetCompiler::CompileResult compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return AssetCompiler::CompileResult::COPY_AS_IS;
 	}
 
 	StudioApp& m_app;
@@ -162,16 +148,9 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	}
 
 
-	bool compile(const Path& src) override
+	AssetCompiler::CompileResult compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return AssetCompiler::CompileResult::COPY_AS_IS;
 	}
 	
 	
@@ -198,16 +177,9 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	bool compile(const Path& src) override
+	AssetCompiler::CompileResult compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return AssetCompiler::CompileResult::COPY_AS_IS;
 	}
 
 
@@ -546,47 +518,38 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return *c != ':' ? str : c + 1;
 	}
 
-	bool compile(const Path& src) override
+	AssetCompiler::CompileResult compile(const Path& src) override
 	{
-		if (PathUtils::hasExtension(src.c_str(), "fbx")) {
-			const char* filepath = getResourceFilePath(src.c_str());
-			FBXImporter::ImportConfig cfg;
-			cfg.base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
-			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
-			const Meta meta = getMeta(Path(filepath));
-			cfg.mesh_scale = meta.scale;
-			const PathUtils::FileInfo src_info(filepath);
-			m_fbx_importer.setSource(cfg.base_path, filepath);
-			if (m_fbx_importer.getMeshes().empty()) {
-				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-					logError("Editor") << "No meshes with materials found in " << src;
-				}
-				else {
-					logError("Editor") << "No meshes found in " << src;
-				}
-			}
+		ASSERT (PathUtils::hasExtension(src.c_str(), "fbx"));
 
-			const StaticString<32> hash_str("", src.getHash());
-			if (meta.split) {
-				//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
-				const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
-				m_fbx_importer.writeSubmodels(filepath, cfg);
-				m_fbx_importer.writePrefab(filepath, cfg);
+		const char* filepath = getResourceFilePath(src.c_str());
+		FBXImporter::ImportConfig cfg;
+		cfg.base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
+		cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
+		const Meta meta = getMeta(Path(filepath));
+		cfg.mesh_scale = meta.scale;
+		const PathUtils::FileInfo src_info(filepath);
+		m_fbx_importer.setSource(cfg.base_path, filepath);
+		if (m_fbx_importer.getMeshes().empty()) {
+			if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
+				logError("Editor") << "No meshes with materials found in " << src;
 			}
-			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
-			m_fbx_importer.writeMaterials(filepath, cfg);
-			m_fbx_importer.writeAnimations(filepath, cfg);
-			return true;
+			else {
+				logError("Editor") << "No meshes found in " << src;
+			}
 		}
 
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		PathUtils::FileInfo src_path_info(src.c_str());
+		if (meta.split) {
+			//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+			const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
+			m_fbx_importer.writeSubmodels(src_path_info.m_dir, src_path_info.m_basename, cfg);
+			m_fbx_importer.writePrefab(filepath, cfg);
+		}
+		m_fbx_importer.writeModel(src_path_info.m_dir, src_path_info.m_basename, ".fbx", cfg);
+		m_fbx_importer.writeMaterials(filepath, cfg);
+		m_fbx_importer.writeAnimations(filepath, cfg);
+		return AssetCompiler::CompileResult::COMPILED;
 	}
 
 
@@ -1305,42 +1268,39 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	bool compile(const Path& src) override
+	AssetCompiler::CompileResult compile(const Path& src) override
 	{
-		char ext[4] = {};
-		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
-
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+		const PathUtils::FileInfo fi(src.c_str());
+		const StaticString<MAX_PATH_LENGTH> dst_dir(m_app.getAssetCompiler().getCompiledDir(), fi.m_dir);
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, fi.m_basename, ".", fi.m_extension);
 
 		OS::InputFile srcf;
 		OS::OutputFile dstf;
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		if (!fs.open(src.c_str(), &srcf)) return false;
+		fs.makePath(dst_dir);
+		if (!fs.open(src.c_str(), &srcf)) return AssetCompiler::CompileResult::FAILED;
 		if (!fs.open(dst, &dstf)) {
 			srcf.close();
-			return false;
+			return AssetCompiler::CompileResult::FAILED;
 		}
 		
 		Meta meta = getMeta(src);
-		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
+		if (equalStrings(fi.m_extension, "dds") || equalStrings(fi.m_extension, "raw") || equalStrings(fi.m_extension, "tga")) {
 			Array<u8> buffer(m_app.getWorldEditor().getAllocator());
 			buffer.resize((int)srcf.size());
 
 			srcf.read(buffer.begin(), buffer.byte_size());
 
-			dstf.write(ext, sizeof(ext) - 1);
+			dstf.write(fi.m_extension, 3);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 			flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
 			dstf.write(&flags, sizeof(flags));
 			dstf.write(buffer.begin(), buffer.byte_size());
 		}
-		else if(equalStrings(ext, "jpg")) {
+		else if(equalStrings(fi.m_extension, "jpg")) {
 			compileJPEG(srcf, dstf, meta);
 		}
-		else if(equalStrings(ext, "png")) {
+		else if(equalStrings(fi.m_extension, "png")) {
 			// TODO rename
 			compileJPEG(srcf, dstf, meta);
 		}
@@ -1351,7 +1311,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		srcf.close();
 		dstf.close();
 
-		return true;
+		return AssetCompiler::CompileResult::COMPILED;
 	}
 
 
@@ -1512,15 +1472,9 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	bool compile(const Path& src) override
+	AssetCompiler::CompileResult compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		return fs.copyFile(src.c_str(), dst);
+		return AssetCompiler::CompileResult::COPY_AS_IS;
 	}
 
 
