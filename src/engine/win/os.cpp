@@ -1062,6 +1062,8 @@ Timer::Timer()
 	QueryPerformanceFrequency(&f);
 	QueryPerformanceCounter(&n);
 	first_tick = last_tick = n.QuadPart;
+	frequency = f.QuadPart;
+
 }
 
 
