@@ -792,7 +792,7 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 	}
 	else {
 		auto err = CommDlgExtendedError();
-		ASSERT(false);
+		ASSERT(err == 0);
 	}
 	return res;
 }
