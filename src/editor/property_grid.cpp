@@ -29,8 +29,6 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	, m_plugins(app.getWorldEditor().getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
-	m_particle_emitter_updating = true;
-	m_particle_emitter_timescale = 1.0f;
 	m_component_filter[0] = '\0';
 }
 
@@ -827,6 +825,11 @@ static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const ch
 
 void PropertyGrid::onGUI()
 {
+	for (auto* i : m_plugins) {
+		i->update();
+	}
+
+
 	if (!m_is_open) return;
 
 	auto& ents = m_editor.getSelectedEntities();
