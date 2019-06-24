@@ -110,8 +110,8 @@ fragment_shader [[
 			if(data.albedo.a < 0.5) discard;
 		#endif
 		data.wpos = v_wpos.xyz;
-		data.roughness = texture(u_roughnessmap, v_uv).r;
-		data.metallic  = texture(u_metallicmap, v_uv).r;
+		data.roughness = texture(u_roughnessmap, v_uv).r * u_material_params.x;
+		data.metallic  = texture(u_metallicmap, v_uv).r * u_material_params.y;
 		data.normal = normalize(v_normal);
 		data.emission = packEmission(u_material_params.z);
 	}

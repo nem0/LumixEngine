@@ -829,7 +829,6 @@ void PropertyGrid::onGUI()
 		i->update();
 	}
 
-
 	if (!m_is_open) return;
 
 	auto& ents = m_editor.getSelectedEntities();
