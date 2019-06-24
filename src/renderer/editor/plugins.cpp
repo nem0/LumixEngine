@@ -1603,8 +1603,12 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 {
+	static constexpr int TEXTURE_SIZE = 1024;
+
+
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
+		, m_data(app.getWorldEditor().getAllocator())
 	{
 		WorldEditor& world_editor = app.getWorldEditor();
 		Engine& engine = world_editor.getEngine();
@@ -1629,7 +1633,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	}
 
 
-	bool saveCubemap(ComponentUID cmp, const u8* data, int texture_size, const char* postfix)
+	bool saveCubemap(u64 probe_guid, const u8* data, int texture_size, const char* postfix)
 	{
 		crn_uint32 size;
 		crn_comp_params comp_params;
@@ -1669,7 +1673,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		{
 			logError("Editor") << "Failed to create " << path;
 		}
-		u64 probe_guid = ((RenderScene*)cmp.scene)->getEnvironmentProbeGUID((EntityRef)cmp.entity);
 		path << probe_guid << postfix << ".dds";
 		OS::OutputFile file;
 		if (!file.open(path))
@@ -1718,9 +1721,12 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	void generateCubemap(ComponentUID cmp)
 	{
 		ASSERT(cmp.isValid());
+		ASSERT(!m_in_progress);
+		m_in_progress = true;
+		MT::memoryBarrier();
+
 		const EntityRef entity = (EntityRef)cmp.entity;
 
-		static const int TEXTURE_SIZE = 1024;
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0') {
@@ -1751,8 +1757,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
-		Array<u8> data(allocator);
-		data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
+		m_data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
 		renderer->startCapture();
 		for (int i = 0; i < 6; ++i) {
@@ -1769,11 +1774,11 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 			const ffr::TextureHandle res = m_pipeline->getOutput();
 			ASSERT(res.isValid());
-			renderer->getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
+			renderer->getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 
 			if (ndc_bottom_left) continue;
 
-			u32* tmp = (u32*)&data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
+			u32* tmp = (u32*)&m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
 			if (i == 2 || i == 3)
 			{
 				flipY(tmp, TEXTURE_SIZE);
@@ -1786,52 +1791,84 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		renderer->stopCapture();
 		renderer->frame();
 		renderer->frame();
+		
+		m_irradiance_size = 32;
+		m_radiance_size = 128;
+		m_reflection_size = TEXTURE_SIZE;
 
-		cmft::Image image;
+		if (scene->isEnvironmentProbeCustomSize(entity)) {
+			m_irradiance_size = scene->getEnvironmentProbe(entity).irradiance_size;
+			m_radiance_size = scene->getEnvironmentProbe(entity).radiance_size;
+			m_reflection_size = scene->getEnvironmentProbeReflectionSize(entity);
+		}
+		m_save_reflection = scene->isEnvironmentProbeReflectionEnabled(entity);
+		m_probe_guid = scene->getEnvironmentProbeGUID(entity);
+		m_reload_probe = entity;
+
+		JobSystem::run(this, [](void* ptr) {
+			((EnvironmentProbePlugin*)ptr)->processData();
+		}, &m_signal);
+	}
+
+
+	void update() override
+	{
+		if (m_reload_probe.isValid() && !m_in_progress) {
+			Universe* universe = m_app.getWorldEditor().getUniverse();
+			auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
+			if(universe->hasEntity((EntityRef)m_reload_probe) 
+				&& universe->hasComponent((EntityRef)m_reload_probe, ENVIRONMENT_PROBE_TYPE))
+			{
+				scene->reloadEnvironmentProbe((EntityRef)m_reload_probe);
+			}
+			m_reload_probe = INVALID_ENTITY;
+		}
+	}
+
+
+	void processData()
+	{
+		cmft::Image image;	
 		cmft::Image irradiance;
 
 		cmft::imageCreate(image, TEXTURE_SIZE, TEXTURE_SIZE, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
-		copyMemory(image.m_data, &data[0], data.size());
+		copyMemory(image.m_data, &m_data[0], m_data.size());
 		cmft::imageToRgba32f(image);
-		
 
-		cmft::imageRadianceFilter(
-			image
-			, 128
-			, cmft::LightingModel::BlinnBrdf
-			, false
-			, 1
-			, 10
-			, 1
-			, cmft::EdgeFixup::None
-			, m_cl_context ? 0 : MT::getCPUsCount()
-			, m_cl_context
-		);
+		{
+			PROFILE_BLOCK("radiance filter");
+			cmft::imageRadianceFilter(
+				image
+				, 128
+				, cmft::LightingModel::BlinnBrdf
+				, false
+				, 1
+				, 10
+				, 1
+				, cmft::EdgeFixup::None
+				, m_cl_context ? 0 : MT::getCPUsCount()
+				, m_cl_context
+			);
+		}
 
-		cmft::imageIrradianceFilterSh(irradiance, 32, image);
+		{
+			PROFILE_BLOCK("irradiance filter");
+			cmft::imageIrradianceFilterSh(irradiance, 32, image);
+		}
 
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
 
-		int irradiance_size = 32;
-		int radiance_size = 128;
-		int reflection_size = TEXTURE_SIZE;
-
-		if (scene->isEnvironmentProbeCustomSize(entity)) {
-			irradiance_size = scene->getEnvironmentProbe(entity).irradiance_size;
-			radiance_size = scene->getEnvironmentProbe(entity).radiance_size;
-			reflection_size = scene->getEnvironmentProbeReflectionSize(entity);
+		for (int i = 3; i < m_data.size(); i += 4) m_data[i] = 0xff; 
+		saveCubemap(m_probe_guid, (u8*)irradiance.m_data, m_irradiance_size, "_irradiance");
+		saveCubemap(m_probe_guid, (u8*)image.m_data, m_radiance_size, "_radiance");
+		if (m_save_reflection) {
+			saveCubemap(m_probe_guid, &m_data[0], m_reflection_size, "");
 		}
 
-		for (int i = 3; i < data.size(); i += 4) data[i] = 0xff; 
-		saveCubemap(cmp, (u8*)irradiance.m_data, irradiance_size, "_irradiance");
-		saveCubemap(cmp, (u8*)image.m_data, radiance_size, "_radiance");
-		if (scene->isEnvironmentProbeReflectionEnabled(entity)) {
-			saveCubemap(cmp, &data[0], reflection_size, "");
-		}
-
-		scene->reloadEnvironmentProbe(entity);
+		MT::memoryBarrier();
+		m_in_progress = false;
 	}
 
 
@@ -1859,12 +1896,25 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			ImGui::LabelText("Radiance path", "%s", texture->getPath().c_str());
 			if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
 		}
-		if (ImGui::Button("Generate")) generateCubemap(cmp);
+		if (m_in_progress) ImGui::Text("Generating...");
+		else if (ImGui::Button("Generate")) generateCubemap(cmp);
 	}
 
 
 	StudioApp& m_app;
 	Pipeline* m_pipeline;
+	
+	Array<u8> m_data;
+	bool m_in_progress = false;
+	EntityPtr m_reload_probe = INVALID_ENTITY;
+	int m_irradiance_size;
+	int m_radiance_size;
+	int m_reflection_size;
+	bool m_save_reflection;
+	u64 m_probe_guid;
+
+	JobSystem::SignalHandle m_signal = JobSystem::INVALID_HANDLE;
+
 
 	cmft::ClContext* m_cl_context;
 };

@@ -167,6 +167,7 @@ public:
 		, m_instances(editor.getAllocator())
 		, m_resources(editor.getAllocator())
 		, m_prefabs(editor.getAllocator())
+		, m_deferred_instances(editor.getAllocator())
 	{
 		editor.universeCreated().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
@@ -379,7 +380,11 @@ public:
 
 	EntityPtr doInstantiatePrefab(PrefabResource& prefab_res, const DVec3& pos, const Quat& rot, float scale)
 	{
-		if (!prefab_res.isReady()) return INVALID_ENTITY;
+		if (!prefab_res.isReady()) {
+			m_deferred_instances.push({&prefab_res, {pos, rot, scale}});
+			// TODO undo does not work in this case
+			return INVALID_ENTITY;
+		}
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
 		{
 			m_resources.insert(prefab_res.getPath().getHash(), &prefab_res);
@@ -592,6 +597,27 @@ public:
 	}
 
 
+	void update() override
+	{
+		while (!m_deferred_instances.empty()) {
+			PrefabResource* res = m_deferred_instances.back().resource;
+			if (res->isFailure()) {
+				logError("Editor") << "Failed to instantiate " << res->getPath();
+				res->getResourceManager().unload(*res);
+				m_deferred_instances.pop();
+			} else if (res->isReady()) {
+				DeferredInstance tmp = m_deferred_instances.back();
+				doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
+				res->getResourceManager().unload(*res);
+				m_deferred_instances.pop();
+			} else {
+				break;
+			}
+		}
+	}
+
+
+
 	void serialize(IOutputStream& serializer) override
 	{
 		serializer.write(m_prefabs.size());
@@ -716,6 +742,12 @@ private:
 	Universe* m_universe;
 	WorldEditor& m_editor;
 	StudioApp* m_app;
+
+	struct DeferredInstance {
+		PrefabResource* resource;
+		Transform transform;
+	};
+	Array<DeferredInstance> m_deferred_instances;
 }; // class PrefabSystemImpl
 
 

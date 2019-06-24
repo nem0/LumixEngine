@@ -1407,6 +1407,8 @@ public:
 		updateGoTo();
 		previewSnapVertex();
 
+		m_prefab_system->update();
+
 		if (!m_selected_entities.empty())
 		{
 			m_gizmo->add(m_selected_entities[0]);
