@@ -922,12 +922,11 @@ struct RendererImpl final : public Renderer
 				PROFILE_FUNCTION();
 				JobSystem::enableBackupWorker(true);
 				ffr::swapBuffers();
-				// TODO
-				/*if(renderer->m_fence.isValid()) {
+				if(renderer->m_fence.isValid()) {
 					ffr::waitClient(renderer->m_fence);
 					ffr::destroy(renderer->m_fence);
 				}
-				renderer->m_fence = ffr::createFence();*/
+				renderer->m_fence = ffr::createFence();
 				JobSystem::enableBackupWorker(false);
 				renderer->m_profiler.frame();
 			}

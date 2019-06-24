@@ -24,6 +24,7 @@ public:
 	struct IPlugin
 	{
 		virtual ~IPlugin() {}
+		virtual void update() {}
 		virtual void onGUI(PropertyGrid& grid, ComponentUID cmp) = 0;
 	};
 
