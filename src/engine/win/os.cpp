@@ -763,8 +763,20 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 	{
 		out[0] = '\0';
 	}
-	WCHAR wout[MAX_PATH_LENGTH];
-	WCharStr<MAX_PATH_LENGTH> wfilter(filter);
+	WCHAR wout[MAX_PATH_LENGTH] = {};
+	WCHAR wfilter[MAX_PATH_LENGTH];
+	
+	const char* c = filter;
+	WCHAR* cout = wfilter;
+	while ((*c || *(c + 1)) && (c - filter) < MAX_PATH_LENGTH - 2) {
+		*cout = *c;
+		++cout;
+		++c;
+	}
+	*cout = 0;
+	++cout;
+	*cout = 0;
+
 	ofn.lpstrFile = wout;
 	ofn.nMaxFile = sizeof(wout);
 	ofn.lpstrFilter = wfilter;
@@ -777,6 +789,10 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 	const bool res = GetOpenFileName(&ofn) != FALSE;
 	if (res) {
 		fromWChar(out, max_size, wout);
+	}
+	else {
+		auto err = CommDlgExtendedError();
+		ASSERT(false);
 	}
 	return res;
 }

@@ -718,7 +718,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 			ImGui::SameLine();
 			if (ImGui::Button("Execute file"))
 			{
-				char tmp[MAX_PATH_LENGTH];
+				char tmp[MAX_PATH_LENGTH] = {};
 				if (OS::getOpenFilename(tmp, MAX_PATH_LENGTH, "Scripts\0*.lua\0", nullptr))
 				{
 					OS::InputFile file;
