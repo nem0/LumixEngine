@@ -51,9 +51,6 @@ private:
 	EntityPtr m_deferred_select;
 	
 	char m_component_filter[32];
-
-	float m_particle_emitter_timescale;
-	bool m_particle_emitter_updating;
 };
 
 
