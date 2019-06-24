@@ -74,6 +74,15 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	setRenderTargets(hdr_rb, gbuffer_depth)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
+	local view_params = getCameraParams()
+	bindTextures({
+		gbuffer0,
+		gbuffer1,
+		gbuffer2,
+		gbuffer_depth,
+	}, 0)
+	renderEnvProbeVolumes(environment_shader, view_params)
+	
 	drawArray(0, 4, deferred_shader,
 	{
 		gbuffer0,
@@ -81,17 +90,8 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 		gbuffer2,
 		gbuffer_depth,
 		shadowmap
-	}, {}, {}, { depth_test = false })
-	local view_params = getCameraParams()
-	bindTextures({
-		gbuffer0,
-		gbuffer1,
-		gbuffer2,
-		gbuffer_depth,
-		shadowmap
-	}, 2)
-	renderEnvProbeVolumes(environment_shader, view_params)
-	
+	}, {}, {}, { depth_test = false, blending = "add"})
+
 	endBlock()
 	
 	beginBlock("local_lights")

@@ -1191,13 +1191,9 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 				ffr::bindTextures(m_textures_handles, m_offset, m_textures_count);
-				for(int i = 0; i < m_textures_count; ++i) {
-					ffr::setUniform1i(m_textures_uniforms[i], i + m_offset);
-				}
 			}
 
 			ffr::TextureHandle m_textures_handles[16];
-			ffr::UniformHandle m_textures_uniforms[16];
 			int m_offset = 0;
 			int m_textures_count = 0;
 		};
@@ -1215,9 +1211,9 @@ struct PipelineImpl final : Pipeline
 		cmd->m_offset = offset;
 		
 		
-		const int len = (int)lua_objlen(L, 4);
+		const int len = (int)lua_objlen(L, 1);
 		for(int i = 0; i < len; ++i) {
-			lua_rawgeti(L, 4, i + 1);
+			lua_rawgeti(L, 1, i + 1);
 			if(lua_type(L, -1) != LUA_TNUMBER) {
 				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
@@ -1305,7 +1301,7 @@ struct PipelineImpl final : Pipeline
 					ffr::bindTextures(handles, 14, 2);
 					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
 					
-					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius);
+					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
 					const u64 state = intersecting
 						? (u64)ffr::StateFlags::CULL_FRONT
 						: (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK;
