@@ -62,15 +62,15 @@ public:
 	RenderData* getRenderData() const { return m_render_data; }
 
 	float getMetallic() const { return m_metallic; }
-	void setMetallic(float value) { m_metallic = value; }
+	void setMetallic(float value) { m_metallic = value; updateRenderData(false); }
 	float getRoughness() const { return m_roughness; }
-	void setRoughness(float value) { m_roughness = value; }
+	void setRoughness(float value) { m_roughness = value; updateRenderData(false); }
 	float getEmission() const { return m_emission; }
-	void setEmission(float value) { m_emission = value; }
+	void setEmission(float value) { m_emission = value; updateRenderData(false); }
 	Vec4 getColor() const { return m_color; }
-	void setColor(const Vec4& color) { m_color = color; }
+	void setColor(const Vec4& color) { m_color = color; updateRenderData(false); }
 	float getAlphaRef() const { return m_alpha_ref; }
-	void setAlphaRef(float value);
+	void setAlphaRef(float value) { m_alpha_ref = value; updateRenderData(false); }
 	u64 getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
 	bool isBackfaceCulling() const;
@@ -110,6 +110,7 @@ private:
 	static int LUA_layer(lua_State* L);
 
 	void onBeforeReady() override;
+	void updateRenderData(bool on_before_ready);
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 

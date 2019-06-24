@@ -475,7 +475,21 @@ void Material::onBeforeReady()
 	}
 	m_texture_count = minimum(m_texture_count, m_shader->m_texture_slot_count);
 
-	
+	updateRenderData(true);
+}
+
+
+void Material::updateRenderData(bool on_before_ready)
+{
+	if (!m_shader) return;
+	if (!on_before_ready && !isReady()) return;
+
+	if(m_render_data) {
+		m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
+			LUMIX_DELETE(renderer.getAllocator(), (RenderData*)ptr);
+		});
+	}
+
 	m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);
 	m_render_data->color = m_color;
 	m_render_data->emission = m_emission;
@@ -528,12 +542,6 @@ bool Material::isTextureDefine(u8 define_idx) const
 		}
 	}
 	return false;
-}
-
-
-void Material::setAlphaRef(float value)
-{
-	m_alpha_ref = value;
 }
 
 
