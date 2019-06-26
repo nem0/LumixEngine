@@ -58,7 +58,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual const char* getShaderDefine(int define_idx) const = 0;
 		virtual int getShaderDefinesCount() const = 0;
 		virtual FontManager& getFontManager() = 0;
-		virtual TextureManager& getTextureManager() = 0;
+		virtual ResourceManager& getTextureManager() = 0;
 		
 		virtual IAllocator& getAllocator() = 0;
 		virtual MemRef allocate(uint size) = 0;

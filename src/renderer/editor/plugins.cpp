@@ -29,7 +29,7 @@
 #include "game_view.h"
 #include "renderer/culling_system.h"
 #include "renderer/ffr/ffr.h"
-#include "renderer/font_manager.h"
+#include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
@@ -2055,7 +2055,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		Texture* old_texture = material->getTexture(0);
 		PluginManager& plugin_manager = engine.getPluginManager();
 		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
-			Path("font"), m_renderer, *engine.getResourceManager().get(Texture::TYPE), engine.getAllocator());
+			Path("font"), *engine.getResourceManager().get(Texture::TYPE), m_renderer, engine.getAllocator());
 
 		texture->create(width, height, pixels, width * height * 4);
 		material->setTexture(0, texture);
@@ -2099,7 +2099,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		auto& rm = engine.getResourceManager();
 		auto& allocator = m_editor.getAllocator();
 
-		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), m_renderer, *rm.get(Texture::TYPE), allocator);
+		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
 		texture->create(w, h, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, texture);
 		return (ImTextureID)(uintptr_t)texture->handle.value;

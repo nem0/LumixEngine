@@ -151,26 +151,6 @@ Path::Path(const Path& rhs)
 }
 
 
-Path::Path(const char* s1, const char* s2)
-{
-	StaticString<MAX_PATH_LENGTH> tmp(s1, s2);
-	char out[MAX_PATH_LENGTH];
-	PathUtils::normalize(tmp, out, lengthOf(out));
-	u32 hash = crc32(out);
-	m_data = g_path_manager->getPath(hash, out);
-}
-
-
-Path::Path(const char* s1, const char* s2, const char* s3)
-{
-	StaticString<MAX_PATH_LENGTH> tmp(s1, s2, s3);
-	char out[MAX_PATH_LENGTH];
-	PathUtils::normalize(tmp, out, lengthOf(out));
-	u32 hash = crc32(out);
-	m_data = g_path_manager->getPath(hash, out);
-}
-
-
 Path::Path(const char* path)
 {
 	char tmp[MAX_PATH_LENGTH];

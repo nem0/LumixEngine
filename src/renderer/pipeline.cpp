@@ -17,7 +17,7 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "culling_system.h"
-#include "font_manager.h"
+#include "font.h"
 #include "material.h"
 #include "model.h"
 #include "particle_system.h"
@@ -235,7 +235,6 @@ struct PipelineImpl final : Pipeline
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 		m_text_mesh_shader = rm.load<Shader>(Path("pipelines/text_mesh.shd"));
-		TextureManager& texture_manager = renderer.getTextureManager();
 		m_default_cubemap = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 
 		FontAtlas& font_atlas = m_renderer.getFontManager().getFontAtlas();

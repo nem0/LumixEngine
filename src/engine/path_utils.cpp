@@ -2,9 +2,7 @@
 #include "engine/string.h"
 
 
-namespace Lumix
-{
-namespace PathUtils
+namespace Lumix::PathUtils
 {
 
 void normalize(const char* path, char* out, u32 max_size)
@@ -81,20 +79,6 @@ void getBasename(char* basename, int max_length, const char* src)
 	}
 }
 
-void getFilename(char* filename, int max_length, const char* src)
-{
-	for (int i = stringLength(src) - 1; i >= 0; --i)
-	{
-		if (src[i] == '\\' || src[i] == '/')
-		{
-			++i;
-			copyString(filename, max_length, src + i);
-			return;
-		}
-	}
-	copyString(filename, max_length, src);
-}
-
 
 void getExtension(char* extension, int max_length, const char* src)
 {
@@ -147,9 +131,4 @@ bool hasExtension(const char* filename, const char* ext)
 }
 
 
-bool isAbsolute(const char* path)
-{
-	return path[0] != '\0' && path[1] == ':';
-}
-}
-}
+} // namespace Lumix::PathUtils
