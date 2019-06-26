@@ -4,6 +4,7 @@
 #include <cmath>
 #include <ctype.h>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -1037,9 +1038,11 @@ struct MaterialImpl : Material
 
 	const Texture* getTexture(Texture::TextureType type) const override { return textures[type]; }
 	Color getDiffuseColor() const override { return diffuse_color; }
+	Color getSpecularColor() const override { return specular_color; }
 
 	const Texture* textures[Texture::TextureType::COUNT];
 	Color diffuse_color;
+	Color specular_color;
 };
 
 
@@ -1117,6 +1120,7 @@ struct GeometryImpl : Geometry
 
 	const Skin* skin = nullptr;
 
+	std::vector<int> indices;
 	std::vector<int> to_old_vertices;
 	std::vector<NewVertex> to_new_vertices;
 
@@ -1128,6 +1132,8 @@ struct GeometryImpl : Geometry
 
 	Type getType() const override { return Type::GEOMETRY; }
 	int getVertexCount() const override { return (int)vertices.size(); }
+	const int* getFaceIndices() const override { return indices.empty() ? nullptr : &indices[0]; }
+	int getIndexCount() const override { return (int)indices.size(); }
 	const Vec3* getVertices() const override { return &vertices[0]; }
 	const Vec3* getNormals() const override { return normals.empty() ? nullptr : &normals[0]; }
 	const Vec2* getUVs(int index = 0) const override { return index < 0 || index >= s_uvs_max || uvs[index].empty() ? nullptr : &uvs[index][0]; }
@@ -1135,43 +1141,6 @@ struct GeometryImpl : Geometry
 	const Vec3* getTangents() const override { return tangents.empty() ? nullptr : &tangents[0]; }
 	const Skin* getSkin() const override { return skin; }
 	const int* getMaterials() const override { return materials.empty() ? nullptr : &materials[0]; }
-
-
-	void triangulate(const std::vector<int>& old_indices, std::vector<int>* indices, std::vector<int>* to_old)
-	{
-		assert(indices);
-		assert(to_old);
-
-		auto getIdx = [&old_indices](int i) -> int {
-			int idx = old_indices[i];
-			return idx < 0 ? -idx - 1 : idx;
-		};
-
-		int in_polygon_idx = 0;
-		for (int i = 0; i < old_indices.size(); ++i)
-		{
-			int idx = getIdx(i);
-			if (in_polygon_idx <= 2)
-			{
-				indices->push_back(idx);
-				to_old->push_back(i);
-			}
-			else
-			{
-				indices->push_back(old_indices[i - in_polygon_idx]);
-				to_old->push_back(i - in_polygon_idx);
-				indices->push_back(old_indices[i - 1]);
-				to_old->push_back(i - 1);
-				indices->push_back(idx);
-				to_old->push_back(i);
-			}
-			++in_polygon_idx;
-			if (old_indices[i] < 0)
-			{
-				in_polygon_idx = 0;
-			}
-		}
-	}
 };
 
 
@@ -1661,6 +1630,12 @@ static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& e
 				material->diffuse_color.g = (float)prop->getProperty(5)->getValue().toDouble();
 				material->diffuse_color.b = (float)prop->getProperty(6)->getValue().toDouble();
 			}
+			else if (prop->first_property->value == "SpecularColor")
+			{
+				material->specular_color.r = (float)prop->getProperty(4)->getValue().toDouble();
+				material->specular_color.g = (float)prop->getProperty(5)->getValue().toDouble();
+				material->specular_color.b = (float)prop->getProperty(6)->getValue().toDouble();
+			}
 		}
 		prop = prop->sibling;
 	}
@@ -1943,6 +1918,18 @@ static bool parseVertexData(const Element& element,
 }
 
 
+static int decodeIndex(int idx)
+{
+	return (idx < 0) ? (-idx - 1) : idx;
+}
+
+
+static int codeIndex(int idx, bool last)
+{
+	return last ? (-idx - 1) : idx;
+}
+
+
 template <typename T>
 static void splat(std::vector<T>* out,
 	GeometryImpl::VertexDataMapping mapping,
@@ -1984,8 +1971,7 @@ static void splat(std::vector<T>* out,
 		int data_size = (int)data.size();
 		for (int i = 0, c = (int)original_indices.size(); i < c; ++i)
 		{
-			int idx = original_indices[i];
-			if (idx < 0) idx = -idx - 1;
+			int idx = decodeIndex(original_indices[i]);
 			if (idx < data_size)
 				(*out)[i] = data[idx];
 			else
@@ -2078,33 +2064,71 @@ static void add(GeometryImpl::NewVertex& vtx, int index)
 }
 
 
-static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& element)
+static void triangulate(
+	const std::vector<int>& old_indices,
+	std::vector<int>* to_old_vertices,
+	std::vector<int>* to_old_indices)
 {
-	assert(element.first_property);
+	assert(to_old_vertices);
+	assert(to_old_indices);
 
-	const Element* vertices_element = findChild(element, "Vertices");
-	if (!vertices_element || !vertices_element->first_property)
+	auto getIdx = [&old_indices](int i) -> int {
+		int idx = old_indices[i];
+		return decodeIndex(idx);
+	};
+
+	int in_polygon_idx = 0;
+	for (int i = 0; i < old_indices.size(); ++i)
 	{
-		return new GeometryImpl(scene, element);
+		int idx = getIdx(i);
+		if (in_polygon_idx <= 2)
+		{
+			to_old_vertices->push_back(idx);
+			to_old_indices->push_back(i);
+		}
+		else
+		{
+			to_old_vertices->push_back(old_indices[i - in_polygon_idx]);
+			to_old_indices->push_back(i - in_polygon_idx);
+			to_old_vertices->push_back(old_indices[i - 1]);
+			to_old_indices->push_back(i - 1);
+			to_old_vertices->push_back(idx);
+			to_old_indices->push_back(i);
+		}
+		++in_polygon_idx;
+		if (old_indices[i] < 0)
+		{
+			in_polygon_idx = 0;
+		}
 	}
+}
 
-	const Element* polys_element = findChild(element, "PolygonVertexIndex");
-	if (!polys_element || !polys_element->first_property) return Error("Indices missing");
 
-	std::unique_ptr<GeometryImpl> geom(new GeometryImpl(scene, element));
-
-	std::vector<Vec3> vertices;
-	if (!parseDoubleVecData(*vertices_element->first_property, &vertices)) return Error("Failed to parse vertices");
-	std::vector<int> original_indices;
-	if (!parseBinaryArray(*polys_element->first_property, &original_indices)) return Error("Failed to parse indices");
-
-	std::vector<int> to_old_indices;
-	geom->triangulate(original_indices, &geom->to_old_vertices, &to_old_indices);
-	geom->vertices.resize(geom->to_old_vertices.size());
-
-	for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
-	{
-		geom->vertices[i] = vertices[geom->to_old_vertices[i]];
+static void buildGeometryVertexData(
+	const std::unique_ptr<GeometryImpl>& geom,
+	const std::vector<Vec3>& vertices,
+	const std::vector<int>& original_indices,
+	std::vector<int>& to_old_indices,
+	bool triangulationEnabled)
+{
+	if (triangulationEnabled) {
+		triangulate(original_indices, &geom->to_old_vertices, &to_old_indices);
+		geom->vertices.resize(geom->to_old_vertices.size());
+		geom->indices.resize(geom->vertices.size());
+		for (int i = 0, c = (int)geom->to_old_vertices.size(); i < c; ++i)
+		{
+			geom->vertices[i] = vertices[geom->to_old_vertices[i]];
+			geom->indices[i] = codeIndex(i, i % 3 == 2);
+		}
+	} else {
+		geom->vertices = vertices;
+		geom->to_old_vertices.resize(original_indices.size());
+		for (size_t i = 0; i < original_indices.size(); ++i) {
+			geom->to_old_vertices[i] = decodeIndex(original_indices[i]);
+		}
+		geom->indices = original_indices;
+		to_old_indices.resize(original_indices.size());
+		iota(to_old_indices.begin(), to_old_indices.end(), 0);
 	}
 
 	geom->to_new_vertices.resize(vertices.size()); // some vertices can be unused, so this isn't necessarily the same size as to_old_vertices.
@@ -2114,7 +2138,14 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 		int old = to_old_vertices[i];
 		add(geom->to_new_vertices[old], i);
 	}
+}
 
+
+static OptionalError<Object*> parseGeometryMaterials(
+	const std::unique_ptr<GeometryImpl>& geom,
+	const Element& element,
+	const std::vector<int>& original_indices)
+{
 	const Element* layer_material_element = findChild(element, "LayerElementMaterial");
 	if (layer_material_element)
 	{
@@ -2151,7 +2182,16 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 			if (mapping_element->first_property->value != "AllSame") return Error("Mapping not supported");
 		}
 	}
+	return {nullptr};
+}
 
+
+static OptionalError<Object*> parseGeometryUVs(
+	const std::unique_ptr<GeometryImpl>& geom,
+	const Element& element,
+	const std::vector<int>& original_indices,
+	const std::vector<int>& to_old_indices)
+{
 	const Element* layer_uv_element = findChild(element, "LayerElementUV");
 	while (layer_uv_element)
 	{
@@ -2179,7 +2219,16 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 			layer_uv_element = layer_uv_element->sibling;
 		} while (layer_uv_element && layer_uv_element->id != "LayerElementUV");
 	}
+	return {nullptr};
+}
 
+
+static OptionalError<Object*> parseGeometryTangents(
+	const std::unique_ptr<GeometryImpl>& geom,
+	const Element& element,
+	const std::vector<int>& original_indices,
+	const std::vector<int>& to_old_indices)
+{
 	const Element* layer_tangent_element = findChild(element, "LayerElementTangents");
 	if (layer_tangent_element)
 	{
@@ -2202,7 +2251,16 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 			remap(&geom->tangents, to_old_indices);
 		}
 	}
+	return {nullptr};
+}
 
+
+static OptionalError<Object*> parseGeometryColors(
+	const std::unique_ptr<GeometryImpl>& geom,
+	const Element& element,
+	const std::vector<int>& original_indices,
+	const std::vector<int>& to_old_indices)
+{
 	const Element* layer_color_element = findChild(element, "LayerElementColor");
 	if (layer_color_element)
 	{
@@ -2217,7 +2275,16 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 			remap(&geom->colors, to_old_indices);
 		}
 	}
+	return {nullptr};
+}
 
+
+static OptionalError<Object*> parseGeometryNormals(
+	const std::unique_ptr<GeometryImpl>& geom,
+	const Element& element,
+	const std::vector<int>& original_indices,
+	const std::vector<int>& to_old_indices)
+{
 	const Element* layer_normal_element = findChild(element, "LayerElementNormal");
 	if (layer_normal_element)
 	{
@@ -2232,6 +2299,47 @@ static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& e
 			remap(&geom->normals, to_old_indices);
 		}
 	}
+	return {nullptr};
+}
+
+
+static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& element, bool triangulate)
+{
+	assert(element.first_property);
+
+	const Element* vertices_element = findChild(element, "Vertices");
+	if (!vertices_element || !vertices_element->first_property)
+	{
+		return new GeometryImpl(scene, element);
+	}
+
+	const Element* polys_element = findChild(element, "PolygonVertexIndex");
+	if (!polys_element || !polys_element->first_property) return Error("Indices missing");
+
+	std::unique_ptr<GeometryImpl> geom(new GeometryImpl(scene, element));
+
+	std::vector<Vec3> vertices;
+	if (!parseDoubleVecData(*vertices_element->first_property, &vertices)) return Error("Failed to parse vertices");
+	std::vector<int> original_indices;
+	if (!parseBinaryArray(*polys_element->first_property, &original_indices)) return Error("Failed to parse indices");
+
+	std::vector<int> to_old_indices;
+	buildGeometryVertexData(geom, vertices, original_indices, to_old_indices, triangulate);
+
+	OptionalError<Object*> materialParsingError = parseGeometryMaterials(geom, element, original_indices);
+	if (materialParsingError.isError()) return materialParsingError;
+
+	OptionalError<Object*> uvParsingError = parseGeometryUVs(geom, element, original_indices, to_old_indices);
+	if (uvParsingError.isError()) return uvParsingError;
+
+	OptionalError<Object*> tangentsParsingError = parseGeometryTangents(geom, element, original_indices, to_old_indices);
+	if (tangentsParsingError.isError()) return tangentsParsingError;
+
+	OptionalError<Object*> colorsParsingError = parseGeometryColors(geom, element, original_indices, to_old_indices);
+	if (colorsParsingError.isError()) return colorsParsingError;
+
+	OptionalError<Object*> normalsParsingError = parseGeometryNormals(geom, element, original_indices, to_old_indices);
+	if (normalsParsingError.isError()) return normalsParsingError;
 
 	return geom.release();
 }
@@ -2440,7 +2548,7 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 }
 
 
-static bool parseObjects(const Element& root, Scene* scene)
+static bool parseObjects(const Element& root, Scene* scene, bool triangulate)
 {
 	const Element* objs = findChild(root, "Objects");
 	if (!objs) return true;
@@ -2475,7 +2583,7 @@ static bool parseObjects(const Element& root, Scene* scene)
 			while (last_prop->next) last_prop = last_prop->next;
 			if (last_prop && last_prop->value == "Mesh")
 			{
-				obj = parseGeometry(*scene, *iter.second.element);
+				obj = parseGeometry(*scene, *iter.second.element, triangulate);
 			}
 		}
 		else if (iter.second.element->id == "Material")
@@ -2628,6 +2736,8 @@ static bool parseObjects(const Element& root, Scene* scene)
 						type = Texture::NORMAL;
 					else if (con.property == "DiffuseColor")
 						type = Texture::DIFFUSE;
+					else if (con.property == "SpecularColor")
+						type = Texture::SPECULAR;
 					if (type == Texture::COUNT) break;
 
 					if (mat->textures[type])
@@ -2923,7 +3033,7 @@ Object* Object::getParent() const
 }
 
 
-IScene* load(const u8* data, int size)
+IScene* load(const u8* data, int size, bool triangulate)
 {
 	std::unique_ptr<Scene> scene(new Scene());
 	scene->m_data.resize(size);
@@ -2948,7 +3058,7 @@ IScene* load(const u8* data, int size)
 	// if (parseTemplates(*root.getValue()).isError()) return nullptr;
 	if (!parseConnections(*root.getValue(), scene.get())) return nullptr;
 	if (!parseTakes(scene.get())) return nullptr;
-	if (!parseObjects(*root.getValue(), scene.get())) return nullptr;
+	if (!parseObjects(*root.getValue(), scene.get(), triangulate)) return nullptr;
 	parseGlobalSettings(*root.getValue(), scene.get());
 
 	return scene.release();
