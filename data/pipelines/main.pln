@@ -175,7 +175,12 @@ end
 
 function tonemap(hdr_buffer)
 	beginBlock("tonemap")
-	local rb = createRenderbuffer(1, 1, true, "rgba8", "tonemap")
+	local rb
+	if APP ~= nil then
+		rb = createRenderbuffer(1, 1, true, "rgba8", "tonemap")
+	else
+		rb = createRenderbuffer(1, 1, true, "rgba16f", "tonemap")
+	end
 	setRenderTargets(rb)
 	drawArray(0, 4, tonemap_shader
 		, { hdr_buffer }
