@@ -209,6 +209,7 @@ struct Texture : Object
 	{
 		DIFFUSE,
 		NORMAL,
+		SPECULAR,
 
 		COUNT
 	};
@@ -228,6 +229,7 @@ struct Material : Object
 	Material(const Scene& _scene, const IElement& _element);
 
 	virtual Color getDiffuseColor() const = 0;
+	virtual Color getSpecularColor() const = 0;
 	virtual const Texture* getTexture(Texture::TextureType type) const = 0;
 };
 
@@ -278,6 +280,9 @@ struct Geometry : Object
 
 	virtual const Vec3* getVertices() const = 0;
 	virtual int getVertexCount() const = 0;
+
+	virtual const int* getFaceIndices() const = 0;
+	virtual int getIndexCount() const = 0;
 
 	virtual const Vec3* getNormals() const = 0;
 	virtual const Vec2* getUVs(int index = 0) const = 0;
@@ -440,7 +445,7 @@ protected:
 };
 
 
-IScene* load(const u8* data, int size);
+IScene* load(const u8* data, int size, bool triangulate = true);
 const char* getError();
 
 

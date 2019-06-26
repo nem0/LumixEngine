@@ -88,6 +88,7 @@ struct FBXImporter
 		{
 			DIFFUSE,
 			NORMAL,
+			SPECULAR,
 			COUNT
 		};
 

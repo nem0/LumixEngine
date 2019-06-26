@@ -152,6 +152,7 @@ void FBXImporter::gatherMaterials(const ofbx::Object* node, const char* src_dir)
 
 		gatherTexture(ofbx::Texture::DIFFUSE);
 		gatherTexture(ofbx::Texture::NORMAL);
+		gatherTexture(ofbx::Texture::SPECULAR);
 	}
 }
 
@@ -771,6 +772,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 
 		writeTexture(material.textures[0]);
 		writeTexture(material.textures[1]);
+		writeTexture(material.textures[2]);
 
 /*			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
 		out_file << "color {" << diffuse_color.r 
