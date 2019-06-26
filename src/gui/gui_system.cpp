@@ -13,7 +13,7 @@
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
-#include "renderer/font_manager.h"
+#include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"

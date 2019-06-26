@@ -11,11 +11,9 @@ namespace PathUtils
 	LUMIX_ENGINE_API void normalize(const char* path, char* out, u32 max_size);
 	LUMIX_ENGINE_API void getDir(char* dir, int max_length, const char* src);
 	LUMIX_ENGINE_API void getBasename(char* basename, int max_length, const char* src);
-	LUMIX_ENGINE_API void getFilename(char* filename, int max_length, const char* src);
 	LUMIX_ENGINE_API void getExtension(char* extension, int max_length, const char* src);
 	LUMIX_ENGINE_API bool hasExtension(const char* filename, const char* ext);
 	LUMIX_ENGINE_API bool replaceExtension(char* path, const char* ext);
-	LUMIX_ENGINE_API bool isAbsolute(const char* path);
 
 
 	struct LUMIX_ENGINE_API FileInfo

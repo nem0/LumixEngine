@@ -20,7 +20,7 @@
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/culling_system.h"
-#include "renderer/font_manager.h"
+#include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
@@ -1684,10 +1684,7 @@ public:
 
 		if (m_culling_system->isAdded(entity)) {
 			if (m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-				ModelInstance& r = m_model_instances[entity.index];
-				const float radius = m_universe.getScale(entity) * r.model->getBoundingRadius();
 				const DVec3 position = m_universe.getPosition(entity);
-				m_culling_system->setRadius(entity, radius);
 				m_culling_system->setPosition(entity, position);
 			}
 			else if (m_universe.hasComponent(entity, DECAL_TYPE)) {

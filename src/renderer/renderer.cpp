@@ -17,7 +17,7 @@
 #include "engine/string.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
-#include "renderer/font_manager.h"
+#include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -26,7 +26,7 @@
 #include "renderer/shader.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#include "renderer/texture_manager.h"
+
 
 #include <Windows.h>
 #undef near
@@ -845,7 +845,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	TextureManager& getTextureManager() override { return m_texture_manager; }
+	ResourceManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
 
 	void createScenes(Universe& ctx) override
@@ -956,13 +956,13 @@ struct RendererImpl final : public Renderer
 	IAllocator& m_allocator;
 	Array<ShaderDefine> m_shader_defines;
 	Array<StaticString<32>> m_layers;
-	TextureManager m_texture_manager;
 	FontManager* m_font_manager;
 	RenderResourceManager<Material> m_material_manager;
 	RenderResourceManager<Model> m_model_manager;
 	RenderResourceManager<ParticleEmitterResource> m_particle_emitter_manager;
 	RenderResourceManager<PipelineResource> m_pipeline_manager;
 	RenderResourceManager<Shader> m_shader_manager;
+	RenderResourceManager<Texture> m_texture_manager;
 	bool m_vsync;
 	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;

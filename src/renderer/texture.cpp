@@ -8,7 +8,6 @@
 #include "engine/stream.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include "renderer/texture_manager.h"
 
 
 namespace Lumix
@@ -18,7 +17,7 @@ namespace Lumix
 const ResourceType Texture::TYPE("texture");
 
 
-Texture::Texture(const Path& path, Renderer& renderer, ResourceManager& resource_manager, IAllocator& _allocator)
+Texture::Texture(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& _allocator)
 	: Resource(path, resource_manager, _allocator)
 	, data_reference(0)
 	, allocator(_allocator)
@@ -482,12 +481,12 @@ bool Texture::loadTGA(IInputStream& file)
 	height = header.height;
 	int pixel_count = width * height;
 	is_cubemap = false;
-	TextureManager& manager = static_cast<TextureManager&>(getResourceManager());
-	if (data_reference)
-	{
-		data.resize(image_size);
-	}
-	u8* image_dest = data_reference ? &data[0] : (u8*)manager.getBuffer(image_size);
+	if (data_reference) data.resize(image_size);
+
+	Renderer::MemRef mem;
+	if (!data_reference) mem = renderer.allocate(image_size);
+
+	u8* image_dest = data_reference ? &data[0] : (u8*)mem.data;
 
 	bool is_rle = header.dataType == 10;
 	if (is_rle)
@@ -574,7 +573,7 @@ bool Texture::loadTGA(IInputStream& file)
 
 	bytes_per_pixel = 4;
 	mips = 1;
-	Renderer::MemRef mem = renderer.copy(image_dest, image_size);
+	if (data_reference) mem = renderer.copy(image_dest, image_size);
 	handle = renderer.createTexture(header.width, header.height, 1, ffr::TextureFormat::RGBA8, getFFRFlags(), mem, getPath().c_str());
 	depth = 1;
 	layers = 1;

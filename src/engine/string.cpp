@@ -284,12 +284,6 @@ static char makeLowercase(char c)
 }
 
 
-char makeUppercase(char c)
-{
-	return c >= 'a' && c <= 'z' ? c - ('a' - 'A') : c;
-}
-
-
 int compareMemory(const void* lhs, const void* rhs, size_t size)
 {
 	return memcmp(lhs, rhs, size);
@@ -400,29 +394,6 @@ bool makeLowercase(char* destination, int length, const char* source)
 	while (*source && length)
 	{
 		*destination = makeLowercase(*source);
-		--length;
-		++destination;
-		++source;
-	}
-	if (length > 0)
-	{
-		*destination = 0;
-		return true;
-	}
-	return false;
-}
-
-
-bool makeUppercase(char* destination, int length, const char* source)
-{
-	if (!source)
-	{
-		return false;
-	}
-
-	while (*source && length)
-	{
-		*destination = makeUppercase(*source);
 		--length;
 		++destination;
 		++source;
@@ -1013,16 +984,6 @@ bool toCString(double value, char* output, int length, int after_point)
 	if ((int)(dec_part + 0.5f))
 		increment(output, c - 1, length > 1);
 	return true;
-}
-
-
-char* trimmed(char* str)
-{
-	while (*str && (*str == '\t' || *str == ' '))
-	{
-		++str;
-	}
-	return str;
 }
 
 

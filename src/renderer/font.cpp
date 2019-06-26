@@ -1,7 +1,6 @@
 #include "engine/stream.h"
-#include "font_manager.h"
+#include "font.h"
 #include "renderer/texture.h"
-#include "renderer/texture_manager.h"
 #include "renderer/renderer.h"
 
 
@@ -96,7 +95,7 @@ void FontManager::updateFontTexture()
 	else
 	{
 		auto& texture_manager = m_renderer.getTextureManager();
-		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), m_renderer, texture_manager, m_allocator);
+		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
 	}
 	m_atlas_texture->create(w, h, pixels, w * h * 4);
 

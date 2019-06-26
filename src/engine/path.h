@@ -25,8 +25,6 @@ class LUMIX_ENGINE_API Path
 public:
 	Path();
 	Path(const Path& rhs);
-	Path(const char* s1, const char* s2);
-	Path(const char* s1, const char* s2, const char* s3);
 	explicit Path(u32 hash);
 	explicit Path(const char* path);
 	~Path();

@@ -1314,7 +1314,7 @@ void TerrainEditor::onGUI()
 					IPlugin* plugin = m_world_editor.getEngine().getPluginManager().getPlugin("renderer");
 					Renderer& renderer = *static_cast<Renderer*>(plugin);
 					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Texture)(
-						Path("brush_texture"), renderer, *rm.get(Texture::TYPE), m_world_editor.getAllocator());
+						Path("brush_texture"), *rm.get(Texture::TYPE), renderer, m_world_editor.getAllocator());
 					m_brush_texture->create(image_width, image_height, data, image_width * image_height * 4);
 
 					stbi_image_free(data);
