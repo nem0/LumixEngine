@@ -55,6 +55,8 @@ public:
 		virtual bool onDropFile(const char* file) { return false; }
 		virtual bool packData(const char* dest_dir) { return true; }
 		virtual void guiEndFrame() {}
+		virtual void onSettingsLoaded() {}
+		virtual void onBeforeSettingsSaved() {}
 	};
 
 	struct IAddComponentPlugin
@@ -119,6 +121,7 @@ public:
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual bool makeFile(const char* path, const char* content) = 0;
 	virtual Vec2 getMouseMove() const = 0;
+	virtual struct Settings& getSettings() = 0;
 
 	virtual const OS::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;

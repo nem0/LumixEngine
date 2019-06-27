@@ -1556,6 +1556,10 @@ public:
 		m_settings.m_mouse_sensitivity.x = m_editor->getMouseSensitivity().x;
 		m_settings.m_mouse_sensitivity.y = m_editor->getMouseSensitivity().y;
 
+		for (auto* i : m_gui_plugins) {
+			i->onBeforeSettingsSaved();
+		}
+
 		m_settings.save();
 	}
 
@@ -1603,6 +1607,12 @@ public:
 	}
 
 
+	Settings& getSettings() override
+	{
+		return m_settings;
+	}
+
+
 	void loadSettings()
 	{
 		char cmd_line[2048];
@@ -1618,6 +1628,9 @@ public:
 		}
 
 		m_settings.load();
+		for (auto* i : m_gui_plugins) {
+			i->onSettingsLoaded();
+		}
 
 		m_asset_browser->m_is_open = m_settings.m_is_asset_browser_open;
 		m_asset_browser->m_left_column_width = m_settings.m_asset_browser_left_column_width;

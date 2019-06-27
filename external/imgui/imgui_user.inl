@@ -414,7 +414,7 @@ namespace ImGui
 
 		ImGuiWindow* parent_win = GetCurrentWindow();
 		char title[256];
-		ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
+		ImFormatString(title, IM_ARRAYSIZE(title), "%s/%08X", parent_win->Name, id);
 		ImGuiWindow* win = FindWindowByName(title);
 		if (!win)
 		{
@@ -440,7 +440,7 @@ namespace ImGui
 
 		ImGuiWindow* parent_win = GetCurrentWindow();
 		char title[256];
-		ImFormatString(title, IM_ARRAYSIZE(title), "%s.child_%08x", parent_win->Name, id);
+		ImFormatString(title, IM_ARRAYSIZE(title), "%s/%08X", parent_win->Name, id);
 		ImGuiWindow* win = FindWindowByName(title);
 		if (!win)
 		{

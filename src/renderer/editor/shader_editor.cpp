@@ -207,12 +207,12 @@ struct VertexOutputNode : public ShaderEditor::Node
 	{
 		if (!m_inputs[0])
 		{
-			blob << "\t" << m_output.name << " = " << getDefaultValue(m_output.type) << ";";
+			blob << "\t\t" << m_output.name << " = " << getDefaultValue(m_output.type) << ";\n";
 			return;
 		}
 
 		m_inputs[0]->generate(blob);
-		blob << "\t" << m_output.name << " = ";
+		blob << "\t\t" << m_output.name << " = ";
 		m_inputs[0]->printReference(blob);
 		blob << ";\n";
 	}
@@ -492,13 +492,13 @@ struct Vec4MergeNode : public ShaderEditor::Node
 
 	void generate(OutputMemoryStream& blob) override 
 	{
-		blob << "\tvec4 v" << m_id << ";\n";
+		blob << "\t\tvec4 v" << m_id << ";\n";
 
 		if (m_inputs[0]) 
 		{
 			m_inputs[0]->generate(blob);
 
-			blob << "\tv" << m_id << ".xyz = ";
+			blob << "\t\tv" << m_id << ".xyz = ";
 			m_inputs[0]->printReference(blob);
 			blob << ";\n";
 		}
@@ -506,7 +506,7 @@ struct Vec4MergeNode : public ShaderEditor::Node
 		{
 			m_inputs[1]->generate(blob);
 
-			blob << "\tv" << m_id << ".x = ";
+			blob << "\t\tv" << m_id << ".x = ";
 			m_inputs[1]->printReference(blob);
 			blob << ";\n";
 		}
@@ -514,7 +514,7 @@ struct Vec4MergeNode : public ShaderEditor::Node
 		{
 			m_inputs[2]->generate(blob);
 
-			blob << "\tv" << m_id << ".y = ";
+			blob << "\t\tv" << m_id << ".y = ";
 			m_inputs[2]->printReference(blob);
 			blob << ";\n";
 		}
@@ -522,7 +522,7 @@ struct Vec4MergeNode : public ShaderEditor::Node
 		{
 			m_inputs[3]->generate(blob);
 
-			blob << "\tv" << m_id << ".z = ";
+			blob << "\t\tv" << m_id << ".z = ";
 			m_inputs[3]->printReference(blob);
 			blob << ";\n";
 		}
@@ -530,7 +530,7 @@ struct Vec4MergeNode : public ShaderEditor::Node
 		{
 			m_inputs[4]->generate(blob);
 
-			blob << "\tv" << m_id << ".w = ";
+			blob << "\t\tv" << m_id << ".w = ";
 			m_inputs[4]->printReference(blob);
 			blob << ";\n";
 		}
@@ -881,12 +881,12 @@ struct FragmentOutputNode : public ShaderEditor::Node
 	void generate(OutputMemoryStream& blob) override
 	{
 		if (!m_inputs[0]) {
-			blob << "\t_out = vec4(0, 0, 0, 1);\n";
+			blob << "\t\t_out = vec4(0, 0, 0, 1);\n";
 			return;
 		}
 
 		m_inputs[0]->generate(blob);
-		blob << "\t_out = ";
+		blob << "\t\t_out = ";
 		m_inputs[0]->printReference(blob);
 		blob << ";\n";
 	}
@@ -1383,8 +1383,10 @@ static constexpr char* toString(Mesh::AttributeSemantic sem) {
 }
 
 
-void ShaderEditor::generate(const char* path)
+void ShaderEditor::generate(const char* sed_path)
 {
+	PathUtils::FileInfo fi(sed_path);
+	StaticString<MAX_PATH_LENGTH> path(fi.m_dir, fi.m_basename, ".shd");
 	OS::OutputFile file;
 	if (!file.open(path)) {
 		logError("Editor") << "Could not create file " << path;
@@ -1433,7 +1435,7 @@ void ShaderEditor::generate(const char* path)
 				node->generate(blob);
 			}
 		}
-		blob << "}\n";
+		blob << "\t}\n";
 
 		blob << "]]\n\n";
 	};
