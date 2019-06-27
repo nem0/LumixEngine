@@ -177,9 +177,9 @@ Settings::~Settings()
 bool Settings::load()
 {
 	auto L = m_state;
-	const bool has_settings = OS::fileExists(SETTINGS_PATH);
 	OS::InputFile file;
 	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	const bool has_settings = fs.fileExists(SETTINGS_PATH);
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
 	if (!fs.open(path, &file)) {
 		logError("Editor") << "Failed to open " << path;
