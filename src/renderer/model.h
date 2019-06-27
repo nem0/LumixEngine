@@ -58,6 +58,8 @@ struct LUMIX_RENDERER_API Mesh
 		INSTANCE1,
 		INSTANCE2,
 
+		COUNT,
+
 		NONE = 0xff
 	};
 

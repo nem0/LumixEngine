@@ -797,6 +797,7 @@ struct RendererImpl final : public Renderer
 
 	void destroy(ffr::TextureHandle tex)
 	{
+		ASSERT(tex.isValid());
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 

@@ -1150,7 +1150,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	~TexturePlugin() {
 		PluginManager& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
 		auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		renderer->destroy(m_texture_view);
+		if(m_texture_view.isValid()) {
+			renderer->destroy(m_texture_view);
+		}
 	}
 
 
