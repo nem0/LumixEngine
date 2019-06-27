@@ -5,6 +5,10 @@
 #ifndef _W64 
 	#define _W64 __w64
 #endif
+#define MEM_COMMIT 0x00001000  
+#define MEM_RESERVE 0x00002000  
+#define MEM_RELEASE 0x00008000  
+#define PAGE_READWRITE 0x04
 #define INVALID_SET_FILE_POINTER ((DWORD)-1)
 #define CF_TEXT 1
 #define WSADESCRIPTION_LEN 256
@@ -501,6 +505,15 @@ int PASCAL connect(SOCKET s, const struct sockaddr* name, int namelen);
 int PASCAL closesocket(SOCKET s);
 int PASCAL recv(SOCKET s, char* buf, int len, int flags);
 int PASCAL send(SOCKET s, const char* buf, int len, int flags);
+WINBASEAPI LPVOID WINAPI VirtualAlloc(
+    LPVOID lpAddress,
+    SIZE_T dwSize,
+    DWORD flAllocationType,
+    DWORD flProtect);
+WINBASEAPI BOOL WINAPI VirtualFree(
+    LPVOID lpAddress,
+    SIZE_T dwSize,
+    DWORD dwFreeType);
 WINBASEAPI HANDLE WINAPI CreateFileA(LPCSTR lpFileName,
 	DWORD dwDesiredAccess,
 	DWORD dwShareMode,

@@ -1,7 +1,7 @@
 #include "page_allocator.h"
 #include "mt/atomic.h"
-#include <Windows.h>
-// TODO #include "engine/win/simple_win.h"
+#include "engine/win/simple_win.h"
+#include <cstring>
 
 
 namespace Lumix
