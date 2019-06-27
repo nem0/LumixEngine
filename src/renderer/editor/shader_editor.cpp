@@ -45,6 +45,26 @@ struct VertexOutput {
 };
 
 
+static ShaderEditor::ValueType semanticToType(Mesh::AttributeSemantic semantic) {
+	switch (semantic) {
+		case Mesh::AttributeSemantic::POSITION: return ShaderEditor::ValueType::VEC3;
+		case Mesh::AttributeSemantic::COLOR0: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::COLOR1: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::INDICES: return ShaderEditor::ValueType::IVEC4;
+		case Mesh::AttributeSemantic::WEIGHTS: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::NORMAL: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::TANGENT: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::BITANGENT: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::TEXCOORD0: return ShaderEditor::ValueType::VEC2;
+		case Mesh::AttributeSemantic::TEXCOORD1: return ShaderEditor::ValueType::VEC2;
+		case Mesh::AttributeSemantic::INSTANCE0: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::INSTANCE1: return ShaderEditor::ValueType::VEC4;
+		case Mesh::AttributeSemantic::INSTANCE2: return ShaderEditor::ValueType::VEC4;
+		default: ASSERT(false); return ShaderEditor::ValueType::VEC4;
+	}
+}
+
+
 static constexpr char* toString(ShaderEditor::ValueType type) {
 	switch (type) {
 		case ShaderEditor::ValueType::BOOL: return "bool";
@@ -52,6 +72,7 @@ static constexpr char* toString(ShaderEditor::ValueType type) {
 		case ShaderEditor::ValueType::VEC2: return "vec2";
 		case ShaderEditor::ValueType::VEC3: return "vec3";
 		case ShaderEditor::ValueType::VEC4: return "vec4";
+		case ShaderEditor::ValueType::IVEC4: return "ivec4";
 		case ShaderEditor::ValueType::MATRIX3: return "mat3";
 		case ShaderEditor::ValueType::MATRIX4: return "mat4";
 		default: ASSERT(false); return "Unknown type";
@@ -66,6 +87,7 @@ static constexpr char* getDefaultValue(ShaderEditor::ValueType type) {
 		case ShaderEditor::ValueType::VEC2: return "vec2(0)";
 		case ShaderEditor::ValueType::VEC3: return "vec3(0)";
 		case ShaderEditor::ValueType::VEC4: return "vec4(0)";
+		case ShaderEditor::ValueType::IVEC4: return "ivec4(0)";
 		case ShaderEditor::ValueType::MATRIX3: return "mat3(0)";
 		case ShaderEditor::ValueType::MATRIX4: return "mat4(0)";
 		default: ASSERT(false); return "Unknown type";
@@ -81,7 +103,7 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Input",				NodeType::FRAGMENT_INPUT,		true,		false},
 	{"Output",				NodeType::FRAGMENT_OUTPUT,		true,		false},
 	{"Color constant",		NodeType::COLOR_CONST,			true,		true},
-	{"Float Const",			NodeType::FLOAT_CONST,			true,		true},
+	{"Float constant",		NodeType::FLOAT_CONST,			true,		true},
 	{"Uniform",				NodeType::UNIFORM,				true,		true},
 	{"Vec4 merge",			NodeType::VEC4_MERGE,			true,		true},
 	{"Operator",			NodeType::OPERATOR,				true,		true},
@@ -166,6 +188,7 @@ static const char* getValueTypeName(ShaderEditor::ValueType type)
 		case ShaderEditor::ValueType::VEC2: return "vec2";
 		case ShaderEditor::ValueType::VEC3: return "vec3";
 		case ShaderEditor::ValueType::VEC4: return "vec4";
+		case ShaderEditor::ValueType::IVEC4: return "ivec4";
 		case ShaderEditor::ValueType::MATRIX3: return "mat3";
 		case ShaderEditor::ValueType::MATRIX4: return "mat4";
 		default:
@@ -220,7 +243,7 @@ struct VertexOutputNode : public ShaderEditor::Node
 
 	void onGUI() override
 	{
-		ImGui::InputText("Name", m_output.name.data, sizeof(m_output.name.data));
+		ImGui::InputText("Output", m_output.name.data, sizeof(m_output.name.data));
 		auto getter = [](void*, int idx, const char** out){
 			*out = toString((ShaderEditor::ValueType)idx);
 			return true;
@@ -260,6 +283,7 @@ struct VertexInputNode : public ShaderEditor::Node
 
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
+		if (m_idx < 0) return ShaderEditor::ValueType::VEC4;
 		return m_editor.getAttributeType(m_idx);
 	}
 
@@ -365,7 +389,7 @@ void ShaderEditor::Node::onNodeGUI()
 
 struct OperatorNode : public ShaderEditor::Node
 {
-	enum Operation
+	enum Operation : int
 	{
 		ADD,
 		SUB,
@@ -376,7 +400,9 @@ struct OperatorNode : public ShaderEditor::Node
 		GT,
 		GTE,
 		EQ,
-		NEQ
+		NEQ,
+		
+		COUNT
 	};
 
 	explicit OperatorNode(ShaderEditor& editor)
@@ -410,6 +436,23 @@ struct OperatorNode : public ShaderEditor::Node
 	}
 
 
+	static const char* toString(Operation op) {
+		switch (op) {
+			case ADD: return "+";
+			case MUL: return "*";
+			case DIV: return "/";
+			case SUB: return "-";
+			case LT: return "<";
+			case LTE: return "<=";
+			case GT: return ">";
+			case GTE: return ">=";
+			case EQ: return "==";
+			case NEQ: return "!=";
+			default: ASSERT(false); return "Unknown";
+		}
+	}
+
+
 	void generate(OutputMemoryStream& blob) override
 	{
 		if(!m_inputs[0]) return;
@@ -423,34 +466,16 @@ struct OperatorNode : public ShaderEditor::Node
 						 input0_type == ShaderEditor::ValueType::MATRIX4;
 		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
 
-		if (m_operation == MUL && is_matrix)
-		{
+		if (m_operation == MUL && is_matrix) {
 			blob << "mul(";
 			m_inputs[0]->printReference(blob);
 			blob << (", ");
 			m_inputs[1]->printReference(blob);
 			blob << (");\n");
 		}
-		else
-		{
+		else {
 			m_inputs[0]->printReference(blob);
-			switch (m_operation)
-			{
-				case MUL: blob << " * "; break;
-				case DIV: blob << " / "; break;
-				case ADD: blob << " + "; break;
-				case SUB: blob << " - "; break;
-				case LT: blob << " < "; break;
-				case LTE: blob << " <= "; break;
-				case GT: blob << " > "; break;
-				case GTE: blob << " >= "; break;
-				case EQ: blob << " == "; break;
-				case NEQ: blob << " != "; break;
-				default:
-					ASSERT(false);
-					blob << " * ";
-					break;
-			}
+			blob << " " << toString(m_operation) << " ";
 			m_inputs[1]->printReference(blob);
 			blob << (";\n");
 		}
@@ -461,8 +486,11 @@ struct OperatorNode : public ShaderEditor::Node
 		ImGui::Text("A");
 		ImGui::Text("B");
 		int o = m_operation;
-		if (ImGui::Combo("Operation", &o, "Addition\0Subtraction\0Multiplication\0Division\0"))
-		{
+		auto getter = [](void*, int idx, const char** out){
+			*out = toString((Operation)idx);
+			return true;
+		};
+		if (ImGui::Combo("Op", &o, getter, nullptr, (int)Operation::COUNT)) {
 			m_operation = (Operation)o;
 		}
 	}
@@ -742,7 +770,7 @@ struct ColorConstNode : public ShaderEditor::Node
 
 	void generate(OutputMemoryStream& blob) override
 	{
-		blob << "\tconst vec4 v" << m_id << " = vec4(" << m_color[0] << ", " << m_color[1] << ", "
+		blob << "\t\tconst vec4 v" << m_id << " = vec4(" << m_color[0] << ", " << m_color[1] << ", "
 			 << m_color[2] << ", " << m_color[3] << ");\n";
 	}
 
@@ -770,12 +798,12 @@ struct SampleNode : public ShaderEditor::Node
 	{
 		if (!m_inputs[0])
 		{
-			blob << "\tvec4 v" << m_id << " = vec4(1, 0, 1, 0);\n";
+			blob << "\t\tvec4 v" << m_id << " = vec4(1, 0, 1, 0);\n";
 			return;
 		}
 
 		m_inputs[0]->generate(blob);
-		blob << "\tvec4 v" << m_id << " = texture2D(" << m_editor.getTextureName(m_texture) << ", ";
+		blob << "\t\tvec4 v" << m_id << " = texture2D(" << m_editor.getTextureName(m_texture) << ", ";
 		m_inputs[0]->printReference(blob);
 		blob << ");\n";
 	}
@@ -871,28 +899,55 @@ struct FragmentOutputNode : public ShaderEditor::Node
 		m_inputs.push(nullptr);
 	}
 
+	void save(OutputMemoryStream& blob) { blob.write(m_inputs.size()); }
+	
+	void load(InputMemoryStream& blob) {
+		int c;
+		blob.read(c);
+		m_inputs.clear();
+		m_inputs.reserve(c);
+		for (int i = 0; i < c; ++i) m_inputs.push(nullptr);
+	}
 
 	void generateBeforeMain(OutputMemoryStream& blob) override
 	{
-		blob << "\tlayout(location = 0) out vec4 _out;\n";
+		for (int i = 0; i < m_inputs.size(); ++i) {
+			blob << "\tlayout(location = " << i << ") out vec4 out" << i << ";\n";
+		}
 	}
 
 
 	void generate(OutputMemoryStream& blob) override
 	{
-		if (!m_inputs[0]) {
-			blob << "\t\t_out = vec4(0, 0, 0, 1);\n";
-			return;
+		for(int i = 0; i < m_inputs.size(); ++i) {
+			if (m_inputs[i]) {
+				m_inputs[i]->generate(blob);
+				blob << "\t\tout" << i << " = ";
+				m_inputs[i]->printReference(blob);
+				blob << ";\n";
+			}
+			else {
+				blob << "\t\tout" << i << " = vec4(0, 0, 0, 1);\n";
+			}
 		}
-
-		m_inputs[0]->generate(blob);
-		blob << "\t\t_out = ";
-		m_inputs[0]->printReference(blob);
-		blob << ";\n";
 	}
 
 
-	void onGUI() override { ImGui::Text("OUTPUT"); }
+	void onGUI() override { 
+		for (int i = 0; i < m_inputs.size(); ++i) {
+			ImGui::Text("output %d ", i);
+		}
+		if (ImGui::Button("Add")) {
+			m_inputs.push(nullptr);
+		}
+		if (m_inputs.size() > 1) {
+			ImGui::SameLine();
+			if (ImGui::Button("Remove")) {
+				// TODO remove connection
+				m_inputs.pop();
+			}
+		}
+	}
 };
 
 
@@ -970,17 +1025,17 @@ struct PassNode : public ShaderEditor::Node
 
 	void generate(OutputMemoryStream& blob) override 
 	{
-		const char* defs[] = { "#ifdef ", "#ifndef " };
+		const char* defs[] = { "\t\t#ifdef ", "\t\t#ifndef " };
 		for (int i = 0; i < 2; ++i)
 		{
 			if (!m_inputs[i]) continue;
 
 			blob << defs[i] << m_pass << "\n";
 			m_inputs[i]->generate(blob);
-			blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
+			blob << "\t\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
 			m_inputs[i]->printReference(blob);
 			blob << ";\n";
-			blob << "#endif // " << m_pass << "\n";
+			blob << "\t\t#endif // " << m_pass << "\n\n";
 		}
 	}
 
@@ -1044,8 +1099,8 @@ struct UniformNode : public ShaderEditor::Node
 		m_value_type = ShaderEditor::ValueType::VEC4;
 	}
 
-	void save(OutputMemoryStream& blob) override { blob.write(m_type); }
-	void load(InputMemoryStream& blob) override { blob.read(m_type); }
+	void save(OutputMemoryStream& blob) override { blob.write(m_type); blob.writeString(m_name); }
+	void load(InputMemoryStream& blob) override { blob.read(m_type); blob.readString(m_name.data, lengthOf(m_name.data)); }
 	ShaderEditor::ValueType getOutputType(int) const override { return m_value_type; }
 
 
@@ -1057,7 +1112,7 @@ struct UniformNode : public ShaderEditor::Node
 
 	void generateBeforeMain(OutputMemoryStream& blob) override
 	{
-		blob << "uniform " << getValueTypeName(m_value_type) << " " << m_name << ";\n";
+		blob << "\tuniform " << getValueTypeName(m_value_type) << " " << m_name << ";\n";
 	}
 
 
@@ -1326,6 +1381,7 @@ ShaderEditor::ShaderEditor(IAllocator& allocator)
 	, m_allocator(allocator)
 	, m_undo_stack(allocator)
 	, m_attributes(allocator)
+	, m_source(allocator)
 	, m_undo_stack_idx(-1)
 	, m_current_node_id(-1)
 	, m_is_focused(false)
@@ -1383,16 +1439,8 @@ static constexpr char* toString(Mesh::AttributeSemantic sem) {
 }
 
 
-void ShaderEditor::generate(const char* sed_path)
+void ShaderEditor::generate(const char* sed_path, bool save_file)
 {
-	PathUtils::FileInfo fi(sed_path);
-	StaticString<MAX_PATH_LENGTH> path(fi.m_dir, fi.m_basename, ".shd");
-	OS::OutputFile file;
-	if (!file.open(path)) {
-		logError("Editor") << "Could not create file " << path;
-		return;
-	}
-
 	OutputMemoryStream blob(m_allocator);
 	blob.reserve(8192);
 
@@ -1400,7 +1448,7 @@ void ShaderEditor::generate(const char* sed_path)
 		if (!m_textures[i][0]) continue;
 
 		blob << "texture_slot {\n";
-		blob << "\tname = \"Metallic\",\n";
+		blob << "\tname = \"" << m_textures[i] << "\",\n";
 		blob << "\tdefault_texture = \"textures/common/white.tga\"\n";
 		blob << "}\n\n";
 	}
@@ -1443,8 +1491,21 @@ void ShaderEditor::generate(const char* sed_path)
 	writeShader("fragment", m_fragment_nodes);
 	writeShader("vertex", m_vertex_nodes);
 
-	file.write(blob.getData(), blob.getPos());
-	file.close();
+	if (save_file) {
+		PathUtils::FileInfo fi(sed_path);
+		StaticString<MAX_PATH_LENGTH> path(fi.m_dir, fi.m_basename, ".shd");
+		OS::OutputFile file;
+		if (!file.open(path)) {
+			logError("Editor") << "Could not create file " << path;
+			return;
+		}
+
+		file.write(blob.getData(), blob.getPos());
+		file.close();
+	}
+
+	m_source.resize((int)blob.getPos());
+	copyMemory(m_source.getData(), blob.getData(), m_source.length() + 1);
 }
 
 
@@ -1893,15 +1954,37 @@ void ShaderEditor::onGUIRightColumn()
 
 void ShaderEditor::onGUILeftColumn()
 {
-	ImGui::BeginChild("left_col", ImVec2(120, 0));
-	ImGui::PushItemWidth(120);
+	ImGui::BeginChild("left_col", ImVec2(m_left_col_width, 0));
+	ImGui::PushItemWidth(m_left_col_width);
 
-	ImGui::Separator();
-	ImGui::Text("Textures");
-	ImGui::Separator();
-	for (int i = 0; i < lengthOf(m_textures); ++i)
-	{
-		ImGui::InputText(StaticString<10>("###tex", i), m_textures[i].data, sizeof(m_textures[i]));
+	if (ImGui::CollapsingHeader("Textures")) {
+		for (int i = 0; i < lengthOf(m_textures); ++i) {
+			ImGui::InputText(StaticString<10>("###tex", i), m_textures[i].data, sizeof(m_textures[i]));
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Attributes")) {
+		for (int i = 0; i < m_attributes.size(); ++i) {
+			if (ImGui::Button(StaticString<32>("X##x", i))) {
+				m_attributes.erase(i);
+				--i;
+				continue;
+			}
+			ImGui::SameLine();
+			ImGui::InputText(StaticString<10>("###attr", i), m_attributes[i].name.data, sizeof(m_attributes[i].name.data));
+		}
+		if (ImGui::Button("Add")) {
+			m_attributes.emplace();
+		}
+	}
+
+	if (ImGui::CollapsingHeader("Source")) {
+		if (m_source.length() == 0) {
+			ImGui::Text("Empty");
+		}
+		else {
+			ImGui::InputTextMultiline("", m_source.getData(), m_source.length(), ImVec2(0, 300), ImGuiInputTextFlags_ReadOnly);
+		}
 	}
 
 	ImGui::PopItemWidth();
@@ -1931,6 +2014,8 @@ void ShaderEditor::execute(ICommand* command)
 	m_undo_stack.push(command);
 
 	command->execute();
+
+	generate("", false);
 }
 
 
@@ -1999,9 +2084,7 @@ const char* ShaderEditor::getAttributeName(uint idx) const
 
 ShaderEditor::ValueType ShaderEditor::getAttributeType(uint idx) const
 {
-	ASSERT(false);
-	// TODO
-	return ShaderEditor::ValueType::VEC4;
+	return semanticToType((Mesh::AttributeSemantic)m_attributes[idx].semantic);
 }
 
 
@@ -2075,8 +2158,8 @@ void ShaderEditor::onGUIMenu()
 			if (ImGui::MenuItem("Redo", nullptr, false, canRedo())) redo();
 			ImGui::EndMenu();
 		}
-		if (ImGui::MenuItem("Generate", nullptr, false, m_path.isValid())) {
-			generate(m_path.c_str());
+		if (ImGui::MenuItem("Generate & save", nullptr, false, m_path.isValid())) {
+			generate(m_path.c_str(), true);
 		}
 
 		ImGui::EndMenuBar();
@@ -2096,6 +2179,10 @@ void ShaderEditor::onGUI()
 
 		onGUIMenu();
 		onGUILeftColumn();
+		ImVec2 size(m_left_col_width, 0);
+		ImGui::SameLine();
+		ImGui::VSplitter("vsplit", &size);
+		m_left_col_width = size.x;
 		ImGui::SameLine();
 		onGUIRightColumn();
 	}

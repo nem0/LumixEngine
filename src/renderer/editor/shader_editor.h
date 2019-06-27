@@ -36,6 +36,7 @@ public:
 		VEC2,
 		VEC3,
 		VEC4,
+		IVEC4,
 		MATRIX3,
 		MATRIX4,
 
@@ -100,7 +101,7 @@ public:
 
 private:
 	void generatePasses(OutputMemoryStream& blob);
-	void generate(const char* path);
+	void generate(const char* path, bool save_file);
 	void newGraph();
 	void save(const char* path);
 	void load();
@@ -144,6 +145,8 @@ private:
 	ShaderType m_current_shader_type;
 	bool m_is_focused;
 	ImVec2 m_canvas_pos;
+	float m_left_col_width = 100;
+	String m_source;
 };
 
 
