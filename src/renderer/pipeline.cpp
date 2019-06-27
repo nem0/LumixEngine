@@ -2681,53 +2681,57 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::LOCAL_LIGHT: {
-							/*u16* instance_count = (u16*)out;
+							const u64 type_bits = (u64)RenderableTypes::LOCAL_LIGHT << 32;
+							const u64 type_mask = (u64)0xff << 32;
 							int start_i = i;
-							out += sizeof(*instance_count);
-							bool* intersecting = (bool*)out;
-							out += sizeof(*intersecting);
-							const u64 key = sort_keys[i];
-
-							const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-							const Transform& tr = entity_data[e.index];
-							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-							const PointLight& pl = scene->getPointLight(e);
-							*intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
-							if (*intersecting) {
-								WRITE(tr.rot);
-								WRITE(lpos);
-								WRITE(pl.range);
-								WRITE(pl.attenuation_param);
-								const Vec3 color = pl.color * pl.intensity;
-								WRITE(color);
-								const Vec3 dir = tr.rot * Vec3(0, 0, 1);
-								WRITE(dir);
-								WRITE(pl.fov);
+							while (i < c && (renderables[i] & type_mask) == type_bits) {
 								++i;
 							}
-							else {
-								while (i < c && sort_keys[i] == key) {
-									const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-									const Transform& tr = entity_data[e.index];
-									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-									const PointLight& pl = scene->getPointLight(e);
 
-									WRITE(tr.rot);
-									WRITE(lpos);
-									WRITE(pl.range);
-									WRITE(pl.attenuation_param);
-									const Vec3 color = pl.color * pl.intensity;
-									WRITE(color);
-									const Vec3 dir = tr.rot * Vec3(0, 0, 1);
-									WRITE(dir);
-									WRITE(pl.fov);
-									++i;
-								}
+							const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(float) * 16);
+							// TODO check if slice is valid
+							uint intersecting_count = 0;
+
+							struct LightData {
+								Vec3 pos;
+								Quat rot;
+								float range;
+								float attenuation;
+								Vec3 color;
+								Vec3 dir;
+								float fov;
+							};
+
+							LightData* beg = (LightData*)slice.ptr;
+							LightData* end = (LightData*)(slice.ptr + slice.size - sizeof(LightData));
+
+							for (int j = start_i; j < i; ++j) {
+								const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+								const Transform& tr = entity_data[e.index];
+								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+								const PointLight& pl = scene->getPointLight(e);
+								const bool intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
+							
+								LightData* iter = intersecting ? end : beg;
+								iter->pos = lpos;
+								iter->rot = tr.rot;
+								iter->range = pl.range;
+								iter->attenuation = pl.attenuation_param;
+								iter->color = pl.color * pl.intensity;
+								iter->dir = tr.rot * Vec3(0, 0, 1);
+								iter->fov = pl.fov;
+								intersecting ? --end : ++beg;
 							}
-							*instance_count = u16(i - start_i);
-							--i;*/
-							ASSERT(false);
-							// TODO
+							if ((cmd_page->data + sizeof(cmd_page->data) - out) < 9) {
+								new_page(bucket);
+							}
+							WRITE(type);
+							const uint total_count = i - start_i;
+							const uint nonintersecting_count = uint(beg - (LightData*)slice.ptr);
+							WRITE(total_count);
+							WRITE(nonintersecting_count);
+
+							--i;
 							break;
 						}
 						case RenderableTypes::GRASS: {
@@ -2781,7 +2785,10 @@ struct PipelineImpl final : Pipeline
 			ASSERT(renderables);
 			if (renderables->header.count == 0 && !renderables->header.next) return;
 			PagedListIterator<const CullResult> iterator(renderables);
-
+			
+			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
+			const u8 local_light_bucket = m_bucket_map[local_light_layer];
+			
 			JobSystem::runOnWorkers([&](){
 				PROFILE_BLOCK("sort_keys");
 				int total = 0;
@@ -2800,6 +2807,14 @@ struct PipelineImpl final : Pipeline
 					total += page->header.count;
 					const EntityRef* LUMIX_RESTRICT renderables = page->entities;
 					switch(type) {
+						case RenderableTypes::LOCAL_LIGHT: {
+							if(local_light_bucket < 0xff) {
+								for (int i = 0, c = page->header.count; i < c; ++i) {
+									result.push((u64)local_light_bucket << 56, renderables[i].index | type_mask);
+								}
+							}
+							break;
+						}
 						case RenderableTypes::MESH: {
 							for (int i = 0, c = page->header.count; i < c; ++i) {
 								const EntityRef e = renderables[i];
