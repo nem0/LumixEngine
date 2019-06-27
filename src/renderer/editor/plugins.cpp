@@ -3,6 +3,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -2636,6 +2637,13 @@ struct ShaderEditorPlugin final : public StudioApp::GUIPlugin
 	void onWindowGUI() override { m_shader_editor.onGUI(); }
 	bool hasFocus() override { return m_shader_editor.hasFocus(); }
 	bool isOpen() const { return m_shader_editor.m_is_open; }
+	void onSettingsLoaded() override {
+		m_shader_editor.m_is_open = m_app.getSettings().getValue("is_shader_editor_open", false);
+	}
+	void onBeforeSettingsSaved() override {
+		m_app.getSettings().setValue("is_shader_editor_open", m_shader_editor.m_is_open);
+	}
+
 
 	StudioApp& m_app;
 	ShaderEditor m_shader_editor;
