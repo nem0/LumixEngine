@@ -636,12 +636,6 @@ void TerrainEditor::onUniverseDestroyed()
 }
 
 
-static IEditorCommand* createPaintTerrainCommand(WorldEditor& editor)
-{
-	return LUMIX_NEW(editor.getAllocator(), PaintTerrainCommand)(editor);
-}
-
-
 TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	: m_world_editor(editor)
 	, m_app(app)
@@ -655,7 +649,6 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	, m_size_spread(1, 1)
 	, m_y_spread(0, 0)
 {
-	editor.registerEditorCommandCreator("paint_terrain", createPaintTerrainCommand);
 	m_increase_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "Terrain editor - Increase brush size", "increaseBrushSize");
 	m_increase_brush_size->is_global = false;
 	m_increase_brush_size->func.bind<TerrainEditor, &TerrainEditor::increaseBrushSize>(this);

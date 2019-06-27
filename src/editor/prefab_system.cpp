@@ -87,6 +87,12 @@ class PrefabSystemImpl final : public PrefabSystem
 		}
 
 
+		bool isReady() override
+		{
+			return prefab->isReady() || prefab->isFailure();
+		}
+
+
 		void createEntityGUIDRecursive(EntityPtr entity) const
 		{
 			if (!entity.isValid()) return;
@@ -118,22 +124,23 @@ class PrefabSystemImpl final : public PrefabSystem
 		bool execute() override
 		{
 			entity = INVALID_ENTITY;
-			if (!prefab->isReady()) return false;
+			if (!prefab->isFailure()) return false;
+			
+			ASSERT(prefab->isReady());
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
 
 			entity = system.doInstantiatePrefab(*prefab, position, rotation, scale);
-			if (entity.isValid()) {
-				editor.createEntityGUID((EntityRef)entity);
-				createEntityGUIDRecursive(editor.getUniverse()->getFirstChild((EntityRef)entity));
-				return true;
-			}
-			return false;
+			if (!entity.isValid()) return false;
+
+			editor.createEntityGUID((EntityRef)entity);
+			createEntityGUIDRecursive(editor.getUniverse()->getFirstChild((EntityRef)entity));
+			return true;
 		}
 
 
 		void undo() override
 		{
-			if (!entity.isValid()) return;
+			ASSERT(entity.isValid());
 
 			Universe& universe = *editor.getUniverse();
 
@@ -141,6 +148,8 @@ class PrefabSystemImpl final : public PrefabSystem
 			destroyEntityRecursive(universe.getFirstChild(e));
 			universe.destroyEntity(e);
 			editor.destroyEntityGUID(e);
+
+			entity = INVALID_ENTITY;
 		}
 
 
@@ -157,7 +166,7 @@ class PrefabSystemImpl final : public PrefabSystem
 		Quat rotation;
 		float scale;
 		WorldEditor& editor;
-		EntityPtr entity;
+		EntityPtr entity = INVALID_ENTITY;
 	};
 
 public:
@@ -167,13 +176,10 @@ public:
 		, m_instances(editor.getAllocator())
 		, m_resources(editor.getAllocator())
 		, m_prefabs(editor.getAllocator())
-		, m_deferred_instances(editor.getAllocator())
 	{
 		editor.universeCreated().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(editor.getUniverse());
-		editor.registerEditorCommandCreator(
-			"instantiate_prefab", &PrefabSystemImpl::createInstantiatePrefabCommand);
 	}
 
 
@@ -184,12 +190,6 @@ public:
 		m_editor.universeDestroyed()
 			.unbind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(nullptr);
-	}
-
-
-	static IEditorCommand* createInstantiatePrefabCommand(WorldEditor& editor)
-	{
-		return LUMIX_NEW(editor.getAllocator(), InstantiatePrefabCommand)(editor);
 	}
 
 
@@ -380,11 +380,7 @@ public:
 
 	EntityPtr doInstantiatePrefab(PrefabResource& prefab_res, const DVec3& pos, const Quat& rot, float scale)
 	{
-		if (!prefab_res.isReady()) {
-			m_deferred_instances.push({&prefab_res, {pos, rot, scale}});
-			// TODO undo does not work in this case
-			return INVALID_ENTITY;
-		}
+		ASSERT(prefab_res.isReady());
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
 		{
 			m_resources.insert(prefab_res.getPath().getHash(), &prefab_res);
@@ -597,27 +593,6 @@ public:
 	}
 
 
-	void update() override
-	{
-		while (!m_deferred_instances.empty()) {
-			PrefabResource* res = m_deferred_instances.back().resource;
-			if (res->isFailure()) {
-				logError("Editor") << "Failed to instantiate " << res->getPath();
-				res->getResourceManager().unload(*res);
-				m_deferred_instances.pop();
-			} else if (res->isReady()) {
-				DeferredInstance tmp = m_deferred_instances.back();
-				doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
-				res->getResourceManager().unload(*res);
-				m_deferred_instances.pop();
-			} else {
-				break;
-			}
-		}
-	}
-
-
-
 	void serialize(IOutputStream& serializer) override
 	{
 		serializer.write(m_prefabs.size());
@@ -724,7 +699,12 @@ public:
 			serializer.read(&rot);
 			float scale;
 			serializer.read(&scale);
-			doInstantiatePrefab(*m_resources[res_hash], pos, rot, scale);
+			if (m_resources[res_hash]->isReady()) {
+				doInstantiatePrefab(*m_resources[res_hash], pos, rot, scale);
+			}
+			else {
+				ASSERT(m_resources[res_hash]->isFailure());
+			}
 		}
 	}
 
@@ -747,7 +727,6 @@ private:
 		PrefabResource* resource;
 		Transform transform;
 	};
-	Array<DeferredInstance> m_deferred_instances;
 }; // class PrefabSystemImpl
 
 

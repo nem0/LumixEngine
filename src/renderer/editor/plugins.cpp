@@ -1385,12 +1385,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (texture->bytes_per_pixel > 0) ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
 		if (texture->handle.isValid()) {
 			ImVec2 texture_size(200, 200);
-			if (texture->width > texture->height)
-			{
+			if (texture->width > texture->height) {
 				texture_size.y = texture_size.x * texture->height / texture->width;
 			}
-			else
-			{
+			else {
 				texture_size.x = texture_size.y * texture->width / texture->height;
 			}
 

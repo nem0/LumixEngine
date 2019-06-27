@@ -140,10 +140,6 @@ public:
 		LATEST // keep this last
 	};
 
-	enum class LoadingFlags : u32
-	{
-	};
-
 	struct LOD
 	{
 		int from_mesh;

@@ -37,7 +37,6 @@ class SceneView : public StudioApp::GUIPlugin
 		const char* getName() const override { return "scene_view"; }
 
 	private:
-		void processDeferPrefabInserts();
 		void renderSelection();
 		void renderGizmos();
 		void renderIcons();
@@ -75,14 +74,6 @@ class SceneView : public StudioApp::GUIPlugin
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
 		Shader* m_debug_shape_shader;
-
-		struct DeferredPrefabInsert
-		{
-			DVec3 pos;
-			struct PrefabResource* prefab;
-		};
-
-		Array<DeferredPrefabInsert> m_deferred_prefab_inserts;
 };
 
 
