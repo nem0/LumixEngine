@@ -43,7 +43,6 @@ SceneView::SceneView(StudioApp& app)
 	, m_drop_handlers(app.getWorldEditor().getAllocator())
 	, m_log_ui(app.getLogUI())
 	, m_editor(m_app.getWorldEditor())
-	, m_deferred_prefab_inserts(app.getWorldEditor().getAllocator())
 {
 	m_camera_speed = 0.1f;
 	m_is_mouse_captured = false;
@@ -138,26 +137,9 @@ void SceneView::onUniverseDestroyed()
 }
 
 
-void SceneView::processDeferPrefabInserts()
-{
-	for (int i = m_deferred_prefab_inserts.size() - 1; i >= 0; --i)
-	{
-		DeferredPrefabInsert& defer = m_deferred_prefab_inserts[i];
-		if (defer.prefab->isReady())
-		{
-			m_editor.getPrefabSystem().instantiatePrefab(*defer.prefab, defer.pos, Quat::IDENTITY, 1);
-			defer.prefab->getResourceManager().unload(*defer.prefab);
-			m_deferred_prefab_inserts.erase(i);
-		}
-	}
-}
-
-
 void SceneView::update(float)
 {
 	PROFILE_FUNCTION();
-
-	processDeferPrefabInserts();
 
 	if (ImGui::IsAnyItemActive()) return;
 	if (!m_is_open) return;
@@ -441,11 +423,10 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	}
 	else if (PathUtils::hasExtension(path, "fab"))
 	{
-		DeferredPrefabInsert defer;
-		defer.pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
 		ResourceManagerHub& manager = m_editor.getEngine().getResourceManager();
-		defer.prefab = manager.load<PrefabResource>(Path(path));
-		m_deferred_prefab_inserts.push(defer);
+		PrefabResource* prefab = manager.load<PrefabResource>(Path(path));
+		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
+		m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, 1);
 	}
 	else if (PathUtils::hasExtension(path, "phy"))
 	{

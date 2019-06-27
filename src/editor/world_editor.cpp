@@ -86,13 +86,6 @@ struct EndGroupCommand final : public IEditorCommand
 class SetEntityNameCommand final : public IEditorCommand
 {
 public:
-	explicit SetEntityNameCommand(WorldEditor& editor)
-		: m_new_name(m_editor.getAllocator())
-		, m_old_name(m_editor.getAllocator())
-		, m_editor(editor)
-	{
-	}
-
 	SetEntityNameCommand(WorldEditor& editor, EntityRef entity, const char* name)
 		: m_entity(entity)
 		, m_new_name(name, editor.getAllocator())
@@ -105,19 +98,14 @@ public:
 
 	bool execute() override
 	{
-		if (m_entity.isValid()) {
-			m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_new_name.c_str());
-			return true;
-		}
-		return false;
+		m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_new_name.c_str());
+		return true;
 	}
 
 
 	void undo() override
 	{
-		if (m_entity.isValid()) {
-			m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_old_name.c_str());
-		}
+		m_editor.getUniverse()->setEntityName((EntityRef)m_entity, m_old_name.c_str());
 	}
 
 
@@ -140,7 +128,7 @@ public:
 
 private:
 	WorldEditor& m_editor;
-	EntityPtr m_entity;
+	EntityRef m_entity;
 	String m_new_name;
 	String m_old_name;
 };
@@ -799,15 +787,8 @@ struct WorldEditorImpl final : public WorldEditor
 {
 	friend class PasteEntityCommand;
 private:
-	class AddComponentCommand final : public IEditorCommand
+	struct AddComponentCommand final : public IEditorCommand
 	{
-	public:
-		explicit AddComponentCommand(WorldEditor& editor)
-			: m_editor(static_cast<WorldEditorImpl&>(editor))
-			, m_entities(editor.getAllocator())
-		{
-		}
-
 		AddComponentCommand(WorldEditorImpl& editor,
 							const Array<EntityRef>& entities,
 							ComponentType type)
@@ -816,20 +797,16 @@ private:
 		{
 			m_type = type;
 			m_entities.reserve(entities.size());
-			for (int i = 0; i < entities.size(); ++i)
-			{
-				if (!m_editor.getUniverse()->getComponent(entities[i], type).isValid())
-				{
-					u64 prefab = editor.getPrefabSystem().getPrefab(entities[i]);
-					if (prefab == 0)
-					{
-						m_entities.push(entities[i]);
+			Universe* universe = m_editor.getUniverse();
+			for (EntityRef e : entities) {
+				if (!universe->getComponent(e, type).isValid()) {
+					u64 prefab = editor.getPrefabSystem().getPrefab(e);
+					if (prefab == 0) {
+						m_entities.push(e);
 					}
-					else
-					{
+					else {
 						EntityPtr instance = editor.getPrefabSystem().getFirstInstance(prefab);
-						while(instance.isValid())
-						{
+						while (instance.isValid()) {
 							const EntityRef e = (EntityRef)instance;
 							m_entities.push(e);
 							instance = editor.getPrefabSystem().getNextInstance(e);
@@ -851,12 +828,14 @@ private:
 			bool ret = false;
 			Universe* universe = m_editor.getUniverse();
 
-			for (int j = 0; j < m_entities.size(); ++j)
-			{
-				universe->createComponent(m_type, m_entities[j]);
-				if (universe->hasComponent(m_entities[j], m_type))
-				{
+			for (EntityRef e : m_entities) {
+				ASSERT(!universe->hasComponent(e, m_type));
+				universe->createComponent(m_type, e);
+				if (universe->hasComponent(e, m_type)) {
 					ret = true;
+				}
+				else {
+					logError("Editor") << "Failed to create component on entity " << e.index;
 				}
 			}
 			return ret;
@@ -865,11 +844,11 @@ private:
 
 		void undo() override
 		{
-			for (int i = 0; i < m_entities.size(); ++i)
-			{
-				const ComponentUID& cmp = m_editor.getUniverse()->getComponent(m_entities[i], m_type);
-				if (cmp.isValid()) {
-					m_editor.getUniverse()->destroyComponent((EntityRef)cmp.entity, cmp.type);
+			Universe* universe = m_editor.getUniverse();
+			for (EntityRef e : m_entities) {
+				if (universe->hasComponent(e, m_type)) {
+					universe->destroyComponent(e, m_type);
+					ASSERT(!universe->hasComponent(e, m_type));
 				}
 			}
 		}
@@ -1149,21 +1128,18 @@ private:
 			, m_resources(editor.getAllocator())
 		{
 			m_entities.reserve(count);
-			for (int i = 0; i < count; ++i)
-			{
+			PrefabSystem& prefab_system = editor.getPrefabSystem();
+			for (int i = 0; i < count; ++i) {
 				if (!m_editor.getUniverse()->getComponent(entities[i], m_cmp_type).isValid()) continue;
-				u64 prefab = editor.getPrefabSystem().getPrefab(entities[i]);
-				if (prefab == 0)
-				{
+				const u64 prefab = prefab_system.getPrefab(entities[i]);
+				if (prefab == 0) {
 					m_entities.push(entities[i]);
 				}
-				else
-				{
-					EntityPtr instance = editor.getPrefabSystem().getFirstInstance(prefab);
-					while(instance.isValid())
-					{
+				else {
+					EntityPtr instance = prefab_system.getFirstInstance(prefab);
+					while(instance.isValid()) {
 						m_entities.push((EntityRef)instance);
-						instance = editor.getPrefabSystem().getNextInstance((EntityRef)instance);
+						instance = prefab_system.getNextInstance((EntityRef)instance);
 					}
 				}
 			}
@@ -1172,8 +1148,7 @@ private:
 
 		~DestroyComponentCommand()
 		{
-			for (Resource* resource : m_resources)
-			{
+			for (Resource* resource : m_resources) {
 				resource->getResourceManager().unload(*resource);
 			}
 		}
@@ -1204,16 +1179,16 @@ private:
 
 		bool execute() override
 		{
+			ASSERT(!m_entities.empty());
 			const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(m_cmp_type);
 			ComponentUID cmp;
 			cmp.type = m_cmp_type;
 			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
-			if (m_entities.empty()) return false;
-			if (!cmp.scene) return false;
+			ASSERT(cmp.scene);
+
 			ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 
-			for (EntityRef entity : m_entities)
-			{
+			for (EntityRef entity : m_entities) {
 				cmp.entity = entity;
 				SaveVisitor save;
 				save.cmp = cmp;
@@ -1241,16 +1216,8 @@ private:
 	};
 
 
-	class AddEntityCommand final : public IEditorCommand
+	struct AddEntityCommand final : public IEditorCommand
 	{
-	public:
-		explicit AddEntityCommand(WorldEditor& editor)
-			: m_editor(static_cast<WorldEditorImpl&>(editor))
-		{
-			m_entity = INVALID_ENTITY;
-		}
-
-
 		AddEntityCommand(WorldEditorImpl& editor, const DVec3& position)
 			: m_editor(editor)
 			, m_position(position)
@@ -1261,13 +1228,11 @@ private:
 
 		bool execute() override
 		{
-			if (m_entity.isValid())
-			{
+			if (m_entity.isValid()) {
 				m_editor.getUniverse()->emplaceEntity((EntityRef)m_entity);
 				m_editor.getUniverse()->setPosition((EntityRef)m_entity, m_position);
 			}
-			else
-			{
+			else {
 				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
 			const EntityRef e = (EntityRef)m_entity;
@@ -1279,20 +1244,16 @@ private:
 
 		void undo() override
 		{
-			if(m_entity.isValid()) {
-				const EntityRef e = (EntityRef)m_entity;
-				m_editor.getUniverse()->destroyEntity(e);
-				m_editor.m_entity_map.erase(e);
-			}
+			ASSERT(m_entity.isValid());
+
+			const EntityRef e = (EntityRef)m_entity;
+			m_editor.getUniverse()->destroyEntity(e);
+			m_editor.m_entity_map.erase(e);
 		}
 
 
 		bool merge(IEditorCommand&) override { return false; }
-
-
 		const char* getType() override { return "add_entity"; }
-
-
 		EntityPtr getEntity() const { return m_entity; }
 
 
@@ -1404,10 +1365,18 @@ public:
 	void update() override
 	{
 		PROFILE_FUNCTION();
+
+		// TODO do not allow user interaction (e.g. saving universe) while queue is not empty
+		while (!m_command_queue.empty()) {
+			if (!m_command_queue[0]->isReady()) break;
+
+			IEditorCommand* cmd = m_command_queue[0];
+			m_command_queue.erase(0);
+			doExecute(cmd);
+		}
+
 		updateGoTo();
 		previewSnapVertex();
-
-		m_prefab_system->update();
 
 		if (!m_selected_entities.empty())
 		{
@@ -2341,6 +2310,18 @@ public:
 
 	void executeCommand(IEditorCommand* command) override
 	{
+		if (!m_command_queue.empty() || !command->isReady()) {
+			m_command_queue.push(command);
+			return;
+		}
+
+		doExecute(command);
+	}
+
+
+	void doExecute(IEditorCommand* command)
+	{
+		ASSERT(command->isReady());
 		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
@@ -2367,7 +2348,10 @@ public:
 			++m_undo_index;
 			return;
 		}
-		LUMIX_DELETE(m_allocator, command);
+		else {
+			logError("Editor") << "Editor command failed";
+		}
+		LUMIX_DELETE(m_allocator, command);	
 	}
 
 
@@ -2687,7 +2671,6 @@ public:
 		, m_plugins(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_copy_buffer(m_allocator)
-		, m_editor_command_creators(m_allocator)
 		, m_is_loading(false)
 		, m_universe(nullptr)
 		, m_is_orbit(false)
@@ -2703,6 +2686,7 @@ public:
 		, m_entity_map(m_allocator)
 		, m_is_guid_pseudorandom(false)
         , m_game_mode_file(m_allocator)
+		, m_command_queue(m_allocator)
 	{
 		m_viewport.is_ortho = false;
 		m_viewport.pos = DVec3(0);
@@ -2744,33 +2728,6 @@ public:
 		plugin_manager.initPlugins();
 
 		m_prefab_system = PrefabSystem::create(*this);
-
-		m_editor_command_creators.insert(
-			crc32("begin_group"), &WorldEditorImpl::constructEditorCommand<BeginGroupCommand>);
-		m_editor_command_creators.insert(
-			crc32("end_group"), &WorldEditorImpl::constructEditorCommand<EndGroupCommand>);
-		m_editor_command_creators.insert(
-			crc32("scale_entity"), &WorldEditorImpl::constructEditorCommand<ScaleEntityCommand>);
-		m_editor_command_creators.insert(
-			crc32("move_entity"), &WorldEditorImpl::constructEditorCommand<MoveEntityCommand>);
-		m_editor_command_creators.insert(
-			crc32("set_entity_name"), &WorldEditorImpl::constructEditorCommand<SetEntityNameCommand>);
-		m_editor_command_creators.insert(
-			crc32("paste_entity"), &WorldEditorImpl::constructEditorCommand<PasteEntityCommand>);
-		m_editor_command_creators.insert(crc32("remove_array_property_item"),
-			&WorldEditorImpl::constructEditorCommand<RemoveArrayPropertyItemCommand>);
-		m_editor_command_creators.insert(
-			crc32("add_array_property_item"), &WorldEditorImpl::constructEditorCommand<AddArrayPropertyItemCommand>);
-		m_editor_command_creators.insert(
-			crc32("set_property_values"), &WorldEditorImpl::constructEditorCommand<SetPropertyCommand>);
-		m_editor_command_creators.insert(
-			crc32("add_component"), &WorldEditorImpl::constructEditorCommand<AddComponentCommand>);
-		m_editor_command_creators.insert(
-			crc32("destroy_entities"), &WorldEditorImpl::constructEditorCommand<DestroyEntitiesCommand>);
-		m_editor_command_creators.insert(
-			crc32("destroy_components"), &WorldEditorImpl::constructEditorCommand<DestroyComponentCommand>);
-		m_editor_command_creators.insert(
-			crc32("add_entity"), &WorldEditorImpl::constructEditorCommand<AddEntityCommand>);
 
 		m_gizmo = Gizmo::create(*this);
 		m_editor_icons = EditorIcons::create(*this);
@@ -3130,23 +3087,6 @@ public:
 	}
 
 
-	IEditorCommand* createEditorCommand(u32 command_type) override
-	{
-		int index = m_editor_command_creators.find(command_type);
-		if (index >= 0)
-		{
-			return m_editor_command_creators.at(index)(*this);
-		}
-		return nullptr;
-	}
-
-
-	void registerEditorCommandCreator(const char* command_type, EditorCommandCreator creator) override
-	{
-		m_editor_command_creators.insert(crc32(command_type), creator);
-	}
-
-
 	void setTopView() override
 	{
 		m_go_to_parameters.m_is_active = true;
@@ -3267,7 +3207,7 @@ private:
 	Plugin* m_mouse_handling_plugin;
 	PrefabSystem* m_prefab_system;
 	Array<IEditorCommand*> m_undo_stack;
-	AssociativeArray<u32, EditorCommandCreator> m_editor_command_creators;
+	Array<IEditorCommand*> m_command_queue;
 	int m_undo_index;
 	OutputMemoryStream m_copy_buffer;
 	bool m_is_loading;
@@ -3401,8 +3341,7 @@ public:
 
 	void undo() override
 	{
-		for (auto entity : m_entities)
-		{
+		for (auto entity : m_entities) {
 			m_editor.getUniverse()->destroyEntity(entity);
 			((WorldEditorImpl&)m_editor).m_entity_map.erase(entity);
 		}

@@ -30,7 +30,6 @@ public:
 	static void destroyEditorPlugins(StudioApp& app);
 
 	virtual ~PrefabSystem() {}
-	virtual void update() = 0;
 	virtual void serialize(IOutputStream& serializer) = 0;
 	virtual void deserialize(IInputStream& serializer) = 0;
 	virtual void serialize(ISerializer& serializer) = 0;

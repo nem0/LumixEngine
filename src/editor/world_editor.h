@@ -26,6 +26,7 @@ class Engine;
 struct EntityGUID;
 class Hierarchy;
 struct IAllocator;
+struct IEditorCommand;
 class InputMemoryStream;
 struct IPlugin;
 struct ISerializer;
@@ -44,9 +45,6 @@ struct Viewport;
 class LUMIX_EDITOR_API WorldEditor
 {
 public:
-	typedef Array<ComponentUID> ComponentList;
-	typedef struct IEditorCommand* (*EditorCommandCreator)(WorldEditor&);
-
 	enum class Coordinate : int
 	{
 		X,
@@ -85,7 +83,6 @@ public:
 	virtual void beginCommandGroup(u32 type) = 0;
 	virtual void endCommandGroup() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
-	virtual IEditorCommand* createEditorCommand(u32 command_type) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
@@ -175,7 +172,6 @@ public:
 	virtual void makeRelative(char* relative, int max_size, const char* absolute) const = 0;
 	virtual void makeAbsolute(char* absolute, int max_size, const char* relative) const = 0;
 
-	virtual void registerEditorCommandCreator(const char* command_type, EditorCommandCreator) = 0;
 	virtual bool isGameMode() const = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;
 	virtual Vec2 getMouseSensitivity() = 0;
