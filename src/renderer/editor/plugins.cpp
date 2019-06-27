@@ -1401,7 +1401,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					if (!p->m_texture_view.isValid()) {
 						p->m_texture_view = ffr::allocTextureHandle();
 					}
-					ffr::createTextureView(p->m_texture_view, p->m_texture->handle, ffr::TextureFormat::RGBA8);
+					ffr::createTextureView(p->m_texture_view, p->m_texture->handle);
 				});
 			}
 

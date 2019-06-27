@@ -51,6 +51,7 @@ struct Texture
 
 	GLuint handle;
 	GLenum target;
+	GLenum format;
 };
 
 
@@ -1592,6 +1593,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap));
 
 	Texture& t = g_ffr.textures[handle.value];
+	t.format = internal_format;
 	t.handle = texture;
 	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	return true;
@@ -1642,7 +1644,7 @@ TextureHandle allocTextureHandle()
 }
 
 
-bool createTextureView(TextureHandle view_handle, TextureHandle orig_handle, TextureFormat format)
+void createTextureView(TextureHandle view_handle, TextureHandle orig_handle)
 {
 	checkThread();
 	
@@ -1654,17 +1656,10 @@ bool createTextureView(TextureHandle view_handle, TextureHandle orig_handle, Tex
 	}
 
 	view.target = GL_TEXTURE_2D;
+	view.format = orig.format;
 
 	CHECK_GL(glGenTextures(1, &view.handle));
-
-	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
-		if(s_texture_formats[i].format == format) {
-			glTextureView(view.handle, GL_TEXTURE_2D, orig.handle, s_texture_formats[i].gl_internal, 0, 1, 0, 1);
-			return true;
-		}
-	}
-
-	return false;
+	CHECK_GL(glTextureView(view.handle, GL_TEXTURE_2D, orig.handle, orig.format, 0, 1, 0, 1));
 }
 
 
@@ -1677,52 +1672,55 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 
 	GLuint texture;
 	int found_format = 0;
+	GLenum internal_format = 0;
 	const GLenum target = depth <= 1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_ARRAY;
-	if(depth <= 1) {
-		CHECK_GL(glGenTextures(1, &texture));
-		CHECK_GL(glBindTexture(target, texture));
-		for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
-			if(s_texture_formats[i].format == format) {
-				CHECK_GL(glTexImage2D(target
-					, 0
-					, s_texture_formats[i].gl_internal
-					, w
-					, h
-					, 0
-					, s_texture_formats[i].gl_format
-					, s_texture_formats[i].type
-					, data));
-				found_format = 1;
-				break;
+	const uint mip_count = 1 + log2(maximum(w, h, depth));
+
+	CHECK_GL(glCreateTextures(target, 1, &texture));
+	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
+		if(s_texture_formats[i].format == format) {
+			internal_format = s_texture_formats[i].gl_internal;
+			if(depth <= 1) {
+				CHECK_GL(glTextureStorage2D(texture, mip_count, s_texture_formats[i].gl_internal, w, h));
+				if (data) {
+					CHECK_GL(glTextureSubImage2D(texture
+						, 0
+						, 0
+						, 0
+						, w
+						, h
+						, s_texture_formats[i].gl_format
+						, s_texture_formats[i].type
+						, data));
+				}
 			}
-		}
-	}
-	else {
-		CHECK_GL(glGenTextures(1, &texture));
-		CHECK_GL(glBindTexture(target, texture));
-		for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
-			if(s_texture_formats[i].format == format) {
-				CHECK_GL(glTexImage3D(target
-					, 0
-					, s_texture_formats[i].gl_internal
-					, w
-					, h
-					, depth
-					, 0
-					, s_texture_formats[i].gl_format
-					, s_texture_formats[i].type
-					, data));
-				found_format = 1;
-				break;
+			else {
+				CHECK_GL(glTextureStorage3D(texture, mip_count, s_texture_formats[i].gl_internal, w, h, depth));
+				if (data) {
+					CHECK_GL(glTextureSubImage3D(texture
+						, 0
+						, 0
+						, 0
+						, 0
+						, w
+						, h
+						, depth
+						, s_texture_formats[i].gl_format
+						, s_texture_formats[i].type
+						, data));
+				}
 			}
+			found_format = 1;
+			break;
 		}
 	}
 
 	if(!found_format) {
-		CHECK_GL(glBindTexture(target, 0));
 		CHECK_GL(glDeleteTextures(1, &texture));
 		return false;	
 	}
+
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAX_LEVEL, mip_count - 1));
 
 	if(debug_name && debug_name[0]) {
 		CHECK_GL(glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name));
@@ -1740,6 +1738,7 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 	Texture& t = g_ffr.textures[handle.value];
 	t.handle = texture;
 	t.target = target;
+	t.format = internal_format;
 
 	return true;
 }
@@ -2064,7 +2063,7 @@ void generateMipmaps(ffr::TextureHandle texture)
 	Texture& t = g_ffr.textures[texture.value];
 	const GLuint handle = t.handle;
 
-	glGenerateTextureMipmap(handle);
+	CHECK_GL(glGenerateTextureMipmap(handle));
 }
 
 
