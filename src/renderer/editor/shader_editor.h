@@ -29,8 +29,9 @@ public:
 	};
 
 
-	enum class ValueType
+	enum class ValueType : int
 	{
+		BOOL,
 		FLOAT,
 		VEC2,
 		VEC3,
@@ -88,6 +89,9 @@ public:
 	bool hasFocus() const { return m_is_focused; }
 	void undo();
 	void redo();
+	uint getAttributesCount() const;
+	const char* getAttributeName(uint idx) const;
+	ValueType getAttributeType(uint idx) const;
 
 public:
 	static const int MAX_TEXTURES_COUNT = 16;
@@ -95,9 +99,8 @@ public:
 	bool m_is_open;
 
 private:
-	void generateMain(const char* path);
 	void generatePasses(OutputMemoryStream& blob);
-	void generate(const char* path, ShaderType shader_type);
+	void generate(const char* path);
 	void newGraph();
 	void save(const char* path);
 	void load();
@@ -124,7 +127,12 @@ private:
 	} m_new_link_info;
 
 private:
-	char m_textures[MAX_TEXTURES_COUNT][50];
+	struct Attribute { 
+		StaticString<50> name;
+		uint semantic;
+	};
+	Array<Attribute> m_attributes;
+	StaticString<50> m_textures[MAX_TEXTURES_COUNT];
 	Path m_path;
 	int m_last_node_id;
 	int m_undo_stack_idx;
