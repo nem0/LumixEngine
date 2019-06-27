@@ -1642,6 +1642,32 @@ TextureHandle allocTextureHandle()
 }
 
 
+bool createTextureView(TextureHandle view_handle, TextureHandle orig_handle, TextureFormat format)
+{
+	checkThread();
+	
+	const Texture& orig = g_ffr.textures[orig_handle.value];
+	Texture& view = g_ffr.textures[view_handle.value];
+
+	if (view.handle != 0) {
+		CHECK_GL(glDeleteTextures(1, &view.handle));
+	}
+
+	view.target = GL_TEXTURE_2D;
+
+	CHECK_GL(glGenTextures(1, &view.handle));
+
+	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
+		if(s_texture_formats[i].format == format) {
+			glTextureView(view.handle, GL_TEXTURE_2D, orig.handle, s_texture_formats[i].gl_internal, 0, 1, 0, 1);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
 bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name)
 {
 	checkThread();
