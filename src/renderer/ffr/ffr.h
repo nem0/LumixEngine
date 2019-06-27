@@ -230,6 +230,7 @@ bool createProgram(ProgramHandle program, const char** srcs, const ShaderType* t
 void useProgram(ProgramHandle prg);
 void createBuffer(BufferHandle handle, uint flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name);
+bool createTextureView(TextureHandle view, TextureHandle texture, TextureFormat format);
 bool loadTexture(TextureHandle handle, const void* data, int size, uint flags, const char* debug_name);
 void update(TextureHandle texture, uint level, uint x, uint y, uint w, uint h, TextureFormat format, void* buf);
 FramebufferHandle createFramebuffer();

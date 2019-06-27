@@ -1147,6 +1147,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
+	~TexturePlugin() {
+		PluginManager& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
+		auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+		renderer->destroy(m_texture_view);
+	}
+
+
 	struct TextureTileJob
 	{
 		TextureTileJob(FileSystem& filesystem, IAllocator& allocator) 
@@ -1376,10 +1383,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
 		ImGui::LabelText("Mips", "%d", texture->mips);
 		if (texture->bytes_per_pixel > 0) ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
-		if (texture->is_cubemap) {
-			ImGui::Text("Cubemap");
-		}
-		else if (texture->handle.isValid()) {
+		if (texture->handle.isValid()) {
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height)
 			{
@@ -1390,7 +1394,20 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				texture_size.x = texture_size.y * texture->width / texture->height;
 			}
 
-			ImGui::Image((void*)(uintptr_t)texture->handle.value, texture_size);
+			if (texture != m_texture) {
+				m_texture = texture;
+				PluginManager& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
+				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+				renderer->runInRenderThread(this, [](Renderer& r, void* ptr){
+					TexturePlugin* p = (TexturePlugin*)ptr;
+					if (!p->m_texture_view.isValid()) {
+						p->m_texture_view = ffr::allocTextureHandle();
+					}
+					ffr::createTextureView(p->m_texture_view, p->m_texture->handle, ffr::TextureFormat::RGBA8);
+				});
+			}
+
+			ImGui::Image((void*)(uintptr_t)m_texture_view.value, texture_size);
 
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(resource);
 		}
@@ -1426,6 +1443,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 
 	StudioApp& m_app;
+	Texture* m_texture;
+	ffr::TextureHandle m_texture_view = ffr::INVALID_TEXTURE;
 	JobSystem::SignalHandle m_tile_signal = JobSystem::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
