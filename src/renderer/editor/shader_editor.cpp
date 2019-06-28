@@ -19,23 +19,23 @@ enum class NodeType
 {
 	VERTEX_INPUT,
 	VERTEX_OUTPUT,
-	POSITION_OUTPUT,
 
 	FRAGMENT_INPUT,
 	FRAGMENT_OUTPUT,
 
-	FLOAT_CONST,
-	COLOR_CONST,
+	CONSTANT,
 	SAMPLE,
 	MIX,
 	UNIFORM,
 	VEC4_MERGE,
+	SWIZZLE,
 	OPERATOR,
 	BUILTIN_UNIFORM,
 	PASS,
 	INSTANCE_MATRIX,
 	FUNCTION_CALL,
 	BINARY_FUNCTION_CALL,
+	IF
 };
 
 
@@ -45,7 +45,7 @@ struct VertexOutput {
 };
 
 
-static ShaderEditor::ValueType semanticToType(Mesh::AttributeSemantic semantic) {
+static constexpr ShaderEditor::ValueType semanticToType(Mesh::AttributeSemantic semantic) {
 	switch (semantic) {
 		case Mesh::AttributeSemantic::POSITION: return ShaderEditor::ValueType::VEC3;
 		case Mesh::AttributeSemantic::COLOR0: return ShaderEditor::ValueType::VEC4;
@@ -65,8 +65,38 @@ static ShaderEditor::ValueType semanticToType(Mesh::AttributeSemantic semantic) 
 }
 
 
-static constexpr char* toString(ShaderEditor::ValueType type) {
+static constexpr const char* toString(Mesh::AttributeSemantic sem) {
+
+	struct {
+		Mesh::AttributeSemantic semantic;
+		const char* name;
+	} table[] = {
+		{ Mesh::AttributeSemantic::POSITION, "position" },
+		{ Mesh::AttributeSemantic::NORMAL, "normal" },
+		{ Mesh::AttributeSemantic::TANGENT, "tangent" },
+		{ Mesh::AttributeSemantic::BITANGENT, "bitangent" },
+		{ Mesh::AttributeSemantic::COLOR0, "color 0" },
+		{ Mesh::AttributeSemantic::COLOR1, "color 1" },
+		{ Mesh::AttributeSemantic::INDICES, "indices" },
+		{ Mesh::AttributeSemantic::WEIGHTS, "weights" },
+		{ Mesh::AttributeSemantic::TEXCOORD0, "tex coord 0" },
+		{ Mesh::AttributeSemantic::TEXCOORD1, "tex coord 1" },
+		{ Mesh::AttributeSemantic::INSTANCE0, "instance 0" },
+		{ Mesh::AttributeSemantic::INSTANCE1, "instance 1" },
+		{ Mesh::AttributeSemantic::INSTANCE2, "instance 2" }
+	};
+
+	for (const auto& i : table) {
+		if (i.semantic == sem) return i.name;
+	}
+	ASSERT(false);
+	return "Unknown";
+}
+
+
+static constexpr const char* toString(ShaderEditor::ValueType type) {
 	switch (type) {
+		case ShaderEditor::ValueType::NONE: return "error";
 		case ShaderEditor::ValueType::BOOL: return "bool";
 		case ShaderEditor::ValueType::FLOAT: return "float";
 		case ShaderEditor::ValueType::VEC2: return "vec2";
@@ -80,21 +110,6 @@ static constexpr char* toString(ShaderEditor::ValueType type) {
 }
 
 
-static constexpr char* getDefaultValue(ShaderEditor::ValueType type) {
-	switch (type) {
-		case ShaderEditor::ValueType::BOOL: return "false";
-		case ShaderEditor::ValueType::FLOAT: return "0";
-		case ShaderEditor::ValueType::VEC2: return "vec2(0)";
-		case ShaderEditor::ValueType::VEC3: return "vec3(0)";
-		case ShaderEditor::ValueType::VEC4: return "vec4(0)";
-		case ShaderEditor::ValueType::IVEC4: return "ivec4(0)";
-		case ShaderEditor::ValueType::MATRIX3: return "mat3(0)";
-		case ShaderEditor::ValueType::MATRIX4: return "mat4(0)";
-		default: ASSERT(false); return "Unknown type";
-	}
-}
-
-
 static const struct { const char* name; NodeType type; bool is_frag; bool is_vert; } NODE_TYPES[] = {
 	{"Mix",					NodeType::MIX,					true,		true},
 	{"Sample",				NodeType::SAMPLE,				true,		true},
@@ -102,16 +117,17 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Output",				NodeType::VERTEX_OUTPUT,		false,		true},
 	{"Input",				NodeType::FRAGMENT_INPUT,		true,		false},
 	{"Output",				NodeType::FRAGMENT_OUTPUT,		true,		false},
-	{"Color constant",		NodeType::COLOR_CONST,			true,		true},
-	{"Float constant",		NodeType::FLOAT_CONST,			true,		true},
+	{"Constant",			NodeType::CONSTANT,				true,		true},
 	{"Uniform",				NodeType::UNIFORM,				true,		true},
 	{"Vec4 merge",			NodeType::VEC4_MERGE,			true,		true},
+	{"Swizzle",				NodeType::SWIZZLE,				true,		true},
 	{"Operator",			NodeType::OPERATOR,				true,		true},
 	{"Builtin uniforms",	NodeType::BUILTIN_UNIFORM,		true,		true},
 	{"Pass",				NodeType::PASS,					true,		true},
 	{"Instance matrix",		NodeType::INSTANCE_MATRIX,		false,		true},
 	{"Function",			NodeType::FUNCTION_CALL,		true,		true},
-	{"Binary function",		NodeType::BINARY_FUNCTION_CALL,	true,		true}
+	{"Binary function",		NodeType::BINARY_FUNCTION_CALL,	true,		true},
+	{"If",					NodeType::IF,					true,		true}
 };
 
 
@@ -156,6 +172,7 @@ static const struct
 	{ "distance",	[](const ShaderEditor::Node&){ return ShaderEditor::ValueType::FLOAT; } }
 };
 
+
 static constexpr char* FUNCTIONS[] = {
 	"abs",
 	"all",
@@ -177,137 +194,6 @@ static constexpr char* FUNCTIONS[] = {
 	"tan",
 	"transpose",
 	"trunc"
-};
-
-static const char* getValueTypeName(ShaderEditor::ValueType type)
-{
-	switch(type)
-	{
-		case ShaderEditor::ValueType::BOOL: return "bool";
-		case ShaderEditor::ValueType::FLOAT: return "float";
-		case ShaderEditor::ValueType::VEC2: return "vec2";
-		case ShaderEditor::ValueType::VEC3: return "vec3";
-		case ShaderEditor::ValueType::VEC4: return "vec4";
-		case ShaderEditor::ValueType::IVEC4: return "ivec4";
-		case ShaderEditor::ValueType::MATRIX3: return "mat3";
-		case ShaderEditor::ValueType::MATRIX4: return "mat4";
-		default:
-			ASSERT(false);
-			return "float";
-	}
-}
-
-
-struct VertexOutputNode : public ShaderEditor::Node
-{
-	explicit VertexOutputNode(ShaderEditor& editor)
-		: Node((int)NodeType::VERTEX_OUTPUT, editor)
-	{
-		m_inputs.push(nullptr);
-		m_output.name = "N/A";
-		m_output.type = ShaderEditor::ValueType::VEC4;
-	}
-
-
-	void save(OutputMemoryStream& blob) override
-	{
-		blob.write(m_output);
-	}
-
-
-	void load(InputMemoryStream& blob) override
-	{
-		blob.read(m_output);
-	}
-
-	void generateBeforeMain(OutputMemoryStream& blob) override
-	{
-		// TODO handle ifdefs
-		blob << "\tout " << getValueTypeName(m_output.type) << " " << m_output.name << ";\n";
-	}
-
-	void generate(OutputMemoryStream& blob) override
-	{
-		if (!m_inputs[0])
-		{
-			blob << "\t\t" << m_output.name << " = " << getDefaultValue(m_output.type) << ";\n";
-			return;
-		}
-
-		m_inputs[0]->generate(blob);
-		blob << "\t\t" << m_output.name << " = ";
-		m_inputs[0]->printReference(blob);
-		blob << ";\n";
-	}
-
-
-	void onGUI() override
-	{
-		ImGui::InputText("Output", m_output.name.data, sizeof(m_output.name.data));
-		auto getter = [](void*, int idx, const char** out){
-			*out = toString((ShaderEditor::ValueType)idx);
-			return true;
-		};
-		ImGui::Combo("Type", (int*)&m_output.type, getter, nullptr, (int)ShaderEditor::ValueType::COUNT);
-	}
-
-
-	VertexOutput m_output;
-};
-
-
-struct VertexInputNode : public ShaderEditor::Node
-{
-	explicit VertexInputNode(ShaderEditor& editor)
-		: Node((int)NodeType::VERTEX_INPUT, editor)
-	{
-		m_outputs.push(nullptr);
-		m_idx = -1;
-	}
-
-
-	void save(OutputMemoryStream& blob) override { blob.write(m_idx); }
-
-
-	void load(InputMemoryStream& blob) override
-	{
-		blob.read(m_idx);
-	}
-
-
-	void printReference(OutputMemoryStream& blob) override
-	{
-		blob << m_editor.getAttributeName(m_idx);
-	}
-
-
-	ShaderEditor::ValueType getOutputType(int) const override
-	{
-		if (m_idx < 0) return ShaderEditor::ValueType::VEC4;
-		return m_editor.getAttributeType(m_idx);
-	}
-
-
-	void generateBeforeMain(OutputMemoryStream& blob) override
-	{
-		// TODO handle ifdefs
-		blob << "\tin " << getValueTypeName(getOutputType(0)) << " " << m_editor.getAttributeName(m_idx) << ";\n";
-	}
-
-
-	void generate(OutputMemoryStream&) override {}
-
-
-	void onGUI() override
-	{
-		auto getter = [](void* ptr, int idx, const char** out) -> bool {
-			*out = ((ShaderEditor*)ptr)->getAttributeName(idx);
-			return true;
-		};
-		ImGui::Combo("Input", &m_idx, getter, &m_editor, m_editor.getAttributesCount());
-	}
-
-	int m_idx;
 };
 
 
@@ -336,6 +222,187 @@ static void removeConnection(ShaderEditor::Node* node, int pin_index, bool is_in
 }
 
 
+struct VertexOutputNode : public ShaderEditor::Node
+{
+	explicit VertexOutputNode(ShaderEditor& editor)
+		: Node((int)NodeType::VERTEX_OUTPUT, editor)
+		, m_varyings(editor.getAllocator())
+	{
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_varyings.push({ StaticString<32>("output"), ShaderEditor::ValueType::VEC4 });
+	}
+
+	void save(OutputMemoryStream& blob) override
+	{
+		blob.write(m_varyings.size());
+		for (const Varying& v : m_varyings) {
+			blob.write(v.type);
+			blob.writeString(v.name);
+		}
+	}
+
+	void load(InputMemoryStream& blob) override
+	{
+		int c;
+		blob.read(c);
+		m_varyings.resize(c);
+		m_inputs.clear();
+		m_inputs.push(nullptr); // gl_Position
+		for (int i = 0; i < c; ++i) {
+			blob.read(m_varyings[i].type);
+			blob.readString(m_varyings[i].name.data, lengthOf(m_varyings[i].name.data));
+			m_inputs.push(nullptr);
+		}
+	}
+
+	void generateBeforeMain(OutputMemoryStream& blob) override
+	{
+		// TODO handle ifdefs
+		for (const Varying& v : m_varyings) {
+			blob << "\tout " << toString(v.type) << " " << v.name << ";\n";
+		}
+	}
+
+	void generate(OutputMemoryStream& blob) override
+	{
+		if (m_inputs[0]) {
+			blob << "\t\tgl_Position = ";
+			m_inputs[0]->printReference(blob, this);
+			blob << ";\n";
+		}
+		for (int i = 0, c = m_varyings.size(); i < c; ++i) {
+			if (!m_inputs[i + 1]) continue;
+			const Varying& v = m_varyings[i];
+
+			blob << "\t\t" << v.name << " = ";
+			m_inputs[i + 1]->printReference(blob, this);
+			blob << ";\n";
+		}
+	}
+
+	void onGUI() override
+	{
+		ImGui::Text("%s", "Vertex position");
+		for (int i = 0, c = m_varyings.size(); i < c; ++i) {
+			Varying& v = m_varyings[i];
+			auto getter = [](void*, int idx, const char** out){
+				*out = toString((ShaderEditor::ValueType)idx);
+				return true;
+			};
+			if (ImGui::Button(StaticString<32>("x##x", i))) {
+				removeConnection(this, i + 1, true);
+				m_inputs.erase(i + 1);
+				m_varyings.erase(i);
+				--i;
+				continue;
+			}
+			ImGui::SameLine();
+			ImGui::Combo(StaticString<32>("##t", i), (int*)&v.type, getter, nullptr, (int)ShaderEditor::ValueType::COUNT);
+			ImGui::SameLine();
+			ImGui::InputTextWithHint(StaticString<32>("##n", i), "Name", v.name.data, sizeof(v.name.data));
+		}
+	}
+
+	struct Varying {
+		StaticString<32> name;
+		ShaderEditor::ValueType type;
+	};
+	Array<Varying> m_varyings;
+};
+
+
+struct VertexInputNode : public ShaderEditor::Node
+{
+	explicit VertexInputNode(ShaderEditor& editor)
+		: Node((int)NodeType::VERTEX_INPUT, editor)
+		, m_semantics(editor.getAllocator())
+	{
+		for (int i = 0; i < (int)Mesh::AttributeSemantic::COUNT; ++i) {
+			m_outputs.push(nullptr);
+			m_semantics.push((Mesh::AttributeSemantic)i);
+		}
+	}
+
+
+	void save(OutputMemoryStream& blob) override
+	{
+		blob.write(m_outputs.size()); 
+		for(Mesh::AttributeSemantic i : m_semantics) {
+			blob.write(i);
+		}
+	}
+
+
+	void load(InputMemoryStream& blob) override
+	{
+		int c;
+		blob.read(c);
+		m_outputs.clear();
+		m_semantics.resize(c);
+		for (int i = 0; i < c; ++i) {
+			m_outputs.push(nullptr);
+			blob.read(m_semantics[i]);
+		}
+	}
+
+
+	void printReference(OutputMemoryStream& blob, Node* node) override
+	{
+		for(int i = 0; i < m_outputs.size(); ++i) {
+			if (m_outputs[i] == node) {
+				blob << "a" << i;
+				break;
+			}
+		}
+	}
+
+
+	ShaderEditor::ValueType getOutputType(int idx) const override
+	{
+		return semanticToType(m_semantics[idx]);
+	}
+
+
+	void generateBeforeMain(OutputMemoryStream& blob) override
+	{
+		// TODO handle ifdefs
+		for (int i = 0; i < m_outputs.size(); ++i) {
+			blob << "\tin " << toString(getOutputType(0)) << " a" << i << ";\n";
+		}
+	}
+
+
+	void onGUI() override
+	{
+		for (int i = 0; i < m_outputs.size(); ++i) {
+			if (ImGui::Button(StaticString<32>("x##del", i))) {
+				removeConnection(this, i, false);
+				m_outputs.erase(i);
+				m_semantics.erase(i);
+				--i;
+				continue;
+			}
+			ImGui::SameLine();
+			auto getter = [](void*, int idx, const char** out){
+				*out = toString((Mesh::AttributeSemantic)idx);
+				return true;
+			};
+			int s = (int)m_semantics[i];
+			if (ImGui::Combo(StaticString<32>("##cmb", i), &s, getter, nullptr, (int)Mesh::AttributeSemantic::COUNT)) {
+				m_semantics[i] = (Mesh::AttributeSemantic)s;
+			}
+		}
+		if (ImGui::Button("Add")) {
+			m_outputs.push(nullptr);
+			m_semantics.push(Mesh::AttributeSemantic::POSITION);
+		}
+	}
+
+	Array<Mesh::AttributeSemantic> m_semantics;
+};
+
+
 struct ShaderEditor::ICommand
 {
 	explicit ICommand(ShaderEditor& editor)
@@ -354,7 +421,7 @@ struct ShaderEditor::ICommand
 };
 
 
-void ShaderEditor::Node::printReference(OutputMemoryStream& blob)
+void ShaderEditor::Node::printReference(OutputMemoryStream& blob, Node*)
 {
 	blob << "v" << m_id;
 }
@@ -376,6 +443,15 @@ ShaderEditor::ValueType ShaderEditor::Node::getInputType(int index) const
 
 	int output_idx = m_inputs[index]->m_outputs.indexOf(this);
 	return m_inputs[index]->getOutputType(output_idx);
+}
+
+
+void ShaderEditor::Node::generateRecursive(OutputMemoryStream& blob)
+{
+	for (Node* i : m_inputs) {
+		if(i) i->generateRecursive(blob);
+	}
+	generate(blob);
 }
 
 
@@ -414,10 +490,8 @@ struct OperatorNode : public ShaderEditor::Node
 		m_operation = MUL;
 	}
 
-
 	void save(OutputMemoryStream& blob) override { int o = m_operation; blob.write(o); }
 	void load(InputMemoryStream& blob) override { int o; blob.read(o); m_operation = (Operation)o; }
-
 
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
@@ -432,9 +506,9 @@ struct OperatorNode : public ShaderEditor::Node
 				return ShaderEditor::ValueType::BOOL;
 				break;
 		}
-		return m_inputs[1] ? getInputType(1) : ShaderEditor::ValueType::NONE;
+		// TODO float * vec4 and others
+		return getInputType(0);
 	}
-
 
 	static const char* toString(Operation op) {
 		switch (op) {
@@ -452,33 +526,11 @@ struct OperatorNode : public ShaderEditor::Node
 		}
 	}
 
-
-	void generate(OutputMemoryStream& blob) override
+	void printReference(OutputMemoryStream& blob, Node*) override
 	{
-		if(!m_inputs[0]) return;
-		if(!m_inputs[1]) return;
-
-		m_inputs[0]->generate(blob);
-		m_inputs[1]->generate(blob);
-
-		auto input0_type = getInputType(0);
-		bool is_matrix = input0_type == ShaderEditor::ValueType::MATRIX3 ||
-						 input0_type == ShaderEditor::ValueType::MATRIX4;
-		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
-
-		if (m_operation == MUL && is_matrix) {
-			blob << "mul(";
-			m_inputs[0]->printReference(blob);
-			blob << (", ");
-			m_inputs[1]->printReference(blob);
-			blob << (");\n");
-		}
-		else {
-			m_inputs[0]->printReference(blob);
-			blob << " " << toString(m_operation) << " ";
-			m_inputs[1]->printReference(blob);
-			blob << (";\n");
-		}
+		m_inputs[0]->printReference(blob, this);
+		blob << " " << toString(m_operation) << " ";
+		m_inputs[1]->printReference(blob, this);
 	}
 
 	void onGUI() override
@@ -496,6 +548,46 @@ struct OperatorNode : public ShaderEditor::Node
 	}
 
 	Operation m_operation;
+};
+
+
+struct SwizzleNode : public ShaderEditor::Node
+{
+	explicit SwizzleNode(ShaderEditor& editor)
+		: Node((int)NodeType::SWIZZLE, editor)
+	{
+		m_inputs.push(nullptr);
+		m_outputs.push(nullptr);
+		m_swizzle = "xyzw";
+	}
+	
+	void save(OutputMemoryStream& blob) override { blob.write(m_swizzle); }
+	void load(InputMemoryStream& blob) override { blob.read(m_swizzle); }
+	ShaderEditor::ValueType getOutputType(int idx) const override { 
+		// TODO other types, e.g. ivec4...
+		switch(stringLength(m_swizzle)) {
+			case 0: return ShaderEditor::ValueType::NONE;
+			case 1: return ShaderEditor::ValueType::FLOAT;
+			case 2: return ShaderEditor::ValueType::VEC2;
+			case 3: return ShaderEditor::ValueType::VEC3;
+			case 4: return ShaderEditor::ValueType::VEC4;
+			default: ASSERT(false); return ShaderEditor::ValueType::NONE;
+		}
+	}
+	
+	void printReference(OutputMemoryStream& blob, Node* node) override {
+		if (!m_inputs[0]) return;
+		
+		blob << "(";
+		m_inputs[0]->printReference(blob, this);
+		blob << ")." << m_swizzle;
+	}
+
+	void onGUI() override {
+		ImGui::InputTextWithHint("", "swizzle", m_swizzle.data, sizeof(m_swizzle.data));
+	}
+
+	StaticString<5> m_swizzle;
 };
 
 
@@ -517,49 +609,38 @@ struct Vec4MergeNode : public ShaderEditor::Node
 	void load(InputMemoryStream&) override {}
 	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
 
-
 	void generate(OutputMemoryStream& blob) override 
 	{
 		blob << "\t\tvec4 v" << m_id << ";\n";
 
 		if (m_inputs[0]) 
 		{
-			m_inputs[0]->generate(blob);
-
 			blob << "\t\tv" << m_id << ".xyz = ";
-			m_inputs[0]->printReference(blob);
+			m_inputs[0]->printReference(blob, this);
 			blob << ";\n";
 		}
 		if (m_inputs[1])
 		{
-			m_inputs[1]->generate(blob);
-
 			blob << "\t\tv" << m_id << ".x = ";
-			m_inputs[1]->printReference(blob);
+			m_inputs[1]->printReference(blob, this);
 			blob << ";\n";
 		}
 		if (m_inputs[2])
 		{
-			m_inputs[2]->generate(blob);
-
 			blob << "\t\tv" << m_id << ".y = ";
-			m_inputs[2]->printReference(blob);
+			m_inputs[2]->printReference(blob, this);
 			blob << ";\n";
 		}
 		if (m_inputs[3])
 		{
-			m_inputs[3]->generate(blob);
-
 			blob << "\t\tv" << m_id << ".z = ";
-			m_inputs[3]->printReference(blob);
+			m_inputs[3]->printReference(blob, this);
 			blob << ";\n";
 		}
 		if (m_inputs[4])
 		{
-			m_inputs[4]->generate(blob);
-
 			blob << "\t\tv" << m_id << ".w = ";
-			m_inputs[4]->printReference(blob);
+			m_inputs[4]->printReference(blob, this);
 			blob << ";\n";
 		}
 	}
@@ -592,24 +673,17 @@ struct FunctionCallNode : public ShaderEditor::Node
 	ShaderEditor::ValueType getOutputType(int) const override
 	{
 		if (m_inputs[0]) return getInputType(0);
-		return ShaderEditor::ValueType::VEC4;
+		return ShaderEditor::ValueType::NONE;
 	}
 
 
 	void generate(OutputMemoryStream& blob) override
 	{
-		if(m_inputs[0]) {
-			m_inputs[0]->generate(blob);
+		blob << "\t\t" << toString(getOutputType(0)) << " v" << m_id << " = " << FUNCTIONS[m_function] << "(";
+		if (m_inputs[0]) {
+			m_inputs[0]->printReference(blob, this);
 		}
-
-		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
-		blob << FUNCTIONS[m_function] << "(";
-		if (m_inputs[0])
-		{
-			m_inputs[0]->printReference(blob);
-		}
-		else
-		{
+		else {
 			blob << "0";
 		}
 		blob << ");\n";
@@ -653,26 +727,18 @@ struct BinaryFunctionCallNode : public ShaderEditor::Node
 
 	void generate(OutputMemoryStream& blob) override
 	{
-		m_inputs[0]->generate(blob);
-		m_inputs[1]->generate(blob);
-
-		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
-		blob << BINARY_FUNCTIONS[m_function].name << "(";
-		if (m_inputs[0])
-		{
-			m_inputs[0]->printReference(blob);
+		blob << "\t\t" << toString(getOutputType(0)) << " v" << m_id << " = " << BINARY_FUNCTIONS[m_function].name << "(";
+		if (m_inputs[0]) {
+			m_inputs[0]->printReference(blob, this);
 		}
-		else
-		{
+		else {
 			blob << "0";
 		}
 		blob << ", ";
-		if (m_inputs[1])
-		{
-			m_inputs[1]->printReference(blob);
+		if (m_inputs[1]) {
+			m_inputs[1]->printReference(blob, this);
 		}
-		else
-		{
+		else {
 			blob << "0";
 		}
 		blob << ");\n";
@@ -729,54 +795,92 @@ struct InstanceMatrixNode : public ShaderEditor::Node
 };
 
 
-struct FloatConstNode : public ShaderEditor::Node
+struct ConstNode : public ShaderEditor::Node
 {
-	explicit FloatConstNode(ShaderEditor& editor)
-		: Node((int)NodeType::FLOAT_CONST, editor)
+	explicit ConstNode(ShaderEditor& editor)
+		: Node((int)NodeType::CONSTANT, editor)
 	{
-		m_value = 0;
+		m_type = ShaderEditor::ValueType::VEC4;
+		m_value[0] = m_value[1] = m_value[2] = m_value[3] = 0;
 		m_outputs.push(nullptr);
 	}
 
-	void save(OutputMemoryStream& blob) override { blob.write(m_value); }
-	void load(InputMemoryStream& blob) override { blob.read(m_value); }
-	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::FLOAT; }
-
-	void generate(OutputMemoryStream&) override	{}
-
-	void printReference(OutputMemoryStream& blob) override
+	void save(OutputMemoryStream& blob) override
 	{
-		blob << m_value;
+		blob.write(m_value);
+		blob.write(m_is_color);
+		blob.write(m_type);
 	}
 
-	void onGUI() override { ImGui::DragFloat("value", &m_value, 0.1f); }
-
-	float m_value;
-};
-
-
-struct ColorConstNode : public ShaderEditor::Node
-{
-	explicit ColorConstNode(ShaderEditor& editor)
-		: Node((int)NodeType::COLOR_CONST, editor)
+	void load(InputMemoryStream& blob) override 
 	{
-		m_color[0] = m_color[1] = m_color[2] = m_color[3] = 0;
-		m_outputs.push(nullptr);
+		blob.read(m_value);
+		blob.read(m_is_color);
+		blob.read(m_type);
 	}
 
-	void save(OutputMemoryStream& blob) override { blob.write(m_color); }
-	void load(InputMemoryStream& blob) override { blob.read(m_color); }
-	ShaderEditor::ValueType getOutputType(int) const override { return ShaderEditor::ValueType::VEC4; }
+	ShaderEditor::ValueType getOutputType(int) const override { return m_type; }
 
-	void generate(OutputMemoryStream& blob) override
+	void printReference(OutputMemoryStream& blob, Node*) override
 	{
-		blob << "\t\tconst vec4 v" << m_id << " = vec4(" << m_color[0] << ", " << m_color[1] << ", "
-			 << m_color[2] << ", " << m_color[3] << ");\n";
+		switch(m_type) {
+			case ShaderEditor::ValueType::VEC4:
+				blob << "vec4(" << m_value[0] << ", " << m_value[1] << ", "
+					<< m_value[2] << ", " << m_value[3] << ")";
+				break;
+			case ShaderEditor::ValueType::VEC3:
+				blob << "vec3(" << m_value[0] << ", " << m_value[1] << ", "
+					<< m_value[2] << ")";
+				break;
+			case ShaderEditor::ValueType::VEC2:
+				blob << "vec2(" << m_value[0] << ", " << m_value[1] << ")";
+				break;
+			case ShaderEditor::ValueType::FLOAT:
+				blob << m_value[0];
+				break;
+			default: ASSERT(false); break;
+		}
 	}
 
-	void onGUI() override { ImGui::ColorPicker4("", m_color); }
+	void onGUI() override { 
+		auto getter = [](void*, int idx, const char** out){
+			*out = toString((ShaderEditor::ValueType)idx);
+			return true;
+		};
+		ImGui::Combo("Type", (int*)&m_type, getter, nullptr, (int)ShaderEditor::ValueType::COUNT);
 
-	float m_color[4];
+		switch(m_type) {
+			case ShaderEditor::ValueType::VEC4:
+				ImGui::Checkbox("Color", &m_is_color);
+				if (m_is_color) {
+					ImGui::ColorPicker4("", m_value); 
+				}
+				else {
+					ImGui::InputFloat4("", m_value);
+				}
+				break;
+			case ShaderEditor::ValueType::VEC3:
+				ImGui::Checkbox("Color", &m_is_color);
+				if (m_is_color) {
+					ImGui::ColorPicker3("", m_value); 
+				}
+				else {
+					ImGui::InputFloat3("", m_value);
+				}
+				break;
+			case ShaderEditor::ValueType::VEC2:
+				ImGui::InputFloat2("", m_value);
+				break;
+			case ShaderEditor::ValueType::FLOAT:
+				ImGui::InputFloat("", m_value);
+				break;
+			default: ASSERT(false); break;
+		}
+	}
+
+	ShaderEditor::ValueType m_type;
+	bool m_is_color = false;
+	float m_value[4];
 };
 
 
@@ -796,15 +900,14 @@ struct SampleNode : public ShaderEditor::Node
 
 	void generate(OutputMemoryStream& blob) override
 	{
-		if (!m_inputs[0])
-		{
-			blob << "\t\tvec4 v" << m_id << " = vec4(1, 0, 1, 0);\n";
+		blob << "\t\tvec4 v" << m_id << " = ";
+		if (!m_inputs[0]) {
+			blob << "vec4(1, 0, 1, 1);\n";
 			return;
 		}
 
-		m_inputs[0]->generate(blob);
-		blob << "\t\tvec4 v" << m_id << " = texture2D(" << m_editor.getTextureName(m_texture) << ", ";
-		m_inputs[0]->printReference(blob);
+		blob << "texture(" << m_editor.getTextureName(m_texture) << ", ";
+		m_inputs[0]->printReference(blob, this);
 		blob << ");\n";
 	}
 
@@ -826,68 +929,76 @@ struct FragmentInputNode : public ShaderEditor::Node
 {
 	explicit FragmentInputNode(ShaderEditor& editor)
 		: Node((int)NodeType::FRAGMENT_INPUT, editor)
+		, m_varyings(editor.getAllocator())
 	{
 		m_outputs.push(nullptr);
-		m_vertex_output.type = ShaderEditor::ValueType::VEC4;
-		m_vertex_output.name = "N/A";
+		m_varyings.push({StaticString<32>(), ShaderEditor::ValueType::VEC4});
 	}
 
-	void save(OutputMemoryStream& blob) override { blob.write(m_vertex_output); }
-	void load(InputMemoryStream& blob) override { blob.read(m_vertex_output); }
-	void generate(OutputMemoryStream&) override {}
+	void save(OutputMemoryStream& blob) override
+	{
+		blob.write(m_varyings.size());
+		for (const VertexOutputNode::Varying& v : m_varyings) {
+			blob.write(v.type);
+			blob.writeString(v.name);
+		}
+	}
 
-	
+	void load(InputMemoryStream& blob) override
+	{
+		int c;
+		blob.read(c);
+		m_varyings.resize(c);
+		m_outputs.clear();
+		for (int i = 0; i < c; ++i) {
+			blob.read(m_varyings[i].type);
+			blob.readString(m_varyings[i].name.data, lengthOf(m_varyings[i].name.data));
+			m_outputs.push(nullptr);
+		}
+	}
+
 	void generateBeforeMain(OutputMemoryStream& blob) override
 	{
 		// TODO handle ifdefs
-		blob << "\tin " << getValueTypeName(m_vertex_output.type) << " " << m_vertex_output.name << ";\n";
+		for (const VertexOutputNode::Varying& v : m_varyings) {
+			blob << "\tin " << toString(v.type) << " " << v.name << ";\n";
+		}
 	}
 
-
-	void printReference(OutputMemoryStream& blob) override
+	void printReference(OutputMemoryStream& blob, Node* node) override
 	{
-		blob << m_vertex_output.name;
+		for (int i = 0; i < m_outputs.size(); ++i) {
+			if (node == m_outputs[i]) {
+				blob << m_varyings[i].name;
+				return;
+			}
+		}
+		blob << "vec4(0) // N/A\n";
 	}
-
 
 	void onGUI() override
 	{
-		ImGui::InputText("Name", m_vertex_output.name.data, sizeof(m_vertex_output.name.data));
-		auto getter = [](void*, int idx, const char** out){
-			*out = toString((ShaderEditor::ValueType)idx);
-			return true;
-		};
-		ImGui::Combo("Type", (int*)&m_vertex_output.type, getter, nullptr, (int)ShaderEditor::ValueType::COUNT);
-	}
-
-	VertexOutput m_vertex_output;
-};
-
-
-struct PositionOutputNode : public ShaderEditor::Node
-{
-	explicit PositionOutputNode(ShaderEditor& editor)
-		: Node((int)NodeType::POSITION_OUTPUT, editor)
-	{
-		m_inputs.push(nullptr);
-	}
-
-
-	void generate(OutputMemoryStream& blob) override
-	{
-		if(!m_inputs[0]) {
-			blob << "\t\tgl_Position = vec4(0, 0, 0, 1);\n";
-			return;
+		for (int i = 0, c = m_varyings.size(); i < c; ++i) {
+			VertexOutputNode::Varying& v = m_varyings[i];
+			auto getter = [](void*, int idx, const char** out){
+				*out = toString((ShaderEditor::ValueType)idx);
+				return true;
+			};
+			if (ImGui::Button(StaticString<32>("x##x", i))) {
+				removeConnection(this, i, true);
+				m_inputs.erase(i);
+				m_varyings.erase(i);
+				--i;
+				continue;
+			}
+			ImGui::SameLine();
+			ImGui::Combo(StaticString<32>("##t", i), (int*)&v.type, getter, nullptr, (int)ShaderEditor::ValueType::COUNT);
+			ImGui::SameLine();
+			ImGui::InputTextWithHint(StaticString<32>("##n", i), "Name", v.name.data, sizeof(v.name.data));
 		}
-
-		m_inputs[0]->generate(blob);
-		blob << "\t\tgl_Position = ";
-		m_inputs[0]->printReference(blob);
-		blob << ";\n";
 	}
 
-
-	void onGUI() override { ImGui::Text("Output position"); }
+	Array<VertexOutputNode::Varying> m_varyings;
 };
 
 
@@ -896,6 +1007,7 @@ struct FragmentOutputNode : public ShaderEditor::Node
 	explicit FragmentOutputNode(ShaderEditor& editor)
 		: Node((int)NodeType::FRAGMENT_OUTPUT, editor)
 	{
+		m_inputs.push(nullptr);
 		m_inputs.push(nullptr);
 	}
 
@@ -911,31 +1023,35 @@ struct FragmentOutputNode : public ShaderEditor::Node
 
 	void generateBeforeMain(OutputMemoryStream& blob) override
 	{
-		for (int i = 0; i < m_inputs.size(); ++i) {
-			blob << "\tlayout(location = " << i << ") out vec4 out" << i << ";\n";
+		for (int i = 1; i < m_inputs.size(); ++i) {
+			blob << "\tlayout(location = " << i - 1 << ") out vec4 out" << i - 1 << ";\n";
 		}
 	}
-
 
 	void generate(OutputMemoryStream& blob) override
 	{
-		for(int i = 0; i < m_inputs.size(); ++i) {
+		if (m_inputs[0]) {
+			blob << "\t\tif(";
+			m_inputs[0]->printReference(blob, this);
+			blob << ") discard;\n";
+		}
+
+		for(int i = 1; i < m_inputs.size(); ++i) {
 			if (m_inputs[i]) {
-				m_inputs[i]->generate(blob);
-				blob << "\t\tout" << i << " = ";
-				m_inputs[i]->printReference(blob);
+				blob << "\t\tout" << i - 1 << " = ";
+				m_inputs[i]->printReference(blob, this);
 				blob << ";\n";
 			}
 			else {
-				blob << "\t\tout" << i << " = vec4(0, 0, 0, 1);\n";
+				blob << "\t\tout" << i - 1 << " = vec4(0, 0, 0, 1);\n";
 			}
 		}
 	}
 
-
-	void onGUI() override { 
-		for (int i = 0; i < m_inputs.size(); ++i) {
-			ImGui::Text("output %d ", i);
+	void onGUI() override {
+		ImGui::Text("Discard");
+		for (int i = 1; i < m_inputs.size(); ++i) {
+			ImGui::Text("output %d ", i - 1);
 		}
 		if (ImGui::Button("Add")) {
 			m_inputs.push(nullptr);
@@ -943,7 +1059,7 @@ struct FragmentOutputNode : public ShaderEditor::Node
 		if (m_inputs.size() > 1) {
 			ImGui::SameLine();
 			if (ImGui::Button("Remove")) {
-				// TODO remove connection
+				removeConnection(this, m_inputs.size() - 1, true);
 				m_inputs.pop();
 			}
 		}
@@ -967,25 +1083,17 @@ struct MixNode : public ShaderEditor::Node
 		return getInputType(1);
 	}
 
-	void generate(OutputMemoryStream& blob) override
+	void printReference(OutputMemoryStream& blob, Node*) override
 	{
-		if (!m_inputs[0] || !m_inputs[1] || !m_inputs[2])
-		{
-			blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << ";\n";
-			return;
-		}
+		if (!m_inputs[0] || !m_inputs[1] || !m_inputs[2]) return;
 
-		m_inputs[0]->generate(blob);
-		m_inputs[1]->generate(blob);
-		m_inputs[2]->generate(blob);
-
-		blob << "\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = mix(";
-		m_inputs[0]->printReference(blob);
+		blob << "mix(";
+		m_inputs[0]->printReference(blob, this);
 		blob << ", ";
-		m_inputs[1]->printReference(blob);
+		m_inputs[1]->printReference(blob, this);
 		blob << ", ";
-		m_inputs[2]->printReference(blob);
-		blob << ");";
+		m_inputs[2]->printReference(blob, this);
+		blob << ")";
 	}
 
 	void onGUI() override
@@ -1008,20 +1116,9 @@ struct PassNode : public ShaderEditor::Node
 		m_pass[0] = 0;
 	}
 
-
 	void save(OutputMemoryStream& blob) override { blob.writeString(m_pass); }
 	void load(InputMemoryStream& blob) override { blob.readString(m_pass, lengthOf(m_pass)); }
-
-
-	ShaderEditor::ValueType getOutputType(int) const override
-	{
-		if (!m_inputs[0]) return ShaderEditor::ValueType::NONE;
-		
-		int idx = m_inputs[0]->m_outputs.indexOf(this);
-		if (idx == -1) return ShaderEditor::ValueType::NONE;
-
-		return m_inputs[0]->getOutputType(idx);
-	}
+	ShaderEditor::ValueType getOutputType(int) const override { return getInputType(0); }
 
 	void generate(OutputMemoryStream& blob) override 
 	{
@@ -1031,9 +1128,8 @@ struct PassNode : public ShaderEditor::Node
 			if (!m_inputs[i]) continue;
 
 			blob << defs[i] << m_pass << "\n";
-			m_inputs[i]->generate(blob);
-			blob << "\t\t" << getValueTypeName(getOutputType(0)) << " v" << m_id << " = ";
-			m_inputs[i]->printReference(blob);
+			blob << "\t\t" << toString(getOutputType(0)) << " v" << m_id << " = ";
+			m_inputs[i]->printReference(blob, this);
 			blob << ";\n";
 			blob << "\t\t#endif // " << m_pass << "\n\n";
 		}
@@ -1047,6 +1143,67 @@ struct PassNode : public ShaderEditor::Node
 	}
 
 	char m_pass[50];
+};
+
+
+struct IfNode : public ShaderEditor::Node
+{
+	explicit IfNode(ShaderEditor& editor)
+		: Node((int)NodeType::IF, editor)
+	{
+		m_outputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+		m_inputs.push(nullptr);
+	}
+
+	void save(OutputMemoryStream& blob) override {}
+	void load(InputMemoryStream& blob) override {}
+
+	ShaderEditor::ValueType getOutputType(int) const override
+	{
+		if (!m_inputs[0]) return ShaderEditor::ValueType::NONE;
+		return getInputType(1);
+	}
+
+	void generate(OutputMemoryStream& blob) override 
+	{
+		blob << "\t\t" << toString(getOutputType(0)) << " v" << m_id << ";\n";
+		if(!m_inputs[0]) return;
+		if (m_inputs[1]) {
+			blob << "\t\tif(";
+			m_inputs[0]->printReference(blob, this);
+			blob << ") {\n";
+			blob << "\t\t\tv" << m_id << " = ";
+			m_inputs[1]->printReference(blob, this);
+			blob << ";\n";
+			blob << "\t\t}\n";
+
+			if(m_inputs[2]) {
+				blob << "else {\n";
+				blob << "\t\t\tv" << m_id << " = ";
+				m_inputs[1]->printReference(blob, this);
+				blob << ";\n";
+				blob << "\t\t}\n";
+			}
+		}
+		else if(m_inputs[2]) {
+			blob << "\t\tif(!(";
+			m_inputs[0]->printReference(blob, this);
+			blob << ")) {\n";
+			blob << "\t\t\tv" << m_id << " = ";
+			m_inputs[1]->printReference(blob, this);
+			blob << ";\n";
+			blob << "\t\t}\n";
+		}
+	}
+
+	void onGUI() override
+	{
+		ImGui::Text("condition");
+		ImGui::Text("if");
+		ImGui::Text("else");
+	}
 };
 
 
@@ -1064,7 +1221,7 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 	void load(InputMemoryStream& blob) override { blob.read(m_uniform); }
 
 
-	void printReference(OutputMemoryStream& blob) override
+	void printReference(OutputMemoryStream& blob, Node*) override
 	{
 		blob << BUILTIN_UNIFORMS[m_uniform].name;
 	}
@@ -1073,8 +1230,6 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 	{
 		return BUILTIN_UNIFORMS[m_uniform].type;
 	}
-
-	void generate(OutputMemoryStream&) override {}
 
 	void onGUI() override
 	{
@@ -1087,7 +1242,6 @@ struct BuiltinUniformNode : public ShaderEditor::Node
 
 	int m_uniform;
 };
-
 
 
 struct UniformNode : public ShaderEditor::Node
@@ -1104,7 +1258,7 @@ struct UniformNode : public ShaderEditor::Node
 	ShaderEditor::ValueType getOutputType(int) const override { return m_value_type; }
 
 
-	void printReference(OutputMemoryStream& blob) override
+	void printReference(OutputMemoryStream& blob, Node*) override
 	{
 		blob << m_name;
 	}
@@ -1112,11 +1266,8 @@ struct UniformNode : public ShaderEditor::Node
 
 	void generateBeforeMain(OutputMemoryStream& blob) override
 	{
-		blob << "\tuniform " << getValueTypeName(m_value_type) << " " << m_name << ";\n";
+		blob << "\tuniform " << toString(m_value_type) << " " << m_name << ";\n";
 	}
-
-
-	void generate(OutputMemoryStream&) override {}
 
 
 	void onGUI() override
@@ -1380,7 +1531,6 @@ ShaderEditor::ShaderEditor(IAllocator& allocator)
 	, m_vertex_nodes(allocator)
 	, m_allocator(allocator)
 	, m_undo_stack(allocator)
-	, m_attributes(allocator)
 	, m_source(allocator)
 	, m_undo_stack_idx(-1)
 	, m_current_node_id(-1)
@@ -1414,31 +1564,6 @@ ShaderEditor::Node* ShaderEditor::getNodeByID(int id)
 }
 
 
-static constexpr char* toString(Mesh::AttributeSemantic sem) {
-	#define SEM(x) \
-		case Mesh::AttributeSemantic::x: return "SEMANTICS_"#x;
-
-	switch (sem) {
-		SEM(POSITION)
-		SEM(NORMAL)
-		SEM(TANGENT)
-		SEM(BITANGENT)
-		SEM(COLOR0)
-		SEM(COLOR1)
-		SEM(INDICES)
-		SEM(WEIGHTS)
-		SEM(TEXCOORD0)
-		SEM(TEXCOORD1)
-		SEM(INSTANCE0)
-		SEM(INSTANCE1)
-		SEM(INSTANCE2)
-		default: return "Unknown";
-	}
-
-	#undef SEM
-}
-
-
 void ShaderEditor::generate(const char* sed_path, bool save_file)
 {
 	OutputMemoryStream blob(m_allocator);
@@ -1453,9 +1578,12 @@ void ShaderEditor::generate(const char* sed_path, bool save_file)
 		blob << "}\n\n";
 	}
 
+	// TODO
+	/*
 	for (const Attribute& attr : m_attributes) {
 		blob << "attribute { name = \"" << attr.name << "\", semantic = " << toString((Mesh::AttributeSemantic)attr.semantic) << " }\n";
 	}
+	*/
 
 	blob << "include \"pipelines/common.glsl\"\n\n";
 
@@ -1477,10 +1605,9 @@ void ShaderEditor::generate(const char* sed_path, bool save_file)
 		for(auto& node : nodes)
 		{
 			if (node->m_type == (int)NodeType::FRAGMENT_OUTPUT ||
-				node->m_type == (int)NodeType::VERTEX_OUTPUT ||
-				node->m_type == (int)NodeType::POSITION_OUTPUT)
+				node->m_type == (int)NodeType::VERTEX_OUTPUT)
 			{
-				node->generate(blob);
+				node->generateRecursive(blob);
 			}
 		}
 		blob << "\t}\n";
@@ -1667,17 +1794,17 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 		case NodeType::FRAGMENT_OUTPUT:				return LUMIX_NEW(m_allocator, FragmentOutputNode)(*this);
 		case NodeType::VERTEX_OUTPUT:				return LUMIX_NEW(m_allocator, VertexOutputNode)(*this);
 		case NodeType::FRAGMENT_INPUT:				return LUMIX_NEW(m_allocator, FragmentInputNode)(*this);
-		case NodeType::POSITION_OUTPUT:				return LUMIX_NEW(m_allocator, PositionOutputNode)(*this);
 		case NodeType::VERTEX_INPUT:				return LUMIX_NEW(m_allocator, VertexInputNode)(*this);
-		case NodeType::COLOR_CONST:					return LUMIX_NEW(m_allocator, ColorConstNode)(*this);
-		case NodeType::FLOAT_CONST:					return LUMIX_NEW(m_allocator, FloatConstNode)(*this);
+		case NodeType::CONSTANT:					return LUMIX_NEW(m_allocator, ConstNode)(*this);
 		case NodeType::MIX:							return LUMIX_NEW(m_allocator, MixNode)(*this);
 		case NodeType::SAMPLE:						return LUMIX_NEW(m_allocator, SampleNode)(*this);
 		case NodeType::UNIFORM:						return LUMIX_NEW(m_allocator, UniformNode)(*this);
+		case NodeType::SWIZZLE:						return LUMIX_NEW(m_allocator, SwizzleNode)(*this);
 		case NodeType::VEC4_MERGE:					return LUMIX_NEW(m_allocator, Vec4MergeNode)(*this);
 		case NodeType::OPERATOR:					return LUMIX_NEW(m_allocator, OperatorNode)(*this);
 		case NodeType::BUILTIN_UNIFORM:				return LUMIX_NEW(m_allocator, BuiltinUniformNode)(*this);
 		case NodeType::PASS:						return LUMIX_NEW(m_allocator, PassNode)(*this);
+		case NodeType::IF:							return LUMIX_NEW(m_allocator, IfNode)(*this);
 		case NodeType::INSTANCE_MATRIX:				return LUMIX_NEW(m_allocator, InstanceMatrixNode)(*this);
 		case NodeType::FUNCTION_CALL:				return LUMIX_NEW(m_allocator, FunctionCallNode)(*this);
 		case NodeType::BINARY_FUNCTION_CALL:		return LUMIX_NEW(m_allocator, BinaryFunctionCallNode)(*this);
@@ -1963,21 +2090,6 @@ void ShaderEditor::onGUILeftColumn()
 		}
 	}
 
-	if (ImGui::CollapsingHeader("Attributes")) {
-		for (int i = 0; i < m_attributes.size(); ++i) {
-			if (ImGui::Button(StaticString<32>("X##x", i))) {
-				m_attributes.erase(i);
-				--i;
-				continue;
-			}
-			ImGui::SameLine();
-			ImGui::InputText(StaticString<10>("###attr", i), m_attributes[i].name.data, sizeof(m_attributes[i].name.data));
-		}
-		if (ImGui::Button("Add")) {
-			m_attributes.emplace();
-		}
-	}
-
 	if (ImGui::CollapsingHeader("Source")) {
 		if (m_source.length() == 0) {
 			ImGui::Text("Empty");
@@ -2069,25 +2181,6 @@ void ShaderEditor::destroyNode(Node* node)
 }
 
 
-uint ShaderEditor::getAttributesCount() const
-{
-	return m_attributes.size();
-}
-
-
-const char* ShaderEditor::getAttributeName(uint idx) const
-{
-	if (idx >= (uint)m_attributes.size()) return "N/A";
-	return m_attributes[idx].name;
-}
-
-
-ShaderEditor::ValueType ShaderEditor::getAttributeType(uint idx) const
-{
-	return semanticToType((Mesh::AttributeSemantic)m_attributes[idx].semantic);
-}
-
-
 void ShaderEditor::newGraph()
 {
 	clear();
@@ -2102,9 +2195,19 @@ void ShaderEditor::newGraph()
 	m_fragment_nodes.back()->m_pos.y = 50;
 	m_fragment_nodes.back()->m_id = ++m_last_node_id;
 
-	m_vertex_nodes.push(LUMIX_NEW(m_allocator, PositionOutputNode)(*this));
+	m_fragment_nodes.push(LUMIX_NEW(m_allocator, FragmentInputNode)(*this));
+	m_fragment_nodes.back()->m_pos.x = 50;
+	m_fragment_nodes.back()->m_pos.y = 150;
+	m_fragment_nodes.back()->m_id = ++m_last_node_id;
+
+	m_vertex_nodes.push(LUMIX_NEW(m_allocator, VertexOutputNode)(*this));
 	m_vertex_nodes.back()->m_pos.x = 50;
 	m_vertex_nodes.back()->m_pos.y = 50;
+	m_vertex_nodes.back()->m_id = ++m_last_node_id;
+
+	m_vertex_nodes.push(LUMIX_NEW(m_allocator, VertexInputNode)(*this));
+	m_vertex_nodes.back()->m_pos.x = 50;
+	m_vertex_nodes.back()->m_pos.y = 150;
 	m_vertex_nodes.back()->m_id = ++m_last_node_id;
 }
 
