@@ -382,9 +382,9 @@ namespace ImGui
 		ImGui::SameLine();
 		float width = GetCursorScreenPos().x - node_pos.x;
 		EndGroup();
+		const ImVec2 size = ImGui::GetItemRectSize() + ImGui::GetStyle().WindowPadding * 2;
 		PopItemWidth();
 		float height = GetCursorScreenPos().y - node_pos.y;
-		ImVec2 size(width + GetStyle().WindowPadding.x, height + GetStyle().WindowPadding.y);
 		SetCursorScreenPos(node_pos);
 
 		SetNextWindowPos(node_pos);

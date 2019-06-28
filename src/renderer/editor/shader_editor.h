@@ -51,13 +51,15 @@ public:
 
 		virtual void save(OutputMemoryStream& /*blob*/) {}
 		virtual void load(InputMemoryStream& /*blob*/) {}
-		virtual void generate(OutputMemoryStream& blob) = 0;
-		virtual void printReference(OutputMemoryStream& blob);
+		virtual void generate(OutputMemoryStream& /*blob*/) {}
+		virtual void printReference(OutputMemoryStream& blob, Node* output);
 		virtual void generateBeforeMain(OutputMemoryStream& /*blob*/) {}
 		virtual ValueType getOutputType(int /*index*/) const { return ValueType::FLOAT; }
 		virtual ~Node();
 
+
 		ValueType getInputType(int index) const;
+		void generateRecursive(OutputMemoryStream& blob);
 		void onNodeGUI();
 
 		ImGuiID m_id;
@@ -90,9 +92,6 @@ public:
 	bool hasFocus() const { return m_is_focused; }
 	void undo();
 	void redo();
-	uint getAttributesCount() const;
-	const char* getAttributeName(uint idx) const;
-	ValueType getAttributeType(uint idx) const;
 
 public:
 	static const int MAX_TEXTURES_COUNT = 16;
@@ -128,11 +127,6 @@ private:
 	} m_new_link_info;
 
 private:
-	struct Attribute { 
-		StaticString<50> name;
-		uint semantic;
-	};
-	Array<Attribute> m_attributes;
 	StaticString<50> m_textures[MAX_TEXTURES_COUNT];
 	Path m_path;
 	int m_last_node_id;
