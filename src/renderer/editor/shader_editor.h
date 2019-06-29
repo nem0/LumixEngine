@@ -33,6 +33,7 @@ public:
 	{
 		BOOL,
 		FLOAT,
+		INT,
 		VEC2,
 		VEC3,
 		VEC4,

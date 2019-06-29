@@ -31,6 +31,7 @@ enum class NodeType
 	SWIZZLE,
 	OPERATOR,
 	BUILTIN_UNIFORM,
+	VERTEX_ID,
 	PASS,
 	INSTANCE_MATRIX,
 	FUNCTION_CALL,
@@ -98,6 +99,7 @@ static constexpr const char* toString(ShaderEditor::ValueType type) {
 	switch (type) {
 		case ShaderEditor::ValueType::NONE: return "error";
 		case ShaderEditor::ValueType::BOOL: return "bool";
+		case ShaderEditor::ValueType::INT: return "int";
 		case ShaderEditor::ValueType::FLOAT: return "float";
 		case ShaderEditor::ValueType::VEC2: return "vec2";
 		case ShaderEditor::ValueType::VEC3: return "vec3";
@@ -123,6 +125,7 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Swizzle",				NodeType::SWIZZLE,				true,		true},
 	{"Operator",			NodeType::OPERATOR,				true,		true},
 	{"Builtin uniforms",	NodeType::BUILTIN_UNIFORM,		true,		true},
+	{"Vertex ID",			NodeType::VERTEX_ID,			false,		true},
 	{"Pass",				NodeType::PASS,					true,		true},
 	{"Instance matrix",		NodeType::INSTANCE_MATRIX,		false,		true},
 	{"Function",			NodeType::FUNCTION_CALL,		true,		true},
@@ -295,12 +298,17 @@ struct VertexOutputNode : public ShaderEditor::Node
 				m_inputs.erase(i + 1);
 				m_varyings.erase(i);
 				--i;
+				--c;
 				continue;
 			}
 			ImGui::SameLine();
 			ImGui::Combo(StaticString<32>("##t", i), (int*)&v.type, getter, nullptr, (int)ShaderEditor::ValueType::COUNT);
 			ImGui::SameLine();
 			ImGui::InputTextWithHint(StaticString<32>("##n", i), "Name", v.name.data, sizeof(v.name.data));
+		}
+		if (ImGui::Button("Add")) {
+			m_inputs.push(nullptr);
+			m_varyings.push({ StaticString<32>("output"), ShaderEditor::ValueType::VEC4 });
 		}
 	}
 
@@ -477,6 +485,8 @@ struct OperatorNode : public ShaderEditor::Node
 		GTE,
 		EQ,
 		NEQ,
+		BIT_AND,
+		BIT_OR,
 		
 		COUNT
 	};
@@ -512,6 +522,8 @@ struct OperatorNode : public ShaderEditor::Node
 
 	static const char* toString(Operation op) {
 		switch (op) {
+			case BIT_AND: return "&";
+			case BIT_OR: return "|";
 			case ADD: return "+";
 			case MUL: return "*";
 			case DIV: return "/";
@@ -528,9 +540,12 @@ struct OperatorNode : public ShaderEditor::Node
 
 	void printReference(OutputMemoryStream& blob, Node*) override
 	{
+		if (!m_inputs[0] || !m_inputs[1]) return; 
+		blob << "(";
 		m_inputs[0]->printReference(blob, this);
-		blob << " " << toString(m_operation) << " ";
+		blob << ") " << toString(m_operation) << " (";
 		m_inputs[1]->printReference(blob, this);
+		blob << ")";
 	}
 
 	void onGUI() override
@@ -802,6 +817,7 @@ struct ConstNode : public ShaderEditor::Node
 	{
 		m_type = ShaderEditor::ValueType::VEC4;
 		m_value[0] = m_value[1] = m_value[2] = m_value[3] = 0;
+		m_int_value = 0;
 		m_outputs.push(nullptr);
 	}
 
@@ -810,6 +826,7 @@ struct ConstNode : public ShaderEditor::Node
 		blob.write(m_value);
 		blob.write(m_is_color);
 		blob.write(m_type);
+		blob.write(m_int_value);
 	}
 
 	void load(InputMemoryStream& blob) override 
@@ -817,6 +834,7 @@ struct ConstNode : public ShaderEditor::Node
 		blob.read(m_value);
 		blob.read(m_is_color);
 		blob.read(m_type);
+		blob.read(m_int_value);
 	}
 
 	ShaderEditor::ValueType getOutputType(int) const override { return m_type; }
@@ -834,6 +852,9 @@ struct ConstNode : public ShaderEditor::Node
 				break;
 			case ShaderEditor::ValueType::VEC2:
 				blob << "vec2(" << m_value[0] << ", " << m_value[1] << ")";
+				break;
+			case ShaderEditor::ValueType::INT:
+				blob << m_int_value;
 				break;
 			case ShaderEditor::ValueType::FLOAT:
 				blob << m_value[0];
@@ -874,6 +895,9 @@ struct ConstNode : public ShaderEditor::Node
 			case ShaderEditor::ValueType::FLOAT:
 				ImGui::InputFloat("", m_value);
 				break;
+			case ShaderEditor::ValueType::INT:
+				ImGui::InputInt("", &m_int_value);
+				break;
 			default: ASSERT(false); break;
 		}
 	}
@@ -881,6 +905,7 @@ struct ConstNode : public ShaderEditor::Node
 	ShaderEditor::ValueType m_type;
 	bool m_is_color = false;
 	float m_value[4];
+	int m_int_value;
 };
 
 
@@ -1207,7 +1232,35 @@ struct IfNode : public ShaderEditor::Node
 };
 
 
-struct BuiltinUniformNode : public ShaderEditor::Node
+struct VertexIDNode : ShaderEditor::Node
+{
+	explicit VertexIDNode(ShaderEditor& editor)
+		: Node((int)NodeType::VERTEX_ID, editor)
+	{
+		m_outputs.push(nullptr);
+	}
+
+	void save(OutputMemoryStream& blob) override {}
+	void load(InputMemoryStream& blob) override {}
+
+	void printReference(OutputMemoryStream& blob, Node*) override
+	{
+		blob << "gl_VertexID";
+	}
+
+	ShaderEditor::ValueType getOutputType(int) const override
+	{
+		return ShaderEditor::ValueType::INT;
+	}
+
+	void onGUI() override
+	{
+		ImGui::Text("Vertex ID");
+	}
+};
+
+
+struct BuiltinUniformNode : ShaderEditor::Node
 {
 	explicit BuiltinUniformNode(ShaderEditor& editor)
 		: Node((int)NodeType::BUILTIN_UNIFORM, editor)
@@ -1803,6 +1856,7 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 		case NodeType::VEC4_MERGE:					return LUMIX_NEW(m_allocator, Vec4MergeNode)(*this);
 		case NodeType::OPERATOR:					return LUMIX_NEW(m_allocator, OperatorNode)(*this);
 		case NodeType::BUILTIN_UNIFORM:				return LUMIX_NEW(m_allocator, BuiltinUniformNode)(*this);
+		case NodeType::VERTEX_ID	:				return LUMIX_NEW(m_allocator, VertexIDNode)(*this);
 		case NodeType::PASS:						return LUMIX_NEW(m_allocator, PassNode)(*this);
 		case NodeType::IF:							return LUMIX_NEW(m_allocator, IfNode)(*this);
 		case NodeType::INSTANCE_MATRIX:				return LUMIX_NEW(m_allocator, InstanceMatrixNode)(*this);
