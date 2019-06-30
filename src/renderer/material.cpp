@@ -413,6 +413,8 @@ void Material::setTexture(int i, Texture* texture)
 			}
 		}
 	}
+
+	updateRenderData(false);
 }
 
 
@@ -516,6 +518,8 @@ void Material::setShader(Shader* shader)
 	if (m_shader) {
 		addDependency(*m_shader);
 	}
+
+	updateRenderData(false);
 }
 
 
