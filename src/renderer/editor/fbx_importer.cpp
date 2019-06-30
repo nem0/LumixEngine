@@ -1785,7 +1785,8 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	};
 	OS::OutputFile file;
 	PathUtils::FileInfo file_info(src);
-	StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, file_info.m_dir, "/", file_info.m_basename, ".fab");
+	StaticString<MAX_PATH_LENGTH> tmp_rel(file_info.m_dir, "/", file_info.m_basename, ".fab");
+	StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, tmp_rel);
 	if (!file.open(tmp)) return;
 
 	OutputMemoryStream blob(allocator);
@@ -1795,9 +1796,9 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	serializer.write("version", (u32)PrefabVersion::LAST);
 	const int count = meshes.size();
 	serializer.write("entity_count", count + 1);
-	char normalized_tmp[MAX_PATH_LENGTH];
-	PathUtils::normalize(tmp, normalized_tmp, lengthOf(normalized_tmp));
-	const u64 prefab = crc32(normalized_tmp);
+	char normalized_tmp_rel[MAX_PATH_LENGTH];
+	PathUtils::normalize(tmp_rel, normalized_tmp_rel, lengthOf(normalized_tmp_rel));
+	const u64 prefab = crc32(normalized_tmp_rel);
 
 	serializer.write("prefab", prefab);
 	serializer.write("parent", INVALID_ENTITY);
