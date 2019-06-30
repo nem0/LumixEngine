@@ -994,6 +994,7 @@ void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int
 			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
 			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
 			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
+			default: ASSERT(false); break;
 		}
 
 		const int index = attributes_map ? attributes_map[i] : location_offset + i;

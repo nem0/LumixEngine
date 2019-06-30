@@ -14,7 +14,6 @@ namespace Lumix
 {
 
 struct Action;
-class FileSystemWatcher;
 class Material;
 class OutputMemoryStream;
 class StudioApp;
