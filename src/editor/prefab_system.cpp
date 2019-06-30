@@ -124,7 +124,7 @@ class PrefabSystemImpl final : public PrefabSystem
 		bool execute() override
 		{
 			entity = INVALID_ENTITY;
-			if (!prefab->isFailure()) return false;
+			if (prefab->isFailure()) return false;
 			
 			ASSERT(prefab->isReady());
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
