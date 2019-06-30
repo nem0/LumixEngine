@@ -1841,7 +1841,7 @@ struct PipelineImpl final : Pipeline
 
 	void renderLocalLights(const char* define, int shader_idx, CmdPage* cmds)
 	{
-		/*struct RenderJob : Renderer::RenderJob
+		struct RenderJob : Renderer::RenderJob
 		{
 			void setup() override {}
 
@@ -1854,7 +1854,7 @@ struct PipelineImpl final : Pipeline
 					do {} while(false)
 
 				PROFILE_FUNCTION();
-				if(m_cmd_set->cmds.empty()) return;
+				if(m_cmds->header.size == 0 && m_cmds->header.next == nullptr) return;
 				
 				ffr::VertexDecl instance_decl;
 				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false); // rot
@@ -1870,49 +1870,52 @@ struct PipelineImpl final : Pipeline
 
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
 				const u32 define_mask = m_define_mask;
-				for (const Array<u8>& cmds : m_cmd_set->cmds) {
-					const u8* cmd = cmds.begin();
-					const u8* cmd_end = cmds.end();
+				CmdPage* page = m_cmds;
+				while (page) {
+					const u8* cmd = page->data;
+					const u8* cmd_end = page->data + page->header.size;
 					while (cmd != cmd_end) {
-						const RenderableTypes type = *(RenderableTypes*)cmd;
-						cmd += sizeof(type);
-						switch(type) {
-							case RenderableTypes::LOCAL_LIGHT: {
-								READ(u16, instances_count);
-								READ(bool, intersecting);
+						READ(const RenderableTypes, type);
+						ASSERT(type == RenderableTypes::LOCAL_LIGHT);
 
-								const u8* instance_data = cmd;
-								cmd += instance_decl.size * instances_count;
+						READ(uint, total_count);
+						READ(uint, nonintersecting_count);
+						READ(const ffr::BufferHandle, buffer);
+						READ(const uint, offset);
 
-								const Shader::Program& prog = Shader::getProgram(m_shader, define_mask);
-								if (prog.handle.isValid()) {
-									ffr::useProgram(prog.handle);
-									const u64 state = intersecting
-										? (u64)ffr::StateFlags::CULL_FRONT
-										: (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK;
-									ffr::setState(blend_state | state);
-									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
-									ffr::setVertexBuffer(&decl, m_pipeline->m_cube_vb, 0, nullptr);
+						const Shader::Program& prog = Shader::getProgram(m_shader, define_mask);
+						if (prog.handle.isValid()) {
+							ffr::useProgram(prog.handle);
+							ffr::setIndexBuffer(m_pipeline->m_cube_ib);
+							ffr::setVertexBuffer(&decl, m_pipeline->m_cube_vb, 0, nullptr);
 
-									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * instance_decl.size);
-									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
-									ffr::flushBuffer(instance_buffer.buffer, instance_buffer.offset, instance_buffer.size);
+							const uint instance_data_size = sizeof(float) * 16 * total_count;
+							ffr::flushBuffer(buffer, offset, instance_data_size);
 
-									ffr::setInstanceBuffer(instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
-									ffr::drawTrianglesInstanced(0, 36, instances_count);
-								}
-								break;
+							if(total_count - nonintersecting_count) {
+								ffr::setState(blend_state | (u64)ffr::StateFlags::CULL_FRONT);
+								const uint offs = offset + sizeof(float) * 16 * nonintersecting_count;
+								ffr::setInstanceBuffer(instance_decl, buffer, offs, 1, nullptr);
+								ffr::drawTrianglesInstanced(0, 36, total_count - nonintersecting_count);
 							}
-							default: ASSERT(false); return;
+
+							if (nonintersecting_count) {
+								ffr::setState(blend_state | (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK);
+								ffr::setInstanceBuffer(instance_decl, buffer, offset, 1, nullptr);
+								ffr::drawTrianglesInstanced(0, 36, nonintersecting_count);
+							}
 						}
 					}
+					CmdPage* next = page->header.next;
+					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(page, true);
+					page = next;
 				}
 				#undef READ
 			}
 
 			ShaderRenderData* m_shader;
 			PipelineImpl* m_pipeline;
-			CommandSet* m_cmd_set;
+			CmdPage* m_cmds;
 			u32 m_define_mask;
 		};
 
@@ -1930,11 +1933,9 @@ struct PipelineImpl final : Pipeline
 		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
 		job->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		job->m_pipeline = this;
-		job->m_cmd_set = cmd_set;
+		job->m_cmds = cmds;
 		job->m_shader = shader;
-		m_renderer.push(job);*/
-		//ASSERT(false);
-		// TODO
+		m_renderer.push(job, m_profiler_link);
 	}
 
 
@@ -2693,8 +2694,8 @@ struct PipelineImpl final : Pipeline
 							uint intersecting_count = 0;
 
 							struct LightData {
-								Vec3 pos;
 								Quat rot;
+								Vec3 pos;
 								float range;
 								float attenuation;
 								Vec3 color;
@@ -2730,6 +2731,8 @@ struct PipelineImpl final : Pipeline
 							const uint nonintersecting_count = uint(beg - (LightData*)slice.ptr);
 							WRITE(total_count);
 							WRITE(nonintersecting_count);
+							WRITE(slice.buffer);
+							WRITE(slice.offset);
 
 							--i;
 							break;
