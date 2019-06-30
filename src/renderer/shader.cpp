@@ -464,6 +464,10 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setglobal(L, "SEMANTICS_INSTANCE1");
 	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INSTANCE2);
 	lua_setglobal(L, "SEMANTICS_INSTANCE2");
+	lua_pushinteger(L, (int)Mesh::AttributeSemantic::TANGENT);
+	lua_setglobal(L, "SEMANTICS_TANGENT");
+	lua_pushinteger(L, (int)Mesh::AttributeSemantic::BITANGENT);
+	lua_setglobal(L, "SEMANTICS_BITANGENT");
 
 	const StringView content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
