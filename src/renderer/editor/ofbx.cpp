@@ -2230,6 +2230,10 @@ static OptionalError<Object*> parseGeometryTangents(
 	const std::vector<int>& to_old_indices)
 {
 	const Element* layer_tangent_element = findChild(element, "LayerElementTangents");
+	if (!layer_tangent_element ) {
+		layer_tangent_element = findChild(element, "LayerElementTangent");
+	}
+	layer_tangent_element = findChild(element, "LayerElementTangent");
 	if (layer_tangent_element)
 	{
 		std::vector<Vec3> tmp;

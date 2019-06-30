@@ -396,6 +396,44 @@ static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, FBXImport
 }
 
 
+static ofbx::Vec3 operator-(const ofbx::Vec3& a, const ofbx::Vec3& b)
+{
+	return {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+
+static ofbx::Vec2 operator-(const ofbx::Vec2& a, const ofbx::Vec2& b)
+{
+	return {a.x - b.x, a.y - b.y};
+}
+
+
+static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs)
+{
+	/*out.resize(vertex_count);
+	setMemory(out.begin(), 0, out.byte_size());
+	for (int i = 0; i < vertex_count; i += 3) {
+		const ofbx::Vec3 v0 = vertices[i + 0];
+		const ofbx::Vec3 v1 = vertices[i + 1];
+		const ofbx::Vec3 v2 = vertices[i + 2];
+		const ofbx::Vec2 uv0 = uvs[0];
+		const ofbx::Vec2 uv1 = uvs[1];
+		const ofbx::Vec2 uv2 = uvs[2];
+
+		const ofbx::Vec3 dv10 = v1 - v0;
+		const ofbx::Vec3 dv20 = v2 - v0;
+		const ofbx::Vec2 duv10 = uv1 - uv0;
+		const ofbx::Vec2 duv20 = uv2 - uv0;
+
+		const float dir = duv20.x * duv10.y - duv20.y * duv10.x < 0 ? -1.f : 1.f;
+		ofbx::Vec3 tangent; 
+		tagent.x = (dv20.x * duv10.y - dv10.x * duv2.y) * dir;
+		tagent.y = (dv20.y * duv10.y - dv10.y * duv2.y) * dir;
+		tagent.z = (dv20.z * duv10.y - dv10.z * duv2.y) * dir;
+	}*/
+}
+
+
 void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 {
 	for (int mesh_idx = 0; mesh_idx < meshes.size(); ++mesh_idx)
@@ -443,6 +481,12 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		subblobs.reserve(vertex_count);
 
 		const int* materials = geom->getMaterials();
+		Array<ofbx::Vec3> computed_tangents(allocator);
+		if (!tangents && normals && uvs) {
+			//computeTangents(computed_tangents, vertex_count, vertices, normals, uvs);
+			//tangents = computed_tangents.begin();
+		}
+
 		for (int i = 0; i < vertex_count; ++i)
 		{
 			if (materials && materials[i / 3] != material_idx) continue;
