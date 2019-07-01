@@ -36,7 +36,8 @@ enum class NodeType
 	INSTANCE_MATRIX,
 	FUNCTION_CALL,
 	BINARY_FUNCTION_CALL,
-	IF
+	IF,
+	VERTEX_PREFAB
 };
 
 
@@ -130,7 +131,8 @@ static const struct { const char* name; NodeType type; bool is_frag; bool is_ver
 	{"Instance matrix",		NodeType::INSTANCE_MATRIX,		false,		true},
 	{"Function",			NodeType::FUNCTION_CALL,		true,		true},
 	{"Binary function",		NodeType::BINARY_FUNCTION_CALL,	true,		true},
-	{"If",					NodeType::IF,					true,		true}
+	{"If",					NodeType::IF,					true,		true},
+	{"Vertex prefab",		NodeType::VERTEX_PREFAB,		false,		true}
 };
 
 
@@ -1232,6 +1234,56 @@ struct IfNode : public ShaderEditor::Node
 };
 
 
+struct VertexPrefabNode : ShaderEditor::Node
+{
+	enum class Type : int {
+		FULLSCREEN_POSITION,
+
+		COUNT
+	};
+
+	explicit VertexPrefabNode(ShaderEditor& editor)
+		: Node((int)NodeType::VERTEX_PREFAB, editor)
+	{
+		m_outputs.push(nullptr);
+	}
+
+	void save(OutputMemoryStream& blob) override {}
+	void load(InputMemoryStream& blob) override {}
+
+	void printReference(OutputMemoryStream& blob, Node*) override
+	{
+		switch(m_type) {
+			case Type::FULLSCREEN_POSITION: blob << "vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1)"; break;
+			default: ASSERT(false); break;
+		}
+	}
+
+	ShaderEditor::ValueType getOutputType(int) const override
+	{
+		return ShaderEditor::ValueType::VEC4;
+	}
+
+	static const char* toString(Type type) {
+		switch(type) {
+			case Type::FULLSCREEN_POSITION: return "fullscreen position"; 
+			default: ASSERT(false); return "Unknown";
+		}
+	}
+
+	void onGUI() override
+	{
+		auto getter = [](void*, int idx, const char** out){
+			*out = toString((Type)idx);
+			return true;
+		};
+		ImGui::Combo("", (int*)&m_type, getter, nullptr, (int)Type::COUNT);
+	}
+
+	Type m_type = Type::FULLSCREEN_POSITION;
+};
+
+
 struct VertexIDNode : ShaderEditor::Node
 {
 	explicit VertexIDNode(ShaderEditor& editor)
@@ -1862,6 +1914,7 @@ ShaderEditor::Node* ShaderEditor::createNode(int type)
 		case NodeType::INSTANCE_MATRIX:				return LUMIX_NEW(m_allocator, InstanceMatrixNode)(*this);
 		case NodeType::FUNCTION_CALL:				return LUMIX_NEW(m_allocator, FunctionCallNode)(*this);
 		case NodeType::BINARY_FUNCTION_CALL:		return LUMIX_NEW(m_allocator, BinaryFunctionCallNode)(*this);
+		case NodeType::VERTEX_PREFAB:				return LUMIX_NEW(m_allocator, VertexPrefabNode)(*this);
 	}
 
 	ASSERT(false);
