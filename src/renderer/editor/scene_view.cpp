@@ -226,7 +226,7 @@ void SceneView::renderSelection()
 
 				for (int i = 0; i < model->getMeshCount(); ++i) {
 					const Mesh& mesh = model->getMesh(i);
-					Item item;
+					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;
 					item.shader = mesh.material->getShader()->m_render_data;
 					item.mtx = universe.getRelativeMatrix(e, m_editor->getViewport().pos);
