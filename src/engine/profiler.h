@@ -154,9 +154,11 @@ LUMIX_ENGINE_API struct ThreadState {
 
 } // namespace Profiler
 
+#define LUMIX_CONCAT2(a, b) a ## b
+#define LUMIX_CONCAT(a, b) LUMIX_CONCAT2(a, b)
 
 #define PROFILE_FUNCTION() Profiler::Scope profile_scope(__FUNCTION__);
-#define PROFILE_BLOCK(name) Profiler::Scope profile_scope(name);
+#define PROFILE_BLOCK(name) Profiler::Scope LUMIX_CONCAT(profile_scope, __LINE__)(name);
 
 
 } // namespace Lumix
