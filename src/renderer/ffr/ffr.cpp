@@ -1668,6 +1668,7 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 {
 	checkThread();
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
+	const bool no_mips = flags & (u32)TextureFlags::NO_MIPS;
 	ASSERT(!is_srgb); // use format argument to enable srgb
 	ASSERT(debug_name && debug_name[0]);
 
@@ -1675,7 +1676,7 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 	int found_format = 0;
 	GLenum internal_format = 0;
 	const GLenum target = depth <= 1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_ARRAY;
-	const uint mip_count = 1 + log2(maximum(w, h, depth));
+	const uint mip_count = no_mips ? 1 : 1 + log2(maximum(w, h, depth));
 
 	CHECK_GL(glCreateTextures(target, 1, &texture));
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
@@ -1732,7 +1733,7 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 	CHECK_GL(glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap));
 	CHECK_GL(glTexParameteri(target, GL_TEXTURE_WRAP_T, wrap));
 	CHECK_GL(glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-	CHECK_GL(glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+	CHECK_GL(glTexParameteri(target, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
 
 	CHECK_GL(glBindTexture(target, 0));
 

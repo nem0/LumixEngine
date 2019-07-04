@@ -140,7 +140,8 @@ enum class UniformType : uint {
 
 enum class TextureFlags : uint {
 	SRGB = 1 << 0,
-	CLAMP = 1 << 1
+	CLAMP = 1 << 1,
+	NO_MIPS = 1 << 2
 };
 
 enum class BufferFlags : uint {
