@@ -753,17 +753,14 @@ int ParticleEmitter::getInstanceDataSizeBytes() const
 
 void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 {
-		// TODO
-	ASSERT(false);
-/*
 	const OutputMemoryStream& bytecode = m_resource->getBytecode();
 	const int offset = m_resource->getOutputByteOffset();
 	InputMemoryStream blob((u8*)bytecode.getData() + offset, bytecode.getPos());
 	
 	// TODO
-	m_constants[1].value = cam_pos.x;
-	m_constants[2].value = cam_pos.y;
-	m_constants[3].value = cam_pos.z;
+	m_constants[1].value = (float)cam_pos.x;
+	m_constants[2].value = (float)cam_pos.y;
+	m_constants[3].value = (float)cam_pos.z;
 	// TODO
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
@@ -849,7 +846,7 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 				ASSERT(false);
 				break;
 		}
-	}*/
+	}
 }
 
 // TODO
