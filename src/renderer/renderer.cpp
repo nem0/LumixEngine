@@ -955,18 +955,11 @@ struct RendererImpl final : public Renderer
 
 		m_transient_buffer_frame_offset = (m_transient_buffer_frame_offset + TRANSIENT_BUFFER_SIZE) % (2 * TRANSIENT_BUFFER_SIZE);
 		m_transient_buffer_offset = 0;
-
-		//m_last_exec_job = JobSystem::INVALID_HANDLE;
 	}
-
-
-	using ShaderDefine = StaticString<32>;
-	using Layer = StaticString<32>;
-
 
 	Engine& m_engine;
 	IAllocator& m_allocator;
-	Array<ShaderDefine> m_shader_defines;
+	Array<StaticString<32>> m_shader_defines;
 	Array<StaticString<32>> m_layers;
 	FontManager* m_font_manager;
 	RenderResourceManager<Material> m_material_manager;
