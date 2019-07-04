@@ -2090,15 +2090,14 @@ struct PipelineImpl final : Pipeline
 								break;
 							}
 							case RenderableTypes::DECAL: {
-								READ(Material::RenderData*, material);
-								READ(u16, instances_count);
-								/*
+								READ(const Material::RenderData*, material);
+								READ(const ffr::BufferHandle, buffer);
+								READ(const u32, offset);
+								READ(const u32, count);
+								
 								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(material->textures, 0, material->textures_count);
-
-								const u8* instance_data = cmd;
-								cmd += decal_instance_decl.size * instances_count;
-
+								
 								const Shader::Program& prog = Shader::getProgram(shader, m_define_mask);
 								if (prog.handle.isValid()) {
 									ffr::useProgram(prog.handle);
@@ -2106,17 +2105,11 @@ struct PipelineImpl final : Pipeline
 									ffr::setIndexBuffer(m_pipeline->m_cube_ib);
 									ffr::setVertexBuffer(&decal_decl, m_pipeline->m_cube_vb, 0, nullptr);
 
-									const Renderer::TransientSlice instance_buffer = m_pipeline->m_renderer.allocTransient(instances_count * decal_instance_decl.size);
-									memcpy(instance_buffer.ptr, instance_data, instance_buffer.size);
-									ffr::flushBuffer(instance_buffer.buffer, instance_buffer.offset, instance_buffer.size);
-									
-									ffr::setInstanceBuffer(decal_instance_decl, instance_buffer.buffer, instance_buffer.offset, 1, nullptr);
-									ffr::drawTrianglesInstanced(0, 36, instances_count);
+									ffr::setInstanceBuffer(decal_instance_decl, buffer, offset, 1, nullptr);
+									ffr::drawTrianglesInstanced(0, 36, count);
 									++stats.draw_call_count;
-									stats.instance_count += instances_count;
+									stats.instance_count += count;
 								}
-								*/
-								// TODO
 								break;
 							}
 							case RenderableTypes::GRASS: {
@@ -2638,31 +2631,35 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::DECAL: {
-							/*const Material* material = scene->getDecalMaterial(e);
+							const Material* material = scene->getDecalMaterial(e);
 							const Vec3 half_extents = scene->getDecalHalfExtents(e);
 
-							const uint out_offset = uint(out - ctx->output->begin());
-							ctx->output->resize(ctx->output->size() +  sizeof(Vec3) + sizeof(void*) + sizeof(Vec3) + sizeof(Quat));
-							WRITE_FN(material->getRenderData());
-
-							u16* instance_count = (u16*)out;
 							int start_i = i;
-							out += sizeof(*instance_count);
 							const u64 key = sort_keys[i];
 							while (i < c && sort_keys[i] == key) {
-								const EntityRef e = {int(renderables[i] & 0x00ffFFff)};
-								const Transform& tr = entity_data[e.index];
-								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-								WRITE(lpos);
-								WRITE(tr.rot);
-								const Vec3 half_extents = scene->getDecalHalfExtents(e);
-								WRITE(half_extents);
 								++i;
 							}
-							*instance_count = u16(i - start_i);
-							--i;*/
-							ASSERT(false);
-							// TODO
+							const u32 count = i - start_i;
+							const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) * 2 + sizeof(Quat)));
+							
+							WRITE(type);
+							WRITE_FN(material->getRenderData());
+							WRITE(slice.buffer);
+							WRITE(slice.offset);
+							WRITE(count);
+							u8* mem = slice.ptr;
+							for(int j = start_i; j < i; ++j) {
+								const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+								const Transform& tr = entity_data[e.index];
+								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+								memcpy(mem, &lpos, sizeof(lpos));
+								mem += sizeof(lpos);
+								memcpy(mem, &tr.rot, sizeof(tr.rot));
+								mem += sizeof(tr.rot);
+								const Vec3 half_extents = scene->getDecalHalfExtents(e);
+								memcpy(mem, &half_extents, sizeof(half_extents));
+								mem += sizeof(half_extents);
+							}
 							break;
 						}
 						case RenderableTypes::LOCAL_LIGHT: {
@@ -2798,6 +2795,20 @@ struct PipelineImpl final : Pipeline
 							if(local_light_bucket < 0xff) {
 								for (int i = 0, c = page->header.count; i < c; ++i) {
 									result.push((u64)local_light_bucket << 56, renderables[i].index | type_mask);
+								}
+							}
+							break;
+						}
+						case RenderableTypes::DECAL: {
+							for (int i = 0, c = page->header.count; i < c; ++i) {
+								const EntityRef e = renderables[i];
+								const Material* material = scene->getDecalMaterial(e);
+								const int layer = material->getLayer();
+								const u8 bucket = bucket_map[layer];
+								if (bucket < 0xff) {
+									// TODO material can have the same sort key as mesh
+									const u64 subrenderable = e.index | type_mask;
+									result.push(material->getSortKey() | ((u64)bucket << 56), subrenderable);
 								}
 							}
 							break;

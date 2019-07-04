@@ -39,7 +39,8 @@ function transparentPass(transparent_set, colorbuffer, dsbuffer)
 	beginBlock("transparent_pass")
 	pass(getCameraParams())
 	renderBucket(transparent_set, transparent_state)
-	--renderParticles(view_params)
+	local view_params = getCameraParams()
+	renderParticles(view_params)
 	endBlock()
 end
 
@@ -60,8 +61,8 @@ function geomPass(default_set, decal_set)
 
 	beginBlock("decals")
 	bindTextures({
-		u_gbuffer_depth = gbuffer_depth,
-	}, 0)
+		dsbuffer,
+	}, 1)
 	renderBucket(decal_set, decal_state)
 	endBlock()
 	
