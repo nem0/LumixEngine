@@ -296,11 +296,16 @@ void SceneView::renderGizmos()
 			Engine& engine = view->m_editor.getEngine();
 			renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 			model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
+
+			ib = renderer->allocTransient(data.indices.byte_size());
+			vb = renderer->allocTransient(data.vertices.byte_size());
+			memcpy(ib.ptr, data.indices.begin(), data.indices.byte_size());
+			memcpy(vb.ptr, data.vertices.begin(), data.vertices.byte_size());
 		}
 
 		void execute() override
 		{
-			/*PROFILE_FUNCTION();
+			PROFILE_FUNCTION();
 			if (data.cmds.empty()) return;
 
 			const ffr::ProgramHandle prg = Shader::getProgram(shader, 0).handle;
@@ -313,31 +318,26 @@ void SceneView::renderGizmos()
 			renderer->beginProfileBlock("gizmos", 0);
 			ffr::pushDebugGroup("gizmos");
 			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
+			u32 vb_offset = 0;
+			u32 ib_offset = 0;
 			for(Gizmo::RenderData::Cmd& cmd : data.cmds) {
-				Renderer::TransientSlice ib = renderer->allocTransient(cmd.indices_count * sizeof(u16));
-				Renderer::TransientSlice vb = renderer->allocTransient(cmd.vertices_count * sizeof(Gizmo::RenderData::Vertex));
-		
-				const u16* indices = data.indices.begin() + cmd.indices_offset;
-				const Gizmo::RenderData::Vertex* vertices = data.vertices.begin() + cmd.vertices_offset;
-
-				memcpy(ib.ptr, indices, ib.size);
-				memcpy(vb.ptr, vertices, vb.size);
-				ffr::flushBuffer(ib.buffer, ib.offset, ib.size);
-				ffr::flushBuffer(vb.buffer, vb.offset, vb.size);
-
 				ffr::setUniformMatrix4f(model_uniform, &cmd.mtx.m11);
 				ffr::useProgram(prg);
-				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
+				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset + vb_offset, nullptr);
 				ffr::setIndexBuffer(ib.buffer);
 				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-				ffr::drawElements(ib.offset / sizeof(indices[0]), cmd.indices_count, primitive_type, ffr::DataType::UINT16);
+				ffr::drawElements((ib.offset + ib_offset) / sizeof(u16), cmd.indices_count, primitive_type, ffr::DataType::UINT16);
+
+				vb_offset += cmd.vertices_count * sizeof(Gizmo::RenderData::Vertex);
+				ib_offset += cmd.indices_count * sizeof(u16);
 			}
 			ffr::popDebugGroup();
-			renderer->endProfileBlock();*/
-			// TODO
+			renderer->endProfileBlock();
 		}
 
 		Renderer* renderer;
+		Renderer::TransientSlice ib;
+		Renderer::TransientSlice vb;
 		Gizmo::RenderData data;
 		Viewport viewport;
 		SceneView* view;
