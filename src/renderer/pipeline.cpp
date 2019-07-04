@@ -1776,15 +1776,14 @@ struct PipelineImpl final : Pipeline
 
 		struct RenderJob : Renderer::RenderJob
 		{
-			RenderJob(IAllocator& allocator) : m_vertices(allocator) {}
-
-
 			void setup() override
 			{
 				PROFILE_FUNCTION();
 				const Quat& rot = m_pipeline->m_viewport.rot;
 				const DVec3& pos = m_pipeline->m_viewport.pos;
-				m_pipeline->m_scene->getTextMeshesVertices(m_vertices, pos, rot);
+				const u32 count = m_pipeline->m_scene->getTextMeshesVerticesCount();
+				vb = m_pipeline->m_renderer.allocTransient(count * sizeof(TextMeshVertex));
+				m_pipeline->m_scene->getTextMeshesVertices((TextMeshVertex*)vb.ptr, pos, rot);
 				Renderer& renderer = m_pipeline->m_renderer;
 				Texture* atlas = renderer.getFontManager().getAtlasTexture();
 				m_atlas = atlas ? atlas->handle : ffr::INVALID_TEXTURE;
@@ -1793,15 +1792,12 @@ struct PipelineImpl final : Pipeline
 
 			void execute() override
 			{
-				/*PROFILE_FUNCTION();
+				PROFILE_FUNCTION();
 				const Shader::Program& p = Shader::getProgram(m_shader, 0);
-				if(!p.handle.isValid()) return;
-				if (m_vertices.empty()) return;
+				if (!p.handle.isValid()) return;
+				if (vb.size == 0) return;
 
 				Renderer& renderer = m_pipeline->m_renderer;
-				const Renderer::TransientSlice transient = renderer.allocTransient(m_vertices.byte_size());
-				memcpy(transient.ptr, m_vertices.begin(), transient.size);
-				ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
 				ffr::useProgram(p.handle);
 				ffr::VertexDecl decl;
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
@@ -1810,21 +1806,19 @@ struct PipelineImpl final : Pipeline
 				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 				decl.addAttribute(4, ffr::AttributeType::U8, true, false);
 				decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-				ffr::setVertexBuffer(&decl, transient.buffer, transient.offset, nullptr);
-				ffr::drawArrays(0, m_vertices.size(), ffr::PrimitiveType::TRIANGLES);*/
-				// TODO
+				ffr::setVertexBuffer(&decl, vb.buffer, vb.offset, nullptr);
+				ffr::drawArrays(0, vb.size / sizeof(TextMeshVertex), ffr::PrimitiveType::TRIANGLES);
 			}
 
-
+			Renderer::TransientSlice vb;
 			ffr::TextureHandle m_atlas;
 			ShaderRenderData* m_shader;
 			PipelineImpl* m_pipeline;
-			Array<TextMeshVertex> m_vertices;
 		};
 
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
+		RenderJob* job = LUMIX_NEW(allocator, RenderJob);
 		job->m_pipeline = this;
 		job->m_shader = m_text_mesh_shader->m_render_data;
 		m_renderer.queue(job, m_profiler_link);

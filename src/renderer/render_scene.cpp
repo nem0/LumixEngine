@@ -803,11 +803,20 @@ public:
 		return text.getFontResource() == nullptr ? Path() : text.getFontResource()->getPath();
 	}
 
+	u32 getTextMeshesVerticesCount() const override {
+		u32 count = 0;
+		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j) {
+			const TextMesh& text = *m_text_meshes.at(j);
+			count += 6 * text.text.length();
+		}
+		return count;
+	}
 
-	void getTextMeshesVertices(Array<TextMeshVertex>& vertices, const DVec3& cam_pos, const Quat& cam_rot) override
+	void getTextMeshesVertices(TextMeshVertex* vertices, const DVec3& cam_pos, const Quat& cam_rot) override
 	{
 		const Vec3 cam_right = cam_rot * Vec3(1, 0, 0);
 		const Vec3 cam_up = cam_rot * Vec3(0, -1, 0);
+		u32 idx = 0;
 		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j) {
 			const TextMesh& text = *m_text_meshes.at(j);
 			const Font* font = text.getFont();
@@ -836,14 +845,15 @@ public:
 				const Vec3 x1y1 = base + right * glyph->X1 + up * glyph->Y1;
 				const Vec3 x0y1 = base + right * glyph->X0 + up * glyph->Y1;
 
-				vertices.push({ x0y0, color, { glyph->U0, glyph->V0 } });
-				vertices.push({ x1y0, color, { glyph->U1, glyph->V0 } });
-				vertices.push({ x1y1, color, { glyph->U1, glyph->V1 } });
+				vertices[idx + 0] = { x0y0, color, { glyph->U0, glyph->V0 } };
+				vertices[idx + 1] = { x1y0, color, { glyph->U1, glyph->V0 } };
+				vertices[idx + 2] = { x1y1, color, { glyph->U1, glyph->V1 } };
 
-				vertices.push({ x0y0, color, { glyph->U0, glyph->V0 } });
-				vertices.push({ x1y1, color, { glyph->U1, glyph->V1 } });
-				vertices.push({ x0y1, color, { glyph->U0, glyph->V1 } });
-				
+				vertices[idx + 3] = { x0y0, color, { glyph->U0, glyph->V0 } };
+				vertices[idx + 4] = { x1y1, color, { glyph->U1, glyph->V1 } };
+				vertices[idx + 5] = { x0y1, color, { glyph->U0, glyph->V1 } };
+				idx += 6;
+
 				base += right * glyph->XAdvance;
 			}
 		}

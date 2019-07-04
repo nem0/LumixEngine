@@ -355,7 +355,8 @@ public:
 	virtual void setTextMeshFontPath(EntityRef entity, const Path& path) = 0;
 	virtual bool isTextMeshCameraOriented(EntityRef entity) = 0;
 	virtual void setTextMeshCameraOriented(EntityRef entity, bool is_oriented) = 0;
-	virtual void getTextMeshesVertices(Array<TextMeshVertex>& vertices, const DVec3& cam_pos, const Quat& rot) = 0;
+	virtual void getTextMeshesVertices(TextMeshVertex* vertices, const DVec3& cam_pos, const Quat& rot) = 0;
+	virtual u32 getTextMeshesVerticesCount() const = 0;
 
 protected:
 	virtual ~RenderScene() {}
