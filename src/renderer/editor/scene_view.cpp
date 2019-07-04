@@ -201,7 +201,7 @@ void SceneView::renderIcons()
 	IAllocator& allocator = renderer->getAllocator();
 	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 	cmd->view = this;
-	renderer->push(cmd, 0);
+	renderer->queue(cmd, 0);
 }
 
 
@@ -276,7 +276,7 @@ void SceneView::renderSelection()
 	RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
 	job->m_pipeline = m_pipeline;
 	job->m_editor = &m_editor;
-	renderer->push(job, 0);
+	renderer->queue(job, 0);
 }
 
 
@@ -300,7 +300,7 @@ void SceneView::renderGizmos()
 
 		void execute() override
 		{
-			PROFILE_FUNCTION();
+			/*PROFILE_FUNCTION();
 			if (data.cmds.empty()) return;
 
 			const ffr::ProgramHandle prg = Shader::getProgram(shader, 0).handle;
@@ -333,7 +333,8 @@ void SceneView::renderGizmos()
 				ffr::drawElements(ib.offset / sizeof(indices[0]), cmd.indices_count, primitive_type, ffr::DataType::UINT16);
 			}
 			ffr::popDebugGroup();
-			renderer->endProfileBlock();
+			renderer->endProfileBlock();*/
+			// TODO
 		}
 
 		Renderer* renderer;
@@ -353,7 +354,7 @@ void SceneView::renderGizmos()
 	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 	cmd->shader = m_debug_shape_shader->m_render_data;
 	cmd->view = this;
-	renderer->push(cmd, 0);
+	renderer->queue(cmd, 0);
 }
 
 

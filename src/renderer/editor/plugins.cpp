@@ -1060,7 +1060,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		cmd->mem.data = &m_tile.data[0];
 		cmd->mem.size = m_tile.data.size() * sizeof(&m_tile.data[0]);
 		cmd->mem.own = false;
-		renderer->push(cmd, 0);
+		renderer->queue(cmd, 0);
 		m_tile.mesh_entity = mesh_entity;
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
@@ -2597,7 +2597,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		RenderCommand* cmd = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
 		cmd->plugin = this;
 		
-		renderer->push(cmd, 0);
+		renderer->queue(cmd, 0);
 		renderer->frame();
 	}
 

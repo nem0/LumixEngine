@@ -387,6 +387,7 @@ struct RendererImpl final : public Renderer
 		, m_vsync(true)
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
+		, m_cmd_queue(m_allocator)
 	{
 		ffr::preinit(m_allocator);
 	}
@@ -409,7 +410,7 @@ struct RendererImpl final : public Renderer
 			ffr::destroy(renderer->m_transient_buffer);
 			renderer->m_profiler.clear();
 			ffr::shutdown();
-		}, &signal, m_last_exec_job, 1);
+		}, &signal, m_prev_frame_job, 1);
 		JobSystem::wait(signal);
 	}
 
@@ -535,7 +536,7 @@ struct RendererImpl final : public Renderer
 		cmd->handle = texture;
 		cmd->size = size;
 		cmd->buf = data;
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
 
@@ -571,7 +572,7 @@ struct RendererImpl final : public Renderer
 		cmd->mem = mem;
 		cmd->renderer = this;
 
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
 
@@ -610,7 +611,7 @@ struct RendererImpl final : public Renderer
 		cmd->memory = memory;
 		cmd->flags = flags;
 		cmd->renderer = this;
-		push(cmd, 0);
+		queue(cmd, 0);
 
 		return handle;
 	}
@@ -663,7 +664,7 @@ struct RendererImpl final : public Renderer
 		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->renderer = this;
-		push(cmd, 0);
+		queue(cmd, 0);
 
 		return handle;
 	}
@@ -710,7 +711,7 @@ struct RendererImpl final : public Renderer
 		cmd->fnc = fnc;
 		cmd->ptr = user_ptr;
 		cmd->renderer = this;
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
 	
@@ -730,7 +731,7 @@ struct RendererImpl final : public Renderer
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->program = program;
 		cmd->renderer = this;
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
 
@@ -750,7 +751,7 @@ struct RendererImpl final : public Renderer
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->buffer = buffer;
 		cmd->renderer = this;
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
 
@@ -789,7 +790,7 @@ struct RendererImpl final : public Renderer
 		cmd->h = h;
 		cmd->depth = depth;
 		cmd->renderer = this;
-		push(cmd, 0);
+		queue(cmd, 0);
 
 		return handle;
 	}
@@ -812,37 +813,21 @@ struct RendererImpl final : public Renderer
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->texture = tex;
 		cmd->renderer = this;
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
 
-	void push(RenderJob* cmd, i64 profiler_link) override
+	void queue(RenderJob* cmd, i64 profiler_link) override
 	{
-		ASSERT(!cmd->renderer);
-		cmd->renderer = this;
 		cmd->profiler_link = profiler_link;
 		
-		JobSystem::SignalHandle preconditions = m_last_exec_job;
-		JobSystem::incSignal(&m_setup_jobs_done);
+		m_cmd_queue.push(cmd);
+
 		JobSystem::run(cmd, [](void* data){
 			RenderJob* cmd = (RenderJob*)data;
 			PROFILE_BLOCK("setup_render_job");
 			cmd->setup();
-			RendererImpl* r = (RendererImpl*)cmd->renderer;
-			JobSystem::decSignal(r->m_setup_jobs_done);
-		}, &preconditions);
-
-		JobSystem::SignalHandle exec_counter = JobSystem::INVALID_HANDLE;
-		JobSystem::runEx(cmd, [](void* data){
-			PROFILE_BLOCK("execute_render_job");
-			Profiler::blockColor(0xaa, 0xff, 0xaa);
-			RenderJob* cmd = (RenderJob*)data;
-			Profiler::link(cmd->profiler_link);
-			cmd->execute();
-			LUMIX_DELETE(cmd->renderer->getAllocator(), cmd);
-		}, &exec_counter, preconditions, 1);
-
-		m_last_exec_job = exec_counter;
+		}, &m_setup_jobs_done);
 	}
 
 
@@ -896,7 +881,7 @@ struct RendererImpl final : public Renderer
 			}
 		};
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
 
@@ -910,41 +895,67 @@ struct RendererImpl final : public Renderer
 			}
 		};
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		push(cmd, 0);
+		queue(cmd, 0);
 	}
 
+	struct RenderFrameData {
+		RenderFrameData(RendererImpl& renderer) 
+			: m_renderer(renderer)
+			, m_jobs(renderer.m_allocator)
+			, m_transient_offset(renderer.m_transient_buffer_frame_offset)
+			, m_transient_size(renderer.m_transient_buffer_offset)
+		{
+			renderer.m_cmd_queue.swap(m_jobs);
+		}
+
+		void render() {
+			ffr::flushBuffer(m_renderer.m_transient_buffer, m_transient_offset, m_transient_size);
+			for (RenderJob* job : m_jobs) {
+				PROFILE_BLOCK("execute_render_job");
+				Profiler::blockColor(0xaa, 0xff, 0xaa);
+				Profiler::link(job->profiler_link);
+				job->execute();
+				LUMIX_DELETE(m_renderer.m_allocator, job);
+			}
+
+			PROFILE_BLOCK("swap buffers");
+			JobSystem::enableBackupWorker(true);
+			ffr::swapBuffers();
+			
+			ffr::FenceHandle fence;
+			fence = ffr::createFence();
+			ffr::waitClient(fence);
+			ffr::destroy(fence);
+
+			JobSystem::enableBackupWorker(false);
+			m_renderer.m_profiler.frame();
+			LUMIX_DELETE(m_renderer.m_allocator, this);
+		}
+
+		RendererImpl& m_renderer;
+		Array<RenderJob*> m_jobs;
+		i32 m_transient_offset;
+		i32 m_transient_size;
+	};
 
 	void frame() override
 	{
 		PROFILE_FUNCTION();
-		struct SwapCmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				JobSystem::enableBackupWorker(true);
-				ffr::swapBuffers();
-				if(renderer->m_fence.isValid()) {
-					ffr::waitClient(renderer->m_fence);
-					ffr::destroy(renderer->m_fence);
-				}
-				renderer->m_fence = ffr::createFence();
-				JobSystem::enableBackupWorker(false);
-				renderer->m_profiler.frame();
-			}
-			RendererImpl* renderer;
-			bool capture;
-		};
-		SwapCmd* swap_cmd = LUMIX_NEW(m_allocator, SwapCmd);
-		swap_cmd->renderer = this;
-		push(swap_cmd, 0);
-		JobSystem::wait(m_prev_frame_job);
+		
 		JobSystem::wait(m_setup_jobs_done);
 		m_setup_jobs_done = JobSystem::INVALID_HANDLE;
+		JobSystem::wait(m_prev_frame_job);
+		m_prev_frame_job = JobSystem::INVALID_HANDLE;
+
+		RenderFrameData* data = LUMIX_NEW(m_allocator, RenderFrameData)(*this);
+		JobSystem::runEx(data, [](void* ptr){
+			auto* data = (RenderFrameData*)ptr;
+			data->render();
+		}, &m_prev_frame_job, JobSystem::INVALID_HANDLE, 1);
 
 		m_transient_buffer_frame_offset = (m_transient_buffer_frame_offset + TRANSIENT_BUFFER_SIZE) % (2 * TRANSIENT_BUFFER_SIZE);
 		m_transient_buffer_offset = 0;
 
-		m_prev_frame_job = m_last_exec_job;
 		//m_last_exec_job = JobSystem::INVALID_HANDLE;
 	}
 
@@ -965,10 +976,9 @@ struct RendererImpl final : public Renderer
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
 	bool m_vsync;
-	JobSystem::SignalHandle m_last_exec_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_setup_jobs_done = JobSystem::INVALID_HANDLE;
-	ffr::FenceHandle m_fence = ffr::INVALID_FENCE;
+	Array<RenderJob*> m_cmd_queue;
 
 	ffr::FramebufferHandle m_framebuffer;
 	ffr::BufferHandle m_transient_buffer;

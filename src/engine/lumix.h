@@ -20,9 +20,6 @@
 	#error Platform not supported
 #endif
 
-#define STRINGIZE_2( _ ) #_
-#define STRINGIZE( _ ) STRINGIZE_2( _ )
-
 
 namespace Lumix
 {
