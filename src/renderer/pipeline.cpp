@@ -2118,18 +2118,9 @@ struct PipelineImpl final : Pipeline
 								READ(const Mesh::RenderData*, mesh);
 								READ(const Material::RenderData*, material);
 								READ(const int, instances_count);
-								/*const u8* instance_data = cmd;
-								const int byte_size = sizeof(Terrain::GrassPatch::InstanceData) * instances_count;
-								cmd += byte_size;
-
-								const Renderer::TransientSlice transient = m_pipeline->m_renderer.allocTransient(byte_size);
-								if ((int)transient.size < byte_size) {
-									logWarning("Renderer") << "Not enough memory reserved to render grass.";
-									break;
-								}
-
-								memcpy(transient.ptr, instance_data, transient.size);
-								ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
+								READ(const ffr::BufferHandle, buffer);
+								READ(const u32, offset);
+								
 								ffr::VertexDecl instance_decl;
 								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
@@ -2159,15 +2150,14 @@ struct PipelineImpl final : Pipeline
 									for (uint i = 0; i < instance_decl.attributes_count; ++i) {
 										instance_map[i] = prg.attribute_by_semantics[(int)Mesh::AttributeSemantic::INSTANCE0 + i];
 									}
-									ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0, instance_map);
+									ffr::setInstanceBuffer(instance_decl, buffer, offset, 0, instance_map);
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
 									
 									++stats.draw_call_count;
 									stats.instance_count += instances_count;
-								}*/
-								// TODO
+								}
 								break;
 							}
 							default: ASSERT(false); break;
@@ -2719,29 +2709,29 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::GRASS: {
-							/*const u16 quad_idx = u16(renderables[i] >> 32);
-							const u8 patch_idx = u8(renderables[i] >> 48);
-							const u8 mesh_idx = u8(renderables[i] >> 56);
+							const u16 quad_idx = u16(renderables[i] >> 48);
+							const u8 patch_idx = u8(renderables[i] >> 40);
 							const Terrain* t = scene->getTerrain(e);
 							// TODO this crashes if the shader is reloaded
 							// TODO 0 const in following:
 							const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
-							const Mesh& mesh = p.m_type->m_grass_model->getMesh(mesh_idx);
+							const Mesh& mesh = p.m_type->m_grass_model->getMesh(0);
 							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+							// TODO make sure there's enough space in cmd buffer
+							WRITE(type);
 							WRITE(tr.rot);
 							WRITE(lpos);
 							WRITE(mesh.render_data);
 							WRITE_FN(mesh.material->getRenderData());
 							const int instances_count = p.instance_data.size();
 							WRITE(instances_count);
-							const uint out_offset = uint(out - ctx->output->begin());
-							ctx->output->resize(ctx->output->size() + p.instance_data.byte_size());
-							out = ctx->output->begin() + out_offset;
-							memcpy(out, p.instance_data.begin(), p.instance_data.byte_size());
-							out += p.instance_data.byte_size();*/
-							ASSERT(false);
-							// TODO
+							
+							const Renderer::TransientSlice slice = renderer.allocTransient(p.instance_data.byte_size());
+							memcpy(slice.ptr, p.instance_data.begin(), p.instance_data.byte_size());
+
+							WRITE(slice.buffer);
+							WRITE(slice.offset);
 
 							break;
 						}
@@ -2795,6 +2785,34 @@ struct PipelineImpl final : Pipeline
 							if(local_light_bucket < 0xff) {
 								for (int i = 0, c = page->header.count; i < c; ++i) {
 									result.push((u64)local_light_bucket << 56, renderables[i].index | type_mask);
+								}
+							}
+							break;
+						}
+						case RenderableTypes::GRASS: {
+							for (int i = 0, c = page->header.count; i < c; ++i) {
+								const EntityRef e = renderables[i];
+								Terrain* terrain = scene->getTerrain(e);
+								if (!terrain) continue;
+								if (terrain->m_grass_quads.empty()) continue;
+								
+								ASSERT(terrain->m_grass_quads[0].size() < 0xffff);
+								for (u16 q = 0; q < terrain->m_grass_quads[0].size(); ++q) {
+									const Terrain::GrassQuad* quad = terrain->m_grass_quads[0][q];
+									
+									ASSERT(quad->m_patches.size() < 0xff);
+									for (u8 p = 0; p < quad->m_patches.size(); ++p) {
+										Model* model = quad->m_patches[p].m_type->m_grass_model;
+										if (!model->isReady()) continue;
+										ASSERT(model->getMeshCount() == 1);
+
+										const Mesh& mesh = model->getMesh(0);
+										const u8 bucket = bucket_map[mesh.material->getLayer()];
+										if (bucket < 0xff) {
+											const u64 subrenderable = e.index | type_mask | ((u64)p << 40) | ((u64)q << 48);
+											result.push(mesh.material->getSortKey() | ((u64)bucket << 56), subrenderable);
+										}
+									}
 								}
 							}
 							break;
@@ -2888,6 +2906,7 @@ struct PipelineImpl final : Pipeline
 				RenderableTypes::LOCAL_LIGHT
 			};
 			JobSystem::forEach(lengthOf(types), [&](int idx){
+				if (m_camera_params.is_shadow && types[idx] == RenderableTypes::GRASS) return;
 				CullResult* renderables = scene->getRenderables(m_camera_params.frustum, types[idx]);
 				if (renderables) {
 					createSortKeys(renderables, types[idx], sort_keys);
