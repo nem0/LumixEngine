@@ -1,13 +1,11 @@
 #include "navigation_scene.h"
 #include "animation/animation_scene.h"
-#include "engine/base_proxy_allocator.h"
 #include "engine/engine.h"
-#include "engine/iallocator.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
+#include "engine/math.h"
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
-#include "engine/vec.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include <DetourAlloc.h>
@@ -130,9 +128,10 @@ void NavigationSystem::registerProperties()
 			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
 				MinAttribute(0)),
 			property("Height", LUMIX_PROP(NavigationScene, AgentHeight),
-				MinAttribute(0)),
-			property("Use root motion", LUMIX_PROP_FULL(NavigationScene, useAgentRootMotion, setUseAgentRootMotion)),
-			property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
+				MinAttribute(0))
+			// TODO
+			//property("Use root motion", LUMIX_PROP_FULL(NavigationScene, useAgentRootMotion, setUseAgentRootMotion)),
+			//property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
 		)
 	);
 	registerScene(navigation_scene);

@@ -1,19 +1,16 @@
 #include "navigation_scene.h"
 #include "animation/animation_scene.h"
 #include "engine/array.h"
-#include "engine/blob.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/fs/os_file.h"
-#include "engine/iallocator.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
+#include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
-#include "engine/vec.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -61,7 +58,7 @@ struct Agent
 	int agent;
 	bool is_finished;
 	u32 flags = 0;
-	Vec3 root_motion = {0, 0, 0};
+	DVec3 root_motion = {0, 0, 0};
 	float speed = 0;
 	float yaw_diff = 0;
 	float stop_distance = 0;
@@ -123,7 +120,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f)
 		{
-			Vec3 target_pos = *(Vec3*)dt_agent->targetPos;
+			DVec3 target_pos = DVec3(*(Vec3*)dt_agent->targetPos);
 			float speed = dt_agent->params.maxSpeed;
 			m_crowd->removeAgent(agent.agent);
 			addCrowdAgent(iter.value());
@@ -163,13 +160,15 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	AABB getTerrainSpaceAABB(const Vec3& terrain_pos, const Quat& terrain_rot, const AABB& aabb_world_space)
+	AABB getTerrainSpaceAABB(const DVec3& terrain_pos, const Quat& terrain_rot, const AABB& aabb_world_space)
 	{
-		Matrix mtx = terrain_rot.toMatrix();
-		mtx.setTranslation(terrain_pos);
-		mtx.fastInverse();
+		ASSERT(false);
+		// TODO
+		//Matrix mtx = terrain_rot.toMatrix();
+		//mtx.setTranslation(terrain_pos);
+		//mtx.fastInverse();
 		AABB ret = aabb_world_space;
-		ret.transform(mtx);
+		//ret.transform(mtx);
 		return ret;
 	}
 
@@ -177,7 +176,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	void rasterizeTerrains(const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
 		PROFILE_FUNCTION();
-		const float walkable_threshold = cosf(Math::degreesToRadians(60));
+		const float walkable_threshold = cosf(degreesToRadians(60));
 
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -186,15 +185,15 @@ struct NavigationSceneImpl final : public NavigationScene
 		while (entity_ptr.isValid())
 		{
 			const EntityRef entity = (EntityRef)entity_ptr;
-			Vec3 pos = m_universe.getPosition(entity);
+			Vec3 pos = m_universe.getPosition(entity).toFloat(); // TODO
 			Quat rot = m_universe.getRotation(entity);
 			Vec2 res = render_scene->getTerrainResolution(entity);
 			float scaleXZ = render_scene->getTerrainXZScale(entity);
-			AABB terrain_space_aabb = getTerrainSpaceAABB(pos, rot, aabb);
-			int from_z = (int)Math::clamp(terrain_space_aabb.min.z / scaleXZ - 1, 0.0f, res.y - 1);
-			int to_z = (int)Math::clamp(terrain_space_aabb.max.z / scaleXZ + 1, 0.0f, res.y - 1);
-			int from_x = (int)Math::clamp(terrain_space_aabb.min.x / scaleXZ - 1, 0.0f, res.x - 1);
-			int to_x = (int)Math::clamp(terrain_space_aabb.max.x / scaleXZ + 1, 0.0f, res.x - 1);
+			AABB terrain_space_aabb = getTerrainSpaceAABB(DVec3(pos), rot, aabb); // TODO
+			int from_z = (int)clamp(terrain_space_aabb.min.z / scaleXZ - 1, 0.0f, res.y - 1);
+			int to_z = (int)clamp(terrain_space_aabb.max.z / scaleXZ + 1, 0.0f, res.y - 1);
+			int from_x = (int)clamp(terrain_space_aabb.min.x / scaleXZ - 1, 0.0f, res.x - 1);
+			int to_x = (int)clamp(terrain_space_aabb.max.x / scaleXZ + 1, 0.0f, res.x - 1);
 			for (int j = from_z; j < to_z; ++j)
 			{
 				for (int i = from_x; i < to_x; ++i)
@@ -236,8 +235,8 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	void rasterizeMeshes(const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
-		PROFILE_FUNCTION();
-		const float walkable_threshold = cosf(Math::degreesToRadians(45));
+	/*	PROFILE_FUNCTION();
+		const float walkable_threshold = cosf(degreesToRadians(45));
 
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
@@ -295,7 +294,9 @@ struct NavigationSceneImpl final : public NavigationScene
 					}
 				}
 			}
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -333,7 +334,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) override
+	void setAgentRootMotion(EntityRef entity, const DVec3& root_motion) override
 	{
 		m_agents[entity].root_motion = root_motion;
 	}
@@ -352,9 +353,9 @@ struct NavigationSceneImpl final : public NavigationScene
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
-			Vec3 pos = m_universe.getPosition(agent.entity);
+			DVec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
-			Vec3 diff = *(Vec3*)dt_agent->npos - pos;
+			Vec3 diff = *(Vec3*)dt_agent->npos - pos.toFloat(); // TODO
 
 			Vec3 velocity = *(Vec3*)dt_agent->nvel;
 			agent.speed = diff.length() / time_delta;
@@ -363,7 +364,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			{
 				float wanted_yaw = atan2(velocity.x, velocity.z);
 				float current_yaw = rot.toEuler().y;
-				agent.yaw_diff = Math::angleDiff(wanted_yaw, current_yaw);
+				agent.yaw_diff = angleDiff(wanted_yaw, current_yaw);
 			}
 		}
 		m_on_update.invoke(time_delta);
@@ -385,21 +386,21 @@ struct NavigationSceneImpl final : public NavigationScene
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
-			Vec3 pos = m_universe.getPosition(agent.entity);
+			Vec3 pos = m_universe.getPosition(agent.entity).toFloat(); // TODO
 			Quat rot = m_universe.getRotation(agent.entity);
 			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
 			{
 				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE))
 				{
-					RigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
-					agent.root_motion = root_motion.pos;
+					LocalRigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
+					agent.root_motion = DVec3(root_motion.pos); // TODO
 					//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 				}
 			}
 			if (agent.flags & Agent::USE_ROOT_MOTION)
 			{
-				*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion);
-				agent.root_motion.set(0, 0, 0);
+				*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion).toFloat(); // TODO
+				agent.root_motion = DVec3(0, 0, 0);
 			}
 		}
 
@@ -411,7 +412,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
-			m_universe.setPosition(agent.entity, *(Vec3*)dt_agent->npos);
+			m_universe.setPosition(agent.entity, DVec3(*(Vec3*)dt_agent->npos)); // TODO
 
 			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0)
 			{
@@ -433,7 +434,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			{
 				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE))
 				{
-					RigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
+					LocalRigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
 					m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 				}
 			}
@@ -500,7 +501,7 @@ struct NavigationSceneImpl final : public NavigationScene
 					v[k] = *(Vec3*)&tile.detailVerts[(pd.vertBase + t[k] - poly.vertCount) * 3];
 				}
 			}
-			render_scene->addDebugTriangle(v[0], v[1], v[2], 0xff00aaff, 0);
+			render_scene->addDebugTriangle(DVec3(v[0]), DVec3(v[1]), DVec3(v[2]), 0xff00aaff); // TODO
 		}
 
 		for (int k = 0; k < pd.triCount; ++k)
@@ -517,7 +518,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			for (int m = 0, n = 2; m < 3; n = m++)
 			{
 				if (((t[3] >> (n * 2)) & 0x3) == 0) continue; // Skip inner detail edges.
-				render_scene->addDebugLine(*(Vec3*)tv[n], *(Vec3*)tv[m], 0xff0000ff, 0);
+				render_scene->addDebugLine(DVec3(*(Vec3*)tv[n]), DVec3(*(Vec3*)tv[m]), 0xff0000ff); // TODO
 			}
 		}
 	}
@@ -564,13 +565,13 @@ struct NavigationSceneImpl final : public NavigationScene
 		for (int i = 0; i < dt_agent->ncorners; ++i)
 		{
 			Vec3 tmp = *(Vec3*)&dt_agent->cornerVerts[i * 3];
-			render_scene->addDebugLine(prev, tmp, 0xffff0000, 0);
+			render_scene->addDebugLine(DVec3(prev), DVec3(tmp), 0xffff0000); // TODO
 			prev = tmp;
 		}
-		render_scene->addDebugCross(*(Vec3*)dt_agent->targetPos, 1.0f, 0xffffffff, 0);
+		render_scene->addDebugCross(DVec3(*(Vec3*)dt_agent->targetPos), 1.0f, 0xffffffff); // TODO
 		Vec3 vel = *(Vec3*)dt_agent->vel;
-		Vec3 pos = m_universe.getPosition(entity);
-		render_scene->addDebugLine(pos, pos + vel, 0xff0000ff, 0);
+		DVec3 pos = m_universe.getPosition(entity);
+		render_scene->addDebugLine(pos, pos + vel, 0xff0000ff);
 	}
 
 
@@ -608,11 +609,11 @@ struct NavigationSceneImpl final : public NavigationScene
 			{
 				const int* v = &c.verts[j * 4];
 				Vec3 cur = orig + Vec3((float)v[0] * cs, (float)v[1] * ch, (float)v[2] * cs);
-				render_scene->addDebugLine(prev, cur, i & 1 ? 0xffff00ff : 0xffff0000, 0);
+				render_scene->addDebugLine(DVec3(prev), DVec3(cur), i & 1 ? 0xffff00ff : 0xffff0000); // TODO
 				prev = cur;
 			}
 
-			render_scene->addDebugLine(prev, first, i & 1 ? 0xffff00ff : 0xffff0000, 0);
+			render_scene->addDebugLine(DVec3(prev), DVec3(first), i & 1 ? 0xffff00ff : 0xffff0000); // TODO
 		}
 	}
 
@@ -623,15 +624,16 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void fileLoaded(FS::IFile& file, bool success)
+	void fileLoaded(u64 size, const u8* mem, bool success)
 	{
 		if (!success)
 		{
-			g_log_error.log("Navigation") << "Could not load navmesh";
+			logError("Navigation") << "Could not load navmesh";
 			return;
 		}
 		if (!initNavmesh()) return;
 
+		InputMemoryStream file(mem, size);
 		file.read(&m_aabb, sizeof(m_aabb));
 		file.read(&m_num_tiles_x, sizeof(m_num_tiles_x));
 		file.read(&m_num_tiles_z, sizeof(m_num_tiles_z));
@@ -639,7 +641,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		file.read(&params, sizeof(params));
 		if (dtStatusFailed(m_navmesh->init(&params)))
 		{
-			g_log_error.log("Navigation") << "Could not init Detour navmesh";
+			logError("Navigation") << "Could not init Detour navmesh";
 			return;
 		}
 		for (int j = 0; j < m_num_tiles_z; ++j)
@@ -652,14 +654,12 @@ struct NavigationSceneImpl final : public NavigationScene
 				file.read(data, data_size);
 				if (dtStatusFailed(m_navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0)))
 				{
-					file.close();
 					dtFree(data);
 					return;
 				}
 			}
 		}
 
-		file.close();
 		if (!m_crowd) initCrowd();
 	}
 
@@ -668,10 +668,10 @@ struct NavigationSceneImpl final : public NavigationScene
 	{
 		clearNavmesh();
 
-		FS::ReadCallback cb;
+		FileSystem::ContentCallback cb;
 		cb.bind<NavigationSceneImpl, &NavigationSceneImpl::fileLoaded>(this);
-		FS::FileSystem& fs = m_engine.getFileSystem();
-		return fs.openAsync(fs.getDefaultDevice(), Path(path), FS::Mode::OPEN_AND_READ, cb) != FS::FileSystem::INVALID_ASYNC;
+		FileSystem& fs = m_engine.getFileSystem();
+		return fs.getContent(Path(path), cb).isValid();
 	}
 
 	
@@ -679,8 +679,10 @@ struct NavigationSceneImpl final : public NavigationScene
 	{
 		if (!m_navmesh) return false;
 
-		FS::OsFile file;
-		if (!file.open(path, FS::Mode::CREATE_AND_WRITE)) return false;
+		FileSystem& fs = m_engine.getFileSystem();
+		
+		OS::OutputFile file;
+		if (!fs.open(path, &file)) return false;
 
 		file.write(&m_aabb, sizeof(m_aabb));
 		file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));
@@ -723,8 +725,8 @@ struct NavigationSceneImpl final : public NavigationScene
 					Vec3 mins(fx, orig.y + span->smin * cell_height, fz);
 					Vec3 maxs(fx + CELL_SIZE, orig.y + span->smax * cell_height, fz + CELL_SIZE);
 					u32 color = span->area == 0 ? 0xffff0000 : 0xff00aaff;
-					render_scene->addDebugCubeSolid(mins, maxs, color, 0);
-					render_scene->addDebugCube(mins, maxs, 0xffffFFFF, 0);
+					render_scene->addDebugCubeSolid(DVec3(mins), DVec3(maxs), color); // TODO
+					render_scene->addDebugCube(DVec3(mins), DVec3(maxs), 0xffffFFFF); // TODO
 					span = span->next;
 				}
 			}
@@ -759,10 +761,11 @@ struct NavigationSceneImpl final : public NavigationScene
 				for (u32 i = c.index, ni = c.index + c.count; i < ni; ++i)
 				{
 					float vy = orig.y + float(chf.spans[i].y) * ch;
+					// TODO DVec3(vx -> float)
 					render_scene->addDebugTriangle(
-						Vec3(vx, vy, vz), Vec3(vx + cs, vy, vz + cs), Vec3(vx + cs, vy, vz), 0xffff00FF, 0);
+						DVec3(vx, vy, vz), DVec3(vx + cs, vy, vz + cs), DVec3(vx + cs, vy, vz), 0xffff00FF);
 					render_scene->addDebugTriangle(
-						Vec3(vx, vy, vz), Vec3(vx, vy, vz + cs), Vec3(vx + cs, vy, vz + cs), 0xffff00FF, 0);
+						DVec3(vx, vy, vz), DVec3(vx, vy, vz + cs), DVec3(vx + cs, vy, vz + cs), 0xffff00FF);
 					++rendered_cubes;
 					if (rendered_cubes > MAX_CUBES) return;
 				}
@@ -838,7 +841,7 @@ struct NavigationSceneImpl final : public NavigationScene
 						if (distancePtLine2d(tv[n], v0, v1) < thr && distancePtLine2d(tv[m], v0, v1) < thr)
 						{
 							render_scene->addDebugLine(
-								*(Vec3*)tv[n] + Vec3(0, 0.5f, 0), *(Vec3*)tv[m] + Vec3(0, 0.5f, 0), c, 0);
+								DVec3(*(Vec3*)tv[n] + Vec3(0, 0.5f, 0)), DVec3(*(Vec3*)tv[m] + Vec3(0, 0.5f, 0)), c); // TODO
 						}
 					}
 				}
@@ -874,10 +877,10 @@ struct NavigationSceneImpl final : public NavigationScene
 
 						const float x = va[0] + ((side == 0) ? -padx : padx);
 
-						render_scene->addDebugLine(Vec3(x, va[1] - pady, va[2]), Vec3(x, va[1] + pady, va[2]), col, 0);
-						render_scene->addDebugLine(Vec3(x, va[1] + pady, va[2]), Vec3(x, vb[1] + pady, vb[2]), col, 0);
-						render_scene->addDebugLine(Vec3(x, vb[1] + pady, vb[2]), Vec3(x, vb[1] - pady, vb[2]), col, 0);
-						render_scene->addDebugLine(Vec3(x, vb[1] - pady, vb[2]), Vec3(x, va[1] - pady, va[2]), col, 0);
+						render_scene->addDebugLine(DVec3(x, va[1] - pady, va[2]), DVec3(x, va[1] + pady, va[2]), col); // TODO DVec3
+						render_scene->addDebugLine(DVec3(x, va[1] + pady, va[2]), DVec3(x, vb[1] + pady, vb[2]), col);
+						render_scene->addDebugLine(DVec3(x, vb[1] + pady, vb[2]), DVec3(x, vb[1] - pady, vb[2]), col);
+						render_scene->addDebugLine(DVec3(x, vb[1] - pady, vb[2]), DVec3(x, va[1] - pady, va[2]), col);
 
 					}
 					else if (side == 2 || side == 6)
@@ -886,10 +889,10 @@ struct NavigationSceneImpl final : public NavigationScene
 
 						const float z = va[2] + ((side == 2) ? -padx : padx);
 
-						render_scene->addDebugLine(Vec3(va[0], va[1] - pady, z), Vec3(va[0], va[1] + pady, z), col, 0);
-						render_scene->addDebugLine(Vec3(va[0], va[1] + pady, z), Vec3(vb[0], vb[1] + pady, z), col, 0);
-						render_scene->addDebugLine(Vec3(vb[0], vb[1] + pady, z), Vec3(vb[0], vb[1] - pady, z), col, 0);
-						render_scene->addDebugLine(Vec3(vb[0], vb[1] - pady, z), Vec3(va[0], va[1] - pady, z), col, 0);
+						render_scene->addDebugLine(DVec3(va[0], va[1] - pady, z), DVec3(va[0], va[1] + pady, z), col); // TODO DVec3
+						render_scene->addDebugLine(DVec3(va[0], va[1] + pady, z), DVec3(vb[0], vb[1] + pady, z), col);
+						render_scene->addDebugLine(DVec3(vb[0], vb[1] + pady, z), DVec3(vb[0], vb[1] - pady, z), col);
+						render_scene->addDebugLine(DVec3(vb[0], vb[1] - pady, z), DVec3(va[0], va[1] - pady, z), col);
 					}
 
 				}
@@ -898,7 +901,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void debugDrawNavmesh(const Vec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) override
+	void debugDrawNavmesh(const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) override
 	{
 		if (pos.x > m_aabb.max.x || pos.x < m_aabb.min.x || pos.z > m_aabb.max.z || pos.z < m_aabb.min.z) return;
 
@@ -996,9 +999,9 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	bool navigate(EntityRef entity, const Vec3& dest, float speed, float stop_distance) override
+	bool navigate(EntityRef entity, const DVec3& dest, float speed, float stop_distance) override
 	{
-		if (!m_navquery) return false;
+		/*if (!m_navquery) return false;
 		if (!m_crowd) return false;
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return false;
@@ -1021,7 +1024,9 @@ struct NavigationSceneImpl final : public NavigationScene
 			g_log_warning.log("Navigation") << "requestMoveTarget failed";
 			agent.is_finished = true;
 		}
-		return !agent.is_finished;
+		return !agent.is_finished;*/
+		// TODO
+		return false;
 	}
 
 
@@ -1062,7 +1067,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	bool generateTileAt(const Vec3& pos, bool keep_data) override
+	bool generateTileAt(const DVec3& pos, bool keep_data) override
 	{
 		int x = int((pos.x - m_aabb.min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		int z = int((pos.z - m_aabb.min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
@@ -1091,13 +1096,13 @@ struct NavigationSceneImpl final : public NavigationScene
 		m_debug_heightfield = keep_data ? solid : nullptr;
 		if (!solid)
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'solid'.";
+			logError("Navigation") << "Could not generate navmesh: Out of memory 'solid'.";
 			return false;
 		}
 		if (!rcCreateHeightfield(
 				&ctx, *solid, m_config.width, m_config.height, m_config.bmin, m_config.bmax, m_config.cs, m_config.ch))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not create solid heightfield.";
+			logError("Navigation") << "Could not generate navmesh: Could not create solid heightfield.";
 			return false;
 		}
 		rasterizeGeometry(AABB(bmin, bmax), ctx, m_config, *solid);
@@ -1110,13 +1115,13 @@ struct NavigationSceneImpl final : public NavigationScene
 		m_debug_compact_heightfield = keep_data ? chf : nullptr;
 		if (!chf)
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'chf'.";
+			logError("Navigation") << "Could not generate navmesh: Out of memory 'chf'.";
 			return false;
 		}
 
 		if (!rcBuildCompactHeightfield(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid, *chf))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build compact data.";
+			logError("Navigation") << "Could not generate navmesh: Could not build compact data.";
 			return false;
 		}
 
@@ -1124,19 +1129,19 @@ struct NavigationSceneImpl final : public NavigationScene
 
 		if (!rcErodeWalkableArea(&ctx, m_config.walkableRadius, *chf))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not erode.";
+			logError("Navigation") << "Could not generate navmesh: Could not erode.";
 			return false;
 		}
 
 		if (!rcBuildDistanceField(&ctx, *chf))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build distance field.";
+			logError("Navigation") << "Could not generate navmesh: Could not build distance field.";
 			return false;
 		}
 
 		if (!rcBuildRegions(&ctx, *chf, m_config.borderSize, m_config.minRegionArea, m_config.mergeRegionArea))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build regions.";
+			logError("Navigation") << "Could not generate navmesh: Could not build regions.";
 			return false;
 		}
 
@@ -1149,33 +1154,33 @@ struct NavigationSceneImpl final : public NavigationScene
 		}
 		if (!rcBuildContours(&ctx, *chf, m_config.maxSimplificationError, m_config.maxEdgeLen, *cset))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not create contours.";
+			logError("Navigation") << "Could not generate navmesh: Could not create contours.";
 			return false;
 		}
 
 		m_polymesh = rcAllocPolyMesh();
 		if (!m_polymesh)
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'm_polymesh'.";
+			logError("Navigation") << "Could not generate navmesh: Out of memory 'm_polymesh'.";
 			return false;
 		}
 		if (!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *m_polymesh))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not triangulate contours.";
+			logError("Navigation") << "Could not generate navmesh: Could not triangulate contours.";
 			return false;
 		}
 
 		m_detail_mesh = rcAllocPolyMeshDetail();
 		if (!m_detail_mesh)
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Out of memory 'pmdtl'.";
+			logError("Navigation") << "Could not generate navmesh: Out of memory 'pmdtl'.";
 			return false;
 		}
 
 		if (!rcBuildPolyMeshDetail(
 				&ctx, *m_polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *m_detail_mesh))
 		{
-			g_log_error.log("Navigation") << "Could not generate navmesh: Could not build detail mesh.";
+			logError("Navigation") << "Could not generate navmesh: Could not build detail mesh.";
 			return false;
 		}
 
@@ -1216,12 +1221,12 @@ struct NavigationSceneImpl final : public NavigationScene
 
 		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size))
 		{
-			g_log_error.log("Navigation") << "Could not build Detour navmesh.";
+			logError("Navigation") << "Could not build Detour navmesh.";
 			return false;
 		}
 		if (dtStatusFailed(m_navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr)))
 		{
-			g_log_error.log("Navigation") << "Could not add Detour tile.";
+			logError("Navigation") << "Could not add Detour tile.";
 			return false;
 		}
 		return true;
@@ -1230,7 +1235,7 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	void computeAABB()
 	{
-		m_aabb.set(Vec3(0, 0, 0), Vec3(0, 0, 0));
+		/*m_aabb.set(Vec3(0, 0, 0), Vec3(0, 0, 0));
 		auto* render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
@@ -1256,7 +1261,8 @@ struct NavigationSceneImpl final : public NavigationScene
 			m_aabb.merge(terrain_aabb);
 
 			entity = render_scene->getNextTerrain((EntityRef)entity);
-		}
+		}*/
+		// TODO
 	}
 
 
@@ -1265,19 +1271,19 @@ struct NavigationSceneImpl final : public NavigationScene
 		m_navmesh = dtAllocNavMesh();
 		if (!m_navmesh)
 		{
-			g_log_error.log("Navigation") << "Could not create Detour navmesh";
+			logError("Navigation") << "Could not create Detour navmesh";
 			return false;
 		}
 
 		m_navquery = dtAllocNavMeshQuery();
 		if (!m_navquery)
 		{
-			g_log_error.log("Navigation") << "Could not create Detour navmesh query";
+			logError("Navigation") << "Could not create Detour navmesh query";
 			return false;
 		}
 		if (dtStatusFailed(m_navquery->init(m_navmesh, 2048)))
 		{
-			g_log_error.log("Navigation") << "Could not init Detour navmesh query";
+			logError("Navigation") << "Could not init Detour navmesh query";
 			return false;
 		}
 		return true;
@@ -1301,12 +1307,12 @@ struct NavigationSceneImpl final : public NavigationScene
 		m_num_tiles_x = (grid_width + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
 		m_num_tiles_z = (grid_height + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
 		params.maxTiles = m_num_tiles_x * m_num_tiles_z;
-		int tiles_bits = Math::log2(Math::nextPow2(params.maxTiles));
+		int tiles_bits = log2(nextPow2(params.maxTiles));
 		params.maxPolys = 1 << (22 - tiles_bits); // keep 10 bits for salt
 
 		if (dtStatusFailed(m_navmesh->init(&params)))
 		{
-			g_log_error.log("Navigation") << "Could not init Detour navmesh";
+			logError("Navigation") << "Could not init Detour navmesh";
 			return false;
 		}
 
@@ -1328,7 +1334,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	{
 		ASSERT(m_crowd);
 
-		Vec3 pos = m_universe.getPosition(agent.entity);
+		Vec3 pos = m_universe.getPosition(agent.entity).toFloat(); // TODO
 		dtCrowdAgentParams params = {};
 		params.radius = agent.radius;
 		params.height = agent.height;
@@ -1340,7 +1346,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		agent.agent = m_crowd->addAgent(&pos.x, &params);
 		if (agent.agent < 0)
 		{
-			g_log_error.log("Navigation") << "Failed to create navigation actor";
+			logError("Navigation") << "Failed to create navigation actor";
 		}
 	}
 
@@ -1412,7 +1418,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void serialize(OutputBlob& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		int count = m_agents.size();
 		serializer.write(count);
@@ -1426,11 +1432,11 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void deserialize(InputBlob& serializer) override
+	void deserialize(InputMemoryStream& serializer) override
 	{
 		int count = 0;
 		serializer.read(count);
-		m_agents.rehash(count);
+		m_agents.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
 			Agent agent;

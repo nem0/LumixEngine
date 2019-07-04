@@ -21,7 +21,7 @@ public:
 	static void destroy(NavigationScene& scene);
 
 	virtual bool isFinished(EntityRef entity) = 0;
-	virtual bool navigate(EntityRef entity, const struct Vec3& dest, float speed, float stop_distance) = 0;
+	virtual bool navigate(EntityRef entity, const struct DVec3& dest, float speed, float stop_distance) = 0;
 	virtual void cancelNavigation(EntityRef entity) = 0;
 	virtual void setActorActive(EntityRef entity, bool active) = 0;
 	virtual float getAgentSpeed(EntityRef entity) = 0;
@@ -30,18 +30,18 @@ public:
 	virtual float getAgentRadius(EntityRef entity) = 0;
 	virtual void setAgentHeight(EntityRef entity, float height) = 0;
 	virtual float getAgentHeight(EntityRef entity) = 0;
-	virtual void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) = 0;
+	virtual void setAgentRootMotion(EntityRef entity, const DVec3& root_motion) = 0;
 	virtual bool useAgentRootMotion(EntityRef entity) = 0;
 	virtual void setUseAgentRootMotion(EntityRef entity, bool use_root_motion) = 0;
 	virtual bool isGettingRootMotionFromAnim(EntityRef entity) = 0;
 	virtual void setIsGettingRootMotionFromAnim(EntityRef entity, bool is) = 0;
 	virtual bool generateNavmesh() = 0;
 	virtual bool generateTile(int x, int z, bool keep_data) = 0;
-	virtual bool generateTileAt(const Vec3& pos, bool keep_data) = 0;
+	virtual bool generateTileAt(const DVec3& pos, bool keep_data) = 0;
 	virtual bool load(const char* path) = 0;
 	virtual bool save(const char* path) = 0;
 	virtual int getPolygonCount() = 0;
-	virtual void debugDrawNavmesh(const Vec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
+	virtual void debugDrawNavmesh(const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
 	virtual void debugDrawCompactHeightfield() = 0;
 	virtual void debugDrawHeightfield() = 0;
 	virtual void debugDrawContours() = 0;
