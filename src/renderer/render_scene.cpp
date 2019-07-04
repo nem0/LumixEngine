@@ -11,6 +11,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/os.h"
+#include "engine/page_allocator.h"
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -2237,18 +2238,29 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 
 	CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const override
 	{
-		CullResult* result = m_culling_system->cull(frustum, static_cast<u8>(type));
-		// TODO
-		//ASSERT(false);
-		return result;
-		/*if(type == RenderableTypes::GRASS) {
+		if(type == RenderableTypes::GRASS) {
 			if (m_is_grass_enabled && !m_terrains.empty()) {
-				if (result.empty()) result.emplace(m_allocator);
+				PageAllocator& page_allocator = m_engine.getPageAllocator();
+				CullResult* result = (CullResult*)page_allocator.allocate(true);
+				CullResult* iter = result; 
+				result->header.count = 0;
+				result->header.next = nullptr;
 				for (auto* terrain : m_terrains) {
-					result[0].push(terrain->m_entity);
+					terrain->updateGrass(0, frustum.origin);
+					if(iter->header.count == lengthOf(iter->entities)) {
+						iter->header.next = (CullResult*)page_allocator.allocate(true);
+						iter->header.next->header.next = nullptr;
+						iter->header.next->header.count = 0;
+						iter = iter->header.next;
+					}
+					iter->entities[iter->header.count] = terrain->m_entity;
+					++iter->header.count;
 				}
+
+				return result;
 			}
-		}*/
+		}
+		return m_culling_system->cull(frustum, static_cast<u8>(type));
 	}
 
 
