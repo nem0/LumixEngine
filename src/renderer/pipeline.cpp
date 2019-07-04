@@ -224,7 +224,6 @@ struct PipelineImpl final : Pipeline
 		, m_custom_commands_handlers(allocator)
 		, m_define(define)
 		, m_scene(nullptr)
-		, m_is_first_render(true)
 		, m_draw2d(allocator)
 		, m_output(-1)
 		, m_renderbuffers(allocator)
@@ -565,15 +564,12 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 
 		if (!isReady() || !m_scene || m_viewport.w <= 0 || m_viewport.h <= 0) {
-			m_is_first_render = true;
-			return false;
-		}
-
-		if (m_is_first_render) {
-			// m_draw2d might accumulate too much data to render while pipeline was not ready
-			// so we clear it on the first frame
-			m_is_first_render = false;
+			if (m_scene) {
+				m_scene->clearDebugLines();
+				m_scene->clearDebugTriangles();
+			}
 			m_draw2d.Clear();
+			return false;
 		}
 
 		m_stats = {};
@@ -645,6 +641,8 @@ struct PipelineImpl final : Pipeline
 		lua_getfield(m_lua_state, -1, "main");
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
 			lua_pop(m_lua_state, 2);
+			m_scene->clearDebugLines();
+			m_scene->clearDebugTriangles();
 			return false;
 		}
 		{
@@ -660,40 +658,37 @@ struct PipelineImpl final : Pipeline
 	{
 		struct Cmd : Renderer::RenderJob
 		{
-			Cmd(IAllocator& allocator) : lines(allocator) {}
+			struct BaseVertex {
+				Vec3 pos;
+				u32 color;
+			};
 
 			void setup() override
 			{
 				PROFILE_FUNCTION();
-				const Array<DebugLine>& src_lines = pipeline->m_scene->getDebugLines();
-				lines.resize(src_lines.size());
-				copyMemory(&lines[0], &src_lines[0], lines.size() * sizeof(lines[0]));
+				const Array<DebugLine>& lines = pipeline->m_scene->getDebugLines();
+				vb.size = 0;
+				if (lines.size() == 0) return;
+
 				render_data = pipeline->m_debug_shape_shader->m_render_data;
+				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
+				BaseVertex* vertices = (BaseVertex*)vb.ptr;
+				for (u32 i = 0, c = lines.size(); i < c; ++i) {
+					vertices[2 * i + 0].color = lines[i].color;
+					vertices[2 * i + 0].pos = (lines[i].from - viewport_pos).toFloat();
+					vertices[2 * i + 1].color = lines[i].color;
+					vertices[2 * i + 1].pos = (lines[i].to - viewport_pos).toFloat();
+				}
+				pipeline->m_scene->clearDebugLines();
 			}
 
 
 			void execute() override {
-				/*PROFILE_FUNCTION();
+				PROFILE_FUNCTION();
 				const Shader::Program& shader = Shader::getProgram(render_data, 0);
 				if(!shader.handle.isValid()) return;
 
 				ffr::pushDebugGroup("debug lines");
-				struct BaseVertex {
-					Vec3 pos;
-					u32 color;
-				};
-
-				Array<BaseVertex> vertices(pipeline->m_allocator);
-				vertices.resize(lines.size() * 2);
-				for (int j = 0, n = lines.size(); j < n; ++j) {
-					const DebugLine& line = lines[j];
-
-					vertices[j * 2].color = line.color;
-					vertices[j * 2].pos = (line.from - viewport_pos).toFloat();
-
-					vertices[j * 2 + 1].color = line.color;
-					vertices[j * 2 + 1].pos = (line.to - viewport_pos).toFloat();
-				}
 
 				ffr::VertexDecl vertex_decl;
 				vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
@@ -704,22 +699,16 @@ struct PipelineImpl final : Pipeline
 				ffr::setState(0);
 				ffr::useProgram(shader.handle);
 
-				const Renderer::TransientSlice vb = pipeline->m_renderer.allocTransient(vertices.byte_size());
-				
-				memcpy(vb.ptr, vertices.begin(), vb.size);
-				ffr::flushBuffer(vb.buffer, vb.offset, vb.size);
-				
 				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
 				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
-				ffr::drawArrays(0, lines.size() * 2, ffr::PrimitiveType::LINES);
-				ffr::popDebugGroup();*/
-				// TODO
+				ffr::drawArrays(0, vb.size / sizeof(BaseVertex), ffr::PrimitiveType::LINES);
+				ffr::popDebugGroup();
 			}
 
-			Array<DebugLine> lines;
 			PipelineImpl* pipeline;
 			DVec3 viewport_pos;
 			ShaderRenderData* render_data;
+			Renderer::TransientSlice vb;
 		};
 
 
@@ -727,7 +716,7 @@ struct PipelineImpl final : Pipeline
 		if (lines.empty() || !m_debug_shape_shader->isReady()) return;
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+		Cmd* cmd = LUMIX_NEW(allocator, Cmd);
 		cmd->pipeline = this;
 		cmd->viewport_pos = m_viewport.pos;
 		m_renderer.queue(cmd, m_profiler_link);
@@ -3196,7 +3185,6 @@ struct PipelineImpl final : Pipeline
 	lua_State* m_lua_state;
 	int m_lua_thread_ref;
 	int m_lua_env;
-	bool m_is_first_render;
 	StaticString<32> m_define;
 	RenderScene* m_scene;
 	Draw2D m_draw2d;
