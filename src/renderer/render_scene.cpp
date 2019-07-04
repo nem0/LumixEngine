@@ -572,8 +572,6 @@ public:
 		PROFILE_FUNCTION();
 
 		m_time += dt;
-		m_debug_lines.clear();
-		m_debug_triangles.clear();
 
 		if (m_is_game_running && !paused)
 		{
@@ -2304,6 +2302,8 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		return Vec2(cam.screen_width, cam.screen_height);
 	}
 
+	void clearDebugLines() override { m_debug_lines.clear(); }
+	void clearDebugTriangles() override { m_debug_triangles.clear(); }
 
 	const Array<DebugTriangle>& getDebugTriangles() const override { return m_debug_triangles; }
 	const Array<DebugLine>& getDebugLines() const override { return m_debug_lines; }

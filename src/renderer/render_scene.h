@@ -253,6 +253,8 @@ public:
 	virtual void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) = 0;
 	virtual void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) = 0;
 
+	virtual void clearDebugLines() = 0;
+	virtual void clearDebugTriangles() = 0;
 	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
 	virtual const Array<DebugLine>& getDebugLines() const = 0;
 
