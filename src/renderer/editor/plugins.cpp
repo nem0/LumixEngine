@@ -2189,6 +2189,12 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
+	void addDebugCube(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, u32 color) override
+	{
+		m_render_scene->addDebugCube(pos, dir, right, up, color);
+	}
+
+
 	AABB getEntityAABB(Universe& universe, EntityRef entity, const DVec3& base) override
 	{
 		AABB aabb;

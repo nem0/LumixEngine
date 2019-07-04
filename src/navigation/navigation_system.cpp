@@ -121,6 +121,9 @@ void NavigationSystem::registerProperties()
 		functions(
 			function(LUMIX_FUNC(NavigationScene::load))
 		),
+		component("navmesh_zone", 
+			var_property("Extents", &NavigationScene::getZone, &NavmeshZone::extents)
+		),
 		component("navmesh_agent",
 			functions(
 				function(LUMIX_FUNC(NavigationScene::navigate))
@@ -176,7 +179,6 @@ static void registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(debugDrawPath);
 	REGISTER_FUNCTION(getPolygonCount);
 	REGISTER_FUNCTION(debugDrawContours);
-	REGISTER_FUNCTION(generateTile);
 	REGISTER_FUNCTION(save);
 	REGISTER_FUNCTION(load);
 	REGISTER_FUNCTION(setGeneratorParams);
