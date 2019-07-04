@@ -1,4 +1,3 @@
-#include "editor/platform_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -56,7 +55,7 @@ struct NavmeshEditorPlugin final : public StudioApp::GUIPlugin
 			if (ImGui::Button("Load"))
 			{
 				char path[MAX_PATH_LENGTH];
-				if (PlatformInterface::getOpenFilename(path, lengthOf(path), "Navmesh\0*.nav\0", nullptr))
+				if (OS::getOpenFilename(path, lengthOf(path), "Navmesh\0*.nav\0", nullptr))
 				{
 					scene->load(path);
 				}
@@ -67,7 +66,7 @@ struct NavmeshEditorPlugin final : public StudioApp::GUIPlugin
 				if (ImGui::Button("Save"))
 				{
 					char path[MAX_PATH_LENGTH];
-					if (PlatformInterface::getSaveFilename(path, lengthOf(path), "Navmesh\0*.nav\0", nullptr))
+					if (OS::getSaveFilename(path, lengthOf(path), "Navmesh\0*.nav\0", nullptr))
 					{
 						scene->save(path);
 					}
@@ -161,22 +160,25 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
-	{
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
-		m_navmesh_editor = LUMIX_NEW(allocator, NavmeshEditorPlugin)(app);
-		app.addPlugin(*m_navmesh_editor);
+	{}
+	
+	void init() override {
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		m_navmesh_editor = LUMIX_NEW(allocator, NavmeshEditorPlugin)(m_app);
+		m_app.addPlugin(*m_navmesh_editor);
 
-		app.registerComponent("navmesh_agent", "Navmesh Agent");
+		m_app.registerComponent("navmesh_agent", "Navmesh Agent");
 	}
 
-
-	~StudioAppPlugin()
-	{
+	~StudioAppPlugin() {
 		m_app.removePlugin(*m_navmesh_editor);
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		LUMIX_DELETE(allocator, m_navmesh_editor);
 	}
 
+	const char* getName() const override {
+		return "navigation";
+	}
 
 	StudioApp& m_app;
 	NavmeshEditorPlugin* m_navmesh_editor;
