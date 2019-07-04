@@ -1,1 +1,1 @@
-genie.exe --static-plugins --no-navigation vs2019
+genie.exe --static-plugins vs2019

@@ -1,5 +1,6 @@
 #pragma once
 #include "engine/lumix.h"
+#include "engine/math.h"
 #include "engine/iplugin.h"
 
 
@@ -14,12 +15,18 @@ struct IAllocator;
 template <typename T> class DelegateList;
 
 
+struct NavmeshZone {
+	Vec3 extents;
+};
+
+
 class NavigationScene : public IScene
 {
 public:
 	static NavigationScene* create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator);
 	static void destroy(NavigationScene& scene);
 
+	virtual NavmeshZone& getZone(EntityRef entity) = 0;
 	virtual bool isFinished(EntityRef entity) = 0;
 	virtual bool navigate(EntityRef entity, const struct DVec3& dest, float speed, float stop_distance) = 0;
 	virtual void cancelNavigation(EntityRef entity) = 0;
@@ -35,20 +42,19 @@ public:
 	virtual void setUseAgentRootMotion(EntityRef entity, bool use_root_motion) = 0;
 	virtual bool isGettingRootMotionFromAnim(EntityRef entity) = 0;
 	virtual void setIsGettingRootMotionFromAnim(EntityRef entity, bool is) = 0;
-	virtual bool generateNavmesh() = 0;
-	virtual bool generateTile(int x, int z, bool keep_data) = 0;
-	virtual bool generateTileAt(const DVec3& pos, bool keep_data) = 0;
+	virtual bool generateNavmesh(EntityRef zone) = 0;
+	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;
 	virtual bool load(const char* path) = 0;
 	virtual bool save(const char* path) = 0;
 	virtual int getPolygonCount() = 0;
-	virtual void debugDrawNavmesh(const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
-	virtual void debugDrawCompactHeightfield() = 0;
-	virtual void debugDrawHeightfield() = 0;
-	virtual void debugDrawContours() = 0;
+	virtual void debugDrawNavmesh(EntityRef zone, const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
+	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;
+	virtual void debugDrawHeightfield(EntityRef zone) = 0;
+	virtual void debugDrawContours(EntityRef zone) = 0;
 	virtual void debugDrawPath(EntityRef entity) = 0;
 	virtual const dtCrowdAgent* getDetourAgent(EntityRef entity) = 0;
-	virtual bool isNavmeshReady() const = 0;
-	virtual bool hasDebugDrawData() const = 0;
+	virtual bool isNavmeshReady(EntityRef zone) const = 0;
+	virtual bool hasDebugDrawData(EntityRef zoneko) const = 0;
 	virtual DelegateList<void(float)>& onUpdate() = 0;
 	virtual void setGeneratorParams(float cell_size,
 		float cell_height,
