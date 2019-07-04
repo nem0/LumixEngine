@@ -1006,21 +1006,22 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderJob
 		{
-			Cmd(IAllocator& allocator) 
-				: m_data(allocator) 
-			{}
-
 			void setup() override
 			{
 				PROFILE_FUNCTION();
 				const auto& emitters = m_pipeline->m_scene->getParticleEmitters();
+				m_size = 0;
+				if(emitters.size() == 0) return;
 
-				int byte_size = 0;
+				u32 byte_size = 0;
 				for (ParticleEmitter* emitter : emitters) {
 					byte_size += emitter->getInstanceDataSizeBytes();
 				}
 
-				m_data.reserve(sizeof(int) * emitters.size() + byte_size);
+				byte_size += (sizeof(int) * 2 + sizeof(ShaderRenderData)) * emitters.size();
+				m_vb = m_pipeline->m_renderer.allocTransient(byte_size);
+
+				OutputMemoryStream str(m_vb.ptr, m_vb.size);
 
 				for (ParticleEmitter* emitter : emitters) {
 					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
@@ -1029,19 +1030,23 @@ struct PipelineImpl final : Pipeline
 					if (size == 0) continue;
 
 					const Material* material = emitter->getResource()->getMaterial();
-					m_data.write(material->getShader()->m_render_data);
-					m_data.write(size);
-					m_data.write(emitter->getInstancesCount());
-					float* instance_data = (float*)m_data.skip(size);
+					str.write(material->getShader()->m_render_data);
+					str.write(size);
+					str.write(emitter->getInstancesCount());
+					float* instance_data = (float*)str.skip(size);
 					emitter->fillInstanceData(m_camera_params.pos, instance_data);
 				}
+				m_size = (u32)str.getPos();
 			}
 
 			void execute() override
 			{
-				/*PROFILE_FUNCTION();
+				PROFILE_FUNCTION();
+				
+				if (m_size == 0) return;
+				
 				ffr::pushDebugGroup("particles");
-				InputMemoryStream blob(m_data);
+				InputMemoryStream blob(m_vb.ptr, m_size);
 				ffr::VertexDecl instance_decl;
 				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
@@ -1050,33 +1055,27 @@ struct PipelineImpl final : Pipeline
 					ShaderRenderData* shader_data = blob.read<ShaderRenderData*>();
 					const int byte_size = blob.read<int>();
 					const int instances_count = blob.read<int>();
-					const Renderer::TransientSlice transient = m_pipeline->m_renderer.allocTransient(byte_size);
-					if ((int)transient.size < byte_size) {
-						logWarning("Renderer") << "Not enough memory reserved to render all particles.";
-						break;
-					}
 
-					const void* mem = blob.skip(byte_size);
-					memcpy(transient.ptr, mem, byte_size);
-					ffr::flushBuffer(transient.buffer, transient.offset, transient.size);
+					const u32 offset = (u32)blob.getPosition();
+					blob.skip(byte_size);
 
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
 					if (prog.handle.isValid()) {
 						ffr::useProgram(prog.handle);
-						ffr::setInstanceBuffer(instance_decl, transient.buffer, transient.offset, 0, nullptr);
+						ffr::setInstanceBuffer(instance_decl, m_vb.buffer, m_vb.offset + offset, 0, nullptr);
 						ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
 					}
 				}
-				ffr::popDebugGroup();*/
-				// TODO
+				ffr::popDebugGroup();
 			}
 
-			OutputMemoryStream m_data;
 			PipelineImpl* m_pipeline;
 			CameraParams m_camera_params;
+			Renderer::TransientSlice m_vb;
+			u32 m_size;
 		};
 
-		Cmd* cmd = LUMIX_NEW(pipeline->m_allocator, Cmd)(pipeline->m_allocator);
+		Cmd* cmd = LUMIX_NEW(pipeline->m_allocator, Cmd);
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
 
