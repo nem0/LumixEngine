@@ -74,7 +74,7 @@ void Texture::destroy()
 bool Texture::create(int w, int h, const void* data, uint size)
 {
 	Renderer::MemRef memory = renderer.copy(data, size);
-	handle = renderer.createTexture(w, h, 1, ffr::TextureFormat::RGBA8, getFFRFlags(), memory, getPath().c_str());
+	handle = renderer.createTexture(w, h, 1, ffr::TextureFormat::RGBA8, getFFRFlags() | (u32)ffr::TextureFlags::NO_MIPS, memory, getPath().c_str());
 	mips = 1;
 	width = w;
 	height = h;
