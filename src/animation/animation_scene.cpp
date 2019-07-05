@@ -72,7 +72,7 @@ struct AnimationSceneImpl final : public AnimationScene
 			i16 max_iterations = 5;
 			i16 bones_count = 4;
 			u32 bones[MAX_BONES_COUNT];
-			DVec3 target;
+			Vec3 target;
 		} inverse_kinematics[4];
 	};
 
@@ -262,15 +262,17 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	static int setIK(lua_State* L)
 	{
-		/*AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
+		AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
 		EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-		Controller& controller = scene->m_controllers.get(entity);
+		const int ctrl_idx = scene->m_controllers.find(entity);
+		if (ctrl_idx < 0) {
+			luaL_argerror(L, 2, "entity does not have controller");
+		}
+		Controller& controller = scene->m_controllers.at(ctrl_idx);
 		int index = LuaWrapper::checkArg<int>(L, 3);
 		Controller::IK& ik = controller.inverse_kinematics[index];
 		ik.weight = LuaWrapper::checkArg<float>(L, 4);
-		ik.target = LuaWrapper::checkArg<DVec3>(L, 5);
-		Transform tr = scene->m_universe.getTransform(controller.entity);
-		ik.target = tr.inverted().transform(ik.target);
+		ik.target = LuaWrapper::checkArg<Vec3>(L, 5);
 
 		ik.bones_count = lua_gettop(L) - 5;
 		if (ik.bones_count > lengthOf(ik.bones))
@@ -281,9 +283,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		{
 			const char* bone = LuaWrapper::checkArg<const char*>(L, i + 6);
 			ik.bones[i] = crc32(bone);
-		}*/
-		// TODO
-		ASSERT(false);
+		}
 		return 0;
 	}
 
@@ -806,6 +806,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	bool initControllerRuntime(Controller& controller)
 	{
+		if (!controller.resource) return false;
 		if (!controller.resource->isReady()) return false;
 		if (controller.resource->m_input_decl.getSize() == 0) return false;
 		controller.root = controller.resource->createInstance(m_allocator);
@@ -868,7 +869,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void updateController(Controller& controller, float time_delta)
 	{
-		if (!controller.resource->isReady())
+		if (!controller.resource || !controller.resource->isReady())
 		{
 			LUMIX_DELETE(m_allocator, controller.root);
 			controller.root = nullptr;
@@ -926,13 +927,12 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	static void updateIK(Controller::IK& ik, Pose& pose, Model& model)
 	{
-		/*int indices[Controller::IK::MAX_BONES_COUNT];
+		int indices[Controller::IK::MAX_BONES_COUNT];
 		LocalRigidTransform transforms[Controller::IK::MAX_BONES_COUNT];
 		Vec3 old_pos[Controller::IK::MAX_BONES_COUNT];
 		float len[Controller::IK::MAX_BONES_COUNT - 1];
 		float len_sum = 0;
-		for (int i = 0; i < ik.bones_count; ++i)
-		{
+		for (int i = 0; i < ik.bones_count; ++i) {
 			auto iter = model.getBoneIndex(ik.bones[i]);
 			if (!iter.isValid()) return;
 
@@ -942,24 +942,20 @@ struct AnimationSceneImpl final : public AnimationScene
 		// convert from bone space to object space
 		const Model::Bone& first_bone = model.getBone(indices[0]);
 		LocalRigidTransform roots_parent;
-		if (first_bone.parent_idx >= 0)
-		{
+		if (first_bone.parent_idx >= 0) {
 			roots_parent = getAbsolutePosition(pose, model, first_bone.parent_idx);
 		}
-		else
-		{
+		else {
 			roots_parent.pos = Vec3::ZERO;
 			roots_parent.rot = Quat::IDENTITY;
 		}
 
 		LocalRigidTransform parent_tr = roots_parent;
-		for (int i = 0; i < ik.bones_count; ++i)
-		{
+		for (int i = 0; i < ik.bones_count; ++i) {
 			LocalRigidTransform tr{pose.positions[indices[i]], pose.rotations[indices[i]]};
 			transforms[i] = parent_tr * tr;
 			old_pos[i] = transforms[i].pos;
-			if (i > 0)
-			{
+			if (i > 0) {
 				len[i - 1] = (transforms[i].pos - transforms[i - 1].pos).length();
 				len_sum += len[i - 1];
 			}
@@ -973,28 +969,23 @@ struct AnimationSceneImpl final : public AnimationScene
 			target = transforms[0].pos + to_target * len_sum;
 		}
 
-		for (int iteration = 0; iteration < ik.max_iterations; ++iteration)
-		{
+		for (int iteration = 0; iteration < ik.max_iterations; ++iteration) {
 			transforms[ik.bones_count - 1].pos = target;
 			
-			for (int i = ik.bones_count - 1; i > 1; --i)
-			{
+			for (int i = ik.bones_count - 1; i > 1; --i) {
 				Vec3 dir = (transforms[i - 1].pos - transforms[i].pos).normalized();
 				transforms[i - 1].pos = transforms[i].pos + dir * len[i - 1];
 			}
 
-			for (int i = 1; i < ik.bones_count; ++i)
-			{
+			for (int i = 1; i < ik.bones_count; ++i) {
 				Vec3 dir = (transforms[i].pos - transforms[i - 1].pos).normalized();
 				transforms[i].pos = transforms[i - 1].pos + dir * len[i - 1];
 			}
 		}
 
 		// compute rotations from new positions
-		for (int i = ik.bones_count - 1; i >= 0; --i)
-		{
-			if (i < ik.bones_count - 1)
-			{
+		for (int i = ik.bones_count - 1; i >= 0; --i) {
+			if (i < ik.bones_count - 1) {
 				Vec3 old_d = old_pos[i + 1] - old_pos[i];
 				Vec3 new_d = transforms[i + 1].pos - transforms[i].pos;
 				old_d.normalize();
@@ -1006,26 +997,20 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 
 		// convert from object space to bone space
-		for (int i = ik.bones_count - 1; i > 0; --i)
-		{
+		for (int i = ik.bones_count - 1; i > 0; --i) {
 			transforms[i] = transforms[i - 1].inverted() * transforms[i];
 			pose.positions[indices[i]] = transforms[i].pos;
 		}
-		for (int i = ik.bones_count - 2; i > 0; --i)
-		{
+		for (int i = ik.bones_count - 2; i > 0; --i) {
 			pose.rotations[indices[i]] = transforms[i].rot;
 		}
 
-		if (first_bone.parent_idx >= 0)
-		{
+		if (first_bone.parent_idx >= 0) {
 			pose.rotations[indices[0]] = roots_parent.rot.conjugated() * transforms[0].rot;
 		}
-		else
-		{
+		else {
 			pose.rotations[indices[0]] = transforms[0].rot;
-		}*/
-		// TODO
-		ASSERT(false);
+		}
 	}
 
 

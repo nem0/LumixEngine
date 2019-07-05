@@ -289,15 +289,23 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 };
 
 
-struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin
+struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
-
 	explicit AnimControllerAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
 		app.getAssetCompiler().registerExtension("act", Anim::ControllerResource::TYPE);
 	}
 
+	bool compile(const Path& src)  {
+		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
+		const u32 hash = crc32(src.c_str());
+
+		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
+
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		return fs.copyFile(src.c_str(), dst);
+	}
 
 	void onGUI(Resource* resource) override {}
 
@@ -409,6 +417,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		
 		const char* exts[] = { "ani", nullptr };
 		m_app.getAssetCompiler().addPlugin(*m_animtion_plugin, exts);
+		const char* act_exts[] = { "act", nullptr };
+		m_app.getAssetCompiler().addPlugin(*m_anim_ctrl_plugin, act_exts);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.addPlugin(*m_animtion_plugin);
@@ -426,6 +436,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	~StudioAppPlugin()
 	{
 		m_app.getAssetCompiler().removePlugin(*m_animtion_plugin);
+		m_app.getAssetCompiler().removePlugin(*m_anim_ctrl_plugin);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
 		asset_browser.removePlugin(*m_animtion_plugin);
