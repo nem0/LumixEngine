@@ -50,7 +50,7 @@ public:
 	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;
 	virtual void debugDrawHeightfield(EntityRef zone) = 0;
 	virtual void debugDrawContours(EntityRef zone) = 0;
-	virtual void debugDrawPath(EntityRef entity) = 0;
+	virtual void debugDrawPath(EntityRef agent_entity) = 0;
 	virtual const dtCrowdAgent* getDetourAgent(EntityRef entity) = 0;
 	virtual bool isNavmeshReady(EntityRef zone) const = 0;
 	virtual bool hasDebugDrawData(EntityRef zoneko) const = 0;
