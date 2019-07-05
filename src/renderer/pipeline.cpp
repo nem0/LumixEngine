@@ -653,9 +653,75 @@ struct PipelineImpl final : Pipeline
 		return true;
 	}
 
+	void renderDebugTriangles() {
+		struct Cmd : Renderer::RenderJob
+		{
+			struct BaseVertex {
+				Vec3 pos;
+				u32 color;
+			};
 
-	void renderDebugLines()
-	{
+			void setup() override {
+				PROFILE_FUNCTION();
+				const Array<DebugTriangle>& tris = pipeline->m_scene->getDebugTriangles();
+				vb.size = 0;
+				if (tris.size() == 0) return;
+
+				render_data = pipeline->m_debug_shape_shader->m_render_data;
+				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
+				BaseVertex* vertices = (BaseVertex*)vb.ptr;
+				for (u32 i = 0, c = tris.size(); i < c; ++i) {
+					vertices[3 * i + 0].color = tris[i].color;
+					vertices[3 * i + 0].pos = (tris[i].p0 - viewport_pos).toFloat();
+					vertices[3 * i + 1].color = tris[i].color;
+					vertices[3 * i + 1].pos = (tris[i].p1 - viewport_pos).toFloat();
+					vertices[3 * i + 2].color = tris[i].color;
+					vertices[3 * i + 2].pos = (tris[i].p2 - viewport_pos).toFloat();
+				}
+				pipeline->m_scene->clearDebugTriangles();
+			}
+
+
+			void execute() override {
+				PROFILE_FUNCTION();
+				const Shader::Program& shader = Shader::getProgram(render_data, 0);
+				if(!shader.handle.isValid()) return;
+
+				ffr::pushDebugGroup("debug triangles");
+
+				ffr::VertexDecl vertex_decl;
+				vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+				vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+
+				ffr::setUniformMatrix4f(pipeline->m_model_uniform, &Matrix::IDENTITY.m11);
+
+				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::CULL_BACK));
+				ffr::useProgram(shader.handle);
+
+				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
+				ffr::setIndexBuffer(ffr::INVALID_BUFFER);
+				ffr::drawArrays(0, vb.size / sizeof(BaseVertex), ffr::PrimitiveType::TRIANGLES);
+				ffr::popDebugGroup();
+			}
+
+			PipelineImpl* pipeline;
+			DVec3 viewport_pos;
+			ShaderRenderData* render_data;
+			Renderer::TransientSlice vb;
+		};
+
+
+		const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
+		if (tris.empty() || !m_debug_shape_shader->isReady()) return;
+
+		IAllocator& allocator = m_renderer.getAllocator();
+		Cmd* cmd = LUMIX_NEW(allocator, Cmd);
+		cmd->pipeline = this;
+		cmd->viewport_pos = m_viewport.pos;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
+
+	void renderDebugLines()	{
 		struct Cmd : Renderer::RenderJob
 		{
 			struct BaseVertex {
@@ -696,7 +762,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::setUniformMatrix4f(pipeline->m_model_uniform, &Matrix::IDENTITY.m11);
 
-				ffr::setState(0);
+				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 				ffr::useProgram(shader.handle);
 
 				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset, nullptr);
@@ -725,9 +791,9 @@ struct PipelineImpl final : Pipeline
 
 	void renderDebugShapes()
 	{
+		renderDebugTriangles();
 		renderDebugLines();
-		/*renderDebugTriangles();
-		renderDebugPoints();*/
+		//renderDebugPoints();
 	}
 
 

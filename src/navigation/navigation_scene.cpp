@@ -948,6 +948,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	void debugDrawNavmesh(EntityRef zone_entity, const DVec3& world_pos, bool inner_boundaries, bool outer_boundaries, bool portals) override
 	{
 		const RecastZone& zone = m_zones[zone_entity];
+		if (!zone.navmesh) return;
 
 		const Transform tr = m_universe.getTransform(zone_entity);
 		const Vec3 pos = tr.inverted().transform(world_pos).toFloat();
