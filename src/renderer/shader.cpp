@@ -48,7 +48,7 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 		PROFILE_BLOCK("compile_shader");
 		static const char* shader_code_prefix = 
 			R"#(#version 440
-			layout (std140) uniform GlobalState {
+			layout (std140, binding = 0) uniform GlobalState {
 				mat4 u_shadow_view_projection;
 				mat4 u_shadowmap_matrices[4];
 				mat4 u_camera_projection;
@@ -64,7 +64,7 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 				float u_time;
 				ivec2 u_framebuffer_size;
 			};
-			layout (std140) uniform PassState {
+			layout (std140, binding = 1) uniform PassState {
 				mat4 u_pass_projection;
 				mat4 u_pass_inv_projection;
 				mat4 u_pass_view;
