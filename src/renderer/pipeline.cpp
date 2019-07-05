@@ -1078,13 +1078,15 @@ struct PipelineImpl final : Pipeline
 				const auto& emitters = m_pipeline->m_scene->getParticleEmitters();
 				m_size = 0;
 				if(emitters.size() == 0) return;
+				
+				Universe& universe = m_pipeline->m_scene->getUniverse();
 
 				u32 byte_size = 0;
 				for (ParticleEmitter* emitter : emitters) {
 					byte_size += emitter->getInstanceDataSizeBytes();
 				}
 
-				byte_size += (sizeof(int) * 2 + sizeof(ShaderRenderData)) * emitters.size();
+				byte_size += (sizeof(int) * 2 + sizeof(ShaderRenderData) + sizeof(Vec3) + sizeof(Quat)) * emitters.size();
 				m_vb = m_pipeline->m_renderer.allocTransient(byte_size);
 
 				OutputMemoryStream str(m_vb.ptr, m_vb.size);
@@ -1095,7 +1097,12 @@ struct PipelineImpl final : Pipeline
 					const int size = emitter->getInstanceDataSizeBytes();
 					if (size == 0) continue;
 
+					const Transform tr = universe.getTransform((EntityRef)emitter->m_entity);
+					const Vec3 lpos = (tr.pos - m_camera_params.pos).toFloat();
+
 					const Material* material = emitter->getResource()->getMaterial();
+					str.write(lpos);
+					str.write(tr.rot);
 					str.write(material->getShader()->m_render_data);
 					str.write(size);
 					str.write(emitter->getInstancesCount());
@@ -1118,6 +1125,8 @@ struct PipelineImpl final : Pipeline
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState(blend_state);
 				while(blob.getPosition() < blob.size()) {
+					const Vec3 lpos = blob.read<Vec3>();
+					const Quat rot = blob.read<Quat>();
 					ShaderRenderData* shader_data = blob.read<ShaderRenderData*>();
 					const int byte_size = blob.read<int>();
 					const int instances_count = blob.read<int>();
@@ -1127,6 +1136,9 @@ struct PipelineImpl final : Pipeline
 
 					const Shader::Program& prog = Shader::getProgram(shader_data, 0);
 					if (prog.handle.isValid()) {
+						Matrix mtx = rot.toMatrix();
+						mtx.setTranslation(lpos);
+						ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &mtx.m11);
 						ffr::useProgram(prog.handle);
 						ffr::setInstanceBuffer(instance_decl, m_vb.buffer, m_vb.offset + offset, 0, nullptr);
 						ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
