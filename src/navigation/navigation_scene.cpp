@@ -561,40 +561,42 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	void debugDrawPath(EntityRef entity) override
 	{
-		/*auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
+		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
-		if (!m_crowd) return;
+		
+		auto agent_iter = m_agents.find(entity);
+		if (!agent_iter.isValid()) return;
 
-		auto iter = m_agents.find(entity);
-		if (iter == m_agents.end()) return;
-		const Agent& agent = iter.value();
+		const Agent& agent = agent_iter.value();
 		if (agent.agent < 0) return;
-		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+
+		const RecastZone& zone = m_zones[(EntityRef)agent.zone];
+		if (!zone.crowd) return;
+
+		const Transform zone_tr = m_universe.getTransform(zone.entity);
+		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 
 		const dtPolyRef* path = dt_agent->corridor.getPath();
 		const int npath = dt_agent->corridor.getPathCount();
-		for (int j = 0; j < npath; ++j)
-		{
+		for (int j = 0; j < npath; ++j) {
 			dtPolyRef ref = path[j];
 			const dtMeshTile* tile = nullptr;
 			const dtPoly* poly = nullptr;
-			if (dtStatusFailed(m_navmesh->getTileAndPolyByRef(ref, &tile, &poly))) continue;
+			if (dtStatusFailed(zone.navmesh->getTileAndPolyByRef(ref, &tile, &poly))) continue;
 
-			drawPoly(render_scene, *tile, *poly);
+			drawPoly(render_scene, zone_tr, *tile, *poly);
 		}
 
 		Vec3 prev = *(Vec3*)dt_agent->npos;
-		for (int i = 0; i < dt_agent->ncorners; ++i)
-		{
+		for (int i = 0; i < dt_agent->ncorners; ++i) {
 			Vec3 tmp = *(Vec3*)&dt_agent->cornerVerts[i * 3];
 			render_scene->addDebugLine(DVec3(prev), DVec3(tmp), 0xffff0000); // TODO
 			prev = tmp;
 		}
 		render_scene->addDebugCross(DVec3(*(Vec3*)dt_agent->targetPos), 1.0f, 0xffffffff); // TODO
-		Vec3 vel = *(Vec3*)dt_agent->vel;
-		DVec3 pos = m_universe.getPosition(entity);
-		render_scene->addDebugLine(pos, pos + vel, 0xff0000ff);*/
-		// TODO
+		const Vec3 vel = *(Vec3*)dt_agent->vel;
+		const DVec3 pos = m_universe.getPosition(entity);
+		render_scene->addDebugLine(pos, pos + zone_tr.rot.rotate(vel), 0xff0000ff);
 	}
 
 

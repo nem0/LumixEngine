@@ -17,14 +17,27 @@ namespace
 {
 
 
+static const ComponentType NAVMESH_AGENT_TYPE = Reflection::getComponentType("navmesh_agent");
 static const ComponentType NAVMESH_ZONE_TYPE = Reflection::getComponentType("navmesh_zone");
 
 
 struct PropertyGridPlugin : PropertyGrid::IPlugin {
 	PropertyGridPlugin(StudioApp& app) : m_app(app) {}
 
+	void onAgentGUI(EntityRef entity) {
+		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
+		static bool debug_draw_path = false;
+		ImGui::Checkbox("Draw path", &debug_draw_path);
+		if (debug_draw_path) scene->debugDrawPath(entity);
+	}
+
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
 		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
+		if(cmp.type == NAVMESH_AGENT_TYPE) { 
+			onAgentGUI((EntityRef)cmp.entity);
+			return;
+		}
+
 		if (cmp.type != NAVMESH_ZONE_TYPE) return;
 		
 		if (ImGui::Button("Generate")) {
@@ -60,13 +73,6 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			static bool debug_draw_contours = false;
 			ImGui::Checkbox("Draw contours", &debug_draw_contours);
 			if (debug_draw_contours) scene->debugDrawContours((EntityRef)cmp.entity);
-
-			auto& entities = m_app.getWorldEditor().getSelectedEntities();
-			if (!entities.empty()) {
-				static bool debug_draw_path = false;
-				ImGui::Checkbox("Draw path", &debug_draw_path);
-				if (debug_draw_path) scene->debugDrawPath({entities[0].index});
-			}
 		}
 		else {
 			ImGui::Text("For more info press \"Debug tile\"");
