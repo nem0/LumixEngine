@@ -193,7 +193,6 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	void rasterizeTerrains(const Transform& zone_tr, const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
-		/*
 		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(degreesToRadians(60));
 
@@ -201,41 +200,34 @@ struct NavigationSceneImpl final : public NavigationScene
 		if (!render_scene) return;
 
 		EntityPtr entity_ptr = render_scene->getFirstTerrain();
-		while (entity_ptr.isValid())
-		{
+		while (entity_ptr.isValid()) {
 			const EntityRef entity = (EntityRef)entity_ptr;
-			Vec3 pos = m_universe.getPosition(entity).toFloat(); // TODO
-			Quat rot = m_universe.getRotation(entity);
-			Vec2 res = render_scene->getTerrainResolution(entity);
+			const Transform terrain_tr = m_universe.getTransform(entity);
+			const Transform to_zone = zone_tr.inverted() * terrain_tr;
+			const IVec2 res = render_scene->getTerrainResolution(entity);
 			float scaleXZ = render_scene->getTerrainXZScale(entity);
-			AABB terrain_space_aabb = getTerrainSpaceAABB(DVec3(pos), rot, aabb); // TODO
-			int from_z = (int)clamp(terrain_space_aabb.min.z / scaleXZ - 1, 0.0f, res.y - 1);
-			int to_z = (int)clamp(terrain_space_aabb.max.z / scaleXZ + 1, 0.0f, res.y - 1);
-			int from_x = (int)clamp(terrain_space_aabb.min.x / scaleXZ - 1, 0.0f, res.x - 1);
-			int to_x = (int)clamp(terrain_space_aabb.max.x / scaleXZ + 1, 0.0f, res.x - 1);
-			for (int j = from_z; j < to_z; ++j)
-			{
-				for (int i = from_x; i < to_x; ++i)
-				{
+			for (int j = 0; j < res.y; ++j) {
+				for (int i = 0; i < res.x; ++i) {
 					float x = i * scaleXZ;
 					float z = j * scaleXZ;
-					float h0 = render_scene->getTerrainHeightAt(entity, x, z);
-					Vec3 p0 = pos + rot.rotate(Vec3(x, h0, z));
+
+					const float h0 = render_scene->getTerrainHeightAt(entity, x, z);
+					const Vec3 p0 = to_zone.transform(Vec3(x, h0, z)).toFloat();
 
 					x = (i + 1) * scaleXZ;
 					z = j * scaleXZ;
-					float h1 = render_scene->getTerrainHeightAt(entity, x, z);
-					Vec3 p1 = pos + rot.rotate(Vec3(x, h1, z));
+					const float h1 = render_scene->getTerrainHeightAt(entity, x, z);
+					const Vec3 p1 = to_zone.transform(Vec3(x, h1, z)).toFloat();
 
 					x = (i + 1) * scaleXZ;
 					z = (j + 1) * scaleXZ;
-					float h2 = render_scene->getTerrainHeightAt(entity, x, z);
-					Vec3 p2 = pos + rot.rotate(Vec3(x, h2, z));
+					const float h2 = render_scene->getTerrainHeightAt(entity, x, z);
+					const Vec3 p2 = to_zone.transform(Vec3(x, h2, z)).toFloat();
 
 					x = i * scaleXZ;
 					z = (j + 1) * scaleXZ;
-					float h3 = render_scene->getTerrainHeightAt(entity, x, z);
-					Vec3 p3 = pos + rot.rotate(Vec3(x, h3, z));
+					const float h3 = render_scene->getTerrainHeightAt(entity, x, z);
+					const Vec3 p3 = to_zone.transform(Vec3(x, h3, z)).toFloat();
 
 					Vec3 n = crossProduct(p1 - p0, p0 - p2).normalized();
 					u8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
@@ -246,10 +238,8 @@ struct NavigationSceneImpl final : public NavigationScene
 					rcRasterizeTriangle(&ctx, &p0.x, &p2.x, &p3.x, area, solid);
 				}
 			}
-
 			entity_ptr = render_scene->getNextTerrain(entity);
-		}*/
-		// TODO
+		}
 	}
 
 
@@ -891,57 +881,46 @@ struct NavigationSceneImpl final : public NavigationScene
 		}
 	}
 
-
-	static void drawTilePortal(RenderScene* render_scene, const Transform& tr, const dtMeshTile& tile)
-	{
-		/*
+	static void drawTilePortal(RenderScene* render_scene, const Transform& zone_tr, const dtMeshTile& tile) {
 		const float padx = 0.04f;
 		const float pady = tile.header->walkableClimb;
 
-		for (int side = 0; side < 8; ++side)
-		{
+		for (int side = 0; side < 8; ++side) {
 			unsigned short m = DT_EXT_LINK | (unsigned short)side;
 
-			for (int i = 0; i < tile.header->polyCount; ++i)
-			{
+			for (int i = 0; i < tile.header->polyCount; ++i) {
 				dtPoly* poly = &tile.polys[i];
 
 				const int nv = poly->vertCount;
-				for (int j = 0; j < nv; ++j)
-				{
+				for (int j = 0; j < nv; ++j) {
 					if (poly->neis[j] != m) continue;
 
 					const float* va = &tile.verts[poly->verts[j] * 3];
 					const float* vb = &tile.verts[poly->verts[(j + 1) % nv] * 3];
 
-					if (side == 0 || side == 4)
-					{
+					if (side == 0 || side == 4) {
 						unsigned int col = side == 0 ? 0xff0000aa : 0xff00aaaa;
 
 						const float x = va[0] + ((side == 0) ? -padx : padx);
 
-						render_scene->addDebugLine(DVec3(x, va[1] - pady, va[2]), DVec3(x, va[1] + pady, va[2]), col); // TODO DVec3
-						render_scene->addDebugLine(DVec3(x, va[1] + pady, va[2]), DVec3(x, vb[1] + pady, vb[2]), col);
-						render_scene->addDebugLine(DVec3(x, vb[1] + pady, vb[2]), DVec3(x, vb[1] - pady, vb[2]), col);
-						render_scene->addDebugLine(DVec3(x, vb[1] - pady, vb[2]), DVec3(x, va[1] - pady, va[2]), col);
-
+						render_scene->addDebugLine(zone_tr.transform(Vec3(x, va[1] - pady, va[2])), zone_tr.transform(Vec3(x, va[1] + pady, va[2])), col);
+						render_scene->addDebugLine(zone_tr.transform(Vec3(x, va[1] + pady, va[2])), zone_tr.transform(Vec3(x, vb[1] + pady, vb[2])), col);
+						render_scene->addDebugLine(zone_tr.transform(Vec3(x, vb[1] + pady, vb[2])), zone_tr.transform(Vec3(x, vb[1] - pady, vb[2])), col);
+						render_scene->addDebugLine(zone_tr.transform(Vec3(x, vb[1] - pady, vb[2])), zone_tr.transform(Vec3(x, va[1] - pady, va[2])), col);
 					}
-					else if (side == 2 || side == 6)
-					{
+					else if (side == 2 || side == 6) {
 						unsigned int col = side == 2 ? 0xff00aa00 : 0xffaaaa00;
 
 						const float z = va[2] + ((side == 2) ? -padx : padx);
 
-						render_scene->addDebugLine(DVec3(va[0], va[1] - pady, z), DVec3(va[0], va[1] + pady, z), col); // TODO DVec3
-						render_scene->addDebugLine(DVec3(va[0], va[1] + pady, z), DVec3(vb[0], vb[1] + pady, z), col);
-						render_scene->addDebugLine(DVec3(vb[0], vb[1] + pady, z), DVec3(vb[0], vb[1] - pady, z), col);
-						render_scene->addDebugLine(DVec3(vb[0], vb[1] - pady, z), DVec3(va[0], va[1] - pady, z), col);
+						render_scene->addDebugLine(zone_tr.transform(Vec3(va[0], va[1] - pady, z)), zone_tr.transform(Vec3(va[0], va[1] + pady, z)), col);
+						render_scene->addDebugLine(zone_tr.transform(Vec3(va[0], va[1] + pady, z)), zone_tr.transform(Vec3(vb[0], vb[1] + pady, z)), col);
+						render_scene->addDebugLine(zone_tr.transform(Vec3(vb[0], vb[1] + pady, z)), zone_tr.transform(Vec3(vb[0], vb[1] - pady, z)), col);
+						render_scene->addDebugLine(zone_tr.transform(Vec3(vb[0], vb[1] - pady, z)), zone_tr.transform(Vec3(va[0], va[1] - pady, z)), col);
 					}
-
 				}
 			}
-		}*/
-		// TODO
+		}
 	}
 
 
@@ -960,6 +939,8 @@ struct NavigationSceneImpl final : public NavigationScene
 		int x = int((pos.x - min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		int z = int((pos.z - min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		const dtMeshTile* tile = zone.navmesh->getTileAt(x, z, 0);
+		if (!tile) return;
+
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 

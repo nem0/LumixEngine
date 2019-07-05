@@ -303,7 +303,7 @@ public:
 	virtual float getTerrainYScale(EntityRef entity) = 0;
 	virtual Vec2 getTerrainSize(EntityRef entity) = 0;
 	virtual AABB getTerrainAABB(EntityRef entity) = 0;
-	virtual Vec2 getTerrainResolution(EntityRef entity) = 0;
+	virtual IVec2 getTerrainResolution(EntityRef entity) = 0;
 	virtual EntityPtr getFirstTerrain() = 0;
 	virtual EntityPtr getNextTerrain(EntityRef entity) = 0;
 

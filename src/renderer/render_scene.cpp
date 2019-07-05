@@ -1743,10 +1743,10 @@ public:
 	}
 
 
-	Vec2 getTerrainResolution(EntityRef entity) override
+	IVec2 getTerrainResolution(EntityRef entity) override
 	{
 		auto* terrain = m_terrains[entity];
-		return Vec2((float)terrain->getWidth(), (float)terrain->getHeight());
+		return IVec2(terrain->getWidth(), terrain->getHeight());
 	}
 
 
