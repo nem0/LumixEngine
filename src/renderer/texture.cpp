@@ -317,10 +317,10 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 }
 
 
-bool loadRaw(Texture& texture, IInputStream& file, IAllocator& allocator)
+static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& allocator)
 {
 	PROFILE_FUNCTION();
-	size_t size = file.size() - 3;
+	const size_t size = file.size() - file.getPosition();
 	texture.bytes_per_pixel = 2;
 	texture.width = (int)sqrt(int(size / texture.bytes_per_pixel));
 	texture.height = texture.width;
