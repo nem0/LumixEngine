@@ -658,6 +658,14 @@ struct LUMIX_ENGINE_API LocalRigidTransform {
 	Vec3 pos;
 	Quat rot;
 
+	LocalRigidTransform inverted() const
+	{
+		LocalRigidTransform result;
+		result.rot = rot.conjugated();
+		result.pos = result.rot.rotate(-pos);
+		return result;
+	}
+
 	LocalRigidTransform operator*(const LocalRigidTransform& rhs) const;
 	Matrix toMatrix() const;
 	LocalRigidTransform interpolate(const LocalRigidTransform& rhs, float t) const;
