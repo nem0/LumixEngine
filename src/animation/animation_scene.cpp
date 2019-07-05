@@ -603,8 +603,8 @@ struct AnimationSceneImpl final : public AnimationScene
 	{
 		auto& controller = m_controllers.get(entity);
 		unloadResource(controller.resource);
-		setControllerResource(controller, loadController(path));
-		if (controller.resource->isReady() && m_is_game_running)
+		setControllerResource(controller, path.isValid() ? loadController(path) : nullptr);
+		if (controller.resource && controller.resource->isReady() && m_is_game_running)
 		{
 			initControllerRuntime(controller);
 		}
