@@ -1,7 +1,9 @@
 #include "particle_system.h"
 #include "engine/crc32.h"
+#include "engine/job_system.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
+#include "engine/mt/atomic.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -584,7 +586,7 @@ void ParticleEmitter::update(float dt)
 
 	// TODO remove
 	static bool xx = [&]{
-		for (int i = 0; i < 150'000; ++i) {
+		for (int i = 0; i < 450'000; ++i) {
 			emit(nullptr);
 		}
 		return true;
@@ -602,7 +604,6 @@ void ParticleEmitter::update(float dt)
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
 	m_instances_count = m_particles_count;
-	int output_idx = 0;
 
 	for (;;)
 	{
@@ -753,9 +754,9 @@ int ParticleEmitter::getInstanceDataSizeBytes() const
 
 void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 {
+	PROFILE_FUNCTION();
 	const OutputMemoryStream& bytecode = m_resource->getBytecode();
-	const int offset = m_resource->getOutputByteOffset();
-	InputMemoryStream blob((u8*)bytecode.getData() + offset, bytecode.getPos());
+	const int output_offset = m_resource->getOutputByteOffset();
 	
 	// TODO
 	m_constants[1].value = (float)cam_pos.x;
@@ -764,89 +765,106 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 	// TODO
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
-	int output_idx = 0;
-	for (;;)
-	{
-		u8 instruction = blob.read<u8>();
-		switch ((Instructions)instruction)
-		{
-			case Instructions::END:
-				return;
-			case Instructions::SIN: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const auto arg_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg_idx = blob.read<u8>();
-				
-				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
-				float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
-				const float* const end = result + ((m_particles_count + 3) & ~3);
 
-				for (; result != end; ++result, ++arg) {
-					*result = sinf(*arg);
-				}
-				break;
-			}
-			case Instructions::COS: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const auto arg_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg_idx = blob.read<u8>();
+	auto sim = [&](u32 offset, u32 count){
+		PROFILE_BLOCK("particle simulation");
+		InputMemoryStream blob((u8*)bytecode.getData() + output_offset, bytecode.getPos());
+		int output_idx = 0;
+		for (;;) {
+			u8 instruction = blob.read<u8>();
+			switch ((Instructions)instruction) {
+				case Instructions::END:
+					return;
+				case Instructions::SIN: {
+					const auto dst_type = blob.read<Compiler::DataStream::Type>();
+					const u8 dst_idx = blob.read<u8>();
+					const auto arg_type = blob.read<Compiler::DataStream::Type>();
+					const u8 arg_idx = blob.read<u8>();
 				
-				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
-				float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
-				const float* const end = result + ((m_particles_count + 3) & ~3);
+					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
+					float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin()) + offset;
+					const float* const end = result + count;
 
-				for (; result != end; ++result, ++arg) {
-					*result = cosf(*arg);
-				}
-				break;
-			}
-			case Instructions::MUL: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const auto arg0_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg0_idx = blob.read<u8>();
-				const auto arg1_type = blob.read<Compiler::DataStream::Type>();
-				
-				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
-				const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin());
-				const float4* const end = result + ((m_particles_count + 3) >> 2);
-				if(arg1_type == Compiler::DataStream::LITERAL) {
-					const float4 arg1 = f4Splat(blob.read<float>());
-
-					for (; result != end; ++result, ++arg0) {
-						*result = f4Mul(*arg0, arg1);
+					for (; result != end; ++result, ++arg) {
+						*result = sinf(*arg);
 					}
+					break;
 				}
-				else {
-					const u8 arg1_idx = blob.read<u8>();
-					const float4* arg1 = getStream(*this, arg1_type, arg1_idx, m_particles_count, reg_mem.begin());
+				case Instructions::COS: {
+					const auto dst_type = blob.read<Compiler::DataStream::Type>();
+					const u8 dst_idx = blob.read<u8>();
+					const auto arg_type = blob.read<Compiler::DataStream::Type>();
+					const u8 arg_idx = blob.read<u8>();
+				
+					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
+					float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin()) + offset;
+					const float* const end = result + count;
 
-					for (; result != end; ++result, ++arg0, ++arg1) {
-						*result = f4Mul(*arg0, *arg1);
+					for (; result != end; ++result, ++arg) {
+						*result = cosf(*arg);
 					}
+					break;
 				}
+				case Instructions::MUL: {
+					const auto dst_type = blob.read<Compiler::DataStream::Type>();
+					const u8 dst_idx = blob.read<u8>();
+					const auto arg0_type = blob.read<Compiler::DataStream::Type>();
+					const u8 arg0_idx = blob.read<u8>();
+					const auto arg1_type = blob.read<Compiler::DataStream::Type>();
+				
+					float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
+					const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
+					const float4* const end = result + (count >> 2);
+					if(arg1_type == Compiler::DataStream::LITERAL) {
+						const float4 arg1 = f4Splat(blob.read<float>());
 
-				break;
-			}
-			case Instructions::OUTPUT: {
-				const auto arg_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg_idx = blob.read<u8>();
-				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
-				float* dst = data + output_idx;
-				++output_idx;
-				const int stride = m_resource->getOutputsCount();
-				for (int i = 0; i < m_particles_count; ++i) {
-					dst[i * stride] =  arg[i];
+						for (; result != end; ++result, ++arg0) {
+							*result = f4Mul(*arg0, arg1);
+						}
+					}
+					else {
+						const u8 arg1_idx = blob.read<u8>();
+						const float4* arg1 = getStream(*this, arg1_type, arg1_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
+
+						for (; result != end; ++result, ++arg0, ++arg1) {
+							*result = f4Mul(*arg0, *arg1);
+						}
+					}
+
+					break;
 				}
-				break;
+				case Instructions::OUTPUT: {
+					const int stride = m_resource->getOutputsCount();
+					const auto arg_type = blob.read<Compiler::DataStream::Type>();
+					const u8 arg_idx = blob.read<u8>();
+					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
+					float* dst = data + output_idx + offset * stride;
+					++output_idx;
+					for (u32 i = 0, j = 0; i < count; ++i, j += stride) {
+						dst[j] =  arg[i];
+					}
+					break;
+				}
+				default:
+					ASSERT(false);
+					break;
 			}
-			default:
-				ASSERT(false);
-				break;
 		}
+	};
+	if(m_particles_count > 16 * 1024) {
+		volatile i32 counter = 0;
+		JobSystem::runOnWorkers([&](){
+			for(;;) {
+				const i32 i = MT::atomicAdd(&counter, 16 * 1024);
+				if (i >= m_particles_count) return;
+				sim((u32)i, minimum((m_particles_count - i + 3) & ~3, 16 * 1024));
+			}
+		});
 	}
+	else {
+		sim(0, (m_particles_count + 3) & ~3);
+	}
+
 }
 
 // TODO
