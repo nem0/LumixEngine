@@ -131,9 +131,8 @@ void NavigationSystem::registerProperties()
 			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
 				MinAttribute(0)),
 			property("Height", LUMIX_PROP(NavigationScene, AgentHeight),
-				MinAttribute(0))
-			// TODO
-			//property("Use root motion", LUMIX_PROP_FULL(NavigationScene, useAgentRootMotion, setUseAgentRootMotion)),
+				MinAttribute(0)),
+			property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion)
 			//property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
 		)
 	);
@@ -177,7 +176,6 @@ static void registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(debugDrawCompactHeightfield);
 	REGISTER_FUNCTION(debugDrawHeightfield);
 	REGISTER_FUNCTION(debugDrawPath);
-	REGISTER_FUNCTION(getPolygonCount);
 	REGISTER_FUNCTION(debugDrawContours);
 	REGISTER_FUNCTION(save);
 	REGISTER_FUNCTION(load);
