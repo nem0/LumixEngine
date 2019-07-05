@@ -717,8 +717,8 @@ void getCurrentDirectory(char* buffer, int buffer_size)
 bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
 {
 	WCharStr<MAX_PATH_LENGTH> wtmp("");
-	WCharStr<MAX_PATH_LENGTH> wfilter(filter);
-	WCharStr<MAX_PATH_LENGTH> wdefault_extension(default_extension);
+	WCharStr<MAX_PATH_LENGTH> wfilter(filter ? filter : "");
+	WCharStr<MAX_PATH_LENGTH> wdefault_extension(default_extension ? default_extension : "");
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
@@ -728,7 +728,7 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 	ofn.nMaxFile = lengthOf(wtmp.data);
 	ofn.lpstrFilter = wfilter.data;
 	ofn.nFilterIndex = 1;
-	ofn.lpstrDefExt = wdefault_extension.data;
+	ofn.lpstrDefExt = default_extension ? wdefault_extension.data : nullptr;
 	ofn.lpstrFileTitle = NULL;
 	ofn.nMaxFileTitle = 0;
 	ofn.lpstrInitialDir = NULL;
@@ -788,7 +788,9 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 
 	const bool res = GetOpenFileName(&ofn) != FALSE;
 	if (res) {
-		fromWChar(out, max_size, wout);
+		char tmp[MAX_PATH_LENGTH];
+		fromWChar(tmp, lengthOf(tmp), wout);
+		PathUtils::normalize(tmp, out, max_size);
 	}
 	else {
 		auto err = CommDlgExtendedError();

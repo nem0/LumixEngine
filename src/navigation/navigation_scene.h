@@ -44,8 +44,8 @@ public:
 	virtual void setIsGettingRootMotionFromAnim(EntityRef entity, bool is) = 0;
 	virtual bool generateNavmesh(EntityRef zone) = 0;
 	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;
-	virtual bool load(const char* path) = 0;
-	virtual bool save(const char* path) = 0;
+	virtual bool load(EntityRef zone_entity, const char* path) = 0;
+	virtual bool save(EntityRef zone_entity, const char* path) = 0;
 	virtual void debugDrawNavmesh(EntityRef zone, const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
 	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;
 	virtual void debugDrawHeightfield(EntityRef zone) = 0;

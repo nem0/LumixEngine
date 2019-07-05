@@ -44,6 +44,27 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			scene->generateNavmesh((EntityRef)cmp.entity);
 		}
 		ImGui::SameLine();
+		if (ImGui::Button("Load")) {
+			char path[MAX_PATH_LENGTH];
+			if (OS::getOpenFilename(path, lengthOf(path), "Navmesh\0*.nav\0", nullptr)) {
+				char rel[MAX_PATH_LENGTH];
+				m_app.getWorldEditor().makeRelative(rel, lengthOf(rel), path);
+				scene->load((EntityRef)cmp.entity, rel);
+			}		
+		}
+
+		if(scene->isNavmeshReady((EntityRef)cmp.entity)) {
+			ImGui::SameLine();
+			if (ImGui::Button("Save")) {
+				char path[MAX_PATH_LENGTH];
+				if (OS::getSaveFilename(path, lengthOf(path), "Navmesh\0*.nav\0", "nav")) {
+					char rel[MAX_PATH_LENGTH];
+					m_app.getWorldEditor().makeRelative(rel, lengthOf(rel), path);
+					scene->save((EntityRef)cmp.entity, rel);
+				}
+			}
+		}
+		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
 			const DVec3 camera_hit = m_app.getWorldEditor().getCameraRaycastHit();
 			scene->generateTileAt((EntityRef)cmp.entity, camera_hit, true);

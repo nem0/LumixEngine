@@ -687,47 +687,99 @@ struct NavigationSceneImpl final : public NavigationScene
 		// TODO
 	}
 
+	struct LoadCallback {
+		LoadCallback(NavigationSceneImpl& scene, EntityRef entity)
+			: scene(scene)
+			, entity(entity)
+		{}
 
-	bool load(const char* path) override
-	{
-		/*clearNavmesh();
+		void fileLoaded(u64 size, const u8* mem, bool success) {
+			auto iter = scene.m_zones.find(entity);
+			if (!iter.isValid()) {
+				LUMIX_DELETE(scene.m_allocator, this);
+				return;
+			}
+
+			if (!success) {
+				logError("Navigation") << "Could not load navmesh";
+				LUMIX_DELETE(scene.m_allocator, this);
+				return;
+			}
+
+			RecastZone& zone = iter.value();
+			if (!scene.initNavmesh(zone)) {
+				LUMIX_DELETE(scene.m_allocator, this);
+				return;
+			}
+
+			InputMemoryStream file(mem, size);
+			file.read(&scene.m_num_tiles_x, sizeof(scene.m_num_tiles_x));
+			file.read(&scene.m_num_tiles_z, sizeof(scene.m_num_tiles_z));
+			dtNavMeshParams params;
+			file.read(&params, sizeof(params));
+			if (dtStatusFailed(zone.navmesh->init(&params))) {
+				logError("Navigation") << "Could not init Detour navmesh";
+				LUMIX_DELETE(scene.m_allocator, this);
+				return;
+			}
+			for (int j = 0; j < scene.m_num_tiles_z; ++j) {
+				for (int i = 0; i < scene.m_num_tiles_x; ++i) {
+					int data_size;
+					file.read(&data_size, sizeof(data_size));
+					u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
+					file.read(data, data_size);
+					if (dtStatusFailed(zone.navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0))) {
+						dtFree(data);
+						LUMIX_DELETE(scene.m_allocator, this);
+						return;
+					}
+				}
+			}
+
+			if (!zone.crowd) scene.initCrowd(zone);
+
+			LUMIX_DELETE(scene.m_allocator, this);
+		}
+
+		NavigationSceneImpl& scene;
+		EntityRef entity;
+	};
+
+	bool load(EntityRef zone_entity, const char* path) override {
+		RecastZone& zone = m_zones[zone_entity];
+		clearNavmesh(zone);
+
+		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
 
 		FileSystem::ContentCallback cb;
-		cb.bind<NavigationSceneImpl, &NavigationSceneImpl::fileLoaded>(this);
+		cb.bind<LoadCallback, &LoadCallback::fileLoaded>(lcb);
 		FileSystem& fs = m_engine.getFileSystem();
-		return fs.getContent(Path(path), cb).isValid();*/
-		// TODO
-		return false;
+		return fs.getContent(Path(path), cb).isValid();
 	}
 
-	
-	bool save(const char* path) override
-	{
-		/*if (!m_navmesh) return false;
+	bool save(EntityRef zone_entity, const char* path) override {
+		RecastZone& zone = m_zones[zone_entity];
+		if (!zone.navmesh) return false;
 
 		FileSystem& fs = m_engine.getFileSystem();
 		
 		OS::OutputFile file;
 		if (!fs.open(path, &file)) return false;
 
-		file.write(&m_aabb, sizeof(m_aabb));
-		file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));
-		file.write(&m_num_tiles_z, sizeof(m_num_tiles_z));
-		auto params = m_navmesh->getParams();
-		file.write(params, sizeof(*params));
-		for (int j = 0; j < m_num_tiles_z; ++j)
-		{
-			for (int i = 0; i < m_num_tiles_x; ++i)
-			{
-				const auto* tile = m_navmesh->getTileAt(i, j, 0);
-				file.write(&tile->dataSize, sizeof(tile->dataSize));
-				file.write(tile->data, tile->dataSize);
+		bool success = file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));
+		success = success && file.write(&m_num_tiles_z, sizeof(m_num_tiles_z));
+		const dtNavMeshParams* params = zone.navmesh->getParams();
+		success = success && file.write(params, sizeof(*params));
+		for (int j = 0; j < m_num_tiles_z; ++j) {
+			for (int i = 0; i < m_num_tiles_x; ++i) {
+				const auto* tile = zone.navmesh->getTileAt(i, j, 0);
+				success = success && file.write(&tile->dataSize, sizeof(tile->dataSize));
+				success = success && file.write(tile->data, tile->dataSize);
 			}
 		}
 
-		file.close();*/
-		// TODO
-		return true;
+		file.close();
+		return success;
 	}
 
 
@@ -1281,6 +1333,8 @@ struct NavigationSceneImpl final : public NavigationScene
 
 
 	bool initNavmesh(RecastZone& zone) {
+		ASSERT(!zone.navmesh);
+
 		zone.navmesh = dtAllocNavMesh();
 		if (!zone.navmesh) {
 			logError("Navigation") << "Could not create Detour navmesh";
