@@ -625,7 +625,7 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 			hit.t = t;
 			return hit;
 		}
-		if (next_x < next_z) {
+		if (next_x < next_z && step_x != 0) {
 			next_x += delta_x;
 			hx += step_x;
 		}
