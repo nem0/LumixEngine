@@ -1727,7 +1727,7 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 	if(debug_name && debug_name[0]) {
 		CHECK_GL(glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name));
 	}
-	CHECK_GL(glGenerateMipmap(target));
+	CHECK_GL(glGenerateTextureMipmap(texture));
 	
 	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
 	CHECK_GL(glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap));
