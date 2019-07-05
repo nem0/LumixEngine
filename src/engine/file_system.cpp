@@ -8,6 +8,7 @@
 #include "engine/mt/task.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/queue.h"
 #include "engine/stream.h"
@@ -72,10 +73,7 @@ struct FileSystemImpl final : public FileSystem
 		, m_last_id(0)
 		, m_semaphore(0, 0xffFF)
 	{
-		m_base_path = base_path;
-		if (!endsWith(base_path, "/") && !endsWith(base_path, "\\")) {
-			m_base_path << '/';
-		}
+		setBasePath(base_path);
 		m_task = LUMIX_NEW(m_allocator, FSTask)(*this, m_allocator);
 		m_task->create("Filesystem", true);
 	}
@@ -101,8 +99,8 @@ struct FileSystemImpl final : public FileSystem
 
 	void setBasePath(const char* dir) override
 	{ 
-		m_base_path = dir; 
-		if (!endsWith(dir, "/") && !endsWith(dir, "\\")) {
+		PathUtils::normalize(dir, m_base_path.data, lengthOf(m_base_path.data));
+		if (!endsWith(m_base_path, "/") && !endsWith(m_base_path, "\\")) {
 			m_base_path << '/';
 		}
 	}
