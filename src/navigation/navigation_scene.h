@@ -37,7 +37,7 @@ public:
 	virtual float getAgentRadius(EntityRef entity) = 0;
 	virtual void setAgentHeight(EntityRef entity, float height) = 0;
 	virtual float getAgentHeight(EntityRef entity) = 0;
-	virtual void setAgentRootMotion(EntityRef entity, const DVec3& root_motion) = 0;
+	virtual void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) = 0;
 	virtual bool useAgentRootMotion(EntityRef entity) = 0;
 	virtual void setUseAgentRootMotion(EntityRef entity, bool use_root_motion) = 0;
 	virtual bool isGettingRootMotionFromAnim(EntityRef entity) = 0;
@@ -46,7 +46,6 @@ public:
 	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;
 	virtual bool load(const char* path) = 0;
 	virtual bool save(const char* path) = 0;
-	virtual int getPolygonCount() = 0;
 	virtual void debugDrawNavmesh(EntityRef zone, const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
 	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;
 	virtual void debugDrawHeightfield(EntityRef zone) = 0;

@@ -109,7 +109,7 @@ struct EnvironmentProbe
 
 struct DecalInfo
 {
-	Material* material;
+	Material* material = nullptr;
 	Transform transform;
 	float radius;
 };

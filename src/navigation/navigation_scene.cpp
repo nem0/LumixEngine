@@ -46,6 +46,7 @@ static const float CELL_SIZE = 0.3f;
 
 
 struct RecastZone {
+	EntityRef entity;
 	NavmeshZone zone;
 
 	dtNavMeshQuery* navquery = nullptr;
@@ -67,14 +68,14 @@ struct Agent
 		GET_ROOT_MOTION_FROM_ANIM_CONTROLLER = 1 << 1
 	};
 
-	EntityPtr zone;
+	EntityPtr zone = INVALID_ENTITY;
 	EntityRef entity;
 	float radius;
 	float height;
 	int agent;
 	bool is_finished;
 	u32 flags = 0;
-	DVec3 root_motion = {0, 0, 0};
+	Vec3 root_motion = {0, 0, 0};
 	float speed = 0;
 	float yaw_diff = 0;
 	float stop_distance = 0;
@@ -344,94 +345,97 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void setAgentRootMotion(EntityRef entity, const DVec3& root_motion) override
+	void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) override
 	{
 		m_agents[entity].root_motion = root_motion;
 	}
 
+	void update(RecastZone& zone, float time_delta) {
+		if (!zone.crowd) return;
+		zone.crowd->update(time_delta, nullptr);
 
-	void update(float time_delta, bool paused) override
-	{
-		/*PROFILE_FUNCTION();
-		if (!m_crowd) return;
-		if (paused) return;
-		m_crowd->update(time_delta, nullptr);
+		const Transform inv_tr = m_universe.getTransform(zone.entity).inverted();
 
-		for (auto& agent : m_agents)
-		{
+		for (auto& agent : m_agents) {
 			if (agent.agent < 0) continue;
-			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (agent.zone != zone.entity) continue;
+			
+			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
-			DVec3 pos = m_universe.getPosition(agent.entity);
-			Quat rot = m_universe.getRotation(agent.entity);
-			Vec3 diff = *(Vec3*)dt_agent->npos - pos.toFloat(); // TODO
+			const Vec3 pos = inv_tr.transform(m_universe.getPosition(agent.entity)).toFloat();
+			const Quat rot = m_universe.getRotation(agent.entity);
+			const Vec3 diff = *(Vec3*)dt_agent->npos - pos;
 
-			Vec3 velocity = *(Vec3*)dt_agent->nvel;
+			const Vec3 velocity = *(Vec3*)dt_agent->nvel;
 			agent.speed = diff.length() / time_delta;
 			agent.yaw_diff = 0;
-			if (velocity.squaredLength() > 0)
-			{
+			if (velocity.squaredLength() > 0) {
 				float wanted_yaw = atan2(velocity.x, velocity.z);
 				float current_yaw = rot.toEuler().y;
 				agent.yaw_diff = angleDiff(wanted_yaw, current_yaw);
 			}
 		}
-		m_on_update.invoke(time_delta);*/
-		// TODO
 	}
 
-
-	void lateUpdate(float time_delta, bool paused) override
-	{
-		/*PROFILE_FUNCTION();
-		if (!m_crowd) return;
+	void update(float time_delta, bool paused) override {
+		PROFILE_FUNCTION();
 		if (paused) return;
+		
+		for (RecastZone& zone : m_zones) {
+			update(zone, time_delta);
+		}
+
+		m_on_update.invoke(time_delta);
+	}
+
+	void lateUpdate(RecastZone& zone, float time_delta) {
+		if (!zone.crowd) return;
+		
+		const Transform zone_tr = m_universe.getTransform(zone.entity);
+		const Transform inv_zone_tr = zone_tr.inverted();
 
 		static const u32 ANIMATION_HASH = crc32("animation");
 		auto* anim_scene = (AnimationScene*)m_universe.getScene(ANIMATION_HASH);
 
-		for (Agent& agent : m_agents)
-		{
+		for (Agent& agent : m_agents) {
 			if (agent.agent < 0) continue;
-			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (agent.zone != zone.entity) continue;
+
+			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
-			Vec3 pos = m_universe.getPosition(agent.entity).toFloat(); // TODO
+			DVec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
-			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
-			{
-				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE))
-				{
+			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene) {
+				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE)) {
 					LocalRigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
-					agent.root_motion = DVec3(root_motion.pos); // TODO
+					agent.root_motion = root_motion.pos;
 					//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 				}
 			}
-			if (agent.flags & Agent::USE_ROOT_MOTION)
-			{
-				*(Vec3*)dt_agent->npos = pos + rot.rotate(agent.root_motion).toFloat(); // TODO
-				agent.root_motion = DVec3(0, 0, 0);
+			if (agent.flags & Agent::USE_ROOT_MOTION) {
+				*(Vec3*)dt_agent->npos = inv_zone_tr.transform(pos + rot.rotate(agent.root_motion)).toFloat();
+				agent.root_motion = Vec3::ZERO;
 			}
 		}
 
-		m_crowd->doMove(time_delta);
+		zone.crowd->doMove(time_delta);
 
-		for (auto& agent : m_agents)
-		{
+		for (auto& agent : m_agents) {
 			if (agent.agent < 0) continue;
-			const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
+			if (agent.zone != zone.entity) continue;
+
+			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
-			m_universe.setPosition(agent.entity, DVec3(*(Vec3*)dt_agent->npos)); // TODO
+			m_universe.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
 
-			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0)
-			{
+			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0) {
 				Vec3 vel = *(Vec3*)dt_agent->nvel;
 				vel.y = 0;
 				float len = vel.length();
-				if (len > 0)
-				{
+				if (len > 0) {
 					vel *= 1 / len;
 					float angle = atan2f(vel.x, vel.z);
 					Quat wanted_rot(Vec3(0, 1, 0), angle);
@@ -441,42 +445,41 @@ struct NavigationSceneImpl final : public NavigationScene
 					m_universe.setRotation(agent.entity, new_rot);
 				}
 			}
-			else if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene)
-			{
-				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE))
-				{
+			else if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene) {
+				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE)) {
 					LocalRigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
 					m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 				}
 			}
 
-			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING)
-			{
-				if (!agent.is_finished)
-				{
-					m_crowd->resetMoveTarget(agent.agent);
+			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING) {
+				if (!agent.is_finished) {
+					zone.crowd->resetMoveTarget(agent.agent);
 					agent.is_finished = true;
 					onPathFinished(agent);
 				}
 			}
-			else if (dt_agent->ncorners == 1 && agent.stop_distance > 0)
-			{
+			else if (dt_agent->ncorners == 1 && agent.stop_distance > 0) {
 				Vec3 diff = *(Vec3*)dt_agent->targetPos - *(Vec3*)dt_agent->npos;
-				if (diff.squaredLength() < agent.stop_distance * agent.stop_distance)
-				{
-					m_crowd->resetMoveTarget(agent.agent);
+				if (diff.squaredLength() < agent.stop_distance * agent.stop_distance) {
+					zone.crowd->resetMoveTarget(agent.agent);
 					agent.is_finished = true;
 					onPathFinished(agent);
 				}
 			}
-			else
-			{
+			else {
 				agent.is_finished = false;
 			}
-		}*/
-		// TODO
+		}
 	}
 
+	void lateUpdate(float time_delta, bool paused) override {
+		PROFILE_FUNCTION();
+		if (paused) return;
+		for (RecastZone& zone : m_zones) {
+			lateUpdate(zone, time_delta);
+		}
+	}
 
 	static float distancePtLine2d(const float* pt, const float* p, const float* q)
 	{
@@ -639,12 +642,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	bool isNavmeshReady(EntityRef zone) const override
-	{
-		// TODO
-		//return m_navmesh != nullptr;
-		return false;
-	}
+	bool isNavmeshReady(EntityRef zone) const override { return m_zones[zone].navmesh != nullptr; }
 
 
 	void fileLoaded(u64 size, const u8* mem, bool success)
@@ -961,17 +959,18 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	void stopGame() override
 	{
-		/*if (m_crowd)
-		{
-			for (Agent& agent : m_agents)
-			{
-				m_crowd->removeAgent(agent.agent);
-				agent.agent = -1;
+		for (RecastZone& zone : m_zones) {
+			if (zone.crowd) {
+				for (Agent& agent : m_agents) {
+					if (agent.zone == zone.entity) {
+						zone.crowd->removeAgent(agent.agent);
+						agent.agent = -1;
+					}
+				}
+				dtFreeCrowd(zone.crowd);
+				zone.crowd = nullptr;
 			}
-			dtFreeCrowd(m_crowd);
-			m_crowd = nullptr;
-		}*/
-		// TODO
+		}
 	}
 
 
@@ -980,43 +979,58 @@ struct NavigationSceneImpl final : public NavigationScene
 		auto* scene = m_universe.getScene(crc32("lua_script"));
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		
-		//if (m_navmesh && !m_crowd) initCrowd();
-		// TODO
+		for (RecastZone& zone : m_zones) {
+			if (zone.navmesh && !zone.crowd) initCrowd(zone);
+		}
 	}
 
 
-	bool initCrowd()
-	{
-		/*ASSERT(!m_crowd);
+	bool initCrowd(RecastZone& zone) {
+		ASSERT(!zone.crowd);
 
-		m_crowd = dtAllocCrowd();
-		if (!m_crowd->init(1000, 4.0f, m_navmesh))
-		{
-			dtFreeCrowd(m_crowd);
-			m_crowd = nullptr;
+		zone.crowd = dtAllocCrowd();
+		if (!zone.crowd->init(1000, 4.0f, zone.navmesh)) {
+			dtFreeCrowd(zone.crowd);
+			zone.crowd = nullptr;
 			return false;
 		}
-		for (auto iter = m_agents.begin(), end = m_agents.end(); iter != end; ++iter)
-		{
+
+		const Transform inv_zone_tr = m_universe.getTransform(zone.entity).inverted();
+		const Vec3 min = -zone.zone.extents;
+		const Vec3 max = zone.zone.extents;
+
+		for (auto iter = m_agents.begin(), end = m_agents.end(); iter != end; ++iter) {
 			Agent& agent = iter.value();
-			addCrowdAgent(agent);
+			if (agent.zone.isValid()) continue;
+
+			const Vec3 pos = inv_zone_tr.transform(m_universe.getPosition(agent.entity)).toFloat();
+			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
+				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
+			{
+				agent.zone = zone.entity;
+				addCrowdAgent(agent, zone);
+			}
 		}
-		*/
-		// TODO
 		return true;
 	}
 
+	RecastZone* getZone(const Agent& agent) {
+		if (!agent.zone.isValid()) return nullptr;
+		return &m_zones[(EntityRef)agent.zone];
+	}
 
-	void cancelNavigation(EntityRef entity) override
-	{
-		/*auto iter = m_agents.find(entity);
+	void cancelNavigation(EntityRef entity) override {
+		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return;
 
 		Agent& agent = iter.value();
 		if (agent.agent < 0) return;
+		
+		RecastZone* zone = getZone(agent);
 
-		m_crowd->resetMoveTarget(agent.agent);*/
-		// TODO
+		if (zone) {
+			zone->crowd->resetMoveTarget(agent.agent);
+		}
 	}
 
 
@@ -1036,43 +1050,40 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	bool navigate(EntityRef entity, const DVec3& dest, float speed, float stop_distance) override
+	bool navigate(EntityRef entity, const DVec3& world_dest, float speed, float stop_distance) override
 	{
-		/*if (!m_navquery) return false;
-		if (!m_crowd) return false;
 		auto iter = m_agents.find(entity);
 		if (iter == m_agents.end()) return false;
+		
 		Agent& agent = iter.value();
 		if (agent.agent < 0) return false;
+		if (!agent.zone.isValid()) return false;
+
+		RecastZone& zone = m_zones[(EntityRef)agent.zone];
+
+		if (!zone.navquery) return false;
+		if (!zone.crowd) return false;
+
 		dtPolyRef end_poly_ref;
 		dtQueryFilter filter;
 		static const float ext[] = { 1.0f, 20.0f, 1.0f };
-		m_navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
-		dtCrowdAgentParams params = m_crowd->getAgent(agent.agent)->params;
+
+		const Transform zone_tr = m_universe.getTransform(zone.entity);
+		const Vec3 dest = zone_tr.inverted().transform(world_dest).toFloat();
+
+		zone.navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
+		dtCrowdAgentParams params = zone.crowd->getAgent(agent.agent)->params;
 		params.maxSpeed = speed;
-		m_crowd->updateAgentParameters(agent.agent, &params);
-		if (m_crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x))
-		{
+		zone.crowd->updateAgentParameters(agent.agent, &params);
+		if (zone.crowd->requestMoveTarget(agent.agent, end_poly_ref, &dest.x)) {
 			agent.stop_distance = stop_distance;
 			agent.is_finished = false;
 		}
-		else
-		{
-			g_log_warning.log("Navigation") << "requestMoveTarget failed";
+		else {
+			logError("Navigation") << "requestMoveTarget failed";
 			agent.is_finished = true;
 		}
-		return !agent.is_finished;*/
-		// TODO
-		return false;
-	}
-
-
-	int getPolygonCount() override
-	{
-		/*if (!m_polymesh) return 0;
-		return m_polymesh->npolys;*/
-		// TODO
-		return 0;
+		return !agent.is_finished;
 	}
 
 
@@ -1325,11 +1336,11 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void addCrowdAgent(Agent& agent)
-	{
-		/*ASSERT(m_crowd);
+	void addCrowdAgent(Agent& agent, RecastZone& zone) {
+		ASSERT(zone.crowd);
 
-		Vec3 pos = m_universe.getPosition(agent.entity).toFloat(); // TODO
+		const Transform zone_tr = m_universe.getTransform(zone.entity);
+		const Vec3 pos = zone_tr.inverted().transform(m_universe.getPosition(agent.entity)).toFloat();
 		dtCrowdAgentParams params = {};
 		params.radius = agent.radius;
 		params.height = agent.height;
@@ -1338,25 +1349,25 @@ struct NavigationSceneImpl final : public NavigationScene
 		params.collisionQueryRange = params.radius * 12.0f;
 		params.pathOptimizationRange = params.radius * 30.0f;
 		params.updateFlags = DT_CROWD_ANTICIPATE_TURNS | DT_CROWD_SEPARATION | DT_CROWD_OBSTACLE_AVOIDANCE | DT_CROWD_OPTIMIZE_TOPO | DT_CROWD_OPTIMIZE_VIS;
-		agent.agent = m_crowd->addAgent(&pos.x, &params);
-		if (agent.agent < 0)
-		{
+		agent.agent = zone.crowd->addAgent(&pos.x, &params);
+		if (agent.agent < 0) {
 			logError("Navigation") << "Failed to create navigation actor";
-		}*/
-		// TODO
+		}
 	}
 
 	void createZone(EntityRef entity) {
 		RecastZone zone;
 		zone.zone.extents = Vec3(1);
+		zone.entity = entity;
 		m_zones.insert(entity, zone);
 		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
 	}
 
 	void destroyZone(EntityRef entity) {
+		// TODO remove all agents
 		auto iter = m_zones.find(entity);
 		m_zones.erase(iter);
-		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
+		m_universe.onComponentDestroyed(entity, NAVMESH_ZONE_TYPE, this);
 	}
 
 	void serializeZone(ISerializer& serializer, EntityRef entity) {
@@ -1366,6 +1377,7 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	void deserializeZone(IDeserializer& serializer, EntityRef entity, int scene_version) {
 		RecastZone zone;
+		zone.entity = entity;
 		serializer.read(&zone.zone.extents);
 		m_zones.insert(entity, zone);
 		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
@@ -1391,9 +1403,11 @@ struct NavigationSceneImpl final : public NavigationScene
 	{
 		auto iter = m_agents.find(entity);
 		const Agent& agent = iter.value();
-		// TODO
-		//if (m_crowd && agent.agent >= 0) m_crowd->removeAgent(agent.agent);
-		m_agents.erase(iter);
+		if (agent.zone.isValid()) {
+			RecastZone& zone = m_zones[(EntityRef)agent.zone];
+			if (zone.crowd && agent.agent >= 0) zone.crowd->removeAgent(agent.agent);
+			m_agents.erase(iter);
+		}
 		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
@@ -1446,7 +1460,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		serializer.write(count);
 		for (auto iter = m_zones.begin(); iter.isValid(); ++iter) {
 			serializer.write(iter.key());
-			serializer.write(iter.value());
+			serializer.write(iter.value().zone);
 		}
 
 		count = m_agents.size();
@@ -1466,10 +1480,11 @@ struct NavigationSceneImpl final : public NavigationScene
 		serializer.read(count);
 		m_zones.reserve(count);
 		for (int i = 0; i < count; ++i) {
-			NavmeshZone zone;
+			RecastZone zone;
 			EntityRef e;
 			serializer.read(e);
-			serializer.read(zone);
+			serializer.read(zone.zone);
+			m_zones.insert(e, zone);
 			m_universe.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
 		}
 
