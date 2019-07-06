@@ -52,6 +52,7 @@ Mesh::Mesh(Material* mat,
 	render_data->vertex_decl = vertex_decl;
 	render_data->vertex_buffer_handle = ffr::INVALID_BUFFER;
 	render_data->index_buffer_handle = ffr::INVALID_BUFFER;
+	render_data->index_type = ffr::DataType::U32;
 	for(AttributeSemantic& attr : render_data->attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
@@ -497,6 +498,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&mesh.indices[0], mesh.indices.size());
 		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem);
+		mesh.render_data->index_type = index_size == 2 ? ffr::DataType::U16 : ffr::DataType::U32;
 	}
 
 	for (int i = 0; i < object_count; ++i)

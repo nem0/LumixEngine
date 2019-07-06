@@ -69,6 +69,7 @@ struct LUMIX_RENDERER_API Mesh
 		AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
 		ffr::BufferHandle vertex_buffer_handle;
 		ffr::BufferHandle index_buffer_handle;
+		ffr::DataType index_type;
 		int indices_count;
 	};
 

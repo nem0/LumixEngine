@@ -2438,7 +2438,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 					uint(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
 					uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 
-				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::UINT32);
+				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
 		
 				elem_offset += pcmd->ElemCount;
 			}
