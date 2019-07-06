@@ -3,15 +3,19 @@ local film_grain_shader = nil
 function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return ldr_buffer end
 	if transparent_phase ~= "post_tonemap" then return ldr_buffer end
-	local res = env.createRenderbuffer(1, 1, true, "rgba8")
+	local res = env.createRenderbuffer(1, 1, true, "rgba8", "film_grain")
 	env.beginBlock("film_grain")
 	if film_grain_shader == nil then
 		film_grain_shader = env.preloadShader("pipelines/film_grain.shd")
 	end
 
-	env.blending("")
 	env.setRenderTargets(0, res)
-	env.drawArray(0, 4, film_grain_shader, { u_source = ldr_buffer })
+	env.drawArray(0, 4, film_grain_shader, 
+		{ ldr_buffer },
+		{},
+		{},
+		{ depth_test = false, blending = ""}
+	)
 	env.endBlock()
 	return res
 end
