@@ -124,7 +124,7 @@ vec3 env_brdf_approx (vec3 F0, float roughness, float NoV)
 
 vec3 PBR_ComputeIndirectLight(vec3 albedo, float roughness, float metallic, vec3 N, vec3 V)
 {
-	float ndotv = max(1e-5f, dot(N , V ));
+	float ndotv = clamp(dot(N , V ), 1e-5f, 1);
 	vec3 F0 = mix(vec3(0.04), albedo, metallic);		
 	vec3 irradiance = texture(u_irradiancemap, N).rgb;
 	vec3 F = F_Schlick(ndotv, F0);
