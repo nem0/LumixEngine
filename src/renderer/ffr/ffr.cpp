@@ -1176,8 +1176,8 @@ void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataTyp
 	GLenum t;
 	int ts;
 	switch(type) {
-		case DataType::UINT16: t = GL_UNSIGNED_SHORT; ts = sizeof(u16); break;
-		case DataType::UINT32: t = GL_UNSIGNED_INT; ts = sizeof(u32); break;
+		case DataType::U16: t = GL_UNSIGNED_SHORT; ts = sizeof(u16); break;
+		case DataType::U32: t = GL_UNSIGNED_INT; ts = sizeof(u32); break;
 		default: ASSERT(0); break;
 	}
 
@@ -1185,9 +1185,10 @@ void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataTyp
 	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)(offset * ts)));
 }
 
-void drawTrianglesInstanced(uint indices_offset, uint indices_count, uint instances_count)
+void drawTrianglesInstanced(uint indices_count, uint instances_count, DataType index_type)
 {
 	checkThread();
+	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 	if (instances_count * indices_count > 4096) {
 		struct {
 			uint  indices_count;
@@ -1198,25 +1199,26 @@ void drawTrianglesInstanced(uint indices_offset, uint indices_count, uint instan
 		} mdi;
 		mdi.indices_count = indices_count;
 		mdi.instances_count = instances_count;
-		mdi.indices_offset = indices_offset;
+		mdi.indices_offset = 0;
 		mdi.base_instance = 0;
 		mdi.base_vertex = 0;
 		// we use glMultiDrawElementsIndirect because of 
 		// https://devtalk.nvidia.com/default/topic/1052728/opengl/extremely-slow-gldrawelementsinstanced-compared-to-gldrawarraysinstanced-/
-		CHECK_GL(glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, &mdi, 1, 0));
+		CHECK_GL(glMultiDrawElementsIndirect(GL_TRIANGLES, type, &mdi, 1, 0));
 	}
 	else {
-		CHECK_GL(glDrawElementsInstanced(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, (const void*)(intptr_t)indices_offset, instances_count));
+		CHECK_GL(glDrawElementsInstanced(GL_TRIANGLES, indices_count, type, 0, instances_count));
 	}
 }
 
 
-void drawTriangles(uint indices_count)
+void drawTriangles(uint indices_count, DataType index_type)
 {
 	checkThread();
 
 	resetInstanceBuffer();
-	CHECK_GL(glDrawElements(GL_TRIANGLES, indices_count, GL_UNSIGNED_SHORT, 0));
+	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+	CHECK_GL(glDrawElements(GL_TRIANGLES, indices_count, type, 0));
 }
 
 

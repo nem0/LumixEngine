@@ -253,7 +253,7 @@ void SceneView::renderSelection()
 				ffr::setVertexBuffer(&rd->vertex_decl, rd->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 				ffr::setIndexBuffer(rd->index_buffer_handle);
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | item.material_render_states);
-				ffr::drawTriangles(rd->indices_count);
+				ffr::drawTriangles(rd->indices_count, rd->index_type);
 			}
 		}
 
@@ -326,7 +326,7 @@ void SceneView::renderGizmos()
 				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset + vb_offset, nullptr);
 				ffr::setIndexBuffer(ib.buffer);
 				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-				ffr::drawElements((ib.offset + ib_offset) / sizeof(u16), cmd.indices_count, primitive_type, ffr::DataType::UINT16);
+				ffr::drawElements((ib.offset + ib_offset) / sizeof(u16), cmd.indices_count, primitive_type, ffr::DataType::U16);
 
 				vb_offset += cmd.vertices_count * sizeof(Gizmo::RenderData::Vertex);
 				ib_offset += cmd.indices_count * sizeof(u16);

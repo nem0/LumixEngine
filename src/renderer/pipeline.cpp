@@ -898,7 +898,7 @@ struct PipelineImpl final : Pipeline
 
 						ffr::bindTextures(&texture_id, 0, 1);
 
-						ffr::drawTriangles(num_indices);
+						ffr::drawTriangles(num_indices, ffr::DataType::U32);
 
 						elem_offset += pcmd->ElemCount;
 					}
@@ -1373,7 +1373,7 @@ struct PipelineImpl final : Pipeline
 						? (u64)ffr::StateFlags::CULL_FRONT
 						: (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK;
 					ffr::setState(state | blend_state);
-					ffr::drawTriangles(36);
+					ffr::drawTriangles(36, ffr::DataType::U16);
 				}
 				ffr::popDebugGroup();
 			}
@@ -1958,13 +1958,13 @@ struct PipelineImpl final : Pipeline
 								ffr::setState(blend_state | (u64)ffr::StateFlags::CULL_FRONT);
 								const uint offs = offset + sizeof(float) * 16 * nonintersecting_count;
 								ffr::setInstanceBuffer(instance_decl, buffer, offs, 1, nullptr);
-								ffr::drawTrianglesInstanced(0, 36, total_count - nonintersecting_count);
+								ffr::drawTrianglesInstanced(36, total_count - nonintersecting_count, ffr::DataType::U16);
 							}
 
 							if (nonintersecting_count) {
 								ffr::setState(blend_state | (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK);
 								ffr::setInstanceBuffer(instance_decl, buffer, offset, 1, nullptr);
-								ffr::drawTrianglesInstanced(0, 36, nonintersecting_count);
+								ffr::drawTrianglesInstanced(36, nonintersecting_count, ffr::DataType::U16);
 							}
 						}
 					}
@@ -2117,7 +2117,7 @@ struct PipelineImpl final : Pipeline
 									}
 
 									ffr::setInstanceBuffer(instance_decl, buffer, offset, mesh->vertex_decl.attributes_count, instance_map);
-									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
+									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
 									++stats.draw_call_count;
 									stats.triangle_count += instances_count * mesh->indices_count / 3;
 									stats.instance_count += instances_count;
@@ -2160,7 +2160,7 @@ struct PipelineImpl final : Pipeline
 									}
 									ffr::setVertexBuffer(&mesh->vertex_decl, mesh->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 									ffr::setIndexBuffer(mesh->index_buffer_handle);
-									ffr::drawTriangles(mesh->indices_count);
+									ffr::drawTriangles(mesh->indices_count, mesh->index_type);
 									++stats.draw_call_count;
 									stats.triangle_count += mesh->indices_count / 3;
 									++stats.instance_count;
@@ -2184,7 +2184,7 @@ struct PipelineImpl final : Pipeline
 									ffr::setVertexBuffer(&decal_decl, m_pipeline->m_cube_vb, 0, nullptr);
 
 									ffr::setInstanceBuffer(decal_instance_decl, buffer, offset, 1, nullptr);
-									ffr::drawTrianglesInstanced(0, 36, count);
+									ffr::drawTrianglesInstanced(36, count, ffr::DataType::U16);
 									++stats.draw_call_count;
 									stats.instance_count += count;
 								}
@@ -2231,7 +2231,7 @@ struct PipelineImpl final : Pipeline
 									ffr::setInstanceBuffer(instance_decl, buffer, offset, 0, instance_map);
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
-									ffr::drawTrianglesInstanced(0, mesh->indices_count, instances_count);
+									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
 									
 									++stats.draw_call_count;
 									stats.instance_count += instances_count;
@@ -3362,7 +3362,7 @@ void Pipeline::renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle m
 		ffr::setVertexBuffer(&rd->vertex_decl, rd->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
 		ffr::setIndexBuffer(rd->index_buffer_handle);
 		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
-		ffr::drawTriangles(rd->indices_count);
+		ffr::drawTriangles(rd->indices_count, rd->index_type);
 	}
 }
 

@@ -154,8 +154,8 @@ enum class BufferFlags : uint {
 };
 
 enum class DataType {
-	UINT16,
-	UINT32
+	U16,
+	U32
 };
 
 
@@ -264,9 +264,9 @@ void destroy(QueryHandle query);
 void destroy(UniformHandle query);
 
 void setIndexBuffer(BufferHandle handle);
-void drawTriangles(uint indices_count);
-void drawTrianglesInstanced(uint indices_offset_bytes, uint indices_count, uint instances_count);
-void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataType type);
+void drawTriangles(uint indices_count, DataType index_type);
+void drawTrianglesInstanced(uint indices_count, uint instances_count, DataType index_type);
+void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataType index_type);
 void drawArrays(uint offset, uint count, PrimitiveType type);
 void drawTriangleStripArraysInstanced(uint offset, uint indices_count, uint instances_count);
 
