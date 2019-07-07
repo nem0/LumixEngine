@@ -590,10 +590,10 @@ struct NavigationSceneImpl final : public NavigationScene
 		Vec3 prev = *(Vec3*)dt_agent->npos;
 		for (int i = 0; i < dt_agent->ncorners; ++i) {
 			Vec3 tmp = *(Vec3*)&dt_agent->cornerVerts[i * 3];
-			render_scene->addDebugLine(DVec3(prev), DVec3(tmp), 0xffff0000); // TODO
+			render_scene->addDebugLine(zone_tr.transform(prev), zone_tr.transform(tmp), 0xffff0000);
 			prev = tmp;
 		}
-		render_scene->addDebugCross(DVec3(*(Vec3*)dt_agent->targetPos), 1.0f, 0xffffffff); // TODO
+		render_scene->addDebugCross(zone_tr.transform(*(Vec3*)dt_agent->targetPos), 1.0f, 0xffffffff);
 		const Vec3 vel = *(Vec3*)dt_agent->vel;
 		const DVec3 pos = m_universe.getPosition(entity);
 		render_scene->addDebugLine(pos, pos + zone_tr.rot.rotate(vel), 0xff0000ff);
@@ -643,49 +643,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		}
 	}
 
-
 	bool isNavmeshReady(EntityRef zone) const override { return m_zones[zone].navmesh != nullptr; }
-
-
-	void fileLoaded(u64 size, const u8* mem, bool success)
-	{
-		/*if (!success)
-		{
-			logError("Navigation") << "Could not load navmesh";
-			return;
-		}
-		if (!initNavmesh()) return;
-
-		InputMemoryStream file(mem, size);
-		file.read(&m_aabb, sizeof(m_aabb));
-		file.read(&m_num_tiles_x, sizeof(m_num_tiles_x));
-		file.read(&m_num_tiles_z, sizeof(m_num_tiles_z));
-		dtNavMeshParams params;
-		file.read(&params, sizeof(params));
-		if (dtStatusFailed(m_navmesh->init(&params)))
-		{
-			logError("Navigation") << "Could not init Detour navmesh";
-			return;
-		}
-		for (int j = 0; j < m_num_tiles_z; ++j)
-		{
-			for (int i = 0; i < m_num_tiles_x; ++i)
-			{
-				int data_size;
-				file.read(&data_size, sizeof(data_size));
-				u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
-				file.read(data, data_size);
-				if (dtStatusFailed(m_navmesh->addTile(data, data_size, DT_TILE_FREE_DATA, 0, 0)))
-				{
-					dtFree(data);
-					return;
-				}
-			}
-		}
-
-		if (!m_crowd) initCrowd();*/
-		// TODO
-	}
 
 	struct LoadCallback {
 		LoadCallback(NavigationSceneImpl& scene, EntityRef entity)
