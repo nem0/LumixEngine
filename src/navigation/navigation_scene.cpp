@@ -131,24 +131,25 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	void onEntityMoved(EntityRef entity)
 	{
-		/*auto iter = m_agents.find(entity);
+		auto iter = m_agents.find(entity);
 		if (!iter.isValid()) return;
+		if (m_moving_agent == entity) return;
 		if (iter.value().agent < 0) return;
 		const Agent& agent = iter.value();
+		RecastZone& zone = m_zones[(EntityRef)agent.zone];
+
 		const DVec3 pos = m_universe.getPosition(iter.key());
-		const dtCrowdAgent* dt_agent = m_crowd->getAgent(agent.agent);
-		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f)
-		{
-			DVec3 target_pos = DVec3(*(Vec3*)dt_agent->targetPos);
+		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
+		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f) {
+			const Transform old_zone_tr = m_universe.getTransform(zone.entity);
+			const DVec3 target_pos = old_zone_tr.transform(*(Vec3*)dt_agent->targetPos);
 			float speed = dt_agent->params.maxSpeed;
-			m_crowd->removeAgent(agent.agent);
-			addCrowdAgent(iter.value());
-			if (!agent.is_finished)
-			{
+			zone.crowd->removeAgent(agent.agent);
+			addCrowdAgent(iter.value(), zone);
+			if (!agent.is_finished) {
 				navigate({entity.index}, target_pos, speed, agent.stop_distance);
 			}
-		}*/
-		// TODO
+		}
 	}
 
 
@@ -176,19 +177,6 @@ struct NavigationSceneImpl final : public NavigationScene
 	{
 		rasterizeMeshes(zone_tr, aabb, ctx, cfg, solid);
 		rasterizeTerrains(zone_tr, aabb, ctx, cfg, solid);
-	}
-
-
-	AABB getTerrainSpaceAABB(const DVec3& terrain_pos, const Quat& terrain_rot, const AABB& aabb_world_space)
-	{
-		ASSERT(false);
-		// TODO
-		//Matrix mtx = terrain_rot.toMatrix();
-		//mtx.setTranslation(terrain_pos);
-		//mtx.fastInverse();
-		AABB ret = aabb_world_space;
-		//ret.transform(mtx);
-		return ret;
 	}
 
 
@@ -429,6 +417,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			if (dt_agent->paused) continue;
 
+			m_moving_agent = agent.entity;
 			m_universe.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
 
 			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0) {
@@ -470,6 +459,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			else {
 				agent.is_finished = false;
 			}
+			m_moving_agent = INVALID_ENTITY;
 		}
 	}
 
@@ -1378,8 +1368,18 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 	void destroyZone(EntityRef entity) {
-		// TODO remove all agents
 		auto iter = m_zones.find(entity);
+		const RecastZone& zone = iter.value();
+		if (zone.crowd) {
+			for (Agent& agent : m_agents) {
+				if (agent.zone == zone.entity) {
+					zone.crowd->removeAgent(agent.agent);
+					agent.agent = -1;
+				}
+			}
+			dtFreeCrowd(zone.crowd);
+		}
+
 		m_zones.erase(iter);
 		m_universe.onComponentDestroyed(entity, NAVMESH_ZONE_TYPE, this);
 	}
@@ -1397,8 +1397,24 @@ struct NavigationSceneImpl final : public NavigationScene
 		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
 	}
 
-	void createAgent(EntityRef entity)
-	{
+	void assignZone(Agent& agent) {
+		const DVec3 pos = m_universe.getPosition(agent.entity);
+		for (RecastZone& zone : m_zones) {
+			const Transform inv_zone_tr = m_universe.getTransform(zone.entity).inverted();
+			const Vec3 min = -zone.zone.extents;
+			const Vec3 max = zone.zone.extents;
+			const Vec3 pos = inv_zone_tr.transform(pos).toFloat();
+			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
+				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
+			{
+				agent.zone = zone.entity;
+				if (zone.crowd) addCrowdAgent(agent, zone);
+				return;
+			}
+		}
+	}
+
+	void createAgent(EntityRef entity) {
 		Agent agent;
 		agent.zone = INVALID_ENTITY;
 		agent.entity = entity;
@@ -1407,14 +1423,12 @@ struct NavigationSceneImpl final : public NavigationScene
 		agent.agent = -1;
 		agent.flags = Agent::USE_ROOT_MOTION;
 		agent.is_finished = true;
-		//if (m_crowd) addCrowdAgent(agent); // TODO
 		m_agents.insert(entity, agent);
+		assignZone(agent);
 		m_universe.onComponentCreated(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
-
-	void destroyAgent(EntityRef entity)
-	{
+	void destroyAgent(EntityRef entity) {
 		auto iter = m_agents.find(entity);
 		const Agent& agent = iter.value();
 		if (agent.zone.isValid()) {
@@ -1425,9 +1439,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
-
 	int getVersion() const override { return (int)NavigationSceneVersion::LATEST; }
-
 
 	void serializeAgent(ISerializer& serializer, EntityRef entity)
 	{
@@ -1461,7 +1473,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		}
 		agent.is_finished = true;
 		agent.agent = -1;
-		//if (m_crowd) addCrowdAgent(agent); // TODO
+		assignZone(agent);
 		m_agents.insert(agent.entity, agent);
 		
 		m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
@@ -1585,6 +1597,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	Engine& m_engine;
 	HashMap<EntityRef, RecastZone> m_zones;
 	HashMap<EntityRef, Agent> m_agents;
+	EntityPtr m_moving_agent = INVALID_ENTITY;
 	
 	Vec3 m_debug_tile_origin;
 	rcConfig m_config;
