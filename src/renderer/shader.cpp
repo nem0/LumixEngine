@@ -40,7 +40,7 @@ Shader::~Shader()
 }
 
 
-const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
+const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 {
 	ffr::checkThread();
 	auto iter = rd->programs.find(defines);
@@ -99,25 +99,14 @@ const Shader::Program& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 			}
 		}
 
-		Program program;
-
-		for(int& i : program.attribute_by_semantics) i = -1;
-		program.handle = ffr::allocProgramHandle();
-		if(program.handle.isValid() && !ffr::createProgram(program.handle, codes, types, rd->sources.size(), prefixes, 3 + defines_count, rd->path.c_str())) {
-			ffr::destroy(program.handle);
-			program.handle = ffr::INVALID_PROGRAM;
+		ffr::ProgramHandle program = ffr::allocProgramHandle();
+		if(program.isValid() && !ffr::createProgram(program, codes, types, rd->sources.size(), prefixes, 3 + defines_count, rd->path.c_str())) {
+			ffr::destroy(program);
+			program = ffr::INVALID_PROGRAM;
 		}
-		program.use_semantics = false;
-		if (program.handle.isValid()) {
-			ffr::uniformBlockBinding(program.handle, "GlobalState", 0);
-			ffr::uniformBlockBinding(program.handle, "PassState", 1);
-			for(const AttributeInfo& attr : rd->attributes) {
-				program.use_semantics = true;
-				const int loc = ffr::getAttribLocation(program.handle, attr.name);
-				if(loc >= 0) {
-					program.attribute_by_semantics[(int)attr.semantic] = loc;
-				}
-			}
+		if (program.isValid()) {
+			ffr::uniformBlockBinding(program, "GlobalState", 0);
+			ffr::uniformBlockBinding(program, "PassState", 1);
 		}
 		rd->programs.insert(defines, program);
 		iter = rd->programs.find(defines);
@@ -236,31 +225,6 @@ static void alpha_blending(lua_State* L, const char* mode)
 
 namespace LuaAPI
 {
-
-
-int attribute(lua_State* L)
-{
-	LuaWrapper::checkTableArg(L, 1);
-
-	lua_getfield(L, LUA_GLOBALSINDEX, "this");
-	Shader* shader = (Shader*)lua_touserdata(L, -1);
-	lua_pop(L, 1);
-
-	Shader::AttributeInfo& info = shader->m_render_data->attributes.emplace();
-	lua_getfield(L, 1, "name");
-	if (lua_isstring(L, -1)) {
-		info.name = lua_tostring(L, -1);
-	}
-	lua_pop(L, 1);
-	
-	lua_getfield(L, 1, "semantic");
-	if (lua_isnumber(L, -1)) {
-		info.semantic = (Mesh::AttributeSemantic)lua_tointeger(L, -1);
-	}
-	lua_pop(L, 1);
-
-	return 0;
-}
 
 
 int texture_slot(lua_State* L)
@@ -443,8 +407,6 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setfield(L, LUA_GLOBALSINDEX, "include");
 	lua_pushcclosure(L, LuaAPI::texture_slot, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
-	lua_pushcclosure(L, LuaAPI::attribute, 0);
-	lua_setfield(L, LUA_GLOBALSINDEX, "attribute");
 
 	lua_pushinteger(L, (int)Mesh::AttributeSemantic::POSITION);
 	lua_setglobal(L, "SEMANTICS_POSITION");
@@ -489,8 +451,8 @@ void Shader::unload()
 	if (m_render_data) {
 		m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
 			ShaderRenderData* rd = (ShaderRenderData*)ptr;
-			for(const Program& prg : rd->programs) {
-				if (prg.handle.isValid()) ffr::destroy(prg.handle);
+			for(const ffr::ProgramHandle prg : rd->programs) {
+				if (prg.isValid()) ffr::destroy(prg);
 			}
 			LUMIX_DELETE(rd->allocator, rd);
 		});

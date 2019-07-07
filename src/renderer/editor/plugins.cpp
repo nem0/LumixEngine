@@ -2372,10 +2372,16 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			const uint num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
 			const uint num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
-			ffr::VertexDecl decl;
-			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-			decl.addAttribute(2, ffr::AttributeType::FLOAT, false, false);
-			decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+			const ffr::VertexAttrib attribs[] = {
+				{ 0, 2, ffr::AttributeType::FLOAT, 0, false, false, false },
+				{ 1, 2, ffr::AttributeType::FLOAT, 8, false, false, false },
+				{ 2, 4, ffr::AttributeType::U8, 16, true, false, false }
+			};
+
+			// TODO reuse
+			ffr::VAOHandle vao = ffr::allocVAOHandle();
+			ffr::createVAO(vao, attribs, 3);
+			ffr::bindVAO(vao);
 
 			const bool use_big_buffers = (vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024 ||
 				(ib_offset + num_indices) * sizeof(ImDrawIdx) > 1024 * 1024;
@@ -2386,8 +2392,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				big_ib = ffr::allocBufferHandle();
 				ffr::createBuffer(big_vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
 				ffr::createBuffer(big_ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
-				ffr::setVertexBuffer(&decl, big_vb, 0, nullptr);
-				ffr::setIndexBuffer(big_ib);
+				ffr::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
+				ffr::bindIndexBuffer(big_ib);
 			}
 			else {
 				ffr::update(ib
@@ -2399,8 +2405,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 					, vb_offset * sizeof(ImDrawVert)
 					, num_vertices * sizeof(ImDrawVert));
 
-				ffr::setVertexBuffer(&decl, vb, vb_offset * sizeof(ImDrawVert), nullptr);
-				ffr::setIndexBuffer(ib);
+				ffr::bindVertexBuffer(0, vb, vb_offset * sizeof(ImDrawVert), sizeof(ImDrawVert));
+				ffr::bindIndexBuffer(ib);
 			}
 			renderer->free(cmd_list.vtx_buffer);
 			renderer->free(cmd_list.idx_buffer);
@@ -2450,6 +2456,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				ib_offset += num_indices;
 				vb_offset += num_vertices;
 			}
+			ffr::destroy(vao);
 		}
 
 

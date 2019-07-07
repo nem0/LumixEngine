@@ -3,9 +3,6 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
-attribute { name = "a_position", semantic = SEMANTICS_POSITION }
-attribute { name = "a_uv", semantic = SEMANTICS_TEXCOORD0 }
-
 ------------------
 
 vertex_shader [[

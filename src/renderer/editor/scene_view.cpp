@@ -239,19 +239,16 @@ void SceneView::renderSelection()
 		{
 			PROFILE_FUNCTION();
 			for (const Item& item : m_items) {
-				const Shader::Program& prog = Shader::getProgram(item.shader, 0); // TODO define
-				if(!prog.handle.isValid()) continue;
+				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, 0); // TODO define
+				if (!prog.isValid()) continue;
 
-				int attribute_map[16];
 				const Mesh::RenderData* rd = item.mesh;
-				for(uint i = 0; i < rd->vertex_decl.attributes_count; ++i) {
-					attribute_map[i] = prog.attribute_by_semantics[(int)rd->attributes_semantic[i]];
-				}
 			
 				ffr::setUniformMatrix4f(m_mtx_uniform, &item.mtx.m11);
-				ffr::useProgram(prog.handle);
-				ffr::setVertexBuffer(&rd->vertex_decl, rd->vertex_buffer_handle, 0, prog.use_semantics ? attribute_map : nullptr);
-				ffr::setIndexBuffer(rd->index_buffer_handle);
+				ffr::useProgram(prog);
+				ffr::bindVAO(rd->vao);
+				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vertex_decl.size);
+				ffr::bindIndexBuffer(rd->index_buffer_handle);
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | item.material_render_states);
 				ffr::drawTriangles(rd->indices_count, rd->index_type);
 			}
@@ -308,12 +305,18 @@ void SceneView::renderGizmos()
 			PROFILE_FUNCTION();
 			if (data.cmds.empty()) return;
 
-			const ffr::ProgramHandle prg = Shader::getProgram(shader, 0).handle;
+			const ffr::ProgramHandle prg = Shader::getProgram(shader, 0);
 			if (!prg.isValid()) return;
 
-			ffr::VertexDecl vertex_decl;
-			vertex_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-			vertex_decl.addAttribute(4, ffr::AttributeType::U8, true, false);
+			const ffr::VertexAttrib attribs[] = {
+				{0, 3, ffr::AttributeType::FLOAT, 0, false, false, false},
+				{1, 4, ffr::AttributeType::U8, 12, true, false, false},
+			};
+			
+			// TODO reuse vao
+			ffr::VAOHandle vao = ffr::allocVAOHandle();
+			ffr::createVAO(vao, attribs, 2);
+			ffr::bindVAO(vao);
 
 			renderer->beginProfileBlock("gizmos", 0);
 			ffr::pushDebugGroup("gizmos");
@@ -323,8 +326,8 @@ void SceneView::renderGizmos()
 			for(Gizmo::RenderData::Cmd& cmd : data.cmds) {
 				ffr::setUniformMatrix4f(model_uniform, &cmd.mtx.m11);
 				ffr::useProgram(prg);
-				ffr::setVertexBuffer(&vertex_decl, vb.buffer, vb.offset + vb_offset, nullptr);
-				ffr::setIndexBuffer(ib.buffer);
+				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
+				ffr::bindIndexBuffer(ib.buffer);
 				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
 				ffr::drawElements((ib.offset + ib_offset) / sizeof(u16), cmd.indices_count, primitive_type, ffr::DataType::U16);
 
@@ -332,6 +335,7 @@ void SceneView::renderGizmos()
 				ib_offset += cmd.indices_count * sizeof(u16);
 			}
 			ffr::popDebugGroup();
+			
 			renderer->endProfileBlock();
 		}
 

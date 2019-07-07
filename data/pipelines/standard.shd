@@ -18,17 +18,6 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
-attribute { name = "a_position", semantic = SEMANTICS_POSITION }
-attribute { name = "a_color", semantic = SEMANTICS_COLOR0 }
-attribute { name = "a_uv", semantic = SEMANTICS_TEXCOORD0 }
-attribute { name = "a_normal", semantic = SEMANTICS_NORMAL }
-attribute { name = "a_tangent", semantic = SEMANTICS_TANGENT }
-attribute { name = "a_indices", semantic = SEMANTICS_INDICES }
-attribute { name = "a_weights", semantic = SEMANTICS_WEIGHTS }
-attribute { name = "i_rot_quat", semantic = SEMANTICS_INSTANCE0 }
-attribute { name = "i_pos_scale", semantic = SEMANTICS_INSTANCE1 }
-attribute { name = "i_grass_normal", semantic = SEMANTICS_INSTANCE2 }
-
 include "pipelines/common.glsl"
 
 ------------------

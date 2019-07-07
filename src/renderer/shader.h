@@ -64,17 +64,6 @@ public:
 		Array<char> code;
 	};
 
-	struct Program {
-		int attribute_by_semantics[16];
-		bool use_semantics;
-		ffr::ProgramHandle handle;
-	};
-
-	struct AttributeInfo {
-		StaticString<32> name;
-		Mesh::AttributeSemantic semantic;
-	};
-
 public:
 	static const int MAX_TEXTURE_SLOT_COUNT = 16;
 	ShaderRenderData* m_render_data;
@@ -85,7 +74,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	static const Program& getProgram(ShaderRenderData* rd, u32 defines);
+	static const ffr::ProgramHandle& getProgram(ShaderRenderData* rd, u32 defines);
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -114,15 +103,13 @@ struct ShaderRenderData
 		, include(allocator)
 		, sources(allocator)
 		, common_source(allocator)
-		, attributes(allocator)
 	{}
 	IAllocator& allocator;
 	Renderer& renderer;
-	HashMap<u32, Shader::Program> programs;
+	HashMap<u32, ffr::ProgramHandle> programs;
 	Array<Shader::Source> sources;
 	Array<char> include;
 	Array<char> common_source;
-	Array<Shader::AttributeInfo> attributes;
 	Path path;
 };
 

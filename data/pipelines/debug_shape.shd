@@ -1,6 +1,3 @@
-attribute { name = "a_position", semantic = SEMANTICS_POSITION }
-attribute { name = "a_color", semantic = SEMANTICS_COLOR0 }
-
 vertex_shader [[
 	uniform mat4 u_model;
 	layout(location = 0) in vec3 a_position;
