@@ -2552,8 +2552,10 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 }
 
 
-static bool parseObjects(const Element& root, Scene* scene, bool triangulate)
+static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 {
+	const bool triangulate = (flags & (u64)LoadFlags::TRIANGULATE) != 0;
+	const bool ignore_geometry = (flags & (u64)LoadFlags::IGNORE_GEOMETRY) != 0;
 	const Element* objs = findChild(root, "Objects");
 	if (!objs) return true;
 
@@ -2585,7 +2587,7 @@ static bool parseObjects(const Element& root, Scene* scene, bool triangulate)
 		{
 			Property* last_prop = iter.second.element->first_property;
 			while (last_prop->next) last_prop = last_prop->next;
-			if (last_prop && last_prop->value == "Mesh")
+			if (last_prop && last_prop->value == "Mesh" && !ignore_geometry)
 			{
 				obj = parseGeometry(*scene, *iter.second.element, triangulate);
 			}
@@ -3037,7 +3039,7 @@ Object* Object::getParent() const
 }
 
 
-IScene* load(const u8* data, int size, bool triangulate)
+IScene* load(const u8* data, int size, u64 flags)
 {
 	std::unique_ptr<Scene> scene(new Scene());
 	scene->m_data.resize(size);
@@ -3062,7 +3064,7 @@ IScene* load(const u8* data, int size, bool triangulate)
 	// if (parseTemplates(*root.getValue()).isError()) return nullptr;
 	if (!parseConnections(*root.getValue(), scene.get())) return nullptr;
 	if (!parseTakes(scene.get())) return nullptr;
-	if (!parseObjects(*root.getValue(), scene.get(), triangulate)) return nullptr;
+	if (!parseObjects(*root.getValue(), scene.get(), flags)) return nullptr;
 	parseGlobalSettings(*root.getValue(), scene.get());
 
 	return scene.release();

@@ -191,13 +191,15 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene)
 {
 	for (const ImportMesh& mesh : meshes)
 	{
-		const ofbx::Skin* skin = mesh.fbx->getGeometry()->getSkin();
-		if (skin)
-		{
-			for (int i = 0; i < skin->getClusterCount(); ++i)
+		if(mesh.fbx->getGeometry()) {
+			const ofbx::Skin* skin = mesh.fbx->getGeometry()->getSkin();
+			if (skin)
 			{
-				const ofbx::Cluster* cluster = skin->getCluster(i);
-				insertHierarchy(bones, cluster->getLink());
+				for (int i = 0; i < skin->getClusterCount(); ++i)
+				{
+					const ofbx::Cluster* cluster = skin->getCluster(i);
+					insertHierarchy(bones, cluster->getLink());
+				}
 			}
 		}
 	}
@@ -571,7 +573,7 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 	for (int i = 0; i < c; ++i)
 	{
 		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(i);
-		if (fbx_mesh->getGeometry()->getVertexCount() == 0) continue;
+		//if (fbx_mesh->getGeometry()->getVertexCount() == 0) continue;
 		const int mat_count = fbx_mesh->getMaterialCount();
 		for (int j = 0; j < mat_count; ++j)
 		{
@@ -610,7 +612,7 @@ FBXImporter::FBXImporter(IAllocator& allocator)
 }
 
 
-bool FBXImporter::setSource(const char* base_dir, const char* filename)
+bool FBXImporter::setSource(const char* base_dir, const char* filename, bool ignore_geometry)
 {
 	PROFILE_FUNCTION();
 	if(scene) {
@@ -636,7 +638,8 @@ bool FBXImporter::setSource(const char* base_dir, const char* filename)
 	}
 	file.close();
 
-	scene = ofbx::load(&data[0], data.size());
+	const u64 flags = ignore_geometry ? (u64)ofbx::LoadFlags::IGNORE_GEOMETRY : (u64)ofbx::LoadFlags::TRIANGULATE;
+	scene = ofbx::load(&data[0], data.size(), (u64)ofbx::LoadFlags::IGNORE_GEOMETRY);
 	if (!scene)
 	{
 		logError("FBX") << "Failed to import \"" << fullpath << ": " << ofbx::getError();
@@ -647,10 +650,13 @@ bool FBXImporter::setSource(const char* base_dir, const char* filename)
 	char src_dir[MAX_PATH_LENGTH];
 	PathUtils::getDir(src_dir, lengthOf(src_dir), filename);
 	gatherMeshes(scene);
-	gatherMaterials(root, src_dir);
-	materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
-	gatherBones(*scene);
-	gatherAnimations(*scene);
+
+	if (!ignore_geometry) {
+		gatherMaterials(root, src_dir);
+		materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
+		gatherBones(*scene);
+		gatherAnimations(*scene);
+	}
 
 	return true;
 }

@@ -2195,7 +2195,7 @@ public:
 
 		AssetCompiler& compiler = studio->getAssetCompiler();
 		if (ResourceType(type) == INVALID_RESOURCE_TYPE) return 0;
-		auto& resources_paths = compiler.getResources(ResourceType(type));
+		auto& resources_paths = compiler.lockResources(ResourceType(type));
 
 		lua_createtable(L, resources_paths.size(), 0);
 		int i = 0;
@@ -2206,6 +2206,7 @@ public:
 			++i;
 		}
 
+		compiler.unlockResources();
 		return 1;
 	}
 

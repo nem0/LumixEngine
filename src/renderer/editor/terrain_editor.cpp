@@ -1387,7 +1387,7 @@ void TerrainEditor::onGUI()
 			static ImVec2 size(-1, 100);
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 			ImGui::ListBoxHeader("Prefabs", size);
-			auto& all_prefabs = m_app.getAssetCompiler().getResources(PrefabResource::TYPE);
+			auto& all_prefabs = m_app.getAssetCompiler().lockResources(PrefabResource::TYPE);
 			for(int i = 0; i < all_prefabs.size(); ++i)
 			{
 				if (filter[0] != 0 && stristr(all_prefabs[i].c_str(), filter) == nullptr) continue;
@@ -1411,6 +1411,7 @@ void TerrainEditor::onGUI()
 					}
 				}
 			}
+			m_app.getAssetCompiler().unlockResources();
 			ImGui::ListBoxFooter();
 			ImGui::HSplitter("after_prefab", &size);
 

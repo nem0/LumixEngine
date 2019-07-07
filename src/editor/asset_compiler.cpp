@@ -48,15 +48,12 @@ struct AssetCompilerTask : MT::Task
 };
 
 
-void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources)
+void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const char* path)
 {
 	const ResourceType type = compiler.getResourceType(path);
 	if (type == INVALID_RESOURCE_TYPE) return;
 	
-	const Path path_obj(path);
-	auto iter = subresources.find(type);
-	if (!iter.isValid()) return;
-	if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
+	compiler.addResource(type, path);
 }
 
 
@@ -144,6 +141,13 @@ struct AssetCompilerImpl : AssetCompiler
 		FileSystemWatcher::destroy(m_watcher);
 	}
 
+	void addResource(ResourceType type, const char* path) override {
+		const Path path_obj(path);
+		MT::CriticalSectionLock lock(m_resources_mutex);
+		auto iter = m_resources.find(type);
+		if (!iter.isValid()) return;
+		if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
+	}
 
 	ResourceType getResourceType(const char* path) const override
 	{
@@ -173,6 +177,8 @@ struct AssetCompilerImpl : AssetCompiler
 		m_registered_extensions.insert(hash, type);
 
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		
+		MT::CriticalSectionLock lock(m_resources_mutex);
 		if (!m_resources.find(type).isValid()) {
 			m_resources.insert(type, Array<Path>(allocator));
 		}
@@ -188,7 +194,7 @@ struct AssetCompilerImpl : AssetCompiler
 		auto iter = m_plugins.find(crc32(ext));
 		if (!iter.isValid()) return;
 
-		iter.value()->addSubresources(*this, fullpath, m_resources);
+		iter.value()->addSubresources(*this, fullpath);
 	}
 
 	
@@ -267,6 +273,7 @@ struct AssetCompilerImpl : AssetCompiler
 				LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this](const Path& p){
 					const ResourceType type = getResourceType(p.c_str());
 					if (type != INVALID_RESOURCE_TYPE) {
+						MT::CriticalSectionLock lock(m_resources_mutex);
 						auto iter = m_resources.find(type);
 						if (iter.isValid() && iter.value().indexOf(p) < 0) {
 							iter.value().push(p);
@@ -313,6 +320,8 @@ struct AssetCompilerImpl : AssetCompiler
 	Array<Path> removeResource(const char* path)
 	{
 		Array<Path> res(m_app.getWorldEditor().getAllocator());
+
+		MT::CriticalSectionLock lock(m_resources_mutex);
 		for (Array<Path>& tmp : m_resources) {
 			for (int i = tmp.size() - 1; i >= 0; --i) {
 				const Path& p = tmp[i];
@@ -540,12 +549,14 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 	}
 
-
-	const Array<Path>& getResources(ResourceType type) const override
-	{
-		return m_resources[type];
+	void unlockResources() override {
+		m_resources_mutex.exit();
 	}
 
+	const Array<Path>& lockResources(ResourceType type) override {
+		m_resources_mutex.enter();
+		return m_resources[type];
+	}
 
 	MT::Semaphore m_semaphore;
 	MT::SpinMutex m_to_compile_mutex;
@@ -560,6 +571,7 @@ struct AssetCompilerImpl : AssetCompiler
 	HashMap<u32, IPlugin*> m_plugins;
 	AssetCompilerTask m_task;
 	FileSystemWatcher* m_watcher;
+	MT::CriticalSection m_resources_mutex;
 	HashMap<ResourceType, Array<Path>> m_resources;
 	HashMap<u32, ResourceType> m_registered_extensions;
 	int m_log_id = -1;

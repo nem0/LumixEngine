@@ -657,8 +657,10 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height), false, ImGuiWindowFlags_HorizontalScrollbar);
-	const AssetCompiler& compiler = m_app.getAssetCompiler();
-	for (const auto& res : compiler.getResources(type))
+	AssetCompiler& compiler = m_app.getAssetCompiler();
+	
+	const Array<Path>& resourcs = compiler.lockResources(type);
+	for (const auto& res : resourcs)
 	{
 		if (filter[0] != '\0' && strstr(res.c_str(), filter) == nullptr) continue;
 
@@ -666,10 +668,12 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 		{
 			copyString(buf, max_size, res.c_str());
 			ImGui::EndChild();
+			compiler.unlockResources();
 			return true;
 		}
 	}
 	ImGui::EndChild();
+	compiler.unlockResources();
 	return false;
 }
 

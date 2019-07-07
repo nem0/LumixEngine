@@ -33,7 +33,7 @@ struct AssetCompiler
 	{
 		virtual ~IPlugin() {}
 		virtual bool compile(const Path& src) = 0;
-		virtual void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources);
+		virtual void addSubresources(AssetCompiler& compiler, const char* path);
 	};
 
 	static AssetCompiler* create(StudioApp& app);
@@ -49,8 +49,10 @@ struct AssetCompiler
 	virtual const char* getCompiledDir() const = 0;
 	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
 	virtual void updateMeta(const Path& res, const char* src) const = 0;
-	virtual const Array<Path>& getResources(ResourceType) const = 0;
+	virtual const Array<Path>& lockResources(ResourceType) = 0;
+	virtual void unlockResources() = 0;
 	virtual void registerDependency(const Path& included_from, const Path& dependency) = 0;
+	virtual void addResource(ResourceType type, const char* path) = 0;
 
 	virtual ResourceType getResourceType(const char* path) const = 0;
 	virtual void registerExtension(const char* extension, ResourceType type) = 0;
