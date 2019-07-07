@@ -17,6 +17,12 @@ static_assert(sizeof(u64) == 8, "u64 is not 8 bytes");
 static_assert(sizeof(i64) == 8, "i64 is not 8 bytes");
 
 
+enum class LoadFlags : u64 {
+	TRIANGULATE = 1 << 0,
+	IGNORE_GEOMETRY = 1 << 1,
+};
+
+
 struct Vec2
 {
 	double x, y;
@@ -445,7 +451,7 @@ protected:
 };
 
 
-IScene* load(const u8* data, int size, bool triangulate = true);
+IScene* load(const u8* data, int size, u64 flags);
 const char* getError();
 
 

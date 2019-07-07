@@ -490,6 +490,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	~ModelPlugin()
 	{
+		JobSystem::wait(m_subres_signal);
 		auto& engine = m_app.getWorldEditor().getEngine();
 		engine.destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
@@ -508,37 +509,39 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return meta;
 	}
 
+	void addSubresources(AssetCompiler& compiler, const char* path) override {
+		compiler.addResource(Model::TYPE, path);
 
-	void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources) override
-	{
 		const Meta meta = getMeta(Path(path));
-		auto iter = subresources.find(Model::TYPE);
-		if (!iter.isValid()) return;
-		
-		const Path path_obj(path);
-		if (iter.value().indexOf(path_obj) >= 0) return;
-
-		iter.value().push(path_obj);
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-
 		if(meta.split) {
-			m_fbx_importer.setSource(fs.getBasePath(), path[0] == '/' ? path + 1 : path);
-			const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
-			for (int i = 0; i < meshes.size(); ++i) {
-				char mesh_name[256];
-				m_fbx_importer.getImportMeshName(meshes[i], mesh_name);
-				StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ":", (path[0] == '/' ? path + 1: path));
-				Path subpath_obj(tmp);
-				if (iter.value().indexOf(subpath_obj) < 0) iter.value().push(subpath_obj);
-			}
-		}
-		else {
-			const Path path_obj(path);
-			if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
+			struct JobData {
+				ModelPlugin* plugin;
+				StaticString<MAX_PATH_LENGTH> path;
+			};
+			JobData* data = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), JobData);
+			data->plugin = this;
+			data->path = path;
+			JobSystem::runEx(data, [](void* ptr) {
+				JobData* data = (JobData*)ptr;
+				ModelPlugin* plugin = data->plugin;
+				WorldEditor& editor = plugin->m_app.getWorldEditor();
+				FBXImporter importer(editor.getAllocator());
+				FileSystem& fs = editor.getEngine().getFileSystem();
+				AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
+
+				const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path;
+				importer.setSource(fs.getBasePath(), path, true);
+				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
+				for (int i = 0; i < meshes.size(); ++i) {
+					char mesh_name[256];
+					importer.getImportMeshName(meshes[i], mesh_name);
+					StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ":", path);
+					compiler.addResource(Model::TYPE, tmp);
+				}
+				LUMIX_DELETE(editor.getAllocator(), data);
+			}, &m_subres_signal, JobSystem::INVALID_HANDLE, 2);			
 		}
 	}
-
 
 	static const char* getResourceFilePath(const char* str)
 	{
@@ -557,7 +560,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const Meta meta = getMeta(Path(filepath));
 			cfg.mesh_scale = meta.scale;
 			const PathUtils::FileInfo src_info(filepath);
-			m_fbx_importer.setSource(cfg.base_path, filepath);
+			m_fbx_importer.setSource(cfg.base_path, filepath, false);
 			if (m_fbx_importer.getMeshes().empty()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
 					logError("Editor") << "No meshes with materials found in " << src;
@@ -1121,6 +1124,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 	int m_captured_mouse_x;
 	int m_captured_mouse_y;
 	FBXImporter m_fbx_importer;
+	JobSystem::SignalHandle m_subres_signal = JobSystem::INVALID_HANDLE;
 };
 
 
@@ -1535,17 +1539,10 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		lua_close(L);
 	}
 
-
-	void addSubresources(AssetCompiler& compiler, const char* path, HashMap<ResourceType, Array<Path>, HashFunc<ResourceType>>& subresources) override
-	{
-		const Path path_obj(path);
-		auto iter = subresources.find(Shader::TYPE);
-		if (!iter.isValid()) return;
-		if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
-
+	void addSubresources(AssetCompiler& compiler, const char* path) override {
+		compiler.addResource(Shader::TYPE, path);
 		findIncludes(path);
 	}
-
 
 	bool compile(const Path& src) override
 	{
