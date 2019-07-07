@@ -51,6 +51,7 @@ Mesh::Mesh(Material* mat,
 	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
 	render_data->vertex_decl = vertex_decl;
 	render_data->vertex_buffer_handle = ffr::INVALID_BUFFER;
+	render_data->vao = ffr::INVALID_VAO;
 	render_data->index_buffer_handle = ffr::INVALID_BUFFER;
 	render_data->index_type = ffr::DataType::U32;
 	for(AttributeSemantic& attr : render_data->attributes_semantic) {
@@ -538,6 +539,43 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&vertices_mem[0], vertices_mem.size());
 		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(mem);
+		ffr::VertexAttrib attribs[16] = {};
+		ffr::VertexAttrib* attr = attribs;
+		if (position_attribute_offset >= 0)	{
+			*attr = { 0, 3, ffr::AttributeType::FLOAT, (u32)position_attribute_offset, false, false, false };
+			++attr;
+		}
+		if (uv_attribute_offset >= 0)	{
+			*attr = { 1, 2, ffr::AttributeType::FLOAT, (u32)uv_attribute_offset, false, false, false };
+			++attr;
+		}
+		const int normal_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::NORMAL);
+		if (normal_attribute_offset >= 0)	{
+			*attr = { 2, 4, ffr::AttributeType::U8, (u32)normal_attribute_offset, true, true, false };
+			++attr;
+		}
+		const int tangent_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::TANGENT);
+		if (tangent_attribute_offset >= 0)	{
+			*attr = { 3, 4, ffr::AttributeType::U8, (u32)tangent_attribute_offset, true, true, false };
+			++attr;
+		}
+
+		if(weights_attribute_offset < 0) {
+			*attr = { 4, 4, ffr::AttributeType::FLOAT, 0, false, false, true };
+			++attr;
+			*attr = { 5, 4, ffr::AttributeType::FLOAT, 16, false, false, true };
+			++attr;
+			// TODO this is here because of grass, find a better solution
+			*attr = { 6, 4, ffr::AttributeType::FLOAT, 32, false, false, true };
+			++attr;
+		}
+		else {
+			*attr = { 4, 4, ffr::AttributeType::I16, (u32)bone_indices_attribute_offset, false, true, false };
+			++attr;
+			*attr = { 5, 4, ffr::AttributeType::FLOAT, (u32)weights_attribute_offset, false, false, false };
+			++attr;
+		}
+		mesh.render_data->vao = m_renderer.createVAO(attribs, u32(attr - attribs));
 	}
 	file.read(&m_bounding_radius, sizeof(m_bounding_radius));
 	file.read(&m_aabb, sizeof(m_aabb));
@@ -643,6 +681,7 @@ void Model::unload()
 	}
 
 	for (Mesh& mesh : m_meshes) {
+		m_renderer.destroy(mesh.render_data->vao);
 		m_renderer.runInRenderThread(mesh.render_data, [](Renderer& renderer, void* ptr){
 			Mesh::RenderData* rd = (Mesh::RenderData*)ptr;
 			if (rd->index_buffer_handle.isValid()) ffr::destroy(rd->index_buffer_handle);

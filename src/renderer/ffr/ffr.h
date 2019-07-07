@@ -17,7 +17,7 @@ struct FramebufferHandle { uint value; bool isValid() const { return value != 0x
 struct TextureHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct QueryHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 struct UniformHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
-
+struct VAOHandle { uint value; bool isValid() const { return value != 0xFFffFFff; } };
 
 const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
 const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
@@ -26,6 +26,7 @@ const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 const UniformHandle INVALID_UNIFORM = { 0xffFFffFF };
 const FenceHandle INVALID_FENCE = { 0 };
+const VAOHandle INVALID_VAO = { 0xffFFffFF };
 
 
 enum class LogLevel : uint {
@@ -158,6 +159,15 @@ enum class DataType {
 	U32
 };
 
+struct VertexAttrib {
+	u8 idx;
+	int size;
+	AttributeType type;
+	uint offset;
+	bool normalized;
+	bool as_int;
+	bool instanced;
+};
 
 struct Attribute {
 	enum Flags {
@@ -219,6 +229,7 @@ inline u64 getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask
 }
 
 TextureHandle allocTextureHandle();
+VAOHandle allocVAOHandle();
 BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
 UniformHandle allocUniform(const char* name, UniformType type, int count);
@@ -229,6 +240,8 @@ void waitClient(FenceHandle fence);
 void setState(u64 state);
 bool createProgram(ProgramHandle program, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
+
+void createVAO(VAOHandle handle, const VertexAttrib* attribs, uint count);
 void createBuffer(BufferHandle handle, uint flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture);
@@ -237,8 +250,8 @@ void update(TextureHandle texture, uint level, uint x, uint y, uint w, uint h, T
 FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
 
-void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map);
-void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int byte_offset, int location_offset, int* attributes_map);
+void bindVAO(VAOHandle handle);
+void bindVertexBuffer(uint binding_idx, BufferHandle buffer, uint buffer_offset, uint stride_offset);
 void bindTextures(const TextureHandle* handles, int offset, int count);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding);
 void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers);
@@ -262,8 +275,9 @@ void destroy(TextureHandle texture);
 void destroy(FramebufferHandle fb);
 void destroy(QueryHandle query);
 void destroy(UniformHandle query);
+void destroy(VAOHandle query);
 
-void setIndexBuffer(BufferHandle handle);
+void bindIndexBuffer(BufferHandle handle);
 void drawTriangles(uint indices_count, DataType index_type);
 void drawTrianglesInstanced(uint indices_count, uint instances_count, DataType index_type);
 void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataType index_type);

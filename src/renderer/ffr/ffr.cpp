@@ -24,6 +24,13 @@ namespace Lumix
 
 namespace ffr {
 
+struct VertexArrayObject {
+	enum { MAX_COUNT = 8192 };
+
+	GLuint handle;
+	u32 hash;
+};
+
 struct Buffer
 {
 	enum { MAX_COUNT = 8192 };
@@ -110,17 +117,17 @@ struct Pool
 
 static struct {
 	RENDERDOC_API_1_0_2* rdoc_api;
-	GLuint vao;
 	IAllocator* allocator;
 	void* device_context;
 	Pool<Buffer, Buffer::MAX_COUNT> buffers;
 	Pool<Texture, Texture::MAX_COUNT> textures;
 	Pool<Uniform, Uniform::MAX_COUNT> uniforms;
 	Pool<Program, Program::MAX_COUNT> programs;
+	Pool<VertexArrayObject, VertexArrayObject::MAX_COUNT> vaos;
+	VAOHandle current_vao = INVALID_VAO;
 	HashMap<u32, uint>* uniforms_hash_map;
 	MT::SpinMutex handle_mutex;
 	DWORD thread;
-	int vertex_attributes = 0;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
 	ProgramHandle last_program = INVALID_PROGRAM;
@@ -960,84 +967,40 @@ void bindTextures(const TextureHandle* handles, int offset, int count)
 {
 	GLuint gl_handles[64];
 	ASSERT(count <= lengthOf(gl_handles));
+	ASSERT(handles);
 	
-	if (!handles) {
-	//	CHECK_GL(glBindTextures(0, count, nullptr));
+	for(int i = 0; i < count; ++i) {
+		if (handles[i].isValid()) {
+			gl_handles[i] = g_ffr.textures[handles[i].value].handle;
+		}
+		else {
+			gl_handles[i] = 0;
+		}
+	}
+
+	CHECK_GL(glBindTextures(offset, count, gl_handles));
+}
+
+
+void bindVertexBuffer(uint binding_idx, BufferHandle buffer, uint buffer_offset, uint stride_offset) {
+	checkThread();
+	const GLuint gl_handle = g_ffr.buffers[buffer.value].handle;
+	CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
+}
+
+void bindVAO(VAOHandle handle) {
+	checkThread();
+	if (g_ffr.current_vao.value == handle.value) return;
+	
+	g_ffr.current_vao = handle;
+	const GLuint gl_handle = g_ffr.vaos[handle.value].handle;
+	if(handle.isValid()) {
+		CHECK_GL(glBindVertexArray(gl_handle));
 	}
 	else {
-		for(int i = 0; i < count; ++i) {
-			if (handles[i].isValid()) {
-				gl_handles[i] = g_ffr.textures[handles[i].value].handle;
-			}
-			else {
-				gl_handles[i] = 0;
-			}
-		}
-
-		CHECK_GL(glBindTextures(offset, count, gl_handles));
+		CHECK_GL(glBindVertexArray(0));
 	}
 }
-
-
-void setInstanceBuffer(const VertexDecl& decl, BufferHandle instance_buffer, int byte_offset, int location_offset, int* attributes_map)
-{
-	checkThread();
-	const GLuint ib = g_ffr.buffers[instance_buffer.value].handle;
-	const GLsizei stride = decl.size;
-
-	g_ffr.instance_attributes = decl.attributes_count;
-	for (uint i = 0; i < decl.attributes_count; ++i) {
-		const Attribute* attr = &decl.attributes[i];
-		const void* offset = (void*)(intptr_t)(attr->offset + byte_offset);
-		GLenum gl_attr_type;
-		switch (attr->type) {
-			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
-			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
-			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
-			default: ASSERT(false); break;
-		}
-
-		const int index = attributes_map ? attributes_map[i] : location_offset + i;
-		if(index >= 0) {
-			CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, ib));
-			CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->flags & Attribute::NORMALIZED, stride, offset));
-			CHECK_GL(glVertexAttribDivisor(index, 1));  
-			CHECK_GL(glEnableVertexAttribArray(index));
-		}
-	}
-}
-
-void setVertexBuffer(const VertexDecl* decl, BufferHandle vertex_buffer, uint buffer_offset_bytes, const int* attribute_map)
-{
-	for (int i = 0; i < g_ffr.max_vertex_attributes; ++i) {
-		glDisableVertexAttribArray(i);
-	}
-	if (decl) {
-		const GLsizei stride = decl->size;
-		const GLuint vb = g_ffr.buffers[vertex_buffer.value].handle;
-		const uint vb_offset = buffer_offset_bytes;
-		g_ffr.vertex_attributes = decl->attributes_count;
-		for (uint i = 0; i < decl->attributes_count; ++i) {
-			const Attribute* attr = &decl->attributes[i];
-			const void* offset = (void*)(intptr_t)(attr->offset + vb_offset);
-			GLenum gl_attr_type;
-			switch (attr->type) {
-				case AttributeType::I16: gl_attr_type = GL_SHORT; break;
-				case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
-				case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
-			}
-			const int index = attribute_map ? attribute_map[i] : i;
-
-			if(index >= 0) {
-				CHECK_GL(glBindBuffer(GL_ARRAY_BUFFER, vb));
-				CHECK_GL(glVertexAttribPointer(index, attr->components_num, gl_attr_type, attr->flags & Attribute::NORMALIZED, stride, offset));
-				CHECK_GL(glVertexAttribDivisor(index, 0));  
-				CHECK_GL(glEnableVertexAttribArray(index));
-			}
-		}
-	}
-}
-
 
 void setState(u64 state)
 {
@@ -1137,7 +1100,7 @@ void setState(u64 state)
 }
 
 
-void setIndexBuffer(BufferHandle handle)
+void bindIndexBuffer(BufferHandle handle)
 {
 	checkThread();
 	if(handle.isValid()) {	
@@ -1147,16 +1110,6 @@ void setIndexBuffer(BufferHandle handle)
 	}
 
 	CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
-}
-
-void resetInstanceBuffer()
-{
-	if (g_ffr.instance_attributes == 0) return;
-
-	for (int i = g_ffr.vertex_attributes; i < g_ffr.max_vertex_attributes; ++i) {
-		glDisableVertexAttribArray(i);
-	}
-	g_ffr.instance_attributes = 0;
 }
 
 
@@ -1181,7 +1134,6 @@ void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataTyp
 		default: ASSERT(0); break;
 	}
 
-	resetInstanceBuffer();
 	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)(offset * ts)));
 }
 
@@ -1216,7 +1168,6 @@ void drawTriangles(uint indices_count, DataType index_type)
 {
 	checkThread();
 
-	resetInstanceBuffer();
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 	CHECK_GL(glDrawElements(GL_TRIANGLES, indices_count, type, 0));
 }
@@ -1241,7 +1192,6 @@ void drawArrays(uint offset, uint count, PrimitiveType type)
 		default: ASSERT(0); break;
 	}
 
-	resetInstanceBuffer();
 	CHECK_GL(glDrawArrays(pt, offset, count));
 }
 
@@ -1324,6 +1274,34 @@ void swapBuffers()
 	SwapBuffers(hdc);
 }
 
+void createVAO(VAOHandle handle, const VertexAttrib* attribs, uint count) {
+	checkThread();
+	CHECK_GL(glGenVertexArrays(1, &g_ffr.vaos[handle.value].handle));
+
+	CHECK_GL(glBindVertexArray(g_ffr.vaos[handle.value].handle));
+	for (uint i = 0; i < count; ++i) {
+		const VertexAttrib& attr = attribs[i];
+		GLenum gl_attr_type;
+		switch (attr.type) {
+			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
+			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
+			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
+			default: ASSERT(false); break;
+		}
+
+		if (attr.as_int) {
+			CHECK_GL(glVertexAttribFormat(attr.idx, attr.size, gl_attr_type, attr.normalized, attr.offset));
+		}
+		else {
+			CHECK_GL(glVertexAttribFormat(attr.idx, attr.size, gl_attr_type, attr.normalized, attr.offset));
+		}
+		CHECK_GL(glEnableVertexAttribArray(attr.idx));
+		CHECK_GL(glVertexAttribBinding(attr.idx, attr.instanced ? 1 : 0));
+	}
+	CHECK_GL(glVertexBindingDivisor(0, 0));
+	CHECK_GL(glVertexBindingDivisor(1, 1));
+	CHECK_GL(glBindVertexArray(0));
+}
 
 void createBuffer(BufferHandle buffer, uint flags, size_t size, const void* data)
 {
@@ -1602,6 +1580,22 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	return true;
 }
 
+
+VAOHandle allocVAOHandle()
+{
+	MT::SpinLock lock(g_ffr.handle_mutex);
+
+	if(g_ffr.programs.isFull()) {
+		logError("Renderer") << "FFR is out of free VAO slots.";
+		return INVALID_VAO;
+	}
+	const int id = g_ffr.vaos.alloc();
+	VertexArrayObject& p = g_ffr.vaos[id];
+	p.handle = 0;
+	return { (uint)id };
+}
+
+
 ProgramHandle allocProgramHandle()
 {
 	MT::SpinLock lock(g_ffr.handle_mutex);
@@ -1757,6 +1751,21 @@ void destroy(TextureHandle texture)
 
 	MT::SpinLock lock(g_ffr.handle_mutex);
 	g_ffr.textures.dealloc(texture.value);
+}
+
+
+void destroy(VAOHandle vao)
+{
+	checkThread();
+	
+	if(g_ffr.current_vao.value == vao.value) bindVAO(INVALID_VAO);
+
+	VertexArrayObject& t = g_ffr.vaos[vao.value];
+	const GLuint handle = t.handle;
+	CHECK_GL(glDeleteVertexArrays(1, &handle));
+
+	MT::SpinLock lock(g_ffr.handle_mutex);
+	g_ffr.vaos.dealloc(vao.value);
 }
 
 
@@ -2006,6 +2015,7 @@ void preinit(IAllocator& allocator)
 	try_load_renderdoc();
 	g_ffr.allocator = &allocator;
 	g_ffr.textures.create(*g_ffr.allocator);
+	g_ffr.vaos.create(*g_ffr.allocator);
 	g_ffr.buffers.create(*g_ffr.allocator);
 	g_ffr.uniforms.create(*g_ffr.allocator);
 	g_ffr.programs.create(*g_ffr.allocator);
@@ -2042,10 +2052,8 @@ bool init(void* window_handle)
 		CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
 	#endif
 
-	CHECK_GL(glGenVertexArrays(1, &g_ffr.vao));
-	CHECK_GL(glBindVertexArray(g_ffr.vao));
-
 	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
+	CHECK_GL(glBindVertexArray(0));	
 
 	g_ffr.last_state = 1;
 	setState(0);
@@ -2361,6 +2369,7 @@ void shutdown()
 {
 	checkThread();
 	g_ffr.textures.destroy(*g_ffr.allocator);
+	g_ffr.vaos.destroy(*g_ffr.allocator);
 	g_ffr.buffers.destroy(*g_ffr.allocator);
 	for (uint u : *g_ffr.uniforms_hash_map) {
 		g_ffr.allocator->deallocate(g_ffr.uniforms[u].data);
