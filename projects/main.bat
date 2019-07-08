@@ -23,7 +23,7 @@ echo   7. Pull latest from Github
 echo   8. Open chat
 echo   9. Download Godot Engine
 echo ===============================
-choice /C 12345678 /N /M "Your choice:"
+choice /C 123456789 /N /M "Your choice:"
 echo.
 
 if %errorlevel%==1 goto :exit
