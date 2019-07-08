@@ -10,7 +10,7 @@ HEAD of master is not stable, for stable version use [this](https://github.com/n
 
 3D Game Engine
 
-* [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started)
+* [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started) | [Video](https://www.youtube.com/watch?v=EMrFdz_sFaQ)
 * [Features](https://github.com/nem0/LumixEngine/wiki/Features)
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg/videos)
 * [Plugins](https://github.com/nem0/LumixEngine/wiki/available-plugins)
