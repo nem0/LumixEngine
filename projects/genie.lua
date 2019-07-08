@@ -557,12 +557,6 @@ project "engine"
 			"../external/imgui/**.inl"
 	}
 
-	if embed_resources then
-		removefiles { "../src/engine/no_resources.cpp" }
-	else
-		removefiles { "../src/engine/resources.cpp" }
-	end
-
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/luajit/include" }
 	
@@ -873,6 +867,11 @@ if build_studio then
 
 
 		files { "../src/studio/**.cpp" }
+
+		if embed_resources then
+			files { "../src/studio/**.rc" }
+		end
+
 		includedirs { "../src" }
 
 		if _OPTIONS["static-plugins"] then	

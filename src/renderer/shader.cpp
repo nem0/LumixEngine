@@ -87,7 +87,7 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 		StaticString<128> defines_code[32];
 		int defines_count = 0;
 		prefixes[0] = shader_code_prefix;
-		prefixes[1] = rd->include.empty() ? "" : rd->include.begin();
+		prefixes[1] = rd->include.empty() ? "" : (const char*)rd->include.begin();
 		prefixes[2] = rd->common_source.empty() ? "" : rd->common_source.begin();
 		if (defines != 0) {
 			for(int i = 0; i < sizeof(defines) * 8; ++i) {
@@ -361,20 +361,18 @@ int include(lua_State* L)
 	}
 
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
-	OS::InputFile file;
-	if (!fs.open(path, &file)) {
-		logError("Renderer") << "Failed to open include " << path << " included from " << shader->getPath();
+
+	if (!fs.getContentSync(Path(path), &shader->m_render_data->include)) {
+		logError("Renderer") << "Failed to open/read include " << path << " included from " << shader->getPath();
 		return 0;
 	}
-
-	shader->m_render_data->include.resize((int)file.size() + 2);
+	
 	if (!shader->m_render_data->include.empty()) {
-		file.read(&shader->m_render_data->include[0], shader->m_render_data->include.size() - 1);
+		shader->m_render_data->include.resize(shader->m_render_data->include.size() + 2);
 		shader->m_render_data->include[shader->m_render_data->include.size() - 2] = '\n';
 		shader->m_render_data->include.back() = '\0';
 	}
 
-	file.close();
 	return 0;
 }
 

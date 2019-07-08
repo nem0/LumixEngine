@@ -108,7 +108,7 @@ struct ShaderRenderData
 	Renderer& renderer;
 	HashMap<u32, ffr::ProgramHandle> programs;
 	Array<Shader::Source> sources;
-	Array<char> include;
+	Array<u8> include;
 	Array<char> common_source;
 	Path path;
 };

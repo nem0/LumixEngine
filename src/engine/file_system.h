@@ -8,6 +8,7 @@ namespace Lumix
 struct IAllocator;
 class Path;
 template <typename T> class Delegate;
+template <typename T> class Array;
 namespace OS
 {
 	struct FileIterator;
@@ -44,6 +45,7 @@ public:
 	virtual void updateAsyncTransactions() = 0;
 	virtual bool hasWork() = 0;
 
+	virtual bool getContentSync(const Path& file, Array<u8>* content) =  0;
 	virtual AsyncHandle getContent(const Path& file, const ContentCallback& callback) = 0;
 	virtual void cancel(AsyncHandle handle) = 0;
 };

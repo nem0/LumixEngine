@@ -2,8 +2,11 @@
 
 #include "engine/allocator.h"
 #include "engine/array.h"
+#include "engine/crc32.h"
 #include "engine/delegate_list.h"
 #include "engine/flag_set.h"
+#include "engine/hash_map.h"
+#include "engine/log.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/os.h"
@@ -13,10 +16,32 @@
 #include "engine/queue.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-
+#ifdef _WIN32
+	#include <Windows.h>
+#endif
 
 namespace Lumix
 {
+
+
+struct TarHeader {
+	char name[100];
+	char mode[8];
+	char uid[8];
+	char gid[8];
+	char size[12];
+	char mtime[12];
+	char chksum[8];
+	char typeflag;
+	char linkname[100];
+	char magic[6];
+	char version[2];
+	char uname[32];
+	char gname[32];
+	char devmajor[8];
+	char devminor[8];
+	char prefix[155];   
+};
 
 
 struct AsyncItem
@@ -72,17 +97,60 @@ struct FileSystemImpl final : public FileSystem
 		, m_finished(allocator)	
 		, m_last_id(0)
 		, m_semaphore(0, 0xffFF)
+		, m_bundled(allocator)
+		, m_bundled_map(allocator)
 	{
 		setBasePath(base_path);
+		loadBundled();
 		m_task = LUMIX_NEW(m_allocator, FSTask)(*this, m_allocator);
 		m_task->create("Filesystem", true);
 	}
+
 
 	~FileSystemImpl()
 	{
 		m_task->stop();
 		m_task->destroy();
 		LUMIX_DELETE(m_allocator, m_task);
+	}
+
+
+	void loadBundled() {
+		#ifdef _WIN32
+			HRSRC hrsrc = FindResource(GetModuleHandle(NULL), MAKEINTRESOURCE(102), "TAR");
+			if (!hrsrc) return;
+			HGLOBAL hglobal = LoadResource(GetModuleHandle(NULL), hrsrc);
+			if (!hglobal) return;
+			const DWORD size = SizeofResource(GetModuleHandle(NULL), hrsrc);
+			if (size == 0) return;
+			const void* res_mem = LockResource(hglobal);
+			if (!res_mem) return;
+	
+			TCHAR exe_path[MAX_PATH_LENGTH];
+			GetModuleFileName(NULL, exe_path, MAX_PATH_LENGTH);
+
+			m_bundled_last_modified = OS::getLastModified(exe_path);
+			m_bundled.resize((int)size);
+			memcpy(m_bundled.begin(), res_mem, m_bundled.byte_size());
+			InputMemoryStream str(m_bundled.begin(), m_bundled.byte_size());
+
+			UnlockResource(res_mem);
+
+			TarHeader header;
+			while (str.getPosition() < str.size()) {
+				const u8* ptr = (const u8*)str.getData() + str.getPosition();
+				str.read(&header, sizeof(header));
+				u32 size;
+				fromCStringOctal(header.size, sizeof(header.size), &size); 
+				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
+					Path path(header.name);
+					m_bundled_map.insert(path.getHash(), ptr);
+				}
+
+				str.setPosition(str.getPosition() + (512 - str.getPosition() % 512) % 512);
+				str.setPosition(str.getPosition() + size + (512 - size % 512) % 512);
+			}
+		#endif
 	}
 
 
@@ -105,7 +173,31 @@ struct FileSystemImpl final : public FileSystem
 		}
 	}
 
+	bool getContentSync(const Path& path, Array<u8>* content) override {
+		OS::InputFile file;
+		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path.c_str());
 
+		if (!file.open(full_path)) {
+			auto iter = m_bundled_map.find(path.getHash());
+			if (iter.isValid()) {
+				const TarHeader* header = (const TarHeader*)iter.value();
+				u32 size;
+				fromCStringOctal(header->size, sizeof(header->size), &size);
+				content->resize(size);
+				copyMemory(content->begin(), iter.value() + 512, content->byte_size());
+				return true;
+			}
+			return false;
+		}
+
+		content->resize((int)file.size());
+		if (!file.read(content->begin(), content->byte_size())) {
+			file.close();
+			return false;
+		}
+		file.close();
+		return true;
+	}
 
 	AsyncHandle getContent(const Path& file, const ContentCallback& callback) override
 	{
@@ -161,21 +253,41 @@ struct FileSystemImpl final : public FileSystem
 	{
 		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
 		StaticString<MAX_PATH_LENGTH> full_path_to(m_base_path, to);
-		return OS::copyFile(full_path_from, full_path_to);
+		if (OS::copyFile(full_path_from, full_path_to)) return true;
+
+		auto iter = m_bundled_map.find(crc32(from));
+		if(!iter.isValid()) return false;
+
+		OS::OutputFile file;
+		if(!file.open(full_path_to)) return false;
+
+		u32 size;
+		TarHeader* header = (TarHeader*)iter.value();
+		fromCStringOctal(header->size, sizeof(header->size), &size);
+		const bool res = file.write(iter.value() + 512, size);
+		file.close();
+		return res;
 	}
 
 
 	bool fileExists(const char* path) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
-		return OS::fileExists(full_path);
+		if (!OS::fileExists(full_path)) {
+			return (m_bundled_map.find(crc32(path)).isValid());
+		}
+		return true;
 	}
 
 
 	u64 getLastModified(const char* path) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
-		return OS::getLastModified(full_path);
+		const u64 res = OS::getLastModified(full_path);
+		if (!res && m_bundled_map.find(crc32(path)).isValid()) {
+			return m_bundled_last_modified;
+		}
+		return res;
 	}
 
 
@@ -213,6 +325,9 @@ struct FileSystemImpl final : public FileSystem
 	StaticString<MAX_PATH_LENGTH> m_base_path;
 	Array<AsyncItem> m_queue;
 	Array<AsyncItem> m_finished;
+	Array<u8> m_bundled;
+	HashMap<u32, const u8*> m_bundled_map;
+	u64 m_bundled_last_modified;
 	MT::CriticalSection m_mutex;
 	MT::Semaphore m_semaphore;
 
@@ -238,9 +353,11 @@ int FSTask::task()
 		}
 
 		bool success = true;
+		
+		Array<u8> data(m_fs.m_allocator);
+
 		OS::InputFile file;
 		StaticString<MAX_PATH_LENGTH> full_path(m_fs.m_base_path, path);
-		Array<u8> data(m_fs.m_allocator);
 		
 		if (file.open(full_path)) {
 			data.resize((int)file.size());
@@ -250,7 +367,18 @@ int FSTask::task()
 			file.close();
 		}
 		else {
-			success = false;
+			auto iter = m_fs.m_bundled_map.find(crc32(path));
+			if (iter.isValid()) {
+				const TarHeader* header = (const TarHeader*)iter.value();
+				u32 size;
+				fromCStringOctal(header->size, sizeof(header->size), &size);
+				data.resize(size);
+				copyMemory(data.begin(), iter.value() + 512, data.byte_size());
+				success = true;
+			}
+			else {
+				success = false;
+			}
 		}
 
 		{

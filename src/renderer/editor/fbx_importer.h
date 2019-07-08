@@ -130,7 +130,7 @@ struct FBXImporter
 		Matrix transform_matrix = Matrix::IDENTITY;
 	};
 
-	FBXImporter(IAllocator& allocator);
+	FBXImporter(class FileSystem& fs, IAllocator& allocator);
 	~FBXImporter();
 	bool setSource(const char* base_dir, const char* filename, bool ignore_geometry);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
@@ -181,6 +181,7 @@ private:
 
 	
 	IAllocator& allocator;
+	FileSystem& filesystem;
 	Array<ImportMaterial> materials;
 	Array<ImportMesh> meshes;
 	Array<ImportAnimation> animations;

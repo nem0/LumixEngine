@@ -588,6 +588,25 @@ const char* fromCString(const char* input, int length, u32* value)
 	return nullptr;
 }
 
+const char* fromCStringOctal(const char* input, int length, u32* value)
+{
+	if (length > 0)
+	{
+		const char* c = input;
+		*value = 0;
+		if (*c == '-') {
+			return nullptr;
+		}
+		while (length && *c >= '0' && *c <= '7') {
+			*value *= 8;
+			*value += *c - '0';
+			++c;
+			--length;
+		}
+		return c;
+	}
+	return nullptr;
+}
 
 const char* fromCString(const char* input, int length, u64* value)
 {

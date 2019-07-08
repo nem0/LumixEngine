@@ -476,7 +476,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
 		, m_tile(app.getWorldEditor().getAllocator())
-		, m_fbx_importer(app.getWorldEditor().getAllocator())
+		, m_fbx_importer(app.getWorldEditor().getEngine().getFileSystem(), app.getWorldEditor().getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
 		createPreviewUniverse();
@@ -525,8 +525,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				JobData* data = (JobData*)ptr;
 				ModelPlugin* plugin = data->plugin;
 				WorldEditor& editor = plugin->m_app.getWorldEditor();
-				FBXImporter importer(editor.getAllocator());
 				FileSystem& fs = editor.getEngine().getFileSystem();
+				FBXImporter importer(fs, editor.getAllocator());
 				AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
 
 				const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path;
@@ -1272,14 +1272,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	bool compileJPEG(OS::InputFile& src, OS::OutputFile& dst, const Meta& meta)
+	bool compileJPEG(const Array<u8>& src_data, OS::OutputFile& dst, const Meta& meta)
 	{
-		Array<u8> tmp(m_app.getWorldEditor().getAllocator());
-		tmp.resize((int)src.size());
-		if (!src.read(tmp.begin(), tmp.byte_size())) return false;
-
 		int w, h, comps;
-		stbi_uc* data = stbi_load_from_memory(tmp.begin(), tmp.byte_size(), &w, &h, &comps, 4);
+		stbi_uc* data = stbi_load_from_memory(src_data.begin(), src_data.byte_size(), &w, &h, &comps, 4);
 		if (!data) return false;
 
 		crn_comp_params comp_params;
@@ -1343,40 +1339,32 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
 
-		OS::InputFile srcf;
 		OS::OutputFile dstf;
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		if (!fs.open(src.c_str(), &srcf)) return false;
-		if (!fs.open(dst, &dstf)) {
-			srcf.close();
-			return false;
-		}
+
+		Array<u8> src_data(m_app.getWorldEditor().getAllocator());
+		if (!fs.getContentSync(src, &src_data)) return false;
+		if (!fs.open(dst, &dstf)) return false;
 		
 		Meta meta = getMeta(src);
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
-			Array<u8> buffer(m_app.getWorldEditor().getAllocator());
-			buffer.resize((int)srcf.size());
-
-			srcf.read(buffer.begin(), buffer.byte_size());
-
 			dstf.write(ext, sizeof(ext) - 1);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 			flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
 			dstf.write(&flags, sizeof(flags));
-			dstf.write(buffer.begin(), buffer.byte_size());
+			dstf.write(src_data.begin(), src_data.byte_size());
 		}
 		else if(equalStrings(ext, "jpg")) {
-			compileJPEG(srcf, dstf, meta);
+			compileJPEG(src_data, dstf, meta);
 		}
 		else if(equalStrings(ext, "png")) {
 			// TODO rename
-			compileJPEG(srcf, dstf, meta);
+			compileJPEG(src_data, dstf, meta);
 		}
 		else {
 			ASSERT(false);
 		}
 
-		srcf.close();
 		dstf.close();
 
 		return true;
