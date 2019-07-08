@@ -332,6 +332,18 @@ public:
 
 	~StudioAppImpl()
 	{
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.WantSaveIniSettings) {
+			size_t size;
+			const char* data = ImGui::SaveIniSettingsToMemory(&size);
+			FileSystem& fs = m_editor->getEngine().getFileSystem();
+			OS::OutputFile file;
+			if (fs.open("imgui.ini", &file)) {
+				file.write(data ,size);
+				file.close();
+			}
+		}
+
 		if (m_watched_plugin.watcher) FileSystemWatcher::destroy(m_watched_plugin.watcher);
 
 		saveSettings();
@@ -1579,10 +1591,16 @@ public:
 	{
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
+		io.IniFilename = nullptr;
 		const int dpi = OS::getDPI();
 		float font_scale = dpi / 96.f;
 		FileSystem& fs = getWorldEditor().getEngine().getFileSystem();
 		
+		Array<u8> ini_data(m_allocator);
+		if (fs.getContentSync(Path("imgui.ini"), &ini_data)) {
+			ImGui::LoadIniSettingsFromMemory((const char*)ini_data.begin(), ini_data.size());
+		}
+
 		m_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
 		m_bold_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
 
