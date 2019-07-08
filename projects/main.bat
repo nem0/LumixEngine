@@ -1,97 +1,98 @@
-<!-- :: Batch section
 @echo off
-setlocal
 
-start mshta.exe %0
-goto :EOF
--->
+REM detect paths
+set msbuild_cmd=msbuild.exe
+set devenv_cmd=devenv.exe
+where /q devenv.exe
+if not %errorlevel%==0 set devenv_cmd="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\IDE\devenv.exe"
+where /q msbuild.exe
+if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe"
+
+:begin
+cls
+
+echo Wut?
+echo ===============================
+echo   1. Exit
+echo   2. Create project
+echo   3. Build release
+echo   4. Run Studio
+echo   5. Open in VS
+echo   6. Create bundle
+echo   7. Pull latest from Github
+echo   8. Open chat
+echo   9. Download Godot Engine
+echo ===============================
+choice /C 12345678 /N /M "Your choice:"
+echo.
+
+if %errorlevel%==1 goto :exit
+if %errorlevel%==2 call :create_project
+if %errorlevel%==3 call :build
+if %errorlevel%==4 call :run_studio
+if %errorlevel%==5 call :open_in_vs
+if %errorlevel%==6 call :create_bundle
+if %errorlevel%==7 call :git_pull
+if %errorlevel%==8 call :open_gitter
+if %errorlevel%==9 call :download_godot
+goto :begin
+
+:create_project
+	echo Creating project...
+	genie.exe --static-plugins vs2019
+	pause
+exit /B 0
+
+:build
+	if not exist "tmp/vs2019/LumixEngine.sln" call :create_project
+	echo Building...
+	%msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+	pause
+exit /B 0
+
+:run_studio
+	if not exist "tmp/vs2019/bin/RelWithDebInfo/studio.exe" call :build
+	cd ..\data
+	start "" "../projects/tmp/vs2019/bin/RelWithDebInfo/studio.exe"
+	cd ..\projects
+	pause
+exit /B 0
+
+:open_in_vs
+	start "" %devenv_cmd% "tmp/vs2019/LumixEngine.sln"
+exit /B 0
+
+:create_bundle
+	echo Creating bundle...
+	genie.exe --embed-resources --static-plugins vs2019
+	cd ..\data
+	tar -cvf data.tar .
+	move data.tar ../src/studio
+	cd ..\projects\
+	%msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+	del ..\src\studio\data.tar
+	pause
+exit /B 0
+
+:download_godot
+	if %RANDOM% gtr 16000 (
+		start "" "https://godotengine.org/"
+		echo Son, I'm disappointed.
+	) else (
+		echo No.
+	)	
+	pause
+exit /B 0
+
+:open_gitter
+	start "" "https://gitter.im/nem0/LumixEngine"
+	pause
+exit /B 0
+
+:git_pull
+	git pull
+exit /B 0
+
+:exit
 
 
-<HTML>
-<HEAD>
-<!--<HTA:APPLICATION SCROLL="no" SYSMENU="no" >-->
-<HTA:APPLICATION SCROLL="no">
-
-<TITLE>Install</TITLE>
-<SCRIPT language="JavaScript">
-window.resizeTo(250,300);
-var fso = new ActiveXObject("Scripting.FileSystemObject");
-var app = new ActiveXObject("Shell.Application");
-
-function archive()
-{
-	app.ShellExecute("archive.bat")
-}
-
-function symstore()
-{
-	app.ShellExecute("C:/Program Files (x86)/Windows Kits/10/Debuggers/x64/symstore.exe", "add /s \"../../lumixengine_pdb/\" /compress /r /f ../../lumixengine_data/bin/*.pdb /t LumixEngine", "../../lumixengine_data/bin/")
-	setTimeout(function() {
-		app.ShellExecute("C:/Program Files (x86)/Windows Kits/10/Debuggers/x64/symstore.exe", "add /s \"../../lumixengine_pdb/\" /compress /r /f ../../lumixengine_data/bin/*.exe /t LumixEngine", "../../lumixengine_data/bin/")	
-	}, 2000)
-}
-
-function publishToItchIO()
-{
-	app.ShellExecute("C:/Users/Miki/AppData/Roaming/itch/bin/butler.exe", "login")
-	setTimeout(function() {
-		app.ShellExecute("C:/Users/Miki/AppData/Roaming/itch/bin/butler.exe", "push ../../lumixengine_data_exported mikulasflorek/lumix-engine:win-64")
-	}, 2000)
-}
-
-function install()
-{
-	var dest_dir = "../../lumixengine_data/bin/"
-	var src_dir = "./tmp/vs2017/bin/relwithdebinfo/"
-	fso.CopyFile(src_dir + "studio.exe", dest_dir)
-	fso.CopyFile(src_dir + "app.exe", dest_dir)
-	fso.CopyFile(src_dir + "studio.pdb", dest_dir)
-	fso.CopyFile(src_dir + "app.exe", dest_dir)
-}
-
-function generateProject()
-{
-	app.ShellExecute("genie_static_vs17.bat")
-}
-
-function updateTests()
-{
-	app.ShellExecute("genie.exe", "update-tests")
-}
-
-function runRenderTests()
-{
-	app.ShellExecute("genie.exe", "run-render-tests")
-}
-
-function openInVS()
-{
-	app.ShellExecute("C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/Common7/IDE/devenv.exe", "tmp/vs2017/LumixEngine.sln")
-}
-
-function build(configuration)
-{
-	app.ShellExecute("C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/MSBuild/15.0/Bin/msbuild.exe", "tmp/vs2017/LumixEngine.sln /p:Configuration=" + configuration + " /p:Platform=x64")
-}
-
-function cleanAll()
-{
-	if(fso.FolderExists("tmp")) fso.DeleteFolder("tmp");
-}
-
-
-</SCRIPT>
-</HEAD>
-<BODY>
-   <button style="width:200" onclick="generateProject();">Generate VS project</button>
-   <button style="width:200" onclick="build('relwithdebinfo');">Build</button>
-   <button style="width:200" onclick="install();">Install</button>
-   <button style="width:200" onclick="archive();">Archive</button>
-   <button style="width:200" onclick="publishToItchIO();">Publish to itch.io</button>
-   <button style="width:200" onclick="openInVS();">Open in VS</button>
-   <button style="width:200" onclick="symstore();">Symstore</button>
-   <button style="width:200" onclick="updateTests();">Update tests</button>
-   <button style="width:200" onclick="runRenderTests();">Run render tests</button>
-   <button style="width:200" onclick="cleanAll();">Clean all</button>
-</BODY>
-</HTML>

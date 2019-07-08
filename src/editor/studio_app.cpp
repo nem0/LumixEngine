@@ -1564,6 +1564,17 @@ public:
 	}
 
 
+	ImFont* addFontFromFile(const char* path, float size) {
+		FileSystem& fs = m_editor->getEngine().getFileSystem();
+		Array<u8> data(m_allocator);
+		if (!fs.getContentSync(Path(path), &data)) return nullptr;
+		ImGuiIO& io = ImGui::GetIO();
+		ImFontConfig cfg;
+		cfg.FontDataOwnedByAtlas = false;
+		return io.Fonts->AddFontFromMemoryTTF(data.begin(), data.byte_size(), size, &cfg);
+	}
+
+
 	void initIMGUI()
 	{
 		ImGuiIO& io = ImGui::GetIO();
@@ -1571,10 +1582,9 @@ public:
 		const int dpi = OS::getDPI();
 		float font_scale = dpi / 96.f;
 		FileSystem& fs = getWorldEditor().getEngine().getFileSystem();
-		const StaticString<MAX_PATH_LENGTH> font_path(fs.getBasePath(), "editor/fonts/OpenSans-Regular.ttf");
-		const StaticString<MAX_PATH_LENGTH> bold_font_path(fs.getBasePath(), "editor/fonts/OpenSans-Regular.ttf");
-		m_font = io.Fonts->AddFontFromFileTTF(font_path, (float)m_settings.m_font_size * font_scale);
-		m_bold_font = io.Fonts->AddFontFromFileTTF(bold_font_path, (float)m_settings.m_font_size * font_scale);
+		
+		m_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
+		m_bold_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
 
 		m_font->DisplayOffset.y = 0;
 		m_bold_font->DisplayOffset.y = 0;

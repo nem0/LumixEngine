@@ -1,6 +1,7 @@
 #include "fbx_importer.h"
 #include "animation/animation.h"
 #include "engine/crc32.h"
+#include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
@@ -599,7 +600,7 @@ FBXImporter::~FBXImporter()
 }
 
 
-FBXImporter::FBXImporter(IAllocator& allocator)
+FBXImporter::FBXImporter(FileSystem& fs, IAllocator& allocator)
 	: allocator(allocator)
 	, scene(nullptr)
 	, materials(allocator)
@@ -607,6 +608,7 @@ FBXImporter::FBXImporter(IAllocator& allocator)
 	, animations(allocator)
 	, bones(allocator)
 	, out_file(allocator)
+	, filesystem(fs)
 {
 	out_file.reserve(1024 * 1024);
 }
@@ -624,25 +626,14 @@ bool FBXImporter::setSource(const char* base_dir, const char* filename, bool ign
 		bones.clear();
 	}
 
-	OS::InputFile file;
-	StaticString<MAX_PATH_LENGTH> fullpath(base_dir, filename);
-	if (!file.open(fullpath)) return false;
-
 	Array<u8> data(allocator);
-	data.resize((int)file.size());
-
-	if (!file.read(&data[0], data.size()))
-	{
-		file.close();
-		return false;
-	}
-	file.close();
-
+	if (!filesystem.getContentSync(Path(filename), &data)) return false;
+	
 	const u64 flags = ignore_geometry ? (u64)ofbx::LoadFlags::IGNORE_GEOMETRY : (u64)ofbx::LoadFlags::TRIANGULATE;
-	scene = ofbx::load(&data[0], data.size(), (u64)ofbx::LoadFlags::IGNORE_GEOMETRY);
+	scene = ofbx::load(&data[0], data.size(), flags);
 	if (!scene)
 	{
-		logError("FBX") << "Failed to import \"" << fullpath << ": " << ofbx::getError();
+		logError("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError();
 		return false;
 	}
 

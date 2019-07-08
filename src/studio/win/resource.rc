@@ -1,0 +1,3 @@
+#define IDR_TAR1                        102
+
+IDR_TAR1                TAR                     "..\\data.tar"
