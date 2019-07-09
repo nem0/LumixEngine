@@ -1604,8 +1604,18 @@ public:
 		m_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
 		m_bold_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
 
-		m_font->DisplayOffset.y = 0;
-		m_bold_font->DisplayOffset.y = 0;
+		if (m_font) {
+			m_font->DisplayOffset.y = 0;
+			m_bold_font->DisplayOffset.y = 0;
+		}
+		else {
+			OS::messageBox(
+				"Could not open editor/fonts/opensans-regular.ttf\n"
+				"It very likely means that data are not bundled with\n"
+				"the exe and the exe is not in the correct directory.\n"
+				"The program will eventually crash!"
+			);
+		}
 
 		io.KeyMap[ImGuiKey_Space] = (int)OS::Keycode::SPACE;
 		io.KeyMap[ImGuiKey_Tab] = (int)OS::Keycode::TAB;
