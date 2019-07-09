@@ -410,6 +410,8 @@ struct RendererImpl final : public Renderer
 		m_font_manager->destroy();
 		LUMIX_DELETE(m_allocator, m_font_manager);
 
+		frame();
+	
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
 		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
