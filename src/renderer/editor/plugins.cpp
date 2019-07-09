@@ -41,12 +41,17 @@
 #include "renderer/texture.h"
 #include "scene_view.h"
 #include "shader_editor.h"
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#if defined _MSC_VER && _MSC_VER == 1900 
+#pragma warning(disable : 4312)
+#endif
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
 #include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
-#include <crnlib.h>
+#include <nvtt.h>
 #include <cstddef>
 
 
@@ -64,40 +69,42 @@ static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_m
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 
 
-static bool saveAsDDS(const char* path, const u8* image_data, int image_width, int image_height)
-{
-	ASSERT(image_data);
-
-	crn_uint32 size;
-	crn_comp_params comp_params;
-	comp_params.m_file_type = cCRNFileTypeDDS;
-	comp_params.m_quality_level = cCRNMaxQualityLevel;
-	comp_params.m_dxt_quality = cCRNDXTQualityNormal;
-	comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
-	comp_params.m_pProgress_func = nullptr;
-	comp_params.m_pProgress_func_data = nullptr;
-	comp_params.m_num_helper_threads = 3;
-	comp_params.m_width = image_width;
-	comp_params.m_height = image_height;
-	comp_params.m_format = cCRNFmtDXT5;
-	comp_params.m_pImages[0][0] = (u32*)image_data;
-	crn_mipmap_params mipmap_params;
-	mipmap_params.m_mode = cCRNMipModeGenerateMips;
-
-	void* data = crn_compress(comp_params, mipmap_params, size);
-	if (!data) return false;
-
+static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
+	ASSERT(data);
 	OS::OutputFile file;
-	if (file.open(path))
-	{
-		file.write(data, size);
-		file.close();
-		crn_free_block(data);
-		return true;
-	}
+	if (!file.open(path)) return false;
+	
+	nvtt::Context context;
+		
+	nvtt::InputOptions input;
+	input.setMipmapGeneration(true);
+	input.setAlphaMode(nvtt::AlphaMode_Transparency);
+	input.setNormalMap(false);
+	input.setTextureLayout(nvtt::TextureType_2D, w, h);
+	input.setMipmapData(data, w, h);
+		
+	nvtt::OutputOptions output;
+	output.setSrgbFlag(false);
+	struct : nvtt::OutputHandler {
+		bool writeData(const void * data, int size) override { return dst->write(data, size); }
+		void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
+		void endImage() override {}
 
-	crn_free_block(data);
-	return false;
+		OS::OutputFile* dst;
+	} output_handler;
+	output_handler.dst = &file;
+	output.setOutputHandler(&output_handler);
+
+	nvtt::CompressionOptions compression;
+	compression.setFormat(nvtt::Format_DXT5);
+	compression.setQuality(nvtt::Quality_Fastest);
+
+	if (!context.process(input, compression, output)) {
+		file.close();
+		return false;
+	}
+	file.close();
+	return true;
 }
 
 
@@ -712,14 +719,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				DVec3 pos = m_viewport.pos;
 				Quat rot = m_viewport.rot;
 
-				float yaw = -signum(delta.x) * (::pow(abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
+				float yaw = -signum(delta.x) * (::powf(abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
 				Quat yaw_rot(Vec3(0, 1, 0), yaw);
 				rot = yaw_rot * rot;
 				rot.normalize();
 
 				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 				float pitch =
-					-signum(delta.y) * (::pow(abs((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
+					-signum(delta.y) * (::powf(abs((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
 				Quat pitch_rot(pitch_axis, pitch);
 				rot = pitch_rot * rot;
 				rot.normalize();
@@ -1171,16 +1178,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		void execute() {
 			IAllocator& allocator = m_allocator;
 
-			int image_width, image_height;
 			u32 hash = crc32(m_in_path);
 			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
 			Array<u8> resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-			if (PathUtils::hasExtension(m_in_path, "dds"))
-			{
+			if (PathUtils::hasExtension(m_in_path, "dds")) {
 				OS::InputFile file;
-				if (!file.open(m_in_path))
-				{
+				if (!file.open(m_in_path)) {
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					logError("Editor") << "Failed to load " << m_in_path;
 					return;
@@ -1190,31 +1194,45 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				file.read(&data[0], data.size());
 				file.close();
 
-				crn_uint32* raw_img[cCRNMaxFaces * cCRNMaxLevels];
-				crn_texture_desc desc;
-				bool success = crn_decompress_dds_to_images(&data[0], data.size(), raw_img, desc);
-				if (!success)
-				{
+				nvtt::Surface surface;
+				if (!surface.load(m_in_path, data.begin(), data.byte_size())) {
+					logError("Editor") << "Failed to load " << m_in_path;
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
-				image_width = desc.m_width;
-				image_height = desc.m_height;
-				stbir_resize_uint8((u8*)raw_img[0],
-					image_width,
-					image_height,
+
+				// TODO check if this is correct
+				ASSERT(false);
+
+				Array<u8> decompressed(allocator);
+				const int w = surface.width();
+				const int h = surface.height();
+				decompressed.resize(4 * w * h);
+				for (int c = 0; c < 4; ++c) {
+					const float* data = surface.channel(c);
+					for (int j = 0; j < h; ++j) {
+						for (int i = 0; i < w; ++i) {
+							const u8 p = u8(data[j * w + i] * 255.f + 0.5f);
+							decompressed[(j * w + i) * 4 + c] = p;
+						}
+					}
+				}
+
+				stbir_resize_uint8((const u8*)decompressed.begin(),
+					w,
+					h,
 					0,
 					&resized_data[0],
 					AssetBrowser::TILE_SIZE,
 					AssetBrowser::TILE_SIZE,
 					0,
 					4);
-				crn_free_all_images(raw_img, desc);
 			}
 			else
 			{
 				int image_comp;
-				auto data = stbi_load(m_in_path, &image_width, &image_height, &image_comp, 4);
+				int w, h;
+				auto data = stbi_load(m_in_path, &w, &h, &image_comp, 4);
 				if (!data)
 				{
 					logError("Editor") << "Failed to load " << m_in_path;
@@ -1222,8 +1240,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					return;
 				}
 				stbir_resize_uint8(data,
-					image_width,
-					image_height,
+					w,
+					h,
 					0,
 					&resized_data[0],
 					AssetBrowser::TILE_SIZE,
@@ -1233,8 +1251,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				stbi_image_free(data);
 			}
 
-			if (!saveAsDDS(m_out_path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE))
-			{
+			if (!saveAsDDS(m_out_path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE)) {
 				logError("Editor") << "Failed to save " << m_out_path;
 			}
 		}
@@ -1272,44 +1289,48 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	bool compileJPEG(const Array<u8>& src_data, OS::OutputFile& dst, const Meta& meta)
+	bool compileImage(const Array<u8>& src_data, OS::OutputFile& dst, const Meta& meta)
 	{
+		PROFILE_FUNCTION();
 		int w, h, comps;
 		stbi_uc* data = stbi_load_from_memory(src_data.begin(), src_data.byte_size(), &w, &h, &comps, 4);
 		if (!data) return false;
-
-		crn_comp_params comp_params;
-		comp_params.m_file_type = cCRNFileTypeDDS;
-		comp_params.m_quality_level = cCRNMaxQualityLevel;
-		comp_params.m_dxt_quality = cCRNDXTQualityNormal;
-		comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
-		comp_params.m_pProgress_func = nullptr;
-		comp_params.m_pProgress_func_data = nullptr;
-		comp_params.m_num_helper_threads = 3;
-		comp_params.m_width = w;
-		comp_params.m_height = h;
-		const bool has_alpha = comps == 4;
-		comp_params.m_format = meta.is_normalmap ? cCRNFmtDXN_YX : (has_alpha ? cCRNFmtDXT5 : cCRNFmtDXT1);
-		comp_params.m_pImages[0][0] = (u32*)data;
-		crn_mipmap_params mipmap_params;
-		mipmap_params.m_mode = cCRNMipModeGenerateMips;
-
-		u32 compressed_size;
-		void* compressed = crn_compress(comp_params, mipmap_params, compressed_size);
-		if(!compressed) {
-			stbi_image_free(data);
-			return false;
-		}
 
 		dst.write("dds", 3);
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 		flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
 		dst.write(&flags, sizeof(flags));
-		dst.write(compressed, compressed_size);
 
+		nvtt::Context context;
+		
+		const bool has_alpha = comps == 4;
+		nvtt::InputOptions input;
+		input.setMipmapGeneration(true);
+		input.setAlphaMode(has_alpha ? nvtt::AlphaMode_Transparency : nvtt::AlphaMode_None);
+		input.setNormalMap(meta.is_normalmap);
+		input.setTextureLayout(nvtt::TextureType_2D, w, h);
+		input.setMipmapData(data, w, h);
 		stbi_image_free(data);
-		crn_free_block(compressed);
+		
+		nvtt::OutputOptions output;
+		output.setSrgbFlag(meta.srgb);
+		struct : nvtt::OutputHandler {
+			bool writeData(const void * data, int size) override { return dst->write(data, size); }
+			void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
+			void endImage() override {}
 
+			OS::OutputFile* dst;
+		} output_handler;
+		output_handler.dst = &dst;
+		output.setOutputHandler(&output_handler);
+
+		nvtt::CompressionOptions compression;
+		compression.setFormat(meta.is_normalmap ? nvtt::Format_DXT5n : (has_alpha ? nvtt::Format_DXT5 :  nvtt::Format_DXT1));
+		compression.setQuality(nvtt::Quality_Normal);
+
+		if (!context.process(input, compression, output)) {
+			return false;
+		}
 		return true;
 	}
 
@@ -1355,11 +1376,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			dstf.write(src_data.begin(), src_data.byte_size());
 		}
 		else if(equalStrings(ext, "jpg")) {
-			compileJPEG(src_data, dstf, meta);
+			compileImage(src_data, dstf, meta);
 		}
 		else if(equalStrings(ext, "png")) {
-			// TODO rename
-			compileJPEG(src_data, dstf, meta);
+			compileImage(src_data, dstf, meta);
 		}
 		else {
 			ASSERT(false);
@@ -1640,56 +1660,56 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 	bool saveCubemap(u64 probe_guid, const u8* data, int texture_size, const char* postfix)
 	{
-		crn_uint32 size;
-		crn_comp_params comp_params;
-		comp_params.m_width = texture_size;
-		comp_params.m_height = texture_size;
-		comp_params.m_file_type = cCRNFileTypeDDS;
-		comp_params.m_format = cCRNFmtDXT1;
-		comp_params.m_quality_level = cCRNMinQualityLevel;
-		comp_params.m_dxt_quality = cCRNDXTQualitySuperFast;
-		comp_params.m_dxt_compressor_type = cCRNDXTCompressorRYG;
-		comp_params.m_pProgress_func = nullptr;
-		comp_params.m_pProgress_func_data = nullptr;
-		comp_params.m_num_helper_threads = MT::getCPUsCount() - 1;
-		comp_params.m_faces = 6;
-		for (int i = 0; i < 6; ++i)
-		{
-			comp_params.m_pImages[i][0] = (u32*)&data[i * texture_size * texture_size * 4];
-		}
-		crn_mipmap_params mipmap_params;
-		mipmap_params.m_mode = cCRNMipModeGenerateMips;
-
-		void* compressed_data = crn_compress(comp_params, mipmap_params, size);
-		if (!compressed_data)
-		{
-			logError("Editor") << "Failed to compress the probe.";
-			return false;
-		}
-
+		ASSERT(data);
 		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
-		if (!OS::makePath(path) && !OS::dirExists(path))
-		{
+		if (!OS::makePath(path) && !OS::dirExists(path)) {
 			logError("Editor") << "Failed to create " << path;
 		}
 		path << "/probes/";
-		if (!OS::makePath(path) && !OS::dirExists(path))
-		{
+		if (!OS::makePath(path) && !OS::dirExists(path)) {
 			logError("Editor") << "Failed to create " << path;
 		}
 		path << probe_guid << postfix << ".dds";
 		OS::OutputFile file;
-		if (!file.open(path))
-		{
+		if (!file.open(path)) {
 			logError("Editor") << "Failed to create " << path;
-			crn_free_block(compressed_data);
 			return false;
 		}
 
-		file.write((const char*)compressed_data, size);
+		nvtt::Context context;
+		
+		nvtt::InputOptions input;
+		input.setMipmapGeneration(true);
+		input.setAlphaMode(nvtt::AlphaMode_None);
+		input.setNormalMap(false);
+		input.setTextureLayout(nvtt::TextureType_Cube, texture_size, texture_size);
+		for (int i = 0; i < 6; ++i) {
+			const int step = texture_size * texture_size * 4;
+			input.setMipmapData(data + step * i, texture_size, texture_size, 1, i);
+		}
+		
+		nvtt::OutputOptions output;
+		output.setSrgbFlag(false);
+		struct : nvtt::OutputHandler {
+			bool writeData(const void * data, int size) override { return dst->write(data, size); }
+			void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
+			void endImage() override {}
+
+			OS::OutputFile* dst;
+		} output_handler;
+		output_handler.dst = &file;
+		output.setOutputHandler(&output_handler);
+
+		nvtt::CompressionOptions compression;
+		compression.setFormat(nvtt::Format_DXT1);
+		compression.setQuality(nvtt::Quality_Fastest);
+
+		if (!context.process(input, compression, output)) {
+			file.close();
+			return false;
+		}
 		file.close();
-		crn_free_block(compressed_data);
 		return true;
 	}
 

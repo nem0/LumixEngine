@@ -14,14 +14,6 @@
 #include "renderer/model.h"
 #include <cfloat>
 #include <cmath>
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#if defined _MSC_VER && _MSC_VER == 1900 
-#pragma warning(disable : 4312)
-#endif
-#include "stb/stb_image.h"
-#include "stb/stb_image_resize.h"
-#include <crnlib.h>
 
 
 namespace Lumix
@@ -722,51 +714,6 @@ bool FBXImporter::writeBillboardMaterial(const char* output_dir, const char* src
 	file << "\"}\n}";
 	file.close();*/
 	// TODO
-	return true;
-}
-
-
-static bool saveAsDDS(const u8* image_data,
-	int image_width,
-	int image_height,
-	bool alpha,
-	bool normal,
-	const char* dest_path)
-{
-	ASSERT(image_data);
-
-	crn_uint32 size;
-	crn_comp_params comp_params;
-
-	comp_params.m_file_type = cCRNFileTypeDDS;
-	comp_params.m_quality_level = cCRNMaxQualityLevel;
-	comp_params.m_dxt_quality = cCRNDXTQualityNormal;
-	comp_params.m_dxt_compressor_type = cCRNDXTCompressorCRN;
-	//comp_params.m_pProgress_func = ddsConvertCallback;
-	//comp_params.m_pProgress_func_data = &m_dds_convert_callback;
-	comp_params.m_num_helper_threads = 3;
-
-	comp_params.m_width = image_width;
-	comp_params.m_height = image_height;
-	comp_params.m_format = normal ? cCRNFmtDXN_YX : (alpha ? cCRNFmtDXT5 : cCRNFmtDXT1);
-	comp_params.m_pImages[0][0] = (u32*)image_data;
-	crn_mipmap_params mipmap_params;
-	mipmap_params.m_mode = cCRNMipModeGenerateMips;
-
-	void* data = crn_compress(comp_params, mipmap_params, size);
-	if (!data) {
-		return false;
-	}
-
-	OS::OutputFile file;
-	if (!file.open(dest_path)) {
-		crn_free_block(data);
-		return false;
-	}
-
-	file.write((const char*)data, size);
-	file.close();
-	crn_free_block(data);
 	return true;
 }
 
