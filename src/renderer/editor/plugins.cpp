@@ -1201,9 +1201,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					return;
 				}
 
-				// TODO check if this is correct
-				ASSERT(false);
-
 				Array<u8> decompressed(allocator);
 				const int w = surface.width();
 				const int h = surface.height();
