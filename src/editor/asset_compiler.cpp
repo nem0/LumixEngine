@@ -464,6 +464,7 @@ struct AssetCompilerImpl : AssetCompiler
 			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
+			logInfo("Editor") << res.getPath() << " is not compiled, pushing to compile queue";
 			MT::SpinLock lock(m_to_compile_mutex);
 			MT::atomicIncrement(&m_task.m_to_compile_count);
 			const Path path(filepath);
@@ -591,6 +592,7 @@ int AssetCompilerTask::task()
 		if (p.isValid()) {
 			PROFILE_BLOCK("compile asset");
 			Profiler::pushString(p.c_str());
+			logInfo("Editor") << "Compiling " << p << "...";
 			const bool compiled = m_compiler.compile(p);
 			MT::atomicDecrement(&m_to_compile_count);
 			if (compiled) {

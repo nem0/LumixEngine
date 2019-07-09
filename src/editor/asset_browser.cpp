@@ -263,6 +263,8 @@ int AssetBrowser::getThumbnailIndex(int i, int j, int columns) const
 void AssetBrowser::createTile(FileInfo& tile, const char* out_path)
 {
 	if (tile.create_called) return;
+	
+	logInfo("Editor") << "Creating tile for " << tile.filepath;
 	tile.create_called = true;
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	for (IPlugin* plugin : m_plugins) {

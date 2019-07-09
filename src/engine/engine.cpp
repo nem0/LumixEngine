@@ -389,8 +389,8 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 
 
-static OS::OutputFile g_error_file;
-static bool g_is_error_file_open = false;
+static OS::OutputFile g_log_file;
+static bool g_is_log_file_open = false;
 
 
 #pragma pack(1)
@@ -406,7 +406,7 @@ public:
 static void showLogInVS(LogLevel level, const char* system, const char* message)
 {
 	if(level == LogLevel::ERROR) {
-		Debug::debugOutput("error: ");
+		Debug::debugOutput("Error: ");
 	}
 	Debug::debugOutput(system);
 	Debug::debugOutput(" : ");
@@ -417,10 +417,13 @@ static void showLogInVS(LogLevel level, const char* system, const char* message)
 
 static void logToFile(LogLevel level, const char*, const char* message)
 {
-	if (level != LogLevel::ERROR) return;
-	if (!g_is_error_file_open) return;
-	g_error_file.write(message, stringLength(message));
-	g_error_file.flush();
+	if (!g_is_log_file_open) return;
+	if (level == LogLevel::ERROR) {
+		g_log_file.write("Error: ", stringLength("Error :"));
+	}
+	g_log_file.write(message, stringLength(message));
+	g_log_file.write("\n", 1);
+	g_log_file.flush();
 }
 
 
@@ -466,11 +469,11 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 	{
+		g_is_log_file_open = g_log_file.open("lumix.log");
+		
 		logInfo("Core") << "Creating engine...";
 		Profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
-
-		g_is_error_file_open = g_error_file.open("error.log");
 
 		getLogCallback().bind<logToFile>();
 		getLogCallback().bind<showLogInVS>();
@@ -1210,7 +1213,7 @@ public:
 		m_prefab_resource_manager.destroy();
 		lua_close(m_state);
 
-		g_error_file.close();
+		g_log_file.close();
 		PathManager::destroy(*m_path_manager);
 	}
 
