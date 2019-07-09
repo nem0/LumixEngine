@@ -9,6 +9,6 @@ obj/
 *.orig
 .vscode
 data/.lumix
-data/error.log
+data/lumix.log
 data/studio.ini
 .lumixuser
