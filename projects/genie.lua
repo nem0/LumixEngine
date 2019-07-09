@@ -591,13 +591,13 @@ if has_plugin("renderer") then
 		libType()
 
 		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c"}
-		includedirs { "../src", "../external/cmft/include", "../external/crnlib/include" }
+		includedirs { "../src", "../external/cmft/include", "../external/nvtt/include" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
 
 		if build_studio then
 			links { "editor" }
-			linkLib "crnlib"
+			linkLib "nvtt"
 			linkLib "cmft"
 		end
 		links { "opengl32" }
@@ -773,7 +773,7 @@ if build_app then
 			links { "editor", "engine" }
 		end
 		if build_studio then
-			linkLib "crnlib"
+			linkLib "nvtt"
 			linkLib "cmft"
 		end
 		
@@ -884,7 +884,7 @@ if build_studio then
 		
 
 			links { "editor", "engine" }
-			linkLib "crnlib"
+			linkLib "nvtt"
 			linkLib "cmft"
 			linkLib "luajit"
 			linkLib "recast"
