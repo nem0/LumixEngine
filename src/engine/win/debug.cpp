@@ -400,7 +400,7 @@ u8* Allocator::getSystemFromUser(void* user_ptr)
 
 void* Allocator::reallocate(void* user_ptr, size_t size)
 {
-#ifndef _DEBUG
+#ifndef LUMIX_DEBUG
 	return m_source.reallocate(user_ptr, size);
 #else
 	if (user_ptr == nullptr) return allocate(size);
@@ -421,7 +421,7 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 
 void* Allocator::allocate_aligned(size_t size, size_t align)
 {
-#ifndef _DEBUG
+#ifndef LUMIX_DEBUG
 	return m_source.allocate_aligned(size, align);
 #else
 	void* system_ptr;
@@ -467,7 +467,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 
 void Allocator::deallocate_aligned(void* user_ptr)
 {
-#ifndef _DEBUG
+#ifndef LUMIX_DEBUG
 	m_source.deallocate_aligned(user_ptr);
 #else
 	if (user_ptr)
@@ -508,7 +508,7 @@ void Allocator::deallocate_aligned(void* user_ptr)
 
 void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align)
 {
-#ifndef _DEBUG
+#ifndef LUMIX_DEBUG
 	return m_source.reallocate_aligned(user_ptr, size, align);
 #else
 	if (user_ptr == nullptr) return allocate_aligned(size, align);
@@ -529,7 +529,7 @@ void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align)
 
 void* Allocator::allocate(size_t size)
 {
-#ifndef _DEBUG
+#ifndef LUMIX_DEBUG
 	return m_source.allocate(size);
 #else
 	void* system_ptr;
@@ -572,7 +572,7 @@ void* Allocator::allocate(size_t size)
 
 void Allocator::deallocate(void* user_ptr)
 {
-#ifndef _DEBUG
+#ifndef LUMIX_DEBUG
 	m_source.deallocate(user_ptr);
 #else
 	if (user_ptr)

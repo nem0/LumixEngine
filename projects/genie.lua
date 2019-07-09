@@ -266,8 +266,8 @@ newaction {
 function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
-		defines { "DEBUG", "_DEBUG" }
-		flags { "Symbols", "WinMain" }
+		defines { "NDEBUG", "LUMIX_DEBUG" }
+		flags { "Symbols", "ReleaseRuntime", "WinMain" }
 
 	configuration "RelWithDebInfo"
 		targetdir(BINARY_DIR .. "RelWithDebInfo")
@@ -284,13 +284,13 @@ function defaultConfigurations()
 		
 	configuration {}
 		files { "lumix.natvis", "../.editorconfig" }
-
+		defines { "_ITERATOR_DEBUG_LEVEL=0" }
 end
 
 function linkLib(lib)
 	links {lib}
 
-	for conf,conf_dir in pairs({Debug="debug", RelWithDebInfo="release"}) do
+	for conf,conf_dir in pairs({Debug="release", RelWithDebInfo="release"}) do
 		for platform,target_platform in pairs({win="windows", linux="linux", }) do
 			configuration { "x64", conf, target_platform }
 				libdirs {"../external/" .. lib .. "/lib/" .. platform .. "64" .. "_" .. binary_api_dir .. "/" .. conf_dir}
@@ -357,7 +357,7 @@ function linkPhysX()
 			}
 
 		configuration { "Debug" }
-			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/debug"}
+			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
 
 		configuration { "RelWithDebInfo" }
 			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
@@ -920,12 +920,12 @@ if build_studio then
 		defaultConfigurations()
 		
 		if _ACTION == "vs2019" then
-			copyDlls("Debug", "win64", "Debug")
+			copyDlls("Release", "win64", "Debug")
 			copyDlls("Release", "win64", "RelWithDebInfo")
 		end
 		
 		if "linux-gcc" == _OPTIONS["gcc"] then
-			copyDlls("debug", "linux64", "Debug")
+			copyDlls("release", "linux64", "Debug")
 			copyDlls("release", "linux64", "Release")
 		end
 end

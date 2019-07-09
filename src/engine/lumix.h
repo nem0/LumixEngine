@@ -102,19 +102,19 @@ template <typename T, int count> constexpr int lengthOf(const T (&)[count])
 };
 
 #ifndef ASSERT
-	#ifdef NDEBUG
-		#ifdef _WIN32		
-			#define ASSERT(x) __assume(x)
-		#else
-			#define ASSERT(x) { false ? (void)(x) : (void)0; }
-		#endif
-	#else
+	#ifdef LUMIX_DEBUG
 		#ifdef _WIN32
 			#define LUMIX_DEBUG_BREAK() __debugbreak()
 		#else
 			#define LUMIX_DEBUG_BREAK()  raise(SIGTRAP) 
 		#endif
 		#define ASSERT(x) do { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) LUMIX_DEBUG_BREAK(); } while (false)
+	#else
+		#ifdef _WIN32		
+			#define ASSERT(x) __assume(x)
+		#else
+			#define ASSERT(x) { false ? (void)(x) : (void)0; }
+		#endif
 	#endif
 #endif
 
