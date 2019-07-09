@@ -554,7 +554,7 @@ void wait(SignalHandle handle)
 		g_system->m_sync.exit();
 		Profiler::endFiberWait(handle, switch_data);
 		
-		#ifndef NDEBUG
+		#ifdef LUMIX_DEBUG
 			g_system->m_sync.enter();
 			ASSERT(isSignalZero(handle, false));
 			g_system->m_sync.exit();

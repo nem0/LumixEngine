@@ -16,7 +16,7 @@ namespace LuaWrapper
 {
 
 
-#ifdef _DEBUG
+#ifdef LUMIX_DEBUG
 	struct DebugGuard
 	{
 		DebugGuard(lua_State* L)

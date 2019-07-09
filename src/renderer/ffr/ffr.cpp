@@ -46,7 +46,7 @@ struct Uniform
 	UniformType type;
 	uint count;
 	void* data; 
-	#ifdef _DEBUG
+	#ifdef LUMIX_DEBUG
 		StaticString<32> debug_name;
 	#endif
 };
@@ -703,7 +703,7 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 
 } // namespace DDS
 
-#ifdef _DEBUG
+#ifdef LUMIX_DEBUG
 	#define CHECK_GL(gl) \
 		do { \
 			gl; \
@@ -785,7 +785,7 @@ static int load_gl(void* device_contex)
 	const int32_t contextAttrs[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
 		WGL_CONTEXT_MINOR_VERSION_ARB, 5,
-		#ifdef _DEBUG
+		#ifdef LUIMIX_DEBUG
 			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
 		#endif
 		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
@@ -1860,7 +1860,7 @@ UniformHandle allocUniform(const char* name, UniformType type, int count)
 	Uniform& u = g_ffr.uniforms[id];
 	u.count = count;
 	u.type = type;
-	#ifdef _DEBUG
+	#ifdef LUMIX_DEBUG
 		u.debug_name = name;
 	#endif
 	size_t byte_size = getSize(type) * count;
@@ -2045,7 +2045,7 @@ bool init(void* window_handle)
 	CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
 	CHECK_GL(glDepthFunc(GL_GREATER));
 
-	#ifdef _DEBUG
+	#ifdef LUMIX_DEBUG
 		CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
 		CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
 		CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
