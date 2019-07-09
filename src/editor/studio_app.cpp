@@ -266,6 +266,8 @@ public:
 
 	void onInit() override
 	{
+		OS::Timer init_timer;
+
 		m_add_cmp_root.label[0] = '\0';
 		m_template_name[0] = '\0';
 		m_open_filter[0] = '\0';
@@ -284,7 +286,8 @@ public:
 
 		char data_dir[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
-		m_engine = Engine::create(data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir), m_allocator);
+		m_engine = Engine::create(data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir)
+			, m_allocator);
 		createLua();
 
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
@@ -327,6 +330,8 @@ public:
 		m_sleep_when_inactive = shouldSleepWhenInactive();
 
 		checkScriptCommandLine();
+
+		logInfo("Editor") << "Startup took " << init_timer.getTimeSinceStart() << " s"; 
 	}
 
 
@@ -1589,6 +1594,7 @@ public:
 
 	void initIMGUI()
 	{
+		logInfo("Editor") << "Initializing imgui...";
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
 		io.IniFilename = nullptr;
@@ -1653,6 +1659,7 @@ public:
 
 	void loadSettings()
 	{
+		logInfo("Editor") << "Loading settings...";
 		char cmd_line[2048];
 		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
 
@@ -1959,7 +1966,6 @@ public:
 			break;
 		}
 	}
-
 
 	static void checkDataDirCommandLine(char* dir, int max_size)
 	{
@@ -2675,6 +2681,7 @@ public:
 
 	void loadIcons()
 	{
+		logInfo("Editor") << "Loading icons...";
 		RenderInterface& render_interface = *m_editor->getRenderInterface();
 		FileSystem& fs = m_engine->getFileSystem();
 		for (auto* action : m_actions)

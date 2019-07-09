@@ -1,4 +1,5 @@
 #include "engine/debug.h"
+#include "engine/log.h"
 #include "engine/mt/atomic.h"
 #include "engine/os.h"
 #include "engine/string.h"
@@ -756,7 +757,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	};
 
 	auto dumper = [](void* data) -> DWORD {
-		auto info = ((CrashInfo*)data)->info;
+		LPEXCEPTION_POINTERS info = ((CrashInfo*)data)->info;
 		uintptr base = (uintptr)GetModuleHandle(NULL);
 		StaticString<4096> message;
 		if(info)
@@ -798,12 +799,6 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			nullptr);
 		CloseHandle(file);
 
-		SendFile("Lumix Studio crash",
-			"SMTP:mikulas.florek@gamedev.sk",
-			"Lumix Studio",
-			message,
-			minidump_path);
-
 		minidump_type = (MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpWithFullMemoryInfo |
 			MiniDumpFilterMemory | MiniDumpWithHandleData |
 			MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
@@ -816,7 +811,14 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			info ? &minidump_exception_info : nullptr,
 			nullptr,
 			nullptr);
+
 		CloseHandle(file);
+
+		SendFile("Lumix Studio crash",
+			"SMTP:mikulas.florek@gamedev.sk",
+			"Lumix Studio",
+			message,
+			minidump_path);
 		return 0;
 	};
 
@@ -824,6 +826,10 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	CrashInfo crash_info = { info, GetCurrentThreadId() };
 	auto handle = CreateThread(0, 0x8000, dumper, &crash_info, 0, &thread_id);
 	WaitForSingleObject(handle, INFINITE);
+
+	StaticString<4096> message;
+	getStack(*info->ContextRecord, message.data, sizeof(message.data));
+	logError("Engine") << message;
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }

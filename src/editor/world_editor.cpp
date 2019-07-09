@@ -2322,6 +2322,8 @@ public:
 	void doExecute(IEditorCommand* command)
 	{
 		ASSERT(command->isReady());
+		
+		logInfo("Editor") << "Executing editor command " << command->getType() << "...";
 		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
@@ -2688,6 +2690,7 @@ public:
         , m_game_mode_file(m_allocator)
 		, m_command_queue(m_allocator)
 	{
+		logInfo("Editor") << "Initializing editor...";
 		m_viewport.is_ortho = false;
 		m_viewport.pos = DVec3(0);
 		m_viewport.rot.set(0, 0, 0, 1);
