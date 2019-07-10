@@ -1585,7 +1585,7 @@ VAOHandle allocVAOHandle()
 {
 	MT::SpinLock lock(g_ffr.handle_mutex);
 
-	if(g_ffr.programs.isFull()) {
+	if(g_ffr.vaos.isFull()) {
 		logError("Renderer") << "FFR is out of free VAO slots.";
 		return INVALID_VAO;
 	}
