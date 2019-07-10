@@ -335,6 +335,7 @@ void SceneView::renderGizmos()
 				ib_offset += cmd.indices_count * sizeof(u16);
 			}
 			ffr::popDebugGroup();
+			ffr::destroy(vao);
 			
 			renderer->endProfileBlock();
 		}
