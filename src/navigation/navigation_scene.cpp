@@ -349,7 +349,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			if (agent.zone != zone.entity) continue;
 			
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
-			if (dt_agent->paused) continue;
+			//if (dt_agent->paused) continue;
 
 			const Vec3 pos = inv_tr.transform(m_universe.getPosition(agent.entity)).toFloat();
 			const Quat rot = m_universe.getRotation(agent.entity);
@@ -391,7 +391,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			if (agent.zone != zone.entity) continue;
 
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
-			if (dt_agent->paused) continue;
+			//if (dt_agent->paused) continue;
 
 			DVec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
@@ -415,7 +415,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			if (agent.zone != zone.entity) continue;
 
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
-			if (dt_agent->paused) continue;
+			//if (dt_agent->paused) continue;
 
 			m_moving_agent = agent.entity;
 			m_universe.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
