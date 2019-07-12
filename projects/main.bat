@@ -36,7 +36,7 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==7 call :git_pull
 	if %errorlevel%==8 call :open_gitter
 	if %errorlevel%==9 call :third_party
-	if %errorlevel%==A call :download_godot
+	if %errorlevel%==10 call :download_godot
 goto :begin
 
 :third_party 
