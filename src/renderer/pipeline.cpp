@@ -2664,29 +2664,31 @@ struct PipelineImpl final : Pipeline
 							const u16 count = u16(i - start_i);
 							const Renderer::TransientSlice slice = renderer.allocTransient(count * sizeof(Vec4) * 2);
 							u8* instance_data = slice.ptr;
-							for (int j = start_i; j < start_i + count; ++j) {
-								const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
-								const Transform& tr = entity_data[e.index];
-								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-								memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-								instance_data += sizeof(tr.rot);
-								memcpy(instance_data, &lpos, sizeof(lpos));
-								instance_data += sizeof(lpos);
-								memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-								instance_data += sizeof(tr.scale);
-							}
-							if ((cmd_page->data + sizeof(cmd_page->data) - out) < 30) {
-								new_page(bucket);
-							}
+							if (instance_data) {
+								for (int j = start_i; j < start_i + count; ++j) {
+									const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
+									const Transform& tr = entity_data[e.index];
+									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+									memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+									instance_data += sizeof(tr.rot);
+									memcpy(instance_data, &lpos, sizeof(lpos));
+									instance_data += sizeof(lpos);
+									memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+									instance_data += sizeof(tr.scale);
+								}
+								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 30) {
+									new_page(bucket);
+								}
 
-							WRITE(type);
-							WRITE(mi->meshes[mesh_idx].render_data);
-							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
-							WRITE(count);
-							WRITE(slice.buffer);
-							WRITE(slice.offset);
+								WRITE(type);
+								WRITE(mi->meshes[mesh_idx].render_data);
+								WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
+								WRITE(count);
+								WRITE(slice.buffer);
+								WRITE(slice.offset);
 							
-							--i;
+								--i;
+							}
 							break;
 						}
 						case RenderableTypes::SKINNED: {

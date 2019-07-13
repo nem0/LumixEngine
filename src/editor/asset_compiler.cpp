@@ -247,8 +247,8 @@ struct AssetCompilerImpl : AssetCompiler
 	void onInitFinished() override
 	{
 		OS::InputFile file;
-		const char* list_path = ".lumix/assets/_list.txt";
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		const StaticString<MAX_PATH_LENGTH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
 		if (fs.open(list_path, &file)) {
 			Array<char> content(m_app.getWorldEditor().getAllocator());
 			content.resize((int)file.size());
