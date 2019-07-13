@@ -636,7 +636,6 @@ struct RendererImpl final : public Renderer
 		slice.offset = MT::atomicAdd(&m_transient_buffer_offset, size);
 		if (slice.offset + size > TRANSIENT_BUFFER_SIZE) {
 			logError("Renderer") << "Out of transient memory";
-			ASSERT(false);
 			slice.size = 0;
 			slice.ptr = nullptr;
 			MT::atomicSubtract(&m_transient_buffer_offset, size);
