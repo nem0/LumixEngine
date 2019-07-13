@@ -639,6 +639,7 @@ public:
 		serializer.write("fog_color", light.m_fog_color);
 		serializer.write("fog_density", light.m_fog_density);
 		serializer.write("fog_height", light.m_fog_height);
+		serializer.write("flags", light.flags.base);
 	}
 
 
@@ -654,6 +655,7 @@ public:
 		serializer.read(&light.m_fog_color);
 		serializer.read(&light.m_fog_density);
 		serializer.read(&light.m_fog_height);
+		serializer.read(&light.flags.base);
 		m_environments.insert(entity, light);
 		m_universe.onComponentCreated(light.m_entity, ENVIRONMENT_TYPE, this);
 		m_active_global_light_entity = entity;
@@ -1633,6 +1635,13 @@ public:
 		return light_count;
 	}
 
+	bool getEnvironmentCastShadows(EntityRef entity) override {
+		return m_environments[entity].flags.isSet(Environment::CAST_SHADOWS);
+	}
+	
+	void setEnvironmentCastShadows(EntityRef entity, bool enable) override {
+		m_environments[entity].flags.set(Environment::CAST_SHADOWS, enable);
+	}
 
 	Environment& getEnvironment(EntityRef entity) override
 	{
@@ -3266,6 +3275,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void createEnvironment(EntityRef entity)
 	{
 		Environment light;
+		light.flags.set(Environment::CAST_SHADOWS);
 		light.m_entity = entity;
 		light.m_diffuse_color.set(1, 1, 1);
 		light.m_diffuse_intensity = 0;
