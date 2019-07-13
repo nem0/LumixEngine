@@ -140,28 +140,35 @@ function blur(buffer, format, w, h, tmp_rb_dbg_name)
 end
 
 function shadowPass()
-	beginBlock("shadows")
-		local rb = createRenderbuffer(4096, 1024, false, "r32f", "shadowmap")
-		local depthbuf = createRenderbuffer(4096, 1024, false, "depth24", "shadowmap_depth")
-		setRenderTargets(rb, depthbuf)
+	if not environmentCastShadows() then
+		local rb = createRenderbuffer(1, 1, false, "r32f", "shadowmap")
+		setRenderTargets(rb)
 		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
-		
-		for slice = 0, 3 do 
-			local view_params = getShadowCameraParams(slice, 4096)
-			local shadow_set = prepareCommands(view_params, { { layers = { "default" } } })
+		return rb
+	else 
+		beginBlock("shadows")
+			local rb = createRenderbuffer(4096, 1024, false, "r32f", "shadowmap")
+			local depthbuf = createRenderbuffer(4096, 1024, false, "depth24", "shadowmap_depth")
+			setRenderTargets(rb, depthbuf)
+			clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 			
-			viewport(slice * 1024, 0, 1024, 1024)
-			beginBlock("slice " .. tostring(slice + 1))
-			pass(view_params)
-			renderBucket(shadow_set, shadow_state)
-			endBlock()
-		end
-	endBlock()
-	
-	beginBlock("shadow_blur")
-		blur(rb, "r32f", 4096, 1024, "shadowmap_blur")
-	endBlock()
-	return rb
+			for slice = 0, 3 do 
+				local view_params = getShadowCameraParams(slice, 4096)
+				local shadow_set = prepareCommands(view_params, { { layers = { "default" } } })
+				
+				viewport(slice * 1024, 0, 1024, 1024)
+				beginBlock("slice " .. tostring(slice + 1))
+				pass(view_params)
+				renderBucket(shadow_set, shadow_state)
+				endBlock()
+			end
+		endBlock()
+		
+		beginBlock("shadow_blur")
+			blur(rb, "r32f", 4096, 1024, "shadowmap_blur")
+		endBlock()
+		return rb
+	end
 end
 
 function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)

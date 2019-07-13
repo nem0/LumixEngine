@@ -62,6 +62,10 @@ struct TerrainInfo
 
 struct Environment
 {
+	enum Flags : u32{
+		CAST_SHADOWS = 1 << 0
+	};
+
 	Vec3 m_diffuse_color;
 	float m_diffuse_intensity;
 	float m_indirect_intensity;
@@ -71,6 +75,7 @@ struct Environment
 	float m_fog_height;
 	EntityRef m_entity;
 	Vec4 m_cascades;
+	FlagSet<Flags, u32> flags;
 };
 
 
@@ -321,6 +326,8 @@ public:
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;
 
+	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
+	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;
 	virtual Environment& getEnvironment(EntityRef entity) = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, int max_count, PointLight* lights) = 0;

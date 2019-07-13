@@ -3174,6 +3174,12 @@ struct PipelineImpl final : Pipeline
 		m_output = rb_index;
 	}
 
+	bool environmentCastShadows() {
+		if (!m_scene) return false;
+		const EntityPtr env = m_scene->getActiveEnvironment();
+		if (!env.isValid()) return false;
+		return m_scene->getEnvironmentCastShadows((EntityRef)env);
+	}
 
 	int preloadShader(const char* path)
 	{
@@ -3241,6 +3247,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createRenderbuffer);
 		REGISTER_FUNCTION(endBlock);
+		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(preloadShader);
 		REGISTER_FUNCTION(render2D);
