@@ -178,6 +178,16 @@ if _OPTIONS["with-app"] then
 	build_app = true
 end
 
+function detect_plugins()
+	local f = io.popen([[dir /B ..\plugins]])
+	if not f then return end
+	for line in f:lines() do 
+		table.insert(plugins, line)
+	end
+	f:close()
+end
+detect_plugins()
+
 newoption {
 		trigger = "gcc",
 		value = "GCC",
@@ -633,6 +643,11 @@ for _, plugin in ipairs(plugins) do
 	local path = "../../" .. plugin .. "/genie.lua";
 	if os.isfile(path) then
 		dofile(path)
+	else
+		 path = "../plugins/" .. plugin .. "/genie.lua";
+		if os.isfile(path) then
+			dofile(path)
+		end
 	end
 end
 	

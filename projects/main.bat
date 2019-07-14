@@ -22,9 +22,10 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	echo   7. Pull latest from Github
 	echo   8. Open chat
 	echo   9. 3rd party
-	echo   A. Download Godot Engine
+	echo   A. Plugins
+	echo   B. Download Godot Engine
 	echo ===============================
-	choice /C 123456789A /N /M "Your choice:"
+	choice /C 123456789AB /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 goto :EOF
@@ -36,8 +37,35 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==7 call :git_pull
 	if %errorlevel%==8 call :open_gitter
 	if %errorlevel%==9 call :third_party
-	if %errorlevel%==10 call :download_godot
+	if %errorlevel%==10 call :plugins
+	if %errorlevel%==11 call :download_godot
 goto :begin
+
+:plugins 
+	cls
+	echo Wut?
+	echo ===============================
+	echo  1. Go back
+	echo  2. Maps
+	echo ===============================
+	choice /C 1234567 /N /M "Your choice:"
+	echo.
+	if %errorlevel%==1 exit /B 0
+	if %errorlevel%==2 call :map_plugin
+	pause
+goto :plugins
+
+:map_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist maps (
+		git.exe clone https://github.com/nem0/lumixengine_maps.git maps
+	) else (
+		cd maps
+		git pull
+	)
+	popd
+exit /B 0
 
 :third_party 
 	REM we should use specific 3rd party revision
