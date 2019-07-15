@@ -316,7 +316,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)i,
+			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1),
 				ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed,
 				"%s",
 				"");
@@ -333,37 +333,36 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				continue;
 			}
 
-			if (is_node_open)
-			{
+			if (is_node_open) {
 				ImGui::Image((void*)(uintptr_t)texture->handle.value, ImVec2(96, 96));
-				// TODO
-				/*if (ImGui::CollapsingHeader("Advanced"))
-				{
-					static const struct
-					{
-						const char* name;
-						u32 value;
-						u32 unset_flag;
-					} FLAGS[] = {
-						{"u clamp", BGFX_TEXTURE_U_CLAMP, 0},
-						{"v clamp", BGFX_TEXTURE_V_CLAMP, 0},
-						{"Min point", BGFX_TEXTURE_MIN_POINT, BGFX_TEXTURE_MIN_ANISOTROPIC},
-						{"Mag point", BGFX_TEXTURE_MAG_POINT, BGFX_TEXTURE_MAG_ANISOTROPIC},
-						{"Min anisotropic", BGFX_TEXTURE_MIN_ANISOTROPIC, BGFX_TEXTURE_MIN_POINT},
-						{"Mag anisotropic", BGFX_TEXTURE_MAG_ANISOTROPIC, BGFX_TEXTURE_MAG_POINT}
-					};
+				static const struct {
+					const char* name;
+					u32 value;
+					u32 unset_flag;
+				} FLAGS[] = {
+					{"Clamp", (u32)Texture::Flags::CLAMP, 0},
+					{"SRGB", (u32)Texture::Flags::SRGB, 0}
+				};
 
-					for (int i = 0; i < lengthOf(FLAGS); ++i)
-					{
-						auto& flag = FLAGS[i];
-						bool b = (texture->flags & flag.value) != 0;
-						if (ImGui::Checkbox(flag.name, &b))
-						{
-							if (flag.unset_flag) texture->setFlag((Texture::Flags)flag.unset_flag, false);
-							texture->setFlag((Texture::Flags)flag.value, b);
-						}
+				for (int i = 0; i < lengthOf(FLAGS); ++i) {
+					auto& flag = FLAGS[i];
+					bool b = (texture->flags & flag.value) != 0;
+					if (ImGui::Checkbox(flag.name, &b)) {
+						if (flag.unset_flag) texture->setFlag((Texture::Flags)flag.unset_flag, false);
+						texture->setFlag((Texture::Flags)flag.value, b);
 					}
-				}*/
+				}
+				
+				for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
+					bool b = material->isCustomFlag(1 << i);
+					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
+						if (b)
+							material->setCustomFlag(1 << i);
+						else
+							material->unsetCustomFlag(1 << i);
+					}
+				}
+
 				ImGui::TreePop();
 			}
 		}
@@ -441,20 +440,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}*/
 
-			if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags"))
-			{
-				for (int i = 0; i < Material::getCustomFlagCount(); ++i)
-				{
-					bool b = material->isCustomFlag(1 << i);
-					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b))
-					{
-						if (b)
-							material->setCustomFlag(1 << i);
-						else
-							material->unsetCustomFlag(1 << i);
-					}
-				}
-			}
 		}
 	}
 
