@@ -1170,7 +1170,6 @@ public:
 
 	static int LUA_packageLoader(lua_State* L)
 	{
-		/*
 		const char* module = LuaWrapper::toType<const char*>(L, 1);
 		StaticString<MAX_PATH_LENGTH> tmp(module);
 		tmp << ".lua";
@@ -1178,23 +1177,17 @@ public:
 		auto* engine = (Engine*)lua_touserdata(L, -1);
 		lua_pop(L, 1);
 		auto& fs = engine->getFileSystem();
-		auto* file = fs.open(Path(tmp), FS::Mode::OPEN_AND_READ);
-		if (!file)
-		{
+		Array<u8> buf(engine->getAllocator());
+		if (!fs.getContentSync(Path(tmp), &buf)) {
 			logError("Engine") << "Failed to open file " << tmp;
 			StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
 			msg << tmp;
 			lua_pushstring(L, msg);
 		}
-		else if (luaL_loadbuffer(L, (const char*)file->getBuffer(), file->size(), tmp) != 0)
-		{
+		else if (luaL_loadbuffer(L, (const char*)buf.begin(), buf.byte_size(), tmp) != 0) {
 			logError("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
 		}
-		if (file) fs.close(*file);
-		return 1;*/
-		ASSERT(false);
-		// TODO
-		return 0;
+		return 1;
 	}
 
 	
