@@ -78,6 +78,7 @@ exit /B 0
 	echo  4. Recast navigation
 	echo  5. CMFT
 	echo  6. PhysX
+	echo  7. LuaJIT
 	echo ===============================
 	choice /C 1234567 /N /M "Your choice:"
 	echo.
@@ -87,6 +88,7 @@ exit /B 0
 	if %errorlevel%==4 call :recast
 	if %errorlevel%==5 call :cmft
 	if %errorlevel%==6 call :physx
+	if %errorlevel%==7 call :luajit
 goto :third_party
 
 :all_3rdparty
@@ -94,18 +96,71 @@ goto :third_party
 	call :download_nvtt
 	call :download_cmft
 	call :download_recast
+	call :download_luajit
 	
 	call :build_physx
 	call :build_nvtt
 	call :build_cmft
 	call :build_recast
+	call :build_luajit
 	
 	call :deploy_physx
 	call :deploy_nvtt
 	call :deploy_cmft
 	call :deploy_recast
+	call :deploy_luajit
 	pause
 
+exit /B 0
+
+:luajit
+	cls
+	echo LuaJIT
+	echo ===============================
+	echo  1. Go back
+	echo  2. Download
+	echo  3. Build
+	echo  4. Deploy
+	echo  5. Open in VS
+	echo ===============================
+	choice /C 12345 /N /M "Your choice:"
+	echo.
+	if %errorlevel%==1 exit /B 0
+	if %errorlevel%==2 call :download_luajit
+	if %errorlevel%==3 call :build_luajit
+	if %errorlevel%==4 call :deploy_luajit
+	REM if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\luajit\\compiler\vc15win64\PhysXSDK.sln"
+	pause
+goto :luajit
+
+:deploy_luajit
+	copy 3rdparty\luajit\src\lua51.lib ..\external\luajit\lib\win64_vs2017\release\
+	copy 3rdparty\luajit\src\luajit.lib ..\external\luajit\lib\win64_vs2017\release\
+	copy 3rdparty\luajit\src\lauxlib.h ..\external\luajit\include
+	copy 3rdparty\luajit\src\lua.h ..\external\luajit\include
+	copy 3rdparty\luajit\src\lua.hpp ..\external\luajit\include
+	copy 3rdparty\luajit\src\luaconf.h ..\external\luajit\include
+	copy 3rdparty\luajit\src\luajit.h ..\external\luajit\include
+	copy 3rdparty\luajit\src\lualib.h ..\external\luajit\include
+exit /B 0
+
+:build_luajit
+	pushd 3rdparty\luajit\src
+	call msvcbuild.bat
+	popd
+exit /B 0
+
+:download_luajit
+	if not exist 3rdparty mkdir 3rdparty
+	cd 3rdparty
+	if not exist luajit (
+		git.exe clone https://github.com/LuaJIT/LuaJIT.git luajit
+	) else (
+		cd luajit
+		git pull
+		cd ..
+	)
+	cd ..
 exit /B 0
 
 :physx
