@@ -207,7 +207,7 @@ void AssetBrowser::breadcrumbs()
 
 void AssetBrowser::dirColumn()
 {
-	ImVec2 size(m_left_column_width, 0);
+	ImVec2 size(maximum(120.f, m_left_column_width), 0);
 	ImGui::BeginChild("left_col", size);
 	ImGui::PushItemWidth(120);
 	bool b = false;
@@ -449,7 +449,9 @@ void AssetBrowser::onGUI()
 
 		ImGui::SameLine();
 		ImGui::VSplitter("vsplit1", &left_size);
-		m_left_column_width = left_size.x;
+		if (left_size.x >= 120) {
+			m_left_column_width = left_size.x;
+		}
 		ImGui::SameLine();
 
 		fileColumn();
