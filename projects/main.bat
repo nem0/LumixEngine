@@ -121,15 +121,13 @@ exit /B 0
 	echo  2. Download
 	echo  3. Build
 	echo  4. Deploy
-	echo  5. Open in VS
 	echo ===============================
-	choice /C 12345 /N /M "Your choice:"
+	choice /C 1234 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :download_luajit
 	if %errorlevel%==3 call :build_luajit
 	if %errorlevel%==4 call :deploy_luajit
-	REM if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\luajit\\compiler\vc15win64\PhysXSDK.sln"
 	pause
 goto :luajit
 

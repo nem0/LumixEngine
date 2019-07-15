@@ -142,6 +142,10 @@ struct FileInfo {
 
 struct FileIterator;
 
+LUMIX_ENGINE_API void* memReserve(size_t size);
+LUMIX_ENGINE_API void memCommit(void* ptr, size_t size);
+LUMIX_ENGINE_API void memRelease(void* ptr);
+
 LUMIX_ENGINE_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
 LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);
 LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
