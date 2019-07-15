@@ -656,6 +656,18 @@ int getDPI()
 }
 
 
+void* memReserve(size_t size) {
+	return VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);
+}
+
+void memCommit(void* ptr, size_t size) {
+	VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
+}
+
+void memRelease(void* ptr) {
+	VirtualFree(ptr, 0, MEM_RELEASE);
+}
+
 struct FileIterator
 {
 	HANDLE handle;

@@ -28,10 +28,8 @@
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
-#include <algorithm>
 #include <cmath>
-#include <malloc.h> // TODO
-#include <Windows.h> // TODO
+
 
 namespace Lumix
 {
@@ -99,8 +97,8 @@ struct MTBucketArray
 	MTBucketArray(IAllocator& allocator) 
 		: m_counts(allocator) 
 	{
-		m_keys_mem = (u8*)VirtualAlloc(nullptr, 1024 * 1024 * 8, MEM_RESERVE, PAGE_READWRITE);
-		m_values_mem = (u8*)VirtualAlloc(nullptr, 1024 * 1024 * 8, MEM_RESERVE, PAGE_READWRITE);
+		m_keys_mem = (u8*)OS::memReserve(1024 * 1024 * 8);
+		m_values_mem = (u8*)OS::memReserve(1024 * 1024 * 8);
 		m_keys_end = m_keys_mem;
 		m_values_end = m_values_mem;
 		m_counts.reserve(1024 * 1024 * 8 / BUCKET_SIZE);
@@ -108,8 +106,8 @@ struct MTBucketArray
 
 	~MTBucketArray()
 	{
-		VirtualFree(m_values_mem, 0, MEM_RELEASE);
-		VirtualFree(m_keys_mem, 0, MEM_RELEASE);
+		OS::memRelease(m_values_mem);
+		OS::memRelease(m_keys_mem);
 	}
 
 	Bucket begin()
@@ -127,8 +125,8 @@ struct MTBucketArray
 		m_values_end += BUCKET_SIZE;
 		m_mutex.exit();
 		// TODO make sure BUCKET_SIZE is multiple of page size
-		VirtualAlloc(b.values, BUCKET_SIZE, MEM_COMMIT, PAGE_READWRITE);
-		VirtualAlloc(b.keys, BUCKET_SIZE, MEM_COMMIT, PAGE_READWRITE);
+		OS::memCommit(b.values, BUCKET_SIZE);
+		OS::memCommit(b.keys, BUCKET_SIZE);
 		return b;
 	}
 
@@ -3028,9 +3026,8 @@ struct PipelineImpl final : Pipeline
 
 		void createCommands(u64* renderables, u64* sort_keys, int size)
 		{
-			const int jobs_count = JobSystem::getWorkersCount() * 4;
-			CreateCommands* create_commands = (CreateCommands*)alloca(sizeof(CreateCommands) * jobs_count);
-			new (NewPlaceholder(), create_commands) CreateCommands[jobs_count];
+			CreateCommands create_commands[256];
+			const int jobs_count = minimum(lengthOf(create_commands), JobSystem::getWorkersCount() * 4);
 			
 			JobSystem::SignalHandle counter = JobSystem::INVALID_HANDLE;
 
