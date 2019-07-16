@@ -867,12 +867,6 @@ struct PipelineImpl final : Pipeline
 				copyMemory(&cmd_buffer[0], draw2d.m_cmds.begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
 
 				draw2d.clear();
-				// TODO
-				ASSERT(false);
-				/*draw2d.PushClipRectFullScreen();
-				FontAtlas& atlas = pipeline->m_renderer.getFontManager().getFontAtlas();
-				draw2d.FontTexUvWhitePixel = atlas.TexUvWhitePixel;
-				draw2d.PushTextureID(atlas.TexID);*/
 
 				shader = pipeline->m_draw2d_shader->m_render_data;
 			}

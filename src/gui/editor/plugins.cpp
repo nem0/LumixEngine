@@ -278,7 +278,7 @@ private:
 
 	MouseMode drawGizmo(Draw2D& draw, GUIScene& scene, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos)
 	{
-		/*auto& selected_entities = m_editor->getSelectedEntities();
+		auto& selected_entities = m_editor->getSelectedEntities();
 		if (selected_entities.size() != 1) return MouseMode::NONE;
 
 		EntityRef e = selected_entities[0];
@@ -286,7 +286,7 @@ private:
 
 		GUIScene::Rect& rect = scene.getRectOnCanvas(e, canvas_size);
 		Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
-		draw.AddRect({ rect.x, rect.y }, bottom_right, 0xfff00fff);
+		draw.addRect({ rect.x, rect.y }, bottom_right, {0xff, 0xf0, 0x0f, 0xff}, 1);
 		Vec2 mid = { rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f };
 
 		auto drawHandle = [&](const Vec2& pos, const ImVec2& mouse_pos) {
@@ -295,8 +295,8 @@ private:
 			float dy = pos.y - mouse_pos.y;
 			bool is_hovered = abs(dx) < SIZE && abs(dy) < SIZE;
 			
-			draw.AddRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? 0xffffffff : 0x77ffFFff);
-			draw.AddRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), 0xff777777);
+			draw.addRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? Color{0xff, 0xff, 0xff, 0xff} : Color{0xff, 0xff, 0xff, 0x77});
+			draw.addRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), {0xff, 0xff, 0xff, 0x77}, 1);
 
 			return is_hovered && ImGui::IsMouseClicked(0);
 		};
@@ -316,11 +316,7 @@ private:
 			m_top_left_start_move.x = scene.getRectLeftPoints(e);
 			ret = MouseMode::MOVE;
 		}
-		return ret;*/
-				// TODO
-		ASSERT(false);
-		return {};
-
+		return ret;
 	}
 		
 
