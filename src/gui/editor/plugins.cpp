@@ -278,7 +278,7 @@ private:
 
 	MouseMode drawGizmo(Draw2D& draw, GUIScene& scene, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos)
 	{
-		auto& selected_entities = m_editor->getSelectedEntities();
+		/*auto& selected_entities = m_editor->getSelectedEntities();
 		if (selected_entities.size() != 1) return MouseMode::NONE;
 
 		EntityRef e = selected_entities[0];
@@ -316,7 +316,11 @@ private:
 			m_top_left_start_move.x = scene.getRectLeftPoints(e);
 			ret = MouseMode::MOVE;
 		}
-		return ret;
+		return ret;*/
+				// TODO
+		ASSERT(false);
+		return {};
+
 	}
 		
 

@@ -44,7 +44,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	bool create(int w, int h, const void* data, uint size);
+	bool create(int w, int h, ffr::TextureFormat format, const void* data, uint size);
 	void destroy();
 
 	const u8* getData() const { return data.empty() ? nullptr : &data[0]; }

@@ -202,7 +202,7 @@ struct GUISceneImpl final : public GUIScene
 
 	void renderTextCursor(GUIRect& rect, Draw2D& draw, const Vec2& pos)
 	{
-		if (!rect.input_field) return;
+		/*if (!rect.input_field) return;
 		if (m_focused_entity != rect.entity) return;
 		if (rect.input_field->anim > CURSOR_BLINK_PERIOD * 0.5f) return;
 
@@ -211,7 +211,9 @@ struct GUISceneImpl final : public GUIScene
 		Font* font = rect.text->getFont();
 		float font_size = (float)rect.text->getFontSize();
 		Vec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, text, text_end);
-		draw.AddLine({ pos.x + text_size.x, pos.y }, { pos.x + text_size.x, pos.y + text_size.y }, rect.text->color, 1);
+		draw.AddLine({ pos.x + text_size.x, pos.y }, { pos.x + text_size.x, pos.y + text_size.y }, rect.text->color, 1);*/
+		// TODO
+		ASSERT(false);
 	}
 
 
@@ -226,13 +228,15 @@ struct GUISceneImpl final : public GUIScene
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
 		Draw2D& draw = pipeline.getDraw2D();
-		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.PushClipRect({ l, t }, { r, b });
+		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.pushClipRect({ l, t }, { r, b });
 
 		if (rect.image && rect.image->flags.isSet(GUIImage::IS_ENABLED))
 		{
 			if (rect.image->sprite && rect.image->sprite->getTexture())
 			{
-				Sprite* sprite = rect.image->sprite;
+				// TODO 
+				ASSERT(false);
+				/*Sprite* sprite = rect.image->sprite;
 				Texture* tex = sprite->getTexture();
 				if (sprite->type == Sprite::PATCH9)
 				{
@@ -267,17 +271,19 @@ struct GUISceneImpl final : public GUIScene
 				else
 				{
 					draw.AddImage(&tex->handle, { l, t }, { r, b });
-				}
+				}*/
 			}
 			else
 			{
-				draw.AddRectFilled({ l, t }, { r, b }, rect.image->color);
+				draw.addRectFilled({ l, t }, { r, b }, *(Color*)&rect.image->color);
 			}
 		}
 
 		if (rect.render_target && rect.render_target->isValid())
 		{
-			draw.AddImage(rect.render_target, { l, t }, { r, b });
+				// TODO 
+				ASSERT(false);
+			//draw.AddImage(rect.render_target, { l, t }, { r, b });
 		}
 
 		if (rect.text)
@@ -287,7 +293,9 @@ struct GUISceneImpl final : public GUIScene
 
 			const char* text_cstr = rect.text->text.c_str();
 			float font_size = (float)rect.text->getFontSize();
-			Vec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, text_cstr);
+			// TODO 
+			ASSERT(false);
+/*			Vec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, text_cstr);
 			Vec2 text_pos(l, t);
 
 			switch (rect.text->horizontal_align)
@@ -298,7 +306,7 @@ struct GUISceneImpl final : public GUIScene
 			}
 
 			draw.AddText(font, font_size, text_pos, rect.text->color, text_cstr);
-			renderTextCursor(rect, draw, text_pos);
+			renderTextCursor(rect, draw, text_pos);*/
 		}
 
 		EntityPtr child = m_universe.getFirstChild(rect.entity);
@@ -311,7 +319,7 @@ struct GUISceneImpl final : public GUIScene
 			}
 			child = m_universe.getNextSibling((EntityRef)child);
 		}
-		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.PopClipRect();
+		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.popClipRect();
 	}
 
 

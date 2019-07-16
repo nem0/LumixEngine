@@ -32,7 +32,6 @@
 #include "renderer/texture.h"
 #include <cfloat>
 #include <cmath>
-#include <algorithm>
 
 
 namespace Lumix
@@ -57,8 +56,11 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 
 
-struct Decal : public DecalInfo
+struct Decal
 {
+	Material* material = nullptr;
+	Transform transform;
+	float radius;
 	EntityRef entity;
 	EntityPtr prev_decal = INVALID_ENTITY;
 	EntityPtr next_decal = INVALID_ENTITY;
@@ -824,6 +826,7 @@ public:
 			const TextMesh& text = *m_text_meshes.at(j);
 			const Font* font = text.getFont();
 			if (!font) font = m_renderer.getFontManager().getDefaultFont();
+			if (!font) continue;
 			const EntityRef entity = m_text_meshes.getKey(j);
 			const char* str = text.text.c_str();
 			Vec3 base = (m_universe.getPosition(entity) - cam_pos).toFloat();
@@ -836,28 +839,28 @@ public:
 				up = cam_up * scale;
 			}
 			u32 color = text.color;
-			const Vec2 text_size = font->CalcTextSizeA((float)text.getFontSize(), FLT_MAX, 0, str);
+			const Vec2 text_size = measureTextA(*font, str);
 			base += right * text_size.x * -0.5f;
 			base += up * text_size.y * -0.5f;
 			for (int i = 0, n = text.text.length(); i < n; ++i) {
-				const Font::Glyph* glyph = font->FindGlyph(str[i]);
+				const Glyph* glyph = findGlyph(*font, str[i]);
 				if (!glyph) continue;
 
-				const Vec3 x0y0 = base + right * glyph->X0 + up * glyph->Y0;
-				const Vec3 x1y0 = base + right * glyph->X1 + up * glyph->Y0;
-				const Vec3 x1y1 = base + right * glyph->X1 + up * glyph->Y1;
-				const Vec3 x0y1 = base + right * glyph->X0 + up * glyph->Y1;
+				const Vec3 x0y0 = base + right * float(glyph->x0) + up * float(glyph->y0);
+				const Vec3 x1y0 = base + right * float(glyph->x1) + up * float(glyph->y0);
+				const Vec3 x1y1 = base + right * float(glyph->x1) + up * float(glyph->y1);
+				const Vec3 x0y1 = base + right * float(glyph->x0) + up * float(glyph->y1);
 
-				vertices[idx + 0] = { x0y0, color, { glyph->U0, glyph->V0 } };
-				vertices[idx + 1] = { x1y0, color, { glyph->U1, glyph->V0 } };
-				vertices[idx + 2] = { x1y1, color, { glyph->U1, glyph->V1 } };
+				vertices[idx + 0] = { x0y0, color, { glyph->u0, glyph->v0 } };
+				vertices[idx + 1] = { x1y0, color, { glyph->u1, glyph->v0 } };
+				vertices[idx + 2] = { x1y1, color, { glyph->u1, glyph->v1 } };
 
-				vertices[idx + 3] = { x0y0, color, { glyph->U0, glyph->V0 } };
-				vertices[idx + 4] = { x1y1, color, { glyph->U1, glyph->V1 } };
-				vertices[idx + 5] = { x0y1, color, { glyph->U0, glyph->V1 } };
+				vertices[idx + 3] = { x0y0, color, { glyph->u0, glyph->v0 } };
+				vertices[idx + 4] = { x1y1, color, { glyph->u1, glyph->v1 } };
+				vertices[idx + 5] = { x0y1, color, { glyph->u0, glyph->v1 } };
 				idx += 6;
 
-				base += right * glyph->XAdvance;
+				base += right * float(glyph->advance_x);
 			}
 		}
 	}
@@ -2507,8 +2510,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		x_vec.normalize();
 		const DVec3 bottom = position + Vec3(0, radius, 0);
 		const DVec3 top = bottom + Vec3(0, height, 0);
-		for (int i = 1; i <= 32; ++i)
-		{
+		for (int i = 1; i <= 32; ++i) {
 			const float a = i / 32.0f * 2 * PI;
 			const float x = cosf(a) * radius;
 			const float z = sinf(a) * radius;
@@ -2524,28 +2526,25 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		float radius,
 		u32 color) override
 	{
-		/*Vec3 x_vec = transform.getXVector();
-		Vec3 y_vec = transform.getYVector();
-		Vec3 z_vec = transform.getZVector();
-		Vec3 position = transform.getTranslation();
+		const Vec3 x_vec = transform.rot.rotate(Vec3(1, 0, 0));
+		const Vec3 y_vec = transform.rot.rotate(Vec3(0, 1, 0));
+		const Vec3 z_vec = transform.rot.rotate(Vec3(0, 0, 1));
+		DVec3 position = transform.pos;
 
-		Matrix tmp = transform;
-		tmp.setTranslation(transform.getTranslation() + y_vec * radius);
-		addDebugHalfSphere(tmp, radius, false, color, life);
-		tmp.setTranslation(transform.getTranslation() + y_vec * (radius + height));
-		addDebugHalfSphere(tmp, radius, true, color, life);
+		RigidTransform tmp = transform;
+		tmp.pos = transform.pos + y_vec * radius;
+		addDebugHalfSphere(tmp, radius, false, color);
+		tmp.pos = transform.pos + y_vec * (radius + height);
+		addDebugHalfSphere(tmp, radius, true, color);
 
-		Vec3 bottom = position + y_vec * radius;
-		Vec3 top = bottom + y_vec * height;
-		for (int i = 1; i <= 32; ++i)
-		{
+		DVec3 bottom = position + y_vec * radius;
+		DVec3 top = bottom + y_vec * height;
+		for (int i = 1; i <= 32; ++i) {
 			float a = i / 32.0f * 2 * PI;
 			float x = cosf(a) * radius;
 			float z = sinf(a) * radius;
-			addDebugLine(bottom + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color, life);
-		}*/
-		// TODO
-		ASSERT(false);
+			addDebugLine(bottom + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color);
+		}
 	}
 
 
@@ -2943,21 +2942,21 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
 			path  << "universes/" << m_universe.getName() << "/probes/" << probe.guid << ".dds";
 			probe.texture = rm.load<Texture>(Path(path));
-			// TODO
-			//probe.texture->setFlag(BGFX_TEXTURE_SRGB, true);
+			probe.texture->setFlag(Texture::Flags::SRGB, true);
 		}
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
 		if(probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		probe.irradiance = rm.load<Texture>(Path(path));
-		//probe.irradiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
+		// TODO
 		//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
 		if (probe.radiance) probe.irradiance->getResourceManager().unload(*probe.radiance);
 		probe.radiance = rm.load<Texture>(Path(path));
-		//probe.radiance->setFlag(BGFX_TEXTURE_SRGB, true);
+		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 		//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
 		//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 	}

@@ -112,14 +112,6 @@ struct EnvironmentProbe
 };
 
 
-struct DecalInfo
-{
-	Material* material = nullptr;
-	Transform transform;
-	float radius;
-};
-
-
 struct MeshSortData
 {
     u32 sort_key;

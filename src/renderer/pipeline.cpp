@@ -29,6 +29,7 @@
 #include "terrain.h"
 #include "texture.h"
 #include <cmath>
+#include <cstring>
 
 
 namespace Lumix
@@ -190,7 +191,7 @@ void PipelineResource::unload()
 bool PipelineResource::load(u64 size, const u8* mem)
 {
 	content.resize((int)size);
-	memcpy(content.begin(), mem, size);
+	copyMemory(content.begin(), mem, size);
 	return true;
 }
 
@@ -234,11 +235,7 @@ struct PipelineImpl final : Pipeline
 		m_text_mesh_shader = rm.load<Shader>(Path("pipelines/text_mesh.shd"));
 		m_default_cubemap = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 
-		FontAtlas& font_atlas = m_renderer.getFontManager().getFontAtlas();
-		m_draw2d.FontTexUvWhitePixel = font_atlas.TexUvWhitePixel;
-		m_draw2d.Clear();
-		m_draw2d.PushClipRectFullScreen();
-		m_draw2d.PushTextureID(font_atlas.TexID);
+		m_draw2d.clear();
 
 		m_position_uniform = ffr::allocUniform("u_position", ffr::UniformType::VEC3, 1);
 		m_lod_uniform = ffr::allocUniform("u_lod", ffr::UniformType::INT, 1);
@@ -613,7 +610,7 @@ struct PipelineImpl final : Pipeline
 				m_scene->clearDebugLines();
 				m_scene->clearDebugTriangles();
 			}
-			m_draw2d.Clear();
+			m_draw2d.clear();
 			return false;
 		}
 
@@ -839,32 +836,18 @@ struct PipelineImpl final : Pipeline
 
 	void render2D()
 	{
-		auto resetDraw2D =  [this](){
-			m_draw2d.Clear();
-			m_draw2d.PushClipRectFullScreen();
-			FontAtlas& atlas = m_renderer.getFontManager().getFontAtlas();
-			m_draw2d.FontTexUvWhitePixel = atlas.TexUvWhitePixel;
-			m_draw2d.PushTextureID(atlas.TexID);
-		};
-
 		if (!m_draw2d_shader->isReady()) {
-			resetDraw2D();
+			m_draw2d.clear();
 			return;
 		}
 
-		if (m_draw2d.IdxBuffer.size() == 0) {
-			resetDraw2D();
+		if (m_draw2d.m_indices.empty()) {
+			m_draw2d.clear();
 			return;
 		}
 
 		struct Cmd : Renderer::RenderJob
 		{
-			Renderer::MemRef idx_buffer_mem;
-			Renderer::MemRef vtx_buffer_mem;
-			int num_indices;
-			int num_vertices;
-			Array<Draw2D::DrawCmd> cmd_buffer;
-
 			Cmd(IAllocator& allocator) : cmd_buffer(allocator) {}
 
 			void setup()
@@ -874,19 +857,22 @@ struct PipelineImpl final : Pipeline
 
 				Draw2D& draw2d = pipeline->m_draw2d;
 
-				num_indices = draw2d.IdxBuffer.size();
-				num_vertices = draw2d.VtxBuffer.size();
+				num_indices = draw2d.m_indices.size();
+				num_vertices = draw2d.m_vertices.size();
 
-				idx_buffer_mem = pipeline->m_renderer.copy(&draw2d.IdxBuffer[0], num_indices * sizeof(Draw2D::DrawIdx));
-				vtx_buffer_mem = pipeline->m_renderer.copy(&draw2d.VtxBuffer[0], num_vertices * sizeof(Draw2D::DrawVert));
-				cmd_buffer.resize(draw2d.CmdBuffer.size());
-				copyMemory(&cmd_buffer[0], draw2d.CmdBuffer.begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
+				// TODO use transient buffer
+				idx_buffer_mem = pipeline->m_renderer.copy(&draw2d.m_indices[0], num_indices * sizeof(u32));
+				vtx_buffer_mem = pipeline->m_renderer.copy(&draw2d.m_vertices[0], num_vertices * sizeof(Draw2D::Vertex));
+				cmd_buffer.resize(draw2d.m_cmds.size());
+				copyMemory(&cmd_buffer[0], draw2d.m_cmds.begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
 
-				draw2d.Clear();
-				draw2d.PushClipRectFullScreen();
+				draw2d.clear();
+				// TODO
+				ASSERT(false);
+				/*draw2d.PushClipRectFullScreen();
 				FontAtlas& atlas = pipeline->m_renderer.getFontManager().getFontAtlas();
 				draw2d.FontTexUvWhitePixel = atlas.TexUvWhitePixel;
-				draw2d.PushTextureID(atlas.TexID);
+				draw2d.PushTextureID(atlas.TexID);*/
 
 				shader = pipeline->m_draw2d_shader->m_render_data;
 			}
@@ -912,32 +898,28 @@ struct PipelineImpl final : Pipeline
 					ffr::bindIndexBuffer(ib);
 
 					u32 elem_offset = 0;
-					const Draw2D::DrawCmd* pcmd_begin = cmd_buffer.begin();
-					const Draw2D::DrawCmd* pcmd_end = cmd_buffer.end();
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 					ffr::setState(blend_state);
 					ffr::setUniform1i(pipeline->m_texture_uniform, 0);
 					ffr::useProgram(prg);
 
-					ASSERT(pcmd_begin <= pcmd_end - 1); // TODO compute correct offsets
-					for (const Draw2D::DrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++) {
-						if (0 == pcmd->ElemCount) continue;
+					for (Draw2D::Cmd& cmd : cmd_buffer) {
+						ffr::scissor(uint(maximum(cmd.clip_pos.x, 0.0f)),
+							uint(maximum(cmd.clip_pos.x, 0.0f)),
+							uint(minimum(cmd.clip_size.x, 65535.0f)),
+							uint(minimum(cmd.clip_size.y, 65535.0f)));
 			
-						ffr::scissor(uint(maximum(pcmd->ClipRect.x, 0.0f)),
-							uint(maximum(pcmd->ClipRect.y, 0.0f)),
-							uint(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
-							uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
-			
-						const Texture* atlas_texture = pipeline->m_renderer.getFontManager().getAtlasTexture();
+						/*const Texture* atlas_texture = pipeline->m_renderer.getFontManager().getAtlasTexture();
 						ffr::TextureHandle texture_id = atlas_texture->handle;
 						if (pcmd->TextureId) texture_id = *(ffr::TextureHandle*)pcmd->TextureId;
 						if(!texture_id.isValid()) texture_id = atlas_texture->handle;
 
-						ffr::bindTextures(&texture_id, 0, 1);
+						ffr::bindTextures(&texture_id, 0, 1);*/
+						// TODO
 
-						ffr::drawTriangles(num_indices, ffr::DataType::U16);
+						ffr::drawElements(elem_offset, num_indices, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
 
-						elem_offset += pcmd->ElemCount;
+						elem_offset += cmd.indices_count;
 					}
 				}
 
@@ -946,6 +928,11 @@ struct PipelineImpl final : Pipeline
 				ffr::destroy(ib);
 			}
 
+			Renderer::MemRef idx_buffer_mem;
+			Renderer::MemRef vtx_buffer_mem;
+			int num_indices;
+			int num_vertices;
+			Array<Draw2D::Cmd> cmd_buffer;
 			Vec2 size;
 			PipelineImpl* pipeline;
 			ShaderRenderData* shader;

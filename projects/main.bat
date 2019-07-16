@@ -79,8 +79,9 @@ exit /B 0
 	echo  5. CMFT
 	echo  6. PhysX
 	echo  7. LuaJIT
+	echo  8. FreeType2
 	echo ===============================
-	choice /C 1234567 /N /M "Your choice:"
+	choice /C 12345678 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :all_3rdparty
@@ -89,6 +90,7 @@ exit /B 0
 	if %errorlevel%==5 call :cmft
 	if %errorlevel%==6 call :physx
 	if %errorlevel%==7 call :luajit
+	if %errorlevel%==8 call :freetype
 goto :third_party
 
 :all_3rdparty
@@ -97,18 +99,21 @@ goto :third_party
 	call :download_cmft
 	call :download_recast
 	call :download_luajit
+	call :download_freetype
 	
 	call :build_physx
 	call :build_nvtt
 	call :build_cmft
 	call :build_recast
 	call :build_luajit
+	call :build_freetype
 	
 	call :deploy_physx
 	call :deploy_nvtt
 	call :deploy_cmft
 	call :deploy_recast
 	call :deploy_luajit
+	call :deploy_freetype
 	pause
 
 exit /B 0
@@ -132,6 +137,8 @@ exit /B 0
 goto :luajit
 
 :deploy_luajit
+	del /Q ..\external\luajit\lib\win64_vs2017\release\*
+	del /Q ..\external\luajit\include\*
 	copy 3rdparty\luajit\src\lua51.lib ..\external\luajit\lib\win64_vs2017\release\
 	copy 3rdparty\luajit\src\luajit.lib ..\external\luajit\lib\win64_vs2017\release\
 	copy 3rdparty\luajit\src\lauxlib.h ..\external\luajit\include
@@ -159,6 +166,39 @@ exit /B 0
 		cd ..
 	)
 	cd ..
+exit /B 0
+
+:freetype
+	cls
+	echo FreeType2
+	echo ===============================
+	echo  1. Go back
+	echo  2. Download
+	echo  3. Build
+	echo  4. Deploy
+	echo  5. Open in VS
+	echo ===============================
+	choice /C 12345 /N /M "Your choice:"
+	echo.
+	if %errorlevel%==1 exit /B 0
+	if %errorlevel%==2 call :download_freetype
+	if %errorlevel%==3 call :build_freetype
+	if %errorlevel%==4 call :deploy_freetype
+	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\freetype\builds\windows\vs2010\freetype.sln"
+	pause
+goto :freetype
+
+:build_freetype
+	%msbuild_cmd% 3rdparty\freetype\builds\windows\vc2010\freetype.sln /p:Configuration="Release Static" /p:Platform=x64
+exit /B 0
+
+:deploy_freetype
+echo %CD%
+	del /Q ..\external\freetype\lib\win64_vs2017\release\*
+	copy "3rdparty\freetype\objs\x64\Release Static\freetype.lib" ..\external\freetype\lib\win64_vs2017\release\
+	copy "3rdparty\freetype\objs\x64\Release Static\freetype.pdb" ..\external\freetype\lib\win64_vs2017\release\
+	del /Q ..\external\freetype\include\*
+	xcopy /E /Y "3rdparty\freetype\include\*" ..\external\freetype\include\
 exit /B 0
 
 :physx
@@ -202,8 +242,8 @@ goto :physx
 	REM include
 	for /D %%e in (..\external\physx\include\*) do rmdir /Q /S %%e
 	del /Q ..\external\physx\include\*
-	xcopy /E 3rdparty\PhysX\physx\include\* ..\external\physx\include\
-	xcopy /E 3rdparty\PhysX\pxshared\include\* ..\external\physx\include\
+	xcopy /E /Y 3rdparty\PhysX\physx\include\* ..\external\physx\include\
+	xcopy /E /Y 3rdparty\PhysX\pxshared\include\* ..\external\physx\include\
 	REM dll
 	del /Q ..\external\physx\dll\vs2017\win64\release\*
 	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_64.dll ..\external\physx\dll\vs2017\win64\release\
@@ -377,6 +417,19 @@ exit /B 0
 		git.exe clone https://github.com/nem0/cmft.git
 	) else (
 		cd cmft
+		git pull
+		cd ..
+	)
+	cd ..
+exit /B 0
+
+:download_freetype
+	if not exist 3rdparty mkdir 3rdparty
+	cd 3rdparty
+	if not exist freetype (
+		git.exe clone https://github.com/aseprite/freetype2.git freetype
+	) else (
+		cd freetype
 		git pull
 		cd ..
 	)

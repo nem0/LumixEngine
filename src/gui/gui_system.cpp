@@ -225,7 +225,7 @@ struct GUISystemImpl final : public GUISystem
 	{
 		Pipeline* pipeline = m_interface->getPipeline();
 		Draw2D& draw2d = pipeline->getDraw2D();
-		draw2d.Clear();
+		draw2d.clear();
 	}
 
 
