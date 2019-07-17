@@ -26,7 +26,7 @@ Who is using it?
 
 [3rd party libraries](https://github.com/nem0/lumixengine_3rdparty)
 
-* [lua](https://github.com/LuaDist/lua)
+* [LuaJIT](https://github.com/LuaJIT/LuaJIT/)
 * [nvtt](https://github.com/castano/nvidia-texture-tools)
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [dear imgui](https://github.com/ocornut/imgui)
@@ -34,6 +34,7 @@ Who is using it?
 * [cmft](https://github.com/dariomanesku/cmft)
 * [lent](https://github.com/nem0/lent/)
 * [lucy](https://github.com/nem0/lucy_job_system)
+* [freetype](https://github.com/aseprite/freetype2)
 
 Project generator
 

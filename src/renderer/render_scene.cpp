@@ -825,8 +825,8 @@ public:
 		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j) {
 			const TextMesh& text = *m_text_meshes.at(j);
 			const Font* font = text.getFont();
-			if (!font) font = m_renderer.getFontManager().getDefaultFont();
 			if (!font) continue;
+
 			const EntityRef entity = m_text_meshes.getKey(j);
 			const char* str = text.text.c_str();
 			Vec3 base = (m_universe.getPosition(entity) - cam_pos).toFloat();
@@ -839,7 +839,7 @@ public:
 				up = cam_up * scale;
 			}
 			u32 color = text.color;
-			const Vec2 text_size = measureTextA(*font, str);
+			const Vec2 text_size = measureTextA(*font, str, nullptr);
 			base += right * text_size.x * -0.5f;
 			base += up * text_size.y * -0.5f;
 			for (int i = 0, n = text.text.length(); i < n; ++i) {

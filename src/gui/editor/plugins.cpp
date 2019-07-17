@@ -1,5 +1,6 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -224,6 +225,7 @@ enum class EdgeMask
 
 public:
 	GUIEditor(StudioApp& app)
+		: m_app(app)
 	{
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
 
@@ -258,6 +260,12 @@ private:
 		MOVE
 	};
 
+	void onSettingsLoaded() override {
+		m_is_window_open = m_app.getSettings().getValue("is_gui_editor_open", false);
+	}
+	void onBeforeSettingsSaved() override {
+		m_app.getSettings().setValue("is_gui_editor_open", m_is_window_open);
+	}
 
 	void onAction() { m_is_window_open = !m_is_window_open; }
 	bool isOpen() const { return m_is_window_open; }
@@ -748,6 +756,7 @@ private:
 	const char* getName() const override { return "gui_editor"; }
 
 
+	StudioApp& m_app;
 	Pipeline* m_pipeline = nullptr;
 	WorldEditor* m_editor = nullptr;
 	bool m_is_window_open = false;

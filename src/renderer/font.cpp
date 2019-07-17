@@ -31,12 +31,12 @@ const Glyph* findGlyph(const Font& font, u32 codepoint) {
 	return &iter.value();
 }
 
-Vec2 measureTextA(const Font& font, const char* str) {
+Vec2 measureTextA(const Font& font, const char* str, const char* str_end) {
 	Vec2 res;
 	res.x = 0;
 	res.y = (float)font.font_size;
 	const char* c = str;
-	while (*c) {
+	while (*c && c != str_end) {
 		auto iter = font.glyphs.find(*c);
 		if (iter.isValid()) {
 			const Glyph& glyph = iter.value();
@@ -44,7 +44,6 @@ Vec2 measureTextA(const Font& font, const char* str) {
 		}
 		++c;
 	}
-	res.x /= 64.f; // TODO
 	return res;
 }
 
@@ -84,9 +83,19 @@ static void blit(const ToChar& tc, const Array<u8>& src_bmp, const IVec2& size, 
 	}
 }
 
+Texture* FontManager::getAtlasTexture() {
+	if (m_dirty) build();
+	return m_atlas_texture;
+}
+
 bool FontManager::build()
 {
-	// TODO optimize
+	ASSERT(m_dirty);
+	for(Font* font : m_fonts) {
+		if (!font->resource->isReady()) return false;
+	}
+	m_dirty = false;
+	// TODO profile & optimize
 	// TODO allocator
 	FT_MemoryRec_ memory_rec = {};
 	memory_rec.alloc = [](FT_Memory memory, long size) -> void* { return malloc(size); };
@@ -96,7 +105,14 @@ bool FontManager::build()
 	FT_Library ft_library;
 	FT_Error error = FT_New_Library(&memory_rec, &ft_library);
 	if (error != 0) return false;
+
 	FT_Add_Default_Modules(ft_library);
+
+	Array<u8> tmp_bmp(m_allocator);
+	tmp_bmp.reserve(1024 * 1024);
+	Array<stbrp_rect> rects(m_allocator);
+	Array<ToChar> to_char(m_allocator);
+	constexpr u32 PADDING = 1;
 
 	for(Font* font : m_fonts) {
 		FT_Face face;
@@ -106,23 +122,24 @@ bool FontManager::build()
 			continue;
 		}
 	
-		const u32 size = 16;
-		error = FT_Set_Pixel_Sizes(face, size, size); // TODO actual size
+		FT_Size_RequestRec size_req;
+        size_req.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;
+        size_req.width = 0;
+        size_req.height = (u32)font->font_size * 64;
+        size_req.horiResolution = 0;
+        size_req.vertResolution = 0;
+        error = FT_Request_Size(face, &size_req);
 		if (error != 0) {
-			logError("Renderer") << "Failed to create font " << font->resource->getPath() << " size " << size;
+			logError("Renderer") << "Failed to request font size " << font->font_size << " for " << font->resource->getPath();
 			continue;
 		}
+
 		error = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
 		if (error != 0) {
 			logError("Renderer") << "Failed to select unicode charmap of font " << font->resource->getPath();
 			continue;
 		}
-	
-		Array<u8> tmp_bmp(m_allocator);
-		tmp_bmp.reserve(1024 * 256);
-		Array<stbrp_rect> rects(m_allocator);
 		
-		Array<ToChar> to_char(m_allocator);
 		for (Glyph& c : font->glyphs) {
 			c.u0 = c.v0 = 0;
 			c.u1 = c.v1 = 1;
@@ -139,53 +156,55 @@ bool FontManager::build()
 
 			FT_Bitmap* ft_bitmap = &face->glyph->bitmap;
 			stbrp_rect& r = rects.emplace();
-			r.w = ft_bitmap->width;
-			r.h = ft_bitmap->rows;
+			r.w = ft_bitmap->width + 2 * PADDING;
+			r.h = ft_bitmap->rows + 2 * PADDING;
 			to_char.push({font, c.codepoint, (u32)tmp_bmp.size(), static_cast<u32>(slot->advance.x)});
 			blit(ft_bitmap, &tmp_bmp);
 			c.x0 = float(slot->bitmap_left);
 			c.y0 = float(-slot->bitmap_top);
-			c.x1 = float(c.x0 + r.w);
-			c.y1 = float(c.y0 + r.h);
+			c.x1 = float(c.x0 + r.w - 2 * PADDING);
+			c.y1 = float(c.y0 + r.h - 2 * PADDING);
 		}
-
-		stbrp_context ctx;
-		Array<stbrp_node> nodes(m_allocator);
-		nodes.resize(2048);
-		stbrp_init_target(&ctx, 2048, 32 * 1024, nodes.begin(), nodes.size());
-		stbrp_pack_rects(&ctx, rects.begin(), rects.size());
-
-		u32 w = 2048;
-		u32 h = 0;
-		for (const stbrp_rect& r : rects) {
-			ASSERT(u32(r.x + r.w) <= w);
-			h = maximum(h, r.y + r.h);
-		}
-
-		for (const stbrp_rect& r : rects) {
-			const ToChar& tc = to_char[int(&r - rects.begin())];
-			Glyph& c = tc.font->glyphs[tc.codepoint];
-			c.advance_x = float(((tc.advance_x + 63) & -64) / 64);
-			c.u0 = r.x / (float)w;
-			c.v0 = r.y / (float)h;
-			c.u1 = float(r.x + r.w) / w;
-			c.v1 = float(r.y + r.h) / h;
-		}
-
-		Array<u32> pixels(m_allocator);
-		pixels.resize(w * h);
-		for (const ToChar& tc : to_char) {
-			blit(tc, tmp_bmp, IVec2(w, h), &pixels);
-		}
-		if (m_atlas_texture) {
-			m_atlas_texture->destroy();
-		}
-		else {
-			auto& texture_manager = m_renderer.getTextureManager();
-			m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
-		}
-		m_atlas_texture->create(w, h, ffr::TextureFormat::RGBA8, pixels.begin(), pixels.byte_size());
 	}
+
+	stbrp_context ctx;
+	Array<stbrp_node> nodes(m_allocator);
+	nodes.resize(2048);
+	stbrp_init_target(&ctx, 2048, 32 * 1024, nodes.begin(), nodes.size());
+	stbrp_pack_rects(&ctx, rects.begin(), rects.size());
+
+	u32 w = 2048;
+	u32 h = 1;
+	for (const stbrp_rect& r : rects) {
+		ASSERT(u32(r.x + r.w) <= w);
+		h = maximum(h, r.y + r.h);
+	}
+
+	for (const stbrp_rect& r : rects) {
+		const ToChar& tc = to_char[int(&r - rects.begin())];
+		Glyph& c = tc.font->glyphs[tc.codepoint];
+		c.advance_x = float(((tc.advance_x + 63) & -64) / 64);
+		c.u0 = (r.x + PADDING) / (float)w;
+		c.v0 = (r.y + PADDING) / (float)h;
+		c.u1 = float(r.x + r.w - PADDING) / w;
+		c.v1 = float(r.y + r.h - PADDING) / h;
+	}
+
+	Array<u32> pixels(m_allocator);
+	pixels.resize(w * h);
+	for (const ToChar& tc : to_char) {
+		blit(tc, tmp_bmp, IVec2(w, h), &pixels);
+	}
+
+	pixels[0] = 0xffFFffFF;
+	if (m_atlas_texture) {
+		m_atlas_texture->destroy();
+	}
+	else {
+		auto& texture_manager = m_renderer.getTextureManager();
+		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
+	}
+	m_atlas_texture->create(w, h, ffr::TextureFormat::RGBA8, pixels.begin(), pixels.byte_size());
 
 	FT_Done_Library(ft_library);
 	return true;
@@ -231,6 +250,7 @@ Font* FontResource::addRef(int font_size)
 		font->glyphs.insert(cp, c);
 	}
 	manager.m_fonts.push(font);
+	manager.m_dirty = true;
 	if (isReady()) manager.build();
 	return font;
 }
@@ -238,14 +258,9 @@ Font* FontResource::addRef(int font_size)
 
 void FontResource::removeRef(Font& font)
 {
-	/*
-	auto iter = m_fonts.find((int)(font.FontSize + 0.5f));
-	ASSERT(iter.isValid());
-	--iter.value().ref_count;
-	ASSERT(iter.value().ref_count >= 0);
-	*/
-	// TODO
-	ASSERT(false);
+	ASSERT(font.ref > 0);
+	--font.ref;
+	// TODO destroy Font
 }
 
 
@@ -256,46 +271,16 @@ FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 	, m_atlas_texture(nullptr)
 	, m_fonts(allocator)
 {
-	// TODO
-	ASSERT(false);
-	m_default_font = nullptr;
-	//m_default_font = m_font_atlas.AddFontDefault();
-	updateFontTexture();
+	build();
 }
 
 
 FontManager::~FontManager()
 {
-	if (m_atlas_texture)
-	{
+	if (m_atlas_texture) {
 		m_atlas_texture->destroy();
 		LUMIX_DELETE(m_allocator, m_atlas_texture);
 	}
-}
-
-
-void FontManager::updateFontTexture()
-{
-	build();
-	/*u8* pixels;
-	int w, h;
-	m_font_atlas.GetTexDataAsRGBA32(&pixels, &w, &h);
-
-	if (m_atlas_texture)
-	{
-		m_atlas_texture->destroy();
-	}
-	else
-	{
-		auto& texture_manager = m_renderer.getTextureManager();
-		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
-	}
-	m_atlas_texture->create(w, h, pixels, w * h * 4);
-
-	m_font_atlas.TexID = &m_atlas_texture->handle;
-	m_atlas_texture_changed.invoke();*/
-	// TODO
-	ASSERT(false);
 }
 
 

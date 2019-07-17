@@ -1966,8 +1966,13 @@ struct RenderInterfaceImpl final : public RenderInterface
 	{
 		m_model_index = 0;
 		auto& rm = m_editor.getEngine().getResourceManager();
+		
 		Path shader_path("pipelines/debug_shape.shd");
 		m_shader = rm.load<Shader>(shader_path);
+		
+		Path font_path("editor/fonts/OpenSans-Regular.ttf");
+		m_font_res = rm.load<FontResource>(font_path);
+		m_font = m_font_res->addRef(16);
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
@@ -1978,20 +1983,17 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	~RenderInterfaceImpl()
 	{
-		auto& rm = m_editor.getEngine().getResourceManager();
-		rm.get(Shader::TYPE)->unload(*m_shader);
+		m_shader->getResourceManager().unload(*m_shader);
+		m_font_res->getResourceManager().unload(*m_font_res);
 
 		m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
 	}
 
 
-	void addText2D(float x, float y, float font_size, u32 color, const char* text) override
+	void addText2D(float x, float y, u32 color, const char* text) override
 	{
-		Font* font = m_renderer.getFontManager().getDefaultFont();
-		//m_pipeline.getDraw2D().AddText(font, font_size, {x, y}, color, text);
-		// TODO
-		ASSERT(false);
+		if (m_font) m_pipeline.getDraw2D().addText(*m_font, {x, y}, Color(color), text);
 	}
 
 
@@ -2289,6 +2291,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	WorldEditor& m_editor;
 	Shader* m_shader;
+	FontResource* m_font_res;
+	Font* m_font;
 	RenderScene* m_render_scene;
 	Renderer& m_renderer;
 	Pipeline& m_pipeline;

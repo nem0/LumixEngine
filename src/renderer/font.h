@@ -25,7 +25,7 @@ struct Glyph {
 };
 
 
-LUMIX_RENDERER_API Vec2 measureTextA(const Font& font, const char* str);
+LUMIX_RENDERER_API Vec2 measureTextA(const Font& font, const char* str, const char* str_end);
 LUMIX_RENDERER_API const Glyph* findGlyph(const Font& font, u32 codepoint);
 
 
@@ -53,21 +53,19 @@ public:
 	FontManager(Renderer& renderer, IAllocator& allocator);
 	~FontManager();
 
-	Font* getDefaultFont() const { return m_default_font; }
-	Texture* getAtlasTexture() const { return m_atlas_texture; }
+	Texture* getAtlasTexture();
 
 private:
 	Resource* createResource(const Path& path) override;
 	void destroyResource(Resource& resource) override;
-	void updateFontTexture();
 	bool build();
 
 private:
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
-	Font* m_default_font;
 	Texture* m_atlas_texture;
 	Array<Font*> m_fonts;
+	bool m_dirty = true;
 };
 
 

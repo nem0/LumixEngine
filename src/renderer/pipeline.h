@@ -75,6 +75,7 @@ public:
 	virtual void setViewport(const Viewport& viewport) = 0;
 
 	virtual Draw2D& getDraw2D() = 0;
+	virtual void clearDraw2D() = 0;
 	virtual ffr::TextureHandle getOutput() = 0;
 };
 

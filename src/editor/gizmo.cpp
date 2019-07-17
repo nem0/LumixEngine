@@ -151,6 +151,7 @@ struct GizmoImpl final : public Gizmo
 	void update(const Viewport& vp) override
 	{
 		RenderInterface* ri = m_editor.getRenderInterface();
+		ri->addText2D(50, 50, 0xffFFffFF, "test");
 		for (int i = 0; i < m_count; ++i) {
 			const RigidTransform gizmo_tr = getTransform(m_entities[i]);
 			const Vec2 p = m_editor.getViewport().worldToScreenPixels(gizmo_tr.pos);
@@ -161,8 +162,8 @@ struct GizmoImpl final : public Gizmo
 						const Vec3 delta_vec = (intersection - m_start_axis_point).toFloat();
 
 						StaticString<128> tmp("", delta_vec.x, "; ", delta_vec.y, "; ", delta_vec.z);
-						ri->addText2D(p.x + 31, p.y + 31, 16, 0xff000000, tmp);
-						ri->addText2D(p.x + 30, p.y + 30, 16, 0xffffFFFF, tmp);
+						ri->addText2D(p.x + 31, p.y + 31, 0xff000000, tmp);
+						ri->addText2D(p.x + 30, p.y + 30, 0xffffFFFF, tmp);
 					}
 
 					break;
@@ -172,8 +173,8 @@ struct GizmoImpl final : public Gizmo
 						StaticString<128> tmp("", angle_degrees, " deg");
 						Vec2 screen_delta = (m_start_mouse_pos - p).normalized();
 						Vec2 text_pos = m_start_mouse_pos + screen_delta * 15;
-						ri->addText2D(text_pos.x + 1, text_pos.y + 1, 16, 0xff000000, tmp);
-						ri->addText2D(text_pos.x, text_pos.y, 16, 0xffffFFFF, tmp);
+						ri->addText2D(text_pos.x + 1, text_pos.y + 1, 0xff000000, tmp);
+						ri->addText2D(text_pos.x, text_pos.y, 0xffffFFFF, tmp);
 					}
 					break;
 			}

@@ -1,4 +1,5 @@
 #include "draw2d.h"
+#include "font.h"
 
 
 namespace Lumix {
@@ -11,14 +12,16 @@ Draw2D::Draw2D(IAllocator& allocator)
 	, m_vertices(allocator)
 	, m_clip_queue(allocator)
 {
-	clear();
+	clear({1, 1});
 }
 
-void Draw2D::clear() {
+void Draw2D::clear(Vec2 atlas_size) {
 	m_cmds.clear();
 	m_indices.clear();
 	m_vertices.clear();
+	m_atlas_size = atlas_size;
 	Cmd& cmd = m_cmds.emplace();
+	cmd.texture = nullptr;
 	cmd.indices_count = 0;
 	cmd.index_offset = 0;
 	cmd.clip_pos = { -1, -1 };
@@ -29,6 +32,7 @@ void Draw2D::clear() {
 void Draw2D::pushClipRect(const Vec2& from, const Vec2& to) {
 	m_clip_queue.push({from, to});
 	Cmd& cmd = m_cmds.emplace();
+	cmd.texture = nullptr;
 	cmd.clip_pos = from;
 	cmd.clip_size = to;
 	cmd.indices_count = 0;
@@ -39,13 +43,51 @@ void Draw2D::popClipRect() {
 	m_clip_queue.pop();
 	const Rect& r = m_clip_queue.back();
 	Cmd& cmd = m_cmds.emplace();
+	cmd.texture = nullptr;
 	cmd.clip_pos = r.from;
 	cmd.clip_size = r.to;
 	cmd.indices_count = 0;
 	cmd.index_offset = m_indices.size();
 }
 
-void Draw2D::addLine(const Vec2& from, const Vec2& to, Color color, float width) {
+void Draw2D::addLine(const Vec2& p0, const Vec2& p1, Color color, float width) {
+	Cmd* cmd = &m_cmds.back();
+
+	if (cmd->texture != nullptr && cmd->indices_count != 0) {
+		cmd = &m_cmds.emplace();
+		const Rect& r = m_clip_queue.back();
+		cmd->clip_pos = r.from;
+		cmd->clip_size = r.to;
+		cmd->indices_count = 0;
+		cmd->index_offset = m_indices.size();
+	}
+	
+	Vec2 from = p0 + Vec2(0.5f);
+	Vec2 to = p1 + Vec2(0.5f);
+
+	cmd->texture = nullptr;
+	const Vec2 uv = Vec2(0.5f) / m_atlas_size;
+	const Vec2 dir = (to - from).normalized();
+	const Vec2 n = Vec2(dir.y, -dir.x) * (width * 0.5f);
+	const u32 voff = m_vertices.size();
+	
+	from = from - dir * width * 0.5f;
+	to = to + dir * width * 0.5f;
+
+	m_vertices.push({from + n, uv, color});
+	m_vertices.push({from - n, uv, color});
+	m_vertices.push({to - n, uv, color});
+	m_vertices.push({to + n, uv, color});
+
+	m_indices.push(voff);
+	m_indices.push(voff + 1);
+	m_indices.push(voff + 2);
+
+	m_indices.push(voff);
+	m_indices.push(voff + 2);
+	m_indices.push(voff + 3);
+
+	cmd->indices_count += 6;
 }
 
 void Draw2D::addRect(const Vec2& from, const Vec2& to, Color color, float width) {
@@ -56,7 +98,18 @@ void Draw2D::addRect(const Vec2& from, const Vec2& to, Color color, float width)
 }
 
 void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
-	Cmd& cmd = m_cmds.back();
+	Cmd* cmd = &m_cmds.back();
+
+	if (cmd->texture != nullptr && cmd->indices_count != 0) {
+		cmd = &m_cmds.emplace();
+		const Rect& r = m_clip_queue.back();
+		cmd->clip_pos = r.from;
+		cmd->clip_size = r.to;
+		cmd->indices_count = 0;
+		cmd->index_offset = m_indices.size();
+	}
+
+	cmd->texture = nullptr;
 	const u32 voff = m_vertices.size();
 	m_indices.push(voff);
 	m_indices.push(voff + 1);
@@ -66,15 +119,88 @@ void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 	m_indices.push(voff + 2);
 	m_indices.push(voff + 3);
 
-	m_vertices.push({from, {0, 0}, color});
-	m_vertices.push({{from.x, to.y}, {0, 1}, color});
-	m_vertices.push({to, {1, 1}, color});
-	m_vertices.push({{to.x, from.y}, {1, 0}, color});
+	const Vec2 uv = Vec2(0.5f) / m_atlas_size;
+
+	m_vertices.push({from, uv, color});
+	m_vertices.push({{from.x, to.y}, uv, color});
+	m_vertices.push({to, uv, color});
+	m_vertices.push({{to.x, from.y}, uv, color});
 	
-	cmd.indices_count += 6;
+	cmd->indices_count += 6;
 }
 
-void Draw2D::addText(const Font& font, float font_size, const Vec2& pos, Color color, const char* text) {
+void Draw2D::addImage(ffr::TextureHandle* tex, const Vec2& from, const Vec2& to, const Vec2& uv0, const Vec2& uv1) {
+	Cmd* cmd = &m_cmds.back();
+
+	if (cmd->texture != tex && cmd->indices_count != 0) {
+		cmd = &m_cmds.emplace();
+		const Rect& r = m_clip_queue.back();
+		cmd->clip_pos = r.from;
+		cmd->clip_size = r.to;
+		cmd->indices_count = 0;
+		cmd->index_offset = m_indices.size();
+	}
+
+	cmd->texture = tex;
+	const u32 voff = m_vertices.size();
+	m_indices.push(voff);
+	m_indices.push(voff + 1);
+	m_indices.push(voff + 2);
+
+	m_indices.push(voff);
+	m_indices.push(voff + 2);
+	m_indices.push(voff + 3);
+
+	const Color color(0xff, 0xff, 0xff, 0xff);
+
+	m_vertices.push({from, uv0, color});
+	m_vertices.push({{from.x, to.y}, {uv0.x, uv1.y}, color});
+	m_vertices.push({to, uv1, color});
+	m_vertices.push({{to.x, from.y}, {uv1.x, uv0.y}, color});
+	
+	cmd->indices_count += 6;
+}
+
+void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char* str) {
+	if (!*str) return;
+	Cmd* cmd = &m_cmds.back();
+
+	if (cmd->texture != nullptr && cmd->indices_count != 0) {
+		cmd = &m_cmds.emplace();
+		const Rect& r = m_clip_queue.back();
+		cmd->clip_pos = r.from;
+		cmd->clip_size = r.to;
+		cmd->indices_count = 0;
+		cmd->index_offset = m_indices.size();
+	}
+
+	cmd->texture = nullptr;
+	
+	Vec2 p = pos;
+	for (const char* c = str; *c; ++c) {
+		const Glyph* glyph = findGlyph(font, *c);
+		if (!glyph) {
+			p.x += 16;
+			continue;
+		}
+	
+		const u32 voff = m_vertices.size();
+		m_indices.push(voff);
+		m_indices.push(voff + 1);
+		m_indices.push(voff + 2);
+
+		m_indices.push(voff);
+		m_indices.push(voff + 2);
+		m_indices.push(voff + 3);
+
+		m_vertices.push({ p + Vec2(glyph->x0, glyph->y0), { glyph->u0, glyph->v0 }, color });
+		m_vertices.push({ p + Vec2(glyph->x1, glyph->y0), { glyph->u1, glyph->v0 }, color });
+		m_vertices.push({ p + Vec2(glyph->x1, glyph->y1), { glyph->u1, glyph->v1 }, color });
+		m_vertices.push({ p + Vec2(glyph->x0, glyph->y1), { glyph->u0, glyph->v1 }, color });
+		
+		p.x += glyph->advance_x;
+		cmd->indices_count += 6;
+	}
 }
 
 } // namespace Lumix

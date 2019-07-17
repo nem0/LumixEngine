@@ -224,8 +224,7 @@ struct GUISystemImpl final : public GUISystem
 	void stopGame() override
 	{
 		Pipeline* pipeline = m_interface->getPipeline();
-		Draw2D& draw2d = pipeline->getDraw2D();
-		draw2d.clear();
+		pipeline->clearDraw2D();
 	}
 
 
