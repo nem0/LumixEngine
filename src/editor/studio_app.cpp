@@ -27,6 +27,7 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
+#include "imgui/IconsFontAwesome4.h"
 #include "log_ui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
@@ -36,6 +37,9 @@
 
 namespace Lumix
 {
+
+
+#define NO_ICON "       "
 
 
 struct LuaPlugin : public StudioApp::GUIPlugin
@@ -682,6 +686,7 @@ public:
 					float menu_height = showMainMenu();
 					showMainToolbar(menu_height);
 					ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
+					ImGui::Dummy(ImVec2(2, 2));
 					ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
 				}
 				ImGui::End();
@@ -1191,7 +1196,7 @@ public:
 
 		const auto& selected_entities = m_editor->getSelectedEntities();
 		bool is_any_entity_selected = !selected_entities.empty();
-		if (ImGui::BeginMenu("Create"))
+		if (ImGui::BeginMenu(ICON_FA_PLUS_SQUARE_O "Create"))
 		{
 			onCreateEntityWithComponentGUI();
 			ImGui::EndMenu();
@@ -1226,7 +1231,7 @@ public:
 		doMenuItem(*getAction("setPivotOrigin"), true);
 		doMenuItem(*getAction("setLocalCoordSystem"), true);
 		doMenuItem(*getAction("setGlobalCoordSystem"), true);
-		if (ImGui::BeginMenu("View", true))
+		if (ImGui::BeginMenu(ICON_FA_CAMERA "View", true))
 		{
 			doMenuItem(*getAction("viewTop"), true);
 			doMenuItem(*getAction("viewFront"), true);
@@ -1242,7 +1247,7 @@ public:
 		if (!ImGui::BeginMenu("File")) return;
 
 		doMenuItem(*getAction("newUniverse"), true);
-		if (ImGui::BeginMenu("Open"))
+		if (ImGui::BeginMenu(NO_ICON "Open"))
 		{
 			ImGui::LabellessInputText("Filter", m_open_filter, sizeof(m_open_filter));
 			for (auto& univ : m_universes)
@@ -1290,11 +1295,11 @@ public:
 	{
 		if (!ImGui::BeginMenu("View")) return;
 
-		ImGui::MenuItem("Asset browser", nullptr, &m_asset_browser->m_is_open);
+		ImGui::MenuItem(ICON_FA_CUBES "Asset browser", nullptr, &m_asset_browser->m_is_open);
 		doMenuItem(*getAction("entityList"), true);
-		ImGui::MenuItem("Log", nullptr, &m_log_ui->m_is_open);
-		ImGui::MenuItem("Profiler", nullptr, &m_profiler_ui->m_is_open);
-		ImGui::MenuItem("Properties", nullptr, &m_property_grid->m_is_open);
+		ImGui::MenuItem(ICON_FA_RSS "Log", nullptr, &m_log_ui->m_is_open);
+		ImGui::MenuItem(ICON_FA_AREA_CHART "Profiler", nullptr, &m_profiler_ui->m_is_open);
+		ImGui::MenuItem(ICON_FA_SLIDERS "Properties", nullptr, &m_property_grid->m_is_open);
 		doMenuItem(*getAction("settings"), true);
 		ImGui::Separator();
 		for (Action* action : m_window_actions)
@@ -1581,14 +1586,28 @@ public:
 	}
 
 
-	ImFont* addFontFromFile(const char* path, float size) {
+	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
 		FileSystem& fs = m_editor->getEngine().getFileSystem();
 		Array<u8> data(m_allocator);
 		if (!fs.getContentSync(Path(path), &data)) return nullptr;
 		ImGuiIO& io = ImGui::GetIO();
 		ImFontConfig cfg;
 		cfg.FontDataOwnedByAtlas = false;
-		return io.Fonts->AddFontFromMemoryTTF(data.begin(), data.byte_size(), size, &cfg);
+		auto font = io.Fonts->AddFontFromMemoryTTF(data.begin(), data.byte_size(), size, &cfg);
+		if(merge_icons) {
+			ImFontConfig config;
+			config.MergeMode = true;
+			config.FontDataOwnedByAtlas = false;
+			config.GlyphMinAdvanceX = 20.0f; // Use if you want to make the icon monospaced
+			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+			Array<u8> icons_data(m_allocator);
+			if (fs.getContentSync(Path("editor/fonts/fontawesome-webfont.ttf"), &icons_data)) {
+				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF(icons_data.begin(), icons_data.byte_size(), size * 0.75f, &config, icon_ranges);
+				ASSERT(icons_font);
+			}
+		}
+
+		return font;
 	}
 
 
@@ -1607,8 +1626,8 @@ public:
 			ImGui::LoadIniSettingsFromMemory((const char*)ini_data.begin(), ini_data.size());
 		}
 
-		m_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
-		m_bold_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale);
+		m_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
+		m_bold_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
 
 		if (m_font) {
 			m_font->DisplayOffset.y = 0;
@@ -1702,70 +1721,70 @@ public:
 
 	void addActions()
 	{
-		addAction<&StudioAppImpl::newUniverse>("New", "New universe", "newUniverse");
+		addAction<&StudioAppImpl::newUniverse>(ICON_FA_PLUS "New", "New universe", "newUniverse");
 		addAction<&StudioAppImpl::save>(
-			"Save", "Save universe", "save", OS::Keycode::LCTRL, OS::Keycode::S, OS::Keycode::INVALID);
+			ICON_FA_FLOPPY_O "Save", "Save universe", "save", OS::Keycode::LCTRL, OS::Keycode::S, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::saveAs>(
-			"Save As", "Save universe as", "saveAs", OS::Keycode::LCTRL, OS::Keycode::LSHIFT, OS::Keycode::S);
+			NO_ICON "Save As", "Save universe as", "saveAs", OS::Keycode::LCTRL, OS::Keycode::LSHIFT, OS::Keycode::S);
 		addAction<&StudioAppImpl::exit>(
-			"Exit", "Exit Studio", "exit", OS::Keycode::LCTRL, OS::Keycode::X, OS::Keycode::INVALID);
+			ICON_FA_SIGN_OUT "Exit", "Exit Studio", "exit", OS::Keycode::LCTRL, OS::Keycode::X, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::redo>(
-			"Redo", "Redo scene action", "redo", OS::Keycode::LCTRL, OS::Keycode::LSHIFT, OS::Keycode::Z);
+			ICON_FA_REPEAT "Redo", "Redo scene action", "redo", OS::Keycode::LCTRL, OS::Keycode::LSHIFT, OS::Keycode::Z);
 		addAction<&StudioAppImpl::undo>(
-			"Undo", "Undo scene action", "undo", OS::Keycode::LCTRL, OS::Keycode::Z, OS::Keycode::INVALID);
+			ICON_FA_UNDO "Undo", "Undo scene action", "undo", OS::Keycode::LCTRL, OS::Keycode::Z, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::copy>(
-			"Copy", "Copy entity", "copy", OS::Keycode::LCTRL, OS::Keycode::C, OS::Keycode::INVALID);
+			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", OS::Keycode::LCTRL, OS::Keycode::C, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::paste>(
-			"Paste", "Paste entity", "paste", OS::Keycode::LCTRL, OS::Keycode::V, OS::Keycode::INVALID);
+			NO_ICON "Paste", "Paste entity", "paste", OS::Keycode::LCTRL, OS::Keycode::V, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::duplicate>(
-			"Duplicate", "Duplicate entity", "duplicate", OS::Keycode::LCTRL, OS::Keycode::D, OS::Keycode::INVALID);
-		addAction<&StudioAppImpl::toggleOrbitCamera>("Orbit camera", "Orbit camera", "orbitCamera")
+			ICON_FA_FILES_O "Duplicate", "Duplicate entity", "duplicate", OS::Keycode::LCTRL, OS::Keycode::D, OS::Keycode::INVALID);
+		addAction<&StudioAppImpl::toggleOrbitCamera>(NO_ICON "Orbit camera", "Orbit camera", "orbitCamera")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
-		addAction<&StudioAppImpl::setTranslateGizmoMode>("Translate", "Set translate mode", "setTranslateGizmoMode")
+		addAction<&StudioAppImpl::setTranslateGizmoMode>(ICON_FA_ARROWS "Translate", "Set translate mode", "setTranslateGizmoMode")
 			.is_selected.bind<Gizmo, &Gizmo::isTranslateMode>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setRotateGizmoMode>("Rotate", "Set rotate mode", "setRotateGizmoMode")
+		addAction<&StudioAppImpl::setRotateGizmoMode>(ICON_FA_REPEAT "Rotate", "Set rotate mode", "setRotateGizmoMode")
 			.is_selected.bind<Gizmo, &Gizmo::isRotateMode>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setScaleGizmoMode>("Scale", "Set scale mode", "setScaleGizmoMode")
+		addAction<&StudioAppImpl::setScaleGizmoMode>(NO_ICON "Scale", "Set scale mode", "setScaleGizmoMode")
 			.is_selected.bind<Gizmo, &Gizmo::isScaleMode>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setTopView>("Top", "Set top camera view", "viewTop");
-		addAction<&StudioAppImpl::setFrontView>("Front", "Set front camera view", "viewFront");
-		addAction<&StudioAppImpl::setSideView>("Side", "Set side camera view", "viewSide");
-		addAction<&StudioAppImpl::setLocalCoordSystem>("Local", "Set local transform system", "setLocalCoordSystem")
+		addAction<&StudioAppImpl::setTopView>(NO_ICON "Top", "Set top camera view", "viewTop");
+		addAction<&StudioAppImpl::setFrontView>(NO_ICON "Front", "Set front camera view", "viewFront");
+		addAction<&StudioAppImpl::setSideView>(NO_ICON "Side", "Set side camera view", "viewSide");
+		addAction<&StudioAppImpl::setLocalCoordSystem>(NO_ICON "Local", "Set local transform system", "setLocalCoordSystem")
 			.is_selected.bind<Gizmo, &Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setGlobalCoordSystem>("Global", "Set global transform system", "setGlobalCoordSystem")
+		addAction<&StudioAppImpl::setGlobalCoordSystem>(ICON_FA_GLOBE "Global", "Set global transform system", "setGlobalCoordSystem")
 			.is_selected.bind<Gizmo, &Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setPivotCenter>("Center", "Set center transform system", "setPivotCenter")
+		addAction<&StudioAppImpl::setPivotCenter>(ICON_FA_ALIGN_CENTER "Center", "Set center transform system", "setPivotCenter")
 			.is_selected.bind<Gizmo, &Gizmo::isPivotCenter>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setPivotOrigin>("Pivot", "Set pivot transform system", "setPivotOrigin")
+		addAction<&StudioAppImpl::setPivotOrigin>(NO_ICON "Pivot", "Set pivot transform system", "setPivotOrigin")
 			.is_selected.bind<Gizmo, &Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
-		addAction<&StudioAppImpl::addEntity>("Create empty", "Create empty entity", "createEntity");
-		addAction<&StudioAppImpl::destroySelectedEntity>("Destroy",
+		addAction<&StudioAppImpl::addEntity>(ICON_FA_PLUS_SQUARE_O "Create empty", "Create empty entity", "createEntity");
+		addAction<&StudioAppImpl::destroySelectedEntity>(ICON_FA_MINUS_SQUARE_O "Destroy",
 			"Destroy entity",
 			"destroyEntity",
 			OS::Keycode::DEL,
 			OS::Keycode::INVALID,
 			OS::Keycode::INVALID);
-		addAction<&StudioAppImpl::savePrefab>("Save prefab", "Save selected entities as prefab", "savePrefab");
-		addAction<&StudioAppImpl::makeParent>("Make parent", "Make entity parent", "makeParent");
-		addAction<&StudioAppImpl::unparent>("Unparent", "Unparent entity", "unparent");
+		addAction<&StudioAppImpl::savePrefab>(ICON_FA_FLOPPY_O "Save prefab", "Save selected entities as prefab", "savePrefab");
+		addAction<&StudioAppImpl::makeParent>(ICON_FA_OBJECT_GROUP "Make parent", "Make entity parent", "makeParent");
+		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent");
 
-		addAction<&StudioAppImpl::toggleGameMode>("Game Mode", "Toggle game mode", "toggleGameMode")
+		addAction<&StudioAppImpl::toggleGameMode>(ICON_FA_PLAY "Game Mode", "Toggle game mode", "toggleGameMode")
 			.is_selected.bind<WorldEditor, &WorldEditor::isGameMode>(m_editor);
-		addAction<&StudioAppImpl::toggleMeasure>("Toggle measure", "Toggle measure mode", "toggleMeasure")
+		addAction<&StudioAppImpl::toggleMeasure>(NO_ICON "Toggle measure", "Toggle measure mode", "toggleMeasure")
 			.is_selected.bind<WorldEditor, &WorldEditor::isMeasureToolActive>(m_editor);
-		addAction<&StudioAppImpl::autosnapDown>("Autosnap down", "Toggle autosnap down", "autosnapDown")
+		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<Gizmo, &Gizmo::isAutosnapDown>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::snapDown>("Snap down", "Snap entities down", "snapDown");
-		addAction<&StudioAppImpl::setEditCamTransform>("Camera transform", "Set camera transformation", "setEditCamTransform");
-		addAction<&StudioAppImpl::lookAtSelected>("Look at selected", "Look at selected entity", "lookAtSelected");
-		addAction<&StudioAppImpl::toggleAssetBrowser>("Asset Browser", "Toggle asset browser", "assetBrowser")
+		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
+		addAction<&StudioAppImpl::setEditCamTransform>(NO_ICON "Camera transform", "Set camera transformation", "setEditCamTransform");
+		addAction<&StudioAppImpl::lookAtSelected>(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected");
+		addAction<&StudioAppImpl::toggleAssetBrowser>(ICON_FA_CUBES "Asset Browser", "Toggle asset browser", "assetBrowser")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
-		addAction<&StudioAppImpl::toggleEntityList>("Entity List", "Toggle entity list", "entityList")
+		addAction<&StudioAppImpl::toggleEntityList>(ICON_FA_LIST "Entity List", "Toggle entity list", "entityList")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpen>(this);
-		addAction<&StudioAppImpl::toggleSettings>("Settings", "Toggle settings UI", "settings")
+		addAction<&StudioAppImpl::toggleSettings>(ICON_FA_COGS "Settings", "Toggle settings UI", "settings")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpen>(this);
-		addAction<&StudioAppImpl::showPackDataDialog>("Pack data", "Pack data", "pack_data");
+		addAction<&StudioAppImpl::showPackDataDialog>(ICON_FA_FILE_ARCHIVE_O "Pack data", "Pack data", "pack_data");
 	}
 
 

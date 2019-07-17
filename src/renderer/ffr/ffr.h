@@ -112,6 +112,7 @@ enum class AttributeType : u8 {
 
 
 enum class TextureFormat : uint {
+	R8,
 	D32,
 	D24,
 	D24S8,
