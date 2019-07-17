@@ -729,7 +729,19 @@ void getCurrentDirectory(char* buffer, int buffer_size)
 bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
 {
 	WCharStr<MAX_PATH_LENGTH> wtmp("");
-	WCharStr<MAX_PATH_LENGTH> wfilter(filter ? filter : "");
+	WCHAR wfilter[MAX_PATH_LENGTH];
+	
+	const char* c = filter;
+	WCHAR* cout = wfilter;
+	while ((*c || *(c + 1)) && (c - filter) < MAX_PATH_LENGTH - 2) {
+		*cout = *c;
+		++cout;
+		++c;
+	}
+	*cout = 0;
+	++cout;
+	*cout = 0;
+
 	WCharStr<MAX_PATH_LENGTH> wdefault_extension(default_extension ? default_extension : "");
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
@@ -738,7 +750,7 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 	ofn.lpstrFile = wtmp.data;
 	ofn.lpstrFile[0] = '\0';
 	ofn.nMaxFile = lengthOf(wtmp.data);
-	ofn.lpstrFilter = wfilter.data;
+	ofn.lpstrFilter = wfilter;
 	ofn.nFilterIndex = 1;
 	ofn.lpstrDefExt = default_extension ? wdefault_extension.data : nullptr;
 	ofn.lpstrFileTitle = NULL;
