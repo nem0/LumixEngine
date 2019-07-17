@@ -179,7 +179,7 @@ if _OPTIONS["with-app"] then
 end
 
 function detect_plugins()
-	local f = io.popen([[dir /B ..\plugins]])
+	local f = io.popen([[if exist ..\plugins dir /B ..\plugins]])
 	if not f then return end
 	for line in f:lines() do 
 		table.insert(plugins, line)
@@ -568,7 +568,7 @@ project "engine"
 	}
 
 	defines { "BUILDING_ENGINE" }
-	includedirs { "../external/luajit/include" }
+	includedirs { "../external/luajit/include", "../external/freetype/include" }
 	
 	linkLib "luajit"
 
@@ -601,7 +601,7 @@ if has_plugin("renderer") then
 		libType()
 
 		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c"}
-		includedirs { "../src", "../external/cmft/include", "../external/nvtt/include" }
+		includedirs { "../src", "../external/cmft/include", "../external/nvtt/include", "../external/freetype/include" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
 
@@ -610,6 +610,7 @@ if has_plugin("renderer") then
 			linkLib "nvtt"
 			linkLib "cmft"
 		end
+		linkLib "freetype"
 		links { "opengl32" }
 		configuration { "linux-*" }
 			links { "GL", "X11" }
@@ -900,6 +901,7 @@ if build_studio then
 
 			links { "editor", "engine" }
 			linkLib "nvtt"
+			linkLib "freetype"
 			linkLib "cmft"
 			linkLib "luajit"
 			linkLib "recast"

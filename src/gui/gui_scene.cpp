@@ -210,8 +210,11 @@ struct GUISceneImpl final : public GUIScene
 		const char* text_end = text + rect.input_field->cursor;
 		Font* font = rect.text->getFont();
 		float font_size = (float)rect.text->getFontSize();
-		Vec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, text, text_end);
-		draw.AddLine({ pos.x + text_size.x, pos.y }, { pos.x + text_size.x, pos.y + text_size.y }, rect.text->color, 1);
+		Vec2 text_size = measureTextA(*font, text, text_end);
+		draw.addLine({ pos.x + text_size.x, pos.y }
+			, { pos.x + text_size.x, pos.y + text_size.y }
+			, *(Color*)&rect.text->color
+			, 1);
 	}
 
 
@@ -226,7 +229,7 @@ struct GUISceneImpl final : public GUIScene
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
 		Draw2D& draw = pipeline.getDraw2D();
-		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.PushClipRect({ l, t }, { r, b });
+		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.pushClipRect({ l, t }, { r, b });
 
 		if (rect.image && rect.image->flags.isSet(GUIImage::IS_ENABLED))
 		{
@@ -251,54 +254,54 @@ struct GUISceneImpl final : public GUIScene
 						sprite->bottom / (float)tex->height
 					};
 
-					draw.AddImage(&tex->handle, { l, t }, { pos.l, pos.t }, { 0, 0 }, { uvs.l, uvs.t });
-					draw.AddImage(&tex->handle, { pos.l, t }, { pos.r, pos.t }, { uvs.l, 0 }, { uvs.r, uvs.t });
-					draw.AddImage(&tex->handle, { pos.r, t }, { r, pos.t }, { uvs.r, 0 }, { 1, uvs.t });
+					draw.addImage(&tex->handle, { l, t }, { pos.l, pos.t }, { 0, 0 }, { uvs.l, uvs.t });
+					draw.addImage(&tex->handle, { pos.l, t }, { pos.r, pos.t }, { uvs.l, 0 }, { uvs.r, uvs.t });
+					draw.addImage(&tex->handle, { pos.r, t }, { r, pos.t }, { uvs.r, 0 }, { 1, uvs.t });
 
-					draw.AddImage(&tex->handle, { l, pos.t }, { pos.l, pos.b }, { 0, uvs.t }, { uvs.l, uvs.b });
-					draw.AddImage(&tex->handle, { pos.l, pos.t }, { pos.r, pos.b }, { uvs.l, uvs.t }, { uvs.r, uvs.b });
-					draw.AddImage(&tex->handle, { pos.r, pos.t }, { r, pos.b }, { uvs.r, uvs.t }, { 1, uvs.b });
+					draw.addImage(&tex->handle, { l, pos.t }, { pos.l, pos.b }, { 0, uvs.t }, { uvs.l, uvs.b });
+					draw.addImage(&tex->handle, { pos.l, pos.t }, { pos.r, pos.b }, { uvs.l, uvs.t }, { uvs.r, uvs.b });
+					draw.addImage(&tex->handle, { pos.r, pos.t }, { r, pos.b }, { uvs.r, uvs.t }, { 1, uvs.b });
 
-					draw.AddImage(&tex->handle, { l, pos.b }, { pos.l, b }, { 0, uvs.b }, { uvs.l, 1 });
-					draw.AddImage(&tex->handle, { pos.l, pos.b }, { pos.r, b }, { uvs.l, uvs.b }, { uvs.r, 1 });
-					draw.AddImage(&tex->handle, { pos.r, pos.b }, { r, b }, { uvs.r, uvs.b }, { 1, 1 });
+					draw.addImage(&tex->handle, { l, pos.b }, { pos.l, b }, { 0, uvs.b }, { uvs.l, 1 });
+					draw.addImage(&tex->handle, { pos.l, pos.b }, { pos.r, b }, { uvs.l, uvs.b }, { uvs.r, 1 });
+					draw.addImage(&tex->handle, { pos.r, pos.b }, { r, b }, { uvs.r, uvs.b }, { 1, 1 });
 
 				}
 				else
 				{
-					draw.AddImage(&tex->handle, { l, t }, { r, b });
+					draw.addImage(&tex->handle, { l, t }, { r, b }, {0, 0}, {1, 1});
 				}
 			}
 			else
 			{
-				draw.AddRectFilled({ l, t }, { r, b }, rect.image->color);
+				draw.addRectFilled({ l, t }, { r, b }, *(Color*)&rect.image->color);
 			}
 		}
 
 		if (rect.render_target && rect.render_target->isValid())
 		{
-			draw.AddImage(rect.render_target, { l, t }, { r, b });
+			draw.addImage(rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1});
 		}
 
 		if (rect.text)
 		{
 			Font* font = rect.text->getFont();
-			if (!font) font = m_font_manager->getDefaultFont();
+			if (font) {
+				const char* text_cstr = rect.text->text.c_str();
+				float font_size = (float)rect.text->getFontSize();
+				Vec2 text_size = measureTextA(*font, text_cstr, nullptr);
+				Vec2 text_pos(l, t);
 
-			const char* text_cstr = rect.text->text.c_str();
-			float font_size = (float)rect.text->getFontSize();
-			Vec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0, text_cstr);
-			Vec2 text_pos(l, t);
+				switch (rect.text->horizontal_align)
+				{
+					case TextHAlign::LEFT: break;
+					case TextHAlign::RIGHT: text_pos.x = r - text_size.x; break;
+					case TextHAlign::CENTER: text_pos.x = (r + l - text_size.x) * 0.5f; break;
+				}
 
-			switch (rect.text->horizontal_align)
-			{
-				case TextHAlign::LEFT: break;
-				case TextHAlign::RIGHT: text_pos.x = r - text_size.x; break;
-				case TextHAlign::CENTER: text_pos.x = (r + l - text_size.x) * 0.5f; break; 
+				draw.addText(*font, text_pos, *(Color*)&rect.text->color, text_cstr);
+				renderTextCursor(rect, draw, text_pos);
 			}
-
-			draw.AddText(font, font_size, text_pos, rect.text->color, text_cstr);
-			renderTextCursor(rect, draw, text_pos);
 		}
 
 		EntityPtr child = m_universe.getFirstChild(rect.entity);
@@ -311,7 +314,7 @@ struct GUISceneImpl final : public GUIScene
 			}
 			child = m_universe.getNextSibling((EntityRef)child);
 		}
-		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.PopClipRect();
+		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.popClipRect();
 	}
 
 

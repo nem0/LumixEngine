@@ -57,7 +57,7 @@ public:
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;
 	virtual DVec3 getClosestVertex(Universe* universe, EntityRef entity, const DVec3& pos) = 0;
-	virtual void addText2D(float x, float y, float font_size, u32 color, const char* text) = 0;
+	virtual void addText2D(float x, float y, u32 color, const char* text) = 0;
 	virtual void addRect2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) = 0;
 	virtual void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum) = 0;

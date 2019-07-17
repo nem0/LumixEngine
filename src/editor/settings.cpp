@@ -431,7 +431,7 @@ void Settings::showToolbarSettings() const
 			++count;
 		}
 	}
-	ImGui::Combo("", &tmp, getter, tools, count);
+	ImGui::Combo("##tool_combo", &tmp, getter, tools, count);
 	ImGui::SameLine();
 	if (ImGui::Button("Add"))
 	{

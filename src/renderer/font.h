@@ -12,8 +12,21 @@ namespace Lumix
 {
 
 
+struct Font;
 class Renderer;
 class Texture;
+
+
+struct Glyph {
+	u32 codepoint;
+	float u0, v0, u1, v1;
+	float x0, y0, x1, y1;
+	float advance_x;
+};
+
+
+LUMIX_RENDERER_API Vec2 measureTextA(const Font& font, const char* str, const char* str_end);
+LUMIX_RENDERER_API const Glyph* findGlyph(const Font& font, u32 codepoint);
 
 
 class LUMIX_RENDERER_API FontResource final : public Resource
@@ -23,22 +36,13 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	void unload() override { m_file_data.free(); }
+	void unload() override { file_data.free(); }
 	bool load(u64 size, const u8* mem) override;
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
 
+	Array<u8> file_data;
 	static const ResourceType TYPE;
-
-private:
-	struct FontRef
-	{
-		Font* font;
-		int ref_count;
-	};
-
-	HashMap<int, FontRef> m_fonts;
-	Array<u8> m_file_data;
 };
 
 
@@ -49,23 +53,19 @@ public:
 	FontManager(Renderer& renderer, IAllocator& allocator);
 	~FontManager();
 
-	FontAtlas& getFontAtlas() { return m_font_atlas; }
-	Font* getDefaultFont() const { return m_default_font; }
-	Texture* getAtlasTexture() const { return m_atlas_texture; }
-	DelegateList<void()>& onAtlasTextureChanged() { return m_atlas_texture_changed; }
+	Texture* getAtlasTexture();
 
 private:
 	Resource* createResource(const Path& path) override;
 	void destroyResource(Resource& resource) override;
-	void updateFontTexture();
+	bool build();
 
 private:
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
-	FontAtlas m_font_atlas;
-	Font* m_default_font;
 	Texture* m_atlas_texture;
-	DelegateList<void()> m_atlas_texture_changed;
+	Array<Font*> m_fonts;
+	bool m_dirty = true;
 };
 
 

@@ -46,6 +46,7 @@
 #if defined _MSC_VER && _MSC_VER == 1900 
 #pragma warning(disable : 4312)
 #endif
+#include "imgui/imgui_freetype.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
@@ -1965,8 +1966,13 @@ struct RenderInterfaceImpl final : public RenderInterface
 	{
 		m_model_index = 0;
 		auto& rm = m_editor.getEngine().getResourceManager();
+		
 		Path shader_path("pipelines/debug_shape.shd");
 		m_shader = rm.load<Shader>(shader_path);
+		
+		Path font_path("editor/fonts/OpenSans-Regular.ttf");
+		m_font_res = rm.load<FontResource>(font_path);
+		m_font = m_font_res->addRef(16);
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
@@ -1977,27 +1983,29 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	~RenderInterfaceImpl()
 	{
-		auto& rm = m_editor.getEngine().getResourceManager();
-		rm.get(Shader::TYPE)->unload(*m_shader);
+		m_shader->getResourceManager().unload(*m_shader);
+		m_font_res->getResourceManager().unload(*m_font_res);
 
 		m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
 	}
 
 
-	void addText2D(float x, float y, float font_size, u32 color, const char* text) override
+	void addText2D(float x, float y, u32 color, const char* text) override
 	{
-		Font* font = m_renderer.getFontManager().getDefaultFont();
-		m_pipeline.getDraw2D().AddText(font, font_size, {x, y}, color, text);
+		if (m_font) m_pipeline.getDraw2D().addText(*m_font, {x, y}, Color(color), text);
 	}
 
 
-	void addRect2D(const Vec2& a, const Vec2& b, u32 color) override { m_pipeline.getDraw2D().AddRect(a, b, color); }
+	void addRect2D(const Vec2& a, const Vec2& b, u32 color) override
+	{
+		m_pipeline.getDraw2D().addRect(a, b, *(Color*)&color, 1);
+	}
 
 
 	void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) override
 	{
-		m_pipeline.getDraw2D().AddRectFilled(a, b, color);
+		m_pipeline.getDraw2D().addRectFilled(a, b, *(Color*)&color);
 	}
 
 
@@ -2056,6 +2064,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 		Engine& engine = m_editor.getEngine();
 		unsigned char* pixels;
 		int width, height;
+
+		ImGuiFreeType::BuildFontAtlas(ImGui::GetIO().Fonts);
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 		Material* material = engine.getResourceManager().load<Material>(Path("pipelines/imgui/imgui.mat"));
 
@@ -2064,7 +2074,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
 			Path("font"), *engine.getResourceManager().get(Texture::TYPE), m_renderer, engine.getAllocator());
 
-		texture->create(width, height, pixels, width * height * 4);
+		texture->create(width, height, ffr::TextureFormat::RGBA8, pixels, width * height * 4);
 		material->setTexture(0, texture);
 		if (old_texture)
 		{
@@ -2107,7 +2117,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		auto& allocator = m_editor.getAllocator();
 
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
-		texture->create(w, h, pixels, w * h * 4);
+		texture->create(w, h, ffr::TextureFormat::RGBA8, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, texture);
 		return (ImTextureID)(uintptr_t)texture->handle.value;
 	}
@@ -2281,6 +2291,8 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 	WorldEditor& m_editor;
 	Shader* m_shader;
+	FontResource* m_font_res;
+	Font* m_font;
 	RenderScene* m_render_scene;
 	Renderer& m_renderer;
 	Pipeline& m_pipeline;
@@ -2544,6 +2556,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 		unsigned char* pixels;
 		int width, height;
+		ImGuiFreeType::BuildFontAtlas(ImGui::GetIO().Fonts);
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);

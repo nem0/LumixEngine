@@ -1,5 +1,6 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -224,6 +225,7 @@ enum class EdgeMask
 
 public:
 	GUIEditor(StudioApp& app)
+		: m_app(app)
 	{
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
 
@@ -258,6 +260,12 @@ private:
 		MOVE
 	};
 
+	void onSettingsLoaded() override {
+		m_is_window_open = m_app.getSettings().getValue("is_gui_editor_open", false);
+	}
+	void onBeforeSettingsSaved() override {
+		m_app.getSettings().setValue("is_gui_editor_open", m_is_window_open);
+	}
 
 	void onAction() { m_is_window_open = !m_is_window_open; }
 	bool isOpen() const { return m_is_window_open; }
@@ -286,7 +294,7 @@ private:
 
 		GUIScene::Rect& rect = scene.getRectOnCanvas(e, canvas_size);
 		Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
-		draw.AddRect({ rect.x, rect.y }, bottom_right, 0xfff00fff);
+		draw.addRect({ rect.x, rect.y }, bottom_right, {0xff, 0xf0, 0x0f, 0xff}, 1);
 		Vec2 mid = { rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f };
 
 		auto drawHandle = [&](const Vec2& pos, const ImVec2& mouse_pos) {
@@ -295,8 +303,8 @@ private:
 			float dy = pos.y - mouse_pos.y;
 			bool is_hovered = abs(dx) < SIZE && abs(dy) < SIZE;
 			
-			draw.AddRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? 0xffffffff : 0x77ffFFff);
-			draw.AddRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), 0xff777777);
+			draw.addRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? Color{0xff, 0xff, 0xff, 0xff} : Color{0xff, 0xff, 0xff, 0x77});
+			draw.addRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), {0xff, 0xff, 0xff, 0x77}, 1);
 
 			return is_hovered && ImGui::IsMouseClicked(0);
 		};
@@ -748,6 +756,7 @@ private:
 	const char* getName() const override { return "gui_editor"; }
 
 
+	StudioApp& m_app;
 	Pipeline* m_pipeline = nullptr;
 	WorldEditor* m_editor = nullptr;
 	bool m_is_window_open = false;
