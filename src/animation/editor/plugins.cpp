@@ -405,10 +405,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponentWithResource("property_animator", "Animation/Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
-		m_app.registerComponentWithResource("animable", "Animation/Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
-		m_app.registerComponentWithResource("anim_controller", "Animation/Controller", Anim::ControllerResource::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
-		m_app.registerComponent("shared_anim_controller", "Animation/Shared controller");
+		m_app.registerComponentWithResource("property_animator", "Animation / Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
+		m_app.registerComponentWithResource("animable", "Animation / Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
+		m_app.registerComponentWithResource("anim_controller", "Animation / Controller", Anim::ControllerResource::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
+		m_app.registerComponent("shared_anim_controller", "Animation / Shared controller");
 
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		m_animtion_plugin = LUMIX_NEW(allocator, AnimationAssetBrowserPlugin)(m_app);

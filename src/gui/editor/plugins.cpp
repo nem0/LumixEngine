@@ -781,12 +781,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponent("gui_button", "GUI/Button");
-		m_app.registerComponentWithResource("gui_image", "GUI/Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
-		m_app.registerComponent("gui_input_field", "GUI/Input field");
-		m_app.registerComponent("gui_rect", "GUI/Rect");
-		m_app.registerComponent("gui_render_target", "GUI/Render target");
-		m_app.registerComponent("gui_text", "GUI/Text");
+		m_app.registerComponent("gui_button", "GUI / Button");
+		m_app.registerComponentWithResource("gui_image", "GUI / Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
+		m_app.registerComponent("gui_input_field", "GUI / Input field");
+		m_app.registerComponent("gui_rect", "GUI / Rect");
+		m_app.registerComponent("gui_render_target", "GUI / Render target");
+		m_app.registerComponent("gui_text", "GUI / Text");
 
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		m_gui_editor = LUMIX_NEW(allocator, GUIEditor)(m_app);

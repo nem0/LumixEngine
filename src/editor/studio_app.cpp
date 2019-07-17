@@ -507,7 +507,9 @@ public:
 			{
 				ImGui::SetNextWindowSize(ImVec2(300, 300));
 				const char* last = reverseFind(label, nullptr, '/');
-				if (!ImGui::BeginMenu(last && !from_filter ? last + 1 : label)) return;
+				last = last && !from_filter ? last + 1 : label;
+				if (last[0] == ' ') ++last;
+				if (!ImGui::BeginMenu(last)) return;
 				char buf[MAX_PATH_LENGTH];
 				bool create_empty = ImGui::MenuItem("Empty");
 				if (asset_browser->resourceList(buf, lengthOf(buf), resource_type, 0) || create_empty)
@@ -575,7 +577,9 @@ public:
 			void onGUI(bool create_entity, bool from_filter) override
 			{
 				const char* last = reverseFind(label, nullptr, '/');
-				if (ImGui::MenuItem(last && !from_filter ? last + 1 : label))
+				last = last && !from_filter ? last + 1 : label;
+				if (last[0] == ' ') ++last;
+				if (ImGui::MenuItem(last))
 				{
 					if (create_entity)
 					{
@@ -1172,7 +1176,9 @@ public:
 		}
 
 		const char* last = reverseFind(node->label, nullptr, '/');
-		if (ImGui::BeginMenu(last ? last + 1 : node->label))
+		last = last ? last + 1 : node->label;
+		if (last[0] == ' ') ++last;
+		if (ImGui::BeginMenu(last))
 		{
 			showAddComponentNode(node->child, filter);
 			ImGui::EndMenu();
