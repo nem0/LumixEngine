@@ -151,7 +151,6 @@ struct GizmoImpl final : public Gizmo
 	void update(const Viewport& vp) override
 	{
 		RenderInterface* ri = m_editor.getRenderInterface();
-		ri->addText2D(50, 50, 0xffFFffFF, "test");
 		for (int i = 0; i < m_count; ++i) {
 			const RigidTransform gizmo_tr = getTransform(m_entities[i]);
 			const Vec2 p = m_editor.getViewport().worldToScreenPixels(gizmo_tr.pos);
