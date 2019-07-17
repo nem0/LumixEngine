@@ -341,8 +341,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					u32 value;
 					u32 unset_flag;
 				} FLAGS[] = {
-					{"Clamp", (u32)Texture::Flags::CLAMP, 0},
-					{"SRGB", (u32)Texture::Flags::SRGB, 0}
+					{"Clamp", (u32)Texture::Flags::CLAMP, 0}
 				};
 
 				for (int i = 0; i < lengthOf(FLAGS); ++i) {
