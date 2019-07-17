@@ -281,10 +281,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override 
 	{
-		m_app.registerComponent("ambient_sound", "Audio/Ambient sound");
-		m_app.registerComponent("audio_listener", "Audio/Listener");
-		m_app.registerComponent("echo_zone", "Audio/Echo zone");
-		m_app.registerComponent("chorus_zone", "Audio/Chorus zone");
+		m_app.registerComponent("ambient_sound", "Audio / Ambient sound");
+		m_app.registerComponent("audio_listener", "Audio / Listener");
+		m_app.registerComponent("echo_zone", "Audio / Echo zone");
+		m_app.registerComponent("chorus_zone", "Audio / Chorus zone");
 
 		WorldEditor& editor = m_app.getWorldEditor();
 		IAllocator& allocator = editor.getAllocator();

@@ -2868,7 +2868,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 	}
 
 
-	const char* getLabel() const override { return "Render/Terrain"; }
+	const char* getLabel() const override { return "Render / Terrain"; }
 
 
 	StudioApp& app;
@@ -2890,21 +2890,21 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 
-		m_app.registerComponent("camera", "Render/Camera");
-		m_app.registerComponent("environment", "Render/Environment");
+		m_app.registerComponent("camera", "Render / Camera");
+		m_app.registerComponent("environment", "Render / Environment");
 
 		m_app.registerComponentWithResource(
-			"model_instance", "Render/Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
+			"model_instance", "Render / Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
 		m_app.registerComponentWithResource("particle_emitter",
-			"Render/Particle emitter",
+			"Render / Particle emitter",
 			ParticleEmitterResource::TYPE,
 			*Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Resource"));
-		m_app.registerComponent("point_light", "Render/Point light");
-		m_app.registerComponent("decal", "Render/Decal");
-		m_app.registerComponent("bone_attachment", "Render/Bone attachment");
-		m_app.registerComponent("environment_probe", "Render/Environment probe");
+		m_app.registerComponent("point_light", "Render / Point light");
+		m_app.registerComponent("decal", "Render / Decal");
+		m_app.registerComponent("bone_attachment", "Render / Bone attachment");
+		m_app.registerComponent("environment_probe", "Render / Environment probe");
 		m_app.registerComponentWithResource(
-			"text_mesh", "Render/Text 3D", FontResource::TYPE, *Reflection::getProperty(TEXT_MESH_TYPE, "Font"));
+			"text_mesh", "Render / Text 3D", FontResource::TYPE, *Reflection::getProperty(TEXT_MESH_TYPE, "Font"));
 
 		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
 		m_app.registerComponent("terrain", *m_add_terrain_plugin);
