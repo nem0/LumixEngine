@@ -574,7 +574,14 @@ bool Texture::loadTGA(IInputStream& file)
 	bytes_per_pixel = 4;
 	mips = 1;
 	if (data_reference) mem = renderer.copy(image_dest, image_size);
-	handle = renderer.createTexture(header.width, header.height, 1, ffr::TextureFormat::RGBA8, getFFRFlags(), mem, getPath().c_str());
+	const bool is_srgb = flags & (u32)ffr::TextureFlags::SRGB;
+	handle = renderer.createTexture(header.width
+		, header.height
+		, 1
+		, is_srgb ? ffr::TextureFormat::SRGBA : ffr::TextureFormat::RGBA8
+		, getFFRFlags() & ~(u32)ffr::TextureFlags::SRGB
+		, mem
+		, getPath().c_str());
 	depth = 1;
 	layers = 1;
 	return handle.isValid();

@@ -512,7 +512,7 @@ public:
 				if (!ImGui::BeginMenu(last)) return;
 				char buf[MAX_PATH_LENGTH];
 				bool create_empty = ImGui::MenuItem("Empty");
-				if (asset_browser->resourceList(buf, lengthOf(buf), resource_type, 0) || create_empty)
+				if (asset_browser->resourceList(buf, lengthOf(buf), resource_type, 0, true) || create_empty)
 				{
 					if (create_entity)
 					{

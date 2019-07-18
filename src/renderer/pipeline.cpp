@@ -2125,13 +2125,11 @@ struct PipelineImpl final : Pipeline
 								READ(const u16, instances_count);
 								READ(const ffr::BufferHandle, buffer);
 								READ(const uint, offset);
-								const uint size = instances_count * instance_decl.size;
 
 								ShaderRenderData* shader = material->shader;
-								ffr::bindTextures(material->textures, 0, material->textures_count);
-
-								const ffr::ProgramHandle prog = Shader::getProgram(shader, instanced_mask);
+								const ffr::ProgramHandle prog = Shader::getProgram(shader, instanced_mask | material->define_mask);
 								if(prog.isValid()) {
+									ffr::bindTextures(material->textures, 0, material->textures_count);
 									ffr::setState(material->render_states | render_states);
 									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
 									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
@@ -2168,7 +2166,7 @@ struct PipelineImpl final : Pipeline
 								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(material->textures, 0, material->textures_count);
 
-								const ffr::ProgramHandle prog = Shader::getProgram(shader, skinned_mask);
+								const ffr::ProgramHandle prog = Shader::getProgram(shader, skinned_mask | material->define_mask);
 								if(prog.isValid()) {
 									ffr::setState(material->render_states | render_states);
 									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
@@ -2200,7 +2198,7 @@ struct PipelineImpl final : Pipeline
 								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(material->textures, 0, material->textures_count);
 								
-								const ffr::ProgramHandle prog = Shader::getProgram(shader, m_define_mask);
+								const ffr::ProgramHandle prog = Shader::getProgram(shader, m_define_mask | material->define_mask);
 								if (prog.isValid()) {
 									ffr::useProgram(prog);
 									ffr::setState(material->render_states | render_states);
@@ -2231,7 +2229,7 @@ struct PipelineImpl final : Pipeline
 								const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 								const u32 define_mask = (1 << m_pipeline->m_renderer.getShaderDefineIdx("GRASS")) | deferred_define_mask;
 
-								const ffr::ProgramHandle prg = Shader::getProgram(material->shader, define_mask);
+								const ffr::ProgramHandle prg = Shader::getProgram(material->shader, define_mask | material->define_mask);
 								if (prg.isValid()) {
 									ffr::bindTextures(material->textures, 0, material->textures_count);
 									ffr::bindVAO(mesh->vao);
@@ -2419,7 +2417,7 @@ struct PipelineImpl final : Pipeline
 				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
 				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
 
-				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count);
+				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count | inst.material->define_mask);
 
 				ffr::setState(state);
 				const int loc = ffr::getUniformLocation(p, m_pipeline->m_lod_uniform);

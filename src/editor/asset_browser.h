@@ -28,7 +28,12 @@ public:
 		virtual ~IPlugin() {}
 
 		virtual bool canCreateResource() const { return false; }
-		virtual bool createResource(char* out_path, int max_size) { return false; }
+		virtual bool createResource(const char* path) { return false; }
+		
+		virtual const char* getFileDialogFilter() const { return ""; }
+		virtual const char* getFileDialogExtensions() const { return ""; }
+		virtual const char* getDefaultExtension() const { return ""; }
+
 		virtual void onGUI(Resource* resource) = 0;
 		virtual void onResourceUnloaded(Resource* resource) = 0;
 		virtual const char* getName() const = 0;
@@ -51,7 +56,7 @@ public:
 	void removePlugin(IPlugin& plugin);
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
-	bool resourceList(char* buf, int max_size, ResourceType type, float height) const;
+	bool resourceList(char* buf, int max_size, ResourceType type, float height, bool can_create_new) const;
 	OutputMemoryStream* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);
 

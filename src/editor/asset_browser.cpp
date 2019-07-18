@@ -339,6 +339,12 @@ void AssetBrowser::fileColumn()
 		{
 			selectResource(Path(tile.filepath), true);
 		}
+		/*
+		if (ImGui::BeginPopupContextItem("item_context")) {
+			ImGui::Selectable("Delete");
+			ImGui::EndMenu();
+		}*/
+		// TODO
 	};
 
 	while (clipper.Step())
@@ -369,6 +375,28 @@ void AssetBrowser::fileColumn()
 		}
 	}
 	ImGui::EndChild();
+
+	if (ImGui::BeginPopupContextItem("context")) {
+		const char* base_path = m_editor.getEngine().getFileSystem().getBasePath();
+		for (IPlugin* plugin : m_plugins) {
+			if (!plugin->canCreateResource()) continue;
+			if (ImGui::BeginMenu(plugin->getName())) {
+				static char tmp[MAX_PATH_LENGTH];
+				ImGui::InputText("Name", tmp, sizeof(tmp));
+				if (ImGui::Button("Create")) {
+					StaticString<MAX_PATH_LENGTH> rel_path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
+					StaticString<MAX_PATH_LENGTH> full_path(base_path, rel_path);
+					plugin->createResource(full_path);
+					changeDir(m_dir);
+					m_wanted_resource = rel_path;
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndMenu();
+			}
+		}
+		ImGui::EndPopup();
+	}
+
 }
 
 
@@ -586,7 +614,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 			ImGui::PopID();
 			return true;
 		}
-		if (resourceList(buf, max_size, type, 0))
+		if (resourceList(buf, max_size, type, 0, true))
 		{
 			ImGui::EndPopup();
 			ImGui::PopID();
@@ -641,19 +669,19 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 }
 
 
-bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height) const
+bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height, bool can_create_new) const
 {
 	auto iter = m_plugins.find(type);
 	if (!iter.isValid()) return false;
 
 	IPlugin* plugin = iter.value();
-	if (plugin->canCreateResource() && ImGui::Selectable("New"))
-	{
-		char path[MAX_PATH_LENGTH];
-		if (plugin->createResource(path, lengthOf(path)))
-		{
-			copyString(buf, max_size, path);
-			return true;
+	if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New")) {
+		char full_path[MAX_PATH_LENGTH];
+		if (OS::getSaveFilename(full_path, lengthOf(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
+			if (plugin->createResource(full_path)) {
+				m_editor.makeRelative(buf, max_size, full_path);
+				return true;
+			}
 		}
 	}
 
