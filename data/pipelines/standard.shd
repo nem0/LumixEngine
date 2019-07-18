@@ -20,6 +20,8 @@ texture_slot {
 
 include "pipelines/common.glsl"
 
+define "ALPHA_CUTOUT"
+
 ------------------
 
 vertex_shader [[

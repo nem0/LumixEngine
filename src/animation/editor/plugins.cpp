@@ -93,26 +93,23 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		app.getAssetCompiler().registerExtension("anp", PropertyAnimation::TYPE);
 	}
 
-
 	bool canCreateResource() const override { return true; }
+	const char* getFileDialogFilter() const override { return "Property animation\0*.anp\0"; }
+	const char* getFileDialogExtensions() const override { return "anp"; }
+	const char* getDefaultExtension() const override { return "anp"; }
 
-
-	bool createResource(char* out, int max_size) override
+	bool createResource(const char* path) override
 	{
-		char full_path[MAX_PATH_LENGTH];
-		if (!OS::getSaveFilename(full_path, lengthOf(full_path), "Property animation\0*.anp\0", "anp")) return false;
-
 		OS::OutputFile file;
 		WorldEditor& editor = m_app.getWorldEditor();
-		if (!file.open(full_path))
+		if (!file.open(path))
 		{
-			logError("Animation") << "Failed to create " << full_path;
+			logError("Animation") << "Failed to create " << path;
 			return false;
 		}
 
 		file << "[]";
 		file.close();
-		editor.makeRelative(out, max_size, full_path);
 		return true;
 	}
 

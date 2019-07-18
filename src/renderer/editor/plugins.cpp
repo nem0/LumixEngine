@@ -206,6 +206,23 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		app.getAssetCompiler().registerExtension("mat", Material::TYPE);
 	}
 
+	bool canCreateResource() const override { return true; }
+	const char* getFileDialogFilter() const override { return "Material\0*.mat\0"; }
+	const char* getFileDialogExtensions() const override { return "mat"; }
+	const char* getDefaultExtension() const override { return "mat"; }
+
+	bool createResource(const char* path) override {
+		OS::OutputFile file;
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (!file.open(path)) {
+			logError("Renderer") << "Failed to create " << path;
+			return false;
+		}
+
+		file << "shader \"/pipelines/standard.shd\"";
+		file.close();
+		return true;
+	}
 
 	bool compile(const Path& src) override
 	{
@@ -233,9 +250,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
-
-	void onGUI(Resource* resource) override
-	{
+	void onGUI(Resource* resource) override {
 		Material* material = static_cast<Material*>(resource);
 		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
 		if (!material->isReady()) return;
@@ -251,49 +266,43 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool b = material->isBackfaceCulling();
 		if (ImGui::Checkbox("Backface culling", &b)) material->enableBackfaceCulling(b);
 
-		/*if (material->hasDefine(alpha_cutout_define))
+		if (material->getShader() 
+			&& material->getShader()->isReady() 
+			&& material->getShader()->hasDefine(alpha_cutout_define))
 		{
 			b = material->isDefined(alpha_cutout_define);
 			if (ImGui::Checkbox("Is alpha cutout", &b)) material->setDefine(alpha_cutout_define, b);
-			if (b)
-			{
+			if (b) {
 				float tmp = material->getAlphaRef();
-				if (ImGui::DragFloat("Alpha reference value", &tmp, 0.01f, 0.0f, 1.0f))
-				{
+				if (ImGui::DragFloat("Alpha reference value", &tmp, 0.01f, 0.0f, 1.0f)) {
 					material->setAlphaRef(tmp);
 				}
 			}
-		}*/
-		// TODO
+		}
 
 		Vec4 color = material->getColor();
-		if (ImGui::ColorEdit4("Color", &color.x))
-		{
+		if (ImGui::ColorEdit4("Color", &color.x)) {
 			material->setColor(color);
 		}
 
 		float roughness = material->getRoughness();
-		if (ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f))
-		{
+		if (ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f)) {
 			material->setRoughness(roughness);
 		}
 
 		float metallic = material->getMetallic();
-		if (ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.0f, 1.0f))
-		{
+		if (ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
 			material->setMetallic(metallic);
 		}
 
 		float emission = material->getEmission();
-		if (ImGui::DragFloat("Emission", &emission, 0.01f, 0.0f))
-		{
+		if (ImGui::DragFloat("Emission", &emission, 0.01f, 0.0f)) {
 			material->setEmission(emission);
 		}
 
 		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", buf, sizeof(buf), Shader::TYPE))
-		{
+		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", buf, sizeof(buf), Shader::TYPE)) {
 			material->setShader(Path(buf));
 		}
 
@@ -308,8 +317,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::EndCombo();
 		}
 
-		for (int i = 0; i < material->getShader()->m_texture_slot_count; ++i)
-		{
+		for (int i = 0; material->getShader() && i < material->getShader()->m_texture_slot_count; ++i) {
 			auto& slot = material->getShader()->m_texture_slots[i];
 			Texture* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
@@ -328,8 +336,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			{
 				material->setTexturePath(i, Path(buf));
 			}
-			if (!texture && is_node_open)
-			{
+			if (!texture && is_node_open) {
 				ImGui::TreePop();
 				continue;
 			}
@@ -367,8 +374,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		auto* shader = material->getShader();
-		if (shader && material->isReady())
+		if (material->getShader() && material->isReady())
 		{
 						// TODO
 				/*
@@ -2841,7 +2847,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser.resourceList(buf, lengthOf(buf), Material::TYPE, 0) || create_empty || new_created)
+		if (asset_browser.resourceList(buf, lengthOf(buf), Material::TYPE, 0, false) || create_empty || new_created)
 		{
 			if (create_entity)
 			{

@@ -108,6 +108,7 @@ void Material::setDefine(u8 define_idx, bool enabled)
 	else {
 		m_define_mask &= ~(1 << define_idx);
 	}
+	updateRenderData(false);
 }
 
 
@@ -161,12 +162,13 @@ bool Material::save(IOutputStream& file)
 	file << "metallic(" <<  tmp << ")\n";
 	toCString(m_roughness, tmp, lengthOf(tmp), 9);
 	file << "roughness(" <<  tmp << ")\n";
+	toCString(m_alpha_ref, tmp, lengthOf(tmp), 2);
+	file << "alpha_ref(" <<  tmp << ")\n";
 
 	file << "defines {";
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
 		if ((m_define_mask & (1 << i)) == 0) continue;
 		const char* def = m_renderer.getShaderDefine(i);
-		if (equalStrings("SKINNED", def)) continue;
 		if (i > 0) file << ", ";
 		file << "\"" << def << "\"";
 	}
@@ -279,7 +281,6 @@ bool Material::save(IOutputStream& file)
 	}
 	serializer.endArray();
 	serializer.serialize("emission", m_emission);
-	serializer.serialize("alpha_ref", m_alpha_ref);
 	serializer.beginArray("color");
 		serializer.serializeArrayItem(m_color.x);
 		serializer.serializeArrayItem(m_color.y);
@@ -496,6 +497,7 @@ void Material::updateRenderData(bool on_before_ready)
 	m_render_data->color = m_color;
 	m_render_data->emission = m_emission;
 	m_render_data->metallic = m_metallic;
+	m_render_data->define_mask = m_define_mask;
 	m_render_data->render_states = m_render_states;
 	m_render_data->roughness = m_roughness;
 	m_render_data->shader = m_shader->m_render_data;

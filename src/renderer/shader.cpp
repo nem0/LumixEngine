@@ -30,6 +30,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_render_states(0)
 	, m_all_defines_mask(0)
 	, m_render_data(nullptr)
+	, m_defines(m_allocator)
 {
 }
 
@@ -39,6 +40,9 @@ Shader::~Shader()
 	ASSERT(isEmpty());
 }
 
+bool Shader::hasDefine(u8 define) const {
+	return m_defines.indexOf(define) >= 0;
+}
 
 const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 {
@@ -201,30 +205,23 @@ static void uniform(lua_State* L, const char* name, const char* type)
 }
 
 
-static void alpha_blending(lua_State* L, const char* mode)
-{
-	// TODO
-	ASSERT(false);
-	/*
-	Shader* shader = getShader(L);
-	if (!shader) return;
-	if (equalStrings(mode, "add"))
-	{
-		shader->m_render_states |= BGFX_STATE_BLEND_ADD;
-	}
-	else if (equalStrings(mode, "alpha"))
-	{
-		shader->m_render_states |= BGFX_STATE_BLEND_ALPHA;
-	}
-	else
-	{
-		logError("Renderer") << "Uknown blend mode " << mode << " in " << shader->getPath().c_str();
-	}*/
-}
-
-
 namespace LuaAPI
 {
+
+
+int define(lua_State* L)
+{
+	const char* def = LuaWrapper::checkArg<const char*>(L, 1);
+
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Shader* shader = (Shader*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	const u8 def_idx = shader->m_renderer.getShaderDefineIdx(def);
+	shader->m_defines.push(def_idx);
+
+	return 0;
+}
 
 
 int texture_slot(lua_State* L)
@@ -405,6 +402,8 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setfield(L, LUA_GLOBALSINDEX, "include");
 	lua_pushcclosure(L, LuaAPI::texture_slot, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
+	lua_pushcclosure(L, LuaAPI::define, 0);
+	lua_setfield(L, LUA_GLOBALSINDEX, "define");
 
 	lua_pushinteger(L, (int)Mesh::AttributeSemantic::POSITION);
 	lua_setglobal(L, "SEMANTICS_POSITION");
@@ -438,9 +437,6 @@ bool Shader::load(u64 size, const u8* mem)
 	m_size = size;
 	lua_close(L);
 	return true;
-
-	// TODO
-	//m_render_states = BGFX_STATE_DEPTH_TEST_GEQUAL;
 }
 
 

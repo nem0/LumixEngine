@@ -46,26 +46,21 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 		app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
 	}
 
-
 	bool canCreateResource() const override { return true; }
+	const char* getFileDialogFilter() const { return "Sprite\0*.spr\0"; }
+	const char* getFileDialogExtensions() const { return "spr"; }
+	const char* getDefaultExtension() const override { return "spr"; }
 
-
-	bool createResource(char* out, int max_size) override
-	{
-		char full_path[MAX_PATH_LENGTH];
-		if (!OS::getSaveFilename(full_path, lengthOf(full_path), "Sprite\0*.spr\0", "spr")) return false;
-		
+	bool createResource(const char* path) override {
 		OS::OutputFile file;
 		WorldEditor& editor = app.getWorldEditor();
-		if (!file.open(full_path))
-		{
-			logError("GUI") << "Failed to create " << full_path;
+		if (!file.open(path)) {
+			logError("GUI") << "Failed to create " << path;
 			return false;
 		}
 
 		file << "{ \"type\" : \"simple\" }";
 		file.close();
-		editor.makeRelative(out, max_size, full_path);
 		return true;
 	}
 

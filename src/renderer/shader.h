@@ -73,6 +73,7 @@ public:
 	~Shader();
 
 	ResourceType getType() const override { return TYPE; }
+	bool hasDefine(u8 define) const;
 
 	static const ffr::ProgramHandle& getProgram(ShaderRenderData* rd, u32 defines);
 
@@ -83,6 +84,7 @@ public:
 	TextureSlot m_texture_slots[MAX_TEXTURE_SLOT_COUNT];
 	int m_texture_slot_count;
 	Array<Uniform> m_uniforms;
+	Array<u8> m_defines;
 
 	static const ResourceType TYPE;
 

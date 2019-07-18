@@ -34,6 +34,7 @@ public:
 		float metallic;
 		float emission;
 		ShaderRenderData* shader;
+		u32 define_mask;
 	};
 
 	struct Uniform
