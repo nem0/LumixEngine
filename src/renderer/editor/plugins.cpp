@@ -40,7 +40,6 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "scene_view.h"
-#include "shader_editor.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #if defined _MSC_VER && _MSC_VER == 1900 
@@ -2635,39 +2634,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 };
 
 
-struct ShaderEditorPlugin final : public StudioApp::GUIPlugin
-{
-	explicit ShaderEditorPlugin(StudioApp& app)
-		: m_shader_editor(app.getWorldEditor().getAllocator())
-		, m_app(app)
-	{
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)(
-			"Shader Editor", "Toggle shader editor", "shaderEditor");
-		action->func.bind<ShaderEditorPlugin, &ShaderEditorPlugin::onAction>(this);
-		action->is_selected.bind<ShaderEditorPlugin, &ShaderEditorPlugin::isOpen>(this);
-		app.addWindowAction(action);
-		m_shader_editor.m_is_open = false;
-	}
-
-
-	const char* getName() const override { return "shader_editor"; }
-	void onAction() { m_shader_editor.m_is_open = !m_shader_editor.m_is_open; }
-	void onWindowGUI() override { m_shader_editor.onGUI(); }
-	bool hasFocus() override { return m_shader_editor.hasFocus(); }
-	bool isOpen() const { return m_shader_editor.m_is_open; }
-	void onSettingsLoaded() override {
-		m_shader_editor.m_is_open = m_app.getSettings().getValue("is_shader_editor_open", false);
-	}
-	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue("is_shader_editor_open", m_shader_editor.m_is_open);
-	}
-
-
-	StudioApp& m_app;
-	ShaderEditor m_shader_editor;
-};
-
-
 struct GizmoPlugin final : public WorldEditor::Plugin
 {
 	void showPointLightGizmo(ComponentUID light)
@@ -2962,11 +2928,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
 		m_game_view = LUMIX_NEW(allocator, GameView)(m_app);
 		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view, *m_game_view);
-		m_shader_editor_plugin = LUMIX_NEW(allocator, ShaderEditorPlugin)(m_app);
 		m_app.addPlugin(*m_scene_view);
 		m_app.addPlugin(*m_game_view);
 		m_app.addPlugin(*m_editor_ui_render_plugin);
-		m_app.addPlugin(*m_shader_editor_plugin);
 
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)();
 		m_app.getWorldEditor().addPlugin(*m_gizmo_plugin);
@@ -3013,12 +2977,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.removePlugin(*m_scene_view);
 		m_app.removePlugin(*m_game_view);
 		m_app.removePlugin(*m_editor_ui_render_plugin);
-		m_app.removePlugin(*m_shader_editor_plugin);
 
 		LUMIX_DELETE(allocator, m_scene_view);
 		LUMIX_DELETE(allocator, m_game_view);
 		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
-		LUMIX_DELETE(allocator, m_shader_editor_plugin);
 
 		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
 		LUMIX_DELETE(allocator, m_gizmo_plugin);
@@ -3039,7 +3001,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	SceneView* m_scene_view;
 	GameView* m_game_view;
 	EditorUIRenderPlugin* m_editor_ui_render_plugin;
-	ShaderEditorPlugin* m_shader_editor_plugin;
 	GizmoPlugin* m_gizmo_plugin;
 };
 
