@@ -47,13 +47,28 @@ goto :begin
 	echo ===============================
 	echo  1. Go back
 	echo  2. Maps
+	echo  3. Shader editor
 	echo ===============================
 	choice /C 1234567 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :map_plugin
+	if %errorlevel%==3 call :shader_editor_plugin
 	pause
 goto :plugins
+
+
+:shader_editor_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist shader_editor (
+		git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
+	) else (
+		cd shader_editor
+		git pull
+	)
+	popd
+exit /B 0
 
 :map_plugin
 	if not exist ..\plugins mkdir ..\plugins
