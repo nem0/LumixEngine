@@ -277,6 +277,10 @@ FontManager::FontManager(Renderer& renderer, IAllocator& allocator)
 
 FontManager::~FontManager()
 {
+	for (Font* font : m_fonts) {
+		LUMIX_DELETE(m_allocator, font);
+	}
+
 	if (m_atlas_texture) {
 		m_atlas_texture->destroy();
 		LUMIX_DELETE(m_allocator, m_atlas_texture);
