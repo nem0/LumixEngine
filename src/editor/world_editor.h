@@ -147,6 +147,7 @@ public:
 	virtual Vec2 getMousePos() const = 0;
 	virtual float getMouseRelX() const = 0;
 	virtual float getMouseRelY() const = 0;
+	virtual void copyViewTransform() = 0;
 	virtual void lookAtSelected() = 0;
 	virtual bool isOrbitCamera() const = 0;
 	virtual void setOrbitCamera(bool enable) = 0;

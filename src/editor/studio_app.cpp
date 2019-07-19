@@ -999,6 +999,7 @@ public:
 	void snapDown() { m_editor->snapDown(); }
 	void setEditCamTransform() { m_is_edit_cam_transform_ui_open = !m_is_edit_cam_transform_ui_open; }
 	void lookAtSelected() { m_editor->lookAtSelected(); }
+	void copyViewTransform() { m_editor->copyViewTransform(); }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
 	bool areSettingsOpen() const { return m_settings.m_is_open; }
 	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
@@ -1288,6 +1289,7 @@ public:
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
 		doMenuItem(*getAction("setEditCamTransform"), true);
 		doMenuItem(*getAction("lookAtSelected"), is_any_entity_selected);
+		doMenuItem(*getAction("copyViewTransform"), is_any_entity_selected);
 		doMenuItem(*getAction("toggleGameMode"), true);
 		doMenuItem(*getAction("toggleMeasure"), true);
 		doMenuItem(*getAction("snapDown"), is_any_entity_selected);
@@ -1783,6 +1785,7 @@ public:
 			.is_selected.bind<Gizmo, &Gizmo::isAutosnapDown>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
 		addAction<&StudioAppImpl::setEditCamTransform>(NO_ICON "Camera transform", "Set camera transformation", "setEditCamTransform");
+		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
 		addAction<&StudioAppImpl::lookAtSelected>(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>(ICON_FA_CUBES "Asset Browser", "Toggle asset browser", "assetBrowser")
 			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
