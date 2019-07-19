@@ -118,11 +118,11 @@ fragment_shader [[
 	vec3 getNormal(vec2 uv)
 	{
 		float hscale = u_terrain_scale.y;
-		vec3 off = vec3(-1.0/2048.0, 0, 1.0/2048.0);
-		float s01 = texture2D(u_hm, uv + off.xy).x;
-		float s21 = texture2D(u_hm, uv + off.zy).x;
-		float s10 = texture2D(u_hm, uv + off.yx).x;
-		float s12 = texture2D(u_hm, uv + off.yz).x;
+		ivec3 off = ivec3(-1, 0, 1);
+		float s01 = textureLodOffset(u_hm, uv, 0, off.xy).x;
+		float s21 = textureLodOffset(u_hm, uv, 0, off.zy).x;
+		float s10 = textureLodOffset(u_hm, uv, 0, off.yx).x;
+		float s12 = textureLodOffset(u_hm, uv, 0, off.yz).x;
 		vec3 va = normalize(vec3(1.0, (s21-s01) * hscale, 0.0));
 		vec3 vb = normalize(vec3(0.0, (s12-s10) * hscale, 1.0));
 		return normalize(cross(vb,va));
@@ -147,7 +147,7 @@ fragment_shader [[
 		{
 			getData();
 			o_gbuffer0 = vec4(data.albedo.rgb, data.roughness);
-			o_gbuffer1 = vec4(data.normal, data.metallic);
+			o_gbuffer1 = vec4(data.normal * 0.5 + 0.5, data.metallic);
 			o_gbuffer2 = vec4(data.emission, 0, 0, 1);
 		}
 
