@@ -1727,12 +1727,10 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 	CHECK_GL(glGenerateTextureMipmap(texture));
 	
 	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-	CHECK_GL(glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap));
-	CHECK_GL(glTexParameteri(target, GL_TEXTURE_WRAP_T, wrap));
-	CHECK_GL(glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-	CHECK_GL(glTexParameteri(target, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
-
-	CHECK_GL(glBindTexture(target, 0));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
 
 	Texture& t = g_ffr.textures[handle.value];
 	t.handle = texture;
