@@ -2539,6 +2539,12 @@ public:
 		}
 	}
 
+	void copyViewTransform() override {
+		if (m_selected_entities.empty()) return;
+		const Universe* universe = getUniverse();
+
+		setEntitiesPositionsAndRotations(m_selected_entities.begin(), &m_viewport.pos, &m_viewport.rot, 1);
+	}
 
 	void lookAtSelected() override
 	{
