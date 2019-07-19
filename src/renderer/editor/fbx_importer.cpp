@@ -206,7 +206,7 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene)
 			for (int k = 0; layer->getCurveNode(k); ++k)
 			{
 				const ofbx::AnimationCurveNode* node = layer->getCurveNode(k);
-				if (node->getBone()) bones.push(node->getBone());
+				if (node->getBone()) insertHierarchy(bones, node->getBone());
 			}
 		}
 	}
