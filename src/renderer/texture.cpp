@@ -8,7 +8,7 @@
 #include "engine/stream.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-
+#include "stb/stb_image.h"
 
 namespace Lumix
 {
@@ -376,93 +376,6 @@ static void flipVertical(u32* image, int width, int height)
 }
 
 
-static bool loadTGA(IInputStream& file, TGAHeader& header, Array<u8>& data, const char* path)
-{
-	PROFILE_FUNCTION();
-	file.read(&header, sizeof(header));
-
-	int bytes_per_pixel = header.bitsPerPixel / 8;
-	int image_size = header.width * header.height * 4;
-	if (header.dataType != 2 && header.dataType != 10)
-	{
-		logError("Renderer") << "Unsupported texture format " << path;
-		return false;
-	}
-
-	if (bytes_per_pixel < 3)
-	{
-		logError("Renderer") << "Unsupported color mode " << path;
-		return false;
-	}
-
-	int pixel_count = header.width * header.height;
-	data.resize(image_size);
-	u8* image_dest = &data[0];
-
-	bool is_rle = header.dataType == 10;
-	if (is_rle)
-	{
-		u8* out = image_dest;
-		u8 byte;
-		struct Pixel {
-			u8 uint8[4];
-		} pixel;
-		do
-		{
-			file.read(&byte, sizeof(byte));
-			if (byte < 128)
-			{
-				u8 count = byte + 1;
-				for (u8 i = 0; i < count; ++i)
-				{
-					file.read(&pixel, bytes_per_pixel);
-					out[0] = pixel.uint8[2];
-					out[1] = pixel.uint8[1];
-					out[2] = pixel.uint8[0];
-					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
-					else out[3] = 255;
-					out += 4;
-				}
-			}
-			else
-			{
-				byte -= 127;
-				file.read(&pixel, bytes_per_pixel);
-				for (int i = 0; i < byte; ++i)
-				{
-					out[0] = pixel.uint8[2];
-					out[1] = pixel.uint8[1];
-					out[2] = pixel.uint8[0];
-					if (bytes_per_pixel == 4) out[3] = pixel.uint8[3];
-					else out[3] = 255;
-					out += 4;
-				}
-			}
-		} while (out - image_dest < pixel_count * 4);
-	}
-	else
-	{
-		for (long y = 0; y < header.height; y++)
-		{
-			long idx = y * header.width * 4;
-			for (long x = 0; x < header.width; x++)
-			{
-				file.read(&image_dest[idx + 2], sizeof(u8));
-				file.read(&image_dest[idx + 1], sizeof(u8));
-				file.read(&image_dest[idx + 0], sizeof(u8));
-				if (bytes_per_pixel == 4)
-					file.read(&image_dest[idx + 3], sizeof(u8));
-				else
-					image_dest[idx + 3] = 255;
-				idx += 4;
-			}
-		}
-	}
-	if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
-	return true;
-}
-
-
 bool Texture::loadTGA(IInputStream& file)
 {
 	PROFILE_FUNCTION();
@@ -473,8 +386,34 @@ bool Texture::loadTGA(IInputStream& file)
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2 && header.dataType != 10)
 	{
-		logError("Renderer") << "Unsupported texture format " << getPath().c_str();
-		return false;
+		int w, h, cmp;
+		stbi_uc* stb_data = stbi_load_from_memory(static_cast<const stbi_uc*>(file.getBuffer()) + 7, (int)file.size() - 7, &w, &h, &cmp, 4);
+		if (!stb_data) {
+			logError("Renderer") << "Unsupported texture format " << getPath().c_str();
+			return false;
+		}
+		Renderer::MemRef mem;
+		if (!data_reference) mem = renderer.allocate(image_size);
+		u8* image_dest = data_reference ? &data[0] : (u8*)mem.data;
+		copyMemory(image_dest, stb_data, image_size);
+		stbi_image_free(stb_data);
+
+		//if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
+
+		bytes_per_pixel = 4;
+		mips = 1;
+		if (data_reference) mem = renderer.copy(image_dest, image_size);
+		const bool is_srgb = flags & (u32)ffr::TextureFlags::SRGB;
+		handle = renderer.createTexture(header.width
+			, header.height
+			, 1
+			, is_srgb ? ffr::TextureFormat::SRGBA : ffr::TextureFormat::RGBA8
+			, getFFRFlags() & ~(u32)ffr::TextureFlags::SRGB
+			, mem
+			, getPath().c_str());
+		depth = 1;
+		layers = 1;
+		return handle.isValid();
 	}
 
 	if (bytes_per_pixel < 3)
