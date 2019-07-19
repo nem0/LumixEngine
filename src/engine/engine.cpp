@@ -1142,21 +1142,22 @@ public:
 	void installLuaPackageLoader() const
 	{
 		lua_getglobal(m_state, "package");
-		if (lua_type(m_state, -1) != LUA_TTABLE)
-		{
+		if (lua_type(m_state, -1) != LUA_TTABLE) {
 			logError("Engine") << "Lua \"package\" is not a table";
 			return;
 		}
 		lua_getfield(m_state, -1, "searchers");
-		if (lua_type(m_state, -1) != LUA_TTABLE)
-		{
-			logError("Engine") << "Lua \"package.searchers\" is not a table";
-			return;
+		if (lua_type(m_state, -1) != LUA_TTABLE) {
+			lua_pop(m_state, 1);
+			lua_getfield(m_state, -1, "loaders");
+			if (lua_type(m_state, -1) != LUA_TTABLE) {
+				logError("Engine") << "Lua \"package.searchers\"/\"package.loaders\" is not a table";
+				return;
+			}
 		}
 		int numLoaders = 0;
 		lua_pushnil(m_state);
-		while (lua_next(m_state, -2) != 0)
-		{
+		while (lua_next(m_state, -2) != 0) {
 			lua_pop(m_state, 1);
 			numLoaders++;
 		}
