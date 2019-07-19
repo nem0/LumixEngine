@@ -192,6 +192,7 @@ bool FontManager::build()
 
 	Array<u32> pixels(m_allocator);
 	pixels.resize(w * h);
+	for (u32& p : pixels) p = 0;
 	for (const ToChar& tc : to_char) {
 		blit(tc, tmp_bmp, IVec2(w, h), &pixels);
 	}
