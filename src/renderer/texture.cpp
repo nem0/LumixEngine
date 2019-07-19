@@ -400,6 +400,9 @@ bool Texture::loadTGA(IInputStream& file)
 
 		//if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
 
+		is_cubemap = false;
+		width = header.width;
+		height = header.height;
 		bytes_per_pixel = 4;
 		mips = 1;
 		if (data_reference) mem = renderer.copy(image_dest, image_size);
