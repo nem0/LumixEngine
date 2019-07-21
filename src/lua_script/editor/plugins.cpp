@@ -3,6 +3,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
 #include "editor/property_grid.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -522,6 +523,13 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 		buf[0] = '\0';
 	}
 
+	void onSettingsLoaded() override {
+		open = app.getSettings().getValue("is_script_console_open", false);
+	}
+
+	void onBeforeSettingsSaved() override {
+		app.getSettings().setValue("is_script_console_open", open);
+	}
 
 	static const int LUA_CALL_EVENT_SIZE = 32;
 
