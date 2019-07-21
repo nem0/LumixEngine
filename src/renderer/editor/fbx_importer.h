@@ -119,6 +119,8 @@ struct FBXImporter
 
 		const ofbx::Mesh* fbx = nullptr;
 		const ofbx::Material* fbx_mat = nullptr;
+		bool is_skinned = false;
+		int bone_idx = -1;
 		bool import = true;
 		bool import_physics = false;
 		int lod = 0;
@@ -144,7 +146,7 @@ struct FBXImporter
 	ofbx::IScene* getOFBXScene() { return scene; }
 
 private:
-	const ofbx::Mesh* getAnyMeshFromBone(const ofbx::Object* node) const;
+	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
 	void gatherMaterials(const ofbx::Object* node, const char* src_dir);
 
 	void sortBones();
@@ -153,14 +155,14 @@ private:
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg);
 	void gatherMeshes(ofbx::IScene* scene);
+	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
 	void writeString(const char* str);
 	bool writeBillboardMaterial(const char* output_dir, const char* src);
-	bool isSkinned(const ofbx::Mesh& mesh) const { return !ignore_skeleton && mesh.getGeometry()->getSkin() != nullptr; }
-	int getVertexSize(const ofbx::Mesh& mesh) const;
-	void fillSkinInfo(Array<Skin>& skinning, const ofbx::Mesh* mesh) const;
+	int getVertexSize(const ImportMesh& mesh) const;
+	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixRootOrientation(const Vec3& v) const;
 	Quat fixRootOrientation(const Quat& v) const;
 	Vec3 fixOrientation(const Vec3& v) const;
@@ -172,7 +174,7 @@ private:
 	void writeMeshes(const char* mesh_output_filename, const char* src, int mesh_idx);
 	void writeSkeleton(const ImportConfig& cfg);
 	void writeLODs();
-	int getAttributeCount(const ofbx::Mesh& mesh) const;
+	int getAttributeCount(const ImportMesh& mesh) const;
 	bool areIndices16Bit(const ImportMesh& mesh) const;
 	void writeModelHeader();
 	void writePhysicsHeader(OS::OutputFile& file) const;

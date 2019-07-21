@@ -1433,6 +1433,23 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 	AnimationCurveNodeImpl(const Scene& _scene, const IElement& _element)
 		: AnimationCurveNode(_scene, _element)
 	{
+		default_values[0] = default_values[1] = default_values[2] =  0;
+		ofbx::Element* dx = static_cast<ofbx::Element*>(resolveProperty(*this, "d|X"));
+		ofbx::Element* dy = static_cast<ofbx::Element*>(resolveProperty(*this, "d|Y"));
+		ofbx::Element* dz = static_cast<ofbx::Element*>(resolveProperty(*this, "d|Z"));
+
+		if (dx) {
+			Property* x = (Property*)dx->getProperty(4);
+			if (x) default_values[0] = (float)x->value.toDouble();	
+		}
+		if (dy) {
+			Property* y = (Property*)dy->getProperty(4);
+			if (y) default_values[1] = (float)y->value.toDouble();	
+		}
+		if (dz) {
+			Property* z = (Property*)dz->getProperty(4);
+			if (z) default_values[2] = (float)z->value.toDouble();	
+		}
 	}
 
 
@@ -1446,8 +1463,8 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 	{
 		i64 fbx_time = secondsToFbxTime(time);
 
-		auto getCoord = [](const Curve& curve, i64 fbx_time) {
-			if (!curve.curve) return 0.0f;
+		auto getCoord = [&](const Curve& curve, i64 fbx_time, int idx) {
+			if (!curve.curve) return default_values[idx];
 
 			const i64* times = curve.curve->getKeyTime();
 			const float* values = curve.curve->getKeyValue();
@@ -1466,7 +1483,7 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 			return values[0];
 		};
 
-		return {getCoord(curves[0], fbx_time), getCoord(curves[1], fbx_time), getCoord(curves[2], fbx_time)};
+		return {getCoord(curves[0], fbx_time, 0), getCoord(curves[1], fbx_time, 1), getCoord(curves[2], fbx_time, 2)};
 	}
 
 
@@ -1481,6 +1498,7 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 	Object* bone = nullptr;
 	DataView bone_link_property;
 	Type getType() const override { return Type::ANIMATION_CURVE_NODE; }
+	float default_values[3];
 	enum Mode
 	{
 		TRANSLATION,
@@ -2791,25 +2809,22 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 				AnimationCurveNodeImpl* node = (AnimationCurveNodeImpl*)parent;
 				if (child->getType() == Object::Type::ANIMATION_CURVE)
 				{
-					if (!node->curves[0].curve)
+					char tmp[32];
+					con.property.toString(tmp);
+					if (strcmp(tmp, "d|X") == 0)
 					{
 						node->curves[0].connection = &con;
 						node->curves[0].curve = (AnimationCurve*)child;
 					}
-					else if (!node->curves[1].curve)
+					else if (strcmp(tmp, "d|Y") == 0)
 					{
 						node->curves[1].connection = &con;
 						node->curves[1].curve = (AnimationCurve*)child;
 					}
-					else if (!node->curves[2].curve)
+					else if (strcmp(tmp, "d|Z") == 0)
 					{
 						node->curves[2].connection = &con;
 						node->curves[2].curve = (AnimationCurve*)child;
-					}
-					else
-					{
-						Error::s_message = "Invalid animation node";
-						return false;
 					}
 				}
 				break;
