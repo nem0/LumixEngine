@@ -58,18 +58,21 @@ void FBXImporter::getImportMeshName(const ImportMesh& mesh, char (&out)[256])
 }
 
 
-const ofbx::Mesh* FBXImporter::getAnyMeshFromBone(const ofbx::Object* node) const
+const FBXImporter::ImportMesh* FBXImporter::getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const
 {
 	for (int i = 0; i < meshes.size(); ++i)
 	{
 		const ofbx::Mesh* mesh = meshes[i].fbx;
+		if (meshes[i].bone_idx == bone_idx) {
+			return &meshes[i];
+		}
 
 		auto* skin = mesh->getGeometry()->getSkin();
 		if (!skin) continue;
 
 		for (int j = 0, c = skin->getClusterCount(); j < c; ++j)
 		{
-			if (skin->getCluster(j)->getLink() == node) return mesh;
+			if (skin->getCluster(j)->getLink() == node) return &meshes[i];
 		}
 	}
 	return nullptr;
@@ -79,11 +82,13 @@ const ofbx::Mesh* FBXImporter::getAnyMeshFromBone(const ofbx::Object* node) cons
 static ofbx::Matrix makeOFBXIdentity() { return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; }
 
 
-static ofbx::Matrix getBindPoseMatrix(const ofbx::Mesh* mesh, const ofbx::Object* node)
+static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const ofbx::Object* node)
 {
-	if (!mesh) return makeOFBXIdentity();
+	if (!mesh) return node->getGlobalTransform();
+	if (!mesh->fbx) return makeOFBXIdentity();
 
-	auto* skin = mesh->getGeometry()->getSkin();
+	auto* skin = mesh->fbx->getGeometry()->getSkin();
+	if (!skin) return node->getGlobalTransform();
 
 	for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
 	{
@@ -150,7 +155,7 @@ void FBXImporter::gatherMaterials(const ofbx::Object* node, const char* src_dir)
 }
 
 
-static void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node)
+void FBXImporter::insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node)
 {
 	if (!node) return;
 	if (bones.indexOf(node) >= 0) return;
@@ -175,6 +180,17 @@ void FBXImporter::sortBones()
 				--i;
 				break;
 			}
+		}
+	}
+
+	for (const ofbx::Object*& bone : bones) {
+		const int idx = meshes.find([&](const ImportMesh& mesh){
+			return mesh.fbx == bone;
+		});
+
+		if (idx >= 0) {
+			meshes[idx].is_skinned = true;
+			meshes[idx].bone_idx = int(&bone - bones.begin());
 		}
 	}
 }
@@ -457,12 +473,11 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		import_mesh.transform_matrix.inverse();
 
 		OutputMemoryStream blob(allocator);
-		int vertex_size = getVertexSize(mesh);
+		int vertex_size = getVertexSize(import_mesh);
 		import_mesh.vertex_data.reserve(vertex_count * vertex_size);
 
 		Array<Skin> skinning(allocator);
-		bool is_skinned = isSkinned(mesh);
-		if (is_skinned) fillSkinInfo(skinning, &mesh);
+		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
 
 		AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 		float radius_squared = 0;
@@ -507,7 +522,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 			if (uvs) writeUV(uvs[i], &blob);
 			if (colors) writeColor(colors[i], &blob);
 			if (tangents) writePackedVec3(tangents[i], transform_matrix, &blob);
-			if (is_skinned) writeSkin(skinning[i], &blob);
+			if (import_mesh.is_skinned) writeSkin(skinning[i], &blob);
 
 			u8 first_byte = ((const u8*)blob.getData())[0];
 
@@ -571,6 +586,7 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 		for (int j = 0; j < mat_count; ++j)
 		{
 			ImportMesh& mesh = meshes.emplace(allocator);
+			mesh.is_skinned = !ignore_skeleton && fbx_mesh->getGeometry()->getSkin();
 			mesh.fbx = fbx_mesh;
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
 			mesh.submesh = mat_count > 1 ? j : -1;
@@ -1045,8 +1061,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 	}
 }
 
-
-int FBXImporter::getVertexSize(const ofbx::Mesh& mesh) const
+int FBXImporter::getVertexSize(const ImportMesh& mesh) const
 {
 	static const int POSITION_SIZE = sizeof(float) * 3;
 	static const int NORMAL_SIZE = sizeof(u8) * 4;
@@ -1056,23 +1071,36 @@ int FBXImporter::getVertexSize(const ofbx::Mesh& mesh) const
 	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(u16) * 4;
 	int size = POSITION_SIZE;
 
-	if (mesh.getGeometry()->getNormals()) size += NORMAL_SIZE;
-	if (mesh.getGeometry()->getUVs()) size += UV_SIZE;
-	if (mesh.getGeometry()->getColors() && import_vertex_colors) size += COLOR_SIZE;
-	if (mesh.getGeometry()->getTangents()) size += TANGENT_SIZE;
-	if (isSkinned(mesh)) size += BONE_INDICES_WEIGHTS_SIZE;
+	if (mesh.fbx->getGeometry()->getNormals()) size += NORMAL_SIZE;
+	if (mesh.fbx->getGeometry()->getUVs()) size += UV_SIZE;
+	if (mesh.fbx->getGeometry()->getColors() && import_vertex_colors) size += COLOR_SIZE;
+	if (mesh.fbx->getGeometry()->getTangents()) size += TANGENT_SIZE;
+	if (mesh.is_skinned) size += BONE_INDICES_WEIGHTS_SIZE;
 
 	return size;
 }
 
 
-void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ofbx::Mesh* mesh) const
+void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_mesh) const
 {
+	const ofbx::Mesh* mesh = import_mesh.fbx;
 	const ofbx::Geometry* geom = mesh->getGeometry();
 	skinning.resize(geom->getVertexCount());
 	setMemory(&skinning[0], 0, skinning.size() * sizeof(skinning[0]));
 
 	auto* skin = mesh->getGeometry()->getSkin();
+	if(!skin) {
+		ASSERT(import_mesh.bone_idx >= 0);
+		skinning.resize(mesh->getGeometry()->getIndexCount());
+		for (Skin& skin : skinning) {
+			skin.count = 1;
+			skin.weights[0] = 1;
+			skin.weights[1] = skin.weights[2] = skin.weights[3] = 0;
+			skin.joints[0] = skin.joints[1] = skin.joints[2] = skin.joints[3] = import_mesh.bone_idx;
+		}
+		return;
+	}
+
 	for (int i = 0, c = skin->getClusterCount(); i < c; ++i)
 	{
 		const ofbx::Cluster* cluster = skin->getCluster(i);
@@ -1460,7 +1488,7 @@ void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src,
 			
 		const ofbx::Mesh& mesh = *import_mesh.fbx;
 
-		i32 attribute_count = getAttributeCount(mesh);
+		i32 attribute_count = getAttributeCount(import_mesh);
 		write(attribute_count);
 
 		i32 pos_attr = 0;
@@ -1486,7 +1514,7 @@ void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src,
 			i32 tangent_attr = 2;
 			write(tangent_attr);
 		}
-		if (isSkinned(mesh))
+		if (import_mesh.is_skinned)
 		{
 			i32 indices_attr = 6;
 			write(indices_attr);
@@ -1534,7 +1562,7 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 
 	write(bones.size());
 
-	for (const ofbx::Object* node : bones)
+	for (const ofbx::Object*& node : bones)
 	{
 		const char* name = node->name;
 		int len = (int)stringLength(name);
@@ -1554,7 +1582,7 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 			writeString(parent_name);
 		}
 
-		const ofbx::Mesh* mesh = getAnyMeshFromBone(node);
+		const ImportMesh* mesh = getAnyMeshFromBone(node, int(&node - bones.begin()));
 		Matrix tr = toLumix(getBindPoseMatrix(mesh, node));
 		tr.normalizeScale();
 
@@ -1604,21 +1632,21 @@ void FBXImporter::writeLODs()
 }
 
 
-int FBXImporter::getAttributeCount(const ofbx::Mesh& mesh) const
+int FBXImporter::getAttributeCount(const ImportMesh& mesh) const
 {
 	int count = 1; // position
-	if (mesh.getGeometry()->getNormals()) ++count;
-	if (mesh.getGeometry()->getUVs()) ++count;
-	if (mesh.getGeometry()->getColors() && import_vertex_colors) ++count;
-	if (mesh.getGeometry()->getTangents()) ++count;
-	if (isSkinned(mesh)) count += 2;
+	if (mesh.fbx->getGeometry()->getNormals()) ++count;
+	if (mesh.fbx->getGeometry()->getUVs()) ++count;
+	if (mesh.fbx->getGeometry()->getColors() && import_vertex_colors) ++count;
+	if (mesh.fbx->getGeometry()->getTangents()) ++count;
+	if (mesh.is_skinned) count += 2;
 	return count;
 }
 
 
 bool FBXImporter::areIndices16Bit(const ImportMesh& mesh) const
 {
-	int vertex_size = getVertexSize(*mesh.fbx);
+	int vertex_size = getVertexSize(mesh);
 	return !(mesh.import && mesh.vertex_data.getPos() / vertex_size > (1 << 16));
 }
 
@@ -1659,7 +1687,7 @@ void FBXImporter::writePhysicsTriMesh(OS::OutputFile& file)
 			u32 index = mesh.indices[j] + offset;
 			file.write((const char*)&index, sizeof(index));
 		}
-		int vertex_size = getVertexSize(*mesh.fbx);
+		int vertex_size = getVertexSize(mesh);
 		int vertex_count = (i32)(mesh.vertex_data.getPos() / vertex_size);
 		offset += vertex_count;
 	}
@@ -1694,14 +1722,14 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 	i32 count = 0;
 	for (auto& mesh : meshes)
 	{
-		if (mesh.import_physics) count += (i32)(mesh.vertex_data.getPos() / getVertexSize(*mesh.fbx));
+		if (mesh.import_physics) count += (i32)(mesh.vertex_data.getPos() / getVertexSize(mesh));
 	}
 	file.write((const char*)&count, sizeof(count));
 	for (auto& mesh : meshes)
 	{
 		if (mesh.import_physics)
 		{
-			int vertex_size = getVertexSize(*mesh.fbx);
+			int vertex_size = getVertexSize(mesh);
 			int vertex_count = (i32)(mesh.vertex_data.getPos() / vertex_size);
 
 			const u8* verts = (const u8*)mesh.vertex_data.getData();
