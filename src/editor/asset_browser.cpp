@@ -285,6 +285,9 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 			int* th = (int*)tile.tex;
 			ImGui::Image((void*)(uintptr_t)*th, img_size);
 		}
+		else {
+			ImGui::Dummy(img_size);
+		}
 	}
 	else
 	{
@@ -315,6 +318,12 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	ImGui::EndGroup();
 }
 
+void AssetBrowser::deleteTile(u32 idx) {
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	if (!fs.deleteFile(m_file_infos[idx].filepath)) {
+		logError("Editor") << "Failed to delete " << m_file_infos[idx].filepath;
+	}
+}
 
 void AssetBrowser::fileColumn()
 {
@@ -327,7 +336,7 @@ void AssetBrowser::fileColumn()
 	int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
 	ImGuiListClipper clipper(row_count);
 	
-	auto callbacks = [this](FileInfo& tile) {
+	auto callbacks = [this](FileInfo& tile, int idx) {
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
 		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
 		{
@@ -335,16 +344,16 @@ void AssetBrowser::fileColumn()
 			ImGui::SetDragDropPayload("path", tile.filepath, stringLength(tile.filepath) + 1, ImGuiCond_Once);
 			ImGui::EndDragDropSource();
 		}
-		else if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
+		else if (ImGui::IsItemHovered())
 		{
-			selectResource(Path(tile.filepath), true);
+			if (ImGui::IsMouseReleased(0)) {
+				selectResource(Path(tile.filepath), true);
+			}
+			else if(ImGui::IsMouseReleased(1)) {
+				m_context_resource = idx;
+				ImGui::OpenPopup("item_ctx");
+			}
 		}
-		/*
-		if (ImGui::BeginPopupContextItem("item_context")) {
-			ImGui::Selectable("Delete");
-			ImGui::EndMenu();
-		}*/
-		// TODO
 	};
 
 	while (clipper.Step())
@@ -360,7 +369,7 @@ void AssetBrowser::fileColumn()
 					if (idx < 0) break;
 					FileInfo& tile = m_file_infos[idx];
 					thumbnail(tile);
-					callbacks(tile);
+					callbacks(tile, idx);
 				}
 			}
 			else
@@ -370,19 +379,28 @@ void AssetBrowser::fileColumn()
 				bool b = m_selected_resource && m_selected_resource->getPath().getHash() == tile.file_path_hash;
 				ImGui::Selectable(tile.filepath, b);
 				
-				callbacks(tile);
+				callbacks(tile, j);
 			}
 		}
 	}
-	ImGui::EndChild();
 
-	if (ImGui::BeginPopupContextItem("context")) {
+	bool open_delete_popup = false;
+	bool open_rename_popup = false;
+	if (ImGui::BeginPopup("item_ctx")) {
+		ImGui::Text("%s", m_file_infos[m_context_resource]);
+		ImGui::Separator();
+		open_rename_popup = ImGui::MenuItem("Rename");
+		open_delete_popup = ImGui::MenuItem("Delete");
+		ImGui::EndPopup();
+	}
+	else if (ImGui::BeginPopupContextWindow("context")) {
 		const char* base_path = m_editor.getEngine().getFileSystem().getBasePath();
 		for (IPlugin* plugin : m_plugins) {
 			if (!plugin->canCreateResource()) continue;
 			if (ImGui::BeginMenu(plugin->getName())) {
 				static char tmp[MAX_PATH_LENGTH];
-				ImGui::InputText("Name", tmp, sizeof(tmp));
+				ImGui::InputTextWithHint("", "Name", tmp, sizeof(tmp));
+				ImGui::SameLine();
 				if (ImGui::Button("Create")) {
 					StaticString<MAX_PATH_LENGTH> rel_path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
 					StaticString<MAX_PATH_LENGTH> full_path(base_path, rel_path);
@@ -397,6 +415,48 @@ void AssetBrowser::fileColumn()
 		ImGui::EndPopup();
 	}
 
+	if (open_delete_popup) ImGui::OpenPopup("Delete file");
+	if (open_rename_popup) {
+		PathUtils::getBasename(m_new_name, lengthOf(m_new_name), m_file_infos[m_context_resource].filepath);
+		ImGui::OpenPopup("Rename file");
+	}
+	if (ImGui::BeginPopupModal("Rename file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::InputText("New name", m_new_name, sizeof(m_new_name));
+		if (ImGui::Button("Rename", ImVec2(100, 0))) {
+			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+			PathUtils::FileInfo fi(m_file_infos[m_context_resource].filepath);
+			StaticString<MAX_PATH_LENGTH> new_path(fi.m_dir, m_new_name, ".", fi.m_extension);
+			if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
+				logError("Editor") << "Failed to rename " << m_file_infos[m_context_resource].filepath << " to " << new_path;
+			}
+			else {
+				changeDir(m_dir);
+			}
+
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine(ImGui::GetWindowWidth() - 100 - ImGui::GetStyle().WindowPadding.x);
+		if (ImGui::Button("Cancel", ImVec2(100, 0))) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+	if (ImGui::BeginPopupModal("Delete file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::Text("Are you sure? This can not be undone.");
+		if (ImGui::Button("Yes, delete", ImVec2(100, 0))) {
+			deleteTile(m_context_resource);
+			changeDir(m_dir);
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine(ImGui::GetWindowWidth() - 100 - ImGui::GetStyle().WindowPadding.x);
+		if (ImGui::Button("Cancel", ImVec2(100, 0))) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+	ImGui::EndChild();
 }
 
 

@@ -89,6 +89,7 @@ private:
 	void selectResource(Resource* resource, bool record_history);
 	void goBack();
 	void goForward();
+	void deleteTile(u32 idx);
 
 
 private:
@@ -101,6 +102,8 @@ private:
 	int m_history_index;
 	HashMap<ResourceType, IPlugin*> m_plugins;
 	Resource* m_selected_resource;
+	int m_context_resource;
+	char m_new_name[MAX_PATH_LENGTH];
 	WorldEditor& m_editor;
 	int m_current_type;
 	char m_filter[128];

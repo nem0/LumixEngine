@@ -249,6 +249,21 @@ struct FileSystemImpl final : public FileSystem
 	}
 
 
+	bool deleteFile(const char* path) override
+	{
+		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		return OS::deleteFile(path);
+	}
+
+
+	bool moveFile(const char* from, const char* to) override
+	{
+		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
+		StaticString<MAX_PATH_LENGTH> full_path_to(m_base_path, to);
+		return OS::moveFile(full_path_from, full_path_to);
+	}
+
+
 	bool copyFile(const char* from, const char* to) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
