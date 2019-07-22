@@ -3106,12 +3106,6 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 			r.pose = LUMIX_NEW(m_allocator, Pose)(m_allocator);
 			r.pose->resize(model->getBoneCount());
 			model->getPose(*r.pose);
-			int skinned_define_idx = m_renderer.getShaderDefineIdx("SKINNED");
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				Mesh& mesh = model->getMesh(i);
-				mesh.material->setDefine(skinned_define_idx, !mesh.skin.empty());
-			}
 		}
 		r.meshes = &r.model->getMesh(0);
 		r.mesh_count = r.model->getMeshCount();
