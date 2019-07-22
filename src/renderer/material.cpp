@@ -102,13 +102,14 @@ bool Material::isDefined(u8 define_idx) const
 
 void Material::setDefine(u8 define_idx, bool enabled)
 {
+	u32 old_mask = m_define_mask;
 	if (enabled) {
 		m_define_mask |= 1 << define_idx;
 	}
 	else {
 		m_define_mask &= ~(1 << define_idx);
 	}
-	updateRenderData(false);
+	if(old_mask != m_define_mask) updateRenderData(false);
 }
 
 
