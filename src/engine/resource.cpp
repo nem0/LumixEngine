@@ -50,6 +50,14 @@ void Resource::checkState()
 			m_desired_state != State::EMPTY)
 		{
 			onBeforeReady();
+			const bool state_changed = m_empty_dep_count != 0 
+				|| m_current_state == State::READY 
+				|| m_desired_state == State::EMPTY;
+			
+			if (state_changed) {
+				return;
+			}
+
 			m_current_state = State::READY;
 			m_cb.invoke(old_state, m_current_state, *this);
 		}

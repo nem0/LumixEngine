@@ -119,11 +119,10 @@ void Material::unload()
 /*
 	m_uniforms.clear();
 	*/
-	ResourceManager* texture_manager = m_resource_manager.getOwner().get(Texture::TYPE);
 	for (int i = 0; i < m_texture_count; i++) {
-		if (m_textures[i] && (!m_shader || m_textures[i] != m_shader->m_texture_slots[i].default_texture)) {
+		if (m_textures[i]) {
 			removeDependency(*m_textures[i]);
-			texture_manager->unload(*m_textures[i]);
+			m_textures[i]->getResourceManager().unload(*m_textures[i]);
 		}
 	}
 	m_texture_count = 0;
@@ -387,18 +386,18 @@ void Material::setTexturePath(int i, const Path& path)
 void Material::setTexture(int i, Texture* texture)
 {
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
-	if (texture) addDependency(*texture);
 	if (!texture && m_shader && m_shader->isReady() && m_shader->m_texture_slots[i].default_texture)
 	{
 		texture = m_shader->m_texture_slots[i].default_texture;
+		texture->getResourceManager().load(*texture);
 	}
+	if (texture) addDependency(*texture);
 	m_textures[i] = texture;
 	if (i >= m_texture_count) m_texture_count = i + 1;
 
-	if (old_texture && (!m_shader || old_texture != m_shader->m_texture_slots[i].default_texture))
-	{
+	if (old_texture) {
 		removeDependency(*old_texture);
-		m_resource_manager.getOwner().get(Texture::TYPE)->unload(*old_texture);
+		old_texture->getResourceManager().unload(*old_texture);
 	}
 	if (isReady() && m_shader)
 	{
@@ -431,6 +430,17 @@ void Material::onBeforeReady()
 {
 	if (!m_shader) return;
 
+	for(int i = 0; i < m_shader->m_texture_slot_count; ++i) {
+		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture) {
+			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
+			if (i >= m_texture_count) m_texture_count = i + 1;
+			m_textures[i]->getResourceManager().load(*m_textures[i]);
+			addDependency(*m_textures[i]);
+			return;
+		}
+	}
+
+
 	for(int i = 0; i < m_shader->m_uniforms.size(); ++i)
 	{
 		auto& shader_uniform = m_shader->m_uniforms[i];
@@ -459,10 +469,6 @@ void Material::onBeforeReady()
 	}
 
 	for(int i = 0; i < m_shader->m_texture_slot_count; ++i) {
-		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture) {
-			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
-			if (i >= m_texture_count) m_texture_count = i + 1;
-		}
 		const int define_idx = m_shader->m_texture_slots[i].define_idx;
 		if(define_idx >= 0) {
 			if(m_textures[i]) {
@@ -515,7 +521,7 @@ void Material::setShader(Shader* shader)
 		Shader* shader = m_shader;
 		m_shader = nullptr;
 		removeDependency(*shader);
-		m_resource_manager.getOwner().get(Shader::TYPE)->unload(*shader);
+		shader->getResourceManager().unload(*shader);
 	}
 	m_shader = shader;
 	if (m_shader) {
