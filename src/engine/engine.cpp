@@ -852,6 +852,7 @@ public:
 
 
 	static void LUA_setEntityPosition(Universe* univ, EntityRef entity, const DVec3& pos) { univ->setPosition(entity, pos); }
+	static float LUA_getLastTimeDelta(EngineImpl* engine) { return engine->getLastTimeDelta(); }
 	static void LUA_unloadResource(EngineImpl* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
 	static Universe* LUA_createUniverse(EngineImpl* engine) { return &engine->createUniverse(false); }
 	static void LUA_destroyUniverse(EngineImpl* engine, Universe* universe) { engine->destroyUniverse(*universe); }
@@ -1002,6 +1003,7 @@ public:
 		REGISTER_FUNCTION(getEntityDirection);
 		REGISTER_FUNCTION(getEntityPosition);
 		REGISTER_FUNCTION(getEntityRotation);
+		REGISTER_FUNCTION(getLastTimeDelta);
 		REGISTER_FUNCTION(getScene);
 		REGISTER_FUNCTION(getSceneUniverse);
 		REGISTER_FUNCTION(hasFilesystemWork);
@@ -1031,13 +1033,13 @@ public:
 				LuaWrapper::createSystemFunction(m_state, "Engine", #F, f); \
 			} while(false)
 
-		REGISTER_FUNCTION(getFirstChild);
-		REGISTER_FUNCTION(getNextSibling);
 		REGISTER_FUNCTION(cloneEntity);
 		REGISTER_FUNCTION(destroyEntity);
 		REGISTER_FUNCTION(findByName);
+		REGISTER_FUNCTION(getFirstChild);
 		REGISTER_FUNCTION(getFirstEntity);
 		REGISTER_FUNCTION(getNextEntity);
+		REGISTER_FUNCTION(getNextSibling);
 		REGISTER_FUNCTION(getParent);
 		REGISTER_FUNCTION(hasComponent);
 		REGISTER_FUNCTION(setParent);

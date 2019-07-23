@@ -36,6 +36,44 @@ namespace Lumix
 {
 
 
+namespace LuaWrapper {
+	template <> inline bool isType<Color>(lua_State* L, int index)
+	{
+		return lua_isnumber(L, index) != 0 || lua_istable(L, index);
+	}
+
+	template <> inline Color toType<Color>(lua_State* L, int index)
+	{
+		if (lua_isnumber(L, index)) {
+			return Color((u32)lua_tointeger(L, index));
+		}
+		else if (lua_istable(L, index)) {
+			Color c(0);
+			lua_rawgeti(L, index, 1);
+			c.r = (u8)lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			lua_rawgeti(L, index, 2);
+			c.g = (u8)lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			lua_rawgeti(L, index, 3);
+			c.b = (u8)lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			lua_rawgeti(L, index, 4);
+			c.a = (u8)lua_tointeger(L, -1);
+			lua_pop(L, 1);
+
+			return c;
+	
+		}
+		return Color(0);
+	}
+}
+
+
+
 struct GlobalState
 {
 	Matrix shadow_view_projection;
@@ -3270,6 +3308,28 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
+
+		#define REGISTER_DRAW2D_FUNCTION(fn_name) \
+			do { \
+				auto f = &LuaWrapper::wrapMethodClosure<Draw2D, decltype(&Draw2D::fn_name), &Draw2D::fn_name>; \
+				lua_getfield(L, -1, "Draw2D");		 \
+				if (lua_type(L, -1) == LUA_TNIL) {	 \
+					lua_pop(L, 1);					 \
+					lua_newtable(L);				 \
+					lua_setfield(L, -2, "Draw2D");	 \
+					lua_getfield(L, -1, "Draw2D");	 \
+				}									 \
+				lua_pushlightuserdata(L, &m_draw2d); \
+				lua_pushcclosure(L, f, 1);			 \
+				lua_setfield(L, -2, #fn_name);		 \
+				lua_pop(L, 1);						 \
+			} while(false)							 \
+
+		REGISTER_DRAW2D_FUNCTION(addLine);
+		REGISTER_DRAW2D_FUNCTION(addRect);
+		REGISTER_DRAW2D_FUNCTION(addRectFilled);
+
+		#undef REGISTER_DRAW2D_FUNCTION
 
 		lua_pop(L, 1); // pop env
 
