@@ -47,6 +47,7 @@ struct AssetCompiler
 	virtual void onInitFinished() = 0;
 
 	virtual ~AssetCompiler() {}
+	virtual void onGUI() = 0;
 	virtual void update() = 0;
 	virtual void addPlugin(IPlugin& plugin, const char** extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;

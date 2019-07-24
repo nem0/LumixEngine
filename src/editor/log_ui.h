@@ -20,7 +20,6 @@ class LUMIX_EDITOR_API LogUI
 		void onGUI();
 		void update(float time_delta);
 		int addNotification(const char* text);
-		void setNotificationTime(int uid, float time);
 		int getUnreadErrorCount() const;
 
 	public:

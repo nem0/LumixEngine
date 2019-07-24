@@ -34,19 +34,6 @@ LogUI::~LogUI()
 }
 
 
-void LogUI::setNotificationTime(int uid, float time)
-{
-	for (auto& notif : m_notifications)
-	{
-		if (notif.uid == uid)
-		{
-			notif.time = time;
-			break;
-		}
-	}
-}
-
-
 int LogUI::addNotification(const char* text)
 {
 	m_move_notifications_to_front = true;
