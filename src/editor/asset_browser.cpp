@@ -751,14 +751,15 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 	ImGui::BeginChild("Resources", ImVec2(0, height), false, ImGuiWindowFlags_HorizontalScrollbar);
 	AssetCompiler& compiler = m_app.getAssetCompiler();
 	
-	const Array<Path>& resourcs = compiler.lockResources(type);
+	const HashMap<u32, AssetCompiler::ResourceItem>& resourcs = compiler.lockResources();
 	for (const auto& res : resourcs)
 	{
-		if (filter[0] != '\0' && strstr(res.c_str(), filter) == nullptr) continue;
+		if(res.type != type) continue;
+		if (filter[0] != '\0' && strstr(res.path.c_str(), filter) == nullptr) continue;
 
-		if (ImGui::Selectable(res.c_str(), false))
+		if (ImGui::Selectable(res.path.c_str(), false))
 		{
-			copyString(buf, max_size, res.c_str());
+			copyString(buf, max_size, res.path.c_str());
 			ImGui::EndChild();
 			compiler.unlockResources();
 			return true;

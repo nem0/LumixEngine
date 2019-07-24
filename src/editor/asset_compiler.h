@@ -36,6 +36,11 @@ struct AssetCompiler
 		virtual void addSubresources(AssetCompiler& compiler, const char* path);
 	};
 
+	struct ResourceItem {
+		Path path;
+		ResourceType type;
+	};
+
 	static AssetCompiler* create(StudioApp& app);
 	static void destroy(AssetCompiler& compiler);
 
@@ -49,7 +54,7 @@ struct AssetCompiler
 	virtual const char* getCompiledDir() const = 0;
 	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
 	virtual void updateMeta(const Path& res, const char* src) const = 0;
-	virtual const Array<Path>& lockResources(ResourceType) = 0;
+	virtual const HashMap<u32, ResourceItem>& lockResources() = 0;
 	virtual void unlockResources() = 0;
 	virtual void registerDependency(const Path& included_from, const Path& dependency) = 0;
 	virtual void addResource(ResourceType type, const char* path) = 0;

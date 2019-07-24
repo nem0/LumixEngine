@@ -2267,13 +2267,13 @@ public:
 
 		AssetCompiler& compiler = studio->getAssetCompiler();
 		if (ResourceType(type) == INVALID_RESOURCE_TYPE) return 0;
-		auto& resources_paths = compiler.lockResources(ResourceType(type));
+		const auto& resources = compiler.lockResources();
 
-		lua_createtable(L, resources_paths.size(), 0);
+		lua_createtable(L, resources.size(), 0);
 		int i = 0;
-		for (auto& path : resources_paths)
+		for (const AssetCompiler::ResourceItem& res : resources)
 		{
-			LuaWrapper::push(L, path.c_str());
+			LuaWrapper::push(L, res.path.c_str());
 			lua_rawseti(L, -2, i + 1);
 			++i;
 		}

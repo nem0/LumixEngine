@@ -109,10 +109,8 @@ struct AssetCompilerImpl : AssetCompiler
 		// TODO make this safe - i.e. handle case when program gets interrupted while writing the file
 		if (fs.open(".lumix/assets/_list.txt", &file)) {
 			file << "resources = {\n";
-			for (auto& i : m_resources) {
-				for (const Path& j : i) {
-					file << "\"" << j.c_str() << "\",\n";
-				}
+			for (const ResourceItem& ri : m_resources) {
+				file << "\"" << ri.path.c_str() << "\",\n";
 			}
 			file << "}\n\n";
 			file << "dependencies = {\n";
@@ -144,9 +142,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void addResource(ResourceType type, const char* path) override {
 		const Path path_obj(path);
 		MT::CriticalSectionLock lock(m_resources_mutex);
-		auto iter = m_resources.find(type);
-		if (!iter.isValid()) return;
-		if (iter.value().indexOf(path_obj) < 0) iter.value().push(path_obj);
+		m_resources.insert(path_obj.getHash(), {path_obj, type});
 	}
 
 	ResourceType getResourceType(const char* path) const override
@@ -175,13 +171,6 @@ struct AssetCompilerImpl : AssetCompiler
 		ASSERT(!m_registered_extensions.find(hash).isValid());
 
 		m_registered_extensions.insert(hash, type);
-
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-		
-		MT::CriticalSectionLock lock(m_resources_mutex);
-		if (!m_resources.find(type).isValid()) {
-			m_resources.insert(type, Array<Path>(allocator));
-		}
 	}
 
 
@@ -224,6 +213,12 @@ struct AssetCompilerImpl : AssetCompiler
 
 				if (fs.getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
 					addResource(fullpath);
+				}
+				else {
+					Path path(fullpath[0] == '/' ? fullpath + 1 : fullpath);
+					if (!m_resources.find(path.getHash()).isValid()) {
+						addResource(fullpath);
+					}
 				}
 			}
 		}
@@ -270,16 +265,15 @@ struct AssetCompilerImpl : AssetCompiler
 				lua_getglobal(L, "resources");
 				if (lua_type(L, -1) != LUA_TTABLE) return;
 
-				LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this](const Path& p){
-					const ResourceType type = getResourceType(p.c_str());
-					if (type != INVALID_RESOURCE_TYPE) {
-						MT::CriticalSectionLock lock(m_resources_mutex);
-						auto iter = m_resources.find(type);
-						if (iter.isValid() && iter.value().indexOf(p) < 0) {
-							iter.value().push(p);
-						}
-					}	
-				});
+				{
+					MT::CriticalSectionLock lock(m_resources_mutex);
+					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this](const Path& p){
+						const ResourceType type = getResourceType(p.c_str());
+						if (type != INVALID_RESOURCE_TYPE) {
+							m_resources.insert(p.getHash(), {p, type});
+						}	
+					});
+				}
 				lua_pop(L, 1);
 
 				lua_getglobal(L, "dependencies");
@@ -322,15 +316,11 @@ struct AssetCompilerImpl : AssetCompiler
 		Array<Path> res(m_app.getWorldEditor().getAllocator());
 
 		MT::CriticalSectionLock lock(m_resources_mutex);
-		for (Array<Path>& tmp : m_resources) {
-			for (int i = tmp.size() - 1; i >= 0; --i) {
-				const Path& p = tmp[i];
-				if (equalStrings(getResourceFilePath(p.c_str()), path)) {
-					res.push(p);
-					tmp.erase(i);
-				}
-			}
-		}
+		m_resources.eraseIf([&](const ResourceItem& ri){
+			if (!equalStrings(getResourceFilePath(ri.path.c_str()), path)) return false;
+			res.push(ri.path);
+			return true;
+		});
 
 		const Path path_obj(path);
 		for (Array<Path>& deps : m_dependencies) {
@@ -554,9 +544,9 @@ struct AssetCompilerImpl : AssetCompiler
 		m_resources_mutex.exit();
 	}
 
-	const Array<Path>& lockResources(ResourceType type) override {
+	const HashMap<u32, ResourceItem>& lockResources() override {
 		m_resources_mutex.enter();
-		return m_resources[type];
+		return m_resources;
 	}
 
 	MT::Semaphore m_semaphore;
@@ -573,7 +563,7 @@ struct AssetCompilerImpl : AssetCompiler
 	AssetCompilerTask m_task;
 	FileSystemWatcher* m_watcher;
 	MT::CriticalSection m_resources_mutex;
-	HashMap<ResourceType, Array<Path>> m_resources;
+	HashMap<u32, ResourceItem> m_resources;
 	HashMap<u32, ResourceType> m_registered_extensions;
 	int m_log_id = -1;
 };

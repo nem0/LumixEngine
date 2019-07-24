@@ -299,6 +299,27 @@ public:
 		return { this, pos };
 	}
 
+	template <typename F>
+	void eraseIf(F predicate) {
+		Slot* keys = m_keys;
+		for (uint i = 0; i < m_capacity; ++i) {
+			if (!keys[i].valid) continue;
+			if (predicate(m_values[i])) {
+				((Key*)keys[i].key_mem)->~Key();
+				m_values[i].~Value();
+				keys[i].valid = false;
+				--m_size;
+
+				uint pos = (i + 1) % m_capacity;
+				while (keys[pos].valid) {
+					rehash(pos);
+					pos = (pos + 1) % m_capacity;
+				}
+				--i;
+			}
+		}
+	}
+
 	void erase(const iterator& key) {
 		ASSERT(key.isValid());
 
@@ -310,9 +331,10 @@ public:
 		--m_size;
 
 		const uint mask = m_mask;
-		while (keys[pos + 1].valid) {
-			rehash(pos + 1);
-			++pos;
+		pos = (pos + 1) % m_capacity;
+		while (keys[pos].valid) {
+			rehash(pos);
+			pos = (pos + 1) % m_capacity;
 		}
 	}
 
