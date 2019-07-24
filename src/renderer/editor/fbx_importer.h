@@ -63,21 +63,9 @@ struct FBXImporter
 
 	struct ImportAnimation
 	{
-		struct Split
-		{
-			int from_frame = 0;
-			int to_frame = 0;
-			StaticString<32> name;
-		};
-
-		explicit ImportAnimation(IAllocator& allocator)
-			: splits(allocator)
-		{}
-
 		const ofbx::AnimationStack* fbx = nullptr;
 		const ofbx::IScene* scene = nullptr;
-		Array<Split> splits;
-		StaticString<MAX_PATH_LENGTH> output_filename;
+		StaticString<MAX_PATH_LENGTH> name;
 		bool import = true;
 		int root_motion_bone_idx = -1;
 	};
@@ -136,12 +124,14 @@ struct FBXImporter
 	~FBXImporter();
 	bool setSource(const char* base_dir, const char* filename, bool ignore_geometry);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
-	void writeAnimations(const char* src, const ImportConfig& cfg);
+	void writeAnimation(const char* dst, const ImportAnimation& anim, const ImportConfig& cfg);
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
 	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg);
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
+	const Array<ImportAnimation>& getAnimations() const { return animations; }
+
 	static void getImportMeshName(const ImportMesh& mesh, char (&name)[256]);
 	ofbx::IScene* getOFBXScene() { return scene; }
 

@@ -1,4 +1,5 @@
 #include "../ffr/ffr.h"
+#include "animation/animation.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/property_grid.h"
@@ -510,24 +511,27 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		compiler.addResource(Model::TYPE, path);
 
 		const Meta meta = getMeta(Path(path));
-		if(meta.split) {
-			struct JobData {
-				ModelPlugin* plugin;
-				StaticString<MAX_PATH_LENGTH> path;
-			};
-			JobData* data = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), JobData);
-			data->plugin = this;
-			data->path = path;
-			JobSystem::runEx(data, [](void* ptr) {
-				JobData* data = (JobData*)ptr;
-				ModelPlugin* plugin = data->plugin;
-				WorldEditor& editor = plugin->m_app.getWorldEditor();
-				FileSystem& fs = editor.getEngine().getFileSystem();
-				FBXImporter importer(fs, editor.getAllocator());
-				AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
+		struct JobData {
+			ModelPlugin* plugin;
+			StaticString<MAX_PATH_LENGTH> path;
+			Meta meta;
+		};
+		JobData* data = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), JobData);
+		data->plugin = this;
+		data->path = path;
+		data->meta = meta;
+		JobSystem::runEx(data, [](void* ptr) {
+			JobData* data = (JobData*)ptr;
+			ModelPlugin* plugin = data->plugin;
+			WorldEditor& editor = plugin->m_app.getWorldEditor();
+			FileSystem& fs = editor.getEngine().getFileSystem();
+			FBXImporter importer(fs, editor.getAllocator());
+			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
 
-				const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path;
-				importer.setSource(fs.getBasePath(), path, true);
+			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path;
+			importer.setSource(fs.getBasePath(), path, true);
+
+			if(data->meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
 				for (int i = 0; i < meshes.size(); ++i) {
 					char mesh_name[256];
@@ -535,9 +539,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ":", path);
 					compiler.addResource(Model::TYPE, tmp);
 				}
-				LUMIX_DELETE(editor.getAllocator(), data);
-			}, &m_subres_signal, JobSystem::INVALID_HANDLE, 2);			
-		}
+			}
+
+			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
+			for (const FBXImporter::ImportAnimation& anim : animations) {
+				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ":", path);
+				compiler.addResource(Animation::TYPE, tmp);
+			}
+
+			LUMIX_DELETE(editor.getAllocator(), data);
+		}, &m_subres_signal, JobSystem::INVALID_HANDLE, 2);			
 	}
 
 	static const char* getResourceFilePath(const char* str)
@@ -576,7 +587,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
 			m_fbx_importer.writeMaterials(filepath, cfg);
-			m_fbx_importer.writeAnimations(filepath, cfg);
+			for (FBXImporter::ImportAnimation& anim : m_fbx_importer.getAnimations()) { 
+				StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ":", filepath);
+				char anim_path_n[MAX_PATH_LENGTH];
+				PathUtils::normalize(anim_path, anim_path_n, lengthOf(anim_path_n));
+				StaticString<64> tmp("", crc32(anim_path_n), ".res");
+				m_fbx_importer.writeAnimation(tmp, anim, cfg);
+			}
 			return true;
 		}
 
