@@ -792,7 +792,7 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 
-		if (asset_browser.resourceList(buf, lengthOf(buf), LuaScript::TYPE, 0, false) || create_empty || new_created)
+		if (asset_browser.resourceList(buf, lengthOf(buf), nullptr, LuaScript::TYPE, 0, false) || create_empty || new_created)
 		{
 			WorldEditor& editor = app.getWorldEditor();
 			if (create_entity)

@@ -1,13 +1,22 @@
 #pragma once
 
 
+#include "engine/delegate.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
-#include "engine/delegate.h"
+#include "engine/string.h"
 #include "imgui/imgui.h"
 
 namespace Lumix
 {
+
+struct LUMIX_EDITOR_API ResourceLocator {
+	ResourceLocator(const char* path);
+
+	StringView name;
+	StringView filepath;
+	char full[MAX_PATH_LENGTH];
+};
 
 
 struct LUMIX_EDITOR_API Action

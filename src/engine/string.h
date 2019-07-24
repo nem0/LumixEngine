@@ -81,6 +81,29 @@ template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
 }
 
 
+struct StringView
+{
+	StringView() : begin(nullptr), end(nullptr) {}
+	
+	StringView(const char* begin)
+		: begin(begin)
+		, end(begin + stringLength(begin))
+	{
+	}
+
+	StringView(const char* begin, int len)
+		: begin(begin)
+		, end(begin + len)
+	{
+	}
+
+	uint length() const { return uint(end - begin); }
+
+	const char* begin;
+	const char* end;
+};
+
+
 template <int size> struct StaticString
 {
 	StaticString() { data[0] = '\0'; }
@@ -109,6 +132,7 @@ template <int size> struct StaticString
 	template <int value_size> void add(StaticString<value_size>& value) { catString(data, size, value.data); }
 	void add(const char* value) { catString(data, size, value); }
 	void add(char* value) { catString(data, size, value); }
+	void add(const StringView& value) { catNString(data, size, value.begin, value.length()); }
 
 	void operator=(const char* str) { copyString(data, str); }
 
@@ -151,29 +175,6 @@ template <int size> struct StaticString
 
 	operator const char*() const { return data; }
 	char data[size];
-};
-
-
-struct StringView
-{
-	StringView() : begin(nullptr), end(nullptr) {}
-	
-	StringView(const char* begin)
-		: begin(begin)
-		, end(begin + stringLength(begin))
-	{
-	}
-
-	StringView(const char* begin, int len)
-		: begin(begin)
-		, end(begin + len)
-	{
-	}
-
-	uint length() const { return uint(end - begin); }
-
-	const char* begin;
-	const char* end;
 };
 
 
