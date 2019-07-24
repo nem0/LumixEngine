@@ -1387,24 +1387,21 @@ void TerrainEditor::onGUI()
 			static ImVec2 size(-1, 100);
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 			ImGui::ListBoxHeader("Prefabs", size);
-			auto& all_prefabs = m_app.getAssetCompiler().lockResources(PrefabResource::TYPE);
-			for(int i = 0; i < all_prefabs.size(); ++i)
-			{
-				if (filter[0] != 0 && stristr(all_prefabs[i].c_str(), filter) == nullptr) continue;
-				int selected_idx = m_selected_prefabs.find([&](PrefabResource* res) -> bool {
-					return res && res->getPath() == all_prefabs[i];
+			auto& resources = m_app.getAssetCompiler().lockResources();
+			for (const AssetCompiler::ResourceItem& res : resources) {
+				if (res.type != PrefabResource::TYPE) continue;
+				if (filter[0] != 0 && stristr(res.path.c_str(), filter) == nullptr) continue;
+				int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
+					return r && r->getPath() == res.path;
 				});
 				bool selected = selected_idx >= 0;
-				if (ImGui::Checkbox(all_prefabs[i].c_str(), &selected))
-				{
-					if (selected)
-					{
+				if (ImGui::Checkbox(res.path.c_str(), &selected)) {
+					if (selected) {
 						ResourceManagerHub& manager = m_world_editor.getEngine().getResourceManager();
-						PrefabResource* prefab = manager.load<PrefabResource>(all_prefabs[i]);
+						PrefabResource* prefab = manager.load<PrefabResource>(res.path);
 						m_selected_prefabs.push(prefab);
 					}
-					else
-					{
+					else {
 						PrefabResource* prefab = m_selected_prefabs[selected_idx];
 						m_selected_prefabs.eraseFast(selected_idx);
 						prefab->getResourceManager().unload(*prefab);
