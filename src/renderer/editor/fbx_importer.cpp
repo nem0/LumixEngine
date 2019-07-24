@@ -249,7 +249,7 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 	int anim_count = scene.getAnimationStackCount();
 	for (int i = 0; i < anim_count; ++i)
 	{
-		ImportAnimation& anim = animations.emplace(allocator);
+		ImportAnimation& anim = animations.emplace();
 		anim.scene = &scene;
 		anim.fbx = (const ofbx::AnimationStack*)scene.getAnimationStack(i);
 		anim.import = true;
@@ -258,20 +258,20 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 		{
 			if (take_info->name.begin != take_info->name.end)
 			{
-				take_info->name.toString(anim.output_filename.data);
+				take_info->name.toString(anim.name.data);
 			}
-			if (anim.output_filename.empty() && take_info->filename.begin != take_info->filename.end)
+			if (anim.name.empty() && take_info->filename.begin != take_info->filename.end)
 			{
-				take_info->filename.toString(anim.output_filename.data);
+				char tmp[MAX_PATH_LENGTH];
+				take_info->filename.toString(tmp);
+				PathUtils::getBasename(anim.name.data, lengthOf(anim.name.data), tmp);
 			}
-			if (anim.output_filename.empty()) anim.output_filename << "anim";
+			if (anim.name.empty()) anim.name << "anim";
 		}
 		else
 		{
-			anim.output_filename = "anim";
+			anim.name = "anim";
 		}
-
-		makeValidFilename(anim.output_filename.data);
 	}
 }
 
@@ -586,7 +586,7 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 		for (int j = 0; j < mat_count; ++j)
 		{
 			ImportMesh& mesh = meshes.emplace(allocator);
-			mesh.is_skinned = !ignore_skeleton && fbx_mesh->getGeometry()->getSkin();
+			mesh.is_skinned = !ignore_skeleton && fbx_mesh->getGeometry() && fbx_mesh->getGeometry()->getSkin();
 			mesh.fbx = fbx_mesh;
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
 			mesh.submesh = mat_count > 1 ? j : -1;
@@ -650,11 +650,11 @@ bool FBXImporter::setSource(const char* base_dir, const char* filename, bool ign
 	PathUtils::getDir(src_dir, lengthOf(src_dir), filename);
 	gatherMeshes(scene);
 
+	gatherAnimations(*scene);
 	if (!ignore_geometry) {
 		gatherMaterials(root, src_dir);
 		materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
 		gatherBones(*scene);
-		gatherAnimations(*scene);
 	}
 
 	return true;
@@ -929,136 +929,121 @@ static int getDepth(const ofbx::Object* bone)
 }
 
 
-void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
+void FBXImporter::writeAnimation(const char* dst, const ImportAnimation& anim, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
-	const PathUtils::FileInfo src_info(src);
+	ASSERT(anim.import);
+	const ofbx::AnimationStack* stack = anim.fbx;
+	const ofbx::IScene& scene = *anim.scene;
+	const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
 
-	for (int anim_idx = 0; anim_idx < animations.size(); ++anim_idx)
+	float fbx_frame_rate = scene.getSceneFrameRate();
+	if (fbx_frame_rate < 0) fbx_frame_rate = 24;
+	float scene_frame_rate = fbx_frame_rate / time_scale;
+	float sampling_period = 1.0f / scene_frame_rate;
+	int all_frames_count = 0;
+	if (take_info)
 	{
-		ImportAnimation& anim = animations[anim_idx];
-		if (!anim.import) continue;
-		const ofbx::AnimationStack* stack = anim.fbx;
-		const ofbx::IScene& scene = *anim.scene;
-		const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
-
-		float fbx_frame_rate = scene.getSceneFrameRate();
-		if (fbx_frame_rate < 0) fbx_frame_rate = 24;
-		float scene_frame_rate = fbx_frame_rate / time_scale;
-		float sampling_period = 1.0f / scene_frame_rate;
-		int all_frames_count = 0;
-		if (take_info)
-		{
-			all_frames_count = int((take_info->local_time_to - take_info->local_time_from) / sampling_period + 0.5f);
-		}
-		else
-		{
-			ASSERT(false);
-			// TODO
-			// scene->GetGlobalSettings().GetTimelineDefaultTimeSpan(time_spawn);
-		}
-
+		all_frames_count = int((take_info->local_time_to - take_info->local_time_from) / sampling_period + 0.5f);
+	}
+	else
+	{
+		ASSERT(false);
 		// TODO
-		/*FbxTime::EMode mode = scene->GetGlobalSettings().GetTimeMode();
-		float scene_frame_rate =
-		(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
-		: FbxTime::GetFrameRate(mode));
-		*/
-		for (int i = 0; i < maximum(1, anim.splits.size()); ++i)
+		// scene->GetGlobalSettings().GetTimelineDefaultTimeSpan(time_spawn);
+	}
+
+	// TODO
+	/*FbxTime::EMode mode = scene->GetGlobalSettings().GetTimeMode();
+	float scene_frame_rate =
+	(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
+	: FbxTime::GetFrameRate(mode));
+	*/
+	out_file.clear();
+
+	Animation::Header header;
+	header.magic = Animation::HEADER_MAGIC;
+	header.version = 3;
+	header.fps = (u32)(scene_frame_rate + 0.5f);
+	write(header);
+
+	write(anim.root_motion_bone_idx);
+	write(all_frames_count);
+	int used_bone_count = 0;
+
+	for (const ofbx::Object* bone : bones)
+	{
+		if (&bone->getScene() != &scene) continue;
+
+		const ofbx::AnimationLayer* layer = stack->getLayer(0);
+		const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
+		const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
+		if (translation_curve_node || rotation_curve_node) ++used_bone_count;
+	}
+
+	write(used_bone_count);
+	Array<TranslationKey> positions(allocator);
+	Array<RotationKey> rotations(allocator);
+	for (const ofbx::Object* bone : bones)
+	{
+		if (&bone->getScene() != &scene) continue;
+		const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
+
+		const ofbx::AnimationLayer* layer = stack->getLayer(0);
+		const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
+		const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
+		if (!translation_node && !rotation_node) continue;
+
+		u32 name_hash = crc32(bone->name);
+		write(name_hash);
+
+		int depth = getDepth(bone);
+		float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+		compressPositions(positions, 0, all_frames_count, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
+		write(positions.size());
+
+		for (TranslationKey& key : positions) write(key.frame);
+		for (TranslationKey& key : positions)
 		{
-			FBXImporter::ImportAnimation::Split whole_anim_split;
-			whole_anim_split.to_frame = all_frames_count;
-			auto* split = anim.splits.empty() ? &whole_anim_split : &anim.splits[i];
-
-			int frame_count = split->to_frame - split->from_frame;
-
-			StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, src_info.m_dir, anim.output_filename, split->name, ".ani");
-			OS::OutputFile f;
-			if (!f.open(tmp))
+			if (bone == root_bone)
 			{
-				logError("FBX") << "Failed to create " << tmp;
-				continue;
+				write(fixRootOrientation(key.pos * cfg.mesh_scale));
 			}
-			out_file.clear();
-
-			Animation::Header header;
-			header.magic = Animation::HEADER_MAGIC;
-			header.version = 3;
-			header.fps = (u32)(scene_frame_rate + 0.5f);
-			write(header);
-
-			write(anim.root_motion_bone_idx);
-			write(frame_count);
-			int used_bone_count = 0;
-
-			for (const ofbx::Object* bone : bones)
+			else
 			{
-				if (&bone->getScene() != &scene) continue;
-
-				const ofbx::AnimationLayer* layer = stack->getLayer(0);
-				const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
-				const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
-				if (translation_curve_node || rotation_curve_node) ++used_bone_count;
+				write(fixOrientation(key.pos * cfg.mesh_scale));
 			}
+		}
 
-			write(used_bone_count);
-			Array<TranslationKey> positions(allocator);
-			Array<RotationKey> rotations(allocator);
-			for (const ofbx::Object* bone : bones)
+		compressRotations(rotations, 0, all_frames_count, sampling_period, rotation_node, *bone, rotation_error / depth);
+
+		write(rotations.size());
+		for (RotationKey& key : rotations) write(key.frame);
+		for (RotationKey& key : rotations)
+		{
+			if (bone == root_bone)
 			{
-				if (&bone->getScene() != &scene) continue;
-				const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
-
-				const ofbx::AnimationLayer* layer = stack->getLayer(0);
-				const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
-				const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
-				if (!translation_node && !rotation_node) continue;
-
-				u32 name_hash = crc32(bone->name);
-				write(name_hash);
-
-				int depth = getDepth(bone);
-				float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-				compressPositions(positions, split->from_frame, split->to_frame, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
-				write(positions.size());
-
-				for (TranslationKey& key : positions) write(key.frame);
-				for (TranslationKey& key : positions)
-				{
-					if (bone == root_bone)
-					{
-						write(fixRootOrientation(key.pos * cfg.mesh_scale));
-					}
-					else
-					{
-						write(fixOrientation(key.pos * cfg.mesh_scale));
-					}
-				}
-
-				compressRotations(rotations, split->from_frame, split->to_frame, sampling_period, rotation_node, *bone, rotation_error / depth);
-
-				write(rotations.size());
-				for (RotationKey& key : rotations) write(key.frame);
-				for (RotationKey& key : rotations)
-				{
-					if (bone == root_bone)
-					{
-						write(fixRootOrientation(key.rot));
-					}
-					else
-					{
-						write(fixOrientation(key.rot));
-					}
-				}
+				write(fixRootOrientation(key.rot));
 			}
-
-			if (!f.write(out_file.getData(), out_file.getPos())) {
-				logError("FBX") << "Failed to write " << tmp;
+			else
+			{
+				write(fixOrientation(key.rot));
 			}
-
-			f.close();
 		}
 	}
+
+	OS::OutputFile f;
+	StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, dst);
+	if (!f.open(out_path)) {
+		logError("FBX") << "Failed to create " << dst;
+		return;
+	}
+
+	if (!f.write(out_file.getData(), out_file.getPos())) {
+		logError("FBX") << "Failed to write " << dst;
+	}
+
+	f.close();
 }
 
 int FBXImporter::getVertexSize(const ImportMesh& mesh) const
