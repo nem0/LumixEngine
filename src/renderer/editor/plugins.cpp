@@ -2830,7 +2830,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser.resourceList(buf, lengthOf(buf), Material::TYPE, 0, false) || create_empty || new_created)
+		if (asset_browser.resourceList(buf, lengthOf(buf), nullptr, Material::TYPE, 0, false) || create_empty || new_created)
 		{
 			if (create_entity)
 			{

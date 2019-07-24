@@ -607,9 +607,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::PushID(str_id);
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
-	float text_width = maximum(
-		50.0f, item_w - ImGui::CalcTextSize(" ... ").x - style.FramePadding.x * 2);
-
+	float text_width = maximum(50.0f, item_w - ImGui::CalcTextSize(" ... ").x - style.FramePadding.x * 2);
 	
 	auto pos = ImGui::GetCursorPos();
 	pos.x += text_width;
@@ -625,10 +623,20 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		ImGui::Text("%s", tmp);
 	}
 	else {
+		char tmp[64];
 		char* c = buf + stringLength(buf);
 		while (c > buf && *c != '/' && *c != '\\') --c;
 		if (*c == '/' || *c == '\\') ++c;
-		ImGui::Text("%s", c);
+
+		const char* end = reverseFind(c, nullptr, '.');
+		if (end) {
+			copyNString(tmp, lengthOf(tmp), c, int(end - c));
+		}
+		else {
+			copyString(tmp, c);
+		}
+
+		ImGui::Text("%s", tmp);
 	}
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
@@ -674,7 +682,8 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 			ImGui::PopID();
 			return true;
 		}
-		if (resourceList(buf, max_size, type, 0, true))
+		static u32 selected_path_hash = 0;
+		if (resourceList(buf, max_size, &selected_path_hash, type, 0, true))
 		{
 			ImGui::EndPopup();
 			ImGui::PopID();
@@ -729,7 +738,8 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 }
 
 
-bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, float height, bool can_create_new) const
+// TODO selected_path_hash == null is bad UX
+bool AssetBrowser::resourceList(char* buf, int max_size, u32* selected_path_hash, ResourceType type, float height, bool can_create_new) const
 {
 	auto iter = m_plugins.find(type);
 	if (!iter.isValid()) return false;
@@ -748,24 +758,40 @@ bool AssetBrowser::resourceList(char* buf, int max_size, ResourceType type, floa
 	static char filter[128] = "";
 	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 
-	ImGui::BeginChild("Resources", ImVec2(0, height), false, ImGuiWindowFlags_HorizontalScrollbar);
+	ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 3), false, ImGuiWindowFlags_HorizontalScrollbar);
 	AssetCompiler& compiler = m_app.getAssetCompiler();
 	
 	const HashMap<u32, AssetCompiler::ResourceItem>& resourcs = compiler.lockResources();
+	Path selected_path;
 	for (const auto& res : resourcs)
 	{
 		if(res.type != type) continue;
 		if (filter[0] != '\0' && strstr(res.path.c_str(), filter) == nullptr) continue;
 
-		if (ImGui::Selectable(res.path.c_str(), false))
+		const bool selected = selected_path_hash ? *selected_path_hash == res.path.getHash() : false;
+		if(selected) selected_path = res.path;
+		ResourceLocator rl(res.path.c_str());
+		StaticString<MAX_PATH_LENGTH> label("", rl.name, "##h", res.path.getHash());
+		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick))
 		{
-			copyString(buf, max_size, res.path.c_str());
-			ImGui::EndChild();
-			compiler.unlockResources();
-			return true;
+			if(selected_path_hash) {
+				*selected_path_hash = res.path.getHash();
+			}
+			
+			if (selected || !selected_path_hash || ImGui::IsMouseDoubleClicked(0)) {
+				copyString(buf, max_size, res.path.c_str());
+				ImGui::CloseCurrentPopup();
+				ImGui::EndChild();
+				compiler.unlockResources();
+				return true;
+			}
 		}
 	}
 	ImGui::EndChild();
+	ImGui::Separator();
+	if (selected_path.isValid()) {
+		ImGui::Text("%s", selected_path.c_str());
+	}
 	compiler.unlockResources();
 	return false;
 }

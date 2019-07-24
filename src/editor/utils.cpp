@@ -13,6 +13,43 @@ namespace Lumix
 {
 
 
+ResourceLocator::ResourceLocator(const char* path)
+{
+	copyString(full, path);
+	const char* c = full;
+	while(*c && *c != ':') {
+		++c;
+	}
+	if(*c == ':') {
+		name.begin = full;
+		name.end = c;
+
+		filepath.begin = c + 1;
+		filepath.end = filepath.begin + stringLength(filepath.begin);
+	}
+	else {
+		const char* dot = reverseFind(full, nullptr, '.');
+		if(dot) {
+			filepath.begin = full;
+			filepath.end = full + stringLength(full);
+
+			name.end = dot;
+			name.begin = name.end;
+			while (name.begin > full && *name.begin != '/' && *name.begin != '\\') {
+				--name.begin;
+			}
+			if (*name.begin == '/' || *name.begin == '\\') ++name.begin;
+		}
+		else {
+			name.begin = full;
+			name.end = full + stringLength(name.begin);
+
+			filepath = name;
+		}
+	}
+}
+
+
 Action::Action(const char* label_short, const char* label_long, const char* name)
 	: label_long(label_long)
 	, label_short(label_short)
