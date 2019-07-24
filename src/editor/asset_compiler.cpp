@@ -15,6 +15,8 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "imgui/imgui.h"
+
 
 namespace Lumix
 {
@@ -42,7 +44,6 @@ struct AssetCompilerTask : MT::Task
 
 	int task() override;
 
-	volatile int m_to_compile_count = 0;
 	AssetCompilerImpl& m_compiler;
 	volatile bool m_finished = false;
 };
@@ -456,11 +457,12 @@ struct AssetCompilerImpl : AssetCompiler
 		{
 			logInfo("Editor") << res.getPath() << " is not compiled, pushing to compile queue";
 			MT::SpinLock lock(m_to_compile_mutex);
-			MT::atomicIncrement(&m_task.m_to_compile_count);
 			const Path path(filepath);
 			auto iter = m_to_compile_subresources.find(path);
 			if (!iter.isValid()) {
 				m_to_compile.push(path);
+				++m_compile_batch_count;
+				++m_batch_remaining_count;
 				m_semaphore.signal();
 				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 				m_to_compile_subresources.insert(path, Array<Resource*>(allocator));
@@ -478,23 +480,40 @@ struct AssetCompilerImpl : AssetCompiler
 		if(m_compiled.empty()) return Path();
 		const Path p = m_compiled.back();
 		m_compiled.pop();
+		--m_batch_remaining_count;
+		if (m_batch_remaining_count == 0) m_compile_batch_count = 0;
 		return p;
 	}
 	
+	void onGUI() override {
+		if (m_batch_remaining_count == 0) return;
+		const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
+
+		ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f, 30));
+		ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
+		ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
+			| ImGuiWindowFlags_AlwaysAutoResize
+			| ImGuiWindowFlags_NoMove
+			| ImGuiWindowFlags_NoSavedSettings;
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
+		if (ImGui::Begin("Resource compilation", nullptr, flags)) {
+			ImGui::Text("%s", "Compiling resources...");
+			ImGui::ProgressBar(((float)m_compile_batch_count - m_batch_remaining_count) / m_compile_batch_count);
+			StaticString<MAX_PATH_LENGTH> path;
+			{
+				MT::SpinLock lock(m_to_compile_mutex);
+				path = m_res_in_progress;
+			}
+			ImGui::TextWrapped("%s", path.data);
+		}
+		ImGui::End();
+		ImGui::PopStyleVar();
+	}
+
 	void update() override
 	{
 		LogUI& log = m_app.getLogUI();
-		if (m_log_id == -1 && m_task.m_to_compile_count > 0) {
-			m_log_id = log.addNotification("Compiling resources...");
-		}
-		if(m_log_id != -1) {
-			log.setNotificationTime(m_log_id, 3.f);
-			if (m_task.m_to_compile_count == 0) m_log_id = -1;
-		}
-		if(m_task.m_to_compile_count == 0) {
-			m_log_id = -1;
-		}
-
 		for(;;) {
 			Path p = popCompiledResource();
 			if (!p.isValid()) break;
@@ -565,7 +584,10 @@ struct AssetCompilerImpl : AssetCompiler
 	MT::CriticalSection m_resources_mutex;
 	HashMap<u32, ResourceItem> m_resources;
 	HashMap<u32, ResourceType> m_registered_extensions;
-	int m_log_id = -1;
+
+	u32 m_compile_batch_count = 0;
+	u32 m_batch_remaining_count = 0;
+	StaticString<MAX_PATH_LENGTH> m_res_in_progress;
 };
 
 
@@ -576,6 +598,7 @@ int AssetCompilerTask::task()
 		const Path p = [&]{
 			MT::SpinLock lock(m_compiler.m_to_compile_mutex);
 			Path p = m_compiler.m_to_compile.back();
+			m_compiler.m_res_in_progress = p.c_str();
 			m_compiler.m_to_compile.pop();
 			return p;
 		}();
@@ -584,7 +607,6 @@ int AssetCompilerTask::task()
 			Profiler::pushString(p.c_str());
 			logInfo("Editor") << "Compiling " << p << "...";
 			const bool compiled = m_compiler.compile(p);
-			MT::atomicDecrement(&m_to_compile_count);
 			if (compiled) {
 				MT::CriticalSectionLock lock(m_compiler.m_compiled_mutex);
 				m_compiler.m_compiled.push(p);

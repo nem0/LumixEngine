@@ -701,6 +701,7 @@ public:
 			m_profiler_ui->onGUI();
 			m_asset_browser->onGUI();
 			m_log_ui->onGUI();
+			m_asset_compiler->onGUI();
 			m_property_grid->onGUI();
 			onEntityListGUI();
 			onEditCameraGUI();
