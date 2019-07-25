@@ -431,7 +431,7 @@ struct RendererImpl final : public Renderer
 	{
 		registerProperties(m_engine.getAllocator());
 		char cmd_line[4096];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		m_vsync = true;
 		while (cmd_line_parser.next())

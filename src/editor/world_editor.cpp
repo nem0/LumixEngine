@@ -2742,7 +2742,7 @@ public:
 		m_editor_icons = EditorIcons::create(*this);
 
 		char command_line[2048];
-		OS::getCommandLine(command_line, lengthOf(command_line));
+		OS::getCommandLine(Span(command_line));
 		CommandLineParser parser(command_line);
 		while (parser.next())
 		{

@@ -365,7 +365,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 	bool packData(const char* dest_dir) override
 	{
 		char exe_path[MAX_PATH_LENGTH];
-		OS::getExecutablePath(exe_path, lengthOf(exe_path));
+		OS::getExecutablePath(Span(exe_path));
 		char exe_dir[MAX_PATH_LENGTH];
 
 		const char* physx_dlls[] = {

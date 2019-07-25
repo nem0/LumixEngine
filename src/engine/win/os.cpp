@@ -184,10 +184,11 @@ OutputFile& OutputFile::operator <<(float value)
 }
 
 
-static void fromWChar(char* out, int size, const WCHAR* in)
+static void fromWChar(Span<char> out, const WCHAR* in)
 {
 	const WCHAR* c = in;
-	char* cout = out;
+	char* cout = out.begin;
+	const u32 size = out.length();
 	while (*c && c - in < size - 1)
 	{
 		*cout = (char)*c;
@@ -229,14 +230,14 @@ struct WCharStr
 };
 
 
-void getDropFile(const Event& event, int idx, char* out, int max_size)
+void getDropFile(const Event& event, int idx, Span<char> out)
 {
-	ASSERT(max_size > 0);
+	ASSERT(out.length() > 0);
 	HDROP drop = (HDROP)event.file_drop.handle;
 	WCHAR buffer[MAX_PATH];
 	if (DragQueryFile(drop, idx, buffer, MAX_PATH))
 	{
-		fromWChar(out, max_size, buffer);
+		fromWChar(out, buffer);
 	}
 	else
 	{
@@ -511,7 +512,7 @@ bool isKeyDown(Keycode keycode)
 }
 
 
-void getKeyName(Keycode keycode, char* out, int size)
+void getKeyName(Keycode keycode, Span<char> out)
 {
 	LONG scancode = MapVirtualKey((UINT)keycode, MAPVK_VK_TO_VSC);
 
@@ -533,15 +534,14 @@ void getKeyName(Keycode keycode, char* out, int size)
 	}
 
 	WCHAR tmp[256];
+	u32 size = out.length();
 	ASSERT(size <= 256 && size > 0);
 	int res = GetKeyNameText(scancode << 16, tmp, size);
-	if (res == 0)
-	{
-		*out = 0;
+	if (res == 0) {
+		out[0] = 0;
 	}
-	else
-	{
-		fromWChar(out, size, tmp);
+	else {
+		fromWChar(out, tmp);
 	}
 }
 
@@ -704,7 +704,7 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 	if (!iterator->is_valid) return false;
 
 	info->is_directory = (iterator->ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-	fromWChar(info->filename, lengthOf(info->filename), iterator->ffd.cFileName);
+	fromWChar(Span(info->filename), iterator->ffd.cFileName);
 
 	iterator->is_valid = FindNextFile(iterator->handle, &iterator->ffd) != FALSE;
 	return true;
@@ -718,11 +718,11 @@ void setCurrentDirectory(const char* path)
 }
 
 
-void getCurrentDirectory(char* buffer, int buffer_size)
+void getCurrentDirectory(Span<char> output)
 {
 	WCHAR tmp[MAX_PATH_LENGTH];
 	GetCurrentDirectory(lengthOf(tmp), tmp);
-	fromWChar(buffer, buffer_size, tmp);
+	fromWChar(output, tmp);
 }
 
 
@@ -761,7 +761,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 	bool res = GetSaveFileName(&ofn) != FALSE;
 
 	char tmp[MAX_PATH_LENGTH];
-	fromWChar(tmp, lengthOf(tmp), wtmp);
+	fromWChar(Span(tmp), wtmp);
 	if (res) PathUtils::normalize(tmp, out);
 	return res;
 }
@@ -813,7 +813,7 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 	const bool res = GetOpenFileName(&ofn) != FALSE;
 	if (res) {
 		char tmp[MAX_PATH_LENGTH];
-		fromWChar(tmp, lengthOf(tmp), wout);
+		fromWChar(Span(tmp), wout);
 		PathUtils::normalize(tmp, out);
 	}
 	else {
@@ -1049,11 +1049,11 @@ bool copyFile(const char* from, const char* to)
 }
 
 
-void getExecutablePath(char* buffer, int buffer_size)
+void getExecutablePath(Span<char> buffer)
 {
 	WCHAR tmp[MAX_PATH];
-	toWChar(tmp, buffer);
-	GetModuleFileName(NULL, tmp, buffer_size);
+	GetModuleFileName(NULL, tmp, sizeof(tmp));
+	fromWChar(buffer, tmp);
 }
 
 
@@ -1071,10 +1071,10 @@ void setCommandLine(int, char**)
 }
 	
 
-bool getCommandLine(char* output, int max_size)
+bool getCommandLine(Span<char> output)
 {
 	WCHAR* cl = GetCommandLine();
-	fromWChar(output, max_size, cl);
+	fromWChar(output, cl);
 	return true;
 }
 

@@ -735,12 +735,13 @@ namespace Lumix
 		}
 
 		
-		static void convertPropertyToLuaName(const char* src, char* out, int max_size)
+		static void convertPropertyToLuaName(const char* src, Span<char> out)
 		{
+			const u32 max_size = out.length();
 			ASSERT(max_size > 0);
 			bool to_upper = true;
-			char* dest = out;
-			while (*src && dest - out < max_size - 1)
+			char* dest = out.begin;
+			while (*src && dest - out.begin < max_size - 1)
 			{
 				if (isLetter(*src))
 				{
@@ -772,7 +773,7 @@ namespace Lumix
 				char tmp[50];
 				char setter[50];
 				char getter[50];
-				convertPropertyToLuaName(prop.name, tmp, lengthOf(tmp));
+				convertPropertyToLuaName(prop.name, Span(tmp));
 				copyString(setter, "set");
 				copyString(getter, "get");
 				catString(setter, tmp);
@@ -817,7 +818,7 @@ namespace Lumix
 				lua_newtable(L);
 				lua_pushvalue(L, -1);
 				char tmp[50];
-				convertPropertyToLuaName(cmp_name, tmp, lengthOf(tmp));
+				convertPropertyToLuaName(cmp_name, Span(tmp));
 				lua_setglobal(L, tmp);
 
 				ComponentType cmp_type = Reflection::getComponentType(cmp_name);

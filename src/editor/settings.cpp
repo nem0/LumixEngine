@@ -70,7 +70,7 @@ static void shortcutInput(OS::Keycode& shortcut)
 	popup_name << (i64)&shortcut;
 
 	char tmp[32];
-	OS::getKeyName(shortcut, tmp, sizeof(tmp));
+	OS::getKeyName(shortcut, Span(tmp));
 	StaticString<50> button_label(tmp[0] || shortcut == OS::Keycode::INVALID ? tmp : "Unknown");
 	button_label << "###" << (i64)&shortcut;
 
@@ -188,7 +188,7 @@ bool Settings::load()
 		return false;
 	}
 
-	StringView content((const char*)buf.begin(), buf.size());
+	Span<const char> content((const char*)buf.begin(), buf.size());
 	if (!LuaWrapper::execute(L, content, "settings", 0)) {
 		logError("Editor") << path << ": " << lua_tostring(L, -1);
 		lua_pop(L, 1);

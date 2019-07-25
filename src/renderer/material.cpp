@@ -801,7 +801,7 @@ bool Material::load(u64 size, const u8* mem)
 
 	m_custom_flags = 0;
 
-	const StringView content((const char*)mem, (int)size);
+	const Span<const char> content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
 		lua_close(L);
 		return false;
