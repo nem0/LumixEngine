@@ -170,8 +170,8 @@ public:
 	virtual void setFrontView() = 0;
 	virtual void setSideView() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
-	virtual void makeRelative(char* relative, int max_size, const char* absolute) const = 0;
-	virtual void makeAbsolute(char* absolute, int max_size, const char* relative) const = 0;
+	virtual void makeRelative(Span<char> relative, const char* absolute) const = 0;
+	virtual void makeAbsolute(Span<char> absolute, const char* relative) const = 0;
 
 	virtual bool isGameMode() const = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;

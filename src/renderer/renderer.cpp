@@ -454,9 +454,9 @@ struct RendererImpl final : public Renderer
 			renderer.m_transient_buffer = ffr::allocBufferHandle();
 			renderer.m_transient_buffer_offset = 0;
 			renderer.m_transient_buffer_frame_offset = 0;
-			const uint transient_flags = (uint)ffr::BufferFlags::PERSISTENT
-				| (uint)ffr::BufferFlags::MAP_WRITE
-				| (uint)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
+			const u32 transient_flags = (u32)ffr::BufferFlags::PERSISTENT
+				| (u32)ffr::BufferFlags::MAP_WRITE
+				| (u32)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
 			ffr::createBuffer(renderer.m_transient_buffer, transient_flags, 2 * TRANSIENT_BUFFER_SIZE, nullptr);
 			renderer.m_transient_buffer_ptr = (u8*)ffr::map(renderer.m_transient_buffer, 0, 2 * TRANSIENT_BUFFER_SIZE, transient_flags);
 			renderer.m_profiler.init();
@@ -479,7 +479,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	MemRef copy(const void* data, uint size) override
+	MemRef copy(const void* data, u32 size) override
 	{
 		MemRef mem = allocate(size);
 		copyMemory(mem.data, data, size);
@@ -500,7 +500,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	MemRef allocate(uint size) override
+	MemRef allocate(u32 size) override
 	{
 		MemRef ret;
 		ret.size = size;
@@ -540,7 +540,7 @@ struct RendererImpl final : public Renderer
 			}
 
 			ffr::TextureHandle handle;
-			uint size;
+			u32 size;
 			void* buf;
 		};
 
@@ -552,7 +552,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void updateTexture(ffr::TextureHandle handle, uint x, uint y, uint w, uint h, ffr::TextureFormat format, const MemRef& mem) override
+	void updateTexture(ffr::TextureHandle handle, u32 x, u32 y, u32 w, u32 h, ffr::TextureFormat format, const MemRef& mem) override
 	{
 		ASSERT(mem.size > 0);
 		ASSERT(handle.isValid());
@@ -568,7 +568,7 @@ struct RendererImpl final : public Renderer
 			}
 
 			ffr::TextureHandle handle;
-			uint x, y, w, h;
+			u32 x, y, w, h;
 			ffr::TextureFormat format;
 			MemRef mem;
 			RendererImpl* renderer;
@@ -629,7 +629,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	TransientSlice allocTransient(uint size) override
+	TransientSlice allocTransient(u32 size) override
 	{
 		// TODO grow if not enough space
 		TransientSlice slice;
@@ -649,12 +649,12 @@ struct RendererImpl final : public Renderer
 		return slice;
 	}
 	
-	ffr::VAOHandle createVAO(const ffr::VertexAttrib* attribs, uint attribs_count) override {
+	ffr::VAOHandle createVAO(const ffr::VertexAttrib* attribs, u32 attribs_count) override {
 		ASSERT(attribs_count <= 16);
 		
 		ffr::VAOHandle handle;
 		u32 hash = 0;
-		for(uint i = 0; i < attribs_count; ++i) {
+		for(u32 i = 0; i < attribs_count; ++i) {
 			const ffr::VertexAttrib& attr = attribs[i];
 			hash = continueCrc32(hash, &attr.as_int, sizeof(attr.as_int));
 			hash = continueCrc32(hash, &attr.idx, sizeof(attr.idx));
@@ -690,7 +690,7 @@ struct RendererImpl final : public Renderer
 			ffr::VAOHandle handle;
 			Renderer* renderer;
 			ffr::VertexAttrib attribs[16];
-			uint attribs_count;
+			u32 attribs_count;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
@@ -713,7 +713,7 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::createBuffer(handle, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, memory.size, memory.data);
+				ffr::createBuffer(handle, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, memory.size, memory.data);
 				if (memory.own) {
 					renderer->free(memory);
 				}
@@ -828,7 +828,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::TextureHandle createTexture(uint w, uint h, uint depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) override
+	ffr::TextureHandle createTexture(u32 w, u32 h, u32 depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) override
 	{
 		ffr::TextureHandle handle = ffr::allocTextureHandle();
 		if(!handle.isValid()) return handle;
@@ -845,9 +845,9 @@ struct RendererImpl final : public Renderer
 			StaticString<MAX_PATH_LENGTH> debug_name;
 			ffr::TextureHandle handle;
 			MemRef memory;
-			uint w;
-			uint h;
-			uint depth;
+			u32 w;
+			u32 h;
+			u32 depth;
 			ffr::TextureFormat format;
 			Renderer* renderer;
 			u32 flags;

@@ -372,7 +372,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		{
 			copyString(m_layers_names[i], "Layer");
 			char tmp[3];
-			toCString(i, tmp, lengthOf(tmp));
+			toCString(i, Span(tmp));
 			catString(m_layers_names[i], tmp);
 			m_collision_filter[i] = 0xffffFFFF;
 		}
@@ -3362,11 +3362,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void deserialize(IDeserializer& serializer) override
 	{
-		serializer.read(&m_layers_count);
+		serializer.read(Ref(m_layers_count));
 		for (int i = 0; i < m_layers_count; ++i)
 		{
 			serializer.read(m_layers_names[i], lengthOf(m_layers_names[i]));
-			serializer.read(&m_collision_filter[i]);
+			serializer.read(Ref(m_collision_filter[i]));
 		}
 	}
 
@@ -3387,9 +3387,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		terrain.m_entity = entity;
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, MAX_PATH_LENGTH);
-		serializer.read(&terrain.m_xz_scale);
-		serializer.read(&terrain.m_y_scale);
-		serializer.read(&terrain.m_layer);
+		serializer.read(Ref(terrain.m_xz_scale));
+		serializer.read(Ref(terrain.m_y_scale));
+		serializer.read(Ref(terrain.m_layer));
 
 		m_terrains.insert(terrain.m_entity, terrain);
 		if (terrain.m_heightmap == nullptr || !equalStrings(tmp, terrain.m_heightmap->getPath().c_str()))
@@ -3416,11 +3416,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		Controller& c = m_controllers.insert(entity);
 		c.m_frame_change.set(0, 0, 0);
 
-		serializer.read(&c.m_layer);
-		serializer.read(&c.m_radius);
-		serializer.read(&c.m_height);
-		serializer.read(&c.m_custom_gravity);
-		serializer.read(&c.m_custom_gravity_acceleration);
+		serializer.read(Ref(c.m_layer));
+		serializer.read(Ref(c.m_radius));
+		serializer.read(Ref(c.m_height));
+		serializer.read(Ref(c.m_custom_gravity));
+		serializer.read(Ref(c.m_custom_gravity_acceleration));
 
 		PxCapsuleControllerDesc cDesc;
 		initControllerDesc(cDesc);
@@ -3465,11 +3465,11 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		m_wheels.insert(entity, {});
 		Wheel& wheel = m_wheels[entity];
-		serializer.read(&wheel.mass);
-		serializer.read(&wheel.radius);
-		serializer.read(&wheel.width);
-		serializer.read(&wheel.moi);
-		serializer.read((u8*)&wheel.slot);
+		serializer.read(Ref(wheel.mass));
+		serializer.read(Ref(wheel.radius));
+		serializer.read(Ref(wheel.width));
+		serializer.read(Ref(wheel.moi));
+		serializer.read(Ref((u8&)wheel.slot));
 
 		m_universe.onComponentCreated(entity, WHEEL_TYPE, this);
 	}
@@ -3487,7 +3487,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		m_vehicles.insert(entity, {});
 		Vehicle& veh = m_vehicles[entity];
 		
-		serializer.read(&veh.chassis_mass);
+		serializer.read(Ref(veh.chassis_mass));
 
 		m_universe.onComponentCreated(entity, VEHICLE_TYPE, this);
 	}
@@ -3509,7 +3509,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		ragdoll.entity = entity;
 		ragdoll.root_transform.pos = DVec3(0, 0, 0);
 		ragdoll.root_transform.rot.set(0, 0, 0, 1);
-		serializer.read(&ragdoll.layer);
+		serializer.read(Ref(ragdoll.layer));
 
 		setRagdollRoot(ragdoll, deserializeRagdollBone(ragdoll, nullptr, serializer));
 		m_universe.onComponentCreated(ragdoll.entity, RAGDOLL_TYPE, this);
@@ -3544,16 +3544,16 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	static void deserializeJoint(IDeserializer& serializer, PxSphericalJoint* px_joint)
 	{
 		u32 flags;
-		serializer.read(&flags);
+		serializer.read(Ref(flags));
 		px_joint->setSphericalJointFlags(PxSphericalJointFlags(flags));
 		PxJointLimitCone limit(0, 0);
-		serializer.read(&limit.bounceThreshold);
-		serializer.read(&limit.contactDistance);
-		serializer.read(&limit.damping);
-		serializer.read(&limit.restitution);
-		serializer.read(&limit.stiffness);
-		serializer.read(&limit.yAngle);
-		serializer.read(&limit.zAngle);
+		serializer.read(Ref(limit.bounceThreshold));
+		serializer.read(Ref(limit.contactDistance));
+		serializer.read(Ref(limit.damping));
+		serializer.read(Ref(limit.restitution));
+		serializer.read(Ref(limit.stiffness));
+		serializer.read(Ref(limit.yAngle));
+		serializer.read(Ref(limit.zAngle));
 		px_joint->setLimitCone(limit);
 	}
 
@@ -3561,9 +3561,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void deserializeSphericalJoint(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
-		serializer.read(&joint.connected_body);
+		serializer.read(Ref(joint.connected_body));
 		RigidTransform tr;
-		serializer.read(&tr);
+		serializer.read(Ref(tr));
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxSphericalJointCreate(
 			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
@@ -3598,18 +3598,18 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	static void deserializeJoint(IDeserializer& serializer, PxDistanceJoint* px_joint)
 	{
 		u32 flags;
-		serializer.read(&flags);
+		serializer.read(Ref(flags));
 		px_joint->setDistanceJointFlags((PxDistanceJointFlags)flags);
 		PxReal value;
-		serializer.read(&value);
+		serializer.read(Ref(value));
 		px_joint->setDamping(value);
-		serializer.read(&value);
+		serializer.read(Ref(value));
 		px_joint->setStiffness(value);
-		serializer.read(&value);
+		serializer.read(Ref(value));
 		px_joint->setTolerance(value);
-		serializer.read(&value);
+		serializer.read(Ref(value));
 		px_joint->setMinDistance(value);
-		serializer.read(&value);
+		serializer.read(Ref(value));
 		px_joint->setMaxDistance(value);
 	}
 
@@ -3617,9 +3617,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void deserializeDistanceJoint(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
-		serializer.read(&joint.connected_body);
+		serializer.read(Ref(joint.connected_body));
 		RigidTransform tr;
-		serializer.read(&tr);
+		serializer.read(Ref(tr));
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxDistanceJointCreate(
 			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
@@ -3679,46 +3679,46 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	static void deserializeJoint(IDeserializer& serializer, PxD6Joint* px_joint)
 	{
 		int tmp;
-		serializer.read(&tmp);
+		serializer.read(Ref(tmp));
 		px_joint->setMotion(PxD6Axis::eX, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp);
+		serializer.read(Ref(tmp));
 		px_joint->setMotion(PxD6Axis::eY, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp);
+		serializer.read(Ref(tmp));
 		px_joint->setMotion(PxD6Axis::eZ, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp);
+		serializer.read(Ref(tmp));
 		px_joint->setMotion(PxD6Axis::eSWING1, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp);
+		serializer.read(Ref(tmp));
 		px_joint->setMotion(PxD6Axis::eSWING2, (PxD6Motion::Enum)tmp);
-		serializer.read(&tmp);
+		serializer.read(Ref(tmp));
 		px_joint->setMotion(PxD6Axis::eTWIST, (PxD6Motion::Enum)tmp);
 
 		PxJointLinearLimit linear(0, PxSpring(0, 0));
-		serializer.read(&linear.bounceThreshold);
-		serializer.read(&linear.contactDistance);
-		serializer.read(&linear.damping);
-		serializer.read(&linear.restitution);
-		serializer.read(&linear.stiffness);
-		serializer.read(&linear.value);
+		serializer.read(Ref(linear.bounceThreshold));
+		serializer.read(Ref(linear.contactDistance));
+		serializer.read(Ref(linear.damping));
+		serializer.read(Ref(linear.restitution));
+		serializer.read(Ref(linear.stiffness));
+		serializer.read(Ref(linear.value));
 		px_joint->setLinearLimit(linear);
 
 		PxJointLimitCone swing(0, 0);
-		serializer.read(&swing.bounceThreshold);
-		serializer.read(&swing.contactDistance);
-		serializer.read(&swing.damping);
-		serializer.read(&swing.restitution);
-		serializer.read(&swing.stiffness);
-		serializer.read(&swing.yAngle);
-		serializer.read(&swing.zAngle);
+		serializer.read(Ref(swing.bounceThreshold));
+		serializer.read(Ref(swing.contactDistance));
+		serializer.read(Ref(swing.damping));
+		serializer.read(Ref(swing.restitution));
+		serializer.read(Ref(swing.stiffness));
+		serializer.read(Ref(swing.yAngle));
+		serializer.read(Ref(swing.zAngle));
 		px_joint->setSwingLimit(swing);
 
 		PxJointAngularLimitPair twist(0, 0);
-		serializer.read(&twist.bounceThreshold);
-		serializer.read(&twist.contactDistance);
-		serializer.read(&twist.damping);
-		serializer.read(&twist.restitution);
-		serializer.read(&twist.stiffness);
-		serializer.read(&twist.lower);
-		serializer.read(&twist.upper);
+		serializer.read(Ref(twist.bounceThreshold));
+		serializer.read(Ref(twist.contactDistance));
+		serializer.read(Ref(twist.damping));
+		serializer.read(Ref(twist.restitution));
+		serializer.read(Ref(twist.stiffness));
+		serializer.read(Ref(twist.lower));
+		serializer.read(Ref(twist.upper));
 		px_joint->setTwistLimit(twist);
 	}
 
@@ -3726,9 +3726,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void deserializeD6Joint(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
-		serializer.read(&joint.connected_body);
+		serializer.read(Ref(joint.connected_body));
 		RigidTransform tr;
-		serializer.read(&tr);
+		serializer.read(Ref(tr));
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint =
 			PxD6JointCreate(m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
@@ -3768,16 +3768,16 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	static void deserializeJoint(IDeserializer& serializer, PxRevoluteJoint* px_joint)
 	{
 		u32 flags;
-		serializer.read(&flags);
+		serializer.read(Ref(flags));
 		px_joint->setRevoluteJointFlags(PxRevoluteJointFlags(flags));
 		PxJointAngularLimitPair limit(0, 0);
-		serializer.read(&limit.bounceThreshold);
-		serializer.read(&limit.contactDistance);
-		serializer.read(&limit.damping);
-		serializer.read(&limit.restitution);
-		serializer.read(&limit.stiffness);
-		serializer.read(&limit.lower);
-		serializer.read(&limit.upper);
+		serializer.read(Ref(limit.bounceThreshold));
+		serializer.read(Ref(limit.contactDistance));
+		serializer.read(Ref(limit.damping));
+		serializer.read(Ref(limit.restitution));
+		serializer.read(Ref(limit.stiffness));
+		serializer.read(Ref(limit.lower));
+		serializer.read(Ref(limit.upper));
 		px_joint->setLimit(limit);
 	}
 
@@ -3785,9 +3785,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void deserializeHingeJoint(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		Joint& joint = m_joints.insert(entity);
-		serializer.read(&joint.connected_body);
+		serializer.read(Ref(joint.connected_body));
 		RigidTransform tr;
-		serializer.read(&tr);
+		serializer.read(Ref(tr));
 		joint.local_frame0 = toPhysx(tr);
 		auto* px_joint = PxRevoluteJointCreate(
 			m_scene->getPhysics(), m_dummy_actor, joint.local_frame0, nullptr, PxTransform(PxIdentity));
@@ -3809,9 +3809,9 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	void deserializeCommonRigidActorProperties(IDeserializer& serializer, RigidActor* actor, int scene_version)
 	{
-		serializer.read((int*)&actor->dynamic_type);
+		serializer.read(Ref((int&)actor->dynamic_type));
 		if (actor->dynamic_type == DynamicType::DYNAMIC) m_dynamic_actors.push(actor);
-		serializer.read(&actor->is_trigger);
+		serializer.read(Ref(actor->is_trigger));
 	}
 
 
@@ -3861,7 +3861,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void deserializeRigidActor(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
-		serializer.read(&actor->layer);
+		serializer.read(Ref(actor->layer));
 		deserializeCommonRigidActorProperties(serializer, actor, scene_version);
 		m_actors.insert(actor->entity, actor);
 
@@ -3878,25 +3878,25 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 
 		int count;
-		serializer.read(&count);
+		serializer.read(Ref(count));
 		for (int i = 0; i < count; ++i)
 		{
 			int type;
-			serializer.read(&type);
+			serializer.read(Ref(type));
 			int index;
-			serializer.read(&index);
+			serializer.read(Ref(index));
 			PxShape* shape = nullptr;
 			RigidTransform tr;
-			serializer.read(&tr);
+			serializer.read(Ref(tr));
 			PxTransform local_pos = toPhysx(tr);
 			switch (type)
 			{
 				case PxGeometryType::eBOX:
 				{
 					PxBoxGeometry geom;
-					serializer.read(&geom.halfExtents.x);
-					serializer.read(&geom.halfExtents.y);
-					serializer.read(&geom.halfExtents.z);
+					serializer.read(Ref(geom.halfExtents.x));
+					serializer.read(Ref(geom.halfExtents.y));
+					serializer.read(Ref(geom.halfExtents.z));
 
 					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
 					shape->setLocalPose(local_pos);
@@ -3905,7 +3905,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				case PxGeometryType::eSPHERE:
 				{
 					PxSphereGeometry geom;
-					serializer.read(&geom.radius);
+					serializer.read(Ref(geom.radius));
 					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
 					shape->setLocalPose(local_pos);
 				}
@@ -4289,16 +4289,16 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void deserializeRagdollJoint(RagdollBone* bone, IDeserializer& serializer)
 	{
 		bool has_joint;
-		serializer.read(&has_joint);
+		serializer.read(Ref(has_joint));
 		if (!has_joint) return;
 
 		int type;
-		serializer.read(&type);
+		serializer.read(Ref(type));
 		changeRagdollBoneJoint(bone, type);
 
 		RigidTransform local_poses[2];
-		serializer.read(&local_poses[0]);
-		serializer.read(&local_poses[1]);
+		serializer.read(Ref(local_poses[0]));
+		serializer.read(Ref(local_poses[1]));
 		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR0, toPhysx(local_poses[0]));
 		bone->parent_joint->setLocalPose(PxJointActorIndex::eACTOR1, toPhysx(local_poses[1]));
 
@@ -4398,7 +4398,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	RagdollBone* deserializeRagdollBone(Ragdoll& ragdoll, RagdollBone* parent, IDeserializer& serializer)
 	{
 		int pose_bone_idx;
-		serializer.read(&pose_bone_idx);
+		serializer.read(Ref(pose_bone_idx));
 		if (pose_bone_idx < 0) return nullptr;
 		auto* bone = LUMIX_NEW(m_allocator, RagdollBone);
 		bone->pose_bone_idx = pose_bone_idx;
@@ -4406,22 +4406,22 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		bone->is_kinematic = false;
 		bone->prev = nullptr;
 		RigidTransform transform;
-		serializer.read(&transform);
-		serializer.read(&bone->bind_transform);
+		serializer.read(Ref(transform));
+		serializer.read(Ref(bone->bind_transform));
 		bone->inv_bind_transform = bone->bind_transform.inverted();
 
 		PxTransform px_transform = toPhysx(m_universe.getTransform(ragdoll.entity).getRigidPart()) * toPhysx(transform);
 
 		RagdollBone::Type type;
-		serializer.read((int*)&type);
+		serializer.read(Ref((int&)type));
 
 		switch (type)
 		{
 			case RagdollBone::CAPSULE:
 			{
 				PxCapsuleGeometry shape;
-				serializer.read(&shape.halfHeight);
-				serializer.read(&shape.radius);
+				serializer.read(Ref(shape.halfHeight));
+				serializer.read(Ref(shape.radius));
 				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
 				break;
 			}
@@ -4429,14 +4429,14 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			{
 				PxBoxGeometry shape;
 				Vec3 e;
-				serializer.read(&e);
+				serializer.read(Ref(e));
 				shape.halfExtents = toPhysx(e);
 				bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, shape, *m_default_material, 1.0f);
 				break;
 			}
 			default: ASSERT(false); break;
 		}
-		serializer.read(&bone->is_kinematic);
+		serializer.read(Ref(bone->is_kinematic));
 		bone->actor->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, bone->is_kinematic);
 		bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
 		bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);

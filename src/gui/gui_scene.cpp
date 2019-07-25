@@ -625,18 +625,18 @@ struct GUISceneImpl final : public GUIScene
 			m_rects.insert(entity, rect);
 		}
 		rect->entity = entity;
-		serializer.read(&rect->flags.base);
-		serializer.read(&rect->top.points);
-		serializer.read(&rect->top.relative);
+		serializer.read(Ref(rect->flags.base));
+		serializer.read(Ref(rect->top.points));
+		serializer.read(Ref(rect->top.relative));
 
-		serializer.read(&rect->right.points);
-		serializer.read(&rect->right.relative);
+		serializer.read(Ref(rect->right.points));
+		serializer.read(Ref(rect->right.relative));
 
-		serializer.read(&rect->bottom.points);
-		serializer.read(&rect->bottom.relative);
+		serializer.read(Ref(rect->bottom.points));
+		serializer.read(Ref(rect->bottom.relative));
 
-		serializer.read(&rect->left.points);
-		serializer.read(&rect->left.relative);
+		serializer.read(Ref(rect->left.points));
+		serializer.read(Ref(rect->left.relative));
 		
 		m_root = findRoot();
 		
@@ -675,8 +675,8 @@ struct GUISceneImpl final : public GUIScene
 	void deserializeButton(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		GUIButton& button = m_buttons.emplace(entity);
-		serializer.read(&button.normal_color);
-		serializer.read(&button.hovered_color);
+		serializer.read(Ref(button.normal_color));
+		serializer.read(Ref(button.hovered_color));
 		m_universe.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
 	}
 
@@ -735,8 +735,8 @@ struct GUISceneImpl final : public GUIScene
 			rect.image->sprite = manager.load<Sprite>(Path(tmp));
 		}
 
-		serializer.read(&rect.image->color);
-		serializer.read(&rect.image->flags.base);
+		serializer.read(Ref(rect.image->color));
+		serializer.read(Ref(rect.image->flags.base));
 		
 		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
 	}
@@ -767,12 +767,12 @@ struct GUISceneImpl final : public GUIScene
 
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		serializer.read((int*)&rect.text->horizontal_align);
-		serializer.read(&rect.text->color);
+		serializer.read(Ref((int&)rect.text->horizontal_align));
+		serializer.read(Ref(rect.text->color));
 		int font_size;
-		serializer.read(&font_size);
+		serializer.read(Ref(font_size));
 		rect.text->setFontSize(font_size);
-		serializer.read(&rect.text->text);
+		serializer.read(Ref(rect.text->text));
 		FontResource* res = tmp[0] ? m_font_manager->getOwner().load<FontResource>(Path(tmp)) : nullptr;
 		rect.text->setFontResource(res);
 

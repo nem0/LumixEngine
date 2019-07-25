@@ -58,7 +58,7 @@ Mesh::Mesh(Material* mat,
 		attr = AttributeSemantic::NONE;
 	}
 	if(semantics) {
-		for(uint i = 0; i < vertex_decl.attributes_count; ++i) {
+		for(u32 i = 0; i < vertex_decl.attributes_count; ++i) {
 			render_data->attributes_semantic[i] = semantics[i];
 		}
 	}
@@ -453,7 +453,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	if (object_count <= 0) return false;
 
 	char model_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(model_dir, MAX_PATH_LENGTH, getPath().c_str());
+	PathUtils::getDir(Span(model_dir), getPath().c_str());
 
 	m_meshes.reserve(object_count);
 	for (int i = 0; i < object_count; ++i)

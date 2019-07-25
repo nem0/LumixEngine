@@ -174,7 +174,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 			else {
 				char tmp[1024];
 				tmp[0] = '\0';
-				scene->getPropertyValue(entity, scr_index, property_name, tmp, lengthOf(tmp));
+				scene->getPropertyValue(entity, scr_index, property_name, Span(tmp));
 				old_value = tmp;
 				return;
 			}
@@ -289,7 +289,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 			char buf[MAX_PATH_LENGTH];
 			copyString(buf, scene->getScriptPath(entity, j).c_str());
 			StaticString<MAX_PATH_LENGTH + 20> header;
-			PathUtils::getBasename(header.data, lengthOf(header.data), buf);
+			PathUtils::getBasename(Span(header.data), buf);
 			if (header.empty()) header << j;
 			ImGui::Unindent();
 			bool open = ImGui::TreeNodeEx(StaticString<32>("###", j), ImGuiTreeNodeFlags_AllowItemOverlap);
@@ -329,8 +329,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 					break;
 				}
 
-				if (m_app.getAssetBrowser().resourceInput(
-						"Source", "src", buf, lengthOf(buf), LuaScript::TYPE))
+				if (m_app.getAssetBrowser().resourceInput("Source", "src", Span(buf), LuaScript::TYPE))
 				{
 					auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(editor, entity, j, "-source", buf, allocator);
 					editor.executeCommand(cmd);
@@ -345,7 +344,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 					char buf[256];
 					const char* property_name = scene->getPropertyName(entity, j, k);
 					if (!property_name) continue;
-					scene->getPropertyValue(entity, j, property_name, buf, lengthOf(buf));
+					scene->getPropertyValue(entity, j, property_name, Span(buf));
 					switch (scene->getPropertyType(entity, j, k))
 					{
 						case LuaScriptScene::Property::BOOLEAN:
@@ -364,7 +363,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 							float f = (float)atof(buf);
 							if (ImGui::DragFloat(property_name, &f))
 							{
-								toCString(f, buf, sizeof(buf), 5);
+								toCString(f, Span(buf), 5);
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									editor, entity, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
@@ -376,7 +375,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 							int f = atoi(buf);
 							if (ImGui::DragInt(property_name, &f))
 							{
-								toCString(f, buf, sizeof(buf));
+								toCString(f, Span(buf));
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									editor, entity, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
@@ -386,10 +385,10 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 						case LuaScriptScene::Property::ENTITY:
 						{
 							EntityPtr e;
-							fromCString(buf, sizeof(buf), &e.index);
+							fromCString(Span(buf), Ref(e.index));
 							if (grid.entityInput(property_name, StaticString<50>(property_name, entity.index), e))
 							{
-								toCString(e.index, buf, sizeof(buf));
+								toCString(e.index, Span(buf));
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									editor, entity, j, property_name, buf, allocator);
 								editor.executeCommand(cmd);
@@ -409,7 +408,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 						{
 							ResourceType res_type = scene->getPropertyResourceType(entity, j, k);
 							if (m_app.getAssetBrowser().resourceInput(
-									property_name, property_name, buf, lengthOf(buf), res_type))
+									property_name, property_name, Span(buf), res_type))
 							{
 								auto* cmd = LUMIX_NEW(allocator, SetPropertyCommand)(
 									editor, entity, j, property_name, buf, allocator);
@@ -620,7 +619,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 				c = data->Buf[start_word - 1];
 			}
 			char tmp[128];
-			copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
+			copyNString(Span(tmp), data->Buf + start_word, data->CursorPos - start_word);
 
 			that->autocomplete.clear();
 			lua_pushvalue(L, LUA_GLOBALSINDEX);
@@ -677,7 +676,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 			if (ImGui::Button("Execute file"))
 			{
 				char tmp[MAX_PATH_LENGTH] = {};
-				if (OS::getOpenFilename(tmp, MAX_PATH_LENGTH, "Scripts\0*.lua\0", nullptr))
+				if (OS::getOpenFilename(Span(tmp), "Scripts\0*.lua\0", nullptr))
 				{
 					OS::InputFile file;
 					IAllocator& allocator = app.getWorldEditor().getAllocator();
@@ -774,14 +773,14 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 		if (ImGui::Selectable("New"))
 		{
 			char full_path[MAX_PATH_LENGTH];
-			if (OS::getSaveFilename(full_path, lengthOf(full_path), "Lua script\0*.lua\0", "lua"))
+			if (OS::getSaveFilename(Span(full_path), "Lua script\0*.lua\0", "lua"))
 			{
 				OS::OutputFile file;
 				WorldEditor& editor = app.getWorldEditor();
 				if (file.open(full_path))
 				{
 					new_created = true;
-					editor.makeRelative(buf, lengthOf(buf), full_path);
+					editor.makeRelative(Span(buf), full_path);
 					file.close();
 				}
 				else
@@ -792,7 +791,8 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 
-		if (asset_browser.resourceList(buf, lengthOf(buf), nullptr, LuaScript::TYPE, 0, false) || create_empty || new_created)
+		static u32 selected_res_hash = 0;
+		if (asset_browser.resourceList(Span(buf), Ref(selected_res_hash), LuaScript::TYPE, 0, false) || create_empty || new_created)
 		{
 			WorldEditor& editor = app.getWorldEditor();
 			if (create_entity)

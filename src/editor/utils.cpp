@@ -102,9 +102,9 @@ bool Action::toolbarButton()
 }
 
 
-void Action::getIconPath(char* path, int max_size)
+void Action::getIconPath(Span<char> path)
 {
-	copyString(path, max_size, "editor/icons/icon_"); 
+	copyString(path, "editor/icons/icon_"); 
 		
 	char tmp[1024];
 	const char* c = name;
@@ -119,8 +119,8 @@ void Action::getIconPath(char* path, int max_size)
 	}
 	*out = 0;
 
-	catString(path, max_size, tmp);
-	catString(path, max_size, ".dds");
+	catString(path, tmp);
+	catString(path, ".dds");
 }
 
 
@@ -161,11 +161,11 @@ bool Action::isActive()
 }
 
 
-void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, EntityPtr entity)
+void getEntityListDisplayName(WorldEditor& editor, Span<char> buf, EntityPtr entity)
 {
 	if (!entity.isValid())
 	{
-		*buf = '\0';
+		buf[0] = '\0';
 		return;
 	}
 
@@ -181,31 +181,31 @@ void getEntityListDisplayName(WorldEditor& editor, char* buf, int max_size, Enti
 			const char* c = path.c_str();
 			while (*c && *c != ':') ++c;
 			if (*c == ':') {
-				copyString(buf, minimum(max_size, int(c - path.c_str() + 1)), path.c_str());
+				copyNString(buf, path.c_str(), int(c - path.c_str() + 1));
 				return;
 			}
 
 			char basename[MAX_PATH_LENGTH];
-			copyString(buf, max_size, path.c_str());
-			PathUtils::getBasename(basename, MAX_PATH_LENGTH, path.c_str());
+			copyString(buf, path.c_str());
+			PathUtils::getBasename(Span(basename), path.c_str());
 			if (name && name[0] != '\0')
-				copyString(buf, max_size, name);
+				copyString(buf, name);
 			else
-				toCString(entity.index, buf, max_size);
+				toCString(entity.index, buf);
 
-			catString(buf, max_size, " - ");
-			catString(buf, max_size, basename);
+			catString(buf, " - ");
+			catString(buf, basename);
 			return;
 		}
 	}
 
 	if (name && name[0] != '\0')
 	{
-		copyString(buf, max_size, name);
+		copyString(buf, name);
 	}
 	else
 	{
-		toCString(entity.index, buf, max_size);
+		toCString(entity.index, buf);
 	}
 }
 

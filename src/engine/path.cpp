@@ -156,7 +156,7 @@ Path::Path(const char* path)
 	char tmp[MAX_PATH_LENGTH];
 	size_t len = stringLength(path);
 	ASSERT(len < MAX_PATH_LENGTH);
-	PathUtils::normalize(path, tmp, (u32)len + 1);
+	PathUtils::normalize(path, Span(tmp, (u32)len + 1));
 	u32 hash = crc32(tmp);
 	m_data = g_path_manager->getPath(hash, tmp);
 }
@@ -188,7 +188,7 @@ void Path::operator =(const char* rhs)
 	char tmp[MAX_PATH_LENGTH];
 	size_t len = stringLength(rhs);
 	ASSERT(len < MAX_PATH_LENGTH);
-	PathUtils::normalize(rhs, tmp, (u32)len + 1);
+	PathUtils::normalize(rhs, Span(tmp, (u32)len + 1));
 	u32 hash = crc32(tmp);
 	m_data = g_path_manager->getPath(hash, tmp);
 }

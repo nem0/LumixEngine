@@ -62,7 +62,7 @@ static int autocompleteCallback(ImGuiTextEditCallbackData *data)
 	char tmp[128];
 	int start_word = data->CursorPos;
 	while (start_word > 0 && data->Buf[start_word - 1] != ' ') --start_word;
-	copyNString(tmp, lengthOf(tmp), data->Buf + start_word, data->CursorPos - start_word);
+	copyNString(Span(tmp), data->Buf + start_word, data->CursorPos - start_word);
 
 	const auto& input_decl = controller->getEngineResource()->m_input_decl;
 	for (const auto& input : input_decl.inputs)

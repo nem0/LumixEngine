@@ -44,7 +44,7 @@ struct Uniform
 	enum { MAX_COUNT = 512 };
 
 	UniformType type;
-	uint count;
+	u32 count;
 	void* data; 
 	#ifdef LUMIX_DEBUG
 		StaticString<32> debug_name;
@@ -102,7 +102,7 @@ struct Pool
 		return id;
 	}
 
-	void dealloc(uint idx)
+	void dealloc(u32 idx)
 	{
 		*((int*)&values[idx]) = first_free;
 		first_free = idx;
@@ -125,7 +125,7 @@ static struct {
 	Pool<Program, Program::MAX_COUNT> programs;
 	Pool<VertexArrayObject, VertexArrayObject::MAX_COUNT> vaos;
 	VAOHandle current_vao = INVALID_VAO;
-	HashMap<u32, uint>* uniforms_hash_map;
+	HashMap<u32, u32>* uniforms_hash_map;
 	MT::SpinMutex handle_mutex;
 	DWORD thread;
 	int instance_attributes = 0;
@@ -138,40 +138,40 @@ static struct {
 namespace DDS
 {
 
-static const uint DDS_MAGIC = 0x20534444; //  little-endian
-static const uint DDSD_CAPS = 0x00000001;
-static const uint DDSD_HEIGHT = 0x00000002;
-static const uint DDSD_WIDTH = 0x00000004;
-static const uint DDSD_PITCH = 0x00000008;
-static const uint DDSD_PIXELFORMAT = 0x00001000;
-static const uint DDSD_MIPMAPCOUNT = 0x00020000;
-static const uint DDSD_LINEARSIZE = 0x00080000;
-static const uint DDSD_DEPTH = 0x00800000;
-static const uint DDPF_ALPHAPIXELS = 0x00000001;
-static const uint DDPF_FOURCC = 0x00000004;
-static const uint DDPF_INDEXED = 0x00000020;
-static const uint DDPF_RGB = 0x00000040;
-static const uint DDSCAPS_COMPLEX = 0x00000008;
-static const uint DDSCAPS_TEXTURE = 0x00001000;
-static const uint DDSCAPS_MIPMAP = 0x00400000;
-static const uint DDSCAPS2_CUBEMAP = 0x00000200;
-static const uint DDSCAPS2_CUBEMAP_POSITIVEX = 0x00000400;
-static const uint DDSCAPS2_CUBEMAP_NEGATIVEX = 0x00000800;
-static const uint DDSCAPS2_CUBEMAP_POSITIVEY = 0x00001000;
-static const uint DDSCAPS2_CUBEMAP_NEGATIVEY = 0x00002000;
-static const uint DDSCAPS2_CUBEMAP_POSITIVEZ = 0x00004000;
-static const uint DDSCAPS2_CUBEMAP_NEGATIVEZ = 0x00008000;
-static const uint DDSCAPS2_VOLUME = 0x00200000;
-static const uint D3DFMT_ATI1 = '1ITA';
-static const uint D3DFMT_ATI2 = '2ITA';
-static const uint D3DFMT_DXT1 = '1TXD';
-static const uint D3DFMT_DXT2 = '2TXD';
-static const uint D3DFMT_DXT3 = '3TXD';
-static const uint D3DFMT_DXT4 = '4TXD';
-static const uint D3DFMT_DXT5 = '5TXD';
-static const uint D3DFMT_DX10 = '01XD';
+static const u32 DDS_MAGIC = 0x20534444; //  little-endian
+static const u32 DDSD_CAPS = 0x00000001;
+static const u32 DDSD_HEIGHT = 0x00000002;
+static const u32 DDSD_WIDTH = 0x00000004;
+static const u32 DDSD_PITCH = 0x00000008;
+static const u32 DDSD_PIXELFORMAT = 0x00001000;
+static const u32 DDSD_MIPMAPCOUNT = 0x00020000;
+static const u32 DDSD_LINEARSIZE = 0x00080000;
+static const u32 DDSD_DEPTH = 0x00800000;
+static const u32 DDPF_ALPHAPIXELS = 0x00000001;
+static const u32 DDPF_FOURCC = 0x00000004;
+static const u32 DDPF_INDEXED = 0x00000020;
+static const u32 DDPF_RGB = 0x00000040;
+static const u32 DDSCAPS_COMPLEX = 0x00000008;
+static const u32 DDSCAPS_TEXTURE = 0x00001000;
+static const u32 DDSCAPS_MIPMAP = 0x00400000;
+static const u32 DDSCAPS2_CUBEMAP = 0x00000200;
+static const u32 DDSCAPS2_CUBEMAP_POSITIVEX = 0x00000400;
+static const u32 DDSCAPS2_CUBEMAP_NEGATIVEX = 0x00000800;
+static const u32 DDSCAPS2_CUBEMAP_POSITIVEY = 0x00001000;
+static const u32 DDSCAPS2_CUBEMAP_NEGATIVEY = 0x00002000;
+static const u32 DDSCAPS2_CUBEMAP_POSITIVEZ = 0x00004000;
+static const u32 DDSCAPS2_CUBEMAP_NEGATIVEZ = 0x00008000;
+static const u32 DDSCAPS2_VOLUME = 0x00200000;
+static const u32 D3DFMT_ATI1 = '1ITA';
+static const u32 D3DFMT_ATI2 = '2ITA';
+static const u32 D3DFMT_DXT1 = '1TXD';
+static const u32 D3DFMT_DXT2 = '2TXD';
+static const u32 D3DFMT_DXT3 = '3TXD';
+static const u32 D3DFMT_DXT4 = '4TXD';
+static const u32 D3DFMT_DXT5 = '5TXD';
+static const u32 D3DFMT_DX10 = '01XD';
 
-enum class DxgiFormat : uint {
+enum class DxgiFormat : u32 {
   UNKNOWN                     ,
   R32G32B32A32_TYPELESS       ,
   R32G32B32A32_FLOAT          ,
@@ -295,61 +295,61 @@ enum class DxgiFormat : uint {
 } ;
 
 struct PixelFormat {
-	uint dwSize;
-	uint dwFlags;
-	uint dwFourCC;
-	uint dwRGBBitCount;
-	uint dwRBitMask;
-	uint dwGBitMask;
-	uint dwBBitMask;
-	uint dwAlphaBitMask;
+	u32 dwSize;
+	u32 dwFlags;
+	u32 dwFourCC;
+	u32 dwRGBBitCount;
+	u32 dwRBitMask;
+	u32 dwGBitMask;
+	u32 dwBBitMask;
+	u32 dwAlphaBitMask;
 };
 
 struct Caps2 {
-	uint dwCaps1;
-	uint dwCaps2;
-	uint dwDDSX;
-	uint dwReserved;
+	u32 dwCaps1;
+	u32 dwCaps2;
+	u32 dwDDSX;
+	u32 dwReserved;
 };
 
 struct Header {
-	uint dwMagic;
-	uint dwSize;
-	uint dwFlags;
-	uint dwHeight;
-	uint dwWidth;
-	uint dwPitchOrLinearSize;
-	uint dwDepth;
-	uint dwMipMapCount;
-	uint dwReserved1[11];
+	u32 dwMagic;
+	u32 dwSize;
+	u32 dwFlags;
+	u32 dwHeight;
+	u32 dwWidth;
+	u32 dwPitchOrLinearSize;
+	u32 dwDepth;
+	u32 dwMipMapCount;
+	u32 dwReserved1[11];
 
 	PixelFormat pixelFormat;
 	Caps2 caps2;
 
-	uint dwReserved2;
+	u32 dwReserved2;
 };
 
 struct DXT10Header
 {
 	DxgiFormat dxgi_format;
-	uint resource_dimension;
-	uint misc_flag;
-	uint array_size;
-	uint misc_flags2;
+	u32 resource_dimension;
+	u32 misc_flag;
+	u32 array_size;
+	u32 misc_flags2;
 };
 
 struct LoadInfo {
 	bool compressed;
 	bool swap;
 	bool palette;
-	uint blockBytes;
+	u32 blockBytes;
 	GLenum internalFormat;
 	GLenum internalSRGBFormat;
 	GLenum externalFormat;
 	GLenum type;
 };
 
-static uint sizeDXTC(uint w, uint h, GLuint format) {
+static u32 sizeDXTC(u32 w, u32 h, GLuint format) {
     const bool is_dxt1 = format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT || format == GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT;
 	const bool is_ati = format == GL_COMPRESSED_RED_RGTC1;
 	return ((w + 3) / 4) * ((h + 3) / 4) * (is_dxt1 || is_ati ? 8 : 16);
@@ -568,8 +568,8 @@ static void flipDXT5Alpha(DXT5AlphaBlock *block)
 {
 	u8 tmp_bits[4][4];
 
-	const uint mask = 0x00000007;
-	uint bits = 0;
+	const u32 mask = 0x00000007;
+	u32 bits = 0;
 	memcpy(&bits, &block->row[0], sizeof(u8) * 3);
 
 	tmp_bits[0][0] = (u8)(bits & mask);
@@ -607,7 +607,7 @@ static void flipDXT5Alpha(DXT5AlphaBlock *block)
 	bits >>= 3;
 	tmp_bits[3][3] = (u8)(bits & mask);
 
-	uint *out_bits = (uint*)&block->row[0];
+	u32 *out_bits = (u32*)&block->row[0];
 
 	*out_bits = *out_bits | (tmp_bits[3][0] << 0);
 	*out_bits = *out_bits | (tmp_bits[3][1] << 3);
@@ -619,7 +619,7 @@ static void flipDXT5Alpha(DXT5AlphaBlock *block)
 	*out_bits = *out_bits | (tmp_bits[2][2] << 18);
 	*out_bits = *out_bits | (tmp_bits[2][3] << 21);
 
-	out_bits = (uint*)&block->row[3];
+	out_bits = (u32*)&block->row[3];
 
 	*out_bits &= 0xff000000;
 
@@ -847,14 +847,14 @@ void VertexDecl::addAttribute(u8 components_num, AttributeType type, bool normal
 }
 
 
-void viewport(uint x,uint y,uint w,uint h)
+void viewport(u32 x,u32 y,u32 w,u32 h)
 {
 	checkThread();
 	glViewport(x, y, w, h);
 }
 
 
-void scissor(uint x,uint y,uint w,uint h)
+void scissor(u32 x,u32 y,u32 w,u32 h)
 {
 	checkThread();
 	glScissor(x, y, w, h);
@@ -878,7 +878,7 @@ void applyUniformMatrix4f(int location, const float* value)
 	glUniformMatrix4fv(location, 1, false, value);
 }
 
-void applyUniformMatrix4fv(int location, uint count, const float* value)
+void applyUniformMatrix4fv(int location, u32 count, const float* value)
 {
 	glUniformMatrix4fv(location, count, false, value);
 }
@@ -982,7 +982,7 @@ void bindTextures(const TextureHandle* handles, int offset, int count)
 }
 
 
-void bindVertexBuffer(uint binding_idx, BufferHandle buffer, uint buffer_offset, uint stride_offset) {
+void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset) {
 	checkThread();
 	const GLuint gl_handle = g_ffr.buffers[buffer.value].handle;
 	CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
@@ -1113,7 +1113,7 @@ void bindIndexBuffer(BufferHandle handle)
 }
 
 
-void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataType type)
+void drawElements(u32 offset, u32 count, PrimitiveType primitive_type, DataType type)
 {
 	checkThread();
 	
@@ -1137,17 +1137,17 @@ void drawElements(uint offset, uint count, PrimitiveType primitive_type, DataTyp
 	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)(offset * ts)));
 }
 
-void drawTrianglesInstanced(uint indices_count, uint instances_count, DataType index_type)
+void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType index_type)
 {
 	checkThread();
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 	if (instances_count * indices_count > 4096) {
 		struct {
-			uint  indices_count;
-			uint  instances_count;
-			uint  indices_offset;
-			uint  base_vertex;
-			uint  base_instance;
+			u32  indices_count;
+			u32  instances_count;
+			u32  indices_offset;
+			u32  base_vertex;
+			u32  base_instance;
 		} mdi;
 		mdi.indices_count = indices_count;
 		mdi.instances_count = instances_count;
@@ -1164,7 +1164,7 @@ void drawTrianglesInstanced(uint indices_count, uint instances_count, DataType i
 }
 
 
-void drawTriangles(uint indices_count, DataType index_type)
+void drawTriangles(u32 indices_count, DataType index_type)
 {
 	checkThread();
 
@@ -1173,13 +1173,13 @@ void drawTriangles(uint indices_count, DataType index_type)
 }
 
 
-void drawTriangleStripArraysInstanced(uint offset, uint indices_count, uint instances_count)
+void drawTriangleStripArraysInstanced(u32 offset, u32 indices_count, u32 instances_count)
 {
 	glDrawArraysInstanced(GL_TRIANGLE_STRIP, offset, indices_count, instances_count);
 }
 
 
-void drawArrays(uint offset, uint count, PrimitiveType type)
+void drawArrays(u32 offset, u32 count, PrimitiveType type)
 {
 	checkThread();
 	
@@ -1196,7 +1196,7 @@ void drawArrays(uint offset, uint count, PrimitiveType type)
 }
 
 
-void uniformBlockBinding(ProgramHandle program, const char* block_name, uint binding)
+void uniformBlockBinding(ProgramHandle program, const char* block_name, u32 binding)
 {
 	checkThread();
 	const GLuint handle = g_ffr.programs.values[program.value].handle;
@@ -1205,7 +1205,7 @@ void uniformBlockBinding(ProgramHandle program, const char* block_name, uint bin
 }
 
 
-void bindUniformBuffer(uint index, BufferHandle buffer, size_t offset, size_t size)
+void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size)
 {
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
@@ -1221,16 +1221,16 @@ void flushBuffer(BufferHandle buffer, size_t offset, size_t len)
 }
 
 
-void* map(BufferHandle buffer, size_t offset, size_t size, uint flags)
+void* map(BufferHandle buffer, size_t offset, size_t size, u32 flags)
 {
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
 	GLbitfield gl_flags = 0;
-	if (flags & (uint)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
-	if (flags & (uint)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
-	if (flags & (uint)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
-	if (flags & (uint)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
-	if (flags & (uint)BufferFlags::MAP_FLUSH_EXPLICIT) gl_flags |= GL_MAP_FLUSH_EXPLICIT_BIT;
+	if (flags & (u32)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
+	if (flags & (u32)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
+	if (flags & (u32)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
+	if (flags & (u32)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
+	if (flags & (u32)BufferFlags::MAP_FLUSH_EXPLICIT) gl_flags |= GL_MAP_FLUSH_EXPLICIT_BIT;
 	return glMapNamedBufferRange(buf, offset, size, gl_flags);
 }
 
@@ -1274,12 +1274,12 @@ void swapBuffers()
 	SwapBuffers(hdc);
 }
 
-void createVAO(VAOHandle handle, const VertexAttrib* attribs, uint count) {
+void createVAO(VAOHandle handle, const VertexAttrib* attribs, u32 count) {
 	checkThread();
 	CHECK_GL(glGenVertexArrays(1, &g_ffr.vaos[handle.value].handle));
 
 	CHECK_GL(glBindVertexArray(g_ffr.vaos[handle.value].handle));
-	for (uint i = 0; i < count; ++i) {
+	for (u32 i = 0; i < count; ++i) {
 		const VertexAttrib& attr = attribs[i];
 		GLenum gl_attr_type;
 		switch (attr.type) {
@@ -1303,18 +1303,18 @@ void createVAO(VAOHandle handle, const VertexAttrib* attribs, uint count) {
 	CHECK_GL(glBindVertexArray(0));
 }
 
-void createBuffer(BufferHandle buffer, uint flags, size_t size, const void* data)
+void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 {
 	checkThread();
 	GLuint buf;
 	CHECK_GL(glCreateBuffers(1, &buf));
 	
 	GLbitfield gl_flags = 0;
-	if (flags & (uint)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
-	if (flags & (uint)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
-	if (flags & (uint)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
-	if (flags & (uint)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
-	if (flags & (uint)BufferFlags::DYNAMIC_STORAGE) gl_flags |= GL_DYNAMIC_STORAGE_BIT;
+	if (flags & (u32)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
+	if (flags & (u32)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
+	if (flags & (u32)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
+	if (flags & (u32)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
+	if (flags & (u32)BufferFlags::DYNAMIC_STORAGE) gl_flags |= GL_DYNAMIC_STORAGE_BIT;
 	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
 
 	g_ffr.buffers[buffer.value].handle = buf;
@@ -1379,7 +1379,7 @@ TextureInfo getTextureInfo(const void* data)
 }
 
 
-void update(TextureHandle texture, uint level, uint x, uint y, uint w, uint h, TextureFormat format, void* buf)
+void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf)
 {
 	checkThread();
 	Texture& t = g_ffr.textures[texture.value];
@@ -1395,7 +1395,7 @@ void update(TextureHandle texture, uint level, uint x, uint y, uint w, uint h, T
 }
 
 
-bool loadTexture(TextureHandle handle, const void* input, int input_size, uint flags, const char* debug_name)
+bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 flags, const char* debug_name)
 {
 	ASSERT(debug_name && debug_name[0]);
 	checkThread();
@@ -1460,7 +1460,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	const GLenum texture_target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
 	const GLenum internal_format = is_srgb ? li->internalSRGBFormat : li->internalFormat;
-	const uint mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
+	const u32 mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
 
 	GLuint texture;
 	CHECK_GL(glCreateTextures(texture_target, 1, &texture));
@@ -1480,18 +1480,18 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 	for (int layer = 0; layer < layers; ++layer) {
 		for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
 			const GLenum tex_img_target =  is_cubemap ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + side : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
-			uint width = hdr.dwWidth;
-			uint height = hdr.dwHeight;
+			u32 width = hdr.dwWidth;
+			u32 height = hdr.dwHeight;
 
 			if (li->compressed) {
-				uint size = DDS::sizeDXTC(width, height, internal_format);
+				u32 size = DDS::sizeDXTC(width, height, internal_format);
 				if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0) {
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
 				Array<u8> data(*g_ffr.allocator);
 				data.resize(size);
-				for (uint mip = 0; mip < mipMapCount; ++mip) {
+				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					blob.read(&data[0], size);
 					//DDS::flipCompressedTexture(width, height, internal_format, &data[0]);
 					if(layers > 1) {
@@ -1516,20 +1516,20 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
-				uint size = hdr.dwPitchOrLinearSize * height;
+				u32 size = hdr.dwPitchOrLinearSize * height;
 				if (size != width * height * li->blockBytes) {
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
 				Array<u8> data(*g_ffr.allocator);
 				data.resize(size);
-				uint palette[256];
-				Array<uint> unpacked(*g_ffr.allocator);
+				u32 palette[256];
+				Array<u32> unpacked(*g_ffr.allocator);
 				unpacked.resize(size);
 				blob.read(palette, 4 * 256);
-				for (uint mip = 0; mip < mipMapCount; ++mip) {
+				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					blob.read(&data[0], size);
-					for (uint zz = 0; zz < size; ++zz) {
+					for (u32 zz = 0; zz < size; ++zz) {
 						unpacked[zz] = palette[data[zz]];
 					}
 					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
@@ -1548,10 +1548,10 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, uint f
 				if (li->swap) {
 					CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE));
 				}
-				uint size = width * height * li->blockBytes;
+				u32 size = width * height * li->blockBytes;
 				Array<u8> data(*g_ffr.allocator);
 				data.resize(size);
-				for (uint mip = 0; mip < mipMapCount; ++mip) {
+				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					blob.read(&data[0], size);
 					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if (layers > 1) {
@@ -1593,7 +1593,7 @@ VAOHandle allocVAOHandle()
 	const int id = g_ffr.vaos.alloc();
 	VertexArrayObject& p = g_ffr.vaos[id];
 	p.handle = 0;
-	return { (uint)id };
+	return { (u32)id };
 }
 
 
@@ -1608,7 +1608,7 @@ ProgramHandle allocProgramHandle()
 	const int id = g_ffr.programs.alloc();
 	Program& p = g_ffr.programs[id];
 	p.handle = 0;
-	return { (uint)id };
+	return { (u32)id };
 }
 
 
@@ -1623,7 +1623,7 @@ BufferHandle allocBufferHandle()
 	const int id = g_ffr.buffers.alloc();
 	Buffer& t = g_ffr.buffers[id];
 	t.handle = 0;
-	return { (uint)id };
+	return { (u32)id };
 }
 
 
@@ -1638,7 +1638,7 @@ TextureHandle allocTextureHandle()
 	const int id = g_ffr.textures.alloc();
 	Texture& t = g_ffr.textures[id];
 	t.handle = 0;
-	return { (uint)id };
+	return { (u32)id };
 }
 
 
@@ -1661,7 +1661,7 @@ void createTextureView(TextureHandle view_handle, TextureHandle orig_handle)
 }
 
 
-bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureFormat format, uint flags, const void* data, const char* debug_name)
+bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, u32 flags, const void* data, const char* debug_name)
 {
 	checkThread();
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
@@ -1673,7 +1673,7 @@ bool createTexture(TextureHandle handle, uint w, uint h, uint depth, TextureForm
 	int found_format = 0;
 	GLenum internal_format = 0;
 	const GLenum target = depth <= 1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_ARRAY;
-	const uint mip_count = no_mips ? 1 : 1 + log2(maximum(w, h, depth));
+	const u32 mip_count = no_mips ? 1 : 1 + log2(maximum(w, h, depth));
 
 	CHECK_GL(glCreateTextures(target, 1, &texture));
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
@@ -1781,23 +1781,23 @@ void destroy(BufferHandle buffer)
 }
 
 
-void clear(uint flags, const float* color, float depth)
+void clear(u32 flags, const float* color, float depth)
 {
 	CHECK_GL(glDisable(GL_SCISSOR_TEST));
 	CHECK_GL(glDisable(GL_BLEND));
 	g_ffr.last_state &= ~u64(0xffFF << 6);
 	checkThread();
 	GLbitfield gl_flags = 0;
-	if (flags & (uint)ClearFlags::COLOR) {
+	if (flags & (u32)ClearFlags::COLOR) {
 		CHECK_GL(glClearColor(color[0], color[1], color[2], color[3]));
 		gl_flags |= GL_COLOR_BUFFER_BIT;
 	}
-	if (flags & (uint)ClearFlags::DEPTH) {
+	if (flags & (u32)ClearFlags::DEPTH) {
 		CHECK_GL(glDepthMask(GL_TRUE));
 		CHECK_GL(glClearDepth(depth));
 		gl_flags |= GL_DEPTH_BUFFER_BIT;
 	}
-	if (flags & (uint)ClearFlags::STENCIL) {
+	if (flags & (u32)ClearFlags::STENCIL) {
 		glStencilMask(0xff);
 		g_ffr.last_state = g_ffr.last_state | (0xff << 22);
 		glClearStencil(0);
@@ -1819,7 +1819,7 @@ static const char* shaderTypeToString(ShaderType type)
 }
 
 
-static uint getSize(UniformType type)
+static u32 getSize(UniformType type)
 {
 	switch(type)
 	{
@@ -1866,7 +1866,7 @@ UniformHandle allocUniform(const char* name, UniformType type, int count)
 	u.data = g_ffr.allocator->allocate(byte_size);
 	setMemory(u.data, 0, byte_size);
 	g_ffr.uniforms_hash_map->insert(name_hash, id);
-	return { (uint)id };
+	return { (u32)id };
 }
 
 
@@ -2018,7 +2018,7 @@ void preinit(IAllocator& allocator)
 	g_ffr.buffers.create(*g_ffr.allocator);
 	g_ffr.uniforms.create(*g_ffr.allocator);
 	g_ffr.programs.create(*g_ffr.allocator);
-	g_ffr.uniforms_hash_map = LUMIX_NEW(*g_ffr.allocator, HashMap<u32, uint>)(*g_ffr.allocator);
+	g_ffr.uniforms_hash_map = LUMIX_NEW(*g_ffr.allocator, HashMap<u32, u32>)(*g_ffr.allocator);
 }
 
 
@@ -2078,7 +2078,7 @@ void generateMipmaps(ffr::TextureHandle texture)
 }
 
 
-void getTextureImage(ffr::TextureHandle texture, uint size, void* buf)
+void getTextureImage(ffr::TextureHandle texture, u32 size, void* buf)
 {
 	checkThread();
 
@@ -2202,7 +2202,7 @@ void setUniformMatrix3x4f(UniformHandle uniform, const float* value)
 	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 12); 
 }
 
-void bindLayer(FramebufferHandle fb, TextureHandle rb, uint layer)
+void bindLayer(FramebufferHandle fb, TextureHandle rb, u32 layer)
 {
 	checkThread();
 
@@ -2249,13 +2249,13 @@ void bindLayer(FramebufferHandle fb, TextureHandle rb, uint layer)
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void update(FramebufferHandle fb, uint renderbuffers_count, const TextureHandle* renderbuffers)
+void update(FramebufferHandle fb, u32 renderbuffers_count, const TextureHandle* renderbuffers)
 {
 	checkThread();
 
 	int color_attachment_idx = 0;
 	bool depth_bound = false;
-	for (uint i = 0; i < renderbuffers_count; ++i) {
+	for (u32 i = 0; i < renderbuffers_count; ++i) {
 		const GLuint t = g_ffr.textures[renderbuffers[i].value].handle;
 		CHECK_GL(glBindTexture(GL_TEXTURE_2D, t));
 		GLint internal_format;
@@ -2370,7 +2370,7 @@ void shutdown()
 	g_ffr.textures.destroy(*g_ffr.allocator);
 	g_ffr.vaos.destroy(*g_ffr.allocator);
 	g_ffr.buffers.destroy(*g_ffr.allocator);
-	for (uint u : *g_ffr.uniforms_hash_map) {
+	for (u32 u : *g_ffr.uniforms_hash_map) {
 		g_ffr.allocator->deallocate(g_ffr.uniforms[u].data);
 	}
 	g_ffr.uniforms.destroy(*g_ffr.allocator);

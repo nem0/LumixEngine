@@ -64,14 +64,14 @@ void LogUI::onLog(LogLevel level, const char* system, const char* message)
 }
 
 
-void fillLabel(char* output, int max_size, const char* label, int count)
+void fillLabel(Span<char> output, const char* label, int count)
 {
-	copyString(output, max_size, label);
-	catString(output, max_size, "(");
-	int len = stringLength(output);
-	toCString(count, output + len, max_size - len);
-	catString(output, max_size, ")###");
-	catString(output, max_size, label);
+	copyString(output, label);
+	catString(output, "(");
+	int len = stringLength(output.begin);
+	toCString(count, output.fromLeft(len));
+	catString(output, ")###");
+	catString(output, label);
 }
 
 
@@ -140,7 +140,7 @@ void LogUI::onGUI()
 		for (int i = 0; i < lengthOf(labels); ++i)
 		{
 			char label[40];
-			fillLabel(label, sizeof(label), labels[i], m_new_message_count[i]);
+			fillLabel(Span(label), labels[i], m_new_message_count[i]);
 			if (i > 0) ImGui::SameLine();
 			bool b = m_level_filter & (1 << i);
 			if (ImGui::Checkbox(label, &b))
@@ -189,13 +189,14 @@ void LogUI::onGUI()
 				{
 					char* mem = (char*)m_allocator.allocate(len);
 					mem[0] = '\0';
+					const Span<char> memspan(mem, len);
 					for (int i = 0; i < m_messages.size(); ++i)
 					{
 						const char* msg = m_messages[i].text.c_str();
 						if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 						{
-							catString(mem, len, msg);
-							catString(mem, len, "\n");
+							catString(memspan, msg);
+							catString(memspan, "\n");
 						}
 					}
 

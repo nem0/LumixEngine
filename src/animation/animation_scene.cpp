@@ -154,7 +154,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	void deserializeSharedController(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
 		EntityRef parent;
-		serializer.read(&parent);
+		serializer.read(Ref(parent));
 		m_shared_controllers.insert(entity, {entity, parent});
 		m_universe.onComponentCreated(entity, SHARED_CONTROLLER_TYPE, this);
 	}
@@ -176,7 +176,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
 		animator.animation = loadPropertyAnimation(Path(tmp));
-		serializer.read(&animator.flags.base);
+		serializer.read(Ref(animator.flags.base));
 		m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
 	}
 
@@ -194,8 +194,8 @@ struct AnimationSceneImpl final : public AnimationScene
 	{
 		Animable& animable = m_animables.insert(entity);
 		animable.entity = entity;
-		serializer.read(&animable.time_scale);
-		serializer.read(&animable.start_time);
+		serializer.read(Ref(animable.time_scale));
+		serializer.read(Ref(animable.start_time));
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
 		auto* res = tmp[0] ? m_engine.getResourceManager().load<Animation>(Path(tmp)) : nullptr;
@@ -223,7 +223,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		serializer.read(tmp, lengthOf(tmp));
 		if (scene_version > (int)AnimationSceneVersion::SHARED_CONTROLLER)
 		{
-			serializer.read(&controller.default_set);
+			serializer.read(Ref(controller.default_set));
 		}
 		auto* res = tmp[0] ? m_engine.getResourceManager().load<Anim::ControllerResource>(Path(tmp)) : nullptr;
 		setControllerResource(controller, (Anim::ControllerResource*)res);

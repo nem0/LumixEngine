@@ -180,7 +180,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 				if (ImGui::TreeNode((const void*)(uintptr)clip_id, "%s", clip_info->name))
 				{
 					char buf[30];
-					copyString(buf, lengthOf(buf), clip_info->name);
+					copyString(Span(buf), clip_info->name);
 					if (ImGui::InputText("Name", buf, sizeof(buf)))
 					{
 						copyString(clip_info->name, buf);
@@ -189,7 +189,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[MAX_PATH_LENGTH];
 					copyString(path, clip ? clip->getPath().c_str() : "");
-					if (m_app.getAssetBrowser().resourceInput("Clip", "", path, lengthOf(path), Clip::TYPE))
+					if (m_app.getAssetBrowser().resourceInput("Clip", "", Span(path), Clip::TYPE))
 					{
 						audio_scene->setClip(clip_id, Path(path));
 					}

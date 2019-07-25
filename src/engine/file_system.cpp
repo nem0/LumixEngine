@@ -141,7 +141,7 @@ struct FileSystemImpl final : public FileSystem
 				const u8* ptr = (const u8*)str.getData() + str.getPosition();
 				str.read(&header, sizeof(header));
 				u32 size;
-				fromCStringOctal(header.size, sizeof(header.size), &size); 
+				fromCStringOctal(Span(header.size, sizeof(header.size)), Ref(size)); 
 				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
 					Path path(header.name);
 					m_bundled_map.insert(path.getHash(), ptr);
@@ -167,7 +167,7 @@ struct FileSystemImpl final : public FileSystem
 
 	void setBasePath(const char* dir) override
 	{ 
-		PathUtils::normalize(dir, m_base_path.data, lengthOf(m_base_path.data));
+		PathUtils::normalize(dir, Span(m_base_path.data));
 		if (!endsWith(m_base_path, "/") && !endsWith(m_base_path, "\\")) {
 			m_base_path << '/';
 		}
@@ -182,7 +182,7 @@ struct FileSystemImpl final : public FileSystem
 			if (iter.isValid()) {
 				const TarHeader* header = (const TarHeader*)iter.value();
 				u32 size;
-				fromCStringOctal(header->size, sizeof(header->size), &size);
+				fromCStringOctal(Span(header->size), Ref(size));
 				content->resize(size);
 				copyMemory(content->begin(), iter.value() + 512, content->byte_size());
 				return true;
@@ -278,7 +278,7 @@ struct FileSystemImpl final : public FileSystem
 
 		u32 size;
 		TarHeader* header = (TarHeader*)iter.value();
-		fromCStringOctal(header->size, sizeof(header->size), &size);
+		fromCStringOctal(Span(header->size), Ref(size));
 		const bool res = file.write(iter.value() + 512, size);
 		file.close();
 		return res;
@@ -386,7 +386,7 @@ int FSTask::task()
 			if (iter.isValid()) {
 				const TarHeader* header = (const TarHeader*)iter.value();
 				u32 size;
-				fromCStringOctal(header->size, sizeof(header->size), &size);
+				fromCStringOctal(Span(header->size), Ref(size));
 				data.resize(size);
 				copyMemory(data.begin(), iter.value() + 512, data.byte_size());
 				success = true;

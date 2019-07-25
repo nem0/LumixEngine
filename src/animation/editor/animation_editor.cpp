@@ -706,7 +706,7 @@ void AnimationEditor::onWindowGUI()
 
 void AnimationEditor::saveAs()
 {
-	if (!OS::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
+	if (!OS::getSaveFilename(Span(m_path.data), "Animation controllers\0*.act\0", "")) return;
 	save();
 }
 
@@ -714,7 +714,7 @@ void AnimationEditor::saveAs()
 void AnimationEditor::save()
 {
 	if (m_path[0] == 0 &&
-		!OS::getSaveFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", ""))
+		!OS::getSaveFilename(Span(m_path.data), "Animation controllers\0*.act\0", ""))
 		return;
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	OutputMemoryStream blob(allocator);
@@ -804,7 +804,7 @@ void AnimationEditor::load()
 void AnimationEditor::loadFromFile()
 {
 	newController();
-	if (!OS::getOpenFilename(m_path.data, lengthOf(m_path.data), "Animation controllers\0*.act\0", "")) return;
+	if (!OS::getOpenFilename(Span(m_path.data), "Animation controllers\0*.act\0", "")) return;
 	load();
 }
 
@@ -1048,7 +1048,7 @@ void AnimationEditor::animationSlotsGUI()
 			copyString(tmp, anim ? anim->getPath().c_str() : "");
 			ImGui::PushID(j);
 			Path old_path(tmp);
-			if (m_app.getAssetBrowser().resourceInput("", "##res", tmp, lengthOf(tmp), Animation::TYPE))
+			if (m_app.getAssetBrowser().resourceInput("", "##res", Span(tmp), Animation::TYPE))
 			{
 				Path path(tmp);
 				auto* cmd = LUMIX_NEW(allocator, SetCommand<decltype(root_getter), Path>)(root_getter, old_path, path, "slots", i, "values", j, "path");

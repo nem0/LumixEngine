@@ -33,10 +33,10 @@ public:
 		{ 
 			Matrix mtx;
 			bool lines;
-			uint indices_offset;
-			uint indices_count;
-			uint vertices_offset;
-			uint vertices_count;
+			u32 indices_offset;
+			u32 indices_count;
+			u32 vertices_offset;
+			u32 vertices_count;
 		};
 		Array<u16> indices;
 		Array<Vertex> vertices;

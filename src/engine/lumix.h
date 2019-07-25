@@ -20,6 +20,22 @@
 	#error Platform not supported
 #endif
 
+#ifndef ASSERT
+	#ifdef LUMIX_DEBUG
+		#ifdef _WIN32
+			#define LUMIX_DEBUG_BREAK() __debugbreak()
+		#else
+			#define LUMIX_DEBUG_BREAK()  raise(SIGTRAP) 
+		#endif
+		#define ASSERT(x) do { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) LUMIX_DEBUG_BREAK(); } while (false)
+	#else
+		#ifdef _WIN32		
+			#define ASSERT(x) __assume(x)
+		#else
+			#define ASSERT(x) { false ? (void)(x) : (void)0; }
+		#endif
+	#endif
+#endif
 
 namespace Lumix
 {
@@ -31,7 +47,7 @@ typedef short i16;
 typedef unsigned short u16;
 typedef int i32;
 typedef unsigned int u32;
-typedef unsigned int uint;
+typedef unsigned int u32;
 
 #ifdef _WIN32
 	typedef long long i64;
@@ -101,22 +117,32 @@ template <typename T, int count> constexpr int lengthOf(const T (&)[count])
 	return count;
 };
 
-#ifndef ASSERT
-	#ifdef LUMIX_DEBUG
-		#ifdef _WIN32
-			#define LUMIX_DEBUG_BREAK() __debugbreak()
-		#else
-			#define LUMIX_DEBUG_BREAK()  raise(SIGTRAP) 
-		#endif
-		#define ASSERT(x) do { const volatile bool lumix_assert_b____ = !(x); if(lumix_assert_b____) LUMIX_DEBUG_BREAK(); } while (false)
-	#else
-		#ifdef _WIN32		
-			#define ASSERT(x) __assume(x)
-		#else
-			#define ASSERT(x) { false ? (void)(x) : (void)0; }
-		#endif
-	#endif
-#endif
+// use this instead non-const reference parameter to show intention
+template <typename T>
+struct Ref {
+	explicit Ref(T& value) : value(value) {}
+	operator T&() { return value; }
+	T* operator->() { return &value; } 
+	void operator =(const T& rhs) { value = rhs; }
+	T& value;
+};
+
+template <typename T>
+struct Span
+{
+	Span() : begin(nullptr), end(nullptr) {}
+	Span(T* begin, int len) : begin(begin), end(begin + len) {}
+	Span(T* begin, T* end) : begin(begin), end(end) {}
+	template <int N> explicit Span(T (&value)[N]) : begin(value), end(begin + N) {}
+	T& operator[](u32 idx) { ASSERT(begin + idx < end); return begin[idx]; }
+	operator Span<const T>() { return Span<const T>(begin, end); }
+	Span fromLeft(u32 count) const { return Span(begin + count, end); }
+	
+	u32 length() const { return u32(end - begin); }
+
+	T* begin;
+	T* end;
+};
 
 #ifdef _WIN32
 	#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)

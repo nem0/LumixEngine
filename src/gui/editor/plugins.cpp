@@ -76,7 +76,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 		char tmp[MAX_PATH_LENGTH];
 		Texture* tex = sprite->getTexture();
 		copyString(tmp, tex ? tex->getPath().c_str() : "");
-		if (app.getAssetBrowser().resourceInput("Texture", "texture", tmp, lengthOf(tmp), Texture::TYPE))
+		if (app.getAssetBrowser().resourceInput("Texture", "texture", Span(tmp), Texture::TYPE))
 		{
 			sprite->setTexture(Path(tmp));
 		}

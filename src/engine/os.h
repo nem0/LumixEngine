@@ -152,9 +152,9 @@ LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
 LUMIX_ENGINE_API void setCurrentDirectory(const char* path);
 LUMIX_ENGINE_API void getCurrentDirectory(char* buffer, int buffer_size);
-LUMIX_ENGINE_API bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file);
-LUMIX_ENGINE_API bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension);
-LUMIX_ENGINE_API bool getOpenDirectory(char* out, int max_size, const char* starting_dir);
+LUMIX_ENGINE_API bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
+LUMIX_ENGINE_API bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
+LUMIX_ENGINE_API bool getOpenDirectory(Span<char> out, const char* starting_dir);
 LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(const char* path);
 LUMIX_ENGINE_API void copyToClipboard(const char* text);
 

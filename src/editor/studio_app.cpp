@@ -490,7 +490,7 @@ public:
 			return;
 		}
 		auto* new_group = LUMIX_NEW(m_allocator, AddCmpTreeNode);
-		copyNString(new_group->label, (int)sizeof(new_group->label), node->label, int(slash - node->label));
+		copyNString(Span(new_group->label), node->label, int(slash - node->label));
 		insertAddCmpNodeOrdered(parent, new_group);
 		insertAddCmpNode(*new_group, node);
 	}
@@ -512,7 +512,8 @@ public:
 				if (!ImGui::BeginMenu(last)) return;
 				char buf[MAX_PATH_LENGTH];
 				bool create_empty = ImGui::MenuItem("Empty");
-				if (asset_browser->resourceList(buf, lengthOf(buf), nullptr, resource_type, 0, true) || create_empty)
+				static u32 selected_res_hash = 0;
+				if (asset_browser->resourceList(Span(buf), Ref(selected_res_hash), resource_type, 0, true) || create_empty)
 				{
 					if (create_entity)
 					{
@@ -790,7 +791,7 @@ public:
 				ImGui::SameLine();
 				if (ImGui::Button("Change...")) {
 					char dir[MAX_PATH_LENGTH];
-					if (OS::getOpenDirectory(dir, lengthOf(dir), ".")) {
+					if (OS::getOpenDirectory(Span(dir), ".")) {
 						OS::OutputFile cfg_file;
 						if (cfg_file.open(".lumixuser")) {
 							cfg_file << dir;
@@ -867,15 +868,15 @@ public:
 	}
 
 
-	static void getShortcut(const Action& action, char* buf, int max_size)
+	static void getShortcut(const Action& action, Span<char> buf)
 	{
 		buf[0] = 0;
 		for (int i = 0; i < lengthOf(action.shortcut); ++i) {
 			char tmp[64];
 			OS::getKeyName(action.shortcut[i], tmp, sizeof(tmp));
 			if (tmp[0] == 0) return;
-			if (i > 0) catString(buf, max_size, " - ");
-			catString(buf, max_size, tmp);
+			if (i > 0) catString(buf, " - ");
+			catString(buf, tmp);
 		}
 	}
 
@@ -883,7 +884,7 @@ public:
 	void doMenuItem(Action& a, bool enabled) const
 	{
 		char buf[20];
-		getShortcut(a, buf, sizeof(buf));
+		getShortcut(a, Span(buf));
 		if (ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled))
 		{
 			a.func.invoke();
@@ -1054,9 +1055,9 @@ public:
 	{
 		char filename[MAX_PATH_LENGTH];
 		char tmp[MAX_PATH_LENGTH];
-		if (OS::getSaveFilename(tmp, lengthOf(tmp), "Prefab files\0*.fab\0", "fab"))
+		if (OS::getSaveFilename(Span(tmp), "Prefab files\0*.fab\0", "fab"))
 		{
-			PathUtils::normalize(tmp, filename, lengthOf(tmp));
+			PathUtils::normalize(tmp, Span(filename));
 			const char* base_path = m_engine->getFileSystem().getBasePath();
 			if (startsWith(filename, base_path))
 			{
@@ -1422,7 +1423,7 @@ public:
 	{
 		char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
-		getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), entity);
+		getEntityListDisplayName(*m_editor, Span(buffer), entity);
 		bool selected = selected_entities.indexOf(entity) >= 0;
 		ImGui::PushID(entity.index);
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
@@ -1531,7 +1532,7 @@ public:
 						 e = universe->getNextEntity((EntityRef)e))
 					{
 						char buffer[1024];
-						getEntityListDisplayName(*m_editor, buffer, sizeof(buffer), e);
+						getEntityListDisplayName(*m_editor, Span(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
@@ -1803,10 +1804,10 @@ public:
 		char tmp_path[MAX_PATH_LENGTH];
 		OS::getExecutablePath(tmp_path, lengthOf(tmp_path));
 		StaticString<MAX_PATH_LENGTH> copy_path;
-		PathUtils::getDir(copy_path.data, lengthOf(copy_path.data), tmp_path);
+		PathUtils::getDir(Span(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
 		OS::makePath(copy_path);
-		PathUtils::getBasename(tmp_path, lengthOf(tmp_path), src);
+		PathUtils::getBasename(Span(tmp_path), src);
 		copy_path << "/" << tmp_path << "." << getPluginExtension();
 #ifdef _WIN32
 		StaticString<MAX_PATH_LENGTH> src_pdb(src);
@@ -1869,9 +1870,9 @@ public:
 			{
 				char dir[MAX_PATH_LENGTH];
 				char basename[MAX_PATH_LENGTH];
-				PathUtils::getBasename(basename, lengthOf(basename), src);
+				PathUtils::getBasename(Span(basename), src);
 				m_watched_plugin.basename = basename;
-				PathUtils::getDir(dir, lengthOf(dir), src);
+				PathUtils::getDir(Span(dir), src);
 				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
 				m_watched_plugin.watcher->getCallback().bind<StudioAppImpl, &StudioAppImpl::onPluginChanged>(this);
 				m_watched_plugin.dir = dir;
@@ -1906,7 +1907,7 @@ public:
 			return;
 
 		char basename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(basename, lengthOf(basename), path);
+		PathUtils::getBasename(Span(basename), path);
 		if (!equalIStrings(basename, m_watched_plugin.basename)) return;
 
 		m_watched_plugin.reload_request = true;
@@ -2394,7 +2395,7 @@ public:
 		while (OS::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
-			PathUtils::normalize(info.filename, normalized_path, lengthOf(normalized_path));
+			PathUtils::normalize(info.filename, Span(normalized_path));
 			if (info.is_directory)
 			{
 				if (!includeDirInPack(normalized_path)) continue;
@@ -2442,7 +2443,7 @@ public:
 			{
 				u32 hash = crc32(res->getPath().c_str());
 				auto& out_info = infos.emplace(hash);
-				copyString(out_info.path, MAX_PATH_LENGTH, res->getPath().c_str());
+				copyString(Span(out_info.path), res->getPath().c_str());
 				out_info.hash = hash;
 				out_info.size = OS::getFileSize(res->getPath().c_str());
 				out_info.offset = ~0UL;
@@ -2456,7 +2457,7 @@ public:
 		unv_path << "universes/" << m_editor->getUniverse()->getName() << ".unv";
 		u32 hash = crc32(unv_path);
 		auto& out_info = infos.emplace(hash);
-		copyString(out_info.path, MAX_PATH_LENGTH, unv_path);
+		copyString(Span(out_info.path), unv_path);
 		out_info.hash = hash;
 		out_info.size = OS::getFileSize(unv_path);
 		out_info.offset = ~0UL;
@@ -2475,7 +2476,7 @@ public:
 			ImGui::SameLine();
 			if (ImGui::Button("Choose dir"))
 			{
-				if (OS::getOpenDirectory(m_pack.dest_dir.data, lengthOf(m_pack.dest_dir.data), "."))
+				if (OS::getOpenDirectory(Span(m_pack.dest_dir.data), "."))
 				{
 					m_pack.dest_dir << "/";
 				}
@@ -2570,7 +2571,7 @@ public:
 		{
 			char tmp[MAX_PATH_LENGTH];
 			OS::getExecutablePath(tmp, lengthOf(tmp));
-			PathUtils::getDir(src_dir.data, lengthOf(src_dir.data), tmp);
+			PathUtils::getDir(Span(src_dir.data), tmp);
 		}
 		for (auto& file : bin_files)
 		{
@@ -2630,7 +2631,7 @@ public:
 			if (startsWith(info.filename, "__")) continue;
 
 			char basename[MAX_PATH_LENGTH];
-			PathUtils::getBasename(basename, lengthOf(basename), info.filename);
+			PathUtils::getBasename(Span(basename), info.filename);
 			m_universes.emplace(basename);
 		}
 		OS::destroyFileIterator(iter);
@@ -2644,7 +2645,7 @@ public:
 		while (OS::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
-			PathUtils::normalize(info.filename, normalized_path, lengthOf(normalized_path));
+			PathUtils::normalize(info.filename, Span(normalized_path));
 			if (normalized_path[0] == '.') continue;
 			if (info.is_directory)
 			{
@@ -2657,7 +2658,7 @@ public:
 			else
 			{
 				char ext[5];
-				PathUtils::getExtension(ext, lengthOf(ext), info.filename);
+				PathUtils::getExtension(Span(ext), info.filename);
 				if (equalStrings(ext, "lua"))
 				{
 					loadLuaPlugin(dir, info.filename);
@@ -2716,7 +2717,7 @@ public:
 		for (auto* action : m_actions)
 		{
 			char tmp[MAX_PATH_LENGTH];
-			action->getIconPath(tmp, lengthOf(tmp));
+			action->getIconPath(Span(tmp));
 			if (fs.fileExists(tmp))
 			{
 				action->icon = render_interface.loadTexture(Path(tmp));

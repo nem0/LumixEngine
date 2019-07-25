@@ -666,8 +666,8 @@ struct PipelineImpl final : Pipeline
 			for (int i = m_renderbuffers.size() - 1; i >= 0; --i) {
 				Renderbuffer& rb = m_renderbuffers[i];
 				if (!rb.use_realtive_size) continue;
-				const uint w = uint(rb.relative_size.x * m_viewport.w + 0.5f);
-				const uint h = uint(rb.relative_size.y * m_viewport.h + 0.5f);
+				const u32 w = u32(rb.relative_size.x * m_viewport.w + 0.5f);
+				const u32 h = u32(rb.relative_size.y * m_viewport.h + 0.5f);
 				if (rb.width != w || rb.height != h) {
 					m_renderer.destroy(rb.handle);
 					m_renderbuffers.eraseFast(i);
@@ -925,8 +925,8 @@ struct PipelineImpl final : Pipeline
 				
 				ffr::BufferHandle vb = ffr::allocBufferHandle();
 				ffr::BufferHandle ib = ffr::allocBufferHandle();
-				ffr::createBuffer(vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, vtx_buffer_mem.size, vtx_buffer_mem.data);
-				ffr::createBuffer(ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, idx_buffer_mem.size, idx_buffer_mem.data);
+				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, vtx_buffer_mem.size, vtx_buffer_mem.data);
+				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, idx_buffer_mem.size, idx_buffer_mem.data);
 				pipeline->m_renderer.free(idx_buffer_mem);
 				pipeline->m_renderer.free(vtx_buffer_mem);
 
@@ -950,10 +950,10 @@ struct PipelineImpl final : Pipeline
 							ffr::scissor(0, 0, pipeline->m_viewport.w, pipeline->m_viewport.h);
 						}
 						else {
-							ffr::scissor(uint(maximum(cmd.clip_pos.x, 0.0f)),
-								uint(maximum(cmd.clip_pos.x, 0.0f)),
-								uint(minimum(cmd.clip_size.x, 65535.0f)),
-								uint(minimum(cmd.clip_size.y, 65535.0f)));
+							ffr::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+								u32(maximum(cmd.clip_pos.x, 0.0f)),
+								u32(minimum(cmd.clip_size.x, 65535.0f)),
+								u32(minimum(cmd.clip_size.y, 65535.0f)));
 						}
 			
 						ffr::TextureHandle texture_id = atlas_texture;
@@ -1042,8 +1042,8 @@ struct PipelineImpl final : Pipeline
 	int createRenderbuffer(float w, float h, bool relative, const char* format_str, const char* debug_name)
 	{
 		PROFILE_FUNCTION();
-		const uint rb_w = uint(relative ? w * m_viewport.w + 0.5f : w);
-		const uint rb_h = uint(relative ? h * m_viewport.h + 0.5f : h);
+		const u32 rb_w = u32(relative ? w * m_viewport.w + 0.5f : w);
+		const u32 rb_h = u32(relative ? h * m_viewport.h + 0.5f : h);
 		const ffr::TextureFormat format = getFormat(format_str);
 
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
@@ -1550,7 +1550,7 @@ struct PipelineImpl final : Pipeline
 
 			PrepareCommandsRenderJob::SortOrder order = PrepareCommandsRenderJob::SortOrder::DEFAULT;
 			char tmp[64];
-			if (LuaWrapper::getOptionalStringField(L, -1, "sort", tmp, lengthOf(tmp))) {
+			if (LuaWrapper::getOptionalStringField(L, -1, "sort", Span(tmp))) {
 				order = equalIStrings(tmp, "depth") 
 					? PrepareCommandsRenderJob::SortOrder::DEPTH
 					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
@@ -2016,10 +2016,10 @@ struct PipelineImpl final : Pipeline
 						READ(const RenderableTypes, type);
 						ASSERT(type == RenderableTypes::LOCAL_LIGHT);
 
-						READ(uint, total_count);
-						READ(uint, nonintersecting_count);
+						READ(u32, total_count);
+						READ(u32, nonintersecting_count);
 						READ(const ffr::BufferHandle, buffer);
-						READ(const uint, offset);
+						READ(const u32, offset);
 
 						const ffr::ProgramHandle prog = Shader::getProgram(m_shader, define_mask);
 						if (prog.isValid()) {
@@ -2030,7 +2030,7 @@ struct PipelineImpl final : Pipeline
 
 							if(total_count - nonintersecting_count) {
 								ffr::setState(blend_state | (u64)ffr::StateFlags::CULL_FRONT);
-								const uint offs = offset + sizeof(float) * 16 * nonintersecting_count;
+								const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
 								ffr::bindVertexBuffer(1, buffer, offs, 64);
 								ffr::drawTrianglesInstanced(36, total_count - nonintersecting_count, ffr::DataType::U16);
 							}
@@ -2087,7 +2087,7 @@ struct PipelineImpl final : Pipeline
 
 		char tmp[64];
 		u64 rs = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
-		if (LuaWrapper::getOptionalStringField(L, idx, "blending", tmp, lengthOf(tmp))) {
+		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
 			if(equalIStrings(tmp, "add")) {
 				rs |= ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
 			}
@@ -2162,7 +2162,7 @@ struct PipelineImpl final : Pipeline
 								READ(const Material::RenderData*, material);
 								READ(const u16, instances_count);
 								READ(const ffr::BufferHandle, buffer);
-								READ(const uint, offset);
+								READ(const u32, offset);
 
 								ShaderRenderData* shader = material->shader;
 								const ffr::ProgramHandle prog = Shader::getProgram(shader, instanced_mask | material->define_mask);
@@ -2196,7 +2196,7 @@ struct PipelineImpl final : Pipeline
 								READ(const i32, bones_count);
 
 								READ(const ffr::BufferHandle, buffer);
-								READ(const uint, offset);
+								READ(const u32, offset);
 
 								Matrix model_mtx(pos, rot);
 								model_mtx.multiply3x3(scale);
@@ -2320,7 +2320,7 @@ struct PipelineImpl final : Pipeline
 		RenderJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderJob);
 
 		char tmp[64];
-		if (LuaWrapper::getOptionalStringField(L, 2, "define", tmp, lengthOf(tmp))) {
+		if (LuaWrapper::getOptionalStringField(L, 2, "define", Span(tmp))) {
 			job->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
 		}
 
@@ -2382,9 +2382,9 @@ struct PipelineImpl final : Pipeline
 
 			PipelineImpl* pipeline;
 			ffr::TextureHandle rbs[16];
-			uint count;
-			uint w;
-			uint h;
+			u32 count;
+			u32 w;
+			u32 h;
 		};
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
@@ -2736,8 +2736,8 @@ struct PipelineImpl final : Pipeline
 
 							const Renderer::TransientSlice slice = renderer.allocTransient(mi->pose->count * sizeof(Matrix) + 256);
 							WRITE(slice.buffer);
-							uint align = 256 - slice.offset % 256; 
-							uint offset = slice.offset + align;
+							u32 align = 256 - slice.offset % 256; 
+							u32 offset = slice.offset + align;
 							WRITE(offset);
 							const Quat* rotations = mi->pose->rotations;
 							const Vec3* positions = mi->pose->positions;
@@ -2793,7 +2793,7 @@ struct PipelineImpl final : Pipeline
 
 							const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(float) * 16);
 							// TODO check if slice is valid
-							uint intersecting_count = 0;
+							u32 intersecting_count = 0;
 
 							struct LightData {
 								Quat rot;
@@ -2829,8 +2829,8 @@ struct PipelineImpl final : Pipeline
 								new_page(bucket);
 							}
 							WRITE(type);
-							const uint total_count = i - start_i;
-							const uint nonintersecting_count = uint(beg - (LightData*)slice.ptr);
+							const u32 total_count = i - start_i;
+							const u32 nonintersecting_count = u32(beg - (LightData*)slice.ptr);
 							WRITE(total_count);
 							WRITE(nonintersecting_count);
 							WRITE(slice.buffer);
@@ -3285,16 +3285,16 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(viewport);
 
-		registerConst("CLEAR_DEPTH", (uint)ffr::ClearFlags::DEPTH);
-		registerConst("CLEAR_COLOR", (uint)ffr::ClearFlags::COLOR);
-		registerConst("CLEAR_ALL", (uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH | (uint)ffr::ClearFlags::STENCIL);
+		registerConst("CLEAR_DEPTH", (u32)ffr::ClearFlags::DEPTH);
+		registerConst("CLEAR_COLOR", (u32)ffr::ClearFlags::COLOR);
+		registerConst("CLEAR_ALL", (u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH | (u32)ffr::ClearFlags::STENCIL);
 
-		registerConst("STENCIL_ALWAYS", (uint)ffr::StencilFuncs::ALWAYS);
-		registerConst("STENCIL_EQUAL", (uint)ffr::StencilFuncs::EQUAL);
-		registerConst("STENCIL_NOT_EQUAL", (uint)ffr::StencilFuncs::NOT_EQUAL);
-		registerConst("STENCIL_DISABLE", (uint)ffr::StencilFuncs::DISABLE);
-		registerConst("STENCIL_KEEP", (uint)ffr::StencilOps::KEEP);
-		registerConst("STENCIL_REPLACE", (uint)ffr::StencilOps::REPLACE);
+		registerConst("STENCIL_ALWAYS", (u32)ffr::StencilFuncs::ALWAYS);
+		registerConst("STENCIL_EQUAL", (u32)ffr::StencilFuncs::EQUAL);
+		registerConst("STENCIL_NOT_EQUAL", (u32)ffr::StencilFuncs::NOT_EQUAL);
+		registerConst("STENCIL_DISABLE", (u32)ffr::StencilFuncs::DISABLE);
+		registerConst("STENCIL_KEEP", (u32)ffr::StencilOps::KEEP);
+		registerConst("STENCIL_REPLACE", (u32)ffr::StencilOps::REPLACE);
 
 		registerCFunction("bindTextures", PipelineImpl::bindTextures);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
@@ -3349,8 +3349,8 @@ struct PipelineImpl final : Pipeline
 	}
 
 	struct Renderbuffer {
-		uint width;
-		uint height;
+		u32 width;
+		u32 height;
 		bool use_realtive_size;
 		Vec2 relative_size; 
 		ffr::TextureFormat format;

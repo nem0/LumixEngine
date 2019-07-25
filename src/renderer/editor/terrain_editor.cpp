@@ -1279,7 +1279,7 @@ void TerrainEditor::onGUI()
 		if (ImGui::Button("Select mask"))
 		{
 			char filename[MAX_PATH_LENGTH];
-			if (OS::getOpenFilename(filename, lengthOf(filename), "All\0*.*\0", nullptr))
+			if (OS::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
 			{
 				int image_width;
 				int image_height;

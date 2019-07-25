@@ -160,7 +160,7 @@ void AssetBrowser::changeDir(const char* path)
 
 		FileInfo tile;
 		char filename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(filename, lengthOf(filename), filepath.c_str());
+		PathUtils::getBasename(Span(filename), filepath.c_str());
 		clampText(filename, TILE_SIZE);
 
 		tile.file_path_hash = filepath.getHash();
@@ -194,7 +194,7 @@ void AssetBrowser::breadcrumbs()
 		if (ImGui::Button(tmp))
 		{
 			char new_dir[MAX_PATH_LENGTH];
-			copyNString(new_dir, lengthOf(new_dir), m_dir, int(c - m_dir.data));
+			copyNString(Span(new_dir), m_dir, int(c - m_dir.data));
 			changeDir(new_dir);
 		}
 		ImGui::SameLine(0, 1);
@@ -214,7 +214,7 @@ void AssetBrowser::dirColumn()
 	if (ImGui::Selectable("..", &b))
 	{
 		char dir[MAX_PATH_LENGTH];
-		PathUtils::getDir(dir, lengthOf(dir), m_dir);
+		PathUtils::getDir(Span(dir), m_dir);
 		changeDir(dir);
 	}
 
@@ -417,7 +417,7 @@ void AssetBrowser::fileColumn()
 
 	if (open_delete_popup) ImGui::OpenPopup("Delete file");
 	if (open_rename_popup) {
-		PathUtils::getBasename(m_new_name, lengthOf(m_new_name), m_file_infos[m_context_resource].filepath);
+		PathUtils::getBasename(Span(m_new_name), m_file_infos[m_context_resource].filepath);
 		ImGui::OpenPopup("Rename file");
 	}
 	if (ImGui::BeginPopupModal("Rename file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -592,7 +592,7 @@ void AssetBrowser::selectResource(const Path& path, bool record_history)
 {
 	m_is_focus_requested = true;
 	char ext[30];
-	PathUtils::getExtension(ext, lengthOf(ext), path.c_str());
+	PathUtils::getExtension(Span(ext), path.c_str());
 
 	auto& manager = m_editor.getEngine().getResourceManager();
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -602,7 +602,7 @@ void AssetBrowser::selectResource(const Path& path, bool record_history)
 }
 
 
-bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type)
+bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<char> buf, ResourceType type)
 {
 	ImGui::PushID(str_id);
 	float item_w = ImGui::CalcItemWidth();
@@ -615,22 +615,21 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 	ImGui::AlignTextToFramePadding();
 	ImGui::PushTextWrapPos(pos.x);
 
-	char* c = buf;
-	while (*c && c - buf < max_size && *c != ':') ++c;
+	char* c = buf.begin;
+	while (*c && c < buf.end && *c != ':') ++c;
+	char tmp[64];
 	if(*c == ':') {
-		char tmp[64];
-		copyString(tmp, minimum(lengthOf(tmp), int(c - buf) + 1), buf); 
+		copyNString(Span(tmp), buf.begin, int(c - buf.begin) + 1); 
 		ImGui::Text("%s", tmp);
 	}
 	else {
-		char tmp[64];
-		char* c = buf + stringLength(buf);
-		while (c > buf && *c != '/' && *c != '\\') --c;
+		char* c = buf.begin + stringLength(buf.begin);
+		while (c > buf.begin && *c != '/' && *c != '\\') --c;
 		if (*c == '/' || *c == '\\') ++c;
 
 		const char* end = reverseFind(c, nullptr, '.');
 		if (end) {
-			copyNString(tmp, lengthOf(tmp), c, int(end - c));
+			copyNString(Span(tmp), c, int(end - c));
 		}
 		else {
 			copyString(tmp, c);
@@ -652,11 +651,11 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		{
 			char ext[10];
 			const char* path = (const char*)payload->Data;
-			PathUtils::getExtension(ext, lengthOf(ext), path);
+			PathUtils::getExtension(Span(ext), path);
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
 			if (compiler.acceptExtension(ext, type))
 			{
-				copyString(buf, max_size, path);
+				copyString(buf, path);
 				ImGui::EndDragDropTarget();
 				ImGui::PopID();
 				return true;
@@ -673,17 +672,17 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, char* bu
 		{
 			m_is_focus_requested = true;
 			m_is_open = true;
-			m_wanted_resource = buf;
+			m_wanted_resource = buf.begin;
 		}
 		if (ImGui::Selectable("Empty", false))
 		{
-			*buf = '\0';
+			buf[0] = '\0';
 			ImGui::EndPopup();
 			ImGui::PopID();
 			return true;
 		}
 		static u32 selected_path_hash = 0;
-		if (resourceList(buf, max_size, &selected_path_hash, type, 0, true))
+		if (resourceList(buf, Ref(selected_path_hash), type, 0, true))
 		{
 			ImGui::EndPopup();
 			ImGui::PopID();
@@ -739,7 +738,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 
 
 // TODO selected_path_hash == null is bad UX
-bool AssetBrowser::resourceList(char* buf, int max_size, u32* selected_path_hash, ResourceType type, float height, bool can_create_new) const
+bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, ResourceType type, float height, bool can_create_new) const
 {
 	auto iter = m_plugins.find(type);
 	if (!iter.isValid()) return false;
@@ -747,9 +746,9 @@ bool AssetBrowser::resourceList(char* buf, int max_size, u32* selected_path_hash
 	IPlugin* plugin = iter.value();
 	if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New")) {
 		char full_path[MAX_PATH_LENGTH];
-		if (OS::getSaveFilename(full_path, lengthOf(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
+		if (OS::getSaveFilename(Span(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
 			if (plugin->createResource(full_path)) {
-				m_editor.makeRelative(buf, max_size, full_path);
+				m_editor.makeRelative(buf, full_path);
 				return true;
 			}
 		}
@@ -768,18 +767,18 @@ bool AssetBrowser::resourceList(char* buf, int max_size, u32* selected_path_hash
 		if(res.type != type) continue;
 		if (filter[0] != '\0' && strstr(res.path.c_str(), filter) == nullptr) continue;
 
-		const bool selected = selected_path_hash ? *selected_path_hash == res.path.getHash() : false;
+		const bool selected = selected_path_hash == res.path.getHash();
 		if(selected) selected_path = res.path;
 		ResourceLocator rl(res.path.c_str());
 		StaticString<MAX_PATH_LENGTH> label("", rl.name, "##h", res.path.getHash());
 		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick))
 		{
 			if(selected_path_hash) {
-				*selected_path_hash = res.path.getHash();
+				selected_path_hash = res.path.getHash();
 			}
 			
-			if (selected || !selected_path_hash || ImGui::IsMouseDoubleClicked(0)) {
-				copyString(buf, max_size, res.path.c_str());
+			if (selected || ImGui::IsMouseDoubleClicked(0)) {
+				copyString(buf, res.path.c_str());
 				ImGui::CloseCurrentPopup();
 				ImGui::EndChild();
 				compiler.unlockResources();

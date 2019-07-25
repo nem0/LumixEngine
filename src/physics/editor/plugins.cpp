@@ -377,7 +377,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 		};
 		for (const char* dll : physx_dlls)
 		{
-			PathUtils::getDir(exe_dir, lengthOf(exe_dir), exe_path);
+			PathUtils::getDir(Span(exe_dir), exe_path);
 			StaticString<MAX_PATH_LENGTH> tmp(exe_dir, dll);
 			if (!OS::fileExists(tmp)) return false;
 			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
@@ -407,7 +407,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 				char buf[30];
 				copyString(buf, scene->getCollisionLayerName(i));
 				char label[10];
-				toCString(i, label, lengthOf(label));
+				toCString(i, Span(label));
 				if (ImGui::InputText(label, buf, lengthOf(buf)))
 				{
 					scene->setCollisionLayerName(i, buf);
@@ -526,13 +526,13 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 
 				ImGui::PushID(i);
 				char tmp[256];
-				getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
+				getEntityListDisplayName(m_editor, Span(tmp), cmp.entity);
 				bool b = false;
 				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&entity, 1, false);
 				ImGui::NextColumn();
 
 				EntityPtr other_entity = scene->getJointConnectedBody(entity);
-				getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), other_entity);
+				getEntityListDisplayName(m_editor, Span(tmp), other_entity);
 				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) {
 					const EntityRef e = (EntityRef)other_entity;
 					m_editor.selectEntities(&e, 1, false);

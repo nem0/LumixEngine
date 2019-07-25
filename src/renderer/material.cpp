@@ -158,11 +158,11 @@ bool Material::save(IOutputStream& file)
 	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
 	char tmp[64];
-	toCString(m_metallic, tmp, lengthOf(tmp), 9);
+	toCString(m_metallic, Span(tmp), 9);
 	file << "metallic(" <<  tmp << ")\n";
-	toCString(m_roughness, tmp, lengthOf(tmp), 9);
+	toCString(m_roughness, Span(tmp), 9);
 	file << "roughness(" <<  tmp << ")\n";
-	toCString(m_alpha_ref, tmp, lengthOf(tmp), 2);
+	toCString(m_alpha_ref, Span(tmp), 9);
 	file << "alpha_ref(" <<  tmp << ")\n";
 
 	file << "defines {";
@@ -180,7 +180,7 @@ bool Material::save(IOutputStream& file)
 	for (int i = 0; i < m_texture_count; ++i) {
 		char path[MAX_PATH_LENGTH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
-			copyString(path, MAX_PATH_LENGTH, m_textures[i]->getPath().c_str());
+			copyString(Span(path), m_textures[i]->getPath().c_str());
 		}
 		else {
 			path[0] = '\0';
@@ -711,7 +711,7 @@ int texture(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	char material_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, material->getPath().c_str());
+	PathUtils::getDir(Span(material_dir), material->getPath().c_str());
 
 	if (lua_istable(L, 1)) {
 		lua_getfield(L, 1, "source");

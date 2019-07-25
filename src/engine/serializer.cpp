@@ -165,22 +165,22 @@ EntityPtr TextDeserializer::getEntity(EntityGUID guid)
 }
 
 
-void TextDeserializer::read(EntityPtr* entity)
+void TextDeserializer::read(Ref<EntityPtr> entity)
 {
 	EntityGUID guid;
-	read(&guid.value);
-	*entity = entity_map.get(guid);
+	read(Ref(guid.value));
+	entity = entity_map.get(guid);
 }
 
 
-void TextDeserializer::read(EntityRef* entity)
+void TextDeserializer::read(Ref<EntityRef> entity)
 {
 	EntityGUID guid;
-	read(&guid.value);
-	*entity = (EntityRef)entity_map.get(guid);
+	read(Ref(guid.value));
+	entity = (EntityRef)entity_map.get(guid);
 }
 
-void TextDeserializer::read(RigidTransform* value)
+void TextDeserializer::read(Ref<RigidTransform> value)
 {
 	skip();
 	value->pos.x = asDouble(readU64());
@@ -198,7 +198,7 @@ void TextDeserializer::read(RigidTransform* value)
 	value->rot.w = asFloat(readU32());
 }
 
-void TextDeserializer::read(LocalRigidTransform* value)
+void TextDeserializer::read(Ref<LocalRigidTransform> value)
 {
 	skip();
 	value->pos.x = asFloat(readU32());
@@ -217,7 +217,7 @@ void TextDeserializer::read(LocalRigidTransform* value)
 }
 
 
-void TextDeserializer::read(Transform* value)
+void TextDeserializer::read(Ref<Transform> value)
 {
 	skip();
 	value->pos.x = asDouble(readU64());
@@ -238,7 +238,7 @@ void TextDeserializer::read(Transform* value)
 }
 
 
-void TextDeserializer::read(Vec3* value)
+void TextDeserializer::read(Ref<Vec3> value)
 {
 	skip();
 	value->x = asFloat(readU32());
@@ -249,7 +249,7 @@ void TextDeserializer::read(Vec3* value)
 }
 
 
-void TextDeserializer::read(DVec3* value)
+void TextDeserializer::read(Ref<DVec3> value)
 {
 	skip();
 	value->x = asDouble(readU64());
@@ -260,7 +260,7 @@ void TextDeserializer::read(DVec3* value)
 }
 
 
-void TextDeserializer::read(Vec4* value)
+void TextDeserializer::read(Ref<Vec4> value)
 {
 	skip();
 	value->x = asFloat(readU32());
@@ -273,7 +273,7 @@ void TextDeserializer::read(Vec4* value)
 }
 
 
-void TextDeserializer::read(Quat* value)
+void TextDeserializer::read(Ref<Quat> value)
 {
 	skip();
 	value->x = asFloat(readU32());
@@ -286,51 +286,35 @@ void TextDeserializer::read(Quat* value)
 }
 
 
-void TextDeserializer::read(float* value)
+void TextDeserializer::read(Ref<float> value)
 {
 	skip();
-	*value = asFloat(readU32());
+	value = asFloat(readU32());
 }
 
 
-void TextDeserializer::read(double* value)
+void TextDeserializer::read(Ref<double> value)
 {
 	skip();
-	*value = asDouble(readU64());
+	value = asDouble(readU64());
 }
 
 
-void TextDeserializer::read(bool* value)
+void TextDeserializer::read(Ref<bool> value)
 {
 	skip();
-	*value = readU32() != 0;
+	value = readU32() != 0;
 }
 
 
-void TextDeserializer::read(u32* value)
+void TextDeserializer::read(Ref<u32> value)
 {
 	skip();
-	*value = readU32();
+	value = readU32();
 }
 
 
-void TextDeserializer::read(u16* value)
-{
-	skip();
-	char tmp[40];
-	char* c = tmp;
-	*c = blob.readChar();
-	while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
-	{
-		++c;
-		*c = blob.readChar();
-	}
-	*c = 0;
-	fromCString(tmp, lengthOf(tmp), value);
-}
-
-
-void TextDeserializer::read(u64* value)
+void TextDeserializer::read(Ref<u16> value)
 {
 	skip();
 	char tmp[40];
@@ -342,11 +326,27 @@ void TextDeserializer::read(u64* value)
 		*c = blob.readChar();
 	}
 	*c = 0;
-	fromCString(tmp, lengthOf(tmp), value);
+	fromCString(Span(tmp), value);
 }
 
 
-void TextDeserializer::read(i64* value)
+void TextDeserializer::read(Ref<u64> value)
+{
+	skip();
+	char tmp[40];
+	char* c = tmp;
+	*c = blob.readChar();
+	while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
+	{
+		++c;
+		*c = blob.readChar();
+	}
+	*c = 0;
+	fromCString(Span(tmp), value);
+}
+
+
+void TextDeserializer::read(Ref<i64> value)
 {
 	skip();
 	char tmp[40];
@@ -363,11 +363,11 @@ void TextDeserializer::read(i64* value)
 		*c = blob.readChar();
 	}
 	*c = 0;
-	fromCString(tmp, lengthOf(tmp), value);
+	fromCString(Span(tmp), value);
 }
 
 
-void TextDeserializer::read(i32* value)
+void TextDeserializer::read(Ref<i32> value)
 {
 	skip();
 	char tmp[20];
@@ -384,21 +384,21 @@ void TextDeserializer::read(i32* value)
 		*c = blob.readChar();
 	}
 	*c = 0;
-	fromCString(tmp, lengthOf(tmp), value);
+	fromCString(Span(tmp), value);
 }
 
 
-void TextDeserializer::read(u8* value)
+void TextDeserializer::read(Ref<u8> value)
 {
 	skip();
-	*value = (u8)readU32();
+	value = (u8)readU32();
 }
 
 
-void TextDeserializer::read(i8* value)
+void TextDeserializer::read(Ref<i8> value)
 {
 	skip();
-	*value = (i8)readU32();
+	value = (i8)readU32();
 }
 
 
@@ -420,7 +420,7 @@ static int getStringLength(const InputMemoryStream& blob)
 }
 
 
-void TextDeserializer::read(String* value)
+void TextDeserializer::read(Ref<String> value)
 {
 	skip();
 	value->resize(getStringLength(blob) + 1);
@@ -464,7 +464,7 @@ u32 TextDeserializer::readU32()
 	}
 	*c = 0;
 	u32 v;
-	fromCString(tmp, lengthOf(tmp), &v);
+	fromCString(Span<const char>(tmp), Ref(v));
 	return v;
 }
 
@@ -480,7 +480,7 @@ u64 TextDeserializer::readU64()
 	}
 	*c = 0;
 	u64 v;
-	fromCString(tmp, lengthOf(tmp), &v);
+	fromCString(Span(tmp), Ref(v));
 	return v;
 }
 

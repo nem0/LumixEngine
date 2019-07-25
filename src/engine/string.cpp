@@ -191,13 +191,13 @@ String& String::cat(const char* value, int length)
 			m_allocator.deallocate(m_cstr);
 			m_cstr = new_cstr;
 			m_size = new_size;
-			catNString(m_cstr, m_size + 1, value, length);
+			catNString(Span(m_cstr, m_size + 1), value, length);
 		}
 		else
 		{
 			m_size = length;
 			m_cstr = (char*)m_allocator.allocate(m_size + 1);
-			copyNString(m_cstr, m_size + 1, value, length);
+			copyNString(Span(m_cstr, m_size + 1), value, length);
 		}
 	}
 	return *this;
@@ -207,7 +207,7 @@ String& String::cat(const char* value, int length)
 String& String::cat(float value)
 {
 	char tmp[40];
-	toCString(value, tmp, 30, 10);
+	toCString(value, Span(tmp), 10);
 	cat(tmp);
 	return *this;
 }
@@ -248,7 +248,7 @@ void String::insert(int position, const char* value)
 	{
 		m_size = stringLength(value);
 		m_cstr = (char*)m_allocator.allocate(m_size + 1);
-		copyString(m_cstr, m_size + 1, value);
+		copyString(Span(m_cstr, m_size + 1), value);
 	}
 }
 
@@ -265,13 +265,13 @@ String& String::cat(const char* rhs)
 			m_allocator.deallocate(m_cstr);
 			m_cstr = new_cstr;
 			m_size = new_size;
-			catString(m_cstr, m_size + 1, rhs);
+			catString(Span(m_cstr, m_size + 1), rhs);
 		}
 		else
 		{
 			m_size = stringLength(rhs);
 			m_cstr = (char*)m_allocator.allocate(m_size + 1);
-			copyString(m_cstr, m_size + 1, rhs);
+			copyString(Span(m_cstr, m_size + 1), rhs);
 		}
 	}
 	return *this;
@@ -384,8 +384,10 @@ const char* stristr(const char* haystack, const char* needle)
 }
 
 
-bool makeLowercase(char* destination, int length, const char* source)
+bool makeLowercase(Span<char> dst, const char* source)
 {
+	char* destination = dst.begin;
+	u32 length = dst.length();
 	if (!source)
 	{
 		return false;
@@ -413,19 +415,19 @@ const char* findSubstring(const char* haystack, const char* needle)
 }
 
 
-bool copyNString(char* destination, int length, const char* source, int source_len)
+bool copyNString(Span<char> dst, const char* src, int N)
 {
-	ASSERT(length >= 0);
-	ASSERT(source_len >= 0);
-	if (!source)
-	{
-		return false;
-	}
+	if (!src) return false;
 
-	while (*source && length > 1 && source_len)
+	char* destination = dst.begin;
+	const char* source = src;
+	u32 length = dst.length();
+	ASSERT(N >= 0);
+
+	while (*source && length > 1 && N)
 	{
 		*destination = *source;
-		--source_len;
+		--N;
 		--length;
 		++destination;
 		++source;
@@ -433,28 +435,26 @@ bool copyNString(char* destination, int length, const char* source, int source_l
 	if (length > 0)
 	{
 		*destination = 0;
-		return *source == '\0' || source_len == 0;
+		return *source == '\0' || N == 0;
 	}
 	return false;
 }
 
 
-bool copyString(char* destination, int length, const char* source)
+bool copyString(Span<char> dst, const char* src)
 {
-	if (!source || length < 1)
-	{
-		return false;
-	}
+	if (!src || dst.length() < 1) return false;
 
-	while (*source && length > 1)
-	{
-		*destination = *source;
+	u32 length = dst.length();
+	char* tmp = dst.begin;
+	while (*src && length > 1) {
+		*tmp = *src;
 		--length;
-		++destination;
-		++source;
+		++tmp;
+		++src;
 	}
-	*destination = 0;
-	return *source == '\0';
+	*tmp = 0;
+	return *src == '\0';
 }
 
 
@@ -481,28 +481,28 @@ const char* reverseFind(const char* begin_haystack, const char* end_haystack, ch
 }
 
 
-bool catNString(char* destination,
-				int length,
-				const char* source,
-				int source_len)
+bool catNString(Span<char> dst, const char* src, int N)
 {
-	while (*destination && length)
-	{
+	char* destination = dst.begin;
+	u32 length = dst.length();
+	while (*destination && length) {
 		--length;
 		++destination;
 	}
-	return copyNString(destination, length, source, source_len);
+	return copyNString(Span(destination, length), src, N);
 }
 
 
-bool catString(char* destination, int length, const char* source)
+bool catString(Span<char> destination, const char* source)
 {
-	while (*destination && length)
+	char* dst = destination.begin;
+	u32 length = destination.length();
+	while (*dst && length)
 	{
 		--length;
-		++destination;
+		++dst;
 	}
-	return copyString(destination, length, source);
+	return copyString(Span(dst, length), source);
 }
 
 static void reverse(char* str, int length)
@@ -519,20 +519,21 @@ static void reverse(char* str, int length)
 	}
 }
 
-const char* fromCString(const char* input, int length, i32* value)
+const char* fromCString(Span<const char> input, Ref<i32> value)
 {
 	i64 val;
-	const char* ret = fromCString(input, length, &val);
-	*value = (i32)val;
+	const char* ret = fromCString(input, Ref(val));
+	value = (i32)val;
 	return ret;
 }
 
-const char* fromCString(const char* input, int length, i64* value)
+const char* fromCString(Span<const char> input, Ref<i64> value)
 {
+	u32 length = input.length();
 	if (length > 0)
 	{
-		const char* c = input;
-		*value = 0;
+		const char* c = input.begin;
+		value = 0;
 		if (*c == '-')
 		{
 			++c;
@@ -544,42 +545,43 @@ const char* fromCString(const char* input, int length, i64* value)
 		}
 		while (length && *c >= '0' && *c <= '9')
 		{
-			*value *= 10;
-			*value += *c - '0';
+			value *= 10;
+			value += *c - '0';
 			++c;
 			--length;
 		}
 		if (input[0] == '-')
 		{
-			*value = -*value;
+			value = -value;
 		}
 		return c;
 	}
 	return nullptr;
 }
 
-const char* fromCString(const char* input, int length, u16* value)
+const char* fromCString(Span<const char> input, Ref<u16> value)
 {
 	u32 tmp;
-	const char* ret = fromCString(input, length, &tmp);
-	*value = u16(tmp);
+	const char* ret = fromCString(input, Ref(tmp));
+	value = u16(tmp);
 	return ret;
 }
 
-const char* fromCString(const char* input, int length, u32* value)
+const char* fromCString(Span<const char> input, Ref<u32> value)
 {
+	u32 length = input.length();
 	if (length > 0)
 	{
-		const char* c = input;
-		*value = 0;
+		const char* c = input.begin;
+		value = 0;
 		if (*c == '-')
 		{
 			return nullptr;
 		}
 		while (length && *c >= '0' && *c <= '9')
 		{
-			*value *= 10;
-			*value += *c - '0';
+			value *= 10;
+			value += *c - '0';
 			++c;
 			--length;
 		}
@@ -588,18 +590,19 @@ const char* fromCString(const char* input, int length, u32* value)
 	return nullptr;
 }
 
-const char* fromCStringOctal(const char* input, int length, u32* value)
+const char* fromCStringOctal(Span<const char> input, Ref<u32> value)
 {
+	u32 length = input.length();
 	if (length > 0)
 	{
-		const char* c = input;
-		*value = 0;
+		const char* c = input.begin;
+		value = 0;
 		if (*c == '-') {
 			return nullptr;
 		}
 		while (length && *c >= '0' && *c <= '7') {
-			*value *= 8;
-			*value += *c - '0';
+			value *= 8;
+			value += *c - '0';
 			++c;
 			--length;
 		}
@@ -608,20 +611,21 @@ const char* fromCStringOctal(const char* input, int length, u32* value)
 	return nullptr;
 }
 
-const char* fromCString(const char* input, int length, u64* value)
+const char* fromCString(Span<const char> input, Ref<u64> value)
 {
+	u32 length = input.length();
 	if (length > 0)
 	{
-		const char* c = input;
-		*value = 0;
+		const char* c = input.begin;
+		value = 0;
 		if (*c == '-')
 		{
 			return nullptr;
 		}
 		while (length && *c >= '0' && *c <= '9')
 		{
-			*value *= 10;
-			*value += *c - '0';
+			value *= 10;
+			value += *c - '0';
 			++c;
 			--length;
 		}
@@ -631,9 +635,10 @@ const char* fromCString(const char* input, int length, u64* value)
 }
 
 
-bool toCStringPretty(i32 value, char* output, int length)
+bool toCStringPretty(i32 value, Span<char> output)
 {
-	char* c = output;
+	char* c = output.begin;
+	u32 length = output.length();
 	if (length > 0)
 	{
 		if (value < 0)
@@ -643,22 +648,23 @@ bool toCStringPretty(i32 value, char* output, int length)
 			*c = '-';
 			++c;
 		}
-		return toCStringPretty((unsigned int)value, c, length);
+		return toCStringPretty((unsigned int)value, Span(c, length));
 	}
 	return false;
 }
 
 
-bool toCStringPretty(u32 value, char* output, int length)
+bool toCStringPretty(u32 value, Span<char> output)
 {
-	return toCStringPretty(u64(value), output, length);
+	return toCStringPretty(u64(value), output);
 }
 
 
-bool toCStringPretty(u64 value, char* output, int length)
+bool toCStringPretty(u64 value, Span<char> output)
 {
-	char* c = output;
-	char* num_start = output;
+	char* c = output.begin;
+	char* num_start = output.begin;
+	u32 length = output.length();
 	if (length > 0)
 	{
 		if (value == 0)
@@ -700,9 +706,10 @@ bool toCStringPretty(u64 value, char* output, int length)
 }
 
 
-bool toCString(i32 value, char* output, int length)
+bool toCString(i32 value, Span<char> output)
 {
-	char* c = output;
+	char* c = output.begin;
+	u32 length = output.length();
 	if (length > 0)
 	{
 		if (value < 0)
@@ -712,14 +719,15 @@ bool toCString(i32 value, char* output, int length)
 			*c = '-';
 			++c;
 		}
-		return toCString((unsigned int)value, c, length);
+		return toCString((unsigned int)value, Span(c, length));
 	}
 	return false;
 }
 
-bool toCString(i64 value, char* output, int length)
+bool toCString(i64 value, Span<char> output)
 {
-	char* c = output;
+	char* c = output.begin;
+	u32 length = output.length();
 	if (length > 0)
 	{
 		if (value < 0)
@@ -729,15 +737,16 @@ bool toCString(i64 value, char* output, int length)
 			*c = '-';
 			++c;
 		}
-		return toCString((u64)value, c, length);
+		return toCString((u64)value, Span(c, length));
 	}
 	return false;
 }
 
-bool toCString(u64 value, char* output, int length)
+bool toCString(u64 value, Span<char> output)
 {
-	char* c = output;
-	char* num_start = output;
+	char* c = output.begin;
+	char* num_start = output.begin;
+	u32 length = output.length();
 	if (length > 0)
 	{
 		if (value == 0)
@@ -767,9 +776,9 @@ bool toCString(u64 value, char* output, int length)
 	return false;
 }
 
-bool toCStringHex(u8 value, char* output, int length)
+bool toCStringHex(u8 value, Span<char> output)
 {
-	if (length < 2)
+	if (output.length() < 2)
 	{
 		return false;
 	}
@@ -794,10 +803,11 @@ bool toCStringHex(u8 value, char* output, int length)
 	return true;
 }
 
-bool toCString(u32 value, char* output, int length)
+bool toCString(u32 value, Span<char> output)
 {
-	char* c = output;
-	char* num_start = output;
+	char* c = output.begin;
+	char* num_start = output.begin;
+	u32 length = output.length();
 	if (length > 0)
 	{
 		if (value == 0)
@@ -866,8 +876,10 @@ static bool increment(const char* output, char* end, bool is_space_after)
 }
 
 
-bool toCString(float value, char* output, int length, int after_point)
+bool toCString(float value, Span<char> out, int after_point)
 {
+	char* output = out.begin;
+	u32 length = out.length();
 	if (length < 2)
 	{
 		return false;
@@ -936,8 +948,10 @@ bool toCString(float value, char* output, int length, int after_point)
 }
 
 
-bool toCString(double value, char* output, int length, int after_point)
+bool toCString(double value, Span<char> out, int after_point)
 {
+	char* output = out.begin;
+	u32 length = out.length();
 	if (length < 2)
 	{
 		return false;

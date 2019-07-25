@@ -121,12 +121,12 @@ struct AudioSceneImpl final : public AudioScene
 	void deserialize(IDeserializer& serializer) override
 	{
 		int count;
-		serializer.read(&count);
+		serializer.read(Ref(count));
 		m_clips.resize(count);
 		for (int i = 0; i < count; ++i)
 		{
 			bool valid;
-			serializer.read(&valid);
+			serializer.read(Ref(valid));
 			if (!valid)
 			{
 				m_clips[i] = nullptr;
@@ -135,8 +135,8 @@ struct AudioSceneImpl final : public AudioScene
 
 			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
 			m_clips[i] = clip;
-			serializer.read(&clip->volume);
-			serializer.read(&clip->looped);
+			serializer.read(Ref(clip->volume));
+			serializer.read(Ref(clip->looped));
 			serializer.read(clip->name, lengthOf(clip->name));
 			clip->name_hash = crc32(clip->name);
 			char path[MAX_PATH_LENGTH];
@@ -159,8 +159,8 @@ struct AudioSceneImpl final : public AudioScene
 	{
 		EchoZone& zone = m_echo_zones.insert(entity);
 		zone.entity = entity;
-		serializer.read(&zone.radius);
-		serializer.read(&zone.delay);
+		serializer.read(Ref(zone.radius));
+		serializer.read(Ref(zone.delay));
 		m_universe.onComponentCreated(entity, ECHO_ZONE_TYPE, this);
 	}
 
@@ -181,13 +181,13 @@ struct AudioSceneImpl final : public AudioScene
 	{
 		ChorusZone& zone = m_chorus_zones.insert(entity);
 		zone.entity = entity;
-		serializer.read(&zone.radius);
-		serializer.read(&zone.delay);
-		serializer.read(&zone.depth);
-		serializer.read(&zone.feedback);
-		serializer.read(&zone.frequency);
-		serializer.read(&zone.phase);
-		serializer.read(&zone.wet_dry_mix);
+		serializer.read(Ref(zone.radius));
+		serializer.read(Ref(zone.delay));
+		serializer.read(Ref(zone.depth));
+		serializer.read(Ref(zone.feedback));
+		serializer.read(Ref(zone.frequency));
+		serializer.read(Ref(zone.phase));
+		serializer.read(Ref(zone.wet_dry_mix));
 		m_universe.onComponentCreated(entity, CHORUS_ZONE_TYPE, this);
 	}
 
@@ -205,8 +205,8 @@ struct AudioSceneImpl final : public AudioScene
 		sound.playing_sound = -1;
 		sound.entity = entity;
 		int clip;
-		serializer.read(&clip);
-		serializer.read(&sound.is_3d);
+		serializer.read(Ref(clip));
+		serializer.read(Ref(sound.is_3d));
 		sound.clip = clip >= 0 ? m_clips[clip] : nullptr;
 		m_universe.onComponentCreated(entity, AMBIENT_SOUND_TYPE, this);
 	}

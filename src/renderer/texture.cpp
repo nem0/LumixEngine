@@ -71,7 +71,7 @@ void Texture::destroy()
 }
 
 
-bool Texture::create(int w, int h, ffr::TextureFormat format, const void* data, uint size)
+bool Texture::create(int w, int h, ffr::TextureFormat format, const void* data, u32 size)
 {
 	Renderer::MemRef memory = renderer.copy(data, size);
 	handle = renderer.createTexture(w, h, 1, format, getFFRFlags() | (u32)ffr::TextureFlags::NO_MIPS, memory, getPath().c_str());
@@ -260,7 +260,7 @@ void Texture::save()
 {
 	char ext[5];
 	ext[0] = 0;
-	PathUtils::getExtension(ext, 5, getPath().c_str());
+	PathUtils::getExtension(Span(ext), getPath().c_str());
 	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();

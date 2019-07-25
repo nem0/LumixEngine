@@ -5,8 +5,10 @@
 namespace Lumix::PathUtils
 {
 
-void normalize(const char* path, char* out, u32 max_size)
+void normalize(const char* path, Span<char> output)
 {
+	char* out = output.begin;
+	u32 max_size = output.length();
 	ASSERT(max_size > 0);
 	u32 i = 0;
 
@@ -42,10 +44,10 @@ void normalize(const char* path, char* out, u32 max_size)
 	(i < max_size ? *out : *(out - 1)) = '\0';
 }
 
-void getDir(char* dir, int max_length, const char* src)
+void getDir(Span<char> dir, const char* src)
 {
-	copyString(dir, max_length, src);
-	for (int i = stringLength(dir) - 1; i >= 0; --i)
+	copyString(dir, src);
+	for (int i = stringLength(dir.begin) - 1; i >= 0; --i)
 	{
 		if (dir[i] == '\\' || dir[i] == '/')
 		{
@@ -57,7 +59,7 @@ void getDir(char* dir, int max_length, const char* src)
 	dir[0] = '\0';
 }
 
-void getBasename(char* basename, int max_length, const char* src)
+void getBasename(Span<char> basename, const char* src)
 {
 	basename[0] = '\0';
 	for (int i = stringLength(src) - 1; i >= 0; --i)
@@ -66,9 +68,9 @@ void getBasename(char* basename, int max_length, const char* src)
 		{
 			if (src[i] == '\\' || src[i] == '/')
 				++i;
-			int j = 0;
+			u32 j = 0;
 			basename[j] = src[i];
-			while (j < max_length - 1 && src[i + j] && src[i + j] != '.')
+			while (j < basename.length() - 1 && src[i + j] && src[i + j] != '.')
 			{
 				++j;
 				basename[j] = src[j + i];
@@ -80,15 +82,15 @@ void getBasename(char* basename, int max_length, const char* src)
 }
 
 
-void getExtension(char* extension, int max_length, const char* src)
+void getExtension(Span<char> extension, const char* src)
 {
-	ASSERT(max_length > 0);
+	ASSERT(extension.length() > 0);
 	for (int i = stringLength(src) - 1; i >= 0; --i)
 	{
 		if (src[i] == '.')
 		{
 			++i;
-			copyString(extension, max_length, src + i);
+			copyString(extension, src + i);
 			return;
 		}
 	}
@@ -124,8 +126,8 @@ bool replaceExtension(char* path, const char* ext)
 bool hasExtension(const char* filename, const char* ext)
 {
 	char tmp[20];
-	getExtension(tmp, lengthOf(tmp), filename);
-	makeLowercase(tmp, lengthOf(tmp), tmp);
+	getExtension(Span(tmp), filename);
+	makeLowercase(Span(tmp), tmp);
 
 	return equalStrings(tmp, ext);
 }

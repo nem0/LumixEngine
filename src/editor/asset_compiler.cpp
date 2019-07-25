@@ -149,7 +149,7 @@ struct AssetCompilerImpl : AssetCompiler
 	ResourceType getResourceType(const char* path) const override
 	{
 		char ext[16];
-		PathUtils::getExtension(ext, lengthOf(ext), path);
+		PathUtils::getExtension(Span(ext), path);
 
 		auto iter = m_registered_extensions.find(crc32(ext));
 		if (iter.isValid()) return iter.value();
@@ -178,8 +178,8 @@ struct AssetCompilerImpl : AssetCompiler
 	void addResource(const char* fullpath)
 	{
 		char ext[10];
-		PathUtils::getExtension(ext, sizeof(ext), fullpath);
-		makeLowercase(ext, lengthOf(ext), ext);
+		PathUtils::getExtension(Span(ext), fullpath);
+		makeLowercase(Span(ext), ext);
 	
 		auto iter = m_plugins.find(crc32(ext));
 		if (!iter.isValid()) return;
@@ -420,7 +420,7 @@ struct AssetCompilerImpl : AssetCompiler
 	bool compile(const Path& src) override
 	{
 		char ext[16];
-		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
+		PathUtils::getExtension(Span(ext), src.c_str());
 		const u32 hash = crc32(ext);
 		MT::CriticalSectionLock lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);

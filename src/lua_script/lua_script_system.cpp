@@ -464,7 +464,7 @@ namespace Lumix
 					char tmp[1024];
 					tmp[0] = '\0';
 					const char* prop_name = getPropertyName(prop.name_hash);
-					if(prop_name) getPropertyValue(entity, i, getPropertyName(prop.name_hash), tmp, lengthOf(tmp));
+					if(prop_name) getPropertyValue(entity, i, getPropertyName(prop.name_hash), Span(tmp));
 					blob.writeString(prop_name ? tmp : prop.stored_value.c_str());
 				}
 			}
@@ -1235,10 +1235,9 @@ namespace Lumix
 		void getPropertyValue(EntityRef entity,
 			int scr_index,
 			const char* property_name,
-			char* out,
-			int max_size) override
+			Span<char> out) override
 		{
-			ASSERT(max_size > 0);
+			ASSERT(out.length() > 0);
 
 			u32 hash = crc32(property_name);
 			auto& inst = m_scripts[entity]->m_scripts[scr_index];
@@ -1247,31 +1246,31 @@ namespace Lumix
 				if (prop.name_hash == hash)
 				{
 					if (inst.m_script->isReady())
-						getProperty(prop, property_name, inst, out, max_size);
+						getProperty(prop, property_name, inst, out);
 					else
-						copyString(out, max_size, prop.stored_value.c_str());
+						copyString(out, prop.stored_value.c_str());
 					return;
 				}
 			}
-			*out = '\0';
+			out[0] = '\0';
 		}
 
 
-		void getProperty(Property& prop, const char* prop_name, ScriptInstance& scr, char* out, int max_size)
+		void getProperty(Property& prop, const char* prop_name, ScriptInstance& scr, Span<char> out)
 		{
-			if(max_size <= 0) return;
+			if (out.length() <= 0) return;
 			if (!scr.m_state)
 			{
-				copyString(out, max_size, prop.stored_value.c_str());
+				copyString(out, prop.stored_value.c_str());
 				return;
 			}
 
-			*out = '\0';
+			out[0] = '\0';
 			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
 			lua_getfield(scr.m_state, -1, prop_name);
 			if (lua_type(scr.m_state, -1) == LUA_TNIL)
 			{
-				copyString(out, max_size, prop.stored_value.c_str());
+				copyString(out, prop.stored_value.c_str());
 				lua_pop(scr.m_state, 2);
 				return;
 			}
@@ -1280,37 +1279,37 @@ namespace Lumix
 				case Property::BOOLEAN:
 				{
 					bool b = lua_toboolean(scr.m_state, -1) != 0;
-					copyString(out, max_size, b ? "true" : "false");
+					copyString(out, b ? "true" : "false");
 				}
 				break;
 				case Property::FLOAT:
 				{
 					float val = (float)lua_tonumber(scr.m_state, -1);
-					toCString(val, out, max_size, 8);
+					toCString(val, out, 8);
 				}
 				break;
 				case Property::INT:
 				{
 					int val = (int )lua_tointeger(scr.m_state, -1);
-					toCString(val, out, max_size);
+					toCString(val, out);
 				}
 				break;
 				case Property::ENTITY:
 				{
 					EntityRef val = { (int)lua_tointeger(scr.m_state, -1) };
-					toCString(val.index, out, max_size);
+					toCString(val.index, out);
 				}
 				break;
 				case Property::STRING:
 				{
-					copyString(out, max_size, lua_tostring(scr.m_state, -1));
+					copyString(out, lua_tostring(scr.m_state, -1));
 				}
 				break;
 				case Property::RESOURCE:
 				{
 					int res_idx = LuaWrapper::toType<int>(scr.m_state, -1);
 					Resource* res = m_system.m_engine.getLuaResource(res_idx);
-					copyString(out, max_size, res ? res->getPath().c_str() : "");
+					copyString(out, res ? res->getPath().c_str() : "");
 				}
 				break;
 				default: ASSERT(false); break;
@@ -1350,14 +1349,14 @@ namespace Lumix
 								EntityRef val = {(int)lua_tointeger(inst.m_state, -1)};
 								EntityGUID guid = serializer.getGUID(val);
 								char tmp[128];
-								toCString(guid.value, tmp, lengthOf(tmp));
+								toCString(guid.value, Span(tmp));
 								serializer.write("prop_value", tmp);
 							}
 						}
 						else
 						{
 							char tmp[1024];
-							getProperty(prop, name, inst, tmp, lengthOf(tmp));
+							getProperty(prop, name, inst, Span(tmp));
 							serializer.write("prop_value", tmp);
 						}
 					}
@@ -1379,7 +1378,7 @@ namespace Lumix
 			m_scripts.insert(entity, script);
 			
 			int count;
-			serializer.read(&count);
+			serializer.read(Ref(count));
 			script->m_scripts.reserve(count);
 			for (int i = 0; i < count; ++i)
 			{
@@ -1388,10 +1387,10 @@ namespace Lumix
 				serializer.read(tmp, lengthOf(tmp));
 				setScriptPath(entity, i, Path(tmp));
 				if(scene_version >(int)LuaSceneVersion::FLAGS)
-					serializer.read(&inst.m_flags.base);
+					serializer.read(Ref(inst.m_flags.base));
 
 				int prop_count;
-				serializer.read(&prop_count);
+				serializer.read(Ref(prop_count));
 				for (int j = 0; j < prop_count; ++j)
 				{
 					char tmp[1024];
@@ -1414,15 +1413,15 @@ namespace Lumix
 						prop = &inst.m_properties[prop_idx];
 					}
 					tmp[0] = 0;
-					if (scene_version > (int)LuaSceneVersion::PROPERTY_TYPE) serializer.read((int*)&prop->type);
+					if (scene_version > (int)LuaSceneVersion::PROPERTY_TYPE) serializer.read(Ref((int&)prop->type));
 					serializer.read(tmp, lengthOf(tmp));
 					
 					if (prop->type == Property::ENTITY)
 					{
 						u64 guid;
-						fromCString(tmp, lengthOf(tmp), &guid);
+						fromCString(Span(tmp), Ref(guid));
 						const EntityPtr entity = serializer.getEntity({guid});
-						toCString(entity.index, tmp, lengthOf(tmp));
+						toCString(entity.index, Span(tmp));
 					}
 					prop->stored_value = tmp;
 					applyProperty(inst, *prop, tmp);
@@ -1454,7 +1453,7 @@ namespace Lumix
 						{
 							const char* name = m_property_names.at(idx).c_str();
 							char tmp[1024];
-							getProperty(prop, name, scr, tmp, lengthOf(tmp));
+							getProperty(prop, name, scr, Span(tmp));
 							serializer.writeString(tmp);
 						}
 						else
@@ -1874,7 +1873,7 @@ namespace Lumix
 				}
 				else
 				{
-					getProperty(prop, property_name, scr, tmp, lengthOf(tmp));
+					getProperty(prop, property_name, scr, Span(tmp));
 					blob.writeString(tmp);
 				}
 			}
