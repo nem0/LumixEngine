@@ -26,12 +26,12 @@ String::String(const String& rhs, int start, i32 length)
 }
 
 
-String::String(const char* rhs, i32 length, IAllocator& allocator)
+String::String(Span<const char> rhs, IAllocator& allocator)
 	: m_allocator(allocator)
 {
-	m_size = length;
+	m_size = rhs.length();
 	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-	copyMemory(m_cstr, rhs, m_size * sizeof(char));
+	copyMemory(m_cstr, rhs.begin, m_size * sizeof(char));
 	m_cstr[m_size] = 0;
 }
 
@@ -173,15 +173,10 @@ void String::resize(int size)
 }
 
 
-String& String::cat(const StringView& value)
+String& String::cat(Span<const char> value)
 {
-	return cat(value.begin, value.length());
-}
-
-
-String& String::cat(const char* value, int length)
-{
-	if (value < m_cstr || value >= m_cstr + m_size)
+	const u32 length = value.length();
+	if (value.begin < m_cstr || value.begin >= m_cstr + m_size)
 	{
 		if (m_cstr)
 		{
@@ -191,13 +186,13 @@ String& String::cat(const char* value, int length)
 			m_allocator.deallocate(m_cstr);
 			m_cstr = new_cstr;
 			m_size = new_size;
-			catNString(Span(m_cstr, m_size + 1), value, length);
+			catNString(Span(m_cstr, m_size + 1), value.begin, length);
 		}
 		else
 		{
 			m_size = length;
 			m_cstr = (char*)m_allocator.allocate(m_size + 1);
-			copyNString(Span(m_cstr, m_size + 1), value, length);
+			copyNString(Span(m_cstr, m_size + 1), value.begin, length);
 		}
 	}
 	return *this;

@@ -87,7 +87,7 @@ inline bool pcall(lua_State* L, int nargs)
 
 
 inline bool execute(lua_State* L
-	, StringView content
+	, Span<const char> content
 	, const char* name
 	, int nresults)
 {

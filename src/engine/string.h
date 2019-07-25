@@ -78,16 +78,6 @@ template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
 }
 
 
-struct StringView : Span<const char>
-{
-	using Span<const char>::Span;
-	StringView(const char* begin)
-		: Span<const char>(begin, stringLength(begin))
-	{
-	}
-};
-
-
 template <int SIZE> struct StaticString
 {
 	StaticString() { data[0] = '\0'; }
@@ -116,7 +106,7 @@ template <int SIZE> struct StaticString
 	template <int value_size> void add(StaticString<value_size>& value) { catString(data, value.data); }
 	void add(const char* value) { catString(data, value); }
 	void add(char* value) { catString(data, value); }
-	void add(const StringView& value) { catNString(Span(data), value.begin, value.length()); }
+	void add(const Span<const char>& value) { catNString(Span(data), value.begin, value.length()); }
 
 	void operator=(const char* str) { copyString(data, str); }
 
@@ -167,7 +157,7 @@ class LUMIX_ENGINE_API String
 public:
 	explicit String(IAllocator& allocator);
 	String(const String& rhs, int start, i32 length);
-	String(const char* rhs, i32 length, IAllocator& allocator);
+	String(Span<const char> rhs, IAllocator& allocator);
 	String(const String& rhs);
 	String(String&& rhs);
 	String(const char* rhs, IAllocator& allocator);
@@ -188,9 +178,8 @@ public:
 	int length() const { return m_size; }
 	const char* c_str() const { return m_cstr; }
 	String substr(int start, int length) const;
-	String& cat(const char* value, int length);
+	String& cat(Span<const char> value);
 	String& cat(float value);
-	String& cat(const StringView& value);
 	String& cat(char* value);
 	String& cat(const char* value);
 	void insert(int position, const char* value);

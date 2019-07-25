@@ -151,7 +151,7 @@ LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);
 LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
 LUMIX_ENGINE_API void setCurrentDirectory(const char* path);
-LUMIX_ENGINE_API void getCurrentDirectory(char* buffer, int buffer_size);
+LUMIX_ENGINE_API void getCurrentDirectory(Span<char> path);
 LUMIX_ENGINE_API bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
 LUMIX_ENGINE_API bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
 LUMIX_ENGINE_API bool getOpenDirectory(Span<char> out, const char* starting_dir);
@@ -171,7 +171,7 @@ LUMIX_ENGINE_API void unclipCursor();
 
 LUMIX_ENGINE_API void quit();
 
-LUMIX_ENGINE_API void getDropFile(const Event& event, int idx, char* out, int max_size);
+LUMIX_ENGINE_API void getDropFile(const Event& event, int idx, Span<char> out);
 LUMIX_ENGINE_API int getDropFileCount(const Event& event);
 LUMIX_ENGINE_API void finishDrag(const Event& event);
 
@@ -191,15 +191,15 @@ LUMIX_ENGINE_API bool isMaximized(WindowHandle win);
 LUMIX_ENGINE_API WindowHandle getFocused();
 
 LUMIX_ENGINE_API bool isKeyDown(Keycode keycode);
-LUMIX_ENGINE_API void getKeyName(Keycode keycode, char* out, int size);
+LUMIX_ENGINE_API void getKeyName(Keycode keycode, Span<char> out);
 LUMIX_ENGINE_API int getDPI();
 LUMIX_ENGINE_API void UTF32ToUTF8(u32 utf32, char* utf8);
 
 LUMIX_ENGINE_API bool copyFile(const char* from, const char* to);
-LUMIX_ENGINE_API void getExecutablePath(char* buffer, int buffer_size);
+LUMIX_ENGINE_API void getExecutablePath(Span<char> path);
 LUMIX_ENGINE_API void messageBox(const char* text);
 LUMIX_ENGINE_API void setCommandLine(int, char**);
-LUMIX_ENGINE_API bool getCommandLine(char* output, int max_size);
+LUMIX_ENGINE_API bool getCommandLine(Span<char> output);
 LUMIX_ENGINE_API void* loadLibrary(const char* path);
 LUMIX_ENGINE_API void unloadLibrary(void* handle);
 LUMIX_ENGINE_API void* getLibrarySymbol(void* handle, const char* name);

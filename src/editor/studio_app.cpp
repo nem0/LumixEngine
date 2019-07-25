@@ -227,7 +227,7 @@ public:
 			case OS::Event::Type::DROP_FILE:
 				for(int i = 0, c = OS::getDropFileCount(event); i < c; ++i) {
 					char tmp[MAX_PATH_LENGTH];
-					OS::getDropFile(event, i, tmp, lengthOf(tmp));
+					OS::getDropFile(event, i, Span(tmp));
 					for (GUIPlugin* plugin : m_gui_plugins) {
 						if (plugin->onDropFile(tmp)) break;
 					}
@@ -286,7 +286,7 @@ public:
 		}
 
 		char current_dir[MAX_PATH_LENGTH];
-		OS::getCurrentDirectory(current_dir, lengthOf(current_dir));
+		OS::getCurrentDirectory(Span(current_dir));
 
 		char data_dir[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
@@ -873,7 +873,7 @@ public:
 		buf[0] = 0;
 		for (int i = 0; i < lengthOf(action.shortcut); ++i) {
 			char tmp[64];
-			OS::getKeyName(action.shortcut[i], tmp, sizeof(tmp));
+			OS::getKeyName(action.shortcut[i], Span(tmp));
 			if (tmp[0] == 0) return;
 			if (i > 0) catString(buf, " - ");
 			catString(buf, tmp);
@@ -1690,7 +1690,7 @@ public:
 	{
 		logInfo("Editor") << "Loading settings...";
 		char cmd_line[2048];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -1802,7 +1802,7 @@ public:
 	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH_LENGTH])
 	{
 		char tmp_path[MAX_PATH_LENGTH];
-		OS::getExecutablePath(tmp_path, lengthOf(tmp_path));
+		OS::getExecutablePath(Span(tmp_path));
 		StaticString<MAX_PATH_LENGTH> copy_path;
 		PathUtils::getDir(Span(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
@@ -1837,7 +1837,7 @@ public:
 	void loadUserPlugins()
 	{
 		char cmd_line[2048];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
@@ -1966,7 +1966,7 @@ public:
 	bool shouldSleepWhenInactive()
 	{
 		char cmd_line[2048];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -1981,7 +1981,7 @@ public:
 	{
 		char cmd_line[2048];
 		char path[MAX_PATH_LENGTH];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2000,7 +2000,7 @@ public:
 	static void checkDataDirCommandLine(char* dir, int max_size)
 	{
 		char cmd_line[2048];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2326,7 +2326,7 @@ public:
 	void checkScriptCommandLine()
 	{
 		char command_line[1024];
-		OS::getCommandLine(command_line, lengthOf(command_line));
+		OS::getCommandLine(Span(command_line));
 		CommandLineParser parser(command_line);
 		while (parser.next())
 		{
@@ -2570,7 +2570,7 @@ public:
 		if (!OS::fileExists("bin/app.exe"))
 		{
 			char tmp[MAX_PATH_LENGTH];
-			OS::getExecutablePath(tmp, lengthOf(tmp));
+			OS::getExecutablePath(Span(tmp));
 			PathUtils::getDir(Span(src_dir.data), tmp);
 		}
 		for (auto& file : bin_files)

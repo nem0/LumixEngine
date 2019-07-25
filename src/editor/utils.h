@@ -13,8 +13,8 @@ namespace Lumix
 struct LUMIX_EDITOR_API ResourceLocator {
 	ResourceLocator(const char* path);
 
-	StringView name;
-	StringView filepath;
+	Span<const char> name;
+	Span<const char> filepath;
 	char full[MAX_PATH_LENGTH];
 };
 
