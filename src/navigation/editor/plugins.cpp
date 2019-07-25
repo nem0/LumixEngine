@@ -63,9 +63,9 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		ImGui::SameLine();
 		if (ImGui::Button("Load")) {
 			char path[MAX_PATH_LENGTH];
-			if (OS::getOpenFilename(path, lengthOf(path), "Navmesh\0*.nav\0", nullptr)) {
+			if (OS::getOpenFilename(Span(path), "Navmesh\0*.nav\0", nullptr)) {
 				char rel[MAX_PATH_LENGTH];
-				m_app.getWorldEditor().makeRelative(rel, lengthOf(rel), path);
+				m_app.getWorldEditor().makeRelative(Span(rel), path);
 				scene->load((EntityRef)cmp.entity, rel);
 			}		
 		}
@@ -74,9 +74,9 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
 				char path[MAX_PATH_LENGTH];
-				if (OS::getSaveFilename(path, lengthOf(path), "Navmesh\0*.nav\0", "nav")) {
+				if (OS::getSaveFilename(Span(path), "Navmesh\0*.nav\0", "nav")) {
 					char rel[MAX_PATH_LENGTH];
-					m_app.getWorldEditor().makeRelative(rel, lengthOf(rel), path);
+					m_app.getWorldEditor().makeRelative(Span(rel), path);
 					scene->save((EntityRef)cmp.entity, rel);
 				}
 			}

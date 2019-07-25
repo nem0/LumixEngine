@@ -72,10 +72,10 @@ bool Sprite::load(u64 size, const u8* mem)
 	char tmp[MAX_PATH_LENGTH];
 	serializer.read(tmp, lengthOf(tmp));
 	type = equalStrings(tmp, "simple") ? SIMPLE : PATCH9; 
-	serializer.read(&top);
-	serializer.read(&bottom);
-	serializer.read(&left);
-	serializer.read(&right);
+	serializer.read(Ref(top));
+	serializer.read(Ref(bottom));
+	serializer.read(Ref(left));
+	serializer.read(Ref(right));
 	serializer.read(tmp, lengthOf(tmp));
 	ResourceManagerHub& mng = m_resource_manager.getOwner();
 	m_texture = tmp[0] != '\0' ? mng.load<Texture>(Path(tmp)) : nullptr;

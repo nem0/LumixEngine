@@ -58,7 +58,7 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 	TextDeserializer serializer(file, dummy_map);
 	
 	int count;
-	serializer.read(&count);
+	serializer.read(Ref(count));
 	for (int i = 0; i < count; ++i) {
 		Curve& curve = curves.emplace(m_allocator);
 		char tmp[32];
@@ -68,12 +68,12 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 		u32 prop_hash = crc32(tmp);
 		
 		int keys_count;
-		serializer.read(&keys_count);
+		serializer.read(Ref(keys_count));
 		curve.frames.resize(keys_count);
 		curve.values.resize(keys_count);
 		for (int j = 0; j < keys_count; ++j) {
-			serializer.read(&curve.frames[i]);
-			serializer.read(&curve.values[i]);
+			serializer.read(Ref(curve.frames[i]));
+			serializer.read(Ref(curve.values[i]));
 		}
 	}
 	return true;

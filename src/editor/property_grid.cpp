@@ -150,7 +150,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		prop.getValue(cmp, m_index, blob);
 
 		char buf[128];
-		getEntityListDisplayName(m_editor, buf, lengthOf(buf), entity);
+		getEntityListDisplayName(m_editor, Span(buf), entity);
 		ImGui::PushID(prop.name);
 		
 		float item_w = ImGui::CalcItemWidth();
@@ -183,7 +183,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			ImGui::LabellessInputText("Filter", entity_filter, sizeof(entity_filter));
 			for (EntityPtr i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity((EntityRef)i))
 			{
-				getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
+				getEntityListDisplayName(m_editor, Span(buf), i);
 				bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
 				if (show && ImGui::Selectable(buf))
 				{
@@ -305,7 +305,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 		if (attrs.resource_type != INVALID_RESOURCE_TYPE)
 		{
-			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), tmp, sizeof(tmp), attrs.resource_type))
+			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), Span(tmp), attrs.resource_type))
 			{
 				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
 			}
@@ -432,7 +432,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[10];
-			toCString(i, tmp, sizeof(tmp));
+			toCString(i, Span(tmp));
 			ImGui::PushID(i);
 			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
 			bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
@@ -597,7 +597,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, EntityPtr&
 	ImGui::PushItemWidth(
 		item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2 - style.ItemSpacing.x);
 	char buf[50];
-	getEntityListDisplayName(m_editor, buf, sizeof(buf), entity);
+	getEntityListDisplayName(m_editor, Span(buf), entity);
 	ImGui::LabelText("", "%s", buf);
 	ImGui::SameLine();
 	StaticString<30> popup_name("pu", str_id);
@@ -644,7 +644,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, EntityPtr&
 			{
 				for (EntityPtr i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity((EntityRef)i))
 				{
-					getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
+					getEntityListDisplayName(m_editor, Span(buf), i);
 					if (stristr(buf, entity_filter) == nullptr) continue;
 					if (ImGui::Selectable(buf))
 					{
@@ -660,7 +660,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, EntityPtr&
 			{
 				for (EntityPtr i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity((EntityRef)i))
 				{
-					getEntityListDisplayName(m_editor, buf, lengthOf(buf), i);
+					getEntityListDisplayName(m_editor, Span(buf), i);
 					if (ImGui::Selectable(buf))
 					{
 						ImGui::ListBoxFooter();
@@ -714,14 +714,14 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 		else
 		{
 			char guid_str[32];
-			toCString(guid.value, guid_str, lengthOf(guid_str));
+			toCString(guid.value, Span(guid_str));
 			ImGui::Text("ID: %d, GUID: %s", entities[0].index, guid_str);
 		}
 
 		EntityPtr parent = m_editor.getUniverse()->getParent(entities[0]);
 		if (parent.isValid())
 		{
-			getEntityListDisplayName(m_editor, name, lengthOf(name), parent);
+			getEntityListDisplayName(m_editor, Span(name), parent);
 			ImGui::LabelText("Parent", "%s", name);
 
 			Transform tr = m_editor.getUniverse()->getLocalTransform(entities[0]);

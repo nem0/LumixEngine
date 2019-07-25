@@ -749,14 +749,14 @@ EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 	PrefabEntityGUIDMap entity_map(entities);
 	TextDeserializer deserializer(blob, entity_map);
 	u32 version;
-	deserializer.read(&version);
+	deserializer.read(Ref(version));
 	if (version > (int)PrefabVersion::LAST)
 	{
 		logError("Engine") << "Prefab " << prefab.getPath() << " has unsupported version.";
 		return INVALID_ENTITY;
 	}
 	int count;
-	deserializer.read(&count);
+	deserializer.read(Ref(count));
 	int entity_idx = 0;
 	entities.reserve(count);
 	for (int i = 0; i < count; ++i)
@@ -766,33 +766,33 @@ EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
 	while (blob.getPosition() < blob.size() && entity_idx < count)
 	{
 		u64 prefab;
-		deserializer.read(&prefab);
+		deserializer.read(Ref(prefab));
 		EntityRef entity = entities[entity_idx];
 		setTransform(entity, {pos, rot, scale});
 		if (version > (int)PrefabVersion::WITH_HIERARCHY)
 		{
 			EntityPtr parent;
 
-			deserializer.read(&parent);
+			deserializer.read(Ref(parent));
 			if (parent.isValid())
 			{
 				RigidTransform local_tr;
-				deserializer.read(&local_tr);
+				deserializer.read(Ref(local_tr));
 				float scale;
-				deserializer.read(&scale);
+				deserializer.read(Ref(scale));
 				setParent(parent, entity);
 				setLocalTransform(entity, {local_tr.pos, local_tr.rot, scale});
 			}
 		}
 		u32 cmp_type_hash;
-		deserializer.read(&cmp_type_hash);
+		deserializer.read(Ref(cmp_type_hash));
 		while (cmp_type_hash != 0)
 		{
 			ComponentType cmp_type = Reflection::getComponentTypeFromHash(cmp_type_hash);
 			int scene_version;
-			deserializer.read(&scene_version);
+			deserializer.read(Ref(scene_version));
 			deserializeComponent(deserializer, entity, cmp_type, scene_version);
-			deserializer.read(&cmp_type_hash);
+			deserializer.read(Ref(cmp_type_hash));
 		}
 		++entity_idx;
 	}

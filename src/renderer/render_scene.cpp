@@ -618,7 +618,7 @@ public:
 
 		char path[MAX_PATH_LENGTH];
 		serializer.read(path, lengthOf(path));
-		serializer.read(&r.flags.base);
+		serializer.read(Ref(r.flags.base));
 
 		if (path[0] != 0)
 		{
@@ -649,15 +649,15 @@ public:
 	{
 		Environment light;
 		light.m_entity = entity;
-		serializer.read(&light.m_cascades);
-		serializer.read(&light.m_diffuse_color);
-		serializer.read(&light.m_diffuse_intensity);
-		serializer.read(&light.m_indirect_intensity);
-		serializer.read(&light.m_fog_bottom);
-		serializer.read(&light.m_fog_color);
-		serializer.read(&light.m_fog_density);
-		serializer.read(&light.m_fog_height);
-		serializer.read(&light.flags.base);
+		serializer.read(Ref(light.m_cascades));
+		serializer.read(Ref(light.m_diffuse_color));
+		serializer.read(Ref(light.m_diffuse_intensity));
+		serializer.read(Ref(light.m_indirect_intensity));
+		serializer.read(Ref(light.m_fog_bottom));
+		serializer.read(Ref(light.m_fog_color));
+		serializer.read(Ref(light.m_fog_density));
+		serializer.read(Ref(light.m_fog_height));
+		serializer.read(Ref(light.flags.base));
 		m_environments.insert(entity, light);
 		m_universe.onComponentCreated(light.m_entity, ENVIRONMENT_TYPE, this);
 		m_active_global_light_entity = entity;
@@ -680,12 +680,12 @@ public:
 	{
 		PointLight light;
 		light.entity = entity;
-		serializer.read(&light.attenuation_param);
-		serializer.read(&light.cast_shadows);
-		serializer.read(&light.color);
-		serializer.read(&light.intensity);
-		serializer.read(&light.fov);
-		serializer.read(&light.range);
+		serializer.read(Ref(light.attenuation_param));
+		serializer.read(Ref(light.cast_shadows));
+		serializer.read(Ref(light.color));
+		serializer.read(Ref(light.intensity));
+		serializer.read(Ref(light.fov));
+		serializer.read(Ref(light.range));
 		m_point_lights.insert(entity, light);
 		
 		const DVec3 pos = m_universe.getPosition(entity);
@@ -710,7 +710,7 @@ public:
 		Decal& decal = m_decals[entity];
 		char tmp[MAX_PATH_LENGTH];
 		decal.entity = entity;
-		serializer.read(&decal.half_extents);
+		serializer.read(Ref(decal.half_extents));
 		serializer.read(tmp, lengthOf(tmp));
 		setDecalMaterialPath(entity, Path(tmp));
 		updateDecalInfo(decal);
@@ -882,11 +882,11 @@ public:
 
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		serializer.read(&text.color);
+		serializer.read(Ref(text.color));
 		int font_size;
-		serializer.read(&font_size);
+		serializer.read(Ref(font_size));
 		text.setFontSize(font_size);
-		serializer.read(&text.text);
+		serializer.read(Ref(text.text));
 		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
 		FontResource* res = tmp[0] ? manager.load<FontResource>(Path(tmp)) : nullptr;
 		text.setFontResource(res);
@@ -909,11 +909,11 @@ public:
 	{
 		Camera camera;
 		camera.entity = entity;
-		serializer.read(&camera.far);
-		serializer.read(&camera.fov);
-		serializer.read(&camera.is_ortho);
-		serializer.read(&camera.ortho_size);
-		serializer.read(&camera.near);
+		serializer.read(Ref(camera.far));
+		serializer.read(Ref(camera.fov));
+		serializer.read(Ref(camera.is_ortho));
+		serializer.read(Ref(camera.ortho_size));
+		serializer.read(Ref(camera.near));
 		m_cameras.insert(camera.entity, camera);
 		m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
 	}
@@ -932,9 +932,9 @@ public:
 	{
 		BoneAttachment& bone_attachment = m_bone_attachments.emplace(entity);
 		bone_attachment.entity = entity;
-		serializer.read(&bone_attachment.bone_index);
-		serializer.read(&bone_attachment.parent_entity);
-		serializer.read(&bone_attachment.relative_transform);
+		serializer.read(Ref(bone_attachment.bone_index));
+		serializer.read(Ref(bone_attachment.parent_entity));
+		serializer.read(Ref(bone_attachment.relative_transform));
 		m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
 		EntityPtr parent_entity = bone_attachment.parent_entity;
 		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
@@ -966,21 +966,21 @@ public:
 		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
 		m_terrains.insert(entity, terrain);
 		terrain->m_entity = entity;
-		serializer.read(&terrain->m_layer_mask);
-		serializer.read(&terrain->m_scale);
+		serializer.read(Ref(terrain->m_layer_mask));
+		serializer.read(Ref(terrain->m_scale));
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
 		auto* material = tmp[0] ? m_engine.getResourceManager().load<Material>(Path(tmp)) : nullptr;
 		terrain->setMaterial(material);
 
 		int count;
-		serializer.read(&count);
+		serializer.read(Ref(count));
 		for(int i = 0; i < count; ++i)
 		{
 			Terrain::GrassType type(*terrain);
-			serializer.read(&type.m_density);
-			serializer.read(&type.m_distance);
-			serializer.read((int*)&type.m_rotation_mode);
+			serializer.read(Ref(type.m_density));
+			serializer.read(Ref(type.m_distance));
+			serializer.read(Ref((int&)type.m_rotation_mode));
 			type.m_idx = i;
 			serializer.read(tmp, lengthOf(tmp));
 			terrain->m_grass_types.push(type);
@@ -1010,12 +1010,12 @@ public:
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
-		serializer.read(&probe.guid);
-		serializer.read(&probe.flags.base);
-		serializer.read(&probe.radius);
-		serializer.read(&probe.radiance_size);
-		serializer.read(&probe.irradiance_size);
-		serializer.read(&probe.reflection_size);
+		serializer.read(Ref(probe.guid));
+		serializer.read(Ref(probe.flags.base));
+		serializer.read(Ref(probe.radius));
+		serializer.read(Ref(probe.radiance_size));
+		serializer.read(Ref(probe.irradiance_size));
+		serializer.read(Ref(probe.reflection_size));
 
 		StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 		

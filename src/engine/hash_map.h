@@ -132,7 +132,7 @@ private:
 	template <typename HM, typename K, typename V>
 	struct iterator_base {
 		HM* hm;
-		uint idx;
+		u32 idx;
 
 		template <typename HM, typename K, typename V>
 		bool operator !=(const iterator_base<HM, K, V>& rhs) const {
@@ -148,7 +148,7 @@ private:
 
 		void operator++() { 
 			const Slot* keys = hm->m_keys;
-			for(uint i = idx + 1, c = hm->m_capacity; i < c; ++i) {
+			for(u32 i = idx + 1, c = hm->m_capacity; i < c; ++i) {
 				if(keys[i].valid) {
 					idx = i;
 					return;
@@ -190,7 +190,7 @@ public:
 		init(8, true); 
 	}
 
-	HashMap(uint size, IAllocator& allocator) 
+	HashMap(u32 size, IAllocator& allocator) 
 		: m_allocator(allocator) 
 	{
 		init(size, true); 
@@ -198,7 +198,7 @@ public:
 
 	~HashMap()
 	{
-		for(uint i = 0, c = m_capacity; i < c; ++i) {
+		for(u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) {
 				((Key*)m_keys[i].key_mem)->~Key();
 				m_values[i].~Value();
@@ -210,14 +210,14 @@ public:
 	}
 
 	iterator begin() {
-		for (uint i = 0, c = m_capacity; i < c; ++i) {
+		for (u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) return { this, i };
 		}
 		return { this, m_capacity };
 	}
 
 	const_iterator begin() const {
-		for (uint i = 0, c = m_capacity; i < c; ++i) {
+		for (u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) return { this, i };
 		}
 		return { this, m_capacity };
@@ -227,7 +227,7 @@ public:
 	const_iterator end() const { return const_iterator { this, m_capacity }; }
 
 	void clear() {
-		for(uint i = 0, c = m_capacity; i < c; ++i) {
+		for(u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) {
 				((Key*)m_keys[i].key_mem)->~Key();
 				m_values[i].~Value();
@@ -248,19 +248,19 @@ public:
 	}
 	
 	Value& operator[](const Key& key) {
-		const uint pos = findPos(key);
+		const u32 pos = findPos(key);
 		ASSERT(pos < m_capacity);
 		return m_values[pos];
 	}
 	
 	const Value& operator[](const Key& key) const {
-		const uint pos = findPos(key);
+		const u32 pos = findPos(key);
 		ASSERT(pos < m_capacity);
 		return m_values[pos];
 	}
 
 	Value& insert(const Key& key, Value&& value) {
-		uint pos = Hasher::get(key) & m_mask;
+		u32 pos = Hasher::get(key) & m_mask;
 		while (m_keys[pos].valid) ++pos;
 		if(pos == m_capacity) {
 			pos = 0;
@@ -280,7 +280,7 @@ public:
 	}
 
 	iterator insert(const Key& key, const Value& value) {
-		uint pos = Hasher::get(key) & m_mask;
+		u32 pos = Hasher::get(key) & m_mask;
 		while (m_keys[pos].valid) ++pos;
 		if(pos == m_capacity) {
 			pos = 0;
@@ -302,7 +302,7 @@ public:
 	template <typename F>
 	void eraseIf(F predicate) {
 		Slot* keys = m_keys;
-		for (uint i = 0; i < m_capacity; ++i) {
+		for (u32 i = 0; i < m_capacity; ++i) {
 			if (!keys[i].valid) continue;
 			if (predicate(m_values[i])) {
 				((Key*)keys[i].key_mem)->~Key();
@@ -310,7 +310,7 @@ public:
 				keys[i].valid = false;
 				--m_size;
 
-				uint pos = (i + 1) % m_capacity;
+				u32 pos = (i + 1) % m_capacity;
 				while (keys[pos].valid) {
 					rehash(pos);
 					pos = (pos + 1) % m_capacity;
@@ -324,13 +324,13 @@ public:
 		ASSERT(key.isValid());
 
 		Slot* keys = m_keys;
-		uint pos = key.idx;
+		u32 pos = key.idx;
 		((Key*)keys[pos].key_mem)->~Key();
 		m_values[pos].~Value();
 		keys[pos].valid = false;
 		--m_size;
 
-		const uint mask = m_mask;
+		const u32 mask = m_mask;
 		pos = (pos + 1) % m_capacity;
 		while (keys[pos].valid) {
 			rehash(pos);
@@ -339,19 +339,19 @@ public:
 	}
 
 	void erase(const Key& key) {
-		const uint pos = findPos(key);
+		const u32 pos = findPos(key);
 		if (m_keys[pos].valid) erase({this, pos});
 	}
 
 	bool empty() const { return m_size == 0; }
-	uint size() const { return m_size; }
+	u32 size() const { return m_size; }
 
-	void reserve(uint new_capacity) {
+	void reserve(u32 new_capacity) {
 		if (new_capacity > m_capacity) grow(new_capacity);
 	}
 
 private:
-	void grow(uint new_capacity) {
+	void grow(u32 new_capacity) {
 		HashMap<Key, Value, Hasher> tmp(new_capacity, m_allocator);
 		if (m_size > 0) {
 			for(auto iter = begin(); iter.isValid(); ++iter) {
@@ -366,9 +366,9 @@ private:
 		swap(m_values, tmp.m_values);
 	}
 
-	uint findEmptySlot(const Key& key, uint end_pos) const {
-		const uint mask = m_mask;
-		uint pos = Hasher::get(key) & mask;
+	u32 findEmptySlot(const Key& key, u32 end_pos) const {
+		const u32 mask = m_mask;
+		u32 pos = Hasher::get(key) & mask;
 		while (m_keys[pos].valid && pos != end_pos) ++pos;
 		if (pos == m_capacity) {
 			pos = 0;
@@ -377,9 +377,9 @@ private:
 		return pos;
 	}
 
-	void rehash(uint pos) {
+	void rehash(u32 pos) {
 		Key& key = *((Key*)m_keys[pos].key_mem);
-		const uint rehashed_pos = findEmptySlot(key, pos);
+		const u32 rehashed_pos = findEmptySlot(key, pos);
 		if (rehashed_pos != pos) {
 			new (NewPlaceholder(), m_keys[rehashed_pos].key_mem) Key(static_cast<Key&&>(key));
 			new (NewPlaceholder(), &m_values[rehashed_pos]) Value(static_cast<Value&&>(m_values[pos]));
@@ -391,8 +391,8 @@ private:
 		}
 	}
 
-	uint findPos(const Key& key) const {
-		uint pos = Hasher::get(key) & m_mask;
+	u32 findPos(const Key& key) const {
+		u32 pos = Hasher::get(key) & m_mask;
 		const Slot* LUMIX_RESTRICT keys = m_keys;
 		while (keys[pos].valid) {
 			if (*((Key*)keys[pos].key_mem) == key) return pos;
@@ -406,7 +406,7 @@ private:
 		return m_capacity;
 	}
 
-	void init(uint capacity, bool all_invalid) {
+	void init(u32 capacity, bool all_invalid) {
 		ASSERT(isPowOfTwo(capacity));
 		m_size = 0;
 		m_mask = capacity - 1;
@@ -414,7 +414,7 @@ private:
 		m_values = (Value*)m_allocator.allocate(sizeof(Value) * capacity);
 		m_capacity = capacity;
 		if (all_invalid) {
-			for(uint i = 0; i < capacity; ++i) {
+			for(u32 i = 0; i < capacity; ++i) {
 				m_keys[i].valid = false;
 			}
 		}
@@ -424,9 +424,9 @@ private:
 	IAllocator& m_allocator;
 	Slot* m_keys;
 	Value* m_values;
-	uint m_capacity;
-	uint m_size;
-	uint m_mask;
+	u32 m_capacity;
+	u32 m_size;
+	u32 m_mask;
 };
 
 

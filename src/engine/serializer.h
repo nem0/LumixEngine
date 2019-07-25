@@ -75,27 +75,27 @@ struct LUMIX_ENGINE_API IDeserializer
 {
 	virtual ~IDeserializer() {}
 
-	virtual void read(EntityPtr* entity) = 0;
-	virtual void read(EntityRef* entity) = 0;
-	virtual void read(Transform* value) = 0;
-	virtual void read(RigidTransform* value) = 0;
-	virtual void read(LocalRigidTransform* value) = 0;
-	virtual void read(Vec4* value) = 0;
-	virtual void read(DVec3* value) = 0;
-	virtual void read(Vec3* value) = 0;
-	virtual void read(Quat* value) = 0;
-	virtual void read(float* value) = 0;
-	virtual void read(double* value) = 0;
-	virtual void read(bool* value) = 0;
-	virtual void read(u64* value) = 0;
-	virtual void read(i64* value) = 0;
-	virtual void read(u32* value) = 0;
-	virtual void read(i32* value) = 0;
-	virtual void read(u16* value) = 0;
-	virtual void read(u8* value) = 0;
-	virtual void read(i8* value) = 0;
+	virtual void read(Ref<EntityPtr> entity) = 0;
+	virtual void read(Ref<EntityRef> entity) = 0;
+	virtual void read(Ref<Transform> value) = 0;
+	virtual void read(Ref<RigidTransform> value) = 0;
+	virtual void read(Ref<LocalRigidTransform> value) = 0;
+	virtual void read(Ref<Vec4> value) = 0;
+	virtual void read(Ref<DVec3> value) = 0;
+	virtual void read(Ref<Vec3> value) = 0;
+	virtual void read(Ref<Quat> value) = 0;
+	virtual void read(Ref<float> value) = 0;
+	virtual void read(Ref<double> value) = 0;
+	virtual void read(Ref<bool> value) = 0;
+	virtual void read(Ref<u64> value) = 0;
+	virtual void read(Ref<i64> value) = 0;
+	virtual void read(Ref<u32> value) = 0;
+	virtual void read(Ref<i32> value) = 0;
+	virtual void read(Ref<u16> value) = 0;
+	virtual void read(Ref<u8> value) = 0;
+	virtual void read(Ref<i8> value) = 0;
 	virtual void read(char* value, int max_size) = 0;
-	virtual void read(String* value) = 0;
+	virtual void read(Ref<String> value) = 0;
 	virtual EntityPtr getEntity(EntityGUID guid) = 0;
 };
 
@@ -143,27 +143,27 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	{
 	}
 
-	void read(EntityPtr* entity)  override;
-	void read(EntityRef* entity)  override;
-	void read(RigidTransform* value)  override;
-	void read(LocalRigidTransform* value)  override;
-	void read(Transform* value)  override;
-	void read(Vec4* value)  override;
-	void read(DVec3* value)  override;
-	void read(Vec3* value)  override;
-	void read(Quat* value)  override;
-	void read(float* value)  override;
-	void read(double* value)  override;
-	void read(bool* value)  override;
-	void read(u64* value)  override;
-	void read(i64* value)  override;
-	void read(u32* value)  override;
-	void read(i32* value)  override;
-	void read(u16* value)  override;
-	void read(u8* value)  override;
-	void read(i8* value)  override;
+	void read(Ref<EntityPtr> entity)  override;
+	void read(Ref<EntityRef> entity)  override;
+	void read(Ref<RigidTransform> value)  override;
+	void read(Ref<LocalRigidTransform> value)  override;
+	void read(Ref<Transform> value)  override;
+	void read(Ref<Vec4> value)  override;
+	void read(Ref<DVec3> value)  override;
+	void read(Ref<Vec3> value)  override;
+	void read(Ref<Quat> value)  override;
+	void read(Ref<float> value)  override;
+	void read(Ref<double> value)  override;
+	void read(Ref<bool> value)  override;
+	void read(Ref<u64> value)  override;
+	void read(Ref<i64> value)  override;
+	void read(Ref<u32> value)  override;
+	void read(Ref<i32> value)  override;
+	void read(Ref<u16> value)  override;
+	void read(Ref<u8> value)  override;
+	void read(Ref<i8> value)  override;
 	void read(char* value, int max_size)  override;
-	void read(String* value)  override;
+	void read(Ref<String> value)  override;
 	EntityPtr getEntity(EntityGUID guid) override;
 
 	void skip();

@@ -12,31 +12,28 @@ struct IAllocator;
 
 
 LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle);
-LUMIX_ENGINE_API bool toCStringHex(u8 value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(i32 value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(u32 value, char* output, int length);
-LUMIX_ENGINE_API bool toCStringPretty(u64 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(i32 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(i64 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(u64 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(u32 value, char* output, int length);
-LUMIX_ENGINE_API bool toCString(float value, char* output, int length, int after_point);
-LUMIX_ENGINE_API bool toCString(double value, char* output, int length, int after_point);
+LUMIX_ENGINE_API bool toCStringHex(u8 value, Span<char> output);
+LUMIX_ENGINE_API bool toCStringPretty(i32 value, Span<char> output);
+LUMIX_ENGINE_API bool toCStringPretty(u32 value, Span<char> output);
+LUMIX_ENGINE_API bool toCStringPretty(u64 value, Span<char> output);
+LUMIX_ENGINE_API bool toCString(i32 value, Span<char> output);
+LUMIX_ENGINE_API bool toCString(i64 value, Span<char> output);
+LUMIX_ENGINE_API bool toCString(u64 value, Span<char> output);
+LUMIX_ENGINE_API bool toCString(u32 value, Span<char> output);
+LUMIX_ENGINE_API bool toCString(float value, Span<char> output, int after_point);
+LUMIX_ENGINE_API bool toCString(double value, Span<char> output, int after_point);
 LUMIX_ENGINE_API const char* reverseFind(const char* begin_haystack, const char* end_haystack, char c);
-LUMIX_ENGINE_API const char* fromCStringOctal(const char* input, int length, u32* value);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i32* value);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u64* value);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, i64* value);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u32* value);
-LUMIX_ENGINE_API const char* fromCString(const char* input, int length, u16* value);
-LUMIX_ENGINE_API bool copyString(char* destination, int length, const char* source);
-LUMIX_ENGINE_API bool copyNString(char* destination,
-	int length,
-	const char* source,
-	int source_len);
-LUMIX_ENGINE_API bool catString(char* destination, int length, const char* source);
-LUMIX_ENGINE_API bool catNString(char* destination, int length, const char* source, int source_len);
-LUMIX_ENGINE_API bool makeLowercase(char* destination, int length, const char* source);
+LUMIX_ENGINE_API const char* fromCStringOctal(Span<const char> input, Ref<u32> value);
+LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<i32> value);
+LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u64> value);
+LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<i64> value);
+LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u32> value);
+LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u16> value);
+LUMIX_ENGINE_API bool copyString(Span<char> output, const char* source);
+LUMIX_ENGINE_API bool copyNString(Span<char> output, const char* source, int N);
+LUMIX_ENGINE_API bool catString(Span<char> output, const char* source);
+LUMIX_ENGINE_API bool catNString(Span<char> output, const char* source, int N);
+LUMIX_ENGINE_API bool makeLowercase(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
 LUMIX_ENGINE_API int stringLength(const char* str);
 LUMIX_ENGINE_API bool equalStrings(const char* lhs, const char* rhs);
@@ -72,47 +69,34 @@ inline bool isUpperCase(char c)
 
 template <int SIZE> bool copyString(char(&destination)[SIZE], const char* source)
 {
-	return copyString(destination, SIZE, source);
+	return copyString(Span<char>(destination, SIZE), source);
 }
 
 template <int SIZE> bool catString(char(&destination)[SIZE], const char* source)
 {
-	return catString(destination, SIZE, source);
+	return catString(Span<char>(destination, SIZE), source);
 }
 
 
-struct StringView
+struct StringView : Span<const char>
 {
-	StringView() : begin(nullptr), end(nullptr) {}
-	
+	using Span<const char>::Span;
 	StringView(const char* begin)
-		: begin(begin)
-		, end(begin + stringLength(begin))
+		: Span<const char>(begin, stringLength(begin))
 	{
 	}
-
-	StringView(const char* begin, int len)
-		: begin(begin)
-		, end(begin + len)
-	{
-	}
-
-	uint length() const { return uint(end - begin); }
-
-	const char* begin;
-	const char* end;
 };
 
 
-template <int size> struct StaticString
+template <int SIZE> struct StaticString
 {
 	StaticString() { data[0] = '\0'; }
 
-	explicit StaticString(const char* str) { copyString(data, size, str); }
+	explicit StaticString(const char* str) { copyString(Span(data), str); }
 
 	template <typename... Args> StaticString(const char* str, Args... args)
 	{
-		copyString(data, size, str);
+		copyString(data, str);
 		int tmp[] = { (add(args), 0)... };
 		(void)tmp;
 	}
@@ -129,29 +113,29 @@ template <int size> struct StaticString
 		return *this;
 	}
 
-	template <int value_size> void add(StaticString<value_size>& value) { catString(data, size, value.data); }
-	void add(const char* value) { catString(data, size, value); }
-	void add(char* value) { catString(data, size, value); }
-	void add(const StringView& value) { catNString(data, size, value.begin, value.length()); }
+	template <int value_size> void add(StaticString<value_size>& value) { catString(data, value.data); }
+	void add(const char* value) { catString(data, value); }
+	void add(char* value) { catString(data, value); }
+	void add(const StringView& value) { catNString(Span(data), value.begin, value.length()); }
 
 	void operator=(const char* str) { copyString(data, str); }
 
 	void add(char value)
 	{
 		char tmp[2] = {value, 0};
-		catString(data, size, tmp);
+		catString(data, tmp);
 	}
 
 	void add(float value)
 	{
 		int len = stringLength(data);
-		toCString(value, data + len, size - len, 3);
+		toCString(value, Span(data).fromLeft(len), 3);
 	}
 
 	template <typename T> void add(T value)
 	{
 		int len = stringLength(data);
-		toCString(value, data + len, size - len);
+		toCString(value, Span(data + len, SIZE - len));
 	}
 
 	bool operator<(const char* str) const {
@@ -166,15 +150,15 @@ template <int size> struct StaticString
 		return !equalStrings(data, str);
 	}
 
-	StaticString<size> operator +(const char* rhs)
+	StaticString<SIZE> operator +(const char* rhs)
 	{
-		return StaticString<size>(*this, rhs);
+		return StaticString<SIZE>(*this, rhs);
 	}
 
 	bool empty() const { return data[0] == '\0'; }
 
 	operator const char*() const { return data; }
-	char data[size];
+	char data[SIZE];
 };
 
 
@@ -215,7 +199,7 @@ public:
 	template <class V> String& cat(V value)
 	{
 		char tmp[30];
-		toCString(value, tmp, 30);
+		toCString(value, Span<char>(tmp, 30));
 		cat(tmp);
 		return *this;
 	}

@@ -1392,7 +1392,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	void deserializeZone(IDeserializer& serializer, EntityRef entity, int scene_version) {
 		RecastZone zone;
 		zone.entity = entity;
-		serializer.read(&zone.zone.extents);
+		serializer.read(Ref(zone.zone.extents));
 		m_zones.insert(entity, zone);
 		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
 	}
@@ -1456,19 +1456,19 @@ struct NavigationSceneImpl final : public NavigationScene
 	{
 		Agent agent;
 		agent.entity = entity;
-		serializer.read(&agent.radius);
-		serializer.read(&agent.height);
+		serializer.read(Ref(agent.radius));
+		serializer.read(Ref(agent.height));
 		if (scene_version > (int)NavigationSceneVersion::USE_ROOT_MOTION)
 		{
 			agent.flags = 0;
 			bool b;
-			serializer.read(&b);
+			serializer.read(Ref(b));
 			if (b) agent.flags = Agent::USE_ROOT_MOTION;
 		}
 		if (scene_version > (int)NavigationSceneVersion::ROOT_MOTION_FROM_ANIM)
 		{
 			bool b;
-			serializer.read(&b);
+			serializer.read(Ref(b));
 			if (b) agent.flags |= Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
 		}
 		agent.is_finished = true;

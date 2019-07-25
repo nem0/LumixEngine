@@ -37,9 +37,9 @@ struct ThreadContext
 
 	Array<const char*> open_blocks;
 	Array<u8> buffer;
-	uint begin = 0;
-	uint end = 0;
-	uint rows = 0;
+	u32 begin = 0;
+	u32 end = 0;
+	u32 rows = 0;
 	bool open = false;
 	MT::SpinMutex mutex;
 	StaticString<64> name;
@@ -197,7 +197,7 @@ void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
 		ctx.begin += size;
 	}
 
-	const uint lend = ctx.end % buf_size;
+	const u32 lend = ctx.end % buf_size;
 	if (buf_size - lend >= sizeof(v)) {
 		memcpy(buf + lend, &v, sizeof(v));
 	}
@@ -234,7 +234,7 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 		ctx.begin += size;
 	}
 
-	const uint lend = ctx.end % buf_size;
+	const u32 lend = ctx.end % buf_size;
 	if (buf_size - lend >= sizeof(v)) {
 		memcpy(buf + lend, &v, sizeof(v));
 	}
@@ -259,15 +259,15 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 
 	MT::SpinLock lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
-	const uint buf_size = ctx.buffer.size();
+	const u32 buf_size = ctx.buffer.size();
 
 	while (header.size + ctx.end - ctx.begin > buf_size) {
 		const u8 size = buf[ctx.begin % buf_size];
 		ctx.begin += size;
 	}
 
-	auto cpy = [&](const u8* ptr, uint size) {
-		const uint lend = ctx.end % buf_size;
+	auto cpy = [&](const u8* ptr, u32 size) {
+		const u32 lend = ctx.end % buf_size;
 		if (buf_size - lend >= size) {
 			memcpy(buf + lend, ptr, size);
 		}

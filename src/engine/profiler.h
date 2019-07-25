@@ -141,14 +141,14 @@ LUMIX_ENGINE_API struct ThreadState {
 
 	const char* name;
 	const u8* buffer;
-	uint buffer_size;
-	uint begin;
-	uint end;
+	u32 buffer_size;
+	u32 begin;
+	u32 end;
 	u32 thread_id;
 
 	bool show;
 	bool open;
-	uint rows;
+	u32 rows;
 };
 
 

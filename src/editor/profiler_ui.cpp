@@ -316,7 +316,7 @@ ProfilerUIImpl::AllocationStackNode* ProfilerUIImpl::getOrCreate(AllocationStack
 void ProfilerUIImpl::addToTree(Debug::Allocator::AllocationInfo* info)
 {
 	Debug::StackNode* nodes[1024];
-	int count = Debug::StackTree::getPath(info->stack_leaf, nodes, lengthOf(nodes));
+	int count = Debug::StackTree::getPath(info->stack_leaf, Span(nodes));
 
 	auto node = m_allocation_root;
 	for (int i = count - 1; i >= 0; --i)
@@ -351,7 +351,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column) c
 	{
 		char fn_name[100];
 		int line;
-		if (Debug::StackTree::getFunction(node->m_stack_node, fn_name, sizeof(fn_name), &line))
+		if (Debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), Ref(line)))
 		{
 			if (line >= 0)
 			{
@@ -361,7 +361,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column) c
 					fn_name[len] = ' ';
 					fn_name[len + 1] = '\0';
 					++len;
-					toCString(line, fn_name + len, sizeof(fn_name) - len);
+					toCString(line, Span(fn_name).fromLeft(len));
 				}
 			}
 		}
@@ -389,7 +389,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column) c
 	ASSERT(column == SIZE);
 	#ifdef _MSC_VER
 		char size[50];
-		toCStringPretty(node->m_inclusive_size, size, sizeof(size));
+		toCStringPretty(node->m_inclusive_size, Span(size));
 		ImGui::Text("%s", size);
 		if (node->m_open)
 		{
@@ -432,11 +432,11 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 }
 
 template <typename T>
-static void read(Profiler::ThreadState& ctx, uint p, T& value)
+static void read(Profiler::ThreadState& ctx, u32 p, T& value)
 {
 	const u8* buf = ctx.buffer;
-	const uint buf_size = ctx.buffer_size;
-	const uint l = p % buf_size;
+	const u32 buf_size = ctx.buffer_size;
+	const u32 l = p % buf_size;
 	if (l + sizeof(value) <= buf_size) {
 		memcpy(&value, buf + l, sizeof(value));
 		return;
@@ -447,11 +447,11 @@ static void read(Profiler::ThreadState& ctx, uint p, T& value)
 }
 
 
-static void read(Profiler::ThreadState& ctx, uint p, u8* ptr, int size)
+static void read(Profiler::ThreadState& ctx, u32 p, u8* ptr, int size)
 {
 	const u8* buf = ctx.buffer;
-	const uint buf_size = ctx.buffer_size;
-	const uint l = p % buf_size;
+	const u32 buf_size = ctx.buffer_size;
+	const u32 l = p % buf_size;
 	if (l + size <= buf_size) {
 		memcpy(ptr, buf + l, size);
 		return;
@@ -627,15 +627,15 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		ctx.rows = 0;
 
 		struct {
-			uint offset;
+			u32 offset;
 			i32 switch_id;
 			u32 color;
 			i64 link;
 			Profiler::JobRecord job_info;
 		} open_blocks[64];
 		int level = -1;
-		uint p = ctx.begin;
-		const uint end = ctx.end;
+		u32 p = ctx.begin;
+		const u32 end = ctx.end;
 
 		struct Property {
 			Profiler::EventHeader header;
@@ -886,11 +886,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 		y += 20;
 
-		uint open_blocks[64];
+		u32 open_blocks[64];
 		int level = -1;
 
-		uint p = ctx.begin;
-		const uint end = ctx.end;
+		u32 p = ctx.begin;
+		const u32 end = ctx.end;
 		while (p != end) {
 			Profiler::EventHeader header;
 			read(ctx, p, header);

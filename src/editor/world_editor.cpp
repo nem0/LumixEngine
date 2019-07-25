@@ -1772,7 +1772,7 @@ public:
 
 			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
 			char plugin_name[64];
-			PathUtils::getBasename(plugin_name, lengthOf(plugin_name), filepath);
+			PathUtils::getBasename(Span(plugin_name), filepath);
 			IScene* scene = universe.getScene(crc32(plugin_name));
 			if (!scene)
 			{
@@ -1782,7 +1782,7 @@ public:
 
 			loadFile(filepath, [scene, &versions, &universe](TextDeserializer& deserializer) {
 				int version;
-				deserializer.read(&version);
+				deserializer.read(Ref(version));
 				for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
 				{
 					ComponentType cmp_type = {i};
@@ -1805,9 +1805,9 @@ public:
 
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 			char tmp[32];
-			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
+			PathUtils::getBasename(Span(tmp), filepath);
 			EntityGUID guid;
-			fromCString(tmp, lengthOf(tmp), &guid.value);
+			fromCString(Span(tmp), Ref(guid.value));
 			EntityRef entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
 			entity_map.insert(guid, entity);
 		}
@@ -1821,33 +1821,33 @@ public:
 
 			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
 			char tmp[32];
-			PathUtils::getBasename(tmp, lengthOf(tmp), filepath);
+			PathUtils::getBasename(Span(tmp), filepath);
 			EntityGUID guid;
-			fromCString(tmp, lengthOf(tmp), &guid.value);
+			fromCString(Span(tmp), Ref(guid.value));
 			loadFile(filepath, [&versions, &entity_map, &universe, guid](TextDeserializer& deserializer) {
 				char name[64];
 				deserializer.read(name, lengthOf(name));
 				RigidTransform tr;
-				deserializer.read(&tr);
+				deserializer.read(Ref(tr));
 				float scale;
-				deserializer.read(&scale);
+				deserializer.read(Ref(scale));
 
 				const EntityPtr e = entity_map.get(guid);
 				const EntityRef entity = (EntityRef)e;
 
 				EntityPtr parent;
-				deserializer.read(&parent);
+				deserializer.read(Ref(parent));
 				if (parent.isValid()) universe.setParent(parent, entity);
 
 				if(name[0]) universe.setEntityName(entity, name);
 				universe.setTransformKeepChildren(entity, {tr.pos, tr.rot, scale});
 				u32 cmp_type_hash;
-				deserializer.read(&cmp_type_hash);
+				deserializer.read(Ref(cmp_type_hash));
 				while (cmp_type_hash != 0)
 				{
 					ComponentType cmp_type = Reflection::getComponentTypeFromHash(cmp_type_hash);
 					universe.deserializeComponent(deserializer, entity, cmp_type, versions[cmp_type.index]);
-					deserializer.read(&cmp_type_hash);
+					deserializer.read(Ref(cmp_type_hash));
 				}
 			});
 		}
@@ -1938,9 +1938,9 @@ public:
 			if (info.filename[0] == '.') continue;
 
 			char basename[64];
-			PathUtils::getBasename(basename, lengthOf(basename), info.filename);
+			PathUtils::getBasename(Span(basename), info.filename);
 			EntityGUID guid;
-			fromCString(basename, lengthOf(basename), &guid.value);
+			fromCString(Span(basename), Ref(guid.value));
 			if (!m_entity_map.has(guid))
 			{
 				StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
@@ -2071,30 +2071,30 @@ public:
 	}
 
 
-	void makeAbsolute(char* absolute, int max_size, const char* relative) const override
+	void makeAbsolute(Span<char> absolute, const char* relative) const override
 	{
 		bool is_absolute = relative[0] == '\\' || relative[0] == '/';
 		is_absolute = is_absolute || (relative[0] != 0 && relative[1] == ':');
 
 		if (is_absolute)
 		{
-			copyString(absolute, max_size, relative);
+			copyString(absolute, relative);
 			return;
 		}
 
-		copyString(absolute, max_size, m_engine->getFileSystem().getBasePath());
-		catString(absolute, max_size, relative);
+		copyString(absolute, m_engine->getFileSystem().getBasePath());
+		catString(absolute, relative);
 	}
 
 
-	void makeRelative(char* relative, int max_size, const char* absolute) const override
+	void makeRelative(Span<char> relative, const char* absolute) const override
 	{
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		if (startsWith(absolute, base_path)) {
-			copyString(relative, max_size, absolute + stringLength(base_path));
+			copyString(relative, absolute + stringLength(base_path));
 			return;
 		}
-		copyString(relative, max_size, absolute);
+		copyString(relative, absolute);
 	}
 
 
@@ -3283,7 +3283,7 @@ public:
 
 		Universe& universe = *m_editor.getUniverse();
 		int entity_count;
-		deserializer.read(&entity_count);
+		deserializer.read(Ref(entity_count));
 		map.entities.resize(entity_count);
 		bool is_redo = !m_entities.empty();
 		for (int i = 0; i < entity_count; ++i)
@@ -3308,9 +3308,9 @@ public:
 		for (int i = 0; i < entity_count; ++i)
 		{
 			Transform tr;
-			deserializer.read(&tr);
+			deserializer.read(Ref(tr));
 			EntityPtr parent;
-			deserializer.read(&parent);
+			deserializer.read(Ref(parent));
 
 			if (!m_identity)
 			{
@@ -3334,11 +3334,11 @@ public:
 			universe.setTransform(new_entity, tr);
 			universe.setParent(parent, new_entity);
 			i32 count;
-			deserializer.read(&count);
+			deserializer.read(Ref(count));
 			for (int j = 0; j < count; ++j)
 			{
 				u32 hash;
-				deserializer.read(&hash);
+				deserializer.read(Ref(hash));
 				ComponentType type = Reflection::getComponentTypeFromHash(hash);
 				const int scene_version = universe.getScene(type)->getVersion();
 				universe.deserializeComponent(deserializer, new_entity, type, scene_version);

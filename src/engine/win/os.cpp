@@ -151,7 +151,7 @@ OutputFile& OutputFile::operator <<(const char* text)
 OutputFile& OutputFile::operator <<(i32 value)
 {
 	char buf[20];
-	toCString(value, buf, lengthOf(buf));
+	toCString(value, Span(buf));
 	write(buf, stringLength(buf));
 	return *this;
 }
@@ -160,7 +160,7 @@ OutputFile& OutputFile::operator <<(i32 value)
 OutputFile& OutputFile::operator <<(u32 value)
 {
 	char buf[20];
-	toCString(value, buf, lengthOf(buf));
+	toCString(value, Span(buf));
 	write(buf, stringLength(buf));
 	return *this;
 }
@@ -169,7 +169,7 @@ OutputFile& OutputFile::operator <<(u32 value)
 OutputFile& OutputFile::operator <<(u64 value)
 {
 	char buf[30];
-	toCString(value, buf, lengthOf(buf));
+	toCString(value, Span(buf));
 	write(buf, stringLength(buf));
 	return *this;
 }
@@ -178,7 +178,7 @@ OutputFile& OutputFile::operator <<(u64 value)
 OutputFile& OutputFile::operator <<(float value)
 {
 	char buf[128];
-	toCString(value, buf, lengthOf(buf), 7);
+	toCString(value, Span(buf), 7);
 	write(buf, stringLength(buf));
 	return *this;
 }
@@ -726,7 +726,7 @@ void getCurrentDirectory(char* buffer, int buffer_size)
 }
 
 
-bool getSaveFilename(char* out, int max_size, const char* filter, const char* default_extension)
+bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension)
 {
 	WCharStr<MAX_PATH_LENGTH> wtmp("");
 	WCHAR wfilter[MAX_PATH_LENGTH];
@@ -762,12 +762,12 @@ bool getSaveFilename(char* out, int max_size, const char* filter, const char* de
 
 	char tmp[MAX_PATH_LENGTH];
 	fromWChar(tmp, lengthOf(tmp), wtmp);
-	if (res) PathUtils::normalize(tmp, out, max_size);
+	if (res) PathUtils::normalize(tmp, out);
 	return res;
 }
 
 
-bool getOpenFilename(char* out, int max_size, const char* filter, const char* starting_file)
+bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file)
 {
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
@@ -775,10 +775,10 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 	ofn.hwndOwner = NULL;
 	if (starting_file)
 	{
-		char* to = out;
+		char* to = out.begin;
 		for (const char *from = starting_file; *from; ++from, ++to)
 		{
-			if (to - out > max_size - 1) break;
+			if (to - out.begin > out.length() - 1) break;
 			*to = *to == '/' ? '\\' : *from;
 		}
 		*to = '\0';
@@ -814,7 +814,7 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 	if (res) {
 		char tmp[MAX_PATH_LENGTH];
 		fromWChar(tmp, lengthOf(tmp), wout);
-		PathUtils::normalize(tmp, out, max_size);
+		PathUtils::normalize(tmp, out);
 	}
 	else {
 		auto err = CommDlgExtendedError();
@@ -824,7 +824,7 @@ bool getOpenFilename(char* out, int max_size, const char* filter, const char* st
 }
 
 
-bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
+bool getOpenDirectory(Span<char> output, const char* starting_dir)
 {
 	bool ret = false;
 	IFileDialog* pfd;
@@ -867,15 +867,16 @@ bool getOpenDirectory(char* out, int max_size, const char* starting_dir)
 				WCHAR* tmp;
 				if (SUCCEEDED(psi->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &tmp)))
 				{
-					char* c = out;
-					while (*tmp && c - out < max_size - 1)
+					char* c = output.begin;
+					const u32 max_size = output.length();
+					while (*tmp && c - output.begin < max_size - 1)
 					{
 						*c = (char)*tmp;
 						++c;
 						++tmp;
 					}
 					*c = '\0';
-					if (!endsWith(out, "/") && !endsWith(out, "\\") && c - out < max_size - 1)
+					if (!endsWith(output.begin, "/") && !endsWith(output.begin, "\\") && c - output.begin < max_size - 1)
 					{
 						*c = '/';
 						++c;
@@ -900,7 +901,7 @@ void copyToClipboard(const char* text)
 	if (!mem_handle) return;
 
 	char* mem = (char*)GlobalLock(mem_handle);
-	copyString(mem, len, text);
+	copyString(Span(mem, len), text);
 	GlobalUnlock(mem_handle);
 	EmptyClipboard();
 	SetClipboardData(CF_TEXT, mem_handle);

@@ -25,7 +25,7 @@ struct LUMIX_EDITOR_API Action
 	Action(const char* label_short, const char* label_long, const char* name, OS::Keycode key0, OS::Keycode key1, OS::Keycode key2);
 	bool toolbarButton();
 	bool isActive();
-	void getIconPath(char* path, int max_size);
+	void getIconPath(Span<char> path);
 	bool isRequested();
 
 	static bool falseConst() { return false; }
@@ -45,10 +45,7 @@ struct LUMIX_EDITOR_API Action
 class WorldEditor;
 
 
-LUMIX_EDITOR_API void getEntityListDisplayName(WorldEditor& editor,
-	char* buf,
-	int max_size,
-	EntityPtr entity);
+LUMIX_EDITOR_API void getEntityListDisplayName(WorldEditor& editor, Span<char> buf, EntityPtr entity);
 
 
 } // namespace Lumix

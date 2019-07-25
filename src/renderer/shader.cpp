@@ -238,10 +238,10 @@ int texture_slot(lua_State* L)
 	}
 
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
-	LuaWrapper::getOptionalStringField(L, -1, "name", slot.name, lengthOf(slot.name));
+	LuaWrapper::getOptionalStringField(L, -1, "name", Span(slot.name));
 
 	char tmp[MAX_PATH_LENGTH];
-	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", tmp, lengthOf(tmp))) {
+	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", Span(tmp))) {
 		ResourceManagerHub& manager = shader->getResourceManager().getOwner();
 		slot.default_texture = manager.load<Texture>(Path(tmp));
 	}

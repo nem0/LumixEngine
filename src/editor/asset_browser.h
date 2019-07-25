@@ -51,12 +51,12 @@ public:
 	void update();
 	int getTypeIndex(ResourceType type) const;
 	void selectResource(const Path& resource, bool record_history);
-	bool resourceInput(const char* label, const char* str_id, char* buf, int max_size, ResourceType type);
+	bool resourceInput(const char* label, const char* str_id, Span<char> buf, ResourceType type);
 	void addPlugin(IPlugin& plugin);
 	void removePlugin(IPlugin& plugin);
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
-	bool resourceList(char* buf, int max_size, u32* selected_idx, ResourceType type, float height, bool can_create_new) const;
+	bool resourceList(Span<char> buf, Ref<u32> selected_idx, ResourceType type, float height, bool can_create_new) const;
 	OutputMemoryStream* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);
 

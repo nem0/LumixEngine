@@ -76,7 +76,7 @@ IOutputStream& IOutputStream::operator << (const char* str)
 IOutputStream& IOutputStream::operator << (i32 value)
 {
 	char tmp[20];
-	toCString(value, tmp, lengthOf(tmp));
+	toCString(value, Span(tmp));
 	write(tmp, stringLength(tmp));
 	return *this;
 }
@@ -85,7 +85,7 @@ IOutputStream& IOutputStream::operator << (i32 value)
 IOutputStream& IOutputStream::operator << (u64 value)
 {
 	char tmp[40];
-	toCString(value, tmp, lengthOf(tmp));
+	toCString(value, Span(tmp));
 	write(tmp, stringLength(tmp));
 	return *this;
 }
@@ -94,7 +94,7 @@ IOutputStream& IOutputStream::operator << (u64 value)
 IOutputStream& IOutputStream::operator << (i64 value)
 {
 	char tmp[40];
-	toCString(value, tmp, lengthOf(tmp));
+	toCString(value, Span(tmp));
 	write(tmp, stringLength(tmp));
 	return *this;
 }
@@ -103,7 +103,7 @@ IOutputStream& IOutputStream::operator << (i64 value)
 IOutputStream& IOutputStream::operator << (u32 value)
 {
 	char tmp[20];
-	toCString(value, tmp, lengthOf(tmp));
+	toCString(value, Span(tmp));
 	write(tmp, stringLength(tmp));
 	return *this;
 }
@@ -112,7 +112,7 @@ IOutputStream& IOutputStream::operator << (u32 value)
 IOutputStream& IOutputStream::operator << (float value)
 {
 	char tmp[30];
-	toCString(value, tmp, lengthOf(tmp), 6);
+	toCString(value, Span(tmp), 6);
 	write(tmp, stringLength(tmp));
 	return *this;
 }
@@ -121,7 +121,7 @@ IOutputStream& IOutputStream::operator << (float value)
 IOutputStream& IOutputStream::operator << (double value)
 {
 	char tmp[40];
-	toCString(value, tmp, lengthOf(tmp), 12);
+	toCString(value, Span(tmp), 12);
 	write(tmp, stringLength(tmp));
 	return *this;
 }

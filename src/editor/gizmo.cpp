@@ -138,9 +138,9 @@ struct GizmoImpl final : public Gizmo
 	};
 
 
-	static DataPtrs reserve(RenderData* data, const Matrix& mtx, bool lines, uint vertices_count, uint indices_count)
+	static DataPtrs reserve(RenderData* data, const Matrix& mtx, bool lines, u32 vertices_count, u32 indices_count)
 	{
-		data->cmds.push({mtx, lines, (uint)data->indices.size(), indices_count, (uint)data->vertices.size(), vertices_count});
+		data->cmds.push({mtx, lines, (u32)data->indices.size(), indices_count, (u32)data->vertices.size(), vertices_count});
 		data->vertices.resize(data->vertices.size() + vertices_count);
 		data->indices.resize(data->indices.size() + indices_count);
 

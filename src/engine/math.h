@@ -1150,7 +1150,7 @@ template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 maximum(T1 a, T2...
 }
 
 
-// converts float to uint so it can be used in radix sort
+// converts float to u32 so it can be used in radix sort
 // float float_value = 0;
 // u32 sort_key = floatFlip(*(u32*)&float_value);
 // http://stereopsis.com/radix.html

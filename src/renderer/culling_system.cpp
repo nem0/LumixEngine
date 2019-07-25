@@ -305,7 +305,7 @@ struct CullingSystemImpl final : public CullingSystem
 		PROFILE_FUNCTION();
 		if (m_cells.empty()) return nullptr;
 
-		const uint worker_count = MT::getCPUsCount();
+		const u32 worker_count = MT::getCPUsCount();
 
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
 		volatile i32 cell_idx = 0;

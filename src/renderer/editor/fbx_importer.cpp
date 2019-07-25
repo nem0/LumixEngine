@@ -37,7 +37,7 @@ static void getMaterialName(const ofbx::Material* material, char (&out)[128])
 		}
 		++iter;
 	}
-	makeLowercase(out, lengthOf(out), out);
+	makeLowercase(Span(out), out);
 }
 
 
@@ -52,7 +52,7 @@ void FBXImporter::getImportMeshName(const ImportMesh& mesh, char (&out)[256])
 	if(mesh.submesh >= 0) {
 		catString(out, "_");
 		char tmp[32];
-		toCString(mesh.submesh, tmp, lengthOf(tmp));
+		toCString(mesh.submesh, Span(tmp));
 		catString(out, tmp);
 	}
 }
@@ -141,7 +141,7 @@ void FBXImporter::gatherMaterials(const ofbx::Object* node, const char* src_dir)
 			}
 
 			char tmp[MAX_PATH_LENGTH];
-			PathUtils::normalize(tex.src, tmp, lengthOf(tmp));
+			PathUtils::normalize(tex.src, Span(tmp));
 			tex.src = tmp;
 
 			tex.import = true;
@@ -264,7 +264,7 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 			{
 				char tmp[MAX_PATH_LENGTH];
 				take_info->filename.toString(tmp);
-				PathUtils::getBasename(anim.name.data, lengthOf(anim.name.data), tmp);
+				PathUtils::getBasename(Span(anim.name.data), tmp);
 			}
 			if (anim.name.empty()) anim.name << "anim";
 		}
@@ -567,7 +567,7 @@ static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 	lod_str += stringLength("_LOD");
 
 	int lod;
-	fromCString(lod_str, stringLength(lod_str), &lod);
+	fromCString(Span(lod_str, stringLength(lod_str)), Ref(lod));
 
 	return lod;
 }
@@ -647,7 +647,7 @@ bool FBXImporter::setSource(const char* base_dir, const char* filename, bool ign
 
 	const ofbx::Object* root = scene->getRoot();
 	char src_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(src_dir, lengthOf(src_dir), filename);
+	PathUtils::getDir(Span(src_dir), filename);
 	gatherMeshes(scene);
 
 	gatherAnimations(*scene);
@@ -1754,7 +1754,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	const int count = meshes.size();
 	serializer.write("entity_count", count + 1);
 	char normalized_tmp_rel[MAX_PATH_LENGTH];
-	PathUtils::normalize(tmp_rel, normalized_tmp_rel, lengthOf(normalized_tmp_rel));
+	PathUtils::normalize(tmp_rel, Span(normalized_tmp_rel));
 	const u64 prefab = crc32(normalized_tmp_rel);
 
 	serializer.write("prefab", prefab);
@@ -1803,7 +1803,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		char name[256];
 		getImportMeshName(meshes[i], name);
 		StaticString<MAX_PATH_LENGTH> hash_str(name, ":", src);
-		makeLowercase(hash_str.data, stringLength(hash_str), hash_str);
+		makeLowercase(Span(hash_str.data), hash_str);
 		const StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, crc32(hash_str), ".res");
 		OS::makePath(cfg.output_dir);
 		OS::OutputFile f;

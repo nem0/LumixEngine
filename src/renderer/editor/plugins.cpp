@@ -302,7 +302,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", buf, sizeof(buf), Shader::TYPE)) {
+		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", Span(buf), Shader::TYPE)) {
 			material->setShader(Path(buf));
 		}
 
@@ -332,7 +332,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
 			if (m_app.getAssetBrowser().resourceInput(
-					slot.name, StaticString<30>("", (u64)&slot), buf, sizeof(buf), Texture::TYPE))
+					slot.name, StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
@@ -590,7 +590,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			for (FBXImporter::ImportAnimation& anim : m_fbx_importer.getAnimations()) { 
 				StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ":", filepath);
 				char anim_path_n[MAX_PATH_LENGTH];
-				PathUtils::normalize(anim_path, anim_path_n, lengthOf(anim_path_n));
+				PathUtils::normalize(anim_path, Span(anim_path_n));
 				StaticString<64> tmp("", crc32(anim_path_n), ".res");
 				m_fbx_importer.writeAnimation(tmp, anim, cfg);
 			}
@@ -1346,7 +1346,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
 			char tmp[32];
-			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode", tmp, lengthOf(tmp))) {
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode", Span(tmp))) {
 				meta.wrap_mode = stricmp(tmp, "repeat") == 0 ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
 			}
 		});
@@ -1357,7 +1357,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool compile(const Path& src) override
 	{
 		char ext[4] = {};
-		PathUtils::getExtension(ext, lengthOf(ext), src.c_str());
+		PathUtils::getExtension(Span(ext), src.c_str());
 
 		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
 		const u32 hash = crc32(src.c_str());
@@ -1572,7 +1572,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		auto* shader = static_cast<Shader*>(resource);
 		char basename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(basename, lengthOf(basename), resource->getPath().c_str());
+		PathUtils::getBasename(Span(basename), resource->getPath().c_str());
 		if (ImGui::Button("Open in external editor"))
 		{
 			m_app.getAssetBrowser().openInExternalEditor(resource->getPath().c_str());
@@ -2389,8 +2389,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 		void draw(const CmdList& cmd_list)
 		{
-			const uint num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
-			const uint num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
+			const u32 num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
+			const u32 num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
 			const ffr::VertexAttrib attribs[] = {
 				{ 0, 2, ffr::AttributeType::FLOAT, 0, false, false, false },
@@ -2410,8 +2410,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			if (use_big_buffers) {
 				big_vb = ffr::allocBufferHandle();
 				big_ib = ffr::allocBufferHandle();
-				ffr::createBuffer(big_vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
-				ffr::createBuffer(big_ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
+				ffr::createBuffer(big_vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
+				ffr::createBuffer(big_ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
 				ffr::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
 				ffr::bindIndexBuffer(big_ib);
 			}
@@ -2453,16 +2453,16 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 				const u32 first_index = elem_offset + (use_big_buffers ? 0 : ib_offset);
 
-				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(uint)(intptr_t)pcmd->TextureId} : *default_texture;
+				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(u32)(intptr_t)pcmd->TextureId} : *default_texture;
 				if (!tex.isValid()) tex = *default_texture;
 				ffr::bindTextures(&tex, 0, 1);
 
-				const uint h = uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f));
+				const u32 h = u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f));
 
-				ffr::scissor(uint(maximum(pcmd->ClipRect.x, 0.0f)),
-					height - uint(maximum(pcmd->ClipRect.y, 0.0f)) - h,
-					uint(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
-					uint(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
+				ffr::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
+					height - u32(maximum(pcmd->ClipRect.y, 0.0f)) - h,
+					u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
+					u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 
 				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
 		
@@ -2485,8 +2485,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 
 			if(init_render) {
-				ffr::createBuffer(ib, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
-				ffr::createBuffer(vb, (uint)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
+				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
+				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				const char* vs =
 					R"#(#version 330
 					layout(location = 0) in vec2 a_pos;
@@ -2521,7 +2521,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
 
 			const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
-			ffr::clear((uint)ffr::ClearFlags::COLOR | (uint)ffr::ClearFlags::DEPTH, clear_color, 1.0);
+			ffr::clear((u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH, clear_color, 1.0);
 
 			ffr::viewport(0, 0, width, height);
 			const float canvas_size[] = {(float)width, (float)height};
@@ -2539,10 +2539,10 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		
 		Renderer* renderer;
 		const ffr::TextureHandle* default_texture;
-		uint width, height;
+		u32 width, height;
 		Array<CmdList> command_lists;
-		uint ib_offset;
-		uint vb_offset;
+		u32 ib_offset;
+		u32 vb_offset;
 		IAllocator& allocator;
 		ffr::BufferHandle ib;
 		ffr::BufferHandle vb;
@@ -2762,7 +2762,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 	bool createHeightmap(const char* material_path, int size)
 	{
 		char normalized_material_path[MAX_PATH_LENGTH];
-		PathUtils::normalize(material_path, normalized_material_path, lengthOf(normalized_material_path));
+		PathUtils::normalize(material_path, Span(normalized_material_path));
 
 		PathUtils::FileInfo info(normalized_material_path);
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
@@ -2820,17 +2820,16 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 			if (ImGui::Button("Create"))
 			{
 				char save_filename[MAX_PATH_LENGTH];
-				if (OS::getSaveFilename(
-						save_filename, lengthOf(save_filename), "Material\0*.mat\0", "mat"))
-				{
-					editor.makeRelative(buf, lengthOf(buf), save_filename);
+				if (OS::getSaveFilename(Span(save_filename), "Material\0*.mat\0", "mat")) {
+					editor.makeRelative(Span(buf), save_filename);
 					new_created = createHeightmap(buf, size);
 				}
 			}
 			ImGui::EndMenu();
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
-		if (asset_browser.resourceList(buf, lengthOf(buf), nullptr, Material::TYPE, 0, false) || create_empty || new_created)
+		static u32 selected_res_hash = 0;
+		if (asset_browser.resourceList(Span(buf), Ref(selected_res_hash), Material::TYPE, 0, false) || create_empty || new_created)
 		{
 			if (create_entity)
 			{

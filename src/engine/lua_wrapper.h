@@ -743,13 +743,13 @@ inline void getOptionalFlagField(lua_State* L, int idx, const char* field_name, 
 	else *out &= ~flag;
 }
 
-inline bool getOptionalStringField(lua_State* L, int idx, const char* field_name, char* out, int max_size)
+inline bool getOptionalStringField(lua_State* L, int idx, const char* field_name, Span<char> out)
 {
 	bool ret = false;
 	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<const char*>(L, -1))
 	{
 		const char* src = toType<const char*>(L, -1);;
-		copyString(out, max_size, src);
+		copyString(out, src);
 		ret = true;
 	}
 	lua_pop(L, 1);

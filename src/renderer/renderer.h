@@ -24,7 +24,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 	public:
 		struct MemRef
 		{
-			uint size = 0;
+			u32 size = 0;
 			void* data = nullptr;
 			bool own = false;
 		};
@@ -40,8 +40,8 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		struct TransientSlice
 		{
 			ffr::BufferHandle buffer;
-			uint offset;
-			uint size;
+			u32 offset;
+			u32 size;
 			u8* ptr;
 		};
 
@@ -60,20 +60,20 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual ResourceManager& getTextureManager() = 0;
 		
 		virtual IAllocator& getAllocator() = 0;
-		virtual MemRef allocate(uint size) = 0;
-		virtual MemRef copy(const void* data, uint size) = 0 ;
+		virtual MemRef allocate(u32 size) = 0;
+		virtual MemRef copy(const void* data, u32 size) = 0 ;
 		virtual void free(const MemRef& memory) = 0;
 		
-		virtual TransientSlice allocTransient(uint size) = 0;
+		virtual TransientSlice allocTransient(u32 size) = 0;
 		virtual ffr::BufferHandle createBuffer(const MemRef& memory) = 0;
-		virtual ffr::VAOHandle createVAO(const ffr::VertexAttrib* attribs, uint attribs_count) = 0;
+		virtual ffr::VAOHandle createVAO(const ffr::VertexAttrib* attribs, u32 attribs_count) = 0;
 		virtual void destroy(ffr::BufferHandle buffer) = 0;
 		virtual void destroy(ffr::VAOHandle buffer) = 0;
 		virtual void destroy(ffr::ProgramHandle program) = 0;
 		
-		virtual ffr::TextureHandle createTexture(uint w, uint h, uint depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) = 0;
+		virtual ffr::TextureHandle createTexture(u32 w, u32 h, u32 depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) = 0;
 		virtual ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info, const char* debug_name) = 0;
-		virtual void updateTexture(ffr::TextureHandle handle, uint x, uint y, uint w, uint h, ffr::TextureFormat format, const MemRef& memory) = 0;
+		virtual void updateTexture(ffr::TextureHandle handle, u32 x, u32 y, u32 w, u32 h, ffr::TextureFormat format, const MemRef& memory) = 0;
 		virtual void getTextureImage(ffr::TextureHandle texture, int size, void* data) = 0;
 		virtual void destroy(ffr::TextureHandle tex) = 0;
 		

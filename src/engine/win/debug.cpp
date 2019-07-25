@@ -105,10 +105,10 @@ void StackTree::refreshModuleList()
 }
 
 
-int StackTree::getPath(StackNode* node, StackNode** output, int max_size)
+int StackTree::getPath(StackNode* node, Span<StackNode*> output)
 {
-	int i = 0;
-	while (i < max_size && node)
+	u32 i = 0;
+	while (i < output.length() && node)
 	{
 		output[i] = node;
 		i++;
@@ -124,7 +124,7 @@ StackNode* StackTree::getParent(StackNode* node)
 }
 
 
-bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
+bool StackTree::getFunction(StackNode* node, Span<char> out, Ref<int> line)
 {
 	HANDLE process = GetCurrentProcess();
 	u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)] = {};
@@ -136,13 +136,13 @@ bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
 	DWORD displacement;
 	if (SymGetLineFromAddr64(process, (DWORD64)(node->m_instruction), &displacement, &line_info))
 	{
-		*line = line_info.LineNumber;
+		line = line_info.LineNumber;
 	}
 	else
 	{
-		*line = -1;
+		line = -1;
 	}
-	if (success) copyString(out, max_size, symbol->Name);
+	if (success) copyString(out, symbol->Name);
 
 	return success != FALSE;
 }
@@ -169,7 +169,7 @@ void StackTree::printCallstack(StackNode* node)
 				OutputDebugString(line.FileName);
 				OutputDebugString("(");
 				char tmp[20];
-				toCString((u32)line.LineNumber, tmp, sizeof(tmp));
+				toCString((u32)line.LineNumber, Span(tmp));
 				OutputDebugString(tmp);
 				OutputDebugString("):");
 			}
@@ -676,14 +676,14 @@ BOOL SendFile(LPCSTR lpszSubject,
 }
 
 
-static void getStack(CONTEXT& context, char* out, int max_size)
+static void getStack(CONTEXT& context, Span<char> out)
 {
 	BOOL result;
 	STACKFRAME64 stack;
 	char symbol_mem[sizeof(IMAGEHLP_SYMBOL64) + 256];
 	IMAGEHLP_SYMBOL64* symbol = (IMAGEHLP_SYMBOL64*)symbol_mem;
 	char name[256];
-	copyString(out, max_size, "Crash callstack:\n");
+	copyString(out, "Crash callstack:\n");
 	memset(&stack, 0, sizeof(STACKFRAME64));
 
 	HANDLE process = GetCurrentProcess();
@@ -739,8 +739,8 @@ static void getStack(CONTEXT& context, char* out, int max_size)
 		SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
 		UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
 
-		if (!catString(out, max_size, symbol->Name)) return;
-		if (!catString(out, max_size, "\n")) return;
+		if (!catString(out, symbol->Name)) return;
+		if (!catString(out, "\n")) return;
 
 	} while (result);
 }
@@ -762,7 +762,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 		StaticString<4096> message;
 		if(info)
 		{
-			getStack(*info->ContextRecord, message.data, sizeof(message.data));
+			getStack(*info->ContextRecord, Span(message.data));
 			message << "\nCode: " << (u32)info->ExceptionRecord->ExceptionCode;
 			message << "\nAddress: " << (uintptr)info->ExceptionRecord->ExceptionAddress;
 			message << "\nBase: " << (uintptr)base;
@@ -828,7 +828,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 	WaitForSingleObject(handle, INFINITE);
 
 	StaticString<4096> message;
-	getStack(*info->ContextRecord, message.data, sizeof(message.data));
+	getStack(*info->ContextRecord, Span(message.data));
 	logError("Engine") << message;
 
 	return EXCEPTION_CONTINUE_SEARCH;
