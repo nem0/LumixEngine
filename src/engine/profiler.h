@@ -121,7 +121,7 @@ struct EventHeader
 #pragma pack()
 
 
-LUMIX_ENGINE_API struct GlobalState {
+struct LUMIX_ENGINE_API GlobalState {
 	GlobalState();
 	~GlobalState();
 	
@@ -132,7 +132,7 @@ LUMIX_ENGINE_API struct GlobalState {
 };
 
 
-LUMIX_ENGINE_API struct ThreadState {
+struct LUMIX_ENGINE_API ThreadState {
 	ThreadState(GlobalState& reader, int thread_idx);
 	~ThreadState();
 

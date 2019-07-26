@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -35,6 +35,7 @@
 
 #include "PxPhysXConfig.h"
 #include "common/PxBase.h"
+#include "solver/PxSolverDefs.h"
 
 #if !PX_DOXYGEN
 namespace physx
@@ -65,48 +66,6 @@ struct PxArticulationJointDriveType
 	};
 };
 
-struct PxArticulationAxis
-{
-	enum Enum
-	{
-		eTWIST = 0,
-		eSWING1 = 1,
-		eSWING2 = 2,
-		eX = 3,
-		eY = 4,
-		eZ = 5,
-		eCOUNT = 6
-	};
-};
-
-PX_FLAGS_OPERATORS(PxArticulationAxis::Enum, PxU8)
-
-struct PxArticulationMotion
-{
-	enum Enum
-	{
-		eLOCKED = 0,
-		eLIMITED = 1,
-		eFREE = 2
-	};
-};
-
-typedef PxFlags<PxArticulationMotion::Enum, PxU8> PxArticulationMotions;
-PX_FLAGS_OPERATORS(PxArticulationMotion::Enum, PxU8)
-
-struct PxArticulationJointType
-{
-	enum Enum
-	{
-		ePRISMATIC = 0,
-		eREVOLUTE = 1,
-		eSPHERICAL = 2,
-		eFIX = 3,
-		eUNDEFINED = 4
-	};
-};
-
-
 class PxArticulationJointBase : public PxBase
 {
 public:
@@ -125,7 +84,6 @@ public:
 
 	@see getParentPose()
 	*/
-
 	virtual		void			setParentPose(const PxTransform& pose) = 0;
 
 	/**
@@ -135,7 +93,6 @@ public:
 
 	@see setParentPose()
 	*/
-
 	virtual		PxTransform		getParentPose() const = 0;
 
 	/**
@@ -145,7 +102,6 @@ public:
 	*/
 	virtual		PxArticulationLink&	getChildArticulationLink() const = 0;
 
-
 	/**
 	\brief set the joint pose in the child frame
 
@@ -154,7 +110,6 @@ public:
 
 	@see getChildPose()
 	*/
-
 	virtual		void			setChildPose(const PxTransform& pose) = 0;
 
 	/**
@@ -205,7 +160,6 @@ public:
 
 	@see getTargetOrientation()
 	*/
-
 	virtual		void			setTargetOrientation(const PxQuat& orientation) = 0;
 
 	/**
@@ -238,7 +192,6 @@ public:
 	*/
 	virtual		PxVec3			getTargetVelocity() const = 0;
 
-
 	/**
 	\brief set the drive type
 
@@ -256,11 +209,8 @@ public:
 
 	@see setDriveType()
 	*/
-	virtual		PxArticulationJointDriveType::Enum
-								getDriveType() const = 0;
+	virtual		PxArticulationJointDriveType::Enum	getDriveType() const = 0;
 
-
-	
 	/**
 	\brief set the drive strength of the joint acceleration spring. 
 
@@ -285,7 +235,6 @@ public:
 	*/
 	virtual		PxReal			getStiffness() const = 0;
 
-
 	/**
 	\brief set the damping of the joint acceleration spring
 
@@ -306,7 +255,6 @@ public:
 
 	@see setDamping()
 	*/
-
 	virtual		PxReal			getDamping() const = 0;
 
 	/**
@@ -327,9 +275,7 @@ public:
 
 	@see getInternalCompliance()
 	*/
-
 	virtual		void			setInternalCompliance(PxReal compliance) = 0;
-
 
 	/**
 	\brief get the internal compliance
@@ -358,7 +304,6 @@ public:
 
 	@see getExternalCompliance()
 	*/
-
 	virtual		void			setExternalCompliance(PxReal compliance) = 0;
 
 	/**
@@ -369,8 +314,6 @@ public:
 	@see setExternalCompliance()
 	*/
 	virtual		PxReal			getExternalCompliance() const = 0;
-
-
 
 	/**
 	\brief set the extents of the cone limit. The extents are measured in the frame
@@ -387,7 +330,6 @@ public:
 	*/
 	virtual		void			setSwingLimit(PxReal zLimit, PxReal yLimit) = 0;
 
-
 	/**
 	\brief get the extents for the swing limit cone
 
@@ -400,16 +342,12 @@ public:
 	*/
 	virtual		void			getSwingLimit(PxReal& zLimit, PxReal& yLimit) const = 0;
 
-
-
 	/**
 	\brief set the tangential spring for the limit cone
 	<b> Range:</b> ([0, PX_MAX_F32), [0, PX_MAX_F32))
 	<b> Default:</b> (0.0, 0.0)
 	*/
-
 	virtual		void			setTangentialStiffness(PxReal spring) = 0;
-
 
 	/**
 	\brief get the tangential spring for the swing limit cone
@@ -420,15 +358,12 @@ public:
 	*/
 	virtual		PxReal			getTangentialStiffness() const = 0;
 
-
 	/**
 	\brief set the tangential damping for the limit cone
 	<b> Range:</b> ([0, PX_MAX_F32), [0, PX_MAX_F32))
 	<b> Default:</b> (0.0, 0.0)
 	*/
-
 	virtual		void			setTangentialDamping(PxReal damping) = 0;
-
 
 	/**
 	\brief get the tangential damping for the swing limit cone
@@ -438,7 +373,6 @@ public:
 	@see setTangentialDamping()
 	*/
 	virtual		PxReal			getTangentialDamping() const = 0;
-
 
 	/**
 	\brief set the contact distance for the swing limit
@@ -450,9 +384,7 @@ public:
 
 	@see getSwingLimitContactDistance()
 	*/
-
 	virtual		void			setSwingLimitContactDistance(PxReal contactDistance) = 0;
-
 
 	/**
 	\brief get the contact distance for the swing limit
@@ -462,8 +394,6 @@ public:
 	@see setSwingLimitContactDistance()
 	*/
 	virtual		PxReal			getSwingLimitContactDistance() const = 0;
-
-
 
 	/**
 	\brief set the flag which enables the swing limit
@@ -482,9 +412,7 @@ public:
 
 	@see setSwingLimitEnabled()
 	*/
-
 	virtual		bool			getSwingLimitEnabled() const = 0;
-
 
 	/**
 	\brief set the bounds of the twistLimit
@@ -508,7 +436,6 @@ public:
 
 	@see setTwistLimit()
 	*/
-
 	virtual		void			getTwistLimit(PxReal &lower, PxReal &upper) const = 0;
 
 	/**
@@ -528,9 +455,7 @@ public:
 
 	@see setTwistLimitEnabled()
 	*/
-
 	virtual		bool			getTwistLimitEnabled() const = 0;
-
 
 	/**
 	\brief set the contact distance for the swing limit
@@ -542,9 +467,7 @@ public:
 
 	@see getTwistLimitContactDistance()
 	*/
-
 	virtual		void			setTwistLimitContactDistance(PxReal contactDistance) = 0;
-
 
 	/**
 	\brief get the contact distance for the swing limit
@@ -555,13 +478,13 @@ public:
 	*/
 	virtual		PxReal			getTwistLimitContactDistance() const = 0;
 
-	virtual		const char*		getConcreteTypeName() const					{	return "PxArticulationJoint"; }
+	virtual		const char*		getConcreteTypeName() const			{ return "PxArticulationJoint"; }
 
 protected:
 	PX_INLINE					PxArticulationJoint(PxType concreteType, PxBaseFlags baseFlags) : PxArticulationJointBase(concreteType, baseFlags) {}
 	PX_INLINE					PxArticulationJoint(PxBaseFlags baseFlags) : PxArticulationJointBase(baseFlags)	{}
 	virtual						~PxArticulationJoint() {}
-	virtual		bool			isKindOf(const char* name)	const		{	return !::strcmp("PxArticulationJoint", name) || PxArticulationJointBase::isKindOf(name); }
+	virtual		bool			isKindOf(const char* name)	const	{ return !::strcmp("PxArticulationJoint", name) || PxArticulationJointBase::isKindOf(name); }
 };
 
 #if !PX_DOXYGEN

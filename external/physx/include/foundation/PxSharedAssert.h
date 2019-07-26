@@ -23,35 +23,24 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
-// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
+// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
+#ifndef PXFOUNDATION_PXASSERT_H
+#define PXFOUNDATION_PXASSERT_H
 
-#ifndef PX_CHARACTER_H
-#define PX_CHARACTER_H
-/** \addtogroup character
-  @{
-*/
+/** \addtogroup foundation
+@{ */
 
 #include "foundation/Px.h"
 
-// define API function declaration
-#if defined PX_PHYSX_STATIC_LIB || defined PX_PHYSX_CHARACTER_STATIC_LIB
-	#define PX_PHYSX_CHARACTER_API
+#if !PX_ENABLE_ASSERTS
+	#define PX_SHARED_ASSERT(exp) ((void)0)
 #else
-	#if PX_WINDOWS
-		#if defined PX_PHYSX_CHARACTER_EXPORTS
-			#define PX_PHYSX_CHARACTER_API __declspec(dllexport)
-		#else
-			#define PX_PHYSX_CHARACTER_API __declspec(dllimport)
-		#endif
-	#elif PX_UNIX_FAMILY
-		#define PX_PHYSX_CHARACTER_API PX_UNIX_EXPORT
-    #else
-		#define PX_PHYSX_CHARACTER_API
-    #endif
-#endif
+	#include <assert.h>
+	#define PX_SHARED_ASSERT(exp) assert(exp);
+#endif // !PX_ENABLE_ASSERTS
 
 /** @} */
-#endif
+#endif // #ifndef PXFOUNDATION_PXASSERT_H

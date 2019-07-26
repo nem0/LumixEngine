@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
@@ -48,12 +48,12 @@ namespace physx
 	*/
 	struct PxCache
 	{
-		PxU8*		mCachedData;			//!< Cached data pointer. Allocated via PxCacheAllocator
-		PxU16		mCachedSize;			//!< The total size of the cached data 
-		PxU8		mPairData;				//!< Pair data information used and cached internally by some contact gen functions to accelerate performance.
-		PxU8		mManifoldFlags;			//!< Manifold flags used to identify the format the cached data is stored in.
+		PxU8*		mCachedData;	//!< Cached data pointer. Allocated via PxCacheAllocator
+		PxU16		mCachedSize;	//!< The total size of the cached data 
+		PxU8		mPairData;		//!< Pair data information used and cached internally by some contact gen functions to accelerate performance.
+		PxU8		mManifoldFlags;	//!< Manifold flags used to identify the format the cached data is stored in.
 
-		PxCache() : mCachedData(NULL), mCachedSize(0), mPairData(0), mManifoldFlags(0)
+		PX_FORCE_INLINE	PxCache() : mCachedData(NULL), mCachedSize(0), mPairData(0), mManifoldFlags(0)
 		{
 		}
 	};

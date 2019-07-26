@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
@@ -70,6 +70,13 @@ Compiler defines, see http://sourceforge.net/p/predef/wiki/Compilers/
 #endif
 #elif defined(__clang__)
 #define PX_CLANG 1
+	#if defined (__clang_major__) 
+		#define PX_CLANG_MAJOR __clang_major__
+	#elif defined (_clang_major)
+		#define PX_CLANG_MAJOR _clang_major
+	#else
+		#define PX_CLANG_MAJOR 0
+	#endif	
 #elif defined(__GNUC__) // note: __clang__ implies __GNUC__
 #define PX_GCC 1
 #else
@@ -110,7 +117,7 @@ Architecture defines, see http://sourceforge.net/p/predef/wiki/Architectures/
 #define PX_X64 1
 #elif defined(__i386__) || defined(_M_IX86) || defined (__EMSCRIPTEN__)
 #define PX_X86 1
-#elif defined(__arm64__) || defined(__aarch64__)
+#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
 #define PX_A64 1
 #elif defined(__arm__) || defined(_M_ARM)
 #define PX_ARM 1
@@ -291,31 +298,6 @@ DLL export macros
 #else
 #define PX_DLL_EXPORT PX_UNIX_EXPORT
 #define PX_DLL_IMPORT
-#endif
-
-/**
-Define API function declaration
-
-PX_FOUNDATION_DLL=1 - used by the DLL library (PhysXCommon) to export the API
-PX_FOUNDATION_DLL=0 - for windows configurations where the PX_FOUNDATION_API is linked through standard static linking
-no definition       - this will allow DLLs and libraries to use the exported API from PhysXCommon
-
-*/
-
-#if PX_WINDOWS_FAMILY && !PX_ARM_FAMILY
-#ifndef PX_FOUNDATION_DLL
-#define PX_FOUNDATION_API PX_DLL_IMPORT
-#elif PX_FOUNDATION_DLL
-#define PX_FOUNDATION_API PX_DLL_EXPORT
-#endif
-#elif PX_UNIX_FAMILY
-#ifdef PX_FOUNDATION_DLL
-#define PX_FOUNDATION_API PX_UNIX_EXPORT
-#endif
-#endif
-
-#ifndef PX_FOUNDATION_API
-#define PX_FOUNDATION_API
 #endif
 
 /**

@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 
 #ifndef PXTASK_PXTASKMANAGER_H
 #define PXTASK_PXTASKMANAGER_H
@@ -57,14 +57,12 @@ struct PxTaskType
 	enum Enum
 	{
 		TT_CPU,				//!< PxTask will be run on the CPU
-		TT_GPU,				//!< PxTask will be run on the GPU
 		TT_NOT_PRESENT,		//!< Return code when attempting to find a task that does not exist
 		TT_COMPLETED		//!< PxTask execution has been completed
 	};
 };
 
 class PxCpuDispatcher;
-class PxGpuDispatcher;
 
 /** 
  \brief The PxTaskManager interface
@@ -75,7 +73,6 @@ class PxGpuDispatcher;
  per-scene which users can configure by passing dispatcher objects into the PxSceneDesc.
 
  @see CpuDispatcher
- @see PxGpuDispatcher
  
 */
 class PxTaskManager
@@ -92,15 +89,6 @@ public:
 	virtual void     setCpuDispatcher(PxCpuDispatcher& ref) = 0;
 
 	/**
-	\brief Set the user-provided dispatcher object for GPU tasks
-
-	\param[in] ref The dispatcher object.
-
-	@see PxGpuDispatcher
-	*/
-	virtual void     setGpuDispatcher(PxGpuDispatcher& ref) = 0;
-	
-	/**
 	\brief Get the user-provided dispatcher object for CPU tasks
 
 	\return The CPU dispatcher object.
@@ -108,15 +96,6 @@ public:
 	@see CpuDispatcher
 	*/
 	virtual PxCpuDispatcher*			getCpuDispatcher() const = 0;
-
-	/**
-	\brief Get the user-provided dispatcher object for GPU tasks
-
-	\return The GPU dispatcher object.
-
-	@see PxGpuDispatcher
-	*/
-	virtual PxGpuDispatcher*			getGpuDispatcher() const = 0;
 
 	/**
 	\brief Reset any dependencies between Tasks
@@ -137,9 +116,7 @@ public:
 	virtual void	startSimulation() = 0;
 
 	/**
-	\brief Called by the owning scene at the end of a simulation step to synchronize the PxGpuDispatcher
-
-	@see PxGpuDispatcher
+	\brief Called by the owning scene at the end of a simulation step.
 	*/
 	virtual void	stopSimulation() = 0;
 
@@ -195,7 +172,7 @@ public:
 	/**
 	\brief Construct a new PxTaskManager instance with the given [optional] dispatchers
 	*/
-	static PxTaskManager* createTaskManager(PxErrorCallback& errorCallback, PxCpuDispatcher* = 0, PxGpuDispatcher* = 0);
+	static PxTaskManager* createTaskManager(PxErrorCallback& errorCallback, PxCpuDispatcher* = 0);
 	
 protected:
 	virtual ~PxTaskManager() {}
@@ -217,7 +194,6 @@ protected:
 	friend class PxBaseTask;
 	friend class PxTask;
 	friend class PxLightCpuTask;
-	friend class PxGpuWorkerThread;
 };
 
 PX_POP_PACK

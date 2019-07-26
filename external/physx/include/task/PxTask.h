@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 
 #ifndef PXTASK_PXTASK_H
 #define PXTASK_PXTASK_H
@@ -31,7 +31,6 @@
 #include "task/PxTaskDefine.h"
 #include "task/PxTaskManager.h"
 #include "task/PxCpuDispatcher.h"
-#include "task/PxGpuDispatcher.h"
 #include "foundation/PxAssert.h"
 
 namespace physx
@@ -184,25 +183,12 @@ public:
 	 */
 	virtual void submitted()
 	{
-		mStreamIndex = 0;
-		mPreSyncRequired = false;
-	}
-
-	/**
-	 * \brief Specify that the GpuTask sync flag be set
-	 */
-	PX_INLINE void		requestSyncPoint()
-	{
-		mPreSyncRequired = true;
 	}
 
 protected:
 	PxTaskID			mTaskID;			//!< ID assigned at submission
-	uint32_t			mStreamIndex;		//!< GpuTask CUDA stream index
-	bool				mPreSyncRequired;	//!< GpuTask sync flag
 
 	friend class PxTaskMgr;
-	friend class PxGpuWorkerThread;
 };
 
 

@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -68,8 +68,10 @@ struct PxConcreteType
 		eCONSTRAINT,
 		eAGGREGATE,
 		eARTICULATION,
+		eARTICULATION_REDUCED_COORDINATE,
 		eARTICULATION_LINK,
 		eARTICULATION_JOINT,
+		eARTICULATION_JOINT_REDUCED_COORDINATE,
 		ePRUNING_STRUCTURE,
 		eBVH_STRUCTURE,
 		
@@ -96,25 +98,27 @@ template<typename T> struct PxTypeInfo {};
  * This implies that B has no concrete subclasses or superclasses.
  */
 
-PX_DEFINE_TYPEINFO(PxBase,				PxConcreteType::eUNDEFINED)
-PX_DEFINE_TYPEINFO(PxMaterial,			PxConcreteType::eMATERIAL)
-PX_DEFINE_TYPEINFO(PxConvexMesh,		PxConcreteType::eCONVEX_MESH)
-PX_DEFINE_TYPEINFO(PxTriangleMesh,		PxConcreteType::eUNDEFINED)
-PX_DEFINE_TYPEINFO(PxBVH33TriangleMesh,	PxConcreteType::eTRIANGLE_MESH_BVH33)
-PX_DEFINE_TYPEINFO(PxBVH34TriangleMesh,	PxConcreteType::eTRIANGLE_MESH_BVH34)
-PX_DEFINE_TYPEINFO(PxHeightField,		PxConcreteType::eHEIGHTFIELD)
-PX_DEFINE_TYPEINFO(PxActor,				PxConcreteType::eUNDEFINED)
-PX_DEFINE_TYPEINFO(PxRigidActor,		PxConcreteType::eUNDEFINED)
-PX_DEFINE_TYPEINFO(PxRigidBody,			PxConcreteType::eUNDEFINED)
-PX_DEFINE_TYPEINFO(PxRigidDynamic,		PxConcreteType::eRIGID_DYNAMIC)
-PX_DEFINE_TYPEINFO(PxRigidStatic,		PxConcreteType::eRIGID_STATIC)
-PX_DEFINE_TYPEINFO(PxArticulationLink,	PxConcreteType::eARTICULATION_LINK)
-PX_DEFINE_TYPEINFO(PxArticulationJoint, PxConcreteType::eARTICULATION_JOINT)
-PX_DEFINE_TYPEINFO(PxArticulation,		PxConcreteType::eARTICULATION)
-PX_DEFINE_TYPEINFO(PxAggregate,			PxConcreteType::eAGGREGATE)
-PX_DEFINE_TYPEINFO(PxConstraint,		PxConcreteType::eCONSTRAINT)
-PX_DEFINE_TYPEINFO(PxShape,				PxConcreteType::eSHAPE)
-PX_DEFINE_TYPEINFO(PxPruningStructure,	PxConcreteType::ePRUNING_STRUCTURE)
+PX_DEFINE_TYPEINFO(PxBase,									PxConcreteType::eUNDEFINED)
+PX_DEFINE_TYPEINFO(PxMaterial,								PxConcreteType::eMATERIAL)
+PX_DEFINE_TYPEINFO(PxConvexMesh,							PxConcreteType::eCONVEX_MESH)
+PX_DEFINE_TYPEINFO(PxTriangleMesh,							PxConcreteType::eUNDEFINED)
+PX_DEFINE_TYPEINFO(PxBVH33TriangleMesh,						PxConcreteType::eTRIANGLE_MESH_BVH33)
+PX_DEFINE_TYPEINFO(PxBVH34TriangleMesh,						PxConcreteType::eTRIANGLE_MESH_BVH34)
+PX_DEFINE_TYPEINFO(PxHeightField,							PxConcreteType::eHEIGHTFIELD)
+PX_DEFINE_TYPEINFO(PxActor,									PxConcreteType::eUNDEFINED)
+PX_DEFINE_TYPEINFO(PxRigidActor,							PxConcreteType::eUNDEFINED)
+PX_DEFINE_TYPEINFO(PxRigidBody,								PxConcreteType::eUNDEFINED)
+PX_DEFINE_TYPEINFO(PxRigidDynamic,							PxConcreteType::eRIGID_DYNAMIC)
+PX_DEFINE_TYPEINFO(PxRigidStatic,							PxConcreteType::eRIGID_STATIC)
+PX_DEFINE_TYPEINFO(PxArticulationLink,						PxConcreteType::eARTICULATION_LINK)
+PX_DEFINE_TYPEINFO(PxArticulationJoint,						PxConcreteType::eARTICULATION_JOINT)
+PX_DEFINE_TYPEINFO(PxArticulationJointReducedCoordinate,	PxConcreteType::eARTICULATION_JOINT_REDUCED_COORDINATE)
+PX_DEFINE_TYPEINFO(PxArticulation,							PxConcreteType::eARTICULATION)
+PX_DEFINE_TYPEINFO(PxArticulationReducedCoordinate,			PxConcreteType::eARTICULATION_REDUCED_COORDINATE)
+PX_DEFINE_TYPEINFO(PxAggregate,								PxConcreteType::eAGGREGATE)
+PX_DEFINE_TYPEINFO(PxConstraint,							PxConcreteType::eCONSTRAINT)
+PX_DEFINE_TYPEINFO(PxShape,									PxConcreteType::eSHAPE)
+PX_DEFINE_TYPEINFO(PxPruningStructure,						PxConcreteType::ePRUNING_STRUCTURE)
 
 #if !PX_DOXYGEN
 } // namespace physx

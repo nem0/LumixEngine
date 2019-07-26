@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -46,6 +46,8 @@
 namespace physx
 {
 #endif
+
+	class PxCudaContextManager;
 
 /**
 \brief Pruning structure used to accelerate scene queries.
@@ -220,30 +222,6 @@ struct PxSceneFlag
 		eADAPTIVE_FORCE			= (1<<3),
 
 		/**
-		\brief Enable contact pair filtering between kinematic and static rigid bodies.
-		
-		By default contacts between kinematic and static rigid bodies are suppressed (see #PxFilterFlag::eSUPPRESS) and don't get reported to the filter mechanism.
-		Raise this flag if these pairs should go through the filtering pipeline nonetheless.
-
-		\note This flag is not mutable, and must be set in PxSceneDesc at scene creation.
-
-		<b>Default:</b> false
-		*/
-		eENABLE_KINEMATIC_STATIC_PAIRS	PX_DEPRECATED = (1<<4),
-
-		/**
-		\brief Enable contact pair filtering between kinematic rigid bodies.
-		
-		By default contacts between kinematic bodies are suppressed (see #PxFilterFlag::eSUPPRESS) and don't get reported to the filter mechanism.
-		Raise this flag if these pairs should go through the filtering pipeline nonetheless.
-
-		\note This flag is not mutable, and must be set in PxSceneDesc at scene creation.
-
-		<b>Default:</b> false
-		*/
-		eENABLE_KINEMATIC_PAIRS	PX_DEPRECATED = (1<<5),
-
-		/**
 		\brief Enable GJK-based distance collision detection system.
 		
 		\note This flag is not mutable, and must be set in PxSceneDesc at scene creation.
@@ -326,7 +304,7 @@ struct PxSceneFlag
 
 		/*\brief Enables the GPU dynamics pipeline
 
-		When set to true, a CUDA ARCH 3.0 or above-enabled NVIDIA GPU is present and the GPU dispatcher has been configured, this will run the GPU dynamics pipelin instead of the CPU dynamics pipeline.
+		When set to true, a CUDA ARCH 3.0 or above-enabled NVIDIA GPU is present and the CUDA context manager has been configured, this will run the GPU dynamics pipelin instead of the CPU dynamics pipeline.
 
 		Note that this flag is not mutable and must be set in PxSceneDesc at scene creation.
 		*/
@@ -632,7 +610,7 @@ public:
 	/**
 	\brief Selects the solver algorithm to use.
 
-	<b>Default:</b> PxSolverType::eDEFAULT
+	<b>Default:</b> PxSolverType::ePGS
 
 	@see PxSolverType
 	*/
@@ -700,13 +678,13 @@ public:
 	PxCpuDispatcher*		cpuDispatcher;
 
 	/**
-	\brief The GPU task dispatcher for the scene.
+	\brief The CUDA context manager for the scene.
 
 	<b>Platform specific:</b> Applies to PC GPU only.
 
-	See PxGpuDispatcher, PxScene::getGpuDispatcher
+	See PxCudaContextManager, PxScene::getCudaContextManager
 	*/
-	PxGpuDispatcher* 		gpuDispatcher;
+	PxCudaContextManager* 	cudaContextManager;
 
 	/**
 	\brief Defines the structure used to store static objects.
@@ -761,11 +739,30 @@ public:
 	detrimentally affect performance if some bodies in the scene have large solver iteration counts because all constraints in a given island are solved by the 
 	maximum number of solver iterations requested by any body in the island.
 
+	Note that a rigid body solver task chain is spawned as soon as either a sufficient number of rigid bodies or articulations are batched together.
+
 	<b>Default:</b> 128
 
 	@see PxScene.setSolverBatchSize() PxScene.getSolverBatchSize()
 	*/
 	PxU32					solverBatchSize;
+
+	/**
+	\brief Defines the number of articulations required to spawn a separate rigid body solver island task chain.
+
+	This parameter defines the minimum number of articulations required to spawn a separate rigid body solver task chain. Setting a low value
+	will potentially cause more task chains to be generated. This may result in the overhead of spawning tasks can become a limiting performance factor.
+	Setting a high value will potentially cause fewer islands to be generated. This may reduce thread scaling (fewer task chains spawned) and may
+	detrimentally affect performance if some bodies in the scene have large solver iteration counts because all constraints in a given island are solved by the
+	maximum number of solver iterations requested by any body in the island.
+
+	Note that a rigid body solver task chain is spawned as soon as either a sufficient number of rigid bodies or articulations are batched together. 
+
+	<b>Default:</b> 128
+
+	@see PxScene.setSolverArticulationBatchSize() PxScene.getSolverArticulationBatchSize()
+	*/
+	PxU32					solverArticulationBatchSize;
 
 	/**
 	\brief Setting to define the number of 16K blocks that will be initially reserved to store contact, friction, and contact cache data.
@@ -847,6 +844,22 @@ public:
 	<b>Range:</b> [1, PX_MAX_U32]<br>
 	*/
 	PxU32					ccdMaxPasses;
+
+	/**
+	\brief CCD threshold
+
+	CCD performs sweeps against shapes if and only if the relative motion of the shapes is fast-enough that a collision would be missed
+	by the discrete contact generation. However, in some circumstances, e.g. when the environment is constructed from large convex shapes, this 
+	approach may produce undesired simulation artefacts. This parameter defines the minimum relative motion that would be required to force CCD between shapes.
+	The smaller of this value and the sum of the thresholds calculated for the shapes involved will be used.
+
+	\note It is not advisable to set this to a very small value as this may lead to CCD "jamming" and detrimentally effect performance. This value should be at least larger than the translation caused by a single frame's gravitational effect
+
+	<b>Default:</b> PX_MAX_F32
+	<b>Range:</b> [Eps, PX_MAX_F32]<br>
+	*/
+
+	PxReal					ccdThreshold;
 
 	/**
 	\brief The wake counter reset value
@@ -964,7 +977,7 @@ PX_INLINE PxSceneDesc::PxSceneDesc(const PxTolerancesScale& scale):
 	flags								(PxSceneFlag::eENABLE_PCM),
 
 	cpuDispatcher						(NULL),
-	gpuDispatcher						(NULL),
+	cudaContextManager					(NULL),
 
 	staticStructure						(PxPruningStructureType::eDYNAMIC_AABB_TREE),
 	dynamicStructure					(PxPruningStructureType::eDYNAMIC_AABB_TREE),
@@ -974,12 +987,14 @@ PX_INLINE PxSceneDesc::PxSceneDesc(const PxTolerancesScale& scale):
 	userData							(NULL),
 
 	solverBatchSize						(128),
+	solverArticulationBatchSize			(16),
 
 	nbContactDataBlocks					(0),
 	maxNbContactDataBlocks				(1<<16),
 	maxBiasCoefficient					(PX_MAX_F32),
 	contactReportStreamBufferSize		(8192),
 	ccdMaxPasses						(1),
+	ccdThreshold						(PX_MAX_F32),
 	wakeCounterResetValue				(20.0f*0.02f),
 	sanityBounds						(PxBounds3(PxVec3(-PX_MAX_BOUNDS_EXTENTS), PxVec3(PX_MAX_BOUNDS_EXTENTS))),
 	gpuMaxNumPartitions					(8),
@@ -1018,6 +1033,9 @@ PX_INLINE bool PxSceneDesc::isValid() const
 	if(ccdMaxSeparation < 0.0f)
 		return false;
 	if (solverOffsetSlop < 0.f)
+		return false;
+
+	if(ccdThreshold <= 0.f)
 		return false;
 
 	if(!cpuDispatcher)

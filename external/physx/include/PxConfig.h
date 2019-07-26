@@ -24,50 +24,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 // Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
-// Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
-// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
-#ifndef PXFOUNDATION_PXUNIONCAST_H
-#define PXFOUNDATION_PXUNIONCAST_H
 
-#include "foundation/Px.h"
+#ifndef PX_CONFIG
+#define PX_CONFIG
 
-/** \addtogroup foundation
-@{
-*/
 
-#if !PX_DOXYGEN
-namespace physx
-{
-#endif
 
-// Needed for clang 7
-#if PX_CLANG && PX_CLANG_MAJOR >= 7
- #define USE_VOLATILE_UNION volatile 
-#else
- #define USE_VOLATILE_UNION
-#endif
-
-template <class A, class B>
-PX_FORCE_INLINE A PxUnionCast(B b)
-{
-	union AB
-	{
-		AB(B bb) : _b(bb)
-		{
-		}
-		 B _b;
-		 A _a;
-	} USE_VOLATILE_UNION u(b);
-	return u._a;
-}
-
-#undef USE_VOLATILE_UNION
-
-#if !PX_DOXYGEN
-} // namespace physx
-#endif
-
-/** @} */
-
-#endif // PXFOUNDATION_PXUNIONCAST_H
+#endif  // PX_CONFIG

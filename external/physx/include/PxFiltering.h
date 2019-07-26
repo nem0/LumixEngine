@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -562,8 +562,8 @@ This methods gets called when:
 following pairs:
 
 \li Pair of static rigid actors
-\li A static rigid actor and a kinematic actor (unless one is a trigger or if explicitly enabled through PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS)
-\li Two kinematic actors (unless one is a trigger or if explicitly enabled through PxSceneFlag::eENABLE_KINEMATIC_PAIRS)
+\li A static rigid actor and a kinematic actor (unless one is a trigger or if explicitly enabled through PxPairFilteringMode::eKEEP)
+\li Two kinematic actors (unless one is a trigger or if explicitly enabled through PxPairFilteringMode::eKEEP)
 \li Two jointed rigid bodies and the joint was defined to disable collision
 \li Two articulation links if connected through an articulation joint
 
@@ -702,13 +702,18 @@ struct PxPairFilteringMode
 	{
 		/**
 		Output pair from BP, potentially send to user callbacks, create regular interaction object.
-		Similar to enabling PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS / PxSceneFlag::eENABLE_KINEMATIC_PAIRS.
+
+		Enable contact pair filtering between kinematic/static or kinematic/kinematic rigid bodies.
+		
+		By default contacts between these are suppressed (see #PxFilterFlag::eSUPPRESS) and don't get reported to the filter mechanism.
+		Use this mode if these pairs should go through the filtering pipeline nonetheless.
+
+		\note This mode is not mutable, and must be set in PxSceneDesc at scene creation.
 		*/
 		eKEEP,
 
 		/**
 		Output pair from BP, create interaction marker. Can be later switched to regular interaction.
-		Similar to disabling PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS / PxSceneFlag::eENABLE_KINEMATIC_PAIRS.
 		*/
 		eSUPPRESS,
 
@@ -718,9 +723,9 @@ struct PxPairFilteringMode
 		eKILL,
 
 		/**
-		Default is to ignore the mode and use PxSceneFlag::eENABLE_KINEMATIC_STATIC_PAIRS and PxSceneFlag::eENABLE_KINEMATIC_PAIRS instead (compatibility).
+		Default is eSUPPRESS for compatibility with previous PhysX versions.
 		*/
-		eDEFAULT
+		eDEFAULT = eSUPPRESS
 	};
 };
 
