@@ -166,7 +166,7 @@ exit /B 0
 
 :build_luajit
 	pushd 3rdparty\luajit\src
-	call msvcbuild.bat
+	call msvcbuild.bat static
 	popd
 exit /B 0
 
@@ -174,7 +174,7 @@ exit /B 0
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
 	if not exist luajit (
-		git.exe clone https://github.com/LuaJIT/LuaJIT.git luajit
+		git.exe clone https://github.com/nem0/LuaJIT.git luajit
 	) else (
 		cd luajit
 		git pull
@@ -199,7 +199,7 @@ exit /B 0
 	if %errorlevel%==2 call :download_freetype
 	if %errorlevel%==3 call :build_freetype
 	if %errorlevel%==4 call :deploy_freetype
-	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\freetype\builds\windows\vs2010\freetype.sln"
+	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\freetype\builds\windows\vc2010\freetype.sln"
 	pause
 goto :freetype
 
@@ -429,7 +429,7 @@ exit /B 0
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
 	if not exist cmft (
-		git.exe clone https://github.com/nem0/cmft.git
+		git.exe clone --depth=1 https://github.com/nem0/cmft.git
 	) else (
 		cd cmft
 		git pull
@@ -442,7 +442,7 @@ exit /B 0
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
 	if not exist freetype (
-		git.exe clone https://github.com/aseprite/freetype2.git freetype
+		git.exe clone --depth=1 https://github.com/nem0/freetype2.git freetype
 	) else (
 		cd freetype
 		git pull
@@ -455,7 +455,7 @@ exit /B 0
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
 	if not exist recast (
-		git.exe clone https://github.com/nem0/recastnavigation.git recast
+		git.exe clone --depth=1  https://github.com/nem0/recastnavigation.git recast
 	) else (
 		cd recast
 		git pull
@@ -468,7 +468,7 @@ exit /B 0
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
 	if not exist physx (
-		git.exe clone https://github.com/nem0/PhysX.git physx
+		git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
 	) else (
 		cd physx
 		git pull
@@ -481,7 +481,7 @@ exit /B 0
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
 	if not exist nvtt (
-		git.exe clone https://github.com/nem0/nvidia-texture-tools.git nvtt
+		git.exe clone --depth=1 https://github.com/nem0/nvidia-texture-tools.git nvtt
 	) else (
 		cd nvtt
 		git pull

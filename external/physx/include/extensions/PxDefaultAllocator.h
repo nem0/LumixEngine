@@ -23,9 +23,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
-// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
+// Copyright (c) 2001-2004 NovodeX AG. All rights reserved.
 
 
 #ifndef PX_DEFAULT_ALLOCATOR_H
@@ -40,7 +40,7 @@
 
 #include <stdlib.h>
 
-#if PX_WINDOWS || PX_LINUX_FAMILY || PX_SWITCH
+#if PX_WINDOWS_FAMILY || PX_LINUX_FAMILY || PX_SWITCH
 #include <malloc.h>
 #endif
 
@@ -49,7 +49,7 @@ namespace physx
 {
 #endif
 
-#if PX_WINDOWS
+#if PX_WINDOWS_FAMILY
 // on win32 we only have 8-byte alignment guaranteed, but the CRT provides special aligned allocation fns
 PX_FORCE_INLINE void* platformAlignedAlloc(size_t size)
 {
@@ -74,7 +74,7 @@ PX_FORCE_INLINE void platformAlignedFree(void* ptr)
 // on all other platforms we get 16-byte alignment by default
 PX_FORCE_INLINE void* platformAlignedAlloc(size_t size)
 {
-	return ::malloc(size);	
+	return ::malloc(size);
 }
 
 PX_FORCE_INLINE void platformAlignedFree(void* ptr)

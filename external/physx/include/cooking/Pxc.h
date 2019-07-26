@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -35,7 +35,7 @@
 
 // define API function declaration
 #if !defined PX_PHYSX_STATIC_LIB 
-	#if PX_WINDOWS
+	#if PX_WINDOWS_FAMILY
 		#if defined PX_PHYSX_COOKING_EXPORTS
 			#define PX_PHYSX_COOKING_API __declspec(dllexport)
 		#else

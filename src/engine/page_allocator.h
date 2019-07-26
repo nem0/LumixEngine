@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-LUMIX_ENGINE_API class PageAllocator final
+class LUMIX_ENGINE_API PageAllocator final
 {
 public:
 	enum { PAGE_SIZE = 16384 };

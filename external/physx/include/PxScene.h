@@ -23,7 +23,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-// Copyright (c) 2008-2018 NVIDIA Corporation. All rights reserved.
+// Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
 
@@ -618,13 +618,13 @@ class PxScene
 	virtual PxCpuDispatcher* getCpuDispatcher() const = 0;
 
 	/**
-	\brief Return the gpu dispatcher that was set in PxSceneDesc::gpuDispatcher when creating the scene with PxPhysics::createScene
+	\brief Return the CUDA context manager that was set in PxSceneDesc::cudaContextManager when creating the scene with PxPhysics::createScene
 
 	<b>Platform specific:</b> Applies to PC GPU only.
 
-	@see PxSceneDesc::gpuDispatcher, PxPhysics::createScene
+	@see PxSceneDesc::cudaContextManager, PxPhysics::createScene
 	*/
-	virtual PxGpuDispatcher* getGpuDispatcher() const = 0;
+	virtual PxCudaContextManager* getCudaContextManager() const = 0;
 
 	//@}
 	/************************************************************************************************/
@@ -776,8 +776,7 @@ class PxScene
 
 	@see PxSceneDesc.filterShader PxSimulationFilterShader
 	*/
-	virtual	PxSimulationFilterShader
-								getFilterShader() const = 0;
+	virtual	PxSimulationFilterShader	getFilterShader() const = 0;
 
 	/**
 	\brief Gets the custom collision filter callback in use for this scene.
@@ -786,8 +785,7 @@ class PxScene
 
 	@see PxSceneDesc.filterCallback PxSimulationFilterCallback
 	*/
-	virtual	PxSimulationFilterCallback*
-								getFilterCallback() const = 0;
+	virtual	PxSimulationFilterCallback*	getFilterCallback() const = 0;
 
 	/**
 	\brief Marks the object to reset interactions and re-run collision filters in the next simulation step.
@@ -835,6 +833,24 @@ class PxScene
 	@see PxSimulationFilterShader PxSimulationFilterCallback
 	*/
 	virtual void				resetFiltering(PxRigidActor& actor, PxShape*const* shapes, PxU32 shapeCount) = 0;
+
+	/**
+	\brief Gets the pair filtering mode for kinematic-kinematic pairs.
+
+	\return Filtering mode for kinematic-kinematic pairs.
+
+	@see PxPairFilteringMode PxSceneDesc
+	*/
+	virtual	PxPairFilteringMode::Enum	getKinematicKinematicFilteringMode()	const	= 0;
+
+	/**
+	\brief Gets the pair filtering mode for static-kinematic pairs.
+
+	\return Filtering mode for static-kinematic pairs.
+
+	@see PxPairFilteringMode PxSceneDesc
+	*/
+	virtual	PxPairFilteringMode::Enum	getStaticKinematicFilteringMode()		const	= 0;
 
 	//@}
 	/************************************************************************************************/
@@ -1177,7 +1193,7 @@ class PxScene
 	virtual PxPruningStructureType::Enum getDynamicStructure() const = 0;
 
 	/**
-	\brief Flushes any changes in the simulation to the scene query representation.
+	\brief Flushes any changes to the scene query representation.
 
 	This method updates the state of the scene query representation to match changes in the scene state.
 
@@ -1188,8 +1204,7 @@ class PxScene
 	A thread performing updates will hold a write lock on the query structure, and thus stall other querying threads. In multithread
 	scenarios it can be useful to explicitly schedule the period where this lock may be held for a significant period, so that
 	subsequent queries issued from multiple threads will not block.
-
-	Note that while queries will block during the execution of this method, other read operations on the scene will not.
+	
 	*/
 	virtual	void				flushQueryUpdates() = 0;
 
@@ -1601,6 +1616,24 @@ class PxScene
 	@see PxSceneDesc.solverBatchSize setSolverBatchSize()
 	*/
 	virtual PxU32						getSolverBatchSize() const = 0;
+
+	/**
+	\brief Sets the number of articulations required to spawn a separate rigid body solver thread.
+
+	\param[in] solverBatchSize Number of articulations required to spawn a separate rigid body solver thread.
+
+	@see PxSceneDesc.solverBatchSize getSolverArticulationBatchSize()
+	*/
+	virtual	void						setSolverArticulationBatchSize(PxU32 solverBatchSize) = 0;
+
+	/**
+	\brief Retrieves the number of articulations required to spawn a separate rigid body solver thread.
+
+	\return Current number of articulations required to spawn a separate rigid body solver thread.
+
+	@see PxSceneDesc.solverBatchSize setSolverArticulationBatchSize()
+	*/
+	virtual PxU32						getSolverArticulationBatchSize() const = 0;
 	
 
 	//@}
