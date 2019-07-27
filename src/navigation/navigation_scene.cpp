@@ -712,7 +712,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		FileSystem& fs = m_engine.getFileSystem();
 		
 		OS::OutputFile file;
-		if (!fs.open(path, &file)) return false;
+		if (!fs.open(path, Ref(file))) return false;
 
 		bool success = file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));
 		success = success && file.write(&m_num_tiles_z, sizeof(m_num_tiles_z));

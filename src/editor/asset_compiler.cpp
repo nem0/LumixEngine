@@ -108,7 +108,7 @@ struct AssetCompilerImpl : AssetCompiler
 		OS::OutputFile file;
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		// TODO make this safe - i.e. handle case when program gets interrupted while writing the file
-		if (fs.open(".lumix/assets/_list.txt", &file)) {
+		if (fs.open(".lumix/assets/_list.txt", Ref(file))) {
 			file << "resources = {\n";
 			for (const ResourceItem& ri : m_resources) {
 				file << "\"" << ri.path.c_str() << "\",\n";
@@ -245,7 +245,7 @@ struct AssetCompilerImpl : AssetCompiler
 		OS::InputFile file;
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		const StaticString<MAX_PATH_LENGTH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
-		if (fs.open(list_path, &file)) {
+		if (fs.open(list_path, Ref(file))) {
 			Array<char> content(m_app.getWorldEditor().getAllocator());
 			content.resize((int)file.size());
 			file.read(content.begin(), content.byte_size());
@@ -370,7 +370,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 		
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		if (!fs.open(meta_path, &file)) return nullptr;
+		if (!fs.open(meta_path, Ref(file))) return nullptr;
 
 		Array<char> buf(m_app.getWorldEditor().getAllocator());
 		buf.resize((int)file.size());
@@ -407,7 +407,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
 				
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		if (!fs.open(meta_path, &file)) {
+		if (!fs.open(meta_path, Ref(file))) {
 			logError("Editor") << "Could not create " << meta_path;
 			return;
 		}

@@ -1750,7 +1750,7 @@ public:
 		FileSystem& fs = m_engine->getFileSystem();
 		OS::InputFile file;
 		auto loadFile = [&file, &data, &entity_map, &fs](const char* filepath, auto callback) {
-			if (fs.open(filepath, &file))
+			if (fs.open(filepath, Ref(file)))
 			{
 				if (file.size() > 0)
 				{

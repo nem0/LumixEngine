@@ -39,8 +39,8 @@ public:
 	virtual bool deleteFile(const char* path) = 0;
 	virtual bool fileExists(const char* path) = 0;
 	virtual OS::FileIterator* createFileIterator(const char* dir) = 0;
-	virtual bool open(const char* path, OS::InputFile* file) = 0;
-	virtual bool open(const char* path, OS::OutputFile* file) = 0;
+	virtual bool open(const char* path, Ref<OS::InputFile> file) = 0;
+	virtual bool open(const char* path, Ref<OS::OutputFile> file) = 0;
 
 	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;
