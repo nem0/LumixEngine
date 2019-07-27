@@ -1368,7 +1368,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 
 		Array<u8> src_data(m_app.getWorldEditor().getAllocator());
-		if (!fs.getContentSync(src, &src_data)) return false;
+		if (!fs.getContentSync(src, Ref(src_data))) return false;
 		if (!fs.open(dst, &dstf)) return false;
 		
 		Meta meta = getMeta(src);

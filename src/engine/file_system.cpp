@@ -173,7 +173,7 @@ struct FileSystemImpl final : public FileSystem
 		}
 	}
 
-	bool getContentSync(const Path& path, Array<u8>* content) override {
+	bool getContentSync(const Path& path, Ref<Array<u8>> content) override {
 		OS::InputFile file;
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path.c_str());
 

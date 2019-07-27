@@ -1181,7 +1181,7 @@ public:
 		lua_pop(L, 1);
 		auto& fs = engine->getFileSystem();
 		Array<u8> buf(engine->getAllocator());
-		if (!fs.getContentSync(Path(tmp), &buf)) {
+		if (!fs.getContentSync(Path(tmp), Ref(buf))) {
 			logError("Engine") << "Failed to open file " << tmp;
 			StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
 			msg << tmp;
