@@ -48,15 +48,29 @@ goto :begin
 	echo  1. Go back
 	echo  2. Maps
 	echo  3. Shader editor
+	echo  4. GLTF importer
 	echo ===============================
-	choice /C 1234567 /N /M "Your choice:"
+	choice /C 1234 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :map_plugin
 	if %errorlevel%==3 call :shader_editor_plugin
+	if %errorlevel%==4 call :glft_import_plugin
 	pause
 goto :plugins
 
+
+:glft_import_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist gltf_import (
+		git.exe clone https://github.com/nem0/lumixengine_gltf.git gltf_import
+	) else (
+		cd gltf_import
+		git pull
+	)
+	popd
+exit /B 0
 
 :shader_editor_plugin
 	if not exist ..\plugins mkdir ..\plugins
