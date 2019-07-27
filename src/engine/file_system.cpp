@@ -233,17 +233,15 @@ struct FileSystemImpl final : public FileSystem
 	}
 
 
-	bool open(const char* path, OS::InputFile* file) override
+	bool open(const char* path, Ref<OS::InputFile> file) override
 	{
-		ASSERT(file);
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
 		return file->open(full_path);
 	}
 
 
-	bool open(const char* path, OS::OutputFile* file) override
+	bool open(const char* path, Ref<OS::OutputFile> file) override
 	{
-		ASSERT(file);
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
 		return file->open(full_path);
 	}

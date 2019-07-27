@@ -308,7 +308,7 @@ bool Settings::save()
 	auto& actions = m_app.getActions();
 	OS::OutputFile file;
 	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-	if (!fs.open(SETTINGS_PATH, &file)) return false;
+	if (!fs.open(SETTINGS_PATH, Ref(file))) return false;
 
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 

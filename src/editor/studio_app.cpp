@@ -347,7 +347,7 @@ public:
 			const char* data = ImGui::SaveIniSettingsToMemory(&size);
 			FileSystem& fs = m_editor->getEngine().getFileSystem();
 			OS::OutputFile file;
-			if (fs.open("imgui.ini", &file)) {
+			if (fs.open("imgui.ini", Ref(file))) {
 				file.write(data ,size);
 				file.close();
 			}
@@ -405,7 +405,7 @@ public:
 	bool makeFile(const char* path, const char* content) override
 	{
 		OS::OutputFile file;
-		if (!m_engine->getFileSystem().open(path, &file)) return false;
+		if (!m_engine->getFileSystem().open(path, Ref(file))) return false;
 		file << content;
 		file.close();
 		return file.isError();
@@ -2336,7 +2336,7 @@ public:
 				char tmp[MAX_PATH_LENGTH];
 				parser.getCurrent(tmp, lengthOf(tmp));
 				OS::InputFile file;
-				if (m_engine->getFileSystem().open(tmp, &file))
+				if (m_engine->getFileSystem().open(tmp, Ref(file)))
 				{
 					auto size = file.size();
 					auto* src = (char*)m_allocator.allocate(size + 1);
@@ -2542,7 +2542,7 @@ public:
 		{
 			OS::InputFile src;
 			size_t src_size = OS::getFileSize(info.path);
-			if (!m_editor->getEngine().getFileSystem().open(info.path, &src))
+			if (!m_editor->getEngine().getFileSystem().open(info.path, Ref(src)))
 			{
 				file.close();
 				logError("Editor") << "Could not open " << info.path;
@@ -2598,7 +2598,7 @@ public:
 		StaticString<MAX_PATH_LENGTH> path(dir, filename);
 		OS::InputFile file;
 
-		if (m_engine->getFileSystem().open(path, &file))
+		if (m_engine->getFileSystem().open(path, Ref(file)))
 		{
 			const int size = (int)file.size();
 			Array<u8> src(m_engine->getAllocator());

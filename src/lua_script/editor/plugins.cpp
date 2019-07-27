@@ -468,7 +468,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 			OS::OutputFile file;
-			if (!fs.open(resource->getPath().c_str(), &file))
+			if (!fs.open(resource->getPath().c_str(), Ref(file)))
 			{
 				logWarning("Lua Script") << "Could not save " << resource->getPath();
 				return;

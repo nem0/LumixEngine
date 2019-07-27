@@ -710,7 +710,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
 	OS::OutputFile f;
-	if (!fs.open(tmp_path, &f))
+	if (!fs.open(tmp_path, Ref(f)))
 	{
 		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &stream);
 		logError("Editor") << "Could not save file " << resource.getPath().c_str();

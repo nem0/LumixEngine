@@ -559,7 +559,7 @@ public:
 
 		FileSystem& fs = m_editor.getEngine().getFileSystem();
 		OS::OutputFile file;
-		if (!fs.open(path.c_str(), &file))
+		if (!fs.open(path.c_str(), Ref(file)))
 		{
 			logError("Editor") << "Failed to create " << path.c_str();
 			return;
