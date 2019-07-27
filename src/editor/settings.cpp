@@ -183,7 +183,7 @@ bool Settings::load()
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
 	
 	Array<u8> buf(m_app.getWorldEditor().getAllocator());
-	if (!fs.getContentSync(Path(path), &buf)) {
+	if (!fs.getContentSync(Path(path), Ref(buf))) {
 		logError("Editor") << "Failed to open " << path;
 		return false;
 	}

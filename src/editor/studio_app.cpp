@@ -1599,7 +1599,7 @@ public:
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
 		FileSystem& fs = m_editor->getEngine().getFileSystem();
 		Array<u8> data(m_allocator);
-		if (!fs.getContentSync(Path(path), &data)) return nullptr;
+		if (!fs.getContentSync(Path(path), Ref(data))) return nullptr;
 		ImGuiIO& io = ImGui::GetIO();
 		ImFontConfig cfg;
 		cfg.FontDataOwnedByAtlas = false;
@@ -1611,7 +1611,7 @@ public:
 			config.GlyphMinAdvanceX = 20.0f; // Use if you want to make the icon monospaced
 			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 			Array<u8> icons_data(m_allocator);
-			if (fs.getContentSync(Path("editor/fonts/fontawesome-webfont.ttf"), &icons_data)) {
+			if (fs.getContentSync(Path("editor/fonts/fontawesome-webfont.ttf"), Ref(icons_data))) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF(icons_data.begin(), icons_data.byte_size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
@@ -1632,7 +1632,7 @@ public:
 		FileSystem& fs = getWorldEditor().getEngine().getFileSystem();
 		
 		Array<u8> ini_data(m_allocator);
-		if (fs.getContentSync(Path("imgui.ini"), &ini_data)) {
+		if (fs.getContentSync(Path("imgui.ini"), Ref(ini_data))) {
 			ImGui::LoadIniSettingsFromMemory((const char*)ini_data.begin(), ini_data.size());
 		}
 

@@ -635,7 +635,7 @@ bool FBXImporter::setSource(const char* base_dir, const char* filename, bool ign
 	}
 
 	Array<u8> data(allocator);
-	if (!filesystem.getContentSync(Path(filename), &data)) return false;
+	if (!filesystem.getContentSync(Path(filename), Ref(data))) return false;
 	
 	const u64 flags = ignore_geometry ? (u64)ofbx::LoadFlags::IGNORE_GEOMETRY : (u64)ofbx::LoadFlags::TRIANGULATE;
 	scene = ofbx::load(&data[0], data.size(), flags);

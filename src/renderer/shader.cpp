@@ -359,7 +359,7 @@ int include(lua_State* L)
 
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 
-	if (!fs.getContentSync(Path(path), &shader->m_render_data->include)) {
+	if (!fs.getContentSync(Path(path), Ref(shader->m_render_data->include))) {
 		logError("Renderer") << "Failed to open/read include " << path << " included from " << shader->getPath();
 		return 0;
 	}
