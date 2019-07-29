@@ -8,6 +8,7 @@ elseif "linux-clang" == _OPTIONS["gcc"] then
 end
 local binary_api_dir = iif(ide_dir == "vs2019", "vs2017", ide_dir)
 
+local ROOT_DIR = path.getabsolute("../")
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
 local build_app = false
@@ -319,7 +320,7 @@ function useLua()
 			defines { "LUA_BUILD_AS_DLL" }
 		configuration {}
 	end
-	includedirs { "../external/luajit/include" }
+	includedirs { path.join(ROOT_DIR, "external/luajit/include") }
 end
 
 function copyDlls(src_dir, platform_dir, dest_dir)
