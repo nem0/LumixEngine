@@ -1426,17 +1426,21 @@ void FBXImporter::writeBillboardMesh(i32 attribute_array_offset, i32 indices_off
 	const i32 attribute_count = 4;
 	write(attribute_count);
 
-	const i32 pos_attr = 0;
-	write(pos_attr);
+	write(Mesh::AttributeSemantic::POSITION);
+	write(ffr::AttributeType::FLOAT);
+	write((u8)3);
 
-	const i32 nrm_attr = 1;
-	write(nrm_attr);
+	write(Mesh::AttributeSemantic::NORMAL);
+	write(ffr::AttributeType::U8);
+	write((u8)4);
 
-	const i32 tangent_attr = 2;
-	write(tangent_attr);
+	write(Mesh::AttributeSemantic::TANGENT);
+	write(ffr::AttributeType::U8);
+	write((u8)4);
 
-	const i32 uv0_attr = 8;
-	write(uv0_attr);
+	write(Mesh::AttributeSemantic::TEXCOORD0);
+	write(ffr::AttributeType::FLOAT);
+	write((u8)2);
 
 	const StaticString<MAX_PATH_LENGTH + 10> material_name(mesh_output_filename, "_billboard");
 	i32 length = stringLength(material_name);
@@ -1476,35 +1480,37 @@ void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src,
 		i32 attribute_count = getAttributeCount(import_mesh);
 		write(attribute_count);
 
-		i32 pos_attr = 0;
-		write(pos_attr);
+		write(Mesh::AttributeSemantic::POSITION);
+		write(ffr::AttributeType::FLOAT);
+		write((u8)3);
 		const ofbx::Geometry* geom = mesh.getGeometry();
-		if (geom->getNormals())
-		{
-			i32 nrm_attr = 1;
-			write(nrm_attr);
+		if (geom->getNormals()) {
+			write(Mesh::AttributeSemantic::NORMAL);
+			write(ffr::AttributeType::U8);
+			write((u8)4);
 		}
-		if (geom->getUVs())
-		{
-			i32 uv0_attr = 8;
-			write(uv0_attr);
+		if (geom->getUVs()) {
+			write(Mesh::AttributeSemantic::TEXCOORD0);
+			write(ffr::AttributeType::FLOAT);
+			write((u8)2);
 		}
-		if (geom->getColors() && import_vertex_colors)
-		{
-			i32 color_attr = 4;
-			write(color_attr);
+		if (geom->getColors() && import_vertex_colors) {
+			write(Mesh::AttributeSemantic::COLOR0);
+			write(ffr::AttributeType::U8);
+			write((u8)4);
 		}
-		if (geom->getTangents())
-		{
-			i32 tangent_attr = 2;
-			write(tangent_attr);
+		if (geom->getTangents()) {
+			write(Mesh::AttributeSemantic::TANGENT);
+			write(ffr::AttributeType::U8);
+			write((u8)4);
 		}
-		if (import_mesh.is_skinned)
-		{
-			i32 indices_attr = 6;
-			write(indices_attr);
-			i32 weight_attr = 7;
-			write(weight_attr);
+		if (import_mesh.is_skinned) {
+			write(Mesh::AttributeSemantic::INDICES);
+			write(ffr::AttributeType::I16);
+			write((u8)4);
+			write(Mesh::AttributeSemantic::WEIGHTS);
+			write(ffr::AttributeType::FLOAT);
+			write((u8)4);
 		}
 
 		const ofbx::Material* material = import_mesh.fbx_mat;

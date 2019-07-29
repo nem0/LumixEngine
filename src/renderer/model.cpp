@@ -287,31 +287,32 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 	file.read(&attribute_count, sizeof(attribute_count));
 	vertex_decl->attributes_count = 0;
 
-	for (u32 i = 0; i < attribute_count; ++i)
-	{
-		i32 attr;
-		file.read(&attr, sizeof(attr));
-		semantics[i] = (Mesh::AttributeSemantic)attr;
+	for (u32 i = 0; i < attribute_count; ++i) {
+		ffr::AttributeType type;
+		u8 cmp_count;
+		file.read(semantics[i]);
+		file.read(type);
+		file.read(cmp_count);
 
 		switch(semantics[i]) {
 			case Mesh::AttributeSemantic::POSITION:
-				vertex_decl->addAttribute(3, ffr::AttributeType::FLOAT, false, false);
+				vertex_decl->addAttribute(cmp_count, type, false, false);
 				break;
 			case Mesh::AttributeSemantic::COLOR0:
-				vertex_decl->addAttribute(4, ffr::AttributeType::U8, true, false);
+				vertex_decl->addAttribute(cmp_count, type, true, false);
 				break;
 			case Mesh::AttributeSemantic::TEXCOORD0:
-				vertex_decl->addAttribute(2, ffr::AttributeType::FLOAT, false, false);
+				vertex_decl->addAttribute(cmp_count, type, false, false);
 				break;
 			case Mesh::AttributeSemantic::NORMAL:
 			case Mesh::AttributeSemantic::TANGENT:
-				vertex_decl->addAttribute(4, ffr::AttributeType::U8, true, true);
+				vertex_decl->addAttribute(cmp_count, type, true, true);
 				break;
 			case Mesh::AttributeSemantic::WEIGHTS:
-				vertex_decl->addAttribute(4, ffr::AttributeType::FLOAT, false, false);
+				vertex_decl->addAttribute(cmp_count, type, false, false);
 				break;
 			case Mesh::AttributeSemantic::INDICES:
-				vertex_decl->addAttribute(4, ffr::AttributeType::I16, false, true);
+				vertex_decl->addAttribute(cmp_count, type, false, true);
 				break;
 			default: ASSERT(false); break;
 		}
