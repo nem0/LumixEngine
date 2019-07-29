@@ -5,7 +5,7 @@
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/stream.h"
-#include <cmath>
+#include <math.h>
 
 
 namespace Lumix
@@ -267,7 +267,7 @@ ComponentInstance* Blend1DNodeInstance::update(RunningContext& rc, bool check_ed
 	float old_time = time;
 	time += rc.time_delta;
 	float length = instances[0]->getLength();
-	time = fmod(time, length);
+	time = fmodf(time, length);
 
 	float input_value = *(float*)&rc.input[node.input_offset];
 	current_weight = 0;
@@ -683,7 +683,7 @@ struct AnimationNodeInstance : public NodeInstance
 		float length = resource->getLength();
 		if (node.looped && time > length)
 		{
-			time = fmod(time, length);
+			time = fmodf(time, length);
 			if (node.new_on_loop && !node.animations_hashes.empty())
 			{
 				int idx = rand() % node.animations_hashes.size();

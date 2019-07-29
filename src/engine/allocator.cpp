@@ -1,8 +1,8 @@
 #include "engine/allocator.h"
 #include "engine/mt/atomic.h"
-#include <cstdlib>
+#include <stdlib.h>
 #ifndef _WIN32
-	#include <cstring>
+	#include <string.h>
 	#include <malloc.h>
 #endif
 

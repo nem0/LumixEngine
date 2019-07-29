@@ -28,8 +28,8 @@
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
-#include <cmath>
-#include <cstring>
+#include <math.h>
+#include <string.h>
 
 
 namespace Lumix

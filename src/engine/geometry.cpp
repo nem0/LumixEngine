@@ -1,8 +1,8 @@
 #include "geometry.h"
 #include "engine/math.h"
 #include "engine/simd.h"
-#include <cmath>
-#include <cstring>
+#include <math.h>
+#include <string.h>
 
 
 namespace Lumix

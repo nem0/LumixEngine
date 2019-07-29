@@ -4,9 +4,9 @@
 #include "engine/os.h"
 #include "engine/universe/universe.h"
 #include "render_interface.h"
-#include <cfloat>
-#include <cmath>
-#include <cstring>
+#include <float.h>
+#include <math.h>
+#include <string.h>
 
 
 namespace Lumix
@@ -656,13 +656,13 @@ struct GizmoImpl final : public Gizmo
 		Vec3 hit;
 		if (getRaySphereIntersection(rel_origin, dir, pos, scale, hit)) {
 			const Vec3 x = gizmo_tr.rot * Vec3(1, 0, 0);
-			const float x_dist = fabs(dotProduct(hit, x) - dotProduct(x, pos));
+			const float x_dist = fabsf(dotProduct(hit, x) - dotProduct(x, pos));
 
 			const Vec3 y = gizmo_tr.rot * Vec3(0, 1, 0);
-			const float y_dist = fabs(dotProduct(hit, y) - dotProduct(y, pos));
+			const float y_dist = fabsf(dotProduct(hit, y) - dotProduct(y, pos));
 
 			const Vec3 z = gizmo_tr.rot * Vec3(0, 0, 1);
-			const float z_dist = fabs(dotProduct(hit, z) - dotProduct(z, pos));
+			const float z_dist = fabsf(dotProduct(hit, z) - dotProduct(z, pos));
 
 			float influence_dist = scale * 0.15f;
 			if (x_dist > influence_dist && y_dist > influence_dist && z_dist > influence_dist)
@@ -820,7 +820,7 @@ struct GizmoImpl final : public Gizmo
 		const float y = clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
 		const float x = clamp(dotProduct(delta, side), -1.0f, 1.0f);
 
-		return atan2(x, y);
+		return atan2f(x, y);
 		/*
 		if (m_is_step)
 		{

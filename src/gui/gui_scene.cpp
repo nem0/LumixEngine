@@ -16,7 +16,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/texture.h"
 #include "sprite.h"
-#include <cmath>
+#include <math.h>
 
 
 namespace Lumix

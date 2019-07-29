@@ -21,7 +21,7 @@
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
 #include <Recast.h>
-#include <cmath>
+#include <math.h>
 
 
 namespace Lumix
@@ -359,7 +359,7 @@ struct NavigationSceneImpl final : public NavigationScene
 			agent.speed = diff.length() / time_delta;
 			agent.yaw_diff = 0;
 			if (velocity.squaredLength() > 0) {
-				float wanted_yaw = atan2(velocity.x, velocity.z);
+				float wanted_yaw = atan2f(velocity.x, velocity.z);
 				float current_yaw = rot.toEuler().y;
 				agent.yaw_diff = angleDiff(wanted_yaw, current_yaw);
 			}

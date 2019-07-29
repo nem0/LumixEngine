@@ -1,7 +1,7 @@
 #include "math.h"
 #include "simd.h"
-#include <cmath>
-#include <cfloat>
+#include <math.h>
+#include <float.h>
 #include <random>
 
 

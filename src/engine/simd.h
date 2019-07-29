@@ -7,7 +7,7 @@
 #ifdef _WIN32
 	#include <xmmintrin.h>
 #else
-	#include <cmath>
+	#include <math.h>
 #endif
 
 namespace Lumix

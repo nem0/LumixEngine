@@ -10,7 +10,7 @@
 #include "renderer/model.h"
 #include <DetourAlloc.h>
 #include <RecastAlloc.h>
-#include <cmath>
+#include <math.h>
 
 
 namespace Lumix

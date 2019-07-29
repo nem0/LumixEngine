@@ -20,7 +20,7 @@
 #include "engine/string.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
-#include <cstdlib>
+#include <stdlib.h>
 
 namespace Lumix
 {

@@ -53,7 +53,7 @@
 #include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
 #include <nvtt.h>
-#include <cstddef>
+#include <stddef.h>
 
 
 using namespace Lumix;

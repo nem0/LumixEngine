@@ -14,8 +14,8 @@
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
-#include <cmath>
-#include <cstring>
+#include <math.h>
+#include <string.h>
 
 
 namespace Lumix

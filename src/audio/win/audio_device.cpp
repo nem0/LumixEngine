@@ -3,7 +3,7 @@
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/math.h"
-#include <cmath>
+#include <math.h>
 #include <dsound.h>
 
 

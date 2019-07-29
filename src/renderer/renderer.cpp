@@ -33,7 +33,7 @@
 #undef far
 #include "gl/GL.h"
 #include "ffr/ffr.h"
-#include <cstdio>
+#include <stdio.h>
 
 #define FFR_GL_IMPORT(prototype, name) static prototype name;
 #define FFR_GL_IMPORT_TYPEDEFS

@@ -30,8 +30,8 @@
 #include "renderer/renderer.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#include <cfloat>
-#include <cmath>
+#include <float.h>
+#include <math.h>
 
 
 namespace Lumix
@@ -2356,15 +2356,15 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		float prev_si = 0;
 		for (int y = -r2; y < r2; ++y)
 		{
-			float cy = cos(y * STEP);
-			float cy1 = cos((y + 1) * STEP);
-			float sy = sin(y * STEP);
-			float sy1 = sin((y + 1) * STEP);
+			float cy = cosf(y * STEP);
+			float cy1 = cosf((y + 1) * STEP);
+			float sy = sinf(y * STEP);
+			float sy1 = sinf((y + 1) * STEP);
 
 			for (int i = -p2; i < p2; ++i)
 			{
-				float ci = cos(i * STEP);
-				float si = sin(i * STEP);
+				float ci = cosf(i * STEP);
+				float si = sinf(i * STEP);
 				addDebugLine(DVec3(center.x + radius * ci * cy,
 								  center.y + radius * sy,
 								  center.z + radius * si * cy),
@@ -2404,20 +2404,20 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		static const float STEP = degreesToRadians(360.0f) / COLS;
 		for (int y = 0; y < ROWS >> 1; ++y)
 		{
-			float cy = cos(y * STEP);
-			float cy1 = cos((y + 1) * STEP);
-			float sy = sin(y * STEP);
-			float sy1 = sin((y + 1) * STEP);
-			float prev_ci = cos(-STEP);
-			float prev_si = sin(-STEP);
+			float cy = cosf(y * STEP);
+			float cy1 = cosf((y + 1) * STEP);
+			float sy = sinf(y * STEP);
+			float sy1 = sinf((y + 1) * STEP);
+			float prev_ci = cosf(-STEP);
+			float prev_si = sinf(-STEP);
 
 			Vec3 y_offset = y_vec * sy;
 			Vec3 y_offset1 = y_vec * sy1;
 
 			for (int i = 0; i < COLS; ++i)
 			{
-				float ci = cos(i * STEP);
-				float si = sin(i * STEP);
+				float ci = cosf(i * STEP);
+				float si = sinf(i * STEP);
 
 				addDebugLine(
 					center + radius * (x_vec * ci * cy + z_vec * si * cy + y_offset),
@@ -2444,17 +2444,17 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		int yto = top ? ROWS >> 1 : 0;
 		for (int y = yfrom; y < yto; ++y)
 		{
-			float cy = cos(y * STEP);
-			float cy1 = cos((y + 1) * STEP);
-			float sy = sin(y * STEP);
-			float sy1 = sin((y + 1) * STEP);
-			float prev_ci = cos((-p2 - 1) * STEP);
-			float prev_si = sin((-p2 - 1) * STEP);
+			float cy = cosf(y * STEP);
+			float cy1 = cosf((y + 1) * STEP);
+			float sy = sinf(y * STEP);
+			float sy1 = sinf((y + 1) * STEP);
+			float prev_ci = cosf((-p2 - 1) * STEP);
+			float prev_si = sinf((-p2 - 1) * STEP);
 
 			for (int i = -p2; i < p2; ++i)
 			{
-				float ci = cos(i * STEP);
-				float si = sin(i * STEP);
+				float ci = cosf(i * STEP);
+				float si = sinf(i * STEP);
 				addDebugLine(DVec3(center.x + radius * ci * cy,
 					center.y + radius * sy,
 					center.z + radius * si * cy),
