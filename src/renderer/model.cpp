@@ -559,27 +559,35 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		ffr::VertexAttrib attribs[16] = {};
 		ffr::VertexAttrib* attr = attribs;
 		if (position_attribute_offset >= 0)	{
-			*attr = { 0, 3, ffr::AttributeType::FLOAT, (u32)position_attribute_offset, false, false, false };
+			const ffr::Attribute& pos = getAttribute(mesh, Mesh::AttributeSemantic::POSITION);
+			*attr = { 0, pos.components_num, pos.type, (u32)pos.offset, false, false, false };
 			++attr;
 		}
 		if (uv_attribute_offset >= 0)	{
-			*attr = { 1, 2, ffr::AttributeType::FLOAT, (u32)uv_attribute_offset, false, false, false };
+			const ffr::Attribute& uv = getAttribute(mesh, Mesh::AttributeSemantic::TEXCOORD0);
+			*attr = { 1, uv.components_num, uv.type, (u32)uv.offset, false, false, false };
 			++attr;
 		}
 		const int normal_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::NORMAL);
 		if (normal_attribute_offset >= 0)	{
-			const ffr::Attribute& ffr_attr = getAttribute(mesh, Mesh::AttributeSemantic::NORMAL);
-			if (ffr_attr.type == ffr::AttributeType::FLOAT) {
-				*attr = { 2, ffr_attr.components_num, ffr_attr.type, (u32)normal_attribute_offset, false, false, false };
+			const ffr::Attribute& normal = getAttribute(mesh, Mesh::AttributeSemantic::NORMAL);
+			if (normal.type == ffr::AttributeType::FLOAT) {
+				*attr = { 2, normal.components_num, normal.type, (u32)normal.offset, false, false, false };
 			}
 			else {
-				*attr = { 2, ffr_attr.components_num, ffr_attr.type, (u32)normal_attribute_offset, true, true, false };
+				*attr = { 2, normal.components_num, normal.type, (u32)normal.offset, true, true, false };
 			}
 			++attr;
 		}
 		const int tangent_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::TANGENT);
 		if (tangent_attribute_offset >= 0)	{
-			*attr = { 3, 4, ffr::AttributeType::U8, (u32)tangent_attribute_offset, true, true, false };
+			const ffr::Attribute& tangent = getAttribute(mesh, Mesh::AttributeSemantic::TANGENT);
+			if (tangent.type == ffr::AttributeType::FLOAT) {
+				*attr = { 3, tangent.components_num, tangent.type, (u32)tangent.offset, false, false, false };
+			}
+			else {
+				*attr = { 3, tangent.components_num, tangent.type, (u32)tangent.offset, true, true, false };
+			}
 			++attr;
 		}
 
@@ -593,9 +601,11 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			++attr;
 		}
 		else {
-			*attr = { 4, 4, ffr::AttributeType::I16, (u32)bone_indices_attribute_offset, false, true, false };
+			const ffr::Attribute& indices = getAttribute(mesh, Mesh::AttributeSemantic::INDICES);
+			*attr = { 4, indices.components_num, indices.type, (u32)indices.offset, false, true, false };
 			++attr;
-			*attr = { 5, 4, ffr::AttributeType::FLOAT, (u32)weights_attribute_offset, false, false, false };
+			const ffr::Attribute& weights = getAttribute(mesh, Mesh::AttributeSemantic::WEIGHTS);
+			*attr = { 5, weights.components_num, weights.type, (u32)weights.offset, false, false, false };
 			++attr;
 		}
 		mesh.render_data->vao = m_renderer.createVAO(attribs, u32(attr - attribs));
