@@ -773,9 +773,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 		StaticString<MAX_PATH_LENGTH> label("", rl.name, "##h", res.path.getHash());
 		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick))
 		{
-			if(selected_path_hash) {
-				selected_path_hash = res.path.getHash();
-			}
+			selected_path_hash = res.path.getHash();
 			
 			if (selected || ImGui::IsMouseDoubleClicked(0)) {
 				copyString(buf, res.path.c_str());
