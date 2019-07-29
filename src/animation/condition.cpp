@@ -1,8 +1,8 @@
 #include "condition.h"
 #include "state_machine.h"
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 namespace Lumix
@@ -402,8 +402,8 @@ void ExpressionVM::callFunction(u16 idx, RunningContext& rc)
 {
 	switch(idx)
 	{
-		case 0: push<float>(sin(pop<float>())); break;
-		case 1: push<float>(cos(pop<float>())); break;
+		case 0: push<float>(sinf(pop<float>())); break;
+		case 1: push<float>(cosf(pop<float>())); break;
 		case 2: push<float>(rc.current->getTime()); break;
 		case 3: push<float>(rc.current->getLength()); break;
 		case 4: push<bool>(rc.current->getTime() > rc.current->getLength() - rc.edge->length); break;

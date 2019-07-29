@@ -8,7 +8,7 @@
 #include "engine/universe/universe.h"
 #include "render_interface.h"
 #include "world_editor.h"
-#include <cmath>
+#include <math.h>
 
 
 namespace Lumix
@@ -290,7 +290,7 @@ struct EditorIconsImpl final : public EditorIcons
 			const float distance = (position - vp.pos).toFloat().length();
 			float scale_factor = MIN_SCALE_FACTOR + distance;
 			scale_factor = clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
-			icon.scale = tan(vp.fov * 0.5f) * distance / scale_factor;
+			icon.scale = tanf(vp.fov * 0.5f) * distance / scale_factor;
 			
 			Matrix icon_mtx = getIconMatrix(icon, camera_mtx, vp.pos, vp.is_ortho, vp.ortho_size);
 			data->push({icon_mtx, m_models[(int)icon.type]});

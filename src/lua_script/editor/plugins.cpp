@@ -22,7 +22,7 @@
 #include "imgui/imgui.h"
 #include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
-#include <cstdlib>
+#include <stdlib.h>
 
 
 using namespace Lumix;

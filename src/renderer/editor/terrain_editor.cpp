@@ -25,7 +25,7 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
-#include <cmath>
+#include <math.h>
 
 
 namespace Lumix
@@ -754,11 +754,11 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const DVec
 	for (int i = 0; i < SLICE_COUNT + 1; ++i) {
 		const float angle = i * angle_step;
 		const float next_angle = i * angle_step + angle_step;
-		Vec3 local_from = local_center + Vec3(cos(angle), 0, sin(angle)) * brush_size;
+		Vec3 local_from = local_center + Vec3(cosf(angle), 0, sinf(angle)) * brush_size;
 		local_from.y = scene.getTerrainHeightAt(terrain, local_from.x, local_from.z);
 		local_from.y += 0.25f;
 		Vec3 local_to =
-			local_center + Vec3(cos(next_angle), 0, sin(next_angle)) * brush_size;
+			local_center + Vec3(cosf(next_angle), 0, sinf(next_angle)) * brush_size;
 		local_to.y = scene.getTerrainHeightAt(terrain, local_to.x, local_to.z);
 		local_to.y += 0.25f;
 

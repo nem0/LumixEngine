@@ -14,8 +14,8 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "engine/universe/universe.h"
-#include <cfloat>
-#include <cmath>
+#include <float.h>
+#include <math.h>
 
 
 namespace Lumix

@@ -1,7 +1,7 @@
 #include "ofbx.h"
 #include "miniz.h"
 #include <cassert>
-#include <cmath>
+#include <math.h>
 #include <ctype.h>
 #include <memory>
 #include <numeric>

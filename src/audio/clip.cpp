@@ -6,7 +6,7 @@
 #include "engine/string.h"
 #define STB_VORBIS_HEADER_ONLY
 #include "stb/stb_vorbis.cpp"
-#include <cstdlib>
+#include <stdlib.h>
 
 
 namespace Lumix

@@ -11,7 +11,7 @@
 #include "engine/page_allocator.h"
 #include "engine/profiler.h"
 #include "engine/simd.h"
-#include <cstring>
+#include <string.h>
 
 
 namespace Lumix

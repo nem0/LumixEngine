@@ -12,8 +12,9 @@
 #include "engine/serializer.h"
 #include "physics/physics_geometry.h"
 #include "renderer/model.h"
-#include <cfloat>
-#include <cmath>
+#include <float.h>
+#include <math.h>
+#include <stdlib.h>
 
 
 namespace Lumix

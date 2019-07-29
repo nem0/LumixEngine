@@ -2,7 +2,7 @@
 #include "engine/log.h"
 #include "engine/path.h"
 #include "engine/string.h"
-#include <cstdlib>
+#include <stdlib.h>
 
 
 namespace Lumix

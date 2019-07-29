@@ -13,8 +13,8 @@
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "ui_builder.h"
-#include <cmath>
-#include <cstdlib>
+#include <math.h>
+#include <stdlib.h>
 
 
 
@@ -97,13 +97,13 @@ static ImVec2 getEdgeStartPoint(const ImVec2 a_pos, const ImVec2 a_size, const I
 	ImVec2 center_a = a_pos + a_size * 0.5f;
 	ImVec2 center_b = b_pos + b_size * 0.5f;
 	ImVec2 dir = center_b - center_a;
-	if (fabs(dir.x / dir.y) > fabs(a_size.x / a_size.y))
+	if (fabsf(dir.x / dir.y) > fabs(a_size.x / a_size.y))
 	{
-		dir = dir * fabs(1 / dir.x);
+		dir = dir * fabsf(1 / dir.x);
 		return center_a + dir * a_size.x * 0.5f + ImVec2(0, center_a.y > center_b.y == is_dir ? 5.0f : -5.0f);
 	}
 
-	dir = dir * fabs(1 / dir.y);
+	dir = dir * fabsf(1 / dir.y);
 	return center_a + dir * a_size.y * 0.5f + ImVec2(center_a.x > center_b.x == is_dir ? 5.0f : -5.0f, 0);
 }
 

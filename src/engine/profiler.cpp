@@ -8,14 +8,14 @@
 #include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "profiler.h"
-#include <cstring>
+#include <string.h>
 
 #define INITGUID
 #include <Windows.h>
 #include <evntcons.h>
 #include <evntrace.h>
 #include <thread>
-#include <cassert>
+#include <assert.h>
 
 namespace Lumix
 {

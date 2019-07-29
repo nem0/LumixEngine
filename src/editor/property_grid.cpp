@@ -15,7 +15,7 @@
 #include "engine/math.h"
 #include "imgui/imgui.h"
 #include "utils.h"
-#include <cmath>
+#include <math.h>
 
 
 namespace Lumix

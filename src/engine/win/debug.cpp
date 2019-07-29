@@ -9,9 +9,9 @@
 #include <DbgHelp.h>
 #pragma warning (pop)
 #include <mapi.h>
-#include <cfloat>
-#include <cstdlib>
-#include <cstdio>
+#include <float.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include "engine/allocator.h"
 
 

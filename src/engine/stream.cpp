@@ -1,7 +1,7 @@
 #include "stream.h"
 #include "engine/allocator.h"
 #include "engine/string.h"
-#include <cstring>
+#include <string.h>
 
 
 namespace Lumix
