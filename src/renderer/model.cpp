@@ -306,7 +306,12 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 				break;
 			case Mesh::AttributeSemantic::NORMAL:
 			case Mesh::AttributeSemantic::TANGENT:
-				vertex_decl->addAttribute(cmp_count, type, true, true);
+				if (type == ffr::AttributeType::FLOAT) {
+					vertex_decl->addAttribute(cmp_count, type, false, false);
+				}
+				else {
+					vertex_decl->addAttribute(cmp_count, type, true, true);
+				}
 				break;
 			case Mesh::AttributeSemantic::WEIGHTS:
 				vertex_decl->addAttribute(cmp_count, type, false, false);
@@ -446,6 +451,17 @@ static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
 	return -1;
 }
 
+static const ffr::Attribute& getAttribute(Mesh& mesh, Mesh::AttributeSemantic attr)
+{
+	for (int i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
+		if(mesh.render_data->attributes_semantic[i] == attr) {
+			return mesh.render_data->vertex_decl.attributes[i];
+		}
+	}
+	ASSERT(false);
+	static ffr::Attribute dummy;
+	return dummy;
+}
 
 bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 {
@@ -552,7 +568,13 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		}
 		const int normal_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::NORMAL);
 		if (normal_attribute_offset >= 0)	{
-			*attr = { 2, 4, ffr::AttributeType::U8, (u32)normal_attribute_offset, true, true, false };
+			const ffr::Attribute& ffr_attr = getAttribute(mesh, Mesh::AttributeSemantic::NORMAL);
+			if (ffr_attr.type == ffr::AttributeType::FLOAT) {
+				*attr = { 2, ffr_attr.components_num, ffr_attr.type, (u32)normal_attribute_offset, false, false, false };
+			}
+			else {
+				*attr = { 2, ffr_attr.components_num, ffr_attr.type, (u32)normal_attribute_offset, true, true, false };
+			}
 			++attr;
 		}
 		const int tangent_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::TANGENT);
