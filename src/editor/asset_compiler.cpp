@@ -245,7 +245,7 @@ struct AssetCompilerImpl : AssetCompiler
 		OS::InputFile file;
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		const StaticString<MAX_PATH_LENGTH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
-		if (fs.open(list_path, Ref(file))) {
+		if (fs.open(".lumix/assets/_list.txt", Ref(file))) {
 			Array<char> content(m_app.getWorldEditor().getAllocator());
 			content.resize((int)file.size());
 			file.read(content.begin(), content.byte_size());
@@ -309,6 +309,8 @@ struct AssetCompilerImpl : AssetCompiler
 
 		const u64 list_last_modified = OS::getLastModified(list_path);
 		processDir("", 0, list_last_modified);
+
+		registerLuaAPI(m_app.getWorldEditor().getEngine().getState());
 	}
 
 
@@ -485,6 +487,29 @@ struct AssetCompilerImpl : AssetCompiler
 		return p;
 	}
 	
+	static int LUA_getResources(lua_State* L) {
+		const int index = lua_upvalueindex(1);
+		if (!LuaWrapper::isType<AssetCompilerImpl*>(L, index)) {
+			logError("Lua") << "Invalid Lua closure";
+			ASSERT(false);
+			return 0;
+		}
+		AssetCompilerImpl* compiler = LuaWrapper::toType<AssetCompilerImpl*>(L, index);
+		ASSERT(compiler);
+
+		MT::CriticalSectionLock lock(compiler->m_resources_mutex);
+		lua_createtable(L, 0, compiler->m_resources.size());
+		for (ResourceItem& ri : compiler->m_resources) {
+			lua_pushinteger(L, ri.type.type);
+			lua_setfield(L, -2, ri.path.c_str());
+		}
+		return 1;
+	}
+
+	void registerLuaAPI(lua_State* L) {
+		LuaWrapper::createSystemClosure(L, "Assets", this, "getResources", &LUA_getResources);
+	}
+
 	void onGUI() override {
 		if (m_batch_remaining_count == 0) return;
 		const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
