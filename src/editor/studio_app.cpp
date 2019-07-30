@@ -2304,7 +2304,6 @@ public:
 		LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);                                              \
 	} while (false)
 
-
 		REGISTER_FUNCTION(savePrefabAs);
 		REGISTER_FUNCTION(selectEntity);
 		REGISTER_FUNCTION(createEntity);
