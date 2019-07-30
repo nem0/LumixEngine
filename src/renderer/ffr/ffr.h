@@ -205,7 +205,7 @@ struct TextureInfo {
 
 
 void preinit(IAllocator& allocator);
-bool init(void* window_handle);
+bool init(void* window_handle, bool debug);
 void swapBuffers();
 bool isHomogenousDepth();
 bool isOriginBottomLeft();
