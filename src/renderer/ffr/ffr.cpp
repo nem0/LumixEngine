@@ -1783,6 +1783,8 @@ void destroy(BufferHandle buffer)
 
 void clear(u32 flags, const float* color, float depth)
 {
+	CHECK_GL(glUseProgram(0));
+	g_ffr.last_program = INVALID_PROGRAM;
 	CHECK_GL(glDisable(GL_SCISSOR_TEST));
 	CHECK_GL(glDisable(GL_BLEND));
 	g_ffr.last_state &= ~u64(0xffFF << 6);
@@ -1803,8 +1805,6 @@ void clear(u32 flags, const float* color, float depth)
 		glClearStencil(0);
 		gl_flags |= GL_STENCIL_BUFFER_BIT;
 	}
-	CHECK_GL(glUseProgram(0));
-	g_ffr.last_program = INVALID_PROGRAM;
 	CHECK_GL(glClear(gl_flags));
 }
 
