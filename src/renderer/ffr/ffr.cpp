@@ -785,7 +785,7 @@ static int load_gl(void* device_contex)
 	const int32_t contextAttrs[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
 		WGL_CONTEXT_MINOR_VERSION_ARB, 5,
-		#ifdef LUIMIX_DEBUG
+		#ifdef LUMIX_DEBUG
 			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
 		#endif
 		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
@@ -2022,7 +2022,7 @@ void preinit(IAllocator& allocator)
 }
 
 
-bool init(void* window_handle)
+bool init(void* window_handle, bool debug)
 {
 	g_ffr.device_context = GetDC((HWND)window_handle);
 	g_ffr.thread = GetCurrentThreadId();
@@ -2045,11 +2045,15 @@ bool init(void* window_handle)
 	CHECK_GL(glDepthFunc(GL_GREATER));
 
 	#ifdef LUMIX_DEBUG
+		debug = true;
+	#endif
+
+	if (debug) {
 		CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
 		CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
 		CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
 		CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
-	#endif
+	}
 
 	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
 	CHECK_GL(glBindVertexArray(0));	

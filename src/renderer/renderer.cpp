@@ -434,12 +434,13 @@ struct RendererImpl final : public Renderer
 		OS::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		m_vsync = true;
-		while (cmd_line_parser.next())
-		{
-			if (cmd_line_parser.currentEquals("-no_vsync"))
-			{
+		m_debug_opengl = false;
+		while (cmd_line_parser.next()) {
+			if (cmd_line_parser.currentEquals("-no_vsync")) {
 				m_vsync = false;
-				break;
+			}
+			else if (cmd_line_parser.currentEquals("-debug_opengl")) {
+				m_debug_opengl = true;
 			}
 		}
 
@@ -449,7 +450,7 @@ struct RendererImpl final : public Renderer
 			RendererImpl& renderer = *(RendererImpl*)data;
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getPlatformData().window_handle;
-			ffr::init(window_handle);
+			ffr::init(window_handle, renderer.m_debug_opengl);
 			renderer.m_framebuffer = ffr::createFramebuffer();
 			renderer.m_transient_buffer = ffr::allocBufferHandle();
 			renderer.m_transient_buffer_offset = 0;
@@ -1044,6 +1045,7 @@ struct RendererImpl final : public Renderer
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
 	bool m_vsync;
+	bool m_debug_opengl = false;
 	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle m_setup_jobs_done = JobSystem::INVALID_HANDLE;
 	Array<RenderJob*> m_cmd_queue;
