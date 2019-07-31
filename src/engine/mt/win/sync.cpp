@@ -113,27 +113,5 @@ void CriticalSection::exit()
 }
 
 
-SpinMutex::SpinMutex() : m_id(0) {}
-
-SpinMutex::~SpinMutex() = default;
-
-void SpinMutex::lock()
-{
-	for (;;) {
-		for (int i = 0; i < 16; ++i) {
-			if (m_id == 0 && _interlockedbittestandset(&m_id, 0) == 0) {
-				return;
-			}
-		}
-		_mm_pause();
-	}
-}
-
-void SpinMutex::unlock()
-{
-	_interlockedbittestandreset(&m_id, 0);
-}
-
-
 } // namespace MT
 } // namespace Lumix

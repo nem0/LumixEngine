@@ -41,7 +41,7 @@ struct ThreadContext
 	u32 end = 0;
 	u32 rows = 0;
 	bool open = false;
-	MT::SpinMutex mutex;
+	MT::CriticalSection mutex;
 	StaticString<64> name;
 	bool show_in_profiler = false;
 	u32 thread_id;
@@ -148,7 +148,7 @@ static struct Instance
 		thread_local ThreadContext* ctx = [&](){
 			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(allocator);
 			new_ctx->thread_id = MT::getCurrentThreadID();
-			MT::SpinLock lock(mutex);
+			MT::CriticalSectionLock lock(mutex);
 			contexts.push(new_ctx);
 			return new_ctx;
 		}();
@@ -159,7 +159,7 @@ static struct Instance
 
 	DefaultAllocator allocator;
 	Array<ThreadContext*> contexts;
-	MT::SpinMutex mutex;
+	MT::CriticalSection mutex;
 	OS::Timer timer;
 	bool paused = false;
 	bool context_switches_enabled = false;
@@ -188,7 +188,7 @@ void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
 	v.header.time = timestamp;
 	v.value = value;
 
-	MT::SpinLock lock(ctx.mutex);
+	MT::CriticalSectionLock lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
 	const int buf_size = ctx.buffer.size();
 
@@ -225,7 +225,7 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 	v.header.time = OS::Timer::getRawTimestamp();
 	v.value = value;
 
-	MT::SpinLock lock(ctx.mutex);
+	MT::CriticalSectionLock lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
 	const int buf_size = ctx.buffer.size();
 
@@ -257,7 +257,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	header.size = u16(sizeof(header) + size);
 	header.time = OS::Timer::getRawTimestamp();
 
-	MT::SpinLock lock(ctx.mutex);
+	MT::CriticalSectionLock lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
 	const u32 buf_size = ctx.buffer.size();
 
@@ -479,7 +479,7 @@ void frame()
 void showInProfiler(bool show)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	MT::SpinLock lock(ctx->mutex);
+	MT::CriticalSectionLock lock(ctx->mutex);
 
 	ctx->show_in_profiler = show;
 }
@@ -488,7 +488,7 @@ void showInProfiler(bool show)
 void setThreadName(const char* name)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	MT::SpinLock lock(ctx->mutex);
+	MT::CriticalSectionLock lock(ctx->mutex);
 
 	ctx->name = name;
 }
@@ -496,14 +496,14 @@ void setThreadName(const char* name)
 
 GlobalState::GlobalState()
 {
-	g_instance.mutex.lock();
+	g_instance.mutex.enter();
 }
 
 
 GlobalState::~GlobalState()
 {
 	ASSERT(local_readers_count == 0);
-	g_instance.mutex.unlock();
+	g_instance.mutex.exit();
 }
 
 
@@ -516,7 +516,7 @@ int GlobalState::threadsCount() const
 const char* GlobalState::getThreadName(int idx) const
 {
 	ThreadContext* ctx = g_instance.contexts[idx];
-	MT::SpinLock lock(ctx->mutex);
+	MT::CriticalSectionLock lock(ctx->mutex);
 	return ctx->name;
 }
 
@@ -528,7 +528,7 @@ ThreadState::ThreadState(GlobalState& reader, int thread_idx)
 	++reader.local_readers_count;
 	ThreadContext& ctx = thread_idx >= 0 ? *g_instance.contexts[thread_idx] : g_instance.global_context;
 
-	ctx.mutex.lock();
+	ctx.mutex.enter();
 	buffer = ctx.buffer.begin();
 	buffer_size = ctx.buffer.size();
 	begin = ctx.begin;
@@ -547,7 +547,7 @@ ThreadState::~ThreadState()
 	ctx.open = open;
 	ctx.rows = rows;
 	ctx.show_in_profiler = show;
-	ctx.mutex.unlock();
+	ctx.mutex.exit();
 	--reader.local_readers_count;
 }
 

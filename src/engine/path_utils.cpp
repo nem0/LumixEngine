@@ -7,7 +7,7 @@ namespace Lumix::PathUtils
 
 void normalize(const char* path, Span<char> output)
 {
-	char* out = output.begin;
+	char* out = output.begin();
 	u32 max_size = output.length();
 	ASSERT(max_size > 0);
 	u32 i = 0;
@@ -47,7 +47,7 @@ void normalize(const char* path, Span<char> output)
 void getDir(Span<char> dir, const char* src)
 {
 	copyString(dir, src);
-	for (int i = stringLength(dir.begin) - 1; i >= 0; --i)
+	for (int i = stringLength(dir.begin()) - 1; i >= 0; --i)
 	{
 		if (dir[i] == '\\' || dir[i] == '/')
 		{

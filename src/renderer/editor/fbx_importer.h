@@ -24,8 +24,6 @@ struct FBXImporter
 			CENTER,
 			BOTTOM
 		};
-		const char* output_dir;
-		const char* base_path;
 		float mesh_scale;
 		Origin origin = Origin::SOURCE;
 	};
@@ -120,14 +118,14 @@ struct FBXImporter
 		Matrix transform_matrix = Matrix::IDENTITY;
 	};
 
-	FBXImporter(class FileSystem& fs, IAllocator& allocator);
+	FBXImporter(struct AssetCompiler& compiler, class FileSystem& fs, IAllocator& allocator);
 	~FBXImporter();
-	bool setSource(const char* base_dir, const char* filename, bool ignore_geometry);
+	bool setSource(const char* filename, bool ignore_geometry);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
-	void writeAnimation(const char* dst, const ImportAnimation& anim, const ImportConfig& cfg);
+	void writeAnimations(const char* src, const ImportConfig& cfg);
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
 	void writePrefab(const char* src, const ImportConfig& cfg);
-	void writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg);
+	void writeModel(const char* src, const ImportConfig& cfg);
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return animations; }
@@ -150,7 +148,7 @@ private:
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
 	void writeString(const char* str);
-	bool writeBillboardMaterial(const char* output_dir, const char* src);
+	bool writeBillboardMaterial(const char* src);
 	int getVertexSize(const ImportMesh& mesh) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixRootOrientation(const Vec3& v) const;
@@ -160,8 +158,8 @@ private:
 	void writeBillboardVertices(const AABB& aabb);
 	void writeGeometry();
 	void writeGeometry(int mesh_idx);
-	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset, const char* mesh_output_filename);
-	void writeMeshes(const char* mesh_output_filename, const char* src, int mesh_idx);
+	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset);
+	void writeMeshes(const char* src, int mesh_idx);
 	void writeSkeleton(const ImportConfig& cfg);
 	void writeLODs();
 	int getAttributeCount(const ImportMesh& mesh) const;
@@ -174,6 +172,7 @@ private:
 	
 	IAllocator& allocator;
 	FileSystem& filesystem;
+	AssetCompiler& compiler;
 	Array<ImportMaterial> materials;
 	Array<ImportMesh> meshes;
 	Array<ImportAnimation> animations;

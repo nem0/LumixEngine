@@ -120,17 +120,10 @@ struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
-	void onGUI(Resource* resource) override {}
+	void onGUI(Span<Resource*> resources) override {}
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Font"; }
 
@@ -148,14 +141,7 @@ struct PipelinePlugin final : AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
 	StudioApp& m_app;
@@ -173,20 +159,11 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 	
 	
-	void onGUI(Resource* resource) override
-	{
-	}
+	void onGUI(Span<Resource*> resources) override {}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
@@ -226,14 +203,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
-		return true;
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
 
@@ -250,8 +220,60 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
-	void onGUI(Resource* resource) override {
-		Material* material = static_cast<Material*>(resource);
+	void onGUIMultiple(Span<Resource*> resources) {
+		if (ImGui::Button("Open in external editor")) {
+			for (Resource* res : resources) {
+				m_app.getAssetBrowser().openInExternalEditor(res);
+			}
+		}
+
+		for (Resource* res : resources) {
+			if (!res->isReady()) {
+				ImGui::Text("%s is not ready", res->getPath().c_str());
+				return;
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Save")) {
+			for (Resource* res : resources) {
+				saveMaterial(static_cast<Material*>(res));
+			}
+		}
+
+		char buf[MAX_PATH_LENGTH];
+		auto* first = static_cast<Material*>(resources[0]);
+
+		bool same_shader = true;
+		for (Resource* res : resources) {
+			if (static_cast<Material*>(res)->getShader() != first->getShader()) {
+				same_shader = false;
+			}
+		}
+
+		if (same_shader) {
+			copyString(buf, first->getShader() ? first->getShader()->getPath().c_str() : "");
+		}
+		else {
+			copyString(buf, "<different values>");
+		}
+
+		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", Span(buf), Shader::TYPE)) {
+			for (Resource* res : resources) {
+				static_cast<Material*>(res)->setShader(Path(buf));
+			}
+		}
+
+		if (!same_shader) return;
+
+	}
+
+	void onGUI(Span<Resource*> resources) override {
+		if (resources.length() > 1) {
+			onGUIMultiple(resources);
+			return;
+		}
+
+		Material* material = static_cast<Material*>(resources[0]);
 		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
 		if (!material->isReady()) return;
 
@@ -308,9 +330,9 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const char* current_layer_name = renderer->getLayerName(material->getLayer());
 		if (ImGui::BeginCombo("Layer", current_layer_name)) {
-			for(u8 i = 0, c = renderer->getLayersCount(); i < c; ++i) {
+			for (u8 i = 0, c = renderer->getLayersCount(); i < c; ++i) {
 				const char* name = renderer->getLayerName(i);
-				if(ImGui::Selectable(name)) {
+				if (ImGui::Selectable(name)) {
 					material->setLayer(i);
 				}
 			}
@@ -474,7 +496,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
 		, m_tile(app.getWorldEditor().getAllocator())
-		, m_fbx_importer(app.getWorldEditor().getEngine().getFileSystem(), app.getWorldEditor().getAllocator())
+		, m_fbx_importer(app.getAssetCompiler(), app.getWorldEditor().getEngine().getFileSystem(), app.getWorldEditor().getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
 		createPreviewUniverse();
@@ -525,11 +547,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ModelPlugin* plugin = data->plugin;
 			WorldEditor& editor = plugin->m_app.getWorldEditor();
 			FileSystem& fs = editor.getEngine().getFileSystem();
-			FBXImporter importer(fs, editor.getAllocator());
+			FBXImporter importer(plugin->m_app.getAssetCompiler(), fs, editor.getAllocator());
 			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
 
 			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path;
-			importer.setSource(fs.getBasePath(), path, true);
+			importer.setSource(path, true);
 
 			if(data->meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
@@ -560,50 +582,32 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override
 	{
-		if (PathUtils::hasExtension(src.c_str(), "fbx")) {
-			const char* filepath = getResourceFilePath(src.c_str());
-			FBXImporter::ImportConfig cfg;
-			cfg.base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
-			cfg.output_dir = m_app.getAssetCompiler().getCompiledDir();
-			const Meta meta = getMeta(Path(filepath));
-			cfg.mesh_scale = meta.scale;
-			const PathUtils::FileInfo src_info(filepath);
-			m_fbx_importer.setSource(cfg.base_path, filepath, false);
-			if (m_fbx_importer.getMeshes().empty()) {
-				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-					logError("Editor") << "No meshes with materials found in " << src;
-				}
-				else {
-					logError("Editor") << "No meshes found in " << src;
-				}
+		ASSERT(PathUtils::hasExtension(src.c_str(), "fbx"));
+		const char* filepath = getResourceFilePath(src.c_str());
+		FBXImporter::ImportConfig cfg;
+		const Meta meta = getMeta(Path(filepath));
+		cfg.mesh_scale = meta.scale;
+		const PathUtils::FileInfo src_info(filepath);
+		m_fbx_importer.setSource(filepath, false);
+		if (m_fbx_importer.getMeshes().empty()) {
+			if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
+				logError("Editor") << "No meshes with materials found in " << src;
 			}
-
-			const StaticString<32> hash_str("", src.getHash());
-			if (meta.split) {
-				//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
-				const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
-				m_fbx_importer.writeSubmodels(filepath, cfg);
-				m_fbx_importer.writePrefab(filepath, cfg);
+			else {
+				logError("Editor") << "No meshes found in " << src;
 			}
-			m_fbx_importer.writeModel(hash_str, ".res", src.c_str(), cfg);
-			m_fbx_importer.writeMaterials(filepath, cfg);
-			for (FBXImporter::ImportAnimation& anim : m_fbx_importer.getAnimations()) { 
-				StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ":", filepath);
-				char anim_path_n[MAX_PATH_LENGTH];
-				PathUtils::normalize(anim_path, Span(anim_path_n));
-				StaticString<64> tmp("", crc32(anim_path_n), ".res");
-				m_fbx_importer.writeAnimation(tmp, anim, cfg);
-			}
-			return true;
 		}
 
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		fs.copyFile(src.c_str(), dst);
+		const StaticString<32> hash_str("", src.getHash());
+		if (meta.split) {
+			//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+			const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
+			m_fbx_importer.writeSubmodels(filepath, cfg);
+			m_fbx_importer.writePrefab(filepath, cfg);
+		}
+		m_fbx_importer.writeModel(src.c_str(), cfg);
+		m_fbx_importer.writeMaterials(filepath, cfg);
+		m_fbx_importer.writeAnimations(filepath, cfg);
 		return true;
 	}
 
@@ -751,11 +755,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		auto* model = static_cast<Model*>(resource);
+		if (resources.length() > 1) return;
 
-		if (resource->isReady()) {
+		auto* model = static_cast<Model*>(resources[0]);
+
+		if (model->isReady()) {
 			ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
 
 			auto* lods = model->getLODs();
@@ -824,7 +830,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					ImGui::SameLine();
 					if (ImGui::Button("->"))
 					{
-						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true);
+						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
 					}
 					ImGui::TreePop();
 				}
@@ -849,17 +855,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
-			if(m_meta_res != resource->getPath().getHash()) {
-				m_meta = getMeta(resource->getPath());
-				m_meta_res = resource->getPath().getHash();
+			if(m_meta_res != model->getPath().getHash()) {
+				m_meta = getMeta(model->getPath());
+				m_meta_res = model->getPath().getHash();
 			}
 			ImGui::InputFloat("Scale", &m_meta.scale);
 			ImGui::Checkbox("Split", &m_meta.split);
 			if (ImGui::Button("Apply")) {
 				StaticString<256> src("scale = ", m_meta.scale, "\nsplit = ", m_meta.split ? "true\n" : "false\n");
-				compiler.updateMeta(resource->getPath(), src);
-				if (compiler.compile(resource->getPath())) {
-					resource->getResourceManager().reload(*resource);
+				compiler.updateMeta(model->getPath(), src);
+				if (compiler.compile(model->getPath())) {
+					model->getResourceManager().reload(*model);
 				}
 			}
 		}
@@ -1293,7 +1299,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	bool compileImage(const Array<u8>& src_data, OS::OutputFile& dst, const Meta& meta)
+	bool compileImage(const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta)
 	{
 		PROFILE_FUNCTION();
 		int w, h, comps;
@@ -1323,7 +1329,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
 			void endImage() override {}
 
-			OS::OutputFile* dst;
+			OutputMemoryStream* dst;
 		} output_handler;
 		output_handler.dst = &dst;
 		output.setOutputHandler(&output_handler);
@@ -1359,45 +1365,38 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		char ext[4] = {};
 		PathUtils::getExtension(Span(ext), src.c_str());
 
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		OS::OutputFile dstf;
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-
 		Array<u8> src_data(m_app.getWorldEditor().getAllocator());
 		if (!fs.getContentSync(src, Ref(src_data))) return false;
-		if (!fs.open(dst, Ref(dstf))) return false;
 		
+		OutputMemoryStream out(m_app.getWorldEditor().getAllocator());
 		Meta meta = getMeta(src);
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
-			dstf.write(ext, sizeof(ext) - 1);
+			out.write(ext, sizeof(ext) - 1);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 			flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
-			dstf.write(&flags, sizeof(flags));
-			dstf.write(src_data.begin(), src_data.byte_size());
+			out.write(flags);
+			out.write(src_data.begin(), src_data.byte_size());
 		}
 		else if(equalStrings(ext, "jpg")) {
-			compileImage(src_data, dstf, meta);
+			compileImage(src_data, out, meta);
 		}
 		else if(equalStrings(ext, "png")) {
-			compileImage(src_data, dstf, meta);
+			compileImage(src_data, out, meta);
 		}
 		else {
 			ASSERT(false);
 		}
 
-		dstf.close();
-
-		return true;
+		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span((u8*)out.getData(), (i32)out.getPos()));
 	}
 
 
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		auto* texture = static_cast<Texture*>(resource);
+		if(resources.length() > 1) return;
+
+		auto* texture = static_cast<Texture*>(resources[0]);
 
 		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
 		ImGui::LabelText("Mips", "%d", texture->mips);
@@ -1426,14 +1425,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			ImGui::Image((void*)(uintptr_t)m_texture_view.value, texture_size);
 
-			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(resource);
+			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
 		}
 
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			
 			if(texture->getPath().getHash() != m_meta_res) {
-				m_meta = getMeta(resource->getPath());
+				m_meta = getMeta(texture->getPath());
 				m_meta_res = texture->getPath().getHash();
 			}
 			
@@ -1445,9 +1444,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				const StaticString<256> src("srgb = ", m_meta.srgb ? "true" : "false"
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
 					, "\nwrap_mode = \"", m_meta.wrap_mode == Meta::WrapMode::REPEAT ? "repeat\"" : "clamp\"");
-				compiler.updateMeta(resource->getPath(), src);
-				if (compiler.compile(resource->getPath())) {
-					resource->getResourceManager().reload(*resource);
+				compiler.updateMeta(texture->getPath(), src);
+				if (compiler.compile(texture->getPath())) {
+					texture->getResourceManager().reload(*texture);
 				}
 			}
 		}
@@ -1558,24 +1557,20 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		return fs.copyFile(src.c_str(), dst);
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
 
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		auto* shader = static_cast<Shader*>(resource);
+		if(resources.length() > 1) return;
+
+		auto* shader = static_cast<Shader*>(resources[0]);
 		char basename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(Span(basename), resource->getPath().c_str());
+		PathUtils::getBasename(Span(basename), shader->getPath().c_str());
 		if (ImGui::Button("Open in external editor"))
 		{
-			m_app.getAssetBrowser().openInExternalEditor(resource->getPath().c_str());
+			m_app.getAssetBrowser().openInExternalEditor(shader->getPath().c_str());
 		}
 
 		if (shader->m_texture_slot_count > 0 &&
@@ -1911,19 +1906,19 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		if (texture)
 		{
 			ImGui::LabelText("Reflection path", "%s", texture->getPath().c_str());
-			if (ImGui::Button("View reflection")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
+			if (ImGui::Button("View reflection")) m_app.getAssetBrowser().selectResource(texture->getPath(), true, false);
 		}
 		texture = scene->getEnvironmentProbeIrradiance(e);
 		if (texture)
 		{
 			ImGui::LabelText("Irradiance path", "%s", texture->getPath().c_str());
-			if (ImGui::Button("View irradiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
+			if (ImGui::Button("View irradiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true, false);
 		}
 		texture = scene->getEnvironmentProbeRadiance(e);
 		if (texture)
 		{
 			ImGui::LabelText("Radiance path", "%s", texture->getPath().c_str());
-			if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true);
+			if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true, false);
 		}
 		if (m_in_progress) ImGui::Text("Generating...");
 		else if (ImGui::Button("Generate")) generateCubemap(cmp);

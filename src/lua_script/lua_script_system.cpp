@@ -740,8 +740,8 @@ namespace Lumix
 			const u32 max_size = out.length();
 			ASSERT(max_size > 0);
 			bool to_upper = true;
-			char* dest = out.begin;
-			while (*src && dest - out.begin < max_size - 1)
+			char* dest = out.begin();
+			while (*src && dest - out.begin() < max_size - 1)
 			{
 				if (isLetter(*src))
 				{

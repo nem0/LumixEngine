@@ -47,6 +47,9 @@ public:
 	T* end() const { return m_data ? m_data + m_size : nullptr; }
 
 
+	Span<T> getSpan() const { return Span(begin(), end()); }
+
+
 	void swap(Array<T>& rhs)
 	{
 		ASSERT(&rhs.m_allocator == &m_allocator);

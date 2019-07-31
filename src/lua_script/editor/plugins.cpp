@@ -445,19 +445,15 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		return fs.copyFile(src.c_str(), dst);
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
 	
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		auto* script = static_cast<LuaScript*>(resource);
+		if (resources.length() > 1) return;
+
+		auto* script = static_cast<LuaScript*>(resources[0]);
 
 		if (m_text_buffer[0] == '\0')
 		{
@@ -468,9 +464,9 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 			OS::OutputFile file;
-			if (!fs.open(resource->getPath().c_str(), Ref(file)))
+			if (!fs.open(script->getPath().c_str(), Ref(file)))
 			{
-				logWarning("Lua Script") << "Could not save " << resource->getPath();
+				logWarning("Lua Script") << "Could not save " << script->getPath();
 				return;
 			}
 
@@ -480,7 +476,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::SameLine();
 		if (ImGui::Button("Open in external editor"))
 		{
-			m_app.getAssetBrowser().openInExternalEditor(resource);
+			m_app.getAssetBrowser().openInExternalEditor(script);
 		}
 	}
 

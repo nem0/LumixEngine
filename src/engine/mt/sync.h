@@ -14,7 +14,6 @@ namespace MT
 	typedef void* SemaphoreHandle;
 	typedef void* MutexHandle;
 	typedef void* EventHandle;
-	typedef volatile long SpinMutexHandle;
 #elif defined __linux__
 	struct SemaphoreHandle
 	{
@@ -30,7 +29,6 @@ namespace MT
 		bool signaled;
 		bool manual_reset;
 	};
-	typedef volatile i32 SpinMutexHandle;
 #endif
 
 
@@ -39,6 +37,8 @@ class alignas(8) LUMIX_ENGINE_API CriticalSection
 public:
 	CriticalSection();
 	~CriticalSection();
+
+	CriticalSection(const CriticalSection&) = delete;
 
 	void enter();
 	void exit();
@@ -82,39 +82,6 @@ public:
 
 private:
 	EventHandle m_id;
-};
-
-
-class LUMIX_ENGINE_API SpinMutex
-{
-public:
-	explicit SpinMutex();
-	~SpinMutex();
-
-	void lock();
-
-	void unlock();
-
-private:
-	alignas(64) SpinMutexHandle m_id;
-};
-
-
-class SpinLock
-{
-public:
-	explicit SpinLock(SpinMutex& mutex)
-		: m_mutex(mutex)
-	{
-		mutex.lock();
-	}
-	~SpinLock() { m_mutex.unlock(); }
-
-	SpinLock(const SpinLock&) = delete;
-	void operator=(const SpinLock&) = delete;
-
-private:
-	SpinMutex& m_mutex;
 };
 
 

@@ -140,6 +140,30 @@ struct AssetCompilerImpl : AssetCompiler
 		FileSystemWatcher::destroy(m_watcher);
 	}
 
+	bool copyCompile(const Path& src) override {
+		const StaticString<MAX_PATH_LENGTH> dst(".lumix/assets/", src.getHash(), ".res");
+
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		return fs.copyFile(src.c_str(), dst);
+	}
+
+	bool writeCompiledResource(const char* locator, Span<u8> data) override {
+		char normalized[MAX_PATH_LENGTH];
+		PathUtils::normalize(locator, Span(normalized));
+		const u32 hash = crc32(normalized);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		StaticString<MAX_PATH_LENGTH> out_path(".lumix/assets/", hash, ".res");
+		OS::OutputFile file;
+		if(!fs.open(out_path, Ref(file))) {
+			logError("Editor") << "Could not create " << out_path;
+			return false;
+		}
+		const bool written = file.write(data.begin(), data.length());
+		if (!written) logError("Editor") << "Could not write " << out_path;
+		file.close();
+		return written;
+	}
+
 	void addResource(ResourceType type, const char* path) override {
 		const Path path_obj(path);
 		MT::CriticalSectionLock lock(m_resources_mutex);
@@ -188,7 +212,7 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	
-	void processDir(const char* dir, int base_length, u64 list_last_modified)
+	void processDir(const char* dir, u64 list_last_modified)
 	{
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		auto* iter = fs.createFileIterator(dir);
@@ -201,15 +225,15 @@ struct AssetCompilerImpl : AssetCompiler
 			{
 				char child_path[MAX_PATH_LENGTH];
 				copyString(child_path, dir);
-				catString(child_path, "/");
+				if(dir[0]) catString(child_path, "/");
 				catString(child_path, info.filename);
-				processDir(child_path, base_length, list_last_modified);
+				processDir(child_path, list_last_modified);
 			}
 			else
 			{
 				char fullpath[MAX_PATH_LENGTH];
-				copyString(fullpath, dir + base_length);
-				catString(fullpath, "/");
+				copyString(fullpath, dir);
+				if(dir[0]) catString(fullpath, "/");
 				catString(fullpath, info.filename);
 
 				if (fs.getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
@@ -308,7 +332,7 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 
 		const u64 list_last_modified = OS::getLastModified(list_path);
-		processDir("", 0, list_last_modified);
+		processDir("", list_last_modified);
 
 		registerLuaAPI(m_app.getWorldEditor().getEngine().getState());
 	}
@@ -458,7 +482,7 @@ struct AssetCompilerImpl : AssetCompiler
 			)
 		{
 			logInfo("Editor") << res.getPath() << " is not compiled, pushing to compile queue";
-			MT::SpinLock lock(m_to_compile_mutex);
+			MT::CriticalSectionLock lock(m_to_compile_mutex);
 			const Path path(filepath);
 			auto iter = m_to_compile_subresources.find(path);
 			if (!iter.isValid()) {
@@ -527,7 +551,7 @@ struct AssetCompilerImpl : AssetCompiler
 			ImGui::ProgressBar(((float)m_compile_batch_count - m_batch_remaining_count) / m_compile_batch_count);
 			StaticString<MAX_PATH_LENGTH> path;
 			{
-				MT::SpinLock lock(m_to_compile_mutex);
+				MT::CriticalSectionLock lock(m_to_compile_mutex);
 				path = m_res_in_progress;
 			}
 			ImGui::TextWrapped("%s", path.data);
@@ -538,12 +562,11 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void update() override
 	{
-		LogUI& log = m_app.getLogUI();
 		for(;;) {
 			Path p = popCompiledResource();
 			if (!p.isValid()) break;
 
-			// this can take some time, spinmutex is probably not the best option
+			// this can take some time, mutex is probably not the best option
 			MT::CriticalSectionLock lock(m_compiled_mutex);
 
 			for (Resource* r : m_to_compile_subresources[p]) {
@@ -570,9 +593,6 @@ struct AssetCompilerImpl : AssetCompiler
 		} while(removed);
 	}
 
-	const char* getCompiledDir() const override { return ".lumix/assets/"; }
-
-
 	void addPlugin(IPlugin& plugin, const char** extensions) override
 	{
 		const char** i = extensions;
@@ -594,7 +614,7 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	MT::Semaphore m_semaphore;
-	MT::SpinMutex m_to_compile_mutex;
+	MT::CriticalSection m_to_compile_mutex;
 	MT::CriticalSection m_compiled_mutex;
 	MT::CriticalSection m_plugin_mutex;
 	HashMap<Path, Array<Resource*>> m_to_compile_subresources; 
@@ -621,7 +641,7 @@ int AssetCompilerTask::task()
 	while (!m_finished) {
 		m_compiler.m_semaphore.wait();
 		const Path p = [&]{
-			MT::SpinLock lock(m_compiler.m_to_compile_mutex);
+			MT::CriticalSectionLock lock(m_compiler.m_to_compile_mutex);
 			Path p = m_compiler.m_to_compile.back();
 			m_compiler.m_res_in_progress = p.c_str();
 			m_compiler.m_to_compile.pop();

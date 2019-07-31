@@ -48,7 +48,7 @@ int LogUI::addNotification(const char* text)
 
 void LogUI::push(LogLevel level, const char* message)
 {
-	MT::SpinLock lock(m_guard);
+	MT::CriticalSectionLock lock(m_guard);
 	++m_new_message_count[(int)level];
 	Message& msg = m_messages.emplace(m_allocator);
 	msg.text = message;
@@ -68,7 +68,7 @@ void fillLabel(Span<char> output, const char* label, int count)
 {
 	copyString(output, label);
 	catString(output, "(");
-	int len = stringLength(output.begin);
+	int len = stringLength(output.begin());
 	toCString(count, output.fromLeft(len));
 	catString(output, ")###");
 	catString(output, label);
@@ -130,7 +130,7 @@ int LogUI::getUnreadErrorCount() const
 
 void LogUI::onGUI()
 {
-	MT::SpinLock lock(m_guard);
+	MT::CriticalSectionLock lock(m_guard);
 	showNotifications();
 
 	if (!m_is_open) return;

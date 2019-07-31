@@ -158,12 +158,11 @@ public:
 
 		explicit Bone(IAllocator& allocator)
 			: name(allocator)
-			, parent(allocator)
+			, parent_idx(-1)
 		{
 		}
 
 		String name;
-		String parent;
 		LocalRigidTransform transform;
 		LocalRigidTransform relative_transform;
 		LocalRigidTransform inv_bind_transform;

@@ -187,7 +187,7 @@ OutputFile& OutputFile::operator <<(float value)
 static void fromWChar(Span<char> out, const WCHAR* in)
 {
 	const WCHAR* c = in;
-	char* cout = out.begin;
+	char* cout = out.begin();
 	const u32 size = out.length();
 	while (*c && c - in < size - 1)
 	{
@@ -775,10 +775,10 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 	ofn.hwndOwner = NULL;
 	if (starting_file)
 	{
-		char* to = out.begin;
+		char* to = out.begin();
 		for (const char *from = starting_file; *from; ++from, ++to)
 		{
-			if (to - out.begin > out.length() - 1) break;
+			if (to - out.begin() > out.length() - 1) break;
 			*to = *to == '/' ? '\\' : *from;
 		}
 		*to = '\0';
@@ -867,16 +867,16 @@ bool getOpenDirectory(Span<char> output, const char* starting_dir)
 				WCHAR* tmp;
 				if (SUCCEEDED(psi->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &tmp)))
 				{
-					char* c = output.begin;
+					char* c = output.begin();
 					const u32 max_size = output.length();
-					while (*tmp && c - output.begin < max_size - 1)
+					while (*tmp && c - output.begin() < max_size - 1)
 					{
 						*c = (char)*tmp;
 						++c;
 						++tmp;
 					}
 					*c = '\0';
-					if (!endsWith(output.begin, "/") && !endsWith(output.begin, "\\") && c - output.begin < max_size - 1)
+					if (!endsWith(output.begin(), "/") && !endsWith(output.begin(), "\\") && c - output.begin() < max_size - 1)
 					{
 						*c = '/';
 						++c;

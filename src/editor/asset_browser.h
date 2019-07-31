@@ -34,7 +34,7 @@ public:
 		virtual const char* getFileDialogExtensions() const { return ""; }
 		virtual const char* getDefaultExtension() const { return ""; }
 
-		virtual void onGUI(Resource* resource) = 0;
+		virtual void onGUI(Span<Resource*> resource) = 0;
 		virtual void onResourceUnloaded(Resource* resource) = 0;
 		virtual const char* getName() const = 0;
 		virtual ResourceType getResourceType() const = 0;
@@ -50,7 +50,7 @@ public:
 	void onGUI();
 	void update();
 	int getTypeIndex(ResourceType type) const;
-	void selectResource(const Path& resource, bool record_history);
+	void selectResource(const Path& resource, bool record_history, bool additive);
 	bool resourceInput(const char* label, const char* str_id, Span<char> buf, ResourceType type);
 	void addPlugin(IPlugin& plugin);
 	void removePlugin(IPlugin& plugin);
@@ -85,8 +85,8 @@ private:
 	void doFilter();
 	void breadcrumbs();
 	void changeDir(const char* path);
-	void unloadResource();
-	void selectResource(Resource* resource, bool record_history);
+	void unloadResources();
+	void selectResource(Resource* resource, bool record_history, bool additive);
 	void goBack();
 	void goForward();
 	void deleteTile(u32 idx);
@@ -101,7 +101,7 @@ private:
 	Array<Path> m_history;
 	int m_history_index;
 	HashMap<ResourceType, IPlugin*> m_plugins;
-	Resource* m_selected_resource;
+	Array<Resource*> m_selected_resources;
 	int m_context_resource;
 	char m_new_name[MAX_PATH_LENGTH];
 	WorldEditor& m_editor;

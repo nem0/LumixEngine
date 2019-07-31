@@ -65,9 +65,11 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 	}
 
 
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		Sprite* sprite = (Sprite*)resource;
+		if (resources.length() > 1) return;
+
+		Sprite* sprite = (Sprite*)resources[0];
 		
 		if (ImGui::Button("Save")) saveSprite(*sprite);
 		ImGui::SameLine();
