@@ -130,18 +130,21 @@ struct Ref {
 template <typename T>
 struct Span
 {
-	Span() : begin(nullptr), end(nullptr) {}
-	Span(T* begin, int len) : begin(begin), end(begin + len) {}
-	Span(T* begin, T* end) : begin(begin), end(end) {}
-	template <int N> explicit Span(T (&value)[N]) : begin(value), end(begin + N) {}
-	T& operator[](u32 idx) { ASSERT(begin + idx < end); return begin[idx]; }
-	operator Span<const T>() { return Span<const T>(begin, end); }
-	Span fromLeft(u32 count) const { return Span(begin + count, end); }
+	Span() : m_begin(nullptr), m_end(nullptr) {}
+	Span(T* begin, int len) : m_begin(begin), m_end(begin + len) {}
+	Span(T* begin, T* end) : m_begin(begin), m_end(end) {}
+	template <int N> explicit Span(T (&value)[N]) : m_begin(value), m_end(m_begin + N) {}
+	T& operator[](u32 idx) { ASSERT(m_begin + idx < m_end); return m_begin[idx]; }
+	operator Span<const T>() { return Span<const T>(m_begin, m_end); }
+	Span fromLeft(u32 count) const { return Span(m_begin + count, m_end); }
 	
-	u32 length() const { return u32(end - begin); }
+	u32 length() const { return u32(m_end - m_begin); }
 
-	T* begin;
-	T* end;
+	T* begin() const { return m_begin; }
+	T* end() const { return m_end; }
+
+	T* m_begin;
+	T* m_end;
 };
 
 #ifdef _WIN32

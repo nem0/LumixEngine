@@ -968,7 +968,7 @@ struct PhysicsGeometryPlugin final : public AssetBrowser::IPlugin
 	}
 
 
-	void onGUI(Resource* resource) override {}
+	void onGUI(Span<Resource*> resources) override {}
 
 
 	void onResourceUnloaded(Resource* resource) override {}

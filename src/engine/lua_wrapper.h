@@ -92,7 +92,7 @@ inline bool execute(lua_State* L
 	, int nresults)
 {
 	lua_pushcfunction(L, traceback);
-	if (luaL_loadbuffer(L, content.begin, content.length(), name) != 0) {
+	if (luaL_loadbuffer(L, content.begin(), content.length(), name) != 0) {
 		logError("Engine") << name << ": " << lua_tostring(L, -1);
 		lua_pop(L, 2);
 		return false;

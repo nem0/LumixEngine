@@ -31,7 +31,7 @@ bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path
 
 AssetBrowser::AssetBrowser(StudioApp& app)
 	: m_editor(app.getWorldEditor())
-	, m_selected_resource(nullptr)
+	, m_selected_resources(app.getWorldEditor().getAllocator())
 	, m_is_focus_requested(false)
 	, m_history(app.getWorldEditor().getAllocator())
 	, m_plugins(app.getWorldEditor().getAllocator())
@@ -67,10 +67,9 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 
 AssetBrowser::~AssetBrowser()
 {
-	unloadResource();
+	unloadResources();
 	RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
-	for (FileInfo& info : m_file_infos)
-	{
+	for (FileInfo& info : m_file_infos) {
 		ri->unloadTexture(info.tex);
 	}
 	m_file_infos.clear();
@@ -79,17 +78,18 @@ AssetBrowser::~AssetBrowser()
 }
 
 
-void AssetBrowser::unloadResource()
+void AssetBrowser::unloadResources()
 {
-	if (!m_selected_resource) return;
+	if (m_selected_resources.empty()) return;
 
-	for (auto* plugin : m_plugins)
-	{
-		plugin->onResourceUnloaded(m_selected_resource);
+	for (Resource* res : m_selected_resources) {
+		for (auto* plugin : m_plugins) {
+			plugin->onResourceUnloaded(res);
+		}
+		res->getResourceManager().unload(*res);
 	}
-	m_selected_resource->getResourceManager().unload(*m_selected_resource);
 
-	m_selected_resource = nullptr;
+	m_selected_resources.clear();
 }
 
 
@@ -347,7 +347,8 @@ void AssetBrowser::fileColumn()
 		else if (ImGui::IsItemHovered())
 		{
 			if (ImGui::IsMouseReleased(0)) {
-				selectResource(Path(tile.filepath), true);
+				const bool additive = OS::isKeyDown(OS::Keycode::LSHIFT);
+				selectResource(Path(tile.filepath), true, additive);
 			}
 			else if(ImGui::IsMouseReleased(1)) {
 				m_context_resource = idx;
@@ -376,9 +377,8 @@ void AssetBrowser::fileColumn()
 			{
 				if (!m_filtered_file_infos.empty()) j = m_filtered_file_infos[j];
 				FileInfo& tile = m_file_infos[j];
-				bool b = m_selected_resource && m_selected_resource->getPath().getHash() == tile.file_path_hash;
+				bool b = m_selected_resources.find([&](Resource* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
 				ImGui::Selectable(tile.filepath, b);
-				
 				callbacks(tile, j);
 			}
 		}
@@ -475,24 +475,57 @@ void AssetBrowser::detailsGUI()
 		}
 		ImGui::EndToolbar();
 
-		if (!m_selected_resource)
+		if (m_selected_resources.empty())
 		{
 			ImGui::End();
 			return;
 		}
 
-		const char* path = m_selected_resource->getPath().c_str();
-		ImGui::Separator();
-		ImGui::LabelText("Selected resource", "%s", path);
-		ImGui::Separator();
+		if (m_selected_resources.size() == 1) {
+			Resource* res = m_selected_resources[0];
+			const char* path = res->getPath().c_str();
+			ImGui::Separator();
+			ImGui::LabelText("Selected resource", "%s", path);
+			ImGui::Separator();
 
-		ImGui::LabelText("Status", "%s", m_selected_resource->isFailure() ? "failure" : (m_selected_resource->isReady() ? "Ready" : "Not ready"));
+			ImGui::LabelText("Status", "%s", res->isFailure() ? "failure" : (res->isReady() ? "Ready" : "Not ready"));
 
-		const AssetCompiler& compiler = m_app.getAssetCompiler();
-		ResourceType resource_type = compiler.getResourceType(path);
-		auto iter = m_plugins.find(resource_type);
-		if(iter.isValid()) {
-			iter.value()->onGUI(m_selected_resource);
+			const AssetCompiler& compiler = m_app.getAssetCompiler();
+			ResourceType resource_type = compiler.getResourceType(path);
+			auto iter = m_plugins.find(resource_type);
+			if(iter.isValid()) {
+				iter.value()->onGUI(m_selected_resources.getSpan());
+			}
+		}
+		else {
+			ImGui::Separator();
+			ImGui::LabelText("Selected resource", "%s", "multiple");
+			ImGui::Separator();
+
+			u32 ready = 0;
+			u32 failed = 0;
+			const ResourceType type = m_selected_resources[0]->getType();
+			bool all_same_type = true;
+			for (Resource* res : m_selected_resources) {
+				ready += res->isReady() ? 1 : 0;
+				failed += res->isFailure() ? 1 : 0;
+				all_same_type = all_same_type && res->getType() == type;
+			}
+
+			ImGui::LabelText("All", "%d", m_selected_resources.size());
+			ImGui::LabelText("Ready", "%d", ready);
+			ImGui::LabelText("Failed", "%d", failed);
+
+			if (all_same_type) {
+				const AssetCompiler& compiler = m_app.getAssetCompiler();
+				auto iter = m_plugins.find(type);
+				if(iter.isValid()) {
+					iter.value()->onGUI(m_selected_resources.getSpan());
+				}
+			}
+			else {
+				ImGui::Text("Selected resources have different types.");
+			}
 		}
 	}
 	ImGui::End();
@@ -505,7 +538,7 @@ void AssetBrowser::onGUI()
 	
 	if (m_wanted_resource.isValid())
 	{
-		selectResource(m_wanted_resource, true);
+		selectResource(m_wanted_resource, true, false);
 		m_wanted_resource = "";
 	}
 
@@ -551,7 +584,7 @@ void AssetBrowser::onGUI()
 }
 
 
-void AssetBrowser::selectResource(Resource* resource, bool record_history)
+void AssetBrowser::selectResource(Resource* resource, bool record_history, bool additive)
 {
 	if (record_history)
 	{
@@ -570,9 +603,19 @@ void AssetBrowser::selectResource(Resource* resource, bool record_history)
 	}
 
 	m_wanted_resource = "";
-	unloadResource();
-	m_selected_resource = resource;
-	ASSERT(m_selected_resource->getRefCount() > 0);
+	if(additive) {
+		if(m_selected_resources.indexOf(resource) >= 0) {
+			m_selected_resources.eraseItemFast(resource);
+		}
+		else {
+			m_selected_resources.push(resource);
+		}
+	}
+	else {
+		unloadResources();
+		m_selected_resources.push(resource);
+	}
+	ASSERT(resource->getRefCount() > 0);
 }
 
 
@@ -588,7 +631,7 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 }
 
 
-void AssetBrowser::selectResource(const Path& path, bool record_history)
+void AssetBrowser::selectResource(const Path& path, bool record_history, bool additive)
 {
 	m_is_focus_requested = true;
 	char ext[30];
@@ -598,7 +641,7 @@ void AssetBrowser::selectResource(const Path& path, bool record_history)
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	const ResourceType type = compiler.getResourceType(path.c_str());
 	Resource* res = manager.load(type, path);
-	if (res) selectResource(res, record_history);
+	if (res) selectResource(res, record_history, additive);
 }
 
 
@@ -615,16 +658,16 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 	ImGui::AlignTextToFramePadding();
 	ImGui::PushTextWrapPos(pos.x);
 
-	char* c = buf.begin;
-	while (*c && c < buf.end && *c != ':') ++c;
+	char* c = buf.begin();
+	while (*c && c < buf.end() && *c != ':') ++c;
 	char tmp[64];
 	if(*c == ':') {
-		copyNString(Span(tmp), buf.begin, int(c - buf.begin) + 1); 
+		copyNString(Span(tmp), buf.begin(), int(c - buf.begin()) + 1); 
 		ImGui::Text("%s", tmp);
 	}
 	else {
-		char* c = buf.begin + stringLength(buf.begin);
-		while (c > buf.begin && *c != '/' && *c != '\\') --c;
+		char* c = buf.begin() + stringLength(buf.begin());
+		while (c > buf.begin() && *c != '/' && *c != '\\') --c;
 		if (*c == '/' || *c == '\\') ++c;
 
 		const char* end = reverseFind(c, nullptr, '.');
@@ -672,7 +715,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 		{
 			m_is_focus_requested = true;
 			m_is_open = true;
-			m_wanted_resource = buf.begin;
+			m_wanted_resource = buf.begin();
 		}
 		if (ImGui::Selectable("Empty", false))
 		{
@@ -818,14 +861,14 @@ void AssetBrowser::goBack()
 {
 	if (m_history_index < 1) return;
 	m_history_index = maximum(0, m_history_index - 1);
-	selectResource(m_history[m_history_index], false);
+	selectResource(m_history[m_history_index], false, false);
 }
 
 
 void AssetBrowser::goForward()
 {
 	m_history_index = minimum(m_history_index + 1, m_history.size() - 1);
-	selectResource(m_history[m_history_index], false);
+	selectResource(m_history[m_history_index], false, false);
 }
 
 

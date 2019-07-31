@@ -54,9 +54,11 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 	const char* getName() const override { return "Audio"; }
 
 
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		auto* clip = static_cast<Clip*>(resource);
+		if(resources.length() > 1) return;
+
+		auto* clip = static_cast<Clip*>(resources[0]);
 		ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
 		auto& device = getAudioDevice(m_app.getWorldEditor().getEngine());
 

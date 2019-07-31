@@ -61,7 +61,7 @@ class LUMIX_EDITOR_API LogUI
 		int m_last_uid;
 		bool m_move_notifications_to_front;
 		bool m_are_notifications_hovered;
-		MT::SpinMutex m_guard;
+		MT::CriticalSection m_guard;
 };
 
 

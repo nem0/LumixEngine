@@ -35,30 +35,19 @@ namespace
 {
 
 
-struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 {
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetCompiler().registerExtension("ani", Animation::TYPE);
 	}
 
 
-	bool compile(const Path& src) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
+		if (resources.length() > 1) return;
 
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		return fs.copyFile(src.c_str(), dst);
-	}
-
-
-	void onGUI(Resource* resource) override
-	{
-		auto* animation = static_cast<Animation*>(resource);
+		auto* animation = static_cast<Animation*>(resources[0]);
 		ImGui::LabelText("FPS", "%d", animation->getFPS());
 		ImGui::LabelText("Length", "%.3fs", animation->getLength());
 		ImGui::LabelText("Frames", "%d", animation->getFrameCount());
@@ -183,9 +172,11 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	}
 
 
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		auto* animation = static_cast<PropertyAnimation*>(resource);
+		if (resources.length() > 1) return;
+
+		auto* animation = static_cast<PropertyAnimation*>(resources[0]);
 		if (!animation->isReady()) return;
 
 		if (ImGui::Button("Save")) savePropertyAnimation(*animation);
@@ -294,17 +285,11 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 		app.getAssetCompiler().registerExtension("act", Anim::ControllerResource::TYPE);
 	}
 
-	bool compile(const Path& src)  {
-		const char* dst_dir = m_app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		return fs.copyFile(src.c_str(), dst);
+	bool compile(const Path& src) {
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
-	void onGUI(Resource* resource) override {}
+	void onGUI(Span<Resource*> resources) override {}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
@@ -412,8 +397,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_prop_anim_plugin = LUMIX_NEW(allocator, PropertyAnimationAssetBrowserPlugin)(m_app);
 		m_anim_ctrl_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(m_app);
 		
-		const char* exts[] = { "ani", nullptr };
-		m_app.getAssetCompiler().addPlugin(*m_animtion_plugin, exts);
 		const char* act_exts[] = { "act", nullptr };
 		m_app.getAssetCompiler().addPlugin(*m_anim_ctrl_plugin, act_exts);
 
@@ -432,7 +415,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		m_app.getAssetCompiler().removePlugin(*m_animtion_plugin);
 		m_app.getAssetCompiler().removePlugin(*m_anim_ctrl_plugin);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();

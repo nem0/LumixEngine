@@ -339,72 +339,47 @@ void Model::onBeforeReady()
 bool Model::parseBones(InputMemoryStream& file)
 {
 	int bone_count;
-	file.read(&bone_count, sizeof(bone_count));
+	file.read(bone_count);
 	if (bone_count < 0) return false;
-	if (bone_count > Bone::MAX_COUNT)
-	{
+	if (bone_count > Bone::MAX_COUNT) {
 		logWarning("Renderer") << "Model " << getPath().c_str() << " has too many bones.";
 		return false;
 	}
 
 	m_bones.reserve(bone_count);
-	for (int i = 0; i < bone_count; ++i)
-	{
+	for (int i = 0; i < bone_count; ++i) {
 		Model::Bone& b = m_bones.emplace(m_allocator);
 		int len;
-		file.read(&len, sizeof(len));
+		file.read(len);
 		char tmp[MAX_PATH_LENGTH];
-		if (len >= MAX_PATH_LENGTH)
-		{
+		if (len >= MAX_PATH_LENGTH) {
 			return false;
 		}
 		file.read(tmp, len);
 		tmp[len] = 0;
 		b.name = tmp;
 		m_bone_map.insert(crc32(b.name.c_str()), m_bones.size() - 1);
-		file.read(&len, sizeof(len));
-		if (len >= MAX_PATH_LENGTH)
-		{
-			return false;
-		}
-		if(len > 0)
-		{
-			file.read(tmp, len);
-			tmp[len] = 0;
-			b.parent = tmp;
-		}
-		else
-		{
-			b.parent = "";
-		}
-		file.read(&b.transform.pos.x, sizeof(float) * 3);
-		file.read(&b.transform.rot.x, sizeof(float) * 4);
+		file.read(b.parent_idx);
+		file.read(b.transform.pos);
+		file.read(b.transform.rot);
 	}
+
 	m_first_nonroot_bone_index = -1;
-	for (int i = 0; i < bone_count; ++i)
-	{
+	for (int i = 0; i < bone_count; ++i) {
 		Model::Bone& b = m_bones[i];
-		if (b.parent.length() == 0)
-		{
-			if (m_first_nonroot_bone_index != -1)
-			{
+		if (b.parent_idx < 0) {
+			if (m_first_nonroot_bone_index != -1) {
 				logError("Renderer") << "Invalid skeleton in " << getPath().c_str();
 				return false;
 			}
 			b.parent_idx = -1;
 		}
-		else
-		{
-			b.parent_idx = getBoneIdx(b.parent.c_str());
-			if (b.parent_idx > i || b.parent_idx < 0)
-			{
+		else {
+			if (b.parent_idx > i) {
 				logError("Renderer") << "Invalid skeleton in " << getPath().c_str();
 				return false;
 			}
-			if (m_first_nonroot_bone_index == -1)
-			{
-				m_first_nonroot_bone_index = i;
-			}
+			if (m_first_nonroot_bone_index == -1) m_first_nonroot_bone_index = i;
 		}
 	}
 
@@ -466,7 +441,7 @@ static const ffr::Attribute& getAttribute(Mesh& mesh, Mesh::AttributeSemantic at
 bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 {
 	int object_count = 0;
-	file.read(&object_count, sizeof(object_count));
+	file.read(object_count);
 	if (object_count <= 0) return false;
 
 	char model_dir[MAX_PATH_LENGTH];
@@ -482,7 +457,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		i32 mat_path_length;
 		char mat_path[MAX_PATH_LENGTH + 128];
-		file.read(&mat_path_length, sizeof(mat_path_length));
+		file.read(mat_path_length);
 		if (mat_path_length + 1 > lengthOf(mat_path)) return false;
 		file.read(mat_path, mat_path_length);
 		mat_path[mat_path_length] = '\0';
@@ -490,7 +465,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		Material* material = m_resource_manager.getOwner().load<Material>(Path(mat_path));
 	
 		i32 str_size;
-		file.read(&str_size, sizeof(str_size));
+		file.read(str_size);
 		char mesh_name[MAX_PATH_LENGTH];
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
@@ -504,9 +479,9 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		Mesh& mesh = m_meshes[i];
 		int index_size;
 		int indices_count;
-		file.read(&index_size, sizeof(index_size));
+		file.read(index_size);
 		if (index_size != 2 && index_size != 4) return false;
-		file.read(&indices_count, sizeof(indices_count));
+		file.read(indices_count);
 		if (indices_count <= 0) return false;
 		mesh.indices.resize(index_size * indices_count);
 		mesh.render_data->indices_count = indices_count;
@@ -523,7 +498,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	{
 		Mesh& mesh = m_meshes[i];
 		int data_size;
-		file.read(&data_size, sizeof(data_size));
+		file.read(data_size);
 		Array<u8> vertices_mem(m_allocator);
 		vertices_mem.resize(data_size);
 		file.read(&vertices_mem[0], data_size);
@@ -610,8 +585,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		}
 		mesh.render_data->vao = m_renderer.createVAO(attribs, u32(attr - attribs));
 	}
-	file.read(&m_bounding_radius, sizeof(m_bounding_radius));
-	file.read(&m_aabb, sizeof(m_aabb));
+	file.read(m_bounding_radius);
+	file.read(m_aabb);
 
 	return true;
 }
@@ -620,15 +595,15 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 bool Model::parseLODs(InputMemoryStream& file)
 {
 	i32 lod_count;
-	file.read(&lod_count, sizeof(lod_count));
+	file.read(lod_count);
 	if (lod_count <= 0 || lod_count > lengthOf(m_lods))
 	{
 		return false;
 	}
 	for (int i = 0; i < lod_count; ++i)
 	{
-		file.read(&m_lods[i].to_mesh, sizeof(m_lods[i].to_mesh));
-		file.read(&m_lods[i].distance, sizeof(m_lods[i].distance));
+		file.read(m_lods[i].to_mesh);
+		file.read(m_lods[i].distance);
 		m_lods[i].from_mesh = i > 0 ? m_lods[i - 1].to_mesh + 1 : 0;
 	}
 	return true;
@@ -640,7 +615,7 @@ bool Model::load(u64 size, const u8* mem)
 	PROFILE_FUNCTION();
 	FileHeader header;
 	InputMemoryStream file(mem, size);
-	file.read(&header, sizeof(header));
+	file.read(header);
 
 	if (header.magic != FILE_MAGIC)
 	{

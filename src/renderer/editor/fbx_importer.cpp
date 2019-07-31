@@ -1,5 +1,6 @@
 #include "fbx_importer.h"
 #include "animation/animation.h"
+#include "editor/asset_compiler.h"
 #include "engine/crc32.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
@@ -609,8 +610,9 @@ FBXImporter::~FBXImporter()
 }
 
 
-FBXImporter::FBXImporter(FileSystem& fs, IAllocator& allocator)
+FBXImporter::FBXImporter(AssetCompiler& compiler, FileSystem& fs, IAllocator& allocator)
 	: allocator(allocator)
+	, compiler(compiler)
 	, scene(nullptr)
 	, materials(allocator)
 	, meshes(allocator)
@@ -623,7 +625,7 @@ FBXImporter::FBXImporter(FileSystem& fs, IAllocator& allocator)
 }
 
 
-bool FBXImporter::setSource(const char* base_dir, const char* filename, bool ignore_geometry)
+bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 {
 	PROFILE_FUNCTION();
 	if(scene) {
@@ -703,7 +705,7 @@ static void getRelativePath(WorldEditor& editor, char* relative_path, int max_le
 }*/
 
 
-bool FBXImporter::writeBillboardMaterial(const char* output_dir, const char* src)
+bool FBXImporter::writeBillboardMaterial(const char* src)
 {/*
 	if (!create_billboard_lod) return true;
 
@@ -746,16 +748,13 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		
 		const PathUtils::FileInfo src_info(src);
 
-		const StaticString<MAX_PATH_LENGTH + 128> mat_src(cfg.base_path, src_info.m_dir, mat_name, ".mat");
+		const StaticString<MAX_PATH_LENGTH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
 		if (OS::fileExists(mat_src)) continue;
-		
-		const u32 hash = crc32(mat_src);
 
-		const StaticString<MAX_PATH_LENGTH> path(cfg.base_path, cfg.output_dir, hash, ".res");
 		OS::OutputFile f;
-		if (!f.open(path))
+		if (!filesystem.open(mat_src, Ref(f)))
 		{
-			logError("FBX") << "Failed to create " << path;
+			logError("FBX") << "Failed to create " << mat_src;
 			continue;
 		}
 		out_file.clear();
@@ -786,12 +785,11 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			<< ",1}\n";*/
 
 		if (!f.write(out_file.getData(), out_file.getPos())) {
-			logError("FBX") << "Failed to write " << path;
+			logError("FBX") << "Failed to write " << mat_src;
 		}
 		f.close();
-		OS::copyFile(path, mat_src);
 	}
-	writeBillboardMaterial(cfg.output_dir, src);
+	writeBillboardMaterial(src);
 }
 
 
@@ -930,121 +928,114 @@ static int getDepth(const ofbx::Object* bone)
 }
 
 
-void FBXImporter::writeAnimation(const char* dst, const ImportAnimation& anim, const ImportConfig& cfg)
+void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
-	ASSERT(anim.import);
-	const ofbx::AnimationStack* stack = anim.fbx;
-	const ofbx::IScene& scene = *anim.scene;
-	const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
+	for (FBXImporter::ImportAnimation& anim : getAnimations()) { 
+		StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ":", src);
+		ASSERT(anim.import);
 
-	float fbx_frame_rate = scene.getSceneFrameRate();
-	if (fbx_frame_rate < 0) fbx_frame_rate = 24;
-	float scene_frame_rate = fbx_frame_rate / time_scale;
-	float sampling_period = 1.0f / scene_frame_rate;
-	int all_frames_count = 0;
-	if (take_info)
-	{
-		all_frames_count = int((take_info->local_time_to - take_info->local_time_from) / sampling_period + 0.5f);
-	}
-	else
-	{
-		ASSERT(false);
+		const ofbx::AnimationStack* stack = anim.fbx;
+		const ofbx::IScene& scene = *anim.scene;
+		const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
+
+		float fbx_frame_rate = scene.getSceneFrameRate();
+		if (fbx_frame_rate < 0) fbx_frame_rate = 24;
+		float scene_frame_rate = fbx_frame_rate / time_scale;
+		float sampling_period = 1.0f / scene_frame_rate;
+		int all_frames_count = 0;
+		if (take_info)
+		{
+			all_frames_count = int((take_info->local_time_to - take_info->local_time_from) / sampling_period + 0.5f);
+		}
+		else
+		{
+			ASSERT(false);
+			// TODO
+			// scene->GetGlobalSettings().GetTimelineDefaultTimeSpan(time_spawn);
+		}
+
 		// TODO
-		// scene->GetGlobalSettings().GetTimelineDefaultTimeSpan(time_spawn);
-	}
+		/*FbxTime::EMode mode = scene->GetGlobalSettings().GetTimeMode();
+		float scene_frame_rate =
+		(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
+		: FbxTime::GetFrameRate(mode));
+		*/
+		out_file.clear();
 
-	// TODO
-	/*FbxTime::EMode mode = scene->GetGlobalSettings().GetTimeMode();
-	float scene_frame_rate =
-	(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
-	: FbxTime::GetFrameRate(mode));
-	*/
-	out_file.clear();
+		Animation::Header header;
+		header.magic = Animation::HEADER_MAGIC;
+		header.version = 3;
+		header.fps = (u32)(scene_frame_rate + 0.5f);
+		write(header);
 
-	Animation::Header header;
-	header.magic = Animation::HEADER_MAGIC;
-	header.version = 3;
-	header.fps = (u32)(scene_frame_rate + 0.5f);
-	write(header);
+		write(anim.root_motion_bone_idx);
+		write(all_frames_count);
+		int used_bone_count = 0;
 
-	write(anim.root_motion_bone_idx);
-	write(all_frames_count);
-	int used_bone_count = 0;
-
-	for (const ofbx::Object* bone : bones)
-	{
-		if (&bone->getScene() != &scene) continue;
-
-		const ofbx::AnimationLayer* layer = stack->getLayer(0);
-		const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
-		const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
-		if (translation_curve_node || rotation_curve_node) ++used_bone_count;
-	}
-
-	write(used_bone_count);
-	Array<TranslationKey> positions(allocator);
-	Array<RotationKey> rotations(allocator);
-	for (const ofbx::Object* bone : bones)
-	{
-		if (&bone->getScene() != &scene) continue;
-		const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
-
-		const ofbx::AnimationLayer* layer = stack->getLayer(0);
-		const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
-		const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
-		if (!translation_node && !rotation_node) continue;
-
-		u32 name_hash = crc32(bone->name);
-		write(name_hash);
-
-		int depth = getDepth(bone);
-		float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-		compressPositions(positions, 0, all_frames_count, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
-		write(positions.size());
-
-		for (TranslationKey& key : positions) write(key.frame);
-		for (TranslationKey& key : positions)
+		for (const ofbx::Object* bone : bones)
 		{
-			if (bone == root_bone)
+			if (&bone->getScene() != &scene) continue;
+
+			const ofbx::AnimationLayer* layer = stack->getLayer(0);
+			const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
+			const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
+			if (translation_curve_node || rotation_curve_node) ++used_bone_count;
+		}
+
+		write(used_bone_count);
+		Array<TranslationKey> positions(allocator);
+		Array<RotationKey> rotations(allocator);
+		for (const ofbx::Object* bone : bones)
+		{
+			if (&bone->getScene() != &scene) continue;
+			const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
+
+			const ofbx::AnimationLayer* layer = stack->getLayer(0);
+			const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
+			const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
+			if (!translation_node && !rotation_node) continue;
+
+			u32 name_hash = crc32(bone->name);
+			write(name_hash);
+
+			int depth = getDepth(bone);
+			float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+			compressPositions(positions, 0, all_frames_count, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
+			write(positions.size());
+
+			for (TranslationKey& key : positions) write(key.frame);
+			for (TranslationKey& key : positions)
 			{
-				write(fixRootOrientation(key.pos * cfg.mesh_scale));
+				if (bone == root_bone)
+				{
+					write(fixRootOrientation(key.pos * cfg.mesh_scale));
+				}
+				else
+				{
+					write(fixOrientation(key.pos * cfg.mesh_scale));
+				}
 			}
-			else
+
+			compressRotations(rotations, 0, all_frames_count, sampling_period, rotation_node, *bone, rotation_error / depth);
+
+			write(rotations.size());
+			for (RotationKey& key : rotations) write(key.frame);
+			for (RotationKey& key : rotations)
 			{
-				write(fixOrientation(key.pos * cfg.mesh_scale));
+				if (bone == root_bone)
+				{
+					write(fixRootOrientation(key.rot));
+				}
+				else
+				{
+					write(fixOrientation(key.rot));
+				}
 			}
 		}
 
-		compressRotations(rotations, 0, all_frames_count, sampling_period, rotation_node, *bone, rotation_error / depth);
-
-		write(rotations.size());
-		for (RotationKey& key : rotations) write(key.frame);
-		for (RotationKey& key : rotations)
-		{
-			if (bone == root_bone)
-			{
-				write(fixRootOrientation(key.rot));
-			}
-			else
-			{
-				write(fixOrientation(key.rot));
-			}
-		}
+		compiler.writeCompiledResource(anim_path, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
 	}
-
-	OS::OutputFile f;
-	StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, dst);
-	if (!f.open(out_path)) {
-		logError("FBX") << "Failed to create " << dst;
-		return;
-	}
-
-	if (!f.write(out_file.getData(), out_file.getPos())) {
-		logError("FBX") << "Failed to write " << dst;
-	}
-
-	f.close();
 }
 
 int FBXImporter::getVertexSize(const ImportMesh& mesh) const
@@ -1420,9 +1411,9 @@ void FBXImporter::writeGeometry()
 }
 
 
-void FBXImporter::writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset, const char* mesh_output_filename)
+void FBXImporter::writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset)
 {
-	if (!create_billboard_lod) return;
+	/*if (!create_billboard_lod) return;
 
 	const i32 attribute_count = 4;
 	write(attribute_count);
@@ -1452,11 +1443,11 @@ void FBXImporter::writeBillboardMesh(i32 attribute_array_offset, i32 indices_off
 	length = stringLength(mesh_name);
 
 	write((const char*)&length, sizeof(length));
-	write(mesh_name, length);
+	write(mesh_name, length);*/
 }
 
 
-void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src, int mesh_idx)
+void FBXImporter::writeMeshes(const char* src, int mesh_idx)
 {
 	const PathUtils::FileInfo src_info(src);
 	i32 mesh_count = 0;
@@ -1539,7 +1530,7 @@ void FBXImporter::writeMeshes(const char* mesh_output_filename, const char* src,
 	}
 
 	if (mesh_idx < 0) {
-		writeBillboardMesh(attr_offset, indices_offset, mesh_output_filename);
+		writeBillboardMesh(attr_offset, indices_offset);
 	}
 }
 
@@ -1564,14 +1555,12 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 		ofbx::Object* parent = node->getParent();
 		if (!parent)
 		{
-			write((int)0);
+			write((int)-1);
 		}
 		else
 		{
-			const char* parent_name = parent->name;
-			len = (int)stringLength(parent_name);
-			write(len);
-			writeString(parent_name);
+			const int idx = bones.indexOf(parent);
+			write(idx);
 		}
 
 		const ImportMesh* mesh = getAnyMeshFromBone(node, int(&node - bones.begin()));
@@ -1749,9 +1738,8 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	};
 	OS::OutputFile file;
 	PathUtils::FileInfo file_info(src);
-	StaticString<MAX_PATH_LENGTH> tmp_rel(file_info.m_dir, "/", file_info.m_basename, ".fab");
-	StaticString<MAX_PATH_LENGTH> tmp(cfg.base_path, tmp_rel);
-	if (!file.open(tmp)) return;
+	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
+	if (!filesystem.open(tmp, Ref(file))) return;
 
 	OutputMemoryStream blob(allocator);
 	SaveEntityGUIDMap entity_map;
@@ -1761,7 +1749,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	const int count = meshes.size();
 	serializer.write("entity_count", count + 1);
 	char normalized_tmp_rel[MAX_PATH_LENGTH];
-	PathUtils::normalize(tmp_rel, Span(normalized_tmp_rel));
+	PathUtils::normalize(tmp, Span(normalized_tmp_rel));
 	const u64 prefab = crc32(normalized_tmp_rel);
 
 	serializer.write("prefab", prefab);
@@ -1809,19 +1797,10 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 	for (int i = 0; i < meshes.size(); ++i) {
 		char name[256];
 		getImportMeshName(meshes[i], name);
-		StaticString<MAX_PATH_LENGTH> hash_str(name, ":", src);
-		makeLowercase(Span(hash_str.data), hash_str);
-		const StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, crc32(hash_str), ".res");
-		OS::makePath(cfg.output_dir);
-		OS::OutputFile f;
-		if (!f.open(out_path)) {
-			logError("FBX") << "Failed to create " << out_path;
-			return;
-		}
 
 		out_file.clear();
 		writeModelHeader();
-		writeMeshes("", src, i);
+		writeMeshes(src, i);
 		writeGeometry(i);
 		const ofbx::Skin* skin = meshes[i].fbx->getGeometry()->getSkin();
 		if (!skin) {
@@ -1839,15 +1818,14 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		write(to_mesh);
 		write(factor);
 
-		if (!f.write(out_file.getData(), out_file.getPos())) {
-			logError("FBX") << "Failed to write " << out_path;
-		}
-		f.close();
+		StaticString<MAX_PATH_LENGTH> resource_locator(name, ":", src);
+
+		compiler.writeCompiledResource(resource_locator, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
 	}
 }
 
 
-void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, const char* src, const ImportConfig& cfg)
+void FBXImporter::writeModel(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
 	postprocessMeshes(cfg);
@@ -1865,25 +1843,14 @@ void FBXImporter::writeModel(const char* output_mesh_filename, const char* ext, 
 	if (!import_any_mesh) return;
 
 	qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
-	StaticString<MAX_PATH_LENGTH> out_path(cfg.base_path, cfg.output_dir, output_mesh_filename, ext);
-	OS::makePath(cfg.output_dir);
-	OS::OutputFile f;
-	if (!f.open(out_path))
-	{
-		logError("FBX") << "Failed to create " << out_path;
-		return;
-	}
 	out_file.clear();
 	writeModelHeader();
-	writeMeshes(output_mesh_filename, src, -1);
+	writeMeshes(src, -1);
 	writeGeometry();
 	writeSkeleton(cfg);
 	writeLODs();
-	
-	if (!f.write(out_file.getData(), out_file.getPos())) {
-		logError("FBX") << "Failed to write " << out_path;
-	}
-	f.close();
+
+	compiler.writeCompiledResource(src, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
 }
 
 

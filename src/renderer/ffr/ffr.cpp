@@ -126,7 +126,7 @@ static struct {
 	Pool<VertexArrayObject, VertexArrayObject::MAX_COUNT> vaos;
 	VAOHandle current_vao = INVALID_VAO;
 	HashMap<u32, u32>* uniforms_hash_map;
-	MT::SpinMutex handle_mutex;
+	MT::CriticalSection handle_mutex;
 	DWORD thread;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
@@ -1329,7 +1329,7 @@ void destroy(ProgramHandle program)
 	const GLuint handle = p.handle;
 	CHECK_GL(glDeleteProgram(handle));
 
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 	g_ffr.programs.dealloc(program.value);
 }
 
@@ -1407,7 +1407,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
-		logError("renderer") << "Wrong dds format or corrupted dds.";
+		logError("renderer") << "Wrong dds format or corrupted dds (" << debug_name << ")";
 		return false;
 	}
 
@@ -1584,7 +1584,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 VAOHandle allocVAOHandle()
 {
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 
 	if(g_ffr.vaos.isFull()) {
 		logError("Renderer") << "FFR is out of free VAO slots.";
@@ -1599,7 +1599,7 @@ VAOHandle allocVAOHandle()
 
 ProgramHandle allocProgramHandle()
 {
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 
 	if(g_ffr.programs.isFull()) {
 		logError("Renderer") << "FFR is out of free program slots.";
@@ -1614,7 +1614,7 @@ ProgramHandle allocProgramHandle()
 
 BufferHandle allocBufferHandle()
 {
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 
 	if(g_ffr.buffers.isFull()) {
 		logError("Renderer") << "FFR is out of free buffer slots.";
@@ -1629,7 +1629,7 @@ BufferHandle allocBufferHandle()
 
 TextureHandle allocTextureHandle()
 {
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 
 	if(g_ffr.textures.isFull()) {
 		logError("Renderer") << "FFR is out of free texture slots.";
@@ -1748,7 +1748,7 @@ void destroy(TextureHandle texture)
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteTextures(1, &handle));
 
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 	g_ffr.textures.dealloc(texture.value);
 }
 
@@ -1763,7 +1763,7 @@ void destroy(VAOHandle vao)
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteVertexArrays(1, &handle));
 
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 	g_ffr.vaos.dealloc(vao.value);
 }
 
@@ -1776,7 +1776,7 @@ void destroy(BufferHandle buffer)
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteBuffers(1, &handle));
 
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 	g_ffr.buffers.dealloc(buffer.value);
 }
 
@@ -1844,7 +1844,7 @@ UniformHandle allocUniform(const char* name, UniformType type, int count)
 {
 	const u32 name_hash = crc32(name);
 	
-	MT::SpinLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
 
 	auto iter = g_ffr.uniforms_hash_map->find(name_hash);
 	if(iter.isValid()) {

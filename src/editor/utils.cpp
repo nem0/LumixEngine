@@ -21,28 +21,28 @@ ResourceLocator::ResourceLocator(const char* path)
 		++c;
 	}
 	if(*c == ':') {
-		name.begin = full;
-		name.end = c;
+		name.m_begin = full;
+		name.m_end = c;
 
-		filepath.begin = c + 1;
-		filepath.end = filepath.begin + stringLength(filepath.begin);
+		filepath.m_begin = c + 1;
+		filepath.m_end = filepath.m_begin + stringLength(filepath.m_begin);
 	}
 	else {
 		const char* dot = reverseFind(full, nullptr, '.');
 		if(dot) {
-			filepath.begin = full;
-			filepath.end = full + stringLength(full);
+			filepath.m_begin = full;
+			filepath.m_end = full + stringLength(full);
 
-			name.end = dot;
-			name.begin = name.end;
-			while (name.begin > full && *name.begin != '/' && *name.begin != '\\') {
-				--name.begin;
+			name.m_end = dot;
+			name.m_begin = name.m_end;
+			while (name.m_begin > full && *name.m_begin != '/' && *name.m_begin != '\\') {
+				--name.m_begin;
 			}
-			if (*name.begin == '/' || *name.begin == '\\') ++name.begin;
+			if (*name.m_begin == '/' || *name.m_begin == '\\') ++name.m_begin;
 		}
 		else {
-			name.begin = full;
-			name.end = full + stringLength(name.begin);
+			name.m_begin = full;
+			name.m_end = full + stringLength(name.m_begin);
 
 			filepath = name;
 		}

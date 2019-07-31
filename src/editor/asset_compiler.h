@@ -52,13 +52,14 @@ struct AssetCompiler
 	virtual void addPlugin(IPlugin& plugin, const char** extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
 	virtual bool compile(const Path& path) = 0;
-	virtual const char* getCompiledDir() const = 0;
 	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
 	virtual void updateMeta(const Path& res, const char* src) const = 0;
 	virtual const HashMap<u32, ResourceItem>& lockResources() = 0;
 	virtual void unlockResources() = 0;
 	virtual void registerDependency(const Path& included_from, const Path& dependency) = 0;
 	virtual void addResource(ResourceType type, const char* path) = 0;
+	virtual bool writeCompiledResource(const char* locator, Span<u8> data) = 0;
+	virtual bool copyCompile(const Path& src) = 0;
 
 	virtual ResourceType getResourceType(const char* path) const = 0;
 	virtual void registerExtension(const char* extension, ResourceType type) = 0;

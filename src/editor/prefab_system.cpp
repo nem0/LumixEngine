@@ -38,25 +38,20 @@ public:
 	}
 
 
-	void onGUI(Resource* resource) override
+	void onGUI(Span<Resource*> resources) override
 	{
-		if (ImGui::Button("instantiate"))
-		{
+		if (resources.length() > 1) return;
+
+		if (ImGui::Button("instantiate")) {
 			Array<EntityRef> entities(editor.getAllocator());
-			system.instantiatePrefab(*(PrefabResource*)resource, editor.getCameraRaycastHit(), {0, 0, 0, 1}, 1);
+			system.instantiatePrefab(*(PrefabResource*)resources[0], editor.getCameraRaycastHit(), {0, 0, 0, 1}, 1);
 		}
 	}
 	
 	
 	bool compile(const Path& src) override
 	{
-		const char* dst_dir = app.getAssetCompiler().getCompiledDir();
-		const u32 hash = crc32(src.c_str());
-
-		const StaticString<MAX_PATH_LENGTH> dst(dst_dir, hash, ".res");
-
-		FileSystem& fs = app.getWorldEditor().getEngine().getFileSystem();
-		return fs.copyFile(src.c_str(), dst);
+		return app.getAssetCompiler().copyCompile(src);
 	}
 
 
