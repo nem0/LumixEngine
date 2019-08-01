@@ -382,7 +382,6 @@ exit /B 0
 	del /Q ..\external\cmft\include\cmft\*
 	copy 3rdparty\cmft\include\cmft\* ..\external\cmft\include\cmft\
 	copy 3rdparty\cmft\_build\win64_vs2019\bin\cmftRelease.lib ..\external\cmft\lib\win64_vs2017\release\cmft.lib
-	copy 3rdparty\cmft\_build\win64_vs2019\bin\cmftRelease.pdb ..\external\cmft\lib\win64_vs2017\release\cmft.pdb
 exit /B 0
 
 :nvtt
