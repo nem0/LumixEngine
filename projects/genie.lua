@@ -43,6 +43,11 @@ newoption {
 }
 
 newoption {
+	trigger = "static-physx",
+	description = "Linked physx static lib."
+}
+
+newoption {
 	trigger = "embed-resources",
 	description = "Embed resources (shaders, ...) in executable"
 }
@@ -328,14 +333,16 @@ function copyDlls(src_dir, platform_dir, dest_dir)
 	configuration { "x64", dest_dir, "windows" }
 	physx_suffix = "64"
 
-	postbuildcommands {
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCommon_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCooking_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXFoundation_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysX_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-		[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbghelp.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\"",
-		[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbgcore.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\""
-	}
+	if _OPTIONS["static-physx"] == nil then
+		postbuildcommands {
+			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCommon_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCooking_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXFoundation_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysX_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
+			[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbghelp.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\"",
+			[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbgcore.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\""
+		}
+	end
 end
 
 function libType()
@@ -348,33 +355,54 @@ end
 
 function linkPhysX()
 	if has_plugin("physics") then
-		configuration { "x64", "vs20*" }
-			links { 
-				"FastXml_static_64",
-				"LowLevel_static_64",
-				"LowLevelAABB_static_64",
-				"LowLevelDynamics_static_64",
-				"PhysX_64",
-				"PhysXCommon_64",
-				"PhysXCooking_64",
-				"PhysXExtensions_static_64",
-				"PhysXFoundation_64",
-				"PhysXCharacterKinematic_static_64",
-				"PhysXPvdSDK_static_64",
-				"PhysXTask_static_64",
-				"PhysXVehicle_static_64",
-				"SceneQuery_static_64",
-				"SimulationController_static_64"
-			}
+		if _OPTIONS["static-physx"] then
+			configuration { "x64", "vs20*" }
+				links { 
+					"PhysXCharacterKinematic_static_64",
+					"PhysXCommon_static_64",
+					"PhysXCooking_static_64",
+					"PhysXExtensions_static_64",
+					"PhysXFoundation_static_64",
+					"PhysXPvdSDK_static_64",
+					"PhysXVehicle_static_64",
+					"PhysX_static_64"
+				}
 
-		configuration { "Debug" }
-			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
+			configuration {}
+				libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release_static"}
+				defines {
+					"PX_PHYSX_CHARACTER_STATIC_LIB",
+					"PX_PHYSX_STATIC_LIB"
+				}
+		else 
+			configuration { "x64", "vs20*" }
+				links { 
+					"FastXml_static_64",
+					"LowLevel_static_64",
+					"LowLevelAABB_static_64",
+					"LowLevelDynamics_static_64",
+					"PhysX_64",
+					"PhysXCommon_64",
+					"PhysXCooking_64",
+					"PhysXExtensions_static_64",
+					"PhysXFoundation_64",
+					"PhysXCharacterKinematic_static_64",
+					"PhysXPvdSDK_static_64",
+					"PhysXTask_static_64",
+					"PhysXVehicle_static_64",
+					"SceneQuery_static_64",
+					"SimulationController_static_64"
+				}
 
-		configuration { "RelWithDebInfo" }
-			libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
+			configuration { "Debug" }
+				libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
 
-		configuration {}
-			defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
+			configuration { "RelWithDebInfo" }
+				libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release"}
+
+			configuration {}
+				defines {"PX_PHYSX_CHARACTER_STATIC_LIB"}
+		end
 	end
 end
 
