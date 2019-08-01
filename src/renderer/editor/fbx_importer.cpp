@@ -492,6 +492,8 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		Array<int> subblobs(allocator);
 		subblobs.reserve(vertex_count);
 
+		const float scene_scale = 1.f / scene->getGlobalSettings()->UnitScaleFactor;
+
 		const int* materials = geom->getMaterials();
 		Array<ofbx::Vec3> computed_tangents(allocator);
 		if (!tangents && normals && uvs) {
@@ -506,7 +508,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 			blob.clear();
 			ofbx::Vec3 cp = vertices[i];
 			// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
-			Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale;
+			Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * scene_scale;
 			pos = fixOrientation(pos);
 			blob.write(pos);
 

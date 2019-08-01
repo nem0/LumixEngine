@@ -14,7 +14,7 @@ solution "RecastDetour"
 	
 project "Recast"
 	kind "StaticLib"
-	flags { "Symbols", "ReleaseRuntime", "WinMain" }
+	flags { "ReleaseRuntime", "WinMain" }
 	configuration { "Release" }
 	files { "3rdparty/recast/Recast/Source/**.cpp" }
 	includedirs { "3rdparty/recast/Recast/include/" }

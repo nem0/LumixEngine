@@ -2532,7 +2532,7 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 						if (!node->first_property)
 							continue;
 
-#define get_property(name, field, type, getter) if(node->first_property->value == name) \
+						#define get_property(name, field, type, getter) if(node->first_property->value == name) \
 						{ \
 							ofbx::IElementProperty* prop = node->getProperty(4); \
 							if (prop) \
@@ -2557,7 +2557,7 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 						get_property("TimeMode", TimeMode, FrameRate, toInt);
 						get_property("CustomFrameRate", CustomFrameRate, float, toDouble);
 
-#undef get_property
+						#undef get_property
 
 						scene->m_scene_frame_rate = getFramerateFromTimeMode(scene->m_settings.TimeMode, scene->m_settings.CustomFrameRate);
 					}

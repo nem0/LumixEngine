@@ -24,8 +24,9 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	echo   9. 3rd party
 	echo   A. Plugins
 	echo   B. Download Godot Engine
+	echo   C. Create project - static physx
 	echo ===============================
-	choice /C 123456789AB /N /M "Your choice:"
+	choice /C 123456789ABC /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 goto :EOF
@@ -39,6 +40,7 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==9 call :third_party
 	if %errorlevel%==10 call :plugins
 	if %errorlevel%==11 call :download_godot
+	if %errorlevel%==12 call :create_project_static_physx
 goto :begin
 
 :plugins 
@@ -237,16 +239,18 @@ exit /B 0
 	echo  1. Go back
 	echo  2. Download
 	echo  3. Build
-	echo  4. Deploy
-	echo  5. Open in VS
+	echo  4. Build and deploy static
+	echo  5. Deploy
+	echo  6. Open in VS
 	echo ===============================
-	choice /C 12345 /N /M "Your choice:"
+	choice /C 123456 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :download_physx
 	if %errorlevel%==3 call :build_physx
-	if %errorlevel%==4 call :deploy_physx
-	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\PhysX\physx\compiler\vc15win64\PhysXSDK.sln"
+	if %errorlevel%==4 call :build_deploy_physx_static
+	if %errorlevel%==5 call :deploy_physx
+	if %errorlevel%==6 start "" %devenv_cmd% "3rdparty\PhysX\physx\compiler\vc15win64\PhysXSDK.sln"
 	pause
 goto :physx
 
@@ -286,6 +290,25 @@ exit /B 0
 	call generate_projects.bat lumix_vc15win64
 	%msbuild_cmd% "compiler\vc15win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
 	cd ..\..\..\
+exit /B 0
+
+:build_deploy_physx_static
+	cd 3rdparty\PhysX\physx
+	call generate_projects.bat lumix_vc15win64_static
+	%msbuild_cmd% "compiler\vc15win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
+	cd ..\..\..\
+
+	if not exist "..\external\physx\lib\vs2017\win64\release_static\" mkdir ..\external\physx\lib\vs2017\win64\release_static\
+	del /Q ..\external\physx\lib\vs2017\win64\release_static\*
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCharacterKinematic_static_64.lib ..\external\physx\lib\vs2017\win64\release_static\
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCommon_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXCooking_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXExtensions_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXFoundation_static_64.lib		   ..\external\physx\lib\vs2017\win64\release_static\
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXPvdSDK_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
+	copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib				   ..\external\physx\lib\vs2017\win64\release_static\
+
 exit /B 0
 
 :recast
@@ -395,6 +418,12 @@ exit /B 0
 :create_project
 	echo Creating project...
 	genie.exe --static-plugins vs2019 
+	pause
+exit /B 0
+
+:create_project_static_physx
+	echo Creating project with statically linked PhysX...
+	genie.exe --static-plugins --static-physx vs2019 
 	pause
 exit /B 0
 
