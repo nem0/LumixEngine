@@ -763,7 +763,19 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 
 		writeString("shader \"pipelines/standard.shd\"\n");
 		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
-		auto writeTexture = [this](const ImportTexture& texture) {
+		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
+			if (texture.is_valid && idx < 2) {
+				PathUtils::FileInfo info(texture.src);
+				const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
+				if (!OS::fileExists(meta_path)) {
+					OS::OutputFile file;
+					if (file.open(meta_path)) {
+						
+						file << (idx == 0 ? "srgb = true\n" : "normalmap = true\n");
+						file.close();
+					}
+				}
+			}
 			if (texture.fbx)
 			{
 				writeString("texture \"/");
@@ -776,10 +788,10 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			}
 		};
 
-		writeTexture(material.textures[0]);
-		writeTexture(material.textures[1]);
-		writeTexture(material.textures[2]);
-
+		writeTexture(material.textures[0], 0);
+		writeTexture(material.textures[1], 1);
+		writeTexture(material.textures[2], 2);
+		
 /*			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
 		out_file << "color {" << diffuse_color.r 
 			<< "," << diffuse_color.g

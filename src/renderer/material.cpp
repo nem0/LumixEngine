@@ -39,8 +39,8 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_renderer(renderer)
 	, m_render_states(u64(ffr::StateFlags::CULL_BACK))
 	, m_color(1, 1, 1, 1)
-	, m_metallic(0)
-	, m_roughness(1.0f)
+	, m_metallic(1.f)
+	, m_roughness(1.f)
 	, m_emission(0.0f)
 	, m_define_mask(0)
 	, m_custom_flags(0)
@@ -141,7 +141,7 @@ void Material::unload()
 	m_color.set(1, 1, 1, 1);
 	m_custom_flags = 0;
 	m_define_mask = 0;
-	m_metallic = 0.0f;
+	m_metallic = 1.0f;
 	m_roughness = 1.0f;
 	m_emission = 0.0f;
 	m_render_states = u64(ffr::StateFlags::CULL_BACK);
