@@ -375,25 +375,18 @@ void AssetBrowser::fileColumn()
 			}
 			else
 			{
-				if (!m_filtered_file_infos.empty()) j = m_filtered_file_infos[j];
-				FileInfo& tile = m_file_infos[j];
+				const int idx = (!m_filtered_file_infos.empty()) ? m_filtered_file_infos[j] : j;
+				FileInfo& tile = m_file_infos[idx];
 				bool b = m_selected_resources.find([&](Resource* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
 				ImGui::Selectable(tile.filepath, b);
-				callbacks(tile, j);
+				callbacks(tile, idx);
 			}
 		}
 	}
 
 	bool open_delete_popup = false;
 	bool open_rename_popup = false;
-	if (ImGui::BeginPopup("item_ctx")) {
-		ImGui::Text("%s", m_file_infos[m_context_resource]);
-		ImGui::Separator();
-		open_rename_popup = ImGui::MenuItem("Rename");
-		open_delete_popup = ImGui::MenuItem("Delete");
-		ImGui::EndPopup();
-	}
-	else if (ImGui::BeginPopupContextWindow("context")) {
+	auto common_popup = [&](){
 		const char* base_path = m_editor.getEngine().getFileSystem().getBasePath();
 		for (IPlugin* plugin : m_plugins) {
 			if (!plugin->canCreateResource()) continue;
@@ -412,6 +405,32 @@ void AssetBrowser::fileColumn()
 				ImGui::EndMenu();
 			}
 		}
+		if (ImGui::MenuItem("Select all")) {
+			m_selected_resources.clear();
+			m_selected_resources.reserve(m_file_infos.size());
+			if(m_filtered_file_infos.empty()) {
+				for (const FileInfo& fi : m_file_infos) {
+					selectResource(Path(fi.filepath), false, true);
+				}
+			}
+			else {
+				for (int i : m_filtered_file_infos) {
+					selectResource(Path(m_file_infos[i].filepath), false, true);
+				}
+			}
+		}
+	};
+	if (ImGui::BeginPopup("item_ctx")) {
+		ImGui::Text("%s", m_file_infos[m_context_resource]);
+		ImGui::Separator();
+		open_rename_popup = ImGui::MenuItem("Rename");
+		open_delete_popup = ImGui::MenuItem("Delete");
+		ImGui::Separator();
+		common_popup();
+		ImGui::EndPopup();
+	}
+	else if (ImGui::BeginPopupContextWindow("context")) {
+		common_popup();
 		ImGui::EndPopup();
 	}
 
