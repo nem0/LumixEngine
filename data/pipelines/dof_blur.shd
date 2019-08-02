@@ -1,5 +1,5 @@
 vertex_shader [[
-	uniform sampler2D u_source;
+	layout (binding=0) uniform sampler2D u_source;
 	uniform vec4 u_offset_scale;
 	
 	out vec2 v_uv0;
@@ -43,8 +43,8 @@ fragment_shader [[
 		return -view_pos.z / view_pos.w;
 	}
 
-	uniform sampler2D u_source;
-	uniform sampler2D u_depth;
+	layout (binding=0) uniform sampler2D u_source;
+	layout (binding=1) uniform sampler2D u_depth;
 	
 	in vec2 v_uv0;
 	in vec4 v_uv1;

@@ -6,38 +6,39 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	if phase ~= "post" then return input end
 	env.beginBlock("dof")
 	if dof_shader == nil then
-		dof_shader = env.preloadShader("pipelines/dof/dof.shd")
-		dof_blur_shader = env.preloadShader("pipelines/dof/dof_blur.shd")
+		dof_shader = env.preloadShader("pipelines/dof.shd")
+		dof_blur_shader = env.preloadShader("pipelines/dof_blur.shd")
 	end
 
-	local tmp_rb = env.createRenderbuffer(1, 1, true, "rgba16f")
+	local tmp_rb = env.createRenderbuffer(1, 1, true, "rgba16f", "dof_tmp")
 	
-	env.blending("")
-	env.setRenderTargets(0, tmp_rb)
+	env.setRenderTargets(tmp_rb)
 	env.drawArray(0, 4, dof_blur_shader, 
 		{ 
-			u_source = input,
-			u_depth = gbuffer_depth
+			input,
+			gbuffer_depth
 		},
 		{},
-		{ "HBLUR", "NEAR" }
+		{ "HBLUR", "NEAR" },
+		{ depth_test = false, blending = ""}
 	)
 
-	env.setRenderTargets(0, input)
+	env.setRenderTargets(input)
 	env.drawArray(0, 4, dof_blur_shader, 
 		{
-			u_source = tmp_rb,
-			u_depth = gbuffer_depth
+			tmp_rb,
+			gbuffer_depth
 		},
 		{},
-		{ "NEAR" }
+		{ "NEAR" },
+		{ depth_test = false, blending = ""}
 	)
 
-	env.setRenderTargets(0, tmp_rb)
+	env.setRenderTargets(tmp_rb)
 	env.drawArray(0, 4, dof_shader, 
 		{
-			u_source = input,
-			u_depth = gbuffer_depth
+			input,
+			gbuffer_depth
 		}
 	)
 

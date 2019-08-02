@@ -34,8 +34,8 @@ struct FileSystemWatcherTask final : public MT::Task
 
 	int task() override;
 
+	u8 m_info[4096];
 	volatile bool m_finished;
-	FILE_NOTIFY_INFORMATION m_info[10];
 	HANDLE m_handle;
 	DWORD m_received;
 	OVERLAPPED m_overlapped;
@@ -129,7 +129,7 @@ static void CALLBACK notif(DWORD status, DWORD tferred, LPOVERLAPPED over)
 	}
 	if (tferred == 0) return;
 
-	FILE_NOTIFY_INFORMATION* info = &task->m_info[0];
+	FILE_NOTIFY_INFORMATION* info = (FILE_NOTIFY_INFORMATION*)task->m_info;
 	while (info)
 	{
 		auto action = info->Action;
@@ -150,7 +150,7 @@ static void CALLBACK notif(DWORD status, DWORD tferred, LPOVERLAPPED over)
 		}
 		info = info->NextEntryOffset == 0
 				   ? nullptr
-				   : (FILE_NOTIFY_INFORMATION*)(((char*)info) + info->NextEntryOffset);
+				   : (FILE_NOTIFY_INFORMATION*)(((u8*)info) + info->NextEntryOffset);
 	}
 }
 
