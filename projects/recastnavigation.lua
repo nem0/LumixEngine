@@ -16,5 +16,11 @@ project "Recast"
 	kind "StaticLib"
 	flags { "ReleaseRuntime", "WinMain" }
 	configuration { "Release" }
-	files { "3rdparty/recast/Recast/Source/**.cpp" }
-	includedirs { "3rdparty/recast/Recast/include/" }
+	files { 
+		"3rdparty/recast/Recast/Source/**.cpp",
+		"3rdparty/recast/Detour/Source/**.cpp" 
+	}
+	includedirs { 
+		"3rdparty/recast/Recast/include/",
+		"3rdparty/recast/Detour/include/"
+	}

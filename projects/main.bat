@@ -335,7 +335,6 @@ goto :recast
 	del /Q ..\external\recast\include\*
 	del /Q ..\external\recast\src\*
 	copy 3rdparty\recast\Recast\Include\* ..\external\recast\include\
-	copy 3rdparty\recast\Detour\Source\* ..\external\recast\src\
 	copy 3rdparty\recast\Detour\Include\* ..\external\recast\include\
 	copy 3rdparty\recast\DetourCrowd\Include\* ..\external\recast\include\
 	copy 3rdparty\recast\DetourCrowd\Source\* ..\external\recast\src\
