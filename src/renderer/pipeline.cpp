@@ -1433,9 +1433,6 @@ struct PipelineImpl final : Pipeline
 
 				const int pos_radius_uniform_loc = ffr::getUniformLocation(prog, m_pos_radius_uniform);
 
-				ffr::VertexDecl decl;
-				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-
 				ffr::bindVAO(m_pipeline->m_3D_pos_vao);
 				ffr::bindVertexBuffer(0, m_vb, 0, 12);
 				ffr::bindIndexBuffer(m_ib);
@@ -1994,18 +1991,6 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if(m_cmds->header.size == 0 && m_cmds->header.next == nullptr) return;
 				
-				ffr::VertexDecl instance_decl;
-				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false); // rot
-				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false); // pos
-				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // radius
-				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // attn
-				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false); // color
-				instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false); // dir
-				instance_decl.addAttribute(1, ffr::AttributeType::FLOAT, false, false); // fov
-
-				ffr::VertexDecl decl;
-				decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
 				const u32 define_mask = m_define_mask;
 				CmdPage* page = m_cmds;
@@ -2129,18 +2114,6 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if(m_cmds->header.size == 0 && !m_cmds->header.next) return;
 
-				ffr::VertexDecl instance_decl;
-				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-				instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-
-				ffr::VertexDecl decal_decl;
-				decal_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-
-				ffr::VertexDecl decal_instance_decl;
-				decal_instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-				decal_instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-				decal_instance_decl.addAttribute(3, ffr::AttributeType::FLOAT, false, false);
-
 				Renderer& renderer = m_pipeline->m_renderer;
 
 				Stats stats = {};
@@ -2260,10 +2233,6 @@ struct PipelineImpl final : Pipeline
 								READ(const ffr::BufferHandle, buffer);
 								READ(const u32, offset);
 								
-								ffr::VertexDecl instance_decl;
-								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
-								instance_decl.addAttribute(4, ffr::AttributeType::FLOAT, false, false);
 								const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 								const u32 define_mask = (1 << m_pipeline->m_renderer.getShaderDefineIdx("GRASS")) | deferred_define_mask;
 
