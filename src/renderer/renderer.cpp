@@ -374,11 +374,6 @@ static void registerProperties(IAllocator& allocator)
 
 struct RendererImpl final : public Renderer
 {
-	struct VAO {
-		ffr::VAOHandle handle;
-		u32 ref_count = 0;
-	};
-
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
@@ -394,7 +389,6 @@ struct RendererImpl final : public Renderer
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
 		, m_cmd_queue(m_allocator)
-		, m_vaos(m_allocator)
 	{
 		ffr::preinit(m_allocator);
 	}
@@ -418,9 +412,6 @@ struct RendererImpl final : public Renderer
 			RendererImpl* renderer = (RendererImpl*)data;
 			ffr::destroy(renderer->m_transient_buffer);
 			renderer->m_profiler.clear();
-			for(VAO& vao : renderer->m_vaos) {
-				ffr::destroy(vao.handle);
-			}
 			ffr::shutdown();
 		}, &signal, m_prev_frame_job, 1);
 		JobSystem::wait(signal);
@@ -650,60 +641,6 @@ struct RendererImpl final : public Renderer
 		return slice;
 	}
 	
-	ffr::VAOHandle createVAO(const ffr::VertexAttrib* attribs, u32 attribs_count) override {
-		ASSERT(attribs_count <= 16);
-		
-		ffr::VAOHandle handle;
-		u32 hash = 0;
-		for(u32 i = 0; i < attribs_count; ++i) {
-			const ffr::VertexAttrib& attr = attribs[i];
-			hash = continueCrc32(hash, &attr.as_int, sizeof(attr.as_int));
-			hash = continueCrc32(hash, &attr.idx, sizeof(attr.idx));
-			hash = continueCrc32(hash, &attr.instanced, sizeof(attr.instanced));
-			hash = continueCrc32(hash, &attr.normalized, sizeof(attr.normalized));
-			hash = continueCrc32(hash, &attr.offset, sizeof(attr.offset));
-			hash = continueCrc32(hash, &attr.size, sizeof(attr.size));
-			hash = continueCrc32(hash, &attr.type, sizeof(attr.type));
-		}
-		crc32(attribs, sizeof(attribs[0]) * attribs_count);
-		{
-			MT::CriticalSectionLock lock(m_vaos_mutex);
-			auto iter = m_vaos.find(hash);
-			if(iter.isValid()) {
-				++iter.value().ref_count;
-				return iter.value().handle;
-			}
-			VAO vao;
-			vao.ref_count = 1;
-			handle = ffr::allocVAOHandle();
-			if(!handle.isValid()) return handle;
-			vao.handle = handle;
-			m_vaos.insert(hash, vao);
-		}
-
-		struct Cmd : RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				ffr::createVAO(handle, attribs, attribs_count);
-			}
-
-			ffr::VAOHandle handle;
-			Renderer* renderer;
-			ffr::VertexAttrib attribs[16];
-			u32 attribs_count;
-		};
-
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		memcpy(cmd->attribs, attribs, sizeof(attribs[0]) * attribs_count);
-		cmd->attribs_count = attribs_count;
-		cmd->handle = handle;
-		cmd->renderer = this;
-		queue(cmd, 0);
-
-		return handle;
-	}
-
 
 	ffr::BufferHandle createBuffer(const MemRef& memory) override
 	{
@@ -798,15 +735,6 @@ struct RendererImpl final : public Renderer
 		cmd->program = program;
 		cmd->renderer = this;
 		queue(cmd, 0);
-	}
-
-	void destroy(ffr::VAOHandle handle) override {
-		MT::CriticalSectionLock lock(m_vaos_mutex);
-		for(VAO& vao : m_vaos) {
-			if(vao.handle.value == handle.value) {
-				--vao.ref_count;
-			}
-		}
 	}
 
 	void destroy(ffr::BufferHandle buffer) override
@@ -1035,8 +963,6 @@ struct RendererImpl final : public Renderer
 	IAllocator& m_allocator;
 	Array<StaticString<32>> m_shader_defines;
 	Array<StaticString<32>> m_layers;
-	HashMap<u32, VAO> m_vaos;
-	MT::CriticalSection m_vaos_mutex;
 	FontManager* m_font_manager;
 	RenderResourceManager<Material> m_material_manager;
 	RenderResourceManager<Model> m_model_manager;

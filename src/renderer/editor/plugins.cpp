@@ -2387,19 +2387,9 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			const u32 num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
 			const u32 num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
-			const ffr::VertexAttrib attribs[] = {
-				{ 0, 2, ffr::AttributeType::FLOAT, 0, false, false, false },
-				{ 1, 2, ffr::AttributeType::FLOAT, 8, false, false, false },
-				{ 2, 4, ffr::AttributeType::U8, 16, true, false, false }
-			};
-
-			// TODO reuse
-			ffr::VAOHandle vao = ffr::allocVAOHandle();
-			ffr::createVAO(vao, attribs, 3);
-			ffr::bindVAO(vao);
-
 			const bool use_big_buffers = (vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024 ||
 				(ib_offset + num_indices) * sizeof(ImDrawIdx) > 1024 * 1024;
+			ffr::useProgram(program);
 
 			ffr::BufferHandle big_ib, big_vb;
 			if (use_big_buffers) {
@@ -2428,7 +2418,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			u32 elem_offset = 0;
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
-			ffr::useProgram(program);
 			// TODO enable only when dc.textures[0].value != m_scene_view.getTextureHandle().value);
 			const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 			ffr::setState((u64)ffr::StateFlags::SCISSOR_TEST | blend_state);
@@ -2471,7 +2460,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				ib_offset += num_indices;
 				vb_offset += num_vertices;
 			}
-			ffr::destroy(vao);
 		}
 
 
@@ -2482,34 +2470,86 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			if(init_render) {
 				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
-				const char* vs =
-					R"#(#version 330
-					layout(location = 0) in vec2 a_pos;
-					layout(location = 1) in vec2 a_uv;
-					layout(location = 2) in vec4 a_color;
-					out vec4 v_color;
-					out vec2 v_uv;
-					uniform vec2 u_canvas_size;
-					void main() {
-						v_color = a_color;
-						v_uv = a_uv;
-						gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);
-						gl_Position.y = -gl_Position.y;
-					})#";
-				const char* fs = 
-					R"#(#version 330
-					in vec4 v_color;
-					in vec2 v_uv;
-					out vec4 o_color;
-					uniform sampler2D u_texture;
-					void main() {
-						vec4 tc = textureLod(u_texture, v_uv, 0);
-						o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
-						o_color.a = v_color.a * tc.a;
-					})#";
+				#if 1 // OGL
+					const char* vs =
+						R"#(#version 330
+						layout(location = 0) in vec2 a_pos;
+						layout(location = 1) in vec2 a_uv;
+						layout(location = 2) in vec4 a_color;
+						out vec4 v_color;
+						out vec2 v_uv;
+						uniform vec2 u_canvas_size;
+						void main() {
+							v_color = a_color;
+							v_uv = a_uv;
+							gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);
+							gl_Position.y = -gl_Position.y;
+						})#";
+					const char* fs = 
+						R"#(#version 330
+						in vec4 v_color;
+						in vec2 v_uv;
+						out vec4 o_color;
+						uniform sampler2D u_texture;
+						void main() {
+							vec4 tc = textureLod(u_texture, v_uv, 0);
+							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
+							o_color.a = v_color.a * tc.a;
+						})#";
+				#else
+					const char* vs =
+						R"#(cbuffer vertexBuffer : register(b0)
+						{
+							float4x4 ProjectionMatrix;
+						};
+
+						struct VS_INPUT
+						{
+							float2 pos : POSITION;
+							float4 col : COLOR0;
+							float2 uv  : TEXCOORD0;
+						};
+
+						struct PS_INPUT
+						{
+							float4 pos : SV_POSITION;
+							float4 col : COLOR0;
+							float2 uv  : TEXCOORD0;
+						};
+
+						PS_INPUT main(VS_INPUT input)
+						{
+							PS_INPUT output;
+							output.pos = mul( ProjectionMatrix, float4(input.pos.xy, 0.f, 1.f));
+							output.col = input.col;
+							output.uv  = input.uv;
+							return output;
+						})#";
+					const char* fs = 
+						R"#(struct PS_INPUT
+						{
+							float4 pos : SV_POSITION;
+							float4 col : COLOR0;
+							float2 uv  : TEXCOORD0;
+						};
+
+						sampler sampler0;
+						Texture2D texture0;
+
+						float4 main(PS_INPUT input) : SV_Target
+						{
+							float4 out_col = input.col * texture0.Sample(sampler0, input.uv);
+							return out_col;
+						})#";
+
+				#endif
 				const char* srcs[] = {vs, fs};
 				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
-				ffr::createProgram(program, srcs, types, 2, nullptr, 0, "imgui shader");
+				ffr::VertexDecl decl;
+				decl.addAttribute(0, 0, 2, ffr::AttributeType::FLOAT, 0);
+				decl.addAttribute(1, 8, 2, ffr::AttributeType::FLOAT, 0);
+				decl.addAttribute(2, 16, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
+				ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
 			ffr::pushDebugGroup("imgui");

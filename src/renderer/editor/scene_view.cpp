@@ -239,15 +239,14 @@ void SceneView::renderSelection()
 		{
 			PROFILE_FUNCTION();
 			for (const Item& item : m_items) {
-				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, 0); // TODO define
-				if (!prog.isValid()) continue;
-
 				const Mesh::RenderData* rd = item.mesh;
+				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, rd->vertex_decl, 0); // TODO define
+
+				if (!prog.isValid()) continue;
 			
 				ffr::setUniformMatrix4f(m_mtx_uniform, &item.mtx.m11);
 				ffr::useProgram(prog);
-				ffr::bindVAO(rd->vao);
-				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vertex_decl.size);
+				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				ffr::bindIndexBuffer(rd->index_buffer_handle);
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | item.material_render_states);
 				ffr::drawTriangles(rd->indices_count, rd->index_type);
@@ -305,18 +304,12 @@ void SceneView::renderGizmos()
 			PROFILE_FUNCTION();
 			if (data.cmds.empty()) return;
 
-			const ffr::ProgramHandle prg = Shader::getProgram(shader, 0);
-			if (!prg.isValid()) return;
-
-			const ffr::VertexAttrib attribs[] = {
-				{0, 3, ffr::AttributeType::FLOAT, 0, false, false, false},
-				{1, 4, ffr::AttributeType::U8, 12, true, false, false},
-			};
+			ffr::VertexDecl decl;
+			decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
+			decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
 			
-			// TODO reuse vao
-			ffr::VAOHandle vao = ffr::allocVAOHandle();
-			ffr::createVAO(vao, attribs, 2);
-			ffr::bindVAO(vao);
+			const ffr::ProgramHandle prg = Shader::getProgram(shader, decl, 0);
+			if (!prg.isValid()) return;
 
 			renderer->beginProfileBlock("gizmos", 0);
 			ffr::pushDebugGroup("gizmos");
@@ -335,7 +328,6 @@ void SceneView::renderGizmos()
 				ib_offset += cmd.indices_count * sizeof(u16);
 			}
 			ffr::popDebugGroup();
-			ffr::destroy(vao);
 			
 			renderer->endProfileBlock();
 		}

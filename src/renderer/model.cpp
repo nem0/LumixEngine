@@ -37,6 +37,7 @@ static LocalRigidTransform invert(const LocalRigidTransform& tr)
 
 Mesh::Mesh(Material* mat,
 	const ffr::VertexDecl& vertex_decl,
+	u8 vb_stride,
 	const char* name,
 	const AttributeSemantic* semantics,
 	Renderer& renderer,
@@ -50,8 +51,8 @@ Mesh::Mesh(Material* mat,
 {
 	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
 	render_data->vertex_decl = vertex_decl;
+	render_data->vb_stride = vb_stride;
 	render_data->vertex_buffer_handle = ffr::INVALID_BUFFER;
-	render_data->vao = ffr::INVALID_VAO;
 	render_data->index_buffer_handle = ffr::INVALID_BUFFER;
 	render_data->index_type = ffr::DataType::U32;
 	for(AttributeSemantic& attr : render_data->attributes_semantic) {
@@ -281,12 +282,28 @@ void Model::getPose(Pose& pose)
 }
 
 
-static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics)
+static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
+	switch (semantic) {
+		case Mesh::AttributeSemantic::POSITION: return 0;
+		case Mesh::AttributeSemantic::TEXCOORD0: return 1;
+		case Mesh::AttributeSemantic::NORMAL: return 2;
+		case Mesh::AttributeSemantic::TANGENT: return 3;
+		case Mesh::AttributeSemantic::INDICES: return 4;
+		case Mesh::AttributeSemantic::WEIGHTS: return 5;
+	}
+	ASSERT(false);
+	return 0;
+}
+
+
+static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics, Ref<u32> vb_stride)
 {
 	u32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
 	vertex_decl->attributes_count = 0;
 
+	u8 offset = 0;
+	bool is_skinned = false;
 	for (u32 i = 0; i < attribute_count; ++i) {
 		ffr::AttributeType type;
 		u8 cmp_count;
@@ -294,33 +311,42 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 		file.read(type);
 		file.read(cmp_count);
 
+		const u8 idx = getIndexBySemantic(semantics[i]);
+
 		switch(semantics[i]) {
+			case Mesh::AttributeSemantic::WEIGHTS:
 			case Mesh::AttributeSemantic::POSITION:
-				vertex_decl->addAttribute(cmp_count, type, false, false);
+			case Mesh::AttributeSemantic::TEXCOORD0:
+				vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
 				break;
 			case Mesh::AttributeSemantic::COLOR0:
-				vertex_decl->addAttribute(cmp_count, type, true, false);
-				break;
-			case Mesh::AttributeSemantic::TEXCOORD0:
-				vertex_decl->addAttribute(cmp_count, type, false, false);
+				vertex_decl->addAttribute(idx, offset, cmp_count, type, ffr::Attribute::NORMALIZED);
 				break;
 			case Mesh::AttributeSemantic::NORMAL:
 			case Mesh::AttributeSemantic::TANGENT:
 				if (type == ffr::AttributeType::FLOAT) {
-					vertex_decl->addAttribute(cmp_count, type, false, false);
+					vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
 				}
 				else {
-					vertex_decl->addAttribute(cmp_count, type, true, true);
+					vertex_decl->addAttribute(idx, offset, cmp_count, type, ffr::Attribute::NORMALIZED | ffr::Attribute::AS_INT);
 				}
 				break;
-			case Mesh::AttributeSemantic::WEIGHTS:
-				vertex_decl->addAttribute(cmp_count, type, false, false);
-				break;
 			case Mesh::AttributeSemantic::INDICES:
-				vertex_decl->addAttribute(cmp_count, type, false, true);
+				is_skinned = true;
+				vertex_decl->addAttribute(idx, offset, cmp_count, type, ffr::Attribute::AS_INT);
 				break;
 			default: ASSERT(false); break;
 		}
+
+		offset += ffr::getSize(type) * cmp_count;
+	}
+	vb_stride = offset;
+
+	if (!is_skinned) {
+		vertex_decl->addAttribute(4, 0, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
+		vertex_decl->addAttribute(5, 16, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
+		// TODO this is here because of grass, find a better solution
+		vertex_decl->addAttribute(6, 32, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
 	}
 
 	return true;
@@ -420,7 +446,7 @@ static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
 {
 	for (int i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
 		if(mesh.render_data->attributes_semantic[i] == attr) {
-			return mesh.render_data->vertex_decl.attributes[i].offset;
+			return mesh.render_data->vertex_decl.attributes[i].byte_offset;
 		}
 	}
 	return -1;
@@ -453,7 +479,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		ffr::VertexDecl vertex_decl;
 		Mesh::AttributeSemantic semantics[ffr::VertexDecl::MAX_ATTRIBUTES];
 		for(auto& i : semantics) i = Mesh::AttributeSemantic::NONE;
-		if (!parseVertexDecl(file, &vertex_decl, semantics)) return false;
+		u32 vb_stride;
+		if (!parseVertexDecl(file, &vertex_decl, semantics, Ref(vb_stride))) return false;
 
 		i32 mat_path_length;
 		char mat_path[MAX_PATH_LENGTH + 128];
@@ -470,7 +497,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
 
-		m_meshes.emplace(material, vertex_decl, mesh_name, semantics, m_renderer, m_allocator);
+		m_meshes.emplace(material, vertex_decl, vb_stride, mesh_name, semantics, m_renderer, m_allocator);
 		addDependency(*material);
 	}
 
@@ -509,8 +536,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		int bone_indices_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::INDICES);
 		bool keep_skin = hasAttribute(mesh, Mesh::AttributeSemantic::WEIGHTS) && hasAttribute(mesh, Mesh::AttributeSemantic::INDICES);
 
-		int vertex_size = mesh.render_data->vertex_decl.size;
-		int mesh_vertex_count = vertices_mem.size() / mesh.render_data->vertex_decl.size;
+		int vertex_size = mesh.render_data->vb_stride;
+		int mesh_vertex_count = vertices_mem.size() / vertex_size;
 		mesh.vertices.resize(mesh_vertex_count);
 		mesh.uvs.resize(mesh_vertex_count);
 		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
@@ -531,59 +558,6 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&vertices_mem[0], vertices_mem.size());
 		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(mem);
-		ffr::VertexAttrib attribs[16] = {};
-		ffr::VertexAttrib* attr = attribs;
-		if (position_attribute_offset >= 0)	{
-			const ffr::Attribute& pos = getAttribute(mesh, Mesh::AttributeSemantic::POSITION);
-			*attr = { 0, pos.components_num, pos.type, (u32)pos.offset, false, false, false };
-			++attr;
-		}
-		if (uv_attribute_offset >= 0)	{
-			const ffr::Attribute& uv = getAttribute(mesh, Mesh::AttributeSemantic::TEXCOORD0);
-			*attr = { 1, uv.components_num, uv.type, (u32)uv.offset, false, false, false };
-			++attr;
-		}
-		const int normal_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::NORMAL);
-		if (normal_attribute_offset >= 0)	{
-			const ffr::Attribute& normal = getAttribute(mesh, Mesh::AttributeSemantic::NORMAL);
-			if (normal.type == ffr::AttributeType::FLOAT) {
-				*attr = { 2, normal.components_num, normal.type, (u32)normal.offset, false, false, false };
-			}
-			else {
-				*attr = { 2, normal.components_num, normal.type, (u32)normal.offset, true, true, false };
-			}
-			++attr;
-		}
-		const int tangent_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::TANGENT);
-		if (tangent_attribute_offset >= 0)	{
-			const ffr::Attribute& tangent = getAttribute(mesh, Mesh::AttributeSemantic::TANGENT);
-			if (tangent.type == ffr::AttributeType::FLOAT) {
-				*attr = { 3, tangent.components_num, tangent.type, (u32)tangent.offset, false, false, false };
-			}
-			else {
-				*attr = { 3, tangent.components_num, tangent.type, (u32)tangent.offset, true, true, false };
-			}
-			++attr;
-		}
-
-		if(weights_attribute_offset < 0) {
-			*attr = { 4, 4, ffr::AttributeType::FLOAT, 0, false, false, true };
-			++attr;
-			*attr = { 5, 4, ffr::AttributeType::FLOAT, 16, false, false, true };
-			++attr;
-			// TODO this is here because of grass, find a better solution
-			*attr = { 6, 4, ffr::AttributeType::FLOAT, 32, false, false, true };
-			++attr;
-		}
-		else {
-			const ffr::Attribute& indices = getAttribute(mesh, Mesh::AttributeSemantic::INDICES);
-			*attr = { 4, indices.components_num, indices.type, (u32)indices.offset, false, true, false };
-			++attr;
-			const ffr::Attribute& weights = getAttribute(mesh, Mesh::AttributeSemantic::WEIGHTS);
-			*attr = { 5, weights.components_num, weights.type, (u32)weights.offset, false, false, false };
-			++attr;
-		}
-		mesh.render_data->vao = m_renderer.createVAO(attribs, u32(attr - attribs));
 	}
 	file.read(m_bounding_radius);
 	file.read(m_aabb);
@@ -689,7 +663,6 @@ void Model::unload()
 	}
 
 	for (Mesh& mesh : m_meshes) {
-		m_renderer.destroy(mesh.render_data->vao);
 		m_renderer.runInRenderThread(mesh.render_data, [](Renderer& renderer, void* ptr){
 			Mesh::RenderData* rd = (Mesh::RenderData*)ptr;
 			if (rd->index_buffer_handle.isValid()) ffr::destroy(rd->index_buffer_handle);
