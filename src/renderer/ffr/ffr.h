@@ -17,7 +17,6 @@ struct FramebufferHandle { u32 value; bool isValid() const { return value != 0xF
 struct TextureHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct QueryHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct UniformHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
-struct VAOHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 
 const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
 const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
@@ -26,7 +25,6 @@ const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 const UniformHandle INVALID_UNIFORM = { 0xffFFffFF };
 const FenceHandle INVALID_FENCE = { 0 };
-const VAOHandle INVALID_VAO = { 0xffFFffFF };
 
 
 enum class LogLevel : u32 {
@@ -160,35 +158,27 @@ enum class DataType {
 	U32
 };
 
-struct VertexAttrib {
-	u8 idx;
-	int size;
-	AttributeType type;
-	u32 offset;
-	bool normalized;
-	bool as_int;
-	bool instanced;
-};
-
+#pragma pack(1)
 struct Attribute {
 	enum Flags {
 		NORMALIZED = 1 << 0,
-		AS_INT = 1 << 1
+		AS_INT = 1 << 1,
+		INSTANCED = 1 << 2
 	};
-	u8 components_num;
-	u8 offset;
+	u8 idx;
+	u8 components_count;
+	u8 byte_offset;
 	AttributeType type;
 	u8 flags;
 };
-
+#pragma pack()
 
 struct VertexDecl {
 	enum { MAX_ATTRIBUTES = 16 };
 
-	void addAttribute(u8 components_num, AttributeType type, bool normalized, bool as_int);
+	void addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags);
 
-	u16 size = 0;
-	u16 attributes_count = 0;
+	u8 attributes_count = 0;
 	u32 hash = 0;
 	Attribute attributes[MAX_ATTRIBUTES];
 };
@@ -213,6 +203,8 @@ void checkThread();
 void shutdown();
 void startCapture();
 void stopCapture();
+int getSize(AttributeType type);
+
 
 void clear(u32 flags, const float* color, float depth);
 
@@ -230,7 +222,6 @@ inline u64 getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask
 }
 
 TextureHandle allocTextureHandle();
-VAOHandle allocVAOHandle();
 BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
 UniformHandle allocUniform(const char* name, UniformType type, int count);
@@ -239,10 +230,9 @@ FenceHandle createFence();
 void waitClient(FenceHandle fence);
 
 void setState(u64 state);
-bool createProgram(ProgramHandle program, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
+bool createProgram(ProgramHandle program, const VertexDecl& decl, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
 
-void createVAO(VAOHandle handle, const VertexAttrib* attribs, u32 count);
 void createBuffer(BufferHandle handle, u32 flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, u32 flags, const void* data, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture);
@@ -251,7 +241,6 @@ void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, Textur
 FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
 
-void bindVAO(VAOHandle handle);
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
 void bindTextures(const TextureHandle* handles, int offset, int count);
 void uniformBlockBinding(ProgramHandle program, const char* block_name, u32 binding);
@@ -276,7 +265,6 @@ void destroy(TextureHandle texture);
 void destroy(FramebufferHandle fb);
 void destroy(QueryHandle query);
 void destroy(UniformHandle query);
-void destroy(VAOHandle query);
 
 void bindIndexBuffer(BufferHandle handle);
 void drawTriangles(u32 indices_count, DataType index_type);

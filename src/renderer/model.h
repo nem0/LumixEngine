@@ -68,7 +68,7 @@ struct LUMIX_RENDERER_API Mesh
 		ffr::VertexDecl vertex_decl;
 		AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
 		ffr::BufferHandle vertex_buffer_handle;
-		ffr::VAOHandle vao;
+		u32 vb_stride; 
 		ffr::BufferHandle index_buffer_handle;
 		ffr::DataType index_type;
 		int indices_count;
@@ -95,6 +95,7 @@ struct LUMIX_RENDERER_API Mesh
 
 	Mesh(Material* mat,
 		const ffr::VertexDecl& vertex_decl,
+		u8 vb_stride,
 		const char* name,
 		const AttributeSemantic* semantics,
 		Renderer& renderer,

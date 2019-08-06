@@ -44,10 +44,11 @@ bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
 }
 
-const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, u32 defines)
+const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::VertexDecl& decl, u32 defines)
 {
 	ffr::checkThread();
-	auto iter = rd->programs.find(defines);
+	const u64 key = defines | ((u64)decl.hash << 32);
+	auto iter = rd->programs.find(key);
 	if (!iter.isValid()) {
 		PROFILE_BLOCK("compile_shader");
 		static const char* shader_code_prefix = 
@@ -104,7 +105,7 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 		}
 
 		ffr::ProgramHandle program = ffr::allocProgramHandle();
-		if(program.isValid() && !ffr::createProgram(program, codes, types, rd->sources.size(), prefixes, 3 + defines_count, rd->path.c_str())) {
+		if(program.isValid() && !ffr::createProgram(program, decl, codes, types, rd->sources.size(), prefixes, 3 + defines_count, rd->path.c_str())) {
 			ffr::destroy(program);
 			program = ffr::INVALID_PROGRAM;
 		}
@@ -112,8 +113,8 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, u32 defines)
 			ffr::uniformBlockBinding(program, "GlobalState", 0);
 			ffr::uniformBlockBinding(program, "PassState", 1);
 		}
-		rd->programs.insert(defines, program);
-		iter = rd->programs.find(defines);
+		rd->programs.insert(key, program);
+		iter = rd->programs.find(key);
 	}
 	return iter.value();
 }
@@ -404,29 +405,6 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setfield(L, LUA_GLOBALSINDEX, "texture_slot");
 	lua_pushcclosure(L, LuaAPI::define, 0);
 	lua_setfield(L, LUA_GLOBALSINDEX, "define");
-
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::POSITION);
-	lua_setglobal(L, "SEMANTICS_POSITION");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::COLOR0);
-	lua_setglobal(L, "SEMANTICS_COLOR0");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::TEXCOORD0);
-	lua_setglobal(L, "SEMANTICS_TEXCOORD0");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::NORMAL);
-	lua_setglobal(L, "SEMANTICS_NORMAL");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::WEIGHTS);
-	lua_setglobal(L, "SEMANTICS_WEIGHTS");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INDICES);
-	lua_setglobal(L, "SEMANTICS_INDICES");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INSTANCE0);
-	lua_setglobal(L, "SEMANTICS_INSTANCE0");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INSTANCE1);
-	lua_setglobal(L, "SEMANTICS_INSTANCE1");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::INSTANCE2);
-	lua_setglobal(L, "SEMANTICS_INSTANCE2");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::TANGENT);
-	lua_setglobal(L, "SEMANTICS_TANGENT");
-	lua_pushinteger(L, (int)Mesh::AttributeSemantic::BITANGENT);
-	lua_setglobal(L, "SEMANTICS_BITANGENT");
 
 	const Span<const char> content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {

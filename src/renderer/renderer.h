@@ -66,9 +66,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		
 		virtual TransientSlice allocTransient(u32 size) = 0;
 		virtual ffr::BufferHandle createBuffer(const MemRef& memory) = 0;
-		virtual ffr::VAOHandle createVAO(const ffr::VertexAttrib* attribs, u32 attribs_count) = 0;
 		virtual void destroy(ffr::BufferHandle buffer) = 0;
-		virtual void destroy(ffr::VAOHandle buffer) = 0;
 		virtual void destroy(ffr::ProgramHandle program) = 0;
 		
 		virtual ffr::TextureHandle createTexture(u32 w, u32 h, u32 depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) = 0;

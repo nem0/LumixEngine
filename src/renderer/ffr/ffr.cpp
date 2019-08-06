@@ -24,13 +24,6 @@ namespace Lumix
 
 namespace ffr {
 
-struct VertexArrayObject {
-	enum { MAX_COUNT = 8192 };
-
-	GLuint handle;
-	u32 hash;
-};
-
 struct Buffer
 {
 	enum { MAX_COUNT = 8192 };
@@ -66,6 +59,7 @@ struct Program
 {
 	enum { MAX_COUNT = 2048 };
 	GLuint handle;
+	GLuint vao;
 
 	struct {
 		int loc;
@@ -123,8 +117,6 @@ static struct {
 	Pool<Texture, Texture::MAX_COUNT> textures;
 	Pool<Uniform, Uniform::MAX_COUNT> uniforms;
 	Pool<Program, Program::MAX_COUNT> programs;
-	Pool<VertexArrayObject, VertexArrayObject::MAX_COUNT> vaos;
-	VAOHandle current_vao = INVALID_VAO;
 	HashMap<u32, u32>* uniforms_hash_map;
 	MT::CriticalSection handle_mutex;
 	DWORD thread;
@@ -813,7 +805,7 @@ static int load_gl(void* device_contex)
 }
 
 
-static int getSize(AttributeType type)
+int getSize(AttributeType type)
 {
 	switch(type) {
 		case AttributeType::FLOAT: return 4;
@@ -824,7 +816,7 @@ static int getSize(AttributeType type)
 }
 
 
-void VertexDecl::addAttribute(u8 components_num, AttributeType type, bool normalized, bool as_int)
+void VertexDecl::addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags)
 {
 	if((int)attributes_count >= lengthOf(attributes)) {
 		ASSERT(false);
@@ -832,16 +824,11 @@ void VertexDecl::addAttribute(u8 components_num, AttributeType type, bool normal
 	}
 
 	Attribute& attr = attributes[attributes_count];
-	attr.components_num = components_num;
-	attr.flags = as_int ? Attribute::AS_INT : 0;
-	attr.flags |= normalized ? Attribute::NORMALIZED : 0;
+	attr.components_count = components_num;
+	attr.idx = idx;
+	attr.flags = flags;
 	attr.type = type;
-	attr.offset = 0;
-	if(attributes_count > 0) {
-		const Attribute& prev = attributes[attributes_count - 1];
-		attr.offset = prev.offset + prev.components_num * getSize(prev.type);
-	}
-	size = attr.offset + attr.components_num * getSize(attr.type);
+	attr.byte_offset = byte_offset;
 	hash = crc32(attributes, sizeof(Attribute) * attributes_count);
 	++attributes_count;
 }
@@ -915,12 +902,17 @@ void applyUniformMatrix3x4f(int location, const float* value)
 
 void useProgram(ProgramHandle handle)
 {
-	if (!handle.isValid()) return;
-
 	const Program& prg = g_ffr.programs.values[handle.value];
 	if(g_ffr.last_program.value != handle.value) {
 		g_ffr.last_program = handle;
-		CHECK_GL(glUseProgram(prg.handle));
+		if (!handle.isValid()) {
+			CHECK_GL(glBindVertexArray(0));
+			CHECK_GL(glUseProgram(0));
+		}
+		else {
+			CHECK_GL(glUseProgram(prg.handle));
+			CHECK_GL(glBindVertexArray(prg.vao));
+		}
 	}
 	
 	for(int i = 0; i < prg.uniforms_count; ++i) {
@@ -988,19 +980,6 @@ void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u
 	CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
 }
 
-void bindVAO(VAOHandle handle) {
-	checkThread();
-	if (g_ffr.current_vao.value == handle.value) return;
-	
-	g_ffr.current_vao = handle;
-	const GLuint gl_handle = g_ffr.vaos[handle.value].handle;
-	if(handle.isValid()) {
-		CHECK_GL(glBindVertexArray(gl_handle));
-	}
-	else {
-		CHECK_GL(glBindVertexArray(0));
-	}
-}
 
 void setState(u64 state)
 {
@@ -1274,13 +1253,16 @@ void swapBuffers()
 	SwapBuffers(hdc);
 }
 
-void createVAO(VAOHandle handle, const VertexAttrib* attribs, u32 count) {
+static GLuint createVAO(const VertexDecl& decl) {
 	checkThread();
-	CHECK_GL(glGenVertexArrays(1, &g_ffr.vaos[handle.value].handle));
 
-	CHECK_GL(glBindVertexArray(g_ffr.vaos[handle.value].handle));
-	for (u32 i = 0; i < count; ++i) {
-		const VertexAttrib& attr = attribs[i];
+	if(decl.attributes_count == 0) return 0;
+	GLuint vao;
+	
+	CHECK_GL(glGenVertexArrays(1, &vao));
+	CHECK_GL(glBindVertexArray(vao));
+	for (u32 i = 0; i < decl.attributes_count; ++i) {
+		const Attribute& attr = decl.attributes[i];
 		GLenum gl_attr_type;
 		switch (attr.type) {
 			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
@@ -1289,18 +1271,21 @@ void createVAO(VAOHandle handle, const VertexAttrib* attribs, u32 count) {
 			default: ASSERT(false); break;
 		}
 
-		if (attr.as_int) {
-			CHECK_GL(glVertexAttribFormat(attr.idx, attr.size, gl_attr_type, attr.normalized, attr.offset));
+		const bool normalized = attr.flags & Attribute::NORMALIZED;
+		const bool instanced = attr.flags & Attribute::INSTANCED;
+		if (attr.flags & Attribute::AS_INT) {
+			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
 		}
 		else {
-			CHECK_GL(glVertexAttribFormat(attr.idx, attr.size, gl_attr_type, attr.normalized, attr.offset));
+			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
 		}
 		CHECK_GL(glEnableVertexAttribArray(attr.idx));
-		CHECK_GL(glVertexAttribBinding(attr.idx, attr.instanced ? 1 : 0));
+		CHECK_GL(glVertexAttribBinding(attr.idx, instanced ? 1 : 0));
 	}
 	CHECK_GL(glVertexBindingDivisor(0, 0));
 	CHECK_GL(glVertexBindingDivisor(1, 1));
 	CHECK_GL(glBindVertexArray(0));
+	return vao;
 }
 
 void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
@@ -1582,21 +1567,6 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 }
 
 
-VAOHandle allocVAOHandle()
-{
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
-
-	if(g_ffr.vaos.isFull()) {
-		logError("Renderer") << "FFR is out of free VAO slots.";
-		return INVALID_VAO;
-	}
-	const int id = g_ffr.vaos.alloc();
-	VertexArrayObject& p = g_ffr.vaos[id];
-	p.handle = 0;
-	return { (u32)id };
-}
-
-
 ProgramHandle allocProgramHandle()
 {
 	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
@@ -1753,21 +1723,6 @@ void destroy(TextureHandle texture)
 }
 
 
-void destroy(VAOHandle vao)
-{
-	checkThread();
-	
-	if(g_ffr.current_vao.value == vao.value) bindVAO(INVALID_VAO);
-
-	VertexArrayObject& t = g_ffr.vaos[vao.value];
-	const GLuint handle = t.handle;
-	CHECK_GL(glDeleteVertexArrays(1, &handle));
-
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
-	g_ffr.vaos.dealloc(vao.value);
-}
-
-
 void destroy(BufferHandle buffer)
 {
 	checkThread();
@@ -1870,7 +1825,7 @@ UniformHandle allocUniform(const char* name, UniformType type, int count)
 }
 
 
-bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
+bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
 {
 	checkThread();
 
@@ -1992,7 +1947,7 @@ bool createProgram(ProgramHandle prog, const char** srcs, const ShaderType* type
 			++g_ffr.programs[id].uniforms_count;
 		}
 	}
-
+	g_ffr.programs[id].vao = createVAO(decl);
 	return true;
 }
 
@@ -2014,7 +1969,6 @@ void preinit(IAllocator& allocator)
 	try_load_renderdoc();
 	g_ffr.allocator = &allocator;
 	g_ffr.textures.create(*g_ffr.allocator);
-	g_ffr.vaos.create(*g_ffr.allocator);
 	g_ffr.buffers.create(*g_ffr.allocator);
 	g_ffr.uniforms.create(*g_ffr.allocator);
 	g_ffr.programs.create(*g_ffr.allocator);
@@ -2372,7 +2326,6 @@ void shutdown()
 {
 	checkThread();
 	g_ffr.textures.destroy(*g_ffr.allocator);
-	g_ffr.vaos.destroy(*g_ffr.allocator);
 	g_ffr.buffers.destroy(*g_ffr.allocator);
 	for (u32 u : *g_ffr.uniforms_hash_map) {
 		g_ffr.allocator->deallocate(g_ffr.uniforms[u].data);

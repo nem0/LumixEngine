@@ -75,7 +75,7 @@ public:
 	ResourceType getType() const override { return TYPE; }
 	bool hasDefine(u8 define) const;
 
-	static const ffr::ProgramHandle& getProgram(ShaderRenderData* rd, u32 defines);
+	static const ffr::ProgramHandle& getProgram(ShaderRenderData* rd, const ffr::VertexDecl& decl, u32 defines);
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -108,7 +108,7 @@ struct ShaderRenderData
 	{}
 	IAllocator& allocator;
 	Renderer& renderer;
-	HashMap<u32, ffr::ProgramHandle> programs;
+	HashMap<u64, ffr::ProgramHandle> programs;
 	Array<Shader::Source> sources;
 	Array<u8> include;
 	Array<char> common_source;
