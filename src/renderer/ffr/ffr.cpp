@@ -1175,15 +1175,6 @@ void drawArrays(u32 offset, u32 count, PrimitiveType type)
 }
 
 
-void uniformBlockBinding(ProgramHandle program, const char* block_name, u32 binding)
-{
-	checkThread();
-	const GLuint handle = g_ffr.programs.values[program.value].handle;
-	const GLint index = glGetUniformBlockIndex(handle, block_name);
-	CHECK_GL(glUniformBlockBinding(handle, index, binding));
-}
-
-
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size)
 {
 	checkThread();

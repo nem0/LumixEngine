@@ -243,7 +243,6 @@ QueryHandle createQuery();
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
 void bindTextures(const TextureHandle* handles, int offset, int count);
-void uniformBlockBinding(ProgramHandle program, const char* block_name, u32 binding);
 void update(FramebufferHandle fb, u32 renderbuffers_count, const TextureHandle* renderbuffers);
 void bindLayer(FramebufferHandle fb, TextureHandle rb, u32 layer);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);

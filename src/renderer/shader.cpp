@@ -115,10 +115,6 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 			ffr::destroy(program);
 			program = ffr::INVALID_PROGRAM;
 		}
-		if (program.isValid()) {
-			ffr::uniformBlockBinding(program, "GlobalState", 0);
-			ffr::uniformBlockBinding(program, "PassState", 1);
-		}
 		rd->programs.insert(key, program);
 		iter = rd->programs.find(key);
 	}
