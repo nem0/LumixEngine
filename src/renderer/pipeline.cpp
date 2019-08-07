@@ -2090,7 +2090,8 @@ struct PipelineImpl final : Pipeline
 				const u32 instanced_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 				const u32 skinned_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
 				const u64 render_states = m_render_state;
-
+				const ffr::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
+				u32 material_ub_idx = 0xffFFffFF;
 				CmdPage* page = m_cmds;
 				while (page) {
 					const u8* cmd = page->data;
@@ -2111,9 +2112,10 @@ struct PipelineImpl final : Pipeline
 								if(prog.isValid()) {
 									ffr::bindTextures(material->textures, 0, material->textures_count);
 									ffr::setState(material->render_states | render_states);
-									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
-									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
-									ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material->color.x);
+									if (material_ub_idx != material->material_constants) {
+										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(Renderer::MaterialConstants), sizeof(Renderer::MaterialConstants));
+										material_ub_idx = material->material_constants;
+									}
 
 									ffr::useProgram(prog);
 
@@ -2148,15 +2150,16 @@ struct PipelineImpl final : Pipeline
 								const ffr::ProgramHandle prog = Shader::getProgram(shader, mesh->vertex_decl, skinned_mask | material->define_mask);
 								if(prog.isValid()) {
 									ffr::setState(material->render_states | render_states);
-									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
-									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
-									ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material->color.x);
+									if (material_ub_idx != material->material_constants) {
+										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(Renderer::MaterialConstants), sizeof(Renderer::MaterialConstants));
+										material_ub_idx = material->material_constants;
+									}
 									ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &model_mtx.m11);
 								
 									ffr::useProgram(prog);
 
 									const int bones_size = bones_count * sizeof(Matrix);
-									ffr::bindUniformBuffer(2, buffer, offset, bones_size);
+									ffr::bindUniformBuffer(3, buffer, offset, bones_size);
 
 									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 									ffr::bindIndexBuffer(mesh->index_buffer_handle);
@@ -2209,9 +2212,10 @@ struct PipelineImpl final : Pipeline
 									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 									ffr::bindIndexBuffer(mesh->index_buffer_handle);
 									ffr::bindVertexBuffer(1, buffer, offset, 48);
-									const Vec4 params(material->roughness, material->metallic, material->emission, 0);
-									ffr::setUniform4f(m_pipeline->m_material_params_uniform, &params.x);
-									ffr::setUniform4f(m_pipeline->m_material_color_uniform, &material->color.x);
+									if (material_ub_idx != material->material_constants) {
+										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(Renderer::MaterialConstants), sizeof(Renderer::MaterialConstants));
+										material_ub_idx = material->material_constants;
+									}
 									const Matrix mtx(pos, rot);
 									ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &mtx.m11);
 

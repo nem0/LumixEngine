@@ -36,7 +36,7 @@ vertex_shader [[
 	#elif defined SKINNED
 		layout(location = 4) in vec4 a_indices;
 		layout(location = 5) in vec4 a_weights;
-		layout(std140, binding = 2) uniform Bones {
+		layout(std140, binding = 3) uniform Bones {
 			mat4 u_bones[256];
 		};
 	#elif defined INSTANCED
@@ -87,8 +87,6 @@ fragment_shader [[
 	layout (binding=2) uniform sampler2D u_roughnessmap;
 	layout (binding=3) uniform sampler2D u_metallicmap;
 	layout (binding=4) uniform sampler2D u_shadowmap;
-	uniform vec4 u_material_params;
-	uniform vec4 u_material_color;
 	in vec2 v_uv;
 	in vec3 v_normal;
 	in vec3 v_tangent;
@@ -115,12 +113,12 @@ fragment_shader [[
 				);
 		
 		data.wpos = v_wpos.xyz;
-		data.roughness = texture(u_roughnessmap, v_uv).r * u_material_params.x;
-		data.metallic  = texture(u_metallicmap, v_uv).r * u_material_params.y;
+		data.roughness = texture(u_roughnessmap, v_uv).r * u_roughness;
+		data.metallic  = texture(u_metallicmap, v_uv).r * u_metallic;
 		data.normal.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
 		data.normal.y = sqrt(clamp(1 - dot(data.normal.xz, data.normal.xz), 0, 1)); 
 		data.normal = tbn * data.normal;
-		data.emission = packEmission(u_material_params.z);
+		data.emission = packEmission(u_emission);
 	}
 	
 	#ifdef DEPTH

@@ -77,6 +77,12 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 				mat4 u_pass_view_projection;
 				mat4 u_pass_inv_view_projection;
 			};
+			layout (std140, binding = 2) uniform MaterialState {
+				vec4 u_material_color;
+				float u_roughness;
+				float u_metallic;
+				float u_emission;
+			};
 			layout (binding=14) uniform samplerCube u_irradiancemap;
 			layout (binding=15) uniform samplerCube u_radiancemap;
 			)#";

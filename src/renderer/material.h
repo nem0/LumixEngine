@@ -29,10 +29,7 @@ public:
 		ffr::TextureHandle textures[MAX_TEXTURE_COUNT];
 		int textures_count;
 		u64 render_states;
-		Vec4 color;
-		float roughness;
-		float metallic;
-		float emission;
+		u32 material_constants;
 		ShaderRenderData* shader;
 		u32 define_mask;
 	};
