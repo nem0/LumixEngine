@@ -668,7 +668,7 @@ struct RendererImpl final : public Renderer
 			idx = iter.value();
 		}
 		else {
-			idx = m_material_buffer.first_free / sizeof(data);
+			idx = m_material_buffer.first_free;
 			const u32 next_free = *(u32*)&m_material_buffer.data[m_material_buffer.first_free];
 			memcpy(&m_material_buffer.data[m_material_buffer.first_free], &data, sizeof(data));
 			m_material_buffer.data[m_material_buffer.first_free].ref_count = 0;

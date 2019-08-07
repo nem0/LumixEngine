@@ -276,7 +276,6 @@ void drawTriangleStripArraysInstanced(u32 offset, u32 indices_count, u32 instanc
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
 int getAttribLocation(ProgramHandle program, const char* uniform_name);
-void setUniform1i(UniformHandle uniform, int value);
 void setUniform4i(UniformHandle uniform, const int* value);
 void setUniform2f(UniformHandle uniform, const float* value);
 void setUniform3f(UniformHandle uniform, const float* value);
