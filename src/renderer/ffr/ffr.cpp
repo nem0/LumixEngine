@@ -2097,14 +2097,6 @@ int getAttribLocation(ProgramHandle program, const char* uniform_name)
 }
 
 
-void setUniform1i(UniformHandle uniform, int value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::INT);
-	memcpy(g_ffr.uniforms[uniform.value].data, &value, sizeof(value)); 
-}
-
-
 void setUniform2f(UniformHandle uniform, const float* value)
 {
 	checkThread();

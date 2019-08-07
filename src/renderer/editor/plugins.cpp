@@ -2368,6 +2368,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			if (init_render) {
 				plugin->m_index_buffer = ffr::allocBufferHandle();
 				plugin->m_vertex_buffer = ffr::allocBufferHandle();
+				plugin->m_uniform_buffer = ffr::allocBufferHandle();
 				plugin->m_program = ffr::allocProgramHandle();
 			}
 		
@@ -2376,8 +2377,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			default_texture = &plugin->m_texture;
 			vb = plugin->m_vertex_buffer;
 			ib = plugin->m_index_buffer;
-			canvas_size_uniform = plugin->m_canvas_size_uniform;
-			texture_uniform = plugin->m_texture_uniform;
+			ub = plugin->m_uniform_buffer;
 			program = plugin->m_program;
 		}
 
@@ -2468,17 +2468,20 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 
 			if(init_render) {
+				ffr::createBuffer(ub, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 256, nullptr);
 				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				#if 1 // OGL
 					const char* vs =
-						R"#(#version 330
+						R"#(#version 420
 						layout(location = 0) in vec2 a_pos;
 						layout(location = 1) in vec2 a_uv;
 						layout(location = 2) in vec4 a_color;
 						out vec4 v_color;
 						out vec2 v_uv;
-						uniform vec2 u_canvas_size;
+						layout (std140, binding = 0) uniform IMGUIState {
+							vec2 u_canvas_size;
+						};
 						void main() {
 							v_color = a_color;
 							v_uv = a_uv;
@@ -2560,8 +2563,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 			ffr::viewport(0, 0, width, height);
 			const float canvas_size[] = {(float)width, (float)height};
-			ffr::setUniform2f(canvas_size_uniform, canvas_size);
-			ffr::setUniform1i(texture_uniform, 0);
+			ffr::update(ub, canvas_size, 0, sizeof(canvas_size));
+			ffr::bindUniformBuffer(0, ub, 0, sizeof(canvas_size));
 
 			vb_offset = 0;
 			ib_offset = 0;
@@ -2581,8 +2584,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		IAllocator& allocator;
 		ffr::BufferHandle ib;
 		ffr::BufferHandle vb;
-		ffr::UniformHandle canvas_size_uniform;
-		ffr::UniformHandle texture_uniform;
+		ffr::BufferHandle ub;
 		ffr::ProgramHandle program;
 		bool init_render;
 		EditorUIRenderPlugin* plugin;
@@ -2598,6 +2600,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		, m_engine(app.getWorldEditor().getEngine())
 		, m_index_buffer(ffr::INVALID_BUFFER)
 		, m_vertex_buffer(ffr::INVALID_BUFFER)
+		, m_uniform_buffer(ffr::INVALID_BUFFER)
 		, m_program(ffr::INVALID_PROGRAM)
 	{
 		WorldEditor& editor = app.getWorldEditor();
@@ -2622,9 +2625,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		RenderInterface* render_interface =
 			LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline(), *renderer);
 		editor.setRenderInterface(render_interface);
-
-		m_canvas_size_uniform = ffr::allocUniform("u_canvas_size", ffr::UniformType::VEC2, 1);
-		m_texture_uniform = ffr::allocUniform("u_texture", ffr::UniformType::INT, 1);
 	}
 
 
@@ -2680,9 +2680,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 	ffr::TextureHandle m_texture;
 	ffr::BufferHandle m_index_buffer;
 	ffr::BufferHandle m_vertex_buffer;
+	ffr::BufferHandle m_uniform_buffer;
 	ffr::ProgramHandle m_program;
-	ffr::UniformHandle m_texture_uniform;
-	ffr::UniformHandle m_canvas_size_uniform;
 };
 
 

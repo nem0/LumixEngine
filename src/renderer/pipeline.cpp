@@ -917,7 +917,6 @@ struct PipelineImpl final : Pipeline
 					u32 elem_offset = 0;
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 					ffr::setState(blend_state);
-					ffr::setUniform1i(pipeline->m_texture_uniform, 0);
 					ffr::useProgram(prg);
 					ffr::bindVertexBuffer(0, vb, 0, 20);
 					ffr::bindIndexBuffer(ib);
