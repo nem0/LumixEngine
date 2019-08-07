@@ -495,20 +495,24 @@ void Material::updateRenderData(bool on_before_ready)
 	if (!on_before_ready && !isReady()) return;
 
 	if(m_render_data) {
+		m_renderer.destroyMaterialConstants(m_render_data->material_constants);
 		m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
 			LUMIX_DELETE(renderer.getAllocator(), (RenderData*)ptr);
 		});
 	}
 
 	m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);
-	m_render_data->color = m_color;
-	m_render_data->emission = m_emission;
-	m_render_data->metallic = m_metallic;
 	m_render_data->define_mask = m_define_mask;
 	m_render_data->render_states = m_render_states;
-	m_render_data->roughness = m_roughness;
 	m_render_data->shader = m_shader->m_render_data;
 	m_render_data->textures_count = m_texture_count;
+	Renderer::MaterialConstants cs;
+	cs.color = m_color;
+	cs.emission = m_emission;
+	cs.metallic = m_metallic;
+	cs.roughness = m_roughness;
+	m_render_data->material_constants = m_renderer.createMaterialConstants(cs);
+
 	for(int i = 0; i < m_texture_count; ++i) {
 		m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : ffr::INVALID_TEXTURE;
 	}

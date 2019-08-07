@@ -55,7 +55,10 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 
-enum { TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024 };
+enum { 
+	TRANSIENT_BUFFER_SIZE = 32 * 1024 * 1024,
+	MATERIAL_BUFFER_SIZE = 1 * 1024 * 1024
+};
 
 
 template <typename T>
@@ -389,6 +392,7 @@ struct RendererImpl final : public Renderer
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
 		, m_cmd_queue(m_allocator)
+		, m_material_buffer(m_allocator)
 	{
 		ffr::preinit(m_allocator);
 	}
@@ -411,6 +415,7 @@ struct RendererImpl final : public Renderer
 		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
 			ffr::destroy(renderer->m_transient_buffer);
+			ffr::destroy(renderer->m_material_buffer.buffer);
 			renderer->m_profiler.clear();
 			ffr::shutdown();
 		}, &signal, m_prev_frame_job, 1);
@@ -452,6 +457,16 @@ struct RendererImpl final : public Renderer
 			ffr::createBuffer(renderer.m_transient_buffer, transient_flags, 2 * TRANSIENT_BUFFER_SIZE, nullptr);
 			renderer.m_transient_buffer_ptr = (u8*)ffr::map(renderer.m_transient_buffer, 0, 2 * TRANSIENT_BUFFER_SIZE, transient_flags);
 			renderer.m_profiler.init();
+
+			renderer.m_material_buffer.buffer = ffr::allocBufferHandle();
+			ffr::createBuffer(renderer.m_material_buffer.buffer, transient_flags, MATERIAL_BUFFER_SIZE, nullptr);
+			renderer.m_material_buffer.data = (MaterialConstants*)ffr::map(renderer.m_material_buffer.buffer, 0, MATERIAL_BUFFER_SIZE, transient_flags);
+
+			const u32 ub_mat_count = MATERIAL_BUFFER_SIZE / sizeof(MaterialConstants);
+			for (u32 i = 0; i < ub_mat_count; ++i) {
+				*(u32*)&renderer.m_material_buffer.data[i] = i + 1;
+			}
+			*(u32*)&renderer.m_material_buffer.data[ub_mat_count - 1] = 0xffFFffFF;
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 
@@ -641,6 +656,41 @@ struct RendererImpl final : public Renderer
 		return slice;
 	}
 	
+	ffr::BufferHandle getMaterialUniformBuffer() override {
+		return m_material_buffer.buffer;
+	}
+
+	u32 createMaterialConstants(const MaterialConstants& data) override {
+		const u32 hash = crc32(&data, sizeof(Vec4) + sizeof(Vec3));
+		auto iter = m_material_buffer.map.find(hash);
+		u32 idx;
+		if(iter.isValid()) {
+			idx = iter.value();
+		}
+		else {
+			idx = m_material_buffer.first_free / sizeof(data);
+			const u32 next_free = *(u32*)&m_material_buffer.data[m_material_buffer.first_free];
+			memcpy(&m_material_buffer.data[m_material_buffer.first_free], &data, sizeof(data));
+			m_material_buffer.data[m_material_buffer.first_free].ref_count = 0;
+			m_material_buffer.first_free = next_free;
+			ASSERT(next_free != 0xffFFffFF);
+			m_material_buffer.dirty = true;
+			m_material_buffer.map.insert(hash, idx);
+		}
+		++m_material_buffer.data[idx].ref_count;
+		return idx;
+	}
+
+	void destroyMaterialConstants(u32 idx) override {
+		--m_material_buffer.data[idx].ref_count;
+		if(m_material_buffer.data[idx].ref_count == 0) {
+			const u32 hash = crc32(&m_material_buffer.data[idx], sizeof(Vec4) + sizeof(Vec3));
+			*(u32*)&m_material_buffer.data[idx] = m_material_buffer.first_free;
+			m_material_buffer.first_free = idx;
+			m_material_buffer.map.erase(hash);
+		}
+	}
+
 
 	ffr::BufferHandle createBuffer(const MemRef& memory) override
 	{
@@ -912,6 +962,10 @@ struct RendererImpl final : public Renderer
 
 		void render() {
 			ffr::flushBuffer(m_renderer.m_transient_buffer, m_transient_offset, m_transient_size);
+			if (m_renderer.m_material_buffer.dirty) {
+				ffr::flushBuffer(m_renderer.m_material_buffer.buffer, 0, MATERIAL_BUFFER_SIZE);
+				m_renderer.m_material_buffer.dirty = false;
+			}
 			for (RenderJob* job : m_jobs) {
 				PROFILE_BLOCK("execute_render_job");
 				Profiler::blockColor(0xaa, 0xff, 0xaa);
@@ -982,6 +1036,16 @@ struct RendererImpl final : public Renderer
 	i32 m_transient_buffer_frame_offset;
 	u8* m_transient_buffer_ptr = nullptr;
 	GPUProfiler m_profiler;
+
+	struct MaterialBuffer {
+		MaterialBuffer(IAllocator& alloc) : map(alloc) {}
+		ffr::BufferHandle buffer = ffr::INVALID_BUFFER;
+		MaterialConstants* data = nullptr;
+		HashMap<u32, u32> map;
+		u32 first_free = 0;
+		// TODO this is not MT safe
+		bool dirty = false;
+	} m_material_buffer;
 };
 
 
