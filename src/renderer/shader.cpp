@@ -98,17 +98,17 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 		StaticString<128> defines_code[32];
 		int defines_count = 0;
 		prefixes[0] = shader_code_prefix;
-		prefixes[1] = rd->include.empty() ? "" : (const char*)rd->include.begin();
-		prefixes[2] = rd->common_source.empty() ? "" : rd->common_source.begin();
 		if (defines != 0) {
 			for(int i = 0; i < sizeof(defines) * 8; ++i) {
 				if((defines & (1 << i)) == 0) continue;
 				// TODO getShaderDefine is not threadsafe
 				defines_code[defines_count] << "#define " << rd->renderer.getShaderDefine(i) << "\n";
-				prefixes[3 + defines_count] = defines_code[defines_count];
+				prefixes[1 + defines_count] = defines_code[defines_count];
 				++defines_count;
 			}
 		}
+		prefixes[1 + defines_count] = rd->include.empty() ? "" : (const char*)rd->include.begin();
+		prefixes[2 + defines_count] = rd->common_source.empty() ? "" : rd->common_source.begin();
 
 		ffr::ProgramHandle program = ffr::allocProgramHandle();
 		if(program.isValid() && !ffr::createProgram(program, decl, codes, types, rd->sources.size(), prefixes, 3 + defines_count, rd->path.c_str())) {

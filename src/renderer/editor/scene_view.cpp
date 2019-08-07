@@ -316,7 +316,7 @@ void SceneView::renderGizmos()
 			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 			u32 vb_offset = 0;
 			u32 ib_offset = 0;
-			for(Gizmo::RenderData::Cmd& cmd : data.cmds) {
+			for (Gizmo::RenderData::Cmd& cmd : data.cmds) {
 				ffr::setUniformMatrix4f(model_uniform, &cmd.mtx.m11);
 				ffr::useProgram(prg);
 				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
