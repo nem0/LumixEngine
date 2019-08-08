@@ -302,7 +302,9 @@ struct PipelineImpl final : Pipeline
 			-1, 1, 1
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
+		// TODO destroy
 		m_cube_vb = m_renderer.createBuffer(vb_mem);
+		const Renderer::MemRef ub_mem = { 32 * 1024, nullptr, false };
 
 		u16 cube_indices[] = {
 			0, 1, 2,
@@ -689,16 +691,28 @@ struct PipelineImpl final : Pipeline
 				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
 				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
+				const u32 map_flags = (u32)ffr::BufferFlags::MAP_WRITE | (u32)ffr::BufferFlags::PERSISTENT | (u32)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
+				
+				if (!pipeline->m_drawcall_ub.isValid()) {
+					// TODO cleanup
+					pipeline->m_drawcall_ub = ffr::allocBufferHandle();
+					ASSERT(pipeline->m_drawcall_ub.isValid());
+					ffr::createBuffer(pipeline->m_drawcall_ub, map_flags, 32 * 1024, nullptr);
+					pipeline->m_drawcall_ptr = (u8*)ffr::map(pipeline->m_drawcall_ub, 0, 32 * 1024, map_flags);
+				}
+				ffr::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, sizeof(32 * 1024));
 			}
 			void setup() override {}
 
 			ffr::BufferHandle global_state_buffer;
 			ffr::BufferHandle pass_state_buffer;
+			PipelineImpl* pipeline;
 			GlobalState global_state;
 			PassState pass_state;
 		};
 
 		StartFrameCmd* start_frame_cmd = LUMIX_NEW(m_renderer.getAllocator(), StartFrameCmd);
+		start_frame_cmd->pipeline = this;
 		start_frame_cmd->global_state = global_state;
 		start_frame_cmd->global_state_buffer = m_global_state_buffer;
 		start_frame_cmd->pass_state_buffer = m_pass_state_buffer;
@@ -720,6 +734,7 @@ struct PipelineImpl final : Pipeline
 			LuaWrapper::pcall(m_lua_state, 0);
 		}
 		lua_pop(m_lua_state, 1);
+
 		return true;
 	}
 
@@ -910,9 +925,10 @@ struct PipelineImpl final : Pipeline
 
 				ffr::pushDebugGroup("draw2d");
 				ffr::ProgramHandle prg = Shader::getProgram(shader, pipeline->m_2D_decl, 0);
-				if(prg.isValid()) {
 
-					ffr::setUniform2f(pipeline->m_canvas_size_uniform, &size.x);
+				if(prg.isValid()) {
+					memcpy(pipeline->m_drawcall_ptr, &size.x, sizeof(size));
+					ffr::flushBuffer(pipeline->m_drawcall_ub, 0, sizeof(size));
 
 					u32 elem_offset = 0;
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
@@ -3348,6 +3364,8 @@ struct PipelineImpl final : Pipeline
 	ffr::UniformHandle m_material_color_uniform;
 	ffr::BufferHandle m_cube_vb;
 	ffr::BufferHandle m_cube_ib;
+	ffr::BufferHandle m_drawcall_ub = ffr::INVALID_BUFFER;
+	u8* m_drawcall_ptr = nullptr;
 };
 
 
