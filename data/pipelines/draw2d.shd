@@ -3,7 +3,10 @@ vertex_shader [[
 	layout(location = 1) in vec2 a_uv;
 	layout(location = 2) in vec4 a_color;
 	
-	uniform vec2 u_canvas_size;
+	layout(std140, binding = 4) uniform Bones {
+		vec2 u_canvas_size;
+	};
+
 	out vec4 v_color;
 	out vec2 v_uv;
 	
