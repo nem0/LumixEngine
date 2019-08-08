@@ -1931,7 +1931,7 @@ public:
 	void clearUniverseDir(const char* dir)
 	{
 		OS::FileInfo info;
-		OS::FileIterator* file_iter = m_engine->getFileSystem().createFileIterator(dir);
+		OS::FileIterator* file_iter = OS::createFileIterator(dir, m_allocator);
 		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
