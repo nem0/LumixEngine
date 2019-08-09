@@ -2465,7 +2465,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 
 			if(init_render) {
-				ffr::createBuffer(ub, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 256, nullptr);
+				ffr::createBuffer(ub, (u32)ffr::BufferFlags::DYNAMIC_STORAGE | (u32)ffr::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
 				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
@@ -2474,90 +2474,39 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				decl.addAttribute(1, 8, 2, ffr::AttributeType::FLOAT, 0);
 				decl.addAttribute(2, 16, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
 
-				if (ffr::getBackend() == ffr::Backend::OPENGL) {
-					const char* vs =
-						R"#(#version 420
-						layout(location = 0) in vec2 a_pos;
-						layout(location = 1) in vec2 a_uv;
-						layout(location = 2) in vec4 a_color;
-						out vec4 v_color;
-						out vec2 v_uv;
-						layout (std140, binding = 0) uniform IMGUIState {
-							vec2 u_canvas_size;
-						};
-						void main() {
-							v_color = a_color;
-							v_uv = a_uv;
-							gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);
-							gl_Position.y = -gl_Position.y;
-						})#";
-					const char* fs = 
-						R"#(#version 330
-						in vec4 v_color;
-						in vec2 v_uv;
-						out vec4 o_color;
-						uniform sampler2D u_texture;
-						void main() {
-							vec4 tc = textureLod(u_texture, v_uv, 0);
-							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
-							o_color.a = v_color.a * tc.a;
-						})#";
-					const char* srcs[] = {vs, fs};
-					ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
-				}
-				else {
-					const char* vs =
-						R"#(cbuffer vertexBuffer : register(b0)
-						{
-							float2 canvas_size;
-						};
-
-						struct VS_INPUT
-						{
-							float2 pos : POSITION;
-							float4 col : COLOR0;
-							float2 uv  : TEXCOORD0;
-						};
-
-						struct PS_INPUT
-						{
-							float4 pos : SV_POSITION;
-							float4 col : COLOR0;
-							float2 uv  : TEXCOORD0;
-						};
-
-						PS_INPUT main(VS_INPUT input)
-						{
-							PS_INPUT output;
-							output.pos = float4(input.pos.xy / canvas_size * 2 - 1, 0, 1);
-							output.pos.y = -output.pos.y;
-							output.col = input.col;
-							output.uv  = input.uv;
-							return output;
-						})#";
-					const char* fs = 
-						R"#(struct PS_INPUT
-						{
-							float4 pos : SV_POSITION;
-							float4 col : COLOR0;
-							float2 uv  : TEXCOORD0;
-						};
-
-						sampler sampler0;
-						Texture2D texture0;
-
-						float4 main(PS_INPUT input) : SV_Target
-						{
-							float4 out_col = input.col * texture0.Sample(sampler0, input.uv);
-							return out_col;
-						})#";
-					const char* srcs[] = {vs, fs};
-					ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
-				}
+				const char* vs =
+					R"#(#version 420
+					layout(location = 0) in vec2 a_pos;
+					layout(location = 1) in vec2 a_uv;
+					layout(location = 2) in vec4 a_color;
+					layout(location = 0) out vec4 v_color;
+					layout(location = 1) out vec2 v_uv;
+					layout (std140, binding = 0) uniform IMGUIState {
+						vec2 u_canvas_size;
+					};
+					void main() {
+						v_color = a_color;
+						v_uv = a_uv;
+						gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);
+						gl_Position.y = -gl_Position.y;
+					})#";
+				const char* fs = 
+					R"#(#version 420
+					layout(location = 0) in vec4 v_color;
+					layout(location = 1) in vec2 v_uv;
+					layout(location = 0) out vec4 o_color;
+					uniform sampler2D u_texture;
+					void main() {
+						vec4 tc = textureLod(u_texture, v_uv, 0);
+						o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
+						o_color.a = v_color.a * tc.a;
+					})#";
+				const char* srcs[] = {vs, fs};
+				ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
 			ffr::pushDebugGroup("imgui");
-			ffr::setFramebuffer(ffr::INVALID_FRAMEBUFFER, false);
+			ffr::setFramebuffer(nullptr, 0, 0);
 
 			const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
 			ffr::clear((u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH, clear_color, 1.0);

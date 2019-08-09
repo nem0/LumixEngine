@@ -60,6 +60,7 @@ function geomPass(default_set, decal_set)
 	endBlock()
 
 	beginBlock("decals")
+	setRenderTargetsReadonlyDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 	bindTextures({
 		dsbuffer,
 	}, 1)
@@ -72,7 +73,7 @@ end
 function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
 	beginBlock("light_pass")
 	local hdr_rb = createRenderbuffer(1, 1, true, "rgba16f", "hdr")
-	setRenderTargets(hdr_rb, gbuffer_depth)
+	setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
 	local view_params = getCameraParams()
@@ -246,7 +247,7 @@ function main()
 	end
 	
 	transparentPass(transparent_set, res, gbuffer_depth)
-	setRenderTargets(hdr_buffer, gbuffer_depth)
+	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 	renderTextMeshes()
 
 	if PREVIEW == nil then

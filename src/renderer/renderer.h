@@ -77,7 +77,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void free(const MemRef& memory) = 0;
 		
 		virtual TransientSlice allocTransient(u32 size) = 0;
-		virtual ffr::BufferHandle createBuffer(const MemRef& memory) = 0;
+		virtual ffr::BufferHandle createBuffer(const MemRef& memory, u32 flags) = 0;
 		virtual void destroy(ffr::BufferHandle buffer) = 0;
 		virtual void destroy(ffr::ProgramHandle program) = 0;
 		
@@ -88,7 +88,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void destroy(ffr::TextureHandle tex) = 0;
 		
 		virtual void queue(RenderJob* cmd, i64 profiler_link) = 0;
-		virtual ffr::FramebufferHandle getFramebuffer() const = 0;
 
 		virtual void beginProfileBlock(const char* name, i64 link) = 0;
 		virtual void endProfileBlock() = 0;

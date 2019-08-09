@@ -31,7 +31,7 @@ float unpackEmission(float emission)
 
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 {
-	float z = texture2D(depth_buffer, tex_coord).r;
+	float z = texture(depth_buffer, tex_coord).r;
 	vec4 pos_proj = vec4(tex_coord * 2 - 1, z, 1.0);
 	vec4 view_pos = inv_view_proj * pos_proj;
 	return view_pos.xyz / view_pos.w;

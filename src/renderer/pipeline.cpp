@@ -287,7 +287,7 @@ struct PipelineImpl final : Pipeline
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
 		// TODO destroy
-		m_cube_vb = m_renderer.createBuffer(vb_mem);
+		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
 		const Renderer::MemRef ub_mem = { 32 * 1024, nullptr, false };
 
 		u16 cube_indices[] = {
@@ -306,17 +306,17 @@ struct PipelineImpl final : Pipeline
 		};
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
-		m_cube_ib = m_renderer.createBuffer(ib_mem);
+		m_cube_ib = m_renderer.createBuffer(ib_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
 
 		m_resource->onLoaded<PipelineImpl, &PipelineImpl::onStateChanged>(this);
 
 		GlobalState global_state;
 		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));
-		m_global_state_buffer = m_renderer.createBuffer(global_state_mem);
+		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE | (u32)ffr::BufferFlags::UNIFORM_BUFFER);
 		
 		PassState pass_state;
 		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
-		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem);
+		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE | (u32)ffr::BufferFlags::UNIFORM_BUFFER);
 
 		m_base_vertex_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
 		m_base_vertex_decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
@@ -2230,9 +2230,7 @@ struct PipelineImpl final : Pipeline
 		return 1;
 	}
 
-
-	static int setRenderTargets(lua_State* L)
-	{ 
+	static int setRenderTargets(lua_State* L, bool readonly_ds) {
 		PROFILE_FUNCTION();
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
@@ -2258,15 +2256,14 @@ struct PipelineImpl final : Pipeline
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				const ffr::FramebufferHandle fb = pipeline->m_renderer.getFramebuffer();
 			
-				ffr::update(fb, count, rbs);
-				ffr::setFramebuffer(fb, true);
+				ffr::setFramebuffer(rbs, count, flags);
 				ffr::viewport(0, 0, w, h);
 			}
 
 			PipelineImpl* pipeline;
 			ffr::TextureHandle rbs[16];
+			u32 flags;
 			u32 count;
 			u32 w;
 			u32 h;
@@ -2280,6 +2277,10 @@ struct PipelineImpl final : Pipeline
 
 		cmd->pipeline = pipeline;
 		cmd->count = rb_count;
+		cmd->flags = (u32)ffr::FramebufferFlags::SRGB;
+		if (readonly_ds) {
+			cmd->flags |= (u32)ffr::FramebufferFlags::READONLY_DEPTH_STENCIL;
+		}
 		cmd->w = pipeline->m_viewport.w;
 		cmd->h = pipeline->m_viewport.h;
 		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
@@ -2287,6 +2288,13 @@ struct PipelineImpl final : Pipeline
 		return 0;
 	}
 
+	static int setRenderTargets(lua_State* L) { 
+		return setRenderTargets(L, false);
+	}
+
+	static int setRenderTargetsReadonlyDS(lua_State* L) { 
+		return setRenderTargets(L, true);
+	}
 
 	struct RenderTerrainsCommand : Renderer::RenderJob
 	{
@@ -3187,6 +3195,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
+		registerCFunction("setRenderTargetsReadonlyDS", PipelineImpl::setRenderTargetsReadonlyDS);
 
 		#define REGISTER_DRAW2D_FUNCTION(fn_name) \
 			do { \

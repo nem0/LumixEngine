@@ -517,7 +517,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
 		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&mesh.indices[0], mesh.indices.size());
-		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem);
+		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
 		mesh.render_data->index_type = index_size == 2 ? ffr::DataType::U16 : ffr::DataType::U32;
 	}
 
@@ -557,7 +557,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		}
 		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&vertices_mem[0], vertices_mem.size());
-		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(mem);
+		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
 	}
 	file.read(m_bounding_radius);
 	file.read(m_aabb);
