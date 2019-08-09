@@ -976,7 +976,8 @@ struct RendererImpl final : public Renderer
 
 			PROFILE_BLOCK("swap buffers");
 			JobSystem::enableBackupWorker(true);
-			ffr::swapBuffers();
+			
+			ffr::swapBuffers(m_window_size.x, m_window_size.y);
 			
 			ffr::FenceHandle fence;
 			fence = ffr::createFence();
@@ -992,6 +993,7 @@ struct RendererImpl final : public Renderer
 		Array<RenderJob*> m_jobs;
 		i32 m_transient_offset;
 		i32 m_transient_size;
+		OS::Point m_window_size;
 	};
 
 	void frame() override
@@ -1004,10 +1006,14 @@ struct RendererImpl final : public Renderer
 		m_prev_frame_job = JobSystem::INVALID_HANDLE;
 
 		RenderFrameData* data = LUMIX_NEW(m_allocator, RenderFrameData)(*this);
+		const void* window_handle = m_engine.getPlatformData().window_handle;
+		data->m_window_size = OS::getWindowClientSize((OS::WindowHandle)window_handle);
+		
 		JobSystem::runEx(data, [](void* ptr){
 			auto* data = (RenderFrameData*)ptr;
 			data->render();
 		}, &m_prev_frame_job, JobSystem::INVALID_HANDLE, 1);
+
 
 		m_transient_buffer_frame_offset = (m_transient_buffer_frame_offset + TRANSIENT_BUFFER_SIZE) % (2 * TRANSIENT_BUFFER_SIZE);
 		m_transient_buffer_offset = 0;

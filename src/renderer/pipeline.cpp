@@ -275,22 +275,6 @@ struct PipelineImpl final : Pipeline
 
 		m_draw2d.clear({1, 1});
 
-		m_position_uniform = ffr::allocUniform("u_position", ffr::UniformType::VEC3, 1);
-		m_lod_uniform = ffr::allocUniform("u_lod", ffr::UniformType::INT, 1);
-		m_position_radius_uniform = ffr::allocUniform("u_pos_radius", ffr::UniformType::VEC4, 1);
-		m_terrain_params_uniform = ffr::allocUniform("u_terrain_params", ffr::UniformType::VEC4, 1);
-		m_rel_camera_pos_uniform = ffr::allocUniform("u_rel_camera_pos", ffr::UniformType::VEC3, 1);
-		m_terrain_scale_uniform = ffr::allocUniform("u_terrain_scale", ffr::UniformType::VEC3, 1);
-		m_terrain_matrix_uniform = ffr::allocUniform("u_terrain_matrix", ffr::UniformType::MAT4, 1);
-		m_model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
-		m_bones_uniform = ffr::allocUniform("u_bones", ffr::UniformType::MAT4, 196);
-		m_canvas_size_uniform = ffr::allocUniform("u_canvas_size", ffr::UniformType::VEC2, 1);
-		m_texture_uniform = ffr::allocUniform("u_texture", ffr::UniformType::INT, 1);
-		m_irradiance_map_uniform = ffr::allocUniform("u_irradiancemap", ffr::UniformType::INT, 1);
-		m_radiance_map_uniform = ffr::allocUniform("u_radiancemap", ffr::UniformType::INT, 1);
-		m_material_params_uniform = ffr::allocUniform("u_material_params", ffr::UniformType::VEC4, 1);
-		m_material_color_uniform = ffr::allocUniform("u_material_color", ffr::UniformType::VEC4, 1);
-
 		float cube_verts[] = {
 			-1, -1, -1,
 			1, -1, -1,
@@ -546,8 +530,9 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
+	ffr::BufferHandle getDrawcallUniformBuffer() override { return m_drawcall_ub; }
 
-	virtual void setViewport(const Viewport& viewport) override 
+	void setViewport(const Viewport& viewport) override 
 	{
 		m_viewport = viewport;
 	}
@@ -691,14 +676,14 @@ struct PipelineImpl final : Pipeline
 				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
 				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
-				const u32 map_flags = (u32)ffr::BufferFlags::MAP_WRITE | (u32)ffr::BufferFlags::PERSISTENT | (u32)ffr::BufferFlags::MAP_FLUSH_EXPLICIT;
 				
 				if (!pipeline->m_drawcall_ub.isValid()) {
 					// TODO cleanup
 					pipeline->m_drawcall_ub = ffr::allocBufferHandle();
 					ASSERT(pipeline->m_drawcall_ub.isValid());
-					ffr::createBuffer(pipeline->m_drawcall_ub, map_flags, 32 * 1024, nullptr);
-					pipeline->m_drawcall_ptr = (u8*)ffr::map(pipeline->m_drawcall_ub, 0, 32 * 1024, map_flags);
+					const u32 flags = (u32)ffr::BufferFlags::DYNAMIC_STORAGE
+						| (u32)ffr::BufferFlags::UNIFORM_BUFFER;
+					ffr::createBuffer(pipeline->m_drawcall_ub, flags, 32 * 1024, nullptr);
 				}
 				ffr::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, sizeof(32 * 1024));
 			}
@@ -774,7 +759,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::pushDebugGroup("debug triangles");
 
-				ffr::setUniformMatrix4f(pipeline->m_model_uniform, &Matrix::IDENTITY.m11);
+				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, 0, sizeof(Matrix));
 
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::CULL_BACK));
 				ffr::useProgram(shader);
@@ -837,7 +822,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::pushDebugGroup("debug lines");
 
-				ffr::setUniformMatrix4f(pipeline->m_model_uniform, &Matrix::IDENTITY.m11);
+				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, 0, sizeof(Matrix));
 
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 				ffr::useProgram(shader);
@@ -927,9 +912,7 @@ struct PipelineImpl final : Pipeline
 				ffr::ProgramHandle prg = Shader::getProgram(shader, pipeline->m_2D_decl, 0);
 
 				if(prg.isValid()) {
-					memcpy(pipeline->m_drawcall_ptr, &size.x, sizeof(size));
-					ffr::flushBuffer(pipeline->m_drawcall_ub, 0, sizeof(size));
-
+					ffr::update(pipeline->m_drawcall_ub, &size.x, 0, sizeof(size));
 					u32 elem_offset = 0;
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 					ffr::setState(blend_state);
@@ -1057,7 +1040,7 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, 0, {0, 0}, debug_name);
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)ffr::TextureFlags::NO_MIPS, {0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
 	}
@@ -1076,44 +1059,9 @@ struct PipelineImpl final : Pipeline
 		
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
-
+		
 		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
-			lua_pushnil(L);
-			while (lua_next(L, 2) != 0) {
-				if(lua_type(L, -1) != LUA_TNUMBER) {
-					logError("Renderer") << "Incorrect global textures arguments of renderTerrains";
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
-				}
-
-				if(lua_type(L, -2) != LUA_TSTRING) {
-					logError("Renderer") << "Incorrect global textures arguments of renderTerrains";
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
-				}
-			
-				if (cmd->m_global_textures_count > lengthOf(cmd->m_global_textures)) {
-					logError("Renderer") << "Too many textures in renderTerrains call";
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					lua_pop(L, 2);
-					return 0;
-				}
-
-				const char* uniform = lua_tostring(L, -2);
-				const int rb_idx = (int)lua_tointeger(L, -1);
-				auto& t = cmd->m_global_textures[cmd->m_global_textures_count]; 
-				t.texture = pipeline->m_renderbuffers[rb_idx].handle;
-				t.uniform = ffr::allocUniform(uniform, ffr::UniformType::INT, 1);
-				++cmd->m_global_textures_count;
-
-				lua_pop(L, 1);
-			}
-		}
-
-		if (lua_gettop(L) > 2 && lua_istable(L, 3)) {
-			cmd->m_render_state = getState(L, 3);
+			cmd->m_render_state = getState(L, 2);
 		}
 
 		cmd->m_pipeline = pipeline;
@@ -1204,7 +1152,7 @@ struct PipelineImpl final : Pipeline
 					if (prog.isValid()) {
 						Matrix mtx = rot.toMatrix();
 						mtx.setTranslation(lpos);
-						ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &mtx.m11);
+						ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, 0, sizeof(mtx));
 						ffr::useProgram(prog);
 						ffr::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
 						ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
@@ -1418,8 +1366,6 @@ struct PipelineImpl final : Pipeline
 				const ffr::ProgramHandle prog = Shader::getProgram(m_shader, m_pipeline->m_3D_pos_decl, 0);
 				if(!prog.isValid()) return;
 
-				const int pos_radius_uniform_loc = ffr::getUniformLocation(prog, m_pos_radius_uniform);
-
 				ffr::useProgram(prog);
 				ffr::bindVertexBuffer(0, m_vb, 0, 12);
 				ffr::bindIndexBuffer(m_ib);
@@ -1429,7 +1375,7 @@ struct PipelineImpl final : Pipeline
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
 					ffr::TextureHandle handles[2] = { probe.irradiance, probe.radiance };
 					ffr::bindTextures(handles, 14, 2);
-					ffr::applyUniform4f(pos_radius_uniform_loc, &pos_radius.x);
+					ffr::update(m_pipeline->m_drawcall_ub, &pos_radius.x, 0, sizeof(pos_radius));
 					
 					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
 					const u64 state = intersecting
@@ -1443,9 +1389,6 @@ struct PipelineImpl final : Pipeline
 
 			ffr::BufferHandle m_ib;
 			ffr::BufferHandle m_vb;
-			ffr::UniformHandle m_pos_radius_uniform;
-			ffr::UniformHandle m_irradiance_map_uniform;
-			ffr::UniformHandle m_radiance_map_uniform;
 			CameraParams m_camera_params;
 			PipelineImpl* m_pipeline;
 			Array<EnvProbeInfo> m_probes;
@@ -1460,9 +1403,6 @@ struct PipelineImpl final : Pipeline
 			cmd->m_ib = pipeline->m_cube_ib;
 			cmd->m_vb = pipeline->m_cube_vb;
 			cmd->m_camera_params = cp;
-			cmd->m_irradiance_map_uniform = pipeline->m_irradiance_map_uniform;
-			cmd->m_radiance_map_uniform = pipeline->m_radiance_map_uniform;
-			cmd->m_pos_radius_uniform = pipeline->m_position_radius_uniform;
 			pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
 		}
 		return 0;
@@ -1586,8 +1526,8 @@ struct PipelineImpl final : Pipeline
 
 				ffr::bindTextures(m_textures_handles, 0, m_textures_count);
 
-				for(int i = 0; i < m_uniforms_count; ++i) {
-					ffr::setUniform4f(m_uniforms[i].handle, &m_uniforms[i].value.x);
+				if (m_uniforms_count > 0) {
+					ffr::update(m_pipeline->m_drawcall_ub, m_uniforms, 0, sizeof(m_uniforms[0]) * m_uniforms_count);
 				}
 
 				ffr::useProgram(prg);
@@ -1595,12 +1535,10 @@ struct PipelineImpl final : Pipeline
 				ffr::drawArrays(m_indices_offset, m_indices_count, ffr::PrimitiveType::TRIANGLE_STRIP);
 			}
 
+			PipelineImpl* m_pipeline;
 			ffr::TextureHandle m_textures_handles[16];
 			int m_textures_count = 0;
-			struct {
-				Vec4 value;
-				ffr::UniformHandle handle;
-			} m_uniforms[16];
+			float m_uniforms[16][4];
 			int m_uniforms_count = 0;
 			Shader* m_shader;
 			int m_indices_count;
@@ -1651,8 +1589,8 @@ struct PipelineImpl final : Pipeline
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
 		if(lua_gettop(L) > 3) {
-			const int len = (int)lua_objlen(L, 4);
-			for(int i = 0; i < len; ++i) {
+			const u32 len = (u32)lua_objlen(L, 4);
+			for(u32 i = 0; i < len; ++i) {
 				lua_rawgeti(L, 4, i + 1);
 				if(lua_type(L, -1) != LUA_TNUMBER) {
 					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
@@ -1672,27 +1610,20 @@ struct PipelineImpl final : Pipeline
 		
 			if (lua_istable(L, 5)) {
 				lua_pushnil(L);
-				while (lua_next(L, 5) != 0) {
+				for (u32 i = 0, c = (u32)lua_objlen(L, 5); i < c; ++i) {
+					lua_rawgeti(L, 5, i + 1);
 					if(lua_type(L, -1) != LUA_TTABLE) {
 						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 						return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays");
 					}
 
-					if(lua_type(L, -2) != LUA_TSTRING) {
-						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays");
-					}
-
-					const char* uniform_name = lua_tostring(L, -2);
-					cmd->m_uniforms[cmd->m_uniforms_count].handle = ffr::allocUniform(uniform_name, ffr::UniformType::VEC4, 1);
-					float* value = &cmd->m_uniforms[cmd->m_uniforms_count].value.x;
 					for(int i = 0; i < 4; ++i) {
 						lua_rawgeti(L, -1, 1 + i);
 						if (lua_type(L, -1) != LUA_TNUMBER) {
 							LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
 							return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays. Uniforms can only be Vec4.");
 						}
-						value[i] = (float)lua_tonumber(L, -1);
+						cmd->m_uniforms[cmd->m_uniforms_count][i] = (float)lua_tonumber(L, -1);
 						lua_pop(L, 1);
 					}
 
@@ -1720,6 +1651,7 @@ struct PipelineImpl final : Pipeline
 
 		}
 	
+		cmd->m_pipeline = pipeline;
 		cmd->m_render_state = rs;
 		cmd->m_shader = shader;
 		cmd->m_indices_count = indices_count;
@@ -2169,7 +2101,7 @@ struct PipelineImpl final : Pipeline
 										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(Renderer::MaterialConstants), sizeof(Renderer::MaterialConstants));
 										material_ub_idx = material->material_constants;
 									}
-									ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &model_mtx.m11);
+									ffr::update(m_pipeline->m_drawcall_ub, &model_mtx.m11, 0, sizeof(model_mtx));
 								
 									ffr::useProgram(prog);
 
@@ -2232,7 +2164,7 @@ struct PipelineImpl final : Pipeline
 										material_ub_idx = material->material_constants;
 									}
 									const Matrix mtx(pos, rot);
-									ffr::setUniformMatrix4f(m_pipeline->m_model_uniform, &mtx.m11);
+									ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, 0, sizeof(mtx));
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
@@ -2401,32 +2333,34 @@ struct PipelineImpl final : Pipeline
 			for (Instance& inst : m_instances) {
 				const ffr::ProgramHandle p = Shader::getProgram(inst.shader, ffr::VertexDecl(), deferred_define_mask);
 				if (!p.isValid()) continue;
+				ffr::useProgram(p);
 
-				const Vec3 pos = inst.pos;
-				const Vec3 lpos = inst.rot.conjugated().rotate(-inst.pos);
-
-				ffr::setUniform3f(m_pipeline->m_position_uniform, &pos.x);
-				ffr::setUniform3f(m_pipeline->m_rel_camera_pos_uniform, &lpos.x);
+				struct {
+					IVec4 from_to;
+					IVec4 from_to_sup;
+					Vec4 pos;
+					Vec4 lpos;
+					Vec4 terrain_scale;
+					int lod;
+				} dc_data;
+				dc_data.pos = Vec4(inst.pos, 0);
+				dc_data.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
 
 				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count | inst.material->define_mask);
 
 				ffr::setState(state);
-				const int loc = ffr::getUniformLocation(p, m_pipeline->m_lod_uniform);
-				const int loc2 = ffr::getUniformLocation(p, ffr::allocUniform("u_from_to", ffr::UniformType::IVEC4, 1));
-				const int loc3 = ffr::getUniformLocation(p, m_pipeline->m_terrain_scale_uniform);
-				const int loc4 = ffr::getUniformLocation(p, ffr::allocUniform("u_from_to_sup", ffr::UniformType::IVEC4, 1));
 				IVec4 prev_from_to;
 				for (int i = 0; ; ++i) {
 					const int s = 1 << i;
 					// round 
-					IVec2 from = IVec2((lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
+					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
 					IVec2 to = from + IVec2(128);
 					// clamp
 					const IVec2 from_unclamped = from;
 					const IVec2 to_unclamped = to;
-					const IVec4 from_to_sup(from_unclamped, to_unclamped);
+					dc_data.from_to_sup = IVec4(from_unclamped, to_unclamped);
 					
 					from.x = clamp(from.x, 0, 1024 / s);
 					from.y = clamp(from.y, 0, 1024 / s);
@@ -2435,12 +2369,10 @@ struct PipelineImpl final : Pipeline
 
 					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
 						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
-						const IVec4 from_to(subfrom, subto);
-						ffr::useProgram(p);
-						ffr::applyUniform4i(loc4, &from_to_sup.x);
-						ffr::applyUniform4i(loc2, &from_to.x);
-						ffr::applyUniform3f(loc3, &inst.scale.x);
-						ffr::applyUniform1i(loc, i);
+						dc_data.from_to = IVec4(subfrom, subto);
+						dc_data.terrain_scale = Vec4(inst.scale, 0);
+						dc_data.lod = i;
+						ffr::update(m_pipeline->m_drawcall_ub, &dc_data, 0, sizeof(dc_data));
 						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
 						stat += (subto.x - subfrom.x) * (subto.y - subfrom.y);
 					};
@@ -2477,10 +2409,7 @@ struct PipelineImpl final : Pipeline
 		CameraParams m_camera_params;
 		u64 m_render_state;
 		Array<Instance> m_instances;
-		struct {
-			ffr::TextureHandle texture;
-			ffr::UniformHandle uniform;
-		} m_global_textures[16];
+		ffr::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
 
 	};
@@ -3052,10 +2981,7 @@ struct PipelineImpl final : Pipeline
 		PageAllocator& m_page_allocator;
 		CameraParams m_camera_params;
 		PipelineImpl* m_pipeline;
-		struct {
-			ffr::TextureHandle texture;
-			ffr::UniformHandle uniform;
-		} m_global_textures[16];
+		ffr::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
 		CmdPage* m_command_sets[255];
 		u32 m_bucket_map[255];
@@ -3289,6 +3215,30 @@ struct PipelineImpl final : Pipeline
 		#undef REGISTER_FUNCTION
 	}
 
+	void renderModel(Model& model, const Matrix& mtx) override
+	{
+		for(int i = 0; i < model.getMeshCount(); ++i) {
+
+			const Mesh& mesh = model.getMesh(i);
+			const Material* material = mesh.material;
+			const Mesh::RenderData* rd = mesh.render_data;
+
+			ShaderRenderData* shader_rd = material->getShader()->m_render_data;
+			const ffr::ProgramHandle prog = Shader::getProgram(shader_rd, rd->vertex_decl, 0); // TODO define
+
+			if(!prog.isValid()) continue;
+
+			const Material::RenderData* mat_rd = material->getRenderData();
+			ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
+
+			ffr::update(m_drawcall_ub, &mtx.m11, 0, sizeof(mtx));
+			ffr::useProgram(prog);
+			ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+			ffr::bindIndexBuffer(rd->index_buffer_handle);
+			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
+			ffr::drawTriangles(rd->indices_count, rd->index_type);
+		}
+	}
 
 	bool isReady() const override { return m_resource->isReady(); }
 	const Stats& getStats() const override { return m_stats; }
@@ -3347,25 +3297,9 @@ struct PipelineImpl final : Pipeline
 	ffr::VertexDecl m_point_light_decl;
 	CameraParams m_shadow_camera_params[4];
 
-	ffr::UniformHandle m_position_radius_uniform;
-	ffr::UniformHandle m_position_uniform;
-	ffr::UniformHandle m_lod_uniform;
-	ffr::UniformHandle m_terrain_params_uniform;
-	ffr::UniformHandle m_rel_camera_pos_uniform;
-	ffr::UniformHandle m_terrain_scale_uniform;
-	ffr::UniformHandle m_terrain_matrix_uniform;
-	ffr::UniformHandle m_model_uniform;
-	ffr::UniformHandle m_bones_uniform;
-	ffr::UniformHandle m_canvas_size_uniform;
-	ffr::UniformHandle m_texture_uniform;
-	ffr::UniformHandle m_irradiance_map_uniform;
-	ffr::UniformHandle m_radiance_map_uniform;
-	ffr::UniformHandle m_material_params_uniform;
-	ffr::UniformHandle m_material_color_uniform;
 	ffr::BufferHandle m_cube_vb;
 	ffr::BufferHandle m_cube_ib;
 	ffr::BufferHandle m_drawcall_ub = ffr::INVALID_BUFFER;
-	u8* m_drawcall_ptr = nullptr;
 };
 
 
@@ -3380,33 +3314,6 @@ void Pipeline::destroy(Pipeline* pipeline)
 	PipelineImpl* p = (PipelineImpl*)pipeline;
 	LUMIX_DELETE(p->m_allocator, p);
 }
-
-
-void Pipeline::renderModel(Model& model, const Matrix& mtx, ffr::UniformHandle mtx_uniform)
-{
-	for(int i = 0; i < model.getMeshCount(); ++i) {
-
-		const Mesh& mesh = model.getMesh(i);
-		const Material* material = mesh.material;
-		const Mesh::RenderData* rd = mesh.render_data;
-
-		ShaderRenderData* shader_rd = material->getShader()->m_render_data;
-		const ffr::ProgramHandle prog = Shader::getProgram(shader_rd, rd->vertex_decl, 0); // TODO define
-
-		if(!prog.isValid()) continue;
-
-		const Material::RenderData* mat_rd = material->getRenderData();
-		ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
-
-		ffr::setUniformMatrix4f(mtx_uniform, &mtx.m11);
-		ffr::useProgram(prog);
-		ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-		ffr::bindIndexBuffer(rd->index_buffer_handle);
-		ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
-		ffr::drawTriangles(rd->indices_count, rd->index_type);
-	}
-}
-
 
 
 } // namespace Lumix

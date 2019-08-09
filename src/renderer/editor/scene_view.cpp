@@ -216,7 +216,6 @@ void SceneView::renderSelection()
 			PROFILE_FUNCTION();
 			const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 			RenderScene* scene = m_pipeline->getScene();
-			m_mtx_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
 			const Universe& universe = scene->getUniverse();
 			for (EntityRef e : entities) {
 				if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
@@ -238,13 +237,14 @@ void SceneView::renderSelection()
 		void execute() override
 		{
 			PROFILE_FUNCTION();
+			const ffr::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, rd->vertex_decl, 0); // TODO define
 
 				if (!prog.isValid()) continue;
 			
-				ffr::setUniformMatrix4f(m_mtx_uniform, &item.mtx.m11);
+				ffr::update(drawcall_ub, &item.mtx.m11, 0, sizeof(item.mtx));
 				ffr::useProgram(prog);
 				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				ffr::bindIndexBuffer(rd->index_buffer_handle);
@@ -262,7 +262,6 @@ void SceneView::renderSelection()
 
 		Array<Item> m_items;
 		Pipeline* m_pipeline;
-		ffr::UniformHandle m_mtx_uniform;
 		WorldEditor* m_editor;
 	};
 
@@ -291,7 +290,6 @@ void SceneView::renderGizmos()
 			view->m_editor.getGizmo().getRenderData(&data, viewport);
 			Engine& engine = view->m_editor.getEngine();
 			renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-			model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
 
 			ib = renderer->allocTransient(data.indices.byte_size());
 			vb = renderer->allocTransient(data.vertices.byte_size());
@@ -316,8 +314,9 @@ void SceneView::renderGizmos()
 			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 			u32 vb_offset = 0;
 			u32 ib_offset = 0;
+			const ffr::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
 			for (Gizmo::RenderData::Cmd& cmd : data.cmds) {
-				ffr::setUniformMatrix4f(model_uniform, &cmd.mtx.m11);
+				ffr::update(drawcall_ub, &cmd.mtx.m11, 0, sizeof(cmd.mtx));
 				ffr::useProgram(prg);
 				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
 				ffr::bindIndexBuffer(ib.buffer);
@@ -339,7 +338,6 @@ void SceneView::renderGizmos()
 		Viewport viewport;
 		SceneView* view;
 		ShaderRenderData* shader;
-		ffr::UniformHandle model_uniform;
 	};
 
 	if (!m_debug_shape_shader || !m_debug_shape_shader->isReady()) return;

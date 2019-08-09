@@ -55,7 +55,7 @@ function geomPass(default_set, decal_set)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
 	pass(view_params)
-	renderTerrains(view_params, {}, default_state)
+	renderTerrains(view_params, default_state)
 	renderBucket(default_set, default_state)
 	endBlock()
 
@@ -133,7 +133,7 @@ function blur(buffer, format, w, h, tmp_rb_dbg_name)
 	viewport(0, 0, w, h)
 	drawArray(0, 4, blur_shader
 		, { blur_buf }
-		, { u_inv_sm_size = {1.0 / w, 1.0 / h, 0, 0 }}
+		, { {1.0 / w, 1.0 / h, 0, 0 } }
 		, {}
 		, { depth_test = false, depth_write = false }
 	)

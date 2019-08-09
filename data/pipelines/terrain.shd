@@ -29,6 +29,17 @@ vertex_shader [[
 	}
 ]]
 
+common [[
+	layout(std140, binding = 4) uniform Model {
+		ivec4 u_from_to;
+		ivec4 u_from_to_sup;
+		vec4 u_position;
+		vec4 u_rel_camera_pos;
+		vec4 u_terrain_scale;
+		int u_lod;
+	};
+]]
+
 geometry_shader [[
 	layout (points) in;
 	layout (triangle_strip, max_vertices = 4) out;
@@ -36,13 +47,7 @@ geometry_shader [[
 	
 	out vec2 v_uv;
 	layout (binding=0) uniform sampler2D u_hm;
-	uniform vec3 u_position;
-	uniform int u_lod;
-	uniform vec3 u_rel_camera_pos;
-	uniform ivec4 u_from_to;
-	uniform ivec4 u_from_to_sup;
-	uniform vec3 u_terrain_scale;
-	
+
 	void getVertex(ivec2 ij, out vec3 pos, out vec2 uv)
 	{
 		pos = vec3(ij.x, 0.0, ij.y) * (1 << u_lod);
@@ -76,22 +81,22 @@ geometry_shader [[
 		vec3 v;
 		getVertex(ij, v, v_uv);
 		float h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
 		getVertex(ij + ivec2(1, 0), v, v_uv);
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
 		getVertex(ij + ivec2(0, 1), v, v_uv);
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
 		EmitVertex();
 
 		getVertex(ij + ivec2(1, 1), v, v_uv);
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position + v + vec3(0, h, 0), 1);
+		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
 		EmitVertex();
 	}
 ]]
@@ -112,8 +117,6 @@ fragment_shader [[
 	layout(binding=1) uniform sampler2DArray u_albedo;
 	layout(binding=2) uniform sampler2D u_splatmap;
 	layout(binding=3) uniform sampler2D u_satellite;
-	uniform int u_lod;
-	uniform vec3 u_terrain_scale;
 
 	vec3 getNormal(vec2 uv)
 	{

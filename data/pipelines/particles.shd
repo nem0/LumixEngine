@@ -1,7 +1,9 @@
 ------------------
 
 vertex_shader [[
-	uniform mat4 u_model;
+	layout(std140, binding = 4) uniform Model {
+		mat4 u_model;
+	};
 	layout(location = 0) in vec3 i_position;
 
 	void main() {
