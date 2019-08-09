@@ -447,7 +447,6 @@ struct RendererImpl final : public Renderer
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getPlatformData().window_handle;
 			ffr::init(window_handle, renderer.m_debug_opengl);
-			renderer.m_framebuffer = ffr::createFramebuffer();
 			renderer.m_transient_buffer = ffr::allocBufferHandle();
 			renderer.m_transient_buffer_offset = 0;
 			renderer.m_transient_buffer_frame_offset = 0;
@@ -459,7 +458,7 @@ struct RendererImpl final : public Renderer
 			renderer.m_profiler.init();
 
 			renderer.m_material_buffer.buffer = ffr::allocBufferHandle();
-			ffr::createBuffer(renderer.m_material_buffer.buffer, transient_flags, MATERIAL_BUFFER_SIZE, nullptr);
+			ffr::createBuffer(renderer.m_material_buffer.buffer, transient_flags | (u32)ffr::BufferFlags::UNIFORM_BUFFER, MATERIAL_BUFFER_SIZE, nullptr);
 			renderer.m_material_buffer.data = (MaterialConstants*)ffr::map(renderer.m_material_buffer.buffer, 0, MATERIAL_BUFFER_SIZE, transient_flags);
 
 			const u32 ub_mat_count = MATERIAL_BUFFER_SIZE / sizeof(MaterialConstants);
@@ -526,12 +525,6 @@ struct RendererImpl final : public Renderer
 	void endProfileBlock() override
 	{
 		m_profiler.endQuery();
-	}
-
-
-	ffr::FramebufferHandle getFramebuffer() const override
-	{
-		return m_framebuffer;
 	}
 
 
@@ -692,7 +685,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::BufferHandle createBuffer(const MemRef& memory) override
+	ffr::BufferHandle createBuffer(const MemRef& memory, u32 flags) override
 	{
 		ffr::BufferHandle handle = ffr::allocBufferHandle();
 		if(!handle.isValid()) return handle;
@@ -701,7 +694,7 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::createBuffer(handle, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, memory.size, memory.data);
+				ffr::createBuffer(handle, flags, memory.size, memory.data);
 				if (memory.own) {
 					renderer->free(memory);
 				}
@@ -709,6 +702,7 @@ struct RendererImpl final : public Renderer
 
 			ffr::BufferHandle handle;
 			MemRef memory;
+			u32 flags;
 			ffr::TextureFormat format;
 			Renderer* renderer;
 		};
@@ -717,6 +711,7 @@ struct RendererImpl final : public Renderer
 		cmd->handle = handle;
 		cmd->memory = memory;
 		cmd->renderer = this;
+		cmd->flags = flags;
 		queue(cmd, 0);
 
 		return handle;
@@ -1036,7 +1031,6 @@ struct RendererImpl final : public Renderer
 	JobSystem::SignalHandle m_setup_jobs_done = JobSystem::INVALID_HANDLE;
 	Array<RenderJob*> m_cmd_queue;
 
-	ffr::FramebufferHandle m_framebuffer;
 	ffr::BufferHandle m_transient_buffer;
 	i32 m_transient_buffer_offset;
 	i32 m_transient_buffer_frame_offset;

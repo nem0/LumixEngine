@@ -13,14 +13,12 @@ namespace ffr {
 struct FenceHandle { void* value; bool isValid() const { return value; } };
 struct BufferHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct ProgramHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
-struct FramebufferHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct TextureHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct QueryHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 
 const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
 const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
 const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
-const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 const FenceHandle INVALID_FENCE = { 0 };
 
@@ -35,6 +33,11 @@ enum class LogLevel : u32 {
 enum class Backend {
 	OPENGL,
 	DX11
+};
+
+enum class FramebufferFlags : u32 {
+	SRGB = 1 << 0,
+	READONLY_DEPTH_STENCIL = 1 << 1
 };
 
 enum class StateFlags : u64 {
@@ -228,13 +231,10 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 void createTextureView(TextureHandle view, TextureHandle texture);
 bool loadTexture(TextureHandle handle, const void* data, int size, u32 flags, const char* debug_name);
 void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf);
-FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
-void update(FramebufferHandle fb, u32 renderbuffers_count, const TextureHandle* renderbuffers);
-void bindLayer(FramebufferHandle fb, TextureHandle rb, u32 layer);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void* map(BufferHandle buffer, size_t offset, size_t size, u32 flags);
 void unmap(BufferHandle buffer);
@@ -251,7 +251,6 @@ void destroy(FenceHandle fence);
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
 void destroy(TextureHandle texture);
-void destroy(FramebufferHandle fb);
 void destroy(QueryHandle query);
 
 void bindIndexBuffer(BufferHandle handle);
@@ -264,7 +263,7 @@ void drawTriangleStripArraysInstanced(u32 offset, u32 indices_count, u32 instanc
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
 
-void setFramebuffer(FramebufferHandle fb, bool srgb);
+void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags);
 
 
 } // namespace ffr
