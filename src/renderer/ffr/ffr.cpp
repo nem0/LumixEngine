@@ -32,19 +32,6 @@ struct Buffer
 };
 
 
-struct Uniform
-{
-	enum { MAX_COUNT = 512 };
-
-	UniformType type;
-	u32 count;
-	void* data; 
-	#ifdef LUMIX_DEBUG
-		StaticString<32> debug_name;
-	#endif
-};
-
-
 struct Texture
 {
 	enum { MAX_COUNT = 8192 };
@@ -60,12 +47,6 @@ struct Program
 	enum { MAX_COUNT = 2048 };
 	GLuint handle;
 	GLuint vao;
-
-	struct {
-		int loc;
-		UniformHandle uniform;
-	} uniforms[32];
-	int uniforms_count;
 };
 
 
@@ -115,9 +96,7 @@ static struct {
 	void* device_context;
 	Pool<Buffer, Buffer::MAX_COUNT> buffers;
 	Pool<Texture, Texture::MAX_COUNT> textures;
-	Pool<Uniform, Uniform::MAX_COUNT> uniforms;
 	Pool<Program, Program::MAX_COUNT> programs;
-	HashMap<u32, u32>* uniforms_hash_map;
 	MT::CriticalSection handle_mutex;
 	DWORD thread;
 	int instance_attributes = 0;
@@ -847,59 +826,6 @@ void scissor(u32 x,u32 y,u32 w,u32 h)
 	glScissor(x, y, w, h);
 }
 
-int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform)
-{
-	const Program& prg = g_ffr.programs.values[program_handle.value];
-	const Uniform& u = g_ffr.uniforms[uniform.value];
-	for(int i = 0; i < prg.uniforms_count; ++i) {
-		const auto& pu = prg.uniforms[i];
-		if (pu.uniform.value == uniform.value) {
-			return pu.loc;
-		}
-	}
-	return -1;
-}
-
-void applyUniformMatrix4f(int location, const float* value)
-{
-	glUniformMatrix4fv(location, 1, false, value);
-}
-
-void applyUniformMatrix4fv(int location, u32 count, const float* value)
-{
-	glUniformMatrix4fv(location, count, false, value);
-}
-
-void applyUniformMatrix4x3f(int location, const float* value)
-{
-	glUniformMatrix4x3fv(location, 1, false, value);
-}
-
-void applyUniform1i(int location, int value)
-{
-	glUniform1i(location, value);
-}
-
-void applyUniform4i(int location, const int* value)
-{
-	glUniform4iv(location, 1, value);
-}
-
-void applyUniform4f(int location, const float* value)
-{
-	glUniform4fv(location, 1, value);
-}
-
-void applyUniform3f(int location, const float* value)
-{
-	glUniform3fv(location, 1, value);
-}
-
-void applyUniformMatrix3x4f(int location, const float* value)
-{
-	glUniformMatrix3x4fv(location, 1, false, value);
-}
-
 void useProgram(ProgramHandle handle)
 {
 	const Program& prg = g_ffr.programs.values[handle.value];
@@ -914,54 +840,16 @@ void useProgram(ProgramHandle handle)
 			CHECK_GL(glBindVertexArray(prg.vao));
 		}
 	}
-	
-	for(int i = 0; i < prg.uniforms_count; ++i) {
-		const auto& pu = prg.uniforms[i];
-		const Uniform& u = g_ffr.uniforms[pu.uniform.value];
-		switch(u.type) {
-			case UniformType::MAT4:
-				glUniformMatrix4fv(pu.loc, u.count, false, (float*)u.data);
-				break;
-			case UniformType::MAT4X3:
-				glUniformMatrix4x3fv(pu.loc, u.count, false, (float*)u.data);
-				break;
-			case UniformType::MAT3X4:
-				glUniformMatrix3x4fv(pu.loc, u.count, false, (float*)u.data);
-				break;
-			case UniformType::VEC4:
-				glUniform4fv(pu.loc, u.count, (float*)u.data);
-				break;
-			case UniformType::VEC3:
-				glUniform3fv(pu.loc, u.count, (float*)u.data);
-				break;
-			case UniformType::VEC2:
-				glUniform2fv(pu.loc, u.count, (float*)u.data);
-				break;
-			case UniformType::FLOAT:
-				glUniform1fv(pu.loc, u.count, (float*)u.data);
-				break;
-			case UniformType::INT:
-				glUniform1i(pu.loc, *(int*)u.data);
-				break;
-			case UniformType::IVEC2:
-				glUniform2iv(pu.loc, u.count, (int*)u.data);
-				break;
-			case UniformType::IVEC4:
-				glUniform4iv(pu.loc, u.count, (int*)u.data);
-				break;
-			default: ASSERT(false); break;
-		}
-	}
 }
 
 
-void bindTextures(const TextureHandle* handles, int offset, int count)
+void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 {
 	GLuint gl_handles[64];
-	ASSERT(count <= lengthOf(gl_handles));
+	ASSERT(count <= (u32)lengthOf(gl_handles));
 	ASSERT(handles);
 	
-	for(int i = 0; i < count; ++i) {
+	for(u32 i = 0; i < count; ++i) {
 		if (handles[i].isValid()) {
 			gl_handles[i] = g_ffr.textures[handles[i].value].handle;
 		}
@@ -1236,8 +1124,9 @@ void stopCapture()
 	}
 }
 
+Backend getBackend() { return Backend::OPENGL; }
 
-void swapBuffers()
+void swapBuffers(u32, u32)
 {
 	checkThread();
 	HDC hdc = (HDC)g_ffr.device_context;
@@ -1765,57 +1654,6 @@ static const char* shaderTypeToString(ShaderType type)
 }
 
 
-static u32 getSize(UniformType type)
-{
-	switch(type)
-	{
-	case UniformType::INT: return sizeof(int);
-	case UniformType::FLOAT: return sizeof(float);
-	case UniformType::IVEC2: return sizeof(int) * 2;
-	case UniformType::IVEC4: return sizeof(int) * 4;
-	case UniformType::VEC2: return sizeof(float) * 2;
-	case UniformType::VEC3: return sizeof(float) * 3;
-	case UniformType::VEC4: return sizeof(float) * 4;
-	case UniformType::MAT4: return sizeof(float) * 16;
-	case UniformType::MAT4X3: return sizeof(float) * 12;
-	case UniformType::MAT3X4: return sizeof(float) * 12;
-	default:
-		ASSERT(false);
-		return 4;
-	}
-}
-
-
-UniformHandle allocUniform(const char* name, UniformType type, int count)
-{
-	const u32 name_hash = crc32(name);
-	
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
-
-	auto iter = g_ffr.uniforms_hash_map->find(name_hash);
-	if(iter.isValid()) {
-		return { iter.value() };
-	}
-
-	if(g_ffr.uniforms.isFull()) {
-		logError("Renderer") << "FFR is out of free uniform slots.";
-		return INVALID_UNIFORM;
-	}
-	const int id = g_ffr.uniforms.alloc();
-	Uniform& u = g_ffr.uniforms[id];
-	u.count = count;
-	u.type = type;
-	#ifdef LUMIX_DEBUG
-		u.debug_name = name;
-	#endif
-	size_t byte_size = getSize(type) * count;
-	u.data = g_ffr.allocator->allocate(byte_size);
-	setMemory(u.data, 0, byte_size);
-	g_ffr.uniforms_hash_map->insert(name_hash, id);
-	return { (u32)id };
-}
-
-
 bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
 {
 	checkThread();
@@ -1895,49 +1733,6 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 
 	const int id = prog.value;
 	g_ffr.programs[id].handle = prg;
-	GLint uniforms_count;
-	CHECK_GL(glGetProgramiv(prg, GL_ACTIVE_UNIFORMS, &uniforms_count));
-	if(uniforms_count > lengthOf(g_ffr.programs[id].uniforms)) {
-		uniforms_count = lengthOf(g_ffr.programs[id].uniforms);
-		logError("Renderer") << "Too many uniforms per program, not all will be used.";
-	}
-	g_ffr.programs[id].uniforms_count = 0;
-	for(int i = 0; i < uniforms_count; ++i) {
-		char name[32];
-		GLint size;
-		GLenum type;
-		UniformType ffr_type;
-		glGetActiveUniform(prg, i, sizeof(name), nullptr, &size, &type, name);
-		switch(type) {
-			case GL_SAMPLER_CUBE:
-			case GL_SAMPLER_2D_ARRAY:
-			case GL_SAMPLER_2D:
-			case GL_SAMPLER_3D: continue;
-			case GL_INT: ffr_type = UniformType::INT; break;
-			case GL_FLOAT: ffr_type = UniformType::FLOAT; break;
-			case GL_FLOAT_VEC2: ffr_type = UniformType::VEC2; break;
-			case GL_FLOAT_VEC3: ffr_type = UniformType::VEC3; break;
-			case GL_FLOAT_VEC4: ffr_type = UniformType::VEC4; break;
-			case GL_FLOAT_MAT4: ffr_type = UniformType::MAT4; break;
-			case GL_FLOAT_MAT4x3: ffr_type = UniformType::MAT4X3; break;
-			case GL_FLOAT_MAT3x4: ffr_type = UniformType::MAT3X4; break;
-			case GL_INT_VEC2: ffr_type = UniformType::IVEC2; break;
-			case GL_INT_VEC4: ffr_type = UniformType::IVEC4; break;
-			default: ASSERT(false); ffr_type = UniformType::VEC4; break;
-		}
-
-		if (size > 1) {
-			name[stringLength(name) - 3] = '\0';
-		}
-		const int loc = glGetUniformLocation(prg, name);
-
-		if(loc >= 0) {
-			auto& u = g_ffr.programs[id].uniforms[g_ffr.programs[id].uniforms_count];
-			u.loc = loc;
-			u.uniform = allocUniform(name, ffr_type, size);
-			++g_ffr.programs[id].uniforms_count;
-		}
-	}
 	g_ffr.programs[id].vao = createVAO(decl);
 	return true;
 }
@@ -1961,9 +1756,7 @@ void preinit(IAllocator& allocator)
 	g_ffr.allocator = &allocator;
 	g_ffr.textures.create(*g_ffr.allocator);
 	g_ffr.buffers.create(*g_ffr.allocator);
-	g_ffr.uniforms.create(*g_ffr.allocator);
 	g_ffr.programs.create(*g_ffr.allocator);
-	g_ffr.uniforms_hash_map = LUMIX_NEW(*g_ffr.allocator, HashMap<u32, u32>)(*g_ffr.allocator);
 }
 
 
@@ -2080,68 +1873,6 @@ void destroy(FramebufferHandle fb)
 	CHECK_GL(glDeleteFramebuffers(1, &fb.value));
 }
 
-
-int getAttribLocation(ProgramHandle program, const char* uniform_name)
-{
-	checkThread();
-	return glGetAttribLocation(g_ffr.programs.values[program.value].handle, uniform_name);
-}
-
-
-void setUniform2f(UniformHandle uniform, const float* value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::VEC2);
-	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 2); 
-}
-
-
-void setUniform4f(UniformHandle uniform, const float* value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::VEC4);
-	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 4); 
-}
-
-
-void setUniform4i(UniformHandle uniform, const int* value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::IVEC4);
-	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 4); 
-}
-
-
-void setUniform3f(UniformHandle uniform, const float* value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::VEC3);
-	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 3); 
-}
-
-
-void setUniformMatrix4f(UniformHandle uniform, const float* value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::MAT4);
-	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 16); 
-}
-
-
-void setUniformMatrix4x3f(UniformHandle uniform, const float* value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::MAT4X3);
-	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 12); 
-}
-
-
-void setUniformMatrix3x4f(UniformHandle uniform, const float* value)
-{
-	checkThread();
-	ASSERT(g_ffr.uniforms[uniform.value].type == UniformType::MAT3X4);
-	memcpy(g_ffr.uniforms[uniform.value].data, value, sizeof(value[0]) * 12); 
-}
 
 void bindLayer(FramebufferHandle fb, TextureHandle rb, u32 layer)
 {
@@ -2310,12 +2041,7 @@ void shutdown()
 	checkThread();
 	g_ffr.textures.destroy(*g_ffr.allocator);
 	g_ffr.buffers.destroy(*g_ffr.allocator);
-	for (u32 u : *g_ffr.uniforms_hash_map) {
-		g_ffr.allocator->deallocate(g_ffr.uniforms[u].data);
-	}
-	g_ffr.uniforms.destroy(*g_ffr.allocator);
 	g_ffr.programs.destroy(*g_ffr.allocator);
-	LUMIX_DELETE(*g_ffr.allocator, g_ffr.uniforms_hash_map);
 }
 
 } // ns ffr 

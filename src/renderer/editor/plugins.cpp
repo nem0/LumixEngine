@@ -1992,8 +1992,6 @@ struct RenderInterfaceImpl final : public RenderInterface
 
 		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
-
-		m_model_uniform = ffr::allocUniform("u_model", ffr::UniformType::MAT4, 1);
 	}
 
 
@@ -2260,7 +2258,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 	{
 		if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
 
-		Pipeline::renderModel(*m_models[model], mtx, m_model_uniform);
+		m_pipeline.renderModel(*m_models[model], mtx);
 	}
 
 
@@ -2312,7 +2310,6 @@ struct RenderInterfaceImpl final : public RenderInterface
 	RenderScene* m_render_scene;
 	Renderer& m_renderer;
 	Pipeline& m_pipeline;
-	ffr::UniformHandle m_model_uniform;
 	HashMap<int, Model*> m_models;
 	HashMap<void*, Texture*> m_textures;
 	int m_model_index;
@@ -2471,7 +2468,13 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				ffr::createBuffer(ub, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 256, nullptr);
 				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
 				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
-				#if 1 // OGL
+				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
+				ffr::VertexDecl decl;
+				decl.addAttribute(0, 0, 2, ffr::AttributeType::FLOAT, 0);
+				decl.addAttribute(1, 8, 2, ffr::AttributeType::FLOAT, 0);
+				decl.addAttribute(2, 16, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
+
+				if (ffr::getBackend() == ffr::Backend::OPENGL) {
 					const char* vs =
 						R"#(#version 420
 						layout(location = 0) in vec2 a_pos;
@@ -2499,11 +2502,14 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
 							o_color.a = v_color.a * tc.a;
 						})#";
-				#else
+					const char* srcs[] = {vs, fs};
+					ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+				}
+				else {
 					const char* vs =
 						R"#(cbuffer vertexBuffer : register(b0)
 						{
-							float4x4 ProjectionMatrix;
+							float2 canvas_size;
 						};
 
 						struct VS_INPUT
@@ -2523,7 +2529,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 						PS_INPUT main(VS_INPUT input)
 						{
 							PS_INPUT output;
-							output.pos = mul( ProjectionMatrix, float4(input.pos.xy, 0.f, 1.f));
+							output.pos = float4(input.pos.xy / canvas_size * 2 - 1, 0, 1);
+							output.pos.y = -output.pos.y;
 							output.col = input.col;
 							output.uv  = input.uv;
 							return output;
@@ -2544,15 +2551,9 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 							float4 out_col = input.col * texture0.Sample(sampler0, input.uv);
 							return out_col;
 						})#";
-
-				#endif
-				const char* srcs[] = {vs, fs};
-				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
-				ffr::VertexDecl decl;
-				decl.addAttribute(0, 0, 2, ffr::AttributeType::FLOAT, 0);
-				decl.addAttribute(1, 8, 2, ffr::AttributeType::FLOAT, 0);
-				decl.addAttribute(2, 16, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
-				ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+					const char* srcs[] = {vs, fs};
+					ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+				}
 			}
 
 			ffr::pushDebugGroup("imgui");

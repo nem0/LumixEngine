@@ -16,14 +16,12 @@ struct ProgramHandle { u32 value; bool isValid() const { return value != 0xFFffF
 struct FramebufferHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct TextureHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct QueryHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
-struct UniformHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 
 const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
 const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
 const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
 const FramebufferHandle INVALID_FRAMEBUFFER = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
-const UniformHandle INVALID_UNIFORM = { 0xffFFffFF };
 const FenceHandle INVALID_FENCE = { 0 };
 
 
@@ -34,6 +32,10 @@ enum class LogLevel : u32 {
 	FATAL
 };
 
+enum class Backend {
+	OPENGL,
+	DX11
+};
 
 enum class StateFlags : u64 {
 	WIREFRAME = 1 << 0,
@@ -124,19 +126,6 @@ enum class TextureFormat : u32 {
 	SRGBA
 };
 
-enum class UniformType : u32 {
-	INT,
-	FLOAT,
-	VEC2,
-	VEC3,
-	VEC4,
-	IVEC2,
-	IVEC4,
-	MAT4,
-	MAT4X3,
-	MAT3X4
-};
-
 
 enum class TextureFlags : u32 {
 	SRGB = 1 << 0,
@@ -150,7 +139,8 @@ enum class BufferFlags : u32 {
 	MAP_READ = 1 << 2,
 	MAP_WRITE = 1 << 3,
 	MAP_FLUSH_EXPLICIT = 1 << 4,
-	DYNAMIC_STORAGE = 1 << 5
+	DYNAMIC_STORAGE = 1 << 5,
+	UNIFORM_BUFFER = 1 << 6
 };
 
 enum class DataType {
@@ -196,7 +186,8 @@ struct TextureInfo {
 
 void preinit(IAllocator& allocator);
 bool init(void* window_handle, bool debug);
-void swapBuffers();
+Backend getBackend();
+void swapBuffers(u32 w, u32 h);
 bool isHomogenousDepth();
 bool isOriginBottomLeft();
 void checkThread();
@@ -224,7 +215,6 @@ inline u64 getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
-UniformHandle allocUniform(const char* name, UniformType type, int count);
 
 FenceHandle createFence();
 void waitClient(FenceHandle fence);
@@ -242,7 +232,7 @@ FramebufferHandle createFramebuffer();
 QueryHandle createQuery();
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
-void bindTextures(const TextureHandle* handles, int offset, int count);
+void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
 void update(FramebufferHandle fb, u32 renderbuffers_count, const TextureHandle* renderbuffers);
 void bindLayer(FramebufferHandle fb, TextureHandle rb, u32 layer);
 void update(BufferHandle buffer, const void* data, size_t offset, size_t size);
@@ -263,7 +253,6 @@ void destroy(BufferHandle buffer);
 void destroy(TextureHandle texture);
 void destroy(FramebufferHandle fb);
 void destroy(QueryHandle query);
-void destroy(UniformHandle query);
 
 void bindIndexBuffer(BufferHandle handle);
 void drawTriangles(u32 indices_count, DataType index_type);
@@ -274,23 +263,6 @@ void drawTriangleStripArraysInstanced(u32 offset, u32 indices_count, u32 instanc
 
 void pushDebugGroup(const char* msg);
 void popDebugGroup();
-int getAttribLocation(ProgramHandle program, const char* uniform_name);
-void setUniform4i(UniformHandle uniform, const int* value);
-void setUniform2f(UniformHandle uniform, const float* value);
-void setUniform3f(UniformHandle uniform, const float* value);
-void setUniform4f(UniformHandle uniform, const float* value);
-void setUniformMatrix3x4f(UniformHandle uniform, const float* value);
-void setUniformMatrix4f(UniformHandle uniform, const float* value);
-void setUniformMatrix4x3f(UniformHandle uniform, const float* value);
-int getUniformLocation(ProgramHandle program_handle, UniformHandle uniform);
-void applyUniform1i(int location, int value);
-void applyUniform4i(int location, const int* value);
-void applyUniform4f(int location, const float* value);
-void applyUniform3f(int location, const float* value);
-void applyUniformMatrix3x4f(int location, const float* value);
-void applyUniformMatrix4f(int location, const float* value);
-void applyUniformMatrix4fv(int location, u32 count, const float* value);
-void applyUniformMatrix4x3f(int location, const float* value);
 
 void setFramebuffer(FramebufferHandle fb, bool srgb);
 
