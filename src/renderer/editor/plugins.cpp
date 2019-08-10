@@ -2475,13 +2475,13 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				decl.addAttribute(2, 16, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
 
 				const char* vs =
-					R"#(#version 420
+					R"#(
 					layout(location = 0) in vec2 a_pos;
 					layout(location = 1) in vec2 a_uv;
 					layout(location = 2) in vec4 a_color;
 					layout(location = 0) out vec4 v_color;
 					layout(location = 1) out vec2 v_uv;
-					layout (std140, binding = 0) uniform IMGUIState {
+					layout (std140, binding = 4) uniform IMGUIState {
 						vec2 u_canvas_size;
 					};
 					void main() {
@@ -2491,7 +2491,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 						gl_Position.y = -gl_Position.y;
 					})#";
 				const char* fs = 
-					R"#(#version 420
+					R"#(
 					layout(location = 0) in vec4 v_color;
 					layout(location = 1) in vec2 v_uv;
 					layout(location = 0) out vec4 o_color;
@@ -2502,7 +2502,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 						o_color.a = v_color.a * tc.a;
 					})#";
 				const char* srcs[] = {vs, fs};
-				ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+				const char* prefix = "#version 420\n";
+				ffr::createProgram(program, decl, srcs, types, 2, &prefix, 1, "imgui shader");
 			}
 
 			ffr::pushDebugGroup("imgui");
@@ -2514,7 +2515,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			ffr::viewport(0, 0, width, height);
 			const float canvas_size[] = {(float)width, (float)height};
 			ffr::update(ub, canvas_size, 0, sizeof(canvas_size));
-			ffr::bindUniformBuffer(0, ub, 0, sizeof(canvas_size));
+			ffr::bindUniformBuffer(4, ub, 0, sizeof(canvas_size));
 
 			vb_offset = 0;
 			ib_offset = 0;

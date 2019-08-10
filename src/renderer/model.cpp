@@ -346,7 +346,7 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 		vertex_decl->addAttribute(4, 0, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
 		vertex_decl->addAttribute(5, 16, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
 		// TODO this is here because of grass, find a better solution
-		vertex_decl->addAttribute(6, 32, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
+		//vertex_decl->addAttribute(6, 32, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
 	}
 
 	return true;
