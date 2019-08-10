@@ -51,6 +51,6 @@ fragment_shader [[
 		
 		o_color.rgb = direct;
 				
-		o_color.w = 0;
+		o_color.w = 1;
 	}
 ]]
