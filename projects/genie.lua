@@ -6,18 +6,19 @@ elseif "linux-gcc-5" == _OPTIONS["gcc"] then
 elseif "linux-clang" == _OPTIONS["gcc"] then
 	ide_dir = "clang"
 end
-local binary_api_dir = iif(ide_dir == "vs2019", "vs2017", ide_dir)
+binary_api_dir = iif(ide_dir == "vs2019", "vs2017", ide_dir)
 
 local ROOT_DIR = path.getabsolute("../")
 local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
-local build_app = false
-local build_studio = true
+build_app = false
+build_studio = true
 local build_game = false
 local working_dir = nil
 local debug_args = nil
 local release_args = nil
 local plugins = {}
+local base_plugins = {}
 local embed_resources = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
@@ -31,6 +32,27 @@ function has_plugin(plugin)
   return false
 end
 
+
+function linkPlugin(plugin_name)
+	if build_studio then
+		project "studio"
+			if _OPTIONS["static-plugins"] then	
+				forceLink("s_" .. plugin_name .. "_plugin_register")
+				forceLink("setStudioApp_" .. plugin_name)
+			end
+			links(plugin_name)
+	end
+
+	if build_app then
+		project "app"
+		if _OPTIONS["static-plugins"] then	
+			forceLink ("s_" .. plugin_name .. "_plugin_register")
+		end
+		if build_studio then
+			forceLink("setStudioApp_" .. plugin_name)
+		end
+	end
+end
 
 newoption {
 	trigger = "plugins",
@@ -149,30 +171,37 @@ end
 
 if not _OPTIONS["no-physics"] then
 	table.insert(plugins, "physics")
+	table.insert(base_plugins, "physics")
 end
 
 if _OPTIONS["no-renderer"] == nil then
 	table.insert(plugins, "renderer")
+	table.insert(base_plugins, "renderer")
 end
 
 if _OPTIONS["no-audio"] == nil then
 	table.insert(plugins, "audio")
+	table.insert(base_plugins, "audio")
 end
 
 if _OPTIONS["no-lua-script"] == nil then
 	table.insert(plugins, "lua_script")
+	table.insert(base_plugins, "lua_script")
 end
 
 if _OPTIONS["no-gui"] == nil or _ACTION ~= "vs2019" then
 	table.insert(plugins, "gui")
+	table.insert(base_plugins, "gui")
 end
 
 if _OPTIONS["no-animation"] == nil then
 	table.insert(plugins, "animation")
+	table.insert(base_plugins, "animation")
 end
 
 if _OPTIONS["no-navigation"] == nil then
 	table.insert(plugins, "navigation")
+	table.insert(base_plugins, "navigation")
 end
 
 if _OPTIONS["no-studio"] then
@@ -787,14 +816,6 @@ if build_app then
 		
 		includedirs { "../src", "../src/app" }
 		if _OPTIONS["static-plugins"] then	
-			for _, plugin in ipairs(plugins) do
-				forceLink ("s_" .. plugin .. "_plugin_register")
-				links { plugin }
-				if build_studio then
-					forceLink("setStudioApp_" .. plugin)
-				end
-			end
-					
 			if build_studio then
 				for _, plugin in ipairs(plugins) do
 					forceLink("setStudioApp_" .. plugin)
@@ -844,6 +865,10 @@ if build_app then
 		
 		useLua()
 		defaultConfigurations()
+end
+
+for _, plugin in ipairs(base_plugins) do
+	linkPlugin(plugin)
 end
 
 
@@ -910,7 +935,6 @@ if build_studio then
 			debugdir "../data"
 		end
 
-
 		files { "../src/studio/**.cpp" }
 
 		if embed_resources then
@@ -920,14 +944,6 @@ if build_studio then
 		includedirs { "../src" }
 
 		if _OPTIONS["static-plugins"] then	
-			for _, plugin in ipairs(plugins) do
-				forceLink("s_" .. plugin .. "_plugin_register")
-				forceLink("setStudioApp_" .. plugin)
-				links { plugin }
-			end
-			
-		
-
 			links { "editor", "engine" }
 			linkLib "nvtt"
 			linkLib "freetype"
