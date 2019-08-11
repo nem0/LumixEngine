@@ -1,20 +1,22 @@
 ------------------
 
+include "pipelines/common.glsl"
+
 vertex_shader [[
 	
-	out vec2 v_uv;
+	layout(location = 0) out vec2 v_uv;
+	
+
 	void main() {
-		v_uv = vec2((gl_VertexID & 1), (gl_VertexID & 2) * 0.5);
-		gl_Position = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
 	}
 ]]
 
 ---------------------
 
 fragment_shader [[
-	
-	layout (binding=0) uniform sampler2D u_mask;
-	in vec2 v_uv;
+	layout (binding = 0) uniform sampler2D u_mask;
+	layout(location = 0) in vec2 v_uv;
 	layout(location = 0) out vec4 o_color;
 	
 	void main() {
