@@ -1,9 +1,3 @@
-#if 0
-
-#include "ffr_dx.cpp"
-
-#else 
-
 #include "ffr.h"
 #include "engine/array.h"
 #include "engine/crc32.h"
