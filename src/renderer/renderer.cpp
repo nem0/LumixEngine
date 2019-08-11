@@ -595,9 +595,8 @@ struct RendererImpl final : public Renderer
 		const ffr::TextureHandle handle = ffr::allocTextureHandle();
 		if (!handle.isValid()) return handle;
 
-		ffr::TextureInfo tmp_info = ffr::getTextureInfo(memory.data);
 		if(info) {
-			*info = tmp_info;
+			*info = ffr::getTextureInfo(memory.data);
 		}
 
 		struct Cmd : RenderJob {
@@ -633,6 +632,7 @@ struct RendererImpl final : public Renderer
 	{
 		// TODO grow if not enough space
 		TransientSlice slice;
+		size = (size + 15) & ~15;
 		slice.buffer = m_transient_buffer;
 		slice.offset = MT::atomicAdd(&m_transient_buffer_offset, size);
 		if (slice.offset + size > TRANSIENT_BUFFER_SIZE) {

@@ -52,7 +52,7 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 	if (!iter.isValid()) {
 		PROFILE_BLOCK("compile_shader");
 		static const char* shader_code_prefix = 
-			R"#(#version 440
+			R"#(
 			layout (std140, binding = 0) uniform GlobalState {
 				mat4 u_shadow_view_projection;
 				mat4 u_shadowmap_matrices[4];

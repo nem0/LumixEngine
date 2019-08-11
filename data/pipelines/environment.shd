@@ -9,9 +9,9 @@ common [[
 ------------------
 
 vertex_shader [[
-	in vec3 a_position;
-	out vec3 v_uv;
-	out float v_radius;
+	layout (location = 0) in vec3 a_position;
+	layout (location = 0) out vec3 v_uv;
+	layout (location = 1) out float v_radius;
 	void main()
 	{
 		v_uv = a_position;
@@ -23,8 +23,8 @@ vertex_shader [[
 
 
 fragment_shader [[
-	in vec3 v_uv;
-	out vec4 o_color;
+	layout (location = 0) in vec3 v_uv;
+	layout (location = 0) out vec4 o_color;
 
 	layout (binding=0) uniform sampler2D u_gbuffer0;
 	layout (binding=1) uniform sampler2D u_gbuffer1;

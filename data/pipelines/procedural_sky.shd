@@ -1,18 +1,19 @@
+include "pipelines/common.glsl"
+
 vertex_shader [[
 	
-	out vec2 v_uv;
+	layout (location = 0) out vec2 v_uv;
 	
 	void main()
 	{
-		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
-		gl_Position = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
 	}
 ]]
 
 
 fragment_shader [[
-	in vec2 v_uv;
-	out vec4 o_color;
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 0) out vec4 o_color;
 
 	vec3 air_color = vec3(0.18867780436772762, 0.4978442963618773, 0.6616065586417131);
 	
@@ -64,7 +65,11 @@ fragment_shader [[
 	vec3 get_world_normal(vec2 frag_coord)
 	{
 		float z = 1;
-		vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
+		#ifdef _ORIGIN_BOTTOM_LEFT
+			vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
+		#else
+			vec4 posProj = vec4(vec2(frag_coord.x, -frag_coord.y) * 2 - 1, z, 1.0);
+		#endif
 		vec4 wpos = u_camera_inv_view_projection * posProj;
 		wpos /= wpos.w;
 		vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;

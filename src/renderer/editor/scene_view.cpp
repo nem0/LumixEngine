@@ -238,9 +238,10 @@ void SceneView::renderSelection()
 		{
 			PROFILE_FUNCTION();
 			const ffr::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
+
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
-				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, rd->vertex_decl, 0); // TODO define
+				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, rd->vertex_decl, m_define_mask);
 
 				if (!prog.isValid()) continue;
 			
@@ -248,7 +249,7 @@ void SceneView::renderSelection()
 				ffr::useProgram(prog);
 				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				ffr::bindIndexBuffer(rd->index_buffer_handle);
-				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | item.material_render_states);
+				ffr::setState(item.material_render_states);
 				ffr::drawTriangles(rd->indices_count, rd->index_type);
 			}
 		}
@@ -263,12 +264,14 @@ void SceneView::renderSelection()
 		Array<Item> m_items;
 		Pipeline* m_pipeline;
 		WorldEditor* m_editor;
+		u32 m_define_mask;
 	};
 
 	Engine& engine = m_editor.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	IAllocator& allocator = renderer->getAllocator();
 	RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
+	job->m_define_mask = 1 << renderer->getShaderDefineIdx("DEPTH");
 	job->m_pipeline = m_pipeline;
 	job->m_editor = &m_editor;
 	renderer->queue(job, 0);

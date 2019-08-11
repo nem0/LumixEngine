@@ -16,6 +16,14 @@ vec2 saturate(vec2 a) { return clamp(a, vec2(0), vec2(1)); }
 vec3 saturate(vec3 a) { return clamp(a, vec3(0), vec3(1)); }
 vec4 saturate(vec4 a) { return clamp(a, vec4(0), vec4(1)); }
 
+vec4 fullscreenQuad(int vertexID, out vec2 uv) {
+	uv = vec2((vertexID & 1), (vertexID & 2) * 0.5);
+	#ifdef _ORIGIN_BOTTOM_LEFT
+		return vec4((vertexID & 1) * 2 - 1, (vertexID & 2) - 1, 0, 1);
+	#else
+		return vec4((vertexID & 1) * 2 - 1, -(vertexID & 2) + 1, 0, 1);
+	#endif
+}
 
 float packEmission(float emission)
 {
@@ -32,7 +40,11 @@ float unpackEmission(float emission)
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 {
 	float z = texture(depth_buffer, tex_coord).r;
-	vec4 pos_proj = vec4(tex_coord * 2 - 1, z, 1.0);
+	#ifdef _ORIGIN_BOTTOM_LEFT
+		vec4 pos_proj = vec4(vec2(tex_coord.x, tex_coord.y) * 2 - 1, z, 1.0);
+	#else 
+		vec4 pos_proj = vec4(vec2(tex_coord.x, -tex_coord.y) * 2 - 1, z, 1.0);
+	#endif
 	vec4 view_pos = inv_view_proj * pos_proj;
 	return view_pos.xyz / view_pos.w;
 }

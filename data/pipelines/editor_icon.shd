@@ -10,8 +10,12 @@ vertex_shader [[
 		mat4 u_model;
 	};
 	layout(location = 0) in vec3 a_position;
-	layout(location = 1) in vec2 a_uv;
-	out vec2 v_uv;
+	#ifdef _HAS_ATTR1
+		layout(location = 1) in vec2 a_uv;
+	#else
+		const vec2 a_uv = vec2(0, 0);
+	#endif
+	layout (location = 0) out vec2 v_uv;
 	
 	void main() {
 		v_uv = a_uv;
@@ -23,12 +27,9 @@ vertex_shader [[
 
 fragment_shader [[
 	layout (binding=0) uniform sampler2D u_albedomap;
-	in vec2 v_uv;
-	in vec3 v_normal;
-	
+	layout (location = 0) in vec2 v_uv;
 	layout(location = 0) out vec4 o_color;
 
-	
 	void main() {
 		vec4 albedo = texture(u_albedomap, v_uv);
 		#ifdef ALPHA_CUTOUT

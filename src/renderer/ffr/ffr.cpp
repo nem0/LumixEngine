@@ -1,3 +1,9 @@
+#if 0
+
+#include "ffr_dx.cpp"
+
+#else 
+
 #include "ffr.h"
 #include "engine/array.h"
 #include "engine/crc32.h"
@@ -1659,7 +1665,23 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 {
 	checkThread();
 
-	const char* combined_srcs[16];
+	static const char* attr_defines[] = {
+		"#define _HAS_ATTR0\n",
+		"#define _HAS_ATTR1\n",
+		"#define _HAS_ATTR2\n",
+		"#define _HAS_ATTR3\n",
+		"#define _HAS_ATTR4\n",
+		"#define _HAS_ATTR5\n",
+		"#define _HAS_ATTR6\n",
+		"#define _HAS_ATTR7\n",
+		"#define _HAS_ATTR8\n",
+		"#define _HAS_ATTR9\n",
+		"#define _HAS_ATTR10\n",
+		"#define _HAS_ATTR11\n",
+		"#define _HAS_ATTR12\n"
+	};
+
+	const char* combined_srcs[32];
 	ASSERT(prefixes_count < lengthOf(combined_srcs) - 1); 
 	enum { MAX_SHADERS_PER_PROGRAM = 16 };
 
@@ -1682,12 +1704,17 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			default: ASSERT(0); break;
 		}
 		const GLuint shd = glCreateShader(shader_type);
-		combined_srcs[prefixes_count] = srcs[i];
+		combined_srcs[0] = "#version 440\n";
+		combined_srcs[1] = "#define _ORIGIN_BOTTOM_LEFT\n";
+		combined_srcs[prefixes_count + decl.attributes_count + 2] = srcs[i];
 		for (int j = 0; j < prefixes_count; ++j) {
-			combined_srcs[j] = prefixes[j];
+			combined_srcs[j + 2] = prefixes[j];
+		}
+		for (u32 j = 0; j < decl.attributes_count; ++j) {
+			combined_srcs[j + prefixes_count + 2] = attr_defines[decl.attributes[j].idx];
 		}
 
-		CHECK_GL(glShaderSource(shd, 1 + prefixes_count, combined_srcs, 0));
+		CHECK_GL(glShaderSource(shd, 3 + prefixes_count + decl.attributes_count, combined_srcs, 0));
 		CHECK_GL(glCompileShader(shd));
 
 		GLint compile_status;
@@ -2030,3 +2057,5 @@ void shutdown()
 } // ns ffr 
 
 } // ns Lumix
+
+#endif

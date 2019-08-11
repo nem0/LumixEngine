@@ -2440,10 +2440,18 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 				const u32 h = u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f));
 
-				ffr::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
-					height - u32(maximum(pcmd->ClipRect.y, 0.0f)) - h,
-					u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
-					u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
+				if(ffr::isOriginBottomLeft()) {
+					ffr::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
+						height - u32(maximum(pcmd->ClipRect.y, 0.0f)) - h,
+						u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
+						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
+				}
+				else {
+					ffr::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
+						u32(maximum(pcmd->ClipRect.y, 0.0f)),
+						u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
+						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
+				}
 
 				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
 		
@@ -2482,13 +2490,13 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 					layout(location = 0) out vec4 v_color;
 					layout(location = 1) out vec2 v_uv;
 					layout (std140, binding = 4) uniform IMGUIState {
-						vec2 u_canvas_size;
+						mat2x3 u_canvas_mtx;
 					};
 					void main() {
 						v_color = a_color;
 						v_uv = a_uv;
-						gl_Position = vec4(a_pos / u_canvas_size * 2 - 1, 0, 1);
-						gl_Position.y = -gl_Position.y;
+						vec2 p = vec3(a_pos, 1) * u_canvas_mtx;
+						gl_Position = vec4(p.xy, 0, 1);
 					})#";
 				const char* fs = 
 					R"#(
@@ -2502,8 +2510,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 						o_color.a = v_color.a * tc.a;
 					})#";
 				const char* srcs[] = {vs, fs};
-				const char* prefix = "#version 420\n";
-				ffr::createProgram(program, decl, srcs, types, 2, &prefix, 1, "imgui shader");
+				ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
 			ffr::pushDebugGroup("imgui");
@@ -2513,9 +2520,13 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			ffr::clear((u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH, clear_color, 1.0);
 
 			ffr::viewport(0, 0, width, height);
-			const float canvas_size[] = {(float)width, (float)height};
-			ffr::update(ub, canvas_size, 0, sizeof(canvas_size));
-			ffr::bindUniformBuffer(4, ub, 0, sizeof(canvas_size));
+			const bool is_dx = ffr::getBackend() == ffr::Backend::DX11;
+			const Vec4 canvas_mtx[] = {
+				Vec4(2.f / width, 0, -1, 0),
+				Vec4(0, -2.f / height, 1, 0)
+			};
+			ffr::update(ub, canvas_mtx, 0, sizeof(canvas_mtx));
+			ffr::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
 
 			vb_offset = 0;
 			ib_offset = 0;

@@ -58,14 +58,14 @@ function geomPass(default_set, decal_set)
 	renderTerrains(view_params, default_state)
 	renderBucket(default_set, default_state)
 	endBlock()
-
+	--[[
 	beginBlock("decals")
 	setRenderTargetsReadonlyDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 	bindTextures({
 		dsbuffer,
 	}, 1)
 	renderBucket(decal_set, decal_state)
-	endBlock()
+	endBlock()]]--
 	
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
 end
@@ -261,7 +261,6 @@ function main()
 	end
 
 	debugPass(res, shadowmap)
-		
 	if renderGizmos ~= nil then
 		pass(getCameraParams())
 		setRenderTargets(res, gbuffer_depth)
