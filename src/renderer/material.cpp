@@ -113,12 +113,16 @@ void Material::setDefine(u8 define_idx, bool enabled)
 }
 
 
+Material::Uniform* Material::findUniform(u32 name_hash) {
+	for (Uniform& u : m_uniforms) {
+		if (u.name_hash == name_hash) return &u;
+	}
+	return nullptr;
+}
+
 void Material::unload()
 {
-	// TODO
-/*
 	m_uniforms.clear();
-	*/
 	for (int i = 0; i < m_texture_count; i++) {
 		if (m_textures[i]) {
 			removeDependency(*m_textures[i]);
@@ -157,13 +161,10 @@ bool Material::save(IOutputStream& file)
 	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
-	char tmp[64];
-	toCString(m_metallic, Span(tmp), 9);
-	file << "metallic(" <<  tmp << ")\n";
-	toCString(m_roughness, Span(tmp), 9);
-	file << "roughness(" <<  tmp << ")\n";
-	toCString(m_alpha_ref, Span(tmp), 9);
-	file << "alpha_ref(" <<  tmp << ")\n";
+	file << "emission(" <<  m_emission << ")\n";
+	file << "metallic(" <<  m_metallic << ")\n";
+	file << "roughness(" <<  m_roughness << ")\n";
+	file << "alpha_ref(" <<  m_alpha_ref << ")\n";
 
 	file << "defines {";
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
@@ -174,8 +175,7 @@ bool Material::save(IOutputStream& file)
 	}
 	file << "}\n";
 
-	StaticString<1024> color_tmp("", m_color.x, ", ", m_color.y, ", ", m_color.z, ", ", m_color.w);
-	file << "color { " << color_tmp << " }\n";
+	file << "color { " << m_color.x << ", " << m_color.y << ", " << m_color.z << ", " << m_color.w << " }\n";
 
 	for (int i = 0; i < m_texture_count; ++i) {
 		char path[MAX_PATH_LENGTH];
@@ -187,6 +187,7 @@ bool Material::save(IOutputStream& file)
 		}
 		file << "texture \"/" << path << "\"\n";
 		
+		// TODO
 			/*serializer.beginObject("texture");
 		serializer.serialize("source", path);
 		if (flags & BGFX_TEXTURE_U_CLAMP) serializer.serialize("u_clamp", true);
@@ -200,172 +201,71 @@ bool Material::save(IOutputStream& file)
 		serializer.endObject();*/
 	}
 
-	// TODO
-	/*
-
-	serializer.beginObject();
-	serializer.serialize("render_layer", renderer.getLayerName(m_render_layer));
-	serializer.serialize("layers_count", m_layers_count);
-	serializer.serialize("backface_culling", isBackfaceCulling());
-	
-
-	if (m_custom_flags != 0)
-	{
-		serializer.beginArray("custom_flags");
+	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
+	if (m_custom_flags != 0) {
 		for (int i = 0; i < 32; ++i)
 		{
-			if (m_custom_flags & (1 << i)) serializer.serializeArrayItem(s_custom_flags.flags[i]);
+			if (m_custom_flags & (1 << i)) {
+				file << "custom_flag \"" << s_custom_flags.flags[i] << "\"\n";
+			}
 		}
-		serializer.endArray();
 	}
+	
+	auto writeArray = [&file](const float* value, u32 num) {
+		file << "{ ";
+		for (u32 i = 0; i < num; ++i) {
+			if (i > 0) file << ", ";
+			file << value[i];
+		}
+		file << " }";
+	};
 
-	serializer.beginArray("uniforms");
-	for (int i = 0; i < m_shader->m_uniforms.size(); ++i)
-	{
-		serializer.beginObject();
-		const auto& uniform = m_shader->m_uniforms[i];
-
-		serializer.serialize("name", uniform.name);
-		switch (uniform.type)
-		{
-			case Shader::Uniform::FLOAT:
-				serializer.serialize("float_value", m_uniforms[i].float_value);
-				break;
-			case Shader::Uniform::COLOR:
-				serializer.beginArray("color");
-					serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
-					serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
-					serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
-				serializer.endArray();
-				break;
-			case Shader::Uniform::VEC3:
-				serializer.beginArray("vec3");
-				serializer.serializeArrayItem(m_uniforms[i].vec3[0]);
-				serializer.serializeArrayItem(m_uniforms[i].vec3[1]);
-				serializer.serializeArrayItem(m_uniforms[i].vec3[2]);
-				serializer.endArray();
-				break;
-			case Shader::Uniform::VEC4:
-				serializer.beginArray("vec4");
-				serializer.serializeArrayItem(m_uniforms[i].vec4[0]);
-				serializer.serializeArrayItem(m_uniforms[i].vec4[1]);
-				serializer.serializeArrayItem(m_uniforms[i].vec4[2]);
-				serializer.serializeArrayItem(m_uniforms[i].vec4[3]);
-				serializer.endArray();
-				break;
-			case Shader::Uniform::VEC2:
-				serializer.beginArray("vec2");
-				serializer.serializeArrayItem(m_uniforms[i].vec2[0]);
-				serializer.serializeArrayItem(m_uniforms[i].vec2[1]);
-				serializer.endArray();
-				break;
-			case Shader::Uniform::TIME:
-				serializer.serialize("time", 0);
-				break;
-			case Shader::Uniform::INT:
-				serializer.serialize("int_value", m_uniforms[i].int_value);
-				break;
-			case Shader::Uniform::MATRIX4:
-				serializer.beginArray("matrix_value");
-				for (int j = 0; j < 16; ++j)
-				{
-					serializer.serializeArrayItem(m_uniforms[i].matrix[j]);
+	for (const Shader::Uniform& su : m_shader->m_uniforms) {
+		for (const Uniform& mu : m_uniforms) {
+			if(mu.name_hash == su.name_hash) {
+				file << "uniform(\"" << su.name << "\", ";
+				switch(su.type) {
+					case Shader::Uniform::FLOAT: file << mu.float_value; break;
+					case Shader::Uniform::INT: file << *(int*)&mu.float_value; break;
+					case Shader::Uniform::COLOR: 
+					case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
+					case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
+					case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
+					case Shader::Uniform::MATRIX4: writeArray(mu.matrix, 16); break;
+					default: ASSERT(false); break;
 				}
-				serializer.endArray();
+				file << ")\n";
 				break;
-			default:
-				ASSERT(false);
-				break;
+			}
 		}
-		serializer.endObject();
 	}
-	serializer.endArray();
-	serializer.serialize("emission", m_emission);
-	serializer.beginArray("color");
-		serializer.serializeArrayItem(m_color.x);
-		serializer.serializeArrayItem(m_color.y);
-		serializer.serializeArrayItem(m_color.z);
-		serializer.serializeArrayItem(m_color.w);
-	serializer.endArray();
-	serializer.endObject();*/
+
 	return true;
 }
 
 
-void Material::deserializeUniforms(lua_State* L)
-{
-			// TODO
-	ASSERT(false);
-/*
-serializer.deserializeArrayBegin();
-	m_uniforms.clear();
-	while (!serializer.isArrayEnd())
-	{
-		Uniform& uniform = m_uniforms.emplace();
-		serializer.nextArrayItem();
-		serializer.deserializeObjectBegin();
-		char label[256];
-		while (!serializer.isObjectEnd())
-		{
-			serializer.deserializeLabel(label, 255);
-			if (equalStrings(label, "name"))
-			{
-				char name[32];
-				serializer.deserialize(name, lengthOf(name), "");
-				uniform.name_hash = crc32(name);
+int Material::uniform(lua_State* L) {
+	const char* name = LuaWrapper::checkArg<const char*>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	Uniform u;
+	u.name_hash = crc32(name);
+	switch (lua_type(L, 2)) {
+		case LUA_TNUMBER: u.float_value = LuaWrapper::toType<float>(L, 2); break;
+		case LUA_TTABLE: 
+			switch (lua_objlen(L, 2)) {
+				case 2:	*(Vec2*)u.vec2 = LuaWrapper::toType<Vec2>(L, 2);
+				case 3: *(Vec3*)u.vec3 = LuaWrapper::toType<Vec3>(L, 2);
+				case 4: *(Vec4*)u.vec4 = LuaWrapper::toType<Vec4>(L, 2);
+				case 16: *(Matrix*)u.vec4 = LuaWrapper::toType<Matrix>(L, 2);
+				default: luaL_error(L, "Uniform %s has unsupported type", name); break;
 			}
-			else if (equalStrings(label, "int_value"))
-			{
-				serializer.deserialize(uniform.int_value, 0);
-			}
-			else if (equalStrings(label, "float_value"))
-			{
-				serializer.deserialize(uniform.float_value, 0);
-			}
-			else if (equalStrings(label, "matrix_value"))
-			{
-				serializer.deserializeArrayBegin();
-				for (int i = 0; i < 16; ++i)
-				{
-					serializer.deserializeArrayItem(uniform.matrix[i], 0);
-				}
-				serializer.deserializeArrayEnd();
-			}
-			else if (equalStrings(label, "time"))
-			{
-				serializer.deserialize(uniform.float_value, 0);
-			}
-			else if (equalStrings(label, "color"))
-			{
-				serializer.deserializeArrayBegin();
-					serializer.deserializeArrayItem(uniform.vec3[0], 0);
-					serializer.deserializeArrayItem(uniform.vec3[1], 0);
-					serializer.deserializeArrayItem(uniform.vec3[2], 0);
-				serializer.deserializeArrayEnd();
-			}
-			else if (equalStrings(label, "vec3"))
-			{
-				serializer.deserializeArrayBegin();
-				serializer.deserializeArrayItem(uniform.vec3[0], 0);
-				serializer.deserializeArrayItem(uniform.vec3[1], 0);
-				serializer.deserializeArrayItem(uniform.vec3[2], 0);
-				serializer.deserializeArrayEnd();
-			}
-			else if (equalStrings(label, "vec2"))
-			{
-				serializer.deserializeArrayBegin();
-				serializer.deserializeArrayItem(uniform.vec2[0], 0);
-				serializer.deserializeArrayItem(uniform.vec2[1], 0);
-				serializer.deserializeArrayEnd();
-			}
-			else
-			{
-				logWarning("Renderer") << "Unknown label \"" << label << "\"";
-			}
-		}
-		serializer.deserializeObjectEnd();
+			break;
+		default: luaL_error(L, "Uniform %s has unsupported type", name); break;
 	}
-	serializer.deserializeArrayEnd();*/
+	material->m_uniforms.push(u);
+	return 0;
 }
 
 
@@ -440,10 +340,9 @@ void Material::onBeforeReady()
 		}
 	}
 
-
 	for(int i = 0; i < m_shader->m_uniforms.size(); ++i)
 	{
-		auto& shader_uniform = m_shader->m_uniforms[i];
+		const Shader::Uniform& shader_uniform = m_shader->m_uniforms[i];
 		bool found = false;
 		for(int j = i; j < m_uniforms.size(); ++j)
 		{
@@ -506,11 +405,23 @@ void Material::updateRenderData(bool on_before_ready)
 	m_render_data->render_states = m_render_states;
 	m_render_data->shader = m_shader->m_render_data;
 	m_render_data->textures_count = m_texture_count;
-	Renderer::MaterialConstants cs;
+	MaterialConsts cs;
+	static_assert(sizeof(cs) == 256, "Renderer::MaterialConstants must have 256B");
 	cs.color = m_color;
 	cs.emission = m_emission;
 	cs.metallic = m_metallic;
 	cs.roughness = m_roughness;
+	setMemory(cs.custom, 0, sizeof(cs.custom));
+	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
+		for (Uniform& mat_uniform : m_uniforms) {
+			if (shader_uniform.name_hash == mat_uniform.name_hash) {
+				const u32 size = shader_uniform.size();
+				copyMemory((u8*)cs.custom + shader_uniform.offset, mat_uniform.matrix, size);
+				break;
+			}
+		}
+	}
+
 	m_render_data->material_constants = m_renderer.createMaterialConstants(cs);
 
 	for(int i = 0; i < m_texture_count; ++i) {
@@ -783,6 +694,9 @@ bool Material::load(u64 size, const u8* mem)
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
 	
+	m_uniforms.clear();
+	m_render_states = u64(ffr::StateFlags::CULL_BACK);
+	
 	#define DEFINE_LUA_FUNC(func) \
 		lua_pushcclosure(L, LuaAPI::func, 0); \
 		lua_setfield(L, LUA_GLOBALSINDEX, #func); 
@@ -798,7 +712,10 @@ bool Material::load(u64 size, const u8* mem)
 	DEFINE_LUA_FUNC(roughness);
 	DEFINE_LUA_FUNC(shader);
 	DEFINE_LUA_FUNC(texture);
-	
+
+	lua_pushcfunction(L, &Material::uniform);
+	lua_setfield(L, LUA_GLOBALSINDEX, "uniform"); 
+
 	#undef DEFINE_LUA_FUNC
 
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
@@ -811,52 +728,8 @@ bool Material::load(u64 size, const u8* mem)
 		return false;
 	}
 	lua_close(L);
-	return m_shader != nullptr;
 
-	// TODO
-	ASSERT(false);
-	/*
-	m_render_states = BGFX_STATE_CULL_CW;
-	
-	m_uniforms.clear();
-	
-	JsonDeserializer serializer(file, getPath(), m_allocator);
-	serializer.deserializeObjectBegin();
-	char label[256];
-	char material_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(material_dir, MAX_PATH_LENGTH, getPath().c_str());
-	while (!serializer.isObjectEnd())
-	{
-		serializer.deserializeLabel(label, 255);
-		else if (equalStrings(label, "render_layer"))
-		{
-		}
-		else if (equalStrings(label, "uniforms"))
-		{
-			deserializeUniforms(serializer);
-		}
-		else if (equalStrings(label, "backface_culling"))
-		{
-			bool b = true;
-			serializer.deserialize(b, true);
-			if (b)
-			{
-				m_render_states |= BGFX_STATE_CULL_CW;
-			}
-			else
-			{
-				m_render_states &= ~BGFX_STATE_CULL_MASK;
-			}
-		}
-		else
-		{
-			logError("Renderer") << "Unknown parameter " << label << " in material " << getPath();
-		}
-	}
-	serializer.deserializeObjectEnd();
-	*/
-	if (!m_shader)
-	{
+	if (!m_shader) {
 		logError("Renderer") << "Material " << getPath() << " without a shader";
 		return false;
 	}

@@ -459,9 +459,9 @@ struct RendererImpl final : public Renderer
 
 			renderer.m_material_buffer.buffer = ffr::allocBufferHandle();
 			ffr::createBuffer(renderer.m_material_buffer.buffer, transient_flags | (u32)ffr::BufferFlags::UNIFORM_BUFFER, MATERIAL_BUFFER_SIZE, nullptr);
-			renderer.m_material_buffer.data = (MaterialConstants*)ffr::map(renderer.m_material_buffer.buffer, 0, MATERIAL_BUFFER_SIZE, transient_flags);
+			renderer.m_material_buffer.data = (MaterialConsts*)ffr::map(renderer.m_material_buffer.buffer, 0, MATERIAL_BUFFER_SIZE, transient_flags);
 
-			const u32 ub_mat_count = MATERIAL_BUFFER_SIZE / sizeof(MaterialConstants);
+			const u32 ub_mat_count = MATERIAL_BUFFER_SIZE / sizeof(MaterialConsts);
 			for (u32 i = 0; i < ub_mat_count; ++i) {
 				*(u32*)&renderer.m_material_buffer.data[i] = i + 1;
 			}
@@ -653,8 +653,8 @@ struct RendererImpl final : public Renderer
 		return m_material_buffer.buffer;
 	}
 
-	u32 createMaterialConstants(const MaterialConstants& data) override {
-		const u32 hash = crc32(&data, sizeof(Vec4) + sizeof(Vec3));
+	u32 createMaterialConstants(const MaterialConsts& data) override {
+		const u32 hash = crc32(&data, sizeof(data));
 		auto iter = m_material_buffer.map.find(hash);
 		u32 idx;
 		if(iter.isValid()) {
@@ -1040,7 +1040,7 @@ struct RendererImpl final : public Renderer
 	struct MaterialBuffer {
 		MaterialBuffer(IAllocator& alloc) : map(alloc) {}
 		ffr::BufferHandle buffer = ffr::INVALID_BUFFER;
-		MaterialConstants* data = nullptr;
+		MaterialConsts* data = nullptr;
 		HashMap<u32, u32> map;
 		u32 first_free = 0;
 		// TODO this is not MT safe

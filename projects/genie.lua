@@ -659,6 +659,7 @@ if has_plugin("renderer") then
 		libType()
 
 		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c"}
+		files { "../data/pipelines/**.*"}
 		includedirs { "../src", "../external/cmft/include", "../external/nvtt/include", "../external/freetype/include" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }

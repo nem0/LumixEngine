@@ -231,9 +231,6 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 {
 	if (!m_show_stats || !m_is_open) return;
 	
-			// TODO
-			ASSERT(false);
-			/*
 	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 	ImVec2 v = view_pos;
 	v.x += ImGui::GetStyle().FramePadding.x;
@@ -243,28 +240,17 @@ void GameView::onStatsGUI(const ImVec2& view_pos)
 	col.w = 0.3f;
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
-	if (ImGui::Begin("###stats_overlay", nullptr, flags))
-	{
-		const bgfx::Stats* bgfx_stats = bgfx::getStats();
+	if (ImGui::Begin("###stats_overlay", nullptr, flags)) {
 		const auto& stats = m_pipeline->getStats();
 		ImGui::LabelText("Draw calls", "%d", stats.draw_call_count);
 		ImGui::LabelText("Instances", "%d", stats.instance_count);
 		char buf[30];
-		toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
+		toCStringPretty(stats.triangle_count, Span(buf));
 		ImGui::LabelText("Triangles", "%s", buf);
-		ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
-		ImGui::LabelText("FPS", "%.2f", m_editor.getEngine().getFPS());
-		double cpu_time = 1000 * bgfx_stats->cpuTimeFrame / (double)bgfx_stats->cpuTimerFreq;
-		double gpu_time = 1000 * (bgfx_stats->gpuTimeEnd - bgfx_stats->gpuTimeBegin) / (double)bgfx_stats->gpuTimerFreq;
-		double wait_submit_time = 1000 * bgfx_stats->waitSubmit / (double)bgfx_stats->cpuTimerFreq;
-		double wait_render_time = 1000 * bgfx_stats->waitRender / (double)bgfx_stats->cpuTimerFreq;
-		ImGui::LabelText("CPU time", "%.2f", cpu_time);
-		ImGui::LabelText("GPU time", "%.2f", gpu_time);
-		ImGui::LabelText("Waiting for submit", "%.2f", wait_submit_time);
-		ImGui::LabelText("Waiting for render thread", "%.2f", wait_render_time);
+		ImGui::LabelText("Resolution", "%dx%d", (int)m_size.x, (int)m_size.y);
 	}
 	ImGui::End();
-	ImGui::PopStyleColor();*/
+	ImGui::PopStyleColor();
 }
 
 

@@ -2060,7 +2060,7 @@ struct PipelineImpl final : Pipeline
 									ffr::bindTextures(material->textures, 0, material->textures_count);
 									ffr::setState(material->render_states | render_states);
 									if (material_ub_idx != material->material_constants) {
-										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(Renderer::MaterialConstants), sizeof(Renderer::MaterialConstants));
+										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 										material_ub_idx = material->material_constants;
 									}
 
@@ -2098,7 +2098,7 @@ struct PipelineImpl final : Pipeline
 								if(prog.isValid()) {
 									ffr::setState(material->render_states | render_states);
 									if (material_ub_idx != material->material_constants) {
-										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(Renderer::MaterialConstants), sizeof(Renderer::MaterialConstants));
+										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 										material_ub_idx = material->material_constants;
 									}
 									ffr::update(m_pipeline->m_drawcall_ub, &model_mtx.m11, 0, sizeof(model_mtx));
@@ -2160,7 +2160,7 @@ struct PipelineImpl final : Pipeline
 									ffr::bindIndexBuffer(mesh->index_buffer_handle);
 									ffr::bindVertexBuffer(1, buffer, offset, 48);
 									if (material_ub_idx != material->material_constants) {
-										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(Renderer::MaterialConstants), sizeof(Renderer::MaterialConstants));
+										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 										material_ub_idx = material->material_constants;
 									}
 									const Matrix mtx(pos, rot);

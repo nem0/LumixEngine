@@ -658,10 +658,7 @@ void SceneView::onWindowGUI()
 
 	ImGui::End();
 
-			// TODO
-			/*
-	if(m_show_stats && m_is_open)
-	{
+	if(m_show_stats && m_is_open) {
 		float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 		view_pos.x += ImGui::GetStyle().FramePadding.x;
 		view_pos.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
@@ -674,28 +671,17 @@ void SceneView::onWindowGUI()
 				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
 					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
 		{
-			const bgfx::Stats* bgfx_stats = bgfx::getStats();
 			const auto& stats = m_pipeline->getStats();
 			ImGui::LabelText("Draw calls (scene view only)", "%d", stats.draw_call_count);
 			ImGui::LabelText("Instances (scene view only)", "%d", stats.instance_count);
 			char buf[30];
-			toCStringPretty(stats.triangle_count, buf, lengthOf(buf));
+			toCStringPretty(stats.triangle_count, Span(buf));
 			ImGui::LabelText("Triangles (scene view only)", "%s", buf);
-			ImGui::LabelText("GPU memory used", "%dMB", int(bgfx_stats->gpuMemoryUsed / (1024 * 1024)));
-			ImGui::LabelText("Resolution", "%dx%d", m_pipeline->getWidth(), m_pipeline->getHeight());
-			ImGui::LabelText("FPS", "%.2f", m_editor.getEngine().getFPS());
-			double cpu_time = 1000 * bgfx_stats->cpuTimeFrame / (double)bgfx_stats->cpuTimerFreq;
-			double gpu_time = 1000 * (bgfx_stats->gpuTimeEnd - bgfx_stats->gpuTimeBegin) / (double)bgfx_stats->gpuTimerFreq;
-			double wait_submit_time = 1000 * bgfx_stats->waitSubmit / (double)bgfx_stats->cpuTimerFreq;
-			double wait_render_time = 1000 * bgfx_stats->waitRender / (double)bgfx_stats->cpuTimerFreq;
-			ImGui::LabelText("CPU time", "%.2f", cpu_time);
-			ImGui::LabelText("GPU time", "%.2f", gpu_time);
-			ImGui::LabelText("Waiting for submit", "%.2f", wait_submit_time);
-			ImGui::LabelText("Waiting for render thread", "%.2f", wait_render_time);
+			ImGui::LabelText("Resolution", "%dx%d", m_width, m_height);
 		}
 		ImGui::End();
 		ImGui::PopStyleColor();
-	}*/
+	}
 }
 
 

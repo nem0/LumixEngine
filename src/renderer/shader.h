@@ -43,7 +43,6 @@ public:
 			INT,
 			FLOAT,
 			MATRIX4,
-			TIME,
 			COLOR,
 			VEC2,
 			VEC3,
@@ -53,9 +52,8 @@ public:
 		char name[32];
 		u32 name_hash;
 		Type type;
-	// TODO
-/*
-		bgfx::UniformHandle handle;*/
+		u32 offset;
+		u32 size() const;
 	};
 
 	struct Source {
@@ -64,11 +62,7 @@ public:
 		Array<char> code;
 	};
 
-public:
-	static const int MAX_TEXTURE_SLOT_COUNT = 16;
-	ShaderRenderData* m_render_data;
 
-public:
 	Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Shader();
 
@@ -80,17 +74,15 @@ public:
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
 	u32 m_all_defines_mask;
-	u64 m_render_states;
-	TextureSlot m_texture_slots[MAX_TEXTURE_SLOT_COUNT];
+	TextureSlot m_texture_slots[16];
 	int m_texture_slot_count;
 	Array<Uniform> m_uniforms;
 	Array<u8> m_defines;
+	ShaderRenderData* m_render_data;
 
 	static const ResourceType TYPE;
 
 private:
-	bool generateInstances();
-
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 };
