@@ -396,60 +396,48 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		if (material->getShader() && material->isReady())
-		{
-						// TODO
-				/*
-	for (int i = 0; i < shader->m_uniforms.size(); ++i)
-			{
-				auto& uniform = material->getUniform(i);
-				auto& shader_uniform = shader->m_uniforms[i];
-				switch (shader_uniform.type)
-				{
+		if (material->getShader() && material->isReady()) {
+			const Shader* shader = material->getShader();
+			for (int i = 0; i < shader->m_uniforms.size(); ++i) {
+				const Shader::Uniform& shader_uniform = shader->m_uniforms[i];
+				Material::Uniform* uniform = material->findUniform(shader_uniform.name_hash);
+				if (!uniform) continue;
+
+				switch (shader_uniform.type) {
 					case Shader::Uniform::FLOAT:
-						if (ImGui::DragFloat(shader_uniform.name, &uniform.float_value))
-						{
-							material->createCommandBuffer();
+						if (ImGui::DragFloat(shader_uniform.name, &uniform->float_value)) {
+							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::VEC3:
-						if (ImGui::DragFloat3(shader_uniform.name, uniform.vec3))
-						{
-							material->createCommandBuffer();
+						if (ImGui::DragFloat3(shader_uniform.name, uniform->vec3)) {
+							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::VEC4:
-						if (ImGui::DragFloat4(shader_uniform.name, uniform.vec4))
-						{
-							material->createCommandBuffer();
+						if (ImGui::DragFloat4(shader_uniform.name, uniform->vec4)) {
+							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::VEC2:
-						if (ImGui::DragFloat2(shader_uniform.name, uniform.vec2))
-						{
-							material->createCommandBuffer();
+						if (ImGui::DragFloat2(shader_uniform.name, uniform->vec2)) {
+							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::COLOR:
-						if (ImGui::ColorEdit3(shader_uniform.name, uniform.vec3))
-						{
-							material->createCommandBuffer();
+						if (ImGui::ColorEdit3(shader_uniform.name, uniform->vec3)) {
+							material->updateRenderData(false);
 						}
 						break;
-					case Shader::Uniform::TIME: break;
 					default: ASSERT(false); break;
 				}
 			}
-			*/
-			// TODO
-				/*
-			if (ImGui::CollapsingHeader("Defines"))
-			{
-				for (int define_idx = 0; define_idx < renderer->getShaderDefinesCount(); ++define_idx)
-				{
-					const char* define = renderer->getShaderDefine(define_idx);
-					if (!material->hasDefine(define_idx)) continue;
-					bool value = material->isDefined(define_idx);
+			
+			if (ImGui::CollapsingHeader("Defines")) {
+				for (int i = 0; i < renderer->getShaderDefinesCount(); ++i) {
+					const char* define = renderer->getShaderDefine(i);
+					if (!shader->hasDefine(i)) continue;
+					bool value = material->isDefined(i);
 
 					auto isBuiltinDefine = [](const char* define) {
 						const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "ALPHA_CUTOUT", "SKINNED"};
@@ -460,13 +448,12 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						return false;
 					};
 
-					bool is_texture_define = material->isTextureDefine(define_idx);
-					if (!is_texture_define && !isBuiltinDefine(define) && ImGui::Checkbox(define, &value))
-					{
-						material->setDefine(define_idx, value);
+					bool is_texture_define = material->isTextureDefine(i);
+					if (!is_texture_define && !isBuiltinDefine(define) && ImGui::Checkbox(define, &value)) {
+						material->setDefine(i, value);
 					}
 				}
-			}*/
+			}
 
 		}
 	}
@@ -1599,11 +1586,10 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGui::NextColumn();
 				switch (uniform.type)
 				{
-					case Shader::Uniform::COLOR: ImGui::Text("color"); break;
-					case Shader::Uniform::FLOAT: ImGui::Text("float"); break;
-					case Shader::Uniform::INT: ImGui::Text("int"); break;
+					case Shader::Uniform::COLOR: ImGui::Text("Color"); break;
+					case Shader::Uniform::FLOAT: ImGui::Text("Float"); break;
+					case Shader::Uniform::INT: ImGui::Text("Int"); break;
 					case Shader::Uniform::MATRIX4: ImGui::Text("Matrix 4x4"); break;
-					case Shader::Uniform::TIME: ImGui::Text("time"); break;
 					case Shader::Uniform::VEC4: ImGui::Text("Vector4"); break;
 					case Shader::Uniform::VEC3: ImGui::Text("Vector3"); break;
 					case Shader::Uniform::VEC2: ImGui::Text("Vector2"); break;

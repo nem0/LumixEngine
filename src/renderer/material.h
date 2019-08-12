@@ -19,6 +19,14 @@ class Shader;
 struct ShaderRenderData;
 class Texture;
 
+struct  MaterialConsts {
+	Vec4 color;
+	float roughness;
+	float metallic;
+	float emission;
+	float custom[56];
+	u32 ref_count;
+};
 
 class LUMIX_RENDERER_API Material final : public Resource
 {
@@ -39,7 +47,6 @@ public:
 		u32 name_hash;
 		union
 		{
-			i32 int_value;
 			float float_value;
 			float vec4[4];
 			float vec3[3];
@@ -87,6 +94,7 @@ public:
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }
+	Uniform* findUniform(u32 name_hash);
 
 	void setDefine(u8 define_idx, bool enabled);
 	bool isDefined(u8 define_idx) const;
@@ -103,16 +111,14 @@ public:
 	static u32 getCustomFlag(const char* flag_name);
 	static const char* getCustomFlagName(int index);
 	static int getCustomFlagCount();
+	void updateRenderData(bool on_before_ready);
 
 private:
-	static int LUA_layer(lua_State* L);
-
 	void onBeforeReady() override;
-	void updateRenderData(bool on_before_ready);
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 
-	void deserializeUniforms(lua_State* L);
+	static int uniform(lua_State* L);
 
 private:
 

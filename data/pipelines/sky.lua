@@ -3,7 +3,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	if transparent_phase ~= "pre" then return hdr_buffer end
 	env.beginBlock("sky")
 	if env.procedural_sky_shader == nil then
-		env.procedural_sky_shader = env.preloadShader("pipelines/procedural_sky.shd")
+		env.procedural_sky_shader = env.preloadShader("pipelines/sky.shd")
 	end
 	env.setRenderTargets(hdr_buffer, gbuffer_depth)
 	local state = {

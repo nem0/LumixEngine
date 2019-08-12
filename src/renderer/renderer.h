@@ -13,6 +13,7 @@ namespace Lumix
 
 class Engine;
 class FontManager;
+struct MaterialConsts;
 class Path;
 class Pipeline;
 class ResourceManager;
@@ -45,14 +46,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 			u8* ptr;
 		};
 
-		struct alignas(256) MaterialConstants {
-			Vec4 color;
-			float roughness;
-			float metallic;
-			float emission;
-			u32 ref_count;
-		};
-
 		enum { MAX_SHADER_DEFINES = 32 };
 	public:
 		virtual ~Renderer() {}
@@ -67,7 +60,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual FontManager& getFontManager() = 0;
 		virtual ResourceManager& getTextureManager() = 0;
 		
-		virtual u32 createMaterialConstants(const MaterialConstants& data) = 0;
+		virtual u32 createMaterialConstants(const MaterialConsts& data) = 0;
 		virtual void destroyMaterialConstants(u32 id) = 0;
 		virtual ffr::BufferHandle getMaterialUniformBuffer() = 0;
 

@@ -2051,5 +2051,3 @@ void shutdown()
 } // ns ffr 
 
 } // ns Lumix
-
-#endif
