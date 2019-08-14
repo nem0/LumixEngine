@@ -107,8 +107,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		OS::OutputFile file;
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		// TODO make this safe - i.e. handle case when program gets interrupted while writing the file
-		if (fs.open(".lumix/assets/_list.txt", Ref(file))) {
+		if (fs.open(".lumix/assets/_list.txt_tmp", Ref(file))) {
 			file << "resources = {\n";
 			for (const ResourceItem& ri : m_resources) {
 				file << "\"" << ri.path.c_str() << "\",\n";
@@ -124,7 +123,9 @@ struct AssetCompilerImpl : AssetCompiler
 			}
 			file << "}\n";
 
-			file.close();	
+			file.close();
+			fs.deleteFile(".lumix/assets/_list.txt");
+			fs.moveFile(".lumix/assets/_list.txt_tmp", ".lumix/assets/_list.txt");
 		}
 		else {
 			logError("Editor") << "Could not save .lumix/assets/_list.txt";

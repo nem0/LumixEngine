@@ -798,10 +798,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	}
 }
 
-
-// TODO selected_path_hash == null is bad UX
-bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, ResourceType type, float height, bool can_create_new) const
-{
+bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, ResourceType type, float height, bool can_create_new) const {
 	auto iter = m_plugins.find(type);
 	if (!iter.isValid()) return false;
 
@@ -824,8 +821,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	
 	const HashMap<u32, AssetCompiler::ResourceItem>& resourcs = compiler.lockResources();
 	Path selected_path;
-	for (const auto& res : resourcs)
-	{
+	for (const auto& res : resourcs) {
 		if(res.type != type) continue;
 		if (filter[0] != '\0' && strstr(res.path.c_str(), filter) == nullptr) continue;
 
@@ -833,8 +829,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 		if(selected) selected_path = res.path;
 		ResourceLocator rl(res.path.c_str());
 		StaticString<MAX_PATH_LENGTH> label("", rl.name, "##h", res.path.getHash());
-		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick))
-		{
+		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
 			selected_path_hash = res.path.getHash();
 			
 			if (selected || ImGui::IsMouseDoubleClicked(0)) {

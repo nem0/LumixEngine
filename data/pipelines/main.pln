@@ -6,6 +6,7 @@ local selection_outline_shader = preloadShader("pipelines/selection_outline.shd"
 local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
 local debug_shadowmap = false
+local screenshot_request = 0
 
 local decal_state = {
 	blending = "add",
@@ -260,22 +261,49 @@ function main()
 		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 
+	if GAME_VIEW or APP then
+		renderIngameGUI()	
+	end
+
 	debugPass(res, shadowmap)
-	if renderGizmos ~= nil then
+	if SCENE_VIEW ~= nil then
 		pass(getCameraParams())
-		setRenderTargets(res, gbuffer_depth)
-		clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
-		renderGizmos()
-		render2D()
+			setRenderTargets(res, gbuffer_depth)
+			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
+			renderGizmos()
+	end
+
+	render2D()
+
+	if SCENE_VIEW ~= nil then
 		renderIcons()
 		renderDebugShapes()
 		renderSelectionOutline(res)
 	end
 
 	setOutput(res)
+
+	if screenshot_request > 1 then
+		-- we have to wait for a few frames to propagate changed resolution
+		-- only then we can take a screeshot
+		screenshot_request = screenshot_request - 1
+		GameView.forceViewport(true, 4096, 2160)
+	elseif screenshot_request == 1 then
+		saveRenderbuffer(res, "screenshot.tga")
+		GameView.forceViewport(false, 0, 0)
+		screenshot_request = 0
+	end		
 end
 
 function onGUI()
+	if GAME_VIEW then
+		ImGui.SameLine()
+		if ImGui.Button("Screenshot") then
+			screenshot_request = 2
+		end
+		return
+	end
+
 	if ImGui.Button("Debug") then
 		ImGui.OpenPopup("debug_popup")
 	end

@@ -4,7 +4,6 @@
 #include "engine/path_utils.h"
 #include "engine/string.h"
 #define UNICODE
-#include <cASSERT>
 #pragma warning(push)
 #pragma warning(disable : 4091)
 #include <ShlObj.h>
@@ -615,15 +614,27 @@ WindowHandle getFocused()
 	return GetActiveWindow();
 }
 
-
-bool isMaximized(WindowHandle win)
-{
+bool isMaximized(WindowHandle win) {
 	WINDOWPLACEMENT placement;
 	BOOL res = GetWindowPlacement((HWND)win, &placement);
 	ASSERT(res);
 	return placement.showCmd == SW_SHOWMAXIMIZED;
 }
 
+void restore(WindowHandle win, WindowState state) {
+	SetWindowLongPtr((HWND)win, GWL_STYLE, state.style);
+	OS::setWindowScreenRect(win, state.rect);
+}
+
+WindowState setFullscreen(WindowHandle win) {
+	WindowState res;
+	res.rect = OS::getWindowScreenRect(win);
+	res.style = SetWindowLongPtr((HWND)win, GWL_STYLE, WS_VISIBLE | WS_POPUP);
+	int w = GetSystemMetrics(SM_CXSCREEN);
+	int h = GetSystemMetrics(SM_CYSCREEN);
+	SetWindowPos((HWND)win, HWND_TOP, 0, 0, w, h, SWP_FRAMECHANGED);
+	return res;
+}
 
 void maximizeWindow(WindowHandle win)
 {

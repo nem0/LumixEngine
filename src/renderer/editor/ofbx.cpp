@@ -1008,11 +1008,13 @@ struct MeshImpl : Mesh
 	Type getType() const override { return Type::MESH; }
 
 
+	const Pose* getPose() const override { return pose; }
 	const Geometry* getGeometry() const override { return geometry; }
 	const Material* getMaterial(int index) const override { return materials[index]; }
 	int getMaterialCount() const override { return (int)materials.size(); }
 
 
+	const Pose* pose = nullptr;
 	const Geometry* geometry = nullptr;
 	const Scene& scene;
 	std::vector<const Material*> materials;
@@ -1308,6 +1310,33 @@ Texture::Texture(const Scene& _scene, const IElement& _element)
 }
 
 
+Pose::Pose(const Scene& _scene, const IElement& _element)
+	: Object(_scene, _element)
+{
+}
+
+
+struct PoseImpl : Pose
+{
+	PoseImpl(const Scene& _scene, const IElement& _element)
+		: Pose(_scene, _element)
+	{
+	}
+
+	bool postprocess(Scene* scene);
+
+
+	Matrix getMatrix() const override { return matrix; }
+	const Object* getNode() const override { return node; }
+
+	Type getType() const override { return Type::POSE; }
+
+	Matrix matrix;
+	Object* node = nullptr;
+	DataView node_id;
+};
+
+
 struct TextureImpl : Texture
 {
 	TextureImpl(const Scene& _scene, const IElement& _element)
@@ -1426,6 +1455,16 @@ struct Scene : IScene
 	std::vector<u8> m_data;
 	std::vector<TakeInfo> m_take_infos;
 };
+
+
+bool PoseImpl::postprocess(Scene* scene)
+{
+	node = scene->m_object_map[node_id.toU64()].object;
+	if (node && node->getType() == Object::Type::MESH) {
+		static_cast<MeshImpl*>(node)->pose = this;
+	}
+	return true;
+}
 
 
 struct AnimationCurveNodeImpl : AnimationCurveNode
@@ -1554,6 +1593,23 @@ struct OptionalError<Object*> parseTexture(const Scene& scene, const Element& el
 		texture->relative_filename = texture_relative_filename->first_property->value;
 	}
 	return texture;
+}
+
+
+struct OptionalError<Object*> parsePose(const Scene& scene, const Element& element)
+{
+	PoseImpl* pose = new PoseImpl(scene, element);
+	const Element* pose_node = findChild(element, "PoseNode");
+	if (pose_node) {
+		const Element* node = findChild(*pose_node, "Node");
+		const Element* matrix = findChild(*pose_node, "Matrix");
+
+		if (matrix->first_property) {
+			parseArrayRaw(*matrix->first_property, &pose->matrix, sizeof(pose->matrix));
+		}
+		pose->node_id = node->first_property->value;
+	}
+	return pose;
 }
 
 
@@ -2542,6 +2598,16 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 							} \
 						}
 
+						#define get_time_property(name, field, type, getter) if(node->first_property->value == name) \
+						{ \
+							ofbx::IElementProperty* prop = node->getProperty(4); \
+							if (prop) \
+							{ \
+								ofbx::DataView value = prop->getValue(); \
+								scene->m_settings.field = fbxTimeToSeconds((type)value.getter()); \
+							} \
+						}
+
 						get_property("UpAxis", UpAxis, UpVector, toInt);
 						get_property("UpAxisSign", UpAxisSign, int, toInt);
 						get_property("FrontAxis", FrontAxis, FrontVector, toInt);
@@ -2552,8 +2618,8 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 						get_property("OriginalUpAxisSign", OriginalUpAxisSign, int, toInt);
 						get_property("UnitScaleFactor", UnitScaleFactor, float, toDouble);
 						get_property("OriginalUnitScaleFactor", OriginalUnitScaleFactor, float, toDouble);
-						get_property("TimeSpanStart", TimeSpanStart, u64, toU64);
-						get_property("TimeSpanStop", TimeSpanStop, u64, toU64);
+						get_time_property("TimeSpanStart", TimeSpanStart, u64, toU64);
+						get_time_property("TimeSpanStop", TimeSpanStop, u64, toU64);
 						get_property("TimeMode", TimeMode, FrameRate, toInt);
 						get_property("CustomFrameRate", CustomFrameRate, float, toDouble);
 
@@ -2676,6 +2742,10 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 		else if (iter.second.element->id == "Texture")
 		{
 			obj = parseTexture(*scene, *iter.second.element);
+		}
+		else if (iter.second.element->id == "Pose")
+		{
+			obj = parsePose(*scene, *iter.second.element);
 		}
 
 		if (obj.isError()) return false;
@@ -2832,16 +2902,24 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 		}
 	}
 
-	for (auto iter : scene->m_object_map)
-	{
-		Object* obj = iter.second.object;
-		if (!obj) continue;
-		if (obj->getType() == Object::Type::CLUSTER)
+	if (!ignore_geometry) {
+		for (auto iter : scene->m_object_map)
 		{
-			if (!((ClusterImpl*)iter.second.object)->postprocess())
-			{
-				Error::s_message = "Failed to postprocess cluster";
-				return false;
+			Object* obj = iter.second.object;
+			if (!obj) continue;
+			switch (obj->getType()) {
+				case Object::Type::CLUSTER:
+					if (!((ClusterImpl*)iter.second.object)->postprocess()) {
+						Error::s_message = "Failed to postprocess cluster";
+						return false;
+					}
+					break;
+				case Object::Type::POSE:
+					if (!((PoseImpl*)iter.second.object)->postprocess(scene)) {
+						Error::s_message = "Failed to postprocess pose";
+						return false;
+					}
+					break;
 			}
 		}
 	}
@@ -2980,7 +3058,8 @@ Object* Object::resolveObjectLinkReverse(Object::Type type) const
 	{
 		if (connection.from == id && connection.to != 0)
 		{
-			Object* obj = scene.m_object_map.find(connection.to)->second.object;
+			const Scene::ObjectPair& pair = scene.m_object_map.find(connection.to)->second;
+			Object* obj = pair.object;
 			if (obj && obj->getType() == type) return obj;
 		}
 	}
