@@ -310,10 +310,6 @@ public:
 		ImGui::CreateContext();
 		loadSettings();
 		initIMGUI();
-#ifdef _WIN32
-// TODO
-// ImGui::GetPlatformIO().ImeWindowHandle = m_window;
-#endif
 
 		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Set Custom Pivot",
 			"Set Custom Pivot",
@@ -1572,8 +1568,12 @@ public:
 
 	void setFullscreen(bool fullscreen) override
 	{
-		ASSERT(false); // TODO
-					   // SDL_SetWindowFullscreen(m_window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+		if(fullscreen) {
+			m_fullscreen_restore_state = OS::setFullscreen(m_window);
+		}
+		else {
+			OS::restore(m_window, m_fullscreen_restore_state);
+		}
 	}
 
 
@@ -2793,6 +2793,7 @@ public:
 	Debug::Allocator m_allocator;
 	Engine* m_engine;
 	OS::WindowHandle m_window;
+	OS::WindowState m_fullscreen_restore_state;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
 	Array<Action*> m_toolbar_actions;

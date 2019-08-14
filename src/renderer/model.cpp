@@ -46,7 +46,6 @@ Mesh::Mesh(Material* mat,
 	, material(mat)
 	, indices(allocator)
 	, vertices(allocator)
-	, uvs(allocator)
 	, skin(allocator)
 {
 	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
@@ -290,6 +289,7 @@ static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
 		case Mesh::AttributeSemantic::TANGENT: return 3;
 		case Mesh::AttributeSemantic::INDICES: return 4;
 		case Mesh::AttributeSemantic::WEIGHTS: return 5;
+		case Mesh::AttributeSemantic::COLOR0: return 6;
 	}
 	ASSERT(false);
 	return 0;
@@ -515,7 +515,6 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		file.read(&mesh.indices[0], mesh.indices.size());
 
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
-		// TODO do not copy, allocate in advance
 		const Renderer::MemRef mem = m_renderer.copy(&mesh.indices[0], mesh.indices.size());
 		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
 		mesh.render_data->index_type = index_size == 2 ? ffr::DataType::U16 : ffr::DataType::U32;
@@ -526,22 +525,19 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		Mesh& mesh = m_meshes[i];
 		int data_size;
 		file.read(data_size);
-		Array<u8> vertices_mem(m_allocator);
-		vertices_mem.resize(data_size);
-		file.read(&vertices_mem[0], data_size);
+		Renderer::MemRef vertices_mem = m_renderer.allocate(data_size);
+		file.read(vertices_mem.data, data_size);
 
 		int position_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::POSITION);
-		int uv_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::TEXCOORD0);
 		int weights_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::WEIGHTS);
 		int bone_indices_attribute_offset = getAttributeOffset(mesh, Mesh::AttributeSemantic::INDICES);
 		bool keep_skin = hasAttribute(mesh, Mesh::AttributeSemantic::WEIGHTS) && hasAttribute(mesh, Mesh::AttributeSemantic::INDICES);
 
 		int vertex_size = mesh.render_data->vb_stride;
-		int mesh_vertex_count = vertices_mem.size() / vertex_size;
+		int mesh_vertex_count = data_size / vertex_size;
 		mesh.vertices.resize(mesh_vertex_count);
-		mesh.uvs.resize(mesh_vertex_count);
 		if (keep_skin) mesh.skin.resize(mesh_vertex_count);
-		const u8* vertices = &vertices_mem[0];
+		const u8* vertices = (const u8*)vertices_mem.data;
 		for (int j = 0; j < mesh_vertex_count; ++j)
 		{
 			int offset = j * vertex_size;
@@ -553,11 +549,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 					sizeof(mesh.skin[j].indices));
 			}
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
-			mesh.uvs[j] = *(const Vec2*)&vertices[offset + uv_attribute_offset];
 		}
-		// TODO do not copy, allocate in advance
-		const Renderer::MemRef mem = m_renderer.copy(&vertices_mem[0], vertices_mem.size());
-		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
+		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
 	}
 	file.read(m_bounding_radius);
 	file.read(m_aabb);

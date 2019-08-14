@@ -928,12 +928,12 @@ struct GUISceneImpl final : public GUIScene
 
 	void handleTextInput(const InputSystem::Event& event)
 	{
-		/*const GUIRect* rect = getInput(m_focused_entity);
+		const GUIRect* rect = getInput(m_focused_entity);
 		if (!rect) return;
-		rect->text->text.insert(rect->input_field->cursor, event.data.text.text);
-		rect->input_field->cursor += stringLength(event.data.text.text);*/
-		// TODO
-		ASSERT(false);
+		char tmp[5];
+		OS::UTF32ToUTF8(event.data.text.utf32, tmp);
+		rect->text->text.insert(rect->input_field->cursor, tmp);
+		++rect->input_field->cursor;
 	}
 
 

@@ -162,7 +162,8 @@ struct Object
 		ANIMATION_STACK,
 		ANIMATION_LAYER,
 		ANIMATION_CURVE,
-		ANIMATION_CURVE_NODE
+		ANIMATION_CURVE_NODE,
+		POSE
 	};
 
 	Object(const Scene& _scene, const IElement& _element);
@@ -206,6 +207,15 @@ struct Object
 protected:
 	bool is_node;
 	const Scene& scene;
+};
+
+
+struct Pose : Object {
+	static const Type s_type = Type::POSE;
+	Pose(const Scene& _scene, const IElement& _element);
+
+	virtual Matrix getMatrix() const = 0;
+	virtual const Object* getNode() const = 0;
 };
 
 
@@ -305,6 +315,7 @@ struct Mesh : Object
 
 	Mesh(const Scene& _scene, const IElement& _element);
 
+	virtual const Pose* getPose() const = 0;
 	virtual const Geometry* getGeometry() const = 0;
 	virtual Matrix getGeometricMatrix() const = 0;
 	virtual const Material* getMaterial(int idx) const = 0;
@@ -424,8 +435,8 @@ struct GlobalSettings
 	int OriginalUpAxisSign = 1;
 	float UnitScaleFactor = 1;
 	float OriginalUnitScaleFactor = 1;
-	u64 TimeSpanStart = 0L;
-	u64 TimeSpanStop = 0L;
+	double TimeSpanStart = 0L;
+	double TimeSpanStop = 0L;
 	FrameRate TimeMode = FrameRate_DEFAULT;
 	float CustomFrameRate = -1.0f;
 };

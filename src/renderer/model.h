@@ -108,7 +108,6 @@ struct LUMIX_RENDERER_API Mesh
 	Type type;
 	Array<u8> indices;
 	Array<Vec3> vertices;
-	Array<Vec2> uvs;
 	Array<Skin> skin;
 	FlagSet<Flags, u8> flags;
 	u32 sort_key;

@@ -2332,12 +2332,6 @@ struct PipelineImpl final : Pipeline
 			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
 			
 			u64 state = m_render_state;
-			static bool b = false; // TODO
-			if (b) state |= (u64)ffr::StateFlags::WIREFRAME;
-
-			static int stat;
-			stat = 0;
-
 			for (Instance& inst : m_instances) {
 				const ffr::ProgramHandle p = Shader::getProgram(inst.shader, ffr::VertexDecl(), deferred_define_mask);
 				if (!p.isValid()) continue;
@@ -2382,7 +2376,6 @@ struct PipelineImpl final : Pipeline
 						dc_data.lod = i;
 						ffr::update(m_pipeline->m_drawcall_ub, &dc_data, 0, sizeof(dc_data));
 						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
-						stat += (subto.x - subfrom.x) * (subto.y - subfrom.y);
 					};
 
 					if (i > 0) {
@@ -3135,7 +3128,80 @@ struct PipelineImpl final : Pipeline
 		lua_pop(m_lua_state, 1);
 	}
 	
-	
+
+	void saveRenderbuffer(int render_buffer, const char* out_path)
+	{
+		struct Cmd : Renderer::RenderJob {
+			Cmd(IAllocator& allocator) : allocator(allocator) {}
+			void setup() override {}
+			void execute() override { 
+				PROFILE_FUNCTION();
+				Array<u32> pixels(allocator);
+				pixels.resize(w * h);
+				ffr::getTextureImage(handle, pixels.byte_size(), pixels.begin());
+
+				OS::OutputFile file;
+				if (fs->open(path, Ref(file))) {
+					Texture::saveTGA(&file, w, h, 4, (u8*)pixels.begin(), Path(path), allocator);
+					file.close();
+				}
+				else {
+					logError("Renderer") << "Failed to save " << path;
+				}
+			}
+
+			IAllocator& allocator;
+			u32 w, h;
+			ffr::TextureHandle handle;
+			FileSystem* fs;
+			StaticString<MAX_PATH_LENGTH> path;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd)(m_renderer.getAllocator());
+		cmd->handle = m_renderbuffers[render_buffer].handle;
+		cmd->w = m_viewport.w;
+		cmd->h = m_viewport.h;
+		cmd->path = out_path;
+		cmd->fs = &m_renderer.getEngine().getFileSystem();
+		m_renderer.queue(cmd, m_profiler_link);
+		
+
+		
+		/*FrameBuffer* fb = getFramebuffer(framebuffer);
+		if (!fb)
+		{
+			g_log_error.log("Renderer") << "saveRenderbuffer: Framebuffer " << framebuffer << " not found.";
+			return;
+		}
+
+		bgfx::TextureHandle texture = bgfx::createTexture2D(
+			fb->getWidth(), fb->getHeight(), false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
+		m_renderer.viewCounterAdd();
+		bgfx::touch(m_renderer.getViewCounter());
+		bgfx::setViewName(m_renderer.getViewCounter(), "saveRenderbuffer_blit");
+		bgfx::TextureHandle rb = fb->getRenderbufferHandle(render_buffer_index);
+		bgfx::blit(m_renderer.getViewCounter(), texture, 0, 0, rb);
+		
+		m_renderer.viewCounterAdd();
+		bgfx::setViewName(m_renderer.getViewCounter(), "saveRenderbuffer_read");
+		Array<u8> data(m_renderer.getEngine().getAllocator());
+		data.resize(fb->getWidth() * fb->getHeight() * 4);
+		bgfx::readTexture(texture, &data[0]);
+		bgfx::touch(m_renderer.getViewCounter());
+
+		bgfx::frame(); // submit
+		bgfx::frame(); // wait for gpu
+
+		FS::FileSystem& fs = m_renderer.getEngine().getFileSystem();
+		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(out_path), FS::Mode::CREATE_AND_WRITE);
+		Texture::saveTGA(file, fb->getWidth(), fb->getHeight(), 4, &data[0], Path(out_path), m_renderer.getEngine().getAllocator());
+
+		fs.close(*file);
+
+		bgfx::destroy(texture);*/
+	}
+
+
 	void registerLuaAPI(lua_State* L)
 	{
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -3169,6 +3235,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderDebugShapes);
 		REGISTER_FUNCTION(renderLocalLights);
 		REGISTER_FUNCTION(renderTextMeshes);
+		REGISTER_FUNCTION(saveRenderbuffer);
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(viewport);
 

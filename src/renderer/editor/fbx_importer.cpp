@@ -89,6 +89,10 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 	if (!mesh) return node->getGlobalTransform();
 	if (!mesh->fbx) return makeOFBXIdentity();
 
+	if (mesh->fbx->getPose()) {
+		return mesh->fbx->getPose()->getMatrix();
+	}
+
 	auto* skin = mesh->fbx->getGeometry()->getSkin();
 	if (!skin) return node->getGlobalTransform();
 
@@ -945,36 +949,32 @@ static int getDepth(const ofbx::Object* bone)
 void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
-	for (FBXImporter::ImportAnimation& anim : getAnimations()) { 
-		StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ":", src);
+	for (const FBXImporter::ImportAnimation& anim : getAnimations()) { 
 		ASSERT(anim.import);
 
 		const ofbx::AnimationStack* stack = anim.fbx;
 		const ofbx::IScene& scene = *anim.scene;
 		const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
+		if(!take_info && startsWith(stack->name, "AnimStack::")) {
+			take_info = scene.getTakeInfo(stack->name + 11);
+		}
 
 		float fbx_frame_rate = scene.getSceneFrameRate();
 		if (fbx_frame_rate < 0) fbx_frame_rate = 24;
 		float scene_frame_rate = fbx_frame_rate / time_scale;
 		float sampling_period = 1.0f / scene_frame_rate;
 		int all_frames_count = 0;
-		if (take_info)
-		{
+		if (take_info) {
 			all_frames_count = int((take_info->local_time_to - take_info->local_time_from) / sampling_period + 0.5f);
 		}
-		else
-		{
-			ASSERT(false);
-			// TODO
-			// scene->GetGlobalSettings().GetTimelineDefaultTimeSpan(time_spawn);
+		else if(scene.getGlobalSettings()) {
+			all_frames_count  = int(scene.getGlobalSettings()->TimeSpanStop / sampling_period + 0.5f);
+		}
+		else {
+			logError("Renderer") << "Unsupported animation in " << src;
+			continue;
 		}
 
-		// TODO
-		/*FbxTime::EMode mode = scene->GetGlobalSettings().GetTimeMode();
-		float scene_frame_rate =
-		(float)((mode == FbxTime::eCustom) ? scene->GetGlobalSettings().GetCustomFrameRate()
-		: FbxTime::GetFrameRate(mode));
-		*/
 		out_file.clear();
 
 		Animation::Header header;
@@ -987,8 +987,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		write(all_frames_count);
 		int used_bone_count = 0;
 
-		for (const ofbx::Object* bone : bones)
-		{
+		for (const ofbx::Object* bone : bones) {
 			if (&bone->getScene() != &scene) continue;
 
 			const ofbx::AnimationLayer* layer = stack->getLayer(0);
@@ -1000,8 +999,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		write(used_bone_count);
 		Array<TranslationKey> positions(allocator);
 		Array<RotationKey> rotations(allocator);
-		for (const ofbx::Object* bone : bones)
-		{
+		for (const ofbx::Object* bone : bones) {
 			if (&bone->getScene() != &scene) continue;
 			const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
 
@@ -1019,14 +1017,11 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			write(positions.size());
 
 			for (TranslationKey& key : positions) write(key.frame);
-			for (TranslationKey& key : positions)
-			{
-				if (bone == root_bone)
-				{
+			for (TranslationKey& key : positions) {
+				if (bone == root_bone) {
 					write(fixRootOrientation(key.pos * cfg.mesh_scale));
 				}
-				else
-				{
+				else {
 					write(fixOrientation(key.pos * cfg.mesh_scale));
 				}
 			}
@@ -1035,19 +1030,17 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 			write(rotations.size());
 			for (RotationKey& key : rotations) write(key.frame);
-			for (RotationKey& key : rotations)
-			{
-				if (bone == root_bone)
-				{
+			for (RotationKey& key : rotations) {
+				if (bone == root_bone) {
 					write(fixRootOrientation(key.rot));
 				}
-				else
-				{
+				else {
 					write(fixOrientation(key.rot));
 				}
 			}
 		}
 
+		const StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ":", src);
 		compiler.writeCompiledResource(anim_path, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
 	}
 }

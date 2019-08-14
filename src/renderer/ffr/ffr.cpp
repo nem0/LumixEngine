@@ -1889,55 +1889,6 @@ void pushDebugGroup(const char* msg)
 	CHECK_GL(glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, msg));
 }
 
-// TODO
-/*
-void bindLayer(FramebufferHandle fb, TextureHandle rb, u32 layer)
-{
-	checkThread();
-
-	int color_attachment_idx = 0;
-	bool depth_bound = false;
-	const GLuint t = g_ffr.textures[rb.value].handle;
-	CHECK_GL(glBindTexture(GL_TEXTURE_2D_ARRAY, t));
-	GLint internal_format;
-	CHECK_GL(glGetTexLevelParameteriv(GL_TEXTURE_2D_ARRAY, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format));
-
-	CHECK_GL(glBindTexture(GL_TEXTURE_2D_ARRAY, 0));
-	switch(internal_format) {
-		case GL_DEPTH24_STENCIL8:
-			CHECK_GL(glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0));
-			CHECK_GL(glNamedFramebufferTextureLayer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, t, 0, layer));
-			depth_bound = true;
-			break;
-		case GL_DEPTH_COMPONENT24:
-		case GL_DEPTH_COMPONENT32:
-			CHECK_GL(glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
-			CHECK_GL(glNamedFramebufferTextureLayer(fb.value, GL_DEPTH_ATTACHMENT, t, 0, layer));
-			depth_bound = true;
-			break;
-		default:
-			CHECK_GL(glNamedFramebufferTextureLayer(fb.value, GL_COLOR_ATTACHMENT0 + color_attachment_idx, t, 0, layer));
-			++color_attachment_idx;
-			break;
-	}
-
-	GLint max_attachments = 0;
-	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
-	for(int i = color_attachment_idx; i < max_attachments; ++i) {
-		glNamedFramebufferRenderbuffer(fb.value, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
-	}
-	
-	if (!depth_bound) {
-		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
-		glNamedFramebufferRenderbuffer(fb.value, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
-	}
-
-	glBindFramebuffer(GL_FRAMEBUFFER, fb.value);
-	auto xx = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	ASSERT(xx == GL_FRAMEBUFFER_COMPLETE);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}*/
-
 
 QueryHandle createQuery()
 {
