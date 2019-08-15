@@ -2657,7 +2657,7 @@ public:
 			else
 			{
 				char ext[5];
-				PathUtils::getExtension(Span(ext), info.filename);
+				PathUtils::getExtension(Span(ext), Span(info.filename, stringLength(info.filename)));
 				if (equalStrings(ext, "lua"))
 				{
 					loadLuaPlugin(dir, info.filename);

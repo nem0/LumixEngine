@@ -40,6 +40,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getAssetCompiler().registerExtension("ani", Animation::TYPE);
 	}
 
 

@@ -173,8 +173,9 @@ struct AssetCompilerImpl : AssetCompiler
 
 	ResourceType getResourceType(const char* path) const override
 	{
+		const Span<const char> subres = getSubresource(path);
 		char ext[16];
-		PathUtils::getExtension(Span(ext), path);
+		PathUtils::getExtension(Span(ext), subres);
 
 		auto iter = m_registered_extensions.find(crc32(ext));
 		if (iter.isValid()) return iter.value();
@@ -203,7 +204,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void addResource(const char* fullpath)
 	{
 		char ext[10];
-		PathUtils::getExtension(Span(ext), fullpath);
+		PathUtils::getExtension(Span(ext), Span(fullpath, stringLength(fullpath)));
 		makeLowercase(Span(ext), ext);
 	
 		auto iter = m_plugins.find(crc32(ext));
@@ -447,7 +448,7 @@ struct AssetCompilerImpl : AssetCompiler
 	bool compile(const Path& src) override
 	{
 		char ext[16];
-		PathUtils::getExtension(Span(ext), src.c_str());
+		PathUtils::getExtension(Span(ext), Span(src.c_str(), src.length()));
 		const u32 hash = crc32(ext);
 		MT::CriticalSectionLock lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
@@ -463,6 +464,14 @@ struct AssetCompilerImpl : AssetCompiler
 		return *c != ':' ? str : c + 1;
 	}
 
+	static Span<const char> getSubresource(const char* str)
+	{
+		Span<const char> ret;
+		ret.m_begin = str;
+		ret.m_end = str;
+		while(*ret.m_end && *ret.m_end != ':') ++ret.m_end;
+		return ret;
+	}
 
 	ResourceManagerHub::LoadHook::Action onBeforeLoad(Resource& res)
 	{

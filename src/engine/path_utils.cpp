@@ -82,15 +82,16 @@ void getBasename(Span<char> basename, const char* src)
 }
 
 
-void getExtension(Span<char> extension, const char* src)
+void getExtension(Span<char> extension, Span<const char> src)
 {
 	ASSERT(extension.length() > 0);
-	for (int i = stringLength(src) - 1; i >= 0; --i)
+	for (int i = src.length() - 1; i >= 0; --i)
 	{
 		if (src[i] == '.')
 		{
 			++i;
-			copyString(extension, src + i);
+			Span<const char> tmp = { src.begin() + i, src.end() };
+			copyString(extension, tmp);
 			return;
 		}
 	}
@@ -126,10 +127,18 @@ bool replaceExtension(char* path, const char* ext)
 bool hasExtension(const char* filename, const char* ext)
 {
 	char tmp[20];
-	getExtension(Span(tmp), filename);
+	getExtension(Span(tmp), Span(filename, stringLength(filename)));
 	makeLowercase(Span(tmp), tmp);
 
 	return equalStrings(tmp, ext);
+}
+
+FileInfo::FileInfo(const char* path) {
+	char tmp[MAX_PATH_LENGTH];
+	normalize(path, Span(tmp));
+	getExtension(Span(m_extension), Span(tmp, stringLength(tmp)));
+	getBasename(Span(m_basename), tmp);
+	getDir(Span(m_dir), tmp);
 }
 
 
