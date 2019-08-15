@@ -1473,9 +1473,9 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 		: AnimationCurveNode(_scene, _element)
 	{
 		default_values[0] = default_values[1] = default_values[2] =  0;
-		ofbx::Element* dx = static_cast<ofbx::Element*>(resolveProperty(*this, "d|X"));
-		ofbx::Element* dy = static_cast<ofbx::Element*>(resolveProperty(*this, "d|Y"));
-		ofbx::Element* dz = static_cast<ofbx::Element*>(resolveProperty(*this, "d|Z"));
+		Element* dx = static_cast<Element*>(resolveProperty(*this, "d|X"));
+		Element* dy = static_cast<Element*>(resolveProperty(*this, "d|Y"));
+		Element* dz = static_cast<Element*>(resolveProperty(*this, "d|Z"));
 
 		if (dx) {
 			Property* x = (Property*)dx->getProperty(4);
@@ -2575,35 +2575,35 @@ static float getFramerateFromTimeMode(FrameRate time_mode, float custom_frame_ra
 
 static void parseGlobalSettings(const Element& root, Scene* scene)
 {
-	for (ofbx::Element* settings = root.child; settings; settings = settings->sibling)
+	for (Element* settings = root.child; settings; settings = settings->sibling)
 	{
 		if (settings->id == "GlobalSettings")
 		{
-			for (ofbx::Element* props70 = settings->child; props70; props70 = props70->sibling)
+			for (Element* props70 = settings->child; props70; props70 = props70->sibling)
 			{
 				if (props70->id == "Properties70")
 				{
-					for (ofbx::Element* node = props70->child; node; node = node->sibling)
+					for (Element* node = props70->child; node; node = node->sibling)
 					{
 						if (!node->first_property)
 							continue;
 
 						#define get_property(name, field, type, getter) if(node->first_property->value == name) \
 						{ \
-							ofbx::IElementProperty* prop = node->getProperty(4); \
+							IElementProperty* prop = node->getProperty(4); \
 							if (prop) \
 							{ \
-								ofbx::DataView value = prop->getValue(); \
+								DataView value = prop->getValue(); \
 								scene->m_settings.field = (type)value.getter(); \
 							} \
 						}
 
 						#define get_time_property(name, field, type, getter) if(node->first_property->value == name) \
 						{ \
-							ofbx::IElementProperty* prop = node->getProperty(4); \
+							IElementProperty* prop = node->getProperty(4); \
 							if (prop) \
 							{ \
-								ofbx::DataView value = prop->getValue(); \
+								DataView value = prop->getValue(); \
 								scene->m_settings.field = fbxTimeToSeconds((type)value.getter()); \
 							} \
 						}

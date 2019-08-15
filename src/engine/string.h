@@ -30,6 +30,7 @@ LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<i64> value)
 LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u32> value);
 LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u16> value);
 LUMIX_ENGINE_API bool copyString(Span<char> output, const char* source);
+LUMIX_ENGINE_API bool copyString(Span<char> output, Span<const char> source);
 LUMIX_ENGINE_API bool copyNString(Span<char> output, const char* source, int N);
 LUMIX_ENGINE_API bool catString(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool catNString(Span<char> output, const char* source, int N);

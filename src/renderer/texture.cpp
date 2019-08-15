@@ -260,7 +260,7 @@ void Texture::save()
 {
 	char ext[5];
 	ext[0] = 0;
-	PathUtils::getExtension(Span(ext), getPath().c_str());
+	PathUtils::getExtension(Span(ext), Span(getPath().c_str(), getPath().length()));
 	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();

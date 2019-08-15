@@ -435,6 +435,26 @@ bool copyNString(Span<char> dst, const char* src, int N)
 	return false;
 }
 
+bool copyString(Span<char> dst, Span<const char> src)
+{
+	if (dst.length() < 1) return false;
+	if (src.length() < 1) {
+		dst.m_begin = dst.m_end = nullptr;
+		return true;
+	}
+
+	u32 length = dst.length();
+	char* tmp = dst.begin();
+	const char* srcp = src.m_begin;
+	while (srcp != src.m_end && length > 1) {
+		*tmp = *srcp;
+		--length;
+		++tmp;
+		++srcp;
+	}
+	*tmp = 0;
+	return srcp == src.m_end;
+}
 
 bool copyString(Span<char> dst, const char* src)
 {

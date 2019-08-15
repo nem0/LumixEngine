@@ -653,9 +653,6 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 void AssetBrowser::selectResource(const Path& path, bool record_history, bool additive)
 {
 	m_is_focus_requested = true;
-	char ext[30];
-	PathUtils::getExtension(Span(ext), path.c_str());
-
 	auto& manager = m_editor.getEngine().getResourceManager();
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	const ResourceType type = compiler.getResourceType(path.c_str());
@@ -713,7 +710,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 		{
 			char ext[10];
 			const char* path = (const char*)payload->Data;
-			PathUtils::getExtension(Span(ext), path);
+			PathUtils::getExtension(Span(ext), Span(path, stringLength(path)));
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
 			if (compiler.acceptExtension(ext, type))
 			{

@@ -552,7 +552,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
 			for (const FBXImporter::ImportAnimation& anim : animations) {
-				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ":", path);
+				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ".ani:", path);
 				compiler.addResource(Animation::TYPE, tmp);
 			}
 
@@ -1350,7 +1350,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool compile(const Path& src) override
 	{
 		char ext[4] = {};
-		PathUtils::getExtension(Span(ext), src.c_str());
+		PathUtils::getExtension(Span(ext), Span(src.c_str(), src.length()));
 
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		Array<u8> src_data(m_app.getWorldEditor().getAllocator());

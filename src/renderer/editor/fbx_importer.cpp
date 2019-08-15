@@ -89,10 +89,6 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 	if (!mesh) return node->getGlobalTransform();
 	if (!mesh->fbx) return makeOFBXIdentity();
 
-	if (mesh->fbx->getPose()) {
-		return mesh->fbx->getPose()->getMatrix();
-	}
-
 	auto* skin = mesh->fbx->getGeometry()->getSkin();
 	if (!skin) return node->getGlobalTransform();
 
@@ -104,8 +100,7 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 			return cluster->getTransformLinkMatrix();
 		}
 	}
-	ASSERT(false);
-	return makeOFBXIdentity();
+	return node->getGlobalTransform();
 }
 
 
@@ -1040,7 +1035,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			}
 		}
 
-		const StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ":", src);
+		const StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ".ani:", src);
 		compiler.writeCompiledResource(anim_path, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
 	}
 }
@@ -1785,7 +1780,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 		
 		char mesh_name[256];
 		getImportMeshName(meshes[i], mesh_name);
-		StaticString<MAX_PATH_LENGTH> mesh_path(mesh_name, ":", src);
+		StaticString<MAX_PATH_LENGTH> mesh_path(mesh_name, ".fbx:", src);
 		serializer.write("source", (const char*)mesh_path);
 		serializer.write("flags", u8(2 /*enabled*/));
 		serializer.write("cmp_end", 0);
@@ -1825,7 +1820,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		write(to_mesh);
 		write(factor);
 
-		StaticString<MAX_PATH_LENGTH> resource_locator(name, ":", src);
+		StaticString<MAX_PATH_LENGTH> resource_locator(name, ".fbx:", src);
 
 		compiler.writeCompiledResource(resource_locator, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
 	}
