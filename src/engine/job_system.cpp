@@ -49,10 +49,15 @@ struct WorkerTask;
 struct FiberDecl
 {
 	int idx;
-	Fiber::Handle fiber;
+	Fiber::Handle fiber = Fiber::INVALID_FIBER;
 	Job current_job;
 };
 
+#ifdef _WIN32
+	static void __stdcall manage(void* data);
+#else
+	static void manage(void* data);
+#endif
 
 struct System
 {
@@ -141,6 +146,9 @@ struct WorkerTask : MT::Task
 		g_system->m_sync.enter();
 		FiberDecl* fiber = g_system->m_free_fibers.back();
 		g_system->m_free_fibers.pop();
+		if (fiber->fiber == Fiber::INVALID_FIBER) {
+			fiber->fiber = Fiber::create(64 * 1024, manage, fiber);
+		}
 		getWorker()->m_current_fiber = fiber;
 		Fiber::switchTo(&getWorker()->m_primary_fiber, fiber->fiber);
 	}
@@ -449,7 +457,6 @@ bool init(u8 workers_count, IAllocator& allocator)
 	const int fiber_num = lengthOf(g_system->m_fiber_pool);
 	for(int i = 0; i < fiber_num; ++i) { 
 		FiberDecl& decl = g_system->m_fiber_pool[i];
-		decl.fiber = Fiber::create(64 * 1024, manage, &g_system->m_fiber_pool[i]);
 		decl.idx = i;
 	}
 
@@ -511,7 +518,9 @@ void shutdown()
 
 	for (FiberDecl& fiber : g_system->m_fiber_pool)
 	{
-		Fiber::destroy(fiber.fiber);
+		if(fiber.fiber != Fiber::INVALID_FIBER) {
+			Fiber::destroy(fiber.fiber);
+		}
 	}
 
 	LUMIX_DELETE(allocator, g_system);
@@ -548,6 +557,9 @@ void wait(SignalHandle handle)
 		const Profiler::FiberSwitchData& switch_data = Profiler::beginFiberWait(handle);
 		FiberDecl* new_fiber = g_system->m_free_fibers.back();
 		g_system->m_free_fibers.pop();
+		if (new_fiber->fiber == Fiber::INVALID_FIBER) {
+			new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
+		}
 		getWorker()->m_current_fiber = new_fiber;
 		Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 		getWorker()->m_current_fiber = this_fiber;
