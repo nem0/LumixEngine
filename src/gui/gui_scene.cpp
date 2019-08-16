@@ -290,7 +290,7 @@ struct GUISceneImpl final : public GUIScene
 				const char* text_cstr = rect.text->text.c_str();
 				float font_size = (float)rect.text->getFontSize();
 				Vec2 text_size = measureTextA(*font, text_cstr, nullptr);
-				Vec2 text_pos(l, t);
+				Vec2 text_pos(l, t + font_size);
 
 				switch (rect.text->horizontal_align)
 				{
