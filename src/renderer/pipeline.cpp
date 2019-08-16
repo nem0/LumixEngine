@@ -625,7 +625,6 @@ struct PipelineImpl final : Pipeline
 			return false;
 		}
 
-		m_stats = {};
 		clearBuffers();
 
 		{
@@ -670,7 +669,7 @@ struct PipelineImpl final : Pipeline
 			prepareShadowCameras(global_state);
 		}
 
-		struct StartFrameCmd : Renderer::RenderJob {
+		struct StartPipelineJob : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
 				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
@@ -686,6 +685,7 @@ struct PipelineImpl final : Pipeline
 					ffr::createBuffer(pipeline->m_drawcall_ub, flags, 32 * 1024, nullptr);
 				}
 				ffr::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, sizeof(32 * 1024));
+				pipeline->m_stats = {};
 			}
 			void setup() override {}
 
@@ -696,12 +696,12 @@ struct PipelineImpl final : Pipeline
 			PassState pass_state;
 		};
 
-		StartFrameCmd* start_frame_cmd = LUMIX_NEW(m_renderer.getAllocator(), StartFrameCmd);
-		start_frame_cmd->pipeline = this;
-		start_frame_cmd->global_state = global_state;
-		start_frame_cmd->global_state_buffer = m_global_state_buffer;
-		start_frame_cmd->pass_state_buffer = m_pass_state_buffer;
-		m_renderer.queue(start_frame_cmd, 0);
+		StartPipelineJob* start_job = LUMIX_NEW(m_renderer.getAllocator(), StartPipelineJob);
+		start_job->pipeline = this;
+		start_job->global_state = global_state;
+		start_job->global_state_buffer = m_global_state_buffer;
+		start_job->pass_state_buffer = m_pass_state_buffer;
+		m_renderer.queue(start_job, 0);
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -719,6 +719,20 @@ struct PipelineImpl final : Pipeline
 			LuaWrapper::pcall(m_lua_state, 0);
 		}
 		lua_pop(m_lua_state, 1);
+
+
+		struct EndPipelineJob : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override {
+				pipeline->m_last_frame_stats = pipeline->m_stats;
+			}
+
+			PipelineImpl* pipeline;
+		};
+
+		EndPipelineJob* end_job = LUMIX_NEW(m_renderer.getAllocator(), EndPipelineJob);
+		end_job->pipeline = this;
+		m_renderer.queue(end_job, 0);
 
 		return true;
 	}
@@ -2185,6 +2199,9 @@ struct PipelineImpl final : Pipeline
 				Profiler::pushInt("drawcalls", stats.draw_call_count);
 				Profiler::pushInt("instances", stats.instance_count);
 				Profiler::pushInt("triangles", stats.triangle_count);
+				m_pipeline->m_stats.draw_call_count += stats.draw_call_count;
+				m_pipeline->m_stats.instance_count += stats.instance_count;
+				m_pipeline->m_stats.triangle_count += stats.triangle_count;
 			}
 
 			u32 m_define_mask = 0;
@@ -3317,7 +3334,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	bool isReady() const override { return m_resource->isReady(); }
-	const Stats& getStats() const override { return m_stats; }
+	const Stats& getStats() const override { return m_last_frame_stats; }
 	const Path& getPath() override { return m_resource->getPath(); }
 
 	void clearDraw2D() override { return m_draw2d.clear(getAtlasSize()); }
@@ -3353,7 +3370,8 @@ struct PipelineImpl final : Pipeline
 	RenderScene* m_scene;
 	Draw2D m_draw2d;
 	Shader* m_draw2d_shader;
-	Stats m_stats;
+	Stats m_last_frame_stats;
+	Stats m_stats; // accessed from render thread
 	Viewport m_viewport;
 	int m_output;
 	Shader* m_debug_shape_shader;
