@@ -1022,21 +1022,12 @@ public:
 		probe.texture = nullptr;
 		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
 			probe.texture = manager.load<Texture>(Path(path_str));
-			probe.texture->setFlag(Texture::Flags::SRGB, true);
 		}
 		
 		StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 		probe.irradiance = manager.load<Texture>(Path(irr_path_str));
-		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
-		// TODO
-		//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 		probe.radiance = manager.load<Texture>(Path(r_path_str));
-		probe.radiance->setFlag(Texture::Flags::SRGB, true);
-		// TODO
-		//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
@@ -1248,19 +1239,11 @@ public:
 			{
 				StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
 				probe.texture = manager.load<Texture>(Path(path_str));
-				probe.texture->setFlag(Texture::Flags::SRGB, true);
 			}
 			StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
 			probe.irradiance = manager.load<Texture>(Path(irr_path_str));
-			probe.irradiance->setFlag(Texture::Flags::SRGB, true);
-			// TODO
-			//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-			//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 			StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
 			probe.radiance = manager.load<Texture>(Path(r_path_str));
-			probe.radiance->setFlag(Texture::Flags::SRGB, true);
-			// TODO//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-			//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 
 			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 		}
@@ -2069,17 +2052,6 @@ public:
 	}
 
 
-	// TODO
-	/*
-	static bgfx::TextureHandle* LUA_getRenderBuffer(Pipeline* pipeline,
-		const char* framebuffer_name,
-		int renderbuffer_idx)
-	{
-bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, renderbuffer_idx);
-		return &handle;
-	}*/
-
-
 	static void LUA_setModelInstancePath(IScene* scene, int component, const char* path)
 	{
 		RenderScene* render_scene = (RenderScene*)scene;
@@ -2283,21 +2255,7 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 	void setGlobalLODMultiplier(float multiplier) { m_lod_multiplier = multiplier; }
 	float getGlobalLODMultiplier() const { return m_lod_multiplier; }
 
-
-	Matrix getCameraViewProjection(EntityRef entity) override
-	{
-		/*Matrix view = m_universe.getMatrix(entity);
-		view.fastInverse();
-		return getCameraProjection(entity) * view;*/
-		// TODO
-		ASSERT(false);
-		return {};
-	}
-
-
 	Camera& getCamera(EntityRef entity) override { return m_cameras[entity]; }
-
-
 
 	Matrix getCameraProjection(EntityRef entity) override
 	{
@@ -2948,17 +2906,10 @@ bgfx::TextureHandle& handle = pipeline->getRenderbuffer(framebuffer_name, render
 		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
 		if(probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		probe.irradiance = rm.load<Texture>(Path(path));
-		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
-		// TODO
-		//probe.irradiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		//probe.irradiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
 		if (probe.radiance) probe.irradiance->getResourceManager().unload(*probe.radiance);
 		probe.radiance = rm.load<Texture>(Path(path));
-		probe.radiance->setFlag(Texture::Flags::SRGB, true);
-		//probe.radiance->setFlag(BGFX_TEXTURE_MIN_ANISOTROPIC, true);
-		//probe.radiance->setFlag(BGFX_TEXTURE_MAG_ANISOTROPIC, true);
 	}
 
 	
@@ -3541,7 +3492,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(setGlobalLODMultiplier);
 	REGISTER_FUNCTION(getGlobalLODMultiplier);
-	REGISTER_FUNCTION(getCameraViewProjection);
 	REGISTER_FUNCTION(getActiveEnvironment);
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
@@ -3566,9 +3516,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(destroyPipeline);
 	REGISTER_FUNCTION(setPipelineScene);
 	REGISTER_FUNCTION(getPipelineScene);
-	// TODO
-	/*REGISTER_FUNCTION(pipelineRender);
-	REGISTER_FUNCTION(getRenderBuffer);*/
 	REGISTER_FUNCTION(setModelInstancePath);
 	REGISTER_FUNCTION(getModelBoneIndex);
 	REGISTER_FUNCTION(makeScreenshot);

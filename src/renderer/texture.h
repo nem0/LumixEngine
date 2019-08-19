@@ -35,7 +35,10 @@ class LUMIX_RENDERER_API Texture final : public Resource
 public: 
 	enum class Flags : u32 {
 		SRGB = 1 << 0,
-		CLAMP = 1 << 1
+		CLAMP_U = 1 << 1,
+		CLAMP_V = 1 << 2,
+		CLAMP_W = 1 << 3,
+		POINT = 1 << 4
 	};
 
 public:

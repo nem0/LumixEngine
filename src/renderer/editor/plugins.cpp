@@ -365,23 +365,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (is_node_open) {
 				ImGui::Image((void*)(uintptr_t)texture->handle.value, ImVec2(96, 96));
-				static const struct {
-					const char* name;
-					u32 value;
-					u32 unset_flag;
-				} FLAGS[] = {
-					{"Clamp", (u32)Texture::Flags::CLAMP, 0}
-				};
 
-				for (int i = 0; i < lengthOf(FLAGS); ++i) {
-					auto& flag = FLAGS[i];
-					bool b = (texture->flags & flag.value) != 0;
-					if (ImGui::Checkbox(flag.name, &b)) {
-						if (flag.unset_flag) texture->setFlag((Texture::Flags)flag.unset_flag, false);
-						texture->setFlag((Texture::Flags)flag.value, b);
-					}
-				}
-				
 				for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
 					bool b = material->isCustomFlag(1 << i);
 					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
@@ -689,11 +673,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			if (ImGui::Selectable("Save preview"))
 			{
-				// TODO 
-				ASSERT(false);
-				/*const Matrix mtx(m_viewport.pos, m_viewport.rot);
 				model.getResourceManager().load(model);
-				renderTile(&model, &mtx);*/
+				renderTile(&model, &m_viewport.pos, &m_viewport.rot);
 			}
 			ImGui::EndPopup();
 		}
@@ -927,7 +908,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		popTileQueue();
 
 		if (resource->getType() == Model::TYPE) {
-			renderTile((Model*)resource, nullptr);
+			renderTile((Model*)resource, nullptr, nullptr);
 		}
 		else if (resource->getType() == PrefabResource::TYPE) {
 			renderTile((PrefabResource*)resource);
@@ -1013,7 +994,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 	}
 
 
-	void renderTile(Model* model, const Matrix* in_mtx)
+	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
 	{
 		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
@@ -1033,9 +1014,6 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
 		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
 		mtx.inverse();
-		if (in_mtx) {
-			mtx = *in_mtx;
-		}
 		Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.far = 10000.f;
@@ -1043,8 +1021,8 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		viewport.fov = degreesToRadians(60.f);
 		viewport.h = AssetBrowser::TILE_SIZE;
 		viewport.w = AssetBrowser::TILE_SIZE;
-		viewport.pos = DVec3(eye.x, eye.y, eye.z);
-		viewport.rot = mtx.getRotation();
+		viewport.pos = in_pos ? *in_pos : DVec3(eye.x, eye.y, eye.z);
+		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
 
@@ -1139,13 +1117,20 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
 	{
-		enum WrapMode : int {
+		enum WrapMode : u32 {
 			REPEAT,
 			CLAMP
 		};
+		enum Filter : u32 {
+			LINEAR,
+			POINT
+		};
 		bool srgb = false;
 		bool is_normalmap = false;
-		WrapMode wrap_mode = WrapMode::REPEAT;
+		WrapMode wrap_mode_u = WrapMode::REPEAT;
+		WrapMode wrap_mode_v = WrapMode::REPEAT;
+		WrapMode wrap_mode_w = WrapMode::REPEAT;
+		Filter filter = Filter::LINEAR;
 	};
 
 	explicit TexturePlugin(StudioApp& app)
@@ -1295,7 +1280,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		dst.write("dds", 3);
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-		flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
+		flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+		flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+		flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
 		dst.write(&flags, sizeof(flags));
 
 		nvtt::Context context;
@@ -1339,8 +1327,22 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
 			char tmp[32];
-			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode", Span(tmp))) {
-				meta.wrap_mode = stricmp(tmp, "repeat") == 0 ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
+				if (stricmp(tmp, "point") == 0) {
+					meta.filter = Meta::Filter::POINT;
+				}
+				else {
+					meta.filter = Meta::Filter::LINEAR;
+				}
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_u", Span(tmp))) {
+				meta.wrap_mode_u = stricmp(tmp, "repeat") == 0 ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_v", Span(tmp))) {
+				meta.wrap_mode_v = stricmp(tmp, "repeat") == 0 ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+			}
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
+				meta.wrap_mode_w = stricmp(tmp, "repeat") == 0 ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
 			}
 		});
 		return meta;
@@ -1361,7 +1363,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
 			out.write(ext, sizeof(ext) - 1);
 			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			flags |= meta.wrap_mode == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP : 0;
+			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
 			out.write(flags);
 			out.write(src_data.begin(), src_data.byte_size());
 		}
@@ -1378,6 +1383,21 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span((u8*)out.getData(), (i32)out.getPos()));
 	}
 
+	const char* toString(Meta::Filter filter) {
+		switch (filter) {
+			case Meta::Filter::POINT: return "point";
+			case Meta::Filter::LINEAR: return "linear";
+			default: ASSERT(false); return "linear";
+		}
+	}
+
+	const char* toString(Meta::WrapMode wrap) {
+		switch (wrap) {
+			case Meta::WrapMode::CLAMP: return "clamp";
+			case Meta::WrapMode::REPEAT: return "repeat";
+			default: ASSERT(false); return "repeat";
+		}
+	}
 
 	void onGUI(Span<Resource*> resources) override
 	{
@@ -1425,12 +1445,19 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			
 			ImGui::Checkbox("SRGB", &m_meta.srgb);
 			ImGui::Checkbox("Is normalmap", &m_meta.is_normalmap);
-			ImGui::Combo("Wrap mode", (int*)&m_meta.wrap_mode, "Repeat\0Clamp\0");
+			ImGui::Combo("U Wrap mode", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
+			ImGui::Combo("V Wrap mode", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0");
+			ImGui::Combo("W Wrap mode", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0");
+			ImGui::Combo("Filter", (int*)&m_meta.wrap_mode_w, "Trilinear\0Bilinear\0Point\0");
 
 			if (ImGui::Button("Apply")) {
-				const StaticString<256> src("srgb = ", m_meta.srgb ? "true" : "false"
+				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
-					, "\nwrap_mode = \"", m_meta.wrap_mode == Meta::WrapMode::REPEAT ? "repeat\"" : "clamp\"");
+					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
+					, "\nwrap_mode_v = \"", toString(m_meta.wrap_mode_v), "\""
+					, "\nwrap_mode_w = \"", toString(m_meta.wrap_mode_w), "\""
+					, "\nfilter = \"", toString(m_meta.filter), "\""
+				);
 				compiler.updateMeta(texture->getPath(), src);
 				if (compiler.compile(texture->getPath())) {
 					texture->getResourceManager().reload(*texture);
