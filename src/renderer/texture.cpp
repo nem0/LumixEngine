@@ -581,10 +581,18 @@ u32 Texture::getFFRFlags() const
 	if(flags & (u32)Flags::SRGB) {
 		ffr_flags  |= (u32)ffr::TextureFlags::SRGB;
 	}
-	if (flags & (u32)Flags::CLAMP) {
-		ffr_flags |= (u32)ffr::TextureFlags::CLAMP;
+	if(flags & (u32)Flags::POINT) {
+		ffr_flags  |= (u32)ffr::TextureFlags::POINT_FILTER;
 	}
-
+	if (flags & (u32)Flags::CLAMP_U) {
+		ffr_flags |= (u32)ffr::TextureFlags::CLAMP_U;
+	}
+	if (flags & (u32)Flags::CLAMP_V) {
+		ffr_flags |= (u32)ffr::TextureFlags::CLAMP_V;
+	}
+	if (flags & (u32)Flags::CLAMP_W) {
+		ffr_flags |= (u32)ffr::TextureFlags::CLAMP_W;
+	}
 	return ffr_flags ;
 }
 
@@ -595,10 +603,7 @@ bool Texture::load(u64 size, const u8* mem)
 	char ext[4] = {};
 	InputMemoryStream file(mem, size);
 	if (!file.read(ext, 3)) return false;
-	u32 flags;
 	if (!file.read(&flags, sizeof(flags))) return false;
-	setSRGB(flags & (u32)Flags::SRGB);
-	setFlag(Flags::CLAMP, flags & (u32)Flags::CLAMP);
 
 	bool loaded = false;
 	if (equalIStrings(ext, "dds")) {

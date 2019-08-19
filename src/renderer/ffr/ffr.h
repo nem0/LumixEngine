@@ -132,8 +132,11 @@ enum class TextureFormat : u32 {
 
 enum class TextureFlags : u32 {
 	SRGB = 1 << 0,
-	CLAMP = 1 << 1,
-	NO_MIPS = 1 << 2
+	CLAMP_U = 1 << 1,
+	CLAMP_V = 1 << 2,
+	CLAMP_W = 1 << 3,
+	NO_MIPS = 1 << 4,
+	POINT_FILTER = 1 << 5,
 };
 
 enum class BufferFlags : u32 {

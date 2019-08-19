@@ -257,7 +257,6 @@ public:
 
 	virtual Camera& getCamera(EntityRef entity) = 0;
 	virtual Matrix getCameraProjection(EntityRef entity) = 0;
-	virtual Matrix getCameraViewProjection(EntityRef entity) = 0;
 	virtual float getCameraScreenWidth(EntityRef entity) = 0;
 	virtual float getCameraScreenHeight(EntityRef entity) = 0;
 	virtual void setCameraScreenSize(EntityRef entity, int w, int h) = 0;

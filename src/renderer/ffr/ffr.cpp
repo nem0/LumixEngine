@@ -1436,9 +1436,12 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 		}
 	}
 
-	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP : GL_REPEAT;
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap));
+	const GLint wrap_u = (flags & (u32)TextureFlags::CLAMP_U) ? GL_CLAMP : GL_REPEAT;
+	const GLint wrap_v = (flags & (u32)TextureFlags::CLAMP_V) ? GL_CLAMP : GL_REPEAT;
+	const GLint wrap_w = (flags & (u32)TextureFlags::CLAMP_W) ? GL_CLAMP : GL_REPEAT;
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w));
 
 	Texture& t = g_ffr.textures[handle.value];
 	t.format = internal_format;
@@ -1577,11 +1580,20 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	}
 	CHECK_GL(glGenerateTextureMipmap(texture));
 	
-	const GLint wrap = (flags & (u32)TextureFlags::CLAMP) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
+	const GLint wrap_u = (flags & (u32)TextureFlags::CLAMP_U) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+	const GLint wrap_v = (flags & (u32)TextureFlags::CLAMP_V) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+	const GLint wrap_w = (flags & (u32)TextureFlags::CLAMP_W) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v));
+	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w));
+	if (flags & (u32)TextureFlags::POINT_FILTER) {
+		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+	}
+	else {
+		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
+	}
 
 	Texture& t = g_ffr.textures[handle.value];
 	t.handle = texture;
