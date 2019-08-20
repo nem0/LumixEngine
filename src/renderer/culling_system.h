@@ -17,6 +17,16 @@ namespace Lumix
 
 	struct CullResult {
 		void free(PageAllocator& allocator);
+		template <typename F>
+		void forEach(F&& f) {
+			CullResult* j = this;
+			while (j) {
+				j = j->header.next;
+				for (u32 i = 0, c = j->header.count; j < c; ++j) {
+					f(j->entities[i]);
+				}
+			}
+		}
 		
 		struct {
 			CullResult* next = nullptr;
