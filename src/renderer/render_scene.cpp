@@ -2185,25 +2185,6 @@ public:
 	}
 
 
-	void getModelInstanceEntities(const ShiftedFrustum& frustum, Array<EntityRef>& entities) override
-	{
-		/*PROFILE_FUNCTION();
-
-		CullingSystem::Results results(m_allocator);
-		m_culling_system->cull(frustum, results);
-
-		for (auto& subresults : results)
-		{
-			for (u32 renderable: subresults)
-			{
-				entities.push(model_instance);
-			}
-		}*/
-		// TODO
-		ASSERT(false);
-	}
-
-
 	float getCameraLODMultiplier(EntityRef camera)
 	{
 		float lod_multiplier;

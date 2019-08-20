@@ -149,6 +149,8 @@ struct CullingSystemImpl final : public CullingSystem
 		if(m_entity_to_cell.size() <= entity.index) return;
 		
 		const Sphere* sphere = m_entity_to_cell[entity.index];
+		if(!sphere) return;
+
 		CellPage& cell = getCell(*sphere);
 		if(cell.header.count == 1) {
 			if(!cell.header.prev) {

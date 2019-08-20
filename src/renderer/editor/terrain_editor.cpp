@@ -19,6 +19,7 @@
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "physics/physics_scene.h"
+#include "renderer/culling_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
@@ -907,19 +908,16 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 		-m_terrain_brush_size,
 		m_terrain_brush_size);
 
-	Array<EntityRef> entities(m_world_editor.getAllocator());
-	scene->getModelInstanceEntities(frustum, entities);
+	CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
 	if (m_selected_prefabs.empty())
 	{
-		for (EntityRef entity : entities)
-		{
+		meshes->forEach([&](EntityRef entity){
 			if (prefab_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
-		}
+		});
 	}
 	else
 	{
-		for (EntityRef entity : entities)
-		{
+		meshes->forEach([&](EntityRef entity){
 			for (auto* res : m_selected_prefabs)
 			{
 				if ((prefab_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
@@ -928,9 +926,10 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 					break;
 				}
 			}
-		}
+		});
 	}
 	m_world_editor.endCommandGroup();
+	meshes->free(scene->getEngine().getPageAllocator());
 }
 
 

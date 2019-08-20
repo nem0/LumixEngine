@@ -876,25 +876,37 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.paths.pop();
 		pushTileQueue(path);
 	}
+	
+	static void destroyEntityRecursive(Universe& universe, EntityPtr entity)
+	{
+		if (!entity.isValid()) return;
+			
+		EntityRef e = (EntityRef)entity;
+		destroyEntityRecursive(universe, universe.getFirstChild(e));
+		destroyEntityRecursive(universe, universe.getNextSibling(e));
 
+		universe.destroyEntity(e);
+	}
 
 	void update() override
 	{
 		if (m_tile.frame_countdown >= 0) {
 			--m_tile.frame_countdown;
 			if (m_tile.frame_countdown == -1) {
-				m_tile.universe->destroyEntity((EntityRef)m_tile.mesh_entity);
+				destroyEntityRecursive(*m_tile.universe, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getWorldEditor().getEngine();
 				FileSystem& fs = engine.getFileSystem();
 				StaticString<MAX_PATH_LENGTH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
 				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+				memset(m_tile.data.begin(), 0, m_tile.data.byte_size());
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 				renderer->destroy(m_tile.texture);
+				m_tile.entity = INVALID_ENTITY;
 			}
 			return;
 		}
 
-		if (m_tile.m_entity_in_fly.isValid()) return;
+		if (m_tile.entity.isValid()) return;
 		if (m_tile.queue.empty()) return;
 
 		Resource* resource = m_tile.queue.front();
@@ -921,16 +933,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void renderTile(PrefabResource* prefab)
 	{
-				// TODO
-	//ASSERT(false);
-/*Engine& engine = m_app.getWorldEditor().getEngine();
+		Engine& engine = m_app.getWorldEditor().getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
-		EntityPtr mesh_entity = m_tile.universe->instantiatePrefab(*prefab, Vec3::ZERO, Quat::IDENTITY, 1);
+		EntityPtr mesh_entity = m_tile.universe->instantiatePrefab(*prefab, DVec3(0), Quat::IDENTITY, 1);
 		if (!mesh_entity.isValid()) return;
 
 		if (!render_scene->getUniverse().hasComponent((EntityRef)mesh_entity, MODEL_INSTANCE_TYPE)) return;
@@ -940,18 +950,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
-		m_tile.m_entity_in_fly = mesh_entity;
-		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);*/
+		m_tile.entity = mesh_entity;
+		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);
 	}
 
 
 	void renderPrefabSecondStage(Resource::State old_state, Resource::State new_state, Resource& resource)
 	{
-		// TODO
-		ASSERT(false);
-		/*
-Engine& engine = m_app.getWorldEditor().getEngine();
-		
+		Engine& engine = m_app.getWorldEditor().getEngine();
 
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
@@ -959,38 +965,52 @@ Engine& engine = m_app.getWorldEditor().getEngine();
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
+		if (new_state != Resource::State::READY) return;
 		Model* model = (Model*)&resource;
 		if (!model->isReady()) return;
 
 		AABB aabb = model->getAABB();
 
-		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
+		Matrix mtx;
 		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
 		mtx.inverse();
-		m_tile.universe->setMatrix(m_tile.camera_entity, mtx);
+		Viewport viewport;
+		viewport.is_ortho = false;
+		viewport.far = 10000.f;
+		viewport.near = 0.1f;
+		viewport.fov = degreesToRadians(60.f);
+		viewport.h = AssetBrowser::TILE_SIZE;
+		viewport.w = AssetBrowser::TILE_SIZE;
+		viewport.pos = DVec3(eye.x, eye.y, eye.z);
+		viewport.rot = mtx.getRotation();
+		m_tile.pipeline->setViewport(viewport);
+		m_tile.pipeline->render(false);
+		
+		struct Cmd : Renderer::RenderJob
+		{
+			void setup() override {}
+			void execute() override
+			{
+				PROFILE_FUNCTION();
+				ffr::getTextureImage(texture, mem.size, mem.data);
+			}
 
-		m_tile.pipeline->resize(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
-		m_tile.pipeline->render();
+			Renderer::MemRef mem;
+			ffr::TextureHandle texture;
+		};
 
-		m_tile.texture =
-			bgfx::createTexture2D(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, 1,
-bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
-		bgfx::touch(renderer->getViewCounter());
-		bgfx::setViewName(renderer->getViewCounter(), "billboard_blit");
-		bgfx::TextureHandle color_renderbuffer = m_tile.pipeline->getRenderbuffer("default", 0);
-		bgfx::blit(renderer->getViewCounter(), m_tile.texture, 0, 0, color_renderbuffer);
+		m_tile.texture = ffr::allocTextureHandle(); 
 
-		renderer->viewCounterAdd();
-		bgfx::setViewName(renderer->getViewCounter(), "billboard_read");
+		Cmd* cmd = LUMIX_NEW(renderer->getAllocator(), Cmd);
+		cmd->texture = m_tile.pipeline->getOutput();
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		bgfx::readTexture(m_tile.texture, &m_tile.data[0]);
-		bgfx::touch(renderer->getViewCounter());
-		m_tile.universe->destroyEntity(m_tile.m_entity_in_fly);
-
+		cmd->mem.data = &m_tile.data[0];
+		cmd->mem.size = m_tile.data.size() * sizeof(&m_tile.data[0]);
+		cmd->mem.own = false;
+		renderer->queue(cmd, 0);
 		m_tile.frame_countdown = 2;
-		m_tile.m_entity_in_fly = INVALID_ENTITY;*/
 	}
 
 
@@ -1049,7 +1069,7 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		cmd->mem.size = m_tile.data.size() * sizeof(&m_tile.data[0]);
 		cmd->mem.own = false;
 		renderer->queue(cmd, 0);
-		m_tile.mesh_entity = mesh_entity;
+		m_tile.entity = mesh_entity;
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
 		model->getResourceManager().unload(*model);
@@ -1087,9 +1107,8 @@ bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK); renderer->viewCounterAdd();
 		}
 
 		Universe* universe = nullptr;
-		EntityPtr mesh_entity = INVALID_ENTITY;
 		Pipeline* pipeline = nullptr;
-		EntityPtr m_entity_in_fly = INVALID_ENTITY;
+		EntityPtr entity = INVALID_ENTITY;
 		int frame_countdown = -1;
 		u32 path_hash;
 		Array<u8> data;
