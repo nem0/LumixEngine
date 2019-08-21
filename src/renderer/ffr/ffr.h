@@ -142,11 +142,10 @@ enum class TextureFlags : u32 {
 enum class BufferFlags : u32 {
 	PERSISTENT = 1 << 0,
 	COHERENT = 1 << 1,
-	MAP_READ = 1 << 2,
-	MAP_WRITE = 1 << 3,
-	MAP_FLUSH_EXPLICIT = 1 << 4,
-	DYNAMIC_STORAGE = 1 << 5,
-	UNIFORM_BUFFER = 1 << 6
+	MAP_WRITE = 1 << 2,
+	MAP_FLUSH_EXPLICIT = 1 << 3,
+	DYNAMIC_STORAGE = 1 << 4,
+	UNIFORM_BUFFER = 1 << 5
 };
 
 enum class DataType {

@@ -318,6 +318,7 @@ struct PipelineImpl final : Pipeline
 
 		const Renderer::MemRef dc_mem = { 32*1024, nullptr, false };
 		const u32 dc_ub_flags = (u32)ffr::BufferFlags::DYNAMIC_STORAGE
+			| (u32)ffr::BufferFlags::MAP_WRITE
 			| (u32)ffr::BufferFlags::UNIFORM_BUFFER;
 		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
 
@@ -2118,8 +2119,11 @@ struct PipelineImpl final : Pipeline
 										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 										material_ub_idx = material->material_constants;
 									}
-									ffr::update(m_pipeline->m_drawcall_ub, &model_mtx.m11, 0, sizeof(model_mtx));
-									ffr::update(m_pipeline->m_drawcall_ub, bones, sizeof(model_mtx), sizeof(bones[0]) * bones_count);
+
+									u8* dc_mem = (u8*)ffr::map(m_pipeline->m_drawcall_ub, 0, sizeof(Matrix) * (bones_count + 1), (u32)ffr::BufferFlags::MAP_WRITE);
+									memcpy(dc_mem, &model_mtx, sizeof(Matrix));
+									memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
+									ffr::unmap(m_pipeline->m_drawcall_ub);
 
 									ffr::useProgram(prog);
 
