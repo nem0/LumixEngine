@@ -1084,7 +1084,6 @@ void* map(BufferHandle buffer, size_t offset, size_t size, u32 flags)
 	checkThread();
 	const GLuint buf = g_ffr.buffers[buffer.value].handle;
 	GLbitfield gl_flags = 0;
-	if (flags & (u32)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
 	if (flags & (u32)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
 	if (flags & (u32)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
 	if (flags & (u32)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
@@ -1175,7 +1174,6 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	CHECK_GL(glCreateBuffers(1, &buf));
 	
 	GLbitfield gl_flags = 0;
-	if (flags & (u32)BufferFlags::MAP_READ) gl_flags |= GL_MAP_READ_BIT;
 	if (flags & (u32)BufferFlags::MAP_WRITE) gl_flags |= GL_MAP_WRITE_BIT;
 	if (flags & (u32)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT;
 	if (flags & (u32)BufferFlags::COHERENT) gl_flags |= GL_MAP_COHERENT_BIT;
