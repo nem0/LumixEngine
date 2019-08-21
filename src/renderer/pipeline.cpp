@@ -155,7 +155,6 @@ struct MTBucketArray
 		Bucket b;
 		b.array = this;
 		
-		// TODO get rid of mutex, atomics should be enough
 		m_mutex.enter();
 		m_counts.emplace();
 		b.values = (T*)m_values_end;
@@ -286,7 +285,6 @@ struct PipelineImpl final : Pipeline
 			-1, 1, 1
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
-		// TODO destroy
 		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
 		const Renderer::MemRef ub_mem = { 32 * 1024, nullptr, false };
 
@@ -317,6 +315,11 @@ struct PipelineImpl final : Pipeline
 		PassState pass_state;
 		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
 		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE | (u32)ffr::BufferFlags::UNIFORM_BUFFER);
+
+		const Renderer::MemRef dc_mem = { 32*1024, nullptr, false };
+		const u32 dc_ub_flags = (u32)ffr::BufferFlags::DYNAMIC_STORAGE
+			| (u32)ffr::BufferFlags::UNIFORM_BUFFER;
+		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
 
 		m_base_vertex_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
 		m_base_vertex_decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
@@ -359,6 +362,14 @@ struct PipelineImpl final : Pipeline
 			shader.res->getResourceManager().unload(*shader.res);
 		}
 		if (m_resource) m_resource->getResourceManager().unload(*m_resource);
+
+		m_renderer.destroy(m_cube_ib);
+		m_renderer.destroy(m_cube_vb);
+		m_renderer.destroy(m_global_state_buffer);
+		m_renderer.destroy(m_pass_state_buffer);
+		m_renderer.destroy(m_drawcall_ub);
+
+		clearBuffers();
 	}
 
 
@@ -600,8 +611,7 @@ struct PipelineImpl final : Pipeline
 				, SHADOW_CAM_NEAR
 				, SHADOW_CAM_FAR);
 
-			// TODO
-			//findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
+			findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
 		}
 	}
 
@@ -675,15 +685,6 @@ struct PipelineImpl final : Pipeline
 				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
 				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
-				
-				if (!pipeline->m_drawcall_ub.isValid()) {
-					// TODO cleanup
-					pipeline->m_drawcall_ub = ffr::allocBufferHandle();
-					ASSERT(pipeline->m_drawcall_ub.isValid());
-					const u32 flags = (u32)ffr::BufferFlags::DYNAMIC_STORAGE
-						| (u32)ffr::BufferFlags::UNIFORM_BUFFER;
-					ffr::createBuffer(pipeline->m_drawcall_ub, flags, 32 * 1024, nullptr);
-				}
 				ffr::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, sizeof(32 * 1024));
 				pipeline->m_stats = {};
 			}
@@ -754,13 +755,15 @@ struct PipelineImpl final : Pipeline
 				render_data = pipeline->m_debug_shape_shader->m_render_data;
 				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
-				for (u32 i = 0, c = tris.size(); i < c; ++i) {
-					vertices[3 * i + 0].color = tris[i].color;
-					vertices[3 * i + 0].pos = (tris[i].p0 - viewport_pos).toFloat();
-					vertices[3 * i + 1].color = tris[i].color;
-					vertices[3 * i + 1].pos = (tris[i].p1 - viewport_pos).toFloat();
-					vertices[3 * i + 2].color = tris[i].color;
-					vertices[3 * i + 2].pos = (tris[i].p2 - viewport_pos).toFloat();
+				if (vertices) {
+					for (u32 i = 0, c = tris.size(); i < c; ++i) {
+						vertices[3 * i + 0].color = tris[i].color;
+						vertices[3 * i + 0].pos = (tris[i].p0 - viewport_pos).toFloat();
+						vertices[3 * i + 1].color = tris[i].color;
+						vertices[3 * i + 1].pos = (tris[i].p1 - viewport_pos).toFloat();
+						vertices[3 * i + 2].color = tris[i].color;
+						vertices[3 * i + 2].pos = (tris[i].p2 - viewport_pos).toFloat();
+					}
 				}
 				pipeline->m_scene->clearDebugTriangles();
 			}
@@ -768,8 +771,9 @@ struct PipelineImpl final : Pipeline
 
 			void execute() override {
 				PROFILE_FUNCTION();
+
 				const ffr::ProgramHandle shader = Shader::getProgram(render_data, pipeline->m_base_vertex_decl, 0);
-				if(!shader.isValid()) return;
+				if(!shader.isValid() || !vb.ptr) return;
 
 				ffr::pushDebugGroup("debug triangles");
 
@@ -819,11 +823,13 @@ struct PipelineImpl final : Pipeline
 				render_data = pipeline->m_debug_shape_shader->m_render_data;
 				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
-				for (u32 i = 0, c = lines.size(); i < c; ++i) {
-					vertices[2 * i + 0].color = lines[i].color;
-					vertices[2 * i + 0].pos = (lines[i].from - viewport_pos).toFloat();
-					vertices[2 * i + 1].color = lines[i].color;
-					vertices[2 * i + 1].pos = (lines[i].to - viewport_pos).toFloat();
+				if (vertices) {
+					for (u32 i = 0, c = lines.size(); i < c; ++i) {
+						vertices[2 * i + 0].color = lines[i].color;
+						vertices[2 * i + 0].pos = (lines[i].from - viewport_pos).toFloat();
+						vertices[2 * i + 1].color = lines[i].color;
+						vertices[2 * i + 1].pos = (lines[i].to - viewport_pos).toFloat();
+					}
 				}
 				pipeline->m_scene->clearDebugLines();
 			}
@@ -832,7 +838,7 @@ struct PipelineImpl final : Pipeline
 			void execute() override {
 				PROFILE_FUNCTION();
 				const ffr::ProgramHandle shader = Shader::getProgram(render_data, pipeline->m_base_vertex_decl, 0);
-				if(!shader.isValid()) return;
+				if (!shader.isValid() || !vb.ptr) return;
 
 				ffr::pushDebugGroup("debug lines");
 
@@ -900,9 +906,12 @@ struct PipelineImpl final : Pipeline
 				num_indices = draw2d.getIndices().size();
 				num_vertices = draw2d.getVertices().size();
 
-				// TODO use transient buffer
-				idx_buffer_mem = pipeline->m_renderer.copy(&draw2d.getIndices()[0], num_indices * sizeof(u32));
-				vtx_buffer_mem = pipeline->m_renderer.copy(&draw2d.getVertices()[0], num_vertices * sizeof(Draw2D::Vertex));
+				idx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getIndices().byte_size());
+				vtx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getVertices().byte_size());
+				if (idx_buffer_mem.ptr && vtx_buffer_mem.ptr) {
+					memcpy(idx_buffer_mem.ptr, draw2d.getIndices().begin(), draw2d.getIndices().byte_size());
+					memcpy(vtx_buffer_mem.ptr, draw2d.getVertices().begin(), draw2d.getVertices().byte_size());
+				}
 				cmd_buffer.resize(draw2d.getCmds().size());
 				copyMemory(&cmd_buffer[0], draw2d.getCmds().begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
 
@@ -914,25 +923,18 @@ struct PipelineImpl final : Pipeline
 			void execute()
 			{
 				PROFILE_FUNCTION();
-				
-				ffr::BufferHandle vb = ffr::allocBufferHandle();
-				ffr::BufferHandle ib = ffr::allocBufferHandle();
-				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, vtx_buffer_mem.size, vtx_buffer_mem.data);
-				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, idx_buffer_mem.size, idx_buffer_mem.data);
-				pipeline->m_renderer.free(idx_buffer_mem);
-				pipeline->m_renderer.free(vtx_buffer_mem);
 
 				ffr::pushDebugGroup("draw2d");
 				ffr::ProgramHandle prg = Shader::getProgram(shader, pipeline->m_2D_decl, 0);
 
-				if(prg.isValid()) {
+				if(prg.isValid() && idx_buffer_mem.ptr && vtx_buffer_mem.ptr) {
 					ffr::update(pipeline->m_drawcall_ub, &size.x, 0, sizeof(size));
 					u32 elem_offset = 0;
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 					ffr::setState(blend_state);
 					ffr::useProgram(prg);
-					ffr::bindVertexBuffer(0, vb, 0, 20);
-					ffr::bindIndexBuffer(ib);
+					ffr::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
+					ffr::bindIndexBuffer(idx_buffer_mem.buffer);
 
 					for (Draw2D::Cmd& cmd : cmd_buffer) {
 						if(cmd.clip_size.x < 0) {
@@ -950,21 +952,18 @@ struct PipelineImpl final : Pipeline
 						if (!texture_id.isValid()) texture_id = atlas_texture;
 
 						ffr::bindTextures(&texture_id, 0, 1);
-
-						ffr::drawElements(elem_offset, num_indices, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
+						ffr::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), num_indices, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
 
 						elem_offset += cmd.indices_count;
 					}
 				}
 
 				ffr::popDebugGroup();
-				ffr::destroy(vb);
-				ffr::destroy(ib);
 			}
 
 			ffr::TextureHandle atlas_texture;
-			Renderer::MemRef idx_buffer_mem;
-			Renderer::MemRef vtx_buffer_mem;
+			Renderer::TransientSlice idx_buffer_mem;
+			Renderer::TransientSlice vtx_buffer_mem;
 			int num_indices;
 			int num_vertices;
 			Array<Draw2D::Cmd> cmd_buffer;
@@ -1078,6 +1077,7 @@ struct PipelineImpl final : Pipeline
 			cmd->m_render_state = getState(L, 2);
 		}
 
+		cmd->m_deferred_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
 
@@ -1114,6 +1114,7 @@ struct PipelineImpl final : Pipeline
 
 				byte_size += (sizeof(int) * 2 + sizeof(ShaderRenderData) + sizeof(Vec3) + sizeof(Quat)) * emitters.size();
 				m_vb = m_pipeline->m_renderer.allocTransient(byte_size);
+				if (!m_vb.ptr) return;
 
 				OutputMemoryStream str(m_vb.ptr, m_vb.size);
 
@@ -1868,7 +1869,9 @@ struct PipelineImpl final : Pipeline
 				const DVec3& pos = m_pipeline->m_viewport.pos;
 				const u32 count = m_pipeline->m_scene->getTextMeshesVerticesCount();
 				vb = m_pipeline->m_renderer.allocTransient(count * sizeof(TextMeshVertex));
-				m_pipeline->m_scene->getTextMeshesVertices((TextMeshVertex*)vb.ptr, pos, rot);
+				if(vb.ptr) {
+					m_pipeline->m_scene->getTextMeshesVertices((TextMeshVertex*)vb.ptr, pos, rot);
+				}
 			}
 
 			void execute() override
@@ -2048,8 +2051,8 @@ struct PipelineImpl final : Pipeline
 
 				Stats stats = {};
 
-				const u32 instanced_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-				const u32 skinned_mask = m_define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
+				const u32 instanced_mask = m_define_mask | m_instanced_define_mask;
+				const u32 skinned_mask = m_define_mask | m_skinned_define_mask;
 				const u64 render_states = m_render_state;
 				const ffr::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
@@ -2099,8 +2102,8 @@ struct PipelineImpl final : Pipeline
 								READ(const float, scale);
 								READ(const i32, bones_count);
 
-								READ(const ffr::BufferHandle, buffer);
-								READ(const u32, offset);
+								Matrix* bones = (Matrix*)cmd;
+								cmd += sizeof(bones[0]) * bones_count;
 
 								Matrix model_mtx(pos, rot);
 								model_mtx.multiply3x3(scale);
@@ -2116,11 +2119,9 @@ struct PipelineImpl final : Pipeline
 										material_ub_idx = material->material_constants;
 									}
 									ffr::update(m_pipeline->m_drawcall_ub, &model_mtx.m11, 0, sizeof(model_mtx));
-								
-									ffr::useProgram(prog);
+									ffr::update(m_pipeline->m_drawcall_ub, bones, sizeof(model_mtx), sizeof(bones[0]) * bones_count);
 
-									const int bones_size = bones_count * sizeof(Matrix);
-									ffr::bindUniformBuffer(3, buffer, offset, bones_size);
+									ffr::useProgram(prog);
 
 									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 									ffr::bindIndexBuffer(mesh->index_buffer_handle);
@@ -2163,8 +2164,7 @@ struct PipelineImpl final : Pipeline
 								READ(const ffr::BufferHandle, buffer);
 								READ(const u32, offset);
 								
-								const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
-								const u32 define_mask = (1 << m_pipeline->m_renderer.getShaderDefineIdx("GRASS")) | deferred_define_mask;
+								const u32 define_mask = m_grass_define_mask | m_deferred_define_mask | m_define_mask;
 
 								const ffr::ProgramHandle prg = Shader::getProgram(material->shader, mesh->vertex_decl, define_mask | material->define_mask);
 								if (prg.isValid()) {
@@ -2205,6 +2205,10 @@ struct PipelineImpl final : Pipeline
 			}
 
 			u32 m_define_mask = 0;
+			u32 m_instanced_define_mask = 0;
+			u32 m_skinned_define_mask = 0;
+			u32 m_deferred_define_mask = 0;
+			u32 m_grass_define_mask = 0;
 			u64 m_render_state;
 			PipelineImpl* m_pipeline;
 			CmdPage* m_cmds;
@@ -2229,6 +2233,10 @@ struct PipelineImpl final : Pipeline
 		job->m_render_state = getState(L, 2);
 		job->m_pipeline = pipeline;
 		job->m_cmds = cmd_page;
+		job->m_instanced_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("INSTANCED");
+		job->m_skinned_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("SKINNED");
+		job->m_deferred_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
+		job->m_grass_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("GRASS");
 		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
 		return 0;
 	}
@@ -2345,8 +2353,7 @@ struct PipelineImpl final : Pipeline
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const u32 deferred_define_mask = 1 << m_pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
-			const u8 edge_define_idx = m_pipeline->m_renderer.getShaderDefineIdx("EDGE");
+			const u32 deferred_define_mask = m_deferred_define_mask;
 			
 			u64 state = m_render_state;
 			for (Instance& inst : m_instances) {
@@ -2429,6 +2436,7 @@ struct PipelineImpl final : Pipeline
 		Array<Instance> m_instances;
 		ffr::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
+		u32 m_deferred_define_mask = 0;
 
 	};
 
@@ -2626,6 +2634,10 @@ struct PipelineImpl final : Pipeline
 							const Transform& tr = entity_data[e.index];
 							const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
 
+							if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 53) {
+								new_page(bucket);
+							}
+
 							WRITE(type);
 							WRITE(mi->meshes[mesh_idx].render_data);
 							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
@@ -2634,11 +2646,6 @@ struct PipelineImpl final : Pipeline
 							WRITE(tr.scale);
 							WRITE(mi->pose->count);
 
-							const Renderer::TransientSlice slice = renderer.allocTransient(mi->pose->count * sizeof(Matrix) + 256);
-							WRITE(slice.buffer);
-							u32 align = 256 - slice.offset % 256; 
-							u32 offset = slice.offset + align;
-							WRITE(offset);
 							const Quat* rotations = mi->pose->rotations;
 							const Vec3* positions = mi->pose->positions;
 
@@ -2646,8 +2653,8 @@ struct PipelineImpl final : Pipeline
 							for (int j = 0, c = mi->pose->count; j < c; ++j) {
 								const Model::Bone& bone = model.getBone(j);
 								const LocalRigidTransform tmp = {positions[j], rotations[j]};
-								Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
-								memcpy(slice.ptr + align + sizeof(Matrix) * j, &m, sizeof(Matrix));
+								const Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
+								WRITE(m);
 							}
 							break;
 						}
@@ -2663,23 +2670,28 @@ struct PipelineImpl final : Pipeline
 							const u32 count = i - start_i;
 							const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) * 2 + sizeof(Quat)));
 							
-							WRITE(type);
-							WRITE_FN(material->getRenderData());
-							WRITE(slice.buffer);
-							WRITE(slice.offset);
-							WRITE(count);
-							u8* mem = slice.ptr;
-							for(int j = start_i; j < i; ++j) {
-								const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-								const Transform& tr = entity_data[e.index];
-								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-								memcpy(mem, &lpos, sizeof(lpos));
-								mem += sizeof(lpos);
-								memcpy(mem, &tr.rot, sizeof(tr.rot));
-								mem += sizeof(tr.rot);
-								const Vec3 half_extents = scene->getDecalHalfExtents(e);
-								memcpy(mem, &half_extents, sizeof(half_extents));
-								mem += sizeof(half_extents);
+							if(slice.ptr) {
+								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
+									new_page(bucket);
+								}
+								WRITE(type);
+								WRITE_FN(material->getRenderData());
+								WRITE(slice.buffer);
+								WRITE(slice.offset);
+								WRITE(count);
+								u8* mem = slice.ptr;
+								for(int j = start_i; j < i; ++j) {
+									const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+									const Transform& tr = entity_data[e.index];
+									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+									memcpy(mem, &lpos, sizeof(lpos));
+									mem += sizeof(lpos);
+									memcpy(mem, &tr.rot, sizeof(tr.rot));
+									mem += sizeof(tr.rot);
+									const Vec3 half_extents = scene->getDecalHalfExtents(e);
+									memcpy(mem, &half_extents, sizeof(half_extents));
+									mem += sizeof(half_extents);
+								}
 							}
 							break;
 						}
@@ -2692,49 +2704,50 @@ struct PipelineImpl final : Pipeline
 							}
 
 							const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(float) * 16);
-							// TODO check if slice is valid
-							u32 intersecting_count = 0;
+							if(slice.ptr) {
+								u32 intersecting_count = 0;
 
-							struct LightData {
-								Quat rot;
-								Vec3 pos;
-								float range;
-								float attenuation;
-								Vec3 color;
-								Vec3 dir;
-								float fov;
-							};
+								struct LightData {
+									Quat rot;
+									Vec3 pos;
+									float range;
+									float attenuation;
+									Vec3 color;
+									Vec3 dir;
+									float fov;
+								};
 
-							LightData* beg = (LightData*)slice.ptr;
-							LightData* end = (LightData*)(slice.ptr + slice.size - sizeof(LightData));
+								LightData* beg = (LightData*)slice.ptr;
+								LightData* end = (LightData*)(slice.ptr + slice.size - sizeof(LightData));
 
-							for (int j = start_i; j < i; ++j) {
-								const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-								const Transform& tr = entity_data[e.index];
-								const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-								const PointLight& pl = scene->getPointLight(e);
-								const bool intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
+								for (int j = start_i; j < i; ++j) {
+									const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+									const Transform& tr = entity_data[e.index];
+									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+									const PointLight& pl = scene->getPointLight(e);
+									const bool intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
 							
-								LightData* iter = intersecting ? end : beg;
-								iter->pos = lpos;
-								iter->rot = tr.rot;
-								iter->range = pl.range;
-								iter->attenuation = pl.attenuation_param;
-								iter->color = pl.color * pl.intensity;
-								iter->dir = tr.rot * Vec3(0, 0, 1);
-								iter->fov = pl.fov;
-								intersecting ? --end : ++beg;
+									LightData* iter = intersecting ? end : beg;
+									iter->pos = lpos;
+									iter->rot = tr.rot;
+									iter->range = pl.range;
+									iter->attenuation = pl.attenuation_param;
+									iter->color = pl.color * pl.intensity;
+									iter->dir = tr.rot * Vec3(0, 0, 1);
+									iter->fov = pl.fov;
+									intersecting ? --end : ++beg;
+								}
+								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 9) {
+									new_page(bucket);
+								}
+								WRITE(type);
+								const u32 total_count = i - start_i;
+								const u32 nonintersecting_count = u32(beg - (LightData*)slice.ptr);
+								WRITE(total_count);
+								WRITE(nonintersecting_count);
+								WRITE(slice.buffer);
+								WRITE(slice.offset);
 							}
-							if ((cmd_page->data + sizeof(cmd_page->data) - out) < 9) {
-								new_page(bucket);
-							}
-							WRITE(type);
-							const u32 total_count = i - start_i;
-							const u32 nonintersecting_count = u32(beg - (LightData*)slice.ptr);
-							WRITE(total_count);
-							WRITE(nonintersecting_count);
-							WRITE(slice.buffer);
-							WRITE(slice.offset);
 
 							--i;
 							break;
@@ -2750,20 +2763,25 @@ struct PipelineImpl final : Pipeline
 							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 							if (p.instance_data.empty()) break;
-							// TODO make sure there's enough space in cmd buffer
-							WRITE(type);
-							WRITE(tr.rot);
-							WRITE(lpos);
-							WRITE(mesh.render_data);
-							WRITE_FN(mesh.material->getRenderData());
-							const int instances_count = p.instance_data.size();
-							WRITE(instances_count);
-							
 							const Renderer::TransientSlice slice = renderer.allocTransient(p.instance_data.byte_size());
-							memcpy(slice.ptr, p.instance_data.begin(), p.instance_data.byte_size());
+							
+							if (slice.ptr) {
+								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 57) {
+									new_page(bucket);
+								}
+								WRITE(type);
+								WRITE(tr.rot);
+								WRITE(lpos);
+								WRITE(mesh.render_data);
+								WRITE_FN(mesh.material->getRenderData());
+								const int instances_count = p.instance_data.size();
+								WRITE(instances_count);
+							
+								memcpy(slice.ptr, p.instance_data.begin(), p.instance_data.byte_size());
 
-							WRITE(slice.buffer);
-							WRITE(slice.offset);
+								WRITE(slice.buffer);
+								WRITE(slice.offset);
+							}
 
 							break;
 						}

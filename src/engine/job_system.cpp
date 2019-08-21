@@ -574,7 +574,7 @@ void wait(SignalHandle handle)
 	}
 	else
 	{
-		// TODO maybe handle thi externally since main thread is no more
+		// TODO maybe handle this externally since main thread is no more
 		PROFILE_BLOCK("not a job waiting");
 		Profiler::blockColor(0xff, 0, 0);
 

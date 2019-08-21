@@ -101,7 +101,6 @@ struct LUMIX_RENDERER_API Mesh
 		Renderer& renderer,
 		IAllocator& allocator);
 
-	//void set(const Mesh& rhs);
 	void setMaterial(Material* material, Model& model, Renderer& renderer);
 	bool areIndices16() const { return flags.isSet(Flags::INDICES_16_BIT); }
 

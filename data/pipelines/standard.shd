@@ -37,19 +37,24 @@ vertex_shader [[
 		layout(location = 4) in vec4 i_rot_quat;
 		layout(location = 5) in vec4 i_pos_scale;
 		layout(location = 6) in vec4 i_grass_normal;
+		layout(std140, binding = 4) uniform Model {
+			mat4 u_model;
+		};
 	#elif defined SKINNED
 		layout(location = 4) in vec4 a_indices;
 		layout(location = 5) in vec4 a_weights;
-		layout(std140, binding = 3) uniform Bones {
+		layout(std140, binding = 4) uniform Model {
+			mat4 u_model;
 			mat4 u_bones[256];
 		};
 	#elif defined INSTANCED
 		layout(location = 4) in vec4 i_rot_quat;
 		layout(location = 5) in vec4 i_pos_scale;
+	#else
+		layout(std140, binding = 4) uniform Model {
+			mat4 u_model;
+		};
 	#endif
-	layout(std140, binding = 4) uniform Model {
-		mat4 u_model;
-	};
 	layout (location = 0) out vec2 v_uv;
 	layout (location = 1) out vec3 v_normal;
 	layout (location = 2) out vec3 v_tangent;

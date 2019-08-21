@@ -941,10 +941,11 @@ static bool overlaps(float min1, float max1, float min2, float max2)
 
 static void getProjections(const Vec3& axis,
 	const Vec3 vertices[8],
-	float& min,
-	float& max)
+	Ref<float> min,
+	Ref<float> max)
 {
-	min = max = dotProduct(vertices[0], axis);
+	max = dotProduct(vertices[0], axis);
+	min = max;
 	for(int i = 1; i < 8; ++i)
 	{
 		float dot = dotProduct(vertices[i], axis);
@@ -954,37 +955,22 @@ static void getProjections(const Vec3& axis,
 }
 
 
-static bool testOBBCollision(const Matrix& matrix_a,
-	const Model* model_a,
-	const Matrix& matrix_b,
-	const Model* model_b,
-	float scale)
+static bool testOBBCollision(const AABB& a,
+	const Matrix& mtx_b,
+	const AABB& b)
 {
 	Vec3 box_a_points[8];
 	Vec3 box_b_points[8];
 
-	if(fabs(scale - 1.0) < 0.01f)
-	{
-		model_a->getAABB().getCorners(matrix_a, box_a_points);
-		model_b->getAABB().getCorners(matrix_b, box_b_points);
-	}
-	else
-	{
-		Matrix scale_matrix_a = matrix_a;
-		scale_matrix_a.multiply3x3(scale);
-		Matrix scale_matrix_b = matrix_b;
-		scale_matrix_b.multiply3x3(scale);
-		model_a->getAABB().getCorners(scale_matrix_a, box_a_points);
-		model_b->getAABB().getCorners(scale_matrix_b, box_b_points);
-	}
+	a.getCorners(Matrix::IDENTITY, box_a_points);
+	b.getCorners(mtx_b, box_b_points);
 
-	Vec3 normals[] = {
-		matrix_a.getXVector(), matrix_a.getYVector(), matrix_a.getZVector()};
+	const Vec3 normals[] = {Vec3(1, 0, 0), Vec3(0, 1, 0), Vec3(0, 0, 1)};
 	for(int i = 0; i < 3; i++)
 	{
 		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals[i], box_a_points, box_a_min, box_a_max);
-		getProjections(normals[i], box_b_points, box_b_min, box_b_max);
+		getProjections(normals[i], box_a_points, Ref(box_a_min), Ref(box_a_max));
+		getProjections(normals[i], box_b_points, Ref(box_b_min), Ref(box_b_max));
 		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
 		{
 			return false;
@@ -992,12 +978,12 @@ static bool testOBBCollision(const Matrix& matrix_a,
 	}
 
 	Vec3 normals_b[] = {
-		matrix_b.getXVector(), matrix_b.getYVector(), matrix_b.getZVector()};
+		mtx_b.getXVector().normalized(), mtx_b.getYVector().normalized(), mtx_b.getZVector().normalized()};
 	for(int i = 0; i < 3; i++)
 	{
 		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
-		getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
+		getProjections(normals_b[i], box_a_points, Ref(box_a_min), Ref(box_a_max));
+		getProjections(normals_b[i], box_b_points, Ref(box_b_min), Ref(box_b_max));
 		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
 		{
 			return false;
@@ -1009,43 +995,40 @@ static bool testOBBCollision(const Matrix& matrix_a,
 
 
 static bool isOBBCollision(RenderScene& scene,
-	const Array<Array<MeshInstance>>& meshes,
-	const Vec3& pos_a,
-	Model* model,
-	float scale)
+	const CullResult* meshes,
+	const Transform& model_tr,
+	Model* model)
 {
-			// TODO
-	ASSERT(false);
-/*float radius_a_squared = model->getBoundingRadius();
+	float radius_a_squared = model->getBoundingRadius() * model_tr.scale;
 	radius_a_squared = radius_a_squared * radius_a_squared;
-	for(auto& submeshes : meshes)
-	{
-		for(auto& mesh : submeshes)
-		{
-			auto* model_instance = scene.getModelInstance(mesh.owner);
-			Vec3 pos_b = model_instance->matrix.getTranslation();
-			float radius_b = model_instance->model->getBoundingRadius();
-			float radius_squared = radius_a_squared + radius_b * radius_b;
-			if ((pos_a - pos_b).squaredLength() < radius_squared * scale * scale)
-			{
-				Matrix matrix = Matrix::IDENTITY;
-				matrix.setTranslation(pos_a);
-				if (testOBBCollision(matrix, model, model_instance->matrix, model_instance->model, scale))
-				{
+	Universe& universe = scene.getUniverse();
+	while(meshes) {
+		for (u32 i = 0, c = meshes->header.count; i < c; ++i) {
+			const EntityRef mesh = meshes->entities[i];
+			const ModelInstance* model_instance = scene.getModelInstance(mesh);
+			const Transform tr_b = universe.getTransform(mesh);
+			const float radius_b = model_instance->model->getBoundingRadius() * tr_b.scale;
+			const float radius_squared = radius_a_squared + radius_b * radius_b;
+			if ((model_tr.pos - tr_b.pos).squaredLength() < radius_squared) {
+				const Transform rel_tr = model_tr.inverted() * tr_b;
+				Matrix mtx = rel_tr.rot.toMatrix();
+				mtx.multiply3x3(rel_tr.scale);
+				mtx.setTranslation(rel_tr.pos.toFloat());
+
+				if (testOBBCollision(model->getAABB(), mtx, model_instance->model->getAABB())) {
 					return true;
 				}
 			}
 		}
-	}*/
+		meshes = meshes->header.next;
+	}
 	return false;
 }
 
 
 void TerrainEditor::paintEntities(const DVec3& hit_pos)
 {
-	// TODO 
-	ASSERT(false);
-	/*PROFILE_FUNCTION();
+	PROFILE_FUNCTION();
 	if (m_selected_prefabs.empty()) return;
 	auto& prefab_system = m_world_editor.getPrefabSystem();
 
@@ -1053,11 +1036,10 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);
 	{
 		RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
-		Matrix terrain_matrix = m_world_editor.getUniverse()->getMatrix(m_component.entity);
-		Matrix inv_terrain_matrix = terrain_matrix;
-		inv_terrain_matrix.inverse();
+		const Transform terrain_tr = m_world_editor.getUniverse()->getTransform((EntityRef)m_component.entity);
+		const Transform inv_terrain_tr = terrain_tr.inverted();
 
-		Frustum frustum;
+		ShiftedFrustum frustum;
 		frustum.computeOrtho(hit_pos,
 			Vec3(0, 0, 1),
 			Vec3(0, 1, 0),
@@ -1065,30 +1047,29 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		ComponentUID camera = m_world_editor.getEditCamera();
-		EntityRef camera_entity = camera.entity;
-		Vec3 camera_pos = scene->getUniverse().getPosition(camera_entity);
+		const DVec3 camera_pos = m_app.getWorldEditor().getViewport().pos;
 		
-		auto& meshes = scene->getModelInstanceInfos(frustum, camera_pos, camera.entity, ~0ULL);
+		CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
+		// TODO mesh_groups
 
-		Vec2 size = scene->getTerrainSize(m_component.entity);
+		Vec2 size = scene->getTerrainSize((EntityRef)m_component.entity);
 		float scale = 1.0f - maximum(0.01f, m_terrain_brush_strength);
 		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
 		{
-			float angle = randFloat(0, PI * 2);
-			float dist = randFloat(0, 1.0f) * m_terrain_brush_size;
-			float y = randFloat(m_y_spread.x, m_y_spread.y);
-			Vec3 pos(hit_pos.x + cos(angle) * dist, 0, hit_pos.z + sin(angle) * dist);
-			Vec3 terrain_pos = inv_terrain_matrix.transformPoint(pos);
+			const float angle = randFloat(0, PI * 2);
+			const float dist = randFloat(0, 1.0f) * m_terrain_brush_size;
+			const float y = randFloat(m_y_spread.x, m_y_spread.y);
+			DVec3 pos(hit_pos.x + cosf(angle) * dist, 0, hit_pos.z + sinf(angle) * dist);
+			const Vec3 terrain_pos = inv_terrain_tr.transform(pos).toFloat();
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
-				pos.y = scene->getTerrainHeightAt(m_component.entity, terrain_pos.x, terrain_pos.z) + y;
-				pos.y += terrain_matrix.getTranslation().y;
+				pos.y = scene->getTerrainHeightAt((EntityRef)m_component.entity, terrain_pos.x, terrain_pos.z) + y;
+				pos.y += terrain_tr.pos.y;
 				Quat rot(0, 0, 0, 1);
 				if(m_is_align_with_normal)
 				{
 					RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
-					Vec3 normal = scene->getTerrainNormalAt(m_component.entity, pos.x, pos.z);
+					Vec3 normal = scene->getTerrainNormalAt((EntityRef)m_component.entity, terrain_pos.x, terrain_pos.z);
 					Vec3 dir = crossProduct(normal, Vec3(1, 0, 0)).normalized();
 					Matrix mtx = Matrix::IDENTITY;
 					mtx.setXVector(crossProduct(normal, dir));
@@ -1123,22 +1104,21 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 				float size = randFloat(m_size_spread.x, m_size_spread.y);
 				int random_idx = rand(0, m_selected_prefabs.size() - 1);
 				if (!m_selected_prefabs[random_idx]) continue;
-				EntityRef entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
-				if (entity.isValid())
-				{
-					if (scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE))
-					{
-						Model* model = scene->getModelInstanceModel(entity);
-						if (isOBBCollision(*scene, meshes, pos, model, scale))
-						{
+				const EntityPtr entity = prefab_system.instantiatePrefab(*m_selected_prefabs[random_idx], pos, rot, size);
+				if (entity.isValid()) {
+					if (scene->getUniverse().hasComponent((EntityRef)entity, MODEL_INSTANCE_TYPE)) {
+						Model* model = scene->getModelInstanceModel((EntityRef)entity);
+						const Transform tr = { pos, rot, size };
+						if (isOBBCollision(*scene, meshes, tr, model)) {
 							m_world_editor.undo();
 						}
 					}
 				}
 			}
 		}
+		meshes->free(m_app.getWorldEditor().getEngine().getPageAllocator());
 	}
-	m_world_editor.endCommandGroup();*/
+	m_world_editor.endCommandGroup();
 }
 
 

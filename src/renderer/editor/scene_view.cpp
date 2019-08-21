@@ -296,14 +296,16 @@ void SceneView::renderGizmos()
 
 			ib = renderer->allocTransient(data.indices.byte_size());
 			vb = renderer->allocTransient(data.vertices.byte_size());
-			memcpy(ib.ptr, data.indices.begin(), data.indices.byte_size());
-			memcpy(vb.ptr, data.vertices.begin(), data.vertices.byte_size());
+			if (ib.ptr && vb.ptr) {
+				memcpy(ib.ptr, data.indices.begin(), data.indices.byte_size());
+				memcpy(vb.ptr, data.vertices.begin(), data.vertices.byte_size());
+			}
 		}
 
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			if (data.cmds.empty()) return;
+			if (data.cmds.empty() || !ib.ptr || !vb.ptr) return;
 
 			ffr::VertexDecl decl;
 			decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
@@ -324,7 +326,7 @@ void SceneView::renderGizmos()
 				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
 				ffr::bindIndexBuffer(ib.buffer);
 				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-				ffr::drawElements((ib.offset + ib_offset) / sizeof(u16), cmd.indices_count, primitive_type, ffr::DataType::U16);
+				ffr::drawElements(ib.offset + ib_offset, cmd.indices_count, primitive_type, ffr::DataType::U16);
 
 				vb_offset += cmd.vertices_count * sizeof(Gizmo::RenderData::Vertex);
 				ib_offset += cmd.indices_count * sizeof(u16);

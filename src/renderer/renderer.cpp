@@ -394,6 +394,7 @@ struct RendererImpl final : public Renderer
 		, m_cmd_queue(m_allocator)
 		, m_material_buffer(m_allocator)
 	{
+		m_shader_defines.reserve(32);
 		ffr::preinit(m_allocator);
 	}
 
@@ -639,7 +640,6 @@ struct RendererImpl final : public Renderer
 			logError("Renderer") << "Out of transient memory";
 			slice.size = 0;
 			slice.ptr = nullptr;
-			MT::atomicSubtract(&m_transient_buffer_offset, size);
 		}
 		else {
 			slice.size = size;
@@ -900,6 +900,7 @@ struct RendererImpl final : public Renderer
 
 	u8 getShaderDefineIdx(const char* define) override
 	{
+		MT::CriticalSectionLock lock(m_shader_defines_mutex);
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
 			if (m_shader_defines[i] == define)
@@ -914,6 +915,7 @@ struct RendererImpl final : public Renderer
 		}
 
 		m_shader_defines.emplace(define);
+		ASSERT(m_shader_defines.size() <= 32); // m_shader_defines are reserved in renderer constructor, so getShaderDefine() is MT safe
 		return m_shader_defines.size() - 1;
 	}
 
@@ -1017,6 +1019,7 @@ struct RendererImpl final : public Renderer
 	Engine& m_engine;
 	IAllocator& m_allocator;
 	Array<StaticString<32>> m_shader_defines;
+	MT::CriticalSection m_shader_defines_mutex;
 	Array<StaticString<32>> m_layers;
 	FontManager* m_font_manager;
 	RenderResourceManager<Material> m_material_manager;

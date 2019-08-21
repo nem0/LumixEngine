@@ -995,14 +995,13 @@ void drawElements(u32 offset, u32 count, PrimitiveType primitive_type, DataType 
 	} 
 
 	GLenum t;
-	int ts;
 	switch(type) {
-		case DataType::U16: t = GL_UNSIGNED_SHORT; ts = sizeof(u16); break;
-		case DataType::U32: t = GL_UNSIGNED_INT; ts = sizeof(u32); break;
+		case DataType::U16: t = GL_UNSIGNED_SHORT; break;
+		case DataType::U32: t = GL_UNSIGNED_INT; break;
 		default: ASSERT(0); break;
 	}
 
-	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)(offset * ts)));
+	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)offset));
 }
 
 void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType index_type)
