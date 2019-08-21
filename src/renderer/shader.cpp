@@ -115,7 +115,6 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 		if (defines != 0) {
 			for(int i = 0; i < sizeof(defines) * 8; ++i) {
 				if((defines & (1 << i)) == 0) continue;
-				// TODO getShaderDefine is not threadsafe
 				defines_code[defines_count] << "#define " << rd->renderer.getShaderDefine(i) << "\n";
 				prefixes[1 + defines_count] = defines_code[defines_count];
 				++defines_count;

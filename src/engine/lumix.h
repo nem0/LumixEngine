@@ -124,6 +124,7 @@ struct Ref {
 	operator T&() { return value; }
 	T* operator->() { return &value; } 
 	void operator =(const T& rhs) { value = rhs; }
+	void operator =(const Ref<T>& rhs) { value = rhs.value; }
 	T& value;
 };
 

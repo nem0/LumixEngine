@@ -460,7 +460,6 @@ void Terrain::serialize(IOutputStream& serializer)
 
 void Terrain::getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point)
 {
-	//if (!m_root) return;
 	if (!m_material || !m_material->isReady()) return;
 	
 	TerrainInfo& info = infos.emplace();

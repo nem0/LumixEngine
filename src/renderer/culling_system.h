@@ -18,11 +18,11 @@ namespace Lumix
 	struct CullResult {
 		void free(PageAllocator& allocator);
 		template <typename F>
-		void forEach(F&& f) {
-			CullResult* j = this;
+		void forEach(F&& f) const {
+			const CullResult* j = this;
 			while (j) {
 				j = j->header.next;
-				for (u32 i = 0, c = j->header.count; j < c; ++j) {
+				for (u32 i = 0, c = j->header.count; i < c; ++i) {
 					f(j->entities[i]);
 				}
 			}
@@ -30,7 +30,7 @@ namespace Lumix
 		
 		struct {
 			CullResult* next = nullptr;
-			int count = 0;
+			u32 count = 0;
 		} header;
 		EntityRef entities[(16384 - sizeof(header)) / sizeof(EntityRef)];
 	};

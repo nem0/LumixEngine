@@ -2326,7 +2326,7 @@ struct RenderInterfaceImpl final : public RenderInterface
 		for (int i = 0; i < (int)RenderableTypes::COUNT; ++i) {
 			CullResult* renderables = m_render_scene->getRenderables(frustum, (RenderableTypes)i);
 			while (renderables) {
-				for (int i = 0; i < renderables->header.count; ++i) {
+				for (u32 i = 0; i < renderables->header.count; ++i) {
 					entities.push(renderables->entities[i]);
 				}
 				renderables = renderables->header.next;
@@ -2485,7 +2485,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 				}
 
-				ffr::drawElements(first_index, pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
+				ffr::drawElements(first_index * sizeof(u32), pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
 		
 				elem_offset += pcmd->ElemCount;
 			}

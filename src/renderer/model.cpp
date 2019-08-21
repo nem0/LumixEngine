@@ -67,26 +67,6 @@ Mesh::Mesh(Material* mat,
 	++s_last_sort_key;
 }
 
-// TODO remove?
-/*
-void Mesh::set(const Mesh& rhs)
-{
-	type = rhs.type;
-	indices = rhs.indices;
-	vertices = rhs.vertices;
-	uvs = rhs.uvs;
-	skin = rhs.skin;
-	flags = rhs.flags;
-	layer_mask = rhs.layer_mask;
-	indices_count = rhs.indices_count;
-	vertex_decl = rhs.vertex_decl;
-	vertex_buffer_handle = rhs.vertex_buffer_handle;
-	index_buffer_handle = rhs.index_buffer_handle;
-	name = rhs.name;
-	copyMemory(attributes_semantic, rhs.attributes_semantic, sizeof(attributes_semantic));
-	// all except material
-}*/
-
 
 static bool hasAttribute(Mesh& mesh, Mesh::AttributeSemantic attribute)
 {
