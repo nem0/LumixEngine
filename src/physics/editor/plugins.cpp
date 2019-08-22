@@ -636,9 +636,9 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 	}
 
 
-	void showBoneListItem(RenderScene& render_scene, const Matrix& mtx, Model& model, int bone_index, bool visualize)
+	void showBoneListItem(RenderScene& render_scene, const Transform& tr, Model& model, int bone_index, bool visualize)
 	{
-		/*auto& bone = model.getBone(bone_index);
+		auto& bone = model.getBone(bone_index);
 		if (ImGui::Selectable(bone.name.c_str(), m_selected_bone == bone_index)) m_selected_bone = bone_index;
 
 		ImGui::Indent();
@@ -650,13 +650,11 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			if (visualize)
 			{
 				u32 color = m_selected_bone == i ? 0xffff0000 : 0xff0000ff;
-				render_scene.addDebugLine(
-					mtx.transformPoint(bone.transform.pos), mtx.transformPoint(child_bone.transform.pos), color, 0);
+				render_scene.addDebugLine(tr.transform(bone.transform.pos), tr.transform(child_bone.transform.pos), color);
 			}
-			showBoneListItem(render_scene, mtx, model, i, visualize);
+			showBoneListItem(render_scene, tr, model, i, visualize);
 		}
-		ImGui::Unindent();*/
-		// TODO
+		ImGui::Unindent();
 	}
 
 
@@ -715,7 +713,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 
 	void onRagdollGUI()
 	{
-		/*if (!ImGui::CollapsingHeader("Ragdoll")) return;
+		if (!ImGui::CollapsingHeader("Ragdoll")) return;
 
 		if (m_editor.getSelectedEntities().size() != 1)
 		{
@@ -737,7 +735,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			return;
 		}
 
-		Matrix mtx = m_editor.getUniverse()->getMatrix(entity);
+		const Transform tr = m_editor.getUniverse()->getTransform(entity);
 		Model* model = render_scene->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
 
@@ -771,7 +769,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 				auto& bone = model->getBone(i);
 				if (bone.parent_idx >= 0) continue;
 
-				showBoneListItem(*render_scene, mtx, *model, i, visualize_bones);
+				showBoneListItem(*render_scene, tr, *model, i, visualize_bones);
 			}
 		}
 		ImGui::EndChild();
@@ -788,14 +786,12 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 				onBonePropertiesGUI(*phy_scene, entity, crc32(bone.name.c_str()));
 			}
 		}
-		ImGui::EndChild();*/
-		// TODO
+		ImGui::EndChild();
 	}
 
 
 	void onBonePropertiesGUI(PhysicsScene& scene, EntityRef entity, u32 bone_name_hash)
 	{
-		// TODO
 		/*auto* bone_handle = scene.getRagdollBoneByName(entity, bone_name_hash);
 		if (!bone_handle)
 		{

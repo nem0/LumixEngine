@@ -64,13 +64,6 @@ BinaryArray::~BinaryArray()
 }
 
 
-void BinaryArray::eraseFast(int index)
-{
-	this->operator[](index) = back();
-	pop();
-}
-
-
 void BinaryArray::erase(int index)
 {
 	if (0 <= index && index < m_size)

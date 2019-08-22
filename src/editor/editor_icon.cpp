@@ -109,7 +109,7 @@ struct EditorIconsImpl final : public EditorIcons
 		{
 			if(m_icons[i].entity == entity)
 			{
-				m_icons.eraseFast(i);
+				m_icons.swapAndPop(i);
 				return;
 			}
 		}

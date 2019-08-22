@@ -1441,7 +1441,7 @@ void StateMachine::removeEntry(EntryEdge& entry)
 		if (sm->entries[i].node == entry.getTo()->engine_cmp)
 		{
 			sm->entries.erase(i);
-			m_entry_node->entries.eraseItemFast(&entry);
+			m_entry_node->entries.swapAndPopItem(&entry);
 			break;
 		}
 	}

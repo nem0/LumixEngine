@@ -285,7 +285,7 @@ struct PipelineImpl final : Pipeline
 			-1, 1, 1
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
-		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
+		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)ffr::BufferFlags::IMMUTABLE);
 		const Renderer::MemRef ub_mem = { 32 * 1024, nullptr, false };
 
 		u16 cube_indices[] = {
@@ -304,22 +304,20 @@ struct PipelineImpl final : Pipeline
 		};
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
-		m_cube_ib = m_renderer.createBuffer(ib_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE);
+		m_cube_ib = m_renderer.createBuffer(ib_mem, (u32)ffr::BufferFlags::IMMUTABLE);
 
 		m_resource->onLoaded<PipelineImpl, &PipelineImpl::onStateChanged>(this);
 
 		GlobalState global_state;
 		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));
-		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE | (u32)ffr::BufferFlags::UNIFORM_BUFFER);
+		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, (u32)ffr::BufferFlags::UNIFORM_BUFFER);
 		
 		PassState pass_state;
 		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
-		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)ffr::BufferFlags::DYNAMIC_STORAGE | (u32)ffr::BufferFlags::UNIFORM_BUFFER);
+		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)ffr::BufferFlags::UNIFORM_BUFFER);
 
 		const Renderer::MemRef dc_mem = { 32*1024, nullptr, false };
-		const u32 dc_ub_flags = (u32)ffr::BufferFlags::DYNAMIC_STORAGE
-			| (u32)ffr::BufferFlags::MAP_WRITE
-			| (u32)ffr::BufferFlags::UNIFORM_BUFFER;
+		const u32 dc_ub_flags = (u32)ffr::BufferFlags::UNIFORM_BUFFER;
 		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
 
 		m_base_vertex_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
@@ -537,7 +535,7 @@ struct PipelineImpl final : Pipeline
 		for(int i = m_renderbuffers.size() - 1; i >= 0; --i) {
 			if (m_renderbuffers[i].frame_counter > 1) {
 				m_renderer.destroy(m_renderbuffers[i].handle);
-				m_renderbuffers.eraseFast(i);
+				m_renderbuffers.swapAndPop(i);
 			}
 		}
 	}
@@ -647,7 +645,7 @@ struct PipelineImpl final : Pipeline
 				const u32 h = u32(rb.relative_size.y * m_viewport.h + 0.5f);
 				if (rb.width != w || rb.height != h) {
 					m_renderer.destroy(rb.handle);
-					m_renderbuffers.eraseFast(i);
+					m_renderbuffers.swapAndPop(i);
 				}
 			}
 		}
@@ -683,7 +681,7 @@ struct PipelineImpl final : Pipeline
 		struct StartPipelineJob : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::update(global_state_buffer, &global_state, 0, sizeof(global_state));
+				ffr::update(global_state_buffer, &global_state, sizeof(global_state));
 				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
 				ffr::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, sizeof(32 * 1024));
@@ -778,7 +776,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::pushDebugGroup("debug triangles");
 
-				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, 0, sizeof(Matrix));
+				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
 
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::CULL_BACK));
 				ffr::useProgram(shader);
@@ -843,7 +841,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::pushDebugGroup("debug lines");
 
-				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, 0, sizeof(Matrix));
+				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
 
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 				ffr::useProgram(shader);
@@ -929,7 +927,7 @@ struct PipelineImpl final : Pipeline
 				ffr::ProgramHandle prg = Shader::getProgram(shader, pipeline->m_2D_decl, 0);
 
 				if(prg.isValid() && idx_buffer_mem.ptr && vtx_buffer_mem.ptr) {
-					ffr::update(pipeline->m_drawcall_ub, &size.x, 0, sizeof(size));
+					ffr::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
 					u32 elem_offset = 0;
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 					ffr::setState(blend_state);
@@ -1168,7 +1166,7 @@ struct PipelineImpl final : Pipeline
 					if (prog.isValid()) {
 						Matrix mtx = rot.toMatrix();
 						mtx.setTranslation(lpos);
-						ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, 0, sizeof(mtx));
+						ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
 						ffr::useProgram(prog);
 						ffr::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
 						ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
@@ -1391,7 +1389,7 @@ struct PipelineImpl final : Pipeline
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
 					ffr::TextureHandle handles[2] = { probe.irradiance, probe.radiance };
 					ffr::bindTextures(handles, 14, 2);
-					ffr::update(m_pipeline->m_drawcall_ub, &pos_radius.x, 0, sizeof(pos_radius));
+					ffr::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
 					
 					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
 					const u64 state = intersecting
@@ -1431,7 +1429,7 @@ struct PipelineImpl final : Pipeline
 		struct PushPassStateCmd : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::update(pass_state_buffer, &pass_state, 0, sizeof(pass_state));
+				ffr::update(pass_state_buffer, &pass_state, sizeof(pass_state));
 				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
 			}
 			void setup() override {}
@@ -1543,7 +1541,7 @@ struct PipelineImpl final : Pipeline
 				ffr::bindTextures(m_textures_handles, 0, m_textures_count);
 
 				if (m_uniforms_count > 0) {
-					ffr::update(m_pipeline->m_drawcall_ub, m_uniforms, 0, sizeof(m_uniforms[0]) * m_uniforms_count);
+					ffr::update(m_pipeline->m_drawcall_ub, m_uniforms, sizeof(m_uniforms[0]) * m_uniforms_count);
 				}
 
 				ffr::useProgram(prg);
@@ -2120,7 +2118,7 @@ struct PipelineImpl final : Pipeline
 										material_ub_idx = material->material_constants;
 									}
 
-									u8* dc_mem = (u8*)ffr::map(m_pipeline->m_drawcall_ub, 0, sizeof(Matrix) * (bones_count + 1), (u32)ffr::BufferFlags::MAP_WRITE);
+									u8* dc_mem = (u8*)ffr::map(m_pipeline->m_drawcall_ub, sizeof(Matrix) * (bones_count + 1));
 									memcpy(dc_mem, &model_mtx, sizeof(Matrix));
 									memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
 									ffr::unmap(m_pipeline->m_drawcall_ub);
@@ -2182,7 +2180,7 @@ struct PipelineImpl final : Pipeline
 										material_ub_idx = material->material_constants;
 									}
 									const Matrix mtx(pos, rot);
-									ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, 0, sizeof(mtx));
+									ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
@@ -2402,7 +2400,7 @@ struct PipelineImpl final : Pipeline
 						dc_data.from_to = IVec4(subfrom, subto);
 						dc_data.terrain_scale = Vec4(inst.scale, 0);
 						dc_data.lod = i;
-						ffr::update(m_pipeline->m_drawcall_ub, &dc_data, 0, sizeof(dc_data));
+						ffr::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
 						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
 					};
 
@@ -3144,9 +3142,6 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	void setWindowHandle(void* data) override { ASSERT(false); } // TODO
-
-
 	void callLuaFunction(const char* function) override 
 	{
 		if (!m_lua_state) return;
@@ -3346,7 +3341,7 @@ struct PipelineImpl final : Pipeline
 			const Material::RenderData* mat_rd = material->getRenderData();
 			ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
 
-			ffr::update(m_drawcall_ub, &mtx.m11, 0, sizeof(mtx));
+			ffr::update(m_drawcall_ub, &mtx.m11, sizeof(mtx));
 			ffr::useProgram(prog);
 			ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 			ffr::bindIndexBuffer(rd->index_buffer_handle);

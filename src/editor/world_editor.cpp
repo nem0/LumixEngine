@@ -1525,7 +1525,7 @@ public:
 
 	void removePlugin(Plugin& plugin) override
 	{
-		m_plugins.eraseItemFast(&plugin);
+		m_plugins.swapAndPopItem(&plugin);
 	}
 
 
@@ -2927,7 +2927,7 @@ public:
 				}
 				else
 				{
-					m_selected_entities.eraseFast(idx);
+					m_selected_entities.swapAndPop(idx);
 				}
 			}
 		}
@@ -2939,7 +2939,7 @@ public:
 
 	void onEntityDestroyed(EntityRef entity)
 	{
-		m_selected_entities.eraseItemFast(entity);
+		m_selected_entities.swapAndPopItem(entity);
 	}
 
 

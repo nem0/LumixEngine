@@ -245,7 +245,7 @@ void SceneView::renderSelection()
 
 				if (!prog.isValid()) continue;
 			
-				ffr::update(drawcall_ub, &item.mtx.m11, 0, sizeof(item.mtx));
+				ffr::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
 				ffr::useProgram(prog);
 				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				ffr::bindIndexBuffer(rd->index_buffer_handle);
@@ -321,7 +321,7 @@ void SceneView::renderGizmos()
 			u32 ib_offset = 0;
 			const ffr::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
 			for (Gizmo::RenderData::Cmd& cmd : data.cmds) {
-				ffr::update(drawcall_ub, &cmd.mtx.m11, 0, sizeof(cmd.mtx));
+				ffr::update(drawcall_ub, &cmd.mtx.m11, sizeof(cmd.mtx));
 				ffr::useProgram(prg);
 				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
 				ffr::bindIndexBuffer(ib.buffer);
@@ -396,7 +396,7 @@ void SceneView::addDropHandler(DropHandler handler)
 
 void SceneView::removeDropHandler(DropHandler handler)
 {
-	m_drop_handlers.eraseItemFast(handler);
+	m_drop_handlers.swapAndPopItem(handler);
 }
 
 

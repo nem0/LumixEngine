@@ -176,7 +176,7 @@ void FBXImporter::sortBones()
 			if (bones[i]->getParent() == bones[j])
 			{
 				const ofbx::Object* bone = bones[j];
-				bones.eraseFast(j);
+				bones.swapAndPop(j);
 				bones.insert(i, bone);
 				--i;
 				break;
@@ -548,7 +548,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 	}
 	for (int mesh_idx = meshes.size() - 1; mesh_idx >= 0; --mesh_idx)
 	{
-		if (meshes[mesh_idx].indices.empty()) meshes.eraseFast(mesh_idx);
+		if (meshes[mesh_idx].indices.empty()) meshes.swapAndPop(mesh_idx);
 	}
 }
 

@@ -50,7 +50,6 @@ namespace Lumix
 			void reserve(int capacity);
 			void resize(int capacity);
 			void erase(int index);
-			void eraseFast(int index);
 			void clear();
 			void setAllZeros();
 			void push(bool value);
