@@ -39,7 +39,7 @@ public:
 		{
 			if (m_delegates[i] == cb)
 			{
-				m_delegates.eraseFast(i);
+				m_delegates.swapAndPop(i);
 				break;
 			}
 		}

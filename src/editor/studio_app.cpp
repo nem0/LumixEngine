@@ -2061,7 +2061,7 @@ public:
 	}
 
 
-	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.eraseItemFast(&plugin); }
+	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
 
 
 	void setStudioApp()

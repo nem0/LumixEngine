@@ -159,7 +159,7 @@ struct CullingSystemImpl final : public CullingSystem
 			}
 			if(cell.header.prev) cell.header.prev->header.next = cell.header.next;
 			if(cell.header.next) cell.header.next->header.prev = cell.header.prev;
-			m_cells.eraseItemFast(&cell);
+			m_cells.swapAndPopItem(&cell);
 			cell.~CellPage();
 			m_page_allocator.deallocate(&cell, true);
 		}

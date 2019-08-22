@@ -624,7 +624,7 @@ void AssetBrowser::selectResource(Resource* resource, bool record_history, bool 
 	m_wanted_resource = "";
 	if(additive) {
 		if(m_selected_resources.indexOf(resource) >= 0) {
-			m_selected_resources.eraseItemFast(resource);
+			m_selected_resources.swapAndPopItem(resource);
 		}
 		else {
 			m_selected_resources.push(resource);

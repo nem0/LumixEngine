@@ -2006,7 +2006,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 	RigidTransform getNewBoneTransform(const Model* model, int bone_idx, float& length)
 	{
-		/*auto& bone = model->getBone(bone_idx);
+		/*const Model::Bone& bone = model->getBone(bone_idx);
 
 		length = 0.1f;
 		for (int i = 0; i < model->getBoneCount(); ++i)
@@ -3288,7 +3288,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 		else
 		{
-			m_dynamic_actors.eraseItemFast(actor);
+			m_dynamic_actors.swapAndPopItem(actor);
 		}
 		if (!actor->physx_actor) return;
 

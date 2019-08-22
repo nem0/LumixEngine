@@ -203,7 +203,7 @@ namespace Lumix
 				for (int i = inst.m_properties.size() - 1; i >= 0; --i)
 				{
 					if (valid_properties[i]) continue;
-					inst.m_properties.eraseFast(i);
+					inst.m_properties.swapAndPop(i);
 				}
 				lua_pop(L, 1);
 			}
@@ -842,7 +842,7 @@ namespace Lumix
 			{
 				if (m_timers[i].func == timer_func)
 				{
-					m_timers.eraseFast(i);
+					m_timers.swapAndPop(i);
 					break;
 				}
 			}
@@ -1031,7 +1031,7 @@ namespace Lumix
 				if (m_timers[i].state == inst.m_state)
 				{
 					luaL_unref(m_timers[i].state, LUA_REGISTRYINDEX, m_timers[i].func);
-					m_timers.eraseFast(i);
+					m_timers.swapAndPop(i);
 					--i;
 				}
 			}
@@ -1040,7 +1040,7 @@ namespace Lumix
 			{
 				if (m_updates[i].state == inst.m_state)
 				{
-					m_updates.eraseFast(i);
+					m_updates.swapAndPop(i);
 					break;
 				}
 			}
@@ -1049,7 +1049,7 @@ namespace Lumix
 			{
 				if (m_input_handlers[i].state == inst.m_state)
 				{
-					m_input_handlers.eraseFast(i);
+					m_input_handlers.swapAndPop(i);
 					break;
 				}
 			}
@@ -1568,7 +1568,7 @@ namespace Lumix
 			{
 				auto& timer = m_timers[timers_to_remove[i]];
 				luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
-				m_timers.eraseFast(timers_to_remove[i]);
+				m_timers.swapAndPop(timers_to_remove[i]);
 			}
 		}
 
@@ -1853,7 +1853,7 @@ namespace Lumix
 		void removeScript(EntityRef entity, int scr_index) override
 		{
 			setScriptPath(entity, scr_index, Path());
-			m_scripts[entity]->m_scripts.eraseFast(scr_index);
+			m_scripts[entity]->m_scripts.swapAndPop(scr_index);
 		}
 
 

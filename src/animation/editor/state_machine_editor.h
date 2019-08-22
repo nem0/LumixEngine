@@ -99,8 +99,8 @@ public:
 	bool draw(ImDrawList* draw, const ImVec2& canvas_screen_pos, bool selected) override;
 	void addEdge(Edge* edge) { m_edges.push(edge); }
 	void addInEdge(Edge* edge) { m_in_edges.push(edge); }
-	void removeEdge(Edge* edge) { m_edges.eraseItemFast(edge); }
-	void removeInEdge(Edge* edge) { m_in_edges.eraseItemFast(edge); }
+	void removeEdge(Edge* edge) { m_edges.swapAndPopItem(edge); }
+	void removeInEdge(Edge* edge) { m_in_edges.swapAndPopItem(edge); }
 	void removeEvent(Anim::EventArray& events, int index);
 	const Array<Edge*>& getEdges() { return m_edges; }
 	const Array<Edge*>& getInEdges() { return m_in_edges; }

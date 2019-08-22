@@ -67,7 +67,6 @@ public:
 	virtual void setScene(RenderScene* scene) = 0;
 	virtual RenderScene* getScene() const = 0;
 	virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
-	virtual void setWindowHandle(void* data) = 0;
 	virtual bool isReady() const = 0;
 	virtual const Stats& getStats() const = 0;
 	virtual const Path& getPath() = 0;

@@ -12,6 +12,7 @@
 #include FT_MODULE_H            // <freetype/ftmodapi.h>
 #include FT_GLYPH_H             // <freetype/ftglyph.h>
 #include FT_SYNTHESIS_H         // <freetype/ftsynth.h>
+// TODO
 #pragma comment(lib, "freetype.lib")
 
 namespace Lumix
@@ -95,12 +96,20 @@ bool FontManager::build()
 		if (!font->resource->isReady()) return false;
 	}
 	m_dirty = false;
-	// TODO profile & optimize
-	// TODO allocator
 	FT_MemoryRec_ memory_rec = {};
-	memory_rec.alloc = [](FT_Memory memory, long size) -> void* { return malloc(size); };
-	memory_rec.free = [](FT_Memory memory, void* block) -> void { free(block); };
-	memory_rec.realloc = [](FT_Memory memory, long cur_size, long new_size, void* block) -> void* { return realloc(block, new_size); };
+	memory_rec.user = &m_allocator;
+	memory_rec.alloc = [](FT_Memory memory, long size) -> void* { 
+		IAllocator* alloc = (IAllocator*)memory->user;
+		return alloc->allocate(size);
+	};
+	memory_rec.free = [](FT_Memory memory, void* block) -> void { 
+		IAllocator* alloc = (IAllocator*)memory->user;
+		alloc->deallocate(block);
+	};
+	memory_rec.realloc = [](FT_Memory memory, long cur_size, long new_size, void* block) -> void* {
+		IAllocator* alloc = (IAllocator*)memory->user;
+		return alloc->reallocate(block, new_size);
+	};
 
 	FT_Library ft_library;
 	FT_Error error = FT_New_Library(&memory_rec, &ft_library);
@@ -261,7 +270,13 @@ void FontResource::removeRef(Font& font)
 {
 	ASSERT(font.ref > 0);
 	--font.ref;
-	// TODO destroy Font
+	if(font.ref == 0) {
+		auto& manager = (FontManager&)m_resource_manager;
+		LUMIX_DELETE(manager.m_allocator, &font);
+		manager.m_fonts.eraseItem(&font);
+		manager.m_dirty = true;
+		if (isReady()) manager.build();
+	}
 }
 
 

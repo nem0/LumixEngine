@@ -1382,7 +1382,7 @@ void TerrainEditor::onGUI()
 					}
 					else {
 						PrefabResource* prefab = m_selected_prefabs[selected_idx];
-						m_selected_prefabs.eraseFast(selected_idx);
+						m_selected_prefabs.swapAndPop(selected_idx);
 						prefab->getResourceManager().unload(*prefab);
 					}
 				}

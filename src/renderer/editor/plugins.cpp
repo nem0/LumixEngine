@@ -2416,30 +2416,24 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			const u32 num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
 			const u32 num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
-			const bool use_big_buffers = (vb_offset + num_vertices) * sizeof(ImDrawVert) > 1024 * 1024 ||
-				(ib_offset + num_indices) * sizeof(ImDrawIdx) > 1024 * 1024;
+			const bool use_big_buffers = num_vertices * sizeof(ImDrawVert) > 256 * 1024 ||
+				num_indices * sizeof(ImDrawIdx) > 256 * 1024;
 			ffr::useProgram(program);
 
 			ffr::BufferHandle big_ib, big_vb;
 			if (use_big_buffers) {
 				big_vb = ffr::allocBufferHandle();
 				big_ib = ffr::allocBufferHandle();
-				ffr::createBuffer(big_vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
-				ffr::createBuffer(big_ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
+				ffr::createBuffer(big_vb, (u32)ffr::BufferFlags::IMMUTABLE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
+				ffr::createBuffer(big_ib, (u32)ffr::BufferFlags::IMMUTABLE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
 				ffr::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
 				ffr::bindIndexBuffer(big_ib);
 			}
 			else {
-				ffr::update(ib
-					, cmd_list.idx_buffer.data
-					, ib_offset * sizeof(ImDrawIdx)
-					, num_indices * sizeof(ImDrawIdx));
-				ffr::update(vb
-					, cmd_list.vtx_buffer.data
-					, vb_offset * sizeof(ImDrawVert)
-					, num_vertices * sizeof(ImDrawVert));
+				ffr::update(ib, cmd_list.idx_buffer.data, num_indices * sizeof(ImDrawIdx));
+				ffr::update(vb, cmd_list.vtx_buffer.data, num_vertices * sizeof(ImDrawVert));
 
-				ffr::bindVertexBuffer(0, vb, vb_offset * sizeof(ImDrawVert), sizeof(ImDrawVert));
+				ffr::bindVertexBuffer(0, vb, 0, sizeof(ImDrawVert));
 				ffr::bindIndexBuffer(ib);
 			}
 			renderer->free(cmd_list.vtx_buffer);
@@ -2464,8 +2458,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 							}
 				*/
 
-				const u32 first_index = elem_offset + (use_big_buffers ? 0 : ib_offset);
-
 				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(u32)(intptr_t)pcmd->TextureId} : *default_texture;
 				if (!tex.isValid()) tex = *default_texture;
 				ffr::bindTextures(&tex, 0, 1);
@@ -2485,7 +2477,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 				}
 
-				ffr::drawElements(first_index * sizeof(u32), pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
+				ffr::drawElements(elem_offset * sizeof(u32), pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
 		
 				elem_offset += pcmd->ElemCount;
 			}
@@ -2505,9 +2497,9 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 
 			if(init_render) {
-				ffr::createBuffer(ub, (u32)ffr::BufferFlags::DYNAMIC_STORAGE | (u32)ffr::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
-				ffr::createBuffer(ib, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
-				ffr::createBuffer(vb, (u32)ffr::BufferFlags::DYNAMIC_STORAGE, 1024 * 1024, nullptr);
+				ffr::createBuffer(ub, (u32)ffr::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+				ffr::createBuffer(ib, 0, 256 * 1024, nullptr);
+				ffr::createBuffer(vb, 0, 256 * 1024, nullptr);
 				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
 				ffr::VertexDecl decl;
 				decl.addAttribute(0, 0, 2, ffr::AttributeType::FLOAT, 0);
@@ -2557,7 +2549,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				Vec4(2.f / width, 0, -1, 0),
 				Vec4(0, -2.f / height, 1, 0)
 			};
-			ffr::update(ub, canvas_mtx, 0, sizeof(canvas_mtx));
+			ffr::update(ub, canvas_mtx, sizeof(canvas_mtx));
 			ffr::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
 
 			vb_offset = 0;

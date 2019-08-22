@@ -336,7 +336,7 @@ void Terrain::updateGrass(int view, const DVec3& camera_pos)
 			quad->pos.z > to_quad_z)
 		{
 			LUMIX_DELETE(m_allocator, quads[i]);
-			quads.eraseFast(i);
+			quads.swapAndPop(i);
 		}
 	}
 

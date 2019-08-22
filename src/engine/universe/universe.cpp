@@ -71,7 +71,7 @@ void Universe::addScene(IScene* scene)
 
 void Universe::removeScene(IScene* scene)
 {
-	m_scenes.eraseItemFast(scene);
+	m_scenes.swapAndPopItem(scene);
 }
 
 
@@ -421,7 +421,7 @@ void Universe::destroyEntity(EntityRef entity)
 	if (entity_data.name >= 0)
 	{
 		m_entities[m_names.back().entity.index].name = entity_data.name;
-		m_names.eraseFast(entity_data.name);
+		m_names.swapAndPop(entity_data.name);
 		entity_data.name = -1;
 	}
 

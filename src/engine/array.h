@@ -77,7 +77,7 @@ public:
 			{
 				if (equals(m_data[i], m_data[j]))
 				{
-					eraseFast(j);
+					swapAndPop(j);
 					--j;
 				}
 			}
@@ -93,7 +93,7 @@ public:
 			{
 				if (m_data[i] == m_data[j])
 				{
-					eraseFast(j);
+					swapAndPop(j);
 					--j;
 				}
 			}
@@ -200,19 +200,19 @@ public:
 		}
 	}
 
-	void eraseItemFast(const T& item)
+	void swapAndPopItem(const T& item)
 	{
 		for (int i = 0; i < m_size; ++i)
 		{
 			if (m_data[i] == item)
 			{
-				eraseFast(i);
+				swapAndPop(i);
 				return;
 			}
 		}
 	}
 
-	void eraseFast(int index)
+	void swapAndPop(int index)
 	{
 		if (index >= 0 && index < m_size)
 		{
