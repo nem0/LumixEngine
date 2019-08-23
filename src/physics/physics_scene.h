@@ -270,8 +270,8 @@ public:
 	virtual void setDebugVisualizationFlags(u32 flags) = 0;
 	virtual void setVisualizationCullingBox(const DVec3& min, const DVec3& max) = 0;
 
-	/*virtual bool isActorDebugEnabled(int index) const = 0;
-	virtual void enableActorDebug(int index, bool enable) const = 0;*/
+	virtual bool isActorDebugEnabled(EntityRef e) const = 0;
+	virtual void enableActorDebug(EntityRef index, bool enable) const = 0;
 };
 
 

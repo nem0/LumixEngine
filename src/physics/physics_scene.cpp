@@ -1494,25 +1494,25 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	// TODO
-/*	bool isActorDebugEnabled(int index) const override
+	bool isActorDebugEnabled(EntityRef entity) const override
 	{
-		auto* px_actor = m_actors.at(index)->physx_actor;
+		auto* px_actor = m_actors[entity]->physx_actor;
 		if (!px_actor) return false;
 		return px_actor->getActorFlags().isSet(PxActorFlag::eVISUALIZATION);
 	}
 
 
-	void enableActorDebug(int index, bool enable) const override
+	void enableActorDebug(EntityRef entity, bool enable) const override
 	{
-		auto* px_actor = m_actors.at(index)->physx_actor;
+		auto* px_actor = m_actors[entity]->physx_actor;
 		if (!px_actor) return;
 		px_actor->setActorFlag(PxActorFlag::eVISUALIZATION, enable);
 		PxShape* shape;
-		int count = px_actor->getShapes(&shape, 1);
-		ASSERT(count > 0);
-		shape->setFlag(PxShapeFlag::eVISUALIZATION, enable);
-	}*/
+		const u32 count = px_actor->getShapes(&shape, 1);
+		if(shape) {
+			shape->setFlag(PxShapeFlag::eVISUALIZATION, enable);
+		}
+	}
 
 
 	void render() override

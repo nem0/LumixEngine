@@ -392,7 +392,7 @@ void Material::updateRenderData(bool on_before_ready)
 	m_render_data->render_states = m_render_states;
 	m_render_data->shader = m_shader->m_render_data;
 	m_render_data->textures_count = m_texture_count;
-	MaterialConsts cs;
+	MaterialConsts cs = {};
 	static_assert(sizeof(cs) == 256, "Renderer::MaterialConstants must have 256B");
 	cs.color = m_color;
 	cs.emission = m_emission;
@@ -676,17 +676,47 @@ bool Material::load(u64 size, const u8* mem)
 {
 	PROFILE_FUNCTION();
 
-	// TODO reuse state
-	lua_State* L = luaL_newstate();
-	lua_pushlightuserdata(L, this);
-	lua_setfield(L, LUA_GLOBALSINDEX, "this");
+	MaterialManager& mng = static_cast<MaterialManager&>(getResourceManager());
+	lua_State* L = mng.getState(*this);
 	
 	m_uniforms.clear();
 	m_render_states = u64(ffr::StateFlags::CULL_BACK);
-	
+	m_custom_flags = 0;
+	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
+
+	const Span<const char> content((const char*)mem, (u32)size);
+	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
+		return false;
+	}
+
+	if (!m_shader) {
+		logError("Renderer") << "Material " << getPath() << " does not have a shader.";
+		return false;
+	}
+
+	m_size = size;
+	return true;
+}
+
+lua_State* MaterialManager::getState(Material& material) const {
+	lua_pushlightuserdata(m_state, &material);
+	lua_setfield(m_state, LUA_GLOBALSINDEX, "this");
+	return m_state;
+}
+
+MaterialManager::~MaterialManager() {
+	lua_close(m_state);
+}
+
+MaterialManager::MaterialManager(Renderer& renderer, IAllocator& allocator)
+	: ResourceManager(allocator)
+	, m_renderer(renderer)
+{
+	m_state = luaL_newstate();
+
 	#define DEFINE_LUA_FUNC(func) \
-		lua_pushcclosure(L, LuaAPI::func, 0); \
-		lua_setfield(L, LUA_GLOBALSINDEX, #func); 
+		lua_pushcfunction(m_state, LuaAPI::func); \
+		lua_setfield(m_state, LUA_GLOBALSINDEX, #func); 
 	
 	DEFINE_LUA_FUNC(alpha_ref);
 	DEFINE_LUA_FUNC(backface_culling);
@@ -700,30 +730,19 @@ bool Material::load(u64 size, const u8* mem)
 	DEFINE_LUA_FUNC(shader);
 	DEFINE_LUA_FUNC(texture);
 
-	lua_pushcfunction(L, &Material::uniform);
-	lua_setfield(L, LUA_GLOBALSINDEX, "uniform"); 
+	lua_pushcfunction(m_state, &Material::uniform);
+	lua_setfield(m_state, LUA_GLOBALSINDEX, "uniform"); 
 
 	#undef DEFINE_LUA_FUNC
 
-	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
-
-	m_custom_flags = 0;
-
-	const Span<const char> content((const char*)mem, (int)size);
-	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
-		lua_close(L);
-		return false;
-	}
-	lua_close(L);
-
-	if (!m_shader) {
-		logError("Renderer") << "Material " << getPath() << " without a shader";
-		return false;
-	}
-
-	m_size = size;
-	return true;
 }
 
+Resource* MaterialManager::createResource(const Path& path) {
+	return LUMIX_NEW(m_allocator, Material)(path, *this, m_renderer, m_allocator);
+}
+
+void MaterialManager::destroyResource(Resource& resource) {
+	LUMIX_DELETE(m_allocator, &resource);
+};
 
 } // namespace Lumix

@@ -666,6 +666,11 @@ int getDPI()
     return GetDeviceCaps(hdc, LOGPIXELSX);
 }
 
+u32 getMemPageSize() {
+	SYSTEM_INFO info;
+	GetSystemInfo(&info);
+	return info.dwPageSize;
+}
 
 void* memReserve(size_t size) {
 	return VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_READWRITE);

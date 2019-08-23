@@ -2136,16 +2136,51 @@ public:
 			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
 		}
 
+		void visit(const Reflection::Property<float>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!lua_isnumber(L, -1)) return;
 
-		// TODO
-		void visit(const Reflection::Property<float>& prop) override { notSupported(prop); }
-		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const Reflection::Property<IVec2>& prop) override { notSupported(prop); }
-		void visit(const Reflection::Property<Vec2>& prop) override { notSupported(prop); }
-		void visit(const Reflection::Property<Vec3>& prop) override { notSupported(prop); }
-		void visit(const Reflection::Property<Vec4>& prop) override { notSupported(prop); }
+			float val = (float)lua_tonumber(L, -1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+		}
 
+		void visit(const Reflection::Property<Vec2>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
 
+			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+		}
+
+		void visit(const Reflection::Property<Vec3>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
+
+			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+		}
+
+		void visit(const Reflection::Property<Vec4>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
+
+			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+		}
+
+		void visit(const Reflection::Property<IVec2>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!LuaWrapper::isType<IVec2>(L, -1)) return;
+
+			const IVec2 val = LuaWrapper::toType<IVec2>(L, -1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+		}
+		
 		void visit(const Reflection::Property<const char*>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
@@ -2175,6 +2210,7 @@ public:
 			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
 		}
 
+		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
 		void visit(const Reflection::IArrayProperty& prop) override { notSupported(prop); }
 		void visit(const Reflection::IEnumProperty& prop) override { notSupported(prop); }
 		void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }

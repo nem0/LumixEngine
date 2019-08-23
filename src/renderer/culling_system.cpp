@@ -146,19 +146,19 @@ struct CullingSystemImpl final : public CullingSystem
 
 	void remove(EntityRef entity) override
 	{
-		if(m_entity_to_cell.size() <= entity.index) return;
+		if (m_entity_to_cell.size() <= entity.index) return;
 		
 		const Sphere* sphere = m_entity_to_cell[entity.index];
-		if(!sphere) return;
+		if (!sphere) return;
 
 		CellPage& cell = getCell(*sphere);
-		if(cell.header.count == 1) {
-			if(!cell.header.prev) {
-				if(!cell.header.next) m_cell_map.erase(cell.header.indices);
+		if (cell.header.count == 1) {
+			if (!cell.header.prev) {
+				if (!cell.header.next) m_cell_map.erase(cell.header.indices);
 				else m_cell_map[cell.header.indices] = cell.header.next;
 			}
-			if(cell.header.prev) cell.header.prev->header.next = cell.header.next;
-			if(cell.header.next) cell.header.next->header.prev = cell.header.prev;
+			if (cell.header.prev) cell.header.prev->header.next = cell.header.next;
+			if (cell.header.next) cell.header.next->header.prev = cell.header.prev;
 			m_cells.swapAndPopItem(&cell);
 			cell.~CellPage();
 			m_page_allocator.deallocate(&cell, true);

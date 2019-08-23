@@ -162,7 +162,7 @@ struct MTBucketArray
 		m_keys_end += BUCKET_SIZE;
 		m_values_end += BUCKET_SIZE;
 		m_mutex.exit();
-		// TODO make sure BUCKET_SIZE is multiple of page size
+		ASSERT(BUCKET_SIZE % OS::getMemPageSize() == 0);
 		OS::memCommit(b.values, BUCKET_SIZE);
 		OS::memCommit(b.keys, BUCKET_SIZE);
 		return b;
@@ -3325,6 +3325,7 @@ struct PipelineImpl final : Pipeline
 		#undef REGISTER_FUNCTION
 	}
 
+	// TOOD can't use model in render thread
 	void renderModel(Model& model, const Matrix& mtx) override
 	{
 		for(int i = 0; i < model.getMeshCount(); ++i) {

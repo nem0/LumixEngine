@@ -12,8 +12,7 @@
 #include FT_MODULE_H            // <freetype/ftmodapi.h>
 #include FT_GLYPH_H             // <freetype/ftglyph.h>
 #include FT_SYNTHESIS_H         // <freetype/ftsynth.h>
-// TODO
-#pragma comment(lib, "freetype.lib")
+
 
 namespace Lumix
 {

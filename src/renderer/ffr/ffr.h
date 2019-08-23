@@ -140,9 +140,8 @@ enum class TextureFlags : u32 {
 };
 
 enum class BufferFlags : u32 {
-	PERSISTENT = 1 << 0,
-	IMMUTABLE = 1 << 2,
-	UNIFORM_BUFFER = 1 << 3
+	IMMUTABLE = 1 << 0,
+	UNIFORM_BUFFER = 1 << 1
 };
 
 enum class DataType {
@@ -237,7 +236,6 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
 void update(BufferHandle buffer, const void* data, size_t size);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
-void flushBuffer(BufferHandle buffer, size_t len);
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size);
 void getTextureImage(ffr::TextureHandle texture, u32 size, void* buf);
 TextureInfo getTextureInfo(const void* data);

@@ -150,6 +150,7 @@ struct WindowState {
 LUMIX_ENGINE_API void* memReserve(size_t size);
 LUMIX_ENGINE_API void memCommit(void* ptr, size_t size);
 LUMIX_ENGINE_API void memRelease(void* ptr);
+LUMIX_ENGINE_API u32 getMemPageSize();
 
 LUMIX_ENGINE_API FileIterator* createFileIterator(const char* path, IAllocator& allocator);
 LUMIX_ENGINE_API void destroyFileIterator(FileIterator* iterator);

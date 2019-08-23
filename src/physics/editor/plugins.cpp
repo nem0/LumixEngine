@@ -34,6 +34,7 @@ const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance
 const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
 const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
 const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
+const ComponentType RIGID_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
 const u32 RENDERER_HASH = crc32("renderer");
 
 
@@ -587,39 +588,30 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 	void onActorGUI()
 	{
 		if (!ImGui::CollapsingHeader("Actors")) return;
-		/*
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		int count = scene->getActorCount();
-		if (!count) return;
-		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
 
-		ImGui::Columns(2);
-		ImGui::Text("EntityRef"); ImGui::NextColumn();
-		ImGui::Text("Debug visualization"); ImGui::NextColumn();
-		ImGui::Separator();
-		for (int i = 0; i < count; ++i)
-		{
-			ComponentUID cmp;
-			const EntityRef entity = scene->getActorEntity(i);
-			cmp.entity = entity;
-			if (!cmp.entity.isValid()) continue;
-			ImGui::PushID(i);
-			char tmp[255];
-			getEntityListDisplayName(m_editor, tmp, lengthOf(tmp), cmp.entity);
-			bool selected = false;
-			if (ImGui::Selectable(tmp, &selected)) m_editor.selectEntities(&entity, 1, false);
-			ImGui::NextColumn();
-			bool is_debug_viz = scene->isActorDebugEnabled(i);
-			if (ImGui::Checkbox("", &is_debug_viz))
-			{
-				scene->enableActorDebug(i, is_debug_viz);
-			}
-			ImGui::NextColumn();
-			ImGui::PopID();
+		if (m_editor.getSelectedEntities().empty()) {
+			ImGui::Text("No entities selected.");
+			return;
 		}
-		ImGui::Columns();*/
-		ASSERT(false);
-		// TODO
+
+		const EntityRef e = m_editor.getSelectedEntities()[0];
+
+		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+
+		if(!scene->getUniverse().hasComponent(e, RIGID_ACTOR_TYPE)) {
+			ImGui::Text("Entity does not have rigid actor component.");
+			return;
+		};
+		
+		char tmp[255];
+		getEntityListDisplayName(m_editor, Span(tmp), e);
+
+		ImGui::Text("%s", tmp);
+		ImGui::SameLine();
+		bool is_debug_viz = scene->isActorDebugEnabled(e);
+		if (ImGui::Checkbox("Debug visualization", &is_debug_viz)) {
+			scene->enableActorDebug(e, is_debug_viz);
+		}
 	}
 
 
