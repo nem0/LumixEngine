@@ -632,7 +632,6 @@ OutputMemoryStream& AnimationEditor::getCopyBuffer()
 
 void AnimationEditor::executeCommand(IEditorCommand& command)
 {
-	// TODO free memory in destructor
 	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 	while (m_undo_stack.size() > m_undo_index + 1)
 	{

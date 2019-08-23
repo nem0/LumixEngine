@@ -464,14 +464,16 @@ struct RendererImpl final : public Renderer
 			renderer.m_profiler.init();
 
 			renderer.m_material_buffer.buffer = ffr::allocBufferHandle();
-			ffr::createBuffer(renderer.m_material_buffer.buffer, (u32)ffr::BufferFlags::PERSISTENT | (u32)ffr::BufferFlags::UNIFORM_BUFFER, MATERIAL_BUFFER_SIZE, nullptr);
-			renderer.m_material_buffer.data = (MaterialConsts*)ffr::map(renderer.m_material_buffer.buffer, MATERIAL_BUFFER_SIZE);
+			renderer.m_material_buffer.data.resize(400);
+			renderer.m_material_buffer.map.insert(0, 0);
+			ffr::createBuffer(renderer.m_material_buffer.buffer, (u32)ffr::BufferFlags::UNIFORM_BUFFER, renderer.m_material_buffer.data.byte_size(), nullptr);
 
-			const u32 ub_mat_count = MATERIAL_BUFFER_SIZE / sizeof(MaterialConsts);
-			for (u32 i = 0; i < ub_mat_count; ++i) {
+			const u32 max_mat_count = renderer.m_material_buffer.data.size();
+			for (u32 i = 0; i < max_mat_count; ++i) {
 				*(u32*)&renderer.m_material_buffer.data[i] = i + 1;
 			}
-			*(u32*)&renderer.m_material_buffer.data[ub_mat_count - 1] = 0xffFFffFF;
+			*(u32*)&renderer.m_material_buffer.data[max_mat_count - 1] = 0xffFFffFF;
+			renderer.m_material_buffer.data[0].color = Vec4(1, 0, 1, 1);
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 
@@ -666,6 +668,10 @@ struct RendererImpl final : public Renderer
 		}
 		else {
 			idx = m_material_buffer.first_free;
+			if (idx == 0xffFFffFF) {
+				++m_material_buffer.data[0].ref_count;
+				return 0;
+			}
 			const u32 next_free = *(u32*)&m_material_buffer.data[m_material_buffer.first_free];
 			memcpy(&m_material_buffer.data[m_material_buffer.first_free], &data, sizeof(data));
 			m_material_buffer.data[m_material_buffer.first_free].ref_count = 0;
@@ -681,7 +687,7 @@ struct RendererImpl final : public Renderer
 	void destroyMaterialConstants(u32 idx) override {
 		--m_material_buffer.data[idx].ref_count;
 		if(m_material_buffer.data[idx].ref_count == 0) {
-			const u32 hash = crc32(&m_material_buffer.data[idx], sizeof(Vec4) + sizeof(Vec3));
+			const u32 hash = crc32(&m_material_buffer.data[idx], sizeof(m_material_buffer.data[idx]));
 			*(u32*)&m_material_buffer.data[idx] = m_material_buffer.first_free;
 			m_material_buffer.first_free = idx;
 			m_material_buffer.map.erase(hash);
@@ -981,7 +987,7 @@ struct RendererImpl final : public Renderer
 			JobSystem::decSignal(m_renderer.m_transient_ready);
 
 			if (m_renderer.m_material_buffer.dirty) {
-				ffr::flushBuffer(m_renderer.m_material_buffer.buffer, MATERIAL_BUFFER_SIZE);
+				ffr::update(m_renderer.m_material_buffer.buffer, m_renderer.m_material_buffer.data.begin(), m_renderer.m_material_buffer.data.byte_size());
 				m_renderer.m_material_buffer.dirty = false;
 			}
 			for (RenderJob* job : m_jobs) {
@@ -1038,7 +1044,7 @@ struct RendererImpl final : public Renderer
 	MT::CriticalSection m_shader_defines_mutex;
 	Array<StaticString<32>> m_layers;
 	FontManager* m_font_manager;
-	RenderResourceManager<Material> m_material_manager;
+	MaterialManager m_material_manager;
 	RenderResourceManager<Model> m_model_manager;
 	RenderResourceManager<ParticleEmitterResource> m_particle_emitter_manager;
 	RenderResourceManager<PipelineResource> m_pipeline_manager;
@@ -1062,11 +1068,11 @@ struct RendererImpl final : public Renderer
 	GPUProfiler m_profiler;
 
 	struct MaterialBuffer {
-		MaterialBuffer(IAllocator& alloc) : map(alloc) {}
+		MaterialBuffer(IAllocator& alloc) : map(alloc), data(alloc) {}
 		ffr::BufferHandle buffer = ffr::INVALID_BUFFER;
-		MaterialConsts* data = nullptr;
+		Array<MaterialConsts> data;
 		HashMap<u32, u32> map;
-		u32 first_free = 0;
+		u32 first_free = 1;
 		// TODO this is not MT safe
 		bool dirty = false;
 	} m_material_buffer;

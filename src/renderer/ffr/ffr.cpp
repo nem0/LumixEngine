@@ -886,7 +886,6 @@ void setState(u64 state)
 	if (state & u64(StateFlags::SCISSOR_TEST)) CHECK_GL(glEnable(GL_SCISSOR_TEST));
 	else CHECK_GL(glDisable(GL_SCISSOR_TEST));
 	
-	// TODO
 	if (state & u64(StateFlags::CULL_BACK)) {
 		CHECK_GL(glEnable(GL_CULL_FACE));
 		CHECK_GL(glCullFace(GL_BACK));
@@ -1072,22 +1071,12 @@ void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t siz
 }
 
 
-void flushBuffer(BufferHandle buffer, size_t len)
-{
-	checkThread();
-	const GLuint buf = g_ffr.buffers[buffer.value].handle;
-	CHECK_GL(glFlushMappedNamedBufferRange(buf, 0, len));
-}
-
-
 void* map(BufferHandle buffer, size_t size)
 {
 	checkThread();
 	const Buffer& b = g_ffr.buffers[buffer.value];
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
-	const GLbitfield gl_flags = (b.flags & (u32)BufferFlags::PERSISTENT)
-		? GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT | GL_MAP_WRITE_BIT
-		: GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT;
+	const GLbitfield gl_flags = GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT;
 	return glMapNamedBufferRange(b.handle, 0, size, gl_flags);
 }
 
@@ -1104,7 +1093,6 @@ void update(BufferHandle buffer, const void* data, size_t size)
 {
 	checkThread();
 	const Buffer& b = g_ffr.buffers[buffer.value];
-	ASSERT((b.flags & (u32)BufferFlags::PERSISTENT) == 0);
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
 	const GLuint buf = b.handle;
 	CHECK_GL(glNamedBufferSubData(buf, 0, size, data));
@@ -1177,7 +1165,6 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	CHECK_GL(glCreateBuffers(1, &buf));
 	
 	GLbitfield gl_flags = 0;
-	if (flags & (u32)BufferFlags::PERSISTENT) gl_flags |= GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT;
 	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT;
 	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
 

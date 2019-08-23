@@ -47,8 +47,6 @@ struct ThreadContext
 	u32 thread_id;
 };
 
-
-// TODO this has to be defined somewhere
 #define SWITCH_CONTEXT_OPCODE 36
 
 #pragma pack(1)
@@ -135,7 +133,7 @@ static struct Instance
 		}
 
 		static EVENT_TRACE_LOGFILE trace = {};
-		trace.LoggerName = (char*)KERNEL_LOGGER_NAME; // TODO const cast wtf
+		trace.LoggerName = KERNEL_LOGGER_NAME;
 		trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
 		trace.EventRecordCallback = TraceTask::callback;
 		g_instance.trace_task.open_handle = OpenTrace(&trace);

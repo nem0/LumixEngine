@@ -667,44 +667,6 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 
 void FBXImporter::writeString(const char* str) { out_file.write(str, stringLength(str)); }
 
-/*
-static void getRelativePath(WorldEditor& editor, char* relative_path, int max_length, const char* source)
-{
-	char tmp[MAX_PATH_LENGTH];
-	PathUtils::normalize(source, tmp, sizeof(tmp));
-
-	const char* base_path = editor.getEngine().getDiskFileDevice()->getBasePath();
-	if (compareStringN(base_path, tmp, stringLength(base_path)) == 0)
-	{
-		int base_path_length = stringLength(base_path);
-		const char* rel_path_start = tmp + base_path_length;
-		if (rel_path_start[0] == '/')
-		{
-			++rel_path_start;
-		}
-		copyString(relative_path, max_length, rel_path_start);
-	}
-	else
-	{
-		auto* patch_fd = editor.getEngine().getPatchFileDevice();
-		const char* base_path = patch_fd ? patch_fd->getBasePath() : nullptr;
-		if (base_path && compareStringN(base_path, tmp, stringLength(base_path)) == 0)
-		{
-			int base_path_length = stringLength(base_path);
-			const char* rel_path_start = tmp + base_path_length;
-			if (rel_path_start[0] == '/')
-			{
-				++rel_path_start;
-			}
-			copyString(relative_path, max_length, rel_path_start);
-		}
-		else
-		{
-			copyString(relative_path, max_length, tmp);
-		}
-	}
-}*/
-
 
 bool FBXImporter::writeBillboardMaterial(const char* src)
 {/*

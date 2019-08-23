@@ -3,6 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/resource.h"
+#include "engine/resource_manager.h"
 #include "engine/math.h"
 #include "ffr/ffr.h"
 
@@ -28,8 +29,23 @@ struct  MaterialConsts {
 	u32 ref_count;
 };
 
+class MaterialManager : public ResourceManager {
+public:
+	MaterialManager(Renderer& renderer, IAllocator& allocator);
+	~MaterialManager() override;
+
+	Resource* createResource(const Path& path) override;
+	void destroyResource(Resource& resource) override;
+	lua_State* getState(class Material& material) const;
+
+private:
+	Renderer& m_renderer; 
+	lua_State* m_state;
+};
+
 class LUMIX_RENDERER_API Material final : public Resource
 {
+friend class MaterialManager;
 public:
 	static const int MAX_TEXTURE_COUNT = 16;
 

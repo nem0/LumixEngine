@@ -1658,7 +1658,6 @@ public:
 	}
 
 
-	// TODO split
 	struct EntityGUIDMap : public ILoadEntityGUIDMap, public ISaveEntityGUIDMap
 	{
 		explicit EntityGUIDMap(IAllocator& allocator)
