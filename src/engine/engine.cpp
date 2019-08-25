@@ -1335,7 +1335,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 		++m_fps_frame;
-		if (m_fps_timer.getTimeSinceTick() > 0.5f)
+		if (m_fps_timer.getTimeSinceTick() > 1.0f)
 		{
 			m_fps = m_fps_frame / m_fps_timer.tick();
 			m_fps_frame = 0;
