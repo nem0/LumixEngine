@@ -748,7 +748,7 @@ void ParticleEmitter::update(float dt)
 
 int ParticleEmitter::getInstanceDataSizeBytes() const
 {
-	return ((m_particles_count + 3) & ~3) * m_resource->getOutputsCount() * sizeof(float);
+	return m_resource ? ((m_particles_count + 3) & ~3) * m_resource->getOutputsCount() * sizeof(float) : 0;
 }
 
 

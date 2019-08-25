@@ -866,8 +866,13 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset) {
 	checkThread();
-	const GLuint gl_handle = g_ffr.buffers[buffer.value].handle;
-	CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
+	if(buffer.isValid()) {
+		const GLuint gl_handle = g_ffr.buffers[buffer.value].handle;
+		CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
+	}
+	else {
+		CHECK_GL(glBindVertexBuffer(binding_idx, 0, 0, 0));
+	}
 }
 
 
@@ -1040,9 +1045,9 @@ void drawTriangles(u32 indices_count, DataType index_type)
 }
 
 
-void drawTriangleStripArraysInstanced(u32 offset, u32 indices_count, u32 instances_count)
+void drawTriangleStripArraysInstanced(u32 indices_count, u32 instances_count)
 {
-	glDrawArraysInstanced(GL_TRIANGLE_STRIP, offset, indices_count, instances_count);
+	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, indices_count, instances_count);
 }
 
 
