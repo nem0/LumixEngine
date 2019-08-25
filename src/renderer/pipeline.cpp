@@ -1168,8 +1168,9 @@ struct PipelineImpl final : Pipeline
 						mtx.setTranslation(lpos);
 						ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
 						ffr::useProgram(prog);
+						ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
 						ffr::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
-						ffr::drawTriangleStripArraysInstanced(0, 4, instances_count);
+						ffr::drawTriangleStripArraysInstanced(4, instances_count);
 					}
 				}
 				ffr::popDebugGroup();
@@ -1545,6 +1546,8 @@ struct PipelineImpl final : Pipeline
 				}
 
 				ffr::useProgram(prg);
+				ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::drawArrays(m_indices_offset, m_indices_count, ffr::PrimitiveType::TRIANGLE_STRIP);
 			}
