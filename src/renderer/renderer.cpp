@@ -115,7 +115,7 @@ struct GPUProfiler
 
 	u64 toCPUTimestamp(u64 gpu_timestamp) const
 	{
-		return u64(gpu_timestamp * (OS::Timer::getFrequency() / double(1'000'000'000))) + m_gpu_to_cpu_offset;
+		return u64(gpu_timestamp * (OS::Timer::getFrequency() / double(ffr::getQueryFrequency()))) + m_gpu_to_cpu_offset;
 	}
 
 
@@ -124,9 +124,20 @@ struct GPUProfiler
 		ffr::QueryHandle q = ffr::createQuery();
 		ffr::queryTimestamp(q);
 		const u64 cpu_timestamp = OS::Timer::getRawTimestamp();
-		const u64 gpu_timestamp = ffr::getQueryResult(q);
-		m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (OS::Timer::getFrequency() / double(1'000'000'000)));
-		ffr::destroy(q);
+		u32 try_num = 0;
+		while (!ffr::isQueryReady(q) && try_num < 1000) {
+			Sleep(1);
+			++try_num;
+		}
+		if (try_num == 1000) {
+			logError("Renderer") << "Failed to get GPU timestamp, timing are unreliable.";
+			m_gpu_to_cpu_offset = 0;
+		}
+		else {
+			const u64 gpu_timestamp = ffr::getQueryResult(q);
+			m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (OS::Timer::getFrequency() / double(ffr::getQueryFrequency())));
+			ffr::destroy(q);
+		}
 	}
 
 

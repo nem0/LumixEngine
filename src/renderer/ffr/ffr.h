@@ -236,6 +236,7 @@ void getTextureImage(ffr::TextureHandle texture, u32 size, void* buf);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
+u64 getQueryFrequency();
 bool isQueryReady(QueryHandle query);
 void generateMipmaps(TextureHandle texture);
 

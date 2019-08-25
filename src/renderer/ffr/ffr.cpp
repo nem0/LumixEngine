@@ -1881,6 +1881,7 @@ bool isQueryReady(QueryHandle query)
 	return done;
 }
 
+u64 getQueryFrequency() { return 1'000'000'000; }
 
 u64 getQueryResult(QueryHandle query)
 {
