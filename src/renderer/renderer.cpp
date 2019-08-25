@@ -1003,11 +1003,6 @@ struct RendererImpl final : public Renderer
 			
 			ffr::swapBuffers(m_window_size.x, m_window_size.y);
 			
-			ffr::FenceHandle fence;
-			fence = ffr::createFence();
-			ffr::waitClient(fence);
-			ffr::destroy(fence);
-			
 			JobSystem::enableBackupWorker(false);
 			m_renderer.m_profiler.frame();
 			LUMIX_DELETE(m_renderer.m_allocator, this);

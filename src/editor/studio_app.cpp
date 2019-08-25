@@ -1386,7 +1386,7 @@ public:
 			StaticString<200> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
-			stats << m_engine->getFPS();
+			stats << (u32)(m_engine->getFPS() + 0.5f);
 			if (OS::getFocused() != m_window) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
