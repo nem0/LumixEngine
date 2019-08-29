@@ -1,4 +1,3 @@
-#include "animation/editor/animation_editor.h"
 #include "audio_device.h"
 #include "audio_scene.h"
 #include "audio_system.h"
@@ -121,7 +120,8 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 		app.addWindowAction(action);
 	}
 
-
+	// TODO
+	/*
 	void pluginAdded(GUIPlugin& plugin) override
 	{
 		if (!equalStrings(plugin.getName(), "animation_editor")) return;
@@ -151,7 +151,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 			ev->clip = scene->getClipInfo(current)->name_hash;
 		}
 	}
-
+	*/
 
 	const char* getName() const override { return "audio"; }
 

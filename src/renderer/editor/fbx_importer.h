@@ -135,7 +135,7 @@ struct FBXImporter
 
 private:
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
-	void gatherMaterials(const ofbx::Object* node, const char* src_dir);
+	void gatherMaterials(const char* src_dir);
 
 	void sortBones();
 	void gatherBones(const ofbx::IScene& scene);

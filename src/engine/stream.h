@@ -55,6 +55,7 @@ class LUMIX_ENGINE_API OutputMemoryStream final : public IOutputStream
 
 		bool write(const void* data, u64 size) override;
 
+		Span<u8> release_ownership();
 		void resize(u64 size);
 		void reserve(u64 size);
 		const void* getData() const { return m_data; }
@@ -91,6 +92,7 @@ class LUMIX_ENGINE_API InputMemoryStream final : public IInputStream
 		InputMemoryStream(const void* data, u64 size);
 		explicit InputMemoryStream(const OutputMemoryStream& blob);
 
+		void set(const void* data, u64 size);
 		bool read(void* data, u64 size) override;
 		bool read(String& string);
 		const void* skip(u64 size);

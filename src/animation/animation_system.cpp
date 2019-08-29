@@ -23,7 +23,7 @@ enum class AnimationSceneVersion
 	LATEST
 };
 
-
+/*
 struct AnimSetProperty : public Reflection::IEnumProperty
 {
 	AnimSetProperty() 
@@ -65,7 +65,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 		return res->m_sets_names[index];
 	}
 };
-
+*/
 
 template <typename T>
 struct AnimResourceManager final : public ResourceManager
@@ -104,7 +104,7 @@ struct AnimationSystemImpl final : public IPlugin
 	Engine& m_engine;
 	AnimResourceManager<Animation> m_animation_manager;
 	AnimResourceManager<PropertyAnimation> m_property_animation_manager;
-	AnimResourceManager<Anim::ControllerResource> m_controller_manager;
+	AnimResourceManager<Anim::Controller> m_controller_manager;
 };
 
 
@@ -117,7 +117,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 {
 	m_animation_manager.create(Animation::TYPE, m_engine.getResourceManager());
 	m_property_animation_manager.create(PropertyAnimation::TYPE, m_engine.getResourceManager());
-	m_controller_manager.create(Anim::ControllerResource::TYPE, m_engine.getResourceManager());
+	m_controller_manager.create(Anim::Controller::TYPE, m_engine.getResourceManager());
 
 	using namespace Reflection;
 	static auto anim_scene = scene("animation",
@@ -128,17 +128,15 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 		),
 		component("anim_controller",
 			property("Source", LUMIX_PROP(AnimationScene, ControllerSource),
-				ResourceAttribute("Animation controller (*.act)", Anim::ControllerResource::TYPE)),
-			AnimSetProperty()
+				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE))//,
+			// TODO
+			//AnimSetProperty()
 		),
 		component("animable",
 			property("Animation", LUMIX_PROP(AnimationScene, Animation),
 				ResourceAttribute("Animation (*.ani)", Animation::TYPE)),
 			var_property("Start time", &AnimationScene::getAnimable, &Animable::start_time, MinAttribute(0)),
 			var_property("Time scale", &AnimationScene::getAnimable, &Animable::time_scale, MinAttribute(0))
-		),
-		component("shared_anim_controller",
-			property("Parent", LUMIX_PROP(AnimationScene, SharedControllerParent))
 		)
 	);
 	registerScene(anim_scene);

@@ -18,8 +18,7 @@ class Path;
 
 namespace Anim
 {
-struct ComponentInstance;
-class ControllerResource;
+class Controller;
 }
 
 
@@ -50,21 +49,17 @@ struct AnimationScene : public IScene
 	virtual void updateAnimable(EntityRef entity, float time_delta) = 0;
 	virtual void updateController(EntityRef entity, float time_delta) = 0;
 	virtual Animable& getAnimable(EntityRef entity) = 0;
-	virtual u8* getControllerInput(EntityRef entity) = 0;
 	virtual void setControllerInput(EntityRef entity, int input_idx, int value) = 0;
 	virtual void setControllerInput(EntityRef entity, int input_idx, float value) = 0;
 	virtual void setControllerInput(EntityRef entity, int input_idx, bool value) = 0;
 	virtual struct LocalRigidTransform getControllerRootMotion(EntityRef entity) = 0;
 	virtual void setControllerSource(EntityRef entity, const Path& path) = 0;
 	virtual class Path getControllerSource(EntityRef entity) = 0;
-	virtual Anim::ComponentInstance* getControllerRoot(EntityRef entity) = 0;
 	virtual int getControllerInputIndex(EntityRef entity, const char* name) const = 0;
-	virtual EntityPtr getSharedControllerParent(EntityRef entity) = 0;
-	virtual void setSharedControllerParent(EntityRef entity, EntityRef parent) = 0;
 	virtual void applyControllerSet(EntityRef entity, const char* set_name) = 0;
 	virtual void setControllerDefaultSet(EntityRef entity, int set) = 0;
 	virtual int getControllerDefaultSet(EntityRef entity) = 0;
-	virtual Anim::ControllerResource* getControllerResource(EntityRef entity) = 0;
+	virtual Anim::Controller* getControllerResource(EntityRef entity) = 0;
 	virtual float getAnimationLength(int animation_idx) = 0;
 };
 
