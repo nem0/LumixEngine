@@ -2,7 +2,6 @@
 #include "animation/animation_scene.h"
 #include "animation/controller.h"
 #include "animation/property_animation.h"
-#include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/property_grid.h"
@@ -13,6 +12,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/os.h"
+#include "controller_editor.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
@@ -34,7 +34,7 @@ static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("model
 namespace
 {
 
-
+	
 struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 {
 	explicit AnimationAssetBrowserPlugin(StudioApp& app)
@@ -283,7 +283,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 	explicit AnimControllerAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetCompiler().registerExtension("act", Anim::ControllerResource::TYPE);
+		app.getAssetCompiler().registerExtension("act", Anim::Controller::TYPE);
 	}
 
 	bool compile(const Path& src) {
@@ -295,13 +295,13 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Animation Controller"; }
-	ResourceType getResourceType() const override { return Anim::ControllerResource::TYPE; }
+	ResourceType getResourceType() const override { return Anim::Controller::TYPE; }
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		if (type == Anim::ControllerResource::TYPE) return fs.copyFile("models/editor/tile_animation_graph.dds", out_path);
+		if (type == Anim::Controller::TYPE) return fs.copyFile("models/editor/tile_animation_graph.dds", out_path);
 		return false;
 	}
 
@@ -379,6 +379,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
+		, m_anim_editor(app)
 	{
 	}
 
@@ -390,7 +391,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		m_app.registerComponentWithResource("property_animator", "Animation / Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
 		m_app.registerComponentWithResource("animable", "Animation / Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
-		m_app.registerComponentWithResource("anim_controller", "Animation / Controller", Anim::ControllerResource::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
+		m_app.registerComponentWithResource("anim_controller", "Animation / Controller", Anim::Controller::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
 		m_app.registerComponent("shared_anim_controller", "Animation / Shared controller");
 
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
@@ -409,8 +410,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_animable_plugin = LUMIX_NEW(allocator, AnimablePropertyGridPlugin)(m_app);
 		m_app.getPropertyGrid().addPlugin(*m_animable_plugin);
 		
-		m_anim_editor = AnimEditor::IAnimationEditor::create(allocator, m_app);
-		m_app.addPlugin(*m_anim_editor);
+		m_app.addPlugin(m_anim_editor);
 	}
 
 
@@ -431,8 +431,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getPropertyGrid().removePlugin(*m_animable_plugin);
 		LUMIX_DELETE(allocator, m_animable_plugin);
 
-		m_app.removePlugin(*m_anim_editor);
-		LUMIX_DELETE(allocator, m_anim_editor);
+		m_app.removePlugin(m_anim_editor);
 	}
 
 
@@ -441,7 +440,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	AnimationAssetBrowserPlugin* m_animtion_plugin;
 	PropertyAnimationAssetBrowserPlugin* m_prop_anim_plugin;
 	AnimControllerAssetBrowserPlugin* m_anim_ctrl_plugin;
-	AnimEditor::IAnimationEditor* m_anim_editor;
+	Lumix::Anim::ControllerEditor m_anim_editor;
 };
 
 

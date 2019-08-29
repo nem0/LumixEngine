@@ -1,74 +1,56 @@
 #pragma once
 
-
+#include "condition.h"
+#include "engine/flag_set.h"
 #include "engine/resource.h"
-#include "state_machine.h"
+#include "engine/stream.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
+struct LocalRigidTransform;
+struct Pose;
 
+namespace Anim {
 
-namespace Anim
-{
+struct GroupNode;
+struct RuntimeContext;
 
-
-class ControllerResource : public Resource
-{
+class Controller final : public Resource {
 public:
-	enum class Version : int
-	{
-		ANIMATION_SETS,
-		MAX_ROOT_ROTATION_SPEED,
-		INPUT_REFACTOR,
-		ENTER_EXIT_EVENTS,
-		ANIMATION_SPEED_MULTIPLIER,
-		MASKS,
-		END_GUARD,
-		EVENTS_FIX,
+	Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 
-		LAST
-	};
+	void serialize(OutputMemoryStream& stream);
+	bool deserialize(InputMemoryStream& stream);
 
-public:
-	ControllerResource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
-	~ControllerResource();
+	RuntimeContext* createRuntime(u32 anim_set);
+	void destroyRuntime(RuntimeContext& ctx);
+	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion);
+	void getPose(RuntimeContext& ctx, struct Pose& pose);
+	void initEmpty();
 
 	ResourceType getType() const override { return TYPE; }
+	static const ResourceType TYPE;
 
-	void create() { onCreated(State::READY); }
-	void destroy() { doUnload(); }
-	void unload() override;
-	bool load(u64 size, const u8* mem) override;
-	ComponentInstance* createInstance(IAllocator& allocator) const;
-	void serialize(OutputMemoryStream& blob);
-	bool deserialize(InputMemoryStream& blob, int& version);
-	IAllocator& getAllocator() const { return m_allocator; }
-	void addAnimation(int set, u32 hash, Animation* animation);
-
-	struct AnimSetEntry
-	{
-		int set;
-		u32 hash;
+	struct AnimationEntry {
+		u32 set;
+		u32 slot_hash;
 		Animation* animation;
 	};
 
-	Array<AnimSetEntry> m_animation_set;
-	Array<StaticString<32>> m_sets_names;
-	Array<BoneMask> m_masks;
-	InputDecl m_input_decl;
-	Component* m_root;
-
-	static const ResourceType TYPE;
+	IAllocator& m_allocator;
+	GroupNode* m_root = nullptr;
+	Array<AnimationEntry> m_animation_entries;
+	Array<String> m_animation_slots;
+	InputDecl m_inputs;
+	enum class Flags : u32 {
+		USE_ROOT_MOTION = 1 << 0
+	};
+	FlagSet<Flags, u32> m_flags;
 
 private:
-	void clearAnimationSets();
-
-	IAllocator& m_allocator;
+	void unload() override;
+	bool load(u64 size, const u8* mem) override;
 };
 
-
-} // namespace Anim
-
-
-} // namespace Lumix
+} // ns Anim
+} // ns Lumix

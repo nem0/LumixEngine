@@ -1,5 +1,7 @@
 #include "condition.h"
-#include "state_machine.h"
+#include "controller.h"
+#include "engine/math.h"
+#include "nodes.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +19,7 @@ enum class Types : u8
 {
 	FLOAT,
 	BOOL,
-	INT,
+	U32,
 
 	NONE
 };
@@ -29,7 +31,7 @@ namespace Instruction
 	{
 		PUSH_BOOL,
 		PUSH_FLOAT,
-		PUSH_INT,
+		PUSH_U32,
 		ADD_FLOAT,
 		MUL_FLOAT,
 		DIV_FLOAT,
@@ -46,7 +48,7 @@ namespace Instruction
 		OR,
 		NOT,
 		INPUT_FLOAT,
-		INPUT_INT,
+		INPUT_U32,
 		INPUT_BOOL
 	};
 }
@@ -225,10 +227,10 @@ public:
 	};
 
 public:
-	ReturnValue evaluate(const u8* code, RunningContext& rc);
+	ReturnValue evaluate(const u8* code, const RuntimeContext& rc);
 
 private:
-	void callFunction(u16 idx, RunningContext& rc);
+	void callFunction(u16 idx, const RuntimeContext& rc);
 
 	template<typename T>
 	T& pop()
@@ -260,7 +262,7 @@ private:
 };
 
 
-ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, RunningContext& rc)
+ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, const RuntimeContext& rc)
 {
 	m_stack_pointer = 0;
 	const u8* cp = code;
@@ -275,16 +277,16 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, RunningContext&
 				cp += sizeof(u16);
 				break;
 			case Instruction::INPUT_FLOAT:
-				push<float>(*(float*)(rc.input + *(int*)cp));
+				push<float>(*(float*)(rc.inputs.begin() + *(int*)cp));
 				cp += sizeof(int);
 				break;
 			case Instruction::INPUT_BOOL:
-				push<bool>(*(bool*)(rc.input + *(int*)cp));
+				push<bool>(*(bool*)(rc.inputs.begin() + *(int*)cp));
 				cp += sizeof(int);
 				break;
-			case Instruction::INPUT_INT:
-				push<int>(*(int*)(rc.input + *(int*)cp));
-				cp += sizeof(int);
+			case Instruction::INPUT_U32:
+				push<u32>(*(u32*)(rc.inputs.begin() + *(int*)cp));
+				cp += sizeof(u32);
 				break;
 			case Instruction::RET_FLOAT: return ExpressionVM::ReturnValue(pop<float>());
 			case Instruction::RET_BOOL: return ExpressionVM::ReturnValue(pop<bool>());
@@ -292,7 +294,7 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, RunningContext&
 			case Instruction::SUB_FLOAT: push<float>(-pop<float>() + pop<float>()); break;
 			case Instruction::PUSH_BOOL: cp = pushStackConst<bool>(cp); break;
 			case Instruction::PUSH_FLOAT: cp = pushStackConst<float>(cp); break;
-			case Instruction::PUSH_INT: cp = pushStackConst<int>(cp); break;
+			case Instruction::PUSH_U32: cp = pushStackConst<u32>(cp); break;
 			case Instruction::FLOAT_LT: push<bool>(pop<float>() > pop<float>()); break;
 			case Instruction::FLOAT_GT: push<bool>(pop<float>() < pop<float>()); break;
 			case Instruction::INT_EQ: push<bool>(pop<int>() == pop<int>()); break;
@@ -398,15 +400,16 @@ int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
 }
 
 
-void ExpressionVM::callFunction(u16 idx, RunningContext& rc)
+void ExpressionVM::callFunction(u16 idx, const RuntimeContext& rc)
 {
 	switch(idx)
 	{
 		case 0: push<float>(sinf(pop<float>())); break;
 		case 1: push<float>(cosf(pop<float>())); break;
-		case 2: push<float>(rc.current->getTime()); break;
-		case 3: push<float>(rc.current->getLength()); break;
-		case 4: push<bool>(rc.current->getTime() > rc.current->getLength() - rc.edge->length); break;
+		// TODO
+		//case 2: push<float>(rc.current->getTime()); break;
+		//case 3: push<float>(rc.current->getLength()); break;
+		//case 4: push<bool>(rc.current->getTime() > rc.current->getLength() - rc.edge->length); break;
 		default: ASSERT(false); break;
 	}
 }
@@ -471,12 +474,12 @@ static const struct
 	{ExpressionCompiler::Token::EQUAL,
 		Types::BOOL,
 		Instruction::INT_EQ,
-		{Types::INT, Types::INT, Types::NONE},
+		{Types::U32, Types::U32, Types::NONE},
 		2},
 	{ExpressionCompiler::Token::NOT_EQUAL,
 		Types::BOOL,
 		Instruction::INT_NEQ,
-		{Types::INT, Types::INT, Types::NONE},
+		{Types::U32, Types::U32, Types::NONE},
 		2},
 	{ExpressionCompiler::Token::GREATER_THAN,
 		Types::BOOL,
@@ -626,9 +629,9 @@ int ExpressionCompiler::compile(const char* src,
 									*(int*)out = input.offset;
 									out += sizeof(int);
 									break;
-								case InputDecl::INT:
-									*out = Instruction::INPUT_INT;
-									type_stack[type_stack_idx] = Types::INT;
+								case InputDecl::U32:
+									*out = Instruction::INPUT_U32;
+									type_stack[type_stack_idx] = Types::U32;
 									++type_stack_idx;
 									++out;
 									*(int*)out = input.offset;
@@ -658,9 +661,9 @@ int ExpressionCompiler::compile(const char* src,
 									*(float*)out = constant.f_value;
 									out += sizeof(float);
 									break;
-								case InputDecl::INT:
-									*out = Instruction::PUSH_INT;
-									type_stack[type_stack_idx] = Types::INT;
+								case InputDecl::U32:
+									*out = Instruction::PUSH_U32;
+									type_stack[type_stack_idx] = Types::U32;
 									++type_stack_idx;
 									++out;
 									*(int*)out = constant.i_value;
@@ -859,8 +862,9 @@ Condition::Condition(IAllocator& allocator)
 {}
 
 
-bool Condition::operator()(RunningContext& rc)
+bool Condition::eval(const RuntimeContext& rc) const
 {
+	if(bytecode.size() == 0) return true;
 	ExpressionVM vm;
 	auto ret = vm.evaluate(&bytecode[0], rc);
 	return ret.b_value;
@@ -956,7 +960,7 @@ void InputDecl::moveInput(int old_idx, int new_idx)
 
 int InputDecl::addInput()
 {
-	ASSERT(inputs_count < lengthOf(inputs));
+	ASSERT(inputs_count < (u32)lengthOf(inputs));
 		
 	for (int i = 0; i < lengthOf(inputs); ++i)
 	{
@@ -975,7 +979,7 @@ int InputDecl::addInput()
 
 int InputDecl::addConstant()
 {
-	ASSERT(constants_count < lengthOf(constants));
+	ASSERT(constants_count < (u32)lengthOf(constants));
 
 	for (int i = 0; i < lengthOf(constants); ++i)
 	{
@@ -1008,7 +1012,7 @@ int InputDecl::getSize(Type type)
 	switch (type)
 	{
 		case FLOAT: return sizeof(float);
-		case INT: return sizeof(int);
+		case U32: return sizeof(u32);
 		case BOOL: return sizeof(bool);
 		default: ASSERT(false); return 1;
 	}

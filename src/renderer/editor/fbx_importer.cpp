@@ -104,7 +104,7 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 }
 
 
-void FBXImporter::gatherMaterials(const ofbx::Object* node, const char* src_dir)
+void FBXImporter::gatherMaterials(const char* src_dir)
 {
 	for (ImportMesh& mesh : meshes)
 	{
@@ -649,14 +649,21 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 		return false;
 	}
 
-	const ofbx::Object* root = scene->getRoot();
+	const ofbx::GlobalSettings* settings = scene->getGlobalSettings();
+	switch (settings->UpAxis) {
+		case ofbx::UpVector_AxisX: orientation = Orientation::X_UP; break;
+		case ofbx::UpVector_AxisY: orientation = Orientation::Y_UP; break;
+		case ofbx::UpVector_AxisZ: orientation = Orientation::Z_UP; break;
+	}
+	root_orientation = orientation;
+
 	char src_dir[MAX_PATH_LENGTH];
 	PathUtils::getDir(Span(src_dir), filename);
 	gatherMeshes(scene);
 
 	gatherAnimations(*scene);
 	if (!ignore_geometry) {
-		gatherMaterials(root, src_dir);
+		gatherMaterials(src_dir);
 		materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
 		gatherBones(*scene);
 	}
