@@ -20,30 +20,13 @@ namespace Anim
 {
 
 
-using AnimSet = HashMap<u32, Animation*, HashFunc<u32>>;
-
-
-struct RunningContext
-{
-	float time_delta;
-	u8* input;
-	IAllocator* allocator;
-	struct ComponentInstance* current;
-	struct Edge* edge;
-	AnimSet* anim_set;
-	OutputMemoryStream* event_stream;
-	EntityRef controller;
-};
-
-
-
 struct InputDecl
 {
 	enum Type : int
 	{
 		// don't change order
 		FLOAT,
-		INT,
+		U32,
 		BOOL,
 		EMPTY
 	};
@@ -68,9 +51,9 @@ struct InputDecl
 	};
 
 	Input inputs[32];
-	int inputs_count = 0;
+	u32 inputs_count = 0;
 	Constant constants[32];
-	int constants_count = 0;
+	u32 constants_count = 0;
 
 
 	static int getSize(Type type);
@@ -111,7 +94,7 @@ struct Condition
 
 	explicit Condition(IAllocator& allocator);
 
-	bool operator()(RunningContext& rc);
+	bool eval(const struct RuntimeContext& rc) const;
 	Error compile(const char* expression, InputDecl& decl);
 
 	Array<u8> bytecode;

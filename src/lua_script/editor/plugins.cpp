@@ -1,4 +1,3 @@
-#include "animation/editor/animation_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
@@ -528,7 +527,8 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 
 	static const int LUA_CALL_EVENT_SIZE = 32;
 
-
+	// TODO
+/*
 	void pluginAdded(GUIPlugin& plugin) override
 	{
 		if (!equalStrings(plugin.getName(), "animation_editor")) return;
@@ -546,7 +546,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 		LuaScriptScene* scene = (LuaScriptScene*)app.getWorldEditor().getUniverse()->getScene(crc32("lua_script"));
 		ImGui::InputText("Function", (char*)data, LUA_CALL_EVENT_SIZE);
 	}
-
+	*/
 
 	const char* getName() const override { return "script_console"; }
 

@@ -16,9 +16,11 @@
 #include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
+#include "nodes.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
+#include "string.h" // memcpy
 
 
 namespace Lumix
@@ -30,8 +32,7 @@ class Universe;
 
 enum class AnimationSceneVersion
 {
-	SHARED_CONTROLLER,
-	PROPERTY_ANIMATOR,
+	FIRST,
 
 	LATEST
 };
@@ -41,29 +42,18 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
 static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
 static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
-static const ComponentType SHARED_CONTROLLER_TYPE = Reflection::getComponentType("shared_anim_controller");
 
 
 struct AnimationSceneImpl final : public AnimationScene
 {
 	friend struct AnimationSystemImpl;
-
-	struct SharedController
-	{
-		EntityRef entity;
-		EntityPtr parent;
-	};
-
+	
 	struct Controller
 	{
-		explicit Controller(IAllocator& allocator) : input(allocator), animations(allocator) {}
-
 		EntityRef entity;
-		Anim::ControllerResource* resource = nullptr;
-		Anim::ComponentInstance* root = nullptr;
+		Anim::Controller* resource = nullptr;
 		u32 default_set = 0;
-		Array<u8> input;
-		HashMap<u32, Animation*> animations;
+		Anim::RuntimeContext* ctx = nullptr;
 
 		struct IK
 		{
@@ -110,7 +100,6 @@ struct AnimationSceneImpl final : public AnimationScene
 		, m_animables(allocator)
 		, m_property_animators(allocator)
 		, m_controllers(allocator)
-		, m_shared_controllers(allocator)
 		, m_event_stream(allocator)
 		, m_allocator(allocator)
 	{
@@ -134,29 +123,7 @@ struct AnimationSceneImpl final : public AnimationScene
 			, &AnimationSceneImpl::destroyController
 			, &AnimationSceneImpl::serializeController
 			, &AnimationSceneImpl::deserializeController);
-		universe.registerComponentType(SHARED_CONTROLLER_TYPE
-			, this
-			, &AnimationSceneImpl::createSharedController
-			, &AnimationSceneImpl::destroySharedController
-			, &AnimationSceneImpl::serializeSharedController
-			, &AnimationSceneImpl::deserializeSharedController);
 		ASSERT(m_render_scene);
-	}
-
-
-	void serializeSharedController(ISerializer& serializer, EntityRef entity)
-	{
-		SharedController& ctrl = m_shared_controllers[entity];
-		serializer.write("parent", ctrl.parent);
-	}
-
-
-	void deserializeSharedController(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		EntityRef parent;
-		serializer.read(Ref(parent));
-		m_shared_controllers.insert(entity, {entity, parent});
-		m_universe.onComponentCreated(entity, SHARED_CONTROLLER_TYPE, this);
 	}
 
 
@@ -206,7 +173,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void serializeController(ISerializer& serializer, EntityRef entity)
 	{
-		Controller& controller = m_controllers.get(entity);
+		Controller& controller = m_controllers[entity];
 		serializer.write("source", controller.resource ? controller.resource->getPath().c_str() : "");
 		serializer.write("default_set", controller.default_set);
 	}
@@ -217,16 +184,13 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void deserializeController(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
-		Controller& controller = m_controllers.emplace(entity, m_allocator);
+		Controller& controller = m_controllers.insert(entity, Controller());
 		controller.entity = entity;
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(tmp, lengthOf(tmp));
-		if (scene_version > (int)AnimationSceneVersion::SHARED_CONTROLLER)
-		{
-			serializer.read(Ref(controller.default_set));
-		}
-		auto* res = tmp[0] ? m_engine.getResourceManager().load<Anim::ControllerResource>(Path(tmp)) : nullptr;
-		setControllerResource(controller, (Anim::ControllerResource*)res);
+		serializer.read(Ref(controller.default_set));
+		auto* res = tmp[0] ? m_engine.getResourceManager().load<Anim::Controller>(Path(tmp)) : nullptr;
+		setControllerResource(controller, (Anim::Controller*)res);
 		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
 	}
 
@@ -264,11 +228,11 @@ struct AnimationSceneImpl final : public AnimationScene
 	{
 		AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
 		EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-		const int ctrl_idx = scene->m_controllers.find(entity);
-		if (ctrl_idx < 0) {
+		auto iter = scene->m_controllers.find(entity);
+		if (!iter.isValid()) {
 			luaL_argerror(L, 2, "entity does not have controller");
 		}
-		Controller& controller = scene->m_controllers.at(ctrl_idx);
+		Controller& controller = iter.value();
 		int index = LuaWrapper::checkArg<int>(L, 3);
 		Controller::IK& ik = controller.inverse_kinematics[index];
 		ik.weight = LuaWrapper::checkArg<float>(L, 4);
@@ -290,32 +254,29 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	int getControllerInputIndex(EntityRef entity, const char* name) const override
 	{
-		const Controller& controller = m_controllers[entity];
+		/*const Controller& controller = m_controllers[entity];
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
 		for (int i = 0; i < lengthOf(decl.inputs); ++i)
 		{
 			if (decl.inputs[i].type != Anim::InputDecl::EMPTY && equalStrings(decl.inputs[i].name, name)) return i;
-		}
+		}*/
+		// TODO
+		ASSERT(false);
 		return -1;
 	}
 
 
-	void setControllerFloatInput(EntityRef entity, int input_idx, float value)
+	void setControllerFloatInput(EntityRef entity, u32 input_idx, float value)
 	{
-		Controller& controller = m_controllers.get(entity);
-		if (!controller.root)
-		{
-			logWarning("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
-			return;
+		auto iter = m_controllers.find(entity);
+		if (!iter.isValid()) return;
+		Controller& controller = iter.value();
+		Anim::InputDecl& decl = controller.resource->m_inputs;
+		if (input_idx >= decl.inputs_count) return;
+		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT) {
+			memcpy(&controller.ctx->inputs[decl.inputs[input_idx].offset], &value, sizeof(value));
 		}
-		Anim::InputDecl& decl = controller.resource->m_input_decl;
-		if (input_idx < 0 || input_idx >= lengthOf(decl.inputs)) return;
-		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT)
-		{
-			*(float*)&controller.input[decl.inputs[input_idx].offset] = value;
-		}
-		else
-		{
+		else {
 			logWarning("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
 		}
 	}
@@ -323,12 +284,10 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void setControllerIntInput(EntityRef entity, int input_idx, int value)
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& controller = m_controllers.get(entity);
-		if (!controller.root)
-		{
-			logWarning("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
-			return;
-		}
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
 		if (decl.inputs[input_idx].type == Anim::InputDecl::INT)
 		{
@@ -337,18 +296,16 @@ struct AnimationSceneImpl final : public AnimationScene
 		else
 		{
 			logWarning("Animation") << "Trying to set int to " << decl.inputs[input_idx].name;
-		}
+		}*/
 	}
 
 
 	void setControllerBoolInput(EntityRef entity, int input_idx, bool value)
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& controller = m_controllers.get(entity);
-		if (!controller.root)
-		{
-			logWarning("Animation") << "Trying to set input " << input_idx << " before the controller is ready";
-			return;
-		}
 		Anim::InputDecl& decl = controller.resource->m_input_decl;
 		if (decl.inputs[input_idx].type == Anim::InputDecl::BOOL)
 		{
@@ -357,7 +314,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		else
 		{
 			logWarning("Animation") << "Trying to set bool to " << decl.inputs[input_idx].name;
-		}
+		}*/
 	}
 
 
@@ -383,21 +340,12 @@ struct AnimationSceneImpl final : public AnimationScene
 	
 	void startGame() override 
 	{
-		for (auto& controller : m_controllers)
-		{
-			initControllerRuntime(controller);
-		}
 		m_is_game_running = true;
 	}
 	
 	
 	void stopGame() override
 	{
-		for (auto& controller : m_controllers)
-		{
-			LUMIX_DELETE(m_allocator, controller.root);
-			controller.root = nullptr;
-		}
 		m_is_game_running = false;
 	}
 	
@@ -413,24 +361,18 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	void setControllerResource(Controller& controller, Anim::ControllerResource* res)
+	void setControllerResource(Controller& controller, Anim::Controller* res)
 	{
 		if (controller.resource == res) return;
-		if (controller.resource != nullptr)
-		{
+		if (controller.resource != nullptr) {
+			if (controller.ctx) {
+				controller.resource->destroyRuntime(*controller.ctx);
+				controller.ctx = nullptr;
+			}
 			controller.resource->getObserverCb().unbind<AnimationSceneImpl, &AnimationSceneImpl::onControllerResourceChanged>(this);
 		}
-		if (controller.root != nullptr)
-		{
-			LUMIX_DELETE(m_engine.getAllocator(), controller.root);
-			controller.root = nullptr;
-			controller.default_set = 0;
-			controller.animations.clear();
-			controller.input.clear();
-		}
 		controller.resource = res;
-		if (controller.resource != nullptr)
-		{
+		if (controller.resource != nullptr) {
 			controller.resource->onLoaded<AnimationSceneImpl, &AnimationSceneImpl::onControllerResourceChanged>(this);
 		}
 	}
@@ -438,15 +380,18 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void onControllerResourceChanged(Resource::State, Resource::State new_state, Resource& resource)
 	{
-		for (auto& controller : m_controllers)
-		{
-			if (controller.resource == &resource && controller.root != nullptr && new_state != Resource::State::READY)
-			{
-				LUMIX_DELETE(m_engine.getAllocator(), controller.root);
-				controller.root = nullptr;
-				controller.default_set = 0;
-				controller.animations.clear();
-				controller.input.clear();
+		for (auto& controller : m_controllers) {
+			if (controller.resource == &resource) {
+				if(new_state == Resource::State::READY) {
+					ASSERT(!controller.ctx);
+					controller.ctx = controller.resource->createRuntime(controller.default_set);
+				}
+				else {
+					if (controller.ctx) {
+						controller.resource->destroyRuntime(*controller.ctx);
+						controller.ctx = nullptr;
+					}
+				}
 			}
 		}
 	}
@@ -473,18 +418,11 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void destroyController(EntityRef entity)
 	{
-		auto& controller = m_controllers.get(entity);
+		auto& controller = m_controllers[entity];
 		unloadResource(controller.resource);
 		setControllerResource(controller, nullptr);
 		m_controllers.erase(entity);
 		m_universe.onComponentDestroyed(entity, CONTROLLER_TYPE, this);
-	}
-
-
-	void destroySharedController(EntityRef entity)
-	{
-		m_shared_controllers.erase(entity);
-		m_universe.onComponentDestroyed(entity, SHARED_CONTROLLER_TYPE, this);
 	}
 
 
@@ -515,13 +453,6 @@ struct AnimationSceneImpl final : public AnimationScene
 			serializer.write(controller.default_set);
 			serializer.write(controller.entity);
 			serializer.writeString(controller.resource ? controller.resource->getPath().c_str() : "");
-		}
-
-		serializer.write(m_shared_controllers.size());
-		for (const SharedController& controller : m_shared_controllers)
-		{
-			serializer.write(controller.entity);
-			serializer.write(controller.parent);
 		}
 	}
 
@@ -567,53 +498,33 @@ struct AnimationSceneImpl final : public AnimationScene
 		m_controllers.reserve(count);
 		for (int i = 0; i < count; ++i)
 		{
-			Controller controller(m_allocator);
+			Controller controller;
 			serializer.read(controller.default_set);
 			serializer.read(controller.entity);
 			char tmp[MAX_PATH_LENGTH];
 			serializer.readString(tmp, lengthOf(tmp));
 			setControllerResource(controller, tmp[0] ? loadController(Path(tmp)) : nullptr);
-			m_controllers.insert(controller.entity, Move(controller));
+			m_controllers.insert(controller.entity, static_cast<Controller&&>(controller));
 			m_universe.onComponentCreated(controller.entity, CONTROLLER_TYPE, this);
 		}
-
-		serializer.read(count);
-		m_shared_controllers.reserve(count);
-		for (int i = 0; i < count; ++i)
-		{
-			SharedController controller;
-			serializer.read(controller.entity);
-			serializer.read(controller.parent);
-			m_shared_controllers.insert(controller.entity, controller);
-			m_universe.onComponentCreated(controller.entity, SHARED_CONTROLLER_TYPE, this);
-		}
 	}
-
-
-	void setSharedControllerParent(EntityRef entity, EntityRef parent) override
-	{
-		m_shared_controllers[entity].parent = parent;
-	}
-
-
-	EntityPtr getSharedControllerParent(EntityRef entity) override { return m_shared_controllers[entity].parent; }
 
 
 	void setControllerSource(EntityRef entity, const Path& path) override
 	{
-		auto& controller = m_controllers.get(entity);
+		auto& controller = m_controllers[entity];
 		unloadResource(controller.resource);
 		setControllerResource(controller, path.isValid() ? loadController(path) : nullptr);
-		if (controller.resource && controller.resource->isReady() && m_is_game_running)
-		{
-			initControllerRuntime(controller);
+		if (controller.resource && controller.resource->isReady() && m_is_game_running) {
+			ASSERT(false);
+			// TODO
 		}
 	}
 
 
 	Path getControllerSource(EntityRef entity) override
 	{
-		const auto& controller = m_controllers.get(entity);
+		const auto& controller = m_controllers[entity];
 		return controller.resource ? controller.resource->getPath() : Path("");
 	}
 
@@ -701,7 +612,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void updateController(EntityRef entity, float time_delta) override
 	{
-		Controller& controller = m_controllers.get(entity);
+		Controller& controller = m_controllers[entity];
 		updateController(controller, time_delta);
 		processEventStream();
 		m_event_stream.clear();
@@ -710,59 +621,56 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void setControllerInput(EntityRef entity, int input_idx, float value) override
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& ctrl = m_controllers.get(entity);
 		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
-		if (!ctrl.root) return;
 		if (input_idx >= lengthOf(decl.inputs)) return;
 		if (decl.inputs[input_idx].type != Anim::InputDecl::FLOAT) return;
-		*(float*)&ctrl.input[decl.inputs[input_idx].offset] = value;
+		*(float*)&ctrl.input[decl.inputs[input_idx].offset] = value;*/
 	}
 
 
 	void setControllerInput(EntityRef entity, int input_idx, bool value) override
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& ctrl = m_controllers.get(entity);
 		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
-		if (!ctrl.root) return;
 		if (input_idx >= lengthOf(decl.inputs)) return;
 		if (decl.inputs[input_idx].type != Anim::InputDecl::BOOL) return;
-		*(bool*)&ctrl.input[decl.inputs[input_idx].offset] = value;
+		*(bool*)&ctrl.input[decl.inputs[input_idx].offset] = value;*/
 	}
 
 
 	void setControllerInput(EntityRef entity, int input_idx, int value) override
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& ctrl = m_controllers.get(entity);
 		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
-		if (!ctrl.root) return;
 		if (input_idx >= lengthOf(decl.inputs)) return;
 		if (decl.inputs[input_idx].type != Anim::InputDecl::INT) return;
-		*(int*)&ctrl.input[decl.inputs[input_idx].offset] = value;
-	}
-
-
-	Anim::ComponentInstance* getControllerRoot(EntityRef entity) override
-	{
-		return m_controllers.get(entity).root;
+		*(int*)&ctrl.input[decl.inputs[input_idx].offset] = value;*/
 	}
 
 
 	LocalRigidTransform getControllerRootMotion(EntityRef entity) override
 	{
-		Controller& ctrl = m_controllers.get(entity);
-		return ctrl.root ? ctrl.root->getRootMotion() : LocalRigidTransform{{0, 0, 0}, {0, 0, 0, 1}};
-	}
-
-	
-	u8* getControllerInput(EntityRef entity) override
-	{
-		auto& input = m_controllers.get(entity).input;
-		return input.empty() ? nullptr : &input[0];
+		ASSERT(false);
+		// TODO
+		return {};
 	}
 
 
 	void applyControllerSet(EntityRef entity, const char* set_name) override
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& ctrl = m_controllers.get(entity);
 		u32 set_name_hash = crc32(set_name);
 		int set_idx = ctrl.resource->m_sets_names.find([set_name_hash](const StaticString<32>& val) {
@@ -775,140 +683,75 @@ struct AnimationSceneImpl final : public AnimationScene
 			if (entry.set != set_idx) continue;
 			ctrl.animations[entry.hash] = entry.animation;
 		}
-		if (ctrl.root) ctrl.root->onAnimationSetUpdated(ctrl.animations);
+		ASSERT(false);
+		// TODO
+		//if (ctrl.root) ctrl.root->onAnimationSetUpdated(ctrl.animations);*/
 	}
 
 
 	void setControllerDefaultSet(EntityRef entity, int set) override
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& ctrl = m_controllers.get(entity);
-		ctrl.default_set = ctrl.resource ? crc32(ctrl.resource->m_sets_names[set]) : 0;
+		ctrl.default_set = ctrl.resource ? crc32(ctrl.resource->m_sets_names[set]) : 0;*/
 	}
 
 
 	int getControllerDefaultSet(EntityRef entity) override
 	{
+		// TODO
+		ASSERT(false);
+		/*
 		Controller& ctrl = m_controllers.get(entity);
 		auto is_default_set = [&ctrl](const StaticString<32>& val) {
 			return crc32(val) == ctrl.default_set;
 		};
 		int idx = 0;
 		if(ctrl.resource) idx = ctrl.resource->m_sets_names.find(is_default_set);
-		return idx < 0 ? 0 : idx;
+		return idx < 0 ? 0 : idx;*/
+		return -1;
 	}
 
 
-	Anim::ControllerResource* getControllerResource(EntityRef entity) override
+	Anim::Controller* getControllerResource(EntityRef entity) override
 	{
-		return m_controllers.get(entity).resource;
+		return m_controllers[entity].resource;
 	}
-
-
-	bool initControllerRuntime(Controller& controller)
-	{
-		if (!controller.resource) return false;
-		if (!controller.resource->isReady()) return false;
-		if (controller.resource->m_input_decl.getSize() == 0) return false;
-		controller.root = controller.resource->createInstance(m_allocator);
-		controller.input.resize(controller.resource->m_input_decl.getSize());
-		int set_idx = 0;
-		for (int i = 0; i < controller.resource->m_sets_names.size(); ++i)
-		{
-			if (controller.default_set == crc32(controller.resource->m_sets_names[i]))
-			{
-				set_idx = i;
-				break;
-			}
-		}
-		for (auto& entry : controller.resource->m_animation_set)
-		{
-			if (entry.set != set_idx) continue;
-			controller.animations.insert(entry.hash, entry.animation);
-		}
-		setMemory(&controller.input[0], 0, controller.input.size());
-		Anim::RunningContext rc;
-		rc.time_delta = 0;
-		rc.allocator = &m_allocator;
-		rc.input = &controller.input[0];
-		rc.current = nullptr;
-		rc.anim_set = &controller.animations;
-		rc.event_stream = &m_event_stream;
-		rc.controller = {controller.entity.index};
-		controller.root->enter(rc, nullptr);
-		return true;
-	}
-
-
-	void updateSharedController(SharedController& controller)
-	{
-		if (!controller.parent.isValid()) return;
-
-		int parent_controller_idx = m_controllers.find((EntityRef)controller.parent);
-		if (parent_controller_idx < 0) return;
-
-		Controller& parent_controller = m_controllers.at(parent_controller_idx);
-		if (!parent_controller.root) return;
-
-		EntityRef entity = controller.entity;
-		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
-
-		Pose* pose = m_render_scene->lockPose(entity);
-		if (!pose) return;
-
-		Model* model = m_render_scene->getModelInstanceModel(entity);
-
-		model->getPose(*pose);
-		pose->computeRelative(*model);
-
-		parent_controller.root->fillPose(m_engine, *pose, *model, 1, nullptr);
-
-		pose->computeAbsolute(*model);
-		m_render_scene->unlockPose(entity, true);
-	}
-
 
 	void updateController(Controller& controller, float time_delta)
 	{
-		if (!controller.resource || !controller.resource->isReady())
-		{
-			LUMIX_DELETE(m_allocator, controller.root);
-			controller.root = nullptr;
-			return;
+		if (!controller.resource || !controller.resource->isReady()) return;
+		if (!controller.ctx) return;
+
+		controller.ctx->time_delta = time_delta;
+		// TODO
+		controller.ctx->root_bone_hash = crc32("RigRoot");
+		LocalRigidTransform root_motion;
+		controller.resource->update(*controller.ctx, Ref(root_motion));
+		const EntityRef entity = controller.entity;
+
+		if (controller.resource->m_flags.isSet(Anim::Controller::Flags::USE_ROOT_MOTION)) {
+			Transform tr = m_universe.getTransform(entity);
+			tr.rot = tr.rot * root_motion.rot; 
+			tr.pos = tr.pos + tr.rot.rotate(root_motion.pos);
+			m_universe.setTransform(entity, tr);
 		}
 
-		if (!controller.root && !initControllerRuntime(controller)) return;
-
-		Anim::RunningContext rc;
-		rc.time_delta = time_delta;
-		rc.current = controller.root;
-		rc.allocator = &m_allocator;
-		rc.input = &controller.input[0];
-		rc.anim_set = &controller.animations;
-		rc.event_stream = &m_event_stream;
-		rc.controller = {controller.entity.index};
-		controller.root = controller.root->update(rc, true);
-
-		EntityRef entity = controller.entity;
 		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(entity);
-		if (!model || !model->isReady()) return;
-			
+		if (!model->isReady()) return;
+
 		Pose* pose = m_render_scene->lockPose(entity);
 		if (!pose) return;
 
 		model->getRelativePose(*pose);
-
-		controller.root->fillPose(m_engine, *pose, *model, 1, nullptr);
-
-		for (Controller::IK& ik : controller.inverse_kinematics)
-		{
-			if (ik.weight == 0) break;
-
-			updateIK(ik, *pose, *model);
-		}
-
+		controller.ctx->model = model;
+		controller.resource->getPose(*controller.ctx, *pose);
 		pose->computeAbsolute(*model);
+
 		m_render_scene->unlockPose(entity, true);
 	}
 
@@ -1068,7 +911,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 		JobSystem::forEach(m_animables.size(), [&](int idx){
 			Animable& animable = m_animables.at(idx);
-			AnimationSceneImpl::updateAnimable(animable, time_delta);
+			updateAnimable(animable, time_delta);
 		});
 	}
 
@@ -1086,12 +929,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 		for (Controller& controller : m_controllers)
 		{
-			AnimationSceneImpl::updateController(controller, time_delta);
-		}
-
-		for (SharedController& controller : m_shared_controllers)
-		{
-			updateSharedController(controller);
+			updateController(controller, time_delta);
 		}
 
 		processEventStream();
@@ -1114,16 +952,16 @@ struct AnimationSceneImpl final : public AnimationScene
 			{
 				Anim::SetInputEvent event;
 				blob.read(event);
-				Controller& ctrl = m_controllers.get(entity);
+				Controller& ctrl = m_controllers[entity];
 				if (ctrl.resource->isReady())
 				{
-					Anim::InputDecl& decl = ctrl.resource->m_input_decl;
+					Anim::InputDecl& decl = ctrl.resource->m_inputs;
 					Anim::InputDecl::Input& input = decl.inputs[event.input_idx];
 					switch (input.type)
 					{
-						case Anim::InputDecl::BOOL: *(bool*)&ctrl.input[input.offset] = event.b_value; break;
-						case Anim::InputDecl::INT: *(int*)&ctrl.input[input.offset] = event.i_value; break;
-						case Anim::InputDecl::FLOAT: *(float*)&ctrl.input[input.offset] = event.f_value; break;
+						case Anim::InputDecl::BOOL: *(bool*)&ctrl.ctx->inputs[input.offset] = event.b_value; break;
+						case Anim::InputDecl::U32: *(u32*)&ctrl.ctx->inputs[input.offset] = event.i_value; break;
+						case Anim::InputDecl::FLOAT: *(float*)&ctrl.ctx->inputs[input.offset] = event.f_value; break;
 						default: ASSERT(false); break;
 					}
 				}
@@ -1151,10 +989,10 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	Anim::ControllerResource* loadController(const Path& path) const
+	Anim::Controller* loadController(const Path& path) const
 	{
 		ResourceManagerHub& rm = m_engine.getResourceManager();
-		return rm.load<Anim::ControllerResource>(path);
+		return rm.load<Anim::Controller>(path);
 	}
 
 
@@ -1182,18 +1020,10 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void createController(EntityRef entity)
 	{
-		Controller& controller = m_controllers.emplace(entity, m_allocator);
+		Controller& controller = m_controllers.insert(entity, Controller());
 		controller.entity = entity;
 
 		m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
-	}
-
-
-	void createSharedController(EntityRef entity)
-	{
-		m_shared_controllers.insert(entity, {entity, INVALID_ENTITY});
-
-		m_universe.onComponentCreated(entity, SHARED_CONTROLLER_TYPE, this);
 	}
 
 
@@ -1206,8 +1036,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	Engine& m_engine;
 	AssociativeArray<EntityRef, Animable> m_animables;
 	AssociativeArray<EntityRef, PropertyAnimator> m_property_animators;
-	AssociativeArray<EntityRef, Controller> m_controllers;
-	AssociativeArray<EntityRef, SharedController> m_shared_controllers;
+	HashMap<EntityRef, Controller> m_controllers;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
 	OutputMemoryStream m_event_stream;

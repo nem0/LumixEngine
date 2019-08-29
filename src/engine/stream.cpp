@@ -234,6 +234,14 @@ void OutputMemoryStream::reserve(u64 size)
 }
 
 
+Span<u8> OutputMemoryStream::release_ownership() {
+	Span<u8> res((u8*)m_data, (u8*)m_data + m_size);
+	m_data = nullptr;
+	m_pos = m_size = 0;
+	return res;
+}
+
+
 void OutputMemoryStream::resize(u64 size)
 {
 	m_pos = size;
@@ -261,6 +269,13 @@ InputMemoryStream::InputMemoryStream(const OutputMemoryStream& blob)
 	, m_size(blob.getPos())
 	, m_pos(0)
 {}
+
+
+void InputMemoryStream::set(const void* data, u64 size) {
+	m_data = (u8*)data;
+	m_size = size;
+	m_pos = 0;
+}
 
 
 const void* InputMemoryStream::skip(u64 size)
@@ -307,8 +322,9 @@ bool IInputStream::readString(char* data, int max_size)
 {
 	i32 size;
 	IInputStream::read(size);
-	ASSERT(size <= max_size);
-	bool res = read(data, size < max_size ? size : max_size);
+	ASSERT(size < max_size);
+	bool res = read(data, size < max_size - 1 ? size : max_size - 1);
+	data[size < max_size - 1 ? size : max_size - 1] = 0;
 	for (int i = max_size; i < size; ++i) {
 		char dummy;
 		read(dummy);
