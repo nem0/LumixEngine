@@ -71,7 +71,7 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(Animation* anim, flo
 	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, 0, t1, root_bone_idx);
 	
 	LocalRigidTransform root_motion;
-	root_motion.rot = tr_0.rot * tr_1.rot;
+	root_motion.rot = tr_1.rot * tr_0.rot;
 	root_motion.pos = tr_0.pos + tr_0.rot.rotate(tr_1.pos);
 	return root_motion;
 }
@@ -301,6 +301,17 @@ void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motio
 	ctx.input_runtime.set(mem.begin(), mem.length());
 	m_root->update(ctx, root_motion);
 	m_allocator.deallocate(mem.begin());
+	
+	auto root_bone_iter = ctx.model->getBoneIndex(ctx.root_bone_hash);
+	if (root_bone_iter.isValid()) {
+		const int root_bone_idx = root_bone_iter.value();
+		const Model::Bone& bone = ctx.model->getBone(root_bone_idx);
+		LocalRigidTransform root_tr;
+		root_tr = bone.transform;
+		LocalRigidTransform rt;
+		root_motion->rot = root_tr.rot * root_motion->rot * root_tr.rot.conjugated();
+		root_motion->pos = root_tr.rot.rotate(root_motion->pos);
+	}
 }
 
 void Controller::getPose(RuntimeContext& ctx, struct Pose& pose) {
@@ -318,11 +329,11 @@ void Controller::getPose(RuntimeContext& ctx, struct Pose& pose) {
 	m_root->getPose(ctx, 1.f, pose);
 	
 	// TODO this should be in AnimationNode
-	/*if (root_bone_iter.isValid()) {
+	if (root_bone_iter.isValid()) {
 		const int root_bone_idx = root_bone_iter.value();
 		pose.positions[root_bone_idx] = root_bind_pose.pos;
 		pose.rotations[root_bone_idx] = root_bind_pose.rot;
-	}*/
+	}
 }
 
 struct Header {
