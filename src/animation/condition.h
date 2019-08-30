@@ -60,7 +60,7 @@ struct InputDecl
 
 	int inputFromLinearIdx(int idx) const;
 	int inputToLinearIdx(int idx) const;
-	void removeInput(int index);
+	void removeInput(u32 index);
 	void removeConstant(int index);
 	void moveConstant(int old_idx, int new_idx);
 	void moveInput(int old_idx, int new_idx);

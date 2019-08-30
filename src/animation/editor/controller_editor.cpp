@@ -156,6 +156,25 @@ void ControllerEditor::onWindowGUI() {
 			ImGui::EndMenuBar();
 		}
 		
+		if (ImGui::CollapsingHeader("Inputs")) {
+			Anim::InputDecl& inputs = m_controller->m_inputs;
+			for (Anim::InputDecl::Input& input : inputs.inputs) {
+				if (input.type == Anim::InputDecl::Type::EMPTY) continue;
+
+				if (ImGui::TreeNodeEx(&input, 0, "%s", input.name.data)) {
+					ImGui::InputText("Name", input.name.data, sizeof(input.name.data));
+					if (ImGui::Combo("Type", (int*)&input.type, "float\0u32\0bool")) {
+						inputs.recalculateOffsets();
+					}
+					if(ImGui::Button("Remove")) {
+						inputs.removeInput(int(&input - inputs.inputs));
+					}
+					ImGui::TreePop();
+				}
+			}
+			if (ImGui::Button("Add")) inputs.addInput();
+		}
+
 		if(ImGui::CollapsingHeader("Slots")) {
 			for (u32 i = 0; i < (u32)m_controller->m_animation_slots.size(); ++i) {
 				String& slot = m_controller->m_animation_slots[i];
