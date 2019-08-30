@@ -725,20 +725,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		if (!controller.resource || !controller.resource->isReady()) return;
 		if (!controller.ctx) return;
 
-		controller.ctx->time_delta = time_delta;
-		// TODO
-		controller.ctx->root_bone_hash = crc32("RigRoot");
-		LocalRigidTransform root_motion;
-		controller.resource->update(*controller.ctx, Ref(root_motion));
 		const EntityRef entity = controller.entity;
-
-		if (controller.resource->m_flags.isSet(Anim::Controller::Flags::USE_ROOT_MOTION)) {
-			Transform tr = m_universe.getTransform(entity);
-			tr.rot = tr.rot * root_motion.rot; 
-			tr.pos = tr.pos + tr.rot.rotate(root_motion.pos);
-			m_universe.setTransform(entity, tr);
-		}
-
 		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
 
 		Model* model = m_render_scene->getModelInstanceModel(entity);
@@ -747,8 +734,21 @@ struct AnimationSceneImpl final : public AnimationScene
 		Pose* pose = m_render_scene->lockPose(entity);
 		if (!pose) return;
 
-		model->getRelativePose(*pose);
 		controller.ctx->model = model;
+		controller.ctx->time_delta = time_delta;
+		// TODO
+		controller.ctx->root_bone_hash = crc32("RigRoot");
+		LocalRigidTransform root_motion;
+		controller.resource->update(*controller.ctx, Ref(root_motion));
+
+		if (controller.resource->m_flags.isSet(Anim::Controller::Flags::USE_ROOT_MOTION)) {
+			Transform tr = m_universe.getTransform(entity);
+			tr.rot = tr.rot * root_motion.rot; 
+			tr.pos = tr.pos + tr.rot.rotate(root_motion.pos);
+			m_universe.setTransform(entity, tr);
+		}
+
+		model->getRelativePose(*pose);
 		controller.resource->getPose(*controller.ctx, *pose);
 		pose->computeAbsolute(*model);
 
