@@ -660,6 +660,16 @@ void AssetBrowser::selectResource(const Path& path, bool record_history, bool ad
 	if (res) selectResource(res, record_history, additive);
 }
 
+static StaticString<MAX_PATH_LENGTH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
+	StaticString<MAX_PATH_LENGTH> res("");
+	if (rl.full.length() > 0) {
+		res << rl.subresource << (rl.subresource.length() > 0 ? ":" : "") << rl.basename << "." << rl.ext;
+	}
+	if (hash_id) {
+		res << "##h" << crc32(rl.full.m_begin, rl.full.length());
+	}
+	return res;
+}
 
 bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<char> buf, ResourceType type)
 {
@@ -674,28 +684,9 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 	ImGui::AlignTextToFramePadding();
 	ImGui::PushTextWrapPos(pos.x);
 
-	char* c = buf.begin();
-	while (*c && c < buf.end() && *c != ':') ++c;
-	char tmp[64];
-	if(*c == ':') {
-		copyNString(Span(tmp), buf.begin(), int(c - buf.begin()) + 1); 
-		ImGui::Text("%s", tmp);
-	}
-	else {
-		char* c = buf.begin() + stringLength(buf.begin());
-		while (c > buf.begin() && *c != '/' && *c != '\\') --c;
-		if (*c == '/' || *c == '\\') ++c;
+	const ResourceLocator rl(Span(buf.m_begin, stringLength(buf.m_begin)));
+	ImGui::Text("%s", getImGuiLabelID(rl, false).data);
 
-		const char* end = reverseFind(c, nullptr, '.');
-		if (end) {
-			copyNString(Span(tmp), c, int(end - c));
-		}
-		else {
-			copyString(tmp, c);
-		}
-
-		ImGui::Text("%s", tmp);
-	}
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
 	ImGui::SetCursorPos(pos);
@@ -824,8 +815,8 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 
 		const bool selected = selected_path_hash == res.path.getHash();
 		if(selected) selected_path = res.path;
-		ResourceLocator rl(res.path.c_str());
-		StaticString<MAX_PATH_LENGTH> label("", rl.name, "##h", res.path.getHash());
+		const ResourceLocator rl(Span(res.path.c_str(), res.path.length()));
+		StaticString<MAX_PATH_LENGTH> label = getImGuiLabelID(rl, true);
 		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
 			selected_path_hash = res.path.getHash();
 			
