@@ -11,11 +11,14 @@ namespace Lumix
 {
 
 struct LUMIX_EDITOR_API ResourceLocator {
-	ResourceLocator(const char* path);
+	ResourceLocator(const Span<const char>& path);
 
-	Span<const char> name;
-	Span<const char> filepath;
-	char full[MAX_PATH_LENGTH];
+	Span<const char> subresource;
+	Span<const char> dir;
+	Span<const char> basename;
+	Span<const char> ext;
+
+	Span<const char> full;
 };
 
 

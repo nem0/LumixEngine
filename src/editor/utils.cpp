@@ -13,39 +13,42 @@ namespace Lumix
 {
 
 
-ResourceLocator::ResourceLocator(const char* path)
+ResourceLocator::ResourceLocator(const Span<const char>& path)
 {
-	copyString(full, path);
-	const char* c = full;
-	while(*c && *c != ':') {
+	full = path;
+	const char* c = path.m_begin;
+	subresource.m_begin = c;
+	while(c != path.m_end && *c != ':') {
 		++c;
 	}
-	if(*c == ':') {
-		name.m_begin = full;
-		name.m_end = c;
-
-		filepath.m_begin = c + 1;
-		filepath.m_end = filepath.m_begin + stringLength(filepath.m_begin);
+	if(c != path.m_end) {
+		subresource.m_end = c;
+		dir.m_begin = c + 1;
 	}
 	else {
-		const char* dot = reverseFind(full, nullptr, '.');
-		if(dot) {
-			filepath.m_begin = full;
-			filepath.m_end = full + stringLength(full);
-
-			name.m_end = dot;
-			name.m_begin = name.m_end;
-			while (name.m_begin > full && *name.m_begin != '/' && *name.m_begin != '\\') {
-				--name.m_begin;
-			}
-			if (*name.m_begin == '/' || *name.m_begin == '\\') ++name.m_begin;
-		}
-		else {
-			name.m_begin = full;
-			name.m_end = full + stringLength(name.m_begin);
-
-			filepath = name;
-		}
+		subresource.m_end = subresource.m_begin;
+		dir.m_begin = path.m_begin;
+	}
+	
+	ext.m_end = path.m_end;
+	ext.m_begin = reverseFind(dir.m_begin, ext.m_end, '.');
+	if (ext.m_begin) {
+		basename.m_end = ext.m_begin;
+		++ext.m_begin;
+	}
+	else {
+		ext.m_begin = ext.m_end;
+		basename.m_end = path.m_end;
+	}
+	basename.m_begin = reverseFind(dir.m_begin, basename.m_end, '/');
+	if (!basename.m_begin) basename.m_begin = reverseFind(dir.m_begin, basename.m_end, '\\');
+	if (basename.m_begin)  {
+		dir.m_end = basename.m_begin;
+		++basename.m_begin;
+	}
+	else {
+		basename.m_begin = dir.m_begin;
+		dir.m_end = dir.m_begin;
 	}
 }
 

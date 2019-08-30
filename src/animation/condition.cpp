@@ -925,10 +925,11 @@ int InputDecl::inputToLinearIdx(int idx) const
 }
 
 
-void InputDecl::removeInput(int index)
+void InputDecl::removeInput(u32 index)
 {
 	inputs[index].type = EMPTY;
 	--inputs_count;
+	recalculateOffsets();
 }
 
 
