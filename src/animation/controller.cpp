@@ -351,6 +351,12 @@ void Controller::serialize(OutputMemoryStream& stream) {
 	Header header;
 	stream.write(header);
 	stream.write(m_flags);
+	for (const InputDecl::Input& input : m_inputs.inputs) {
+		if (input.type == InputDecl::Type::EMPTY) continue;
+		stream.write(input.type);
+		stream.write(input.name);
+	}
+	stream.write(InputDecl::EMPTY);
 	stream.write((u32)m_animation_slots.size());
 	for (const String& slot : m_animation_slots) {
 		stream.writeString(slot.c_str());
@@ -368,6 +374,15 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 	Header header;
 	stream.read(header);
 	stream.read(m_flags);
+	InputDecl::Type type;
+	stream.read(type);
+	while (type != InputDecl::EMPTY) {
+		const int idx = m_inputs.addInput();
+		m_inputs.inputs[idx].type = type;
+		stream.read(m_inputs.inputs[idx].name);
+		stream.read(type);
+	}
+	m_inputs.recalculateOffsets();
 	if (header.magic != Header::MAGIC) {
 		logError("Animation") << "Invalid animation controller file " << getPath();
 		return false;

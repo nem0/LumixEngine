@@ -723,7 +723,9 @@ struct AnimationSceneImpl final : public AnimationScene
 	void updateController(Controller& controller, float time_delta)
 	{
 		if (!controller.resource || !controller.resource->isReady()) return;
-		if (!controller.ctx) return;
+		if (!controller.ctx) {
+			controller.ctx = controller.resource->createRuntime(controller.default_set);
+		}
 
 		const EntityRef entity = controller.entity;
 		if (!m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return;
