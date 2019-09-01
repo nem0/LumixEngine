@@ -25,7 +25,7 @@ public:
 	RuntimeContext* createRuntime(u32 anim_set);
 	void destroyRuntime(RuntimeContext& ctx);
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion);
-	void getPose(RuntimeContext& ctx, struct Pose& pose);
+	void getPose(RuntimeContext& ctx, Ref<struct Pose> pose);
 	void initEmpty();
 
 	ResourceType getType() const override { return TYPE; }

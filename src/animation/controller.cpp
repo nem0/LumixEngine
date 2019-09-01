@@ -14,6 +14,53 @@
 
 namespace Lumix::Anim {
 
+
+static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionSimple(const Animation* anim, float t0, float t1, u32 root_bone_idx) {
+	LocalRigidTransform root_motion;
+
+	const LocalRigidTransform old_tr = anim->getBoneTransform(t0, root_bone_idx);
+	const Quat old_rot_inv = old_tr.rot.conjugated();
+	ASSERT(t0 < t1);
+	const LocalRigidTransform new_tr = anim->getBoneTransform(t1, root_bone_idx);
+	root_motion.rot = old_rot_inv * new_tr.rot;
+	root_motion.pos = old_rot_inv.rotate(new_tr.pos - old_tr.pos);
+	return root_motion;
+}
+
+static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* anim, float t0, float t1, u32 root_bone_idx) {
+	if (t0 < t1) return getRootMotionSimple(anim, t0, t1, root_bone_idx);
+
+	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), root_bone_idx);
+	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, 0, t1, root_bone_idx);
+	
+	LocalRigidTransform root_motion;
+	root_motion.rot = tr_1.rot * tr_0.rot;
+	root_motion.pos = tr_0.pos + tr_0.rot.rotate(tr_1.pos);
+	return root_motion;
+}
+
+static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext& ctx, u32 slot, float t0_abs, float t1_abs) {
+	auto iter = ctx.animations.find(slot);
+	if(!iter.isValid()) return { {0, 0, 0}, {0, 0, 0, 1} };
+	const Animation* anim = iter.value();
+
+	// TODO getBoneIndex is O(n)
+	const int root_bone_idx = anim->getBoneIndex(ctx.root_bone_hash);
+
+	const float t0 = fmodf(t0_abs, anim->getLength());
+	const float t1 = fmodf(t1_abs, anim->getLength());
+
+	if (t0 < t1) return getRootMotionSimple(anim, t0, t1, root_bone_idx);
+
+	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), root_bone_idx);
+	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, 0, t1, root_bone_idx);
+	
+	LocalRigidTransform root_motion;
+	root_motion.rot = tr_1.rot * tr_0.rot;
+	root_motion.pos = tr_0.pos + tr_0.rot.rotate(tr_1.pos);
+	return root_motion;
+}
+
 RuntimeContext::RuntimeContext(Controller& controller, IAllocator& allocator)
 	: data(allocator)
 	, inputs(allocator)
@@ -47,34 +94,112 @@ void RuntimeContext::setInput(u32 input_idx, bool value) {
 	memcpy(&inputs[offset], &value, sizeof(value));
 }
 
+Blend1DNode::Blend1DNode(GroupNode* parent, IAllocator& allocator)
+	: Node(parent, allocator) 
+	, m_children(allocator)
+{}
+
+static float getInputValue(const RuntimeContext& ctx, u32 idx) {
+	const InputDecl::Input& input = ctx.controller.m_inputs.inputs[idx];
+	ASSERT(input.type == InputDecl::FLOAT);
+	return *(float*)&ctx.inputs[input.offset];
+}
+
+struct Blend1DActivePair {
+	const Blend1DNode::Child* a;
+	const Blend1DNode::Child* b;
+	float t;
+};
+
+static Blend1DActivePair getActivePair(const Blend1DNode& node, float input_val) {
+	const auto& children = node.m_children;
+	if (input_val > children[0].value) {
+		if (input_val >= children.back().value) {
+			return { &children.back(), nullptr, 0 };
+		}
+		else {
+			for (u32 i = 1, c = children.size(); i < c; ++i) {
+				if (input_val < children[i].value) {
+					const float w = (input_val - children[i - 1].value) / (children[i].value - children[i - 1].value);
+					return { &children[i - 1], &children[i], w };
+				}
+			}
+		}
+	}
+	return { &children[0], nullptr, 0 };
+}
+
+void Blend1DNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const {
+	float t = ctx.input_runtime.read<float>();
+	const float t0 = t;
+	t += ctx.time_delta;
+	ctx.data.write(t);
+	
+	const float input_val = getInputValue(ctx, m_input_index);
+	const Blend1DActivePair pair = getActivePair(*this, input_val);
+	
+	root_motion = getRootMotion(ctx, pair.a->slot_hash, t0, t);
+	if (pair.b) {
+		const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot_hash, t0, t);
+		root_motion->interpolate(tr1, pair.t);
+	}
+}
+
+void Blend1DNode::enter(RuntimeContext& ctx) const {
+	ctx.data.write(0.f);
+}
+
+void Blend1DNode::skip(RuntimeContext& ctx) const {
+	ctx.input_runtime.skip(sizeof(float));
+}
+
+static void getPose(const RuntimeContext& ctx, float time, float weight, u32 slot_hash, Ref<Pose> pose) {
+	auto iter = ctx.animations.find(slot_hash);
+	if (!iter.isValid()) return;
+
+	const Animation* anim = iter.value();
+	const float anim_time = fmodf(time, anim->getLength());
+
+	anim->getRelativePose(anim_time, pose, *ctx.model, weight, nullptr);
+}
+
+void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const {
+	const float t = ctx.input_runtime.read<float>();
+
+	if (m_children.empty()) return;
+	if (m_children.size() == 1) {
+		Anim::getPose(ctx, t, weight, m_children[0].slot_hash, pose);
+		return;
+	}
+
+	const float input_val = getInputValue(ctx, m_input_index);
+	const Blend1DActivePair pair = getActivePair(*this, input_val);
+	
+	Anim::getPose(ctx, t, weight, pair.a->slot_hash, pose);
+	if (pair.b) {
+		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot_hash, pose);
+	}
+}
+
+void Blend1DNode::serialize(OutputMemoryStream& stream) const {
+	Node::serialize(stream);
+	stream.write(m_input_index);
+	stream.write((u32)m_children.size());
+	stream.write(m_children.begin(), m_children.byte_size());
+}
+
+void Blend1DNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
+	Node::deserialize(stream, ctrl);
+	stream.read(m_input_index);
+	u32 count;
+	stream.read(count);
+	m_children.resize(count);
+	stream.read(m_children.begin(), m_children.byte_size());
+}
+
 AnimationNode::AnimationNode(GroupNode* parent, IAllocator& allocator) 
 	: Node(parent, allocator) 
 {}
-
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionSimple(Animation* anim, float t0, float t1, u32 root_bone_idx) {
-	LocalRigidTransform root_motion;
-
-	const LocalRigidTransform old_tr = anim->getBoneTransform(t0, root_bone_idx);
-	const Quat old_rot_inv = old_tr.rot.conjugated();
-	ASSERT(t0 < t1);
-	const LocalRigidTransform new_tr = anim->getBoneTransform(t1, root_bone_idx);
-	root_motion.rot = old_rot_inv * new_tr.rot;
-	root_motion.pos = old_rot_inv.rotate(new_tr.pos - old_tr.pos);
-	return root_motion;
-}
-
-static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(Animation* anim, float t0, float t1, u32 root_bone_idx) {
-
-	if (t0 < t1) return getRootMotionSimple(anim, t0, t1, root_bone_idx);
-
-	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), root_bone_idx);
-	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, 0, t1, root_bone_idx);
-	
-	LocalRigidTransform root_motion;
-	root_motion.rot = tr_1.rot * tr_0.rot;
-	root_motion.pos = tr_0.pos + tr_0.rot.rotate(tr_1.pos);
-	return root_motion;
-}
 
 void AnimationNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const {
 	float t = ctx.input_runtime.read<float>();
@@ -106,7 +231,7 @@ void AnimationNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(float));
 }
 	
-void AnimationNode::getPose(RuntimeContext& ctx, float weight, Pose& pose) const {
+void AnimationNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const {
 	const float t = ctx.input_runtime.read<float>();
 
 	auto iter = ctx.animations.find(m_animation_hash);
@@ -150,6 +275,7 @@ void GroupNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion
 		}
 
 		ctx.data.write(data);
+		// TODO root motion
 		m_children[data.from].node->update(ctx, root_motion);
 		m_children[data.to].node->update(ctx, root_motion);
 		return;
@@ -191,7 +317,7 @@ void GroupNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(RuntimeData));
 }
 	
-void GroupNode::getPose(RuntimeContext& ctx, float weight, Pose& pose) const {
+void GroupNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const {
 	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 
 	m_children[data.from].node->getPose(ctx, weight, pose);
@@ -235,6 +361,7 @@ Node* Node::create(GroupNode* parent, Type type, IAllocator& allocator) {
 	switch (type) {
 		case Node::ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(parent, allocator);
 		case Node::GROUP: return LUMIX_NEW(allocator, GroupNode)(parent, allocator);
+		case Node::BLEND1D: return LUMIX_NEW(allocator, Blend1DNode)(parent, allocator);
 		default: ASSERT(false); return nullptr;
 	}
 }
@@ -314,7 +441,7 @@ void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motio
 	}
 }
 
-void Controller::getPose(RuntimeContext& ctx, struct Pose& pose) {
+void Controller::getPose(RuntimeContext& ctx, Ref<Pose> pose) {
 	ASSERT(&ctx.controller == this);
 	ctx.input_runtime.set(ctx.data.getData(), ctx.data.getPos());
 	
@@ -322,8 +449,8 @@ void Controller::getPose(RuntimeContext& ctx, struct Pose& pose) {
 	auto root_bone_iter = ctx.model->getBoneIndex(ctx.root_bone_hash);
 	if (root_bone_iter.isValid()) {
 		const int root_bone_idx = root_bone_iter.value();
-		root_bind_pose.pos = pose.positions[root_bone_idx];
-		root_bind_pose.rot = pose.rotations[root_bone_idx];
+		root_bind_pose.pos = pose->positions[root_bone_idx];
+		root_bind_pose.rot = pose->rotations[root_bone_idx];
 	}
 	
 	m_root->getPose(ctx, 1.f, pose);
@@ -331,8 +458,8 @@ void Controller::getPose(RuntimeContext& ctx, struct Pose& pose) {
 	// TODO this should be in AnimationNode
 	if (root_bone_iter.isValid()) {
 		const int root_bone_idx = root_bone_iter.value();
-		pose.positions[root_bone_idx] = root_bind_pose.pos;
-		pose.rotations[root_bone_idx] = root_bind_pose.rot;
+		pose->positions[root_bone_idx] = root_bind_pose.pos;
+		pose->rotations[root_bone_idx] = root_bind_pose.rot;
 	}
 }
 

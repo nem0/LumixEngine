@@ -751,7 +751,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 
 		model->getRelativePose(*pose);
-		controller.resource->getPose(*controller.ctx, *pose);
+		controller.resource->getPose(*controller.ctx, Ref(*pose));
 		pose->computeAbsolute(*model);
 
 		m_render_scene->unlockPose(entity, true);

@@ -690,21 +690,20 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
 	ImGui::SetCursorPos(pos);
-	if (ImGui::Button(" ... "))
-	{
+	if (ImGui::Button(" ... ")) {
 		ImGui::OpenPopup("popup");
 	}
 	ImGui::EndGroup();
-	if (ImGui::BeginDragDropTarget())
-	{
-		if (auto* payload = ImGui::AcceptDragDropPayload("path"))
-		{
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("%s", buf.m_begin);
+	}
+	if (ImGui::BeginDragDropTarget()) {
+		if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
 			char ext[10];
 			const char* path = (const char*)payload->Data;
 			PathUtils::getExtension(Span(ext), Span(path, stringLength(path)));
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
-			if (compiler.acceptExtension(ext, type))
-			{
+			if (compiler.acceptExtension(ext, type)) {
 				copyString(buf, path);
 				ImGui::EndDragDropTarget();
 				ImGui::PopID();
@@ -716,24 +715,20 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 	ImGui::SameLine();
 	ImGui::Text("%s", label);
 
-	if (ImGui::BeginResizablePopup("popup", ImVec2(300, 300)))
-	{
-		if (buf[0] != '\0' && ImGui::Button(StaticString<30>("View###go", str_id)))
-		{
+	if (ImGui::BeginResizablePopup("popup", ImVec2(300, 300))) {
+		if (buf[0] != '\0' && ImGui::Button(StaticString<30>("View###go", str_id))) {
 			m_is_focus_requested = true;
 			m_is_open = true;
 			m_wanted_resource = buf.begin();
 		}
-		if (ImGui::Selectable("Empty", false))
-		{
+		if (ImGui::Selectable("Empty", false)) {
 			buf[0] = '\0';
 			ImGui::EndPopup();
 			ImGui::PopID();
 			return true;
 		}
 		static u32 selected_path_hash = 0;
-		if (resourceList(buf, Ref(selected_path_hash), type, 0, true))
-		{
+		if (resourceList(buf, Ref(selected_path_hash), type, 0, true)) {
 			ImGui::EndPopup();
 			ImGui::PopID();
 			return true;
@@ -807,9 +802,9 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 3), false, ImGuiWindowFlags_HorizontalScrollbar);
 	AssetCompiler& compiler = m_app.getAssetCompiler();
 	
-	const HashMap<u32, AssetCompiler::ResourceItem>& resourcs = compiler.lockResources();
+	const HashMap<u32, AssetCompiler::ResourceItem>& resources = compiler.lockResources();
 	Path selected_path;
-	for (const auto& res : resourcs) {
+	for (const auto& res : resources) {
 		if(res.type != type) continue;
 		if (filter[0] != '\0' && strstr(res.path.c_str(), filter) == nullptr) continue;
 
