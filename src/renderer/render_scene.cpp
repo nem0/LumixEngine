@@ -916,6 +916,8 @@ public:
 		serializer.read(Ref(camera.near));
 		m_cameras.insert(camera.entity, camera);
 		m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
+
+		if (!m_active_camera.isValid()) m_active_camera = entity;
 	}
 
 
