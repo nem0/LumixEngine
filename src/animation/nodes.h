@@ -35,11 +35,12 @@ struct RuntimeContext {
 struct Node {
 	enum Type : u32 {
 		ANIMATION,
-		GROUP
+		GROUP,
+		BLEND1D
 	};
 
 	Node(GroupNode* parent, IAllocator& allocator) 
-		: m_name(allocator)
+		: m_name("", allocator)
 		, m_parent(parent)
 	{}
 
@@ -48,7 +49,7 @@ struct Node {
 	virtual void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const = 0;
 	virtual void enter(RuntimeContext& ctx) const = 0;
 	virtual void skip(RuntimeContext& ctx) const = 0;
-	virtual void getPose(RuntimeContext& ctx, float weight, Pose& pose) const = 0;
+	virtual void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const = 0;
 	virtual void serialize(OutputMemoryStream& stream) const = 0 {
 		stream.writeString(m_name.c_str());
 	}
@@ -72,11 +73,31 @@ struct AnimationNode final : Node {
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;
 	void enter(RuntimeContext& ctx) const override;
 	void skip(RuntimeContext& ctx) const override;
-	void getPose(RuntimeContext& ctx, float weight, Pose& pose) const override;
+	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 
 	u32 m_animation_hash;
+};
+
+struct Blend1DNode final : Node {
+	Blend1DNode(GroupNode* parent, IAllocator& allocator);
+	Type type() const override { return BLEND1D; }
+	
+	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;
+	void enter(RuntimeContext& ctx) const override;
+	void skip(RuntimeContext& ctx) const override;
+	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const override;
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
+
+	struct Child {
+		float value = 0;
+		u32 slot_hash = 0;
+	};
+
+	Array<Child> m_children;
+	u32 m_input_index = 0;
 };
 
 struct GroupNode final : Node {
@@ -86,7 +107,7 @@ struct GroupNode final : Node {
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;
 	void enter(RuntimeContext& ctx) const override;
 	void skip(RuntimeContext& ctx) const override;
-	void getPose(RuntimeContext& ctx, float weight, Pose& pose) const override;
+	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 

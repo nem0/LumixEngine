@@ -1,10 +1,14 @@
+#include "animation/animation_scene.h"
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/log.h"
+#include "engine/plugin_manager.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/universe/universe.h"
 #include "imgui/imgui.h"
 #include "../animation.h"
 #include "../controller.h"
@@ -32,6 +36,7 @@ static void createChild(GroupNode& parent, Node::Type type, IAllocator& allocato
 	switch(type) {
 		case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 		case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
+		case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
 		default: ASSERT(false); return;
 	}
 
@@ -74,11 +79,114 @@ static void ui(GroupNode& node, ControllerEditor& editor) {
 	}
 }
 
+static void ui(Blend1DNode& node, ControllerEditor& editor) {
+	ui((Node&)node, editor);
+	const InputDecl::Input& input = editor.m_controller->m_inputs.inputs[node.m_input_index];
+	if (ImGui::BeginCombo("Input", input.name)) {
+		for (const InputDecl::Input& input : editor.m_controller->m_inputs.inputs) {
+			if (ImGui::Selectable(input.name)) {
+				node.m_input_index = u32(&input - editor.m_controller->m_inputs.inputs);
+			}
+		}
+		ImGui::EndCombo();
+	}
+
+	ImGui::Columns(2);
+	ImGui::Text("Value");
+	ImGui::NextColumn();
+	ImGui::Text("Slot");
+	ImGui::NextColumn();
+	ImGui::Separator();
+
+	for (Blend1DNode::Child& child : node.m_children) {
+		ImGui::PushID(&child);
+		
+		ImGui::PushItemWidth(-1);
+		ImGui::InputFloat("##val", &child.value);
+		ImGui::PopItemWidth();
+		ImGui::NextColumn();
+		
+		ImGui::PushItemWidth(-1);
+		
+		const Array<String>& slots = editor.m_controller->m_animation_slots;
+		const int slot_idx = editor.m_controller->m_animation_slots.find([&child](const String& val){
+			return crc32(val.c_str()) == child.slot_hash;
+		});
+		if (ImGui::BeginCombo("##anim", slot_idx >= 0 ? slots[slot_idx].c_str() : "")) {
+			for (u32 i = 0; i < (u32)slots.size(); ++i) {
+				if (ImGui::Selectable(slots[i].c_str())) {
+					child.slot_hash = crc32(slots[i].c_str());
+				}
+			}
+			ImGui::EndCombo();
+		}
+		
+		ImGui::PopItemWidth();
+		ImGui::NextColumn();
+		
+		
+		ImGui::PopID();
+	}
+	ImGui::Columns();
+	if (ImGui::Button("Add")) {
+		node.m_children.emplace();
+		if(node.m_children.size() > 1) {
+			node.m_children.back().value = node.m_children[node.m_children.size() - 2].value;
+		}
+	}
+}
+
 static void ui_dispatch(Node& node, ControllerEditor& editor) {
 	switch(node.type()) {
 		case Node::ANIMATION: ui((AnimationNode&)node, editor); break;
 		case Node::GROUP: ui((GroupNode&)node, editor); break;
+		case Node::BLEND1D: ui((Blend1DNode&)node, editor); break;
 		default: ASSERT(false); break;
+	}
+}
+
+static bool canLoadFromEntity(StudioApp& app) {
+	const Array<EntityRef>& selected = app.getWorldEditor().getSelectedEntities();
+	if (selected.size() != 1) return false;
+	return app.getWorldEditor().getUniverse()->hasComponent(selected[0], Reflection::getComponentType("anim_controller"));
+}
+
+static const char* getPathFromEntity(StudioApp& app) {
+	const Array<EntityRef>& selected = app.getWorldEditor().getSelectedEntities();
+	if (selected.size() != 1) return "";
+	Universe* universe = app.getWorldEditor().getUniverse();
+	const ComponentType cmp_type = Reflection::getComponentType("anim_controller");
+	if (!universe->hasComponent(selected[0], cmp_type)) return "";
+	AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
+	return scene->getControllerSource(selected[0]).c_str();
+}
+
+static void load(ControllerEditor& editor, const char* path) {
+	OS::InputFile file;
+	if (file.open(path)) {
+		IAllocator& allocator = editor.m_app.getWorldEditor().getAllocator();
+		ResourceManager* res_manager = editor.m_app.getWorldEditor().getEngine().getResourceManager().get(Controller::TYPE);
+		Array<u8> data(allocator);
+		data.resize((u32)file.size());
+		if (!file.read(data.begin(), data.byte_size())) {
+			logError("Animation") << "Failed to read " << path;
+		}
+		else {
+			InputMemoryStream str(data.begin(), data.byte_size());
+			Controller* new_controller = LUMIX_NEW(allocator, Controller)(Path("anim_editor"), *res_manager, allocator);
+			if (new_controller ->deserialize(str)) {
+				LUMIX_DELETE(allocator, editor.m_controller);
+				editor.m_controller = new_controller;
+				editor.m_current_level = editor.m_controller->m_root;
+			}
+			else {
+				LUMIX_DELETE(allocator, new_controller);
+			}
+		}
+		file.close();
+	}
+	else {
+		logError("Animation") << "Failed to open " << path;
 	}
 }
 
@@ -105,34 +213,17 @@ void ControllerEditor::onWindowGUI() {
 				}
 				if (ImGui::MenuItem("Load")) {
 					char path[MAX_PATH_LENGTH];
+
 					if (OS::getOpenFilename(Span(path), "Animation controller\0*.act", nullptr)) {
-						OS::InputFile file;
-						if (file.open(path)) {
-							IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-							ResourceManager* res_manager = m_app.getWorldEditor().getEngine().getResourceManager().get(Controller::TYPE);
-							Array<u8> data(allocator);
-							data.resize((u32)file.size());
-							if (!file.read(data.begin(), data.byte_size())) {
-								logError("Animation") << "Failed to read " << path;
-							}
-							else {
-								InputMemoryStream str(data.begin(), data.byte_size());
-								Controller* new_controller = LUMIX_NEW(allocator, Controller)(Path("anim_editor"), *res_manager, allocator);
-								if (new_controller ->deserialize(str)) {
-									LUMIX_DELETE(allocator, m_controller);
-									m_controller = new_controller;
-									m_current_level = m_controller->m_root;
-								}
-								else {
-									LUMIX_DELETE(allocator, new_controller);
-								}
-							}
-							file.close();
-						}
-						else {
-							logError("Animation") << "Failed to open " << path;
-						}
+						load(*this, path);
 					}
+				}
+				
+				if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity(m_app))) {
+					char tmp[MAX_PATH_LENGTH];
+					copyString(tmp, m_app.getWorldEditor().getEngine().getFileSystem().getBasePath());
+					catString(tmp, getPathFromEntity(m_app));
+					load(*this, tmp);
 				}
 				ImGui::EndMenu();
 			}
@@ -140,6 +231,9 @@ void ControllerEditor::onWindowGUI() {
 				if (ImGui::BeginMenu("Create")) {
 					if (ImGui::MenuItem("Animation")) {
 						createChild(*m_current_level, Node::ANIMATION, m_controller->m_allocator);
+					}
+					if (ImGui::MenuItem("Blend 1D")) {
+						createChild(*m_current_level, Node::BLEND1D, m_controller->m_allocator);
 					}
 					if (ImGui::MenuItem("Group")) {
 						createChild(*m_current_level, Node::GROUP, m_controller->m_allocator);
@@ -252,6 +346,12 @@ void ControllerEditor::onWindowGUI() {
 			for (u32 i = 0; i < (u32)parent->m_children.size(); ++i) {
 				GroupNode::Child& ch = parent->m_children[i];
 				if (ImGui::TreeNodeEx(ch.node, 0, "%s", ch.node->m_name.c_str())) {
+					if (ImGui::SmallButton("Remove")) {
+						LUMIX_DELETE(m_controller->m_allocator, parent->m_children[i].node);
+						parent->m_children.erase(i);
+						ImGui::TreePop();
+						continue;
+					}
 					char tmp[256];
 					copyString(tmp, ch.condition_str.c_str());
 					if (ImGui::InputText("Condition", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
