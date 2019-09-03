@@ -2,7 +2,6 @@
 #include "condition.h"
 #include "controller.h"
 #include "nodes.h"
-#include "engine/crc32.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
@@ -40,9 +39,8 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* ani
 }
 
 static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext& ctx, u32 slot, float t0_abs, float t1_abs) {
-	auto iter = ctx.animations.find(slot);
-	if(!iter.isValid()) return { {0, 0, 0}, {0, 0, 0, 1} };
-	const Animation* anim = iter.value();
+	Animation* anim = ctx.animations[slot];
+	if (!anim) return { {0, 0, 0}, {0, 0, 0, 1} };
 
 	// TODO getBoneIndex is O(n)
 	const int root_bone_idx = anim->getBoneIndex(ctx.root_bone_hash);
@@ -138,9 +136,9 @@ void Blend1DNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_moti
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
 	
-	root_motion = getRootMotion(ctx, pair.a->slot_hash, t0, t);
+	root_motion = getRootMotion(ctx, pair.a->slot, t0, t);
 	if (pair.b) {
-		const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot_hash, t0, t);
+		const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot, t0, t);
 		root_motion->interpolate(tr1, pair.t);
 	}
 }
@@ -153,11 +151,10 @@ void Blend1DNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(float));
 }
 
-static void getPose(const RuntimeContext& ctx, float time, float weight, u32 slot_hash, Ref<Pose> pose) {
-	auto iter = ctx.animations.find(slot_hash);
-	if (!iter.isValid()) return;
+static void getPose(const RuntimeContext& ctx, float time, float weight, u32 slot, Ref<Pose> pose) {
+	Animation* anim = ctx.animations[slot];
+	if (!anim) return;
 
-	const Animation* anim = iter.value();
 	const float anim_time = fmodf(time, anim->getLength());
 
 	anim->getRelativePose(anim_time, pose, *ctx.model, weight, nullptr);
@@ -168,16 +165,16 @@ void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) con
 
 	if (m_children.empty()) return;
 	if (m_children.size() == 1) {
-		Anim::getPose(ctx, t, weight, m_children[0].slot_hash, pose);
+		Anim::getPose(ctx, t, weight, m_children[0].slot, pose);
 		return;
 	}
 
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
 	
-	Anim::getPose(ctx, t, weight, pair.a->slot_hash, pose);
+	Anim::getPose(ctx, t, weight, pair.a->slot, pose);
 	if (pair.b) {
-		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot_hash, pose);
+		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot, pose);
 	}
 }
 
@@ -205,9 +202,8 @@ void AnimationNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_mo
 	float t = ctx.input_runtime.read<float>();
 
 	t += ctx.time_delta;
-	auto iter = ctx.animations.find(m_animation_hash);
-	if(iter.isValid()) {
-		Animation* anim = iter.value();
+	Animation* anim = ctx.animations[m_slot];
+	if (anim) {
 		// TODO getBoneIndex is O(n)
 		const int root_bone_idx = anim->getBoneIndex(ctx.root_bone_hash);
 		if (root_bone_idx >= 0) {
@@ -234,10 +230,8 @@ void AnimationNode::skip(RuntimeContext& ctx) const {
 void AnimationNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const {
 	const float t = ctx.input_runtime.read<float>();
 
-	auto iter = ctx.animations.find(m_animation_hash);
-	if (!iter.isValid()) return;
-
-	Animation* anim = iter.value();
+	Animation* anim = ctx.animations[m_slot];
+	if (!anim) return;
 
 	const float anim_time = fmodf(t, anim->getLength());
 	anim->getRelativePose(anim_time, pose, *ctx.model, weight, nullptr);
@@ -245,12 +239,12 @@ void AnimationNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) c
 
 void AnimationNode::serialize(OutputMemoryStream& stream) const {
 	Node::serialize(stream);
-	stream.write(m_animation_hash);
+	stream.write(m_slot);
 }
 
 void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 	Node::deserialize(stream, ctrl);
-	stream.read(m_animation_hash);
+	stream.read(m_slot);
 }
 
 GroupNode::GroupNode(GroupNode* parent, IAllocator& allocator)
@@ -411,9 +405,11 @@ void Controller::destroyRuntime(RuntimeContext& ctx) {
 RuntimeContext* Controller::createRuntime(u32 anim_set) {
 	RuntimeContext* ctx = LUMIX_NEW(m_allocator, RuntimeContext)(*this, m_allocator);
 	ctx->inputs.resize(computeInputsSize(*this));
+	ctx->animations.resize(m_animation_slots.size());
+	setMemory(ctx->animations.begin(), 0, ctx->animations.byte_size());
 	for (AnimationEntry& anim : m_animation_entries) {
 		if (anim.set == anim_set) {
-			ctx->animations.insert(anim.slot_hash, anim.animation);
+			ctx->animations[anim.slot] = anim.animation;
 		}
 	}
 	m_root->enter(*ctx);
@@ -469,7 +465,7 @@ struct Header {
 	};
 
 	u32 magic = MAGIC;
-	u32 version = (u32)Version::LATEST;
+	Version version = Version::LATEST;
 
 	static constexpr u32 MAGIC = '_LAC';
 };
@@ -490,7 +486,7 @@ void Controller::serialize(OutputMemoryStream& stream) {
 	}
 	stream.write((u32)m_animation_entries.size());
 	for (const AnimationEntry& entry : m_animation_entries) {
-		stream.write(entry.slot_hash);
+		stream.write(entry.slot);
 		stream.write(entry.set);
 		stream.writeString(entry.animation ? entry.animation->getPath().c_str() : "");
 	}
@@ -514,7 +510,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		logError("Animation") << "Invalid animation controller file " << getPath();
 		return false;
 	}
-	if (header.version > (u32)Header::Version::LATEST) {
+	if (header.version > Header::Version::LATEST) {
 		logError("Animation") << "Version of animation controller " << getPath() << " is not supported";
 		return false;
 	}
@@ -532,7 +528,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 	m_animation_entries.reserve(entries_count);
 	for (u32 i = 0; i < entries_count; ++i) {
 		AnimationEntry& entry = m_animation_entries.emplace();
-		stream.read(entry.slot_hash);
+		stream.read(entry.slot);
 		stream.read(entry.set);
 		char path[MAX_PATH_LENGTH];
 		stream.readString(path, sizeof(path));
