@@ -2,7 +2,6 @@
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/world_editor.h"
-#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/plugin_manager.h"
@@ -58,14 +57,11 @@ static void ui(AnimationNode& node, ControllerEditor& editor) {
 
 	const Array<String>& names = editor.m_controller->m_animation_slots;
 	
-	const int idx = names.find([&](const String& name){
-		return crc32(name.c_str()) == node.m_animation_hash;
-	});
-	const char* preview = idx >= 0 ? names[idx].c_str() : "";
+	const char* preview = node.m_slot < (u32)names.size() ? names[node.m_slot].c_str() : "";
 	if (ImGui::BeginCombo("Animation", preview)) {
 		for (u32 i = 0; i < (u32)names.size(); ++i) {
 			if (ImGui::Selectable(names[i].c_str())) {
-				node.m_animation_hash = crc32(names[i].c_str());
+				node.m_slot = i;
 			}
 		}
 		ImGui::EndCombo();
@@ -109,13 +105,10 @@ static void ui(Blend1DNode& node, ControllerEditor& editor) {
 		ImGui::PushItemWidth(-1);
 		
 		const Array<String>& slots = editor.m_controller->m_animation_slots;
-		const int slot_idx = editor.m_controller->m_animation_slots.find([&child](const String& val){
-			return crc32(val.c_str()) == child.slot_hash;
-		});
-		if (ImGui::BeginCombo("##anim", slot_idx >= 0 ? slots[slot_idx].c_str() : "")) {
+		if (ImGui::BeginCombo("##anim", child.slot < (u32)slots.size() ? slots[child.slot].c_str() : "")) {
 			for (u32 i = 0; i < (u32)slots.size(); ++i) {
 				if (ImGui::Selectable(slots[i].c_str())) {
-					child.slot_hash = crc32(slots[i].c_str());
+					child.slot = i;
 				}
 			}
 			ImGui::EndCombo();
@@ -227,7 +220,7 @@ void ControllerEditor::onWindowGUI() {
 				}
 				ImGui::EndMenu();
 			}
-			if (ImGui::BeginMenu("Structure")) {
+			if (ImGui::BeginMenu("Nodes")) {
 				if (ImGui::BeginMenu("Create")) {
 					if (ImGui::MenuItem("Animation")) {
 						createChild(*m_current_level, Node::ANIMATION, m_controller->m_allocator);
@@ -300,16 +293,12 @@ void ControllerEditor::onWindowGUI() {
 				ImGui::InputInt("##set", (int*)&entry.set);
 				ImGui::PopItemWidth();
 				ImGui::NextColumn();
-				const int slot_idx = m_controller->m_animation_slots.find([&](const String& value){
-					return crc32(value.c_str()) == entry.slot_hash;
-				});
-				const char* preview = slot_idx >= 0 ? m_controller->m_animation_slots[slot_idx].c_str() : "N/A";
-					"";
+				const char* preview = entry.slot < (u32)m_controller->m_animation_slots.size() ? m_controller->m_animation_slots[entry.slot].c_str() : "N/A";
 				ImGui::PushItemWidth(-1);
 				if (ImGui::BeginCombo("##slot", preview, 0)) {
 					for (u32 i = 0, c = m_controller->m_animation_slots.size(); i < c; ++i) {
 						if (ImGui::Selectable(m_controller->m_animation_slots[i].c_str())) {
-							entry.slot_hash = crc32(m_controller->m_animation_slots[i].c_str());
+							entry.slot = i;
 						}
 					}
 					ImGui::EndCombo();
@@ -333,11 +322,11 @@ void ControllerEditor::onWindowGUI() {
 				Controller::AnimationEntry& entry = m_controller->m_animation_entries.emplace();
 				entry.animation = nullptr;
 				entry.set = 0;
-				entry.slot_hash = 0;
+				entry.slot = 0;
 			}
 		}
 
-		if(ImGui::CollapsingHeader("Structure")) {
+		if(ImGui::CollapsingHeader("Nodes")) {
 			GroupNode* parent = m_current_level;
 			bool use_root_motion = m_controller->m_flags.isSet(Controller::Flags::USE_ROOT_MOTION);
 			if (ImGui::Checkbox("Use root motion", &use_root_motion)) {
