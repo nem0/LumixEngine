@@ -1,7 +1,6 @@
 #pragma once
 
 #include "engine/array.h"
-#include "engine/hash_map.h"
 
 
 namespace Lumix
@@ -22,7 +21,7 @@ struct RuntimeContext {
 
 	Controller& controller;
 	Array<u8> inputs;
-	HashMap<u32, Animation*> animations;
+	Array<Animation*> animations;
 	OutputMemoryStream data;
 	
 	u32 root_bone_hash = 0;
@@ -77,7 +76,7 @@ struct AnimationNode final : Node {
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 
-	u32 m_animation_hash;
+	u32 m_slot;
 };
 
 struct Blend1DNode final : Node {
@@ -93,7 +92,7 @@ struct Blend1DNode final : Node {
 
 	struct Child {
 		float value = 0;
-		u32 slot_hash = 0;
+		u32 slot = 0;
 	};
 
 	Array<Child> m_children;

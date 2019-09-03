@@ -33,7 +33,7 @@ public:
 
 	struct AnimationEntry {
 		u32 set;
-		u32 slot_hash;
+		u32 slot;
 		Animation* animation;
 	};
 
