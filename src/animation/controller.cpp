@@ -490,6 +490,8 @@ void Controller::serialize(OutputMemoryStream& stream) {
 		stream.write(entry.set);
 		stream.writeString(entry.animation ? entry.animation->getPath().c_str() : "");
 	}
+	stream.write(m_ik);
+	stream.write(m_ik_count);
 	m_root->serialize(stream);
 }
 
@@ -535,7 +537,8 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		entry.animation = path[0] ? m_resource_manager.getOwner().load<Animation>(Path(path)) : nullptr;
 	}
 
-
+	stream.read(m_ik);
+	stream.read(m_ik_count);
 	m_root->deserialize(stream, *this);
 	return true;
 }

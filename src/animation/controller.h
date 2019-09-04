@@ -46,6 +46,13 @@ public:
 		USE_ROOT_MOTION = 1 << 0
 	};
 	FlagSet<Flags, u32> m_flags;
+	struct IK {
+		enum { MAX_BONES_COUNT = 8 };
+		u16 max_iterations = 5;
+		u16 bones_count = 4;
+		u32 bones[MAX_BONES_COUNT];
+	} m_ik[4];
+	u32 m_ik_count = 0;
 
 private:
 	void unload() override;

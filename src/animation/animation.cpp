@@ -53,7 +53,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 	{
 		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			Model::BoneMap::const_iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
 			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
@@ -89,7 +89,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 	{
 		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			Model::BoneMap::const_iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
 			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
@@ -166,7 +166,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 	{
 		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			Model::BoneMap::const_iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
 			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
@@ -210,7 +210,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 	{
 		for (Bone& bone : m_bones)
 		{
-			Model::BoneMap::iterator iter = model.getBoneIndex(bone.name);
+			Model::BoneMap::const_iterator iter = model.getBoneIndex(bone.name);
 			if (!iter.isValid()) continue;
 			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
