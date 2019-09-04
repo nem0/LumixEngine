@@ -4,7 +4,11 @@
 #include "editor/studio_app.h"
 
 
-namespace Lumix::Anim {
+namespace Lumix {
+
+class Model;
+
+namespace Anim {
 
 
 struct ControllerEditor : StudioApp::GUIPlugin {
@@ -16,7 +20,9 @@ struct ControllerEditor : StudioApp::GUIPlugin {
 	StudioApp& m_app;
 	class Controller* m_controller;
 	struct GroupNode* m_current_level;
+	Model* m_model = nullptr;
 };
 
 
-} // ns Lumix::Anim
+} // ns Anim
+} // ns Lumix

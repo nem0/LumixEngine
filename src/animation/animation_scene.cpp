@@ -55,13 +55,8 @@ struct AnimationSceneImpl final : public AnimationScene
 		u32 default_set = 0;
 		Anim::RuntimeContext* ctx = nullptr;
 
-		struct IK
-		{
-			enum { MAX_BONES_COUNT = 8 };
+		struct IK {
 			float weight = 0;
-			i16 max_iterations = 5;
-			i16 bones_count = 4;
-			u32 bones[MAX_BONES_COUNT];
 			Vec3 target;
 		} inverse_kinematics[4];
 	};
@@ -238,16 +233,6 @@ struct AnimationSceneImpl final : public AnimationScene
 		ik.weight = LuaWrapper::checkArg<float>(L, 4);
 		ik.target = LuaWrapper::checkArg<Vec3>(L, 5);
 
-		ik.bones_count = lua_gettop(L) - 5;
-		if (ik.bones_count > lengthOf(ik.bones))
-		{
-			luaL_argerror(L, ik.bones_count, "Too many arguments");
-		}
-		for (int i = 0; i < ik.bones_count; ++i)
-		{
-			const char* bone = LuaWrapper::checkArg<const char*>(L, i + 6);
-			ik.bones[i] = crc32(bone);
-		}
 		return 0;
 	}
 
@@ -752,6 +737,13 @@ struct AnimationSceneImpl final : public AnimationScene
 
 		model->getRelativePose(*pose);
 		controller.resource->getPose(*controller.ctx, Ref(*pose));
+		
+		for (Controller::IK& ik : controller.inverse_kinematics) {
+			if (ik.weight == 0) break;
+			const u32 idx = u32(&ik - controller.inverse_kinematics);
+			updateIK(controller.resource->m_ik[idx], ik, *pose, *model);
+		}
+
 		pose->computeAbsolute(*model);
 
 		m_render_scene->unlockPose(entity, true);
@@ -770,15 +762,15 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	static void updateIK(Controller::IK& ik, Pose& pose, Model& model)
+	static void updateIK(Anim::Controller::IK& res_ik, Controller::IK& ik, Pose& pose, Model& model)
 	{
-		int indices[Controller::IK::MAX_BONES_COUNT];
-		LocalRigidTransform transforms[Controller::IK::MAX_BONES_COUNT];
-		Vec3 old_pos[Controller::IK::MAX_BONES_COUNT];
-		float len[Controller::IK::MAX_BONES_COUNT - 1];
+		int indices[Anim::Controller::IK::MAX_BONES_COUNT];
+		LocalRigidTransform transforms[Anim::Controller::IK::MAX_BONES_COUNT];
+		Vec3 old_pos[Anim::Controller::IK::MAX_BONES_COUNT];
+		float len[Anim::Controller::IK::MAX_BONES_COUNT - 1];
 		float len_sum = 0;
-		for (int i = 0; i < ik.bones_count; ++i) {
-			auto iter = model.getBoneIndex(ik.bones[i]);
+		for (int i = 0; i < res_ik.bones_count; ++i) {
+			auto iter = model.getBoneIndex(res_ik.bones[i]);
 			if (!iter.isValid()) return;
 
 			indices[i] = iter.value();
@@ -796,7 +788,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 
 		LocalRigidTransform parent_tr = roots_parent;
-		for (int i = 0; i < ik.bones_count; ++i) {
+		for (int i = 0; i < res_ik.bones_count; ++i) {
 			LocalRigidTransform tr{pose.positions[indices[i]], pose.rotations[indices[i]]};
 			transforms[i] = parent_tr * tr;
 			old_pos[i] = transforms[i].pos;
@@ -814,23 +806,23 @@ struct AnimationSceneImpl final : public AnimationScene
 			target = transforms[0].pos + to_target * len_sum;
 		}
 
-		for (int iteration = 0; iteration < ik.max_iterations; ++iteration) {
-			transforms[ik.bones_count - 1].pos = target;
+		for (int iteration = 0; iteration < res_ik.max_iterations; ++iteration) {
+			transforms[res_ik.bones_count - 1].pos = target;
 			
-			for (int i = ik.bones_count - 1; i > 1; --i) {
+			for (int i = res_ik.bones_count - 1; i > 1; --i) {
 				Vec3 dir = (transforms[i - 1].pos - transforms[i].pos).normalized();
 				transforms[i - 1].pos = transforms[i].pos + dir * len[i - 1];
 			}
 
-			for (int i = 1; i < ik.bones_count; ++i) {
+			for (int i = 1; i < res_ik.bones_count; ++i) {
 				Vec3 dir = (transforms[i].pos - transforms[i - 1].pos).normalized();
 				transforms[i].pos = transforms[i - 1].pos + dir * len[i - 1];
 			}
 		}
 
 		// compute rotations from new positions
-		for (int i = ik.bones_count - 1; i >= 0; --i) {
-			if (i < ik.bones_count - 1) {
+		for (int i = res_ik.bones_count - 1; i >= 0; --i) {
+			if (i < res_ik.bones_count - 1) {
 				Vec3 old_d = old_pos[i + 1] - old_pos[i];
 				Vec3 new_d = transforms[i + 1].pos - transforms[i].pos;
 				old_d.normalize();
@@ -842,11 +834,11 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 
 		// convert from object space to bone space
-		for (int i = ik.bones_count - 1; i > 0; --i) {
+		for (int i = res_ik.bones_count - 1; i > 0; --i) {
 			transforms[i] = transforms[i - 1].inverted() * transforms[i];
 			pose.positions[indices[i]] = transforms[i].pos;
 		}
-		for (int i = ik.bones_count - 2; i > 0; --i) {
+		for (int i = res_ik.bones_count - 2; i > 0; --i) {
 			pose.rotations[indices[i]] = transforms[i].rot;
 		}
 

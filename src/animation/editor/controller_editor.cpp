@@ -2,6 +2,7 @@
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/world_editor.h"
+#include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/plugin_manager.h"
@@ -9,6 +10,7 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
+#include "renderer/model.h"
 #include "../animation.h"
 #include "../controller.h"
 #include "../nodes.h"
@@ -28,7 +30,6 @@ ControllerEditor::ControllerEditor(StudioApp& app)
 	m_controller->initEmpty();
 	m_current_level = m_controller->m_root;
 }
-
 
 static void createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
 	Node* node = nullptr;
@@ -262,7 +263,7 @@ void ControllerEditor::onWindowGUI() {
 			if (ImGui::Button("Add")) inputs.addInput();
 		}
 
-		if(ImGui::CollapsingHeader("Slots")) {
+		if (ImGui::CollapsingHeader("Slots")) {
 			for (u32 i = 0; i < (u32)m_controller->m_animation_slots.size(); ++i) {
 				String& slot = m_controller->m_animation_slots[i];
 				char tmp[64];
@@ -277,7 +278,7 @@ void ControllerEditor::onWindowGUI() {
 			}
 		}
 
-		if(ImGui::CollapsingHeader("Animations")) {
+		if (ImGui::CollapsingHeader("Animations")) {
 			ImGui::Columns(3);
 			ImGui::Text("Set");
 			ImGui::NextColumn();
@@ -326,7 +327,7 @@ void ControllerEditor::onWindowGUI() {
 			}
 		}
 
-		if(ImGui::CollapsingHeader("Nodes")) {
+		if (ImGui::CollapsingHeader("Nodes")) {
 			GroupNode* parent = m_current_level;
 			bool use_root_motion = m_controller->m_flags.isSet(Controller::Flags::USE_ROOT_MOTION);
 			if (ImGui::Checkbox("Use root motion", &use_root_motion)) {
@@ -350,6 +351,68 @@ void ControllerEditor::onWindowGUI() {
 					ui_dispatch(*ch.node, *this);
 					ImGui::TreePop();
 				}
+			}
+		}
+
+		if (ImGui::CollapsingHeader("IK")) {
+			char model_path[MAX_PATH_LENGTH];
+			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
+			if (m_app.getAssetBrowser().resourceInput("Model", "model", Span(model_path), Model::TYPE)) {
+				m_model = m_app.getWorldEditor().getEngine().getResourceManager().load<Model>(Path(model_path));
+			}
+			if(m_model) {
+				for (u32 i = 0; i < m_controller->m_ik_count; ++i) {
+					const StaticString<32> label("Chain ", i);
+					if (ImGui::TreeNode(label)) {
+						Anim::Controller::IK& ik = m_controller->m_ik[i];
+						ASSERT(ik.bones_count > 0);
+						const u32 bones_count = m_model->getBoneCount();
+						auto leaf_iter = m_model->getBoneIndex(ik.bones[ik.bones_count - 1]);
+						if (ImGui::BeginCombo("Leaf", leaf_iter.isValid() ? m_model->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
+							for (u32 j = 0; j < bones_count; ++j) {
+								const char* bone_name = m_model->getBone(j).name.c_str();
+								if (ImGui::Selectable(bone_name)) {
+									ik.bones_count = 1;
+									ik.bones[0] = crc32(bone_name);
+								}
+							}
+							ImGui::EndCombo();
+						}
+						for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) {
+							auto iter = m_model->getBoneIndex(ik.bones[j]);
+							if (iter.isValid()) {
+								ImGui::Text("%s", m_model->getBone(iter.value()).name.c_str());
+							}
+							else {
+								ImGui::Text("Unknown bone");
+							}
+						}
+
+						auto iter = m_model->getBoneIndex(ik.bones[0]);
+						if (iter.isValid() && ik.bones_count < lengthOf(ik.bones)) {
+							const int parent_idx = m_model->getBone(iter.value()).parent_idx;
+							if (parent_idx >= 0) {
+								const char* bone_name = m_model->getBone(parent_idx).name.c_str();
+								const StaticString<64> add_label("Add ", bone_name);
+								if (ImGui::Button(add_label)) {
+									moveMemory(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
+									ik.bones[0] = crc32(bone_name);
+									++ik.bones_count;
+								}
+							}
+						}
+						ImGui::TreePop();
+					}
+				}
+
+				if (m_controller->m_ik_count < (u32)lengthOf(m_controller->m_ik->bones) && ImGui::Button("Add chain")) {
+					m_controller->m_ik[m_controller->m_ik_count].bones_count = 1;
+					m_controller->m_ik[m_controller->m_ik_count].bones[0] = 0;
+					++m_controller->m_ik_count;
+				}
+			}
+			else {
+				ImGui::Text("Please select a model.");
 			}
 		}
 	}

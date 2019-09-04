@@ -190,7 +190,7 @@ public:
 	int getBoneCount() const { return m_bones.size(); }
 	const Bone& getBone(int i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
-	BoneMap::iterator getBoneIndex(u32 hash) { return m_bone_map.find(hash); }
+	BoneMap::const_iterator getBoneIndex(u32 hash) const { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	void getRelativePose(Pose& pose);
 	float getBoundingRadius() const { return m_bounding_radius; }
