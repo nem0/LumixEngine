@@ -27,7 +27,7 @@ using namespace Lumix;
 
 static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
 static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
-static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
+static const ComponentType ANIMATOR_TYPE = Reflection::getComponentType("animator");
 static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("model_instance");
 
 
@@ -391,7 +391,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		m_app.registerComponentWithResource("property_animator", "Animation / Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
 		m_app.registerComponentWithResource("animable", "Animation / Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
-		m_app.registerComponentWithResource("anim_controller", "Animation / Controller", Anim::Controller::TYPE, *Reflection::getProperty(CONTROLLER_TYPE, "Source"));
+		m_app.registerComponentWithResource("animator", "Animation / Animator", Anim::Controller::TYPE, *Reflection::getProperty(ANIMATOR_TYPE, "Source"));
 		m_app.registerComponent("shared_anim_controller", "Animation / Shared controller");
 
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();

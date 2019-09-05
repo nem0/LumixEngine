@@ -35,7 +35,7 @@ void Pose::blend(Pose& rhs, float weight)
 	for (int i = 0, c = count; i < c; ++i)
 	{
 		positions[i] = positions[i] * inv + rhs.positions[i] * weight;
-		nlerp(rotations[i], rhs.rotations[i], &rotations[i], weight);
+		rotations[i] = nlerp(rotations[i], rhs.rotations[i], weight);
 	}
 }
 

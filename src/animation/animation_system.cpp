@@ -126,8 +126,8 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE)),
 			property("Enabled", &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator)
 		),
-		component("anim_controller",
-			property("Source", LUMIX_PROP(AnimationScene, ControllerSource),
+		component("animator",
+			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
 				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE))//,
 			// TODO
 			//AnimSetProperty()

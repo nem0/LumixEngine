@@ -183,12 +183,11 @@ public:
 		return {m_lods[i].from_mesh, m_lods[i].to_mesh};
 	}
 
-	Mesh& getMesh(int index) { return m_meshes[index]; }
-	const Mesh& getMesh(int index) const { return m_meshes[index]; }
-	const Mesh* getMeshPtr(int index) const { return &m_meshes[index]; }
+	Mesh& getMesh(u32 index) { return m_meshes[index]; }
+	const Mesh& getMesh(u32 index) const { return m_meshes[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
 	int getBoneCount() const { return m_bones.size(); }
-	const Bone& getBone(int i) const { return m_bones[i]; }
+	const Bone& getBone(u32 i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
 	BoneMap::const_iterator getBoneIndex(u32 hash) const { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
@@ -204,7 +203,7 @@ public:
 
 public:
 	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LM2'
-	static const int MAX_LOD_COUNT = 4;
+	static const u32 MAX_LOD_COUNT = 4;
 
 private:
 	Model(const Model&);
