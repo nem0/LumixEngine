@@ -1327,7 +1327,7 @@ public:
 		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
 		DVec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
 		Quat rot;
-		nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, &rot, t);
+		rot = nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, t);
 		if (m_go_to_parameters.m_t >= 1)
 		{
 			pos = m_go_to_parameters.m_to;

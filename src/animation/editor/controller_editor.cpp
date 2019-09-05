@@ -142,17 +142,17 @@ static void ui_dispatch(Node& node, ControllerEditor& editor) {
 static bool canLoadFromEntity(StudioApp& app) {
 	const Array<EntityRef>& selected = app.getWorldEditor().getSelectedEntities();
 	if (selected.size() != 1) return false;
-	return app.getWorldEditor().getUniverse()->hasComponent(selected[0], Reflection::getComponentType("anim_controller"));
+	return app.getWorldEditor().getUniverse()->hasComponent(selected[0], Reflection::getComponentType("animator"));
 }
 
 static const char* getPathFromEntity(StudioApp& app) {
 	const Array<EntityRef>& selected = app.getWorldEditor().getSelectedEntities();
 	if (selected.size() != 1) return "";
 	Universe* universe = app.getWorldEditor().getUniverse();
-	const ComponentType cmp_type = Reflection::getComponentType("anim_controller");
+	const ComponentType cmp_type = Reflection::getComponentType("animator");
 	if (!universe->hasComponent(selected[0], cmp_type)) return "";
 	AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
-	return scene->getControllerSource(selected[0]).c_str();
+	return scene->getAnimatorSource(selected[0]).c_str();
 }
 
 static void load(ControllerEditor& editor, const char* path) {
@@ -389,18 +389,31 @@ void ControllerEditor::onWindowGUI() {
 						}
 
 						auto iter = m_model->getBoneIndex(ik.bones[0]);
-						if (iter.isValid() && ik.bones_count < lengthOf(ik.bones)) {
-							const int parent_idx = m_model->getBone(iter.value()).parent_idx;
-							if (parent_idx >= 0) {
-								const char* bone_name = m_model->getBone(parent_idx).name.c_str();
-								const StaticString<64> add_label("Add ", bone_name);
-								if (ImGui::Button(add_label)) {
-									moveMemory(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
-									ik.bones[0] = crc32(bone_name);
-									++ik.bones_count;
+						if (iter.isValid()) {
+							if (ik.bones_count < lengthOf(ik.bones)) {
+								const int parent_idx = m_model->getBone(iter.value()).parent_idx;
+								if (parent_idx >= 0) {
+									const char* bone_name = m_model->getBone(parent_idx).name.c_str();
+									const StaticString<64> add_label("Add ", bone_name);
+									if (ImGui::Button(add_label)) {
+										moveMemory(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
+										ik.bones[0] = crc32(bone_name);
+										++ik.bones_count;
+									}
 								}
 							}
+							else {
+								ImGui::Text("IK is full");
+							}
 						}
+						else {
+							ImGui::Text("Unknown bone.");
+						}
+						if (ik.bones_count > 1) {
+							ImGui::SameLine();
+							if (ImGui::Button("Pop")) --ik.bones_count;
+						} 
+
 						ImGui::TreePop();
 					}
 				}
