@@ -193,12 +193,25 @@ Quat::Quat(const Vec3& axis, float angle)
 
 Quat Quat::vec3ToVec3(const Vec3& v0, const Vec3& v1)
 {
-	const Vec3 a = v0.normalized();
-	const Vec3 b = v1.normalized();
-	float angle = acosf(dotProduct(a, b));
-	Vec3 normal = crossProduct(a, b);
-	float normal_len = normal.length();
-	return Quat(normal_len < 0.001f ? Vec3(0, 1, 0) : normal * (1 / normal_len), angle);
+	const Vec3 from = v0.normalized();
+	const Vec3 to = v1.normalized();
+	
+	float cos_angle = dotProduct(from, to);
+    Vec3 half;
+
+	
+    if(cos_angle > -1.0005f && cos_angle < -0.9995f) {
+        half = crossProduct(from, Vec3(to.x + 0.3f, to.y - 0.15f, to.z - 0.15f)).normalized();
+    }
+    else
+        half = (from + to).normalized();
+
+    // http://physicsforgames.blogspot.sk/2010/03/quaternion-tricks.html
+    return Quat(
+        from.y * half.z - from.z * half.y,
+        from.z * half.x - from.x * half.z,
+        from.x * half.y - from.y * half.x,
+		dotProduct(from, half));
 }
 
 
@@ -272,8 +285,9 @@ Quat Quat::normalized() const
 }
 
 
-void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t)
+Quat nlerp(const Quat& q1, const Quat& q2, float t)
 {
+	Quat res;
 	float inv = 1.0f - t;
 	if (q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w < 0) t = -t;
 	float ox = q1.x * inv + q2.x * t;
@@ -285,10 +299,11 @@ void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t)
 	oy *= l;
 	oz *= l;
 	ow *= l;
-	out->x = ox;
-	out->y = oy;
-	out->z = oz;
-	out->w = ow;
+	res.x = ox;
+	res.y = oy;
+	res.z = oz;
+	res.w = ow;
+	return res;
 }
 
 
@@ -372,8 +387,8 @@ LocalRigidTransform LocalRigidTransform::operator*(const LocalRigidTransform& rh
 LocalRigidTransform LocalRigidTransform::interpolate(const LocalRigidTransform& rhs, float t) const
 {
 	LocalRigidTransform ret;
-	lerp(pos, rhs.pos, &ret.pos, t);
-	nlerp(rot, rhs.rot, &ret.rot, t);
+	ret.pos = lerp(pos, rhs.pos, t);
+	ret.rot = nlerp(rot, rhs.rot, t);
 	return ret;
 }
 

@@ -146,7 +146,6 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 			tex.src = tmp;
 
 			tex.import = true;
-			tex.to_dds = true;
 		};
 
 		gatherTexture(ofbx::Texture::DIFFUSE);
@@ -491,8 +490,6 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		Array<int> subblobs(allocator);
 		subblobs.reserve(vertex_count);
 
-		const float scene_scale = 1.f / scene->getGlobalSettings()->UnitScaleFactor;
-
 		const int* materials = geom->getMaterials();
 		Array<ofbx::Vec3> computed_tangents(allocator);
 		if (!tangents && normals && uvs) {
@@ -507,7 +504,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 			blob.clear();
 			ofbx::Vec3 cp = vertices[i];
 			// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
-			Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * scene_scale;
+			Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * fbx_scale;
 			pos = fixOrientation(pos);
 			blob.write(pos);
 
@@ -648,6 +645,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 		logError("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError();
 		return false;
 	}
+	fbx_scale = scene->getGlobalSettings()->UnitScaleFactor * 0.01f;
 
 	const ofbx::GlobalSettings* settings = scene->getGlobalSettings();
 	switch (settings->UpAxis) {
@@ -868,8 +866,7 @@ static void compressRotations(Array<FBXImporter::RotationKey>& out,
 	{
 		float t = i * sample_period;
 		Quat cur = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform((from_frame + i) * sample_period)));
-		Quat estimate;
-		nlerp(cur, last_written.rot, &estimate, sample_period / (t - last_written.time));
+		Quat estimate = nlerp(cur, last_written.rot, sample_period / (t - last_written.time));
 		if (fabs(estimate.x - after_last.rot.x) > error || fabs(estimate.y - after_last.rot.y) > error ||
 			fabs(estimate.z - after_last.rot.z) > error)
 		{
@@ -983,10 +980,10 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			for (TranslationKey& key : positions) write(key.frame);
 			for (TranslationKey& key : positions) {
 				if (bone == root_bone) {
-					write(fixRootOrientation(key.pos * cfg.mesh_scale));
+					write(fixRootOrientation(key.pos * cfg.mesh_scale * fbx_scale));
 				}
 				else {
-					write(fixOrientation(key.pos * cfg.mesh_scale));
+					write(fixOrientation(key.pos * cfg.mesh_scale * fbx_scale));
 				}
 			}
 
@@ -1540,7 +1537,7 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 
 		Quat q = fixOrientation(tr.getRotation());
 		Vec3 t = fixOrientation(tr.getTranslation());
-		write(t * cfg.mesh_scale);
+		write(t * cfg.mesh_scale * fbx_scale);
 		write(q);
 	}
 }

@@ -600,6 +600,11 @@ static int getBoneParent(Model* model, int bone_index)
 	return model->getBone(bone_index).parent_idx;
 }
 
+static const char* getBoneName(Model* model, int bone_index)
+{
+	return model->getBone(bone_index).name.c_str();
+}
+
 
 void Model::registerLuaAPI(lua_State* L)
 {
@@ -622,6 +627,7 @@ void Model::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(getBonePosition);
 	REGISTER_FUNCTION(getBoneParent);
+	REGISTER_FUNCTION(getBoneName);
 
 	#undef REGISTER_FUNCTION
 }

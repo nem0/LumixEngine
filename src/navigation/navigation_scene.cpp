@@ -40,7 +40,7 @@ enum class NavigationSceneVersion : int
 static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
 static const ComponentType NAVMESH_ZONE_TYPE = Reflection::getComponentType("navmesh_zone");
 static const ComponentType NAVMESH_AGENT_TYPE = Reflection::getComponentType("navmesh_agent");
-static const ComponentType ANIM_CONTROLLER_TYPE = Reflection::getComponentType("anim_controller");
+static const ComponentType ANIMATOR_TYPE = Reflection::getComponentType("animator");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 
@@ -396,8 +396,8 @@ struct NavigationSceneImpl final : public NavigationScene
 			DVec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
 			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene) {
-				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE)) {
-					LocalRigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
+				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIMATOR_TYPE)) {
+					LocalRigidTransform root_motion = anim_scene->getAnimatorRootMotion(agent.entity);
 					agent.root_motion = root_motion.pos;
 					//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 				}
@@ -429,14 +429,13 @@ struct NavigationSceneImpl final : public NavigationScene
 					float angle = atan2f(vel.x, vel.z);
 					Quat wanted_rot(Vec3(0, 1, 0), angle);
 					Quat old_rot = m_universe.getRotation(agent.entity);
-					Quat new_rot;
-					nlerp(wanted_rot, old_rot, &new_rot, 0.90f);
+					Quat new_rot = nlerp(wanted_rot, old_rot, 0.90f);
 					m_universe.setRotation(agent.entity, new_rot);
 				}
 			}
 			else if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene) {
-				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIM_CONTROLLER_TYPE)) {
-					LocalRigidTransform root_motion = anim_scene->getControllerRootMotion(agent.entity);
+				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIMATOR_TYPE)) {
+					LocalRigidTransform root_motion = anim_scene->getAnimatorRootMotion(agent.entity);
 					m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 				}
 			}

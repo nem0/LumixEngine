@@ -566,29 +566,35 @@ inline DVec3 crossProduct(const DVec3& op1, const DVec3& op2)
 }
 
 
-inline void lerp(const Vec3& op1, const Vec3& op2, Vec3* out, float t)
+inline Vec3 lerp(const Vec3& op1, const Vec3& op2, float t)
 {
+	Vec3 res;
 	const float invt = 1.0f - t;
-	out->x = op1.x * invt + op2.x * t;
-	out->y = op1.y * invt + op2.y * t;
-	out->z = op1.z * invt + op2.z * t;
+	res.x = op1.x * invt + op2.x * t;
+	res.y = op1.y * invt + op2.y * t;
+	res.z = op1.z * invt + op2.z * t;
+	return res;
 }
 
 
-inline void lerp(const DVec3& op1, const DVec3& op2, DVec3* out, float t)
+inline DVec3 lerp(const DVec3& op1, const DVec3& op2, float t)
 {
+	DVec3 res;
 	const float invt = 1.0f - t;
-	out->x = op1.x * invt + op2.x * t;
-	out->y = op1.y * invt + op2.y * t;
-	out->z = op1.z * invt + op2.z * t;
+	res.x = op1.x * invt + op2.x * t;
+	res.y = op1.y * invt + op2.y * t;
+	res.z = op1.z * invt + op2.z * t;
+	return res;
 }
 
 
-inline void lerp(const Vec2& op1, const Vec2& op2, Vec2* out, float t)
+inline Vec2 lerp(const Vec2& op1, const Vec2& op2, float t)
 {
+	Vec2 res;
 	const float invt = 1.0f - t;
-	out->x = op1.x * invt + op2.x * t;
-	out->y = op1.y * invt + op2.y * t;
+	res.x = op1.x * invt + op2.x * t;
+	res.y = op1.y * invt + op2.y * t;
+	return res;
 }
 
 
@@ -653,7 +659,7 @@ struct LUMIX_ENGINE_API Quat
 };
 
 
-LUMIX_ENGINE_API void nlerp(const Quat& q1, const Quat& q2, Quat* out, float t);
+LUMIX_ENGINE_API Quat nlerp(const Quat& q1, const Quat& q2, float t);
 
 
 struct LUMIX_ENGINE_API LocalRigidTransform {

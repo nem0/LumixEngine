@@ -184,12 +184,12 @@ private:
 	float position_error = 0.1f;
 	float rotation_error = 0.01f;
 	float bounding_shape_scale = 1.0f;
-	bool to_dds = false;
 	bool cancel_mesh_transforms = false;
 	bool ignore_skeleton = false;
 	bool import_vertex_colors = true;
 	bool make_convex = false;
 	bool create_billboard_lod = false;
+	float fbx_scale = 1.f;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;
 };

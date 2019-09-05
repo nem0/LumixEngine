@@ -67,9 +67,8 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 					  ((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
 
 			int model_bone_index = iter.value();
-			Vec3 anim_pos;
-			lerp(bone.pos[idx - 1], bone.pos[idx], &anim_pos, t);
-			lerp(pos[model_bone_index], anim_pos, &pos[model_bone_index], weight);
+			Vec3 anim_pos = lerp(bone.pos[idx - 1], bone.pos[idx], t);
+			pos[model_bone_index] = lerp(pos[model_bone_index], anim_pos, weight);
 
 			idx = 1;
 			for (int c = bone.rot_count; idx < c; ++idx)
@@ -80,9 +79,8 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 			t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
 				((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
 
-			Quat anim_rot;
-			nlerp(bone.rot[idx - 1], bone.rot[idx], &anim_rot, t);
-			nlerp(rot[model_bone_index], anim_rot, &rot[model_bone_index], weight);
+			Quat anim_rot = nlerp(bone.rot[idx - 1], bone.rot[idx], t);
+			rot[model_bone_index] = nlerp(rot[model_bone_index], anim_rot, weight);
 		}
 	}
 	else
@@ -94,8 +92,8 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, float weig
 			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
 
 			int model_bone_index = iter.value();
-			lerp(pos[model_bone_index], bone.pos[bone.pos_count - 1], &pos[model_bone_index], weight);
-			nlerp(rot[model_bone_index], bone.rot[bone.rot_count - 1], &rot[model_bone_index], weight);
+			pos[model_bone_index] = lerp(pos[model_bone_index], bone.pos[bone.pos_count - 1], weight);
+			rot[model_bone_index] = nlerp(rot[model_bone_index], bone.rot[bone.rot_count - 1], weight);
 		}
 	}
 }
@@ -119,7 +117,7 @@ LocalRigidTransform Animation::getBoneTransform(float time, int bone_idx) const
 
 		float t = float(time - bone.pos_times[idx - 1] * rcp_fps) /
 			((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
-		lerp(bone.pos[idx - 1], bone.pos[idx], &ret.pos, t);
+		ret.pos = lerp(bone.pos[idx - 1], bone.pos[idx], t);
 
 		idx = 1;
 		for (int c = bone.rot_count; idx < c; ++idx)
@@ -129,7 +127,7 @@ LocalRigidTransform Animation::getBoneTransform(float time, int bone_idx) const
 
 		t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
 			((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
-		nlerp(bone.rot[idx - 1], bone.rot[idx], &ret.rot, t);
+		ret.rot = nlerp(bone.rot[idx - 1], bone.rot[idx], t);
 	}
 	else
 	{
@@ -181,7 +179,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 
 				float t = float(time - bone.pos_times[idx - 1] * rcp_fps) /
 					((bone.pos_times[idx] - bone.pos_times[idx - 1]) * rcp_fps);
-				lerp(bone.pos[idx - 1], bone.pos[idx], &pos[model_bone_index], t);
+				pos[model_bone_index] = lerp(bone.pos[idx - 1], bone.pos[idx], t);
 			}
 			else if (bone.pos_count > 0)
 			{
@@ -198,7 +196,7 @@ void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* 
 
 				float t = float(time - bone.rot_times[idx - 1] * rcp_fps) /
 					((bone.rot_times[idx] - bone.rot_times[idx - 1]) * rcp_fps);
-				nlerp(bone.rot[idx - 1], bone.rot[idx], &rot[model_bone_index], t);
+				rot[model_bone_index] = nlerp(bone.rot[idx - 1], bone.rot[idx], t);
 			}
 			else if (bone.rot_count > 0)
 			{

@@ -200,8 +200,8 @@ AnimationNode::AnimationNode(GroupNode* parent, IAllocator& allocator)
 
 void AnimationNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const {
 	float t = ctx.input_runtime.read<float>();
-
 	t += ctx.time_delta;
+
 	Animation* anim = ctx.animations[m_slot];
 	if (anim) {
 		// TODO getBoneIndex is O(n)
