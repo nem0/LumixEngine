@@ -481,7 +481,7 @@ namespace Lumix
 				int idx = addScript(entity);
 				auto& inst = scr->m_scripts[idx];
 				char tmp[MAX_PATH_LENGTH];
-				blob.readString(tmp, lengthOf(tmp));
+				blob.readString(Span(tmp));
 				blob.read(inst.m_flags);
 				setScriptPath(entity, idx, Path(tmp));
 				
@@ -501,7 +501,7 @@ namespace Lumix
 					prop.name_hash = hash;
 					blob.read(prop.type);
 					char tmp[1024];
-					blob.readString(tmp, lengthOf(tmp));
+					blob.readString(Span(tmp));
 					prop.stored_value = tmp;
 					if (scr->m_scripts[idx].m_state) applyProperty(scr->m_scripts[idx], prop, tmp);
 				}
@@ -628,6 +628,7 @@ namespace Lumix
 			}
 
 			void visit(const Reflection::Property<float>& prop) override { get(prop); }
+			void visit(const Reflection::Property<u32>& prop) override { get(prop); }
 			void visit(const Reflection::Property<int>& prop) override { get(prop); }
 			void visit(const Reflection::Property<bool>& prop) override { get(prop); }
 			void visit(const Reflection::Property<IVec2>& prop) override { get(prop); }
@@ -688,6 +689,7 @@ namespace Lumix
 
 			void visit(const Reflection::Property<float>& prop) override { set(prop); }
 			void visit(const Reflection::Property<int>& prop) override { set(prop); }
+			void visit(const Reflection::Property<u32>& prop) override { set(prop); }
 			void visit(const Reflection::Property<bool>& prop) override { set(prop); }
 			void visit(const Reflection::Property<IVec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
@@ -791,6 +793,7 @@ namespace Lumix
 
 			void visit(const Reflection::Property<float>& prop) override { set(prop); }
 			void visit(const Reflection::Property<int>& prop) override { set(prop); }
+			void visit(const Reflection::Property<u32>& prop) override { set(prop); }
 			void visit(const Reflection::Property<EntityPtr>& prop) override { set(prop); }
 			void visit(const Reflection::Property<IVec2>& prop) override { set(prop); }
 			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
@@ -1385,7 +1388,7 @@ namespace Lumix
 			{
 				ScriptInstance& inst = script->m_scripts.emplace(allocator);
 				char tmp[MAX_PATH_LENGTH];
-				serializer.read(tmp, lengthOf(tmp));
+				serializer.read(Span(tmp));
 				setScriptPath(entity, i, Path(tmp));
 				if(scene_version >(int)LuaSceneVersion::FLAGS)
 					serializer.read(Ref(inst.m_flags.base));
@@ -1395,7 +1398,7 @@ namespace Lumix
 				for (int j = 0; j < prop_count; ++j)
 				{
 					char tmp[1024];
-					serializer.read(tmp, lengthOf(tmp));
+					serializer.read(Span(tmp));
 					u32 hash = crc32(tmp);
 					int prop_idx = ScriptComponent::getProperty(inst, hash);
 					Property* prop;
@@ -1415,7 +1418,7 @@ namespace Lumix
 					}
 					tmp[0] = 0;
 					if (scene_version > (int)LuaSceneVersion::PROPERTY_TYPE) serializer.read(Ref((int&)prop->type));
-					serializer.read(tmp, lengthOf(tmp));
+					serializer.read(Span(tmp));
 					
 					if (prop->type == Property::ENTITY)
 					{
@@ -1486,7 +1489,7 @@ namespace Lumix
 					auto& scr = script->m_scripts.emplace(allocator);
 
 					char tmp[MAX_PATH_LENGTH];
-					serializer.readString(tmp, MAX_PATH_LENGTH);
+					serializer.readString(Span(tmp));
 					serializer.read(scr.m_flags);
 					scr.m_state = nullptr;
 					int prop_count;
@@ -1499,7 +1502,7 @@ namespace Lumix
 						serializer.read(prop.name_hash);
 						char tmp[1024];
 						tmp[0] = 0;
-						serializer.readString(tmp, sizeof(tmp));
+						serializer.readString(Span(tmp));
 						prop.stored_value = tmp;
 					}
 					setScriptPath(*script, scr, Path(tmp));
@@ -1537,7 +1540,7 @@ namespace Lumix
 		void updateTimers(float time_delta)
 		{
 			int timers_to_remove[1024];
-			int timers_to_remove_count = 0;
+			u32 timers_to_remove_count = 0;
 			for (int i = 0, c = m_timers.size(); i < c; ++i)
 			{
 				auto& timer = m_timers[i];
@@ -1564,7 +1567,7 @@ namespace Lumix
 					}
 				}
 			}
-			for (int i = timers_to_remove_count - 1; i >= 0; --i)
+			for (u32 i = timers_to_remove_count - 1; i != 0xffFFffFF; --i)
 			{
 				auto& timer = m_timers[timers_to_remove[i]];
 				luaL_unref(timer.state, LUA_REGISTRYINDEX, timer.func);
@@ -1886,7 +1889,7 @@ namespace Lumix
 			auto& scr = m_scripts[entity]->m_scripts[scr_index];
 			int count;
 			char path[MAX_PATH_LENGTH];
-			blob.readString(path, lengthOf(path));
+			blob.readString(Span(path));
 			blob.read(scr.m_flags);
 			blob.read(count);
 			scr.m_environment = -1;
@@ -1897,7 +1900,7 @@ namespace Lumix
 				auto& prop = scr.m_properties.emplace(m_system.m_allocator);
 				prop.type = Property::ANY;
 				blob.read(prop.name_hash);
-				blob.readString(buf, lengthOf(buf));
+				blob.readString(Span(buf));
 				prop.stored_value = buf;
 			}
 			setScriptPath(entity, scr_index, Path(path));

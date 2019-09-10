@@ -101,10 +101,10 @@ public:
 	Shader* getShader() const { return m_shader; }
 
 	int getTextureCount() const { return m_texture_count; }
-	Texture* getTexture(int i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
+	Texture* getTexture(u32 i) const { return i < m_texture_count ? m_textures[i] : nullptr; }
 	Texture* getTextureByName(const char* name) const;
 	bool isTextureDefine(u8 define_idx) const;
-	void setTexture(int i, Texture* texture);
+	void setTexture(u32 i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
 	bool save(IOutputStream& file);
 	int getUniformCount() const { return m_uniforms.size(); }
@@ -147,7 +147,7 @@ private:
 	Vec4 m_color;
 	float m_alpha_ref;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
-	int m_texture_count;
+	u32 m_texture_count;
 	u32 m_define_mask;
 	u64 m_render_states;
 	RenderData* m_render_data;

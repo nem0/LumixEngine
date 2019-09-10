@@ -35,7 +35,7 @@ int InputTextMultiline(lua_State* L)
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
 	auto* value = LuaWrapper::checkArg<const char*>(L, 2);
 	copyString(buf, value);
-	bool changed = ImGui::InputTextMultiline(name, buf, lengthOf(buf), ImVec2(-1, -1));
+	bool changed = ImGui::InputTextMultiline(name, buf, sizeof(buf), ImVec2(-1, -1));
 	lua_pushboolean(L, changed);
 	if (changed)
 	{
@@ -559,6 +559,19 @@ public:
 			if (lua_isnumber(L, -1))
 			{
 				int i = (int)lua_tointeger(L, -1);
+				InputMemoryStream input_blob(&i, sizeof(i));
+				prop.setValue(cmp, -1, input_blob);
+			}
+
+		}
+
+
+		void visit(const Reflection::Property<u32>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_isnumber(L, -1))
+			{
+				const u32 i = (u32)lua_tointeger(L, -1);
 				InputMemoryStream input_blob(&i, sizeof(i));
 				prop.setValue(cmp, -1, input_blob);
 			}
@@ -1435,7 +1448,7 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[32];
-			serializer.readString(tmp, sizeof(tmp));
+			serializer.readString(Span(tmp));
 			if (!m_plugin_manager->getPlugin(tmp))
 			{
 				logError("Core") << "Missing plugin " << tmp;
@@ -1489,7 +1502,7 @@ public:
 		for (int i = 0; i < scene_count; ++i)
 		{
 			char tmp[32];
-			serializer.readString(tmp, sizeof(tmp));
+			serializer.readString(Span(tmp));
 			IScene* scene = ctx.getScene(crc32(tmp));
 			scene->deserialize(serializer);
 		}

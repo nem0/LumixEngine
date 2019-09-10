@@ -627,7 +627,7 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(tmp, lengthOf(tmp));
+			serializer.readString(Span(tmp));
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), res);
 		}
@@ -673,7 +673,7 @@ public:
 		for (;;)
 		{
 			char tmp[MAX_PATH_LENGTH];
-			serializer.read(tmp, lengthOf(tmp));
+			serializer.read(Span(tmp));
 			if (tmp[0] == 0) break;
 			auto* res = mng.load<PrefabResource>(Path(tmp));
 			m_resources.insert(res->getPath().getHash(), res);

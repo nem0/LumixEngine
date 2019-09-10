@@ -7,6 +7,7 @@
 
 namespace Lumix {
 
+struct BoneMask;
 struct LocalRigidTransform;
 struct Pose;
 
@@ -41,6 +42,7 @@ public:
 	GroupNode* m_root = nullptr;
 	Array<AnimationEntry> m_animation_entries;
 	Array<String> m_animation_slots;
+	Array<BoneMask> m_bone_masks;
 	InputDecl m_inputs;
 	enum class Flags : u32 {
 		USE_ROOT_MOTION = 1 << 0

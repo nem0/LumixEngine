@@ -136,7 +136,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 		animator.time = 0;
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		animator.animation = loadPropertyAnimation(Path(tmp));
 		serializer.read(Ref(animator.flags.base));
 		m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
@@ -159,7 +159,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		serializer.read(Ref(animable.time_scale));
 		serializer.read(Ref(animable.start_time));
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		auto* res = tmp[0] ? m_engine.getResourceManager().load<Animation>(Path(tmp)) : nullptr;
 		animable.animation = (Animation*)res;
 		m_universe.onComponentCreated(entity, ANIMABLE_TYPE, this);
@@ -182,7 +182,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		Animator& animator = m_animators.insert(entity, Animator());
 		animator.entity = entity;
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		serializer.read(Ref(animator.default_set));
 		auto* res = tmp[0] ? m_engine.getResourceManager().load<Anim::Controller>(Path(tmp)) : nullptr;
 		setAnimatorSource(animator, (Anim::Controller*)res);
@@ -229,7 +229,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 		Animator& animator = iter.value();
 		const u32 index = LuaWrapper::checkArg<u32>(L, 3);
-		if (index >= (u32)lengthOf(animator.inverse_kinematics)) {
+		if (index >= lengthOf(animator.inverse_kinematics)) {
 			luaL_argerror(L, 3, "Inverse kinematics index out of range");
 		}
 		Animator::IK& ik = animator.inverse_kinematics[index];
@@ -242,14 +242,11 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	int getAnimatorInputIndex(EntityRef entity, const char* name) const override
 	{
-		/*const Animator& animator = m_animators[entity];
-		Anim::InputDecl& decl = controller.resource->m_input_decl;
-		for (int i = 0; i < lengthOf(decl.inputs); ++i)
-		{
+		const Animator& animator = m_animators[entity];
+		Anim::InputDecl& decl = animator.resource->m_inputs;
+		for (u32 i = 0; i < lengthOf(decl.inputs); ++i) {
 			if (decl.inputs[i].type != Anim::InputDecl::EMPTY && equalStrings(decl.inputs[i].name, name)) return i;
-		}*/
-		// TODO
-		ASSERT(false);
+		}
 		return -1;
 	}
 
@@ -258,9 +255,11 @@ struct AnimationSceneImpl final : public AnimationScene
 	{
 		auto iter = m_animators.find(entity);
 		if (!iter.isValid()) return;
+
 		Animator& animator = iter.value();
-		Anim::InputDecl& decl = animator.resource->m_inputs;
+		const Anim::InputDecl& decl = animator.resource->m_inputs;
 		if (input_idx >= decl.inputs_count) return;
+
 		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT) {
 			memcpy(&animator.ctx->inputs[decl.inputs[input_idx].offset], &value, sizeof(value));
 		}
@@ -270,39 +269,39 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	void setAnimatorIntInput(EntityRef entity, int input_idx, int value)
+	void setAnimatorU32Input(EntityRef entity, u32 input_idx, u32 value)
 	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& animator = m_animators.get(entity);
-		Anim::InputDecl& decl = controller.resource->m_input_decl;
-		if (decl.inputs[input_idx].type == Anim::InputDecl::INT)
-		{
-			*(int*)&controller.input[decl.inputs[input_idx].offset] = value;
+		auto iter = m_animators.find(entity);
+		if (!iter.isValid()) return;
+
+		Animator& animator = iter.value();
+		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		if (input_idx >= decl.inputs_count) return;
+
+		if (decl.inputs[input_idx].type == Anim::InputDecl::U32) {
+			*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 		}
-		else
-		{
+		else {
 			logWarning("Animation") << "Trying to set int to " << decl.inputs[input_idx].name;
-		}*/
+		}
 	}
 
 
-	void setAnimatorBoolInput(EntityRef entity, int input_idx, bool value)
+	void setAnimatorBoolInput(EntityRef entity, u32 input_idx, bool value)
 	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& animator = m_animators.get(entity);
-		Anim::InputDecl& decl = controller.resource->m_input_decl;
-		if (decl.inputs[input_idx].type == Anim::InputDecl::BOOL)
-		{
-			*(bool*)&controller.input[decl.inputs[input_idx].offset] = value;
+		auto iter = m_animators.find(entity);
+		if (!iter.isValid()) return;
+
+		Animator& animator = iter.value();
+		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		if (input_idx >= decl.inputs_count) return;
+
+		if (decl.inputs[input_idx].type == Anim::InputDecl::BOOL) {
+			*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 		}
-		else
-		{
+		else {
 			logWarning("Animation") << "Trying to set bool to " << decl.inputs[input_idx].name;
-		}*/
+		}
 	}
 
 
@@ -459,7 +458,7 @@ struct AnimationSceneImpl final : public AnimationScene
 			animable.time = animable.start_time;
 
 			char path[MAX_PATH_LENGTH];
-			serializer.readString(path, sizeof(path));
+			serializer.readString(Span(path));
 			animable.animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			m_animables.insert(animable.entity, animable);
 			m_universe.onComponentCreated(animable.entity, ANIMABLE_TYPE, this);
@@ -474,7 +473,7 @@ struct AnimationSceneImpl final : public AnimationScene
 
 			PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 			char path[MAX_PATH_LENGTH];
-			serializer.readString(path, sizeof(path));
+			serializer.readString(Span(path));
 			serializer.read(animator.flags.base);
 			animator.time = 0;
 			animator.animation = loadPropertyAnimation(Path(path));
@@ -490,7 +489,7 @@ struct AnimationSceneImpl final : public AnimationScene
 			serializer.read(animator.default_set);
 			serializer.read(animator.entity);
 			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(tmp, lengthOf(tmp));
+			serializer.readString(Span(tmp));
 			setAnimatorSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_animators.insert(animator.entity, static_cast<Animator&&>(animator));
 			m_universe.onComponentCreated(animator.entity, ANIMATOR_TYPE, this);
@@ -598,53 +597,39 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	void updateAnimator(EntityRef entity, float time_delta) override
-	{
+	void updateAnimator(EntityRef entity, float time_delta) override {
 		Animator& animator = m_animators[entity];
 		updateAnimator(animator, time_delta);
 		processEventStream();
 		m_event_stream.clear();
 	}
 
+	void setAnimatorInput(EntityRef entity, u32 input_idx, float value) override {
+		Animator& ctrl = m_animators[entity];
+		const Anim::InputDecl& decl = ctrl.resource->m_inputs;
+		ASSERT(input_idx >= lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type != Anim::InputDecl::FLOAT);
 
-	void setAnimatorInput(EntityRef entity, int input_idx, float value) override
-	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& ctrl = m_animators.get(entity);
-		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
-		if (input_idx >= lengthOf(decl.inputs)) return;
-		if (decl.inputs[input_idx].type != Anim::InputDecl::FLOAT) return;
-		*(float*)&ctrl.input[decl.inputs[input_idx].offset] = value;*/
+		*(float*)&ctrl.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
 
+	void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) override {
+		Animator& ctrl = m_animators[entity];
+		const Anim::InputDecl& decl = ctrl.resource->m_inputs;
+		ASSERT(input_idx >= lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type != Anim::InputDecl::BOOL);
 
-	void setAnimatorInput(EntityRef entity, int input_idx, bool value) override
-	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& ctrl = m_animators.get(entity);
-		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
-		if (input_idx >= lengthOf(decl.inputs)) return;
-		if (decl.inputs[input_idx].type != Anim::InputDecl::BOOL) return;
-		*(bool*)&ctrl.input[decl.inputs[input_idx].offset] = value;*/
+		*(bool*)&ctrl.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
 
+	void setAnimatorInput(EntityRef entity, u32 input_idx, u32 value) override {
+		Animator& ctrl = m_animators[entity];
+		const Anim::InputDecl& decl = ctrl.resource->m_inputs;
+		ASSERT(input_idx >= lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type != Anim::InputDecl::U32);
 
-	void setAnimatorInput(EntityRef entity, int input_idx, int value) override
-	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& ctrl = m_animators.get(entity);
-		Anim::InputDecl& decl = ctrl.resource->m_input_decl;
-		if (input_idx >= lengthOf(decl.inputs)) return;
-		if (decl.inputs[input_idx].type != Anim::InputDecl::INT) return;
-		*(int*)&ctrl.input[decl.inputs[input_idx].offset] = value;*/
+		*(u32*)&ctrl.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
-
 
 	LocalRigidTransform getAnimatorRootMotion(EntityRef entity) override
 	{
@@ -656,11 +641,8 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void applyAnimatorSet(EntityRef entity, const char* set_name) override
 	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& ctrl = m_animators.get(entity);
-		u32 set_name_hash = crc32(set_name);
+		/*Animator& ctrl = m_animators[entity];
+		const u32 set_name_hash = crc32(set_name);
 		int set_idx = ctrl.resource->m_sets_names.find([set_name_hash](const StaticString<32>& val) {
 			return crc32(val) == set_name_hash;
 		});
@@ -677,7 +659,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	void setAnimatorDefaultSet(EntityRef entity, int set) override
+	void setAnimatorDefaultSet(EntityRef entity, u32 set) override
 	{
 		// TODO
 		ASSERT(false);
@@ -1061,7 +1043,7 @@ void AnimationScene::registerLuaAPI(lua_State* L)
 	} while(false) \
 
 	REGISTER_FUNCTION(getAnimationLength);
-	REGISTER_FUNCTION(setAnimatorIntInput);
+	REGISTER_FUNCTION(setAnimatorU32Input);
 	REGISTER_FUNCTION(setAnimatorBoolInput);
 	REGISTER_FUNCTION(setAnimatorFloatInput);
 	REGISTER_FUNCTION(getAnimatorInputIndex);

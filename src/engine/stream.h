@@ -35,7 +35,7 @@ struct LUMIX_ENGINE_API IInputStream
 	
 	template <class T> void read(T& value) { read(&value, sizeof(T)); }
 	template <class T> T read();
-	bool readString(char* data, int max_size);
+	bool readString(const Span<char>& data);
 };
 
 

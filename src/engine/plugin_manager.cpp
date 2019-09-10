@@ -39,9 +39,9 @@ class PluginManagerImpl final : public PluginManager
 				LUMIX_DELETE(m_engine.getAllocator(), m_plugins[i]);
 			}
 
-			for (int i = 0; i < m_libraries.size(); ++i)
+			for (void* lib : m_libraries)
 			{
-				OS::unloadLibrary(m_libraries[i]);
+				OS::unloadLibrary(lib);
 			}
 		}
 
@@ -107,11 +107,11 @@ class PluginManagerImpl final : public PluginManager
 
 		IPlugin* getPlugin(const char* name) override
 		{
-			for (int i = 0; i < m_plugins.size(); ++i)
+			for (IPlugin* plugin : m_plugins)
 			{
-				if (equalStrings(m_plugins[i]->getName(), name))
+				if (equalStrings(plugin->getName(), name))
 				{
-					return m_plugins[i];
+					return plugin;
 				}
 			}
 			return nullptr;

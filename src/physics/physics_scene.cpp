@@ -368,7 +368,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 
 		setMemory(m_layers_names, 0, sizeof(m_layers_names));
-		for (int i = 0; i < lengthOf(m_layers_names); ++i)
+		for (u32 i = 0; i < lengthOf(m_layers_names); ++i)
 		{
 			copyString(m_layers_names[i], "Layer");
 			char tmp[3];
@@ -587,10 +587,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	IPlugin& getPlugin() const override { return *m_system; }
 
 
-	int getControllerLayer(EntityRef entity) override { return m_controllers[entity].m_layer; }
+	u32 getControllerLayer(EntityRef entity) override { return m_controllers[entity].m_layer; }
 
 
-	void setControllerLayer(EntityRef entity, int layer) override
+	void setControllerLayer(EntityRef entity, u32 layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
 		auto& controller = m_controllers[entity];
@@ -610,7 +610,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	void setRagdollLayer(EntityRef entity, int layer) override
+	void setRagdollLayer(EntityRef entity, u32 layer) override
 	{
 		auto& ragdoll = m_ragdolls[entity];
 		ragdoll.layer = layer;
@@ -631,10 +631,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	int getRagdollLayer(EntityRef entity) override { return m_ragdolls[entity].layer; }
+	u32 getRagdollLayer(EntityRef entity) override { return m_ragdolls[entity].layer; }
 
 
-	void setActorLayer(EntityRef entity, int layer) override
+	void setActorLayer(EntityRef entity, u32 layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
 		auto* actor = m_actors[entity];
@@ -646,7 +646,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	}
 
 
-	int getActorLayer(EntityRef entity) override { return m_actors[entity]->layer; }
+	u32 getActorLayer(EntityRef entity) override { return m_actors[entity]->layer; }
 
 	float getWheelMOI(EntityRef entity) override { return m_wheels[entity].moi; }
 	void setWheelMOI(EntityRef entity, float moi) override { m_wheels[entity].moi = moi; }
@@ -666,10 +666,10 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		ASSERT(false);
 	}
 
-	int getHeightfieldLayer(EntityRef entity) override { return m_terrains[entity].m_layer; }
+	u32 getHeightfieldLayer(EntityRef entity) override { return m_terrains[entity].m_layer; }
 
 
-	void setHeightfieldLayer(EntityRef entity, int layer) override
+	void setHeightfieldLayer(EntityRef entity, u32 layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers_names));
 		auto& terrain = m_terrains[entity];
@@ -2162,7 +2162,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	void updateVehicles(float time_delta)
 	{
 		PxVehicleWheels* wheels[16];
-		const int count = (int)m_vehicles.size();
+		const u32 count = (u32)m_vehicles.size();
 		ASSERT(count <= lengthOf(wheels)); // TODO
 
 		int i = 0;
@@ -3365,7 +3365,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		serializer.read(Ref(m_layers_count));
 		for (int i = 0; i < m_layers_count; ++i)
 		{
-			serializer.read(m_layers_names[i], lengthOf(m_layers_names[i]));
+			serializer.read(Span(m_layers_names[i]));
 			serializer.read(Ref(m_collision_filter[i]));
 		}
 	}
@@ -3386,7 +3386,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		terrain.m_scene = this;
 		terrain.m_entity = entity;
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, MAX_PATH_LENGTH);
+		serializer.read(Span(tmp));
 		serializer.read(Ref(terrain.m_xz_scale));
 		serializer.read(Ref(terrain.m_y_scale));
 		serializer.read(Ref(terrain.m_layer));
@@ -4811,7 +4811,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			terrain.m_scene = this;
 			serializer.read(terrain.m_entity);
 			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(tmp, MAX_PATH_LENGTH);
+			serializer.readString(Span(tmp));
 			serializer.read(terrain.m_xz_scale);
 			serializer.read(terrain.m_y_scale);
 			serializer.read(terrain.m_layer);
@@ -5003,7 +5003,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		float m_height;
 		bool m_custom_gravity;
 		float m_custom_gravity_acceleration;
-		int m_layer;
+		u32 m_layer;
 		FilterCallback m_filter_callback;
 		PxFilterData m_filter_data;
 

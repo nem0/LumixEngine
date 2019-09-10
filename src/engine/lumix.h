@@ -112,7 +112,7 @@ struct ComponentType
 const ComponentType INVALID_COMPONENT_TYPE = {-1};
 const EntityPtr INVALID_ENTITY = {-1};
 
-template <typename T, int count> constexpr int lengthOf(const T (&)[count])
+template <typename T, u32 count> constexpr u32 lengthOf(const T (&)[count])
 {
 	return count;
 };
@@ -123,8 +123,9 @@ struct Ref {
 	explicit Ref(T& value) : value(value) {}
 	operator T&() { return value; }
 	T* operator->() { return &value; } 
-	void operator =(const T& rhs) { value = rhs; }
 	void operator =(const Ref<T>& rhs) { value = rhs.value; }
+	void operator =(const T& rhs) { value = rhs; }
+	template <typename T2> void operator =(const T2& rhs) { value = rhs; }
 	T& value;
 };
 
@@ -135,7 +136,7 @@ struct Span
 	Span(T* begin, u32 len) : m_begin(begin), m_end(begin + len) {}
 	Span(T* begin, T* end) : m_begin(begin), m_end(end) {}
 	template <int N> explicit Span(T (&value)[N]) : m_begin(value), m_end(m_begin + N) {}
-	T& operator[](u32 idx) { ASSERT(m_begin + idx < m_end); return m_begin[idx]; }
+	T& operator[](u32 idx) const { ASSERT(m_begin + idx < m_end); return m_begin[idx]; }
 	operator Span<const T>() { return Span<const T>(m_begin, m_end); }
 	Span fromLeft(u32 count) const { return Span(m_begin + count, m_end); }
 	

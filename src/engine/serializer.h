@@ -94,7 +94,7 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(Ref<u16> value) = 0;
 	virtual void read(Ref<u8> value) = 0;
 	virtual void read(Ref<i8> value) = 0;
-	virtual void read(char* value, int max_size) = 0;
+	virtual void read(const Span<char>& value) = 0;
 	virtual void read(Ref<String> value) = 0;
 	virtual EntityPtr getEntity(EntityGUID guid) = 0;
 };
@@ -162,7 +162,7 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	void read(Ref<u16> value)  override;
 	void read(Ref<u8> value)  override;
 	void read(Ref<i8> value)  override;
-	void read(char* value, int max_size)  override;
+	void read(const Span<char>& value)  override;
 	void read(Ref<String> value)  override;
 	EntityPtr getEntity(EntityGUID guid) override;
 

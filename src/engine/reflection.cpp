@@ -64,7 +64,7 @@ struct ComponentTypeData
 
 static IAllocator* g_allocator = nullptr;
 static const SceneBase* g_scenes[64];
-static int g_scenes_count = 0;
+static u32 g_scenes_count = 0;
 static Array<const EnumBase*>* g_enums = nullptr;
 
 
@@ -311,13 +311,13 @@ const char* getComponentTypeID(int index)
 }
 
 
-int getScenesCount()
+u32 getScenesCount()
 {
 	return g_scenes_count;
 }
 
 
-const SceneBase& getScene(int index)
+const SceneBase& getScene(u32 index)
 {
 	ASSERT(index < lengthOf(g_scenes) && g_scenes[index]);
 	return *g_scenes[index];

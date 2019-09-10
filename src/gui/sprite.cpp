@@ -70,13 +70,13 @@ bool Sprite::load(u64 size, const u8* mem)
 	} dummy_map;
 	TextDeserializer serializer(file, dummy_map);
 	char tmp[MAX_PATH_LENGTH];
-	serializer.read(tmp, lengthOf(tmp));
+	serializer.read(Span(tmp));
 	type = equalStrings(tmp, "simple") ? SIMPLE : PATCH9; 
 	serializer.read(Ref(top));
 	serializer.read(Ref(bottom));
 	serializer.read(Ref(left));
 	serializer.read(Ref(right));
-	serializer.read(tmp, lengthOf(tmp));
+	serializer.read(Span(tmp));
 	ResourceManagerHub& mng = m_resource_manager.getOwner();
 	m_texture = tmp[0] != '\0' ? mng.load<Texture>(Path(tmp)) : nullptr;
 	return true;

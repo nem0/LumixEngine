@@ -867,7 +867,7 @@ public:
 	static void getShortcut(const Action& action, Span<char> buf)
 	{
 		buf[0] = 0;
-		for (int i = 0; i < lengthOf(action.shortcut); ++i) {
+		for (u32 i = 0; i < lengthOf(action.shortcut); ++i) {
 			char tmp[64];
 			OS::getKeyName(action.shortcut[i], Span(tmp));
 			if (tmp[0] == 0) return;
@@ -2136,6 +2136,15 @@ public:
 			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
 		}
 
+		void visit(const Reflection::Property<u32>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!lua_isnumber(L, -1)) return;
+
+			const u32 val = (u32)lua_tointeger(L, -1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+		}
+
 		void visit(const Reflection::Property<float>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
@@ -2779,7 +2788,7 @@ public:
 			if (a->plugin != plugin) continue;
 
 			u32 action_modifiers = 0;
-			for (int i = 0; i < lengthOf(a->shortcut) + 1; ++i)
+			for (u32 i = 0; i < lengthOf(a->shortcut) + 1; ++i)
 			{
 				if ((i == lengthOf(a->shortcut) || a->shortcut[i] == OS::Keycode::INVALID) &&
 					action_modifiers == pressed_modifiers)

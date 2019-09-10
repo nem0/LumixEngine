@@ -96,8 +96,8 @@ public:
 	virtual PhysicsSystem& getSystem() const = 0;
 
 	virtual DelegateList<void(const ContactData&)>& onContact() = 0;
-	virtual void setActorLayer(EntityRef entity, int layer) = 0;
-	virtual int getActorLayer(EntityRef entity) = 0;
+	virtual void setActorLayer(EntityRef entity, u32 layer) = 0;
+	virtual u32 getActorLayer(EntityRef entity) = 0;
 	virtual bool getIsTrigger(EntityRef entity) = 0;
 	virtual void setIsTrigger(EntityRef entity, bool is_trigger) = 0;
 	virtual DynamicType getDynamicType(EntityRef entity) = 0;
@@ -110,8 +110,8 @@ public:
 	virtual void setHeightmapXZScale(EntityRef entity, float scale) = 0;
 	virtual float getHeightmapYScale(EntityRef entity) = 0;
 	virtual void setHeightmapYScale(EntityRef entity, float scale) = 0;
-	virtual int getHeightfieldLayer(EntityRef entity) = 0;
-	virtual void setHeightfieldLayer(EntityRef entity, int layer) = 0;
+	virtual u32 getHeightfieldLayer(EntityRef entity) = 0;
+	virtual void setHeightfieldLayer(EntityRef entity, u32 layer) = 0;
 	virtual void updateHeighfieldData(EntityRef entity,
 		int x,
 		int y,
@@ -189,8 +189,8 @@ public:
 
 	virtual bool isControllerCollisionDown(EntityRef entity) const = 0;
 	virtual void moveController(EntityRef entity, const Vec3& v) = 0;
-	virtual int getControllerLayer(EntityRef entity) = 0;
-	virtual void setControllerLayer(EntityRef entity, int layer) = 0;
+	virtual u32 getControllerLayer(EntityRef entity) = 0;
+	virtual void setControllerLayer(EntityRef entity, u32 layer) = 0;
 	virtual float getControllerRadius(EntityRef entity) = 0;
 	virtual void setControllerRadius(EntityRef entity, float radius) = 0;
 	virtual float getControllerHeight(EntityRef entity) = 0;
@@ -244,8 +244,8 @@ public:
 	virtual void setRagdollBoneKinematicRecursive(RagdollBone* bone, bool is_kinematic) = 0;
 	virtual void setRagdollBoneKinematic(RagdollBone* bone, bool is_kinematic) = 0;
 	virtual bool isRagdollBoneKinematic(RagdollBone* bone) = 0;
-	virtual void setRagdollLayer(EntityRef entity, int layer) = 0;
-	virtual int getRagdollLayer(EntityRef entity) = 0;
+	virtual void setRagdollLayer(EntityRef entity, u32 layer) = 0;
+	virtual u32 getRagdollLayer(EntityRef entity) = 0;
 
 	virtual float getWheelRadius(EntityRef entity) = 0;
 	virtual void setWheelRadius(EntityRef entity, float r) = 0;

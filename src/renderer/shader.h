@@ -75,7 +75,7 @@ public:
 	Renderer& m_renderer;
 	u32 m_all_defines_mask;
 	TextureSlot m_texture_slots[16];
-	int m_texture_slot_count;
+	u32 m_texture_slot_count;
 	Array<Uniform> m_uniforms;
 	Array<u8> m_defines;
 	ShaderRenderData* m_render_data;

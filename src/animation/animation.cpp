@@ -37,7 +37,7 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 }
 
 
-void Animation::getRelativePose(float time, Pose& pose, Model& model, float weight, BoneMask* mask) const
+void Animation::getRelativePose(float time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const
 {
 	ASSERT(!pose.is_absolute);
 
@@ -148,7 +148,7 @@ int Animation::getBoneIndex(u32 name) const
 }
 
 
-void Animation::getRelativePose(float time, Pose& pose, Model& model, BoneMask* mask) const
+void Animation::getRelativePose(float time, Pose& pose, const Model& model, const BoneMask* mask) const
 {
 	ASSERT(!pose.is_absolute);
 

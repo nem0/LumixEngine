@@ -54,7 +54,7 @@ public:
 	{
 		ASSERT(&rhs.m_allocator == &m_allocator);
 
-		int i = rhs.m_capacity;
+		u32 i = rhs.m_capacity;
 		rhs.m_capacity = m_capacity;
 		m_capacity = i;
 
@@ -71,9 +71,9 @@ public:
 	template <typename Comparator>
 	void removeDuplicates(Comparator equals)
 	{
-		for (int i = 0; i < m_size - 1; ++i)
+		for (u32 i = 0; i < m_size - 1; ++i)
 		{
-			for (int j = i + 1; j < m_size; ++j)
+			for (u32 j = i + 1; j < m_size; ++j)
 			{
 				if (equals(m_data[i], m_data[j]))
 				{
@@ -87,9 +87,10 @@ public:
 
 	void removeDuplicates()
 	{
-		for (int i = 0; i < m_size-1; ++i)
+		if (m_size == 0) return;
+		for (u32 i = 0; i < m_size - 1; ++i)
 		{
-			for (int j = i + 1; j < m_size; ++j)
+			for (u32 j = i + 1; j < m_size; ++j)
 			{
 				if (m_data[i] == m_data[j])
 				{
@@ -110,7 +111,7 @@ public:
 			m_data = (T*)m_allocator.allocate_aligned(rhs.m_capacity * sizeof(T), alignof(T));
 			m_capacity = rhs.m_capacity;
 			m_size = rhs.m_size;
-			for (int i = 0; i < m_size; ++i)
+			for (u32 i = 0; i < m_size; ++i)
 			{
 				new (NewPlaceholder(), (char*)(m_data + i)) T(rhs.m_data[i]);
 			}
@@ -153,7 +154,7 @@ public:
 	template <typename F>
 	int find(F predicate) const
 	{
-		for (int i = 0; i < m_size; ++i)
+		for (u32 i = 0; i < m_size; ++i)
 		{
 			if (predicate(m_data[i]))
 			{
@@ -166,7 +167,7 @@ public:
 	template <typename R>
 	int indexOf(R item) const
 	{
-		for (int i = 0; i < m_size; ++i)
+		for (u32 i = 0; i < m_size; ++i)
 		{
 			if (m_data[i] == item)
 			{
@@ -178,7 +179,7 @@ public:
 
 	int indexOf(const T& item) const
 	{
-		for (int i = 0; i < m_size; ++i)
+		for (u32 i = 0; i < m_size; ++i)
 		{
 			if (m_data[i] == item)
 			{
@@ -191,7 +192,7 @@ public:
 	template <typename F>
 	void eraseItems(F predicate)
 	{
-		for (int i = m_size - 1; i >= 0; --i)
+		for (u32 i = m_size - 1; i != 0xffFFffFF; --i)
 		{
 			if (predicate(m_data[i]))
 			{
@@ -202,7 +203,7 @@ public:
 
 	void swapAndPopItem(const T& item)
 	{
-		for (int i = 0; i < m_size; ++i)
+		for (u32 i = 0; i < m_size; ++i)
 		{
 			if (m_data[i] == item)
 			{
@@ -212,7 +213,7 @@ public:
 		}
 	}
 
-	void swapAndPop(int index)
+	void swapAndPop(u32 index)
 	{
 		if (index >= 0 && index < m_size)
 		{
@@ -227,7 +228,7 @@ public:
 
 	void eraseItem(const T& item)
 	{
-		for (int i = 0; i < m_size; ++i)
+		for (u32 i = 0; i < m_size; ++i)
 		{
 			if (m_data[i] == item)
 			{
@@ -238,7 +239,7 @@ public:
 	}
 
 
-	void insert(int index, const T& value)
+	void insert(u32 index, const T& value)
 	{
 		if (m_size == m_capacity)
 		{
@@ -250,9 +251,9 @@ public:
 	}
 
 
-	void erase(int index)
+	void erase(u32 index)
 	{
-		if (index >= 0 && index < m_size)
+		if (index < m_size)
 		{
 			m_data[index].~T();
 			if (index < m_size - 1)
@@ -265,7 +266,7 @@ public:
 
 	void push(const T& value)
 	{
-		int size = m_size;
+		u32 size = m_size;
 		if (size == m_capacity)
 		{
 			grow();
@@ -296,16 +297,11 @@ public:
 		return m_data[m_size - 1];
 	}
 
-	template <typename... Params> T& emplaceAt(int idx, Params&&... params)
+	template <typename... Params> T& emplaceAt(u32 idx, Params&&... params)
 	{
-		if (m_size == m_capacity)
-		{
-			grow();
-		}
-		for (int i = m_size - 1; i >= idx; --i)
-		{
-			copyMemory(&m_data[i + 1], &m_data[i], sizeof(m_data[i]));
-		}
+		if (m_size == m_capacity) grow();
+		
+		moveMemory(&m_data[idx + 1], &m_data[idx], sizeof(m_data[idx]) * (m_size - idx));
 		new (NewPlaceholder(), (char*)(m_data + idx)) T(myforward<Params>(params)...);
 		++m_size;
 		return m_data[idx];
@@ -334,13 +330,13 @@ public:
 		}
 	}
 
-	void resize(int size)
+	void resize(u32 size)
 	{
 		if (size > m_capacity)
 		{
 			reserve(size);
 		}
-		for (int i = m_size; i < size; ++i)
+		for (u32 i = m_size; i < size; ++i)
 		{
 			new (NewPlaceholder(), (char*)(m_data + i)) T;
 		}
@@ -348,8 +344,7 @@ public:
 		m_size = size;
 	}
 
-
-	void reserve(int capacity)
+	void reserve(u32 capacity)
 	{
 		if (capacity > m_capacity)
 		{
@@ -361,26 +356,26 @@ public:
 		}
 	}
 
-	const T& operator[](int index) const
+	const T& operator[](u32 index) const
 	{
 		ASSERT(index >= 0 && index < m_size);
 		return m_data[index];
 	}
 
-	T& operator[](int index)
+	T& operator[](u32 index)
 	{
 		ASSERT(index >= 0 && index < m_size);
 		return m_data[index];
 	}
 
-	int byte_size() const { return m_size * sizeof(T); }
+	u32 byte_size() const { return m_size * sizeof(T); }
 	int size() const { return m_size; }
-	int capacity() const { return m_capacity; }
+	u32 capacity() const { return m_capacity; }
 
 private:
 	void grow()
 	{
-		int new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
+		u32 new_capacity = m_capacity == 0 ? 4 : m_capacity * 2;
 		m_data = (T*)m_allocator.reallocate_aligned(m_data, new_capacity * sizeof(T), alignof(T));
 		m_capacity = new_capacity;
 	}
@@ -395,8 +390,8 @@ private:
 
 private:
 	IAllocator& m_allocator;
-	int m_capacity;
-	int m_size;
+	u32 m_capacity;
+	u32 m_size;
 	T* m_data;
 };
 
