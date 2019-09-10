@@ -320,7 +320,7 @@ public:
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;
 	virtual Environment& getEnvironment(EntityRef entity) = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
-	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, int max_count, PointLight* lights) = 0;
+	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, u32 max_count, PointLight* lights) = 0;
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
 

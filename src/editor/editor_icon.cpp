@@ -215,7 +215,7 @@ struct EditorIconsImpl final : public EditorIcons
 		FileSystem& fs = m_editor.getEngine().getFileSystem();
 		if (m_render_interface)
 		{
-			for (int i = 0; i < lengthOf(ICONS); ++i)
+			for (u32 i = 0; i < lengthOf(ICONS); ++i)
 			{
 				StaticString<MAX_PATH_LENGTH> tmp("editor/models/", ICONS[i], "_3d.fbx");
 				m_is_3d[i] = fs.fileExists(tmp);

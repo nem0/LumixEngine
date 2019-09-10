@@ -72,8 +72,8 @@ struct PropertyBase
 LUMIX_ENGINE_API void init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 
-LUMIX_ENGINE_API int getScenesCount();
-LUMIX_ENGINE_API const SceneBase& getScene(int index);
+LUMIX_ENGINE_API u32 getScenesCount();
+LUMIX_ENGINE_API const SceneBase& getScene(u32 index);
 
 LUMIX_ENGINE_API int getEnumsCount();
 LUMIX_ENGINE_API const EnumBase& getEnum(int index);
@@ -256,6 +256,7 @@ struct IPropertyVisitor
 	virtual void begin(const ComponentBase&) {}
 	virtual void visit(const Property<float>& prop) = 0;
 	virtual void visit(const Property<int>& prop) = 0;
+	virtual void visit(const Property<u32>& prop) = 0;
 	virtual void visit(const Property<EntityPtr>& prop) = 0;
 	virtual void visit(const Property<IVec2>& prop) = 0;
 	virtual void visit(const Property<Vec2>& prop) = 0;
@@ -278,6 +279,7 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 
 	void visit(const Property<float>& prop) override { visitProperty(prop); }
 	void visit(const Property<int>& prop) override { visitProperty(prop); }
+	void visit(const Property<u32>& prop) override { visitProperty(prop); }
 	void visit(const Property<EntityPtr>& prop) override { visitProperty(prop); }
 	void visit(const Property<IVec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec2>& prop) override { visitProperty(prop); }

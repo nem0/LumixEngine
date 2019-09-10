@@ -137,10 +137,10 @@ struct AudioSceneImpl final : public AudioScene
 			m_clips[i] = clip;
 			serializer.read(Ref(clip->volume));
 			serializer.read(Ref(clip->looped));
-			serializer.read(clip->name, lengthOf(clip->name));
+			serializer.read(Span(clip->name));
 			clip->name_hash = crc32(clip->name);
 			char path[MAX_PATH_LENGTH];
-			serializer.read(path, lengthOf(path));
+			serializer.read(Span(path));
 			
 			clip->clip = path[0] ? m_system.getEngine().getResourceManager().load<Clip>(Path(path)) : nullptr;
 		}
@@ -291,9 +291,8 @@ struct AudioSceneImpl final : public AudioScene
 			m_device.setListenerOrientation(front.x, front.y, front.z, up.x, up.y, up.z);
 		}
 
-		for (int i = 0; i < lengthOf(m_playing_sounds); ++i)
+		for (PlayingSound & sound : m_playing_sounds)
 		{
-			auto& sound = m_playing_sounds[i];
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) continue;
 			if (!sound.entity.isValid()) continue;
 
@@ -307,7 +306,7 @@ struct AudioSceneImpl final : public AudioScene
 			if (!clip_info->looped && m_device.isEnd(sound.buffer_id))
 			{
 				m_device.stop(sound.buffer_id);
-				m_playing_sounds[i].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
+				sound.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 			}
 		}
 		m_device.update(time_delta);
@@ -537,10 +536,10 @@ struct AudioSceneImpl final : public AudioScene
 			clip->volume = 1;
 			serializer.read(clip->volume);
 			serializer.read(clip->looped);
-			serializer.readString(clip->name, lengthOf(clip->name));
+			serializer.readString(Span(clip->name));
 			clip->name_hash = crc32(clip->name);
 			char path[MAX_PATH_LENGTH];
-			serializer.readString(path, lengthOf(path));
+			serializer.readString(Span(path));
 
 			clip->clip = m_system.getEngine().getResourceManager().load<Clip>(Path(path));
 		}
@@ -580,10 +579,10 @@ struct AudioSceneImpl final : public AudioScene
 	}
 
 
-	int getClipCount() const override { return m_clips.size(); }
+	u32 getClipCount() const override { return m_clips.size(); }
 
 
-	const char* getClipName(int index) override { return m_clips[index]->name; }
+	const char* getClipName(u32 index) override { return m_clips[index]->name; }
 
 
 	void addClip(const char* name, const Path& path) override
@@ -651,14 +650,14 @@ struct AudioSceneImpl final : public AudioScene
 	}
 
 
-	ClipInfo* getClipInfo(int index) override
+	ClipInfo* getClipInfoByIndex(u32 index) override
 	{
-		if (index >= m_clips.size()) return nullptr;
+		if (index >= (u32)m_clips.size()) return nullptr;
 		return m_clips[index];
 	}
 
 
-	void setClip(int clip_id, const Path& path) override
+	void setClip(u32 clip_id, const Path& path) override
 	{
 		auto* clip = m_clips[clip_id]->clip;
 		if (clip)
@@ -672,24 +671,23 @@ struct AudioSceneImpl final : public AudioScene
 
 	SoundHandle play(EntityRef entity, ClipInfo* clip_info, bool is_3d) override
 	{
-		for (int i = 0; i < lengthOf(m_playing_sounds); ++i)
+		for (PlayingSound& sound : m_playing_sounds)
 		{
-			if (m_playing_sounds[i].buffer_id == AudioDevice::INVALID_BUFFER_HANDLE)
+			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE)
 			{
 				auto* clip = clip_info->clip;
-				if (!clip->isReady()) return -1;
+				if (!clip->isReady()) return INVALID_SOUND_HANDLE;
 
 				int flags = is_3d ? (int)AudioDevice::BufferFlags::IS3D : 0;
 				auto buffer = m_device.createBuffer(
 					clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), flags);
-				if (buffer == AudioDevice::INVALID_BUFFER_HANDLE) return -1;
+				if (buffer == AudioDevice::INVALID_BUFFER_HANDLE) return INVALID_SOUND_HANDLE;
 				m_device.play(buffer, clip_info->looped);
 				m_device.setVolume(buffer, clip_info->volume);
 
 				const DVec3 pos = m_universe.getPosition(entity);
 				m_device.setSourcePosition(buffer, pos);
 
-				auto& sound = m_playing_sounds[i];
 				sound.is_3d = is_3d;
 				sound.buffer_id = buffer;
 				sound.entity = entity;
@@ -716,7 +714,7 @@ struct AudioSceneImpl final : public AudioScene
 					break;
 				}
 
-				return i;
+				return SoundHandle(&sound - m_playing_sounds);
 			}
 		}
 
@@ -726,7 +724,7 @@ struct AudioSceneImpl final : public AudioScene
 
 	void stop(SoundHandle sound_id) override
 	{
-		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
+		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
 		m_device.stop(m_playing_sounds[sound_id].buffer_id);
 		m_playing_sounds[sound_id].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 	}
@@ -737,15 +735,15 @@ struct AudioSceneImpl final : public AudioScene
 
 	void setVolume(SoundHandle sound_id, float volume) override
 	{
-		if (sound_id == AudioScene::INVALID_SOUND_HANDLE) return;
-		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
+		ASSERT(sound_id != AudioScene::INVALID_SOUND_HANDLE);
+		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
 		m_device.setVolume(m_playing_sounds[sound_id].buffer_id, volume);
 	}
 
 
 	void setEcho(SoundHandle sound_id, float wet_dry_mix, float feedback, float left_delay, float right_delay) override
 	{
-		ASSERT(sound_id >= 0 && sound_id < lengthOf(m_playing_sounds));
+		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
 		m_device.setEcho(m_playing_sounds[sound_id].buffer_id, wet_dry_mix, feedback, left_delay, right_delay);
 	}
 

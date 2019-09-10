@@ -103,7 +103,7 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 
 		const char* codes[64];
 		ffr::ShaderType types[64];
-		ASSERT(lengthOf(types) >= rd->sources.size());
+		ASSERT((int)lengthOf(types) >= rd->sources.size());
 		for (int i = 0; i < rd->sources.size(); ++i) {
 			codes[i] = &rd->sources[i].code[0];
 			types[i] = rd->sources[i].type;
@@ -410,7 +410,7 @@ void Shader::unload()
 		m_render_data = nullptr;
 	}
 	m_uniforms.clear();
-	for (int i = 0; i < m_texture_slot_count; ++i) {
+	for (u32 i = 0; i < m_texture_slot_count; ++i) {
 		if (m_texture_slots[i].default_texture) {
 			Texture* t = m_texture_slots[i].default_texture;
 			t->getResourceManager().unload(*t);

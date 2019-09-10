@@ -66,15 +66,15 @@ public:
 	static void destroyInstance(AudioScene* scene);
 	static void registerLuaAPI(lua_State* L);
 
-	virtual int getClipCount() const = 0;
-	virtual const char* getClipName(int index) = 0;
-	virtual ClipInfo* getClipInfo(int index) = 0;
+	virtual u32 getClipCount() const = 0;
+	virtual const char* getClipName(u32 index) = 0;
+	virtual ClipInfo* getClipInfoByIndex(u32 index) = 0;
 	virtual ClipInfo* getClipInfo(u32 hash) = 0;
 	virtual ClipInfo* getClipInfo(const char* name) = 0;
 	virtual int getClipInfoIndex(ClipInfo* info) = 0;
 	virtual void addClip(const char* name, const Path& path) = 0;
 	virtual void removeClip(ClipInfo* clip) = 0;
-	virtual void setClip(int clip_id, const Path& path) = 0;
+	virtual void setClip(u32 clip_id, const Path& path) = 0;
 
 	virtual EchoZone& getEchoZone(EntityRef entity) = 0;
 	virtual ChorusZone& getChorusZone(EntityRef entity) = 0;

@@ -151,30 +151,32 @@ void Blend1DNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(float));
 }
 
-static void getPose(const RuntimeContext& ctx, float time, float weight, u32 slot, Ref<Pose> pose) {
+static void getPose(const RuntimeContext& ctx, float time, float weight, u32 slot, Ref<Pose> pose, u32 mask_idx) {
 	Animation* anim = ctx.animations[slot];
 	if (!anim) return;
 
 	const float anim_time = fmodf(time, anim->getLength());
 
-	anim->getRelativePose(anim_time, pose, *ctx.model, weight, nullptr);
+	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
+	anim->getRelativePose(anim_time, pose, *ctx.model, weight, mask);
 }
 
-void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const {
+void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const {
+	// TODO mask
 	const float t = ctx.input_runtime.read<float>();
 
 	if (m_children.empty()) return;
 	if (m_children.size() == 1) {
-		Anim::getPose(ctx, t, weight, m_children[0].slot, pose);
+		Anim::getPose(ctx, t, weight, m_children[0].slot, pose, mask);
 		return;
 	}
 
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
 	
-	Anim::getPose(ctx, t, weight, pair.a->slot, pose);
+	Anim::getPose(ctx, t, weight, pair.a->slot, pose, mask);
 	if (pair.b) {
-		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot, pose);
+		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot, pose, mask);
 	}
 }
 
@@ -227,14 +229,9 @@ void AnimationNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(float));
 }
 	
-void AnimationNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const {
+void AnimationNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const {
 	const float t = ctx.input_runtime.read<float>();
-
-	Animation* anim = ctx.animations[m_slot];
-	if (!anim) return;
-
-	const float anim_time = fmodf(t, anim->getLength());
-	anim->getRelativePose(anim_time, pose, *ctx.model, weight, nullptr);
+	Anim::getPose(ctx, t, weight, m_slot, pose, mask);
 }
 
 void AnimationNode::serialize(OutputMemoryStream& stream) const {
@@ -245,6 +242,66 @@ void AnimationNode::serialize(OutputMemoryStream& stream) const {
 void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 	Node::deserialize(stream, ctrl);
 	stream.read(m_slot);
+}
+
+LayersNode::Layer::Layer(GroupNode* parent, IAllocator& allocator) 
+ : node(parent, allocator)
+{
+}
+
+LayersNode::LayersNode(GroupNode* parent, IAllocator& allocator) 
+	: Node(parent, allocator)
+	, m_layers(allocator)
+	, m_allocator(allocator)
+{
+}
+
+void LayersNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const {
+	for (const Layer& layer : m_layers) {
+		LocalRigidTransform tmp_rm;
+		layer.node.update(ctx, Ref(tmp_rm));
+		if (&layer == m_layers.begin()) {
+			root_motion = tmp_rm;
+		}
+	}
+}
+
+void LayersNode::enter(RuntimeContext& ctx) const {
+	for (const Layer& layer : m_layers) {
+		layer.node.enter(ctx);
+	}
+}
+
+void LayersNode::skip(RuntimeContext& ctx) const {
+	for (const Layer& layer : m_layers) {
+		layer.node.skip(ctx);
+	}
+}
+
+void LayersNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const {
+	for (const Layer& layer : m_layers) {
+		layer.node.getPose(ctx, weight, pose, layer.mask);
+	}
+}
+
+void LayersNode::serialize(OutputMemoryStream& stream) const {
+	stream.write((u32)m_layers.size());
+	for (const Layer& layer : m_layers) {
+		stream.writeString(layer.name.data);
+		stream.write(layer.mask);
+		layer.node.serialize(stream);
+	}
+}
+
+void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
+	u32 c;
+	stream.read(c);
+	for (u32 i = 0; i < c; ++i) {
+		Layer& layer = m_layers.emplace(m_parent, m_allocator);
+		stream.readString(Span(layer.name.data));
+		stream.read(layer.mask);
+		layer.node.deserialize(stream, ctrl);
+	}
 }
 
 GroupNode::GroupNode(GroupNode* parent, IAllocator& allocator)
@@ -275,9 +332,25 @@ void GroupNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion
 		return;
 	}
 
-	for (u32 i = 0, c = m_children.size(); i < c; ++i) {
-		const Child& child = m_children[i];
-		if (i != data.from && child.condition.eval(ctx)) {
+	if (!m_children[data.from].condition.eval(ctx)) {
+		for (const Child::Transition& transition : m_children[data.from].transitions) {
+			if (!transition.condition.eval(ctx)) continue;
+			
+			data.to = transition.to;
+			data.t = 0;
+			ctx.data.write(data);
+			m_children[data.from].node->update(ctx, root_motion);
+			m_children[data.to].node->enter(ctx);
+			return;
+		}
+
+		for (u32 i = 0, c = m_children.size(); i < c; ++i) {
+			const Child& child = m_children[i];
+			if (i == data.from) continue;
+			if ((child.flags & Child::SELECTABLE) == 0) continue;
+			if (!child.condition.eval(ctx)) continue;
+
+
 			data.to = i;
 			data.t = 0;
 			ctx.data.write(data);
@@ -311,13 +384,13 @@ void GroupNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(RuntimeData));
 }
 	
-void GroupNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const {
+void GroupNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const {
 	const RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 
-	m_children[data.from].node->getPose(ctx, weight, pose);
+	m_children[data.from].node->getPose(ctx, weight, pose, mask);
 	if(data.from != data.to) {
 		const float t = clamp(data.t / m_blend_length, 0.f, 1.f);
-		m_children[data.to].node->getPose(ctx, weight * t, pose);
+		m_children[data.to].node->getPose(ctx, weight * t, pose, mask);
 	}
 }
 
@@ -343,7 +416,7 @@ void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 		stream.read(type);
 		m_children.emplace(m_allocator);
 		char tmp[256];
-		stream.readString(tmp, sizeof(tmp));
+		stream.readString(Span(tmp));
 		m_children[i].condition_str = tmp;
 		m_children[i].condition.compile(tmp, ctrl.m_inputs);
 		m_children[i].node = Node::create(this, type, m_allocator);
@@ -367,6 +440,7 @@ Controller::Controller(const Path& path, ResourceManager& resource_manager, IAll
 	, m_allocator(allocator)
 	, m_animation_slots(allocator)
 	, m_animation_entries(allocator)
+	, m_bone_masks(allocator)
 {}
 
 void Controller::unload() {
@@ -449,7 +523,7 @@ void Controller::getPose(RuntimeContext& ctx, Ref<Pose> pose) {
 		root_bind_pose.rot = pose->rotations[root_bone_idx];
 	}
 	
-	m_root->getPose(ctx, 1.f, pose);
+	m_root->getPose(ctx, 1.f, pose, 0xffFFffFF);
 	
 	// TODO this should be in AnimationNode
 	if (root_bone_iter.isValid()) {
@@ -522,7 +596,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 	for (u32 i = 0; i < slots_count; ++i) {
 		String& slot = m_animation_slots.emplace(m_allocator);
 		char tmp[64];
-		stream.readString(tmp, sizeof(tmp));
+		stream.readString(Span(tmp));
 		slot = tmp;
 	}
 
@@ -533,7 +607,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		stream.read(entry.slot);
 		stream.read(entry.set);
 		char path[MAX_PATH_LENGTH];
-		stream.readString(path, sizeof(path));
+		stream.readString(Span(path));
 		entry.animation = path[0] ? m_resource_manager.getOwner().load<Animation>(Path(path)) : nullptr;
 	}
 

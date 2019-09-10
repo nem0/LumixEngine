@@ -184,6 +184,32 @@ static void load(ControllerEditor& editor, const char* path) {
 	}
 }
 
+static bool conditionInput(const char* label, Anim::InputDecl& input, Ref<String> condition_str, Ref<Condition> condition) {
+	char tmp[1024];
+	copyString(tmp, condition_str->c_str());
+	if (ImGui::InputText(label, tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
+		condition_str = tmp;
+		condition->compile(tmp, input);
+		return true;
+	}
+
+	return false;
+}
+
+static bool nodeInput(const char* label, Ref<u32> value, const Array<GroupNode::Child>& children) {
+	if (!ImGui::BeginCombo(label, children[value].node->m_name.c_str())) return false;
+
+	for (GroupNode::Child& child : children) {
+		if (ImGui::Selectable(child.node->m_name.c_str())) {
+			value = u32(&child - children.begin());
+			return true;
+		}
+	}
+
+	ImGui::EndCombo();
+	return false;
+}
+
 void ControllerEditor::onWindowGUI() {
 	if (ImGui::Begin("Animation editor", nullptr, ImGuiWindowFlags_MenuBar)) {
 		if (ImGui::BeginMenuBar()) {
@@ -342,15 +368,77 @@ void ControllerEditor::onWindowGUI() {
 						ImGui::TreePop();
 						continue;
 					}
-					char tmp[256];
-					copyString(tmp, ch.condition_str.c_str());
-					if (ImGui::InputText("Condition", tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
-						ch.condition_str = tmp;
-						ch.condition.compile(tmp, m_controller->m_inputs);
-					}
+					conditionInput("Condition", m_controller->m_inputs, Ref(ch.condition_str), Ref(ch.condition));
 					ui_dispatch(*ch.node, *this);
 					ImGui::TreePop();
 				}
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Transitions")) {
+			Array<GroupNode::Child>& children = m_current_level->m_children;
+			if (children.empty()) {
+				ImGui::Text("No child nodes.");
+			}
+			else {
+				for (GroupNode::Child& child : children) {
+					for (GroupNode::Child::Transition& tr : child.transitions) {
+						const char* name_from = child.node->m_name.c_str();
+						const char* name_to = children[tr.to].node->m_name.c_str();
+						if (!ImGui::TreeNodeEx(&tr, 0, "%s -> %s", name_from, name_to)) continue;
+
+						u32 from = u32(&child - children.begin());
+						if (nodeInput("From", Ref(from), children)) {
+							children[from].transitions.push(tr);
+							child.transitions.erase(u32(&tr - child.transitions.begin()));
+							ImGui::TreePop();
+							break;
+						}
+
+						nodeInput("To", Ref(tr.to), children);
+						conditionInput("Condition", m_controller->m_inputs, Ref(tr.condition_str), Ref(tr.condition));
+
+						ImGui::TreePop();
+					}
+				}
+
+				if (ImGui::Button("Add")) {
+					GroupNode::Child::Transition& transition = children[0].transitions.emplace(m_controller->m_allocator);
+					transition.to = 0;
+				}
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Bone masks")) {
+			char model_path[MAX_PATH_LENGTH];
+			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
+			if (m_app.getAssetBrowser().resourceInput("Model", "model", Span(model_path), Model::TYPE)) {
+				m_model = m_app.getWorldEditor().getEngine().getResourceManager().load<Model>(Path(model_path));
+			}
+
+			if (m_model) {
+				for (BoneMask& mask : m_controller->m_bone_masks) {
+					if (!ImGui::TreeNodeEx(&mask, 0, "%s", mask.name.data)) continue;
+				
+					ImGui::InputText("Name", mask.name.data, sizeof(mask.name.data));
+					for (u32 i = 0, c = m_model->getBoneCount(); i < c; ++i) {
+						const char* bone_name = m_model->getBone(i).name.c_str();
+						const u32 bone_name_hash = crc32(bone_name);
+						const bool is_masked = mask.bones.find(bone_name_hash).isValid();
+						bool b = is_masked;
+						if (ImGui::Checkbox(bone_name, &b)) {
+							ASSERT(b != is_masked);
+							if (is_masked) {
+								mask.bones.erase(bone_name_hash);
+							}
+							else {
+								mask.bones.insert(bone_name_hash, 1);
+							}
+						}
+					}
+					ImGui::TreePop();
+				}
+				if (ImGui::Button("Add layer")) m_controller->m_bone_masks.emplace(m_controller->m_allocator);
 			}
 		}
 

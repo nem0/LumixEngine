@@ -135,7 +135,7 @@ bool Action::isRequested()
 	float* keys_down_duration = ImGui::GetIO().KeysDownDuration;
 	if (shortcut[0] == OS::Keycode::INVALID) return false;
 
-	for (int i = 0; i < lengthOf(shortcut) + 1; ++i)
+	for (u32 i = 0; i < lengthOf(shortcut) + 1; ++i)
 	{
 		if (i == lengthOf(shortcut) || shortcut[i] == OS::Keycode::INVALID)
 		{
@@ -154,7 +154,7 @@ bool Action::isActive()
 	if (ImGui::IsAnyItemFocused()) return false;
 	if (shortcut[0] == OS::Keycode::INVALID) return false;
 
-	for (int i = 0; i < lengthOf(shortcut) + 1; ++i) {
+	for (u32 i = 0; i < lengthOf(shortcut) + 1; ++i) {
 		if (i == lengthOf(shortcut) || shortcut[i] == OS::Keycode::INVALID) {
 			return true;
 		}

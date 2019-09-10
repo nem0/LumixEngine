@@ -103,7 +103,7 @@ void Frustum::transform(const Matrix& mtx)
 		p = mtx.transformPoint(p);
 	}
 
-	for (int i = 0; i < lengthOf(xs); ++i)
+	for (u32 i = 0; i < lengthOf(xs); ++i)
 	{
 		Vec3 p;
 		if (xs[i] != 0) p.set(-ds[i] / xs[i], 0, 0);
@@ -124,11 +124,11 @@ void Frustum::transform(const Matrix& mtx)
 Frustum Frustum::transformed(const Matrix& mtx) const
 {
 	Frustum res;
-	for (int i = 0; i < lengthOf(points); ++i) {
+	for (u32 i = 0; i < lengthOf(points); ++i) {
 		res.points[i] = mtx.transformPoint(points[i]);
 	}
 
-	for (int i = 0; i < lengthOf(xs); ++i) {
+	for (u32 i = 0; i < lengthOf(xs); ++i) {
 		Vec3 p;
 		if (xs[i] != 0) p.set(-ds[i] / xs[i], 0, 0);
 		else if (ys[i] != 0) p.set(0, -ds[i] / ys[i], 0);
@@ -150,14 +150,14 @@ Sphere Frustum::computeBoundingSphere() const
 {
 	Sphere sphere;
 	sphere.position = points[0];
-	for (int i = 1; i < lengthOf(points); ++i)
+	for (u32 i = 1; i < lengthOf(points); ++i)
 	{
 		sphere.position += points[i];
 	}
 	sphere.position *= 1.0f / lengthOf(points);
 
 	sphere.radius = 0;
-	for (int i = 0; i < lengthOf(points); ++i)
+	for (u32 i = 0; i < lengthOf(points); ++i)
 	{
 		float len_sq = (points[i] - sphere.position).squaredLength();
 		if (len_sq > sphere.radius) sphere.radius = len_sq;

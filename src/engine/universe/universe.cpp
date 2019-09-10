@@ -708,7 +708,7 @@ void Universe::deserialize(IInputStream& serializer)
 	{
 		EntityName& name = m_names.emplace();
 		serializer.read(name.entity);
-		serializer.readString(name.name, lengthOf(name.name));
+		serializer.readString(Span(name.name));
 		m_entities[name.entity.index].name = m_names.size() - 1;
 	}
 

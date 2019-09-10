@@ -83,7 +83,7 @@ static const char* getContexSwitchReasonString(i8 reason)
 		"WrRundown"		   ,
 		"MaximumWaitReason",
 	};
-	if (reason >= lengthOf(reasons)) return "Unknown";
+	if (reason >= (i8)lengthOf(reasons)) return "Unknown";
 	return reasons[reason];
 }
 
@@ -227,7 +227,7 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	ImGui::LabellessInputText("Filter###resource_filter", m_resource_filter, lengthOf(m_resource_filter));
+	ImGui::LabellessInputText("Filter###resource_filter", m_resource_filter, sizeof(m_resource_filter));
 
 	static const ResourceType RESOURCE_TYPES[] = { ResourceType("animation"),
 		ResourceType("material"),
@@ -235,7 +235,7 @@ void ProfilerUIImpl::onGUIResources()
 		ResourceType("physics"),
 		ResourceType("shader"),
 		ResourceType("texture") };
-	static const char* manager_names[] = {
+	static const char* MANAGER_NAMES[] = {
 		"Animations",
 		"Materials",
 		"Models",
@@ -243,11 +243,11 @@ void ProfilerUIImpl::onGUIResources()
 		"Shaders",
 		"Textures"
 	};
-	ASSERT(lengthOf(RESOURCE_TYPES) == lengthOf(manager_names));
+	ASSERT(lengthOf(RESOURCE_TYPES) == lengthOf(MANAGER_NAMES));
 	ImGui::Indent();
-	for (int i = 0; i < lengthOf(RESOURCE_TYPES); ++i)
+	for (u32 i = 0; i < lengthOf(RESOURCE_TYPES); ++i)
 	{
-		if (!ImGui::CollapsingHeader(manager_names[i])) continue;
+		if (!ImGui::CollapsingHeader(MANAGER_NAMES[i])) continue;
 
 		auto* resource_manager = m_resource_manager.get(RESOURCE_TYPES[i]);
 		auto& resources = resource_manager->getResourceTable();
@@ -766,7 +766,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			case Profiler::EventType::BEGIN_BLOCK:
 				++level;
-				ASSERT(level < lengthOf(open_blocks));
+				ASSERT(level < (int)lengthOf(open_blocks));
 				open_blocks[level].link = 0;
 				open_blocks[level].offset = p;
 				open_blocks[level].color = 0xffDDddDD;
@@ -801,7 +801,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				break;
 			case Profiler::EventType::INT:
 			case Profiler::EventType::STRING: {
-				if (properties_count < lengthOf(properties) && level >= 0) {
+				if (properties_count < (int)lengthOf(properties) && level >= 0) {
 					properties[properties_count].header = header;
 					properties[properties_count].level = level;
 					properties[properties_count].offset = sizeof(Profiler::EventHeader) + p;
@@ -897,7 +897,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			switch (header.type) {
 				case Profiler::EventType::BEGIN_GPU_BLOCK:
 					++level;
-					ASSERT(level < lengthOf(open_blocks));
+					ASSERT(level < (int)lengthOf(open_blocks));
 					open_blocks[level] = p;
 					break;
 				case Profiler::EventType::END_GPU_BLOCK:

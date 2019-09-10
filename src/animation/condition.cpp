@@ -126,7 +126,7 @@ public:
 	};
 
 	public:
-		int tokenize(const char* src, Token* tokens, int max_size);
+		int tokenize(const char* src, const Span<Token>& tokens);
 		int compile(const char* src, const Token* tokens, int token_count, u8* byte_code, int max_size, InputDecl& decl);
 		int toPostfix(const Token* input, Token* output, int count);
 		Condition::Error getError() const { return m_compile_time_error; }
@@ -727,7 +727,7 @@ int ExpressionCompiler::compile(const char* src,
 }
 
 
-int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
+int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 {
 	static const struct { const char* c; bool binary; ExpressionCompiler::Token::Operator op; } OPERATORS[] =
 	{
@@ -745,7 +745,7 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 
 	m_compile_time_error = Condition::Error::NONE;
 	const char* c = src;
-	int token_count = 0;
+	u32 token_count = 0;
 	bool binary = false;
 	while (*c)
 	{
@@ -821,7 +821,7 @@ int ExpressionCompiler::tokenize(const char* src, Token* tokens, int max_size)
 		}
 		if(token.type != Token::EMPTY)
 		{
-			if(token_count < max_size)
+			if(token_count < tokens.length())
 			{
 				tokens[token_count] = token;
 			}
@@ -876,7 +876,7 @@ Condition::Error Condition::compile(const char* expression, InputDecl& decl)
 	ExpressionCompiler compiler;
 	ExpressionCompiler::Token tokens[128];
 	ExpressionCompiler::Token postfix_tokens[128];
-	int tokens_count = compiler.tokenize(expression, tokens, lengthOf(tokens));
+	int tokens_count = compiler.tokenize(expression, Span(tokens));
 	if (tokens_count < 0)
 	{
 		compile("1 < 0", decl);
@@ -900,31 +900,6 @@ Condition::Error Condition::compile(const char* expression, InputDecl& decl)
 }
 
 
-int InputDecl::inputFromLinearIdx(int idx) const
-{
-	for (int i = 0; i < lengthOf(inputs); ++i)
-	{
-		if (inputs[i].type == EMPTY) continue;
-		if (idx == 0) return i;
-		--idx;
-	}
-	return -1;
-}
-
-
-int InputDecl::inputToLinearIdx(int idx) const
-{
-	int linear = 0;
-	for (int i = 0; i < lengthOf(inputs); ++i)
-	{
-		if (i == idx) return inputs[i].type == EMPTY ? -1 : linear;
-		if (inputs[i].type == EMPTY) continue;
-		++linear;
-	}
-	return -1;
-}
-
-
 void InputDecl::removeInput(u32 index)
 {
 	inputs[index].type = EMPTY;
@@ -940,30 +915,11 @@ void InputDecl::removeConstant(int index)
 }
 
 
-void InputDecl::moveConstant(int old_idx, int new_idx)
-{
-	if (old_idx == new_idx) return;
-	ASSERT(constants[new_idx].type == EMPTY);
-	constants[new_idx] = constants[old_idx];
-	constants[old_idx].type = EMPTY;
-}
-
-
-void InputDecl::moveInput(int old_idx, int new_idx)
-{
-	if (old_idx == new_idx) return;
-	ASSERT(inputs[new_idx].type == EMPTY);
-	inputs[new_idx] = inputs[old_idx];
-	inputs[old_idx].type = EMPTY;
-	recalculateOffsets();
-}
-
-
 int InputDecl::addInput()
 {
-	ASSERT(inputs_count < (u32)lengthOf(inputs));
+	ASSERT(inputs_count < lengthOf(inputs));
 		
-	for (int i = 0; i < lengthOf(inputs); ++i)
+	for (u32 i = 0; i < lengthOf(inputs); ++i)
 	{
 		if (inputs[i].type == EMPTY)
 		{
@@ -980,9 +936,9 @@ int InputDecl::addInput()
 
 int InputDecl::addConstant()
 {
-	ASSERT(constants_count < (u32)lengthOf(constants));
+	ASSERT(constants_count < lengthOf(constants));
 
-	for (int i = 0; i < lengthOf(constants); ++i)
+	for (u32 i = 0; i < lengthOf(constants); ++i)
 	{
 		if (constants[i].type == EMPTY)
 		{
@@ -993,18 +949,6 @@ int InputDecl::addConstant()
 		}
 	}
 	return -1;
-}
-
-
-int InputDecl::getSize() const
-{
-	if (inputs_count == 0) return 0;
-	int size = 0;
-	for (const auto& input : inputs)
-	{
-		if(input.type != EMPTY) size = maximum(size, input.offset + getSize(input.type));
-	}
-	return size;
 }
 
 
@@ -1035,7 +979,7 @@ void InputDecl::recalculateOffsets()
 
 int InputDecl::getInputIdx(const char* name, int size) const
 {
-	for (int i = 0; i < lengthOf(inputs); ++i)
+	for (u32 i = 0; i < lengthOf(inputs); ++i)
 	{
 		if (inputs[i].type == Type::EMPTY) continue;
 		if (strncmp(inputs[i].name, name, size) == 0) return i;
@@ -1046,7 +990,7 @@ int InputDecl::getInputIdx(const char* name, int size) const
 
 int InputDecl::getConstantIdx(const char* name, int size) const
 {
-	for (int i = 0; i < lengthOf(constants); ++i)
+	for (u32 i = 0; i < lengthOf(constants); ++i)
 	{
 		if (constants[i].type != Type::EMPTY && strncmp(constants[i].name, name, size) == 0) return i;
 	}

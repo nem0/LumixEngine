@@ -799,7 +799,7 @@ int getSize(AttributeType type)
 
 void VertexDecl::addAttribute(u8 idx, u8 byte_offset, u8 components_num, AttributeType type, u8 flags)
 {
-	if((int)attributes_count >= lengthOf(attributes)) {
+	if(attributes_count >= lengthOf(attributes)) {
 		ASSERT(false);
 		return;
 	}
@@ -848,7 +848,7 @@ void useProgram(ProgramHandle handle)
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 {
 	GLuint gl_handles[64];
-	ASSERT(count <= (u32)lengthOf(gl_handles));
+	ASSERT(count <= lengthOf(gl_handles));
 	ASSERT(handles);
 	
 	for(u32 i = 0; i < count; ++i) {
@@ -1658,7 +1658,7 @@ static const char* shaderTypeToString(ShaderType type)
 }
 
 
-bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, int num, const char** prefixes, int prefixes_count, const char* name)
+bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, int num, const char** prefixes, u32 prefixes_count, const char* name)
 {
 	checkThread();
 
@@ -1704,7 +1704,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		combined_srcs[0] = "#version 440\n";
 		combined_srcs[1] = "#define _ORIGIN_BOTTOM_LEFT\n";
 		combined_srcs[prefixes_count + decl.attributes_count + 2] = srcs[i];
-		for (int j = 0; j < prefixes_count; ++j) {
+		for (u32 j = 0; j < prefixes_count; ++j) {
 			combined_srcs[j + 2] = prefixes[j];
 		}
 		for (u32 j = 0; j < decl.attributes_count; ++j) {
@@ -1967,7 +1967,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	ASSERT(status == GL_FRAMEBUFFER_COMPLETE);
 
 	GLenum db[16];
-	for(u32 i = 0; i < (u32)lengthOf(db); ++i) db[i] = GL_COLOR_ATTACHMENT0 + i;
+	for (u32 i = 0; i < lengthOf(db); ++i) db[i] = GL_COLOR_ATTACHMENT0 + i;
 	
 	CHECK_GL(glDrawBuffers(rb_count, db));
 }

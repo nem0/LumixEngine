@@ -109,7 +109,7 @@ struct FBXImporter
 		int bone_idx = -1;
 		bool import = true;
 		bool import_physics = false;
-		int lod = 0;
+		u32 lod = 0;
 		int submesh = -1;
 		OutputMemoryStream vertex_data;
 		Array<int> indices;

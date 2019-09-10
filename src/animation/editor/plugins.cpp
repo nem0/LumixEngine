@@ -214,7 +214,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			
 		PropertyAnimation::Curve& curve = animation->curves[m_selected_curve];
 		ImVec2 points[16];
-		ASSERT(curve.frames.size() < lengthOf(points));
+		ASSERT((u32)curve.frames.size() < lengthOf(points));
 		for (int i = 0; i < curve.frames.size(); ++i)
 		{
 			points[i].x = (float)curve.frames[i];
@@ -353,7 +353,7 @@ struct AnimablePropertyGridPlugin : PropertyGrid::IPlugin
 				if (pose && model)
 				{
 					ImGui::Columns(3);
-					for (int i = 0; i < pose->count; ++i)
+					for (u32 i = 0; i < pose->count; ++i)
 					{
 						ImGui::Text("%s", model->getBone(i).name.c_str());
 						ImGui::NextColumn();

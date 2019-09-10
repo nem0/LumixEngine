@@ -339,7 +339,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::EndCombo();
 		}
 
-		for (int i = 0; material->getShader() && i < material->getShader()->m_texture_slot_count; ++i) {
+		for (u32 i = 0; material->getShader() && i < material->getShader()->m_texture_slot_count; ++i) {
 			auto& slot = material->getShader()->m_texture_slots[i];
 			Texture* texture = material->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
@@ -1527,7 +1527,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const char* path;
 			ShaderPlugin* plugin;
 			u8* content;
-			int content_len;
+			u32 content_len;
 			int idx;
 		} ctx = { path, this, content.begin(), content.byte_size(), 0 };
 
@@ -1610,7 +1610,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::CollapsingHeader(
 				"Texture slots", nullptr, ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed))
 		{
-			for (int i = 0; i < shader->m_texture_slot_count; ++i)
+			for (u32 i = 0; i < shader->m_texture_slot_count; ++i)
 			{
 				auto& slot = shader->m_texture_slots[i];
 				ImGui::Text("%s", slot.name);

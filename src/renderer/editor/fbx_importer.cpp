@@ -1269,8 +1269,7 @@ void FBXImporter::writeBillboardVertices(const AABB& aabb)
 		{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_min.y)},
 		{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_min.y)}};
 
-	int vertex_data_size = sizeof(BillboardSceneData::Vertex);
-	vertex_data_size *= lengthOf(vertices);
+	const u32 vertex_data_size = sizeof(vertices);
 	write(vertex_data_size);
 	for (const BillboardSceneData::Vertex& vertex : vertices)
 	{
@@ -1359,7 +1358,7 @@ void FBXImporter::writeGeometry()
 		const int index_size = sizeof(u16);
 		write(index_size);
 		const u16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
-		const i32 len = lengthOf(indices);
+		const u32 len = lengthOf(indices);
 		write(len);
 		write(indices, sizeof(indices));
 	}
@@ -1558,7 +1557,7 @@ void FBXImporter::writeLODs()
 		lods[mesh.lod] = last_mesh_idx;
 	}
 
-	for (int i = 1; i < Lumix::lengthOf(lods); ++i)
+	for (u32 i = 1; i < Lumix::lengthOf(lods); ++i)
 	{
 		if (lods[i] < lods[i - 1]) lods[i] = lods[i - 1];
 	}

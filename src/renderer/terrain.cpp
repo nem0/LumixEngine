@@ -411,7 +411,7 @@ void Terrain::deserialize(IInputStream& serializer, Universe& universe, RenderSc
 	serializer.read(m_entity);
 	serializer.read(m_layer_mask);
 	char path[MAX_PATH_LENGTH];
-	serializer.readString(path, MAX_PATH_LENGTH);
+	serializer.readString(Span(path));
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
@@ -429,7 +429,7 @@ void Terrain::deserialize(IInputStream& serializer, Universe& universe, RenderSc
 	}
 	for(int i = 0; i < count; ++i)
 	{
-		serializer.readString(path, MAX_PATH_LENGTH);
+		serializer.readString(Span(path));
 		serializer.read(m_grass_types[i].m_density);
 		serializer.read(m_grass_types[i].m_distance);
 		serializer.read(m_grass_types[i].m_rotation_mode);
