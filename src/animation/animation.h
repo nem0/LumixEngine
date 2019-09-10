@@ -16,7 +16,7 @@ struct Vec3;
 struct BoneMask
 {
 	BoneMask(IAllocator& allocator) : bones(allocator) {}
-	u32 name;
+	StaticString<32> name;
 	HashMap<u32, u8> bones;
 };
 
@@ -42,8 +42,8 @@ class Animation final : public Resource
 
 		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
 		LocalRigidTransform getBoneTransform(float time, int bone_idx) const;
-		void getRelativePose(float time, Pose& pose, Model& model, BoneMask* mask) const;
-		void getRelativePose(float time, Pose& pose, Model& model, float weight, BoneMask* mask) const;
+		void getRelativePose(float time, Pose& pose, const Model& model, const BoneMask* mask) const;
+		void getRelativePose(float time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
 		int getFrameCount() const { return m_frame_count; }
 		float getLength() const { return m_frame_count / (float)m_fps; }
 		int getFPS() const { return m_fps; }

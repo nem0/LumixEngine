@@ -23,7 +23,7 @@ static const float DEFAULT_ALPHA_REF_VALUE = 0.3f;
 static struct CustomFlags
 {
 	char flags[32][32];
-	int count;
+	u32 count;
 } s_custom_flags = {};
 
 
@@ -79,7 +79,7 @@ int Material::getCustomFlagCount()
 
 u32 Material::getCustomFlag(const char* flag_name)
 {
-	for (int i = 0; i < s_custom_flags.count; ++i)
+	for (u32 i = 0; i < s_custom_flags.count; ++i)
 	{
 		if (equalStrings(s_custom_flags.flags[i], flag_name)) return 1 << i;
 	}
@@ -123,7 +123,7 @@ Material::Uniform* Material::findUniform(u32 name_hash) {
 void Material::unload()
 {
 	m_uniforms.clear();
-	for (int i = 0; i < m_texture_count; i++) {
+	for (u32 i = 0; i < m_texture_count; i++) {
 		if (m_textures[i]) {
 			removeDependency(*m_textures[i]);
 			m_textures[i]->getResourceManager().unload(*m_textures[i]);
@@ -177,7 +177,7 @@ bool Material::save(IOutputStream& file)
 
 	file << "color { " << m_color.x << ", " << m_color.y << ", " << m_color.z << ", " << m_color.w << " }\n";
 
-	for (int i = 0; i < m_texture_count; ++i) {
+	for (u32 i = 0; i < m_texture_count; ++i) {
 		char path[MAX_PATH_LENGTH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
 			copyString(Span(path), m_textures[i]->getPath().c_str());
@@ -270,7 +270,7 @@ void Material::setTexturePath(int i, const Path& path)
 }
 
 
-void Material::setTexture(int i, Texture* texture)
+void Material::setTexture(u32 i, Texture* texture)
 {
 	Texture* old_texture = i < m_texture_count ? m_textures[i] : nullptr;
 	if (!texture && m_shader && m_shader->isReady() && m_shader->m_texture_slots[i].default_texture)
@@ -317,7 +317,7 @@ void Material::onBeforeReady()
 {
 	if (!m_shader) return;
 
-	for(int i = 0; i < m_shader->m_texture_slot_count; ++i) {
+	for(u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
 		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture) {
 			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
 			if (i >= m_texture_count) m_texture_count = i + 1;
@@ -354,7 +354,7 @@ void Material::onBeforeReady()
 		m_uniforms[i].name_hash = shader_uniform.name_hash;
 	}
 
-	for(int i = 0; i < m_shader->m_texture_slot_count; ++i) {
+	for(u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
 		const int define_idx = m_shader->m_texture_slots[i].define_idx;
 		if(define_idx >= 0) {
 			if(m_textures[i]) {
@@ -366,7 +366,7 @@ void Material::onBeforeReady()
 		}
 	}
 
-	for (int i = m_shader->m_texture_slot_count; i < m_texture_count; ++i) {
+	for (u32 i = m_shader->m_texture_slot_count; i < m_texture_count; ++i) {
 		setTexture(i, nullptr);
 	}
 	m_texture_count = minimum(m_texture_count, m_shader->m_texture_slot_count);
@@ -411,7 +411,7 @@ void Material::updateRenderData(bool on_before_ready)
 
 	m_render_data->material_constants = m_renderer.createMaterialConstants(cs);
 
-	for(int i = 0; i < m_texture_count; ++i) {
+	for(u32 i = 0; i < m_texture_count; ++i) {
 		m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : ffr::INVALID_TEXTURE;
 	}
 }

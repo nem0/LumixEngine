@@ -62,7 +62,7 @@ void Pose::resize(int count)
 void Pose::computeAbsolute(Model& model)
 {
 	if (is_absolute) return;
-	for (int i = model.getFirstNonrootBoneIndex(); i < count; ++i)
+	for (u32 i = model.getFirstNonrootBoneIndex(); i < count; ++i)
 	{
 		int parent = model.getBone(i).parent_idx;
 		positions[i] = rotations[parent].rotate(positions[i]) + positions[parent];

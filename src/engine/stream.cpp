@@ -310,22 +310,23 @@ bool InputMemoryStream::read(void* data, u64 size)
 
 bool InputMemoryStream::read(String& string)
 {
-	i32 size;
+	u32 size;
 	IInputStream::read(size);
 	string.resize(size);
-	bool res = read(string.getData(), size);
-	return res;
+	return read(string.getData(), size);
 }
 
 
-bool IInputStream::readString(char* data, int max_size)
+bool IInputStream::readString(const Span<char>& value)
 {
-	i32 size;
+	u32 size;
 	IInputStream::read(size);
-	ASSERT(size < max_size);
+	const u32 max_size = value.length();
+	ASSERT(size < value.length());
+	char* data = value.m_begin;
 	bool res = read(data, size < max_size - 1 ? size : max_size - 1);
 	data[size < max_size - 1 ? size : max_size - 1] = 0;
-	for (int i = max_size; i < size; ++i) {
+	for (u32 i = max_size; i < size; ++i) {
 		char dummy;
 		read(dummy);
 	}

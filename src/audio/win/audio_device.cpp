@@ -212,11 +212,11 @@ struct AudioDeviceImpl final : public AudioDevice
 			}
 		}
 
-		for (int i = 0; i < lengthOf(m_buffer_map); ++i)
+		for (int& handle : m_buffer_map)
 		{
-			if (m_buffer_map[i] == INVALID_BUFFER_HANDLE)
-			{
-				m_buffer_map[i] = m_buffer_count;
+			if (handle == INVALID_BUFFER_HANDLE) {
+				const u32 i = u32(&handle - m_buffer_map);
+				handle = m_buffer_count;
 				m_buffers[m_buffer_count].handle = buffer;
 				m_buffers[m_buffer_count].data = data;
 				m_buffers[m_buffer_count].data_size = data_size;
@@ -224,8 +224,7 @@ struct AudioDeviceImpl final : public AudioDevice
 				m_buffers[m_buffer_count].sparse_idx = i;
 				m_buffers[m_buffer_count].handle_3d = source;
 				m_buffers[m_buffer_count].handle8 = nullptr;
-				buffer->QueryInterface(
-					IID_IDirectSoundBuffer8, (void**)&m_buffers[m_buffer_count].handle8);
+				buffer->QueryInterface(IID_IDirectSoundBuffer8, (void**)&m_buffers[m_buffer_count].handle8);
 				++m_buffer_count;
 				return i;
 			}

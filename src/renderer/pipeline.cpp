@@ -1291,7 +1291,7 @@ struct PipelineImpl final : Pipeline
 
 			ffr::TextureHandle m_textures_handles[16];
 			int m_offset = 0;
-			int m_textures_count = 0;
+			u32 m_textures_count = 0;
 		};
 
 		const int pipeline_idx = lua_upvalueindex(1);
@@ -1554,7 +1554,7 @@ struct PipelineImpl final : Pipeline
 
 			PipelineImpl* m_pipeline;
 			ffr::TextureHandle m_textures_handles[16];
-			int m_textures_count = 0;
+			u32 m_textures_count = 0;
 			float m_uniforms[16][4];
 			int m_uniforms_count = 0;
 			Shader* m_shader;
@@ -2268,7 +2268,7 @@ struct PipelineImpl final : Pipeline
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
-		const int rb_count = lua_gettop(L);
+		const u32 rb_count = lua_gettop(L);
 		int rbs[16];
 		if(rb_count > lengthOf(rbs)) {
 			logError("Renderer") << "Too many render buffers in " << pipeline->getPath();	
@@ -2300,7 +2300,7 @@ struct PipelineImpl final : Pipeline
 		};
 
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
-		for(int i = 0; i < rb_count; ++i) {
+		for(u32 i = 0; i < rb_count; ++i) {
 			const int rb_idx = LuaWrapper::checkArg<int>(L, i + 1);
 			cmd->rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
 		}

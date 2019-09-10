@@ -1053,7 +1053,7 @@ private:
 				blob.read(guid.value);
 				m_editor.m_entity_map.insert(guid, new_entity);
 				char name[Universe::ENTITY_NAME_MAX_LENGTH];
-				blob.readString(name, lengthOf(name));
+				blob.readString(Span(name));
 				universe->setEntityName(new_entity, name);
 				EntityPtr parent;
 				blob.read(parent);
@@ -1825,7 +1825,7 @@ public:
 			fromCString(Span(tmp), Ref(guid.value));
 			loadFile(filepath, [&versions, &entity_map, &universe, guid](TextDeserializer& deserializer) {
 				char name[64];
-				deserializer.read(name, lengthOf(name));
+				deserializer.read(Span(name));
 				RigidTransform tr;
 				deserializer.read(Ref(tr));
 				float scale;

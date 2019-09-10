@@ -35,7 +35,7 @@ LUMIX_ENGINE_API i64 createNewLinkID();
 struct FiberSwitchData {
 	i32 id;
 	const char* blocks[16];
-	int count;
+	u32 count;
 };
 
 LUMIX_ENGINE_API void beforeFiberSwitch();

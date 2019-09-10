@@ -509,7 +509,7 @@ void ParticleEmitter::deserialize(IInputStream& blob, ResourceManagerHub& manage
 {
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
-	blob.readString(path, lengthOf(path));
+	blob.readString(Span(path));
 	ResourceManager* material_manager = manager.get(ParticleEmitterResource::TYPE);
 	auto* res = manager.load<ParticleEmitterResource>(Path(path));
 	setResource(res);

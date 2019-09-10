@@ -232,7 +232,7 @@ bool Settings::load()
 			lua_getfield(L, -1, actions[i]->name);
 			if (lua_type(L, -1) == LUA_TTABLE)
 			{
-				for (int j = 0; j < lengthOf(actions[i]->shortcut); ++j)
+				for (u32 j = 0; j < lengthOf(actions[i]->shortcut); ++j)
 				{
 					lua_rawgeti(L, -1, 1 + j);
 					if (lua_type(L, -1) == LUA_TNUMBER)
@@ -443,7 +443,7 @@ void Settings::showToolbarSettings() const
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
-	ImGui::LabellessInputText("Filter", m_filter, lengthOf(m_filter));
+	ImGui::LabellessInputText("Filter", m_filter, sizeof(m_filter));
 	ImGui::Columns(4);
 	ImGui::Text("Label");
 	ImGui::NextColumn();

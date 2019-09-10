@@ -62,9 +62,9 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 	for (int i = 0; i < count; ++i) {
 		Curve& curve = curves.emplace(m_allocator);
 		char tmp[32];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		curve.cmp_type = Reflection::getComponentType(tmp);
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		u32 prop_hash = crc32(tmp);
 		
 		int keys_count;

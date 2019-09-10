@@ -429,9 +429,9 @@ void endFiberWait(u32 job_system_signal, const FiberSwitchData& switch_data)
 	r.job_system_signal = job_system_signal;
 
 	write(*ctx, EventType::END_FIBER_WAIT, r);
-	const int count = switch_data.count;
+	const u32 count = switch_data.count;
 	
-	for (int i = 0; i < count; ++i) {
+	for (u32 i = 0; i < count; ++i) {
 		if(i < lengthOf(switch_data.blocks)) {
 			beginBlock(switch_data.blocks[i]);
 		} else {

@@ -47,7 +47,7 @@ struct PathManagerImpl : PathManager
 		serializer.read(size);
 		for (int i = 0; i < size; ++i) {
 			char path[MAX_PATH_LENGTH];
-			serializer.readString(path, sizeof(path));
+			serializer.readString(Span(path));
 			u32 hash = crc32(path);
 			PathInternal* internal = getPathMultithreadUnsafe(hash, path);
 			--internal->m_ref_count;

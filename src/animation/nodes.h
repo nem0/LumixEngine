@@ -35,7 +35,8 @@ struct Node {
 	enum Type : u32 {
 		ANIMATION,
 		GROUP,
-		BLEND1D
+		BLEND1D,
+		LAYERS
 	};
 
 	Node(GroupNode* parent, IAllocator& allocator) 
@@ -48,14 +49,14 @@ struct Node {
 	virtual void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const = 0;
 	virtual void enter(RuntimeContext& ctx) const = 0;
 	virtual void skip(RuntimeContext& ctx) const = 0;
-	virtual void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const = 0;
+	virtual void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const = 0;
 	virtual void serialize(OutputMemoryStream& stream) const = 0 {
 		stream.writeString(m_name.c_str());
 	}
 
 	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl) = 0 {
 		char tmp[64];
-		stream.readString(tmp, sizeof(tmp));
+		stream.readString(Span(tmp));
 		m_name = tmp;
 	}
 
@@ -72,7 +73,7 @@ struct AnimationNode final : Node {
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;
 	void enter(RuntimeContext& ctx) const override;
 	void skip(RuntimeContext& ctx) const override;
-	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const override;
+	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 
@@ -86,7 +87,7 @@ struct Blend1DNode final : Node {
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;
 	void enter(RuntimeContext& ctx) const override;
 	void skip(RuntimeContext& ctx) const override;
-	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const override;
+	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 
@@ -106,7 +107,7 @@ struct GroupNode final : Node {
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;
 	void enter(RuntimeContext& ctx) const override;
 	void skip(RuntimeContext& ctx) const override;
-	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose) const override;
+	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 
@@ -117,22 +118,61 @@ struct GroupNode final : Node {
 	};
 
 	struct Child {
+		struct Transition {
+			Transition(IAllocator& allocator) 
+				: condition(allocator) 
+				, condition_str("", allocator)
+			{}
+
+			u32 to;
+			Condition condition;
+			String condition_str;
+		};
+
+		enum Flags : u32 {
+			SELECTABLE = 1 << 0
+		};
+
 		Child(IAllocator& allocator) 
 			: condition(allocator) 
 			, condition_str("", allocator)
+			, transitions(allocator)
 		{}
 
 		Condition condition;
 		String condition_str;
-		Node* node; 
+		Node* node;
+		u32 flags = SELECTABLE;
+		Array<Transition> transitions;
 	};
+
 
 	IAllocator& m_allocator;
 	float m_blend_length = 0.3f;
 	Array<Child> m_children;
 };
 
+struct LayersNode final : Node {
+	LayersNode(GroupNode* parent, IAllocator& allocator);
+	Type type() const override { return LAYERS; }
+	
+	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;
+	void enter(RuntimeContext& ctx) const override;
+	void skip(RuntimeContext& ctx) const override;
+	void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const override;
+	void serialize(OutputMemoryStream& stream) const override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 
+	struct Layer {
+		Layer(GroupNode* parent, IAllocator& allocator);
+		GroupNode node;
+		u32 mask = 0;
+		StaticString<32> name;
+	};
+
+	IAllocator& m_allocator;
+	Array<Layer> m_layers;
+};
 
 } // ns anim
 } // ns Lumix

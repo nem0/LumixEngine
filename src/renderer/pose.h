@@ -27,7 +27,7 @@ struct LUMIX_RENDERER_API Pose
 
 	IAllocator& allocator;
 	bool is_absolute;
-	i32 count;
+	u32 count;
 	Vec3* positions;
 	Quat* rotations;
 	

@@ -724,7 +724,7 @@ struct GUISceneImpl final : public GUIScene
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
 		
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		if (tmp[0] == '\0')
 		{
 			rect.image->sprite = nullptr;
@@ -766,7 +766,7 @@ struct GUISceneImpl final : public GUIScene
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		serializer.read(Ref((int&)rect.text->horizontal_align));
 		serializer.read(Ref(rect.text->color));
 		int font_size;
@@ -1277,7 +1277,7 @@ struct GUISceneImpl final : public GUIScene
 			if (has_image)
 			{
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
-				serializer.readString(tmp, lengthOf(tmp));
+				serializer.readString(Span(tmp));
 				if (tmp[0] == '\0')
 				{
 					rect->image->sprite = nullptr;
@@ -1304,7 +1304,7 @@ struct GUISceneImpl final : public GUIScene
 			{
 				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 				GUIText& text = *rect->text;
-				serializer.readString(tmp, lengthOf(tmp));
+				serializer.readString(Span(tmp));
 				serializer.read(text.horizontal_align);
 				serializer.read(text.color);
 				int font_size;
@@ -1362,7 +1362,7 @@ struct GUISceneImpl final : public GUIScene
 	AssociativeArray<EntityRef, GUIRect*> m_rects;
 	AssociativeArray<EntityRef, GUIButton> m_buttons;
 	EntityRef m_buttons_down[16];
-	int m_buttons_down_count;
+	u32 m_buttons_down_count;
 	EntityPtr m_focused_entity = INVALID_ENTITY;
 	GUIRect* m_root = nullptr;
 	FontManager* m_font_manager = nullptr;

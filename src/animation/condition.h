@@ -55,19 +55,12 @@ struct InputDecl
 	Constant constants[32];
 	u32 constants_count = 0;
 
-
 	static int getSize(Type type);
 
-	int inputFromLinearIdx(int idx) const;
-	int inputToLinearIdx(int idx) const;
 	void removeInput(u32 index);
 	void removeConstant(int index);
-	void moveConstant(int old_idx, int new_idx);
-	void moveInput(int old_idx, int new_idx);
 	int addInput();
 	int addConstant();
-	int getInputsCount() const { return inputs_count; }
-	int getSize() const;
 	void recalculateOffsets();
 	int getInputIdx(const char* name, int size) const;
 	int getConstantIdx(const char* name, int size) const;

@@ -137,7 +137,7 @@ void LogUI::onGUI()
 	if (ImGui::Begin("Log", &m_is_open))
 	{
 		const char* labels[] = {"Info", "Warning", "Error"};
-		for (int i = 0; i < lengthOf(labels); ++i)
+		for (u32 i = 0; i < lengthOf(labels); ++i)
 		{
 			char label[40];
 			fillLabel(Span(label), labels[i], m_new_message_count[i]);

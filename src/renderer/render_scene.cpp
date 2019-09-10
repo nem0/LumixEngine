@@ -438,7 +438,7 @@ public:
 
 		Transform parent_entity_transform = m_universe.getTransform((EntityRef)bone_attachment.parent_entity);
 		int idx = bone_attachment.bone_index;
-		if (idx < 0 || idx > parent_pose->count) {
+		if (idx < 0 || idx >= (int)parent_pose->count) {
 			unlockPose(model_instance, false);
 			return;
 		}
@@ -470,7 +470,7 @@ public:
 		if (!pose) return;
 
 		ASSERT(pose->is_absolute);
-		if (attachment.bone_index >= pose->count) {
+		if (attachment.bone_index >= (int)pose->count) {
 			unlockPose(model_instance, false);
 			return;
 		}
@@ -617,7 +617,7 @@ public:
 		r.mesh_count = 0;
 
 		char path[MAX_PATH_LENGTH];
-		serializer.read(path, lengthOf(path));
+		serializer.read(Span(path));
 		serializer.read(Ref(r.flags.base));
 
 		if (path[0] != 0)
@@ -711,7 +711,7 @@ public:
 		char tmp[MAX_PATH_LENGTH];
 		decal.entity = entity;
 		serializer.read(Ref(decal.half_extents));
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		setDecalMaterialPath(entity, Path(tmp));
 		updateDecalInfo(decal);
 		const DVec3 pos = m_universe.getPosition(entity);
@@ -881,7 +881,7 @@ public:
 		m_text_meshes.insert(entity, &text);
 
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		serializer.read(Ref(text.color));
 		int font_size;
 		serializer.read(Ref(font_size));
@@ -971,7 +971,7 @@ public:
 		serializer.read(Ref(terrain->m_layer_mask));
 		serializer.read(Ref(terrain->m_scale));
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		auto* material = tmp[0] ? m_engine.getResourceManager().load<Material>(Path(tmp)) : nullptr;
 		terrain->setMaterial(material);
 
@@ -984,7 +984,7 @@ public:
 			serializer.read(Ref(type.m_distance));
 			serializer.read(Ref((int&)type.m_rotation_mode));
 			type.m_idx = i;
-			serializer.read(tmp, lengthOf(tmp));
+			serializer.read(Span(tmp));
 			terrain->m_grass_types.push(type);
 			terrain->setGrassTypePath(terrain->m_grass_types.size() - 1, Path(tmp));
 		}
@@ -1049,7 +1049,7 @@ public:
 		emitter->m_entity = entity;
 
 		char tmp[MAX_PATH_LENGTH];
-		serializer.read(tmp, lengthOf(tmp));
+		serializer.read(Span(tmp));
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		ParticleEmitterResource* res = manager.load<ParticleEmitterResource>(Path(tmp));
 		emitter->setResource(res);
@@ -1152,7 +1152,7 @@ public:
 			TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
 			m_text_meshes.insert(e, &text);
 			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(tmp, lengthOf(tmp));
+			serializer.readString(Span(tmp));
 			serializer.read(text.color);
 			int font_size;
 			serializer.read(font_size);
@@ -1177,7 +1177,7 @@ public:
 			Decal decal;
 			serializer.read(decal.entity);
 			serializer.read(decal.half_extents);
-			serializer.readString(tmp, lengthOf(tmp));
+			serializer.readString(Span(tmp));
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
 			setDecalMaterialPath(decal.entity, Path(tmp));
@@ -1560,7 +1560,7 @@ public:
 	}
 
 
-	int getClosestShadowcastingPointLights(const DVec3& reference_pos, int max_lights, PointLight* lights) override
+	int getClosestShadowcastingPointLights(const DVec3& reference_pos, u32 max_lights, PointLight* lights) override
 	{
 
 		float dists[16];
@@ -1568,7 +1568,7 @@ public:
 		ASSERT(max_lights > 0);
 		if (m_point_lights.empty()) return 0;
 
-		int light_count = 0;
+		u32 light_count = 0;
 		auto iter = m_point_lights.begin();
 		auto end = m_point_lights.end();
 		while (iter != end && light_count < max_lights) {
@@ -2745,7 +2745,7 @@ public:
 
 	DebugTriangle* addDebugTriangles(int count)
 	{
-		const int new_size = m_debug_triangles.size() + count;
+		const u32 new_size = m_debug_triangles.size() + count;
 		if (new_size < m_debug_triangles.capacity()) {
 			m_debug_triangles.reserve(maximum(new_size, m_debug_triangles.capacity() * 3 / 2));
 		}
@@ -2756,7 +2756,7 @@ public:
 
 	DebugLine* addDebugLines(int count) override
 	{
-		const int new_size = m_debug_lines.size() + count;
+		const u32 new_size = m_debug_lines.size() + count;
 		if (new_size < m_debug_lines.capacity()) {
 			m_debug_lines.reserve(maximum(new_size, m_debug_lines.capacity() * 3 / 2));
 		}

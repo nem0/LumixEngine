@@ -435,14 +435,14 @@ void TextDeserializer::read(Ref<String> value)
 }
 
 
-void TextDeserializer::read(char* value, int max_size)
+void TextDeserializer::read(const Span<char>& value)
 {
 	skip();
 	u8 c = blob.readChar();
 	ASSERT(c == '"');
-	char* out = value;
+	char* out = value.m_begin;
 	*out = blob.readChar();
-	while (*out != '"' && out - value < max_size - 1)
+	while (*out != '"' && out - value.m_begin < value.length() - 1)
 	{
 		++out;
 		*out = blob.readChar();

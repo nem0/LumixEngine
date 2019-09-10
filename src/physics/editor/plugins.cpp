@@ -409,7 +409,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 				copyString(buf, scene->getCollisionLayerName(i));
 				char label[10];
 				toCString(i, Span(label));
-				if (ImGui::InputText(label, buf, lengthOf(buf)))
+				if (ImGui::InputText(label, buf, sizeof(buf)))
 				{
 					scene->setCollisionLayerName(i, buf);
 				}

@@ -163,46 +163,33 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 	void onWindowGUI() override
 	{
 		if (!m_is_open) return; 
-		if (ImGui::Begin("Clip Manager", &m_is_open))
-		{
-			ImGui::InputText("Filter", m_filter, lengthOf(m_filter));
 
-			auto universe = m_app.getWorldEditor().getUniverse();
+		if (ImGui::Begin("Clip Manager", &m_is_open)) {
+			ImGui::InputText("Filter", m_filter, sizeof(m_filter));
+
+			Universe* universe = m_app.getWorldEditor().getUniverse();
 			auto* audio_scene = static_cast<AudioScene*>(universe->getScene(crc32("audio")));
-			int clip_count = audio_scene->getClipCount();
-			for (int clip_id = 0; clip_id < clip_count; ++clip_id)
-			{
-				auto* clip_info = audio_scene->getClipInfo(clip_id);
+			u32 clip_count = audio_scene->getClipCount();
+			for (u32 clip_id = 0; clip_id < clip_count; ++clip_id) {
+				AudioScene::ClipInfo* clip_info = audio_scene->getClipInfoByIndex(clip_id);
+				if (!clip_info) continue;
 
-				if (m_filter[0] != 0 && stristr(clip_info->name, m_filter) == nullptr)
-				{
+				if (m_filter[0] != 0 && stristr(clip_info->name, m_filter) == nullptr) {
 					continue;
 				}
 
-				if (ImGui::TreeNode((const void*)(uintptr)clip_id, "%s", clip_info->name))
-				{
-					char buf[30];
-					copyString(Span(buf), clip_info->name);
-					if (ImGui::InputText("Name", buf, sizeof(buf)))
-					{
-						copyString(clip_info->name, buf);
-						clip_info->name_hash = crc32(buf);
+				if (ImGui::TreeNode((const void*)(uintptr)clip_id, "%s", clip_info->name)) {
+					if (ImGui::InputText("Name", clip_info->name, sizeof(clip_info->name))) {
+						clip_info->name_hash = crc32(clip_info->name);
 					}
-					auto* clip = audio_scene->getClipInfo(clip_id)->clip;
 					char path[MAX_PATH_LENGTH];
-					copyString(path, clip ? clip->getPath().c_str() : "");
-					if (m_app.getAssetBrowser().resourceInput("Clip", "", Span(path), Clip::TYPE))
-					{
+					copyString(path, clip_info->clip ? clip_info->clip->getPath().c_str() : "");
+					if (m_app.getAssetBrowser().resourceInput("Clip", "clip", Span(path), Clip::TYPE)) {
 						audio_scene->setClip(clip_id, Path(path));
 					}
-					bool looped = audio_scene->getClipInfo(clip_id)->looped;
 					ImGui::InputFloat("Volume", &clip_info->volume);
-					if (ImGui::Checkbox("Looped", &looped))
-					{
-						clip_info->looped = looped;
-					}
-					if (ImGui::Button("Remove"))
-					{
+					ImGui::Checkbox("Looped", &clip_info->looped);
+					if (ImGui::Button("Remove")) {
 						audio_scene->removeClip(clip_info);
 						--clip_count;
 					}
@@ -210,8 +197,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 				}
 			}
 
-			if (ImGui::Button("Add"))
-			{
+			if (ImGui::Button("Add")) {
 				audio_scene->addClip("test", Path("test.ogg"));
 			}
 		}

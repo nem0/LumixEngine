@@ -49,7 +49,6 @@ public:
 	~AssetBrowser();
 	void onGUI();
 	void update();
-	int getTypeIndex(ResourceType type) const;
 	void selectResource(const Path& resource, bool record_history, bool additive);
 	bool resourceInput(const char* label, const char* str_id, Span<char> buf, ResourceType type);
 	void addPlugin(IPlugin& plugin);

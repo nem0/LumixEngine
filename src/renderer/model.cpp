@@ -122,7 +122,7 @@ static Vec3 evaluateSkin(Vec3& p, Mesh::Skin s, const Matrix* matrices)
 
 static void computeSkinMatrices(const Pose& pose, const Model& model, Matrix* matrices)
 {
-	for (int i = 0; i < pose.count; ++i)
+	for (u32 i = 0; i < pose.count; ++i)
 	{
 		auto& bone = model.getBone(i);
 		LocalRigidTransform tmp = { pose.positions[i], pose.rotations[i] };
@@ -424,7 +424,7 @@ int Model::getBoneIdx(const char* name)
 
 static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
 {
-	for (int i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
+	for (u32 i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
 		if(mesh.render_data->attributes_semantic[i] == attr) {
 			return mesh.render_data->vertex_decl.attributes[i].byte_offset;
 		}
@@ -434,7 +434,7 @@ static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
 
 static const ffr::Attribute& getAttribute(Mesh& mesh, Mesh::AttributeSemantic attr)
 {
-	for (int i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
+	for (u32 i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
 		if(mesh.render_data->attributes_semantic[i] == attr) {
 			return mesh.render_data->vertex_decl.attributes[i];
 		}
@@ -462,7 +462,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		u32 vb_stride;
 		if (!parseVertexDecl(file, &vertex_decl, semantics, Ref(vb_stride))) return false;
 
-		i32 mat_path_length;
+		u32 mat_path_length;
 		char mat_path[MAX_PATH_LENGTH + 128];
 		file.read(mat_path_length);
 		if (mat_path_length + 1 > lengthOf(mat_path)) return false;
@@ -541,13 +541,13 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 bool Model::parseLODs(InputMemoryStream& file)
 {
-	i32 lod_count;
+	u32 lod_count;
 	file.read(lod_count);
 	if (lod_count <= 0 || lod_count > lengthOf(m_lods))
 	{
 		return false;
 	}
-	for (int i = 0; i < lod_count; ++i)
+	for (u32 i = 0; i < lod_count; ++i)
 	{
 		file.read(m_lods[i].to_mesh);
 		file.read(m_lods[i].distance);
