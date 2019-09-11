@@ -32,7 +32,7 @@ class Animation final : public Resource
 		{
 			u32 magic;
 			u32 version;
-			u32 fps;
+			Time length;
 		};
 
 	public:
@@ -41,12 +41,10 @@ class Animation final : public Resource
 		ResourceType getType() const override { return TYPE; }
 
 		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
-		LocalRigidTransform getBoneTransform(float time, int bone_idx) const;
-		void getRelativePose(float time, Pose& pose, const Model& model, const BoneMask* mask) const;
-		void getRelativePose(float time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
-		int getFrameCount() const { return m_frame_count; }
-		float getLength() const { return m_frame_count / (float)m_fps; }
-		int getFPS() const { return m_fps; }
+		LocalRigidTransform getBoneTransform(Time time, int bone_idx) const;
+		void getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const;
+		void getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
+		Time getLength() const { return m_length; }
 		int getBoneCount() const { return m_bones.size(); }
 		int getBoneIndex(u32 name) const;
 
@@ -56,7 +54,7 @@ class Animation final : public Resource
 
 	private:
 		IAllocator& m_allocator;
-		int	m_frame_count;
+		Time m_length;
 		struct Bone
 		{
 			u32 name;
@@ -69,7 +67,6 @@ class Animation final : public Resource
 		};
 		Array<Bone> m_bones;
 		Array<u8> m_mem;
-		int m_fps;
 		int m_root_motion_bone_idx;
 };
 

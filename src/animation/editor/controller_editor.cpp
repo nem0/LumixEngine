@@ -258,6 +258,9 @@ void ControllerEditor::onWindowGUI() {
 					if (ImGui::MenuItem("Group")) {
 						createChild(*m_current_level, Node::GROUP, m_controller->m_allocator);
 					}
+					if (ImGui::MenuItem("Layers")) {
+						createChild(*m_current_level, Node::LAYERS, m_controller->m_allocator);
+					}
 					ImGui::EndMenu();
 				}
 				ImGui::EndMenu();
