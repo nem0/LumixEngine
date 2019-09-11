@@ -293,6 +293,7 @@ static int findSubblobIndex(const OutputMemoryStream& haystack, const OutputMemo
 
 static Vec3 toLumixVec3(const ofbx::Vec4& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
 static Vec3 toLumixVec3(const ofbx::Vec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
+static ofbx::Vec3 toOFBXVec3(const Vec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
 static Quat toLumix(const ofbx::Quat& q) { return {(float)q.x, (float)q.y, (float)q.z, (float)q.w}; }
 
 
@@ -786,13 +787,98 @@ static Quat getRotation(const ofbx::Matrix& mtx)
 	return m.getRotation();
 }
 
+static void fill(Array<FBXImporter::RotationKey>& out, const ofbx::AnimationCurveNode* curve_node, const ofbx::Object& bone) {
+	ASSERT(out.empty());
+	
+	const ofbx::AnimationCurve* x_curve = curve_node->getCurve(0);
+	const ofbx::AnimationCurve* y_curve = curve_node->getCurve(1);
+	const ofbx::AnimationCurve* z_curve = curve_node->getCurve(2);
+
+	if (x_curve) out.resize(x_curve->getKeyCount());
+	else if (y_curve) out.resize(z_curve->getKeyCount());
+	else if (z_curve) out.resize(y_curve->getKeyCount());
+	else return;
+
+	setMemory(out.begin(), 0, out.byte_size());
+
+	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
+		if (!curve) {
+			// TODO default value
+			ASSERT(false);
+			return;
+		}
+
+		// we do not support nodes with curves with different number of keyframes
+		ASSERT(curve->getKeyCount() == out.size());
+
+		const i64* times = curve->getKeyTime();
+		const float* values = curve->getKeyValue();
+		for (u32 i = 0, c = curve->getKeyCount(); i < c; ++i) {
+			(&out[i].rot.x)[idx] = values[i];
+			// node with two curves with different times, this is not supported
+			ASSERT(out[i].time == 0 || out[i].time == times[i]);
+			out[i].time = times[i];
+		}
+	};
+
+	fill_curve(0, x_curve);
+	fill_curve(1, y_curve);
+	fill_curve(2, z_curve);
+
+	ofbx::Vec3 lcl_translation = bone.getLocalTranslation();
+	for (FBXImporter::RotationKey& key : out) {
+		key.rot = getRotation(bone.evalLocal(lcl_translation, {key.rot.x, key.rot.y, key.rot.z}));
+	}
+}
+
+static void fill(Array<FBXImporter::TranslationKey>& out, const ofbx::AnimationCurveNode* curve_node, const ofbx::Object& bone, float parent_scale) {
+	ASSERT(out.empty());
+	
+	const ofbx::AnimationCurve* x_curve = curve_node->getCurve(0);
+	const ofbx::AnimationCurve* y_curve = curve_node->getCurve(1);
+	const ofbx::AnimationCurve* z_curve = curve_node->getCurve(2);
+
+	if (x_curve) out.resize(x_curve->getKeyCount());
+	else if (y_curve) out.resize(z_curve->getKeyCount());
+	else if (z_curve) out.resize(y_curve->getKeyCount());
+	else return;
+
+	setMemory(out.begin(), 0, out.byte_size());
+
+	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
+		if (!curve) {
+			// TODO default value
+			ASSERT(false);
+			return;
+		}
+
+		// we do not support nodes with curves with different number of keyframes
+		ASSERT(curve->getKeyCount() == out.size());
+
+		const i64* times = curve->getKeyTime();
+		const float* values = curve->getKeyValue();
+		for (u32 i = 0, c = curve->getKeyCount(); i < c; ++i) {
+			(&out[i].pos.x)[idx] = values[i];
+			// node with two curves with different times, this is not supported
+			ASSERT(out[i].time == 0 || out[i].time == times[i]);
+			out[i].time = times[i];
+		}
+	};
+
+	fill_curve(0, x_curve);
+	fill_curve(1, y_curve);
+	fill_curve(2, z_curve);
+
+	const ofbx::Vec3 lcl_rotation = bone.getLocalRotation();
+	for (FBXImporter::TranslationKey& key : out) {
+		key.pos = getTranslation(bone.evalLocal(toOFBXVec3(key.pos), lcl_rotation))  * parent_scale;
+	}
+}
+
 
 // arg parent_scale - animated scale is not supported, but we can get rid of static scale if we ignore
 // it in writeSkeleton() and use parent_scale in this function
 static void compressPositions(Array<FBXImporter::TranslationKey>& out,
-	int from_frame,
-	int to_frame,
-	float sample_period,
 	const ofbx::AnimationCurveNode* curve_node,
 	const ofbx::Object& bone,
 	float error,
@@ -800,90 +886,59 @@ static void compressPositions(Array<FBXImporter::TranslationKey>& out,
 {
 	out.clear();
 	if (!curve_node) return;
-	if (to_frame == from_frame) return;
 
-	ofbx::Vec3 lcl_rotation = bone.getLocalRotation();
-	Vec3 pos = getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(from_frame * sample_period), lcl_rotation)) * parent_scale;
-	FBXImporter::TranslationKey last_written = {pos, 0, 0};
-	out.push(last_written);
-	if (to_frame == from_frame + 1) return;
+	fill(out, curve_node, bone, parent_scale);
+	if (out.empty()) return;
 
-	pos = getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform((from_frame + 1) * sample_period), lcl_rotation)) *
-			parent_scale;
-	Vec3 dif = (pos - last_written.pos) / sample_period;
-	FBXImporter::TranslationKey prev = {pos, sample_period, 1};
-	float dt;
-	for (u16 i = 2; i < u16(to_frame - from_frame); ++i)
-	{
-		float t = i * sample_period;
-		Vec3 cur =
-			getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform((from_frame + i) * sample_period), lcl_rotation)) * parent_scale;
-		dt = t - last_written.time;
-		Vec3 estimate = last_written.pos + dif * dt;
-		if (fabs(estimate.x - cur.x) > error || fabs(estimate.y - cur.y) > error ||
-			fabs(estimate.z - cur.z) > error)
+	FBXImporter::TranslationKey prev = out[0];
+	// TODO what if there's just 1 keyframe
+	Vec3 dir = out[1].pos - out[0].pos;
+	dir *= float(1 / ofbx::fbxTimeToSeconds(out[1].time - out[0].time));
+	for (u32 i = 2; i < (u32)out.size(); ++i) {
+		const Vec3 estimate = prev.pos + dir * (float)ofbx::fbxTimeToSeconds(out[i].time - prev.time);
+		if (fabs(estimate.x - out[i].pos.x) > error || fabs(estimate.y - out[i].pos.y) > error ||
+			fabs(estimate.z - out[i].pos.z) > error) 
 		{
-			last_written = prev;
-			out.push(last_written);
-
-			dt = sample_period;
-			dif = (cur - last_written.pos) / dt;
+			prev = out[i - 1];
+			dir = out[i].pos - out[i - 1].pos;
+			dir *= float(1 / ofbx::fbxTimeToSeconds(out[i].time - out[i - 1].time));
 		}
-		prev = {cur, t, i};
+		else {
+			out.erase(i - 1);
+			--i;
+		}
 	}
-
-	float t = (to_frame - from_frame) * sample_period;
-	last_written = {
-		getTranslation(bone.evalLocal(curve_node->getNodeLocalTransform(to_frame * sample_period), lcl_rotation)) * parent_scale,
-		t,
-		u16(to_frame - from_frame)};
-	out.push(last_written);
 }
 
 
 static void compressRotations(Array<FBXImporter::RotationKey>& out,
-	int from_frame,
-	int to_frame,
-	float sample_period,
 	const ofbx::AnimationCurveNode* curve_node,
 	const ofbx::Object& bone,
 	float error)
 {
 	out.clear();
 	if (!curve_node) return;
-	if (to_frame == from_frame) return;
 
-	ofbx::Vec3 lcl_translation = bone.getLocalTranslation();
-	Quat rot = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(from_frame * sample_period)));
-	FBXImporter::RotationKey last_written = {rot, 0, 0};
-	out.push(last_written);
-	if (to_frame == from_frame + 1) return;
+	fill(out, curve_node, bone);
+	if (out.empty()) return;
 
-	rot = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform((from_frame + 1) * sample_period)));
-	FBXImporter::RotationKey after_last = {rot, sample_period, 1};
-	FBXImporter::RotationKey prev = after_last;
-	for (u16 i = 2; i < u16(to_frame - from_frame); ++i)
-	{
-		float t = i * sample_period;
-		Quat cur = getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform((from_frame + i) * sample_period)));
-		Quat estimate = nlerp(cur, last_written.rot, sample_period / (t - last_written.time));
-		if (fabs(estimate.x - after_last.rot.x) > error || fabs(estimate.y - after_last.rot.y) > error ||
-			fabs(estimate.z - after_last.rot.z) > error)
+	FBXImporter::RotationKey prev = out[0];
+	// TODO what if there's just 1 keyframe
+	FBXImporter::RotationKey after_prev = out[1];
+	for (u32 i = 2; i < (u32)out.size(); ++i) {
+		const float t = float(ofbx::fbxTimeToSeconds(after_prev.time - prev.time) / ofbx::fbxTimeToSeconds(out[i].time - prev.time));
+		const Quat estimate = nlerp(prev.rot, out[i].rot, t);
+		if (fabs(estimate.x - after_prev.rot.x) > error || fabs(estimate.y - after_prev.rot.y) > error ||
+			fabs(estimate.z - after_prev.rot.z) > error) 
 		{
-			last_written = prev;
-			out.push(last_written);
-
-			after_last = {cur, t, i};
+			prev = out[i - 1];
+			after_prev = out[i];
 		}
-		prev = {cur, t, i};
+		else {
+			out.erase(i - 1);
+			--i;
+		}
 	}
-
-	float t = (to_frame - from_frame) * sample_period;
-	last_written = {
-		getRotation(bone.evalLocal(lcl_translation, curve_node->getNodeLocalTransform(to_frame * sample_period))), 
-		t, 
-		u16(to_frame - from_frame)};
-	out.push(last_written);
 }
 
 
@@ -920,16 +975,12 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			take_info = scene.getTakeInfo(stack->name + 11);
 		}
 
-		float fbx_frame_rate = scene.getSceneFrameRate();
-		if (fbx_frame_rate < 0) fbx_frame_rate = 24;
-		float scene_frame_rate = fbx_frame_rate / time_scale;
-		float sampling_period = 1.0f / scene_frame_rate;
-		int all_frames_count = 0;
+		double anim_len;
 		if (take_info) {
-			all_frames_count = int((take_info->local_time_to - take_info->local_time_from) / sampling_period + 0.5f);
+			anim_len = take_info->local_time_to - take_info->local_time_from;
 		}
 		else if(scene.getGlobalSettings()) {
-			all_frames_count  = int(scene.getGlobalSettings()->TimeSpanStop / sampling_period + 0.5f);
+			anim_len = scene.getGlobalSettings()->TimeSpanStop;
 		}
 		else {
 			logError("Renderer") << "Unsupported animation in " << src;
@@ -941,11 +992,10 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		Animation::Header header;
 		header.magic = Animation::HEADER_MAGIC;
 		header.version = 3;
-		header.fps = (u32)(scene_frame_rate + 0.5f);
+		header.length = Time::fromSeconds((float)anim_len);
 		write(header);
 
 		write(anim.root_motion_bone_idx);
-		write(all_frames_count);
 		int used_bone_count = 0;
 
 		for (const ofbx::Object* bone : bones) {
@@ -960,6 +1010,11 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		write(used_bone_count);
 		Array<TranslationKey> positions(allocator);
 		Array<RotationKey> rotations(allocator);
+		auto fbx_to_anim_time = [anim_len](i64 fbx_time){
+			const double t = clamp(ofbx::fbxTimeToSeconds(fbx_time) / anim_len, 0.0, 1.0);
+			return u16(t * 0xffFF);
+		};
+
 		for (const ofbx::Object* bone : bones) {
 			if (&bone->getScene() != &scene) continue;
 			const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
@@ -974,10 +1029,10 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 			int depth = getDepth(bone);
 			float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-			compressPositions(positions, 0, all_frames_count, sampling_period, translation_node, *bone, position_error / depth, parent_scale);
+			compressPositions(positions, translation_node, *bone, position_error / depth, parent_scale);
 			write(positions.size());
 
-			for (TranslationKey& key : positions) write(key.frame);
+			for (TranslationKey& key : positions) write(fbx_to_anim_time(key.time));
 			for (TranslationKey& key : positions) {
 				if (bone == root_bone) {
 					write(fixRootOrientation(key.pos * cfg.mesh_scale * fbx_scale));
@@ -987,10 +1042,10 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 				}
 			}
 
-			compressRotations(rotations, 0, all_frames_count, sampling_period, rotation_node, *bone, rotation_error / depth);
+			compressRotations(rotations, rotation_node, *bone, rotation_error / depth);
 
 			write(rotations.size());
-			for (RotationKey& key : rotations) write(key.frame);
+			for (RotationKey& key : rotations) write(fbx_to_anim_time(key.time));
 			for (RotationKey& key : rotations) {
 				if (bone == root_bone) {
 					write(fixRootOrientation(key.rot));

@@ -134,9 +134,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 		),
 		component("animable",
 			property("Animation", LUMIX_PROP(AnimationScene, Animation),
-				ResourceAttribute("Animation (*.ani)", Animation::TYPE)),
-			var_property("Start time", &AnimationScene::getAnimable, &Animable::start_time, MinAttribute(0)),
-			var_property("Time scale", &AnimationScene::getAnimable, &Animable::time_scale, MinAttribute(0))
+				ResourceAttribute("Animation (*.ani)", Animation::TYPE))
 		)
 	);
 	registerScene(anim_scene);
