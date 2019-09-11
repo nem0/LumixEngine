@@ -146,8 +146,6 @@ struct AnimationSceneImpl final : public AnimationScene
 	void serializeAnimable(ISerializer& serializer, EntityRef entity)
 	{
 		Animable& animable = m_animables[entity];
-		serializer.write("time_scale", animable.time_scale);
-		serializer.write("start_time", animable.start_time);
 		serializer.write("animation", animable.animation ? animable.animation->getPath().c_str() : "");
 	}
 
@@ -156,8 +154,6 @@ struct AnimationSceneImpl final : public AnimationScene
 	{
 		Animable& animable = m_animables.insert(entity);
 		animable.entity = entity;
-		serializer.read(Ref(animable.time_scale));
-		serializer.read(Ref(animable.start_time));
 		char tmp[MAX_PATH_LENGTH];
 		serializer.read(Span(tmp));
 		auto* res = tmp[0] ? m_engine.getResourceManager().load<Animation>(Path(tmp)) : nullptr;
@@ -308,7 +304,7 @@ struct AnimationSceneImpl final : public AnimationScene
 	float getAnimationLength(int animation_idx) override
 	{
 		auto* animation = static_cast<Animation*>(animation_idx > 0 ? m_engine.getLuaResource(animation_idx) : nullptr);
-		if (animation) return animation->getLength();
+		if (animation) return animation->getLength().seconds();
 		return 0;
 	}
 
@@ -419,8 +415,6 @@ struct AnimationSceneImpl final : public AnimationScene
 		for (const Animable& animable : m_animables)
 		{
 			serializer.write(animable.entity);
-			serializer.write(animable.time_scale);
-			serializer.write(animable.start_time);
 			serializer.writeString(animable.animation ? animable.animation->getPath().c_str() : "");
 		}
 
@@ -453,9 +447,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		{
 			Animable animable;
 			serializer.read(animable.entity);
-			serializer.read(animable.time_scale);
-			serializer.read(animable.start_time);
-			animable.time = animable.start_time;
+			animable.time = Time::fromSeconds(0);
 
 			char path[MAX_PATH_LENGTH];
 			serializer.readString(Span(path));
@@ -561,7 +553,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		auto& animable = m_animables[entity];
 		unloadResource(animable.animation);
 		animable.animation = loadAnimation(path);
-		animable.time = 0;
+		animable.time = Time::fromSeconds(0);
 	}
 
 
@@ -581,9 +573,9 @@ struct AnimationSceneImpl final : public AnimationScene
 		animable.animation->getRelativePose(animable.time, *pose, *model, nullptr);
 		pose->computeAbsolute(*model);
 
-		float t = animable.time + time_delta * animable.time_scale;
-		float l = animable.animation->getLength();
-		while (t > l) t -= l;
+		Time t = animable.time + Time::fromSeconds(time_delta);
+		const Time l = animable.animation->getLength();
+		t = t % l;
 		animable.time = t;
 
 		m_render_scene->unlockPose(entity, true);
@@ -701,7 +693,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		if (!pose) return;
 
 		animator.ctx->model = model;
-		animator.ctx->time_delta = time_delta;
+		animator.ctx->time_delta = Time::fromSeconds(time_delta);
 		// TODO
 		animator.ctx->root_bone_hash = crc32("RigRoot");
 		LocalRigidTransform root_motion;
@@ -986,11 +978,9 @@ struct AnimationSceneImpl final : public AnimationScene
 	void createAnimable(EntityRef entity)
 	{
 		Animable& animable = m_animables.insert(entity);
-		animable.time = 0;
+		animable.time = Time::fromSeconds(0);
 		animable.animation = nullptr;
 		animable.entity = entity;
-		animable.time_scale = 1;
-		animable.start_time = 0;
 
 		m_universe.onComponentCreated(entity, ANIMABLE_TYPE, this);
 	}

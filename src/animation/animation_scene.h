@@ -24,9 +24,7 @@ class Controller;
 
 struct Animable
 {
-	float time;
-	float time_scale;
-	float start_time;
+	Time time;
 	Animation* animation;
 	EntityRef entity;
 };

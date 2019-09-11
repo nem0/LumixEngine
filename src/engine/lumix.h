@@ -149,6 +149,25 @@ struct Span
 	T* m_end;
 };
 
+struct Time {
+	Time() {}
+	static Time fromSeconds(float time) {
+		ASSERT(time >= 0);
+		return { u32(time * ONE_SECOND) };
+	}
+	float seconds() const { return float(value / double(ONE_SECOND)); }
+	Time operator+(const Time& rhs) const { return { value + rhs.value }; } 
+	void operator+=(const Time& rhs) { value += rhs.value; }
+	bool operator<(const Time& rhs) const { return value < rhs.value; }
+	Time operator%(const Time& rhs) const { return {value % rhs.value }; }
+	u32 raw() const { return value; }
+
+private:
+	Time(u32 v) : value(v) {}
+	u32 value;
+	static constexpr u32 ONE_SECOND = 1 << 15;
+};
+
 #ifdef _WIN32
 	#define LUMIX_LIBRARY_EXPORT __declspec(dllexport)
 	#define LUMIX_LIBRARY_IMPORT __declspec(dllimport)

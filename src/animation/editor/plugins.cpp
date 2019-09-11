@@ -49,9 +49,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (resources.length() > 1) return;
 
 		auto* animation = static_cast<Animation*>(resources[0]);
-		ImGui::LabelText("FPS", "%d", animation->getFPS());
-		ImGui::LabelText("Length", "%.3fs", animation->getLength());
-		ImGui::LabelText("Frames", "%d", animation->getFrameCount());
+		ImGui::LabelText("Length", "%.3fs", animation->getLength().seconds());
 	}
 
 
@@ -330,10 +328,10 @@ struct AnimablePropertyGridPlugin : PropertyGrid::IPlugin
 		if (!animation->isReady()) return;
 
 		ImGui::Checkbox("Preview", &m_is_playing);
-		float time = scene->getAnimable(entity).time;
-		if (ImGui::SliderFloat("Time", &time, 0, animation->getLength()))
+		float time = scene->getAnimable(entity).time.seconds();
+		if (ImGui::SliderFloat("Time", &time, 0, animation->getLength().seconds()))
 		{
-			scene->getAnimable(entity).time = time;
+			scene->getAnimable(entity).time = Time::fromSeconds(time);
 			scene->updateAnimable(entity, 0);
 		}
 

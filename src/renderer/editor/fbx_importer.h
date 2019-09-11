@@ -41,15 +41,13 @@ struct FBXImporter
 	struct RotationKey
 	{
 		Quat rot;
-		float time;
-		u16 frame;
+		i64 time;
 	};
 
 	struct TranslationKey
 	{
 		Vec3 pos;
-		float time;
-		u16 frame;
+		i64 time;
 	};
 
 	struct Skin

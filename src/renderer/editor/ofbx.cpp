@@ -187,13 +187,13 @@ static Matrix getRotationMatrix(const Vec3& euler, RotationOrder order)
 }
 
 
-static double fbxTimeToSeconds(i64 value)
+double fbxTimeToSeconds(i64 value)
 {
 	return double(value) / 46186158000L;
 }
 
 
-static i64 secondsToFbxTime(double value)
+i64 secondsToFbxTime(double value)
 {
 	return i64(value * 46186158000L);
 }
@@ -1495,6 +1495,12 @@ struct AnimationCurveNodeImpl : AnimationCurveNode
 	const Object* getBone() const override
 	{
 		return bone;
+	}
+
+
+	const AnimationCurve* getCurve(int idx) const override {
+		assert(idx >= 0 && idx < 3);
+		return curves[idx].curve;
 	}
 
 

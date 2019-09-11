@@ -1,16 +1,19 @@
 #pragma once
 
 #include "engine/array.h"
+#include "engine/stream.h"
 
 
 namespace Lumix
 {
 
+class Model;
 struct Pose;
 
 namespace Anim
 {
 
+class Controller;
 struct GroupNode;
 
 struct RuntimeContext {
@@ -25,8 +28,8 @@ struct RuntimeContext {
 	OutputMemoryStream data;
 	
 	u32 root_bone_hash = 0;
-	float time_delta;
-	class Model* model = nullptr;
+	Time time_delta;
+	Model* model = nullptr;
 	InputMemoryStream input_runtime;
 };
 
@@ -114,7 +117,7 @@ struct GroupNode final : Node {
 	struct RuntimeData {
 		u32 from;
 		u32 to;
-		float t;
+		Time t;
 	};
 
 	struct Child {
@@ -148,7 +151,7 @@ struct GroupNode final : Node {
 
 
 	IAllocator& m_allocator;
-	float m_blend_length = 0.3f;
+	Time m_blend_length = Time::fromSeconds(0.3f);
 	Array<Child> m_children;
 };
 
