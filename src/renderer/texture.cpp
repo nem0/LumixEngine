@@ -186,6 +186,7 @@ bool Texture::saveTGA(IOutputStream* file,
 	int height,
 	int bytes_per_pixel,
 	const u8* image_dest,
+	bool upper_left_origin,
 	const Path& path,
 	IAllocator& allocator)
 {
@@ -203,7 +204,7 @@ bool Texture::saveTGA(IOutputStream* file,
 	header.height = (short)height;
 	header.width = (short)width;
 	header.dataType = 2;
-	header.imageDescriptor = 0;
+	header.imageDescriptor = upper_left_origin ? 32 : 0;
 
 	file->write(&header, sizeof(header));
 
@@ -249,6 +250,7 @@ static void saveTGA(Texture& texture)
 		texture.height,
 		texture.bytes_per_pixel,
 		&texture.data[0],
+		false,
 		texture.getPath(),
 		texture.allocator);
 
