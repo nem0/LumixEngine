@@ -71,6 +71,7 @@ public:
 	template <typename Comparator>
 	void removeDuplicates(Comparator equals)
 	{
+		if (m_size == 0) return;
 		for (u32 i = 0; i < m_size - 1; ++i)
 		{
 			for (u32 j = i + 1; j < m_size; ++j)
@@ -358,13 +359,13 @@ public:
 
 	const T& operator[](u32 index) const
 	{
-		ASSERT(index >= 0 && index < m_size);
+		ASSERT(index < m_size);
 		return m_data[index];
 	}
 
 	T& operator[](u32 index)
 	{
-		ASSERT(index >= 0 && index < m_size);
+		ASSERT(index < m_size);
 		return m_data[index];
 	}
 
