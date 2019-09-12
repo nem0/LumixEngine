@@ -91,6 +91,7 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_resources(app.getWorldEditor().getAllocator())
 		, m_to_compile_subresources(app.getWorldEditor().getAllocator())
 		, m_dependencies(app.getWorldEditor().getAllocator())
+		, m_changed_files(app.getWorldEditor().getAllocator())
 	{
 		FileSystem& fs = app.getWorldEditor().getEngine().getFileSystem();
 		m_watcher = FileSystemWatcher::create(fs.getBasePath(), app.getWorldEditor().getAllocator());
@@ -373,22 +374,8 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		if (startsWith(path, ".lumix")) return;
 		
-		Path path_obj(path);
-
-		const Array<Path> removed_subresources = removeResource(path_obj.c_str());
-		addResource(path);
-		reloadSubresources(removed_subresources);
-
-		auto iter = m_dependencies.find(path_obj);
-		if (iter.isValid()) {
-			const Array<Path> tmp(iter.value());
-			m_dependencies.erase(iter);
-			for (Path& p : tmp) {
-				Array<Path> removed_subresources = removeResource(p.c_str());
-				addResource(p.c_str());
-				reloadSubresources(removed_subresources);
-			}
-		}
+		MT::CriticalSectionLock lock(m_changed_mutex);
+		m_changed_files.push(Path(path));
 	}
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
@@ -584,6 +571,33 @@ struct AssetCompilerImpl : AssetCompiler
 			}
 			m_to_compile_subresources.erase(p);
 		}
+
+		for (;;) {
+			Path path_obj;
+			{
+				MT::CriticalSectionLock lock(m_changed_mutex);
+				if (m_changed_files.empty()) break;
+
+				m_changed_files.removeDuplicates();
+				path_obj = m_changed_files.back();
+				m_changed_files.pop();
+			}
+
+			const Array<Path> removed_subresources = removeResource(path_obj.c_str());
+			addResource(path_obj.c_str());
+			reloadSubresources(removed_subresources);
+
+			auto iter = m_dependencies.find(path_obj);
+			if (iter.isValid()) {
+				const Array<Path> tmp(iter.value());
+				m_dependencies.erase(iter);
+				for (Path& p : tmp) {
+					Array<Path> removed_subresources = removeResource(p.c_str());
+					addResource(p.c_str());
+					reloadSubresources(removed_subresources);
+				}
+			}
+		}
 	}
 
 
@@ -627,8 +641,10 @@ struct AssetCompilerImpl : AssetCompiler
 	MT::CriticalSection m_to_compile_mutex;
 	MT::CriticalSection m_compiled_mutex;
 	MT::CriticalSection m_plugin_mutex;
+	MT::CriticalSection m_changed_mutex;
 	HashMap<Path, Array<Resource*>> m_to_compile_subresources; 
 	HashMap<Path, Array<Path>> m_dependencies;
+	Array<Path> m_changed_files;
 	Array<Path> m_to_compile;
 	Array<Path> m_compiled;
 	StudioApp& m_app;
