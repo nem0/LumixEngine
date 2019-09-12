@@ -43,7 +43,7 @@ public:
 	virtual ModelHandle loadModel(Path& path) = 0;
 	virtual void unloadModel(ModelHandle handle) = 0;
 	virtual Vec3 getModelCenter(EntityRef entity) = 0;
-	virtual bool saveTexture(Engine& engine, const char* path, const void* pixels, int w, int h) = 0;
+	virtual bool saveTexture(Engine& engine, const char* path, const void* pixels, int w, int h, bool upper_left_origin) = 0;
 	virtual ImTextureID createTexture(const char* name, const void* pixels, int w, int h) = 0;
 	virtual void destroyTexture(ImTextureID handle) = 0;
 	virtual ImTextureID loadTexture(const Path& path) = 0;

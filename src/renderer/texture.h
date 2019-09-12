@@ -70,6 +70,7 @@ public:
 		int height,
 		int bytes_per_pixel,
 		const u8* image_dest,
+		bool upper_left_origin,
 		const Path& path,
 		IAllocator& allocator);
 
