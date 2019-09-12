@@ -3179,7 +3179,7 @@ struct PipelineImpl final : Pipeline
 
 				OS::OutputFile file;
 				if (fs->open(path, Ref(file))) {
-					Texture::saveTGA(&file, w, h, 4, (u8*)pixels.begin(), Path(path), allocator);
+					Texture::saveTGA(&file, w, h, 4, (u8*)pixels.begin(), false, Path(path), allocator);
 					file.close();
 				}
 				else {
