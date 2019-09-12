@@ -882,7 +882,8 @@ static void compressPositions(Array<FBXImporter::TranslationKey>& out,
 	const ofbx::AnimationCurveNode* curve_node,
 	const ofbx::Object& bone,
 	float error,
-	float parent_scale)
+	float parent_scale,
+	double anim_len)
 {
 	out.clear();
 	if (!curve_node) return;
@@ -891,7 +892,10 @@ static void compressPositions(Array<FBXImporter::TranslationKey>& out,
 	if (out.empty()) return;
 
 	FBXImporter::TranslationKey prev = out[0];
-	// TODO what if there's just 1 keyframe
+	if (out.size() == 1) {
+		out.push(out[0]);
+		out[1].time = ofbx::secondsToFbxTime(anim_len);
+	}
 	Vec3 dir = out[1].pos - out[0].pos;
 	dir *= float(1 / ofbx::fbxTimeToSeconds(out[1].time - out[0].time));
 	for (u32 i = 2; i < (u32)out.size(); ++i) {
@@ -914,7 +918,8 @@ static void compressPositions(Array<FBXImporter::TranslationKey>& out,
 static void compressRotations(Array<FBXImporter::RotationKey>& out,
 	const ofbx::AnimationCurveNode* curve_node,
 	const ofbx::Object& bone,
-	float error)
+	float error,
+	double anim_len)
 {
 	out.clear();
 	if (!curve_node) return;
@@ -923,7 +928,10 @@ static void compressRotations(Array<FBXImporter::RotationKey>& out,
 	if (out.empty()) return;
 
 	FBXImporter::RotationKey prev = out[0];
-	// TODO what if there's just 1 keyframe
+	if (out.size() == 1) {
+		out.push(out[0]);
+		out[1].time = ofbx::secondsToFbxTime(anim_len);
+	}
 	FBXImporter::RotationKey after_prev = out[1];
 	for (u32 i = 2; i < (u32)out.size(); ++i) {
 		const float t = float(ofbx::fbxTimeToSeconds(after_prev.time - prev.time) / ofbx::fbxTimeToSeconds(out[i].time - prev.time));
@@ -1029,7 +1037,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 			int depth = getDepth(bone);
 			float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-			compressPositions(positions, translation_node, *bone, position_error / depth, parent_scale);
+			compressPositions(positions, translation_node, *bone, position_error / depth, parent_scale, anim_len);
 			write(positions.size());
 
 			for (TranslationKey& key : positions) write(fbx_to_anim_time(key.time));
@@ -1042,7 +1050,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 				}
 			}
 
-			compressRotations(rotations, rotation_node, *bone, rotation_error / depth);
+			compressRotations(rotations, rotation_node, *bone, rotation_error / depth, anim_len);
 
 			write(rotations.size());
 			for (RotationKey& key : rotations) write(fbx_to_anim_time(key.time));
