@@ -167,10 +167,12 @@ bool Material::save(IOutputStream& file)
 	file << "alpha_ref(" <<  m_alpha_ref << ")\n";
 
 	file << "defines {";
+	bool first_define = true;
 	for (int i = 0; i < sizeof(m_define_mask) * 8; ++i) {
 		if ((m_define_mask & (1 << i)) == 0) continue;
 		const char* def = m_renderer.getShaderDefine(i);
-		if (i > 0) file << ", ";
+		if (!first_define) file << ", ";
+		first_define = false;
 		file << "\"" << def << "\"";
 	}
 	file << "}\n";
