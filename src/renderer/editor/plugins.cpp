@@ -529,7 +529,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				for (int i = 0; i < meshes.size(); ++i) {
 					char mesh_name[256];
 					importer.getImportMeshName(meshes[i], mesh_name);
-					StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ":", path);
+					StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ".fbx:", path);
 					compiler.addResource(Model::TYPE, tmp);
 				}
 			}
