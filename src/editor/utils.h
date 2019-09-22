@@ -34,9 +34,9 @@ struct LUMIX_EDITOR_API Action
 	static bool falseConst() { return false; }
 
 	OS::Keycode shortcut[3];
-	const char* name;
-	const char* label_short;
-	const char* label_long;
+	StaticString<32> name;
+	StaticString<32> label_short;
+	StaticString<64> label_long;
 	bool is_global;
 	void* plugin;
 	ImTextureID icon;
