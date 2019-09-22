@@ -19,6 +19,7 @@ struct RuntimeContext;
 class Controller final : public Resource {
 public:
 	Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
+	~Controller();
 
 	void serialize(OutputMemoryStream& stream);
 	bool deserialize(InputMemoryStream& stream);
@@ -28,6 +29,7 @@ public:
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion);
 	void getPose(RuntimeContext& ctx, Ref<struct Pose> pose);
 	void initEmpty();
+	void destroy();
 
 	ResourceType getType() const override { return TYPE; }
 	static const ResourceType TYPE;

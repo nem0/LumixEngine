@@ -216,7 +216,7 @@ BufferHandle allocBufferHandle();
 ProgramHandle allocProgramHandle();
 
 void setState(u64 state);
-bool createProgram(ProgramHandle program, const VertexDecl& decl, const char** srcs, const ShaderType* types, int num, const char** prefixes, u32 prefixes_count, const char* name);
+bool createProgram(ProgramHandle program, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
 
 void createBuffer(BufferHandle handle, u32 flags, size_t size, const void* data);

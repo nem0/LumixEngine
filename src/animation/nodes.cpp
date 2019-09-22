@@ -309,6 +309,12 @@ GroupNode::GroupNode(GroupNode* parent, IAllocator& allocator)
 	, m_children(allocator)
 {}
 
+GroupNode::~GroupNode() {
+	for (Child& c : m_children) {
+		LUMIX_DELETE(m_allocator, c.node);
+	}
+}
+
 void GroupNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const {
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 	

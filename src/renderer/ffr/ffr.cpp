@@ -1658,7 +1658,7 @@ static const char* shaderTypeToString(ShaderType type)
 }
 
 
-bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, int num, const char** prefixes, u32 prefixes_count, const char* name)
+bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name)
 {
 	checkThread();
 
@@ -1692,7 +1692,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		CHECK_GL(glObjectLabel(GL_PROGRAM, prg, stringLength(name), name));
 	}
 
-	for (int i = 0; i < num; ++i) {
+	for (u32 i = 0; i < num; ++i) {
 		GLenum shader_type;
 		switch (types[i]) {
 			case ShaderType::GEOMETRY: shader_type = GL_GEOMETRY_SHADER; break;
