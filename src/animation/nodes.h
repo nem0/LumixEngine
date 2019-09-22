@@ -105,6 +105,7 @@ struct Blend1DNode final : Node {
 
 struct GroupNode final : Node {
 	GroupNode(GroupNode* parent, IAllocator& allocator);
+	~GroupNode();
 	Type type() const override { return GROUP; }
 
 	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const override;

@@ -31,6 +31,12 @@ ControllerEditor::ControllerEditor(StudioApp& app)
 	m_current_level = m_controller->m_root;
 }
 
+ControllerEditor::~ControllerEditor() {
+	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	m_controller->destroy();
+	LUMIX_DELETE(allocator, m_controller);
+}
+
 static void createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
 	Node* node = nullptr;
 	switch(type) {

@@ -19,6 +19,14 @@ Controller::Controller(const Path& path, ResourceManager& resource_manager, IAll
 	, m_bone_masks(allocator)
 {}
 
+Controller::~Controller() {
+	ASSERT(isEmpty());
+}
+
+void Controller::destroy() {
+	unload();
+}
+
 void Controller::unload() {
 	LUMIX_DELETE(m_allocator, m_root);
 	m_root = nullptr;
