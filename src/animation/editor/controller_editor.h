@@ -13,6 +13,7 @@ namespace Anim {
 
 struct ControllerEditor : StudioApp::GUIPlugin {
 	ControllerEditor(StudioApp& app);
+	~ControllerEditor();
 
 	void onWindowGUI() override;
 	const char* getName() const override { return "Animation Editor"; }
