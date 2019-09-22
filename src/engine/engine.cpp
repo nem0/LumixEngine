@@ -60,6 +60,17 @@ int DragFloat(lua_State* L)
 }
 
 
+int DragInt(lua_State* L)
+{
+	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
+	int value = LuaWrapper::checkArg<int>(L, 2);
+	bool changed = ImGui::DragInt(name, &value);
+	lua_pushboolean(L, changed);
+	lua_pushinteger(L, value);
+	return 2;
+}
+
+
 int PushStyleColor(lua_State* L)
 {
 	int var = LuaWrapper::checkArg<int>(L, 1);
@@ -1095,6 +1106,7 @@ public:
 		LuaImGui::registerCFunction(m_state, "CollapsingHeader", &LuaImGui::CollapsingHeader);
 		LuaImGui::registerCFunction(m_state, "Columns", &LuaWrapper::wrap<decltype(&ImGui::Columns), &ImGui::Columns>);
 		LuaImGui::registerCFunction(m_state, "DragFloat", &LuaImGui::DragFloat);
+		LuaImGui::registerCFunction(m_state, "DragInt", &LuaImGui::DragInt);
 		LuaImGui::registerCFunction(m_state, "Dummy", &LuaWrapper::wrap<decltype(&LuaImGui::Dummy), &LuaImGui::Dummy>);
 		LuaImGui::registerCFunction(m_state, "End", &LuaWrapper::wrap<decltype(&ImGui::End), &ImGui::End>);
 		LuaImGui::registerCFunction(m_state, "EndChildFrame", &LuaWrapper::wrap<decltype(&ImGui::EndChildFrame), &ImGui::EndChildFrame>);
