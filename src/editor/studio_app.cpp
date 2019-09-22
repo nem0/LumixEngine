@@ -72,14 +72,14 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 			logError("Editor") << filename << ": " << lua_tostring(L, -1);
 			lua_pop(L, 1);
 		}
-		lua_pop(L, 1); // []
 
+		lua_getfield(L, -1, "plugin_name"); // [env, plugin_name]
 		const char* name = "LuaPlugin";
-		lua_getglobal(L, "plugin_name");
-		if (lua_type(L, -1) == LUA_TSTRING)
-		{
+		if (lua_type(L, -1) == LUA_TSTRING) {
 			name = lua_tostring(L, -1);
 		}
+
+		lua_pop(L, 2); // []
 
 		Action* action = LUMIX_NEW(editor.getAllocator(), Action)(name, name, name);
 		action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
@@ -107,18 +107,18 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 	void onWindowGUI() override
 	{
 		if (!m_is_open) return;
-		lua_getglobal(L, "onGUI");
-		if (lua_type(L, -1) == LUA_TFUNCTION)
-		{
-			if (lua_pcall(L, 0, 0, 0) != 0)
-			{
+
+		lua_rawgeti(L, LUA_REGISTRYINDEX, env_ref); // [env]
+		lua_getfield(L, -1, "onGUI"); // [env, onGUI]
+		if (lua_type(L, -1) == LUA_TFUNCTION) {
+			if (lua_pcall(L, 0, 0, 0) != 0) {
 				logError("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
 				lua_pop(L, 1);
 			}
-		}
-		else
-		{
 			lua_pop(L, 1);
+		}
+		else {
+			lua_pop(L, 2);
 		}
 	}
 
