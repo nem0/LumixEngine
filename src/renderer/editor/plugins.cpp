@@ -109,7 +109,6 @@ static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
 }
 
 
-
 struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	FontPlugin(StudioApp& app) 
@@ -1665,6 +1664,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
 		, m_data(app.getWorldEditor().getAllocator())
+		, m_probes(app.getWorldEditor().getAllocator())
 	{
 		WorldEditor& world_editor = app.getWorldEditor();
 		Engine& engine = world_editor.getEngine();
@@ -1697,7 +1697,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		if (!OS::makePath(path) && !OS::dirExists(path)) {
 			logError("Editor") << "Failed to create " << path;
 		}
-		path << "/probes/";
+		path << "/probes_tmp/";
 		if (!OS::makePath(path) && !OS::dirExists(path)) {
 			logError("Editor") << "Failed to create " << path;
 		}
@@ -1774,15 +1774,32 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	}
 
 
-	void generateCubemap(ComponentUID cmp)
-	{
-		ASSERT(cmp.isValid());
+	void generateCubemaps(bool bounce) {
 		ASSERT(!m_in_progress);
-		m_in_progress = true;
-		MT::memoryBarrier();
+		ASSERT(m_probes.empty());
 
-		const EntityRef entity = (EntityRef)cmp.entity;
+		// TODO block user interaction
+		Universe* universe = m_app.getWorldEditor().getUniverse();
+		if (universe->getName()[0] == '\0') {
+			logError("Editor") << "Universe must be saved before environment probe can be generated.";
+			return;
+		}
+		
+		// TODO handle in .pln
+		m_pipeline->define("PROBE_BOUNCE", bounce);
 
+		auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
+		const Span<EntityRef> probes = scene->getAllEnvironmentProbes();
+		m_probes.reserve(probes.length());
+		for (const EntityRef& p : probes) {
+			m_probes.push(p);
+		}
+	}
+
+
+	void generateCubemap(EntityRef entity)
+	{
+		ASSERT(!m_in_progress);
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0') {
@@ -1790,18 +1807,22 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			return;
 		}
 
+		m_in_progress = true;
+		MT::memoryBarrier();
+
 		WorldEditor& world_editor = m_app.getWorldEditor();
 		Engine& engine = world_editor.getEngine();
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
-
-		const DVec3 probe_position = universe->getPosition((EntityRef)cmp.entity);
 		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
+		const EnvironmentProbe& probe = scene->getEnvironmentProbe(entity);
+
+		const DVec3 probe_position = universe->getPosition(entity);
 		Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.fov = degreesToRadians(90.f);
 		viewport.near = 0.1f;
-		viewport.far = 10000.f;
+		viewport.far = probe.radius;
 		viewport.w = TEXTURE_SIZE;
 		viewport.h = TEXTURE_SIZE;
 
@@ -1815,9 +1836,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 		m_data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
-		renderer->startCapture();
+		const bool ndc_bottom_left = ffr::isOriginBottomLeft();
 		for (int i = 0; i < 6; ++i) {
-			const bool ndc_bottom_left = ffr::isOriginBottomLeft();
 			Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
 			Matrix mtx = Matrix::IDENTITY;
 			mtx.setZVector(dirs[i]);
@@ -1831,35 +1851,35 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			const ffr::TextureHandle res = m_pipeline->getOutput();
 			ASSERT(res.isValid());
 			renderer->getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
+		}
 
-			if (ndc_bottom_left) continue;
+		renderer->frame();
+		renderer->frame();
 
-			u32* tmp = (u32*)&m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
-			if (i == 2 || i == 3)
-			{
-				flipY(tmp, TEXTURE_SIZE);
-			}
-			else
-			{
-				flipX(tmp, TEXTURE_SIZE);
+		if (!ndc_bottom_left) {
+			for (int i = 0; i < 6; ++i) {
+				u32* tmp = (u32*)&m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
+				if (i == 2 || i == 3) {
+					flipY(tmp, TEXTURE_SIZE);
+				}
+				else {
+					flipX(tmp, TEXTURE_SIZE);
+				}
 			}
 		}
-		renderer->stopCapture();
-		renderer->frame();
-		renderer->frame();
-		
+
 		m_irradiance_size = 32;
 		m_radiance_size = 128;
 		m_reflection_size = TEXTURE_SIZE;
 
-		if (scene->isEnvironmentProbeCustomSize(entity)) {
-			m_irradiance_size = scene->getEnvironmentProbe(entity).irradiance_size;
-			m_radiance_size = scene->getEnvironmentProbe(entity).radiance_size;
-			m_reflection_size = scene->getEnvironmentProbeReflectionSize(entity);
+		if (probe.flags.isSet(EnvironmentProbe::OVERRIDE_GLOBAL_SIZE)) {
+			m_irradiance_size = probe.irradiance_size;
+			m_radiance_size = probe.radiance_size;
+			// TODO the size of m_data should be m_reflection_size^2 instead of TEXTURE_SIZE^2
+			m_reflection_size = probe.reflection_size;
 		}
-		m_save_reflection = scene->isEnvironmentProbeReflectionEnabled(entity);
-		m_probe_guid = scene->getEnvironmentProbeGUID(entity);
-		m_reload_probe = entity;
+		m_save_reflection = probe.flags.isSet(EnvironmentProbe::REFLECTION);
+		m_probe_guid = probe.guid;
 
 		JobSystem::run(this, [](void* ptr) {
 			((EnvironmentProbePlugin*)ptr)->processData();
@@ -1869,15 +1889,35 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 	void update() override
 	{
-		if (m_reload_probe.isValid() && !m_in_progress) {
+		if (m_reload_probes && !m_in_progress) {
+			m_reload_probes = false;
 			Universe* universe = m_app.getWorldEditor().getUniverse();
-			auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
-			if(universe->hasEntity((EntityRef)m_reload_probe) 
-				&& universe->hasComponent((EntityRef)m_reload_probe, ENVIRONMENT_PROBE_TYPE))
-			{
-				scene->reloadEnvironmentProbe((EntityRef)m_reload_probe);
+			const char* universe_name = universe->getName();
+			auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
+			const Span<EntityRef> probes = scene->getAllEnvironmentProbes();
+			
+			auto move = [universe_name](u64 guid, const char* postfix){
+				const StaticString<MAX_PATH_LENGTH> tmp_path("universes/", universe_name, "/probes_tmp/", guid, postfix, ".dds");
+				const StaticString<MAX_PATH_LENGTH> path("universes/", universe_name, "/probes/", guid, postfix, ".dds");
+				if (!OS::fileExists(tmp_path)) return;
+				if (!OS::moveFile(tmp_path, path)) {
+					logError("Editor") << "Failed to move file " << tmp_path;
+				}
+			};
+
+			for (EntityRef e : probes) {
+				const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
+				move(probe.guid, "");
+				move(probe.guid, "_radiance");
+				move(probe.guid, "_irradiance");
 			}
-			m_reload_probe = INVALID_ENTITY;
+		}
+		else if (!m_probes.empty() && !m_in_progress) {
+			const EntityRef e = m_probes.back();
+			m_probes.pop();
+			generateCubemap(e);
+
+			if (m_probes.empty()) m_reload_probes = true;
 		}
 	}
 
@@ -1953,7 +1993,10 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true, false);
 		}
 		if (m_in_progress) ImGui::Text("Generating...");
-		else if (ImGui::Button("Generate")) generateCubemap(cmp);
+		else {
+			if (ImGui::Button("Generate")) generateCubemaps(false);
+			if (ImGui::Button("Add bounce")) generateCubemaps(true);
+		}
 	}
 
 
@@ -1962,12 +2005,13 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	
 	Array<u8> m_data;
 	bool m_in_progress = false;
-	EntityPtr m_reload_probe = INVALID_ENTITY;
+	bool m_reload_probes = false;
 	int m_irradiance_size;
 	int m_radiance_size;
 	int m_reflection_size;
 	bool m_save_reflection;
 	u64 m_probe_guid;
+	Array<EntityRef> m_probes;
 
 	JobSystem::SignalHandle m_signal = JobSystem::INVALID_HANDLE;
 

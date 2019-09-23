@@ -2256,7 +2256,12 @@ public:
 		while (lua_next(L, -2) != 0)
 		{
 			const char* parameter_name = luaL_checkstring(L, -2);
-			if (equalStrings(parameter_name, "position"))
+			if (equalStrings(parameter_name, "name"))
+			{
+				const char* name = LuaWrapper::toType<const char*>(L, -1);
+				editor.setEntityName(e, name);
+			}
+			else if (equalStrings(parameter_name, "position"))
 			{
 				const DVec3 pos = LuaWrapper::toType<DVec3>(L, -1);
 				editor.setEntitiesPositions(&e, &pos, 1);

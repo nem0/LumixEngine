@@ -229,7 +229,7 @@ void SceneView::renderSelection()
 					item.mesh = mesh.render_data;
 					item.shader = mesh.material->getShader()->m_render_data;
 					item.mtx = universe.getRelativeMatrix(e, m_editor->getViewport().pos);
-					item.material_render_states = mesh.material->getRenderStates();
+					item.material = mesh.material->getRenderData();
 				}
 			}
 		}
@@ -241,15 +241,16 @@ void SceneView::renderSelection()
 
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
-				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, rd->vertex_decl, m_define_mask);
+				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, rd->vertex_decl, m_define_mask | item.material->define_mask);
 
 				if (!prog.isValid()) continue;
 			
 				ffr::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
+				ffr::bindTextures(item.material->textures, 0, item.material->textures_count);
 				ffr::useProgram(prog);
 				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				ffr::bindIndexBuffer(rd->index_buffer_handle);
-				ffr::setState(item.material_render_states);
+				ffr::setState(item.material->render_states);
 				ffr::drawTriangles(rd->indices_count, rd->index_type);
 			}
 		}
@@ -257,7 +258,7 @@ void SceneView::renderSelection()
 		struct Item {
 			ShaderRenderData* shader;
 			Mesh::RenderData* mesh;
-			u64 material_render_states;
+			Material::RenderData* material;
 			Matrix mtx;
 		};
 
