@@ -524,9 +524,7 @@ struct PipelineImpl final : Pipeline
 		if (m_scene) callInitScene();
 	}
 
-
-	void clearBuffers()
-	{
+	void clearBuffers() {
 		PROFILE_FUNCTION();
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
@@ -538,6 +536,13 @@ struct PipelineImpl final : Pipeline
 				m_renderbuffers.swapAndPop(i);
 			}
 		}
+	}
+
+	void define(const char* define, bool enable) override {
+		LuaWrapper::DebugGuard guard(m_lua_state);
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		LuaWrapper::setField(m_lua_state, -1, define, enable);
+		lua_pop(m_lua_state, 1);
 	}
 
 	ffr::BufferHandle getDrawcallUniformBuffer() override { return m_drawcall_ub; }

@@ -282,6 +282,13 @@ namespace Lumix
 				}
 			}
 
+			Span<Key> keys() const { 
+				Span<Key> res;
+				res.m_begin = m_keys;
+				res.m_end = m_keys + m_size;
+				return res;
+			}
+
 		private:
 			template <typename T> void callDestructors(T* ptr, int count)
 			{

@@ -600,19 +600,12 @@ inline Vec2 lerp(const Vec2& op1, const Vec2& op2, float t)
 
 struct LUMIX_ENGINE_API Quat
 {
-	struct AxisAngle
-	{
-		Vec3 axis;
-		float angle;
-	};
-
 	Quat() {}
 	Quat(const Vec3& axis, float angle);
 	Quat(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 
 	void fromEuler(const Vec3& euler);
 	Vec3 toEuler() const;
-	AxisAngle getAxisAngle() const;
 	void set(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 	void conjugate();
 	Quat conjugated() const;
@@ -711,28 +704,6 @@ struct LUMIX_ENGINE_API RigidTransform
 	{
 		return{ DVec3(rot.rotate(rhs.pos)) + pos, rot * rhs.rot };
 	}
-
-/*
-	Vec3 transform(const Vec3& value) const
-	{
-		return pos + rot.rotate(value);
-	}
-	
-
-	RigidTransform interpolate(const RigidTransform& rhs, float t)
-	{
-		RigidTransform ret;
-		lerp(pos, rhs.pos, &ret.pos, t);
-		nlerp(rot, rhs.rot, &ret.rot, t);
-		return ret;
-	}
-
-	
-	inline Transform toScaled(float scale) const;
-
-
-	Matrix toMatrix() const;
-	*/
 
 	Quat rot;
 	DVec3 pos;
