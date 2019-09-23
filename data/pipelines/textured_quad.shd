@@ -1,5 +1,7 @@
 vertex_shader [[
-	uniform vec4 u_offset_scale;
+	layout(std140, binding = 4) uniform Drawcall {
+		uniform vec4 u_offset_scale;
+	};
 	out vec2 v_uv;
 	void main() {
 		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
