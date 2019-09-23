@@ -1785,7 +1785,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			return;
 		}
 		
-		// TODO handle in .pln
 		m_pipeline->define("PROBE_BOUNCE", bounce);
 
 		auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
