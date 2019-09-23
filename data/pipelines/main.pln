@@ -84,7 +84,10 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 		gbuffer2,
 		gbuffer_depth,
 	}, 0)
-	renderEnvProbeVolumes(environment_shader, view_params)
+
+	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
+		renderEnvProbeVolumes(environment_shader, view_params)
+	end
 	
 	drawArray(0, 4, deferred_shader,
 	{
