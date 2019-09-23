@@ -324,6 +324,7 @@ public:
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
 
+	virtual Span<EntityRef> getAllEnvironmentProbes() = 0;
 	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
@@ -337,7 +338,6 @@ public:
 	virtual Texture* getEnvironmentProbeTexture(EntityRef entity) const = 0;
 	virtual Texture* getEnvironmentProbeIrradiance(EntityRef entity) const = 0;
 	virtual Texture* getEnvironmentProbeRadiance(EntityRef entity) const = 0;
-	virtual void reloadEnvironmentProbe(EntityRef entity) = 0;
 	virtual u64 getEnvironmentProbeGUID(EntityRef entity) const = 0;
 	virtual float getEnvironmentProbeRadius(EntityRef entity) = 0;
 	virtual void setEnvironmentProbeRadius(EntityRef entity, float radius) = 0;

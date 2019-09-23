@@ -162,24 +162,6 @@ float Vec4::length() const
 const Quat Quat::IDENTITY = { 0, 0, 0, 1 };
 
 
-Quat::AxisAngle Quat::getAxisAngle() const
-{
-	AxisAngle ret;
-	if (fabs(1 - w*w) < 0.00001f)
-	{
-		ret.angle = 0;
-		ret.axis.set(0, 1, 0);
-	}
-	else
-	{
-		ret.angle = 2 * acosf(w);
-		float tmp = 1 / sqrt(1 - w*w);
-		ret.axis.set(x * tmp, y * tmp, z * tmp);
-	}
-	return ret;
-}
-
-
 Quat::Quat(const Vec3& axis, float angle)
 {
 	float half_angle = angle * 0.5f;

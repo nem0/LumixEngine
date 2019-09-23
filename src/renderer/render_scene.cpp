@@ -2872,29 +2872,6 @@ public:
 		return m_active_global_light_entity;
 	}
 
-
-	void reloadEnvironmentProbe(EntityRef entity) override
-	{
-		auto& probe = m_environment_probes[entity];
-		ResourceManagerHub& rm = m_engine.getResourceManager();
-		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
-		probe.texture = nullptr;
-		StaticString<MAX_PATH_LENGTH> path;
-		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
-			path  << "universes/" << m_universe.getName() << "/probes/" << probe.guid << ".dds";
-			probe.texture = rm.load<Texture>(Path(path));
-			probe.texture->setFlag(Texture::Flags::SRGB, true);
-		}
-		path = "universes/";
-		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
-		if(probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
-		probe.irradiance = rm.load<Texture>(Path(path));
-		path = "universes/";
-		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
-		if (probe.radiance) probe.irradiance->getResourceManager().unload(*probe.radiance);
-		probe.radiance = rm.load<Texture>(Path(path));
-	}
-
 	
 	void getEnvironmentProbes(Array<EnvProbeInfo>& probes) override
 	{
@@ -2914,6 +2891,9 @@ public:
 		}
 	}
 	
+	Span<EntityRef> getAllEnvironmentProbes() override {
+		return m_environment_probes.keys();
+	}
 
 	EnvironmentProbe& getEnvironmentProbe(EntityRef entity) override
 	{
@@ -3262,12 +3242,27 @@ public:
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		ResourceManagerHub& rm = m_engine.getResourceManager();
-		probe.texture = rm.load<Texture>(Path("textures/common/default_probe.dds"));
-		probe.texture->setFlag(Texture::Flags::SRGB, true);
-		probe.irradiance = rm.load<Texture>(Path("textures/common/default_probe.dds"));
+
+		StaticString<MAX_PATH_LENGTH> path;
+		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
+			path << "universes/" << m_universe.getName() << "/probes/" << probe.guid << ".dds";
+			probe.texture = rm.load<Texture>(Path(path));
+			probe.texture->setFlag(Texture::Flags::SRGB, true);
+		}
+		else {
+			probe.texture = nullptr;
+		}
+
+		path = "universes/";
+		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
+		probe.irradiance = rm.load<Texture>(Path(path));
 		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
-		probe.radiance = rm.load<Texture>(Path("textures/common/default_probe.dds"));
+
+		path = "universes/";
+		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
+		probe.radiance = rm.load<Texture>(Path(path));
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
+
 		probe.radius = 1;
 		probe.flags.set(EnvironmentProbe::ENABLED);
 		probe.guid = randGUID();

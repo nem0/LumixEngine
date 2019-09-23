@@ -73,6 +73,7 @@ public:
 	virtual void callLuaFunction(const char* func) = 0;
 	virtual void setViewport(const Viewport& viewport) = 0;
 	virtual ffr::BufferHandle getDrawcallUniformBuffer() = 0;
+	virtual void define(const char* define, bool enable) = 0;
 
 	virtual Draw2D& getDraw2D() = 0;
 	virtual void clearDraw2D() = 0;
