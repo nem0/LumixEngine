@@ -66,7 +66,6 @@ void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
 	::WaitForMultipleObjects(2, handles, false, timeout_ms);
 }
 
-
 void Event::waitTimeout(u32 timeout_ms)
 {
 	::WaitForSingleObject(m_id, timeout_ms);

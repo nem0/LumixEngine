@@ -63,7 +63,8 @@ struct TerrainInfo
 struct Environment
 {
 	enum Flags : u32{
-		CAST_SHADOWS = 1 << 0
+		CAST_SHADOWS = 1 << 0,
+		FAST_FILTERING = 1 << 1
 	};
 
 	Vec3 m_diffuse_color;
@@ -318,6 +319,8 @@ public:
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;
+	virtual bool getEnvironmentFastFiltering(EntityRef entity) = 0;
+	virtual void setEnvironmentFastFiltering(EntityRef entity, bool enable) = 0;
 	virtual Environment& getEnvironment(EntityRef entity) = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, u32 max_count, PointLight* lights) = 0;

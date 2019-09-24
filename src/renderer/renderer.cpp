@@ -340,7 +340,8 @@ static void registerProperties(IAllocator& allocator)
 			var_property("Fog height", &RenderScene::getEnvironment, &Environment::m_fog_height, MinAttribute(0)),
 			var_property("Fog color", &RenderScene::getEnvironment, &Environment::m_fog_color, ColorAttribute()),
 			property("Shadow cascades", LUMIX_PROP(RenderScene, ShadowmapCascades)),
-			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows))
+			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows)),
+			property("Fast filtering", LUMIX_PROP(RenderScene, EnvironmentFastFiltering))
 		),
 		component("point_light",
 			var_property("Cast shadows", &RenderScene::getPointLight, &PointLight::cast_shadows),
