@@ -169,6 +169,7 @@ struct CullingSystemImpl final : public CullingSystem
 			cell.entities[idx] = cell.entities[cell.header.count - 1];
 			cell.spheres[idx] = cell.spheres[cell.header.count - 1];
 			m_entity_to_cell[last.index] = &cell.spheres[idx];
+			--cell.header.count;
 		}
 		m_entity_to_cell[entity.index] = nullptr;
 	}
