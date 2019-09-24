@@ -1814,6 +1814,12 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
 		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
+		const EntityPtr env_entity = scene->getActiveEnvironment();
+		m_fast_filtering = false;
+		if (env_entity.isValid()) {
+			const Environment env = scene->getEnvironment((EntityRef)env_entity);
+			m_fast_filtering = env.flags.isSet(Environment::FAST_FILTERING);
+		}
 		const EnvironmentProbe& probe = scene->getEnvironmentProbe(entity);
 
 		const DVec3 probe_position = universe->getPosition(entity);
@@ -1920,18 +1926,19 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		}
 	}
 
-
-	void processData()
-	{
+	void processData() {
 		cmft::Image image;	
 		cmft::Image irradiance;
 
 		cmft::imageCreate(image, TEXTURE_SIZE, TEXTURE_SIZE, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
-		copyMemory(image.m_data, &m_data[0], m_data.size());
+		copyMemory(image.m_data, &m_data[0], m_data.byte_size());
 		cmft::imageToRgba32f(image);
 
-		{
+		if (m_fast_filtering) {
+			cmft::imageResize(image, 128, 128);
+		}
+		else {
 			PROFILE_BLOCK("radiance filter");
 			cmft::imageRadianceFilter(
 				image
@@ -1955,10 +1962,11 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
 
-		for (int i = 3; i < m_data.size(); i += 4) m_data[i] = 0xff; 
 		saveCubemap(m_probe_guid, (u8*)irradiance.m_data, m_irradiance_size, "_irradiance");
+		// TODO do not override mipmaps if slow filter is used
 		saveCubemap(m_probe_guid, (u8*)image.m_data, m_radiance_size, "_radiance");
 		if (m_save_reflection) {
+			for (int i = 3; i < m_data.size(); i += 4) m_data[i] = 0xff; 
 			saveCubemap(m_probe_guid, &m_data[0], m_reflection_size, "");
 		}
 
@@ -2009,6 +2017,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	int m_radiance_size;
 	int m_reflection_size;
 	bool m_save_reflection;
+	// to be used with http://casual-effects.blogspot.com/2011/08/plausible-environment-lighting-in-two.html
+	bool m_fast_filtering;
 	u64 m_probe_guid;
 	Array<EntityRef> m_probes;
 
