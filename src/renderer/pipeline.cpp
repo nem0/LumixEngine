@@ -1283,8 +1283,66 @@ struct PipelineImpl final : Pipeline
 		return cp;
 	}
 
-
 	static int bindTextures(lua_State* L)
+	{
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override
+			{
+				PROFILE_FUNCTION();
+				ffr::bindTextures(m_textures_handles, m_offset, m_textures_count);
+			}
+
+			ffr::TextureHandle m_textures_handles[16];
+			int m_offset = 0;
+			u32 m_textures_count = 0;
+		};
+
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		LuaWrapper::checkTableArg(L, 1);
+
+		const int offset = lua_gettop(L) > 1 ? LuaWrapper::checkArg<int>(L, 2) : 0;
+
+		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
+		cmd->m_offset = offset;
+
+		Engine& engine = pipeline->m_renderer.getEngine();
+		const int len = (int)lua_objlen(L, 1);
+		for(int i = 0; i < len; ++i) {
+			lua_rawgeti(L, 1, i + 1);
+			if(lua_type(L, -1) != LUA_TNUMBER) {
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
+			}
+
+			if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+				return luaL_error(L, "%s", "Too many texture in bindTextures");
+			}
+
+			const int res_idx = (int)lua_tointeger(L, -1);
+			Resource* res = engine.getLuaResource(res_idx);
+			if (!res || res->getType() != Texture::TYPE) {
+				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
+				return luaL_error(L, "%s", "Unknown textures in bindTextures");
+			}
+			cmd->m_textures_handles[cmd->m_textures_count] = ((Texture*)res)->handle;
+			++cmd->m_textures_count;
+
+			lua_pop(L, 1);
+
+		}
+
+		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+
+		return 0;
+	};
+
+	static int bindRenderbuffers(lua_State* L)
 	{
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
@@ -1311,18 +1369,17 @@ struct PipelineImpl final : Pipeline
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
 		cmd->m_offset = offset;
 		
-		
 		const int len = (int)lua_objlen(L, 1);
 		for(int i = 0; i < len; ++i) {
 			lua_rawgeti(L, 1, i + 1);
 			if(lua_type(L, -1) != LUA_TNUMBER) {
 				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
+				return luaL_error(L, "%s", "Incorrect texture arguments of bindRenderbuffers");
 			}
 
 			if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
 				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Too many texture in bindTextures call");
+				return luaL_error(L, "%s", "Too many texture in bindRenderbuffers");
 			}
 
 			const int rb_idx = (int)lua_tointeger(L, -1);
@@ -3292,6 +3349,7 @@ struct PipelineImpl final : Pipeline
 		registerConst("STENCIL_KEEP", (u32)ffr::StencilOps::KEEP);
 		registerConst("STENCIL_REPLACE", (u32)ffr::StencilOps::REPLACE);
 
+		registerCFunction("bindRenderbuffers", PipelineImpl::bindRenderbuffers);
 		registerCFunction("bindTextures", PipelineImpl::bindTextures);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
 		registerCFunction("prepareShadowcastingLocalLights", PipelineImpl::prepareShadowcastingLocalLights);
