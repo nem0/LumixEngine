@@ -62,7 +62,7 @@ function geomPass(default_set, decal_set)
 	--[[
 	beginBlock("decals")
 	setRenderTargetsReadonlyDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
-	bindTextures({
+	bindRenderbuffers({
 		dsbuffer,
 	}, 1)
 	renderBucket(decal_set, decal_state)
@@ -78,7 +78,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
 	local view_params = getCameraParams()
-	bindTextures({
+	bindRenderbuffers({
 		gbuffer0,
 		gbuffer1,
 		gbuffer2,
@@ -101,7 +101,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	endBlock()
 	
 	beginBlock("local_lights")
-	bindTextures({
+	bindRenderbuffers({
 		gbuffer0,
 		gbuffer1,
 		gbuffer2,
