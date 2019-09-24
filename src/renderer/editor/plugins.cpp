@@ -2501,7 +2501,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 							}
 				*/
 
-				ffr::TextureHandle tex = pcmd->TextureId ? ffr::TextureHandle{(u32)(intptr_t)pcmd->TextureId} : *default_texture;
+				ffr::TextureHandle tex = ffr::TextureHandle{(u32)(intptr_t)pcmd->TextureId};
 				if (!tex.isValid()) tex = *default_texture;
 				ffr::bindTextures(&tex, 0, 1);
 
@@ -2649,6 +2649,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
 		m_texture = renderer->createTexture(width, height, 1, ffr::TextureFormat::RGBA8, 0, mem, "editor_font_atlas");
+		ImGui::GetIO().Fonts->TexID = (void*)(intptr_t)m_texture.value;
 
 		IAllocator& allocator = editor.getAllocator();
 		RenderInterface* render_interface =
