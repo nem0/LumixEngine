@@ -1623,6 +1623,14 @@ public:
 		return light_count;
 	}
 
+	bool getEnvironmentFastFiltering(EntityRef entity) override {
+		return m_environments[entity].flags.isSet(Environment::FAST_FILTERING);
+	}
+	
+	void setEnvironmentFastFiltering(EntityRef entity, bool enable) override {
+		m_environments[entity].flags.set(Environment::FAST_FILTERING, enable);
+	}
+
 	bool getEnvironmentCastShadows(EntityRef entity) override {
 		return m_environments[entity].flags.isSet(Environment::CAST_SHADOWS);
 	}

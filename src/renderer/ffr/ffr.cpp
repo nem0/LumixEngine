@@ -1019,7 +1019,7 @@ void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType ind
 {
 	checkThread();
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-	if (instances_count * indices_count > 4096) {
+	/*if (instances_count * indices_count > 4096) {
 		struct {
 			u32  indices_count;
 			u32  instances_count;
@@ -1036,7 +1036,7 @@ void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType ind
 		// https://devtalk.nvidia.com/default/topic/1052728/opengl/extremely-slow-gldrawelementsinstanced-compared-to-gldrawarraysinstanced-/
 		CHECK_GL(glMultiDrawElementsIndirect(GL_TRIANGLES, type, &mdi, 1, 0));
 	}
-	else {
+	else*/ {
 		CHECK_GL(glDrawElementsInstanced(GL_TRIANGLES, indices_count, type, 0, instances_count));
 	}
 }
