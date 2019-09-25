@@ -3249,6 +3249,7 @@ public:
 	void createEnvironmentProbe(EntityRef entity)
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
+		probe.guid = randGUID();
 		ResourceManagerHub& rm = m_engine.getResourceManager();
 
 		StaticString<MAX_PATH_LENGTH> path;
@@ -3273,7 +3274,6 @@ public:
 
 		probe.radius = 1;
 		probe.flags.set(EnvironmentProbe::ENABLED);
-		probe.guid = randGUID();
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
