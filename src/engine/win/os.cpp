@@ -946,7 +946,7 @@ bool moveFile(const char* from, const char* to)
 {
 	const WCharStr<MAX_PATH_LENGTH> wfrom(from);
 	const WCharStr<MAX_PATH_LENGTH> wto(to);
-	return MoveFile(wfrom, wto) != FALSE;
+	return MoveFileEx(wfrom, wto, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED) != FALSE;
 }
 
 
