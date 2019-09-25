@@ -47,26 +47,26 @@ end
 
 function geomPass(default_set, decal_set)
 	beginBlock("geom_pass")
-	local gbuffer0 = createRenderbuffer(1, 1, true, "rgba8", "gbuffer0")
-	local gbuffer1 = createRenderbuffer(1, 1, true, "rgba16", "gbuffer1")
-	local gbuffer2 = createRenderbuffer(1, 1, true, "rgba8", "gbuffer2")
-	local dsbuffer = createRenderbuffer(1, 1, true, "depth24stencil8", "gbuffer_ds")
+		local gbuffer0 = createRenderbuffer(1, 1, true, "rgba8", "gbuffer0")
+		local gbuffer1 = createRenderbuffer(1, 1, true, "rgba16", "gbuffer1")
+		local gbuffer2 = createRenderbuffer(1, 1, true, "rgba8", "gbuffer2")
+		local dsbuffer = createRenderbuffer(1, 1, true, "depth24stencil8", "gbuffer_ds")
 	
-	setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
-	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
-	local view_params = getCameraParams()
-	pass(view_params)
-	renderTerrains(view_params, default_state)
-	renderBucket(default_set, default_state)
+		setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
+		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
+		local view_params = getCameraParams()
+		pass(view_params)
+		renderTerrains(view_params, default_state)
+		renderBucket(default_set, default_state)
 	endBlock()
-	--[[
+
 	beginBlock("decals")
-	setRenderTargetsReadonlyDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
-	bindRenderbuffers({
-		dsbuffer,
-	}, 1)
-	renderBucket(decal_set, decal_state)
-	endBlock()]]--
+		setRenderTargetsReadonlyDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
+		bindRenderbuffers({
+			dsbuffer,
+		}, 1)
+		renderBucket(decal_set, decal_state)
+	endBlock()
 	
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
 end
