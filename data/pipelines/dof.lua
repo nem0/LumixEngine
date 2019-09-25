@@ -1,5 +1,11 @@
+
 local dof_shader = nil
 local dof_blur_shader = nil
+
+near_blur = 1
+near_sharp = 3
+far_sharp = 50
+far_blur = 70
 
 function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return input end
@@ -18,7 +24,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 			input,
 			gbuffer_depth
 		},
-		{},
+		{ { near_blur, near_sharp, far_sharp, far_blur } },
 		{ "HBLUR", "NEAR" },
 		{ depth_test = false, blending = "alpha"}
 	)
@@ -29,7 +35,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 			tmp_rb,
 			gbuffer_depth
 		},
-		{},
+		{ { near_blur, near_sharp, far_sharp, far_blur } },
 		{ "NEAR" },
 		{ depth_test = false, blending = "alpha"}
 	)
@@ -40,7 +46,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 			input,
 			gbuffer_depth
 		},
-		{},
+		{ { near_blur, near_sharp, far_sharp, far_blur } },
 		{ "HBLUR", "FAR" },
 		{ depth_test = false, blending = "alpha"}
 	)
@@ -51,7 +57,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 			tmp_rb,
 			gbuffer_depth
 		},
-		{},
+		{ { near_blur, near_sharp, far_sharp, far_blur } },
 		{ "FAR" },
 		{ depth_test = false, blending = "alpha"}
 	)
