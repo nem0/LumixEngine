@@ -34,6 +34,14 @@ vertex_shader [[
 
 
 fragment_shader [[
+	#define DOF_NEAR_BLUR u_blur_args.x
+	#define DOF_NEAR_SHARP u_blur_args.y
+	#define DOF_FAR_SHARP u_blur_args.z
+	#define DOF_FAR_BLUR u_blur_args.w
+	layout(std140, binding = 4) uniform Drawcall {
+		uniform vec4 u_blur_args;
+	};
+	
 	float toLinearDepth(float ndc_depth)
 	{
 		vec4 pos_proj = vec4(0, 0, ndc_depth, 1.0);
@@ -52,11 +60,6 @@ fragment_shader [[
 	out vec4 o_color;
 
 	void main() {
-		float DOF_NEAR_BLUR = 1;
-		float DOF_NEAR_SHARP = 3;
-		float DOF_FAR_SHARP = 10;
-		float DOF_FAR_BLUR = 15;
-	
 		vec4 color = texture2D(u_source, v_uv0.xy) * 0.2270270270
 		+ texture2D(u_source, v_uv1.xy) * 0.3162162162
 		+ texture2D(u_source, v_uv1.zw) * 0.0702702703
