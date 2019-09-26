@@ -1827,7 +1827,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		viewport.is_ortho = false;
 		viewport.fov = degreesToRadians(90.f);
 		viewport.near = 0.1f;
-		viewport.far = probe.radius;
+		viewport.far = 10'000;
 		viewport.w = TEXTURE_SIZE;
 		viewport.h = TEXTURE_SIZE;
 
@@ -1860,6 +1860,10 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 		renderer->frame();
 		renderer->frame();
+
+		for (u32 i = 0; i < 6 * TEXTURE_SIZE * TEXTURE_SIZE; ++i) {
+			swap(m_data[i * 4], m_data[i * 4 + 2]);
+		}
 
 		if (!ndc_bottom_left) {
 			for (int i = 0; i < 6; ++i) {
