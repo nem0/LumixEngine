@@ -1074,14 +1074,14 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
 		const CameraParams cp = checkCameraParams(L, 1);
-		
+		u64 state;
+		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
+			state = getState(L, 2);
+		}
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
 		
-		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
-			cmd->m_render_state = getState(L, 2);
-		}
-
+		cmd->m_render_state = state;
 		cmd->m_deferred_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
@@ -2080,8 +2080,10 @@ struct PipelineImpl final : Pipeline
 			else if(equalIStrings(tmp, "multiply")) {
 				rs |= ffr::getBlendStateBits(ffr::BlendFactors::DST_COLOR, ffr::BlendFactors::ZERO, ffr::BlendFactors::ONE, ffr::BlendFactors::ZERO);
 			}
+			else if(equalIStrings(tmp, "")) {
+			}
 			else {
-				logError("Renderer") << "Unknwon blending mode " << tmp;
+				luaL_error(L, "Unknown blending mode");
 			}
 		}
 
@@ -2296,6 +2298,7 @@ struct PipelineImpl final : Pipeline
 
 		CmdPage* cmd_page = LuaWrapper::checkArg<CmdPage*>(L, 1);
 		LuaWrapper::checkTableArg(L, 2);
+		const u64 state = getState(L, 2);
 
 		RenderJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderJob);
 
@@ -2304,7 +2307,7 @@ struct PipelineImpl final : Pipeline
 			job->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
 		}
 
-		job->m_render_state = getState(L, 2);
+		job->m_render_state = state;
 		job->m_pipeline = pipeline;
 		job->m_cmds = cmd_page;
 		job->m_instanced_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("INSTANCED");
