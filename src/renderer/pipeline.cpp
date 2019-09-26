@@ -1019,6 +1019,7 @@ struct PipelineImpl final : Pipeline
 			{"rgba16f", ffr::TextureFormat::RGBA16F},
 			{"r16f", ffr::TextureFormat::R16F},
 			{"r16", ffr::TextureFormat::R16},
+			{"r8", ffr::TextureFormat::R8},
 			{"r32f", ffr::TextureFormat::R32F},
 		};
 
@@ -2075,6 +2076,12 @@ struct PipelineImpl final : Pipeline
 			}
 			else if(equalIStrings(tmp, "alpha")) {
 				rs |= ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+			}
+			else if(equalIStrings(tmp, "multiply")) {
+				rs |= ffr::getBlendStateBits(ffr::BlendFactors::DST_COLOR, ffr::BlendFactors::ZERO, ffr::BlendFactors::ONE, ffr::BlendFactors::ZERO);
+			}
+			else {
+				logError("Renderer") << "Unknwon blending mode " << tmp;
 			}
 		}
 
