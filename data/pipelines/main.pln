@@ -270,9 +270,11 @@ function main()
 	end
 
 	debugPass(res, shadowmap)
+	local icon_ds = -1
 	if SCENE_VIEW ~= nil then
+		icon_ds = createRenderbuffer(1, 1, true, "depth24stencil8", "icon_ds")
 		pass(getCameraParams())
-			setRenderTargets(res, gbuffer_depth)
+			setRenderTargets(res, icon_ds)
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 			renderGizmos()
 	end
@@ -280,11 +282,15 @@ function main()
 	render2D()
 
 	if SCENE_VIEW ~= nil then
-		if enable_icons then 
-			renderIcons()
-		end
 		renderDebugShapes()
 		renderSelectionOutline(res)
+		if enable_icons then 
+			setRenderTargets(res, icon_ds)
+			bindRenderbuffers({
+				gbuffer_depth,
+			}, 1)
+			renderIcons()
+		end
 	end
 
 	setOutput(res)
