@@ -1,0 +1,30 @@
+include "pipelines/common.glsl"
+
+vertex_shader [[
+	
+	layout (location = 0) out vec2 v_uv;
+	
+	void main()
+	{
+		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
+	}
+]]
+
+
+
+fragment_shader [[
+	// inspired by https://github.com/tobspr/RenderPipeline/blob/master/rpplugins/ao/shader/ue4ao.kernel.glsl
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 0) out vec4 o_color;
+	layout(std140, binding = 4) uniform Drawcall {
+		uniform vec4 u_params;
+	};
+
+	layout (binding=0) uniform sampler2D u_ssao_buf;
+
+	void main()
+	{
+		o_color.rgb = vec3(texture(u_ssao_buf, v_uv).r);
+		o_color.w = 1;
+	}
+]]
