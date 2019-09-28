@@ -2422,6 +2422,7 @@ struct PipelineImpl final : Pipeline
 				inst.pos = (info.position - m_camera_params.pos).toFloat();
 				inst.rot = info.rot;
 				inst.scale = info.terrain->getScale();
+				inst.hm_size = info.terrain->getSize();
 				inst.shader = info.shader->m_render_data;
 				inst.material = info.terrain->m_material->getRenderData();
 			}
@@ -2444,10 +2445,12 @@ struct PipelineImpl final : Pipeline
 					Vec4 pos;
 					Vec4 lpos;
 					Vec4 terrain_scale;
+					Vec2 hm_size;
 					int lod;
 				} dc_data;
 				dc_data.pos = Vec4(inst.pos, 0);
 				dc_data.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
+				dc_data.hm_size = inst.hm_size;
 
 				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count | inst.material->define_mask);
 
@@ -2465,10 +2468,10 @@ struct PipelineImpl final : Pipeline
 					const IVec2 to_unclamped = to;
 					dc_data.from_to_sup = IVec4(from_unclamped, to_unclamped);
 					
-					from.x = clamp(from.x, 0, 1024 / s);
-					from.y = clamp(from.y, 0, 1024 / s);
-					to.x = clamp(to.x, 0, 1024 / s);
-					to.y = clamp(to.y, 0, 1024 / s);
+					from.x = clamp(from.x, 0, (int)inst.hm_size.x / s);
+					from.y = clamp(from.y, 0, (int)inst.hm_size.y / s);
+					to.x = clamp(to.x, 0, (int)inst.hm_size.x / s);
+					to.y = clamp(to.y, 0, (int)inst.hm_size.y / s);
 
 					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
 						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
@@ -2490,7 +2493,7 @@ struct PipelineImpl final : Pipeline
 						draw_rect(from, to);
 					}
 					
-					if (from.x <= 0 && from.y <= 0 && to.x * s >= 1024 && to.y * s >= 1024) break;
+					if (from.x <= 0 && from.y <= 0 && to.x * s >= inst.hm_size.x && to.y * s >= inst.hm_size.y) break;
 
 					prev_from_to = IVec4(from, to);
 				}
@@ -2499,6 +2502,7 @@ struct PipelineImpl final : Pipeline
 
 		struct Instance
 		{
+			Vec2 hm_size;
 			Vec3 pos;
 			Quat rot;
 			Vec3 scale;
