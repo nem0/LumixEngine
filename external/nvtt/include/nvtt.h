@@ -312,6 +312,7 @@ namespace nvtt
         NVTT_API void setMipmapFilter(MipmapFilter filter);
         NVTT_API void setMipmapGeneration(bool enabled, int maxLevel = -1);
         NVTT_API void setKaiserParameters(float width, float alpha, float stretch);
+		NVTT_API void setAlphaCoverageMipScale(float alpha_ref, int channel);
 
         // Set normal map options.
         NVTT_API void setNormalMap(bool b);
