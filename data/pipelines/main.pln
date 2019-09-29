@@ -6,6 +6,7 @@ local selection_outline_shader = preloadShader("pipelines/selection_outline.shd"
 local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
 local debug_shadowmap = false
+local debug_normal = false
 local screenshot_request = 0
 local enable_icons = true
 
@@ -119,12 +120,12 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	return hdr_rb
 end
 
-function debugRenderbuffer(rb, output)
+function debugRenderbuffer(rb, output, channel_mask)
 	setRenderTargets(output)
 	
 	drawArray(0, 4, textured_quad_shader
 		, { rb }
-		, { { 0.5, 0.5, 0.5, 0.5 } }
+		, { { 0.5, 0.5, 0.5, 0.5 }, channel_mask }
 		, {}
 		, { depth_test = false });
 end
@@ -210,9 +211,12 @@ function tonemap(hdr_buffer)
 	return rb
 end
 
-function debugPass(output, shadowmap)
+function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	if debug_shadowmap then
-		debugRenderbuffer(shadowmap, output)
+		debugRenderbuffer(shadowmap, output, {1, 1, 1, 1})
+	end
+	if debug_normal then
+		debugRenderbuffer(gb1, output, {1, 1, 0, 0})
 	end
 end
 
@@ -273,7 +277,7 @@ function main()
 		renderIngameGUI()	
 	end
 
-	debugPass(res, shadowmap)
+	debugPass(res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local icon_ds = -1
 	if SCENE_VIEW ~= nil then
 		icon_ds = createRenderbuffer(1, 1, true, "depth24stencil8", "icon_ds")
@@ -326,6 +330,7 @@ function onGUI()
 
 	if ImGui.BeginPopup("debug_popup") then
 		changed, debug_shadowmap = ImGui.Checkbox("Shadowmap", debug_shadowmap)
+		changed, debug_normal = ImGui.Checkbox("Normal", debug_normal)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		ImGui.EndPopup()
 	end
