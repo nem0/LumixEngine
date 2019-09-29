@@ -896,6 +896,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				Engine& engine = m_app.getWorldEditor().getEngine();
 				FileSystem& fs = engine.getFileSystem();
 				StaticString<MAX_PATH_LENGTH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
+				
+				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
+					swap(m_tile.data[i * 4 + 0], m_tile.data[i * 4 + 2]);
+				}
+
 				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 				memset(m_tile.data.begin(), 0, m_tile.data.byte_size());
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
@@ -1249,6 +1254,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					AssetBrowser::TILE_SIZE,
 					0,
 					4);
+				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
+					swap(resized_data[i * 4 + 0], resized_data[i * 4 + 2]);
+				}
 				stbi_image_free(data);
 			}
 
@@ -1296,6 +1304,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		int w, h, comps;
 		stbi_uc* data = stbi_load_from_memory(src_data.begin(), src_data.byte_size(), &w, &h, &comps, 4);
 		if (!data) return false;
+
+		for (u32 i = 0; i < u32(w * h); ++i) {
+			swap(data[i * 4 + 0], data[i * 4 + 2]);
+		}
 
 		dst.write("dds", 3);
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
