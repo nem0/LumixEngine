@@ -419,7 +419,6 @@ goto :nvtt
 	del /Q ..\external\nvtt\include\*
 	copy 3rdparty\nvtt\src\nvtt\nvtt.h ..\external\nvtt\include\
 	copy 3rdparty\nvtt\project\vc2017\Release.x64\bin\nvtt.lib  ..\external\nvtt\lib\win64_vs2017\release\nvtt.lib
-	copy 3rdparty\nvtt\project\vc2017\nvtt\Release\x64\nvtt.pdb  ..\external\nvtt\lib\win64_vs2017\release\nvtt.pdb
 exit /B 0
 
 :build_nvtt
