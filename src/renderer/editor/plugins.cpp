@@ -588,7 +588,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.universe = &engine.createUniverse(false);
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_tile.pipeline = Pipeline::create(*renderer, pres, "", engine.getAllocator());
+		m_tile.pipeline = Pipeline::create(*renderer, pres, "PREVIEW", engine.getAllocator());
 
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		const EntityRef env_probe = m_tile.universe->createEntity({0, 0, 0}, Quat::IDENTITY);

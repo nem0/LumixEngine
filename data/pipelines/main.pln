@@ -54,7 +54,11 @@ function geomPass(default_set, decal_set)
 		local dsbuffer = createRenderbuffer(1, 1, true, "depth24stencil8", "gbuffer_ds")
 	
 		setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
-		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
+		if PREVIEW ~= nil then
+			clear(CLEAR_ALL, 0.9, 0.9, 0.9, 1, 0)
+		else
+			clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
+		end
 		local view_params = getCameraParams()
 		pass(view_params)
 		renderTerrains(view_params, default_state)
