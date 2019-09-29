@@ -738,6 +738,7 @@ struct PipelineImpl final : Pipeline
 		EndPipelineJob* end_job = LUMIX_NEW(m_renderer.getAllocator(), EndPipelineJob);
 		end_job->pipeline = this;
 		m_renderer.queue(end_job, 0);
+		m_renderer.waitForCommandSetup();
 
 		return true;
 	}
