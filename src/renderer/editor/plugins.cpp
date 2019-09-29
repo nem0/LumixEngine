@@ -647,7 +647,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			AABB aabb = model.getAABB();
 
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			m_viewport.pos = DVec3(0)  + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
+			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
 			m_viewport.rot = Quat::vec3ToVec3({0, 0, 1}, {1, 1, 1});
 		}
 		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
@@ -1031,7 +1031,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
-		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
+		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
 		mtx.inverse();
 		Viewport viewport;
 		viewport.is_ortho = false;
