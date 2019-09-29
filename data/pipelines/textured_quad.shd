@@ -1,7 +1,11 @@
-vertex_shader [[
+common [[
 	layout(std140, binding = 4) uniform Drawcall {
 		uniform vec4 u_offset_scale;
+		uniform vec4 u_channel_mask;
 	};
+]]
+
+vertex_shader [[
 	out vec2 v_uv;
 	void main() {
 		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
@@ -18,5 +22,11 @@ fragment_shader [[
 	out vec4 o_color;
 	void main() {
 		o_color = textureLod(u_texture, v_uv, 0);
+		if (u_channel_mask.a <= 0) {
+			o_color.rgb *= u_channel_mask.rgb;
+			o_color.a = 1;
+		}
+		else
+			o_color *= u_channel_mask;
 	}
 ]]
