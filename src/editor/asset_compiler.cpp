@@ -439,7 +439,10 @@ struct AssetCompilerImpl : AssetCompiler
 		const u32 hash = crc32(ext);
 		MT::CriticalSectionLock lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
-		if (!iter.isValid()) return false;
+		if (!iter.isValid()) {
+			logError("Editor") << "Unknown resource type " << src;
+			return false;
+		}
 		return iter.value()->compile(src);
 	}
 	

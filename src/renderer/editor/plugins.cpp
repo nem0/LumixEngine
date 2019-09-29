@@ -1145,6 +1145,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 		bool srgb = false;
 		bool is_normalmap = false;
+		float scale_coverage = -1;
 		WrapMode wrap_mode_u = WrapMode::REPEAT;
 		WrapMode wrap_mode_v = WrapMode::REPEAT;
 		WrapMode wrap_mode_w = WrapMode::REPEAT;
@@ -1309,6 +1310,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const bool has_alpha = comps == 4;
 		nvtt::InputOptions input;
 		input.setMipmapGeneration(true);
+		input.setAlphaCoverageMipScale(meta.scale_coverage, comps == 4 ? 3 : 0);
 		input.setAlphaMode(has_alpha ? nvtt::AlphaMode_Transparency : nvtt::AlphaMode_None);
 		input.setNormalMap(meta.is_normalmap);
 		input.setTextureLayout(nvtt::TextureType_2D, w, h);
@@ -1343,6 +1345,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Meta meta;
 		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
 			char tmp[32];
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
@@ -1379,19 +1382,22 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		OutputMemoryStream out(m_app.getWorldEditor().getAllocator());
 		Meta meta = getMeta(src);
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
-			out.write(ext, sizeof(ext) - 1);
-			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-			out.write(flags);
-			out.write(src_data.begin(), src_data.byte_size());
+			if (meta.scale_coverage < 0) {
+				out.write(ext, sizeof(ext) - 1);
+				u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+				flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+				flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+				flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+				flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+				out.write(flags);
+				out.write(src_data.begin(), src_data.byte_size());
+			}
+			else {
+				ASSERT(equalStrings(ext, "tga"));
+				compileImage(src_data, out, meta);
+			}
 		}
-		else if(equalStrings(ext, "jpg")) {
-			compileImage(src_data, out, meta);
-		}
-		else if(equalStrings(ext, "png")) {
+		else if(equalStrings(ext, "jpg") || equalStrings(ext, "png")) {
 			compileImage(src_data, out, meta);
 		}
 		else {
@@ -1462,6 +1468,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			
 			ImGui::Checkbox("SRGB", &m_meta.srgb);
+			bool scale_coverage = m_meta.scale_coverage >= 0;
+			if (ImGui::Checkbox("Mipmap scale coverage", &scale_coverage)) {
+				m_meta.scale_coverage *= -1;
+			}
+			if (m_meta.scale_coverage >= 0) {
+				ImGui::SliderFloat("Coverage alpha ref", &m_meta.scale_coverage, 0, 1);
+			}
 			ImGui::Checkbox("Is normalmap", &m_meta.is_normalmap);
 			ImGui::Combo("U Wrap mode", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
 			ImGui::Combo("V Wrap mode", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0");
@@ -1470,6 +1483,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (ImGui::Button("Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
+					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
 					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
 					, "\nwrap_mode_v = \"", toString(m_meta.wrap_mode_v), "\""

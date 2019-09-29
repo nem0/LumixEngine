@@ -1025,6 +1025,12 @@ struct RendererImpl final : public Renderer
 		OS::Point m_window_size;
 	};
 
+	void waitForCommandSetup() override
+	{
+		JobSystem::wait(m_setup_jobs_done);
+		m_setup_jobs_done = JobSystem::INVALID_HANDLE;
+	}
+
 	void frame() override
 	{
 		PROFILE_FUNCTION();

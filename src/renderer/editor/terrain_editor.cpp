@@ -457,7 +457,9 @@ private:
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
 		m_new_data.resize(bpp * maximum(1, (rect.to_x - rect.from_x) * (rect.to_y - rect.from_y)));
-		copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
+		if(m_old_data.size() > 0) {
+			copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
+		}
 
 		for (int item_index = 0; item_index < m_items.size(); ++item_index)
 		{
@@ -581,15 +583,15 @@ private:
 		Item& item = m_items[0];
 		rect.from_x = maximum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), 0);
 		rect.from_y = maximum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), 0);
-		rect.to_x = minimum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), texture->width);
-		rect.to_y = minimum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), texture->height);
+		rect.to_x = minimum(1 + int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), texture->width);
+		rect.to_y = minimum(1 + int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), texture->height);
 		for (int i = 1; i < m_items.size(); ++i)
 		{
 			Item& item = m_items[i];
 			rect.from_x = minimum(int(s * (item.m_local_pos.x - item.m_radius) - 0.5f), rect.from_x);
-			rect.to_x = maximum(int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), rect.to_x);
+			rect.to_x = maximum(1 + int(s * (item.m_local_pos.x + item.m_radius) + 0.5f), rect.to_x);
 			rect.from_y = minimum(int(s * (item.m_local_pos.z - item.m_radius) - 0.5f), rect.from_y);
-			rect.to_y = maximum(int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), rect.to_y);
+			rect.to_y = maximum(1 + int(s * (item.m_local_pos.z + item.m_radius) + 0.5f), rect.to_y);
 		}
 		rect.from_x = maximum(rect.from_x, 0);
 		rect.to_x = minimum(rect.to_x, texture->width);
