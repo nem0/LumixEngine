@@ -7,6 +7,7 @@ local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
 local debug_shadowmap = false
 local debug_normal = false
+local debug_albedo = false
 local screenshot_request = 0
 local enable_icons = true
 
@@ -125,7 +126,7 @@ function debugRenderbuffer(rb, output, channel_mask)
 	
 	drawArray(0, 4, textured_quad_shader
 		, { rb }
-		, { { 0.5, 0.5, 0.5, 0.5 }, channel_mask }
+		, { { 0, 0, 1, 1 }, channel_mask }
 		, {}
 		, { depth_test = false });
 end
@@ -217,6 +218,9 @@ function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	end
 	if debug_normal then
 		debugRenderbuffer(gb1, output, {1, 1, 0, 0})
+	end
+	if debug_albedo then
+		debugRenderbuffer(gb0, output, {1, 1, 1, 0})
 	end
 end
 
@@ -330,6 +334,7 @@ function onGUI()
 
 	if ImGui.BeginPopup("debug_popup") then
 		changed, debug_shadowmap = ImGui.Checkbox("Shadowmap", debug_shadowmap)
+		changed, debug_albedo = ImGui.Checkbox("Albedo", debug_albedo)
 		changed, debug_normal = ImGui.Checkbox("Normal", debug_normal)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		ImGui.EndPopup()
