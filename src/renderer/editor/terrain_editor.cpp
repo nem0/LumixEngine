@@ -911,14 +911,29 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 		m_terrain_brush_size);
 
 	CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
+	CullResult* mesh_groups = scene->getRenderables(frustum, RenderableTypes::MESH_GROUP);
 	if (m_selected_prefabs.empty())
 	{
 		meshes->forEach([&](EntityRef entity){
 			if (prefab_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
 		});
+		mesh_groups->forEach([&](EntityRef entity){
+			if (prefab_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
+		});
 	}
 	else
 	{
+		mesh_groups->forEach([&](EntityRef entity){
+			for (auto* res : m_selected_prefabs)
+			{
+				if ((prefab_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
+				{
+					m_world_editor.destroyEntities(&entity, 1);
+					break;
+				}
+			}
+		});
+
 		meshes->forEach([&](EntityRef entity){
 			for (auto* res : m_selected_prefabs)
 			{
@@ -932,6 +947,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 	}
 	m_world_editor.endCommandGroup();
 	meshes->free(scene->getEngine().getPageAllocator());
+	mesh_groups->free(scene->getEngine().getPageAllocator());
 }
 
 
@@ -1110,7 +1126,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 				if (entity.isValid()) {
 					if (scene->getUniverse().hasComponent((EntityRef)entity, MODEL_INSTANCE_TYPE)) {
 						Model* model = scene->getModelInstanceModel((EntityRef)entity);
-						const Transform tr = { pos, rot, size };
+						const Transform tr = { pos, rot, size * scale };
 						if (isOBBCollision(*scene, meshes, tr, model) || isOBBCollision(*scene, mesh_groups, tr, model)) {
 							m_world_editor.undo();
 						}

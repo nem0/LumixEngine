@@ -2322,7 +2322,6 @@ public:
 	{
 		ASSERT(command->isReady());
 		
-		logInfo("Editor") << "Executing editor command " << command->getType() << "...";
 		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
