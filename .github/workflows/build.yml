@@ -6,9 +6,9 @@ jobs:
         steps:
             - uses: actions/checkout@v1
             - name: make project
-                working-directory: projects
-                run: genie.exe --static-plugins vs2019 
+              working-directory: projects
+              run: genie.exe --static-plugins vs2019 
             - name: build engine
-                working-directory: projects
-                run: msbuild.exe tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+              working-directory: projects
+              run: msbuild.exe tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
             
