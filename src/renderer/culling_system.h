@@ -21,10 +21,10 @@ namespace Lumix
 		void forEach(F&& f) const {
 			const CullResult* j = this;
 			while (j) {
-				j = j->header.next;
 				for (u32 i = 0, c = j->header.count; i < c; ++i) {
 					f(j->entities[i]);
 				}
+				j = j->header.next;
 			}
 		}
 		
