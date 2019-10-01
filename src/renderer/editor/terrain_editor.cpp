@@ -1052,7 +1052,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 		const DVec3 camera_pos = m_app.getWorldEditor().getViewport().pos;
 		
 		CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
-		// TODO mesh_groups
+		CullResult* mesh_groups = scene->getRenderables(frustum, RenderableTypes::MESH_GROUP);
 
 		Vec2 size = scene->getTerrainSize((EntityRef)m_component.entity);
 		float scale = 1.0f - maximum(0.01f, m_terrain_brush_strength);
@@ -1111,7 +1111,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 					if (scene->getUniverse().hasComponent((EntityRef)entity, MODEL_INSTANCE_TYPE)) {
 						Model* model = scene->getModelInstanceModel((EntityRef)entity);
 						const Transform tr = { pos, rot, size };
-						if (isOBBCollision(*scene, meshes, tr, model)) {
+						if (isOBBCollision(*scene, meshes, tr, model) || isOBBCollision(*scene, mesh_groups, tr, model)) {
 							m_world_editor.undo();
 						}
 					}
@@ -1119,6 +1119,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 			}
 		}
 		meshes->free(m_app.getWorldEditor().getEngine().getPageAllocator());
+		mesh_groups->free(m_app.getWorldEditor().getEngine().getPageAllocator());
 	}
 	m_world_editor.endCommandGroup();
 }
