@@ -1,10 +1,10 @@
 name: build
+on: [push]
 jobs:
     windows:
         runs-on: windows-2019
         steps:
-            - name: checkout
-                uses: actions/checkout@v1
+            - uses: actions/checkout@v1
             - name: make project
                 working-directory: projects
                 run: genie.exe --static-plugins vs2019 
