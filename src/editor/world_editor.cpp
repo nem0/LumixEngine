@@ -1377,6 +1377,7 @@ public:
 
 		updateGoTo();
 		previewSnapVertex();
+		m_prefab_system->update();
 
 		if (!m_selected_entities.empty())
 		{

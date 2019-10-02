@@ -336,21 +336,20 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	const u8* data = (const u8*)file.getBuffer();
 
 	const u16* src_mem = (const u16*)(data + 3);
-	Array<float> dst_mem(allocator);
-	dst_mem.resize(texture.width * texture.height * sizeof(float));
+	const Renderer::MemRef dst_mem = texture.renderer.allocate(sizeof(float) * texture.width * texture.height);
+	float* dst = (float*)dst_mem.data;
 
 	for (int i = 0; i < texture.width * texture.height; ++i)
 	{
-		dst_mem[i] = src_mem[i] / 65535.0f;
+		dst[i] = src_mem[i] / 65535.0f;
 	}
 
-	const Renderer::MemRef mem = texture.renderer.copy(dst_mem.begin(), dst_mem.byte_size());
 	texture.handle = texture.renderer.createTexture(texture.width
 		, texture.height
 		, 1
 		, ffr::TextureFormat::R32F
 		, texture.getFFRFlags() & ~(u32)ffr::TextureFlags::SRGB
-		, mem
+		, dst_mem
 		, texture.getPath().c_str());
 	texture.depth = 1;
 	texture.layers = 1;
