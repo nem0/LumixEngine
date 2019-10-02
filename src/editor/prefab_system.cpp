@@ -171,6 +171,7 @@ public:
 		, m_instances(editor.getAllocator())
 		, m_resources(editor.getAllocator())
 		, m_prefabs(editor.getAllocator())
+		, m_deferred_instances(editor.getAllocator())
 	{
 		editor.universeCreated().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseCreated>(this);
 		editor.universeDestroyed().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
@@ -587,6 +588,22 @@ public:
 		}
 	}
 
+	void update() override {
+		while (!m_deferred_instances.empty()) {
+			PrefabResource* res = m_deferred_instances.back().resource;
+			if (res->isFailure()) {
+				logError("Editor") << "Failed to instantiate " << res->getPath();
+				res->getResourceManager().unload(*res);
+				m_deferred_instances.pop();
+			} else if (res->isReady()) {
+				DeferredInstance tmp = m_deferred_instances.back();
+				doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
+				m_deferred_instances.pop();
+			} else {
+				break;
+			}
+		}
+	}
 
 	void serialize(IOutputStream& serializer) override
 	{
@@ -679,9 +696,6 @@ public:
 			m_resources.insert(res->getPath().getHash(), res);
 		}
 
-		while(m_editor.getEngine().getFileSystem().hasWork())
-			m_editor.getEngine().getFileSystem().updateAsyncTransactions();
-
 		for (;;)
 		{
 			u32 res_hash;
@@ -694,11 +708,15 @@ public:
 			serializer.read(Ref(rot));
 			float scale;
 			serializer.read(Ref(scale));
-			if (m_resources[res_hash]->isReady()) {
-				doInstantiatePrefab(*m_resources[res_hash], pos, rot, scale);
+			PrefabResource* res =  m_resources[res_hash];
+			if (res->isReady()) {
+				doInstantiatePrefab(*res, pos, rot, scale);
+			}
+			else if(res->isEmpty()) {
+				m_deferred_instances.push({res, {pos, rot, scale}});
 			}
 			else {
-				ASSERT(m_resources[res_hash]->isFailure());
+				logError("Editor") << "Failed to instantiate " << res->getPath();
 			}
 		}
 	}
@@ -711,17 +729,18 @@ private:
 		EntityPtr next;
 		EntityPtr prev;
 	};
-	Array<EntityPrefab> m_prefabs;
-	HashMap<u64, EntityRef> m_instances;
-	HashMap<u32, PrefabResource*> m_resources;
-	Universe* m_universe;
-	WorldEditor& m_editor;
-	StudioApp* m_app;
-
 	struct DeferredInstance {
 		PrefabResource* resource;
 		Transform transform;
 	};
+
+	Array<EntityPrefab> m_prefabs;
+	HashMap<u64, EntityRef> m_instances;
+	HashMap<u32, PrefabResource*> m_resources;
+	Array<DeferredInstance> m_deferred_instances;
+	Universe* m_universe;
+	WorldEditor& m_editor;
+	StudioApp* m_app;
 }; // class PrefabSystemImpl
 
 

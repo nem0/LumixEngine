@@ -16,6 +16,14 @@ namespace Lumix
 	struct Vec3;
 
 	struct CullResult {
+		void merge(CullResult* other) {
+			CullResult** last = &header.next;
+			while(*last) {
+				last = &(*last)->header.next;
+			}
+			*last = other;
+		}
+		
 		void free(PageAllocator& allocator);
 		template <typename F>
 		void forEach(F&& f) const {
