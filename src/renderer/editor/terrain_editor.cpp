@@ -889,59 +889,6 @@ bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 	return true;
 }
 
-
-void TerrainEditor::removeEntities(const DVec3& hit_pos)
-{
-	if (m_selected_prefabs.empty()) return;
-	auto& prefab_system = m_world_editor.getPrefabSystem();
-
-	PROFILE_FUNCTION();
-
-	static const u32 REMOVE_ENTITIES_HASH = crc32("remove_entities");
-	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
-
-	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
-	ShiftedFrustum frustum;
-	frustum.computeOrtho(hit_pos,
-		Vec3(0, 0, 1),
-		Vec3(0, 1, 0),
-		m_terrain_brush_size,
-		m_terrain_brush_size,
-		-m_terrain_brush_size,
-		m_terrain_brush_size);
-
-	CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
-	meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_GROUP));
-	if (m_selected_prefabs.empty())
-	{
-		meshes->forEach([&](EntityRef entity){
-			if (prefab_system.getPrefab(entity)) m_world_editor.destroyEntities(&entity, 1);
-		});
-	}
-	else
-	{
-		meshes->forEach([&](EntityRef entity){
-			for (auto* res : m_selected_prefabs)
-			{
-				if ((prefab_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
-				{
-					m_world_editor.destroyEntities(&entity, 1);
-					break;
-				}
-			}
-		});
-	}
-	m_world_editor.endCommandGroup();
-	meshes->free(scene->getEngine().getPageAllocator());
-}
-
-
-static bool overlaps(float min1, float max1, float min2, float max2)
-{
-	return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
-}
-
-
 static void getProjections(const Vec3& axis,
 	const Vec3 vertices[8],
 	Ref<float> min,
@@ -957,6 +904,10 @@ static void getProjections(const Vec3& axis,
 	}
 }
 
+static bool overlaps(float min1, float max1, float min2, float max2)
+{
+	return (min1 <= min2 && min2 <= max1) || (min2 <= min1 && min1 <= max2);
+}
 
 static bool testOBBCollision(const AABB& a,
 	const Matrix& mtx_b,
@@ -994,6 +945,60 @@ static bool testOBBCollision(const AABB& a,
 	}
 
 	return true;
+}
+
+void TerrainEditor::removeEntities(const DVec3& hit_pos)
+{
+	if (m_selected_prefabs.empty()) return;
+	auto& prefab_system = m_world_editor.getPrefabSystem();
+
+	PROFILE_FUNCTION();
+
+	static const u32 REMOVE_ENTITIES_HASH = crc32("remove_entities");
+	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
+
+	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
+	Universe& universe = scene->getUniverse();
+	ShiftedFrustum frustum;
+	frustum.computeOrtho(hit_pos,
+		Vec3(0, 0, 1),
+		Vec3(0, 1, 0),
+		m_terrain_brush_size,
+		m_terrain_brush_size,
+		-m_terrain_brush_size,
+		m_terrain_brush_size);
+	const AABB brush_aabb(Vec3(-m_terrain_brush_size), Vec3(m_terrain_brush_size));
+
+	CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
+	meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_GROUP));
+	if (m_selected_prefabs.empty())
+	{
+		meshes->forEach([&](EntityRef entity){
+			if (prefab_system.getPrefab(entity) == 0) return; 
+			
+			const Model* model = scene->getModelInstanceModel(entity);
+			const AABB entity_aabb = model ? model->getAABB() : AABB(Vec3::ZERO, Vec3::ZERO);
+			const bool collide = testOBBCollision(brush_aabb, universe.getRelativeMatrix(entity, hit_pos), entity_aabb);
+			if (collide) m_world_editor.destroyEntities(&entity, 1);
+		});
+	}
+	else
+	{
+		meshes->forEach([&](EntityRef entity){
+			for (auto* res : m_selected_prefabs)
+			{
+				if ((prefab_system.getPrefab(entity) & 0xffffFFFF) == res->getPath().getHash())
+				{
+					const Model* model = scene->getModelInstanceModel(entity);
+					const AABB entity_aabb = model ? model->getAABB() : AABB(Vec3::ZERO, Vec3::ZERO);
+					const bool collide = testOBBCollision(brush_aabb, universe.getRelativeMatrix(entity, hit_pos), entity_aabb);
+					if (collide) m_world_editor.destroyEntities(&entity, 1);
+				}
+			}
+		});
+	}
+	m_world_editor.endCommandGroup();
+	meshes->free(scene->getEngine().getPageAllocator());
 }
 
 
