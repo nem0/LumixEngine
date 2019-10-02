@@ -25,6 +25,19 @@
 namespace Lumix
 {
 
+	
+static void createEntityGUIDRecursive(WorldEditor& editor, EntityPtr entity)
+{
+	if (!entity.isValid()) return;
+
+	EntityRef e = (EntityRef)entity;
+	editor.createEntityGUID(e);
+			
+	Universe& universe = *editor.getUniverse();
+	createEntityGUIDRecursive(editor, universe.getFirstChild(e));
+	createEntityGUIDRecursive(editor, universe.getNextSibling(e));
+}
+
 
 class AssetBrowserPlugin final : public AssetBrowser::IPlugin, public AssetCompiler::IPlugin
 {
@@ -88,19 +101,6 @@ class PrefabSystemImpl final : public PrefabSystem
 		}
 
 
-		void createEntityGUIDRecursive(EntityPtr entity) const
-		{
-			if (!entity.isValid()) return;
-
-			EntityRef e = (EntityRef)entity;
-			editor.createEntityGUID(e);
-			
-			Universe& universe = *editor.getUniverse();
-			createEntityGUIDRecursive(universe.getFirstChild(e));
-			createEntityGUIDRecursive(universe.getNextSibling(e));
-		}
-
-
 		void destroyEntityRecursive(EntityPtr entity) const
 		{
 			if (!entity.isValid()) return;
@@ -128,7 +128,7 @@ class PrefabSystemImpl final : public PrefabSystem
 			if (!entity.isValid()) return false;
 
 			editor.createEntityGUID((EntityRef)entity);
-			createEntityGUIDRecursive(editor.getUniverse()->getFirstChild((EntityRef)entity));
+			createEntityGUIDRecursive(editor, editor.getUniverse()->getFirstChild((EntityRef)entity));
 			return true;
 		}
 
@@ -588,6 +588,7 @@ public:
 		}
 	}
 
+
 	void update() override {
 		while (!m_deferred_instances.empty()) {
 			PrefabResource* res = m_deferred_instances.back().resource;
@@ -597,7 +598,12 @@ public:
 				m_deferred_instances.pop();
 			} else if (res->isReady()) {
 				DeferredInstance tmp = m_deferred_instances.back();
-				doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
+				const EntityPtr e = doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
+				if (e.isValid()) {
+					m_editor.createEntityGUID((EntityRef)e);
+					createEntityGUIDRecursive(m_editor, m_editor.getUniverse()->getFirstChild((EntityRef)e));
+				}
+			
 				m_deferred_instances.pop();
 			} else {
 				break;
@@ -710,7 +716,11 @@ public:
 			serializer.read(Ref(scale));
 			PrefabResource* res =  m_resources[res_hash];
 			if (res->isReady()) {
-				doInstantiatePrefab(*res, pos, rot, scale);
+				const EntityPtr e = doInstantiatePrefab(*res, pos, rot, scale);
+				if (e.isValid()) {
+					m_editor.createEntityGUID((EntityRef)e);
+					createEntityGUIDRecursive(m_editor, m_editor.getUniverse()->getFirstChild((EntityRef)e));
+				}
 			}
 			else if(res->isEmpty()) {
 				m_deferred_instances.push({res, {pos, rot, scale}});
