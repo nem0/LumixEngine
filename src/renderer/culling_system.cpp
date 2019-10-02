@@ -327,7 +327,7 @@ struct CullingSystemImpl final : public CullingSystem
 				if (cell.header.indices.type != type) continue;
 				if (!result) result = list.push();
 
-				if (frustum.containsAABB(cell.header.origin + v3_cell_size, -v3_cell_size)) {
+				if (frustum.containsAABB(cell.header.origin + v3_cell_size, v3_cell_size)) {
 					int to_cpy = cell.header.count;
 					int src_offset = 0;
 					while (to_cpy > 0) {
