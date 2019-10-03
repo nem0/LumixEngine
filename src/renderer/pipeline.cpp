@@ -2257,7 +2257,7 @@ struct PipelineImpl final : Pipeline
 									const Matrix mtx(pos, rot);
 									ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
 
-									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
+									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | render_states);
 									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
 									
 									++stats.draw_call_count;
