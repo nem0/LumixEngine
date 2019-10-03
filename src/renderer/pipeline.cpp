@@ -101,6 +101,7 @@ struct PassState
 	Matrix inv_view;
 	Matrix view_projection;
 	Matrix inv_view_projection;
+	Vec3 view_dir;
 };
 
 
@@ -1516,6 +1517,7 @@ struct PipelineImpl final : Pipeline
 		cmd->pass_state.inv_view = cp.view.fastInverted();
 		cmd->pass_state.view_projection = cp.projection * cp.view;
 		cmd->pass_state.inv_view_projection = cmd->pass_state.view_projection.inverted();
+		cmd->pass_state.view_dir = cp.view.inverted().transformVector(Vec3(0, 0, -1));
 		
 		cmd->pass_state_buffer = pipeline->m_pass_state_buffer;
 		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
