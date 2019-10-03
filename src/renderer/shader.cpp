@@ -90,6 +90,7 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 				mat4 u_pass_inv_view;
 				mat4 u_pass_view_projection;
 				mat4 u_pass_inv_view_projection;
+				vec3 u_pass_view_dir;
 			};
 			layout (std140, binding = 2) uniform MaterialState {
 				vec4 u_material_color;
