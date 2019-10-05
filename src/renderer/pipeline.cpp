@@ -85,6 +85,7 @@ struct GlobalState
 	Matrix camera_view_projection;
 	Matrix camera_inv_view_projection;
 	Vec4 light_direction;
+	Vec4 cam_world_pos;
 	Vec3 light_color;
 	float light_intensity;
 	float light_indirect_intensity;
@@ -656,6 +657,7 @@ struct PipelineImpl final : Pipeline
 		global_state.time = m_timer.getTimeSinceStart();
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
+		global_state.cam_world_pos = Vec4(m_viewport.pos.toFloat(), 1);
 
 		if(m_scene) {
 			const EntityPtr global_light = m_scene->getActiveEnvironment();

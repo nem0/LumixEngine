@@ -77,6 +77,8 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 				mat4 u_camera_view_projection;
 				mat4 u_camera_inv_view_projection;
 				vec3 u_light_direction;
+				float u_gs_padding;
+				vec4 u_camera_world_pos;
 				vec3 u_light_color;
 				float u_light_intensity;
 				float u_light_indirect_intensity;
