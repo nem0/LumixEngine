@@ -872,15 +872,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				FBXImporter importer(m_app);
 				Array<u32> gb0(m_app.getWorldEditor().getAllocator()); 
 				Array<u32> gb1(m_app.getWorldEditor().getAllocator()); 
-				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1));
+				IVec2 tile_size;
+				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(tile_size));
 				const PathUtils::FileInfo fi(model->getPath().c_str());
 				StaticString<MAX_PATH_LENGTH> dds_path(fi.m_dir, fi.m_basename, "_impostor0.dds");
-				ASSERT(gb0.size() == 256 * 9 * 256 * 9);
+				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				// TODO save as TGA
-				saveAsDDS(dds_path, (const u8*)gb0.begin(), 256 * 9, 256 * 9);
+				saveAsDDS(dds_path, (const u8*)gb0.begin(), tile_size.x * 9, tile_size.y * 9);
 				dds_path = fi.m_dir;
 				dds_path << fi.m_basename << "_impostor1.dds";
-				saveAsDDS(dds_path, (const u8*)gb1.begin(), 256 * 9, 256 * 9);
+				saveAsDDS(dds_path, (const u8*)gb1.begin(), tile_size.x * 9, tile_size.y * 9);
 			}
 		}
 
