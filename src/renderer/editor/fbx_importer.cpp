@@ -683,22 +683,67 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 
 void FBXImporter::writeString(const char* str) { out_file.write(str, stringLength(str)); }
 
-struct CaptureImpostorJob : Renderer::RenderJob {
-	static constexpr u32 TILE_SIZE = 256;
-	static constexpr u32 COLS = 9;
+static Vec3 impostorToWorld(Vec2 uv) {
+	Vec3 position = Vec3(
+							0.0f + (uv.x - uv.y),
+						-1.0f + (uv.x + uv.y),
+							0.0f
+					);
 
-	CaptureImpostorJob(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1) 
+	Vec2 absolute;
+	absolute.x = abs(position.x);
+	absolute.y = abs(position.y);
+	position.z = 1.0f - absolute.x - absolute.y;
+
+	return Vec3{position.x, position.z, position.y};
+};
+
+static constexpr u32 IMPOSTOR_TILE_SIZE = 256;
+static constexpr u32 IMPOSTOR_COLS = 9;
+
+static void getBBProjection(const AABB& aabb, Ref<Vec2> out_min, Ref<Vec2> out_max) {
+	const float radius = (aabb.max - aabb.min).length() * 0.5f;
+	const Vec3 center = (aabb.min + aabb.max) * 0.5f;
+
+	Matrix proj;
+	proj.setOrtho(-1, 1, -1, 1, 0, radius * 2, false, true);
+	Vec2 min(FLT_MAX, FLT_MAX), max(-FLT_MAX, -FLT_MAX);
+	for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
+		for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
+			const Vec3 v = impostorToWorld({i / (float)IMPOSTOR_COLS, j / (float)IMPOSTOR_COLS});
+			Matrix view;
+			view.lookAt(center + v, center, Vec3(0, 1, 0));
+			const Matrix vp = proj * view;
+			for (u32 k = 0; k < 8; ++k) {
+				const Vec3 p = {
+					k & 1 ? aabb.min.x : aabb.max.x,
+					k & 2 ? aabb.min.y : aabb.max.y,
+					k & 4 ? aabb.min.z : aabb.max.z
+				};
+				const Vec4 proj_p = vp * Vec4(p, 1);
+				min.x = minimum(min.x, proj_p.x / proj_p.w);
+				min.y = minimum(min.y, proj_p.y / proj_p.w);
+				max.x = maximum(max.x, proj_p.x / proj_p.w);
+				max.y = maximum(max.y, proj_p.y / proj_p.w);
+			}
+		}
+	}
+	out_min = min;
+	out_max = max;
+}
+
+struct CaptureImpostorJob : Renderer::RenderJob {
+
+	CaptureImpostorJob(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, Ref<IVec2> size) 
 		: m_gb0(gb0)
 		, m_gb1(gb1)
+		, m_tile_size(size)
 	{}
 
 	void setup() override {}
 
 	void execute() override {
 		ffr::TextureHandle gbs[] = { ffr::allocTextureHandle(), ffr::allocTextureHandle(), ffr::allocTextureHandle() };
-		ffr::createTexture(gbs[0], COLS * TILE_SIZE, COLS * TILE_SIZE, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb0");
-		ffr::createTexture(gbs[1], COLS * TILE_SIZE, COLS * TILE_SIZE, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
-		ffr::createTexture(gbs[2], COLS * TILE_SIZE, COLS * TILE_SIZE, 1, ffr::TextureFormat::D24S8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gbd");
 
 		ffr::BufferHandle pass_buf = ffr::allocBufferHandle();
 		ffr::BufferHandle ub = ffr::allocBufferHandle();
@@ -708,14 +753,28 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		ffr::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
 		ffr::bindUniformBuffer(4, ub, 0, 256);
 
+		const AABB aabb = m_model->getAABB();
+		const Vec3 center = (aabb.min + aabb.max) * 0.5f;
+		const float radius = m_model->getBoundingRadius();
+		Vec2 min, max;
+		getBBProjection(aabb, Ref(min), Ref(max));
+		const Vec2 size = max - min;
+
+		m_tile_size = IVec2(int(IMPOSTOR_TILE_SIZE * size.x / size.y), IMPOSTOR_TILE_SIZE);
+		m_tile_size->x = (m_tile_size->x + 3) & ~3;
+		m_tile_size->y = (m_tile_size->y + 3) & ~3;
+		const IVec2 texture_size = m_tile_size.value * IMPOSTOR_COLS;
+		ffr::createTexture(gbs[0], texture_size.x, texture_size.y, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb0");
+		ffr::createTexture(gbs[1], texture_size.x, texture_size.y, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
+		ffr::createTexture(gbs[2], texture_size.x, texture_size.y, 1, ffr::TextureFormat::D24S8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gbd");
+		
 		ffr::setFramebuffer(gbs, 3, 0);
 		const float color[] = {0, 0, 0, 0};
 		ffr::clear((u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH | (u32)ffr::ClearFlags::STENCIL, color, 0);
 
-		const float radius = m_model->getBoundingRadius();
-		for (u32 j = 0; j < COLS; ++j) {
-			for (u32 i = 0; i < COLS; ++i) {
-				ffr::viewport(i * TILE_SIZE, j * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
+			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
+				ffr::viewport(i * m_tile_size->x, j * m_tile_size->y, m_tile_size->x, m_tile_size->y);
 				const u32 mesh_count = m_model->getMeshCount();
 				;
 				for (u32 k = 0; k <= (u32)m_model->getLODs()[0].to_mesh; ++k) {
@@ -732,29 +791,13 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					const Material::RenderData* mat_rd = material->getRenderData();
 					ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
 
-
-					auto octa_to_world = [](Vec2 uv) {
-						Vec3 position = Vec3(
-											 0.0f + (uv.x - uv.y),
-											-1.0f + (uv.x + uv.y),
-											 0.0f
-										);
-
-						Vec2 absolute;
-						absolute.x = abs(position.x);
-						absolute.y = abs(position.y);
-						position.z = 1.0f - absolute.x - absolute.y;
-
-						return Vec3{position.x, position.z, position.y};
-					};
-
-					auto v = octa_to_world({i / (float)COLS, j / (float)COLS});
+					const Vec3 v = impostorToWorld({i / (float)IMPOSTOR_COLS, j / (float)IMPOSTOR_COLS});
 
 					Matrix mtx = Matrix::IDENTITY;
 					ffr::update(ub, &mtx.m11, sizeof(mtx));
 					PassState pass_state;
-					pass_state.view.lookAt(v, {0, 0, 0}, {0, 1, 0});
-					pass_state.projection.setOrtho(-radius, radius, -radius, radius, 0, 2 * radius, false, true);
+					pass_state.view.lookAt(center + v, center, {0, 1, 0});
+					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 2 * radius, false, true);
 					pass_state.inv_projection = pass_state.projection.inverted();
 					pass_state.inv_view = pass_state.view.fastInverted();
 					pass_state.view_projection = pass_state.projection * pass_state.view;
@@ -773,7 +816,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 
 		ffr::setFramebuffer(nullptr, 0, 0);
 
-		m_gb0->resize(COLS * TILE_SIZE * COLS * TILE_SIZE);
+		m_gb0->resize(texture_size.x * texture_size.y);
 		m_gb1->resize(m_gb0->size());
 		ffr::getTextureImage(gbs[0], m_gb0->byte_size(), m_gb0->begin());
 		ffr::getTextureImage(gbs[1], m_gb1->byte_size(), m_gb1->begin());
@@ -788,9 +831,10 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	Ref<Array<u32>> m_gb1;
 	Model* m_model;
 	u32 m_capture_define;
+	Ref<IVec2> m_tile_size;
 };
 
-bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0, Ref<Array<u32>> gb1)
+bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, Ref<IVec2> size)
 {
 	ASSERT(model->isReady());
 
@@ -799,12 +843,10 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0, Ref<
 	ASSERT(renderer);
 
 	IAllocator& allocator = renderer->getAllocator();
-	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0, gb1);
+	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0, gb1, size);
 	// TODO do not use m_model in render thread
 	job->m_model = model;
 	job->m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
-	job->m_gb0 = gb0;
-	job->m_gb1 = gb1;
 	renderer->queue(job, 0);
 	renderer->frame();
 	renderer->frame();
@@ -1345,12 +1387,16 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 	#pragma pack()
 
 	const float radius = (aabb.max - aabb.min).length() * 0.5f;
+	const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+
+	Vec2 min, max;
+	getBBProjection(aabb, Ref(min), Ref(max));
 
 	const Vertex vertices[] = {
-		{{-radius, -radius, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, {0, 0}},
-		{{-radius, radius, 0},	{128, 255, 128, 0}, {255, 128, 128, 0}, {0, 1}},
-		{{radius, radius, 0},	{128, 255, 128, 0}, {255, 128, 128, 0}, {1, 1}},
-		{{radius, -radius, 0},	{128, 255, 128, 0}, {255, 128, 128, 0}, {1, 0}}
+		{{center.x + min.x, center.y + min.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {0, 0}},
+		{{center.x + min.x, center.y + max.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {0, 1}},
+		{{center.x + max.x, center.y + max.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {1, 1}},
+		{{center.x + max.x, center.y + min.y, center.z},	{128, 255, 128, 0},	 {255, 128, 128, 0}, {1, 0}}
 	};
 
 	const u32 vertex_data_size = sizeof(vertices);
