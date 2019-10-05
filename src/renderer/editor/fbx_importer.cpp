@@ -1,18 +1,27 @@
 #include "fbx_importer.h"
 #include "animation/animation.h"
 #include "editor/asset_compiler.h"
+#include "editor/studio_app.h"
+#include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
+#include "engine/plugin_manager.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
+#include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "physics/physics_geometry.h"
+#include "renderer/material.h"
 #include "renderer/model.h"
+#include "renderer/pipeline.h"
+#include "renderer/renderer.h"
+#include "renderer/shader.h"
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
@@ -609,16 +618,17 @@ FBXImporter::~FBXImporter()
 }
 
 
-FBXImporter::FBXImporter(AssetCompiler& compiler, FileSystem& fs, IAllocator& allocator)
-	: allocator(allocator)
-	, compiler(compiler)
+FBXImporter::FBXImporter(StudioApp& app)
+	: allocator(app.getWorldEditor().getAllocator())
+	, compiler(app.getAssetCompiler())
 	, scene(nullptr)
 	, materials(allocator)
 	, meshes(allocator)
 	, animations(allocator)
 	, bones(allocator)
 	, out_file(allocator)
-	, filesystem(fs)
+	, filesystem(app.getWorldEditor().getEngine().getFileSystem())
+	, app(app)
 {
 	out_file.reserve(1024 * 1024);
 }
@@ -673,35 +683,132 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 
 void FBXImporter::writeString(const char* str) { out_file.write(str, stringLength(str)); }
 
+struct CaptureImpostorJob : Renderer::RenderJob {
+	static constexpr u32 TILE_SIZE = 256;
+	static constexpr u32 COLS = 9;
 
-bool FBXImporter::writeBillboardMaterial(const char* src)
-{/*
-	if (!create_billboard_lod) return true;
+	CaptureImpostorJob(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1) 
+		: m_gb0(gb0)
+		, m_gb1(gb1)
+	{}
 
-	FS::OsFile file;
-	const u32 hash = continueCrc32(mesh_hash, "||billboard");
-	PathBuilder output_material_name(output_dir, hash, ".res");
-	if (!file.open(output_material_name, FS::Mode::CREATE_AND_WRITE))
-	{
-		logError("FBX") << "Failed to create " << output_material_name;
-		return false;
+	void setup() override {}
+
+	void execute() override {
+		ffr::TextureHandle gbs[] = { ffr::allocTextureHandle(), ffr::allocTextureHandle(), ffr::allocTextureHandle() };
+		ffr::createTexture(gbs[0], COLS * TILE_SIZE, COLS * TILE_SIZE, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb0");
+		ffr::createTexture(gbs[1], COLS * TILE_SIZE, COLS * TILE_SIZE, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
+		ffr::createTexture(gbs[2], COLS * TILE_SIZE, COLS * TILE_SIZE, 1, ffr::TextureFormat::D24S8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gbd");
+
+		ffr::BufferHandle pass_buf = ffr::allocBufferHandle();
+		ffr::BufferHandle ub = ffr::allocBufferHandle();
+		ffr::createBuffer(ub, (u32)ffr::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+		const u32 pass_buf_size = (sizeof(PassState) + 255) & ~255;
+		ffr::createBuffer(pass_buf, (u32)ffr::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
+		ffr::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
+		ffr::bindUniformBuffer(4, ub, 0, 256);
+
+		ffr::setFramebuffer(gbs, 3, 0);
+		const float color[] = {0, 0, 0, 0};
+		ffr::clear((u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH | (u32)ffr::ClearFlags::STENCIL, color, 0);
+
+		const float radius = m_model->getBoundingRadius();
+		for (u32 j = 0; j < COLS; ++j) {
+			for (u32 i = 0; i < COLS; ++i) {
+				ffr::viewport(i * TILE_SIZE, j * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+				const u32 mesh_count = m_model->getMeshCount();
+				;
+				for (u32 k = 0; k <= (u32)m_model->getLODs()[0].to_mesh; ++k) {
+					const Mesh& mesh = m_model->getMesh(k);
+
+					const Material* material = mesh.material;
+					const Mesh::RenderData* rd = mesh.render_data;
+
+					ShaderRenderData* shader_rd = material->getShader()->m_render_data;
+					const ffr::ProgramHandle prog = Shader::getProgram(shader_rd, rd->vertex_decl, m_capture_define | material->getDefineMask());
+
+					if(!prog.isValid()) continue;
+
+					const Material::RenderData* mat_rd = material->getRenderData();
+					ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
+
+
+					auto octa_to_world = [](Vec2 uv) {
+						Vec3 position = Vec3(
+											 0.0f + (uv.x - uv.y),
+											-1.0f + (uv.x + uv.y),
+											 0.0f
+										);
+
+						Vec2 absolute;
+						absolute.x = abs(position.x);
+						absolute.y = abs(position.y);
+						position.z = 1.0f - absolute.x - absolute.y;
+
+						return Vec3{position.x, position.z, position.y};
+					};
+
+					auto v = octa_to_world({i / (float)COLS, j / (float)COLS});
+
+					Matrix mtx = Matrix::IDENTITY;
+					ffr::update(ub, &mtx.m11, sizeof(mtx));
+					PassState pass_state;
+					pass_state.view.lookAt(v, {0, 0, 0}, {0, 1, 0});
+					pass_state.projection.setOrtho(-radius, radius, -radius, radius, 0, 2 * radius, false, true);
+					pass_state.inv_projection = pass_state.projection.inverted();
+					pass_state.inv_view = pass_state.view.fastInverted();
+					pass_state.view_projection = pass_state.projection * pass_state.view;
+					pass_state.inv_view_projection = pass_state.view_projection.inverted();
+					pass_state.view_dir = pass_state.view.inverted().transformVector(Vec3(0, 0, -1));
+
+					ffr::update(pass_buf, &pass_state, sizeof(pass_state));
+					ffr::useProgram(prog);
+					ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+					ffr::bindIndexBuffer(rd->index_buffer_handle);
+					ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
+					ffr::drawTriangles(rd->indices_count, rd->index_type);
+				}
+			}
+		}
+
+		ffr::setFramebuffer(nullptr, 0, 0);
+
+		m_gb0->resize(COLS * TILE_SIZE * COLS * TILE_SIZE);
+		m_gb1->resize(m_gb0->size());
+		ffr::getTextureImage(gbs[0], m_gb0->byte_size(), m_gb0->begin());
+		ffr::getTextureImage(gbs[1], m_gb1->byte_size(), m_gb1->begin());
+
+		ffr::destroy(ub);
+		ffr::destroy(gbs[0]);
+		ffr::destroy(gbs[1]);
+		ffr::destroy(gbs[2]);
 	}
-	file << "{\n\t\"shader\" : \"pipelines/rigid/rigid.shd\"\n";
-	file << "\t, \"defines\" : [\"ALPHA_CUTOUT\"]\n";
-	file << "\t, \"texture\" : {\n\t\t\"source\" : \"";
 
-	WorldEditor& editor = app.getWorldEditor();
-	file << mesh_output_filename << "_billboard.dds\"}\n\t, \"texture\" : {\n\t\t\"source\" : \"";
-	PathBuilder texture_path(output_dir, "/", mesh_output_filename, "_billboard.dds");
-	copyFile("models/utils/cube/default.dds", texture_path);
+	Ref<Array<u32>> m_gb0;
+	Ref<Array<u32>> m_gb1;
+	Model* m_model;
+	u32 m_capture_define;
+};
 
-	file << mesh_output_filename << "_billboard_normal.dds";
-	PathBuilder normal_path(output_dir, "/", mesh_output_filename, "_billboard_normal.dds");
-	copyFile("models/utils/cube/default.dds", normal_path);
+bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0, Ref<Array<u32>> gb1)
+{
+	ASSERT(model->isReady());
 
-	file << "\"}\n}";
-	file.close();*/
-	// TODO
+	Engine& engine = app.getWorldEditor().getEngine();
+	Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+	ASSERT(renderer);
+
+	IAllocator& allocator = renderer->getAllocator();
+	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0, gb1);
+	// TODO do not use m_model in render thread
+	job->m_model = model;
+	job->m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
+	job->m_gb0 = gb0;
+	job->m_gb1 = gb1;
+	renderer->queue(job, 0);
+	renderer->frame();
+	renderer->frame();
+	
 	return true;
 }
 
@@ -709,16 +816,15 @@ bool FBXImporter::writeBillboardMaterial(const char* src)
 void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION()
+	const PathUtils::FileInfo src_info(src);
 	for (const ImportMaterial& material : materials) {
 		if (!material.import) continue;
 
 		char mat_name[128];
 		getMaterialName(material.fbx, mat_name);
-		
-		const PathUtils::FileInfo src_info(src);
 
 		const StaticString<MAX_PATH_LENGTH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
-		if (OS::fileExists(mat_src)) continue;
+		if (filesystem.fileExists(mat_src)) continue;
 
 		OS::OutputFile f;
 		if (!filesystem.open(mat_src, Ref(f)))
@@ -770,7 +876,20 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		}
 		f.close();
 	}
-	writeBillboardMaterial(src);
+
+	if (cfg.create_impostor) {
+		const StaticString<MAX_PATH_LENGTH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
+		if (!filesystem.fileExists(mat_src)) {
+			OS::OutputFile f;
+			if (!filesystem.open(mat_src, Ref(f))) {
+				logError("FBX") << "Failed to create " << mat_src;
+			}
+			else {
+				f << "shader \"/pipelines/standard.shd\"\n";
+				f.close();
+			}
+		}
+	}
 }
 
 
@@ -1213,8 +1332,7 @@ Quat FBXImporter::fixOrientation(const Quat& v) const
 	return Quat(v.x, v.y, v.z, v.w);
 }
 
-
-struct BillboardSceneData
+void FBXImporter::writeImpostorVertices(const AABB& aabb)
 {
 	#pragma pack(1)
 		struct Vertex
@@ -1226,116 +1344,18 @@ struct BillboardSceneData
 		};
 	#pragma pack()
 
-	static const int TEXTURE_SIZE = 512;
+	const float radius = (aabb.max - aabb.min).length() * 0.5f;
 
-	int width;
-	int height;
-	float ortho_size;
-	Vec3 position;
-
-
-	static int ceilPowOf2(int value)
-	{
-		ASSERT(value > 0);
-		int ret = value - 1;
-		ret |= ret >> 1;
-		ret |= ret >> 2;
-		ret |= ret >> 3;
-		ret |= ret >> 8;
-		ret |= ret >> 16;
-		return ret + 1;
-	}
-
-
-	BillboardSceneData(const AABB& aabb, int texture_size)
-	{
-		Vec3 size = aabb.max - aabb.min;
-		float right = aabb.max.x + size.z + size.x + size.z;
-		float left = aabb.min.x;
-		position.set((right + left) * 0.5f, (aabb.max.y + aabb.min.y) * 0.5f, aabb.max.z + 5);
-
-		if (2 * size.x + 2 * size.z > size.y)
-		{
-			width = texture_size;
-			int nonceiled_height = int(width / (2 * size.x + 2 * size.z) * size.y);
-			height = ceilPowOf2(nonceiled_height);
-			ortho_size = size.y * height / nonceiled_height * 0.5f;
-		}
-		else
-		{
-			height = texture_size;
-			width = ceilPowOf2(int(height * (2 * size.x + 2 * size.z) / size.y));
-			ortho_size = size.y * 0.5f;
-		}
-	}
-
-
-	Matrix computeMVPMatrix()
-	{
-		Matrix mvp = Matrix::IDENTITY;
-
-		float ratio = height > 0 ? (float)width / height : 1.0f;
-		Matrix proj;
-		proj.setOrtho(-ortho_size * ratio,
-			ortho_size * ratio,
-			-ortho_size,
-			ortho_size,
-			0.0001f,
-			10000.0f,
-			false /* we do not care for z value, so both true and false are correct*/,
-			true);
-
-		mvp.setTranslation(position);
-		mvp.fastInverse();
-		mvp = proj * mvp;
-
-		return mvp;
-	}
-};
-
-
-void FBXImporter::writeBillboardVertices(const AABB& aabb)
-{
-	if (!create_billboard_lod) return;
-
-	Vec3 max = aabb.max;
-	Vec3 min = aabb.min;
-	Vec3 size = max - min;
-	BillboardSceneData data({min, max}, BillboardSceneData::TEXTURE_SIZE);
-	Matrix mtx = data.computeMVPMatrix();
-	Vec3 uv0_min = mtx.transformPoint(min);
-	Vec3 uv0_max = mtx.transformPoint(max);
-	float x1_max = 0.0f;
-	float x2_max = mtx.transformPoint(Vec3(max.x + size.z + size.x, 0, 0)).x;
-	float x3_max = mtx.transformPoint(Vec3(max.x + size.z + size.x + size.z, 0, 0)).x;
-
-	auto fixUV = [](float x, float y) -> Vec2 { return Vec2(x * 0.5f + 0.5f, y * 0.5f + 0.5f); };
-
-	BillboardSceneData::Vertex vertices[] = {
-		{{min.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_max.y)},
-		{{max.x, min.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_max.y)},
-		{{max.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_max.x, uv0_min.y)},
-		{{min.x, max.y, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, fixUV(uv0_min.x, uv0_min.y)},
-
-		{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_max.y)},
-		{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_max.y)},
-		{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(x1_max, uv0_min.y)},
-		{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 255, 0}, fixUV(uv0_max.x, uv0_min.y)},
-
-		{{max.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_max.y)},
-		{{min.x, min.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_max.y)},
-		{{min.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x2_max, uv0_min.y)},
-		{{max.x, max.y, 0}, {128, 255, 128, 0}, {0, 128, 128, 0}, fixUV(x1_max, uv0_min.y)},
-
-		{{0, min.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_max.y)},
-		{{0, min.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_max.y)},
-		{{0, max.y, min.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x3_max, uv0_min.y)},
-		{{0, max.y, max.z}, {128, 255, 128, 0}, {128, 128, 0, 0}, fixUV(x2_max, uv0_min.y)}};
+	const Vertex vertices[] = {
+		{{-radius, -radius, 0}, {128, 255, 128, 0}, {255, 128, 128, 0}, {0, 0}},
+		{{-radius, radius, 0},	{128, 255, 128, 0}, {255, 128, 128, 0}, {0, 1}},
+		{{radius, radius, 0},	{128, 255, 128, 0}, {255, 128, 128, 0}, {1, 1}},
+		{{radius, -radius, 0},	{128, 255, 128, 0}, {255, 128, 128, 0}, {1, 0}}
+	};
 
 	const u32 vertex_data_size = sizeof(vertices);
 	write(vertex_data_size);
-	for (const BillboardSceneData::Vertex& vertex : vertices)
-	{
+	for (const Vertex& vertex : vertices) {
 		write(vertex.pos);
 		write(vertex.normal);
 		write(vertex.tangent);
@@ -1384,7 +1404,7 @@ void FBXImporter::writeGeometry(int mesh_idx)
 }
 
 
-void FBXImporter::writeGeometry()
+void FBXImporter::writeGeometry(const ImportConfig& cfg)
 {
 	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 	float radius_squared = 0;
@@ -1416,11 +1436,10 @@ void FBXImporter::writeGeometry()
 		radius_squared = maximum(radius_squared, import_mesh.radius_squared);
 	}
 
-	if (create_billboard_lod)
-	{
+	if (cfg.create_impostor) {
 		const int index_size = sizeof(u16);
 		write(index_size);
-		const u16 indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15};
+		const u16 indices[] = {0, 1, 2, 0, 2, 3};
 		const u32 len = lengthOf(indices);
 		write(len);
 		write(indices, sizeof(indices));
@@ -1432,7 +1451,9 @@ void FBXImporter::writeGeometry()
 		write((i32)import_mesh.vertex_data.getPos());
 		write(import_mesh.vertex_data.getData(), import_mesh.vertex_data.getPos());
 	}
-	writeBillboardVertices(aabb);
+	if (cfg.create_impostor) {
+		writeImpostorVertices(aabb);
+	}
 
 	write(sqrtf(radius_squared) * bounding_shape_scale);
 	aabb.min *= bounding_shape_scale;
@@ -1441,10 +1462,8 @@ void FBXImporter::writeGeometry()
 }
 
 
-void FBXImporter::writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset)
+void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
 {
-	/*if (!create_billboard_lod) return;
-
 	const i32 attribute_count = 4;
 	write(attribute_count);
 
@@ -1464,20 +1483,19 @@ void FBXImporter::writeBillboardMesh(i32 attribute_array_offset, i32 indices_off
 	write(ffr::AttributeType::FLOAT);
 	write((u8)2);
 
-	const StaticString<MAX_PATH_LENGTH + 10> material_name(mesh_output_filename, "_billboard");
+	const StaticString<MAX_PATH_LENGTH + 10> material_name(dir, model_name, "_impostor.mat");
 	i32 length = stringLength(material_name);
-	write((const char*)&length, sizeof(length));
+	write(length);
 	write(material_name, length);
 
-	const char* mesh_name = "billboard";
+	const char* mesh_name = "impostor";
 	length = stringLength(mesh_name);
-
-	write((const char*)&length, sizeof(length));
-	write(mesh_name, length);*/
+	write(length);
+	write(mesh_name, length);
 }
 
 
-void FBXImporter::writeMeshes(const char* src, int mesh_idx)
+void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig& cfg)
 {
 	const PathUtils::FileInfo src_info(src);
 	i32 mesh_count = 0;
@@ -1487,13 +1505,9 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx)
 	else {
 		for (ImportMesh& mesh : meshes)
 			if (mesh.import) ++mesh_count;
-		if (create_billboard_lod) ++mesh_count;
+		if (cfg.create_impostor) ++mesh_count;
 	}
 	write(mesh_count);
-
-	i32 attr_offset = 0;
-	i32 indices_offset = 0;
-	
 	
 	auto writeMesh = [&](const ImportMesh& import_mesh ) {
 			
@@ -1559,8 +1573,8 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx)
 		}
 	}
 
-	if (mesh_idx < 0) {
-		writeBillboardMesh(attr_offset, indices_offset);
+	if (mesh_idx < 0 && cfg.create_impostor) {
+		writeImpostorMesh(src_info.m_dir, src_info.m_basename);
 	}
 }
 
@@ -1605,39 +1619,35 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 }
 
 
-void FBXImporter::writeLODs()
+void FBXImporter::writeLODs(const ImportConfig& cfg)
 {
 	i32 lod_count = 1;
 	i32 last_mesh_idx = -1;
 	i32 lods[8] = {};
-	for (auto& mesh : meshes)
-	{
+	for (auto& mesh : meshes) {
 		if (!mesh.import) continue;
 
 		++last_mesh_idx;
-		if (mesh.lod >= lengthOf(lods_distances)) continue;
+		if (mesh.lod >= lengthOf(cfg.lods_distances)) continue;
 		lod_count = mesh.lod + 1;
 		lods[mesh.lod] = last_mesh_idx;
 	}
 
-	for (u32 i = 1; i < Lumix::lengthOf(lods); ++i)
-	{
+	for (u32 i = 1; i < Lumix::lengthOf(lods); ++i) {
 		if (lods[i] < lods[i - 1]) lods[i] = lods[i - 1];
 	}
 
-	if (create_billboard_lod)
-	{
+	if (cfg.create_impostor) {
 		lods[lod_count] = last_mesh_idx + 1;
 		++lod_count;
 	}
 
 	write((const char*)&lod_count, sizeof(lod_count));
 
-	for (int i = 0; i < lod_count; ++i)
-	{
+	for (int i = 0; i < lod_count; ++i) {
 		i32 to_mesh = lods[i];
 		write((const char*)&to_mesh, sizeof(to_mesh));
-		float factor = lods_distances[i] < 0 ? FLT_MAX : lods_distances[i] * lods_distances[i];
+		float factor = cfg.lods_distances[i] < 0 ? FLT_MAX : cfg.lods_distances[i] * cfg.lods_distances[i];
 		write((const char*)&factor, sizeof(factor));
 	}
 }
@@ -1830,7 +1840,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 
 		out_file.clear();
 		writeModelHeader();
-		writeMeshes(src, i);
+		writeMeshes(src, i, cfg);
 		writeGeometry(i);
 		const ofbx::Skin* skin = meshes[i].fbx->getGeometry()->getSkin();
 		if (!skin) {
@@ -1875,10 +1885,10 @@ void FBXImporter::writeModel(const char* src, const ImportConfig& cfg)
 	qsort(&meshes[0], meshes.size(), sizeof(meshes[0]), cmpMeshes);
 	out_file.clear();
 	writeModelHeader();
-	writeMeshes(src, -1);
-	writeGeometry();
+	writeMeshes(src, -1, cfg);
+	writeGeometry(cfg);
 	writeSkeleton(cfg);
-	writeLODs();
+	writeLODs(cfg);
 
 	compiler.writeCompiledResource(src, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
 }

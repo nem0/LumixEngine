@@ -287,7 +287,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 			}
 
 			GrassPatch::InstanceData& instance_data = patch.instance_data.emplace();
-			instance_data.pos_scale.set(instance_rel_pos, randFloat(0.9f, 1.1f));
+			instance_data.pos_scale.set(instance_rel_pos, randFloat(0.75f, 1.25f));
 			instance_data.rot = instance_rel_rot;
 			instance_data.normal = Vec4(getNormal(x, z), 0);
 		}

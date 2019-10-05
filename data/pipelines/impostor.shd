@@ -33,28 +33,8 @@ vertex_shader [[
 	#else 
 		const vec3 a_tangent = vec3(0, 1, 0);
 	#endif
-	#ifdef GRASS
-		layout(location = 4) in vec4 i_rot_quat;
-		layout(location = 5) in vec4 i_pos_scale;
-		layout(location = 6) in vec4 i_grass_normal;
-		layout(std140, binding = 4) uniform Model {
-			mat4 u_model;
-		};
-	#elif defined SKINNED
-		layout(location = 4) in vec4 a_indices;
-		layout(location = 5) in vec4 a_weights;
-		layout(std140, binding = 4) uniform Model {
-			mat4 u_model;
-			mat4 u_bones[256];
-		};
-	#elif defined INSTANCED
-		layout(location = 4) in vec4 i_rot_quat;
-		layout(location = 5) in vec4 i_pos_scale;
-	#else
-		layout(std140, binding = 4) uniform Model {
-			mat4 u_model;
-		};
-	#endif
+	layout(location = 4) in vec4 i_rot_quat;
+	layout(location = 5) in vec4 i_pos_scale;
 	layout (location = 0) out vec2 v_uv;
 	layout (location = 1) out vec3 v_normal;
 	layout (location = 2) out vec3 v_tangent;
@@ -64,34 +44,10 @@ vertex_shader [[
 	#endif
 	
 	void main() {
-		v_uv = a_uv;
-		#ifdef GRASS
-			v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
-			v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
-			vec3 p = a_position;
-			
-			v_wpos = u_model * vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p * i_pos_scale.w), 1);
-			v_wpos.x += p.y > 0.1 ? cos((i_pos_scale.x + i_pos_scale.y + i_pos_scale.z +  i_rot_quat.w * 5) * 0.3 + u_time * 2) * p.y * 0.1 : 0;
-			v_darken = a_position.y > 0.1 ? 1 : 0.0;
-		#elif defined INSTANCED
-			v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
-			v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
-			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, a_position * i_pos_scale.w), 1);
-
-		#elif defined SKINNED
-			mat4 model_mtx = u_model * (a_weights.x * u_bones[int(a_indices.x)] + 
-			a_weights.y * u_bones[int(a_indices.y)] +
-			a_weights.z * u_bones[int(a_indices.z)] +
-			a_weights.w * u_bones[int(a_indices.w)]);
-			v_normal = mat3(model_mtx) * (a_normal * 2 - 1);
-			v_tangent = mat3(model_mtx) * (a_tangent * 2 - 1);
-			v_wpos = model_mtx * vec4(a_position,  1);
-		#else 
-			mat4 model_mtx = u_model;
-			v_normal = mat3(model_mtx) * (a_normal * 2 - 1);
-			v_tangent = mat3(model_mtx) * (a_tangent * 2 - 1);
-			v_wpos = model_mtx * vec4(a_position,  1);
-		#endif
+		v_uv = a_uv / 9;
+		v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
+		v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
+		v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, a_position * i_pos_scale.w), 1);
 		
 		gl_Position = u_pass_view_projection * v_wpos;		
 	}
@@ -109,9 +65,6 @@ fragment_shader [[
 	layout (location = 1) in vec3 v_normal;
 	layout (location = 2) in vec3 v_tangent;
 	layout (location = 3) in vec4 v_wpos;
-	#ifdef GRASS
-		layout (location = 4) in float v_darken;
-	#endif
 
 	#ifdef DEFERRED
 		layout(location = 0) out vec4 o_gbuffer0;
@@ -151,7 +104,7 @@ fragment_shader [[
 			#endif
 			o_color = vec4(gl_FragCoord.z);
 		}
-	#elif defined DEFERRED
+	#else
 		void main()
 		{
 			getData();
@@ -161,29 +114,6 @@ fragment_shader [[
 			#endif
 			o_gbuffer1 = vec4(data.normal * 0.5 + 0.5, data.metallic);
 			o_gbuffer2 = vec4(data.emission, 0, 0, 1);
-		}
-	#else 
-		void main()
-		{
-			getData();
-			
-			vec3 V = normalize(-data.wpos);
-			vec3 L = normalize(u_light_direction);
-		
-			float shadow = getShadow(u_shadowmap, data.wpos);
-		
-			o_color.rgb = pbr(data.albedo.rgb
-				, data.roughness
-				, data.metallic
-				, data.emission
-				, data.normal
-				, V
-				, L
-				, shadow
-				, u_light_color * u_light_intensity
-				, u_light_indirect_intensity);
-			
-			o_color.w = data.albedo.a;
 		}
 	#endif
 ]]
