@@ -26,6 +26,8 @@ struct FBXImporter
 		};
 		float mesh_scale;
 		Origin origin = Origin::SOURCE;
+		bool create_impostor = false;
+		float lods_distances[4] = {-10, -100, -1000, -10000};
 	};
 
 
@@ -116,7 +118,7 @@ struct FBXImporter
 		Matrix transform_matrix = Matrix::IDENTITY;
 	};
 
-	FBXImporter(struct AssetCompiler& compiler, class FileSystem& fs, IAllocator& allocator);
+	FBXImporter(class StudioApp& app);
 	~FBXImporter();
 	bool setSource(const char* filename, bool ignore_geometry);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
@@ -124,6 +126,7 @@ struct FBXImporter
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
 	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* src, const ImportConfig& cfg);
+	bool createImpostorTextures(class Model* model, Ref<Array<u32>> gb0, Ref<Array<u32>> gb1);
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return animations; }
@@ -146,20 +149,19 @@ private:
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
 	void writeString(const char* str);
-	bool writeBillboardMaterial(const char* src);
 	int getVertexSize(const ImportMesh& mesh) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixRootOrientation(const Vec3& v) const;
 	Quat fixRootOrientation(const Quat& v) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;
-	void writeBillboardVertices(const AABB& aabb);
-	void writeGeometry();
+	void writeImpostorVertices(const AABB& aabb);
+	void writeGeometry(const ImportConfig& cfg);
 	void writeGeometry(int mesh_idx);
-	void writeBillboardMesh(i32 attribute_array_offset, i32 indices_offset);
-	void writeMeshes(const char* src, int mesh_idx);
+	void writeImpostorMesh(const char* dir, const char* model_name);
+	void writeMeshes(const char* src, int mesh_idx, const ImportConfig& cfg);
 	void writeSkeleton(const ImportConfig& cfg);
-	void writeLODs();
+	void writeLODs(const ImportConfig& cfg);
 	int getAttributeCount(const ImportMesh& mesh) const;
 	bool areIndices16Bit(const ImportMesh& mesh) const;
 	void writeModelHeader();
@@ -169,14 +171,14 @@ private:
 
 	
 	IAllocator& allocator;
-	FileSystem& filesystem;
-	AssetCompiler& compiler;
+	class FileSystem& filesystem;
+	StudioApp& app;
+	struct AssetCompiler& compiler;
 	Array<ImportMaterial> materials;
 	Array<ImportMesh> meshes;
 	Array<ImportAnimation> animations;
 	Array<const ofbx::Object*> bones;
 	ofbx::IScene* scene;
-	float lods_distances[4] = {-10, -100, -1000, -10000};
 	OutputMemoryStream out_file;
 	float time_scale = 1.0f;
 	float position_error = 0.1f;
@@ -186,7 +188,6 @@ private:
 	bool ignore_skeleton = false;
 	bool import_vertex_colors = true;
 	bool make_convex = false;
-	bool create_billboard_lod = false;
 	float fbx_scale = 1.f;
 	Orientation orientation = Orientation::Y_UP;
 	Orientation root_orientation = Orientation::Y_UP;

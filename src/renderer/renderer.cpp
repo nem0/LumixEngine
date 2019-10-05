@@ -56,8 +56,8 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 
 enum { 
-	TRANSIENT_BUFFER_INIT_SIZE = 1 * 1024 * 1024,
-	MATERIAL_BUFFER_SIZE = 1 * 1024 * 1024
+	TRANSIENT_BUFFER_INIT_SIZE = 16 * 1024 * 1024,
+	MATERIAL_BUFFER_SIZE = 16 * 1024 * 1024
 };
 
 
