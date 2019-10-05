@@ -223,7 +223,7 @@ void SceneView::renderSelection()
 				const Model* model = scene->getModelInstanceModel(e);
 				if (!model || !model->isReady()) continue;
 
-				for (int i = 0; i < model->getMeshCount(); ++i) {
+				for (int i = 0; i <= model->getLODs()[0].to_mesh; ++i) {
 					const Mesh& mesh = model->getMesh(i);
 					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;

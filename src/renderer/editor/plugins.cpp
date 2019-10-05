@@ -457,6 +457,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		float scale = 1;
 		bool split = false;
+		bool create_impostor = false;
+		float lods_distances[4] = { -1, -1, -1, -1 };
 	};
 
 	explicit ModelPlugin(StudioApp& app)
@@ -466,7 +468,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
 		, m_tile(app.getWorldEditor().getAllocator())
-		, m_fbx_importer(app.getAssetCompiler(), app.getWorldEditor().getEngine().getFileSystem(), app.getWorldEditor().getAllocator())
+		, m_fbx_importer(app)
 	{
 		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
 		createPreviewUniverse();
@@ -495,6 +497,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
+			
+			for (u32 i = 0; i < lengthOf(meta.lods_distances); ++i) {
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &meta.lods_distances[i]);
+			}
 		});
 		return meta;
 	}
@@ -517,7 +524,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ModelPlugin* plugin = data->plugin;
 			WorldEditor& editor = plugin->m_app.getWorldEditor();
 			FileSystem& fs = editor.getEngine().getFileSystem();
-			FBXImporter importer(plugin->m_app.getAssetCompiler(), fs, editor.getAllocator());
+			FBXImporter importer(plugin->m_app);
 			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
 
 			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path;
@@ -557,6 +564,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		FBXImporter::ImportConfig cfg;
 		const Meta meta = getMeta(Path(filepath));
 		cfg.mesh_scale = meta.scale;
+		copyMemory(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
+		cfg.create_impostor = meta.create_impostor;
 		const PathUtils::FileInfo src_info(filepath);
 		m_fbx_importer.setSource(filepath, false);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
@@ -828,12 +837,50 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			ImGui::InputFloat("Scale", &m_meta.scale);
 			ImGui::Checkbox("Split", &m_meta.split);
+			ImGui::Checkbox("Create impostor", &m_meta.create_impostor);
+			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
+				bool infinite = m_meta.lods_distances[i] <= 0;
+				if(ImGui::Checkbox(StaticString<32>("Infinite LOD ", i), &infinite)) {
+					m_meta.lods_distances[i] *= -1;
+				}
+				if (m_meta.lods_distances[i] > 0) {
+					ImGui::SameLine();
+					ImGui::PushItemWidth(-1);
+					ImGui::DragFloat(StaticString<32>("##lod", i), &m_meta.lods_distances[i]);
+					ImGui::PopItemWidth();
+				}
+			}
+			
 			if (ImGui::Button("Apply")) {
-				StaticString<256> src("scale = ", m_meta.scale, "\nsplit = ", m_meta.split ? "true\n" : "false\n");
-				compiler.updateMeta(model->getPath(), src);
+				String src(m_app.getWorldEditor().getAllocator());
+				src.cat("create_impostor=").cat(m_meta.create_impostor ? "true" : "false")
+					.cat("\nscale = ").cat(m_meta.scale)
+					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n");
+
+				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
+					if (m_meta.lods_distances[i] > 0) {
+						src.cat("lod").cat(i).cat("_distance").cat(" = ").cat(m_meta.lods_distances[i]).cat("\n");
+					}
+				}
+
+				compiler.updateMeta(model->getPath(), src.c_str());
 				if (compiler.compile(model->getPath())) {
 					model->getResourceManager().reload(*model);
 				}
+			}
+			if (ImGui::Button("Create impostor texture")) {
+				FBXImporter importer(m_app);
+				Array<u32> gb0(m_app.getWorldEditor().getAllocator()); 
+				Array<u32> gb1(m_app.getWorldEditor().getAllocator()); 
+				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1));
+				const PathUtils::FileInfo fi(model->getPath().c_str());
+				StaticString<MAX_PATH_LENGTH> dds_path(fi.m_dir, fi.m_basename, "_impostor0.dds");
+				ASSERT(gb0.size() == 256 * 9 * 256 * 9);
+				// TODO save as TGA
+				saveAsDDS(dds_path, (const u8*)gb0.begin(), 256 * 9, 256 * 9);
+				dds_path = fi.m_dir;
+				dds_path << fi.m_basename << "_impostor1.dds";
+				saveAsDDS(dds_path, (const u8*)gb1.begin(), 256 * 9, 256 * 9);
 			}
 		}
 

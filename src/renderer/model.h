@@ -195,6 +195,7 @@ public:
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
+	const LOD* getLODs() const { return m_lods; }
 	LOD* getLODs() { return m_lods; }
 	void onBeforeReady() override;
 	bool isSkinned() const;

@@ -24,6 +24,16 @@ class RenderScene;
 struct Viewport;
 template <typename T> class Delegate;
 
+struct PassState
+{
+	Matrix projection;
+	Matrix inv_projection;
+	Matrix view;
+	Matrix inv_view;
+	Matrix view_projection;
+	Matrix inv_view_projection;
+	Vec3 view_dir;
+};
 
 struct PipelineResource : Resource
 {
