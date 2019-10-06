@@ -698,7 +698,7 @@ static Vec3 impostorToWorld(Vec2 uv) {
 	return Vec3{position.x, position.z, position.y};
 };
 
-static constexpr u32 IMPOSTOR_TILE_SIZE = 256;
+static constexpr u32 IMPOSTOR_TILE_SIZE = 512;
 static constexpr u32 IMPOSTOR_COLS = 9;
 
 static void getBBProjection(const AABB& aabb, Ref<Vec2> out_min, Ref<Vec2> out_max) {
@@ -840,7 +840,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	Ref<IVec2> m_tile_size;
 };
 
-bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, Ref<IVec2> size)
+bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba, Ref<Array<u32>> gb1_rgba, Ref<IVec2> size)
 {
 	ASSERT(model->isReady());
 
@@ -849,7 +849,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0, Ref<
 	ASSERT(renderer);
 
 	IAllocator& allocator = renderer->getAllocator();
-	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0, gb1, size);
+	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0_rgba, gb1_rgba, size);
 	// TODO do not use m_model in render thread
 	job->m_model = model;
 	job->m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
