@@ -1062,7 +1062,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 
 		Vec2 size = scene->getTerrainSize((EntityRef)m_component.entity);
 		float scale = 1.0f - maximum(0.01f, m_terrain_brush_strength);
-		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 1000.0f; ++i)
+		for (int i = 0; i <= m_terrain_brush_size * m_terrain_brush_size / 100.0f * m_terrain_brush_strength; ++i)
 		{
 			const float angle = randFloat(0, PI * 2);
 			const float dist = randFloat(0, 1.0f) * m_terrain_brush_size;

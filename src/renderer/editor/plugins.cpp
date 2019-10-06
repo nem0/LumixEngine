@@ -732,6 +732,106 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
+	static void postprocessImpostor(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, const IVec2& tile_size, IAllocator& allocator) {
+		struct Cell {
+			i16 x, y;
+		};
+		const IVec2 size = tile_size * 9;
+		Array<Cell> cells(allocator);
+		cells.resize(gb0->size());
+		const u32* data = gb0->begin();
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0x000000ff) {
+					cells[i].x = i;
+					cells[i].y = j;
+				}
+				else {
+					cells[i].x = -3 * size.x;
+					cells[i].y = -3 * size.y;
+				}
+			}
+		}
+
+		auto pow2 = [](i32 v){
+			return v * v;
+		};
+
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0x000000ff) {
+					cells[idx].x = i;
+					cells[idx].y = j;
+				}
+				else {
+					if(i > 0) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_x = pow2(cells[idx - 1].x - i) + pow2(cells[idx - 1].y - j);
+						if(dist_x < dist_0) {
+							cells[idx] = cells[idx - 1];
+						}
+					}					
+					if(j > 0) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_y = pow2(cells[idx - size.x].x - i) + pow2(cells[idx - size.x].y - j);
+						if(dist_y < dist_0) {
+							cells[idx] = cells[idx - size.x];
+						}
+					}					
+				}
+			}
+		}
+
+		for (i32 j = size.y - 1; j >= 0; --j) {
+			for (i32 i = size.x - 1; i>= 0; --i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0xff) {
+					cells[idx].x = i;
+					cells[idx].y = j;
+				}
+				else {
+					if(i < size.x - 1) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_x = pow2(cells[idx + 1].x - i) + pow2(cells[idx + 1].y - j);
+						if(dist_x < dist_0) {
+							cells[idx] = cells[idx + 1];
+						}
+					}					
+					if(j < size.y - 1) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_y = pow2(cells[idx + size.x].x - i) + pow2(cells[idx + size.x].y - j);
+						if(dist_y < dist_0) {
+							cells[idx] = cells[idx + size.x];
+						}
+					}					
+				}
+			}
+		}
+
+		Array<u32> tmp(allocator);
+		tmp.resize(gb0->size());
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				const u8 alpha = data[idx] >> 24;
+				tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
+				tmp[idx] = alpha << 24 | tmp[idx] & 0xffFFff;
+			}
+		}
+		copyMemory(gb0->begin(), tmp.begin(), tmp.byte_size());
+
+		const u32* gb1_data = gb1->begin();
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
+			}
+		}
+		copyMemory(gb1->begin(), tmp.begin(), tmp.byte_size());
+	}
+
 	void onGUI(Span<Resource*> resources) override
 	{
 		if (resources.length() > 1) return;
@@ -871,16 +971,17 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			if (ImGui::Button("Create impostor texture")) {
 				FBXImporter importer(m_app);
-				Array<u32> gb0(m_app.getWorldEditor().getAllocator()); 
-				Array<u32> gb1(m_app.getWorldEditor().getAllocator()); 
+				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+				Array<u32> gb0(allocator); 
+				Array<u32> gb1(allocator); 
 				IVec2 tile_size;
 				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(tile_size));
+				postprocessImpostor(Ref(gb0), Ref(gb1), tile_size, allocator);
 				const PathUtils::FileInfo fi(model->getPath().c_str());
 				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
 				OS::OutputFile file;
-				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 				if (file.open(img_path)) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, 4, (const u8*)gb0.begin(), true, Path(img_path), allocator);
 					file.close();
@@ -1555,7 +1656,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Combo("U Wrap mode", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
 			ImGui::Combo("V Wrap mode", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0");
 			ImGui::Combo("W Wrap mode", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0");
-			ImGui::Combo("Filter", (int*)&m_meta.wrap_mode_w, "Trilinear\0Bilinear\0Point\0");
+			ImGui::Combo("Filter", (int*)&m_meta.filter, "Linear\0Point\0");
 
 			if (ImGui::Button("Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
