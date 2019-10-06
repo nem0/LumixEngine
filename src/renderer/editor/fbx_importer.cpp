@@ -685,9 +685,9 @@ void FBXImporter::writeString(const char* str) { out_file.write(str, stringLengt
 
 static Vec3 impostorToWorld(Vec2 uv) {
 	Vec3 position = Vec3(
-							0.0f + (uv.x - uv.y),
+						0.0f + (uv.x - uv.y),
 						-1.0f + (uv.x + uv.y),
-							0.0f
+						0.0f
 					);
 
 	Vec2 absolute;
@@ -710,7 +710,7 @@ static void getBBProjection(const AABB& aabb, Ref<Vec2> out_min, Ref<Vec2> out_m
 	Vec2 min(FLT_MAX, FLT_MAX), max(-FLT_MAX, -FLT_MAX);
 	for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 		for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
-			const Vec3 v = impostorToWorld({i / (float)IMPOSTOR_COLS, j / (float)IMPOSTOR_COLS});
+			const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
 			Matrix view;
 			view.lookAt(center + v, center, Vec3(0, 1, 0));
 			const Matrix vp = proj * view;
@@ -791,13 +791,19 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					const Material::RenderData* mat_rd = material->getRenderData();
 					ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
 
-					const Vec3 v = impostorToWorld({i / (float)IMPOSTOR_COLS, j / (float)IMPOSTOR_COLS});
+					const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
 
-					Matrix mtx = Matrix::IDENTITY;
-					ffr::update(ub, &mtx.m11, sizeof(mtx));
+					Matrix model_mtx;
+					if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) {
+						model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 0, 1));
+					}
+					else {
+						model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 1, 0));
+					}
+					ffr::update(ub, &model_mtx.m11, sizeof(model_mtx));
 					PassState pass_state;
-					pass_state.view.lookAt(center + v, center, {0, 1, 0});
-					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 2 * radius, false, true);
+					pass_state.view.lookAt(center + Vec3(0, 0, 2 * radius), center, {0, 1, 0});
+					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * radius, false, true);
 					pass_state.inv_projection = pass_state.projection.inverted();
 					pass_state.inv_view = pass_state.view.fastInverted();
 					pass_state.view_projection = pass_state.projection * pass_state.view;
