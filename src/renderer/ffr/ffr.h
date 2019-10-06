@@ -232,7 +232,7 @@ void update(BufferHandle buffer, const void* data, size_t size);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size);
-void getTextureImage(ffr::TextureHandle texture, u32 size, void* buf);
+void getTextureImage(ffr::TextureHandle texture, u32 size, void* rgba);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
