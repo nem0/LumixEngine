@@ -1083,6 +1083,7 @@ public:
 			serializer.write(camera.ortho_size);
 			serializer.write(camera.near);
 		}
+		serializer.write(m_active_camera);
 	}
 
 	void serializeLights(IOutputStream& serializer)
@@ -1331,6 +1332,7 @@ public:
 			m_cameras.insert(camera.entity, camera);
 			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
 		}
+		serializer.read(m_active_camera);
 	}
 
 	void deserializeModelInstances(IInputStream& serializer)
