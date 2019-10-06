@@ -17,7 +17,7 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionSimple(const Animatio
 
 	const LocalRigidTransform old_tr = anim->getBoneTransform(t0, root_bone_idx);
 	const Quat old_rot_inv = old_tr.rot.conjugated();
-	ASSERT(t0 < t1);
+	ASSERT(t0 <= t1);
 	const LocalRigidTransform new_tr = anim->getBoneTransform(t1, root_bone_idx);
 	root_motion.rot = old_rot_inv * new_tr.rot;
 	root_motion.pos = old_rot_inv.rotate(new_tr.pos - old_tr.pos);
@@ -137,7 +137,7 @@ void Blend1DNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_moti
 	root_motion = getRootMotion(ctx, pair.a->slot, t0, t);
 	if (pair.b) {
 		const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot, t0, t);
-		root_motion->interpolate(tr1, pair.t);
+		root_motion = root_motion->interpolate(tr1, pair.t);
 	}
 }
 
