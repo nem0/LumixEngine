@@ -9,7 +9,7 @@ function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbu
 		film_grain_shader = env.preloadShader("pipelines/film_grain.shd")
 	end
 
-	env.setRenderTargets(0, res)
+	env.setRenderTargets(res)
 	env.drawArray(0, 4, film_grain_shader, 
 		{ ldr_buffer },
 		{},
