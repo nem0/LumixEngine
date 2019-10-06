@@ -54,6 +54,7 @@ void LogUI::push(LogLevel level, const char* message)
 	msg.text = message;
 	msg.level = level;
 
+	if (m_autoscroll) m_scroll_to_bottom = true;
 	if (level == LogLevel::ERROR) addNotification(message);
 }
 
@@ -155,6 +156,7 @@ void LogUI::onGUI()
 
 		ImGui::SameLine();
 		char filter[128] = "";
+		ImGui::Checkbox("Autoscroll", &m_autoscroll);
 		ImGui::LabellessInputText("Filter", filter, sizeof(filter));
 		int len = 0;
 
@@ -168,6 +170,10 @@ void LogUI::onGUI()
 				{
 					ImGui::TextUnformatted(msg);
 				}
+			}
+			if (m_scroll_to_bottom) {
+				m_scroll_to_bottom = false;
+				ImGui::SetScrollHereY();
 			}
 		}
 		ImGui::EndChild();
