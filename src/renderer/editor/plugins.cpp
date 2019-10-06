@@ -80,6 +80,7 @@ static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
 	nvtt::InputOptions input;
 	input.setMipmapGeneration(true);
 	input.setAlphaMode(nvtt::AlphaMode_Transparency);
+	input.setAlphaCoverageMipScale(0.3f, 3);
 	input.setNormalMap(false);
 	input.setTextureLayout(nvtt::TextureType_2D, w, h);
 	input.setMipmapData(data, w, h);
@@ -875,13 +876,28 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				IVec2 tile_size;
 				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(tile_size));
 				const PathUtils::FileInfo fi(model->getPath().c_str());
-				StaticString<MAX_PATH_LENGTH> dds_path(fi.m_dir, fi.m_basename, "_impostor0.dds");
+				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
-				// TODO save as TGA
-				saveAsDDS(dds_path, (const u8*)gb0.begin(), tile_size.x * 9, tile_size.y * 9);
-				dds_path = fi.m_dir;
-				dds_path << fi.m_basename << "_impostor1.dds";
-				saveAsDDS(dds_path, (const u8*)gb1.begin(), tile_size.x * 9, tile_size.y * 9);
+				
+				OS::OutputFile file;
+				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+				if (file.open(img_path)) {
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, 4, (const u8*)gb0.begin(), true, Path(img_path), allocator);
+					file.close();
+				}
+				else {
+					logError("Renderer") << "Failed to open " << img_path;
+				}
+
+				img_path = fi.m_dir;
+				img_path << fi.m_basename << "_impostor1.tga";
+				if (file.open(img_path)) {
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, 4, (const u8*)gb1.begin(), true, Path(img_path), allocator);
+					file.close();
+				}
+				else {
+					logError("Renderer") << "Failed to open " << img_path;
+				}
 			}
 		}
 
