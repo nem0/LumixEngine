@@ -333,23 +333,24 @@ int include(lua_State* L)
 
 	Shader* shader = getShader(L);
 
-	if (!shader->m_render_data->include.empty()) {
-		logError("Renderer") << "More than 1 include in " << shader->getPath() << ". Max is 1.";
-		return 0;
-	}
-
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 
-	if (!fs.getContentSync(Path(path), Ref(shader->m_render_data->include))) {
+	Array<u8> content(shader->m_allocator);
+	if (!fs.getContentSync(Path(path), Ref(content))) {
 		logError("Renderer") << "Failed to open/read include " << path << " included from " << shader->getPath();
 		return 0;
 	}
 	
-	if (!shader->m_render_data->include.empty()) {
-		shader->m_render_data->include.resize(shader->m_render_data->include.size() + 2);
-		shader->m_render_data->include[shader->m_render_data->include.size() - 2] = '\n';
-		shader->m_render_data->include.back() = '\0';
+	if (!content.empty()) {
+		content.resize(content.size() + 2);
+		content[content.size() - 2] = '\n';
+		content.back() = '\0';
 	}
+
+	u32 old_size = shader->m_render_data->include.size();
+	if (old_size > 0) --old_size; // overwrite '\0' in the original
+	shader->m_render_data->include.resize(old_size + content.size());
+	copyMemory(shader->m_render_data->include.begin() + old_size, content.begin(), content.byte_size());
 
 	return 0;
 }
