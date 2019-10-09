@@ -197,6 +197,33 @@ float rand(vec3 seed)
 	return fract(sin(dot_product) * 43758.5453);
 }
 
+float getFogFactor(float cam_height
+	, float frag_height
+	, vec3 to_fragment
+	, float fog_density
+	, float fog_bottom
+	, float fog_height) 
+{ 
+	float fog_top = fog_bottom + fog_height;
+	frag_height = min(frag_height, fog_top);
+	float len = length(to_fragment);
+	vec3 view_dir = to_fragment / len;
+	float y_dir = abs(view_dir.y);
+	
+	cam_height = min(cam_height, fog_top);
+	float avg_y = (frag_height + cam_height) * 0.5;
+	float avg_density = fog_density * clamp(1.0 - (avg_y - fog_bottom) / fog_height, 0, 1);
+
+	float dist = abs(cam_height - frag_height);
+	if (y_dir <= 0) {
+		dist = len;
+	}
+	else {
+		dist = dist / y_dir; 
+	}
+	float res = exp(-pow(avg_density * dist, 2));
+	return 1 - clamp(res, 0.0, 1.0);
+}
 
 const vec2 POISSON_DISK_16[16] = vec2[](
 	vec2(0.3568125,-0.5825516),

@@ -37,19 +37,20 @@ fragment_shader [[
 
 		vec3 wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, v_uv);
 		vec3 V = normalize(-wpos);
-		vec3 L = normalize(u_light_direction);
+		vec3 L = normalize(u_light_direction.xyz);
 		
 		float shadow = getShadow(u_shadowmap, wpos);
 		vec3 direct = PBR_ComputeDirectLight(albedo
 			, normal
 			, L
 			, V
-			, u_light_color * u_light_intensity * shadow
+			, u_light_color.rgb * u_light_intensity * shadow
 			, roughness
 			, metallic);
 		
-		o_color.rgb = direct;
-				
+		float fog_factor = getFogFactor(u_camera_world_pos.y, u_camera_world_pos.y + wpos.y, wpos, u_fog_params.x, u_fog_params.y, u_fog_params.z);
+		o_color.rgb = mix(direct, u_fog_color.rgb, fog_factor);
+
 		o_color.w = 1;
 	}
 ]]

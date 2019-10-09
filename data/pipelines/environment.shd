@@ -47,7 +47,7 @@ fragment_shader [[
 
 		vec3 wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, screen_uv);
 		vec3 V = normalize(-wpos);
-		vec3 L = normalize(u_light_direction);
+		vec3 L = normalize(u_light_direction.xyz);
 		
 		vec3 indirect = PBR_ComputeIndirectLight(albedo, roughness, metallic, normal, V);
 		float alpha = 1 - saturate(length(wpos - u_pos_radius.xyz) / u_pos_radius.w);

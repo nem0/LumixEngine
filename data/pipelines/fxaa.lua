@@ -20,6 +20,7 @@ function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbu
 	return res
 end
 
+
 function awake()
 	if _G["postprocesses"] == nil then
 		_G["postprocesses"] = {}

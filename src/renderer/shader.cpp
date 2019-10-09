@@ -76,14 +76,15 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 				mat4 u_camera_inv_view;
 				mat4 u_camera_view_projection;
 				mat4 u_camera_inv_view_projection;
-				vec3 u_light_direction;
-				float u_gs_padding;
+				vec4 u_fog_params;
+				vec4 u_fog_color;
 				vec4 u_camera_world_pos;
-				vec3 u_light_color;
+				vec4 u_light_direction;
+				vec4 u_light_color;
+				ivec2 u_framebuffer_size;
 				float u_light_intensity;
 				float u_light_indirect_intensity;
 				float u_time;
-				ivec2 u_framebuffer_size;
 			};
 			layout (std140, binding = 1) uniform PassState {
 				mat4 u_pass_projection;
