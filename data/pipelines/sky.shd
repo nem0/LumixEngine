@@ -90,7 +90,7 @@ fragment_shader [[
 		const float intensity = 1.8;
 		const int step_count = 4;
 		
-		vec3 lightdir = u_light_direction;
+		vec3 lightdir = u_light_direction.xyz;
 		vec3 eyedir = get_world_normal(v_uv);
 		
 		float alpha = dot(eyedir, lightdir);
