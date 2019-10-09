@@ -1,7 +1,3 @@
-
-local dof_shader = nil
-local dof_blur_shader = nil
-
 near_blur = 1
 near_sharp = 3
 far_sharp = 50
@@ -11,15 +7,15 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	if not enabled then return input end
 	if phase ~= "post" then return input end
 	env.beginBlock("dof")
-	if dof_shader == nil then
-		dof_shader = env.preloadShader("pipelines/dof.shd")
-		dof_blur_shader = env.preloadShader("pipelines/dof_blur.shd")
+	if env.dof_shader == nil then
+		env.dof_shader = env.preloadShader("pipelines/dof.shd")
+		env.dof_blur_shader = env.preloadShader("pipelines/dof_blur.shd")
 	end
 
 	local tmp_rb = env.createRenderbuffer(1, 1, true, "rgba16f", "dof_tmp")
 	
 	env.setRenderTargets(tmp_rb)
-	env.drawArray(0, 4, dof_blur_shader, 
+	env.drawArray(0, 4, env.dof_blur_shader, 
 		{ 
 			input,
 			gbuffer_depth
@@ -30,7 +26,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	)
 
 	env.setRenderTargets(input)
-	env.drawArray(0, 4, dof_blur_shader, 
+	env.drawArray(0, 4, env.dof_blur_shader, 
 		{
 			tmp_rb,
 			gbuffer_depth
@@ -41,7 +37,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	)
 
 	env.setRenderTargets(tmp_rb)
-	env.drawArray(0, 4, dof_blur_shader, 
+	env.drawArray(0, 4, env.dof_blur_shader, 
 		{ 
 			input,
 			gbuffer_depth
@@ -52,7 +48,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	)
 
 	env.setRenderTargets(input)
-	env.drawArray(0, 4, dof_blur_shader, 
+	env.drawArray(0, 4, env.dof_blur_shader, 
 		{
 			tmp_rb,
 			gbuffer_depth
@@ -64,7 +60,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 
 
 	env.setRenderTargets(tmp_rb)
-	env.drawArray(0, 4, dof_shader, 
+	env.drawArray(0, 4, env.dof_shader, 
 		{
 			input,
 			gbuffer_depth
