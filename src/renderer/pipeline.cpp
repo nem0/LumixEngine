@@ -84,13 +84,15 @@ struct GlobalState
 	Matrix camera_inv_view;
 	Matrix camera_view_projection;
 	Matrix camera_inv_view_projection;
-	Vec4 light_direction;
+	Vec4 fog_params;
+	Vec4 fog_color;
 	Vec4 cam_world_pos;
-	Vec3 light_color;
+	Vec4 light_direction;
+	Vec4 light_color;
+	IVec2 framebuffer_size;
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;
-	IVec2 framebuffer_size;
 };
 
 
@@ -663,10 +665,13 @@ struct PipelineImpl final : Pipeline
 			const EntityPtr global_light = m_scene->getActiveEnvironment();
 			if(global_light.isValid()) {
 				EntityRef gl = (EntityRef)global_light;
+				const Environment& env = m_scene->getEnvironment(gl);
 				global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
-				global_state.light_color = m_scene->getEnvironment(gl).m_diffuse_color;
-				global_state.light_intensity = m_scene->getEnvironment(gl).m_diffuse_intensity;
-				global_state.light_indirect_intensity = m_scene->getEnvironment(gl).m_indirect_intensity;
+				global_state.light_color = Vec4(env.m_diffuse_color, 456);
+				global_state.light_intensity = env.m_diffuse_intensity;
+				global_state.light_indirect_intensity = env.m_indirect_intensity;
+				global_state.fog_params = Vec4(env.m_fog_density, env.m_fog_bottom, env.m_fog_height, 456);
+				global_state.fog_color = Vec4(env.m_fog_color, 1);
 			}
 		}
 
