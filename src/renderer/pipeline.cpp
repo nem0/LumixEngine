@@ -2463,7 +2463,7 @@ struct PipelineImpl final : Pipeline
 					from.y = from.y & ~1;
 					IVec2 to = from + IVec2(128);
 					// clamp
-					dc_data.from_to_sup = IVec4(from_unclamped, to_unclamped);
+					dc_data.from_to_sup = IVec4(from, to);
 					
 					from.x = clamp(from.x, 0, (int)inst.hm_size.x / s);
 					from.y = clamp(from.y, 0, (int)inst.hm_size.y / s);
