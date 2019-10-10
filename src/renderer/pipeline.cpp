@@ -2450,11 +2450,12 @@ struct PipelineImpl final : Pipeline
 				dc_data.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
 				dc_data.hm_size = inst.hm_size;
 
-				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count | inst.material->define_mask);
+				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count);
 
 				ffr::setState(state);
 				IVec4 prev_from_to;
 				for (int i = 0; ; ++i) {
+					ASSERT(i < 31);
 					const int s = 1 << i;
 					// round 
 					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
@@ -2462,8 +2463,6 @@ struct PipelineImpl final : Pipeline
 					from.y = from.y & ~1;
 					IVec2 to = from + IVec2(128);
 					// clamp
-					const IVec2 from_unclamped = from;
-					const IVec2 to_unclamped = to;
 					dc_data.from_to_sup = IVec4(from_unclamped, to_unclamped);
 					
 					from.x = clamp(from.x, 0, (int)inst.hm_size.x / s);
