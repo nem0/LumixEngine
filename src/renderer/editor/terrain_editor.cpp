@@ -954,9 +954,6 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 
 	PROFILE_FUNCTION();
 
-	static const u32 REMOVE_ENTITIES_HASH = crc32("remove_entities");
-	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
-
 	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 	Universe& universe = scene->getUniverse();
 	ShiftedFrustum frustum;
@@ -970,7 +967,16 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 	const AABB brush_aabb(Vec3(-m_terrain_brush_size), Vec3(m_terrain_brush_size));
 
 	CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
-	meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_GROUP));
+	if(meshes) {
+		meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_GROUP));
+	}
+	else {
+		meshes = scene->getRenderables(frustum, RenderableTypes::MESH_GROUP);
+	}
+	if(!meshes) return;
+
+	const u32 REMOVE_ENTITIES_HASH = crc32("remove_entities");
+	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
 	if (m_selected_prefabs.empty())
 	{
 		meshes->forEach([&](EntityRef entity){

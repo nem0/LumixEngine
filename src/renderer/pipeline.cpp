@@ -2452,7 +2452,13 @@ struct PipelineImpl final : Pipeline
 
 				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count);
 
-				ffr::setState(state);
+				static bool wf = false;
+				if(wf) {
+					ffr::setState(state | (u64)ffr::StateFlags::WIREFRAME);
+				}
+				else {
+					ffr::setState(state);
+				}
 				IVec4 prev_from_to;
 				for (int i = 0; ; ++i) {
 					ASSERT(i < 31);
@@ -2465,10 +2471,10 @@ struct PipelineImpl final : Pipeline
 					// clamp
 					dc_data.from_to_sup = IVec4(from, to);
 					
-					from.x = clamp(from.x, 0, (int)inst.hm_size.x / s);
-					from.y = clamp(from.y, 0, (int)inst.hm_size.y / s);
-					to.x = clamp(to.x, 0, (int)inst.hm_size.x / s);
-					to.y = clamp(to.y, 0, (int)inst.hm_size.y / s);
+					from.x = clamp(from.x, 0, (int)ceil(inst.hm_size.x / s));
+					from.y = clamp(from.y, 0, (int)ceil(inst.hm_size.y / s));
+					to.x = clamp(to.x, 0, (int)ceil(inst.hm_size.x / s));
+					to.y = clamp(to.y, 0, (int)ceil(inst.hm_size.y / s));
 
 					auto draw_rect = [&](const IVec2& subfrom, const IVec2& subto){
 						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
