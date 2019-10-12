@@ -326,6 +326,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	texture.bytes_per_pixel = 2;
 	texture.width = (int)sqrt(int(size / texture.bytes_per_pixel));
 	texture.height = texture.width;
+	const u32 file_data_offset = (u32)file.getPosition();
 
 	if (texture.data_reference)
 	{
@@ -335,7 +336,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 
 	const u8* data = (const u8*)file.getBuffer();
 
-	const u16* src_mem = (const u16*)(data + 3);
+	const u16* src_mem = (const u16*)(data + file_data_offset);
 	const Renderer::MemRef dst_mem = texture.renderer.allocate(sizeof(float) * texture.width * texture.height);
 	float* dst = (float*)dst_mem.data;
 
