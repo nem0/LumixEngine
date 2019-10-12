@@ -1213,7 +1213,7 @@ void TerrainEditor::onGUI()
 		ImGui::Indent();
 		return;
 	}
-	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
+	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 500);
 	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
 
 	enum BrushType

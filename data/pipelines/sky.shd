@@ -62,7 +62,7 @@ fragment_shader [[
 		return color-color*pow(air_color.rgb, vec3(factor/dist));
 	}
 
-	vec3 get_world_normal(vec2 frag_coord)
+	vec3 getWorldNormal(vec2 frag_coord)
 	{
 		float z = 1;
 		#ifdef _ORIGIN_BOTTOM_LEFT
@@ -77,6 +77,18 @@ fragment_shader [[
 		return -normalize(view);
 	}
 	
+	float getFogFactorSky(float cam_height, vec3 eye_dir, float fog_density, float fog_bottom, float fog_height) 
+	{
+		if(eye_dir.y == 0) return 1.0;
+		float to_top = max(0, (fog_bottom + fog_height) - cam_height);
+
+		float avg_y = (fog_bottom + fog_height + cam_height) * 0.5;
+		float avg_density = fog_density * clamp(1 - (avg_y - fog_bottom) / fog_height, 0, 1);
+		float res = exp(-pow(avg_density * to_top / eye_dir.y, 2));
+		res =  1 - clamp(res - (1-min(0.2, eye_dir.y)*5), 0, 1);
+		return res;
+	}
+
 	void main()
 	{
 		const vec3 strength = vec3(0.028, 0.139, 0.0264);
@@ -91,7 +103,7 @@ fragment_shader [[
 		const int step_count = 4;
 		
 		vec3 lightdir = u_light_direction.xyz;
-		vec3 eyedir = get_world_normal(v_uv);
+		vec3 eyedir = getWorldNormal(v_uv);
 		
 		float alpha = dot(eyedir, lightdir);
 		
@@ -123,8 +135,8 @@ fragment_shader [[
 		
 		vec3 color = vec3(spot * mie_collected + mie_factor * mie_collected + rayleigh_factor * rayleigh_collected);
 		
-		o_color.xyz = vec3(eyedir);
-		o_color.xyz = color;
+		float fog_factor = getFogFactorSky(u_camera_world_pos.y, eyedir, u_fog_params.x, u_fog_params.y, u_fog_params.z);
+		o_color.xyz = mix(color.rgb, u_fog_color.rgb, fog_factor);
 		o_color.w = 1;
 	}
 ]]
