@@ -2086,6 +2086,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)ffr::StateFlags::DEPTH_TEST, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, (u64)ffr::StateFlags::WIREFRAME, false);
 		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, (u64)ffr::StateFlags::DEPTH_WRITE, true);
 		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
 		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
