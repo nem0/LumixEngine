@@ -60,7 +60,7 @@ geometry_shader [[
 		rel = saturate(abs(rel - vec2(0.5)) * 10 - 4);
 	
 		pos.xz = mix(pos.xz, npos.xz, rel.yx);
-		uv = pos.xz / u_hm_size;
+		uv = (pos.xz + vec2(0.5 * u_terrain_scale.xz)) / u_hm_size ;
 		//pos.xz *= u_terrain_scale.xz;
 	}
 	
