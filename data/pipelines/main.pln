@@ -31,6 +31,7 @@ local default_state = {
 	stencil_sfail = STENCIL_REPLACE,
 	stencil_zfail = STENCIL_REPLACE,
 	stencil_zpass = STENCIL_REPLACE,
+	wireframe = false
 }
 
 local shadow_state = {
@@ -337,6 +338,7 @@ function onGUI()
 		changed, debug_albedo = ImGui.Checkbox("Albedo", debug_albedo)
 		changed, debug_normal = ImGui.Checkbox("Normal", debug_normal)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
+		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
 		ImGui.EndPopup()
 	end
 end
