@@ -121,7 +121,7 @@ fragment_shader [[
 
 	vec3 getNormal(vec2 uv)
 	{
-		float hscale = u_terrain_scale.y;
+		float hscale = u_terrain_scale.y / u_terrain_scale.x;
 		ivec3 off = ivec3(-1, 0, 1);
 		float s01 = textureLodOffset(u_hm, uv, 0, off.xy).x;
 		float s21 = textureLodOffset(u_hm, uv, 0, off.zy).x;
