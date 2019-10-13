@@ -258,13 +258,7 @@ struct LUMIX_ENGINE_API Vec3
 
 	float length() const;
 
-	float squaredLength() const
-	{
-		float x = this->x;
-		float y = this->y;
-		float z = this->z;
-		return x * x + y * y + z * z;
-	}
+	float squaredLength() const { return x * x + y * y + z * z; }
 	
 	Vec2 xz() const { return {x, z}; }
 
@@ -296,7 +290,7 @@ struct LUMIX_ENGINE_API DVec3
 	DVec3 operator-(const Vec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
 	DVec3 operator+(const Vec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
 	double length() const;
-	double squaredLength() const;
+	double squaredLength() const { return x * x + y * y + z * z; }
 	void operator*=(const double& rhs) { x *= rhs; y *= rhs; z *= rhs; }
 	void operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
