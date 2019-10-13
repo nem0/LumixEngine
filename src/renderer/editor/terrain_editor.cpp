@@ -1016,12 +1016,15 @@ static bool isOBBCollision(RenderScene& scene,
 	float radius_a_squared = model->getBoundingRadius() * model_tr.scale;
 	radius_a_squared = radius_a_squared * radius_a_squared;
 	Universe& universe = scene.getUniverse();
+	const ModelInstance* model_instances = scene.getModelInstances();
+	const Transform* transforms = universe.getTransforms();
 	while(meshes) {
+		const EntityRef* entities = meshes->entities;
 		for (u32 i = 0, c = meshes->header.count; i < c; ++i) {
-			const EntityRef mesh = meshes->entities[i];
-			const ModelInstance* model_instance = scene.getModelInstance(mesh);
-			const Transform tr_b = universe.getTransform(mesh);
-			const float radius_b = model_instance->model->getBoundingRadius() * tr_b.scale;
+			const EntityRef mesh = entities[i];
+			const ModelInstance& model_instance = model_instances[mesh.index];
+			const Transform& tr_b = transforms[mesh.index];
+			const float radius_b = model_instance.model->getBoundingRadius() * tr_b.scale;
 			const float radius_squared = radius_a_squared + radius_b * radius_b;
 			if ((model_tr.pos - tr_b.pos).squaredLength() < radius_squared) {
 				const Transform rel_tr = model_tr.inverted() * tr_b;
@@ -1029,7 +1032,7 @@ static bool isOBBCollision(RenderScene& scene,
 				mtx.multiply3x3(rel_tr.scale);
 				mtx.setTranslation(rel_tr.pos.toFloat());
 
-				if (testOBBCollision(model->getAABB(), mtx, model_instance->model->getAABB())) {
+				if (testOBBCollision(model->getAABB(), mtx, model_instance.model->getAABB())) {
 					return true;
 				}
 			}
