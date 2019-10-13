@@ -243,3 +243,9 @@ const vec2 POISSON_DISK_16[16] = vec2[](
 	vec2(-0.6493049,-0.4945979),
 	vec2(0.6104985,0.7838438)
 );
+
+vec3 vegetationAnim(vec3 obj_pos, vec3 vertex_pos) {
+	obj_pos += u_camera_world_pos.xyz;
+	vertex_pos.x += vertex_pos.y > 0.1 ? cos((obj_pos.x + obj_pos.y + obj_pos.z * 2) * 0.3 + u_time * 2) * vertex_pos.y * 0.03 : 0;
+	return vertex_pos;
+}
