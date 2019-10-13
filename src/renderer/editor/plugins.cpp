@@ -275,7 +275,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Material* material = static_cast<Material*>(resources[0]);
 		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
-		if (!material->isReady()) return;
 
 		if (ImGui::Button("Save")) saveMaterial(material);
 		ImGui::SameLine();
