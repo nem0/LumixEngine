@@ -681,13 +681,11 @@ int AssetCompilerTask::task()
 			Profiler::pushString(p.c_str());
 			logInfo("Editor") << "Compiling " << p << "...";
 			const bool compiled = m_compiler.compile(p);
-			if (compiled) {
-				MT::CriticalSectionLock lock(m_compiler.m_compiled_mutex);
-				m_compiler.m_compiled.push(p);
-			}
-			else {
+			if (!compiled) {
 				logError("Editor") << "Failed to compile resource " << p;
 			}
+			MT::CriticalSectionLock lock(m_compiler.m_compiled_mutex);
+			m_compiler.m_compiled.push(p);
 		}
 	}
 	return 0;
