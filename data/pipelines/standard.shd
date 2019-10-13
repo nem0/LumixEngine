@@ -21,6 +21,7 @@ texture_slot {
 include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
+define "VEGETATION"
 
 ------------------
 
@@ -76,8 +77,11 @@ vertex_shader [[
 		#elif defined INSTANCED
 			v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
-			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, a_position * i_pos_scale.w), 1);
-
+			vec3 p = a_position * i_pos_scale.w;
+			#ifdef VEGETATION
+				p = vegetationAnim(i_pos_scale.xyz, p);
+			#endif
+			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
 		#elif defined SKINNED
 			mat4 model_mtx = u_model * (a_weights.x * u_bones[int(a_indices.x)] + 
 			a_weights.y * u_bones[int(a_indices.y)] +
