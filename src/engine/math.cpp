@@ -98,15 +98,6 @@ double DVec3::length() const
 }
 
 
-double DVec3::squaredLength() const
-{
-	const double x = this->x;
-	const double y = this->y;
-	const double z = this->z;
-	return x * x + y * y + z * z;
-}
-
-
 float Vec3::length() const
 {
 	const float x = this->x;
