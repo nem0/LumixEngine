@@ -1383,30 +1383,31 @@ void TerrainEditor::onGUI()
 			static char filter[100] = {0};
 			static ImVec2 size(-1, 100);
 			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
-			ImGui::ListBoxHeader("Prefabs", size);
-			auto& resources = m_app.getAssetCompiler().lockResources();
-			for (const AssetCompiler::ResourceItem& res : resources) {
-				if (res.type != PrefabResource::TYPE) continue;
-				if (filter[0] != 0 && stristr(res.path.c_str(), filter) == nullptr) continue;
-				int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
-					return r && r->getPath() == res.path;
-				});
-				bool selected = selected_idx >= 0;
-				if (ImGui::Checkbox(res.path.c_str(), &selected)) {
-					if (selected) {
-						ResourceManagerHub& manager = m_world_editor.getEngine().getResourceManager();
-						PrefabResource* prefab = manager.load<PrefabResource>(res.path);
-						m_selected_prefabs.push(prefab);
-					}
-					else {
-						PrefabResource* prefab = m_selected_prefabs[selected_idx];
-						m_selected_prefabs.swapAndPop(selected_idx);
-						prefab->getResourceManager().unload(*prefab);
+			if (ImGui::ListBoxHeader("Prefabs", size)) {
+				auto& resources = m_app.getAssetCompiler().lockResources();
+				for (const AssetCompiler::ResourceItem& res : resources) {
+					if (res.type != PrefabResource::TYPE) continue;
+					if (filter[0] != 0 && stristr(res.path.c_str(), filter) == nullptr) continue;
+					int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
+						return r && r->getPath() == res.path;
+					});
+					bool selected = selected_idx >= 0;
+					if (ImGui::Checkbox(res.path.c_str(), &selected)) {
+						if (selected) {
+							ResourceManagerHub& manager = m_world_editor.getEngine().getResourceManager();
+							PrefabResource* prefab = manager.load<PrefabResource>(res.path);
+							m_selected_prefabs.push(prefab);
+						}
+						else {
+							PrefabResource* prefab = m_selected_prefabs[selected_idx];
+							m_selected_prefabs.swapAndPop(selected_idx);
+							prefab->getResourceManager().unload(*prefab);
+						}
 					}
 				}
+				m_app.getAssetCompiler().unlockResources();
+				ImGui::ListBoxFooter();
 			}
-			m_app.getAssetCompiler().unlockResources();
-			ImGui::ListBoxFooter();
 			ImGui::HSplitter("after_prefab", &size);
 
 			if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
