@@ -897,22 +897,25 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 
 			ImGui::Separator();
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& mesh = model->getMesh(i);
-				if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
-				{
-					ImGui::LabelText("Triangle count", "%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
-					ImGui::LabelText("Material", "%s", mesh.material->getPath().c_str());
-					ImGui::SameLine();
-					if (ImGui::Button("->"))
-					{
-						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
-					}
-					ImGui::TreePop();
-				}
-			}
+		}
 
+		for (int i = 0; i < model->getMeshCount(); ++i)
+		{
+			auto& mesh = model->getMesh(i);
+			if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
+			{
+				ImGui::LabelText("Triangle count", "%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
+				ImGui::LabelText("Material", "%s", mesh.material->getPath().c_str());
+				ImGui::SameLine();
+				if (ImGui::Button("->"))
+				{
+					m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
+				}
+				ImGui::TreePop();
+			}
+		}
+
+		if (model->isReady()) {
 			ImGui::LabelText("Bone count", "%d", model->getBoneCount());
 			if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
 				ImGui::Columns(3);
