@@ -1,0 +1,55 @@
+include "pipelines/common.glsl"
+
+vertex_shader [[
+	
+	layout (location = 0) out vec2 v_uv;
+	
+	void main()
+	{
+		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
+	}
+]]
+
+
+fragment_shader [[
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 0) out vec4 o_color;
+	layout (binding = 0) uniform samplerCube u_sky;
+
+
+	vec3 getWorldNormal(vec2 frag_coord)
+	{
+		float z = 1;
+		#ifdef _ORIGIN_BOTTOM_LEFT
+			vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
+		#else
+			vec4 posProj = vec4(vec2(frag_coord.x, -frag_coord.y) * 2 - 1, z, 1.0);
+		#endif
+		vec4 wpos = u_camera_inv_view_projection * posProj;
+		wpos /= wpos.w;
+		vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
+
+		return -normalize(view);
+	}
+	
+	float getFogFactorSky(float cam_height, vec3 eye_dir, float fog_density, float fog_bottom, float fog_height) 
+	{
+		if(eye_dir.y == 0) return 1.0;
+		float to_top = max(0, (fog_bottom + fog_height) - cam_height);
+
+		float avg_y = (fog_bottom + fog_height + cam_height) * 0.5;
+		float avg_density = fog_density * clamp(1 - (avg_y - fog_bottom) / fog_height, 0, 1);
+		float res = exp(-pow(avg_density * to_top / eye_dir.y, 2));
+		res =  1 - clamp(res - (1-min(0.2, eye_dir.y)*5), 0, 1);
+		return res;
+	}
+
+	void main()
+	{
+		vec3 eye_dir = getWorldNormal(v_uv);
+		float fog_factor = getFogFactorSky(u_camera_world_pos.y, eye_dir, u_fog_params.x, u_fog_params.y, u_fog_params.z);
+		vec4 sky_color = texture(u_sky, eye_dir);
+		o_color.xyz = mix(sky_color.rgb, u_fog_color.rgb, fog_factor);
+		o_color.w = 1;
+	}
+]]
