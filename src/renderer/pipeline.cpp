@@ -2663,7 +2663,7 @@ struct PipelineImpl final : Pipeline
 				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
 				const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
 				const DVec3 camera_pos = ctx->camera_pos;
-				for (int i = 0, c = ctx->count; i < c; ++i) {
+				for (u32 i = 0, c = ctx->count; i < c; ++i) {
 					const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
 					const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & 0xff);
 					const u8 bucket = sort_keys[i] >> 56;
@@ -2765,7 +2765,7 @@ struct PipelineImpl final : Pipeline
 								WRITE(slice.offset);
 								WRITE(count);
 								u8* mem = slice.ptr;
-								for(int j = start_i; j < i; ++j) {
+								for(u32 j = start_i; j < i; ++j) {
 									const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
 									const Transform& tr = entity_data[e.index];
 									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
@@ -2805,7 +2805,7 @@ struct PipelineImpl final : Pipeline
 								LightData* beg = (LightData*)slice.ptr;
 								LightData* end = (LightData*)(slice.ptr + slice.size - sizeof(LightData));
 
-								for (int j = start_i; j < i; ++j) {
+								for (u32 j = start_i; j < i; ++j) {
 									const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
 									const Transform& tr = entity_data[e.index];
 									const Vec3 lpos = (tr.pos - camera_pos).toFloat();
@@ -2838,35 +2838,52 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::GRASS: {
-							const u16 quad_idx = u16(renderables[i] >> 48);
-							const u8 patch_idx = u8(renderables[i] >> 40);
-							const Terrain* t = scene->getTerrain(e);
-							// TODO this crashes if the shader is reloaded
-							// TODO 0 const in following:
-							const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
-							const Mesh& mesh = p.m_type->m_grass_model->getMesh(0);
 							const Transform& tr = entity_data[e.index];
 							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-							if (p.instance_data.empty()) break;
-							const Renderer::TransientSlice slice = renderer.allocTransient(p.instance_data.byte_size());
-							
+
+							u32 start_i = i;
+							const u64 sort_key_mask = 0xffFFffFF;
+							const u64 key = sort_keys[i] & sort_key_mask;
+							const u64 entity_mask = 0xffFFffFF;
+							u32 instance_data_size = 0;
+							while (i < c && (sort_keys[i] & sort_key_mask) == key && (renderables[i] & entity_mask) == e.index) {
+								const u16 quad_idx = u16(renderables[i] >> 48);
+								const u8 patch_idx = u8(renderables[i] >> 40);
+								const Terrain* t = scene->getTerrain(e);
+								// TODO this crashes if the shader is reloaded
+								// TODO 0 const in following:
+								const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
+								instance_data_size += p.instance_data.byte_size();
+								++i;
+							}
+							const Renderer::TransientSlice slice = renderer.allocTransient(instance_data_size);
+
 							if (slice.ptr) {
+								u32 mem_offset = 0;
+								const Mesh* mesh = nullptr;
+								for (u32 j = start_i; j < i; ++j) {
+									const u16 quad_idx = u16(renderables[j] >> 48);
+									const u8 patch_idx = u8(renderables[j] >> 40);
+									const Terrain* t = scene->getTerrain(e);
+									const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
+									mesh = &p.m_type->m_grass_model->getMesh(0);
+									memcpy(slice.ptr + mem_offset, p.instance_data.begin(), p.instance_data.byte_size());
+									mem_offset += p.instance_data.byte_size();
+								}
 								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 57) {
 									new_page(bucket);
 								}
 								WRITE(type);
 								WRITE(tr.rot);
 								WRITE(lpos);
-								WRITE(mesh.render_data);
-								WRITE_FN(mesh.material->getRenderData());
-								const int instances_count = p.instance_data.size();
+								WRITE(mesh->render_data);
+								WRITE_FN(mesh->material->getRenderData());
+								const u32 instances_count = instance_data_size / sizeof(Terrain::GrassPatch::InstanceData);
 								WRITE(instances_count);
-							
-								memcpy(slice.ptr, p.instance_data.begin(), p.instance_data.byte_size());
-
 								WRITE(slice.buffer);
 								WRITE(slice.offset);
 							}
+							--i;
 
 							break;
 						}
