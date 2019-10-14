@@ -2243,6 +2243,7 @@ struct PipelineImpl final : Pipeline
 
 								const ffr::ProgramHandle prg = Shader::getProgram(material->shader, mesh->vertex_decl, define_mask | material->define_mask);
 								if (prg.isValid()) {
+									renderer.beginProfileBlock("grass", 0);
 									ffr::useProgram(prg);
 									ffr::bindTextures(material->textures, 0, material->textures_count);
 									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
@@ -2257,8 +2258,10 @@ struct PipelineImpl final : Pipeline
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | render_states);
 									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-									
+									ffr::popDebugGroup();
+									renderer.endProfileBlock();
 									++stats.draw_call_count;
+									stats.triangle_count += mesh->indices_count / 3 * instances_count;
 									stats.instance_count += instances_count;
 								}
 								break;
@@ -2436,6 +2439,8 @@ struct PipelineImpl final : Pipeline
 			for (Instance& inst : m_instances) {
 				const ffr::ProgramHandle p = Shader::getProgram(inst.shader, ffr::VertexDecl(), deferred_define_mask);
 				if (!p.isValid()) continue;
+				Renderer& renderer = m_pipeline->m_renderer;
+				renderer.beginProfileBlock("terrain", 0);
 				ffr::useProgram(p);
 
 				struct {
@@ -2453,13 +2458,7 @@ struct PipelineImpl final : Pipeline
 
 				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count);
 
-				static bool wf = false;
-				if(wf) {
-					ffr::setState(state | (u64)ffr::StateFlags::WIREFRAME);
-				}
-				else {
-					ffr::setState(state);
-				}
+				ffr::setState(state);
 				IVec4 prev_from_to;
 				for (int i = 0; ; ++i) {
 					ASSERT(i < 31);
@@ -2501,6 +2500,7 @@ struct PipelineImpl final : Pipeline
 
 					prev_from_to = IVec4(from, to);
 				}
+				renderer.endProfileBlock();
 			}
 		}
 
