@@ -2258,7 +2258,6 @@ struct PipelineImpl final : Pipeline
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | render_states);
 									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-									ffr::popDebugGroup();
 									renderer.endProfileBlock();
 									++stats.draw_call_count;
 									stats.triangle_count += mesh->indices_count / 3 * instances_count;
