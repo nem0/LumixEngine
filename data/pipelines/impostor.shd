@@ -60,7 +60,9 @@ vertex_shader [[
 		tangent_space[1] = vec3(0, 1, 0);
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
-		vec2 grid = dirToGrid(normalize(vec3(u_pass_view_dir.z, 0, u_pass_view_dir.x))) * 0.5 + 0.5;
+		vec3 vd = vec3(u_pass_view_dir.z, 0, u_pass_view_dir.x);
+		vd = rotateByQuat(i_rot_quat, vd);
+		vec2 grid = dirToGrid(normalize(vd)) * 0.5 + 0.5;
 		v_uv = a_uv / 9 + ivec2(grid * 9) / 9.0;
 
 		vec3 p = tangent_space * a_position * i_pos_scale.w;
