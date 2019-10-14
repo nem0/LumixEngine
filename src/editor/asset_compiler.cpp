@@ -168,8 +168,14 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void addResource(ResourceType type, const char* path) override {
 		const Path path_obj(path);
+		const u32 hash = path_obj.getHash();
 		MT::CriticalSectionLock lock(m_resources_mutex);
-		m_resources.insert(path_obj.getHash(), {path_obj, type});
+		if(m_resources.find(hash).isValid()) {
+			m_resources[hash] = {path_obj, type};
+		}
+		else {
+			m_resources.insert(hash, {path_obj, type});
+		}
 	}
 
 	ResourceType getResourceType(const char* path) const override
