@@ -274,6 +274,7 @@ public:
 
 		if (m_size > m_capacity * 3 / 4) {
 			grow(m_capacity << 1);
+			return find(key).value();
 		}
 
 		return m_values[pos];
