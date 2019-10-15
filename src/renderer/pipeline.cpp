@@ -2233,6 +2233,7 @@ struct PipelineImpl final : Pipeline
 							case RenderableTypes::GRASS: {
 								READ(const Quat, rot);
 								READ(const Vec3, pos);
+								READ(const float, distance);
 								READ(const Mesh::RenderData*, mesh);
 								READ(const Material::RenderData*, material);
 								READ(const int, instances_count);
@@ -2253,8 +2254,13 @@ struct PipelineImpl final : Pipeline
 										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 										material_ub_idx = material->material_constants;
 									}
-									const Matrix mtx(pos, rot);
-									ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
+									struct {
+										Matrix mtx;
+										float distance;
+									} dc;
+									dc.mtx = Matrix(pos, rot);
+									dc.distance = distance;
+									ffr::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
 
 									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | render_states);
 									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
@@ -2860,12 +2866,14 @@ struct PipelineImpl final : Pipeline
 							if (slice.ptr) {
 								u32 mem_offset = 0;
 								const Mesh* mesh = nullptr;
+								float distance = 0;
 								for (u32 j = start_i; j < i; ++j) {
 									const u16 quad_idx = u16(renderables[j] >> 48);
 									const u8 patch_idx = u8(renderables[j] >> 40);
 									const Terrain* t = scene->getTerrain(e);
 									const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
 									mesh = &p.m_type->m_grass_model->getMesh(0);
+									distance = p.m_type->m_distance;
 									memcpy(slice.ptr + mem_offset, p.instance_data.begin(), p.instance_data.byte_size());
 									mem_offset += p.instance_data.byte_size();
 								}
@@ -2875,6 +2883,7 @@ struct PipelineImpl final : Pipeline
 								WRITE(type);
 								WRITE(tr.rot);
 								WRITE(lpos);
+								WRITE(distance);
 								WRITE(mesh->render_data);
 								WRITE_FN(mesh->material->getRenderData());
 								const u32 instances_count = instance_data_size / sizeof(Terrain::GrassPatch::InstanceData);
