@@ -40,6 +40,7 @@ vertex_shader [[
 		layout(location = 6) in vec4 i_grass_normal;
 		layout(std140, binding = 4) uniform Model {
 			mat4 u_model;
+			float u_max_dist;
 		};
 	#elif defined SKINNED
 		layout(location = 4) in vec4 a_indices;
@@ -70,7 +71,10 @@ vertex_shader [[
 			v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
 			vec3 p = a_position;
-			
+			vec3 v = (u_model * vec4(i_pos_scale.xyz, 1)).xyz;
+			const float scale_dist = 10;
+			const float dist = length(v) - (u_max_dist - scale_dist);
+			p *= 1 - saturate(dist / scale_dist);
 			v_wpos = u_model * vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p * i_pos_scale.w), 1);
 			v_wpos.x += p.y > 0.1 ? cos((i_pos_scale.x + i_pos_scale.y + i_pos_scale.z +  i_rot_quat.w * 5) * 0.3 + u_time * 2) * p.y * 0.1 : 0;
 			v_darken = a_position.y > 0.1 ? 1 : 0.0;
