@@ -701,7 +701,6 @@ void checkThread()
 	ASSERT(g_ffr.thread == GetCurrentThreadId());
 }
 
-
 static void try_load_renderdoc()
 {
 	HMODULE lib = LoadLibrary("renderdoc.dll");

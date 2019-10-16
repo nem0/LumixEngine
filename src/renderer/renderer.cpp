@@ -61,6 +61,25 @@ enum {
 };
 
 
+struct FrameData {
+	FrameData(struct RendererImpl& renderer, IAllocator& allocator) 
+		: jobs(allocator)
+		, renderer(renderer)
+	{}
+
+	ffr::BufferHandle transient_buffer = ffr::INVALID_BUFFER;
+	i32 transient_offset = 0;
+	u32 transient_size = 0;
+	u8* transient_ptr = nullptr;
+	JobSystem::SignalHandle transient_mapped = JobSystem::INVALID_HANDLE;
+	JobSystem::SignalHandle setup_done = JobSystem::INVALID_HANDLE;
+	JobSystem::SignalHandle rendering_done = JobSystem::INVALID_HANDLE;
+	Array<Renderer::RenderJob*> jobs;
+	OS::Point window_size;
+	RendererImpl& renderer;
+};
+
+
 template <typename T>
 struct RenderResourceManager : public ResourceManager
 {
@@ -403,11 +422,13 @@ struct RendererImpl final : public Renderer
 		, m_vsync(true)
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
-		, m_cmd_queue(m_allocator)
+		, m_frame_data(m_allocator)
 		, m_material_buffer(m_allocator)
 	{
 		m_shader_defines.reserve(32);
 		ffr::preinit(m_allocator);
+		m_frame_data.emplace(*this, m_allocator);
+		m_frame_data.emplace(*this, m_allocator);
 	}
 
 
@@ -427,12 +448,13 @@ struct RendererImpl final : public Renderer
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
 		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
-			ffr::destroy(renderer->m_transient[0].buffer);
-			ffr::destroy(renderer->m_transient[1].buffer);
+			for (FrameData& frame : renderer->m_frame_data) {
+				ffr::destroy(frame.transient_buffer);
+			}
 			ffr::destroy(renderer->m_material_buffer.buffer);
 			renderer->m_profiler.clear();
 			ffr::shutdown();
-		}, &signal, m_prev_frame_job, 1);
+		}, &signal, m_gpu_frame->rendering_done, 1);
 		JobSystem::wait(signal);
 	}
 
@@ -461,18 +483,18 @@ struct RendererImpl final : public Renderer
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getPlatformData().window_handle;
 			ffr::init(window_handle, renderer.m_debug_opengl);
-			
-			renderer.m_transient[0].buffer = ffr::allocBufferHandle();
-			renderer.m_transient[1].buffer = ffr::allocBufferHandle();
-			renderer.m_transient[0].offset = 0;
-			renderer.m_transient[1].offset = 0;
-			ffr::createBuffer(renderer.m_transient[0].buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
-			ffr::createBuffer(renderer.m_transient[1].buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
-			renderer.m_transient[0].ptr = (u8*)ffr::map(renderer.m_transient[0].buffer, TRANSIENT_BUFFER_INIT_SIZE);
-			renderer.m_transient[0].size = TRANSIENT_BUFFER_INIT_SIZE;
-			renderer.m_transient[1].size = TRANSIENT_BUFFER_INIT_SIZE;
-			renderer.m_current_transient = 0;
-			
+
+			for (FrameData& frame : renderer.m_frame_data) {
+				frame.transient_buffer = ffr::allocBufferHandle();
+				frame.transient_offset = 0;
+				ffr::createBuffer(frame.transient_buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
+				frame.transient_ptr = nullptr;
+				frame.transient_size = TRANSIENT_BUFFER_INIT_SIZE;
+			}
+			renderer.m_frame_data[0].transient_ptr = (u8*)ffr::map(renderer.m_frame_data[0].transient_buffer, TRANSIENT_BUFFER_INIT_SIZE);
+			renderer.m_cpu_frame = &renderer.m_frame_data[0];
+			renderer.m_gpu_frame = &renderer.m_frame_data[1];
+
 			renderer.m_profiler.init();
 
 			renderer.m_material_buffer.buffer = ffr::allocBufferHandle();
@@ -652,17 +674,16 @@ struct RendererImpl final : public Renderer
 	{
 		TransientSlice slice;
 		size = (size + 15) & ~15;
-		auto& transient = m_transient[m_current_transient];
-		slice.buffer = transient.buffer;
-		slice.offset = MT::atomicAdd(&transient .offset, size);
-		if (slice.offset + size > transient .size) {
+		slice.buffer = m_cpu_frame->transient_buffer;
+		slice.offset = MT::atomicAdd(&m_cpu_frame->transient_offset, size);
+		if (slice.offset + size > m_cpu_frame->transient_size) {
 			logError("Renderer") << "Out of transient memory";
 			slice.size = 0;
 			slice.ptr = nullptr;
 		}
 		else {
 			slice.size = size;
-			slice.ptr = transient.ptr + slice.offset;
+			slice.ptr = m_cpu_frame->transient_ptr + slice.offset;
 		}
 		return slice;
 	}
@@ -890,14 +911,13 @@ struct RendererImpl final : public Renderer
 	{
 		cmd->profiler_link = profiler_link;
 		
-		m_cmd_queue.push(cmd);
+		m_cpu_frame->jobs.push(cmd);
 
-		JobSystem::wait(m_transient_ready);
-		JobSystem::run(cmd, [](void* data){
+		JobSystem::runEx(cmd, [](void* data){
 			RenderJob* cmd = (RenderJob*)data;
 			PROFILE_BLOCK("setup_render_job");
 			cmd->setup();
-		}, &m_setup_jobs_done);
+		}, &m_cpu_frame->setup_done, m_cpu_frame->transient_mapped, JobSystem::ANY_WORKER);
 	}
 
 
@@ -970,85 +990,72 @@ struct RendererImpl final : public Renderer
 		queue(cmd, 0);
 	}
 
-	struct RenderFrameData {
-		RenderFrameData(RendererImpl& renderer) 
-			: m_renderer(renderer)
-			, m_jobs(renderer.m_allocator)
-		{
-			renderer.m_cmd_queue.swap(m_jobs);
+	void render(FrameData& frame) {
+		ffr::unmap(frame.transient_buffer);
+		frame.transient_ptr = nullptr;
+
+		if (m_material_buffer.dirty) {
+			ffr::update(m_material_buffer.buffer, m_material_buffer.data.begin(), m_material_buffer.data.byte_size());
+			m_material_buffer.dirty = false;
 		}
 
-		void render() {
-			auto& current_transient = m_renderer.m_transient[m_renderer.m_current_transient];
-			m_renderer.m_current_transient = (m_renderer.m_current_transient + 1) % 2;
-			auto& next_transient = m_renderer.m_transient[m_renderer.m_current_transient];
+		ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
+		ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+		for (RenderJob* job : frame.jobs) {
+			PROFILE_BLOCK("execute_render_job");
+			Profiler::blockColor(0xaa, 0xff, 0xaa);
+			Profiler::link(job->profiler_link);
+			job->execute();
+			LUMIX_DELETE(m_allocator, job);
+		}
+		frame.jobs.clear();
+
+		PROFILE_BLOCK("swap buffers");
+		JobSystem::enableBackupWorker(true);
 			
-			ffr::unmap(current_transient.buffer);
-			current_transient.ptr = nullptr;
-
-			if ((u32)next_transient.offset > next_transient.size) {
-				next_transient.size = nextPow2(next_transient.offset);
-				ffr::destroy(next_transient.buffer);
-				next_transient.buffer = ffr::allocBufferHandle();
-				ffr::createBuffer(next_transient.buffer, 0, next_transient.size, nullptr);
-			}
-
-			ASSERT(!next_transient.ptr);
-			next_transient.ptr = (u8*)ffr::map(next_transient.buffer, next_transient.size);
-			next_transient.offset = 0;
-			JobSystem::decSignal(m_renderer.m_transient_ready);
-
-			if (m_renderer.m_material_buffer.dirty) {
-				ffr::update(m_renderer.m_material_buffer.buffer, m_renderer.m_material_buffer.data.begin(), m_renderer.m_material_buffer.data.byte_size());
-				m_renderer.m_material_buffer.dirty = false;
-			}
-			for (RenderJob* job : m_jobs) {
-				PROFILE_BLOCK("execute_render_job");
-				Profiler::blockColor(0xaa, 0xff, 0xaa);
-				Profiler::link(job->profiler_link);
-				job->execute();
-				LUMIX_DELETE(m_renderer.m_allocator, job);
-			}
-
-			PROFILE_BLOCK("swap buffers");
-			JobSystem::enableBackupWorker(true);
+		ffr::swapBuffers(frame.window_size.x, frame.window_size.y);
 			
-			ffr::swapBuffers(m_window_size.x, m_window_size.y);
-			
-			JobSystem::enableBackupWorker(false);
-			m_renderer.m_profiler.frame();
-			LUMIX_DELETE(m_renderer.m_allocator, this);
+		JobSystem::enableBackupWorker(false);
+		m_profiler.frame();
+
+		if ((u32)frame.transient_offset > frame.transient_size) {
+			frame.transient_size = nextPow2(frame.transient_offset);
+			ffr::destroy(frame.transient_buffer);
+			frame.transient_buffer = ffr::allocBufferHandle();
+			ffr::createBuffer(frame.transient_buffer, 0, frame.transient_size, nullptr);
 		}
 
-		RendererImpl& m_renderer;
-		Array<RenderJob*> m_jobs;
-		OS::Point m_window_size;
-	};
+		ASSERT(!frame.transient_ptr);
+		frame.transient_ptr = (u8*)ffr::map(frame.transient_buffer, frame.transient_size);
+		frame.transient_offset = 0;
+		JobSystem::decSignal(frame.transient_mapped);
+	}
 
 	void waitForCommandSetup() override
 	{
-		JobSystem::wait(m_setup_jobs_done);
-		m_setup_jobs_done = JobSystem::INVALID_HANDLE;
+		JobSystem::wait(m_cpu_frame->setup_done);
+		m_cpu_frame->setup_done = JobSystem::INVALID_HANDLE;
 	}
 
 	void frame() override
 	{
 		PROFILE_FUNCTION();
 		
-		JobSystem::wait(m_setup_jobs_done);
-		m_setup_jobs_done = JobSystem::INVALID_HANDLE;
-		JobSystem::wait(m_prev_frame_job);
-		m_prev_frame_job = JobSystem::INVALID_HANDLE;
-
-		RenderFrameData* data = LUMIX_NEW(m_allocator, RenderFrameData)(*this);
+		JobSystem::wait(m_cpu_frame->setup_done);
+		m_cpu_frame->setup_done = JobSystem::INVALID_HANDLE;
+		JobSystem::wait(m_gpu_frame->rendering_done);
+		m_gpu_frame->rendering_done = JobSystem::INVALID_HANDLE;
+		
 		const void* window_handle = m_engine.getPlatformData().window_handle;
-		data->m_window_size = OS::getWindowClientSize((OS::WindowHandle)window_handle);
-		JobSystem::incSignal(&m_transient_ready);
+		m_cpu_frame->window_size = OS::getWindowClientSize((OS::WindowHandle)window_handle);
+		JobSystem::incSignal(&m_cpu_frame->transient_mapped);
 
-		JobSystem::runEx(data, [](void* ptr){
-			auto* data = (RenderFrameData*)ptr;
-			data->render();
-		}, &m_prev_frame_job, JobSystem::INVALID_HANDLE, 1);
+		JobSystem::runEx(m_cpu_frame, [](void* ptr){
+			auto* data = (FrameData*)ptr;
+			data->renderer.render(*data);
+		}, &m_cpu_frame->rendering_done, JobSystem::INVALID_HANDLE, 1);
+
+		swap(m_gpu_frame, m_cpu_frame);
 	}
 
 	Engine& m_engine;
@@ -1065,19 +1072,11 @@ struct RendererImpl final : public Renderer
 	RenderResourceManager<Texture> m_texture_manager;
 	bool m_vsync;
 	bool m_debug_opengl = false;
-	JobSystem::SignalHandle m_prev_frame_job = JobSystem::INVALID_HANDLE;
-	JobSystem::SignalHandle m_setup_jobs_done = JobSystem::INVALID_HANDLE;
-	Array<RenderJob*> m_cmd_queue;
 
-	struct {
-		ffr::BufferHandle buffer;
-		i32 offset;
-		u8* ptr = nullptr;
-		u32 size;
-	} m_transient[2];
-	u32 m_current_transient;
+	Array<FrameData> m_frame_data;
+	FrameData* m_cpu_frame = nullptr;
+	FrameData* m_gpu_frame = nullptr;
 
-	JobSystem::SignalHandle m_transient_ready = JobSystem::INVALID_HANDLE;
 	GPUProfiler m_profiler;
 
 	struct MaterialBuffer {
