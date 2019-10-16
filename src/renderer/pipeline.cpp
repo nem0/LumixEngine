@@ -2955,11 +2955,14 @@ struct PipelineImpl final : Pipeline
 								Terrain* terrain = scene->getTerrain(e);
 								if (!terrain) continue;
 								if (terrain->m_grass_quads.empty()) continue;
+								const Transform& tr = scene->getUniverse().getTransform(e);
 								
 								ASSERT(terrain->m_grass_quads[0].size() < 0xffff);
 								for (u16 q = 0; q < terrain->m_grass_quads[0].size(); ++q) {
 									const Terrain::GrassQuad* quad = terrain->m_grass_quads[0][q];
-									
+									const DVec3 quad_pos = tr.transform(DVec3(quad->pos));
+									if (!m_camera_params.frustum.intersectsAABB(quad_pos - DVec3(quad->radius), Vec3(2 * quad->radius))) continue;
+
 									ASSERT(quad->m_patches.size() < 0xff);
 									for (u8 p = 0; p < quad->m_patches.size(); ++p) {
 										Model* model = quad->m_patches[p].m_type->m_grass_model;
