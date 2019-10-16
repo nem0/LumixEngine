@@ -1773,6 +1773,7 @@ static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum seve
 	if(GL_DEBUG_TYPE_PUSH_GROUP == type || type == GL_DEBUG_TYPE_POP_GROUP) return;
 	if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_PERFORMANCE) {
 		logError("GL") << message;
+		ASSERT(false);
 	}
 	else {
 		//logInfo("GL") << message;
