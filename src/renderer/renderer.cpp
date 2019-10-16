@@ -488,10 +488,9 @@ struct RendererImpl final : public Renderer
 				frame.transient_buffer = ffr::allocBufferHandle();
 				frame.transient_offset = 0;
 				ffr::createBuffer(frame.transient_buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
-				frame.transient_ptr = nullptr;
 				frame.transient_size = TRANSIENT_BUFFER_INIT_SIZE;
+				frame.transient_ptr = (u8*)ffr::map(frame.transient_buffer, TRANSIENT_BUFFER_INIT_SIZE);
 			}
-			renderer.m_frame_data[0].transient_ptr = (u8*)ffr::map(renderer.m_frame_data[0].transient_buffer, TRANSIENT_BUFFER_INIT_SIZE);
 			renderer.m_cpu_frame = &renderer.m_frame_data[0];
 			renderer.m_gpu_frame = &renderer.m_frame_data[1];
 
