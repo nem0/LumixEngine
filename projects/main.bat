@@ -458,7 +458,7 @@ exit /B 0
 
 :create_bundle
 	echo Creating bundle...
-	genie.exe --embed-resources --static-plugins vs2019
+	genie.exe --embed-resources --static-plugins --static-physx vs2019
 	cd ..\data
 	tar -cvf data.tar .
 	move data.tar ../src/studio
