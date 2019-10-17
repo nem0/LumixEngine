@@ -20,12 +20,9 @@ const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
 const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 
-
-enum class LogLevel : u32 {
-	INFO,
-	WARNING,
-	ERROR,
-	FATAL
+enum class InitFlags : u32 {
+	DEBUG_OUTPUT,
+	VSYNC
 };
 
 enum class Backend {
@@ -184,7 +181,7 @@ struct TextureInfo {
 
 
 void preinit(IAllocator& allocator);
-bool init(void* window_handle, bool debug);
+bool init(void* window_handle, u32 flags);
 Backend getBackend();
 void swapBuffers(u32 w, u32 h);
 bool isHomogenousDepth();

@@ -783,8 +783,9 @@ struct PipelineImpl final : Pipeline
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::CULL_BACK));
 				ffr::useProgram(shader);
 
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
+				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 				ffr::drawArrays(0, vb.size / sizeof(BaseVertex), ffr::PrimitiveType::TRIANGLES);
 				ffr::popDebugGroup();
 			}
@@ -848,8 +849,9 @@ struct PipelineImpl final : Pipeline
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
 				ffr::useProgram(shader);
 
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
+				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 
 				ffr::drawArrays(0, vb.size / sizeof(BaseVertex), ffr::PrimitiveType::LINES);
 				ffr::popDebugGroup();
@@ -934,8 +936,9 @@ struct PipelineImpl final : Pipeline
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 					ffr::setState(blend_state);
 					ffr::useProgram(prg);
-					ffr::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
 					ffr::bindIndexBuffer(idx_buffer_mem.buffer);
+					ffr::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
+					ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 
 					for (Draw2D::Cmd& cmd : cmd_buffer) {
 						if(cmd.clip_size.x < 0) {
@@ -1171,6 +1174,7 @@ struct PipelineImpl final : Pipeline
 						mtx.setTranslation(lpos);
 						ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
 						ffr::useProgram(prog);
+						ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 						ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
 						ffr::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
 						ffr::drawTriangleStripArraysInstanced(4, instances_count);
@@ -1442,8 +1446,9 @@ struct PipelineImpl final : Pipeline
 				if(!prog.isValid()) return;
 
 				ffr::useProgram(prog);
-				ffr::bindVertexBuffer(0, m_vb, 0, 12);
 				ffr::bindIndexBuffer(m_ib);
+				ffr::bindVertexBuffer(0, m_vb, 0, 12);
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				const DVec3 cam_pos = m_camera_params.pos;
 				for (const EnvProbeInfo& probe : m_probes) {
@@ -1607,9 +1612,9 @@ struct PipelineImpl final : Pipeline
 				}
 
 				ffr::useProgram(prg);
+				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
 				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::drawArrays(m_indices_offset, m_indices_count, ffr::PrimitiveType::TRIANGLE_STRIP);
 			}
 
@@ -1949,8 +1954,9 @@ struct PipelineImpl final : Pipeline
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST | blend_state);
 				ffr::bindTextures(&m_atlas, 0, 1);
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, 24);
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
+				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, 24);
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 				ffr::drawArrays(0, vb.size / sizeof(TextMeshVertex), ffr::PrimitiveType::TRIANGLES);
 			}
 
@@ -2006,18 +2012,20 @@ struct PipelineImpl final : Pipeline
 						const ffr::ProgramHandle prog = Shader::getProgram(m_shader, m_pipeline->m_point_light_decl, define_mask);
 						if (prog.isValid()) {
 							ffr::useProgram(prog);
-							ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
-							ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
 
 							if(total_count - nonintersecting_count) {
 								ffr::setState(blend_state | (u64)ffr::StateFlags::CULL_FRONT);
 								const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
+								ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
+								ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
 								ffr::bindVertexBuffer(1, buffer, offs, 64);
 								ffr::drawTrianglesInstanced(36, total_count - nonintersecting_count, ffr::DataType::U16);
 							}
 
 							if (nonintersecting_count) {
 								ffr::setState(blend_state | (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK);
+								ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
+								ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
 								ffr::bindVertexBuffer(1, buffer, offset, 64);
 								ffr::drawTrianglesInstanced(36, nonintersecting_count, ffr::DataType::U16);
 							}
@@ -2113,7 +2121,7 @@ struct PipelineImpl final : Pipeline
 			{
 				// inline in debug
 				#define READ(T, N) \
-					T N = *(T*)cmd; \
+					const T N = *(T*)cmd; \
 					cmd += sizeof(T); \
 					do {} while(false)
 				PROFILE_FUNCTION();
@@ -2133,15 +2141,15 @@ struct PipelineImpl final : Pipeline
 					const u8* cmd = page->data;
 					const u8* cmd_end = page->data + page->header.size;
 					while (cmd != cmd_end) {
-						READ(const RenderableTypes, type);
+						READ(RenderableTypes, type);
 						switch(type) {
 							case RenderableTypes::MESH:
 							case RenderableTypes::MESH_GROUP: {
-								READ(const Mesh::RenderData*, mesh);
-								READ(const Material::RenderData*, material);
-								READ(const u16, instances_count);
-								READ(const ffr::BufferHandle, buffer);
-								READ(const u32, offset);
+								READ(Mesh::RenderData*, mesh);
+								READ(Material::RenderData*, material);
+								READ(u16, instances_count);
+								READ(ffr::BufferHandle, buffer);
+								READ(u32, offset);
 
 								ShaderRenderData* shader = material->shader;
 								const ffr::ProgramHandle prog = Shader::getProgram(shader, mesh->vertex_decl, instanced_mask | material->define_mask);
@@ -2167,12 +2175,12 @@ struct PipelineImpl final : Pipeline
 								break;
 							}
 							case RenderableTypes::SKINNED: {
-								READ(const Mesh::RenderData*, mesh);
-								READ(const Material::RenderData*, material);
-								READ(const Vec3, pos);
-								READ(const Quat, rot);
-								READ(const float, scale);
-								READ(const i32, bones_count);
+								READ(Mesh::RenderData*, mesh);
+								READ(Material::RenderData*, material);
+								READ(Vec3, pos);
+								READ(Quat, rot);
+								READ(float, scale);
+								READ(i32, bones_count);
 
 								Matrix* bones = (Matrix*)cmd;
 								cmd += sizeof(bones[0]) * bones_count;
@@ -2198,8 +2206,9 @@ struct PipelineImpl final : Pipeline
 
 									ffr::useProgram(prog);
 
-									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 									ffr::bindIndexBuffer(mesh->index_buffer_handle);
+									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+									ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 									ffr::drawTriangles(mesh->indices_count, mesh->index_type);
 									++stats.draw_call_count;
 									stats.triangle_count += mesh->indices_count / 3;
@@ -2208,10 +2217,10 @@ struct PipelineImpl final : Pipeline
 								break;
 							}
 							case RenderableTypes::DECAL: {
-								READ(const Material::RenderData*, material);
-								READ(const ffr::BufferHandle, buffer);
-								READ(const u32, offset);
-								READ(const u32, count);
+								READ(Material::RenderData*, material);
+								READ(ffr::BufferHandle, buffer);
+								READ(u32, offset);
+								READ(u32, count);
 								
 								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(material->textures, 0, material->textures_count);
@@ -2231,14 +2240,14 @@ struct PipelineImpl final : Pipeline
 								break;
 							}
 							case RenderableTypes::GRASS: {
-								READ(const Quat, rot);
-								READ(const Vec3, pos);
-								READ(const float, distance);
-								READ(const Mesh::RenderData*, mesh);
-								READ(const Material::RenderData*, material);
-								READ(const int, instances_count);
-								READ(const ffr::BufferHandle, buffer);
-								READ(const u32, offset);
+								READ(Quat, rot);
+								READ(Vec3, pos);
+								READ(float, distance);
+								READ(Mesh::RenderData*, mesh);
+								READ(Material::RenderData*, material);
+								READ(int, instances_count);
+								READ(ffr::BufferHandle, buffer);
+								READ(u32, offset);
 								
 								const u32 define_mask = m_grass_define_mask | m_deferred_define_mask | m_define_mask;
 
@@ -2247,8 +2256,8 @@ struct PipelineImpl final : Pipeline
 									renderer.beginProfileBlock("grass", 0);
 									ffr::useProgram(prg);
 									ffr::bindTextures(material->textures, 0, material->textures_count);
-									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 									ffr::bindIndexBuffer(mesh->index_buffer_handle);
+									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 									ffr::bindVertexBuffer(1, buffer, offset, 48);
 									if (material_ub_idx != material->material_constants) {
 										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
@@ -2447,6 +2456,9 @@ struct PipelineImpl final : Pipeline
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
 				ffr::useProgram(p);
+				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
+				ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 
 				struct {
 					IVec4 from_to;
@@ -2972,8 +2984,10 @@ struct PipelineImpl final : Pipeline
 										const Mesh& mesh = model->getMesh(0);
 										const u8 bucket = bucket_map[mesh.material->getLayer()];
 										if (bucket < 0xff) {
+											const float squared_length = (float)quad_pos.squaredLength();
+											const u32 depth_bits = floatFlip(*(u32*)&squared_length);
 											const u64 subrenderable = e.index | type_mask | ((u64)p << 40) | ((u64)q << 48);
-											result.push(mesh.material->getSortKey() | ((u64)bucket << 56), subrenderable);
+											result.push(mesh.material->getSortKey() | ((u64)bucket << 56) | ((u64)depth_bits << 24), subrenderable);
 										}
 									}
 								}
@@ -3309,41 +3323,6 @@ struct PipelineImpl final : Pipeline
 		cmd->path = out_path;
 		cmd->fs = &m_renderer.getEngine().getFileSystem();
 		m_renderer.queue(cmd, m_profiler_link);
-		
-
-		
-		/*FrameBuffer* fb = getFramebuffer(framebuffer);
-		if (!fb)
-		{
-			g_log_error.log("Renderer") << "saveRenderbuffer: Framebuffer " << framebuffer << " not found.";
-			return;
-		}
-
-		bgfx::TextureHandle texture = bgfx::createTexture2D(
-			fb->getWidth(), fb->getHeight(), false, 1, bgfx::TextureFormat::RGBA8, BGFX_TEXTURE_READ_BACK);
-		m_renderer.viewCounterAdd();
-		bgfx::touch(m_renderer.getViewCounter());
-		bgfx::setViewName(m_renderer.getViewCounter(), "saveRenderbuffer_blit");
-		bgfx::TextureHandle rb = fb->getRenderbufferHandle(render_buffer_index);
-		bgfx::blit(m_renderer.getViewCounter(), texture, 0, 0, rb);
-		
-		m_renderer.viewCounterAdd();
-		bgfx::setViewName(m_renderer.getViewCounter(), "saveRenderbuffer_read");
-		Array<u8> data(m_renderer.getEngine().getAllocator());
-		data.resize(fb->getWidth() * fb->getHeight() * 4);
-		bgfx::readTexture(texture, &data[0]);
-		bgfx::touch(m_renderer.getViewCounter());
-
-		bgfx::frame(); // submit
-		bgfx::frame(); // wait for gpu
-
-		FS::FileSystem& fs = m_renderer.getEngine().getFileSystem();
-		FS::IFile* file = fs.open(fs.getDefaultDevice(), Path(out_path), FS::Mode::CREATE_AND_WRITE);
-		Texture::saveTGA(file, fb->getWidth(), fb->getHeight(), 4, &data[0], Path(out_path), m_renderer.getEngine().getAllocator());
-
-		fs.close(*file);
-
-		bgfx::destroy(texture);*/
 	}
 
 
@@ -3456,8 +3435,9 @@ struct PipelineImpl final : Pipeline
 
 			ffr::update(m_drawcall_ub, &mtx.m11, sizeof(mtx));
 			ffr::useProgram(prog);
-			ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 			ffr::bindIndexBuffer(rd->index_buffer_handle);
+			ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+			ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
 			ffr::drawTriangles(rd->indices_count, rd->index_type);
 		}

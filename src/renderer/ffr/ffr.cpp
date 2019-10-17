@@ -715,8 +715,9 @@ static void try_load_renderdoc()
 }
 
 
-static int load_gl(void* device_contex)
+static int load_gl(void* device_contex, u32 init_flags)
 {
+	const bool vsync = init_flags & (u32)InitFlags::VSYNC;
 	HDC hdc = (HDC)device_contex;
 	const PIXELFORMATDESCRIPTOR pfd =
 	{
@@ -772,7 +773,7 @@ static int load_gl(void* device_contex)
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
 	wglMakeCurrent(hdc, hglrc);
 	wglDeleteContext(dummy_context);
-	// wglSwapIntervalEXT(0); // no vsync
+	wglSwapIntervalEXT(vsync ? 1 : 0);
 
 	#define FFR_GL_IMPORT(prototype, name) \
 		do { \
@@ -1791,12 +1792,17 @@ void preinit(IAllocator& allocator)
 }
 
 
-bool init(void* window_handle, bool debug)
+bool init(void* window_handle, u32 init_flags)
 {
+	#ifdef LUMIX_DEBUG
+		const bool debug = true;
+	#else 
+		const bool debug = init_flags & (u32)InitFlags::DEBUG_OUTPUT;
+	#endif
 	g_ffr.device_context = GetDC((HWND)window_handle);
 	g_ffr.thread = GetCurrentThreadId();
 
-	if (!load_gl(g_ffr.device_context)) return false;
+	if (!load_gl(g_ffr.device_context, init_flags)) return false;
 
 	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_ffr.max_vertex_attributes);
 
@@ -1812,10 +1818,6 @@ bool init(void* window_handle, bool debug)
 
 	CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
 	CHECK_GL(glDepthFunc(GL_GREATER));
-
-	#ifdef LUMIX_DEBUG
-		debug = true;
-	#endif
 
 	if (debug) {
 		CHECK_GL(glEnable(GL_DEBUG_OUTPUT));

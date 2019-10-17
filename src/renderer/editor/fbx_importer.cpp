@@ -812,8 +812,9 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 
 					ffr::update(pass_buf, &pass_state, sizeof(pass_state));
 					ffr::useProgram(prog);
-					ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					ffr::bindIndexBuffer(rd->index_buffer_handle);
+					ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+					ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 					ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
 					ffr::drawTriangles(rd->indices_count, rd->index_type);
 				}

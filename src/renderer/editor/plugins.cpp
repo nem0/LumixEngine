@@ -2676,15 +2676,17 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				big_ib = ffr::allocBufferHandle();
 				ffr::createBuffer(big_vb, (u32)ffr::BufferFlags::IMMUTABLE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
 				ffr::createBuffer(big_ib, (u32)ffr::BufferFlags::IMMUTABLE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
-				ffr::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
 				ffr::bindIndexBuffer(big_ib);
+				ffr::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 			}
 			else {
 				ffr::update(ib, cmd_list.idx_buffer.data, num_indices * sizeof(ImDrawIdx));
 				ffr::update(vb, cmd_list.vtx_buffer.data, num_vertices * sizeof(ImDrawVert));
 
-				ffr::bindVertexBuffer(0, vb, 0, sizeof(ImDrawVert));
 				ffr::bindIndexBuffer(ib);
+				ffr::bindVertexBuffer(0, vb, 0, sizeof(ImDrawVert));
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 			}
 			renderer->free(cmd_list.vtx_buffer);
 			renderer->free(cmd_list.idx_buffer);
