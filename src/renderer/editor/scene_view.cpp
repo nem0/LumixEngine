@@ -248,8 +248,9 @@ void SceneView::renderSelection()
 				ffr::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
 				ffr::bindTextures(item.material->textures, 0, item.material->textures_count);
 				ffr::useProgram(prog);
-				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				ffr::bindIndexBuffer(rd->index_buffer_handle);
+				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 				ffr::setState(item.material->render_states);
 				ffr::drawTriangles(rd->indices_count, rd->index_type);
 			}
@@ -324,8 +325,9 @@ void SceneView::renderGizmos()
 			for (Gizmo::RenderData::Cmd& cmd : data.cmds) {
 				ffr::update(drawcall_ub, &cmd.mtx.m11, sizeof(cmd.mtx));
 				ffr::useProgram(prg);
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
 				ffr::bindIndexBuffer(ib.buffer);
+				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
 				ffr::drawElements(ib.offset + ib_offset, cmd.indices_count, primitive_type, ffr::DataType::U16);
 

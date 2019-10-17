@@ -54,11 +54,7 @@ namespace Lumix
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-
-enum { 
-	TRANSIENT_BUFFER_INIT_SIZE = 16 * 1024 * 1024,
-	MATERIAL_BUFFER_SIZE = 16 * 1024 * 1024
-};
+static constexpr u32 TRANSIENT_BUFFER_INIT_SIZE = 16 * 1024 * 1024;
 
 
 struct FrameData {
@@ -71,12 +67,11 @@ struct FrameData {
 	i32 transient_offset = 0;
 	u32 transient_size = 0;
 	u8* transient_ptr = nullptr;
-	JobSystem::SignalHandle transient_mapped = JobSystem::INVALID_HANDLE;
-	JobSystem::SignalHandle setup_done = JobSystem::INVALID_HANDLE;
-	JobSystem::SignalHandle rendering_done = JobSystem::INVALID_HANDLE;
 	Array<Renderer::RenderJob*> jobs;
 	OS::Point window_size;
 	RendererImpl& renderer;
+	JobSystem::SignalHandle can_setup = JobSystem::INVALID_HANDLE;
+	JobSystem::SignalHandle setup_done = JobSystem::INVALID_HANDLE;
 };
 
 
@@ -419,16 +414,16 @@ struct RendererImpl final : public Renderer
 		, m_shader_manager(*this, m_allocator)
 		, m_font_manager(nullptr)
 		, m_shader_defines(m_allocator)
-		, m_vsync(true)
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
-		, m_frame_data(m_allocator)
+		, m_frames(m_allocator)
 		, m_material_buffer(m_allocator)
 	{
 		m_shader_defines.reserve(32);
 		ffr::preinit(m_allocator);
-		m_frame_data.emplace(*this, m_allocator);
-		m_frame_data.emplace(*this, m_allocator);
+		m_frames.emplace(*this, m_allocator);
+		m_frames.emplace(*this, m_allocator);
+		m_frames.emplace(*this, m_allocator);
 	}
 
 
@@ -445,16 +440,20 @@ struct RendererImpl final : public Renderer
 
 		frame();
 	
+		for (FrameData& frame : m_frames) {
+			JobSystem::wait(frame.can_setup);
+		}
+		
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
 		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
-			for (FrameData& frame : renderer->m_frame_data) {
+			for (FrameData& frame : renderer->m_frames) {
 				ffr::destroy(frame.transient_buffer);
 			}
 			ffr::destroy(renderer->m_material_buffer.buffer);
 			renderer->m_profiler.clear();
 			ffr::shutdown();
-		}, &signal, m_gpu_frame->rendering_done, 1);
+		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 	}
 
@@ -462,37 +461,43 @@ struct RendererImpl final : public Renderer
 	void init() override
 	{
 		registerProperties(m_engine.getAllocator());
+		
+		struct InitData {
+			u32 flags = (u32)ffr::InitFlags::VSYNC;
+			RendererImpl* renderer;
+		} init_data;
+		init_data.renderer = this;
+		
 		char cmd_line[4096];
 		OS::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
-		m_vsync = true;
-		m_debug_opengl = false;
 		while (cmd_line_parser.next()) {
 			if (cmd_line_parser.currentEquals("-no_vsync")) {
-				m_vsync = false;
+				init_data.flags &= ~(u32)ffr::InitFlags::VSYNC;
 			}
 			else if (cmd_line_parser.currentEquals("-debug_opengl")) {
-				m_debug_opengl = true;
+				init_data.flags |= (u32)ffr::InitFlags::DEBUG_OUTPUT;
 			}
 		}
 
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
-		JobSystem::runEx(this, [](void* data) {
+		JobSystem::runEx(&init_data, [](void* data) {
 			PROFILE_BLOCK("init_render");
-			RendererImpl& renderer = *(RendererImpl*)data;
+			InitData* init_data = (InitData*)data;
+			RendererImpl& renderer = *(RendererImpl*)init_data->renderer;
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getPlatformData().window_handle;
-			ffr::init(window_handle, renderer.m_debug_opengl);
+			ffr::init(window_handle, init_data->flags);
 
-			for (FrameData& frame : renderer.m_frame_data) {
+			for (FrameData& frame : renderer.m_frames) {
 				frame.transient_buffer = ffr::allocBufferHandle();
 				frame.transient_offset = 0;
 				ffr::createBuffer(frame.transient_buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
 				frame.transient_size = TRANSIENT_BUFFER_INIT_SIZE;
 				frame.transient_ptr = (u8*)ffr::map(frame.transient_buffer, TRANSIENT_BUFFER_INIT_SIZE);
 			}
-			renderer.m_cpu_frame = &renderer.m_frame_data[0];
-			renderer.m_gpu_frame = &renderer.m_frame_data[1];
+			renderer.m_cpu_frame = renderer.m_frames.begin();
+			renderer.m_gpu_frame = renderer.m_frames.begin();
 
 			renderer.m_profiler.init();
 
@@ -910,13 +915,14 @@ struct RendererImpl final : public Renderer
 	{
 		cmd->profiler_link = profiler_link;
 		
+		JobSystem::wait(m_cpu_frame->can_setup);
 		m_cpu_frame->jobs.push(cmd);
 
-		JobSystem::runEx(cmd, [](void* data){
+		JobSystem::run(cmd, [](void* data){
 			RenderJob* cmd = (RenderJob*)data;
 			PROFILE_BLOCK("setup_render_job");
 			cmd->setup();
-		}, &m_cpu_frame->setup_done, m_cpu_frame->transient_mapped, JobSystem::ANY_WORKER);
+		}, &m_cpu_frame->setup_done);
 	}
 
 
@@ -989,7 +995,9 @@ struct RendererImpl final : public Renderer
 		queue(cmd, 0);
 	}
 
-	void render(FrameData& frame) {
+	void render() {
+		FrameData& frame = *m_gpu_frame;
+		
 		ffr::unmap(frame.transient_buffer);
 		frame.transient_ptr = nullptr;
 
@@ -998,6 +1006,8 @@ struct RendererImpl final : public Renderer
 			m_material_buffer.dirty = false;
 		}
 
+		ffr::useProgram(ffr::INVALID_PROGRAM);
+		ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 		ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
 		ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
 		for (RenderJob* job : frame.jobs) {
@@ -1027,7 +1037,11 @@ struct RendererImpl final : public Renderer
 		ASSERT(!frame.transient_ptr);
 		frame.transient_ptr = (u8*)ffr::map(frame.transient_buffer, frame.transient_size);
 		frame.transient_offset = 0;
-		JobSystem::decSignal(frame.transient_mapped);
+		
+		JobSystem::decSignal(frame.can_setup);
+
+		++m_gpu_frame;
+		if (m_gpu_frame == m_frames.end()) m_gpu_frame = m_frames.begin();
 	}
 
 	void waitForCommandSetup() override
@@ -1042,19 +1056,18 @@ struct RendererImpl final : public Renderer
 		
 		JobSystem::wait(m_cpu_frame->setup_done);
 		m_cpu_frame->setup_done = JobSystem::INVALID_HANDLE;
-		JobSystem::wait(m_gpu_frame->rendering_done);
-		m_gpu_frame->rendering_done = JobSystem::INVALID_HANDLE;
+		JobSystem::incSignal(&m_cpu_frame->can_setup);
 		
 		const void* window_handle = m_engine.getPlatformData().window_handle;
 		m_cpu_frame->window_size = OS::getWindowClientSize((OS::WindowHandle)window_handle);
-		JobSystem::incSignal(&m_cpu_frame->transient_mapped);
 
-		JobSystem::runEx(m_cpu_frame, [](void* ptr){
-			auto* data = (FrameData*)ptr;
-			data->renderer.render(*data);
-		}, &m_cpu_frame->rendering_done, JobSystem::INVALID_HANDLE, 1);
+		++m_cpu_frame;
+		if(m_cpu_frame == m_frames.end()) m_cpu_frame = m_frames.begin();
 
-		swap(m_gpu_frame, m_cpu_frame);
+		JobSystem::runEx(this, [](void* ptr){
+			auto* renderer = (RendererImpl*)ptr;
+			renderer->render();
+		}, nullptr, JobSystem::INVALID_HANDLE, 1);
 	}
 
 	Engine& m_engine;
@@ -1069,12 +1082,10 @@ struct RendererImpl final : public Renderer
 	RenderResourceManager<PipelineResource> m_pipeline_manager;
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
-	bool m_vsync;
-	bool m_debug_opengl = false;
 
-	Array<FrameData> m_frame_data;
-	FrameData* m_cpu_frame = nullptr;
+	Array<FrameData> m_frames;
 	FrameData* m_gpu_frame = nullptr;
+	FrameData* m_cpu_frame = nullptr;
 
 	GPUProfiler m_profiler;
 
