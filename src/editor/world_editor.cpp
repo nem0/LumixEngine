@@ -2696,7 +2696,7 @@ public:
 		m_viewport.rot.set(0, 0, 0, 1);
 		m_viewport.w = -1;
 		m_viewport.h = -1;
-		m_viewport.fov = degreesToRadians(30.f);
+		m_viewport.fov = degreesToRadians(60.f);
 		m_viewport.near = 0.1f;
 		m_viewport.far = 100000.f;
 
