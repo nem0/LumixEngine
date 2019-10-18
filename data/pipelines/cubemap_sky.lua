@@ -4,6 +4,7 @@ Editor.setPropertyType("sky", Editor.RESOURCE_PROPERTY, "texture")
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
+	if sky == -1 then return hdr_buffer end
 	env.beginBlock("sky")
 	if env.cubemap_sky_shader == nil then
 		env.cubemap_sky_shader = env.preloadShader("pipelines/cubemap_sky.shd")
