@@ -53,10 +53,9 @@ vertex_shader [[
 	}
 
 	void main() {
-		//v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
-		//v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
 		mat3 tangent_space;
-		tangent_space[0] = normalize(cross(u_pass_view_dir.xyz, vec3(0, 1, 0)));
+		vec3 N = normalize(i_pos_scale.xyz);
+		tangent_space[0] = normalize(cross(N, vec3(0, 1, 0)));
 		tangent_space[1] = vec3(0, 1, 0);
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
