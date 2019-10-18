@@ -1007,8 +1007,8 @@ static void fill(Array<FBXImporter::TranslationKey>& out, const ofbx::AnimationC
 	const ofbx::AnimationCurve* z_curve = curve_node->getCurve(2);
 
 	if (x_curve) out.resize(x_curve->getKeyCount());
-	else if (y_curve) out.resize(z_curve->getKeyCount());
-	else if (z_curve) out.resize(y_curve->getKeyCount());
+	else if (y_curve) out.resize(y_curve->getKeyCount());
+	else if (z_curve) out.resize(z_curve->getKeyCount());
 	else return;
 
 	setMemory(out.begin(), 0, out.byte_size());
