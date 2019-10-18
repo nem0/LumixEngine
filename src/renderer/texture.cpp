@@ -512,10 +512,7 @@ bool Texture::loadTGA(IInputStream& file)
 					file.read(&image_dest[idx + 2], sizeof(u8));
 					file.read(&image_dest[idx + 1], sizeof(u8));
 					file.read(&image_dest[idx + 0], sizeof(u8));
-					if (bytes_per_pixel == 4)
-						file.read(&image_dest[idx + 3], sizeof(u8));
-					else
-						image_dest[idx + 3] = 255;
+					image_dest[idx + 3] = 255;
 					idx += 4;
 				}
 			}

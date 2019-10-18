@@ -531,11 +531,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		ImGui::Checkbox("Show frames", &m_show_frames);
 		ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
 		if (ImGui::MenuItem("Reset zoom")) m_zoom = DEFAULT_ZOOM;
-		bool do_autopause = m_autopause > 0;
+		bool do_autopause = m_autopause >= 0;
 		if (ImGui::Checkbox("Autopause enabled", &do_autopause)) {
 			m_autopause = -m_autopause;
 		}
-		if (m_autopause > 0) {
+		if (m_autopause >= 0) {
 			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
 		}
 		if (ImGui::BeginMenu("Threads")) {
