@@ -137,7 +137,7 @@ void SceneView::onUniverseDestroyed()
 }
 
 
-void SceneView::update(float)
+void SceneView::update(float time_delta)
 {
 	PROFILE_FUNCTION();
 
@@ -153,7 +153,7 @@ void SceneView::update(float)
 
 	m_camera_speed = maximum(0.01f, m_camera_speed + ImGui::GetIO().MouseWheel / 20.0f);
 
-	float speed = m_camera_speed;
+	float speed = m_camera_speed * time_delta * 60.f;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
 	m_editor.getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
 	if (m_move_forward_action->isActive()) m_editor.navigate(1.0f, 0, 0, speed);
