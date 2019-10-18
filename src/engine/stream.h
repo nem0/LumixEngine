@@ -47,6 +47,7 @@ class LUMIX_ENGINE_API OutputMemoryStream final : public IOutputStream
 	public:
 		explicit OutputMemoryStream(IAllocator& allocator);
 		OutputMemoryStream(void* data, u64 size);
+		OutputMemoryStream(OutputMemoryStream&& rhs);
 		OutputMemoryStream(const OutputMemoryStream& rhs);
 		OutputMemoryStream(const OutputMemoryStream& blob, IAllocator& allocator);
 		OutputMemoryStream(const InputMemoryStream& blob, IAllocator& allocator);

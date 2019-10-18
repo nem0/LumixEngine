@@ -57,7 +57,7 @@ struct AsyncItem
 	bool isCanceled() const { return flags.isSet(Flags::CANCELED); }
 
 	FileSystem::ContentCallback callback;
-	Array<u8> data;
+	OutputMemoryStream data;
 	StaticString<MAX_PATH_LENGTH> path;
 	u32 id = 0;
 	FlagSet<Flags, u32> flags;
@@ -329,7 +329,7 @@ struct FileSystemImpl final : public FileSystem
 			m_mutex.exit();
 
 			if(!item.isCanceled()) {
-				item.callback.invoke(item.data.size(), item.data.begin(), !item.isFailed());
+				item.callback.invoke(item.data.getPos(), (const u8*)item.data.getData(), !item.isFailed());
 			}
 
 			if (timer.getTimeSinceStart() > 0.1f) {
@@ -372,14 +372,14 @@ int FSTask::task()
 
 		bool success = true;
 		
-		Array<u8> data(m_fs.m_allocator);
+		OutputMemoryStream data(m_fs.m_allocator);
 
 		OS::InputFile file;
 		StaticString<MAX_PATH_LENGTH> full_path(m_fs.m_base_path, path);
 		
 		if (file.open(full_path)) {
 			data.resize((int)file.size());
-			if (!file.read(data.begin(), data.byte_size())) {
+			if (!file.read(data.getMutableData(), data.getPos())) {
 				success = false;
 			}
 			file.close();
@@ -391,7 +391,7 @@ int FSTask::task()
 				u32 size;
 				fromCStringOctal(Span(header->size), Ref(size));
 				data.resize(size);
-				copyMemory(data.begin(), iter.value() + 512, data.byte_size());
+				copyMemory(data.getMutableData(), iter.value() + 512, data.getPos());
 				success = true;
 			}
 			else {
@@ -403,7 +403,7 @@ int FSTask::task()
 			MT::CriticalSectionLock lock(m_fs.m_mutex);
 			if (!m_fs.m_queue[0].isCanceled()) {
 				m_fs.m_finished.emplace(static_cast<AsyncItem&&>(m_fs.m_queue[0]));
-				m_fs.m_finished.back().data = static_cast<Array<u8>&&>(data);
+				m_fs.m_finished.back().data = static_cast<OutputMemoryStream&&>(data);
 				if(!success) {
 					m_fs.m_finished.back().flags.set(AsyncItem::Flags::FAILED);
 				}

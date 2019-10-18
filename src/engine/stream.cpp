@@ -127,6 +127,20 @@ IOutputStream& IOutputStream::operator << (double value)
 }
 
 
+OutputMemoryStream::OutputMemoryStream(OutputMemoryStream&& rhs)
+{
+	m_allocator = rhs.m_allocator;
+	m_pos = rhs.m_pos;
+	m_size = rhs.m_size;
+	m_data = rhs.m_data;
+	
+	rhs.m_data = nullptr;
+	rhs.m_size = 0;
+	rhs.m_pos = 0;
+}
+
+
+
 OutputMemoryStream::OutputMemoryStream(const OutputMemoryStream& rhs)
 {
 	m_allocator = rhs.m_allocator;
