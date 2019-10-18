@@ -145,8 +145,6 @@ public:
 	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
 	virtual void onMouseUp(int x, int y, OS::MouseButton button) = 0;
 	virtual Vec2 getMousePos() const = 0;
-	virtual float getMouseRelX() const = 0;
-	virtual float getMouseRelY() const = 0;
 	virtual void copyViewTransform() = 0;
 	virtual void lookAtSelected() = 0;
 	virtual bool isOrbitCamera() const = 0;

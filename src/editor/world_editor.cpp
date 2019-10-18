@@ -1340,7 +1340,6 @@ public:
 
 	void inputFrame() override
 	{
-		m_mouse_rel_x = m_mouse_rel_y = 0;
 		for (auto& i : m_is_mouse_click) i = false;
 	}
 
@@ -1535,9 +1534,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 		m_mouse_pos.set((float)x, (float)y);
-		m_mouse_rel_x = (float)relx;
-		m_mouse_rel_y = (float)rely;
-
+		
 		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
 
 		switch (m_mouse_mode)
@@ -1629,8 +1626,6 @@ public:
 
 
 	Vec2 getMousePos() const override { return m_mouse_pos; }
-	float getMouseRelX() const override { return m_mouse_rel_x; }
-	float getMouseRelY() const override { return m_mouse_rel_y; }
 
 
 	bool isUniverseChanged() const override { return m_is_universe_changed; }
@@ -3191,8 +3186,6 @@ private:
 	Vec2 m_rect_selection_start;
 	EditorIcons* m_editor_icons;
 	Vec2 m_mouse_pos;
-	float m_mouse_rel_x;
-	float m_mouse_rel_y;
 	Vec2 m_orbit_delta;
 	Vec2 m_mouse_sensitivity;
 	bool m_is_game_mode;
