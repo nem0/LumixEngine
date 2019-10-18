@@ -490,11 +490,13 @@ bool Texture::loadTGA(IInputStream& file)
 			for (long y = 0; y < header.height; y++)
 			{
 				long idx = y * header.width * bytes_per_pixel;
-				u8* cursor = &image_dest[idx];
+				u8* LUMIX_RESTRICT cursor = &image_dest[idx];
 				const u8* row_end = cursor + header.width * bytes_per_pixel;
 				while(cursor != row_end)
 				{
-					swap(cursor[0], cursor[2]);
+					const u8 tmp = cursor[0];
+					cursor[0] = cursor[2];
+					cursor[2] = tmp;
 					cursor += 4;
 				}
 			}

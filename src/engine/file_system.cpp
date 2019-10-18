@@ -315,6 +315,7 @@ struct FileSystemImpl final : public FileSystem
 	{
 		PROFILE_FUNCTION();
 
+		OS::Timer timer;
 		for(;;) {
 			m_mutex.enter();
 			if (m_finished.empty()) {
@@ -329,6 +330,10 @@ struct FileSystemImpl final : public FileSystem
 
 			if(!item.isCanceled()) {
 				item.callback.invoke(item.data.size(), item.data.begin(), !item.isFailed());
+			}
+
+			if (timer.getTimeSinceStart() > 0.1f) {
+				break;
 			}
 		}
 	}
