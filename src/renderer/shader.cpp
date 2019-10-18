@@ -85,6 +85,8 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 				float u_light_intensity;
 				float u_light_indirect_intensity;
 				float u_time;
+				float u_shadow_near_plane;
+				float u_shadow_far_plane;
 			};
 			layout (std140, binding = 1) uniform PassState {
 				mat4 u_pass_projection;
@@ -93,7 +95,7 @@ const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::Ve
 				mat4 u_pass_inv_view;
 				mat4 u_pass_view_projection;
 				mat4 u_pass_inv_view_projection;
-				vec3 u_pass_view_dir;
+				vec4 u_pass_view_dir;
 			};
 			layout (std140, binding = 2) uniform MaterialState {
 				vec4 u_material_color;

@@ -37,6 +37,12 @@ float unpackEmission(float emission)
 }
 
 
+float shadowmapValue(float frag_z)
+{
+	return exp(38 / 5000.0 * (u_shadow_near_plane - frag_z * (u_shadow_near_plane - u_shadow_far_plane)));
+}
+
+
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 {
 	float z = texture(depth_buffer, tex_coord).r;
@@ -57,10 +63,12 @@ float getShadow(sampler2D shadowmap, vec3 wpos)
 	for (int i = 0; i < 4; ++i) {
 		vec4 sc = u_shadowmap_matrices[i] * pos;
 		sc = sc / sc.w;
-		if (all(lessThan(sc.xy, vec2(0.99))) && all(greaterThan(sc.xy, vec2(0.01)))) {
+		if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 			vec2 sm_uv = vec2(sc.x * 0.25 + i * 0.25, sc.y);
 			float occluder = textureLod(shadowmap, sm_uv, 0).r;
-			return clamp(exp(5000 * (sc.z - occluder)), 0.0, 1.0);
+			float receiver = shadowmapValue(sc.z);
+			float m =  receiver /occluder;
+			return clamp(1 - (1 - m) * 512, 0.0, 1.0);
 		}
 	}
 

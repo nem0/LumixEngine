@@ -135,10 +135,20 @@ fragment_shader [[
 		#ifdef ALPHA_CUTOUT
 			if(data.albedo.a < 0.5) discard;
 		#endif
+
+		vec3 N = v_normal;
+		vec3 tangent = v_tangent;
+		#ifdef VEGETATION
+			if (!gl_FrontFacing) {
+				N = -N;
+				tangent = -tangent;
+			}
+		#endif
+
 		mat3 tbn = mat3(
-				normalize(v_tangent),
-				normalize(v_normal),
-				normalize(cross(v_normal, v_tangent))
+				normalize(tangent),
+				normalize(N),
+				normalize(cross(N, tangent))
 				);
 		
 		data.wpos = v_wpos.xyz;
@@ -157,7 +167,7 @@ fragment_shader [[
 				data.albedo = texture(u_albedomap, v_uv);
 				if(data.albedo.a < 0.5) discard;
 			#endif
-			o_color = vec4(gl_FragCoord.z);
+			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		}
 	#elif defined DEFERRED
 		void main()

@@ -173,6 +173,7 @@ function shadowPass()
 				beginBlock("slice " .. tostring(slice + 1))
 				pass(view_params)
 				renderBucket(shadow_set, shadow_state)
+				renderTerrains(view_params, shadow_state)
 				endBlock()
 			end
 		endBlock()

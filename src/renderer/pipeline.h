@@ -32,7 +32,7 @@ struct PassState
 	Matrix inv_view;
 	Matrix view_projection;
 	Matrix inv_view_projection;
-	Vec3 view_dir;
+	Vec4 view_dir;
 };
 
 struct PipelineResource : Resource

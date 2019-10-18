@@ -808,7 +808,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.inv_view = pass_state.view.fastInverted();
 					pass_state.view_projection = pass_state.projection * pass_state.view;
 					pass_state.inv_view_projection = pass_state.view_projection.inverted();
-					pass_state.view_dir = pass_state.view.inverted().transformVector(Vec3(0, 0, -1));
+					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 
 					ffr::update(pass_buf, &pass_state, sizeof(pass_state));
 					ffr::useProgram(prog);
@@ -972,7 +972,7 @@ static void fill(Array<FBXImporter::RotationKey>& out, const ofbx::AnimationCurv
 	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
 		if (!curve) {
 			// TODO default value
-			ASSERT(false);
+			//ASSERT(false);
 			return;
 		}
 
@@ -1016,7 +1016,7 @@ static void fill(Array<FBXImporter::TranslationKey>& out, const ofbx::AnimationC
 	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
 		if (!curve) {
 			// TODO default value
-			ASSERT(false);
+			//ASSERT(false);
 			return;
 		}
 
