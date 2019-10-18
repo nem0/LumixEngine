@@ -2052,7 +2052,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		}
 
 		renderer->frame();
-		renderer->frame();
+		renderer->waitForRender();
 
 		for (u32 i = 0; i < 6 * TEXTURE_SIZE * TEXTURE_SIZE; ++i) {
 			swap(m_data[i * 4], m_data[i * 4 + 2]);

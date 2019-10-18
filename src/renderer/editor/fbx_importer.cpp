@@ -856,7 +856,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 	job->m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	renderer->queue(job, 0);
 	renderer->frame();
-	renderer->frame();
+	renderer->waitForRender();
 	
 	return true;
 }
