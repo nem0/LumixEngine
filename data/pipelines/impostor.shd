@@ -56,7 +56,7 @@ vertex_shader [[
 		//v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
 		//v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
 		mat3 tangent_space;
-		tangent_space[0] = normalize(cross(u_pass_view_dir, vec3(0, 1, 0)));
+		tangent_space[0] = normalize(cross(u_pass_view_dir.xyz, vec3(0, 1, 0)));
 		tangent_space[1] = vec3(0, 1, 0);
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
@@ -125,7 +125,7 @@ fragment_shader [[
 				data.albedo = texture(u_albedomap, v_uv);
 				if(data.albedo.a < 0.5) discard;
 			#endif
-			o_color = vec4(gl_FragCoord.z);
+			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		}
 	#else
 		void main()

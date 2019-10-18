@@ -93,6 +93,8 @@ struct GlobalState
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;
+	float shadow_cam_near_plane;
+	float shadow_cam_far_plane;
 };
 
 
@@ -590,6 +592,8 @@ struct PipelineImpl final : Pipeline
 				0.5, 0.5, 0.0, 1.0);
 
 			global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
+			global_state.shadow_cam_near_plane = SHADOW_CAM_NEAR;
+			global_state.shadow_cam_far_plane = SHADOW_CAM_FAR;
 
 			global_state.shadow_view_projection = projection_matrix * view_matrix;
 
@@ -1080,9 +1084,13 @@ struct PipelineImpl final : Pipeline
 		}
 		IAllocator& allocator = pipeline->m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
+
+		char tmp[64];
+		if (LuaWrapper::getOptionalStringField(L, 2, "define", Span(tmp))) {
+			cmd->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
+		}
 		
 		cmd->m_render_state = state;
-		cmd->m_deferred_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
 		cmd->m_pipeline = pipeline;
 		cmd->m_camera_params = cp;
 
@@ -1517,7 +1525,7 @@ struct PipelineImpl final : Pipeline
 		cmd->pass_state.inv_view = cp.view.fastInverted();
 		cmd->pass_state.view_projection = cp.projection * cp.view;
 		cmd->pass_state.inv_view_projection = cmd->pass_state.view_projection.inverted();
-		cmd->pass_state.view_dir = cp.view.inverted().transformVector(Vec3(0, 0, -1));
+		cmd->pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 		
 		cmd->pass_state_buffer = pipeline->m_pass_state_buffer;
 		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
@@ -2447,11 +2455,11 @@ struct PipelineImpl final : Pipeline
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const u32 deferred_define_mask = m_deferred_define_mask;
+			const u32 define_mask = m_define_mask;
 			
 			u64 state = m_render_state;
 			for (Instance& inst : m_instances) {
-				const ffr::ProgramHandle p = Shader::getProgram(inst.shader, ffr::VertexDecl(), deferred_define_mask);
+				const ffr::ProgramHandle p = Shader::getProgram(inst.shader, ffr::VertexDecl(), define_mask);
 				if (!p.isValid()) continue;
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
@@ -2538,7 +2546,7 @@ struct PipelineImpl final : Pipeline
 		Array<Instance> m_instances;
 		ffr::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
-		u32 m_deferred_define_mask = 0;
+		u32 m_define_mask = 0;
 
 	};
 

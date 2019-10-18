@@ -145,6 +145,7 @@ fragment_shader [[
 	#ifdef DEPTH
 		void main()
 		{
+			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		}
 	#elif defined DEFERRED
 		void main()
