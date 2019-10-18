@@ -97,7 +97,7 @@ fragment_shader [[
 		const float mie_collection_power = 0.39f;
 		const float mie_distribution = 0.13f;
 
-		const float sun_size = 15;
+		const float sun_size = 150;
 		const float surface_height = 0.993;
 		const float intensity = 1.8;
 		const int step_count = 4;
