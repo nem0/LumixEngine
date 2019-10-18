@@ -30,10 +30,11 @@ fragment_shader [[
 		float depth = texture(u_gbuffer_depth, v_uv).x;
 
 		vec3 albedo = gb0.rgb;
-		vec3 normal = gb1.rgb * 2 - 1;
+		vec3 N = gb1.rgb * 2 - 1;
 		float roughness = gb0.w;
 		float metallic = gb1.w;
 		float emission = unpackEmission(gb2.x);
+		float translucency = gb2.y;
 
 		vec3 wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, v_uv);
 		vec3 V = normalize(-wpos);
@@ -41,13 +42,14 @@ fragment_shader [[
 		
 		float shadow = getShadow(u_shadowmap, wpos);
 		vec3 direct = PBR_ComputeDirectLight(albedo
-			, normal
+			, N
 			, L
 			, V
 			, u_light_color.rgb * u_light_intensity * shadow
 			, roughness
 			, metallic);
-		
+		direct += getTranslucency(albedo, translucency, V, L, N, shadow);
+
 		float fog_factor = getFogFactor(u_camera_world_pos.y, u_camera_world_pos.y + wpos.y, wpos, u_fog_params.x, u_fog_params.y, u_fog_params.z);
 		o_color.rgb = mix(direct, u_fog_color.rgb, fog_factor);
 

@@ -55,6 +55,14 @@ vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 	return view_pos.xyz / view_pos.w;
 }
 
+vec3 getTranslucency(vec3 albedo, float translucency, vec3 V, vec3 L, vec3 N, float shadow)
+{
+	float w = pow(max(0, dot(-V, L)), 64) * shadow;
+	w += abs(dot(V, N)) * 0.1;
+	w *= max(0.5, dot(-L, N));
+	w *= max(0.5, dot(N, V));
+	return vec3(albedo * translucency * w);
+}
 
 float getShadow(sampler2D shadowmap, vec3 wpos)
 {
@@ -67,8 +75,8 @@ float getShadow(sampler2D shadowmap, vec3 wpos)
 			vec2 sm_uv = vec2(sc.x * 0.25 + i * 0.25, sc.y);
 			float occluder = textureLod(shadowmap, sm_uv, 0).r;
 			float receiver = shadowmapValue(sc.z);
-			float m =  receiver /occluder;
-			return clamp(1 - (1 - m) * 512, 0.0, 1.0);
+			float m =  receiver / occluder;
+			return clamp(1 - (1 - m) * 64, 0.0, 1.0);
 		}
 	}
 

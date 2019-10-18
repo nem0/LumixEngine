@@ -98,7 +98,13 @@ vertex_shader [[
 			mat4 model_mtx = u_model;
 			v_normal = mat3(model_mtx) * (a_normal * 2 - 1);
 			v_tangent = mat3(model_mtx) * (a_tangent * 2 - 1);
-			v_wpos = model_mtx * vec4(a_position,  1);
+
+			vec3 p = a_position;
+			#ifdef VEGETATION
+				p = vegetationAnim(u_model[3].xyz, p);
+			#endif
+
+			v_wpos = model_mtx * vec4(p,  1);
 		#endif
 		
 		gl_Position = u_pass_view_projection * v_wpos;		
@@ -178,7 +184,11 @@ fragment_shader [[
 				o_gbuffer0.rgb *= v_darken;
 			#endif
 			o_gbuffer1 = vec4(data.normal * 0.5 + 0.5, data.metallic);
-			o_gbuffer2 = vec4(data.emission, 0, 0, 1);
+			float translucency = 0;
+			#if defined(VEGETATION) && defined(ALPHA_CUTOUT)
+				translucency = 1;
+			#endif
+			o_gbuffer2 = vec4(data.emission, translucency, 0, 1);
 		}
 	#else 
 		void main()
