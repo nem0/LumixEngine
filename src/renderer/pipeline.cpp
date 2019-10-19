@@ -2457,6 +2457,8 @@ struct PipelineImpl final : Pipeline
 			PROFILE_FUNCTION();
 			const u32 define_mask = m_define_mask;
 			
+			const ffr::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+
 			u64 state = m_render_state;
 			for (Instance& inst : m_instances) {
 				const ffr::ProgramHandle p = Shader::getProgram(inst.shader, ffr::VertexDecl(), define_mask);
@@ -2464,6 +2466,8 @@ struct PipelineImpl final : Pipeline
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
 				ffr::useProgram(p);
+				ffr::bindUniformBuffer(2, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+				
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
 				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
