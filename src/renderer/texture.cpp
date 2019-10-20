@@ -559,6 +559,11 @@ void Texture::removeDataReference()
 
 static bool loadDDS(Texture& texture, IInputStream& file)
 {
+	if(texture.data_reference > 0) {
+		logError("Renderer") << "Unsupported texture format " << texture.getPath() << " to access on CPU. Convert to TGA or RAW.";
+		return false;
+	}
+
 	ffr::TextureInfo info;
 	const u8* data = (const u8*)file.getBuffer();
 	Renderer::MemRef mem = texture.renderer.copy(data + 7, (int)file.size() - 7);
