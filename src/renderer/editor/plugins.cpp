@@ -1318,6 +1318,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool srgb = false;
 		bool is_normalmap = false;
 		float scale_coverage = -1;
+		bool convert_to_raw = false;
 		WrapMode wrap_mode_u = WrapMode::REPEAT;
 		WrapMode wrap_mode_v = WrapMode::REPEAT;
 		WrapMode wrap_mode_w = WrapMode::REPEAT;
@@ -1469,8 +1470,30 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		PROFILE_FUNCTION();
 		int w, h, comps;
+		const bool is_16_bit = stbi_is_16_bit_from_memory(src_data.begin(), src_data.byte_size());
+		if (is_16_bit) {
+			logError("Renderer") << "16bit images not yet supported.";
+		}
+
 		stbi_uc* data = stbi_load_from_memory(src_data.begin(), src_data.byte_size(), &w, &h, &comps, 4);
 		if (!data) return false;
+
+		if(meta.convert_to_raw) {
+			dst.write("raw", 3);
+			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+			dst.write(&flags, sizeof(flags));
+			for (int j = 0; j < h; ++j) {
+				for (int i = 0; i < w; ++i) {
+					const u16 tmp = (u16)data[(i + j * w) * 4] * 256;
+					dst.write(tmp);
+				}
+			}
+			return true;
+		}
 
 		for (u32 i = 0; i < u32(w * h); ++i) {
 			swap(data[i * 4 + 0], data[i * 4 + 2]);
@@ -1524,6 +1547,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Meta meta;
 		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "convert_to_raw", &meta.convert_to_raw);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
 			char tmp[32];
@@ -1561,7 +1585,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		OutputMemoryStream out(m_app.getWorldEditor().getAllocator());
 		Meta meta = getMeta(src);
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
-			if (meta.scale_coverage < 0) {
+			if (meta.scale_coverage < 0 || !equalStrings(ext, "tga")) {
 				out.write(ext, sizeof(ext) - 1);
 				u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 				flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
@@ -1572,7 +1596,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				out.write(src_data.begin(), src_data.byte_size());
 			}
 			else {
-				ASSERT(equalStrings(ext, "tga"));
 				compileImage(src_data, out, meta);
 			}
 		}
@@ -1647,6 +1670,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			
 			ImGui::Checkbox("SRGB", &m_meta.srgb);
+			ImGui::Checkbox("Convert to RAW", &m_meta.convert_to_raw);
 			bool scale_coverage = m_meta.scale_coverage >= 0;
 			if (ImGui::Checkbox("Mipmap scale coverage", &scale_coverage)) {
 				m_meta.scale_coverage *= -1;
@@ -1662,6 +1686,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (ImGui::Button("Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
+					, "\nconvert_to_raw = ", m_meta.convert_to_raw ? "true" : "false"
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
 					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
