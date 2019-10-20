@@ -38,7 +38,7 @@ static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain"
 static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
 static const char* HEIGHTMAP_SLOT_NAME = "Heightmap";
 static const char* SPLATMAP_SLOT_NAME = "Splatmap";
-static const char* DETAIL_ALBEDO_SLOT_NAME = "Albedo";
+static const char* DETAIL_ALBEDO_SLOT_NAME = "Detail albedo";
 static const char* SATELLITE_SLOT_NAME = "Satellite";
 static const float MIN_BRUSH_SIZE = 0.5f;
 

@@ -6,7 +6,12 @@ texture_slot {
 }
 
 texture_slot {
-	name = "Albedo",
+	name = "Detail albedo",
+	default_texture = "textures/common/white.tga"
+}
+
+texture_slot {
+	name = "Detail normal",
 	default_texture = "textures/common/white.tga"
 }
 
@@ -19,6 +24,14 @@ texture_slot {
 	name = "Satellite",
 	default_texture = "textures/common/white.tga"
 }
+
+texture_slot {
+	name = "Noise",
+	default_texture = "textures/common/white.tga"
+}
+
+uniform("u_detail_distance", "float")
+uniform("u_detail_scale", "float")
 
 vertex_shader [[
 	out int v_vid;
@@ -39,6 +52,16 @@ common [[
 		vec2 u_hm_size;
 		int u_lod;
 	};
+
+	layout (std140, binding = 2) uniform TerrainMaterial {
+		vec4 u_material_color_;
+		float u_roughness_;
+		float u_metallic_;
+		float u_emission_;
+		float u_detail_distance;
+		float u_detail_scale;
+	};
+
 ]]
 
 geometry_shader [[
@@ -47,6 +70,8 @@ geometry_shader [[
 	in int v_vid[];
 	
 	out vec2 v_uv;
+	out vec2 v_uv_detail;
+	out float v_dist2;
 	layout (binding=0) uniform sampler2D u_hm;
 
 	void getVertex(ivec2 ij, out vec3 pos, out vec2 uv)
@@ -78,26 +103,41 @@ geometry_shader [[
 		float s = pow(2, u_lod);
 		float hscale = u_terrain_scale.y;
 			
-			
+
+		// because of float precision
+		vec2 detail_uv_offset = floor(u_rel_camera_pos.xz);
+
 		vec3 v;
 		getVertex(ij, v, v_uv);
+		v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
 		float h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		vec4 p = u_pass_view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		v_dist2 = dot(p.xyz, p.xyz);
+		gl_Position = u_pass_projection * p;
 		EmitVertex();
 
 		getVertex(ij + ivec2(1, 0), v, v_uv);
+		v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		p = u_pass_view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		v_dist2 = dot(p.xyz, p.xyz);
+		gl_Position = u_pass_projection * p;
 		EmitVertex();
 
 		getVertex(ij + ivec2(0, 1), v, v_uv);
+		v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		p = u_pass_view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		v_dist2 = dot(p.xyz, p.xyz);
+		gl_Position = u_pass_projection * p;
 		EmitVertex();
 
 		getVertex(ij + ivec2(1, 1), v, v_uv);
+		v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
 		h = texture(u_hm, v_uv).x * hscale;
-		gl_Position = u_pass_view_projection * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		p = u_pass_view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		v_dist2 = dot(p.xyz, p.xyz);
+		gl_Position = u_pass_projection * p;
 		EmitVertex();
 	}
 ]]
@@ -114,12 +154,16 @@ fragment_shader [[
 	#endif
 
 	in vec2 v_uv;
+	in vec2 v_uv_detail;
+	in float v_dist2;
 	layout(binding=0) uniform sampler2D u_hm;
 	layout(binding=1) uniform sampler2DArray u_albedo;
-	layout(binding=2) uniform sampler2D u_splatmap;
-	layout(binding=3) uniform sampler2D u_satellite;
+	layout(binding=2) uniform sampler2DArray u_normal;
+	layout(binding=3) uniform sampler2D u_splatmap;
+	layout(binding=4) uniform sampler2D u_satellite;
+	layout(binding=5) uniform sampler2D u_noise;
 
-	vec3 getNormal(vec2 uv)
+	mat3 getTBN(vec2 uv)
 	{
 		float hscale = u_terrain_scale.y / u_terrain_scale.x;
 		ivec3 off = ivec3(-1, 0, 1);
@@ -129,13 +173,91 @@ fragment_shader [[
 		float s12 = textureLodOffset(u_hm, uv, 0, off.yz).x;
 		vec3 va = normalize(vec3(1.0, (s21-s01) * hscale, 0.0));
 		vec3 vb = normalize(vec3(0.0, (s12-s10) * hscale, 1.0));
-		return normalize(cross(vb,va));
+		vec3 N = normalize(cross(vb,va));
+		vec3 T = normalize(cross(N, vb));
+		return mat3(
+			T,
+			N,
+			normalize(cross(T, N))
+		);
 	}
 	
+	// http://www.iquilezles.org/www/articles/texturerepetition/texturerepetition.htm
+	float sum( vec3 v ) { return v.x+v.y+v.z; }
+	struct Detail {
+		vec3 albedo;
+		vec3 normal;
+	};
+	Detail textureNoTile(float k, vec2 x, int layer, float v )
+	{
+		vec2 duvdx = dFdx( x );
+		vec2 duvdy = dFdx( x );
+    
+		float l = k*8;
+		float f = fract(l);
+    
+		float ia = floor(l);
+		float ib = ia + 1.0;
+    
+		vec2 offa = sin(vec2(3.0,7.0)*ia);
+		vec2 offb = sin(vec2(3.0,7.0)*ib);
+
+		vec3 cola = textureGrad(u_albedo, vec3(x + v * offa, layer), duvdx, duvdy).xyz;
+		vec3 colb = textureGrad(u_albedo, vec3(x + v * offb, layer), duvdx, duvdy).xyz;
+
+		vec3 norma = textureGrad(u_normal, vec3(x + v * offa, layer), duvdx, duvdy).xyz * 2 - 1;
+		vec3 normb = textureGrad(u_normal, vec3(x + v * offb, layer), duvdx, duvdy).xyz * 2 - 1;
+    
+		Detail detail;
+		detail.albedo = mix( cola, colb, smoothstep(0.2,0.8,f-0.1*sum(cola-colb)) );
+		detail.normal = mix( norma, normb, smoothstep(0.2,0.8,f-0.1*sum(norma-normb)) );
+		return detail;
+	}
+
 	void getData()
 	{
-		data.normal = getNormal(v_uv);
-		data.albedo = texture(u_satellite, vec3(v_uv, 0).xy);
+		if(v_dist2 < u_detail_distance * u_detail_distance) {
+			vec2 uvx = v_uv;
+
+			float r = texture(u_noise, uvx*256).x * 2 - 1;
+			float r2 = texture(u_noise, uvx.yx*256).x * 0.6 - 0.3;
+			uvx += vec2(r, r2) / u_hm_size;
+
+			vec2 uv = uvx * u_hm_size + vec2(0.5);
+			vec2 xy = floor(uv);
+			vec2 uv_ratio = uv - xy;
+			uv_ratio = pow(uv_ratio, vec2(16));
+			vec2 uv_opposite = 1.0 - uv_ratio;
+
+			vec4 bicoef = vec4(
+				uv_opposite.x * uv_opposite.y,
+				uv_opposite.x * uv_ratio.y,
+				uv_ratio.x * uv_opposite.y,
+				uv_ratio.x * uv_ratio.y
+			);
+
+			vec2 half_texel = vec2(0.5) / u_hm_size;
+
+			vec4 splat00 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(0, 0));
+			vec4 splat10 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(1, 0));
+			vec4 splat01 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(0, 1));
+			vec4 splat11 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(1, 1));
+
+			float noise = texture(u_noise, 0.1 * v_uv * u_hm_size).x;
+
+			Detail c00 = textureNoTile(noise, v_uv_detail, int(splat00.x * 256.0), 1);
+			Detail c01 = textureNoTile(noise, v_uv_detail, int(splat01.x * 256.0), 1);
+			Detail c10 = textureNoTile(noise, v_uv_detail, int(splat10.x * 256.0), 1);
+			Detail c11 = textureNoTile(noise, v_uv_detail, int(splat11.x * 256.0), 1);
+			
+			data.normal = normalize(getTBN(v_uv) * (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy);
+			data.albedo.rgb = c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w;
+			data.albedo.w = 1;
+		}
+		else {
+			data.normal = getTBN(v_uv)[1];
+			data.albedo = texture(u_satellite, vec3(v_uv, 0).xy);
+		}
 		data.wpos = vec3(0);
 		data.roughness = 0.9;
 		data.metallic  = 0;
