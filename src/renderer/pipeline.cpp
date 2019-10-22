@@ -2479,7 +2479,7 @@ struct PipelineImpl final : Pipeline
 					Vec4 lpos;
 					Vec4 terrain_scale;
 					Vec2 hm_size;
-					int lod;
+					float cell_size;
 				} dc_data;
 				dc_data.pos = Vec4(inst.pos, 0);
 				dc_data.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
@@ -2489,14 +2489,15 @@ struct PipelineImpl final : Pipeline
 
 				ffr::setState(state);
 				IVec4 prev_from_to;
-				for (int i = 0; ; ++i) {
-					ASSERT(i < 31);
-					const int s = 1 << i;
+
+				float s = 1 / 16.f;
+				bool first = true;
+				for (;;) {
 					// round 
-					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
+					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(first ? 128 : 64);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(128);
+					IVec2 to = from + IVec2(first ? 256 : 128);
 					// clamp
 					dc_data.from_to_sup = IVec4(from, to);
 					
@@ -2509,26 +2510,34 @@ struct PipelineImpl final : Pipeline
 						if (subfrom.x >= subto.x || subfrom.y >= subto.y) return;
 						dc_data.from_to = IVec4(subfrom, subto);
 						dc_data.terrain_scale = Vec4(inst.scale, 0);
-						dc_data.lod = i;
+						dc_data.cell_size = s;
 						ffr::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
 						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
+						m_pipeline->m_stats.draw_call_count += 1;
+						m_pipeline->m_stats.instance_count += 1;
+						m_pipeline->m_stats.triangle_count += (subto.x - subfrom.x) * (subto.y - subfrom.y) * 2;
 					};
 
-					if (i > 0) {
-						draw_rect(from, IVec2(to.x, prev_from_to.y / 2));
-						draw_rect(IVec2(from.x, prev_from_to.w / 2), to);
-						
-						draw_rect(IVec2(prev_from_to.z / 2, prev_from_to.y / 2), IVec2(to.x, prev_from_to.w / 2));
-						draw_rect(IVec2(from.x, prev_from_to.y / 2), IVec2(prev_from_to.x / 2, prev_from_to.w / 2));
+					if (first) {
+						draw_rect(from, to);
+						first = false;
 					}
 					else {
-						draw_rect(from, to);
+						draw_rect(from, IVec2(to.x, prev_from_to.y));
+						draw_rect(IVec2(from.x, prev_from_to.w), to);
+						
+						draw_rect(IVec2(prev_from_to.z, prev_from_to.y), IVec2(to.x, prev_from_to.w));
+						draw_rect(IVec2(from.x, prev_from_to.y), IVec2(prev_from_to.x, prev_from_to.w));
 					}
 					
 					if (from.x <= 0 && from.y <= 0 && to.x * s >= inst.hm_size.x && to.y * s >= inst.hm_size.y) break;
 
-					prev_from_to = IVec4(from, to);
+					s *= 2;
+					prev_from_to = IVec4(from / 2, to / 2);
 				}
+
+
+
 				renderer.endProfileBlock();
 			}
 		}
