@@ -239,9 +239,9 @@ public:
 		}
 		m_particle_emitters.clear();
 
-		for (auto& i : m_model_instances)
+		for (ModelInstance& i : m_model_instances)
 		{
-			if (i.entity != INVALID_ENTITY && i.model)
+			if (i.flags.isSet(ModelInstance::VALID) && i.model)
 			{
 				i.model->getResourceManager().unload(*i.model);
 				LUMIX_DELETE(m_allocator, i.pose);
@@ -589,7 +589,7 @@ public:
 	void serializeModelInstance(ISerializer& serialize, EntityRef entity)
 	{
 		ModelInstance& r = m_model_instances[entity.index];
-		ASSERT(r.entity != INVALID_ENTITY);
+		ASSERT(r.flags.isSet(ModelInstance::VALID));
 
 		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
 		serialize.write("flags", u8(r.flags.base));
@@ -601,18 +601,16 @@ public:
 		while (entity.index >= m_model_instances.size())
 		{
 			auto& r = m_model_instances.emplace();
-			r.entity = INVALID_ENTITY;
+			r.flags.clear();
+			r.flags.set(ModelInstance::VALID, false);
 			r.pose = nullptr;
 			r.model = nullptr;
 			r.meshes = nullptr;
 			r.mesh_count = 0;
 		}
 		auto& r = m_model_instances[entity.index];
-		r.entity = entity;
 		r.model = nullptr;
 		r.pose = nullptr;
-		r.flags.clear();
-		r.flags.set(ModelInstance::ENABLED);
 		r.meshes = nullptr;
 		r.mesh_count = 0;
 
@@ -1106,9 +1104,8 @@ public:
 		serializer.write((i32)m_model_instances.size());
 		for (auto& r : m_model_instances)
 		{
-			serializer.write(r.entity);
-			serializer.write(u8(r.flags.base));
-			if(r.entity != INVALID_ENTITY)
+			serializer.write(r.flags.base);
+			if(r.flags.isSet(ModelInstance::VALID))
 			{
 				serializer.write(r.model ? r.model->getPath().getHash() : 0);
 			}
@@ -1344,17 +1341,15 @@ public:
 		for (int i = 0; i < size; ++i)
 		{
 			auto& r = m_model_instances.emplace();
-			serializer.read(r.entity);
 			serializer.read(r.flags);
-			ASSERT(r.entity.index == i || !r.entity.isValid());
 			r.model = nullptr;
 			r.pose = nullptr;
 			r.meshes = nullptr;
 			r.mesh_count = 0;
 
-			if(r.entity.isValid())
+			if(r.flags.isSet(ModelInstance::VALID))
 			{
-				const EntityRef e = (EntityRef)r.entity;
+				const EntityRef e = {i};
 
 				u32 path;
 				serializer.read(path);
@@ -1454,7 +1449,8 @@ public:
 		auto& model_instance = m_model_instances[entity.index];
 		LUMIX_DELETE(m_allocator, model_instance.pose);
 		model_instance.pose = nullptr;
-		model_instance.entity = INVALID_ENTITY;
+		model_instance.flags.clear();
+		model_instance.flags.set(ModelInstance::VALID, false);
 		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
@@ -1939,7 +1935,7 @@ public:
 		{
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
-			const DVec3 pos = m_universe.getPosition((EntityRef)model_instance.entity);
+			const DVec3 pos = m_universe.getPosition(entity);
 			const float radius = model_instance.model->getBoundingRadius();
 			if (!m_culling_system->isAdded(entity)) {
 				const RenderableTypes type = getRenderableType(*model_instance.model);
@@ -2191,7 +2187,7 @@ public:
 	{
 		for(int i = entity.index + 1; i < m_model_instances.size(); ++i)
 		{
-			if (m_model_instances[i].entity != INVALID_ENTITY) return {i};
+			if (m_model_instances[i].flags.isSet(ModelInstance::VALID)) return {i};
 		}
 		return INVALID_ENTITY;
 	}
@@ -2804,7 +2800,7 @@ public:
 			if (ignored_model_instance.index == i || !r.model) continue;
 			if (!r.flags.isSet(ModelInstance::ENABLED)) continue;
 
-			const EntityRef entity = (EntityRef)r.entity;
+			const EntityRef entity{i};
 			const DVec3& pos = universe.getPosition(entity);
 			float scale = universe.getScale(entity);
 			float radius = r.model->getBoundingRadius() * scale;
@@ -2885,6 +2881,7 @@ public:
 	
 	void getEnvironmentProbes(Array<EnvProbeInfo>& probes) override
 	{
+		// TODO probes in culling system
 		PROFILE_FUNCTION();
 		probes.reserve(m_environment_probes.size());
 		for (int i = 0; i < m_environment_probes.size(); ++i) {
@@ -3051,7 +3048,7 @@ public:
 	{
 		for (int i = 0, c = m_model_instances.size(); i < c; ++i)
 		{
-			if (m_model_instances[i].entity != INVALID_ENTITY && m_model_instances[i].model == model)
+			if (m_model_instances[i].flags.isSet(ModelInstance::VALID) && m_model_instances[i].model == model)
 			{
 				modelUnloaded(model, {i});
 			}
@@ -3150,7 +3147,7 @@ public:
 	void setModel(EntityRef entity, Model* model)
 	{
 		auto& model_instance = m_model_instances[entity.index];
-		ASSERT(model_instance.entity.isValid());
+		ASSERT(model_instance.flags.isSet(ModelInstance::VALID));
 		Model* old_model = model_instance.model;
 		bool no_change = model == old_model && old_model;
 		if (no_change)
@@ -3255,22 +3252,24 @@ public:
 		ResourceManagerHub& rm = m_engine.getResourceManager();
 
 		StaticString<MAX_PATH_LENGTH> path;
-		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
-			path << "universes/" << m_universe.getName() << "/probes/" << probe.guid << ".dds";
-			probe.texture = rm.load<Texture>(Path(path));
-			probe.texture->setFlag(Texture::Flags::SRGB, true);
-		}
-		else {
-			probe.texture = nullptr;
-		}
+		probe.texture = nullptr;
 
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
+		FileSystem& fs = m_engine.getFileSystem();
+		if (!fs.fileExists(path)) {
+			fs.copyFile("textures/common/default_probe.dds", path);
+		}
+
 		probe.irradiance = rm.load<Texture>(Path(path));
+		// TODO check if the texture is really srgb 
 		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
 
 		path = "universes/";
 		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
+		if (!fs.fileExists(path)) {
+			fs.copyFile("textures/common/default_probe.dds", path);
+		}
 		probe.radiance = rm.load<Texture>(Path(path));
 		probe.radiance->setFlag(Texture::Flags::SRGB, true);
 
@@ -3297,16 +3296,17 @@ public:
 		while(entity.index >= m_model_instances.size())
 		{
 			auto& r = m_model_instances.emplace();
-			r.entity = INVALID_ENTITY;
+			r.flags.clear();
+			r.flags.set(ModelInstance::VALID, false);
 			r.model = nullptr;
 			r.pose = nullptr;
 		}
 		auto& r = m_model_instances[entity.index];
-		r.entity = entity;
 		r.model = nullptr;
 		r.meshes = nullptr;
 		r.pose = nullptr;
 		r.flags.clear();
+		r.flags.set(ModelInstance::VALID);
 		r.flags.set(ModelInstance::ENABLED);
 		r.mesh_count = 0;
 		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);

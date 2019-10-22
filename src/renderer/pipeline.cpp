@@ -3055,7 +3055,7 @@ struct PipelineImpl final : Pipeline
 									const u64 type_mask = (u64)mesh_type << 32;
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
 									if (bucket < 0xff) {
-										const u64 key = ((u64)mi.meshes[mesh_idx].sort_key << 32) | ((u64)bucket << 56);
+										const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
 										result.push(key, subrenderable);
 									} else if (bucket < 0xffFF) {
 										const DVec3 pos = entity_data[e.index].pos;

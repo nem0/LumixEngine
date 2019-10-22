@@ -934,7 +934,11 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 				logError("FBX") << "Failed to create " << mat_src;
 			}
 			else {
-				f << "shader \"/pipelines/standard.shd\"\n";
+				f << "shader \"/pipelines/impostor.shd\"\n";
+				f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
+				f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
+				f << "defines { \"ALPHA_CUTOUT\" }\n";
+				f << "backface_culling(false)\n";
 				f.close();
 			}
 		}
