@@ -126,12 +126,12 @@ struct ModelInstance
 	{
 		IS_BONE_ATTACHMENT_PARENT = 1 << 0,
 		ENABLED = 1 << 1,
+		VALID = 1 << 2
 	};
 
 	Model* model;
 	Mesh* meshes;
 	Pose* pose;
-	EntityPtr entity;
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	FlagSet<Flags, u8> flags;
