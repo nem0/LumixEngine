@@ -14,7 +14,6 @@ namespace Lumix
 
 
 class Renderer;
-struct ShaderRenderData;
 class Texture;
 
 
@@ -56,12 +55,22 @@ public:
 		u32 size() const;
 	};
 
-	struct Source {
-		Source(IAllocator& allocator) : code(allocator) {}
+	struct Stage {
+		Stage(IAllocator& allocator) : code(allocator) {}
 		ffr::ShaderType type;
 		Array<char> code;
 	};
 
+	struct Sources {
+		Sources(IAllocator& allocator) 
+			: stages(allocator)
+			, common(allocator)
+		{}
+
+		Path path;
+		Array<Shader::Stage> stages;
+		String common;
+	};
 
 	Shader(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Shader();
@@ -69,7 +78,8 @@ public:
 	ResourceType getType() const override { return TYPE; }
 	bool hasDefine(u8 define) const;
 
-	static const ffr::ProgramHandle& getProgram(ShaderRenderData* rd, const ffr::VertexDecl& decl, u32 defines);
+	ffr::ProgramHandle getProgram(const ffr::VertexDecl& decl, u32 defines);
+	static void compile(ffr::ProgramHandle program, ffr::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer);
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -78,7 +88,8 @@ public:
 	u32 m_texture_slot_count;
 	Array<Uniform> m_uniforms;
 	Array<u8> m_defines;
-	ShaderRenderData* m_render_data;
+	HashMap<u64, ffr::ProgramHandle> m_programs;
+	Sources m_sources;
 
 	static const ResourceType TYPE;
 
@@ -87,24 +98,5 @@ private:
 	bool load(u64 size, const u8* mem) override;
 };
 
-
-struct ShaderRenderData 
-{
-	ShaderRenderData(Renderer& renderer, IAllocator& allocator) 
-		: allocator(allocator)
-		, renderer(renderer)
-		, programs(allocator) 
-		, include(allocator)
-		, sources(allocator)
-		, common_source(allocator)
-	{}
-	IAllocator& allocator;
-	Renderer& renderer;
-	HashMap<u64, ffr::ProgramHandle> programs;
-	Array<Shader::Source> sources;
-	Array<u8> include;
-	Array<char> common_source;
-	Path path;
-};
 
 } // namespace Lumix

@@ -2278,7 +2278,7 @@ struct TerrainPlugin final : public PropertyGrid::IPlugin
 };
 
 
-struct RenderInterfaceImpl final : public RenderInterface
+struct RenderInterfaceImpl final : public RenderInterfaceBase
 {
 	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline, Renderer& renderer)
 		: m_pipeline(pipeline)
@@ -2534,6 +2534,10 @@ struct RenderInterfaceImpl final : public RenderInterface
 	}
 
 
+	Model* getModel(ModelHandle handle) override {
+		return m_models[handle];
+	}
+
 	void unloadModel(ModelHandle handle) override
 	{
 		auto* model = m_models[handle];
@@ -2558,14 +2562,6 @@ struct RenderInterfaceImpl final : public RenderInterface
 	{
 		RayCastModelHit hit = m_models[model]->castRay(origin, dir, pose);
 		return hit.is_hit ? hit.t : -1;
-	}
-
-
-	void renderModel(ModelHandle model, const Matrix& mtx) override
-	{
-		if (!m_pipeline.isReady() || !m_models[model]->isReady()) return;
-
-		m_pipeline.renderModel(*m_models[model], mtx);
 	}
 
 

@@ -61,13 +61,24 @@ struct FrameData {
 	FrameData(struct RendererImpl& renderer, IAllocator& allocator) 
 		: jobs(allocator)
 		, renderer(renderer)
+		, to_compile_shaders(allocator)
 	{}
+
+	struct ShaderToCompile {
+		Shader* shader;
+		ffr::VertexDecl decl;
+		u32 defines;
+		ffr::ProgramHandle program;
+		Shader::Sources sources;
+	};
 
 	ffr::BufferHandle transient_buffer = ffr::INVALID_BUFFER;
 	i32 transient_offset = 0;
 	u32 transient_size = 0;
 	u8* transient_ptr = nullptr;
 	Array<Renderer::RenderJob*> jobs;
+	MT::CriticalSection shader_mutex;
+	Array<ShaderToCompile> to_compile_shaders;
 	OS::Point window_size;
 	RendererImpl& renderer;
 	JobSystem::SignalHandle can_setup = JobSystem::INVALID_HANDLE;
@@ -939,6 +950,19 @@ struct RendererImpl final : public Renderer
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
 
+	ffr::ProgramHandle queueShaderCompile(Shader& shader, ffr::VertexDecl decl, u32 defines) override {
+		MT::CriticalSectionLock lock(m_cpu_frame->shader_mutex);
+		
+		for (const auto& i : m_cpu_frame->to_compile_shaders) {
+			if (i.shader == &shader && decl.hash == i.decl.hash && defines == i.defines) {
+				return i.program;
+			}
+		}
+		ffr::ProgramHandle program = ffr::allocProgramHandle();
+		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program, shader.m_sources});
+		return program;
+	}
+
 	void makeScreenshot(const Path& filename) override {  }
 	void resize(int w, int h) override {  }
 
@@ -995,6 +1019,11 @@ struct RendererImpl final : public Renderer
 	void render() {
 		FrameData& frame = *m_gpu_frame;
 		
+		for (const auto& i : frame.to_compile_shaders) {
+			Shader::compile(i.program, i.decl, i.defines, i.sources, *this);
+		}
+		frame.to_compile_shaders.clear();
+
 		ffr::unmap(frame.transient_buffer);
 		frame.transient_ptr = nullptr;
 
@@ -1059,6 +1088,11 @@ struct RendererImpl final : public Renderer
 		
 		JobSystem::wait(m_cpu_frame->setup_done);
 		m_cpu_frame->setup_done = JobSystem::INVALID_HANDLE;
+		for (const auto& i : m_cpu_frame->to_compile_shaders) {
+			const u64 key = i.defines | ((u64)i.decl.hash << 32);
+			i.shader->m_programs.insert(key, i.program);
+		}
+
 		JobSystem::incSignal(&m_cpu_frame->can_setup);
 		
 		const void* window_handle = m_engine.getPlatformData().window_handle;

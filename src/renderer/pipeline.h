@@ -13,11 +13,16 @@ struct lua_State;
 namespace Lumix
 {
 
-namespace ffr { struct TextureHandle; struct UniformHandle; struct BufferHandle; }
+namespace ffr { 
+	struct BufferHandle; 
+	struct ProgramHandle; 
+	struct TextureHandle; 
+	struct UniformHandle; 
+}
 
 struct Draw2D;
 struct IAllocator;
-class Model;
+struct Mesh;
 class Path;
 class Renderer;
 class RenderScene;
@@ -73,7 +78,6 @@ public:
 	virtual ~Pipeline() {}
 
 	virtual bool render(bool only_2d) = 0;
-	virtual void renderModel(Model& model, const Matrix& mtx) = 0;
 	virtual void setScene(RenderScene* scene) = 0;
 	virtual RenderScene* getScene() const = 0;
 	virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;

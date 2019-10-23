@@ -43,9 +43,11 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_texture_slot_count(0)
 	, m_uniforms(m_allocator)
 	, m_all_defines_mask(0)
-	, m_render_data(nullptr)
 	, m_defines(m_allocator)
+	, m_programs(m_allocator)
+	, m_sources(m_allocator)
 {
+	m_sources.path = path;
 }
 
 
@@ -58,88 +60,80 @@ bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
 }
 
-const ffr::ProgramHandle& Shader::getProgram(ShaderRenderData* rd, const ffr::VertexDecl& decl, u32 defines)
-{
-	ffr::checkThread();
-	const u64 key = defines | ((u64)decl.hash << 32);
-	auto iter = rd->programs.find(key);
-	if (!iter.isValid()) {
-		PROFILE_BLOCK("compile_shader");
-		static const char* shader_code_prefix = 
-			R"#(
-			layout (std140, binding = 0) uniform GlobalState {
-				mat4 u_shadow_view_projection;
-				mat4 u_shadowmap_matrices[4];
-				mat4 u_camera_projection;
-				mat4 u_camera_inv_projection;
-				mat4 u_camera_view;
-				mat4 u_camera_inv_view;
-				mat4 u_camera_view_projection;
-				mat4 u_camera_inv_view_projection;
-				vec4 u_fog_params;
-				vec4 u_fog_color;
-				vec4 u_camera_world_pos;
-				vec4 u_light_direction;
-				vec4 u_light_color;
-				ivec2 u_framebuffer_size;
-				float u_light_intensity;
-				float u_light_indirect_intensity;
-				float u_time;
-				float u_shadow_near_plane;
-				float u_shadow_far_plane;
-			};
-			layout (std140, binding = 1) uniform PassState {
-				mat4 u_pass_projection;
-				mat4 u_pass_inv_projection;
-				mat4 u_pass_view;
-				mat4 u_pass_inv_view;
-				mat4 u_pass_view_projection;
-				mat4 u_pass_inv_view_projection;
-				vec4 u_pass_view_dir;
-			};
-			layout (std140, binding = 2) uniform MaterialState {
-				vec4 u_material_color;
-				float u_roughness;
-				float u_metallic;
-				float u_emission;
-			};
-			layout (binding=14) uniform samplerCube u_irradiancemap;
-			layout (binding=15) uniform samplerCube u_radiancemap;
-			)#";
+void Shader::compile(ffr::ProgramHandle program, ffr::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer) {
+	PROFILE_BLOCK("compile_shader");
+	static const char* shader_code_prefix = 
+		R"#(
+		layout (std140, binding = 0) uniform GlobalState {
+			mat4 u_shadow_view_projection;
+			mat4 u_shadowmap_matrices[4];
+			mat4 u_camera_projection;
+			mat4 u_camera_inv_projection;
+			mat4 u_camera_view;
+			mat4 u_camera_inv_view;
+			mat4 u_camera_view_projection;
+			mat4 u_camera_inv_view_projection;
+			vec4 u_fog_params;
+			vec4 u_fog_color;
+			vec4 u_camera_world_pos;
+			vec4 u_light_direction;
+			vec4 u_light_color;
+			ivec2 u_framebuffer_size;
+			float u_light_intensity;
+			float u_light_indirect_intensity;
+			float u_time;
+			float u_shadow_near_plane;
+			float u_shadow_far_plane;
+		};
+		layout (std140, binding = 1) uniform PassState {
+			mat4 u_pass_projection;
+			mat4 u_pass_inv_projection;
+			mat4 u_pass_view;
+			mat4 u_pass_inv_view;
+			mat4 u_pass_view_projection;
+			mat4 u_pass_inv_view_projection;
+			vec4 u_pass_view_dir;
+		};
+		layout (std140, binding = 2) uniform MaterialState {
+			vec4 u_material_color;
+			float u_roughness;
+			float u_metallic;
+			float u_emission;
+		};
+		layout (binding=14) uniform samplerCube u_irradiancemap;
+		layout (binding=15) uniform samplerCube u_radiancemap;
+		)#";
 
-		const char* codes[64];
-		ffr::ShaderType types[64];
-		ASSERT((int)lengthOf(types) >= rd->sources.size());
-		for (int i = 0; i < rd->sources.size(); ++i) {
-			codes[i] = &rd->sources[i].code[0];
-			types[i] = rd->sources[i].type;
-		}
-		const char* prefixes[35];
-		StaticString<128> defines_code[32];
-		int defines_count = 0;
-		prefixes[0] = shader_code_prefix;
-		if (defines != 0) {
-			for(int i = 0; i < sizeof(defines) * 8; ++i) {
-				if((defines & (1 << i)) == 0) continue;
-				defines_code[defines_count] << "#define " << rd->renderer.getShaderDefine(i) << "\n";
-				prefixes[1 + defines_count] = defines_code[defines_count];
-				++defines_count;
-			}
-		}
-		prefixes[1 + defines_count] = rd->include.empty() ? "" : (const char*)rd->include.begin();
-		prefixes[2 + defines_count] = rd->common_source.empty() ? "" : rd->common_source.begin();
-
-		ffr::ProgramHandle program = ffr::allocProgramHandle();
-		if(program.isValid() && !ffr::createProgram(program, decl, codes, types, rd->sources.size(), prefixes, 3 + defines_count, rd->path.c_str())) {
-			ffr::destroy(program);
-			program = ffr::INVALID_PROGRAM;
-		}
-		rd->programs.insert(key, program);
-		iter = rd->programs.find(key);
+	const char* codes[64];
+	ffr::ShaderType types[64];
+	ASSERT((int)lengthOf(types) >= sources.stages.size());
+	for (int i = 0; i < sources.stages.size(); ++i) {
+		codes[i] = &sources.stages[i].code[0];
+		types[i] = sources.stages[i].type;
 	}
-	return iter.value();
+	const char* prefixes[35];
+	StaticString<128> defines_code[32];
+	int defines_count = 0;
+	prefixes[0] = shader_code_prefix;
+	if (defines != 0) {
+		for(int i = 0; i < sizeof(defines) * 8; ++i) {
+			if((defines & (1 << i)) == 0) continue;
+			defines_code[defines_count] << "#define " << renderer.getShaderDefine(i) << "\n";
+			prefixes[1 + defines_count] = defines_code[defines_count];
+			++defines_count;
+		}
+	}
+	prefixes[1 + defines_count] = sources.common.length() == 0 ? "" : sources.common.c_str();
+
+	ffr::createProgram(program, decl, codes, types, sources.stages.size(), prefixes, 2 + defines_count, sources.path.c_str());
 }
 
+ffr::ProgramHandle Shader::getProgram(const ffr::VertexDecl& decl, u32 defines) {
+	const u64 key = defines | ((u64)decl.hash << 32);
+	auto iter = m_programs.find(key);
+	if (iter.isValid()) return iter.value();
+	return m_renderer.queueShaderCompile(*this, decl, defines);
+}
 
 static Shader* getShader(lua_State* L)
 {
@@ -257,8 +251,8 @@ static void source(lua_State* L, ffr::ShaderType shader_type)
 	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
 	
 	Shader* shader = getShader(L);
-	Shader::Source& srcobj = shader->m_render_data->sources.emplace(shader->m_allocator);
-	srcobj.type = shader_type;
+	Shader::Stage& stage = shader->m_sources.stages.emplace(shader->m_allocator);
+	stage.type = shader_type;
 
 	lua_Debug ar;
 	lua_getstack(L, 1, &ar);
@@ -269,10 +263,10 @@ static void source(lua_State* L, ffr::ShaderType shader_type)
 	const int line_str_len = stringLength(line_str);
 	const int src_len = stringLength(src);
 
-	srcobj.code.resize(line_str_len + src_len + 1);
-	copyMemory(&srcobj.code[0], line_str, line_str_len);
-	copyMemory(&srcobj.code[line_str_len], src, src_len);
-	srcobj.code.back() = '\0';
+	stage.code.resize(line_str_len + src_len + 1);
+	copyMemory(&stage.code[0], line_str, line_str_len);
+	copyMemory(&stage.code[line_str_len], src, src_len);
+	stage.code.back() = '\0';
 }
 
 
@@ -298,13 +292,10 @@ static int common(lua_State* L)
 	const int line = ar.currentline - countLines(src);
 
 	const StaticString<32> line_str("#line ", line, "\n");
-	const int line_str_len = stringLength(line_str);
-	const int src_len = stringLength(src);
 
-	shader->m_render_data->common_source.resize(line_str_len + src_len + 1);
-	copyMemory(&shader->m_render_data->common_source[0], line_str, line_str_len);
-	copyMemory(&shader->m_render_data->common_source[line_str_len], src, src_len);
-	shader->m_render_data->common_source.back() = '\0';
+	shader->m_sources.common
+		.cat(line_str.data)
+		.cat(src);
 	return 0;
 }
 
@@ -350,10 +341,7 @@ int include(lua_State* L)
 		content.back() = '\0';
 	}
 
-	u32 old_size = shader->m_render_data->include.size();
-	if (old_size > 0) --old_size; // overwrite '\0' in the original
-	shader->m_render_data->include.resize(old_size + content.size());
-	copyMemory(shader->m_render_data->include.begin() + old_size, content.begin(), content.byte_size());
+	shader->m_sources.common.cat((const char*)content.begin());
 
 	return 0;
 }
@@ -366,12 +354,6 @@ bool Shader::load(u64 size, const u8* mem)
 {
 	lua_State* L = luaL_newstate();
 	luaL_openlibs(L);
-
-	ASSERT(!m_render_data);
-
-	IAllocator& allocator = m_renderer.getAllocator();
-	m_render_data = LUMIX_NEW(allocator, ShaderRenderData)(m_renderer, allocator);
-	m_render_data->path = getPath();
 
 	lua_pushlightuserdata(L, this);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
@@ -406,16 +388,12 @@ bool Shader::load(u64 size, const u8* mem)
 
 void Shader::unload()
 {
-	if (m_render_data) {
-		m_renderer.runInRenderThread(m_render_data, [](Renderer& renderer, void* ptr){
-			ShaderRenderData* rd = (ShaderRenderData*)ptr;
-			for(const ffr::ProgramHandle prg : rd->programs) {
-				if (prg.isValid()) ffr::destroy(prg);
-			}
-			LUMIX_DELETE(rd->allocator, rd);
-		});
-		m_render_data = nullptr;
+	for (ffr::ProgramHandle prg : m_programs) {
+		m_renderer.destroy(prg);
 	}
+	m_sources.common = "";
+	m_sources.stages.clear();
+	m_programs.clear();
 	m_uniforms.clear();
 	for (u32 i = 0; i < m_texture_slot_count; ++i) {
 		if (m_texture_slots[i].default_texture) {

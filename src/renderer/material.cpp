@@ -392,7 +392,6 @@ void Material::updateRenderData(bool on_before_ready)
 	m_render_data = LUMIX_NEW(m_renderer.getAllocator(), RenderData);
 	m_render_data->define_mask = m_define_mask;
 	m_render_data->render_states = m_render_states;
-	m_render_data->shader = m_shader->m_render_data;
 	m_render_data->textures_count = m_texture_count;
 	MaterialConsts cs = {};
 	static_assert(sizeof(cs) == 256, "Renderer::MaterialConstants must have 256B");

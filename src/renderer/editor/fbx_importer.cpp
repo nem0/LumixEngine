@@ -734,15 +734,25 @@ static void getBBProjection(const AABB& aabb, Ref<Vec2> out_min, Ref<Vec2> out_m
 
 struct CaptureImpostorJob : Renderer::RenderJob {
 
-	CaptureImpostorJob(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, Ref<IVec2> size) 
+	CaptureImpostorJob(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, Ref<IVec2> size, IAllocator& allocator) 
 		: m_gb0(gb0)
 		, m_gb1(gb1)
 		, m_tile_size(size)
-	{}
+		, m_programs(allocator)
+	{
+	}
 
-	void setup() override {}
+	void setup() override {
+		for (u32 i = 0; i <= (u32)m_model->getLODs()[0].to_mesh; ++i) {
+			const Mesh& mesh = m_model->getMesh(i);
+			Shader* shader = mesh.material->getShader();
+			const ffr::ProgramHandle p = shader->getProgram(mesh.vertex_decl, m_capture_define | mesh.material->getDefineMask());
+			m_programs.push(p);
+		}
+	}
 
 	void execute() override {
+		// TODO can't use m_model in render thread
 		ffr::TextureHandle gbs[] = { ffr::allocTextureHandle(), ffr::allocTextureHandle(), ffr::allocTextureHandle() };
 
 		ffr::BufferHandle pass_buf = ffr::allocBufferHandle();
@@ -776,17 +786,11 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
 				ffr::viewport(i * m_tile_size->x, j * m_tile_size->y, m_tile_size->x, m_tile_size->y);
 				const u32 mesh_count = m_model->getMeshCount();
-				;
 				for (u32 k = 0; k <= (u32)m_model->getLODs()[0].to_mesh; ++k) {
 					const Mesh& mesh = m_model->getMesh(k);
 
 					const Material* material = mesh.material;
 					const Mesh::RenderData* rd = mesh.render_data;
-
-					ShaderRenderData* shader_rd = material->getShader()->m_render_data;
-					const ffr::ProgramHandle prog = Shader::getProgram(shader_rd, rd->vertex_decl, m_capture_define | material->getDefineMask());
-
-					if(!prog.isValid()) continue;
 
 					const Material::RenderData* mat_rd = material->getRenderData();
 					ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
@@ -811,7 +815,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 
 					ffr::update(pass_buf, &pass_state, sizeof(pass_state));
-					ffr::useProgram(prog);
+					ffr::useProgram(m_programs[k]);
 					ffr::bindIndexBuffer(rd->index_buffer_handle);
 					ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
@@ -834,6 +838,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		ffr::destroy(gbs[2]);
 	}
 
+	Array<ffr::ProgramHandle> m_programs;
 	Ref<Array<u32>> m_gb0;
 	Ref<Array<u32>> m_gb1;
 	Model* m_model;
@@ -850,8 +855,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 	ASSERT(renderer);
 
 	IAllocator& allocator = renderer->getAllocator();
-	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0_rgba, gb1_rgba, size);
-	// TODO do not use m_model in render thread
+	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0_rgba, gb1_rgba, size, allocator);
 	job->m_model = model;
 	job->m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
 	renderer->queue(job, 0);

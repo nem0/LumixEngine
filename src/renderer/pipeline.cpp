@@ -757,7 +757,7 @@ struct PipelineImpl final : Pipeline
 				vb.size = 0;
 				if (tris.size() == 0) return;
 
-				render_data = pipeline->m_debug_shape_shader->m_render_data;
+				program = pipeline->m_debug_shape_shader->getProgram(pipeline->m_base_vertex_decl, 0);
 				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * tris.size() * 3);
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				if (vertices) {
@@ -777,15 +777,14 @@ struct PipelineImpl final : Pipeline
 			void execute() override {
 				PROFILE_FUNCTION();
 
-				const ffr::ProgramHandle shader = Shader::getProgram(render_data, pipeline->m_base_vertex_decl, 0);
-				if(!shader.isValid() || !vb.ptr) return;
+				if(!vb.ptr) return;
 
 				ffr::pushDebugGroup("debug triangles");
 
 				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
 
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::CULL_BACK));
-				ffr::useProgram(shader);
+				ffr::useProgram(program);
 
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
@@ -796,7 +795,7 @@ struct PipelineImpl final : Pipeline
 
 			PipelineImpl* pipeline;
 			DVec3 viewport_pos;
-			ShaderRenderData* render_data;
+			ffr::ProgramHandle program;
 			Renderer::TransientSlice vb;
 		};
 
@@ -826,7 +825,7 @@ struct PipelineImpl final : Pipeline
 				vb.size = 0;
 				if (lines.size() == 0) return;
 
-				render_data = pipeline->m_debug_shape_shader->m_render_data;
+				program = pipeline->m_debug_shape_shader->getProgram(pipeline->m_base_vertex_decl, 0);
 				vb = pipeline->m_renderer.allocTransient(sizeof(BaseVertex) * lines.size() * 2);
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				if (vertices) {
@@ -843,15 +842,14 @@ struct PipelineImpl final : Pipeline
 
 			void execute() override {
 				PROFILE_FUNCTION();
-				const ffr::ProgramHandle shader = Shader::getProgram(render_data, pipeline->m_base_vertex_decl, 0);
-				if (!shader.isValid() || !vb.ptr) return;
+				if (!vb.ptr) return;
 
 				ffr::pushDebugGroup("debug lines");
 
 				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
 
 				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
-				ffr::useProgram(shader);
+				ffr::useProgram(program);
 
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
@@ -863,7 +861,7 @@ struct PipelineImpl final : Pipeline
 
 			PipelineImpl* pipeline;
 			DVec3 viewport_pos;
-			ShaderRenderData* render_data;
+			ffr::ProgramHandle program;
 			Renderer::TransientSlice vb;
 		};
 
@@ -924,7 +922,7 @@ struct PipelineImpl final : Pipeline
 
 				draw2d.clear(pipeline->getAtlasSize());
 
-				shader = pipeline->m_draw2d_shader->m_render_data;
+				program = pipeline->m_draw2d_shader->getProgram(pipeline->m_2D_decl, 0);
 			}
 
 			void execute()
@@ -932,14 +930,13 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 
 				ffr::pushDebugGroup("draw2d");
-				ffr::ProgramHandle prg = Shader::getProgram(shader, pipeline->m_2D_decl, 0);
 
-				if(prg.isValid() && idx_buffer_mem.ptr && vtx_buffer_mem.ptr) {
+				if (idx_buffer_mem.ptr && vtx_buffer_mem.ptr) {
 					ffr::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
 					u32 elem_offset = 0;
 					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 					ffr::setState(blend_state);
-					ffr::useProgram(prg);
+					ffr::useProgram(program);
 					ffr::bindIndexBuffer(idx_buffer_mem.buffer);
 					ffr::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
 					ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
@@ -977,7 +974,7 @@ struct PipelineImpl final : Pipeline
 			Array<Draw2D::Cmd> cmd_buffer;
 			Vec2 size;
 			PipelineImpl* pipeline;
-			ShaderRenderData* shader;
+			ffr::ProgramHandle program;
 		};
 
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
@@ -1125,11 +1122,13 @@ struct PipelineImpl final : Pipeline
 					byte_size += emitter->getInstanceDataSizeBytes();
 				}
 
-				byte_size += (sizeof(int) * 2 + sizeof(ShaderRenderData) + sizeof(Vec3) + sizeof(Quat)) * emitters.size();
+				byte_size += (sizeof(int) * 2 + sizeof(ffr::ProgramHandle) + sizeof(Vec3) + sizeof(Quat)) * emitters.size();
 				m_vb = m_pipeline->m_renderer.allocTransient(byte_size);
 				if (!m_vb.ptr) return;
 
 				OutputMemoryStream str(m_vb.ptr, m_vb.size);
+				ffr::VertexDecl decl;
+				decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
 
 				for (ParticleEmitter* emitter : emitters) {
 					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
@@ -1143,7 +1142,7 @@ struct PipelineImpl final : Pipeline
 					const Material* material = emitter->getResource()->getMaterial();
 					str.write(lpos);
 					str.write(tr.rot);
-					str.write(material->getShader()->m_render_data);
+					str.write(material->getShader()->getProgram(decl, 0));
 					str.write(size);
 					str.write(emitter->getInstancesCount());
 					float* instance_data = (float*)str.skip(size);
@@ -1161,32 +1160,26 @@ struct PipelineImpl final : Pipeline
 				ffr::pushDebugGroup("particles");
 				InputMemoryStream blob(m_vb.ptr, m_size);
 				
-				ffr::VertexDecl decl;
-				decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
-
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState(blend_state);
 				while(blob.getPosition() < blob.size()) {
 					const Vec3 lpos = blob.read<Vec3>();
 					const Quat rot = blob.read<Quat>();
-					ShaderRenderData* shader_data = blob.read<ShaderRenderData*>();
+					const ffr::ProgramHandle program = blob.read<ffr::ProgramHandle>();
 					const int byte_size = blob.read<int>();
 					const int instances_count = blob.read<int>();
 
 					const u32 offset = (u32)blob.getPosition();
 					blob.skip(byte_size);
 
-					const ffr::ProgramHandle prog = Shader::getProgram(shader_data, decl, 0);
-					if (prog.isValid()) {
-						Matrix mtx = rot.toMatrix();
-						mtx.setTranslation(lpos);
-						ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
-						ffr::useProgram(prog);
-						ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-						ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
-						ffr::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
-						ffr::drawTriangleStripArraysInstanced(4, instances_count);
-					}
+					Matrix mtx = rot.toMatrix();
+					mtx.setTranslation(lpos);
+					ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
+					ffr::useProgram(program);
+					ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
+					ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
+					ffr::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
+					ffr::drawTriangleStripArraysInstanced(4, instances_count);
 				}
 				ffr::popDebugGroup();
 			}
@@ -1414,7 +1407,7 @@ struct PipelineImpl final : Pipeline
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 		const int shader_id = LuaWrapper::checkArg<int>(L, 1);
-		const Shader* shader = [&] {
+		Shader* shader = [&] {
 			for (const ShaderRef& s : pipeline->m_shaders) {
 				if(s.id == shader_id) {
 					return s.res;
@@ -1450,10 +1443,8 @@ struct PipelineImpl final : Pipeline
 				if(m_probes.empty()) return;
 
 				ffr::pushDebugGroup("environment");
-				const ffr::ProgramHandle prog = Shader::getProgram(m_shader, m_pipeline->m_3D_pos_decl, 0);
-				if(!prog.isValid()) return;
 
-				ffr::useProgram(prog);
+				ffr::useProgram(m_program);
 				ffr::bindIndexBuffer(m_ib);
 				ffr::bindVertexBuffer(0, m_vb, 0, 12);
 				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
@@ -1480,14 +1471,14 @@ struct PipelineImpl final : Pipeline
 			CameraParams m_camera_params;
 			PipelineImpl* m_pipeline;
 			Array<EnvProbeInfo> m_probes;
-			ShaderRenderData* m_shader;
+			ffr::ProgramHandle m_program;
 		};
 
 		if(shader->isReady()) {
 			IAllocator& allocator = pipeline->m_renderer.getAllocator();
 			Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 			cmd->m_pipeline = pipeline;
-			cmd->m_shader = shader->m_render_data;
+			cmd->m_program = shader->getProgram(pipeline->m_3D_pos_decl, 0);
 			cmd->m_ib = pipeline->m_cube_ib;
 			cmd->m_vb = pipeline->m_cube_vb;
 			cmd->m_camera_params = cp;
@@ -1568,6 +1559,7 @@ struct PipelineImpl final : Pipeline
 					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
 			}
 
+			cmd->m_define_mask[i] = 0;
 			cmd->m_bucket_sort_order[i] = order;
 
 			lua_getfield(L, -1, "layers");
@@ -1575,6 +1567,14 @@ struct PipelineImpl final : Pipeline
 				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
 				cmd->m_bucket_map[layer] = i | (order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
 			});
+			lua_pop(L, 1);
+
+			lua_getfield(L, -1, "defines");
+			if (lua_istable(L, -1)) {
+				LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* define){
+					cmd->m_define_mask[i] |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);
+				});
+			}
 			lua_pop(L, 1);
 
 			if(!ok) {
@@ -1602,14 +1602,10 @@ struct PipelineImpl final : Pipeline
 	static int drawArray(lua_State* L)
 	{
 		struct Cmd : Renderer::RenderJob {
-			void setup() override { m_render_data = m_shader->isReady() ? m_shader->m_render_data : nullptr; }
+			void setup() override { m_program = m_shader->getProgram(ffr::VertexDecl(), m_define_mask); }
 			void execute() override 
 			{
 				PROFILE_FUNCTION();
-				if (!m_render_data) return;
-
-				ffr::ProgramHandle prg = Shader::getProgram(m_render_data, ffr::VertexDecl(), m_define_mask);
-				if(!prg.isValid()) return;
 
 				ffr::setState(m_render_state);
 
@@ -1619,7 +1615,7 @@ struct PipelineImpl final : Pipeline
 					ffr::update(m_pipeline->m_drawcall_ub, m_uniforms, sizeof(m_uniforms[0]) * m_uniforms_count);
 				}
 
-				ffr::useProgram(prg);
+				ffr::useProgram(m_program);
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
 				ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
 				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
@@ -1636,7 +1632,7 @@ struct PipelineImpl final : Pipeline
 			int m_indices_offset;
 			u32 m_define_mask = 0;
 			u64 m_render_state;
-			ShaderRenderData* m_render_data = nullptr;
+			ffr::ProgramHandle m_program;
 
 		};
 
@@ -1953,12 +1949,10 @@ struct PipelineImpl final : Pipeline
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				const ffr::ProgramHandle p = Shader::getProgram(m_shader, m_pipeline->m_text_mesh_decl, 0);
-				if (!p.isValid()) return;
 				if (vb.size == 0) return;
 
 				Renderer& renderer = m_pipeline->m_renderer;
-				ffr::useProgram(p);
+				ffr::useProgram(m_program);
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST | blend_state);
 				ffr::bindTextures(&m_atlas, 0, 1);
@@ -1970,7 +1964,7 @@ struct PipelineImpl final : Pipeline
 
 			Renderer::TransientSlice vb;
 			ffr::TextureHandle m_atlas;
-			ShaderRenderData* m_shader;
+			ffr::ProgramHandle m_program;
 			PipelineImpl* m_pipeline;
 		};
 
@@ -1980,7 +1974,7 @@ struct PipelineImpl final : Pipeline
 		RenderJob* job = LUMIX_NEW(allocator, RenderJob);
 		job->m_pipeline = this;
 		job->m_atlas = atlas ? atlas->handle : ffr::INVALID_TEXTURE;
-		job->m_shader = m_text_mesh_shader->m_render_data;
+		job->m_program = m_text_mesh_shader->getProgram(m_text_mesh_decl, 0);
 		m_renderer.queue(job, m_profiler_link);
 	}
 
@@ -2003,7 +1997,6 @@ struct PipelineImpl final : Pipeline
 				if(m_cmds->header.size == 0 && m_cmds->header.next == nullptr) return;
 				
 				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
-				const u32 define_mask = m_define_mask;
 				CmdPage* page = m_cmds;
 				while (page) {
 					const u8* cmd = page->data;
@@ -2017,26 +2010,23 @@ struct PipelineImpl final : Pipeline
 						READ(const ffr::BufferHandle, buffer);
 						READ(const u32, offset);
 
-						const ffr::ProgramHandle prog = Shader::getProgram(m_shader, m_pipeline->m_point_light_decl, define_mask);
-						if (prog.isValid()) {
-							ffr::useProgram(prog);
+						ffr::useProgram(m_program);
 
-							if(total_count - nonintersecting_count) {
-								ffr::setState(blend_state | (u64)ffr::StateFlags::CULL_FRONT);
-								const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
-								ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
-								ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-								ffr::bindVertexBuffer(1, buffer, offs, 64);
-								ffr::drawTrianglesInstanced(36, total_count - nonintersecting_count, ffr::DataType::U16);
-							}
+						if(total_count - nonintersecting_count) {
+							ffr::setState(blend_state | (u64)ffr::StateFlags::CULL_FRONT);
+							const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
+							ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
+							ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+							ffr::bindVertexBuffer(1, buffer, offs, 64);
+							ffr::drawTrianglesInstanced(36, total_count - nonintersecting_count, ffr::DataType::U16);
+						}
 
-							if (nonintersecting_count) {
-								ffr::setState(blend_state | (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK);
-								ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
-								ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-								ffr::bindVertexBuffer(1, buffer, offset, 64);
-								ffr::drawTrianglesInstanced(36, nonintersecting_count, ffr::DataType::U16);
-							}
+						if (nonintersecting_count) {
+							ffr::setState(blend_state | (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK);
+							ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
+							ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+							ffr::bindVertexBuffer(1, buffer, offset, 64);
+							ffr::drawTrianglesInstanced(36, nonintersecting_count, ffr::DataType::U16);
 						}
 					}
 					CmdPage* next = page->header.next;
@@ -2046,16 +2036,15 @@ struct PipelineImpl final : Pipeline
 				#undef READ
 			}
 
-			ShaderRenderData* m_shader;
+			ffr::ProgramHandle m_program;
 			PipelineImpl* m_pipeline;
 			CmdPage* m_cmds;
-			u32 m_define_mask;
 		};
 
-		ShaderRenderData* shader = [&]() -> ShaderRenderData* {
+		Shader* shader = [&]() -> Shader* {
 			for (const ShaderRef& s : m_shaders) {
 				if(s.id == shader_idx) {
-					return ((Shader*)s.res)->m_render_data;
+					return ((Shader*)s.res);
 				}
 			}
 			return nullptr;
@@ -2064,10 +2053,10 @@ struct PipelineImpl final : Pipeline
 		if(!shader) return;
 
 		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
-		job->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		job->m_pipeline = this;
 		job->m_cmds = cmds;
-		job->m_shader = shader;
+		job->m_program = shader->getProgram(m_point_light_decl, define_mask);
 		m_renderer.queue(job, m_profiler_link);
 	}
 
@@ -2139,8 +2128,6 @@ struct PipelineImpl final : Pipeline
 
 				Stats stats = {};
 
-				const u32 instanced_mask = m_define_mask | m_instanced_define_mask;
-				const u32 skinned_mask = m_define_mask | m_skinned_define_mask;
 				const u64 render_states = m_render_state;
 				const ffr::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
@@ -2155,36 +2142,34 @@ struct PipelineImpl final : Pipeline
 							case RenderableTypes::MESH_GROUP: {
 								READ(Mesh::RenderData*, mesh);
 								READ(Material::RenderData*, material);
+								READ(ffr::ProgramHandle, program);
 								READ(u16, instances_count);
 								READ(ffr::BufferHandle, buffer);
 								READ(u32, offset);
 
-								ShaderRenderData* shader = material->shader;
-								const ffr::ProgramHandle prog = Shader::getProgram(shader, mesh->vertex_decl, instanced_mask | material->define_mask);
-								if(prog.isValid()) {
-									ffr::bindTextures(material->textures, 0, material->textures_count);
-									ffr::setState(material->render_states | render_states);
-									if (material_ub_idx != material->material_constants) {
-										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-										material_ub_idx = material->material_constants;
-									}
-
-									ffr::useProgram(prog);
-
-									ffr::bindIndexBuffer(mesh->index_buffer_handle);
-									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-									ffr::bindVertexBuffer(1, buffer, offset, 32);
-
-									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-									++stats.draw_call_count;
-									stats.triangle_count += instances_count * mesh->indices_count / 3;
-									stats.instance_count += instances_count;
+								ffr::bindTextures(material->textures, 0, material->textures_count);
+								ffr::setState(material->render_states | render_states);
+								if (material_ub_idx != material->material_constants) {
+									ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									material_ub_idx = material->material_constants;
 								}
+
+								ffr::useProgram(program);
+
+								ffr::bindIndexBuffer(mesh->index_buffer_handle);
+								ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+								ffr::bindVertexBuffer(1, buffer, offset, 32);
+
+								ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
+								++stats.draw_call_count;
+								stats.triangle_count += instances_count * mesh->indices_count / 3;
+								stats.instance_count += instances_count;
 								break;
 							}
 							case RenderableTypes::SKINNED: {
 								READ(Mesh::RenderData*, mesh);
 								READ(Material::RenderData*, material);
+								READ(ffr::ProgramHandle, program);
 								READ(Vec3, pos);
 								READ(Quat, rot);
 								READ(float, scale);
@@ -2196,55 +2181,48 @@ struct PipelineImpl final : Pipeline
 								Matrix model_mtx(pos, rot);
 								model_mtx.multiply3x3(scale);
 
-								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(material->textures, 0, material->textures_count);
 
-								const ffr::ProgramHandle prog = Shader::getProgram(shader, mesh->vertex_decl, skinned_mask | material->define_mask);
-								if(prog.isValid()) {
-									ffr::setState(material->render_states | render_states);
-									if (material_ub_idx != material->material_constants) {
-										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-										material_ub_idx = material->material_constants;
-									}
-
-									u8* dc_mem = (u8*)ffr::map(m_pipeline->m_drawcall_ub, sizeof(Matrix) * (bones_count + 1));
-									memcpy(dc_mem, &model_mtx, sizeof(Matrix));
-									memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
-									ffr::unmap(m_pipeline->m_drawcall_ub);
-
-									ffr::useProgram(prog);
-
-									ffr::bindIndexBuffer(mesh->index_buffer_handle);
-									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-									ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-									ffr::drawTriangles(mesh->indices_count, mesh->index_type);
-									++stats.draw_call_count;
-									stats.triangle_count += mesh->indices_count / 3;
-									++stats.instance_count;
+								ffr::setState(material->render_states | render_states);
+								if (material_ub_idx != material->material_constants) {
+									ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									material_ub_idx = material->material_constants;
 								}
+
+								u8* dc_mem = (u8*)ffr::map(m_pipeline->m_drawcall_ub, sizeof(Matrix) * (bones_count + 1));
+								memcpy(dc_mem, &model_mtx, sizeof(Matrix));
+								memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
+								ffr::unmap(m_pipeline->m_drawcall_ub);
+
+								ffr::useProgram(program);
+
+								ffr::bindIndexBuffer(mesh->index_buffer_handle);
+								ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+								ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+								ffr::drawTriangles(mesh->indices_count, mesh->index_type);
+								++stats.draw_call_count;
+								stats.triangle_count += mesh->indices_count / 3;
+								++stats.instance_count;
 								break;
 							}
 							case RenderableTypes::DECAL: {
 								READ(Material::RenderData*, material);
+								READ(ffr::ProgramHandle, program);
 								READ(ffr::BufferHandle, buffer);
 								READ(u32, offset);
 								READ(u32, count);
 								
-								ShaderRenderData* shader = material->shader;
 								ffr::bindTextures(material->textures, 0, material->textures_count);
 								
-								const ffr::ProgramHandle prog = Shader::getProgram(shader, m_pipeline->m_decal_decl, m_define_mask | material->define_mask);
-								if (prog.isValid()) {
-									ffr::useProgram(prog);
-									ffr::setState(material->render_states | render_states);
-									ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
-									ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-									ffr::bindVertexBuffer(1, buffer, offset, 44);
+								ffr::useProgram(program);
+								ffr::setState(material->render_states | render_states);
+								ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
+								ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+								ffr::bindVertexBuffer(1, buffer, offset, 44);
 
-									ffr::drawTrianglesInstanced(36, count, ffr::DataType::U16);
-									++stats.draw_call_count;
-									stats.instance_count += count;
-								}
+								ffr::drawTrianglesInstanced(36, count, ffr::DataType::U16);
+								++stats.draw_call_count;
+								stats.instance_count += count;
 								break;
 							}
 							case RenderableTypes::GRASS: {
@@ -2253,39 +2231,35 @@ struct PipelineImpl final : Pipeline
 								READ(float, distance);
 								READ(Mesh::RenderData*, mesh);
 								READ(Material::RenderData*, material);
+								READ(ffr::ProgramHandle, program);
 								READ(int, instances_count);
 								READ(ffr::BufferHandle, buffer);
 								READ(u32, offset);
 								
-								const u32 define_mask = m_grass_define_mask | m_deferred_define_mask | m_define_mask;
-
-								const ffr::ProgramHandle prg = Shader::getProgram(material->shader, mesh->vertex_decl, define_mask | material->define_mask);
-								if (prg.isValid()) {
-									renderer.beginProfileBlock("grass", 0);
-									ffr::useProgram(prg);
-									ffr::bindTextures(material->textures, 0, material->textures_count);
-									ffr::bindIndexBuffer(mesh->index_buffer_handle);
-									ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-									ffr::bindVertexBuffer(1, buffer, offset, 48);
-									if (material_ub_idx != material->material_constants) {
-										ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-										material_ub_idx = material->material_constants;
-									}
-									struct {
-										Matrix mtx;
-										float distance;
-									} dc;
-									dc.mtx = Matrix(pos, rot);
-									dc.distance = distance;
-									ffr::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
-
-									ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | render_states);
-									ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-									renderer.endProfileBlock();
-									++stats.draw_call_count;
-									stats.triangle_count += mesh->indices_count / 3 * instances_count;
-									stats.instance_count += instances_count;
+								renderer.beginProfileBlock("grass", 0);
+								ffr::useProgram(program);
+								ffr::bindTextures(material->textures, 0, material->textures_count);
+								ffr::bindIndexBuffer(mesh->index_buffer_handle);
+								ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+								ffr::bindVertexBuffer(1, buffer, offset, 48);
+								if (material_ub_idx != material->material_constants) {
+									ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									material_ub_idx = material->material_constants;
 								}
+								struct {
+									Matrix mtx;
+									float distance;
+								} dc;
+								dc.mtx = Matrix(pos, rot);
+								dc.distance = distance;
+								ffr::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
+
+								ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | render_states);
+								ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
+								renderer.endProfileBlock();
+								++stats.draw_call_count;
+								stats.triangle_count += mesh->indices_count / 3 * instances_count;
+								stats.instance_count += instances_count;
 								break;
 							}
 							default: ASSERT(false); break;
@@ -2304,11 +2278,6 @@ struct PipelineImpl final : Pipeline
 				m_pipeline->m_stats.triangle_count += stats.triangle_count;
 			}
 
-			u32 m_define_mask = 0;
-			u32 m_instanced_define_mask = 0;
-			u32 m_skinned_define_mask = 0;
-			u32 m_deferred_define_mask = 0;
-			u32 m_grass_define_mask = 0;
 			u64 m_render_state;
 			PipelineImpl* m_pipeline;
 			CmdPage* m_cmds;
@@ -2326,18 +2295,9 @@ struct PipelineImpl final : Pipeline
 
 		RenderJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderJob);
 
-		char tmp[64];
-		if (LuaWrapper::getOptionalStringField(L, 2, "define", Span(tmp))) {
-			job->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
-		}
-
 		job->m_render_state = state;
 		job->m_pipeline = pipeline;
 		job->m_cmds = cmd_page;
-		job->m_instanced_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("INSTANCED");
-		job->m_skinned_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("SKINNED");
-		job->m_deferred_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("DEFERRED");
-		job->m_grass_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("GRASS");
 		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
 		return 0;
 	}
@@ -2447,7 +2407,7 @@ struct PipelineImpl final : Pipeline
 				inst.rot = info.rot;
 				inst.scale = info.terrain->getScale();
 				inst.hm_size = info.terrain->getSize();
-				inst.shader = info.shader->m_render_data;
+				inst.program = info.shader->getProgram(ffr::VertexDecl(), m_define_mask);
 				inst.material = info.terrain->m_material->getRenderData();
 			}
 		}
@@ -2461,11 +2421,9 @@ struct PipelineImpl final : Pipeline
 
 			u64 state = m_render_state;
 			for (Instance& inst : m_instances) {
-				const ffr::ProgramHandle p = Shader::getProgram(inst.shader, ffr::VertexDecl(), define_mask);
-				if (!p.isValid()) continue;
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
-				ffr::useProgram(p);
+				ffr::useProgram(inst.program);
 				ffr::bindUniformBuffer(2, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 				
 				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
@@ -2548,7 +2506,7 @@ struct PipelineImpl final : Pipeline
 			Vec3 pos;
 			Quat rot;
 			Vec3 scale;
-			ShaderRenderData* shader;
+			ffr::ProgramHandle program;
 			Material::RenderData* material;
 		};
 
@@ -2685,6 +2643,11 @@ struct PipelineImpl final : Pipeline
 				ctx->first_page = ctx->last_page = cmd_page;
 				cmd_page->header.bucket = sort_keys[0] >> 56;
 				u8* out = cmd_page->data;
+				u32 define_mask = ctx->cmd->m_define_mask[cmd_page->header.bucket];
+
+				u32 instanced_define_mask = define_mask | (1 << ctx->pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
+				u32 skinned_define_mask = define_mask | (1 << ctx->pipeline->m_renderer.getShaderDefineIdx("SKINNED"));
+				u32 grass_define_mask = define_mask | (1 << ctx->pipeline->m_renderer.getShaderDefineIdx("GRASS"));
 
 				auto new_page = [&](u8 bucket){
 					cmd_page->header.size = int(out - cmd_page->data);
@@ -2694,6 +2657,10 @@ struct PipelineImpl final : Pipeline
 					new_page->header.bucket = bucket;
 					ctx->last_page = cmd_page;
 					out = cmd_page->data;
+					define_mask = ctx->cmd->m_define_mask[bucket];
+					instanced_define_mask = define_mask | (1 << ctx->pipeline->m_renderer.getShaderDefineIdx("INSTANCED"));
+					skinned_define_mask = define_mask | (1 << ctx->pipeline->m_renderer.getShaderDefineIdx("SKINNED"));
+					grass_define_mask = define_mask | (1 << ctx->pipeline->m_renderer.getShaderDefineIdx("GRASS"));
 				};
 
 				RenderScene* scene = ctx->cmd->m_pipeline->m_scene;
@@ -2736,13 +2703,18 @@ struct PipelineImpl final : Pipeline
 									memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 									instance_data += sizeof(tr.scale);
 								}
-								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 30) {
+								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 34) {
 									new_page(bucket);
 								}
 
+								const Mesh& mesh = mi->meshes[mesh_idx];
+								Shader* shader = mesh.material->getShader();
+								const ffr::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+
 								WRITE(type);
-								WRITE(mi->meshes[mesh_idx].render_data);
-								WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
+								WRITE(mesh.render_data);
+								WRITE_FN(mesh.material->getRenderData());
+								WRITE(prog);
 								WRITE(count);
 								WRITE(slice.buffer);
 								WRITE(slice.offset);
@@ -2756,14 +2728,18 @@ struct PipelineImpl final : Pipeline
 							const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 							const Transform& tr = entity_data[e.index];
 							const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
+							const Mesh& mesh = mi->meshes[mesh_idx];
+							Shader* shader = mesh.material->getShader();
+							const ffr::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, skinned_define_mask | mesh.material->getDefineMask());
 
-							if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 53) {
+							if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 57) {
 								new_page(bucket);
 							}
 
 							WRITE(type);
-							WRITE(mi->meshes[mesh_idx].render_data);
-							WRITE_FN(mi->meshes[mesh_idx].material->getRenderData());
+							WRITE(mesh.render_data);
+							WRITE_FN(mesh.material->getRenderData());
+							WRITE(prog);
 							WRITE(rel_pos);
 							WRITE(tr.rot);
 							WRITE(tr.scale);
@@ -2792,13 +2768,15 @@ struct PipelineImpl final : Pipeline
 							}
 							const u32 count = i - start_i;
 							const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) * 2 + sizeof(Quat)));
-							
+							const ffr::ProgramHandle prog = material->getShader()->getProgram(ctx->pipeline->m_decal_decl, define_mask | material->getDefineMask());
+
 							if(slice.ptr) {
 								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
 									new_page(bucket);
 								}
 								WRITE(type);
 								WRITE_FN(material->getRenderData());
+								WRITE(prog);
 								WRITE(slice.buffer);
 								WRITE(slice.offset);
 								WRITE(count);
@@ -2913,12 +2891,17 @@ struct PipelineImpl final : Pipeline
 								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 57) {
 									new_page(bucket);
 								}
+
+								Shader* shader = mesh->material->getShader();
+								const ffr::ProgramHandle prg = shader->getProgram(mesh->vertex_decl, grass_define_mask | mesh->material->getDefineMask());
+
 								WRITE(type);
 								WRITE(tr.rot);
 								WRITE(lpos);
 								WRITE(distance);
 								WRITE(mesh->render_data);
 								WRITE_FN(mesh->material->getRenderData());
+								WRITE(prg);
 								const u32 instances_count = instance_data_size / sizeof(Terrain::GrassPatch::InstanceData);
 								WRITE(instances_count);
 								WRITE(slice.buffer);
@@ -2936,6 +2919,7 @@ struct PipelineImpl final : Pipeline
 				#undef WRITE_FN
 			}
 
+			PipelineImpl* pipeline;
 			u64* renderables;
 			u64* sort_keys;
 			int idx;
@@ -3060,7 +3044,7 @@ struct PipelineImpl final : Pipeline
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
 									const u32 bucket = bucket_map[mesh.layer];
-									const RenderableTypes mesh_type = mesh.type == Mesh::RIGID_INSTANCED ? RenderableTypes::MESH_GROUP : RenderableTypes::SKINNED;
+									const RenderableTypes mesh_type = mesh.type == Mesh::RIGID ? RenderableTypes::MESH_GROUP : RenderableTypes::SKINNED;
 									const u64 type_mask = (u64)mesh_type << 32;
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
 									if (bucket < 0xff) {
@@ -3134,6 +3118,7 @@ struct PipelineImpl final : Pipeline
 				const int count = minimum(step, size - offset);
 				if (count <= 0) break;
 				CreateCommands& ctx = create_commands[i];
+				ctx.pipeline = m_pipeline;
 				ctx.renderables = renderables + offset;
 				ctx.sort_keys = sort_keys + offset;
 				ctx.count = count;
@@ -3170,6 +3155,7 @@ struct PipelineImpl final : Pipeline
 		CmdPage* m_command_sets[255];
 		u32 m_bucket_map[255];
 		SortOrder m_bucket_sort_order[255] = {};
+		u32 m_define_mask[255];
 		u8 m_bucket_count;
 	};
 
@@ -3435,33 +3421,6 @@ struct PipelineImpl final : Pipeline
 		lua_pop(L, 1); // pop env
 
 		#undef REGISTER_FUNCTION
-	}
-
-	// TOOD can't use model in render thread
-	void renderModel(Model& model, const Matrix& mtx) override
-	{
-		for(int i = 0; i < model.getMeshCount(); ++i) {
-
-			const Mesh& mesh = model.getMesh(i);
-			const Material* material = mesh.material;
-			const Mesh::RenderData* rd = mesh.render_data;
-
-			ShaderRenderData* shader_rd = material->getShader()->m_render_data;
-			const ffr::ProgramHandle prog = Shader::getProgram(shader_rd, rd->vertex_decl, 0); // TODO define
-
-			if(!prog.isValid()) continue;
-
-			const Material::RenderData* mat_rd = material->getRenderData();
-			ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
-
-			ffr::update(m_drawcall_ub, &mtx.m11, sizeof(mtx));
-			ffr::useProgram(prog);
-			ffr::bindIndexBuffer(rd->index_buffer_handle);
-			ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-			ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
-			ffr::drawTriangles(rd->indices_count, rd->index_type);
-		}
 	}
 
 	bool isReady() const override { return m_resource->isReady(); }
