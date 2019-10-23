@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -12,10 +13,16 @@ namespace Lumix
 
 
 class LogUI;
+class Model;
 class StudioApp;
 class Pipeline;
 class RenderScene;
 class Shader;
+
+
+struct RenderInterfaceBase : RenderInterface {
+	virtual Model* getModel(RenderInterface::ModelHandle handle) = 0;
+};
 
 
 class SceneView : public StudioApp::GUIPlugin

@@ -59,6 +59,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual u8 getShaderDefineIdx(const char* define) = 0;
 		virtual const char* getShaderDefine(int define_idx) const = 0;
 		virtual int getShaderDefinesCount() const = 0;
+		virtual ffr::ProgramHandle queueShaderCompile(class Shader& shader, ffr::VertexDecl decl, u32 defines) = 0;
 		virtual FontManager& getFontManager() = 0;
 		virtual ResourceManager& getTextureManager() = 0;
 		

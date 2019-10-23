@@ -47,19 +47,19 @@ Mesh::Mesh(Material* mat,
 	, indices(allocator)
 	, vertices(allocator)
 	, skin(allocator)
+	, vertex_decl(vertex_decl)
 {
 	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
-	render_data->vertex_decl = vertex_decl;
 	render_data->vb_stride = vb_stride;
 	render_data->vertex_buffer_handle = ffr::INVALID_BUFFER;
 	render_data->index_buffer_handle = ffr::INVALID_BUFFER;
 	render_data->index_type = ffr::DataType::U32;
-	for(AttributeSemantic& attr : render_data->attributes_semantic) {
+	for(AttributeSemantic& attr : attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
 	if(semantics) {
 		for(u32 i = 0; i < vertex_decl.attributes_count; ++i) {
-			render_data->attributes_semantic[i] = semantics[i];
+			attributes_semantic[i] = semantics[i];
 		}
 	}
 
@@ -70,7 +70,7 @@ Mesh::Mesh(Material* mat,
 
 static bool hasAttribute(Mesh& mesh, Mesh::AttributeSemantic attribute)
 {
-	for(const Mesh::AttributeSemantic& attr : mesh.render_data->attributes_semantic) {
+	for(const Mesh::AttributeSemantic& attr : mesh.attributes_semantic) {
 		if(attr == attribute) return true;
 	}
 	return false;
@@ -81,7 +81,7 @@ void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 {
 	if (material) material->getResourceManager().unload(*material);
 	material = new_material;
-	type = model.getBoneCount() == 0 || skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
+	type = model.getBoneCount() == 0 || skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
 }
 
 
@@ -336,7 +336,7 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 void Model::onBeforeReady()
 {
 	for (Mesh& mesh : m_meshes) {
-		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID_INSTANCED : Mesh::SKINNED;
+		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
 		mesh.layer = mesh.material->getLayer();
 	}
 }
@@ -424,25 +424,14 @@ int Model::getBoneIdx(const char* name)
 
 static int getAttributeOffset(Mesh& mesh, Mesh::AttributeSemantic attr)
 {
-	for (u32 i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
-		if(mesh.render_data->attributes_semantic[i] == attr) {
-			return mesh.render_data->vertex_decl.attributes[i].byte_offset;
+	for (u32 i = 0; i < lengthOf(mesh.attributes_semantic); ++i) {
+		if(mesh.attributes_semantic[i] == attr) {
+			return mesh.vertex_decl.attributes[i].byte_offset;
 		}
 	}
 	return -1;
 }
 
-static const ffr::Attribute& getAttribute(Mesh& mesh, Mesh::AttributeSemantic attr)
-{
-	for (u32 i = 0; i < lengthOf(mesh.render_data->attributes_semantic); ++i) {
-		if(mesh.render_data->attributes_semantic[i] == attr) {
-			return mesh.render_data->vertex_decl.attributes[i];
-		}
-	}
-	ASSERT(false);
-	static ffr::Attribute dummy;
-	return dummy;
-}
 
 bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 {

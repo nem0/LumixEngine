@@ -17,7 +17,6 @@ namespace Lumix
 class Renderer;
 class ResourceManagerHub;
 class Shader;
-struct ShaderRenderData;
 class Texture;
 
 struct  MaterialConsts {
@@ -54,7 +53,6 @@ public:
 		int textures_count;
 		u64 render_states;
 		u32 material_constants;
-		ShaderRenderData* shader;
 		u32 define_mask;
 	};
 

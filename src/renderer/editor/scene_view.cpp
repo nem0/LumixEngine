@@ -167,40 +167,75 @@ void SceneView::update(float time_delta)
 
 void SceneView::renderIcons()
 {
-	struct Cmd : Renderer::RenderJob
+	struct RenderJob : Renderer::RenderJob
 	{
-		Cmd(IAllocator& allocator)
-			: data(allocator)
+		RenderJob(IAllocator& allocator) 
+			: m_allocator(allocator)
+			, m_items(allocator) 
 		{}
 
 		void setup() override
 		{
 			PROFILE_FUNCTION();
-			view->m_editor.getIcons().getRenderData(&data);
+			Array<EditorIcons::RenderData> data(m_allocator);
+			m_view->m_editor.getIcons().getRenderData(&data);
+			RenderScene* scene = m_view->m_pipeline->getScene();
+			const Universe& universe = scene->getUniverse();
+			
+			RenderInterfaceBase* ri = (RenderInterfaceBase*)m_view->m_editor.getRenderInterface();
+
+			for (EditorIcons::RenderData& rd : data) {
+				const Model* model = (Model*)ri->getModel(rd.model);
+				if (!model || !model->isReady()) continue;
+
+				for (int i = 0; i <= model->getLODs()[0].to_mesh; ++i) {
+					const Mesh& mesh = model->getMesh(i);
+					Item& item = m_items.emplace();
+					item.mesh = mesh.render_data;
+					item.mtx = rd.mtx;
+					item.material = mesh.material->getRenderData();
+					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, item.material->define_mask);
+				}
+			}
 		}
 
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			ffr::pushDebugGroup("icons");
-			RenderInterface* ri = view->m_editor.getRenderInterface();
+			const ffr::BufferHandle drawcall_ub = m_view->m_pipeline->getDrawcallUniformBuffer();
+
+			for (const Item& item : m_items) {
+				const Mesh::RenderData* rd = item.mesh;
 			
-			for(const EditorIcons::RenderData& i : data) {
-				ri->renderModel(i.model, i.mtx);
+				ffr::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
+				ffr::bindTextures(item.material->textures, 0, item.material->textures_count);
+				ffr::useProgram(item.program);
+				ffr::bindIndexBuffer(rd->index_buffer_handle);
+				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+				ffr::setState(item.material->render_states);
+				ffr::drawTriangles(rd->indices_count, rd->index_type);
 			}
-			ffr::popDebugGroup();
 		}
 
-		Array<EditorIcons::RenderData> data;
-		SceneView* view;
+		struct Item {
+			ffr::ProgramHandle program;
+			Mesh::RenderData* mesh;
+			Material::RenderData* material;
+			Matrix mtx;
+		};
+
+		IAllocator& m_allocator;
+		Array<Item> m_items;
+		SceneView* m_view;
 	};
 
 	Engine& engine = m_editor.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	IAllocator& allocator = renderer->getAllocator();
-	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
-	cmd->view = this;
+	RenderJob* cmd = LUMIX_NEW(allocator, RenderJob)(allocator);
+	cmd->m_view = this;
 	renderer->queue(cmd, 0);
 }
 
@@ -227,9 +262,9 @@ void SceneView::renderSelection()
 					const Mesh& mesh = model->getMesh(i);
 					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;
-					item.shader = mesh.material->getShader()->m_render_data;
 					item.mtx = universe.getRelativeMatrix(e, m_editor->getViewport().pos);
 					item.material = mesh.material->getRenderData();
+					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | item.material->define_mask);
 				}
 			}
 		}
@@ -241,13 +276,10 @@ void SceneView::renderSelection()
 
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
-				const ffr::ProgramHandle prog = Shader::getProgram(item.shader, rd->vertex_decl, m_define_mask | item.material->define_mask);
-
-				if (!prog.isValid()) continue;
 			
 				ffr::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
 				ffr::bindTextures(item.material->textures, 0, item.material->textures_count);
-				ffr::useProgram(prog);
+				ffr::useProgram(item.program);
 				ffr::bindIndexBuffer(rd->index_buffer_handle);
 				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
@@ -257,7 +289,7 @@ void SceneView::renderSelection()
 		}
 
 		struct Item {
-			ShaderRenderData* shader;
+			ffr::ProgramHandle program;
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
 			Matrix mtx;
@@ -309,13 +341,6 @@ void SceneView::renderGizmos()
 			PROFILE_FUNCTION();
 			if (data.cmds.empty() || !ib.ptr || !vb.ptr) return;
 
-			ffr::VertexDecl decl;
-			decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
-			decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
-			
-			const ffr::ProgramHandle prg = Shader::getProgram(shader, decl, 0);
-			if (!prg.isValid()) return;
-
 			renderer->beginProfileBlock("gizmos", 0);
 			ffr::pushDebugGroup("gizmos");
 			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
@@ -324,7 +349,7 @@ void SceneView::renderGizmos()
 			const ffr::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
 			for (Gizmo::RenderData::Cmd& cmd : data.cmds) {
 				ffr::update(drawcall_ub, &cmd.mtx.m11, sizeof(cmd.mtx));
-				ffr::useProgram(prg);
+				ffr::useProgram(program);
 				ffr::bindIndexBuffer(ib.buffer);
 				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
 				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
@@ -345,7 +370,7 @@ void SceneView::renderGizmos()
 		Gizmo::RenderData data;
 		Viewport viewport;
 		SceneView* view;
-		ShaderRenderData* shader;
+		ffr::ProgramHandle program;
 	};
 
 	if (!m_debug_shape_shader || !m_debug_shape_shader->isReady()) return;
@@ -355,7 +380,10 @@ void SceneView::renderGizmos()
 
 	IAllocator& allocator = renderer->getAllocator();
 	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
-	cmd->shader = m_debug_shape_shader->m_render_data;
+	ffr::VertexDecl decl;
+	decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
+	decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
+	cmd->program = m_debug_shape_shader->getProgram(decl, 0);
 	cmd->view = this;
 	renderer->queue(cmd, 0);
 }

@@ -65,8 +65,6 @@ struct LUMIX_RENDERER_API Mesh
 
 	struct RenderData
 	{
-		ffr::VertexDecl vertex_decl;
-		AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
 		ffr::BufferHandle vertex_buffer_handle;
 		u32 vb_stride; 
 		ffr::BufferHandle index_buffer_handle;
@@ -82,7 +80,7 @@ struct LUMIX_RENDERER_API Mesh
 
 	enum Type : u8
 	{
-		RIGID_INSTANCED,
+		RIGID,
 		SKINNED,
 
 		LAST_TYPE
@@ -113,6 +111,8 @@ struct LUMIX_RENDERER_API Mesh
 	u8 layer;
 	String name;
 	Material* material;
+	ffr::VertexDecl vertex_decl;
+	AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
 	RenderData* render_data;
 	static u32 s_last_sort_key;
 };

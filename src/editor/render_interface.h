@@ -39,7 +39,6 @@ public:
 	virtual float getCameraOrthoSize(EntityRef entity) = 0;
 	virtual Vec2 getCameraScreenSize(EntityRef entity) = 0;
 	virtual float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Pose* pose) = 0;
-	virtual void renderModel(ModelHandle model, const Matrix& mtx) = 0;
 	virtual ModelHandle loadModel(Path& path) = 0;
 	virtual void unloadModel(ModelHandle handle) = 0;
 	virtual Vec3 getModelCenter(EntityRef entity) = 0;

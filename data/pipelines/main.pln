@@ -34,10 +34,6 @@ local default_state = {
 	wireframe = false
 }
 
-local shadow_state = {
-	define = "DEPTH"
-}
-
 function transparentPass(transparent_set, colorbuffer, dsbuffer)
 	setRenderTargets(colorbuffer, dsbuffer)
 
@@ -167,13 +163,13 @@ function shadowPass()
 			
 			for slice = 0, 3 do 
 				local view_params = getShadowCameraParams(slice, 4096)
-				local shadow_set = prepareCommands(view_params, { { layers = { "default" } } })
+				local shadow_set = prepareCommands(view_params, { { layers = { "default" }, defines = { "DEPTH" } } })
 				
 				viewport(slice * 1024, 0, 1024, 1024)
 				beginBlock("slice " .. tostring(slice + 1))
 				pass(view_params)
-				renderBucket(shadow_set, shadow_state)
-				renderTerrains(view_params, shadow_state)
+				renderBucket(shadow_set, {})
+				renderTerrains(view_params, {})
 				endBlock()
 			end
 		endBlock()
@@ -248,7 +244,7 @@ function main()
 	local view_params = getCameraParams()
 	local default_set, decal_set, local_light_set, transparent_set = prepareCommands(view_params, 
 		{ 
-			{ layers = { "default" } },
+			{ layers = { "default" }, defines = { "DEFERRED" } },
 			{ layers = { "decal" } },
 			{ layers = { "local_light" } },
 			{ layers = { "transparent" }, sort = "depth" }
@@ -257,7 +253,7 @@ function main()
 
 	
 	local shadowmap = shadowPass()
-	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set, transparent_set)
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set)
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
 	
 	local res = hdr_buffer		
