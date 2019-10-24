@@ -4,7 +4,7 @@
 #include "engine/array.h"
 #include "engine/math.h"
 #include "engine/resource.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 
 
 namespace Lumix

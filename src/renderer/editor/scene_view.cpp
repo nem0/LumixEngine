@@ -22,7 +22,7 @@
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
 #include "imgui/imgui.h"
-#include "renderer/ffr/ffr.h"
+#include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -202,24 +202,24 @@ void SceneView::renderIcons()
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const ffr::BufferHandle drawcall_ub = m_view->m_pipeline->getDrawcallUniformBuffer();
+			const gpu::BufferHandle drawcall_ub = m_view->m_pipeline->getDrawcallUniformBuffer();
 
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
-				ffr::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
-				ffr::bindTextures(item.material->textures, 0, item.material->textures_count);
-				ffr::useProgram(item.program);
-				ffr::bindIndexBuffer(rd->index_buffer_handle);
-				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				ffr::setState(item.material->render_states);
-				ffr::drawTriangles(rd->indices_count, rd->index_type);
+				gpu::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
+				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
+				gpu::useProgram(item.program);
+				gpu::bindIndexBuffer(rd->index_buffer_handle);
+				gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				gpu::setState(item.material->render_states);
+				gpu::drawTriangles(rd->indices_count, rd->index_type);
 			}
 		}
 
 		struct Item {
-			ffr::ProgramHandle program;
+			gpu::ProgramHandle program;
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
 			Matrix mtx;
@@ -272,24 +272,24 @@ void SceneView::renderSelection()
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const ffr::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
+			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
 
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
-				ffr::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
-				ffr::bindTextures(item.material->textures, 0, item.material->textures_count);
-				ffr::useProgram(item.program);
-				ffr::bindIndexBuffer(rd->index_buffer_handle);
-				ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				ffr::setState(item.material->render_states);
-				ffr::drawTriangles(rd->indices_count, rd->index_type);
+				gpu::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
+				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
+				gpu::useProgram(item.program);
+				gpu::bindIndexBuffer(rd->index_buffer_handle);
+				gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				gpu::setState(item.material->render_states);
+				gpu::drawTriangles(rd->indices_count, rd->index_type);
 			}
 		}
 
 		struct Item {
-			ffr::ProgramHandle program;
+			gpu::ProgramHandle program;
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
 			Matrix mtx;
@@ -342,24 +342,24 @@ void SceneView::renderGizmos()
 			if (data.cmds.empty() || !ib.ptr || !vb.ptr) return;
 
 			renderer->beginProfileBlock("gizmos", 0);
-			ffr::pushDebugGroup("gizmos");
-			ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
+			gpu::pushDebugGroup("gizmos");
+			gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE));
 			u32 vb_offset = 0;
 			u32 ib_offset = 0;
-			const ffr::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
+			const gpu::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
 			for (Gizmo::RenderData::Cmd& cmd : data.cmds) {
-				ffr::update(drawcall_ub, &cmd.mtx.m11, sizeof(cmd.mtx));
-				ffr::useProgram(program);
-				ffr::bindIndexBuffer(ib.buffer);
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				const ffr::PrimitiveType primitive_type = cmd.lines ? ffr::PrimitiveType::LINES : ffr::PrimitiveType::TRIANGLES;
-				ffr::drawElements(ib.offset + ib_offset, cmd.indices_count, primitive_type, ffr::DataType::U16);
+				gpu::update(drawcall_ub, &cmd.mtx.m11, sizeof(cmd.mtx));
+				gpu::useProgram(program);
+				gpu::bindIndexBuffer(ib.buffer);
+				gpu::bindVertexBuffer(0, vb.buffer, vb.offset + vb_offset, 16);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				const gpu::PrimitiveType primitive_type = cmd.lines ? gpu::PrimitiveType::LINES : gpu::PrimitiveType::TRIANGLES;
+				gpu::drawElements(ib.offset + ib_offset, cmd.indices_count, primitive_type, gpu::DataType::U16);
 
 				vb_offset += cmd.vertices_count * sizeof(Gizmo::RenderData::Vertex);
 				ib_offset += cmd.indices_count * sizeof(u16);
 			}
-			ffr::popDebugGroup();
+			gpu::popDebugGroup();
 			
 			renderer->endProfileBlock();
 		}
@@ -370,7 +370,7 @@ void SceneView::renderGizmos()
 		Gizmo::RenderData data;
 		Viewport viewport;
 		SceneView* view;
-		ffr::ProgramHandle program;
+		gpu::ProgramHandle program;
 	};
 
 	if (!m_debug_shape_shader || !m_debug_shape_shader->isReady()) return;
@@ -380,9 +380,9 @@ void SceneView::renderGizmos()
 
 	IAllocator& allocator = renderer->getAllocator();
 	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
-	ffr::VertexDecl decl;
-	decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
-	decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
+	gpu::VertexDecl decl;
+	decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+	decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 	cmd->program = m_debug_shape_shader->getProgram(decl, 0);
 	cmd->view = this;
 	renderer->queue(cmd, 0);
@@ -554,7 +554,7 @@ void SceneView::onToolbar()
 	pos.y -= offset;
 	ImGui::SetCursorPos(pos);
 	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
-	const ffr::TextureHandle t = *(ffr::TextureHandle*)mode_action->icon;
+	const gpu::TextureHandle t = *(gpu::TextureHandle*)mode_action->icon;
 	ImGui::Image((void*)(uintptr_t)t.value, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), tint_color);
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
 
@@ -620,7 +620,7 @@ void SceneView::onWindowGUI()
 			auto content_min = ImGui::GetCursorScreenPos();
 			if(m_texture_handle.isValid()) {
 				void* t = (void*)(uintptr_t)m_texture_handle.value;
-				if (ffr::isOriginBottomLeft()) {
+				if (gpu::isOriginBottomLeft()) {
 					ImGui::Image(t, size, ImVec2(0, 1), ImVec2(1, 0));
 				} 
 				else {

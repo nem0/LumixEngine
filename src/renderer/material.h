@@ -5,7 +5,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/math.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 
 
 struct lua_State;
@@ -49,7 +49,7 @@ public:
 	static const int MAX_TEXTURE_COUNT = 16;
 
 	struct RenderData {
-		ffr::TextureHandle textures[MAX_TEXTURE_COUNT];
+		gpu::TextureHandle textures[MAX_TEXTURE_COUNT];
 		int textures_count;
 		u64 render_states;
 		u32 material_constants;

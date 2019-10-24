@@ -746,22 +746,22 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		for (u32 i = 0; i <= (u32)m_model->getLODs()[0].to_mesh; ++i) {
 			const Mesh& mesh = m_model->getMesh(i);
 			Shader* shader = mesh.material->getShader();
-			const ffr::ProgramHandle p = shader->getProgram(mesh.vertex_decl, m_capture_define | mesh.material->getDefineMask());
+			const gpu::ProgramHandle p = shader->getProgram(mesh.vertex_decl, m_capture_define | mesh.material->getDefineMask());
 			m_programs.push(p);
 		}
 	}
 
 	void execute() override {
 		// TODO can't use m_model in render thread
-		ffr::TextureHandle gbs[] = { ffr::allocTextureHandle(), ffr::allocTextureHandle(), ffr::allocTextureHandle() };
+		gpu::TextureHandle gbs[] = { gpu::allocTextureHandle(), gpu::allocTextureHandle(), gpu::allocTextureHandle() };
 
-		ffr::BufferHandle pass_buf = ffr::allocBufferHandle();
-		ffr::BufferHandle ub = ffr::allocBufferHandle();
-		ffr::createBuffer(ub, (u32)ffr::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+		gpu::BufferHandle pass_buf = gpu::allocBufferHandle();
+		gpu::BufferHandle ub = gpu::allocBufferHandle();
+		gpu::createBuffer(ub, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
 		const u32 pass_buf_size = (sizeof(PassState) + 255) & ~255;
-		ffr::createBuffer(pass_buf, (u32)ffr::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
-		ffr::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
-		ffr::bindUniformBuffer(4, ub, 0, 256);
+		gpu::createBuffer(pass_buf, (u32)gpu::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
+		gpu::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
+		gpu::bindUniformBuffer(4, ub, 0, 256);
 
 		const AABB aabb = m_model->getAABB();
 		const Vec3 center = (aabb.min + aabb.max) * 0.5f;
@@ -774,17 +774,17 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		m_tile_size->x = (m_tile_size->x + 3) & ~3;
 		m_tile_size->y = (m_tile_size->y + 3) & ~3;
 		const IVec2 texture_size = m_tile_size.value * IMPOSTOR_COLS;
-		ffr::createTexture(gbs[0], texture_size.x, texture_size.y, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb0");
-		ffr::createTexture(gbs[1], texture_size.x, texture_size.y, 1, ffr::TextureFormat::RGBA8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
-		ffr::createTexture(gbs[2], texture_size.x, texture_size.y, 1, ffr::TextureFormat::D24S8, (u32)ffr::TextureFlags::NO_MIPS, nullptr, "impostor_gbd");
+		gpu::createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gb0");
+		gpu::createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
+		gpu::createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D24S8, (u32)gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gbd");
 		
-		ffr::setFramebuffer(gbs, 3, 0);
+		gpu::setFramebuffer(gbs, 3, 0);
 		const float color[] = {0, 0, 0, 0};
-		ffr::clear((u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH | (u32)ffr::ClearFlags::STENCIL, color, 0);
+		gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH | (u32)gpu::ClearFlags::STENCIL, color, 0);
 
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
-				ffr::viewport(i * m_tile_size->x, j * m_tile_size->y, m_tile_size->x, m_tile_size->y);
+				gpu::viewport(i * m_tile_size->x, j * m_tile_size->y, m_tile_size->x, m_tile_size->y);
 				const u32 mesh_count = m_model->getMeshCount();
 				for (u32 k = 0; k <= (u32)m_model->getLODs()[0].to_mesh; ++k) {
 					const Mesh& mesh = m_model->getMesh(k);
@@ -793,7 +793,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					const Mesh::RenderData* rd = mesh.render_data;
 
 					const Material::RenderData* mat_rd = material->getRenderData();
-					ffr::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
+					gpu::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
 
 					const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
 
@@ -804,7 +804,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					else {
 						model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 1, 0));
 					}
-					ffr::update(ub, &model_mtx.m11, sizeof(model_mtx));
+					gpu::update(ub, &model_mtx.m11, sizeof(model_mtx));
 					PassState pass_state;
 					pass_state.view.lookAt(center + Vec3(0, 0, 2 * radius), center, {0, 1, 0});
 					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * radius, false, true);
@@ -814,31 +814,31 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.inv_view_projection = pass_state.view_projection.inverted();
 					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 
-					ffr::update(pass_buf, &pass_state, sizeof(pass_state));
-					ffr::useProgram(m_programs[k]);
-					ffr::bindIndexBuffer(rd->index_buffer_handle);
-					ffr::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
-					ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-					ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | material->getRenderStates());
-					ffr::drawTriangles(rd->indices_count, rd->index_type);
+					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
+					gpu::useProgram(m_programs[k]);
+					gpu::bindIndexBuffer(rd->index_buffer_handle);
+					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
+					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+					gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | material->getRenderStates());
+					gpu::drawTriangles(rd->indices_count, rd->index_type);
 				}
 			}
 		}
 
-		ffr::setFramebuffer(nullptr, 0, 0);
+		gpu::setFramebuffer(nullptr, 0, 0);
 
 		m_gb0->resize(texture_size.x * texture_size.y);
 		m_gb1->resize(m_gb0->size());
-		ffr::getTextureImage(gbs[0], m_gb0->byte_size(), m_gb0->begin());
-		ffr::getTextureImage(gbs[1], m_gb1->byte_size(), m_gb1->begin());
+		gpu::getTextureImage(gbs[0], m_gb0->byte_size(), m_gb0->begin());
+		gpu::getTextureImage(gbs[1], m_gb1->byte_size(), m_gb1->begin());
 
-		ffr::destroy(ub);
-		ffr::destroy(gbs[0]);
-		ffr::destroy(gbs[1]);
-		ffr::destroy(gbs[2]);
+		gpu::destroy(ub);
+		gpu::destroy(gbs[0]);
+		gpu::destroy(gbs[1]);
+		gpu::destroy(gbs[2]);
 	}
 
-	Array<ffr::ProgramHandle> m_programs;
+	Array<gpu::ProgramHandle> m_programs;
 	Ref<Array<u32>> m_gb0;
 	Ref<Array<u32>> m_gb1;
 	Model* m_model;
@@ -1529,19 +1529,19 @@ void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
 	write(attribute_count);
 
 	write(Mesh::AttributeSemantic::POSITION);
-	write(ffr::AttributeType::FLOAT);
+	write(gpu::AttributeType::FLOAT);
 	write((u8)3);
 
 	write(Mesh::AttributeSemantic::NORMAL);
-	write(ffr::AttributeType::U8);
+	write(gpu::AttributeType::U8);
 	write((u8)4);
 
 	write(Mesh::AttributeSemantic::TANGENT);
-	write(ffr::AttributeType::U8);
+	write(gpu::AttributeType::U8);
 	write((u8)4);
 
 	write(Mesh::AttributeSemantic::TEXCOORD0);
-	write(ffr::AttributeType::FLOAT);
+	write(gpu::AttributeType::FLOAT);
 	write((u8)2);
 
 	const StaticString<MAX_PATH_LENGTH + 10> material_name(dir, model_name, "_impostor.mat");
@@ -1578,35 +1578,35 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 		write(attribute_count);
 
 		write(Mesh::AttributeSemantic::POSITION);
-		write(ffr::AttributeType::FLOAT);
+		write(gpu::AttributeType::FLOAT);
 		write((u8)3);
 		const ofbx::Geometry* geom = mesh.getGeometry();
 		if (geom->getNormals()) {
 			write(Mesh::AttributeSemantic::NORMAL);
-			write(ffr::AttributeType::U8);
+			write(gpu::AttributeType::U8);
 			write((u8)4);
 		}
 		if (geom->getUVs()) {
 			write(Mesh::AttributeSemantic::TEXCOORD0);
-			write(ffr::AttributeType::FLOAT);
+			write(gpu::AttributeType::FLOAT);
 			write((u8)2);
 		}
 		if (geom->getColors() && import_vertex_colors) {
 			write(Mesh::AttributeSemantic::COLOR0);
-			write(ffr::AttributeType::U8);
+			write(gpu::AttributeType::U8);
 			write((u8)4);
 		}
 		if (geom->getTangents()) {
 			write(Mesh::AttributeSemantic::TANGENT);
-			write(ffr::AttributeType::U8);
+			write(gpu::AttributeType::U8);
 			write((u8)4);
 		}
 		if (import_mesh.is_skinned) {
 			write(Mesh::AttributeSemantic::INDICES);
-			write(ffr::AttributeType::I16);
+			write(gpu::AttributeType::I16);
 			write((u8)4);
 			write(Mesh::AttributeSemantic::WEIGHTS);
-			write(ffr::AttributeType::FLOAT);
+			write(gpu::AttributeType::FLOAT);
 			write((u8)4);
 		}
 

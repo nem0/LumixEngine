@@ -9,7 +9,7 @@
 #include "engine/string.h"
 #include "engine/math.h"
 #include "engine/resource.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 #include "renderer.h"
 
 
@@ -65,10 +65,10 @@ struct LUMIX_RENDERER_API Mesh
 
 	struct RenderData
 	{
-		ffr::BufferHandle vertex_buffer_handle;
+		gpu::BufferHandle vertex_buffer_handle;
 		u32 vb_stride; 
-		ffr::BufferHandle index_buffer_handle;
-		ffr::DataType index_type;
+		gpu::BufferHandle index_buffer_handle;
+		gpu::DataType index_type;
 		int indices_count;
 	};
 
@@ -92,7 +92,7 @@ struct LUMIX_RENDERER_API Mesh
 	};
 
 	Mesh(Material* mat,
-		const ffr::VertexDecl& vertex_decl,
+		const gpu::VertexDecl& vertex_decl,
 		u8 vb_stride,
 		const char* name,
 		const AttributeSemantic* semantics,
@@ -111,8 +111,8 @@ struct LUMIX_RENDERER_API Mesh
 	u8 layer;
 	String name;
 	Material* material;
-	ffr::VertexDecl vertex_decl;
-	AttributeSemantic attributes_semantic[ffr::VertexDecl::MAX_ATTRIBUTES];
+	gpu::VertexDecl vertex_decl;
+	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
 	RenderData* render_data;
 	static u32 s_last_sort_key;
 };

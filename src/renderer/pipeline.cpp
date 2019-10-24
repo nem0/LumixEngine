@@ -1,4 +1,4 @@
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -279,7 +279,7 @@ struct PipelineImpl final : Pipeline
 			-1, 1, 1
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
-		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)ffr::BufferFlags::IMMUTABLE);
+		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)gpu::BufferFlags::IMMUTABLE);
 		const Renderer::MemRef ub_mem = { 32 * 1024, nullptr, false };
 
 		u16 cube_indices[] = {
@@ -298,48 +298,48 @@ struct PipelineImpl final : Pipeline
 		};
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
-		m_cube_ib = m_renderer.createBuffer(ib_mem, (u32)ffr::BufferFlags::IMMUTABLE);
+		m_cube_ib = m_renderer.createBuffer(ib_mem, (u32)gpu::BufferFlags::IMMUTABLE);
 
 		m_resource->onLoaded<PipelineImpl, &PipelineImpl::onStateChanged>(this);
 
 		GlobalState global_state;
 		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));
-		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, (u32)ffr::BufferFlags::UNIFORM_BUFFER);
+		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, (u32)gpu::BufferFlags::UNIFORM_BUFFER);
 		
 		PassState pass_state;
 		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
-		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)ffr::BufferFlags::UNIFORM_BUFFER);
+		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)gpu::BufferFlags::UNIFORM_BUFFER);
 
 		const Renderer::MemRef dc_mem = { 32*1024, nullptr, false };
-		const u32 dc_ub_flags = (u32)ffr::BufferFlags::UNIFORM_BUFFER;
+		const u32 dc_ub_flags = (u32)gpu::BufferFlags::UNIFORM_BUFFER;
 		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
 
-		m_base_vertex_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
-		m_base_vertex_decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
+		m_base_vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+		m_base_vertex_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
-		m_decal_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
-		m_decal_decl.addAttribute(1, 0, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(2, 12, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
-		m_decal_decl.addAttribute(3, 28, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+		m_decal_decl.addAttribute(1, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(2, 12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(3, 28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
-		m_2D_decl.addAttribute(0, 0, 2, ffr::AttributeType::FLOAT, 0);
-		m_2D_decl.addAttribute(1, 8, 2, ffr::AttributeType::FLOAT, 0);
-		m_2D_decl.addAttribute(2, 16, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
+		m_2D_decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
+		m_2D_decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
+		m_2D_decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
-		m_3D_pos_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
+		m_3D_pos_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 
-		m_text_mesh_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0);
-		m_text_mesh_decl.addAttribute(1, 12, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
-		m_text_mesh_decl.addAttribute(2, 16, 2, ffr::AttributeType::FLOAT, 0);
+		m_text_mesh_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+		m_text_mesh_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+		m_text_mesh_decl.addAttribute(2, 16, 2, gpu::AttributeType::FLOAT, 0);
 
-		m_point_light_decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, 0); // vpos
-		m_point_light_decl.addAttribute(1, 0, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED); // rot
-		m_point_light_decl.addAttribute(2, 16, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED); // pos
-		m_point_light_decl.addAttribute(3, 28, 1, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED); // radius
-		m_point_light_decl.addAttribute(4, 32, 1, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED); // attn
-		m_point_light_decl.addAttribute(5, 36, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED); // color
-		m_point_light_decl.addAttribute(6, 48, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED); // dir
-		m_point_light_decl.addAttribute(7, 60, 1, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED); // fov
+		m_point_light_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0); // vpos
+		m_point_light_decl.addAttribute(1, 0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
+		m_point_light_decl.addAttribute(2, 16, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
+		m_point_light_decl.addAttribute(3, 28, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // radius
+		m_point_light_decl.addAttribute(4, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // attn
+		m_point_light_decl.addAttribute(5, 36, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // color
+		m_point_light_decl.addAttribute(6, 48, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // dir
+		m_point_light_decl.addAttribute(7, 60, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // fov
 	}
 
 
@@ -539,7 +539,7 @@ struct PipelineImpl final : Pipeline
 		lua_pop(m_lua_state, 1);
 	}
 
-	ffr::BufferHandle getDrawcallUniformBuffer() override { return m_drawcall_ub; }
+	gpu::BufferHandle getDrawcallUniformBuffer() override { return m_drawcall_ub; }
 
 	void setViewport(const Viewport& viewport) override 
 	{
@@ -579,12 +579,12 @@ struct PipelineImpl final : Pipeline
 			shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 			Matrix projection_matrix;
-			projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, ffr::isHomogenousDepth(), true);
+			projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, gpu::isHomogenousDepth(), true);
 			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 			Matrix view_matrix;
 			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
 
-			const float ymul = ffr::isOriginBottomLeft() ? 0.5f : -0.5f;
+			const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
 			const Matrix bias_matrix(
 				0.5, 0.0, 0.0, 0.0,
 				0.0, ymul, 0.0, 0.0,
@@ -652,7 +652,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		const Matrix view = m_viewport.getViewRotation();
-		const Matrix projection = m_viewport.getProjection(ffr::isHomogenousDepth());
+		const Matrix projection = m_viewport.getProjection(gpu::isHomogenousDepth());
 		GlobalState global_state;
 		global_state.camera_projection = projection;
 		global_state.camera_inv_projection = projection.inverted();
@@ -686,16 +686,16 @@ struct PipelineImpl final : Pipeline
 		struct StartPipelineJob : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::update(global_state_buffer, &global_state, sizeof(global_state));
-				ffr::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
-				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
-				ffr::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, sizeof(32 * 1024));
+				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
+				gpu::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
+				gpu::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
+				gpu::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, sizeof(32 * 1024));
 				pipeline->m_stats = {};
 			}
 			void setup() override {}
 
-			ffr::BufferHandle global_state_buffer;
-			ffr::BufferHandle pass_state_buffer;
+			gpu::BufferHandle global_state_buffer;
+			gpu::BufferHandle pass_state_buffer;
 			PipelineImpl* pipeline;
 			GlobalState global_state;
 			PassState pass_state;
@@ -779,23 +779,23 @@ struct PipelineImpl final : Pipeline
 
 				if(!vb.ptr) return;
 
-				ffr::pushDebugGroup("debug triangles");
+				gpu::pushDebugGroup("debug triangles");
 
-				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
+				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
 
-				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | u64(ffr::StateFlags::CULL_BACK));
-				ffr::useProgram(program);
+				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | u64(gpu::StateFlags::CULL_BACK));
+				gpu::useProgram(program);
 
-				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				ffr::drawArrays(0, vb.size / sizeof(BaseVertex), ffr::PrimitiveType::TRIANGLES);
-				ffr::popDebugGroup();
+				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				gpu::drawArrays(0, vb.size / sizeof(BaseVertex), gpu::PrimitiveType::TRIANGLES);
+				gpu::popDebugGroup();
 			}
 
 			PipelineImpl* pipeline;
 			DVec3 viewport_pos;
-			ffr::ProgramHandle program;
+			gpu::ProgramHandle program;
 			Renderer::TransientSlice vb;
 		};
 
@@ -844,24 +844,24 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if (!vb.ptr) return;
 
-				ffr::pushDebugGroup("debug lines");
+				gpu::pushDebugGroup("debug lines");
 
-				ffr::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
+				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
 
-				ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE));
-				ffr::useProgram(program);
+				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE));
+				gpu::useProgram(program);
 
-				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				ffr::drawArrays(0, vb.size / sizeof(BaseVertex), ffr::PrimitiveType::LINES);
-				ffr::popDebugGroup();
+				gpu::drawArrays(0, vb.size / sizeof(BaseVertex), gpu::PrimitiveType::LINES);
+				gpu::popDebugGroup();
 			}
 
 			PipelineImpl* pipeline;
 			DVec3 viewport_pos;
-			ffr::ProgramHandle program;
+			gpu::ProgramHandle program;
 			Renderer::TransientSlice vb;
 		};
 
@@ -929,44 +929,44 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 
-				ffr::pushDebugGroup("draw2d");
+				gpu::pushDebugGroup("draw2d");
 
 				if (idx_buffer_mem.ptr && vtx_buffer_mem.ptr) {
-					ffr::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
+					gpu::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
 					u32 elem_offset = 0;
-					const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
-					ffr::setState(blend_state);
-					ffr::useProgram(program);
-					ffr::bindIndexBuffer(idx_buffer_mem.buffer);
-					ffr::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
-					ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+					const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+					gpu::setState(blend_state);
+					gpu::useProgram(program);
+					gpu::bindIndexBuffer(idx_buffer_mem.buffer);
+					gpu::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
+					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 					for (Draw2D::Cmd& cmd : cmd_buffer) {
 						if(cmd.clip_size.x < 0) {
-							ffr::scissor(0, 0, pipeline->m_viewport.w, pipeline->m_viewport.h);
+							gpu::scissor(0, 0, pipeline->m_viewport.w, pipeline->m_viewport.h);
 						}
 						else {
-							ffr::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+							gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
 								u32(maximum(cmd.clip_pos.x, 0.0f)),
 								u32(minimum(cmd.clip_size.x, 65535.0f)),
 								u32(minimum(cmd.clip_size.y, 65535.0f)));
 						}
 			
-						ffr::TextureHandle texture_id = atlas_texture;
+						gpu::TextureHandle texture_id = atlas_texture;
 						if (cmd.texture) texture_id = *cmd.texture;
 						if (!texture_id.isValid()) texture_id = atlas_texture;
 
-						ffr::bindTextures(&texture_id, 0, 1);
-						ffr::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), num_indices, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
+						gpu::bindTextures(&texture_id, 0, 1);
+						gpu::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), num_indices, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
 
 						elem_offset += cmd.indices_count;
 					}
 				}
 
-				ffr::popDebugGroup();
+				gpu::popDebugGroup();
 			}
 
-			ffr::TextureHandle atlas_texture;
+			gpu::TextureHandle atlas_texture;
 			Renderer::TransientSlice idx_buffer_mem;
 			Renderer::TransientSlice vtx_buffer_mem;
 			int num_indices;
@@ -974,7 +974,7 @@ struct PipelineImpl final : Pipeline
 			Array<Draw2D::Cmd> cmd_buffer;
 			Vec2 size;
 			PipelineImpl* pipeline;
-			ffr::ProgramHandle program;
+			gpu::ProgramHandle program;
 		};
 
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
@@ -1003,25 +1003,25 @@ struct PipelineImpl final : Pipeline
 	}
 
 	
-	static ffr::TextureFormat getFormat(const char* name)
+	static gpu::TextureFormat getFormat(const char* name)
 	{
 		static const struct
 		{
 			const char* name;
-			ffr::TextureFormat value;
+			gpu::TextureFormat value;
 		} FORMATS[] = {
-			{"depth32", ffr::TextureFormat::D32},
-			{"depth24", ffr::TextureFormat::D24},
-			{"depth24stencil8", ffr::TextureFormat::D24S8},
-			{"rgba8", ffr::TextureFormat::RGBA8},
-			{"srgba", ffr::TextureFormat::SRGBA},
-			{"srgb", ffr::TextureFormat::SRGB},
-			{"rgba16", ffr::TextureFormat::RGBA16},
-			{"rgba16f", ffr::TextureFormat::RGBA16F},
-			{"r16f", ffr::TextureFormat::R16F},
-			{"r16", ffr::TextureFormat::R16},
-			{"r8", ffr::TextureFormat::R8},
-			{"r32f", ffr::TextureFormat::R32F},
+			{"depth32", gpu::TextureFormat::D32},
+			{"depth24", gpu::TextureFormat::D24},
+			{"depth24stencil8", gpu::TextureFormat::D24S8},
+			{"rgba8", gpu::TextureFormat::RGBA8},
+			{"srgba", gpu::TextureFormat::SRGBA},
+			{"srgb", gpu::TextureFormat::SRGB},
+			{"rgba16", gpu::TextureFormat::RGBA16},
+			{"rgba16f", gpu::TextureFormat::RGBA16F},
+			{"r16f", gpu::TextureFormat::R16F},
+			{"r16", gpu::TextureFormat::R16},
+			{"r8", gpu::TextureFormat::R8},
+			{"r32f", gpu::TextureFormat::R32F},
 		};
 
 		for (auto& i : FORMATS)
@@ -1029,7 +1029,7 @@ struct PipelineImpl final : Pipeline
 			if (equalStrings(i.name, name)) return i.value;
 		}
 		logError("Renderer") << "Uknown texture format " << name;
-		return ffr::TextureFormat::RGBA8;
+		return gpu::TextureFormat::RGBA8;
 	}
 
 
@@ -1038,7 +1038,7 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		const u32 rb_w = u32(relative ? w * m_viewport.w + 0.5f : w);
 		const u32 rb_h = u32(relative ? h * m_viewport.h + 0.5f : h);
-		const ffr::TextureFormat format = getFormat(format_str);
+		const gpu::TextureFormat format = getFormat(format_str);
 
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
 		{
@@ -1059,7 +1059,7 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)ffr::TextureFlags::NO_MIPS, {0, 0}, debug_name);
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS, {0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
 	}
@@ -1122,13 +1122,13 @@ struct PipelineImpl final : Pipeline
 					byte_size += emitter->getInstanceDataSizeBytes();
 				}
 
-				byte_size += (sizeof(int) * 2 + sizeof(ffr::ProgramHandle) + sizeof(Vec3) + sizeof(Quat)) * emitters.size();
+				byte_size += (sizeof(int) * 2 + sizeof(gpu::ProgramHandle) + sizeof(Vec3) + sizeof(Quat)) * emitters.size();
 				m_vb = m_pipeline->m_renderer.allocTransient(byte_size);
 				if (!m_vb.ptr) return;
 
 				OutputMemoryStream str(m_vb.ptr, m_vb.size);
-				ffr::VertexDecl decl;
-				decl.addAttribute(0, 0, 3, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
+				gpu::VertexDecl decl;
+				decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
 				for (ParticleEmitter* emitter : emitters) {
 					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
@@ -1157,15 +1157,15 @@ struct PipelineImpl final : Pipeline
 				
 				if (m_size == 0) return;
 				
-				ffr::pushDebugGroup("particles");
+				gpu::pushDebugGroup("particles");
 				InputMemoryStream blob(m_vb.ptr, m_size);
 				
-				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				ffr::setState(blend_state);
+				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				gpu::setState(blend_state);
 				while(blob.getPosition() < blob.size()) {
 					const Vec3 lpos = blob.read<Vec3>();
 					const Quat rot = blob.read<Quat>();
-					const ffr::ProgramHandle program = blob.read<ffr::ProgramHandle>();
+					const gpu::ProgramHandle program = blob.read<gpu::ProgramHandle>();
 					const int byte_size = blob.read<int>();
 					const int instances_count = blob.read<int>();
 
@@ -1174,14 +1174,14 @@ struct PipelineImpl final : Pipeline
 
 					Matrix mtx = rot.toMatrix();
 					mtx.setTranslation(lpos);
-					ffr::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
-					ffr::useProgram(program);
-					ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-					ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
-					ffr::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
-					ffr::drawTriangleStripArraysInstanced(4, instances_count);
+					gpu::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
+					gpu::useProgram(program);
+					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+					gpu::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
+					gpu::drawTriangleStripArraysInstanced(4, instances_count);
 				}
-				ffr::popDebugGroup();
+				gpu::popDebugGroup();
 			}
 
 			PipelineImpl* m_pipeline;
@@ -1293,10 +1293,10 @@ struct PipelineImpl final : Pipeline
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				ffr::bindTextures(m_textures_handles, m_offset, m_textures_count);
+				gpu::bindTextures(m_textures_handles, m_offset, m_textures_count);
 			}
 
-			ffr::TextureHandle m_textures_handles[16];
+			gpu::TextureHandle m_textures_handles[16];
 			int m_offset = 0;
 			u32 m_textures_count = 0;
 		};
@@ -1352,10 +1352,10 @@ struct PipelineImpl final : Pipeline
 			void execute() override 
 			{
 				PROFILE_FUNCTION();
-				ffr::bindTextures(m_textures_handles, m_offset, m_textures_count);
+				gpu::bindTextures(m_textures_handles, m_offset, m_textures_count);
 			}
 
-			ffr::TextureHandle m_textures_handles[16];
+			gpu::TextureHandle m_textures_handles[16];
 			int m_offset = 0;
 			u32 m_textures_count = 0;
 		};
@@ -1425,7 +1425,7 @@ struct PipelineImpl final : Pipeline
 			struct Probe
 			{
 				Vec3 pos;
-				ffr::TextureHandle texture;
+				gpu::TextureHandle texture;
 			};
 
 			Cmd(IAllocator& allocator) : m_probes(allocator) {}
@@ -1442,36 +1442,36 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if(m_probes.empty()) return;
 
-				ffr::pushDebugGroup("environment");
+				gpu::pushDebugGroup("environment");
 
-				ffr::useProgram(m_program);
-				ffr::bindIndexBuffer(m_ib);
-				ffr::bindVertexBuffer(0, m_vb, 0, 12);
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				gpu::useProgram(m_program);
+				gpu::bindIndexBuffer(m_ib);
+				gpu::bindVertexBuffer(0, m_vb, 0, 12);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				const DVec3 cam_pos = m_camera_params.pos;
 				for (const EnvProbeInfo& probe : m_probes) {
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
-					ffr::TextureHandle handles[2] = { probe.irradiance, probe.radiance };
-					ffr::bindTextures(handles, 14, 2);
-					ffr::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
+					gpu::TextureHandle handles[2] = { probe.irradiance, probe.radiance };
+					gpu::bindTextures(handles, 14, 2);
+					gpu::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
 					
 					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
 					const u64 state = intersecting
-						? (u64)ffr::StateFlags::CULL_FRONT
-						: (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK;
-					ffr::setState(state | blend_state);
-					ffr::drawTriangles(36, ffr::DataType::U16);
+						? (u64)gpu::StateFlags::CULL_FRONT
+						: (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK;
+					gpu::setState(state | blend_state);
+					gpu::drawTriangles(36, gpu::DataType::U16);
 				}
-				ffr::popDebugGroup();
+				gpu::popDebugGroup();
 			}
 
-			ffr::BufferHandle m_ib;
-			ffr::BufferHandle m_vb;
+			gpu::BufferHandle m_ib;
+			gpu::BufferHandle m_vb;
 			CameraParams m_camera_params;
 			PipelineImpl* m_pipeline;
 			Array<EnvProbeInfo> m_probes;
-			ffr::ProgramHandle m_program;
+			gpu::ProgramHandle m_program;
 		};
 
 		if(shader->isReady()) {
@@ -1494,12 +1494,12 @@ struct PipelineImpl final : Pipeline
 		struct PushPassStateCmd : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::update(pass_state_buffer, &pass_state, sizeof(pass_state));
-				ffr::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
+				gpu::update(pass_state_buffer, &pass_state, sizeof(pass_state));
+				gpu::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
 			}
 			void setup() override {}
 
-			ffr::BufferHandle pass_state_buffer;
+			gpu::BufferHandle pass_state_buffer;
 			PassState pass_state;
 		};
 
@@ -1602,28 +1602,28 @@ struct PipelineImpl final : Pipeline
 	static int drawArray(lua_State* L)
 	{
 		struct Cmd : Renderer::RenderJob {
-			void setup() override { m_program = m_shader->getProgram(ffr::VertexDecl(), m_define_mask); }
+			void setup() override { m_program = m_shader->getProgram(gpu::VertexDecl(), m_define_mask); }
 			void execute() override 
 			{
 				PROFILE_FUNCTION();
 
-				ffr::setState(m_render_state);
+				gpu::setState(m_render_state);
 
-				ffr::bindTextures(m_textures_handles, 0, m_textures_count);
+				gpu::bindTextures(m_textures_handles, 0, m_textures_count);
 
 				if (m_uniforms_count > 0) {
-					ffr::update(m_pipeline->m_drawcall_ub, m_uniforms, sizeof(m_uniforms[0]) * m_uniforms_count);
+					gpu::update(m_pipeline->m_drawcall_ub, m_uniforms, sizeof(m_uniforms[0]) * m_uniforms_count);
 				}
 
-				ffr::useProgram(m_program);
-				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-				ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				ffr::drawArrays(m_indices_offset, m_indices_count, ffr::PrimitiveType::TRIANGLE_STRIP);
+				gpu::useProgram(m_program);
+				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				gpu::drawArrays(m_indices_offset, m_indices_count, gpu::PrimitiveType::TRIANGLE_STRIP);
 			}
 
 			PipelineImpl* m_pipeline;
-			ffr::TextureHandle m_textures_handles[16];
+			gpu::TextureHandle m_textures_handles[16];
 			u32 m_textures_count = 0;
 			float m_uniforms[16][4];
 			int m_uniforms_count = 0;
@@ -1632,7 +1632,7 @@ struct PipelineImpl final : Pipeline
 			int m_indices_offset;
 			u32 m_define_mask = 0;
 			u64 m_render_state;
-			ffr::ProgramHandle m_program;
+			gpu::ProgramHandle m_program;
 
 		};
 
@@ -1655,7 +1655,7 @@ struct PipelineImpl final : Pipeline
 				LuaWrapper::checkTableArg(L, 7);
 				return getState(L, 7);
 			}
-			return (u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST;
+			return (u64)gpu::StateFlags::DEPTH_WRITE | (u64)gpu::StateFlags::DEPTH_TEST;
 		}();
 
 		Shader* shader = nullptr;
@@ -1871,7 +1871,7 @@ struct PipelineImpl final : Pipeline
 		cp.lod_multiplier = scene->getCameraLODMultiplier(pipeline->m_viewport.fov, pipeline->m_viewport.is_ortho);
 		cp.is_shadow = false;
 		cp.view = pipeline->m_viewport.getView(cp.pos);
-		cp.projection = pipeline->m_viewport.getProjection(ffr::isHomogenousDepth());
+		cp.projection = pipeline->m_viewport.getProjection(gpu::isHomogenousDepth());
 		pushCameraParams(L, cp);
 
 		return 1;
@@ -1952,19 +1952,19 @@ struct PipelineImpl final : Pipeline
 				if (vb.size == 0) return;
 
 				Renderer& renderer = m_pipeline->m_renderer;
-				ffr::useProgram(m_program);
-				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				ffr::setState((u64)ffr::StateFlags::DEPTH_WRITE | (u64)ffr::StateFlags::DEPTH_TEST | blend_state);
-				ffr::bindTextures(&m_atlas, 0, 1);
-				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-				ffr::bindVertexBuffer(0, vb.buffer, vb.offset, 24);
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-				ffr::drawArrays(0, vb.size / sizeof(TextMeshVertex), ffr::PrimitiveType::TRIANGLES);
+				gpu::useProgram(m_program);
+				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				gpu::setState((u64)gpu::StateFlags::DEPTH_WRITE | (u64)gpu::StateFlags::DEPTH_TEST | blend_state);
+				gpu::bindTextures(&m_atlas, 0, 1);
+				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, 24);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				gpu::drawArrays(0, vb.size / sizeof(TextMeshVertex), gpu::PrimitiveType::TRIANGLES);
 			}
 
 			Renderer::TransientSlice vb;
-			ffr::TextureHandle m_atlas;
-			ffr::ProgramHandle m_program;
+			gpu::TextureHandle m_atlas;
+			gpu::ProgramHandle m_program;
 			PipelineImpl* m_pipeline;
 		};
 
@@ -1973,7 +1973,7 @@ struct PipelineImpl final : Pipeline
 		IAllocator& allocator = m_renderer.getAllocator();
 		RenderJob* job = LUMIX_NEW(allocator, RenderJob);
 		job->m_pipeline = this;
-		job->m_atlas = atlas ? atlas->handle : ffr::INVALID_TEXTURE;
+		job->m_atlas = atlas ? atlas->handle : gpu::INVALID_TEXTURE;
 		job->m_program = m_text_mesh_shader->getProgram(m_text_mesh_decl, 0);
 		m_renderer.queue(job, m_profiler_link);
 	}
@@ -1996,7 +1996,7 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if(m_cmds->header.size == 0 && m_cmds->header.next == nullptr) return;
 				
-				const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
+				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 				CmdPage* page = m_cmds;
 				while (page) {
 					const u8* cmd = page->data;
@@ -2007,26 +2007,26 @@ struct PipelineImpl final : Pipeline
 
 						READ(u32, total_count);
 						READ(u32, nonintersecting_count);
-						READ(const ffr::BufferHandle, buffer);
+						READ(const gpu::BufferHandle, buffer);
 						READ(const u32, offset);
 
-						ffr::useProgram(m_program);
+						gpu::useProgram(m_program);
 
 						if(total_count - nonintersecting_count) {
-							ffr::setState(blend_state | (u64)ffr::StateFlags::CULL_FRONT);
+							gpu::setState(blend_state | (u64)gpu::StateFlags::CULL_FRONT);
 							const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
-							ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
-							ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-							ffr::bindVertexBuffer(1, buffer, offs, 64);
-							ffr::drawTrianglesInstanced(36, total_count - nonintersecting_count, ffr::DataType::U16);
+							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+							gpu::bindVertexBuffer(1, buffer, offs, 64);
+							gpu::drawTrianglesInstanced(36, total_count - nonintersecting_count, gpu::DataType::U16);
 						}
 
 						if (nonintersecting_count) {
-							ffr::setState(blend_state | (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::CULL_BACK);
-							ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
-							ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-							ffr::bindVertexBuffer(1, buffer, offset, 64);
-							ffr::drawTrianglesInstanced(36, nonintersecting_count, ffr::DataType::U16);
+							gpu::setState(blend_state | (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK);
+							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+							gpu::bindVertexBuffer(1, buffer, offset, 64);
+							gpu::drawTrianglesInstanced(36, nonintersecting_count, gpu::DataType::U16);
 						}
 					}
 					CmdPage* next = page->header.next;
@@ -2036,7 +2036,7 @@ struct PipelineImpl final : Pipeline
 				#undef READ
 			}
 
-			ffr::ProgramHandle m_program;
+			gpu::ProgramHandle m_program;
 			PipelineImpl* m_pipeline;
 			CmdPage* m_cmds;
 		};
@@ -2063,25 +2063,25 @@ struct PipelineImpl final : Pipeline
 
 	static u64 getState(lua_State* L, int idx)
 	{
-		ffr::StencilFuncs stencil_func = ffr::StencilFuncs::DISABLE;
+		gpu::StencilFuncs stencil_func = gpu::StencilFuncs::DISABLE;
 		u8 stencil_write_mask = 0xff;
 		u8 stencil_ref = 0;
 		u8 stencil_mask = 0;
-		ffr::StencilOps stencil_sfail = ffr::StencilOps::KEEP;
-		ffr::StencilOps stencil_zfail = ffr::StencilOps::KEEP;
-		ffr::StencilOps stencil_zpass = ffr::StencilOps::KEEP;
+		gpu::StencilOps stencil_sfail = gpu::StencilOps::KEEP;
+		gpu::StencilOps stencil_zfail = gpu::StencilOps::KEEP;
+		gpu::StencilOps stencil_zpass = gpu::StencilOps::KEEP;
 
 		char tmp[64];
-		u64 rs = (u64)ffr::StateFlags::DEPTH_TEST | (u64)ffr::StateFlags::DEPTH_WRITE;
+		u64 rs = (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::DEPTH_WRITE;
 		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
 			if(equalIStrings(tmp, "add")) {
-				rs |= ffr::getBlendStateBits(ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE, ffr::BlendFactors::ONE);
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			}
 			else if(equalIStrings(tmp, "alpha")) {
-				rs |= ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 			}
 			else if(equalIStrings(tmp, "multiply")) {
-				rs |= ffr::getBlendStateBits(ffr::BlendFactors::DST_COLOR, ffr::BlendFactors::ZERO, ffr::BlendFactors::ONE, ffr::BlendFactors::ZERO);
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
 			}
 			else if(equalIStrings(tmp, "")) {
 			}
@@ -2090,9 +2090,9 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)ffr::StateFlags::DEPTH_TEST, true);
-		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, (u64)ffr::StateFlags::WIREFRAME, false);
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, (u64)ffr::StateFlags::DEPTH_WRITE, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)gpu::StateFlags::DEPTH_TEST, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, (u64)gpu::StateFlags::WIREFRAME, false);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, (u64)gpu::StateFlags::DEPTH_WRITE, true);
 		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
 		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
 		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
@@ -2101,7 +2101,7 @@ struct PipelineImpl final : Pipeline
 		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<u8*>(&stencil_zfail));
 		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<u8*>(&stencil_zpass));
 
-		rs |= ffr::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
+		rs |= gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
 
 		return rs;
 	}
@@ -2129,7 +2129,7 @@ struct PipelineImpl final : Pipeline
 				Stats stats = {};
 
 				const u64 render_states = m_render_state;
-				const ffr::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
+				const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
 				CmdPage* page = m_cmds;
 				while (page) {
@@ -2142,25 +2142,25 @@ struct PipelineImpl final : Pipeline
 							case RenderableTypes::MESH_GROUP: {
 								READ(Mesh::RenderData*, mesh);
 								READ(Material::RenderData*, material);
-								READ(ffr::ProgramHandle, program);
+								READ(gpu::ProgramHandle, program);
 								READ(u16, instances_count);
-								READ(ffr::BufferHandle, buffer);
+								READ(gpu::BufferHandle, buffer);
 								READ(u32, offset);
 
-								ffr::bindTextures(material->textures, 0, material->textures_count);
-								ffr::setState(material->render_states | render_states);
+								gpu::bindTextures(material->textures, 0, material->textures_count);
+								gpu::setState(material->render_states | render_states);
 								if (material_ub_idx != material->material_constants) {
-									ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 									material_ub_idx = material->material_constants;
 								}
 
-								ffr::useProgram(program);
+								gpu::useProgram(program);
 
-								ffr::bindIndexBuffer(mesh->index_buffer_handle);
-								ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-								ffr::bindVertexBuffer(1, buffer, offset, 32);
+								gpu::bindIndexBuffer(mesh->index_buffer_handle);
+								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+								gpu::bindVertexBuffer(1, buffer, offset, 32);
 
-								ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
+								gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
 								++stats.draw_call_count;
 								stats.triangle_count += instances_count * mesh->indices_count / 3;
 								stats.instance_count += instances_count;
@@ -2169,7 +2169,7 @@ struct PipelineImpl final : Pipeline
 							case RenderableTypes::SKINNED: {
 								READ(Mesh::RenderData*, mesh);
 								READ(Material::RenderData*, material);
-								READ(ffr::ProgramHandle, program);
+								READ(gpu::ProgramHandle, program);
 								READ(Vec3, pos);
 								READ(Quat, rot);
 								READ(float, scale);
@@ -2181,25 +2181,25 @@ struct PipelineImpl final : Pipeline
 								Matrix model_mtx(pos, rot);
 								model_mtx.multiply3x3(scale);
 
-								ffr::bindTextures(material->textures, 0, material->textures_count);
+								gpu::bindTextures(material->textures, 0, material->textures_count);
 
-								ffr::setState(material->render_states | render_states);
+								gpu::setState(material->render_states | render_states);
 								if (material_ub_idx != material->material_constants) {
-									ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 									material_ub_idx = material->material_constants;
 								}
 
-								u8* dc_mem = (u8*)ffr::map(m_pipeline->m_drawcall_ub, sizeof(Matrix) * (bones_count + 1));
+								u8* dc_mem = (u8*)gpu::map(m_pipeline->m_drawcall_ub, sizeof(Matrix) * (bones_count + 1));
 								memcpy(dc_mem, &model_mtx, sizeof(Matrix));
 								memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
-								ffr::unmap(m_pipeline->m_drawcall_ub);
+								gpu::unmap(m_pipeline->m_drawcall_ub);
 
-								ffr::useProgram(program);
+								gpu::useProgram(program);
 
-								ffr::bindIndexBuffer(mesh->index_buffer_handle);
-								ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-								ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
-								ffr::drawTriangles(mesh->indices_count, mesh->index_type);
+								gpu::bindIndexBuffer(mesh->index_buffer_handle);
+								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+								gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+								gpu::drawTriangles(mesh->indices_count, mesh->index_type);
 								++stats.draw_call_count;
 								stats.triangle_count += mesh->indices_count / 3;
 								++stats.instance_count;
@@ -2207,20 +2207,20 @@ struct PipelineImpl final : Pipeline
 							}
 							case RenderableTypes::DECAL: {
 								READ(Material::RenderData*, material);
-								READ(ffr::ProgramHandle, program);
-								READ(ffr::BufferHandle, buffer);
+								READ(gpu::ProgramHandle, program);
+								READ(gpu::BufferHandle, buffer);
 								READ(u32, offset);
 								READ(u32, count);
 								
-								ffr::bindTextures(material->textures, 0, material->textures_count);
+								gpu::bindTextures(material->textures, 0, material->textures_count);
 								
-								ffr::useProgram(program);
-								ffr::setState(material->render_states | render_states);
-								ffr::bindIndexBuffer(m_pipeline->m_cube_ib);
-								ffr::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-								ffr::bindVertexBuffer(1, buffer, offset, 44);
+								gpu::useProgram(program);
+								gpu::setState(material->render_states | render_states);
+								gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+								gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+								gpu::bindVertexBuffer(1, buffer, offset, 44);
 
-								ffr::drawTrianglesInstanced(36, count, ffr::DataType::U16);
+								gpu::drawTrianglesInstanced(36, count, gpu::DataType::U16);
 								++stats.draw_call_count;
 								stats.instance_count += count;
 								break;
@@ -2231,19 +2231,19 @@ struct PipelineImpl final : Pipeline
 								READ(float, distance);
 								READ(Mesh::RenderData*, mesh);
 								READ(Material::RenderData*, material);
-								READ(ffr::ProgramHandle, program);
+								READ(gpu::ProgramHandle, program);
 								READ(int, instances_count);
-								READ(ffr::BufferHandle, buffer);
+								READ(gpu::BufferHandle, buffer);
 								READ(u32, offset);
 								
 								renderer.beginProfileBlock("grass", 0);
-								ffr::useProgram(program);
-								ffr::bindTextures(material->textures, 0, material->textures_count);
-								ffr::bindIndexBuffer(mesh->index_buffer_handle);
-								ffr::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-								ffr::bindVertexBuffer(1, buffer, offset, 48);
+								gpu::useProgram(program);
+								gpu::bindTextures(material->textures, 0, material->textures_count);
+								gpu::bindIndexBuffer(mesh->index_buffer_handle);
+								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+								gpu::bindVertexBuffer(1, buffer, offset, 48);
 								if (material_ub_idx != material->material_constants) {
-									ffr::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 									material_ub_idx = material->material_constants;
 								}
 								struct {
@@ -2252,10 +2252,10 @@ struct PipelineImpl final : Pipeline
 								} dc;
 								dc.mtx = Matrix(pos, rot);
 								dc.distance = distance;
-								ffr::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
+								gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
 
-								ffr::setState(u64(ffr::StateFlags::DEPTH_TEST) | u64(ffr::StateFlags::DEPTH_WRITE) | render_states);
-								ffr::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
+								gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | render_states);
+								gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
 								renderer.endProfileBlock();
 								++stats.draw_call_count;
 								stats.triangle_count += mesh->indices_count / 3 * instances_count;
@@ -2343,12 +2343,12 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 			
-				ffr::setFramebuffer(rbs, count, flags);
-				ffr::viewport(0, 0, w, h);
+				gpu::setFramebuffer(rbs, count, flags);
+				gpu::viewport(0, 0, w, h);
 			}
 
 			PipelineImpl* pipeline;
-			ffr::TextureHandle rbs[16];
+			gpu::TextureHandle rbs[16];
 			u32 flags;
 			u32 count;
 			u32 w;
@@ -2363,9 +2363,9 @@ struct PipelineImpl final : Pipeline
 
 		cmd->pipeline = pipeline;
 		cmd->count = rb_count;
-		cmd->flags = (u32)ffr::FramebufferFlags::SRGB;
+		cmd->flags = (u32)gpu::FramebufferFlags::SRGB;
 		if (readonly_ds) {
-			cmd->flags |= (u32)ffr::FramebufferFlags::READONLY_DEPTH_STENCIL;
+			cmd->flags |= (u32)gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
 		}
 		cmd->w = pipeline->m_viewport.w;
 		cmd->h = pipeline->m_viewport.h;
@@ -2407,7 +2407,7 @@ struct PipelineImpl final : Pipeline
 				inst.rot = info.rot;
 				inst.scale = info.terrain->getScale();
 				inst.hm_size = info.terrain->getSize();
-				inst.program = info.shader->getProgram(ffr::VertexDecl(), m_define_mask);
+				inst.program = info.shader->getProgram(gpu::VertexDecl(), m_define_mask);
 				inst.material = info.terrain->m_material->getRenderData();
 			}
 		}
@@ -2417,18 +2417,18 @@ struct PipelineImpl final : Pipeline
 			PROFILE_FUNCTION();
 			const u32 define_mask = m_define_mask;
 			
-			const ffr::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
 			u64 state = m_render_state;
 			for (Instance& inst : m_instances) {
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
-				ffr::useProgram(inst.program);
-				ffr::bindUniformBuffer(2, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+				gpu::useProgram(inst.program);
+				gpu::bindUniformBuffer(2, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 				
-				ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-				ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
 				struct {
 					IVec4 from_to;
@@ -2443,9 +2443,9 @@ struct PipelineImpl final : Pipeline
 				dc_data.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
 				dc_data.hm_size = inst.hm_size;
 
-				ffr::bindTextures(inst.material->textures, 0, inst.material->textures_count);
+				gpu::bindTextures(inst.material->textures, 0, inst.material->textures_count);
 
-				ffr::setState(state);
+				gpu::setState(state);
 				IVec4 prev_from_to;
 
 				float s = 1 / 16.f;
@@ -2469,8 +2469,8 @@ struct PipelineImpl final : Pipeline
 						dc_data.from_to = IVec4(subfrom, subto);
 						dc_data.terrain_scale = Vec4(inst.scale, 0);
 						dc_data.cell_size = s;
-						ffr::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
-						ffr::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), ffr::PrimitiveType::POINTS);
+						gpu::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
+						gpu::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), gpu::PrimitiveType::POINTS);
 						m_pipeline->m_stats.draw_call_count += 1;
 						m_pipeline->m_stats.instance_count += 1;
 						m_pipeline->m_stats.triangle_count += (subto.x - subfrom.x) * (subto.y - subfrom.y) * 2;
@@ -2506,7 +2506,7 @@ struct PipelineImpl final : Pipeline
 			Vec3 pos;
 			Quat rot;
 			Vec3 scale;
-			ffr::ProgramHandle program;
+			gpu::ProgramHandle program;
 			Material::RenderData* material;
 		};
 
@@ -2515,7 +2515,7 @@ struct PipelineImpl final : Pipeline
 		CameraParams m_camera_params;
 		u64 m_render_state;
 		Array<Instance> m_instances;
-		ffr::TextureHandle m_global_textures[16];
+		gpu::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
 		u32 m_define_mask = 0;
 
@@ -2709,7 +2709,7 @@ struct PipelineImpl final : Pipeline
 
 								const Mesh& mesh = mi->meshes[mesh_idx];
 								Shader* shader = mesh.material->getShader();
-								const ffr::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+								const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
 
 								WRITE(type);
 								WRITE(mesh.render_data);
@@ -2730,7 +2730,7 @@ struct PipelineImpl final : Pipeline
 							const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
 							const Mesh& mesh = mi->meshes[mesh_idx];
 							Shader* shader = mesh.material->getShader();
-							const ffr::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, skinned_define_mask | mesh.material->getDefineMask());
+							const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, skinned_define_mask | mesh.material->getDefineMask());
 
 							if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 57) {
 								new_page(bucket);
@@ -2768,7 +2768,7 @@ struct PipelineImpl final : Pipeline
 							}
 							const u32 count = i - start_i;
 							const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) * 2 + sizeof(Quat)));
-							const ffr::ProgramHandle prog = material->getShader()->getProgram(ctx->pipeline->m_decal_decl, define_mask | material->getDefineMask());
+							const gpu::ProgramHandle prog = material->getShader()->getProgram(ctx->pipeline->m_decal_decl, define_mask | material->getDefineMask());
 
 							if(slice.ptr) {
 								if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
@@ -2893,7 +2893,7 @@ struct PipelineImpl final : Pipeline
 								}
 
 								Shader* shader = mesh->material->getShader();
-								const ffr::ProgramHandle prg = shader->getProgram(mesh->vertex_decl, grass_define_mask | mesh->material->getDefineMask());
+								const gpu::ProgramHandle prg = shader->getProgram(mesh->vertex_decl, grass_define_mask | mesh->material->getDefineMask());
 
 								WRITE(type);
 								WRITE(tr.rot);
@@ -3150,7 +3150,7 @@ struct PipelineImpl final : Pipeline
 		PageAllocator& m_page_allocator;
 		CameraParams m_camera_params;
 		PipelineImpl* m_pipeline;
-		ffr::TextureHandle m_global_textures[16];
+		gpu::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
 		CmdPage* m_command_sets[255];
 		u32 m_bucket_map[255];
@@ -3166,7 +3166,7 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::clear(flags, &color.x, depth);
+				gpu::clear(flags, &color.x, depth);
 			}
 			Vec4 color;
 			float depth;
@@ -3187,7 +3187,7 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
-				ffr::viewport(x, y, w, h); 
+				gpu::viewport(x, y, w, h); 
 			}
 			int x, y, w, h;
 		};
@@ -3210,7 +3210,7 @@ struct PipelineImpl final : Pipeline
 			void execute() override 
 			{
 				PROFILE_FUNCTION();
-				ffr::pushDebugGroup(name);
+				gpu::pushDebugGroup(name);
 				renderer->beginProfileBlock(name, profiler_link);
 			}
 			StaticString<32> name;
@@ -3235,7 +3235,7 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 				renderer->endProfileBlock();
-				ffr::popDebugGroup();
+				gpu::popDebugGroup();
 			}
 			Renderer* renderer;
 		};
@@ -3304,7 +3304,7 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				Array<u32> pixels(allocator);
 				pixels.resize(w * h);
-				ffr::getTextureImage(handle, pixels.byte_size(), pixels.begin());
+				gpu::getTextureImage(handle, pixels.byte_size(), pixels.begin());
 
 				OS::OutputFile file;
 				if (fs->open(path, Ref(file))) {
@@ -3318,7 +3318,7 @@ struct PipelineImpl final : Pipeline
 
 			IAllocator& allocator;
 			u32 w, h;
-			ffr::TextureHandle handle;
+			gpu::TextureHandle handle;
 			FileSystem* fs;
 			StaticString<MAX_PATH_LENGTH> path;
 		};
@@ -3370,16 +3370,16 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(viewport);
 
-		registerConst("CLEAR_DEPTH", (u32)ffr::ClearFlags::DEPTH);
-		registerConst("CLEAR_COLOR", (u32)ffr::ClearFlags::COLOR);
-		registerConst("CLEAR_ALL", (u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH | (u32)ffr::ClearFlags::STENCIL);
+		registerConst("CLEAR_DEPTH", (u32)gpu::ClearFlags::DEPTH);
+		registerConst("CLEAR_COLOR", (u32)gpu::ClearFlags::COLOR);
+		registerConst("CLEAR_ALL", (u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH | (u32)gpu::ClearFlags::STENCIL);
 
-		registerConst("STENCIL_ALWAYS", (u32)ffr::StencilFuncs::ALWAYS);
-		registerConst("STENCIL_EQUAL", (u32)ffr::StencilFuncs::EQUAL);
-		registerConst("STENCIL_NOT_EQUAL", (u32)ffr::StencilFuncs::NOT_EQUAL);
-		registerConst("STENCIL_DISABLE", (u32)ffr::StencilFuncs::DISABLE);
-		registerConst("STENCIL_KEEP", (u32)ffr::StencilOps::KEEP);
-		registerConst("STENCIL_REPLACE", (u32)ffr::StencilOps::REPLACE);
+		registerConst("STENCIL_ALWAYS", (u32)gpu::StencilFuncs::ALWAYS);
+		registerConst("STENCIL_EQUAL", (u32)gpu::StencilFuncs::EQUAL);
+		registerConst("STENCIL_NOT_EQUAL", (u32)gpu::StencilFuncs::NOT_EQUAL);
+		registerConst("STENCIL_DISABLE", (u32)gpu::StencilFuncs::DISABLE);
+		registerConst("STENCIL_KEEP", (u32)gpu::StencilOps::KEEP);
+		registerConst("STENCIL_REPLACE", (u32)gpu::StencilOps::REPLACE);
 
 		registerCFunction("bindRenderbuffers", PipelineImpl::bindRenderbuffers);
 		registerCFunction("bindTextures", PipelineImpl::bindTextures);
@@ -3429,8 +3429,8 @@ struct PipelineImpl final : Pipeline
 
 	void clearDraw2D() override { return m_draw2d.clear(getAtlasSize()); }
 	Draw2D& getDraw2D() override { return m_draw2d; }
-	ffr::TextureHandle getOutput() override { 
-		if (m_output < 0 || m_output >= m_renderbuffers.size()) return ffr::INVALID_TEXTURE;
+	gpu::TextureHandle getOutput() override { 
+		if (m_output < 0 || m_output >= m_renderbuffers.size()) return gpu::INVALID_TEXTURE;
 		return m_renderbuffers[m_output].handle;
 	}
 
@@ -3439,8 +3439,8 @@ struct PipelineImpl final : Pipeline
 		u32 height;
 		bool use_realtive_size;
 		Vec2 relative_size; 
-		ffr::TextureFormat format;
-		ffr::TextureHandle handle;
+		gpu::TextureFormat format;
+		gpu::TextureHandle handle;
 		int frame_counter;
 	};
 
@@ -3471,19 +3471,19 @@ struct PipelineImpl final : Pipeline
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
 	OS::Timer m_timer;
-	ffr::BufferHandle m_global_state_buffer;
-	ffr::BufferHandle m_pass_state_buffer;
-	ffr::VertexDecl m_base_vertex_decl;
-	ffr::VertexDecl m_2D_decl;
-	ffr::VertexDecl m_decal_decl;
-	ffr::VertexDecl m_3D_pos_decl;
-	ffr::VertexDecl m_text_mesh_decl;
-	ffr::VertexDecl m_point_light_decl;
+	gpu::BufferHandle m_global_state_buffer;
+	gpu::BufferHandle m_pass_state_buffer;
+	gpu::VertexDecl m_base_vertex_decl;
+	gpu::VertexDecl m_2D_decl;
+	gpu::VertexDecl m_decal_decl;
+	gpu::VertexDecl m_3D_pos_decl;
+	gpu::VertexDecl m_text_mesh_decl;
+	gpu::VertexDecl m_point_light_decl;
 	CameraParams m_shadow_camera_params[4];
 
-	ffr::BufferHandle m_cube_vb;
-	ffr::BufferHandle m_cube_ib;
-	ffr::BufferHandle m_drawcall_ub = ffr::INVALID_BUFFER;
+	gpu::BufferHandle m_cube_vb;
+	gpu::BufferHandle m_cube_ib;
+	gpu::BufferHandle m_drawcall_ub = gpu::INVALID_BUFFER;
 };
 
 

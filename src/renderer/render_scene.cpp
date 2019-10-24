@@ -2251,7 +2251,7 @@ public:
 		const Camera& camera = m_cameras[entity];
 		Matrix mtx;
 		const float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
-		const bool is_homogenous_depth = ffr::isHomogenousDepth();
+		const bool is_homogenous_depth = gpu::isHomogenousDepth();
 		if (camera.is_ortho) {
 			mtx.setOrtho(-camera.ortho_size * ratio,
 				camera.ortho_size * ratio,
@@ -2892,9 +2892,9 @@ public:
 			EnvProbeInfo& out = probes.emplace();
 			out.radius = probe.radius;
 			out.position = m_universe.getPosition(entity);
-			out.radiance = probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : ffr::INVALID_TEXTURE;
-			out.irradiance = probe.irradiance && probe.irradiance->isReady() ? probe.irradiance->handle : ffr::INVALID_TEXTURE;
-			out.reflection = probe.texture && probe.texture->isReady() ? probe.texture->handle : ffr::INVALID_TEXTURE;
+			out.radiance = probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : gpu::INVALID_TEXTURE;
+			out.irradiance = probe.irradiance && probe.irradiance->isReady() ? probe.irradiance->handle : gpu::INVALID_TEXTURE;
+			out.reflection = probe.texture && probe.texture->isReady() ? probe.texture->handle : gpu::INVALID_TEXTURE;
 		}
 	}
 	

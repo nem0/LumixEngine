@@ -2,7 +2,7 @@
 
 
 #include "engine/resource.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 
 
 namespace Lumix
@@ -47,7 +47,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	bool create(int w, int h, ffr::TextureFormat format, const void* data, u32 size);
+	bool create(int w, int h, gpu::TextureFormat format, const void* data, u32 size);
 	void destroy();
 
 	const u8* getData() const { return data.empty() ? nullptr : &data[0]; }
@@ -62,7 +62,7 @@ public:
 	void setFlag(Flags flag, bool value);
 	u32 getPixelNearest(int x, int y) const;
 	u32 getPixel(float x, float y) const;
-	u32 getFFRFlags() const;
+	u32 getGPUFlags() const;
 
 	static unsigned int compareTGA(IInputStream* file1, IInputStream* file2, int difference, IAllocator& allocator);
 	static bool saveTGA(IOutputStream* file,
@@ -85,7 +85,7 @@ public:
 	int mips;
 	bool is_cubemap;
 	u32 flags;
-	ffr::TextureHandle handle;
+	gpu::TextureHandle handle;
 	IAllocator& allocator;
 	int data_reference;
 	Array<u8> data;

@@ -1260,7 +1260,7 @@ void TerrainEditor::onGUI()
 	{
 		if (m_brush_texture)
 		{
-			const ffr::TextureHandle th = m_brush_texture->handle;
+			const gpu::TextureHandle th = m_brush_texture->handle;
 			ImGui::Image((void*)(uintptr_t)th.value, ImVec2(100, 100));
 			if (ImGui::Button("Clear mask"))
 			{
@@ -1305,7 +1305,7 @@ void TerrainEditor::onGUI()
 					Renderer& renderer = *static_cast<Renderer*>(plugin);
 					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Texture)(
 						Path("brush_texture"), *rm.get(Texture::TYPE), renderer, m_world_editor.getAllocator());
-					m_brush_texture->create(image_width, image_height, ffr::TextureFormat::RGBA8, data, image_width * image_height * 4);
+					m_brush_texture->create(image_width, image_height, gpu::TextureFormat::RGBA8, data, image_width * image_height * 4);
 
 					stbi_image_free(data);
 				}

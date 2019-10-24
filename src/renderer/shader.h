@@ -2,7 +2,7 @@
 #include "engine/array.h"
 #include "engine/hash_map.h"
 #include "engine/resource.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 #include "renderer/model.h"
 
 
@@ -57,7 +57,7 @@ public:
 
 	struct Stage {
 		Stage(IAllocator& allocator) : code(allocator) {}
-		ffr::ShaderType type;
+		gpu::ShaderType type;
 		Array<char> code;
 	};
 
@@ -78,8 +78,8 @@ public:
 	ResourceType getType() const override { return TYPE; }
 	bool hasDefine(u8 define) const;
 
-	ffr::ProgramHandle getProgram(const ffr::VertexDecl& decl, u32 defines);
-	static void compile(ffr::ProgramHandle program, ffr::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer);
+	gpu::ProgramHandle getProgram(const gpu::VertexDecl& decl, u32 defines);
+	static void compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer);
 
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
@@ -88,7 +88,7 @@ public:
 	u32 m_texture_slot_count;
 	Array<Uniform> m_uniforms;
 	Array<u8> m_defines;
-	HashMap<u64, ffr::ProgramHandle> m_programs;
+	HashMap<u64, gpu::ProgramHandle> m_programs;
 	Sources m_sources;
 
 	static const ResourceType TYPE;

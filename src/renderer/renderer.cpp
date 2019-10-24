@@ -32,13 +32,13 @@
 #undef near
 #undef far
 #include "gl/GL.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 #include <stdio.h>
 
-#define FFR_GL_IMPORT(prototype, name) static prototype name;
-#define FFR_GL_IMPORT_TYPEDEFS
+#define GPU_GL_IMPORT(prototype, name) static prototype name;
+#define GPU_GL_IMPORT_TYPEDEFS
 
-#include "ffr/gl_ext.h"
+#include "gpu/gl_ext.h"
 
 #define CHECK_GL(gl) \
 	do { \
@@ -66,13 +66,13 @@ struct FrameData {
 
 	struct ShaderToCompile {
 		Shader* shader;
-		ffr::VertexDecl decl;
+		gpu::VertexDecl decl;
 		u32 defines;
-		ffr::ProgramHandle program;
+		gpu::ProgramHandle program;
 		Shader::Sources sources;
 	};
 
-	ffr::BufferHandle transient_buffer = ffr::INVALID_BUFFER;
+	gpu::BufferHandle transient_buffer = gpu::INVALID_BUFFER;
 	i32 transient_offset = 0;
 	u32 transient_size = 0;
 	u8* transient_ptr = nullptr;
@@ -115,7 +115,7 @@ struct GPUProfiler
 	struct Query
 	{
 		StaticString<32> name;
-		ffr::QueryHandle handle;
+		gpu::QueryHandle handle;
 		u64 result;
 		i64 profiler_link;
 		bool is_end;
@@ -140,17 +140,17 @@ struct GPUProfiler
 
 	u64 toCPUTimestamp(u64 gpu_timestamp) const
 	{
-		return u64(gpu_timestamp * (OS::Timer::getFrequency() / double(ffr::getQueryFrequency()))) + m_gpu_to_cpu_offset;
+		return u64(gpu_timestamp * (OS::Timer::getFrequency() / double(gpu::getQueryFrequency()))) + m_gpu_to_cpu_offset;
 	}
 
 
 	void init()
 	{
-		ffr::QueryHandle q = ffr::createQuery();
-		ffr::queryTimestamp(q);
+		gpu::QueryHandle q = gpu::createQuery();
+		gpu::queryTimestamp(q);
 		const u64 cpu_timestamp = OS::Timer::getRawTimestamp();
 		u32 try_num = 0;
-		while (!ffr::isQueryReady(q) && try_num < 1000) {
+		while (!gpu::isQueryReady(q) && try_num < 1000) {
 			Sleep(1);
 			++try_num;
 		}
@@ -159,9 +159,9 @@ struct GPUProfiler
 			m_gpu_to_cpu_offset = 0;
 		}
 		else {
-			const u64 gpu_timestamp = ffr::getQueryResult(q);
-			m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (OS::Timer::getFrequency() / double(ffr::getQueryFrequency())));
-			ffr::destroy(q);
+			const u64 gpu_timestamp = gpu::getQueryResult(q);
+			m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (OS::Timer::getFrequency() / double(gpu::getQueryFrequency())));
+			gpu::destroy(q);
 		}
 	}
 
@@ -170,21 +170,21 @@ struct GPUProfiler
 	{
 		m_queries.clear();
 
-		for(const ffr::QueryHandle h : m_pool) {
-			ffr::destroy(h);
+		for(const gpu::QueryHandle h : m_pool) {
+			gpu::destroy(h);
 		}
 		m_pool.clear();
 	}
 
 
-	ffr::QueryHandle allocQuery()
+	gpu::QueryHandle allocQuery()
 	{
 		if(!m_pool.empty()) {
-			const ffr::QueryHandle res = m_pool.back();
+			const gpu::QueryHandle res = m_pool.back();
 			m_pool.pop();
 			return res;
 		}
-		return ffr::createQuery();
+		return gpu::createQuery();
 	}
 
 
@@ -197,7 +197,7 @@ struct GPUProfiler
 		q.is_end = false;
 		q.is_frame = false;
 		q.handle = allocQuery();
-		ffr::queryTimestamp(q.handle);
+		gpu::queryTimestamp(q.handle);
 	}
 
 
@@ -208,7 +208,7 @@ struct GPUProfiler
 		q.is_end = true;
 		q.is_frame = false;
 		q.handle = allocQuery();
-		ffr::queryTimestamp(q.handle);
+		gpu::queryTimestamp(q.handle);
 	}
 
 
@@ -227,14 +227,14 @@ struct GPUProfiler
 				continue;
 			}
 			
-			if (!ffr::isQueryReady(q.handle)) break;
+			if (!gpu::isQueryReady(q.handle)) break;
 
 			if (q.is_end) {
-				const u64 timestamp = toCPUTimestamp(ffr::getQueryResult(q.handle));
+				const u64 timestamp = toCPUTimestamp(gpu::getQueryResult(q.handle));
 				Profiler::endGPUBlock(timestamp);
 			}
 			else {
-				const u64 timestamp = toCPUTimestamp(ffr::getQueryResult(q.handle));
+				const u64 timestamp = toCPUTimestamp(gpu::getQueryResult(q.handle));
 				Profiler::beginGPUBlock(q.name, timestamp, q.profiler_link);
 			}
 			m_pool.push(q.handle);
@@ -244,7 +244,7 @@ struct GPUProfiler
 
 
 	Array<Query> m_queries;
-	Array<ffr::QueryHandle> m_pool;
+	Array<gpu::QueryHandle> m_pool;
 	MT::CriticalSection m_mutex;
 	i64 m_gpu_to_cpu_offset;
 };
@@ -431,7 +431,7 @@ struct RendererImpl final : public Renderer
 		, m_material_buffer(m_allocator)
 	{
 		m_shader_defines.reserve(32);
-		ffr::preinit(m_allocator);
+		gpu::preinit(m_allocator);
 		m_frames.emplace(*this, m_allocator);
 		m_frames.emplace(*this, m_allocator);
 		m_frames.emplace(*this, m_allocator);
@@ -456,11 +456,11 @@ struct RendererImpl final : public Renderer
 		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
 			for (FrameData& frame : renderer->m_frames) {
-				ffr::destroy(frame.transient_buffer);
+				gpu::destroy(frame.transient_buffer);
 			}
-			ffr::destroy(renderer->m_material_buffer.buffer);
+			gpu::destroy(renderer->m_material_buffer.buffer);
 			renderer->m_profiler.clear();
-			ffr::shutdown();
+			gpu::shutdown();
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 	}
@@ -471,7 +471,7 @@ struct RendererImpl final : public Renderer
 		registerProperties(m_engine.getAllocator());
 		
 		struct InitData {
-			u32 flags = (u32)ffr::InitFlags::VSYNC;
+			u32 flags = (u32)gpu::InitFlags::VSYNC;
 			RendererImpl* renderer;
 		} init_data;
 		init_data.renderer = this;
@@ -481,10 +481,10 @@ struct RendererImpl final : public Renderer
 		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next()) {
 			if (cmd_line_parser.currentEquals("-no_vsync")) {
-				init_data.flags &= ~(u32)ffr::InitFlags::VSYNC;
+				init_data.flags &= ~(u32)gpu::InitFlags::VSYNC;
 			}
 			else if (cmd_line_parser.currentEquals("-debug_opengl")) {
-				init_data.flags |= (u32)ffr::InitFlags::DEBUG_OUTPUT;
+				init_data.flags |= (u32)gpu::InitFlags::DEBUG_OUTPUT;
 			}
 		}
 
@@ -495,24 +495,24 @@ struct RendererImpl final : public Renderer
 			RendererImpl& renderer = *(RendererImpl*)init_data->renderer;
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getPlatformData().window_handle;
-			ffr::init(window_handle, init_data->flags);
+			gpu::init(window_handle, init_data->flags);
 
 			for (FrameData& frame : renderer.m_frames) {
-				frame.transient_buffer = ffr::allocBufferHandle();
+				frame.transient_buffer = gpu::allocBufferHandle();
 				frame.transient_offset = 0;
-				ffr::createBuffer(frame.transient_buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
+				gpu::createBuffer(frame.transient_buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
 				frame.transient_size = TRANSIENT_BUFFER_INIT_SIZE;
-				frame.transient_ptr = (u8*)ffr::map(frame.transient_buffer, TRANSIENT_BUFFER_INIT_SIZE);
+				frame.transient_ptr = (u8*)gpu::map(frame.transient_buffer, TRANSIENT_BUFFER_INIT_SIZE);
 			}
 			renderer.m_cpu_frame = renderer.m_frames.begin();
 			renderer.m_gpu_frame = renderer.m_frames.begin();
 
 			renderer.m_profiler.init();
 
-			renderer.m_material_buffer.buffer = ffr::allocBufferHandle();
+			renderer.m_material_buffer.buffer = gpu::allocBufferHandle();
 			renderer.m_material_buffer.data.resize(400);
 			renderer.m_material_buffer.map.insert(0, 0);
-			ffr::createBuffer(renderer.m_material_buffer.buffer, (u32)ffr::BufferFlags::UNIFORM_BUFFER, renderer.m_material_buffer.data.byte_size(), nullptr);
+			gpu::createBuffer(renderer.m_material_buffer.buffer, (u32)gpu::BufferFlags::UNIFORM_BUFFER, renderer.m_material_buffer.data.byte_size(), nullptr);
 
 			const u32 max_mat_count = renderer.m_material_buffer.data.size();
 			for (u32 i = 0; i < max_mat_count; ++i) {
@@ -582,18 +582,18 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void getTextureImage(ffr::TextureHandle texture, int size, void* data) override
+	void getTextureImage(gpu::TextureHandle texture, int size, void* data) override
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::pushDebugGroup("get image data");
-				ffr::getTextureImage(handle, size, buf);
-				ffr::popDebugGroup();
+				gpu::pushDebugGroup("get image data");
+				gpu::getTextureImage(handle, size, buf);
+				gpu::popDebugGroup();
 			}
 
-			ffr::TextureHandle handle;
+			gpu::TextureHandle handle;
 			u32 size;
 			void* buf;
 		};
@@ -606,7 +606,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void updateTexture(ffr::TextureHandle handle, u32 x, u32 y, u32 w, u32 h, ffr::TextureFormat format, const MemRef& mem) override
+	void updateTexture(gpu::TextureHandle handle, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override
 	{
 		ASSERT(mem.size > 0);
 		ASSERT(handle.isValid());
@@ -615,15 +615,15 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::update(handle, 0, x, y, w, h, format, mem.data);
+				gpu::update(handle, 0, x, y, w, h, format, mem.data);
 				if (mem.own) {
 					renderer->free(mem);
 				}
 			}
 
-			ffr::TextureHandle handle;
+			gpu::TextureHandle handle;
 			u32 x, y, w, h;
-			ffr::TextureFormat format;
+			gpu::TextureFormat format;
 			MemRef mem;
 			RendererImpl* renderer;
 		};
@@ -642,29 +642,29 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info, const char* debug_name) override
+	gpu::TextureHandle loadTexture(const MemRef& memory, u32 flags, gpu::TextureInfo* info, const char* debug_name) override
 	{
 		ASSERT(memory.size > 0);
 
-		const ffr::TextureHandle handle = ffr::allocTextureHandle();
+		const gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if (!handle.isValid()) return handle;
 
 		if(info) {
-			*info = ffr::getTextureInfo(memory.data);
+			*info = gpu::getTextureInfo(memory.data);
 		}
 
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::loadTexture(handle, memory.data, memory.size, flags, debug_name);
+				gpu::loadTexture(handle, memory.data, memory.size, flags, debug_name);
 				if(memory.own) {
 					renderer->free(memory);
 				}
 			}
 
 			StaticString<MAX_PATH_LENGTH> debug_name;
-			ffr::TextureHandle handle;
+			gpu::TextureHandle handle;
 			MemRef memory;
 			u32 flags;
 			RendererImpl* renderer; 
@@ -700,7 +700,7 @@ struct RendererImpl final : public Renderer
 		return slice;
 	}
 	
-	ffr::BufferHandle getMaterialUniformBuffer() override {
+	gpu::BufferHandle getMaterialUniformBuffer() override {
 		return m_material_buffer.buffer;
 	}
 
@@ -740,25 +740,25 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::BufferHandle createBuffer(const MemRef& memory, u32 flags) override
+	gpu::BufferHandle createBuffer(const MemRef& memory, u32 flags) override
 	{
-		ffr::BufferHandle handle = ffr::allocBufferHandle();
+		gpu::BufferHandle handle = gpu::allocBufferHandle();
 		if(!handle.isValid()) return handle;
 
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				ffr::createBuffer(handle, flags, memory.size, memory.data);
+				gpu::createBuffer(handle, flags, memory.size, memory.data);
 				if (memory.own) {
 					renderer->free(memory);
 				}
 			}
 
-			ffr::BufferHandle handle;
+			gpu::BufferHandle handle;
 			MemRef memory;
 			u32 flags;
-			ffr::TextureFormat format;
+			gpu::TextureFormat format;
 			Renderer* renderer;
 		};
 
@@ -818,16 +818,16 @@ struct RendererImpl final : public Renderer
 	}
 
 	
-	void destroy(ffr::ProgramHandle program) override
+	void destroy(gpu::ProgramHandle program) override
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
-				ffr::destroy(program); 
+				gpu::destroy(program); 
 			}
 
-			ffr::ProgramHandle program;
+			gpu::ProgramHandle program;
 			RendererImpl* renderer;
 		};
 
@@ -837,16 +837,16 @@ struct RendererImpl final : public Renderer
 		queue(cmd, 0);
 	}
 
-	void destroy(ffr::BufferHandle buffer) override
+	void destroy(gpu::BufferHandle buffer) override
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
-				ffr::destroy(buffer);
+				gpu::destroy(buffer);
 			}
 
-			ffr::BufferHandle buffer;
+			gpu::BufferHandle buffer;
 			RendererImpl* renderer;
 		};
 
@@ -857,9 +857,9 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	ffr::TextureHandle createTexture(u32 w, u32 h, u32 depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) override
+	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) override
 	{
-		ffr::TextureHandle handle = ffr::allocTextureHandle();
+		gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if(!handle.isValid()) return handle;
 
 		struct Cmd : RenderJob {
@@ -867,17 +867,17 @@ struct RendererImpl final : public Renderer
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				ffr::createTexture(handle, w, h, depth, format, flags, memory.data, debug_name);
+				gpu::createTexture(handle, w, h, depth, format, flags, memory.data, debug_name);
 				if (memory.own) renderer->free(memory);
 			}
 
 			StaticString<MAX_PATH_LENGTH> debug_name;
-			ffr::TextureHandle handle;
+			gpu::TextureHandle handle;
 			MemRef memory;
 			u32 w;
 			u32 h;
 			u32 depth;
-			ffr::TextureFormat format;
+			gpu::TextureFormat format;
 			Renderer* renderer;
 			u32 flags;
 		};
@@ -898,17 +898,17 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void destroy(ffr::TextureHandle tex)
+	void destroy(gpu::TextureHandle tex)
 	{
 		ASSERT(tex.isValid());
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
-				ffr::destroy(texture); 
+				gpu::destroy(texture); 
 			}
 
-			ffr::TextureHandle texture;
+			gpu::TextureHandle texture;
 			RendererImpl* renderer;
 		};
 
@@ -950,7 +950,7 @@ struct RendererImpl final : public Renderer
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }
 	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
 
-	ffr::ProgramHandle queueShaderCompile(Shader& shader, ffr::VertexDecl decl, u32 defines) override {
+	gpu::ProgramHandle queueShaderCompile(Shader& shader, gpu::VertexDecl decl, u32 defines) override {
 		MT::CriticalSectionLock lock(m_cpu_frame->shader_mutex);
 		
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
@@ -958,7 +958,7 @@ struct RendererImpl final : public Renderer
 				return i.program;
 			}
 		}
-		ffr::ProgramHandle program = ffr::allocProgramHandle();
+		gpu::ProgramHandle program = gpu::allocProgramHandle();
 		m_cpu_frame->to_compile_shaders.push({&shader, decl, defines, program, shader.m_sources});
 		return program;
 	}
@@ -995,7 +995,7 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
-				ffr::startCapture();
+				gpu::startCapture();
 			}
 		};
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
@@ -1009,7 +1009,7 @@ struct RendererImpl final : public Renderer
 			void setup() override {}
 			void execute() override { 
 				PROFILE_FUNCTION();
-				ffr::stopCapture();
+				gpu::stopCapture();
 			}
 		};
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
@@ -1024,18 +1024,18 @@ struct RendererImpl final : public Renderer
 		}
 		frame.to_compile_shaders.clear();
 
-		ffr::unmap(frame.transient_buffer);
+		gpu::unmap(frame.transient_buffer);
 		frame.transient_ptr = nullptr;
 
 		if (m_material_buffer.dirty) {
-			ffr::update(m_material_buffer.buffer, m_material_buffer.data.begin(), m_material_buffer.data.byte_size());
+			gpu::update(m_material_buffer.buffer, m_material_buffer.data.begin(), m_material_buffer.data.byte_size());
 			m_material_buffer.dirty = false;
 		}
 
-		ffr::useProgram(ffr::INVALID_PROGRAM);
-		ffr::bindIndexBuffer(ffr::INVALID_BUFFER);
-		ffr::bindVertexBuffer(0, ffr::INVALID_BUFFER, 0, 0);
-		ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+		gpu::useProgram(gpu::INVALID_PROGRAM);
+		gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
+		gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
+		gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		for (RenderJob* job : frame.jobs) {
 			PROFILE_BLOCK("execute_render_job");
 			Profiler::blockColor(0xaa, 0xff, 0xaa);
@@ -1048,20 +1048,20 @@ struct RendererImpl final : public Renderer
 		PROFILE_BLOCK("swap buffers");
 		JobSystem::enableBackupWorker(true);
 			
-		ffr::swapBuffers(frame.window_size.x, frame.window_size.y);
+		gpu::swapBuffers(frame.window_size.x, frame.window_size.y);
 			
 		JobSystem::enableBackupWorker(false);
 		m_profiler.frame();
 
 		if ((u32)frame.transient_offset > frame.transient_size) {
 			frame.transient_size = nextPow2(frame.transient_offset);
-			ffr::destroy(frame.transient_buffer);
-			frame.transient_buffer = ffr::allocBufferHandle();
-			ffr::createBuffer(frame.transient_buffer, 0, frame.transient_size, nullptr);
+			gpu::destroy(frame.transient_buffer);
+			frame.transient_buffer = gpu::allocBufferHandle();
+			gpu::createBuffer(frame.transient_buffer, 0, frame.transient_size, nullptr);
 		}
 
 		ASSERT(!frame.transient_ptr);
-		frame.transient_ptr = (u8*)ffr::map(frame.transient_buffer, frame.transient_size);
+		frame.transient_ptr = (u8*)gpu::map(frame.transient_buffer, frame.transient_size);
 		frame.transient_offset = 0;
 		
 		JobSystem::decSignal(frame.can_setup);
@@ -1128,7 +1128,7 @@ struct RendererImpl final : public Renderer
 
 	struct MaterialBuffer {
 		MaterialBuffer(IAllocator& alloc) : map(alloc), data(alloc) {}
-		ffr::BufferHandle buffer = ffr::INVALID_BUFFER;
+		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
 		Array<MaterialConsts> data;
 		HashMap<u32, u32> map;
 		u32 first_free = 1;

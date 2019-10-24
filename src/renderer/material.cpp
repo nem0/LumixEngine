@@ -11,7 +11,7 @@
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 
 namespace Lumix
 {
@@ -37,7 +37,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_allocator(allocator)
 	, m_texture_count(0)
 	, m_renderer(renderer)
-	, m_render_states(u64(ffr::StateFlags::CULL_BACK))
+	, m_render_states(u64(gpu::StateFlags::CULL_BACK))
 	, m_color(1, 1, 1, 1)
 	, m_metallic(1.f)
 	, m_roughness(1.f)
@@ -148,7 +148,7 @@ void Material::unload()
 	m_metallic = 1.0f;
 	m_roughness = 1.0f;
 	m_emission = 0.0f;
-	m_render_states = u64(ffr::StateFlags::CULL_BACK);
+	m_render_states = u64(gpu::StateFlags::CULL_BACK);
 }
 
 
@@ -413,7 +413,7 @@ void Material::updateRenderData(bool on_before_ready)
 	m_render_data->material_constants = m_renderer.createMaterialConstants(cs);
 
 	for(u32 i = 0; i < m_texture_count; ++i) {
-		m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : ffr::INVALID_TEXTURE;
+		m_render_data->textures[i] = m_textures[i] ? m_textures[i]->handle : gpu::INVALID_TEXTURE;
 	}
 }
 
@@ -464,17 +464,17 @@ bool Material::isTextureDefine(u8 define_idx) const
 void Material::enableBackfaceCulling(bool enable)
 {
 	if (enable) {
-		m_render_states |= (u64)ffr::StateFlags::CULL_BACK;
+		m_render_states |= (u64)gpu::StateFlags::CULL_BACK;
 	}
 	else {
-		m_render_states &= ~(u64)ffr::StateFlags::CULL_BACK;
+		m_render_states &= ~(u64)gpu::StateFlags::CULL_BACK;
 	}
 }
 
 
 bool Material::isBackfaceCulling() const
 {
-	return (m_render_states & (u64)ffr::StateFlags::CULL_BACK) != 0;
+	return (m_render_states & (u64)gpu::StateFlags::CULL_BACK) != 0;
 }
 
 
@@ -681,7 +681,7 @@ bool Material::load(u64 size, const u8* mem)
 	lua_State* L = mng.getState(*this);
 	
 	m_uniforms.clear();
-	m_render_states = u64(ffr::StateFlags::CULL_BACK);
+	m_render_states = u64(gpu::StateFlags::CULL_BACK);
 	m_custom_flags = 0;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 
