@@ -2470,7 +2470,7 @@ struct PipelineImpl final : Pipeline
 						dc_data.terrain_scale = Vec4(inst.scale, 0);
 						dc_data.cell_size = s;
 						gpu::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
-						gpu::drawArrays(0, (subto.x - subfrom.x) * (subto.y - subfrom.y), gpu::PrimitiveType::POINTS);
+						gpu::drawTriangleStripArraysInstanced((subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
 						m_pipeline->m_stats.draw_call_count += 1;
 						m_pipeline->m_stats.instance_count += 1;
 						m_pipeline->m_stats.triangle_count += (subto.x - subfrom.x) * (subto.y - subfrom.y) * 2;
