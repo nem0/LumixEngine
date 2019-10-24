@@ -15,7 +15,7 @@
 #include "engine/universe/universe.h"
 #include "gui/gui_system.h"
 #include "imgui/imgui.h"
-#include "renderer/ffr/ffr.h"
+#include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
@@ -59,7 +59,7 @@ GameView::GameView(StudioApp& app)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
 	, m_show_stats(false)
-	, m_texture_handle(ffr::INVALID_TEXTURE)
+	, m_texture_handle(gpu::INVALID_TEXTURE)
 	, m_gui_interface(nullptr)
 	, m_editor(app.getWorldEditor())
 {
@@ -186,7 +186,7 @@ void GameView::onFullscreenGUI()
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
 		m_texture_handle = m_pipeline->getOutput();
-		if (ffr::isOriginBottomLeft())
+		if (gpu::isOriginBottomLeft())
 		{
 			ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
 		}
@@ -319,7 +319,7 @@ void GameView::onWindowGUI()
 				m_texture_handle = m_pipeline->getOutput();
 
 				if(m_texture_handle.isValid()) {
-					if (ffr::isOriginBottomLeft()) {
+					if (gpu::isOriginBottomLeft()) {
 						ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
 					}
 					else {

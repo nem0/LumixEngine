@@ -60,7 +60,7 @@ bool Shader::hasDefine(u8 define) const {
 	return m_defines.indexOf(define) >= 0;
 }
 
-void Shader::compile(ffr::ProgramHandle program, ffr::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer) {
+void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer) {
 	PROFILE_BLOCK("compile_shader");
 	static const char* shader_code_prefix = 
 		R"#(
@@ -105,7 +105,7 @@ void Shader::compile(ffr::ProgramHandle program, ffr::VertexDecl decl, u32 defin
 		)#";
 
 	const char* codes[64];
-	ffr::ShaderType types[64];
+	gpu::ShaderType types[64];
 	ASSERT((int)lengthOf(types) >= sources.stages.size());
 	for (int i = 0; i < sources.stages.size(); ++i) {
 		codes[i] = &sources.stages[i].code[0];
@@ -125,10 +125,10 @@ void Shader::compile(ffr::ProgramHandle program, ffr::VertexDecl decl, u32 defin
 	}
 	prefixes[1 + defines_count] = sources.common.length() == 0 ? "" : sources.common.c_str();
 
-	ffr::createProgram(program, decl, codes, types, sources.stages.size(), prefixes, 2 + defines_count, sources.path.c_str());
+	gpu::createProgram(program, decl, codes, types, sources.stages.size(), prefixes, 2 + defines_count, sources.path.c_str());
 }
 
-ffr::ProgramHandle Shader::getProgram(const ffr::VertexDecl& decl, u32 defines) {
+gpu::ProgramHandle Shader::getProgram(const gpu::VertexDecl& decl, u32 defines) {
 	const u64 key = defines | ((u64)decl.hash << 32);
 	auto iter = m_programs.find(key);
 	if (iter.isValid()) return iter.value();
@@ -236,7 +236,7 @@ int texture_slot(lua_State* L)
 }
 
 
-static void source(lua_State* L, ffr::ShaderType shader_type)
+static void source(lua_State* L, gpu::ShaderType shader_type)
 {
 	auto countLines = [](const char* str) {
 		int count = 0;
@@ -302,21 +302,21 @@ static int common(lua_State* L)
 
 int vertex_shader(lua_State* L)
 {
-	source(L, ffr::ShaderType::VERTEX);
+	source(L, gpu::ShaderType::VERTEX);
 	return 0;
 }
 
 
 int fragment_shader(lua_State* L)
 {
-	source(L, ffr::ShaderType::FRAGMENT);
+	source(L, gpu::ShaderType::FRAGMENT);
 	return 0;
 }
 
 
 int geometry_shader(lua_State* L)
 {
-	source(L, ffr::ShaderType::GEOMETRY);
+	source(L, gpu::ShaderType::GEOMETRY);
 	return 0;
 }
 
@@ -388,7 +388,7 @@ bool Shader::load(u64 size, const u8* mem)
 
 void Shader::unload()
 {
-	for (ffr::ProgramHandle prg : m_programs) {
+	for (gpu::ProgramHandle prg : m_programs) {
 		m_renderer.destroy(prg);
 	}
 	m_sources.common = "";

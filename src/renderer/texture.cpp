@@ -29,7 +29,7 @@ Texture::Texture(const Path& path, ResourceManager& resource_manager, Renderer& 
 {
 	flags = 0;
 	is_cubemap = false;
-	handle = ffr::INVALID_TEXTURE;
+	handle = gpu::INVALID_TEXTURE;
 }
 
 
@@ -71,10 +71,10 @@ void Texture::destroy()
 }
 
 
-bool Texture::create(int w, int h, ffr::TextureFormat format, const void* data, u32 size)
+bool Texture::create(int w, int h, gpu::TextureFormat format, const void* data, u32 size)
 {
 	Renderer::MemRef memory = renderer.copy(data, size);
-	handle = renderer.createTexture(w, h, 1, format, getFFRFlags() | (u32)ffr::TextureFlags::NO_MIPS, memory, getPath().c_str());
+	handle = renderer.createTexture(w, h, 1, format, getGPUFlags() | (u32)gpu::TextureFlags::NO_MIPS, memory, getPath().c_str());
 	mips = 1;
 	width = w;
 	height = h;
@@ -300,7 +300,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 				dst_mem[i + j * w] = src_mem[x + i + (y + j) * width] / 65535.0f;
 			}
 		}
-		renderer.updateTexture(handle, x, y, w, h, ffr::TextureFormat::R32F, mem);
+		renderer.updateTexture(handle, x, y, w, h, gpu::TextureFormat::R32F, mem);
 		return;
 	}
 
@@ -315,7 +315,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 			&src_mem[(x + (y + j) * width) * bytes_per_pixel],
 			bytes_per_pixel * w);
 	}
-	renderer.updateTexture(handle, x, y, w, h, ffr::TextureFormat::RGBA8, mem);
+	renderer.updateTexture(handle, x, y, w, h, gpu::TextureFormat::RGBA8, mem);
 }
 
 
@@ -348,8 +348,8 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	texture.handle = texture.renderer.createTexture(texture.width
 		, texture.height
 		, 1
-		, ffr::TextureFormat::R32F
-		, texture.getFFRFlags() & ~(u32)ffr::TextureFlags::SRGB
+		, gpu::TextureFormat::R32F
+		, texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
 		, dst_mem
 		, texture.getPath().c_str());
 	texture.depth = 1;
@@ -408,12 +408,12 @@ bool Texture::loadTGA(IInputStream& file)
 		bytes_per_pixel = 4;
 		mips = 1;
 		if (data_reference) mem = renderer.copy(image_dest, image_size);
-		const bool is_srgb = flags & (u32)ffr::TextureFlags::SRGB;
+		const bool is_srgb = flags & (u32)gpu::TextureFlags::SRGB;
 		handle = renderer.createTexture(header.width
 			, header.height
 			, 1
-			, is_srgb ? ffr::TextureFormat::SRGBA : ffr::TextureFormat::RGBA8
-			, getFFRFlags() & ~(u32)ffr::TextureFlags::SRGB
+			, is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8
+			, getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
 			, mem
 			, getPath().c_str());
 		depth = 1;
@@ -523,12 +523,12 @@ bool Texture::loadTGA(IInputStream& file)
 	bytes_per_pixel = 4;
 	mips = 1;
 	if (data_reference) mem = renderer.copy(image_dest, image_size);
-	const bool is_srgb = flags & (u32)ffr::TextureFlags::SRGB;
+	const bool is_srgb = flags & (u32)gpu::TextureFlags::SRGB;
 	handle = renderer.createTexture(header.width
 		, header.height
 		, 1
-		, is_srgb ? ffr::TextureFormat::SRGBA : ffr::TextureFormat::RGBA8
-		, getFFRFlags() & ~(u32)ffr::TextureFlags::SRGB
+		, is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8
+		, getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
 		, mem
 		, getPath().c_str());
 	depth = 1;
@@ -564,10 +564,10 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 		return false;
 	}
 
-	ffr::TextureInfo info;
+	gpu::TextureInfo info;
 	const u8* data = (const u8*)file.getBuffer();
 	Renderer::MemRef mem = texture.renderer.copy(data + 7, (int)file.size() - 7);
-	texture.handle = texture.renderer.loadTexture(mem, texture.getFFRFlags(), &info, texture.getPath().c_str());
+	texture.handle = texture.renderer.loadTexture(mem, texture.getGPUFlags(), &info, texture.getPath().c_str());
 	if (texture.handle.isValid()) {
 		texture.width = info.width;
 		texture.height = info.height;
@@ -581,25 +581,25 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 }
 
 
-u32 Texture::getFFRFlags() const
+u32 Texture::getGPUFlags() const
 {
-	u32 ffr_flags = 0;
+	u32 gpu_flags = 0;
 	if(flags & (u32)Flags::SRGB) {
-		ffr_flags  |= (u32)ffr::TextureFlags::SRGB;
+		gpu_flags  |= (u32)gpu::TextureFlags::SRGB;
 	}
 	if(flags & (u32)Flags::POINT) {
-		ffr_flags  |= (u32)ffr::TextureFlags::POINT_FILTER;
+		gpu_flags  |= (u32)gpu::TextureFlags::POINT_FILTER;
 	}
 	if (flags & (u32)Flags::CLAMP_U) {
-		ffr_flags |= (u32)ffr::TextureFlags::CLAMP_U;
+		gpu_flags |= (u32)gpu::TextureFlags::CLAMP_U;
 	}
 	if (flags & (u32)Flags::CLAMP_V) {
-		ffr_flags |= (u32)ffr::TextureFlags::CLAMP_V;
+		gpu_flags |= (u32)gpu::TextureFlags::CLAMP_V;
 	}
 	if (flags & (u32)Flags::CLAMP_W) {
-		ffr_flags |= (u32)ffr::TextureFlags::CLAMP_W;
+		gpu_flags |= (u32)gpu::TextureFlags::CLAMP_W;
 	}
-	return ffr_flags ;
+	return gpu_flags;
 }
 
 
@@ -636,7 +636,7 @@ void Texture::unload()
 {
 	if (handle.isValid()) {
 		renderer.destroy(handle);
-		handle = ffr::INVALID_TEXTURE;
+		handle = gpu::INVALID_TEXTURE;
 	}
 	data.clear();
 }

@@ -36,7 +36,7 @@ static LocalRigidTransform invert(const LocalRigidTransform& tr)
 
 
 Mesh::Mesh(Material* mat,
-	const ffr::VertexDecl& vertex_decl,
+	const gpu::VertexDecl& vertex_decl,
 	u8 vb_stride,
 	const char* name,
 	const AttributeSemantic* semantics,
@@ -51,9 +51,9 @@ Mesh::Mesh(Material* mat,
 {
 	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
 	render_data->vb_stride = vb_stride;
-	render_data->vertex_buffer_handle = ffr::INVALID_BUFFER;
-	render_data->index_buffer_handle = ffr::INVALID_BUFFER;
-	render_data->index_type = ffr::DataType::U32;
+	render_data->vertex_buffer_handle = gpu::INVALID_BUFFER;
+	render_data->index_buffer_handle = gpu::INVALID_BUFFER;
+	render_data->index_type = gpu::DataType::U32;
 	for(AttributeSemantic& attr : attributes_semantic) {
 		attr = AttributeSemantic::NONE;
 	}
@@ -276,7 +276,7 @@ static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
 }
 
 
-static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics, Ref<u32> vb_stride)
+static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics, Ref<u32> vb_stride)
 {
 	u32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
@@ -285,7 +285,7 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 	u8 offset = 0;
 	bool is_skinned = false;
 	for (u32 i = 0; i < attribute_count; ++i) {
-		ffr::AttributeType type;
+		gpu::AttributeType type;
 		u8 cmp_count;
 		file.read(semantics[i]);
 		file.read(type);
@@ -300,33 +300,33 @@ static bool parseVertexDecl(IInputStream& file, ffr::VertexDecl* vertex_decl, Me
 				vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
 				break;
 			case Mesh::AttributeSemantic::COLOR0:
-				vertex_decl->addAttribute(idx, offset, cmp_count, type, ffr::Attribute::NORMALIZED);
+				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED);
 				break;
 			case Mesh::AttributeSemantic::NORMAL:
 			case Mesh::AttributeSemantic::TANGENT:
-				if (type == ffr::AttributeType::FLOAT) {
+				if (type == gpu::AttributeType::FLOAT) {
 					vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
 				}
 				else {
-					vertex_decl->addAttribute(idx, offset, cmp_count, type, ffr::Attribute::NORMALIZED | ffr::Attribute::AS_INT);
+					vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED | gpu::Attribute::AS_INT);
 				}
 				break;
 			case Mesh::AttributeSemantic::INDICES:
 				is_skinned = true;
-				vertex_decl->addAttribute(idx, offset, cmp_count, type, ffr::Attribute::AS_INT);
+				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::AS_INT);
 				break;
 			default: ASSERT(false); break;
 		}
 
-		offset += ffr::getSize(type) * cmp_count;
+		offset += gpu::getSize(type) * cmp_count;
 	}
 	vb_stride = offset;
 
 	if (!is_skinned) {
-		vertex_decl->addAttribute(4, 0, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
-		vertex_decl->addAttribute(5, 16, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
+		vertex_decl->addAttribute(4, 0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		vertex_decl->addAttribute(5, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		// TODO this is here because of grass, find a better solution
-		//vertex_decl->addAttribute(6, 32, 4, ffr::AttributeType::FLOAT, ffr::Attribute::INSTANCED);
+		//vertex_decl->addAttribute(6, 32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 	}
 
 	return true;
@@ -445,8 +445,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	m_meshes.reserve(object_count);
 	for (int i = 0; i < object_count; ++i)
 	{
-		ffr::VertexDecl vertex_decl;
-		Mesh::AttributeSemantic semantics[ffr::VertexDecl::MAX_ATTRIBUTES];
+		gpu::VertexDecl vertex_decl;
+		Mesh::AttributeSemantic semantics[gpu::VertexDecl::MAX_ATTRIBUTES];
 		for(auto& i : semantics) i = Mesh::AttributeSemantic::NONE;
 		u32 vb_stride;
 		if (!parseVertexDecl(file, &vertex_decl, semantics, Ref(vb_stride))) return false;
@@ -485,8 +485,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
 		const Renderer::MemRef mem = m_renderer.copy(&mesh.indices[0], mesh.indices.size());
-		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, (u32)ffr::BufferFlags::IMMUTABLE);
-		mesh.render_data->index_type = index_size == 2 ? ffr::DataType::U16 : ffr::DataType::U32;
+		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::IMMUTABLE);
+		mesh.render_data->index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
 	}
 
 	for (int i = 0; i < object_count; ++i)
@@ -519,7 +519,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			}
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 		}
-		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, (u32)ffr::BufferFlags::IMMUTABLE);
+		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, (u32)gpu::BufferFlags::IMMUTABLE);
 	}
 	file.read(m_bounding_radius);
 	file.read(m_aabb);
@@ -633,8 +633,8 @@ void Model::unload()
 	for (Mesh& mesh : m_meshes) {
 		m_renderer.runInRenderThread(mesh.render_data, [](Renderer& renderer, void* ptr){
 			Mesh::RenderData* rd = (Mesh::RenderData*)ptr;
-			if (rd->index_buffer_handle.isValid()) ffr::destroy(rd->index_buffer_handle);
-			if (rd->vertex_buffer_handle.isValid()) ffr::destroy(rd->vertex_buffer_handle);
+			if (rd->index_buffer_handle.isValid()) gpu::destroy(rd->index_buffer_handle);
+			if (rd->vertex_buffer_handle.isValid()) gpu::destroy(rd->vertex_buffer_handle);
 			LUMIX_DELETE(renderer.getAllocator(), rd); 
 		});
 	}

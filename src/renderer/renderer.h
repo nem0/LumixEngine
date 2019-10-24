@@ -4,7 +4,7 @@
 #include "engine/iplugin.h"
 #include "engine/math.h"
 #include "engine/string.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 
 
 namespace Lumix
@@ -40,7 +40,7 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 
 		struct TransientSlice
 		{
-			ffr::BufferHandle buffer;
+			gpu::BufferHandle buffer;
 			u32 offset;
 			u32 size;
 			u8* ptr;
@@ -59,13 +59,13 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual u8 getShaderDefineIdx(const char* define) = 0;
 		virtual const char* getShaderDefine(int define_idx) const = 0;
 		virtual int getShaderDefinesCount() const = 0;
-		virtual ffr::ProgramHandle queueShaderCompile(class Shader& shader, ffr::VertexDecl decl, u32 defines) = 0;
+		virtual gpu::ProgramHandle queueShaderCompile(class Shader& shader, gpu::VertexDecl decl, u32 defines) = 0;
 		virtual FontManager& getFontManager() = 0;
 		virtual ResourceManager& getTextureManager() = 0;
 		
 		virtual u32 createMaterialConstants(const MaterialConsts& data) = 0;
 		virtual void destroyMaterialConstants(u32 id) = 0;
-		virtual ffr::BufferHandle getMaterialUniformBuffer() = 0;
+		virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 
 		virtual IAllocator& getAllocator() = 0;
 		virtual MemRef allocate(u32 size) = 0;
@@ -73,15 +73,15 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void free(const MemRef& memory) = 0;
 		
 		virtual TransientSlice allocTransient(u32 size) = 0;
-		virtual ffr::BufferHandle createBuffer(const MemRef& memory, u32 flags) = 0;
-		virtual void destroy(ffr::BufferHandle buffer) = 0;
-		virtual void destroy(ffr::ProgramHandle program) = 0;
+		virtual gpu::BufferHandle createBuffer(const MemRef& memory, u32 flags) = 0;
+		virtual void destroy(gpu::BufferHandle buffer) = 0;
+		virtual void destroy(gpu::ProgramHandle program) = 0;
 		
-		virtual ffr::TextureHandle createTexture(u32 w, u32 h, u32 depth, ffr::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) = 0;
-		virtual ffr::TextureHandle loadTexture(const MemRef& memory, u32 flags, ffr::TextureInfo* info, const char* debug_name) = 0;
-		virtual void updateTexture(ffr::TextureHandle handle, u32 x, u32 y, u32 w, u32 h, ffr::TextureFormat format, const MemRef& memory) = 0;
-		virtual void getTextureImage(ffr::TextureHandle texture, int size, void* data) = 0;
-		virtual void destroy(ffr::TextureHandle tex) = 0;
+		virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) = 0;
+		virtual gpu::TextureHandle loadTexture(const MemRef& memory, u32 flags, gpu::TextureInfo* info, const char* debug_name) = 0;
+		virtual void updateTexture(gpu::TextureHandle handle, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& memory) = 0;
+		virtual void getTextureImage(gpu::TextureHandle texture, int size, void* data) = 0;
+		virtual void destroy(gpu::TextureHandle tex) = 0;
 		
 		virtual void queue(RenderJob* cmd, i64 profiler_link) = 0;
 

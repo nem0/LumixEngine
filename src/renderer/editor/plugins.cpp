@@ -1,4 +1,3 @@
-#include "../ffr/ffr.h"
 #include "animation/animation.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -30,7 +29,7 @@
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "renderer/culling_system.h"
-#include "renderer/ffr/ffr.h"
+#include "renderer/gpu/gpu.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -1165,14 +1164,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				ffr::getTextureImage(texture, mem.size, mem.data);
+				gpu::getTextureImage(texture, mem.size, mem.data);
 			}
 
 			Renderer::MemRef mem;
-			ffr::TextureHandle texture;
+			gpu::TextureHandle texture;
 		};
 
-		m_tile.texture = ffr::allocTextureHandle(); 
+		m_tile.texture = gpu::allocTextureHandle(); 
 
 		Cmd* cmd = LUMIX_NEW(renderer->getAllocator(), Cmd);
 		cmd->texture = m_tile.pipeline->getOutput();
@@ -1223,14 +1222,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				ffr::getTextureImage(texture, mem.size, mem.data);
+				gpu::getTextureImage(texture, mem.size, mem.data);
 			}
 
 			Renderer::MemRef mem;
-			ffr::TextureHandle texture;
+			gpu::TextureHandle texture;
 		};
 
-		m_tile.texture = ffr::allocTextureHandle(); 
+		m_tile.texture = gpu::allocTextureHandle(); 
 		
 
 		Cmd* cmd = LUMIX_NEW(renderer->getAllocator(), Cmd);
@@ -1283,14 +1282,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		int frame_countdown = -1;
 		u32 path_hash;
 		Array<u8> data;
-		ffr::TextureHandle texture = ffr::INVALID_TEXTURE;
+		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
 		Queue<Resource*, 8> queue;
 		Array<Path> paths;
 	} m_tile;
 	
 
 	StudioApp& m_app;
-	ffr::TextureHandle m_preview;
+	gpu::TextureHandle m_preview;
 	Universe* m_universe;
 	Viewport m_viewport;
 	Pipeline* m_pipeline;
@@ -1650,9 +1649,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				renderer->runInRenderThread(this, [](Renderer& r, void* ptr){
 					TexturePlugin* p = (TexturePlugin*)ptr;
 					if (!p->m_texture_view.isValid()) {
-						p->m_texture_view = ffr::allocTextureHandle();
+						p->m_texture_view = gpu::allocTextureHandle();
 					}
-					ffr::createTextureView(p->m_texture_view, p->m_texture->handle);
+					gpu::createTextureView(p->m_texture_view, p->m_texture->handle);
 				});
 			}
 
@@ -1710,7 +1709,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	StudioApp& m_app;
 	Texture* m_texture;
-	ffr::TextureHandle m_texture_view = ffr::INVALID_TEXTURE;
+	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
 	JobSystem::SignalHandle m_tile_signal = JobSystem::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
@@ -2059,7 +2058,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 		m_data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
-		const bool ndc_bottom_left = ffr::isOriginBottomLeft();
+		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 		for (int i = 0; i < 6; ++i) {
 			Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
 			Matrix mtx = Matrix::IDENTITY;
@@ -2071,7 +2070,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			m_pipeline->setViewport(viewport);
 			m_pipeline->render(false);
 
-			const ffr::TextureHandle res = m_pipeline->getOutput();
+			const gpu::TextureHandle res = m_pipeline->getOutput();
 			ASSERT(res.isValid());
 			renderer->getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 		}
@@ -2395,7 +2394,7 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
 			Path("font"), *engine.getResourceManager().get(Texture::TYPE), m_renderer, engine.getAllocator());
 
-		texture->create(width, height, ffr::TextureFormat::RGBA8, pixels, width * height * 4);
+		texture->create(width, height, gpu::TextureFormat::RGBA8, pixels, width * height * 4);
 		material->setTexture(0, texture);
 		if (old_texture)
 		{
@@ -2438,7 +2437,7 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 		auto& allocator = m_editor.getAllocator();
 
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
-		texture->create(w, h, ffr::TextureFormat::RGBA8, pixels, w * h * 4);
+		texture->create(w, h, gpu::TextureFormat::RGBA8, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, texture);
 		return (ImTextureID)(uintptr_t)texture->handle.value;
 	}
@@ -2458,7 +2457,7 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 
 	bool isValid(ImTextureID texture) override
 	{
-		return texture && ((ffr::TextureHandle*)texture)->isValid();
+		return texture && ((gpu::TextureHandle*)texture)->isValid();
 	}
 
 
@@ -2666,10 +2665,10 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			init_render = !plugin->m_program.isValid();
 			
 			if (init_render) {
-				plugin->m_index_buffer = ffr::allocBufferHandle();
-				plugin->m_vertex_buffer = ffr::allocBufferHandle();
-				plugin->m_uniform_buffer = ffr::allocBufferHandle();
-				plugin->m_program = ffr::allocProgramHandle();
+				plugin->m_index_buffer = gpu::allocBufferHandle();
+				plugin->m_vertex_buffer = gpu::allocBufferHandle();
+				plugin->m_uniform_buffer = gpu::allocBufferHandle();
+				plugin->m_program = gpu::allocProgramHandle();
 			}
 		
 			width = plugin->m_width;
@@ -2689,25 +2688,25 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 			const bool use_big_buffers = num_vertices * sizeof(ImDrawVert) > 256 * 1024 ||
 				num_indices * sizeof(ImDrawIdx) > 256 * 1024;
-			ffr::useProgram(program);
+			gpu::useProgram(program);
 
-			ffr::BufferHandle big_ib, big_vb;
+			gpu::BufferHandle big_ib, big_vb;
 			if (use_big_buffers) {
-				big_vb = ffr::allocBufferHandle();
-				big_ib = ffr::allocBufferHandle();
-				ffr::createBuffer(big_vb, (u32)ffr::BufferFlags::IMMUTABLE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
-				ffr::createBuffer(big_ib, (u32)ffr::BufferFlags::IMMUTABLE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
-				ffr::bindIndexBuffer(big_ib);
-				ffr::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+				big_vb = gpu::allocBufferHandle();
+				big_ib = gpu::allocBufferHandle();
+				gpu::createBuffer(big_vb, (u32)gpu::BufferFlags::IMMUTABLE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
+				gpu::createBuffer(big_ib, (u32)gpu::BufferFlags::IMMUTABLE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
+				gpu::bindIndexBuffer(big_ib);
+				gpu::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			}
 			else {
-				ffr::update(ib, cmd_list.idx_buffer.data, num_indices * sizeof(ImDrawIdx));
-				ffr::update(vb, cmd_list.vtx_buffer.data, num_vertices * sizeof(ImDrawVert));
+				gpu::update(ib, cmd_list.idx_buffer.data, num_indices * sizeof(ImDrawIdx));
+				gpu::update(vb, cmd_list.vtx_buffer.data, num_vertices * sizeof(ImDrawVert));
 
-				ffr::bindIndexBuffer(ib);
-				ffr::bindVertexBuffer(0, vb, 0, sizeof(ImDrawVert));
-				ffr::bindVertexBuffer(1, ffr::INVALID_BUFFER, 0, 0);
+				gpu::bindIndexBuffer(ib);
+				gpu::bindVertexBuffer(0, vb, 0, sizeof(ImDrawVert));
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			}
 			renderer->free(cmd_list.vtx_buffer);
 			renderer->free(cmd_list.idx_buffer);
@@ -2715,8 +2714,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
 			// TODO enable only when dc.textures[0].value != m_scene_view.getTextureHandle().value);
-			const u64 blend_state = ffr::getBlendStateBits(ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA, ffr::BlendFactors::SRC_ALPHA, ffr::BlendFactors::ONE_MINUS_SRC_ALPHA);
-			ffr::setState((u64)ffr::StateFlags::SCISSOR_TEST | blend_state);
+			const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+			gpu::setState((u64)gpu::StateFlags::SCISSOR_TEST | blend_state);
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 			{
 				ASSERT(!pcmd->UserCallback);
@@ -2731,32 +2730,32 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 							}
 				*/
 
-				ffr::TextureHandle tex = ffr::TextureHandle{(u32)(intptr_t)pcmd->TextureId};
+				gpu::TextureHandle tex = gpu::TextureHandle{(u32)(intptr_t)pcmd->TextureId};
 				if (!tex.isValid()) tex = *default_texture;
-				ffr::bindTextures(&tex, 0, 1);
+				gpu::bindTextures(&tex, 0, 1);
 
 				const u32 h = u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f));
 
-				if(ffr::isOriginBottomLeft()) {
-					ffr::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
+				if(gpu::isOriginBottomLeft()) {
+					gpu::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
 						height - u32(maximum(pcmd->ClipRect.y, 0.0f)) - h,
 						u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
 						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 				}
 				else {
-					ffr::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
+					gpu::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
 						u32(maximum(pcmd->ClipRect.y, 0.0f)),
 						u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
 						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
 				}
 
-				ffr::drawElements(elem_offset * sizeof(u32), pcmd->ElemCount, ffr::PrimitiveType::TRIANGLES, ffr::DataType::U32);
+				gpu::drawElements(elem_offset * sizeof(u32), pcmd->ElemCount, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
 		
 				elem_offset += pcmd->ElemCount;
 			}
 			if(use_big_buffers) {
-				ffr::destroy(big_ib);
-				ffr::destroy(big_vb);
+				gpu::destroy(big_ib);
+				gpu::destroy(big_vb);
 			}
 			else {
 				ib_offset += num_indices;
@@ -2770,14 +2769,14 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 
 			if(init_render) {
-				ffr::createBuffer(ub, (u32)ffr::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
-				ffr::createBuffer(ib, 0, 256 * 1024, nullptr);
-				ffr::createBuffer(vb, 0, 256 * 1024, nullptr);
-				ffr::ShaderType types[] = {ffr::ShaderType::VERTEX, ffr::ShaderType::FRAGMENT};
-				ffr::VertexDecl decl;
-				decl.addAttribute(0, 0, 2, ffr::AttributeType::FLOAT, 0);
-				decl.addAttribute(1, 8, 2, ffr::AttributeType::FLOAT, 0);
-				decl.addAttribute(2, 16, 4, ffr::AttributeType::U8, ffr::Attribute::NORMALIZED);
+				gpu::createBuffer(ub, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+				gpu::createBuffer(ib, 0, 256 * 1024, nullptr);
+				gpu::createBuffer(vb, 0, 256 * 1024, nullptr);
+				gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
+				gpu::VertexDecl decl;
+				decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
+				decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
 
 				const char* vs =
 					R"#(
@@ -2807,23 +2806,23 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 						o_color.a = v_color.a * tc.a;
 					})#";
 				const char* srcs[] = {vs, fs};
-				ffr::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+				gpu::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
-			ffr::pushDebugGroup("imgui");
-			ffr::setFramebuffer(nullptr, 0, 0);
+			gpu::pushDebugGroup("imgui");
+			gpu::setFramebuffer(nullptr, 0, 0);
 
 			const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
-			ffr::clear((u32)ffr::ClearFlags::COLOR | (u32)ffr::ClearFlags::DEPTH, clear_color, 1.0);
+			gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH, clear_color, 1.0);
 
-			ffr::viewport(0, 0, width, height);
-			const bool is_dx = ffr::getBackend() == ffr::Backend::DX11;
+			gpu::viewport(0, 0, width, height);
+			const bool is_dx = gpu::getBackend() == gpu::Backend::DX11;
 			const Vec4 canvas_mtx[] = {
 				Vec4(2.f / width, 0, -1, 0),
 				Vec4(0, -2.f / height, 1, 0)
 			};
-			ffr::update(ub, canvas_mtx, sizeof(canvas_mtx));
-			ffr::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
+			gpu::update(ub, canvas_mtx, sizeof(canvas_mtx));
+			gpu::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
 
 			vb_offset = 0;
 			ib_offset = 0;
@@ -2831,20 +2830,20 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				draw(cmd_list);
 			}
 
-			ffr::popDebugGroup();
+			gpu::popDebugGroup();
 		}
 		
 		Renderer* renderer;
-		const ffr::TextureHandle* default_texture;
+		const gpu::TextureHandle* default_texture;
 		u32 width, height;
 		Array<CmdList> command_lists;
 		u32 ib_offset;
 		u32 vb_offset;
 		IAllocator& allocator;
-		ffr::BufferHandle ib;
-		ffr::BufferHandle vb;
-		ffr::BufferHandle ub;
-		ffr::ProgramHandle program;
+		gpu::BufferHandle ib;
+		gpu::BufferHandle vb;
+		gpu::BufferHandle ub;
+		gpu::ProgramHandle program;
 		bool init_render;
 		EditorUIRenderPlugin* plugin;
 	};
@@ -2857,10 +2856,10 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		, m_width(-1)
 		, m_height(-1)
 		, m_engine(app.getWorldEditor().getEngine())
-		, m_index_buffer(ffr::INVALID_BUFFER)
-		, m_vertex_buffer(ffr::INVALID_BUFFER)
-		, m_uniform_buffer(ffr::INVALID_BUFFER)
-		, m_program(ffr::INVALID_PROGRAM)
+		, m_index_buffer(gpu::INVALID_BUFFER)
+		, m_vertex_buffer(gpu::INVALID_BUFFER)
+		, m_uniform_buffer(gpu::INVALID_BUFFER)
+		, m_program(gpu::INVALID_PROGRAM)
 	{
 		WorldEditor& editor = app.getWorldEditor();
 
@@ -2878,7 +2877,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
-		m_texture = renderer->createTexture(width, height, 1, ffr::TextureFormat::RGBA8, 0, mem, "editor_font_atlas");
+		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, 0, mem, "editor_font_atlas");
 		ImGui::GetIO().Fonts->TexID = (void*)(intptr_t)m_texture.value;
 
 		IAllocator& allocator = editor.getAllocator();
@@ -2937,11 +2936,11 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 	Engine& m_engine;
 	SceneView& m_scene_view;
 	GameView& m_game_view;
-	ffr::TextureHandle m_texture;
-	ffr::BufferHandle m_index_buffer;
-	ffr::BufferHandle m_vertex_buffer;
-	ffr::BufferHandle m_uniform_buffer;
-	ffr::ProgramHandle m_program;
+	gpu::TextureHandle m_texture;
+	gpu::BufferHandle m_index_buffer;
+	gpu::BufferHandle m_vertex_buffer;
+	gpu::BufferHandle m_uniform_buffer;
+	gpu::ProgramHandle m_program;
 };
 
 

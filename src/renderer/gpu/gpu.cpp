@@ -1,4 +1,4 @@
-#include "ffr.h"
+#include "gpu.h"
 #include "engine/array.h"
 #include "engine/crc32.h"
 #include "engine/hash_map.h"
@@ -10,13 +10,13 @@
 #include <gl/GL.h>
 #include "renderdoc_app.h"
 
-#define FFR_GL_IMPORT(prototype, name) static prototype name;
-#define FFR_GL_IMPORT_TYPEDEFS
+#define GPU_GL_IMPORT(prototype, name) static prototype name;
+#define GPU_GL_IMPORT_TYPEDEFS
 
 #include "gl_ext.h"
 
-#undef FFR_GL_IMPORT_TYPEDEFS
-#undef FFR_GL_IMPORT
+#undef GPU_GL_IMPORT_TYPEDEFS
+#undef GPU_GL_IMPORT
 
 //Request high performace profiles from mobile chipsets
 extern "C" {
@@ -28,7 +28,7 @@ namespace Lumix
 {
 
 
-namespace ffr {
+namespace gpu {
 
 struct Buffer
 {
@@ -111,7 +111,7 @@ static struct {
 	ProgramHandle last_program = INVALID_PROGRAM;
 	u64 last_state = 0;
 	GLuint framebuffer = 0;
-} g_ffr;
+} g_gpu;
 
 
 namespace DDS
@@ -504,7 +504,7 @@ static LUMIX_FORCE_INLINE void swapMemory(void* mem1, void* mem2, int size)
 	}
 	else
 	{
-		Array<u8> tmp(*g_ffr.allocator);
+		Array<u8> tmp(*g_gpu.allocator);
 		tmp.resize(size);
 		memcpy(&tmp[0], mem1, size);
 		memcpy(mem1, mem2, size);
@@ -698,7 +698,7 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 
 void checkThread()
 {
-	ASSERT(g_ffr.thread == GetCurrentThreadId());
+	ASSERT(g_gpu.thread == GetCurrentThreadId());
 }
 
 static void try_load_renderdoc()
@@ -707,8 +707,8 @@ static void try_load_renderdoc()
 	if (!lib) return;
 	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(lib, "RENDERDOC_GetAPI");
 	if (RENDERDOC_GetAPI) {
-		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void **)&g_ffr.rdoc_api);
-		g_ffr.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
+		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void **)&g_gpu.rdoc_api);
+		g_gpu.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
 	}
 	/**/
 	//FreeLibrary(lib);
@@ -775,7 +775,7 @@ static int load_gl(void* device_contex, u32 init_flags)
 	wglDeleteContext(dummy_context);
 	wglSwapIntervalEXT(vsync ? 1 : 0);
 
-	#define FFR_GL_IMPORT(prototype, name) \
+	#define GPU_GL_IMPORT(prototype, name) \
 		do { \
 			name = (prototype)wglGetProcAddress(#name); \
 			if (!name) { \
@@ -786,7 +786,7 @@ static int load_gl(void* device_contex, u32 init_flags)
 
 	#include "gl_ext.h"
 
-	#undef FFR_GL_IMPORT
+	#undef GPU_GL_IMPORT
 
 	return 1;
 }
@@ -836,9 +836,9 @@ void scissor(u32 x,u32 y,u32 w,u32 h)
 
 void useProgram(ProgramHandle handle)
 {
-	const Program& prg = g_ffr.programs.values[handle.value];
-	if(g_ffr.last_program.value != handle.value) {
-		g_ffr.last_program = handle;
+	const Program& prg = g_gpu.programs.values[handle.value];
+	if(g_gpu.last_program.value != handle.value) {
+		g_gpu.last_program = handle;
 		if (!handle.isValid()) {
 			CHECK_GL(glBindVertexArray(0));
 			CHECK_GL(glUseProgram(0));
@@ -859,7 +859,7 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 	
 	for(u32 i = 0; i < count; ++i) {
 		if (handles[i].isValid()) {
-			gl_handles[i] = g_ffr.textures[handles[i].value].handle;
+			gl_handles[i] = g_gpu.textures[handles[i].value].handle;
 		}
 		else {
 			gl_handles[i] = 0;
@@ -873,7 +873,7 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset) {
 	checkThread();
 	if(buffer.isValid()) {
-		const GLuint gl_handle = g_ffr.buffers[buffer.value].handle;
+		const GLuint gl_handle = g_gpu.buffers[buffer.value].handle;
 		CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
 	}
 	else {
@@ -886,8 +886,8 @@ void setState(u64 state)
 {
 	checkThread();
 	
-	if(state == g_ffr.last_state) return;
-	g_ffr.last_state = state;
+	if(state == g_gpu.last_state) return;
+	g_gpu.last_state = state;
 
 	if (state & u64(StateFlags::DEPTH_TEST)) CHECK_GL(glEnable(GL_DEPTH_TEST));
 	else CHECK_GL(glDisable(GL_DEPTH_TEST));
@@ -983,7 +983,7 @@ void bindIndexBuffer(BufferHandle handle)
 {
 	checkThread();
 	if(handle.isValid()) {	
-		const GLuint ib = g_ffr.buffers[handle.value].handle;
+		const GLuint ib = g_gpu.buffers[handle.value].handle;
 		CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib));
 		return;
 	}
@@ -1077,7 +1077,7 @@ void drawArrays(u32 offset, u32 count, PrimitiveType type)
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size)
 {
 	checkThread();
-	const GLuint buf = g_ffr.buffers[buffer.value].handle;
+	const GLuint buf = g_gpu.buffers[buffer.value].handle;
 	CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size));
 }
 
@@ -1085,7 +1085,7 @@ void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t siz
 void* map(BufferHandle buffer, size_t size)
 {
 	checkThread();
-	const Buffer& b = g_ffr.buffers[buffer.value];
+	const Buffer& b = g_gpu.buffers[buffer.value];
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
 	const GLbitfield gl_flags = GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT;
 	return glMapNamedBufferRange(b.handle, 0, size, gl_flags);
@@ -1095,7 +1095,7 @@ void* map(BufferHandle buffer, size_t size)
 void unmap(BufferHandle buffer)
 {
 	checkThread();
-	const GLuint buf = g_ffr.buffers[buffer.value].handle;
+	const GLuint buf = g_gpu.buffers[buffer.value].handle;
 	CHECK_GL(glUnmapNamedBuffer(buf));
 }
 
@@ -1103,7 +1103,7 @@ void unmap(BufferHandle buffer)
 void update(BufferHandle buffer, const void* data, size_t size)
 {
 	checkThread();
-	const Buffer& b = g_ffr.buffers[buffer.value];
+	const Buffer& b = g_gpu.buffers[buffer.value];
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
 	const GLuint buf = b.handle;
 	CHECK_GL(glNamedBufferSubData(buf, 0, size, data));
@@ -1112,16 +1112,16 @@ void update(BufferHandle buffer, const void* data, size_t size)
 
 void startCapture()
 {
-	if (g_ffr.rdoc_api) {
-		g_ffr.rdoc_api->StartFrameCapture(nullptr, nullptr);
+	if (g_gpu.rdoc_api) {
+		g_gpu.rdoc_api->StartFrameCapture(nullptr, nullptr);
 	}
 }
 
 
 void stopCapture()
 {
-	if (g_ffr.rdoc_api) {
-		g_ffr.rdoc_api->EndFrameCapture(nullptr, nullptr);
+	if (g_gpu.rdoc_api) {
+		g_gpu.rdoc_api->EndFrameCapture(nullptr, nullptr);
 	}
 }
 
@@ -1130,7 +1130,7 @@ Backend getBackend() { return Backend::OPENGL; }
 void swapBuffers(u32, u32)
 {
 	checkThread();
-	HDC hdc = (HDC)g_ffr.device_context;
+	HDC hdc = (HDC)g_gpu.device_context;
 	SwapBuffers(hdc);
 }
 
@@ -1179,8 +1179,8 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT;
 	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
 
-	g_ffr.buffers[buffer.value].handle = buf;
-	g_ffr.buffers[buffer.value].flags = flags;
+	g_gpu.buffers[buffer.value].handle = buf;
+	g_gpu.buffers[buffer.value].flags = flags;
 }
 
 
@@ -1188,12 +1188,12 @@ void destroy(ProgramHandle program)
 {
 	checkThread();
 	
-	Program& p = g_ffr.programs[program.value];
+	Program& p = g_gpu.programs[program.value];
 	const GLuint handle = p.handle;
 	CHECK_GL(glDeleteProgram(handle));
 
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
-	g_ffr.programs.dealloc(program.value);
+	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	g_gpu.programs.dealloc(program.value);
 }
 
 static struct {
@@ -1245,7 +1245,7 @@ TextureInfo getTextureInfo(const void* data)
 void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf)
 {
 	checkThread();
-	Texture& t = g_ffr.textures[texture.value];
+	Texture& t = g_gpu.textures[texture.value];
 	const GLuint handle = t.handle;
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if (s_texture_formats[i].format == format) {
@@ -1352,7 +1352,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
-				Array<u8> data(*g_ffr.allocator);
+				Array<u8> data(*g_gpu.allocator);
 				data.resize(size);
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					blob.read(&data[0], size);
@@ -1384,10 +1384,10 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
-				Array<u8> data(*g_ffr.allocator);
+				Array<u8> data(*g_gpu.allocator);
 				data.resize(size);
 				u32 palette[256];
-				Array<u32> unpacked(*g_ffr.allocator);
+				Array<u32> unpacked(*g_gpu.allocator);
 				unpacked.resize(size);
 				blob.read(palette, 4 * 256);
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
@@ -1412,7 +1412,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 					CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE));
 				}
 				u32 size = width * height * li->blockBytes;
-				Array<u8> data(*g_ffr.allocator);
+				Array<u8> data(*g_gpu.allocator);
 				data.resize(size);
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					blob.read(&data[0], size);
@@ -1440,7 +1440,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v));
 	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w));
 
-	Texture& t = g_ffr.textures[handle.value];
+	Texture& t = g_gpu.textures[handle.value];
 	t.format = internal_format;
 	t.handle = texture;
 	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
@@ -1450,14 +1450,14 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 ProgramHandle allocProgramHandle()
 {
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
 
-	if(g_ffr.programs.isFull()) {
-		logError("Renderer") << "FFR is out of free program slots.";
+	if(g_gpu.programs.isFull()) {
+		logError("Renderer") << "Not enough free program slots.";
 		return INVALID_PROGRAM;
 	}
-	const int id = g_ffr.programs.alloc();
-	Program& p = g_ffr.programs[id];
+	const int id = g_gpu.programs.alloc();
+	Program& p = g_gpu.programs[id];
 	p.handle = 0;
 	return { (u32)id };
 }
@@ -1465,14 +1465,14 @@ ProgramHandle allocProgramHandle()
 
 BufferHandle allocBufferHandle()
 {
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
 
-	if(g_ffr.buffers.isFull()) {
-		logError("Renderer") << "FFR is out of free buffer slots.";
+	if(g_gpu.buffers.isFull()) {
+		logError("Renderer") << "Not enough free buffer slots.";
 		return INVALID_BUFFER;
 	}
-	const int id = g_ffr.buffers.alloc();
-	Buffer& t = g_ffr.buffers[id];
+	const int id = g_gpu.buffers.alloc();
+	Buffer& t = g_gpu.buffers[id];
 	t.handle = 0;
 	return { (u32)id };
 }
@@ -1480,14 +1480,14 @@ BufferHandle allocBufferHandle()
 
 TextureHandle allocTextureHandle()
 {
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
+	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
 
-	if(g_ffr.textures.isFull()) {
-		logError("Renderer") << "FFR is out of free texture slots.";
+	if(g_gpu.textures.isFull()) {
+		logError("Renderer") << "Not enough free texture slots.";
 		return INVALID_TEXTURE;
 	}
-	const int id = g_ffr.textures.alloc();
-	Texture& t = g_ffr.textures[id];
+	const int id = g_gpu.textures.alloc();
+	Texture& t = g_gpu.textures[id];
 	t.handle = 0;
 	return { (u32)id };
 }
@@ -1497,8 +1497,8 @@ void createTextureView(TextureHandle view_handle, TextureHandle orig_handle)
 {
 	checkThread();
 	
-	const Texture& orig = g_ffr.textures[orig_handle.value];
-	Texture& view = g_ffr.textures[view_handle.value];
+	const Texture& orig = g_gpu.textures[orig_handle.value];
+	Texture& view = g_gpu.textures[view_handle.value];
 
 	if (view.handle != 0) {
 		CHECK_GL(glDeleteTextures(1, &view.handle));
@@ -1592,7 +1592,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
 	}
 
-	Texture& t = g_ffr.textures[handle.value];
+	Texture& t = g_gpu.textures[handle.value];
 	t.handle = texture;
 	t.target = target;
 	t.format = internal_format;
@@ -1604,12 +1604,12 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 void destroy(TextureHandle texture)
 {
 	checkThread();
-	Texture& t = g_ffr.textures[texture.value];
+	Texture& t = g_gpu.textures[texture.value];
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteTextures(1, &handle));
 
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
-	g_ffr.textures.dealloc(texture.value);
+	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	g_gpu.textures.dealloc(texture.value);
 }
 
 
@@ -1617,22 +1617,22 @@ void destroy(BufferHandle buffer)
 {
 	checkThread();
 	
-	Buffer& t = g_ffr.buffers[buffer.value];
+	Buffer& t = g_gpu.buffers[buffer.value];
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteBuffers(1, &handle));
 
-	MT::CriticalSectionLock lock(g_ffr.handle_mutex);
-	g_ffr.buffers.dealloc(buffer.value);
+	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	g_gpu.buffers.dealloc(buffer.value);
 }
 
 
 void clear(u32 flags, const float* color, float depth)
 {
 	CHECK_GL(glUseProgram(0));
-	g_ffr.last_program = INVALID_PROGRAM;
+	g_gpu.last_program = INVALID_PROGRAM;
 	CHECK_GL(glDisable(GL_SCISSOR_TEST));
 	CHECK_GL(glDisable(GL_BLEND));
-	g_ffr.last_state &= ~u64(0xffFF << 6);
+	g_gpu.last_state &= ~u64(0xffFF << 6);
 	checkThread();
 	GLbitfield gl_flags = 0;
 	if (flags & (u32)ClearFlags::COLOR) {
@@ -1646,7 +1646,7 @@ void clear(u32 flags, const float* color, float depth)
 	}
 	if (flags & (u32)ClearFlags::STENCIL) {
 		glStencilMask(0xff);
-		g_ffr.last_state = g_ffr.last_state | (0xff << 22);
+		g_gpu.last_state = g_gpu.last_state | (0xff << 22);
 		glClearStencil(0);
 		gl_flags |= GL_STENCIL_BUFFER_BIT;
 	}
@@ -1726,7 +1726,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			GLint log_len = 0;
 			CHECK_GL(glGetShaderiv(shd, GL_INFO_LOG_LENGTH, &log_len));
 			if (log_len > 0) {
-				Array<char> log_buf(*g_ffr.allocator);
+				Array<char> log_buf(*g_gpu.allocator);
 				log_buf.resize(log_len);
 				CHECK_GL(glGetShaderInfoLog(shd, log_len, &log_len, &log_buf[0]));
 				logError("Renderer") << name << " - " << shaderTypeToString(types[i]) << ": " << &log_buf[0];
@@ -1750,7 +1750,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		GLint log_len = 0;
 		CHECK_GL(glGetProgramiv(prg, GL_INFO_LOG_LENGTH, &log_len));
 		if (log_len > 0) {
-			Array<char> log_buf(*g_ffr.allocator);
+			Array<char> log_buf(*g_gpu.allocator);
 			log_buf.resize(log_len);
 			CHECK_GL(glGetProgramInfoLog(prg, log_len, &log_len, &log_buf[0]));
 			logError("Renderer") << name << ": " << &log_buf[0];
@@ -1763,8 +1763,8 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 	}
 
 	const int id = prog.value;
-	g_ffr.programs[id].handle = prg;
-	g_ffr.programs[id].vao = createVAO(decl);
+	g_gpu.programs[id].handle = prg;
+	g_gpu.programs[id].vao = createVAO(decl);
 	return true;
 }
 
@@ -1785,10 +1785,10 @@ static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum seve
 void preinit(IAllocator& allocator)
 {
 	try_load_renderdoc();
-	g_ffr.allocator = &allocator;
-	g_ffr.textures.create(*g_ffr.allocator);
-	g_ffr.buffers.create(*g_ffr.allocator);
-	g_ffr.programs.create(*g_ffr.allocator);
+	g_gpu.allocator = &allocator;
+	g_gpu.textures.create(*g_gpu.allocator);
+	g_gpu.buffers.create(*g_gpu.allocator);
+	g_gpu.programs.create(*g_gpu.allocator);
 }
 
 
@@ -1799,12 +1799,12 @@ bool init(void* window_handle, u32 init_flags)
 	#else 
 		const bool debug = init_flags & (u32)InitFlags::DEBUG_OUTPUT;
 	#endif
-	g_ffr.device_context = GetDC((HWND)window_handle);
-	g_ffr.thread = GetCurrentThreadId();
+	g_gpu.device_context = GetDC((HWND)window_handle);
+	g_gpu.thread = GetCurrentThreadId();
 
-	if (!load_gl(g_ffr.device_context, init_flags)) return false;
+	if (!load_gl(g_gpu.device_context, init_flags)) return false;
 
-	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_ffr.max_vertex_attributes);
+	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_gpu.max_vertex_attributes);
 
 /*	int extensions_count;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
@@ -1828,9 +1828,9 @@ bool init(void* window_handle, u32 init_flags)
 
 	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
 	CHECK_GL(glBindVertexArray(0));	
-	CHECK_GL(glCreateFramebuffers(1, &g_ffr.framebuffer));
+	CHECK_GL(glCreateFramebuffers(1, &g_gpu.framebuffer));
 
-	g_ffr.last_state = 1;
+	g_gpu.last_state = 1;
 	setState(0);
 
 	return true;
@@ -1843,22 +1843,22 @@ bool isHomogenousDepth() { return false; }
 bool isOriginBottomLeft() { return true; }
 
 
-void generateMipmaps(ffr::TextureHandle texture)
+void generateMipmaps(gpu::TextureHandle texture)
 {
 	checkThread();
 
-	Texture& t = g_ffr.textures[texture.value];
+	Texture& t = g_gpu.textures[texture.value];
 	const GLuint handle = t.handle;
 
 	CHECK_GL(glGenerateTextureMipmap(handle));
 }
 
 
-void getTextureImage(ffr::TextureHandle texture, u32 size, void* buf)
+void getTextureImage(gpu::TextureHandle texture, u32 size, void* buf)
 {
 	checkThread();
 
-	Texture& t = g_ffr.textures[texture.value];
+	Texture& t = g_gpu.textures[texture.value];
 	const GLuint handle = t.handle;
 
 	CHECK_GL(glGetTextureImage(handle, 0, GL_RGBA, GL_UNSIGNED_BYTE, size, buf));
@@ -1935,25 +1935,25 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	bool depth_bound = false;
 	u32 rb_count = 0;
 	for (u32 i = 0; i < num; ++i) {
-		const GLuint t = g_ffr.textures[attachments[i].value].handle;
+		const GLuint t = g_gpu.textures[attachments[i].value].handle;
 		GLint internal_format;
 		CHECK_GL(glBindTexture(GL_TEXTURE_2D, t));
 		CHECK_GL(glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format));
 		
 		switch(internal_format) {
 			case GL_DEPTH24_STENCIL8:
-				CHECK_GL(glNamedFramebufferRenderbuffer(g_ffr.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0));
-				CHECK_GL(glNamedFramebufferTexture(g_ffr.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, t, 0));
+				CHECK_GL(glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0));
+				CHECK_GL(glNamedFramebufferTexture(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, t, 0));
 				depth_bound = true;
 				break;
 			case GL_DEPTH_COMPONENT24:
 			case GL_DEPTH_COMPONENT32:
-				CHECK_GL(glNamedFramebufferRenderbuffer(g_ffr.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
-				CHECK_GL(glNamedFramebufferTexture(g_ffr.framebuffer, GL_DEPTH_ATTACHMENT, t, 0));
+				CHECK_GL(glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
+				CHECK_GL(glNamedFramebufferTexture(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, t, 0));
 				depth_bound = true;
 				break;
 			default:
-				CHECK_GL(glNamedFramebufferTexture(g_ffr.framebuffer, GL_COLOR_ATTACHMENT0 + i, t, 0));
+				CHECK_GL(glNamedFramebufferTexture(g_gpu.framebuffer, GL_COLOR_ATTACHMENT0 + i, t, 0));
 				++rb_count;
 				break;
 		}
@@ -1962,15 +1962,15 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	GLint max_attachments = 0;
 	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
 	for(int i = rb_count; i < max_attachments; ++i) {
-		glNamedFramebufferRenderbuffer(g_ffr.framebuffer, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
 	}
 
 	if(!depth_bound) {
-		glNamedFramebufferRenderbuffer(g_ffr.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
-		glNamedFramebufferRenderbuffer(g_ffr.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
 	}
 
-	glBindFramebuffer(GL_FRAMEBUFFER, g_ffr.framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
 	auto status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	ASSERT(status == GL_FRAMEBUFFER_COMPLETE);
 
@@ -1984,11 +1984,11 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 void shutdown()
 {
 	checkThread();
-	g_ffr.textures.destroy(*g_ffr.allocator);
-	g_ffr.buffers.destroy(*g_ffr.allocator);
-	g_ffr.programs.destroy(*g_ffr.allocator);
+	g_gpu.textures.destroy(*g_gpu.allocator);
+	g_gpu.buffers.destroy(*g_gpu.allocator);
+	g_gpu.programs.destroy(*g_gpu.allocator);
 }
 
-} // ns ffr 
+} // ns gpu 
 
 } // ns Lumix

@@ -13,7 +13,7 @@ struct lua_State;
 namespace Lumix
 {
 
-namespace ffr { 
+namespace gpu { 
 	struct BufferHandle; 
 	struct ProgramHandle; 
 	struct TextureHandle; 
@@ -86,12 +86,12 @@ public:
 	virtual const Path& getPath() = 0;
 	virtual void callLuaFunction(const char* func) = 0;
 	virtual void setViewport(const Viewport& viewport) = 0;
-	virtual ffr::BufferHandle getDrawcallUniformBuffer() = 0;
+	virtual gpu::BufferHandle getDrawcallUniformBuffer() = 0;
 	virtual void define(const char* define, bool enable) = 0;
 
 	virtual Draw2D& getDraw2D() = 0;
 	virtual void clearDraw2D() = 0;
-	virtual ffr::TextureHandle getOutput() = 0;
+	virtual gpu::TextureHandle getOutput() = 0;
 };
 
 } // namespace Lumix

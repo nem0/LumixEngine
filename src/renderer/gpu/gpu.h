@@ -7,7 +7,7 @@ namespace Lumix {
 
 struct IAllocator;
 
-namespace ffr {
+namespace gpu {
 
 
 struct BufferHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
@@ -229,7 +229,7 @@ void update(BufferHandle buffer, const void* data, size_t size);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size);
-void getTextureImage(ffr::TextureHandle texture, u32 size, void* rgba);
+void getTextureImage(gpu::TextureHandle texture, u32 size, void* rgba);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
@@ -255,6 +255,6 @@ void popDebugGroup();
 void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags);
 
 
-} // namespace ffr
+} // namespace gpu
 
 } // namespace Lumix

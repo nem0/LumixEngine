@@ -7,7 +7,7 @@
 namespace Lumix
 {
 
-namespace ffr { struct TextureHandle; }
+namespace gpu { struct TextureHandle; }
 
 class GUISystem;
 class Path;
@@ -92,7 +92,7 @@ public:
 	virtual Path getTextFontPath(EntityRef entity) = 0;
 	virtual void setTextFontPath(EntityRef entity, const Path& path) = 0;
 
-	virtual void setRenderTarget(EntityRef entity, ffr::TextureHandle* texture_handle) = 0;
+	virtual void setRenderTarget(EntityRef entity, gpu::TextureHandle* texture_handle) = 0;
 
 	virtual DelegateList<void(EntityRef)>& buttonClicked() = 0;
 	virtual DelegateList<void(EntityRef)>& rectHovered() = 0;

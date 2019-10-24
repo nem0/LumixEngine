@@ -213,7 +213,7 @@ bool FontManager::build()
 		auto& texture_manager = m_renderer.getTextureManager();
 		m_atlas_texture = LUMIX_NEW(m_allocator, Texture)(Path("draw2d_atlas"), texture_manager, m_renderer, m_allocator);
 	}
-	m_atlas_texture->create(w, h, ffr::TextureFormat::RGBA8, pixels.begin(), pixels.byte_size());
+	m_atlas_texture->create(w, h, gpu::TextureFormat::RGBA8, pixels.begin(), pixels.byte_size());
 
 	FT_Done_Library(ft_library);
 	return true;

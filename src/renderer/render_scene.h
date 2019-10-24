@@ -5,7 +5,7 @@
 #include "engine/flag_set.h"
 #include "engine/math.h"
 #include "engine/iplugin.h"
-#include "ffr/ffr.h"
+#include "gpu/gpu.h"
 
 
 struct lua_State;
@@ -151,9 +151,9 @@ struct EnvProbeInfo
 {
 	DVec3 position;
 	float radius;
-	ffr::TextureHandle reflection;
-	ffr::TextureHandle radiance;
-	ffr::TextureHandle irradiance;
+	gpu::TextureHandle reflection;
+	gpu::TextureHandle radiance;
+	gpu::TextureHandle irradiance;
 };
 
 

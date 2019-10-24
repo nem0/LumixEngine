@@ -30,7 +30,7 @@ static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_im
 static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
 static const ComponentType GUI_INPUT_FIELD_TYPE = Reflection::getComponentType("gui_input_field");
 static const float CURSOR_BLINK_PERIOD = 1.0f;
-static ffr::TextureHandle EMPTY_RENDER_TARGET = ffr::INVALID_TEXTURE;
+static gpu::TextureHandle EMPTY_RENDER_TARGET = gpu::INVALID_TEXTURE;
 
 struct GUIText
 {
@@ -143,7 +143,7 @@ struct GUIRect
 	GUIImage* image = nullptr;
 	GUIText* text = nullptr;
 	GUIInputField* input_field = nullptr;
-	ffr::TextureHandle* render_target = nullptr;
+	gpu::TextureHandle* render_target = nullptr;
 };
 
 
@@ -1328,7 +1328,7 @@ struct GUISceneImpl final : public GUIScene
 	}
 	
 
-	void setRenderTarget(EntityRef entity, ffr::TextureHandle* texture_handle) override
+	void setRenderTarget(EntityRef entity, gpu::TextureHandle* texture_handle) override
 	{
 		m_rects[entity]->render_target = texture_handle;
 	}

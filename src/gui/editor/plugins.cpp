@@ -19,7 +19,7 @@
 #include "gui/sprite.h"
 #include "imgui/imgui.h"
 #include "renderer/draw2d.h"
-#include "renderer/ffr/ffr.h"
+#include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
@@ -455,7 +455,7 @@ private:
 
 				if(m_texture_handle.isValid()) {
 					const ImTextureID img = (ImTextureID)(uintptr)m_texture_handle.value;
-					if (ffr::isOriginBottomLeft()) {
+					if (gpu::isOriginBottomLeft()) {
 						ImGui::Image(img, size, ImVec2(0, 1), ImVec2(1, 0));
 					}
 					else {
@@ -757,7 +757,7 @@ private:
 	Pipeline* m_pipeline = nullptr;
 	WorldEditor* m_editor = nullptr;
 	bool m_is_window_open = false;
-	ffr::TextureHandle m_texture_handle;
+	gpu::TextureHandle m_texture_handle;
 	MouseMode m_mouse_mode = MouseMode::NONE;
 	Vec2 m_bottom_right_start_transform;
 	Vec2 m_top_left_start_move;

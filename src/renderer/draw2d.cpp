@@ -129,7 +129,7 @@ void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 	cmd->indices_count += 6;
 }
 
-void Draw2D::addImage(ffr::TextureHandle* tex, const Vec2& from, const Vec2& to, const Vec2& uv0, const Vec2& uv1) {
+void Draw2D::addImage(gpu::TextureHandle* tex, const Vec2& from, const Vec2& to, const Vec2& uv0, const Vec2& uv1) {
 	Cmd* cmd = &m_cmds.back();
 
 	if (cmd->texture != tex && cmd->indices_count != 0) {
