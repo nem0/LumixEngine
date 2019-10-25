@@ -1,18 +1,19 @@
-#include "engine/debug.h"
-#include "engine/log.h"
-#include "engine/mt/atomic.h"
-#include "engine/os.h"
-#include "engine/string.h"
+#define NOGDI
 #include <windows.h>
 #pragma warning (push)
 #pragma warning (disable: 4091) // declaration of 'xx' hides previous local declaration
 #include <DbgHelp.h>
 #pragma warning (pop)
 #include <mapi.h>
-#include <float.h>
-#include <stdlib.h>
-#include <stdio.h>
+
 #include "engine/allocator.h"
+#include "engine/crt.h"
+#include "engine/debug.h"
+#include "engine/log.h"
+#include "engine/mt/atomic.h"
+#include "engine/path_utils.h"
+#include "engine/os.h"
+#include "engine/string.h"
 
 
 #pragma comment(lib, "DbgHelp.lib")
@@ -297,8 +298,7 @@ void Allocator::checkLeaks()
 		AllocationInfo* info = m_root;
 		while (info != last_sentinel)
 		{
-			char tmp[2048];
-			sprintf(tmp, "\nAllocation size : %Iu, memory %p\n", info->size, info + sizeof(info));
+			StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n");
 			OutputDebugString(tmp);
 			m_stack_tree.printCallstack(info->stack_leaf);
 			info = info->next;
@@ -411,7 +411,7 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	copyMemory(new_data, user_ptr, info->size < size ? info->size : size);
+	memcpy(new_data, user_ptr, info->size < size ? info->size : size);
 
 	deallocate(user_ptr);
 
@@ -519,7 +519,7 @@ void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align)
 	if (!new_data) return nullptr;
 
 	AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
-	copyMemory(new_data, user_ptr, info->size < size ? info->size : size);
+	memcpy(new_data, user_ptr, info->size < size ? info->size : size);
 
 	deallocate_aligned(user_ptr);
 
@@ -625,15 +625,12 @@ BOOL SendFile(LPCSTR lpszSubject,
 	if (!hMAPI) return FALSE;
 	LPMAPISENDMAIL lpfnMAPISendMail = (LPMAPISENDMAIL)::GetProcAddress(hMAPI, "MAPISendMail");
 
-	char szDrive[_MAX_DRIVE] = {0};
-	char szDir[_MAX_DIR] = {0};
-	char szName[_MAX_FNAME] = {0};
-	char szExt[_MAX_EXT] = {0};
-	_splitpath_s(lpszFullFileName, szDrive, szDir, szName, szExt);
+	PathUtils::FileInfo fi(lpszFullFileName);
 
 	char szFileName[MAX_PATH] = {0};
-	strcat_s(szFileName, szName);
-	strcat_s(szFileName, szExt);
+	strcat_s(szFileName, fi.m_basename);
+	strcat_s(szFileName, ".");
+	strcat_s(szFileName, fi.m_extension);
 
 	char szFullFileName[MAX_PATH] = {0};
 	strcat_s(szFullFileName, lpszFullFileName);

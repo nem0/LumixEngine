@@ -1,11 +1,9 @@
 #pragma once
 
-
 #include "engine/delegate.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/string.h"
-#include "imgui/imgui.h"
 
 namespace Lumix
 {

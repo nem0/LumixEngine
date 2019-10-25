@@ -1,6 +1,6 @@
 #include "binary_array.h"
 #include "engine/allocator.h"
-#include "engine/string.h"
+#include "engine/crt.h"
 
 
 namespace Lumix
@@ -94,7 +94,7 @@ void BinaryArray::erase(int index)
 
 void BinaryArray::setAllZeros()
 {
-	setMemory(m_data, 0, m_capacity >> 3);
+	memset(m_data, 0, m_capacity >> 3);
 }
 
 
@@ -196,7 +196,7 @@ void BinaryArray::grow(int capacity)
 		static_cast<StoreType*>(m_allocator.allocate(capacity >> 3));
 	if (m_data)
 	{
-		copyMemory(new_data, m_data, sizeof(StoreType) * (m_size + BITMASK_7BIT) >> 5);
+		memcpy(new_data, m_data, sizeof(StoreType) * (m_size + BITMASK_7BIT) >> 5);
 		m_allocator.deallocate(m_data);
 	}
 	m_data = new_data;

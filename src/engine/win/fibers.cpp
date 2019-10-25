@@ -1,6 +1,6 @@
 #include "engine/fibers.h"
 #include "engine/profiler.h"
-#include <Windows.h>
+#include "engine/win/simple_win.h"
 
 namespace Lumix
 {

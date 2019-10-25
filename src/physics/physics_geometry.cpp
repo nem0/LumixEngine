@@ -1,3 +1,5 @@
+#include <PxPhysicsAPI.h>
+
 #include "physics_geometry.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
@@ -5,7 +7,6 @@
 #include "engine/string.h"
 #include "engine/math.h"
 #include "physics/physics_system.h"
-#include <PxPhysicsAPI.h>
 
 
 namespace Lumix
@@ -31,12 +32,12 @@ struct OutputStream final : public physx::PxOutputStream
 		{
 			int new_capacity = maximum(size + (int)count, capacity + 4096);
 			u8* new_data = (u8*)allocator.allocate(sizeof(u8) * new_capacity);
-			copyMemory(new_data, data, size);
+			memcpy(new_data, data, size);
 			allocator.deallocate(data);
 			data = new_data;
 			capacity = new_capacity;
 		}
-		copyMemory(data + size, src, count);
+		memcpy(data + size, src, count);
 		size += count;
 		return count;
 	}
@@ -61,13 +62,13 @@ struct InputStream final : public physx::PxInputStream
 	{
 		if (pos + (int)count <= size)
 		{
-			copyMemory(dest, data + pos, count);
+			memcpy(dest, data + pos, count);
 			pos += count;
 			return count;
 		}
 		else
 		{
-			copyMemory(dest, data + pos, size - pos);
+			memcpy(dest, data + pos, size - pos);
 			int real_count = size - pos;
 			pos = size;
 			return real_count;

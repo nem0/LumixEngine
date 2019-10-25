@@ -235,7 +235,7 @@ bool FontResource::load(u64 size, const u8* mem)
 	if (size <= 0) return false;
 	
 	file_data.resize((int)size);
-	copyMemory(file_data.begin(), mem, size);
+	memcpy(file_data.begin(), mem, size);
 	return true;
 }
 

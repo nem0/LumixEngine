@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "animation/animation.h"
 #include "animation/animation_scene.h"
 #include "animation/controller.h"
@@ -16,7 +18,6 @@
 #include "engine/reflection.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
-#include "imgui/imgui.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"

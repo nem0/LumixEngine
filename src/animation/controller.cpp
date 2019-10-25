@@ -64,7 +64,7 @@ RuntimeContext* Controller::createRuntime(u32 anim_set) {
 	RuntimeContext* ctx = LUMIX_NEW(m_allocator, RuntimeContext)(*this, m_allocator);
 	ctx->inputs.resize(computeInputsSize(*this));
 	ctx->animations.resize(m_animation_slots.size());
-	setMemory(ctx->animations.begin(), 0, ctx->animations.byte_size());
+	memset(ctx->animations.begin(), 0, ctx->animations.byte_size());
 	for (AnimationEntry& anim : m_animation_entries) {
 		if (anim.set == anim_set) {
 			ctx->animations[anim.slot] = anim.animation;

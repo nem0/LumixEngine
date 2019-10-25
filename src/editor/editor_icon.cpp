@@ -1,4 +1,5 @@
 #include "editor_icon.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/math.h"
@@ -8,7 +9,6 @@
 #include "engine/universe/universe.h"
 #include "render_interface.h"
 #include "world_editor.h"
-#include <math.h>
 
 
 namespace Lumix

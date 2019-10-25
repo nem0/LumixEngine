@@ -1,10 +1,8 @@
 #include "condition.h"
 #include "controller.h"
+#include "engine/crt.h"
 #include "engine/math.h"
 #include "nodes.h"
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
 
 
 namespace Lumix

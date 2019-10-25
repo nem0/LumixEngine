@@ -4,6 +4,7 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
@@ -22,9 +23,6 @@
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
-#include <float.h>
-#include <math.h>
-#include <stdlib.h>
 
 
 namespace Lumix
@@ -432,7 +430,7 @@ static ofbx::Vec2 operator-(const ofbx::Vec2& a, const ofbx::Vec2& b)
 static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs)
 {
 	/*out.resize(vertex_count);
-	setMemory(out.begin(), 0, out.byte_size());
+	memset(out.begin(), 0, out.byte_size());
 	for (int i = 0; i < vertex_count; i += 3) {
 		const ofbx::Vec3 v0 = vertices[i + 0];
 		const ofbx::Vec3 v1 = vertices[i + 1];
@@ -691,8 +689,8 @@ static Vec3 impostorToWorld(Vec2 uv) {
 					);
 
 	Vec2 absolute;
-	absolute.x = abs(position.x);
-	absolute.y = abs(position.y);
+	absolute.x = fabsf(position.x);
+	absolute.y = fabsf(position.y);
 	position.z = 1.0f - absolute.x - absolute.y;
 
 	return Vec3{position.x, position.z, position.y};
@@ -975,7 +973,7 @@ static void fill(Array<FBXImporter::RotationKey>& out, const ofbx::AnimationCurv
 	else if (z_curve) out.resize(z_curve->getKeyCount());
 	else return;
 
-	setMemory(out.begin(), 0, out.byte_size());
+	memset(out.begin(), 0, out.byte_size());
 
 	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
 		if (!curve) {
@@ -1019,7 +1017,7 @@ static void fill(Array<FBXImporter::TranslationKey>& out, const ofbx::AnimationC
 	else if (z_curve) out.resize(z_curve->getKeyCount());
 	else return;
 
-	setMemory(out.begin(), 0, out.byte_size());
+	memset(out.begin(), 0, out.byte_size());
 
 	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
 		if (!curve) {
@@ -1270,7 +1268,7 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 	const ofbx::Mesh* mesh = import_mesh.fbx;
 	const ofbx::Geometry* geom = mesh->getGeometry();
 	skinning.resize(geom->getVertexCount());
-	setMemory(&skinning[0], 0, skinning.size() * sizeof(skinning[0]));
+	memset(&skinning[0], 0, skinning.size() * sizeof(skinning[0]));
 
 	auto* skin = mesh->getGeometry()->getSkin();
 	if(!skin) {

@@ -1,6 +1,6 @@
 #include "engine/allocator.h"
+#include "engine/crt.h"
 #include "engine/mt/atomic.h"
-#include <stdlib.h>
 #ifndef _WIN32
 	#include <string.h>
 	#include <malloc.h>

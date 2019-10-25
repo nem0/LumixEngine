@@ -3,6 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/lumix.h"
+#include "engine/string.h"
 
 
 namespace Lumix

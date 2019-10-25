@@ -1,7 +1,6 @@
 #include "string.h"
 #include "engine/allocator.h"
-#include <math.h>
-#include <string.h>
+#include "engine/crt.h"
 
 
 namespace Lumix
@@ -21,7 +20,7 @@ String::String(const String& rhs, int start, i32 length)
 {
 	m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
 	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-	copyMemory(m_cstr, rhs.m_cstr + start, m_size * sizeof(char));
+	memcpy(m_cstr, rhs.m_cstr + start, m_size * sizeof(char));
 	m_cstr[m_size] = 0;
 }
 
@@ -31,7 +30,7 @@ String::String(Span<const char> rhs, IAllocator& allocator)
 {
 	m_size = rhs.length();
 	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-	copyMemory(m_cstr, rhs.begin(), m_size * sizeof(char));
+	memcpy(m_cstr, rhs.begin(), m_size * sizeof(char));
 	m_cstr[m_size] = 0;
 }
 
@@ -41,7 +40,7 @@ String::String(const String& rhs)
 {
 	m_cstr = (char*)m_allocator.allocate((rhs.m_size + 1) * sizeof(char));
 	m_size = rhs.m_size;
-	copyMemory(m_cstr, rhs.m_cstr, m_size * sizeof(char));
+	memcpy(m_cstr, rhs.m_cstr, m_size * sizeof(char));
 	m_cstr[m_size] = 0;
 }
 
@@ -61,7 +60,7 @@ String::String(const char* rhs, IAllocator& allocator)
 {
 	m_size = stringLength(rhs);
 	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-	copyMemory(m_cstr, rhs, sizeof(char) * (m_size + 1));
+	memcpy(m_cstr, rhs, sizeof(char) * (m_size + 1));
 }
 
 
@@ -82,7 +81,7 @@ void String::set(const char* rhs, int size)
 		m_allocator.deallocate(m_cstr);
 		m_size = size;
 		m_cstr = (char*)m_allocator.allocate(m_size + 1);
-		copyMemory(m_cstr, rhs, size);
+		memcpy(m_cstr, rhs, size);
 		m_cstr[size] = '\0';
 	}
 }
@@ -95,7 +94,7 @@ void String::operator=(const String& rhs)
 		m_allocator.deallocate(m_cstr);
 		m_cstr = (char*)m_allocator.allocate((rhs.m_size + 1) * sizeof(char));
 		m_size = rhs.m_size;
-		copyMemory(m_cstr, rhs.m_cstr, sizeof(char) * (m_size + 1));
+		memcpy(m_cstr, rhs.m_cstr, sizeof(char) * (m_size + 1));
 	}
 }
 
@@ -109,7 +108,7 @@ void String::operator=(const char* rhs)
 		{
 			m_size = stringLength(rhs);
 			m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-			copyMemory(m_cstr, rhs, sizeof(char) * (m_size + 1));
+			memcpy(m_cstr, rhs, sizeof(char) * (m_size + 1));
 		}
 		else
 		{
@@ -182,7 +181,7 @@ String& String::cat(Span<const char> value)
 		{
 			i32 new_size = m_size + length;
 			char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
-			copyMemory(new_cstr, m_cstr, sizeof(char) * m_size + 1);
+			memcpy(new_cstr, m_cstr, sizeof(char) * m_size + 1);
 			m_allocator.deallocate(m_cstr);
 			m_cstr = new_cstr;
 			m_size = new_size;
@@ -218,7 +217,7 @@ String& String::cat(char* value)
 void String::eraseAt(int position)
 {
 	if (position < 0 || position >= m_size) return;
-	moveMemory(m_cstr + position, m_cstr + position + 1, m_size - position - 1);
+	memmove(m_cstr + position, m_cstr + position + 1, m_size - position - 1);
 	--m_size;
 	m_cstr[m_size] = '\0';
 }
@@ -231,9 +230,9 @@ void String::insert(int position, const char* value)
 		int value_len = stringLength(value);
 		i32 new_size = m_size + value_len;
 		char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
-		if (position > 0) copyMemory(new_cstr, m_cstr, sizeof(char) * position);
-		if (value_len > 0) copyMemory(new_cstr + position, value, sizeof(char) * value_len);
-		copyMemory(new_cstr + position + value_len, m_cstr + position, sizeof(char) * (m_size - position) + 1);
+		if (position > 0) memcpy(new_cstr, m_cstr, sizeof(char) * position);
+		if (value_len > 0) memcpy(new_cstr + position, value, sizeof(char) * value_len);
+		memcpy(new_cstr + position + value_len, m_cstr + position, sizeof(char) * (m_size - position) + 1);
 		
 		m_allocator.deallocate(m_cstr);
 		m_cstr = new_cstr;
@@ -256,7 +255,7 @@ String& String::cat(const char* rhs)
 		{
 			i32 new_size = m_size + stringLength(rhs);
 			char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
-			copyMemory(new_cstr, m_cstr, sizeof(char) * m_size + 1);
+			memcpy(new_cstr, m_cstr, sizeof(char) * m_size + 1);
 			m_allocator.deallocate(m_cstr);
 			m_cstr = new_cstr;
 			m_size = new_size;
@@ -328,23 +327,6 @@ int stringLength(const char* str)
 	return (int)strlen(str);
 }
 
-
-void moveMemory(void* dest, const void* src, size_t count)
-{
-	memmove(dest, src, count);
-}
-
-
-void setMemory(void* ptr, u8 value, size_t num)
-{
-	memset(ptr, value, num);
-}
-
-
-void copyMemory(void* dest, const void* src, size_t count)
-{
-	memcpy(dest, src, count);
-}
 
 
 bool endsWith(const char* str, const char* substr)
@@ -920,7 +902,7 @@ bool toCString(float value, Span<char> out, int after_point)
 	{
 		while ((num >= 1 || exponent >= 0) && length > 1)
 		{
-			float power = (float)pow(10, exponent);
+			float power = powf(10, (float)exponent);
 			char digit = (char)floor(num / power);
 			num -= digit * power;
 			*c = digit + '0';

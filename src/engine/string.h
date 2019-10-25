@@ -43,9 +43,6 @@ LUMIX_ENGINE_API int compareMemory(const void* lhs, const void* rhs, size_t size
 LUMIX_ENGINE_API int compareString(const char* lhs, const char* rhs);
 LUMIX_ENGINE_API int compareStringN(const char* lhs, const char* rhs, int length);
 LUMIX_ENGINE_API int compareIStringN(const char* lhs, const char* rhs, int length);
-LUMIX_ENGINE_API void copyMemory(void* dest, const void* src, size_t count);
-LUMIX_ENGINE_API void moveMemory(void* dest, const void* src, size_t count);
-LUMIX_ENGINE_API void setMemory(void* ptr, u8 value, size_t num);
 LUMIX_ENGINE_API const char* findSubstring(const char* str, const char* substr);
 LUMIX_ENGINE_API bool endsWith(const char* str, const char* substr);
 

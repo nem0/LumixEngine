@@ -1,3 +1,5 @@
+#include <imgui/imgui_freetype.h>
+
 #include "animation/animation.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -45,14 +47,12 @@
 #if defined _MSC_VER && _MSC_VER == 1900 
 #pragma warning(disable : 4312)
 #endif
-#include "imgui/imgui_freetype.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
 #include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
 #include <nvtt.h>
-#include <stddef.h>
 
 
 using namespace Lumix;
@@ -563,7 +563,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		FBXImporter::ImportConfig cfg;
 		const Meta meta = getMeta(Path(filepath));
 		cfg.mesh_scale = meta.scale;
-		copyMemory(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
+		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		const PathUtils::FileInfo src_info(filepath);
 		m_fbx_importer.setSource(filepath, false);
@@ -705,14 +705,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				DVec3 pos = m_viewport.pos;
 				Quat rot = m_viewport.rot;
 
-				float yaw = -signum(delta.x) * (::powf(abs((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
+				float yaw = -signum(delta.x) * (powf(fabsf((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
 				Quat yaw_rot(Vec3(0, 1, 0), yaw);
 				rot = yaw_rot * rot;
 				rot.normalize();
 
 				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 				float pitch =
-					-signum(delta.y) * (::powf(abs((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
+					-signum(delta.y) * (powf(fabsf((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
 				Quat pitch_rot(pitch_axis, pitch);
 				rot = pitch_rot * rot;
 				rot.normalize();
@@ -818,7 +818,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				tmp[idx] = alpha << 24 | tmp[idx] & 0xffFFff;
 			}
 		}
-		copyMemory(gb0->begin(), tmp.begin(), tmp.byte_size());
+		memcpy(gb0->begin(), tmp.begin(), tmp.byte_size());
 
 		const u32* gb1_data = gb1->begin();
 		for (i32 j = 0; j < size.y; ++j) {
@@ -827,7 +827,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
 			}
 		}
-		copyMemory(gb1->begin(), tmp.begin(), tmp.byte_size());
+		memcpy(gb1->begin(), tmp.begin(), tmp.byte_size());
 	}
 
 	void onGUI(Span<Resource*> resources) override
@@ -865,7 +865,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					}
 					else
 					{
-						float dist = sqrt(lods[i].distance);
+						float dist = sqrtf(lods[i].distance);
 						if (ImGui::DragFloat("", &dist))
 						{
 							lods[i].distance = dist * dist;
@@ -2153,7 +2153,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 		cmft::imageCreate(image, TEXTURE_SIZE, TEXTURE_SIZE, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
-		copyMemory(image.m_data, &m_data[0], m_data.byte_size());
+		memcpy(image.m_data, &m_data[0], m_data.byte_size());
 		cmft::imageToRgba32f(image);
 
 		if (m_fast_filtering) {

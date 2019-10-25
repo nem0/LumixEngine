@@ -1,4 +1,5 @@
 #include "engine/allocator.h"
+#include "engine/crt.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/thread.h"
@@ -86,7 +87,7 @@ CriticalSection::CriticalSection()
 {
 	static_assert(sizeof(data) >= sizeof(CRITICAL_SECTION), "Size is not enough");
 	static_assert(alignof(CriticalSection) == alignof(CRITICAL_SECTION), "Alignment does not match");
-	setMemory(data, 0, sizeof(data));
+	memset(data, 0, sizeof(data));
 	CRITICAL_SECTION* cs = new (NewPlaceholder(), data) CRITICAL_SECTION;
 	InitializeCriticalSectionAndSpinCount(cs, 0x400);
 }

@@ -1021,7 +1021,7 @@ namespace Lumix
 			if (ptr == nullptr) return allocator.allocate(nsize);
 
 			void* new_mem = allocator.allocate(nsize);
-			copyMemory(new_mem, ptr, minimum(osize, nsize));
+			memcpy(new_mem, ptr, minimum(osize, nsize));
 			allocator.deallocate(ptr);
 			return new_mem;
 		}

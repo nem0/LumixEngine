@@ -17,7 +17,7 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 #ifdef _WIN32
-	#include <Windows.h>
+	#include "engine/win/simple_win.h"
 #endif
 
 namespace Lumix
@@ -117,7 +117,7 @@ struct FileSystemImpl final : public FileSystem
 
 	void loadBundled() {
 		#ifdef _WIN32
-			HRSRC hrsrc = FindResource(GetModuleHandle(NULL), MAKEINTRESOURCE(102), "TAR");
+			HRSRC hrsrc = FindResourceA(GetModuleHandle(NULL), MAKEINTRESOURCE(102), "TAR");
 			if (!hrsrc) return;
 			HGLOBAL hglobal = LoadResource(GetModuleHandle(NULL), hrsrc);
 			if (!hglobal) return;
@@ -127,7 +127,7 @@ struct FileSystemImpl final : public FileSystem
 			if (!res_mem) return;
 	
 			TCHAR exe_path[MAX_PATH_LENGTH];
-			GetModuleFileName(NULL, exe_path, MAX_PATH_LENGTH);
+			GetModuleFileNameA(NULL, exe_path, MAX_PATH_LENGTH);
 
 			m_bundled_last_modified = OS::getLastModified(exe_path);
 			m_bundled.resize((int)size);
@@ -184,7 +184,7 @@ struct FileSystemImpl final : public FileSystem
 				u32 size;
 				fromCStringOctal(Span(header->size), Ref(size));
 				content->resize(size);
-				copyMemory(content->begin(), iter.value() + 512, content->byte_size());
+				memcpy(content->begin(), iter.value() + 512, content->byte_size());
 				return true;
 			}
 			return false;
@@ -391,7 +391,7 @@ int FSTask::task()
 				u32 size;
 				fromCStringOctal(Span(header->size), Ref(size));
 				data.resize(size);
-				copyMemory(data.getMutableData(), iter.value() + 512, data.getPos());
+				memcpy(data.getMutableData(), iter.value() + 512, data.getPos());
 				success = true;
 			}
 			else {

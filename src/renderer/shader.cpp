@@ -264,8 +264,8 @@ static void source(lua_State* L, gpu::ShaderType shader_type)
 	const int src_len = stringLength(src);
 
 	stage.code.resize(line_str_len + src_len + 1);
-	copyMemory(&stage.code[0], line_str, line_str_len);
-	copyMemory(&stage.code[line_str_len], src, src_len);
+	memcpy(&stage.code[0], line_str, line_str_len);
+	memcpy(&stage.code[line_str_len], src, src_len);
 	stage.code.back() = '\0';
 }
 

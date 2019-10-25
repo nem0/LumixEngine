@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "engine/engine.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
@@ -8,7 +10,6 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
-#include "engine/os.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
 #include "engine/plugin_manager.h"
@@ -17,9 +18,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe/component.h"
 #include "engine/universe/universe.h"
-#include <imgui/imgui.h>
 
 
 namespace Lumix

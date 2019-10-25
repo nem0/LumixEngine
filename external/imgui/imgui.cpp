@@ -992,6 +992,7 @@ CODE
 #include "imgui_internal.h"
 
 #include <ctype.h>      // toupper
+#include <stdarg.h>     // va_list
 #include <stdio.h>      // vsnprintf, sscanf, printf
 #if defined(_MSC_VER) && _MSC_VER <= 1500 // MSVC 2008 or earlier
 #include <stddef.h>     // intptr_t

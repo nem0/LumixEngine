@@ -1,3 +1,6 @@
+#include <DetourCrowd.h>
+#include <imgui/imgui.h>
+
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
@@ -7,7 +10,6 @@
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
 #include "navigation/navigation_scene.h"
-#include <DetourCrowd.h>
 
 
 using namespace Lumix;

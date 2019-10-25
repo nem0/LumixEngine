@@ -1,7 +1,6 @@
 #pragma once
 
 #include "engine/lumix.h"
-#include "engine/universe/component.h"
 #include "engine/math.h"
 
 
@@ -11,8 +10,8 @@ namespace Lumix
 
 namespace Reflection
 {
-struct PropertyBase;
-struct IArrayProperty;
+	struct PropertyBase;
+	struct IArrayProperty;
 }
 
 namespace OS { 
@@ -22,21 +21,16 @@ namespace OS {
 
 template <typename T> class DelegateList;
 template <typename T> class Array;
+struct ComponentUID;
 class Engine;
 struct EntityGUID;
-class Hierarchy;
 struct IAllocator;
 struct IEditorCommand;
-class InputMemoryStream;
 struct IPlugin;
 struct ISerializer;
-class OutputMemoryStream;
 class Path;
-class Pipeline;
 class PrefabSystem;
-class PropertyDescriptorBase;
 struct Quat;
-struct RayCastModelHit;
 class RenderInterface;
 class Universe;
 struct Viewport;
@@ -68,7 +62,7 @@ public:
 		virtual bool onMouseDown(const RayHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
 		virtual void onMouseUp(int /*x*/, int /*y*/, OS::MouseButton /*button*/) {}
 		virtual void onMouseMove(int /*x*/, int /*y*/, int /*rel_x*/, int /*rel_y*/) {}
-		virtual bool showGizmo(ComponentUID /*cmp*/) { return false; }
+		virtual bool showGizmo(ComponentUID /*cmp*/);
 	};
 
 public:

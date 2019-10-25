@@ -3,6 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -14,9 +15,6 @@
 #include "renderer/material.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
-
-#include <float.h>
-#include <math.h>
 
 
 namespace Lumix
@@ -513,7 +511,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			if (keep_skin)
 			{
 				mesh.skin[j].weights = *(const Vec4*)&vertices[offset + weights_attribute_offset];
-				copyMemory(mesh.skin[j].indices,
+				memcpy(mesh.skin[j].indices,
 					&vertices[offset + bone_indices_attribute_offset],
 					sizeof(mesh.skin[j].indices));
 			}

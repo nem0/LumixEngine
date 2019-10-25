@@ -1,12 +1,10 @@
 #include "editor/gizmo.h"
+#include "engine/crt.h"
 #include "engine/geometry.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/universe/universe.h"
 #include "render_interface.h"
-#include <float.h>
-#include <math.h>
-#include <string.h>
 
 
 namespace Lumix

@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "game_view.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -14,7 +16,6 @@
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_system.h"
-#include "imgui/imgui.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"

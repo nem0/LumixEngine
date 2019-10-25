@@ -1,6 +1,7 @@
 #include "gpu/gpu.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
@@ -28,8 +29,6 @@
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
-#include <math.h>
-#include <string.h>
 
 
 namespace Lumix
@@ -222,7 +221,7 @@ void PipelineResource::unload()
 bool PipelineResource::load(u64 size, const u8* mem)
 {
 	content.resize((int)size);
-	copyMemory(content.begin(), mem, size);
+	memcpy(content.begin(), mem, size);
 	return true;
 }
 
@@ -918,7 +917,7 @@ struct PipelineImpl final : Pipeline
 					memcpy(vtx_buffer_mem.ptr, draw2d.getVertices().begin(), draw2d.getVertices().byte_size());
 				}
 				cmd_buffer.resize(draw2d.getCmds().size());
-				copyMemory(&cmd_buffer[0], draw2d.getCmds().begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
+				memcpy(&cmd_buffer[0], draw2d.getCmds().begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
 
 				draw2d.clear(pipeline->getAtlasSize());
 

@@ -1,4 +1,5 @@
 #include "engine/allocator.h"
+#include "engine/crt.h"
 #include "engine/mt/task.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
@@ -166,7 +167,7 @@ int FileSystemWatcherTask::task()
 		nullptr);
 	if (m_handle == INVALID_HANDLE_VALUE) return -1;
 
-	setMemory(&m_overlapped, 0, sizeof(m_overlapped));
+	memset(&m_overlapped, 0, sizeof(m_overlapped));
 	m_overlapped.hEvent = this;
 	m_finished = false;
 	while (!m_finished)

@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/render_interface.h"
@@ -12,15 +14,11 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "imgui/imgui.h"
 #include "utils.h"
 
 
 namespace Lumix
 {
-
-
-static const u32 SOURCE_HASH = crc32("source");
 
 
 bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path, ResourceType type)
@@ -283,7 +281,7 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	{
 		if(ri->isValid(tile.tex)) {
 			int* th = (int*)tile.tex;
-			ImGui::Image((void*)(uintptr_t)*th, img_size);
+			ImGui::Image((void*)(uintptr)*th, img_size);
 		}
 		else {
 			ImGui::Dummy(img_size);

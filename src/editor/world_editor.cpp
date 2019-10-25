@@ -8,6 +8,7 @@
 #include "engine/associative_array.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -781,6 +782,10 @@ private:
 };
 
 class PasteEntityCommand;
+
+
+bool WorldEditor::Plugin::showGizmo(ComponentUID) { return false; }
+
 
 
 struct WorldEditorImpl final : public WorldEditor
@@ -2868,13 +2873,13 @@ public:
 		Quat rot = m_viewport.rot;
 		const Quat old_rot = rot;
 
-		float yaw = -signum(x) * (pow(abs((float)x / m_mouse_sensitivity.x), 1.2f));
+		float yaw = -signum(x) * (powf(fabsf((float)x / m_mouse_sensitivity.x), 1.2f));
 		Quat yaw_rot(Vec3(0, 1, 0), yaw);
 		rot = yaw_rot * rot;
 		rot.normalize();
 
 		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-		float pitch = -signum(y) * (pow(abs((float)y / m_mouse_sensitivity.y), 1.2f));
+		float pitch = -signum(y) * (powf(fabsf((float)y / m_mouse_sensitivity.y), 1.2f));
 		const Quat pitch_rot(pitch_axis, pitch);
 		rot = pitch_rot * rot;
 		rot.normalize();

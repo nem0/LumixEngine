@@ -2,6 +2,7 @@
 #include "animation/animation_scene.h"
 #include "engine/array.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -21,7 +22,6 @@
 #include <DetourNavMeshBuilder.h>
 #include <DetourNavMeshQuery.h>
 #include <Recast.h>
-#include <math.h>
 
 
 namespace Lumix

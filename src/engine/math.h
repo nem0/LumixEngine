@@ -1134,18 +1134,6 @@ LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value)
 }
 
 
-LUMIX_FORCE_INLINE float floor(float f)
-{
-	return float(int(f));
-}
-
-
-template <typename T> LUMIX_FORCE_INLINE T abs(T a)
-{
-	return a > 0 ? a : -a;
-}
-
-
 template <typename T> LUMIX_FORCE_INLINE T signum(T a)
 {
 	return a > 0 ? (T)1 : (a < 0 ? (T)-1 : 0);
@@ -1229,10 +1217,6 @@ inline float easeInOut(float t)
 
 LUMIX_ENGINE_API Vec3 degreesToRadians(const Vec3& v);
 LUMIX_ENGINE_API float angleDiff(float a, float b);
-LUMIX_ENGINE_API float pow(float base, float exponent);
-LUMIX_ENGINE_API float sqrt(float value);
-LUMIX_ENGINE_API double sqrt(int value);
-LUMIX_ENGINE_API double sqrt(double value);
 LUMIX_ENGINE_API u64 randGUID();
 LUMIX_ENGINE_API u32 rand();
 LUMIX_ENGINE_API u32 rand(u32 from, u32 to);
