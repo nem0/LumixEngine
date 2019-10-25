@@ -1,5 +1,6 @@
 #include "culling_system.h"
 #include "engine/array.h"
+#include "engine/crt.h"
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/allocator.h"
@@ -11,7 +12,6 @@
 #include "engine/page_allocator.h"
 #include "engine/profiler.h"
 #include "engine/simd.h"
-#include <string.h>
 
 
 namespace Lumix

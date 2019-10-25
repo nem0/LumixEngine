@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "terrain_editor.h"
 #include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
@@ -5,6 +7,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
@@ -17,7 +20,6 @@
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/universe/universe.h"
-#include "imgui/imgui.h"
 #include "physics/physics_scene.h"
 #include "renderer/culling_system.h"
 #include "renderer/material.h"
@@ -26,7 +28,6 @@
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
-#include <math.h>
 
 
 namespace Lumix
@@ -216,7 +217,7 @@ private:
 	float getAttenuation(Item& item, int i, int j, int texture_size) const
 	{
 		float dist =
-			sqrt((texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
+			sqrtf((texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
 				 (texture_size * item.m_local_pos.z - 0.5f - j) * (texture_size * item.m_local_pos.z - 0.5f - j));
 		return 1.0f - minimum(dist / (texture_size * item.m_radius), 1.0f);
 	}
@@ -259,7 +260,7 @@ private:
 	{
 		if (m_mask.size() == 0) return true;
 
-		int s = int(sqrt(m_mask.size()));
+		int s = int(sqrtf((float)m_mask.size()));
 		int ix = int(x * s);
 		int iy = int(y * s);
 
@@ -384,7 +385,7 @@ private:
 			for (int j = rect.from_y, end2 = rect.to_y; j < end2; ++j)
 			{
 				int offset = i - m_x + (j - m_y) * m_width;
-				float dist = sqrt(
+				float dist = sqrtf(
 					(texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
 					(texture_size * item.m_local_pos.z - 0.5f - j) * (texture_size * item.m_local_pos.z - 0.5f - j));
 				float t = (dist - texture_size * item.m_radius * item.m_amount) /
@@ -458,7 +459,7 @@ private:
 		getBoundingRectangle(texture, rect);
 		m_new_data.resize(bpp * maximum(1, (rect.to_x - rect.from_x) * (rect.to_y - rect.from_y)));
 		if(m_old_data.size() > 0) {
-			copyMemory(&m_new_data[0], &m_old_data[0], m_new_data.size());
+			memcpy(&m_new_data[0], &m_old_data[0], m_new_data.size());
 		}
 
 		for (int item_index = 0; item_index < m_items.size(); ++item_index)
@@ -548,10 +549,10 @@ private:
 		// original
 		for (int row = rect.from_y; row < rect.to_y; ++row)
 		{
-			copyMemory(&new_data[(row - rect.from_y) * new_w * bpp],
+			memcpy(&new_data[(row - rect.from_y) * new_w * bpp],
 				&texture->getData()[row * bpp * texture->width + rect.from_x * bpp],
 				bpp * new_w);
-			copyMemory(&old_data[(row - rect.from_y) * new_w * bpp],
+			memcpy(&old_data[(row - rect.from_y) * new_w * bpp],
 				&texture->getData()[row * bpp * texture->width + rect.from_x * bpp],
 				bpp * new_w);
 		}
@@ -559,10 +560,10 @@ private:
 		// new
 		for (int row = 0; row < m_height; ++row)
 		{
-			copyMemory(&new_data[((row + m_y - rect.from_y) * new_w + m_x - rect.from_x) * bpp],
+			memcpy(&new_data[((row + m_y - rect.from_y) * new_w + m_x - rect.from_x) * bpp],
 				&m_new_data[row * bpp * m_width],
 				bpp * m_width);
-			copyMemory(&old_data[((row + m_y - rect.from_y) * new_w + m_x - rect.from_x) * bpp],
+			memcpy(&old_data[((row + m_y - rect.from_y) * new_w + m_x - rect.from_x) * bpp],
 				&m_old_data[row * bpp * m_width],
 				bpp * m_width);
 		}

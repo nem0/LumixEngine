@@ -1,7 +1,7 @@
 #include "page_allocator.h"
 #include "mt/atomic.h"
+#include "engine/crt.h"
 #include "engine/win/simple_win.h"
-#include <string.h>
 
 
 namespace Lumix

@@ -1,5 +1,6 @@
 #include "particle_system.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/job_system.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
@@ -14,8 +15,6 @@
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
 #include "engine/universe/universe.h"
-#include <math.h>
-#include <string.h>
 
 
 namespace Lumix

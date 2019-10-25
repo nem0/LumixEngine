@@ -1,12 +1,12 @@
 #include "clip.h"
 #include "engine/allocator.h"
+#include "engine/crt.h"
 #include "engine/lumix.h"
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/string.h"
 #define STB_VORBIS_HEADER_ONLY
 #include "stb/stb_vorbis.cpp"
-#include <stdlib.h>
 
 
 namespace Lumix
@@ -30,7 +30,7 @@ bool Clip::load(u64 size, const u8* mem)
 	if (res <= 0) return false;
 
 	m_data.resize(res * m_channels);
-	copyMemory(&m_data[0], output, res * m_channels * sizeof(m_data[0]));
+	memcpy(&m_data[0], output, res * m_channels * sizeof(m_data[0]));
 	free(output);
 
 	return true;

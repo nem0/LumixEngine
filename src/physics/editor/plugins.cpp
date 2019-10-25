@@ -1,4 +1,5 @@
 #include <PxPhysicsAPI.h>
+#include <imgui/imgui.h>
 
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -217,7 +218,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		dir = dir * (1.0f / SEGMENT_COUNT);
 		float dir_len = dir.length();
 		Vec3 right(0, -dir.z, dir.y);
-		if (abs(right.y) < 0.001f && abs(right.z) < 0.001f)
+		if (fabsf(right.y) < 0.001f && fabsf(right.z) < 0.001f)
 		{
 			right.set(dir.z, 0, -dir.x);
 		}

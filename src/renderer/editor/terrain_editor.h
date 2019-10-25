@@ -4,6 +4,7 @@
 #include "engine/array.h"
 #include "engine/binary_array.h"
 #include "engine/math.h"
+#include "engine/universe/component.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
 

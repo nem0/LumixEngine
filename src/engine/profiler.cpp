@@ -1,4 +1,11 @@
+#define INITGUID
+#define NOGDI 
+#include <Windows.h>
+#include <evntcons.h>
+
+
 #include "engine/array.h"
+#include "engine/crt.h"
 #include "engine/fibers.h"
 #include "engine/hash_map.h"
 #include "engine/allocator.h"
@@ -8,14 +15,6 @@
 #include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "profiler.h"
-#include <string.h>
-
-#define INITGUID
-#include <Windows.h>
-#include <evntcons.h>
-#include <evntrace.h>
-#include <thread>
-#include <assert.h>
 
 namespace Lumix
 {
@@ -61,18 +60,18 @@ struct ThreadContext
 // https://docs.microsoft.com/en-us/windows/desktop/etw/cswitch
 struct CSwitch
 {
-	uint32_t                 NewThreadId;
-	uint32_t                 OldThreadId;
-	int8_t             NewThreadPriority;
-	int8_t             OldThreadPriority;
-	uint8_t               PreviousCState;
-	int8_t                     SpareByte;
-	int8_t           OldThreadWaitReason;
-	int8_t             OldThreadWaitMode;
-	int8_t                OldThreadState;
-	int8_t   OldThreadWaitIdealProcessor;
-	uint32_t           NewThreadWaitTime;
-	uint32_t                    Reserved;
+	u32                 NewThreadId;
+	u32                 OldThreadId;
+	i8             NewThreadPriority;
+	i8             OldThreadPriority;
+	u8               PreviousCState;
+	i8                     SpareByte;
+	i8           OldThreadWaitReason;
+	i8             OldThreadWaitMode;
+	i8                OldThreadState;
+	i8   OldThreadWaitIdealProcessor;
+	u32           NewThreadWaitTime;
+	u32                    Reserved;
 };
 
 

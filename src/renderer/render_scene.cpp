@@ -3,6 +3,7 @@
 #include "engine/array.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
@@ -30,8 +31,6 @@
 #include "renderer/renderer.h"
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
-#include <float.h>
-#include <math.h>
 
 
 namespace Lumix

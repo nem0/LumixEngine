@@ -2,7 +2,7 @@
 
 
 #include "engine/allocator.h"
-#include "engine/string.h"
+#include "engine/crt.h"
 
 
 namespace Lumix
@@ -221,7 +221,7 @@ public:
 			m_data[index].~T();
 			if (index != m_size - 1)
 			{
-				moveMemory(m_data + index, m_data + m_size - 1, sizeof(T));
+				memmove(m_data + index, m_data + m_size - 1, sizeof(T));
 			}
 			--m_size;
 		}
@@ -246,7 +246,7 @@ public:
 		{
 			grow();
 		}
-		moveMemory(m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
+		memmove(m_data + index + 1, m_data + index, sizeof(T) * (m_size - index));
 		new (NewPlaceholder(), &m_data[index]) T(value);
 		++m_size;
 	}
@@ -259,7 +259,7 @@ public:
 			m_data[index].~T();
 			if (index < m_size - 1)
 			{
-				moveMemory(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
+				memcpy(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
 			}
 			--m_size;
 		}
@@ -302,7 +302,7 @@ public:
 	{
 		if (m_size == m_capacity) grow();
 		
-		moveMemory(&m_data[idx + 1], &m_data[idx], sizeof(m_data[idx]) * (m_size - idx));
+		memmove(&m_data[idx + 1], &m_data[idx], sizeof(m_data[idx]) * (m_size - idx));
 		new (NewPlaceholder(), (char*)(m_data + idx)) T(myforward<Params>(params)...);
 		++m_size;
 		return m_data[idx];
@@ -350,7 +350,7 @@ public:
 		if (capacity > m_capacity)
 		{
 			T* newData = (T*)m_allocator.allocate_aligned(capacity * sizeof(T), alignof(T));
-			copyMemory(newData, m_data, sizeof(T) * m_size);
+			memcpy(newData, m_data, sizeof(T) * m_size);
 			m_allocator.deallocate_aligned(m_data);
 			m_data = newData;
 			m_capacity = capacity;

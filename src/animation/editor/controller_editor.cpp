@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "animation/animation_scene.h"
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
@@ -9,7 +11,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "imgui/imgui.h"
 #include "renderer/model.h"
 #include "../animation.h"
 #include "../controller.h"
@@ -303,7 +304,7 @@ void ControllerEditor::onWindowGUI() {
 				String& slot = m_controller->m_animation_slots[i];
 				char tmp[64];
 				copyString(tmp, slot.c_str());
-				if (ImGui::InputText(StaticString<32>("##", (u64)(uintptr_t)&slot), tmp, sizeof(tmp))) {
+				if (ImGui::InputText(StaticString<32>("##", (u64)(uintptr)&slot), tmp, sizeof(tmp))) {
 					// update AnimationNode::m_animation_hash
 					slot = tmp;
 				}
@@ -493,7 +494,7 @@ void ControllerEditor::onWindowGUI() {
 									const char* bone_name = m_model->getBone(parent_idx).name.c_str();
 									const StaticString<64> add_label("Add ", bone_name);
 									if (ImGui::Button(add_label)) {
-										moveMemory(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
+										memmove(&ik.bones[1], &ik.bones[0], sizeof(ik.bones[0]) * ik.bones_count);
 										ik.bones[0] = crc32(bone_name);
 										++ik.bones_count;
 									}

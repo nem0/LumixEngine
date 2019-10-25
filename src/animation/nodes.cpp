@@ -5,8 +5,7 @@
 #include "nodes.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
-#include <math.h> // fmodf
-#include <string.h> // memcpy
+#include "engine/crt.h"
 
 
 namespace Lumix::Anim {

@@ -160,6 +160,8 @@ CreateWindowExA(0L,                 \
 #define PM_REMOVE 0x0001
 #define WM_QUIT 0x0012
 
+#define UnlockResource(hResData) ((hResData), 0)
+#define HGLOBAL     HANDLE
 #define MAKEINTRESOURCEA(i) ((LPSTR)((ULONG_PTR)((WORD)(i))))
 #define MAKEINTRESOURCE MAKEINTRESOURCEA
 #define IDI_APPLICATION MAKEINTRESOURCE(32512)
@@ -204,7 +206,8 @@ typedef __int64 LONGLONG;
 typedef unsigned __int64 ULONGLONG;
 typedef void* HANDLE;
 typedef void* HWND;
-
+typedef void *HRSRC;
+typedef char TCHAR, *PTCHAR;
 
 #if defined(_WIN64)
 	typedef __int64 INT_PTR, *PINT_PTR;
@@ -236,6 +239,8 @@ typedef wchar_t WCHAR;
 typedef WCHAR *NWPSTR, *LPWSTR, *PWSTR;
 
 
+typedef VOID (WINAPI *PFIBER_START_ROUTINE)(LPVOID lpFiberParameter);
+typedef PFIBER_START_ROUTINE LPFIBER_START_ROUTINE;
 typedef DWORD(WINAPI* PTHREAD_START_ROUTINE)(LPVOID lpThreadParameter);
 typedef PTHREAD_START_ROUTINE LPTHREAD_START_ROUTINE;
 
@@ -630,4 +635,15 @@ WINBASEAPI DWORD WINAPI GetFileAttributesA(LPCSTR lpFileName);
 WINUSERAPI BOOL WINAPI OpenClipboard(HWND hWndNewOwner);
 WINUSERAPI HANDLE WINAPI SetClipboardData(UINT uFormat, HANDLE hMem);
 
-}
+WINBASEAPI HGLOBAL WINAPI LoadResource(HMODULE hModule, HRSRC hResInfo);
+WINBASEAPI HRSRC WINAPI FindResourceA(HMODULE hModule, LPCSTR lpName, LPCSTR lpType);
+WINBASEAPI DWORD WINAPI SizeofResource(HMODULE hModule, HRSRC hResInfo);
+WINBASEAPI LPVOID WINAPI LockResource(HGLOBAL hResData);
+WINBASEAPI DWORD WINAPI GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize);
+
+LPVOID WINAPI CreateFiber(SIZE_T dwStackSize, LPFIBER_START_ROUTINE lpStartAddress, LPVOID lpParameter);
+LPVOID WINAPI ConvertThreadToFiber(LPVOID lpParameter);
+WINBASEAPI VOID WINAPI SwitchToFiber(LPVOID lpFiber);
+WINBASEAPI VOID WINAPI DeleteFiber(PVOID lpFiber);
+
+} // extern "C"

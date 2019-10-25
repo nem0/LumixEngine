@@ -399,12 +399,12 @@ void Material::updateRenderData(bool on_before_ready)
 	cs.emission = m_emission;
 	cs.metallic = m_metallic;
 	cs.roughness = m_roughness;
-	setMemory(cs.custom, 0, sizeof(cs.custom));
+	memset(cs.custom, 0, sizeof(cs.custom));
 	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
 		for (Uniform& mat_uniform : m_uniforms) {
 			if (shader_uniform.name_hash == mat_uniform.name_hash) {
 				const u32 size = shader_uniform.size();
-				copyMemory((u8*)cs.custom + shader_uniform.offset, mat_uniform.matrix, size);
+				memcpy((u8*)cs.custom + shader_uniform.offset, mat_uniform.matrix, size);
 				break;
 			}
 		}

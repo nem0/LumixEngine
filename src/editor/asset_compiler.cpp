@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "asset_compiler.h"
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
@@ -15,7 +17,6 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "imgui/imgui.h"
 
 
 namespace Lumix

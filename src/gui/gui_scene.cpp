@@ -1,6 +1,7 @@
 #include "engine/engine.h"
 #include "engine/allocator.h"
 #include "engine/associative_array.h"
+#include "engine/crt.h"
 #include "engine/flag_set.h"
 #include "engine/input_system.h"
 #include "engine/log.h"
@@ -16,7 +17,6 @@
 #include "renderer/pipeline.h"
 #include "renderer/texture.h"
 #include "sprite.h"
-#include <math.h>
 
 
 namespace Lumix

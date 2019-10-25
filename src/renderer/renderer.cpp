@@ -33,7 +33,6 @@
 #undef far
 #include "gl/GL.h"
 #include "gpu/gpu.h"
-#include <stdio.h>
 
 #define GPU_GL_IMPORT(prototype, name) static prototype name;
 #define GPU_GL_IMPORT_TYPEDEFS
@@ -542,7 +541,7 @@ struct RendererImpl final : public Renderer
 	MemRef copy(const void* data, u32 size) override
 	{
 		MemRef mem = allocate(size);
-		copyMemory(mem.data, data, size);
+		memcpy(mem.data, data, size);
 		return mem;
 	}
 

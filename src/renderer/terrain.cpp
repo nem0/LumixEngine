@@ -1,5 +1,6 @@
 #include "terrain.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
@@ -14,8 +15,6 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "engine/universe/universe.h"
-#include <float.h>
-#include <math.h>
 
 
 namespace Lumix
@@ -597,8 +596,8 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 	float next_x = fabs(rel_dir.x) < 0.01f ? hx : ((hx + (rel_dir.x < 0 ? 0 : 1)) * m_scale.x - rel_origin.x) / rel_dir.x;
 	float next_z = fabs(rel_dir.z) < 0.01f ? hz : ((hz + (rel_dir.z < 0 ? 0 : 1)) * m_scale.x - rel_origin.z) / rel_dir.z;
 
-	float delta_x = fabs(rel_dir.x) < 0.01f ? 0 : m_scale.x / abs(rel_dir.x);
-	float delta_z = fabs(rel_dir.z) < 0.01f ? 0 : m_scale.x / abs(rel_dir.z);
+	float delta_x = fabsf(rel_dir.x) < 0.01f ? 0 : m_scale.x / fabsf(rel_dir.x);
+	float delta_z = fabsf(rel_dir.z) < 0.01f ? 0 : m_scale.x / fabsf(rel_dir.z);
 	int step_x = (int)signum(rel_dir.x);
 	int step_z = (int)signum(rel_dir.z);
 

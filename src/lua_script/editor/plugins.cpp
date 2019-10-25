@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/ieditor_command.h"
@@ -8,6 +10,7 @@
 #include "editor/world_editor.h"
 #include "engine/array.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/allocator.h"
@@ -18,10 +21,8 @@
 #include "engine/reflection.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
-#include "imgui/imgui.h"
 #include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
-#include <stdlib.h>
 
 
 using namespace Lumix;

@@ -1,7 +1,5 @@
 #include "math.h"
 #include "simd.h"
-#include <math.h>
-#include <float.h>
 #include <random>
 
 
@@ -962,30 +960,6 @@ static std::mt19937& getRandomGenerator()
 	static std::mt19937 gen(seed());
 
 	return gen;
-}
-
-
-float sqrt(float value)
-{
-	return ::sqrtf(value);
-}
-
-
-double sqrt(int value)
-{
-	return ::sqrt(value);
-}
-
-
-double sqrt(double value)
-{
-	return ::sqrtl(value);
-}
-
-
-float pow(float base, float exponent)
-{
-	return ::pow(base, exponent);
 }
 
 

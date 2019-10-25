@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "utils.h"
 #include "engine/math.h"
 #include "engine/path.h"
@@ -5,7 +7,6 @@
 #include "engine/reflection.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
-#include "imgui/imgui.h"
 #include "engine/universe/universe.h"
 
 
@@ -96,7 +97,7 @@ bool Action::toolbarButton()
 	ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
 	ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
 	int* t = (int*)icon; 
-	if (ImGui::ToolbarButton((void*)(uintptr_t)*t, bg_color, label_long))
+	if (ImGui::ToolbarButton((void*)(uintptr)*t, bg_color, label_long))
 	{
 		func.invoke();
 		return true;

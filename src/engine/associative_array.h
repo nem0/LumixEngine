@@ -2,8 +2,8 @@
 
 
 #include "engine/allocator.h"
+#include "engine/crt.h"
 #include "engine/metaprogramming.h"
-#include "engine/string.h"
 
 
 namespace Lumix
@@ -35,8 +35,8 @@ namespace Lumix
 
 				int i = index(key);
 				ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
-				moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-				moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+				memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+				memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
 				new (NewPlaceholder(), &m_values[i]) Value();
 				new (NewPlaceholder(), &m_keys[i]) Key(key);
 				++m_size;
@@ -75,8 +75,8 @@ namespace Lumix
 				int i = index(key);
 				ASSERT(i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size));
 
-				moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-				moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+				memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+				memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
 				new (NewPlaceholder(), &m_values[i]) Value(myforward<Params>(params)...);
 				new (NewPlaceholder(), &m_keys[i]) Key(key);
 				++m_size;
@@ -92,8 +92,8 @@ namespace Lumix
 				int i = index(key);
 				if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
 				{
-					moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-					moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+					memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+					memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
 					new (NewPlaceholder(), &m_values[i]) Value(Move(value));
 					new (NewPlaceholder(), &m_keys[i]) Key(key);
 					++m_size;
@@ -111,8 +111,8 @@ namespace Lumix
 				int i = index(key);
 				if (i >= 0 && ((i < m_size && m_keys[i] != key) || i == m_size))
 				{
-					moveMemory(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
-					moveMemory(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
+					memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
+					memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
 					new (NewPlaceholder(), &m_values[i]) Value(value);
 					new (NewPlaceholder(), &m_keys[i]) Key(key);
 					++m_size;
@@ -240,8 +240,8 @@ namespace Lumix
 				
 				u8* new_data = (u8*)m_allocator.allocate(new_capacity * (sizeof(Key) + sizeof(Value)));
 				
-				copyMemory(new_data, m_keys, sizeof(Key) * m_size);
-				copyMemory(new_data + sizeof(Key) * new_capacity, m_values, sizeof(Value) * m_size);
+				memcpy(new_data, m_keys, sizeof(Key) * m_size);
+				memcpy(new_data + sizeof(Key) * new_capacity, m_values, sizeof(Value) * m_size);
 
 				m_allocator.deallocate(m_keys);
 				m_keys = (Key*)new_data;
@@ -265,8 +265,8 @@ namespace Lumix
 					m_keys[index].~Key();
 					if (index < m_size - 1)
 					{
-						moveMemory(m_keys + index, m_keys + index + 1, sizeof(Key) * (m_size - index - 1));
-						moveMemory(m_values + index, m_values + index + 1, sizeof(Value) * (m_size - index - 1));
+						memmove(m_keys + index, m_keys + index + 1, sizeof(Key) * (m_size - index - 1));
+						memmove(m_values + index, m_values + index + 1, sizeof(Value) * (m_size - index - 1));
 					}
 					--m_size;
 				}

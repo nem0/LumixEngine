@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "settings.h"
 #include "engine/debug.h"
 #include "engine/file_system.h"
@@ -8,7 +10,6 @@
 #include "engine/os.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
-#include "imgui/imgui.h"
 #include "utils.h"
 #include <lua.hpp>
 

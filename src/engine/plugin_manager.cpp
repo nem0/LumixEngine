@@ -9,6 +9,7 @@
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 
 
 namespace Lumix 

@@ -3,8 +3,6 @@
 
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
-#include "editor/utils.h"
-#include "editor/world_editor.h"
 #include "renderer/gpu/gpu.h"
 
 
@@ -12,10 +10,12 @@ namespace Lumix
 {
 
 
+template <typename T> class Delegate;
 class LogUI;
 class Model;
 class StudioApp;
 class Pipeline;
+struct RayCastModelHit;
 class RenderScene;
 class Shader;
 
@@ -57,7 +57,6 @@ class SceneView : public StudioApp::GUIPlugin
 
 	private:
 		StudioApp& m_app;
-		bool m_is_mouse_captured;
 		Action* m_toggle_gizmo_step_action;
 		Action* m_move_forward_action;
 		Action* m_move_back_action;
@@ -66,7 +65,9 @@ class SceneView : public StudioApp::GUIPlugin
 		Action* m_move_up_action;
 		Action* m_move_down_action;
 		Action* m_camera_speed_action;
+		bool m_is_mouse_captured;
 		bool m_is_open;
+		bool m_show_stats;
 		int m_screen_x;
 		int m_screen_y;
 		int m_width;
@@ -77,7 +78,6 @@ class SceneView : public StudioApp::GUIPlugin
 		WorldEditor& m_editor;
 		Pipeline* m_pipeline;
 		gpu::TextureHandle m_texture_handle;
-		bool m_show_stats;
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
 		Shader* m_debug_shape_shader;

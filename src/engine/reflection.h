@@ -5,6 +5,7 @@
 #include "engine/metaprogramming.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 #include "engine/universe/component.h"
 
 
@@ -764,11 +765,11 @@ namespace internal
 #ifdef _WIN32
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			static char typeName[size] = {};
-			copyMemory(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
+			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
 #else
 			static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			static char typeName[size] = {};
-			copyMemory(typeName, __PRETTY_FUNCTION__ + FRONT_SIZE, size - 1u);
+			memcpy(typeName, __PRETTY_FUNCTION__ + FRONT_SIZE, size - 1u);
 #endif
 
 			return typeName;
@@ -824,7 +825,7 @@ struct EnumDescriptor : EnumBase
 
 	void operator =(const EnumDescriptor& rhs)
 	{
-		copyMemory(this, &rhs, sizeof(*this));
+		memcpy(this, &rhs, sizeof(*this));
 		values = values_buffer;
 	}
 

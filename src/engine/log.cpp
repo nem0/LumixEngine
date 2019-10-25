@@ -1,8 +1,8 @@
+#include "engine/crt.h"
 #include "engine/delegate_list.h"
 #include "engine/log.h"
 #include "engine/path.h"
 #include "engine/string.h"
-#include <stdlib.h>
 
 
 namespace Lumix

@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "scene_view.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -7,6 +9,7 @@
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "engine/crc32.h"
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
@@ -21,7 +24,6 @@
 #include "engine/string.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
-#include "imgui/imgui.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -555,7 +557,7 @@ void SceneView::onToolbar()
 	ImGui::SetCursorPos(pos);
 	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
 	const gpu::TextureHandle t = *(gpu::TextureHandle*)mode_action->icon;
-	ImGui::Image((void*)(uintptr_t)t.value, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), tint_color);
+	ImGui::Image((void*)(uintptr)t.value, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), tint_color);
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
 
 	ImGui::SameLine();
@@ -619,7 +621,7 @@ void SceneView::onWindowGUI()
 			m_height = int(size.y);
 			auto content_min = ImGui::GetCursorScreenPos();
 			if(m_texture_handle.isValid()) {
-				void* t = (void*)(uintptr_t)m_texture_handle.value;
+				void* t = (void*)(uintptr)m_texture_handle.value;
 				if (gpu::isOriginBottomLeft()) {
 					ImGui::Image(t, size, ImVec2(0, 1), ImVec2(1, 0));
 				} 

@@ -1,3 +1,5 @@
+#include <imgui/imgui.h>
+
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/settings.h"
@@ -5,6 +7,7 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
@@ -17,7 +20,6 @@
 #include "engine/universe/universe.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
-#include "imgui/imgui.h"
 #include "renderer/draw2d.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/pipeline.h"
@@ -298,7 +300,7 @@ private:
 			const float SIZE = 5;
 			float dx = pos.x - mouse_pos.x;
 			float dy = pos.y - mouse_pos.y;
-			bool is_hovered = abs(dx) < SIZE && abs(dy) < SIZE;
+			bool is_hovered = fabsf(dx) < SIZE && fabsf(dy) < SIZE;
 			
 			draw.addRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? Color{0xff, 0xff, 0xff, 0xff} : Color{0xff, 0xff, 0xff, 0x77});
 			draw.addRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), {0xff, 0xff, 0xff, 0x77}, 1);

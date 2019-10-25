@@ -1,3 +1,4 @@
+#include "engine/crt.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -199,7 +200,7 @@ bool Texture::saveTGA(IOutputStream* file,
 	u8* data = (u8*)allocator.allocate(width * height * 4);
 
 	TGAHeader header;
-	setMemory(&header, 0, sizeof(header));
+	memset(&header, 0, sizeof(header));
 	header.bitsPerPixel = (char)(bytes_per_pixel * 8);
 	header.height = (short)height;
 	header.width = (short)width;
@@ -310,7 +311,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 	u8* dst_mem = (u8*)mem.data;
 
 	for (int j = 0; j < h; ++j) {
-		copyMemory(
+		memcpy(
 			&dst_mem[(j * w) * bytes_per_pixel],
 			&src_mem[(x + (y + j) * width) * bytes_per_pixel],
 			bytes_per_pixel * w);
@@ -324,7 +325,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	PROFILE_FUNCTION();
 	const size_t size = file.size() - file.getPosition();
 	texture.bytes_per_pixel = 2;
-	texture.width = (int)sqrt(int(size / texture.bytes_per_pixel));
+	texture.width = (int)sqrtf((float)int(size / texture.bytes_per_pixel));
 	texture.height = texture.width;
 	const u32 file_data_offset = (u32)file.getPosition();
 
@@ -397,7 +398,7 @@ bool Texture::loadTGA(IInputStream& file)
 		Renderer::MemRef mem;
 		if (!data_reference) mem = renderer.allocate(image_size);
 		u8* image_dest = data_reference ? &data[0] : (u8*)mem.data;
-		copyMemory(image_dest, stb_data, image_size);
+		memcpy(image_dest, stb_data, image_size);
 		stbi_image_free(stb_data);
 
 		//if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);

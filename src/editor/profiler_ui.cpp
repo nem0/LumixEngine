@@ -1,4 +1,7 @@
+#include <imgui/imgui.h>
+
 #include "profiler_ui.h"
+#include "engine/crt.h"
 #include "engine/fibers.h"
 #include "engine/file_system.h"
 #include "engine/job_system.h"
@@ -11,9 +14,7 @@
 #include "engine/resource_manager.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
-#include "imgui/imgui.h"
 #include "utils.h"
-#include <inttypes.h>
 
 
 namespace Lumix

@@ -1,5 +1,5 @@
+#include "engine/crt.h"
 #include "prefab.h"
-
 
 namespace Lumix
 {
@@ -24,7 +24,7 @@ void PrefabResource::unload() { data.clear(); }
 bool PrefabResource::load(u64 size, const u8* mem)
 {
 	data.resize((int)size);
-	copyMemory(data.begin(), mem, size);
+	memcpy(data.begin(), mem, size);
 	return true;
 }
 

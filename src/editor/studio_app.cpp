@@ -1,3 +1,6 @@
+#include <imgui/imgui.h>
+#include <imgui/IconsFontAwesome4.h>
+
 #include "studio_app.h"
 #include "asset_browser.h"
 #include "audio/audio_scene.h"
@@ -26,8 +29,6 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe/universe.h"
-#include "imgui/imgui.h"
-#include "imgui/IconsFontAwesome4.h"
 #include "log_ui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
