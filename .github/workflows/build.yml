@@ -9,7 +9,7 @@ jobs:
                 fetch-depth: 1
             - name: make project
               working-directory: projects
-              run: genie.exe --static-plugins vs2019 
+              run: dir
             - name: build engine
               working-directory: projects
               run: |
