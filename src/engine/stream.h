@@ -56,19 +56,20 @@ class LUMIX_ENGINE_API OutputMemoryStream final : public IOutputStream
 
 		bool write(const void* data, u64 size) override;
 
-		Span<u8> release_ownership();
+		Span<u8> releaseOwnership();
 		void resize(u64 size);
 		void reserve(u64 size);
-		const void* getData() const { return m_data; }
-		void* getMutableData() { return m_data; }
+		const u8* getData() const { return m_data; }
+		u8* getMutableData() { return m_data; }
 		u64 getPos() const { return m_pos; }
 		void write(const String& string);
 		template <class T> void write(const T& value);
 		void clear();
 		void* skip(int size);
+		bool empty() const { return m_pos == 0; }
 
 	private:
-		void* m_data;
+		u8* m_data;
 		u64 m_size;
 		u64 m_pos;
 		IAllocator* m_allocator;

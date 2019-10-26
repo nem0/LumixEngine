@@ -77,7 +77,7 @@ RuntimeContext* Controller::createRuntime(u32 anim_set) {
 void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) {
 	ASSERT(&ctx.controller == this);
 	// TODO better allocation strategy
-	const Span<u8> mem = ctx.data.release_ownership();
+	const Span<u8> mem = ctx.data.releaseOwnership();
 	ctx.data.reserve(mem.length());
 	ctx.input_runtime.set(mem.begin(), mem.length());
 	m_root->update(ctx, root_motion);

@@ -2,6 +2,7 @@
 
 
 #include "engine/resource.h"
+#include "engine/stream.h"
 #include "gpu/gpu.h"
 
 
@@ -50,8 +51,8 @@ public:
 	bool create(int w, int h, gpu::TextureFormat format, const void* data, u32 size);
 	void destroy();
 
-	const u8* getData() const { return data.empty() ? nullptr : &data[0]; }
-	u8* getData() { return data.empty() ? nullptr : &data[0]; }
+	const u8* getData() const { return (const u8*)data.getData(); }
+	u8* getData() { return (u8*)data.getMutableData(); }
 	void addDataReference();
 	void removeDataReference();
 	void onDataUpdated(int x, int y, int w, int h);
@@ -88,7 +89,7 @@ public:
 	gpu::TextureHandle handle;
 	IAllocator& allocator;
 	int data_reference;
-	Array<u8> data;
+	OutputMemoryStream data;
 	Renderer& renderer;
 
 private:

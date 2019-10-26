@@ -2023,13 +2023,13 @@ public:
 	{
 		if (!texture) return 0;
 		if (!texture->isReady()) return 0;
-		if (texture->data.empty()) return 0;
+		if (texture->data.getPos() == 0) return 0;
 		if (texture->bytes_per_pixel != 4) return 0;
 		
 		x = clamp(x, 0, texture->width - 1);
 		y = clamp(y, 0, texture->height - 1);
 
-		return ((u32*)&texture->data[0])[x + y * texture->width];
+		return ((const u32*)texture->getData())[x + y * texture->width];
 	}
 
 
