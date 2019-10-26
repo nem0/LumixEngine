@@ -91,7 +91,7 @@ u32 Texture::getPixelNearest(int x, int y) const
 {
 	if (data.empty() || x >= width || y >= height || x < 0 || y < 0 || bytes_per_pixel != 4) return 0;
 
-	return *(u32*)&data[(x + y * width) * 4];
+	return *(u32*)&data.getData()[(x + y * width) * 4];
 }
 
 
@@ -106,7 +106,7 @@ u32 Texture::getPixel(float x, float y) const
 	// http://fastcpp.blogspot.sk/2011/06/bilinear-pixel-interpolation-using-sse.html
 	int px = (int)x;
 	int py = (int)y;
-	const u32* p0 = (u32*)&data[(px + py * width) * 4];
+	const u32* p0 = (u32*)&data.getData()[(px + py * width) * 4];
 
 	const u8* p1 = (u8*)p0;
 	const u8* p2 = (u8*)(p0 + 1);
@@ -250,7 +250,7 @@ static void saveTGA(Texture& texture)
 		texture.width,
 		texture.height,
 		texture.bytes_per_pixel,
-		&texture.data[0],
+		texture.data.getData(),
 		false,
 		texture.getPath(),
 		texture.allocator);
@@ -273,7 +273,7 @@ void Texture::save()
 			return;
 		}
 
-		file.write(&data[0], data.size() * sizeof(data[0]));
+		file.write(data.getData(), data.getPos());
 		file.close();
 	}
 	else if (equalStrings(ext, "tga") && bytes_per_pixel == 4)
@@ -293,7 +293,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 
 	if (bytes_per_pixel == 2) {
 		const Renderer::MemRef mem = renderer.allocate(w * h * sizeof(float));
-		const u16* src_mem = (const u16*)&data[0];
+		const u16* src_mem = (const u16*)data.getData();
 		float* dst_mem = (float*)mem.data;
 
 		for (int j = 0; j < h; ++j) {
@@ -306,7 +306,7 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 	}
 
 	ASSERT(bytes_per_pixel == 4);
-	const u8* src_mem = (const u8*)&data[0];
+	const u8* src_mem = (const u8*)data.getData();
 	const Renderer::MemRef mem = renderer.allocate(w * h * bytes_per_pixel);
 	u8* dst_mem = (u8*)mem.data;
 
@@ -332,7 +332,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	if (texture.data_reference)
 	{
 		texture.data.resize((int)size);
-		file.read(&texture.data[0], size);
+		file.read(texture.data.getMutableData(), size);
 	}
 
 	const u8* data = (const u8*)file.getBuffer();
@@ -397,7 +397,7 @@ bool Texture::loadTGA(IInputStream& file)
 		}
 		Renderer::MemRef mem;
 		if (!data_reference) mem = renderer.allocate(image_size);
-		u8* image_dest = data_reference ? &data[0] : (u8*)mem.data;
+		u8* image_dest = data_reference ? data.getMutableData() : (u8*)mem.data;
 		memcpy(image_dest, stb_data, image_size);
 		stbi_image_free(stb_data);
 
@@ -437,7 +437,7 @@ bool Texture::loadTGA(IInputStream& file)
 	Renderer::MemRef mem;
 	if (!data_reference) mem = renderer.allocate(image_size);
 
-	u8* image_dest = data_reference ? &data[0] : (u8*)mem.data;
+	u8* image_dest = data_reference ? data.getMutableData() : (u8*)mem.data;
 
 	bool is_rle = header.dataType == 10;
 	if (is_rle)

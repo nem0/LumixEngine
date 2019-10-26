@@ -16,7 +16,7 @@ OutputMemoryStream::OutputMemoryStream(IAllocator& allocator)
 
 
 OutputMemoryStream::OutputMemoryStream(void* data, u64 size)
-	: m_data(data)
+	: m_data((u8*)data)
 	, m_size(size)
 	, m_allocator(nullptr)
 	, m_pos(0)
@@ -30,7 +30,7 @@ OutputMemoryStream::OutputMemoryStream(const OutputMemoryStream& blob, IAllocato
 {
 	if (blob.m_size > 0)
 	{
-		m_data = allocator.allocate(blob.m_size);
+		m_data = (u8*)allocator.allocate(blob.m_size);
 		memcpy(m_data, blob.m_data, blob.m_size);
 		m_size = blob.m_size;
 	}
@@ -48,7 +48,7 @@ OutputMemoryStream::OutputMemoryStream(const InputMemoryStream& blob, IAllocator
 {
 	if (blob.size() > 0)
 	{
-		m_data = allocator.allocate(blob.size());
+		m_data = (u8*)allocator.allocate(blob.size());
 		memcpy(m_data, blob.getData(), blob.size());
 		m_size = blob.size();
 	}
@@ -147,7 +147,7 @@ OutputMemoryStream::OutputMemoryStream(const OutputMemoryStream& rhs)
 	m_pos = rhs.m_pos;
 	if (rhs.m_size > 0)
 	{
-		m_data = m_allocator->allocate(rhs.m_size);
+		m_data = (u8*)m_allocator->allocate(rhs.m_size);
 		memcpy(m_data, rhs.m_data, rhs.m_size);
 		m_size = rhs.m_size;
 	}
@@ -168,7 +168,7 @@ void OutputMemoryStream::operator =(const OutputMemoryStream& rhs)
 	m_pos = rhs.m_pos;
 	if (rhs.m_size > 0)
 	{
-		m_data = m_allocator->allocate(rhs.m_size);
+		m_data = (u8*)m_allocator->allocate(rhs.m_size);
 		memcpy(m_data, rhs.m_data, rhs.m_size);
 		m_size = rhs.m_size;
 	}
@@ -248,7 +248,7 @@ void OutputMemoryStream::reserve(u64 size)
 }
 
 
-Span<u8> OutputMemoryStream::release_ownership() {
+Span<u8> OutputMemoryStream::releaseOwnership() {
 	Span<u8> res((u8*)m_data, (u8*)m_data + m_size);
 	m_data = nullptr;
 	m_pos = m_size = 0;
