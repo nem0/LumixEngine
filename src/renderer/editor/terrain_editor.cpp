@@ -75,6 +75,7 @@ struct PaintTerrainCommand final : public IEditorCommand
 		u16 flat_height,
 		Vec3 color,
 		ComponentUID terrain,
+		bool secondary_layer,
 		bool can_be_merged)
 		: m_world_editor(editor)
 		, m_terrain(terrain)
@@ -87,6 +88,7 @@ struct PaintTerrainCommand final : public IEditorCommand
 		, m_grass_mask((u16)texture_idx)
 		, m_mask(editor.getAllocator())
 		, m_flat_height(flat_height)
+		, m_secondary_layer(secondary_layer)
 	{
 		ASSERT(terrain.isValid());
 		
@@ -268,7 +270,7 @@ private:
 	}
 
 
-	void rasterLayerItem(Texture* texture, Array<u8>& data, Item& item)
+	void rasterLayerItem(Texture* texture, Array<u8>& data, Item& item, bool secondary)
 	{
 		int texture_size = texture->width;
 		Rectangle r = item.getBoundingRectangle(texture_size);
@@ -289,18 +291,20 @@ private:
 			{
 				if (isMasked(fx, fy))
 				{
-					int offset = 4 * (i - m_x + (j - m_y) * m_width);
+					int offset = 4 * (i - m_x + (j - m_y) * m_width) + (secondary ? 1: 0);
 					float attenuation = getAttenuation(item, i, j, texture_size);
 					int add = int(attenuation * item.m_amount * 255);
 					if (add > 0)
 					{
-						if (data[offset] == m_texture_idx)
-						{
-							data[offset + 1] += minimum(255 - data[offset + 1], add);
-						}
-						else
-						{
-							data[offset + 1] = add;
+						if(secondary) {
+							if (data[offset] == m_texture_idx)
+							{
+								data[offset + 1] += minimum(255 - data[offset + 1], add);
+							}
+							else
+							{
+								data[offset + 1] = add;
+							}
 						}
 						data[offset] = m_texture_idx;
 					}
@@ -407,7 +411,7 @@ private:
 		}
 		else if (m_action_type == TerrainEditor::LAYER)
 		{
-			rasterLayerItem(texture, data, item);
+			rasterLayerItem(texture, data, item, m_secondary_layer);
 			return;
 		}
 		else if (m_action_type == TerrainEditor::ADD_GRASS || m_action_type == TerrainEditor::REMOVE_GRASS)
@@ -616,6 +620,7 @@ private:
 	WorldEditor& m_world_editor;
 	BinaryArray m_mask;
 	u16 m_flat_height;
+	bool m_secondary_layer;
 	bool m_can_be_merged;
 };
 
@@ -1217,7 +1222,7 @@ void TerrainEditor::onGUI()
 		ImGui::Indent();
 		return;
 	}
-	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 500);
+	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
 	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
 
 	enum BrushType
@@ -1366,6 +1371,7 @@ void TerrainEditor::onGUI()
 			Texture* tex = getMaterial()->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
 			if (tex)
 			{
+				ImGui::Checkbox("Secondary layer", &m_secondary_layer);
 				for (int i = 0; i < tex->layers; ++i)
 				{
 					if (i % 4 != 0) ImGui::SameLine();
@@ -1513,6 +1519,7 @@ void TerrainEditor::paint(const DVec3& hit_pos, ActionType action_type, bool old
 		m_flat_height,
 		m_color,
 		m_component,
+		m_secondary_layer,
 		old_stroke);
 	m_world_editor.executeCommand(command);
 }
