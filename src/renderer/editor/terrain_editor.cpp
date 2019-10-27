@@ -67,7 +67,7 @@ struct PaintTerrainCommand final : public IEditorCommand
 
 	PaintTerrainCommand(WorldEditor& editor,
 		TerrainEditor::ActionType action_type,
-		int texture_idx,
+		u64 textures_mask,
 		const DVec3& hit_pos,
 		BinaryArray& mask,
 		float radius,
@@ -75,7 +75,8 @@ struct PaintTerrainCommand final : public IEditorCommand
 		u16 flat_height,
 		Vec3 color,
 		ComponentUID terrain,
-		bool secondary_layer,
+		u32 layers_mask,
+		Vec2 fixed_value,
 		bool can_be_merged)
 		: m_world_editor(editor)
 		, m_terrain(terrain)
@@ -84,11 +85,12 @@ struct PaintTerrainCommand final : public IEditorCommand
 		, m_old_data(editor.getAllocator())
 		, m_items(editor.getAllocator())
 		, m_action_type(action_type)
-		, m_texture_idx(texture_idx)
-		, m_grass_mask((u16)texture_idx)
+		, m_textures_mask(textures_mask)
+		, m_grass_mask((u16)textures_mask)
 		, m_mask(editor.getAllocator())
 		, m_flat_height(flat_height)
-		, m_secondary_layer(secondary_layer)
+		, m_layers_masks(layers_mask)
+		, m_fixed_value(fixed_value)
 	{
 		ASSERT(terrain.isValid());
 		
@@ -141,7 +143,7 @@ struct PaintTerrainCommand final : public IEditorCommand
 		}
 		PaintTerrainCommand& my_command = static_cast<PaintTerrainCommand&>(command);
 		if (m_terrain == my_command.m_terrain && m_action_type == my_command.m_action_type &&
-			m_texture_idx == my_command.m_texture_idx)
+			m_textures_mask == my_command.m_textures_mask && m_layers_masks == my_command.m_layers_masks)
 		{
 			my_command.m_items.push(m_items.back());
 			my_command.resizeData();
@@ -219,9 +221,11 @@ private:
 	float getAttenuation(Item& item, int i, int j, int texture_size) const
 	{
 		float dist =
-			sqrtf((texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
+			((texture_size * item.m_local_pos.x - 0.5f - i) * (texture_size * item.m_local_pos.x - 0.5f - i) +
 				 (texture_size * item.m_local_pos.z - 0.5f - j) * (texture_size * item.m_local_pos.z - 0.5f - j));
-		return 1.0f - minimum(dist / (texture_size * item.m_radius), 1.0f);
+		dist = powf(dist, 4);
+		float max_dist = powf(texture_size * item.m_radius, 8);
+		return 1.0f - minimum(dist / max_dist, 1.0f);
 	}
 
 
@@ -270,7 +274,7 @@ private:
 	}
 
 
-	void rasterLayerItem(Texture* texture, Array<u8>& data, Item& item, bool secondary)
+	void rasterLayerItem(Texture* texture, Array<u8>& data, Item& item)
 	{
 		int texture_size = texture->width;
 		Rectangle r = item.getBoundingRectangle(texture_size);
@@ -284,29 +288,49 @@ private:
 		float fx = 0;
 		float fstepx = 1.0f / (r.to_x - r.from_x);
 		float fstepy = 1.0f / (r.to_y - r.from_y);
-		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx)
-		{
+		u8 tex[64];
+		u32 tex_count = 0;
+		for (u8 i = 0; i < 64; ++i) {
+			if (m_textures_mask & ((u64)1 << i)) {
+				tex[tex_count] = i;
+				++tex_count;
+			}
+		}
+
+		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx) {
 			float fy = 0;
-			for (int j = r.from_y, end2 = r.to_y; j < end2; ++j, fy += fstepy)
-			{
-				if (isMasked(fx, fy))
-				{
-					int offset = 4 * (i - m_x + (j - m_y) * m_width) + (secondary ? 1: 0);
-					float attenuation = getAttenuation(item, i, j, texture_size);
-					int add = int(attenuation * item.m_amount * 255);
-					if (add > 0)
-					{
-						if(secondary) {
-							if (data[offset] == m_texture_idx)
-							{
-								data[offset + 1] += minimum(255 - data[offset + 1], add);
+			
+			for (int j = r.from_y, end2 = r.to_y; j < end2; ++j, fy += fstepy) {
+				if (isMasked(fx, fy)) {
+					for (u32 layer = 0; layer < 2; ++layer) {
+						if ((m_layers_masks & (1 << layer)) == 0) continue;
+						const int offset = 4 * (i - m_x + (j - m_y) * m_width) + layer;
+						const float attenuation = getAttenuation(item, i, j, texture_size);
+						int add = int(attenuation * item.m_amount * 255);
+					
+						if (add > 0) {
+							if (((u64)1 << data[offset]) & m_textures_mask) {
+								if (layer == 1) {
+									if (m_fixed_value.x >= 0) {
+										data[offset + 1] = (u8)clamp(randFloat(m_fixed_value.x, m_fixed_value.y) * 255.f, 0.f, 255.f);
+									}
+									else {
+										data[offset + 1] += minimum(255 - data[offset + 1], add);
+									}
+								}
 							}
-							else
-							{
-								data[offset + 1] = add;
+							else {
+								if (layer == 1) {
+									if (m_fixed_value.x >= 0) {
+										data[offset + 1] = (u8)clamp(randFloat(m_fixed_value.x, m_fixed_value.y) * 255.f, 0.f, 255.f);
+									}
+									else {
+										data[offset + 1] = add;
+									}
+								}
+								data[offset] = tex[rand() % tex_count];
 							}
 						}
-						data[offset] = m_texture_idx;
 					}
 				}
 			}
@@ -411,7 +435,7 @@ private:
 		}
 		else if (m_action_type == TerrainEditor::LAYER)
 		{
-			rasterLayerItem(texture, data, item, m_secondary_layer);
+			rasterLayerItem(texture, data, item);
 			return;
 		}
 		else if (m_action_type == TerrainEditor::ADD_GRASS || m_action_type == TerrainEditor::REMOVE_GRASS)
@@ -608,7 +632,7 @@ private:
 private:
 	Array<u8> m_new_data;
 	Array<u8> m_old_data;
-	int m_texture_idx;
+	u64 m_textures_mask;
 	u16 m_grass_mask;
 	int m_width;
 	int m_height;
@@ -620,7 +644,8 @@ private:
 	WorldEditor& m_world_editor;
 	BinaryArray m_mask;
 	u16 m_flat_height;
-	bool m_secondary_layer;
+	u32 m_layers_masks;
+	Vec2 m_fixed_value;
 	bool m_can_be_merged;
 };
 
@@ -667,15 +692,6 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	app.addAction(m_increase_brush_size);
 	app.addAction(m_decrease_brush_size);
 
-	m_increase_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Next terrain texture", "Terrain editor - next texture", "nextTerrainTexture");
-	m_increase_texture_idx->is_global = false;
-	m_increase_texture_idx->func.bind<TerrainEditor, &TerrainEditor::nextTerrainTexture>(this);
-	m_decrease_texture_idx = LUMIX_NEW(editor.getAllocator(), Action)("Previous terrain texture", "Terrain editor - previous texture", "prevTerrainTexture");
-	m_decrease_texture_idx->func.bind<TerrainEditor, &TerrainEditor::prevTerrainTexture>(this);
-	m_decrease_texture_idx->is_global = false;
-	app.addAction(m_increase_texture_idx);
-	app.addAction(m_decrease_texture_idx);
-
 	m_smooth_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "Terrain editor - smooth", "smoothTerrain");
 	m_smooth_terrain_action->is_global = false;
 	m_lower_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "Terrain editor - lower", "lowerTerrain");
@@ -697,7 +713,8 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
 	m_action_type = RAISE_HEIGHT;
-	m_texture_idx = 0;
+	m_textures_mask = 0b1;
+	m_layers_mask = 0b1;
 	m_grass_mask = 1;
 	m_is_align_with_normal = false;
 	m_is_rotate_x = false;
@@ -706,21 +723,6 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, PI * 2);
 
 	editor.universeDestroyed().bind<TerrainEditor, &TerrainEditor::onUniverseDestroyed>(this);
-}
-
-
-void TerrainEditor::nextTerrainTexture()
-{
-	Material* material = getMaterial();
-	if (!material) return;
-	Texture* tex = material->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
-	if (tex) m_texture_idx = minimum(tex->layers - 1, m_texture_idx + 1);
-}
-
-
-void TerrainEditor::prevTerrainTexture()
-{
-	m_texture_idx = maximum(0, m_texture_idx - 1);
 }
 
 
@@ -1196,8 +1198,6 @@ void TerrainEditor::onGUI()
 {
 	if (m_decrease_brush_size->isRequested()) m_decrease_brush_size->func.invoke();
 	if (m_increase_brush_size->isRequested()) m_increase_brush_size->func.invoke();
-	if (m_increase_texture_idx->isRequested()) m_increase_texture_idx->func.invoke();
-	if (m_decrease_texture_idx->isRequested()) m_decrease_texture_idx->func.invoke();
 
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
 	ImGui::Unindent();
@@ -1369,17 +1369,31 @@ void TerrainEditor::onGUI()
 		{
 			m_action_type = TerrainEditor::LAYER;
 			Texture* tex = getMaterial()->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
-			if (tex)
-			{
-				ImGui::Checkbox("Secondary layer", &m_secondary_layer);
-				for (int i = 0; i < tex->layers; ++i)
-				{
-					if (i % 4 != 0) ImGui::SameLine();
-					if (ImGui::RadioButton(StaticString<20>("", i, "###rb", i), m_texture_idx == i))
-					{
-						m_texture_idx = i;
+			if (tex) {
+				bool primary = m_layers_mask & 0b1;
+				bool secondary = m_layers_mask & 0b10;
+				ImGui::Checkbox("Primary layer", &primary);
+				ImGui::Checkbox("Secondary layer", &secondary);
+				if (secondary) {
+					bool use = m_fixed_value.x >= 0;
+					if (ImGui::Checkbox("Use fixed value", &use)) {
+						m_fixed_value.x = use ? 0.f : -1.f;
+					}
+					if (m_fixed_value.x >= 0) {
+						ImGui::SliderFloat("Fixed value min", &m_fixed_value.x, 0, m_fixed_value.y);
+						ImGui::SliderFloat("Fixed value max", &m_fixed_value.y, m_fixed_value.x, 1);
 					}
 				}
+				m_layers_mask = (primary ? 1 : 0) | (secondary ? 0b10 : 0);
+				for (int i = 0; i < tex->layers; ++i) {
+					if (i % 4 != 0) ImGui::SameLine();
+					bool b = m_textures_mask & ((u64)1 << i);
+					if (ImGui::Checkbox(StaticString<20>("", i, "###rb", i), &b)) {
+						if (b) m_textures_mask |= (u64)1 << i;
+						else m_textures_mask &= ~((u64)1 << i);
+					}
+				}
+
 			}
 			break;
 		}
@@ -1511,7 +1525,7 @@ void TerrainEditor::paint(const DVec3& hit_pos, ActionType action_type, bool old
 {
 	PaintTerrainCommand* command = LUMIX_NEW(m_world_editor.getAllocator(), PaintTerrainCommand)(m_world_editor,
 		action_type,
-		action_type == ADD_GRASS || action_type == REMOVE_GRASS ? (int)m_grass_mask : m_texture_idx,
+		action_type == ADD_GRASS || action_type == REMOVE_GRASS ? (u64)m_grass_mask : m_textures_mask,
 		hit_pos,
 		m_brush_mask,
 		m_terrain_brush_size,
@@ -1519,7 +1533,8 @@ void TerrainEditor::paint(const DVec3& hit_pos, ActionType action_type, bool old
 		m_flat_height,
 		m_color,
 		m_component,
-		m_secondary_layer,
+		m_layers_mask,
+		m_fixed_value,
 		old_stroke);
 	m_world_editor.executeCommand(command);
 }

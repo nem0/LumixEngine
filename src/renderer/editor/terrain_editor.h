@@ -60,8 +60,6 @@ private:
 	void paintEntities(const DVec3& hit);
 	void increaseBrushSize();
 	void decreaseBrushSize();
-	void nextTerrainTexture();
-	void prevTerrainTexture();
 	u16 getHeight(const DVec3& world_pos) const;
 	Texture* getHeightmap() const;
 	DVec3 getRelativePosition(const DVec3& world_pos) const;
@@ -73,8 +71,9 @@ private:
 	ComponentUID m_component;
 	float m_terrain_brush_strength;
 	float m_terrain_brush_size;
-	int m_texture_idx;
-	bool m_secondary_layer = false;
+	u64 m_textures_mask = 0b1;
+	u32 m_layers_mask = 0b1;
+	Vec2 m_fixed_value{-0.01f,-1};
 	u16 m_grass_mask;
 	u16 m_flat_height;
 	Vec3 m_color;
@@ -82,8 +81,6 @@ private:
 	Array<PrefabResource*> m_selected_prefabs;
 	Action* m_increase_brush_size;
 	Action* m_decrease_brush_size;
-	Action* m_increase_texture_idx;
-	Action* m_decrease_texture_idx;
 	Action* m_lower_terrain_action;
 	Action* m_smooth_terrain_action;
 	Action* m_remove_entity_action;
