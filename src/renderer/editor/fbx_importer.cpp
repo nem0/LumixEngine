@@ -145,6 +145,12 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 					tex.src = src_dir;
 					tex.src << tex.path;
 					tex.is_valid = OS::fileExists(tex.src);
+					
+					if (!tex.is_valid) {
+						tex.src = src_dir;
+						tex.src << "textures/" << file_info.m_basename << "." << file_info.m_extension;
+						tex.is_valid = OS::fileExists(tex.src);
+					}
 				}
 			}
 
