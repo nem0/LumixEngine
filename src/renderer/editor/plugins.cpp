@@ -1332,6 +1332,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		app.getAssetCompiler().registerExtension("tga", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("dds", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("raw", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("ltc", Texture::TYPE);
 	}
 
 
@@ -1464,6 +1465,241 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return false;
 	}
 
+	struct TextureComposite {
+		struct ChannelSource {
+			Path path;
+			u32 src_channel = 0;
+		};
+		
+		struct Layer {
+			ChannelSource red;
+			ChannelSource green;
+			ChannelSource blue;
+			ChannelSource alpha;
+
+			ChannelSource& getChannel(u32 i) {
+				switch(i) {
+					case 0: return red;
+					case 1: return green;
+					case 2: return blue;
+					case 3: return alpha;
+					default: ASSERT(false); return red;
+				}
+			}
+		};
+
+		enum class Output {
+			BC1,
+			BC3
+		};
+
+		static TextureComposite& getThis(lua_State* L) {
+			lua_getfield(L, LUA_GLOBALSINDEX, "this");
+			TextureComposite* tc = (TextureComposite*)lua_touserdata(L, -1);
+			lua_pop(L, 1);
+			ASSERT(tc);
+			return *tc;
+		}
+
+		static ChannelSource toChannelSource(lua_State* L, int idx) {
+			ChannelSource res;
+			if (!lua_istable(L, idx)) {
+				luaL_argerror(L, 1, "unexpected form");
+			}
+			const size_t l = lua_objlen(L, idx);
+			if (l == 0) {
+				luaL_argerror(L, 1, "unexpected form");
+			}
+			lua_rawgeti(L, idx, 1);
+			if (!lua_isstring(L, -1)) {
+				luaL_argerror(L, 1, "unexpected form");
+			}
+			res.path = lua_tostring(L, -1);
+			lua_pop(L, 1);
+
+			return res;
+		}
+
+		static int LUA_layer(lua_State* L) {
+			LuaWrapper::DebugGuard guard(L);
+			LuaWrapper::checkTableArg(L, 1);
+			TextureComposite& that = getThis(L);
+
+			Layer& layer = that.layers.emplace();
+
+			lua_pushnil(L);
+			while (lua_next(L, 1)) {
+				const char* key = LuaWrapper::toType<const char*>(L, -2);
+				if (equalIStrings(key, "rgb")) {
+					layer.red = toChannelSource(L, -1);
+					layer.green = layer.red;
+					layer.blue = layer.red;
+					layer.red.src_channel = 0;
+					layer.green.src_channel = 1;
+					layer.blue.src_channel = 2;
+				}
+				else if (equalIStrings(key, "alpha")) {
+					layer.alpha = toChannelSource(L, -1);
+				}
+				else if (equalIStrings(key, "red")) {
+					layer.red = toChannelSource(L, -1);
+				}
+				else if (equalIStrings(key, "green")) {
+					layer.green = toChannelSource(L, -1);
+				}
+				else if (equalIStrings(key, "blue")) {
+					layer.blue = toChannelSource(L, -1);
+				}
+				else {
+					luaL_argerror(L, 1, StaticString<128>("unknown key ", key));
+				}
+				lua_pop(L, 1);
+			}
+			return 0;
+		}
+
+		static int LUA_output(lua_State* L) {
+			const char* type = LuaWrapper::checkArg<const char*>(L, 1);
+			
+			TextureComposite& that = getThis(L);
+			if (equalIStrings(type, "bc1")) {
+				that.output = Output::BC1;
+			}
+			else if (equalIStrings(type, "bc3")) {
+				that.output = Output::BC3;
+			}
+			else {
+				luaL_argerror(L, 1, "unknown value");
+			}
+			return 0;
+		}
+
+		TextureComposite(IAllocator& allocator)
+			: layers(allocator)
+		{}
+
+		Array<Layer> layers;
+		Output output = Output::BC1;
+	};
+
+	void createComposite(const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
+		// TODO reuse
+		lua_State* L = luaL_newstate();
+		luaL_openlibs(L);
+
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		TextureComposite tc(allocator);
+		lua_pushlightuserdata(L, &tc);
+		lua_setfield(L, LUA_GLOBALSINDEX, "this");
+		
+		#define DEFINE_LUA_FUNC(func) \
+			lua_pushcfunction(L, TextureComposite::LUA_##func); \
+			lua_setfield(L, LUA_GLOBALSINDEX, #func); 
+
+		DEFINE_LUA_FUNC(layer)
+		
+		#undef DEFINE_LUA_FUNC
+
+		if (!LuaWrapper::execute(L, Span((const char*)src_data.begin(), (const char*)src_data.end()), src_path, 0)) return;
+
+		HashMap<u32, stbi_uc*> sources(allocator);
+		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		Array<u8> tmp_src(allocator);
+		int w = -1, h = -1;
+		auto prepare_source =[&](const TextureComposite::ChannelSource& ch){
+			if (!ch.path.isValid()) return;
+			if (sources.find(ch.path.getHash()).isValid()) return;
+
+			tmp_src.clear();
+			if (!fs.getContentSync(ch.path, Ref(tmp_src))) {
+				// TODO
+			}
+
+			int cmp;
+			stbi_uc* data = stbi_load_from_memory(tmp_src.begin(), tmp_src.byte_size(), &w, &h, &cmp, 4);
+			if (!data) {
+				// TODO
+			}
+
+			sources.insert(ch.path.getHash(), data);
+		};
+
+		for (TextureComposite::Layer& layer : tc.layers) {
+			prepare_source(layer.red);
+			prepare_source(layer.green);
+			prepare_source(layer.blue);
+			prepare_source(layer.alpha);
+		}
+
+		if (tc.layers.empty()) {
+			// TODO
+		}
+
+		nvtt::InputOptions input;
+		input.setMipmapGeneration(true);
+		input.setAlphaCoverageMipScale(meta.scale_coverage, 4);
+		input.setAlphaMode(nvtt::AlphaMode_Transparency);
+		input.setNormalMap(meta.is_normalmap);
+		input.setTextureLayout(nvtt::TextureType_Array, w, h, 1, tc.layers.size());
+		
+		Array<u8> out_data(allocator);
+		out_data.resize(w * h * 4);
+		for (TextureComposite::Layer& layer : tc.layers) {
+			const u32 idx = u32(&layer - tc.layers.begin());
+			for (u32 ch = 0; ch < 4; ++ch) {
+				const Path& p = layer.getChannel(ch).path;
+				if (!p.isValid()) continue;
+				stbi_uc* from = sources[p.getHash()];
+				u32 from_ch = layer.getChannel(ch).src_channel;
+				if (from_ch == 0) from_ch = 2;
+				else if (from_ch == 2) from_ch = 0;
+
+				for (u32 j = 0; j < (u32)h; ++j) {
+					for (u32 i = 0; i < (u32)w; ++i) {
+						out_data[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
+					}
+				}
+			}
+
+			input.setMipmapData(out_data.begin(), w, h, 1, idx);
+		}
+
+		for (stbi_uc* i : sources) {
+			free(i);
+		}
+
+		nvtt::OutputOptions output;
+		output.setSrgbFlag(meta.srgb);
+		output.setContainer(nvtt::Container_DDS10);
+		struct : nvtt::OutputHandler {
+			bool writeData(const void * data, int size) override { return dst->write(data, size); }
+			void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
+			void endImage() override {}
+
+			OutputMemoryStream* dst;
+		} output_handler;
+		output_handler.dst = &dst;
+		output.setOutputHandler(&output_handler);
+
+		nvtt::CompressionOptions compression;
+		// TODO format
+		compression.setFormat(nvtt::Format_BC3);
+		compression.setQuality(nvtt::Quality_Fastest);
+
+		dst.write("dds", 3);
+		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+		flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+		flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+		flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+		dst.write(&flags, sizeof(flags));
+
+		nvtt::Context context;
+		if (!context.process(input, compression, output)) {
+			// TODO
+		}
+
+	}
 
 	bool compileImage(const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta)
 	{
@@ -1571,7 +1807,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return meta;
 	}
 
-
 	bool compile(const Path& src) override
 	{
 		char ext[4] = {};
@@ -1600,6 +1835,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 		else if(equalStrings(ext, "jpg") || equalStrings(ext, "png")) {
 			compileImage(src_data, out, meta);
+		}
+		else if (equalStrings(ext, "ltc")) {
+			createComposite(src_data, out, meta, src.c_str());
 		}
 		else {
 			ASSERT(false);
@@ -3197,7 +3435,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.addPlugin(*m_shader_plugin, shader_exts);
 
 		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(m_app);
-		const char* texture_exts[] = { "png", "jpg", "dds", "tga", "raw", nullptr};
+		const char* texture_exts[] = { "png", "jpg", "dds", "tga", "raw", "ltc", nullptr};
 		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
 
 		m_pipeline_plugin = LUMIX_NEW(allocator, PipelinePlugin)(m_app);

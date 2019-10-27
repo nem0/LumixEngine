@@ -264,8 +264,22 @@ fragment_shader [[
 			Detail c10 = textureNoTile(noise, v_uv_detail, int(splat10.x * 256.0), 1);
 			Detail c11 = textureNoTile(noise, v_uv_detail, int(splat11.x * 256.0), 1);
 			
-			data.normal = normalize(getTBN(v_uv) * (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy);
-			data.albedo.rgb = (c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w).rgb;
+			Detail s00 = textureNoTile(noise, v_uv_detail, int(splat00.y * 256.0), 1);
+			Detail s01 = textureNoTile(noise, v_uv_detail, int(splat01.y * 256.0), 1);
+			Detail s10 = textureNoTile(noise, v_uv_detail, int(splat10.y * 256.0), 1);
+			Detail s11 = textureNoTile(noise, v_uv_detail, int(splat11.y * 256.0), 1);
+
+			vec4 v4 = c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w;
+			vec4 v4_2 = s00.albedo * bicoef.x + s01.albedo * bicoef.y + s10.albedo * bicoef.z + s11.albedo * bicoef.w;
+			float a = splat00.z * bicoef.x + splat01.z * bicoef.y + splat10.z * bicoef.z + splat11.z * bicoef.w;
+			a = a * 2 - 1;
+			vec3 n0 = (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy;
+			vec3 n0_2 = (s00.normal * bicoef.x + s01.normal * bicoef.y + s10.normal * bicoef.z + s11.normal * bicoef.w).xzy;
+
+			vec3 n = v4.w > v4_2.w + a ? n0.rgb : n0_2.rgb;
+
+			data.normal = normalize(getTBN(v_uv) * n);
+			data.albedo.rgb = v4.w > v4_2.w + a ? v4.rgb : v4_2.rgb;
 			data.albedo.w = 1;
 		}
 		else {

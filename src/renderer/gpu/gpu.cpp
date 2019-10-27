@@ -458,12 +458,15 @@ static LoadInfo* getDXT10LoadInfo(const Header& hdr, const DXT10Header& dxt10_hd
 		case DxgiFormat::R8G8B8A8_UNORM:
 			return &loadInfoRGBA8;
 			break;
+		case DxgiFormat::BC1_UNORM_SRGB:
 		case DxgiFormat::BC1_UNORM:
 			return &loadInfoDXT1;
 			break;
+		case DxgiFormat::BC2_UNORM_SRGB:
 		case DxgiFormat::BC2_UNORM:
 			return &loadInfoDXT3;
 			break;
+		case DxgiFormat::BC3_UNORM_SRGB:
 		case DxgiFormat::BC3_UNORM:
 			return &loadInfoDXT5;
 			break;
@@ -1276,6 +1279,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 	DDS::LoadInfo* li;
 	int layers = 1;
+	bool is_dds10 = false;
 
 	if (isDXT1(hdr.pixelFormat)) {
 		li = &DDS::loadInfoDXT1;
@@ -1310,6 +1314,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	else if (isDXT10(hdr.pixelFormat)) {
 		DDS::DXT10Header dxt10_hdr;
 		blob.read(dxt10_hdr);
+		is_dds10 = true;
 		li = DDS::getDXT10LoadInfo(hdr, dxt10_hdr);
 		layers = dxt10_hdr.array_size;
 	}
@@ -1348,7 +1353,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 			if (li->compressed) {
 				u32 size = DDS::sizeDXTC(width, height, internal_format);
-				if (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0) {
+				if (!is_dds10 && (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)) {
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
