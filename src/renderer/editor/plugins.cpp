@@ -1517,6 +1517,15 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			res.path = lua_tostring(L, -1);
 			lua_pop(L, 1);
 
+			if (l > 1) {
+				lua_rawgeti(L, idx, 2);
+				if (!lua_isnumber(L, -1)) {
+					luaL_argerror(L, 1, "unexpected form");
+				}
+				res.src_channel = (u32)lua_tointeger(L, -1);
+				lua_pop(L, 1);
+			}
+
 			return res;
 		}
 
@@ -1650,6 +1659,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				const Path& p = layer.getChannel(ch).path;
 				if (!p.isValid()) continue;
 				stbi_uc* from = sources[p.getHash()];
+				if (!from) continue;
 				u32 from_ch = layer.getChannel(ch).src_channel;
 				if (from_ch == 0) from_ch = 2;
 				else if (from_ch == 2) from_ch = 0;

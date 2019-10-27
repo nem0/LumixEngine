@@ -13,13 +13,13 @@ vertex_shader [[
 	layout(location = 6) in vec3 i_dir;
 	layout(location = 7) in float i_fov;
 	
-	out float v_radius;
-	out vec3 v_center;
-	out vec4 v_rot;
-	out float v_attn;
-	out vec3 v_color;
-	out vec3 v_dir;
-	out float v_fov;
+	layout(location = 0) out float v_radius;
+	layout(location = 1) out vec3 v_center;
+	layout(location = 2) out vec4 v_rot;
+	layout(location = 3) out float v_attn;
+	layout(location = 4) out vec3 v_color;
+	layout(location = 5) out vec3 v_dir;
+	layout(location = 6) out float v_fov;
 	
 	void main()
 	{
@@ -40,15 +40,15 @@ vertex_shader [[
 
 
 fragment_shader [[
-	out vec4 o_color;
+	layout(location = 0) out vec4 o_color;
 	
-	in float v_radius;
-	in vec3 v_center;
-	in vec4 v_rot;
-	in float v_attn;
-	in vec3 v_color;
-	in vec3 v_dir;
-	in float v_fov;
+	layout(location = 0) in float v_radius;
+	layout(location = 1) in vec3 v_center;
+	layout(location = 2) in vec4 v_rot;
+	layout(location = 3) in float v_attn;
+	layout(location = 4) in vec3 v_color;
+	layout(location = 5) in vec3 v_dir;
+	layout(location = 6) in float v_fov;
 	
 	layout (binding=0) uniform sampler2D u_gbuffer0;
 	layout (binding=1) uniform sampler2D u_gbuffer1;
@@ -85,10 +85,10 @@ fragment_shader [[
 		float f0 = 0.04;
 
 		vec2 screen_uv = gl_FragCoord.xy / u_framebuffer_size;
-		vec4 gbuffer1_val = texture2D(u_gbuffer1, screen_uv);
-		vec4 gbuffer2_val = texture2D(u_gbuffer2, screen_uv);
+		vec4 gbuffer1_val = texture(u_gbuffer1, screen_uv);
+		vec4 gbuffer2_val = texture(u_gbuffer2, screen_uv);
 		vec3 N = normalize(gbuffer1_val.xyz * 2 - 1);
-		vec4 albedo = texture2D(u_gbuffer0, screen_uv);
+		vec4 albedo = texture(u_gbuffer0, screen_uv);
 		float roughness = albedo.w;
 		float metallic = gbuffer1_val.w;
 
