@@ -1033,8 +1033,6 @@ struct RendererImpl final : public Renderer
 
 		gpu::useProgram(gpu::INVALID_PROGRAM);
 		gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-		gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-		gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 		for (RenderJob* job : frame.jobs) {
 			PROFILE_BLOCK("execute_render_job");
 			Profiler::blockColor(0xaa, 0xff, 0xaa);

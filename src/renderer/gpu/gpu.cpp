@@ -770,7 +770,7 @@ static int load_gl(void* device_contex, u32 init_flags)
 		#ifdef LUMIX_DEBUG
 			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
 		#endif
-		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
+//		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
 		0
 	};
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
@@ -1140,7 +1140,6 @@ void swapBuffers(u32, u32)
 static GLuint createVAO(const VertexDecl& decl) {
 	checkThread();
 
-	if(decl.attributes_count == 0) return 0;
 	GLuint vao;
 	
 	CHECK_GL(glGenVertexArrays(1, &vao));
