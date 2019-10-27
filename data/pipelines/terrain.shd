@@ -63,11 +63,10 @@ common [[
 	mat3 getTBN(vec2 uv)
 	{
 		float hscale = u_terrain_scale.y / u_terrain_scale.x;
-		ivec3 off = ivec3(-1, 0, 1);
-		float s01 = textureLodOffset(u_hm, uv, 0, off.xy).x;
-		float s21 = textureLodOffset(u_hm, uv, 0, off.zy).x;
-		float s10 = textureLodOffset(u_hm, uv, 0, off.yx).x;
-		float s12 = textureLodOffset(u_hm, uv, 0, off.yz).x;
+		float s01 = textureLodOffset(u_hm, uv, 0, ivec2(-1, 0)).x;
+		float s21 = textureLodOffset(u_hm, uv, 0, ivec2(1, 0)).x;
+		float s10 = textureLodOffset(u_hm, uv, 0, ivec2(0, -1)).x;
+		float s12 = textureLodOffset(u_hm, uv, 0, ivec2(0, 1)).x;
 		vec3 va = normalize(vec3(1.0, (s21-s01) * hscale, 0.0));
 		vec3 vb = normalize(vec3(0.0, (s12-s10) * hscale, 1.0));
 		vec3 N = normalize(cross(vb,va));
@@ -152,9 +151,9 @@ common [[
 ]]
 
 vertex_shader [[ 
-	out vec2 v_uv;
- 	out vec2 v_uv_detail;
- 	out float v_dist2;
+	layout (location = 0) out vec2 v_uv;
+ 	layout (location = 1) out vec2 v_uv_detail;
+ 	layout (location = 2) out float v_dist2;
 
 	void main() {
 		ivec2 ij = ivec2(u_from_to.x + (gl_VertexID >> 1), u_from_to.y + gl_InstanceID + (gl_VertexID & 1));
@@ -197,9 +196,9 @@ fragment_shader [[
 		layout(location = 0) out vec4 o_color;
 	#endif
 
-	in vec2 v_uv;
-	in vec2 v_uv_detail;
-	in float v_dist2;
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 1) in vec2 v_uv_detail;
+	layout (location = 2) in float v_dist2;
 	
 	Detail textureNoTile(float k, vec2 x, int layer, float v )
 	{

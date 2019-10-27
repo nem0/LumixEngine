@@ -296,6 +296,7 @@ private:
 				++tex_count;
 			}
 		}
+		if (tex_count == 0) return;
 
 		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx) {
 			float fy = 0;
