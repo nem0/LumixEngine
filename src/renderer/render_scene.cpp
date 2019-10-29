@@ -3473,7 +3473,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
-			auto f = &LuaWrapper::wrapMethod<RenderSceneImpl, decltype(&RenderSceneImpl::F), &RenderSceneImpl::F>; \
+			auto f = &LuaWrapper::wrapMethod<&RenderSceneImpl::F>; \
 			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
@@ -3495,7 +3495,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
-		auto f = &LuaWrapper::wrap<decltype(&RenderSceneImpl::LUA_##F), &RenderSceneImpl::LUA_##F>; \
+		auto f = &LuaWrapper::wrap<&RenderSceneImpl::LUA_##F>; \
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 

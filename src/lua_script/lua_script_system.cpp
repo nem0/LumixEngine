@@ -574,7 +574,7 @@ namespace Lumix
 		void registerPropertyAPI()
 		{
 			lua_State* L = m_system.m_engine.getState();
-			auto f = &LuaWrapper::wrap<decltype(&setPropertyType), &setPropertyType>;
+			auto f = &LuaWrapper::wrap<&setPropertyType>;
 			LuaWrapper::createSystemFunction(L, "Editor", "setPropertyType", f);
 			LuaWrapper::createSystemVariable(L, "Editor", "BOOLEAN_PROPERTY", Property::BOOLEAN);
 			LuaWrapper::createSystemVariable(L, "Editor", "FLOAT_PROPERTY", Property::FLOAT);
@@ -889,9 +889,7 @@ namespace Lumix
 			
 			#define REGISTER_FUNCTION(F) \
 				do { \
-					auto f = &LuaWrapper::wrapMethod<LuaScriptSceneImpl, \
-						decltype(&LuaScriptSceneImpl::F), \
-						&LuaScriptSceneImpl::F>; \
+					auto f = &LuaWrapper::wrapMethod<&LuaScriptSceneImpl::F>; \
 					LuaWrapper::createSystemFunction(engine_state, "LuaScript", #F, f); \
 				} while(false)
 

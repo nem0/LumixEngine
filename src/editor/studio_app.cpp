@@ -2351,7 +2351,7 @@ public:
 #define REGISTER_FUNCTION(F)                                                                                    \
 	do                                                                                                          \
 	{                                                                                                           \
-		auto f = &LuaWrapper::wrapMethodClosure<StudioAppImpl, decltype(&StudioAppImpl::F), &StudioAppImpl::F>; \
+		auto f = &LuaWrapper::wrapMethodClosure<&StudioAppImpl::F>; \
 		LuaWrapper::createSystemClosure(L, "Editor", this, #F, f);                                              \
 	} while (false)
 

@@ -168,8 +168,7 @@ struct GUISystemImpl final : public GUISystem
 		
 		#define REGISTER_FUNCTION(name) \
 			do {\
-				auto f = &LuaWrapper::wrapMethod<GUISystemImpl, decltype(&GUISystemImpl::name), \
-					&GUISystemImpl::name>; \
+				auto f = &LuaWrapper::wrapMethod<&GUISystemImpl::name>; \
 				LuaWrapper::createSystemFunction(L, "Gui", #name, f); \
 			} while(false) \
 

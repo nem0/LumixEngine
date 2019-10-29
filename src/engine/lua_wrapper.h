@@ -777,6 +777,7 @@ struct Caller<Indices<indices...>>
 	template <typename R, typename... Args>
 	static int callFunction(R (*f)(Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 1);
 		R v = f(convert<Args, indices>(L)...);
 		push(L, v);
 		return 1;
@@ -786,6 +787,7 @@ struct Caller<Indices<indices...>>
 	template <typename... Args>
 	static int callFunction(void (*f)(Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 0);
 		f(convert<Args, indices>(L)...);
 		return 0;
 	}
@@ -794,6 +796,7 @@ struct Caller<Indices<indices...>>
 	template <typename R, typename... Args>
 	static int callFunction(R(*f)(lua_State*, Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 1);
 		R v = f(L, convert<Args, indices>(L)...);
 		push(L, v);
 		return 1;
@@ -803,6 +806,7 @@ struct Caller<Indices<indices...>>
 	template <typename... Args>
 	static int callFunction(void(*f)(lua_State*, Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 0);
 		f(L, convert<Args, indices>(L)...);
 		return 0;
 	}
@@ -811,6 +815,7 @@ struct Caller<Indices<indices...>>
 	template <typename C, typename... Args>
 	static int callMethod(C* inst, void(C::*f)(lua_State*, Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 0);
 		(inst->*f)(L, convert<Args, indices>(L)...);
 		return 0;
 	}
@@ -819,6 +824,7 @@ struct Caller<Indices<indices...>>
 	template <typename R, typename C, typename... Args>
 	static int callMethod(C* inst, R(C::*f)(lua_State*, Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 1);
 		R v = (inst->*f)(L, convert<Args, indices>(L)...);
 		push(L, v);
 		return 1;
@@ -828,6 +834,7 @@ struct Caller<Indices<indices...>>
 	template <typename R, typename C, typename... Args>
 	static int callMethod(C* inst, R(C::*f)(lua_State*, Args...) const, lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 1);
 		R v = (inst->*f)(L, convert<Args, indices>(L)...);
 		push(L, v);
 		return 1;
@@ -837,6 +844,7 @@ struct Caller<Indices<indices...>>
 	template <typename C, typename... Args>
 	static int callMethod(C* inst, void(C::*f)(Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 0);
 		(inst->*f)(convert<Args, indices>(L)...);
 		return 0;
 	}
@@ -845,6 +853,7 @@ struct Caller<Indices<indices...>>
 	template <typename R, typename C, typename... Args>
 	static int callMethod(C* inst, R(C::*f)(Args...), lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 1);
 		R v = (inst->*f)(convert<Args, indices>(L)...);
 		push(L, v);
 		return 1;
@@ -854,6 +863,7 @@ struct Caller<Indices<indices...>>
 	template <typename R, typename C, typename... Args>
 	static int callMethod(C* inst, R(C::*f)(Args...) const, lua_State* L)
 	{
+		LuaWrapper::DebugGuard guard(L, 1);
 		R v = (inst->*f)(convert<Args, indices>(L)...);
 		push(L, v);
 		return 1;
@@ -900,23 +910,25 @@ template <typename R, typename C, typename... Args> constexpr int arity(R (C::*f
 } // namespace details
 
 
-template <typename T, T t> int wrap(lua_State* L)
+template <auto t> int wrap(lua_State* L)
 {
 	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	return details::Caller<indices>::callFunction(t, L);
 }
 
 
-template <typename C, typename T, T t> int wrapMethod(lua_State* L)
+template <auto t> int wrapMethod(lua_State* L)
 {
 	using indices = typename BuildIndices<1, details::arity(t)>::result;
+	using C = ClassOf<decltype(t)>::Type;
 	auto* inst = checkArg<C*>(L, 1);
 	return details::Caller<indices>::callMethod(inst, t, L);
 }
 
 
-template <typename C, typename T, T t> int wrapMethodClosure(lua_State* L)
+template <auto t> int wrapMethodClosure(lua_State* L)
 {
+	using C = ClassOf<decltype(t)>::Type;
 	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
 	if (!isType<C>(L, index))
