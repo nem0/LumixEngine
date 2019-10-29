@@ -17,6 +17,7 @@
 #include "engine/string.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
+#include "engine/win/simple_win.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -27,26 +28,6 @@
 #include "renderer/terrain.h"
 #include "renderer/texture.h"
 
-
-#include <Windows.h>
-#undef near
-#undef far
-#include "gl/GL.h"
-#include "gpu/gpu.h"
-
-#define GPU_GL_IMPORT(prototype, name) static prototype name;
-#define GPU_GL_IMPORT_TYPEDEFS
-
-#include "gpu/gl_ext.h"
-
-#define CHECK_GL(gl) \
-	do { \
-		gl; \
-		GLenum err = glGetError(); \
-		if (err != GL_NO_ERROR) { \
-			logError("Renderer") << "OpenGL error " << err; \
-		} \
-	} while(0)
 
 namespace Lumix
 {
