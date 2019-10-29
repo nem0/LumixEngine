@@ -1047,7 +1047,7 @@ void AnimationScene::registerLuaAPI(lua_State* L)
 {
 	#define REGISTER_FUNCTION(name) \
 	do {\
-		auto f = &LuaWrapper::wrapMethod<AnimationSceneImpl, decltype(&AnimationSceneImpl::name), &AnimationSceneImpl::name>; \
+		auto f = &LuaWrapper::wrapMethod<&AnimationSceneImpl::name>; \
 		LuaWrapper::createSystemFunction(L, "Animation", #name, f); \
 	} while(false) \
 

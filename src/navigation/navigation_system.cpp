@@ -163,7 +163,7 @@ static void registerLuaAPI(lua_State* L)
 {
 	#define REGISTER_FUNCTION(name) \
 		do {\
-			auto f = &LuaWrapper::wrapMethod<NavigationScene, decltype(&NavigationScene::name), &NavigationScene::name>; \
+			auto f = &LuaWrapper::wrapMethod<&NavigationScene::name>; \
 			LuaWrapper::createSystemFunction(L, "Navigation", #name, f); \
 		} while(false) \
 

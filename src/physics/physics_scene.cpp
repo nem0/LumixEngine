@@ -5192,12 +5192,11 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Re
 
 void PhysicsScene::registerLuaAPI(lua_State* L)
 {
-#define REGISTER_FUNCTION(name)                                                                                    \
-	do                                                                                                             \
-	{                                                                                                              \
-		auto f =                                                                                                   \
-			&LuaWrapper::wrapMethod<PhysicsSceneImpl, decltype(&PhysicsSceneImpl::name), &PhysicsSceneImpl::name>; \
-		LuaWrapper::createSystemFunction(L, "Physics", #name, f);                                                  \
+#define REGISTER_FUNCTION(name) \
+	do \
+	{ \
+		auto f = &LuaWrapper::wrapMethod<&PhysicsSceneImpl::name>; \
+		LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
 	} while (false)
 
 	REGISTER_FUNCTION(putToSleep);

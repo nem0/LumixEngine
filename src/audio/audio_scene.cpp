@@ -782,7 +782,7 @@ void AudioScene::registerLuaAPI(lua_State* L)
 {
 	#define REGISTER_FUNCTION(F) \
 		do { \
-		auto f = &LuaWrapper::wrapMethod<AudioSceneImpl, decltype(&AudioSceneImpl::F), &AudioSceneImpl::F>; \
+		auto f = &LuaWrapper::wrapMethod<&AudioSceneImpl::F>; \
 		LuaWrapper::createSystemFunction(L, "Audio", #F, f); \
 		} while(false) \
 

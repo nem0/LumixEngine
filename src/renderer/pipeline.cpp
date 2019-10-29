@@ -1635,6 +1635,8 @@ struct PipelineImpl final : Pipeline
 
 		};
 
+		LuaWrapper::DebugGuard guard(L);
+
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
@@ -1695,7 +1697,6 @@ struct PipelineImpl final : Pipeline
 			}
 		
 			if (lua_istable(L, 5)) {
-				lua_pushnil(L);
 				for (u32 i = 0, c = (u32)lua_objlen(L, 5); i < c; ++i) {
 					lua_rawgeti(L, 5, i + 1);
 					if(lua_type(L, -1) != LUA_TTABLE) {
@@ -3350,7 +3351,7 @@ struct PipelineImpl final : Pipeline
 
 		#define REGISTER_FUNCTION(name) \
 			do {\
-				auto f = &LuaWrapper::wrapMethodClosure<PipelineImpl, decltype(&PipelineImpl::name), &PipelineImpl::name>; \
+				auto f = &LuaWrapper::wrapMethodClosure<&PipelineImpl::name>; \
 				registerCFunction(#name, f); \
 			} while(false) \
 
@@ -3397,7 +3398,7 @@ struct PipelineImpl final : Pipeline
 
 		#define REGISTER_DRAW2D_FUNCTION(fn_name) \
 			do { \
-				auto f = &LuaWrapper::wrapMethodClosure<Draw2D, decltype(&Draw2D::fn_name), &Draw2D::fn_name>; \
+				auto f = &LuaWrapper::wrapMethodClosure<&Draw2D::fn_name>; \
 				lua_getfield(L, -1, "Draw2D");		 \
 				if (lua_type(L, -1) == LUA_TNIL) {	 \
 					lua_pop(L, 1);					 \

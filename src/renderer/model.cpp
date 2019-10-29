@@ -597,7 +597,7 @@ void Model::registerLuaAPI(lua_State* L)
 {
 	#define REGISTER_FUNCTION(F)\
 		do { \
-			auto f = &LuaWrapper::wrapMethod<Model, decltype(&Model::F), &Model::F>; \
+			auto f = &LuaWrapper::wrapMethod<&Model::F>; \
 			LuaWrapper::createSystemFunction(L, "Model", #F, f); \
 		} while(false) \
 
@@ -608,7 +608,7 @@ void Model::registerLuaAPI(lua_State* L)
 
 	#define REGISTER_FUNCTION(F)\
 		do { \
-			auto f = &LuaWrapper::wrap<decltype(&F), &F>; \
+			auto f = &LuaWrapper::wrap<&F>; \
 			LuaWrapper::createSystemFunction(L, "Model", #F, f); \
 		} while(false) \
 
