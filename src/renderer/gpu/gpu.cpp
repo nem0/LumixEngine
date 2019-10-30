@@ -111,6 +111,7 @@ static struct {
 	ProgramHandle last_program = INVALID_PROGRAM;
 	u64 last_state = 0;
 	GLuint framebuffer = 0;
+	ProgramHandle default_program;
 } g_gpu;
 
 
@@ -847,8 +848,14 @@ void useProgram(ProgramHandle handle)
 			CHECK_GL(glUseProgram(0));
 		}
 		else {
-			CHECK_GL(glUseProgram(prg.handle));
-			CHECK_GL(glBindVertexArray(prg.vao));
+			if (!prg.handle) {
+				CHECK_GL(glUseProgram(g_gpu.programs[g_gpu.default_program.value].handle));
+				CHECK_GL(glBindVertexArray(g_gpu.programs[g_gpu.default_program.value].vao));
+			}
+			else {
+				CHECK_GL(glUseProgram(prg.handle));
+				CHECK_GL(glBindVertexArray(prg.vao));
+			}
 		}
 	}
 }
@@ -1833,6 +1840,19 @@ bool init(void* window_handle, u32 init_flags)
 	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
 	CHECK_GL(glBindVertexArray(0));	
 	CHECK_GL(glCreateFramebuffers(1, &g_gpu.framebuffer));
+
+	
+	g_gpu.default_program = allocProgramHandle();
+	Program& p = g_gpu.programs[g_gpu.default_program.value];
+	p.handle = glCreateProgram();
+	CHECK_GL(glGenVertexArrays(1, &p.vao));
+	const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
+	glShaderSource(vs, 1, &vs_src, nullptr);
+	glAttachShader(p.handle, vs);
+	CHECK_GL(glLinkProgram(p.handle));
+	glDeleteShader(vs);
+
 
 	g_gpu.last_state = 1;
 	setState(0);
