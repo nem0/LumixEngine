@@ -21,6 +21,10 @@ local transparent_state = {
 	depth_write = false
 }
 
+local water_state = {
+	depth_write = false
+}
+
 local default_state = {
 	define = "DEFERRED",
 	depth_write = true,
@@ -33,6 +37,16 @@ local default_state = {
 	stencil_zpass = STENCIL_REPLACE,
 	wireframe = false
 }
+
+function waterPass(water_set, colorbuffer, dsbuffer)
+	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
+
+	beginBlock("water_pass")
+	pass(getCameraParams())
+	bindRenderbuffers({ dsbuffer, }, 4);
+	renderBucket(water_set, water_state)
+	endBlock()
+end
 
 function transparentPass(transparent_set, colorbuffer, dsbuffer)
 	setRenderTargets(colorbuffer, dsbuffer)
@@ -242,12 +256,13 @@ end
 
 function main()
 	local view_params = getCameraParams()
-	local default_set, decal_set, local_light_set, transparent_set = prepareCommands(view_params, 
+	local default_set, decal_set, local_light_set, transparent_set, water_set = prepareCommands(view_params, 
 		{ 
 			{ layers = { "default" }, defines = { "DEFERRED" } },
 			{ layers = { "decal" } },
 			{ layers = { "local_light" } },
-			{ layers = { "transparent" }, sort = "depth" }
+			{ layers = { "transparent" }, sort = "depth" },
+			{ layers = { "water" }, sort = "depth" }
 		}
 	)
 
@@ -261,6 +276,7 @@ function main()
 		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 	
+	waterPass(water_set, res, gbuffer_depth)
 	transparentPass(transparent_set, res, gbuffer_depth)
 	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 	renderTextMeshes()
