@@ -196,7 +196,7 @@ fragment_shader [[
 			getData();
 			
 			vec3 V = normalize(-data.wpos);
-			vec3 L = normalize(u_light_direction);
+			vec3 L = normalize(u_light_direction.xyz);
 		
 			float shadow = getShadow(u_shadowmap, data.wpos);
 		
@@ -208,7 +208,7 @@ fragment_shader [[
 				, V
 				, L
 				, shadow
-				, u_light_color * u_light_intensity
+				, u_light_color.rgb * u_light_intensity
 				, u_light_indirect_intensity);
 			
 			o_color.w = data.albedo.a;
