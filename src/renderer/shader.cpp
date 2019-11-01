@@ -46,6 +46,7 @@ Shader::Shader(const Path& path, ResourceManager& resource_manager, Renderer& re
 	, m_defines(m_allocator)
 	, m_programs(m_allocator)
 	, m_sources(m_allocator)
+	, m_ignored_properties(0)
 {
 	m_sources.path = path;
 }
@@ -148,6 +149,29 @@ static Shader* getShader(lua_State* L)
 namespace LuaAPI
 {
 	
+int ignore_property(lua_State* L) {
+	const char* name = LuaWrapper::checkArg<const char*>(L, 1); 
+	Shader* shader = getShader(L);
+	ASSERT(shader);
+
+	if (equalIStrings(name, "roughness")) {
+		shader->ignoreProperty(Shader::ROUGHNESS);
+	}
+	else if (equalIStrings(name, "metallic")) {
+		shader->ignoreProperty(Shader::METALLIC);
+	}
+	else if (equalIStrings(name, "emission")) {
+		shader->ignoreProperty(Shader::EMISSION);
+	}
+	else if (equalIStrings(name, "color")) {
+		shader->ignoreProperty(Shader::COLOR);
+	}
+	else {
+		luaL_argerror(L, 1, "unknown value");
+	}
+	return 0;
+}
+
 
 int uniform(lua_State* L)
 {
@@ -373,6 +397,8 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setfield(L, LUA_GLOBALSINDEX, "define");
 	lua_pushcfunction(L, LuaAPI::uniform);
 	lua_setfield(L, LUA_GLOBALSINDEX, "uniform");
+	lua_pushcfunction(L, LuaAPI::ignore_property);
+	lua_setfield(L, LUA_GLOBALSINDEX, "ignore_property");
 
 	const Span<const char> content((const char*)mem, (int)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {
@@ -393,6 +419,7 @@ void Shader::unload()
 	}
 	m_sources.common = "";
 	m_sources.stages.clear();
+	m_ignored_properties = 0;
 	m_programs.clear();
 	m_uniforms.clear();
 	for (u32 i = 0; i < m_texture_slot_count; ++i) {
