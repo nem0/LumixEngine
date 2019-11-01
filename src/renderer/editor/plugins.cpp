@@ -299,25 +299,36 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 		}
+		
+		const Shader* shader = material->getShader() && material->getShader()->isReady() ? material->getShader() : nullptr;
+		if (shader) {
+			if (!shader->isIgnored(Shader::COLOR)) {
+				Vec4 color = material->getColor();
+				if (ImGui::ColorEdit4("Color", &color.x)) {
+					material->setColor(color);
+				}
+			}
 
-		Vec4 color = material->getColor();
-		if (ImGui::ColorEdit4("Color", &color.x)) {
-			material->setColor(color);
-		}
+			if (!shader->isIgnored(Shader::ROUGHNESS)) {
+				float roughness = material->getRoughness();
+				if (ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f)) {
+					material->setRoughness(roughness);
+				}
+			}
 
-		float roughness = material->getRoughness();
-		if (ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f)) {
-			material->setRoughness(roughness);
-		}
-
-		float metallic = material->getMetallic();
-		if (ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
-			material->setMetallic(metallic);
-		}
-
-		float emission = material->getEmission();
-		if (ImGui::DragFloat("Emission", &emission, 0.01f, 0.0f)) {
-			material->setEmission(emission);
+			if (!shader->isIgnored(Shader::METALLIC)) {
+				float metallic = material->getMetallic();
+				if (ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
+					material->setMetallic(metallic);
+				}
+			}
+			
+			if (!shader->isIgnored(Shader::EMISSION)) {
+				float emission = material->getEmission();
+				if (ImGui::DragFloat("Emission", &emission, 0.01f, 0.0f)) {
+					material->setEmission(emission);
+				}
+			}
 		}
 
 		char buf[MAX_PATH_LENGTH];
