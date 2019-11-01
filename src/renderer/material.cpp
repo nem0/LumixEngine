@@ -242,15 +242,17 @@ int Material::uniform(lua_State* L) {
 	u.name_hash = crc32(name);
 	switch (lua_type(L, 2)) {
 		case LUA_TNUMBER: u.float_value = LuaWrapper::toType<float>(L, 2); break;
-		case LUA_TTABLE: 
-			switch (lua_objlen(L, 2)) {
-				case 2:	*(Vec2*)u.vec2 = LuaWrapper::toType<Vec2>(L, 2);
-				case 3: *(Vec3*)u.vec3 = LuaWrapper::toType<Vec3>(L, 2);
-				case 4: *(Vec4*)u.vec4 = LuaWrapper::toType<Vec4>(L, 2);
-				case 16: *(Matrix*)u.vec4 = LuaWrapper::toType<Matrix>(L, 2);
+		case LUA_TTABLE: {
+			const size_t len = lua_objlen(L, 2);
+			switch (len) {
+				case 2:	*(Vec2*)u.vec2 = LuaWrapper::toType<Vec2>(L, 2); break;
+				case 3: *(Vec3*)u.vec3 = LuaWrapper::toType<Vec3>(L, 2); break;
+				case 4: *(Vec4*)u.vec4 = LuaWrapper::toType<Vec4>(L, 2); break;
+				case 16: *(Matrix*)u.vec4 = LuaWrapper::toType<Matrix>(L, 2); break;
 				default: luaL_error(L, "Uniform %s has unsupported type", name); break;
 			}
 			break;
+		}
 		default: luaL_error(L, "Uniform %s has unsupported type", name); break;
 	}
 	material->m_uniforms.push(u);
