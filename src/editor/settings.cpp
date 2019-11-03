@@ -192,8 +192,6 @@ bool Settings::load()
 
 	Span<const char> content((const char*)buf.begin(), buf.size());
 	if (!LuaWrapper::execute(L, content, "settings", 0)) {
-		logError("Editor") << path << ": " << lua_tostring(L, -1);
-		lua_pop(L, 1);
 		return false;
 	}
 

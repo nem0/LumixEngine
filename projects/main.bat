@@ -307,8 +307,8 @@ exit /B 0
 
 :build_deploy_physx_static
 	cd 3rdparty\PhysX\physx
-	call generate_projects.bat lumix_vc15win64_static
-	%msbuild_cmd% "compiler\vc15win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
+	call generate_projects.bat lumix_vc16win64_static
+	%msbuild_cmd% "compiler\vc16win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
 	cd ..\..\..\
 
 	if not exist "..\external\physx\lib\vs2017\win64\release_static\" mkdir ..\external\physx\lib\vs2017\win64\release_static\
