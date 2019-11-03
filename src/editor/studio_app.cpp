@@ -816,10 +816,13 @@ public:
 				fromCStringOctal(Span(header.size, sizeof(header.size)), Ref(size)); 
 				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
 					const StaticString<MAX_PATH_LENGTH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
+					char dir[MAX_PATH_LENGTH];
+					PathUtils::getDir(Span(dir), path);
+					OS::makePath(dir);
 					if (!OS::fileExists(path)) {
 						OS::OutputFile file;
 						if (file.open(path)) {
-							if (!file.write(ptr, size)) {
+							if (!file.write(ptr + 512, size)) {
 								logError("Editor") << "Failed to write " << path;
 							}
 							file.close();
