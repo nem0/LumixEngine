@@ -35,9 +35,32 @@
 #include "settings.h"
 #include "utils.h"
 
+#ifdef _WIN32
+	#include "engine/win/simple_win.h"
+#endif
 
 namespace Lumix
 {
+	
+
+struct TarHeader {
+	char name[100];
+	char mode[8];
+	char uid[8];
+	char gid[8];
+	char size[12];
+	char mtime[12];
+	char chksum[8];
+	char typeflag;
+	char linkname[100];
+	char magic[6];
+	char version[2];
+	char uname[32];
+	char gname[32];
+	char devmajor[8];
+	char devminor[8];
+	char prefix[155];   
+};
 
 
 #define NO_ICON "       "
@@ -294,6 +317,8 @@ public:
 		m_engine = Engine::create(data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir)
 			, m_allocator);
 		createLua();
+
+		extractBundled();
 
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
 		m_window = m_editor->getWindow();
@@ -766,6 +791,54 @@ public:
 	}
 
 
+	void extractBundled() {
+		#ifdef _WIN32
+			HRSRC hrsrc = FindResourceA(GetModuleHandle(NULL), MAKEINTRESOURCE(102), "TAR");
+			if (!hrsrc) return;
+			HGLOBAL hglobal = LoadResource(GetModuleHandle(NULL), hrsrc);
+			if (!hglobal) return;
+			const DWORD size = SizeofResource(GetModuleHandle(NULL), hrsrc);
+			if (size == 0) return;
+			const void* res_mem = LockResource(hglobal);
+			if (!res_mem) return;
+	
+			TCHAR exe_path[MAX_PATH_LENGTH];
+			GetModuleFileNameA(NULL, exe_path, MAX_PATH_LENGTH);
+
+			u64 bundled_last_modified = OS::getLastModified(exe_path);
+			InputMemoryStream str(res_mem, size);
+
+			TarHeader header;
+			while (str.getPosition() < str.size()) {
+				const u8* ptr = (const u8*)str.getData() + str.getPosition();
+				str.read(&header, sizeof(header));
+				u32 size;
+				fromCStringOctal(Span(header.size, sizeof(header.size)), Ref(size)); 
+				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
+					const StaticString<MAX_PATH_LENGTH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
+					if (!OS::fileExists(path)) {
+						OS::OutputFile file;
+						if (file.open(path)) {
+							if (!file.write(ptr, size)) {
+								logError("Editor") << "Failed to write " << path;
+							}
+							file.close();
+						}
+						else {
+							logError("Editor") << "Failed to extract " << path;
+						}
+					}
+				}
+
+				str.setPosition(str.getPosition() + (512 - str.getPosition() % 512) % 512);
+				str.setPosition(str.getPosition() + size + (512 - size % 512) % 512);
+			}
+
+			UnlockResource(res_mem);
+		#endif
+	}
+
+
 	void showWelcomeScreen()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -795,6 +868,7 @@ public:
 							cfg_file.close();
 						}
 						m_engine->getFileSystem().setBasePath(dir);
+						extractBundled();
 						scanUniverses();
 					}
 				}
@@ -827,12 +901,6 @@ public:
 				if (ImGui::Button("Wiki"))
 				{
 					OS::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
-				}
-
-				if (ImGui::Button("Download new version"))
-				{
-					OS::shellExecuteOpen(
-						"https://github.com/nem0/lumixengine_data/archive/master.zip");
 				}
 
 				if (ImGui::Button("Show major releases"))
