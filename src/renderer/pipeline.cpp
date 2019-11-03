@@ -345,6 +345,10 @@ struct PipelineImpl final : Pipeline
 
 	~PipelineImpl()
 	{
+		m_renderer.frame();
+		m_renderer.frame();
+		m_renderer.frame();
+
 		m_draw2d_shader->getResourceManager().unload(*m_draw2d_shader);
 		m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
 		m_text_mesh_shader->getResourceManager().unload(*m_text_mesh_shader);

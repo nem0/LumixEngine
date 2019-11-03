@@ -842,6 +842,27 @@ public:
 	}
 
 
+	void initDefaultUniverse() {
+		EntityRef env = m_editor->addEntity();
+		m_editor->setEntityName(env, "environment");
+		ComponentType env_cmp_type = Reflection::getComponentType("environment");
+		ComponentType lua_script_cmp_type = Reflection::getComponentType("lua_script");
+		m_editor->selectEntities(&env, 1, false);
+		m_editor->addComponent(env_cmp_type);
+		// TODO add sky
+		//m_editor->addComponent(lua_script_cmp_type);
+		auto* intensity_prop = Reflection::getProperty(env_cmp_type, "Intensity");
+		auto* indirect_intensity_prop = Reflection::getProperty(env_cmp_type, "Indirect intensity");
+		const float intensity = 3;
+		m_editor->setProperty(env_cmp_type, -1, *intensity_prop, &env, 1, &intensity, sizeof(intensity));
+		const float indirect_intensity = 0.3f;
+		m_editor->setProperty(env_cmp_type, -1, *indirect_intensity_prop, &env, 1, &indirect_intensity, sizeof(indirect_intensity));
+		Quat rot;
+		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
+		m_editor->setEntitiesRotations(&env, &rot, 1);
+	}
+
+
 	void showWelcomeScreen()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
@@ -876,7 +897,10 @@ public:
 					}
 				}
 				ImGui::Separator();
-				if (ImGui::Button("New universe")) m_is_welcome_screen_open = false;
+				if (ImGui::Button("New universe")) {
+					initDefaultUniverse();
+					m_is_welcome_screen_open = false;
+				}
 				ImGui::Text("Open universe:");
 				ImGui::Indent();
 				if(m_universes.empty()) {
