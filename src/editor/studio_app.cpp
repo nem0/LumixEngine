@@ -252,8 +252,10 @@ public:
 				for(int i = 0, c = OS::getDropFileCount(event); i < c; ++i) {
 					char tmp[MAX_PATH_LENGTH];
 					OS::getDropFile(event, i, Span(tmp));
-					for (GUIPlugin* plugin : m_gui_plugins) {
-						if (plugin->onDropFile(tmp)) break;
+					if (!m_asset_browser->onDropFile(tmp)) {
+						for (GUIPlugin* plugin : m_gui_plugins) {
+							if (plugin->onDropFile(tmp)) break;
+						}
 					}
 				}
 				break;

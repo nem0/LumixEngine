@@ -49,6 +49,7 @@ public:
 	~AssetBrowser();
 	void onGUI();
 	void update();
+	bool onDropFile(const char* path);
 	void selectResource(const Path& resource, bool record_history, bool additive);
 	bool resourceInput(const char* label, const char* str_id, Span<char> buf, ResourceType type);
 	void addPlugin(IPlugin& plugin);

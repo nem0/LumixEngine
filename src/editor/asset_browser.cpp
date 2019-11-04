@@ -384,12 +384,26 @@ void AssetBrowser::fileColumn()
 
 	bool open_delete_popup = false;
 	bool open_rename_popup = false;
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	static char tmp[MAX_PATH_LENGTH] = "";
 	auto common_popup = [&](){
-		const char* base_path = m_editor.getEngine().getFileSystem().getBasePath();
+		const char* base_path = fs.getBasePath();
+		if (ImGui::BeginMenu("Create dir")) {
+			ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp));
+			ImGui::SameLine();
+			if (ImGui::Button("Create")) {
+				StaticString<MAX_PATH_LENGTH> path(base_path, "/", m_dir, "/", tmp);
+				if (!OS::makePath(path)) {
+					logError("Editor") << "Failed to create " << path;
+				}
+				changeDir(m_dir);
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndMenu();
+		}
 		for (IPlugin* plugin : m_plugins) {
 			if (!plugin->canCreateResource()) continue;
 			if (ImGui::BeginMenu(plugin->getName())) {
-				static char tmp[MAX_PATH_LENGTH];
 				ImGui::InputTextWithHint("", "Name", tmp, sizeof(tmp));
 				ImGui::SameLine();
 				if (ImGui::Button("Create")) {
@@ -440,7 +454,6 @@ void AssetBrowser::fileColumn()
 	if (ImGui::BeginPopupModal("Rename file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::InputText("New name", m_new_name, sizeof(m_new_name));
 		if (ImGui::Button("Rename", ImVec2(100, 0))) {
-			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 			PathUtils::FileInfo fi(m_file_infos[m_context_resource].filepath);
 			StaticString<MAX_PATH_LENGTH> new_path(fi.m_dir, m_new_name, ".", fi.m_extension);
 			if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
@@ -647,6 +660,45 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 	m_plugins.insert(plugin.getResourceType(), &plugin);
 }
 
+static void copyDir(const char* src, const char* dest, IAllocator& allocator)
+{
+	PathUtils::FileInfo fi(src);
+	StaticString<MAX_PATH_LENGTH> dst_dir(dest, "/", fi.m_basename);
+	OS::makePath(dst_dir);
+	OS::FileIterator* iter = OS::createFileIterator(src, allocator);
+
+	OS::FileInfo cfi;
+	while(OS::getNextFile(iter, &cfi)) {
+		if (cfi.is_directory) {
+			if (cfi.filename[0] != '.') {
+				StaticString<MAX_PATH_LENGTH> tmp_src(src, "/", cfi.filename);
+				StaticString<MAX_PATH_LENGTH> tmp_dst(dest, "/", fi.m_basename);
+				copyDir(tmp_src, tmp_dst, allocator);
+			}
+		}
+		else {
+			StaticString<MAX_PATH_LENGTH> tmp_src(src, "/", cfi.filename);
+			StaticString<MAX_PATH_LENGTH> tmp_dst(dest, "/", fi.m_basename, "/", cfi.filename);
+			if(!OS::copyFile(tmp_src, tmp_dst)) {
+				logError("Editor") << "Failed to copy " << tmp_src << " to " << tmp_dst;
+			}
+		}
+	}
+	OS::destroyFileIterator(iter);
+}
+
+bool AssetBrowser::onDropFile(const char* path)
+{
+	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	if (OS::dirExists(path)) {
+		StaticString<MAX_PATH_LENGTH> tmp(fs.getBasePath(), "/", m_dir, "/");
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		copyDir(path, tmp, allocator);
+	}
+	PathUtils::FileInfo fi(path);
+	StaticString<MAX_PATH_LENGTH> dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
+	return OS::copyFile(path, dest);
+}
 
 void AssetBrowser::selectResource(const Path& path, bool record_history, bool additive)
 {
