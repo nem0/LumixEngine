@@ -82,9 +82,9 @@ template <int SIZE> struct StaticString
 
 	explicit StaticString(const char* str) { copyString(Span(data), str); }
 
-	template <typename... Args> StaticString(const char* str, Args... args)
+	template <typename... Args> StaticString(Args... args)
 	{
-		copyString(data, str);
+		data[0] = '\0';
 		int tmp[] = { (add(args), 0)... };
 		(void)tmp;
 	}

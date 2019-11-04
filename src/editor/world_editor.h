@@ -4,6 +4,9 @@
 #include "engine/math.h"
 
 
+struct lua_State;
+
+
 namespace Lumix
 {
 
@@ -65,6 +68,8 @@ public:
 		virtual bool showGizmo(ComponentUID /*cmp*/);
 	};
 
+	using CommandCreator = IEditorCommand* (lua_State*, WorldEditor&);
+
 public:
 	static WorldEditor* create(const char* base_path, Engine& engine, IAllocator& allocator);
 	static void destroy(WorldEditor* editor, IAllocator& allocator);
@@ -77,6 +82,8 @@ public:
 	virtual void beginCommandGroup(u32 type) = 0;
 	virtual void endCommandGroup() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
+	virtual void executeCommand(const char* name, const char* args) = 0;
+	virtual void registerCommand(const char* name, CommandCreator* creator) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
