@@ -15,6 +15,7 @@
 #include "engine/geometry.h"
 #include "engine/iplugin.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
@@ -1282,7 +1283,7 @@ public:
 	}
 
 
-	Engine& getEngine() override { return *m_engine; }
+	Engine& getEngine() override { return m_engine; }
 
 
 	void showGizmos()
@@ -1329,7 +1330,7 @@ public:
 		if (!m_go_to_parameters.m_is_active) return;
 
 		float t = easeInOut(m_go_to_parameters.m_t);
-		m_go_to_parameters.m_t += m_engine->getLastTimeDelta() * m_go_to_parameters.m_speed;
+		m_go_to_parameters.m_t += m_engine.getLastTimeDelta() * m_go_to_parameters.m_speed;
 		DVec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
 		Quat rot;
 		rot = nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, t);
@@ -1402,7 +1403,7 @@ public:
 	void updateEngine() override
 	{
 		ASSERT(m_universe);
-		m_engine->update(*m_universe);
+		m_engine.update(*m_universe);
 	}
 
 
@@ -1640,7 +1641,7 @@ public:
 	{
 		logInfo("Editor") << "Saving universe " << basename << "...";
 		
-		StaticString<MAX_PATH_LENGTH> dir(m_engine->getFileSystem().getBasePath(), "universes/");
+		StaticString<MAX_PATH_LENGTH> dir(m_engine.getFileSystem().getBasePath(), "universes/");
 		OS::makePath(dir);
 		StaticString<MAX_PATH_LENGTH> path(dir, basename, ".unv");
 		OS::OutputFile file;
@@ -1745,9 +1746,9 @@ public:
 		
 		entity_map.clear();
 		StaticString<MAX_PATH_LENGTH> scn_dir(basedir, "/", basename, "/scenes/");
-		OS::FileIterator* scn_file_iter = m_engine->getFileSystem().createFileIterator(scn_dir);
+		OS::FileIterator* scn_file_iter = m_engine.getFileSystem().createFileIterator(scn_dir);
 		Array<u8> data(allocator);
-		FileSystem& fs = m_engine->getFileSystem();
+		FileSystem& fs = m_engine.getFileSystem();
 		OS::InputFile file;
 		auto loadFile = [&file, &data, &entity_map, &fs](const char* filepath, auto callback) {
 			if (fs.open(filepath, Ref(file)))
@@ -1797,7 +1798,7 @@ public:
 		OS::destroyFileIterator(scn_file_iter);
 		
 		StaticString<MAX_PATH_LENGTH> dir(basedir, "/", basename, "/");
-		auto file_iter = m_engine->getFileSystem().createFileIterator(dir);
+		auto file_iter = m_engine.getFileSystem().createFileIterator(dir);
 		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
@@ -1813,7 +1814,7 @@ public:
 		}
 		OS::destroyFileIterator(file_iter);
 		
-		file_iter = m_engine->getFileSystem().createFileIterator(dir);
+		file_iter = m_engine.getFileSystem().createFileIterator(dir);
 		while (OS::getNextFile(file_iter, &info))
 		{
 			if (info.is_directory) continue;
@@ -1868,7 +1869,7 @@ public:
 	
 	void serialize(const char* basename)
 	{
-		StaticString<MAX_PATH_LENGTH> dir(m_engine->getFileSystem().getBasePath(), "universes/", basename, "/");
+		StaticString<MAX_PATH_LENGTH> dir(m_engine.getFileSystem().getBasePath(), "universes/", basename, "/");
 		OS::makePath(dir);
 		OS::makePath(dir + "probes/");
 		OS::makePath(dir + "scenes/");
@@ -1953,7 +1954,7 @@ public:
 
 	void save(IOutputStream& file)
 	{
-		while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
+		while (m_engine.getFileSystem().hasWork()) m_engine.getFileSystem().updateAsyncTransactions();
 
 		ASSERT(m_universe);
 
@@ -1964,7 +1965,7 @@ public:
 		blob.write(header);
 		int hashed_offset = sizeof(header);
 
-		header.engine_hash = m_engine->serialize(*m_universe, blob);
+		header.engine_hash = m_engine.serialize(*m_universe, blob);
 		m_prefab_system->serialize(blob);
 		header.hash = crc32((const u8*)blob.getData() + hashed_offset, (int)blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
@@ -2082,14 +2083,14 @@ public:
 			return;
 		}
 
-		copyString(absolute, m_engine->getFileSystem().getBasePath());
+		copyString(absolute, m_engine.getFileSystem().getBasePath());
 		catString(absolute, relative);
 	}
 
 
 	void makeRelative(Span<char> relative, const char* absolute) const override
 	{
-		const char* base_path = m_engine->getFileSystem().getBasePath();
+		const char* base_path = m_engine.getFileSystem().getBasePath();
 		if (startsWith(absolute, base_path)) {
 			copyString(relative, absolute + stringLength(base_path));
 			return;
@@ -2307,6 +2308,45 @@ public:
 		++m_undo_index;
 	}
 
+	void registerCommand(const char* name, CommandCreator* creator) override {
+		lua_State* L = m_engine.getState();
+		LuaWrapper::DebugGuard guard(L);
+		lua_getfield(L, LUA_GLOBALSINDEX, "Editor");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			lua_newtable(L);
+			lua_pushvalue(L, -1);
+			lua_setfield(L, LUA_GLOBALSINDEX, "Editor");
+		}
+
+		lua_getfield(L, -1, name);
+		if (!lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			logError("Editor") << "Command " << name << " already exists.";
+			return;
+		}
+		lua_pop(L, 1);
+
+		auto f = [](lua_State* L) -> int {
+			auto* creator = LuaWrapper::toType<CommandCreator*>(L, lua_upvalueindex(1));
+			auto* editor = LuaWrapper::toType<WorldEditor*>(L, lua_upvalueindex(2));
+			IEditorCommand* cmd = creator(L, *editor);
+			editor->executeCommand(cmd);
+			return 0;
+		};
+
+		lua_pushlightuserdata(L, creator);
+		lua_pushlightuserdata(L, this);
+		lua_pushcclosure(L, f, 2);
+		lua_setfield(L, -2, name);
+		lua_pop(L, 1);
+	}
+
+	void executeCommand(const char* name, const char* args) override {
+		lua_State* L = m_engine.getState();
+		StaticString<1024> tmp("Editor.", name, "(", args, ")");
+		LuaWrapper::execute(L, Span(tmp.data, stringLength(tmp.data)), "executeCommand", 0);
+	}
 
 	void executeCommand(IEditorCommand* command) override
 	{
@@ -2374,7 +2414,7 @@ public:
 		beginCommandGroup(0);
 		endCommandGroup();
 		m_game_mode_commands = 2;
-		m_engine->startGame(*m_universe);
+		m_engine.startGame(*m_universe);
 	}
 
 
@@ -2388,8 +2428,8 @@ public:
 		}
 
 		ASSERT(m_universe);
-		m_engine->getResourceManager().enableUnload(false);
-		m_engine->stopGame(*m_universe);
+		m_engine.getResourceManager().enableUnload(false);
+		m_engine.stopGame(*m_universe);
 		selectEntities(nullptr, 0, false);
 		m_gizmo->clearEntities();
 		m_editor_icons->clear();
@@ -2398,9 +2438,9 @@ public:
 		{
 			m_universe_destroyed.invoke();
 			StaticString<64> name(m_universe->getName());
-			m_engine->destroyUniverse(*m_universe);
+			m_engine.destroyUniverse(*m_universe);
 			
-			m_universe = &m_engine->createUniverse(true);
+			m_universe = &m_engine.createUniverse(true);
 			m_universe_created.invoke();
 			m_universe->setName(name);
 			m_universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
@@ -2413,7 +2453,7 @@ public:
 			EntityRef e = (EntityRef)m_selected_entity_on_game_mode;
 			selectEntities(&e, 1, false);
 		}
-		m_engine->getResourceManager().enableUnload(true);
+		m_engine.getResourceManager().enableUnload(true);
 	}
 
 
@@ -2639,7 +2679,7 @@ public:
 			return;
 		}
 
-		if (m_engine->deserialize(*m_universe, blob))
+		if (m_engine.deserialize(*m_universe, blob))
 		{
 			m_prefab_system->deserialize(blob);
 			logInfo("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
@@ -2689,7 +2729,7 @@ public:
 		, m_is_game_mode(false)
 		, m_snap_mode(SnapMode::NONE)
 		, m_undo_index(-1)
-		, m_engine(&engine)
+		, m_engine(engine)
 		, m_entity_map(m_allocator)
 		, m_is_guid_pseudorandom(false)
         , m_game_mode_file(m_allocator)
@@ -2718,7 +2758,7 @@ public:
 			#endif
 		};
 
-		PluginManager& plugin_manager = m_engine->getPluginManager();
+		PluginManager& plugin_manager = m_engine.getPluginManager();
 		for (auto* plugin_name : plugins) {
 			if (plugin_name[0] && !plugin_manager.load(plugin_name)) {
 				logInfo("Editor") << plugin_name << " plugin has not been loaded";
@@ -2731,7 +2771,7 @@ public:
 		m_window = OS::createWindow(create_win_args);
 		Engine::PlatformData platform_data = {};
 		platform_data.window_handle = m_window;
-		m_engine->setPlatformData(platform_data);
+		m_engine.setPlatformData(platform_data);
 
 		plugin_manager.initPlugins();
 
@@ -2952,7 +2992,7 @@ public:
 		m_editor_icons->clear();
 		m_gizmo->clearEntities();
 		selectEntities(nullptr, 0, false);
-		m_engine->destroyUniverse(*m_universe);
+		m_engine.destroyUniverse(*m_universe);
 		m_universe = nullptr;
 	}
 
@@ -2992,7 +3032,7 @@ public:
 
 		m_is_universe_changed = false;
 		destroyUndoStack();
-		m_universe = &m_engine->createUniverse(true);
+		m_universe = &m_engine.createUniverse(true);
 		Universe* universe = m_universe;
 
 		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
@@ -3199,7 +3239,7 @@ private:
 	bool m_is_toggle_selection;
 	SnapMode m_snap_mode;
 	OutputMemoryStream m_game_mode_file;
-	Engine* m_engine;
+	Engine& m_engine;
 	OS::WindowHandle m_window;
 	EntityPtr m_selected_entity_on_game_mode;
 	DelegateList<void()> m_universe_destroyed;

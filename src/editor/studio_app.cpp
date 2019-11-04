@@ -849,8 +849,7 @@ public:
 		ComponentType lua_script_cmp_type = Reflection::getComponentType("lua_script");
 		m_editor->selectEntities(&env, 1, false);
 		m_editor->addComponent(env_cmp_type);
-		// TODO add sky
-		//m_editor->addComponent(lua_script_cmp_type);
+		m_editor->addComponent(lua_script_cmp_type);
 		auto* intensity_prop = Reflection::getProperty(env_cmp_type, "Intensity");
 		auto* indirect_intensity_prop = Reflection::getProperty(env_cmp_type, "Indirect intensity");
 		const float intensity = 3;
@@ -860,6 +859,8 @@ public:
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);
+		m_editor->executeCommand("addLuaScript", StaticString<32>("", env.index));
+		m_editor->executeCommand("setLuaScriptSource", StaticString<256>("", env.index, ", 0, \"pipelines/sky.lua\""));
 	}
 
 

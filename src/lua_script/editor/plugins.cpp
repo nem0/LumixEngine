@@ -39,6 +39,13 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 {
 	struct AddLuaScriptCommand final : public IEditorCommand
 	{
+		static IEditorCommand* deserialize(lua_State* L, WorldEditor& editor) {
+			const EntityRef e = LuaWrapper::checkArg<EntityRef>(L, 1);
+			IAllocator& allocator = editor.getAllocator();
+			return LUMIX_NEW(allocator, AddLuaScriptCommand)(e, editor);
+		}
+
+
 		explicit AddLuaScriptCommand(EntityRef entity, WorldEditor& editor)
 			: editor(editor)
 			, entity(entity)
@@ -154,6 +161,14 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 
 	struct SetPropertyCommand final : public IEditorCommand
 	{
+		static IEditorCommand* deserialize(lua_State* L, WorldEditor& editor) {
+			const EntityRef e = LuaWrapper::checkArg<EntityRef>(L, 1);
+			const int scr_idx = LuaWrapper::checkArg<int>(L, 2);
+			const char* path = LuaWrapper::checkArg<const char*>(L, 3);
+			IAllocator& allocator = editor.getAllocator();
+			return LUMIX_NEW(allocator, SetPropertyCommand)(editor, e, scr_idx, "-Source", path, allocator);
+		}
+
 		SetPropertyCommand(WorldEditor& _editor,
 			EntityRef entity,
 			int scr_index,
@@ -234,6 +249,8 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 	explicit PropertyGridPlugin(StudioApp& app)
 		: m_app(app)
 	{
+		app.getWorldEditor().registerCommand("addLuaScript", &AddLuaScriptCommand::deserialize);
+		app.getWorldEditor().registerCommand("setLuaScriptSource", &SetPropertyCommand::deserialize);
 	}
 
 
