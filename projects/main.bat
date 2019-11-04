@@ -25,8 +25,9 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	echo   A. Plugins
 	echo   B. Download Godot Engine
 	echo   C. Create project - static physx
+	echo   D. Push to itch.io
 	echo ===============================
-	choice /C 123456789ABC /N /M "Your choice:"
+	choice /C 123456789ABCD /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 goto :EOF
@@ -41,6 +42,7 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==10 call :plugins
 	if %errorlevel%==11 call :download_godot
 	if %errorlevel%==12 call :create_project_static_physx
+	if %errorlevel%==13 call :push_to_itch_io
 goto :begin
 
 :plugins 
@@ -62,6 +64,13 @@ goto :begin
 	if %errorlevel%==5 call :dx11_plugin
 	pause
 goto :plugins
+
+:push_to_itch_io
+	if not exist itch_io mkdir itch_io
+	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+	butler.exe push itch_io mikulasflorek/lumix-engine:win-64
+	pause
+exit /B 0
 
 :dx11_plugin
 	if not exist ..\plugins mkdir ..\plugins
