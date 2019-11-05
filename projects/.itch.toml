@@ -1,5 +1,5 @@
 [[prereqs]]
-name = "vcredist-2015-x64"
+name = "vcredist-2019-x64"
 
 [[actions]]
 name = "play"

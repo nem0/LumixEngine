@@ -1404,7 +1404,7 @@ void TerrainEditor::onGUI()
 			
 			static char filter[100] = {0};
 			static ImVec2 size(-1, 100);
-			ImGui::LabellessInputText("Filter", filter, sizeof(filter));
+			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 			if (ImGui::ListBoxHeader("Prefabs", size)) {
 				auto& resources = m_app.getAssetCompiler().lockResources();
 				for (const AssetCompiler::ResourceItem& res : resources) {

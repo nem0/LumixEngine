@@ -562,25 +562,32 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void getTextureImage(gpu::TextureHandle texture, int size, void* data) override
+	void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, void* data) override
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
 				gpu::pushDebugGroup("get image data");
-				gpu::getTextureImage(handle, size, buf);
+				gpu::TextureHandle staging = gpu::allocTextureHandle();
+				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
+				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
+				gpu::copy(staging, handle);
+				gpu::readTexture(staging, w * h * 4, buf);
+				gpu::destroy(staging);
 				gpu::popDebugGroup();
 			}
 
 			gpu::TextureHandle handle;
-			u32 size;
+			u32 w;
+			u32 h;
 			void* buf;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
 		cmd->handle = texture;
-		cmd->size = size;
+		cmd->w = w;
+		cmd->h = h;
 		cmd->buf = data;
 		queue(cmd, 0);
 	}

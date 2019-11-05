@@ -383,12 +383,15 @@ void AssetBrowser::fileColumn()
 	}
 
 	bool open_delete_popup = false;
-	bool open_rename_popup = false;
 	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 	static char tmp[MAX_PATH_LENGTH] = "";
 	auto common_popup = [&](){
 		const char* base_path = fs.getBasePath();
-		if (ImGui::BeginMenu("Create dir")) {
+		if (ImGui::MenuItem("View in explorer")) {
+			StaticString<MAX_PATH_LENGTH> dir_full_path(base_path, "/", m_dir);
+			OS::openExplorer(dir_full_path);
+		}
+		if (ImGui::BeginMenu("Create directory")) {
 			ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp));
 			ImGui::SameLine();
 			if (ImGui::Button("Create")) {
@@ -435,7 +438,24 @@ void AssetBrowser::fileColumn()
 	if (ImGui::BeginPopup("item_ctx")) {
 		ImGui::Text("%s", m_file_infos[m_context_resource]);
 		ImGui::Separator();
-		open_rename_popup = ImGui::MenuItem("Rename");
+		if (ImGui::MenuItem("Open in external editor")) {
+			openInExternalEditor(m_file_infos[m_context_resource].filepath);
+		}
+		if (ImGui::BeginMenu("Rename")) {
+			ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp));
+			if (ImGui::Button("Rename", ImVec2(100, 0))) {
+				PathUtils::FileInfo fi(m_file_infos[m_context_resource].filepath);
+				StaticString<MAX_PATH_LENGTH> new_path(fi.m_dir, tmp, ".", fi.m_extension);
+				if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
+					logError("Editor") << "Failed to rename " << m_file_infos[m_context_resource].filepath << " to " << new_path;
+				}
+				else {
+					changeDir(m_dir);
+				}
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndMenu();
+		}
 		open_delete_popup = ImGui::MenuItem("Delete");
 		ImGui::Separator();
 		common_popup();
@@ -447,30 +467,6 @@ void AssetBrowser::fileColumn()
 	}
 
 	if (open_delete_popup) ImGui::OpenPopup("Delete file");
-	if (open_rename_popup) {
-		PathUtils::getBasename(Span(m_new_name), m_file_infos[m_context_resource].filepath);
-		ImGui::OpenPopup("Rename file");
-	}
-	if (ImGui::BeginPopupModal("Rename file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-		ImGui::InputText("New name", m_new_name, sizeof(m_new_name));
-		if (ImGui::Button("Rename", ImVec2(100, 0))) {
-			PathUtils::FileInfo fi(m_file_infos[m_context_resource].filepath);
-			StaticString<MAX_PATH_LENGTH> new_path(fi.m_dir, m_new_name, ".", fi.m_extension);
-			if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
-				logError("Editor") << "Failed to rename " << m_file_infos[m_context_resource].filepath << " to " << new_path;
-			}
-			else {
-				changeDir(m_dir);
-			}
-
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::SameLine(ImGui::GetWindowWidth() - 100 - ImGui::GetStyle().WindowPadding.x);
-		if (ImGui::Button("Cancel", ImVec2(100, 0))) {
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
-	}
 
 	if (ImGui::BeginPopupModal("Delete file", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::Text("Are you sure? This can not be undone.");
@@ -586,7 +582,9 @@ void AssetBrowser::onGUI()
 		ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
 		ImGui::SameLine();
 		checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
-		if (ImGui::LabellessInputText("Filter", m_filter, sizeof(m_filter), 100)) doFilter();
+		ImGui::PushItemWidth(100);
+		if (ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter))) doFilter();
+		ImGui::PopItemWidth();
 		ImGui::SameLine(130 + checkbox_w);
 		breadcrumbs();
 		ImGui::Separator();
@@ -847,7 +845,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	}
 
 	static char filter[128] = "";
-	ImGui::LabellessInputText("Filter", filter, sizeof(filter));
+	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 
 	ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 3), false, ImGuiWindowFlags_HorizontalScrollbar);
 	AssetCompiler& compiler = m_app.getAssetCompiler();

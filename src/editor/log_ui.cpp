@@ -158,7 +158,7 @@ void LogUI::onGUI()
 		ImGui::SameLine();
 		char filter[128] = "";
 		ImGui::Checkbox("Autoscroll", &m_autoscroll);
-		ImGui::LabellessInputText("Filter", filter, sizeof(filter));
+		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))
