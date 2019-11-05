@@ -1,5 +1,5 @@
 vertex_shader [[
-	out vec2 v_uv;
+	layout (location = 0) out vec2 v_uv;
 	void main() {
 		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
 		vec4 pos = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
@@ -102,8 +102,8 @@ fragment_shader [[
 	}
 
 	layout (binding=0) uniform sampler2D u_source;
-	in vec2 v_uv;
-	out vec4 o_color;
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 0) out vec4 o_color;
 	void main() {
 		vec3 c = texture(u_source, v_uv).rgb;
 		vec2 tex_size = textureSize(u_source, 0);
