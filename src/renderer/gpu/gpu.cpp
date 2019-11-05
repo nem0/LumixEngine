@@ -1875,16 +1875,6 @@ bool isHomogenousDepth() { return false; }
 bool isOriginBottomLeft() { return true; }
 
 
-void generateMipmaps(gpu::TextureHandle texture)
-{
-	checkThread();
-
-	Texture& t = g_gpu.textures[texture.value];
-	const GLuint handle = t.handle;
-
-	CHECK_GL(glGenerateTextureMipmap(handle));
-}
-
 void copy(TextureHandle dst_handle, TextureHandle src_handle) {
 	checkThread();
 	Texture& dst = g_gpu.textures[dst_handle.value];

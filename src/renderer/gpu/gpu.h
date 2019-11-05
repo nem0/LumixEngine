@@ -237,7 +237,6 @@ void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
 u64 getQueryFrequency();
 bool isQueryReady(QueryHandle query);
-void generateMipmaps(TextureHandle texture);
 
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
