@@ -162,6 +162,7 @@ LUMIX_ENGINE_API bool getOpenFilename(Span<char> out, const char* filter, const 
 LUMIX_ENGINE_API bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
 LUMIX_ENGINE_API bool getOpenDirectory(Span<char> out, const char* starting_dir);
 LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(const char* path);
+LUMIX_ENGINE_API ExecuteOpenResult openExplorer(const char* path);
 LUMIX_ENGINE_API void copyToClipboard(const char* text);
 
 LUMIX_ENGINE_API bool deleteFile(const char* path);

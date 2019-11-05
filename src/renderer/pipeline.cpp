@@ -3308,7 +3308,12 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				Array<u32> pixels(allocator);
 				pixels.resize(w * h);
-				gpu::getTextureImage(handle, pixels.byte_size(), pixels.begin());
+				gpu::TextureHandle staging = gpu::allocTextureHandle();
+				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
+				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
+				gpu::copy(staging, handle);
+				gpu::readTexture(staging, pixels.byte_size(), pixels.begin());
+				gpu::destroy(staging);
 
 				OS::OutputFile file;
 				if (fs->open(path, Ref(file))) {

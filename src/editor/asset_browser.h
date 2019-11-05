@@ -103,7 +103,6 @@ private:
 	HashMap<ResourceType, IPlugin*> m_plugins;
 	Array<Resource*> m_selected_resources;
 	int m_context_resource;
-	char m_new_name[MAX_PATH_LENGTH];
 	WorldEditor& m_editor;
 	int m_current_type;
 	char m_filter[128];

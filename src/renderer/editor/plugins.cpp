@@ -1168,29 +1168,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		viewport.rot = mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
-		
-		struct Cmd : Renderer::RenderJob
-		{
-			void setup() override {}
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-				gpu::getTextureImage(texture, mem.size, mem.data);
-			}
 
-			Renderer::MemRef mem;
-			gpu::TextureHandle texture;
-		};
-
-		m_tile.texture = gpu::allocTextureHandle(); 
-
-		Cmd* cmd = LUMIX_NEW(renderer->getAllocator(), Cmd);
-		cmd->texture = m_tile.pipeline->getOutput();
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		cmd->mem.data = &m_tile.data[0];
-		cmd->mem.size = m_tile.data.size() * sizeof(&m_tile.data[0]);
-		cmd->mem.own = false;
-		renderer->queue(cmd, 0);
+		m_tile.texture = gpu::allocTextureHandle(); 
+		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, m_tile.data.begin());
+		
 		m_tile.frame_countdown = 2;
 	}
 
@@ -1227,29 +1209,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
 
-		struct Cmd : Renderer::RenderJob
-		{
-			void setup() override {}
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-				gpu::getTextureImage(texture, mem.size, mem.data);
-			}
-
-			Renderer::MemRef mem;
-			gpu::TextureHandle texture;
-		};
-
 		m_tile.texture = gpu::allocTextureHandle(); 
-		
-
-		Cmd* cmd = LUMIX_NEW(renderer->getAllocator(), Cmd);
-		cmd->texture = m_tile.pipeline->getOutput();
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		cmd->mem.data = &m_tile.data[0];
-		cmd->mem.size = m_tile.data.size() * sizeof(&m_tile.data[0]);
-		cmd->mem.own = false;
-		renderer->queue(cmd, 0);
+		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, m_tile.data.begin());
+		
 		m_tile.entity = mesh_entity;
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
@@ -2331,7 +2294,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 			const gpu::TextureHandle res = m_pipeline->getOutput();
 			ASSERT(res.isValid());
-			renderer->getTextureImage(res, TEXTURE_SIZE * TEXTURE_SIZE * 4, &m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
+			renderer->getTextureImage(res, TEXTURE_SIZE, TEXTURE_SIZE, &m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 		}
 
 		renderer->frame();

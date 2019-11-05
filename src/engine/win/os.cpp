@@ -935,6 +935,16 @@ ExecuteOpenResult shellExecuteOpen(const char* path)
 }
 
 
+ExecuteOpenResult openExplorer(const char* path)
+{
+	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const uintptr_t res = (uintptr_t)ShellExecute(NULL, L"explore", wpath, NULL, NULL, SW_SHOWNORMAL);
+	if (res > 32) return ExecuteOpenResult::SUCCESS;
+	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
+	return ExecuteOpenResult::OTHER_ERROR;
+}
+
+
 bool deleteFile(const char* path)
 {
 	const WCharStr<MAX_PATH_LENGTH> wpath(path);

@@ -208,7 +208,7 @@ end
 function tonemap(hdr_buffer)
 	beginBlock("tonemap")
 	local rb
-	if APP ~= nil then
+	if APP ~= nil or PREVIEW ~= nil or PROBE ~= nil then
 		rb = createRenderbuffer(1, 1, true, "rgba8", "tonemap")
 	else
 		rb = createRenderbuffer(1, 1, true, "rgba16f", "tonemap")

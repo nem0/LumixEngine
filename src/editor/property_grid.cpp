@@ -196,7 +196,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			if (entity.isValid() && ImGui::Button("Select")) m_grid.m_deferred_select = entity;
 
 			static char entity_filter[32] = {};
-			ImGui::LabellessInputText("Filter", entity_filter, sizeof(entity_filter));
+			ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter));
 			for (EntityPtr i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity((EntityRef)i))
 			{
 				getEntityListDisplayName(m_editor, Span(buf), i);
@@ -653,7 +653,7 @@ bool PropertyGrid::entityInput(const char* label, const char* str_id, EntityPtr&
 		}
 		Universe* universe = m_editor.getUniverse();
 		static char entity_filter[32] = {};
-		ImGui::LabellessInputText("Filter", entity_filter, sizeof(entity_filter));
+		ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter));
 		if (ImGui::ListBoxHeader("Entities"))
 		{
 			if (entity_filter[0])
@@ -701,7 +701,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 	char name[256];
 	const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
 	copyString(name, tmp);
-	if (ImGui::LabellessInputText("Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
+	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
 	ImGui::PushFont(m_app.getBoldFont());
 	if (!ImGui::TreeNodeEx("General", ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -856,7 +856,7 @@ void PropertyGrid::onGUI()
 		}
 		if (ImGui::BeginPopup("AddComponentPopup"))
 		{
-			ImGui::LabellessInputText("Filter", m_component_filter, sizeof(m_component_filter));
+			ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
 			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter);
 			ImGui::EndPopup();
 		}

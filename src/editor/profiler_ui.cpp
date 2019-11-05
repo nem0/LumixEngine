@@ -228,7 +228,7 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	ImGui::LabellessInputText("Filter###resource_filter", m_resource_filter, sizeof(m_resource_filter));
+	ImGui::InputTextWithHint("##resource_filter", "Filter", m_resource_filter, sizeof(m_resource_filter));
 
 	static const ResourceType RESOURCE_TYPES[] = { ResourceType("animation"),
 		ResourceType("material"),

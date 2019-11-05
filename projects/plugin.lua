@@ -1,4 +1,4 @@
-local ide_dir = iif(_ACTION == nil, "vs2017", _ACTION)
+local ide_dir = iif(_ACTION == nil, "vs2019", _ACTION)
 if "linux-gcc" == _OPTIONS["gcc"] then
 	ide_dir = "gcc"
 elseif "linux-gcc-5" == _OPTIONS["gcc"] then
@@ -259,19 +259,18 @@ function bootstrapPlugin(name)
 		includedirs { 
 			"../lumixengine/src/",
 			"../lumixengine/external/",
-			"../lumixengine/external/SDL/include",
 		}
 		
 		links { "engine" }
 		
 		configuration  "Debug" 
-			libdirs { "../lumixengine/projects/tmp/vs2017/bin/Debug" }
+			libdirs { "../lumixengine/projects/tmp/vs2019/bin/Debug" }
 
 		configuration  "Release" 
-			libdirs { "../lumixengine/projects/tmp/vs2017/bin/Release" }
+			libdirs { "../lumixengine/projects/tmp/vs2019/bin/Release" }
 
 		configuration  "RelWithDebInfo" 
-			libdirs { "../lumixengine/projects/tmp/vs2017/bin/RelWithDebInfo" }
+			libdirs { "../lumixengine/projects/tmp/vs2019/bin/RelWithDebInfo" }
 
 		configuration {}
 end

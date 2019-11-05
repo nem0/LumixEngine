@@ -46,6 +46,8 @@ struct Texture
 	GLuint handle;
 	GLenum target;
 	GLenum format;
+	u32 width;
+	u32 height;
 };
 
 
@@ -1455,6 +1457,8 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	t.format = internal_format;
 	t.handle = texture;
 	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
+	t.width = hdr.dwWidth;
+	t.height = hdr.dwHeight;
 	return true;
 }
 
@@ -1520,6 +1524,8 @@ void createTextureView(TextureHandle view_handle, TextureHandle orig_handle)
 
 	CHECK_GL(glGenTextures(1, &view.handle));
 	CHECK_GL(glTextureView(view.handle, GL_TEXTURE_2D, orig.handle, orig.format, 0, 1, 0, 1));
+	view.width = orig.width;
+	view.height = orig.height;
 }
 
 
@@ -1607,6 +1613,8 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	t.handle = texture;
 	t.target = target;
 	t.format = internal_format;
+	t.width = w;
+	t.height = h;
 
 	return true;
 }
@@ -1877,8 +1885,19 @@ void generateMipmaps(gpu::TextureHandle texture)
 	CHECK_GL(glGenerateTextureMipmap(handle));
 }
 
+void copy(TextureHandle dst_handle, TextureHandle src_handle) {
+	checkThread();
+	Texture& dst = g_gpu.textures[dst_handle.value];
+	Texture& src = g_gpu.textures[src_handle.value];
+	ASSERT(src.target == GL_TEXTURE_2D);
+	ASSERT(src.target == dst.target);
+	ASSERT(dst.width == src.width);
+	ASSERT(dst.height == src.height);
 
-void getTextureImage(gpu::TextureHandle texture, u32 size, void* buf)
+	CHECK_GL(glCopyImageSubData(src.handle, src.target, 0, 0, 0, 0, dst.handle, dst.target, 0, 0, 0, 0, src.width, src.height, 1));
+}
+
+void readTexture(TextureHandle texture, u32 size, void* buf)
 {
 	checkThread();
 

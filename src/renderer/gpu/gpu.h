@@ -132,6 +132,7 @@ enum class TextureFlags : u32 {
 	CLAMP_W = 1 << 3,
 	NO_MIPS = 1 << 4,
 	POINT_FILTER = 1 << 5,
+	READBACK = 1 << 6
 };
 
 enum class BufferFlags : u32 {
@@ -229,7 +230,8 @@ void update(BufferHandle buffer, const void* data, size_t size);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size);
-void getTextureImage(gpu::TextureHandle texture, u32 size, void* rgba);
+void copy(TextureHandle dst, TextureHandle src);
+void readTexture(TextureHandle texture, u32 size, void* rgba);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
