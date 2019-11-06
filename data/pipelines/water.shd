@@ -117,7 +117,7 @@ fragment_shader [[
 		vec4 screen_pos = u_camera_view_projection * vec4(wpos, 1);
 		screen_pos /= screen_pos.w;
 		#ifndef _ORIGIN_BOTTOM_LEFT
-		screen_pos.y *= -1;
+			screen_pos.y *= -1;
 		#endif
 		float depth = texture(u_depthbuffer, screen_pos.xy * 0.5 + 0.5).x;
 		float depth_diff = toLinearDepth(depth) - toLinearDepth(screen_pos.z) + wave;

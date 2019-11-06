@@ -545,8 +545,11 @@ namespace Lumix
 				resource_type = ResourceType(LuaWrapper::checkArg<const char*>(L, 3));
 			}
 			lua_getglobal(L, "g_scene_lua_script");
-			ASSERT(lua_type(L, -1) == LUA_TLIGHTUSERDATA);
+			if(lua_type(L, -1) == LUA_TLIGHTUSERDATA) {
+				luaL_error(L, "%s", "Invalid g_scene_lua_script");
+			}
 			auto* scene = LuaWrapper::toType<LuaScriptSceneImpl*>(L, -1);
+			lua_pop(L, -1);
 			u32 prop_name_hash = crc32(prop_name);
 			for (auto& prop : scene->m_current_script_instance->m_properties)
 			{
@@ -554,7 +557,6 @@ namespace Lumix
 				{
 					prop.type = (Property::Type)type;
 					prop.resource_type = resource_type;
-					lua_pop(L, -1);
 					return 0;
 				}
 			}

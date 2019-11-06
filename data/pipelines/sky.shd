@@ -68,7 +68,7 @@ fragment_shader [[
 		#ifdef _ORIGIN_BOTTOM_LEFT
 			vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
 		#else
-			vec4 posProj = vec4(vec2(frag_coord.x, -frag_coord.y) * 2 - 1, z, 1.0);
+			vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
 		#endif
 		vec4 wpos = u_camera_inv_view_projection * posProj;
 		wpos /= wpos.w;
