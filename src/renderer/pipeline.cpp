@@ -2054,7 +2054,7 @@ struct PipelineImpl final : Pipeline
 			return nullptr;
 		}();
 
-		if(!shader) return;
+		if (!shader || !shader->isReady()) return;
 
 		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
 		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;

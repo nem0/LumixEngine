@@ -95,12 +95,6 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 			mat4 u_pass_inv_view_projection;
 			vec4 u_pass_view_dir;
 		};
-		layout (std140, binding = 2) uniform MaterialState {
-			vec4 u_material_color;
-			float u_roughness;
-			float u_metallic;
-			float u_emission;
-		};
 		layout (binding=14) uniform samplerCube u_irradiancemap;
 		layout (binding=15) uniform samplerCube u_radiancemap;
 		)#";
@@ -172,6 +166,15 @@ int ignore_property(lua_State* L) {
 	return 0;
 }
 
+static int countLines(const char* str) {
+	int count = 0;
+	const char* c = str;
+	while(*c) {
+		if(*c == '\n') ++count;
+		++c;
+	}
+	return count;
+};
 
 int uniform(lua_State* L)
 {
@@ -262,16 +265,6 @@ int texture_slot(lua_State* L)
 
 static void source(lua_State* L, gpu::ShaderType shader_type)
 {
-	auto countLines = [](const char* str) {
-		int count = 0;
-		const char* c = str;
-		while(*c) {
-			if(*c == '\n') ++count;
-			++c;
-		}
-		return count;
-	};
-
 	const char* src = LuaWrapper::checkArg<const char*>(L, 1);
 	
 	Shader* shader = getShader(L);
@@ -431,6 +424,64 @@ void Shader::unload()
 	}
 	m_texture_slot_count = 0;
 	m_all_defines_mask = 0;
+}
+
+static const char* toString(Shader::Uniform::Type type) {
+	switch(type) {
+		case Shader::Uniform::COLOR: return "vec4";
+		case Shader::Uniform::FLOAT: return "float";
+		case Shader::Uniform::INT: return "int";
+		case Shader::Uniform::MATRIX4: return "mat4";
+		case Shader::Uniform::VEC2: return "vec2";
+		case Shader::Uniform::VEC3: return "vec3";
+		case Shader::Uniform::VEC4: return "vec4";
+		default: ASSERT(false); return "unknown_type";
+	}
+}
+
+static void toVarName(Span<char> out, const char* in) {
+	ASSERT(out.length() > 3);
+	const char* c = in;
+	char* o = out.begin();
+	*o = 'u';
+	++o;
+	*o = '_';
+	++o;
+	while (o != out.end() - 1 && *c) {
+		if (*c >= 'a' && *c <= 'z' || *c >= '0' && *c <= '9') {
+			*o = *c;
+		}
+		else if (*c >= 'A' && *c <= 'Z') {
+			*o = *c + ('a' - 'A');
+		}
+		else {
+			*o = '_';
+		}
+		++o;
+		++c;
+	}
+	*o = 0;
+}
+
+void Shader::onBeforeReady() {
+	m_sources.common.cat(R"#(
+		layout (std140, binding = 2) uniform MaterialState {
+			vec4 u_material_color;
+			float u_roughness;
+			float u_metallic;
+			float u_emission;
+		)#");
+
+	for (const Uniform& u : m_uniforms) {
+		m_sources.common.cat(toString(u.type));
+		m_sources.common.cat(" ");
+		char var_name[64];
+		toVarName(Span(var_name), u.name);
+		m_sources.common.cat(var_name);
+		m_sources.common.cat(";\n");
+	}
+
+	m_sources.common.cat("};\n");
 }
 
 
