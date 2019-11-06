@@ -49,7 +49,7 @@ vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 	#ifdef _ORIGIN_BOTTOM_LEFT
 		vec4 pos_proj = vec4(vec2(tex_coord.x, tex_coord.y) * 2 - 1, z, 1.0);
 	#else 
-		vec4 pos_proj = vec4(vec2(tex_coord.x, -tex_coord.y) * 2 - 1, z, 1.0);
+		vec4 pos_proj = vec4(vec2(tex_coord.x, 1-tex_coord.y) * 2 - 1, z, 1.0);
 	#endif
 	vec4 view_pos = inv_view_proj * pos_proj;
 	return view_pos.xyz / view_pos.w;
