@@ -27,7 +27,7 @@ fragment_shader [[
 	
 	vec3 getViewNormal(vec2 tex_coord)
 	{
-		vec3 wnormal = texture2D(u_normal_buffer, tex_coord).xyz * 2 - 1;
+		vec3 wnormal = texture(u_normal_buffer, tex_coord).xyz * 2 - 1;
 		vec4 vnormal = u_camera_view * vec4(wnormal, 0);
 		return vnormal.xyz;
 	}	

@@ -105,7 +105,11 @@ fragment_shader [[
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 0) out vec4 o_color;
 	void main() {
-		vec3 c = texture(u_source, v_uv).rgb;
+		#ifdef ORIGIN_BOTTOM_LEFT
+			vec3 c = texture(u_source, v_uv).rgb;
+		#else
+			vec3 c = texture(u_source, vec2(v_uv.x, -v_uv.y)).rgb;
+		#endif
 		vec2 tex_size = textureSize(u_source, 0);
 		o_color.rgb = filmGrain(v_uv, tex_size, c);
 		o_color.w = 1;

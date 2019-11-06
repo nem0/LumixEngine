@@ -116,6 +116,9 @@ fragment_shader [[
 		vec3 water_color = u_material_color.rgb * 0.1;
 		vec4 screen_pos = u_camera_view_projection * vec4(wpos, 1);
 		screen_pos /= screen_pos.w;
+		#ifndef _ORIGIN_BOTTOM_LEFT
+		screen_pos.y *= -1;
+		#endif
 		float depth = texture(u_depthbuffer, screen_pos.xy * 0.5 + 0.5).x;
 		float depth_diff = toLinearDepth(depth) - toLinearDepth(screen_pos.z) + wave;
 		vec3 refraction = refract(-view, normal, u_r0);
