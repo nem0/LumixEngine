@@ -94,20 +94,6 @@ fragment_shader [[
 
 	layout(location = 0) out vec4 o_color;
 
-	layout (std140, binding = 2) uniform WaterMaterial {
-		vec4 u_material_color_;
-		float u_roughness_;
-		float u_metallic_;
-		float u_emission_;
-		float u_uv_scale;
-		float u_spec_power;
-		float u_r0;
-		float u_normal_strength;
-		float u_reflection_multiplier;
-		float u_specular_multiplier;
-		vec2 u_flow_dir;
-	};
-
 	vec3 getReflectionColor(vec3 view, vec3 normal, float dist)
 	{
 		vec3 reflection = reflect(-view, normal);
@@ -205,7 +191,7 @@ fragment_shader [[
 		vec3 refr_color = getRefractionColor(v_wpos.xyz, view, wnormal, /*wave*/0);
 		//
 		vec3 halfvec = normalize(mix(u_light_direction.xyz, view, 0.5));
-		float spec_strength = pow(max(0.0, dot(halfvec, wnormal)), u_spec_power);
+		float spec_strength = pow(max(0.0, dot(halfvec, wnormal)), u_specular_power);
 		vec3 spec_color = u_light_color.rgb * spec_strength * u_specular_multiplier;
 		
 		float fresnel = u_r0 + (1.0 - u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);

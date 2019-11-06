@@ -30,8 +30,8 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
-uniform("u_detail_distance", "float")
-uniform("u_detail_scale", "float")
+uniform("Detail distance", "float")
+uniform("Detail scale", "float")
 
 common [[
 	layout(binding=0) uniform sampler2D u_hm;
@@ -49,15 +49,6 @@ common [[
 		vec4 u_terrain_scale;
 		vec2 u_hm_size;
 		float u_cell_size;
-	};
-
-	layout (std140, binding = 2) uniform TerrainMaterial {
-		vec4 u_material_color_;
-		float u_roughness_;
-		float u_metallic_;
-		float u_emission_;
-		float u_detail_distance;
-		float u_detail_scale;
 	};
 
 	mat3 getTBN(vec2 uv)

@@ -85,7 +85,7 @@ public:
 	bool hasDefine(u8 define) const;
 	void ignoreProperty(Property value) { m_ignored_properties |= 1 << (u32)value; }
 	bool isIgnored(Property value) const { return m_ignored_properties & (1 << (u32)value); }
-
+	
 	gpu::ProgramHandle getProgram(const gpu::VertexDecl& decl, u32 defines);
 	static void compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer);
 
@@ -105,6 +105,7 @@ public:
 private:
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
+	void onBeforeReady() override;
 };
 
 

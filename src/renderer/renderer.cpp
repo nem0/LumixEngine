@@ -938,6 +938,7 @@ struct RendererImpl final : public Renderer
 	const char* getShaderDefine(int define_idx) const override { return m_shader_defines[define_idx]; }
 
 	gpu::ProgramHandle queueShaderCompile(Shader& shader, gpu::VertexDecl decl, u32 defines) override {
+		ASSERT(shader.isReady());
 		MT::CriticalSectionLock lock(m_cpu_frame->shader_mutex);
 		
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
