@@ -79,6 +79,7 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 			vec4 u_camera_world_pos;
 			vec4 u_light_direction;
 			vec4 u_light_color;
+			vec4 u_shadow_cascades;
 			ivec2 u_framebuffer_size;
 			float u_light_intensity;
 			float u_light_indirect_intensity;

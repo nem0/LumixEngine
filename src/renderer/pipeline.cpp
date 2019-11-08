@@ -88,6 +88,7 @@ struct GlobalState
 	Vec4 cam_world_pos;
 	Vec4 light_direction;
 	Vec4 light_color;
+	Vec4 shadow_cascades;
 	IVec2 framebuffer_size;
 	float light_intensity;
 	float light_indirect_intensity;
@@ -597,6 +598,7 @@ struct PipelineImpl final : Pipeline
 			global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
 			global_state.shadow_cam_near_plane = SHADOW_CAM_NEAR;
 			global_state.shadow_cam_far_plane = SHADOW_CAM_FAR;
+			global_state.shadow_cascades = cascades;
 
 			global_state.shadow_view_projection = projection_matrix * view_matrix;
 
