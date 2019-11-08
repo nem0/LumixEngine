@@ -1719,24 +1719,35 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 
 	for (u32 i = 0; i < num; ++i) {
 		GLenum shader_type;
+		const char* type_define = "";
 		switch (types[i]) {
-			case ShaderType::GEOMETRY: shader_type = GL_GEOMETRY_SHADER; break;
-			case ShaderType::FRAGMENT: shader_type = GL_FRAGMENT_SHADER; break;
-			case ShaderType::VERTEX: shader_type = GL_VERTEX_SHADER; break;
+			case ShaderType::GEOMETRY: 
+				type_define = "#define LUMIX_GEOMETRY_SHADER\n";
+				shader_type = GL_GEOMETRY_SHADER; 
+				break;
+			case ShaderType::FRAGMENT:
+				type_define = "#define LUMIX_FRAGMENT_SHADER\n";
+				shader_type = GL_FRAGMENT_SHADER; 
+				break;
+			case ShaderType::VERTEX: 
+				type_define = "#define LUMIX_VERTEX_SHADER\n";
+				shader_type = GL_VERTEX_SHADER; 
+				break;
 			default: ASSERT(0); break;
 		}
 		const GLuint shd = glCreateShader(shader_type);
 		combined_srcs[0] = "#version 440\n";
 		combined_srcs[1] = "#define _ORIGIN_BOTTOM_LEFT\n";
-		combined_srcs[prefixes_count + decl.attributes_count + 2] = srcs[i];
+		combined_srcs[2] = type_define;
+		combined_srcs[prefixes_count + decl.attributes_count + 3] = srcs[i];
 		for (u32 j = 0; j < prefixes_count; ++j) {
-			combined_srcs[j + 2] = prefixes[j];
+			combined_srcs[j + 3] = prefixes[j];
 		}
 		for (u32 j = 0; j < decl.attributes_count; ++j) {
-			combined_srcs[j + prefixes_count + 2] = attr_defines[decl.attributes[j].idx];
+			combined_srcs[j + prefixes_count + 3] = attr_defines[decl.attributes[j].idx];
 		}
 
-		CHECK_GL(glShaderSource(shd, 3 + prefixes_count + decl.attributes_count, combined_srcs, 0));
+		CHECK_GL(glShaderSource(shd, 4 + prefixes_count + decl.attributes_count, combined_srcs, 0));
 		CHECK_GL(glCompileShader(shd));
 
 		GLint compile_status;
