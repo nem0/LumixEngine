@@ -189,7 +189,7 @@ function shadowPass()
 		endBlock()
 		
 		beginBlock("shadow_blur")
-			blur(rb, "r32f", 4096, 1024, "shadowmap_blur")
+			--blur(rb, "r32f", 4096, 1024, "shadowmap_blur")
 		endBlock()
 		return rb
 	end
