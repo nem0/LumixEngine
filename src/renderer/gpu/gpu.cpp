@@ -1163,12 +1163,12 @@ static GLuint createVAO(const VertexDecl& decl) {
 			default: ASSERT(false); break;
 		}
 
-		const bool normalized = attr.flags & Attribute::NORMALIZED;
 		const bool instanced = attr.flags & Attribute::INSTANCED;
 		if (attr.flags & Attribute::AS_INT) {
-			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
+			CHECK_GL(glVertexAttribIFormat(attr.idx, attr.components_count, gl_attr_type, attr.byte_offset));
 		}
 		else {
+			const bool normalized = attr.flags & Attribute::NORMALIZED;
 			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
 		}
 		CHECK_GL(glEnableVertexAttribArray(attr.idx));
