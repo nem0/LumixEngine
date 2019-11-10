@@ -2891,9 +2891,9 @@ public:
 			EnvProbeInfo& out = probes.emplace();
 			out.radius = probe.radius;
 			out.position = m_universe.getPosition(entity);
-			out.radiance = probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : gpu::INVALID_TEXTURE;
-			out.irradiance = probe.irradiance && probe.irradiance->isReady() ? probe.irradiance->handle : gpu::INVALID_TEXTURE;
-			out.reflection = probe.texture && probe.texture->isReady() ? probe.texture->handle : gpu::INVALID_TEXTURE;
+			out.radiance = probe.flags.isSet(EnvironmentProbe::SPECULAR) && probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : gpu::INVALID_TEXTURE;
+			out.irradiance = probe.flags.isSet(EnvironmentProbe::DIFFUSE) && probe.irradiance && probe.irradiance->isReady() ? probe.irradiance->handle : gpu::INVALID_TEXTURE;
+			out.reflection = probe.flags.isSet(EnvironmentProbe::REFLECTION) && probe.texture && probe.texture->isReady() ? probe.texture->handle : gpu::INVALID_TEXTURE;
 		}
 	}
 	

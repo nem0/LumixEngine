@@ -95,8 +95,6 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 			mat4 u_pass_inv_view_projection;
 			vec4 u_pass_view_dir;
 		};
-		layout (binding=14) uniform samplerCube u_irradiancemap;
-		layout (binding=15) uniform samplerCube u_radiancemap;
 		)#";
 
 	const char* codes[64];

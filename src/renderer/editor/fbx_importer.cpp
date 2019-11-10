@@ -33,6 +33,13 @@ typedef StaticString<MAX_PATH_LENGTH> PathBuilder;
 
 
 
+static bool hasTangents(const ofbx::Mesh& mesh) {
+	if (mesh.getGeometry()->getTangents()) return true;
+	if (mesh.getGeometry()->getNormals() && mesh.getGeometry()->getUVs()) return true;
+	return false;
+}
+
+
 static void getMaterialName(const ofbx::Material* material, char (&out)[128])
 {
 	copyString(out, material ? material->name : "default");
@@ -322,14 +329,14 @@ static Matrix toLumix(const ofbx::Matrix& mtx)
 
 static u32 packF4u(const Vec3& vec)
 {
-	const u8 xx = u8(vec.x * 127.0f + 128.0f);
-	const u8 yy = u8(vec.y * 127.0f + 128.0f);
-	const u8 zz = u8(vec.z * 127.0f + 128.0f);
-	const u8 ww = u8(0);
+	const i8 xx = i8(clamp((vec.x * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+	const i8 yy = i8(clamp((vec.y * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+	const i8 zz = i8(clamp((vec.z * 0.5f + 0.5f) * 255, 0.f, 255.f) - 128);
+	const i8 ww = i8(0);
 
 	union {
 		u32 ui32;
-		u8 arr[4];
+		i8 arr[4];
 	} un;
 
 	un.arr[0] = xx;
@@ -435,7 +442,7 @@ static ofbx::Vec2 operator-(const ofbx::Vec2& a, const ofbx::Vec2& b)
 
 static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs)
 {
-	/*out.resize(vertex_count);
+	out.resize(vertex_count);
 	memset(out.begin(), 0, out.byte_size());
 	for (int i = 0; i < vertex_count; i += 3) {
 		const ofbx::Vec3 v0 = vertices[i + 0];
@@ -452,10 +459,11 @@ static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx
 
 		const float dir = duv20.x * duv10.y - duv20.y * duv10.x < 0 ? -1.f : 1.f;
 		ofbx::Vec3 tangent; 
-		tagent.x = (dv20.x * duv10.y - dv10.x * duv2.y) * dir;
-		tagent.y = (dv20.y * duv10.y - dv10.y * duv2.y) * dir;
-		tagent.z = (dv20.z * duv10.y - dv10.z * duv2.y) * dir;
-	}*/
+		tangent.x = (dv20.x * duv10.y - dv10.x * duv20.y) * dir;
+		tangent.y = (dv20.y * duv10.y - dv10.y * duv20.y) * dir;
+		tangent.z = (dv20.z * duv10.y - dv10.z * duv20.y) * dir;
+		out[i] = tangent;
+	}
 }
 
 
@@ -507,8 +515,8 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		const int* materials = geom->getMaterials();
 		Array<ofbx::Vec3> computed_tangents(allocator);
 		if (!tangents && normals && uvs) {
-			//computeTangents(computed_tangents, vertex_count, vertices, normals, uvs);
-			//tangents = computed_tangents.begin();
+			computeTangents(computed_tangents, vertex_count, vertices, normals, uvs);
+			tangents = computed_tangents.begin();
 		}
 
 		for (int i = 0; i < vertex_count; ++i)
@@ -1269,7 +1277,7 @@ int FBXImporter::getVertexSize(const ImportMesh& mesh) const
 	if (mesh.fbx->getGeometry()->getNormals()) size += NORMAL_SIZE;
 	if (mesh.fbx->getGeometry()->getUVs()) size += UV_SIZE;
 	if (mesh.fbx->getGeometry()->getColors() && import_vertex_colors) size += COLOR_SIZE;
-	if (mesh.fbx->getGeometry()->getTangents()) size += TANGENT_SIZE;
+	if (hasTangents(*mesh.fbx)) size += TANGENT_SIZE;
 	if (mesh.is_skinned) size += BONE_INDICES_WEIGHTS_SIZE;
 
 	return size;
@@ -1594,8 +1602,9 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 		const ofbx::Geometry* geom = mesh.getGeometry();
 		if (geom->getNormals()) {
 			write(Mesh::AttributeSemantic::NORMAL);
-			write(gpu::AttributeType::U8);
+			write(gpu::AttributeType::I8);
 			write((u8)4);
+
 		}
 		if (geom->getUVs()) {
 			write(Mesh::AttributeSemantic::TEXCOORD0);
@@ -1607,11 +1616,12 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 			write(gpu::AttributeType::U8);
 			write((u8)4);
 		}
-		if (geom->getTangents()) {
+		if (hasTangents(mesh)) {
 			write(Mesh::AttributeSemantic::TANGENT);
-			write(gpu::AttributeType::U8);
+			write(gpu::AttributeType::I8);
 			write((u8)4);
 		}
+
 		if (import_mesh.is_skinned) {
 			write(Mesh::AttributeSemantic::INDICES);
 			write(gpu::AttributeType::I16);
@@ -1728,10 +1738,12 @@ void FBXImporter::writeLODs(const ImportConfig& cfg)
 int FBXImporter::getAttributeCount(const ImportMesh& mesh) const
 {
 	int count = 1; // position
-	if (mesh.fbx->getGeometry()->getNormals()) ++count;
-	if (mesh.fbx->getGeometry()->getUVs()) ++count;
+	const bool has_normals = mesh.fbx->getGeometry()->getNormals();
+	const bool has_uvs = mesh.fbx->getGeometry()->getUVs();
+	if (has_normals) ++count;
+	if (has_uvs) ++count;
 	if (mesh.fbx->getGeometry()->getColors() && import_vertex_colors) ++count;
-	if (mesh.fbx->getGeometry()->getTangents()) ++count;
+	if (hasTangents(*mesh.fbx)) ++count;
 	if (mesh.is_skinned) count += 2;
 	return count;
 }
