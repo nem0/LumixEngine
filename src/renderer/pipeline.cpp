@@ -1445,18 +1445,41 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if(m_probes.empty()) return;
 
-				gpu::pushDebugGroup("environment");
+				gpu::pushDebugGroup("diffuse indirect");
 
-				gpu::useProgram(m_program);
+				gpu::useProgram(m_diffuse_program);
 				gpu::bindIndexBuffer(m_ib);
 				gpu::bindVertexBuffer(0, m_vb, 0, 12);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				const DVec3 cam_pos = m_camera_params.pos;
 				for (const EnvProbeInfo& probe : m_probes) {
+					if (!probe.irradiance.isValid()) continue;
+
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
-					gpu::TextureHandle handles[2] = { probe.irradiance, probe.radiance };
-					gpu::bindTextures(handles, 14, 2);
+					gpu::bindTextures(&probe.irradiance, 15, 1);
+					gpu::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
+					
+					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
+					const u64 state = intersecting
+						? (u64)gpu::StateFlags::CULL_FRONT
+						: (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK;
+					gpu::setState(state | blend_state);
+					gpu::drawTriangles(36, gpu::DataType::U16);
+				}
+				gpu::popDebugGroup();
+
+				gpu::pushDebugGroup("specular indirect");
+
+				gpu::useProgram(m_specular_program);
+				gpu::bindIndexBuffer(m_ib);
+				gpu::bindVertexBuffer(0, m_vb, 0, 12);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				for (const EnvProbeInfo& probe : m_probes) {
+					if (!probe.radiance.isValid()) continue;
+
+					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
+					gpu::bindTextures(&probe.radiance, 15, 1);
 					gpu::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
 					
 					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
@@ -1474,14 +1497,17 @@ struct PipelineImpl final : Pipeline
 			CameraParams m_camera_params;
 			PipelineImpl* m_pipeline;
 			Array<EnvProbeInfo> m_probes;
-			gpu::ProgramHandle m_program;
+			gpu::ProgramHandle m_diffuse_program;
+			gpu::ProgramHandle m_specular_program;
 		};
 
 		if(shader->isReady()) {
 			IAllocator& allocator = pipeline->m_renderer.getAllocator();
 			Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 			cmd->m_pipeline = pipeline;
-			cmd->m_program = shader->getProgram(pipeline->m_3D_pos_decl, 0);
+			const u32 specular_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("_LUMIX_SPECULAR");
+			cmd->m_diffuse_program = shader->getProgram(pipeline->m_3D_pos_decl, 0);
+			cmd->m_specular_program = shader->getProgram(pipeline->m_3D_pos_decl, specular_mask);
 			cmd->m_ib = pipeline->m_cube_ib;
 			cmd->m_vb = pipeline->m_cube_vb;
 			cmd->m_camera_params = cp;

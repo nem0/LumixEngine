@@ -802,6 +802,7 @@ int getSize(AttributeType type)
 {
 	switch(type) {
 		case AttributeType::FLOAT: return 4;
+		case AttributeType::I8: return 1;
 		case AttributeType::U8: return 1;
 		case AttributeType::I16: return 2;
 		default: ASSERT(false); return 0;
@@ -1159,16 +1160,18 @@ static GLuint createVAO(const VertexDecl& decl) {
 		switch (attr.type) {
 			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
 			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
+			case AttributeType::I8: gl_attr_type = GL_BYTE; break;
 			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
 			default: ASSERT(false); break;
 		}
 
 		const bool instanced = attr.flags & Attribute::INSTANCED;
+		const bool normalized = attr.flags & Attribute::NORMALIZED;
 		if (attr.flags & Attribute::AS_INT) {
+			ASSERT(!normalized);
 			CHECK_GL(glVertexAttribIFormat(attr.idx, attr.components_count, gl_attr_type, attr.byte_offset));
 		}
 		else {
-			const bool normalized = attr.flags & Attribute::NORMALIZED;
 			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
 		}
 		CHECK_GL(glEnableVertexAttribArray(attr.idx));
