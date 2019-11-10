@@ -1,3 +1,5 @@
+include "pipelines/common.glsl"
+
 common [[
 	layout(std140, binding = 4) uniform Drawcall {
 		uniform vec4 u_offset_scale;
@@ -8,9 +10,9 @@ common [[
 vertex_shader [[
 	layout (location = 0) out vec2 v_uv;
 	void main() {
-		v_uv = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
-		vec4 pos = vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		vec4 pos = fullscreenQuad(gl_VertexID, v_uv);
 		pos.xy = pos.xy * u_offset_scale.zw + u_offset_scale.xy;
+		pos.y = -pos.y;
 		gl_Position = pos;
 	}
 ]]

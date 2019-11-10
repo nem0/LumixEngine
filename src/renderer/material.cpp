@@ -39,7 +39,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_renderer(renderer)
 	, m_render_states(u64(gpu::StateFlags::CULL_BACK))
 	, m_color(1, 1, 1, 1)
-	, m_metallic(1.f)
+	, m_metallic(0.f)
 	, m_roughness(1.f)
 	, m_emission(0.0f)
 	, m_define_mask(0)
