@@ -1410,6 +1410,8 @@ struct PipelineImpl final : Pipeline
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 		const int shader_id = LuaWrapper::checkArg<int>(L, 1);
+		const bool specular = LuaWrapper::checkArg<bool>(L, 3);
+		const bool weights = LuaWrapper::checkArg<bool>(L, 4);
 		Shader* shader = [&] {
 			for (const ShaderRef& s : pipeline->m_shaders) {
 				if(s.id == shader_id) {
@@ -1437,6 +1439,12 @@ struct PipelineImpl final : Pipeline
 			{
 				RenderScene* scene = m_pipeline->getScene();
 				scene->getEnvironmentProbes(m_probes);
+				
+				for (i32 i = m_probes.size() - 1; i >= 0; --i) {
+					const EnvProbeInfo& probe = m_probes[i]; 
+					if (!probe.radiance.isValid() && m_specular) m_probes.swapAndPop(i);
+					else if (!probe.irradiance.isValid() && !m_specular) m_probes.swapAndPop(i);
+				}
 			}
 
 
@@ -1445,19 +1453,15 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if(m_probes.empty()) return;
 
-				gpu::pushDebugGroup("diffuse indirect");
-
-				gpu::useProgram(m_diffuse_program);
+				gpu::useProgram(m_program);
 				gpu::bindIndexBuffer(m_ib);
 				gpu::bindVertexBuffer(0, m_vb, 0, 12);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				const DVec3 cam_pos = m_camera_params.pos;
+				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 				for (const EnvProbeInfo& probe : m_probes) {
-					if (!probe.irradiance.isValid()) continue;
-
 					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
-					gpu::bindTextures(&probe.irradiance, 15, 1);
+					gpu::bindTextures(m_specular ? &probe.radiance : &probe.irradiance, 15, 1);
 					gpu::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
 					
 					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
@@ -1467,38 +1471,15 @@ struct PipelineImpl final : Pipeline
 					gpu::setState(state | blend_state);
 					gpu::drawTriangles(36, gpu::DataType::U16);
 				}
-				gpu::popDebugGroup();
-
-				gpu::pushDebugGroup("specular indirect");
-
-				gpu::useProgram(m_specular_program);
-				gpu::bindIndexBuffer(m_ib);
-				gpu::bindVertexBuffer(0, m_vb, 0, 12);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				for (const EnvProbeInfo& probe : m_probes) {
-					if (!probe.radiance.isValid()) continue;
-
-					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
-					gpu::bindTextures(&probe.radiance, 15, 1);
-					gpu::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
-					
-					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
-					const u64 state = intersecting
-						? (u64)gpu::StateFlags::CULL_FRONT
-						: (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK;
-					gpu::setState(state | blend_state);
-					gpu::drawTriangles(36, gpu::DataType::U16);
-				}
-				gpu::popDebugGroup();
 			}
 
 			gpu::BufferHandle m_ib;
 			gpu::BufferHandle m_vb;
 			CameraParams m_camera_params;
 			PipelineImpl* m_pipeline;
+			bool m_specular;
 			Array<EnvProbeInfo> m_probes;
-			gpu::ProgramHandle m_diffuse_program;
-			gpu::ProgramHandle m_specular_program;
+			gpu::ProgramHandle m_program;
 		};
 
 		if(shader->isReady()) {
@@ -1506,8 +1487,11 @@ struct PipelineImpl final : Pipeline
 			Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
 			cmd->m_pipeline = pipeline;
 			const u32 specular_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("_LUMIX_SPECULAR");
-			cmd->m_diffuse_program = shader->getProgram(pipeline->m_3D_pos_decl, 0);
-			cmd->m_specular_program = shader->getProgram(pipeline->m_3D_pos_decl, specular_mask);
+			const u32 weights_mask = 1 << pipeline->m_renderer.getShaderDefineIdx("_LUMIX_WEIGHTS");
+			u32 def_mask = specular ? specular_mask : 0;
+			def_mask |= weights ? weights_mask : 0;
+			cmd->m_program = shader->getProgram(pipeline->m_3D_pos_decl, def_mask);
+			cmd->m_specular = specular;
 			cmd->m_ib = pipeline->m_cube_ib;
 			cmd->m_vb = pipeline->m_cube_vb;
 			cmd->m_camera_params = cp;

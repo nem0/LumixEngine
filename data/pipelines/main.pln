@@ -1,7 +1,7 @@
 local deferred_shader = preloadShader("pipelines/deferred.shd")
 local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
-local environment_shader =  preloadShader("pipelines/environment.shd")
+local indirect_shader =  preloadShader("pipelines/indirect.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
@@ -90,21 +90,61 @@ function geomPass(default_set, decal_set)
 end
 
 function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
-	beginBlock("light_pass")
 	local hdr_rb = createRenderbuffer(1, 1, true, "rgba16f", "hdr")
-	setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
+	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
 	local view_params = getCameraParams()
-	bindRenderbuffers({
-		gbuffer0,
-		gbuffer1,
-		gbuffer2,
-		gbuffer_depth,
-	}, 0)
 
 	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
-		renderEnvProbeVolumes(environment_shader, view_params)
+		beginBlock("indirect diffuse")
+			beginBlock("weights")
+				local wrb = createRenderbuffer(1, 1, true, "r16f", "indirect_weights")
+				setRenderTargetsReadonlyDS(wrb, gbuffer_depth)
+				clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
+				bindRenderbuffers({
+					gbuffer0,
+					gbuffer1,
+					gbuffer2,
+					gbuffer_depth,
+				}, 0)
+				renderEnvProbeVolumes(indirect_shader, view_params, false, true)
+			endBlock()
+
+			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
+			bindRenderbuffers({
+				gbuffer0,
+				gbuffer1,
+				gbuffer2,
+				gbuffer_depth,
+				wrb,
+			}, 0)
+			renderEnvProbeVolumes(indirect_shader, view_params, false, false)
+		endBlock()
+
+		beginBlock("indirect specular")
+			beginBlock("weights")
+				setRenderTargetsReadonlyDS(wrb, gbuffer_depth)
+				clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
+				bindRenderbuffers({
+					gbuffer0,
+					gbuffer1,
+					gbuffer2,
+					gbuffer_depth,
+				}, 0)
+				renderEnvProbeVolumes(indirect_shader, view_params, true, true)
+			endBlock()
+
+			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
+			bindRenderbuffers({
+				gbuffer0,
+				gbuffer1,
+				gbuffer2,
+				gbuffer_depth,
+				wrb,
+			}, 0)
+			renderEnvProbeVolumes(indirect_shader, view_params, true, false)
+		endBlock()
 	end
 	
 	drawArray(0, 4, deferred_shader,

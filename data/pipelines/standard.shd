@@ -68,8 +68,8 @@ vertex_shader [[
 	void main() {
 		v_uv = a_uv;
 		#ifdef GRASS
-			v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
-			v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
+			v_normal = rotateByQuat(i_rot_quat, a_normal);
+			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position;
 			vec3 v = (u_model * vec4(i_pos_scale.xyz, 1)).xyz;
 			const float scale_dist = 10;
@@ -79,8 +79,8 @@ vertex_shader [[
 			v_wpos.x += p.y > 0.1 ? cos((i_pos_scale.x + i_pos_scale.y + i_pos_scale.z +  i_rot_quat.w * 5) * 0.3 + u_time * 2) * p.y * 0.1 : 0;
 			v_darken = a_position.y > 0.1 ? 1 : 0.0;
 		#elif defined INSTANCED
-			v_normal = rotateByQuat(i_rot_quat, a_normal * 2 - 1);
-			v_tangent = rotateByQuat(i_rot_quat, a_tangent * 2 - 1);
+			v_normal = rotateByQuat(i_rot_quat, a_normal);
+			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position * i_pos_scale.w;
 			#ifdef VEGETATION
 				p = vegetationAnim(i_pos_scale.xyz, p);
@@ -91,13 +91,13 @@ vertex_shader [[
 			a_weights.y * u_bones[a_indices.y] +
 			a_weights.z * u_bones[a_indices.z] +
 			a_weights.w * u_bones[a_indices.w]);
-			v_normal = mat3(model_mtx) * (a_normal * 2 - 1);
-			v_tangent = mat3(model_mtx) * (a_tangent * 2 - 1);
+			v_normal = mat3(model_mtx) * a_normal;
+			v_tangent = mat3(model_mtx) * a_tangent;
 			v_wpos = model_mtx * vec4(a_position,  1);
 		#else 
 			mat4 model_mtx = u_model;
-			v_normal = mat3(model_mtx) * (a_normal * 2 - 1);
-			v_tangent = mat3(model_mtx) * (a_tangent * 2 - 1);
+			v_normal = mat3(model_mtx) * a_normal;
+			v_tangent = mat3(model_mtx) * a_tangent;
 
 			vec3 p = a_position;
 			#ifdef VEGETATION
