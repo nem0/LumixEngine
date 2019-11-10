@@ -98,7 +98,9 @@ struct EnvironmentProbe
 	{
 		REFLECTION = 1 << 0,
 		OVERRIDE_GLOBAL_SIZE = 1 << 1,
-		ENABLED = 1 << 2
+		ENABLED = 1 << 2,
+		DIFFUSE = 1 << 3,
+		SPECULAR = 1 << 4
 	};
 
 	Texture* texture;
@@ -336,6 +338,10 @@ public:
 	virtual void setEnvironmentProbeReflectionSize(EntityRef entity, int size) = 0;
 	virtual bool isEnvironmentProbeReflectionEnabled(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbeReflection(EntityRef entity, bool enable) = 0;
+	virtual bool isEnvironmentProbeSpecular(EntityRef entity) = 0;
+	virtual void enableEnvironmentProbeSpecular(EntityRef entity, bool enable) = 0;
+	virtual bool isEnvironmentProbeDiffuse(EntityRef entity) = 0;
+	virtual void enableEnvironmentProbeDiffuse(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeCustomSize(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbeCustomSize(EntityRef entity, bool enable) = 0;
 	virtual Texture* getEnvironmentProbeTexture(EntityRef entity) const = 0;
