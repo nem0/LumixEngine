@@ -2967,6 +2967,30 @@ public:
 	}
 
 
+	bool isEnvironmentProbeSpecular(EntityRef entity) override
+	{
+		return m_environment_probes[entity].flags.isSet(EnvironmentProbe::SPECULAR);
+	}
+
+
+	void enableEnvironmentProbeSpecular(EntityRef entity, bool enable) override
+	{
+		m_environment_probes[entity].flags.set(EnvironmentProbe::SPECULAR, enable);
+	}
+
+
+	bool isEnvironmentProbeDiffuse(EntityRef entity) override
+	{
+		return m_environment_probes[entity].flags.isSet(EnvironmentProbe::DIFFUSE);
+	}
+
+
+	void enableEnvironmentProbeDiffuse(EntityRef entity, bool enable) override
+	{
+		m_environment_probes[entity].flags.set(EnvironmentProbe::DIFFUSE, enable);
+	}
+
+
 	Texture* getEnvironmentProbeTexture(EntityRef entity) const override
 	{
 		return m_environment_probes[entity].texture;
@@ -3274,6 +3298,8 @@ public:
 
 		probe.radius = 1;
 		probe.flags.set(EnvironmentProbe::ENABLED);
+		probe.flags.set(EnvironmentProbe::DIFFUSE);
+		probe.flags.set(EnvironmentProbe::SPECULAR);
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}

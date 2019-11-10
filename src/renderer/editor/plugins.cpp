@@ -2327,6 +2327,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			m_reflection_size = probe.reflection_size;
 		}
 		m_save_reflection = probe.flags.isSet(EnvironmentProbe::REFLECTION);
+		m_save_specular = probe.flags.isSet(EnvironmentProbe::SPECULAR);
+		m_save_diffuse = probe.flags.isSet(EnvironmentProbe::DIFFUSE);
 		m_probe_guid = probe.guid;
 
 		JobSystem::run(this, [](void* ptr) {
@@ -2378,36 +2380,35 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		memcpy(image.m_data, &m_data[0], m_data.byte_size());
 		cmft::imageToRgba32f(image);
 
-		if (m_fast_filtering) {
-			cmft::imageResize(image, 128, 128);
-		}
-		else {
-			PROFILE_BLOCK("radiance filter");
-			cmft::imageRadianceFilter(
-				image
-				, 128
-				, cmft::LightingModel::BlinnBrdf
-				, false
-				, 1
-				, 10
-				, 1
-				, cmft::EdgeFixup::None
-				, m_cl_context ? 0 : MT::getCPUsCount()
-				, m_cl_context
-			);
-		}
-
-		{
-			PROFILE_BLOCK("irradiance filter");
+		if (m_save_diffuse) {
+			PROFILE_BLOCK("irradiance");
 			cmft::imageIrradianceFilterSh(irradiance, 32, image);
+			cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
+			saveCubemap(m_probe_guid, (u8*)irradiance.m_data, m_irradiance_size, "_irradiance");
 		}
-
-		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
-		cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
-
-		saveCubemap(m_probe_guid, (u8*)irradiance.m_data, m_irradiance_size, "_irradiance");
 		// TODO do not override mipmaps if slow filter is used
-		saveCubemap(m_probe_guid, (u8*)image.m_data, m_radiance_size, "_radiance");
+		if (m_save_specular) {
+			if (m_fast_filtering) {
+				cmft::imageResize(image, 128, 128);
+			}
+			else {
+				PROFILE_BLOCK("radiance");
+				cmft::imageRadianceFilter(
+					image
+					, 128
+					, cmft::LightingModel::BlinnBrdf
+					, false
+					, 1
+					, 10
+					, 1
+					, cmft::EdgeFixup::None
+					, m_cl_context ? 0 : MT::getCPUsCount()
+					, m_cl_context
+				);
+			}
+			cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
+			saveCubemap(m_probe_guid, (u8*)image.m_data, m_radiance_size, "_radiance");
+		}
 		if (m_save_reflection) {
 			for (int i = 3; i < m_data.size(); i += 4) m_data[i] = 0xff; 
 			saveCubemap(m_probe_guid, &m_data[0], m_reflection_size, "");
@@ -2418,32 +2419,26 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	}
 
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
-	{
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
 		if (cmp.type != ENVIRONMENT_PROBE_TYPE) return;
 
 		const EntityRef e = (EntityRef)cmp.entity;
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
-		auto* texture = scene->getEnvironmentProbeTexture(e);
-		if (texture)
-		{
-			ImGui::LabelText("Reflection path", "%s", texture->getPath().c_str());
-			if (ImGui::Button("View reflection")) m_app.getAssetBrowser().selectResource(texture->getPath(), true, false);
-		}
-		texture = scene->getEnvironmentProbeIrradiance(e);
-		if (texture)
-		{
-			ImGui::LabelText("Irradiance path", "%s", texture->getPath().c_str());
-			if (ImGui::Button("View irradiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true, false);
-		}
-		texture = scene->getEnvironmentProbeRadiance(e);
-		if (texture)
-		{
-			ImGui::LabelText("Radiance path", "%s", texture->getPath().c_str());
-			if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(texture->getPath(), true, false);
-		}
 		if (m_in_progress) ImGui::Text("Generating...");
 		else {
+			const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
+			if (probe.texture && probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
+				ImGui::LabelText("Reflection path", "%s", probe.texture->getPath().c_str());
+				if (ImGui::Button("View reflection")) m_app.getAssetBrowser().selectResource(probe.texture->getPath(), true, false);
+			}
+			if (probe.irradiance && probe.flags.isSet(EnvironmentProbe::DIFFUSE)) {
+				ImGui::LabelText("Irradiance path", "%s", probe.irradiance->getPath().c_str());
+				if (ImGui::Button("View irradiance")) m_app.getAssetBrowser().selectResource(probe.irradiance->getPath(), true, false);
+			}
+			if (probe.radiance && probe.flags.isSet(EnvironmentProbe::SPECULAR)) {
+				ImGui::LabelText("Radiance path", "%s", probe.radiance->getPath().c_str());
+				if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(probe.radiance->getPath(), true, false);
+			}
 			if (ImGui::Button("Generate")) generateCubemaps(false);
 			if (ImGui::Button("Add bounce")) generateCubemaps(true);
 		}
@@ -2460,6 +2455,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	int m_radiance_size;
 	int m_reflection_size;
 	bool m_save_reflection;
+	bool m_save_specular;
+	bool m_save_diffuse;
 	// to be used with http://casual-effects.blogspot.com/2011/08/plausible-environment-lighting-in-two.html
 	bool m_fast_filtering;
 	u64 m_probe_guid;

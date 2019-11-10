@@ -316,6 +316,8 @@ static void registerProperties(IAllocator& allocator)
 			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
 			property("Radius", LUMIX_PROP(RenderScene, EnvironmentProbeRadius)),
 			property("Enabled reflection", &RenderScene::isEnvironmentProbeReflectionEnabled, &RenderScene::enableEnvironmentProbeReflection),
+			property("Enabled specular", &RenderScene::isEnvironmentProbeSpecular, &RenderScene::enableEnvironmentProbeSpecular),
+			property("Enabled diffuse", &RenderScene::isEnvironmentProbeDiffuse, &RenderScene::enableEnvironmentProbeDiffuse),
 			property("Override global size", &RenderScene::isEnvironmentProbeCustomSize, &RenderScene::enableEnvironmentProbeCustomSize),
 			var_property("Radiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::radiance_size),
 			var_property("Irradiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::irradiance_size)
