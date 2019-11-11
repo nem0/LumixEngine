@@ -2097,9 +2097,6 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 {
-	static constexpr int TEXTURE_SIZE = 1024;
-
-
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
 		, m_probes(app.getWorldEditor().getAllocator())
@@ -2266,13 +2263,18 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
 
+		bool diffuse_only = job.probe.flags.isSet(EnvironmentProbe::DIFFUSE);
+		diffuse_only = diffuse_only && !job.probe.flags.isSet(EnvironmentProbe::SPECULAR);
+		diffuse_only = diffuse_only && !job.probe.flags.isSet(EnvironmentProbe::REFLECTION);
+		const u32 texture_size = diffuse_only ? 32 : 1024;
+
 		Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.fov = degreesToRadians(90.f);
 		viewport.near = 0.1f;
 		viewport.far = 10'000;
-		viewport.w = TEXTURE_SIZE;
-		viewport.h = TEXTURE_SIZE;
+		viewport.w = texture_size;
+		viewport.h = texture_size;
 
 		Universe* universe = world_editor.getUniverse();
 		RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
@@ -2284,7 +2286,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
-		job.data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
+		job.data.resize(6 * texture_size * texture_size * 4);
 
 		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 		for (int i = 0; i < 6; ++i) {
@@ -2300,7 +2302,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 			const gpu::TextureHandle res = m_pipeline->getOutput();
 			ASSERT(res.isValid());
-			renderer->getTextureImage(res, TEXTURE_SIZE, TEXTURE_SIZE, &job.data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
+			renderer->getTextureImage(res, texture_size, texture_size, &job.data[i * texture_size * texture_size * 4]);
 		}
 
 		struct Job : Renderer::RenderJob {
@@ -2392,19 +2394,20 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	
 	void processData(ProbeJob& job) {
 		Array<u8>& data = job.data;
-		for (u32 i = 0; i < 6 * TEXTURE_SIZE * TEXTURE_SIZE; ++i) {
+		const u32 texture_size = (u32)sqrt(data.size() / 24);
+		for (u32 i = 0; i < (u32)data.size() / 4; ++i) {
 			swap(data[i * 4], data[i * 4 + 2]);
 		}
 				
 		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 		if (!ndc_bottom_left) {
 			for (int i = 0; i < 6; ++i) {
-				u32* tmp = (u32*)&data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
+				u32* tmp = (u32*)&data[i * texture_size * texture_size  * 4];
 				if (i == 2 || i == 3) {
-					flipY(tmp, TEXTURE_SIZE);
+					flipY(tmp, texture_size);
 				}
 				else {
-					flipX(tmp, TEXTURE_SIZE);
+					flipX(tmp, texture_size);
 				}
 			}
 		}
@@ -2412,12 +2415,13 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		cmft::Image image;	
 		cmft::Image irradiance;
 
-		cmft::imageCreate(image, TEXTURE_SIZE, TEXTURE_SIZE, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
+		cmft::imageCreate(image, texture_size, texture_size, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
 		memcpy(image.m_data, &job.data[0], job.data.byte_size());
 		cmft::imageToRgba32f(image);
 
-		if (job.probe.flags.isSet(EnvironmentProbe::DIFFUSE)) {
+		const bool save_diffuse = job.probe.flags.isSet(EnvironmentProbe::DIFFUSE);
+		if (save_diffuse) {
 			PROFILE_BLOCK("irradiance");
 			cmft::imageIrradianceFilterSh(irradiance, 32, image);
 			cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
@@ -2447,7 +2451,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		}
 		if (job.probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
 			for (int i = 3; i < job.data.size(); i += 4) job.data[i] = 0xff; 
-			saveCubemap(job.probe.guid, &job.data[0], TEXTURE_SIZE, "");
+			saveCubemap(job.probe.guid, &job.data[0], texture_size, "");
 		}
 
 		MT::memoryBarrier();
@@ -2476,6 +2480,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 				if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(probe.radiance->getPath(), true, false);
 			}
 			if (ImGui::Button("Generate")) generateCubemaps(false);
+			ImGui::SameLine();
 			if (ImGui::Button("Add bounce")) generateCubemaps(true);
 		}
 	}
