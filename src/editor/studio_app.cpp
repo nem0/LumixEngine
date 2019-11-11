@@ -2271,6 +2271,15 @@ public:
 			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
 		}
 
+		void visit(const Reflection::Property<IVec3>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
+
+			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
+			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+		}
+
 		void visit(const Reflection::Property<Vec4>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;

@@ -338,6 +338,10 @@ static void registerProperties(IAllocator& allocator)
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
 				ResourceAttribute("Mesh (*.msh)", Model::TYPE))
 		),
+		component("light_probe_grid",
+			var_property("Resolution", &RenderScene::getLightProbeGrid, &LightProbeGrid::resolution),
+			var_property("Scale", &RenderScene::getLightProbeGrid, &LightProbeGrid::scale)
+		),
 		component("environment",
 			var_property("Color", &RenderScene::getEnvironment, &Environment::m_diffuse_color, ColorAttribute()),
 			var_property("Intensity", &RenderScene::getEnvironment, &Environment::m_diffuse_intensity, MinAttribute(0)),

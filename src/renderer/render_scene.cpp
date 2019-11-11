@@ -52,6 +52,7 @@ static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
 static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
+static const ComponentType LIGHT_PROBE_GRID_TYPE = Reflection::getComponentType("light_probe_grid");
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 
 
@@ -627,9 +628,38 @@ public:
 	}
 
 
+	void serializeLightProbeGrid(ISerializer& serializer, EntityRef entity) {
+		const LightProbeGrid& lp = m_light_probe_grids[entity];
+		serializer.write("guid", lp.guid);
+		serializer.write("resolution", lp.resolution);
+		serializer.write("scale", lp.scale);
+	}
+
+	void loadLightProbeGridData(LightProbeGrid& lp) const {
+		StaticString<MAX_PATH_LENGTH> dir("universes/", m_universe.getName(), "/probes/");
+		StaticString<MAX_PATH_LENGTH> path_str(dir, lp.guid, "_0.dds");
+		ResourceManagerHub& manager = m_engine.getResourceManager();
+		lp.data[0] = manager.load<Texture>(Path(path_str));
+		path_str = dir; path_str << lp.guid << "_1.dds";
+		lp.data[1] = manager.load<Texture>(Path(path_str));
+		path_str = dir; path_str << lp.guid << "_2.dds";
+		lp.data[2] = manager.load<Texture>(Path(path_str));
+	}
+
+	void deserializeLightProbeGrid(IDeserializer& serializer, EntityRef entity, int scene_version) {
+		LightProbeGrid lp;
+		lp.entity = entity;
+		serializer.read(Ref(lp.guid));
+		serializer.read(Ref(lp.resolution));
+		serializer.read(Ref(lp.scale));
+		loadLightProbeGridData(lp);
+		m_light_probe_grids.insert(entity, lp);
+		m_universe.onComponentCreated(entity, LIGHT_PROBE_GRID_TYPE, this);
+	}
+
 	void serializeEnvironment(ISerializer& serializer, EntityRef entity)
 	{
-		Environment& light = m_environments[entity];
+		const Environment& light = m_environments[entity];
 		serializer.write("cascades", light.m_cascades);
 		serializer.write("diffuse_color", light.m_diffuse_color);
 		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
@@ -1195,6 +1225,16 @@ public:
 		}
 	}
 
+	void serializeLightProbeGrids(IOutputStream& serializer) {
+		const i32 count = m_light_probe_grids.size();
+		serializer.write(count);
+		for (auto iter : m_light_probe_grids) {
+			serializer.write(iter.entity);
+			serializer.write(iter.guid);
+			serializer.write(iter.resolution);
+			serializer.write(iter.scale);
+		}
+	}
 
 	void serializeEnvironmentProbes(IOutputStream& serializer)
 	{
@@ -1214,6 +1254,21 @@ public:
 		}
 	}
 
+	void deserializeLightProbeGrids(InputMemoryStream& serializer) {
+		i32 count;
+		serializer.read(count);
+		m_light_probe_grids.reserve(count);
+		for (i32 i = 0; i < count; ++i) {
+			LightProbeGrid lp;
+			serializer.read(lp.entity);
+			serializer.read(lp.guid);
+			serializer.read(lp.resolution);
+			serializer.read(lp.scale);
+			loadLightProbeGridData(lp);
+			m_light_probe_grids.insert(lp.entity, lp);
+			m_universe.onComponentCreated(lp.entity, LIGHT_PROBE_GRID_TYPE, this);
+		}
+	}
 
 	void deserializeEnvironmentProbes(InputMemoryStream& serializer)
 	{
@@ -1305,6 +1360,7 @@ public:
 		serializeParticleEmitters(serializer);
 		serializeBoneAttachments(serializer);
 		serializeEnvironmentProbes(serializer);
+		serializeLightProbeGrids(serializer);
 		serializeDecals(serializer);
 		serializeTextMeshes(serializer);
 	}
@@ -1412,6 +1468,7 @@ public:
 		deserializeParticleEmitters(serializer);
 		deserializeBoneAttachments(serializer);
 		deserializeEnvironmentProbes(serializer);
+		deserializeLightProbeGrids(serializer);
 		deserializeDecals(serializer);
 		deserializeTextMeshes(serializer);
 	}
@@ -1453,6 +1510,14 @@ public:
 		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
+	void destroyLightProbeGrid(EntityRef entity) {
+		const LightProbeGrid& lp = m_light_probe_grids[entity];
+		m_universe.onComponentDestroyed(entity, LIGHT_PROBE_GRID_TYPE, this);
+		for (Texture* t : lp.data) {
+			if (t) t->getResourceManager().unload(*t);
+		}
+		m_light_probe_grids.erase(entity);
+	}
 
 	void destroyEnvironment(EntityRef entity)
 	{
@@ -2746,7 +2811,10 @@ public:
 		line.to = to;
 		line.color = ARGBToABGR(color);
 	}
-
+	
+	LightProbeGrid& getLightProbeGrid(EntityRef entity) override {
+		return m_light_probe_grids[entity];
+	}
 
 	DebugTriangle* addDebugTriangles(int count)
 	{
@@ -3009,12 +3077,6 @@ public:
 	}
 
 
-	u64 getEnvironmentProbeGUID(EntityRef entity) const override
-	{
-		return m_environment_probes[entity].guid;
-	}
-
-
 	float getTime() const override { return m_time; }
 
 
@@ -3208,6 +3270,17 @@ public:
 
 	IAllocator& getAllocator() override { return m_allocator; }
 
+	void createLightProbeGrid(EntityRef entity) {
+		LightProbeGrid lp = {};
+		lp.entity = entity;
+		lp.guid = randGUID();
+		lp.resolution = IVec3(32, 8, 32);
+		lp.scale = Vec3(32.f, 8.f, 32.f);
+		loadLightProbeGridData(lp);
+		m_light_probe_grids.insert(entity, lp);
+
+		m_universe.onComponentCreated(entity, LIGHT_PROBE_GRID_TYPE, this);
+	}
 
 	void createEnvironment(EntityRef entity)
 	{
@@ -3377,6 +3450,7 @@ private:
 	Array<ModelInstance> m_model_instances;
 	Array<MeshSortData> m_mesh_sort_data;
 	HashMap<EntityRef, Environment> m_environments;
+	HashMap<EntityRef, LightProbeGrid> m_light_probe_grids;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera;
 	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
@@ -3419,6 +3493,7 @@ static struct
 } COMPONENT_INFOS[] = {
 	COMPONENT_TYPE(MODEL_INSTANCE_TYPE, ModelInstance),
 	COMPONENT_TYPE(ENVIRONMENT_TYPE, Environment),
+	COMPONENT_TYPE(LIGHT_PROBE_GRID_TYPE, LightProbeGrid),
 	COMPONENT_TYPE(POINT_LIGHT_TYPE, PointLight),
 	COMPONENT_TYPE(DECAL_TYPE, Decal),
 	COMPONENT_TYPE(CAMERA_TYPE, Camera),
@@ -3461,6 +3536,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
 	, m_mesh_sort_data(m_allocator)
+	, m_light_probe_grids(m_allocator)
 {
 
 	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);

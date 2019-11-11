@@ -59,6 +59,13 @@ struct TerrainInfo
 	int index;
 };
 
+struct LightProbeGrid {
+	EntityRef entity;
+	IVec3 resolution;
+	Vec3 scale;
+	u64 guid;
+	Texture* data[3] = {};
+};
 
 struct Environment
 {
@@ -227,6 +234,8 @@ public:
 	virtual Vec4 getShadowmapCascades(EntityRef entity) = 0;
 	virtual void setShadowmapCascades(EntityRef entity, const Vec4& value) = 0;
 
+	virtual LightProbeGrid& getLightProbeGrid(EntityRef entity) = 0;
+
 	virtual DebugTriangle* addDebugTriangles(int count) = 0;
 	virtual void addDebugTriangle(const DVec3& p0, const DVec3& p1, const DVec3& p2, u32 color) = 0;
 	virtual void addDebugCone(const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, u32 color) = 0;
@@ -347,7 +356,6 @@ public:
 	virtual Texture* getEnvironmentProbeTexture(EntityRef entity) const = 0;
 	virtual Texture* getEnvironmentProbeIrradiance(EntityRef entity) const = 0;
 	virtual Texture* getEnvironmentProbeRadiance(EntityRef entity) const = 0;
-	virtual u64 getEnvironmentProbeGUID(EntityRef entity) const = 0;
 	virtual float getEnvironmentProbeRadius(EntityRef entity) = 0;
 	virtual void setEnvironmentProbeRadius(EntityRef entity, float radius) = 0;
 

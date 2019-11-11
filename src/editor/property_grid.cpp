@@ -268,6 +268,20 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	}
 
 
+	void visit(const Reflection::Property<IVec3>& prop) override
+	{
+		if (skipProperty(prop)) return;
+		ComponentUID cmp = getComponent();
+		IVec3 value;
+		OutputMemoryStream blob(&value, sizeof(value));
+		prop.getValue(cmp, m_index, blob);
+		
+		if (ImGui::DragInt3(prop.name, &value.x)) {
+			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		}
+	}
+
+
 	void visit(const Reflection::Property<Vec4>& prop) override
 	{
 		if (skipProperty(prop)) return;

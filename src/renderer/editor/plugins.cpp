@@ -3392,6 +3392,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.registerComponent("camera", "Render / Camera");
 		m_app.registerComponent("environment", "Render / Environment");
+		m_app.registerComponent("light_probe_grid", "Render / Light probe grid");
 
 		m_app.registerComponentWithResource(
 			"model_instance", "Render / Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));

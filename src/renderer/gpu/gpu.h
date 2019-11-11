@@ -103,10 +103,10 @@ enum class BlendFactors : u8 {
 
 
 enum class AttributeType : u8 {
-	I8,
 	U8,
 	FLOAT,
-	I16
+	I16,
+	I8
 };
 
 
