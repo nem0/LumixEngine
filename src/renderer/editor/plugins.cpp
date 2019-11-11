@@ -2232,6 +2232,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		for (const EntityRef& p : probes) {
 			m_probes.push(p);
 		}
+		m_probe_counter += m_probes.size();
 	}
 
 
@@ -2339,6 +2340,29 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 	void update() override
 	{
+		if (!m_probes.empty() || m_in_progress) {
+			const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
+
+			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f, 30));
+			ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
+			ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
+			ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
+				| ImGuiWindowFlags_AlwaysAutoResize
+				| ImGuiWindowFlags_NoMove
+				| ImGuiWindowFlags_NoSavedSettings;
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
+			if (ImGui::Begin("Env probe generation", nullptr, flags)) {
+				u32 count = m_probes.size() + (m_in_progress ? 1 : 0);
+				ImGui::Text("%s", "Generating probes...");
+				ImGui::ProgressBar(((float)m_probe_counter - count) / m_probe_counter, ImVec2(-1, 0), StaticString<64>(m_probe_counter - count, " / ", m_probe_counter));
+			}
+			ImGui::End();
+			ImGui::PopStyleVar();
+		}
+		else {
+			m_probe_counter = 0;
+		}
+
 		if (m_reload_probes && !m_in_progress) {
 			m_reload_probes = false;
 			Universe* universe = m_app.getWorldEditor().getUniverse();
@@ -2461,6 +2485,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	bool m_fast_filtering;
 	u64 m_probe_guid;
 	Array<EntityRef> m_probes;
+	u32 m_probe_counter = 0;
 
 	JobSystem::SignalHandle m_signal = JobSystem::INVALID_HANDLE;
 

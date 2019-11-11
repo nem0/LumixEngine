@@ -3372,7 +3372,6 @@ public:
 		probe.radius = 1;
 		probe.flags.set(EnvironmentProbe::ENABLED);
 		probe.flags.set(EnvironmentProbe::DIFFUSE);
-		probe.flags.set(EnvironmentProbe::SPECULAR);
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
