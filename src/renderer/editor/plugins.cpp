@@ -2102,7 +2102,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
-		, m_data(app.getWorldEditor().getAllocator())
 		, m_probes(app.getWorldEditor().getAllocator())
 	{
 		WorldEditor& world_editor = app.getWorldEditor();
@@ -2112,18 +2111,11 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		IAllocator& allocator = world_editor.getAllocator();
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
-
-		m_cl_context = nullptr; // cmft::clLoad() > 0 ? cmft::clInit() : nullptr;
 	}
 
 
 	~EnvironmentProbePlugin()
 	{
-		if (m_cl_context)
-		{
-			cmft::clDestroy(m_cl_context);
-			cmft::clUnload();
-		}
 		Pipeline::destroy(m_pipeline);
 	}
 
@@ -2184,7 +2176,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	}
 
 
-	void flipY(u32* data, int texture_size)
+	static void flipY(u32* data, int texture_size)
 	{
 		for (int y = 0; y < texture_size / 2; ++y)
 		{
@@ -2198,7 +2190,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	}
 
 
-	void flipX(u32* data, int texture_size)
+	static void flipX(u32* data, int texture_size)
 	{
 		for (int y = 0; y < texture_size; ++y)
 		{
@@ -2214,7 +2206,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 
 	void generateCubemaps(bool bounce) {
-		ASSERT(!m_in_progress);
 		ASSERT(m_probes.empty());
 
 		// TODO block user interaction
@@ -2229,40 +2220,52 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
 		const Span<EntityRef> probes = scene->getAllEnvironmentProbes();
 		m_probes.reserve(probes.length());
-		for (const EntityRef& p : probes) {
-			m_probes.push(p);
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		for (EntityRef p : probes) {
+			ProbeJob* job = LUMIX_NEW(m_app.getWorldEditor().getAllocator(), ProbeJob)(*this, p, allocator);
+			
+			const EntityPtr env_entity = scene->getActiveEnvironment();
+			job->probe = scene->getEnvironmentProbe(p);
+			job->position = universe->getPosition(p);
+			job->universe_name = universe->getName();
+			if (env_entity.isValid()) {
+				const Environment env = scene->getEnvironment((EntityRef)env_entity);
+				job->fast_filtering = env.flags.isSet(Environment::FAST_FILTERING);
+			}
+
+			m_probes.push(job);
 		}
 		m_probe_counter += m_probes.size();
 	}
 
+	struct ProbeJob {
+		ProbeJob(EnvironmentProbePlugin& plugin, EntityRef& entity, IAllocator& allocator) 
+			: entity(entity)
+			, data(allocator)
+			, plugin(plugin)
+		{}
+		
+		StaticString<MAX_PATH_LENGTH> universe_name;
+		EntityRef entity;
+		EnvironmentProbe probe;
+		EnvironmentProbePlugin& plugin;
+		DVec3 position;
+		bool fast_filtering = false;
 
-	void generateCubemap(EntityRef entity)
-	{
-		ASSERT(!m_in_progress);
+		Array<u8> data;
+		bool render_dispatched = false;
+		bool done = false;
+		bool done_counted = false;
+	};
 
-		Universe* universe = m_app.getWorldEditor().getUniverse();
-		if (universe->getName()[0] == '\0') {
-			logError("Editor") << "Universe must be saved before environment probe can be generated.";
-			return;
-		}
-
-		m_in_progress = true;
+	void render(ProbeJob& job) {
 		MT::memoryBarrier();
 
 		WorldEditor& world_editor = m_app.getWorldEditor();
 		Engine& engine = world_editor.getEngine();
 		auto& plugin_manager = engine.getPluginManager();
 		IAllocator& allocator = engine.getAllocator();
-		auto* scene = static_cast<RenderScene*>(universe->getScene(CAMERA_TYPE));
-		const EntityPtr env_entity = scene->getActiveEnvironment();
-		m_fast_filtering = false;
-		if (env_entity.isValid()) {
-			const Environment env = scene->getEnvironment((EntityRef)env_entity);
-			m_fast_filtering = env.flags.isSet(Environment::FAST_FILTERING);
-		}
-		const EnvironmentProbe& probe = scene->getEnvironmentProbe(entity);
 
-		const DVec3 probe_position = universe->getPosition(entity);
 		Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.fov = degreesToRadians(90.f);
@@ -2271,6 +2274,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		viewport.w = TEXTURE_SIZE;
 		viewport.h = TEXTURE_SIZE;
 
+		Universe* universe = world_editor.getUniverse();
+		RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
 		m_pipeline->setScene(scene);
 		m_pipeline->setViewport(viewport);
 
@@ -2279,7 +2284,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
-		m_data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
+		job.data.resize(6 * TEXTURE_SIZE * TEXTURE_SIZE * 4);
 
 		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 		for (int i = 0; i < 6; ++i) {
@@ -2288,59 +2293,37 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			mtx.setZVector(dirs[i]);
 			mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
 			mtx.setXVector(side);
-			viewport.pos = probe_position;
+			viewport.pos = job.position;
 			viewport.rot = mtx.getRotation();
 			m_pipeline->setViewport(viewport);
 			m_pipeline->render(false);
 
 			const gpu::TextureHandle res = m_pipeline->getOutput();
 			ASSERT(res.isValid());
-			renderer->getTextureImage(res, TEXTURE_SIZE, TEXTURE_SIZE, &m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
+			renderer->getTextureImage(res, TEXTURE_SIZE, TEXTURE_SIZE, &job.data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4]);
 		}
 
-		renderer->frame();
-		renderer->waitForRender();
+		struct Job : Renderer::RenderJob {
+			Job(ProbeJob& job) : job(job) {}
 
-		for (u32 i = 0; i < 6 * TEXTURE_SIZE * TEXTURE_SIZE; ++i) {
-			swap(m_data[i * 4], m_data[i * 4 + 2]);
-		}
-
-		if (!ndc_bottom_left) {
-			for (int i = 0; i < 6; ++i) {
-				u32* tmp = (u32*)&m_data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
-				if (i == 2 || i == 3) {
-					flipY(tmp, TEXTURE_SIZE);
-				}
-				else {
-					flipX(tmp, TEXTURE_SIZE);
-				}
+			void setup() override {}
+			void execute() override {
+				JobSystem::run(&job, [](void* ptr) {
+					ProbeJob* pjob = (ProbeJob*)ptr;
+					pjob->plugin.processData(*pjob);
+				}, nullptr);
 			}
-		}
+			ProbeJob& job;
+		};
 
-		m_irradiance_size = 32;
-		m_radiance_size = 128;
-		m_reflection_size = TEXTURE_SIZE;
-
-		if (probe.flags.isSet(EnvironmentProbe::OVERRIDE_GLOBAL_SIZE)) {
-			m_irradiance_size = probe.irradiance_size;
-			m_radiance_size = probe.radiance_size;
-			// TODO the size of m_data should be m_reflection_size^2 instead of TEXTURE_SIZE^2
-			m_reflection_size = probe.reflection_size;
-		}
-		m_save_reflection = probe.flags.isSet(EnvironmentProbe::REFLECTION);
-		m_save_specular = probe.flags.isSet(EnvironmentProbe::SPECULAR);
-		m_save_diffuse = probe.flags.isSet(EnvironmentProbe::DIFFUSE);
-		m_probe_guid = probe.guid;
-
-		JobSystem::run(this, [](void* ptr) {
-			((EnvironmentProbePlugin*)ptr)->processData();
-		}, &m_signal);
+		Job* rjob = LUMIX_NEW(renderer->getAllocator(), Job)(job);
+		renderer->queue(rjob, 0);
 	}
 
 
 	void update() override
 	{
-		if (!m_probes.empty() || m_in_progress) {
+		if (m_done_counter != m_probe_counter) {
 			const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
 
 			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f, 30));
@@ -2352,67 +2335,97 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 				| ImGuiWindowFlags_NoSavedSettings;
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
 			if (ImGui::Begin("Env probe generation", nullptr, flags)) {
-				u32 count = m_probes.size() + (m_in_progress ? 1 : 0);
 				ImGui::Text("%s", "Generating probes...");
-				ImGui::ProgressBar(((float)m_probe_counter - count) / m_probe_counter, ImVec2(-1, 0), StaticString<64>(m_probe_counter - count, " / ", m_probe_counter));
+				ImGui::Text("%s", "Manipulating with entities at this time can produce incorrect probes.");
+				ImGui::ProgressBar(((float)m_done_counter) / m_probe_counter, ImVec2(-1, 0), StaticString<64>(m_done_counter, " / ", m_probe_counter));
 			}
 			ImGui::End();
 			ImGui::PopStyleVar();
 		}
 		else {
 			m_probe_counter = 0;
+			m_done_counter = 0;
 		}
 
-		if (m_reload_probes && !m_in_progress) {
-			m_reload_probes = false;
-			Universe* universe = m_app.getWorldEditor().getUniverse();
-			const char* universe_name = universe->getName();
-			auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
-			const Span<EntityRef> probes = scene->getAllEnvironmentProbes();
-			
-			auto move = [universe_name](u64 guid, const char* postfix){
-				const StaticString<MAX_PATH_LENGTH> tmp_path("universes/", universe_name, "/probes_tmp/", guid, postfix, ".dds");
-				const StaticString<MAX_PATH_LENGTH> path("universes/", universe_name, "/probes/", guid, postfix, ".dds");
-				if (!OS::fileExists(tmp_path)) return;
-				if (!OS::moveFile(tmp_path, path)) {
-					logError("Editor") << "Failed to move file " << tmp_path;
-				}
-			};
-
-			for (EntityRef e : probes) {
-				const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
-				move(probe.guid, "");
-				move(probe.guid, "_radiance");
-				move(probe.guid, "_irradiance");
+		for (ProbeJob* j : m_probes) {
+			if (!j->render_dispatched) {
+				j->render_dispatched = true;
+				render(*j);
+				break;
 			}
 		}
-		else if (!m_probes.empty() && !m_in_progress) {
-			const EntityRef e = m_probes.back();
-			m_probes.pop();
-			generateCubemap(e);
 
-			if (m_probes.empty()) m_reload_probes = true;
+		MT::memoryBarrier();
+		for (ProbeJob* j : m_probes) {
+			if (j->done && !j->done_counted) {
+				j->done_counted = true;
+				++m_done_counter;
+			}
+		}
+
+		if (m_done_counter == m_probe_counter) {
+			while (!m_probes.empty()) {
+				ProbeJob& job = *m_probes.back();
+				m_probes.pop();
+				ASSERT(job.done);
+				ASSERT(job.done_counted);
+
+				auto move = [job](u64 guid, const char* postfix){
+					const StaticString<MAX_PATH_LENGTH> tmp_path("universes/", job.universe_name, "/probes_tmp/", guid, postfix, ".dds");
+					const StaticString<MAX_PATH_LENGTH> path("universes/", job.universe_name, "/probes/", guid, postfix, ".dds");
+					if (!OS::fileExists(tmp_path)) return;
+					if (!OS::moveFile(tmp_path, path)) {
+						logError("Editor") << "Failed to move file " << tmp_path;
+					}
+				};
+
+				move(job.probe.guid, "");
+				move(job.probe.guid, "_radiance");
+				move(job.probe.guid, "_irradiance");
+
+				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+				LUMIX_DELETE(allocator, &job);
+			}
 		}
 	}
 
-	void processData() {
+	
+	void processData(ProbeJob& job) {
+		Array<u8>& data = job.data;
+		for (u32 i = 0; i < 6 * TEXTURE_SIZE * TEXTURE_SIZE; ++i) {
+			swap(data[i * 4], data[i * 4 + 2]);
+		}
+				
+		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
+		if (!ndc_bottom_left) {
+			for (int i = 0; i < 6; ++i) {
+				u32* tmp = (u32*)&data[i * TEXTURE_SIZE * TEXTURE_SIZE * 4];
+				if (i == 2 || i == 3) {
+					flipY(tmp, TEXTURE_SIZE);
+				}
+				else {
+					flipX(tmp, TEXTURE_SIZE);
+				}
+			}
+		}
+
 		cmft::Image image;	
 		cmft::Image irradiance;
 
 		cmft::imageCreate(image, TEXTURE_SIZE, TEXTURE_SIZE, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA8);
 		cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
-		memcpy(image.m_data, &m_data[0], m_data.byte_size());
+		memcpy(image.m_data, &job.data[0], job.data.byte_size());
 		cmft::imageToRgba32f(image);
 
-		if (m_save_diffuse) {
+		if (job.probe.flags.isSet(EnvironmentProbe::DIFFUSE)) {
 			PROFILE_BLOCK("irradiance");
 			cmft::imageIrradianceFilterSh(irradiance, 32, image);
 			cmft::imageFromRgba32f(irradiance, cmft::TextureFormat::RGBA8);
-			saveCubemap(m_probe_guid, (u8*)irradiance.m_data, m_irradiance_size, "_irradiance");
+			saveCubemap(job.probe.guid, (u8*)irradiance.m_data, 32, "_irradiance");
 		}
 		// TODO do not override mipmaps if slow filter is used
-		if (m_save_specular) {
-			if (m_fast_filtering) {
+		if (job.probe.flags.isSet(EnvironmentProbe::SPECULAR)) {
+			if (job.fast_filtering) {
 				cmft::imageResize(image, 128, 128);
 			}
 			else {
@@ -2426,20 +2439,19 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 					, 10
 					, 1
 					, cmft::EdgeFixup::None
-					, m_cl_context ? 0 : MT::getCPUsCount()
-					, m_cl_context
+					, MT::getCPUsCount()
 				);
 			}
 			cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
-			saveCubemap(m_probe_guid, (u8*)image.m_data, m_radiance_size, "_radiance");
+			saveCubemap(job.probe.guid, (u8*)image.m_data, 128, "_radiance");
 		}
-		if (m_save_reflection) {
-			for (int i = 3; i < m_data.size(); i += 4) m_data[i] = 0xff; 
-			saveCubemap(m_probe_guid, &m_data[0], m_reflection_size, "");
+		if (job.probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
+			for (int i = 3; i < job.data.size(); i += 4) job.data[i] = 0xff; 
+			saveCubemap(job.probe.guid, &job.data[0], TEXTURE_SIZE, "");
 		}
 
 		MT::memoryBarrier();
-		m_in_progress = false;
+		job.done = true;
 	}
 
 
@@ -2448,7 +2460,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 		const EntityRef e = (EntityRef)cmp.entity;
 		auto* scene = static_cast<RenderScene*>(cmp.scene);
-		if (m_in_progress) ImGui::Text("Generating...");
+		if (m_probe_counter) ImGui::Text("Generating...");
 		else {
 			const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
 			if (probe.texture && probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
@@ -2472,25 +2484,10 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	StudioApp& m_app;
 	Pipeline* m_pipeline;
 	
-	Array<u8> m_data;
-	bool m_in_progress = false;
-	bool m_reload_probes = false;
-	int m_irradiance_size;
-	int m_radiance_size;
-	int m_reflection_size;
-	bool m_save_reflection;
-	bool m_save_specular;
-	bool m_save_diffuse;
-	// to be used with http://casual-effects.blogspot.com/2011/08/plausible-environment-lighting-in-two.html
-	bool m_fast_filtering;
-	u64 m_probe_guid;
-	Array<EntityRef> m_probes;
+	// TODO to be used with http://casual-effects.blogspot.com/2011/08/plausible-environment-lighting-in-two.html
+	Array<ProbeJob*> m_probes;
+	u32 m_done_counter = 0;
 	u32 m_probe_counter = 0;
-
-	JobSystem::SignalHandle m_signal = JobSystem::INVALID_HANDLE;
-
-
-	cmft::ClContext* m_cl_context;
 };
 
 
