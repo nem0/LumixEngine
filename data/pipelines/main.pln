@@ -147,6 +147,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 		endBlock()
 	end
 	
+	beginBlock("direct")
 	drawArray(0, 4, deferred_shader,
 	{
 		gbuffer0,
