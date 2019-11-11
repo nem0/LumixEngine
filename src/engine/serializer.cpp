@@ -91,6 +91,11 @@ void TextSerializer::write(const char* label, const DVec3& value)
 		 << asU64(value.y) << "\n\t" << asU64(value.z) << "\n";
 }
 
+void TextSerializer::write(const char* label, const IVec3& value)
+{
+	blob << "#" << label << "\n\t" << value.x << "\n\t" << value.y << "\n\t" << value.z << "\n";
+}
+
 void TextSerializer::write(const char* label, const Vec4& value)
 {
 	blob << "#" << label << " (" << value.x << ", " << value.y << ", " << value.z << ", " << value.w << ")\n\t"
@@ -237,6 +242,36 @@ void TextDeserializer::read(Ref<Transform> value)
 	value->scale = asFloat(readU32());
 }
 
+i32 TextDeserializer::readI32()
+{
+	char tmp[20];
+	char* c = tmp;
+	*c = blob.readChar();
+	if (*c == '-')
+	{
+		++c;
+		*c = blob.readChar();
+	}
+	while (*c >= '0' && *c <= '9' && (c - tmp) < lengthOf(tmp))
+	{
+		++c;
+		*c = blob.readChar();
+	}
+	*c = 0;
+	i32 value;
+	fromCString(Span(tmp), Ref(value));
+	return value;
+}
+
+void TextDeserializer::read(Ref<IVec3> value)
+{
+	skip();
+	value->x = readI32();
+	skip();
+	value->y = readI32();
+	skip();
+	value->z = readI32();
+}
 
 void TextDeserializer::read(Ref<Vec3> value)
 {

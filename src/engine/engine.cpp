@@ -638,6 +638,18 @@ public:
 		}
 
 
+		void visit(const Reflection::Property<IVec3>& prop) override
+		{
+			if (!equalStrings(property_name, prop.name)) return;
+			if (lua_istable(L, -1))
+			{
+				auto v = LuaWrapper::toType<IVec3>(L, -1);
+				InputMemoryStream input_blob(&v, sizeof(v));
+				prop.setValue(cmp, -1, input_blob);
+			}
+		}
+
+
 		void visit(const Reflection::Property<Vec4>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;

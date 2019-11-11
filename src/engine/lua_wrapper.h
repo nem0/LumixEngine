@@ -130,6 +130,7 @@ template <typename T> inline T toType(lua_State* L, int index)
 {
 	return (T)lua_touserdata(L, index);
 }
+
 template <typename T, typename F> bool forEachArrayItem(lua_State* L, int index, const char* error_msg, F&& func)
 {
 	if (!lua_istable(L, index)) {
@@ -194,6 +195,20 @@ template <> inline Vec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	lua_rawgeti(L, index, 3);
 	v.z = (float)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	return v;
+}
+template <> inline IVec3 toType(lua_State* L, int index)
+{
+	IVec3 v;
+	lua_rawgeti(L, index, 1);
+	v.x = (int)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 2);
+	v.y = (int)lua_tonumber(L, -1);
+	lua_pop(L, 1);
+	lua_rawgeti(L, index, 3);
+	v.z = (int)lua_tonumber(L, -1);
 	lua_pop(L, 1);
 	return v;
 }
@@ -499,6 +514,19 @@ inline void push(lua_State* L, const IVec2& value)
 
 	lua_pushinteger(L, value.y);
 	lua_rawseti(L, -2, 2);
+}
+inline void push(lua_State* L, const IVec3& value)
+{
+	lua_createtable(L, 3, 0);
+
+	lua_pushinteger(L, value.x);
+	lua_rawseti(L, -2, 1);
+
+	lua_pushinteger(L, value.y);
+	lua_rawseti(L, -2, 2);
+
+	lua_pushinteger(L, value.z);
+	lua_rawseti(L, -2, 3);
 }
 inline void push(lua_State* L, const Vec3& value)
 {

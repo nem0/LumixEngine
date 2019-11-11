@@ -15,6 +15,7 @@ struct Quat;
 struct RigidTransform;
 class String;
 struct Transform;
+struct IVec3;
 struct Vec3;
 struct Vec4;
 
@@ -55,6 +56,7 @@ struct LUMIX_ENGINE_API ISerializer
 	virtual void write(const char* label, const Vec4& value) = 0;
 	virtual void write(const char* label, const DVec3& value) = 0;
 	virtual void write(const char* label, const Vec3& value) = 0;
+	virtual void write(const char* label, const IVec3& value) = 0;
 	virtual void write(const char* label, const Quat& value) = 0;
 	virtual void write(const char* label, float value) = 0;
 	virtual void write(const char* label, double value) = 0;
@@ -83,6 +85,7 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(Ref<Vec4> value) = 0;
 	virtual void read(Ref<DVec3> value) = 0;
 	virtual void read(Ref<Vec3> value) = 0;
+	virtual void read(Ref<IVec3> value) = 0;
 	virtual void read(Ref<Quat> value) = 0;
 	virtual void read(Ref<float> value) = 0;
 	virtual void read(Ref<double> value) = 0;
@@ -116,6 +119,7 @@ struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
 	void write(const char* label, const Vec4& value)  override;
 	void write(const char* label, const DVec3& value)  override;
 	void write(const char* label, const Vec3& value)  override;
+	void write(const char* label, const IVec3& value)  override;
 	void write(const char* label, const Quat& value)  override;
 	void write(const char* label, float value)  override;
 	void write(const char* label, double value)  override;
@@ -151,6 +155,7 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	void read(Ref<Vec4> value)  override;
 	void read(Ref<DVec3> value)  override;
 	void read(Ref<Vec3> value)  override;
+	void read(Ref<IVec3> value)  override;
 	void read(Ref<Quat> value)  override;
 	void read(Ref<float> value)  override;
 	void read(Ref<double> value)  override;
@@ -168,6 +173,7 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 
 	void skip();
 	u32 readU32();
+	i32 readI32();
 	u64 readU64();
 
 	InputMemoryStream& blob;

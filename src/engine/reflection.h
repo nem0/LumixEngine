@@ -23,6 +23,7 @@ struct IAllocator;
 class Path;
 class PropertyDescriptorBase;
 struct IVec2;
+struct IVec3;
 struct Vec2;
 struct Vec3;
 struct Vec4;
@@ -262,6 +263,7 @@ struct IPropertyVisitor
 	virtual void visit(const Property<IVec2>& prop) = 0;
 	virtual void visit(const Property<Vec2>& prop) = 0;
 	virtual void visit(const Property<Vec3>& prop) = 0;
+	virtual void visit(const Property<IVec3>& prop) = 0;
 	virtual void visit(const Property<Vec4>& prop) = 0;
 	virtual void visit(const Property<Path>& prop) = 0;
 	virtual void visit(const Property<bool>& prop) = 0;
@@ -285,6 +287,7 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 	void visit(const Property<IVec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec3>& prop) override { visitProperty(prop); }
+	void visit(const Property<IVec3>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec4>& prop) override { visitProperty(prop); }
 	void visit(const Property<Path>& prop) override { visitProperty(prop); }
 	void visit(const Property<bool>& prop) override { visitProperty(prop); }
