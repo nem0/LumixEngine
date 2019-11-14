@@ -67,6 +67,7 @@ static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("envi
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
+static const ComponentType LIGHT_PROBE_GRID_TYPE = Reflection::getComponentType("light_probe_grid");
 
 
 static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
@@ -2094,6 +2095,26 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 };
 
+struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
+	LightProbeGridPlugin(StudioApp& app)
+		: m_app(app)
+	{}
+	
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
+		if (cmp.type != LIGHT_PROBE_GRID_TYPE) return;
+
+		if (ImGui::CollapsingHeader("Generator")) {
+			if (ImGui::Button("Generate")) generate(cmp, false);
+			if (ImGui::Button("Add bounce")) generate(cmp, true);
+		}
+	}
+
+	void generate(ComponentUID cmp, bool bounce) {
+	
+	}
+
+	StudioApp& m_app;
+};
 
 struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 {
@@ -3303,6 +3324,16 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 struct GizmoPlugin final : public WorldEditor::Plugin
 {
+	void showLightProbeGridGizmo(ComponentUID cmp) {
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		const Universe& universe = scene->getUniverse();
+		EntityRef e = (EntityRef)cmp.entity;
+		const LightProbeGrid& lpg = scene->getLightProbeGrid(e);
+		const DVec3 pos = universe.getPosition(e);
+
+		scene->addDebugCube(pos - lpg.scale, pos + lpg.scale, 0xff0000ff);
+	}
+
 	void showEnvironmentProbeGizmo(ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		const Universe& universe = scene->getUniverse();
@@ -3408,6 +3439,10 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		}
 		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
 			showEnvironmentProbeGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == LIGHT_PROBE_GRID_TYPE) {
+			showLightProbeGridGizmo(cmp);
 			return true;
 		}
 		return false;
@@ -3601,9 +3636,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_texture_plugin);
 
 		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(m_app);
+		m_light_probe_grid_plugin = LUMIX_NEW(allocator, LightProbeGridPlugin)(m_app);
 		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(m_app);
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(*m_env_probe_plugin);
+		property_grid.addPlugin(*m_light_probe_grid_plugin);
 		property_grid.addPlugin(*m_terrain_plugin);
 
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
@@ -3650,9 +3687,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
 		property_grid.removePlugin(*m_env_probe_plugin);
+		property_grid.removePlugin(*m_light_probe_grid_plugin);
 		property_grid.removePlugin(*m_terrain_plugin);
 
 		LUMIX_DELETE(allocator, m_env_probe_plugin);
+		LUMIX_DELETE(allocator, m_light_probe_grid_plugin);
 		LUMIX_DELETE(allocator, m_terrain_plugin);
 
 		m_app.removePlugin(*m_scene_view);
@@ -3678,6 +3717,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	TexturePlugin* m_texture_plugin;
 	ShaderPlugin* m_shader_plugin;
 	EnvironmentProbePlugin* m_env_probe_plugin;
+	LightProbeGridPlugin* m_light_probe_grid_plugin;
 	TerrainPlugin* m_terrain_plugin;
 	SceneView* m_scene_view;
 	GameView* m_game_view;
