@@ -1021,6 +1021,7 @@ struct PipelineImpl final : Pipeline
 			{"srgb", gpu::TextureFormat::SRGB},
 			{"rgba16", gpu::TextureFormat::RGBA16},
 			{"rgba16f", gpu::TextureFormat::RGBA16F},
+			{"rgba32f", gpu::TextureFormat::RGBA32F},
 			{"r16f", gpu::TextureFormat::R16F},
 			{"r16", gpu::TextureFormat::R16},
 			{"r8", gpu::TextureFormat::R8},
@@ -1443,7 +1444,7 @@ struct PipelineImpl final : Pipeline
 				for (i32 i = m_probes.size() - 1; i >= 0; --i) {
 					const EnvProbeInfo& probe = m_probes[i]; 
 					if (!probe.radiance.isValid() && m_specular) m_probes.swapAndPop(i);
-					else if (!probe.irradiance.isValid() && !m_specular) m_probes.swapAndPop(i);
+					else if (!probe.use_irradiance && !m_specular) m_probes.swapAndPop(i);
 				}
 			}
 
@@ -1460,11 +1461,21 @@ struct PipelineImpl final : Pipeline
 				const DVec3 cam_pos = m_camera_params.pos;
 				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 				for (const EnvProbeInfo& probe : m_probes) {
-					const Vec4 pos_radius((probe.position - cam_pos).toFloat(), probe.radius);
-					gpu::bindTextures(m_specular ? &probe.radiance : &probe.irradiance, 15, 1);
-					gpu::update(m_pipeline->m_drawcall_ub, &pos_radius.x, sizeof(pos_radius));
+					Vec4* dc_mem = (Vec4*)gpu::map(m_pipeline->m_drawcall_ub, sizeof(Vec4) * 11);
+					dc_mem[0] = Vec4((probe.position - cam_pos).toFloat(), 0);
+					dc_mem[1] = Vec4(probe.half_extents, 0);
+					if (m_specular) {
+						gpu::bindTextures(&probe.radiance, 15, 1);
+					}
+					else {
+						for (u32 i = 0; i < 9; ++i) {
+							dc_mem[2 + i] = Vec4(probe.sh_coefs[i], 0);
+						}
+					}
+
+					gpu::unmap(m_pipeline->m_drawcall_ub);
 					
-					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.radius * SQRT2);
+					const bool intersecting = m_camera_params.frustum.intersectNearPlane(probe.position, probe.half_extents.length());
 					const u64 state = intersecting
 						? (u64)gpu::StateFlags::CULL_FRONT
 						: (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK;
@@ -3322,7 +3333,7 @@ struct PipelineImpl final : Pipeline
 				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
 				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
 				gpu::copy(staging, handle);
-				gpu::readTexture(staging, pixels.byte_size(), pixels.begin());
+				gpu::readTexture(staging, gpu::TextureFormat::RGBA8, Span((u8*)pixels.begin(), pixels.byte_size()));
 				gpu::destroy(staging);
 
 				OS::OutputFile file;

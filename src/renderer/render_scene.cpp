@@ -265,9 +265,8 @@ public:
 
 		for (auto& probe : m_environment_probes)
 		{
-			if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
+			if (probe.reflection) probe.reflection->getResourceManager().unload(*probe.reflection);
 			if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
-			if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
 		}
 		m_environment_probes.clear();
 	}
@@ -1024,10 +1023,18 @@ public:
 		EnvironmentProbe& probe = m_environment_probes[entity];
 		serializer.write("guid", probe.guid);
 		serializer.write("flags", probe.flags.base);
-		serializer.write("radius", probe.radius);
+		serializer.write("half_extents", probe.half_extents);
 		serializer.write("radiance_size", probe.radiance_size);
-		serializer.write("irradiance_size", probe.irradiance_size);
 		serializer.write("reflection_size", probe.reflection_size);
+		serializer.write("sh_coef0", probe.sh_coefs[0]);
+		serializer.write("sh_coef1", probe.sh_coefs[1]);
+		serializer.write("sh_coef2", probe.sh_coefs[2]);
+		serializer.write("sh_coef3", probe.sh_coefs[3]);
+		serializer.write("sh_coef4", probe.sh_coefs[4]);
+		serializer.write("sh_coef5", probe.sh_coefs[5]);
+		serializer.write("sh_coef6", probe.sh_coefs[6]);
+		serializer.write("sh_coef7", probe.sh_coefs[7]);
+		serializer.write("sh_coef8", probe.sh_coefs[8]);
 	}
 
 
@@ -1041,22 +1048,30 @@ public:
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		serializer.read(Ref(probe.guid));
 		serializer.read(Ref(probe.flags.base));
-		serializer.read(Ref(probe.radius));
+		serializer.read(Ref(probe.half_extents));
 		serializer.read(Ref(probe.radiance_size));
-		serializer.read(Ref(probe.irradiance_size));
 		serializer.read(Ref(probe.reflection_size));
+		serializer.read(Ref(probe.sh_coefs[0]));
+		serializer.read(Ref(probe.sh_coefs[1]));
+		serializer.read(Ref(probe.sh_coefs[2]));
+		serializer.read(Ref(probe.sh_coefs[3]));
+		serializer.read(Ref(probe.sh_coefs[4]));
+		serializer.read(Ref(probe.sh_coefs[5]));
+		serializer.read(Ref(probe.sh_coefs[6]));
+		serializer.read(Ref(probe.sh_coefs[7]));
+		serializer.read(Ref(probe.sh_coefs[8]));
 
-		StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
-		
-		probe.texture = nullptr;
+		ASSERT(probe.reflection == nullptr);
 		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
-			probe.texture = manager.load<Texture>(Path(path_str));
+			StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
+			probe.reflection = manager.load<Texture>(Path(path_str));
 		}
-		
-		StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
-		probe.irradiance = manager.load<Texture>(Path(irr_path_str));
-		StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
-		probe.radiance = manager.load<Texture>(Path(r_path_str));
+
+		ASSERT(probe.radiance == nullptr);
+		if (probe.flags.isSet(EnvironmentProbe::SPECULAR)) {
+			StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
+			probe.radiance = manager.load<Texture>(Path(r_path_str));
+		}
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}
@@ -1245,12 +1260,12 @@ public:
 			EntityRef entity = m_environment_probes.getKey(i);
 			serializer.write(entity);
 			const EnvironmentProbe& probe = m_environment_probes.at(i);
-			serializer.write(probe.radius);
 			serializer.write(probe.guid);
 			serializer.write(probe.flags.base);
+			serializer.write(probe.half_extents);
 			serializer.write(probe.radiance_size);
-			serializer.write(probe.irradiance_size);
 			serializer.write(probe.reflection_size);
+			serializer.write(probe.sh_coefs);
 		}
 	}
 
@@ -1282,22 +1297,23 @@ public:
 			EntityRef entity;
 			serializer.read(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
-			serializer.read(probe.radius);
 			serializer.read(probe.guid);
 			serializer.read(probe.flags.base);
+			serializer.read(probe.half_extents);
 			serializer.read(probe.radiance_size);
-			serializer.read(probe.irradiance_size);
 			serializer.read(probe.reflection_size);
-			probe.texture = nullptr;
-			if (probe.flags.isSet(EnvironmentProbe::REFLECTION))
-			{
+			serializer.read(probe.sh_coefs);
+			ASSERT(probe.reflection == nullptr);
+			if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
 				StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
-				probe.texture = manager.load<Texture>(Path(path_str));
+				probe.reflection = manager.load<Texture>(Path(path_str));
 			}
-			StaticString<MAX_PATH_LENGTH> irr_path_str(probe_dir, probe.guid, "_irradiance.dds");
-			probe.irradiance = manager.load<Texture>(Path(irr_path_str));
-			StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
-			probe.radiance = manager.load<Texture>(Path(r_path_str));
+			
+			ASSERT(probe.radiance == nullptr);
+			if (probe.flags.isSet(EnvironmentProbe::SPECULAR)) {
+				StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
+				probe.radiance = manager.load<Texture>(Path(r_path_str));
+			}
 
 			m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 		}
@@ -1491,8 +1507,7 @@ public:
 	void destroyEnvironmentProbe(EntityRef entity)
 	{
 		auto& probe = m_environment_probes[entity];
-		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
-		if (probe.irradiance) probe.irradiance->getResourceManager().unload(*probe.irradiance);
+		if (probe.reflection) probe.reflection->getResourceManager().unload(*probe.reflection);
 		if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
 		m_environment_probes.erase(entity);
 		m_universe.onComponentDestroyed(entity, ENVIRONMENT_PROBE_TYPE, this);
@@ -1683,14 +1698,6 @@ public:
 		}
 
 		return light_count;
-	}
-
-	bool getEnvironmentFastFiltering(EntityRef entity) override {
-		return m_environments[entity].flags.isSet(Environment::FAST_FILTERING);
-	}
-	
-	void setEnvironmentFastFiltering(EntityRef entity, bool enable) override {
-		m_environments[entity].flags.set(Environment::FAST_FILTERING, enable);
 	}
 
 	bool getEnvironmentCastShadows(EntityRef entity) override {
@@ -2957,11 +2964,12 @@ public:
 			if(!probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
 			
 			EnvProbeInfo& out = probes.emplace();
-			out.radius = probe.radius;
+			out.half_extents = probe.half_extents;
 			out.position = m_universe.getPosition(entity);
 			out.radiance = probe.flags.isSet(EnvironmentProbe::SPECULAR) && probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : gpu::INVALID_TEXTURE;
-			out.irradiance = probe.flags.isSet(EnvironmentProbe::DIFFUSE) && probe.irradiance && probe.irradiance->isReady() ? probe.irradiance->handle : gpu::INVALID_TEXTURE;
-			out.reflection = probe.flags.isSet(EnvironmentProbe::REFLECTION) && probe.texture && probe.texture->isReady() ? probe.texture->handle : gpu::INVALID_TEXTURE;
+			out.reflection = probe.flags.isSet(EnvironmentProbe::REFLECTION) && probe.reflection && probe.reflection->isReady() ? probe.reflection->handle : gpu::INVALID_TEXTURE;
+			out.use_irradiance = probe.flags.isSet(EnvironmentProbe::DIFFUSE);
+			memcpy(out.sh_coefs, probe.sh_coefs, sizeof(out.sh_coefs));
 		}
 	}
 	
@@ -2987,30 +2995,6 @@ public:
 	}
 
 
-	float getEnvironmentProbeRadius(EntityRef entity) override
-	{
-		return m_environment_probes[entity].radius;
-	}
-
-
-	void setEnvironmentProbeRadius(EntityRef entity, float radius) override
-	{
-		m_environment_probes[entity].radius = radius;
-	}
-
-
-	int getEnvironmentProbeReflectionSize(EntityRef entity) override
-	{
-		return m_environment_probes[entity].reflection_size;
-	}
-
-
-	void setEnvironmentProbeReflectionSize(EntityRef entity, int size) override
-	{
-		m_environment_probes[entity].reflection_size = size;
-	}
-
-
 	bool isEnvironmentProbeCustomSize(EntityRef entity) override
 	{
 		return m_environment_probes[entity].flags.isSet(EnvironmentProbe::OVERRIDE_GLOBAL_SIZE);
@@ -3031,7 +3015,17 @@ public:
 
 	void enableEnvironmentProbeReflection(EntityRef entity, bool enable) override
 	{
-		m_environment_probes[entity].flags.set(EnvironmentProbe::REFLECTION, enable);
+		EnvironmentProbe& p = m_environment_probes[entity];
+		p.flags.set(EnvironmentProbe::REFLECTION, enable);
+		if (enable) {
+			ResourceManagerHub& rm = m_engine.getResourceManager();
+			StaticString<MAX_PATH_LENGTH> path("universes/", m_universe.getName(), "/probes/", p.guid, ".dds");
+			p.reflection = rm.load<Texture>(Path(path));
+		}
+		else {
+			p.reflection->getResourceManager().unload(*p.reflection);
+			p.reflection = nullptr;
+		}
 	}
 
 
@@ -3043,7 +3037,17 @@ public:
 
 	void enableEnvironmentProbeSpecular(EntityRef entity, bool enable) override
 	{
-		m_environment_probes[entity].flags.set(EnvironmentProbe::SPECULAR, enable);
+		EnvironmentProbe& p = m_environment_probes[entity];
+		p.flags.set(EnvironmentProbe::SPECULAR, enable);
+		if (enable) {
+			ResourceManagerHub& rm = m_engine.getResourceManager();
+			StaticString<MAX_PATH_LENGTH> path("universes/", m_universe.getName(), "/probes/", p.guid, "_radiance.dds");
+			p.radiance = rm.load<Texture>(Path(path));
+		}
+		else {
+			p.radiance->getResourceManager().unload(*p.radiance);
+			p.radiance = nullptr;
+		}
 	}
 
 
@@ -3056,24 +3060,6 @@ public:
 	void enableEnvironmentProbeDiffuse(EntityRef entity, bool enable) override
 	{
 		m_environment_probes[entity].flags.set(EnvironmentProbe::DIFFUSE, enable);
-	}
-
-
-	Texture* getEnvironmentProbeTexture(EntityRef entity) const override
-	{
-		return m_environment_probes[entity].texture;
-	}
-
-
-	Texture* getEnvironmentProbeIrradiance(EntityRef entity) const override
-	{
-		return m_environment_probes[entity].irradiance;
-	}
-
-
-	Texture* getEnvironmentProbeRadiance(EntityRef entity) const override
-	{
-		return m_environment_probes[entity].radiance;
 	}
 
 
@@ -3348,30 +3334,13 @@ public:
 		ResourceManagerHub& rm = m_engine.getResourceManager();
 
 		StaticString<MAX_PATH_LENGTH> path;
-		probe.texture = nullptr;
+		probe.reflection = nullptr;
+		probe.radiance = nullptr;
 
-		path = "universes/";
-		path << m_universe.getName() << "/probes/" << probe.guid << "_irradiance.dds";
-		FileSystem& fs = m_engine.getFileSystem();
-		if (!fs.fileExists(path)) {
-			fs.copyFile("textures/common/default_probe.dds", path);
-		}
-
-		probe.irradiance = rm.load<Texture>(Path(path));
-		// TODO check if the texture is really srgb 
-		probe.irradiance->setFlag(Texture::Flags::SRGB, true);
-
-		path = "universes/";
-		path << m_universe.getName() << "/probes/" << probe.guid << "_radiance.dds";
-		if (!fs.fileExists(path)) {
-			fs.copyFile("textures/common/default_probe.dds", path);
-		}
-		probe.radiance = rm.load<Texture>(Path(path));
-		probe.radiance->setFlag(Texture::Flags::SRGB, true);
-
-		probe.radius = 1;
+		probe.half_extents = Vec3(9001.f);
 		probe.flags.set(EnvironmentProbe::ENABLED);
 		probe.flags.set(EnvironmentProbe::DIFFUSE);
+		memset(probe.sh_coefs, 0, sizeof(probe.sh_coefs));
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}

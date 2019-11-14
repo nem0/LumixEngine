@@ -118,6 +118,7 @@ enum class TextureFormat : u32 {
 	RGBA8,
 	RGBA16,
 	RGBA16F,
+	RGBA32F,
 	R16F,
 	R16,
 	R32F,
@@ -232,7 +233,7 @@ void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size);
 void copy(TextureHandle dst, TextureHandle src);
-void readTexture(TextureHandle texture, u32 size, void* rgba);
+void readTexture(TextureHandle texture, TextureFormat format, Span<u8> buf);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
