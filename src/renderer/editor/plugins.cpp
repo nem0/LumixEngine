@@ -3303,6 +3303,16 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 struct GizmoPlugin final : public WorldEditor::Plugin
 {
+	void showEnvironmentProbeGizmo(ComponentUID cmp) {
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		const Universe& universe = scene->getUniverse();
+		EntityRef e = (EntityRef)cmp.entity;
+		const EnvironmentProbe& p = scene->getEnvironmentProbe(e);
+		const DVec3 pos = universe.getPosition(e);
+
+		scene->addDebugCube(pos - p.half_extents, pos + p.half_extents, 0xff0000ff);
+	}
+
 	void showPointLightGizmo(ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
@@ -3394,6 +3404,10 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		if (cmp.type == ENVIRONMENT_TYPE)
 		{
 			showGlobalLightGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
+			showEnvironmentProbeGizmo(cmp);
 			return true;
 		}
 		return false;
