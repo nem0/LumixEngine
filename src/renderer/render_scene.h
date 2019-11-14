@@ -70,8 +70,7 @@ struct LightProbeGrid {
 struct Environment
 {
 	enum Flags : u32{
-		CAST_SHADOWS = 1 << 0,
-		FAST_FILTERING = 1 << 1
+		CAST_SHADOWS = 1 << 0
 	};
 
 	Vec3 m_diffuse_color;
@@ -110,15 +109,14 @@ struct EnvironmentProbe
 		SPECULAR = 1 << 4
 	};
 
-	Texture* texture;
-	Texture* irradiance;
-	Texture* radiance;
-	float radius;
+	Texture* reflection = nullptr;
+	Texture* radiance = nullptr;
+	Vec3 half_extents;
 	u64 guid;
 	FlagSet<Flags, u32> flags;
 	int radiance_size = 128;
-	int irradiance_size = 32;
 	int reflection_size = 1024;
+	Vec3 sh_coefs[9];
 };
 
 
@@ -159,10 +157,11 @@ struct MeshInstance
 struct EnvProbeInfo
 {
 	DVec3 position;
-	float radius;
+	Vec3 half_extents;
 	gpu::TextureHandle reflection;
 	gpu::TextureHandle radiance;
-	gpu::TextureHandle irradiance;
+	Vec3 sh_coefs[9];
+	bool use_irradiance;
 };
 
 
@@ -330,8 +329,6 @@ public:
 
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;
-	virtual bool getEnvironmentFastFiltering(EntityRef entity) = 0;
-	virtual void setEnvironmentFastFiltering(EntityRef entity, bool enable) = 0;
 	virtual Environment& getEnvironment(EntityRef entity) = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, u32 max_count, PointLight* lights) = 0;
@@ -343,8 +340,6 @@ public:
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
 	virtual void getEnvironmentProbes(Array<EnvProbeInfo>& probes) = 0;
-	virtual int getEnvironmentProbeReflectionSize(EntityRef entity) = 0;
-	virtual void setEnvironmentProbeReflectionSize(EntityRef entity, int size) = 0;
 	virtual bool isEnvironmentProbeReflectionEnabled(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbeReflection(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeSpecular(EntityRef entity) = 0;
@@ -353,11 +348,6 @@ public:
 	virtual void enableEnvironmentProbeDiffuse(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeCustomSize(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbeCustomSize(EntityRef entity, bool enable) = 0;
-	virtual Texture* getEnvironmentProbeTexture(EntityRef entity) const = 0;
-	virtual Texture* getEnvironmentProbeIrradiance(EntityRef entity) const = 0;
-	virtual Texture* getEnvironmentProbeRadiance(EntityRef entity) const = 0;
-	virtual float getEnvironmentProbeRadius(EntityRef entity) = 0;
-	virtual void setEnvironmentProbeRadius(EntityRef entity, float radius) = 0;
 
 	virtual void setTextMeshText(EntityRef entity, const char* text) = 0;
 	virtual const char* getTextMeshText(EntityRef entity) = 0;

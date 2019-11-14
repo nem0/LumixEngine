@@ -2,7 +2,6 @@
 #define ONE_BY_PI (1 / 3.14159265359)
 
 layout (binding=15) uniform samplerCube u_radiancemap;
-layout (binding=15) uniform samplerCube u_irradiancemap;
 
 struct PixelData {
 	vec4 albedo;
@@ -152,13 +151,17 @@ vec3 env_brdf_approx (vec3 F0, float roughness, float NoV)
 	return F0 * AB.x + AB.y;
 }
 
-vec3 PBR_ComputeIndirectDiffuse(samplerCube irradiancemap, vec3 albedo, float metallic, vec3 N, vec3 V) {
+vec3 PBR_ComputeIndirectDiffuse(vec3 irradiance, vec3 albedo, float metallic, vec3 N, vec3 V) {
 	float ndotv = clamp(dot(N , V), 1e-5f, 1);
 	vec3 F0 = mix(vec3(0.04), albedo, metallic);		
-	vec3 irradiance = texture(irradiancemap, N).rgb;
 	vec3 F = F_Schlick(ndotv, F0);
 	vec3 kd = mix(vec3(1.0) - F, vec3(0.0), metallic);
 	return kd * albedo * irradiance;
+}
+
+vec3 PBR_ComputeIndirectDiffuse(samplerCube irradiancemap, vec3 albedo, float metallic, vec3 N, vec3 V) {
+	vec3 irradiance = texture(irradiancemap, N).rgb;
+	return PBR_ComputeIndirectDiffuse(irradiance, albedo, metallic, N, V);
 }
 
 vec3 PBR_ComputeIndirectSpecular(samplerCube radiancemap, vec3 albedo, float metallic, float roughness, vec3 N, vec3 V) {
@@ -172,10 +175,11 @@ vec3 PBR_ComputeIndirectSpecular(samplerCube radiancemap, vec3 albedo, float met
 
 vec3 PBR_ComputeIndirectLight(vec3 albedo, float roughness, float metallic, vec3 N, vec3 V)
 {
-	vec3 diffuse = PBR_ComputeIndirectDiffuse(u_irradiancemap, albedo, metallic, N, V);
+	// TODO diffuse
+	//vec3 diffuse = PBR_ComputeIndirectDiffuse(u_irradiancemap, albedo, metallic, N, V);
 	vec3 specular = PBR_ComputeIndirectSpecular(u_radiancemap, albedo, metallic, roughness, N, V);
 	
-	return diffuse + specular;
+	return /*diffuse + */specular;
 }
 
 vec3 rotateByQuat(vec4 rot, vec3 pos)

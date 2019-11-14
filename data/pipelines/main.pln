@@ -90,7 +90,12 @@ function geomPass(default_set, decal_set)
 end
 
 function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
-	local hdr_rb = createRenderbuffer(1, 1, true, "rgba16f", "hdr")
+	local hdr_rb = 0
+	if PROBE ~= nil then
+		hdr_rb = createRenderbuffer(1, 1, true, "rgba32f", "hdr")
+	else
+		hdr_rb = createRenderbuffer(1, 1, true, "rgba16f", "hdr")
+	end
 	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
@@ -247,9 +252,13 @@ function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 end
 
 function tonemap(hdr_buffer)
+	if PROBE ~= nil then
+		return hdr_buffer
+	end
+
 	beginBlock("tonemap")
 	local rb
-	if APP ~= nil or PREVIEW ~= nil or PROBE ~= nil then
+	if APP ~= nil or PREVIEW ~= nil then
 		rb = createRenderbuffer(1, 1, true, "rgba8", "tonemap")
 	else
 		rb = createRenderbuffer(1, 1, true, "rgba16f", "tonemap")
@@ -328,7 +337,7 @@ function main()
 	
 	res = tonemap(res)
 
-	if PREVIEW == nil then
+	if PREVIEW == nil and PROBE == nil then
 		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 

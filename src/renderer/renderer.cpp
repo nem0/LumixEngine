@@ -314,13 +314,12 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("environment_probe",
 			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
-			property("Radius", LUMIX_PROP(RenderScene, EnvironmentProbeRadius)),
 			property("Enabled reflection", &RenderScene::isEnvironmentProbeReflectionEnabled, &RenderScene::enableEnvironmentProbeReflection),
 			property("Enabled specular", &RenderScene::isEnvironmentProbeSpecular, &RenderScene::enableEnvironmentProbeSpecular),
 			property("Enabled diffuse", &RenderScene::isEnvironmentProbeDiffuse, &RenderScene::enableEnvironmentProbeDiffuse),
 			property("Override global size", &RenderScene::isEnvironmentProbeCustomSize, &RenderScene::enableEnvironmentProbeCustomSize),
-			var_property("Radiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::radiance_size),
-			var_property("Irradiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::irradiance_size)
+			var_property("Half extents", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::half_extents),
+			var_property("Radiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::radiance_size)
 		),
 		component("particle_emitter",
 			property("Resource", LUMIX_PROP(RenderScene, ParticleEmitterPath),
@@ -351,8 +350,7 @@ static void registerProperties(IAllocator& allocator)
 			var_property("Fog height", &RenderScene::getEnvironment, &Environment::m_fog_height, MinAttribute(0)),
 			var_property("Fog color", &RenderScene::getEnvironment, &Environment::m_fog_color, ColorAttribute()),
 			property("Shadow cascades", LUMIX_PROP(RenderScene, ShadowmapCascades)),
-			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows)),
-			property("Fast filtering", LUMIX_PROP(RenderScene, EnvironmentFastFiltering))
+			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows))
 		),
 		component("point_light",
 			var_property("Cast shadows", &RenderScene::getPointLight, &PointLight::cast_shadows),
@@ -568,7 +566,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, void* data) override
+	void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) override
 	{
 		struct Cmd : RenderJob {
 			void setup() override {}
@@ -577,17 +575,18 @@ struct RendererImpl final : public Renderer
 				gpu::pushDebugGroup("get image data");
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
 				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
-				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
+				gpu::createTexture(staging, w, h, 1, out_format, flags, nullptr, "staging_buffer");
 				gpu::copy(staging, handle);
-				gpu::readTexture(staging, w * h * 4, buf);
+				gpu::readTexture(staging, out_format, buf);
 				gpu::destroy(staging);
 				gpu::popDebugGroup();
 			}
 
 			gpu::TextureHandle handle;
+			gpu::TextureFormat out_format;
 			u32 w;
 			u32 h;
-			void* buf;
+			Span<u8> buf;
 		};
 
 		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
@@ -595,6 +594,7 @@ struct RendererImpl final : public Renderer
 		cmd->w = w;
 		cmd->h = h;
 		cmd->buf = data;
+		cmd->out_format = out_format;
 		queue(cmd, 0);
 	}
 

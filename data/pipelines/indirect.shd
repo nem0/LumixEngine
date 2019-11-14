@@ -2,7 +2,9 @@ include "pipelines/common.glsl"
 
 common [[ 
 	layout(std140, binding = 4) uniform Drawcall {
-		vec4 u_pos_radius;
+		vec4 u_pos;
+		vec4 u_half_extents;
+		vec4 u_sh_coefs[9];
 	};
 ]]
 
@@ -11,11 +13,10 @@ common [[
 vertex_shader [[
 	layout (location = 0) in vec3 a_position;
 	layout (location = 0) out vec3 v_uv;
-	layout (location = 1) out float v_radius;
 	void main()
 	{
 		v_uv = a_position;
-		gl_Position = u_camera_projection * u_camera_view * vec4(a_position * u_pos_radius.w + u_pos_radius.xyz, 1);
+		gl_Position = u_camera_projection * u_camera_view * vec4(a_position * u_half_extents.xyz + u_pos.xyz, 1);
 	}
 ]]
 
@@ -38,8 +39,8 @@ fragment_shader [[
 	{
 		vec2 screen_uv = gl_FragCoord.xy / u_framebuffer_size;
 		vec3 wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, screen_uv);
-		vec3 d = abs(wpos - u_pos_radius.xyz);
-		float alpha = 1 - saturate(max(max(d.x, d.y), d.z) / u_pos_radius.w);
+		vec3 d = abs(wpos - u_pos.xyz) / u_half_extents.xyz;
+		float alpha = 1 - saturate(max(max(d.x, d.y), d.z));
 
 		#ifdef _LUMIX_WEIGHTS
 			o_color = vec4(alpha);
@@ -63,7 +64,19 @@ fragment_shader [[
 			#ifdef _LUMIX_SPECULAR
 				vec3 indirect = PBR_ComputeIndirectSpecular(u_radiancemap, albedo, metallic, roughness, normal, V);
 			#else
-				vec3 indirect = PBR_ComputeIndirectDiffuse(u_irradiancemap, albedo, metallic, normal, V);
+				vec3 n = normal;
+				vec3 irradiance =  
+					  u_sh_coefs[0].rgb
+					+ u_sh_coefs[1].rgb * (n.y)
+					+ u_sh_coefs[2].rgb * (n.z)
+					+ u_sh_coefs[3].rgb * (n.x)
+					+ u_sh_coefs[4].rgb * (n.y * n.x)
+					+ u_sh_coefs[5].rgb * (n.y * n.z)
+					+ u_sh_coefs[6].rgb * (3.0 * n.z * n.z - 1.0)
+					+ u_sh_coefs[7].rgb * (n.z * n.x)
+					+ u_sh_coefs[8].rgb * (n.x * n.x - n.y * n.y);
+				irradiance = max(vec3(0), irradiance);
+				vec3 indirect = PBR_ComputeIndirectDiffuse(irradiance, albedo, metallic, normal, V);
 			#endif
 			o_color = vec4((indirect * u_light_indirect_intensity) * (alpha / total_w), 1);
 		#endif
