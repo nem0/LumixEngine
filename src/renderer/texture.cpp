@@ -273,6 +273,15 @@ void Texture::save()
 			return;
 		}
 
+		RawTextureHeader header;
+		header.channels_count = 1;
+		header.channel_type = RawTextureHeader::ChannelType::U16;
+		header.is_array = false;
+		header.width = width;
+		header.height = height;
+		header.depth = depth;
+
+		file.write(&header, sizeof(header));
 		file.write(data.getData(), data.getPos());
 		file.close();
 	}
@@ -323,38 +332,58 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& allocator)
 {
 	PROFILE_FUNCTION();
-	const size_t size = file.size() - file.getPosition();
-	texture.bytes_per_pixel = 2;
-	texture.width = (int)sqrtf((float)int(size / texture.bytes_per_pixel));
-	texture.height = texture.width;
-	const u32 file_data_offset = (u32)file.getPosition();
+	RawTextureHeader header;
+	file.read(&header, sizeof(header));
 
-	if (texture.data_reference)
-	{
+	texture.width = header.width;
+	texture.height = header.height;
+	texture.depth = header.is_array ? 1 : header.depth;
+	texture.layers = header.is_array ? header.depth : 1;
+	gpu::TextureFormat format;
+	switch(header.channel_type) {
+		case RawTextureHeader::ChannelType::FLOAT:
+			texture.bytes_per_pixel = sizeof(float) * header.channels_count;
+			switch (header.channels_count) {
+				case 1: format = gpu::TextureFormat::R32F; break;
+				case 4: format = gpu::TextureFormat::RGBA32F; break;
+				default: ASSERT(false); return false;
+			}
+			break;
+		case RawTextureHeader::ChannelType::U8:
+			texture.bytes_per_pixel = sizeof(u8) * header.channels_count;
+			switch (header.channels_count) {
+				case 1: format = gpu::TextureFormat::R8; break;
+				case 4: format = gpu::TextureFormat::RGBA8; break;
+				default: ASSERT(false); return false;
+			}
+			break;
+		case RawTextureHeader::ChannelType::U16:
+			texture.bytes_per_pixel = sizeof(u16) * header.channels_count;
+			switch (header.channels_count) {
+				case 1: format = gpu::TextureFormat::R16; break;
+				case 4: format = gpu::TextureFormat::RGBA16; break;
+				default: ASSERT(false); return false;
+			}
+			break;
+		default: ASSERT(false); return false;
+	}
+
+	const u64 size = file.size() - file.getPosition();
+	if (texture.data_reference) {
 		texture.data.resize((int)size);
 		file.read(texture.data.getMutableData(), size);
 	}
 
-	const u8* data = (const u8*)file.getBuffer();
-
-	const u16* src_mem = (const u16*)(data + file_data_offset);
-	const Renderer::MemRef dst_mem = texture.renderer.allocate(sizeof(float) * texture.width * texture.height);
-	float* dst = (float*)dst_mem.data;
-
-	for (int i = 0; i < texture.width * texture.height; ++i)
-	{
-		dst[i] = src_mem[i] / 65535.0f;
-	}
+	const u8* data = (const u8*)file.getBuffer() + file.getPosition();
+	const Renderer::MemRef dst_mem = texture.renderer.copy(data, (u32)size);
 
 	texture.handle = texture.renderer.createTexture(texture.width
 		, texture.height
-		, 1
-		, gpu::TextureFormat::R32F
+		, texture.depth
+		, format
 		, texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
 		, dst_mem
 		, texture.getPath().c_str());
-	texture.depth = 1;
-	texture.layers = 1;
 	texture.mips = 1;
 	texture.is_cubemap = false;
 	return texture.handle.isValid();

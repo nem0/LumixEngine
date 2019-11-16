@@ -64,7 +64,7 @@ struct LightProbeGrid {
 	IVec3 resolution;
 	Vec3 scale;
 	u64 guid;
-	Texture* data[3] = {};
+	Texture* data[7] = {};
 };
 
 struct Environment
