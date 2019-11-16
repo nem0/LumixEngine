@@ -636,13 +636,11 @@ public:
 
 	void loadLightProbeGridData(LightProbeGrid& lp) const {
 		StaticString<MAX_PATH_LENGTH> dir("universes/", m_universe.getName(), "/probes/");
-		StaticString<MAX_PATH_LENGTH> path_str(dir, lp.guid, "_0.dds");
 		ResourceManagerHub& manager = m_engine.getResourceManager();
-		lp.data[0] = manager.load<Texture>(Path(path_str));
-		path_str = dir; path_str << lp.guid << "_1.dds";
-		lp.data[1] = manager.load<Texture>(Path(path_str));
-		path_str = dir; path_str << lp.guid << "_2.dds";
-		lp.data[2] = manager.load<Texture>(Path(path_str));
+		for (u32 i = 0; i < lengthOf(lp.data); ++i) {
+			const StaticString<MAX_PATH_LENGTH> path_str(dir, lp.guid, "_grid", i, ".raw");
+			lp.data[i] = manager.load<Texture>(Path(path_str));
+		}
 	}
 
 	void deserializeLightProbeGrid(IDeserializer& serializer, EntityRef entity, int scene_version) {

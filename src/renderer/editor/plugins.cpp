@@ -70,6 +70,121 @@ static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType
 static const ComponentType LIGHT_PROBE_GRID_TYPE = Reflection::getComponentType("light_probe_grid");
 
 
+
+struct SphericalHarmonics {
+	Vec3 coefs[9];
+
+	SphericalHarmonics() {
+		for (u32 i = 0; i < 9; ++i) {
+			coefs[i] = Vec3(0);
+		}
+	}
+
+	SphericalHarmonics operator *(const Vec3& v) {
+		SphericalHarmonics res;
+		for (u32 i = 0; i < 9; ++i) {
+			res.coefs[i] = coefs[i] * v;
+		}
+		return res;
+	}
+
+	SphericalHarmonics operator *(float v) {
+		SphericalHarmonics res;
+		for (u32 i = 0; i < 9; ++i) {
+			res.coefs[i] = coefs[i] * v;
+		}
+		return res;
+	}
+
+	void operator +=(const SphericalHarmonics& rhs) {
+		for (u32 i = 0; i < 9; ++i) {
+			coefs[i] += rhs.coefs[i];
+		}
+	}
+
+	static SphericalHarmonics project(const Vec3& dir) {
+		SphericalHarmonics sh;
+    
+		sh.coefs[0] = Vec3(0.282095f);
+		sh.coefs[1] = Vec3(0.488603f * dir.y);
+		sh.coefs[2] = Vec3(0.488603f * dir.z);
+		sh.coefs[3] = Vec3(0.488603f * dir.x);
+		sh.coefs[4] = Vec3(1.092548f * dir.x * dir.y);
+		sh.coefs[5] = Vec3(1.092548f * dir.y * dir.z);
+		sh.coefs[6] = Vec3(0.315392f * (3.0f * dir.z * dir.z - 1.0f));
+		sh.coefs[7] = Vec3(1.092548f * dir.x * dir.z);
+		sh.coefs[8] = Vec3(0.546274f * (dir.x * dir.x - dir.y * dir.y));
+    
+		return sh;
+	}
+	
+
+	static Vec3 cube2dir(u32 x, u32 y, u32 s, u32 width, u32 height) {
+		float u = ((x + 0.5f) / float(width)) * 2.f - 1.f;
+		float v = ((y + 0.5f) / float(height)) * 2.f - 1.f;
+		v *= -1.f;
+
+		Vec3 dir(0.f);
+
+		switch(s) {
+			case 0: return Vec3(1.f, v, -u).normalized();
+			case 1: return Vec3(-1.f, v, u).normalized();
+			case 2: return Vec3(u, 1.f, -v).normalized();
+			case 3: return Vec3(u, -1.f, v).normalized();
+			case 4: return Vec3(u, v, 1.f).normalized();
+			case 5: return Vec3(-u, v, -1.f).normalized();
+		}
+
+		return dir;
+	}
+
+	// https://github.com/TheRealMJP/LowResRendering/blob/master/SampleFramework11/v1.01/Graphics/SH.cpp
+	// https://www.gamedev.net/forums/topic/699721-spherical-harmonics-irradiance-from-hdr/
+	void compute(const Array<Vec4>& pixels) {
+		PROFILE_FUNCTION();
+		for (u32 i = 0; i < 9; ++i) {
+			coefs[i] = Vec3(0);
+		}
+		const u32 w = (u32)sqrt(pixels.size() / 6);
+		const u32 h = w;
+		ASSERT(6 * w * h == pixels.size());
+
+		const float pixel_area = (2.0f * PI / w) * (PI / h);
+		float weightSum = 0.0f;
+		for (u32 face = 0; face < 6; ++face) {
+			for (u32 y = 0; y < h; y++) {
+				for (u32 x = 0; x < w; ++x) {
+					const float u = (x + 0.5f) / w;
+					const float v = (y + 0.5f) / h;
+					const float temp = 1.0f + u * u + v * v;
+					const float weight = 4.0f / (sqrtf(temp) * temp);
+					const Vec3 dir = cube2dir(x, y, face, w, h);
+					const Vec3 color = pixels[(x + y * w + face * w * h)].rgb();
+					*this += project(dir) * (color * weight);
+					weightSum += weight;
+				}
+			}
+		}
+		*this = *this * ((4.0f * PI) / weightSum);
+
+		const float mults[] = {
+			0.282095f,
+			0.488603f * 2 / 3.f,
+			0.488603f * 2 / 3.f,
+			0.488603f * 2 / 3.f,
+			1.092548f / 4.f,
+			1.092548f / 4.f,
+			0.315392f / 4.f,
+			1.092548f / 4.f,
+			0.546274f / 4.f
+		};
+
+		for (u32 i = 0; i < 9; ++i) {
+			coefs[i] = coefs[i] * mults[i];
+		}
+	}
+};
+
 static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
 	ASSERT(data);
 	OS::OutputFile file;
@@ -1686,13 +1801,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	}
 
-	bool compileImage(const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta)
+	bool compileImage(const Path& path, const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta)
 	{
 		PROFILE_FUNCTION();
 		int w, h, comps;
 		const bool is_16_bit = stbi_is_16_bit_from_memory(src_data.begin(), src_data.byte_size());
 		if (is_16_bit) {
-			logError("Renderer") << "16bit images not yet supported.";
+			logError("Renderer") << path << ": 16bit images not yet supported.";
 		}
 
 		stbi_uc* data = stbi_load_from_memory(src_data.begin(), src_data.byte_size(), &w, &h, &comps, 4);
@@ -1815,11 +1930,11 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				out.write(src_data.begin(), src_data.byte_size());
 			}
 			else {
-				compileImage(src_data, out, meta);
+				compileImage(src, src_data, out, meta);
 			}
 		}
 		else if(equalStrings(ext, "jpg") || equalStrings(ext, "png")) {
-			compileImage(src_data, out, meta);
+			compileImage(src, src_data, out, meta);
 		}
 		else if (equalStrings(ext, "ltc")) {
 			createComposite(src_data, out, meta, src.c_str());
@@ -2095,11 +2210,108 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 };
 
+template <typename F>
+void captureCubemap(StudioApp& app
+	, Pipeline& pipeline
+	, const u32 texture_size
+	, const DVec3& position
+	, Ref<Array<Vec4>> data
+	, F&& f) {
+	MT::memoryBarrier();
+
+	WorldEditor& world_editor = app.getWorldEditor();
+	Engine& engine = world_editor.getEngine();
+	auto& plugin_manager = engine.getPluginManager();
+	IAllocator& allocator = engine.getAllocator();
+
+	Viewport viewport;
+	viewport.is_ortho = false;
+	viewport.fov = degreesToRadians(90.f);
+	viewport.near = 0.1f;
+	viewport.far = 10'000;
+	viewport.w = texture_size;
+	viewport.h = texture_size;
+
+	Universe* universe = world_editor.getUniverse();
+	RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
+	pipeline.setScene(scene);
+	pipeline.setViewport(viewport);
+
+	Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+	Vec3 dirs[] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+	Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
+	Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
+
+	data->resize(6 * texture_size * texture_size);
+
+	const bool ndc_bottom_left = gpu::isOriginBottomLeft();
+	for (int i = 0; i < 6; ++i) {
+		Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
+		Matrix mtx = Matrix::IDENTITY;
+		mtx.setZVector(dirs[i]);
+		mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
+		mtx.setXVector(side);
+		viewport.pos = position;
+		viewport.rot = mtx.getRotation();
+		pipeline.setViewport(viewport);
+		pipeline.render(false);
+
+		const gpu::TextureHandle res = pipeline.getOutput();
+		ASSERT(res.isValid());
+		renderer->getTextureImage(res
+			, texture_size
+			, texture_size
+			, gpu::TextureFormat::RGBA32F
+			, Span((u8*)(data->begin() + (i * texture_size * texture_size)), u32(texture_size * texture_size * sizeof(*data->begin())))
+		);
+	}
+
+	struct RenderJob : Renderer::RenderJob {
+		RenderJob(F&& f) : f(f) {}
+
+		void setup() override {}
+		void execute() override {
+			f();
+		}
+		F f;
+	};
+
+	RenderJob* rjob = LUMIX_NEW(renderer->getAllocator(), RenderJob)(static_cast<F&&>(f));
+	renderer->queue(rjob, 0);
+}
+
 struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
+	struct Job {
+		Job(LightProbeGridPlugin& plugin, u32 idx, IAllocator& allocator) 
+			: plugin(plugin)
+			, data(allocator)
+			, index(idx)
+		{}
+
+		u32 index;
+		LightProbeGridPlugin& plugin;
+		Array<Vec4> data;
+		bool done = false;
+	};
+	
 	LightProbeGridPlugin(StudioApp& app)
 		: m_app(app)
-	{}
+		, m_jobs(app.getWorldEditor().getAllocator())
+		, m_result(app.getWorldEditor().getAllocator())
+	{
+		WorldEditor& world_editor = app.getWorldEditor();
+		Engine& engine = world_editor.getEngine();
+		PluginManager& plugin_manager = engine.getPluginManager();
+		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+		IAllocator& allocator = world_editor.getAllocator();
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
+	}
 	
+	~LightProbeGridPlugin() {
+		Pipeline::destroy(m_pipeline);
+	}
+
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
 		if (cmp.type != LIGHT_PROBE_GRID_TYPE) return;
 
@@ -2110,10 +2322,132 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 	}
 
 	void generate(ComponentUID cmp, bool bounce) {
-	
+		m_bounce = bounce;
+		RenderScene* scene = (RenderScene*)cmp.scene;
+		EntityRef e = (EntityRef)cmp.entity;
+		Universe& universe = scene->getUniverse();
+		m_grid = scene->getLightProbeGrid(e);
+		m_to_dispatch = m_grid.resolution.x * m_grid.resolution.y * m_grid.resolution.z;
+		m_total = m_to_dispatch;
+		m_position = universe.getPosition(e);
+		m_result.resize(m_total);
 	}
 
+	void update() override {
+		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		if (m_to_dispatch > 0) {
+			--m_to_dispatch;
+			Job* job = LUMIX_NEW(allocator, Job)(*this, m_to_dispatch, allocator);
+
+			// TODO subposition
+			captureCubemap(m_app, *m_pipeline, 32, m_position, Ref(job->data), [job](){
+				JobSystem::run(job, [](void* ptr) {
+					Job* pjob = (Job*)ptr;
+					pjob->plugin.m_result[pjob->index].compute(pjob->data);
+					MT::memoryBarrier();
+					pjob->done = true;
+				}, nullptr);
+
+			});
+			m_jobs.push(job);
+		}
+
+		if (m_total > 0) {
+			const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
+
+			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f, 30));
+			ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
+			ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
+			ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
+				| ImGuiWindowFlags_AlwaysAutoResize
+				| ImGuiWindowFlags_NoMove
+				| ImGuiWindowFlags_NoSavedSettings;
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
+			if (ImGui::Begin("Light probe grid generation", nullptr, flags)) {
+				ImGui::Text("%s", "Generating light probe grid...");
+				ImGui::Text("%s", "Manipulating with entities at this time can produce incorrect probes.");
+				ImGui::ProgressBar(((float)m_total - m_to_dispatch) / m_total, ImVec2(-1, 0), StaticString<64>(m_total - m_to_dispatch, " / ", m_total));
+			}
+			ImGui::End();
+			ImGui::PopStyleVar();
+		}
+
+		for (int i = m_jobs.size() - 1; i >= 0; --i) {
+			if (m_jobs[i]->done) {
+				LUMIX_DELETE(allocator, m_jobs[i]);
+				m_jobs.swapAndPop(i);
+			}
+		}
+
+		if (m_total > 0) {
+			if (m_to_dispatch == 0 && m_jobs.empty()) {
+				Universe* universe = m_app.getWorldEditor().getUniverse();
+				const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
+				StaticString<MAX_PATH_LENGTH> dir(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName(), "/probes/");
+				if (!OS::makePath(dir) && !OS::dirExists(dir)) {
+					logError("Editor") << "Failed to create " << dir;
+				}
+
+				for (u32 sh_idx = 0; sh_idx < 7; ++sh_idx) {
+					StaticString<MAX_PATH_LENGTH> path(dir, m_grid.guid, "_grid", sh_idx, ".raw");
+					OS::OutputFile file;
+					if (!file.open(path)) {
+						logError("Editor") << "Failed to create " << path;
+						return;
+					}
+					RawTextureHeader header;
+					header.is_array = false;
+					header.width = m_grid.resolution.x;
+					header.height = m_grid.resolution.y;
+					header.depth = m_grid.resolution.z;
+					header.channels_count = sh_idx == 6 ? 3 : 4;
+					header.channel_type = RawTextureHeader::ChannelType::FLOAT;
+					file.write(&header, sizeof(header));
+					const u32 c0 = (sh_idx * 4 + 0) / 3;
+					const u32 c1 = (sh_idx * 4 + 1) / 3;
+					const u32 c2 = (sh_idx * 4 + 2) / 3;
+					const u32 c3 = (sh_idx * 4 + 3) / 3;
+					const u32 c00 = (sh_idx * 4 + 0) % 3;
+					const u32 c10 = (sh_idx * 4 + 1) % 3;
+					const u32 c20 = (sh_idx * 4 + 2) % 3;
+					const u32 c30 = (sh_idx * 4 + 3) % 3;
+					if (sh_idx == 6) {
+						for (u32 i = 0; i < m_total; ++i) {
+							Vec3 v;
+							v.x = (&m_result[i].coefs[c0].x)[c00];
+							v.y = (&m_result[i].coefs[c1].x)[c10];
+							v.z = (&m_result[i].coefs[c2].x)[c20];
+							file.write(&v, sizeof(v));
+						}
+					}
+					else {
+						for (u32 i = 0; i < m_total; ++i) {
+							Vec4 v;
+							v.x = (&m_result[i].coefs[c0].x)[c00];
+							v.y = (&m_result[i].coefs[c1].x)[c10];
+							v.z = (&m_result[i].coefs[c2].x)[c20];
+							v.w = (&m_result[i].coefs[c3].x)[c30];
+							file.write(&v, sizeof(v));
+						}
+					}
+					file.close();
+				}
+
+				m_total = 0;
+				m_to_dispatch = 0;
+			}
+		}
+	}
+
+	Pipeline* m_pipeline;
 	StudioApp& m_app;
+	bool m_bounce;
+	LightProbeGrid m_grid;
+	Array<SphericalHarmonics> m_result;
+	u32 m_to_dispatch = 0;
+	u32 m_total = 0;
+	DVec3 m_position;
+	Array<Job*> m_jobs;
 };
 
 struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
@@ -2258,7 +2592,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	struct ProbeJob {
 		ProbeJob(EnvironmentProbePlugin& plugin, EntityRef& entity, IAllocator& allocator) 
 			: entity(entity)
-			, datax(allocator)
+			, data(allocator)
 			, plugin(plugin)
 		{}
 		
@@ -2269,83 +2603,26 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		DVec3 position;
 		bool fast_filter = false;
 
-		Array<Vec4> datax;
-		Vec3 sh_coefs[9];
+		Array<Vec4> data;
+		SphericalHarmonics sh;
 		bool render_dispatched = false;
 		bool done = false;
 		bool done_counted = false;
 	};
 
 	void render(ProbeJob& job) {
-		MT::memoryBarrier();
-
-		WorldEditor& world_editor = m_app.getWorldEditor();
-		Engine& engine = world_editor.getEngine();
-		auto& plugin_manager = engine.getPluginManager();
-		IAllocator& allocator = engine.getAllocator();
-
 		bool diffuse_only = job.probe.flags.isSet(EnvironmentProbe::DIFFUSE);
 		diffuse_only = diffuse_only && !job.probe.flags.isSet(EnvironmentProbe::SPECULAR);
 		diffuse_only = diffuse_only && !job.probe.flags.isSet(EnvironmentProbe::REFLECTION);
 		const u32 texture_size = diffuse_only ? 32 : 1024;
 
-		Viewport viewport;
-		viewport.is_ortho = false;
-		viewport.fov = degreesToRadians(90.f);
-		viewport.near = 0.1f;
-		viewport.far = 10'000;
-		viewport.w = texture_size;
-		viewport.h = texture_size;
+		captureCubemap(m_app, *m_pipeline, texture_size, job.position, Ref(job.data), [&job](){
+			JobSystem::run(&job, [](void* ptr) {
+				ProbeJob* pjob = (ProbeJob*)ptr;
+				pjob->plugin.processData(*pjob);
+			}, nullptr);
 
-		Universe* universe = world_editor.getUniverse();
-		RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
-		m_pipeline->setScene(scene);
-		m_pipeline->setViewport(viewport);
-
-		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-		Vec3 dirs[] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
-		Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
-		Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
-
-		job.datax.resize(6 * texture_size * texture_size);
-
-		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
-		for (int i = 0; i < 6; ++i) {
-			Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
-			Matrix mtx = Matrix::IDENTITY;
-			mtx.setZVector(dirs[i]);
-			mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
-			mtx.setXVector(side);
-			viewport.pos = job.position;
-			viewport.rot = mtx.getRotation();
-			m_pipeline->setViewport(viewport);
-			m_pipeline->render(false);
-
-			const gpu::TextureHandle res = m_pipeline->getOutput();
-			ASSERT(res.isValid());
-			renderer->getTextureImage(res
-				, texture_size
-				, texture_size
-				, gpu::TextureFormat::RGBA32F
-				, Span((u8*)&job.datax[i * texture_size * texture_size], u32(texture_size * texture_size * sizeof(job.datax[0])))
-			);
-		}
-
-		struct Job : Renderer::RenderJob {
-			Job(ProbeJob& job) : job(job) {}
-
-			void setup() override {}
-			void execute() override {
-				JobSystem::run(&job, [](void* ptr) {
-					ProbeJob* pjob = (ProbeJob*)ptr;
-					pjob->plugin.processData(*pjob);
-				}, nullptr);
-			}
-			ProbeJob& job;
-		};
-
-		Job* rjob = LUMIX_NEW(renderer->getAllocator(), Job)(job);
-		renderer->queue(rjob, 0);
+		});
 	}
 
 
@@ -2409,14 +2686,13 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 				move(job.probe.guid, "");
 				move(job.probe.guid, "_radiance");
-				move(job.probe.guid, "_irradiance");
 
 				Universe* universe = m_app.getWorldEditor().getUniverse();
 				if (universe->hasComponent(job.entity, ENVIRONMENT_PROBE_TYPE)) {
 					RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
 					EnvironmentProbe& p = scene->getEnvironmentProbe(job.entity);
-					static_assert(sizeof(p.sh_coefs == job.sh_coefs));
-					memcpy(p.sh_coefs, job.sh_coefs, sizeof(p.sh_coefs));
+					static_assert(sizeof(p.sh_coefs == job.sh.coefs));
+					memcpy(p.sh_coefs, job.sh.coefs, sizeof(p.sh_coefs));
 				}
 
 				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
@@ -2425,98 +2701,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		}
 	}
 
-	struct SH {
-		Vec3 coefs[9];
-
-		SH() {
-			for (u32 i = 0; i < 9; ++i) {
-				coefs[i] = Vec3(0);
-			}
-		}
-
-		SH operator *(const Vec3& v) {
-			SH res;
-			for (u32 i = 0; i < 9; ++i) {
-				res.coefs[i] = coefs[i] * v;
-			}
-			return res;
-		}
-
-		SH operator *(float v) {
-			SH res;
-			for (u32 i = 0; i < 9; ++i) {
-				res.coefs[i] = coefs[i] * v;
-			}
-			return res;
-		}
-
-		void operator +=(const SH& rhs) {
-			for (u32 i = 0; i < 9; ++i) {
-				coefs[i] += rhs.coefs[i];
-			}
-		}
-	};
-
-	static SH project(const Vec3& dir) {
-		SH sh;
-    
-		sh.coefs[0] = Vec3(0.282095f);
-		sh.coefs[1] = Vec3(0.488603f * dir.y);
-		sh.coefs[2] = Vec3(0.488603f * dir.z);
-		sh.coefs[3] = Vec3(0.488603f * dir.x);
-		sh.coefs[4] = Vec3(1.092548f * dir.x * dir.y);
-		sh.coefs[5] = Vec3(1.092548f * dir.y * dir.z);
-		sh.coefs[6] = Vec3(0.315392f * (3.0f * dir.z * dir.z - 1.0f));
-		sh.coefs[7] = Vec3(1.092548f * dir.x * dir.z);
-		sh.coefs[8] = Vec3(0.546274f * (dir.x * dir.x - dir.y * dir.y));
-    
-		return sh;
-	}
-
-	static Vec3 cube2dir(u32 x, u32 y, u32 s, u32 width, u32 height) {
-		float u = ((x + 0.5f) / float(width)) * 2.f - 1.f;
-		float v = ((y + 0.5f) / float(height)) * 2.f - 1.f;
-		v *= -1.f;
-
-		Vec3 dir(0.f);
-
-		switch(s) {
-			case 0: return Vec3(1.f, v, -u).normalized();
-			case 1: return Vec3(-1.f, v, u).normalized();
-			case 2: return Vec3(u, 1.f, -v).normalized();
-			case 3: return Vec3(u, -1.f, v).normalized();
-			case 4: return Vec3(u, v, 1.f).normalized();
-			case 5: return Vec3(-u, v, -1.f).normalized();
-		}
-
-		return dir;
-	}
-
-	// https://github.com/TheRealMJP/LowResRendering/blob/master/SampleFramework11/v1.01/Graphics/SH.cpp
-	// https://www.gamedev.net/forums/topic/699721-spherical-harmonics-irradiance-from-hdr/
-	static SH computeSH(const Vec4* pixels, u32 w, u32 h) {
-		SH out;
-		const float pixel_area = (2.0f * PI / w) * (PI / h);
-		float weightSum = 0.0f;
-		for (u32 face = 0; face < 6; ++face) {
-			for (u32 y = 0; y < h; y++) {
-				for (u32 x = 0; x < w; x += 3) {
-					const float u = (x + 0.5f) / w;
-					const float v = (y + 0.5f) / h;
-					const float temp = 1.0f + u * u + v * v;
-					const float weight = 4.0f / (sqrtf(temp) * temp);
-					const Vec3 dir = cube2dir(x, y, face, w, h);
-					const Vec3 color = pixels[(x + y * w + face * w * h)].rgb();
-					out += project(dir) * (color * weight);
-					weightSum += weight;
-				}
-			}
-		}
-		return out * ((4.0f * PI) / weightSum);
-	}
-	
 	void processData(ProbeJob& job) {
-		Array<Vec4>& data = job.datax;
+		Array<Vec4>& data = job.data;
 		const u32 texture_size = (u32)sqrt(data.size() / 6);
 				
 		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
@@ -2532,34 +2718,15 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			}
 		}
 
-		cmft::Image image;	
-		cmft::imageCreate(image, texture_size, texture_size, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA32F);
-		memcpy(image.m_data, job.datax.begin(), job.datax.byte_size());
-
 		if (job.probe.flags.isSet(EnvironmentProbe::DIFFUSE)) {
-			PROFILE_BLOCK("irradiance");
-			const SH shcoefs = computeSH(job.datax.begin(), texture_size, texture_size);
-			const float mults[] = {0.282095f,
-				0.488603f,
-				0.488603f * 2 / 3.f,
-				0.488603f * 2 / 3.f,
-				1.092548f * 2 / 3.f,
-				1.092548f / 4.f,
-				0.315392f / 4.f,
-				1.092548f / 4.f,
-				0.546274f / 4.f
-			};
-
-			for (u32 i = 0; i < lengthOf(job.sh_coefs); ++i) {
-				job.sh_coefs[i] = shcoefs.coefs[i] * mults[i];
-			}
-			for (u32 i = 0; i < texture_size * texture_size * 6; ++i) {
-				swap(data[i].x, data[i].z);
-			}
+			job.sh.compute(data);
 		}
 
 		// TODO do not override mipmaps if slow filter is used
 		if (job.probe.flags.isSet(EnvironmentProbe::SPECULAR)) {
+			cmft::Image image;	
+			cmft::imageCreate(image, texture_size, texture_size, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA32F);
+			memcpy(image.m_data, data.begin(), data.byte_size());
 			if (job.fast_filter) {
 				cmft::imageResize(image, 128, 128);
 			}
@@ -3473,9 +3640,16 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 		}
 		else
 		{
+			RawTextureHeader header;
+			header.width = size;
+			header.height = size;
+			header.depth = 1;
+			header.is_array = false;
+			header.channel_type = RawTextureHeader::ChannelType::U16;
+			header.channels_count = 1;
+			file.write(&header, sizeof(header));
 			u16 tmp = 0xffff >> 1;
-			for (int i = 0; i < size * size; ++i)
-			{
+			for (int i = 0; i < size * size; ++i) {
 				file.write(&tmp, sizeof(tmp));
 			}
 			file.close();

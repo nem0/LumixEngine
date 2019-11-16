@@ -31,6 +31,25 @@ struct TGAHeader
 #pragma pack()
 
 
+struct RawTextureHeader {
+	enum class ChannelType : u32 {
+		U8,
+		U16,
+		FLOAT
+	};
+
+	static constexpr u32 MAGIC = '_LTR';
+	u32 magic = MAGIC;
+	u32 version = 0;
+	u32 width;
+	u32 height;
+	u32 depth;
+	ChannelType channel_type;
+	u32 channels_count;
+	bool is_array = false;
+};
+
+
 class LUMIX_RENDERER_API Texture final : public Resource
 {
 public: 
