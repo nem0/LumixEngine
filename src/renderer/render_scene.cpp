@@ -3028,8 +3028,10 @@ public:
 			p.reflection = rm.load<Texture>(Path(path));
 		}
 		else {
-			p.reflection->getResourceManager().unload(*p.reflection);
-			p.reflection = nullptr;
+			if (p.reflection) {
+				p.reflection->getResourceManager().unload(*p.reflection);
+				p.reflection = nullptr;
+			}
 		}
 	}
 
@@ -3050,8 +3052,10 @@ public:
 			p.radiance = rm.load<Texture>(Path(path));
 		}
 		else {
-			p.radiance->getResourceManager().unload(*p.radiance);
-			p.radiance = nullptr;
+			if (p.radiance) {
+				p.radiance->getResourceManager().unload(*p.radiance);
+				p.radiance = nullptr;
+			}
 		}
 	}
 
