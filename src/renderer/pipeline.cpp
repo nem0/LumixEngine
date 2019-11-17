@@ -1021,6 +1021,7 @@ struct PipelineImpl final : Pipeline
 			{"srgb", gpu::TextureFormat::SRGB},
 			{"rgba16", gpu::TextureFormat::RGBA16},
 			{"rgba16f", gpu::TextureFormat::RGBA16F},
+			{"rgb32f", gpu::TextureFormat::RGB32F},
 			{"rgba32f", gpu::TextureFormat::RGBA32F},
 			{"r16f", gpu::TextureFormat::R16F},
 			{"r16", gpu::TextureFormat::R16},
@@ -1401,7 +1402,6 @@ struct PipelineImpl final : Pipeline
 
 		return 0;
 	};
-
 
 	static int renderEnvProbeVolumes(lua_State* L)
 	{
@@ -2003,6 +2003,98 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(job, m_profiler_link);
 	}
 
+	static int renderLightProbeGrids(lua_State* L) {
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		const int shader_idx = LuaWrapper::checkArg<int>(L, 1);
+		const CameraParams& cp = checkCameraParams(L, 2);
+
+		Shader* shader = [&]() -> Shader* {
+			for (const ShaderRef& s : pipeline->m_shaders) {
+				if(s.id == shader_idx) {
+					return ((Shader*)s.res);
+				}
+			}
+			return nullptr;
+		}();
+
+		if (!shader || !shader->isReady()) return 0;
+
+		struct RenderJob : Renderer::RenderJob {
+			RenderJob(IAllocator& allocator)
+				: m_grids(allocator)
+			{}
+			
+			struct Grid {
+				DVec3 position;
+				IVec3 resolution;
+				Vec3 half_extents;
+				bool intersect_cam;
+				gpu::TextureHandle spherical_harmonics[7];
+			};
+
+			void setup() override {
+				RenderScene* scene = m_pipeline->getScene();
+				Universe& universe = scene->getUniverse();
+				Span<LightProbeGrid> grids = scene->getLightProbeGrids();
+				m_grids.reserve(grids.length());
+				for (const LightProbeGrid& grid : grids) {
+					Grid& g = m_grids.emplace();
+					g.half_extents = grid.half_extents;
+					g.resolution = grid.resolution;
+					g.position = universe.getPosition(grid.entity);
+					g.intersect_cam = (g.position - m_cam_pos).squaredLength() < dotProduct(g.half_extents, g.half_extents);
+					for (u32 i = 0; i < lengthOf(g.spherical_harmonics); ++i) {
+						g.spherical_harmonics[i] = grid.data[i]->handle;
+					}
+				}
+			}
+			
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::useProgram(m_program);
+				gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+				gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+				for (const Grid& g : m_grids) {
+					gpu::bindTextures(g.spherical_harmonics, 4, lengthOf(g.spherical_harmonics));
+					// TODO intersecting camera
+					if (g.intersect_cam) {
+						gpu::setState((u64)gpu::StateFlags::CULL_FRONT);
+					}
+					else {
+						gpu::setState((u64)gpu::StateFlags::CULL_BACK | (u64)gpu::StateFlags::DEPTH_TEST);
+					}
+					
+					Vec4* dc_mem = (Vec4*)gpu::map(m_pipeline->m_drawcall_ub, 3 * sizeof(Vec4));
+					memcpy(dc_mem, &g.resolution, sizeof(g.resolution));
+					memcpy(dc_mem + 1, &g.half_extents, sizeof(g.half_extents));
+					const Vec3 pos = (g.position - m_cam_pos).toFloat();
+					memcpy(dc_mem + 2, &pos, sizeof(pos));
+					gpu::unmap(m_pipeline->m_drawcall_ub);
+					
+					gpu::drawTriangles(36, gpu::DataType::U16);
+				}
+			}
+
+			DVec3 m_cam_pos;
+			Array<Grid> m_grids;
+			gpu::ProgramHandle m_program;
+			PipelineImpl* m_pipeline;
+		};
+
+		IAllocator& allocator = pipeline->m_renderer.getAllocator();
+		RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
+		job->m_pipeline = pipeline;
+		job->m_cam_pos = cp.pos;
+		job->m_program = shader->getProgram(pipeline->m_3D_pos_decl, 0);
+		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
+		return 0;
+	}
 
 	void renderLocalLights(const char* define, int shader_idx, CmdPage* cmds)
 	{
@@ -3420,6 +3512,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("pass", PipelineImpl::pass);
 		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
 		registerCFunction("renderEnvProbeVolumes", PipelineImpl::renderEnvProbeVolumes);
+		registerCFunction("renderLightProbeGrids", PipelineImpl::renderLightProbeGrids);
 		registerCFunction("renderBucket", PipelineImpl::renderBucket);
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);

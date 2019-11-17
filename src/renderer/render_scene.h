@@ -62,7 +62,7 @@ struct TerrainInfo
 struct LightProbeGrid {
 	EntityRef entity;
 	IVec3 resolution;
-	Vec3 scale;
+	Vec3 half_extents;
 	u64 guid;
 	Texture* data[7] = {};
 };
@@ -234,6 +234,7 @@ public:
 	virtual void setShadowmapCascades(EntityRef entity, const Vec4& value) = 0;
 
 	virtual LightProbeGrid& getLightProbeGrid(EntityRef entity) = 0;
+	virtual Span<LightProbeGrid> getLightProbeGrids() = 0;
 
 	virtual DebugTriangle* addDebugTriangles(int count) = 0;
 	virtual void addDebugTriangle(const DVec3& p0, const DVec3& p1, const DVec3& p2, u32 color) = 0;
