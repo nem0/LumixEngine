@@ -1226,6 +1226,7 @@ static struct {
 	{TextureFormat::RGBA8, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE},
 	{TextureFormat::RGBA16, GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT},
 	{TextureFormat::RGBA16F, GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT},
+	{TextureFormat::RGB32F, GL_RGB32F, GL_RGB, GL_FLOAT},
 	{TextureFormat::RGBA32F, GL_RGBA32F, GL_RGBA, GL_FLOAT},
 	{TextureFormat::R16F, GL_R16F, GL_RED, GL_HALF_FLOAT},
 	{TextureFormat::R8, GL_R8, GL_RED, GL_UNSIGNED_BYTE},
@@ -1538,13 +1539,14 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	checkThread();
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
 	const bool no_mips = flags & (u32)TextureFlags::NO_MIPS;
+	const bool is_3d = depth > 1 && (flags & (u32)TextureFlags::IS_3D);
 	ASSERT(!is_srgb); // use format argument to enable srgb
 	ASSERT(debug_name && debug_name[0]);
 
 	GLuint texture;
 	int found_format = 0;
 	GLenum internal_format = 0;
-	const GLenum target = depth <= 1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_ARRAY;
+	const GLenum target = depth <= 1 ? GL_TEXTURE_2D : (is_3d ? GL_TEXTURE_3D : GL_TEXTURE_2D_ARRAY);
 	const u32 mip_count = no_mips ? 1 : 1 + log2(maximum(w, h, depth));
 
 	CHECK_GL(glCreateTextures(target, 1, &texture));

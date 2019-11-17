@@ -2339,8 +2339,14 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 			--m_to_dispatch;
 			Job* job = LUMIX_NEW(allocator, Job)(*this, m_to_dispatch, allocator);
 
-			// TODO subposition
-			captureCubemap(m_app, *m_pipeline, 32, m_position, Ref(job->data), [job](){
+			m_pipeline->define("PROBE_BOUNCE", m_bounce);
+			const Vec3 cell_size = 2.f * m_grid.half_extents / m_grid.resolution;
+			const DVec3 origin = m_position - m_grid.half_extents + cell_size * 0.5f;
+			const IVec3 loc(m_to_dispatch % m_grid.resolution.x
+				, (m_to_dispatch / m_grid.resolution.x) % m_grid.resolution.y
+				, m_to_dispatch / (m_grid.resolution.x * m_grid.resolution.y));
+			const DVec3 pos = origin + cell_size * loc;
+			captureCubemap(m_app, *m_pipeline, 32, pos, Ref(job->data), [job](){
 				JobSystem::run(job, [](void* ptr) {
 					Job* pjob = (Job*)ptr;
 					pjob->plugin.m_result[pjob->index].compute(pjob->data);
@@ -2390,6 +2396,19 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 
 				for (u32 sh_idx = 0; sh_idx < 7; ++sh_idx) {
 					StaticString<MAX_PATH_LENGTH> path(dir, m_grid.guid, "_grid", sh_idx, ".raw");
+					StaticString<MAX_PATH_LENGTH> meta_path(dir, m_grid.guid, "_grid", sh_idx, ".meta");
+					
+					OS::OutputFile meta_file;
+					if (!meta_file.open(meta_path)) {
+						logError("Editor") << "Failed to create " << path;
+					}
+					else {
+						meta_file << "wrap_mode_u = \"clamp\"\n";
+						meta_file << "wrap_mode_v = \"clamp\"\n";
+						meta_file << "wrap_mode_w = \"clamp\"\n";
+					}
+					meta_file.close();
+
 					OS::OutputFile file;
 					if (!file.open(path)) {
 						logError("Editor") << "Failed to create " << path;
@@ -3498,7 +3517,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 		const LightProbeGrid& lpg = scene->getLightProbeGrid(e);
 		const DVec3 pos = universe.getPosition(e);
 
-		scene->addDebugCube(pos - lpg.scale, pos + lpg.scale, 0xff0000ff);
+		scene->addDebugCube(pos - lpg.half_extents, pos + lpg.half_extents, 0xff0000ff);
 	}
 
 	void showEnvironmentProbeGizmo(ComponentUID cmp) {

@@ -118,6 +118,7 @@ enum class TextureFormat : u32 {
 	RGBA8,
 	RGBA16,
 	RGBA16F,
+	RGB32F,
 	RGBA32F,
 	R16F,
 	R16,
@@ -134,7 +135,8 @@ enum class TextureFlags : u32 {
 	CLAMP_W = 1 << 3,
 	NO_MIPS = 1 << 4,
 	POINT_FILTER = 1 << 5,
-	READBACK = 1 << 6
+	READBACK = 1 << 6,
+	IS_3D = 1 << 7
 };
 
 enum class BufferFlags : u32 {

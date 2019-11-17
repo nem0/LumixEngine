@@ -631,7 +631,7 @@ public:
 		const LightProbeGrid& lp = m_light_probe_grids[entity];
 		serializer.write("guid", lp.guid);
 		serializer.write("resolution", lp.resolution);
-		serializer.write("scale", lp.scale);
+		serializer.write("half_extents", lp.half_extents);
 	}
 
 	void loadLightProbeGridData(LightProbeGrid& lp) const {
@@ -640,6 +640,9 @@ public:
 		for (u32 i = 0; i < lengthOf(lp.data); ++i) {
 			const StaticString<MAX_PATH_LENGTH> path_str(dir, lp.guid, "_grid", i, ".raw");
 			lp.data[i] = manager.load<Texture>(Path(path_str));
+			lp.data[i]->setFlag(Texture::Flags::CLAMP_U, true);
+			lp.data[i]->setFlag(Texture::Flags::CLAMP_V, true);
+			lp.data[i]->setFlag(Texture::Flags::CLAMP_W, true);
 		}
 	}
 
@@ -648,7 +651,7 @@ public:
 		lp.entity = entity;
 		serializer.read(Ref(lp.guid));
 		serializer.read(Ref(lp.resolution));
-		serializer.read(Ref(lp.scale));
+		serializer.read(Ref(lp.half_extents));
 		loadLightProbeGridData(lp);
 		m_light_probe_grids.insert(entity, lp);
 		m_universe.onComponentCreated(entity, LIGHT_PROBE_GRID_TYPE, this);
@@ -1245,7 +1248,7 @@ public:
 			serializer.write(iter.entity);
 			serializer.write(iter.guid);
 			serializer.write(iter.resolution);
-			serializer.write(iter.scale);
+			serializer.write(iter.half_extents);
 		}
 	}
 
@@ -1276,7 +1279,7 @@ public:
 			serializer.read(lp.entity);
 			serializer.read(lp.guid);
 			serializer.read(lp.resolution);
-			serializer.read(lp.scale);
+			serializer.read(lp.half_extents);
 			loadLightProbeGridData(lp);
 			m_light_probe_grids.insert(lp.entity, lp);
 			m_universe.onComponentCreated(lp.entity, LIGHT_PROBE_GRID_TYPE, this);
@@ -2817,6 +2820,10 @@ public:
 		line.color = ARGBToABGR(color);
 	}
 	
+	Span<LightProbeGrid> getLightProbeGrids() override {
+		return Span(m_light_probe_grids.begin(), m_light_probe_grids.size());
+	}
+
 	LightProbeGrid& getLightProbeGrid(EntityRef entity) override {
 		return m_light_probe_grids[entity];
 	}
@@ -2863,8 +2870,6 @@ public:
 		PROFILE_FUNCTION();
 		RayCastModelHit hit;
 		hit.is_hit = false;
-		hit.origin = origin;
-		hit.dir = dir;
 		double cur_dist = DBL_MAX;
 		const Universe& universe = getUniverse();
 		for (int i = 0; i < m_model_instances.size(); ++i) {
@@ -2904,6 +2909,8 @@ public:
 			}
 		}
 
+		hit.origin = origin;
+		hit.dir = dir;
 		return hit;
 	}
 
@@ -3259,7 +3266,7 @@ public:
 		lp.entity = entity;
 		lp.guid = randGUID();
 		lp.resolution = IVec3(32, 8, 32);
-		lp.scale = Vec3(32.f, 8.f, 32.f);
+		lp.half_extents = Vec3(16.f, 4.f, 16.f);
 		loadLightProbeGridData(lp);
 		m_light_probe_grids.insert(entity, lp);
 
@@ -3416,7 +3423,7 @@ private:
 	Array<ModelInstance> m_model_instances;
 	Array<MeshSortData> m_mesh_sort_data;
 	HashMap<EntityRef, Environment> m_environments;
-	HashMap<EntityRef, LightProbeGrid> m_light_probe_grids;
+	AssociativeArray<EntityRef, LightProbeGrid> m_light_probe_grids;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera;
 	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;

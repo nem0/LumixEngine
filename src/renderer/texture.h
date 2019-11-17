@@ -38,9 +38,10 @@ struct RawTextureHeader {
 		FLOAT
 	};
 
+	static constexpr u32 LAST_VERSION = 0;
 	static constexpr u32 MAGIC = '_LTR';
 	u32 magic = MAGIC;
-	u32 version = 0;
+	u32 version = LAST_VERSION;
 	u32 width;
 	u32 height;
 	u32 depth;
@@ -58,7 +59,7 @@ public:
 		CLAMP_U = 1 << 1,
 		CLAMP_V = 1 << 2,
 		CLAMP_W = 1 << 3,
-		POINT = 1 << 4
+		POINT = 1 << 4,
 	};
 
 public:

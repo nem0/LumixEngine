@@ -2,6 +2,7 @@ local deferred_shader = preloadShader("pipelines/deferred.shd")
 local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local indirect_shader =  preloadShader("pipelines/indirect.shd")
+local light_probe_grid_shader =  preloadShader("pipelines/light_probe_grid.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
@@ -149,6 +150,17 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 				wrb,
 			}, 0)
 			renderEnvProbeVolumes(indirect_shader, view_params, true, false)
+		endBlock()
+
+		beginBlock("light probe grid")
+			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
+			bindRenderbuffers({
+				gbuffer0,
+				gbuffer1,
+				gbuffer2,
+				gbuffer_depth,
+			}, 0)
+			renderLightProbeGrids(light_probe_grid_shader, view_params);
 		endBlock()
 	end
 	

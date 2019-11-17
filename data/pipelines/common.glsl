@@ -78,7 +78,7 @@ float getShadow(sampler2D shadowmap, vec3 wpos)
 			float occluder = textureLod(shadowmap, sm_uv, 0).r;
 			float receiver = shadowmapValue(sc.z);
 			float m =  receiver / occluder;
-			return clamp(1 - (1 - m) * 64, 0.0, 1.0);
+			return clamp(1 - (1 - m) * 2048, 0.0, 1.0);
 		}
 	}
 

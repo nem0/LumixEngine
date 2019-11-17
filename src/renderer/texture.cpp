@@ -334,6 +334,14 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	PROFILE_FUNCTION();
 	RawTextureHeader header;
 	file.read(&header, sizeof(header));
+	if (header.magic != RawTextureHeader::MAGIC) {
+		logError("Renderer") << texture.getPath() << ": corruptede file or not raw texture format.";
+		return false;
+	}
+	if (header.version > RawTextureHeader::LAST_VERSION) {
+		logError("Renderer") << texture.getPath() << ": unsupported version.";
+		return false;
+	}
 
 	texture.width = header.width;
 	texture.height = header.height;
@@ -345,6 +353,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 			texture.bytes_per_pixel = sizeof(float) * header.channels_count;
 			switch (header.channels_count) {
 				case 1: format = gpu::TextureFormat::R32F; break;
+				case 3: format = gpu::TextureFormat::RGB32F; break;
 				case 4: format = gpu::TextureFormat::RGBA32F; break;
 				default: ASSERT(false); return false;
 			}
@@ -377,11 +386,13 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	const u8* data = (const u8*)file.getBuffer() + file.getPosition();
 	const Renderer::MemRef dst_mem = texture.renderer.copy(data, (u32)size);
 
+	const u32 flag_3d = header.depth > 1 && !header.is_array ? (u32)gpu::TextureFlags::IS_3D : 0;
+
 	texture.handle = texture.renderer.createTexture(texture.width
 		, texture.height
 		, texture.depth
 		, format
-		, texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
+		, texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB | flag_3d
 		, dst_mem
 		, texture.getPath().c_str());
 	texture.mips = 1;
