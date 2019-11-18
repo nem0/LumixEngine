@@ -1021,7 +1021,6 @@ struct PipelineImpl final : Pipeline
 			{"srgb", gpu::TextureFormat::SRGB},
 			{"rgba16", gpu::TextureFormat::RGBA16},
 			{"rgba16f", gpu::TextureFormat::RGBA16F},
-			{"rgb32f", gpu::TextureFormat::RGB32F},
 			{"rgba32f", gpu::TextureFormat::RGBA32F},
 			{"r16f", gpu::TextureFormat::R16F},
 			{"r16", gpu::TextureFormat::R16},
@@ -3425,7 +3424,7 @@ struct PipelineImpl final : Pipeline
 				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
 				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
 				gpu::copy(staging, handle);
-				gpu::readTexture(staging, gpu::TextureFormat::RGBA8, Span((u8*)pixels.begin(), pixels.byte_size()));
+				gpu::readTexture(staging, Span((u8*)pixels.begin(), pixels.byte_size()));
 				gpu::destroy(staging);
 
 				OS::OutputFile file;
