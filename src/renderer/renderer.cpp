@@ -577,7 +577,7 @@ struct RendererImpl final : public Renderer
 				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
 				gpu::createTexture(staging, w, h, 1, out_format, flags, nullptr, "staging_buffer");
 				gpu::copy(staging, handle);
-				gpu::readTexture(staging, out_format, buf);
+				gpu::readTexture(staging, buf);
 				gpu::destroy(staging);
 				gpu::popDebugGroup();
 			}

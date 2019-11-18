@@ -353,7 +353,6 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 			texture.bytes_per_pixel = sizeof(float) * header.channels_count;
 			switch (header.channels_count) {
 				case 1: format = gpu::TextureFormat::R32F; break;
-				case 3: format = gpu::TextureFormat::RGB32F; break;
 				case 4: format = gpu::TextureFormat::RGBA32F; break;
 				default: ASSERT(false); return false;
 			}

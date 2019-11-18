@@ -2419,7 +2419,7 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 					header.width = m_grid.resolution.x;
 					header.height = m_grid.resolution.y;
 					header.depth = m_grid.resolution.z;
-					header.channels_count = sh_idx == 6 ? 3 : 4;
+					header.channels_count = 4;
 					header.channel_type = RawTextureHeader::ChannelType::FLOAT;
 					file.write(&header, sizeof(header));
 					const u32 c0 = (sh_idx * 4 + 0) / 3;
@@ -2432,10 +2432,11 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 					const u32 c30 = (sh_idx * 4 + 3) % 3;
 					if (sh_idx == 6) {
 						for (u32 i = 0; i < m_total; ++i) {
-							Vec3 v;
+							Vec4 v;
 							v.x = (&m_result[i].coefs[c0].x)[c00];
 							v.y = (&m_result[i].coefs[c1].x)[c10];
 							v.z = (&m_result[i].coefs[c2].x)[c20];
+							v.w = 0;
 							file.write(&v, sizeof(v));
 						}
 					}

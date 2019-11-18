@@ -1226,7 +1226,6 @@ static struct {
 	{TextureFormat::RGBA8, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE},
 	{TextureFormat::RGBA16, GL_RGBA16, GL_RGBA, GL_UNSIGNED_SHORT},
 	{TextureFormat::RGBA16F, GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT},
-	{TextureFormat::RGB32F, GL_RGB32F, GL_RGB, GL_FLOAT},
 	{TextureFormat::RGBA32F, GL_RGBA32F, GL_RGBA, GL_FLOAT},
 	{TextureFormat::R16F, GL_R16F, GL_RED, GL_HALF_FLOAT},
 	{TextureFormat::R8, GL_R8, GL_RED, GL_UNSIGNED_BYTE},
@@ -1894,7 +1893,7 @@ void copy(TextureHandle dst_handle, TextureHandle src_handle) {
 	CHECK_GL(glCopyImageSubData(src.handle, src.target, 0, 0, 0, 0, dst.handle, dst.target, 0, 0, 0, 0, src.width, src.height, 1));
 }
 
-void readTexture(TextureHandle texture, TextureFormat format, Span<u8> buf)
+void readTexture(TextureHandle texture, Span<u8> buf)
 {
 	checkThread();
 
@@ -1902,7 +1901,7 @@ void readTexture(TextureHandle texture, TextureFormat format, Span<u8> buf)
 	const GLuint handle = t.handle;
 
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
-		if (s_texture_formats[i].format == format) {
+		if (s_texture_formats[i].gl_internal == t.format) {
 			const auto& f = s_texture_formats[i];
 			CHECK_GL(glGetTextureImage(handle, 0, f.gl_format, f.type, buf.length(), buf.begin()));
 			return;
