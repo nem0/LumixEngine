@@ -1444,6 +1444,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	explicit TexturePlugin(StudioApp& app)
 		: m_app(app)
+		, m_composite(app.getWorldEditor().getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("png", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("jpg", Texture::TYPE);
@@ -1462,6 +1463,21 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
+	const char* getDefaultExtension() const { return "ltc"; }
+	const char* getFileDialogFilter() const { return "Composite texture\0*.ltc\0"; }
+	const char* getFileDialogExtensions() const { return "ltc"; }
+	bool canCreateResource() const override { return true; }
+	bool createResource(const char* path) { 
+		OS::OutputFile file;
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (!file.open(path)) {
+			logError("Renderer") << "Failed to create " << path;
+			return false;
+		}
+
+		file.close();
+		return true;
+	}
 
 	struct TextureTileJob
 	{
@@ -1567,7 +1583,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Texture::TYPE) {
+		if (type == Texture::TYPE && !PathUtils::hasExtension(in_path, "ltc") && !PathUtils::hasExtension(in_path, "raw")) {
 			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 			FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 			auto* job = LUMIX_NEW(allocator, TextureTileJob)(fs, allocator);
@@ -1590,10 +1606,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 		
 		struct Layer {
-			ChannelSource red;
-			ChannelSource green;
-			ChannelSource blue;
-			ChannelSource alpha;
+			ChannelSource red = {{}, 0};
+			ChannelSource green = {{}, 1};
+			ChannelSource blue = {{}, 2};
+			ChannelSource alpha = {{}, 3};
 
 			ChannelSource& getChannel(u32 i) {
 				switch(i) {
@@ -1705,61 +1721,75 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			: layers(allocator)
 		{}
 
+		bool init(Span<u8> data, const char* src_path) {
+			layers.clear();
+			output = Output::BC1;
+
+			lua_State* L = luaL_newstate();
+			luaL_openlibs(L);
+
+			lua_pushlightuserdata(L, this);
+			lua_setfield(L, LUA_GLOBALSINDEX, "this");
+		
+			#define DEFINE_LUA_FUNC(func) \
+				lua_pushcfunction(L, TextureComposite::LUA_##func); \
+				lua_setfield(L, LUA_GLOBALSINDEX, #func); 
+
+			DEFINE_LUA_FUNC(layer)
+			DEFINE_LUA_FUNC(output)
+		
+			#undef DEFINE_LUA_FUNC
+
+			bool success = LuaWrapper::execute(L, Span((const char*)data.begin(), (const char*)data.end()), src_path, 0);
+			lua_close(L);
+			return success;
+		}
+
 		Array<Layer> layers;
 		Output output = Output::BC1;
 	};
 
-	void createComposite(const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
-		// TODO reuse
-		lua_State* L = luaL_newstate();
-		luaL_openlibs(L);
-
+	bool createComposite(const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
 		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
 		TextureComposite tc(allocator);
-		lua_pushlightuserdata(L, &tc);
-		lua_setfield(L, LUA_GLOBALSINDEX, "this");
-		
-		#define DEFINE_LUA_FUNC(func) \
-			lua_pushcfunction(L, TextureComposite::LUA_##func); \
-			lua_setfield(L, LUA_GLOBALSINDEX, #func); 
-
-		DEFINE_LUA_FUNC(layer)
-		
-		#undef DEFINE_LUA_FUNC
-
-		if (!LuaWrapper::execute(L, Span((const char*)src_data.begin(), (const char*)src_data.end()), src_path, 0)) return;
+		if (!tc.init(Span(src_data.begin(), src_data.end()), src_path)) return false;
 
 		HashMap<u32, stbi_uc*> sources(allocator);
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		Array<u8> tmp_src(allocator);
 		int w = -1, h = -1;
+
 		auto prepare_source =[&](const TextureComposite::ChannelSource& ch){
-			if (!ch.path.isValid()) return;
-			if (sources.find(ch.path.getHash()).isValid()) return;
+			if (!ch.path.isValid()) return false;
+			if (sources.find(ch.path.getHash()).isValid()) return true;
 
 			tmp_src.clear();
 			if (!fs.getContentSync(ch.path, Ref(tmp_src))) {
-				// TODO
+				return false;
 			}
 
 			int cmp;
 			stbi_uc* data = stbi_load_from_memory(tmp_src.begin(), tmp_src.byte_size(), &w, &h, &cmp, 4);
 			if (!data) {
-				// TODO
+				return false;
 			}
 
 			sources.insert(ch.path.getHash(), data);
+			return true;
 		};
 
+		bool success = true;
 		for (TextureComposite::Layer& layer : tc.layers) {
-			prepare_source(layer.red);
-			prepare_source(layer.green);
-			prepare_source(layer.blue);
-			prepare_source(layer.alpha);
+			success = success && prepare_source(layer.red);
+			success = success && prepare_source(layer.green);
+			success = success && prepare_source(layer.blue);
+			success = success && prepare_source(layer.alpha);
 		}
 
+		if (!success) return false;
+
 		if (tc.layers.empty()) {
-			// TODO
+			return true;
 		}
 
 		nvtt::InputOptions input;
@@ -1824,9 +1854,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		nvtt::Context context;
 		if (!context.process(input, compression, output)) {
-			// TODO
+			return false;
 		}
-
+		return true;
 	}
 
 	bool compileImage(const Path& path, const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta)
@@ -1965,7 +1995,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			compileImage(src, src_data, out, meta);
 		}
 		else if (equalStrings(ext, "ltc")) {
-			createComposite(src_data, out, meta, src.c_str());
+			if (!createComposite(src_data, out, meta, src.c_str())) {
+				return false;
+			}
 		}
 		else {
 			ASSERT(false);
@@ -1987,6 +2019,125 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case Meta::WrapMode::CLAMP: return "clamp";
 			case Meta::WrapMode::REPEAT: return "repeat";
 			default: ASSERT(false); return "repeat";
+		}
+	}
+
+	void compositeGUI(Texture& texture) {
+		WorldEditor& editor = m_app.getWorldEditor();
+		FileSystem& fs = editor.getEngine().getFileSystem();
+		if (m_composite_tag != &texture) {
+			m_composite_tag = &texture;
+			IAllocator& allocator = editor.getAllocator();
+			Array<u8> content(allocator);
+			fs.getContentSync(texture.getPath(), Ref(content));
+			m_composite.init(Span(content.begin(), content.end()), texture.getPath().c_str());
+		}
+
+		if (ImGui::CollapsingHeader("Edit")) {
+			static bool show_channels = false;
+			bool same_channels = true;
+			for (TextureComposite::Layer& layer : m_composite.layers) {
+				if (layer.red.path != layer.green.path
+					|| layer.red.path != layer.blue.path
+					|| layer.red.path != layer.alpha.path) 
+				{
+					same_channels = false;
+					break;
+				}
+				if (layer.red.src_channel != 0
+					|| layer.green.src_channel != 1
+					|| layer.blue.src_channel != 2
+					|| layer.alpha.src_channel != 3)
+				{
+					same_channels = false;
+					break;
+				}
+			}
+
+			if (same_channels) {
+				ImGui::Checkbox("Show single channels", &show_channels);
+			}
+			else {
+				show_channels = true;
+			}
+			for (TextureComposite::Layer& layer : m_composite.layers) {
+				const u32 idx = u32(&layer - m_composite.layers.begin());
+				if (ImGui::TreeNodeEx(&layer, 0, "%d", idx)) {
+					if (ImGui::Button("Remove")) {
+						m_composite.layers.erase(idx);
+						ImGui::TreePop();
+						break;
+					}
+
+					char tmp[MAX_PATH_LENGTH];
+					
+					if (show_channels) {
+						copyString(Span(tmp), layer.red.path.c_str());
+						if (m_app.getAssetBrowser().resourceInput("Red", "r", Span(tmp), Texture::TYPE)) {
+							layer.red.path = tmp;
+						}
+						ImGui::Combo("Red source channel", (int*)&layer.red.src_channel, "Red\0Green\0Blue\0Alpha\0");
+
+						copyString(Span(tmp), layer.green.path.c_str());
+						if (m_app.getAssetBrowser().resourceInput("Green", "g", Span(tmp), Texture::TYPE)) {
+							layer.green.path = tmp;
+						}
+						ImGui::Combo("Green source channel", (int*)&layer.green.src_channel, "Red\0Green\0Blue\0Alpha\0");
+
+						copyString(Span(tmp), layer.blue.path.c_str());
+						if (m_app.getAssetBrowser().resourceInput("Blue", "b", Span(tmp), Texture::TYPE)) {
+							layer.blue.path = tmp;
+						}
+						ImGui::Combo("Blue source channel", (int*)&layer.blue.src_channel, "Red\0Green\0Blue\0Alpha\0");
+				
+						copyString(Span(tmp), layer.alpha.path.c_str());
+						if (m_app.getAssetBrowser().resourceInput("Alpha", "a", Span(tmp), Texture::TYPE)) {
+							layer.alpha.path = tmp;
+						}
+						ImGui::Combo("Alpha source channel", (int*)&layer.alpha.src_channel, "Red\0Green\0Blue\0Alpha\0");
+					}
+					else {
+						copyString(Span(tmp), layer.red.path.c_str());
+						if (m_app.getAssetBrowser().resourceInput("Source", "rgba", Span(tmp), Texture::TYPE)) {
+							layer.red.path = tmp;
+							layer.green.path = tmp;
+							layer.blue.path = tmp;
+							layer.alpha.path = tmp;
+							layer.red.src_channel = 0;
+							layer.green.src_channel = 1;
+							layer.blue.src_channel = 2;
+							layer.alpha.src_channel = 3;
+						}
+					}
+
+					ImGui::TreePop();
+				}
+			}
+			if (ImGui::Button("Add layer")) {
+				m_composite.layers.emplace();
+			}
+			if (ImGui::Button("Save")) {
+				const StaticString<MAX_PATH_LENGTH> out_path(fs.getBasePath(), "/", texture.getPath().c_str());
+				OS::OutputFile file;
+				if (file.open(out_path)) {
+					for (TextureComposite::Layer& layer : m_composite.layers) {
+						file << "layer {\n";
+						file << "\tred = { \"" << layer.red.path.c_str() << "\", " << layer.red.src_channel << " },\n";
+						file << "\tgreen = { \"" << layer.green.path.c_str() << "\", " << layer.green.src_channel << " },\n";
+						file << "\tblue = { \"" << layer.blue.path.c_str() << "\", " << layer.blue.src_channel << " },\n";
+						file << "\talpha = { \"" << layer.alpha.path.c_str() << "\", " << layer.alpha.src_channel << " },\n";
+						file << "}\n";
+					}
+					file.close();
+				}
+				else {
+					logError("Renderer") << "Failed to create " << out_path;
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Open in external editor")) {
+				m_app.getAssetBrowser().openInExternalEditor(texture.getPath().c_str());
+			}
 		}
 	}
 
@@ -2026,6 +2177,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
 		}
 
+		if (PathUtils::hasExtension(texture->getPath().c_str(), "ltc")) compositeGUI(*texture);
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			
@@ -2079,6 +2231,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	JobSystem::SignalHandle m_tile_signal = JobSystem::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
+	TextureComposite m_composite;
+	void* m_composite_tag = nullptr;
 };
 
 
