@@ -185,6 +185,34 @@ struct SphericalHarmonics {
 	}
 };
 
+static void flipY(Vec4* data, int texture_size)
+{
+	for (int y = 0; y < texture_size / 2; ++y)
+	{
+		for (int x = 0; x < texture_size; ++x)
+		{
+			const Vec4 t = data[x + y * texture_size];
+			data[x + y * texture_size] = data[x + (texture_size - y - 1) * texture_size];
+			data[x + (texture_size - y - 1) * texture_size] = t;
+		}
+	}
+}
+
+
+static void flipX(Vec4* data, int texture_size)
+{
+	for (int y = 0; y < texture_size; ++y)
+	{
+		Vec4* tmp = &data[y * texture_size];
+		for (int x = 0; x < texture_size / 2; ++x)
+		{
+			const Vec4 t = tmp[x];
+			tmp[x] = tmp[texture_size - x - 1];
+			tmp[texture_size - x - 1] = t;
+		}
+	}
+}
+
 static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
 	ASSERT(data);
 	OS::OutputFile file;
@@ -2349,6 +2377,21 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 			captureCubemap(m_app, *m_pipeline, 32, pos, Ref(job->data), [job](){
 				JobSystem::run(job, [](void* ptr) {
 					Job* pjob = (Job*)ptr;
+
+					const bool ndc_bottom_left = gpu::isOriginBottomLeft();
+					if (!ndc_bottom_left) {
+						const u32 texture_size = (u32)sqrt(pjob->data.size() / 6);
+						for (int i = 0; i < 6; ++i) {
+							Vec4* tmp = &pjob->data[i * texture_size * texture_size];
+							if (i == 2 || i == 3) {
+								flipY(tmp, texture_size);
+							}
+							else {
+								flipX(tmp, texture_size);
+							}
+						}
+					}
+
 					pjob->plugin.m_result[pjob->index].compute(pjob->data);
 					MT::memoryBarrier();
 					pjob->done = true;
@@ -2548,35 +2591,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 	}
 
 
-	static void flipY(u32* data, int texture_size)
-	{
-		for (int y = 0; y < texture_size / 2; ++y)
-		{
-			for (int x = 0; x < texture_size; ++x)
-			{
-				u32 t = data[x + y * texture_size];
-				data[x + y * texture_size] = data[x + (texture_size - y - 1) * texture_size];
-				data[x + (texture_size - y - 1) * texture_size] = t;
-			}
-		}
-	}
-
-
-	static void flipX(u32* data, int texture_size)
-	{
-		for (int y = 0; y < texture_size; ++y)
-		{
-			u32* tmp = (u32*)&data[y * texture_size];
-			for (int x = 0; x < texture_size / 2; ++x)
-			{
-				u32 t = tmp[x];
-				tmp[x] = tmp[texture_size - x - 1];
-				tmp[texture_size - x - 1] = t;
-			}
-		}
-	}
-
-
 	void generateCubemaps(bool bounce, bool fast_filter) {
 		ASSERT(m_probes.empty());
 
@@ -2728,7 +2742,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 		if (!ndc_bottom_left) {
 			for (int i = 0; i < 6; ++i) {
-				u32* tmp = (u32*)&data[i * texture_size * texture_size  * 4];
+				Vec4* tmp = &data[i * texture_size * texture_size];
 				if (i == 2 || i == 3) {
 					flipY(tmp, texture_size);
 				}
