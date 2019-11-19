@@ -1223,6 +1223,10 @@ void TerrainEditor::onGUI()
 		ImGui::Indent();
 		return;
 	}
+
+	bool is_grass_enabled = scene->isGrassEnabled();
+	if (ImGui::Checkbox("Enable grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
+
 	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
 	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
 
@@ -1231,16 +1235,10 @@ void TerrainEditor::onGUI()
 		HEIGHT,
 		LAYER,
 		ENTITY,
-		COLOR,
 		GRASS
 	};
 
-	bool is_grass_enabled = scene->isGrassEnabled();
-
-	if (ImGui::Checkbox("Enable grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
-
-	if (ImGui::Combo(
-			"Brush type", &m_current_brush, "Height\0Layer\0Entity\0Color\0Grass\0"))
+	if (ImGui::Combo("Brush type", &m_current_brush, "Height\0Layer\0Entity\0Grass\0"))
 	{
 		m_action_type = m_current_brush == HEIGHT ? TerrainEditor::RAISE_HEIGHT : m_action_type;
 	}
@@ -1381,11 +1379,13 @@ void TerrainEditor::onGUI()
 						m_fixed_value.x = use ? 0.f : -1.f;
 					}
 					if (m_fixed_value.x >= 0) {
-						ImGui::SliderFloat("Fixed value min", &m_fixed_value.x, 0, m_fixed_value.y);
-						ImGui::SliderFloat("Fixed value max", &m_fixed_value.y, m_fixed_value.x, 1);
+						ImGui::DragFloatRange2("Min/max", &m_fixed_value.x, &m_fixed_value.y, 0.01f, 0, 1);
 					}
 				}
 				m_layers_mask = (primary ? 1 : 0) | (secondary ? 0b10 : 0);
+				if (tex->layers == 1) {
+					ImGui::Text("Only one layer available. Add layers to albedo detail texture (in material).");
+				}
 				for (int i = 0; i < tex->layers; ++i) {
 					if (i % 4 != 0) ImGui::SameLine();
 					bool b = m_textures_mask & ((u64)1 << i);
@@ -1407,8 +1407,10 @@ void TerrainEditor::onGUI()
 			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 			if (ImGui::ListBoxHeader("Prefabs", size)) {
 				auto& resources = m_app.getAssetCompiler().lockResources();
+				u32 count = 0;
 				for (const AssetCompiler::ResourceItem& res : resources) {
 					if (res.type != PrefabResource::TYPE) continue;
+					++count;
 					if (filter[0] != 0 && stristr(res.path.c_str(), filter) == nullptr) continue;
 					int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
 						return r && r->getPath() == res.path;
@@ -1427,6 +1429,7 @@ void TerrainEditor::onGUI()
 						}
 					}
 				}
+				if (count == 0) ImGui::TextUnformatted("No prefabs");
 				m_app.getAssetCompiler().unlockResources();
 				ImGui::ListBoxFooter();
 			}

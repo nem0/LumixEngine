@@ -26,6 +26,9 @@ Texture::Texture(const Path& path, ResourceManager& resource_manager, Renderer& 
 	, bytes_per_pixel(-1)
 	, depth(-1)
 	, layers(1)
+	, width(0)
+	, height(0)
+	, mips(0)
 	, renderer(renderer)
 {
 	flags = 0;

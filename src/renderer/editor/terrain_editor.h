@@ -73,7 +73,7 @@ private:
 	float m_terrain_brush_size;
 	u64 m_textures_mask = 0b1;
 	u32 m_layers_mask = 0b1;
-	Vec2 m_fixed_value{-0.01f,-1};
+	Vec2 m_fixed_value{-1,1};
 	u16 m_grass_mask;
 	u16 m_flat_height;
 	Vec3 m_color;
