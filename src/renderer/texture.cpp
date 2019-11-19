@@ -377,12 +377,13 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	}
 
 	const u64 size = file.size() - file.getPosition();
+	const u8* data = (const u8*)file.getBuffer() + file.getPosition();
+
 	if (texture.data_reference) {
 		texture.data.resize((int)size);
 		file.read(texture.data.getMutableData(), size);
 	}
 
-	const u8* data = (const u8*)file.getBuffer() + file.getPosition();
 	const Renderer::MemRef dst_mem = texture.renderer.copy(data, (u32)size);
 
 	const u32 flag_3d = header.depth > 1 && !header.is_array ? (u32)gpu::TextureFlags::IS_3D : 0;
