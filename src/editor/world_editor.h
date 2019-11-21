@@ -98,13 +98,11 @@ public:
 	virtual void loadUniverse(const char* basename) = 0;
 	virtual void saveUniverse(const char* basename, bool save_path) = 0;
 	virtual void newUniverse() = 0;
-	virtual void copyEntities(const EntityRef* entities, int count, ISerializer& serializer) = 0;
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
     virtual void duplicateEntities() = 0;
 	virtual void addComponent(ComponentType type) = 0;
-	virtual void cloneComponent(const ComponentUID& src, EntityRef entity) = 0;
 	virtual void destroyComponent(const EntityRef* entities, int count, ComponentType cmp_type) = 0;
 	virtual void createEntityGUID(EntityRef entity) = 0;
 	virtual void destroyEntityGUID(EntityRef entity) = 0;
