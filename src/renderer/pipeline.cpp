@@ -2061,7 +2061,6 @@ struct PipelineImpl final : Pipeline
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 				for (const Grid& g : m_grids) {
 					gpu::bindTextures(g.spherical_harmonics, 4, lengthOf(g.spherical_harmonics));
-					// TODO intersecting camera
 					if (g.intersect_cam) {
 						gpu::setState((u64)gpu::StateFlags::CULL_FRONT);
 					}
