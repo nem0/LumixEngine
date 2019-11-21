@@ -1117,14 +1117,9 @@ public:
 	void serializeCameras(IOutputStream& serializer)
 	{
 		serializer.write((i32)m_cameras.size());
-		for (auto& camera : m_cameras)
+		for (Camera& camera : m_cameras)
 		{
-			serializer.write(camera.entity);
-			serializer.write(camera.far);
-			serializer.write(camera.fov);
-			serializer.write(camera.is_ortho);
-			serializer.write(camera.ortho_size);
-			serializer.write(camera.near);
+			serializer.write(camera);
 		}
 		serializer.write(m_active_camera);
 	}
@@ -1391,12 +1386,7 @@ public:
 		for (int i = 0; i < size; ++i)
 		{
 			Camera camera;
-			serializer.read(camera.entity);
-			serializer.read(camera.far);
-			serializer.read(camera.fov);
-			serializer.read(camera.is_ortho);
-			serializer.read(camera.ortho_size);
-			serializer.read(camera.near);
+			serializer.read(camera);
 
 			m_cameras.insert(camera.entity, camera);
 			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);

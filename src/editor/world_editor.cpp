@@ -2552,7 +2552,7 @@ public:
 		return *m_prefab_system;
 	}
 
-	void copyEntities(const EntityRef* entities, int count, ISerializer& serializer) override
+	void copyEntities(const EntityRef* entities, int count, ISerializer& serializer)
 	{
 		serializer.write("count", count);
 		for (int i = 0; i < count; ++i)
@@ -2625,25 +2625,6 @@ public:
 	void duplicateEntities() override;
 
 
-	void cloneComponent(const ComponentUID& src, EntityRef entity) override
-	{
-		IScene* scene = m_universe->getScene(src.type);
-		m_universe->createComponent(src.type, entity);
-		ComponentUID clone(entity, src.type, scene);
-
-		const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(src.type);
-		OutputMemoryStream stream(m_allocator);
-		
-		SaveVisitor save;
-		save.stream = &stream;
-		save.cmp = src;
-		cmp_desc->visit(save);
-
-		InputMemoryStream blob(stream);
-		::Lumix::load(clone, -1, blob);
-	}
-
-
 	void destroyComponent(const EntityRef* entities, int count, ComponentType cmp_type) override
 	{
 		ASSERT(count > 0);
@@ -2706,7 +2687,6 @@ public:
 
 	enum class SerializedVersion : int
 	{
-
 		LATEST
 	};
 
