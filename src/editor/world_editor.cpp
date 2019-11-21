@@ -39,6 +39,84 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 
+struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
+	PropertyDeserializeVisitor(IDeserializer& deserializer, ComponentUID cmp)
+		: deserializer(deserializer)
+		, cmp(cmp)
+	{}
+
+	void begin(const Reflection::ComponentBase&) {}
+	void end(const Reflection::ComponentBase&) {}
+
+	template <typename T>
+	void visit_generic(const Reflection::Property<T>& prop) {
+		T value;
+		deserializer.read(Ref(value));
+		InputMemoryStream str(&value, sizeof(value));
+		prop.setValue(cmp, -1, str);
+	}
+
+	void visit(const Reflection::Property<float>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<int>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<u32>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<EntityPtr>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<Vec3>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+	
+	// TODO
+	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
+	void visit(const Reflection::Property<Path>& prop) override { ASSERT(false); }
+	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
+	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
+	void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
+	void visit(const Reflection::IEnumProperty& prop) override { ASSERT(false); }
+	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
+	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
+
+	IDeserializer& deserializer;
+	ComponentUID cmp;
+};
+
+struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
+	PropertySerializeVisitor(ISerializer& serializer, ComponentUID cmp)
+		: serializer(serializer)
+		, cmp(cmp)
+	{}
+
+	void begin(const Reflection::ComponentBase&) override {}
+	void end(const Reflection::ComponentBase&) override {}
+
+	template <typename T>
+	void visit_generic(const Reflection::Property<T>& prop) {
+		T value;
+		OutputMemoryStream str(&value, sizeof(value));
+		prop.getValue(cmp, -1, str);
+		serializer.write(prop.name, value);
+	}
+
+	void visit(const Reflection::Property<float>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<int>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<u32>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<EntityPtr>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<Vec3>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+	// TODO
+	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
+	void visit(const Reflection::Property<Path>& prop) override { ASSERT(false); }
+	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
+	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
+	void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
+	void visit(const Reflection::IEnumProperty& prop) override { ASSERT(false); }
+	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
+	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
+
+	ISerializer& serializer;
+	ComponentUID cmp;
+};
 
 static void load(ComponentUID cmp, int index, InputMemoryStream& blob)
 {
@@ -1740,7 +1818,7 @@ public:
 		, const char* basename
 		, PrefabSystem& prefab_system
 		, EntityGUIDMap& entity_map
-		, IAllocator& allocator) const
+		, IAllocator& allocator)
 	{
 		PROFILE_FUNCTION();
 		
@@ -1854,6 +1932,12 @@ public:
 		}
 		OS::destroyFileIterator(file_iter);
 
+		StaticString<MAX_PATH_LENGTH> editor_filepath(basedir, "/", basename, "/systems/editor.sys");
+		loadFile(editor_filepath, [&](TextDeserializer& deserializer) {
+			deserializer.read(Ref(m_viewport.pos));
+			deserializer.read(Ref(m_viewport.rot));
+		});
+
 		StaticString<MAX_PATH_LENGTH> filepath(basedir, "/", basename, "/systems/templates.sys");
 		loadFile(filepath, [&](TextDeserializer& deserializer) {
 			prefab_system.deserialize(deserializer);
@@ -1901,6 +1985,12 @@ public:
 		m_prefab_system->serialize(serializer);
 		StaticString<MAX_PATH_LENGTH> system_file_path(dir, "systems/templates.sys");
 		saveFile(system_file_path);
+
+		blob.clear();
+		serializer.write("cam_pos", m_viewport.pos);
+		serializer.write("cam_rot", m_viewport.rot);
+		StaticString<MAX_PATH_LENGTH> editor_file_path(dir, "systems/editor.sys");
+		saveFile(editor_file_path);
 
 		for (EntityPtr entity = m_universe->getFirstEntity(); entity.isValid(); entity = m_universe->getNextEntity((EntityRef)entity))
 		{
@@ -2462,7 +2552,6 @@ public:
 		return *m_prefab_system;
 	}
 
-
 	void copyEntities(const EntityRef* entities, int count, ISerializer& serializer) override
 	{
 		serializer.write("count", count);
@@ -2473,24 +2562,18 @@ public:
 			serializer.write("transform", tr);
 			serializer.write("parent", m_universe->getParent(entity));
 
-			i32 cmp_count = 0;
-			for (ComponentUID cmp = m_universe->getFirstComponent(entity); cmp.isValid();
-				 cmp = m_universe->getNextComponent(cmp))
-			{
-				++cmp_count;
-			}
-
-			serializer.write("cmp_count", cmp_count);
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity);
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
-				u32 cmp_type = Reflection::getComponentTypeHash(cmp.type);
+				const u32 cmp_type = Reflection::getComponentTypeHash(cmp.type);
 				serializer.write("cmp_type", cmp_type);
 				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
 				
-				m_universe->serializeComponent(serializer, cmp.type, (EntityRef)cmp.entity);
+				PropertySerializeVisitor visitor(serializer, cmp);
+				cmp_desc->visit(visitor);
 			}
+			serializer.write("cmp_type", 0);
 		}
 	}
 
@@ -3370,15 +3453,20 @@ public:
 			if (!is_redo) m_entities.push(new_entity);
 			universe.setTransform(new_entity, tr);
 			universe.setParent(parent, new_entity);
-			i32 count;
-			deserializer.read(Ref(count));
-			for (int j = 0; j < count; ++j)
-			{
+			for (;;) {
 				u32 hash;
 				deserializer.read(Ref(hash));
-				ComponentType type = Reflection::getComponentTypeFromHash(hash);
-				const int scene_version = universe.getScene(type)->getVersion();
-				universe.deserializeComponent(deserializer, new_entity, type, scene_version);
+				if (hash == 0) break;
+
+				ComponentUID cmp;
+				cmp.entity = new_entity;
+				cmp.type = Reflection::getComponentTypeFromHash(hash);
+				cmp.scene = universe.getScene(cmp.type);
+
+				cmp.scene->getUniverse().createComponent(cmp.type, new_entity);
+
+				PropertyDeserializeVisitor visitor(deserializer, cmp);
+				Reflection::getComponent(cmp.type)->visit(visitor);
 			}
 		}
 		return true;
