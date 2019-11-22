@@ -1152,18 +1152,6 @@ static float getScaleX(const ofbx::Matrix& mtx)
 }
 
 
-static int getDepth(const ofbx::Object* bone)
-{
-	int depth = 0;
-	while (bone)
-	{
-		++depth;
-		bone = bone->getParent();
-	}
-	return depth;
-}
-
-
 void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
@@ -1217,11 +1205,10 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			const u32 name_hash = crc32(bone->name);
 			write(name_hash);
 
-			const int depth = getDepth(bone);
 			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
 			
 			// TODO skip curves which do not change anything
-			compressPositions(positions, translation_node, *bone, position_error / depth, parent_scale, anim_len);
+			compressPositions(positions, translation_node, *bone, cfg.position_error, parent_scale, anim_len);
 			write(positions.size());
 
 			for (TranslationKey& key : positions) write(fbx_to_anim_time(key.time));
@@ -1247,10 +1234,9 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			const u32 name_hash = crc32(bone->name);
 			write(name_hash);
 
-			const int depth = getDepth(bone);
 			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
 			
-			compressRotations(rotations, rotation_node, *bone, rotation_error / depth, anim_len);
+			compressRotations(rotations, rotation_node, *bone, cfg.rotation_error, anim_len);
 
 			write(rotations.size());
 			for (RotationKey& key : rotations) write(fbx_to_anim_time(key.time));

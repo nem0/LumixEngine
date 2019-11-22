@@ -515,6 +515,9 @@ void AssetBrowser::detailsGUI()
 			ImGui::Separator();
 
 			ImGui::LabelText("Status", "%s", res->isFailure() ? "failure" : (res->isReady() ? "Ready" : "Not ready"));
+			if (res->isReady()) {
+				ImGui::LabelText("Compiled size", "%.2f KB", res->size() / 1024.f);
+			}
 
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
 			ResourceType resource_type = compiler.getResourceType(path);

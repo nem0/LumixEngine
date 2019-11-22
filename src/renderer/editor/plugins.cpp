@@ -613,6 +613,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool split = false;
 		bool create_impostor = false;
 		float lods_distances[4] = { -1, -1, -1, -1 };
+		float position_error = 0.02f;
+		float rotation_error = 0.001f;
 	};
 
 	explicit ModelPlugin(StudioApp& app)
@@ -649,6 +651,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		Meta meta;
 		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "position_error", &meta.position_error);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "rotation_error", &meta.rotation_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
@@ -717,6 +721,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const char* filepath = getResourceFilePath(src.c_str());
 		FBXImporter::ImportConfig cfg;
 		const Meta meta = getMeta(Path(filepath));
+		cfg.rotation_error = meta.rotation_error;
+		cfg.position_error = meta.position_error;
 		cfg.mesh_scale = meta.scale;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
@@ -1092,6 +1098,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_meta = getMeta(model->getPath());
 				m_meta_res = model->getPath().getHash();
 			}
+			ImGui::InputFloat("Max position error", &m_meta.position_error);
+			ImGui::InputFloat("Max rotation error", &m_meta.rotation_error);
 			ImGui::InputFloat("Scale", &m_meta.scale);
 			ImGui::Checkbox("Split", &m_meta.split);
 			ImGui::Checkbox("Create impostor", &m_meta.create_impostor);
@@ -1111,6 +1119,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button("Apply")) {
 				String src(m_app.getWorldEditor().getAllocator());
 				src.cat("create_impostor=").cat(m_meta.create_impostor ? "true" : "false")
+					.cat("\nposition_error = ").cat(m_meta.position_error)
+					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
+					.cat("\nscale = ").cat(m_meta.scale)
 					.cat("\nscale = ").cat(m_meta.scale)
 					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n");
 

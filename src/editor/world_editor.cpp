@@ -94,7 +94,6 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 
 	// TODO
 	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
-	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
@@ -158,7 +157,6 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 	// TODO
 	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
-	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
 
