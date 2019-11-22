@@ -41,12 +41,13 @@ class Animation final : public Resource
 		ResourceType getType() const override { return TYPE; }
 
 		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
-		LocalRigidTransform getBoneTransform(Time time, int bone_idx) const;
+		Vec3 getTranslation(Time time, u32 curve_idx) const;
+		Quat getRotation(Time time, u32 curve_idx) const;
+		int getTranslationCurveIndex(u32 name_hash) const;
+		int getRotationCurveIndex(u32 name_hash) const;
 		void getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const;
 		void getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const;
 		Time getLength() const { return m_length; }
-		int getBoneCount() const { return m_bones.size(); }
-		int getBoneIndex(u32 name) const;
 
 	private:
 		void unload() override;
@@ -55,17 +56,22 @@ class Animation final : public Resource
 	private:
 		IAllocator& m_allocator;
 		Time m_length;
-		struct Bone
+		struct TranslationCurve
 		{
 			u32 name;
-			int pos_count;
-			const u16* pos_times;
+			u32 count;
+			const u16* times;
 			const Vec3* pos;
-			int rot_count;
-			const u16* rot_times;
+		};
+		struct RotationCurve
+		{
+			u32 name;
+			u32 count;
+			const u16* times;
 			const Quat* rot;
 		};
-		Array<Bone> m_bones;
+		Array<TranslationCurve> m_translations;
+		Array<RotationCurve> m_rotations;
 		Array<u8> m_mem;
 		int m_root_motion_bone_idx;
 };

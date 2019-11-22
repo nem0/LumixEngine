@@ -151,8 +151,6 @@ private:
 	void writeString(const char* str);
 	int getVertexSize(const ImportMesh& mesh) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
-	Vec3 fixRootOrientation(const Vec3& v) const;
-	Quat fixRootOrientation(const Quat& v) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;
 	void writeImpostorVertices(const AABB& aabb);
@@ -190,7 +188,6 @@ private:
 	bool make_convex = false;
 	float fbx_scale = 1.f;
 	Orientation orientation = Orientation::Y_UP;
-	Orientation root_orientation = Orientation::Y_UP;
 };
 
 
