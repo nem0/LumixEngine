@@ -53,7 +53,7 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 		T value;
 		deserializer.read(Ref(value));
 		InputMemoryStream str(&value, sizeof(value));
-		prop.setValue(cmp, -1, str);
+		prop.setValue(cmp, idx, str);
 	}
 
 	void visit(const Reflection::Property<float>& prop) override { visit_generic(prop); }
@@ -64,24 +64,44 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+
 	void visit(const Reflection::Property<Path>& prop) override { 
 		char buf[MAX_PATH_LENGTH];
 		deserializer.read(Span(buf));
 		InputMemoryStream str(buf, strlen(buf));
-		prop.setValue(cmp, -1, str);
+		prop.setValue(cmp, idx, str);
+	}
+
+	void visit(const Reflection::IArrayProperty& prop) override {
+		ASSERT(prop.canAddRemove());
+		int count;
+		deserializer.read(Ref(count));
+		const int idx_backup = idx;
+		for (int i = 0; i < count; ++i) {
+			idx = i;
+			prop.addItem(cmp, i);
+			prop.visit(*this);
+		}
+		idx = idx_backup;
 	}
 	
+	void visit(const Reflection::IEnumProperty& prop) override {
+		int value;
+		deserializer.read(Ref(value));
+		InputMemoryStream str(&value, sizeof(value));
+		prop.setValue(cmp, idx, str);
+	}
+
 	// TODO
 	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
-	void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
-	void visit(const Reflection::IEnumProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
 
 	IDeserializer& deserializer;
 	ComponentUID cmp;
+	int idx;
 };
 
 struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
@@ -97,7 +117,7 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 	void visit_generic(const Reflection::Property<T>& prop) {
 		T value;
 		OutputMemoryStream str(&value, sizeof(value));
-		prop.getValue(cmp, -1, str);
+		prop.getValue(cmp, idx, str);
 		serializer.write(prop.name, value);
 	}
 
@@ -109,23 +129,42 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+
 	void visit(const Reflection::Property<Path>& prop) override { 
 		char tmp[MAX_PATH_LENGTH];
 		OutputMemoryStream str(tmp, sizeof(tmp));
-		prop.getValue(cmp, -1, str);
+		prop.getValue(cmp, idx, str);
 		serializer.write(prop.name, tmp);
 	}
+
+	void visit(const Reflection::IArrayProperty& prop) override {
+		const int count = prop.getCount(cmp);
+		serializer.write("count", count);
+		const int idx_backup = idx;
+		for (int i = 0; i < count; ++i) {
+			idx = i;
+			prop.visit(*this);
+		}
+		idx = idx_backup;
+	}
+
+	void visit(const Reflection::IEnumProperty& prop) override { 
+		int value;
+		OutputMemoryStream str(&value, sizeof(value));
+		prop.getValue(cmp, idx, str);
+		serializer.write(prop.name, value);
+	}
+
 	// TODO
 	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
-	void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
-	void visit(const Reflection::IEnumProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
 
 	ISerializer& serializer;
 	ComponentUID cmp;
+	int idx;
 };
 
 static void load(ComponentUID cmp, int index, InputMemoryStream& blob)
@@ -2581,6 +2620,7 @@ public:
 				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
 				
 				PropertySerializeVisitor visitor(serializer, cmp);
+				visitor.idx = -1;
 				cmp_desc->visit(visitor);
 			}
 			serializer.write("cmp_type", 0);
@@ -3456,6 +3496,7 @@ public:
 				cmp.scene->getUniverse().createComponent(cmp.type, new_entity);
 
 				PropertyDeserializeVisitor visitor(deserializer, cmp);
+				visitor.idx = -1;
 				Reflection::getComponent(cmp.type)->visit(visitor);
 			}
 		}
