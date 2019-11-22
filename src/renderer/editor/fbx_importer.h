@@ -28,6 +28,8 @@ struct FBXImporter
 		Origin origin = Origin::SOURCE;
 		bool create_impostor = false;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
+		float position_error = 0.02f;
+		float rotation_error = 0.001f;
 	};
 
 
@@ -179,8 +181,6 @@ private:
 	ofbx::IScene* scene;
 	OutputMemoryStream out_file;
 	float time_scale = 1.0f;
-	float position_error = 0.1f;
-	float rotation_error = 0.01f;
 	float bounding_shape_scale = 1.0f;
 	bool cancel_mesh_transforms = false;
 	bool ignore_skeleton = false;

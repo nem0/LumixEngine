@@ -260,7 +260,6 @@ struct IPropertyVisitor
 	virtual void visit(const Property<int>& prop) = 0;
 	virtual void visit(const Property<u32>& prop) = 0;
 	virtual void visit(const Property<EntityPtr>& prop) = 0;
-	virtual void visit(const Property<IVec2>& prop) = 0;
 	virtual void visit(const Property<Vec2>& prop) = 0;
 	virtual void visit(const Property<Vec3>& prop) = 0;
 	virtual void visit(const Property<IVec3>& prop) = 0;
@@ -284,7 +283,6 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 	void visit(const Property<int>& prop) override { visitProperty(prop); }
 	void visit(const Property<u32>& prop) override { visitProperty(prop); }
 	void visit(const Property<EntityPtr>& prop) override { visitProperty(prop); }
-	void visit(const Property<IVec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec2>& prop) override { visitProperty(prop); }
 	void visit(const Property<Vec3>& prop) override { visitProperty(prop); }
 	void visit(const Property<IVec3>& prop) override { visitProperty(prop); }

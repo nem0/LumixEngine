@@ -2288,15 +2288,6 @@ public:
 			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
 			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
 		}
-
-		void visit(const Reflection::Property<IVec2>& prop) override
-		{
-			if (!equalStrings(property_name, prop.name)) return;
-			if (!LuaWrapper::isType<IVec2>(L, -1)) return;
-
-			const IVec2 val = LuaWrapper::toType<IVec2>(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
-		}
 		
 		void visit(const Reflection::Property<const char*>& prop) override
 		{
