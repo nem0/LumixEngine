@@ -676,7 +676,6 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 		case ofbx::UpVector_AxisY: orientation = Orientation::Y_UP; break;
 		case ofbx::UpVector_AxisZ: orientation = Orientation::Z_UP; break;
 	}
-	root_orientation = orientation;
 
 	char src_dir[MAX_PATH_LENGTH];
 	PathUtils::getDir(Span(src_dir), filename);
@@ -1199,20 +1198,11 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		write(header);
 
 		write(anim.root_motion_bone_idx);
-		int used_bone_count = 0;
 
-		for (const ofbx::Object* bone : bones) {
-			if (&bone->getScene() != &scene) continue;
-
-			const ofbx::AnimationLayer* layer = stack->getLayer(0);
-			const ofbx::AnimationCurveNode* translation_curve_node = layer->getCurveNode(*bone, "Lcl Translation");
-			const ofbx::AnimationCurveNode* rotation_curve_node = layer->getCurveNode(*bone, "Lcl Rotation");
-			if (translation_curve_node || rotation_curve_node) ++used_bone_count;
-		}
-
-		write(used_bone_count);
+		const u64 stream_translations_count_pos = out_file.getPos();
+		u32 translation_curves_count = 0;
+		write(translation_curves_count);
 		Array<TranslationKey> positions(allocator);
-		Array<RotationKey> rotations(allocator);
 		auto fbx_to_anim_time = [anim_len](i64 fbx_time){
 			const double t = clamp(ofbx::fbxTimeToSeconds(fbx_time) / anim_len, 0.0, 1.0);
 			return u16(t * 0xffFF);
@@ -1220,44 +1210,56 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 		for (const ofbx::Object* bone : bones) {
 			if (&bone->getScene() != &scene) continue;
-			const ofbx::Object* root_bone = anim.root_motion_bone_idx >= 0 ? bones[anim.root_motion_bone_idx] : nullptr;
-
 			const ofbx::AnimationLayer* layer = stack->getLayer(0);
 			const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
-			const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
-			if (!translation_node && !rotation_node) continue;
+			if (!translation_node) continue;
 
-			u32 name_hash = crc32(bone->name);
+			const u32 name_hash = crc32(bone->name);
 			write(name_hash);
 
-			int depth = getDepth(bone);
-			float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+			const int depth = getDepth(bone);
+			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+			
+			// TODO skip curves which do not change anything
 			compressPositions(positions, translation_node, *bone, position_error / depth, parent_scale, anim_len);
 			write(positions.size());
 
 			for (TranslationKey& key : positions) write(fbx_to_anim_time(key.time));
 			for (TranslationKey& key : positions) {
-				if (bone == root_bone) {
-					write(fixRootOrientation(key.pos * cfg.mesh_scale * fbx_scale));
-				}
-				else {
-					write(fixOrientation(key.pos * cfg.mesh_scale * fbx_scale));
-				}
+				write(fixOrientation(key.pos * cfg.mesh_scale * fbx_scale));
 			}
+			++translation_curves_count;
+		}
+		memcpy(out_file.getMutableData() + stream_translations_count_pos, &translation_curves_count, sizeof(translation_curves_count));
 
+		const u64 stream_rotations_count_pos = out_file.getPos();
+		u32 rotation_curves_count = 0;
+		write(rotation_curves_count);
+		Array<RotationKey> rotations(allocator);
+
+		for (const ofbx::Object* bone : bones) {
+			if (&bone->getScene() != &scene) continue;
+
+			const ofbx::AnimationLayer* layer = stack->getLayer(0);
+			const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
+			if (!rotation_node) continue;
+
+			const u32 name_hash = crc32(bone->name);
+			write(name_hash);
+
+			const int depth = getDepth(bone);
+			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+			
 			compressRotations(rotations, rotation_node, *bone, rotation_error / depth, anim_len);
 
 			write(rotations.size());
 			for (RotationKey& key : rotations) write(fbx_to_anim_time(key.time));
 			for (RotationKey& key : rotations) {
-				if (bone == root_bone) {
-					write(fixRootOrientation(key.rot));
-				}
-				else {
-					write(fixOrientation(key.rot));
-				}
+				write(fixOrientation(key.rot));
 			}
+			++rotation_curves_count;
 		}
+		memcpy(out_file.getMutableData() + stream_rotations_count_pos, &rotation_curves_count, sizeof(rotation_curves_count));
 
 		const StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ".ani:", src);
 		compiler.writeCompiledResource(anim_path, Span((u8*)out_file.getData(), (i32)out_file.getPos()));
@@ -1346,36 +1348,6 @@ void FBXImporter::fillSkinInfo(Array<Skin>& skinning, const ImportMesh& import_m
 		for (float w : s.weights) sum += w;
 		for (float& w : s.weights) w /= sum;
 	}
-}
-
-
-Vec3 FBXImporter::fixRootOrientation(const Vec3& v) const
-{
-	switch (root_orientation)
-	{
-		case Orientation::Y_UP: return Vec3(v.x, v.y, v.z);
-		case Orientation::Z_UP: return Vec3(v.x, v.z, -v.y);
-		case Orientation::Z_MINUS_UP: return Vec3(v.x, -v.z, v.y);
-		case Orientation::X_MINUS_UP: return Vec3(v.y, -v.x, v.z);
-		case Orientation::X_UP: return Vec3(-v.y, v.x, v.z);
-	}
-	ASSERT(false);
-	return Vec3(v.x, v.y, v.z);
-}
-
-
-Quat FBXImporter::fixRootOrientation(const Quat& v) const
-{
-	switch (root_orientation)
-	{
-		case Orientation::Y_UP: return Quat(v.x, v.y, v.z, v.w);
-		case Orientation::Z_UP: return Quat(v.x, v.z, -v.y, v.w);
-		case Orientation::Z_MINUS_UP: return Quat(v.x, -v.z, v.y, v.w);
-		case Orientation::X_MINUS_UP: return Quat(v.y, -v.x, v.z, v.w);
-		case Orientation::X_UP: return Quat(-v.y, v.x, v.z, v.w);
-	}
-	ASSERT(false);
-	return Quat(v.x, v.y, v.z, v.w);
 }
 
 
