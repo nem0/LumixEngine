@@ -395,7 +395,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 		, texture.height
 		, texture.depth
 		, format
-		, texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB | flag_3d
+		, texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB | flag_3d | (u32)gpu::TextureFlags::NO_MIPS 
 		, dst_mem
 		, texture.getPath().c_str());
 	texture.mips = 1;
