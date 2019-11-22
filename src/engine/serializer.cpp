@@ -470,7 +470,7 @@ void TextDeserializer::read(Ref<String> value)
 }
 
 
-void TextDeserializer::read(const Span<char>& value)
+void TextDeserializer::read(Span<char> value)
 {
 	skip();
 	u8 c = blob.readChar();
