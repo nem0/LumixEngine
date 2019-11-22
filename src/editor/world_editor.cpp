@@ -64,10 +64,15 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<Path>& prop) override { 
+		char buf[MAX_PATH_LENGTH];
+		deserializer.read(Span(buf));
+		InputMemoryStream str(buf, strlen(buf));
+		prop.setValue(cmp, -1, str);
+	}
 	
 	// TODO
 	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
-	void visit(const Reflection::Property<Path>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
@@ -104,9 +109,14 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<Path>& prop) override { 
+		char tmp[MAX_PATH_LENGTH];
+		OutputMemoryStream str(tmp, sizeof(tmp));
+		prop.getValue(cmp, -1, str);
+		serializer.write(prop.name, tmp);
+	}
 	// TODO
 	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
-	void visit(const Reflection::Property<Path>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<IVec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
