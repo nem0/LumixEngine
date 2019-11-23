@@ -304,16 +304,16 @@ void Texture::onDataUpdated(int x, int y, int w, int h)
 	PROFILE_FUNCTION();
 
 	if (bytes_per_pixel == 2) {
-		const Renderer::MemRef mem = renderer.allocate(w * h * sizeof(float));
+		const Renderer::MemRef mem = renderer.allocate(w * h * sizeof(u16));
 		const u16* src_mem = (const u16*)data.getData();
-		float* dst_mem = (float*)mem.data;
+		u16* dst_mem = (u16*)mem.data;
 
 		for (int j = 0; j < h; ++j) {
 			for (int i = 0; i < w; ++i) {
-				dst_mem[i + j * w] = src_mem[x + i + (y + j) * width] / 65535.0f;
+				dst_mem[i + j * w] = src_mem[x + i + (y + j) * width];
 			}
 		}
-		renderer.updateTexture(handle, x, y, w, h, gpu::TextureFormat::R32F, mem);
+		renderer.updateTexture(handle, x, y, w, h, gpu::TextureFormat::R16, mem);
 		return;
 	}
 
