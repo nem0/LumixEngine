@@ -665,7 +665,8 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 	scene = ofbx::load(&data[0], data.size(), flags);
 	if (!scene)
 	{
-		logError("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError();
+		logError("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError() << "\n"
+			<< "Please try to convert the FBX file with Autodesk FBX Converter or some other software to the latest version.";
 		return false;
 	}
 	fbx_scale = scene->getGlobalSettings()->UnitScaleFactor * 0.01f;

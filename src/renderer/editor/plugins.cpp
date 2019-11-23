@@ -729,11 +729,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const PathUtils::FileInfo src_info(filepath);
 		m_fbx_importer.setSource(filepath, false);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
-			if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-				logError("Editor") << "No meshes with materials found in " << src;
-			}
-			else {
-				logError("Editor") << "No meshes or animations found in " << src;
+			if (m_fbx_importer.getOFBXScene()) {
+				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
+					logError("Editor") << "No meshes with materials found in " << src;
+				}
+				else {
+					logError("Editor") << "No meshes or animations found in " << src;
+				}
 			}
 		}
 
