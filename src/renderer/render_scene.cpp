@@ -268,6 +268,14 @@ public:
 			if (probe.reflection) probe.reflection->getResourceManager().unload(*probe.reflection);
 			if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
 		}
+
+		for (auto& lpg : m_light_probe_grids)
+		{
+			for (Texture* t : lpg.data) {
+				if (t) t->getResourceManager().unload(*t);
+			}
+		}
+
 		m_environment_probes.clear();
 	}
 
