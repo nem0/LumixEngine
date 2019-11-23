@@ -120,6 +120,7 @@ struct IElementProperty
 
 struct IElement
 {
+    virtual ~IElement() = default;
 	virtual IElement* getFirstChild() const = 0;
 	virtual IElement* getSibling() const = 0;
 	virtual DataView getID() const = 0;

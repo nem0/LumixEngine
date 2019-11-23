@@ -304,7 +304,7 @@ bool DataView::operator==(const char* rhs) const
 	const char* c2 = (const char*)begin;
 	while (*c && c2 != (const char*)end)
 	{
-		if (*c != *c2) return 0;
+		if (*c != *c2) return false;
 		++c;
 		++c2;
 	}
@@ -319,7 +319,6 @@ template <typename T> static bool parseBinaryArray(const Property& property, std
 
 struct Property : IElementProperty
 {
-	~Property() { delete next; }
 	Type getType() const override { return (Type)type; }
 	IElementProperty* getNext() const override { return next; }
 	DataView getValue() const override { return value; }
@@ -343,8 +342,8 @@ struct Property : IElementProperty
 
 	bool getValues(int* values, int max_size) const override { return parseArrayRaw(*this, values, max_size); }
 
-	int count;
-	u8 type;
+	int count = 0;
+	u8 type = INTEGER;
 	DataView value;
 	Property* next = nullptr;
 };
@@ -566,7 +565,12 @@ static void deleteElement(Element* el)
 	do
 	{
 		Element* next = iter->sibling;
-		delete iter->first_property;
+		Property* prop = iter->first_property;
+		while (prop) {
+			Property* tmp = prop->next;
+			delete prop;
+			prop = tmp;
+		}
 		deleteElement(iter->child);
 		delete iter;
 		iter = next;
@@ -599,8 +603,6 @@ static OptionalError<Element*> readElement(Cursor* cursor, u32 version)
 	OptionalError<u64> prop_length = readElementOffset(cursor, version);
 	if (prop_count.isError() || prop_length.isError()) return Error();
 
-	const char* sbeg = 0;
-	const char* send = 0;
 	OptionalError<DataView> id = readShortString(cursor);
 	if (id.isError()) return Error();
 
@@ -761,7 +763,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 		return prop.release();
 	}
 
-	if (*cursor->current == 'T' || *cursor->current == 'Y')
+	if (*cursor->current == 'T' || *cursor->current == 'Y' || *cursor->current == 'W')
 	{
 		// WTF is this
 		prop->type = *cursor->current;
@@ -812,10 +814,10 @@ static OptionalError<Element*> readTextElement(Cursor* cursor)
 {
 	DataView id = readTextToken(cursor);
 	if (cursor->current == cursor->end) return Error("Unexpected end of file");
-	if (*cursor->current != ':') return Error("Unexpected end of file");
+	if (*cursor->current != ':') return Error("Unexpected character");
 	++cursor->current;
 
-	skipWhitespaces(cursor);
+	skipInsignificantWhitespaces(cursor);
 	if (cursor->current == cursor->end) return Error("Unexpected end of file");
 
 	Element* element = new Element;
@@ -1375,9 +1377,9 @@ struct Scene : IScene
 			OBJECT_PROPERTY
 		};
 
-		Type type;
-		u64 from;
-		u64 to;
+		Type type = OBJECT_OBJECT;
+		u64 from = 0;
+		u64 to = 0;
 		DataView property;
 	};
 
@@ -1432,7 +1434,7 @@ struct Scene : IScene
 	void destroy() override { delete this; }
 
 
-	~Scene()
+	~Scene() override
 	{
 		for (auto iter : m_object_map)
 		{
@@ -3145,15 +3147,23 @@ IScene* load(const u8* data, int size, u64 flags)
 	scene->m_data.resize(size);
 	memcpy(&scene->m_data[0], data, size);
 	u32 version;
-	OptionalError<Element*> root = tokenize(&scene->m_data[0], size, version);
-	if (version < 6200)
-	{
-		Error::s_message = "Unsupported FBX file format version. Minimum supported version is 6.2";
-		return nullptr;
+	
+	const bool is_binary = size >= 18 && strncmp((const char*)data, "Kaydara FBX Binary", 18) == 0;
+	OptionalError<Element*> root(nullptr);
+	if (is_binary) {
+		root = tokenize(&scene->m_data[0], size, version);
+		if (version < 6200)
+		{
+			Error::s_message = "Unsupported FBX file format version. Minimum supported version is 6.2";
+			return nullptr;
+		}
+		if (root.isError())
+		{
+			Error::s_message = "";
+			if (root.isError()) return nullptr;
+		}
 	}
-	if (root.isError())
-	{
-		Error::s_message = "";
+	else {
 		root = tokenizeText(&scene->m_data[0], size);
 		if (root.isError()) return nullptr;
 	}
