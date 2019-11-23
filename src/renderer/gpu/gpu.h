@@ -128,12 +128,12 @@ enum class TextureFormat : u32 {
 
 
 enum class TextureFlags : u32 {
-	SRGB = 1 << 0,
+	POINT_FILTER = 1 << 0,
 	CLAMP_U = 1 << 1,
 	CLAMP_V = 1 << 2,
 	CLAMP_W = 1 << 3,
 	NO_MIPS = 1 << 4,
-	POINT_FILTER = 1 << 5,
+	SRGB = 1 << 5,
 	READBACK = 1 << 6,
 	IS_3D = 1 << 7
 };
