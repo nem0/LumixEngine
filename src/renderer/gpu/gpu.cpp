@@ -1265,6 +1265,7 @@ void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, Textur
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if (s_texture_formats[i].format == format) {
 			const auto& f = s_texture_formats[i];
+			CHECK_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 			CHECK_GL(glTextureSubImage2D(handle, level, x, y, w, h, f.gl_format, f.type, buf));
 			break;
 		}
