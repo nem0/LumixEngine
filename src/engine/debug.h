@@ -58,6 +58,8 @@ public:
 	explicit Allocator(IAllocator& source);
 	~Allocator();
 
+	bool isDebug() const override { return true; }
+
 	void* allocate(size_t size) override;
 	void deallocate(void* ptr) override;
 	void* reallocate(void* ptr, size_t size) override;

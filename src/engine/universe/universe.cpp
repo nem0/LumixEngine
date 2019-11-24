@@ -13,7 +13,7 @@ namespace Lumix
 {
 
 
-static const int RESERVED_ENTITIES_COUNT = 5000;
+static const int RESERVED_ENTITIES_COUNT = 1024;
 
 
 Universe::~Universe() = default;

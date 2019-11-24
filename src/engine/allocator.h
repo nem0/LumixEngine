@@ -34,6 +34,7 @@ namespace Lumix
 struct LUMIX_ENGINE_API IAllocator
 {
 	virtual ~IAllocator() {}
+	virtual bool isDebug() const { return false; }
 
 	virtual void* allocate(size_t size) = 0;
 	virtual void deallocate(void* ptr) = 0;
