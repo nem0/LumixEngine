@@ -92,7 +92,7 @@ static const char* getContexSwitchReasonString(i8 reason)
 
 struct ProfilerUIImpl final : public ProfilerUI
 {
-	ProfilerUIImpl(Debug::Allocator& allocator, Engine& engine)
+	ProfilerUIImpl(Debug::Allocator* allocator, Engine& engine)
 		: m_main_allocator(allocator)
 		, m_resource_manager(engine.getResourceManager())
 		, m_engine(engine)
@@ -185,7 +185,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 		Debug::StackNode* external_node, size_t size);
 
 	DefaultAllocator m_allocator;
-	Debug::Allocator& m_main_allocator;
+	Debug::Allocator* m_main_allocator;
 	ResourceManagerHub& m_resource_manager;
 	AllocationStackNode* m_allocation_root;
 	int m_allocation_size_from;
@@ -331,19 +331,21 @@ void ProfilerUIImpl::addToTree(Debug::Allocator::AllocationInfo* info)
 
 void ProfilerUIImpl::refreshAllocations()
 {
+	if (!m_main_allocator) return;
+
 	m_allocation_root->clear(m_allocator);
 	LUMIX_DELETE(m_allocator, m_allocation_root);
 	m_allocation_root = LUMIX_NEW(m_allocator, AllocationStackNode)(nullptr, 0, m_allocator);
 
-	m_main_allocator.lock();
-	auto* current_info = m_main_allocator.getFirstAllocationInfo();
+	m_main_allocator->lock();
+	auto* current_info = m_main_allocator->getFirstAllocationInfo();
 
 	while (current_info)
 	{
 		addToTree(current_info);
 		current_info = current_info->next;
 	}
-	m_main_allocator.unlock();
+	m_main_allocator->unlock();
 }
 
 
@@ -408,17 +410,22 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 {
 	if (!ImGui::CollapsingHeader("Memory")) return;
 
-	if (ImGui::Button("Refresh"))
-	{
-		refreshAllocations();
-	}
+	if (m_main_allocator) {
+		if (ImGui::Button("Refresh"))
+		{
+			refreshAllocations();
+		}
 
-	ImGui::SameLine();
-	if (ImGui::Button("Check memory"))
-	{
-		m_main_allocator.checkGuards();
+		ImGui::SameLine();
+		if (ImGui::Button("Check memory"))
+		{
+			m_main_allocator->checkGuards();
+		}
+		ImGui::Text("Total size: %.3fMB", (m_main_allocator->getTotalSize() / 1024) / 1024.0f);
 	}
-	ImGui::Text("Total size: %.3fMB", (m_main_allocator.getTotalSize() / 1024) / 1024.0f);
+	else {
+		ImGui::TextUnformatted("Debug allocator not used, can't print memory stats.");
+	}
 	const PageAllocator& page_allocator = m_engine.getPageAllocator();
 	const float reserved_pages_size = (page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
 	ImGui::Text("Page allocator: %.3fMB", reserved_pages_size);
@@ -996,7 +1003,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 ProfilerUI* ProfilerUI::create(Engine& engine)
 {
-	auto& allocator = static_cast<Debug::Allocator&>(engine.getAllocator());
+	Debug::Allocator* allocator = engine.getAllocator().isDebug() ? static_cast<Debug::Allocator*>(&engine.getAllocator()) : nullptr;
 	return LUMIX_NEW(engine.getAllocator(), ProfilerUIImpl)(allocator, engine);
 }
 

@@ -293,6 +293,18 @@ public:
 		JobSystem::wait(finished);
 	}
 
+	
+	static void* imguiAlloc(size_t size, void* user_data) {
+		StudioAppImpl* app = (StudioAppImpl*)user_data;
+		return app->m_allocator.allocate(size);
+	}
+
+
+	static void imguiFree(void* ptr, void* user_data) {
+		StudioAppImpl* app = (StudioAppImpl*)user_data;
+		return app->m_allocator.deallocate(ptr);
+	}
+
 
 	void onInit() override
 	{
@@ -335,6 +347,7 @@ public:
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
 
+		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
 		loadSettings();
 		initIMGUI();
@@ -2939,7 +2952,11 @@ public:
 
 
 	DefaultAllocator m_main_allocator;
-	Debug::Allocator m_allocator;
+	#ifdef LUMIX_DEBUG
+		Debug::Allocator m_allocator;
+	#else
+		IAllocator& m_allocator;
+	#endif
 	Engine* m_engine;
 	OS::WindowHandle m_window;
 	OS::WindowState m_fullscreen_restore_state;
