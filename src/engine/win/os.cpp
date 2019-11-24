@@ -423,8 +423,8 @@ WindowHandle createWindow(const InitWindowArgs& args)
 		{
 			case WM_MOVE:
 				e.type = Event::Type::WINDOW_MOVE;
-				e.win_move.x = LOWORD(lParam);
-				e.win_move.y = HIWORD(lParam);
+				e.win_move.x = (i16)LOWORD(lParam);
+				e.win_move.y = (i16)HIWORD(lParam);
 				G.iface->onEvent(e);
 				return 0;
 			case WM_SIZE:
