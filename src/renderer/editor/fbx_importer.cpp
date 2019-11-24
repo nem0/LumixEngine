@@ -642,12 +642,12 @@ FBXImporter::FBXImporter(StudioApp& app)
 	, filesystem(app.getWorldEditor().getEngine().getFileSystem())
 	, app(app)
 {
-	out_file.reserve(1024 * 1024);
 }
 
 
 bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 {
+	out_file.reserve(1024 * 1024);
 	PROFILE_FUNCTION();
 	if(scene) {
 		scene->destroy();
@@ -1203,13 +1203,15 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
 			if (!translation_node) continue;
 
-			const u32 name_hash = crc32(bone->name);
-			write(name_hash);
-
 			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
 			
 			// TODO skip curves which do not change anything
 			compressPositions(positions, translation_node, *bone, cfg.position_error, parent_scale, anim_len);
+
+			if (positions.empty()) continue;
+
+			const u32 name_hash = crc32(bone->name);
+			write(name_hash);
 			write(positions.size());
 
 			for (TranslationKey& key : positions) write(fbx_to_anim_time(key.time));
@@ -1232,13 +1234,12 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
 			if (!rotation_node) continue;
 
+			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+			compressRotations(rotations, rotation_node, *bone, cfg.rotation_error, anim_len);
+			if (rotations.empty()) continue;
+
 			const u32 name_hash = crc32(bone->name);
 			write(name_hash);
-
-			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
-			
-			compressRotations(rotations, rotation_node, *bone, cfg.rotation_error, anim_len);
-
 			write(rotations.size());
 			for (RotationKey& key : rotations) write(fbx_to_anim_time(key.time));
 			for (RotationKey& key : rotations) {
