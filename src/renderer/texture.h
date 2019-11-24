@@ -68,20 +68,20 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	bool create(int w, int h, gpu::TextureFormat format, const void* data, u32 size);
+	bool create(u32 w, u32 h, gpu::TextureFormat format, const void* data, u32 size);
 	void destroy();
 
 	const u8* getData() const { return (const u8*)data.getData(); }
 	u8* getData() { return (u8*)data.getMutableData(); }
 	void addDataReference();
 	void removeDataReference();
-	void onDataUpdated(int x, int y, int w, int h);
+	void onDataUpdated(u32 x, u32 y, u32 w, u32 h);
 	void save();
 	void setSRGB(bool enable) { setFlags(enable ? flags | u32(Flags::SRGB) : flags & ~u32(Flags::SRGB)); }
 	void setFlags(u32 flags);
 	bool getFlag(Flags flag);
 	void setFlag(Flags flag, bool value);
-	u32 getPixelNearest(int x, int y) const;
+	u32 getPixelNearest(u32 x, u32 y) const;
 	u32 getPixel(float x, float y) const;
 	u32 getGPUFlags() const;
 
@@ -89,7 +89,7 @@ public:
 	static bool saveTGA(IOutputStream* file,
 		int width,
 		int height,
-		int bytes_per_pixel,
+		gpu::TextureFormat format,
 		const u8* image_dest,
 		bool upper_left_origin,
 		const Path& path,
@@ -98,17 +98,17 @@ public:
 	static const ResourceType TYPE;
 
 public:
-	int width;
-	int height;
-	int bytes_per_pixel;
-	int depth;
-	int layers;
-	int mips;
+	u32 width;
+	u32 height;
+	u32 depth;
+	u32 layers;
+	u32 mips;
+	gpu::TextureFormat format;
 	bool is_cubemap;
 	u32 flags;
 	gpu::TextureHandle handle;
 	IAllocator& allocator;
-	int data_reference;
+	u32 data_reference;
 	OutputMemoryStream data;
 	Renderer& renderer;
 

@@ -1152,7 +1152,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				
 				OS::OutputFile file;
 				if (file.open(img_path)) {
-					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, 4, (const u8*)gb0.begin(), true, Path(img_path), allocator);
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), true, Path(img_path), allocator);
 					file.close();
 				}
 				else {
@@ -1162,7 +1162,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				img_path = fi.m_dir;
 				img_path << fi.m_basename << "_impostor1.tga";
 				if (file.open(img_path)) {
-					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, 4, (const u8*)gb1.begin(), true, Path(img_path), allocator);
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), true, Path(img_path), allocator);
 					file.close();
 				}
 				else {
@@ -2162,7 +2162,21 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
 		ImGui::LabelText("Mips", "%d", texture->mips);
-		if (texture->bytes_per_pixel > 0) ImGui::LabelText("BPP", "%d", texture->bytes_per_pixel);
+		const char* format = "unknown";
+		switch(texture->format) {
+			case gpu::TextureFormat::R8: format = "R8"; break;
+			case gpu::TextureFormat::RGBA8: format = "RGBA8"; break;
+			case gpu::TextureFormat::RGBA16: format = "RGBA16"; break;
+			case gpu::TextureFormat::RGBA16F: format = "RGBA16F"; break;
+			case gpu::TextureFormat::RGBA32F: format = "RGBA32F"; break;
+			case gpu::TextureFormat::R16F: format = "R16F"; break;
+			case gpu::TextureFormat::R16: format = "R16"; break;
+			case gpu::TextureFormat::R32F: format = "R32F"; break;
+			case gpu::TextureFormat::SRGB: format = "SRGB"; break;
+			case gpu::TextureFormat::SRGBA: format = "SRGBA"; break;
+			default: ASSERT(false); break;
+		}
+		ImGui::LabelText("Format", format);
 		if (texture->handle.isValid()) {
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height) {
@@ -3166,7 +3180,7 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 		OS::OutputFile file;
 		if (!file.open(path_cstr)) return false;
 
-		if (!Texture::saveTGA(&file, w, h, 4, (const u8*)pixels, upper_left_origin, path, engine.getAllocator())) {
+		if (!Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (const u8*)pixels, upper_left_origin, path, engine.getAllocator())) {
 			file.close();
 			return false;
 		}
