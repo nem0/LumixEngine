@@ -2,6 +2,8 @@
 
 #include "profiler_ui.h"
 #include "engine/crt.h"
+#include "engine/debug.h"
+#include "engine/engine.h"
 #include "engine/fibers.h"
 #include "engine/file_system.h"
 #include "engine/job_system.h"
@@ -9,11 +11,10 @@
 #include "engine/math.h"
 #include "engine/mt/atomic.h"
 #include "engine/os.h"
+#include "engine/page_allocator.h"
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/debug.h"
-#include "engine/engine.h"
 #include "utils.h"
 
 
@@ -418,6 +419,9 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 		m_main_allocator.checkGuards();
 	}
 	ImGui::Text("Total size: %.3fMB", (m_main_allocator.getTotalSize() / 1024) / 1024.0f);
+	const PageAllocator& page_allocator = m_engine.getPageAllocator();
+	const float reserved_pages_size = (page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
+	ImGui::Text("Page allocator: %.3fMB", reserved_pages_size);
 
 	ImGui::Columns(2, "memc");
 	for (auto* child : m_allocation_root->m_children)

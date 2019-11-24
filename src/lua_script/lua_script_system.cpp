@@ -71,7 +71,7 @@ namespace Lumix
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
 
 		Engine& m_engine;
-		Debug::Allocator m_allocator;
+		IAllocator& m_allocator;
 		LuaScriptManager m_script_manager;
 	};
 

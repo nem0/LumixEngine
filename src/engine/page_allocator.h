@@ -18,11 +18,15 @@ public:
 		
 	void* allocate(bool lock);
 	void deallocate(void* mem, bool lock);
+	u32 getAllocatedCount() const { return allocated_count; }
+	u32 getReservedCount() const { return reserved_count; }
 
 	void lock();
 	void unlock();
 		
 private:
+	u32 allocated_count = 0;
+	u32 reserved_count = 0;
 	void* free_pages = nullptr;
 	MT::CriticalSection mutex;
 };

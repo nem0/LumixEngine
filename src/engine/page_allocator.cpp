@@ -10,6 +10,7 @@ namespace Lumix
 
 PageAllocator::~PageAllocator()
 {
+	ASSERT(allocated_count == 0);
 	void* p = free_pages;
 	while (p) {
 		void* tmp = p;
@@ -34,12 +35,14 @@ void PageAllocator::unlock()
 void* PageAllocator::allocate(bool lock)
 {
 	if (lock) mutex.enter();
+	++allocated_count;
 	if (free_pages) {
 		void* tmp = free_pages;
 		memcpy(&free_pages, free_pages, sizeof(free_pages));
 		if (lock) mutex.exit();
 		return tmp;
 	}
+	++reserved_count;
 	if (lock) mutex.exit();
 	return VirtualAlloc(nullptr, PAGE_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
@@ -48,6 +51,7 @@ void* PageAllocator::allocate(bool lock)
 void PageAllocator::deallocate(void* mem, bool lock)
 {
 	if (lock) mutex.enter();
+	--allocated_count;
 	memcpy(mem, &free_pages, sizeof(free_pages));
 	free_pages = mem;
 	if (lock) mutex.exit();

@@ -2109,7 +2109,10 @@ struct PipelineImpl final : Pipeline
 					do {} while(false)
 
 				PROFILE_FUNCTION();
-				if(m_cmds->header.size == 0 && m_cmds->header.next == nullptr) return;
+				if(m_cmds->header.size == 0 && m_cmds->header.next == nullptr) {
+					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
+					return;
+				}
 				
 				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 				CmdPage* page = m_cmds;
@@ -2237,7 +2240,10 @@ struct PipelineImpl final : Pipeline
 					cmd += sizeof(T); \
 					do {} while(false)
 				PROFILE_FUNCTION();
-				if(m_cmds->header.size == 0 && !m_cmds->header.next) return;
+				if(m_cmds->header.size == 0 && !m_cmds->header.next) {
+					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
+					return;
+				}
 
 				Renderer& renderer = m_pipeline->m_renderer;
 
