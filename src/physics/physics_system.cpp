@@ -161,27 +161,22 @@ namespace Lumix
 	class AssertNullAllocator : public physx::PxAllocatorCallback
 	{
 	public:
-		#ifdef _WIN32
-			void* allocate(size_t size, const char*, const char*, int) override
-			{
-				void* ret = _aligned_malloc(size, 16);
-				// logInfo("Physics") << "Allocated " << size << " bytes for " << typeName << "
-				// from " << filename << "(" << line << ")";
-				ASSERT(ret);
-				return ret;
-			}
-			void deallocate(void* ptr) override { _aligned_free(ptr); }
-		#else
-			void* allocate(size_t size, const char*, const char*, int) override
-			{
-				void* ret = aligned_alloc(16, size);
-				// logInfo("Physics") << "Allocated " << size << " bytes for " << typeName << "
-				// from " << filename << "(" << line << ")";
-				ASSERT(ret);
-				return ret;
-			}
-			void deallocate(void* ptr) override { free(ptr); }
-		#endif
+		AssertNullAllocator(IAllocator& source)
+			: source(source)
+		{}
+
+		void* allocate(size_t size, const char*, const char*, int) override
+		{
+			void* ret = source.allocate_aligned(size, 16);
+			// logInfo("Physics") << "Allocated " << size << " bytes for " << typeName << "
+			// from " << filename << "(" << line << ")";
+			ASSERT(ret);
+			return ret;
+		}
+		
+		void deallocate(void* ptr) override { source.deallocate_aligned(ptr); }
+
+		IAllocator& source;
 	};
 
 
@@ -212,6 +207,7 @@ namespace Lumix
 			: m_allocator(engine.getAllocator())
 			, m_engine(engine)
 			, m_manager(*this, engine.getAllocator())
+			, m_physx_allocator(m_allocator)
 		{
 			registerProperties(engine.getAllocator());
 			m_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());
@@ -281,6 +277,7 @@ namespace Lumix
 			return false;
 		}
 
+		IAllocator& m_allocator;
 		physx::PxPhysics* m_physics;
 		physx::PxFoundation* m_foundation;
 		physx::PxControllerManager* m_controller_manager;
@@ -289,7 +286,6 @@ namespace Lumix
 		physx::PxCooking* m_cooking;
 		PhysicsGeometryManager m_manager;
 		Engine& m_engine;
-		IAllocator& m_allocator;
 	};
 
 
