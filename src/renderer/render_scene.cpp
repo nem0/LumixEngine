@@ -2090,19 +2090,6 @@ public:
 		m_terrains[entity]->setHeight(x, z, height);
 	}
 
-	static u32 LUA_getTexturePixel(Texture* texture, int x, int y)
-	{
-		if (!texture) return 0;
-		if (!texture->isReady()) return 0;
-		if (texture->data.getPos() == 0) return 0;
-		if (texture->bytes_per_pixel != 4) return 0;
-		
-		x = clamp(x, 0, texture->width - 1);
-		y = clamp(y, 0, texture->height - 1);
-
-		return ((const u32*)texture->getData())[x + y * texture->width];
-	}
-
 
 	static Pipeline* LUA_createPipeline(Engine* engine, const char* path)
 	{

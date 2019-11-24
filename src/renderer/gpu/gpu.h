@@ -258,6 +258,29 @@ void popDebugGroup();
 
 void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags);
 
+inline u32 getBytesPerPixel(gpu::TextureFormat format) {
+	switch (format) {
+		case gpu::TextureFormat::R8:
+			return 1;
+
+		case gpu::TextureFormat::R16F:
+		case gpu::TextureFormat::R16:
+			return 2;
+		case gpu::TextureFormat::SRGB:
+			return 3;
+		case gpu::TextureFormat::R32F:
+		case gpu::TextureFormat::SRGBA:
+		case gpu::TextureFormat::RGBA8:
+			return 4;
+		case gpu::TextureFormat::RGBA16:
+		case gpu::TextureFormat::RGBA16F:
+			return 8;
+		case gpu::TextureFormat::RGBA32F:
+			return 16;
+	}
+	ASSERT(false);
+	return 0;
+}
 
 } // namespace gpu
 

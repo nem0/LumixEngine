@@ -23,7 +23,7 @@ Texture::Texture(const Path& path, ResourceManager& resource_manager, Renderer& 
 	, data_reference(0)
 	, allocator(_allocator)
 	, data(_allocator)
-	, bytes_per_pixel(-1)
+	, format(gpu::TextureFormat::RGBA8)
 	, depth(-1)
 	, layers(1)
 	, width(0)
@@ -75,7 +75,7 @@ void Texture::destroy()
 }
 
 
-bool Texture::create(int w, int h, gpu::TextureFormat format, const void* data, u32 size)
+bool Texture::create(u32 w, u32 h, gpu::TextureFormat format, const void* data, u32 size)
 {
 	Renderer::MemRef memory = renderer.copy(data, size);
 	handle = renderer.createTexture(w, h, 1, format, getGPUFlags() | (u32)gpu::TextureFlags::NO_MIPS, memory, getPath().c_str());
@@ -90,9 +90,9 @@ bool Texture::create(int w, int h, gpu::TextureFormat format, const void* data, 
 }
 
 
-u32 Texture::getPixelNearest(int x, int y) const
+u32 Texture::getPixelNearest(u32 x, u32 y) const
 {
-	if (data.empty() || x >= width || y >= height || x < 0 || y < 0 || bytes_per_pixel != 4) return 0;
+	if (data.empty() || x >= width || y >= height || x < 0 || y < 0 || format != gpu::TextureFormat::RGBA8) return 0;
 
 	return *(u32*)&data.getData()[(x + y * width) * 4];
 }
@@ -100,7 +100,7 @@ u32 Texture::getPixelNearest(int x, int y) const
 
 u32 Texture::getPixel(float x, float y) const
 {
-	ASSERT(bytes_per_pixel == 4);
+	ASSERT(format == gpu::TextureFormat::RGBA8);
 	if (data.empty() || x >= width || y >= height || x < 0 || y < 0)
 	{
 		return 0;
@@ -188,13 +188,13 @@ unsigned int Texture::compareTGA(IInputStream* file1, IInputStream* file2, int d
 bool Texture::saveTGA(IOutputStream* file,
 	int width,
 	int height,
-	int bytes_per_pixel,
+	gpu::TextureFormat format,
 	const u8* image_dest,
 	bool upper_left_origin,
 	const Path& path,
 	IAllocator& allocator)
 {
-	if (bytes_per_pixel != 4)
+	if (format != gpu::TextureFormat::RGBA8)
 	{
 		logError("Renderer") << "Texture " << path.c_str() << " could not be saved, unsupported TGA format";
 		return false;
@@ -204,7 +204,7 @@ bool Texture::saveTGA(IOutputStream* file,
 
 	TGAHeader header;
 	memset(&header, 0, sizeof(header));
-	header.bitsPerPixel = (char)(bytes_per_pixel * 8);
+	header.bitsPerPixel = (char)(4 * 8);
 	header.height = (short)height;
 	header.width = (short)width;
 	header.dataType = 2;
@@ -252,7 +252,7 @@ static void saveTGA(Texture& texture)
 	Texture::saveTGA(&file,
 		texture.width,
 		texture.height,
-		texture.bytes_per_pixel,
+		texture.format,
 		texture.data.getData(),
 		false,
 		texture.getPath(),
@@ -267,7 +267,7 @@ void Texture::save()
 	char ext[5];
 	ext[0] = 0;
 	PathUtils::getExtension(Span(ext), Span(getPath().c_str(), getPath().length()));
-	if (equalStrings(ext, "raw") && bytes_per_pixel == 2)
+	if (equalStrings(ext, "raw") && format == gpu::TextureFormat::R16)
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		OS::OutputFile file;
@@ -288,7 +288,7 @@ void Texture::save()
 		file.write(data.getData(), data.getPos());
 		file.close();
 	}
-	else if (equalStrings(ext, "tga") && bytes_per_pixel == 4)
+	else if (equalStrings(ext, "tga") && format == gpu::TextureFormat::RGBA8)
 	{
 		Lumix::saveTGA(*this);
 	}
@@ -299,36 +299,23 @@ void Texture::save()
 }
 
 
-void Texture::onDataUpdated(int x, int y, int w, int h)
+void Texture::onDataUpdated(u32 x, u32 y, u32 w, u32 h)
 {
 	PROFILE_FUNCTION();
 
-	if (bytes_per_pixel == 2) {
-		const Renderer::MemRef mem = renderer.allocate(w * h * sizeof(u16));
-		const u16* src_mem = (const u16*)data.getData();
-		u16* dst_mem = (u16*)mem.data;
+	u32 bytes_per_pixel = getBytesPerPixel(format);
 
-		for (int j = 0; j < h; ++j) {
-			for (int i = 0; i < w; ++i) {
-				dst_mem[i + j * w] = src_mem[x + i + (y + j) * width];
-			}
-		}
-		renderer.updateTexture(handle, x, y, w, h, gpu::TextureFormat::R16, mem);
-		return;
-	}
-
-	ASSERT(bytes_per_pixel == 4);
 	const u8* src_mem = (const u8*)data.getData();
 	const Renderer::MemRef mem = renderer.allocate(w * h * bytes_per_pixel);
 	u8* dst_mem = (u8*)mem.data;
 
-	for (int j = 0; j < h; ++j) {
+	for (u32 j = 0; j < h; ++j) {
 		memcpy(
 			&dst_mem[(j * w) * bytes_per_pixel],
 			&src_mem[(x + (y + j) * width) * bytes_per_pixel],
 			bytes_per_pixel * w);
 	}
-	renderer.updateTexture(handle, x, y, w, h, gpu::TextureFormat::RGBA8, mem);
+	renderer.updateTexture(handle, x, y, w, h, format, mem);
 }
 
 
@@ -350,29 +337,25 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	texture.height = header.height;
 	texture.depth = header.is_array ? 1 : header.depth;
 	texture.layers = header.is_array ? header.depth : 1;
-	gpu::TextureFormat format;
 	switch(header.channel_type) {
 		case RawTextureHeader::ChannelType::FLOAT:
-			texture.bytes_per_pixel = sizeof(float) * header.channels_count;
 			switch (header.channels_count) {
-				case 1: format = gpu::TextureFormat::R32F; break;
-				case 4: format = gpu::TextureFormat::RGBA32F; break;
+				case 1: texture.format = gpu::TextureFormat::R32F; break;
+				case 4: texture.format = gpu::TextureFormat::RGBA32F; break;
 				default: ASSERT(false); return false;
 			}
 			break;
 		case RawTextureHeader::ChannelType::U8:
-			texture.bytes_per_pixel = sizeof(u8) * header.channels_count;
 			switch (header.channels_count) {
-				case 1: format = gpu::TextureFormat::R8; break;
-				case 4: format = gpu::TextureFormat::RGBA8; break;
+				case 1: texture.format = gpu::TextureFormat::R8; break;
+				case 4: texture.format = gpu::TextureFormat::RGBA8; break;
 				default: ASSERT(false); return false;
 			}
 			break;
 		case RawTextureHeader::ChannelType::U16:
-			texture.bytes_per_pixel = sizeof(u16) * header.channels_count;
 			switch (header.channels_count) {
-				case 1: format = gpu::TextureFormat::R16; break;
-				case 4: format = gpu::TextureFormat::RGBA16; break;
+				case 1: texture.format = gpu::TextureFormat::R16; break;
+				case 4: texture.format = gpu::TextureFormat::RGBA16; break;
 				default: ASSERT(false); return false;
 			}
 			break;
@@ -394,7 +377,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	texture.handle = texture.renderer.createTexture(texture.width
 		, texture.height
 		, texture.depth
-		, format
+		, texture.format
 		, texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB | flag_3d | (u32)gpu::TextureFlags::NO_MIPS 
 		, dst_mem
 		, texture.getPath().c_str());
@@ -428,7 +411,6 @@ bool Texture::loadTGA(IInputStream& file)
 	TGAHeader header;
 	file.read(&header, sizeof(header));
 
-	bytes_per_pixel = header.bitsPerPixel / 8;
 	int image_size = header.width * header.height * 4;
 	if (header.dataType != 2 && header.dataType != 10)
 	{
@@ -449,14 +431,14 @@ bool Texture::loadTGA(IInputStream& file)
 		is_cubemap = false;
 		width = header.width;
 		height = header.height;
-		bytes_per_pixel = 4;
 		mips = 1;
 		if (data_reference) mem = renderer.copy(image_dest, image_size);
 		const bool is_srgb = flags & (u32)gpu::TextureFlags::SRGB;
+		format = is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8;
 		handle = renderer.createTexture(header.width
 			, header.height
 			, 1
-			, is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8
+			, format
 			, getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
 			, mem
 			, getPath().c_str());
@@ -465,7 +447,7 @@ bool Texture::loadTGA(IInputStream& file)
 		return handle.isValid();
 	}
 
-	if (bytes_per_pixel < 3)
+	if (header.bitsPerPixel < 24)
 	{
 		logError("Renderer") << "Unsupported color mode " << getPath().c_str();
 		return false;
@@ -482,6 +464,7 @@ bool Texture::loadTGA(IInputStream& file)
 
 	u8* image_dest = data_reference ? data.getMutableData() : (u8*)mem.data;
 
+	u32 bytes_per_pixel = header.bitsPerPixel / 8;
 	bool is_rle = header.dataType == 10;
 	if (is_rle)
 	{
@@ -564,14 +547,14 @@ bool Texture::loadTGA(IInputStream& file)
 	}
 	if ((header.imageDescriptor & 32) == 0) flipVertical((u32*)image_dest, header.width, header.height);
 
-	bytes_per_pixel = 4;
 	mips = 1;
 	if (data_reference) mem = renderer.copy(image_dest, image_size);
 	const bool is_srgb = flags & (u32)gpu::TextureFlags::SRGB;
+	format = is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8;
 	handle = renderer.createTexture(header.width
 		, header.height
 		, 1
-		, is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8
+		, format
 		, getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
 		, mem
 		, getPath().c_str());

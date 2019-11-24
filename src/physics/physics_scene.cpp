@@ -2782,8 +2782,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		int width = terrain.m_heightmap->width;
 		int height = terrain.m_heightmap->height;
 		heights.resize(width * height);
-		int bytes_per_pixel = terrain.m_heightmap->bytes_per_pixel;
-		if (bytes_per_pixel == 2)
+		if (terrain.m_heightmap->format == gpu::TextureFormat::R16)
 		{
 			PROFILE_BLOCK("copyData");
 			const i16* LUMIX_RESTRICT data = (const i16*)terrain.m_heightmap->getData();
@@ -2800,7 +2799,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				}
 			}
 		}
-		else
+		else if (terrain.m_heightmap->format == gpu::TextureFormat::R8)
 		{
 			PROFILE_BLOCK("copyData");
 			const u8* data = terrain.m_heightmap->getData();
@@ -2810,11 +2809,15 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				{
 					int idx = i + j * width;
 					int idx2 = j + i * height;
-					heights[idx].height = PxI16((i32)data[idx2 * bytes_per_pixel] - 0x7f);
+					heights[idx].height = PxI16((i32)data[idx2] - 0x7f);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
 					heights[idx].setTessFlag();
 				}
 			}
+		}
+		else {
+			logError("Physics") << "Unsupported physics heightmap format " << terrain.m_heightmap->getPath();
+			return;
 		}
 
 		{ // PROFILE_BLOCK scope
@@ -2828,7 +2831,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 
 			PxHeightField* heightfield = m_system->getCooking()->createHeightField(
 				hfDesc, m_system->getPhysics()->getPhysicsInsertionCallback());
-			float height_scale = bytes_per_pixel == 2 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
+			float height_scale = terrain.m_heightmap->format == gpu::TextureFormat::R16 ? 1 / (256 * 256.0f - 1) : 1 / 255.0f;
 			PxHeightFieldGeometry hfGeom(heightfield,
 				PxMeshGeometryFlags(),
 				height_scale * terrain.m_y_scale,

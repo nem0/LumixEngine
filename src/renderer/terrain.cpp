@@ -220,7 +220,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 
 	ASSERT(quad_pos.x >= 0);
 	ASSERT(quad_pos.y >= 0);
-	ASSERT(m_splatmap->bytes_per_pixel == 4);
+	ASSERT(m_splatmap->format == gpu::TextureFormat::RGBA8);
 
 	PROFILE_FUNCTION();
 	
@@ -541,7 +541,7 @@ float Terrain::getHeight(int x, int z) const
 	if (!m_heightmap) return 0;
 
 	Texture* t = m_heightmap;
-	ASSERT(t->bytes_per_pixel == 2);
+	ASSERT(t->format == gpu::TextureFormat::R16);
 	int idx = clamp(x, 0, m_width) + clamp(z, 0, m_height) * m_width;
 	return m_scale.y * DIV64K * ((u16*)t->getData())[idx];
 }
@@ -567,7 +567,7 @@ void Terrain::setHeight(int x, int z, float h)
 	if (!m_heightmap) return;
 
 	Texture* t = m_heightmap;
-	ASSERT(t->bytes_per_pixel == 2);
+	ASSERT(t->format == gpu::TextureFormat::R16);
 	int idx = clamp(x, 0, m_width) + clamp(z, 0, m_height) * m_width;
 	((u16*)t->getData())[idx] = (u16)(h * (65535.0f / m_scale.y));
 }

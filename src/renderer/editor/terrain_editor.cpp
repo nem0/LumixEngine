@@ -190,9 +190,6 @@ private:
 			case TerrainEditor::LAYER:
 				uniform_name = SPLATMAP_SLOT_NAME;
 				break;
-			case TerrainEditor::COLOR:
-				uniform_name = SATELLITE_SLOT_NAME;
-				break;
 			default:
 				uniform_name = HEIGHTMAP_SLOT_NAME;
 				break;
@@ -204,7 +201,7 @@ private:
 
 	u16 computeAverage16(const Texture* texture, int from_x, int to_x, int from_y, int to_y)
 	{
-		ASSERT(texture->bytes_per_pixel == 2);
+		ASSERT(texture->format == gpu::TextureFormat::R16);
 		u32 sum = 0;
 		int texture_width = texture->width;
 		for (int i = from_x, end = to_x; i < end; ++i)
@@ -229,39 +226,6 @@ private:
 	}
 
 
-	void rasterColorItem(Texture* texture, Array<u8>& data, Item& item)
-	{
-		int texutre_size = texture->width;
-		Rectangle r = item.getBoundingRectangle(texutre_size);
-
-		if (texture->bytes_per_pixel != 4)
-		{
-			ASSERT(false);
-			return;
-		}
-		float fx = 0;
-		float fstepx = 1.0f / (r.to_x - r.from_x);
-		float fstepy = 1.0f / (r.to_y - r.from_y);
-		for (int i = r.from_x, end = r.to_x; i < end; ++i, fx += fstepx)
-		{
-			float fy = 0;
-			for (int j = r.from_y, end2 = r.to_y; j < end2; ++j, fy += fstepy)
-			{
-				if (isMasked(fx, fy))
-				{
-					float attenuation = getAttenuation(item, i, j, texutre_size);
-					int offset = 4 * (i - m_x + (j - m_y) * m_width);
-					u8* d = &data[offset];
-					d[0] += u8((item.m_color.x * 255 - d[0]) * attenuation * item.m_amount);
-					d[1] += u8((item.m_color.y * 255 - d[1]) * attenuation * item.m_amount);
-					d[2] += u8((item.m_color.z * 255 - d[2]) * attenuation * item.m_amount);
-					d[3] = 255;
-				}
-			}
-		}
-	}
-
-
 	bool isMasked(float x, float y)
 	{
 		if (m_mask.size() == 0) return true;
@@ -279,7 +243,7 @@ private:
 		int texture_size = texture->width;
 		Rectangle r = item.getBoundingRectangle(texture_size);
 
-		if (texture->bytes_per_pixel != 4)
+		if (texture->format != gpu::TextureFormat::RGBA8)
 		{
 			ASSERT(false);
 			return;
@@ -343,7 +307,7 @@ private:
 		int texture_size = texture->width;
 		Rectangle r = item.getBoundingRectangle(texture_size);
 
-		if (texture->bytes_per_pixel != 4)
+		if (texture->format != gpu::TextureFormat::RGBA8)
 		{
 			ASSERT(false);
 			return;
@@ -382,7 +346,7 @@ private:
 
 	void rasterSmoothHeightItem(Texture* texture, Array<u8>& data, Item& item)
 	{
-		ASSERT(texture->bytes_per_pixel == 2);
+		ASSERT(texture->format == gpu::TextureFormat::R16);
 
 		int texture_size = texture->width;
 		Rectangle rect = item.getBoundingRectangle(texture_size);
@@ -404,7 +368,7 @@ private:
 
 	void rasterFlatHeightItem(Texture* texture, Array<u8>& data, Item& item)
 	{
-		ASSERT(texture->bytes_per_pixel == 2);
+		ASSERT(texture->format == gpu::TextureFormat::R16);
 
 		int texture_size = texture->width;
 		Rectangle rect = item.getBoundingRectangle(texture_size);
@@ -429,12 +393,7 @@ private:
 
 	void rasterItem(Texture* texture, Array<u8>& data, Item& item)
 	{
-		if (m_action_type == TerrainEditor::COLOR)
-		{
-			rasterColorItem(texture, data, item);
-			return;
-		}
-		else if (m_action_type == TerrainEditor::LAYER)
+		if (m_action_type == TerrainEditor::LAYER)
 		{
 			rasterLayerItem(texture, data, item);
 			return;
@@ -455,7 +414,7 @@ private:
 			return;
 		}
 
-		ASSERT(texture->bytes_per_pixel == 2);
+		ASSERT(texture->format == gpu::TextureFormat::R16);
 
 		int texture_size = texture->width;
 		Rectangle rect = item.getBoundingRectangle(texture_size);
@@ -483,7 +442,7 @@ private:
 	void generateNewData()
 	{
 		auto texture = getDestinationTexture();
-		int bpp = texture->bytes_per_pixel;
+		const u32 bpp = gpu::getBytesPerPixel(texture->format);
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
 		m_new_data.resize(bpp * maximum(1, (rect.to_x - rect.from_x) * (rect.to_y - rect.from_y)));
@@ -502,7 +461,7 @@ private:
 	void saveOldData()
 	{
 		auto texture = getDestinationTexture();
-		int bpp = texture->bytes_per_pixel;
+		const u32 bpp = gpu::getBytesPerPixel(texture->format);
 		Rectangle rect;
 		getBoundingRectangle(texture, rect);
 		m_x = rect.from_x;
@@ -516,7 +475,7 @@ private:
 		{
 			for (int i = rect.from_x, end = rect.to_x; i < end; ++i)
 			{
-				for (int k = 0; k < bpp; ++k)
+				for (u32 k = 0; k < bpp; ++k)
 				{
 					m_old_data[index] = texture->getData()[(i + j * texture->width) * bpp + k];
 					++index;
@@ -531,14 +490,14 @@ private:
 		if (!m_terrain.isValid()) return;
 
 		auto texture = getDestinationTexture();
-		int bpp = texture->bytes_per_pixel;
+		const u32 bpp = gpu::getBytesPerPixel(texture->format);
 
 		for (int j = m_y; j < m_y + m_height; ++j)
 		{
 			for (int i = m_x; i < m_x + m_width; ++i)
 			{
 				int index = bpp * (i + j * texture->width);
-				for (int k = 0; k < bpp; ++k)
+				for (u32 k = 0; k < bpp; ++k)
 				{
 					texture->getData()[index + k] = data[bpp * (i - m_x + (j - m_y) * m_width) + k];
 				}
@@ -548,8 +507,7 @@ private:
 		const EntityRef e = (EntityRef)m_terrain.entity;
 		static_cast<RenderScene*>(m_terrain.scene)->forceGrassUpdate(e);
 
-		if (m_action_type != TerrainEditor::LAYER && m_action_type != TerrainEditor::COLOR &&
-			m_action_type != TerrainEditor::ADD_GRASS && m_action_type != TerrainEditor::REMOVE_GRASS)
+		if (m_action_type != TerrainEditor::LAYER && m_action_type != TerrainEditor::ADD_GRASS && m_action_type != TerrainEditor::REMOVE_GRASS)
 		{
 			IScene* scene = m_world_editor.getUniverse()->getScene(crc32("physics"));
 			if (!scene) return;
@@ -571,7 +529,7 @@ private:
 		getBoundingRectangle(texture, rect);
 
 		int new_w = rect.to_x - rect.from_x;
-		int bpp = texture->bytes_per_pixel;
+		const u32 bpp = gpu::getBytesPerPixel(texture->format);
 		new_data.resize(bpp * new_w * (rect.to_y - rect.from_y));
 		old_data.resize(bpp * new_w * (rect.to_y - rect.from_y));
 
@@ -887,7 +845,6 @@ bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
 			case SMOOTH_HEIGHT:
 			case REMOVE_GRASS:
 			case ADD_GRASS:
-			case COLOR:
 			case LAYER: paint(hit.pos, m_action_type, false); break;
 			case ENTITY: paintEntities(hit.pos); break;
 			case REMOVE_ENTITY: removeEntities(hit.pos); break;
@@ -1172,7 +1129,6 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 			case SMOOTH_HEIGHT:
 			case REMOVE_GRASS:
 			case ADD_GRASS:
-			case COLOR:
 			case LAYER: paint(hit_point, m_action_type, true); break;
 			case ENTITY: paintEntities(hit_point); break;
 			case REMOVE_ENTITY: removeEntities(hit_point); break;
@@ -1254,14 +1210,10 @@ void TerrainEditor::onGUI()
 			if (ImGui::Button("Save layermap and grassmap"))
 				getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)->save();
 			break;
-		case COLOR:
-			if (ImGui::Button("Save colormap"))
-				getMaterial()->getTextureByName(SATELLITE_SLOT_NAME)->save();
-			break;
 		case ENTITY: break;
 	}
 
-	if (m_current_brush == LAYER || m_current_brush == GRASS || m_current_brush == COLOR)
+	if (m_current_brush == LAYER || m_current_brush == GRASS)
 	{
 		if (m_brush_texture)
 		{
@@ -1358,12 +1310,6 @@ void TerrainEditor::onGUI()
 			}
 			break;
 		}
-		case COLOR:
-		{
-			m_action_type = TerrainEditor::COLOR;
-			ImGui::ColorPicker3("", &m_color.x);
-			break;
-		}
 		case LAYER:
 		{
 			m_action_type = TerrainEditor::LAYER;
@@ -1386,7 +1332,7 @@ void TerrainEditor::onGUI()
 				if (tex->layers == 1) {
 					ImGui::Text("Only one layer available. Add layers to albedo detail texture (in material).");
 				}
-				for (int i = 0; i < tex->layers; ++i) {
+				for (u32 i = 0; i < tex->layers; ++i) {
 					if (i % 4 != 0) ImGui::SameLine();
 					bool b = m_textures_mask & ((u64)1 << i);
 					if (ImGui::Checkbox(StaticString<20>("", i, "###rb", i), &b)) {
