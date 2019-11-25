@@ -28,6 +28,7 @@ LUMIX_ENGINE_API void pushInt(const char* key_literal, int value);
 
 LUMIX_ENGINE_API void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link);
 LUMIX_ENGINE_API void endGPUBlock(u64 timestamp);
+LUMIX_ENGINE_API void gpuMemStats(u64 total, u64 current, u64 dedicated);
 LUMIX_ENGINE_API void gpuFrame();
 LUMIX_ENGINE_API void link(i64 link);
 LUMIX_ENGINE_API i64 createNewLinkID();
@@ -92,6 +93,13 @@ struct GPUBlock
 	i64 profiler_link;
 };
 
+struct GPUMemStatsBlock
+{
+	u64 total;
+	u64 current;
+	u64 dedicated;
+};
+
 
 enum class EventType : u8
 {
@@ -108,6 +116,7 @@ enum class EventType : u8
 	BEGIN_GPU_BLOCK,
 	END_GPU_BLOCK,
 	GPU_FRAME,
+	GPU_MEM_STATS,
 	LINK
 };
 

@@ -11,9 +11,8 @@ namespace Lumix
 class Engine;
 
 
-class ProfilerUI
+struct ProfilerUI
 {
-public:
 	virtual ~ProfilerUI() {}
 	virtual void onGUI() = 0;
 

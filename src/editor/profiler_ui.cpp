@@ -209,6 +209,8 @@ struct ProfilerUIImpl final : public ProfilerUI
 		bool is_current_pos = false;
 	} hovered_signal;
 	i64 hovered_link = 0;
+	Profiler::GPUMemStatsBlock m_gpu_mem_stats;
+	bool m_is_gpu_mem_stats_valid = false;
 };
 
 
@@ -429,6 +431,13 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 	const PageAllocator& page_allocator = m_engine.getPageAllocator();
 	const float reserved_pages_size = (page_allocator.getReservedCount() * PageAllocator::PAGE_SIZE) / (1024.f * 1024.f);
 	ImGui::Text("Page allocator: %.3fMB", reserved_pages_size);
+
+	if (m_is_gpu_mem_stats_valid) {
+		const float current = m_gpu_mem_stats.current / (1024.f * 1024.f);
+		const float total = m_gpu_mem_stats.total / (1024.f * 1024.f);
+		const float dedicated = m_gpu_mem_stats.dedicated / (1024.f * 1024.f);
+		ImGui::Text("GPU: %.02fMB/%.02f (%.02fMB dedicated)", current, total, dedicated);
+	}
 
 	ImGui::Columns(2, "memc");
 	for (auto* child : m_allocation_root->m_children)
@@ -959,6 +968,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					}
 					break;
 				case Profiler::EventType::GPU_FRAME:
+					break;
+				case Profiler::EventType::GPU_MEM_STATS:
+					read(ctx, p + sizeof(Profiler::EventHeader), m_gpu_mem_stats);
+					m_is_gpu_mem_stats_valid = true;
 					break;
 				case Profiler::EventType::FRAME:
 					if (header.time >= view_start && header.time <= view_end && m_show_frames) {

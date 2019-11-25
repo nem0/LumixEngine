@@ -114,6 +114,7 @@ static struct {
 	u64 last_state = 0;
 	GLuint framebuffer = 0;
 	ProgramHandle default_program;
+	bool has_gpu_mem_info_ext = false;
 } g_gpu;
 
 
@@ -1818,6 +1819,23 @@ void preinit(IAllocator& allocator)
 }
 
 
+bool getMemoryStats(Ref<MemoryStats> stats) {
+	if (!g_gpu.has_gpu_mem_info_ext) return false;
+
+	GLint tmp;
+	CHECK_GL(glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &tmp));
+	stats->total_available_mem = (u64)tmp * 1024;
+
+	CHECK_GL(glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &tmp));
+	stats->current_available_mem = (u64)tmp * 1024;
+
+	CHECK_GL(glGetIntegerv(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &tmp));
+	stats->dedicated_vidmem = (u64)tmp * 1024;
+	
+	return true;
+}
+
+
 bool init(void* window_handle, u32 init_flags)
 {
 	#ifdef LUMIX_DEBUG
@@ -1832,15 +1850,19 @@ bool init(void* window_handle, u32 init_flags)
 
 	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_gpu.max_vertex_attributes);
 
-/*	int extensions_count;
+	int extensions_count;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
+	g_gpu.has_gpu_mem_info_ext = false; 
 	for(int i = 0; i < extensions_count; ++i) {
 		const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
-		OutputDebugString(ext);
-		OutputDebugString("\n");
+		if (equalStrings(ext, "GL_NVX_gpu_memory_info")) {
+			g_gpu.has_gpu_mem_info_ext = true; 
+			break;
+		}
+		//OutputDebugString(ext);
+		//OutputDebugString("\n");
 	}
-	const unsigned char* extensions = glGetString(GL_EXTENSIONS);
-	const unsigned char* version = glGetString(GL_VERSION);*/
+	//const unsigned char* version = glGetString(GL_VERSION);
 
 	CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
 	CHECK_GL(glDepthFunc(GL_GREATER));
