@@ -349,6 +349,13 @@ void beginGPUBlock(const char* name, u64 timestamp, i64 profiler_link)
 	write(g_instance.global_context, EventType::BEGIN_GPU_BLOCK, data);
 }
 
+void gpuMemStats(u64 total, u64 current, u64 dedicated) {
+	GPUMemStatsBlock data;
+	data.total = total;
+	data.current = current;
+	data.dedicated = dedicated;
+	write(g_instance.global_context, EventType::GPU_MEM_STATS, data);
+}
 
 void endGPUBlock(u64 timestamp)
 {

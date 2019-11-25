@@ -2953,7 +2953,8 @@ public:
 
 	DefaultAllocator m_main_allocator;
 	#ifdef LUMIX_DEBUG
-		Debug::Allocator m_allocator;
+		IAllocator& m_allocator;
+		//Debug::Allocator m_allocator;
 	#else
 		IAllocator& m_allocator;
 	#endif

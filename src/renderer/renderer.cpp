@@ -481,6 +481,14 @@ struct RendererImpl final : public Renderer
 			void* window_handle = engine.getPlatformData().window_handle;
 			gpu::init(window_handle, init_data->flags);
 
+			gpu::MemoryStats mem_stats;
+			if (gpu::getMemoryStats(Ref(mem_stats))) {
+				logInfo("Renderer") << "Initial GPU memory stats:\n"
+					"total: " << (mem_stats.total_available_mem / (1024.f * 1024.f)) << "MB\n"
+					"currect: " << (mem_stats.current_available_mem / (1024.f * 1024.f)) << "MB\n"
+					"dedicated: " << (mem_stats.dedicated_vidmem/ (1024.f * 1024.f)) << "MB\n";
+			}
+
 			for (FrameData& frame : renderer.m_frames) {
 				frame.transient_buffer = gpu::allocBufferHandle();
 				frame.transient_offset = 0;
@@ -1013,6 +1021,11 @@ struct RendererImpl final : public Renderer
 	void render() {
 		FrameData& frame = *m_gpu_frame;
 		
+		gpu::MemoryStats mem_stats;
+		if (gpu::getMemoryStats(Ref(mem_stats))) {
+			Profiler::gpuMemStats(mem_stats.total_available_mem, mem_stats.current_available_mem, mem_stats.dedicated_vidmem);
+		}
+
 		for (const auto& i : frame.to_compile_shaders) {
 			Shader::compile(i.program, i.decl, i.defines, i.sources, *this);
 		}

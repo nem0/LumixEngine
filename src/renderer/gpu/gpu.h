@@ -184,9 +184,17 @@ struct TextureInfo {
 };
 
 
+struct MemoryStats {
+	u64 total_available_mem;
+	u64 current_available_mem;
+	u64 dedicated_vidmem;
+};
+
+
 void preinit(IAllocator& allocator);
 bool init(void* window_handle, u32 flags);
 Backend getBackend();
+bool getMemoryStats(Ref<MemoryStats> stats);
 void swapBuffers(u32 w, u32 h);
 bool isHomogenousDepth();
 bool isOriginBottomLeft();
