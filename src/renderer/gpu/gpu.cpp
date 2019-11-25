@@ -361,7 +361,6 @@ static bool isATI2(const PixelFormat& pf)
 static bool isDXT3(const PixelFormat& pf)
 {
 	return ((pf.dwFlags & DDPF_FOURCC) && (pf.dwFourCC == D3DFMT_DXT3));
-
 }
 
 static bool isDXT5(const PixelFormat& pf)
