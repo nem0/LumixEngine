@@ -34,7 +34,88 @@ namespace Lumix
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static constexpr u32 TRANSIENT_BUFFER_INIT_SIZE = 16 * 1024 * 1024;
+
+
+struct TransientBuffer {
+	static constexpr u32 INIT_SIZE = 1 * 1024 * 1024;
+	
+	void init() {
+		m_buffer = gpu::allocBufferHandle();
+		m_offset = 0;
+		gpu::createBuffer(m_buffer, 0, INIT_SIZE, nullptr);
+		m_size = INIT_SIZE;
+		m_ptr = (u8*)gpu::map(m_buffer, INIT_SIZE);
+	}
+
+	Renderer::TransientSlice alloc(u32 size) {
+		Renderer::TransientSlice slice;
+		size = (size + 15) & ~15;
+		slice.offset = MT::atomicAdd(&m_offset, size);
+		slice.size = size;
+		if (slice.offset + size <= m_size) {
+			slice.buffer = m_buffer;
+			slice.ptr = m_ptr + slice.offset;
+			return slice;
+		}
+
+		MT::CriticalSectionLock lock(m_mutex);
+		if (!m_overflow.buffer.isValid()) {
+			m_overflow.buffer = gpu::allocBufferHandle();
+			m_overflow.data = (u8*)OS::memReserve(128 * 1024 * 1024);
+			m_overflow.size = 0;
+			m_overflow.commit = 0;
+		}
+		slice.ptr = m_overflow.data + m_overflow.size;
+		m_overflow.size += size;
+		if (m_overflow.size > m_overflow.commit) {
+			const u32 page_size = OS::getMemPageSize();
+			m_overflow.commit = (m_overflow.size + page_size - 1) & ~(page_size - 1);
+			OS::memCommit(m_overflow.data, m_overflow.commit);
+		}
+		slice.buffer = m_overflow.buffer;
+		return slice;
+	} 
+
+	void prepareToRender() {
+		gpu::unmap(m_buffer);
+		m_ptr = nullptr;
+
+		if (m_overflow.buffer.isValid()) {
+			gpu::createBuffer(m_overflow.buffer, 0, nextPow2(m_overflow.size + m_size), nullptr);
+			gpu::update(m_overflow.buffer, m_overflow.data, m_overflow.size);
+			OS::memRelease(m_overflow.data);
+			m_overflow.data = nullptr;
+			m_overflow.commit = 0;
+		}
+	}
+
+	void renderDone() {
+		if (m_overflow.buffer.isValid()) {
+			m_size = nextPow2(m_overflow.size + m_size);
+			gpu::destroy(m_buffer);
+			m_buffer = m_overflow.buffer;
+			m_overflow.buffer = gpu::INVALID_BUFFER;
+			m_overflow.size = 0;
+		}
+
+		ASSERT(!m_ptr);
+		m_ptr = (u8*)gpu::map(m_buffer, m_size);
+		m_offset = 0;
+	}
+
+	gpu::BufferHandle m_buffer = gpu::INVALID_BUFFER;
+	i32 m_offset = 0;
+	u32 m_size = 0;
+	u8* m_ptr = nullptr;
+	MT::CriticalSection m_mutex;
+
+	struct {
+		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
+		u8* data = nullptr;
+		u32 size = 0;
+		u32 commit = 0;
+	} m_overflow;
+};
 
 
 struct FrameData {
@@ -52,10 +133,8 @@ struct FrameData {
 		Shader::Sources sources;
 	};
 
-	gpu::BufferHandle transient_buffer = gpu::INVALID_BUFFER;
-	i32 transient_offset = 0;
-	u32 transient_size = 0;
-	u8* transient_ptr = nullptr;
+	TransientBuffer transient_buffer;
+
 	Array<Renderer::RenderJob*> jobs;
 	MT::CriticalSection shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
@@ -440,7 +519,7 @@ struct RendererImpl final : public Renderer
 		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
 			for (FrameData& frame : renderer->m_frames) {
-				gpu::destroy(frame.transient_buffer);
+				gpu::destroy(frame.transient_buffer.m_buffer);
 			}
 			gpu::destroy(renderer->m_material_buffer.buffer);
 			renderer->m_profiler.clear();
@@ -490,11 +569,7 @@ struct RendererImpl final : public Renderer
 			}
 
 			for (FrameData& frame : renderer.m_frames) {
-				frame.transient_buffer = gpu::allocBufferHandle();
-				frame.transient_offset = 0;
-				gpu::createBuffer(frame.transient_buffer, 0, TRANSIENT_BUFFER_INIT_SIZE, nullptr);
-				frame.transient_size = TRANSIENT_BUFFER_INIT_SIZE;
-				frame.transient_ptr = (u8*)gpu::map(frame.transient_buffer, TRANSIENT_BUFFER_INIT_SIZE);
+				frame.transient_buffer.init();
 			}
 			renderer.m_cpu_frame = renderer.m_frames.begin();
 			renderer.m_gpu_frame = renderer.m_frames.begin();
@@ -685,20 +760,7 @@ struct RendererImpl final : public Renderer
 
 	TransientSlice allocTransient(u32 size) override
 	{
-		TransientSlice slice;
-		size = (size + 15) & ~15;
-		slice.buffer = m_cpu_frame->transient_buffer;
-		slice.offset = MT::atomicAdd(&m_cpu_frame->transient_offset, size);
-		if (slice.offset + size > m_cpu_frame->transient_size) {
-			logError("Renderer") << "Out of transient memory";
-			slice.size = 0;
-			slice.ptr = nullptr;
-		}
-		else {
-			slice.size = size;
-			slice.ptr = m_cpu_frame->transient_ptr + slice.offset;
-		}
-		return slice;
+		return m_cpu_frame->transient_buffer.alloc(size);
 	}
 	
 	gpu::BufferHandle getMaterialUniformBuffer() override {
@@ -1031,8 +1093,7 @@ struct RendererImpl final : public Renderer
 		}
 		frame.to_compile_shaders.clear();
 
-		gpu::unmap(frame.transient_buffer);
-		frame.transient_ptr = nullptr;
+		frame.transient_buffer.prepareToRender();
 
 		if (m_material_buffer.dirty) {
 			gpu::update(m_material_buffer.buffer, m_material_buffer.data.begin(), m_material_buffer.data.byte_size());
@@ -1058,16 +1119,7 @@ struct RendererImpl final : public Renderer
 		JobSystem::enableBackupWorker(false);
 		m_profiler.frame();
 
-		if ((u32)frame.transient_offset > frame.transient_size) {
-			frame.transient_size = nextPow2(frame.transient_offset);
-			gpu::destroy(frame.transient_buffer);
-			frame.transient_buffer = gpu::allocBufferHandle();
-			gpu::createBuffer(frame.transient_buffer, 0, frame.transient_size, nullptr);
-		}
-
-		ASSERT(!frame.transient_ptr);
-		frame.transient_ptr = (u8*)gpu::map(frame.transient_buffer, frame.transient_size);
-		frame.transient_offset = 0;
+		frame.transient_buffer.renderDone();
 		
 		JobSystem::decSignal(frame.can_setup);
 
