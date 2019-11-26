@@ -73,15 +73,15 @@ struct Environment
 		CAST_SHADOWS = 1 << 0
 	};
 
-	Vec3 m_diffuse_color;
-	float m_diffuse_intensity;
-	float m_indirect_intensity;
-	Vec3 m_fog_color;
-	float m_fog_density;
-	float m_fog_bottom;
-	float m_fog_height;
-	EntityRef m_entity;
-	Vec4 m_cascades;
+	Vec3 diffuse_color;
+	float diffuse_intensity;
+	float indirect_intensity;
+	Vec3 fog_color;
+	float fog_density;
+	float fog_bottom;
+	float fog_height;
+	EntityRef entity;
+	Vec4 cascades;
 	FlagSet<Flags, u32> flags;
 };
 

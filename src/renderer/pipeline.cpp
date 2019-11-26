@@ -674,11 +674,11 @@ struct PipelineImpl final : Pipeline
 				EntityRef gl = (EntityRef)global_light;
 				const Environment& env = m_scene->getEnvironment(gl);
 				global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
-				global_state.light_color = Vec4(env.m_diffuse_color, 456);
-				global_state.light_intensity = env.m_diffuse_intensity;
-				global_state.light_indirect_intensity = env.m_indirect_intensity;
-				global_state.fog_params = Vec4(env.m_fog_density, env.m_fog_bottom, env.m_fog_height, 456);
-				global_state.fog_color = Vec4(env.m_fog_color, 1);
+				global_state.light_color = Vec4(env.diffuse_color, 456);
+				global_state.light_intensity = env.diffuse_intensity;
+				global_state.light_indirect_intensity = env.indirect_intensity;
+				global_state.fog_params = Vec4(env.fog_density, env.fog_bottom, env.fog_height, 456);
+				global_state.fog_color = Vec4(env.fog_color, 1);
 			}
 		}
 

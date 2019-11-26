@@ -74,9 +74,6 @@ struct PropertyBase
 LUMIX_ENGINE_API void init(IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
 
-LUMIX_ENGINE_API u32 getScenesCount();
-LUMIX_ENGINE_API const SceneBase& getScene(u32 index);
-
 LUMIX_ENGINE_API int getEnumsCount();
 LUMIX_ENGINE_API const EnumBase& getEnum(int index);
 
@@ -747,9 +744,9 @@ struct ConstArrayProperty : IArrayProperty
 };
 
 
-struct IComponentVisitor
+struct ISceneVisitor
 {
-	virtual ~IComponentVisitor() {}
+	virtual ~ISceneVisitor() {}
 	virtual void visit(const ComponentBase& cmp) = 0;
 };
 
@@ -861,7 +858,7 @@ struct SceneBase
 
 	virtual int getFunctionCount() const = 0;
 	virtual void visit(IFunctionVisitor&) const = 0;
-	virtual void visit(IComponentVisitor& visitor) const = 0;
+	virtual void visit(ISceneVisitor& visitor) const = 0;
 
 	const char* name;
 };
@@ -879,7 +876,7 @@ struct Scene : SceneBase
 	}
 
 
-	void visit(IComponentVisitor& visitor) const override
+	void visit(ISceneVisitor& visitor) const override
 	{
 		apply([&](const auto& cmp) { visitor.visit(cmp); }, components);
 	}
@@ -1098,17 +1095,6 @@ auto array(const char* name, Counter counter, Adder adder, Remover remover, Prop
 	p.counter = counter;
 	p.adder = adder;
 	p.remover = remover;
-	p.properties = makeTuple(properties...);
-	return p;
-}
-
-
-template <typename Counter, typename... Props>
-auto const_array(const char* name, Counter counter, Props... properties)
-{
-	ConstArrayProperty<Counter, Props...> p;
-	p.name = name;
-	p.counter = counter;
 	p.properties = makeTuple(properties...);
 	return p;
 }

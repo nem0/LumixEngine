@@ -668,14 +668,14 @@ public:
 	void serializeEnvironment(ISerializer& serializer, EntityRef entity)
 	{
 		const Environment& light = m_environments[entity];
-		serializer.write("cascades", light.m_cascades);
-		serializer.write("diffuse_color", light.m_diffuse_color);
-		serializer.write("diffuse_intensity", light.m_diffuse_intensity);
-		serializer.write("indirect_intensity", light.m_indirect_intensity);
-		serializer.write("fog_bottom", light.m_fog_bottom);
-		serializer.write("fog_color", light.m_fog_color);
-		serializer.write("fog_density", light.m_fog_density);
-		serializer.write("fog_height", light.m_fog_height);
+		serializer.write("cascades", light.cascades);
+		serializer.write("diffuse_color", light.diffuse_color);
+		serializer.write("diffuse_intensity", light.diffuse_intensity);
+		serializer.write("indirect_intensity", light.indirect_intensity);
+		serializer.write("fog_bottom", light.fog_bottom);
+		serializer.write("fog_color", light.fog_color);
+		serializer.write("fog_density", light.fog_density);
+		serializer.write("fog_height", light.fog_height);
 		serializer.write("flags", light.flags.base);
 	}
 
@@ -683,18 +683,18 @@ public:
 	void deserializeEnvironment(IDeserializer& serializer, EntityRef entity, int scene_version)
 	{
 		Environment light;
-		light.m_entity = entity;
-		serializer.read(Ref(light.m_cascades));
-		serializer.read(Ref(light.m_diffuse_color));
-		serializer.read(Ref(light.m_diffuse_intensity));
-		serializer.read(Ref(light.m_indirect_intensity));
-		serializer.read(Ref(light.m_fog_bottom));
-		serializer.read(Ref(light.m_fog_color));
-		serializer.read(Ref(light.m_fog_density));
-		serializer.read(Ref(light.m_fog_height));
+		light.entity = entity;
+		serializer.read(Ref(light.cascades));
+		serializer.read(Ref(light.diffuse_color));
+		serializer.read(Ref(light.diffuse_intensity));
+		serializer.read(Ref(light.indirect_intensity));
+		serializer.read(Ref(light.fog_bottom));
+		serializer.read(Ref(light.fog_color));
+		serializer.read(Ref(light.fog_density));
+		serializer.read(Ref(light.fog_height));
 		serializer.read(Ref(light.flags.base));
 		m_environments.insert(entity, light);
-		m_universe.onComponentCreated(light.m_entity, ENVIRONMENT_TYPE, this);
+		m_universe.onComponentCreated(light.entity, ENVIRONMENT_TYPE, this);
 		m_active_global_light_entity = entity;
 	}
 	
@@ -1453,8 +1453,8 @@ public:
 		for (int i = 0; i < size; ++i) {
 			Environment light;
 			serializer.read(light);
-			m_environments.insert(light.m_entity, light);
-			m_universe.onComponentCreated(light.m_entity, ENVIRONMENT_TYPE, this);
+			m_environments.insert(light.entity, light);
+			m_universe.onComponentCreated(light.entity, ENVIRONMENT_TYPE, this);
 		}
 		serializer.read(m_active_global_light_entity);
 	}
@@ -2902,7 +2902,7 @@ public:
 	
 	Vec4 getShadowmapCascades(EntityRef entity) override
 	{
-		return m_environments[entity].m_cascades;
+		return m_environments[entity].cascades;
 	}
 
 
@@ -2914,7 +2914,7 @@ public:
 		valid_value.z = maximum(valid_value.y + 0.01f, valid_value.z);
 		valid_value.w = maximum(valid_value.z + 0.01f, valid_value.w);
 
-		m_environments[entity].m_cascades = valid_value;
+		m_environments[entity].cascades = valid_value;
 	}
 
 
@@ -3266,15 +3266,15 @@ public:
 	{
 		Environment light;
 		light.flags.set(Environment::CAST_SHADOWS);
-		light.m_entity = entity;
-		light.m_diffuse_color.set(1, 1, 1);
-		light.m_diffuse_intensity = 0;
-		light.m_indirect_intensity = 1;
-		light.m_fog_color.set(1, 1, 1);
-		light.m_fog_density = 0;
-		light.m_cascades.set(3, 8, 100, 300);
-		light.m_fog_bottom = 0.0f;
-		light.m_fog_height = 10.0f;
+		light.entity = entity;
+		light.diffuse_color.set(1, 1, 1);
+		light.diffuse_intensity = 0;
+		light.indirect_intensity = 1;
+		light.fog_color.set(1, 1, 1);
+		light.fog_density = 0;
+		light.cascades.set(3, 8, 100, 300);
+		light.fog_bottom = 0.0f;
+		light.fog_height = 10.0f;
 
 		if (m_environments.empty()) m_active_global_light_entity = entity;
 
