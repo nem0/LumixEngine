@@ -191,28 +191,33 @@ public:
 
 	void onEvent(const OS::Event& event)
 	{
+		const bool handle_input = OS::getFocused() == m_window;
 		m_events.push(event);
 		switch (event.type) {
 			case OS::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
 				m_editor->setToggleSelection(io.KeyCtrl);
 				m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
-				io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
+				if (handle_input || !event.mouse_button.down) {
+					io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
+				}
 				break;
 			}
-			case OS::Event::Type::MOUSE_WHEEL: {
-				ImGuiIO& io = ImGui::GetIO();
-				io.MouseWheel = event.mouse_wheel.amount;
+			case OS::Event::Type::MOUSE_WHEEL:
+				if (handle_input) {
+					ImGuiIO& io = ImGui::GetIO();
+					io.MouseWheel = event.mouse_wheel.amount;
+				}
 				break;
-			}
-			case OS::Event::Type::MOUSE_MOVE: {
-				ImGuiIO& io = ImGui::GetIO();
-				const OS::Point cp = OS::getMousePos(event.window);
-				m_mouse_move += {(float)event.mouse_move.xrel, (float)event.mouse_move.yrel};
-				io.MousePos.x = (float)cp.x;
-				io.MousePos.y = (float)cp.y;
+			case OS::Event::Type::MOUSE_MOVE:
+				if (handle_input) {
+					ImGuiIO& io = ImGui::GetIO();
+					const OS::Point cp = OS::getMousePos(event.window);
+					m_mouse_move += {(float)event.mouse_move.xrel, (float)event.mouse_move.yrel};
+					io.MousePos.x = (float)cp.x;
+					io.MousePos.y = (float)cp.y;
+				}
 				break;
-			}
 			case OS::Event::Type::WINDOW_SIZE:
 				if (event.window == m_window && event.win_size.h > 0 && event.win_size.w > 0) {
 					m_settings.m_window.w = event.win_size.w;
@@ -231,23 +236,25 @@ public:
 			case OS::Event::Type::QUIT:
 				exit();
 				break;
-			case OS::Event::Type::CHAR: {
-				ImGuiIO& io = ImGui::GetIO();
-				char utf8[5];
-				OS::UTF32ToUTF8(event.text_input.utf32, utf8);
-				utf8[4] = 0;
-				io.AddInputCharactersUTF8(utf8);
+			case OS::Event::Type::CHAR:
+				if (handle_input) {
+					ImGuiIO& io = ImGui::GetIO();
+					char utf8[5];
+					OS::UTF32ToUTF8(event.text_input.utf32, utf8);
+					utf8[4] = 0;
+					io.AddInputCharactersUTF8(utf8);
+				}
 				break;
-			}
-			case OS::Event::Type::KEY: {
-				ImGuiIO& io = ImGui::GetIO();
-				io.KeysDown[(int)event.key.keycode] = event.key.down;
-				io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
-				io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
-				io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
-				checkShortcuts();
+			case OS::Event::Type::KEY:
+				if (handle_input) {
+					ImGuiIO& io = ImGui::GetIO();
+					io.KeysDown[(int)event.key.keycode] = event.key.down;
+					io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
+					io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
+					io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
+					checkShortcuts();
+				}
 				break;
-			}
 			case OS::Event::Type::DROP_FILE:
 				for(int i = 0, c = OS::getDropFileCount(event); i < c; ++i) {
 					char tmp[MAX_PATH_LENGTH];
