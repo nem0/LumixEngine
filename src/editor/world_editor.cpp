@@ -109,9 +109,6 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 		, cmp(cmp)
 	{}
 
-	void begin(const Reflection::ComponentBase&) override {}
-	void end(const Reflection::ComponentBase&) override {}
-
 	template <typename T>
 	void visit_generic(const Reflection::Property<T>& prop) {
 		T value;

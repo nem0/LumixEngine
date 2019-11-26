@@ -770,8 +770,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
 		m_tile.universe->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_scene->getEnvironment(light_entity).m_diffuse_intensity = 1;
-		render_scene->getEnvironment(light_entity).m_indirect_intensity = 1;
+		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 		
 		m_tile.pipeline->setScene(render_scene);
 	}
@@ -798,8 +798,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		const EntityRef light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
 		m_universe->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_scene->getEnvironment(light_entity).m_diffuse_intensity = 1;
-		render_scene->getEnvironment(light_entity).m_indirect_intensity = 1;
+		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 
 		m_pipeline->setScene(render_scene);
 	}

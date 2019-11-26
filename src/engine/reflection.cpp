@@ -63,8 +63,6 @@ struct ComponentTypeData
 
 
 static IAllocator* g_allocator = nullptr;
-static const SceneBase* g_scenes[64];
-static u32 g_scenes_count = 0;
 static Array<const EnumBase*>* g_enums = nullptr;
 
 
@@ -206,7 +204,7 @@ void registerEnum(const EnumBase& e)
 
 void registerScene(const SceneBase& scene)
 {
-	struct : IComponentVisitor
+	struct : ISceneVisitor
 	{
 		void visit(const ComponentBase& cmp) override
 		{
@@ -214,10 +212,6 @@ void registerScene(const SceneBase& scene)
 		}
 	} visitor;
 	scene.visit(visitor);
-
-	ASSERT(g_scenes_count < lengthOf(g_scenes));
-	g_scenes[g_scenes_count] = &scene;
-	++g_scenes_count;
 }
 
 
@@ -308,19 +302,6 @@ int getComponentTypesCount()
 const char* getComponentTypeID(int index)
 {
 	return getComponentTypes()[index].id;
-}
-
-
-u32 getScenesCount()
-{
-	return g_scenes_count;
-}
-
-
-const SceneBase& getScene(u32 index)
-{
-	ASSERT(index < lengthOf(g_scenes) && g_scenes[index]);
-	return *g_scenes[index];
 }
 
 
