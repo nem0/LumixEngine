@@ -144,7 +144,7 @@ private:
 	void gatherBones(const ofbx::IScene& scene);
 	void gatherAnimations(const ofbx::IScene& scene);
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
-	void postprocessMeshes(const ImportConfig& cfg);
+	void postprocessMeshes(const ImportConfig& cfg, const char* path);
 	void gatherMeshes(ofbx::IScene* scene);
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
