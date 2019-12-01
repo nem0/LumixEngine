@@ -466,8 +466,14 @@ static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx
 	}
 }
 
+static bool doesFlipHandness(const Matrix& mtx) {
+	Vec3 x(1, 0, 0);
+	Vec3 y(0, 1, 0);
+	Vec3 z = mtx.inverted().transformVector(crossProduct(mtx.transformVector(x), mtx.transformVector(y)));
+	return z.z < 0;
+}
 
-void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
+void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 {
 	for (int mesh_idx = 0; mesh_idx < meshes.size(); ++mesh_idx)
 	{
@@ -493,6 +499,11 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg)
 		}
 		import_mesh.transform_matrix = transform_matrix;
 		import_mesh.transform_matrix.inverse();
+
+		const bool flip_handness = doesFlipHandness(transform_matrix);
+		if (flip_handness) {
+			logError("FBX") << "Mesh " << mesh.name << " in " << path << " flips handness. This is not supported and the mesh will not display correctly.";
+		}
 
 		OutputMemoryStream blob(allocator);
 		int vertex_size = getVertexSize(import_mesh);
@@ -982,39 +993,83 @@ static Quat getRotation(const ofbx::Matrix& mtx)
 	return m.getRotation();
 }
 
-static void fill(Array<FBXImporter::RotationKey>& out, const ofbx::AnimationCurveNode* curve_node, const ofbx::Object& bone) {
+template <typename T>
+static void fillTimes(const ofbx::AnimationCurve* curve, Array<T>& out){
+	if(!curve) return;
+
+	const i64* times = curve->getKeyTime();
+	for (u32 i = 0, c = curve->getKeyCount(); i < c; ++i) {
+		if (out.empty()) {
+			out.emplace().time = times[i];
+		}
+		else if (times[i] > out.back().time) {
+			out.emplace().time = times[i];
+		}
+		else {
+			for (const T& k : out) {
+				if (k.time == times[i]) break;
+				if (times[i] < k.time) {
+					const u32 idx = u32(&k - out.begin());
+					out.emplaceAt(idx).time = times[i];
+					break;
+				}
+			}
+		}
+	}
+};
+
+static float evalCurve(i64 time, const ofbx::AnimationCurve& curve) {
+	const i64* times = curve.getKeyTime();
+	const float* values = curve.getKeyValue();
+	const int count = curve.getKeyCount();
+
+	ASSERT(count > 0);
+
+	time = clamp(time, times[0], times[count - 1]);
+
+	for (int i = 0; i < count; ++i) {
+		if (time == times[i]) return values[i];
+		if (time < times[i]) {
+			ASSERT(i > 0);
+			ASSERT(time > times[i - 1]);
+			const float t = float((time - times[i - 1]) / double(times[i] - times[i - 1]));
+			return values[i - 1] * (1 - t) + values[i] * t;
+		}
+	}
+	ASSERT(false);
+	return 0.f;
+};
+
+static void fill(Array<FBXImporter::RotationKey>& out, const ofbx::AnimationCurveNode* curve_node, const ofbx::Object& bone, double anim_len) {
 	ASSERT(out.empty());
 	
 	const ofbx::AnimationCurve* x_curve = curve_node->getCurve(0);
 	const ofbx::AnimationCurve* y_curve = curve_node->getCurve(1);
 	const ofbx::AnimationCurve* z_curve = curve_node->getCurve(2);
 
-	if (x_curve) out.resize(x_curve->getKeyCount());
-	else if (y_curve) out.resize(y_curve->getKeyCount());
-	else if (z_curve) out.resize(z_curve->getKeyCount());
-	else return;
-
-	memset(out.begin(), 0, out.byte_size());
-
-	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
+	if (!x_curve && !y_curve && !z_curve) return;
+	
+	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve) {
 		if (!curve) {
-			// TODO default value
-			//ASSERT(false);
+			const ofbx::Vec3 lcl_rot = bone.getLocalRotation();
+			for (FBXImporter::RotationKey& k : out) {
+				(&k.rot.x)[idx] = float((&lcl_rot.x)[idx]);
+			}
 			return;
 		}
 
-		// we do not support nodes with curves with different number of keyframes
-		ASSERT(curve->getKeyCount() == out.size());
-
-		const i64* times = curve->getKeyTime();
-		const float* values = curve->getKeyValue();
-		for (u32 i = 0, c = curve->getKeyCount(); i < c; ++i) {
-			(&out[i].rot.x)[idx] = values[i];
-			// node with two curves with different times, this is not supported
-			ASSERT(out[i].time == 0 || out[i].time == times[i]);
-			out[i].time = times[i];
+		for (FBXImporter::RotationKey& k : out) {
+			(&k.rot.x)[idx] = evalCurve(k.time, *curve);
 		}
 	};
+
+	out.emplace().time = 0;
+	out.emplace().time = ofbx::secondsToFbxTime(anim_len);
+	fillTimes(x_curve, out);
+	fillTimes(y_curve, out);
+	fillTimes(z_curve, out);
+	
+	if (out.empty()) return;
 
 	fill_curve(0, x_curve);
 	fill_curve(1, y_curve);
@@ -1026,39 +1081,37 @@ static void fill(Array<FBXImporter::RotationKey>& out, const ofbx::AnimationCurv
 	}
 }
 
-static void fill(Array<FBXImporter::TranslationKey>& out, const ofbx::AnimationCurveNode* curve_node, const ofbx::Object& bone, float parent_scale) {
+static void fill(Array<FBXImporter::TranslationKey>& out, const ofbx::AnimationCurveNode* curve_node, const ofbx::Object& bone, float parent_scale, double anim_len) {
 	ASSERT(out.empty());
 	
 	const ofbx::AnimationCurve* x_curve = curve_node->getCurve(0);
 	const ofbx::AnimationCurve* y_curve = curve_node->getCurve(1);
 	const ofbx::AnimationCurve* z_curve = curve_node->getCurve(2);
 
-	if (x_curve) out.resize(x_curve->getKeyCount());
-	else if (y_curve) out.resize(y_curve->getKeyCount());
-	else if (z_curve) out.resize(z_curve->getKeyCount());
-	else return;
+	if (!x_curve && !y_curve && !z_curve) return;
 
-	memset(out.begin(), 0, out.byte_size());
-
-	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve){
+	auto fill_curve = [&](int idx, const ofbx::AnimationCurve* curve) {
 		if (!curve) {
-			// TODO default value
-			//ASSERT(false);
+			const ofbx::Vec3 lcl_pos = bone.getLocalTranslation();
+			for (FBXImporter::TranslationKey& k : out) {
+				k.pos[idx] = float((&lcl_pos.x)[idx]);
+			}
 			return;
 		}
 
-		// we do not support nodes with curves with different number of keyframes
-		ASSERT(curve->getKeyCount() == out.size());
-
-		const i64* times = curve->getKeyTime();
-		const float* values = curve->getKeyValue();
-		for (u32 i = 0, c = curve->getKeyCount(); i < c; ++i) {
-			(&out[i].pos.x)[idx] = values[i];
-			// node with two curves with different times, this is not supported
-			ASSERT(out[i].time == 0 || out[i].time == times[i]);
-			out[i].time = times[i];
+		for (FBXImporter::TranslationKey& k : out) {
+			k.pos[idx] = evalCurve(k.time, *curve);
 		}
 	};
+
+
+	out.emplace().time = 0;
+	out.emplace().time = ofbx::secondsToFbxTime(anim_len);
+	fillTimes(x_curve, out);
+	fillTimes(y_curve, out);
+	fillTimes(z_curve, out);
+	
+	if (out.empty()) return;
 
 	fill_curve(0, x_curve);
 	fill_curve(1, y_curve);
@@ -1083,7 +1136,7 @@ static void compressPositions(Array<FBXImporter::TranslationKey>& out,
 	out.clear();
 	if (!curve_node) return;
 
-	fill(out, curve_node, bone, parent_scale);
+	fill(out, curve_node, bone, parent_scale, anim_len);
 	if (out.empty()) return;
 
 	FBXImporter::TranslationKey prev = out[0];
@@ -1119,7 +1172,7 @@ static void compressRotations(Array<FBXImporter::RotationKey>& out,
 	out.clear();
 	if (!curve_node) return;
 
-	fill(out, curve_node, bone);
+	fill(out, curve_node, bone, anim_len);
 	if (out.empty()) return;
 
 	FBXImporter::RotationKey prev = out[0];
@@ -1876,7 +1929,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
-	postprocessMeshes(cfg);
+	postprocessMeshes(cfg, src);
 
 	for (int i = 0; i < meshes.size(); ++i) {
 		char name[256];
@@ -1912,7 +1965,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 void FBXImporter::writeModel(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
-	postprocessMeshes(cfg);
+	postprocessMeshes(cfg, src);
 
 	auto cmpMeshes = [](const void* a, const void* b) -> int {
 		auto a_mesh = static_cast<const ImportMesh*>(a);
