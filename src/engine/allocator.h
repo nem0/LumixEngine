@@ -67,7 +67,7 @@ public:
 };
 
 
-class BaseProxyAllocator final : public IAllocator
+class LUMIX_ENGINE_API BaseProxyAllocator final : public IAllocator
 {
 public:
 	explicit BaseProxyAllocator(IAllocator& source);

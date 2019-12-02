@@ -41,9 +41,15 @@ extern "C" {
 	LUMIX_CRT_API double __cdecl ceil(double x);
 	LUMIX_CRT_API float __cdecl cosf(float x);
 	double __cdecl fabs(double x);
-	float __cdecl fabsf(float x);
 	LUMIX_CRT_API double __cdecl floor(double _X);
+	#ifndef _INC_MATH
+		inline float __cdecl fabsf(float x) { return (float)fabs(x); }
+		inline float __cdecl floorf(float x) { return (float)floor(x); }	
+		LUMIX_CRT_API float __cdecl ceilf(float x);
+		//inline float __cdecl ceilf(float x) { return (float)ceil(x); }	
+	#endif
 	LUMIX_CRT_API float fmodf(float x, float y);
+	double __cdecl fmod(double x, double y);
 	LUMIX_CRT_API void __cdecl free(void* ptr);
 	double __cdecl log10(double x);
 	LUMIX_CRT_API void* __cdecl malloc(size_t size);

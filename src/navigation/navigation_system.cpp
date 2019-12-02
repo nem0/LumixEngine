@@ -105,7 +105,7 @@ struct NavigationSystem final : public IPlugin
 	void createScenes(Universe& universe) override;
 	void destroyScene(IScene* scene) override;
 
-	BaseProxyAllocator m_allocator;
+	IAllocator& m_allocator;
 	Engine& m_engine;
 };
 

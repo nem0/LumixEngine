@@ -42,11 +42,6 @@
 #include "renderer/shader.h"
 #include "renderer/texture.h"
 #include "scene_view.h"
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
-#if defined _MSC_VER && _MSC_VER == 1900 
-#pragma warning(disable : 4312)
-#endif
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
@@ -145,7 +140,7 @@ struct SphericalHarmonics {
 		for (u32 i = 0; i < 9; ++i) {
 			coefs[i] = Vec3(0);
 		}
-		const u32 w = (u32)sqrt(pixels.size() / 6);
+		const u32 w = (u32)sqrtf(pixels.size() / 6.f);
 		const u32 h = w;
 		ASSERT(6 * w * h == pixels.size());
 
@@ -701,7 +696,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
 			for (const FBXImporter::ImportAnimation& anim : animations) {
 				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ".ani:", path);
-				compiler.addResource(Animation::TYPE, tmp);
+				compiler.addResource(ResourceType("animation"), tmp);
 			}
 
 			LUMIX_DELETE(editor.getAllocator(), data);
@@ -2561,7 +2556,7 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 
 					const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 					if (!ndc_bottom_left) {
-						const u32 texture_size = (u32)sqrt(pjob->data.size() / 6);
+						const u32 texture_size = (u32)sqrtf(pjob->data.size() / 6.f);
 						for (int i = 0; i < 6; ++i) {
 							Vec4* tmp = &pjob->data[i * texture_size * texture_size];
 							if (i == 2 || i == 3) {
@@ -2918,7 +2913,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 
 	void processData(ProbeJob& job) {
 		Array<Vec4>& data = job.data;
-		const u32 texture_size = (u32)sqrt(data.size() / 6);
+		const u32 texture_size = (u32)sqrtf(data.size() / 6.f);
 				
 		const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 		if (!ndc_bottom_left) {

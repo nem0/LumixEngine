@@ -61,7 +61,7 @@ class LUMIX_ENGINE_API ResourceManagerHub
 	typedef HashMap<u32, ResourceManager*> ResourceManagerTable;
 
 public:
-	struct LoadHook
+	struct LUMIX_ENGINE_API LoadHook
 	{
 		enum class Action { IMMEDIATE, DEFERRED };
 		virtual ~LoadHook() {}

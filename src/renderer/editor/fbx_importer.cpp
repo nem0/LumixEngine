@@ -1213,6 +1213,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		ASSERT(anim.import);
 
 		const ofbx::AnimationStack* stack = anim.fbx;
+		const ofbx::AnimationLayer* layer = stack->getLayer(0);
 		const ofbx::IScene& scene = *anim.scene;
 		const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
 		if(!take_info && startsWith(stack->name, "AnimStack::")) {
@@ -1251,8 +1252,6 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		};
 
 		for (const ofbx::Object* bone : bones) {
-			if (&bone->getScene() != &scene) continue;
-			const ofbx::AnimationLayer* layer = stack->getLayer(0);
 			const ofbx::AnimationCurveNode* translation_node = layer->getCurveNode(*bone, "Lcl Translation");
 			if (!translation_node) continue;
 
@@ -1281,9 +1280,6 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		Array<RotationKey> rotations(allocator);
 
 		for (const ofbx::Object* bone : bones) {
-			if (&bone->getScene() != &scene) continue;
-
-			const ofbx::AnimationLayer* layer = stack->getLayer(0);
 			const ofbx::AnimationCurveNode* rotation_node = layer->getCurveNode(*bone, "Lcl Rotation");
 			if (!rotation_node) continue;
 

@@ -27,9 +27,9 @@ struct HashFunc<ResourceType>
 };
 
 
-struct AssetCompiler
+struct LUMIX_EDITOR_API AssetCompiler
 {
-	struct IPlugin
+	struct LUMIX_EDITOR_API IPlugin
 	{
 		virtual ~IPlugin() {}
 		virtual bool compile(const Path& src) = 0;

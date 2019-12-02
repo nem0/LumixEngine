@@ -29,7 +29,7 @@ struct Color {
 
 struct Font;
 
-struct Draw2D {
+struct LUMIX_RENDERER_API Draw2D {
 	struct Cmd {
 		gpu::TextureHandle* texture;
 		u32 indices_count;

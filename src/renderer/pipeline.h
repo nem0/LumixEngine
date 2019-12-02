@@ -40,7 +40,7 @@ struct PassState
 	Vec4 view_dir;
 };
 
-struct PipelineResource : Resource
+struct LUMIX_RENDERER_API PipelineResource : Resource
 {
 	static ResourceType TYPE;
 

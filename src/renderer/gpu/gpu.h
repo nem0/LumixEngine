@@ -197,7 +197,7 @@ Backend getBackend();
 bool getMemoryStats(Ref<MemoryStats> stats);
 void swapBuffers(u32 w, u32 h);
 bool isHomogenousDepth();
-bool isOriginBottomLeft();
+LUMIX_RENDERER_API bool isOriginBottomLeft();
 void checkThread();
 void shutdown();
 void startCapture();
