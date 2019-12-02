@@ -235,79 +235,6 @@ newoption {
 		}
 	}
 
-newaction {
-	trigger = "run-render-tests",
-	description = "Run render tests",
-	
-	execute = function() 
-		os.execute([[cd ..\..\lumixengine_data\ && bin\app.exe -window -pipeline_define RENDER_TEST -script unit_tests/render_tests/main.lua]])
-	end
-}
-	
-newaction {
-	trigger = "update-tests",
-	description = "Update render & editor tests, use when serializaiton changes",
-	
-	execute = function() 
-		local editor_tests = { "all_components", "basic", "copy_paste_delete" }
-		os.execute([[cd ..\..\lumixengine_data\ && bin\studio.exe -run_script unit_tests\editor\update_tests.lua -pseudorandom_guid]])
-		for _, test in ipairs(editor_tests) do
-			os.execute([[rmdir /S /Q "..\..\lumixengine_data\unit_tests\editor\]] .. test .. [["]])
-			os.execute([[del /Q "..\..\lumixengine_data\unit_tests\editor\]] .. test .. [[.unv"]])
-			os.execute([[xcopy /I /Y /E "..\..\lumixengine_data\universes\]] .. test ..[[" "..\..\lumixengine_data\unit_tests\editor\]] .. test .. [["]])
-			os.execute([[rmdir /S /Q "..\..\lumixengine_data\universes\]] .. test .. [["]])
-			os.execute([[del /Q "..\..\lumixengine_data\universes\]] .. test .. [[.unv"]])
-		end
-		
-		local render_tests = { "direct_light", "indirect_light", "text_mesh" }
-		for _, test in ipairs(render_tests) do
-			os.execute([[xcopy /I /Y /E "..\..\lumixengine_data\unit_tests\render_tests\]] .. test ..[[" "..\..\lumixengine_data\universes\]] .. test .. [["]])
-			os.execute([[cd ..\..\lumixengine_data\ && bin\studio.exe -run_script unit_tests\render_tests\update_tests.lua -open ]] .. test)
-			os.execute([[cd ..\..\lumixengine_data\ && copy /Y universes\]] .. test .. [[.unv  unit_tests\render_tests\]] .. test .. [[.unv]])
-			os.execute([[rmdir /S /Q "..\..\lumixengine_data\universes\]] .. test .. [["]])
-			os.execute([[del /Q "..\..\lumixengine_data\universes\]] .. test .. [[.unv"]])
-		end
-	end
-}
-	
-newaction {
-	trigger = "install",
-	description = "Install in ../../LumixEngine_data/bin",
-	execute = function()
-		local src_dir = "tmp/vs209/bin/RelWithDebInfo/"
-		local dst_dir = "../../LumixEngine_data/bin/"
-		
-		function installDll(filename)
-			os.copyfile(path.join(src_dir, filename .. ".dll"), path.join(dst_dir, filename .. ".dll"))
-		end
-
-		function installDllWithPdb(filename)
-			installDll(filename)
-			os.copyfile(path.join(src_dir, filename .. ".pdb"), path.join(dst_dir, filename .. ".pdb"))
-		end
-		
-		--installDllWithPdb "animation"
-		--installDllWithPdb "audio"
-		--installDllWithPdb "editor"
-		--installDllWithPdb "engine"
-		--installDllWithPdb "lua_script"
-		--installDllWithPdb "physics"
-		--installDllWithPdb "renderer"
-		
-		installDll "PhysX3CommonCHECKED_x64"
-		installDll "PhysX3CookingCHECKED_x64"
-		installDll "PhysX3CharacterKinematicCHECKED_x64"
-		installDll "PhysX3CHECKED_x64"
-		installDll "nvToolsExt64_1"
-
-		os.copyfile(path.join(src_dir, "studio.exe"), path.join(dst_dir, "studio.exe"))
-		os.copyfile(path.join(src_dir, "studio.pdb"), path.join(dst_dir, "studio.pdb"))
-		os.copyfile(path.join(src_dir, "app.exe"), path.join(dst_dir, "app.exe"))
-		os.copyfile(path.join(src_dir, "app.pdb"), path.join(dst_dir, "app.pdb"))
-	end
-}
-
-		
 function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
@@ -347,13 +274,7 @@ end
 
 function useLua()
 	links {"lua51"}
-	if _OPTIONS["static-plugins"] then
-		linkLib "luajit"
-	else
-		configuration { "windows" }
-			defines { "LUA_BUILD_AS_DLL" }
-		configuration {}
-	end
+	linkLib "luajit"
 	includedirs { path.join(ROOT_DIR, "external/luajit/include") }
 end
 
@@ -628,7 +549,11 @@ project "engine"
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/luajit/include", "../external/freetype/include" }
 	
+	linkLib "lua51"
 	linkLib "luajit"
+	if not _OPTIONS["static-plugins"] then
+		linkLib "freetype"
+	end
 
 	configuration { "vs20*" }
 		if not _OPTIONS["static-plugins"] then

@@ -40,11 +40,11 @@ Index of this file:
 // Header mess
 //-----------------------------------------------------------------------------
 
-#include "engine/crt.h"
-//#include <float.h>                  // FLT_MAX
-//#include <stdarg.h>                 // va_list
-//#include <stddef.h>                 // ptrdiff_t, NULL
-//#include <string.h>                 // memset, memmove, memcpy, strlen, strchr, strcpy, strcmp
+//#include "engine/crt.h"
+#include <float.h>                  // FLT_MAX
+#include <stdarg.h>                 // va_list
+#include <stddef.h>                 // ptrdiff_t, NULL
+#include <string.h>                 // memset, memmove, memcpy, strlen, strchr, strcpy, strcmp
 
 // Version
 // (Integer encoded as XYYZZ for use in #if preprocessor conditionals. Work in progress versions typically starts at XYY99 then bounce up to XYY00, XYY01 etc. when release tagging happens)

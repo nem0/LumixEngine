@@ -2191,7 +2191,7 @@ public:
 		auto& plugin_manager = m_editor->getEngine().getPluginManager();
 		for (auto* lib : plugin_manager.getLibraries())
 		{
-			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) getLibrarySymbol(lib, "setStudioApp");
+			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) OS::getLibrarySymbol(lib, "setStudioApp");
 			if (f)
 			{
 				StudioApp::IPlugin* plugin = f(*this);
