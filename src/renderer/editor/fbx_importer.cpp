@@ -1149,7 +1149,6 @@ static void fill(const ofbx::Object& bone, double anim_len, const ofbx::Animatio
 }
 
 static bool shouldSample(u32 keyframe_count, float anim_len, float fps, u32 data_size) {
-	return true;
 	const u32 sampled_frame_count = u32(anim_len * fps);
 	const u32 sampled_size = sampled_frame_count * data_size;
 	const u32 time_size = sizeof(sizeof(u16));
