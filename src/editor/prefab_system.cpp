@@ -746,7 +746,7 @@ private:
 
 	Array<EntityPrefab> m_prefabs;
 	HashMap<u64, EntityRef> m_instances;
-	HashMap<u32, PrefabResource*> m_resources;
+	HashMap<u32, PrefabResource*, HashFuncDirect<u32>> m_resources;
 	Array<DeferredInstance> m_deferred_instances;
 	Universe* m_universe;
 	WorldEditor& m_editor;

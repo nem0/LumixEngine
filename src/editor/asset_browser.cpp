@@ -853,7 +853,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 3), false, ImGuiWindowFlags_HorizontalScrollbar);
 	AssetCompiler& compiler = m_app.getAssetCompiler();
 	
-	const HashMap<u32, AssetCompiler::ResourceItem>& resources = compiler.lockResources();
+	const auto& resources = compiler.lockResources();
 	Path selected_path;
 	for (const auto& res : resources) {
 		if(res.type != type) continue;

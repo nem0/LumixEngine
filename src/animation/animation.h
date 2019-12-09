@@ -17,7 +17,7 @@ struct BoneMask
 {
 	BoneMask(IAllocator& allocator) : bones(allocator) {}
 	StaticString<32> name;
-	HashMap<u32, u8> bones;
+	HashMap<u32, u8, HashFuncDirect<u32>> bones;
 };
 
 
@@ -28,11 +28,17 @@ class Animation final : public Resource
 		static const ResourceType TYPE;
 
 	public:
+		enum class CurveType : u8 {
+			KEYFRAMED,
+			SAMPLED
+		};
+
 		struct Header
 		{
 			u32 magic;
 			u32 version;
 			Time length;
+			u32 frame_count;
 		};
 
 	public:
@@ -73,7 +79,10 @@ class Animation final : public Resource
 		Array<TranslationCurve> m_translations;
 		Array<RotationCurve> m_rotations;
 		Array<u8> m_mem;
+		u32 m_frame_count = 0;
 		int m_root_motion_bone_idx;
+
+		friend struct AnimationSampler;
 };
 
 

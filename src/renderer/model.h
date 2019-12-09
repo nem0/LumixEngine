@@ -128,7 +128,7 @@ struct LODMeshIndices
 class LUMIX_RENDERER_API Model final : public Resource
 {
 public:
-	typedef HashMap<u32, int> BoneMap;
+	using BoneMap = HashMap<u32, int, HashFuncDirect<u32>>;
 	
 #pragma pack(1)
 	struct FileHeader

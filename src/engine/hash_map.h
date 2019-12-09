@@ -119,6 +119,11 @@ struct HashFunc<char*>
 	}
 };
 
+template <typename T>
+struct HashFuncDirect {
+	static u32 get(T key) { return key; }
+};
+
 template<class Key, class Value, class Hasher = HashFunc<Key>>
 class HashMap
 {
@@ -399,6 +404,7 @@ private:
 			if (*((Key*)keys[pos].key_mem) == key) return pos;
 			++pos;
 		}
+		if (pos != m_capacity) return m_capacity;
 		pos = 0;
 		while (keys[pos].valid) {
 			if (*((Key*)keys[pos].key_mem) == key) return pos;

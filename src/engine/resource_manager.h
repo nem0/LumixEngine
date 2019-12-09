@@ -20,7 +20,7 @@ class LUMIX_ENGINE_API ResourceManager
 	friend class Resource;
 	friend class ResourceManagerHub;
 public:
-	typedef HashMap<u32, Resource*> ResourceTable;
+	using ResourceTable = HashMap<u32, Resource*, HashFuncDirect<u32>>;
 
 public:
 	void create(ResourceType type, ResourceManagerHub& owner);

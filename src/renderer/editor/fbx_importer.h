@@ -42,16 +42,12 @@ struct FBXImporter
 		X_UP
 	};
 
-	struct RotationKey
-	{
-		Quat rot;
-		i64 time;
-	};
-
-	struct TranslationKey
+	struct Key
 	{
 		Vec3 pos;
+		Quat rot;
 		i64 time;
+		u8 flags = 0;
 	};
 
 	struct Skin
