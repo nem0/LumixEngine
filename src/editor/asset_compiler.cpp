@@ -642,7 +642,7 @@ struct AssetCompilerImpl : AssetCompiler
 		m_resources_mutex.exit();
 	}
 
-	const HashMap<u32, ResourceItem>& lockResources() override {
+	const HashMap<u32, ResourceItem, HashFuncDirect<u32>>& lockResources() override {
 		m_resources_mutex.enter();
 		return m_resources;
 	}
@@ -659,12 +659,12 @@ struct AssetCompilerImpl : AssetCompiler
 	Array<Path> m_compiled;
 	StudioApp& m_app;
 	LoadHook m_load_hook;
-	HashMap<u32, IPlugin*> m_plugins;
+	HashMap<u32, IPlugin*, HashFuncDirect<u32>> m_plugins;
 	AssetCompilerTask m_task;
 	FileSystemWatcher* m_watcher;
 	MT::CriticalSection m_resources_mutex;
-	HashMap<u32, ResourceItem> m_resources;
-	HashMap<u32, ResourceType> m_registered_extensions;
+	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
+	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
 
 	u32 m_compile_batch_count = 0;
 	u32 m_batch_remaining_count = 0;

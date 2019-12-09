@@ -34,75 +34,136 @@ Animation::Animation(const Path& path, ResourceManager& resource_manager, IAlloc
 }
 
 
-void Animation::getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const
-{
-	ASSERT(!pose.is_absolute);
+struct AnimationSampler {
+	template <bool use_mask, bool use_weight>
+	static void getRelativePose(const Animation& anim, Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) {
+		ASSERT(!pose.is_absolute);
+		ASSERT(model.isReady());
 
-	if (!model.isReady()) return;
+		Vec3* pos = pose.positions;
+		Quat* rot = pose.rotations;
 
-	Vec3* pos = pose.positions;
-	Quat* rot = pose.rotations;
-
-	if (time < m_length) {
-		const u64 anim_t_highres = ((u64)time.raw() << 16) / (m_length.raw());
-		ASSERT(anim_t_highres <= 0xffFF);
-		const u16 anim_t = u16(anim_t_highres);
+		if (time < anim.getLength()) {
+			const u64 anim_t_highres = ((u64)time.raw() << 16) / (anim.m_length.raw());
+			ASSERT(anim_t_highres <= 0xffFF);
+			const u16 anim_t = u16(anim_t_highres);
+			const u64 frame_48_16 = (anim.m_frame_count - 1) * anim_t_highres;
+			ASSERT((frame_48_16 & 0xffFF00000000) == 0);
+			const u32 frame_idx = u32(frame_48_16 >> 16);
+			const float frame_t = (frame_48_16 & 0xffFF) / float(0xffFF);
 		
-		for (const TranslationCurve& curve : m_translations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
+			for (const Animation::TranslationCurve& curve : anim.m_translations) {
+				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				if (!iter.isValid()) continue;
+				if constexpr(use_mask) {
+					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+				}
 
-			u32 idx = 1;
-			for (u32 c = curve.count; idx < c; ++idx) {
-				if (curve.times[idx] > anim_t) break;
+				Vec3 anim_pos;
+				if (curve.times) {
+					u32 idx = 1;
+					for (u32 c = curve.count; idx < c; ++idx) {
+						if (curve.times[idx] > anim_t) break;
+					}
+					const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
+					anim_pos = lerp(curve.pos[idx - 1], curve.pos[idx], t);
+				}
+				else {
+					anim_pos = lerp(curve.pos[frame_idx], curve.pos[frame_idx + 1], frame_t);
+				}
+
+				const int model_bone_index = iter.value();
+				if constexpr (use_weight) {
+					pos[model_bone_index] = lerp(pos[model_bone_index], anim_pos, weight);
+				}
+				else {
+					pos[model_bone_index] = anim_pos;
+				}
 			}
 
-			const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
+			for (const Animation::RotationCurve& curve : anim.m_rotations) {
+				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				if (!iter.isValid()) continue;
+				if constexpr(use_mask) {
+					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+				}
 
-			const int model_bone_index = iter.value();
-			const Vec3 anim_pos = lerp(curve.pos[idx - 1], curve.pos[idx], t);
-			pos[model_bone_index] = lerp(pos[model_bone_index], anim_pos, weight);
+				Quat anim_rot;
+				if(curve.times) {
+					u32 idx = 1;
+					for (u32 c = curve.count; idx < c; ++idx) {
+						if (curve.times[idx] > anim_t) break;
+					}
+					const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
+					anim_rot = nlerp(curve.rot[idx - 1], curve.rot[idx], t);
+				}
+				else {
+					anim_rot = nlerp(curve.rot[frame_idx], curve.rot[frame_idx + 1], frame_t);
+				}
+
+				const int model_bone_index = iter.value();
+				if constexpr (use_weight) {
+					rot[model_bone_index] = nlerp(rot[model_bone_index], anim_rot, weight);
+				}
+				else {
+					rot[model_bone_index] = anim_rot;
+				}
+			}
 		}
+		else {
+			for (const Animation::TranslationCurve& curve : anim.m_translations) {
+				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				if (!iter.isValid()) continue;
+				if constexpr(use_mask) {
+					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+				}
 
-		for (const RotationCurve& curve : m_rotations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
-
-			u32 idx = 1;
-			for (u32 c = curve.count; idx < c; ++idx) {
-				if (curve.times[idx] > anim_t) break;
+				const int model_bone_index = iter.value();
+				if constexpr (use_weight) {
+					pos[model_bone_index] = lerp(pos[model_bone_index], curve.pos[curve.count - 1], weight);
+				}
+				else {
+					pos[model_bone_index] = curve.pos[curve.count - 1];
+				}
 			}
 
-			const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
+			for (const Animation::RotationCurve& curve : anim.m_rotations) {
+				Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
+				if (!iter.isValid()) continue;
+				if constexpr(use_mask) {
+					if (mask->bones.find(curve.name) == mask->bones.end()) continue;
+				}
 
-			const int model_bone_index = iter.value();
-			Quat anim_rot = nlerp(curve.rot[idx - 1], curve.rot[idx], t);
-			rot[model_bone_index] = nlerp(rot[model_bone_index], anim_rot, weight);
+				const int model_bone_index = iter.value();
+				if constexpr (use_weight) {
+					rot[model_bone_index] = nlerp(rot[model_bone_index], curve.rot[curve.count - 1], weight);
+				}
+				else {
+					rot[model_bone_index] = curve.rot[curve.count - 1];
+				}
+			}
+		}
+	}
+}; // AnimationSampler
+
+void Animation::getRelativePose(Time time, Pose& pose, const Model& model, float weight, const BoneMask* mask) const {
+	if (mask) {
+		if (weight < 0.9999f) {
+			AnimationSampler::getRelativePose<true, true>(*this, time, pose, model, weight, mask);
+		}
+		else {
+			AnimationSampler::getRelativePose<true, false>(*this, time, pose, model, weight, mask);
 		}
 	}
 	else {
-		for (const TranslationCurve& curve : m_translations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
-
-			const int model_bone_index = iter.value();
-			pos[model_bone_index] = lerp(pos[model_bone_index], curve.pos[curve.count - 1], weight);
+		if (weight < 0.9999f) {
+			AnimationSampler::getRelativePose<false, true>(*this, time, pose, model, weight, mask);
 		}
-
-		for (const RotationCurve& curve : m_rotations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
-
-			const int model_bone_index = iter.value();
-			rot[model_bone_index] = nlerp(rot[model_bone_index], curve.rot[curve.count - 1], weight);
+		else {
+			AnimationSampler::getRelativePose<false, false>(*this, time, pose, model, weight, mask);
 		}
 	}
 }
-
 
 Vec3 Animation::getTranslation(Time time, u32 curve_idx) const
 {
@@ -112,13 +173,22 @@ Vec3 Animation::getTranslation(Time time, u32 curve_idx) const
 		ASSERT(anim_t_highres <= 0xffFF);
 		const u16 anim_t = u16(anim_t_highres);
 
-		u32 idx = 1;
-		for (u32 c = curve.count; idx < c; ++idx) {
-			if (curve.times[idx] > anim_t) break;
+		if (curve.times) {
+			u32 idx = 1;
+			for (u32 c = curve.count; idx < c; ++idx) {
+				if (curve.times[idx] > anim_t) break;
+			}
+
+			const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
+			return lerp(curve.pos[idx - 1], curve.pos[idx], t);
 		}
 
-		const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
-		return lerp(curve.pos[idx - 1], curve.pos[idx], t);
+		const u64 frame_48_16 = (m_frame_count - 1) * anim_t_highres;
+		ASSERT((frame_48_16 & 0xffFF00000000) == 0);
+		const u32 frame_idx = u32(frame_48_16 >> 16);
+		const float frame_t = (frame_48_16 & 0xffFF) / float(0xffFF);
+
+		return lerp(curve.pos[frame_idx], curve.pos[frame_idx + 1], frame_t);
 	}
 
 	return curve.pos[curve.count - 1];
@@ -146,140 +216,35 @@ Quat Animation::getRotation(Time time, u32 curve_idx) const
 		ASSERT(anim_t_highres <= 0xffFF);
 		const u16 anim_t = u16(anim_t_highres);
 
-		u32 idx = 1;
-		for (u32 c = curve.count; idx < c; ++idx) {
-			if (curve.times[idx] > anim_t) break;
+		if (curve.times) {
+			u32 idx = 1;
+			for (u32 c = curve.count; idx < c; ++idx) {
+				if (curve.times[idx] > anim_t) break;
+			}
+
+			const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
+			return nlerp(curve.rot[idx - 1], curve.rot[idx], t);
 		}
 
-		const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
-		return nlerp(curve.rot[idx - 1], curve.rot[idx], t);
+		const u64 frame_48_16 = (m_frame_count - 1) * anim_t_highres;
+		ASSERT((frame_48_16 & 0xffFF00000000) == 0);
+		const u32 frame_idx = u32(frame_48_16 >> 16);
+		const float frame_t = (frame_48_16 & 0xffFF) / float(0xffFF);
+
+		return nlerp(curve.rot[frame_idx], curve.rot[frame_idx + 1], frame_t);
 	}
 
 	return curve.rot[curve.count - 1];
 }
 
-
-void Animation::getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const
-{
-#if 0
-	ASSERT(!pose.is_absolute);
-
-	if (!model.isReady()) return;
-
-	Vec3* pos = pose.positions;
-	Quat* rot = pose.rotations;
-
-	if (time < m_length) {
-		const u64 anim_t_highres = ((u64)time.raw() << 16) / (m_length.raw());
-		ASSERT(anim_t_highres <= 0xffFF);
-		const u16 anim_t = u16(anim_t_highres);
-
-		for (Bone& bone : m_bones) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(bone.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
-
-			int model_bone_index = iter.value();
-			ASSERT(bone.pos_count > 1);
-			u32 idx = 1;
-			for (u32 c = bone.pos_count; idx < c; ++idx) {
-				if (bone.pos_times[idx] > anim_t) break;
-			}
-
-			float t = float(anim_t - bone.pos_times[idx - 1]) / (bone.pos_times[idx] - bone.pos_times[idx - 1]);
-			pos[model_bone_index] = lerp(bone.pos[idx - 1], bone.pos[idx], t);
-			
-			ASSERT(bone.rot_count > 1);
-			idx = 1;
-			for (u32 c = bone.rot_count; idx < c; ++idx) {
-				if (bone.rot_times[idx] > anim_t) break;
-			}
-
-			t = float(anim_t - bone.rot_times[idx - 1]) / (bone.rot_times[idx] - bone.rot_times[idx - 1]);
-			rot[model_bone_index] = nlerp(bone.rot[idx - 1], bone.rot[idx], t);
-		}
-	}
-	else
-	{
-		for (Bone& bone : m_bones)
-		{
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(bone.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(bone.name) == mask->bones.end()) continue;
-
-			int model_bone_index = iter.value();
-			pos[model_bone_index] = bone.pos[bone.pos_count - 1];
-			rot[model_bone_index] = bone.rot[bone.rot_count - 1];
-		}
-	}
-#endif
-	ASSERT(!pose.is_absolute);
-
-	if (!model.isReady()) return;
-
-	Vec3* pos = pose.positions;
-	Quat* rot = pose.rotations;
-
-	if (time < m_length) {
-		const u64 anim_t_highres = ((u64)time.raw() << 16) / (m_length.raw());
-		ASSERT(anim_t_highres <= 0xffFF);
-		const u16 anim_t = u16(anim_t_highres);
-		
-		for (const TranslationCurve& curve : m_translations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
-
-			ASSERT(curve.count > 1);
-			u32 idx = 1;
-			for (u32 c = curve.count; idx < c; ++idx) {
-				if (curve.times[idx] > anim_t) break;
-			}
-
-			const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
-
-			const int model_bone_index = iter.value();
-			pos[model_bone_index] = lerp(curve.pos[idx - 1], curve.pos[idx], t);
-		}
-
-		for (const RotationCurve& curve : m_rotations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
-
-			ASSERT(curve.count > 1);
-			u32 idx = 1;
-			for (u32 c = curve.count; idx < c; ++idx) {
-				if (curve.times[idx] > anim_t) break;
-			}
-
-			const float t = float(anim_t - curve.times[idx - 1]) / (curve.times[idx] - curve.times[idx - 1]);
-
-			const int model_bone_index = iter.value();
-			rot[model_bone_index] = nlerp(curve.rot[idx - 1], curve.rot[idx], t);
-		}
+void Animation::getRelativePose(Time time, Pose& pose, const Model& model, const BoneMask* mask) const {
+	if(mask) {
+		AnimationSampler::getRelativePose<true, false>(*this, time, pose, model, 1, mask);
 	}
 	else {
-		for (const TranslationCurve& curve : m_translations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
-
-			const int model_bone_index = iter.value();
-			pos[model_bone_index] = curve.pos[curve.count - 1];
-		}
-
-		for (const RotationCurve& curve : m_rotations) {
-			Model::BoneMap::const_iterator iter = model.getBoneIndex(curve.name);
-			if (!iter.isValid()) continue;
-			if (mask && mask->bones.find(curve.name) == mask->bones.end()) continue;
-
-			const int model_bone_index = iter.value();
-			rot[model_bone_index] = curve.rot[curve.count - 1];
-		}
+		AnimationSampler::getRelativePose<false, false>(*this, time, pose, model, 1, mask);
 	}
 }
-
 
 bool Animation::load(u64 mem_size, const u8* mem)
 {
@@ -296,6 +261,7 @@ bool Animation::load(u64 mem_size, const u8* mem)
 
 	file.read(&m_root_motion_bone_idx, sizeof(m_root_motion_bone_idx));
 	m_length = header.length;
+	m_frame_count = header.frame_count;
 	u32 translations_count;
 	file.read(&translations_count, sizeof(translations_count));
 	const u32 size = u32(file.size() - file.getPosition());
@@ -308,9 +274,10 @@ bool Animation::load(u64 mem_size, const u8* mem)
 	for (int i = 0; i < m_translations.size(); ++i) {
 		TranslationCurve& curve = m_translations[i];
 		curve.name = blob.read<u32>();
+		const Animation::CurveType type = blob.read<Animation::CurveType>();
 		curve.count = blob.read<u32>();
-		ASSERT(curve.count > 1);
-		curve.times = (const u16*)blob.skip(curve.count * sizeof(u16));
+		ASSERT(curve.count > 1 || type != Animation::CurveType::KEYFRAMED);
+		curve.times = type == Animation::CurveType::KEYFRAMED ? (const u16*)blob.skip(curve.count * sizeof(u16)) : nullptr;
 		curve.pos = (const Vec3*)blob.skip(curve.count * sizeof(Vec3));
 	}
 	
@@ -320,9 +287,10 @@ bool Animation::load(u64 mem_size, const u8* mem)
 	for (int i = 0; i < m_rotations.size(); ++i) {
 		RotationCurve& curve = m_rotations[i];
 		curve.name = blob.read<u32>();
+		const Animation::CurveType type = blob.read<Animation::CurveType>();
 		curve.count = blob.read<u32>();
-		ASSERT(curve.count > 1);
-		curve.times = (const u16*)blob.skip(curve.count * sizeof(u16));
+		ASSERT(curve.count > 1 || type != Animation::CurveType::KEYFRAMED);
+		curve.times = type == Animation::CurveType::KEYFRAMED ? (const u16*)blob.skip(curve.count * sizeof(u16)) : nullptr;
 		curve.rot = (const Quat*)blob.skip(curve.count * sizeof(Quat));
 	}
 

@@ -171,6 +171,7 @@ void Blend1DNode::skip(RuntimeContext& ctx) const {
 static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Ref<Pose> pose, u32 mask_idx) {
 	Animation* anim = ctx.animations[slot];
 	if (!anim) return;
+	if (!ctx.model->isReady()) return;
 
 	const Time anim_time = time % anim->getLength();
 
