@@ -84,21 +84,15 @@ struct HashFunc<T*>
 {
 	static u32 get(const void* key)
 	{
-		#ifdef PLATFORM64
-			u64 tmp = (u64)key;
-			tmp = (~tmp) + (tmp << 18);
-			tmp = tmp ^ (tmp >> 31);
-			tmp = tmp * 21;
-			tmp = tmp ^ (tmp >> 11);
-			tmp = tmp + (tmp << 6);
-			tmp = tmp ^ (tmp >> 22);
-			return (u32)tmp;
-		#else
-			size_t x = ((i32(key) >> 16) ^ i32(key)) * 0x45d9f3b;
-			x = ((x >> 16) ^ x) * 0x45d9f3b;
-			x = ((x >> 16) ^ x);
-			return x;
-		#endif
+		static_assert(sizeof(key) == sizeof(u64));
+		u64 tmp = (u64)key;
+		tmp = (~tmp) + (tmp << 18);
+		tmp = tmp ^ (tmp >> 31);
+		tmp = tmp * 21;
+		tmp = tmp ^ (tmp >> 11);
+		tmp = tmp + (tmp << 6);
+		tmp = tmp ^ (tmp >> 22);
+		return (u32)tmp;
 	}
 };
 
