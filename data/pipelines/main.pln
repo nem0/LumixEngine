@@ -1,4 +1,4 @@
-local deferred_shader = preloadShader("pipelines/deferred.shd")
+local direct_shader = preloadShader("pipelines/direct.shd")
 local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local indirect_shader =  preloadShader("pipelines/indirect.shd")
@@ -165,7 +165,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	end
 	
 	beginBlock("direct")
-	drawArray(0, 4, deferred_shader,
+	drawArray(0, 4, direct_shader,
 	{
 		gbuffer0,
 		gbuffer1,
