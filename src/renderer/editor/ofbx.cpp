@@ -2845,8 +2845,6 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 					if (mat->textures[type])
 					{
 						break; // This may happen for some models (eg. 2 normal maps in use)
-						Error::s_message = "Invalid material";
-						return false;
 					}
 
 					mat->textures[type] = (Texture*)child;
