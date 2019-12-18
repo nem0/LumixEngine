@@ -63,7 +63,7 @@ public:
 public:
 	bool m_is_open;
 	float m_left_column_width = 120;
-	static const int TILE_SIZE = 128;
+	static const int TILE_SIZE = 64;
 
 private:
 	struct FileInfo

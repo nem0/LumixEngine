@@ -921,8 +921,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {
-				PathUtils::FileInfo info(texture.src);
-				const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
+				const StaticString<MAX_PATH_LENGTH> meta_path(texture.src, ".meta");
 				if (!OS::fileExists(meta_path)) {
 					OS::OutputFile file;
 					if (file.open(meta_path)) {

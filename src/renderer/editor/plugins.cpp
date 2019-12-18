@@ -2615,7 +2615,7 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 
 				for (u32 sh_idx = 0; sh_idx < 7; ++sh_idx) {
 					StaticString<MAX_PATH_LENGTH> path(dir, m_grid.guid, "_grid", sh_idx, ".raw");
-					StaticString<MAX_PATH_LENGTH> meta_path(dir, m_grid.guid, "_grid", sh_idx, ".meta");
+					StaticString<MAX_PATH_LENGTH> meta_path(dir, m_grid.guid, "_grid", sh_idx, ".raw.meta");
 					
 					OS::OutputFile meta_file;
 					if (!meta_file.open(meta_path)) {

@@ -39,6 +39,7 @@ struct LUMIX_EDITOR_API AssetCompiler
 	struct ResourceItem {
 		Path path;
 		ResourceType type;
+		u32 dir_hash;
 	};
 
 	static AssetCompiler* create(StudioApp& app);
