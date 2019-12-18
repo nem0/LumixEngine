@@ -117,60 +117,77 @@ static void clampText(char* text, int width)
 	} while (size.x > width && end - text > 4);
 }
 
+static const char* getResourceFilePath(const char* str)
+{
+	const char* c = str;
+	while (*c && *c != ':') ++c;
+	return *c != ':' ? str : c + 1;
+}
+
+static Span<const char> getSubresource(const char* str)
+{
+	Span<const char> ret;
+	ret.m_begin = str;
+	ret.m_end = str;
+	while(*ret.m_end && *ret.m_end != ':') ++ret.m_end;
+	return ret;
+}
 
 void AssetBrowser::changeDir(const char* path)
 {
-	RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
-	for (FileInfo& info : m_file_infos)
-	{
+	WorldEditor& editor = m_app.getWorldEditor();
+	RenderInterface* ri = editor.getRenderInterface();
+	for (FileInfo& info : m_file_infos) {
 		ri->unloadTexture(info.tex);
 	}
 	m_file_infos.clear();
 
-	m_dir = path;
+	PathUtils::normalize(path, Span(m_dir.data));
 	int len = stringLength(m_dir);
-	if (len > 0 && (m_dir[len - 1] == '/' || m_dir[len - 1] == '\\'))
-	{
+	if (len > 0 && (m_dir[len - 1] == '/' || m_dir[len - 1] == '\\')) {
 		m_dir.data[len - 1] = '\0';
 	}
 
-
-	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	IAllocator& allocator = editor.getAllocator();
+	FileSystem& fs = editor.getEngine().getFileSystem();
 	OS::FileIterator* iter = fs.createFileIterator(m_dir);
 	OS::FileInfo info;
-
-	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	m_subdirs.clear();
-	while (OS::getNextFile(iter, &info))
-	{
-		if (info.is_directory)
-		{
-			if(info.filename[0] != '.') m_subdirs.emplace(info.filename);
-			continue;
-		}
+	while (OS::getNextFile(iter, &info)) {
+		if (!info.is_directory) continue;
+		if (info.filename[0] != '.') m_subdirs.emplace(info.filename);
+	}
+	OS::destroyFileIterator(iter);
 
-		StaticString<MAX_PATH_LENGTH> file_path_str(m_dir, "/", info.filename);
-		Path filepath(file_path_str);
-		ResourceType type = compiler.getResourceType(filepath.c_str());
-
-		if (type == INVALID_RESOURCE_TYPE) continue;
+	AssetCompiler& compiler = m_app.getAssetCompiler();
+	const u32 dir_hash = crc32(m_dir);
+	auto& resources = compiler.lockResources();
+	for (const AssetCompiler::ResourceItem& res : resources) {
+		if (res.dir_hash != dir_hash) continue;
 
 		FileInfo tile;
 		char filename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(Span(filename), filepath.c_str());
+		Span<const char> subres = getSubresource(res.path.c_str());
+		if (*subres.end()) {
+			copyNString(Span(filename), subres.begin(), subres.length());
+			catString(filename, ":");
+			const int tmp_len = stringLength(filename);
+			PathUtils::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), res.path.c_str());
+		}
+		else {
+			PathUtils::getBasename(Span(filename), res.path.c_str());
+		}
 		clampText(filename, TILE_SIZE);
 
-		tile.file_path_hash = filepath.getHash();
-		tile.filepath = filepath.c_str();
+		tile.file_path_hash = res.path.getHash();
+		tile.filepath = res.path.c_str();
 		tile.clamped_filename = filename;
 
 		m_file_infos.push(tile);
 	}
+	compiler.unlockResources();
 
 	doFilter();
-
-	OS::destroyFileIterator(iter);
 }
 
 
@@ -518,11 +535,17 @@ void AssetBrowser::detailsGUI()
 			if (res->isReady()) {
 				ImGui::LabelText("Compiled size", "%.2f KB", res->size() / 1024.f);
 			}
+			const Span<const char> subres = getSubresource(m_selected_resources[0]->getPath().c_str());
+			if (*subres.end()) {
+				if (ImGui::Button("View parent")) {
+					selectResource(Path(getResourceFilePath(m_selected_resources[0]->getPath().c_str())), true, false);
+				}
+			}
 
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
 			ResourceType resource_type = compiler.getResourceType(path);
 			auto iter = m_plugins.find(resource_type);
-			if(iter.isValid()) {
+			if (iter.isValid()) {
 				iter.value()->onGUI(m_selected_resources.getSpan());
 			}
 		}
@@ -752,7 +775,8 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 		if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
 			char ext[10];
 			const char* path = (const char*)payload->Data;
-			PathUtils::getExtension(Span(ext), Span(path, stringLength(path)));
+			Span<const char> subres = getSubresource(path);
+			PathUtils::getExtension(Span(ext), subres);
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
 			if (compiler.acceptExtension(ext, type)) {
 				copyString(buf, path);

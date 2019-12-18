@@ -167,6 +167,16 @@ struct AssetCompilerImpl : AssetCompiler
 		return written;
 	}
 
+	static u32 dirHash(const char* path) {
+		char dir[MAX_PATH_LENGTH];
+		PathUtils::getDir(Span(dir), getResourceFilePath(path));
+		int len = stringLength(dir);
+		if (len > 0 && (dir[len - 1] == '/' || dir[len - 1] == '\\')) {
+			--len;
+		}
+		return crc32(dir, len);
+	}
+
 	void addResource(ResourceType type, const char* path) override {
 		const Path path_obj(path);
 		const u32 hash = path_obj.getHash();
@@ -175,7 +185,7 @@ struct AssetCompilerImpl : AssetCompiler
 			m_resources[hash] = {path_obj, type};
 		}
 		else {
-			m_resources.insert(hash, {path_obj, type});
+			m_resources.insert(hash, {path_obj, type, dirHash(path_obj.c_str())});
 		}
 	}
 
@@ -305,8 +315,8 @@ struct AssetCompilerImpl : AssetCompiler
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
 						if (type != INVALID_RESOURCE_TYPE) {
-							m_resources.insert(p.getHash(), {p, type});
-						}	
+							m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
+						}
 					});
 				}
 				lua_pop(L, 1);
@@ -387,9 +397,8 @@ struct AssetCompilerImpl : AssetCompiler
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
 	{
-		const PathUtils::FileInfo info(res.c_str());
 		OS::InputFile file;
-		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
+		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
 		
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		if (!fs.open(meta_path, Ref(file))) return nullptr;
@@ -424,9 +433,8 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void updateMeta(const Path& res, const char* src) const override
 	{
-		const PathUtils::FileInfo info(res.c_str());
 		OS::OutputFile file;
-		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
+		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
 				
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 		if (!fs.open(meta_path, Ref(file))) {
@@ -480,8 +488,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 		const u32 hash = res.getPath().getHash();
 		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
-		const PathUtils::FileInfo info(filepath);
-		const StaticString<MAX_PATH_LENGTH> meta_path(info.m_dir, info.m_basename, ".meta");
+		const StaticString<MAX_PATH_LENGTH> meta_path(filepath, ".meta");
 
 		if (!fs.fileExists(dst_path)
 			|| fs.getLastModified(dst_path) < fs.getLastModified(filepath)
@@ -591,6 +598,12 @@ struct AssetCompilerImpl : AssetCompiler
 				m_changed_files.removeDuplicates();
 				path_obj = m_changed_files.back();
 				m_changed_files.pop();
+			}
+
+			if (PathUtils::hasExtension(path_obj.c_str(), "meta")) {
+				char tmp[MAX_PATH_LENGTH];
+				copyNString(Span(tmp), path_obj.c_str(), path_obj.length() - 5);
+				path_obj = tmp;
 			}
 
 			const Array<Path> removed_subresources = removeResource(path_obj.c_str());
