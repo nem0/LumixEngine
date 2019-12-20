@@ -310,7 +310,6 @@ static void processEvents()
 				const RAWINPUT* raw = (const RAWINPUT*)dataBuf;
 				if (raw->header.dwType != RIM_TYPEMOUSE) break;
 
-				const HANDLE deviceHandle = raw->header.hDevice;
 				const RAWMOUSE& mouseData = raw->data.mouse;
 				const USHORT flags = mouseData.usButtonFlags;
 				const short wheel_delta = (short)mouseData.usButtonData;

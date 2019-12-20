@@ -117,13 +117,13 @@ template <int SIZE> struct StaticString
 	void add(float value)
 	{
 		int len = stringLength(data);
-		toCString(value, Span(data).fromLeft(len), 3);
+		toCString(value, Span<char>(data).fromLeft(len), 3);
 	}
 
 	template <typename T> void add(T value)
 	{
 		int len = stringLength(data);
-		toCString(value, Span(data + len, SIZE - len));
+		toCString(value, Span(data + len, u32(SIZE - len)));
 	}
 
 	bool operator<(const char* str) const {

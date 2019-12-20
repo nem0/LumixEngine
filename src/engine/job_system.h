@@ -21,7 +21,7 @@ constexpr u32 INVALID_HANDLE = 0xffFFffFF;
 
 LUMIX_ENGINE_API bool init(u8 workers_count, IAllocator& allocator);
 LUMIX_ENGINE_API void shutdown();
-LUMIX_ENGINE_API int getWorkersCount();
+LUMIX_ENGINE_API u8 getWorkersCount();
 
 LUMIX_ENGINE_API void enableBackupWorker(bool enable);
 
@@ -35,12 +35,12 @@ LUMIX_ENGINE_API inline bool isValid(SignalHandle waitable) { return waitable !=
 
 
 template <typename F>
-void runOnWorkers(F& f)
+void runOnWorkers(const F& f)
 {
 	SignalHandle signal = JobSystem::INVALID_HANDLE;
 	for(int i = 0, c = getWorkersCount(); i < c; ++i) {
-		JobSystem::run(&f, [](void* data){
-			(*(F*)data)();
+		JobSystem::run((void*)&f, [](void* data){
+			(*(const F*)data)();
 		}, &signal);
 	}
 	wait(signal);
@@ -48,10 +48,10 @@ void runOnWorkers(F& f)
 
 
 template <typename F>
-void forEach(u32 count, F& f)
+void forEach(u32 count, const F& f)
 {
 	struct Data {
-		F* f;
+		const F* f;
 		volatile i32 offset = 0;
 		u32 count;
 	} data;

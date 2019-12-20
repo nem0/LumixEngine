@@ -357,7 +357,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	void visit(const Reflection::ISampledFuncProperty& prop) override
 	{
 		if (skipProperty(prop)) return;
-		static const int MIN_COUNT = 6;
 		ComponentUID cmp = getComponent();
 
 		struct Point

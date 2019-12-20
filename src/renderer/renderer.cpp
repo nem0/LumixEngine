@@ -10,6 +10,7 @@
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -17,7 +18,6 @@
 #include "engine/string.h"
 #include "engine/universe/component.h"
 #include "engine/universe/universe.h"
-#include "engine/win/simple_win.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -210,7 +210,7 @@ struct GPUProfiler
 		const u64 cpu_timestamp = OS::Timer::getRawTimestamp();
 		u32 try_num = 0;
 		while (!gpu::isQueryReady(q) && try_num < 1000) {
-			Sleep(1);
+			MT::sleep(1);
 			++try_num;
 		}
 		if (try_num == 1000) {
@@ -850,9 +850,10 @@ struct RendererImpl final : public Renderer
 
 	u8 getLayerIdx(const char* name) override
 	{
-		for(int i = 0; i < m_layers.size(); ++i) {
+		for(u8 i = 0; i < m_layers.size(); ++i) {
 			if(m_layers[i] == name) return i;
 		}
+		ASSERT(m_layers.size() < 0xff);
 		m_layers.emplace(name);
 		return m_layers.size() - 1;
 	}
@@ -961,7 +962,7 @@ struct RendererImpl final : public Renderer
 	}
 
 
-	void destroy(gpu::TextureHandle tex)
+	void destroy(gpu::TextureHandle tex) override
 	{
 		ASSERT(tex.isValid());
 		struct Cmd : RenderJob {
@@ -1049,7 +1050,7 @@ struct RendererImpl final : public Renderer
 
 		m_shader_defines.emplace(define);
 		ASSERT(m_shader_defines.size() <= 32); // m_shader_defines are reserved in renderer constructor, so getShaderDefine() is MT safe
-		return m_shader_defines.size() - 1;
+		return u8(m_shader_defines.size() - 1);
 	}
 
 

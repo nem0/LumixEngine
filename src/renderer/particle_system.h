@@ -91,10 +91,8 @@ private:
 	IAllocator& m_allocator;
 	OutputMemoryStream m_emit_buffer;
 	Constant m_constants[16];
-	int m_constants_count = 0;
 	Channel m_channels[16];
 	int m_capacity = 0;
-	int m_outputs_per_particle = 0;
 	int m_particles_count = 0;
 	int m_instances_count = 0;
 	ParticleEmitterResource* m_resource = nullptr;

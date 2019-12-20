@@ -135,8 +135,6 @@ private:
 	static int uniform(lua_State* L);
 
 private:
-
-	IAllocator& m_allocator;
 	Renderer& m_renderer;
 	Shader* m_shader;
 	float m_metallic;

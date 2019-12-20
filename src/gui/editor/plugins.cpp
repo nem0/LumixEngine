@@ -49,13 +49,12 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 	}
 
 	bool canCreateResource() const override { return true; }
-	const char* getFileDialogFilter() const { return "Sprite\0*.spr\0"; }
-	const char* getFileDialogExtensions() const { return "spr"; }
+	const char* getFileDialogFilter() const override { return "Sprite\0*.spr\0"; }
+	const char* getFileDialogExtensions() const override { return "spr"; }
 	const char* getDefaultExtension() const override { return "spr"; }
 
 	bool createResource(const char* path) override {
 		OS::OutputFile file;
-		WorldEditor& editor = app.getWorldEditor();
 		if (!file.open(path)) {
 			logError("GUI") << "Failed to create " << path;
 			return false;
@@ -291,10 +290,10 @@ private:
 		EntityRef e = selected_entities[0];
 		if (!scene.hasGUI(e)) return MouseMode::NONE;
 
-		GUIScene::Rect& rect = scene.getRectOnCanvas(e, canvas_size);
-		Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
+		const GUIScene::Rect rect = scene.getRectOnCanvas(e, canvas_size);
+		const Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
 		draw.addRect({ rect.x, rect.y }, bottom_right, {0xff, 0xf0, 0x0f, 0xff}, 1);
-		Vec2 mid = { rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f };
+		const Vec2 mid = { rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f };
 
 		auto drawHandle = [&](const Vec2& pos, const ImVec2& mouse_pos) {
 			const float SIZE = 5;
@@ -387,7 +386,6 @@ private:
 	void paste(EntityRef e)
 	{
 		m_editor->beginCommandGroup(crc32("gui_editor_paste"));
-		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 		for (int i = 0; i < m_copy_position_buffer_count; ++i)
 		{
 			CopyPositionBufferItem& item = m_copy_position_buffer[i];
@@ -679,7 +677,6 @@ private:
 
 	void expand(EntityRef entity, u8 mask)
 	{
-		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 		m_editor->beginCommandGroup(crc32("expand_gui_rect"));
 
 		if (mask & (u8)EdgeMask::TOP)

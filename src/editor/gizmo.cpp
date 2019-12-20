@@ -303,7 +303,7 @@ struct GizmoImpl final : public Gizmo
 			indices[5] = 5;
 		}
 
-		auto renderCube = [this](RenderData* data, u32 color, const Matrix& mtx, const Vec3& pos) 
+		auto renderCube = [](RenderData* data, u32 color, const Matrix& mtx, const Vec3& pos) 
 		{
 			const DataPtrs ptrs = reserve(data, mtx, false, 8, 36);
 			u16* indices = ptrs.indices;
@@ -515,7 +515,6 @@ struct GizmoImpl final : public Gizmo
 			renderQuarterRing(data, mtx, -axis1, axis2, SELECTED_COLOR);
 			renderQuarterRing(data, mtx, -axis1, -axis2, SELECTED_COLOR);
 			renderQuarterRing(data, mtx, axis1, -axis2, SELECTED_COLOR);
-			RenderInterface* ri = m_editor.getRenderInterface();
 
 			const Vec3 origin = (m_start_plane_point - gizmo_tr.pos).toFloat().normalized();
 			renderArc(data, (gizmo_tr.pos - camera_pos).toFloat(), n * scale, origin * scale, m_angle_accum, 0x8800a5ff);

@@ -42,7 +42,6 @@ public:
 	static const ResourceType TYPE;
 
 private:
-	IAllocator& m_allocator;
 	Texture* m_texture;
 };
 

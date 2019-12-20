@@ -276,7 +276,7 @@ struct EditorIconsImpl final : public EditorIcons
 	}
 
 
-	void getRenderData(Array<RenderData>* data)
+	void getRenderData(Array<RenderData>* data) override
 	{
 		static const float MIN_SCALE_FACTOR = 10;
 		static const float MAX_SCALE_FACTOR = 60;

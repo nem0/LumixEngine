@@ -60,7 +60,6 @@ class Animation final : public Resource
 		bool load(u64 size, const u8* mem) override;
 
 	private:
-		IAllocator& m_allocator;
 		Time m_length;
 		struct TranslationCurve
 		{

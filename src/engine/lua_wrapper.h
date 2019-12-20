@@ -948,7 +948,7 @@ template <auto t> int wrap(lua_State* L)
 template <auto t> int wrapMethod(lua_State* L)
 {
 	using indices = typename BuildIndices<1, details::arity(t)>::result;
-	using C = ClassOf<decltype(t)>::Type;
+	using C = typename ClassOf<decltype(t)>::Type;
 	auto* inst = checkArg<C*>(L, 1);
 	return details::Caller<indices>::callMethod(inst, t, L);
 }
@@ -956,7 +956,7 @@ template <auto t> int wrapMethod(lua_State* L)
 
 template <auto t> int wrapMethodClosure(lua_State* L)
 {
-	using C = ClassOf<decltype(t)>::Type;
+	using C = typename ClassOf<decltype(t)>::Type;
 	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
 	if (!isType<C>(L, index))

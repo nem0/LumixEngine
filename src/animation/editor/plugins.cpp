@@ -90,7 +90,6 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 	bool createResource(const char* path) override
 	{
 		OS::OutputFile file;
-		WorldEditor& editor = m_app.getWorldEditor();
 		if (!file.open(path))
 		{
 			logError("Animation") << "Failed to create " << path;
@@ -285,7 +284,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 		app.getAssetCompiler().registerExtension("act", Anim::Controller::TYPE);
 	}
 
-	bool compile(const Path& src) {
+	bool compile(const Path& src) override {
 		return m_app.getAssetCompiler().copyCompile(src);
 	}
 

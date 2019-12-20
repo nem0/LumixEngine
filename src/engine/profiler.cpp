@@ -103,7 +103,7 @@ static struct Instance
 	}
 
 
-	static void startTrace()
+	void startTrace()
 	{
 		static TRACEHANDLE trace_handle;
 		static TraceProps props = {};
@@ -124,10 +124,10 @@ static struct Instance
 		case ERROR_ACCESS_DENIED:
 		case ERROR_BAD_LENGTH:
 		default:
-			g_instance.context_switches_enabled = false;
+			context_switches_enabled = false;
 			break;
 		case ERROR_SUCCESS:
-			g_instance.context_switches_enabled = true;
+			context_switches_enabled = true;
 			break;
 		}
 
@@ -135,8 +135,8 @@ static struct Instance
 		trace.LoggerName = KERNEL_LOGGER_NAME;
 		trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
 		trace.EventRecordCallback = TraceTask::callback;
-		g_instance.trace_task.open_handle = OpenTrace(&trace);
-		g_instance.trace_task.create("Profiler trace", true);
+		trace_task.open_handle = OpenTrace(&trace);
+		trace_task.create("Profiler trace", true);
 	}
 
 

@@ -45,8 +45,8 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 		, cmp(cmp)
 	{}
 
-	void begin(const Reflection::ComponentBase&) {}
-	void end(const Reflection::ComponentBase&) {}
+	void begin(const Reflection::ComponentBase&) override {}
+	void end(const Reflection::ComponentBase&) override {}
 
 	template <typename T>
 	void visit_generic(const Reflection::Property<T>& prop) {
@@ -688,7 +688,6 @@ class RemoveArrayPropertyItemCommand final : public IEditorCommand
 public:
 	explicit RemoveArrayPropertyItemCommand(WorldEditor& editor)
 		: m_old_values(editor.getAllocator())
-		, m_editor(editor)
 	{
 	}
 
@@ -700,7 +699,6 @@ public:
 		, m_index(index)
 		, m_property(&property)
 		, m_old_values(editor.getAllocator())
-		, m_editor(editor)
 	{
 		SaveVisitor save;
 		save.cmp = m_component;
@@ -731,7 +729,6 @@ public:
 	bool merge(IEditorCommand&) override { return false; }
 
 private:
-	WorldEditor& m_editor;
 	ComponentUID m_component;
 	int m_index;
 	const Reflection::IArrayProperty *m_property;
@@ -744,7 +741,6 @@ class AddArrayPropertyItemCommand final : public IEditorCommand
 
 public:
 	explicit AddArrayPropertyItemCommand(WorldEditor& editor)
-		: m_editor(editor)
 	{
 	}
 
@@ -754,7 +750,6 @@ public:
 		: m_component(component)
 		, m_index(-1)
 		, m_property(&property)
-		, m_editor(editor)
 	{
 	}
 
@@ -782,7 +777,6 @@ private:
 	ComponentUID m_component;
 	int m_index;
 	const Reflection::IArrayProperty *m_property;
-	WorldEditor& m_editor;
 };
 
 
@@ -1991,7 +1985,7 @@ public:
 				if (prefab != 0) entity_map.create({i});
 			}
 		});
-		return &universe;
+		return true;
 	}
 
 	
@@ -2469,7 +2463,7 @@ public:
 			return 0;
 		};
 
-		lua_pushlightuserdata(L, creator);
+		lua_pushlightuserdata(L, static_cast<void*>(creator));
 		lua_pushlightuserdata(L, this);
 		lua_pushcclosure(L, f, 2);
 		lua_setfield(L, -2, name);
@@ -2689,7 +2683,6 @@ public:
 
 	void copyViewTransform() override {
 		if (m_selected_entities.empty()) return;
-		const Universe* universe = getUniverse();
 
 		setEntitiesPositionsAndRotations(m_selected_entities.begin(), &m_viewport.pos, &m_viewport.rot, 1);
 	}

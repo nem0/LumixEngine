@@ -48,7 +48,7 @@ struct LUMIX_ENGINE_API PathManager
 {
 	static PathManager* create(IAllocator& allocator);
 	static void destroy(PathManager& obj);
-	static const Path& PathManager::getEmptyPath();
+	static const Path& getEmptyPath();
 	
 	virtual ~PathManager() {};
 

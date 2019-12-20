@@ -88,9 +88,10 @@ static u32 getInputByteOffset(Controller& controller, u32 input_idx) {
 	u32 offset = 0;
 	for (u32 i = 0; i < input_idx; ++i) {
 		switch (controller.m_inputs.inputs[i].type) {
-			case InputDecl::FLOAT: offset += sizeof(float);
-			case InputDecl::BOOL: offset += sizeof(bool);
-			case InputDecl::U32: offset += sizeof(u32);
+			case InputDecl::FLOAT: offset += sizeof(float); break;
+			case InputDecl::BOOL: offset += sizeof(bool); break;
+			case InputDecl::U32: offset += sizeof(u32); break;
+			case InputDecl::EMPTY: break;
 		}
 	}
 	return offset;

@@ -1360,7 +1360,6 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 	for (int layer = 0; layer < layers; ++layer) {
 		for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
-			const GLenum tex_img_target =  is_cubemap ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + side : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 			u32 width = hdr.dwWidth;
 			u32 height = hdr.dwHeight;
 

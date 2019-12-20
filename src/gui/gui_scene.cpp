@@ -209,7 +209,6 @@ struct GUISceneImpl final : public GUIScene
 		const char* text = rect.text->text.c_str();
 		const char* text_end = text + rect.input_field->cursor;
 		Font* font = rect.text->getFont();
-		float font_size = (float)rect.text->getFontSize();
 		Vec2 text_size = measureTextA(*font, text, text_end);
 		draw.addLine({ pos.x + text_size.x, pos.y }
 			, { pos.x + text_size.x, pos.y + text_size.y }

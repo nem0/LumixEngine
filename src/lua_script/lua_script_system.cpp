@@ -41,7 +41,7 @@ namespace Lumix
 
 	struct LuaScriptManager final : public ResourceManager
 	{
-		LuaScriptManager::LuaScriptManager(IAllocator& allocator)
+		LuaScriptManager(IAllocator& allocator)
 			: ResourceManager(allocator)
 			, m_allocator(allocator)
 		{

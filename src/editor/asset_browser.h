@@ -104,7 +104,6 @@ private:
 	Array<Resource*> m_selected_resources;
 	int m_context_resource;
 	WorldEditor& m_editor;
-	int m_current_type;
 	char m_filter[128];
 	Path m_wanted_resource;
 	bool m_is_focus_requested;

@@ -85,7 +85,7 @@ class PluginManagerImpl final : public PluginManager
 		}
 
 
-		void* getLibrary(IPlugin* plugin) const
+		void* getLibrary(IPlugin* plugin) const override
 		{
 			int idx = m_plugins.indexOf(plugin);
 			if (idx < 0) return nullptr;

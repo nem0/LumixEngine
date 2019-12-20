@@ -64,7 +64,6 @@ private:
 		Vec2 to;
 	};
 
-	IAllocator& m_allocator;
 	Vec2 m_atlas_size;
 	Array<Cmd> m_cmds;
 	Array<u32> m_indices;

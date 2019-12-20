@@ -210,7 +210,7 @@ void trigger(SignalHandle handle)
 	while (isValid(iter)) {
 		Signal& signal = g_system->m_signals_pool[iter & HANDLE_ID_MASK];
 		if(signal.next_job.task) {
-			MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
+			MT::CriticalSectionLock queue_lock(g_system->m_job_queue_sync);
 			pushJob(signal.next_job);
 		}
 		signal.generation = (((signal.generation >> 16) + 1) & 0xffFF) << 16;
@@ -239,7 +239,7 @@ static LUMIX_FORCE_INLINE bool isSignalZero(SignalHandle handle, bool lock)
 static LUMIX_FORCE_INLINE void runInternal(void* data
 	, void (*task)(void*)
 	, SignalHandle precondition
-	, bool lock
+	, bool do_lock
 	, SignalHandle* on_finish
 	, u8 worker_index)
 {
@@ -249,7 +249,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 	j.worker_index = worker_index % getWorkersCount();
 	j.precondition = precondition;
 
-	if (lock) g_system->m_sync.enter();
+	if (do_lock) g_system->m_sync.enter();
 	j.dec_on_finish = [&]() -> SignalHandle {
 		if (!on_finish) return INVALID_HANDLE;
 		if (isValid(*on_finish) && !isSignalZero(*on_finish, false)) {
@@ -278,7 +278,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 		}
 	}
 
-	if (lock) g_system->m_sync.exit();
+	if (do_lock) g_system->m_sync.exit();
 }
 
 
@@ -479,9 +479,11 @@ bool init(u8 workers_count, IAllocator& allocator)
 }
 
 
-int getWorkersCount()
+u8 getWorkersCount()
 {
-	return g_system->m_workers.size();
+	const int c = g_system->m_workers.size();
+	ASSERT(c <= 0xff);
+	return (u8)c;
 }
 
 

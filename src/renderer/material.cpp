@@ -34,7 +34,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	: Resource(path, resource_manager, allocator)
 	, m_shader(nullptr)
 	, m_uniforms(allocator)
-	, m_allocator(allocator)
 	, m_texture_count(0)
 	, m_renderer(renderer)
 	, m_render_states(u64(gpu::StateFlags::CULL_BACK))
@@ -491,7 +490,7 @@ int layer(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	const int layer = material->getRenderer().getLayerIdx(layer_name);
+	const u8 layer = material->getRenderer().getLayerIdx(layer_name);
 	material->setLayer(layer);
 	return 0;
 }
@@ -548,7 +547,6 @@ int color(lua_State* L)
 
 int custom_flag(lua_State* L)
 {
-	const float m = LuaWrapper::checkArg<float>(L, 1);
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);

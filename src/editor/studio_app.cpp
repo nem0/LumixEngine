@@ -189,11 +189,12 @@ public:
 	}
 
 
-	void onEvent(const OS::Event& event)
+	void onEvent(const OS::Event& event) override
 	{
 		const bool handle_input = OS::getFocused() == m_window;
 		m_events.push(event);
 		switch (event.type) {
+			case OS::Event::Type::FOCUS: break;
 			case OS::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
 				m_editor->setToggleSelection(io.KeyCtrl);
@@ -266,6 +267,7 @@ public:
 					}
 				}
 				break;
+			default: ASSERT(false); break;
 		}
 	}
 
@@ -827,6 +829,7 @@ public:
 			TCHAR exe_path[MAX_PATH_LENGTH];
 			GetModuleFileNameA(NULL, exe_path, MAX_PATH_LENGTH);
 
+			// TODO extract only nonexistent files
 			u64 bundled_last_modified = OS::getLastModified(exe_path);
 			InputMemoryStream str(res_mem, size);
 
@@ -2048,7 +2051,6 @@ public:
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(16 * 1024);
 		PluginManager& plugin_manager = m_editor->getEngine().getPluginManager();
-		void* lib = plugin_manager.getLibrary(m_watched_plugin.plugin);
 
 		Universe* universe = m_editor->getUniverse();
 		for (IScene* scene : universe->getScenes())
@@ -2939,6 +2941,7 @@ public:
 					case OS::Keycode::MENU:
 						action_modifiers |= 4;
 						break;
+					default: break;
 				}
 			}
 		}

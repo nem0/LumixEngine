@@ -34,7 +34,6 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_history(app.getWorldEditor().getAllocator())
 	, m_plugins(app.getWorldEditor().getAllocator())
 	, m_app(app)
-	, m_current_type(0)
 	, m_is_open(false)
 	, m_show_thumbnails(true)
 	, m_history_index(-1)
@@ -148,7 +147,6 @@ void AssetBrowser::changeDir(const char* path)
 		m_dir.data[len - 1] = '\0';
 	}
 
-	IAllocator& allocator = editor.getAllocator();
 	FileSystem& fs = editor.getEngine().getFileSystem();
 	OS::FileIterator* iter = fs.createFileIterator(m_dir);
 	OS::FileInfo info;
@@ -453,7 +451,7 @@ void AssetBrowser::fileColumn()
 		}
 	};
 	if (ImGui::BeginPopup("item_ctx")) {
-		ImGui::Text("%s", m_file_infos[m_context_resource]);
+		ImGui::Text("%s", m_file_infos[m_context_resource].clamped_filename.data);
 		ImGui::Separator();
 		if (ImGui::MenuItem("Open in external editor")) {
 			openInExternalEditor(m_file_infos[m_context_resource].filepath);
@@ -569,7 +567,6 @@ void AssetBrowser::detailsGUI()
 			ImGui::LabelText("Failed", "%d", failed);
 
 			if (all_same_type) {
-				const AssetCompiler& compiler = m_app.getAssetCompiler();
 				auto iter = m_plugins.find(type);
 				if(iter.isValid()) {
 					iter.value()->onGUI(m_selected_resources.getSpan());

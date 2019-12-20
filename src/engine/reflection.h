@@ -760,7 +760,7 @@ namespace internal
 	{
 		static const char* GetTypeName()
 		{
-#ifdef _WIN32
+#if defined(_MSC_VER) && !defined(__clang__)
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			static char typeName[size] = {};
 			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
@@ -1024,7 +1024,6 @@ auto blob_property(const char* name, Getter getter, Setter setter, Attributes...
 template <typename Getter, typename Setter, typename Counter>
 auto sampled_func_property(const char* name, Getter getter, Setter setter, Counter counter, float max_x)
 {
-	using R = typename ResultOf<Getter>::Type;
 	SampledFuncProperty<Getter, Setter, Counter> p;
 	p.getter = getter;
 	p.setter = setter;

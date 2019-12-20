@@ -740,7 +740,6 @@ public:
 
 	void deserializeDecal(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
 	{
-		ResourceManagerHub& manager = m_engine.getResourceManager();
 		m_decals.insert(entity, Decal());
 		Decal& decal = m_decals[entity];
 		char tmp[MAX_PATH_LENGTH];
@@ -749,7 +748,6 @@ public:
 		serializer.read(Span(tmp));
 		setDecalMaterialPath(entity, Path(tmp));
 		updateDecalInfo(decal);
-		const DVec3 pos = m_universe.getPosition(entity);
 		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 	}
 
@@ -1213,7 +1211,6 @@ public:
 
 	void deserializeDecals(IInputStream& serializer)
 	{
-		ResourceManagerHub& manager = m_engine.getResourceManager();
 		int count;
 		serializer.read(count);
 		m_decals.reserve(count);
@@ -1227,7 +1224,6 @@ public:
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
 			setDecalMaterialPath(decal.entity, Path(tmp));
-			const DVec3 pos = m_universe.getPosition(decal.entity);
 			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 		}
 	}
@@ -2027,8 +2023,6 @@ public:
 
 	void setModelInstancePath(EntityRef entity, const Path& path) override
 	{
-		ModelInstance& r = m_model_instances[entity.index];
-
 		if (path.isValid()) {
 			Model* model = m_engine.getResourceManager().load<Model>(path);
 			setModel(entity, model);
@@ -2133,7 +2127,6 @@ public:
 
 	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
 	{
-		auto& fs = scene->m_engine.getFileSystem();
 		OS::InputFile file1, file2;
 		if (!file1.open(path))
 		{
@@ -2813,7 +2806,7 @@ public:
 		return m_light_probe_grids[entity];
 	}
 
-	DebugTriangle* addDebugTriangles(int count)
+	DebugTriangle* addDebugTriangles(int count) override
 	{
 		const u32 new_size = m_debug_triangles.size() + count;
 		if (new_size < m_debug_triangles.capacity()) {
@@ -3074,8 +3067,6 @@ public:
 
 	void modelLoaded(Model* model, EntityRef entity)
 	{
-		auto& rm = m_engine.getResourceManager();
-
 		auto& r = m_model_instances[entity.index];
 
 		float bounding_radius = r.model->getBoundingRadius();
@@ -3222,8 +3213,6 @@ public:
 		}
 		if (old_model)
 		{
-			auto& rm = old_model->getResourceManager();
-			
 			removeFromModelEntityMap(old_model, entity);
 
 			if (old_model->isReady())
@@ -3325,7 +3314,6 @@ public:
 	{
 		EnvironmentProbe& probe = m_environment_probes.insert(entity);
 		probe.guid = randGUID();
-		ResourceManagerHub& rm = m_engine.getResourceManager();
 
 		StaticString<MAX_PATH_LENGTH> path;
 		probe.reflection = nullptr;
