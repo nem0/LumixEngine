@@ -1509,7 +1509,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		if (!px_actor) return;
 		px_actor->setActorFlag(PxActorFlag::eVISUALIZATION, enable);
 		PxShape* shape;
-		const u32 count = px_actor->getShapes(&shape, 1);
+		px_actor->getShapes(&shape, 1);
 		if(shape) {
 			shape->setFlag(PxShapeFlag::eVISUALIZATION, enable);
 		}
@@ -2557,13 +2557,13 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		}
 	}
 
-	void setControllerCustomGravity(EntityRef entity, bool value)
+	void setControllerCustomGravity(EntityRef entity, bool value) override
 	{
 		Controller& ctrl = m_controllers[entity];
 		ctrl.m_custom_gravity = value;
 	}
 
-	void setControllerCustomGravityAcceleration(EntityRef entity, float value)
+	void setControllerCustomGravityAcceleration(EntityRef entity, float value) override
 	{
 		Controller& ctrl = m_controllers[entity];
 		ctrl.m_custom_gravity_acceleration = value;
@@ -3928,7 +3928,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	{
 		serializer.write(actor->layer);
 		auto* px_actor = actor->physx_actor;
-		auto* resource = actor->resource;
 		PxShape* shape;
 		int shape_count = px_actor->getNbShapes();
 		serializer.write(shape_count);
@@ -5102,9 +5101,9 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity).getRigidPart());
 
 		scale = scene.getUniverse().getScale(entity);
-		PxMeshScale scale(scale);
-		PxConvexMeshGeometry convex_geom(resource->convex_mesh, scale);
-		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, scale);
+		PxMeshScale pxscale(scale);
+		PxConvexMeshGeometry convex_geom(resource->convex_mesh, pxscale);
+		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, pxscale);
 		const PxGeometry* geom =
 			resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
 

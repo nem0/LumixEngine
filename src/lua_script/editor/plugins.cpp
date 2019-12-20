@@ -543,10 +543,9 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 		app.getSettings().setValue("is_script_console_open", open);
 	}
 
-	static const int LUA_CALL_EVENT_SIZE = 32;
-
 	// TODO
-/*
+	/*static const int LUA_CALL_EVENT_SIZE = 32;
+
 	void pluginAdded(GUIPlugin& plugin) override
 	{
 		if (!equalStrings(plugin.getName(), "animation_editor")) return;

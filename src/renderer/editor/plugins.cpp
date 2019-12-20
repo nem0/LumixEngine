@@ -144,7 +144,6 @@ struct SphericalHarmonics {
 		const u32 h = w;
 		ASSERT(6 * w * h == pixels.size());
 
-		const float pixel_area = (2.0f * PI / w) * (PI / h);
 		float weightSum = 0.0f;
 		for (u32 face = 0; face < 6; ++face) {
 			for (u32 y = 0; y < h; y++) {
@@ -328,7 +327,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createResource(const char* path) override {
 		OS::OutputFile file;
-		WorldEditor& editor = m_app.getWorldEditor();
 		if (!file.open(path)) {
 			logError("Renderer") << "Failed to create " << path;
 			return false;
@@ -676,7 +674,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			JobData* data = (JobData*)ptr;
 			ModelPlugin* plugin = data->plugin;
 			WorldEditor& editor = plugin->m_app.getWorldEditor();
-			FileSystem& fs = editor.getEngine().getFileSystem();
 			FBXImporter importer(plugin->m_app);
 			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
 
@@ -737,7 +734,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const StaticString<32> hash_str("", src.getHash());
 		if (meta.split) {
 			//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
-			const Array<FBXImporter::ImportMesh>& meshes = m_fbx_importer.getMeshes();
 			m_fbx_importer.writeSubmodels(filepath, cfg);
 			m_fbx_importer.writePrefab(filepath, cfg);
 		}
@@ -1471,13 +1467,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
-	const char* getDefaultExtension() const { return "ltc"; }
-	const char* getFileDialogFilter() const { return "Composite texture\0*.ltc\0"; }
-	const char* getFileDialogExtensions() const { return "ltc"; }
+	const char* getDefaultExtension() const override { return "ltc"; }
+	const char* getFileDialogFilter() const override { return "Composite texture\0*.ltc\0"; }
+	const char* getFileDialogExtensions() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
-	bool createResource(const char* path) { 
+	bool createResource(const char* path) override { 
 		OS::OutputFile file;
-		WorldEditor& editor = m_app.getWorldEditor();
 		if (!file.open(path)) {
 			logError("Renderer") << "Failed to create " << path;
 			return false;
@@ -2171,7 +2166,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case gpu::TextureFormat::SRGBA: format = "SRGBA"; break;
 			default: ASSERT(false); break;
 		}
-		ImGui::LabelText("Format", format);
+		ImGui::LabelText("Format", "%s", format);
 		if (texture->handle.isValid()) {
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height) {
@@ -2426,7 +2421,6 @@ void captureCubemap(StudioApp& app
 	WorldEditor& world_editor = app.getWorldEditor();
 	Engine& engine = world_editor.getEngine();
 	auto& plugin_manager = engine.getPluginManager();
-	IAllocator& allocator = engine.getAllocator();
 
 	Viewport viewport;
 	viewport.is_ortho = false;
@@ -2608,7 +2602,7 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 			if (m_to_dispatch == 0 && m_jobs.empty()) {
 				Universe* universe = m_app.getWorldEditor().getUniverse();
 				const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
-				StaticString<MAX_PATH_LENGTH> dir(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName(), "/probes/");
+				StaticString<MAX_PATH_LENGTH> dir(base_path, "universes/", universe->getName(), "/probes/");
 				if (!OS::makePath(dir) && !OS::dirExists(dir)) {
 					logError("Editor") << "Failed to create " << dir;
 				}
@@ -2790,7 +2784,6 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			job->position = universe->getPosition(p);
 			job->universe_name = universe->getName();
 			if (env_entity.isValid()) {
-				const Environment env = scene->getEnvironment((EntityRef)env_entity);
 				job->fast_filter = fast_filter;
 			}
 
@@ -3145,7 +3138,6 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 		Material* material = engine.getResourceManager().load<Material>(Path("pipelines/imgui/imgui.mat"));
 
 		Texture* old_texture = material->getTexture(0);
-		PluginManager& plugin_manager = engine.getPluginManager();
 		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
 			Path("font"), *engine.getResourceManager().get(Texture::TYPE), m_renderer, engine.getAllocator());
 
@@ -3571,7 +3563,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH, clear_color, 1.0);
 
 			gpu::viewport(0, 0, width, height);
-			const bool is_dx = gpu::getBackend() == gpu::Backend::DX11;
 			const Vec4 canvas_mtx[] = {
 				Vec4(2.f / width, 0, -1, 0),
 				Vec4(0, -2.f / height, 1, 0)
@@ -3644,9 +3635,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 	~EditorUIRenderPlugin()
 	{
-		PluginManager& plugin_manager = m_engine.getPluginManager();
-		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		WorldEditor& editor = m_app.getWorldEditor();
 		shutdownImGui();
 	}
 
@@ -3665,8 +3653,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 	void guiEndFrame() override
 	{
-		const ImDrawData* draw_data = ImGui::GetDrawData();
-
 		const OS::Point size = OS::getWindowClientSize(m_app.getWindow());
 		if (size.x != m_width || size.y != m_height) {
 			m_width = size.x;

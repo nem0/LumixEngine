@@ -494,8 +494,6 @@ void ParticleEmitter::emit(const float* args)
 	}
 }
 
-static bool isWhitespace(char c) { return c == ' ' || c == '\n' || c == '\r' || c == '\t'; }
-
 
 void ParticleEmitter::serialize(IOutputStream& blob)
 {
@@ -509,7 +507,6 @@ void ParticleEmitter::deserialize(IInputStream& blob, ResourceManagerHub& manage
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];
 	blob.readString(Span(path));
-	ResourceManager* material_manager = manager.get(ParticleEmitterResource::TYPE);
 	auto* res = manager.load<ParticleEmitterResource>(Path(path));
 	setResource(res);
 }
@@ -651,7 +648,7 @@ void ParticleEmitter::update(float dt)
 				if(src_type == Compiler::DataStream::CONST) {
 					ASSERT(src_idx == 0);
 					const float4 src = f4Splat(dt);
-					for (; result != end; ++result, src) {
+					for (; result != end; ++result) {
 						*result = src;
 					}
 				}

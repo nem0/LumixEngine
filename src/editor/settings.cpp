@@ -417,7 +417,7 @@ void Settings::showToolbarSettings() const
 	}
 	ImGui::NewLine();
 
-	if (dragged) ImGui::SetTooltip("%s", dragged->label_long);
+	if (dragged) ImGui::SetTooltip("%s", dragged->label_long.data);
 	if (ImGui::IsMouseReleased(0)) dragged = nullptr;
 
 	static int tmp = 0;
@@ -466,7 +466,7 @@ void Settings::showShortcutSettings()
 		if (m_filter[0] == 0 || stristr(a.label_long, m_filter) != 0)
 		{
 			ImGui::AlignTextToFramePadding();
-			ImGui::Text("%s", a.label_long);
+			ImGui::Text("%s", a.label_long.data);
 			ImGui::NextColumn();
 			shortcutInput(a.shortcut[0]);
 			ImGui::NextColumn();

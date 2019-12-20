@@ -401,7 +401,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
 		
 		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-		if (!fs.open(meta_path, Ref(file))) return nullptr;
+		if (!fs.open(meta_path, Ref(file))) return false;
 
 		Array<char> buf(m_app.getWorldEditor().getAllocator());
 		buf.resize((int)file.size());

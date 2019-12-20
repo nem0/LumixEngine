@@ -15,7 +15,6 @@ const ResourceType Sprite::TYPE("sprite");
 
 Sprite::Sprite(const Path& path, ResourceManager& manager, IAllocator& allocator)
 	: Resource(path, manager, allocator)
-	, m_allocator(allocator)
 	, m_texture(nullptr)
 {
 }

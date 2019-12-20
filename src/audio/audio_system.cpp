@@ -72,7 +72,7 @@ struct AudioSystemImpl final : public AudioSystem
 	}
 
 
-	void init()
+	void init() override
 	{
 		registerProperties(m_engine.getAllocator());
 		AudioScene::registerLuaAPI(m_engine.getState());

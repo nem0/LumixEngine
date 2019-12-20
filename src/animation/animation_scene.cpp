@@ -734,7 +734,6 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	static LocalRigidTransform getAbsolutePosition(const Pose& pose, const Model& model, int bone_index)
 	{
-		LocalRigidTransform t{Vec3::ZERO, Quat::IDENTITY};
 		const Model::Bone& bone = model.getBone(bone_index);
 		LocalRigidTransform bone_transform{pose.positions[bone_index], pose.rotations[bone_index]};
 		if (bone.parent_idx < 0)

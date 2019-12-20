@@ -943,8 +943,6 @@ struct NavigationSceneImpl final : public NavigationScene
 		auto render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		if (!render_scene) return;
 
-		dtPolyRef base = zone.navmesh->getPolyRefBase(tile);
-
 		for (int i = 0; i < tile->header->polyCount; ++i) {
 			const dtPoly* p = &tile->polys[i];
 			if (p->getType() == DT_POLYTYPE_OFFMESH_CONNECTION) continue;
@@ -1123,7 +1121,6 @@ struct NavigationSceneImpl final : public NavigationScene
 		const Transform tr = m_universe.getTransform(zone_entity);
 		const Vec3 pos = tr.inverted().transform(world_pos).toFloat();
 		const Vec3 min = -zone.zone.extents;
-		const Vec3 max = zone.zone.extents;
 		const int x = int((pos.x - min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		const int z = int((pos.z - min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		return generateTile(zone, zone_entity, x, z, keep_data);
@@ -1397,12 +1394,12 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 	void assignZone(Agent& agent) {
-		const DVec3 pos = m_universe.getPosition(agent.entity);
+		const DVec3 agent_pos = m_universe.getPosition(agent.entity);
 		for (RecastZone& zone : m_zones) {
 			const Transform inv_zone_tr = m_universe.getTransform(zone.entity).inverted();
 			const Vec3 min = -zone.zone.extents;
 			const Vec3 max = zone.zone.extents;
-			const Vec3 pos = inv_zone_tr.transform(pos).toFloat();
+			const Vec3 pos = inv_zone_tr.transform(agent_pos).toFloat();
 			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
 				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
 			{
@@ -1524,7 +1521,6 @@ struct NavigationSceneImpl final : public NavigationScene
 			agent.is_finished = true;
 			agent.agent = -1;
 			m_agents.insert(agent.entity, agent);
-			EntityRef entity = {agent.entity.index};
 			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
 		}
 	}

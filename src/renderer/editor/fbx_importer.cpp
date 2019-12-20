@@ -252,18 +252,6 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene)
 }
 
 
-static void makeValidFilename(char* filename)
-{
-	char* c = filename;
-	while (*c)
-	{
-		bool is_valid = (*c >= 'A' && *c <= 'Z') || (*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '-' || *c == '_';
-		if (!is_valid) *c = '_';
-		++c;
-	}
-}
-
-
 void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 {
 	int anim_count = scene.getAnimationStackCount();
@@ -311,10 +299,7 @@ static int findSubblobIndex(const OutputMemoryStream& haystack, const OutputMemo
 }
 
 
-static Vec3 toLumixVec3(const ofbx::Vec4& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
 static Vec3 toLumixVec3(const ofbx::Vec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
-static ofbx::Vec3 toOFBXVec3(const Vec3& v) { return {(float)v.x, (float)v.y, (float)v.z}; }
-static Quat toLumix(const ofbx::Quat& q) { return {(float)q.x, (float)q.y, (float)q.z, (float)q.w}; }
 
 
 static Matrix toLumix(const ofbx::Matrix& mtx)
@@ -591,8 +576,6 @@ static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 	{
 		char mesh_name[256];
 		FBXImporter::getImportMeshName(mesh, mesh_name);
-		if (!mesh_name) return 0;
-
 		const char* lod_str = stristr(mesh_name, "_LOD");
 		if (!lod_str) return 0;
 	}
@@ -808,7 +791,6 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
 				gpu::viewport(i * m_tile_size->x, j * m_tile_size->y, m_tile_size->x, m_tile_size->y);
-				const u32 mesh_count = m_model->getMeshCount();
 				for (u32 k = 0; k <= (u32)m_model->getLODs()[0].to_mesh; ++k) {
 					const Mesh& mesh = m_model->getMesh(k);
 
@@ -1462,7 +1444,6 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 		};
 	#pragma pack()
 
-	const float radius = (aabb.max - aabb.min).length() * 0.5f;
 	const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 
 	Vec2 min, max;

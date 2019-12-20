@@ -40,7 +40,6 @@ static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("phys
 static const char* HEIGHTMAP_SLOT_NAME = "Heightmap";
 static const char* SPLATMAP_SLOT_NAME = "Splatmap";
 static const char* DETAIL_ALBEDO_SLOT_NAME = "Detail albedo";
-static const char* SATELLITE_SLOT_NAME = "Satellite";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 
@@ -1030,7 +1029,6 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 			m_terrain_brush_size,
 			-m_terrain_brush_size,
 			m_terrain_brush_size);
-		const DVec3 camera_pos = m_app.getWorldEditor().getViewport().pos;
 		
 		CullResult* meshes = scene->getRenderables(frustum, RenderableTypes::MESH);
 		CullResult* mesh_groups = scene->getRenderables(frustum, RenderableTypes::MESH_GROUP);

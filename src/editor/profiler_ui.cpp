@@ -22,7 +22,6 @@ namespace Lumix
 {
 
 
-static constexpr int MAX_FRAMES = 200;
 static constexpr int DEFAULT_ZOOM = 100'000;
 
 

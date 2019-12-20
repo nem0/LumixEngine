@@ -44,7 +44,9 @@ extern "C" {
 	LUMIX_CRT_API double __cdecl floor(double _X);
 	#ifndef _INC_MATH
 		inline float __cdecl fabsf(float x) { return (float)fabs(x); }
-		inline float __cdecl floorf(float x) { return (float)floor(x); }	
+		#ifdef LUMIX_DEBUG
+			inline float __cdecl floorf(float x) { return (float)floor(x); }	
+		#endif
 		LUMIX_CRT_API float __cdecl ceilf(float x);
 		//inline float __cdecl ceilf(float x) { return (float)ceil(x); }	
 	#endif

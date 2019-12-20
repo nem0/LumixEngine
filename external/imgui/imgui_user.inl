@@ -96,7 +96,6 @@ namespace ImGui
 		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
 		PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
-		float padding = frame_padding.y * 2;
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
 		if (size.x == 0) size.x = GetContentRegionAvailWidth();
@@ -119,7 +118,6 @@ namespace ImGui
 		ImVec2 size = GetWindowSize();
 		if (GImGui->CurrentWindowStack.Size == 2) End(); else EndChild();
 		PopStyleVar(3);
-		ImGuiWindow* win = GetCurrentWindowRead();
 		if (GImGui->CurrentWindowStack.Size > 1) SetCursorScreenPos(pos + ImVec2(0, size.y + GetStyle().FramePadding.y * 2));
 	}
 
@@ -155,21 +153,6 @@ namespace ImGui
 				}
 
 		return true;
-	}
-
-
-	static bool IsHovered(const ImRect& bb, ImGuiID id)
-	{
-		ImGuiContext& g = *GImGui;
-		if (g.HoveredId == 0 || g.HoveredId == id || g.HoveredIdAllowOverlap)
-		{
-			ImGuiWindow* window = GetCurrentWindowRead();
-			if (g.HoveredWindow == window)
-				if ((g.ActiveId == 0 || g.ActiveId == id || g.ActiveIdAllowOverlap) && IsMouseHoveringRect(bb.Min, bb.Max))
-					if (IsWindowContentHoverableEx(g.HoveredRootWindow, 0))
-						return true;
-		}
-		return false;
 	}
 
 
@@ -217,11 +200,9 @@ namespace ImGui
 	{
 		ImDrawList* draw_list = GetWindowDrawList();
 		ImGui::SameLine();
-		float width = GetCursorScreenPos().x - node_pos.x;
 		EndGroup();
 		const ImVec2 size = ImGui::GetItemRectSize() + ImGui::GetStyle().WindowPadding * 2;
 		PopItemWidth();
-		float height = GetCursorScreenPos().y - node_pos.y;
 		SetCursorScreenPos(node_pos);
 
 		SetNextWindowPos(node_pos);
@@ -413,8 +394,6 @@ namespace ImGui
 		window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_Y, from_y);
 		window->StateStorage.SetFloat((ImGuiID)StorageValues::WIDTH, width);
 		window->StateStorage.SetFloat((ImGuiID)StorageValues::HEIGHT, height);
-
-		ImVec2 beg_pos = GetCursorScreenPos();
 
 		const ImRect inner_bb = window->InnerClipRect;
 		const ImRect frame_bb(inner_bb.Min - style.FramePadding, inner_bb.Max + style.FramePadding);

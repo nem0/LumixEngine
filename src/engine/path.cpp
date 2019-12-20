@@ -18,7 +18,7 @@ static PathManagerImpl* g_path_manager = nullptr;
 
 struct PathManagerImpl : PathManager
 {
-	PathManagerImpl::PathManagerImpl(IAllocator& allocator)
+	PathManagerImpl(IAllocator& allocator)
 		: m_paths(allocator)
 		, m_allocator(allocator)
 	{
@@ -26,7 +26,7 @@ struct PathManagerImpl : PathManager
 		m_empty_path = LUMIX_NEW(m_allocator, Path)();
 	}
 
-	PathManagerImpl::~PathManagerImpl() override {
+	~PathManagerImpl() override {
 		LUMIX_DELETE(m_allocator, m_empty_path);
 		ASSERT(m_paths.size() == 0);
 		g_path_manager = nullptr;

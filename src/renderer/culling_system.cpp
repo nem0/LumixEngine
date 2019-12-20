@@ -188,8 +188,6 @@ struct CullingSystemImpl final : public CullingSystem
 		Sphere* sphere = m_entity_to_cell[entity.index];
 		CellPage& cell = getCell(*sphere);
 
-		const CellIndices old_indices = cell.header.indices;
-
 		const IVec3 new_indices(pos * (1 / m_cell_size));
 
 		if(new_indices == cell.header.indices.pos) {
@@ -308,9 +306,6 @@ struct CullingSystemImpl final : public CullingSystem
 		PROFILE_FUNCTION();
 		if (m_cells.empty()) return nullptr;
 
-		const u32 worker_count = MT::getCPUsCount();
-
-		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
 		volatile i32 cell_idx = 0;
 		PagedList<CullResult> list(m_page_allocator);
 

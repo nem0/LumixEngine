@@ -65,7 +65,6 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 		serializer.read(Span(tmp));
 		curve.cmp_type = Reflection::getComponentType(tmp);
 		serializer.read(Span(tmp));
-		u32 prop_hash = crc32(tmp);
 		
 		int keys_count;
 		serializer.read(Ref(keys_count));

@@ -750,7 +750,6 @@ private:
 	Array<DeferredInstance> m_deferred_instances;
 	Universe* m_universe;
 	WorldEditor& m_editor;
-	StudioApp* m_app;
 }; // class PrefabSystemImpl
 
 

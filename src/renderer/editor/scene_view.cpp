@@ -181,8 +181,6 @@ void SceneView::renderIcons()
 			PROFILE_FUNCTION();
 			Array<EditorIcons::RenderData> data(m_allocator);
 			m_view->m_editor.getIcons().getRenderData(&data);
-			RenderScene* scene = m_view->m_pipeline->getScene();
-			const Universe& universe = scene->getUniverse();
 			
 			RenderInterfaceBase* ri = (RenderInterfaceBase*)m_view->m_editor.getRenderInterface();
 
@@ -648,7 +646,6 @@ void SceneView::onWindowGUI()
 			}
 			view_pos = content_min;
 
-			const bool h = ImGui::IsItemHovered();
 			const bool handle_input = ImGui::IsItemHovered() && OS::getFocused() == m_app.getWindow();
 			const OS::Event* events = m_app.getEvents();
 			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {

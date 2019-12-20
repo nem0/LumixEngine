@@ -6,8 +6,7 @@ namespace Lumix {
 
 
 Draw2D::Draw2D(IAllocator& allocator) 
-	: m_allocator(allocator)
-	, m_cmds(allocator)
+	: m_cmds(allocator)
 	, m_indices(allocator)
 	, m_vertices(allocator)
 	, m_clip_queue(allocator)

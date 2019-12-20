@@ -279,7 +279,6 @@ struct PipelineImpl final : Pipeline
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
 		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)gpu::BufferFlags::IMMUTABLE);
-		const Renderer::MemRef ub_mem = { 32 * 1024, nullptr, false };
 
 		u16 cube_indices[] = {
 			0, 1, 2,
@@ -1079,7 +1078,7 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
 		const CameraParams cp = checkCameraParams(L, 1);
-		u64 state;
+		u64 state = 0;
 		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
 			state = getState(L, 2);
 		}
@@ -1975,7 +1974,6 @@ struct PipelineImpl final : Pipeline
 				PROFILE_FUNCTION();
 				if (vb.size == 0) return;
 
-				Renderer& renderer = m_pipeline->m_renderer;
 				gpu::useProgram(m_program);
 				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				gpu::setState((u64)gpu::StateFlags::DEPTH_WRITE | (u64)gpu::StateFlags::DEPTH_TEST | blend_state);
@@ -2536,7 +2534,6 @@ struct PipelineImpl final : Pipeline
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			const u32 define_mask = m_define_mask;
 			
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
@@ -2880,7 +2877,6 @@ struct PipelineImpl final : Pipeline
 						}
 						case RenderableTypes::DECAL: {
 							const Material* material = scene->getDecalMaterial(e);
-							const Vec3 half_extents = scene->getDecalHalfExtents(e);
 
 							int start_i = i;
 							const u64 key = sort_keys[i];
@@ -2927,8 +2923,6 @@ struct PipelineImpl final : Pipeline
 
 							const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(float) * 16);
 							if(slice.ptr) {
-								u32 intersecting_count = 0;
-
 								struct LightData {
 									Quat rot;
 									Vec3 pos;
@@ -3196,7 +3190,6 @@ struct PipelineImpl final : Pipeline
 			PROFILE_FUNCTION();
 			if(!m_pipeline->m_scene) return;
 
-			Renderer& renderer = m_pipeline->m_renderer;
 			const RenderScene* scene = m_pipeline->getScene();
 
 			MTBucketArray<u64> sort_keys(m_allocator);
@@ -3249,7 +3242,6 @@ struct PipelineImpl final : Pipeline
 				offset += count;
 			}
 			JobSystem::wait(counter);
-			CreateCommands& ctx = create_commands[0];
 			for(int i = 0; i < jobs_count; ++i) {
 				CreateCommands& cur = create_commands[i];
 				CmdPage* page = cur.first_page;

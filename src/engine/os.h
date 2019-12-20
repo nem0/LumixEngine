@@ -100,7 +100,7 @@ public:
 	u64 size() const override;
 	u64 pos();
 
-	bool seek(size_t pos);
+	bool seek(u64 pos);
 	
 private:
 	void* m_handle;
@@ -120,7 +120,7 @@ public:
 
 	bool write(const void* data, u64 size) override;
 
-	size_t pos();
+	u64 pos();
 
 	OutputFile& operator <<(const char* text);
 	OutputFile& operator <<(char c) { write(&c, sizeof(c)); return *this; }

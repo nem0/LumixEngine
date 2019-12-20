@@ -330,8 +330,7 @@ public:
 		keys[pos].valid = false;
 		--m_size;
 
-		const u32 mask = m_mask;
-		pos = (pos + 1) % m_capacity;
+		pos = (pos + 1) & m_mask;
 		while (keys[pos].valid) {
 			rehash(pos);
 			pos = (pos + 1) % m_capacity;
