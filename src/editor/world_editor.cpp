@@ -28,7 +28,6 @@
 #include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
-#include "ieditor_command.h"
 #include "render_interface.h"
 
 
@@ -912,13 +911,13 @@ private:
 	struct AddComponentCommand final : public IEditorCommand
 	{
 		AddComponentCommand(WorldEditorImpl& editor,
-							const Array<EntityRef>& entities,
+							Span<const EntityRef> entities,
 							ComponentType type)
 			: m_editor(editor)
 			, m_entities(editor.getAllocator())
 		{
 			m_type = type;
-			m_entities.reserve(entities.size());
+			m_entities.reserve(entities.length());
 			Universe* universe = m_editor.getUniverse();
 			for (EntityRef e : entities) {
 				if (!universe->getComponent(e, type).isValid()) {
@@ -1242,20 +1241,20 @@ private:
 		}
 
 
-		DestroyComponentCommand(WorldEditorImpl& editor, const EntityRef* entities, int count, ComponentType cmp_type)
+		DestroyComponentCommand(WorldEditorImpl& editor, Span<const EntityRef> entities, ComponentType cmp_type)
 			: m_cmp_type(cmp_type)
 			, m_editor(editor)
 			, m_old_values(editor.getAllocator())
 			, m_entities(editor.getAllocator())
 			, m_resources(editor.getAllocator())
 		{
-			m_entities.reserve(count);
+			m_entities.reserve(entities.length());
 			PrefabSystem& prefab_system = editor.getPrefabSystem();
-			for (int i = 0; i < count; ++i) {
-				if (!m_editor.getUniverse()->getComponent(entities[i], m_cmp_type).isValid()) continue;
-				const u64 prefab = prefab_system.getPrefab(entities[i]);
+			for (EntityRef e : entities) {
+				if (!m_editor.getUniverse()->getComponent(e, m_cmp_type).isValid()) continue;
+				const u64 prefab = prefab_system.getPrefab(e);
 				if (prefab == 0) {
-					m_entities.push(entities[i]);
+					m_entities.push(e);
 				}
 				else {
 					EntityPtr instance = prefab_system.getFirstInstance(prefab);
@@ -1513,13 +1512,6 @@ public:
 
 		createEditorLines();
 		m_gizmo->update(m_viewport);
-	}
-
-
-	void updateEngine() override
-	{
-		ASSERT(m_universe);
-		m_engine.update(*m_universe);
 	}
 
 
@@ -2664,21 +2656,19 @@ public:
 	void duplicateEntities() override;
 
 
-	void destroyComponent(const EntityRef* entities, int count, ComponentType cmp_type) override
+	void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) override
 	{
-		ASSERT(count > 0);
-		IEditorCommand* command = LUMIX_NEW(m_allocator, DestroyComponentCommand)(*this, entities, count, cmp_type);
+		ASSERT(entities.length() > 0);
+		IEditorCommand* command = LUMIX_NEW(m_allocator, DestroyComponentCommand)(*this, entities, cmp_type);
 		executeCommand(command);
 	}
 
 
-	void addComponent(ComponentType cmp_type) override
+	void addComponent(Span<const EntityRef> entities, ComponentType cmp_type) override
 	{
-		if (!m_selected_entities.empty())
-		{
-			IEditorCommand* command = LUMIX_NEW(m_allocator, AddComponentCommand)(*this, m_selected_entities, cmp_type);
-			executeCommand(command);
-		}
+		ASSERT(entities.length() > 0);
+		IEditorCommand* command = LUMIX_NEW(m_allocator, AddComponentCommand)(*this, entities, cmp_type);
+		executeCommand(command);
 	}
 
 	void copyViewTransform() override {
@@ -2853,29 +2843,6 @@ public:
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
-		const char* plugins[] = { ""
-			#ifdef LUMIXENGINE_PLUGINS
-				, LUMIXENGINE_PLUGINS
-			#endif
-		};
-
-		PluginManager& plugin_manager = m_engine.getPluginManager();
-		for (auto* plugin_name : plugins) {
-			if (plugin_name[0] && !plugin_manager.load(plugin_name)) {
-				logInfo("Editor") << plugin_name << " plugin has not been loaded";
-			}
-		}
-
-		OS::InitWindowArgs create_win_args;
-		create_win_args.name = "Lumix Studio";
-		create_win_args.handle_file_drops = true;
-		m_window = OS::createWindow(create_win_args);
-		Engine::PlatformData platform_data = {};
-		platform_data.window_handle = m_window;
-		m_engine.setPlatformData(platform_data);
-
-		plugin_manager.initPlugins();
-
 		m_prefab_system = PrefabSystem::create(*this);
 
 		m_gizmo = Gizmo::create(*this);
@@ -2892,12 +2859,6 @@ public:
 				break;
 			}
 		}
-	}
-
-
-	OS::WindowHandle getWindow() override
-	{
-		return m_window;
 	}
 
 
@@ -3341,7 +3302,6 @@ private:
 	SnapMode m_snap_mode;
 	OutputMemoryStream m_game_mode_file;
 	Engine& m_engine;
-	OS::WindowHandle m_window;
 	EntityPtr m_selected_entity_on_game_mode;
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;

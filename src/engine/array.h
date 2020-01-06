@@ -47,7 +47,8 @@ public:
 	T* end() const { return m_data ? m_data + m_size : nullptr; }
 
 
-	Span<T> getSpan() const { return Span(begin(), end()); }
+	operator Span<T>() const { return Span(begin(), end()); }
+	operator Span<const T>() const { return Span(begin(), end()); }
 
 
 	void swap(Array<T>& rhs)

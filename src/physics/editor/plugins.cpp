@@ -754,7 +754,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 			phy_scene->setNewBoneOrientation(new_bone_orientation);
 		}
 
-		if (ImGui::BeginChild("bones", ImVec2(ImGui::GetContentRegionAvailWidth() * 0.5f, 0)))
+		if (ImGui::BeginChild("bones", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f, 0)))
 		{
 			for (int i = 0; i < model->getBoneCount(); ++i)
 			{
@@ -766,7 +766,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 		}
 		ImGui::EndChild();
 		ImGui::SameLine();
-		if (ImGui::BeginChild("properties", ImVec2(ImGui::GetContentRegionAvailWidth(), 0)))
+		if (ImGui::BeginChild("properties", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
 		{
 			if (m_selected_bone < 0 || m_selected_bone >= model->getBoneCount())
 			{

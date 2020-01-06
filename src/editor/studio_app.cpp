@@ -184,6 +184,7 @@ public:
 		, m_allocator(m_main_allocator)
 		, m_universes(m_allocator)
 		, m_events(m_allocator)
+		, m_windows(m_allocator)
 	{
 		JobSystem::init(MT::getCPUsCount(), m_allocator);
 	}
@@ -191,7 +192,7 @@ public:
 
 	void onEvent(const OS::Event& event) override
 	{
-		const bool handle_input = OS::getFocused() == m_window;
+		const bool handle_input = isFocused();
 		m_events.push(event);
 		switch (event.type) {
 			case OS::Event::Type::FOCUS: break;
@@ -212,28 +213,37 @@ public:
 				break;
 			case OS::Event::Type::MOUSE_MOVE:
 				if (handle_input) {
-					ImGuiIO& io = ImGui::GetIO();
-					const OS::Point cp = OS::getMousePos(event.window);
 					m_mouse_move += {(float)event.mouse_move.xrel, (float)event.mouse_move.yrel};
-					io.MousePos.x = (float)cp.x;
-					io.MousePos.y = (float)cp.y;
 				}
 				break;
 			case OS::Event::Type::WINDOW_SIZE:
-				if (event.window == m_window && event.win_size.h > 0 && event.win_size.w > 0) {
+				if (ImGui::GetCurrentContext()) {
+					ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
+					if (vp) vp->PlatformRequestResize = true;
+				}
+				if (event.window == m_main_window && event.win_size.h > 0 && event.win_size.w > 0) {
 					m_settings.m_window.w = event.win_size.w;
 					m_settings.m_window.h = event.win_size.h;
-					m_settings.m_is_maximized = OS::isMaximized(m_window);
+					m_settings.m_is_maximized = OS::isMaximized(m_main_window);
 				}
 				break;
 			case OS::Event::Type::WINDOW_MOVE:
-				if (event.window == m_window) {
+				if (ImGui::GetCurrentContext()) {
+					ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
+					if (vp) vp->PlatformRequestMove = true;
+				}
+				if (event.window == m_main_window) {
 					m_settings.m_window.x = event.win_move.x;
 					m_settings.m_window.y = event.win_move.y;
-					m_settings.m_is_maximized = OS::isMaximized(m_window);
+					m_settings.m_is_maximized = OS::isMaximized(m_main_window);
 				}
 				break;
-			case OS::Event::Type::WINDOW_CLOSE:
+			case OS::Event::Type::WINDOW_CLOSE: {
+				ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
+				if (vp) vp->PlatformRequestClose = true;
+				if (event.window == m_main_window) exit();
+				break;
+			}
 			case OS::Event::Type::QUIT:
 				exit();
 				break;
@@ -271,12 +281,17 @@ public:
 		}
 	}
 
+	bool isFocused() const {
+		const OS::WindowHandle focused = OS::getFocused();
+		const int idx = m_windows.find([focused](OS::WindowHandle w){ return w == focused; });
+		return idx >= 0;
+	}
 
 	void onIdle() override
 	{
 		update();
 
-		if (m_sleep_when_inactive && OS::getFocused() != m_window) {
+		if (m_sleep_when_inactive && !isFocused()) {
 			const float frame_time = m_fps_timer.tick();
 			const float wanted_fps = 5.0f;
 
@@ -343,8 +358,32 @@ public:
 
 		extractBundled();
 
+		OS::InitWindowArgs create_win_args;
+		create_win_args.handle_file_drops = true;
+		create_win_args.name = "Lumix Studio";
+		m_main_window = OS::createWindow(create_win_args);
+		m_windows.push(m_main_window);
+
+		const char* plugins[] = { ""
+			#ifdef LUMIXENGINE_PLUGINS
+				, LUMIXENGINE_PLUGINS
+			#endif
+		};
+
+		PluginManager& plugin_manager = m_engine->getPluginManager();
+		for (auto* plugin_name : plugins) {
+			if (plugin_name[0] && !plugin_manager.load(plugin_name)) {
+				logInfo("Editor") << plugin_name << " plugin has not been loaded";
+			}
+		}
+
+		Engine::PlatformData platform_data = {};
+		platform_data.window_handle = m_main_window;
+		m_engine->setPlatformData(platform_data);
+
+		plugin_manager.initPlugins();
+
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
-		m_window = m_editor->getWindow();
 		m_settings.m_editor = m_editor;
 		scanUniverses();
 		loadUserPlugins();
@@ -443,7 +482,7 @@ public:
 		m_engine = nullptr;
 		m_editor = nullptr;
 		
-		OS::destroyWindow(m_window);
+		OS::destroyWindow(m_main_window);
 		JobSystem::shutdown();
 	}
 
@@ -567,7 +606,8 @@ public:
 						editor->selectEntities(&entity, 1, false);
 					}
 
-					editor->addComponent(type);
+					const Array<EntityRef>& selected_entites = editor->getSelectedEntities();
+					editor->addComponent(selected_entites, type);
 					if (!create_empty)
 					{
 						editor->setProperty(type,
@@ -634,7 +674,7 @@ public:
 						editor->selectEntities(&entity, 1, false);
 					}
 
-					editor->addComponent(type);
+					editor->addComponent(editor->getSelectedEntities(), type);
 				}
 			}
 
@@ -670,9 +710,11 @@ public:
 		PROFILE_FUNCTION();
 
 		ImGuiIO& io = ImGui::GetIO();
-		const OS::Point size = OS::getWindowClientSize(m_window);
-		if (size.x > 0 && size.y > 0) {
-			io.DisplaySize = ImVec2(float(size.x), float(size.y));
+
+		updateIMGUIMonitors();
+		const OS::Rect rect = OS::getWindowClientRect(m_main_window);
+		if (rect.width > 0 && rect.height > 0) {
+			io.DisplaySize = ImVec2(float(rect.width), float(rect.height));
 		}
 		else if(io.DisplaySize.x <= 0) {
 			io.DisplaySize.x = 800;
@@ -682,6 +724,11 @@ public:
 		io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
 		io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
 		io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
+
+		const OS::Point cp = OS::getMouseScreenPos();
+		io.MousePos.x = (float)cp.x;
+		io.MousePos.y = (float)cp.y;
+
 		ImGui::NewFrame();
 		ImGui::PushFont(m_font);
 	}
@@ -699,7 +746,8 @@ public:
 		float padding = frame_padding.y * 2;
 		ImVec2 toolbar_size(ImGui::GetIO().DisplaySize.x, 24 + padding);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-		if (ImGui::BeginToolbar("main_toolbar", ImVec2(1, menu_height), toolbar_size))
+		const ImVec2 pos = ImGui::GetMainViewport()->Pos;
+		if (ImGui::BeginToolbar("main_toolbar", ImVec2(pos.x + 1, pos.y + menu_height), toolbar_size))
 		{
 			for (auto* action : m_toolbar_actions)
 			{
@@ -729,9 +777,10 @@ public:
 				size.y -= pos.y;
 				ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 										 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-										 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+										 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
+										 ImGuiWindowFlags_NoDocking;
 				ImGui::SetNextWindowSize(size);
-				ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
+				ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos, ImGuiCond_FirstUseEver);
 				if (ImGui::Begin("MainDockspace", nullptr, flags))
 				{
 					float menu_height = showMainMenu();
@@ -762,6 +811,8 @@ public:
 		}
 		ImGui::PopFont();
 		ImGui::Render();
+		ImGui::UpdatePlatformWindows();
+
 		for (auto* plugin : m_gui_plugins)
 		{
 			plugin->guiEndFrame();
@@ -872,9 +923,9 @@ public:
 		m_editor->setEntityName(env, "environment");
 		ComponentType env_cmp_type = Reflection::getComponentType("environment");
 		ComponentType lua_script_cmp_type = Reflection::getComponentType("lua_script");
-		m_editor->selectEntities(&env, 1, false);
-		m_editor->addComponent(env_cmp_type);
-		m_editor->addComponent(lua_script_cmp_type);
+		Span<EntityRef> entities(&env, 1);
+		m_editor->addComponent(entities, env_cmp_type);
+		m_editor->addComponent(entities, lua_script_cmp_type);
 		auto* intensity_prop = Reflection::getProperty(env_cmp_type, "Intensity");
 		auto* indirect_intensity_prop = Reflection::getProperty(env_cmp_type, "Indirect intensity");
 		const float intensity = 3;
@@ -893,9 +944,9 @@ public:
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 								 ImGuiWindowFlags_NoSavedSettings;
-		const OS::Point size = OS::getWindowClientSize(m_window);
-		ImGui::SetNextWindowSize(ImVec2((float)size.x, (float)size.y));
-		ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
+		const ImVec2 size = ImGui::GetIO().DisplaySize;
+		ImGui::SetNextWindowSize(size);
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos, ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Welcome", nullptr, flags))
 		{
 			ImGui::Text("Welcome to Lumix Studio");
@@ -982,7 +1033,7 @@ public:
 		char tmp[100];
 		copyString(tmp, "Lumix Studio - ");
 		catString(tmp, title);
-		OS::setWindowTitle(m_window, tmp);
+		OS::setWindowTitle(m_main_window, tmp);
 	}
 
 
@@ -1055,7 +1106,7 @@ public:
 	{
 		if (m_editor->isGameMode())
 		{
-			logError("Editor") << "Could not save while the game is running";
+			logError("Editor") << "Can not save while the game is running";
 			return;
 		}
 
@@ -1086,6 +1137,7 @@ public:
 		else
 		{
 			m_editor->newUniverse();
+			initDefaultUniverse();
 		}
 	}
 
@@ -1509,7 +1561,7 @@ public:
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
 			stats << (u32)(m_engine->getFPS() + 0.5f);
-			if (OS::getFocused() != m_window) stats << " - inactive window";
+			if (!isFocused()) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
 			ImGui::Text("%s", (const char*)stats);
@@ -1631,7 +1683,7 @@ public:
 
 			if (ImGui::BeginChild("entities"))
 			{
-				ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::GetStyle().FramePadding.x);
+				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 				if (filter[0] == '\0')
 				{
 					for (EntityPtr e = universe->getFirstEntity(); e.isValid();
@@ -1691,10 +1743,10 @@ public:
 	void setFullscreen(bool fullscreen) override
 	{
 		if(fullscreen) {
-			m_fullscreen_restore_state = OS::setFullscreen(m_window);
+			m_fullscreen_restore_state = OS::setFullscreen(m_main_window);
 		}
 		else {
-			OS::restore(m_window, m_fullscreen_restore_state);
+			OS::restore(m_main_window, m_fullscreen_restore_state);
 		}
 	}
 
@@ -1707,8 +1759,7 @@ public:
 		m_settings.m_is_log_open = m_log_ui->m_is_open;
 		m_settings.m_is_profiler_open = m_profiler_ui->m_is_open;
 		m_settings.m_is_properties_open = m_property_grid->m_is_open;
-		m_settings.m_mouse_sensitivity.x = m_editor->getMouseSensitivity().x;
-		m_settings.m_mouse_sensitivity.y = m_editor->getMouseSensitivity().y;
+		m_settings.m_mouse_sensitivity = m_editor->getMouseSensitivity();
 
 		for (auto* i : m_gui_plugins) {
 			i->onBeforeSettingsSaved();
@@ -1742,13 +1793,104 @@ public:
 		return font;
 	}
 
+	void initIMGUIPlatformIO() {
+		ImGuiPlatformIO& pio = ImGui::GetPlatformIO();
+		static StudioAppImpl* that = this;
+		ASSERT(that == this);
+		pio.Platform_CreateWindow = [](ImGuiViewport* vp){
+			OS::InitWindowArgs args = {};
+			args.flags = OS::InitWindowArgs::NO_DECORATION | OS::InitWindowArgs::NO_TASKBAR_ICON;
+			ImGuiViewport* parent = ImGui::FindViewportByID(vp->ParentViewportId);
+			args.parent = parent ? parent->PlatformHandle : OS::INVALID_WINDOW;
+			args.name = "child";
+			vp->PlatformHandle = OS::createWindow(args);
+			that->m_windows.push(vp->PlatformHandle);
+
+			ASSERT(vp->PlatformHandle != OS::INVALID_WINDOW);
+		};
+		pio.Platform_DestroyWindow = [](ImGuiViewport* vp){
+			OS::WindowHandle w = (OS::WindowHandle)vp->PlatformHandle;
+			OS::destroyWindow(w);
+			vp->PlatformHandle = nullptr;
+			vp->PlatformUserData = nullptr;
+			that->m_windows.eraseItem(w);
+		};
+		pio.Platform_ShowWindow = [](ImGuiViewport* vp){};
+		pio.Platform_SetWindowPos = [](ImGuiViewport* vp, ImVec2 pos) {
+			const OS::WindowHandle h = vp->PlatformHandle;
+			OS::Rect r = OS::getWindowScreenRect(h);
+			r.left = int(pos.x);
+			r.top = int(pos.y);
+			OS::setWindowScreenRect(h, r);
+		};
+		pio.Platform_GetWindowPos = [](ImGuiViewport* vp) -> ImVec2 {
+			OS::WindowHandle win = (OS::WindowHandle)vp->PlatformHandle;
+			const OS::Rect r = OS::getWindowClientRect(win);
+			const OS::Point p = OS::toScreen(win, r.left, r.top);
+			return {(float)p.x, (float)p.y};
+
+		};
+		pio.Platform_SetWindowSize = [](ImGuiViewport* vp, ImVec2 pos) {
+			const OS::WindowHandle h = vp->PlatformHandle;
+			OS::Rect r = OS::getWindowScreenRect(h);
+			r.width = int(pos.x);
+			r.height = int(pos.y);
+			OS::setWindowScreenRect(h, r);
+		};
+		pio.Platform_GetWindowSize = [](ImGuiViewport* vp) -> ImVec2 {
+			const OS::Rect r = OS::getWindowClientRect((OS::WindowHandle)vp->PlatformHandle);
+			return {(float)r.width, (float)r.height};
+		};
+		pio.Platform_SetWindowTitle = [](ImGuiViewport* vp, const char* title){
+			OS::setWindowTitle((OS::WindowHandle)vp->PlatformHandle, title);
+		};
+		pio.Platform_GetWindowFocus = [](ImGuiViewport* vp){
+			return OS::getFocused() == vp->PlatformHandle;
+		};
+		pio.Platform_SetWindowFocus = [](ImGuiViewport* vp){
+			ASSERT(false);
+		};
+
+		ImGuiViewport* mvp = ImGui::GetMainViewport();
+		mvp->PlatformHandle = m_main_window;
+		mvp->DpiScale = 1;
+		mvp->PlatformUserData = (void*)1;
+
+		updateIMGUIMonitors();
+	}
+
+	static void updateIMGUIMonitors() {
+		OS::Monitor monitors[32];
+		const u32 monitor_count = OS::getMonitors(Span(monitors));
+		ImGuiPlatformIO& pio = ImGui::GetPlatformIO();
+		pio.Monitors.clear();
+		for (u32 i = 0; i < monitor_count; ++i) {
+			const OS::Monitor& m = monitors[i];
+			ImGuiPlatformMonitor im;
+			im.MainPos = ImVec2((float)m.monitor_rect.left, (float)m.monitor_rect.top);
+			im.MainSize = ImVec2((float)m.monitor_rect.width, (float)m.monitor_rect.height);
+			im.WorkPos = ImVec2((float)m.work_rect.left, (float)m.work_rect.top);
+			im.WorkSize = ImVec2((float)m.work_rect.width, (float)m.work_rect.height);
+
+			if (m.primary) {
+				pio.Monitors.push_front(im);
+			}
+			else {
+				pio.Monitors.push_back(im);
+			}
+		}
+	}
 
 	void initIMGUI()
 	{
 		logInfo("Editor") << "Initializing imgui...";
 		ImGuiIO& io = ImGui::GetIO();
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
 		io.IniFilename = nullptr;
+		io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports;
+
+		initIMGUIPlatformIO();
+
 		const int dpi = OS::getDPI();
 		float font_scale = dpi / 96.f;
 		FileSystem& fs = getWorldEditor().getEngine().getFileSystem();
@@ -1837,7 +1979,7 @@ public:
 
 		if (m_settings.m_is_maximized)
 		{
-			OS::maximizeWindow(m_window);
+			OS::maximizeWindow(m_main_window);
 		}
 		else if (m_settings.m_window.w > 0)
 		{
@@ -1846,7 +1988,7 @@ public:
 			r.top = m_settings.m_window.y;
 			r.width = m_settings.m_window.w;
 			r.height = m_settings.m_window.h;
-			OS::setWindowScreenRect(m_window, r);
+			OS::setWindowScreenRect(m_main_window, r);
 		}
 	}
 
@@ -2232,7 +2374,7 @@ public:
 	void createComponent(EntityRef e, int type)
 	{
 		m_editor->selectEntities(&e, 1, false);
-		m_editor->addComponent({type});
+		m_editor->addComponent(Span(&e, 1), {type});
 	}
 
 	void exitGameMode() { m_deferred_game_mode_exit = true; }
@@ -2395,7 +2537,7 @@ public:
 			else
 			{
 				ComponentType cmp_type = Reflection::getComponentType(parameter_name);
-				editor.addComponent(cmp_type);
+				editor.addComponent(Span(&e, 1), cmp_type);
 
 				IScene* scene = editor.getUniverse()->getScene(cmp_type);
 				if (scene)
@@ -2948,9 +3090,6 @@ public:
 	}
 
 
-	void* getWindow() override { return m_window; }
-
-
 	WorldEditor& getWorldEditor() override
 	{
 		ASSERT(m_editor);
@@ -2969,7 +3108,8 @@ public:
 		IAllocator& m_allocator;
 	#endif
 	Engine* m_engine;
-	OS::WindowHandle m_window;
+	Array<OS::WindowHandle> m_windows;
+	OS::WindowHandle m_main_window;
 	OS::WindowState m_fullscreen_restore_state;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;

@@ -71,9 +71,15 @@ struct Event {
 
 struct InitWindowArgs
 {
-    const char* name = ""; 
-    bool handle_file_drops = false;
+	enum Flags {
+		NO_DECORATION = 1 << 0,
+		NO_TASKBAR_ICON = 1 << 1
+	};
+	const char* name = ""; 
+	bool handle_file_drops = false;
 	bool fullscreen = false;
+	u32 flags = 0;
+	WindowHandle parent = INVALID_WINDOW;
 };
 
 
@@ -84,6 +90,11 @@ struct Interface
     virtual void onIdle() = 0;
 };
 
+struct Monitor {
+	Rect work_rect;
+	Rect monitor_rect;
+	bool primary;
+};
 	
 class LUMIX_ENGINE_API InputFile final : public IInputStream
 {
@@ -187,10 +198,12 @@ LUMIX_ENGINE_API Point getMousePos(WindowHandle win);
 LUMIX_ENGINE_API void setMouseScreenPos(int x, int y);
 LUMIX_ENGINE_API void showCursor(bool show);
 
+LUMIX_ENGINE_API u32 getMonitors(Span<Monitor> monitors);
+LUMIX_ENGINE_API Point toScreen(WindowHandle win, int x, int y);
 LUMIX_ENGINE_API WindowHandle createWindow(const InitWindowArgs& args);
 LUMIX_ENGINE_API void destroyWindow(WindowHandle wnd);
 LUMIX_ENGINE_API Rect getWindowScreenRect(WindowHandle win);
-LUMIX_ENGINE_API Point getWindowClientSize(WindowHandle win);
+LUMIX_ENGINE_API Rect getWindowClientRect(WindowHandle win);
 LUMIX_ENGINE_API void setWindowScreenRect(WindowHandle win, const Rect& rect);
 LUMIX_ENGINE_API void setWindowTitle(WindowHandle win, const char* title);
 LUMIX_ENGINE_API void maximizeWindow(WindowHandle win);

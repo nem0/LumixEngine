@@ -408,71 +408,93 @@ void UTF32ToUTF8(u32 utf32, char* utf8)
 	}
 }
 
+Point toScreen(WindowHandle win, int x, int y)
+{
+	POINT p;
+	p.x = x;
+	p.y = y;
+	::ClientToScreen((HWND)win, &p);
+	Point res;
+	res.x = p.x;
+	res.y = p.y;
+	return res;
+}
 
 WindowHandle createWindow(const InitWindowArgs& args)
 {
+	WCharStr<MAX_PATH_LENGTH> cls_name("lunex_window");
+	static WNDCLASS wc = [&]() -> WNDCLASS {
+		WNDCLASS wc = {};
+		auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
+			Event e;
+			e.window = hWnd;
+			switch (Msg)
+			{
+				case WM_MOVE:
+					e.type = Event::Type::WINDOW_MOVE;
+					e.win_move.x = (i16)LOWORD(lParam);
+					e.win_move.y = (i16)HIWORD(lParam);
+					G.iface->onEvent(e);
+					return 0;
+				case WM_SIZE:
+					e.type = Event::Type::WINDOW_SIZE;
+					e.win_size.w = LOWORD(lParam);
+					e.win_size.h = HIWORD(lParam);
+					G.iface->onEvent(e);
+					return 0;
+				case WM_CLOSE:
+					e.type = Event::Type::WINDOW_CLOSE;
+					G.iface->onEvent(e);
+					return 0;
+				case WM_ACTIVATE:
+					if (wParam == WA_INACTIVE) {
+						showCursor(true);
+						unclipCursor();
+					}
+					e.type = Event::Type::FOCUS;
+					e.focus.gained = wParam != WA_INACTIVE;
+					G.iface->onEvent(e);
+					break;
+			}
+			return DefWindowProc(hWnd, Msg, wParam, lParam);
+		};
 
+		wc.style = 0;
+		wc.lpfnWndProc = WndProc;
+		wc.cbClsExtra = 0;
+		wc.cbWndExtra = 0;
+		wc.hInstance = GetModuleHandle(NULL);
+		wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+		wc.hbrBackground = NULL;
+		wc.lpszClassName = cls_name;
 
-	WNDCLASS wc = {};
-
-	auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
-		Event e;
-		e.window = hWnd;
-		switch (Msg)
-		{
-			case WM_MOVE:
-				e.type = Event::Type::WINDOW_MOVE;
-				e.win_move.x = (i16)LOWORD(lParam);
-				e.win_move.y = (i16)HIWORD(lParam);
-				G.iface->onEvent(e);
-				return 0;
-			case WM_SIZE:
-				e.type = Event::Type::WINDOW_SIZE;
-				e.win_size.w = LOWORD(lParam);
-				e.win_size.h = HIWORD(lParam);
-				G.iface->onEvent(e);
-				return 0;
-			case WM_CLOSE:
-				e.type = Event::Type::WINDOW_CLOSE;
-				G.iface->onEvent(e);
-				return 0;
-			case WM_ACTIVATE:
-				if (wParam == WA_INACTIVE) {
-					showCursor(true);
-					unclipCursor();
-				}
-				e.type = Event::Type::FOCUS;
-				e.focus.gained = wParam != WA_INACTIVE;
-				G.iface->onEvent(e);
-				break;
+		if (!RegisterClass(&wc)) {
+			ASSERT(false);
+			return {};
 		}
-		return DefWindowProc(hWnd, Msg, wParam, lParam);
-	};
+		return wc;
+	}();
 
-	wc.style = 0;
-	wc.lpfnWndProc = WndProc;
-	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
-	wc.hInstance = GetModuleHandle(NULL);
-	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = NULL;
+	HWND parent_window = (HWND)args.parent;
+
 	WCharStr<MAX_PATH_LENGTH> wname(args.name);
-	wc.lpszClassName = wname;
-
-	if (!RegisterClass(&wc)) return INVALID_WINDOW;
-
-	const HWND hwnd = CreateWindow(wname,
+	DWORD style =  args.flags & InitWindowArgs::NO_DECORATION ? WS_POPUP : WS_OVERLAPPEDWINDOW ;
+	DWORD ext_style = args.flags & InitWindowArgs::NO_TASKBAR_ICON ? WS_EX_TOOLWINDOW : WS_EX_APPWINDOW;
+	const HWND hwnd = CreateWindowEx(
+		ext_style,
+		cls_name,
 		wname,
-		WS_OVERLAPPEDWINDOW,
+		style,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
-		NULL,
+		parent_window,
 		NULL,
 		wc.hInstance,
 		NULL);
+	ASSERT(hwnd);
 
 	if (args.handle_file_drops)
 	{
@@ -569,21 +591,62 @@ Rect getWindowScreenRect(WindowHandle win)
 	return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
 }
 
-
-Point getWindowClientSize(WindowHandle win)
+Rect getWindowClientRect(WindowHandle win)
 {
 	RECT rect;
 	BOOL status = GetClientRect((HWND)win, &rect);
 	ASSERT(status);
-	return {rect.right - rect.left, rect.bottom - rect.top};
+	return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
 }
-
 
 void setWindowScreenRect(WindowHandle win, const Rect& rect)
 {
 	MoveWindow((HWND)win, rect.left, rect.top, rect.width, rect.height, TRUE);
 }
 
+u32 getMonitors(Span<Monitor> monitors)
+{
+	struct Callback {
+		struct Data {
+			Span<Monitor>* monitors;
+			u32 index;
+		};
+
+		static BOOL CALLBACK func(HMONITOR monitor, HDC, LPRECT, LPARAM lparam)
+		{
+			Data* data = reinterpret_cast<Data*>(lparam);
+			if (data->index >= data->monitors->length()) return TRUE;
+
+			MONITORINFO info = { 0 };
+			info.cbSize = sizeof(MONITORINFO);
+			if (!::GetMonitorInfo(monitor, &info)) return TRUE;
+			
+			Monitor& m = (*data->monitors)[data->index];
+			m.monitor_rect.left = info.rcMonitor.left;
+			m.monitor_rect.top = info.rcMonitor.top;
+			m.monitor_rect.width = info.rcMonitor.right - info.rcMonitor.left;
+			m.monitor_rect.height = info.rcMonitor.bottom - info.rcMonitor.top;
+
+			m.work_rect.left = info.rcWork.left;
+			m.work_rect.top = info.rcWork.top;
+			m.work_rect.width = info.rcWork.right - info.rcWork.left;
+			m.work_rect.height = info.rcWork.bottom - info.rcWork.top;
+			
+			m.primary = info.dwFlags & MONITORINFOF_PRIMARY;
+			++data->index;
+
+			return TRUE;
+		}
+	};
+
+	Callback::Data data = {
+		&monitors,
+		0
+	};
+
+	::EnumDisplayMonitors(NULL, NULL, &Callback::func, (LPARAM)&data);
+	return data.index;
+}
 
 void setMouseScreenPos(int x, int y)
 {

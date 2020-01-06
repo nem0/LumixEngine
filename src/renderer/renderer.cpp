@@ -1029,7 +1029,6 @@ struct RendererImpl final : public Renderer
 	}
 
 	void makeScreenshot(const Path& filename) override {  }
-	void resize(int w, int h) override {  }
 
 
 	u8 getShaderDefineIdx(const char* define) override
@@ -1154,7 +1153,9 @@ struct RendererImpl final : public Renderer
 		JobSystem::incSignal(&m_cpu_frame->can_setup);
 		
 		const void* window_handle = m_engine.getPlatformData().window_handle;
-		m_cpu_frame->window_size = OS::getWindowClientSize((OS::WindowHandle)window_handle);
+		const OS::Rect rect = OS::getWindowClientRect((OS::WindowHandle)window_handle);
+		m_cpu_frame->window_size.x = rect.width;
+		m_cpu_frame->window_size.y = rect.height;
 
 		++m_cpu_frame;
 		if(m_cpu_frame == m_frames.end()) m_cpu_frame = m_frames.begin();

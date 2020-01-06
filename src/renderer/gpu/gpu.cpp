@@ -99,10 +99,16 @@ struct Pool
 	bool isFull() const { return first_free == -1; }
 };
 
+struct WindowContext {
+	void* window_handle = nullptr;
+	HDC device_context;
+	HGLRC hglrc;
+};
+
 static struct {
 	RENDERDOC_API_1_0_2* rdoc_api;
 	IAllocator* allocator;
-	void* device_context;
+	WindowContext contexts[64];
 	Pool<Buffer, Buffer::MAX_COUNT> buffers;
 	Pool<Texture, Texture::MAX_COUNT> textures;
 	Pool<Program, Program::MAX_COUNT> programs;
@@ -779,6 +785,7 @@ static int load_gl(void* device_contex, u32 init_flags)
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
 	wglMakeCurrent(hdc, hglrc);
 	wglDeleteContext(dummy_context);
+	g_gpu.contexts[0].hglrc = hglrc;
 	wglSwapIntervalEXT(vsync ? 1 : 0);
 
 	#define GPU_GL_IMPORT(prototype, name) \
@@ -1140,11 +1147,116 @@ void stopCapture()
 
 Backend getBackend() { return Backend::OPENGL; }
 
+static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char *message, const void *userParam)
+{
+	if(GL_DEBUG_TYPE_PUSH_GROUP == type || type == GL_DEBUG_TYPE_POP_GROUP) return;
+	if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_PERFORMANCE) {
+		logError("GL") << message;
+		//ASSERT(false);
+	}
+	else {
+		//logInfo("GL") << message;
+	}
+}
+
+void setCurrentWindow(void* window_handle) {
+	checkThread();
+
+	WindowContext& ctx = [window_handle]() -> WindowContext& {
+		if (!window_handle) return g_gpu.contexts[0];
+
+		for (WindowContext& i : g_gpu.contexts) {
+			if (i.window_handle == window_handle) return i;
+		}
+
+		for (WindowContext& i : g_gpu.contexts) {
+			if (!i.window_handle) {
+				i.window_handle = window_handle;
+				i.device_context = GetDC((HWND)window_handle);
+				i.hglrc = 0;
+				return i;
+			}
+		}
+		LUMIX_FATAL(false);
+		return g_gpu.contexts[0];
+	}();
+
+	if (!ctx.hglrc) {
+		const HDC hdc = ctx.device_context;
+		const PIXELFORMATDESCRIPTOR pfd =
+		{
+			sizeof(PIXELFORMATDESCRIPTOR),
+			1,
+			PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,    // Flags
+			PFD_TYPE_RGBA,        // The kind of framebuffer. RGBA or palette.
+			32,                   // Colordepth of the framebuffer.
+			0, 0, 0, 0, 0, 0,
+			0,
+			0,
+			0,
+			0, 0, 0, 0,
+			24,                   // Number of bits for the depthbuffer
+			8,                    // Number of bits for the stencilbuffer
+			0,                    // Number of Aux buffers in the framebuffer.
+			PFD_MAIN_PLANE,
+			0,
+			0, 0, 0
+		};
+		const int pf = ChoosePixelFormat(hdc, &pfd);
+		BOOL pf_status = SetPixelFormat(hdc, pf, &pfd);
+		ASSERT(pf_status == TRUE);
+
+		wglMakeCurrent(hdc, g_gpu.contexts[0].hglrc);
+
+		typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
+		typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
+		PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+		PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
+	
+		#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
+		#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
+		#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
+		#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
+		#define WGL_CONTEXT_LAYER_PLANE_ARB 0x2093
+		#define WGL_CONTEXT_FLAGS_ARB 0x2094
+		#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
+		#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+		#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB  0x00000002
+	
+		const int32_t contextAttrs[] = {
+			WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+			WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+			#ifdef LUMIX_DEBUG
+				WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+			#endif
+	//		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
+			0
+		};
+
+		// TODO destroy context when window is destroyed
+		HGLRC hglrc = wglCreateContextAttribsARB(hdc, g_gpu.contexts[0].hglrc, contextAttrs);
+		ctx.hglrc = hglrc;
+		wglMakeCurrent(ctx.device_context, hglrc);
+
+		#ifdef LUMIX_DEBUG
+			CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
+			CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
+			CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
+			CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
+		#endif
+
+	}
+
+	wglMakeCurrent(ctx.device_context, ctx.hglrc);
+}
+
+
 void swapBuffers(u32, u32)
 {
 	checkThread();
-	HDC hdc = (HDC)g_gpu.device_context;
-	SwapBuffers(hdc);
+	for (const WindowContext& ctx : g_gpu.contexts) {
+		SwapBuffers(ctx.device_context);
+	}
 }
 
 static GLuint createVAO(const VertexDecl& decl) {
@@ -1794,19 +1906,6 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 }
 
 
-static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char *message, const void *userParam)
-{
-	if(GL_DEBUG_TYPE_PUSH_GROUP == type || type == GL_DEBUG_TYPE_POP_GROUP) return;
-	if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_PERFORMANCE) {
-		logError("GL") << message;
-		//ASSERT(false);
-	}
-	else {
-		//logInfo("GL") << message;
-	}
-}
-
-
 void preinit(IAllocator& allocator)
 {
 	try_load_renderdoc();
@@ -1841,10 +1940,12 @@ bool init(void* window_handle, u32 init_flags)
 	#else 
 		const bool debug = init_flags & (u32)InitFlags::DEBUG_OUTPUT;
 	#endif
-	g_gpu.device_context = GetDC((HWND)window_handle);
+		
+	g_gpu.contexts[0].window_handle = window_handle;
+	g_gpu.contexts[0].device_context = GetDC((HWND)window_handle);
 	g_gpu.thread = GetCurrentThreadId();
 
-	if (!load_gl(g_gpu.device_context, init_flags)) return false;
+	if (!load_gl(g_gpu.contexts[0].device_context, init_flags)) return false;
 
 	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_gpu.max_vertex_attributes);
 

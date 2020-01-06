@@ -82,7 +82,8 @@ void LogUI::showNotifications()
 	m_are_notifications_hovered = false;
 	if (m_notifications.empty()) return;
 
-	ImGui::SetNextWindowPos(ImVec2(10, 30));
+	const ImGuiViewport* vp = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos({vp->Pos.x + 10, vp->Pos.y + 30});
 	ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
 	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
 							 ImGuiWindowFlags_NoSavedSettings;

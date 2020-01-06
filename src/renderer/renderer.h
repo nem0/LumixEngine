@@ -54,7 +54,6 @@ class LUMIX_RENDERER_API Renderer : public IPlugin
 		virtual void frame() = 0;
 		virtual void waitForRender() = 0;
 		virtual void waitForCommandSetup() = 0;
-		virtual void resize(int width, int height) = 0;
 		virtual void makeScreenshot(const Path& filename) = 0;
 		virtual u8 getShaderDefineIdx(const char* define) = 0;
 		virtual const char* getShaderDefine(int define_idx) const = 0;

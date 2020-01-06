@@ -481,9 +481,6 @@ static void read(Profiler::ThreadState& ctx, u32 p, u8* ptr, int size)
 	memcpy(ptr + (buf_size - l), buf, size - (buf_size - l));
 }
 
-static inline ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs)            { return ImVec2(lhs.x+rhs.x, lhs.y+rhs.y); }
-
-
 static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 {
     const float h = ImGui::GetFontSize() * 1.00f;
@@ -556,7 +553,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			m_autopause = -m_autopause;
 		}
 		if (m_autopause >= 0) {
-			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, 2);
+			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, "%.2f");
 		}
 		if (ImGui::BeginMenu("Threads")) {
 			for (int i = 0; i < contexts_count; ++i) {

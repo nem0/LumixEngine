@@ -2,7 +2,6 @@
 
 #include "terrain_editor.h"
 #include "editor/asset_compiler.h"
-#include "editor/ieditor_command.h"
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
