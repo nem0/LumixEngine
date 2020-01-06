@@ -28,7 +28,6 @@ struct ComponentUID;
 class Engine;
 struct EntityGUID;
 struct IAllocator;
-struct IEditorCommand;
 struct IPlugin;
 struct ISerializer;
 class Path;
@@ -37,6 +36,18 @@ struct Quat;
 class RenderInterface;
 class Universe;
 struct Viewport;
+
+
+struct IEditorCommand
+{
+	virtual ~IEditorCommand() {}
+
+	virtual bool isReady() { return true; }
+	virtual bool execute() = 0;
+	virtual void undo() = 0;
+	virtual const char* getType() = 0;
+	virtual bool merge(IEditorCommand& command) = 0;
+};
 
 
 class LUMIX_EDITOR_API WorldEditor
@@ -76,9 +87,7 @@ public:
 
 	virtual void setRenderInterface(RenderInterface* interface) = 0;
 	virtual RenderInterface* getRenderInterface() = 0;
-	virtual OS::WindowHandle getWindow() = 0;
 	virtual void update() = 0;
-	virtual void updateEngine() = 0;
 	virtual void beginCommandGroup(u32 type) = 0;
 	virtual void endCommandGroup() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
@@ -102,8 +111,8 @@ public:
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
     virtual void duplicateEntities() = 0;
-	virtual void addComponent(ComponentType type) = 0;
-	virtual void destroyComponent(const EntityRef* entities, int count, ComponentType cmp_type) = 0;
+	virtual void addComponent(Span<const EntityRef> entities, ComponentType type) = 0;
+	virtual void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) = 0;
 	virtual void createEntityGUID(EntityRef entity) = 0;
 	virtual void destroyEntityGUID(EntityRef entity) = 0;
 	virtual EntityGUID getEntityGUID(EntityRef entity) = 0;

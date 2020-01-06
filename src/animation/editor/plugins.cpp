@@ -207,7 +207,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (m_selected_curve >= animation->curves.size()) m_selected_curve = -1;
 		if (m_selected_curve < 0) return;
 
-		ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - 20);
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - 20);
 		static ImVec2 size(-1, 200);
 			
 		PropertyAnimation::Curve& curve = animation->curves[m_selected_curve];

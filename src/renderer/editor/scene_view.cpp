@@ -330,16 +330,14 @@ void SceneView::renderGizmos()
 
 			ib = renderer->allocTransient(data.indices.byte_size());
 			vb = renderer->allocTransient(data.vertices.byte_size());
-			if (ib.ptr && vb.ptr) {
-				memcpy(ib.ptr, data.indices.begin(), data.indices.byte_size());
-				memcpy(vb.ptr, data.vertices.begin(), data.vertices.byte_size());
-			}
+			memcpy(ib.ptr, data.indices.begin(), data.indices.byte_size());
+			memcpy(vb.ptr, data.vertices.begin(), data.vertices.byte_size());
 		}
 
 		void execute() override
 		{
 			PROFILE_FUNCTION();
-			if (data.cmds.empty() || !ib.ptr || !vb.ptr) return;
+			if (data.cmds.empty()) return;
 
 			renderer->beginProfileBlock("gizmos", 0);
 			gpu::pushDebugGroup("gizmos");
@@ -447,8 +445,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		m_editor.beginCommandGroup(crc32("insert_mesh"));
 		EntityRef entity = m_editor.addEntity();
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
-		m_editor.selectEntities(&entity, 1, false);
-		m_editor.addComponent(MODEL_INSTANCE_TYPE);
+		m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
 		auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
 		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 		m_editor.endCommandGroup();
@@ -467,7 +464,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.beginCommandGroup(crc32("insert_phy_component"));
 			const EntityRef e = (EntityRef)hit.entity;
 			m_editor.selectEntities(&e, 1, false);
-			m_editor.addComponent(MESH_ACTOR_TYPE);
+			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
 			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
 			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &e, 1, path, stringLength(path) + 1);
 			m_editor.endCommandGroup();
@@ -479,7 +476,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			EntityRef entity = m_editor.addEntity();
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1, false);
-			m_editor.addComponent(MESH_ACTOR_TYPE);
+			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
 			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
 			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 			m_editor.endCommandGroup();
@@ -584,6 +581,72 @@ void SceneView::onToolbar()
 	ImGui::EndToolbar();
 }
 
+void SceneView::handleEvents() {
+	const bool handle_input = ImGui::IsItemHovered() && OS::getFocused() == ImGui::GetWindowViewport()->PlatformHandle;
+	const OS::Event* events = m_app.getEvents();
+	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
+		const OS::Event& event = events[i];
+		switch (event.type) {
+			case OS::Event::Type::MOUSE_BUTTON: {
+				if (event.mouse_button.button == OS::MouseButton::RIGHT && handle_input) {
+					ImGui::SetWindowFocus();
+					captureMouse(event.mouse_button.down);
+				}
+				if (handle_input) {
+					ImGui::ResetActiveID();
+					const OS::Point cp = OS::getMousePos(event.window);
+					Vec2 rel_mp = { (float)cp.x, (float)cp.y };
+					rel_mp.x -= m_screen_x;
+					rel_mp.y -= m_screen_y;
+					if (event.mouse_button.down) {
+						m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
+					}
+					else {
+						m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
+					}
+				}
+				break;
+			}
+			case OS::Event::Type::MOUSE_MOVE: 
+				if (handle_input) {
+					const OS::Point cp = OS::getMousePos(event.window);
+					Vec2 rel_mp = {(float)cp.x, (float)cp.y};
+					rel_mp.x -= m_screen_x;
+					rel_mp.y -= m_screen_y;
+					m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.mouse_move.xrel, (int)event.mouse_move.yrel);
+				}
+				break;
+		}
+	}
+}
+
+void SceneView::statsUI(float x, float y) {
+	if (!m_show_stats || !m_is_open) return;
+
+	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
+	ImVec2 view_pos(x, y);
+	view_pos.x += ImGui::GetStyle().FramePadding.x;
+	view_pos.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
+	ImGui::SetNextWindowPos(view_pos);
+	auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
+	col.w = 0.3f;
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
+	if (ImGui::Begin("###stats_overlay",
+			nullptr,
+			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
+				ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
+	{
+		const auto& stats = m_pipeline->getStats();
+		ImGui::LabelText("Draw calls (scene view only)", "%d", stats.draw_call_count);
+		ImGui::LabelText("Instances (scene view only)", "%d", stats.instance_count);
+		char buf[30];
+		toCStringPretty(stats.triangle_count, Span(buf));
+		ImGui::LabelText("Triangles (scene view only)", "%s", buf);
+		ImGui::LabelText("Resolution", "%dx%d", m_width, m_height);
+	}
+	ImGui::End();
+	ImGui::PopStyleColor();
+}
 
 void SceneView::onWindowGUI()
 {
@@ -591,16 +654,12 @@ void SceneView::onWindowGUI()
 	m_is_open = false;
 	ImVec2 view_pos;
 	const char* title = "Scene View###Scene View";
-	if (m_log_ui.getUnreadErrorCount() > 0)
-	{
-		title = "Scene View | errors in log###Scene View";
-	}
+	if (m_log_ui.getUnreadErrorCount() > 0) title = "Scene View | errors in log###Scene View";
 
-	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse))
-	{
+	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
 		m_is_open = true;
 		onToolbar();
-		auto size = ImGui::GetContentRegionAvail();
+		const ImVec2 size = ImGui::GetContentRegionAvail();
 		Viewport vp = m_editor.getViewport();
 		vp.w = (int)size.x;
 		vp.h = (int)size.y;
@@ -609,17 +668,16 @@ void SceneView::onWindowGUI()
 		m_pipeline->render(false);
 		m_editor.inputFrame();
 
-		m_texture_handle = m_pipeline->getOutput();
-		if (size.x > 0 && size.y > 0)
-		{
-			auto cursor_pos = ImGui::GetCursorScreenPos();
+		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
+		if (size.x > 0 && size.y > 0) {
+			const ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
 			m_screen_x = int(cursor_pos.x);
 			m_screen_y = int(cursor_pos.y);
 			m_width = int(size.x);
 			m_height = int(size.y);
-			auto content_min = ImGui::GetCursorScreenPos();
-			if(m_texture_handle.isValid()) {
-				void* t = (void*)(uintptr)m_texture_handle.value;
+			view_pos = ImGui::GetCursorScreenPos();
+			if (texture_handle.isValid()) {
+				void* t = (void*)(uintptr)texture_handle.value;
 				if (gpu::isOriginBottomLeft()) {
 					ImGui::Image(t, size, ImVec2(0, 1), ImVec2(1, 0));
 				} 
@@ -629,59 +687,20 @@ void SceneView::onWindowGUI()
 			}
 
 			if (m_is_mouse_captured) {
-				ImVec2 pos = ImGui::GetItemRectMin();
-				ImVec2 size = ImGui::GetItemRectSize();
-				OS::clipCursor(m_app.getWindow(), (int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
+				const ImVec2 pos = ImGui::GetItemRectMin();
+				const ImVec2 size = ImGui::GetItemRectSize();
+				OS::clipCursor(ImGui::GetWindowViewport()->PlatformHandle, (int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
 			}
 
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (auto* payload = ImGui::AcceptDragDropPayload("path"))
-				{
-					float x = (ImGui::GetMousePos().x - content_min.x) / size.x;
-					float y = (ImGui::GetMousePos().y - content_min.y) / size.y;
-					handleDrop((const char*)payload->Data, x, y);
+			if (ImGui::BeginDragDropTarget()) {
+				if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
+					const ImVec2 drop_pos = ImGui::GetMousePos() - view_pos / size;
+					handleDrop((const char*)payload->Data, drop_pos.x, drop_pos.y);
 				}
 				ImGui::EndDragDropTarget();
 			}
-			view_pos = content_min;
 
-			const bool handle_input = ImGui::IsItemHovered() && OS::getFocused() == m_app.getWindow();
-			const OS::Event* events = m_app.getEvents();
-			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-				const OS::Event& event = events[i];
-				switch (event.type) {
-					case OS::Event::Type::MOUSE_BUTTON: {
-						if (event.mouse_button.button == OS::MouseButton::RIGHT && handle_input) {
-							ImGui::SetWindowFocus();
-							captureMouse(event.mouse_button.down);
-						}
-						if (handle_input) {
-							ImGui::ResetActiveID();
-							const OS::Point cp = OS::getMousePos(event.window);
-							Vec2 rel_mp = { (float)cp.x, (float)cp.y };
-							rel_mp.x -= m_screen_x;
-							rel_mp.y -= m_screen_y;
-							if (event.mouse_button.down) {
-								m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
-							}
-							else {
-								m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
-							}
-						}
-						break;
-					}
-					case OS::Event::Type::MOUSE_MOVE: 
-						if (handle_input) {
-							const OS::Point cp = OS::getMousePos(event.window);
-							Vec2 rel_mp = {(float)cp.x, (float)cp.y};
-							rel_mp.x -= m_screen_x;
-							rel_mp.y -= m_screen_y;
-							m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.mouse_move.xrel, (int)event.mouse_move.yrel);
-						}
-						break;
-				}
-			}
+			handleEvents();
 		}
 	}
 	else {
@@ -689,31 +708,7 @@ void SceneView::onWindowGUI()
 	}
 
 	ImGui::End();
-
-	if(m_show_stats && m_is_open) {
-		float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
-		view_pos.x += ImGui::GetStyle().FramePadding.x;
-		view_pos.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
-		ImGui::SetNextWindowPos(view_pos);
-		auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
-		col.w = 0.3f;
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, col);
-		if (ImGui::Begin("###stats_overlay",
-				nullptr,
-				ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize |
-					ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
-		{
-			const auto& stats = m_pipeline->getStats();
-			ImGui::LabelText("Draw calls (scene view only)", "%d", stats.draw_call_count);
-			ImGui::LabelText("Instances (scene view only)", "%d", stats.instance_count);
-			char buf[30];
-			toCStringPretty(stats.triangle_count, Span(buf));
-			ImGui::LabelText("Triangles (scene view only)", "%s", buf);
-			ImGui::LabelText("Resolution", "%dx%d", m_width, m_height);
-		}
-		ImGui::End();
-		ImGui::PopStyleColor();
-	}
+	statsUI(view_pos.x, view_pos.y);
 }
 
 

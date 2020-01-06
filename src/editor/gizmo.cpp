@@ -867,8 +867,7 @@ struct GizmoImpl final : public Gizmo
 		const RigidTransform tr = getTransform(m_entities[m_active]);
 
 		Vec3 axis;
-		switch (m_transform_axis)
-		{
+		switch (m_transform_axis) {
 			case Axis::X: axis = tr.rot * Vec3(1, 0, 0); break;
 			case Axis::Y: axis = tr.rot * Vec3(0, 1, 0); break;
 			case Axis::Z: axis = tr.rot * Vec3(0, 0, 1); break;
@@ -880,12 +879,10 @@ struct GizmoImpl final : public Gizmo
 		m_angle_accum += angle;
 		m_angle_accum = angleDiff(m_angle_accum, 0);
 
-		if (m_editor.getSelectedEntities()[0] == m_entities[m_active])
-		{
-			for (int i = 0, c = m_editor.getSelectedEntities().size(); i < c; ++i)
-			{
-				DVec3 pos = universe->getPosition(m_editor.getSelectedEntities()[i]);
-				const Quat old_rot = universe->getRotation(m_editor.getSelectedEntities()[i]);
+		if (m_editor.getSelectedEntities()[0] == m_entities[m_active]) {
+			for (EntityRef e : m_editor.getSelectedEntities()) {
+				DVec3 pos = universe->getPosition(e);
+				const Quat old_rot = universe->getRotation(e);
 				Quat new_rot = Quat(axis, angle) * old_rot;
 				new_rot.normalize();
 				new_rotations.push(new_rot);
@@ -900,8 +897,7 @@ struct GizmoImpl final : public Gizmo
 				&new_rotations[0],
 				new_positions.size());
 		}
-		else
-		{
+		else {
 			Quat old_rot = universe->getRotation(m_entities[m_active]);
 			Quat new_rot = Quat(axis, angle) * old_rot;
 			new_rot.normalize();

@@ -38,7 +38,6 @@ class SceneView : public StudioApp::GUIPlugin
 		void setScene(RenderScene* scene);
 		void onWindowGUI() override;
 		Pipeline* getPipeline() { return m_pipeline; }
-		const gpu::TextureHandle& getTextureHandle() const { return m_texture_handle; }
 		void addDropHandler(DropHandler handler);
 		void removeDropHandler(DropHandler handler);
 		const char* getName() const override { return "scene_view"; }
@@ -54,6 +53,8 @@ class SceneView : public StudioApp::GUIPlugin
 		void handleDrop(const char* path, float x, float y);
 		void onToolbar();
 		void resetCameraSpeed();
+		void handleEvents();
+		void statsUI(float x, float y);
 
 	private:
 		StudioApp& m_app;
@@ -77,7 +78,6 @@ class SceneView : public StudioApp::GUIPlugin
 		float m_camera_speed;
 		WorldEditor& m_editor;
 		Pipeline* m_pipeline;
-		gpu::TextureHandle m_texture_handle;
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
 		Shader* m_debug_shape_shader;

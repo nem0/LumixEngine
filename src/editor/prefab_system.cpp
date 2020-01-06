@@ -3,7 +3,6 @@
 #include "prefab_system.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/ieditor_command.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/array.h"

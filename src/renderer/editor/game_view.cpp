@@ -56,11 +56,9 @@ GameView::GameView(StudioApp& app)
 	, m_pipeline(nullptr)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
-	, m_is_mouse_hovering_window(false)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
 	, m_show_stats(false)
-	, m_texture_handle(gpu::INVALID_TEXTURE)
 	, m_gui_interface(nullptr)
 	, m_editor(app.getWorldEditor())
 {
@@ -167,7 +165,7 @@ void GameView::onFullscreenGUI()
 	ImGuiIO& io = ImGui::GetIO();
 	bool open = true;
 	ImVec2 size = io.DisplaySize;
-	ImGui::SetNextWindowPos(ImVec2(0, 0));
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos);
 	ImGui::SetNextWindowSize(size);
 	if (!ImGui::Begin("game view fullscreen",
 		&open,
@@ -186,23 +184,21 @@ void GameView::onFullscreenGUI()
 		m_pipeline->getScene()->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
-		m_texture_handle = m_pipeline->getOutput();
+		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
 		if (gpu::isOriginBottomLeft())
 		{
-			ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
+			ImGui::Image((void*)(uintptr_t)texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
 		}
 		else
 		{
-			ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size);
+			ImGui::Image((void*)(uintptr_t)texture_handle.value, size);
 		}
 	}
 	else {
 		ImGui::Rect(size.x, size.y, 0xff0000FF);
 	}
-	m_pos.x = ImGui::GetItemRectMin().x;
-	m_pos.y = ImGui::GetItemRectMin().y;
-	m_size.x = ImGui::GetItemRectSize().x;
-	m_size.y = ImGui::GetItemRectSize().y;
+	m_pos = ImGui::GetItemRectMin();
+	m_size = ImGui::GetItemRectSize();
 
 	ImGui::End();
 
@@ -273,18 +269,39 @@ void GameView::processInputEvents()
 	}
 }
 
+void GameView::controlsGUI() {
+	if (ImGui::Checkbox("Pause", &m_paused)) m_editor.getEngine().pause(m_paused);
+	if (m_paused) {
+		ImGui::SameLine();
+		if (ImGui::Button("Next frame")) m_editor.getEngine().nextFrame();
+	}
+	ImGui::SameLine();
+	ImGui::PushItemWidth(50);
+	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
+		m_editor.getEngine().setTimeMultiplier(m_time_multiplier);
+	}
+	ImGui::PopItemWidth();
+	if(m_editor.isGameMode()) {
+		ImGui::SameLine();
+		if (ImGui::Button("Fullscreen")) setFullscreen(true);
+	}
+	ImGui::SameLine();
+	ImGui::Checkbox("Stats", &m_show_stats);
+	ImGui::SameLine();
+	m_pipeline->callLuaFunction("onGUI");
+}
+
 
 void GameView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
-	if (!m_pipeline->isReady()) return;
+	if (!m_pipeline->isReady()) {
+		captureMouse(false);
+		return;
+	}
 
-	auto& io = ImGui::GetIO();
-
-	bool is_focus = OS::getFocused() == m_studio_app.getWindow();
-	if (m_is_mouse_captured &&
-		(io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode() || !is_focus))
-	{
+	ImGuiIO& io = ImGui::GetIO();
+	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode())) {
 		captureMouse(false);
 	}
 
@@ -295,91 +312,73 @@ void GameView::onWindowGUI()
 		onFullscreenGUI();
 		return;
 	}
+
+	if (!m_is_open) {
+		captureMouse(false);
+		return;
+	}
+
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
-	if (!m_is_open) return;
 	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
 		is_game_view_visible = true;
 		view_pos = ImGui::GetCursorScreenPos();
-		m_is_mouse_hovering_window = ImGui::IsWindowHovered();
 
-		auto content_min = ImGui::GetCursorScreenPos();
-		auto size = ImGui::GetContentRegionAvail();
+		const ImVec2 content_min = ImGui::GetCursorScreenPos();
+		ImVec2 size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 		if (m_forced_viewport.enabled) size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
 		if (size.x > 0 && size.y > 0) {
-			const EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
+			RenderScene* scene = m_pipeline->getScene();
+			const EntityPtr camera = scene->getActiveCamera();
+			Viewport vp;
+			vp.w = (int)size.x;
+			vp.h = (int)size.y;
 			if (camera.isValid()) {
-				Viewport vp = m_pipeline->getScene()->getCameraViewport((EntityRef)camera);
-				vp.w = (int)size.x;
-				vp.h = (int)size.y;
-				m_pipeline->getScene()->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
-				m_pipeline->setViewport(vp);
-				m_pipeline->render(false);
-				m_texture_handle = m_pipeline->getOutput();
+				vp = scene->getCameraViewport((EntityRef)camera);
+				scene->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
+			}
+			else {
+				vp.fov = degreesToRadians(90.f);
+				vp.is_ortho = false;
+				vp.far = 10'000.f;
+				vp.near = 1.f;
+				vp.pos = DVec3(0);
+				vp.rot = Quat(0, 0, 0, 1);
+			}
+			m_pipeline->setViewport(vp);
+			m_pipeline->render(false);
+			const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
 
-				if(m_texture_handle.isValid()) {
-					if (gpu::isOriginBottomLeft()) {
-						ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
-					}
-					else {
-						ImGui::Image((void*)(uintptr_t)m_texture_handle.value, size);
-					}
+			if (texture_handle.isValid()) {
+				if (gpu::isOriginBottomLeft()) {
+					ImGui::Image((void*)(uintptr_t)texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
 				}
 				else {
-					ImGui::Rect(size.x, size.y, 0xffFF00FF);
+					ImGui::Image((void*)(uintptr_t)texture_handle.value, size);
 				}
 			}
 			else {
 				ImGui::Rect(size.x, size.y, 0xffFF00FF);
 			}
-			m_pos.x = ImGui::GetItemRectMin().x;
-			m_pos.y = ImGui::GetItemRectMin().y;
-			m_size.x = ImGui::GetItemRectSize().x;
-			m_size.y = ImGui::GetItemRectSize().y;
+			const bool is_hovered = ImGui::IsItemHovered();
+			if (is_hovered && ImGui::IsMouseClicked(0) && m_editor.isGameMode()) captureMouse(true);
+			m_pos = ImGui::GetItemRectMin();
+			m_size = ImGui::GetItemRectSize();
 
 			if (m_is_mouse_captured && m_is_ingame_cursor) {
-				ImVec2 pos = ImGui::GetItemRectMin();
-				OS::clipCursor(m_studio_app.getWindow(), (int)pos.x, (int)pos.y, (int)m_size.x, (int)m_size.y);
+				OS::clipCursor(ImGui::GetWindowViewport()->PlatformHandle, (int)m_pos.x, (int)m_pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
 			processInputEvents();
-
-			if (ImGui::Checkbox("Pause", &m_paused)) m_editor.getEngine().pause(m_paused);
-			if (m_paused) {
-				ImGui::SameLine();
-				if (ImGui::Button("Next frame")) m_editor.getEngine().nextFrame();
-			}
-			ImGui::SameLine();
-			ImGui::PushItemWidth(50);
-			if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
-				m_editor.getEngine().setTimeMultiplier(m_time_multiplier);
-			}
-			ImGui::PopItemWidth();
-			if(m_editor.isGameMode()) {
-				ImGui::SameLine();
-				if (ImGui::Button("Fullscreen")) setFullscreen(true);
-			}
-			ImGui::SameLine();
-			ImGui::Checkbox("Stats", &m_show_stats);
-			ImGui::SameLine();
-			m_pipeline->callLuaFunction("onGUI");
+			controlsGUI();
 		}
 
-		
-		if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode())) {
-			captureMouse(false);
-		}
-
-		if (ImGui::IsMouseHoveringRect(content_min, content_max) && m_is_mouse_hovering_window &&
-			ImGui::IsMouseClicked(0) && m_editor.isGameMode())
-		{
-			captureMouse(true);
-		}
 	}
+	if (m_is_mouse_captured && OS::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
 	ImGui::End();
-	if(is_game_view_visible) onStatsGUI(view_pos);
+	if (is_game_view_visible) onStatsGUI(view_pos);
 }
 
 

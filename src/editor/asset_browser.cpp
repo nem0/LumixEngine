@@ -342,7 +342,7 @@ void AssetBrowser::fileColumn()
 {
 	ImGui::BeginChild("main_col");
 
-	float w = ImGui::GetContentRegionAvailWidth();
+	float w = ImGui::GetContentRegionAvail().x;
 	int columns = m_show_thumbnails ? (int)w / TILE_SIZE : 1;
 	columns = maximum(columns, 1);
 	int tile_count = m_filtered_file_infos.empty() ? m_file_infos.size() : m_filtered_file_infos.size();
@@ -544,7 +544,7 @@ void AssetBrowser::detailsGUI()
 			ResourceType resource_type = compiler.getResourceType(path);
 			auto iter = m_plugins.find(resource_type);
 			if (iter.isValid()) {
-				iter.value()->onGUI(m_selected_resources.getSpan());
+				iter.value()->onGUI(m_selected_resources);
 			}
 		}
 		else {
@@ -569,7 +569,7 @@ void AssetBrowser::detailsGUI()
 			if (all_same_type) {
 				auto iter = m_plugins.find(type);
 				if(iter.isValid()) {
-					iter.value()->onGUI(m_selected_resources.getSpan());
+					iter.value()->onGUI(m_selected_resources);
 				}
 			}
 			else {
@@ -612,7 +612,7 @@ void AssetBrowser::onGUI()
 		breadcrumbs();
 		ImGui::Separator();
 
-		float content_w = ImGui::GetContentRegionAvailWidth();
+		float content_w = ImGui::GetContentRegionAvail().x;
 		ImVec2 left_size(m_left_column_width, 0);
 		if (left_size.x < 10) left_size.x = 10;
 		if (left_size.x > content_w - 10) left_size.x = content_w - 10;

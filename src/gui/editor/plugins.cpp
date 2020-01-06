@@ -113,7 +113,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 
 		if (sprite->type != Sprite::Type::PATCH9 || !texture || !texture->isReady()) return;
 		ImVec2 size;
-		size.x = minimum(ImGui::GetContentRegionAvailWidth(), texture->width * 2.0f);
+		size.x = minimum(ImGui::GetContentRegionAvail().x, texture->width * 2.0f);
 		size.y = size.x / texture->width * texture->height;
 		float scale = size.x / texture->width;
 		ImGui::Dummy(size);
@@ -558,7 +558,7 @@ private:
 		EntityRef child = m_editor->addEntity();
 		m_editor->makeParent(entity, child);
 		m_editor->selectEntities(&child, 1, false);
-		m_editor->addComponent(child_type);
+		m_editor->addComponent(Span(&child, 1), child_type);
 		m_editor->endCommandGroup();
 	}
 

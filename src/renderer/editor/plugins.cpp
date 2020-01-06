@@ -45,7 +45,6 @@
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
-#include <cmft/clcontext.h>
 #include <cmft/cubemapfilter.h>
 #include <nvtt.h>
 
@@ -812,7 +811,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
 			m_viewport.rot = Quat::vec3ToVec3({0, 0, 1}, {1, 1, 1});
 		}
-		ImVec2 image_size(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvailWidth());
+		ImVec2 image_size(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x);
 
 		m_viewport.w = (int)image_size.x;
 		m_viewport.h = (int)image_size.y;
@@ -2574,7 +2573,8 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 		if (m_total > 0) {
 			const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
 
-			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f, 30));
+			const ImVec2 pos = ImGui::GetMainViewport()->Pos;
+			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f + pos.x, 30 + pos.y));
 			ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
 			ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
 			ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
@@ -2834,7 +2834,8 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 		if (m_done_counter != m_probe_counter) {
 			const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
 
-			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f, 30));
+			const ImVec2 pos = ImGui::GetMainViewport()->Pos;
+			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f + pos.x, 30 + pos.y));
 			ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
 			ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
 			ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
@@ -3379,11 +3380,34 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			Array<ImDrawCmd> commands;
 		};
 
+		struct WindowDrawData {
+			WindowDrawData(IAllocator& allocator) : cmd_lists(allocator) {}
+
+			gpu::ProgramHandle program;
+			OS::WindowHandle window;
+			u32 w, h;
+			i32 x, y;
+			bool new_program = false;
+			Array<CmdList> cmd_lists;
+		};
 
 		RenderCommand(IAllocator& allocator)
 			: allocator(allocator)
-			, command_lists(allocator)
+			, window_draw_data(allocator)
 		{
+		}
+
+		gpu::ProgramHandle getProgram(void* window_handle, Ref<bool> new_program) {
+			auto iter = plugin->m_programs.find(window_handle);
+			if (!iter.isValid()) {
+				
+				
+				plugin->m_programs.insert(window_handle, gpu::allocProgramHandle());
+				iter = plugin->m_programs.find(window_handle);
+				new_program = true;
+			}
+
+			return iter.value();
 		}
 
 		void setup() override
@@ -3392,50 +3416,54 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			PluginManager& plugin_manager = plugin->m_engine.getPluginManager();
 			renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
-			const ImDrawData* draw_data = ImGui::GetDrawData();
-			if (!draw_data) return;
+			ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+			window_draw_data.reserve(platform_io.Viewports.size());
+			for (ImGuiViewport* vp : platform_io.Viewports) {
+				ImDrawData* draw_data = vp->DrawData;
+				WindowDrawData& dd = window_draw_data.emplace(allocator);
+				dd.w = u32(vp->Size.x);
+				dd.h = u32(vp->Size.y);
+				dd.x = i32(draw_data->DisplayPos.x);
+				dd.y = i32(draw_data->DisplayPos.y);
+				dd.window = vp->PlatformHandle;
+				dd.program = getProgram(dd.window, Ref(dd.new_program));
+				dd.cmd_lists.reserve(draw_data->CmdListsCount);
+				for (int i = 0; i < draw_data->CmdListsCount; ++i) {
+					ImDrawList* cmd_list = draw_data->CmdLists[i];
+					CmdList& out_cmd_list = dd.cmd_lists.emplace(allocator);
 
-			command_lists.reserve(draw_data->CmdListsCount);
-			for (int i = 0; i < draw_data->CmdListsCount; ++i) {
-				ImDrawList* cmd_list = draw_data->CmdLists[i];
-				CmdList& out_cmd_list = command_lists.emplace(allocator);
-
-				out_cmd_list.idx_buffer = renderer->copy(&cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size() * sizeof(cmd_list->IdxBuffer[0]));
-				out_cmd_list.vtx_buffer = renderer->copy(&cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size() * sizeof(cmd_list->VtxBuffer[0]));
+					out_cmd_list.idx_buffer = renderer->copy(&cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size() * sizeof(cmd_list->IdxBuffer[0]));
+					out_cmd_list.vtx_buffer = renderer->copy(&cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size() * sizeof(cmd_list->VtxBuffer[0]));
 			
-				out_cmd_list.commands.resize(cmd_list->CmdBuffer.size());
-				for (int i = 0, c = out_cmd_list.commands.size(); i < c; ++i) {
-					out_cmd_list.commands[i] = cmd_list->CmdBuffer[i];
+					out_cmd_list.commands.resize(cmd_list->CmdBuffer.size());
+					for (int i = 0, c = out_cmd_list.commands.size(); i < c; ++i) {
+						out_cmd_list.commands[i] = cmd_list->CmdBuffer[i];
+					}
 				}
 			}
 			
-			init_render = !plugin->m_program.isValid();
-			
-			if (init_render) {
+			if (!plugin->m_index_buffer.isValid()) {
+				init_render = true;
 				plugin->m_index_buffer = gpu::allocBufferHandle();
 				plugin->m_vertex_buffer = gpu::allocBufferHandle();
 				plugin->m_uniform_buffer = gpu::allocBufferHandle();
-				plugin->m_program = gpu::allocProgramHandle();
 			}
 		
-			width = plugin->m_width;
-			height = plugin->m_height;
 			default_texture = &plugin->m_texture;
 			vb = plugin->m_vertex_buffer;
 			ib = plugin->m_index_buffer;
 			ub = plugin->m_uniform_buffer;
-			program = plugin->m_program;
 		}
 
 
-		void draw(const CmdList& cmd_list)
+		void draw(const CmdList& cmd_list, const WindowDrawData& wdd)
 		{
 			const u32 num_indices = cmd_list.idx_buffer.size / sizeof(ImDrawIdx);
 			const u32 num_vertices = cmd_list.vtx_buffer.size / sizeof(ImDrawVert);
 
 			const bool use_big_buffers = num_vertices * sizeof(ImDrawVert) > 256 * 1024 ||
 				num_indices * sizeof(ImDrawIdx) > 256 * 1024;
-			gpu::useProgram(program);
+			gpu::useProgram(wdd.program);
 
 			gpu::BufferHandle big_ib, big_vb;
 			if (use_big_buffers) {
@@ -3468,39 +3496,30 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 				ASSERT(!pcmd->UserCallback);
 				if (0 == pcmd->ElemCount) continue;
 
-				/*			auto material = m_material;
-							u64 render_states = material->getRenderStates();
-							if (&m_scene_view.getTextureHandle() == &texture_id || &m_game_view.getTextureHandle() ==
-				   &texture_id)
-							{
-								render_states &= ~BGFX_STATE_BLEND_MASK;
-							}
-				*/
-
 				gpu::TextureHandle tex = gpu::TextureHandle{(u32)(intptr_t)pcmd->TextureId};
 				if (!tex.isValid()) tex = *default_texture;
 				gpu::bindTextures(&tex, 0, 1);
 
-				const u32 h = u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f));
+				const u32 h = u32(clamp(pcmd->ClipRect.w - pcmd->ClipRect.y, 0.f, 65535.f));
 
-				if(gpu::isOriginBottomLeft()) {
-					gpu::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
-						height - u32(maximum(pcmd->ClipRect.y, 0.0f)) - h,
-						u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
-						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
+				if (gpu::isOriginBottomLeft()) {
+					gpu::scissor(u32(maximum(pcmd->ClipRect.x - wdd.x, 0.0f)),
+						wdd.h - u32(maximum(pcmd->ClipRect.y - wdd.y, 0.0f)) - h,
+						u32(clamp(pcmd->ClipRect.z - pcmd->ClipRect.x, 0.f, 65535.f)),
+						u32(clamp(pcmd->ClipRect.w - pcmd->ClipRect.y, 0.f, 65535.f)));
 				}
 				else {
-					gpu::scissor(u32(maximum(pcmd->ClipRect.x, 0.0f)),
-						u32(maximum(pcmd->ClipRect.y, 0.0f)),
-						u32(minimum(pcmd->ClipRect.z, 65535.0f) - maximum(pcmd->ClipRect.x, 0.0f)),
-						u32(minimum(pcmd->ClipRect.w, 65535.0f) - maximum(pcmd->ClipRect.y, 0.0f)));
+					gpu::scissor(u32(maximum(pcmd->ClipRect.x - wdd.x, 0.0f)),
+						u32(maximum(pcmd->ClipRect.y - wdd.y, 0.0f)),
+						u32(clamp(pcmd->ClipRect.z - pcmd->ClipRect.x, 0.f, 65535.f)),
+						u32(clamp(pcmd->ClipRect.w - pcmd->ClipRect.y, 0.f, 65535.f)));
 				}
 
 				gpu::drawElements(elem_offset * sizeof(u32), pcmd->ElemCount, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
 		
 				elem_offset += pcmd->ElemCount;
 			}
-			if(use_big_buffers) {
+			if (use_big_buffers) {
 				gpu::destroy(big_ib);
 				gpu::destroy(big_vb);
 			}
@@ -3515,81 +3534,85 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		{
 			PROFILE_FUNCTION();
 
-			if(init_render) {
+			if (init_render) {
 				gpu::createBuffer(ub, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
 				gpu::createBuffer(ib, 0, 256 * 1024, nullptr);
 				gpu::createBuffer(vb, 0, 256 * 1024, nullptr);
-				gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
-				gpu::VertexDecl decl;
-				decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
-				decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-
-				const char* vs =
-					R"#(
-					layout(location = 0) in vec2 a_pos;
-					layout(location = 1) in vec2 a_uv;
-					layout(location = 2) in vec4 a_color;
-					layout(location = 0) out vec4 v_color;
-					layout(location = 1) out vec2 v_uv;
-					layout (std140, binding = 4) uniform IMGUIState {
-						mat2x3 u_canvas_mtx;
-					};
-					void main() {
-						v_color = a_color;
-						v_uv = a_uv;
-						vec2 p = vec3(a_pos, 1) * u_canvas_mtx;
-						gl_Position = vec4(p.xy, 0, 1);
-					})#";
-				const char* fs = 
-					R"#(
-					layout(location = 0) in vec4 v_color;
-					layout(location = 1) in vec2 v_uv;
-					layout(location = 0) out vec4 o_color;
-					uniform sampler2D u_texture;
-					void main() {
-						vec4 tc = textureLod(u_texture, v_uv, 0);
-						o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
-						o_color.a = v_color.a * tc.a;
-					})#";
-				const char* srcs[] = {vs, fs};
-				gpu::createProgram(program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
 			}
 
 			gpu::pushDebugGroup("imgui");
-			gpu::setFramebuffer(nullptr, 0, 0);
-
-			const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
-			gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH, clear_color, 1.0);
-
-			gpu::viewport(0, 0, width, height);
-			const Vec4 canvas_mtx[] = {
-				Vec4(2.f / width, 0, -1, 0),
-				Vec4(0, -2.f / height, 1, 0)
-			};
-			gpu::update(ub, canvas_mtx, sizeof(canvas_mtx));
-			gpu::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
 
 			vb_offset = 0;
 			ib_offset = 0;
-			for(const CmdList& cmd_list : command_lists) {
-				draw(cmd_list);
+			for (WindowDrawData& dd : window_draw_data) {
+				// TODO window could be destroyed by now
+				gpu::setCurrentWindow(dd.window);
+				gpu::setFramebuffer(nullptr, 0, 0);
+				gpu::viewport(0, 0, dd.w, dd.h);
+				
+				Vec4 canvas_mtx[] = {
+					Vec4(2.f / dd.w, 0, -1 + (float)-dd.x * 2.f / dd.w, 0),
+					Vec4(0, -2.f / dd.h, 1 + (float)dd.y * 2.f / dd.h, 0)
+				};
+				gpu::update(ub, canvas_mtx, sizeof(canvas_mtx));
+				gpu::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
+				Vec4 cc = {1, 0, 1, 1};
+				const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
+				gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH, clear_color, 1.0);
+				if (dd.new_program) {
+					const char* vs =
+						R"#(
+						layout(location = 0) in vec2 a_pos;
+						layout(location = 1) in vec2 a_uv;
+						layout(location = 2) in vec4 a_color;
+						layout(location = 0) out vec4 v_color;
+						layout(location = 1) out vec2 v_uv;
+						layout (std140, binding = 4) uniform IMGUIState {
+							mat2x4 u_canvas_mtx;
+						};
+						void main() {
+							v_color = a_color;
+							v_uv = a_uv;
+							vec2 p = vec3(a_pos, 1) * mat2x3(u_canvas_mtx);
+							gl_Position = vec4(p.xy, 0, 1);
+						})#";
+					const char* fs = 
+						R"#(
+						layout(location = 0) in vec4 v_color;
+						layout(location = 1) in vec2 v_uv;
+						layout(location = 0) out vec4 o_color;
+						uniform sampler2D u_texture;
+						void main() {
+							vec4 tc = textureLod(u_texture, v_uv, 0);
+							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
+							o_color.a = v_color.a * tc.a;
+						})#";
+					const char* srcs[] = {vs, fs};
+					gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
+					gpu::VertexDecl decl;
+					decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
+					decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
+					decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
+					gpu::createProgram(dd.program, decl, srcs, types, 2, nullptr, 0, "imgui shader");
+				}
+				for(const CmdList& cmd_list : dd.cmd_lists) {
+					draw(cmd_list, dd);
+				}
 			}
+			gpu::setCurrentWindow(nullptr);
 
 			gpu::popDebugGroup();
 		}
 		
 		Renderer* renderer;
 		const gpu::TextureHandle* default_texture;
-		u32 width, height;
-		Array<CmdList> command_lists;
+		Array<WindowDrawData> window_draw_data;
 		u32 ib_offset;
 		u32 vb_offset;
 		IAllocator& allocator;
 		gpu::BufferHandle ib;
 		gpu::BufferHandle vb;
 		gpu::BufferHandle ub;
-		gpu::ProgramHandle program;
 		bool init_render;
 		EditorUIRenderPlugin* plugin;
 	};
@@ -3599,23 +3622,16 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		: m_app(app)
 		, m_scene_view(scene_view)
 		, m_game_view(game_view)
-		, m_width(-1)
-		, m_height(-1)
 		, m_engine(app.getWorldEditor().getEngine())
 		, m_index_buffer(gpu::INVALID_BUFFER)
 		, m_vertex_buffer(gpu::INVALID_BUFFER)
 		, m_uniform_buffer(gpu::INVALID_BUFFER)
-		, m_program(gpu::INVALID_PROGRAM)
+		, m_programs(app.getWorldEditor().getAllocator())
 	{
 		WorldEditor& editor = app.getWorldEditor();
 
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-
-		const OS::Point size = OS::getWindowClientSize(m_app.getWindow());
-		m_width = size.x;
-		m_height = size.y;
-		renderer->resize(m_width, m_height);
 
 		unsigned char* pixels;
 		int width, height;
@@ -3653,15 +3669,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 	void guiEndFrame() override
 	{
-		const OS::Point size = OS::getWindowClientSize(m_app.getWindow());
-		if (size.x != m_width || size.y != m_height) {
-			m_width = size.x;
-			m_height = size.y;
-			auto& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
-			auto* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-			if (renderer) renderer->resize(m_width, m_height);
-		}
-
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
 		RenderCommand* cmd = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
 		cmd->plugin = this;
@@ -3671,17 +3678,15 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 	}
 
 
-	int m_width;
-	int m_height;
 	StudioApp& m_app;
 	Engine& m_engine;
 	SceneView& m_scene_view;
 	GameView& m_game_view;
+	HashMap<void*, gpu::ProgramHandle> m_programs;
 	gpu::TextureHandle m_texture;
-	gpu::BufferHandle m_index_buffer;
-	gpu::BufferHandle m_vertex_buffer;
-	gpu::BufferHandle m_uniform_buffer;
-	gpu::ProgramHandle m_program;
+	gpu::BufferHandle m_index_buffer = gpu::INVALID_BUFFER;
+	gpu::BufferHandle m_vertex_buffer = gpu::INVALID_BUFFER;
+	gpu::BufferHandle m_uniform_buffer = gpu::INVALID_BUFFER;
 };
 
 
@@ -3910,7 +3915,7 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 
 			if (!editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE))
 			{
-				editor.addComponent(TERRAIN_TYPE);
+				editor.addComponent(Span(&entity, 1), TERRAIN_TYPE);
 			}
 
 			if (!create_empty)

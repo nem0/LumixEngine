@@ -1,9 +1,20 @@
+#include "engine/math.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <math.h>
 
 
 static const float NODE_SLOT_RADIUS = 4.0f;
+
+
+ImVec2::ImVec2(const Lumix::Vec2& f) 
+	: x(f.x)
+	, y(f.y) 
+{}
+
+ImVec2::operator Lumix::Vec2() const {
+	return {x, y};
+}                                               
 
 
 namespace ImGui
@@ -98,7 +109,7 @@ namespace ImGui
 		PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
 			ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings;
-		if (size.x == 0) size.x = GetContentRegionAvailWidth();
+		if (size.x == 0) size.x = GetContentRegionAvail().x;
 		SetNextWindowSize(size);
 
 		bool ret = is_global ? Begin(str_id, nullptr, flags) : BeginChild(str_id, size, false, flags);

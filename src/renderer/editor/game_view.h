@@ -36,7 +36,6 @@ public:
 	bool isOpen() const { return m_is_open; }
 	void onAction() { m_is_open = !m_is_open; }
 	void onWindowGUI() override;
-	const gpu::TextureHandle& getTextureHandle() const { return m_texture_handle; }
 
 public:
 	bool m_is_open;
@@ -49,7 +48,7 @@ private:
 	void onFullscreenGUI();
 	void setFullscreen(bool fullscreen);
 	void onStatsGUI(const ImVec2& view_pos);
-	
+	void controlsGUI();
 
 private:
 	Pipeline* m_pipeline;
@@ -58,10 +57,8 @@ private:
 	StudioApp& m_studio_app;
 	Vec2 m_pos;
 	Vec2 m_size;
-	gpu::TextureHandle m_texture_handle;
 	struct GUIInterface* m_gui_interface;
 	bool m_is_mouse_captured;
-	bool m_is_mouse_hovering_window;
 	bool m_is_ingame_cursor;
 	bool m_paused;
 	bool m_is_fullscreen;

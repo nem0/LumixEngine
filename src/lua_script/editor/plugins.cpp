@@ -2,7 +2,6 @@
 
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
-#include "editor/ieditor_command.h"
 #include "editor/property_grid.h"
 #include "editor/settings.h"
 #include "editor/studio_app.h"
@@ -818,7 +817,7 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 
 			if (!editor.getUniverse()->hasComponent(entity, LUA_SCRIPT_TYPE))
 			{
-				editor.addComponent(LUA_SCRIPT_TYPE);
+				editor.addComponent(Span(&entity, 1), LUA_SCRIPT_TYPE);
 			}
 
 			IAllocator& allocator = editor.getAllocator();

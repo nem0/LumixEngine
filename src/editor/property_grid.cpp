@@ -572,7 +572,7 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 	ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 	if (ImGui::SmallButton("Remove"))
 	{
-		m_editor.destroyComponent(&entities[0], entities.size(), cmp_type);
+		m_editor.destroyComponent(entities, cmp_type);
 		if (is_open) ImGui::TreePop();
 		return;
 	}
