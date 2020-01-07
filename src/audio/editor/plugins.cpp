@@ -116,8 +116,8 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 		m_filter[0] = 0;
 		m_is_open = false;
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Clip manager", "Toggle clip manager", "clip_manager");
-		action->func.bind<ClipManagerUI, &ClipManagerUI::onAction>(this);
-		action->is_selected.bind<ClipManagerUI, &ClipManagerUI::isOpen>(this);
+		action->func.bind<&ClipManagerUI::onAction>(this);
+		action->is_selected.bind<&ClipManagerUI::isOpen>(this);
 		app.addWindowAction(action);
 	}
 

@@ -1451,14 +1451,14 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		{
 			old_hm->getResourceManager().unload(*old_hm);
 			auto& cb = old_hm->getObserverCb();
-			cb.unbind<Heightfield, &Heightfield::heightmapLoaded>(&terrain);
+			cb.unbind<&Heightfield::heightmapLoaded>(&terrain);
 		}
 
 		if (str.isValid())
 		{
 			auto* new_hm = resource_manager.load<Texture>(str);
 			terrain.m_heightmap = new_hm;
-			new_hm->onLoaded<Heightfield, &Heightfield::heightmapLoaded>(&terrain);
+			new_hm->onLoaded<&Heightfield::heightmapLoaded>(&terrain);
 			new_hm->addDataReference();
 		}
 		else
@@ -5055,8 +5055,8 @@ struct PhysicsSceneImpl final : public PhysicsScene
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
 {
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, allocator);
-	impl->m_universe.entityTransformed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityMoved>(impl);
-	impl->m_universe.entityDestroyed().bind<PhysicsSceneImpl, &PhysicsSceneImpl::onEntityDestroyed>(impl);
+	impl->m_universe.entityTransformed().bind<&PhysicsSceneImpl::onEntityMoved>(impl);
+	impl->m_universe.entityDestroyed().bind<&PhysicsSceneImpl::onEntityDestroyed>(impl);
 	impl->m_engine = &engine;
 	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
@@ -5151,13 +5151,13 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
 {
 	if (resource)
 	{
-		resource->getObserverCb().unbind<RigidActor, &RigidActor::onStateChanged>(this);
+		resource->getObserverCb().unbind<&RigidActor::onStateChanged>(this);
 		resource->getResourceManager().unload(*resource);
 	}
 	resource = _resource;
 	if (resource)
 	{
-		resource->onLoaded<RigidActor, &RigidActor::onStateChanged>(this);
+		resource->onLoaded<&RigidActor::onStateChanged>(this);
 	}
 }
 
@@ -5178,7 +5178,7 @@ Heightfield::~Heightfield()
 	if (m_heightmap)
 	{
 		m_heightmap->getResourceManager().unload(*m_heightmap);
-		m_heightmap->getObserverCb().unbind<Heightfield, &Heightfield::heightmapLoaded>(this);
+		m_heightmap->getObserverCb().unbind<&Heightfield::heightmapLoaded>(this);
 	}
 }
 

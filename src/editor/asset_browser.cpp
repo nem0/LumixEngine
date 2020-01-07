@@ -53,10 +53,10 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 
 	m_back_action = LUMIX_NEW(allocator, Action)("Back", "Back in asset history", "back");
 	m_back_action->is_global = false;
-	m_back_action->func.bind<AssetBrowser, &AssetBrowser::goBack>(this);
+	m_back_action->func.bind<&AssetBrowser::goBack>(this);
 	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "Forward in asset history", "forward");
 	m_forward_action->is_global = false;
-	m_forward_action->func.bind<AssetBrowser, &AssetBrowser::goForward>(this);
+	m_forward_action->func.bind<&AssetBrowser::goForward>(this);
 	m_app.addAction(m_back_action);
 	m_app.addAction(m_forward_action);
 }

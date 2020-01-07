@@ -143,7 +143,7 @@ void Resource::doLoad()
 
 	FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FileSystem::ContentCallback cb;
-	cb.bind<Resource, &Resource::fileLoaded>(this);
+	cb.bind<&Resource::fileLoaded>(this);
 
 	const u32 hash = m_path.getHash();
 	const StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", hash, ".res");
@@ -156,7 +156,7 @@ void Resource::addDependency(Resource& dependent_resource)
 {
 	ASSERT(m_desired_state != State::EMPTY);
 
-	dependent_resource.m_cb.bind<Resource, &Resource::onStateChanged>(this);
+	dependent_resource.m_cb.bind<&Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) ++m_empty_dep_count;
 	if (dependent_resource.isFailure()) {
 		++m_failed_dep_count;
@@ -168,7 +168,7 @@ void Resource::addDependency(Resource& dependent_resource)
 
 void Resource::removeDependency(Resource& dependent_resource)
 {
-	dependent_resource.m_cb.unbind<Resource, &Resource::onStateChanged>(this);
+	dependent_resource.m_cb.unbind<&Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) 
 	{
 		ASSERT(m_empty_dep_count > 0); 

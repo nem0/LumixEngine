@@ -77,13 +77,13 @@ struct GizmoImpl final : public Gizmo
 		m_steps[int(Mode::TRANSLATE)] = 10;
 		m_steps[int(Mode::ROTATE)] = 45;
 		m_steps[int(Mode::SCALE)] = 1;
-		editor.universeDestroyed().bind<GizmoImpl, &GizmoImpl::onUniverseDestroyed>(this);
+		editor.universeDestroyed().bind<&GizmoImpl::onUniverseDestroyed>(this);
 	}
 
 
 	~GizmoImpl()
 	{
-		m_editor.universeDestroyed().unbind<GizmoImpl, &GizmoImpl::onUniverseDestroyed>(this);
+		m_editor.universeDestroyed().unbind<&GizmoImpl::onUniverseDestroyed>(this);
 	}
 
 

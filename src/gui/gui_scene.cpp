@@ -47,11 +47,11 @@ struct GUIText
 				m_font_resource->removeRef(*m_font);
 				m_font = nullptr;
 			}
-			m_font_resource->getObserverCb().unbind<GUIText, &GUIText::onFontLoaded>(this);
+			m_font_resource->getObserverCb().unbind<&GUIText::onFontLoaded>(this);
 			m_font_resource->getResourceManager().unload(*m_font_resource);
 		}
 		m_font_resource = res;
-		if (res) res->onLoaded<GUIText, &GUIText::onFontLoaded>(this);
+		if (res) res->onLoaded<&GUIText::onFontLoaded>(this);
 	}
 
 

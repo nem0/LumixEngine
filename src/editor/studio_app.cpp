@@ -106,7 +106,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 		lua_pop(L, 2); // []
 
 		Action* action = LUMIX_NEW(editor.getAllocator(), Action)(name, name, name);
-		action->func.bind<LuaPlugin, &LuaPlugin::onAction>(this);
+		action->func.bind<&LuaPlugin::onAction>(this);
 		app.addWindowAction(action);
 		m_is_open = false;
 
@@ -292,14 +292,14 @@ public:
 		update();
 
 		if (m_sleep_when_inactive && !isFocused()) {
-			const float frame_time = m_fps_timer.tick();
+			const float frame_time = m_inactive_fps_timer.tick();
 			const float wanted_fps = 5.0f;
 
 			if (frame_time < 1 / wanted_fps) {
 				PROFILE_BLOCK("sleep");
 				MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
 			}
-			m_fps_timer.tick();
+			m_inactive_fps_timer.tick();
 		}
 
 		Profiler::frame();
@@ -445,7 +445,7 @@ public:
 
 		while (m_editor->getEngine().getFileSystem().hasWork())
 		{
-			m_editor->getEngine().getFileSystem().updateAsyncTransactions();
+			m_editor->getEngine().getFileSystem().processCallbacks();
 		}
 
 		m_editor->newUniverse();
@@ -847,6 +847,13 @@ public:
 		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
+
+		++m_fps_frame;
+		if (m_fps_timer.getTimeSinceTick() > 1.0f)
+		{
+			m_fps = m_fps_frame / m_fps_timer.tick();
+			m_fps_frame = 0;
+		}
 
 		if (m_deferred_game_mode_exit)
 		{
@@ -1296,7 +1303,7 @@ public:
 	Action& addAction(const char* label_short, const char* label_long, const char* name)
 	{
 		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name);
-		a->func.bind<StudioAppImpl, Func>(this);
+		a->func.bind<Func>(this);
 		addAction(a);
 		return *a;
 	}
@@ -1312,7 +1319,7 @@ public:
 	{
 		auto* a =
 			LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name, shortcut0, shortcut1, shortcut2);
-		a->func.bind<StudioAppImpl, Func>(this);
+		a->func.bind<Func>(this);
 		addAction(a);
 	}
 
@@ -1560,7 +1567,7 @@ public:
 			StaticString<200> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << "Loading... | ";
 			stats << "FPS: ";
-			stats << (u32)(m_engine->getFPS() + 0.5f);
+			stats << (u32)(m_fps + 0.5f);
 			if (!isFocused()) stats << " - inactive window";
 			auto stats_size = ImGui::CalcTextSize(stats);
 			ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x);
@@ -2013,24 +2020,24 @@ public:
 		addAction<&StudioAppImpl::duplicate>(
 			ICON_FA_FILES_O "Duplicate", "Duplicate entity", "duplicate", OS::Keycode::LCTRL, OS::Keycode::D, OS::Keycode::INVALID);
 		addAction<&StudioAppImpl::toggleOrbitCamera>(NO_ICON "Orbit camera", "Orbit camera", "orbitCamera")
-			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isOrbitCamera>(this);
+			.is_selected.bind<&StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>(ICON_FA_ARROWS "Translate", "Set translate mode", "setTranslateGizmoMode")
-			.is_selected.bind<Gizmo, &Gizmo::isTranslateMode>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isTranslateMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setRotateGizmoMode>(ICON_FA_REPEAT "Rotate", "Set rotate mode", "setRotateGizmoMode")
-			.is_selected.bind<Gizmo, &Gizmo::isRotateMode>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isRotateMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setScaleGizmoMode>(NO_ICON "Scale", "Set scale mode", "setScaleGizmoMode")
-			.is_selected.bind<Gizmo, &Gizmo::isScaleMode>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isScaleMode>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setTopView>(NO_ICON "Top", "Set top camera view", "viewTop");
 		addAction<&StudioAppImpl::setFrontView>(NO_ICON "Front", "Set front camera view", "viewFront");
 		addAction<&StudioAppImpl::setSideView>(NO_ICON "Side", "Set side camera view", "viewSide");
 		addAction<&StudioAppImpl::setLocalCoordSystem>(NO_ICON "Local", "Set local transform system", "setLocalCoordSystem")
-			.is_selected.bind<Gizmo, &Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setGlobalCoordSystem>(ICON_FA_GLOBE "Global", "Set global transform system", "setGlobalCoordSystem")
-			.is_selected.bind<Gizmo, &Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setPivotCenter>(ICON_FA_ALIGN_CENTER "Center", "Set center transform system", "setPivotCenter")
-			.is_selected.bind<Gizmo, &Gizmo::isPivotCenter>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isPivotCenter>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::setPivotOrigin>(NO_ICON "Pivot", "Set pivot transform system", "setPivotOrigin")
-			.is_selected.bind<Gizmo, &Gizmo::isPivotOrigin>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isPivotOrigin>(&m_editor->getGizmo());
 
 		addAction<&StudioAppImpl::addEntity>(ICON_FA_PLUS_SQUARE_O "Create empty", "Create empty entity", "createEntity");
 		addAction<&StudioAppImpl::destroySelectedEntity>(ICON_FA_MINUS_SQUARE_O "Destroy",
@@ -2044,21 +2051,21 @@ public:
 		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent");
 
 		addAction<&StudioAppImpl::toggleGameMode>(ICON_FA_PLAY "Game Mode", "Toggle game mode", "toggleGameMode")
-			.is_selected.bind<WorldEditor, &WorldEditor::isGameMode>(m_editor);
+			.is_selected.bind<&WorldEditor::isGameMode>(m_editor);
 		addAction<&StudioAppImpl::toggleMeasure>(NO_ICON "Toggle measure", "Toggle measure mode", "toggleMeasure")
-			.is_selected.bind<WorldEditor, &WorldEditor::isMeasureToolActive>(m_editor);
+			.is_selected.bind<&WorldEditor::isMeasureToolActive>(m_editor);
 		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
-			.is_selected.bind<Gizmo, &Gizmo::isAutosnapDown>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::isAutosnapDown>(&m_editor->getGizmo());
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
 		addAction<&StudioAppImpl::setEditCamTransform>(NO_ICON "Camera transform", "Set camera transformation", "setEditCamTransform");
 		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
 		addAction<&StudioAppImpl::lookAtSelected>(NO_ICON "Look at selected", "Look at selected entity", "lookAtSelected");
 		addAction<&StudioAppImpl::toggleAssetBrowser>(ICON_FA_CUBES "Asset Browser", "Toggle asset browser", "assetBrowser")
-			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isAssetBrowserOpen>(this);
+			.is_selected.bind<&StudioAppImpl::isAssetBrowserOpen>(this);
 		addAction<&StudioAppImpl::toggleEntityList>(ICON_FA_LIST "Entity List", "Toggle entity list", "entityList")
-			.is_selected.bind<StudioAppImpl, &StudioAppImpl::isEntityListOpen>(this);
+			.is_selected.bind<&StudioAppImpl::isEntityListOpen>(this);
 		addAction<&StudioAppImpl::toggleSettings>(ICON_FA_COGS "Settings", "Toggle settings UI", "settings")
-			.is_selected.bind<StudioAppImpl, &StudioAppImpl::areSettingsOpen>(this);
+			.is_selected.bind<&StudioAppImpl::areSettingsOpen>(this);
 		addAction<&StudioAppImpl::showPackDataDialog>(ICON_FA_FILE_ARCHIVE_O "Pack data", "Pack data", "pack_data");
 	}
 
@@ -2138,7 +2145,7 @@ public:
 				m_watched_plugin.basename = basename;
 				PathUtils::getDir(Span(dir), src);
 				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
-				m_watched_plugin.watcher->getCallback().bind<StudioAppImpl, &StudioAppImpl::onPluginChanged>(this);
+				m_watched_plugin.watcher->getCallback().bind<&StudioAppImpl::onPluginChanged>(this);
 				m_watched_plugin.dir = dir;
 				m_watched_plugin.plugin = loaded_plugin;
 			}
@@ -3134,10 +3141,13 @@ public:
 	Settings m_settings;
 	Array<OS::Event> m_events;
 	Vec2 m_mouse_move;
-	OS::Timer m_fps_timer;
 	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];
+	float m_fps = 0;
+	OS::Timer m_fps_timer;
+	OS::Timer m_inactive_fps_timer;
+	u32 m_fps_frame = 0;
 
 	struct PackConfig
 	{

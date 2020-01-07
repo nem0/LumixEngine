@@ -609,7 +609,7 @@ private:
 
 TerrainEditor::~TerrainEditor()
 {
-	m_world_editor.universeDestroyed().unbind<TerrainEditor, &TerrainEditor::onUniverseDestroyed>(this);
+	m_world_editor.universeDestroyed().unbind<&TerrainEditor::onUniverseDestroyed>(this);
 	if (m_brush_texture)
 	{
 		m_brush_texture->destroy();
@@ -642,9 +642,9 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 {
 	m_increase_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "Terrain editor - Increase brush size", "increaseBrushSize");
 	m_increase_brush_size->is_global = false;
-	m_increase_brush_size->func.bind<TerrainEditor, &TerrainEditor::increaseBrushSize>(this);
+	m_increase_brush_size->func.bind<&TerrainEditor::increaseBrushSize>(this);
 	m_decrease_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "Terrain editor - decrease brush size", "decreaseBrushSize");
-	m_decrease_brush_size->func.bind<TerrainEditor, &TerrainEditor::decreaseBrushSize>(this);
+	m_decrease_brush_size->func.bind<&TerrainEditor::decreaseBrushSize>(this);
 	m_decrease_brush_size->is_global = false;
 	app.addAction(m_increase_brush_size);
 	app.addAction(m_decrease_brush_size);
@@ -679,7 +679,7 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	m_is_rotate_z = false;
 	m_rotate_x_spread = m_rotate_y_spread = m_rotate_z_spread = Vec2(0, PI * 2);
 
-	editor.universeDestroyed().bind<TerrainEditor, &TerrainEditor::onUniverseDestroyed>(this);
+	editor.universeDestroyed().bind<&TerrainEditor::onUniverseDestroyed>(this);
 }
 
 
@@ -1199,13 +1199,21 @@ void TerrainEditor::onGUI()
 	switch (m_current_brush)
 	{
 		case HEIGHT:
-			if (ImGui::Button("Save heightmap"))
+			if (getMaterial() 
+				&& getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)
+				&&ImGui::Button("Save heightmap")) 
+			{
 				getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)->save();
+			}
 			break;
 		case GRASS:
 		case LAYER:
-			if (ImGui::Button("Save layermap and grassmap"))
+			if (getMaterial()
+				&& getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)
+				&& ImGui::Button("Save layermap and grassmap"))
+			{
 				getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)->save();
+			}
 			break;
 		case ENTITY: break;
 	}

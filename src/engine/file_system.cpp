@@ -216,7 +216,7 @@ struct FileSystemImpl final : public FileSystem
 	}
 
 
-	void updateAsyncTransactions() override
+	void processCallbacks() override
 	{
 		PROFILE_FUNCTION();
 

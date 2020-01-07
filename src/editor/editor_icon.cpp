@@ -64,25 +64,25 @@ struct EditorIconsImpl final : public EditorIcons
 	{
 		m_render_interface = nullptr;
 		m_icons.reserve(200);
-		editor.universeDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
-		editor.universeCreated().bind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<&EditorIconsImpl::clear>(this);
+		editor.universeCreated().bind<&EditorIconsImpl::onUniverseCreated>(this);
 		if (m_editor.getUniverse()) onUniverseCreated();
 	}
 
 
 	~EditorIconsImpl()
 	{
-		m_editor.universeDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::clear>(this);
-		m_editor.universeCreated().unbind<EditorIconsImpl, &EditorIconsImpl::onUniverseCreated>(this);
+		m_editor.universeDestroyed().unbind<&EditorIconsImpl::clear>(this);
+		m_editor.universeCreated().unbind<&EditorIconsImpl::onUniverseCreated>(this);
 		setRenderInterface(nullptr);
 
 		if(m_editor.getUniverse())
 		{
 			auto& universe = *m_editor.getUniverse();
-			universe.entityCreated().unbind<EditorIconsImpl, &EditorIconsImpl::onEntityCreated>(this);
-			universe.entityDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::destroyIcon>(this);
-			universe.componentAdded().unbind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
-			universe.componentDestroyed().unbind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
+			universe.entityCreated().unbind<&EditorIconsImpl::onEntityCreated>(this);
+			universe.entityDestroyed().unbind<&EditorIconsImpl::destroyIcon>(this);
+			universe.componentAdded().unbind<&EditorIconsImpl::refreshIcon>(this);
+			universe.componentDestroyed().unbind<&EditorIconsImpl::refreshIcon>(this);
 		}
 	}
 
@@ -90,10 +90,10 @@ struct EditorIconsImpl final : public EditorIcons
 	void onUniverseCreated()
 	{
 		auto& universe = *m_editor.getUniverse();
-		universe.entityCreated().bind<EditorIconsImpl, &EditorIconsImpl::onEntityCreated>(this);
-		universe.entityDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::destroyIcon>(this);
-		universe.componentAdded().bind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
-		universe.componentDestroyed().bind<EditorIconsImpl, &EditorIconsImpl::refreshIcon>(this);
+		universe.entityCreated().bind<&EditorIconsImpl::onEntityCreated>(this);
+		universe.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
+		universe.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
+		universe.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
 	}
 
 

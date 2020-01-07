@@ -68,20 +68,20 @@ GameView::GameView(StudioApp& app)
 
 	WorldEditor& editor = app.getWorldEditor();
 	Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "Toggle game view", "game_view");
-	action->func.bind<GameView, &GameView::onAction>(this);
-	action->is_selected.bind<GameView, &GameView::isOpen>(this);
+	action->func.bind<&GameView::onAction>(this);
+	action->is_selected.bind<&GameView::isOpen>(this);
 	app.addWindowAction(action);
 
 	Action* fullscreen_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen");
-	fullscreen_action->func.bind<GameView, &GameView::toggleFullscreen>(this);
+	fullscreen_action->func.bind<&GameView::toggleFullscreen>(this);
 	app.addAction(fullscreen_action);
 
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW", engine.getAllocator());
 
-	editor.universeCreated().bind<GameView, &GameView::onUniverseCreated>(this);
-	editor.universeDestroyed().bind<GameView, &GameView::onUniverseDestroyed>(this);
+	editor.universeCreated().bind<&GameView::onUniverseCreated>(this);
+	editor.universeDestroyed().bind<&GameView::onUniverseDestroyed>(this);
 	if (editor.getUniverse()) onUniverseCreated();
 
 	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
@@ -95,8 +95,8 @@ GameView::GameView(StudioApp& app)
 
 GameView::~GameView()
 {
-	m_editor.universeCreated().unbind<GameView, &GameView::onUniverseCreated>(this);
-	m_editor.universeDestroyed().unbind<GameView, &GameView::onUniverseDestroyed>(this);
+	m_editor.universeCreated().unbind<&GameView::onUniverseCreated>(this);
+	m_editor.universeDestroyed().unbind<&GameView::onUniverseDestroyed>(this);
 	auto* gui = static_cast<GUISystem*>(m_editor.getEngine().getPluginManager().getPlugin("gui"));
 	if (gui)
 	{

@@ -97,7 +97,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		, m_on_update(m_allocator)
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 0.3f);
-		m_universe.entityTransformed().bind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
+		m_universe.entityTransformed().bind<&NavigationSceneImpl::onEntityMoved>(this);
 		universe.registerComponentType(NAVMESH_AGENT_TYPE
 			, this
 			, &NavigationSceneImpl::createAgent
@@ -115,7 +115,7 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	~NavigationSceneImpl()
 	{
-		m_universe.entityTransformed().unbind<NavigationSceneImpl, &NavigationSceneImpl::onEntityMoved>(this);
+		m_universe.entityTransformed().unbind<&NavigationSceneImpl::onEntityMoved>(this);
 		for(RecastZone& zone : m_zones) {
 			clearNavmesh(zone);
 		}
@@ -699,7 +699,7 @@ struct NavigationSceneImpl final : public NavigationScene
 		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
 
 		FileSystem::ContentCallback cb;
-		cb.bind<LoadCallback, &LoadCallback::fileLoaded>(lcb);
+		cb.bind<&LoadCallback::fileLoaded>(lcb);
 		FileSystem& fs = m_engine.getFileSystem();
 		return fs.getContent(Path(path), cb).isValid();
 	}

@@ -96,11 +96,11 @@ struct TextMesh
 				m_font_resource->removeRef(*m_font);
 				m_font = nullptr;
 			}
-			m_font_resource->getObserverCb().unbind<TextMesh, &TextMesh::onFontLoaded>(this);
+			m_font_resource->getObserverCb().unbind<&TextMesh::onFontLoaded>(this);
 			m_font_resource->getResourceManager().unload(*m_font_resource);
 		}
 		m_font_resource = res;
-		if (res) res->onLoaded<TextMesh, &TextMesh::onFontLoaded>(this); 
+		if (res) res->onLoaded<&TextMesh::onFontLoaded>(this); 
 	}
 
 	void onFontLoaded(Resource::State, Resource::State new_state, Resource&)
@@ -160,8 +160,8 @@ public:
 
 	~RenderSceneImpl()
 	{
-		m_universe.entityTransformed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-		m_universe.entityDestroyed().unbind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
+		m_universe.entityTransformed().unbind<&RenderSceneImpl::onEntityMoved>(this);
+		m_universe.entityDestroyed().unbind<&RenderSceneImpl::onEntityDestroyed>(this);
 		CullingSystem::destroy(*m_culling_system);
 	}
 
@@ -251,13 +251,13 @@ public:
 		m_model_instances.clear();
 		for(auto iter = m_model_entity_map.begin(), end = m_model_entity_map.end(); iter != end; ++iter) {
 			Model* model = iter.key();
-			model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(this);
+			model->getObserverCb().unbind<&RenderSceneImpl::modelStateChanged>(this);
 		}
 		m_model_entity_map.clear();
 
 		for(auto iter = m_material_decal_map.begin(), end = m_material_decal_map.end(); iter != end; ++iter) {
 			Material* mat = iter.key();
-			mat->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::decalMaterialStateChanged>(this);
+			mat->getObserverCb().unbind<&RenderSceneImpl::decalMaterialStateChanged>(this);
 		}
 		m_material_decal_map.clear();
 
@@ -3135,7 +3135,7 @@ public:
 		else {
 			d.next_decal = INVALID_ENTITY;
 			m_material_decal_map.insert(material, entity);
-			material->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::decalMaterialStateChanged>(this);
+			material->getObserverCb().bind<&RenderSceneImpl::decalMaterialStateChanged>(this);
 		}
 	}
 
@@ -3152,7 +3152,7 @@ public:
 		else {
 			r.next_model = INVALID_ENTITY;
 			m_model_entity_map.insert(model, entity);
-			model->getObserverCb().bind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(this);
+			model->getObserverCb().bind<&RenderSceneImpl::modelStateChanged>(this);
 		}
 	}
 
@@ -3173,7 +3173,7 @@ public:
 			}
 			else {
 				m_model_entity_map.erase(model);
-				model->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::modelStateChanged>(this);
+				model->getObserverCb().unbind<&RenderSceneImpl::modelStateChanged>(this);
 			}
 		}
 	}
@@ -3195,7 +3195,7 @@ public:
 			}
 			else {
 				m_material_decal_map.erase(material);
-				material->getObserverCb().unbind<RenderSceneImpl, &RenderSceneImpl::decalMaterialStateChanged>(this);
+				material->getObserverCb().unbind<&RenderSceneImpl::decalMaterialStateChanged>(this);
 			}
 		}
 	}
@@ -3489,8 +3489,8 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_light_probe_grids(m_allocator)
 {
 
-	m_universe.entityTransformed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityMoved>(this);
-	m_universe.entityDestroyed().bind<RenderSceneImpl, &RenderSceneImpl::onEntityDestroyed>(this);
+	m_universe.entityTransformed().bind<&RenderSceneImpl::onEntityMoved>(this);
+	m_universe.entityDestroyed().bind<&RenderSceneImpl::onEntityDestroyed>(this);
 	m_culling_system = CullingSystem::create(m_allocator, engine.getPageAllocator());
 	m_model_instances.reserve(5000);
 	m_mesh_sort_data.reserve(5000);

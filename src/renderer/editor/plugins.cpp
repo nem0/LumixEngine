@@ -1279,7 +1279,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
 		m_tile.entity = mesh_entity;
-		model->onLoaded<ModelPlugin, &ModelPlugin::renderPrefabSecondStage>(this);
+		model->onLoaded<&ModelPlugin::renderPrefabSecondStage>(this);
 	}
 
 
@@ -3045,8 +3045,8 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
 
-		editor.universeCreated().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+		editor.universeCreated().bind<&RenderInterfaceImpl::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<&RenderInterfaceImpl::onUniverseDestroyed>(this);
 	}
 
 
@@ -3055,8 +3055,8 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 		m_shader->getResourceManager().unload(*m_shader);
 		m_font_res->getResourceManager().unload(*m_font_res);
 
-		m_editor.universeCreated().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseCreated>(this);
-		m_editor.universeDestroyed().unbind<RenderInterfaceImpl, &RenderInterfaceImpl::onUniverseDestroyed>(this);
+		m_editor.universeCreated().unbind<&RenderInterfaceImpl::onUniverseCreated>(this);
+		m_editor.universeDestroyed().unbind<&RenderInterfaceImpl::onUniverseDestroyed>(this);
 	}
 
 

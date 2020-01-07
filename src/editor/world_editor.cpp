@@ -2074,7 +2074,7 @@ public:
 
 	void save(IOutputStream& file)
 	{
-		while (m_engine.getFileSystem().hasWork()) m_engine.getFileSystem().updateAsyncTransactions();
+		while (m_engine.getFileSystem().hasWork()) m_engine.getFileSystem().processCallbacks();
 
 		ASSERT(m_universe);
 
@@ -2563,7 +2563,7 @@ public:
 			m_universe = &m_engine.createUniverse(true);
 			m_universe_created.invoke();
 			m_universe->setName(name);
-			m_universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
+			m_universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 			m_selected_entities.clear();
             InputMemoryStream file(m_game_mode_file);
 			load(file);
@@ -3097,7 +3097,7 @@ public:
 		m_universe = &m_engine.createUniverse(true);
 		Universe* universe = m_universe;
 
-		universe->entityDestroyed().bind<WorldEditorImpl, &WorldEditorImpl::onEntityDestroyed>(this);
+		universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 
 		m_is_orbit = false;
 		m_selected_entities.clear();
