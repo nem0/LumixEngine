@@ -55,15 +55,15 @@ SceneView::SceneView(StudioApp& app)
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW", engine.getAllocator());
-	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<SceneView, &SceneView::renderSelection>(this);
-	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<SceneView, &SceneView::renderGizmos>(this);
-	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<SceneView, &SceneView::renderIcons>(this);
+	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
+	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
+	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<&SceneView::renderIcons>(this);
 
 	ResourceManagerHub& rm = engine.getResourceManager();
 	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 
-	m_editor.universeCreated().bind<SceneView, &SceneView::onUniverseCreated>(this);
-	m_editor.universeDestroyed().bind<SceneView, &SceneView::onUniverseDestroyed>(this);
+	m_editor.universeCreated().bind<&SceneView::onUniverseCreated>(this);
+	m_editor.universeDestroyed().bind<&SceneView::onUniverseDestroyed>(this);
 
 	m_toggle_gizmo_step_action =
 		LUMIX_NEW(allocator, Action)("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep");
@@ -96,7 +96,7 @@ SceneView::SceneView(StudioApp& app)
 
 	m_camera_speed_action = LUMIX_NEW(allocator, Action)("Camera speed", "Reset camera speed", "cameraSpeed");
 	m_camera_speed_action->is_global = false;
-	m_camera_speed_action->func.bind<SceneView, &SceneView::resetCameraSpeed>(this);
+	m_camera_speed_action->func.bind<&SceneView::resetCameraSpeed>(this);
 	m_app.addAction(m_camera_speed_action);
 
 	const ResourceType pipeline_type("pipeline");
@@ -112,8 +112,8 @@ void SceneView::resetCameraSpeed()
 
 SceneView::~SceneView()
 {
-	m_editor.universeCreated().unbind<SceneView, &SceneView::onUniverseCreated>(this);
-	m_editor.universeDestroyed().unbind<SceneView, &SceneView::onUniverseDestroyed>(this);
+	m_editor.universeCreated().unbind<&SceneView::onUniverseCreated>(this);
+	m_editor.universeDestroyed().unbind<&SceneView::onUniverseDestroyed>(this);
 	Pipeline::destroy(m_pipeline);
 	m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
 	m_pipeline = nullptr;

@@ -298,7 +298,7 @@ struct PipelineImpl final : Pipeline
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
 		m_cube_ib = m_renderer.createBuffer(ib_mem, (u32)gpu::BufferFlags::IMMUTABLE);
 
-		m_resource->onLoaded<PipelineImpl, &PipelineImpl::onStateChanged>(this);
+		m_resource->onLoaded<&PipelineImpl::onStateChanged>(this);
 
 		GlobalState global_state;
 		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));

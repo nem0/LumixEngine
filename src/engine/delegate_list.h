@@ -17,10 +17,10 @@ public:
 	{
 	}
 
-	template <typename C, R (C::*Function)(Args...)> void bind(C* instance)
+	template <auto Function, typename C> void bind(C* instance)
 	{
 		Delegate<R(Args...)> cb;
-		cb.template bind<C, Function>(instance);
+		cb.template bind<Function>(instance);
 		m_delegates.push(cb);
 	}
 
@@ -31,10 +31,24 @@ public:
 		m_delegates.push(cb);
 	}
 
-	template <typename C, R (C::*Function)(Args...)> void unbind(C* instance)
+	template <R (*Function)(Args...)> void unbind()
 	{
 		Delegate<R(Args...)> cb;
-		cb.template bind<C, Function>(instance);
+		cb.template bind<Function>();
+		for (int i = 0; i < m_delegates.size(); ++i)
+		{
+			if (m_delegates[i] == cb)
+			{
+				m_delegates.swapAndPop(i);
+				break;
+			}
+		}
+	}
+
+	template <auto Function, typename C> void unbind(C* instance)
+	{
+		Delegate<R(Args...)> cb;
+		cb.template bind<Function>(instance);
 		for (int i = 0; i < m_delegates.size(); ++i)
 		{
 			if (m_delegates[i] == cb)

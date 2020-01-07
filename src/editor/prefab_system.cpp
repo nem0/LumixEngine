@@ -172,18 +172,16 @@ public:
 		, m_prefabs(editor.getAllocator())
 		, m_deferred_instances(editor.getAllocator())
 	{
-		editor.universeCreated().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
+		editor.universeCreated().bind<&PrefabSystemImpl::onUniverseCreated>(this);
+		editor.universeDestroyed().bind<&PrefabSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(editor.getUniverse());
 	}
 
 
 	~PrefabSystemImpl()
 	{
-		m_editor.universeCreated()
-			.unbind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseCreated>(this);
-		m_editor.universeDestroyed()
-			.unbind<PrefabSystemImpl, &PrefabSystemImpl::onUniverseDestroyed>(this);
+		m_editor.universeCreated().unbind<&PrefabSystemImpl::onUniverseCreated>(this);
+		m_editor.universeDestroyed().unbind<&PrefabSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(nullptr);
 	}
 
@@ -195,15 +193,12 @@ public:
 	{
 		if (m_universe)
 		{
-			m_universe->entityDestroyed()
-				.unbind<PrefabSystemImpl, &PrefabSystemImpl::onEntityDestroyed>(
-					this);
+			m_universe->entityDestroyed().unbind<&PrefabSystemImpl::onEntityDestroyed>(this);
 		}
 		m_universe = universe;
 		if (m_universe)
 		{
-			m_universe->entityDestroyed()
-				.bind<PrefabSystemImpl, &PrefabSystemImpl::onEntityDestroyed>(this);
+			m_universe->entityDestroyed().bind<&PrefabSystemImpl::onEntityDestroyed>(this);
 		}
 	}
 
@@ -580,7 +575,7 @@ public:
 			m_editor.destroyEntities(&entities[0], entities.size());
 			auto* res = m_editor.getEngine().getResourceManager().load<PrefabResource>(path);
 			FileSystem& fs = m_editor.getEngine().getFileSystem();
-			while (fs.hasWork()) fs.updateAsyncTransactions();
+			while (fs.hasWork()) fs.processCallbacks();
 			instantiatePrefab(*res, tr.pos, tr.rot, tr.scale);
 
 			m_editor.endCommandGroup();

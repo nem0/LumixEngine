@@ -56,7 +56,7 @@ Terrain::GrassType::~GrassType()
 {
 	if (m_grass_model)
 	{
-		m_grass_model->getObserverCb().unbind<Terrain, &Terrain::grassLoaded>(&m_terrain);
+		m_grass_model->getObserverCb().unbind<&Terrain::grassLoaded>(&m_terrain);
 		m_grass_model->getResourceManager().unload(*m_grass_model);
 	}
 }
@@ -184,13 +184,13 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	if (type.m_grass_model)
 	{
 		type.m_grass_model->getResourceManager().unload(*type.m_grass_model);
-		type.m_grass_model->getObserverCb().unbind<Terrain, &Terrain::grassLoaded>(this);
+		type.m_grass_model->getObserverCb().unbind<&Terrain::grassLoaded>(this);
 		type.m_grass_model = nullptr;
 	}
 	if (path.isValid())
 	{
 		type.m_grass_model = m_scene.getEngine().getResourceManager().load<Model>(path);
-		type.m_grass_model->onLoaded<Terrain, &Terrain::grassLoaded>(this);
+		type.m_grass_model->onLoaded<&Terrain::grassLoaded>(this);
 	}
 }
 	
@@ -392,11 +392,11 @@ void Terrain::setMaterial(Material* material)
 	if (material != m_material) {
 		if (m_material) {
 			m_material->getResourceManager().unload(*m_material);
-			m_material->getObserverCb().unbind<Terrain, &Terrain::onMaterialLoaded>(this);
+			m_material->getObserverCb().unbind<&Terrain::onMaterialLoaded>(this);
 		}
 		m_material = material;
 		if (m_material) {
-			m_material->onLoaded<Terrain, &Terrain::onMaterialLoaded>(this);
+			m_material->onLoaded<&Terrain::onMaterialLoaded>(this);
 		}
 	}
 	else if(material) {

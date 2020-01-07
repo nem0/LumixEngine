@@ -22,19 +22,19 @@ private:
 		InternalFunction second;
 	};
 
-	template <R (*Function)(Args...)> static LUMIX_FORCE_INLINE R FunctionStub(InstancePtr, Args... args)
+	template <R (*Function)(Args...)> static R FunctionStub(InstancePtr, Args... args)
 	{
 		return (Function)(args...);
 	}
 
 	template <class C, R(C::*Function)(Args...)>
-	static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, Args... args)
+	static R ClassMethodStub(InstancePtr instance, Args... args)
 	{
 		return (static_cast<C*>(instance)->*Function)(args...);
 	}
 
 	template <class C, R(C::*Function)(Args...) const>
-	static LUMIX_FORCE_INLINE R ClassMethodStub(InstancePtr instance, Args... args)
+	static R ClassMethodStub(InstancePtr instance, Args... args)
 	{
 		return (static_cast<C*>(instance)->*Function)(args...);
 	}
@@ -54,16 +54,10 @@ public:
 		m_stub.second = &FunctionStub<Function>;
 	}
 
-	template <class C, R (C::*Function)(Args...)> void bind(C* instance)
+	template <auto F, class C> void bind(C* instance)
 	{
 		m_stub.first = instance;
-		m_stub.second = &ClassMethodStub<C, Function>;
-	}
-
-	template <class C, R(C::*Function)(Args...) const> void bind(C* instance)
-	{
-		m_stub.first = instance;
-		m_stub.second = &ClassMethodStub<C, Function>;
+		m_stub.second = &ClassMethodStub<C, F>;
 	}
 
 	R invoke(Args... args) const

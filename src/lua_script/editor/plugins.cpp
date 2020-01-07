@@ -528,8 +528,8 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 		, autocomplete(_app.getWorldEditor().getAllocator())
 	{
 		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Script Console", "Toggle script console", "script_console");
-		action->func.bind<ConsolePlugin, &ConsolePlugin::toggleOpen>(this);
-		action->is_selected.bind<ConsolePlugin, &ConsolePlugin::isOpen>(this);
+		action->func.bind<&ConsolePlugin::toggleOpen>(this);
+		action->is_selected.bind<&ConsolePlugin::isOpen>(this);
 		app.addWindowAction(action);
 		buf[0] = '\0';
 	}

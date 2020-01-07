@@ -357,11 +357,11 @@ struct AnimationSceneImpl final : public AnimationScene
 				animator.resource->destroyRuntime(*animator.ctx);
 				animator.ctx = nullptr;
 			}
-			animator.resource->getObserverCb().unbind<AnimationSceneImpl, &AnimationSceneImpl::onControllerResourceChanged>(this);
+			animator.resource->getObserverCb().unbind<&AnimationSceneImpl::onControllerResourceChanged>(this);
 		}
 		animator.resource = res;
 		if (animator.resource != nullptr) {
-			animator.resource->onLoaded<AnimationSceneImpl, &AnimationSceneImpl::onControllerResourceChanged>(this);
+			animator.resource->onLoaded<&AnimationSceneImpl::onControllerResourceChanged>(this);
 		}
 	}
 

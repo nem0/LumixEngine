@@ -196,7 +196,7 @@ struct GUISystemImpl final : public GUISystem
 
 		auto* pipeline = m_interface->getPipeline();
 		pipeline->addCustomCommandHandler("renderIngameGUI")
-			.callback.bind<GUISystemImpl, &GUISystemImpl::pipelineCallback>(this);
+			.callback.bind<&GUISystemImpl::pipelineCallback>(this);
 	}
 
 

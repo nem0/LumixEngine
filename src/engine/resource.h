@@ -56,9 +56,9 @@ public:
 	const Path& getPath() const { return m_path; }
 	ResourceManager& getResourceManager() { return m_resource_manager; }
 
-	template <typename C, void (C::*Function)(State, State, Resource&)> void onLoaded(C* instance)
+	template <auto Function, typename C> void onLoaded(C* instance)
 	{
-		m_cb.bind<C, Function>(instance);
+		m_cb.bind<Function>(instance);
 		if (isReady())
 		{
 			(instance->*Function)(State::READY, State::READY, *this);

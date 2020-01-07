@@ -228,8 +228,8 @@ public:
 		IAllocator& allocator = app.getWorldEditor().getAllocator();
 
 		Action* action = LUMIX_NEW(allocator, Action)("GUI Editor", "Toggle gui editor", "gui_editor");
-		action->func.bind<GUIEditor, &GUIEditor::onAction>(this);
-		action->is_selected.bind<GUIEditor, &GUIEditor::isOpen>(this);
+		action->func.bind<&GUIEditor::onAction>(this);
+		action->is_selected.bind<&GUIEditor::isOpen>(this);
 		app.addWindowAction(action);
 
 		m_editor = &app.getWorldEditor();
@@ -237,15 +237,15 @@ public:
 		PipelineResource* pres = m_editor->getEngine().getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
 		m_pipeline = Pipeline::create(renderer, pres, "", allocator);
 
-		m_editor->universeCreated().bind<GUIEditor, &GUIEditor::onUniverseChanged>(this);
-		m_editor->universeDestroyed().bind<GUIEditor, &GUIEditor::onUniverseChanged>(this);
+		m_editor->universeCreated().bind<&GUIEditor::onUniverseChanged>(this);
+		m_editor->universeDestroyed().bind<&GUIEditor::onUniverseChanged>(this);
 	}
 
 
 	~GUIEditor()
 	{
-		m_editor->universeCreated().unbind<GUIEditor, &GUIEditor::onUniverseChanged>(this);
-		m_editor->universeDestroyed().unbind<GUIEditor, &GUIEditor::onUniverseChanged>(this);
+		m_editor->universeCreated().unbind<&GUIEditor::onUniverseChanged>(this);
+		m_editor->universeDestroyed().unbind<&GUIEditor::onUniverseChanged>(this);
 		Pipeline::destroy(m_pipeline);
 	}
 

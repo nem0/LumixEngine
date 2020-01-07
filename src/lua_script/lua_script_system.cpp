@@ -1095,14 +1095,14 @@ namespace Lumix
 				if (inst.m_state) destroyInstance(cmp, inst);
 				inst.m_properties.clear();
 				auto& cb = inst.m_script->getObserverCb();
-				cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
+				cb.unbind<&ScriptComponent::onScriptLoaded>(&cmp);
 				inst.m_script->getResourceManager().unload(*inst.m_script);
 			}
 			ResourceManagerHub& rm = m_system.m_engine.getResourceManager();
 			inst.m_script = path.isValid() ? rm.load<LuaScript>(path) : nullptr;
 			if (inst.m_script)
 			{
-				inst.m_script->onLoaded<ScriptComponent, &ScriptComponent::onScriptLoaded>(&cmp);
+				inst.m_script->onLoaded<&ScriptComponent::onScriptLoaded>(&cmp);
 			}
 		}
 
@@ -1183,9 +1183,9 @@ namespace Lumix
 			m_gui_scene = (GUIScene*)m_universe.getScene(crc32("gui"));
 			if (m_gui_scene)
 			{
-				m_gui_scene->buttonClicked().bind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onButtonClicked>(this);
-				m_gui_scene->rectHovered().bind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onRectHovered>(this);
-				m_gui_scene->rectHoveredOut().bind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onRectHoveredOut>(this);
+				m_gui_scene->buttonClicked().bind<&LuaScriptSceneImpl::onButtonClicked>(this);
+				m_gui_scene->rectHovered().bind<&LuaScriptSceneImpl::onRectHovered>(this);
+				m_gui_scene->rectHoveredOut().bind<&LuaScriptSceneImpl::onRectHoveredOut>(this);
 			}
 		}
 
@@ -1194,9 +1194,9 @@ namespace Lumix
 		{
 			if (m_gui_scene)
 			{
-				m_gui_scene->buttonClicked().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onButtonClicked>(this);
-				m_gui_scene->rectHovered().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onRectHovered>(this);
-				m_gui_scene->rectHoveredOut().unbind<LuaScriptSceneImpl, &LuaScriptSceneImpl::onRectHoveredOut>(this);
+				m_gui_scene->buttonClicked().unbind<&LuaScriptSceneImpl::onButtonClicked>(this);
+				m_gui_scene->rectHovered().unbind<&LuaScriptSceneImpl::onRectHovered>(this);
+				m_gui_scene->rectHoveredOut().unbind<&LuaScriptSceneImpl::onRectHoveredOut>(this);
 			}
 			m_gui_scene = nullptr;
 			m_scripts_start_called = false;
@@ -1226,7 +1226,7 @@ namespace Lumix
 				if (scr.m_script)
 				{
 					auto& cb = scr.m_script->getObserverCb();
-					cb.unbind<ScriptComponent, &ScriptComponent::onScriptLoaded>(script);
+					cb.unbind<&ScriptComponent::onScriptLoaded>(script);
 					m_system.getScriptManager().unload(*scr.m_script);
 				}
 			}

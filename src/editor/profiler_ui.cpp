@@ -111,7 +111,7 @@ struct ProfilerUIImpl final : public ProfilerUI
 	{
 		while (m_engine.getFileSystem().hasWork())
 		{
-			m_engine.getFileSystem().updateAsyncTransactions();
+			m_engine.getFileSystem().processCallbacks();
 		}
 
 		m_allocation_root->clear(m_allocator);

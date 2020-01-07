@@ -44,7 +44,7 @@ public:
 
 	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;
-	virtual void updateAsyncTransactions() = 0;
+	virtual void processCallbacks() = 0;
 	virtual bool hasWork() = 0;
 
 	virtual bool getContentSync(const Path& file, Ref<Array<u8>> content) =  0;
