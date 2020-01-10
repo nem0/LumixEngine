@@ -119,7 +119,6 @@ public:
 	const Transform& getTransform(EntityRef entity) const;
 	void setRotation(EntityRef entity, float x, float y, float z, float w);
 	void setRotation(EntityRef entity, const Quat& rot);
-	void setPosition(EntityRef entity, double x, double y, double z);
 	void setPosition(EntityRef entity, const DVec3& pos);
 	void setScale(EntityRef entity, float scale);
 	EntityPtr instantiatePrefab(const PrefabResource& prefab,

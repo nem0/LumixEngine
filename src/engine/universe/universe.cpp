@@ -90,7 +90,7 @@ const Quat& Universe::getRotation(EntityRef entity) const
 void Universe::transformEntity(EntityRef entity, bool update_local)
 {
 	const int hierarchy_idx = m_entities[entity.index].hierarchy;
-	entityTransformed().invoke(entity);
+	m_entity_moved.invoke(entity);
 	if (hierarchy_idx >= 0) {
 		Hierarchy& h = m_hierarchy[hierarchy_idx];
 		const Transform my_transform = getTransform(entity);
@@ -203,12 +203,6 @@ Matrix Universe::getRelativeMatrix(EntityRef entity, const DVec3& base_pos) cons
 	mtx.setTranslation((transform.pos - base_pos).toFloat());
 	mtx.multiply3x3(transform.scale);
 	return mtx;
-}
-
-
-void Universe::setPosition(EntityRef entity, double x, double y, double z)
-{
-	setPosition(entity, DVec3(x, y, z));
 }
 
 

@@ -892,6 +892,7 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset) {
 	checkThread();
+	ASSERT(binding_idx < 2);
 	if(buffer.isValid()) {
 		const GLuint gl_handle = g_gpu.buffers[buffer.value].handle;
 		CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
@@ -1097,8 +1098,12 @@ void drawArrays(u32 offset, u32 count, PrimitiveType type)
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size)
 {
 	checkThread();
-	const GLuint buf = g_gpu.buffers[buffer.value].handle;
-	CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size));
+	if (buffer.isValid()) {
+		const GLuint buf = g_gpu.buffers[buffer.value].handle;
+		CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size));
+		return;
+	}
+	CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, 0, offset, size));
 }
 
 
@@ -1107,7 +1112,9 @@ void* map(BufferHandle buffer, size_t size)
 	checkThread();
 	const Buffer& b = g_gpu.buffers[buffer.value];
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
-	const GLbitfield gl_flags = GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT;
+	// we map persistently here because of what appears to be a bug in amd driver 
+	// it thinks a shader access mapped vertex buffer even when we unbind all vertex buffers before the drawcall
+	const GLbitfield gl_flags = GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
 	return glMapNamedBufferRange(b.handle, 0, size, gl_flags);
 }
 
@@ -1302,7 +1309,7 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	CHECK_GL(glCreateBuffers(1, &buf));
 	
 	GLbitfield gl_flags = 0;
-	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT;
+	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
 	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
 
 	g_gpu.buffers[buffer.value].handle = buf;
@@ -1985,6 +1992,7 @@ bool init(void* window_handle, u32 init_flags)
 	const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
 	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
 	glShaderSource(vs, 1, &vs_src, nullptr);
+	glCompileShader(vs);
 	glAttachShader(p.handle, vs);
 	CHECK_GL(glLinkProgram(p.handle));
 	glDeleteShader(vs);

@@ -831,40 +831,33 @@ public:
 		float time_delta = m_editor->getEngine().getLastTimeDelta();
 
 		ImGuiIO& io = ImGui::GetIO();
-		if (!io.KeyShift)
-		{
+		if (!io.KeyShift) {
 			m_editor->setSnapMode(false, false);
 		}
-		else if (io.KeyCtrl)
-		{
+		else if (io.KeyCtrl) {
 			m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
 		}
-		if (m_custom_pivot_action->isActive())
-		{
-			m_editor->setCustomPivot();
-		}
+		if (m_custom_pivot_action->isActive()) m_editor->setCustomPivot();
 
 		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
 
 		++m_fps_frame;
-		if (m_fps_timer.getTimeSinceTick() > 1.0f)
-		{
+		if (m_fps_timer.getTimeSinceTick() > 1.0f) {
 			m_fps = m_fps_frame / m_fps_timer.tick();
 			m_fps_frame = 0;
 		}
 
-		if (m_deferred_game_mode_exit)
-		{
+		if (m_deferred_game_mode_exit) {
 			m_deferred_game_mode_exit = false;
 			m_editor->toggleGameMode();
 		}
 
-		for (auto* plugin : m_gui_plugins)
-		{
+		for (auto* plugin : m_gui_plugins) {
 			plugin->update(time_delta);
 		}
+
 		m_asset_browser->update();
 		m_log_ui->update(time_delta);
 
@@ -2993,7 +2986,8 @@ public:
 
 	int getEventsCount() const override { return m_events.size(); }
 
-
+	
+	// TODO remove
 	Vec2 getMouseMove() const override { return m_mouse_move; }
 
 

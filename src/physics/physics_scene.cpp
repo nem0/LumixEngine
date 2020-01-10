@@ -1624,7 +1624,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 			controller.m_controller->move(toPhysx(dif), 0.001f, time_delta, filters);
 			PxExtendedVec3 p = controller.m_controller->getFootPosition();
 
-			m_universe.setPosition(controller.m_entity, (float)p.x, (float)p.y, (float)p.z);
+			m_universe.setPosition(controller.m_entity, {p.x, p.y, p.z});
 		}
 	}
 
@@ -5020,6 +5020,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	PhysxContactCallback m_contact_callback;
 	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
 	PxScene* m_scene;
+	// TODO reverse dependency, lua_script should depend on physics 
 	LuaScriptScene* m_script_scene;
 	PhysicsSystem* m_system;
 	PxRigidDynamic* m_dummy_actor;

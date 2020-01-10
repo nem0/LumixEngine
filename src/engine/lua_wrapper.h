@@ -72,16 +72,16 @@ inline int traceback (lua_State *L) {
 }
 
 
-inline bool pcall(lua_State* L, int nargs)
+inline bool pcall(lua_State* L, int nargs, int nres)
 {
 	lua_pushcfunction(L, traceback);
 	lua_insert(L, -2 - nargs);
-	if (lua_pcall(L, nargs, 0, -2 - nargs) != 0) {
+	if (lua_pcall(L, nargs, nres, -2 - nargs) != 0) {
 		logError("Engine") << lua_tostring(L, -1);
 		lua_pop(L, 2);
 		return false;
 	}
-	lua_pop(L, 1);
+	lua_remove(L, -1 - nres);
 	return true;
 }
 
@@ -105,6 +105,23 @@ inline bool execute(lua_State* L
 	}
 	lua_pop(L, 1);
 	return true;
+}
+
+
+inline void get_tail(lua_State* L) {}
+
+template <typename... Args>
+void get_tail(lua_State* L, const char* head, Args... tail) {
+	lua_getfield(L, -1, head);
+	lua_remove(L, -2);
+	get_tail(L, tail...);
+}
+
+
+template <typename... Args>
+void get(lua_State* L, const char* head, Args... tail) {
+	lua_getglobal(L, head);
+	get_tail(L, tail...);
 }
 
 template <typename T> inline bool checkField(lua_State* L, int idx, const char* k, T* out)
@@ -605,10 +622,6 @@ template <> inline void push(lua_State* L, int value)
 template <> inline void push(lua_State* L, u16 value)
 {
 	lua_pushinteger(L, value);
-}
-template <> inline void push(lua_State* L, const Path& value)
-{
-	lua_pushstring(L, value.c_str());
 }
 template <> inline void push(lua_State* L, u8 value)
 {

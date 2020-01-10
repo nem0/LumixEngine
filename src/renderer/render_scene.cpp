@@ -20,7 +20,6 @@
 #include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
-#include "lua_script/lua_script_system.h"
 #include "renderer/culling_system.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
@@ -3540,7 +3539,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getTerrainMaterial);
 	REGISTER_FUNCTION(getTerrainNormalAt);
 	REGISTER_FUNCTION(setTerrainHeightAt);
-	REGISTER_FUNCTION(enableModelInstance);
+	//REGISTER_FUNCTION(enableModelInstance);
 	REGISTER_FUNCTION(getPoseBonePosition);
 
 	#undef REGISTER_FUNCTION
@@ -3555,7 +3554,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(destroyPipeline);
 	REGISTER_FUNCTION(setPipelineScene);
 	REGISTER_FUNCTION(getPipelineScene);
-	REGISTER_FUNCTION(setModelInstancePath);
+	//REGISTER_FUNCTION(setModelInstancePath);
 	REGISTER_FUNCTION(getModelBoneIndex);
 	REGISTER_FUNCTION(makeScreenshot);
 	REGISTER_FUNCTION(compareTGA);

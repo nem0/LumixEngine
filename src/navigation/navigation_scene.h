@@ -54,7 +54,6 @@ public:
 	virtual const dtCrowdAgent* getDetourAgent(EntityRef entity) = 0;
 	virtual bool isNavmeshReady(EntityRef zone) const = 0;
 	virtual bool hasDebugDrawData(EntityRef zoneko) const = 0;
-	virtual DelegateList<void(float)>& onUpdate() = 0;
 	virtual void setGeneratorParams(float cell_size,
 		float cell_height,
 		float agent_radius,
