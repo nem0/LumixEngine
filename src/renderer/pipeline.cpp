@@ -723,7 +723,7 @@ struct PipelineImpl final : Pipeline
 		}
 		{
 			PROFILE_BLOCK("lua pipeline main");
-			LuaWrapper::pcall(m_lua_state, 0);
+			LuaWrapper::pcall(m_lua_state, 0, 0);
 		}
 		lua_pop(m_lua_state, 1);
 

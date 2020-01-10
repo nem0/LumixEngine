@@ -28,7 +28,7 @@ public:
 	static Engine* create(const char* working_dir, IAllocator& allocator);
 	static void destroy(Engine* engine, IAllocator& allocator);
 
-	virtual Universe& createUniverse(bool set_lua_globals) = 0;
+	virtual Universe& createUniverse(bool is_main_universe) = 0;
 	virtual void destroyUniverse(Universe& context) = 0;
 	virtual void setPlatformData(const PlatformData& data) = 0;
 	virtual const PlatformData& getPlatformData() = 0;

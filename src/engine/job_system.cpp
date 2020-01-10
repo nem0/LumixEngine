@@ -246,7 +246,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 	Job j;
 	j.data = data;
 	j.task = task;
-	j.worker_index = worker_index % getWorkersCount();
+	j.worker_index = worker_index != ANY_WORKER ? worker_index % getWorkersCount() : worker_index;
 	j.precondition = precondition;
 
 	if (do_lock) g_system->m_sync.enter();

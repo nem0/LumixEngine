@@ -174,29 +174,25 @@ public:
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
 
-	Universe& createUniverse(bool set_lua_globals) override
+	Universe& createUniverse(bool is_main_universe) override
 	{
 		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
-		for (auto* plugin : plugins)
-		{
+		for (auto* plugin : plugins) {
 			plugin->createScenes(*universe);
 		}
 
-		if (set_lua_globals)
-		{
-			for (auto* scene : universe->getScenes())
-			{
-				const char* name = scene->getPlugin().getName();
-				char tmp[128];
-
-				copyString(tmp, "g_scene_");
-				catString(tmp, name);
-				lua_pushlightuserdata(m_state, scene);
-				lua_setglobal(m_state, tmp);
-			}
-			lua_pushlightuserdata(m_state, universe);
-			lua_setglobal(m_state, "g_universe");
+		if (is_main_universe) {
+			lua_State* L = m_state;
+			LuaWrapper::DebugGuard guard(L);
+			lua_getglobal(L, "Lumix"); // [ Lumix ]
+			lua_getfield(L, -1, "Universe"); // [ Lumix, Universe ]
+			lua_getfield(L, -1, "new"); // [ Lumix, Universe, new ]
+			lua_insert(L, -2); // [ Lumix, new, Universe ]
+			lua_pushlightuserdata(L, universe); // [ Lumix, new, Universe, c_universe ]
+			lua_call(L, 2, 1); // [ Lumix, universe ]
+			lua_setfield(L, -2, "main_universe");
+			lua_pop(L, 1);
 		}
 
 		return *universe;

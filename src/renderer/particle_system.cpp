@@ -366,7 +366,7 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 		lua_pushinteger(L, 3);
 		lua_rawseti(L, -2, 1);
 
-		if(!LuaWrapper::pcall(L, 3)) {
+		if(!LuaWrapper::pcall(L, 3, 0)) {
 			lua_close(L);
 			return false;
 		}

@@ -566,13 +566,14 @@ struct SetPropertyLuaVisitor : public Reflection::IPropertyVisitor
 };
 
 
-	
 static int LUA_packageLoader(lua_State* L)
 {
 	const char* module = LuaWrapper::toType<const char*>(L, 1);
 	StaticString<MAX_PATH_LENGTH> tmp(module);
 	tmp << ".lua";
-	lua_getglobal(L, "g_engine");
+	lua_getglobal(L, "LumixAPI");
+	lua_getfield(L, -1, "engine");
+	lua_remove(L, -2);
 	auto* engine = (Engine*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	auto& fs = engine->getFileSystem();
@@ -655,9 +656,9 @@ static bool LUA_createComponent(Universe* universe, EntityRef entity, const char
 }
 
 
-static EntityRef LUA_createEntity(Universe* univ)
+static EntityRef LUA_createEntity(Universe* universe)
 {
-	return univ->createEntity(DVec3(0, 0, 0), Quat(0, 0, 0, 1));
+	return universe->createEntity({0, 0, 0}, Quat::IDENTITY);
 }
 
 
@@ -677,76 +678,6 @@ static int LUA_getComponentTypeByIndex(int index)
 {
 	const char* id = Reflection::getComponentTypeID(index);
 	return Reflection::getComponentType(id).index;
-}
-
-
-static int LUA_createEntityEx(lua_State* L)
-{
-	auto* ctx = LuaWrapper::checkArg<Universe*>(L, 2);
-	LuaWrapper::checkTableArg(L, 3);
-
-	EntityRef e = ctx->createEntity(DVec3(0, 0, 0), Quat(0, 0, 0, 1));
-
-	lua_pushvalue(L, 3);
-	lua_getfield(L, -1, "parent");
-	if (lua_type(L, -1) != LUA_TNIL)
-	{
-		EntityRef parent = LuaWrapper::toType<EntityRef>(L, -1);
-		ctx->setParent(parent, e);
-	}
-	lua_pop(L, 1);
-
-	lua_pushnil(L);
-	while (lua_next(L, -2) != 0)
-	{
-		const char* parameter_name = luaL_checkstring(L, -2);
-		if (equalStrings(parameter_name, "position"))
-		{
-			auto pos = LuaWrapper::toType<DVec3>(L, -1);
-			ctx->setPosition(e, pos);
-		}
-		else if (equalStrings(parameter_name, "pitch"))
-		{
-			const float angle = LuaWrapper::toType<float>(L, -1);
-			const Quat rot(Vec3(1, 0, 0), degreesToRadians(angle)); 
-			ctx->setRotation(e, rot);
-		}
-		else if (equalStrings(parameter_name, "rotation"))
-		{
-			auto rot = LuaWrapper::toType<Quat>(L, -1);
-			ctx->setRotation(e, rot);
-		}
-		else
-		{
-			ComponentType cmp_type = Reflection::getComponentType(parameter_name);
-			IScene* scene = ctx->getScene(cmp_type);
-			if (scene)
-			{
-				ComponentUID cmp(e, cmp_type, scene);
-				const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
-				ctx->createComponent(cmp_type, e);
-				lua_pushvalue(L, -1);
-				lua_pushnil(L);
-				while (lua_next(L, -2) != 0)
-				{
-					const char* property_name = luaL_checkstring(L, -2);
-					SetPropertyLuaVisitor v;
-					v.property_name = property_name;
-					v.cmp = cmp;
-					v.L = L;
-					cmp_des->visit(v);
-
-					lua_pop(L, 1);
-				}
-				lua_pop(L, 1);
-			}
-		}
-		lua_pop(L, 1);
-	}
-	lua_pop(L, 1);
-
-	LuaWrapper::push(L, e);
-	return 1;
 }
 
 
@@ -956,69 +887,67 @@ static int LUA_instantiatePrefab(lua_State* L)
 
 void registerEngineAPI(lua_State* L, Engine* engine)
 {
-	lua_pushlightuserdata(L, engine);
-	lua_setglobal(L, "g_engine");
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "engine", engine);
 
 	#define REGISTER_FUNCTION(name) \
-		LuaWrapper::createSystemFunction(L, "Engine", #name, \
+		LuaWrapper::createSystemFunction(L, "LumixAPI", #name, \
 			&LuaWrapper::wrap<LUA_##name>); \
 
 	REGISTER_FUNCTION(createComponent);
 	REGISTER_FUNCTION(createEntity);
 	REGISTER_FUNCTION(createUniverse);
 	REGISTER_FUNCTION(destroyUniverse);
-	REGISTER_FUNCTION(getComponentType);
-	REGISTER_FUNCTION(getComponentTypeByIndex);
-	REGISTER_FUNCTION(getComponentTypesCount);
-	REGISTER_FUNCTION(getEntityDirection);
+	//REGISTER_FUNCTION(getComponentType);
+	//REGISTER_FUNCTION(getComponentTypeByIndex);
+	//REGISTER_FUNCTION(getComponentTypesCount);
+	//REGISTER_FUNCTION(getEntityDirection);
 	REGISTER_FUNCTION(getEntityPosition);
 	REGISTER_FUNCTION(getEntityRotation);
-	REGISTER_FUNCTION(getLastTimeDelta);
-	REGISTER_FUNCTION(getScene);
-	REGISTER_FUNCTION(getSceneUniverse);
-	REGISTER_FUNCTION(hasFilesystemWork);
+	//REGISTER_FUNCTION(getLastTimeDelta);
+	//REGISTER_FUNCTION(getScene);
+	//REGISTER_FUNCTION(getSceneUniverse);
+	//REGISTER_FUNCTION(hasFilesystemWork);
 	REGISTER_FUNCTION(loadResource);
 	REGISTER_FUNCTION(logError);
-	REGISTER_FUNCTION(logInfo);
-	REGISTER_FUNCTION(multMatrixVec);
-	REGISTER_FUNCTION(multQuat);
-	REGISTER_FUNCTION(nextFrame);
-	REGISTER_FUNCTION(pause);
-	REGISTER_FUNCTION(processFilesystemWork);
-	REGISTER_FUNCTION(setEntityLocalPosition);
-	REGISTER_FUNCTION(setEntityLocalRotation);
+	//REGISTER_FUNCTION(logInfo);
+	//REGISTER_FUNCTION(multMatrixVec);
+	//REGISTER_FUNCTION(multQuat);
+	//REGISTER_FUNCTION(nextFrame);
+	//REGISTER_FUNCTION(pause);
+	//REGISTER_FUNCTION(processFilesystemWork);
+	//REGISTER_FUNCTION(setEntityLocalPosition);
+	//REGISTER_FUNCTION(setEntityLocalRotation);
 	REGISTER_FUNCTION(setEntityPosition);
 	REGISTER_FUNCTION(setEntityRotation);
-	REGISTER_FUNCTION(setTimeMultiplier);
-	REGISTER_FUNCTION(startGame);
+	//REGISTER_FUNCTION(setTimeMultiplier);
+	//REGISTER_FUNCTION(startGame);
 	REGISTER_FUNCTION(unloadResource);
 
-	LuaWrapper::createSystemFunction(L, "Engine", "loadUniverse", LUA_loadUniverse);
+	LuaWrapper::createSystemFunction(L, "LumixAPI", "loadUniverse", LUA_loadUniverse);
 
 	#undef REGISTER_FUNCTION
 
 	#define REGISTER_FUNCTION(F) \
 		do { \
 			auto f = &LuaWrapper::wrapMethod<&Universe::F>; \
-			LuaWrapper::createSystemFunction(L, "Engine", #F, f); \
+			LuaWrapper::createSystemFunction(L, "LumixAPI", #F, f); \
 		} while(false)
 
-	REGISTER_FUNCTION(cloneEntity);
+	//REGISTER_FUNCTION(cloneEntity);
 	REGISTER_FUNCTION(destroyEntity);
-	REGISTER_FUNCTION(findByName);
-	REGISTER_FUNCTION(getFirstChild);
-	REGISTER_FUNCTION(getFirstEntity);
-	REGISTER_FUNCTION(getNextEntity);
-	REGISTER_FUNCTION(getNextSibling);
+	//REGISTER_FUNCTION(findByName);
+	//REGISTER_FUNCTION(getFirstChild);
+	//REGISTER_FUNCTION(getFirstEntity);
+	//REGISTER_FUNCTION(getNextEntity);
+	//REGISTER_FUNCTION(getNextSibling);
 	REGISTER_FUNCTION(getParent);
-	REGISTER_FUNCTION(hasComponent);
+	//REGISTER_FUNCTION(hasComponent);
 	REGISTER_FUNCTION(setParent);
 
 	#undef REGISTER_FUNCTION
 
-	LuaWrapper::createSystemFunction(L, "Engine", "instantiatePrefab", &LUA_instantiatePrefab);
-	LuaWrapper::createSystemFunction(L, "Engine", "createEntityEx", &LUA_createEntityEx);
-	LuaWrapper::createSystemFunction(L, "Engine", "multVecQuat", &LUA_multVecQuat);
+	//LuaWrapper::createSystemFunction(L, "Engine", "instantiatePrefab", &LUA_instantiatePrefab);
+	//LuaWrapper::createSystemFunction(L, "Engine", "multVecQuat", &LUA_multVecQuat);
 
 	lua_newtable(L);
 	lua_pushvalue(L, -1);
@@ -1106,6 +1035,101 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_DEVICE_REMOVED", InputSystem::Event::DEVICE_REMOVED);
 
 	lua_pop(L, 1);
+
+	const char* entity_src = R"#(
+		Lumix = {}
+		Lumix.Entity = {}
+		function Lumix.Entity:new(_universe, _entity)
+			local e = { entity = _entity, universe = _universe }
+			setmetatable(e, self)
+			return e
+		end
+		function Lumix.Entity:destroy()
+			LumixAPI.destroyEntity(self.universe, self.entity)
+			self.entity = 0xffFFffFF
+		end
+		function Lumix.Entity:createComponent(cmp)
+			LumixAPI.createComponent(self.universe, self.entity, cmp)
+			return Lumix[cmp]:new(self.universe, self.entity)
+		end
+		function Lumix.Entity:getComponent(cmp)
+			return Lumix[cmp]:new(self.universe, self.entity)
+		end
+		Lumix.Entity.__index = function(table, key)
+			if key == "position" then
+				return LumixAPI.getEntityPosition(table.universe, table.entity)
+			elseif key == "parent" then
+				local p = LumixAPI.getParent(table.universe, table.entity)
+				return Lumix.Entity:new(table.universe, p)
+			elseif key == "rotation" then
+				return LumixAPI.getEntityRotation(table.universe, table.entity)
+			elseif key == "universe" then
+				return Universe:new(table.universe)
+			elseif Lumix.Entity[key] ~= nil then
+				return Lumix.Entity[key]
+			else 
+				error(key .. " not found")
+			end
+		end
+		Lumix.Entity.__newindex = function(table, key, value)
+			if key == "position" then
+				LumixAPI.setEntityPosition(table.universe, table.entity, value)
+			elseif key == "rotation" then
+				LumixAPI.setEntityRotation(table.universe, table.entity, value)
+			elseif key == "parent" then
+				LumixAPI.setParent(table.universe, table.entity, value.entity)
+			elseif Lumix.Entity[key] ~= nil then
+				Lumix.Entity[key] = value
+			else
+				error(key .. " not found")
+			end
+		end
+
+		Lumix.Universe = {}
+		function Lumix.Universe:create() 
+			local u = LumixAPI.createUniverse(LumixAPI.engine)
+			return Lumix.Universe:new(u)
+		end
+		function Lumix.Universe:destroy()
+			LumixAPI.destroyUniverse(LumixAPI.engine, self.value)
+		end
+		function Lumix.Universe:load(path, callback_fn)
+			LumixAPI.loadUniverse(LumixAPI.engine, self.value, path, callback_fn)
+		end
+		function Lumix.Universe:new(_universe)
+			local u = { value = _universe }
+			setmetatable(u, self)
+			self.__index = self
+			return u
+		end
+		function Lumix.Universe:createEntity()
+			local e = LumixAPI.createEntity(self.value)
+			return Lumix.Entity:new(self.value, e)
+		end
+		function Lumix.Universe:createEntityEx(desc)
+			local e = LumixAPI.createEntity(self.value)
+			local ent = Lumix.Entity:new(self.value, e)
+			for k, v in pairs(desc) do
+				if k == "position" then
+					e.position = v
+				elseif k == "rotation" then
+					e.position = v
+				else
+					local c = ent.createComponent(k)
+					for k2, v2 in pairs(v) do
+						c[k2] = v2
+					end
+				end
+			end
+			return ent
+		end
+	)#";
+
+	#define TO_STR_HELPER(x) #x
+	#define TO_STR(x) TO_STR_HELPER(x)
+	if (!LuaWrapper::execute(L, Span(entity_src, stringLength(entity_src)), __FILE__ "(" TO_STR(__LINE__) ")", 0)) {
+		logError("Engine") << "Failed to init entity api";
+	}
 
 	installLuaPackageLoader(L);
 }

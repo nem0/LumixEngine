@@ -373,8 +373,6 @@ struct NavigationSceneImpl final : public NavigationScene
 		for (RecastZone& zone : m_zones) {
 			update(zone, time_delta);
 		}
-
-		m_on_update.invoke(time_delta);
 	}
 
 	void lateUpdate(RecastZone& zone, float time_delta) {
@@ -586,12 +584,6 @@ struct NavigationSceneImpl final : public NavigationScene
 		const Vec3 vel = *(Vec3*)dt_agent->vel;
 		const DVec3 pos = m_universe.getPosition(entity);
 		render_scene->addDebugLine(pos, pos + zone_tr.rot.rotate(vel), 0xff0000ff);
-	}
-
-
-	DelegateList<void(float)>& onUpdate() override
-	{
-		return m_on_update;
 	}
 
 
@@ -1598,6 +1590,7 @@ struct NavigationSceneImpl final : public NavigationScene
 	rcConfig m_config;
 	int m_num_tiles_x;
 	int m_num_tiles_z;
+	// TODO reverse dependency, lua_script should depend on nav 
 	LuaScriptScene* m_script_scene;
 	DelegateList<void(float)> m_on_update;
 };

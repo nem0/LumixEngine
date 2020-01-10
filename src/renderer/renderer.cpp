@@ -1082,6 +1082,7 @@ struct RendererImpl final : public Renderer
 
 	void render() {
 		FrameData& frame = *m_gpu_frame;
+		frame.transient_buffer.prepareToRender();
 		
 		gpu::MemoryStats mem_stats;
 		if (gpu::getMemoryStats(Ref(mem_stats))) {
@@ -1092,8 +1093,6 @@ struct RendererImpl final : public Renderer
 			Shader::compile(i.program, i.decl, i.defines, i.sources, *this);
 		}
 		frame.to_compile_shaders.clear();
-
-		frame.transient_buffer.prepareToRender();
 
 		if (m_material_buffer.dirty) {
 			gpu::update(m_material_buffer.buffer, m_material_buffer.data.begin(), m_material_buffer.data.byte_size());
