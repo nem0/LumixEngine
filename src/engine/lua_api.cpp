@@ -1039,32 +1039,32 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	const char* entity_src = R"#(
 		Lumix = {}
 		Lumix.Entity = {}
-		function Lumix.Entity:new(_universe, _entity)
-			local e = { entity = _entity, universe = _universe }
+		function Lumix.Entity:new(universe, entity)
+			local e = { _entity = entity, _universe = universe }
 			setmetatable(e, self)
 			return e
 		end
 		function Lumix.Entity:destroy()
-			LumixAPI.destroyEntity(self.universe, self.entity)
-			self.entity = 0xffFFffFF
+			LumixAPI.destroyEntity(self._universe, self._entity)
+			self._entity = 0xffFFffFF
 		end
 		function Lumix.Entity:createComponent(cmp)
-			LumixAPI.createComponent(self.universe, self.entity, cmp)
-			return Lumix[cmp]:new(self.universe, self.entity)
+			LumixAPI.createComponent(self._universe, self._entity, cmp)
+			return Lumix[cmp]:new(self._universe, self._entity)
 		end
 		function Lumix.Entity:getComponent(cmp)
-			return Lumix[cmp]:new(self.universe, self.entity)
+			return Lumix[cmp]:new(self._universe, self._entity)
 		end
 		Lumix.Entity.__index = function(table, key)
 			if key == "position" then
-				return LumixAPI.getEntityPosition(table.universe, table.entity)
+				return LumixAPI.getEntityPosition(table._universe, table._entity)
 			elseif key == "parent" then
-				local p = LumixAPI.getParent(table.universe, table.entity)
-				return Lumix.Entity:new(table.universe, p)
+				local p = LumixAPI.getParent(table._universe, table._entity)
+				return Lumix.Entity:new(table._universe, p)
 			elseif key == "rotation" then
-				return LumixAPI.getEntityRotation(table.universe, table.entity)
+				return LumixAPI.getEntityRotation(table._universe, table._entity)
 			elseif key == "universe" then
-				return Universe:new(table.universe)
+				return Lumix.Universe:new(table._universe)
 			elseif Lumix.Entity[key] ~= nil then
 				return Lumix.Entity[key]
 			else 
@@ -1073,11 +1073,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		end
 		Lumix.Entity.__newindex = function(table, key, value)
 			if key == "position" then
-				LumixAPI.setEntityPosition(table.universe, table.entity, value)
+				LumixAPI.setEntityPosition(table._universe, table._entity, value)
 			elseif key == "rotation" then
-				LumixAPI.setEntityRotation(table.universe, table.entity, value)
+				LumixAPI.setEntityRotation(table._universe, table._entity, value)
 			elseif key == "parent" then
-				LumixAPI.setParent(table.universe, table.entity, value.entity)
+				LumixAPI.setParent(table._universe, table._entity, value.entity)
 			elseif Lumix.Entity[key] ~= nil then
 				Lumix.Entity[key] = value
 			else
