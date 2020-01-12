@@ -1157,9 +1157,12 @@ Backend getBackend() { return Backend::OPENGL; }
 static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char *message, const void *userParam)
 {
 	if(GL_DEBUG_TYPE_PUSH_GROUP == type || type == GL_DEBUG_TYPE_POP_GROUP) return;
-	if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_PERFORMANCE) {
+	if (type == GL_DEBUG_TYPE_ERROR) {
 		logError("GL") << message;
 		//ASSERT(false);
+	}
+	else if (type == GL_DEBUG_TYPE_PERFORMANCE) {
+		logInfo("GL") << message;
 	}
 	else {
 		//logInfo("GL") << message;
