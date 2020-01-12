@@ -825,7 +825,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					++properties_count;
 				}
 				else {
-					ASSERT(false);
+					ASSERT(properties_count == 0);
 				}
 				break;
 			}
