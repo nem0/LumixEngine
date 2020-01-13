@@ -759,14 +759,10 @@ static int load_gl(void* device_contex, u32 init_flags)
 	ASSERT(dummy_context);
 	wglMakeCurrent(hdc, dummy_context);
 
-	HMODULE gl_dll = LoadLibrary("opengl32.dll");
-	auto gl_loader_fn = (decltype(wglGetProcAddress)*)GetProcAddress(gl_dll, "wglGetProcAddress");
-
-
 	typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
 	typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
-	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)gl_loader_fn("wglCreateContextAttribsARB");
-	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)gl_loader_fn("wglSwapIntervalEXT");
+	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
 	
 	#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
 	#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
@@ -790,13 +786,16 @@ static int load_gl(void* device_contex, u32 init_flags)
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
 	wglMakeCurrent(hdc, hglrc);
 	wglDeleteContext(dummy_context);
+	const char* version = (const char*)glGetString(GL_VERSION);
+	logInfo("Renderer") << "OpenGL version: " << version;
 	g_gpu.contexts[0].hglrc = hglrc;
 	wglSwapIntervalEXT(vsync ? 1 : 0);
+	HMODULE gl_dll = LoadLibrary("opengl32.dll");
 
 	#define GPU_GL_IMPORT(prototype, name) \
 		do { \
-			name = (prototype)gl_loader_fn(#name); \
-			if (!name) { \
+			name = (prototype)wglGetProcAddress(#name); \
+			if (!name && gl_dll) { \
 				name = (prototype)GetProcAddress(gl_dll, #name); \
 				if (!name) { \
 					logError("Renderer") << "Failed to load GL function " #name "."; \
