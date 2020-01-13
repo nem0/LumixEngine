@@ -776,7 +776,7 @@ static bool load_gl(void* device_contex, u32 init_flags)
 	
 	const int32_t contextAttrs[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 4,
 		#ifdef LUMIX_DEBUG
 			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
 		#endif
@@ -1318,7 +1318,7 @@ void setCurrentWindow(void* window_handle) {
 }
 
 
-void swapBuffers(u32, u32)
+void swapBuffers()
 {
 	checkThread();
 	glFinish();

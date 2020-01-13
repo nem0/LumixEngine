@@ -138,7 +138,6 @@ struct FrameData {
 	Array<Renderer::RenderJob*> jobs;
 	MT::CriticalSection shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
-	OS::Point window_size;
 	RendererImpl& renderer;
 	JobSystem::SignalHandle can_setup = JobSystem::INVALID_HANDLE;
 	JobSystem::SignalHandle setup_done = JobSystem::INVALID_HANDLE;
@@ -1116,7 +1115,7 @@ struct RendererImpl final : public Renderer
 		PROFILE_BLOCK("swap buffers");
 		JobSystem::enableBackupWorker(true);
 			
-		gpu::swapBuffers(frame.window_size.x, frame.window_size.y);
+		gpu::swapBuffers();
 			
 		JobSystem::enableBackupWorker(false);
 		m_profiler.frame();
@@ -1154,11 +1153,6 @@ struct RendererImpl final : public Renderer
 
 		JobSystem::incSignal(&m_cpu_frame->can_setup);
 		
-		const void* window_handle = m_engine.getPlatformData().window_handle;
-		const OS::Rect rect = OS::getWindowClientRect((OS::WindowHandle)window_handle);
-		m_cpu_frame->window_size.x = rect.width;
-		m_cpu_frame->window_size.y = rect.height;
-
 		++m_cpu_frame;
 		if(m_cpu_frame == m_frames.end()) m_cpu_frame = m_frames.begin();
 

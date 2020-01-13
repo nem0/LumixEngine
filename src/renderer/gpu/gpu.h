@@ -196,7 +196,7 @@ bool init(void* window_handle, u32 flags);
 void setCurrentWindow(void* window_handle);
 Backend getBackend();
 bool getMemoryStats(Ref<MemoryStats> stats);
-void swapBuffers(u32 w, u32 h);
+void swapBuffers();
 bool isHomogenousDepth();
 LUMIX_RENDERER_API bool isOriginBottomLeft();
 void checkThread();
