@@ -787,7 +787,11 @@ static int load_gl(void* device_contex, u32 init_flags)
 	wglMakeCurrent(hdc, hglrc);
 	wglDeleteContext(dummy_context);
 	const char* version = (const char*)glGetString(GL_VERSION);
+	const char* vendor = (const char*)glGetString(GL_VENDOR);
+	const char* renderer = (const char*)glGetString(GL_RENDERER);
 	logInfo("Renderer") << "OpenGL version: " << version;
+	logInfo("Renderer") << "OpenGL vendor: " << vendor;
+	logInfo("Renderer") << "OpenGL renderer: " << renderer;
 	g_gpu.contexts[0].hglrc = hglrc;
 	wglSwapIntervalEXT(vsync ? 1 : 0);
 	HMODULE gl_dll = LoadLibrary("opengl32.dll");
