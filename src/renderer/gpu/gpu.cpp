@@ -55,7 +55,7 @@ struct Program
 {
 	enum { MAX_COUNT = 2048 };
 	GLuint handle;
-	GLuint vao;
+	VertexDecl decl;
 };
 
 
@@ -103,6 +103,7 @@ struct WindowContext {
 	void* window_handle = nullptr;
 	HDC device_context;
 	HGLRC hglrc;
+	GLuint vao;
 };
 
 static struct {
@@ -848,23 +849,62 @@ void scissor(u32 x,u32 y,u32 w,u32 h)
 	glScissor(x, y, w, h);
 }
 
+static void setVAO(const VertexDecl& decl) {
+	checkThread();
+
+	u32 mask = 0;
+	
+	for (u32 i = 0; i < decl.attributes_count; ++i) {
+		const Attribute& attr = decl.attributes[i];
+		GLenum gl_attr_type;
+		switch (attr.type) {
+			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
+			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
+			case AttributeType::I8: gl_attr_type = GL_BYTE; break;
+			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
+			default: ASSERT(false); break;
+		}
+
+		const bool instanced = attr.flags & Attribute::INSTANCED;
+		const bool normalized = attr.flags & Attribute::NORMALIZED;
+		if (attr.flags & Attribute::AS_INT) {
+			ASSERT(!normalized);
+			CHECK_GL(glVertexAttribIFormat(attr.idx, attr.components_count, gl_attr_type, attr.byte_offset));
+		}
+		else {
+			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
+		}
+		CHECK_GL(glEnableVertexAttribArray(attr.idx));
+		mask |= 1 << attr.idx;
+		CHECK_GL(glVertexAttribBinding(attr.idx, instanced ? 1 : 0));
+	}
+
+	for (u32 i = 0; i < 16; ++i) {
+		if (!(mask & (1 << i))) {
+			CHECK_GL(glDisableVertexAttribArray(i));
+		}
+	}
+}
+
 void useProgram(ProgramHandle handle)
 {
 	const Program& prg = g_gpu.programs.values[handle.value];
-	if(g_gpu.last_program.value != handle.value) {
+	const u32 prev = g_gpu.last_program.value;
+	if (prev != handle.value) {
 		g_gpu.last_program = handle;
 		if (!handle.isValid()) {
-			CHECK_GL(glBindVertexArray(0));
 			CHECK_GL(glUseProgram(0));
 		}
 		else {
 			if (!prg.handle) {
 				CHECK_GL(glUseProgram(g_gpu.programs[g_gpu.default_program.value].handle));
-				CHECK_GL(glBindVertexArray(g_gpu.programs[g_gpu.default_program.value].vao));
 			}
 			else {
 				CHECK_GL(glUseProgram(prg.handle));
-				CHECK_GL(glBindVertexArray(prg.vao));
+			}
+
+			if (prev == 0xffFFffFF || g_gpu.programs.values[handle.value].decl.hash != g_gpu.programs.values[prev].decl.hash) {
+				setVAO(prg.decl);
 			}
 		}
 	}
@@ -1112,9 +1152,7 @@ void* map(BufferHandle buffer, size_t size)
 	checkThread();
 	const Buffer& b = g_gpu.buffers[buffer.value];
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
-	// we map persistently here because of what appears to be a bug in amd driver 
-	// it thinks a shader access mapped vertex buffer even when we unbind all vertex buffers before the drawcall
-	const GLbitfield gl_flags = GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
+	const GLbitfield gl_flags = GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT;
 	return glMapNamedBufferRange(b.handle, 0, size, gl_flags);
 }
 
@@ -1247,6 +1285,10 @@ void setCurrentWindow(void* window_handle) {
 		HGLRC hglrc = wglCreateContextAttribsARB(hdc, g_gpu.contexts[0].hglrc, contextAttrs);
 		ctx.hglrc = hglrc;
 		wglMakeCurrent(ctx.device_context, hglrc);
+		CHECK_GL(glGenVertexArrays(1, &ctx.vao));
+		CHECK_GL(glBindVertexArray(ctx.vao));
+		CHECK_GL(glVertexBindingDivisor(0, 0));
+		CHECK_GL(glVertexBindingDivisor(1, 1));
 
 		#ifdef LUMIX_DEBUG
 			CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
@@ -1258,51 +1300,17 @@ void setCurrentWindow(void* window_handle) {
 	}
 
 	wglMakeCurrent(ctx.device_context, ctx.hglrc);
+	useProgram(INVALID_PROGRAM);
 }
 
 
 void swapBuffers(u32, u32)
 {
 	checkThread();
+	glFinish();
 	for (const WindowContext& ctx : g_gpu.contexts) {
 		SwapBuffers(ctx.device_context);
 	}
-}
-
-static GLuint createVAO(const VertexDecl& decl) {
-	checkThread();
-
-	GLuint vao;
-	
-	CHECK_GL(glGenVertexArrays(1, &vao));
-	CHECK_GL(glBindVertexArray(vao));
-	for (u32 i = 0; i < decl.attributes_count; ++i) {
-		const Attribute& attr = decl.attributes[i];
-		GLenum gl_attr_type;
-		switch (attr.type) {
-			case AttributeType::I16: gl_attr_type = GL_SHORT; break;
-			case AttributeType::FLOAT: gl_attr_type = GL_FLOAT; break;
-			case AttributeType::I8: gl_attr_type = GL_BYTE; break;
-			case AttributeType::U8: gl_attr_type = GL_UNSIGNED_BYTE; break;
-			default: ASSERT(false); break;
-		}
-
-		const bool instanced = attr.flags & Attribute::INSTANCED;
-		const bool normalized = attr.flags & Attribute::NORMALIZED;
-		if (attr.flags & Attribute::AS_INT) {
-			ASSERT(!normalized);
-			CHECK_GL(glVertexAttribIFormat(attr.idx, attr.components_count, gl_attr_type, attr.byte_offset));
-		}
-		else {
-			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
-		}
-		CHECK_GL(glEnableVertexAttribArray(attr.idx));
-		CHECK_GL(glVertexAttribBinding(attr.idx, instanced ? 1 : 0));
-	}
-	CHECK_GL(glVertexBindingDivisor(0, 0));
-	CHECK_GL(glVertexBindingDivisor(1, 1));
-	CHECK_GL(glBindVertexArray(0));
-	return vao;
 }
 
 void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
@@ -1312,7 +1320,7 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	CHECK_GL(glCreateBuffers(1, &buf));
 	
 	GLbitfield gl_flags = 0;
-	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
+	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT;
 	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
 
 	g_gpu.buffers[buffer.value].handle = buf;
@@ -1911,7 +1919,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 
 	const int id = prog.value;
 	g_gpu.programs[id].handle = prg;
-	g_gpu.programs[id].vao = createVAO(decl);
+	g_gpu.programs[id].decl = decl;
 	return true;
 }
 
@@ -1991,7 +1999,11 @@ bool init(void* window_handle, u32 init_flags)
 	g_gpu.default_program = allocProgramHandle();
 	Program& p = g_gpu.programs[g_gpu.default_program.value];
 	p.handle = glCreateProgram();
-	CHECK_GL(glGenVertexArrays(1, &p.vao));
+	CHECK_GL(glGenVertexArrays(1, &g_gpu.contexts[0].vao));
+	CHECK_GL(glBindVertexArray(g_gpu.contexts[0].vao));
+	CHECK_GL(glVertexBindingDivisor(0, 0));
+	CHECK_GL(glVertexBindingDivisor(1, 1));
+
 	const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
 	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
 	glShaderSource(vs, 1, &vs_src, nullptr);
