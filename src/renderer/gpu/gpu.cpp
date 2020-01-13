@@ -728,7 +728,7 @@ static void try_load_renderdoc()
 }
 
 
-static int load_gl(void* device_contex, u32 init_flags)
+static bool load_gl(void* device_contex, u32 init_flags)
 {
 	const bool vsync = init_flags & (u32)InitFlags::VSYNC;
 	HDC hdc = (HDC)device_contex;
@@ -784,6 +784,10 @@ static int load_gl(void* device_contex, u32 init_flags)
 		0
 	};
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
+	if (!hglrc) {
+		DWORD err = GetLastError();
+		logError("Renderer") << "wglCreateContextAttribsARB failed err= " << (u32) err; 
+	}
 	wglMakeCurrent(hdc, hglrc);
 	wglDeleteContext(dummy_context);
 	const char* version = (const char*)glGetString(GL_VERSION);
@@ -803,7 +807,7 @@ static int load_gl(void* device_contex, u32 init_flags)
 				name = (prototype)GetProcAddress(gl_dll, #name); \
 				if (!name) { \
 					logError("Renderer") << "Failed to load GL function " #name "."; \
-					return 0; \
+					return false; \
 				} \
 			} \
 		} while(0)
@@ -812,7 +816,7 @@ static int load_gl(void* device_contex, u32 init_flags)
 
 	#undef GPU_GL_IMPORT
 
-	return 1;
+	return true;
 }
 
 
