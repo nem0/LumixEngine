@@ -558,7 +558,10 @@ struct RendererImpl final : public Renderer
 			RendererImpl& renderer = *(RendererImpl*)init_data->renderer;
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getPlatformData().window_handle;
-			gpu::init(window_handle, init_data->flags);
+			if (!gpu::init(window_handle, init_data->flags)) {
+				OS::messageBox("Failed to initialize renderer. More info in lumix.log.");
+				fatal(false, "gpu::init()");
+			}
 
 			gpu::MemoryStats mem_stats;
 			if (gpu::getMemoryStats(Ref(mem_stats))) {
