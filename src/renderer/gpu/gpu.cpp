@@ -59,22 +59,17 @@ struct Program
 };
 
 
-template <typename T, int MAX_COUNT>
+template <typename T, u32 MAX_COUNT>
 struct Pool
 {
-	void create(IAllocator& allocator)
+	void init()
 	{
-		values = (T*)allocator.allocate(sizeof(T) * MAX_COUNT);
-		for(int i = 0; i < MAX_COUNT; ++i) {
-			*((int*)&values[i]) = i + 1;
+		values = (T*)mem;
+		for (int i = 0; i < MAX_COUNT; ++i) {
+			new (NewPlaceholder(), &values[i]) int(i + 1);
 		}
-		*((int*)&values[MAX_COUNT - 1]) = -1;	
+		new (NewPlaceholder(), &values[MAX_COUNT - 1]) int(-1);
 		first_free = 0;
-	}
-
-	void destroy(IAllocator& allocator)
-	{
-		allocator.deallocate(values);
 	}
 
 	int alloc()
@@ -83,15 +78,18 @@ struct Pool
 
 		const int id = first_free;
 		first_free = *((int*)&values[id]);
+		new (NewPlaceholder(), &values[id]) T;
 		return id;
 	}
 
 	void dealloc(u32 idx)
 	{
-		*((int*)&values[idx]) = first_free;
+		values[idx].~T();
+		new (NewPlaceholder(), &values[idx]) int(first_free);
 		first_free = idx;
 	}
 
+	alignas(T) u8 mem[sizeof(T) * MAX_COUNT];
 	T* values;
 	int first_free;
 
@@ -727,6 +725,14 @@ static void try_load_renderdoc()
 	//FreeLibrary(lib);
 }
 
+static void logVersion() {
+	const char* version = (const char*)glGetString(GL_VERSION);
+	const char* vendor = (const char*)glGetString(GL_VENDOR);
+	const char* renderer = (const char*)glGetString(GL_RENDERER);
+	logInfo("Renderer") << "OpenGL version: " << version;
+	logInfo("Renderer") << "OpenGL vendor: " << vendor;
+	logInfo("Renderer") << "OpenGL renderer: " << renderer;
+}
 
 static bool load_gl(void* device_contex, u32 init_flags)
 {
@@ -776,7 +782,7 @@ static bool load_gl(void* device_contex, u32 init_flags)
 	
 	const int32_t contextAttrs[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 4,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 5,
 		#ifdef LUMIX_DEBUG
 			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
 		#endif
@@ -784,18 +790,18 @@ static bool load_gl(void* device_contex, u32 init_flags)
 		0
 	};
 	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
-	if (!hglrc) {
-		DWORD err = GetLastError();
-		logError("Renderer") << "wglCreateContextAttribsARB failed err= " << (u32) err; 
+	if (hglrc) {
+		wglMakeCurrent(hdc, hglrc);
+		wglDeleteContext(dummy_context);
 	}
-	wglMakeCurrent(hdc, hglrc);
-	wglDeleteContext(dummy_context);
-	const char* version = (const char*)glGetString(GL_VERSION);
-	const char* vendor = (const char*)glGetString(GL_VENDOR);
-	const char* renderer = (const char*)glGetString(GL_RENDERER);
-	logInfo("Renderer") << "OpenGL version: " << version;
-	logInfo("Renderer") << "OpenGL vendor: " << vendor;
-	logInfo("Renderer") << "OpenGL renderer: " << renderer;
+	else {
+		DWORD err = GetLastError();
+		logError("Renderer") << "wglCreateContextAttribsARB failed, GetLastError() = " << (u32) err; 
+		logError("Renderer") << "OpenGL 4.5+ required";
+		logVersion();
+		return false;
+	}
+	logVersion();
 	g_gpu.contexts[0].hglrc = hglrc;
 	wglSwapIntervalEXT(vsync ? 1 : 0);
 	HMODULE gl_dll = LoadLibrary("opengl32.dll");
@@ -1620,6 +1626,8 @@ ProgramHandle allocProgramHandle()
 		return INVALID_PROGRAM;
 	}
 	const int id = g_gpu.programs.alloc();
+	if (id < 0) return INVALID_PROGRAM;
+
 	Program& p = g_gpu.programs[id];
 	p.handle = 0;
 	return { (u32)id };
@@ -1635,6 +1643,8 @@ BufferHandle allocBufferHandle()
 		return INVALID_BUFFER;
 	}
 	const int id = g_gpu.buffers.alloc();
+	if (id < 0) return INVALID_BUFFER;
+
 	Buffer& t = g_gpu.buffers[id];
 	t.handle = 0;
 	return { (u32)id };
@@ -1650,6 +1660,8 @@ TextureHandle allocTextureHandle()
 		return INVALID_TEXTURE;
 	}
 	const int id = g_gpu.textures.alloc();
+	if (id < 0) return INVALID_TEXTURE;
+
 	Texture& t = g_gpu.textures[id];
 	t.handle = 0;
 	return { (u32)id };
@@ -1942,9 +1954,9 @@ void preinit(IAllocator& allocator)
 {
 	try_load_renderdoc();
 	g_gpu.allocator = &allocator;
-	g_gpu.textures.create(*g_gpu.allocator);
-	g_gpu.buffers.create(*g_gpu.allocator);
-	g_gpu.programs.create(*g_gpu.allocator);
+	g_gpu.textures.init();
+	g_gpu.buffers.init();
+	g_gpu.programs.init();
 }
 
 
@@ -2189,9 +2201,6 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 void shutdown()
 {
 	checkThread();
-	g_gpu.textures.destroy(*g_gpu.allocator);
-	g_gpu.buffers.destroy(*g_gpu.allocator);
-	g_gpu.programs.destroy(*g_gpu.allocator);
 }
 
 } // ns gpu 
