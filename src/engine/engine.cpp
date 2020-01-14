@@ -116,6 +116,8 @@ public:
 		getLogCallback().bind<logToFile>();
 		getLogCallback().bind<showLogDebugOutput>();
 
+		OS::logVersion();
+
 		m_platform_data = {};
 		m_state = luaL_newstate();
 		luaL_openlibs(m_state);

@@ -158,6 +158,8 @@ struct WindowState {
 	Rect rect;
 };
 
+LUMIX_ENGINE_API void logVersion();
+
 LUMIX_ENGINE_API void* memReserve(size_t size);
 LUMIX_ENGINE_API void memCommit(void* ptr, size_t size);
 LUMIX_ENGINE_API void memRelease(void* ptr);

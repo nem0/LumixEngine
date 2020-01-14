@@ -1,4 +1,5 @@
 #include "engine/allocator.h"
+#include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
@@ -227,6 +228,23 @@ struct WCharStr
 
 	WCHAR data[N];
 };
+
+
+void logVersion() {
+	DWORD dwVersion = 0;
+	DWORD dwMajorVersion = 0;
+	DWORD dwMinorVersion = 0;
+	DWORD dwBuild = 0;
+
+	dwVersion = GetVersion();
+
+	dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
+	dwMinorVersion = (DWORD)(HIBYTE(LOWORD(dwVersion)));
+
+	if (dwVersion < 0x80000000) dwBuild = (DWORD)(HIWORD(dwVersion));
+
+	logInfo("Engine") << "OS Version is " << (u32)dwMajorVersion << "." << (u32)dwMinorVersion << " (" << (u32)dwBuild << ")";
+}
 
 
 void getDropFile(const Event& event, int idx, Span<char> out)

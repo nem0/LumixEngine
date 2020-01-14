@@ -3613,7 +3613,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 		gpu::BufferHandle ib;
 		gpu::BufferHandle vb;
 		gpu::BufferHandle ub;
-		bool init_render;
+		bool init_render = false;
 		EditorUIRenderPlugin* plugin;
 	};
 
