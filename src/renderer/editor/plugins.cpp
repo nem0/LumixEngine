@@ -841,7 +841,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
-			auto delta = m_app.getMouseMove();
+			const Vec2 delta = m_app.getMouseMove();
 
 			if (!m_is_mouse_captured)
 			{
