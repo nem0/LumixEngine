@@ -129,11 +129,11 @@ struct MTBucketArray
 	MTBucketArray(IAllocator& allocator) 
 		: m_counts(allocator) 
 	{
-		m_keys_mem = (u8*)OS::memReserve(1024 * 1024 * 8);
-		m_values_mem = (u8*)OS::memReserve(1024 * 1024 * 8);
+		m_keys_mem = (u8*)OS::memReserve(1024 * 1024 * 16);
+		m_values_mem = (u8*)OS::memReserve(1024 * 1024 * 16);
 		m_keys_end = m_keys_mem;
 		m_values_end = m_values_mem;
-		m_counts.reserve(1024 * 1024 * 8 / BUCKET_SIZE);
+		m_counts.reserve(1024 * 1024 * 16 / BUCKET_SIZE);
 	}
 
 	~MTBucketArray()
@@ -2647,76 +2647,106 @@ struct PipelineImpl final : Pipeline
 		}
 
 
+		struct Histogram {
+			static constexpr u32 BITS = 11;
+			static constexpr u32 SIZE = 1 << BITS;
+			static constexpr u32 BIT_MASK = SIZE - 1;
+			static constexpr i32 STEP = 4096;
+
+			u32 m_histogram[SIZE];
+			bool m_sorted;
+			MT::CriticalSection m_cs;
+
+			void compute(const u64* keys, const u64* values, int size, u16 shift) {
+				memset(m_histogram, 0, sizeof(m_histogram));
+				m_sorted = true;
+
+				volatile i32 counter = 0;
+				JobSystem::runOnWorkers([&](){
+					PROFILE_FUNCTION();
+					u32 histogram[SIZE];
+					bool sorted = true;
+					memset(histogram, 0, sizeof(histogram));
+
+					i32 begin = MT::atomicAdd(&counter, STEP);
+
+					while(begin < size) {
+						const i32 end = minimum(size, begin + STEP);
+
+						u64 key = begin > 0 ? keys[begin - 1] : keys[0];
+						u64 prev_key = key;
+						for (i32 i = begin; i < end; ++i) {
+							key = keys[i];
+							const u16 index = (key >> shift) & BIT_MASK;
+							++histogram[index];
+							sorted &= prev_key <= key;
+							prev_key = key;
+						}
+						begin = MT::atomicAdd(&counter, STEP);
+					}
+
+					MT::CriticalSectionLock lock(m_cs);
+					m_sorted &= sorted;
+					for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
+						m_histogram[i] += histogram[i]; 
+					}
+				});
+			}
+		};
+
+
 		void radixSort(u64* _keys, u64* _values, int size)
 		{
 			PROFILE_FUNCTION();
 			Profiler::pushInt("count", size);
 			if(size == 0) return;
-			// from https://github.com/bkaradzic/bx
-			enum {
-				RADIXSORT_BITS = 11,
-				RADIXSORT_HISTOGRAM_SIZE = 1 << RADIXSORT_BITS,
-				RADIXSORT_BIT_MASK = RADIXSORT_HISTOGRAM_SIZE - 1
-			};
 
-			Array<u64> tmp_keys(m_allocator); // TODO more suitable allocator
-			Array<u64> tmp_values(m_allocator);
-			tmp_keys.resize(size);
-			tmp_values.resize(size);
+			Array<u64> tmp_mem(m_allocator);
 
 			u64* keys = _keys;
-			u64* tempKeys = tmp_keys.begin();
 			u64* values = _values;
-			u64* tempValues = tmp_values.begin();
+			u64* tmp_keys = nullptr;
+			u64* tmp_values = nullptr;
 
-			u32 histogram[RADIXSORT_HISTOGRAM_SIZE];
+			Histogram histogram;
 			u16 shift = 0;
+
 			for (int pass = 0; pass < 6; ++pass) {
-				memset(histogram, 0, sizeof(u32) * RADIXSORT_HISTOGRAM_SIZE);
+				histogram.compute(keys, values, size, shift);
 
-				bool sorted = true;
-				u64 key = keys[0];
-				u64 prevKey = key;
-				for (int i = 0; i < size; ++i, prevKey = key) {
-					key = keys[i];
-					const u16 index = (key >> shift) & RADIXSORT_BIT_MASK;
-					++histogram[index];
-					sorted &= prevKey <= key;
-				}
-
-				if (sorted) {
+				if (histogram.m_sorted) {
 					if (pass & 1) {
-						// Odd number of passes needs to do copy to the destination.
-						memcpy(_keys, tmp_keys.begin(), tmp_keys.byte_size());
-						memcpy(_values, tmp_values.begin(), tmp_values.byte_size());
+						memcpy(_keys, tmp_mem.begin(), tmp_mem.byte_size() / 2);
+						memcpy(_values, &tmp_mem[size], tmp_mem.byte_size() / 2);
 					}
 					return;
 				}
 
+				if (!tmp_keys) {
+					tmp_mem.resize(size * 2);
+					tmp_keys = tmp_mem.begin();
+					tmp_values = &tmp_mem[size];
+				}
+
 				u32 offset = 0;
-				for (int i = 0; i < RADIXSORT_HISTOGRAM_SIZE; ++i) {
-					const u32 count = histogram[i];
-					histogram[i] = offset;
+				for (int i = 0; i < Histogram::SIZE; ++i) {
+					const u32 count = histogram.m_histogram[i];
+					histogram.m_histogram[i] = offset;
 					offset += count;
 				}
 
 				for (int i = 0; i < size; ++i) {
 					const u64 key = keys[i];
-					const u16 index = (key >> shift) & RADIXSORT_BIT_MASK;
-					const u32 dest = histogram[index]++;
-					tempKeys[dest] = key;
-					tempValues[dest] = values[i];
+					const u16 index = (key >> shift) & Histogram::BIT_MASK;
+					const u32 dest = histogram.m_histogram[index]++;
+					tmp_keys[dest] = key;
+					tmp_values[dest] = values[i];
 				}
 
-				u64* const swapKeys = tempKeys;
-				tempKeys = keys;
-				keys = swapKeys;
+				swap(tmp_keys, keys);
+				swap(tmp_values, values);
 
-				u64* const swapValues = tempValues;
-				tempValues = values;
-				values = swapValues;
-
-				shift += RADIXSORT_BITS;
+				shift += Histogram::BITS;
 			}
 		}
 

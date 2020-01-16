@@ -790,9 +790,6 @@ public:
 					ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
 				}
 				ImGui::End();
-
-				// TODO
-				// ImGui::RootDock(pos, size);
 			}
 			m_profiler_ui->onGUI();
 			m_asset_browser->onGUI();
