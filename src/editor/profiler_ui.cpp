@@ -22,7 +22,7 @@ namespace Lumix
 {
 
 
-static constexpr int DEFAULT_ZOOM = 100'000;
+static constexpr int DEFAULT_RANGE = 100'000;
 
 
 enum Column
@@ -191,16 +191,14 @@ struct ProfilerUIImpl final : public ProfilerUI
 	int m_allocation_size_to;
 	int m_current_frame;
 	bool m_is_paused;
-	u64 m_paused_time;
-	i64 m_view_offset = 0;
-	u64 m_zoom = DEFAULT_ZOOM;
+	u64 m_end;
+	u64 m_range = DEFAULT_RANGE;
 	char m_filter[100];
 	char m_resource_filter[100];
 	Engine& m_engine;
 	OS::Timer m_timer;
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
-	bool m_gpu_open = false;
 	bool m_show_frames = true;
 	struct {
 		u32 signal;
@@ -483,34 +481,34 @@ static void read(Profiler::ThreadState& ctx, u32 p, u8* ptr, int size)
 
 static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 {
-    const float h = ImGui::GetFontSize() * 1.00f;
-    float r = h * 0.40f * scale;
-    ImVec2 center = ImVec2(p_min.x + h * 0.50f, p_min.y + h * 0.50f * scale);
+	const float h = ImGui::GetFontSize() * 1.00f;
+	float r = h * 0.40f * scale;
+	ImVec2 center = ImVec2(p_min.x + h * 0.50f, p_min.y + h * 0.50f * scale);
 
-    ImVec2 a, b, c;
-    switch (dir)
-    {
-    case ImGuiDir_Up:
-    case ImGuiDir_Down:
-        if (dir == ImGuiDir_Up) r = -r;
-        a = ImVec2(+0.000f * r,+0.750f * r);
-        b = ImVec2(-0.866f * r,-0.750f * r);
-        c = ImVec2(+0.866f * r,-0.750f * r);
-        break;
-    case ImGuiDir_Left:
-    case ImGuiDir_Right:
-        if (dir == ImGuiDir_Left) r = -r;
-        a = ImVec2(+0.750f * r,+0.000f * r);
-        b = ImVec2(-0.750f * r,+0.866f * r);
-        c = ImVec2(-0.750f * r,-0.866f * r);
-        break;
-    case ImGuiDir_None:
-    case ImGuiDir_COUNT:
-        IM_ASSERT(0);
-        break;
-    }
+	ImVec2 a, b, c;
+	switch (dir)
+	{
+	case ImGuiDir_Up:
+	case ImGuiDir_Down:
+		if (dir == ImGuiDir_Up) r = -r;
+		a = ImVec2(+0.000f * r,+0.750f * r);
+		b = ImVec2(-0.866f * r,-0.750f * r);
+		c = ImVec2(+0.866f * r,-0.750f * r);
+		break;
+	case ImGuiDir_Left:
+	case ImGuiDir_Right:
+		if (dir == ImGuiDir_Left) r = -r;
+		a = ImVec2(+0.750f * r,+0.000f * r);
+		b = ImVec2(-0.750f * r,+0.866f * r);
+		c = ImVec2(-0.750f * r,-0.866f * r);
+		break;
+	case ImGuiDir_None:
+	case ImGuiDir_COUNT:
+		IM_ASSERT(0);
+		break;
+	}
 
-    dl->AddTriangleFilled(center + a, center + b, center + c, ImGui::GetColorU32(ImGuiCol_Text));
+	dl->AddTriangleFilled(center + a, center + b, center + c, ImGui::GetColorU32(ImGuiCol_Text));
 }
 
 
@@ -538,16 +536,17 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	if (ImGui::Checkbox("Pause", &m_is_paused)) {
 		Profiler::pause(m_is_paused);
-		m_view_offset = 0;
-		m_paused_time = OS::Timer::getRawTimestamp();
+	}
+	if (!m_is_paused) {
+		m_end = OS::Timer::getRawTimestamp();
 	}
 
 	Profiler::GlobalState global;
 	const int contexts_count = global.threadsCount();
 	if (ImGui::BeginMenu("Advanced")) {
 		ImGui::Checkbox("Show frames", &m_show_frames);
-		ImGui::Text("Zoom: %f", m_zoom / double(DEFAULT_ZOOM));
-		if (ImGui::MenuItem("Reset zoom")) m_zoom = DEFAULT_ZOOM;
+		ImGui::Text("Zoom: %f", m_range / double(DEFAULT_RANGE));
+		if (ImGui::MenuItem("Reset zoom")) m_range = DEFAULT_RANGE;
 		bool do_autopause = m_autopause >= 0;
 		if (ImGui::Checkbox("Autopause enabled", &do_autopause)) {
 			m_autopause = -m_autopause;
@@ -574,45 +573,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		ImGui::EndMenu();
 	}
 
+	const u64 view_start = m_end - m_range;
 
-	const u64 view_end = m_is_paused ? m_paused_time + m_view_offset : OS::Timer::getRawTimestamp();
-	const u64 view_start = view_end < m_zoom ? 0 : view_end - m_zoom;
-	float h = 0;
-	for (int i = 0; i < contexts_count; ++i) {
-		Profiler::ThreadState ctx(global, i);
-		if (ctx.show) {
-			h += ctx.rows * 20 + 20;
-		}
-	}
-	h += 20; // gpu header
-	if (m_gpu_open) {
-		h += 40;
-	}
-	ImGui::InvisibleButton("x", ImVec2(-1, h));
+	const float from_x = ImGui::GetCursorScreenPos().x;
+	const float from_y = ImGui::GetCursorScreenPos().y;
+	const float to_x = from_x + ImGui::GetContentRegionAvail().x;
 	ImDrawList* dl = ImGui::GetWindowDrawList();
-	const ImVec2 a = ImGui::GetItemRectMin();
-	const ImVec2 b = ImGui::GetItemRectMax();
-	float y = a.y;
-
-	const u64 cursor = u64(((ImGui::GetMousePos().x - a.x) / (b.x - a.x)) * m_zoom) + view_start;
-	u64 cursor_to_end = view_end - cursor;
-
-	if (ImGui::IsItemHovered()) {
-		if (ImGui::IsMouseDragging()) {
-			m_view_offset -= i64((ImGui::GetIO().MouseDelta.x / (b.x - a.x)) * m_zoom);
-		}
-		if (ImGui::GetIO().KeyCtrl) {
-			if (ImGui::GetIO().MouseWheel > 0 && m_zoom > 1) {
-				m_zoom >>= 1;
-				cursor_to_end >>= 1;
-			}
-			else if (ImGui::GetIO().MouseWheel < 0) {
-				m_zoom <<= 1;
-				cursor_to_end <<= 1;
-			}
-			m_view_offset = cursor + cursor_to_end - m_paused_time;
-		}
-	}
 
 	HashMap<u32, ThreadRecord> threads_records(64, m_allocator);
 	auto getThreadName = [&](u32 thread_id){
@@ -629,19 +595,13 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		Profiler::ThreadState ctx(global, i);
 		if (!ctx.show) continue;
 		
-		threads_records.insert(ctx.thread_id, { y, ctx.thread_id, ctx.name, 0});
-		renderArrow(ImVec2(a.x, y), ctx.open ? ImGuiDir_Down : ImGuiDir_Right, 1, dl);
-		dl->AddText(ImVec2(a.x + 20, y), ImGui::GetColorU32(ImGuiCol_Text), ctx.name);
-		dl->AddLine(ImVec2(a.x, y + 20), ImVec2(b.x, y + 20), ImGui::GetColorU32(ImGuiCol_Border));
-		if (ImGui::IsMouseClicked(0) && ImGui::IsMouseHoveringRect(ImVec2(a.x, y), ImVec2(a.x + 20, y + 20))) {
-			ctx.open = !ctx.open;
-		}
-		y += 20;
-		if (!ctx.open) continue;
+		threads_records.insert(ctx.thread_id, { ImGui::GetCursorScreenPos().y, ctx.thread_id, ctx.name, 0});
 
-		float h = maximum(20.f, ctx.rows * 20.f);
-		StaticString<256> name(ctx.name, ctx.thread_id);
-		ctx.rows = 0;
+		if (!ImGui::TreeNode(ctx.buffer, "%s", ctx.name)) continue;
+
+		float y = ImGui::GetCursorScreenPos().y;
+		float top = y;
+		u32 lines = 0;
 
 		struct {
 			u32 offset;
@@ -662,72 +622,72 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		int properties_count = 0;
 
 		auto draw_block = [&](u64 from, u64 to, const char* name, u32 color) {
-			if (from <= view_end && to >= view_start) {
-				const float t_start = float(int(from - view_start) / double(view_end - view_start));
-				const float t_end = float(int(to - view_start) / double(view_end - view_start));
-				const float x_start = a.x * (1 - t_start) + b.x * t_start;
-				float x_end = a.x * (1 - t_end) + b.x * t_end;
-				if (int(x_end) == int(x_start)) ++x_end;
-				const float block_y = level * 20.f + y;
-				const float w = ImGui::CalcTextSize(name).x;
+			if (from > m_end || to < view_start) return;
 
-				const ImVec2 ra(x_start, block_y);
-				const ImVec2 rb(x_end, block_y + 19);
-				if (hovered_signal.signal == open_blocks[level].job_info.signal_on_finish
-					&& hovered_signal.signal != JobSystem::INVALID_HANDLE
-					&& hovered_signal.is_current_pos)
-				{
-					dl->AddLine(ra, ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff0000ff);
-				}
+			const float t_start = float(int(from - view_start) / double(m_range));
+			const float t_end = float(int(to - view_start) / double(m_range));
+			const float x_start = from_x * (1 - t_start) + to_x * t_start;
+			float x_end = from_x * (1 - t_end) + to_x * t_end;
+			if (int(x_end) == int(x_start)) ++x_end;
+			const float block_y = y;
+			const float w = ImGui::CalcTextSize(name).x;
 
-				dl->AddRectFilled(ra, rb, color);
-				if (x_end - x_start > 2) {
-					dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
-				}
-				if (w + 2 < x_end - x_start) {
-					dl->AddText(ImVec2(x_start + 2, block_y), 0xff000000, name);
-				}
-				if (ImGui::IsMouseHoveringRect(ra, rb)) {
-					const u64 freq = Profiler::frequency();
-					const float t = 1000 * float((to - from) / double(freq));
-					ImGui::BeginTooltip();
-					ImGui::Text("%s (%.3f ms)", name, t);
-					if (open_blocks[level].link) {
-						ImGui::Text("Link: %" PRId64, open_blocks[level].link);
+			const ImVec2 ra(x_start, block_y);
+			const ImVec2 rb(x_end, block_y + 19);
+			if (hovered_signal.signal == open_blocks[level].job_info.signal_on_finish
+				&& hovered_signal.signal != JobSystem::INVALID_HANDLE
+				&& hovered_signal.is_current_pos)
+			{
+				dl->AddLine(ra, ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff0000ff);
+			}
+
+			dl->AddRectFilled(ra, rb, color);
+			if (x_end - x_start > 2) {
+				dl->AddRect(ra, rb, ImGui::GetColorU32(ImGuiCol_Border));
+			}
+			if (w + 2 < x_end - x_start) {
+				dl->AddText(ImVec2(x_start + 2, block_y), 0xff000000, name);
+			}
+			if (ImGui::IsMouseHoveringRect(ra, rb)) {
+				const u64 freq = Profiler::frequency();
+				const float t = 1000 * float((to - from) / double(freq));
+				ImGui::BeginTooltip();
+				ImGui::Text("%s (%.3f ms)", name, t);
+				if (open_blocks[level].link) {
+					ImGui::Text("Link: %" PRId64, open_blocks[level].link);
 						
-						any_hovered_link = true;
-						hovered_link = open_blocks[level].link;
-					}
-					if (open_blocks[level].job_info.signal_on_finish != JobSystem::INVALID_HANDLE) {
-						any_hovered_signal = true;
-						hovered_signal.signal = open_blocks[level].job_info.signal_on_finish;
-						ImGui::Text("Signal on finish: %d", open_blocks[level].job_info.signal_on_finish);
-					}
-					if (open_blocks[level].job_info.precondition != JobSystem::INVALID_HANDLE) {
-						ImGui::Text("Precondition signal: %d", open_blocks[level].job_info.precondition);
-					}
-					for (int i = 0; i < properties_count; ++i) {
-						if (properties[i].level != level) continue;
-
-						switch (properties[i].header.type) {
-						case Profiler::EventType::INT: {
-							Profiler::IntRecord r;
-							read(ctx, properties[i].offset, (u8*)&r, sizeof(r));
-							ImGui::Text("%s: %d", r.key, r.value);
-							break;
-						}
-						case Profiler::EventType::STRING: {
-							char tmp[128];
-							const int tmp_size = properties[i].header.size - sizeof(properties[i].header);
-							read(ctx, properties[i].offset, (u8*)tmp, tmp_size);
-							ImGui::Text("%s", tmp);
-							break;
-						}
-						default: ASSERT(false); break;
-						}
-					}
-					ImGui::EndTooltip();
+					any_hovered_link = true;
+					hovered_link = open_blocks[level].link;
 				}
+				if (open_blocks[level].job_info.signal_on_finish != JobSystem::INVALID_HANDLE) {
+					any_hovered_signal = true;
+					hovered_signal.signal = open_blocks[level].job_info.signal_on_finish;
+					ImGui::Text("Signal on finish: %d", open_blocks[level].job_info.signal_on_finish);
+				}
+				if (open_blocks[level].job_info.precondition != JobSystem::INVALID_HANDLE) {
+					ImGui::Text("Precondition signal: %d", open_blocks[level].job_info.precondition);
+				}
+				for (int i = 0; i < properties_count; ++i) {
+					if (properties[i].level != level) continue;
+
+					switch (properties[i].header.type) {
+					case Profiler::EventType::INT: {
+						Profiler::IntRecord r;
+						read(ctx, properties[i].offset, (u8*)&r, sizeof(r));
+						ImGui::Text("%s: %d", r.key, r.value);
+						break;
+					}
+					case Profiler::EventType::STRING: {
+						char tmp[128];
+						const int tmp_size = properties[i].header.size - sizeof(properties[i].header);
+						read(ctx, properties[i].offset, (u8*)tmp, tmp_size);
+						ImGui::Text("%s", tmp);
+						break;
+					}
+					default: ASSERT(false); break;
+					}
+				}
+				ImGui::EndTooltip();
 			}
 		};
 
@@ -741,20 +701,20 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				Profiler::FiberWaitRecord r;
 				read(ctx, p + sizeof(Profiler::EventHeader), r);
 				if (r.job_system_signal == hovered_signal.signal) {
-					float t = float((header.time - view_start) / double(view_end - view_start));
+					float t = float((header.time - view_start) / double(m_range));
 					if (header.time < view_start) {
-						t = -float((view_start - header.time) / double(view_end - view_start));
+						t = -float((view_start - header.time) / double(m_range));
 					}
-					const float x = a.x * (1 - t) + b.x * t;
+					const float x = from_x * (1 - t) + to_x * t;
 					if (hovered_signal.is_current_pos && (x != hovered_signal.x || y != hovered_signal.y)) {
 						dl->AddLine(ImVec2(x, y - 2), ImVec2(hovered_signal.x, hovered_signal.y - 2), 0xff00ff00);
 					}
 				}
-				if (header.time >= view_start && header.time <= view_end || is_begin && hovered_signal.signal == r.job_system_signal) {
+				if (header.time >= view_start && header.time <= m_end || is_begin && hovered_signal.signal == r.job_system_signal) {
 					const float t = view_start <= header.time
-						? float((header.time - view_start) / double(view_end - view_start))
-						: -float((view_start - header.time) / double(view_end - view_start));
-					const float x = a.x * (1 - t) + b.x * t;
+						? float((header.time - view_start) / double(m_range))
+						: -float((view_start - header.time) / double(m_range));
+					const float x = from_x * (1 - t) + to_x * t;
 					const u32 color = header.type == Profiler::EventType::END_FIBER_WAIT ? 0xffff0000 : 0xff00ff00;
 					dl->AddRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2), color);
 					const bool mouse_hovered = ImGui::IsMouseHoveringRect(ImVec2(x - 2, y - 2), ImVec2(x + 2, y + 2));
@@ -789,10 +749,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				open_blocks[level].color = 0xffDDddDD;
 				open_blocks[level].job_info.signal_on_finish = JobSystem::INVALID_HANDLE;
 				open_blocks[level].job_info.precondition = JobSystem::INVALID_HANDLE;
+				lines = maximum(lines, level + 1);
+				y += 20.f;
 				break;
 			case Profiler::EventType::END_BLOCK:
+				y = maximum(y - 20.f, top);
 				if (level >= 0) {
-					ctx.rows = maximum(ctx.rows, level + 1);
 					Profiler::EventHeader start_header;
 					read(ctx, open_blocks[level].offset, start_header);
 					const char* name;
@@ -813,8 +775,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 				}
 				break;
 			case Profiler::EventType::FRAME:
-				ASSERT(false);
-				/*should be in global context*/
+				ASSERT(false);	//should be in global context
 				break;
 			case Profiler::EventType::INT:
 			case Profiler::EventType::STRING: {
@@ -843,16 +804,19 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			p += header.size;
 		}
-		ctx.rows = maximum(ctx.rows, level + 1);
 		while (level >= 0) {
+			y -= 20.f;
 			Profiler::EventHeader start_header;
 			read(ctx, open_blocks[level].offset, start_header);
 			const char* name;
 			read(ctx, open_blocks[level].offset + sizeof(Profiler::EventHeader), name);
-			draw_block(start_header.time, m_paused_time, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
+			draw_block(start_header.time, m_end, name, ImGui::GetColorU32(ImGuiCol_PlotHistogram));
 			--level;
 		}
-		y += ctx.rows * 20;
+
+		ImGui::Dummy(ImVec2(to_x - from_x, lines * 20.f));
+
+		ImGui::TreePop();
 	}
 
 	if (!any_hovered_link) hovered_link = 0;
@@ -861,9 +825,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	auto get_view_x = [&](u64 time) {
 		const float t = time > view_start
-			? float((time - view_start) / double(view_end - view_start))
-			: -float((view_start - time) / double(view_end - view_start));
-		return a.x * (1 - t) + b.x * t;
+			? float((time - view_start) / double(m_range))
+			: -float((view_start - time) / double(m_range));
+		return from_x * (1 - t) + to_x * t;
 	};
 
 	auto draw_cswitch = [&](float x, const Profiler::ContextSwitchRecord& r, ThreadRecord& tr, bool is_enter) {
@@ -895,16 +859,16 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 	{
 		Profiler::ThreadState ctx(global, -1);
-		renderArrow(ImVec2(a.x, y), m_gpu_open ? ImGuiDir_Down : ImGuiDir_Right, 1, dl);
-		dl->AddText(ImVec2(a.x + 20, y), ImGui::GetColorU32(ImGuiCol_Text), "GPU");
-		dl->AddLine(ImVec2(a.x, y + 20), ImVec2(b.x, y + 20), ImGui::GetColorU32(ImGuiCol_Border));
-		if (ImGui::IsMouseClicked(0) && ImGui::IsMouseHoveringRect(ImVec2(a.x, y), ImVec2(a.x + 20, y + 20))) {
-			m_gpu_open = !m_gpu_open;
-		}
-		y += 20;
+
+		float before_gpu_y = ImGui::GetCursorScreenPos().y;
+
+		const bool gpu_open = ImGui::TreeNode(ctx.buffer, "GPU");
+		
+		float y = ImGui::GetCursorScreenPos().y;
 
 		u32 open_blocks[64];
 		int level = -1;
+		u32 lines = 0;
 
 		u32 p = ctx.begin;
 		const u32 end = ctx.end;
@@ -916,21 +880,21 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					++level;
 					ASSERT(level < (int)lengthOf(open_blocks));
 					open_blocks[level] = p;
+					lines = maximum(lines, level + 1);
 					break;
 				case Profiler::EventType::END_GPU_BLOCK:
-					if (level >= 0 && m_gpu_open) {
+					if (level >= 0 && gpu_open) {
 						Profiler::EventHeader start_header;
 						read(ctx, open_blocks[level], start_header);
 						Profiler::GPUBlock data;
 						read(ctx, open_blocks[level] + sizeof(Profiler::EventHeader), data);
 						u64 to;
 						read(ctx, p + sizeof(Profiler::EventHeader), to);
-						/***/
 						const u64 from = data.timestamp;
-						const float t_start = float(int(from - view_start) / double(view_end - view_start));
-						const float t_end = float(int(to - view_start) / double(view_end - view_start));
-						const float x_start = a.x * (1 - t_start) + b.x * t_start;
-						float x_end = a.x * (1 - t_end) + b.x * t_end;
+						const float t_start = float(int(from - view_start) / double(m_range));
+						const float t_end = float(int(to - view_start) / double(m_range));
+						const float x_start = from_x * (1 - t_start) + to_x * t_start;
+						float x_end = from_x * (1 - t_end) + to_x * t_end;
 						if (int(x_end) == int(x_start)) ++x_end;
 						const float block_y = level * 20.f + y;
 						const float w = ImGui::CalcTextSize(data.name).x;
@@ -970,14 +934,14 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					m_is_gpu_mem_stats_valid = true;
 					break;
 				case Profiler::EventType::FRAME:
-					if (header.time >= view_start && header.time <= view_end && m_show_frames) {
-						const float t = float((header.time - view_start) / double(view_end - view_start));
-						const float x = a.x * (1 - t) + b.x * t;
-						dl->AddLine(ImVec2(x, a.y), ImVec2(x, b.y), 0xffff0000);
+					if (header.time >= view_start && header.time <= m_end && m_show_frames) {
+						const float t = float((header.time - view_start) / double(m_range));
+						const float x = from_x * (1 - t) + to_x * t;
+						dl->AddLine(ImVec2(x, from_y), ImVec2(x, before_gpu_y), 0xffff0000);
 					}
 					break;
 				case Profiler::EventType::CONTEXT_SWITCH:
-					if (m_show_context_switches && header.time >= view_start && header.time <= view_end) {
+					if (m_show_context_switches && header.time >= view_start && header.time <= m_end) {
 						Profiler::ContextSwitchRecord r;
 						read(ctx, p + sizeof(Profiler::EventHeader), r);
 						auto new_iter = threads_records.find(r.new_thread_id);
@@ -992,20 +956,43 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			}
 			p += header.size;
 		}
+
+		if (gpu_open) {
+			if (lines > 0) ImGui::Dummy(ImVec2(to_x - from_x, lines * 20.f));
+			ImGui::TreePop();
+		}
+
+		if (ImGui::IsMouseHoveringRect(ImVec2(from_x, from_y), ImVec2(to_x, ImGui::GetCursorScreenPos().y))) {
+			if (ImGui::IsMouseDragging()) {
+				m_end -= i64((ImGui::GetIO().MouseDelta.x / (to_x - from_x)) * m_range);
+			}
+			const u64 cursor = u64(((ImGui::GetMousePos().x - from_x) / (to_x - from_x)) * m_range) + view_start;
+			u64 cursor_to_end = m_end - cursor;
+			if (ImGui::GetIO().KeyCtrl) {
+				if (ImGui::GetIO().MouseWheel > 0 && m_range > 1) {
+					m_range >>= 1;
+					cursor_to_end >>= 1;
+				}
+				else if (ImGui::GetIO().MouseWheel < 0) {
+					m_range <<= 1;
+					cursor_to_end <<= 1;
+				}
+				m_end = cursor_to_end + cursor;
+			}
+		}
 	}
 
 	for (const ThreadRecord& tr : threads_records) {
 		if (tr.last_context_switch.is_enter) {
 			const float x = get_view_x(tr.last_context_switch.time);
-			dl->AddLine(ImVec2(b.x, tr.y + 10), ImVec2(x, tr.y + 10), 0xff00ff00);
+			dl->AddLine(ImVec2(to_x, tr.y + 10), ImVec2(x, tr.y + 10), 0xff00ff00);
 		}
 	}
 
 	if (m_autopause > 0 && !m_is_paused && Profiler::getLastFrameDuration() * 1000.f > m_autopause) {
 		m_is_paused = true;
 		Profiler::pause(m_is_paused);
-		m_view_offset = 0;
-		m_paused_time = OS::Timer::getRawTimestamp();
+		m_end = OS::Timer::getRawTimestamp();
 	}
 }
 

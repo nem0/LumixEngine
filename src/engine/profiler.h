@@ -156,8 +156,6 @@ struct LUMIX_ENGINE_API ThreadState {
 	u32 thread_id;
 
 	bool show;
-	bool open;
-	u32 rows;
 };
 
 
