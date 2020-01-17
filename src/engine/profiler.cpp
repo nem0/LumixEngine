@@ -539,8 +539,6 @@ ThreadState::ThreadState(GlobalState& reader, int thread_idx)
 	end = ctx.end;
 	thread_id = ctx.thread_id;
 	name = ctx.name;
-	open = ctx.open;
-	rows = ctx.rows;
 	show = ctx.show_in_profiler;
 }
 
@@ -548,8 +546,6 @@ ThreadState::ThreadState(GlobalState& reader, int thread_idx)
 ThreadState::~ThreadState()
 {
 	ThreadContext& ctx = thread_idx >= 0 ? *g_instance.contexts[thread_idx] : g_instance.global_context;
-	ctx.open = open;
-	ctx.rows = rows;
 	ctx.show_in_profiler = show;
 	ctx.mutex.exit();
 	--reader.local_readers_count;
