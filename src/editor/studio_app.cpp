@@ -764,22 +764,29 @@ public:
 	{
 		if (m_is_welcome_screen_open)
 		{
-			ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
-			ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
+			ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+										ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+										ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
+										ImGuiWindowFlags_NoDocking;
+			ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin("MainDockspace", nullptr, flags))
+			{
+				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
+				ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
+			}
+			ImGui::End();
 			showWelcomeScreen();
 		}
 		else
 		{
 			if (ImGui::GetIO().DisplaySize.y > 0)
 			{
-				auto pos = ImVec2(0, 0);
-				auto size = ImGui::GetIO().DisplaySize;
-				size.y -= pos.y;
 				ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
 										 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
 										 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
 										 ImGuiWindowFlags_NoDocking;
-				ImGui::SetNextWindowSize(size);
+				ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
 				ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos, ImGuiCond_FirstUseEver);
 				if (ImGui::Begin("MainDockspace", nullptr, flags))
 				{
