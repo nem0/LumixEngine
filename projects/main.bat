@@ -68,7 +68,7 @@ goto :plugins
 :push_to_itch_io
 	if not exist itch_io mkdir itch_io
 	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
-	butler.exe push itch_io mikulasflorek/lumix-engine:win-64
+	butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
 	pause
 exit /B 0
 
