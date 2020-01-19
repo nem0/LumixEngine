@@ -333,13 +333,15 @@ void GameView::onWindowGUI()
 			RenderScene* scene = m_pipeline->getScene();
 			const EntityPtr camera = scene->getActiveCamera();
 			Viewport vp;
-			vp.w = (int)size.x;
-			vp.h = (int)size.y;
 			if (camera.isValid()) {
 				vp = scene->getCameraViewport((EntityRef)camera);
+				vp.w = (int)size.x;
+				vp.h = (int)size.y;
 				scene->setCameraScreenSize((EntityRef)camera, vp.w, vp.h);
 			}
 			else {
+				vp.w = (int)size.x;
+				vp.h = (int)size.y;
 				vp.fov = degreesToRadians(90.f);
 				vp.is_ortho = false;
 				vp.far = 10'000.f;
