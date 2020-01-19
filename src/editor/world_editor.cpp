@@ -91,8 +91,15 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 		prop.setValue(cmp, idx, str);
 	}
 
+	void visit(const Reflection::Property<const char*>& prop) override { 
+		// TODO support bigger strings
+		char buf[4096];
+		deserializer.read(Span(buf));
+		InputMemoryStream str(buf, strlen(buf));
+		prop.setValue(cmp, idx, str);
+	}
+
 	// TODO
-	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
@@ -150,8 +157,14 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 		serializer.write(prop.name, value);
 	}
 
+	void visit(const Reflection::Property<const char*>& prop) override { 
+		char tmp[4096];
+		OutputMemoryStream str(tmp, sizeof(tmp));
+		prop.getValue(cmp, idx, str);
+		serializer.write(prop.name, tmp);
+	}
+
 	// TODO
-	void visit(const Reflection::Property<const char*>& prop) override { ASSERT(false); }
 	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }

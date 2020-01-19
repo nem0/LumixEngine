@@ -1068,7 +1068,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			elseif Lumix.Entity[key] ~= nil then
 				return Lumix.Entity[key]
 			else 
-				error(key .. " not found")
+				error("key " .. tostring(key) .. " not found")
 			end
 		end
 		Lumix.Entity.__newindex = function(table, key, value)
@@ -1077,11 +1077,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			elseif key == "rotation" then
 				LumixAPI.setEntityRotation(table._universe, table._entity, value)
 			elseif key == "parent" then
-				LumixAPI.setParent(table._universe, table._entity, value.entity)
+				LumixAPI.setParent(table._universe, value._entity, table._entity)
 			elseif Lumix.Entity[key] ~= nil then
 				Lumix.Entity[key] = value
 			else
-				error(key .. " not found")
+				error("key " .. tostring(key) .. " not found")
 			end
 		end
 
