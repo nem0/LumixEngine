@@ -1107,15 +1107,14 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			return Lumix.Entity:new(self.value, e)
 		end
 		function Lumix.Universe:createEntityEx(desc)
-			local e = LumixAPI.createEntity(self.value)
-			local ent = Lumix.Entity:new(self.value, e)
+			local ent = self:createEntity()
 			for k, v in pairs(desc) do
 				if k == "position" then
 					e.position = v
 				elseif k == "rotation" then
 					e.position = v
 				else
-					local c = ent.createComponent(k)
+					local c = ent:createComponent(k)
 					for k2, v2 in pairs(v) do
 						c[k2] = v2
 					end
