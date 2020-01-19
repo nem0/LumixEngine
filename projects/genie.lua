@@ -13,7 +13,6 @@ local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
 build_app = false
 build_studio = true
-local build_game = false
 local working_dir = nil
 local debug_args = nil
 local release_args = nil
@@ -150,11 +149,6 @@ end
 
 if _OPTIONS["embed-resources"] then
 	embed_resources = true
-end
-
-if _OPTIONS["with-game"] then
-	build_game = _OPTIONS["with-game"]
-	table.insert(plugins, build_game)
 end
 
 if _OPTIONS["working-dir"] then
@@ -719,9 +713,7 @@ end
 
 if build_app then
 	project "app"
-		if build_game then
-			debugdir ("../../" .. build_game)
-		elseif working_dir then
+		if working_dir then
 			debugdir ("../../" .. working_dir)
 		else 
 			debugdir "../data"
@@ -853,9 +845,7 @@ if build_studio then
 			configuration {}
 		end
 		
-		if build_game then
-			debugdir ("../../" .. build_game)
-		elseif working_dir then
+		if working_dir then
 			debugdir ("../../" .. working_dir)
 		else
 			debugdir "../data"
