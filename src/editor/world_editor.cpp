@@ -1103,6 +1103,7 @@ private:
 
 		bool execute() override
 		{
+			m_editor.selectEntities(nullptr, 0, false);
 			Universe* universe = m_editor.getUniverse();
 			m_transformations.clear();
 			m_old_values.clear();
