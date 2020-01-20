@@ -1657,7 +1657,6 @@ public:
 	}
 
 
-
 	void onMouseMove(int x, int y, int relx, int rely) override
 	{
 		PROFILE_FUNCTION();

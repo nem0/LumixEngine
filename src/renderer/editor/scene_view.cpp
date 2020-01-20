@@ -144,7 +144,7 @@ void SceneView::update(float time_delta)
 	PROFILE_FUNCTION();
 
 	if (ImGui::IsAnyItemActive()) return;
-	if (!m_is_open) return;
+	if (!m_is_mouse_captured) return;
 	if (ImGui::GetIO().KeyCtrl) return;
 
 	int screen_x = int(ImGui::GetIO().MousePos.x);
@@ -588,22 +588,25 @@ void SceneView::handleEvents() {
 		const OS::Event& event = events[i];
 		switch (event.type) {
 			case OS::Event::Type::MOUSE_BUTTON: {
-				if (event.mouse_button.button == OS::MouseButton::RIGHT && handle_input) {
-					ImGui::SetWindowFocus();
-					captureMouse(event.mouse_button.down);
-				}
+				const OS::Point cp = OS::getMousePos(event.window);
+				Vec2 rel_mp = { (float)cp.x, (float)cp.y };
+				rel_mp.x -= m_screen_x;
+				rel_mp.y -= m_screen_y;
 				if (handle_input) {
+					if (event.mouse_button.button == OS::MouseButton::RIGHT) {
+						ImGui::SetWindowFocus();
+						captureMouse(event.mouse_button.down);
+					}
 					ImGui::ResetActiveID();
-					const OS::Point cp = OS::getMousePos(event.window);
-					Vec2 rel_mp = { (float)cp.x, (float)cp.y };
-					rel_mp.x -= m_screen_x;
-					rel_mp.y -= m_screen_y;
 					if (event.mouse_button.down) {
 						m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 					}
 					else {
 						m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 					}
+				}
+				else if (!event.mouse_button.down) {
+					m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 				}
 				break;
 			}
@@ -621,7 +624,7 @@ void SceneView::handleEvents() {
 }
 
 void SceneView::statsUI(float x, float y) {
-	if (!m_show_stats || !m_is_open) return;
+	if (!m_show_stats) return;
 
 	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 	ImVec2 view_pos(x, y);
@@ -651,13 +654,13 @@ void SceneView::statsUI(float x, float y) {
 void SceneView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
-	m_is_open = false;
+	bool is_open = false;
 	ImVec2 view_pos;
 	const char* title = "Scene View###Scene View";
 	if (m_log_ui.getUnreadErrorCount() > 0) title = "Scene View | errors in log###Scene View";
 
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
-		m_is_open = true;
+		is_open = true;
 		onToolbar();
 		const ImVec2 size = ImGui::GetContentRegionAvail();
 		Viewport vp = m_editor.getViewport();
@@ -689,7 +692,7 @@ void SceneView::onWindowGUI()
 			if (m_is_mouse_captured) {
 				const ImVec2 pos = ImGui::GetItemRectMin();
 				const ImVec2 size = ImGui::GetItemRectSize();
-				OS::clipCursor(ImGui::GetWindowViewport()->PlatformHandle, (int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
+				OS::clipCursor((int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
 			}
 
 			if (ImGui::BeginDragDropTarget()) {
@@ -707,8 +710,12 @@ void SceneView::onWindowGUI()
 		m_editor.inputFrame();
 	}
 
+	if (m_is_mouse_captured && OS::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) {
+		captureMouse(false);
+	}
 	ImGui::End();
-	statsUI(view_pos.x, view_pos.y);
+
+	if (is_open) statsUI(view_pos.x, view_pos.y);
 }
 
 

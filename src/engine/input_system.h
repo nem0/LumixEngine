@@ -94,7 +94,6 @@ class LUMIX_ENGINE_API InputSystem
 
 		virtual ~InputSystem() {}
 		virtual IAllocator& getAllocator() = 0;
-		virtual void enable(bool enabled) = 0;
 		virtual void update(float dt) = 0;
 
 		virtual void injectEvent(const Event& event) = 0;
