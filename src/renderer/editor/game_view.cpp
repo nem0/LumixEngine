@@ -143,7 +143,6 @@ void GameView::captureMouse(bool capture)
 	if (m_is_mouse_captured == capture) return;
 
 	m_is_mouse_captured = capture;
-	m_editor.getEngine().getInputSystem().enable(m_is_mouse_captured);
 	OS::showCursor(!capture || m_is_ingame_cursor);
 	
 	if (capture) {
@@ -370,7 +369,7 @@ void GameView::onWindowGUI()
 			m_size = ImGui::GetItemRectSize();
 
 			if (m_is_mouse_captured && m_is_ingame_cursor) {
-				OS::clipCursor(ImGui::GetWindowViewport()->PlatformHandle, (int)m_pos.x, (int)m_pos.y, (int)m_size.x, (int)m_size.y);
+				OS::clipCursor((int)m_pos.x, (int)m_pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
 			processInputEvents();

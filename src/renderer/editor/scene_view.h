@@ -67,7 +67,6 @@ class SceneView : public StudioApp::GUIPlugin
 		Action* m_move_down_action;
 		Action* m_camera_speed_action;
 		bool m_is_mouse_captured;
-		bool m_is_open;
 		bool m_show_stats;
 		int m_screen_x;
 		int m_screen_y;

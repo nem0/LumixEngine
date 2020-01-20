@@ -34,7 +34,6 @@ struct InputSystemImpl final : public InputSystem
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
 		, m_events(m_allocator)
-		, m_is_enabled(false)
 		, m_devices(m_allocator)
 		, m_to_remove(m_allocator)
 	{
@@ -60,7 +59,6 @@ struct InputSystemImpl final : public InputSystem
 
 
 	IAllocator& getAllocator() override { return m_allocator; }
-	void enable(bool enabled) override { m_is_enabled = enabled; }
 	
 	
 	void addDevice(Device* device) override
@@ -172,7 +170,6 @@ struct InputSystemImpl final : public InputSystem
 	MouseDevice* m_mouse_device;
 	KeyboardDevice* m_keyboard_device;
 	Array<Event> m_events;
-	bool m_is_enabled;
 	Array<Device*> m_devices;
 	Array<Device*> m_to_remove;
 };

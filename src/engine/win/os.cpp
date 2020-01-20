@@ -1106,22 +1106,13 @@ bool makePath(const char* path)
 }
 
 
-void clipCursor(WindowHandle win, int x, int y, int w, int h)
+void clipCursor(int x, int y, int w, int h)
 {
-	POINT min;
-	POINT max;
-	min.x = LONG(x);
-	min.y = LONG(y);
-	max.x = LONG(x + w);
-	max.y = LONG(y + h);
-
-	ClientToScreen((HWND)win, &min);
-	ClientToScreen((HWND)win, &max);
 	RECT rect;
-	rect.left = min.x;
-	rect.right = max.x;
-	rect.top = min.y;
-	rect.bottom = max.y;
+	rect.left = x;
+	rect.right = x + w;
+	rect.top = y;
+	rect.bottom = y + h;
 	ClipCursor(&rect);
 }
 

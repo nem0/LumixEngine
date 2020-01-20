@@ -186,7 +186,7 @@ LUMIX_ENGINE_API bool dirExists(const char* path);
 LUMIX_ENGINE_API u64 getLastModified(const char* file);
 LUMIX_ENGINE_API bool makePath(const char* path);
 
-LUMIX_ENGINE_API void clipCursor(WindowHandle win, int x, int y, int w, int h);
+LUMIX_ENGINE_API void clipCursor(int screen_x, int screen_y, int w, int h);
 LUMIX_ENGINE_API void unclipCursor();
 
 LUMIX_ENGINE_API void quit();
