@@ -1879,18 +1879,13 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 
 void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 {
-	struct SaveEntityGUIDMap : public ISaveEntityGUIDMap
-	{
-		EntityGUID get(EntityPtr entity) override { return {(u64)entity.index}; }
-	};
 	OS::OutputFile file;
 	PathUtils::FileInfo file_info(src);
 	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
 	if (!filesystem.open(tmp, Ref(file))) return;
 
 	OutputMemoryStream blob(allocator);
-	SaveEntityGUIDMap entity_map;
-	TextSerializer serializer(blob, entity_map);
+	TextSerializer serializer(blob);
 
 	serializer.write("version", (u32)PrefabVersion::LAST);
 	const int count = meshes.size();

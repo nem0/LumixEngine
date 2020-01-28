@@ -20,9 +20,7 @@ namespace Lumix
 		virtual ~IScene() {}
 
 		virtual void serialize(OutputMemoryStream& serializer) = 0;
-		virtual void serialize(ISerializer& serializer) {}
-		virtual void deserialize(IDeserializer& serializer) {}
-		virtual void deserialize(InputMemoryStream& serializer) = 0;
+		virtual void deserialize(InputMemoryStream& serialize, const struct EntityMap& entity_map) = 0;
 		virtual IPlugin& getPlugin() const = 0;
 		virtual void update(float time_delta, bool paused) = 0;
 		virtual void lateUpdate(float time_delta, bool paused) {}
@@ -39,8 +37,6 @@ namespace Lumix
 		virtual ~IPlugin();
 
 		virtual void init() {}
-		virtual void serialize(OutputMemoryStream&) {}
-		virtual void deserialize(InputMemoryStream&) {}
 		virtual void update(float) {}
 		virtual const char* getName() const = 0;
 		virtual void pluginAdded(IPlugin& plugin) {}

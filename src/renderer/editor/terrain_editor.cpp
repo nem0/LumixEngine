@@ -17,7 +17,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "physics/physics_scene.h"
 #include "renderer/culling_system.h"

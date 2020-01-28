@@ -35,6 +35,7 @@ struct LUMIX_ENGINE_API IInputStream
 	
 	template <class T> void read(T& value) { read(&value, sizeof(T)); }
 	template <class T> T read();
+	template <class T> void read(Ref<T> val) { val = read<T>(); }
 	bool readString(const Span<char>& data);
 };
 
@@ -106,7 +107,7 @@ class LUMIX_ENGINE_API InputMemoryStream final : public IInputStream
 		void rewind() { m_pos = 0; }
 		u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
 
-        using IInputStream::read;
+		using IInputStream::read;
 	private:
 		const u8* m_data;
 		u64 m_size;

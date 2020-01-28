@@ -157,10 +157,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(anim))
 		{
 			bool success = true;
-			struct : ISaveEntityGUIDMap {
-				EntityGUID get(EntityPtr entity) override { ASSERT(false); return INVALID_ENTITY_GUID; }
-			} dummy_map;
-			TextSerializer serializer(*file, dummy_map);
+			TextSerializer serializer(*file);
 			if (!anim.save(serializer))
 			{
 				success = false;

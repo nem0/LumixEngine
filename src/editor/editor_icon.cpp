@@ -79,7 +79,6 @@ struct EditorIconsImpl final : public EditorIcons
 		if(m_editor.getUniverse())
 		{
 			auto& universe = *m_editor.getUniverse();
-			universe.entityCreated().unbind<&EditorIconsImpl::onEntityCreated>(this);
 			universe.entityDestroyed().unbind<&EditorIconsImpl::destroyIcon>(this);
 			universe.componentAdded().unbind<&EditorIconsImpl::refreshIcon>(this);
 			universe.componentDestroyed().unbind<&EditorIconsImpl::refreshIcon>(this);
@@ -90,16 +89,9 @@ struct EditorIconsImpl final : public EditorIcons
 	void onUniverseCreated()
 	{
 		auto& universe = *m_editor.getUniverse();
-		universe.entityCreated().bind<&EditorIconsImpl::onEntityCreated>(this);
 		universe.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
 		universe.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
 		universe.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
-	}
-
-
-	void onEntityCreated(EntityRef entity)
-	{
-		createIcon(entity);
 	}
 
 
@@ -164,9 +156,10 @@ struct EditorIconsImpl final : public EditorIcons
 	{
 		clear();
 		auto& universe = *m_editor.getUniverse();
-		for (EntityPtr entity = universe.getFirstEntity(); entity.isValid(); entity = universe.getNextEntity((EntityRef)entity))
-		{
-			createIcon((EntityRef)entity);
+		for (EntityPtr entity = universe.getFirstEntity(); entity.isValid(); entity = universe.getNextEntity((EntityRef)entity)) {
+			if (universe.getFirstComponent((EntityRef)entity).isValid()) {
+				createIcon((EntityRef)entity);
+			}
 		}
 	}
 

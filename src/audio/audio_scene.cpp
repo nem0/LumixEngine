@@ -11,7 +11,6 @@
 #include "engine/math.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 
@@ -78,147 +77,19 @@ struct AudioSceneImpl final : public AudioScene
 		context.registerComponentType(LISTENER_TYPE
 			, this
 			, &AudioSceneImpl::createListener
-			, &AudioSceneImpl::destroyListener
-			, &AudioSceneImpl::serializeListener
-			, &AudioSceneImpl::deserializeListener);
+			, &AudioSceneImpl::destroyListener);
 		context.registerComponentType(AMBIENT_SOUND_TYPE
 			, this
 			, &AudioSceneImpl::createAmbientSound
-			, &AudioSceneImpl::destroyAmbientSound
-			, &AudioSceneImpl::serializeAmbientSound
-			, &AudioSceneImpl::deserializeAmbientSound);
+			, &AudioSceneImpl::destroyAmbientSound);
 		context.registerComponentType(ECHO_ZONE_TYPE
 			, this
 			, &AudioSceneImpl::createEchoZone
-			, &AudioSceneImpl::destroyEchoZone
-			, &AudioSceneImpl::serializeEchoZone
-			, &AudioSceneImpl::deserializeEchoZone);
+			, &AudioSceneImpl::destroyEchoZone);
 		context.registerComponentType(CHORUS_ZONE_TYPE
 			, this
 			, &AudioSceneImpl::createChorusZone
-			, &AudioSceneImpl::destroyChorusZone
-			, &AudioSceneImpl::serializeChorusZone
-			, &AudioSceneImpl::deserializeChorusZone);
-	}
-
-
-	void serialize(ISerializer& serializer) override
-	{
-		serializer.write("count", m_clips.size());
-		for (ClipInfo* clip : m_clips)
-		{
-			serializer.write("valid", clip != nullptr);
-			if (!clip) continue;
-
-			serializer.write("volume", clip->volume);
-			serializer.write("looped", clip->looped);
-			serializer.write("name", clip->name);
-			serializer.write("path", clip->clip->getPath().c_str());
-		}
-	}
-
-
-	void deserialize(IDeserializer& serializer) override
-	{
-		int count;
-		serializer.read(Ref(count));
-		m_clips.resize(count);
-		for (int i = 0; i < count; ++i)
-		{
-			bool valid;
-			serializer.read(Ref(valid));
-			if (!valid)
-			{
-				m_clips[i] = nullptr;
-				continue;
-			}
-
-			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
-			m_clips[i] = clip;
-			serializer.read(Ref(clip->volume));
-			serializer.read(Ref(clip->looped));
-			serializer.read(Span(clip->name));
-			clip->name_hash = crc32(clip->name);
-			char path[MAX_PATH_LENGTH];
-			serializer.read(Span(path));
-			
-			clip->clip = path[0] ? m_system.getEngine().getResourceManager().load<Clip>(Path(path)) : nullptr;
-		}
-	}
-
-
-	void serializeEchoZone(ISerializer& serializer, EntityRef entity)
-	{
-		EchoZone& zone = m_echo_zones[entity];
-		serializer.write("radius", zone.radius);
-		serializer.write("delay", zone.delay);
-	}
-
-
-	void deserializeEchoZone(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		EchoZone& zone = m_echo_zones.insert(entity);
-		zone.entity = entity;
-		serializer.read(Ref(zone.radius));
-		serializer.read(Ref(zone.delay));
-		m_universe.onComponentCreated(entity, ECHO_ZONE_TYPE, this);
-	}
-
-	void serializeChorusZone(ISerializer& serializer, EntityRef entity)
-	{
-		ChorusZone& zone = m_chorus_zones[entity];
-		serializer.write("radius", zone.radius);
-		serializer.write("delay", zone.delay);
-		serializer.write("depth", zone.depth);
-		serializer.write("feedback", zone.feedback);
-		serializer.write("frequency", zone.frequency);
-		serializer.write("phase", zone.phase);
-		serializer.write("wet_dry_mix", zone.wet_dry_mix);
-	}
-
-
-	void deserializeChorusZone(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		ChorusZone& zone = m_chorus_zones.insert(entity);
-		zone.entity = entity;
-		serializer.read(Ref(zone.radius));
-		serializer.read(Ref(zone.delay));
-		serializer.read(Ref(zone.depth));
-		serializer.read(Ref(zone.feedback));
-		serializer.read(Ref(zone.frequency));
-		serializer.read(Ref(zone.phase));
-		serializer.read(Ref(zone.wet_dry_mix));
-		m_universe.onComponentCreated(entity, CHORUS_ZONE_TYPE, this);
-	}
-
-	void serializeAmbientSound(ISerializer& serializer, EntityRef entity)
-	{
-		AmbientSound& sound = m_ambient_sounds[entity];
-		serializer.write("clip", m_clips.indexOf(sound.clip));
-		serializer.write("is_3d", sound.is_3d);
-	}
-
-
-	void deserializeAmbientSound(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		AmbientSound& sound = m_ambient_sounds.insert(entity);
-		sound.playing_sound = -1;
-		sound.entity = entity;
-		int clip;
-		serializer.read(Ref(clip));
-		serializer.read(Ref(sound.is_3d));
-		sound.clip = clip >= 0 ? m_clips[clip] : nullptr;
-		m_universe.onComponentCreated(entity, AMBIENT_SOUND_TYPE, this);
-	}
-
-
-	void serializeListener(ISerializer&, EntityRef) {}
-
-
-	void deserializeListener(IDeserializer&, EntityRef entity, int /*scene_version*/)
-	{
-		m_listener.entity = entity;
-		m_universe.onComponentCreated(entity, LISTENER_TYPE, this);
+			, &AudioSceneImpl::destroyChorusZone);
 	}
 
 
@@ -511,28 +382,28 @@ struct AudioSceneImpl final : public AudioScene
 	}
 
 
-	void deserialize(InputMemoryStream& serializer) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
-		clear();
-
 		serializer.read(m_listener.entity);
+		m_listener.entity = entity_map.get(m_listener.entity);
 		if (m_listener.entity.isValid()) {
 			m_universe.onComponentCreated((EntityRef)m_listener.entity, LISTENER_TYPE, this);
 		}
 
 		int count = 0;
 		serializer.read(count);
-		m_clips.resize(count);
+		const u32 clip_offset = m_clips.size();
+		m_clips.reserve(m_clips.size() + count);
 		for (int i = 0; i < count; ++i) {
 			bool is_valid;
 			serializer.read(is_valid);
 			if (!is_valid) {
-				m_clips[i] = nullptr;
+				m_clips.emplace() = nullptr;
 				continue;
 			}
 
 			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
-			m_clips[i] = clip;
+			m_clips.emplace() = clip;
 			clip->volume = 1;
 			serializer.read(clip->volume);
 			serializer.read(clip->looped);
@@ -549,8 +420,9 @@ struct AudioSceneImpl final : public AudioScene
 			AmbientSound sound;
 			int clip_idx;
 			serializer.read(clip_idx);
-			if (clip_idx >= 0) sound.clip = m_clips[clip_idx];
+			if (clip_idx >= 0) sound.clip = m_clips[clip_idx + clip_offset];
 			serializer.read(sound.entity);
+			sound.entity = entity_map.get(sound.entity);
 			serializer.read(sound.is_3d);
 
 			m_ambient_sounds.insert(sound.entity, sound);
@@ -562,7 +434,7 @@ struct AudioSceneImpl final : public AudioScene
 		for (int i = 0; i < count; ++i) {
 			EchoZone zone;
 			serializer.read(zone);
-
+			zone.entity = entity_map.get(zone.entity);
 			m_echo_zones.insert(zone.entity, zone);
 			m_universe.onComponentCreated(zone.entity, ECHO_ZONE_TYPE, this);
 		}
@@ -572,6 +444,7 @@ struct AudioSceneImpl final : public AudioScene
 		for (int i = 0; i < count; ++i) {
 			ChorusZone zone;
 			serializer.read(zone);
+			zone.entity = entity_map.get(zone.entity);
 
 			m_chorus_zones.insert(zone.entity, zone);
 			m_universe.onComponentCreated(zone.entity, CHORUS_ZONE_TYPE, this);

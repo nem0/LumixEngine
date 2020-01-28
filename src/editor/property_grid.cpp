@@ -12,7 +12,6 @@
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 #include "engine/resource.h"
-#include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "engine/math.h"
@@ -719,18 +718,6 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 			{
 				prefab_system.savePrefab(prefab->getPath());
 			}
-		}
-
-		EntityGUID guid = m_editor.getEntityGUID(entities[0]);
-		if (guid == INVALID_ENTITY_GUID)
-		{
-			ImGui::Text("ID: %d, GUID: runtime", entities[0].index);
-		}
-		else
-		{
-			char guid_str[32];
-			toCString(guid.value, Span(guid_str));
-			ImGui::Text("ID: %d, GUID: %s", entities[0].index, guid_str);
 		}
 
 		EntityPtr parent = m_editor.getUniverse()->getParent(entities[0]);

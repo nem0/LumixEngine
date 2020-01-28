@@ -19,30 +19,6 @@ struct IVec3;
 struct Vec3;
 struct Vec4;
 
-struct EntityGUID
-{
-	u64 value;
-	bool operator ==(const EntityGUID& rhs) const { return value == rhs.value; }
-};
-
-
-const EntityGUID INVALID_ENTITY_GUID = { 0xffffFFFFffffFFFF };
-inline bool isValid(EntityGUID guid) { return guid.value != INVALID_ENTITY_GUID.value; }
-
-
-struct ISaveEntityGUIDMap
-{
-	virtual ~ISaveEntityGUIDMap() {}
-	virtual EntityGUID get(EntityPtr entity) = 0;
-};
-
-
-struct ILoadEntityGUIDMap
-{
-	virtual ~ILoadEntityGUIDMap() {}
-	virtual EntityPtr get(EntityGUID guid) = 0;
-};
-
 
 struct LUMIX_ENGINE_API ISerializer
 {
@@ -69,7 +45,6 @@ struct LUMIX_ENGINE_API ISerializer
 	virtual void write(const char* label, i8 value) = 0;
 	virtual void write(const char* label, u8 value) = 0;
 	virtual void write(const char* label, const char* value) = 0;
-	virtual EntityGUID getGUID(EntityRef entity) = 0;
 };
 
 
@@ -99,15 +74,13 @@ struct LUMIX_ENGINE_API IDeserializer
 	virtual void read(Ref<i8> value) = 0;
 	virtual void read(Span<char> value) = 0;
 	virtual void read(Ref<String> value) = 0;
-	virtual EntityPtr getEntity(EntityGUID guid) = 0;
 };
 
 
 struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
 {
-	TextSerializer(OutputMemoryStream& _blob, ISaveEntityGUIDMap& _entity_map)
+	TextSerializer(OutputMemoryStream& _blob)
 		: blob(_blob)
-		, entity_map(_entity_map)
 	{
 	}
 
@@ -132,18 +105,15 @@ struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
 	void write(const char* label, i8 value)  override;
 	void write(const char* label, u8 value)  override;
 	void write(const char* label, const char* value)  override;
-	EntityGUID getGUID(EntityRef entity) override;
 
 	OutputMemoryStream& blob;
-	ISaveEntityGUIDMap& entity_map;
 };
 
 
 struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 {
-	TextDeserializer(InputMemoryStream& _blob, ILoadEntityGUIDMap& _entity_map)
+	TextDeserializer(InputMemoryStream& _blob)
 		: blob(_blob)
-		, entity_map(_entity_map)
 	{
 	}
 
@@ -169,7 +139,6 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	void read(Ref<i8> value)  override;
 	void read(Span<char> value)  override;
 	void read(Ref<String> value)  override;
-	EntityPtr getEntity(EntityGUID guid) override;
 
 	void skip();
 	u32 readU32();
@@ -177,7 +146,6 @@ struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
 	u64 readU64();
 
 	InputMemoryStream& blob;
-	ILoadEntityGUIDMap& entity_map;
 };
 
 

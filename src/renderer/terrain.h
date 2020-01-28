@@ -119,7 +119,7 @@ class Terrain
 
 		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 		void serialize(IOutputStream& serializer);
-		void deserialize(IInputStream& serializer, Universe& universe, RenderScene& scene);
+		void deserialize(EntityRef entity, IInputStream& serializer, Universe& universe, RenderScene& scene);
 
 		void addGrassType(int index);
 		void removeGrassType(int index);

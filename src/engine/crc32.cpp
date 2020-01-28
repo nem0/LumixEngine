@@ -51,11 +51,11 @@ static u32 crc32Table[256] = {
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d};
 
 
-u32 crc32(const void* data, int length)
+u32 crc32(const void* data, u32 length)
 {
 	const u8* c = static_cast<const u8*>(data);
 	u32 crc = 0xffffFFFF;
-	int len = length;
+	u32 len = length;
 	while (len)
 	{
 		crc = (crc >> 8) ^ crc32Table[(crc & 0xFF) ^ *c];
@@ -92,7 +92,7 @@ u32 continueCrc32(u32 original_crc, const char* str)
 }
 
 
-u32 continueCrc32(u32 original_crc, const void* data, int length)
+u32 continueCrc32(u32 original_crc, const void* data, u32 length)
 {
 	const u8* c = reinterpret_cast<const u8*>(data);
 	u32 crc = ~original_crc;

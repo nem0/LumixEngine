@@ -175,6 +175,27 @@ public:
 	IAllocator& getAllocator() override { return m_allocator; }
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
+	bool instantiatePrefab(Universe& universe,
+		const struct PrefabResource& prefab,
+		const struct DVec3& pos,
+		const struct Quat& rot,
+		float scale,
+		Ref<EntityMap> entity_map) override
+	{
+		ASSERT(prefab.isReady());
+		InputMemoryStream blob(prefab.data.begin(), prefab.data.byte_size());
+		if (!deserialize(universe, blob, entity_map)) {
+			logError("Engine") << "Failed to instantiate prefab " << prefab.getPath();
+			return false;
+		}
+
+		ASSERT(!entity_map->m_map.empty());
+		const EntityRef root = (EntityRef)entity_map->m_map[0];
+		ASSERT(!universe.getParent(root).isValid());
+		ASSERT(!universe.getNextSibling(root).isValid());
+		universe.setTransform(root, pos, rot, scale);
+		return true;
+	}
 
 	Universe& createUniverse(bool is_main_universe) override
 	{
@@ -300,7 +321,7 @@ public:
 	}
 
 
-	void serializerSceneVersions(OutputMemoryStream& serializer, Universe& ctx)
+	void serializeSceneVersions(OutputMemoryStream& serializer, Universe& ctx)
 	{
 		serializer.write(ctx.getScenes().size());
 		for (auto* scene : ctx.getScenes())
@@ -367,13 +388,12 @@ public:
 		header.m_reserved = 0;
 		serializer.write(header);
 		serializePluginList(serializer);
-		serializerSceneVersions(serializer, ctx);
+		serializeSceneVersions(serializer, ctx);
 		m_path_manager->serialize(serializer);
 		int pos = (int)serializer.getPos();
 		ctx.serialize(serializer);
-		m_plugin_manager->serialize(serializer);
 		serializer.write((i32)ctx.getScenes().size());
-		for (auto* scene : ctx.getScenes())
+		for (IScene* scene : ctx.getScenes())
 		{
 			serializer.writeString(scene->getPlugin().getName());
 			scene->serialize(serializer);
@@ -383,7 +403,7 @@ public:
 	}
 
 
-	bool deserialize(Universe& ctx, InputMemoryStream& serializer) override
+	bool deserialize(Universe& ctx, InputMemoryStream& serializer, Ref<EntityMap> entity_map) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);
@@ -396,8 +416,7 @@ public:
 		if (!hasSupportedSceneVersions(serializer, ctx)) return false;
 
 		m_path_manager->deserialize(serializer);
-		ctx.deserialize(serializer);
-		m_plugin_manager->deserialize(serializer);
+		ctx.deserialize(serializer, entity_map);
 		i32 scene_count;
 		serializer.read(scene_count);
 		for (int i = 0; i < scene_count; ++i)
@@ -405,7 +424,7 @@ public:
 			char tmp[32];
 			serializer.readString(Span(tmp));
 			IScene* scene = ctx.getScene(crc32(tmp));
-			scene->deserialize(serializer);
+			scene->deserialize(serializer, entity_map);
 		}
 		m_path_manager->clear();
 		return true;

@@ -22,20 +22,27 @@ struct ISerializer;
 struct PrefabResource;
 
 
+struct EntityMap {
+	EntityMap(IAllocator& allocator);
+	void reserve(u32 count);
+	EntityPtr get(EntityPtr e) const;
+	EntityRef get(EntityRef e) const;
+	void set(EntityRef src, EntityRef dst);
+
+	Array<EntityPtr> m_map;
+};
+
+
 class LUMIX_ENGINE_API Universe
 {
 public:
 	typedef void (IScene::*Create)(EntityRef);
 	typedef void (IScene::*Destroy)(EntityRef);
-	typedef void (IScene::*Serialize)(ISerializer&, EntityRef);
-	typedef void (IScene::*Deserialize)(IDeserializer&, EntityRef, int);
 	struct ComponentTypeEntry
 	{
 		IScene* scene = nullptr;
 		void (IScene::*create)(EntityRef);
 		void (IScene::*destroy)(EntityRef);
-		void (IScene::*serialize)(ISerializer&, EntityRef);
-		void (IScene::*deserialize)(IDeserializer&, EntityRef, int);
 	};
 
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
@@ -70,7 +77,6 @@ public:
 	const Transform* getTransforms() const { return m_transforms.begin(); }
 	void emplaceEntity(EntityRef entity);
 	EntityRef createEntity(const DVec3& position, const Quat& rotation);
-	EntityRef cloneEntity(EntityRef entity);
 	void destroyEntity(EntityRef entity);
 	void createComponent(ComponentType type, EntityRef entity);
 	void destroyComponent(EntityRef entity, ComponentType type);
@@ -82,14 +88,12 @@ public:
 	ComponentUID getFirstComponent(EntityRef entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
 	ComponentTypeEntry& registerComponentType(ComponentType type) { return m_component_type_map[type.index]; }
-	template <typename T1, typename T2, typename T3, typename T4>
-	void registerComponentType(ComponentType type, IScene* scene, T1 create, T2 destroy, T3 serialize, T4 deserialize)
+	template <typename T1, typename T2>
+	void registerComponentType(ComponentType type, IScene* scene, T1 create, T2 destroy)
 	{
 		m_component_type_map[type.index].scene = scene;
 		m_component_type_map[type.index].create = static_cast<Create>(create);
 		m_component_type_map[type.index].destroy = static_cast<Destroy>(destroy);
-		m_component_type_map[type.index].serialize = static_cast<Serialize>(serialize);
-		m_component_type_map[type.index].deserialize = static_cast<Deserialize>(deserialize);
 	}
 
 	EntityPtr getFirstEntity() const;
@@ -121,10 +125,6 @@ public:
 	void setRotation(EntityRef entity, const Quat& rot);
 	void setPosition(EntityRef entity, const DVec3& pos);
 	void setScale(EntityRef entity, float scale);
-	EntityPtr instantiatePrefab(const PrefabResource& prefab,
-		const DVec3& pos,
-		const Quat& rot,
-		float scale);
 	float getScale(EntityRef entity) const;
 	const DVec3& getPosition(EntityRef entity) const;
 	const Quat& getRotation(EntityRef entity) const;
@@ -135,15 +135,12 @@ public:
 	}
 
 	DelegateList<void(EntityRef)>& entityTransformed() { return m_entity_moved; }
-	DelegateList<void(EntityRef)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(EntityRef)>& entityDestroyed() { return m_entity_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
-	void serializeComponent(ISerializer& serializer, ComponentType type, EntityRef entity);
-	void deserializeComponent(IDeserializer& serializer, EntityRef entity, ComponentType type, int scene_version);
 	void serialize(IOutputStream& serializer);
-	void deserialize(IInputStream& serializer);
+	void deserialize(IInputStream& serializer, Ref<EntityMap> entity_map);
 
 	IScene* getScene(ComponentType type) const;
 	IScene* getScene(u32 hash) const;
@@ -180,7 +177,6 @@ private:
 	Array<Hierarchy> m_hierarchy;
 	Array<EntityName> m_names;
 	DelegateList<void(EntityRef)> m_entity_moved;
-	DelegateList<void(EntityRef)> m_entity_created;
 	DelegateList<void(EntityRef)> m_entity_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;

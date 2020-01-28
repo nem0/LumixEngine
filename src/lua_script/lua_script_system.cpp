@@ -15,7 +15,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/string.h"
 #include "engine/universe/universe.h"
@@ -378,9 +377,7 @@ namespace Lumix
 			ctx.registerComponentType(LUA_SCRIPT_TYPE
 				, this
 				, &LuaScriptSceneImpl::createLuaScriptComponent
-				, &LuaScriptSceneImpl::destroyLuaScriptComponent
-				, &LuaScriptSceneImpl::serializeLuaScript
-				, &LuaScriptSceneImpl::deserializeLuaScript);
+				, &LuaScriptSceneImpl::destroyLuaScriptComponent);
 		}
 
 
@@ -1352,120 +1349,6 @@ namespace Lumix
 		}
 
 
-		void serializeLuaScript(ISerializer& serializer, EntityRef entity)
-		{
-			ScriptComponent* script = m_scripts[entity];
-			serializer.write("count", script->m_scripts.size());
-			for (ScriptInstance& inst : script->m_scripts)
-			{
-				serializer.write("source", inst.m_script ? inst.m_script->getPath().c_str() : "");
-				serializer.write("flags", inst.m_flags.base);
-				serializer.write("prop_count", inst.m_properties.size());
-				for (Property& prop : inst.m_properties)
-				{
-					const char* name = getPropertyName(prop.name_hash);
-					serializer.write("prop_name", name ? name : "");
-					int idx = m_property_names.find(prop.name_hash);
-					if (idx >= 0)
-					{
-						const char* name = m_property_names.at(idx).c_str();
-						serializer.write("prop_type", (int)prop.type);
-						if (prop.type == Property::ENTITY)
-						{
-							lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
-							lua_getfield(inst.m_state, -1, name);
-							if (lua_type(inst.m_state, -1) == LUA_TNIL)
-							{
-								serializer.write("prop_value", prop.stored_value.c_str());
-							}
-							else
-							{
-								EntityRef val = {(int)lua_tointeger(inst.m_state, -1)};
-								EntityGUID guid = serializer.getGUID(val);
-								char tmp[128];
-								toCString(guid.value, Span(tmp));
-								serializer.write("prop_value", tmp);
-							}
-						}
-						else
-						{
-							char tmp[1024];
-							getProperty(prop, name, inst, Span(tmp));
-							serializer.write("prop_value", tmp);
-						}
-					}
-					else
-					{
-						serializer.write("prop_type", (int)Property::ANY);
-						serializer.write("prop_value", "");
-					}
-				}
-			}
-		}
-
-
-		void deserializeLuaScript(IDeserializer& serializer, EntityRef entity, int scene_version)
-		{
-			auto& allocator = m_system.m_allocator;
-			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
-			script->m_entity = entity;
-			m_scripts.insert(entity, script);
-			
-			int count;
-			serializer.read(Ref(count));
-			script->m_scripts.reserve(count);
-			for (int i = 0; i < count; ++i)
-			{
-				ScriptInstance& inst = script->m_scripts.emplace(allocator);
-				char tmp[MAX_PATH_LENGTH];
-				serializer.read(Span(tmp));
-				setScriptPath(entity, i, Path(tmp));
-				if(scene_version >(int)LuaSceneVersion::FLAGS)
-					serializer.read(Ref(inst.m_flags.base));
-
-				int prop_count;
-				serializer.read(Ref(prop_count));
-				for (int j = 0; j < prop_count; ++j)
-				{
-					char tmp[1024];
-					serializer.read(Span(tmp));
-					u32 hash = crc32(tmp);
-					int prop_idx = ScriptComponent::getProperty(inst, hash);
-					Property* prop;
-					if (prop_idx < 0)
-					{
-						prop = &inst.m_properties.emplace(allocator);
-						prop->type = Property::ANY;
-						prop->name_hash = hash;
-						if (m_property_names.find(hash) < 0)
-						{
-							m_property_names.emplace(hash, tmp, allocator);
-						}
-					}
-					else
-					{
-						prop = &inst.m_properties[prop_idx];
-					}
-					tmp[0] = 0;
-					if (scene_version > (int)LuaSceneVersion::PROPERTY_TYPE) serializer.read(Ref((int&)prop->type));
-					serializer.read(Span(tmp));
-					
-					if (prop->type == Property::ENTITY)
-					{
-						u64 guid;
-						fromCString(Span(tmp), Ref(guid));
-						const EntityPtr entity = serializer.getEntity({guid});
-						toCString(entity.index, Span(tmp));
-					}
-					prop->stored_value = tmp;
-					applyProperty(inst, *prop, tmp);
-				}
-			}
-
-			m_universe.onComponentCreated(entity, LUA_SCRIPT_TYPE, this);
-		}
-
-
 		void serialize(OutputMemoryStream& serializer) override
 		{
 			serializer.write(m_scripts.size());
@@ -1500,15 +1383,16 @@ namespace Lumix
 		}
 
 
-		void deserialize(InputMemoryStream& serializer) override
+		void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 		{
 			int len = serializer.read<int>();
-			m_scripts.reserve(len);
+			m_scripts.reserve(len + m_scripts.size());
 			for (int i = 0; i < len; ++i)
 			{
 				auto& allocator = m_system.m_allocator;
 				EntityRef entity;
 				serializer.read(entity);
+				entity = entity_map.get(entity);
 				ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 
 				m_scripts.insert(script->m_entity, script);
@@ -1533,6 +1417,7 @@ namespace Lumix
 						char tmp[1024];
 						tmp[0] = 0;
 						serializer.readString(Span(tmp));
+						// TODO map entities if property is of entity type
 						prop.stored_value = tmp;
 					}
 					setScriptPath(*script, scr, Path(tmp));

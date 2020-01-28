@@ -25,7 +25,6 @@
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "render_interface.h"
@@ -39,7 +38,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 
 struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
-	PropertyDeserializeVisitor(IDeserializer& deserializer, ComponentUID cmp)
+	PropertyDeserializeVisitor(IInputStream& deserializer, ComponentUID cmp)
 		: deserializer(deserializer)
 		, cmp(cmp)
 	{}
@@ -66,7 +65,7 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 
 	void visit(const Reflection::Property<Path>& prop) override { 
 		char buf[MAX_PATH_LENGTH];
-		deserializer.read(Span(buf));
+		deserializer.readString(Span(buf));
 		InputMemoryStream str(buf, strlen(buf));
 		prop.setValue(cmp, idx, str);
 	}
@@ -94,7 +93,7 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::Property<const char*>& prop) override { 
 		// TODO support bigger strings
 		char buf[4096];
-		deserializer.read(Span(buf));
+		deserializer.readString(Span(buf));
 		InputMemoryStream str(buf, strlen(buf));
 		prop.setValue(cmp, idx, str);
 	}
@@ -104,13 +103,13 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
 
-	IDeserializer& deserializer;
+	IInputStream& deserializer;
 	ComponentUID cmp;
 	int idx;
 };
 
 struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
-	PropertySerializeVisitor(ISerializer& serializer, ComponentUID cmp)
+	PropertySerializeVisitor(IOutputStream& serializer, ComponentUID cmp)
 		: serializer(serializer)
 		, cmp(cmp)
 	{}
@@ -120,7 +119,7 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 		T value;
 		OutputMemoryStream str(&value, sizeof(value));
 		prop.getValue(cmp, idx, str);
-		serializer.write(prop.name, value);
+		serializer.write(value);
 	}
 
 	void visit(const Reflection::Property<float>& prop) override { visit_generic(prop); }
@@ -136,12 +135,12 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 		char tmp[MAX_PATH_LENGTH];
 		OutputMemoryStream str(tmp, sizeof(tmp));
 		prop.getValue(cmp, idx, str);
-		serializer.write(prop.name, tmp);
+		serializer.writeString(tmp);
 	}
 
 	void visit(const Reflection::IArrayProperty& prop) override {
 		const int count = prop.getCount(cmp);
-		serializer.write("count", count);
+		serializer.write(count);
 		const int idx_backup = idx;
 		for (int i = 0; i < count; ++i) {
 			idx = i;
@@ -154,14 +153,14 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 		int value;
 		OutputMemoryStream str(&value, sizeof(value));
 		prop.getValue(cmp, idx, str);
-		serializer.write(prop.name, value);
+		serializer.write(value);
 	}
 
 	void visit(const Reflection::Property<const char*>& prop) override { 
 		char tmp[4096];
 		OutputMemoryStream str(tmp, sizeof(tmp));
 		prop.getValue(cmp, idx, str);
-		serializer.write(prop.name, tmp);
+		serializer.writeString(tmp);
 	}
 
 	// TODO
@@ -169,7 +168,7 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
 
-	ISerializer& serializer;
+	IOutputStream& serializer;
 	ComponentUID cmp;
 	int idx;
 };
@@ -307,36 +306,12 @@ public:
 		m_old_rotations.reserve(count);
 		for (int i = count - 1; i >= 0; --i)
 		{
-			u64 prefab = prefab_system.getPrefab(entities[i]);
 			EntityPtr parent = universe->getParent(entities[i]);
-			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab((EntityRef)parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
-			{
-				float scale = universe->getScale(entities[i]);
-				Transform new_local_tr = universe->computeLocalTransform((EntityRef)parent, { new_positions[i], new_rotations[i], scale });
-				EntityPtr instance = prefab_system.getFirstInstance(prefab);
-				while (instance.isValid())
-				{
-					EntityRef instance_ref = (EntityRef)instance;
-					m_entities.push(instance_ref);
-					const EntityPtr inst_parent_ptr = universe->getParent(instance_ref);
-					ASSERT(inst_parent_ptr.isValid());
-					Transform new_tr = universe->getTransform((EntityRef)inst_parent_ptr);
-					new_tr = new_tr * new_local_tr;
-					m_new_positions.push(new_tr.pos);
-					m_new_rotations.push(new_tr.rot);
-					m_old_positions.push(universe->getPosition(instance_ref));
-					m_old_rotations.push(universe->getRotation(instance_ref));
-					instance = prefab_system.getNextInstance(instance_ref);
-				}
-			}
-			else
-			{
-				m_entities.push(entities[i]);
-				m_new_positions.push(new_positions[i]);
-				m_new_rotations.push(new_rotations[i]);
-				m_old_positions.push(universe->getPosition(entities[i]));
-				m_old_rotations.push(universe->getRotation(entities[i]));
-			}
+			m_entities.push(entities[i]);
+			m_new_positions.push(new_positions[i]);
+			m_new_rotations.push(new_rotations[i]);
+			m_old_positions.push(universe->getPosition(entities[i]));
+			m_old_rotations.push(universe->getRotation(entities[i]));
 		}
 	}
 
@@ -437,26 +412,10 @@ public:
 		m_old_positions.reserve(count);
 		for (int i = count - 1; i >= 0; --i)
 		{
-			u64 prefab = prefab_system.getPrefab(entities[i]);
 			EntityPtr parent = universe->getParent(entities[i]);
-			if (prefab != 0 && parent.isValid() && (prefab_system.getPrefab((EntityRef)parent) & 0xffffFFFF) == (prefab & 0xffffFFFF))
-			{
-				EntityPtr instance = prefab_system.getFirstInstance(prefab);
-				while (instance.isValid())
-				{
-					EntityRef e = (EntityRef)instance;
-					m_entities.push(e);
-					m_new_positions.push(new_positions[i]);
-					m_old_positions.push(universe->getPosition(e));
-					instance = prefab_system.getNextInstance(e);
-				}
-			}
-			else
-			{
-				m_entities.push(entities[i]);
-				m_new_positions.push(new_positions[i]);
-				m_old_positions.push(universe->getPosition(entities[i]));
-			}
+			m_entities.push(entities[i]);
+			m_new_positions.push(new_positions[i]);
+			m_old_positions.push(universe->getPosition(entities[i]));
 		}
 	}
 
@@ -825,25 +784,9 @@ public:
 		for (int i = 0; i < count; ++i)
 		{
 			if (!m_editor.getUniverse()->getComponent(entities[i], m_component_type).isValid()) continue;
-			u64 prefab = prefab_system.getPrefab(entities[i]);
-			if (prefab == 0)
-			{
-				ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
-				m_property->getValue(component, index, m_old_value);
-				m_entities.push(entities[i]);
-			}
-			else
-			{
-				EntityPtr instance = prefab_system.getFirstInstance(prefab);
-				while(instance.isValid())
-				{
-					EntityRef inst_ref = (EntityRef)instance;
-					ComponentUID component = m_editor.getUniverse()->getComponent(inst_ref, component_type);
-					m_property->getValue(component, index, m_old_value);
-					m_entities.push(inst_ref);
-					instance = prefab_system.getNextInstance(inst_ref);
-				}
-			}
+			ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
+			m_property->getValue(component, index, m_old_value);
+			m_entities.push(entities[i]);
 		}
 
 		m_index = index;
@@ -934,18 +877,7 @@ private:
 			Universe* universe = m_editor.getUniverse();
 			for (EntityRef e : entities) {
 				if (!universe->getComponent(e, type).isValid()) {
-					u64 prefab = editor.getPrefabSystem().getPrefab(e);
-					if (prefab == 0) {
-						m_entities.push(e);
-					}
-					else {
-						EntityPtr instance = editor.getPrefabSystem().getFirstInstance(prefab);
-						while (instance.isValid()) {
-							const EntityRef e = (EntityRef)instance;
-							m_entities.push(e);
-							instance = editor.getPrefabSystem().getNextInstance(e);
-						}
-					}
+					m_entities.push(e);
 				}
 			}
 		}
@@ -1118,8 +1050,6 @@ private:
 				{
 					++count;
 				}
-				EntityGUID guid = m_editor.m_entity_map.get(m_entities[i]);
-				m_old_values.write(guid.value);
 				m_old_values.writeString(universe->getEntityName(m_entities[i]));
 				EntityPtr parent = universe->getParent(m_entities[i]);
 				m_old_values.write(parent);
@@ -1156,13 +1086,12 @@ private:
 					save.stream = &m_old_values;
 					cmp_desc->visit(save);
 				}
-				u64 prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
+				const PrefabHandle prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
 				m_old_values.write(prefab);
 			}
 			for (EntityRef e : m_entities)
 			{
 				universe->destroyEntity(e);
-				m_editor.m_entity_map.erase(e);
 			}
 			return true;
 		}
@@ -1184,9 +1113,6 @@ private:
 				EntityRef new_entity = m_entities[i];
 				universe->setTransform(new_entity, m_transformations[i]);
 				int cmps_count;
-				EntityGUID guid;
-				blob.read(guid.value);
-				m_editor.m_entity_map.insert(guid, new_entity);
 				char name[Universe::ENTITY_NAME_MAX_LENGTH];
 				blob.readString(Span(name));
 				universe->setEntityName(new_entity, name);
@@ -1223,7 +1149,7 @@ private:
 					
 					::Lumix::load(new_component, -1, blob);
 				}
-				u64 tpl;
+				PrefabHandle tpl;
 				blob.read(tpl);
 				if (tpl) m_editor.getPrefabSystem().setPrefab(new_entity, tpl);
 			}
@@ -1266,17 +1192,7 @@ private:
 			PrefabSystem& prefab_system = editor.getPrefabSystem();
 			for (EntityRef e : entities) {
 				if (!m_editor.getUniverse()->getComponent(e, m_cmp_type).isValid()) continue;
-				const u64 prefab = prefab_system.getPrefab(e);
-				if (prefab == 0) {
-					m_entities.push(e);
-				}
-				else {
-					EntityPtr instance = prefab_system.getFirstInstance(prefab);
-					while(instance.isValid()) {
-						m_entities.push((EntityRef)instance);
-						instance = prefab_system.getNextInstance((EntityRef)instance);
-					}
-				}
+				m_entities.push(e);
 			}
 		}
 
@@ -1371,7 +1287,6 @@ private:
 				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
 			const EntityRef e = (EntityRef)m_entity;
-			((WorldEditorImpl&)m_editor).m_entity_map.create(e);
 			m_editor.selectEntities(&e, 1, false);
 			return true;
 		}
@@ -1383,7 +1298,6 @@ private:
 
 			const EntityRef e = (EntityRef)m_entity;
 			m_editor.getUniverse()->destroyEntity(e);
-			m_editor.m_entity_map.erase(e);
 		}
 
 
@@ -1762,9 +1676,9 @@ public:
 	{
 		logInfo("Editor") << "Saving universe " << basename << "...";
 		
-		StaticString<MAX_PATH_LENGTH> dir(m_engine.getFileSystem().getBasePath(), "universes/");
+		StaticString<MAX_PATH_LENGTH> dir(m_engine.getFileSystem().getBasePath(), "universes/", basename);
 		OS::makePath(dir);
-		StaticString<MAX_PATH_LENGTH> path(dir, basename, ".unv");
+		StaticString<MAX_PATH_LENGTH> path(dir, "/entities.unv");
 		OS::OutputFile file;
 		if (file.open(path)) {
 			save(file);
@@ -1773,315 +1687,10 @@ public:
 		else {
 			logError("Editor") << "Failed to save universe " << basename;
 		}
-
-		serialize(basename);
+		
 		m_is_universe_changed = false;
 
 		if (save_path) m_universe->setName(basename);
-	}
-
-
-	struct EntityGUIDMap : public ILoadEntityGUIDMap, public ISaveEntityGUIDMap
-	{
-		explicit EntityGUIDMap(IAllocator& allocator)
-			: guid_to_entity(allocator)
-			, entity_to_guid(allocator)
-			, is_random(true)
-		{
-		}
-
-
-		void clear()
-		{
-			nonrandom_guid = 0;
-			entity_to_guid.clear();
-			guid_to_entity.clear();
-		}
-
-
-		void create(EntityRef entity)
-		{
-			EntityGUID guid = { is_random ? randGUID() : ++nonrandom_guid };
-			insert(guid, entity);
-		}
-
-
-		void erase(EntityRef entity)
-		{
-			EntityGUID guid = entity_to_guid[entity.index];
-			if (!isValid(guid)) return;
-			entity_to_guid[entity.index] = INVALID_ENTITY_GUID;
-			guid_to_entity.erase(guid.value);
-		}
-
-
-		void insert(EntityGUID guid, EntityRef entity)
-		{
-			guid_to_entity.insert(guid.value, entity);
-			while (entity.index >= entity_to_guid.size())
-			{
-				entity_to_guid.push(INVALID_ENTITY_GUID);
-			}
-			entity_to_guid[entity.index] = guid;
-		}
-
-
-		EntityPtr get(EntityGUID guid) override
-		{
-			auto iter = guid_to_entity.find(guid.value);
-			if (iter.isValid()) return iter.value();
-			return INVALID_ENTITY;
-		}
-
-
-		EntityGUID get(EntityPtr entity) override
-		{
-			if (!entity.isValid()) return INVALID_ENTITY_GUID;
-			if (entity.index >= entity_to_guid.size()) return INVALID_ENTITY_GUID;
-			return entity_to_guid[entity.index];
-		}
-
-
-		bool has(EntityGUID guid) const
-		{
-			auto iter = guid_to_entity.find(guid.value);
-			return iter.isValid();
-		}
-
-
-		HashMap<u64, EntityRef> guid_to_entity;
-		Array<EntityGUID> entity_to_guid;
-		u64 nonrandom_guid = 0;
-		bool is_random = true;
-	};
-
-
-	bool deserialize(Universe& universe
-		, const char* basedir
-		, const char* basename
-		, PrefabSystem& prefab_system
-		, EntityGUIDMap& entity_map
-		, IAllocator& allocator)
-	{
-		PROFILE_FUNCTION();
-		
-		entity_map.clear();
-		StaticString<MAX_PATH_LENGTH> scn_dir(basedir, "/", basename, "/scenes/");
-		OS::FileIterator* scn_file_iter = m_engine.getFileSystem().createFileIterator(scn_dir);
-		Array<u8> data(allocator);
-		FileSystem& fs = m_engine.getFileSystem();
-		OS::InputFile file;
-		auto loadFile = [&file, &data, &entity_map, &fs](const char* filepath, auto callback) {
-			if (fs.open(filepath, Ref(file)))
-			{
-				if (file.size() > 0)
-				{
-					data.resize((int)file.size());
-					file.read(&data[0], data.size());
-					InputMemoryStream blob(&data[0], data.size());
-					TextDeserializer deserializer(blob, entity_map);
-					callback(deserializer);
-				}
-				file.close();
-			}
-		};
-		OS::FileInfo info;
-		int versions[ComponentType::MAX_TYPES_COUNT];
-		while (OS::getNextFile(scn_file_iter, &info))
-		{
-			if (info.is_directory) continue;
-			if (info.filename[0] == '.') continue;
-
-			StaticString<MAX_PATH_LENGTH> filepath(scn_dir, info.filename);
-			char plugin_name[64];
-			PathUtils::getBasename(Span(plugin_name), filepath);
-			IScene* scene = universe.getScene(crc32(plugin_name));
-			if (!scene)
-			{
-				logError("Editor") << "Could not open " << filepath << " since there is not plugin " << plugin_name;
-				return false;
-			}
-
-			loadFile(filepath, [scene, &versions, &universe](TextDeserializer& deserializer) {
-				int version;
-				deserializer.read(Ref(version));
-				for (int i = 0; i < ComponentType::MAX_TYPES_COUNT; ++i)
-				{
-					ComponentType cmp_type = {i};
-					if (universe.getScene(cmp_type) == scene)
-					{
-						versions[i] = version;
-					}
-				}
-				scene->deserialize(deserializer);
-			});
-		}
-		OS::destroyFileIterator(scn_file_iter);
-		
-		StaticString<MAX_PATH_LENGTH> dir(basedir, "/", basename, "/");
-		auto file_iter = m_engine.getFileSystem().createFileIterator(dir);
-		while (OS::getNextFile(file_iter, &info))
-		{
-			if (info.is_directory) continue;
-			if (info.filename[0] == '.') continue;
-
-			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-			char tmp[32];
-			PathUtils::getBasename(Span(tmp), filepath);
-			EntityGUID guid;
-			fromCString(Span(tmp), Ref(guid.value));
-			EntityRef entity = universe.createEntity({0, 0, 0}, {0, 0, 0, 1});
-			entity_map.insert(guid, entity);
-		}
-		OS::destroyFileIterator(file_iter);
-		
-		file_iter = m_engine.getFileSystem().createFileIterator(dir);
-		while (OS::getNextFile(file_iter, &info))
-		{
-			if (info.is_directory) continue;
-			if (info.filename[0] == '.') continue;
-
-			StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-			char tmp[32];
-			PathUtils::getBasename(Span(tmp), filepath);
-			EntityGUID guid;
-			fromCString(Span(tmp), Ref(guid.value));
-			loadFile(filepath, [&versions, &entity_map, &universe, guid](TextDeserializer& deserializer) {
-				char name[64];
-				deserializer.read(Span(name));
-				RigidTransform tr;
-				deserializer.read(Ref(tr));
-				float scale;
-				deserializer.read(Ref(scale));
-
-				const EntityPtr e = entity_map.get(guid);
-				const EntityRef entity = (EntityRef)e;
-
-				EntityPtr parent;
-				deserializer.read(Ref(parent));
-				if (parent.isValid()) universe.setParent(parent, entity);
-
-				if(name[0]) universe.setEntityName(entity, name);
-				universe.setTransformKeepChildren(entity, {tr.pos, tr.rot, scale});
-				u32 cmp_type_hash;
-				deserializer.read(Ref(cmp_type_hash));
-				while (cmp_type_hash != 0)
-				{
-					ComponentType cmp_type = Reflection::getComponentTypeFromHash(cmp_type_hash);
-					universe.deserializeComponent(deserializer, entity, cmp_type, versions[cmp_type.index]);
-					deserializer.read(Ref(cmp_type_hash));
-				}
-			});
-		}
-		OS::destroyFileIterator(file_iter);
-
-		StaticString<MAX_PATH_LENGTH> editor_filepath(basedir, "/", basename, "/systems/editor.sys");
-		loadFile(editor_filepath, [&](TextDeserializer& deserializer) {
-			deserializer.read(Ref(m_viewport.pos));
-			deserializer.read(Ref(m_viewport.rot));
-		});
-
-		StaticString<MAX_PATH_LENGTH> filepath(basedir, "/", basename, "/systems/templates.sys");
-		loadFile(filepath, [&](TextDeserializer& deserializer) {
-			prefab_system.deserialize(deserializer);
-			for (int i = 0, c = prefab_system.getMaxEntityIndex(); i < c; ++i)
-			{
-				u64 prefab = prefab_system.getPrefab({i});
-				if (prefab != 0) entity_map.create({i});
-			}
-		});
-		return true;
-	}
-
-	
-	void serialize(const char* basename)
-	{
-		StaticString<MAX_PATH_LENGTH> dir(m_engine.getFileSystem().getBasePath(), "universes/", basename, "/");
-		OS::makePath(dir);
-		OS::makePath(dir + "probes/");
-		OS::makePath(dir + "scenes/");
-		OS::makePath(dir + "systems/");
-
-		OS::OutputFile file;
-		OutputMemoryStream blob(m_allocator);
-		TextSerializer serializer(blob, m_entity_map);
-		auto saveFile = [&file, &blob](const char* path) {
-			if (file.open(path))
-			{
-				file.write(blob.getData(), blob.getPos());
-				file.close();
-			}
-			else {
-				logError("Editor") << "Failed to save " << path;
-			}
-		};
-		for (IScene* scene : m_universe->getScenes())
-		{
-			blob.clear();
-			serializer.write("version", scene->getVersion());
-			scene->serialize(serializer);
-			StaticString<MAX_PATH_LENGTH> scene_file_path(dir, "scenes/", scene->getPlugin().getName(), ".scn");
-			saveFile(scene_file_path);
-		}
-
-		blob.clear();
-		m_prefab_system->serialize(serializer);
-		StaticString<MAX_PATH_LENGTH> system_file_path(dir, "systems/templates.sys");
-		saveFile(system_file_path);
-
-		blob.clear();
-		serializer.write("cam_pos", m_viewport.pos);
-		serializer.write("cam_rot", m_viewport.rot);
-		StaticString<MAX_PATH_LENGTH> editor_file_path(dir, "systems/editor.sys");
-		saveFile(editor_file_path);
-
-		for (EntityPtr entity = m_universe->getFirstEntity(); entity.isValid(); entity = m_universe->getNextEntity((EntityRef)entity))
-		{
-			const EntityRef e = (EntityRef)entity;
-			if (m_prefab_system->getPrefab(e) != 0) continue;
-			blob.clear();
-			serializer.write("name", m_universe->getEntityName(e));
-			serializer.write("transform", m_universe->getTransform(e).getRigidPart());
-			serializer.write("scale", m_universe->getScale(e));
-			EntityPtr parent = m_universe->getParent(e);
-			serializer.write("parent", parent);
-			EntityGUID guid = m_entity_map.get(entity);
-			StaticString<MAX_PATH_LENGTH> entity_file_path(dir, guid.value, ".ent");
-			for (ComponentUID cmp = m_universe->getFirstComponent(e); cmp.entity.isValid();
-				 cmp = m_universe->getNextComponent(cmp))
-			{
-				const char* cmp_name = Reflection::getComponentTypeID(cmp.type.index);
-				u32 type_hash = Reflection::getComponentTypeHash(cmp.type);
-				serializer.write(cmp_name, type_hash);
-				m_universe->serializeComponent(serializer, cmp.type, (EntityRef)cmp.entity);
-			}
-			serializer.write("cmp_end", (u32)0);
-			saveFile(entity_file_path);
-		}
-		clearUniverseDir(dir);
-	}
-
-
-	void clearUniverseDir(const char* dir)
-	{
-		OS::FileInfo info;
-		OS::FileIterator* file_iter = OS::createFileIterator(dir, m_allocator);
-		while (OS::getNextFile(file_iter, &info))
-		{
-			if (info.is_directory) continue;
-			if (info.filename[0] == '.') continue;
-
-			char basename[64];
-			PathUtils::getBasename(Span(basename), info.filename);
-			EntityGUID guid;
-			fromCString(Span(basename), Ref(guid.value));
-			if (!m_entity_map.has(guid))
-			{
-				StaticString<MAX_PATH_LENGTH> filepath(dir, info.filename);
-				OS::deleteFile(filepath);
-			}
-		}
-		OS::destroyFileIterator(file_iter);
 	}
 
 
@@ -2184,24 +1793,6 @@ public:
 	{
 		DestroyEntitiesCommand* command = LUMIX_NEW(m_allocator, DestroyEntitiesCommand)(*this, entities, count);
 		executeCommand(command);
-	}
-
-
-	void createEntityGUID(EntityRef entity) override
-	{
-		m_entity_map.create(entity);
-	}
-
-
-	void destroyEntityGUID(EntityRef entity) override
-	{
-		m_entity_map.erase(entity);
-	}
-
-
-	EntityGUID getEntityGUID(EntityRef entity) override
-	{
-		return m_entity_map.get(entity);
 	}
 
 
@@ -2595,29 +2186,28 @@ public:
 		return *m_prefab_system;
 	}
 
-	void copyEntities(const EntityRef* entities, int count, ISerializer& serializer)
+	void copyEntities(const EntityRef* entities, int count, IOutputStream& serializer)
 	{
-		serializer.write("count", count);
-		for (int i = 0; i < count; ++i)
-		{
+		serializer.write(count);
+		for (int i = 0; i < count; ++i) {
 			EntityRef entity = entities[i];
 			Transform tr = m_universe->getTransform(entity);
-			serializer.write("transform", tr);
-			serializer.write("parent", m_universe->getParent(entity));
+			serializer.write(tr);
+			serializer.write(m_universe->getParent(entity));
 
 			for (ComponentUID cmp = m_universe->getFirstComponent(entity);
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
 				const u32 cmp_type = Reflection::getComponentTypeHash(cmp.type);
-				serializer.write("cmp_type", cmp_type);
+				serializer.write(cmp_type);
 				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
 				
 				PropertySerializeVisitor visitor(serializer, cmp);
 				visitor.idx = -1;
 				cmp_desc->visit(visitor);
 			}
-			serializer.write("cmp_type", 0);
+			serializer.write((u32)0);
 		}
 	}
 
@@ -2627,23 +2217,6 @@ public:
 		if (m_selected_entities.empty()) return;
 
 		m_copy_buffer.clear();
-
-		struct : ISaveEntityGUIDMap {
-			EntityGUID get(EntityPtr entity) override {
-				if (!entity.isValid()) return INVALID_ENTITY_GUID;
-				
-				int idx = editor->m_selected_entities.indexOf((EntityRef)entity);
-				if (idx >= 0) {
-					return { (u64)idx };
-				}
-				return { ((u64)1 << 32) | (u64)entity.index };
-			}
-
-			WorldEditorImpl* editor;
-		} map;
-		map.editor = this;
-
-		TextSerializer serializer(m_copy_buffer, map);
 
 		Array<EntityRef> entities(m_allocator);
 		entities = m_selected_entities;
@@ -2655,7 +2228,7 @@ public:
 				if(entities.indexOf((EntityRef)child) < 0) entities.push((EntityRef)child);
 			}
 		}
-		copyEntities(&entities[0], entities.size(), serializer);
+		copyEntities(&entities[0], entities.size(), m_copy_buffer);
 	}
 
 
@@ -2713,7 +2286,19 @@ public:
 		createUniverse();
 		m_universe->setName(basename);
 		logInfo("Editor") << "Loading universe " << basename << "...";
-		if (!deserialize(*m_universe, "universes/", basename, *m_prefab_system, m_entity_map, m_allocator)) newUniverse();
+		OS::InputFile file;
+		const StaticString<MAX_PATH_LENGTH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, "/entities.unv");
+		if (file.open(path)) {
+			if (!load(file)) {
+				logError("Editor") << "Failed to parse " << path;
+				newUniverse();
+			}
+			file.close();
+		}
+		else {
+			logError("Editor") << "Failed to open " << path;
+			newUniverse();
+		}
 		m_editor_icons->refresh();
 	}
 
@@ -2743,22 +2328,34 @@ public:
 	#pragma pack()
 
 
-	void load(IInputStream& file)
+	bool load(IInputStream& file)
 	{
 		m_is_loading = true;
-		ASSERT(file.getBuffer());
 		Header header;
-		if (file.size() < sizeof(header))
-		{
+		const u64 file_size = file.size();
+		if (file_size < sizeof(header)) {
 			logError("Editor") << "Corrupted file.";
-			newUniverse();
 			m_is_loading = false;
-			return;
+			return false;
+		}
+		if (file_size > 0xffFFffFF) {
+			logError("Editor") << "File too big.";
+			m_is_loading = false;
+			return false;
 		}
 
 		OS::Timer timer;
 		logInfo("Editor") << "Parsing universe...";
-		InputMemoryStream blob(file.getBuffer(), (int)file.size());
+		Array<u8> data(m_allocator);
+		if (!file.getBuffer()) {
+			data.resize((u32)file_size);
+			if (!file.read(data.begin(), data.byte_size())) {
+				logError("Editor") << "Failed to load file.";
+				m_is_loading = false;
+				return false;
+			}
+		}
+		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.begin(), (int)file_size);
 		u32 hash = 0;
 		blob.read(hash);
 		header.version = -1;
@@ -2778,21 +2375,22 @@ public:
 		if (crc32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
 		{
 			logError("Editor") << "Corrupted file.";
-			newUniverse();
 			m_is_loading = false;
-			return;
+			return false;
 		}
 
-		if (m_engine.deserialize(*m_universe, blob))
+		EntityMap entity_map(m_allocator);
+		if (m_engine.deserialize(*m_universe, blob, Ref(entity_map)))
 		{
-			m_prefab_system->deserialize(blob);
+			m_prefab_system->deserialize(blob, entity_map);
 			logInfo("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
+			m_is_loading = false;
+			return true;
 		}
-		else
-		{
-			newUniverse();
-		}
+
+		newUniverse();
 		m_is_loading = false;
+		return false;
 	}
 
 
@@ -2834,7 +2432,6 @@ public:
 		, m_snap_mode(SnapMode::NONE)
 		, m_undo_index(-1)
 		, m_engine(engine)
-		, m_entity_map(m_allocator)
 		, m_is_guid_pseudorandom(false)
         , m_game_mode_file(m_allocator)
 		, m_command_queue(m_allocator)
@@ -3115,9 +2712,6 @@ public:
 		m_is_orbit = false;
 		m_selected_entities.clear();
 		m_universe_created.invoke();
-
-		m_entity_map.is_random = !m_is_guid_pseudorandom;
-		m_entity_map.clear();
 	}
 
 
@@ -3332,7 +2926,6 @@ private:
 	OutputMemoryStream m_copy_buffer;
 	bool m_is_loading;
 	Universe* m_universe;
-	EntityGUIDMap m_entity_map;
 	RenderInterface* m_render_interface;
 	u32 m_current_group_type;
 	bool m_is_universe_changed;
@@ -3375,42 +2968,24 @@ public:
 
 	bool execute() override
 	{
-		struct Map : ILoadEntityGUIDMap {
-			Map(IAllocator& allocator) : entities(allocator) {}
-
-			EntityPtr get(EntityGUID guid) override 
-			{
-				if (guid == INVALID_ENTITY_GUID) return INVALID_ENTITY;
-
-				if (guid.value > 0xffFFffFF) return { (int)guid.value }; ;
-				
-				return entities[(int)guid.value];
-			}
-
-			Array<EntityRef> entities;
-		} map(m_editor.getAllocator());
-		InputMemoryStream input_blob(m_copy_buffer);
-		TextDeserializer deserializer(input_blob, map);
+		InputMemoryStream blob(m_copy_buffer);
 
 		Universe& universe = *m_editor.getUniverse();
 		int entity_count;
-		deserializer.read(Ref(entity_count));
-		map.entities.resize(entity_count);
+		blob.read(Ref(entity_count));
 		bool is_redo = !m_entities.empty();
+		m_entities.reserve(entity_count);
 		for (int i = 0; i < entity_count; ++i)
 		{
 			if (is_redo)
 			{
-				map.entities[i] = m_entities[i];
 				universe.emplaceEntity(m_entities[i]);
 			}
 			else
 			{
-				map.entities[i] = universe.createEntity(DVec3(0), Quat(0, 0, 0, 1));
+				m_entities[i] = universe.createEntity(DVec3(0), Quat(0, 0, 0, 1));
 			}
 		}
-
-		m_entities.reserve(entity_count);
 
 		Transform base_tr;
 		base_tr.pos = m_position;
@@ -3419,9 +2994,9 @@ public:
 		for (int i = 0; i < entity_count; ++i)
 		{
 			Transform tr;
-			deserializer.read(Ref(tr));
+			blob.read(Ref(tr));
 			EntityPtr parent;
-			deserializer.read(Ref(parent));
+			blob.read(Ref(parent));
 
 			if (!m_identity)
 			{
@@ -3439,14 +3014,12 @@ public:
 				}
 			}
 
-			const EntityRef new_entity = map.entities[i];
-			((WorldEditorImpl&)m_editor).m_entity_map.create(new_entity);
-			if (!is_redo) m_entities.push(new_entity);
+			const EntityRef new_entity = m_entities[i];
 			universe.setTransform(new_entity, tr);
 			universe.setParent(parent, new_entity);
 			for (;;) {
 				u32 hash;
-				deserializer.read(Ref(hash));
+				blob.read(Ref(hash));
 				if (hash == 0) break;
 
 				ComponentUID cmp;
@@ -3456,7 +3029,7 @@ public:
 
 				cmp.scene->getUniverse().createComponent(cmp.type, new_entity);
 
-				PropertyDeserializeVisitor visitor(deserializer, cmp);
+				PropertyDeserializeVisitor visitor(blob, cmp);
 				visitor.idx = -1;
 				Reflection::getComponent(cmp.type)->visit(visitor);
 			}
@@ -3469,7 +3042,6 @@ public:
 	{
 		for (auto entity : m_entities) {
 			m_editor.getUniverse()->destroyEntity(entity);
-			((WorldEditorImpl&)m_editor).m_entity_map.erase(entity);
 		}
 	}
 

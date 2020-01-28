@@ -9,7 +9,6 @@
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "gui_scene.h"
 #include "gui_system.h"
@@ -164,39 +163,27 @@ struct GUISceneImpl final : public GUIScene
 		context.registerComponentType(GUI_RECT_TYPE
 			, this
 			, &GUISceneImpl::createRect
-			, &GUISceneImpl::destroyRect
-			, &GUISceneImpl::serializeRect
-			, &GUISceneImpl::deserializeRect);
+			, &GUISceneImpl::destroyRect);
 		context.registerComponentType(GUI_IMAGE_TYPE
 			, this
 			, &GUISceneImpl::createImage
-			, &GUISceneImpl::destroyImage
-			, &GUISceneImpl::serializeImage
-			, &GUISceneImpl::deserializeImage);
+			, &GUISceneImpl::destroyImage);
 		context.registerComponentType(GUI_RENDER_TARGET_TYPE
 			, this
 			, &GUISceneImpl::createRenderTarget
-			, &GUISceneImpl::destroyRenderTarget
-			, &GUISceneImpl::serializeRenderTarget
-			, &GUISceneImpl::deserializeRenderTarget);
+			, &GUISceneImpl::destroyRenderTarget);
 		context.registerComponentType(GUI_INPUT_FIELD_TYPE
 			, this
 			, &GUISceneImpl::createInputField
-			, &GUISceneImpl::destroyInputField
-			, &GUISceneImpl::serializeInputField
-			, &GUISceneImpl::deserializeInputField);
+			, &GUISceneImpl::destroyInputField);
 		context.registerComponentType(GUI_TEXT_TYPE
 			, this
 			, &GUISceneImpl::createText
-			, &GUISceneImpl::destroyText
-			, &GUISceneImpl::serializeText
-			, &GUISceneImpl::deserializeText);
+			, &GUISceneImpl::destroyText);
 		context.registerComponentType(GUI_BUTTON_TYPE
 			, this
 			, &GUISceneImpl::createButton
-			, &GUISceneImpl::destroyButton
-			, &GUISceneImpl::serializeButton
-			, &GUISceneImpl::deserializeButton);
+			, &GUISceneImpl::destroyButton);
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 
@@ -588,194 +575,6 @@ struct GUISceneImpl final : public GUIScene
 	{
 		GUIText* text = m_rects[entity]->text;
 		return text->text.c_str();
-	}
-
-
-	void serializeRect(ISerializer& serializer, EntityRef entity)
-	{
-		const GUIRect& rect = *m_rects[entity];
-		
-		serializer.write("flags", rect.flags.base);
-		serializer.write("top_pts", rect.top.points);
-		serializer.write("top_rel", rect.top.relative);
-
-		serializer.write("right_pts", rect.right.points);
-		serializer.write("right_rel", rect.right.relative);
-
-		serializer.write("bottom_pts", rect.bottom.points);
-		serializer.write("bottom_rel", rect.bottom.relative);
-
-		serializer.write("left_pts", rect.left.points);
-		serializer.write("left_rel", rect.left.relative);
-	}
-
-
-	void deserializeRect(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		int idx = m_rects.find(entity);
-		GUIRect* rect;
-		if (idx >= 0)
-		{
-			rect = m_rects.at(idx);
-		}
-		else
-		{
-			rect = LUMIX_NEW(m_allocator, GUIRect);
-			m_rects.insert(entity, rect);
-		}
-		rect->entity = entity;
-		serializer.read(Ref(rect->flags.base));
-		serializer.read(Ref(rect->top.points));
-		serializer.read(Ref(rect->top.relative));
-
-		serializer.read(Ref(rect->right.points));
-		serializer.read(Ref(rect->right.relative));
-
-		serializer.read(Ref(rect->bottom.points));
-		serializer.read(Ref(rect->bottom.relative));
-
-		serializer.read(Ref(rect->left.points));
-		serializer.read(Ref(rect->left.relative));
-		
-		m_root = findRoot();
-		
-		m_universe.onComponentCreated(entity, GUI_RECT_TYPE, this);
-	}
-
-
-	void serializeRenderTarget(ISerializer& serializer, EntityRef entity)
-	{
-	}
-
-
-	void deserializeRenderTarget(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
-		{
-			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-			rect->entity = entity;
-			idx = m_rects.insert(entity, rect);
-		}
-		GUIRect& rect = *m_rects.at(idx);
-		rect.render_target = &EMPTY_RENDER_TARGET;
-		m_universe.onComponentCreated(entity, GUI_RENDER_TARGET_TYPE, this);
-	}
-
-
-	void serializeButton(ISerializer& serializer, EntityRef entity)
-	{
-		const GUIButton& button = m_buttons[entity];
-		serializer.write("normal_color", button.normal_color);
-		serializer.write("hovered_color", button.hovered_color);
-	}
-
-	
-	void deserializeButton(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		GUIButton& button = m_buttons.emplace(entity);
-		serializer.read(Ref(button.normal_color));
-		serializer.read(Ref(button.hovered_color));
-		m_universe.onComponentCreated(entity, GUI_BUTTON_TYPE, this);
-	}
-
-
-	void serializeInputField(ISerializer& serializer, EntityRef entity)
-	{
-	}
-
-
-	void deserializeInputField(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
-		{
-			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-			rect->entity = entity;
-			idx = m_rects.insert(entity, rect);
-		}
-		GUIRect& rect = *m_rects.at(idx);
-		rect.input_field = LUMIX_NEW(m_allocator, GUIInputField);
-
-		m_universe.onComponentCreated(entity, GUI_INPUT_FIELD_TYPE, this);
-	}
-
-
-	void serializeImage(ISerializer& serializer, EntityRef entity)
-	{
-		const GUIRect& rect = *m_rects[entity];
-		serializer.write("sprite", rect.image->sprite ? rect.image->sprite->getPath().c_str() : "");
-		serializer.write("color", rect.image->color);
-		serializer.write("flags", rect.image->flags.base);
-	}
-
-
-	void deserializeImage(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
-		{
-			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-			rect->entity = entity;
-			idx = m_rects.insert(entity, rect);
-		}
-		GUIRect& rect = *m_rects.at(idx);
-		rect.image = LUMIX_NEW(m_allocator, GUIImage);
-		
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		if (tmp[0] == '\0')
-		{
-			rect.image->sprite = nullptr;
-		}
-		else
-		{
-			ResourceManagerHub& manager = m_system.getEngine().getResourceManager();
-			rect.image->sprite = manager.load<Sprite>(Path(tmp));
-		}
-
-		serializer.read(Ref(rect.image->color));
-		serializer.read(Ref(rect.image->flags.base));
-		
-		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
-	}
-
-
-	void serializeText(ISerializer& serializer, EntityRef entity)
-	{
-		const GUIRect& rect = *m_rects[entity];
-		serializer.write("font", rect.text->getFontResource() ? rect.text->getFontResource()->getPath().c_str() : "");
-		serializer.write("align", (int)rect.text->horizontal_align);
-		serializer.write("color", rect.text->color);
-		serializer.write("font_size", rect.text->getFontSize());
-		serializer.write("text", rect.text->text.c_str());
-	}
-
-
-	void deserializeText(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
-		{
-			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-			rect->entity = entity;
-			idx = m_rects.insert(entity, rect);
-		}
-		GUIRect& rect = *m_rects.at(idx);
-		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
-
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		serializer.read(Ref((int&)rect.text->horizontal_align));
-		serializer.read(Ref(rect.text->color));
-		int font_size;
-		serializer.read(Ref(font_size));
-		rect.text->setFontSize(font_size);
-		serializer.read(Ref(rect.text->text));
-		FontResource* res = tmp[0] ? m_font_manager->getOwner().load<FontResource>(Path(tmp)) : nullptr;
-		rect.text->setFontResource(res);
-
-		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
 	}
 
 
@@ -1252,22 +1051,21 @@ struct GUISceneImpl final : public GUIScene
 	}
 
 
-	void deserialize(InputMemoryStream& serializer) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
-		clear();
-		int count = serializer.read<int>();
-		for (int i = 0; i < count; ++i)
+		u32 count = serializer.read<u32>();
+		for (u32 i = 0; i < count; ++i)
 		{
 			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
 			serializer.read(rect->flags);
 			serializer.read(rect->entity);
+			rect->entity = entity_map.get(rect->entity);
 			serializer.read(rect->top);
 			serializer.read(rect->right);
 			serializer.read(rect->bottom);
 			serializer.read(rect->left);
 			m_rects.insert(rect->entity, rect);
-			if (rect->flags.isSet(GUIRect::IS_VALID))
-			{
+			if (rect->flags.isSet(GUIRect::IS_VALID)) {
 				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
 			}
 
@@ -1296,7 +1094,6 @@ struct GUISceneImpl final : public GUIScene
 			{
 				rect->input_field = LUMIX_NEW(m_allocator, GUIInputField);
 				m_universe.onComponentCreated(rect->entity, GUI_INPUT_FIELD_TYPE, this);
-
 			}
 			bool has_text = serializer.read<bool>();
 			if (has_text)
@@ -1315,11 +1112,12 @@ struct GUISceneImpl final : public GUIScene
 				m_universe.onComponentCreated(rect->entity, GUI_TEXT_TYPE, this);
 			}
 		}
-		count = serializer.read<int>();
-		for (int i = 0; i < count; ++i)
+		count = serializer.read<u32>();
+		for (u32 i = 0; i < count; ++i)
 		{
 			EntityRef e;
 			serializer.read(e);
+			e = entity_map.get(e);
 			GUIButton& button = m_buttons.emplace(e);
 			serializer.read(button);
 		}

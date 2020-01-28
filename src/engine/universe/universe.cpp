@@ -5,7 +5,6 @@
 #include "engine/math.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
-#include "engine/serializer.h"
 #include "engine/universe/component.h"
 
 
@@ -13,7 +12,32 @@ namespace Lumix
 {
 
 
-static const int RESERVED_ENTITIES_COUNT = 1024;
+static constexpr int RESERVED_ENTITIES_COUNT = 1024;
+
+
+
+EntityMap::EntityMap(IAllocator& allocator) 
+	: m_map(allocator)
+{}
+
+void EntityMap::reserve(u32 count) {
+	m_map.reserve(count);
+}
+
+EntityPtr EntityMap::get(EntityPtr e) const {
+	return e.isValid() ? m_map[e.index] : INVALID_ENTITY;
+}
+
+EntityRef EntityMap::get(EntityRef e) const {
+	return (EntityRef)m_map[e.index];
+}
+
+void EntityMap::set(EntityRef src, EntityRef dst) {
+	while (m_map.size() <= src.index) {
+		m_map.push(INVALID_ENTITY);
+	}
+	m_map[src.index] = dst;
+}
 
 
 Universe::~Universe() = default;
@@ -25,7 +49,6 @@ Universe::Universe(IAllocator& allocator)
 	, m_entities(m_allocator)
 	, m_component_added(m_allocator)
 	, m_component_destroyed(m_allocator)
-	, m_entity_created(m_allocator)
 	, m_entity_destroyed(m_allocator)
 	, m_entity_moved(m_allocator)
 	, m_first_free_slot(-1)
@@ -309,39 +332,6 @@ void Universe::emplaceEntity(EntityRef entity)
 	data.hierarchy = -1;
 	data.components = 0;
 	data.valid = true;
-	m_entity_created.invoke(entity);
-}
-
-
-EntityRef Universe::cloneEntity(EntityRef entity)
-{
-	Transform tr = getTransform(entity);
-	EntityPtr parent = getParent(entity);
-	EntityRef clone = createEntity(tr.pos, tr.rot);
-	setScale(clone, tr.scale);
-	setParent(parent, clone);
-
-	OutputMemoryStream blob_out(m_allocator);
-	blob_out.reserve(1024);
-	for (ComponentUID cmp = getFirstComponent(entity); cmp.isValid(); cmp = getNextComponent(cmp))
-	{
-		blob_out.clear();
-		struct : ISaveEntityGUIDMap
-		{
-			EntityGUID get(EntityPtr entity) override { return { (u64)entity.index }; }
-		} save_map;
-		TextSerializer serializer(blob_out, save_map);
-		serializeComponent(serializer, cmp.type, entity);
-		
-		InputMemoryStream blob_in(blob_out);
-		struct : ILoadEntityGUIDMap
-		{
-			EntityPtr get(EntityGUID guid) override { return { (int)guid.value }; }
-		} load_map;
-		TextDeserializer deserializer(blob_in, load_map);
-		deserializeComponent(deserializer, clone, cmp.type, cmp.scene->getVersion());
-	}
-	return clone;
 }
 
 
@@ -371,7 +361,6 @@ EntityRef Universe::createEntity(const DVec3& position, const Quat& rotation)
 	data->hierarchy = -1;
 	data->components = 0;
 	data->valid = true;
-	m_entity_created.invoke(entity);
 
 	return entity;
 }
@@ -649,148 +638,66 @@ float Universe::getLocalScale(EntityRef entity) const
 }
 
 
-
-void Universe::serializeComponent(ISerializer& serializer, ComponentType type, EntityRef entity)
-{
-	auto* scene = m_component_type_map[type.index].scene;
-	auto& method = m_component_type_map[type.index].serialize;
-	(scene->*method)(serializer, entity);
-}
-
-
-void Universe::deserializeComponent(IDeserializer& serializer, EntityRef entity, ComponentType type, int scene_version)
-{
-	auto* scene = m_component_type_map[type.index].scene;
-	auto& method = m_component_type_map[type.index].deserialize;
-	(scene->*method)(serializer, entity, scene_version);
-}
-
-
 void Universe::serialize(IOutputStream& serializer)
 {
-	serializer.write((i32)m_entities.size());
-	if (!m_entities.empty()) {
-		serializer.write(&m_entities[0], m_entities.byte_size());
-		serializer.write(&m_transforms[0], m_transforms.byte_size());
+	serializer.write((u32)m_entities.size());
+
+	for (u32 i = 0, c = m_entities.size(); i < c; ++i) {
+		if (!m_entities[i].valid) continue;
+		const EntityRef e = {(i32)i};
+		serializer.write(e);
+		serializer.write(m_transforms[i]);
 	}
-	serializer.write((i32)m_names.size());
+	serializer.write(INVALID_ENTITY);
+
+	serializer.write((u32)m_names.size());
 	for (const EntityName& name : m_names) {
 		serializer.write(name.entity);
 		serializer.writeString(name.name);
 	}
-	serializer.write(m_first_free_slot);
 
-	serializer.write(m_hierarchy.size());
-	if(!m_hierarchy.empty()) serializer.write(&m_hierarchy[0], sizeof(m_hierarchy[0]) * m_hierarchy.size());
+	serializer.write((u32)m_hierarchy.size());
+	if (!m_hierarchy.empty()) serializer.write(&m_hierarchy[0], m_hierarchy.byte_size());
 }
 
 
-void Universe::deserialize(IInputStream& serializer)
+void Universe::deserialize(IInputStream& serializer, Ref<EntityMap> entity_map)
 {
-	i32 count;
-	serializer.read(count);
-	m_entities.resize(count);
-	m_transforms.resize(count);
+	u32 to_reserve;
+	serializer.read(to_reserve);
+	entity_map->reserve(to_reserve);
 
-	if (count > 0) {
-		serializer.read(&m_entities[0], m_entities.byte_size());
-		serializer.read(&m_transforms[0], m_transforms.byte_size());
+	for (EntityPtr e = serializer.read<EntityPtr>(); e.isValid(); e = serializer.read<EntityPtr>()) {
+		EntityRef orig = (EntityRef)e;
+		const EntityRef new_e = createEntity({0, 0, 0}, {0, 0, 0, 1});
+		entity_map->set(orig, new_e);
+		serializer.read(m_transforms[new_e.index]);
 	}
 
+	u32 count;
 	serializer.read(count);
-	for (int i = 0; i < count; ++i)
-	{
+	for (u32 i = 0; i < count; ++i) {
 		EntityName& name = m_names.emplace();
 		serializer.read(name.entity);
+		name.entity = entity_map->get(name.entity);
 		serializer.readString(Span(name.name));
 		m_entities[name.entity.index].name = m_names.size() - 1;
 	}
 
-	serializer.read(m_first_free_slot);
-
 	serializer.read(count);
-	m_hierarchy.resize(count);
-	if (count > 0) serializer.read(&m_hierarchy[0], sizeof(m_hierarchy[0]) * m_hierarchy.size());
-}
+	const u32 old_count = m_hierarchy.size();
+	m_hierarchy.resize(count + old_count);
+	if (count > 0) {
+		serializer.read(&m_hierarchy[old_count], sizeof(m_hierarchy[0]) * count);
 
-
-struct PrefabEntityGUIDMap : public ILoadEntityGUIDMap
-{
-	explicit PrefabEntityGUIDMap(const Array<EntityRef>& _entities)
-		: entities(_entities)
-	{
-	}
-
-
-	EntityPtr get(EntityGUID guid) override
-	{
-		if (guid.value >= entities.size()) return INVALID_ENTITY;
-		return entities[(int)guid.value];
-	}
-
-
-	const Array<EntityRef>& entities;
-};
-
-
-EntityPtr Universe::instantiatePrefab(const PrefabResource& prefab,
-	const DVec3& pos,
-	const Quat& rot,
-	float scale)
-{
-	InputMemoryStream blob(prefab.data.begin(), prefab.data.byte_size());
-	Array<EntityRef> entities(m_allocator);
-	PrefabEntityGUIDMap entity_map(entities);
-	TextDeserializer deserializer(blob, entity_map);
-	u32 version;
-	deserializer.read(Ref(version));
-	if (version > (int)PrefabVersion::LAST)
-	{
-		logError("Engine") << "Prefab " << prefab.getPath() << " has unsupported version.";
-		return INVALID_ENTITY;
-	}
-	int count;
-	deserializer.read(Ref(count));
-	int entity_idx = 0;
-	entities.reserve(count);
-	for (int i = 0; i < count; ++i)
-	{
-		entities.push(createEntity({0, 0, 0}, {0, 0, 0, 1}));
-	}
-	while (blob.getPosition() < blob.size() && entity_idx < count)
-	{
-		u64 prefab;
-		deserializer.read(Ref(prefab));
-		EntityRef entity = entities[entity_idx];
-		setTransform(entity, {pos, rot, scale});
-		if (version > (int)PrefabVersion::WITH_HIERARCHY)
-		{
-			EntityPtr parent;
-
-			deserializer.read(Ref(parent));
-			if (parent.isValid())
-			{
-				RigidTransform local_tr;
-				deserializer.read(Ref(local_tr));
-				float scale;
-				deserializer.read(Ref(scale));
-				setParent(parent, entity);
-				setLocalTransform(entity, {local_tr.pos, local_tr.rot, scale});
-			}
+		for (u32 i = old_count; i < count + old_count; ++i) {
+			m_hierarchy[i].entity = entity_map->get(m_hierarchy[i].entity);
+			m_hierarchy[i].first_child = entity_map->get(m_hierarchy[i].first_child);
+			m_hierarchy[i].next_sibling = entity_map->get(m_hierarchy[i].next_sibling);
+			m_hierarchy[i].parent = entity_map->get(m_hierarchy[i].parent);
+			m_entities[m_hierarchy[i].entity.index].hierarchy = i;
 		}
-		u32 cmp_type_hash;
-		deserializer.read(Ref(cmp_type_hash));
-		while (cmp_type_hash != 0)
-		{
-			ComponentType cmp_type = Reflection::getComponentTypeFromHash(cmp_type_hash);
-			int scene_version;
-			deserializer.read(Ref(scene_version));
-			deserializeComponent(deserializer, entity, cmp_type, scene_version);
-			deserializer.read(Ref(cmp_type_hash));
-		}
-		++entity_idx;
 	}
-	return entities[0];
 }
 
 

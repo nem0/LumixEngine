@@ -821,7 +821,8 @@ static int LUA_loadUniverse(lua_State* L)
 				Header header;
 				blob.read(&header, sizeof(header));
 
-				if (!engine->deserialize(*universe, blob))
+				EntityMap entity_map(engine->getAllocator());
+				if (!engine->deserialize(*universe, blob, Ref(entity_map)))
 				{
 					logError("Engine") << "Failed to deserialize universe " << path;
 				}
@@ -868,20 +869,19 @@ static int LUA_instantiatePrefab(lua_State* L)
 	DVec3 position = LuaWrapper::checkArg<DVec3>(L, 3);
 	int prefab_id = LuaWrapper::checkArg<int>(L, 4);
 	PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
-	if (!prefab)
-	{
-		logError("Editor") << "Cannot instantiate null prefab.";
-		return 0;
+	if (!prefab) {
+		luaL_argerror(L, 4, "Unknown prefab.");
 	}
-	if (!prefab->isReady())
-	{
-		logError("Editor") << "Prefab " << prefab->getPath().c_str() << " is not ready, preload it.";
-		return 0;
+	if (!prefab->isReady()) {
+		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
 	}
-	EntityPtr entity = universe->instantiatePrefab(*prefab, position, {0, 0, 0, 1}, 1);
-
-	LuaWrapper::push(L, entity);
-	return 1;
+	EntityMap entity_map(engine->getAllocator());
+	if (engine->instantiatePrefab(*universe, *prefab, position, {0, 0, 0, 1}, 1, Ref(entity_map))) {
+		LuaWrapper::push(L, entity_map.m_map[0]);
+		return 1;
+	}
+	luaL_error(L, "Failed to instantiate prefab");
+	return 0;
 }
 
 
