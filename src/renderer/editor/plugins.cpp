@@ -1261,14 +1261,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void renderTile(PrefabResource* prefab)
 	{
-		Engine& engine = m_app.getWorldEditor().getEngine();
+		WorldEditor& editor = m_app.getWorldEditor();
+		Engine& engine = editor.getEngine();
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		if (!render_scene) return;
 
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
-		EntityPtr mesh_entity = m_tile.universe->instantiatePrefab(*prefab, DVec3(0), Quat::IDENTITY, 1);
+		EntityMap entity_map(editor.getAllocator());
+		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, Ref(entity_map))) return;
+		// TODO there can be more than one model or model not in root
+		const EntityPtr mesh_entity = entity_map.m_map[0];
 		if (!mesh_entity.isValid()) return;
 
 		if (!render_scene->getUniverse().hasComponent((EntityRef)mesh_entity, MODEL_INSTANCE_TYPE)) return;

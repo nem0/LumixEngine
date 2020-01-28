@@ -67,24 +67,6 @@ class PluginManagerImpl final : public PluginManager
 		}
 
 
-		void serialize(OutputMemoryStream& serializer) override
-		{
-			for (int i = 0, c = m_plugins.size(); i < c; ++i)
-			{
-				m_plugins[i]->serialize(serializer);
-			}
-		}
-
-
-		void deserialize(InputMemoryStream& serializer) override
-		{
-			for (int i = 0, c = m_plugins.size(); i < c; ++i)
-			{
-				m_plugins[i]->deserialize(serializer);
-			}
-		}
-
-
 		void* getLibrary(IPlugin* plugin) const override
 		{
 			int idx = m_plugins.indexOf(plugin);

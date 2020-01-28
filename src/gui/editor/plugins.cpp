@@ -182,10 +182,7 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 	{
 		if (OutputMemoryStream* file = app.getAssetBrowser().beginSaveResource(sprite))
 		{
-			struct : ISaveEntityGUIDMap {
-				EntityGUID get(EntityPtr entity) override { return INVALID_ENTITY_GUID; }
-			} dummy_map;
-			TextSerializer serializer(*file, dummy_map);
+			TextSerializer serializer(*file);
 			bool success = true;
 			if (!sprite.save(serializer))
 			{

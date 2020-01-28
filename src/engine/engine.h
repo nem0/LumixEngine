@@ -40,13 +40,19 @@ public:
 	virtual class ResourceManagerHub& getResourceManager() = 0;
 	virtual class PageAllocator& getPageAllocator() = 0;
 	virtual IAllocator& getAllocator() = 0;
+	virtual bool instantiatePrefab(Universe& universe,
+		const struct PrefabResource& prefab,
+		const struct DVec3& pos,
+		const struct Quat& rot,
+		float scale,
+		Ref<struct EntityMap> entity_map) = 0;
 
 	virtual void startGame(Universe& context) = 0;
 	virtual void stopGame(Universe& context) = 0;
 
 	virtual void update(Universe& context) = 0;
 	virtual u32 serialize(Universe& ctx, OutputMemoryStream& serializer) = 0;
-	virtual bool deserialize(Universe& ctx, InputMemoryStream& serializer) = 0;
+	virtual bool deserialize(Universe& ctx, InputMemoryStream& serializer, Ref<struct EntityMap> entity_map) = 0;
 	virtual float getLastTimeDelta() const = 0;
 	virtual void setTimeMultiplier(float multiplier) = 0;
 	virtual void pause(bool pause) = 0;

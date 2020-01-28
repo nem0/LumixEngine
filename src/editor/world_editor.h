@@ -26,7 +26,6 @@ template <typename T> class DelegateList;
 template <typename T> class Array;
 struct ComponentUID;
 class Engine;
-struct EntityGUID;
 struct IAllocator;
 struct IPlugin;
 struct ISerializer;
@@ -113,9 +112,6 @@ public:
     virtual void duplicateEntities() = 0;
 	virtual void addComponent(Span<const EntityRef> entities, ComponentType type) = 0;
 	virtual void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) = 0;
-	virtual void createEntityGUID(EntityRef entity) = 0;
-	virtual void destroyEntityGUID(EntityRef entity) = 0;
-	virtual EntityGUID getEntityGUID(EntityRef entity) = 0;
 	virtual EntityRef addEntity() = 0;
 	virtual void destroyEntities(const EntityRef* entities, int count) = 0;
 	virtual void selectEntities(const EntityRef* entities, int count, bool toggle) = 0;

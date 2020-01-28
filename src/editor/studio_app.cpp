@@ -2184,6 +2184,7 @@ public:
 
 	void tryReloadPlugin()
 	{
+		/*
 		m_watched_plugin.reload_request = false;
 
 		StaticString<MAX_PATH_LENGTH> src(m_watched_plugin.dir, m_watched_plugin.basename, ".", getPluginExtension());
@@ -2227,6 +2228,9 @@ public:
 			if (m_editor->isGameMode()) scene->startGame();
 		}
 		logInfo("Editor") << "Finished reloading plugin.";
+		*/
+		// TODO
+		ASSERT(false);
 	}
 
 

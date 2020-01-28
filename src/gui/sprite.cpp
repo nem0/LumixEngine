@@ -64,10 +64,7 @@ bool Sprite::save(TextSerializer& serializer)
 bool Sprite::load(u64 size, const u8* mem)
 {
 	InputMemoryStream file(mem, size);
-	struct : ILoadEntityGUIDMap {
-		EntityPtr get(EntityGUID guid) override { ASSERT(false); return INVALID_ENTITY; }
-	} dummy_map;
-	TextDeserializer serializer(file, dummy_map);
+	TextDeserializer serializer(file);
 	char tmp[MAX_PATH_LENGTH];
 	serializer.read(Span(tmp));
 	type = equalStrings(tmp, "simple") ? SIMPLE : PATCH9; 

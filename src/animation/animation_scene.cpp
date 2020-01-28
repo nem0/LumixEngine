@@ -13,7 +13,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "nodes.h"
@@ -104,88 +103,20 @@ struct AnimationSceneImpl final : public AnimationScene
 		universe.registerComponentType(PROPERTY_ANIMATOR_TYPE
 			, this
 			, &AnimationSceneImpl::createPropertyAnimator
-			, &AnimationSceneImpl::destroyPropertyAnimator
-			, &AnimationSceneImpl::serializePropertyAnimator
-			, &AnimationSceneImpl::deserializePropertyAnimator);
+			, &AnimationSceneImpl::destroyPropertyAnimator);
 		universe.registerComponentType(ANIMABLE_TYPE
 			, this
 			, &AnimationSceneImpl::createAnimable
-			, &AnimationSceneImpl::destroyAnimable
-			, &AnimationSceneImpl::serializeAnimable
-			, &AnimationSceneImpl::deserializeAnimable);
+			, &AnimationSceneImpl::destroyAnimable);
 		universe.registerComponentType(ANIMATOR_TYPE
 			, this
 			, &AnimationSceneImpl::createAnimator
-			, &AnimationSceneImpl::destroyAnimator
-			, &AnimationSceneImpl::serializeAnimator
-			, &AnimationSceneImpl::deserializeAnimator);
+			, &AnimationSceneImpl::destroyAnimator);
 		ASSERT(m_render_scene);
 	}
 
 
-	void serializePropertyAnimator(ISerializer& serializer, EntityRef entity)
-	{
-		int idx = m_property_animators.find(entity);
-		PropertyAnimator& animator = m_property_animators.at(idx);
-		serializer.write("animation", animator.animation ? animator.animation->getPath().c_str() : "");
-		serializer.write("flags", animator.flags.base);
-	}
-		
-
-	void deserializePropertyAnimator(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
-		animator.time = 0;
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		animator.animation = loadPropertyAnimation(Path(tmp));
-		serializer.read(Ref(animator.flags.base));
-		m_universe.onComponentCreated(entity, PROPERTY_ANIMATOR_TYPE, this);
-	}
-
-
-	void serializeAnimable(ISerializer& serializer, EntityRef entity)
-	{
-		Animable& animable = m_animables[entity];
-		serializer.write("animation", animable.animation ? animable.animation->getPath().c_str() : "");
-	}
-
-
-	void deserializeAnimable(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		Animable& animable = m_animables.insert(entity);
-		animable.entity = entity;
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		auto* res = tmp[0] ? m_engine.getResourceManager().load<Animation>(Path(tmp)) : nullptr;
-		animable.animation = (Animation*)res;
-		m_universe.onComponentCreated(entity, ANIMABLE_TYPE, this);
-	}
-
-
-	void serializeAnimator(ISerializer& serializer, EntityRef entity)
-	{
-		Animator& animator = m_animators[m_animator_map[entity]];
-		serializer.write("source", animator.resource ? animator.resource->getPath().c_str() : "");
-		serializer.write("default_set", animator.default_set);
-	}
-
-
 	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
-
-
-	void deserializeAnimator(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		m_animator_map.insert(entity, m_animators.size());
-		Animator& animator = m_animators.emplace();
-		animator.entity = entity;
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		serializer.read(Ref(animator.default_set));
-		auto* res = tmp[0] ? m_engine.getResourceManager().load<Anim::Controller>(Path(tmp)) : nullptr;
-		setAnimatorSource(animator, (Anim::Controller*)res);
-		m_universe.onComponentCreated(entity, ANIMATOR_TYPE, this);
-	}
 
 
 	const OutputMemoryStream& getEventStream() const override
@@ -422,14 +353,14 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	void serialize(OutputMemoryStream& serializer) override
 	{
-		serializer.write((i32)m_animables.size());
+		serializer.write((u32)m_animables.size());
 		for (const Animable& animable : m_animables)
 		{
 			serializer.write(animable.entity);
 			serializer.writeString(animable.animation ? animable.animation->getPath().c_str() : "");
 		}
 
-		serializer.write((i32)m_property_animators.size());
+		serializer.write((u32)m_property_animators.size());
 		for (int i = 0, n = m_property_animators.size(); i < n; ++i)
 		{
 			const PropertyAnimator& animator = m_property_animators.at(i);
@@ -439,7 +370,7 @@ struct AnimationSceneImpl final : public AnimationScene
 			serializer.write(animator.flags.base);
 		}
 
-		serializer.write(m_animators.size());
+		serializer.write((u32)m_animators.size());
 		for (const Animator& animator : m_animators)
 		{
 			serializer.write(animator.default_set);
@@ -449,15 +380,16 @@ struct AnimationSceneImpl final : public AnimationScene
 	}
 
 
-	void deserialize(InputMemoryStream& serializer) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
-		i32 count;
+		u32 count;
 		serializer.read(count);
-		m_animables.reserve(count);
-		for (int i = 0; i < count; ++i)
+		m_animables.reserve(count + m_animables.size());
+		for (u32 i = 0; i < count; ++i)
 		{
 			Animable animable;
 			serializer.read(animable.entity);
+			animable.entity = entity_map.get(animable.entity);
 			animable.time = Time::fromSeconds(0);
 
 			char path[MAX_PATH_LENGTH];
@@ -468,11 +400,12 @@ struct AnimationSceneImpl final : public AnimationScene
 		}
 
 		serializer.read(count);
-		m_property_animators.reserve(count);
-		for (int i = 0; i < count; ++i)
+		m_property_animators.reserve(count + m_property_animators.size());
+		for (u32 i = 0; i < count; ++i)
 		{
 			EntityRef entity;
 			serializer.read(entity);
+			entity = entity_map.get(entity);
 
 			PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
 			char path[MAX_PATH_LENGTH];
@@ -485,12 +418,14 @@ struct AnimationSceneImpl final : public AnimationScene
 
 
 		serializer.read(count);
-		m_animators.reserve(count);
-		for (int i = 0; i < count; ++i)
+		m_animators.reserve(m_animators.size() + count);
+		for (u32 i = 0; i < count; ++i)
 		{
 			Animator animator;
 			serializer.read(animator.default_set);
 			serializer.read(animator.entity);
+			animator.entity = entity_map.get(animator.entity);
+
 			char tmp[MAX_PATH_LENGTH];
 			serializer.readString(Span(tmp));
 			setAnimatorSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);

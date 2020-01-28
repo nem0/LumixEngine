@@ -10,7 +10,6 @@
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
-#include "engine/serializer.h"
 #include "engine/universe/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
@@ -101,15 +100,11 @@ struct NavigationSceneImpl final : public NavigationScene
 		universe.registerComponentType(NAVMESH_AGENT_TYPE
 			, this
 			, &NavigationSceneImpl::createAgent
-			, &NavigationSceneImpl::destroyAgent
-			, &NavigationSceneImpl::serializeAgent
-			, &NavigationSceneImpl::deserializeAgent);
+			, &NavigationSceneImpl::destroyAgent);
 		universe.registerComponentType(NAVMESH_ZONE_TYPE
 			, this
 			, &NavigationSceneImpl::createZone
-			, &NavigationSceneImpl::destroyZone
-			, &NavigationSceneImpl::serializeZone
-			, &NavigationSceneImpl::deserializeZone);
+			, &NavigationSceneImpl::destroyZone);
 	}
 
 
@@ -1372,19 +1367,6 @@ struct NavigationSceneImpl final : public NavigationScene
 		m_universe.onComponentDestroyed(entity, NAVMESH_ZONE_TYPE, this);
 	}
 
-	void serializeZone(ISerializer& serializer, EntityRef entity) {
-		const RecastZone& zone = m_zones[entity];
-		serializer.write("extents", zone.zone.extents);
-	}
-
-	void deserializeZone(IDeserializer& serializer, EntityRef entity, int scene_version) {
-		RecastZone zone;
-		zone.entity = entity;
-		serializer.read(Ref(zone.zone.extents));
-		m_zones.insert(entity, zone);
-		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
-	}
-
 	void assignZone(Agent& agent) {
 		const DVec3 agent_pos = m_universe.getPosition(agent.entity);
 		for (RecastZone& zone : m_zones) {
@@ -1429,44 +1411,6 @@ struct NavigationSceneImpl final : public NavigationScene
 
 	int getVersion() const override { return (int)NavigationSceneVersion::LATEST; }
 
-	void serializeAgent(ISerializer& serializer, EntityRef entity)
-	{
-		Agent& agent = m_agents[entity];
-		serializer.write("radius", agent.radius);
-		serializer.write("height", agent.height);
-		serializer.write("use_root_motion", (agent.flags & Agent::USE_ROOT_MOTION) != 0);
-		serializer.write("get_root_motion_from_animation_controller",
-			(agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER) != 0);
-	}
-
-
-	void deserializeAgent(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		Agent agent;
-		agent.entity = entity;
-		serializer.read(Ref(agent.radius));
-		serializer.read(Ref(agent.height));
-		if (scene_version > (int)NavigationSceneVersion::USE_ROOT_MOTION)
-		{
-			agent.flags = 0;
-			bool b;
-			serializer.read(Ref(b));
-			if (b) agent.flags = Agent::USE_ROOT_MOTION;
-		}
-		if (scene_version > (int)NavigationSceneVersion::ROOT_MOTION_FROM_ANIM)
-		{
-			bool b;
-			serializer.read(Ref(b));
-			if (b) agent.flags |= Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
-		}
-		agent.is_finished = true;
-		agent.agent = -1;
-		assignZone(agent);
-		m_agents.insert(agent.entity, agent);
-		
-		m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
-	}
-
 
 	void serialize(OutputMemoryStream& serializer) override
 	{
@@ -1488,25 +1432,27 @@ struct NavigationSceneImpl final : public NavigationScene
 	}
 
 
-	void deserialize(InputMemoryStream& serializer) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
-		int count = 0;
+		u32 count = 0;
 		serializer.read(count);
-		m_zones.reserve(count);
-		for (int i = 0; i < count; ++i) {
+		m_zones.reserve(count + m_zones.size());
+		for (u32 i = 0; i < count; ++i) {
 			RecastZone zone;
 			EntityRef e;
 			serializer.read(e);
+			e = entity_map.get(e);
 			serializer.read(zone.zone);
 			m_zones.insert(e, zone);
 			m_universe.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
 		}
 
 		serializer.read(count);
-		m_agents.reserve(count);
-		for (int i = 0; i < count; ++i) {
+		m_agents.reserve(count + m_agents.size());
+		for (u32 i = 0; i < count; ++i) {
 			Agent agent;
 			serializer.read(agent.entity);
+			agent.entity = entity_map.get(agent.entity);
 			serializer.read(agent.radius);
 			serializer.read(agent.height);
 			serializer.read(agent.flags);

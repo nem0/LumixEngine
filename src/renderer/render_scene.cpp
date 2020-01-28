@@ -17,7 +17,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/stream.h"
 #include "engine/universe/universe.h"
 #include "renderer/culling_system.h"
@@ -591,56 +590,6 @@ public:
 		}
 	}
 
-
-	void serializeModelInstance(ISerializer& serialize, EntityRef entity)
-	{
-		ModelInstance& r = m_model_instances[entity.index];
-		ASSERT(r.flags.isSet(ModelInstance::VALID));
-
-		serialize.write("source", r.model ? r.model->getPath().c_str() : "");
-		serialize.write("flags", u8(r.flags.base));
-	}
-
-
-	void deserializeModelInstance(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		while (entity.index >= m_model_instances.size())
-		{
-			auto& r = m_model_instances.emplace();
-			r.flags.clear();
-			r.flags.set(ModelInstance::VALID, false);
-			r.pose = nullptr;
-			r.model = nullptr;
-			r.meshes = nullptr;
-			r.mesh_count = 0;
-		}
-		auto& r = m_model_instances[entity.index];
-		r.model = nullptr;
-		r.pose = nullptr;
-		r.meshes = nullptr;
-		r.mesh_count = 0;
-
-		char path[MAX_PATH_LENGTH];
-		serializer.read(Span(path));
-		serializer.read(Ref(r.flags.base));
-
-		if (path[0] != 0)
-		{
-			auto* model = m_engine.getResourceManager().load<Model>(Path(path));
-			setModel(entity, model);
-		}
-
-		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
-	}
-
-
-	void serializeLightProbeGrid(ISerializer& serializer, EntityRef entity) {
-		const LightProbeGrid& lp = m_light_probe_grids[entity];
-		serializer.write("guid", lp.guid);
-		serializer.write("resolution", lp.resolution);
-		serializer.write("half_extents", lp.half_extents);
-	}
-
 	void loadLightProbeGridData(LightProbeGrid& lp) const {
 		StaticString<MAX_PATH_LENGTH> dir("universes/", m_universe.getName(), "/probes/");
 		ResourceManagerHub& manager = m_engine.getResourceManager();
@@ -652,114 +601,6 @@ public:
 			lp.data[i]->setFlag(Texture::Flags::CLAMP_W, true);
 		}
 	}
-
-	void deserializeLightProbeGrid(IDeserializer& serializer, EntityRef entity, int scene_version) {
-		LightProbeGrid lp;
-		lp.entity = entity;
-		serializer.read(Ref(lp.guid));
-		serializer.read(Ref(lp.resolution));
-		serializer.read(Ref(lp.half_extents));
-		loadLightProbeGridData(lp);
-		m_light_probe_grids.insert(entity, lp);
-		m_universe.onComponentCreated(entity, LIGHT_PROBE_GRID_TYPE, this);
-	}
-
-	void serializeEnvironment(ISerializer& serializer, EntityRef entity)
-	{
-		const Environment& light = m_environments[entity];
-		serializer.write("cascades", light.cascades);
-		serializer.write("diffuse_color", light.diffuse_color);
-		serializer.write("diffuse_intensity", light.diffuse_intensity);
-		serializer.write("indirect_intensity", light.indirect_intensity);
-		serializer.write("fog_bottom", light.fog_bottom);
-		serializer.write("fog_color", light.fog_color);
-		serializer.write("fog_density", light.fog_density);
-		serializer.write("fog_height", light.fog_height);
-		serializer.write("flags", light.flags.base);
-	}
-
-
-	void deserializeEnvironment(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		Environment light;
-		light.entity = entity;
-		serializer.read(Ref(light.cascades));
-		serializer.read(Ref(light.diffuse_color));
-		serializer.read(Ref(light.diffuse_intensity));
-		serializer.read(Ref(light.indirect_intensity));
-		serializer.read(Ref(light.fog_bottom));
-		serializer.read(Ref(light.fog_color));
-		serializer.read(Ref(light.fog_density));
-		serializer.read(Ref(light.fog_height));
-		serializer.read(Ref(light.flags.base));
-		m_environments.insert(entity, light);
-		m_universe.onComponentCreated(light.entity, ENVIRONMENT_TYPE, this);
-		m_active_global_light_entity = entity;
-	}
-	
-	
-	void serializePointLight(ISerializer& serializer, EntityRef entity)
-	{
-		PointLight& light = m_point_lights[entity];
-		serializer.write("attenuation", light.attenuation_param);
-		serializer.write("cast_shadow", light.cast_shadows);
-		serializer.write("color", light.color);
-		serializer.write("intensity", light.intensity);
-		serializer.write("fov", light.fov);
-		serializer.write("range", light.range);
-	}
-
-
-	void deserializePointLight(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		PointLight light;
-		light.entity = entity;
-		serializer.read(Ref(light.attenuation_param));
-		serializer.read(Ref(light.cast_shadows));
-		serializer.read(Ref(light.color));
-		serializer.read(Ref(light.intensity));
-		serializer.read(Ref(light.fov));
-		serializer.read(Ref(light.range));
-		m_point_lights.insert(entity, light);
-		
-		const DVec3 pos = m_universe.getPosition(entity);
-		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
-
-		m_universe.onComponentCreated(light.entity, POINT_LIGHT_TYPE, this);
-	}
-
-
-	void serializeDecal(ISerializer& serializer, EntityRef entity)
-	{
-		const Decal& decal = m_decals[entity];
-		serializer.write("half_extents", decal.half_extents);
-		serializer.write("material", decal.material ? decal.material->getPath().c_str() : "");
-	}
-
-
-	void deserializeDecal(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		m_decals.insert(entity, Decal());
-		Decal& decal = m_decals[entity];
-		char tmp[MAX_PATH_LENGTH];
-		decal.entity = entity;
-		serializer.read(Ref(decal.half_extents));
-		serializer.read(Span(tmp));
-		setDecalMaterialPath(entity, Path(tmp));
-		updateDecalInfo(decal);
-		m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
-	}
-
-
-	void serializeTextMesh(ISerializer& serializer, EntityRef entity)
-	{
-		TextMesh& text = *m_text_meshes.get(entity);
-		serializer.write("font", text.getFontResource() ? text.getFontResource()->getPath().c_str() : "");
-		serializer.write("color", text.color);
-		serializer.write("font_size", text.getFontSize());
-		serializer.write("text", text.text.c_str());
-	}
-
 
 	void setTextMeshText(EntityRef entity, const char* text) override
 	{
@@ -906,205 +747,8 @@ public:
 		text.setFontResource(res);
 	}
 
-	
-	void deserializeTextMesh(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
-		m_text_meshes.insert(entity, &text);
-
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		serializer.read(Ref(text.color));
-		int font_size;
-		serializer.read(Ref(font_size));
-		text.setFontSize(font_size);
-		serializer.read(Ref(text.text));
-		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
-		FontResource* res = tmp[0] ? manager.load<FontResource>(Path(tmp)) : nullptr;
-		text.setFontResource(res);
-		m_universe.onComponentCreated(entity, TEXT_MESH_TYPE, this);
-	}
-
-
-	void serializeCamera(ISerializer& serialize, EntityRef entity)
-	{
-		Camera& camera = m_cameras[entity];
-		serialize.write("far", camera.far);
-		serialize.write("fov", camera.fov);
-		serialize.write("is_ortho", camera.is_ortho);
-		serialize.write("ortho_size", camera.ortho_size);
-		serialize.write("near", camera.near);
-	}
-
-
-	void deserializeCamera(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		Camera camera;
-		camera.entity = entity;
-		serializer.read(Ref(camera.far));
-		serializer.read(Ref(camera.fov));
-		serializer.read(Ref(camera.is_ortho));
-		serializer.read(Ref(camera.ortho_size));
-		serializer.read(Ref(camera.near));
-		m_cameras.insert(camera.entity, camera);
-		m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
-
-		if (!m_active_camera.isValid()) m_active_camera = entity;
-	}
-
-
-	void serializeBoneAttachment(ISerializer& serializer, EntityRef entity) 
-	{
-		BoneAttachment& attachment = m_bone_attachments[entity];
-		serializer.write("bone_index", attachment.bone_index);
-		serializer.write("parent", attachment.parent_entity);
-		serializer.write("relative_transform", attachment.relative_transform);
-	}
-
-
-	void deserializeBoneAttachment(IDeserializer& serializer, EntityRef entity, int /*scene_version*/)
-	{
-		BoneAttachment& bone_attachment = m_bone_attachments.emplace(entity);
-		bone_attachment.entity = entity;
-		serializer.read(Ref(bone_attachment.bone_index));
-		serializer.read(Ref(bone_attachment.parent_entity));
-		serializer.read(Ref(bone_attachment.relative_transform));
-		m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
-		EntityPtr parent_entity = bone_attachment.parent_entity;
-		if (parent_entity.isValid() && parent_entity.index < m_model_instances.size())
-		{
-			ModelInstance& mi = m_model_instances[parent_entity.index];
-			mi.flags.set(ModelInstance::IS_BONE_ATTACHMENT_PARENT);
-		}
-	}
-
-
-	void serializeTerrain(ISerializer& serializer, EntityRef entity)
-	{
-		Terrain* terrain = m_terrains[entity];
-		serializer.write("layer_mask", terrain->m_layer_mask);
-		serializer.write("scale", terrain->m_scale);
-		serializer.write("material", terrain->m_material ? terrain->m_material->getPath().c_str() : "");
-		serializer.write("grass_count", terrain->m_grass_types.size());
-		for (Terrain::GrassType& type : terrain->m_grass_types)
-		{
-			serializer.write("density", type.m_density);
-			serializer.write("distance", type.m_distance);
-			serializer.write("rotation_mode", (int)type.m_rotation_mode);
-			serializer.write("model", type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
-		}
-	}
-
-	void deserializeTerrain(IDeserializer& serializer, EntityRef entity, int version)
-	{
-		Terrain* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
-		m_terrains.insert(entity, terrain);
-		terrain->m_entity = entity;
-		serializer.read(Ref(terrain->m_layer_mask));
-		serializer.read(Ref(terrain->m_scale));
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		auto* material = tmp[0] ? m_engine.getResourceManager().load<Material>(Path(tmp)) : nullptr;
-		terrain->setMaterial(material);
-
-		int count;
-		serializer.read(Ref(count));
-		for(int i = 0; i < count; ++i)
-		{
-			Terrain::GrassType type(*terrain);
-			serializer.read(Ref(type.m_density));
-			serializer.read(Ref(type.m_distance));
-			serializer.read(Ref((int&)type.m_rotation_mode));
-			type.m_idx = i;
-			serializer.read(Span(tmp));
-			terrain->m_grass_types.push(type);
-			terrain->setGrassTypePath(terrain->m_grass_types.size() - 1, Path(tmp));
-		}
-
-		m_universe.onComponentCreated(entity, TERRAIN_TYPE, this);
-	}
-
-	void serializeEnvironmentProbe(ISerializer& serializer, EntityRef entity) 
-	{
-		EnvironmentProbe& probe = m_environment_probes[entity];
-		serializer.write("guid", probe.guid);
-		serializer.write("flags", probe.flags.base);
-		serializer.write("half_extents", probe.half_extents);
-		serializer.write("radiance_size", probe.radiance_size);
-		serializer.write("reflection_size", probe.reflection_size);
-		serializer.write("sh_coef0", probe.sh_coefs[0]);
-		serializer.write("sh_coef1", probe.sh_coefs[1]);
-		serializer.write("sh_coef2", probe.sh_coefs[2]);
-		serializer.write("sh_coef3", probe.sh_coefs[3]);
-		serializer.write("sh_coef4", probe.sh_coefs[4]);
-		serializer.write("sh_coef5", probe.sh_coefs[5]);
-		serializer.write("sh_coef6", probe.sh_coefs[6]);
-		serializer.write("sh_coef7", probe.sh_coefs[7]);
-		serializer.write("sh_coef8", probe.sh_coefs[8]);
-	}
-
 
 	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
-
-
-	void deserializeEnvironmentProbe(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		ResourceManagerHub& manager = m_engine.getResourceManager();
-		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
-		EnvironmentProbe& probe = m_environment_probes.insert(entity);
-		serializer.read(Ref(probe.guid));
-		serializer.read(Ref(probe.flags.base));
-		serializer.read(Ref(probe.half_extents));
-		serializer.read(Ref(probe.radiance_size));
-		serializer.read(Ref(probe.reflection_size));
-		serializer.read(Ref(probe.sh_coefs[0]));
-		serializer.read(Ref(probe.sh_coefs[1]));
-		serializer.read(Ref(probe.sh_coefs[2]));
-		serializer.read(Ref(probe.sh_coefs[3]));
-		serializer.read(Ref(probe.sh_coefs[4]));
-		serializer.read(Ref(probe.sh_coefs[5]));
-		serializer.read(Ref(probe.sh_coefs[6]));
-		serializer.read(Ref(probe.sh_coefs[7]));
-		serializer.read(Ref(probe.sh_coefs[8]));
-
-		ASSERT(probe.reflection == nullptr);
-		if (probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
-			StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
-			probe.reflection = manager.load<Texture>(Path(path_str));
-		}
-
-		ASSERT(probe.radiance == nullptr);
-		if (probe.flags.isSet(EnvironmentProbe::SPECULAR)) {
-			StaticString<MAX_PATH_LENGTH> r_path_str(probe_dir, probe.guid, "_radiance.dds");
-			probe.radiance = manager.load<Texture>(Path(r_path_str));
-		}
-
-		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
-	}
-
-
-	void serializeParticleEmitter(ISerializer& serializer, EntityRef entity)
-	{
-		ParticleEmitter* emitter = m_particle_emitters[entity];
-		const ParticleEmitterResource* res = emitter->getResource();
-		serializer.write("resource", res ? res->getPath().c_str() : "");
-	}
-
-
-	void deserializeParticleEmitter(IDeserializer& serializer, EntityRef entity, int scene_version)
-	{
-		ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(entity, m_allocator);
-		emitter->m_entity = entity;
-
-		char tmp[MAX_PATH_LENGTH];
-		serializer.read(Span(tmp));
-		ResourceManagerHub& manager = m_engine.getResourceManager();
-		ParticleEmitterResource* res = manager.load<ParticleEmitterResource>(Path(tmp));
-		emitter->setResource(res);
-
-		m_particle_emitters.insert(entity, emitter);
-		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
-	}
 
 
 	void serializeBoneAttachments(IOutputStream& serializer)
@@ -1126,7 +770,6 @@ public:
 		{
 			serializer.write(camera);
 		}
-		serializer.write(m_active_camera);
 	}
 
 	void serializeLights(IOutputStream& serializer)
@@ -1183,15 +826,16 @@ public:
 		}
 	}
 
-	void deserializeTextMeshes(IInputStream& serializer)
+	void deserializeTextMeshes(IInputStream& serializer, const EntityMap& entity_map)
 	{
-		int count;
+		u32 count;
 		serializer.read(count);
 		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
 		
-		for (int i = 0; i < count; ++i) {
+		for (u32 i = 0; i < count; ++i) {
 			EntityRef e;
 			serializer.read(e);
+			e = entity_map.get(e);
 			TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
 			m_text_meshes.insert(e, &text);
 			char tmp[MAX_PATH_LENGTH];
@@ -1208,16 +852,16 @@ public:
 	}
 
 
-	void deserializeDecals(IInputStream& serializer)
+	void deserializeDecals(IInputStream& serializer, const EntityMap& entity_map)
 	{
-		int count;
+		u32 count;
 		serializer.read(count);
-		m_decals.reserve(count);
-		for (int i = 0; i < count; ++i)
-		{
+		m_decals.reserve(count + m_decals.size());
+		for (u32 i = 0; i < count; ++i) {
 			char tmp[MAX_PATH_LENGTH];
 			Decal decal;
 			serializer.read(decal.entity);
+			decal.entity = entity_map.get(decal.entity);
 			serializer.read(decal.half_extents);
 			serializer.readString(Span(tmp));
 			updateDecalInfo(decal);
@@ -1268,13 +912,14 @@ public:
 		}
 	}
 
-	void deserializeLightProbeGrids(InputMemoryStream& serializer) {
-		i32 count;
+	void deserializeLightProbeGrids(InputMemoryStream& serializer, const EntityMap& entity_map) {
+		u32 count;
 		serializer.read(count);
-		m_light_probe_grids.reserve(count);
-		for (i32 i = 0; i < count; ++i) {
+		m_light_probe_grids.reserve(count + m_light_probe_grids.size());
+		for (u32 i = 0; i < count; ++i) {
 			LightProbeGrid lp;
 			serializer.read(lp.entity);
+			lp.entity = entity_map.get(lp.entity);
 			serializer.read(lp.guid);
 			serializer.read(lp.resolution);
 			serializer.read(lp.half_extents);
@@ -1284,18 +929,19 @@ public:
 		}
 	}
 
-	void deserializeEnvironmentProbes(InputMemoryStream& serializer)
+	void deserializeEnvironmentProbes(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
-		i32 count;
+		u32 count;
 		serializer.read(count);
-		m_environment_probes.reserve(count);
+		m_environment_probes.reserve(count + m_environment_probes.size());
 		ResourceManagerHub& manager = m_engine.getResourceManager();
 		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
-		for (int i = 0; i < count; ++i)
-		{
+		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
+			entity = entity_map.get(entity);
 			EnvironmentProbe& probe = m_environment_probes.insert(entity);
+			// TODO probes are stored in per-universe directory, that won't work with additive loading
 			serializer.read(probe.guid);
 			serializer.read(probe.flags.base);
 			serializer.read(probe.half_extents);
@@ -1319,17 +965,16 @@ public:
 	}
 
 
-	void deserializeBoneAttachments(InputMemoryStream& serializer)
+	void deserializeBoneAttachments(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
-		i32 count;
+		u32 count;
 		serializer.read(count);
-		m_bone_attachments.clear();
-		m_bone_attachments.reserve(count);
-		for (int i = 0; i < count; ++i)
-		{
+		m_bone_attachments.reserve(count + m_bone_attachments.size());
+		for (u32 i = 0; i < count; ++i) {
 			BoneAttachment bone_attachment;
 			serializer.read(bone_attachment.bone_index);
 			serializer.read(bone_attachment.entity);
+			bone_attachment.entity = entity_map.get(bone_attachment.entity);
 			serializer.read(bone_attachment.parent_entity);
 			serializer.read(bone_attachment.relative_transform);
 			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
@@ -1338,13 +983,14 @@ public:
 	}
 
 
-	void deserializeParticleEmitters(InputMemoryStream& serializer)
+	void deserializeParticleEmitters(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
-		const int count = serializer.read<int>();
-		m_particle_emitters.reserve(count);
-		for (int i = 0; i < count; ++i) {
+		const u32 count = serializer.read<u32>();
+		m_particle_emitters.reserve(count + m_particle_emitters.size());
+		for (u32 i = 0; i < count; ++i) {
 			ParticleEmitter* emitter = LUMIX_NEW(m_allocator, ParticleEmitter)(INVALID_ENTITY, m_allocator);
 			emitter->deserialize(serializer, m_engine.getResourceManager());
+			emitter->m_entity = entity_map.get(emitter->m_entity);
 			if(emitter->m_entity.isValid()) {
 				m_particle_emitters.insert((EntityRef)emitter->m_entity, emitter);
 				m_universe.onComponentCreated((EntityRef)emitter->m_entity, PARTICLE_EMITTER_TYPE, this);
@@ -1381,47 +1027,56 @@ public:
 	}
 
 
-	void deserializeCameras(InputMemoryStream& serializer)
+	void deserializeCameras(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
-		i32 size;
+		u32 size;
 		serializer.read(size);
-		m_cameras.reserve(size);
-		for (int i = 0; i < size; ++i)
+		m_cameras.reserve(size + m_cameras.size());
+		for (u32 i = 0; i < size; ++i)
 		{
 			Camera camera;
 			serializer.read(camera);
+			camera.entity = entity_map.get(camera.entity);
 
 			m_cameras.insert(camera.entity, camera);
 			m_universe.onComponentCreated(camera.entity, CAMERA_TYPE, this);
+			if (!m_active_camera.isValid()) m_active_camera = camera.entity;
 		}
-		serializer.read(m_active_camera);
 	}
 
-	void deserializeModelInstances(IInputStream& serializer)
+	void deserializeModelInstances(IInputStream& serializer, const EntityMap& entity_map)
 	{
-		i32 size = 0;
+		u32 size = 0;
 		serializer.read(size);
-		m_model_instances.reserve(size);
-		m_mesh_sort_data.reserve(size);
-		for (int i = 0; i < size; ++i)
-		{
-			auto& r = m_model_instances.emplace();
-			serializer.read(r.flags);
-			r.model = nullptr;
-			r.pose = nullptr;
-			r.meshes = nullptr;
-			r.mesh_count = 0;
+		m_model_instances.reserve(size + m_model_instances.size());
+		m_mesh_sort_data.reserve(size + m_mesh_sort_data.size());
+		for (u32 i = 0; i < size; ++i) {
+			FlagSet<ModelInstance::Flags, u8> flags;
+			serializer.read(flags);
 
-			if(r.flags.isSet(ModelInstance::VALID))
-			{
-				const EntityRef e = {i};
+			if(flags.isSet(ModelInstance::VALID)) {
+				const EntityRef e = entity_map.get(EntityRef{(i32)i});
+
+				while (e.index >= m_model_instances.size()) {
+					auto& r = m_model_instances.emplace();
+					r.flags.clear();
+					r.flags.set(ModelInstance::VALID, false);
+					r.model = nullptr;
+					r.pose = nullptr;
+				}
+
+				ModelInstance& r = m_model_instances[e.index];
+				r.flags = flags;
+				r.model = nullptr;
+				r.pose = nullptr;
+				r.meshes = nullptr;
+				r.mesh_count = 0;
 
 				u32 path;
 				serializer.read(path);
 
-				if (path != 0)
-				{
-					auto* model = m_engine.getResourceManager().load<Model>(Path(path));
+				if (path != 0) {
+					Model* model = m_engine.getResourceManager().load<Model>(Path(path));
 					setModel(e, model);
 				}
 
@@ -1430,14 +1085,15 @@ public:
 		}
 	}
 
-	void deserializeLights(IInputStream& serializer)
+	void deserializeLights(IInputStream& serializer, const EntityMap& entity_map)
 	{
-		i32 size = 0;
+		u32 size = 0;
 		serializer.read(size);
-		m_point_lights.reserve(size);
-		for (int i = 0; i < size; ++i) {
+		m_point_lights.reserve(size + m_point_lights.size());
+		for (u32 i = 0; i < size; ++i) {
 			PointLight light;
 			serializer.read(light);
+			light.entity = entity_map.get(light.entity);
 			m_point_lights.insert(light.entity, light);
 			const DVec3 pos = m_universe.getPosition(light.entity);
 			m_culling_system->add(light.entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);
@@ -1445,16 +1101,22 @@ public:
 		}
 
 		serializer.read(size);
-		for (int i = 0; i < size; ++i) {
+		for (u32 i = 0; i < size; ++i) {
 			Environment light;
 			serializer.read(light);
+			light.entity = entity_map.get(light.entity);
 			m_environments.insert(light.entity, light);
 			m_universe.onComponentCreated(light.entity, ENVIRONMENT_TYPE, this);
 		}
-		serializer.read(m_active_global_light_entity);
+		
+		EntityPtr tmp;
+		serializer.read(tmp);
+		if (!m_active_global_light_entity.isValid()) {
+			m_active_global_light_entity = tmp;
+		}
 	}
 
-	void deserializeTerrains(InputMemoryStream& serializer)
+	void deserializeTerrains(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		i32 size = 0;
 		serializer.read(size);
@@ -1462,25 +1124,26 @@ public:
 		{
 			EntityRef entity;
 			serializer.read(entity);
+			entity = entity_map.get(entity);
 			auto* terrain = LUMIX_NEW(m_allocator, Terrain)(m_renderer, entity, *this, m_allocator);
-			terrain->deserialize(serializer, m_universe, *this);
-			m_terrains.insert(terrain->getEntity(), terrain);
+			terrain->deserialize(entity, serializer, m_universe, *this);
+			m_terrains.insert(entity, terrain);
 		}
 	}
 
 
-	void deserialize(InputMemoryStream& serializer) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
-		deserializeCameras(serializer);
-		deserializeModelInstances(serializer);
-		deserializeLights(serializer);
-		deserializeTerrains(serializer);
-		deserializeParticleEmitters(serializer);
-		deserializeBoneAttachments(serializer);
-		deserializeEnvironmentProbes(serializer);
-		deserializeLightProbeGrids(serializer);
-		deserializeDecals(serializer);
-		deserializeTextMeshes(serializer);
+		deserializeCameras(serializer, entity_map);
+		deserializeModelInstances(serializer, entity_map);
+		deserializeLights(serializer, entity_map);
+		deserializeTerrains(serializer, entity_map);
+		deserializeParticleEmitters(serializer, entity_map);
+		deserializeBoneAttachments(serializer, entity_map);
+		deserializeEnvironmentProbes(serializer, entity_map);
+		deserializeLightProbeGrids(serializer, entity_map);
+		deserializeDecals(serializer, entity_map);
+		deserializeTextMeshes(serializer, entity_map);
 	}
 
 
@@ -3401,7 +3064,7 @@ private:
 	HashMap<EntityRef, Environment> m_environments;
 	AssociativeArray<EntityRef, LightProbeGrid> m_light_probe_grids;
 	HashMap<EntityRef, Camera> m_cameras;
-	EntityPtr m_active_camera;
+	EntityPtr m_active_camera = INVALID_ENTITY;
 	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
 	AssociativeArray<EntityRef, BoneAttachment> m_bone_attachments;
 	AssociativeArray<EntityRef, EnvironmentProbe> m_environment_probes;
@@ -3426,8 +3089,6 @@ private:
 #define COMPONENT_TYPE(type, name) \
 	{ \
 		type \
-		, static_cast<Universe::Serialize>(&RenderSceneImpl::serialize##name) \
-		, static_cast<Universe::Deserialize>(&RenderSceneImpl::deserialize##name) \
 		, &RenderSceneImpl::create##name \
 		, &RenderSceneImpl::destroy##name \
 	}
@@ -3435,8 +3096,6 @@ private:
 static struct
 {
 	ComponentType type;
-	Universe::Serialize serialize;
-	Universe::Deserialize deserialize;
 	void (RenderSceneImpl::*creator)(EntityRef);
 	void (RenderSceneImpl::*destroyer)(EntityRef);
 } COMPONENT_INFOS[] = {
@@ -3498,7 +3157,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	for (auto& i : COMPONENT_INFOS)
 	{
 		m_render_cmps_mask |= (u64)1 << i.type.index;
-		universe.registerComponentType(i.type, this, i.creator, i.destroyer, i.serialize, i.deserialize);
+		universe.registerComponentType(i.type, this, i.creator, i.destroyer);
 	}
 }
 

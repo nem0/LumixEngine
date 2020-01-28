@@ -32,23 +32,15 @@ static double asDouble(u64 v)
 }
 
 
-EntityGUID TextSerializer::getGUID(EntityRef entity)
-{
-	return entity_map.get(entity);
-}
-
-
 void TextSerializer::write(const char* label, EntityPtr entity)
 {
-	EntityGUID guid = entity_map.get(entity);
-	blob << "#" << label << "\n\t" << guid.value << "\n";
+	blob << "#" << label << "\n\t" << entity.index << "\n";
 }
 
 
 void TextSerializer::write(const char* label, EntityRef entity)
 {
-	EntityGUID guid = entity_map.get(entity);
-	blob << "#" << label << "\n\t" << guid.value << "\n";
+	blob << "#" << label << "\n\t" << entity.index << "\n";
 }
 
 
@@ -164,25 +156,15 @@ void TextSerializer::write(const char* label, u8 value)
 }
 
 
-EntityPtr TextDeserializer::getEntity(EntityGUID guid)
-{
-	return entity_map.get(guid);
-}
-
-
 void TextDeserializer::read(Ref<EntityPtr> entity)
 {
-	EntityGUID guid;
-	read(Ref(guid.value));
-	entity = entity_map.get(guid);
+	read(Ref(entity->index));
 }
 
 
 void TextDeserializer::read(Ref<EntityRef> entity)
 {
-	EntityGUID guid;
-	read(Ref(guid.value));
-	entity = (EntityRef)entity_map.get(guid);
+	read(Ref(entity->index));
 }
 
 void TextDeserializer::read(Ref<RigidTransform> value)

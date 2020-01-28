@@ -1,3 +1,4 @@
+#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "prefab.h"
 
@@ -25,6 +26,7 @@ bool PrefabResource::load(u64 size, const u8* mem)
 {
 	data.resize((int)size);
 	memcpy(data.begin(), mem, size);
+	content_hash = crc32(mem, (u32)size);
 	return true;
 }
 

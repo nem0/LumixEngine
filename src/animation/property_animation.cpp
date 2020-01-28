@@ -52,10 +52,7 @@ bool PropertyAnimation::save(TextSerializer& serializer)
 bool PropertyAnimation::load(u64 size, const u8* mem)
 {
 	InputMemoryStream file(mem, size);
-	struct : ILoadEntityGUIDMap { 
-		EntityPtr get(EntityGUID guid) override { ASSERT(false); return INVALID_ENTITY; }
-	} dummy_map;
-	TextDeserializer serializer(file, dummy_map);
+	TextDeserializer serializer(file);
 	
 	int count;
 	serializer.read(Ref(count));
