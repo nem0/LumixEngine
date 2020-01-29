@@ -2974,15 +2974,15 @@ public:
 		int entity_count;
 		blob.read(Ref(entity_count));
 		bool is_redo = !m_entities.empty();
-		m_entities.reserve(entity_count);
-		for (int i = 0; i < entity_count; ++i)
+		if (is_redo)
 		{
-			if (is_redo)
-			{
+			for (int i = 0; i < entity_count; ++i) {
 				universe.emplaceEntity(m_entities[i]);
 			}
-			else
-			{
+		}
+		else {
+			m_entities.resize(entity_count);
+			for (int i = 0; i < entity_count; ++i) {
 				m_entities[i] = universe.createEntity(DVec3(0), Quat(0, 0, 0, 1));
 			}
 		}
