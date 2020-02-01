@@ -16,6 +16,17 @@
 		<DisplayString>{m_data->m_path,na}</DisplayString>
 	</Type>
 	
+	<Type Name="Lumix::Span&lt;*&gt;">
+		<DisplayString Condition="m_end == m_begin">size=0</DisplayString>
+		<DisplayString Condition="m_end != m_begin">size={m_end - m_begin} [0]=>{m_begin[0]}</DisplayString>
+		<Expand>
+			<ArrayItems>
+				<Size>m_end - m_begin</Size>
+				<ValuePointer>m_begin</ValuePointer>
+			</ArrayItems>
+		</Expand>
+  </Type>
+		
 	<Type Name="Lumix::HashMap&lt;*,*&gt;">
     <DisplayString>{{ size={m_size} }}</DisplayString>
     <Expand>
