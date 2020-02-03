@@ -37,6 +37,180 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 
+struct UniverseViewImpl final : UniverseView {
+	UniverseViewImpl(WorldEditor& editor) 
+		: m_editor(editor) 
+		, m_orbit_delta(0)
+	{}
+
+	const Viewport& getViewport() override { return m_viewport; }
+	void setViewport(const Viewport& vp) override { m_viewport = vp; }
+
+	void copyTransform() override {
+		if (m_editor.getSelectedEntities().empty()) return;
+
+		m_editor.setEntitiesPositionsAndRotations(m_editor.getSelectedEntities().begin(), &m_viewport.pos, &m_viewport.rot, 1);
+	}
+
+	void lookAtSelected() override {
+		const Universe* universe = m_editor.getUniverse();
+		if (m_editor.getSelectedEntities().empty()) return;
+
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		m_go_to_parameters.m_from = m_viewport.pos;
+		const Vec3 dir = m_viewport.rot.rotate(Vec3(0, 0, 1));
+		m_go_to_parameters.m_to = universe->getPosition(m_editor.getSelectedEntities()[0]) + dir * 10;
+		const double len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+		m_go_to_parameters.m_speed = maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
+		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = m_viewport.rot;
+
+	}
+	
+	void setTopView() override {
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		m_go_to_parameters.m_from = m_viewport.pos;
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
+		if (m_is_orbit && !selected_entities.empty()) {
+			auto* universe = m_editor.getUniverse();
+			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 10, 0);
+		}
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = m_viewport.rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(1, 0, 0), -PI * 0.5f);
+	}
+
+	void setFrontView() override {
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		m_go_to_parameters.m_from = m_viewport.pos;
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
+		if (m_is_orbit && !selected_entities.empty()) {
+			auto* universe = m_editor.getUniverse();
+			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 0, -10);
+		}
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = m_viewport.rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), PI);
+	}
+
+
+	void setSideView() override {
+		m_go_to_parameters.m_is_active = true;
+		m_go_to_parameters.m_t = 0;
+		m_go_to_parameters.m_from = m_viewport.pos;
+		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
+		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
+		if (m_is_orbit && !selected_entities.empty()) {
+			auto* universe = m_editor.getUniverse();
+			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(-10, 0, 0);
+		}
+		m_go_to_parameters.m_speed = 2.0f;
+		m_go_to_parameters.m_from_rot = m_viewport.rot;
+		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -PI * 0.5f);
+	}
+	
+	bool isOrbitCamera() const override { return m_is_orbit; }
+
+	void setOrbitCamera(bool enable) override
+	{
+		m_orbit_delta = Vec2(0, 0);
+		m_is_orbit = enable;
+	}
+
+	void moveCamera(float forward, float right, float up, float speed) override
+	{
+		const Quat rot = m_viewport.rot;
+
+		right = m_is_orbit ? 0 : right;
+
+		m_viewport.pos += rot.rotate(Vec3(0, 0, -1)) * forward * speed;
+		m_viewport.pos += rot.rotate(Vec3(1, 0, 0)) * right * speed;
+		m_viewport.pos += rot.rotate(Vec3(0, 1, 0)) * up * speed;
+	}
+
+	void rotateCamera(float yaw, float pitch) {
+		const Universe* universe = m_editor.getUniverse();
+		DVec3 pos = m_viewport.pos;
+		Quat rot = m_viewport.rot;
+		const Quat old_rot = rot;
+
+		Quat yaw_rot(Vec3(0, 1, 0), yaw);
+		rot = yaw_rot * rot;
+		rot.normalize();
+
+		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
+		const Quat pitch_rot(pitch_axis, pitch);
+		rot = pitch_rot * rot;
+		rot.normalize();
+
+		if (m_is_orbit && !m_editor.getSelectedEntities().empty())
+		{
+			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
+			const DVec3 entity_pos = universe->getPosition(m_editor.getSelectedEntities()[0]);
+			DVec3 nondelta_pos = pos;
+
+			nondelta_pos -= old_rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
+			nondelta_pos -= old_rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
+
+			const float dist = float((entity_pos - nondelta_pos).length());
+			pos = entity_pos + dir * dist;
+			pos += rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
+			pos += rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
+		}
+
+		m_viewport.pos = pos;
+		m_viewport.rot = rot;
+	}
+
+	void panCamera(float x, float y) {
+		const Quat rot = m_viewport.rot;
+
+		if (m_is_orbit) {
+			m_orbit_delta.x += x;
+			m_orbit_delta.y += y;
+		}
+
+		m_viewport.pos += rot.rotate(Vec3(x, 0, 0));
+		m_viewport.pos += rot.rotate(Vec3(0, -y, 0));
+	}
+
+	void update() {
+		if (!m_go_to_parameters.m_is_active) return;
+
+		float t = easeInOut(m_go_to_parameters.m_t);
+		m_go_to_parameters.m_t += m_editor.getEngine().getLastTimeDelta() * m_go_to_parameters.m_speed;
+		DVec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
+		Quat rot;
+		rot = nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, t);
+		if (m_go_to_parameters.m_t >= 1)
+		{
+			pos = m_go_to_parameters.m_to;
+			m_go_to_parameters.m_is_active = false;
+		}
+		m_viewport.pos = pos;
+		m_viewport.rot = rot;
+	}
+
+	struct {
+		bool m_is_active = false;
+		DVec3 m_from;
+		DVec3 m_to;
+		Quat m_from_rot;
+		Quat m_to_rot;
+		float m_t;
+		float m_speed;
+	} m_go_to_parameters;
+
+	bool m_is_orbit = false;
+	Vec2 m_orbit_delta;
+	WorldEditor& m_editor;
+	Viewport m_viewport;
+};
+
 struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	PropertyDeserializeVisitor(IInputStream& deserializer, ComponentUID cmp)
 		: deserializer(deserializer)
@@ -1315,9 +1489,7 @@ private:
 public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
-
-	const Viewport& getViewport() const override { return m_viewport; }
-	void setViewport(const Viewport& viewport) override { m_viewport = viewport; }
+	UniverseView& getView() override { return m_view; }
 
 
 	Universe* getUniverse() override
@@ -1337,14 +1509,14 @@ public:
 
 		if (m_selected_entities.size() > 1)
 		{
-			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0], m_viewport.pos);
+			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0], m_view.m_viewport.pos);
 			for (int i = 1; i < m_selected_entities.size(); ++i)
 			{
-				AABB entity_aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[i], m_viewport.pos);
+				AABB entity_aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[i], m_view.m_viewport.pos);
 				aabb.merge(entity_aabb);
 			}
 
-			m_render_interface->addDebugCube(m_viewport.pos + aabb.min, m_viewport.pos + aabb.max, 0xffffff00);
+			m_render_interface->addDebugCube(m_view.m_viewport.pos + aabb.min, m_view.m_viewport.pos + aabb.max, 0xffffff00);
 			return;
 		}
 
@@ -1368,25 +1540,6 @@ public:
 	}
 
 
-	void updateGoTo()
-	{
-		if (!m_go_to_parameters.m_is_active) return;
-
-		float t = easeInOut(m_go_to_parameters.m_t);
-		m_go_to_parameters.m_t += m_engine.getLastTimeDelta() * m_go_to_parameters.m_speed;
-		DVec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
-		Quat rot;
-		rot = nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, t);
-		if (m_go_to_parameters.m_t >= 1)
-		{
-			pos = m_go_to_parameters.m_to;
-			m_go_to_parameters.m_is_active = false;
-		}
-		m_viewport.pos = pos;
-		m_viewport.rot = rot;
-	}
-
-
 	void inputFrame() override
 	{
 		for (auto& i : m_is_mouse_click) i = false;
@@ -1399,7 +1552,7 @@ public:
 
 		DVec3 origin;
 		Vec3 dir;
-		m_viewport.getRay(m_mouse_pos, origin, dir);
+		m_view.m_viewport.getRay(m_mouse_pos, origin, dir);
 		const RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		//if (m_gizmo->isActive()) return;
 		if (!hit.is_hit) return;
@@ -1423,7 +1576,7 @@ public:
 			doExecute(cmd);
 		}
 
-		updateGoTo();
+		m_view.update();
 		previewSnapVertex();
 		m_prefab_system->update();
 
@@ -1439,7 +1592,7 @@ public:
 		}
 
 		createEditorLines();
-		m_gizmo->update(m_viewport);
+		m_gizmo->update(m_view.m_viewport);
 	}
 
 
@@ -1543,7 +1696,7 @@ public:
 		{
 			DVec3 origin;
 			Vec3 dir;
-			m_viewport.getRay({(float)x, (float)y}, origin, dir);
+			m_view.m_viewport.getRay({(float)x, (float)y}, origin, dir);
 			const RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 			if (m_gizmo->isActive()) return;
 
@@ -1588,8 +1741,13 @@ public:
 				}
 			}
 			break;
-			case MouseMode::NAVIGATE: rotateCamera(relx, rely); break;
-			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
+			case MouseMode::NAVIGATE: {
+				const float yaw = -signum(x) * (powf(fabsf((float)x / m_mouse_sensitivity.x), 1.2f));
+				const float pitch = -signum(y) * (powf(fabsf((float)y / m_mouse_sensitivity.y), 1.2f));
+				m_view.rotateCamera(yaw, pitch);
+				break;
+			}
+			case MouseMode::PAN: m_view.panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
 			case MouseMode::NONE:
 			case MouseMode::SELECT:
 				break;
@@ -1605,7 +1763,7 @@ public:
 		Vec2 max = m_mouse_pos;
 		if (min.x > max.x) swap(min.x, max.x);
 		if (min.y > max.y) swap(min.y, max.y);
-		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
+		const ShiftedFrustum frustum = m_view.m_viewport.getFrustum(min, max);
 		m_render_interface->getRenderables(entities, frustum);
 		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
 	}
@@ -1624,7 +1782,7 @@ public:
 			{
 				DVec3 origin;
 				Vec3 dir;
-				m_viewport.getRay(m_mouse_pos, origin, dir);
+				m_view.m_viewport.getRay(m_mouse_pos, origin, dir);
 				auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 
 				if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
@@ -1737,7 +1895,7 @@ public:
 
 		DVec3 origin;
 		Vec3 dir;		
-		m_viewport.getRay(m_mouse_pos, origin, dir);
+		m_view.m_viewport.getRay(m_mouse_pos, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		if (!hit.is_hit || hit.entity != m_selected_entities[0]) return;
 
@@ -1825,7 +1983,7 @@ public:
 
 	EntityRef addEntity() override
 	{
-		return addEntityAt(m_viewport.w >> 1, m_viewport.h >> 1);
+		return addEntityAt(m_view.m_viewport.w >> 1, m_view.m_viewport.h >> 1);
 	}
 
 
@@ -1834,14 +1992,14 @@ public:
 		DVec3 origin;
 		Vec3 dir;
 
-		m_viewport.getRay({(float)camera_x, (float)camera_y}, origin, dir);
+		m_view.m_viewport.getRay({(float)camera_x, (float)camera_y}, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		DVec3 pos;
 		if (hit.is_hit) {
 			pos = origin + dir * hit.t;
 		}
 		else {
-			pos = m_viewport.pos + m_viewport.rot.rotate(Vec3(0, 0, -2));
+			pos = m_view.m_viewport.pos + m_view.m_viewport.rot.rotate(Vec3(0, 0, -2));
 		}
 		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
 		executeCommand(command);
@@ -1852,18 +2010,18 @@ public:
 
 	DVec3 getCameraRaycastHit() override
 	{
-		const Vec2 center(float(m_viewport.w >> 1), float(m_viewport.h >> 1));
+		const Vec2 center(float(m_view.m_viewport.w >> 1), float(m_view.m_viewport.h >> 1));
 
 		DVec3 origin;
 		Vec3 dir;
-		m_viewport.getRay(center, origin, dir);
+		m_view.m_viewport.getRay(center, origin, dir);
 		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
 		DVec3 pos;
 		if (hit.is_hit) {
 			pos = origin + dir * hit.t;
 		}
 		else {
-			pos = m_viewport.pos + m_viewport.rot.rotate(Vec3(0, 0, -2));
+			pos = m_view.m_viewport.pos + m_view.m_viewport.rot.rotate(Vec3(0, 0, -2));
 		}
 		return pos;
 	}
@@ -2257,28 +2415,6 @@ public:
 		executeCommand(command);
 	}
 
-	void copyViewTransform() override {
-		if (m_selected_entities.empty()) return;
-
-		setEntitiesPositionsAndRotations(m_selected_entities.begin(), &m_viewport.pos, &m_viewport.rot, 1);
-	}
-
-	void lookAtSelected() override
-	{
-		const Universe* universe = getUniverse();
-		if (m_selected_entities.empty()) return;
-
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		const Vec3 dir = m_viewport.rot.rotate(Vec3(0, 0, 1));
-		m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + dir * 10;
-		const double len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-		m_go_to_parameters.m_speed = maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
-		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = m_viewport.rot;
-	}
-
-
 	void loadUniverse(const char* basename) override
 	{
 		if (m_is_game_mode) stopGameMode(false);
@@ -2422,7 +2558,6 @@ public:
 		, m_copy_buffer(m_allocator)
 		, m_is_loading(false)
 		, m_universe(nullptr)
-		, m_is_orbit(false)
 		, m_is_toggle_selection(false)
 		, m_mouse_sensitivity(200, 200)
 		, m_render_interface(nullptr)
@@ -2435,20 +2570,20 @@ public:
 		, m_is_guid_pseudorandom(false)
         , m_game_mode_file(m_allocator)
 		, m_command_queue(m_allocator)
+		, m_view(*this)
 	{
 		logInfo("Editor") << "Initializing editor...";
-		m_viewport.is_ortho = false;
-		m_viewport.pos = DVec3(0);
-		m_viewport.rot.set(0, 0, 0, 1);
-		m_viewport.w = -1;
-		m_viewport.h = -1;
-		m_viewport.fov = degreesToRadians(60.f);
-		m_viewport.near = 0.1f;
-		m_viewport.far = 100000.f;
+		m_view.m_viewport.is_ortho = false;
+		m_view.m_viewport.pos = DVec3(0);
+		m_view.m_viewport.rot.set(0, 0, 0, 1);
+		m_view.m_viewport.w = -1;
+		m_view.m_viewport.h = -1;
+		m_view.m_viewport.fov = degreesToRadians(60.f);
+		m_view.m_viewport.near = 0.1f;
+		m_view.m_viewport.far = 100000.f;
 
 		for (auto& i : m_is_mouse_down) i = false;
 		for (auto& i : m_is_mouse_click) i = false;
-		m_go_to_parameters.m_is_active = false;
 		
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
@@ -2469,18 +2604,6 @@ public:
 				break;
 			}
 		}
-	}
-
-
-	void navigate(float forward, float right, float up, float speed) override
-	{
-		const Quat rot = m_viewport.rot;
-
-		right = m_is_orbit ? 0 : right;
-
-		m_viewport.pos += rot.rotate(Vec3(0, 0, -1)) * forward * speed;
-		m_viewport.pos += rot.rotate(Vec3(1, 0, 0)) * right * speed;
-		m_viewport.pos += rot.rotate(Vec3(0, 1, 0)) * up * speed;
 	}
 
 
@@ -2541,30 +2664,6 @@ public:
 	}
 
 
-	bool isOrbitCamera() const override { return m_is_orbit; }
-
-
-	void setOrbitCamera(bool enable) override
-	{
-		m_orbit_delta = Vec2(0, 0);
-		m_is_orbit = enable;
-	}
-
-
-	void panCamera(float x, float y)
-	{
-		const Quat rot = m_viewport.rot;
-
-		if(m_is_orbit) {
-			m_orbit_delta.x += x;
-			m_orbit_delta.y += y;
-		}
-
-		m_viewport.pos += rot.rotate(Vec3(x, 0, 0));
-		m_viewport.pos += rot.rotate(Vec3(0, -y, 0));
-	}
-
-
 	Vec2 getMouseSensitivity() override
 	{
 		return m_mouse_sensitivity;
@@ -2575,44 +2674,6 @@ public:
 	{
 		m_mouse_sensitivity.x = 10000 / x;
 		m_mouse_sensitivity.y = 10000 / y;
-	}
-
-
-	void rotateCamera(int x, int y)
-	{
-		const Universe* universe = getUniverse();
-		DVec3 pos = m_viewport.pos;
-		Quat rot = m_viewport.rot;
-		const Quat old_rot = rot;
-
-		float yaw = -signum(x) * (powf(fabsf((float)x / m_mouse_sensitivity.x), 1.2f));
-		Quat yaw_rot(Vec3(0, 1, 0), yaw);
-		rot = yaw_rot * rot;
-		rot.normalize();
-
-		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-		float pitch = -signum(y) * (powf(fabsf((float)y / m_mouse_sensitivity.y), 1.2f));
-		const Quat pitch_rot(pitch_axis, pitch);
-		rot = pitch_rot * rot;
-		rot.normalize();
-
-		if (m_is_orbit && !m_selected_entities.empty())
-		{
-			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-			const DVec3 entity_pos = universe->getPosition(m_selected_entities[0]);
-			DVec3 nondelta_pos = pos;
-
-			nondelta_pos -= old_rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
-			nondelta_pos -= old_rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
-
-			const float dist = float((entity_pos - nondelta_pos).length());
-			pos = entity_pos + dir * dist;
-			pos += rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
-			pos += rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
-		}
-
-		m_viewport.pos = pos;
-		m_viewport.rot = rot;
 	}
 
 
@@ -2709,7 +2770,7 @@ public:
 
 		universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 
-		m_is_orbit = false;
+		m_view.m_is_orbit = false;
 		m_selected_entities.clear();
 		m_universe_created.invoke();
 	}
@@ -2804,57 +2865,6 @@ public:
 	}
 
 
-	void setTopView() override
-	{
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		auto* universe = m_universe;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		if (m_is_orbit && !m_selected_entities.empty())
-		{
-			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(0, 10, 0);
-		}
-		m_go_to_parameters.m_speed = 2.0f;
-		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(1, 0, 0), -PI * 0.5f);
-	}
-
-
-	void setFrontView() override
-	{
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		auto* universe = m_universe;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		if (m_is_orbit && !m_selected_entities.empty())
-		{
-			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(0, 0, -10);
-		}
-		m_go_to_parameters.m_speed = 2.0f;
-		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), PI);
-	}
-
-
-	void setSideView() override
-	{
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		auto* universe = m_universe;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		if (m_is_orbit && !m_selected_entities.empty())
-		{
-			m_go_to_parameters.m_to = universe->getPosition(m_selected_entities[0]) + Vec3(-10, 0, 0);
-		}
-		m_go_to_parameters.m_speed = 2.0f;
-		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -PI * 0.5f);
-	}
-
-
 	static int getEntitiesCount(Universe& universe)
 	{
 		int count = 0;
@@ -2881,30 +2891,17 @@ private:
 		VERTEX
 	};
 
-	struct GoToParameters
-	{
-		bool m_is_active;
-		DVec3 m_from;
-		DVec3 m_to;
-		Quat m_from_rot;
-		Quat m_to_rot;
-		float m_t;
-		float m_speed;
-	};
-
 	IAllocator& m_allocator;
-	GoToParameters m_go_to_parameters;
+	UniverseViewImpl m_view;
 	Gizmo* m_gizmo;
 	Array<EntityRef> m_selected_entities;
 	MouseMode m_mouse_mode;
 	Vec2 m_rect_selection_start;
 	EditorIcons* m_editor_icons;
 	Vec2 m_mouse_pos;
-	Vec2 m_orbit_delta;
 	Vec2 m_mouse_sensitivity;
 	bool m_is_game_mode;
 	int m_game_mode_commands;
-	bool m_is_orbit;
 	bool m_is_toggle_selection;
 	SnapMode m_snap_mode;
 	OutputMemoryStream m_game_mode_file;
@@ -2930,7 +2927,6 @@ private:
 	u32 m_current_group_type;
 	bool m_is_universe_changed;
 	bool m_is_guid_pseudorandom;
-	Viewport m_viewport;
 };
 
 

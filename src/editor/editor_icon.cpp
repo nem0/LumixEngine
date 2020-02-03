@@ -176,7 +176,7 @@ struct EditorIconsImpl final : public EditorIcons
 		hit.t = -1;
 		hit.entity = INVALID_ENTITY;
 
-		const Viewport& vp = m_editor.getViewport();
+		const Viewport& vp = m_editor.getView().getViewport();
 
 		for(auto& icon : m_icons) {
 			const Transform icon_tr = getIconTransform(icon, vp.rot, vp.is_ortho, vp.ortho_size);
@@ -193,7 +193,6 @@ struct EditorIconsImpl final : public EditorIcons
 
 		return hit;
 	}
-
 
 	void setRenderInterface(RenderInterface* render_interface) override
 	{
@@ -275,7 +274,7 @@ struct EditorIconsImpl final : public EditorIcons
 		static const float MAX_SCALE_FACTOR = 60;
 
 		const Universe& universe = *m_editor.getUniverse();
-		const Viewport& vp = m_editor.getViewport();
+		const Viewport& vp = m_editor.getView().getViewport();
 		Matrix camera_mtx({0, 0, 0}, vp.rot);
 
 		for(auto& icon : m_icons) {

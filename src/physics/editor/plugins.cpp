@@ -550,7 +550,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 	void onVisualizationGUI()
 	{
 		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		DVec3 camera_pos = m_editor.getViewport().pos;
+		DVec3 camera_pos = m_editor.getView().getViewport().pos;
 		const Vec3 extents(20, 20, 20);
 		scene->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
 

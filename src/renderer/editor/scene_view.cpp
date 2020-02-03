@@ -158,12 +158,12 @@ void SceneView::update(float time_delta)
 	float speed = m_camera_speed * time_delta * 60.f;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
 	m_editor.getGizmo().enableStep(m_toggle_gizmo_step_action->isActive());
-	if (m_move_forward_action->isActive()) m_editor.navigate(1.0f, 0, 0, speed);
-	if (m_move_back_action->isActive()) m_editor.navigate(-1.0f, 0, 0, speed);
-	if (m_move_left_action->isActive()) m_editor.navigate(0.0f, -1.0f, 0, speed);
-	if (m_move_right_action->isActive()) m_editor.navigate(0.0f, 1.0f, 0, speed);
-	if (m_move_down_action->isActive()) m_editor.navigate(0, 0, -1.0f, speed);
-	if (m_move_up_action->isActive()) m_editor.navigate(0, 0, 1.0f, speed);
+	if (m_move_forward_action->isActive()) m_editor.getView().moveCamera(1.0f, 0, 0, speed);
+	if (m_move_back_action->isActive()) m_editor.getView().moveCamera(-1.0f, 0, 0, speed);
+	if (m_move_left_action->isActive()) m_editor.getView().moveCamera(0.0f, -1.0f, 0, speed);
+	if (m_move_right_action->isActive()) m_editor.getView().moveCamera(0.0f, 1.0f, 0, speed);
+	if (m_move_down_action->isActive()) m_editor.getView().moveCamera(0, 0, -1.0f, speed);
+	if (m_move_up_action->isActive()) m_editor.getView().moveCamera(0, 0, 1.0f, speed);
 }
 
 
@@ -262,7 +262,7 @@ void SceneView::renderSelection()
 					const Mesh& mesh = model->getMesh(i);
 					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;
-					item.mtx = universe.getRelativeMatrix(e, m_editor->getViewport().pos);
+					item.mtx = universe.getRelativeMatrix(e, m_editor->getView().getViewport().pos);
 					item.material = mesh.material->getRenderData();
 					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | item.material->define_mask);
 				}
@@ -323,7 +323,7 @@ void SceneView::renderGizmos()
 		void setup() override
 		{
 			PROFILE_FUNCTION();
-			viewport = view->m_editor.getViewport();
+			viewport = view->m_editor.getView().getViewport();
 			view->m_editor.getGizmo().getRenderData(&data, viewport);
 			Engine& engine = view->m_editor.getEngine();
 			renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
@@ -409,7 +409,7 @@ RayCastModelHit SceneView::castRay(float x, float y)
 	auto* scene =  m_pipeline->getScene();
 	ASSERT(scene);
 	
-	const Viewport& vp = m_editor.getViewport();
+	const Viewport& vp = m_editor.getView().getViewport();
 	DVec3 origin;
 	Vec3 dir;
 	vp.getRay({x * vp.w, y * vp.h}, origin, dir);
@@ -663,10 +663,10 @@ void SceneView::onWindowGUI()
 		is_open = true;
 		onToolbar();
 		const ImVec2 size = ImGui::GetContentRegionAvail();
-		Viewport vp = m_editor.getViewport();
+		Viewport vp = m_editor.getView().getViewport();
 		vp.w = (int)size.x;
 		vp.h = (int)size.y;
-		m_editor.setViewport(vp);
+		m_editor.getView().setViewport(vp);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
 		m_editor.inputFrame();
