@@ -386,10 +386,10 @@ public:
 		const EntityRef e = (EntityRef)entity;
 
 		const EntityPtr child = universe.getFirstChild(e);
-		destroySubtree(universe, (EntityRef)child);
+		destroySubtree(universe, child);
 
 		const EntityPtr sib = universe.getNextSibling(e);
-		destroySubtree(universe, (EntityRef)sib);
+		destroySubtree(universe, sib);
 
 		universe.destroyEntity(e);
 	}
