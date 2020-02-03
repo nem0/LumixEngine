@@ -100,28 +100,24 @@ public:
 	virtual void setRenderInterface(RenderInterface* interface) = 0;
 	virtual RenderInterface* getRenderInterface() = 0;
 	virtual void update() = 0;
-	virtual void beginCommandGroup(u32 type) = 0;
-	virtual void endCommandGroup() = 0;
-	virtual void executeCommand(IEditorCommand* command) = 0;
-	virtual void executeCommand(const char* name, const char* args) = 0;
-	virtual void registerCommand(const char* name, CommandCreator* creator) = 0;
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual UniverseView& getView() = 0;
 	virtual class EditorIcons& getIcons() = 0;
 	virtual class Gizmo& getGizmo() = 0;
+	
+	// commands
+	virtual void beginCommandGroup(u32 type) = 0;
+	virtual void endCommandGroup() = 0;
+	virtual void executeCommand(IEditorCommand* command) = 0;
+	virtual void executeCommand(const char* name, const char* args) = 0;
+	virtual void registerCommand(const char* name, CommandCreator* creator) = 0;
+	virtual bool isUniverseChanged() const = 0;
 	virtual bool canUndo() const = 0;
 	virtual bool canRedo() const = 0;
 	virtual void undo() = 0;
 	virtual void redo() = 0;
-	virtual void loadUniverse(const char* basename) = 0;
-	virtual void saveUniverse(const char* basename, bool save_path) = 0;
-	virtual void newUniverse() = 0;
-	virtual void copyEntities() = 0;
-	virtual bool canPasteEntities() const = 0;
-	virtual void pasteEntities() = 0;
-    virtual void duplicateEntities() = 0;
 	virtual void addComponent(Span<const EntityRef> entities, ComponentType type) = 0;
 	virtual void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) = 0;
 	virtual EntityRef addEntity() = 0;
@@ -139,8 +135,6 @@ public:
 		const Quat* rotation,
 		int count) = 0;
 	virtual void setEntityName(EntityRef entity, const char* name) = 0;
-	virtual void snapDown() = 0;
-	virtual void toggleGameMode() = 0;
 	virtual void setProperty(ComponentType component,
 		int index,
 		const Reflection::PropertyBase& property,
@@ -148,11 +142,27 @@ public:
 		int count,
 		const void* data,
 		int size) = 0;
-	virtual void setCustomPivot() = 0;
-	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
-	virtual void setToggleSelection(bool is_toggle) = 0;
 	virtual void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) = 0;
+	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
+	virtual bool isEntitySelected(EntityRef entity) const = 0;
+	virtual void makeParent(EntityPtr parent, EntityRef child) = 0;
+
+	//
+	virtual void copyEntities() = 0;
+	virtual bool canPasteEntities() const = 0;
+	virtual void pasteEntities() = 0;
+    virtual void duplicateEntities() = 0;
+
+	virtual void loadUniverse(const char* basename) = 0;
+	virtual void saveUniverse(const char* basename, bool save_path) = 0;
+	virtual void newUniverse() = 0;
+	virtual void snapDown() = 0;
+	virtual void toggleGameMode() = 0;
+	virtual void setCustomPivot() = 0;
+	virtual void setToggleSelection(bool is_toggle) = 0;
+	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
+	
 	virtual bool isMouseDown(OS::MouseButton button) const = 0;
 	virtual bool isMouseClick(OS::MouseButton button) const = 0;
 	virtual void inputFrame() = 0;
@@ -160,11 +170,9 @@ public:
 	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
 	virtual void onMouseUp(int x, int y, OS::MouseButton button) = 0;
 	virtual Vec2 getMousePos() const = 0;
-	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
-	virtual bool isEntitySelected(EntityRef entity) const = 0;
-	virtual void makeParent(EntityPtr parent, EntityRef child) = 0;
+	virtual void setMouseSensitivity(float x, float y) = 0;
+	virtual Vec2 getMouseSensitivity() = 0;
 
-	virtual DelegateList<void(const Array<EntityRef>&)>& entitySelected() = 0;
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 
@@ -180,9 +188,6 @@ public:
 	virtual void makeAbsolute(Span<char> absolute, const char* relative) const = 0;
 
 	virtual bool isGameMode() const = 0;
-	virtual void setMouseSensitivity(float x, float y) = 0;
-	virtual Vec2 getMouseSensitivity() = 0;
-	virtual bool isUniverseChanged() const = 0;
 
 protected:
 	virtual ~WorldEditor() {}
