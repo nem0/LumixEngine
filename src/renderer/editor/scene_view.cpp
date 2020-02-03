@@ -599,14 +599,14 @@ void SceneView::handleEvents() {
 					}
 					ImGui::ResetActiveID();
 					if (event.mouse_button.down) {
-						m_editor.onMouseDown((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
+						m_editor.getView().onMouseDown((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 					}
 					else {
-						m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
+						m_editor.getView().onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 					}
 				}
 				else if (!event.mouse_button.down) {
-					m_editor.onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
+					m_editor.getView().onMouseUp((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 				}
 				break;
 			}
@@ -616,7 +616,7 @@ void SceneView::handleEvents() {
 					Vec2 rel_mp = {(float)cp.x, (float)cp.y};
 					rel_mp.x -= m_screen_x;
 					rel_mp.y -= m_screen_y;
-					m_editor.onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.mouse_move.xrel, (int)event.mouse_move.yrel);
+					m_editor.getView().onMouseMove((int)rel_mp.x, (int)rel_mp.y, (int)event.mouse_move.xrel, (int)event.mouse_move.yrel);
 				}
 				break;
 		}
@@ -669,7 +669,7 @@ void SceneView::onWindowGUI()
 		m_editor.getView().setViewport(vp);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
-		m_editor.inputFrame();
+		m_editor.getView().inputFrame();
 
 		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
 		if (size.x > 0 && size.y > 0) {
@@ -707,7 +707,7 @@ void SceneView::onWindowGUI()
 		}
 	}
 	else {
-		m_editor.inputFrame();
+		m_editor.getView().inputFrame();
 	}
 
 	if (m_is_mouse_captured && OS::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) {

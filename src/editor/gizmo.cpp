@@ -155,7 +155,7 @@ struct GizmoImpl final : public Gizmo
 			switch (m_mode) {
 				case Mode::TRANSLATE:
 					if (m_is_dragging) {
-						const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, m_transform_axis);
+						const DVec3 intersection = getMousePlaneIntersection(m_editor.getView().getMousePos(), gizmo_tr, m_transform_axis);
 						const Vec3 delta_vec = (intersection - m_start_axis_point).toFloat();
 
 						StaticString<128> tmp("", delta_vec.x, "; ", delta_vec.y, "; ", delta_vec.z);
@@ -686,7 +686,7 @@ struct GizmoImpl final : public Gizmo
 		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
 		DVec3 origin;
 		Vec3 cursor_dir;
-		vp.getRay(m_editor.getMousePos(), origin, cursor_dir);
+		vp.getRay(m_editor.getView().getMousePos(), origin, cursor_dir);
 		
 		Axis axis = Axis::NONE;
 		switch(m_mode)
@@ -718,7 +718,7 @@ struct GizmoImpl final : public Gizmo
 
 		DVec3 origin;
 		Vec3 cursor_dir;
-		m_editor.getView().getViewport().getRay(m_editor.getMousePos(), origin, cursor_dir);
+		m_editor.getView().getViewport().getRay(m_editor.getView().getMousePos(), origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -807,7 +807,7 @@ struct GizmoImpl final : public Gizmo
 			default: ASSERT(false); return 0;
 		}
 
-		const DVec3 pos = getMousePlaneIntersection(m_editor.getMousePos(), tr, plane);
+		const DVec3 pos = getMousePlaneIntersection(m_editor.getView().getMousePos(), tr, plane);
 		const DVec3 start_pos = getMousePlaneIntersection(m_mouse_pos, tr, plane);
 		const Vec3 delta = (pos - tr.pos).toFloat().normalized();
 		const Vec3 start_delta = (start_pos - tr.pos).toFloat().normalized();
@@ -858,8 +858,8 @@ struct GizmoImpl final : public Gizmo
 	{
 		if (m_active < 0) return;
 
-		float relx = m_editor.getMousePos().x - m_mouse_pos.x;
-		float rely = m_editor.getMousePos().y - m_mouse_pos.y;
+		float relx = m_editor.getView().getMousePos().x - m_mouse_pos.x;
+		float rely = m_editor.getView().getMousePos().y - m_mouse_pos.y;
 
 		const Universe* universe = m_editor.getUniverse();
 		Array<DVec3> new_positions(m_editor.getAllocator());
@@ -874,7 +874,7 @@ struct GizmoImpl final : public Gizmo
 			default: ASSERT(false); break;
 		}
 		float angle = computeRotateAngle((int)relx, (int)rely);
-		m_mouse_pos = m_editor.getMousePos();
+		m_mouse_pos = m_editor.getView().getMousePos();
 
 		m_angle_accum += angle;
 		m_angle_accum = angleDiff(m_angle_accum, 0);
@@ -910,7 +910,7 @@ struct GizmoImpl final : public Gizmo
 	void scale()
 	{
 		RigidTransform gizmo_tr = getTransform(m_entities[m_active]);
-		const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, m_transform_axis);
+		const DVec3 intersection = getMousePlaneIntersection(m_editor.getView().getMousePos(), gizmo_tr, m_transform_axis);
 		const Vec3 delta_vec = (intersection - m_transform_point).toFloat();
 		float delta = delta_vec.length();
 		const Vec3 entity_to_intersection = (intersection - gizmo_tr.pos).toFloat();
@@ -946,7 +946,7 @@ struct GizmoImpl final : public Gizmo
 	void translate()
 	{
 		const RigidTransform tr = getTransform(m_entities[m_active]);
-		const DVec3 intersection = getMousePlaneIntersection(m_editor.getMousePos(), tr, m_transform_axis);
+		const DVec3 intersection = getMousePlaneIntersection(m_editor.getView().getMousePos(), tr, m_transform_axis);
 		Vec3 delta = (intersection - m_transform_point).toFloat();
 		if (!m_is_step || delta.length() > float(getStep()))
 		{
@@ -980,18 +980,18 @@ struct GizmoImpl final : public Gizmo
 
 	void transform()
 	{
-		if (m_active >= 0 && m_editor.isMouseClick(OS::MouseButton::LEFT))
+		if (m_active >= 0 && m_editor.getView().isMouseClick(OS::MouseButton::LEFT))
 		{
 			const RigidTransform gizmo_tr = getTransform(m_entities[m_active]);
-			m_transform_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, m_transform_axis);
+			m_transform_point = getMousePlaneIntersection(m_editor.getView().getMousePos(), gizmo_tr, m_transform_axis);
 			m_start_axis_point = m_transform_point;
-			m_start_plane_point = getMousePlaneIntersection(m_editor.getMousePos(), gizmo_tr, getPlane(m_transform_axis));
-			m_start_mouse_pos = m_editor.getMousePos();
+			m_start_plane_point = getMousePlaneIntersection(m_editor.getView().getMousePos(), gizmo_tr, getPlane(m_transform_axis));
+			m_start_mouse_pos = m_editor.getView().getMousePos();
 			m_angle_accum = 0;
 			m_is_dragging = true;
-			m_mouse_pos = m_editor.getMousePos();
+			m_mouse_pos = m_editor.getView().getMousePos();
 		}
-		else if (!m_editor.isMouseDown(OS::MouseButton::LEFT))
+		else if (!m_editor.getView().isMouseDown(OS::MouseButton::LEFT))
 		{
 			m_is_dragging = false;
 		}

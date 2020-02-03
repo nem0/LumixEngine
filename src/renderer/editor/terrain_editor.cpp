@@ -1451,7 +1451,7 @@ void TerrainEditor::onGUI()
 		return;
 	}
 
-	const Vec2 mp = m_world_editor.getMousePos();
+	const Vec2 mp = m_world_editor.getView().getMousePos();
 
 	for(auto entity : m_world_editor.getSelectedEntities()) {
 		if (!m_world_editor.getUniverse()->hasComponent(entity, TERRAIN_TYPE)) continue;
