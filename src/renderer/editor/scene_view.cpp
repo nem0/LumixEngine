@@ -588,7 +588,7 @@ void SceneView::handleEvents() {
 		const OS::Event& event = events[i];
 		switch (event.type) {
 			case OS::Event::Type::MOUSE_BUTTON: {
-				const OS::Point cp = OS::getMousePos(event.window);
+				const OS::Point cp = OS::getMouseScreenPos();
 				Vec2 rel_mp = { (float)cp.x, (float)cp.y };
 				rel_mp.x -= m_screen_x;
 				rel_mp.y -= m_screen_y;
@@ -612,7 +612,7 @@ void SceneView::handleEvents() {
 			}
 			case OS::Event::Type::MOUSE_MOVE: 
 				if (handle_input) {
-					const OS::Point cp = OS::getMousePos(event.window);
+					const OS::Point cp = OS::getMouseScreenPos();
 					Vec2 rel_mp = {(float)cp.x, (float)cp.y};
 					rel_mp.x -= m_screen_x;
 					rel_mp.y -= m_screen_y;
