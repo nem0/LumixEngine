@@ -215,8 +215,8 @@ struct UniverseViewImpl final : UniverseView {
 			}
 			break;
 			case MouseMode::NAVIGATE: {
-				const float yaw = -signum(x) * (powf(fabsf((float)x / m_mouse_sensitivity.x), 1.2f));
-				const float pitch = -signum(y) * (powf(fabsf((float)y / m_mouse_sensitivity.y), 1.2f));
+				const float yaw = -signum(relx) * (powf(fabsf((float)relx / m_mouse_sensitivity.x), 1.2f));
+				const float pitch = -signum(rely) * (powf(fabsf((float)rely / m_mouse_sensitivity.y), 1.2f));
 				rotateCamera(yaw, pitch);
 				break;
 			}
