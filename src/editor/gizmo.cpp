@@ -151,7 +151,7 @@ struct GizmoImpl final : public Gizmo
 		RenderInterface* ri = m_editor.getRenderInterface();
 		for (int i = 0; i < m_count; ++i) {
 			const RigidTransform gizmo_tr = getTransform(m_entities[i]);
-			const Vec2 p = m_editor.getViewport().worldToScreenPixels(gizmo_tr.pos);
+			const Vec2 p = m_editor.getView().getViewport().worldToScreenPixels(gizmo_tr.pos);
 			switch (m_mode) {
 				case Mode::TRANSLATE:
 					if (m_is_dragging) {
@@ -682,7 +682,7 @@ struct GizmoImpl final : public Gizmo
 	{
 		if (m_is_dragging) return;
 
-		const Viewport& vp = m_editor.getViewport();
+		const Viewport& vp = m_editor.getView().getViewport();
 		const Vec3 vp_dir = vp.rot * Vec3(0, 0, -1);
 		DVec3 origin;
 		Vec3 cursor_dir;
@@ -718,7 +718,7 @@ struct GizmoImpl final : public Gizmo
 
 		DVec3 origin;
 		Vec3 cursor_dir;
-		m_editor.getViewport().getRay(m_editor.getMousePos(), origin, cursor_dir);
+		m_editor.getView().getViewport().getRay(m_editor.getMousePos(), origin, cursor_dir);
 
 		m_transform_axis = Axis::NONE;
 		m_active = -1;
@@ -754,7 +754,7 @@ struct GizmoImpl final : public Gizmo
 
 	DVec3 getMousePlaneIntersection(const Vec2& mouse_pos, const RigidTransform& gizmo_tr, Axis transform_axis) const
 	{
-		const Viewport& vp = m_editor.getViewport();
+		const Viewport& vp = m_editor.getView().getViewport();
 		DVec3 origin;
 		Vec3 dir;
 		vp.getRay(mouse_pos, origin, dir);

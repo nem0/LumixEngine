@@ -1161,11 +1161,11 @@ public:
 	void copy() { m_editor->copyEntities(); }
 	void paste() { m_editor->pasteEntities(); }
 	void duplicate() { m_editor->duplicateEntities(); }
-	bool isOrbitCamera() { return m_editor->isOrbitCamera(); }
-	void toggleOrbitCamera() { m_editor->setOrbitCamera(!m_editor->isOrbitCamera()); }
-	void setTopView() { m_editor->setTopView(); }
-	void setFrontView() { m_editor->setFrontView(); }
-	void setSideView() { m_editor->setSideView(); }
+	bool isOrbitCamera() { return m_editor->getView().isOrbitCamera(); }
+	void toggleOrbitCamera() { m_editor->getView().setOrbitCamera(!m_editor->getView().isOrbitCamera()); }
+	void setTopView() { m_editor->getView().setTopView(); }
+	void setFrontView() { m_editor->getView().setFrontView(); }
+	void setSideView() { m_editor->getView().setSideView(); }
 	void setLocalCoordSystem() { m_editor->getGizmo().setLocalCoordSystem(); }
 	void setGlobalCoordSystem() { m_editor->getGizmo().setGlobalCoordSystem(); }
 	void setPivotOrigin() { m_editor->getGizmo().setPivotOrigin(); }
@@ -1174,8 +1174,8 @@ public:
 	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void setEditCamTransform() { m_is_edit_cam_transform_ui_open = !m_is_edit_cam_transform_ui_open; }
-	void lookAtSelected() { m_editor->lookAtSelected(); }
-	void copyViewTransform() { m_editor->copyViewTransform(); }
+	void lookAtSelected() { m_editor->getView().lookAtSelected(); }
+	void copyViewTransform() { m_editor->getView().copyTransform(); }
 	void toggleSettings() { m_settings.m_is_open = !m_settings.m_is_open; }
 	bool areSettingsOpen() const { return m_settings.m_is_open; }
 	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
@@ -1406,7 +1406,7 @@ public:
 		doMenuItem(*getAction("paste"), m_editor->canPasteEntities());
 		doMenuItem(*getAction("duplicate"), is_any_entity_selected);
 		ImGui::Separator();
-		doMenuItem(*getAction("orbitCamera"), is_any_entity_selected || m_editor->isOrbitCamera());
+		doMenuItem(*getAction("orbitCamera"), is_any_entity_selected || m_editor->getView().isOrbitCamera());
 		doMenuItem(*getAction("setTranslateGizmoMode"), true);
 		doMenuItem(*getAction("setRotateGizmoMode"), true);
 		doMenuItem(*getAction("setScaleGizmoMode"), true);
@@ -1660,14 +1660,14 @@ public:
 	{
 		if (!m_is_edit_cam_transform_ui_open) return;
 		if (ImGui::Begin("Edit camera")) {
-			Viewport vp = m_editor->getViewport();
+			Viewport vp = m_editor->getView().getViewport();
 			if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &vp.pos.x, 3, 1.f)) {
-				m_editor->setViewport(vp);
+				m_editor->getView().setViewport(vp);
 			}
 			Vec3 angles = vp.rot.toEuler();
 			if (ImGui::DragFloat3("Rotation", &angles.x, 0.01f)) {
 				vp.rot.fromEuler(angles);
-				m_editor->setViewport(vp);
+				m_editor->getView().setViewport(vp);
 			}
 		}
 		ImGui::End();

@@ -1111,7 +1111,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 	DVec3 origin;
 	Vec3 dir;
-	m_world_editor.getViewport().getRay({(float)x, (float)y}, origin, dir);
+	m_world_editor.getView().getViewport().getRay({(float)x, (float)y}, origin, dir);
 	RayCastModelHit hit = scene->castRayTerrain((EntityRef)m_component.entity, origin, dir);
 	if (hit.is_hit) {
 		bool is_terrain = m_world_editor.getUniverse()->hasComponent((EntityRef)hit.entity, TERRAIN_TYPE);
@@ -1459,7 +1459,7 @@ void TerrainEditor::onGUI()
 		RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 		DVec3 origin;
 		Vec3 dir;
-		m_world_editor.getViewport().getRay(mp, origin, dir);
+		m_world_editor.getView().getViewport().getRay(mp, origin, dir);
 		const RayCastModelHit hit = scene->castRayTerrain(entity, origin, dir);
 
 		if(hit.is_hit) {

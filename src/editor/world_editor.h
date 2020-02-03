@@ -48,6 +48,19 @@ struct IEditorCommand
 	virtual bool merge(IEditorCommand& command) = 0;
 };
 
+struct UniverseView {
+	virtual ~UniverseView() = default;
+	virtual const Viewport& getViewport() = 0;
+	virtual void setViewport(const Viewport& vp) = 0;
+	virtual void lookAtSelected() = 0;
+	virtual void setTopView() = 0;
+	virtual void setFrontView() = 0;
+	virtual void setSideView() = 0;
+	virtual bool isOrbitCamera() const = 0;
+	virtual void setOrbitCamera(bool enable) = 0;
+	virtual void moveCamera(float forward, float right, float up, float speed) = 0;
+	virtual void copyTransform() = 0;
+};
 
 class LUMIX_EDITOR_API WorldEditor
 {
@@ -95,8 +108,7 @@ public:
 	virtual Engine& getEngine() = 0;
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
-	virtual const Viewport& getViewport() const = 0;
-	virtual void setViewport(const Viewport& viewport) = 0;
+	virtual UniverseView& getView() = 0;
 	virtual class EditorIcons& getIcons() = 0;
 	virtual class Gizmo& getGizmo() = 0;
 	virtual bool canUndo() const = 0;
@@ -129,7 +141,6 @@ public:
 	virtual void setEntityName(EntityRef entity, const char* name) = 0;
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;
-	virtual void navigate(float forward, float right, float up, float speed) = 0;
 	virtual void setProperty(ComponentType component,
 		int index,
 		const Reflection::PropertyBase& property,
@@ -149,10 +160,6 @@ public:
 	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
 	virtual void onMouseUp(int x, int y, OS::MouseButton button) = 0;
 	virtual Vec2 getMousePos() const = 0;
-	virtual void copyViewTransform() = 0;
-	virtual void lookAtSelected() = 0;
-	virtual bool isOrbitCamera() const = 0;
-	virtual void setOrbitCamera(bool enable) = 0;
 	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(EntityRef entity) const = 0;
 	virtual void makeParent(EntityPtr parent, EntityRef child) = 0;
@@ -168,9 +175,6 @@ public:
 	virtual bool isMeasureToolActive() const = 0;
 	virtual double getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
-	virtual void setTopView() = 0;
-	virtual void setFrontView() = 0;
-	virtual void setSideView() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
 	virtual void makeRelative(Span<char> relative, const char* absolute) const = 0;
 	virtual void makeAbsolute(Span<char> absolute, const char* relative) const = 0;
