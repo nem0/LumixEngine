@@ -2548,7 +2548,6 @@ public:
 
 	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
-		, m_entity_selected(m_allocator)
 		, m_universe_destroyed(m_allocator)
 		, m_universe_created(m_allocator)
 		, m_selected_entities(m_allocator)
@@ -2567,7 +2566,6 @@ public:
 		, m_snap_mode(SnapMode::NONE)
 		, m_undo_index(-1)
 		, m_engine(engine)
-		, m_is_guid_pseudorandom(false)
         , m_game_mode_file(m_allocator)
 		, m_command_queue(m_allocator)
 		, m_view(*this)
@@ -2592,18 +2590,6 @@ public:
 
 		m_gizmo = Gizmo::create(*this);
 		m_editor_icons = EditorIcons::create(*this);
-
-		char command_line[2048];
-		OS::getCommandLine(Span(command_line));
-		CommandLineParser parser(command_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-pseudorandom_guid"))
-			{
-				m_is_guid_pseudorandom = true;
-				break;
-			}
-		}
 	}
 
 
@@ -2705,7 +2691,6 @@ public:
 		}
 
 		m_selected_entities.removeDuplicates();
-		m_entity_selected.invoke(m_selected_entities);
 	}
 
 
@@ -2733,12 +2718,6 @@ public:
 	DelegateList<void()>& universeCreated() override
 	{
 		return m_universe_created;
-	}
-
-
-	DelegateList<void(const Array<EntityRef>&)>& entitySelected() override
-	{
-		return m_entity_selected;
 	}
 
 
@@ -2892,41 +2871,44 @@ private:
 	};
 
 	IAllocator& m_allocator;
-	UniverseViewImpl m_view;
-	Gizmo* m_gizmo;
-	Array<EntityRef> m_selected_entities;
-	MouseMode m_mouse_mode;
-	Vec2 m_rect_selection_start;
-	EditorIcons* m_editor_icons;
-	Vec2 m_mouse_pos;
-	Vec2 m_mouse_sensitivity;
-	bool m_is_game_mode;
-	int m_game_mode_commands;
-	bool m_is_toggle_selection;
-	SnapMode m_snap_mode;
-	OutputMemoryStream m_game_mode_file;
 	Engine& m_engine;
-	EntityPtr m_selected_entity_on_game_mode;
-	DelegateList<void()> m_universe_destroyed;
-	DelegateList<void()> m_universe_created;
-	DelegateList<void(const Array<EntityRef>&)> m_entity_selected;
-	bool m_is_mouse_down[(int)OS::MouseButton::EXTENDED];
-	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED];
-
-	Array<Plugin*> m_plugins;
-	MeasureTool* m_measure_tool;
-	Plugin* m_mouse_handling_plugin;
+	RenderInterface* m_render_interface;
+	UniverseViewImpl m_view;
 	PrefabSystem* m_prefab_system;
+	Universe* m_universe;
+	bool m_is_loading;
+	bool m_is_universe_changed;
+	Array<Plugin*> m_plugins;
+	
 	Array<IEditorCommand*> m_undo_stack;
 	Array<IEditorCommand*> m_command_queue;
 	int m_undo_index;
-	OutputMemoryStream m_copy_buffer;
-	bool m_is_loading;
-	Universe* m_universe;
-	RenderInterface* m_render_interface;
 	u32 m_current_group_type;
-	bool m_is_universe_changed;
-	bool m_is_guid_pseudorandom;
+
+	Array<EntityRef> m_selected_entities;
+	EntityPtr m_selected_entity_on_game_mode;
+
+	Gizmo* m_gizmo;
+	EditorIcons* m_editor_icons;
+	MeasureTool* m_measure_tool;
+
+	MouseMode m_mouse_mode;
+	Vec2 m_mouse_pos;
+	Vec2 m_mouse_sensitivity;
+	bool m_is_mouse_down[(int)OS::MouseButton::EXTENDED];
+	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED];
+	Plugin* m_mouse_handling_plugin;
+	bool m_is_toggle_selection;
+	Vec2 m_rect_selection_start;
+
+	bool m_is_game_mode;
+	int m_game_mode_commands;
+	SnapMode m_snap_mode;
+	OutputMemoryStream m_game_mode_file;
+	DelegateList<void()> m_universe_destroyed;
+	DelegateList<void()> m_universe_created;
+
+	OutputMemoryStream m_copy_buffer;
 };
 
 
