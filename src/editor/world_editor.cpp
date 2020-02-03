@@ -38,10 +38,228 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 
 struct UniverseViewImpl final : UniverseView {
+	enum class MouseMode
+	{
+		NONE,
+		SELECT,
+		NAVIGATE,
+		PAN,
+
+		CUSTOM
+	};
+
+	enum class SnapMode
+	{
+		NONE,
+		FREE,
+		VERTEX
+	};
+
 	UniverseViewImpl(WorldEditor& editor) 
 		: m_editor(editor) 
 		, m_orbit_delta(0)
 	{}
+
+	void setSnapMode(bool enable, bool vertex_snap) override
+	{
+		m_snap_mode = enable ? (vertex_snap ? SnapMode::VERTEX : SnapMode::FREE) : SnapMode::NONE;
+	}
+
+	void previewSnapVertex()
+	{
+		if (m_snap_mode != SnapMode::VERTEX) return;
+
+		DVec3 origin;
+		Vec3 dir;
+		m_viewport.getRay(m_mouse_pos, origin, dir);
+		const WorldEditor::RayHit hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
+		if (!hit.is_hit) return;
+
+		const DVec3 snap_pos = getClosestVertex(hit);
+		m_editor.getRenderInterface()->addDebugCross(snap_pos, 1, 0xfff00fff);
+	}
+
+	Vec2 getMouseSensitivity() override
+	{
+		return m_mouse_sensitivity;
+	}
+
+	void setMouseSensitivity(float x, float y) override
+	{
+		m_mouse_sensitivity.x = 10000 / x;
+		m_mouse_sensitivity.y = 10000 / y;
+	}
+
+	void rectSelect()
+	{
+		Array<EntityRef> entities(m_editor.getAllocator());
+
+		Vec2 min = m_rect_selection_start;
+		Vec2 max = m_mouse_pos;
+		if (min.x > max.x) swap(min.x, max.x);
+		if (min.y > max.y) swap(min.y, max.y);
+		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
+		m_editor.getRenderInterface()->getRenderables(entities, frustum);
+		m_editor.selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
+	}
+
+	void onMouseUp(int x, int y, OS::MouseButton button) override
+	{
+		m_mouse_pos = {(float)x, (float)y};
+		if (m_mouse_mode == MouseMode::SELECT)
+		{
+			if (m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y)
+			{
+				rectSelect();
+			}
+			else
+			{
+				DVec3 origin;
+				Vec3 dir;
+				m_viewport.getRay(m_mouse_pos, origin, dir);
+				auto hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
+
+				const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
+				if (m_snap_mode != SnapMode::NONE && !selected_entities.empty() && hit.is_hit)
+				{
+					DVec3 snap_pos = origin + dir * hit.t;
+					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
+					const Quat rot = m_editor.getUniverse()->getRotation(selected_entities[0]);
+					const Vec3 offset = rot.rotate(m_editor.getGizmo().getOffset());
+					m_editor.snapEntities(snap_pos - offset);
+				}
+				else
+				{
+					auto icon_hit = m_editor.getIcons().raycast(origin, dir);
+					if (icon_hit.entity != INVALID_ENTITY)
+					{
+						if(icon_hit.entity.isValid()) {
+							EntityRef e = (EntityRef)icon_hit.entity;
+							m_editor.selectEntities(&e, 1, true);
+						}
+					}
+					else if (hit.is_hit)
+					{
+						if(hit.entity.isValid()) {
+							EntityRef entity = (EntityRef)hit.entity;
+							m_editor.selectEntities(&entity, 1, true);
+						}
+					}
+				}
+			}
+		}
+
+		m_is_mouse_down[(int)button] = false;
+		if (m_mouse_handling_plugin)
+		{
+			m_mouse_handling_plugin->onMouseUp(x, y, button);
+			m_mouse_handling_plugin = nullptr;
+		}
+		m_mouse_mode = MouseMode::NONE;
+	}
+
+	Vec2 getMousePos() const override { return m_mouse_pos; }
+	void setCustomPivot() override
+	{
+		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
+		if (selected_entities.empty()) return;
+
+		DVec3 origin;
+		Vec3 dir;		
+		m_viewport.getRay(m_mouse_pos, origin, dir);
+		auto hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
+		if (!hit.is_hit || hit.entity != selected_entities[0]) return;
+
+		const DVec3 snap_pos = getClosestVertex(hit);
+
+		const Transform tr = m_editor.getUniverse()->getTransform(selected_entities[0]);
+		m_editor.getGizmo().setOffset(tr.rot.conjugated() * (snap_pos - tr.pos).toFloat());
+	}
+
+	DVec3 getClosestVertex(const WorldEditor::RayHit& hit)
+	{
+		ASSERT(hit.is_hit);
+		return m_editor.getRenderInterface()->getClosestVertex(m_editor.getUniverse(), (EntityRef)hit.entity, hit.pos);
+	}
+
+	void inputFrame() override
+	{
+		for (auto& i : m_is_mouse_click) i = false;
+	}
+
+	bool isMouseClick(OS::MouseButton button) const override
+	{
+		return m_is_mouse_click[(int)button];
+	}
+
+	bool isMouseDown(OS::MouseButton button) const override
+	{
+		return m_is_mouse_down[(int)button];
+	}
+
+	void onMouseMove(int x, int y, int relx, int rely) override
+	{
+		PROFILE_FUNCTION();
+		m_mouse_pos.set((float)x, (float)y);
+		
+		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
+
+		switch (m_mouse_mode)
+		{
+			case MouseMode::CUSTOM:
+			{
+				if (m_mouse_handling_plugin)
+				{
+					m_mouse_handling_plugin->onMouseMove(x, y, relx, rely);
+				}
+			}
+			break;
+			case MouseMode::NAVIGATE: {
+				const float yaw = -signum(x) * (powf(fabsf((float)x / m_mouse_sensitivity.x), 1.2f));
+				const float pitch = -signum(y) * (powf(fabsf((float)y / m_mouse_sensitivity.y), 1.2f));
+				rotateCamera(yaw, pitch);
+				break;
+			}
+			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
+			case MouseMode::NONE:
+			case MouseMode::SELECT:
+				break;
+		}
+	}
+
+	void onMouseDown(int x, int y, OS::MouseButton button) override
+	{
+		m_is_mouse_click[(int)button] = true;
+		m_is_mouse_down[(int)button] = true;
+		if(button == OS::MouseButton::MIDDLE)
+		{
+			m_mouse_mode = MouseMode::PAN;
+		}
+		else if (button == OS::MouseButton::RIGHT)
+		{
+			m_mouse_mode = MouseMode::NAVIGATE;
+		}
+		else if (button == OS::MouseButton::LEFT)
+		{
+			DVec3 origin;
+			Vec3 dir;
+			m_viewport.getRay({(float)x, (float)y}, origin, dir);
+			const WorldEditor::RayHit hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
+			if (m_editor.getGizmo().isActive()) return;
+
+			for (WorldEditor::Plugin* plugin : m_editor.getPlugins())
+			{
+				if (plugin->onMouseDown(hit, x, y))
+				{
+					m_mouse_handling_plugin = plugin;
+					m_mouse_mode = MouseMode::CUSTOM;
+					return;
+				}
+			}
+			m_mouse_mode = MouseMode::SELECT;
+			m_rect_selection_start = {(float)x, (float)y};
+		}
+	}
 
 	const Viewport& getViewport() override { return m_viewport; }
 	void setViewport(const Viewport& vp) override { m_viewport = vp; }
@@ -179,6 +397,13 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void update() {
+		previewSnapVertex();
+		
+		if (m_is_mouse_down[(int)OS::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT) {
+			m_editor.getRenderInterface()->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
+			m_editor.getRenderInterface()->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
+		}
+
 		if (!m_go_to_parameters.m_is_active) return;
 
 		float t = easeInOut(m_go_to_parameters.m_t);
@@ -209,6 +434,15 @@ struct UniverseViewImpl final : UniverseView {
 	Vec2 m_orbit_delta;
 	WorldEditor& m_editor;
 	Viewport m_viewport;
+
+	MouseMode m_mouse_mode = MouseMode::NONE;
+	SnapMode m_snap_mode = SnapMode::NONE;
+	Vec2 m_mouse_pos;
+	Vec2 m_mouse_sensitivity{200, 200};
+	bool m_is_mouse_down[(int)OS::MouseButton::EXTENDED] = {};
+	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED] = {};
+	WorldEditor::Plugin* m_mouse_handling_plugin = nullptr;
+	Vec2 m_rect_selection_start;
 };
 
 struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
@@ -1540,29 +1774,6 @@ public:
 	}
 
 
-	void inputFrame() override
-	{
-		for (auto& i : m_is_mouse_click) i = false;
-	}
-
-
-	void previewSnapVertex()
-	{
-		if (m_snap_mode != SnapMode::VERTEX) return;
-
-		DVec3 origin;
-		Vec3 dir;
-		m_view.m_viewport.getRay(m_mouse_pos, origin, dir);
-		const RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-		//if (m_gizmo->isActive()) return;
-		if (!hit.is_hit) return;
-
-		const DVec3 snap_pos = getClosestVertex(hit);
-		m_render_interface->addDebugCross(snap_pos, 1, 0xfff00fff);
-		// TODO
-	}
-
-
 	void update() override
 	{
 		PROFILE_FUNCTION();
@@ -1577,7 +1788,6 @@ public:
 		}
 
 		m_view.update();
-		previewSnapVertex();
 		m_prefab_system->update();
 
 		if (!m_selected_entities.empty())
@@ -1585,11 +1795,6 @@ public:
 			m_gizmo->add(m_selected_entities[0]);
 		}
 
-		if (m_is_mouse_down[(int)OS::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT)
-		{
-			m_render_interface->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
-			m_render_interface->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
-		}
 
 		createEditorLines();
 		m_gizmo->update(m_view.m_viewport);
@@ -1614,19 +1819,7 @@ public:
 	}
 
 
-	bool isMouseClick(OS::MouseButton button) const override
-	{
-		return m_is_mouse_click[(int)button];
-	}
-
-
-	bool isMouseDown(OS::MouseButton button) const override
-	{
-		return m_is_mouse_down[(int)button];
-	}
-
-
-	void snapEntities(const DVec3& hit_pos)
+	void snapEntities(const DVec3& hit_pos) override
 	{
 		Array<DVec3> positions(m_allocator);
 		Array<Quat> rotations(m_allocator);
@@ -1680,41 +1873,6 @@ public:
 	}
 
 
-	void onMouseDown(int x, int y, OS::MouseButton button) override
-	{
-		m_is_mouse_click[(int)button] = true;
-		m_is_mouse_down[(int)button] = true;
-		if(button == OS::MouseButton::MIDDLE)
-		{
-			m_mouse_mode = MouseMode::PAN;
-		}
-		else if (button == OS::MouseButton::RIGHT)
-		{
-			m_mouse_mode = MouseMode::NAVIGATE;
-		}
-		else if (button == OS::MouseButton::LEFT)
-		{
-			DVec3 origin;
-			Vec3 dir;
-			m_view.m_viewport.getRay({(float)x, (float)y}, origin, dir);
-			const RayHit hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-			if (m_gizmo->isActive()) return;
-
-			for (int i = 0; i < m_plugins.size(); ++i)
-			{
-				if (m_plugins[i]->onMouseDown(hit, x, y))
-				{
-					m_mouse_handling_plugin = m_plugins[i];
-					m_mouse_mode = MouseMode::CUSTOM;
-					return;
-				}
-			}
-			m_mouse_mode = MouseMode::SELECT;
-			m_rect_selection_start = {(float)x, (float)y};
-		}
-	}
-
-
 	void addPlugin(Plugin& plugin) override { m_plugins.push(&plugin); }
 
 
@@ -1722,109 +1880,6 @@ public:
 	{
 		m_plugins.swapAndPopItem(&plugin);
 	}
-
-
-	void onMouseMove(int x, int y, int relx, int rely) override
-	{
-		PROFILE_FUNCTION();
-		m_mouse_pos.set((float)x, (float)y);
-		
-		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
-
-		switch (m_mouse_mode)
-		{
-			case MouseMode::CUSTOM:
-			{
-				if (m_mouse_handling_plugin)
-				{
-					m_mouse_handling_plugin->onMouseMove(x, y, relx, rely);
-				}
-			}
-			break;
-			case MouseMode::NAVIGATE: {
-				const float yaw = -signum(x) * (powf(fabsf((float)x / m_mouse_sensitivity.x), 1.2f));
-				const float pitch = -signum(y) * (powf(fabsf((float)y / m_mouse_sensitivity.y), 1.2f));
-				m_view.rotateCamera(yaw, pitch);
-				break;
-			}
-			case MouseMode::PAN: m_view.panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
-			case MouseMode::NONE:
-			case MouseMode::SELECT:
-				break;
-		}
-	}
-
-
-	void rectSelect()
-	{
-		Array<EntityRef> entities(m_allocator);
-
-		Vec2 min = m_rect_selection_start;
-		Vec2 max = m_mouse_pos;
-		if (min.x > max.x) swap(min.x, max.x);
-		if (min.y > max.y) swap(min.y, max.y);
-		const ShiftedFrustum frustum = m_view.m_viewport.getFrustum(min, max);
-		m_render_interface->getRenderables(entities, frustum);
-		selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
-	}
-
-
-	void onMouseUp(int x, int y, OS::MouseButton button) override
-	{
-		m_mouse_pos = {(float)x, (float)y};
-		if (m_mouse_mode == MouseMode::SELECT)
-		{
-			if (m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y)
-			{
-				rectSelect();
-			}
-			else
-			{
-				DVec3 origin;
-				Vec3 dir;
-				m_view.m_viewport.getRay(m_mouse_pos, origin, dir);
-				auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-
-				if (m_snap_mode != SnapMode::NONE && !m_selected_entities.empty() && hit.is_hit)
-				{
-					DVec3 snap_pos = origin + dir * hit.t;
-					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
-					const Quat rot = m_universe->getRotation(m_selected_entities[0]);
-					const Vec3 offset = rot.rotate(m_gizmo->getOffset());
-					snapEntities(snap_pos - offset);
-				}
-				else
-				{
-					auto icon_hit = m_editor_icons->raycast(origin, dir);
-					if (icon_hit.entity != INVALID_ENTITY)
-					{
-						if(icon_hit.entity.isValid()) {
-							EntityRef e = (EntityRef)icon_hit.entity;
-							selectEntities(&e, 1, true);
-						}
-					}
-					else if (hit.is_hit)
-					{
-						if(hit.entity.isValid()) {
-							EntityRef entity = (EntityRef)hit.entity;
-							selectEntities(&entity, 1, true);
-						}
-					}
-				}
-			}
-		}
-
-		m_is_mouse_down[(int)button] = false;
-		if (m_mouse_handling_plugin)
-		{
-			m_mouse_handling_plugin->onMouseUp(x, y, button);
-			m_mouse_handling_plugin = nullptr;
-		}
-		m_mouse_mode = MouseMode::NONE;
-	}
-
-
-	Vec2 getMousePos() const override { return m_mouse_pos; }
 
 
 	bool isUniverseChanged() const override { return m_is_universe_changed; }
@@ -1886,23 +1941,6 @@ public:
 	RenderInterface* getRenderInterface() override
 	{
 		return m_render_interface;
-	}
-
-
-	void setCustomPivot() override
-	{
-		if (m_selected_entities.empty()) return;
-
-		DVec3 origin;
-		Vec3 dir;		
-		m_view.m_viewport.getRay(m_mouse_pos, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-		if (!hit.is_hit || hit.entity != m_selected_entities[0]) return;
-
-		const DVec3 snap_pos = getClosestVertex(hit);
-
-		const Transform tr = m_universe->getTransform(m_selected_entities[0]);
-		m_gizmo->setOffset(tr.rot.conjugated() * (snap_pos - tr.pos).toFloat());
 	}
 
 
@@ -2531,12 +2569,9 @@ public:
 		, m_is_loading(false)
 		, m_universe(nullptr)
 		, m_is_toggle_selection(false)
-		, m_mouse_sensitivity(200, 200)
 		, m_render_interface(nullptr)
 		, m_selected_entity_on_game_mode(INVALID_ENTITY)
-		, m_mouse_handling_plugin(nullptr)
 		, m_is_game_mode(false)
-		, m_snap_mode(SnapMode::NONE)
 		, m_undo_index(-1)
 		, m_engine(engine)
         , m_game_mode_file(m_allocator)
@@ -2553,9 +2588,6 @@ public:
 		m_view.m_viewport.near = 0.1f;
 		m_view.m_viewport.far = 100000.f;
 
-		for (auto& i : m_is_mouse_down) i = false;
-		for (auto& i : m_is_mouse_click) i = false;
-		
 		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
 		addPlugin(*m_measure_tool);
 
@@ -2575,12 +2607,6 @@ public:
 	const Array<EntityRef>& getSelectedEntities() const override
 	{
 		return m_selected_entities;
-	}
-
-
-	void setSnapMode(bool enable, bool vertex_snap) override
-	{
-		m_snap_mode = enable ? (vertex_snap ? SnapMode::VERTEX : SnapMode::FREE) : SnapMode::NONE;
 	}
 
 
@@ -2621,20 +2647,6 @@ public:
 			*this, entities, count, component_type, index, property, data, size);
 		executeCommand(command);
 	}
-
-
-	Vec2 getMouseSensitivity() override
-	{
-		return m_mouse_sensitivity;
-	}
-
-
-	void setMouseSensitivity(float x, float y) override
-	{
-		m_mouse_sensitivity.x = 10000 / x;
-		m_mouse_sensitivity.y = 10000 / y;
-	}
-
 
 	void selectEntities(const EntityRef* entities, int count, bool toggle) override
 	{
@@ -2824,25 +2836,9 @@ public:
 		return count;
 	}
 
+	Span<Plugin*> getPlugins() override { return m_plugins; }
 
 private:
-	enum class MouseMode
-	{
-		NONE,
-		SELECT,
-		NAVIGATE,
-		PAN,
-
-		CUSTOM
-	};
-
-	enum class SnapMode
-	{
-		NONE,
-		FREE,
-		VERTEX
-	};
-
 	IAllocator& m_allocator;
 	Engine& m_engine;
 	RenderInterface* m_render_interface;
@@ -2865,18 +2861,10 @@ private:
 	EditorIcons* m_editor_icons;
 	MeasureTool* m_measure_tool;
 
-	MouseMode m_mouse_mode;
-	Vec2 m_mouse_pos;
-	Vec2 m_mouse_sensitivity;
-	bool m_is_mouse_down[(int)OS::MouseButton::EXTENDED];
-	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED];
-	Plugin* m_mouse_handling_plugin;
 	bool m_is_toggle_selection;
-	Vec2 m_rect_selection_start;
 
 	bool m_is_game_mode;
 	int m_game_mode_commands;
-	SnapMode m_snap_mode;
 	OutputMemoryStream m_game_mode_file;
 	DelegateList<void()> m_universe_destroyed;
 	DelegateList<void()> m_universe_created;

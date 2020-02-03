@@ -60,6 +60,18 @@ struct UniverseView {
 	virtual void setOrbitCamera(bool enable) = 0;
 	virtual void moveCamera(float forward, float right, float up, float speed) = 0;
 	virtual void copyTransform() = 0;
+
+	virtual bool isMouseDown(OS::MouseButton button) const = 0;
+	virtual bool isMouseClick(OS::MouseButton button) const = 0;
+	virtual void inputFrame() = 0;
+	virtual void onMouseDown(int x, int y, OS::MouseButton button) = 0;
+	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
+	virtual void onMouseUp(int x, int y, OS::MouseButton button) = 0;
+	virtual Vec2 getMousePos() const = 0;
+	virtual void setMouseSensitivity(float x, float y) = 0;
+	virtual Vec2 getMouseSensitivity() = 0;
+	virtual void setCustomPivot() = 0;
+	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
 };
 
 class LUMIX_EDITOR_API WorldEditor
@@ -106,6 +118,7 @@ public:
 	virtual UniverseView& getView() = 0;
 	virtual class EditorIcons& getIcons() = 0;
 	virtual class Gizmo& getGizmo() = 0;
+	virtual Span<Plugin*> getPlugins() = 0;
 	
 	// commands
 	virtual void beginCommandGroup(u32 type) = 0;
@@ -159,20 +172,8 @@ public:
 	virtual void newUniverse() = 0;
 	virtual void snapDown() = 0;
 	virtual void toggleGameMode() = 0;
-	virtual void setCustomPivot() = 0;
 	virtual void setToggleSelection(bool is_toggle) = 0;
-	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
 	
-	virtual bool isMouseDown(OS::MouseButton button) const = 0;
-	virtual bool isMouseClick(OS::MouseButton button) const = 0;
-	virtual void inputFrame() = 0;
-	virtual void onMouseDown(int x, int y, OS::MouseButton button) = 0;
-	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
-	virtual void onMouseUp(int x, int y, OS::MouseButton button) = 0;
-	virtual Vec2 getMousePos() const = 0;
-	virtual void setMouseSensitivity(float x, float y) = 0;
-	virtual Vec2 getMouseSensitivity() = 0;
-
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 
@@ -184,6 +185,7 @@ public:
 	virtual double getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
+	virtual void snapEntities(const DVec3& hit_pos) = 0;
 
 	virtual bool isGameMode() const = 0;
 

@@ -199,7 +199,7 @@ public:
 			case OS::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
 				m_editor->setToggleSelection(io.KeyCtrl);
-				m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
+				m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 				if (handle_input || !event.mouse_button.down) {
 					io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
 				}
@@ -836,14 +836,14 @@ public:
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (!io.KeyShift) {
-			m_editor->setSnapMode(false, false);
+			m_editor->getView().setSnapMode(false, false);
 		}
 		else if (io.KeyCtrl) {
-			m_editor->setSnapMode(io.KeyShift, io.KeyCtrl);
+			m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 		}
-		if (m_custom_pivot_action->isActive()) m_editor->setCustomPivot();
+		if (m_custom_pivot_action->isActive()) m_editor->getView().setCustomPivot();
 
-		m_editor->setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
+		m_editor->getView().setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
 		m_engine->update(*m_editor->getUniverse());
 
@@ -1763,7 +1763,7 @@ public:
 		m_settings.m_is_log_open = m_log_ui->m_is_open;
 		m_settings.m_is_profiler_open = m_profiler_ui->m_is_open;
 		m_settings.m_is_properties_open = m_property_grid->m_is_open;
-		m_settings.m_mouse_sensitivity = m_editor->getMouseSensitivity();
+		m_settings.m_mouse_sensitivity = m_editor->getView().getMouseSensitivity();
 
 		for (auto* i : m_gui_plugins) {
 			i->onBeforeSettingsSaved();
