@@ -1954,33 +1954,6 @@ public:
 	}
 
 
-	void makeAbsolute(Span<char> absolute, const char* relative) const override
-	{
-		bool is_absolute = relative[0] == '\\' || relative[0] == '/';
-		is_absolute = is_absolute || (relative[0] != 0 && relative[1] == ':');
-
-		if (is_absolute)
-		{
-			copyString(absolute, relative);
-			return;
-		}
-
-		copyString(absolute, m_engine.getFileSystem().getBasePath());
-		catString(absolute, relative);
-	}
-
-
-	void makeRelative(Span<char> relative, const char* absolute) const override
-	{
-		const char* base_path = m_engine.getFileSystem().getBasePath();
-		if (startsWith(absolute, base_path)) {
-			copyString(relative, absolute + stringLength(base_path));
-			return;
-		}
-		copyString(relative, absolute);
-	}
-
-
 	EntityRef addEntity() override
 	{
 		return addEntityAt(m_view.m_viewport.w >> 1, m_view.m_viewport.h >> 1);

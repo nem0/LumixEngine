@@ -184,8 +184,6 @@ public:
 	virtual double getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
 	virtual class MeasureTool* getMeasureTool() const = 0;
-	virtual void makeRelative(Span<char> relative, const char* absolute) const = 0;
-	virtual void makeAbsolute(Span<char> absolute, const char* relative) const = 0;
 
 	virtual bool isGameMode() const = 0;
 

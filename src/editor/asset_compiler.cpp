@@ -83,32 +83,32 @@ struct AssetCompilerImpl : AssetCompiler
 	AssetCompilerImpl(StudioApp& app) 
 		: m_app(app)
 		, m_load_hook(*this)
-		, m_plugins(app.getWorldEditor().getAllocator())
-		, m_task(*this, app.getWorldEditor().getAllocator())
-		, m_to_compile(app.getWorldEditor().getAllocator())
-		, m_compiled(app.getWorldEditor().getAllocator())
+		, m_plugins(app.getAllocator())
+		, m_task(*this, app.getAllocator())
+		, m_to_compile(app.getAllocator())
+		, m_compiled(app.getAllocator())
 		, m_semaphore(0, 0x7fFFffFF)
-		, m_registered_extensions(app.getWorldEditor().getAllocator())
-		, m_resources(app.getWorldEditor().getAllocator())
-		, m_to_compile_subresources(app.getWorldEditor().getAllocator())
-		, m_dependencies(app.getWorldEditor().getAllocator())
-		, m_changed_files(app.getWorldEditor().getAllocator())
+		, m_registered_extensions(app.getAllocator())
+		, m_resources(app.getAllocator())
+		, m_to_compile_subresources(app.getAllocator())
+		, m_dependencies(app.getAllocator())
+		, m_changed_files(app.getAllocator())
 	{
-		FileSystem& fs = app.getWorldEditor().getEngine().getFileSystem();
-		m_watcher = FileSystemWatcher::create(fs.getBasePath(), app.getWorldEditor().getAllocator());
+		FileSystem& fs = app.getEngine().getFileSystem();
+		m_watcher = FileSystemWatcher::create(fs.getBasePath(), app.getAllocator());
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
 		m_task.create("Asset compiler", true);
-		const char* base_path = m_app.getWorldEditor().getEngine().getFileSystem().getBasePath();
+		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
 		OS::makePath(path);
-		ResourceManagerHub& rm = app.getWorldEditor().getEngine().getResourceManager();
+		ResourceManagerHub& rm = app.getEngine().getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 	}
 
 	~AssetCompilerImpl()
 	{
 		OS::OutputFile file;
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.open(".lumix/assets/_list.txt_tmp", Ref(file))) {
 			file << "resources = {\n";
 			for (const ResourceItem& ri : m_resources) {
@@ -138,7 +138,7 @@ struct AssetCompilerImpl : AssetCompiler
 		m_to_compile.emplace();
 		m_semaphore.signal();
 		m_task.destroy();
-		ResourceManagerHub& rm = m_app.getWorldEditor().getEngine().getResourceManager();
+		ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
 		rm.setLoadHook(nullptr);
 		FileSystemWatcher::destroy(m_watcher);
 	}
@@ -146,7 +146,7 @@ struct AssetCompilerImpl : AssetCompiler
 	bool copyCompile(const Path& src) override {
 		const StaticString<MAX_PATH_LENGTH> dst(".lumix/assets/", src.getHash(), ".res");
 
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		return fs.copyFile(src.c_str(), dst);
 	}
 
@@ -154,7 +154,7 @@ struct AssetCompilerImpl : AssetCompiler
 		char normalized[MAX_PATH_LENGTH];
 		PathUtils::normalize(locator, Span(normalized));
 		const u32 hash = crc32(normalized);
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		StaticString<MAX_PATH_LENGTH> out_path(".lumix/assets/", hash, ".res");
 		OS::OutputFile file;
 		if(!fs.open(out_path, Ref(file))) {
@@ -234,7 +234,7 @@ struct AssetCompilerImpl : AssetCompiler
 	
 	void processDir(const char* dir, u64 list_last_modified)
 	{
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		auto* iter = fs.createFileIterator(dir);
 		OS::FileInfo info;
 		while (getNextFile(iter, &info))
@@ -276,7 +276,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		auto iter = m_dependencies.find(dependency);
 		if (!iter.isValid()) {
-			IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+			IAllocator& allocator = m_app.getAllocator();
 			m_dependencies.insert(dependency, Array<Path>(allocator));
 			iter = m_dependencies.find(dependency);
 		}
@@ -287,10 +287,10 @@ struct AssetCompilerImpl : AssetCompiler
 	void onInitFinished() override
 	{
 		OS::InputFile file;
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const StaticString<MAX_PATH_LENGTH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
 		if (fs.open(".lumix/assets/_list.txt", Ref(file))) {
-			Array<char> content(m_app.getWorldEditor().getAllocator());
+			Array<char> content(m_app.getAllocator());
 			content.resize((int)file.size());
 			file.read(content.begin(), content.byte_size());
 			file.close();
@@ -333,7 +333,7 @@ struct AssetCompilerImpl : AssetCompiler
 					}
 					
 					const char* key = lua_tostring(L, -2);
-					IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+					IAllocator& allocator = m_app.getAllocator();
 					const Path key_path(key);
 					m_dependencies.insert(key_path, Array<Path>(allocator));
 					Array<Path>& values = m_dependencies.find(key_path).value();
@@ -354,13 +354,13 @@ struct AssetCompilerImpl : AssetCompiler
 		const u64 list_last_modified = OS::getLastModified(list_path);
 		processDir("", list_last_modified);
 
-		registerLuaAPI(m_app.getWorldEditor().getEngine().getState());
+		registerLuaAPI(m_app.getEngine().getState());
 	}
 
 
 	Array<Path> removeResource(const char* path)
 	{
-		Array<Path> res(m_app.getWorldEditor().getAllocator());
+		Array<Path> res(m_app.getAllocator());
 
 		MT::CriticalSectionLock lock(m_resources_mutex);
 		m_resources.eraseIf([&](const ResourceItem& ri){
@@ -380,7 +380,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void reloadSubresources(const Array<Path>& subresources)
 	{
-		ResourceManagerHub& rman = m_app.getWorldEditor().getEngine().getResourceManager();
+		ResourceManagerHub& rman = m_app.getEngine().getResourceManager();
 		for (const Path& p : subresources) {
 			rman.reload(p);
 		}
@@ -400,10 +400,10 @@ struct AssetCompilerImpl : AssetCompiler
 		OS::InputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
 		
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.open(meta_path, Ref(file))) return false;
 
-		Array<char> buf(m_app.getWorldEditor().getAllocator());
+		Array<char> buf(m_app.getAllocator());
 		buf.resize((int)file.size());
 		const bool read_all = file.read(buf.begin(), buf.byte_size());
 		file.close();
@@ -436,7 +436,7 @@ struct AssetCompilerImpl : AssetCompiler
 		OS::OutputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
 				
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.open(meta_path, Ref(file))) {
 			logError("Editor") << "Could not create " << meta_path;
 			return;
@@ -482,7 +482,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		const char* filepath = getResourceFilePath(res.getPath().c_str());
 
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 		if (startsWith(filepath, ".lumix/assets/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
@@ -504,7 +504,7 @@ struct AssetCompilerImpl : AssetCompiler
 				++m_compile_batch_count;
 				++m_batch_remaining_count;
 				m_semaphore.signal();
-				IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+				IAllocator& allocator = m_app.getAllocator();
 				m_to_compile_subresources.insert(path, Array<Resource*>(allocator));
 				iter = m_to_compile_subresources.find(path);
 			}
@@ -715,14 +715,14 @@ int AssetCompilerTask::task()
 
 AssetCompiler* AssetCompiler::create(StudioApp& app)
 {
-	return LUMIX_NEW(app.getWorldEditor().getAllocator(), AssetCompilerImpl)(app);
+	return LUMIX_NEW(app.getAllocator(), AssetCompilerImpl)(app);
 }
 
 
 void AssetCompiler::destroy(AssetCompiler& compiler)
 {
 	AssetCompilerImpl& impl = (AssetCompilerImpl&)compiler;
-	IAllocator& allocator = impl.m_app.getWorldEditor().getAllocator();
+	IAllocator& allocator = impl.m_app.getAllocator();
 	LUMIX_DELETE(allocator, &compiler);
 }
 

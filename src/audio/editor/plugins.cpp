@@ -46,7 +46,7 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 	{
 		if (m_playing_clip < 0) return;
 
-		getAudioDevice(m_app.getWorldEditor().getEngine()).stop(m_playing_clip);
+		getAudioDevice(m_app.getEngine()).stop(m_playing_clip);
 		m_playing_clip = -1;
 	}
 
@@ -60,7 +60,7 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 
 		auto* clip = static_cast<Clip*>(resources[0]);
 		ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
-		auto& device = getAudioDevice(m_app.getWorldEditor().getEngine());
+		auto& device = getAudioDevice(m_app.getEngine());
 
 		if (m_playing_clip >= 0)
 		{
@@ -96,7 +96,7 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (type == Clip::TYPE) return fs.copyFile("models/editor/tile_audio.dds", out_path);
 		return false;
 	}
@@ -115,7 +115,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 	{
 		m_filter[0] = 0;
 		m_is_open = false;
-		Action* action = LUMIX_NEW(app.getWorldEditor().getAllocator(), Action)("Clip manager", "Toggle clip manager", "clip_manager");
+		Action* action = LUMIX_NEW(app.getAllocator(), Action)("Clip manager", "Toggle clip manager", "clip_manager");
 		action->func.bind<&ClipManagerUI::onAction>(this);
 		action->is_selected.bind<&ClipManagerUI::isOpen>(this);
 		app.addWindowAction(action);
@@ -275,8 +275,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("echo_zone", "Audio / Echo zone");
 		m_app.registerComponent("chorus_zone", "Audio / Chorus zone");
 
-		WorldEditor& editor = m_app.getWorldEditor();
-		IAllocator& allocator = editor.getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 
 		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(m_app);
 		m_app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
@@ -284,6 +283,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_clip_manager_ui = LUMIX_NEW(allocator, ClipManagerUI)(m_app);
 		m_app.addPlugin(*m_clip_manager_ui);
 
+		WorldEditor& editor = m_app.getWorldEditor();
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
 		editor.addPlugin(*m_gizmo_plugin);
 	}
@@ -291,8 +291,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		WorldEditor& editor = m_app.getWorldEditor();
-		IAllocator& allocator = editor.getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 
 		m_app.getAssetBrowser().removePlugin(*m_asset_browser_plugin);
 		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
@@ -316,8 +315,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(audio)
 {
-	WorldEditor& editor = app.getWorldEditor();
-	IAllocator& allocator = editor.getAllocator();
-
+	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }
