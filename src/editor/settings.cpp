@@ -180,11 +180,11 @@ bool Settings::load()
 {
 	auto L = m_state;
 	OS::InputFile file;
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const bool has_settings = fs.fileExists(SETTINGS_PATH);
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
 	
-	Array<u8> buf(m_app.getWorldEditor().getAllocator());
+	Array<u8> buf(m_app.getAllocator());
 	if (!fs.getContentSync(Path(path), Ref(buf))) {
 		logError("Editor") << "Failed to open " << path;
 		return false;
@@ -311,7 +311,7 @@ bool Settings::save()
 {
 	auto& actions = m_app.getActions();
 	OS::OutputFile file;
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (!fs.open(SETTINGS_PATH, Ref(file))) return false;
 
 	file << "window = { x = " << m_window.x 

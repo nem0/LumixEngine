@@ -222,7 +222,7 @@ public:
 	GUIEditor(StudioApp& app)
 		: m_app(app)
 	{
-		IAllocator& allocator = app.getWorldEditor().getAllocator();
+		IAllocator& allocator = app.getAllocator();
 
 		Action* action = LUMIX_NEW(allocator, Action)("GUI Editor", "Toggle gui editor", "gui_editor");
 		action->func.bind<&GUIEditor::onAction>(this);
@@ -781,7 +781,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("gui_render_target", "GUI / Render target");
 		m_app.registerComponent("gui_text", "GUI / Text");
 
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 		m_gui_editor = LUMIX_NEW(allocator, GUIEditor)(m_app);
 		m_app.addPlugin(*m_gui_editor);
 
@@ -792,7 +792,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 		m_app.removePlugin(*m_gui_editor);
 		LUMIX_DELETE(allocator, m_gui_editor);
 
@@ -813,6 +813,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(gui)
 {
-	IAllocator& allocator = app.getWorldEditor().getAllocator();
+	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }

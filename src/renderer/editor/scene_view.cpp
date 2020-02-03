@@ -42,7 +42,7 @@ static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_
 
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
-	, m_drop_handlers(app.getWorldEditor().getAllocator())
+	, m_drop_handlers(app.getAllocator())
 	, m_log_ui(app.getLogUI())
 	, m_editor(m_app.getWorldEditor())
 {

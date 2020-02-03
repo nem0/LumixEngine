@@ -988,9 +988,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("vehicle", "Physics / Vehicle");
 		m_app.registerComponent("wheel", "Physics / Wheel");
 
-		WorldEditor& editor = m_app.getWorldEditor();
-		IAllocator& allocator = editor.getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 
+		WorldEditor& editor = m_app.getWorldEditor();
 		m_ui_plugin = LUMIX_NEW(allocator, PhysicsUIPlugin)(m_app);
 		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
 		m_geom_plugin = LUMIX_NEW(allocator, PhysicsGeometryPlugin)(m_app);
@@ -1007,7 +1007,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
 		m_app.getAssetBrowser().removePlugin(*m_geom_plugin);
 
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 		LUMIX_DELETE(allocator, m_ui_plugin);
 		LUMIX_DELETE(allocator, m_gizmo_plugin);
 		LUMIX_DELETE(allocator, m_geom_plugin);
@@ -1029,7 +1029,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(physics)
 {
-	IAllocator& allocator = app.getWorldEditor().getAllocator();
+	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }
 

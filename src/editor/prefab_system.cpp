@@ -609,7 +609,7 @@ static AssetBrowserPlugin* ab_plugin = nullptr;
 
 void PrefabSystem::createEditorPlugins(StudioApp& app, PrefabSystem& system)
 {
-	ab_plugin = LUMIX_NEW(app.getWorldEditor().getAllocator(), AssetBrowserPlugin)(app, system);
+	ab_plugin = LUMIX_NEW(app.getAllocator(), AssetBrowserPlugin)(app, system);
 	app.getAssetBrowser().addPlugin(*ab_plugin);
 	const char* extensions[] = { "fab", nullptr };
 	app.getAssetCompiler().addPlugin(*ab_plugin, extensions);
@@ -620,7 +620,7 @@ void PrefabSystem::destroyEditorPlugins(StudioApp& app)
 {
 	app.getAssetBrowser().removePlugin(*ab_plugin);
 	app.getAssetCompiler().removePlugin(*ab_plugin);
-	LUMIX_DELETE(app.getWorldEditor().getAllocator(), ab_plugin);
+	LUMIX_DELETE(app.getAllocator(), ab_plugin);
 	ab_plugin = nullptr;
 }
 

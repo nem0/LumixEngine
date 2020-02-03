@@ -69,10 +69,10 @@ struct TarHeader {
 struct LuaPlugin : public StudioApp::GUIPlugin
 {
 	LuaPlugin(StudioApp& app, const char* src, const char* filename)
-		: editor(app.getWorldEditor())
+		: app(app)
 	{
-		L = lua_newthread(editor.getEngine().getState());						 // [thread]
-		thread_ref = luaL_ref(editor.getEngine().getState(), LUA_REGISTRYINDEX); // []
+		L = lua_newthread(app.getEngine().getState());						 // [thread]
+		thread_ref = luaL_ref(app.getEngine().getState(), LUA_REGISTRYINDEX); // []
 
 		lua_newtable(L);						  // [env]
 												  // reference environment
@@ -105,7 +105,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 
 		lua_pop(L, 2); // []
 
-		Action* action = LUMIX_NEW(editor.getAllocator(), Action)(name, name, name);
+		Action* action = LUMIX_NEW(app.getAllocator(), Action)(name, name, name);
 		action->func.bind<&LuaPlugin::onAction>(this);
 		app.addWindowAction(action);
 		m_is_open = false;
@@ -116,7 +116,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 
 	~LuaPlugin()
 	{
-		lua_State* L = editor.getEngine().getState();
+		lua_State* L = app.getEngine().getState();
 		luaL_unref(L, LUA_REGISTRYINDEX, env_ref);
 		luaL_unref(L, LUA_REGISTRYINDEX, thread_ref);
 	}
@@ -146,7 +146,7 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 		}
 	}
 
-	WorldEditor& editor;
+	StudioApp& app;
 	lua_State* L;
 	int thread_ref;
 	int env_ref;
@@ -1897,7 +1897,7 @@ public:
 
 		const int dpi = OS::getDPI();
 		float font_scale = dpi / 96.f;
-		FileSystem& fs = getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_engine->getFileSystem();
 		
 		Array<u8> ini_data(m_allocator);
 		if (fs.getContentSync(Path("imgui.ini"), Ref(ini_data))) {
@@ -3098,6 +3098,8 @@ public:
 		}
 	}
 
+	IAllocator& getAllocator() override { return m_allocator; }
+	Engine& getEngine() override { return *m_engine; }
 
 	WorldEditor& getWorldEditor() override
 	{

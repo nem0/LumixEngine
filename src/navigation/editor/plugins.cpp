@@ -7,6 +7,7 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/universe/universe.h"
 #include "navigation/navigation_scene.h"
@@ -63,11 +64,12 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			scene->generateNavmesh((EntityRef)cmp.entity);
 		}
 		ImGui::SameLine();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (ImGui::Button("Load")) {
 			char path[MAX_PATH_LENGTH];
 			if (OS::getOpenFilename(Span(path), "Navmesh\0*.nav\0", nullptr)) {
 				char rel[MAX_PATH_LENGTH];
-				m_app.getWorldEditor().makeRelative(Span(rel), path);
+				fs.makeRelative(Span(rel), path);
 				scene->load((EntityRef)cmp.entity, rel);
 			}		
 		}
@@ -78,7 +80,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 				char path[MAX_PATH_LENGTH];
 				if (OS::getSaveFilename(Span(path), "Navmesh\0*.nav\0", "nav")) {
 					char rel[MAX_PATH_LENGTH];
-					m_app.getWorldEditor().makeRelative(Span(rel), path);
+					fs.makeRelative(Span(rel), path);
 					scene->save((EntityRef)cmp.entity, rel);
 				}
 			}
@@ -158,7 +160,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{}
 	
 	void init() override {
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 
 		m_zone_pg_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(m_app);
 		m_app.getPropertyGrid().addPlugin(*m_zone_pg_plugin);
@@ -172,7 +174,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	~StudioAppPlugin() {
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 		
 		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
 
@@ -196,7 +198,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(navigation)
 {
-	IAllocator& allocator = app.getWorldEditor().getAllocator();
+	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }
 

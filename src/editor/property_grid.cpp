@@ -26,7 +26,7 @@ PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
 	, m_is_open(true)
 	, m_editor(app.getWorldEditor())
-	, m_plugins(app.getWorldEditor().getAllocator())
+	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
 	m_component_filter[0] = '\0';

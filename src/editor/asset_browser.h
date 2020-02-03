@@ -103,7 +103,6 @@ private:
 	HashMap<ResourceType, IPlugin*> m_plugins;
 	Array<Resource*> m_selected_resources;
 	int m_context_resource;
-	WorldEditor& m_editor;
 	char m_filter[128];
 	Path m_wanted_resource;
 	bool m_is_focus_requested;

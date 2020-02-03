@@ -1095,8 +1095,8 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 				}
 			}
 		}
-		meshes->free(m_app.getWorldEditor().getEngine().getPageAllocator());
-		mesh_groups->free(m_app.getWorldEditor().getEngine().getPageAllocator());
+		meshes->free(m_app.getEngine().getPageAllocator());
+		mesh_groups->free(m_app.getEngine().getPageAllocator());
 	}
 	m_world_editor.endCommandGroup();
 }

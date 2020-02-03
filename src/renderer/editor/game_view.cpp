@@ -62,7 +62,7 @@ GameView::GameView(StudioApp& app)
 	, m_gui_interface(nullptr)
 	, m_editor(app.getWorldEditor())
 {
-	Engine& engine = app.getWorldEditor().getEngine();
+	Engine& engine = app.getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 

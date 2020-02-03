@@ -28,23 +28,22 @@ bool AssetBrowser::IPlugin::createTile(const char* in_path, const char* out_path
 
 
 AssetBrowser::AssetBrowser(StudioApp& app)
-	: m_editor(app.getWorldEditor())
-	, m_selected_resources(app.getWorldEditor().getAllocator())
+	: m_selected_resources(app.getAllocator())
 	, m_is_focus_requested(false)
-	, m_history(app.getWorldEditor().getAllocator())
-	, m_plugins(app.getWorldEditor().getAllocator())
+	, m_history(app.getAllocator())
+	, m_plugins(app.getAllocator())
 	, m_app(app)
 	, m_is_open(false)
 	, m_show_thumbnails(true)
 	, m_history_index(-1)
-	, m_file_infos(app.getWorldEditor().getAllocator())
-	, m_filtered_file_infos(app.getWorldEditor().getAllocator())
-	, m_subdirs(app.getWorldEditor().getAllocator())
+	, m_file_infos(app.getAllocator())
+	, m_filtered_file_infos(app.getAllocator())
+	, m_subdirs(app.getAllocator())
 {
-	IAllocator& allocator = m_editor.getAllocator();
+	IAllocator& allocator = app.getAllocator();
 	m_filter[0] = '\0';
 
-	const char* base_path = m_editor.getEngine().getFileSystem().getBasePath();
+	const char* base_path = app.getEngine().getFileSystem().getBasePath();
 
 	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
 	OS::makePath(path);
@@ -306,7 +305,7 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	{
 		ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
 		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.fileExists(path))
 		{
 			if (fs.getLastModified(path) >= fs.getLastModified(tile.filepath))
@@ -332,7 +331,7 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 }
 
 void AssetBrowser::deleteTile(u32 idx) {
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (!fs.deleteFile(m_file_infos[idx].filepath)) {
 		logError("Editor") << "Failed to delete " << m_file_infos[idx].filepath;
 	}
@@ -398,7 +397,7 @@ void AssetBrowser::fileColumn()
 	}
 
 	bool open_delete_popup = false;
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	static char tmp[MAX_PATH_LENGTH] = "";
 	auto common_popup = [&](){
 		const char* base_path = fs.getBasePath();
@@ -710,10 +709,10 @@ static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 
 bool AssetBrowser::onDropFile(const char* path)
 {
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (OS::dirExists(path)) {
 		StaticString<MAX_PATH_LENGTH> tmp(fs.getBasePath(), "/", m_dir, "/");
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 		copyDir(path, tmp, allocator);
 	}
 	PathUtils::FileInfo fi(path);
@@ -724,7 +723,7 @@ bool AssetBrowser::onDropFile(const char* path)
 void AssetBrowser::selectResource(const Path& path, bool record_history, bool additive)
 {
 	m_is_focus_requested = true;
-	auto& manager = m_editor.getEngine().getResourceManager();
+	auto& manager = m_app.getEngine().getResourceManager();
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	const ResourceType type = compiler.getResourceType(path.c_str());
 	Resource* res = manager.load(type, path);
@@ -814,7 +813,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 
 OutputMemoryStream* AssetBrowser::beginSaveResource(Resource& resource)
 {
-	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	IAllocator& allocator = m_app.getAllocator();
 	return LUMIX_NEW(allocator, OutputMemoryStream)(allocator);
 }
 
@@ -823,21 +822,21 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 {
 	if (!success) return;
 	
-	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
 	OS::OutputFile f;
 	if (!fs.open(tmp_path, Ref(f)))
 	{
-		LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &stream);
+		LUMIX_DELETE(m_app.getAllocator(), &stream);
 		logError("Editor") << "Could not save file " << resource.getPath().c_str();
 		return;
 	}
 	f.write(stream.getData(), stream.getPos());
 	f.close();
-	LUMIX_DELETE(m_app.getWorldEditor().getAllocator(), &stream);
+	LUMIX_DELETE(m_app.getAllocator(), &stream);
 
-	auto& engine = m_app.getWorldEditor().getEngine();
+	auto& engine = m_app.getEngine();
 	StaticString<MAX_PATH_LENGTH> src_full_path;
 	StaticString<MAX_PATH_LENGTH> dest_full_path;
 	src_full_path.data[0] = 0;
@@ -857,12 +856,13 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	auto iter = m_plugins.find(type);
 	if (!iter.isValid()) return false;
 
+	FileSystem& fs = m_app.getEngine().getFileSystem();
 	IPlugin* plugin = iter.value();
 	if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New")) {
 		char full_path[MAX_PATH_LENGTH];
 		if (OS::getSaveFilename(Span(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
 			if (plugin->createResource(full_path)) {
-				m_editor.makeRelative(buf, full_path);
+				fs.makeRelative(buf, full_path);
 				return true;
 			}
 		}
@@ -914,7 +914,7 @@ void AssetBrowser::openInExternalEditor(Resource* resource) const
 
 void AssetBrowser::openInExternalEditor(const char* path) const
 {
-	StaticString<MAX_PATH_LENGTH> full_path(m_editor.getEngine().getFileSystem().getBasePath());
+	StaticString<MAX_PATH_LENGTH> full_path(m_app.getEngine().getFileSystem().getBasePath());
 	full_path << path;
 	const OS::ExecuteOpenResult res = OS::shellExecuteOpen(full_path);
 	if (res == OS::ExecuteOpenResult::NO_ASSOCIATION) {

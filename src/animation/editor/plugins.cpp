@@ -65,7 +65,7 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (type == Animation::TYPE) return fs.copyFile("models/editor/tile_animation.dds", out_path);
 		return false;
 	}
@@ -295,7 +295,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (type == Anim::Controller::TYPE) return fs.copyFile("models/editor/tile_animation_graph.dds", out_path);
 		return false;
 	}
@@ -334,7 +334,7 @@ struct AnimablePropertyGridPlugin : PropertyGrid::IPlugin
 
 		if (m_is_playing)
 		{
-			float time_delta = m_app.getWorldEditor().getEngine().getLastTimeDelta();
+			float time_delta = m_app.getEngine().getLastTimeDelta();
 			scene->updateAnimable(entity, time_delta);
 		}
 
@@ -389,7 +389,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponentWithResource("animator", "Animation / Animator", Anim::Controller::TYPE, *Reflection::getProperty(ANIMATOR_TYPE, "Source"));
 		m_app.registerComponent("shared_anim_controller", "Animation / Shared controller");
 
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 		m_animtion_plugin = LUMIX_NEW(allocator, AnimationAssetBrowserPlugin)(m_app);
 		m_prop_anim_plugin = LUMIX_NEW(allocator, PropertyAnimationAssetBrowserPlugin)(m_app);
 		m_anim_ctrl_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(m_app);
@@ -418,7 +418,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(*m_prop_anim_plugin);
 		asset_browser.removePlugin(*m_anim_ctrl_plugin);
 
-		IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
 		LUMIX_DELETE(allocator, m_animtion_plugin);
 		LUMIX_DELETE(allocator, m_prop_anim_plugin);
 		LUMIX_DELETE(allocator, m_anim_ctrl_plugin);
@@ -444,7 +444,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 LUMIX_STUDIO_ENTRY(animation)
 {
-	IAllocator& allocator = app.getWorldEditor().getAllocator();
+	IAllocator& allocator = app.getAllocator();
 	return LUMIX_NEW(allocator, StudioAppPlugin)(app);
 }
 

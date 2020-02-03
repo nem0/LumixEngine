@@ -23,8 +23,8 @@ namespace Lumix::Anim {
 ControllerEditor::ControllerEditor(StudioApp& app)
 	: m_app(app)
 {
-	IAllocator& allocator = app.getWorldEditor().getAllocator();
-	ResourceManager* res_manager = app.getWorldEditor().getEngine().getResourceManager().get(Controller::TYPE);
+	IAllocator& allocator = app.getAllocator();
+	ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
 	ASSERT(res_manager);
 
 	m_controller = LUMIX_NEW(allocator, Controller)(Path("anim_editor"), *res_manager, allocator);
@@ -33,7 +33,7 @@ ControllerEditor::ControllerEditor(StudioApp& app)
 }
 
 ControllerEditor::~ControllerEditor() {
-	IAllocator& allocator = m_app.getWorldEditor().getAllocator();
+	IAllocator& allocator = m_app.getAllocator();
 	m_controller->destroy();
 	LUMIX_DELETE(allocator, m_controller);
 }
@@ -165,8 +165,8 @@ static const char* getPathFromEntity(StudioApp& app) {
 static void load(ControllerEditor& editor, const char* path) {
 	OS::InputFile file;
 	if (file.open(path)) {
-		IAllocator& allocator = editor.m_app.getWorldEditor().getAllocator();
-		ResourceManager* res_manager = editor.m_app.getWorldEditor().getEngine().getResourceManager().get(Controller::TYPE);
+		IAllocator& allocator = editor.m_app.getAllocator();
+		ResourceManager* res_manager = editor.m_app.getEngine().getResourceManager().get(Controller::TYPE);
 		Array<u8> data(allocator);
 		data.resize((u32)file.size());
 		if (!file.read(data.begin(), data.byte_size())) {
@@ -248,7 +248,7 @@ void ControllerEditor::onWindowGUI() {
 				
 				if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity(m_app))) {
 					char tmp[MAX_PATH_LENGTH];
-					copyString(tmp, m_app.getWorldEditor().getEngine().getFileSystem().getBasePath());
+					copyString(tmp, m_app.getEngine().getFileSystem().getBasePath());
 					catString(tmp, getPathFromEntity(m_app));
 					load(*this, tmp);
 				}
@@ -347,7 +347,7 @@ void ControllerEditor::onWindowGUI() {
 				copyString(path, entry.animation ? entry.animation->getPath().c_str() : "");
 				if (m_app.getAssetBrowser().resourceInput("", "anim", Span(path), Animation::TYPE)) {
 					if (entry.animation) entry.animation->getResourceManager().unload(*entry.animation);
-					ResourceManagerHub& res_manager = m_app.getWorldEditor().getEngine().getResourceManager();
+					ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
 					entry.animation = res_manager.load<Animation>(Path(path));
 				}
 				ImGui::PopItemWidth();
@@ -423,7 +423,7 @@ void ControllerEditor::onWindowGUI() {
 			char model_path[MAX_PATH_LENGTH];
 			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
 			if (m_app.getAssetBrowser().resourceInput("Model", "model", Span(model_path), Model::TYPE)) {
-				m_model = m_app.getWorldEditor().getEngine().getResourceManager().load<Model>(Path(model_path));
+				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
 			}
 
 			if (m_model) {
@@ -456,7 +456,7 @@ void ControllerEditor::onWindowGUI() {
 			char model_path[MAX_PATH_LENGTH];
 			copyString(model_path, m_model ? m_model->getPath().c_str() : "");
 			if (m_app.getAssetBrowser().resourceInput("Model", "model", Span(model_path), Model::TYPE)) {
-				m_model = m_app.getWorldEditor().getEngine().getResourceManager().load<Model>(Path(model_path));
+				m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
 			}
 			if(m_model) {
 				for (u32 i = 0; i < m_controller->m_ik_count; ++i) {

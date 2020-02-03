@@ -625,7 +625,7 @@ FBXImporter::~FBXImporter()
 
 
 FBXImporter::FBXImporter(StudioApp& app)
-	: allocator(app.getWorldEditor().getAllocator())
+	: allocator(app.getAllocator())
 	, compiler(app.getAssetCompiler())
 	, scene(nullptr)
 	, materials(allocator)
@@ -633,7 +633,7 @@ FBXImporter::FBXImporter(StudioApp& app)
 	, animations(allocator)
 	, bones(allocator)
 	, out_file(allocator)
-	, filesystem(app.getWorldEditor().getEngine().getFileSystem())
+	, filesystem(app.getEngine().getFileSystem())
 	, app(app)
 {
 }
@@ -862,7 +862,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 {
 	ASSERT(model->isReady());
 
-	Engine& engine = app.getWorldEditor().getEngine();
+	Engine& engine = app.getEngine();
 	Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	ASSERT(renderer);
 
