@@ -191,7 +191,9 @@ Resource* ResourceManagerHub::load(ResourceManager& manager, const Path& path)
 
 ResourceManager* ResourceManagerHub::get(ResourceType type)
 {
-	return m_resource_managers[type.type]; 
+	auto iter = m_resource_managers.find(type.type); 
+	if (!iter.isValid()) return nullptr;
+	return iter.value();
 }
 
 void ResourceManagerHub::LoadHook::continueLoad(Resource& resource)

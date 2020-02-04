@@ -26,8 +26,9 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	echo   B. Download Godot Engine
 	echo   C. Create project - static physx
 	echo   D. Push to itch.io
+	echo   E. Create project with app 
 	echo ===============================
-	choice /C 123456789ABCD /N /M "Your choice:"
+	choice /C 123456789ABCDE /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 goto :EOF
@@ -43,6 +44,7 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==11 call :download_godot
 	if %errorlevel%==12 call :create_project_static_physx
 	if %errorlevel%==13 call :push_to_itch_io
+	if %errorlevel%==13 call :create_project_with_app
 goto :begin
 
 :plugins 
@@ -437,6 +439,12 @@ exit /B 0
 :create_project
 	echo Creating project...
 	genie.exe --static-plugins vs2019 
+	pause
+exit /B 0
+
+:create_project_with_app
+	echo Creating project...
+	genie.exe --static-plugins --with-app vs2019 
 	pause
 exit /B 0
 
