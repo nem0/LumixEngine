@@ -44,6 +44,7 @@ function linkPlugin(plugin_name)
 
 	if build_app then
 		project "app"
+		links {plugin_name}
 		if _OPTIONS["static-plugins"] then	
 			forceLink ("s_" .. plugin_name .. "_plugin_register")
 		end
@@ -731,7 +732,7 @@ if build_app then
 			end
 			defines { "LUMIXENGINE_PLUGINS=" .. def }
 		end
-		
+
 		includedirs { "../src", "../src/app" }
 		if _OPTIONS["static-plugins"] then	
 			if build_studio then
@@ -747,7 +748,13 @@ if build_app then
 				linkPhysX()
 			end
 			if build_studio then links {"editor"} end
-			links {"engine"}
+
+			links { "editor", "engine" }
+			linkLib "nvtt"
+			linkLib "freetype"
+			linkLib "cmft"
+			linkLib "luajit"
+			linkLib "recast"
 			
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }

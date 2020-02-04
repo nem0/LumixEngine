@@ -3,7 +3,9 @@
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/geometry.h"
 #include "engine/input_system.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
@@ -12,7 +14,6 @@
 #include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/stream.h"
-#include "engine/timer.h"
 #include "engine/universe/universe.h"
 #include "gui/gui_system.h"
 #include "renderer/pipeline.h"
@@ -20,9 +21,10 @@
 #include "renderer/texture.h"
 #include <cstdio>
 #ifdef _WIN32
-	#include <windows.h>
+	#include <Windows.h>
+	#undef near
+	#undef far
 #endif
-
 
 namespace Lumix
 {
@@ -57,7 +59,6 @@ public:
 		, m_exit_code(0)
 		, m_pipeline(nullptr)
 	{
-		m_frame_timer = Timer::create(m_allocator);
 		ASSERT(!s_instance);
 		s_instance = this;
 	}
@@ -65,30 +66,29 @@ public:
 
 	~Runner()
 	{
-		Timer::destroy(m_frame_timer);
 		ASSERT(!m_universe);
 		s_instance = nullptr;
 	}
 
 
-	void onResize() const
+	void onResize()
 	{
-		const OS::Point p = OS::getWindowClientSize(m_window);
-		// TODO
-		//m_pipeline->resize(p.x, p.y);
-		m_gui_interface->size.set((float)p.x, (float)p.y);
-		Renderer* renderer = (Renderer*)m_engine->getPluginManager().getPlugin("renderer");
-		renderer->resize(p.x, p.y);
+		if (m_window == OS::INVALID_WINDOW) return;
+		const OS::Rect r = OS::getWindowClientRect(m_window);
+		m_viewport.w = r.width;
+		m_viewport.h = r.height;
 	}
 
 
 	void onInit() override
 	{
+		JobSystem::init(MT::getCPUsCount(), m_allocator);
+
 		copyString(m_pipeline_path, "pipelines/main.pln");
 		m_pipeline_define = "APP";
 		copyString(m_startup_script_path, "startup.lua");
 		char cmd_line[1024];
-		OS::getCommandLine(cmd_line, lengthOf(cmd_line));
+		OS::getCommandLine(Span(cmd_line));
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
 		{
@@ -116,31 +116,22 @@ public:
 			}
 		}
 
-		g_log_info.getCallback().bind<outputToConsole>();
-		g_log_warning.getCallback().bind<outputToConsole>();
-		g_log_error.getCallback().bind<outputToConsole>();
-
 		enableCrashReporting(false);
-
 
 		char current_dir[MAX_PATH_LENGTH];
 		#ifdef _WIN32
-			GetCurrentDirectory(sizeof(current_dir), current_dir); 
+			OS::getCurrentDirectory(Span(current_dir)); 
 		#else
 			current_dir[0] = '\0';
 		#endif
 		m_engine = Engine::create(current_dir, m_allocator);
-		ffr::preinit(m_allocator);
+		gpu::preinit(m_allocator);
 		
 		OS::InitWindowArgs create_win_args = {};
 		create_win_args.fullscreen = !m_window_mode;
 		create_win_args.handle_file_drops = false;
 		create_win_args.name = "Lumix App";
 		m_window = OS::createWindow(create_win_args);
-
-		Engine::PlatformData platform_data = {};
-		platform_data.window_handle = m_window;
-		m_engine->setPlatformData(platform_data);
 
 		#ifdef LUMIXENGINE_PLUGINS
 			const char* plugins[] = { LUMIXENGINE_PLUGINS };
@@ -149,7 +140,13 @@ public:
 				m_engine->getPluginManager().load(plugin);
 			}
 		#endif
-		m_engine->getInputSystem().enable(true);
+
+		Engine::PlatformData platform_data = {};
+		platform_data.window_handle = m_window;
+		m_engine->setPlatformData(platform_data);
+
+		m_engine->getPluginManager().initPlugins();
+			
 		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
 		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path(m_pipeline_path));
 		m_pipeline = Pipeline::create(*renderer, pres, m_pipeline_define, m_engine->getAllocator());
@@ -157,108 +154,16 @@ public:
 		while (m_engine->getFileSystem().hasWork())
 		{
 			MT::sleep(100);
-			m_engine->getFileSystem().updateAsyncTransactions();
+			m_engine->getFileSystem().processCallbacks();
 		}
 
 		m_universe = &m_engine->createUniverse(true);
 		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
 		// TODO
 		//m_pipeline->resize(600, 400);
-		renderer->resize(600, 400);
 
-		registerLuaAPI();
-
-		m_gui_interface = LUMIX_NEW(m_allocator, GUIInterface);
-		auto* gui_system = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
-		m_gui_interface->pipeline = m_pipeline;
-
-		gui_system->setInterface(m_gui_interface);
-		
 		OS::showCursor(false);
 		onResize();
-
-		if (!runStartupScript())
-		{
-			loadUniverse("universes/main.unv");
-			while (m_engine->getFileSystem().hasWork()) m_engine->getFileSystem().updateAsyncTransactions();
-			m_engine->startGame(*m_universe);
-		}
-	}
-
-
-	bool runStartupScript() const
-	{
-		// TODO file->getbuffer returns nullptr in case of OSFileStream
-		ASSERT(false);
-		/*FS::OSFileStream file;
-		if (file.open(Path(m_startup_script_path), FS::Mode::OPEN_AND_READ))
-		{
-			m_engine->runScript((const char*)file->getBuffer(), (int)file->size(), m_startup_script_path);
-			fs.close(*file);
-			return true;
-		}*/
-		return false;
-	}
-
-
-	void registerLuaAPI()
-	{
-		lua_State* L = m_engine->getState();
-
-		#define REGISTER_FUNCTION(F) \
-			do { \
-				auto* f = &LuaWrapper::wrapMethodClosure<Runner, decltype(&Runner::F), &Runner::F>; \
-				LuaWrapper::createSystemClosure(L, "App", this, #F, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(loadUniverse);
-		REGISTER_FUNCTION(setUniverse);
-		REGISTER_FUNCTION(exit);
-
-		#undef REGISTER_FUNCTION
-
-		LuaWrapper::createSystemVariable(L, "App", "universe", m_universe);
-	}
-
-
-	void universeFileLoaded(u64 size, const u8* mem, bool success)
-	{
-		if (!success)
-		{
-			g_log_error.log("App") << "Failed to open universe.";
-			return;
-		}
-
-		ASSERT(mem);
-		InputMemoryStream blob(mem, (int)size);
-		#pragma pack(1)
-			struct Header
-			{
-				u32 magic;
-				int version;
-				u32 hash;
-				u32 engine_hash;
-			};
-		#pragma pack()
-		Header header;
-		blob.read(header);
-		if (crc32((const u8*)blob.getData() + sizeof(header), (int)blob.size() - sizeof(header)) != header.hash)
-		{
-			g_log_error.log("App") << "Universe corrupted";
-			return;
-		}
-		m_engine->destroyUniverse(*m_universe);
-		m_universe = &m_engine->createUniverse(true);
-		char basename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(basename, lengthOf(basename), m_universe_path);
-		m_universe->setName(basename);
-		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
-		LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
-		bool deserialize_succeeded = m_engine->deserialize(*m_universe, blob);
-		if (!deserialize_succeeded)
-		{
-			g_log_error.log("App") << "Failed to deserialize universe";
-		}
 	}
 
 
@@ -272,22 +177,8 @@ public:
 	}
 
 
-	void loadUniverse(const char* path)
-	{
-		copyString(m_universe_path, path);
-		auto& fs = m_engine->getFileSystem();
-		FileSystem::ContentCallback cb;
-		cb.bind<Runner, &Runner::universeFileLoaded>(this);
-		fs.getContent(Path(m_universe_path), cb);
-	}
-
-
 	void shutdown()
 	{
-		auto* gui_system = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
-		gui_system->setInterface(nullptr);
-		LUMIX_DELETE(m_allocator, m_gui_interface);
-
 		m_engine->destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
 		Engine::destroy(m_engine, m_allocator);
@@ -313,24 +204,7 @@ public:
 			case OS::Event::Type::WINDOW_SIZE:
 				onResize();
 				break;
-			case OS::Event::Type::FOCUS: 
-				m_engine->getInputSystem().enable(event.focus.gained); 
-				break;
 		}
-	}
-
-
-	static void outputToVS(const char* system, const char* message)
-	{
-		#ifdef _MSC_VER
-			char tmp[2048];
-			copyString(tmp, system);
-			catString(tmp, " : ");
-			catString(tmp, message);
-			catString(tmp, "\r");
-
-			OutputDebugString(tmp);
-		#endif
 	}
 
 
@@ -349,12 +223,19 @@ public:
 
 	void onIdle() override
 	{
-		float frame_time = m_frame_timer->tick();
+		float frame_time = m_frame_timer.tick();
 		m_engine->update(*m_universe);
-		m_pipeline->render();
+		m_viewport.fov = degreesToRadians(60.f);
+		m_viewport.far = 10'000.f;
+		m_viewport.is_ortho = false;
+		m_viewport.near = 0.1f;
+		m_viewport.pos = {0, 0, 0};
+		m_viewport.rot = Quat::IDENTITY;
+		m_pipeline->setViewport(m_viewport);
+		m_pipeline->render(false);
 		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
 		static_cast<Renderer*>(renderer)->frame();
-		m_engine->getFileSystem().updateAsyncTransactions();
+		m_engine->getFileSystem().processCallbacks();
 		if (frame_time < 1 / 60.0f) {
 			PROFILE_BLOCK("sleep");
 			MT::sleep(u32(1000 / 60.0f - frame_time * 1000));
@@ -369,14 +250,14 @@ private:
 	char m_universe_path[MAX_PATH_LENGTH];
 	Universe* m_universe;
 	Pipeline* m_pipeline;
-	Timer* m_frame_timer;
-	GUIInterface* m_gui_interface;
+	Viewport m_viewport;
+	OS::Timer m_frame_timer;
 	bool m_window_mode;
 	int m_exit_code;
 	char m_startup_script_path[MAX_PATH_LENGTH];
 	char m_pipeline_path[MAX_PATH_LENGTH];
 	StaticString<64> m_pipeline_define;
-	OS::WindowHandle m_window;
+	OS::WindowHandle m_window = OS::INVALID_WINDOW;
 
 	static Runner* s_instance;
 };
