@@ -452,35 +452,37 @@ WindowHandle createWindow(const InitWindowArgs& args)
 	static WNDCLASS wc = [&]() -> WNDCLASS {
 		WNDCLASS wc = {};
 		auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
-			Event e;
-			e.window = hWnd;
-			switch (Msg)
-			{
-				case WM_MOVE:
-					e.type = Event::Type::WINDOW_MOVE;
-					e.win_move.x = (i16)LOWORD(lParam);
-					e.win_move.y = (i16)HIWORD(lParam);
-					G.iface->onEvent(e);
-					return 0;
-				case WM_SIZE:
-					e.type = Event::Type::WINDOW_SIZE;
-					e.win_size.w = LOWORD(lParam);
-					e.win_size.h = HIWORD(lParam);
-					G.iface->onEvent(e);
-					return 0;
-				case WM_CLOSE:
-					e.type = Event::Type::WINDOW_CLOSE;
-					G.iface->onEvent(e);
-					return 0;
-				case WM_ACTIVATE:
-					if (wParam == WA_INACTIVE) {
-						showCursor(true);
-						unclipCursor();
-					}
-					e.type = Event::Type::FOCUS;
-					e.focus.gained = wParam != WA_INACTIVE;
-					G.iface->onEvent(e);
-					break;
+			if (G.iface) {
+				Event e;
+				e.window = hWnd;
+				switch (Msg)
+				{
+					case WM_MOVE:
+						e.type = Event::Type::WINDOW_MOVE;
+						e.win_move.x = (i16)LOWORD(lParam);
+						e.win_move.y = (i16)HIWORD(lParam);
+						G.iface->onEvent(e);
+						return 0;
+					case WM_SIZE:
+						e.type = Event::Type::WINDOW_SIZE;
+						e.win_size.w = LOWORD(lParam);
+						e.win_size.h = HIWORD(lParam);
+						G.iface->onEvent(e);
+						return 0;
+					case WM_CLOSE:
+						e.type = Event::Type::WINDOW_CLOSE;
+						G.iface->onEvent(e);
+						return 0;
+					case WM_ACTIVATE:
+						if (wParam == WA_INACTIVE) {
+							showCursor(true);
+							unclipCursor();
+						}
+						e.type = Event::Type::FOCUS;
+						e.focus.gained = wParam != WA_INACTIVE;
+						G.iface->onEvent(e);
+						break;
+				}
 			}
 			return DefWindowProc(hWnd, Msg, wParam, lParam);
 		};
