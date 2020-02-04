@@ -354,7 +354,9 @@ function main()
 	end
 
 	if GAME_VIEW or APP then
-		renderIngameGUI()	
+		if renderIngameGUI ~= nil then
+			renderIngameGUI()
+		end
 	end
 
 	debugPass(res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
