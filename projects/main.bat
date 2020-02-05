@@ -44,7 +44,7 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==11 call :download_godot
 	if %errorlevel%==12 call :create_project_static_physx
 	if %errorlevel%==13 call :push_to_itch_io
-	if %errorlevel%==13 call :create_project_with_app
+	if %errorlevel%==14 call :create_project_with_app
 goto :begin
 
 :plugins 
