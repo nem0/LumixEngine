@@ -1030,8 +1030,9 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	void setScene(RenderScene* scene) override
-	{
+	void setUniverse(Universe* universe) override {
+		RenderScene* scene = universe ? (RenderScene*)universe->getScene(crc32("renderer")) : nullptr;
+		if (m_scene == scene) return;
 		m_scene = scene;
 		if (m_lua_state && m_scene) callInitScene();
 	}
@@ -2488,10 +2489,6 @@ struct PipelineImpl final : Pipeline
 		int rbs[16];
 		if(rb_count > lengthOf(rbs)) {
 			logError("Renderer") << "Too many render buffers in " << pipeline->getPath();	
-			return 0;
-		}
-		if(rb_count <= 0) {
-			logError("Renderer") << "createFramebuffer without arguments in " << pipeline->getPath();
 			return 0;
 		}
 

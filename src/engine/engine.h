@@ -7,6 +7,10 @@ struct lua_State;
 namespace Lumix
 {
 
+namespace OS {
+	using WindowHandle = void*;
+}
+
 struct IAllocator;
 class InputMemoryStream;
 class OutputMemoryStream;
@@ -16,8 +20,12 @@ class Universe;
 class LUMIX_ENGINE_API Engine
 {
 public:
-	struct PlatformData {
-		void* window_handle = nullptr;
+	struct InitArgs {
+		const char* working_dir = nullptr;
+		Span<const char*> plugins;
+		bool fullscreen = false;
+		bool handle_file_drops = false;
+		const char* window_title = "Lumix App";
 	};
 
 	using LuaResourceHandle = u32;
@@ -25,13 +33,12 @@ public:
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(const char* working_dir, IAllocator& allocator);
+	static Engine* create(const InitArgs& init_data, IAllocator& allocator);
 	static void destroy(Engine* engine, IAllocator& allocator);
 
 	virtual Universe& createUniverse(bool is_main_universe) = 0;
 	virtual void destroyUniverse(Universe& context) = 0;
-	virtual void setPlatformData(const PlatformData& data) = 0;
-	virtual const PlatformData& getPlatformData() = 0;
+	virtual OS::WindowHandle getWindowHandle() = 0;
 
 	virtual struct PathManager& getPathManager() = 0;
 	virtual class FileSystem& getFileSystem() = 0;

@@ -16,8 +16,8 @@ class Model;
 class StudioApp;
 class Pipeline;
 struct RayCastModelHit;
-class RenderScene;
 class Shader;
+class Universe;
 
 
 struct RenderInterfaceBase : RenderInterface {
@@ -35,7 +35,7 @@ class SceneView : public StudioApp::GUIPlugin
 		~SceneView();
 
 		void update(float time_delta) override;
-		void setScene(RenderScene* scene);
+		void setUniverse(Universe* universe);
 		void onWindowGUI() override;
 		Pipeline* getPipeline() { return m_pipeline; }
 		void addDropHandler(DropHandler handler);

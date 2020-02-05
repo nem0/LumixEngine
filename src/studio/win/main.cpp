@@ -4,7 +4,7 @@
 #include "editor/studio_app.h"
 
 
-INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
+int main(int argc, char* argv[])
 {
 	SetProcessDPIAware();
 	HMODULE shcore = LoadLibrary("shcore.dll");

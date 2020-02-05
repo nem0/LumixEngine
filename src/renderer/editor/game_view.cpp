@@ -120,21 +120,20 @@ void GameView::enableIngameCursor(bool enable)
 
 void GameView::onUniverseCreated()
 {
-	auto* scene = m_editor.getUniverse()->getScene(crc32("renderer"));
-	m_pipeline->setScene(static_cast<RenderScene*>(scene));
+	m_pipeline->setUniverse(m_editor.getUniverse());
 }
 
 
 void GameView::onUniverseDestroyed()
 {
-	m_pipeline->setScene(nullptr);
+	m_pipeline->setUniverse(nullptr);
 }
 
 
 
 void GameView::setScene(RenderScene* scene)
 {
-	m_pipeline->setScene(scene);
+	m_pipeline->setUniverse(scene ? &scene->getUniverse() : nullptr);
 }
 
 

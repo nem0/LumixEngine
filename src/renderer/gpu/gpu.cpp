@@ -2139,7 +2139,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 		CHECK_GL(glDisable(GL_FRAMEBUFFER_SRGB));
 	}
 
-	if(!attachments) {
+	if(!attachments || num == 0) {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		return;
 	}

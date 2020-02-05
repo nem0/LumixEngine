@@ -120,22 +120,21 @@ SceneView::~SceneView()
 }
 
 
-void SceneView::setScene(RenderScene* scene)
+void SceneView::setUniverse(Universe* universe)
 {
-	m_pipeline->setScene(scene);
+	m_pipeline->setUniverse(universe);
 }
 
 
 void SceneView::onUniverseCreated()
 {
-	IScene* scene = m_editor.getUniverse()->getScene(crc32("renderer"));
-	m_pipeline->setScene((RenderScene*)scene);
+	m_pipeline->setUniverse(m_editor.getUniverse());
 }
 
 
 void SceneView::onUniverseDestroyed()
 {
-	m_pipeline->setScene(nullptr);
+	m_pipeline->setUniverse(nullptr);
 }
 
 

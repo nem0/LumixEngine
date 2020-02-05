@@ -7,178 +7,112 @@
 #include "engine/input_system.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
-#include "engine/lua_wrapper.h"
 #include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
-#include "engine/profiler.h"
-#include "engine/stream.h"
+#include "engine/reflection.h"
 #include "engine/universe/universe.h"
-#include "gui/gui_system.h"
+#include "lua_script/lua_script_system.h"
 #include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
 #include "renderer/renderer.h"
-#include "renderer/texture.h"
-#include <cstdio>
-#ifdef _WIN32
-	#include <Windows.h>
-	#undef near
-	#undef far
-#endif
 
-namespace Lumix
+using namespace Lumix;
+
+static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
+static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
+
+struct Runner final : public OS::Interface
 {
-
-
-struct GUIInterface : GUISystem::Interface
-{
-	GUIInterface() = default;
-
-	Pipeline* getPipeline() override { return pipeline; }
-	Vec2 getPos() const override { return Vec2(0, 0); }
-	Vec2 getSize() const override { return size; }
-
-	void enableCursor(bool enable) override
+	Runner() 
+		: m_allocator(m_main_allocator) 
 	{
-		OS::showCursor(enable);
+		if (!JobSystem::init(MT::getCPUsCount(), m_allocator)) {
+			logError("Engine") << "Failed to initialize job system.";
+		}
 	}
+	~Runner() { ASSERT(!m_universe); }
 
+	void onResize() {
+		if (!m_engine) return;
+		if (m_engine->getWindowHandle() == OS::INVALID_WINDOW) return;
 
-	Vec2 size;
-	Pipeline* pipeline;
-};
-
-
-class Runner : public OS::Interface
-{
-public:
-	Runner()
-		: m_allocator(m_main_allocator)
-		, m_window_mode(false)
-		, m_universe(nullptr)
-		, m_exit_code(0)
-		, m_pipeline(nullptr)
-	{
-		ASSERT(!s_instance);
-		s_instance = this;
-	}
-
-
-	~Runner()
-	{
-		ASSERT(!m_universe);
-		s_instance = nullptr;
-	}
-
-
-	void onResize()
-	{
-		if (m_window == OS::INVALID_WINDOW) return;
-		const OS::Rect r = OS::getWindowClientRect(m_window);
+		const OS::Rect r = OS::getWindowClientRect(m_engine->getWindowHandle());
 		m_viewport.w = r.width;
 		m_viewport.h = r.height;
 	}
 
-
-	void onInit() override
-	{
-		JobSystem::init(MT::getCPUsCount(), m_allocator);
-
-		copyString(m_pipeline_path, "pipelines/main.pln");
-		m_pipeline_define = "APP";
-		copyString(m_startup_script_path, "startup.lua");
+	void parseCmdLine() {
 		char cmd_line[1024];
 		OS::getCommandLine(Span(cmd_line));
 		CommandLineParser parser(cmd_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-window"))
-			{
-				m_window_mode = true;
-			}
-			else if (parser.currentEquals("-pipeline"))
-			{
-				if (!parser.next()) break;
-
-				parser.getCurrent(m_pipeline_path, lengthOf(m_pipeline_path));
-			}
-			else if (parser.currentEquals("-pipeline_define"))
-			{
-				if (!parser.next()) break;
-
-				parser.getCurrent(m_pipeline_define.data, lengthOf(m_pipeline_define.data));
-			}
-			else if(parser.currentEquals("-script"))
-			{
-				if (!parser.next()) break;
-
-				parser.getCurrent(m_startup_script_path, lengthOf(m_startup_script_path));
+		while (parser.next()) {
+			if (parser.currentEquals("-demo")) {
+				m_use_demo_scene = true;
 			}
 		}
+	}
 
-		enableCrashReporting(false);
+	void initRenderPipeline() {
+		m_viewport.fov = degreesToRadians(60.f);
+		m_viewport.far = 10'000.f;
+		m_viewport.is_ortho = false;
+		m_viewport.near = 0.1f;
+		m_viewport.pos = {0, 0, 0};
+		m_viewport.rot = Quat::IDENTITY;
 
-		char current_dir[MAX_PATH_LENGTH];
-		#ifdef _WIN32
-			OS::getCurrentDirectory(Span(current_dir)); 
-		#else
-			current_dir[0] = '\0';
-		#endif
-		m_engine = Engine::create(current_dir, m_allocator);
-		gpu::preinit(m_allocator);
-		
-		OS::InitWindowArgs create_win_args = {};
-		create_win_args.fullscreen = !m_window_mode;
-		create_win_args.handle_file_drops = false;
-		create_win_args.name = "Lumix App";
-		m_window = OS::createWindow(create_win_args);
+		m_renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
+		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_pipeline = Pipeline::create(*m_renderer, pres, "APP", m_engine->getAllocator());
 
-		#ifdef LUMIXENGINE_PLUGINS
-			const char* plugins[] = { LUMIXENGINE_PLUGINS };
-			for (auto plugin : plugins)
-			{
-				m_engine->getPluginManager().load(plugin);
-			}
-		#endif
-
-		Engine::PlatformData platform_data = {};
-		platform_data.window_handle = m_window;
-		m_engine->setPlatformData(platform_data);
-
-		m_engine->getPluginManager().initPlugins();
-			
-		Renderer* renderer = static_cast<Renderer*>(m_engine->getPluginManager().getPlugin("renderer"));
-		PipelineResource* pres = m_engine->getResourceManager().load<PipelineResource>(Path(m_pipeline_path));
-		m_pipeline = Pipeline::create(*renderer, pres, m_pipeline_define, m_engine->getAllocator());
-
-		while (m_engine->getFileSystem().hasWork())
-		{
+		while (m_engine->getFileSystem().hasWork()) {
 			MT::sleep(100);
 			m_engine->getFileSystem().processCallbacks();
 		}
 
+		m_pipeline->setUniverse(m_universe);
+	}
+
+	void initDemoScene() {
+		if (!m_use_demo_scene) return;
+
+		const EntityRef env = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_universe->createComponent(ENVIRONMENT_TYPE, env);
+		m_universe->createComponent(LUA_SCRIPT_TYPE, env);
+		
+		RenderScene* render_scene = (RenderScene*)m_universe->getScene(crc32("renderer"));
+		Environment& environment = render_scene->getEnvironment(env);
+		environment.diffuse_intensity = 3;
+		
+		Quat rot;
+		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
+		m_universe->setRotation(env, rot);
+		
+		LuaScriptScene* lua_scene = (LuaScriptScene*)m_universe->getScene(crc32("lua_script"));
+		lua_scene->addScript(env);
+		lua_scene->setScriptPath(env, 0, Path("pipelines/sky.lua"));
+	}
+
+	void onInit() override {
+		parseCmdLine();
+
+		Engine::InitArgs init_data;
+		#ifdef LUMIXENGINE_PLUGINS
+			const char* plugins[] = { LUMIXENGINE_PLUGINS };
+			init_data.plugins = Span(plugins);
+		#endif
+		m_engine = Engine::create(init_data, m_allocator);
+
 		m_universe = &m_engine->createUniverse(true);
-		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
-		// TODO
-		//m_pipeline->resize(600, 400);
+		initRenderPipeline();
+		initDemoScene();
 
 		OS::showCursor(false);
 		onResize();
 	}
 
-
-	void setUniverse(Universe* universe)
-	{
-		m_engine->destroyUniverse(*m_universe);
-		m_universe = universe;
-		m_universe->setName("runtime");
-		m_pipeline->setScene((RenderScene*)m_universe->getScene(crc32("renderer")));
-		LuaWrapper::createSystemVariable(m_engine->getState(), "App", "universe", m_universe);
-	}
-
-
-	void shutdown()
-	{
+	void shutdown() {
 		m_engine->destroyUniverse(*m_universe);
 		Pipeline::destroy(m_pipeline);
 		Engine::destroy(m_engine, m_allocator);
@@ -187,14 +121,11 @@ public:
 		m_universe = nullptr;
 	}
 
-
-	int getExitCode() const { return m_exit_code; }
-
-
-	void onEvent(const OS::Event& event) override
-	{
-		InputSystem& input = m_engine->getInputSystem();
-		input.injectEvent(event);
+	void onEvent(const OS::Event& event) override {
+		if (m_engine) {
+			InputSystem& input = m_engine->getInputSystem();
+			input.injectEvent(event);
+		}
 		switch (event.type) {
 			case OS::Event::Type::QUIT:
 			case OS::Event::Type::WINDOW_CLOSE: 
@@ -207,75 +138,27 @@ public:
 		}
 	}
 
-
-	static void outputToConsole(const char* system, const char* message) 
-	{
-		printf("%s: %s\n", system, message); 
-	}
-
-
-	void exit(int exit_code)
-	{
-		m_exit_code = exit_code;
-		OS::quit();
-	}
-
-
-	void onIdle() override
-	{
-		float frame_time = m_frame_timer.tick();
+	void onIdle() override {
 		m_engine->update(*m_universe);
-		m_viewport.fov = degreesToRadians(60.f);
-		m_viewport.far = 10'000.f;
-		m_viewport.is_ortho = false;
-		m_viewport.near = 0.1f;
-		m_viewport.pos = {0, 0, 0};
-		m_viewport.rot = Quat::IDENTITY;
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
-		auto* renderer = m_engine->getPluginManager().getPlugin("renderer");
-		static_cast<Renderer*>(renderer)->frame();
-		m_engine->getFileSystem().processCallbacks();
-		if (frame_time < 1 / 60.0f) {
-			PROFILE_BLOCK("sleep");
-			MT::sleep(u32(1000 / 60.0f - frame_time * 1000));
-		}
+		m_renderer->frame();
 	}
 
-
-private:
 	DefaultAllocator m_main_allocator;
 	Debug::Allocator m_allocator;
-	Engine* m_engine;
-	char m_universe_path[MAX_PATH_LENGTH];
-	Universe* m_universe;
-	Pipeline* m_pipeline;
+	Engine* m_engine = nullptr;
+	Renderer* m_renderer = nullptr;
+	Universe* m_universe = nullptr;
+	Pipeline* m_pipeline = nullptr;
 	Viewport m_viewport;
-	OS::Timer m_frame_timer;
-	bool m_window_mode;
-	int m_exit_code;
-	char m_startup_script_path[MAX_PATH_LENGTH];
-	char m_pipeline_path[MAX_PATH_LENGTH];
-	StaticString<64> m_pipeline_define;
-	OS::WindowHandle m_window = OS::INVALID_WINDOW;
-
-	static Runner* s_instance;
+	bool m_use_demo_scene = false;
 };
 
-
-Runner* Runner::s_instance = nullptr;
-
-
-}
-
-#ifdef _WIN32
-INT WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, INT)
-#else
 int main(int args, char* argv[])
-#endif
 {
-	Lumix::Runner app;
-	Lumix::OS::run(app);
+	Runner app;
+	OS::run(app);
 	app.shutdown();
-	return app.getExitCode();
+	return 0;
 }

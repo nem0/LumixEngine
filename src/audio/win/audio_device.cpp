@@ -125,7 +125,7 @@ struct AudioDeviceImpl final : public AudioDevice
 			return false;
 		}
 
-		HWND hwnd = (HWND)engine.getPlatformData().window_handle;
+		HWND hwnd = (HWND)engine.getWindowHandle();
 		auto result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer())
 		{

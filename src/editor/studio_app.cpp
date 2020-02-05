@@ -186,7 +186,9 @@ public:
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
 	{
-		JobSystem::init(MT::getCPUsCount(), m_allocator);
+		if (!JobSystem::init(MT::getCPUsCount(), m_allocator)) {
+			logError("Engine") << "Failed to initialize job system.";
+		}
 	}
 
 
@@ -352,36 +354,23 @@ public:
 
 		char data_dir[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
-		m_engine = Engine::create(data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir)
-			, m_allocator);
-		createLua();
-
-		extractBundled();
-
-		OS::InitWindowArgs create_win_args;
-		create_win_args.handle_file_drops = true;
-		create_win_args.name = "Lumix Studio";
-		m_main_window = OS::createWindow(create_win_args);
-		m_windows.push(m_main_window);
-
 		const char* plugins[] = { ""
 			#ifdef LUMIXENGINE_PLUGINS
 				, LUMIXENGINE_PLUGINS
 			#endif
 		};
 
-		PluginManager& plugin_manager = m_engine->getPluginManager();
-		for (auto* plugin_name : plugins) {
-			if (plugin_name[0] && !plugin_manager.load(plugin_name)) {
-				logInfo("Editor") << plugin_name << " plugin has not been loaded";
-			}
-		}
+		Engine::InitArgs init_data = {};
+		init_data.handle_file_drops = true;
+		init_data.window_title = "Lumix Studio";
+		init_data.working_dir = data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir);
+		init_data.plugins = Span(plugins);
+		m_engine = Engine::create(init_data, m_allocator);
+		m_main_window = m_engine->getWindowHandle();
+		m_windows.push(m_main_window);
 
-		Engine::PlatformData platform_data = {};
-		platform_data.window_handle = m_main_window;
-		m_engine->setPlatformData(platform_data);
-
-		plugin_manager.initPlugins();
+		createLua();
+		extractBundled();
 
 		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
 		m_settings.m_editor = m_editor;
@@ -482,7 +471,6 @@ public:
 		m_engine = nullptr;
 		m_editor = nullptr;
 		
-		OS::destroyWindow(m_main_window);
 		JobSystem::shutdown();
 	}
 

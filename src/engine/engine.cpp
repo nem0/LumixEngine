@@ -29,10 +29,6 @@ void registerEngineAPI(lua_State* L, Engine* engine);
 static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 
 
-static OS::OutputFile g_log_file;
-static bool g_is_log_file_open = false;
-
-
 #pragma pack(1)
 class SerializedEngineHeader
 {
@@ -41,30 +37,6 @@ public:
 	u32 m_reserved; // for crc
 };
 #pragma pack()
-
-
-static void showLogDebugOutput(LogLevel level, const char* system, const char* message)
-{
-	if(level == LogLevel::ERROR) {
-		Debug::debugOutput("Error: ");
-	}
-	Debug::debugOutput(system);
-	Debug::debugOutput(":: ");
-	Debug::debugOutput(message);
-	Debug::debugOutput("\n");
-}
-
-
-static void logToFile(LogLevel level, const char*, const char* message)
-{
-	if (!g_is_log_file_open) return;
-	if (level == LogLevel::ERROR) {
-		g_log_file.write("Error: ", stringLength("Error :"));
-	}
-	g_log_file.write(message, stringLength(message));
-	g_log_file.write("\n", 1);
-	g_log_file.flush();
-}
 
 
 struct PrefabResourceManager final : public ResourceManager
@@ -94,7 +66,7 @@ public:
 	void operator=(const EngineImpl&) = delete;
 	EngineImpl(const EngineImpl&) = delete;
 
-	EngineImpl(const char* working_dir, IAllocator& allocator)
+	EngineImpl(const InitArgs& init_data, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
@@ -107,24 +79,39 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 	{
-		g_is_log_file_open = g_log_file.open("lumix.log");
+		OS::InitWindowArgs init_win_args;
+		init_win_args.fullscreen = init_data.fullscreen;
+		init_win_args.handle_file_drops = init_data.handle_file_drops;
+		init_win_args.name = init_data.window_title;
+		m_window_handle = OS::createWindow(init_win_args);
+		if (m_window_handle == OS::INVALID_WINDOW) {
+			logError("Engine") << "Failed to create main window.";
+		}
+
+		m_is_log_file_open = m_log_file.open("lumix.log");
 		
 		logInfo("Core") << "Creating engine...";
 		Profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
-		getLogCallback().bind<logToFile>();
-		getLogCallback().bind<showLogDebugOutput>();
+		getLogCallback().bind<&EngineImpl::logToFile>(this);
+		getLogCallback().bind<logToDebugOutput>();
 
 		OS::logVersion();
 
-		m_platform_data = {};
 		m_state = luaL_newstate();
 		luaL_openlibs(m_state);
 
 		registerEngineAPI(m_state, this);
 
-		m_file_system = FileSystem::create(working_dir, m_allocator);
+		if (init_data.working_dir) {
+			m_file_system = FileSystem::create(init_data.working_dir, m_allocator);
+		}
+		else {
+			char current_dir[MAX_PATH_LENGTH];
+			OS::getCurrentDirectory(Span(current_dir)); 
+			m_file_system = FileSystem::create(current_dir, m_allocator);
+		}
 
 		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
@@ -135,13 +122,19 @@ public:
 		m_input_system = InputSystem::create(*this);
 
 		logInfo("Core") << "Engine created.";
-	}
 
+		for (auto* plugin_name : init_data.plugins) {
+			if (plugin_name[0] && !m_plugin_manager->load(plugin_name)) {
+				logInfo("Editor") << plugin_name << " plugin has not been loaded";
+			}
+		}
+
+		m_plugin_manager->initPlugins();
+	}
 
 	~EngineImpl()
 	{
-		for (Resource* res : m_lua_resources)
-		{
+		for (Resource* res : m_lua_resources) {
 			res->getResourceManager().unload(*res);
 		}
 
@@ -153,25 +146,36 @@ public:
 		m_prefab_resource_manager.destroy();
 		lua_close(m_state);
 
-		getLogCallback().unbind<logToFile>();
-		g_log_file.close();
+		getLogCallback().unbind<&EngineImpl::logToFile>(this);
+		m_log_file.close();
+		m_is_log_file_open = false;
 		PathManager::destroy(*m_path_manager);
+		OS::destroyWindow(m_window_handle);
 	}
 
-
-	void setPlatformData(const PlatformData& data) override
+	static void logToDebugOutput(LogLevel level, const char* system, const char* message)
 	{
-		m_platform_data = data;
+		if(level == LogLevel::ERROR) {
+			Debug::debugOutput("Error: ");
+		}
+		Debug::debugOutput(system);
+		Debug::debugOutput(":: ");
+		Debug::debugOutput(message);
+		Debug::debugOutput("\n");
 	}
 
-
-	const PlatformData& getPlatformData() override
+	void logToFile(LogLevel level, const char*, const char* message)
 	{
-		return m_platform_data;
+		if (!m_is_log_file_open) return;
+		if (level == LogLevel::ERROR) {
+			m_log_file.write("Error: ", stringLength("Error :"));
+		}
+		m_log_file.write(message, stringLength(message));
+		m_log_file.write("\n", 1);
+		m_log_file.flush();
 	}
 
-
-
+	OS::WindowHandle getWindowHandle() override { return m_window_handle; }
 	IAllocator& getAllocator() override { return m_allocator; }
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
@@ -484,17 +488,19 @@ private:
 	bool m_is_game_running;
 	bool m_paused;
 	bool m_next_frame;
-	PlatformData m_platform_data;
+	OS::WindowHandle m_window_handle;
 	PathManager* m_path_manager;
 	lua_State* m_state;
+	OS::OutputFile m_log_file;
+	bool m_is_log_file_open = false;
 	HashMap<int, Resource*> m_lua_resources;
 	u32 m_last_lua_resource_idx;
 };
 
 
-Engine* Engine::create(const char* working_dir, IAllocator& allocator)
+Engine* Engine::create(const InitArgs& init_data, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, EngineImpl)(working_dir, allocator);
+	return LUMIX_NEW(allocator, EngineImpl)(init_data, allocator);
 }
 
 
