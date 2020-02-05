@@ -78,7 +78,7 @@ public:
 	virtual ~Pipeline() {}
 
 	virtual bool render(bool only_2d) = 0;
-	virtual void setScene(RenderScene* scene) = 0;
+	virtual void setUniverse(class Universe* universe) = 0;
 	virtual RenderScene* getScene() const = 0;
 	virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
 	virtual bool isReady() const = 0;

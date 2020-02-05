@@ -383,6 +383,14 @@ function main()
 		end
 	end
 
+	if APP ~= nil then
+		setRenderTargets()
+		drawArray(0, 4, textured_quad_shader
+			, { res }
+			, { { 0, 0, 1, 1 }, { 1, 1, 1, 1 } }
+			, {}
+			, { depth_test = false });
+	end
 	setOutput(res)
 
 	if screenshot_request > 1 then

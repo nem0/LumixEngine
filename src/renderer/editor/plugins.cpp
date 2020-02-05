@@ -762,7 +762,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
 		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 		
-		m_tile.pipeline->setScene(render_scene);
+		m_tile.pipeline->setUniverse(m_tile.universe);
 	}
 
 
@@ -790,7 +790,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
 		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 
-		m_pipeline->setScene(render_scene);
+		m_pipeline->setUniverse(m_universe);
 	}
 
 
@@ -2430,8 +2430,7 @@ void captureCubemap(StudioApp& app
 	viewport.h = texture_size;
 
 	Universe* universe = world_editor.getUniverse();
-	RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
-	pipeline.setScene(scene);
+	pipeline.setUniverse(universe);
 	pipeline.setViewport(viewport);
 
 	Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));

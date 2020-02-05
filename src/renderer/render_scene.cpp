@@ -1763,7 +1763,7 @@ public:
 
 	static void LUA_setPipelineScene(Pipeline* pipeline, RenderScene* scene)
 	{
-		pipeline->setScene(scene);
+		pipeline->setUniverse(&scene->getUniverse());
 	}
 
 

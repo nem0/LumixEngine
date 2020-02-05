@@ -234,12 +234,12 @@ function defaultConfigurations()
 	configuration "Debug"
 		targetdir(BINARY_DIR .. "Debug")
 		defines { "NDEBUG", "LUMIX_DEBUG" }
-		flags { "Symbols", "ReleaseRuntime", "WinMain" }
+		flags { "Symbols", "ReleaseRuntime" }
 
 	configuration "RelWithDebInfo"
 		targetdir(BINARY_DIR .. "RelWithDebInfo")
 		defines { "NDEBUG" }
-		flags { "Symbols", "Optimize", "WinMain" }
+		flags { "Symbols", "Optimize" }
 
 	configuration "linux"
 		buildoptions { "-std=c++14" }

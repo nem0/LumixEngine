@@ -85,6 +85,7 @@ struct InitWindowArgs
 
 struct Interface
 {
+	virtual ~Interface() {}
     virtual void onEvent(const Event& event) = 0;
     virtual void onInit() = 0;
     virtual void onIdle() = 0;

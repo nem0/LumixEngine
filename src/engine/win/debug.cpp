@@ -19,7 +19,7 @@
 #pragma comment(lib, "DbgHelp.lib")
 
 
-static bool g_is_crash_reporting_enabled = true;
+static bool g_is_crash_reporting_enabled = false;
 static Lumix::DefaultAllocator xxallocator;
 
 

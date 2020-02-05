@@ -271,11 +271,10 @@ private:
 		Universe* universe = m_editor->getUniverse();
 		if (!universe)
 		{
-			m_pipeline->setScene(nullptr);
+			m_pipeline->setUniverse(nullptr);
 			return;
 		}
-		RenderScene* scene = (RenderScene*)universe->getScene(crc32("renderer"));
-		m_pipeline->setScene(scene);
+		m_pipeline->setUniverse(universe);
 	}
 
 
