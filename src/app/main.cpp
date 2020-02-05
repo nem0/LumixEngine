@@ -43,17 +43,6 @@ struct Runner final : public OS::Interface
 		m_viewport.h = r.height;
 	}
 
-	void parseCmdLine() {
-		char cmd_line[1024];
-		OS::getCommandLine(Span(cmd_line));
-		CommandLineParser parser(cmd_line);
-		while (parser.next()) {
-			if (parser.currentEquals("-demo")) {
-				m_use_demo_scene = true;
-			}
-		}
-	}
-
 	void initRenderPipeline() {
 		m_viewport.fov = degreesToRadians(60.f);
 		m_viewport.far = 10'000.f;
@@ -75,8 +64,6 @@ struct Runner final : public OS::Interface
 	}
 
 	void initDemoScene() {
-		if (!m_use_demo_scene) return;
-
 		const EntityRef env = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
 		m_universe->createComponent(ENVIRONMENT_TYPE, env);
 		m_universe->createComponent(LUA_SCRIPT_TYPE, env);
@@ -95,8 +82,6 @@ struct Runner final : public OS::Interface
 	}
 
 	void onInit() override {
-		parseCmdLine();
-
 		Engine::InitArgs init_data;
 		#ifdef LUMIXENGINE_PLUGINS
 			const char* plugins[] = { LUMIXENGINE_PLUGINS };
@@ -152,7 +137,6 @@ struct Runner final : public OS::Interface
 	Universe* m_universe = nullptr;
 	Pipeline* m_pipeline = nullptr;
 	Viewport m_viewport;
-	bool m_use_demo_scene = false;
 };
 
 int main(int args, char* argv[])
