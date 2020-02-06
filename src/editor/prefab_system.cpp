@@ -440,8 +440,9 @@ public:
 				if (iter.key() == entity) continue;
 
 				const Transform tr = m_universe->getTransform(iter.key());
+				const EntityPtr parent = m_universe->getParent(iter.key());
 
-				m_deferred_instances.push({prefab_res, tr});
+				m_deferred_instances.push({prefab_res, tr, parent});
 				destroySubtree(*m_universe, m_universe->getFirstChild(iter.key()));
 				m_universe->destroyEntity(iter.key());
 			}
@@ -468,8 +469,9 @@ public:
 			if (!m_roots.find(e).isValid()) continue;
 
 			const Transform tr = m_universe->getTransform(e);
+			const EntityPtr parent = m_universe->getParent(e);
 
-			m_deferred_instances.push({m_resources[prefab].resource, tr});
+			m_deferred_instances.push({m_resources[prefab].resource, tr, parent});
 			destroySubtree(*m_universe, m_universe->getFirstChild(e));
 			m_universe->destroyEntity(e);
 		}
@@ -507,8 +509,10 @@ public:
 				m_deferred_instances.pop();
 			} else if (res->isReady()) {
 				DeferredInstance tmp = m_deferred_instances.back();
-				doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
-			
+				const EntityPtr root = doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
+				if (root.isValid()) {
+					m_universe->setParent(tmp.parent, (EntityRef)root);
+				}
 				m_deferred_instances.pop();
 			} else {
 				break;
@@ -574,6 +578,7 @@ private:
 	struct DeferredInstance {
 		PrefabResource* resource;
 		Transform transform;
+		EntityPtr parent;
 	};
 
 	struct PrefabVersion {

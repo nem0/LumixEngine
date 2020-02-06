@@ -14,8 +14,8 @@
 
 //Request high performace profiles from mobile chipsets
 extern "C" {
-	LUMIX_RENDERER_API DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
-	LUMIX_RENDERER_API DWORD NvOptimusEnablement = 0x00000001;
+	LUMIX_ENGINE_API DWORD AmdPowerXpressRequestHighPerformance = 0x00000001;
+	LUMIX_ENGINE_API DWORD NvOptimusEnablement = 0x00000001;
 }
 
 

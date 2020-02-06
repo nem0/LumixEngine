@@ -83,7 +83,7 @@ struct InitWindowArgs
 };
 
 
-struct Interface
+struct LUMIX_ENGINE_API Interface
 {
 	virtual ~Interface() {}
     virtual void onEvent(const Event& event) = 0;

@@ -431,6 +431,8 @@ solution "LumixEngine"
 	configuration "not windows"
 		removefiles { "../src/**/win/*"}
 
+	configuration {}
+
 	if _OPTIONS["static-plugins"] then
 		defines {"STATIC_PLUGINS"}
 	end
