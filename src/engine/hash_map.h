@@ -133,14 +133,14 @@ private:
 		HM* hm;
 		u32 idx;
 
-		template <typename HM, typename K, typename V>
-		bool operator !=(const iterator_base<HM, K, V>& rhs) const {
+		template <typename HM2, typename K2, typename V2>
+		bool operator !=(const iterator_base<HM2, K2, V2>& rhs) const {
 			ASSERT(hm == rhs.hm);
 			return idx != rhs.idx;
 		}
 
-		template <typename HM, typename K, typename V>
-		bool operator ==(const iterator_base<HM, K, V>& rhs) const {
+		template <typename HM2, typename K2, typename V2>
+		bool operator ==(const iterator_base<HM2, K2, V2>& rhs) const {
 			ASSERT(hm == rhs.hm);
 			return idx == rhs.idx;
 		}

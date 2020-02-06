@@ -184,7 +184,7 @@ if _OPTIONS["no-lua-script"] == nil then
 	table.insert(base_plugins, "lua_script")
 end
 
-if _OPTIONS["no-gui"] == nil or _ACTION ~= "vs2019" then
+if _OPTIONS["no-gui"] == nil then
 	table.insert(plugins, "gui")
 	table.insert(base_plugins, "gui")
 end
@@ -223,7 +223,6 @@ newoption {
 		value = "GCC",
 		description = "Choose GCC flavor",
 		allowed = {
-			{ "android-x86",    	"Android - x86"            	 		},
 			{ "linux-gcc", 			"Linux (GCC compiler)" 				},
 			{ "linux-gcc-5", 		"Linux (GCC-5 compiler)"			},
 			{ "linux-clang", 		"Linux (Clang compiler)"			}
@@ -242,7 +241,6 @@ function defaultConfigurations()
 		flags { "Symbols", "Optimize" }
 
 	configuration "linux"
-		buildoptions { "-std=c++14" }
 		defines { "_GLIBCXX_USE_CXX11_ABI=0" }
 		links { "pthread" }
 
@@ -363,87 +361,7 @@ end
 solution "LumixEngine"
 	flags { "Cpp17" }
 	if _ACTION == "gmake" then
-		configuration { "android-*" }
-			flags {
-				"NoImportLib",
-			}
-			includedirs {
-				"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/include",
-				"$(ANDROID_NDK_ROOT)/sources/android/native_app_glue",
-			}
-			linkoptions {
-				"-nostdlib",
-				"-static-libgcc",
-			}
-			links {
-				"c",
-				"dl",
-				"m",
-				"android",
-				"log",
-				"gnustl_static",
-				"gcc",
-			}
-			buildoptions {
-				"-fPIC",
-				"-no-canonical-prefixes",
-				"-Wa,--noexecstack",
-				"-fstack-protector",
-				"-ffunction-sections",
-				"-Wno-psabi",
-				"-Wunused-value",
-				"-Wundef",
-			}
-			buildoptions_cpp {
-				"-std=c++14",
-			}
-			linkoptions {
-				"-no-canonical-prefixes",
-				"-Wl,--no-undefined",
-				"-Wl,-z,noexecstack",
-				"-Wl,-z,relro",
-				"-Wl,-z,now",
-			}
-		
-		configuration { "android-x86" }
-			androidPlatform = "android-24"
-			libdirs {
-				path.join(_libDir, "lib/android-x86"),
-				"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/x86",
-			}
-			includedirs {
-				"$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/4.9/libs/x86/include",
-			}
-			buildoptions {
-				"--sysroot=" .. path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86"),
-				"-march=i686",
-				"-mtune=atom",
-				"-mstackrealign",
-				"-msse3",
-				"-mfpmath=sse",
-				"-Wunused-value",
-				"-Wundef",
-			}
-			linkoptions {
-				"--sysroot=" .. path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86"),
-				path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtbegin_so.o"),
-				path.join("$(ANDROID_NDK_ROOT)/platforms", androidPlatform, "arch-x86/usr/lib/crtend_so.o"),
-			}
-	
-		configuration {}	
-	
-		
-		if "android-x86" == _OPTIONS["gcc"] then
-			if not os.getenv("ANDROID_NDK_X86") or not os.getenv("ANDROID_NDK_ROOT") then
-				print("Set ANDROID_NDK_X86 and ANDROID_NDK_ROOT envrionment variables.")
-			end
-
-			premake.gcc.cc  = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-gcc\""
-			premake.gcc.cxx = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-g++\""
-			premake.gcc.ar  = "\"$(ANDROID_NDK_X86)/bin/i686-linux-android-ar\""
-			LOCATION = "tmp/android-x86_gmake"
-		
-		elseif "linux-gcc" == _OPTIONS["gcc"] then
+		if "linux-gcc" == _OPTIONS["gcc"] then
 			LOCATION = "tmp/gcc"
 
 		elseif "linux-gcc-5" == _OPTIONS["gcc"] then
@@ -466,8 +384,9 @@ solution "LumixEngine"
 		removefiles { "../src/**/editor/*" }
 	end
 
-	configuration { "linux-*" }
+	configuration { "linux" }
 		buildoptions {
+			"-m64",
 			"-fPIC",
 			"-no-canonical-prefixes",
 			"-Wa,--noexecstack",
@@ -477,19 +396,11 @@ solution "LumixEngine"
 			"-Wunused-value",
 			"-Wundef",
 			"-msse2",
+			"-Wno-multichar",
+			"-Wno-undef",
 		}
 		linkoptions {
 			"-Wl,--gc-sections",
-		}
-	
-	configuration { "linux-*", "x32" }
-		buildoptions {
-			"-m32",
-		}
-
-	configuration { "linux-*", "x64" }
-		buildoptions {
-			"-m64",
 		}
 
 	configuration {}
@@ -520,12 +431,6 @@ solution "LumixEngine"
 	configuration "not windows"
 		removefiles { "../src/**/win/*"}
 
-	configuration "android-*"
-		removefiles { "../src/**/win/*"}
-		
-	configuration "not asmjs" 
-		removefiles { "../src/**/asmjs/*"}
-	
 	if _OPTIONS["static-plugins"] then
 		defines {"STATIC_PLUGINS"}
 	end

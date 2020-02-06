@@ -124,23 +124,89 @@ void get(lua_State* L, const char* head, Args... tail) {
 	get_tail(L, tail...);
 }
 
-template <typename T> inline bool checkField(lua_State* L, int idx, const char* k, T* out)
+template <typename T> inline bool isType(lua_State* L, int index)
 {
-	lua_getfield(L, idx, k);
-	if(!isType<T>(L, -1)) {
-		lua_pop(L, 1);
-		return false;
-	}
-	*out = toType<T>(L, -1);
-	lua_pop(L, 1);
-	return true;
+	return lua_islightuserdata(L, index) != 0;
 }
-
-
-inline int getField(lua_State* L, int idx, const char* k)
+template <> inline bool isType<int>(lua_State* L, int index)
 {
-	lua_getfield(L, idx, k);
-	return lua_type(L, -1);
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<u16>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<Path>(lua_State* L, int index)
+{
+	return lua_isstring(L, index);
+}
+template <> inline bool isType<u8>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<EntityRef>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<EntityPtr>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<ComponentType>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<Vec3>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
+}
+template <> inline bool isType<DVec3>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
+}
+template <> inline bool isType<Vec4>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 4;
+}
+template <> inline bool isType<Vec2>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 2;
+}
+template <> inline bool isType<Matrix>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 16;
+}
+template <> inline bool isType<Quat>(lua_State* L, int index)
+{
+	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 4;
+}
+template <> inline bool isType<u32>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<u64>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<i64>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<bool>(lua_State* L, int index)
+{
+	return lua_isboolean(L, index) != 0;
+}
+template <> inline bool isType<float>(lua_State* L, int index)
+{
+	return lua_isnumber(L, index) != 0;
+}
+template <> inline bool isType<const char*>(lua_State* L, int index)
+{
+	return lua_isstring(L, index) != 0;
+}
+template <> inline bool isType<void*>(lua_State* L, int index)
+{
+	return lua_islightuserdata(L, index) != 0;
 }
 
 template <typename T> inline T toType(lua_State* L, int index)
@@ -148,31 +214,6 @@ template <typename T> inline T toType(lua_State* L, int index)
 	return (T)lua_touserdata(L, index);
 }
 
-template <typename T, typename F> bool forEachArrayItem(lua_State* L, int index, const char* error_msg, F&& func)
-{
-	if (!lua_istable(L, index)) {
-		if (error_msg) luaL_argerror(L, index, error_msg);
-		return false;
-	}
-	
-	bool all_match = true;
-	const int n = (int)lua_objlen(L, index);
-	for (int i = 0; i < n; ++i) {
-		lua_rawgeti(L, index, i + 1);
-		if(isType<T>(L, -1)) {
-			func(toType<T>(L, -1));
-		}
-		else if (error_msg) {
-			lua_pop(L, 1);
-			luaL_argerror(L, index, error_msg);
-		}
-		else {
-			all_match = false;
-		}
-		lua_pop(L, 1);
-	}
-	return all_match;
-}
 template <> inline int toType(lua_State* L, int index)
 {
 	return (int)lua_tointeger(L, index);
@@ -339,6 +380,51 @@ template <> inline void* toType(lua_State* L, int index)
 	return lua_touserdata(L, index);
 }
 
+template <typename T> inline bool checkField(lua_State* L, int idx, const char* k, T* out)
+{
+	lua_getfield(L, idx, k);
+	if(!isType<T>(L, -1)) {
+		lua_pop(L, 1);
+		return false;
+	}
+	*out = toType<T>(L, -1);
+	lua_pop(L, 1);
+	return true;
+}
+
+
+inline int getField(lua_State* L, int idx, const char* k)
+{
+	lua_getfield(L, idx, k);
+	return lua_type(L, -1);
+}
+
+template <typename T, typename F> bool forEachArrayItem(lua_State* L, int index, const char* error_msg, F&& func)
+{
+	if (!lua_istable(L, index)) {
+		if (error_msg) luaL_argerror(L, index, error_msg);
+		return false;
+	}
+	
+	bool all_match = true;
+	const int n = (int)lua_objlen(L, index);
+	for (int i = 0; i < n; ++i) {
+		lua_rawgeti(L, index, i + 1);
+		if(isType<T>(L, -1)) {
+			func(toType<T>(L, -1));
+		}
+		else if (error_msg) {
+			lua_pop(L, 1);
+			luaL_argerror(L, index, error_msg);
+		}
+		else {
+			all_match = false;
+		}
+		lua_pop(L, 1);
+	}
+	return all_match;
+}
+
 
 template <typename T> inline const char* typeToString()
 {
@@ -384,98 +470,6 @@ template <> inline const char* typeToString<bool>()
 template <> inline const char* typeToString<float>()
 {
 	return "number|float";
-}
-
-
-template <typename T> inline bool isType(lua_State* L, int index)
-{
-	return lua_islightuserdata(L, index) != 0;
-}
-template <> inline bool isType<int>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<u16>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<Path>(lua_State* L, int index)
-{
-	return lua_isstring(L, index);
-}
-template <> inline bool isType<u8>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<EntityRef>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<EntityPtr>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<ComponentType>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<Vec3>(lua_State* L, int index)
-{
-	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
-}
-template <> inline bool isType<DVec3>(lua_State* L, int index)
-{
-	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 3;
-}
-template <> inline bool isType<Vec4>(lua_State* L, int index)
-{
-	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 4;
-}
-template <> inline bool isType<Vec2>(lua_State* L, int index)
-{
-	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 2;
-}
-template <> inline bool isType<Matrix>(lua_State* L, int index)
-{
-	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 16;
-}
-template <> inline bool isType<Quat>(lua_State* L, int index)
-{
-	return lua_istable(L, index) != 0 && lua_objlen(L, index) == 4;
-}
-template <> inline bool isType<u32>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<u64>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<i64>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<bool>(lua_State* L, int index)
-{
-	return lua_isboolean(L, index) != 0;
-}
-template <> inline bool isType<float>(lua_State* L, int index)
-{
-	return lua_isnumber(L, index) != 0;
-}
-template <> inline bool isType<const char*>(lua_State* L, int index)
-{
-	return lua_isstring(L, index) != 0;
-}
-template <> inline bool isType<void*>(lua_State* L, int index)
-{
-	return lua_islightuserdata(L, index) != 0;
-}
-
-template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)
-{
-	push(L, value);
-	lua_setfield(L, table_idx - 1, name);
 }
 
 template <typename T> inline void push(lua_State* L, T value)
@@ -640,6 +634,11 @@ template <> inline void push(lua_State* L, void* value)
 	lua_pushlightuserdata(L, value);
 }
 
+template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)
+{
+ 	push(L, value);
+	lua_setfield(L, table_idx - 1, name);
+}
 
 inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value)
 {

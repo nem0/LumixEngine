@@ -1,5 +1,5 @@
+#include "engine/allocator.h"
 #include "engine/lumix.h"
-#include "engine/iallocator.h"
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"
 #include "engine/profiler.h"
@@ -55,7 +55,7 @@ Task::~Task()
 	LUMIX_DELETE(m_implementation->allocator, m_implementation);
 }
 
-bool Task::create(const char* name)
+bool Task::create(const char* name, bool is_extended)
 {
 	pthread_attr_t attr;
 	int res = pthread_attr_init(&attr);
@@ -87,11 +87,6 @@ void Task::setAffinityMask(u64 affinity_mask)
 	pthread_setaffinity_np(m_implementation->handle, sizeof(set), &set);
 }
 
-u64 Task::getAffinityMask() const
-{
-	return m_implementation->affinity_mask;
-}
-
 bool Task::isRunning() const
 {
 	return m_implementation->is_running;
@@ -102,24 +97,9 @@ bool Task::isFinished() const
 	return m_implementation->exited;
 }
 
-bool Task::isForceExit() const
-{
-	return m_implementation->force_exit;
-}
-
 IAllocator& Task::getAllocator()
 {
 	return m_implementation->allocator;
-}
-
-void Task::forceExit(bool wait)
-{
-	m_implementation->force_exit = true;
-
-	if (wait)
-	{
-		pthread_join(m_implementation->handle, nullptr);
-	}
 }
 
 } // namespace MT

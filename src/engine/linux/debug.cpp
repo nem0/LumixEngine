@@ -1,7 +1,6 @@
-#include "engine/debug/debug.h"
+#include "engine/debug.h"
 #include "engine/mt/atomic.h"
 #include "engine/string.h"
-#include "engine/system.h"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -64,7 +63,7 @@ void StackTree::refreshModuleList()
 }
 
 
-int StackTree::getPath(StackNode* node, StackNode** output, int max_size)
+int StackTree::getPath(StackNode* node, Span<StackNode*> output)
 {
 	return 0;
 }
@@ -76,7 +75,7 @@ StackNode* StackTree::getParent(StackNode* node)
 }
 
 
-bool StackTree::getFunction(StackNode* node, char* out, int max_size, int* line)
+bool StackTree::getFunction(StackNode* node, Span<char> out, Ref<int> line)
 {
 	return false;
 }
@@ -108,7 +107,6 @@ static const u32 ALLOCATION_GUARD = 0xFDFDFDFD;
 Allocator::Allocator(IAllocator& source)
 	: m_source(source)
 	, m_root(nullptr)
-	, m_mutex(false)
 	, m_total_size(0)
 	, m_is_fill_enabled(true)
 	, m_are_guards_enabled(true)
@@ -151,13 +149,13 @@ Allocator::~Allocator()
 
 void Allocator::lock()
 {
-	m_mutex.lock();
+	m_mutex.enter();
 }
 
 
 void Allocator::unlock()
-{
-	m_mutex.unlock();
+{ 
+	m_mutex.exit();
 }
 
 

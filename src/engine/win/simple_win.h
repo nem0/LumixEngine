@@ -1,6 +1,5 @@
 #pragma once
 
-
 #define PASCAL __stdcall
 #ifndef _W64 
 	#define _W64 __w64

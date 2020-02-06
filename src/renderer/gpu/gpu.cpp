@@ -5,10 +5,24 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/mt/sync.h"
+#include "engine/mt/thread.h"
+#include "engine/os.h"
 #include "engine/stream.h"
-#include <Windows.h>
-#include <gl/GL.h>
+#ifdef _WIN32
+	#include <Windows.h>
+#endif
+#ifdef __linux__
+	#include <X11/Xlib.h>
+	#define GLX_GLXEXT_LEGACY
+	#include <GL/glx.h>
+	#include <GL/glxext.h>
+#endif
+#include <GL/gl.h>
 #include "renderdoc_app.h"
+
+namespace Lumix {
+
+namespace gpu {
 
 #define GPU_GL_IMPORT(prototype, name) static prototype name;
 #define GPU_GL_IMPORT_TYPEDEFS
@@ -17,13 +31,6 @@
 
 #undef GPU_GL_IMPORT_TYPEDEFS
 #undef GPU_GL_IMPORT
-
-
-namespace Lumix
-{
-
-
-namespace gpu {
 
 struct Buffer
 {
@@ -94,9 +101,11 @@ struct Pool
 
 struct WindowContext {
 	void* window_handle = nullptr;
+	GLuint vao;
+#ifdef _WIN32
 	HDC device_context;
 	HGLRC hglrc;
-	GLuint vao;
+#endif
 };
 
 static struct {
@@ -107,7 +116,7 @@ static struct {
 	Pool<Texture, Texture::MAX_COUNT> textures;
 	Pool<Program, Program::MAX_COUNT> programs;
 	MT::CriticalSection handle_mutex;
-	DWORD thread;
+	Lumix::MT::ThreadID thread;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
 	ProgramHandle last_program = INVALID_PROGRAM;
@@ -704,20 +713,22 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 
 void checkThread()
 {
-	ASSERT(g_gpu.thread == GetCurrentThreadId());
+	ASSERT(g_gpu.thread == Lumix::MT::getCurrentThreadID());
 }
 
 static void try_load_renderdoc()
 {
-	HMODULE lib = LoadLibrary("renderdoc.dll");
-	if (!lib) return;
-	pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)GetProcAddress(lib, "RENDERDOC_GetAPI");
-	if (RENDERDOC_GetAPI) {
-		RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void **)&g_gpu.rdoc_api);
-		g_gpu.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
-	}
-	/**/
-	//FreeLibrary(lib);
+	#ifdef _WIN32
+		void* lib = OS::loadLibrary("renderdoc.dll");
+		if (!lib) return;
+		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)OS::getLibrarySymbol(lib, "RENDERDOC_GetAPI");
+		if (RENDERDOC_GetAPI) {
+			RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void **)&g_gpu.rdoc_api);
+			g_gpu.rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
+		}
+		/**/
+		//FreeLibrary(lib);
+	#endif
 }
 
 static void logVersion() {
@@ -729,94 +740,103 @@ static void logVersion() {
 	logInfo("Renderer") << "OpenGL renderer: " << renderer;
 }
 
+static void* getGLFunc(const char* name) {
+	#ifdef _WIN32
+		return wglGetProcAddress(name);
+	#else
+		return (void*)glXGetProcAddress((const GLubyte*)name);
+	#endif
+}
+
 static bool load_gl(void* device_contex, u32 init_flags)
 {
 	const bool vsync = init_flags & (u32)InitFlags::VSYNC;
-	HDC hdc = (HDC)device_contex;
-	const PIXELFORMATDESCRIPTOR pfd =
-	{
-		sizeof(PIXELFORMATDESCRIPTOR),
-		1,
-		PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,    // Flags
-		PFD_TYPE_RGBA,        // The kind of framebuffer. RGBA or palette.
-		32,                   // Colordepth of the framebuffer.
-		0, 0, 0, 0, 0, 0,
-		0,
-		0,
-		0,
-		0, 0, 0, 0,
-		24,                   // Number of bits for the depthbuffer
-		8,                    // Number of bits for the stencilbuffer
-		0,                    // Number of Aux buffers in the framebuffer.
-		PFD_MAIN_PLANE,
-		0,
-		0, 0, 0
-	};
-	const int pf = ChoosePixelFormat(hdc, &pfd);
-	BOOL pf_status = SetPixelFormat(hdc, pf, &pfd);
-	ASSERT(pf_status == TRUE);
+	#ifdef _WIN32
+		HDC hdc = (HDC)device_contex;
+		const PIXELFORMATDESCRIPTOR pfd =
+		{
+			sizeof(PIXELFORMATDESCRIPTOR),
+			1,
+			PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,    // Flags
+			PFD_TYPE_RGBA,        // The kind of framebuffer. RGBA or palette.
+			32,                   // Colordepth of the framebuffer.
+			0, 0, 0, 0, 0, 0,
+			0,
+			0,
+			0,
+			0, 0, 0, 0,
+			24,                   // Number of bits for the depthbuffer
+			8,                    // Number of bits for the stencilbuffer
+			0,                    // Number of Aux buffers in the framebuffer.
+			PFD_MAIN_PLANE,
+			0,
+			0, 0, 0
+		};
+		const int pf = ChoosePixelFormat(hdc, &pfd);
+		BOOL pf_status = SetPixelFormat(hdc, pf, &pfd);
+		ASSERT(pf_status == TRUE);
 
-	const HGLRC dummy_context = wglCreateContext(hdc);
-	ASSERT(dummy_context);
-	wglMakeCurrent(hdc, dummy_context);
+		const HGLRC dummy_context = wglCreateContext(hdc);
+		ASSERT(dummy_context);
+		wglMakeCurrent(hdc, dummy_context);
 
-	typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
-	typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
-	PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-	PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-	
-	#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
-	#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
-	#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
-	#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
-	#define WGL_CONTEXT_LAYER_PLANE_ARB 0x2093
-	#define WGL_CONTEXT_FLAGS_ARB 0x2094
-	#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
-	#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
-	#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB  0x00000002
-	
-	const int32_t contextAttrs[] = {
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 5,
-		#ifdef LUMIX_DEBUG
-			WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
-		#endif
-//		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
-		0
-	};
-	HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
-	if (hglrc) {
-		wglMakeCurrent(hdc, hglrc);
-		wglDeleteContext(dummy_context);
-	}
-	else {
-		DWORD err = GetLastError();
-		logError("Renderer") << "wglCreateContextAttribsARB failed, GetLastError() = " << (u32) err; 
-		logError("Renderer") << "OpenGL 4.5+ required";
+		typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
+		typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
+		PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)getGLFunc("wglCreateContextAttribsARB");
+		PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)getGLFunc("wglSwapIntervalEXT");
+		
+		#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
+		#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
+		#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
+		#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
+		#define WGL_CONTEXT_LAYER_PLANE_ARB 0x2093
+		#define WGL_CONTEXT_FLAGS_ARB 0x2094
+		#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
+		#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+		#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB  0x00000002
+		
+		const int32_t contextAttrs[] = {
+			WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+			WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+			#ifdef LUMIX_DEBUG
+				WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+			#endif
+	//		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
+			0
+		};
+		HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, contextAttrs);
+		if (hglrc) {
+			wglMakeCurrent(hdc, hglrc);
+			wglDeleteContext(dummy_context);
+		}
+		else {
+			DWORD err = GetLastError();
+			logError("Renderer") << "wglCreateContextAttribsARB failed, GetLastError() = " << (u32) err; 
+			logError("Renderer") << "OpenGL 4.5+ required";
+			logVersion();
+			return false;
+		}
 		logVersion();
-		return false;
-	}
-	logVersion();
-	g_gpu.contexts[0].hglrc = hglrc;
-	wglSwapIntervalEXT(vsync ? 1 : 0);
-	HMODULE gl_dll = LoadLibrary("opengl32.dll");
+		g_gpu.contexts[0].hglrc = hglrc;
+		wglSwapIntervalEXT(vsync ? 1 : 0);
+		void* gl_dll = OS::loadLibrary("opengl32.dll");
 
-	#define GPU_GL_IMPORT(prototype, name) \
-		do { \
-			name = (prototype)wglGetProcAddress(#name); \
-			if (!name && gl_dll) { \
-				name = (prototype)GetProcAddress(gl_dll, #name); \
-				if (!name) { \
-					logError("Renderer") << "Failed to load GL function " #name "."; \
-					return false; \
+		#define GPU_GL_IMPORT(prototype, name) \
+			do { \
+				name = (prototype)getGLFunc(#name); \
+				if (!name && gl_dll) { \
+					name = (prototype)OS::getLibrarySymbol(gl_dll, #name); \
+					if (!name) { \
+						logError("Renderer") << "Failed to load GL function " #name "."; \
+						return false; \
+					} \
 				} \
-			} \
-		} while(0)
+			} while(0)
 
-	#include "gl_ext.h"
+		#include "gl_ext.h"
 
-	#undef GPU_GL_IMPORT
-
+		#undef GPU_GL_IMPORT
+#endif
 	return true;
 }
 
@@ -1225,96 +1245,98 @@ static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum seve
 void setCurrentWindow(void* window_handle) {
 	checkThread();
 
-	WindowContext& ctx = [window_handle]() -> WindowContext& {
-		if (!window_handle) return g_gpu.contexts[0];
+	#ifdef _WIN32
+		WindowContext& ctx = [window_handle]() -> WindowContext& {
+			if (!window_handle) return g_gpu.contexts[0];
 
-		for (WindowContext& i : g_gpu.contexts) {
-			if (i.window_handle == window_handle) return i;
-		}
-
-		for (WindowContext& i : g_gpu.contexts) {
-			if (!i.window_handle) {
-				i.window_handle = window_handle;
-				i.device_context = GetDC((HWND)window_handle);
-				i.hglrc = 0;
-				return i;
+			for (WindowContext& i : g_gpu.contexts) {
+				if (i.window_handle == window_handle) return i;
 			}
-		}
-		LUMIX_FATAL(false);
-		return g_gpu.contexts[0];
-	}();
 
-	if (!ctx.hglrc) {
-		const HDC hdc = ctx.device_context;
-		const PIXELFORMATDESCRIPTOR pfd =
-		{
-			sizeof(PIXELFORMATDESCRIPTOR),
-			1,
-			PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,    // Flags
-			PFD_TYPE_RGBA,        // The kind of framebuffer. RGBA or palette.
-			32,                   // Colordepth of the framebuffer.
-			0, 0, 0, 0, 0, 0,
-			0,
-			0,
-			0,
-			0, 0, 0, 0,
-			24,                   // Number of bits for the depthbuffer
-			8,                    // Number of bits for the stencilbuffer
-			0,                    // Number of Aux buffers in the framebuffer.
-			PFD_MAIN_PLANE,
-			0,
-			0, 0, 0
-		};
-		const int pf = ChoosePixelFormat(hdc, &pfd);
-		BOOL pf_status = SetPixelFormat(hdc, pf, &pfd);
-		ASSERT(pf_status == TRUE);
+			for (WindowContext& i : g_gpu.contexts) {
+				if (!i.window_handle) {
+					i.window_handle = window_handle;
+					i.device_context = GetDC((HWND)window_handle);
+					i.hglrc = 0;
+					return i;
+				}
+			}
+			LUMIX_FATAL(false);
+			return g_gpu.contexts[0];
+		}();
 
-		wglMakeCurrent(hdc, g_gpu.contexts[0].hglrc);
+		if (!ctx.hglrc) {
+			const HDC hdc = ctx.device_context;
+			const PIXELFORMATDESCRIPTOR pfd =
+			{
+				sizeof(PIXELFORMATDESCRIPTOR),
+				1,
+				PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,    // Flags
+				PFD_TYPE_RGBA,        // The kind of framebuffer. RGBA or palette.
+				32,                   // Colordepth of the framebuffer.
+				0, 0, 0, 0, 0, 0,
+				0,
+				0,
+				0,
+				0, 0, 0, 0,
+				24,                   // Number of bits for the depthbuffer
+				8,                    // Number of bits for the stencilbuffer
+				0,                    // Number of Aux buffers in the framebuffer.
+				PFD_MAIN_PLANE,
+				0,
+				0, 0, 0
+			};
+			const int pf = ChoosePixelFormat(hdc, &pfd);
+			BOOL pf_status = SetPixelFormat(hdc, pf, &pfd);
+			ASSERT(pf_status == TRUE);
 
-		typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
-		typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
-		PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-		PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-	
-		#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
-		#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
-		#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
-		#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
-		#define WGL_CONTEXT_LAYER_PLANE_ARB 0x2093
-		#define WGL_CONTEXT_FLAGS_ARB 0x2094
-		#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
-		#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
-		#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB  0x00000002
-	
-		const int32_t contextAttrs[] = {
-			WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-			WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+			wglMakeCurrent(hdc, g_gpu.contexts[0].hglrc);
+
+			typedef BOOL (WINAPI * PFNWGLSWAPINTERVALEXTPROC) (int interval);
+			typedef HGLRC (WINAPI * PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int *attribList);
+			PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)getGLFunc("wglCreateContextAttribsARB");
+			PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)getGLFunc("wglSwapIntervalEXT");
+		
+			#define WGL_CONTEXT_DEBUG_BIT_ARB 0x00000001
+			#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
+			#define WGL_CONTEXT_MAJOR_VERSION_ARB 0x2091
+			#define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
+			#define WGL_CONTEXT_LAYER_PLANE_ARB 0x2093
+			#define WGL_CONTEXT_FLAGS_ARB 0x2094
+			#define WGL_CONTEXT_PROFILE_MASK_ARB 0x9126
+			#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB 0x00000001
+			#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB  0x00000002
+		
+			const int32_t contextAttrs[] = {
+				WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
+				WGL_CONTEXT_MINOR_VERSION_ARB, 5,
+				#ifdef LUMIX_DEBUG
+					WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+				#endif
+		//		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
+				0
+			};
+
+			// TODO destroy context when window is destroyed
+			HGLRC hglrc = wglCreateContextAttribsARB(hdc, g_gpu.contexts[0].hglrc, contextAttrs);
+			ctx.hglrc = hglrc;
+			wglMakeCurrent(ctx.device_context, hglrc);
+			CHECK_GL(glGenVertexArrays(1, &ctx.vao));
+			CHECK_GL(glBindVertexArray(ctx.vao));
+			CHECK_GL(glVertexBindingDivisor(0, 0));
+			CHECK_GL(glVertexBindingDivisor(1, 1));
+
 			#ifdef LUMIX_DEBUG
-				WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB,
+				CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
+				CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
+				CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
+				CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
 			#endif
-	//		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB ,
-			0
-		};
 
-		// TODO destroy context when window is destroyed
-		HGLRC hglrc = wglCreateContextAttribsARB(hdc, g_gpu.contexts[0].hglrc, contextAttrs);
-		ctx.hglrc = hglrc;
-		wglMakeCurrent(ctx.device_context, hglrc);
-		CHECK_GL(glGenVertexArrays(1, &ctx.vao));
-		CHECK_GL(glBindVertexArray(ctx.vao));
-		CHECK_GL(glVertexBindingDivisor(0, 0));
-		CHECK_GL(glVertexBindingDivisor(1, 1));
+		}
 
-		#ifdef LUMIX_DEBUG
-			CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
-			CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
-			CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
-			CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
-		#endif
-
-	}
-
-	wglMakeCurrent(ctx.device_context, ctx.hglrc);
+		wglMakeCurrent(ctx.device_context, ctx.hglrc);
+	#endif
 	useProgram(INVALID_PROGRAM);
 }
 
@@ -1324,7 +1346,9 @@ void swapBuffers()
 	checkThread();
 	glFinish();
 	for (const WindowContext& ctx : g_gpu.contexts) {
-		SwapBuffers(ctx.device_context);
+		#ifdef _WIN32
+			SwapBuffers(ctx.device_context);
+		#endif
 	}
 }
 
@@ -1979,61 +2003,62 @@ bool init(void* window_handle, u32 init_flags)
 	#else 
 		const bool debug = init_flags & (u32)InitFlags::DEBUG_OUTPUT;
 	#endif
-		
-	g_gpu.contexts[0].window_handle = window_handle;
-	g_gpu.contexts[0].device_context = GetDC((HWND)window_handle);
-	g_gpu.thread = GetCurrentThreadId();
-
-	if (!load_gl(g_gpu.contexts[0].device_context, init_flags)) return false;
-
-	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_gpu.max_vertex_attributes);
-
-	int extensions_count;
-	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
-	g_gpu.has_gpu_mem_info_ext = false; 
-	for(int i = 0; i < extensions_count; ++i) {
-		const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
-		if (equalStrings(ext, "GL_NVX_gpu_memory_info")) {
-			g_gpu.has_gpu_mem_info_ext = true; 
-			break;
-		}
-		//OutputDebugString(ext);
-		//OutputDebugString("\n");
-	}
-	//const unsigned char* version = glGetString(GL_VERSION);
-
-	CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
-	CHECK_GL(glDepthFunc(GL_GREATER));
-
-	if (debug) {
-		CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
-		CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
-		CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
-		CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
-	}
-
-	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
-	CHECK_GL(glBindVertexArray(0));	
-	CHECK_GL(glCreateFramebuffers(1, &g_gpu.framebuffer));
-
 	
-	g_gpu.default_program = allocProgramHandle();
-	Program& p = g_gpu.programs[g_gpu.default_program.value];
-	p.handle = glCreateProgram();
-	CHECK_GL(glGenVertexArrays(1, &g_gpu.contexts[0].vao));
-	CHECK_GL(glBindVertexArray(g_gpu.contexts[0].vao));
-	CHECK_GL(glVertexBindingDivisor(0, 0));
-	CHECK_GL(glVertexBindingDivisor(1, 1));
+	#ifdef _WIN32
+		g_gpu.contexts[0].window_handle = window_handle;
+		g_gpu.contexts[0].device_context = GetDC((HWND)window_handle);
+		g_gpu.thread = GetCurrentThreadId();
 
-	const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
-	glShaderSource(vs, 1, &vs_src, nullptr);
-	glCompileShader(vs);
-	glAttachShader(p.handle, vs);
-	CHECK_GL(glLinkProgram(p.handle));
-	glDeleteShader(vs);
+		if (!load_gl(g_gpu.contexts[0].device_context, init_flags)) return false;
 
+		glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_gpu.max_vertex_attributes);
 
+		int extensions_count;
+		glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
+		g_gpu.has_gpu_mem_info_ext = false; 
+		for(int i = 0; i < extensions_count; ++i) {
+			const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
+			if (equalStrings(ext, "GL_NVX_gpu_memory_info")) {
+				g_gpu.has_gpu_mem_info_ext = true; 
+				break;
+			}
+			//OutputDebugString(ext);
+			//OutputDebugString("\n");
+		}
+		//const unsigned char* version = glGetString(GL_VERSION);
+
+		CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
+		CHECK_GL(glDepthFunc(GL_GREATER));
+
+		if (debug) {
+			CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
+			CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
+			CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
+			CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
+		}
+
+		CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
+		CHECK_GL(glBindVertexArray(0));	
+		CHECK_GL(glCreateFramebuffers(1, &g_gpu.framebuffer));
+
+		
+		g_gpu.default_program = allocProgramHandle();
+		Program& p = g_gpu.programs[g_gpu.default_program.value];
+		p.handle = glCreateProgram();
+		CHECK_GL(glGenVertexArrays(1, &g_gpu.contexts[0].vao));
+		CHECK_GL(glBindVertexArray(g_gpu.contexts[0].vao));
+		CHECK_GL(glVertexBindingDivisor(0, 0));
+		CHECK_GL(glVertexBindingDivisor(1, 1));
+
+		const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+		const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
+		glShaderSource(vs, 1, &vs_src, nullptr);
+		glCompileShader(vs);
+		glAttachShader(p.handle, vs);
+		CHECK_GL(glLinkProgram(p.handle));
+		glDeleteShader(vs);
+
+	#endif
 	g_gpu.last_state = 1;
 	setState(0);
 

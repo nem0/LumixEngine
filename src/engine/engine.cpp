@@ -6,6 +6,7 @@
 #include "engine/file_system.h"
 #include "engine/input_system.h"
 #include "engine/iplugin.h"
+#include "engine/mt/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"

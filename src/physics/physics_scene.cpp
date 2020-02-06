@@ -4,6 +4,7 @@
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/mt/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"

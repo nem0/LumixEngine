@@ -18,13 +18,14 @@ namespace Fiber
 
 
 #ifdef _WIN32
-	typedef void* Handle;
-	typedef void(__stdcall *FiberProc)(void*);
+	using Handle = void*;
+	using FiberProc = void(__stdcall *)(void*);
+	constexpr Handle INVALID_FIBER = nullptr;
 #else 
-	typedef ucontext_t Handle;
-	typedef void (*FiberProc)(void*);
+	using Handle = ucontext_t*;
+	using FiberProc = void (*)(void*);
+	constexpr Handle INVALID_FIBER = nullptr;
 #endif
-constexpr void* INVALID_FIBER = nullptr;
 
 
 void initThread(FiberProc proc, Handle* handle);
