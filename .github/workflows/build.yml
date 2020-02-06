@@ -24,6 +24,9 @@ jobs:
             - name: make project
               working-directory: projects
               run: ./genie --static-plugins gmake
+            - name: install packages
+              run: |
+                sudo apt-get install mesa-common-dev
             - name: build engine
               working-directory: projects/tmp/gmake
               run: |
@@ -34,5 +37,6 @@ jobs:
                 make navigation
                 make gui
                 make lua_script
+                make renderer
                 make editor
             
