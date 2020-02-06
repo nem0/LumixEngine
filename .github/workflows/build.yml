@@ -28,4 +28,12 @@ jobs:
               working-directory: projects/tmp/gmake
               run: |
                 make engine
+                make animation
+                make physics
+                make renderer
+                make audio
+                make navigation
+                make gui
+                make lua_script
+                make editor
             
