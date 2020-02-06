@@ -34,7 +34,6 @@ jobs:
                 make engine
                 make animation
                 make physics
-                make audio
                 make navigation
                 make gui
                 make lua_script
