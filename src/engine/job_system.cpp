@@ -1,3 +1,4 @@
+#include "engine/mt/atomic.h"
 #include "job_system.h"
 #include "engine/array.h"
 #include "engine/engine.h"
@@ -5,7 +6,6 @@
 #include "engine/allocator.h"
 #include "engine/log.h"
 #include "engine/math.h"
-#include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
 #include "engine/mt/thread.h"

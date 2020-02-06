@@ -1,6 +1,6 @@
-#include "editor/platform_interface.h"
 #include "engine/hash_map.h"
 #include "engine/mt/task.h"
+#include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include "file_system_watcher.h"
@@ -66,7 +66,7 @@ struct FileSystemWatcherImpl : public FileSystemWatcher
     bool start(const char* path)
     {
         task = LUMIX_NEW(allocator, FileSystemWatcherTask)(path, *this, allocator);
-        if (!task->create("FileSystemWatcherTask"))
+        if (!task->create("FileSystemWatcherTask", true))
         {
             LUMIX_DELETE(allocator, task);
             task = nullptr;
@@ -107,14 +107,14 @@ void FileSystemWatcher::destroy(FileSystemWatcher* watcher)
 
 static void addWatch(FileSystemWatcherTask& task, const char* path, int root_length)
 {
-	if (!PlatformInterface::dirExists(path)) return;
+	if (!OS::dirExists(path)) return;
 	
     int wd = inotify_add_watch(task.fd, path, IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_CLOSE_WRITE);
     task.watched.insert(wd, path + root_length);
 
-    auto iter = PlatformInterface::createFileIterator(path, task.allocator);
-    PlatformInterface::FileInfo info;
-    while (PlatformInterface::getNextFile(iter, &info))
+    auto iter = OS::createFileIterator(path, task.allocator);
+    OS::FileInfo info;
+    while (OS::getNextFile(iter, &info))
     {
         if (!info.is_directory) continue;
 		if (Lumix::equalStrings(info.filename, ".")) continue;
@@ -123,7 +123,7 @@ static void addWatch(FileSystemWatcherTask& task, const char* path, int root_len
         Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(path, info.filename, "/");
         addWatch(task, tmp, root_length);
     }
-    PlatformInterface::destroyFileIterator(iter);
+    OS::destroyFileIterator(iter);
 }
 
 
@@ -133,12 +133,12 @@ static void getName(FileSystemWatcherTask& task, inotify_event* event, char* out
 
     if (iter == task.watched.end())
     {
-        Lumix::copyString(out, max_size, event->name);
+        Lumix::copyString(Span(out, max_size), event->name);
         return;
     }
 
-    Lumix::copyString(out, max_size, iter.value());
-    Lumix::catString(out, max_size, event->name);
+    Lumix::copyString(Span(out, max_size), iter.value());
+    Lumix::catString(Span(out, max_size), event->name);
 }
 
 

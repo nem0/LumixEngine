@@ -451,6 +451,16 @@ void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 	}
 }
 
+void Node::serialize(OutputMemoryStream& stream) const {
+	stream.writeString(m_name.c_str());
+}
+
+void Node::deserialize(InputMemoryStream& stream, Controller& ctrl) {
+	char tmp[64];
+	stream.readString(Span(tmp));
+ 	m_name = tmp;
+}
+
 Node* Node::create(GroupNode* parent, Type type, IAllocator& allocator) {
 	switch (type) {
 		case Node::ANIMATION: return LUMIX_NEW(allocator, AnimationNode)(parent, allocator);

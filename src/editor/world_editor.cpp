@@ -2228,7 +2228,7 @@ public:
 			return 0;
 		};
 
-		lua_pushlightuserdata(L, static_cast<void*>(creator));
+		lua_pushlightuserdata(L, reinterpret_cast<void*>(creator));
 		lua_pushlightuserdata(L, this);
 		lua_pushcclosure(L, f, 2);
 		lua_setfield(L, -2, name);

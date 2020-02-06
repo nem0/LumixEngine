@@ -665,7 +665,8 @@ namespace Lumix
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				T val;
-				prop.getValue(cmp, idx, OutputMemoryStream(&val, sizeof(val)));
+				OutputMemoryStream blob(&val, sizeof(val));
+				prop.getValue(cmp, idx, blob);
 				count = 1;
 				LuaWrapper::push(L, val);
 			}
@@ -684,7 +685,8 @@ namespace Lumix
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				char tmp[MAX_PATH_LENGTH];
-				prop.getValue(cmp, idx, OutputMemoryStream(tmp, sizeof(tmp)));
+				OutputMemoryStream blob(tmp, sizeof(tmp));
+				prop.getValue(cmp, idx, blob);
 				count = 1;
 				LuaWrapper::push(L, tmp);
 			}
@@ -693,7 +695,8 @@ namespace Lumix
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				char tmp[1024];
-				prop.getValue(cmp, idx, OutputMemoryStream(tmp, sizeof(tmp)));
+				OutputMemoryStream blob(tmp, sizeof(tmp));
+				prop.getValue(cmp, idx, blob);
 				count = 1;
 				LuaWrapper::push(L, tmp);
 			}
@@ -728,7 +731,8 @@ namespace Lumix
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const T val = LuaWrapper::toType<T>(L, 3);
-				prop.setValue(cmp, idx, InputMemoryStream(&val, sizeof(val)));
+				InputMemoryStream blob(&val, sizeof(val));
+				prop.setValue(cmp, idx, blob);
 			}
 
 			void visit(const Reflection::Property<float>& prop) override { set(prop); }
@@ -745,14 +749,16 @@ namespace Lumix
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
-				prop.setValue(cmp, idx, InputMemoryStream(val, 1 + stringLength(val)));
+				InputMemoryStream blob(val, 1 + stringLength(val));
+				prop.setValue(cmp, idx, blob);
 			}
 
 			void visit(const Reflection::Property<const char*>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
-				prop.setValue(cmp, idx, InputMemoryStream(val, 1 + stringLength(val)));
+				InputMemoryStream blob(val, 1 + stringLength(val));
+				prop.setValue(cmp, idx, blob);
 			}
 
 			void visit(const Reflection::IArrayProperty& prop) override {}

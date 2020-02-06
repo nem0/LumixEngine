@@ -4,7 +4,7 @@
 	#include <signal.h> // SIGTRAP
 #endif
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__linux__)
 	#error Platform not supported
 #endif
 

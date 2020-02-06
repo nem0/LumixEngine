@@ -53,15 +53,8 @@ struct Node {
 	virtual void enter(RuntimeContext& ctx) const = 0;
 	virtual void skip(RuntimeContext& ctx) const = 0;
 	virtual void getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const = 0;
-	virtual void serialize(OutputMemoryStream& stream) const = 0 {
-		stream.writeString(m_name.c_str());
-	}
-
-	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl) = 0 {
-		char tmp[64];
-		stream.readString(Span(tmp));
-		m_name = tmp;
-	}
+	virtual void serialize(OutputMemoryStream& stream) const = 0;
+	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl) = 0;
 
 	static Node* create(GroupNode* parent, Type type, IAllocator& allocator);
 

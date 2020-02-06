@@ -1,7 +1,9 @@
 #include "math.h"
 #include "simd.h"
 #include <random>
-
+#ifdef __linux__
+	#include <float.h>
+#endif
 
 namespace Lumix
 {

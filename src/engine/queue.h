@@ -39,16 +39,6 @@ namespace Lumix
 		Iterator begin() { return {this, m_rd}; }
 		Iterator end() { return {this, m_wr}; }
 
-		T& emplace()
-		{
-			ASSERT(m_wr - m_rd < count);
-
-			u32 idx = m_wr & (count - 1);
-			T& res = ::new (NewPlaceholder(), &m_buffer[idx]) T(item);
-			++m_wr;
-			return res;
-		}
-
 		void push(const T& item)
 		{
 			ASSERT(m_wr - m_rd < count);

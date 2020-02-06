@@ -1,8 +1,9 @@
-#define INITGUID
-#define NOGDI 
-#include <Windows.h>
-#include <evntcons.h>
-
+#ifdef _WIN32
+	#define INITGUID
+	#define NOGDI 
+	#include <Windows.h>
+	#include <evntcons.h>
+#endif
 
 #include "engine/array.h"
 #include "engine/crt.h"
@@ -46,44 +47,52 @@ struct ThreadContext
 	u32 thread_id;
 };
 
-#define SWITCH_CONTEXT_OPCODE 36
+#ifdef _WIN32
+	#define SWITCH_CONTEXT_OPCODE 36
 
-#pragma pack(1)
-	struct TraceProps
+	#pragma pack(1)
+		struct TraceProps
+		{
+			EVENT_TRACE_PROPERTIES base;
+			char name[sizeof(KERNEL_LOGGER_NAME) + 1];
+		};
+	#pragma pack()
+
+
+	// https://docs.microsoft.com/en-us/windows/desktop/etw/cswitch
+	struct CSwitch
 	{
-		EVENT_TRACE_PROPERTIES base;
-		char name[sizeof(KERNEL_LOGGER_NAME) + 1];
+		u32                 NewThreadId;
+		u32                 OldThreadId;
+		i8             NewThreadPriority;
+		i8             OldThreadPriority;
+		u8               PreviousCState;
+		i8                     SpareByte;
+		i8           OldThreadWaitReason;
+		i8             OldThreadWaitMode;
+		i8                OldThreadState;
+		i8   OldThreadWaitIdealProcessor;
+		u32           NewThreadWaitTime;
+		u32                    Reserved;
 	};
-#pragma pack()
 
 
-// https://docs.microsoft.com/en-us/windows/desktop/etw/cswitch
-struct CSwitch
-{
-	u32                 NewThreadId;
-	u32                 OldThreadId;
-	i8             NewThreadPriority;
-	i8             OldThreadPriority;
-	u8               PreviousCState;
-	i8                     SpareByte;
-	i8           OldThreadWaitReason;
-	i8             OldThreadWaitMode;
-	i8                OldThreadState;
-	i8   OldThreadWaitIdealProcessor;
-	u32           NewThreadWaitTime;
-	u32                    Reserved;
-};
+	struct TraceTask : MT::Task {
+		TraceTask(IAllocator& allocator);
 
+		int task() override;
+		static void callback(PEVENT_RECORD event);
 
-struct TraceTask : MT::Task {
-	TraceTask(IAllocator& allocator);
-
-	int task() override;
-	static void callback(PEVENT_RECORD event);
-
-	TRACEHANDLE open_handle;
-};
-
+		TRACEHANDLE open_handle;
+	};
+#else
+	struct TraceTask {
+		TraceTask(IAllocator&) {}
+		void destroy() {}
+		int open_handle;
+	};
+	void CloseTrace(int) {}
+#endif
 
 static struct Instance
 {
@@ -105,38 +114,40 @@ static struct Instance
 
 	void startTrace()
 	{
-		static TRACEHANDLE trace_handle;
-		static TraceProps props = {};
-		props.base.Wnode.BufferSize = sizeof(props);
-		props.base.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
-		props.base.Wnode.ClientContext = 1;
-		props.base.Wnode.Guid = SystemTraceControlGuid;
-		props.base.LoggerNameOffset = sizeof(props.base);
-		props.base.EnableFlags = EVENT_TRACE_FLAG_CSWITCH;
-		props.base.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
-		strcpy_s(props.name, KERNEL_LOGGER_NAME);
+		#ifdef _WIN32
+			static TRACEHANDLE trace_handle;
+			static TraceProps props = {};
+			props.base.Wnode.BufferSize = sizeof(props);
+			props.base.Wnode.Flags = WNODE_FLAG_TRACED_GUID;
+			props.base.Wnode.ClientContext = 1;
+			props.base.Wnode.Guid = SystemTraceControlGuid;
+			props.base.LoggerNameOffset = sizeof(props.base);
+			props.base.EnableFlags = EVENT_TRACE_FLAG_CSWITCH;
+			props.base.LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
+			strcpy_s(props.name, KERNEL_LOGGER_NAME);
 
-		TraceProps tmp = props;
-		ControlTrace(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
-		ULONG res = StartTrace(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
-		switch (res) {
-		case ERROR_ALREADY_EXISTS:
-		case ERROR_ACCESS_DENIED:
-		case ERROR_BAD_LENGTH:
-		default:
-			context_switches_enabled = false;
-			break;
-		case ERROR_SUCCESS:
-			context_switches_enabled = true;
-			break;
-		}
+			TraceProps tmp = props;
+			ControlTrace(NULL, KERNEL_LOGGER_NAME, &tmp.base, EVENT_TRACE_CONTROL_STOP);
+			ULONG res = StartTrace(&trace_handle, KERNEL_LOGGER_NAME, &props.base);
+			switch (res) {
+			case ERROR_ALREADY_EXISTS:
+			case ERROR_ACCESS_DENIED:
+			case ERROR_BAD_LENGTH:
+			default:
+				context_switches_enabled = false;
+				break;
+			case ERROR_SUCCESS:
+				context_switches_enabled = true;
+				break;
+			}
 
-		static EVENT_TRACE_LOGFILE trace = {};
-		trace.LoggerName = KERNEL_LOGGER_NAME;
-		trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
-		trace.EventRecordCallback = TraceTask::callback;
-		trace_task.open_handle = OpenTrace(&trace);
-		trace_task.create("Profiler trace", true);
+			static EVENT_TRACE_LOGFILE trace = {};
+			trace.LoggerName = KERNEL_LOGGER_NAME;
+			trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
+			trace.EventRecordCallback = TraceTask::callback;
+			trace_task.open_handle = OpenTrace(&trace);
+			trace_task.create("Profiler trace", true);
+		#endif
 	}
 
 
@@ -280,31 +291,31 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	cpy(data, size);
 };
 
-
-TraceTask::TraceTask(IAllocator& allocator)
-	: MT::Task(allocator)
-{}
-
-
-int TraceTask::task() {
-	ProcessTrace(&open_handle, 1, nullptr, nullptr);
-	return 0;
-}
+#ifdef _WIN32
+	TraceTask::TraceTask(IAllocator& allocator)
+		: MT::Task(allocator)
+	{}
 
 
-void TraceTask::callback(PEVENT_RECORD event) {
-	if (event->EventHeader.EventDescriptor.Opcode != SWITCH_CONTEXT_OPCODE) return;
-	if (sizeof(CSwitch) != event->UserDataLength) return;
+	int TraceTask::task() {
+		ProcessTrace(&open_handle, 1, nullptr, nullptr);
+		return 0;
+	}
 
-	const CSwitch* cs = reinterpret_cast<CSwitch*>(event->UserData);
-	ContextSwitchRecord rec;
-	rec.timestamp = event->EventHeader.TimeStamp.QuadPart;
-	rec.new_thread_id = cs->NewThreadId;
-	rec.old_thread_id = cs->OldThreadId;
-	rec.reason = cs->OldThreadWaitReason;
-	write(g_instance.global_context, rec.timestamp, Profiler::EventType::CONTEXT_SWITCH, rec);
-};
 
+	void TraceTask::callback(PEVENT_RECORD event) {
+		if (event->EventHeader.EventDescriptor.Opcode != SWITCH_CONTEXT_OPCODE) return;
+		if (sizeof(CSwitch) != event->UserDataLength) return;
+
+		const CSwitch* cs = reinterpret_cast<CSwitch*>(event->UserData);
+		ContextSwitchRecord rec;
+		rec.timestamp = event->EventHeader.TimeStamp.QuadPart;
+		rec.new_thread_id = cs->NewThreadId;
+		rec.old_thread_id = cs->OldThreadId;
+		rec.reason = cs->OldThreadWaitReason;
+		write(g_instance.global_context, rec.timestamp, Profiler::EventType::CONTEXT_SWITCH, rec);
+	};
+#endif
 
 void pushInt(const char* key, int value)
 {
