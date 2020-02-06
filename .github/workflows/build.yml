@@ -30,7 +30,6 @@ jobs:
                 make engine
                 make animation
                 make physics
-                make renderer
                 make audio
                 make navigation
                 make gui
