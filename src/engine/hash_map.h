@@ -68,6 +68,16 @@ struct HashFunc<EntityRef>
 };
 
 template<>
+struct HashFunc<EntityPtr>
+{
+	static u32 get(const EntityPtr& key)
+	{
+		static_assert(sizeof(i32) == sizeof(key.index), "Check this");
+		return HashFunc<i32>::get(key.index);
+	}
+};
+
+template<>
 struct HashFunc<u32>
 {
 	static u32 get(const u32& key)

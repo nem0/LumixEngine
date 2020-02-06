@@ -446,9 +446,14 @@ struct UniverseViewImpl final : UniverseView {
 };
 
 struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
-	PropertyDeserializeVisitor(IInputStream& deserializer, ComponentUID cmp)
+	PropertyDeserializeVisitor(IInputStream& deserializer
+		, ComponentUID cmp
+		, const HashMap<EntityPtr, u32>& map
+		, Span<const EntityRef> entities)
 		: deserializer(deserializer)
 		, cmp(cmp)
+		, map(map)
+		, entities(entities)
 	{}
 
 	void begin(const Reflection::ComponentBase&) override {}
@@ -465,11 +470,20 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::Property<float>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<int>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<u32>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<EntityPtr>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<Vec3>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
 	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+	
+	void visit(const Reflection::Property<EntityPtr>& prop) override { 
+		EntityPtr value;
+		deserializer.read(Ref(value));
+		auto iter = map.find(value);
+		if (iter.isValid()) value = entities[iter.value()];
+		
+		InputMemoryStream str(&value, sizeof(value));
+		prop.setValue(cmp, idx, str);
+	}
 
 	void visit(const Reflection::Property<Path>& prop) override { 
 		char buf[MAX_PATH_LENGTH];
@@ -513,6 +527,8 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 
 	IInputStream& deserializer;
 	ComponentUID cmp;
+	const HashMap<EntityPtr, u32>& map;
+	Span<const EntityRef> entities;
 	int idx;
 };
 
@@ -2359,6 +2375,9 @@ public:
 	{
 		serializer.write(count);
 		for (int i = 0; i < count; ++i) {
+			m_copy_buffer.write(entities[i]);
+		}
+		for (int i = 0; i < count; ++i) {
 			EntityRef entity = entities[i];
 			Transform tr = m_universe->getTransform(entity);
 			serializer.write(tr);
@@ -2379,7 +2398,6 @@ public:
 			serializer.write((u32)0);
 		}
 	}
-
 
 	void copyEntities() override
 	{
@@ -2876,20 +2894,12 @@ private:
 class PasteEntityCommand final : public IEditorCommand
 {
 public:
-	explicit PasteEntityCommand(WorldEditor& editor)
-		: m_copy_buffer(editor.getAllocator())
-		, m_editor(editor)
-		, m_entities(editor.getAllocator())
-		, m_identity(false)
-	{
-	}
-
-
 	PasteEntityCommand(WorldEditor& editor, const OutputMemoryStream& copy_buffer, bool identity = false)
 		: m_copy_buffer(copy_buffer)
 		, m_editor(editor)
 		, m_position(editor.getCameraRaycastHit())
 		, m_entities(editor.getAllocator())
+		, m_map(editor.getAllocator())
 		, m_identity(identity)
 	{
 	}
@@ -2900,6 +2910,7 @@ public:
 		, m_editor(editor)
 		, m_position(pos)
 		, m_entities(editor.getAllocator())
+		, m_map(editor.getAllocator())
 		, m_identity(identity)
 	{
 	}
@@ -2930,12 +2941,23 @@ public:
 		base_tr.pos = m_position;
 		base_tr.scale = 1;
 		base_tr.rot = Quat(0, 0, 0, 1);
+		m_map.reserve(entity_count);
+		if (!is_redo) {
+			for (int i = 0; i < entity_count; ++i) {
+				EntityRef orig_e;
+				blob.read(Ref(orig_e));
+				m_map.insert(orig_e, i);
+			}
+		}
 		for (int i = 0; i < entity_count; ++i)
 		{
 			Transform tr;
 			blob.read(Ref(tr));
 			EntityPtr parent;
 			blob.read(Ref(parent));
+
+			auto iter = m_map.find(parent);
+			if (iter.isValid()) parent = m_entities[iter.value()];
 
 			if (!m_identity)
 			{
@@ -2968,7 +2990,7 @@ public:
 
 				cmp.scene->getUniverse().createComponent(cmp.type, new_entity);
 
-				PropertyDeserializeVisitor visitor(blob, cmp);
+				PropertyDeserializeVisitor visitor(blob, cmp, m_map, m_entities);
 				visitor.idx = -1;
 				Reflection::getComponent(cmp.type)->visit(visitor);
 			}
@@ -3003,6 +3025,7 @@ private:
 	WorldEditor& m_editor;
 	DVec3 m_position;
 	Array<EntityRef> m_entities;
+	HashMap<EntityPtr, u32> m_map;
 	bool m_identity;
 };
 
