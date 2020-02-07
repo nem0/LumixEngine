@@ -1,9 +1,13 @@
 #include "audio_device.h"
+#include "engine/array.h"
 #include "engine/log.h"
 #include "engine/engine.h"
 #include "engine/iplugin.h"
 #include "engine/log.h"
+#include "engine/math.h"
+#include "engine/mt/sync.h"
 #include "engine/mt/task.h"
+#include "engine/os.h"
 #include <alsa/asoundlib.h>
 
 
@@ -55,7 +59,7 @@ public:
 		int sample_rate,
 		int flags) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(flags == 0); // nothing else supported yet
 		for(int i = 0, c = m_buffers.size(); i < c; ++i)
 		{
@@ -68,7 +72,7 @@ public:
 			buffer.data.resize(size_bytes);
 			buffer.runtime_flags = (u8)Buffer::RuntimeFlags::READY;
 			buffer.cursor = 0;
-			copyMemory(&buffer.data[0], data, size_bytes);
+			memcpy(&buffer.data[0], data, size_bytes);
 
 			return i;
 		}
@@ -82,7 +86,7 @@ public:
 		float left_delay,
 		float right_delay) override 
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -95,16 +99,16 @@ public:
 		float delay,
 		i32 phase) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
 
 	void mix(u16* output, int size_bytes)
 	{
-		setMemory(output, 0, size_bytes);
+		memset(output, 0, size_bytes);
 
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		for (Buffer& buffer : m_buffers)
 		{
 			if((buffer.runtime_flags & (u8)Buffer::RuntimeFlags::PLAYING) == 0) continue;
@@ -123,8 +127,8 @@ public:
 		bool is_looped = buffer.runtime_flags & (u8)Buffer::RuntimeFlags::LOOPED;
 		do
 		{
-			int to_copy = Math::minimum(total, buffer.data.size() - buffer.cursor);
-			copyMemory(output, &buffer.data[buffer.cursor], to_copy);
+			int to_copy = minimum(total, buffer.data.size() - buffer.cursor);
+			memcpy(output, &buffer.data[buffer.cursor], to_copy);
 			buffer.cursor += to_copy;
 			if(is_looped) buffer.cursor = buffer.cursor % buffer.data.size();
 			total -= to_copy;
@@ -133,7 +137,7 @@ public:
 
 	void play(BufferHandle buffer, bool looped) override 
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags |= (u8)Buffer::RuntimeFlags::PLAYING;
 		if(looped)
@@ -149,7 +153,7 @@ public:
 
 	bool isPlaying(BufferHandle buffer) override 
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		return m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::PLAYING;
 	}
@@ -157,7 +161,7 @@ public:
 
 	void stop(BufferHandle buffer) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags &= ~(u8)Buffer::RuntimeFlags::PLAYING;
 		m_buffers[buffer].cursor = 0;
@@ -166,7 +170,7 @@ public:
 
 	bool isEnd(BufferHandle buffer) override
 	{ 
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		return m_buffers[buffer].cursor >= m_buffers[buffer].data.size();
 	}
@@ -174,7 +178,7 @@ public:
 
 	void pause(BufferHandle buffer) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags &= ~(u8)Buffer::RuntimeFlags::PLAYING;
 	}
@@ -182,14 +186,14 @@ public:
 
 	void setMasterVolume(float volume) override 
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
 
 	void setVolume(BufferHandle buffer, float volume) override 
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -197,7 +201,7 @@ public:
 
 	void setFrequency(BufferHandle buffer, float frequency) override 
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -205,20 +209,20 @@ public:
 
 	void setCurrentTime(BufferHandle handle, float time_seconds) override 
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[handle].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		
 		Buffer& buffer = m_buffers[handle];
 		float length = float(buffer.data.size() / double(buffer.sample_rate * 2 * buffer.channels));
 		float rel = time_seconds / length;
 		buffer.cursor = rel * buffer.data.size();
-		buffer.cursor = Math::clamp(buffer.cursor, 0, buffer.data.size());
+		buffer.cursor = clamp(buffer.cursor, 0, buffer.data.size());
 	}
 
 
 	float getCurrentTime(BufferHandle handle) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[handle].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		
 		Buffer& buffer = m_buffers[handle];
@@ -227,9 +231,9 @@ public:
 	}
 
 
-	void setListenerPosition(float x, float y, float z) override
+	void setListenerPosition(const DVec3& pos) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -241,14 +245,14 @@ public:
 		float up_y,
 		float up_z) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 	
 
-	void setSourcePosition(BufferHandle buffer, float x, float y, float z) override
+	void setSourcePosition(BufferHandle buffer, const DVec3& pos) override
 	{
-		MT::SpinLock lock(m_mutex);
+		MT::CriticalSectionLock lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -263,7 +267,6 @@ public:
 		: m_allocator(engine.getAllocator())
 		, m_engine(engine)
 		, m_buffers(m_allocator)
-		, m_mutex(false)
 	{
 		m_buffers.reserve(MAX_BUFFERS_COUNT);
 		for (int i = 0; i < MAX_BUFFERS_COUNT; ++i)
@@ -283,21 +286,21 @@ public:
 			LUMIX_DELETE(m_allocator, m_task);
 		}
 		if (m_device) m_api.snd_pcm_close(m_device);
-		if (m_alsa_lib) unloadLibrary(m_alsa_lib);
+		if (m_alsa_lib) OS::unloadLibrary(m_alsa_lib);
 	}
 
 
 	bool loadAlsa()
 	{
-		m_alsa_lib = loadLibrary("libasound.so");
+		m_alsa_lib = OS::loadLibrary("libasound.so");
 		if (!m_alsa_lib) return false;
 
 		#define API(func) \
 			do { \
-				m_api.func = (decltype(m_api.func))getLibrarySymbol(m_alsa_lib, #func);\
+				m_api.func = (decltype(m_api.func))OS::getLibrarySymbol(m_alsa_lib, #func);\
 				if(!m_api.func)\
 				{\
-					unloadLibrary(m_alsa_lib);\
+					OS::unloadLibrary(m_alsa_lib);\
 					m_alsa_lib = nullptr;\
 					return false;\
 				}\
@@ -357,17 +360,17 @@ public:
 		res = m_api.snd_pcm_start(m_device);
 		if(res < 0) goto error;
 
-		g_log_info.log("Audio") << "PCM name: '" << m_api.snd_pcm_name(m_device) << "'";
-		g_log_info.log("Audio") << "PCM state: '" << m_api.snd_pcm_state(m_device) << "'";
+		logInfo("Audio") << "PCM name: '" << m_api.snd_pcm_name(m_device) << "'";
+		logInfo("Audio") << "PCM state: '" << m_api.snd_pcm_state(m_device) << "'";
 
 		m_task = LUMIX_NEW(m_allocator, AudioTask)(*this, m_allocator);
-		m_task->create("AudioTask");
+		m_task->create("AudioTask", true);
 
 		return true;
 
 		error:
 			const char* error_msg = m_api.snd_strerror(res);
-			g_log_error.log("Audio") << error_msg;
+			logError("Audio") << error_msg;
 			return false;
 	}
 
@@ -404,7 +407,7 @@ public:
 	Array<Buffer> m_buffers;
 	AudioTask* m_task = nullptr;
 	Engine& m_engine;
-	MT::SpinMutex m_mutex;
+	MT::CriticalSection m_mutex;
 	void* m_alsa_lib = nullptr;
 	snd_pcm_t* m_device = nullptr;
 	API m_api;
@@ -414,7 +417,7 @@ public:
 void AudioTask::handleError(int error_code)
 {
 	const char* error_msg = m_device.m_api.snd_strerror(error_code);
-	g_log_error.log("Audio") << error_msg;
+	logError("Audio") << error_msg;
 }
 
 
@@ -465,7 +468,7 @@ int AudioTask::task()
 }
 
 
-class NullAudioDevice LUMIX_FINAL : public AudioDevice
+class NullAudioDevice final : public AudioDevice
 {
 public:
 	BufferHandle createBuffer(const void* data,
@@ -498,14 +501,14 @@ public:
 	void setFrequency(BufferHandle buffer, float frequency) override {}
 	void setCurrentTime(BufferHandle buffer, float time_seconds) override {}
 	float getCurrentTime(BufferHandle buffer) override { return -1; }
-	void setListenerPosition(float x, float y, float z) override {}
+	void setListenerPosition(const DVec3& pos) override {}
 	void setListenerOrientation(float front_x,
 		float front_y,
 		float front_z,
 		float up_x,
 		float up_y,
 		float up_z) override {}
-	void setSourcePosition(BufferHandle buffer, float x, float y, float z) override {}
+	void setSourcePosition(BufferHandle buffer, const DVec3& pos) override {}
 	void update(float time_delta) override {}
 };
 
@@ -519,7 +522,7 @@ AudioDevice* AudioDevice::create(Engine& engine)
 	if (!device->init())
 	{
 		LUMIX_DELETE(engine.getAllocator(), device);
-		g_log_warning.log("Audio") << "Using null device";
+		logWarning("Audio") << "Using null device";
 		return &g_null_device;
 	}
 	return device;

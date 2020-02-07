@@ -28,10 +28,12 @@ jobs:
               run: |
                 sudo apt-get update
                 sudo apt-get install mesa-common-dev
+                sudo apt-get install libasound2-dev
             - name: build engine
               working-directory: projects/tmp/gmake
               run: |
                 make engine
+                make audio
                 make animation
                 make physics
                 make navigation
