@@ -81,7 +81,8 @@ struct Condition
 		MISSING_BINARY_OPERAND,
 		NOT_ENOUGH_PARAMETERS,
 		INCORRECT_TYPE_ARGS,
-		NO_RETURN_VALUE
+		NO_RETURN_VALUE,
+		UNKNOWN_ERROR
 	};
 
 	static const char* errorToString(Error error);

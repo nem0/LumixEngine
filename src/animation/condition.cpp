@@ -79,6 +79,7 @@ static const struct
 } FUNCTIONS[] = {
 	{"sin", Types::FLOAT, {Types::FLOAT, Types::NONE}},
 	{"cos", Types::FLOAT, {Types::FLOAT, Types::NONE}},
+	{"eq", Types::BOOL, {Types::FLOAT, Types::FLOAT, Types::FLOAT, Types::NONE}},
 	{"time", Types::FLOAT, {Types::NONE}},
 	{"length", Types::FLOAT, {Types::NONE}},
 	{"finishing", Types::BOOL, {Types::NONE}}};
@@ -96,7 +97,8 @@ public:
 			OPERATOR,
 			IDENTIFIER,
 			LEFT_PARENTHESIS,
-			RIGHT_PARENTHESIS
+			RIGHT_PARENTHESIS,
+			COMMA,
 		};
 		Type type;
 
@@ -126,12 +128,12 @@ public:
 	public:
 		int tokenize(const char* src, const Span<Token>& tokens);
 		int compile(const char* src, const Token* tokens, int token_count, u8* byte_code, int max_size, InputDecl& decl);
-		int toPostfix(const Token* input, Token* output, int count);
+		int toPostfix(const char* src, const Token* input, Token* output, int count);
 		Condition::Error getError() const { return m_compile_time_error; }
 
 
 private:
-	static int getOperatorPriority(const Token& token);
+	static int getPriority(const Token& token);
 
 
 	static bool isIdentifierChar(char c)
@@ -142,6 +144,7 @@ private:
 
 	static u16 getFunctionIdx(const char* src, const ExpressionCompiler::Token& token)
 	{
+		if (token.size == 0) return 0xffFF;
 		int i = 0;
 		for(auto& fn : FUNCTIONS)
 		{
@@ -160,7 +163,7 @@ private:
 		};
 		for (const auto& i : CONSTS)
 		{
-			if (stringLength(i.name) == token.size && equalStrings(i.name, src + token.offset) == 0)
+			if (stringLength(i.name) == token.size && equalStrings(i.name, src + token.offset))
 			{
 				value = i.value;
 				return true;
@@ -326,7 +329,7 @@ ExpressionVM::ReturnValue ExpressionVM::evaluate(const u8* code, const RuntimeCo
 }
 
 
-int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
+int ExpressionCompiler::toPostfix(const char* src, const Token* input, Token* output, int count)
 {
 	Token func_stack[64];
 	int func_stack_idx = 0;
@@ -335,19 +338,30 @@ int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
 	for(int i = 0; i < count; ++i)
 	{
 		const Token& token = input[i];
-		if(token.type == Token::NUMBER || token.type == Token::IDENTIFIER)
+		if(token.type == Token::NUMBER)
 		{
 			*out = token;
 			++out;
 		}
 		else if (token.type == Token::LEFT_PARENTHESIS)
 		{
+			if(i > 0 && input[i - 1].type == Token::NUMBER) {
+				m_compile_time_error = Condition::Error::UNEXPECTED_CHAR;
+				m_compile_time_offset = token.offset;
+				return -1;
+			}
 			--out_token_count;
 			func_stack[func_stack_idx] = token;
 			++func_stack_idx;
 		}
 		else if (token.type == Token::RIGHT_PARENTHESIS)
 		{
+			if(i > 0 && input[i - 1].type == Token::COMMA) {
+				m_compile_time_error = Condition::Error::UNEXPECTED_CHAR;
+				m_compile_time_offset = token.offset;
+				return -1;
+			}
+
 			--out_token_count;
 			while (func_stack_idx > 0 && func_stack[func_stack_idx - 1].type != Token::LEFT_PARENTHESIS)
 			{
@@ -367,10 +381,36 @@ int ExpressionCompiler::toPostfix(const Token* input, Token* output, int count)
 				return -1;
 			}
 		}
+		else if (token.type == Token::COMMA)
+		{
+			if(i > 0 && (input[i - 1].type == Token::COMMA || input[i - 1].type == Token::LEFT_PARENTHESIS)) {
+				m_compile_time_error = Condition::Error::UNEXPECTED_CHAR;
+				m_compile_time_offset = token.offset;
+				return -1;
+			}
+			--out_token_count;
+			while (func_stack_idx > 0 && func_stack[func_stack_idx - 1].type != Token::LEFT_PARENTHESIS)
+			{
+				--func_stack_idx;
+				*out = func_stack[func_stack_idx];
+				++out;
+			}
+
+			if (func_stack_idx == 0) {
+				m_compile_time_error = Condition::Error::UNEXPECTED_CHAR;
+				m_compile_time_offset = token.offset;
+				return -1;
+			}
+		}
 		else
 		{
-			int prio = getOperatorPriority(token);
-			while(func_stack_idx > 0 && getOperatorPriority(func_stack[func_stack_idx - 1]) > prio)
+			const int prio = getPriority(token);
+			if (getFunctionIdx(src, token) != 0xffFF && (i >= count - 1 || input[i + 1].type != Token::LEFT_PARENTHESIS)) {
+				m_compile_time_error = Condition::Error::MISSING_LEFT_PARENTHESIS;
+				m_compile_time_offset = token.offset;
+				return -1;
+			}
+			while(func_stack_idx > 0 && getPriority(func_stack[func_stack_idx - 1]) > prio)
 			{
 				--func_stack_idx;
 				*out = func_stack[func_stack_idx];
@@ -404,10 +444,19 @@ void ExpressionVM::callFunction(u16 idx, const RuntimeContext& rc)
 	{
 		case 0: push<float>(sinf(pop<float>())); break;
 		case 1: push<float>(cosf(pop<float>())); break;
+		case 2: {
+			const float a = pop<float>();
+			const float b = pop<float>();
+			const float epsilon = pop<float>();
+			ASSERT(epsilon >= 0);
+			const bool res = a-b > -epsilon && a-b < epsilon;
+			push<bool>(res); 
+			break;
+		}
 		// TODO
-		//case 2: push<float>(rc.current->getTime()); break;
-		//case 3: push<float>(rc.current->getLength()); break;
-		//case 4: push<bool>(rc.current->getTime() > rc.current->getLength() - rc.edge->length); break;
+		//case 3: push<float>(rc.current->getTime()); break;
+		//case 4: push<float>(rc.current->getLength()); break;
+		//case 5: push<bool>(rc.current->getTime() > rc.current->getLength() - rc.edge->length); break;
 		default: ASSERT(false); break;
 	}
 }
@@ -502,9 +551,9 @@ static const struct
 };
 
 
-int ExpressionCompiler::getOperatorPriority(const Token& token)
+int ExpressionCompiler::getPriority(const Token& token)
 {
-	ASSERT(token.type != Token::IDENTIFIER);
+	if(token.type == Token::IDENTIFIER) return 6;
 	if (token.type == Token::LEFT_PARENTHESIS) return -1;
 	if (token.type != Token::OPERATOR) ASSERT(false);
 	
@@ -714,6 +763,11 @@ int ExpressionCompiler::compile(const char* src,
 		m_compile_time_error = Condition::Error::NO_RETURN_VALUE;
 		return -1;
 	}
+	else if (type_stack_idx > 1)
+	{
+		m_compile_time_error = Condition::Error::UNKNOWN_ERROR;
+		return -1;
+	}
 	switch(type_stack[type_stack_idx - 1])
 	{
 		case Types::FLOAT: *out = Instruction::RET_FLOAT; break;
@@ -803,6 +857,11 @@ int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 				token.type = Token::RIGHT_PARENTHESIS;
 				binary = true;
 			}
+			else if (*c == ',')
+			{
+				token.type = Token::COMMA;
+				binary = false;
+			}
 			else if (*c >= '0' && *c <= '9')
 			{
 				token.type = Token::NUMBER;
@@ -815,6 +874,7 @@ int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 			{
 				m_compile_time_error = Condition::Error::UNEXPECTED_CHAR;
 				m_compile_time_offset = token.offset;
+				return -1;
 			}
 		}
 		if(token.type != Token::EMPTY)
@@ -850,7 +910,8 @@ const char* Condition::errorToString(Error error)
 		case Error::NOT_ENOUGH_PARAMETERS: return "Not enough parameters";
 		case Error::INCORRECT_TYPE_ARGS: return "Incorrect type args";
 		case Error::NO_RETURN_VALUE: return "No return value";
-		default: ASSERT(false); return "Unknown error";
+		case Error::UNKNOWN_ERROR: return "Unknown error";
+		default: ASSERT(false); return "Undefined error";
 	}
 }
 
@@ -880,7 +941,7 @@ Condition::Error Condition::compile(const char* expression, InputDecl& decl)
 		compile("1 < 0", decl);
 		return compiler.getError();
 	}
-	tokens_count = compiler.toPostfix(tokens, postfix_tokens, tokens_count);
+	tokens_count = compiler.toPostfix(expression, tokens, postfix_tokens, tokens_count);
 	if (tokens_count < 0)
 	{
 		compile("1 < 0", decl);

@@ -23,6 +23,32 @@ namespace Lumix::Anim {
 ControllerEditor::ControllerEditor(StudioApp& app)
 	: m_app(app)
 {
+	Condition c(app.getAllocator());
+	InputDecl d;
+	d.addInput();
+	d.inputs[0].name = "x";
+	d.inputs[0].type = InputDecl::Type::FLOAT;
+	ASSERT(c.compile("-5", d) == Condition::Error::NONE);
+	ASSERT(c.compile("-x", d) == Condition::Error::NONE);
+	ASSERT(c.compile("-x > 5", d) == Condition::Error::NONE);
+	ASSERT(c.compile("-sin(x)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("-sin(-x)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("sin(-x)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("sin(x - 1)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("sin(-x - 1)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("sin(x - -1)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("sin(-x - -1)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("sin(-x - -1", d) != Condition::Error::NONE);
+	ASSERT(c.compile("sin(x)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("sin(x)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("unknown_fn(x, 10.0, 0.1)", d) != Condition::Error::NONE);
+	ASSERT(c.compile("eq(x, 10.0, 0.1)", d) == Condition::Error::NONE);
+	ASSERT(c.compile("10, 5", d) != Condition::Error::NONE);
+	ASSERT(c.compile("sin(10(20))", d) != Condition::Error::NONE);
+	ASSERT(c.compile("sin(10,)", d) != Condition::Error::NONE);
+	ASSERT(c.compile("sin(,)", d) != Condition::Error::NONE);
+	ASSERT(c.compile("sin(,10)", d) != Condition::Error::NONE);
+	ASSERT(c.compile("sin(10,10)", d) != Condition::Error::NONE);
 	IAllocator& allocator = app.getAllocator();
 	ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
 	ASSERT(res_manager);
