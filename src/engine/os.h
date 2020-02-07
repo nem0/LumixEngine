@@ -132,8 +132,6 @@ public:
 
 	bool write(const void* data, u64 size) override;
 
-	u64 pos();
-
 	OutputFile& operator <<(const char* text);
 	OutputFile& operator <<(char c) { write(&c, sizeof(c)); return *this; }
 	OutputFile& operator <<(i32 value);

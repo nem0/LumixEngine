@@ -21,6 +21,6 @@ project "Recast"
 		"3rdparty/recast/Detour/Source/**.cpp" 
 	}
 	includedirs { 
-		"3rdparty/recast/Recast/include/",
-		"3rdparty/recast/Detour/include/"
+		"3rdparty/recast/Recast/Include/",
+		"3rdparty/recast/Detour/Include/"
 	}
