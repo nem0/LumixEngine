@@ -22,6 +22,14 @@ local embed_resources = false
 build_studio_callbacks = {}
 build_app_callbacks = {}
 
+function linkOpenGL()
+	configuration { "windows" }
+		links { "opengl32" }
+	configuration { "not windows" }
+		links { "GL" }
+	configuration {}
+end
+
 function has_plugin(plugin)
 	for _, v in ipairs(plugins) do
     if v == plugin then
@@ -266,7 +274,9 @@ function linkLib(lib)
 end
 
 function useLua()
+	configuration {"windows"}
 	links {"lua51"}
+	configuration {}
 	linkLib "luajit"
 	includedirs { path.join(ROOT_DIR, "external/luajit/include") }
 end
@@ -351,7 +361,7 @@ end
 
 function forceLink(name)
 
-	configuration { "linux-*" }
+	configuration { "linux" }
 		linkoptions {"-u " .. name}
 	configuration { "x64", "vs*" }
 		linkoptions {"/INCLUDE:" .. name}
@@ -408,6 +418,9 @@ solution "LumixEngine"
 	configurations { "Debug", "RelWithDebInfo" }
 	platforms { "x64" }
 	flags { 
+		"UseObjectResponseFile",
+		"UseLDResponseFile",
+		"LinkSupportCircularDependencies",
 		"FatalWarnings", 
 		"NoPCH", 
 		"NoExceptions", 
@@ -497,8 +510,8 @@ if has_plugin("renderer") then
 			linkLib "cmft"
 		end
 		linkLib "freetype"
-		links { "opengl32" }
-		configuration { "linux-*" }
+		linkOpenGL()
+		configuration { "linux" }
 			links { "GL", "X11" }
 		configuration {}
 		useLua()
@@ -649,7 +662,7 @@ if build_app then
 			end
 				
 			if has_plugin("renderer") then
-				links { "opengl32" }
+				linkOpenGL()
 			end
 			if has_plugin("physics") then
 				linkPhysX()
@@ -682,7 +695,7 @@ if build_app then
 		configuration { "windows" }
 			kind "WindowedApp"
 
-		configuration { "linux-*" }
+		configuration { "linux" }
 			links { "GL", "X11", "dl", "rt" }
 		
 		configuration {}
@@ -774,6 +787,15 @@ if build_studio then
 		includedirs { "../src" }
 
 		if _OPTIONS["static-plugins"] then	
+			configuration { "linux" }
+				links { "dl", "GL", "X11", "rt" }
+				linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
+
+			configuration { "vs*" }
+				links { "psapi", "dxguid", "winmm" }
+			
+			configuration {}
+
 			links { "editor", "engine" }
 			linkLib "nvtt"
 			linkLib "freetype"
@@ -782,20 +804,11 @@ if build_studio then
 			linkLib "recast"
 			
 			if has_plugin("renderer") then
-				links { "opengl32" }
+				linkOpenGL()
 			end
 			if has_plugin "physics" then
 				linkPhysX()
 			end
-			
-			configuration { "linux-*" }
-				links { "GL", "X11", "dl", "rt" }
-				linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
-
-			configuration { "vs*" }
-				links { "psapi", "dxguid", "winmm" }
-			
-			configuration {}
 		else
 			links { "renderer", "editor", "engine" }
 		end
