@@ -1,4 +1,3 @@
-
 download_project()
 {
 	if [ ! -d "3rdparty" ]; then
@@ -18,51 +17,54 @@ download_project()
 build_recast()
 {
     ./genie --file=recastnavigation.lua gmake
-    cd 3rdparty/recast/_project
+    pushd 3rdparty/recast/_project
     make 
-    cd ../../..
+    popd
 }
 
 build_cmft()
 {
-   	cd 3rdparty/cmft/scripts
+   	pushd 3rdparty/cmft/scripts
 	cp ../../../genie genie
 	./genie --file=main.lua --gcc=linux-gcc gmake
 	rm genie
 	cd ../_projects/gmake-linux
     make config=release64 cmft
-    cd ../_build/linux64_gcc/bin
+    cd ../../_build/linux64_gcc/bin
     ranlib libcmftRelease.a
-	cd ../../../../../..
+	popd
 }
 
 build_luajit()
 {
-    cd 3rdparty/luajit/src
+    pushd 3rdparty/luajit/src
     make
-    cd ../../..
+    popd
 }
 
 build_nvtt()
 {
-    cd 3rdparty/nvtt
+    pushd 3rdparty/nvtt
     chmod +x configure
     ./configure --release
     make
+    popd
 }
 
 build_physx()
 {
-    cd 3rdparty/physx/physx
+    pushd 3rdparty/physx/physx
     sh generate_projects.sh lumix_gcc5
     cd compiler/linux-release
     make
+    popd
 }
 
 build_freetype() 
 {
-    cd 3rdparty/freetype
+    pushd 3rdparty/freetype
     jam
+    popd
 }
 
 pause()
