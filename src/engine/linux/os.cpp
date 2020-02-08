@@ -4,8 +4,13 @@
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/string.h"
+#include <dlfcn.h>
+#include <fcntl.h>
 #include <stdio.h>
-
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
 
 namespace Lumix::OS
 {
@@ -601,71 +606,60 @@ bool getCommandLine(Span<char> output)
 
 void* loadLibrary(const char* path)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	return dlopen(path, RTLD_LOCAL | RTLD_LAZY);
 }
 
 
 void unloadLibrary(void* handle)
 {
-	ASSERT(false);
-    // TODO
+	dlclose(handle);
 }
 
 
 void* getLibrarySymbol(void* handle, const char* name)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	return dlsym(handle, name);
 }
 
 Timer::Timer()
 {
-	ASSERT(false);
-    // TODO
+	last_tick = getRawTimestamp();
+	first_tick = last_tick;
 }
 
 
 float Timer::getTimeSinceStart()
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	return getRawTimestamp() - first_tick;
 }
 
 
 float Timer::getTimeSinceTick()
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	return getRawTimestamp() - last_tick;
 }
 
 
 float Timer::tick()
 {
-	ASSERT(false);
-    // TODO
-    return {};
-
+	const u64 now = getRawTimestamp();
+	const float delta = float(double(now - last_tick) / double(getFrequency()));
+	last_tick = now;
+	return delta;
 }
 
 
 u64 Timer::getFrequency()
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	return 1'000'000'000;
 }
 
 
 u64 Timer::getRawTimestamp()
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	timespec tick;
+	clock_gettime(CLOCK_REALTIME, &tick);
+	return u64(tick.tv_sec) * 1000000000 + u64(tick.tv_nsec);
 }
 
 

@@ -206,7 +206,7 @@ void CriticalSection::enter()
 
 void CriticalSection::exit()
 {
-	((std::mutex*)data)->~unlock();
+	((std::mutex*)data)->unlock();
 }
 
 
