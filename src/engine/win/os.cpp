@@ -125,14 +125,6 @@ u64 InputFile::size() const
 	return ::GetFileSize((HANDLE)m_handle, 0);
 }
 
-
-u64 OutputFile::pos()
-{
-	ASSERT(INVALID_HANDLE_VALUE != m_handle);
-	return ::SetFilePointer((HANDLE)m_handle, 0, nullptr, FILE_CURRENT);
-}
-
-
 u64 InputFile::pos()
 {
 	ASSERT(INVALID_HANDLE_VALUE != m_handle);
