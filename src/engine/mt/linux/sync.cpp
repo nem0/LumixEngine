@@ -5,6 +5,7 @@
 #include "engine/mt/thread.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
+#include <mutex>
 
 
 namespace Lumix
@@ -15,58 +16,106 @@ namespace MT
 
 Semaphore::Semaphore(int init_count, int max_count)
 {
-	ASSERT(false);
-    // TODO
+	m_id.count = init_count;
+	int res = pthread_mutex_init(&m_id.mutex, nullptr);
+	ASSERT(res == 0);
+	res = pthread_cond_init(&m_id.cond, nullptr);
+	ASSERT(res == 0);
 }
 
 Semaphore::~Semaphore()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_destroy(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_destroy(&m_id.cond);
+	ASSERT(res == 0);
 }
 
 void Semaphore::signal()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_signal(&m_id.cond);
+	ASSERT(res == 0);
+	++m_id.count;
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 void Semaphore::wait()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	while(m_id.count <= 0)
+	{
+		res = pthread_cond_wait(&m_id.cond, &m_id.mutex);
+		ASSERT(res == 0);
+	}
+	
+	--m_id.count;
+	
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 bool Semaphore::poll()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	bool ret = false;
+	if(m_id.count > 0)
+	{
+		--m_id.count;
+		ret = true;
+	}
+
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	return ret;
 }
 
 
 Event::Event(bool manual_reset)
 {
-	ASSERT(false);
-    // TODO
-
+	m_id.signaled = false;
+	m_id.manual_reset = manual_reset;
+	int res = pthread_mutex_init(&m_id.mutex, nullptr);
+	ASSERT(res == 0);
+	res = pthread_cond_init(&m_id.cond, nullptr);
+	ASSERT(res == 0);
 }
 
 Event::~Event()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_destroy(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_destroy(&m_id.cond);
+	ASSERT(res == 0);
 }
 
 void Event::reset()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_signal(&m_id.cond);
+	ASSERT(res == 0);
+	m_id.signaled = false;
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 void Event::trigger()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	res = pthread_cond_signal(&m_id.cond);
+	ASSERT(res == 0);
+	m_id.signaled = true;
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
@@ -77,46 +126,87 @@ void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
 
 void Event::waitTimeout(u32 timeout_ms)
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+
+	timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	ts.tv_nsec += (long)timeout_ms * 1000 * 1000;
+	if(ts.tv_nsec > 1000000000)
+	{
+		ts.tv_nsec -= 1000000000;
+		ts.tv_sec += 1;
+	}
+	while (!m_id.signaled)
+	{
+		res = pthread_cond_timedwait(&m_id.cond, &m_id.mutex, &ts);
+		if(res == ETIMEDOUT) break;
+		ASSERT(res == 0);
+	}
+
+	if (!m_id.manual_reset) m_id.signaled = false;
+
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 void Event::wait()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	while (!m_id.signaled)
+	{
+		res = pthread_cond_wait(&m_id.cond, &m_id.mutex);
+		ASSERT(res == 0);
+	}
+	
+	if (!m_id.manual_reset) m_id.signaled = false;
+	
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
 }
 
 bool Event::poll()
 {
-	ASSERT(false);
-    // TODO
+	int res = pthread_mutex_lock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	bool ret = false;
+	if (m_id.signaled)
+	{
+		m_id.signaled = false;
+		ret = true;
+	}
+
+	res = pthread_mutex_unlock(&m_id.mutex);
+	ASSERT(res == 0);
+	
+	return ret;
 }
 
 
 CriticalSection::CriticalSection()
 {
-	ASSERT(false);
-    // TODO
+    static_assert(sizeof(std::mutex) <= sizeof(data));
+	new (NewPlaceholder(), data) std::mutex;
 }
 
 
 CriticalSection::~CriticalSection()
 {
-	ASSERT(false);
-    // TODO
+	((std::mutex*)data)->~mutex();
 }
 
 void CriticalSection::enter()
 {
-	ASSERT(false);
-    // TODO
+	((std::mutex*)data)->lock();
+
 }
 
 void CriticalSection::exit()
 {
-	ASSERT(false);
-    // TODO
+	((std::mutex*)data)->~unlock();
 }
 
 
