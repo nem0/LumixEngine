@@ -64,7 +64,7 @@ class LUMIX_ENGINE_API InputSystem
 
 		struct TextEvent
 		{
-			u32 utf32;
+			u32 utf8;
 		};
 
 		struct Event

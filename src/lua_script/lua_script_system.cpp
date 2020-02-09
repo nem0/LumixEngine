@@ -1539,7 +1539,7 @@ namespace Lumix
 					lua_setfield(L, -2, "y_abs"); // [lua_event]
 					break;
 				case InputSystem::Event::TEXT_INPUT:
-					LuaWrapper::push(L, event.data.text.utf32); // [lua_event, utf32]
+					LuaWrapper::push(L, event.data.text.utf8); // [lua_event, utf8]
 					lua_setfield(L, -2, "text"); // [lua_event]
 					break;
 				default:

@@ -728,8 +728,8 @@ struct GUISceneImpl final : public GUIScene
 	{
 		const GUIRect* rect = getInput(m_focused_entity);
 		if (!rect) return;
-		char tmp[5];
-		OS::UTF32ToUTF8(event.data.text.utf32, tmp);
+		char tmp[5] = {};
+		memcpy(tmp, &event.data.text.utf8, sizeof(event.data.text.utf8));
 		rect->text->text.insert(rect->input_field->cursor, tmp);
 		++rect->input_field->cursor;
 	}
