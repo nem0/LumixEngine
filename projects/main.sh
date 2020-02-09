@@ -105,7 +105,14 @@ deploy_luajit()
 deploy_nvtt()
 {
     mkdir -p ../external/nvtt/lib/linux64_gmake/release
-    cp 3rdparty/nvtt/build-release/src/nvtt/libnvtt.a ../external/nvtt/lib/linux64_gmake/release/libnvtt.a
+    cp 3rdparty/nvtt/build-release/src/nvtt/libnvtt.a ../external/nvtt/lib/linux64_gmake/release/
+    cp 3rdparty/nvtt/build-release/src/nvtt/squish/libsquish.a ../external/nvtt/lib/linux64_gmake/release/
+    cp 3rdparty/nvtt/build-release/src/bc6h/libbc6h.a ../external/nvtt/lib/linux64_gmake/release/
+    cp 3rdparty/nvtt/build-release/src/bc7/libbc7.a ../external/nvtt/lib/linux64_gmake/release/
+    cp 3rdparty/nvtt/build-release/src/nvimage/libnvimage.a ../external/nvtt/lib/linux64_gmake/release/
+    cp 3rdparty/nvtt/build-release/src/nvcore/libnvcore.a ../external/nvtt/lib/linux64_gmake/release/
+    cp 3rdparty/nvtt/build-release/src/nvmath/libnvmath.a ../external/nvtt/lib/linux64_gmake/release/
+    cp 3rdparty/nvtt/build-release/src/nvthread/libnvthread.a ../external/nvtt/lib/linux64_gmake/release/
 }
 
 deploy_recast()
