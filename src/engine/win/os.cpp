@@ -276,6 +276,27 @@ void finishDrag(const Event& event)
 	DragFinish(drop);
 }
 
+static void UTF32ToUTF8(u32 utf32, char* utf8)
+{
+    if (utf32 <= 0x7F) {
+        utf8[0] = (char) utf32;
+    } else if (utf32 <= 0x7FF) {
+        utf8[0] = 0xC0 | (char) ((utf32 >> 6) & 0x1F);
+        utf8[1] = 0x80 | (char) (utf32 & 0x3F);
+    } else if (utf32 <= 0xFFFF) {
+        utf8[0] = 0xE0 | (char) ((utf32 >> 12) & 0x0F);
+        utf8[1] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
+        utf8[2] = 0x80 | (char) (utf32 & 0x3F);
+    } else if (utf32 <= 0x10FFFF) {
+        utf8[0] = 0xF0 | (char) ((utf32 >> 18) & 0x0F);
+        utf8[1] = 0x80 | (char) ((utf32 >> 12) & 0x3F);
+        utf8[2] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
+        utf8[3] = 0x80 | (char) (utf32 & 0x3F);
+	}
+	else {
+		ASSERT(false);
+	}
+}
 
 static void processEvents()
 {
@@ -311,7 +332,8 @@ static void processEvents()
 				break;
 			case WM_CHAR:
 				e.type = Event::Type::CHAR;
-				e.text_input.utf32 = (u32)msg.wParam;
+				e.text_input.utf8 = 0;
+				UTF32ToUTF8((u32)msg.wParam, (char*)&e.text_input.utf8);
 				// TODO msg.wParam is utf16, convert
 				// e.g. https://github.com/SFML/SFML/blob/master/src/SFML/Window/Win32/WindowImplWin32.cpp#L694
 				G.iface->onEvent(e);
@@ -400,31 +422,6 @@ void destroyWindow(WindowHandle window)
 	G.win = INVALID_WINDOW;
 }
 
-void UTF32ToUTF8(u32 utf32, char* utf8)
-{
-    if (utf32 <= 0x7F) {
-        utf8[0] = (char) utf32;
-        utf8[1] = '\0';
-    } else if (utf32 <= 0x7FF) {
-        utf8[0] = 0xC0 | (char) ((utf32 >> 6) & 0x1F);
-        utf8[1] = 0x80 | (char) (utf32 & 0x3F);
-        utf8[2] = '\0';
-    } else if (utf32 <= 0xFFFF) {
-        utf8[0] = 0xE0 | (char) ((utf32 >> 12) & 0x0F);
-        utf8[1] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
-        utf8[2] = 0x80 | (char) (utf32 & 0x3F);
-        utf8[3] = '\0';
-    } else if (utf32 <= 0x10FFFF) {
-        utf8[0] = 0xF0 | (char) ((utf32 >> 18) & 0x0F);
-        utf8[1] = 0x80 | (char) ((utf32 >> 12) & 0x3F);
-        utf8[2] = 0x80 | (char) ((utf32 >> 6) & 0x3F);
-        utf8[3] = 0x80 | (char) (utf32 & 0x3F);
-        utf8[4] = '\0';
-	}
-	else {
-		ASSERT(false);
-	}
-}
 
 Point toScreen(WindowHandle win, int x, int y)
 {

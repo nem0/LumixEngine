@@ -253,10 +253,9 @@ public:
 			case OS::Event::Type::CHAR:
 				if (handle_input) {
 					ImGuiIO& io = ImGui::GetIO();
-					char utf8[5];
-					OS::UTF32ToUTF8(event.text_input.utf32, utf8);
-					utf8[4] = 0;
-					io.AddInputCharactersUTF8(utf8);
+					char tmp[5] = {};
+					memcpy(tmp, &event.text_input.utf8, sizeof(event.text_input.utf8));
+					io.AddInputCharactersUTF8(tmp);
 				}
 				break;
 			case OS::Event::Type::KEY:

@@ -141,7 +141,7 @@ struct InputSystemImpl final : public InputSystem
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::TEXT_INPUT;
 				input_event.device = getKeyboardDevice();
-				input_event.data.text.utf32 = event.text_input.utf32;
+				input_event.data.text.utf8 = event.text_input.utf8;
 				injectEvent(input_event);
 				break;
 			}

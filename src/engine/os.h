@@ -56,7 +56,7 @@ struct Event {
     Type type;
     WindowHandle window;
     union {
-        struct { u32 utf32; } text_input;
+        struct { u32 utf8; } text_input;
         struct { int w, h; } win_size;
         struct { int x, y; } win_move;
 		struct { bool down; MouseButton button; } mouse_button;
@@ -216,7 +216,6 @@ LUMIX_ENGINE_API WindowHandle getFocused();
 LUMIX_ENGINE_API bool isKeyDown(Keycode keycode);
 LUMIX_ENGINE_API void getKeyName(Keycode keycode, Span<char> out);
 LUMIX_ENGINE_API int getDPI();
-LUMIX_ENGINE_API void UTF32ToUTF8(u32 utf32, char* utf8);
 
 LUMIX_ENGINE_API bool copyFile(const char* from, const char* to);
 LUMIX_ENGINE_API void getExecutablePath(Span<char> path);
