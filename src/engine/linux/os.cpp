@@ -5,10 +5,14 @@
 #include "engine/path_utils.h"
 #include "engine/string.h"
 #include <dlfcn.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -378,66 +382,62 @@ u32 getMemPageSize() {
 }
 
 void* memReserve(size_t size) {
-	ASSERT(false);
-    // TODO
-    return {};
+	void* res = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
+	if (res == MAP_FAILED) return nullptr;
+	return res;
 }
 
 void memCommit(void* ptr, size_t size) {
-	ASSERT(false);
-    // TODO
+	// noop on linux
 }
 
 void memRelease(void* ptr) {
+	// TODO size must not be 0
 	ASSERT(false);
-    // TODO
+	const int res = munmap(ptr, 0);
+	ASSERT(res == 0);
 }
 
-struct FileIterator
-{
-	//HANDLE handle;
-	IAllocator* allocator;
-	//WIN32_FIND_DATA ffd;
-	bool is_valid;
-};
-
+struct FileIterator {};
 
 FileIterator* createFileIterator(const char* path, IAllocator& allocator)
 {
-		ASSERT(false);
-    // TODO
-    return {};
-
+	return (FileIterator*)opendir(path);
 }
 
 
 void destroyFileIterator(FileIterator* iterator)
 {
-		ASSERT(false);
-    // TODO
+	closedir((DIR*)iterator);
 }
 
 
 bool getNextFile(FileIterator* iterator, FileInfo* info)
 {
-		ASSERT(false);
-    // TODO
-    return {};
+	if (!iterator) return false;
 
+	auto* dir = (DIR*)iterator;
+	auto* dir_ent = readdir(dir);
+	if (!dir_ent) return false;
+
+	info->is_directory = dir_ent->d_type == DT_DIR;
+	Lumix::copyString(info->filename, dir_ent->d_name);
+	return true;
 }
 
 
 void setCurrentDirectory(const char* path)
 {
-		ASSERT(false);
-    // TODO
+	auto res = chdir(path);
+	(void)res;
 }
 
 
 void getCurrentDirectory(Span<char> output)
 {
-		ASSERT(false);
-    // TODO
+	if (!getcwd(output.m_begin, output.length())) {
+		output[0] = 0;
+	}
 }
 
 
@@ -477,10 +477,7 @@ void copyToClipboard(const char* text)
 
 ExecuteOpenResult shellExecuteOpen(const char* path)
 {
-		ASSERT(false);
-    // TODO
-    return {};
-
+	return system(path) == 0 ? ExecuteOpenResult::SUCCESS : ExecuteOpenResult::OTHER_ERROR;
 }
 
 
@@ -495,59 +492,50 @@ ExecuteOpenResult openExplorer(const char* path)
 
 bool deleteFile(const char* path)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	return unlink(path) == 0;
 }
 
 
 bool moveFile(const char* from, const char* to)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	return rename(from, to) == 0;
 }
 
 
 size_t getFileSize(const char* path)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	struct stat tmp;
+	stat(path, &tmp);
+	return tmp.st_size;
 }
 
 
 bool fileExists(const char* path)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	struct stat tmp;
+	return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) != S_IFDIR));
 }
 
 
 bool dirExists(const char* path)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	struct stat tmp;
+	return ((stat(path, &tmp) == 0) && (((tmp.st_mode) & S_IFMT) == S_IFDIR));
 }
 
 
 u64 getLastModified(const char* path)
 {
-	ASSERT(false);
-    // TODO
-    return {};
-
+	struct stat tmp;
+	Lumix::u64 ret = 0;
+	ret = tmp.st_mtim.tv_sec * 1000 + Lumix::u64(tmp.st_mtim.tv_nsec / 1000000);
+	return ret;
 }
 
 
 bool makePath(const char* path)
 {
-	ASSERT(false);
-    // TODO
-    return {};
-
+	return mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
 }
 
 
@@ -569,8 +557,6 @@ bool copyFile(const char* from, const char* to)
 {
 	ASSERT(false);
     // TODO
-    return {};
-
 }
 
 
