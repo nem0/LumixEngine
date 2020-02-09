@@ -11,6 +11,11 @@ i32 atomicIncrement(i32 volatile* value)
 	return __sync_fetch_and_add(value, 1) + 1;
 }
 
+i64 atomicIncrement(i64 volatile* value)
+{
+	return __sync_fetch_and_add(value, 1) + 1;
+}
+
 i32 atomicDecrement(i32 volatile* value)
 {
 	return __sync_fetch_and_sub(value, 1) - 1;
