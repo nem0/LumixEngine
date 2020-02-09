@@ -320,6 +320,21 @@ function linkPhysX()
 					"PhysXVehicle_static_64",
 					"PhysX_static_64"
 				}
+			configuration { "linux" }
+				libdirs {"../external/physx/lib/linux64_gmake/release"}
+				links { 
+					"PhysX_static_64",
+					"PhysXCharacterKinematic_static_64",
+					"PhysXCommon_static_64",
+					"PhysXCooking_static_64",
+					"PhysXExtensions_static_64",
+					"PhysXFoundation_static_64",
+					"PhysXPvdSDK_static_64",
+					--"PhysXTask_static_64",
+					"PhysXVehicle_static_64",
+					--"SceneQuery_static_64",
+					--"SimulationController_static_64"
+				}
 
 			configuration {}
 				libdirs {"../external/physx/lib/" .. binary_api_dir .. "/win64/release_static"}
@@ -345,6 +360,21 @@ function linkPhysX()
 					"PhysXVehicle_static_64",
 					"SceneQuery_static_64",
 					"SimulationController_static_64"
+				}
+			configuration { "linux" }
+				libdirs {"../external/physx/lib/linux64_gmake/release"}	
+				links { 
+					"PhysX_static_64",
+					"PhysXCharacterKinematic_static_64",
+					"PhysXCommon_static_64",
+					"PhysXCooking_static_64",
+					"PhysXExtensions_static_64",
+					"PhysXFoundation_static_64",
+					"PhysXPvdSDK_static_64",
+					--"PhysXTask_static_64",
+					"PhysXVehicle_static_64",
+					--"SceneQuery_static_64",
+					--"SimulationController_static_64"
 				}
 
 			configuration { "Debug" }
@@ -411,6 +441,7 @@ solution "LumixEngine"
 		}
 		linkoptions {
 			"-Wl,--gc-sections",
+			"-fopenmp"
 		}
 
 	configuration {}
