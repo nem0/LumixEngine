@@ -1,7 +1,8 @@
+#include "engine/allocator.h"
 #include "engine/crt.h"
 #include "engine/mt/atomic.h"
 #include "engine/page_allocator.h"
-#include "engine/win/simple_win.h"
+#include "engine/os.h"
 
 
 namespace Lumix
@@ -15,7 +16,7 @@ PageAllocator::~PageAllocator()
 	while (p) {
 		void* tmp = p;
 		memcpy(&p, p, sizeof(p));
-		VirtualFree(tmp, 0, MEM_RELEASE);
+		OS::memRelease(tmp);
 	}
 }
 
@@ -44,7 +45,9 @@ void* PageAllocator::allocate(bool lock)
 	}
 	++reserved_count;
 	if (lock) mutex.exit();
-	return VirtualAlloc(nullptr, PAGE_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	void* mem = OS::memReserve(PAGE_SIZE);
+	OS::memCommit(mem, PAGE_SIZE);
+	return mem;
 }
 
 

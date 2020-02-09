@@ -790,6 +790,7 @@ if build_studio then
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt" }
 				linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
+				links { "nvimage", "nvcore", "nvmath", "nvthread", "squish", "bc6h", "bc7" } 
 
 			configuration { "vs*" }
 				links { "psapi", "dxguid", "winmm" }
