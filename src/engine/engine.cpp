@@ -453,7 +453,7 @@ public:
 		++m_last_lua_resource_idx;
 		ASSERT(m_last_lua_resource_idx != 0xffFFffFF);
 		m_lua_resources.insert(m_last_lua_resource_idx, res);
-		return {m_last_lua_resource_idx};
+		return m_last_lua_resource_idx;
 	}
 
 

@@ -24,9 +24,7 @@ namespace MT
 	typedef pthread_mutex_t MutexHandle;
 	struct EventHandle
 	{
-		pthread_mutex_t mutex;
-		pthread_cond_t cond;
-		bool signaled;
+		int fd;
 		bool manual_reset;
 	};
 #endif

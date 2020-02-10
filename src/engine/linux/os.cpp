@@ -9,12 +9,16 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <X11/Xlib.h>
+#define GLX_GLXEXT_LEGACY
+#include <GL/glx.h>
 
 namespace Lumix::OS
 {
@@ -27,6 +31,9 @@ static struct
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	WindowHandle win = INVALID_WINDOW;
+
+	int argc = 0;
+	char** argv = nullptr;
 } G;
 
 
@@ -197,6 +204,7 @@ int getDropFileCount(const Event& event)
 {
     ASSERT(false);
     // TODO
+	return {};
 }
 
 
@@ -230,6 +238,38 @@ Point toScreen(WindowHandle win, int x, int y)
 
 WindowHandle createWindow(const InitWindowArgs& args)
 {
+	static Display* display = XOpenDisplay(nullptr);
+	if (!display) return INVALID_WINDOW;
+	
+	static i32 screen = DefaultScreen(display);
+	static i32 depth = DefaultDepth(display, screen);
+	static Window root = RootWindow(display, screen);
+	static Visual* visual = DefaultVisual(display, screen);
+	static XSetWindowAttributes attrs = [](){
+		XSetWindowAttributes ret = {};
+		ret.background_pixmap = 0;
+		ret.border_pixel = 0;
+		ret.event_mask = ButtonPressMask
+			| ButtonReleaseMask
+			| ExposureMask
+			| KeyPressMask
+			| KeyReleaseMask
+			| PointerMotionMask
+			| StructureNotifyMask;
+		return ret;
+	}();
+	XCreateWindow(display
+		, root
+		, 0
+		, 0
+		, 800
+		, 600
+		, 0
+		, depth
+		, InputOutput
+		, visual
+		, CWBorderPixel | CWEventMask
+		, &attrs);
 	ASSERT(false);
     // TODO
     return {};
@@ -557,6 +597,7 @@ bool copyFile(const char* from, const char* to)
 {
 	ASSERT(false);
     // TODO
+	return {};
 }
 
 
@@ -570,23 +611,24 @@ void getExecutablePath(Span<char> buffer)
 
 void messageBox(const char* text)
 {
-	ASSERT(false);
-    // TODO
-    ;
+	fprintf(stderr, "%s", text);
 }
 
 	
-void setCommandLine(int, char**)
+void setCommandLine(int argc, char** argv)
 {
-	ASSERT(false);
+	G.argc = argc;
+	G.argv = argv;
 }
 	
 
 bool getCommandLine(Span<char> output)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	copyString(output, "");
+	for (int i = 0; i < G.argc; ++i) {
+		catString(output, G.argv[i]);
+	}
+    return true;
 }
 
 

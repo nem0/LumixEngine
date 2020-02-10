@@ -6,7 +6,8 @@
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include <mutex>
-
+#include <sys/eventfd.h>
+#include <unistd.h>
 
 namespace Lumix
 {
@@ -80,111 +81,69 @@ bool Semaphore::poll()
 
 Event::Event(bool manual_reset)
 {
-	m_id.signaled = false;
+	m_id.fd = eventfd(0, EFD_NONBLOCK);
 	m_id.manual_reset = manual_reset;
-	int res = pthread_mutex_init(&m_id.mutex, nullptr);
-	ASSERT(res == 0);
-	res = pthread_cond_init(&m_id.cond, nullptr);
-	ASSERT(res == 0);
 }
 
 Event::~Event()
 {
-	int res = pthread_mutex_destroy(&m_id.mutex);
-	ASSERT(res == 0);
-	res = pthread_cond_destroy(&m_id.cond);
-	ASSERT(res == 0);
+	close(m_id.fd);
 }
 
 void Event::reset()
 {
-	int res = pthread_mutex_lock(&m_id.mutex);
-	ASSERT(res == 0);
-	res = pthread_cond_signal(&m_id.cond);
-	ASSERT(res == 0);
-	m_id.signaled = false;
-	res = pthread_mutex_unlock(&m_id.mutex);
-	ASSERT(res == 0);
+	u64 v;
+	read(m_id.fd, &v, sizeof(v)); // reset to 0, nonblocking
 }
 
 void Event::trigger()
 {
-	int res = pthread_mutex_lock(&m_id.mutex);
-	ASSERT(res == 0);
-	res = pthread_cond_signal(&m_id.cond);
-	ASSERT(res == 0);
-	m_id.signaled = true;
-	res = pthread_mutex_unlock(&m_id.mutex);
-	ASSERT(res == 0);
+	const u64 v = 1;
+	const ssize_t res = write(m_id.fd, &v, sizeof(v));
+	ASSERT(res == sizeof(v));
 }
 
 void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
 {
-	ASSERT(false);
-    // TODO
+	fd_set fs;
+	FD_ZERO(&fs);
+	FD_SET(event0.m_id.fd, &fs);
+	FD_SET(event1.m_id.fd, &fs);
+	struct timeval tv;
+	tv.tv_sec = timeout_ms / 1000;
+	tv.tv_usec = (timeout_ms % 1000) * 1000;
+	const int nfds = event0.m_id.fd < event1.m_id.fd ? event1.m_id.fd : event0.m_id.fd;
+	select(nfds + 1, &fs, nullptr, nullptr, &tv);
 }
 
 void Event::waitTimeout(u32 timeout_ms)
 {
-	int res = pthread_mutex_lock(&m_id.mutex);
-	ASSERT(res == 0);
-
-	timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	ts.tv_nsec += (long)timeout_ms * 1000 * 1000;
-	if(ts.tv_nsec > 1000000000)
-	{
-		ts.tv_nsec -= 1000000000;
-		ts.tv_sec += 1;
-	}
-	while (!m_id.signaled)
-	{
-		res = pthread_cond_timedwait(&m_id.cond, &m_id.mutex, &ts);
-		if(res == ETIMEDOUT) break;
-		ASSERT(res == 0);
-	}
-
-	if (!m_id.manual_reset) m_id.signaled = false;
-
-	res = pthread_mutex_unlock(&m_id.mutex);
-	ASSERT(res == 0);
+	fd_set fs;
+	FD_ZERO(&fs);
+	FD_SET(m_id.fd, &fs);
+	struct timeval tv;
+	tv.tv_sec = timeout_ms / 1000;
+	tv.tv_usec = (timeout_ms % 1000) * 1000;
+	select(m_id.fd + 1, &fs, nullptr, nullptr, &tv);
 }
 
 void Event::wait()
 {
-	int res = pthread_mutex_lock(&m_id.mutex);
-	ASSERT(res == 0);
-	
-	while (!m_id.signaled)
-	{
-		res = pthread_cond_wait(&m_id.cond, &m_id.mutex);
-		ASSERT(res == 0);
+	for (;;) {
+		fd_set fs;
+		const int res = select(m_id.fd + 1, &fs, nullptr, nullptr, nullptr);
+		u64 v;
+		read(m_id.fd, &v, sizeof(v));
+		if (errno != EAGAIN) break;
 	}
-	
-	if (!m_id.manual_reset) m_id.signaled = false;
-	
-	res = pthread_mutex_unlock(&m_id.mutex);
-	ASSERT(res == 0);
 }
 
 bool Event::poll()
 {
-	int res = pthread_mutex_lock(&m_id.mutex);
-	ASSERT(res == 0);
-	
-	bool ret = false;
-	if (m_id.signaled)
-	{
-		m_id.signaled = false;
-		ret = true;
-	}
-
-	res = pthread_mutex_unlock(&m_id.mutex);
-	ASSERT(res == 0);
-	
-	return ret;
+	u64 v;
+	read(m_id.fd, &v, sizeof(v));
+	return errno != EAGAIN;
 }
-
 
 CriticalSection::CriticalSection()
 {

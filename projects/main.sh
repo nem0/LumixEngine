@@ -30,8 +30,6 @@ build_cmft()
 	rm genie
 	cd ../_projects/gmake-linux
     make config=release64 cmft
-    cd ../../_build/linux64_gcc/bin
-    ranlib libcmftRelease.a
 	popd
 }
 
@@ -157,12 +155,38 @@ project_menu()
     done
 }
 
+init_3rdparty()
+{
+    download_project "cmft" "https://github.com/nem0/cmft.git"
+    download_project "freetype" "https://github.com/nem0/freetype2.git"
+    download_project "luajit" "https://github.com/nem0/LuaJIT.git"
+    download_project "nvtt" "https://github.com/nem0/nvidia-texture-tools.git"
+    download_project "physx" "https://github.com/nem0/PhysX.git"
+    download_project "recast" "https://github.com/nem0/recastnavigation.git"
+
+    build_3rdparty "cmft"
+    build_3rdparty "freetype"
+    build_3rdparty "luajit"
+    build_3rdparty "nvtt"
+    build_3rdparty "physx"
+    build_3rdparty "recast"
+
+    deploy_3rdparty "cmft"
+    deploy_3rdparty "freetype"
+    deploy_3rdparty "luajit"
+    deploy_3rdparty "nvtt"
+    deploy_3rdparty "physx"
+    deploy_3rdparty "recast"
+
+    pause;
+}
+
 thirdparty_menu()
 {
     while :; do
         clear;
         echo "third party"
-        options=("cmft" "freetype" "luajit" "nvtt" "physx" "recast" "back")
+        options=("cmft" "freetype" "luajit" "nvtt" "physx" "recast" "init all" "back")
         select opt in "${options[@]}"
         do
             case "$REPLY" in
@@ -172,7 +196,8 @@ thirdparty_menu()
                 4 ) project_menu "nvtt" "https://github.com/nem0/nvidia-texture-tools.git"; break;;
                 5 ) project_menu "physx" "https://github.com/nem0/PhysX.git"; break;;
                 6 ) project_menu "recast" "https://github.com/nem0/recastnavigation.git"; break;;
-                7 ) break 2;;
+                7 ) init_3rdparty; break;;
+                8 ) break 2;;
             esac
         done
     done
@@ -181,7 +206,7 @@ thirdparty_menu()
 build()
 {
     cd tmp/gmake
-    make -j config=relwithdebinfo64
+    make -j config=$1
     cd ../..
 }
 
@@ -189,14 +214,15 @@ main_menu()
 {
     clear;
     PS3="Wut? "
-    options=("create project", "build" "3rdparty", "exit")
+    options=("create project" "build release" "build debug" "3rdparty" "exit")
     select opt in "${options[@]}"
     do
         case "$REPLY" in
             1 ) ./genie --static-plugins gmake; pause; break;;
-            2 ) build; pause; break;;
-            3 ) thirdparty_menu; break;;
-            4 ) exit;;
+            2 ) build relwithdebinfo64; pause; break;;
+            3 ) build debug64; pause; break;;
+            4 ) thirdparty_menu; break;;
+            5 ) exit;;
         esac
     done
 }
