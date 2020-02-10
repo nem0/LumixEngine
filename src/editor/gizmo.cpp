@@ -153,6 +153,7 @@ struct GizmoImpl final : public Gizmo
 			const RigidTransform gizmo_tr = getTransform(m_entities[i]);
 			const Vec2 p = m_editor.getView().getViewport().worldToScreenPixels(gizmo_tr.pos);
 			switch (m_mode) {
+				case Mode::SCALE: break;
 				case Mode::TRANSLATE:
 					if (m_is_dragging) {
 						const DVec3 intersection = getMousePlaneIntersection(m_editor.getView().getMousePos(), gizmo_tr, m_transform_axis);
@@ -174,6 +175,7 @@ struct GizmoImpl final : public Gizmo
 						ri->addText2D(text_pos.x, text_pos.y, 0xffffFFFF, tmp);
 					}
 					break;
+				default: ASSERT(false); break;
 			}
 		}
 	}

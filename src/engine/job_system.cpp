@@ -179,7 +179,7 @@ static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
 	w.next_job.task = nullptr;
 	g_system->m_free_queue.pop();
 
-	return handle & HANDLE_ID_MASK | w.generation;
+	return (handle & HANDLE_ID_MASK) | w.generation;
 }
 
 
@@ -214,7 +214,7 @@ void trigger(SignalHandle handle)
 			pushJob(signal.next_job);
 		}
 		signal.generation = (((signal.generation >> 16) + 1) & 0xffFF) << 16;
-		g_system->m_free_queue.push(iter & HANDLE_ID_MASK | signal.generation);
+		g_system->m_free_queue.push((iter & HANDLE_ID_MASK) | signal.generation);
 		signal.next_job.task = nullptr;
 		iter = signal.sibling;
 	}

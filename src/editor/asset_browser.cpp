@@ -4,6 +4,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -754,7 +755,8 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 	ImGui::AlignTextToFramePadding();
 	ImGui::PushTextWrapPos(pos.x);
 
-	const ResourceLocator rl(Span(buf.m_begin, stringLength(buf.m_begin)));
+	const Span span(buf.m_begin, stringLength(buf.m_begin));
+	const ResourceLocator rl(span);
 	ImGui::Text("%s", getImGuiLabelID(rl, false).data);
 
 	ImGui::PopTextWrapPos();
@@ -882,7 +884,8 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 
 		const bool selected = selected_path_hash == res.path.getHash();
 		if(selected) selected_path = res.path;
-		const ResourceLocator rl(Span(res.path.c_str(), res.path.length()));
+		const Span span(res.path.c_str(), res.path.length());
+		const ResourceLocator rl(span);
 		StaticString<MAX_PATH_LENGTH> label = getImGuiLabelID(rl, true);
 		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
 			selected_path_hash = res.path.getHash();

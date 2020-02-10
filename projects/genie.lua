@@ -432,13 +432,26 @@ solution "LumixEngine"
 			"-Wa,--noexecstack",
 			"-fstack-protector",
 			"-ffunction-sections",
-			"-Wno-psabi",
 			"-Wunused-value",
 			"-Wundef",
 			"-msse2",
 			"-Wno-multichar",
 			"-Wno-undef",
 		}
+		
+		if "linux-clang" ~= _OPTIONS["gcc"] then
+			buildoptions { 
+				"-Wno-psabi"
+			}
+		else
+			buildoptions { 
+				"-Wno-logical-op-parentheses",
+				"-Wno-dynamic-class-memaccess",
+				"-Wno-unused-value",
+				"-Wno-switch"
+			}
+		end
+		
 		linkoptions {
 			"-Wl,--gc-sections",
 			"-fopenmp"

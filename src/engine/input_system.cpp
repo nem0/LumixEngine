@@ -145,6 +145,7 @@ struct InputSystemImpl final : public InputSystem
 				injectEvent(input_event);
 				break;
 			}
+			default: break;
 		}
 	}
 

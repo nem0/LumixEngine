@@ -967,7 +967,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				const u32 idx = i + j * size.x;
 				const u8 alpha = data[idx] >> 24;
 				tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
-				tmp[idx] = alpha << 24 | tmp[idx] & 0xffFFff;
+				tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
 			}
 		}
 		memcpy(gb0->begin(), tmp.begin(), tmp.byte_size());
