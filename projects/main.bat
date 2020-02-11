@@ -398,7 +398,7 @@ goto :cmft
 	genie.exe --file=main.lua vs2019
 	del genie.exe
 	cd ..\..\..
-	%msbuild_cmd% 3rdparty\cmft\_projects\vs2019\cmft.sln /p:Configuration=Release /p:Platform=x64
+	%msbuild_cmd% 3rdparty\cmft\_projects\vs2019\cmft.vcxproj /p:Configuration=Release /p:Platform=x64
 exit /B 0
 
 :deploy_cmft
