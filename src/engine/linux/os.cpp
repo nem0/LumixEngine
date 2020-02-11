@@ -13,6 +13,7 @@
 #include <sys/mman.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -34,6 +35,7 @@ static struct
 
 	int argc = 0;
 	char** argv = nullptr;
+	Display* display = nullptr; 
 } G;
 
 
@@ -188,8 +190,17 @@ OutputFile& OutputFile::operator <<(float value)
 
 
 void logVersion() {
-    ASSERT(false);
-    // TODO
+    struct utsname tmp;
+	if (uname(&tmp) == 0) {
+		logInfo("Engine") << "sysname: " << tmp.sysname;
+		logInfo("Engine") << "nodename: " << tmp.nodename;
+		logInfo("Engine") << "release: " << tmp.release;
+		logInfo("Engine") << "version: " << tmp.version;
+		logInfo("Engine") << "machine: " << tmp.machine;
+	}
+	else {
+		logWarning("Engine") << "uname failed";
+	}
 }
 
 
@@ -217,8 +228,20 @@ void finishDrag(const Event& event)
 
 static void processEvents()
 {
-	ASSERT(false);
-    // TODO
+	while (XPending(G.display) > 0) {
+		XEvent xevent;
+		XNextEvent(G.display, &xevent);
+		
+		if (XFilterEvent(&xevent, None)) continue;
+
+		Event e;
+		//e.window = msg.hwnd;
+		switch (xevent.type) {
+			case KeyPress:
+				break;
+		}
+	}
+
 }
 
 
@@ -238,9 +261,9 @@ Point toScreen(WindowHandle win, int x, int y)
 
 WindowHandle createWindow(const InitWindowArgs& args)
 {
-	static Display* display = XOpenDisplay(nullptr);
-	if (!display) return INVALID_WINDOW;
+	ASSERT(G.display);
 	
+	Display* display = G.display;
 	static i32 screen = DefaultScreen(display);
 	static i32 depth = DefaultDepth(display, screen);
 	static Window root = RootWindow(display, screen);
@@ -258,8 +281,8 @@ WindowHandle createWindow(const InitWindowArgs& args)
 			| StructureNotifyMask;
 		return ret;
 	}();
-	XCreateWindow(display
-		, root
+	Window win = XCreateWindow(display
+		, args.parent ? (Window)args.parent : root
 		, 0
 		, 0
 		, 800
@@ -270,9 +293,17 @@ WindowHandle createWindow(const InitWindowArgs& args)
 		, visual
 		, CWBorderPixel | CWEventMask
 		, &attrs);
-	ASSERT(false);
-    // TODO
-    return {};
+	XSetWindowAttributes attr = {};
+	XChangeWindowAttributes(display, win, CWBackPixel, &attr);
+
+	XMapWindow(display, win);
+	XStoreName(display, win, args.name && args.name[0] ? args.name : "Lumix App");
+
+	// TODO glx context fails to create without this
+	for (int i = 0; i < 100; ++i) { processEvents(); }
+
+    WindowHandle res = (WindowHandle)win;
+	return res;
 }
 
 
@@ -327,7 +358,7 @@ Rect getWindowClientRect(WindowHandle win)
 
 void setWindowScreenRect(WindowHandle win, const Rect& rect)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
@@ -398,13 +429,19 @@ bool isRelativeMouseMode()
 
 void run(Interface& iface)
 {
+	XInitThreads();
+	G.display = XOpenDisplay(nullptr);
+	XIM im = XOpenIM(G.display, nullptr, nullptr, nullptr);
+
 	G.iface = &iface;
 	G.iface->onInit();
-	while (!G.finished)
-	{
+	while (!G.finished) {
 		processEvents();
 		G.iface->onIdle();
 	}
+
+	XCloseIM(im);
+	XCloseDisplay(G.display);
 }
 
 
@@ -595,7 +632,7 @@ void unclipCursor()
 
 bool copyFile(const char* from, const char* to)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 	return {};
 }

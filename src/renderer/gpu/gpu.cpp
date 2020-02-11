@@ -735,9 +735,11 @@ static void logVersion() {
 	const char* version = (const char*)glGetString(GL_VERSION);
 	const char* vendor = (const char*)glGetString(GL_VENDOR);
 	const char* renderer = (const char*)glGetString(GL_RENDERER);
-	logInfo("Renderer") << "OpenGL version: " << version;
-	logInfo("Renderer") << "OpenGL vendor: " << vendor;
-	logInfo("Renderer") << "OpenGL renderer: " << renderer;
+	if (version) {
+		logInfo("Renderer") << "OpenGL version: " << version;
+		logInfo("Renderer") << "OpenGL vendor: " << vendor;
+		logInfo("Renderer") << "OpenGL renderer: " << renderer;
+	}
 }
 
 static void* getGLFunc(const char* name) {
@@ -748,11 +750,116 @@ static void* getGLFunc(const char* name) {
 	#endif
 }
 
-static bool load_gl(void* device_contex, u32 init_flags)
+#ifdef __linux__
+static bool load_gl_linux(void* wnd){
+	XInitThreads();
+	Display* display = XOpenDisplay(nullptr);
+	XLockDisplay(display);
+
+	int major, minor;
+	const bool version_res = glXQueryVersion(display, &major, &minor);
+	LUMIX_FATAL(version_res);
+	LUMIX_FATAL((major == 1 && minor >= 2) || major > 1);
+
+	const i32 screen = DefaultScreen(display);
+	const int attrs[] = {
+		GLX_RENDER_TYPE, GLX_RGBA_BIT,
+		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+		GLX_DOUBLEBUFFER, true,
+		GLX_RED_SIZE, 8,
+		GLX_BLUE_SIZE, 8,
+		GLX_GREEN_SIZE, 8,
+		GLX_DEPTH_SIZE, 24,
+		GLX_STENCIL_SIZE, 8,
+		0,
+	};
+
+	GLXFBConfig best_cfg = NULL;
+
+	int cfgs_count;
+	GLXFBConfig* cfgs = glXChooseFBConfig(display, screen, attrs, &cfgs_count);
+
+	XVisualInfo* visual = nullptr;
+	for (int i = 0; i < cfgs_count; ++i) {
+		visual = glXGetVisualFromFBConfig(display, cfgs[i]);
+		if (visual) {
+			bool valid = true;
+			for (uint32_t attr = 6; attr < lengthOf(attrs) - 1 && attrs[attr] != 0; attr += 2) {
+				int value;
+				glXGetFBConfigAttrib(display, cfgs[i], attrs[attr], &value);
+				if (value < attrs[attr + 1]) {
+					valid = false;
+					break;
+				}
+			}
+
+			if (valid) {
+				best_cfg = cfgs[i];
+				break;
+			}
+		}
+
+		XFree(visual);
+		visual = NULL;
+	}
+
+	LUMIX_FATAL(visual);
+
+	GLXContext ctx = glXCreateContext(display, visual, 0, GL_TRUE);
+	LUMIX_FATAL(ctx);
+
+	PFNGLXCREATECONTEXTATTRIBSARBPROC glXCreateContextAttribsARB;
+	glXCreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)glXGetProcAddress( (const GLubyte*)"glXCreateContextAttribsARB");
+
+	if (glXCreateContextAttribsARB) {
+		i32 flags = 0;
+		#ifdef LUMIX_DEBUG
+ 			flags = GLX_CONTEXT_DEBUG_BIT_ARB;
+		#endif
+		const int ctx_attrs[] =
+		{
+			GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+			GLX_CONTEXT_MINOR_VERSION_ARB, 1,
+			GLX_CONTEXT_FLAGS_ARB, flags,
+			GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
+			0,
+		};
+
+		const GLXContext ctx2 = glXCreateContextAttribsARB(display, best_cfg, 0, true, ctx_attrs);
+
+		if (ctx2) {
+			glXDestroyContext(display, ctx);
+			ctx = ctx2;
+		}
+	}
+
+	XFree(cfgs);
+	XUnlockDisplay(display);	
+
+	#define GPU_GL_IMPORT(prototype, name) \
+		do { \
+			name = (prototype)getGLFunc(#name); \
+			if (!name) { \
+				logError("Renderer") << "Failed to load GL function " #name "."; \
+				return false; \
+			} \
+		} while(0)
+
+	#include "gl_ext.h"
+
+	#undef GPU_GL_IMPORT
+
+	glXMakeCurrent(display, (::Window)wnd, ctx);
+	logVersion();
+	return true;
+}
+#endif
+
+static bool load_gl(void* platform_handle, u32 init_flags)
 {
-	const bool vsync = init_flags & (u32)InitFlags::VSYNC;
 	#ifdef _WIN32
-		HDC hdc = (HDC)device_contex;
+		const bool vsync = init_flags & (u32)InitFlags::VSYNC;
+		HDC hdc = (HDC)platform_handle;
 		const PIXELFORMATDESCRIPTOR pfd =
 		{
 			sizeof(PIXELFORMATDESCRIPTOR),
@@ -836,8 +943,13 @@ static bool load_gl(void* device_contex, u32 init_flags)
 		#include "gl_ext.h"
 
 		#undef GPU_GL_IMPORT
-#endif
-	return true;
+		return true;
+	#elif defined __linux__
+		return load_gl_linux(platform_handle);
+	#else
+		#error platform not supported
+		return false;
+	#endif
 }
 
 
@@ -2004,61 +2116,62 @@ bool init(void* window_handle, u32 init_flags)
 		const bool debug = init_flags & (u32)InitFlags::DEBUG_OUTPUT;
 	#endif
 	
+	g_gpu.thread = MT::getCurrentThreadID();
+	g_gpu.contexts[0].window_handle = window_handle;
 	#ifdef _WIN32
-		g_gpu.contexts[0].window_handle = window_handle;
-		g_gpu.contexts[0].device_context = GetDC((HWND)window_handle);
-		g_gpu.thread = GetCurrentThreadId();
-
 		if (!load_gl(g_gpu.contexts[0].device_context, init_flags)) return false;
-
-		glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_gpu.max_vertex_attributes);
-
-		int extensions_count;
-		glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
-		g_gpu.has_gpu_mem_info_ext = false; 
-		for(int i = 0; i < extensions_count; ++i) {
-			const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
-			if (equalStrings(ext, "GL_NVX_gpu_memory_info")) {
-				g_gpu.has_gpu_mem_info_ext = true; 
-				break;
-			}
-			//OutputDebugString(ext);
-			//OutputDebugString("\n");
-		}
-		//const unsigned char* version = glGetString(GL_VERSION);
-
-		CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
-		CHECK_GL(glDepthFunc(GL_GREATER));
-
-		if (debug) {
-			CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
-			CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
-			CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
-			CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
-		}
-
-		CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
-		CHECK_GL(glBindVertexArray(0));	
-		CHECK_GL(glCreateFramebuffers(1, &g_gpu.framebuffer));
-
-		
-		g_gpu.default_program = allocProgramHandle();
-		Program& p = g_gpu.programs[g_gpu.default_program.value];
-		p.handle = glCreateProgram();
-		CHECK_GL(glGenVertexArrays(1, &g_gpu.contexts[0].vao));
-		CHECK_GL(glBindVertexArray(g_gpu.contexts[0].vao));
-		CHECK_GL(glVertexBindingDivisor(0, 0));
-		CHECK_GL(glVertexBindingDivisor(1, 1));
-
-		const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-		const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
-		glShaderSource(vs, 1, &vs_src, nullptr);
-		glCompileShader(vs);
-		glAttachShader(p.handle, vs);
-		CHECK_GL(glLinkProgram(p.handle));
-		glDeleteShader(vs);
-
+		g_gpu.contexts[0].device_context = GetDC((HWND)window_handle);
+	#else
+		if (!load_gl(window_handle, init_flags)) return false;
 	#endif
+
+	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &g_gpu.max_vertex_attributes);
+
+	int extensions_count;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &extensions_count);
+	g_gpu.has_gpu_mem_info_ext = false; 
+	for(int i = 0; i < extensions_count; ++i) {
+		const char* ext = (const char*)glGetStringi(GL_EXTENSIONS, i);
+		if (equalStrings(ext, "GL_NVX_gpu_memory_info")) {
+			g_gpu.has_gpu_mem_info_ext = true; 
+			break;
+		}
+		//OutputDebugString(ext);
+		//OutputDebugString("\n");
+	}
+	//const unsigned char* version = glGetString(GL_VERSION);
+
+	CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
+	CHECK_GL(glDepthFunc(GL_GREATER));
+
+	if (debug) {
+		CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
+		CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
+		CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
+		CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
+	}
+
+	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
+	CHECK_GL(glBindVertexArray(0));	
+	CHECK_GL(glCreateFramebuffers(1, &g_gpu.framebuffer));
+
+	
+	g_gpu.default_program = allocProgramHandle();
+	Program& p = g_gpu.programs[g_gpu.default_program.value];
+	p.handle = glCreateProgram();
+	CHECK_GL(glGenVertexArrays(1, &g_gpu.contexts[0].vao));
+	CHECK_GL(glBindVertexArray(g_gpu.contexts[0].vao));
+	CHECK_GL(glVertexBindingDivisor(0, 0));
+	CHECK_GL(glVertexBindingDivisor(1, 1));
+
+	const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
+	glShaderSource(vs, 1, &vs_src, nullptr);
+	glCompileShader(vs);
+	glAttachShader(p.handle, vs);
+	CHECK_GL(glLinkProgram(p.handle));
+	glDeleteShader(vs);
+
 	g_gpu.last_state = 1;
 	setState(0);
 
