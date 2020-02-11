@@ -1892,8 +1892,8 @@ public:
 			ImGui::LoadIniSettingsFromMemory((const char*)ini_data.begin(), ini_data.size());
 		}
 
-		m_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
-		m_bold_font = addFontFromFile("editor/fonts/opensans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
+		m_font = addFontFromFile("editor/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale, true);
+		m_bold_font = addFontFromFile("editor/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale, true);
 
 		if (m_font) {
 			m_font->DisplayOffset.y = 0;

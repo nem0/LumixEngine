@@ -146,7 +146,7 @@ struct WorkerTask : MT::Task
 		g_system->m_sync.enter();
 		FiberDecl* fiber = g_system->m_free_fibers.back();
 		g_system->m_free_fibers.pop();
-		if (fiber->fiber == Fiber::INVALID_FIBER) {
+		if (!Fiber::isValid(fiber->fiber)) {
 			fiber->fiber = Fiber::create(64 * 1024, manage, fiber);
 		}
 		getWorker()->m_current_fiber = fiber;
@@ -520,7 +520,7 @@ void shutdown()
 
 	for (FiberDecl& fiber : g_system->m_fiber_pool)
 	{
-		if(fiber.fiber != Fiber::INVALID_FIBER) {
+		if(Fiber::isValid(fiber.fiber)) {
 			Fiber::destroy(fiber.fiber);
 		}
 	}
@@ -559,7 +559,7 @@ void wait(SignalHandle handle)
 		const Profiler::FiberSwitchData& switch_data = Profiler::beginFiberWait(handle);
 		FiberDecl* new_fiber = g_system->m_free_fibers.back();
 		g_system->m_free_fibers.pop();
-		if (new_fiber->fiber == Fiber::INVALID_FIBER) {
+		if (!Fiber::isValid(new_fiber->fiber)) {
 			new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
 		}
 		getWorker()->m_current_fiber = new_fiber;
