@@ -206,14 +206,14 @@ void logVersion() {
 
 void getDropFile(const Event& event, int idx, Span<char> out)
 {
-    //ASSERT(false);
+    ASSERT(false);
     // TODO
 }
 
 
 int getDropFileCount(const Event& event)
 {
-    //ASSERT(false);
+    ASSERT(false);
     // TODO
 	return {};
 }
@@ -221,7 +221,7 @@ int getDropFileCount(const Event& event)
 
 void finishDrag(const Event& event)
 {
-    //ASSERT(false);
+    ASSERT(false);
     // TODO
 }
 
@@ -278,7 +278,7 @@ static void processEvents()
 
 void destroyWindow(WindowHandle window)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
@@ -287,7 +287,7 @@ Point toScreen(WindowHandle win, int x, int y)
 {
 	//ASSERT(false);
     // TODO
-    return {};
+    return {x, y};
 }
 
 WindowHandle createWindow(const InitWindowArgs& args)
@@ -348,20 +348,20 @@ bool isKeyDown(Keycode keycode)
 {
 	//ASSERT(false);
     // TODO
-    return {};
+    return false;
 }
 
 
 void getKeyName(Keycode keycode, Span<char> out)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
 
 void showCursor(bool show)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
@@ -374,16 +374,21 @@ void setWindowTitle(WindowHandle win, const char* title)
 
 Rect getWindowScreenRect(WindowHandle win)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
     return {};
 }
 
 Rect getWindowClientRect(WindowHandle win)
 {
-	//ASSERT(false);
-    // TODO
-    return {};
+	XWindowAttributes attrs;
+	XGetWindowAttributes(G.display, (Window)win, &attrs);
+	Rect r;
+	r.left = 0;
+	r.top = 0;
+	r.width = attrs.width;
+	r.height = attrs.height;
+    return r;
 }
 
 void setWindowScreenRect(WindowHandle win, const Rect& rect)
@@ -400,13 +405,13 @@ u32 getMonitors(Span<Monitor> monitors)
 
 void setMouseScreenPos(int x, int y)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
 Point getMousePos(WindowHandle win)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
     return {};
 }
@@ -423,29 +428,29 @@ WindowHandle getFocused()
 {
 	//ASSERT(false);
     // TODO
-    return {};
+    return INVALID_WINDOW;
 }
 
 bool isMaximized(WindowHandle win) {
 	//ASSERT(false);
     // TODO
-    return {};
+    return false;
 }
 
 void restore(WindowHandle win, WindowState state) {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
 WindowState setFullscreen(WindowHandle win) {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
     return {};
 }
 
 void maximizeWindow(WindowHandle win)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
@@ -478,11 +483,11 @@ int getDPI()
 {
 	//ASSERT(false);
     // TODO
-    return {};
+    return 96;
 }
 
 u32 getMemPageSize() {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
     return {};
 }
@@ -499,7 +504,7 @@ void memCommit(void* ptr, size_t size) {
 
 void memRelease(void* ptr) {
 	// TODO size must not be 0
-	//ASSERT(false);
+	ASSERT(false);
 	const int res = munmap(ptr, 0);
 	ASSERT(res == 0);
 }
@@ -549,7 +554,7 @@ void getCurrentDirectory(Span<char> output)
 
 bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension)
 {
-		//ASSERT(false);
+		ASSERT(false);
     // TODO
     return {};
 
@@ -558,7 +563,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 
 bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file)
 {
-		//ASSERT(false);
+		ASSERT(false);
     // TODO
     return {};
 
@@ -567,7 +572,7 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 
 bool getOpenDirectory(Span<char> output, const char* starting_dir)
 {
-		//ASSERT(false);
+		ASSERT(false);
     // TODO
     return {};
 
@@ -576,7 +581,7 @@ bool getOpenDirectory(Span<char> output, const char* starting_dir)
 
 void copyToClipboard(const char* text)
 {
-		//ASSERT(false);
+		ASSERT(false);
     // TODO
 }
 
@@ -589,7 +594,7 @@ ExecuteOpenResult shellExecuteOpen(const char* path)
 
 ExecuteOpenResult openExplorer(const char* path)
 {
-		//ASSERT(false);
+		ASSERT(false);
     // TODO
     return {};
 
@@ -647,14 +652,14 @@ bool makePath(const char* path)
 
 void clipCursor(int x, int y, int w, int h)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
 
 void unclipCursor()
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
 }
 
@@ -682,7 +687,7 @@ bool copyFile(const char* from, const char* to)
 
 void getExecutablePath(Span<char> buffer)
 {
-	//ASSERT(false);
+	ASSERT(false);
     // TODO
     ;
 }
