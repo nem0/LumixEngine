@@ -278,7 +278,7 @@ static void processEvents()
 
 void destroyWindow(WindowHandle window)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
@@ -661,9 +661,22 @@ void unclipCursor()
 
 bool copyFile(const char* from, const char* to)
 {
-	////ASSERT(false);
-    // TODO
-	return {};
+    const int source = open(from, O_RDONLY, 0);
+	if (source < 0) return false;
+    const int dest = open(to, O_WRONLY | O_CREAT, 0644);
+	if (dest < 1) {
+		close(source);
+		return false;
+	}
+
+	char buf[BUFSIZ];
+    size_t size;
+    while ((size = read(source, buf, BUFSIZ)) > 0) {
+        write(dest, buf, size);
+    }
+
+    close(source);
+    close(dest);
 }
 
 

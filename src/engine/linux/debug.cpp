@@ -19,7 +19,7 @@ namespace Debug
 
 void debugOutput(const char* message)
 {
-	puts(message);
+	printf("%s", message);
 }
 
 
