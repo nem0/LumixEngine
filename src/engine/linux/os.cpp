@@ -206,14 +206,14 @@ void logVersion() {
 
 void getDropFile(const Event& event, int idx, Span<char> out)
 {
-    ASSERT(false);
+    //ASSERT(false);
     // TODO
 }
 
 
 int getDropFileCount(const Event& event)
 {
-    ASSERT(false);
+    //ASSERT(false);
     // TODO
 	return {};
 }
@@ -221,7 +221,7 @@ int getDropFileCount(const Event& event)
 
 void finishDrag(const Event& event)
 {
-    ASSERT(false);
+    //ASSERT(false);
     // TODO
 }
 
@@ -235,9 +235,40 @@ static void processEvents()
 		if (XFilterEvent(&xevent, None)) continue;
 
 		Event e;
-		//e.window = msg.hwnd;
 		switch (xevent.type) {
-			case KeyPress:
+			case ButtonPress:
+			case ButtonRelease:
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.window = (WindowHandle)xevent.xbutton.window;
+				switch (xevent.xbutton.button) {
+					case Button1: e.mouse_button.button = MouseButton::LEFT; break;
+					case Button2: e.mouse_button.button = MouseButton::MIDDLE; break;
+					case Button3: e.mouse_button.button = MouseButton::RIGHT; break;
+					default: e.mouse_button.button = MouseButton::EXTENDED; break;
+				}
+				e.mouse_button.down = xevent.type == ButtonPress;
+				G.iface->onEvent(e);
+				break;			
+			case ConfigureNotify:
+				e.window = (WindowHandle)xevent.xconfigure.window;
+
+				e.type = Event::Type::WINDOW_SIZE;
+				e.win_size.w = xevent.xconfigure.width;
+				e.win_size.h = xevent.xconfigure.height;
+				G.iface->onEvent(e);
+
+				e.type = Event::Type::WINDOW_MOVE;
+				e.win_move.x = xevent.xconfigure.x;
+				e.win_move.y = xevent.xconfigure.y;
+				G.iface->onEvent(e);
+				break;
+			case MotionNotify:
+				// TODO xevent.xmotion.x is not relative
+				//e.window = (WindowHandle)xevent.xmotion.window;
+				//e.type = Event::Type::MOUSE_MOVE;
+				//e.mouse_move.xrel = xevent.xmotion.x;
+				//e.mouse_move.yrel = xevent.xmotion.x;
+				//G.iface->onEvent(e);
 				break;
 		}
 	}
@@ -254,7 +285,7 @@ void destroyWindow(WindowHandle window)
 
 Point toScreen(WindowHandle win, int x, int y)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
@@ -315,7 +346,7 @@ void quit()
 
 bool isKeyDown(Keycode keycode)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
@@ -323,68 +354,66 @@ bool isKeyDown(Keycode keycode)
 
 void getKeyName(Keycode keycode, Span<char> out)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
 
 void showCursor(bool show)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
 
 void setWindowTitle(WindowHandle win, const char* title)
 {
-	ASSERT(false);
-    // TODO
+	XStoreName(G.display, (Window)win, title);
 }
 
 
 Rect getWindowScreenRect(WindowHandle win)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 Rect getWindowClientRect(WindowHandle win)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 void setWindowScreenRect(WindowHandle win, const Rect& rect)
 {
-	//ASSERT(false);
-    // TODO
+	XMoveResizeWindow(G.display, (Window)win, rect.left, rect.top, rect.width, rect.height);
 }
 
 u32 getMonitors(Span<Monitor> monitors)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 void setMouseScreenPos(int x, int y)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
 Point getMousePos(WindowHandle win)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 Point getMouseScreenPos()
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
@@ -392,31 +421,31 @@ Point getMouseScreenPos()
 
 WindowHandle getFocused()
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 bool isMaximized(WindowHandle win) {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 void restore(WindowHandle win, WindowState state) {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
 WindowState setFullscreen(WindowHandle win) {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 void maximizeWindow(WindowHandle win)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
@@ -447,13 +476,13 @@ void run(Interface& iface)
 
 int getDPI()
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
 
 u32 getMemPageSize() {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     return {};
 }
@@ -470,7 +499,7 @@ void memCommit(void* ptr, size_t size) {
 
 void memRelease(void* ptr) {
 	// TODO size must not be 0
-	ASSERT(false);
+	//ASSERT(false);
 	const int res = munmap(ptr, 0);
 	ASSERT(res == 0);
 }
@@ -520,7 +549,7 @@ void getCurrentDirectory(Span<char> output)
 
 bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension)
 {
-		ASSERT(false);
+		//ASSERT(false);
     // TODO
     return {};
 
@@ -529,7 +558,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 
 bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file)
 {
-		ASSERT(false);
+		//ASSERT(false);
     // TODO
     return {};
 
@@ -538,7 +567,7 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 
 bool getOpenDirectory(Span<char> output, const char* starting_dir)
 {
-		ASSERT(false);
+		//ASSERT(false);
     // TODO
     return {};
 
@@ -547,7 +576,7 @@ bool getOpenDirectory(Span<char> output, const char* starting_dir)
 
 void copyToClipboard(const char* text)
 {
-		ASSERT(false);
+		//ASSERT(false);
     // TODO
 }
 
@@ -560,7 +589,7 @@ ExecuteOpenResult shellExecuteOpen(const char* path)
 
 ExecuteOpenResult openExplorer(const char* path)
 {
-		ASSERT(false);
+		//ASSERT(false);
     // TODO
     return {};
 
@@ -618,21 +647,21 @@ bool makePath(const char* path)
 
 void clipCursor(int x, int y, int w, int h)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
 
 void unclipCursor()
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
 
 bool copyFile(const char* from, const char* to)
 {
-	//ASSERT(false);
+	////ASSERT(false);
     // TODO
 	return {};
 }
@@ -640,7 +669,7 @@ bool copyFile(const char* from, const char* to)
 
 void getExecutablePath(Span<char> buffer)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
     ;
 }
@@ -695,13 +724,13 @@ Timer::Timer()
 
 float Timer::getTimeSinceStart()
 {
-	return getRawTimestamp() - first_tick;
+	return float(double(getRawTimestamp() - first_tick) / double(getFrequency()));
 }
 
 
 float Timer::getTimeSinceTick()
 {
-	return getRawTimestamp() - last_tick;
+	return float(double(getRawTimestamp() - last_tick) / double(getFrequency()));
 }
 
 
