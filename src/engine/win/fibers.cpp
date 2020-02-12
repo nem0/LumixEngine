@@ -36,6 +36,12 @@ void switchTo(Handle* from, Handle fiber)
 }
 
 
+bool isValid(Handle handle)
+{
+	return handle != INVALID_FIBER;
+}
+
+
 } // namespace Fibers
 
 

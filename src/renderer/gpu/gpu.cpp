@@ -751,9 +751,11 @@ static void* getGLFunc(const char* name) {
 }
 
 #ifdef __linux__
+Display* gdisplay;
 static bool load_gl_linux(void* wnd){
 	XInitThreads();
 	Display* display = XOpenDisplay(nullptr);
+	gdisplay = display;
 	XLockDisplay(display);
 
 	int major, minor;
@@ -1457,11 +1459,13 @@ void swapBuffers()
 {
 	checkThread();
 	glFinish();
-	for (const WindowContext& ctx : g_gpu.contexts) {
-		#ifdef _WIN32
+	#ifdef _WIN32
+		for (const WindowContext& ctx : g_gpu.contexts) {
 			SwapBuffers(ctx.device_context);
-		#endif
-	}
+		}
+	#else
+		glXSwapBuffers(gdisplay, (Window)g_gpu.contexts[0].window_handle);
+	#endif
 }
 
 void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
@@ -2019,17 +2023,22 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			default: ASSERT(0); break;
 		}
 		const GLuint shd = glCreateShader(shader_type);
-		combined_srcs[0] = "#version 440\n";
-		combined_srcs[1] = "#define _ORIGIN_BOTTOM_LEFT\n";
-		combined_srcs[prefixes_count + decl.attributes_count + 2] = srcs[i];
+		combined_srcs[0] = R"#(
+			#version 140
+			#extension GL_ARB_explicit_attrib_location : enable
+			#extension GL_ARB_shading_language_420pack : enable
+			#extension GL_ARB_separate_shader_objects : enable
+			#define _ORIGIN_BOTTOM_LEFT
+		)#";
+		combined_srcs[prefixes_count + decl.attributes_count + 1] = srcs[i];
 		for (u32 j = 0; j < prefixes_count; ++j) {
-			combined_srcs[j + 2] = prefixes[j];
+			combined_srcs[j + 1] = prefixes[j];
 		}
 		for (u32 j = 0; j < decl.attributes_count; ++j) {
-			combined_srcs[j + prefixes_count + 2] = attr_defines[decl.attributes[j].idx];
+			combined_srcs[j + prefixes_count + 1] = attr_defines[decl.attributes[j].idx];
 		}
 
-		CHECK_GL(glShaderSource(shd, 3 + prefixes_count + decl.attributes_count, combined_srcs, 0));
+		CHECK_GL(glShaderSource(shd, 2 + prefixes_count + decl.attributes_count, combined_srcs, 0));
 		CHECK_GL(glCompileShader(shd));
 
 		GLint compile_status;
@@ -2119,8 +2128,8 @@ bool init(void* window_handle, u32 init_flags)
 	g_gpu.thread = MT::getCurrentThreadID();
 	g_gpu.contexts[0].window_handle = window_handle;
 	#ifdef _WIN32
-		if (!load_gl(g_gpu.contexts[0].device_context, init_flags)) return false;
 		g_gpu.contexts[0].device_context = GetDC((HWND)window_handle);
+		if (!load_gl(g_gpu.contexts[0].device_context, init_flags)) return false;
 	#else
 		if (!load_gl(window_handle, init_flags)) return false;
 	#endif
