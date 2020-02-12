@@ -1,5 +1,6 @@
 #include "engine/fibers.h"
 #include "engine/lumix.h"
+#include "engine/profiler.h"
 #include <ucontext.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +49,7 @@ void destroy(Handle fiber)
 
 void switchTo(Handle* prev, Handle fiber)
 {
+	Profiler::beforeFiberSwitch();
 	swapcontext(prev, &fiber); 
 }
 
