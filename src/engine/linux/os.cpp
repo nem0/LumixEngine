@@ -1,11 +1,13 @@
 #include "engine/allocator.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
+#include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/string.h"
 #include <dlfcn.h>
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +38,8 @@ static struct
 	int argc = 0;
 	char** argv = nullptr;
 	Display* display = nullptr; 
+	IVec2 mouse_screen_pos = {};
+	bool key_states[256] = {};
 } G;
 
 
@@ -206,23 +210,19 @@ void logVersion() {
 
 void getDropFile(const Event& event, int idx, Span<char> out)
 {
-    ASSERT(false);
-    // TODO
+    ASSERT(false); // not supported, processEvents does not generate the drop event
 }
 
 
 int getDropFileCount(const Event& event)
 {
-    ASSERT(false);
-    // TODO
-	return {};
+    ASSERT(false); // not supported, processEvents does not generate the drop event
 }
 
 
 void finishDrag(const Event& event)
 {
-    ASSERT(false);
-    // TODO
+    ASSERT(false); // not supported, processEvents does not generate the drop event
 }
 
 
@@ -236,6 +236,11 @@ static void processEvents()
 
 		Event e;
 		switch (xevent.type) {
+			case KeyPress:
+			case KeyRelease:
+				// TODO set G.key_states
+				ASSERT(false);
+				break;
 			case ButtonPress:
 			case ButtonRelease:
 				e.type = Event::Type::MOUSE_BUTTON;
@@ -263,12 +268,14 @@ static void processEvents()
 				G.iface->onEvent(e);
 				break;
 			case MotionNotify:
-				// TODO xevent.xmotion.x is not relative
-				//e.window = (WindowHandle)xevent.xmotion.window;
-				//e.type = Event::Type::MOUSE_MOVE;
-				//e.mouse_move.xrel = xevent.xmotion.x;
-				//e.mouse_move.yrel = xevent.xmotion.x;
-				//G.iface->onEvent(e);
+				const IVec2 mp(xevent.xmotion.x, xevent.xmotion.y);
+				const IVec2 rel = mp - G.mouse_screen_pos;
+				G.mouse_screen_pos = mp;
+				e.window = (WindowHandle)xevent.xmotion.window;
+				e.type = Event::Type::MOUSE_MOVE;
+				e.mouse_move.xrel = rel.x;
+				e.mouse_move.yrel = rel.y;
+				G.iface->onEvent(e);
 				break;
 		}
 	}
@@ -278,16 +285,16 @@ static void processEvents()
 
 void destroyWindow(WindowHandle window)
 {
-	ASSERT(false);
-    // TODO
+	XUnmapWindow(G.display, (Window)window);
+	XDestroyWindow(G.display, (Window)window);
 }
 
 
 Point toScreen(WindowHandle win, int x, int y)
 {
-	//ASSERT(false);
-    // TODO
-    return {x, y};
+	XWindowAttributes attrs;
+	XGetWindowAttributes(G.display, (Window)win, &attrs);
+    return {x + attrs.x, y + attrs.y};
 }
 
 WindowHandle createWindow(const InitWindowArgs& args)
@@ -346,9 +353,7 @@ void quit()
 
 bool isKeyDown(Keycode keycode)
 {
-	//ASSERT(false);
-    // TODO
-    return false;
+	return G.key_states[(u8)keycode];
 }
 
 
@@ -374,9 +379,17 @@ void setWindowTitle(WindowHandle win, const char* title)
 
 Rect getWindowScreenRect(WindowHandle win)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	XWindowAttributes attrs;
+	XGetWindowAttributes(G.display, (Window)win, &attrs);
+	Rect r;
+	r.left = attrs.x;
+	r.top = attrs.y;
+	r.width = attrs.width;
+	r.height = attrs.height;
+	XGetWindowAttributes(G.display, attrs.root, &attrs);
+	r.left += attrs.x;
+	r.top += attrs.y;
+    return r;
 }
 
 Rect getWindowClientRect(WindowHandle win)
@@ -411,24 +424,38 @@ void setMouseScreenPos(int x, int y)
 
 Point getMousePos(WindowHandle win)
 {
-	ASSERT(false);
-    // TODO
-    return {};
+	const Rect r = getWindowScreenRect(win);
+	const Point mp = getMouseScreenPos();
+	return {
+		mp.x - r.left,
+		mp.y - r.top
+	};
 }
 
 Point getMouseScreenPos()
 {
-	//ASSERT(false);
-    // TODO
-    return {};
+	const int screen_count = ScreenCount(G.display);
+	for (int screen = 0; screen < screen_count; ++screen) {
+		Window root, child;
+		int root_x, root_y, win_x, win_y;
+		unsigned mask;
+		if (XQueryPointer(G.display, RootWindow(G.display, screen), &root, &child, &root_x, &root_y, &win_x, &win_y, &mask)) {
+			XWindowAttributes attrs;
+			XGetWindowAttributes(G.display, root, &attrs);
+			return {attrs.x + root_x, attrs.y + root_y};
+		}
+	}
+
+	return {0, 0};
 }
 
 
 WindowHandle getFocused()
 {
-	//ASSERT(false);
-    // TODO
-    return INVALID_WINDOW;
+	Window win;
+	int dummy;
+	XGetInputFocus(G.display, &win, &dummy);
+	return (WindowHandle)win;
 }
 
 bool isMaximized(WindowHandle win) {
@@ -487,15 +514,12 @@ int getDPI()
 }
 
 u32 getMemPageSize() {
-	ASSERT(false);
-    // TODO
-    return {};
+	const u32 sz = sysconf(_SC_PAGESIZE);
+	return sz;
 }
 
 void* memReserve(size_t size) {
-	void* res = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
-	if (res == MAP_FAILED) return nullptr;
-	return res;
+	return malloc(size);
 }
 
 void memCommit(void* ptr, size_t size) {
@@ -503,10 +527,7 @@ void memCommit(void* ptr, size_t size) {
 }
 
 void memRelease(void* ptr) {
-	// TODO size must not be 0
-	ASSERT(false);
-	const int res = munmap(ptr, 0);
-	ASSERT(res == 0);
+	free(ptr);
 }
 
 struct FileIterator {};
@@ -711,6 +732,7 @@ bool getCommandLine(Span<char> output)
 	copyString(output, "");
 	for (int i = 0; i < G.argc; ++i) {
 		catString(output, G.argv[i]);
+		catString(output, " ");
 	}
     return true;
 }

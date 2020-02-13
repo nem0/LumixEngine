@@ -5,7 +5,7 @@
 #include "engine/mt/thread.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
-#include <mutex>
+#include <errno.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
 
@@ -147,25 +147,27 @@ bool Event::poll()
 
 CriticalSection::CriticalSection()
 {
-    static_assert(sizeof(std::mutex) <= sizeof(data));
-	new (NewPlaceholder(), data) std::mutex;
+	const int res = pthread_mutex_init(&mutex, nullptr);
+	ASSERT(res == 0);
 }
 
 
 CriticalSection::~CriticalSection()
 {
-	((std::mutex*)data)->~mutex();
+	const int res = pthread_mutex_destroy(&mutex);
+	ASSERT(res == 0);
 }
 
 void CriticalSection::enter()
 {
-	((std::mutex*)data)->lock();
-
+	const int res = pthread_mutex_lock(&mutex);
+	ASSERT(res == 0);
 }
 
 void CriticalSection::exit()
 {
-	((std::mutex*)data)->unlock();
+	const int res = pthread_mutex_unlock(&mutex);
+	ASSERT(res == 0);
 }
 
 
