@@ -327,7 +327,6 @@ void pushInt(const char* key, int value)
 }
 
 
-
 void pushString(const char* value)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();

@@ -22,11 +22,7 @@ namespace MT
 		i32 count;
 	};
 	typedef pthread_mutex_t MutexHandle;
-	struct EventHandle
-	{
-		int fd;
-		bool manual_reset;
-	};
+	using EventHandle = int;
 #endif
 
 
@@ -69,7 +65,7 @@ private:
 class LUMIX_ENGINE_API Event
 {
 public:
-	explicit Event(bool manual_reset);
+	explicit Event();
 	~Event();
 
 	void reset();

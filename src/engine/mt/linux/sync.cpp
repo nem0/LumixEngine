@@ -6,6 +6,7 @@
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include <errno.h>
+#include <poll.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
 
@@ -79,75 +80,70 @@ bool Semaphore::poll()
 }
 
 
-Event::Event(bool manual_reset)
+Event::Event()
 {
-	m_id.fd = eventfd(0, EFD_NONBLOCK);
-	m_id.manual_reset = manual_reset;
+	m_id = eventfd(0, EFD_NONBLOCK);
 }
 
 Event::~Event()
 {
-	close(m_id.fd);
+	close(m_id);
 }
 
 void Event::reset()
 {
 	u64 v;
-	read(m_id.fd, &v, sizeof(v)); // reset to 0, nonblocking
+	read(m_id, &v, sizeof(v)); // reset to 0, nonblocking
 }
 
 void Event::trigger()
 {
 	const u64 v = 1;
-	const ssize_t res = write(m_id.fd, &v, sizeof(v));
+	const ssize_t res = write(m_id, &v, sizeof(v));
 	ASSERT(res == sizeof(v));
 }
 
 void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
 {
-	fd_set fs;
-	FD_ZERO(&fs);
-	FD_SET(event0.m_id.fd, &fs);
-	FD_SET(event1.m_id.fd, &fs);
-	struct timeval tv;
-	tv.tv_sec = timeout_ms / 1000;
-	tv.tv_usec = (timeout_ms % 1000) * 1000;
-	const int nfds = event0.m_id.fd < event1.m_id.fd ? event1.m_id.fd : event0.m_id.fd;
-	select(nfds + 1, &fs, nullptr, nullptr, &tv);
+	pollfd fds[2];
+	fds[0].fd = event0.m_id;
+	fds[1].fd = event1.m_id;
+	fds[0].events = POLLIN;
+	fds[1].events = POLLIN;
+	::poll(fds, 2, timeout_ms);
 }
 
 void Event::waitTimeout(u32 timeout_ms)
 {
-	fd_set fs;
-	FD_ZERO(&fs);
-	FD_SET(m_id.fd, &fs);
-	struct timeval tv;
-	tv.tv_sec = timeout_ms / 1000;
-	tv.tv_usec = (timeout_ms % 1000) * 1000;
-	select(m_id.fd + 1, &fs, nullptr, nullptr, &tv);
+	pollfd pfd;
+	pfd.fd = m_id;
+	pfd.events = POLLIN;
+	::poll(&pfd, 1, timeout_ms);
 }
 
 void Event::wait()
 {
-	for (;;) {
-		fd_set fs;
-		const int res = select(m_id.fd + 1, &fs, nullptr, nullptr, nullptr);
-		u64 v;
-		read(m_id.fd, &v, sizeof(v));
-		if (errno != EAGAIN) break;
-	}
+	pollfd pfd;
+	pfd.fd = m_id;
+	pfd.events = POLLIN;
+	::poll(&pfd, 1, -1);
 }
 
 bool Event::poll()
 {
-	u64 v;
-	read(m_id.fd, &v, sizeof(v));
-	return errno != EAGAIN;
+	pollfd pfd;
+	pfd.fd = m_id;
+	pfd.events = POLLIN;
+	const int res = ::poll(&pfd, 1, 0);
+	return res > 0;
 }
 
 CriticalSection::CriticalSection()
 {
-	const int res = pthread_mutex_init(&mutex, nullptr);
+	pthread_mutexattr_t attr;
+	pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+	const int res = pthread_mutex_init(&mutex, &attr);
 	ASSERT(res == 0);
 }
 

@@ -67,8 +67,6 @@ struct System
 		, m_job_queue(allocator)
 		, m_ready_fibers(allocator)
 		, m_signals_pool(allocator)
-		, m_work_signal(true)
-		, m_event_outside_job(true)
 		, m_free_queue(allocator)
 		, m_free_fibers(allocator)
 		, m_backup_workers(allocator)
@@ -120,8 +118,6 @@ struct WorkerTask : MT::Task
 		, m_worker_index(worker_index)
 		, m_job_queue(system.m_allocator)
 		, m_ready_fibers(system.m_allocator)
-		, m_enabled(true)
-		, m_work_signal(true)
 	{
 		m_enabled.reset();
 		m_work_signal.reset();

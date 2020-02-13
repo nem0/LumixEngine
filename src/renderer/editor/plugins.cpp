@@ -3615,10 +3615,8 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 	};
 
 
-	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view, GameView& game_view)
+	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view)
 		: m_app(app)
-		, m_scene_view(scene_view)
-		, m_game_view(game_view)
 		, m_engine(app.getEngine())
 		, m_index_buffer(gpu::INVALID_BUFFER)
 		, m_vertex_buffer(gpu::INVALID_BUFFER)
@@ -3677,8 +3675,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 
 	StudioApp& m_app;
 	Engine& m_engine;
-	SceneView& m_scene_view;
-	GameView& m_game_view;
 	HashMap<void*, gpu::ProgramHandle> m_programs;
 	gpu::TextureHandle m_texture;
 	gpu::BufferHandle m_index_buffer = gpu::INVALID_BUFFER;
@@ -4018,7 +4014,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
 		m_game_view = LUMIX_NEW(allocator, GameView)(m_app);
-		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view, *m_game_view);
+		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view);
 		m_app.addPlugin(*m_scene_view);
 		m_app.addPlugin(*m_game_view);
 		m_app.addPlugin(*m_editor_ui_render_plugin);
