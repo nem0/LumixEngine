@@ -41,9 +41,9 @@ bool Semaphore::poll()
 }
 
 
-Event::Event(bool manual_reset)
+Event::Event()
 {
-	m_id = ::CreateEvent(nullptr, manual_reset, FALSE, nullptr);
+	m_id = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
 }
 
 Event::~Event()
