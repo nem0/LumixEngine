@@ -140,10 +140,7 @@ bool Event::poll()
 
 CriticalSection::CriticalSection()
 {
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-	const int res = pthread_mutex_init(&mutex, &attr);
+	const int res = pthread_mutex_init(&mutex, nullptr);
 	ASSERT(res == 0);
 }
 
