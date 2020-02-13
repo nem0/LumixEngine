@@ -2301,18 +2301,21 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 		
 		switch(internal_format) {
 			case GL_DEPTH24_STENCIL8:
-				CHECK_GL(glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0));
-				CHECK_GL(glNamedFramebufferTexture(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, t, 0));
+				CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
+				CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0));
+				CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, t, 0));
 				depth_bound = true;
 				break;
 			case GL_DEPTH_COMPONENT24:
 			case GL_DEPTH_COMPONENT32:
-				CHECK_GL(glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
-				CHECK_GL(glNamedFramebufferTexture(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, t, 0));
+				CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
+				CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
+				CHECK_GL(glFramebufferTexture2D(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t, 0));
 				depth_bound = true;
 				break;
 			default:
-				CHECK_GL(glNamedFramebufferTexture(g_gpu.framebuffer, GL_COLOR_ATTACHMENT0 + i, t, 0));
+				CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
+				CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, t, 0));
 				++rb_count;
 				break;
 		}

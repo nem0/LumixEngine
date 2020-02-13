@@ -42,7 +42,11 @@ public:
 	void exit();
 
 private:
-	u8 data[64];
+	#ifdef _WIN32
+		u8 data[64];
+	#else
+		pthread_mutex_t mutex;
+	#endif
 };
 
 

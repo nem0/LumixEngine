@@ -29,7 +29,7 @@ static struct
 	Interface* iface = nullptr;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
-	WindowHandle win = INVALID_WINDOW;
+	bool raw_input_registered = false;
 } G;
 
 
@@ -419,7 +419,6 @@ static void processEvents()
 void destroyWindow(WindowHandle window)
 {
 	DestroyWindow((HWND)window);
-	G.win = INVALID_WINDOW;
 }
 
 
@@ -520,7 +519,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 	ShowWindow(hwnd, SW_SHOW);
 	UpdateWindow(hwnd);
 
-	if (!G.win) {
+	if (!G.raw_input_registered) {
 		RAWINPUTDEVICE device;
 		device.usUsagePage = 0x01;
 		device.usUsage = 0x02;
@@ -528,9 +527,9 @@ WindowHandle createWindow(const InitWindowArgs& args)
 		device.hwndTarget = hwnd;
 		BOOL status = RegisterRawInputDevices(&device, 1, sizeof(device));
 		ASSERT(status);
+		G.raw_input_registered = true;
 	}
 
-	G.win = hwnd;
 	return hwnd;
 }
 
