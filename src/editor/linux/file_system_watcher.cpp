@@ -1,5 +1,5 @@
 #include "engine/hash_map.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
@@ -16,12 +16,12 @@ struct FileSystemWatcherImpl;
 
 
 
-struct FileSystemWatcherTask : public Lumix::MT::Task
+struct FileSystemWatcherTask : public Lumix::MT::Thread
 {
 	FileSystemWatcherTask(const char* path,
         FileSystemWatcherImpl& _watcher,
 		Lumix::IAllocator& _allocator)
-		: Task(_allocator)
+		: Thread(_allocator)
 		, watcher(_watcher)
 		, watched(_allocator)
 		, allocator(_allocator)

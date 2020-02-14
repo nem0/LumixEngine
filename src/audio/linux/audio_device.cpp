@@ -6,7 +6,7 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/mt/sync.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include <alsa/asoundlib.h>
 
@@ -15,10 +15,10 @@ namespace Lumix
 {
 
 
-struct AudioTask : MT::Task
+struct AudioTask : MT::Thread
 {
 	AudioTask(class AudioDeviceImpl& device, IAllocator& allocator)
-		: Task(allocator)
+		: Thread(allocator)
 		, m_device(device)
 	{}
 

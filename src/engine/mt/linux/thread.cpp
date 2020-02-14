@@ -1,6 +1,6 @@
 #include "engine/allocator.h"
 #include "engine/lumix.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/mt/sync.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
@@ -12,7 +12,7 @@ namespace Lumix
 namespace MT
 {
 
-struct TaskImpl
+struct ThreadImpl
 {
 	IAllocator& allocator;
 	bool force_exit;
@@ -20,13 +20,13 @@ struct TaskImpl
 	bool is_running;
 	pthread_t handle;
 	const char* thread_name;
-	Task* owner;
+	Thread* owner;
 	ConditionVariable cv;
 };
 
 static void* threadFunction(void* ptr)
 {
-	struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
+	struct ThreadImpl* impl = reinterpret_cast<ThreadImpl*>(ptr);
 	pthread_setname_np(OS::getCurrentThreadID(), impl->thread_name);
 	Profiler::setThreadName(impl->thread_name);
 	u32 ret = 0xffffFFFF;
@@ -37,9 +37,9 @@ static void* threadFunction(void* ptr)
 	return nullptr;
 }
 
-Task::Task(IAllocator& allocator)
+Thread::Thread(IAllocator& allocator)
 {
-	auto impl = LUMIX_NEW(allocator, TaskImpl) {allocator};
+	auto impl = LUMIX_NEW(allocator, ThreadImpl) {allocator};
 
 	impl->is_running = false;
 	impl->force_exit = false;
@@ -50,19 +50,19 @@ Task::Task(IAllocator& allocator)
 	m_implementation = impl;
 }
 
-Task::~Task()
+Thread::~Thread()
 {
 	LUMIX_DELETE(m_implementation->allocator, m_implementation);
 }
 
-void Task::sleep(CriticalSection& cs) {
+void Thread::sleep(CriticalSection& cs) {
 	ASSERT(pthread_self() == m_implementation->handle);
 	m_implementation->cv.sleep(cs);
 }
 
-void Task::wakeup() { m_implementation->cv.wakeup(); }
+void Thread::wakeup() { m_implementation->cv.wakeup(); }
 
-bool Task::create(const char* name, bool is_extended)
+bool Thread::create(const char* name, bool is_extended)
 {
 	pthread_attr_t attr;
 	int res = pthread_attr_init(&attr);
@@ -74,12 +74,12 @@ bool Task::create(const char* name, bool is_extended)
 	return true;
 }
 
-bool Task::destroy()
+bool Thread::destroy()
 {
 	return pthread_join(m_implementation->handle, nullptr) == 0;
 }
 
-void Task::setAffinityMask(u64 affinity_mask)
+void Thread::setAffinityMask(u64 affinity_mask)
 {
 	cpu_set_t set;
 	CPU_ZERO(&set);
@@ -93,17 +93,17 @@ void Task::setAffinityMask(u64 affinity_mask)
 	pthread_setaffinity_np(m_implementation->handle, sizeof(set), &set);
 }
 
-bool Task::isRunning() const
+bool Thread::isRunning() const
 {
 	return m_implementation->is_running;
 }
 
-bool Task::isFinished() const
+bool Thread::isFinished() const
 {
 	return m_implementation->exited;
 }
 
-IAllocator& Task::getAllocator()
+IAllocator& Thread::getAllocator()
 {
 	return m_implementation->allocator;
 }
