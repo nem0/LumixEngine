@@ -229,6 +229,20 @@ struct WCharStr
 	WCHAR data[N];
 };
 
+void sleep(u32 milliseconds) { ::Sleep(milliseconds); }
+
+static_assert(sizeof(ThreadID) == sizeof(::GetCurrentThreadId()), "Not matching");
+ThreadID getCurrentThreadID() { return ::GetCurrentThreadId(); }
+
+u32 getCPUsCount() {
+	SYSTEM_INFO sys_info;
+	GetSystemInfo(&sys_info);
+
+	u32 num = sys_info.dwNumberOfProcessors;
+	num = num > 0 ? num : 1;
+
+	return num;
+}
 
 void logVersion() {
 	DWORD dwVersion = 0;

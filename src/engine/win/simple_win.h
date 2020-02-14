@@ -284,6 +284,13 @@ typedef struct _LIST_ENTRY {
 	struct _LIST_ENTRY *Blink;
 } LIST_ENTRY, *PLIST_ENTRY;
 
+
+typedef struct _RTL_CONDITION_VARIABLE {                    
+        PVOID Ptr;                                       
+} RTL_CONDITION_VARIABLE, *PRTL_CONDITION_VARIABLE;      
+
+typedef RTL_CONDITION_VARIABLE CONDITION_VARIABLE, *PCONDITION_VARIABLE;
+
 typedef struct _RTL_CRITICAL_SECTION_DEBUG {
 	WORD   Type;
 	WORD   CreatorBackTraceIndex;
@@ -311,6 +318,7 @@ typedef struct _RTL_CRITICAL_SECTION {
 	ULONG_PTR SpinCount;        // force size on 64-bit systems when packed
 } RTL_CRITICAL_SECTION, *PRTL_CRITICAL_SECTION;
 typedef PRTL_CRITICAL_SECTION LPCRITICAL_SECTION;
+typedef PRTL_CRITICAL_SECTION PCRITICAL_SECTION;
 typedef RTL_CRITICAL_SECTION CRITICAL_SECTION;
 
 
@@ -550,6 +558,9 @@ WINBASEAPI VOID WINAPI DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSectio
 WINBASEAPI VOID WINAPI EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
 WINBASEAPI VOID WINAPI LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
 
+WINBASEAPI BOOL WINAPI SleepConditionVariableCS(PCONDITION_VARIABLE ConditionVariable, PCRITICAL_SECTION CriticalSection, DWORD dwMilliseconds);
+WINBASEAPI VOID WINAPI InitializeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
+WINBASEAPI VOID WINAPI WakeConditionVariable(PCONDITION_VARIABLE ConditionVariable);
 
 WINBASEAPI HANDLE WINAPI CreateSemaphoreA(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes,
 	LONG lInitialCount,

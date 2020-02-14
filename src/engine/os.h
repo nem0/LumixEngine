@@ -3,6 +3,9 @@
 
 #include "lumix.h"
 #include "stream.h"
+#ifdef __linux__
+	#include <pthread.h>
+#endif
 
 
 namespace Lumix
@@ -12,6 +15,12 @@ struct IAllocator;
 
 namespace OS
 {
+
+#ifdef _WIN32
+	typedef u32 ThreadID;
+#else
+	typedef pthread_t ThreadID;
+#endif
 
 enum class Keycode : u8;
 
@@ -158,6 +167,9 @@ struct WindowState {
 };
 
 LUMIX_ENGINE_API void logVersion();
+LUMIX_ENGINE_API u32 getCPUsCount();
+LUMIX_ENGINE_API void sleep(u32 milliseconds);
+LUMIX_ENGINE_API ThreadID getCurrentThreadID();
 
 LUMIX_ENGINE_API void* memReserve(size_t size);
 LUMIX_ENGINE_API void memCommit(void* ptr, size_t size);

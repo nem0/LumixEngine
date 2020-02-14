@@ -5,7 +5,6 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/stream.h"
 #ifdef _WIN32
@@ -116,7 +115,7 @@ static struct {
 	Pool<Texture, Texture::MAX_COUNT> textures;
 	Pool<Program, Program::MAX_COUNT> programs;
 	MT::CriticalSection handle_mutex;
-	Lumix::MT::ThreadID thread;
+	Lumix::OS::ThreadID thread;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
 	ProgramHandle last_program = INVALID_PROGRAM;
@@ -713,7 +712,7 @@ static void flipCompressedTexture(int w, int h, int format, void* surface)
 
 void checkThread()
 {
-	ASSERT(g_gpu.thread == Lumix::MT::getCurrentThreadID());
+	ASSERT(g_gpu.thread == OS::getCurrentThreadID());
 }
 
 static void try_load_renderdoc()
@@ -2125,7 +2124,7 @@ bool init(void* window_handle, u32 init_flags)
 		const bool debug = init_flags & (u32)InitFlags::DEBUG_OUTPUT;
 	#endif
 	
-	g_gpu.thread = MT::getCurrentThreadID();
+	g_gpu.thread = OS::getCurrentThreadID();
 	g_gpu.contexts[0].window_handle = window_handle;
 	#ifdef _WIN32
 		g_gpu.contexts[0].device_context = GetDC((HWND)window_handle);

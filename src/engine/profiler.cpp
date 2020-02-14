@@ -13,7 +13,6 @@
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
-#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "profiler.h"
 
@@ -155,7 +154,7 @@ static struct Instance
 	{
 		thread_local ThreadContext* ctx = [&](){
 			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(allocator);
-			new_ctx->thread_id = MT::getCurrentThreadID();
+			new_ctx->thread_id = OS::getCurrentThreadID();
 			MT::CriticalSectionLock lock(mutex);
 			contexts.push(new_ctx);
 			return new_ctx;

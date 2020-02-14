@@ -8,7 +8,6 @@
 #include "engine/math.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
-#include "engine/mt/thread.h"
 #include "engine/profiler.h"
 
 
@@ -70,11 +69,10 @@ struct System
 		, m_free_queue(allocator)
 		, m_free_fibers(allocator)
 		, m_backup_workers(allocator)
+		, m_outside_job_semaphore(0, 1)
 	{
 		m_signals_pool.resize(4096);
 		m_free_queue.resize(4096);
-		m_event_outside_job.trigger();
-		m_work_signal.reset();
 		for(int i = 0; i < 4096; ++i) {
 			m_free_queue[i] = i;
 			m_signals_pool[i].sibling = JobSystem::INVALID_HANDLE;
@@ -85,8 +83,7 @@ struct System
 
 	MT::CriticalSection m_sync;
 	MT::CriticalSection m_job_queue_sync;
-	MT::Event m_event_outside_job;
-	MT::Event m_work_signal;
+	MT::Semaphore m_outside_job_semaphore;
 	Array<WorkerTask*> m_workers;
 	Array<WorkerTask*> m_backup_workers;
 	Array<Job> m_job_queue;
@@ -119,8 +116,6 @@ struct WorkerTask : MT::Task
 		, m_job_queue(system.m_allocator)
 		, m_ready_fibers(system.m_allocator)
 	{
-		m_enabled.reset();
-		m_work_signal.reset();
 	}
 
 
@@ -159,8 +154,6 @@ struct WorkerTask : MT::Task
 	u8 m_worker_index;
 	bool m_is_enabled = false;
 	bool m_is_backup = false;
-	MT::Event m_enabled;
-	MT::Event m_work_signal;
 };
 
 
@@ -184,11 +177,13 @@ static void pushJob(const Job& job)
 	if (job.worker_index != ANY_WORKER) {
 		WorkerTask* worker = g_system->m_workers[job.worker_index % g_system->m_workers.size()];
 		worker->m_job_queue.push(job);
-		worker->m_work_signal.trigger();
+		worker->wakeup();
 		return;
 	}
 	g_system->m_job_queue.push(job);
-	g_system->m_work_signal.trigger();
+	for (WorkerTask* worker : g_system->m_workers) {
+		worker->wakeup();
+	}
 }
 
 
@@ -285,12 +280,6 @@ void enableBackupWorker(bool enable)
 	for (WorkerTask* task : g_system->m_backup_workers) {
 		if (task->m_is_enabled != enable) {
 			task->m_is_enabled = enable;
-			if (enable) {
-				task->m_enabled.trigger();
-			}
-			else {
-				task->m_enabled.reset();
-			}
 			return;
 		}
 	}
@@ -301,7 +290,6 @@ void enableBackupWorker(bool enable)
 		g_system->m_backup_workers.push(task);
 		task->m_is_enabled = true;
 		task->m_is_backup = true;
-		task->m_enabled.trigger();
 	}
 	else {
 		logError("Engine") << "Job system backup worker failed to initialize.";
@@ -358,38 +346,43 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 	WorkerTask* worker = getWorker();
 	while (!worker->m_finished) {
 		if (worker->m_is_backup) {
-			if (!worker->m_enabled.poll()) {
+			MT::CriticalSectionLock guard(g_system->m_sync);
+			while (!worker->m_is_enabled) {
 				PROFILE_BLOCK("disabled");
 				Profiler::blockColor(0xff, 0, 0xff);
-				worker->m_enabled.wait();
+				worker->sleep(g_system->m_sync);
 			}
 		}
 
 		FiberDecl* fiber = nullptr;
 		Job job;
-		{
+		while (!worker->m_finished) {
 			MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
 
 			if (!worker->m_ready_fibers.empty()) {
 				fiber = worker->m_ready_fibers.back();
 				worker->m_ready_fibers.pop();
-				if (worker->m_ready_fibers.empty()) worker->m_work_signal.reset();
+				break;
 			}
-			else if (!worker->m_job_queue.empty()) {
+			if (!worker->m_job_queue.empty()) {
 				job = worker->m_job_queue.back();
 				worker->m_job_queue.pop();
-				if (worker->m_job_queue.empty()) worker->m_work_signal.reset();
+				break;
 			}
-			else if (!g_system->m_ready_fibers.empty()) {
+			if (!g_system->m_ready_fibers.empty()) {
 				fiber = g_system->m_ready_fibers.back();
 				g_system->m_ready_fibers.pop();
-				if (g_system->m_ready_fibers.empty()) g_system->m_work_signal.reset();
+				break;
 			}
-			else if(!g_system->m_job_queue.empty()) {
+			if(!g_system->m_job_queue.empty()) {
 				job = g_system->m_job_queue.back();
 				g_system->m_job_queue.pop();
-				if (g_system->m_job_queue.empty()) g_system->m_work_signal.reset();
+				break;
 			}
+
+			PROFILE_BLOCK("sleeping");
+			Profiler::blockColor(0xff, 0, 0xff);
+			worker->sleep(g_system->m_job_queue_sync);
 		}
 
 		if (fiber) {
@@ -406,10 +399,8 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			Profiler::blockColor(0, 0, 0xff);
 			worker = getWorker();
 			worker->m_current_fiber = this_fiber;
-			continue;
 		}
-
-		if (job.task) {
+		else {
 			Profiler::endBlock();
 			Profiler::beginBlock("job");
 			if (isValid(job.dec_on_finish) || isValid(job.precondition)) {
@@ -426,12 +417,6 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			Profiler::beginBlock("job management");
 			Profiler::blockColor(0, 0, 0xff);
 		}
-		else 
-		{
-			PROFILE_BLOCK("idle");
-			Profiler::blockColor(0xff, 0, 0xff);
-			MT::Event::waitMultiple(g_system->m_work_signal, worker->m_work_signal, 1);
-		}
 	}
 	Profiler::endBlock();
 	Fiber::switchTo(&getWorker()->m_current_fiber->fiber, getWorker()->m_primary_fiber);
@@ -443,7 +428,6 @@ bool init(u8 workers_count, IAllocator& allocator)
 	ASSERT(!g_system);
 
 	g_system = LUMIX_NEW(allocator, System)(allocator);
-	g_system->m_work_signal.reset();
 
 	g_system->m_free_fibers.reserve(lengthOf(g_system->m_fiber_pool));
 	for (FiberDecl& fiber : g_system->m_fiber_pool) {
@@ -461,7 +445,6 @@ bool init(u8 workers_count, IAllocator& allocator)
 		WorkerTask* task = LUMIX_NEW(allocator, WorkerTask)(*g_system, i < 64 ? u64(1) << i : 0);
 		if (task->create("Worker", false)) {
 			task->m_is_enabled = true;
-			task->m_enabled.trigger();
 			g_system->m_workers.push(task);
 			task->setAffinityMask((u64)1 << i);
 		}
@@ -493,23 +476,22 @@ void shutdown()
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
 	}
-	for (MT::Task* task : g_system->m_backup_workers)
-	{
+	for (MT::Task* task : g_system->m_backup_workers) {
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
-		wt->m_enabled.trigger();
+		wt->wakeup();
 	}
 
-	for (MT::Task* task : g_system->m_backup_workers)
+	for (WorkerTask* task : g_system->m_backup_workers)
 	{
-		while (!task->isFinished()) g_system->m_work_signal.trigger();
+		while (!task->isFinished()) task->wakeup();
 		task->destroy();
 		LUMIX_DELETE(allocator, task);
 	}
 
-	for (MT::Task* task : g_system->m_workers)
+	for (WorkerTask* task : g_system->m_workers)
 	{
-		while (!task->isFinished()) g_system->m_work_signal.trigger();
+		while (!task->isFinished()) task->wakeup();
 		task->destroy();
 		LUMIX_DELETE(allocator, task);
 	}
@@ -543,12 +525,14 @@ void wait(SignalHandle handle)
 			FiberDecl* fiber = (FiberDecl*)data;
 			if (fiber->current_job.worker_index == ANY_WORKER) {
 				g_system->m_ready_fibers.push(fiber);
-				g_system->m_work_signal.trigger();
+				for (WorkerTask* worker : g_system->m_workers) {
+					worker->wakeup();
+				}
 			}
 			else {
 				WorkerTask* worker = g_system->m_workers[fiber->current_job.worker_index % g_system->m_workers.size()];
 				worker->m_ready_fibers.push(fiber);
-				worker->m_work_signal.trigger();
+				worker->wakeup();
 			}
 		}, handle, false, nullptr, 0);
 		
@@ -576,18 +560,16 @@ void wait(SignalHandle handle)
 		PROFILE_BLOCK("not a job waiting");
 		Profiler::blockColor(0xff, 0, 0);
 
-		g_system->m_event_outside_job.reset();
-
+		static bool singleton = true;
+		ASSERT(singleton); // only one external thread supported
+		singleton = false;
 		runInternal(nullptr, [](void* data) {
-			g_system->m_event_outside_job.trigger();
+			g_system->m_outside_job_semaphore.signal();
 		}, handle, false, nullptr, 0);
 
 		g_system->m_sync.exit();
-
-		MT::yield();
-		while (!isSignalZero(handle, true)) {
-			g_system->m_event_outside_job.waitTimeout(100);
-		}
+		g_system->m_outside_job_semaphore.wait();
+		singleton = true;
 	}
 }
 

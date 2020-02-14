@@ -2,7 +2,6 @@
 #include "engine/crt.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/atomic.h"
-#include "engine/mt/thread.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include "engine/win/simple_win.h"
@@ -35,53 +34,20 @@ void Semaphore::wait()
 	::WaitForSingleObject(m_id, INFINITE);
 }
 
-bool Semaphore::poll()
-{
-	return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
+ConditionVariable::~ConditionVariable() {
+	((CONDITION_VARIABLE*)data)->~CONDITION_VARIABLE();
 }
 
-
-Event::Event()
-{
-	m_id = ::CreateEvent(nullptr, TRUE, FALSE, nullptr);
+ConditionVariable::ConditionVariable() {
+	static_assert(sizeof(data) >= sizeof(CONDITION_VARIABLE), "Size is not enough");
+	static_assert(alignof(CONDITION_VARIABLE) == alignof(CONDITION_VARIABLE), "Alignment does not match");
+	memset(data, 0, sizeof(data));
+	CONDITION_VARIABLE* cv = new (NewPlaceholder(), data) CONDITION_VARIABLE;
+	InitializeConditionVariable(cv);
 }
 
-Event::~Event()
-{
-	::CloseHandle(m_id);
-}
-
-void Event::reset()
-{
-	::ResetEvent(m_id);
-}
-
-void Event::trigger()
-{
-	::SetEvent(m_id);
-}
-
-void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
-{
-	const HANDLE handles[2] = { event0.m_id, event1.m_id };
-	::WaitForMultipleObjects(2, handles, false, timeout_ms);
-}
-
-void Event::waitTimeout(u32 timeout_ms)
-{
-	::WaitForSingleObject(m_id, timeout_ms);
-}
-
-void Event::wait()
-{
-	::WaitForSingleObject(m_id, INFINITE);
-}
-
-bool Event::poll()
-{
-	return WAIT_OBJECT_0 == ::WaitForSingleObject(m_id, 0);
-}
-
+void ConditionVariable::sleep(CriticalSection& cs) { SleepConditionVariableCS((CONDITION_VARIABLE*)data, (CRITICAL_SECTION*)cs.data, INFINITE); }
+void ConditionVariable::wakeup() { WakeConditionVariable((CONDITION_VARIABLE*)data); }
 
 CriticalSection::CriticalSection()
 {

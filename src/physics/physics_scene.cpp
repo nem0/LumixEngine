@@ -9,7 +9,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
-#include "engine/mt/thread.h"
+#include "engine/os.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -244,7 +244,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 				},
 				nullptr);
 		}
-		PxU32 getWorkerCount() const override { return MT::getCPUsCount(); }
+		PxU32 getWorkerCount() const override { return OS::getCPUsCount(); }
 	};
 
 

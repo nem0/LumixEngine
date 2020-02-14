@@ -28,6 +28,7 @@ namespace MT
 
 class alignas(8) LUMIX_ENGINE_API CriticalSection
 {
+friend class ConditionVariable;
 public:
 	CriticalSection();
 	~CriticalSection();
@@ -55,31 +56,25 @@ public:
 	void signal();
 
 	void wait();
-	bool poll();
 
 private:
 	SemaphoreHandle m_id;
 };
 
 
-class LUMIX_ENGINE_API Event
+class ConditionVariable
 {
 public:
-	explicit Event();
-	~Event();
-
-	void reset();
-
-	void trigger();
-
-	void wait();
-	void waitTimeout(u32 timeout_ms);
-	bool poll();
-
-	static void waitMultiple(Event& event0, Event& event1, u32 timeout_ms);
-
+	ConditionVariable();
+	~ConditionVariable();
+	void sleep(CriticalSection& cs);
+	void wakeup();
 private:
-	EventHandle m_id;
+	#ifdef _WIN32
+		u8 data[64];
+	#else
+		pthread_cond_t cv;
+	#endif
 };
 
 

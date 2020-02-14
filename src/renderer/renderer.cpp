@@ -10,7 +10,6 @@
 #include "engine/job_system.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/task.h"
-#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -209,7 +208,7 @@ struct GPUProfiler
 		const u64 cpu_timestamp = OS::Timer::getRawTimestamp();
 		u32 try_num = 0;
 		while (!gpu::isQueryReady(q) && try_num < 1000) {
-			MT::sleep(1);
+			OS::sleep(1);
 			++try_num;
 		}
 		if (try_num == 1000) {
