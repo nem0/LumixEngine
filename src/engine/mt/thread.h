@@ -13,11 +13,11 @@ namespace MT
 
 class CriticalSection;
 
-class LUMIX_ENGINE_API Task
+class LUMIX_ENGINE_API Thread
 {
 public:
-	explicit Task(IAllocator& allocator);
-	virtual ~Task();
+	explicit Thread(IAllocator& allocator);
+	virtual ~Thread();
 
 	virtual int task() = 0;
 
@@ -37,7 +37,7 @@ protected:
 	IAllocator& getAllocator();
 
 private:
-	struct TaskImpl* m_implementation;
+	struct ThreadImpl* m_implementation;
 };
 
 

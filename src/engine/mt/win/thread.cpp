@@ -1,7 +1,7 @@
 #include "engine/lumix.h"
 #include "engine/allocator.h"
 #include "engine/mt/sync.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/win/simple_win.h"
 #include "engine/profiler.h"
@@ -15,9 +15,9 @@ namespace MT
 
 const u32 STACK_SIZE = 0x8000;
 
-struct TaskImpl
+struct ThreadImpl
 {
-	explicit TaskImpl(IAllocator& allocator)
+	explicit ThreadImpl(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
 	}
@@ -31,7 +31,7 @@ struct TaskImpl
 	volatile bool m_exited;
 	const char* m_thread_name;
 	MT::ConditionVariable m_cv;
-	Task* m_owner;
+	Thread* m_owner;
 };
 
 static const DWORD MS_VC_EXCEPTION = 0x406D1388;
@@ -65,7 +65,7 @@ static void setThreadName(OS::ThreadID thread_id, const char* thread_name)
 
 static DWORD WINAPI threadFunction(LPVOID ptr)
 {
-	struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
+	struct ThreadImpl* impl = reinterpret_cast<ThreadImpl*>(ptr);
 	setThreadName(impl->m_thread_id, impl->m_thread_name);
 	Profiler::setThreadName(impl->m_thread_name);
 	const u32 ret = impl->m_owner->task();
@@ -74,9 +74,9 @@ static DWORD WINAPI threadFunction(LPVOID ptr)
 	return ret;
 }
 
-Task::Task(IAllocator& allocator)
+Thread::Thread(IAllocator& allocator)
 {
-	TaskImpl* impl = LUMIX_NEW(allocator, TaskImpl)(allocator);
+	ThreadImpl* impl = LUMIX_NEW(allocator, ThreadImpl)(allocator);
 	impl->m_handle = nullptr;
 	impl->m_priority = ::GetThreadPriority(GetCurrentThread());
 	impl->m_is_running = false;
@@ -87,13 +87,13 @@ Task::Task(IAllocator& allocator)
 	m_implementation = impl;
 }
 
-Task::~Task()
+Thread::~Thread()
 {
 	ASSERT(!m_implementation->m_handle);
 	LUMIX_DELETE(m_implementation->m_allocator, m_implementation);
 }
 
-bool Task::create(const char* name, bool is_extended)
+bool Thread::create(const char* name, bool is_extended)
 {
 	HANDLE handle = CreateThread(
 		nullptr, STACK_SIZE, threadFunction, m_implementation, CREATE_SUSPENDED, &m_implementation->m_thread_id);
@@ -116,7 +116,7 @@ bool Task::create(const char* name, bool is_extended)
 	return false;
 }
 
-bool Task::destroy()
+bool Thread::destroy()
 {
 	while (m_implementation->m_is_running) OS::sleep(1);
 
@@ -125,7 +125,7 @@ bool Task::destroy()
 	return true;
 }
 
-void Task::setAffinityMask(u64 affinity_mask)
+void Thread::setAffinityMask(u64 affinity_mask)
 {
 	m_implementation->m_affinity_mask = affinity_mask;
 	if (m_implementation->m_handle)
@@ -134,25 +134,25 @@ void Task::setAffinityMask(u64 affinity_mask)
 	}
 }
 
-void Task::sleep(CriticalSection& cs) {
+void Thread::sleep(CriticalSection& cs) {
 	m_implementation->m_cv.sleep(cs);
 }
 
-void Task::wakeup() {
+void Thread::wakeup() {
 	m_implementation->m_cv.wakeup();
 }
 
-bool Task::isRunning() const
+bool Thread::isRunning() const
 {
 	return m_implementation->m_is_running;
 }
 
-bool Task::isFinished() const
+bool Thread::isFinished() const
 {
 	return m_implementation->m_exited;
 }
 
-IAllocator& Task::getAllocator()
+IAllocator& Thread::getAllocator()
 {
 	return m_implementation->m_allocator;
 }

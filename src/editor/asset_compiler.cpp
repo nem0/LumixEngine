@@ -11,7 +11,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/profiler.h"
@@ -36,10 +36,10 @@ struct HashFunc<Path>
 };
 
 
-struct AssetCompilerTask : MT::Task
+struct AssetCompilerTask : MT::Thread
 {
 	AssetCompilerTask(AssetCompilerImpl& compiler, IAllocator& allocator) 
-		: MT::Task(allocator) 
+		: MT::Thread(allocator) 
 		 , m_compiler(compiler)
 	{}
 

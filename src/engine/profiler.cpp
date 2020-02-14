@@ -12,7 +12,7 @@
 #include "engine/allocator.h"
 #include "engine/mt/atomic.h"
 #include "engine/mt/sync.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "profiler.h"
 
@@ -76,7 +76,7 @@ struct ThreadContext
 	};
 
 
-	struct TraceTask : MT::Task {
+	struct TraceTask : MT::Thread {
 		TraceTask(IAllocator& allocator);
 
 		int task() override;
@@ -292,7 +292,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 
 #ifdef _WIN32
 	TraceTask::TraceTask(IAllocator& allocator)
-		: MT::Task(allocator)
+		: MT::Thread(allocator)
 	{}
 
 

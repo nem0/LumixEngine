@@ -2309,7 +2309,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 			case GL_DEPTH_COMPONENT32:
 				CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
 				CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
-				CHECK_GL(glFramebufferTexture2D(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t, 0));
+				CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t, 0));
 				depth_bound = true;
 				break;
 			default:
