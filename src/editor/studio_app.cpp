@@ -22,7 +22,6 @@
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
@@ -187,7 +186,7 @@ public:
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
 	{
-		if (!JobSystem::init(MT::getCPUsCount(), m_allocator)) {
+		if (!JobSystem::init(OS::getCPUsCount(), m_allocator)) {
 			logError("Engine") << "Failed to initialize job system.";
 		}
 	}
@@ -299,7 +298,7 @@ public:
 
 			if (frame_time < 1 / wanted_fps) {
 				PROFILE_BLOCK("sleep");
-				MT::sleep(u32(1000 / wanted_fps - frame_time * 1000));
+				OS::sleep(u32(1000 / wanted_fps - frame_time * 1000));
 			}
 			m_inactive_fps_timer.tick();
 		}

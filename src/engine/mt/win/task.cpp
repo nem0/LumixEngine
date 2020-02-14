@@ -1,7 +1,8 @@
 #include "engine/lumix.h"
 #include "engine/allocator.h"
+#include "engine/mt/sync.h"
 #include "engine/mt/task.h"
-#include "engine/mt/thread.h"
+#include "engine/os.h"
 #include "engine/win/simple_win.h"
 #include "engine/profiler.h"
 
@@ -29,8 +30,38 @@ struct TaskImpl
 	volatile bool m_is_running;
 	volatile bool m_exited;
 	const char* m_thread_name;
+	MT::ConditionVariable m_cv;
 	Task* m_owner;
 };
+
+static const DWORD MS_VC_EXCEPTION = 0x406D1388;
+
+#pragma pack(push,8)
+	typedef struct tagTHREADNAME_INFO
+	{
+		DWORD type;
+		LPCSTR name;
+		DWORD thread_id;
+		DWORD flags;
+	} THREADNAME_INFO;
+#pragma pack(pop)
+
+static void setThreadName(OS::ThreadID thread_id, const char* thread_name)
+{
+	THREADNAME_INFO info;
+	info.type = 0x1000;
+	info.name = thread_name;
+	info.thread_id = thread_id;
+	info.flags = 0;
+
+	__try
+	{
+		RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+}
 
 static DWORD WINAPI threadFunction(LPVOID ptr)
 {
@@ -47,7 +78,6 @@ Task::Task(IAllocator& allocator)
 {
 	TaskImpl* impl = LUMIX_NEW(allocator, TaskImpl)(allocator);
 	impl->m_handle = nullptr;
-	impl->m_affinity_mask = getThreadAffinityMask();
 	impl->m_priority = ::GetThreadPriority(GetCurrentThread());
 	impl->m_is_running = false;
 	impl->m_exited = false;
@@ -73,7 +103,6 @@ bool Task::create(const char* name, bool is_extended)
 		m_implementation->m_thread_name = name;
 		m_implementation->m_handle = handle;
 		m_implementation->m_is_running = true;
-		SetThreadAffinityMask(handle, m_implementation->m_affinity_mask);
 
 		bool success = ::ResumeThread(m_implementation->m_handle) != -1;
 		if (success)
@@ -89,10 +118,7 @@ bool Task::create(const char* name, bool is_extended)
 
 bool Task::destroy()
 {
-	while (m_implementation->m_is_running)
-	{
-		yield();
-	}
+	while (m_implementation->m_is_running) OS::sleep(1);
 
 	::CloseHandle(m_implementation->m_handle);
 	m_implementation->m_handle = nullptr;
@@ -106,6 +132,14 @@ void Task::setAffinityMask(u64 affinity_mask)
 	{
 		::SetThreadAffinityMask(m_implementation->m_handle, affinity_mask);
 	}
+}
+
+void Task::sleep(CriticalSection& cs) {
+	m_implementation->m_cv.sleep(cs);
+}
+
+void Task::wakeup() {
+	m_implementation->m_cv.wakeup();
 }
 
 bool Task::isRunning() const

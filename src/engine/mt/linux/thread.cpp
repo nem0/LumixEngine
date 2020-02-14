@@ -1,8 +1,10 @@
+#include "engine/allocator.h"
 #include "engine/lumix.h"
-#include "engine/mt/thread.h"
+#include "engine/mt/task.h"
+#include "engine/mt/sync.h"
+#include "engine/os.h"
+#include "engine/profiler.h"
 #include <pthread.h>
-#include <time.h>
-#include <unistd.h>
 
 
 namespace Lumix
@@ -10,50 +12,102 @@ namespace Lumix
 namespace MT
 {
 
-
-void sleep(u32 milliseconds)
+struct TaskImpl
 {
-	if (milliseconds) usleep(useconds_t(milliseconds * 1000));
+	IAllocator& allocator;
+	bool force_exit;
+	bool exited;
+	bool is_running;
+	pthread_t handle;
+	const char* thread_name;
+	Task* owner;
+	ConditionVariable cv;
+};
+
+static void* threadFunction(void* ptr)
+{
+	struct TaskImpl* impl = reinterpret_cast<TaskImpl*>(ptr);
+	pthread_setname_np(OS::getCurrentThreadID(), impl->thread_name);
+	Profiler::setThreadName(impl->thread_name);
+	u32 ret = 0xffffFFFF;
+	if (!impl->force_exit) ret = impl->owner->task();
+	impl->exited = true;
+	impl->is_running = false;
+
+	return nullptr;
 }
 
-
-void yield()
+Task::Task(IAllocator& allocator)
 {
-	pthread_yield();
+	auto impl = LUMIX_NEW(allocator, TaskImpl) {allocator};
+
+	impl->is_running = false;
+	impl->force_exit = false;
+	impl->exited = false;
+	impl->thread_name = "";
+	impl->owner = this;
+
+	m_implementation = impl;
 }
 
-
-u32 getCPUsCount()
+Task::~Task()
 {
-	return sysconf(_SC_NPROCESSORS_ONLN);
+	LUMIX_DELETE(m_implementation->allocator, m_implementation);
 }
 
-ThreadID getCurrentThreadID()
-{
-	return pthread_self();
+void Task::sleep(CriticalSection& cs) {
+	ASSERT(pthread_self() == m_implementation->handle);
+	m_implementation->cv.sleep(cs);
 }
 
-u64 getThreadAffinityMask()
+void Task::wakeup() { m_implementation->cv.wakeup(); }
+
+bool Task::create(const char* name, bool is_extended)
 {
-	cpu_set_t cpu_set;
-	int r = pthread_getaffinity_np(pthread_self(), sizeof(cpu_set), &cpu_set);
-	ASSERT(r == 0);
-	if(CPU_COUNT(&cpu_set) == 0) return 0;
-	
-	int affinity = 0;
-	for(u64 i = 0; i < sizeof(u64) * 8; ++i)
+	pthread_attr_t attr;
+	int res = pthread_attr_init(&attr);
+	ASSERT(res == 0);
+	if (res != 0) return false;
+	res = pthread_create(&m_implementation->handle, &attr, threadFunction, m_implementation);
+	ASSERT(res == 0);
+	if (res != 0) return false;
+	return true;
+}
+
+bool Task::destroy()
+{
+	return pthread_join(m_implementation->handle, nullptr) == 0;
+}
+
+void Task::setAffinityMask(u64 affinity_mask)
+{
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	for (int i = 0; i < 64; ++i)
 	{
-		if (CPU_ISSET(i, &cpu_set)) affinity = affinity | (1 << i);
+		if (affinity_mask & ((u64)1 << i))
+		{
+			CPU_SET(i, &set);
+		}
 	}
-	return affinity;
+	pthread_setaffinity_np(m_implementation->handle, sizeof(set), &set);
 }
 
-
-void setThreadName(ThreadID thread_id, const char* thread_name)
+bool Task::isRunning() const
 {
-	pthread_setname_np(thread_id, thread_name);
+	return m_implementation->is_running;
 }
 
+bool Task::isFinished() const
+{
+	return m_implementation->exited;
+}
 
-} //! namespace MT
-} //! namespace Lumix
+IAllocator& Task::getAllocator()
+{
+	return m_implementation->allocator;
+}
+
+} // namespace MT
+} // namespace Lumix
+

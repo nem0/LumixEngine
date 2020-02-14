@@ -2,7 +2,6 @@
 #include "engine/crt.h"
 #include "engine/mt/sync.h"
 #include "engine/mt/atomic.h"
-#include "engine/mt/thread.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include <errno.h>
@@ -15,6 +14,25 @@ namespace Lumix
 namespace MT
 {
 
+ConditionVariable::ConditionVariable() {
+	const int res = pthread_cond_init(&cv, nullptr);
+	ASSERT(res == 0);
+}
+
+ConditionVariable::~ConditionVariable() {
+	const int res = pthread_cond_destroy(&cv);
+	ASSERT(res == 0);
+}
+
+void ConditionVariable::sleep(CriticalSection& cs) {
+	const int res = pthread_cond_wait(&cv, &cs.mutex);
+	ASSERT(res == 0);
+}
+
+void ConditionVariable::wakeup() {
+	const int res = pthread_cond_signal(&cv);
+	ASSERT(res == 0);
+}
 
 Semaphore::Semaphore(int init_count, int max_count)
 {
@@ -61,82 +79,6 @@ void Semaphore::wait()
 	ASSERT(res == 0);
 }
 
-bool Semaphore::poll()
-{
-	int res = pthread_mutex_lock(&m_id.mutex);
-	ASSERT(res == 0);
-	
-	bool ret = false;
-	if(m_id.count > 0)
-	{
-		--m_id.count;
-		ret = true;
-	}
-
-	res = pthread_mutex_unlock(&m_id.mutex);
-	ASSERT(res == 0);
-	
-	return ret;
-}
-
-
-Event::Event()
-{
-	m_id = eventfd(0, EFD_NONBLOCK);
-}
-
-Event::~Event()
-{
-	close(m_id);
-}
-
-void Event::reset()
-{
-	u64 v;
-	read(m_id, &v, sizeof(v)); // reset to 0, nonblocking
-}
-
-void Event::trigger()
-{
-	const u64 v = 1;
-	const ssize_t res = write(m_id, &v, sizeof(v));
-	ASSERT(res == sizeof(v));
-}
-
-void Event::waitMultiple(Event& event0, Event& event1, u32 timeout_ms)
-{
-	pollfd fds[2];
-	fds[0].fd = event0.m_id;
-	fds[1].fd = event1.m_id;
-	fds[0].events = POLLIN;
-	fds[1].events = POLLIN;
-	::poll(fds, 2, timeout_ms);
-}
-
-void Event::waitTimeout(u32 timeout_ms)
-{
-	pollfd pfd;
-	pfd.fd = m_id;
-	pfd.events = POLLIN;
-	::poll(&pfd, 1, timeout_ms);
-}
-
-void Event::wait()
-{
-	pollfd pfd;
-	pfd.fd = m_id;
-	pfd.events = POLLIN;
-	::poll(&pfd, 1, -1);
-}
-
-bool Event::poll()
-{
-	pollfd pfd;
-	pfd.fd = m_id;
-	pfd.events = POLLIN;
-	const int res = ::poll(&pfd, 1, 0);
-	return res > 0;
-}
 
 CriticalSection::CriticalSection()
 {

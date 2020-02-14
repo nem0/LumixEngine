@@ -18,7 +18,6 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
-#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
@@ -2942,7 +2941,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 					, 10
 					, 1
 					, cmft::EdgeFixup::None
-					, MT::getCPUsCount()
+					, OS::getCPUsCount()
 				);
 			}
 			cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
