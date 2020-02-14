@@ -8,7 +8,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/mt/sync.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/path_utils.h"
@@ -44,11 +44,11 @@ struct AsyncItem
 struct FileSystemImpl;
 
 
-class FSTask final : public MT::Task
+class FSTask final : public MT::Thread
 {
 public:
 	FSTask(FileSystemImpl& fs, IAllocator& allocator)
-		: MT::Task(allocator)
+		: MT::Thread(allocator)
 		, m_fs(fs)
 	{
 	}

@@ -7,7 +7,7 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/mt/sync.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/profiler.h"
 
 
@@ -107,10 +107,10 @@ WorkerTask* getWorker()
 #pragma optimize( "", on )
 
 
-struct WorkerTask : MT::Task
+struct WorkerTask : MT::Thread
 {
 	WorkerTask(System& system, u8 worker_index) 
-		: Task(system.m_allocator)
+		: Thread(system.m_allocator)
 		, m_system(system)
 		, m_worker_index(worker_index)
 		, m_job_queue(system.m_allocator)
@@ -384,6 +384,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			Profiler::blockColor(0xff, 0, 0xff);
 			worker->sleep(g_system->m_job_queue_sync);
 		}
+		if (worker->m_finished) break;
 
 		if (fiber) {
 			Profiler::endBlock();
@@ -471,12 +472,12 @@ void shutdown()
 	if (!g_system) return;
 
 	IAllocator& allocator = g_system->m_allocator;
-	for (MT::Task* task : g_system->m_workers)
+	for (MT::Thread* task : g_system->m_workers)
 	{
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
 	}
-	for (MT::Task* task : g_system->m_backup_workers) {
+	for (MT::Thread* task : g_system->m_backup_workers) {
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
 		wt->wakeup();

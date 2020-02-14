@@ -1,6 +1,6 @@
 #include "engine/allocator.h"
 #include "engine/crt.h"
-#include "engine/mt/task.h"
+#include "engine/mt/thread.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include "file_system_watcher.h"
@@ -21,12 +21,12 @@ static const DWORD READ_DIR_CHANGE_FILTER =
 	FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_FILE_NAME;
 
 
-struct FileSystemWatcherTask final : public MT::Task
+struct FileSystemWatcherTask final : public MT::Thread
 {
 	FileSystemWatcherTask(const char* path,
 		FileSystemWatcherPC& watcher,
 		IAllocator& allocator)
-		: Task(allocator)
+		: Thread(allocator)
 		, m_watcher(watcher)
 	{
 		copyString(m_path, path);
