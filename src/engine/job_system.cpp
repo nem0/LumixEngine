@@ -393,7 +393,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			g_system->m_sync.enter();
             LUMIX_FATAL(!this_fiber->current_job.task);
 			g_system->m_free_fibers.push(this_fiber);
-			Fiber::switchTo(&getWorker()->m_current_fiber->fiber, fiber->fiber);
+			Fiber::switchTo(&this_fiber->fiber, fiber->fiber);
 			g_system->m_sync.exit();
 
 			Profiler::beginBlock("job management");
@@ -420,7 +420,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 		}
 	}
 	Profiler::endBlock();
-	Fiber::switchTo(&getWorker()->m_current_fiber->fiber, getWorker()->m_primary_fiber);
+	Fiber::switchTo(&this_fiber->fiber, getWorker()->m_primary_fiber);
 }
 
 
