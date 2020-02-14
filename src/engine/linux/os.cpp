@@ -369,7 +369,7 @@ void getKeyName(Keycode keycode, Span<char> out)
 
 void showCursor(bool show)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
@@ -421,7 +421,7 @@ u32 getMonitors(Span<Monitor> monitors)
 
 void setMouseScreenPos(int x, int y)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
@@ -676,14 +676,14 @@ bool makePath(const char* path)
 
 void clipCursor(int x, int y, int w, int h)
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
 
 void unclipCursor()
 {
-	ASSERT(false);
+	//ASSERT(false);
     // TODO
 }
 
