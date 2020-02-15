@@ -5,7 +5,7 @@ download_project()
     fi
 	cd 3rdparty
 	if [ ! -d $1 ]; then
-	    git.exe clone --depth=1 $2 $1
+	    git clone --depth=1 $2 $1
     else
 		cd $1
 	    git pull
