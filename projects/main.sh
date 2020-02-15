@@ -227,7 +227,7 @@ main_menu()
     done
 }
 
-if [[ $1 == "init_3rdparty" ]]; then
+if [[ -v TERM ]]; then
     init_3rdparty;
 fi
 while :; do main_menu; done
