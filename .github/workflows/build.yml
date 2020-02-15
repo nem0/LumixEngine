@@ -60,6 +60,9 @@ jobs:
                 sudo wget -O /etc/apt/sources.list.d/viva64.list https://files.viva64.com/etc/viva64.list
                 sudo apt-get update
                 sudo apt-get install -y pvs-studio
+                sudo apt-get update
+                sudo apt-get install mesa-common-dev
+                sudo apt-get install libasound2-dev
               fi
           - name: PVS-Studio static analysis
             run: |
