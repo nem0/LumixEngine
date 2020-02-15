@@ -74,6 +74,7 @@ jobs:
                 exit 0
               fi
               cd projects
+              ./main.sh init_3rdparty
               ./genie --static-plugins gmake
               cd tmp/gmake
               pvs-studio-analyzer trace -- make EXTRA_WARNINGS=1
