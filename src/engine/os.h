@@ -166,6 +166,7 @@ struct WindowState {
 	Rect rect;
 };
 
+LUMIX_ENGINE_API void init();
 LUMIX_ENGINE_API void logVersion();
 LUMIX_ENGINE_API u32 getCPUsCount();
 LUMIX_ENGINE_API void sleep(u32 milliseconds);

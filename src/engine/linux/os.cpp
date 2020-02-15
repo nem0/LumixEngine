@@ -1,4 +1,5 @@
 #include "engine/allocator.h"
+#include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
@@ -27,6 +28,204 @@ namespace Lumix::OS
 {
 
 
+static DefaultAllocator s_allocator;
+static HashMap<KeySym, Keycode> s_from_x11_keysym(s_allocator);
+static KeySym s_to_x11_keysym[256];
+static const char* s_keycode_names[256];
+
+void init() {
+	static bool once = true;
+	ASSERT(once);
+	once = false;
+	struct {
+		KeySym x11;
+		Keycode lumix;
+		const char* name;
+	} map[] = {
+		{ XK_BackSpace, Keycode::BACKSPACE, "Backspace" },
+		{ XK_Tab, Keycode::TAB, "Tab" },
+		{ XK_Clear, Keycode::CLEAR, "Clear" },
+		{ XK_Return, Keycode::RETURN, "Return" },
+		{ XK_Shift_L, Keycode::SHIFT, "Shift" },
+		{ XK_Control_L, Keycode::CTRL, "Ctrl" },
+		{ XK_Menu, Keycode::MENU, "Menu" },
+		{ XK_Pause, Keycode::PAUSE, "Pause" },
+		//{ XK_, Keycode::CAPITAL, "" },
+		//{ XK_, Keycode::KANA, "" },
+		//{ XK_, Keycode::HANGEUL, "" },
+		//{ XK_, Keycode::HANGUL, "" },
+		//{ XK_, Keycode::JUNJA, "" },
+		//{ XK_, Keycode::FINAL, "" },
+		//{ XK_, Keycode::HANJA, "" },
+		//{ XK_, Keycode::KANJI, "" },
+		{ XK_Escape, Keycode::ESCAPE, "Escape" },
+		//{ XK_, Keycode::CONVERT, "" },
+		//{ XK_, Keycode::NONCONVERT, "" },
+		//{ XK_, Keycode::ACCEPT, "" },
+		//{ XK_m, Keycode::MODECHANGE, "" },
+		{ XK_space, Keycode::SPACE, "Space" },
+		{ XK_Page_Up, Keycode::PAGEUP, "Page Up" },
+		{ XK_Page_Down, Keycode::PAGEDOWN, "Page Down" },
+		{ XK_End, Keycode::END, "End" },
+		{ XK_Home, Keycode::HOME, "Home" },
+		{ XK_Left, Keycode::LEFT, "Left" },
+		{ XK_Up, Keycode::UP, "Up" },
+		{ XK_Right, Keycode::RIGHT, "Right" },
+		{ XK_Down, Keycode::DOWN, "Down" },
+		{ XK_Select, Keycode::SELECT, "Select" },
+		{ XK_Print, Keycode::PRINT, "Print" },
+		{ XK_Execute, Keycode::EXECUTE, "Execute" },
+		//{ XK_, Keycode::SNAPSHOT, "" },
+		{ XK_Insert, Keycode::INSERT, "Insert" },
+		{ XK_Delete, Keycode::DEL, "Delete" },
+		{ XK_Help, Keycode::HELP, "Help" },
+		//{ XK_, Keycode::LWIN, "" },
+		//{ XK_, Keycode::RWIN, "" },
+		//{ XK_, Keycode::APPS, "" },
+		//{ XK_, Keycode::SLEEP, "" },
+		{ XK_KP_0, Keycode::NUMPAD0, "Numpad 0" },
+		{ XK_KP_1, Keycode::NUMPAD1, "Numpad 1" },
+		{ XK_KP_2, Keycode::NUMPAD2, "Numpad 2" },
+		{ XK_KP_3, Keycode::NUMPAD3, "Numpad 3" },
+		{ XK_KP_4, Keycode::NUMPAD4, "Numpad 4" },
+		{ XK_KP_5, Keycode::NUMPAD5, "Numpad 5" },
+		{ XK_KP_6, Keycode::NUMPAD6, "Numpad 6" },
+		{ XK_KP_7, Keycode::NUMPAD7, "Numpad 7" },
+		{ XK_KP_8, Keycode::NUMPAD8, "Numpad 8" },
+		{ XK_KP_9, Keycode::NUMPAD9, "Numpad 9" },
+		{ XK_multiply, Keycode::MULTIPLY, "*" },
+		{ XK_KP_Add, Keycode::ADD, "+" },
+		{ XK_KP_Separator, Keycode::SEPARATOR, "N/A" },
+		{ XK_KP_Subtract, Keycode::SUBTRACT, "-" },
+		{ XK_KP_Decimal, Keycode::DECIMAL, "." },
+		{ XK_KP_Divide, Keycode::DIVIDE, "/" },
+		{ XK_F1, Keycode::F1, "F1" },
+		{ XK_F2, Keycode::F2, "F2" },
+		{ XK_F3, Keycode::F3, "F3" },
+		{ XK_F4, Keycode::F4, "F4" },
+		{ XK_F5, Keycode::F5, "F5" },
+		{ XK_F6, Keycode::F6, "F6" },
+		{ XK_F7, Keycode::F7, "F7" },
+		{ XK_F8, Keycode::F8, "F8" },
+		{ XK_F9, Keycode::F9, "F9" },
+		{ XK_F10, Keycode::F10, "F10" },
+		{ XK_F11, Keycode::F11, "F11" },
+		{ XK_F12, Keycode::F12, "F12" },
+		{ XK_F13, Keycode::F13, "F13" },
+		{ XK_F14, Keycode::F14, "F14" },
+		{ XK_F15, Keycode::F15, "F15" },
+		{ XK_F16, Keycode::F16, "F16" },
+		{ XK_F17, Keycode::F17, "F17" },
+		{ XK_F18, Keycode::F18, "F18" },
+		{ XK_F19, Keycode::F19, "F19" },
+		{ XK_F20, Keycode::F20, "F20" },
+		{ XK_F21, Keycode::F21, "F21" },
+		{ XK_F22, Keycode::F22, "F22" },
+		{ XK_F23, Keycode::F23, "F23" },
+		{ XK_F24, Keycode::F24, "F24" },
+		{ XK_Num_Lock, Keycode::NUMLOCK, "Num lock" },
+		{ XK_Scroll_Lock, Keycode::SCROLL, "Scroll lock" },
+		//{ XK_, Keycode::OEM_NEC_EQUAL, "" },
+		//{ XK_, Keycode::OEM_FJ_JISHO, "" },
+		//{ XK_, Keycode::OEM_FJ_MASSHOU, "" },
+		//{ XK_, Keycode::OEM_FJ_TOUROKU, "" },
+		//{ XK_, Keycode::OEM_FJ_LOYA, "" },
+		//{ XK_, Keycode::OEM_FJ_ROYA, "" },
+		{ XK_Shift_L, Keycode::LSHIFT, "LShift" },
+		{ XK_Shift_R, Keycode::RSHIFT, "RShift" },
+		{ XK_Control_L, Keycode::LCTRL, "LCtrl" },
+		{ XK_Control_R, Keycode::RCTRL, "RCtrl" },
+		//{ XK_, Keycode::LMENU, "" },
+		//{ XK_, Keycode::RMENU, "" },
+		//{ XK_, Keycode::BROWSER_BACK, "" },
+		//{ XK_, Keycode::BROWSER_FORWARD, "" },
+		//{ XK_, Keycode::BROWSER_REFRESH, "" },
+		//{ XK_, Keycode::BROWSER_STOP, "" },
+		//{ XK_, Keycode::BROWSER_SEARCH, "" },
+		//{ XK_, Keycode::BROWSER_FAVORITE, ""S },
+		//{ XK_, Keycode::BROWSER_HOME, "" },
+		//{ XK_, Keycode::VOLUME_MUTE, "" },
+		//{ XK_, Keycode::VOLUME_DOWN, "" },
+		//{ XK_, Keycode::VOLUME_UP, "" },
+		//{ XK_, Keycode::MEDIA_NEXT_TRACK, "" },
+		//{ XK_, Keycode::MEDIA_PREV_TRACK, "" },
+		//{ XK_, Keycode::MEDIA_STOP, "" },
+		//{ XK_, Keycode::MEDIA_PLAY_PAUSE, "" },
+		//{ XK_, Keycode::LAUNCH_MAIL, "" },
+		//{ XK_, Keycode::LAUNCH_MEDIA_SEL, ""ECT },
+		//{ XK_, Keycode::LAUNCH_APP1, "" },
+		//{ XK_, Keycode::LAUNCH_APP2, "" },
+		//{ XK_, Keycode::OEM_1, "" },
+		//{ XK_, Keycode::OEM_PLUS, "" },
+		//{ XK_, Keycode::OEM_COMMA, "" },
+		//{ XK_, Keycode::OEM_MINUS, "" },
+		//{ XK_, Keycode::OEM_PERIOD, "" },
+		//{ XK_, Keycode::OEM_2, "" },
+		//{ XK_, Keycode::OEM_3, "" },
+		//{ XK_, Keycode::OEM_4, "" },
+		//{ XK_, Keycode::OEM_5, "" },
+		//{ XK_, Keycode::OEM_6, "" },
+		//{ XK_, Keycode::OEM_7, "" },
+		//{ XK_, Keycode::OEM_8, "" },
+		//{ XK_, Keycode::OEM_AX, "" },
+		//{ XK_, Keycode::OEM_102, "" },
+		//{ XK_, Keycode::ICO_HELP, "" },
+		//{ XK_, Keycode::ICO_00, "" },
+		//{ XK_, Keycode::PROCESSKEY, "" },
+		//{ XK_, Keycode::ICO_CLEAR, "" },
+		//{ XK_, Keycode::PACKET, "" },
+		//{ XK_, Keycode::OEM_RESET, "" },
+		//{ XK_, Keycode::OEM_JUMP, "" },
+		//{ XK_, Keycode::OEM_PA1, "" },
+		//{ XK_, Keycode::OEM_PA2, "" },
+		//{ XK_, Keycode::OEM_PA3, "" },
+		//{ XK_, Keycode::OEM_WSCTRL, "" },
+		//{ XK_, Keycode::OEM_CUSEL, "" },
+		//{ XK_, Keycode::OEM_ATTN, "" },
+		//{ XK_, Keycode::OEM_FINISH, "" },
+		//{ XK_, Keycode::OEM_COPY, "" },
+		//{ XK_, Keycode::OEM_AUTO, "" },
+		//{ XK_, Keycode::OEM_ENLW, "" },
+		//{ XK_, Keycode::OEM_BACKTAB, "" },
+		//{ XK_, Keycode::ATTN, "" },
+		//{ XK_, Keycode::CRSEL, "" },
+		//{ XK_, Keycode::EXSEL, "" },
+		//{ XK_, Keycode::EREOF, "" },
+		//{ XK_, Keycode::PLAY, "" },
+		//{ XK_, Keycode::ZOOM, "" },
+		//{ XK_, Keycode::NONAME, "" },
+		//{ XK_, Keycode::PA1, "" },
+		//{ XK_, Keycode::OEM_CLEAR, "" },
+		{ XK_A, Keycode::A, "A" },
+		{ XK_C, Keycode::C, "B" },
+		{ XK_D, Keycode::D, "C" },
+		{ XK_K, Keycode::K, "D" },
+		{ XK_S, Keycode::S, "E" },
+		{ XK_V, Keycode::V, "F" },
+		{ XK_X, Keycode::X, "G" },
+		{ XK_Y, Keycode::Y, "H" },
+		{ XK_Z, Keycode::Z, "I" },
+		{ 'a', Keycode::A, "A" },
+		{ 'c', Keycode::C, "C" },
+		{ 'd', Keycode::D, "D" },
+		{ 'k', Keycode::K, "K" },
+		{ 's', Keycode::S, "S" },
+		{ 'v', Keycode::V, "V" },
+		{ 'x', Keycode::X, "X" },
+		{ 'y', Keycode::Y, "Y" },
+		{ 'z', Keycode::Z, "Z" },
+	};
+
+	for (KeySym& i : s_to_x11_keysym) i = XK_VoidSymbol;
+	for (const auto& m : map) {
+		s_from_x11_keysym.insert(m.x11, m.lumix);
+		s_to_x11_keysym[(u8)m.lumix] = m.x11;
+		s_keycode_names[(u8)m.lumix] = m.name;
+	}
+}
+
+
+
 static struct
 {
 	bool finished = false;
@@ -38,6 +237,8 @@ static struct
 	int argc = 0;
 	char** argv = nullptr;
 	Display* display = nullptr; 
+	XIC ic;
+	XIM im;
 	IVec2 mouse_screen_pos = {};
 	bool key_states[256] = {};
 } G;
@@ -239,11 +440,41 @@ static void processEvents()
 
 		Event e;
 		switch (xevent.type) {
-			case KeyPress:
-			case KeyRelease:
-				// TODO set G.key_states
-				ASSERT(false);
+			case KeyPress: {
+				KeySym keysym = XLookupKeysym(&xevent.xkey, 0);
+				auto iter = s_from_x11_keysym.find(keysym);
+				e.type = Event::Type::KEY;
+				e.key.down = true;
+				e.key.keycode = iter.isValid() ? iter.value() : Keycode::INVALID;
+				G.key_states[(u8)e.key.keycode] = true;
+				G.iface->onEvent(e);
+
+				Status status = 0;
+				u32 utf8;
+				int len = Xutf8LookupString(G.ic, &xevent.xkey, (char*)&utf8, sizeof(utf8), &keysym, &status);
+				switch (status) {
+					case XLookupChars:
+					case XLookupBoth:
+						if (0 != len) {
+							e.type = Event::Type::CHAR;
+							e.text_input.utf8 = utf8;
+							G.iface->onEvent(e);
+						}
+					break;
+					default: break;
+				}
 				break;
+			}
+			case KeyRelease: {
+				const KeySym keysym = XLookupKeysym(&xevent.xkey, 0);
+				auto iter = s_from_x11_keysym.find(keysym);
+				e.type = Event::Type::KEY;
+				e.key.down = false;
+				e.key.keycode = iter.isValid() ? iter.value() : Keycode::INVALID;
+				G.key_states[(u8)e.key.keycode] = false;
+				G.iface->onEvent(e);
+				break;
+			}
 			case ButtonPress:
 			case ButtonRelease:
 				e.type = Event::Type::MOUSE_BUTTON;
@@ -340,6 +571,17 @@ WindowHandle createWindow(const InitWindowArgs& args)
 	XMapWindow(display, win);
 	XStoreName(display, win, args.name && args.name[0] ? args.name : "Lumix App");
 
+	G.ic = XCreateIC(G.im
+			, XNInputStyle
+			, 0
+			| XIMPreeditNothing
+			| XIMStatusNothing
+			, XNClientWindow
+			, win
+			, NULL
+			);
+
+
 	// TODO glx context fails to create without this
 	for (int i = 0; i < 100; ++i) { processEvents(); }
 
@@ -362,8 +604,8 @@ bool isKeyDown(Keycode keycode)
 
 void getKeyName(Keycode keycode, Span<char> out)
 {
-	ASSERT(false);
-    // TODO
+	const char* name = s_keycode_names[(u8)keycode];
+	copyString(out, name ? name : keycode != Keycode::INVALID ? "N/A" : ""); 
 }
 
 
@@ -495,7 +737,7 @@ void run(Interface& iface)
 {
 	XInitThreads();
 	G.display = XOpenDisplay(nullptr);
-	XIM im = XOpenIM(G.display, nullptr, nullptr, nullptr);
+	G.im = XOpenIM(G.display, nullptr, nullptr, nullptr);
 
 	G.iface = &iface;
 	G.iface->onInit();
@@ -504,7 +746,7 @@ void run(Interface& iface)
 		G.iface->onIdle();
 	}
 
-	XCloseIM(im);
+	XCloseIM(G.im);
 	XCloseDisplay(G.display);
 }
 

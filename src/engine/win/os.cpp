@@ -606,6 +606,9 @@ void showCursor(bool show)
 }
 
 
+void init() {}
+
+
 void setWindowTitle(WindowHandle win, const char* title)
 {
 	WCharStr<256> tmp(title);

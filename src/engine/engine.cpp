@@ -80,6 +80,7 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 	{
+		OS::init();
 		OS::InitWindowArgs init_win_args;
 		init_win_args.fullscreen = init_data.fullscreen;
 		init_win_args.handle_file_drops = init_data.handle_file_drops;
