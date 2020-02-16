@@ -60,6 +60,6 @@ jobs:
               cd projects
               ./genie --static-plugins gmake
               cd tmp/gmake
-              pvs-studio-analyzer trace -- make EXTRA_WARNINGS=1
-              pvs-studio-analyzer analyze -e ../../../src/engine/engine.cpp -l ../../../pvs-studio.lic -o pvs-studio.log
-              plog-converter -a 'GA:1,2;OP:1' -t errorfile -w pvs-studio.log
+              pvs-studio-analyzer trace -- make -j EXTRA_WARNINGS=1
+              pvs-studio-analyzer analyze -e ../../../external -l ../../../pvs-studio.lic -o pvs-studio.log
+              plog-converter -a 'GA:1,2;OP:1' -d V730 -t errorfile -w pvs-studio.log
