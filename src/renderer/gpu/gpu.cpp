@@ -461,8 +461,6 @@ static LoadInfo* getDXT10LoadInfo(const Header& hdr, const DXT10Header& dxt10_hd
 {
 	switch(dxt10_hdr.dxgi_format) {
 		case DxgiFormat::B8G8R8A8_UNORM_SRGB:
-			return &loadInfoBGRA8;
-			break;
 		case DxgiFormat::B8G8R8A8_UNORM:
 			return &loadInfoBGRA8;
 			break;
@@ -2019,7 +2017,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			case ShaderType::GEOMETRY: shader_type = GL_GEOMETRY_SHADER; break;
 			case ShaderType::FRAGMENT: shader_type = GL_FRAGMENT_SHADER; break;
 			case ShaderType::VERTEX: shader_type = GL_VERTEX_SHADER; break;
-			default: ASSERT(0); break;
+			default: ASSERT(false); return false;
 		}
 		const GLuint shd = glCreateShader(shader_type);
 		combined_srcs[0] = R"#(

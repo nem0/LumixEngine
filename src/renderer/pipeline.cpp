@@ -1300,20 +1300,27 @@ struct PipelineImpl final : Pipeline
 			lua_pop(L, 1);
 			luaL_error(L, "Frustum is not a table");
 		}
-		float* points = cp.frustum.xs;
 		if(!LuaWrapper::checkField(L, -1, "origin", &cp.frustum.origin)) {
 				lua_pop(L, 1);
 				luaL_error(L, "Frustum without origin");
 		}
-		for (int i = 0; i < 32 + 24; ++i) {
-			lua_rawgeti(L, -1, i + 1);
-			if(!LuaWrapper::isType<float>(L, -1)) {
-				lua_pop(L, 2);
-				luaL_error(L, "Frustum must contain exactly 24 floats");
+		auto load_floats = [L](float* data, int count, int offset) {
+			for (int i = 0; i < count; ++i) {
+				lua_rawgeti(L, -1, offset + i + 1);
+				if(!LuaWrapper::isType<float>(L, -1)) {
+					lua_pop(L, 2);
+					luaL_error(L, "Invalid frustum");
+				}
+				data[i] = LuaWrapper::toType<float>(L, -1);
+				lua_pop(L, 1);
 			}
-			points[i] = LuaWrapper::toType<float>(L, -1);
-			lua_pop(L, 1);
-		}
+		};
+		load_floats(cp.frustum.xs, (int)Frustum::Planes::COUNT, 0);
+		load_floats(cp.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
+		load_floats(cp.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
+		load_floats(cp.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
+		load_floats(&cp.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
+		
 		lua_pop(L, 1);
 		cp.frustum.setPlanesFromPoints();
 		
@@ -1822,10 +1829,19 @@ struct PipelineImpl final : Pipeline
 
 		lua_createtable(L, 32+24, 0);
 		const float* frustum = params.frustum.xs; 
-		for(int i = 0; i < 32+24; ++i) {
-			LuaWrapper::push(L, frustum[i]);
-			lua_rawseti(L, -2, i + 1);
-		}
+		auto push_floats = [L](const float* values, int count, int offset){
+			for(int i = 0; i < count; ++i) {
+				LuaWrapper::push(L, values[i]);
+				lua_rawseti(L, -2, offset + i + 1);
+			}
+		};
+
+		push_floats(params.frustum.xs, (int)Frustum::Planes::COUNT, 0);
+		push_floats(params.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
+		push_floats(params.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
+		push_floats(params.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
+		push_floats(&params.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
+
 		LuaWrapper::push(L, params.frustum.origin);
 		lua_setfield(L, -2, "origin");
 		lua_setfield(L, -2, "frustum");

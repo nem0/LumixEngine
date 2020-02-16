@@ -491,7 +491,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
-			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1),
+			bool is_node_open = ImGui::TreeNodeEx((const void*)(intptr_t)(i + 1), //-V1028
 				ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed,
 				"%s",
 				"");
@@ -674,7 +674,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			FBXImporter importer(plugin->m_app);
 			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
 
-			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path;
+			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path.data;
 			importer.setSource(path, true);
 
 			if(data->meta.split) {
@@ -2656,7 +2656,7 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 							v.x = (&m_result[i].coefs[c0].x)[c00];
 							v.y = (&m_result[i].coefs[c1].x)[c10];
 							v.z = (&m_result[i].coefs[c2].x)[c20];
-							v.w = (&m_result[i].coefs[c3].x)[c30];
+							v.w = (&m_result[i].coefs[c3].x)[c30]; //-V557
 							file.write(&v, sizeof(v));
 						}
 					}
@@ -2891,7 +2891,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 				if (universe->hasComponent(job.entity, ENVIRONMENT_PROBE_TYPE)) {
 					RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
 					EnvironmentProbe& p = scene->getEnvironmentProbe(job.entity);
-					static_assert(sizeof(p.sh_coefs == job.sh.coefs));
+					static_assert(sizeof(p.sh_coefs) == sizeof(job.sh.coefs));
 					memcpy(p.sh_coefs, job.sh.coefs, sizeof(p.sh_coefs));
 				}
 
@@ -3252,7 +3252,7 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 
 	void addDebugCube(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, u32 color) override
 	{
-		m_render_scene->addDebugCube(pos, dir, right, up, color);
+		m_render_scene->addDebugCube(pos, dir, up, right, color);
 	}
 
 

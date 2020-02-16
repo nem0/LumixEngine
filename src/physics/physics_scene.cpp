@@ -3052,7 +3052,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		for (int i = index; i < count; ++i)
 		{
 			PxShape* shape = getShape(entity, i, type);
-			shape->userData = (void*)(intptr_t)(i + 1);
+			shape->userData = (void*)(intptr_t)(i + 1); //-V1028
 		}
 	}
 

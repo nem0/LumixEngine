@@ -872,7 +872,7 @@ static int LUA_instantiatePrefab(lua_State* L)
 	if (!prefab) {
 		luaL_argerror(L, 4, "Unknown prefab.");
 	}
-	if (!prefab->isReady()) {
+	if (!prefab->isReady()) { //-V1004
 		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
 	}
 	EntityMap entity_map(engine->getAllocator());

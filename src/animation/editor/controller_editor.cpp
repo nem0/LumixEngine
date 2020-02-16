@@ -476,7 +476,7 @@ void ControllerEditor::onWindowGUI() {
 							}
 							ImGui::EndCombo();
 						}
-						for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) {
+						for (u32 j = ik.bones_count - 2; j != 0xffFFffFF; --j) { //-V621
 							auto iter = m_model->getBoneIndex(ik.bones[j]);
 							if (iter.isValid()) {
 								ImGui::Text("%s", m_model->getBone(iter.value()).name.c_str());
@@ -516,7 +516,7 @@ void ControllerEditor::onWindowGUI() {
 					}
 				}
 
-				if (m_controller->m_ik_count < (u32)lengthOf(m_controller->m_ik->bones) && ImGui::Button("Add chain")) {
+				if (m_controller->m_ik_count < (u32)lengthOf(m_controller->m_ik[0].bones) && ImGui::Button("Add chain")) {
 					m_controller->m_ik[m_controller->m_ik_count].bones_count = 1;
 					m_controller->m_ik[m_controller->m_ik_count].bones[0] = 0;
 					++m_controller->m_ik_count;
