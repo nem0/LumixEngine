@@ -11,6 +11,7 @@ jobs:
               working-directory: .
               run: |
                 mkdir plugins
+                cd plugins
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
             - name: fetch gltf plugin
               working-directory: plugins
