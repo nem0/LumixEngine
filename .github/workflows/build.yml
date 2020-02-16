@@ -66,13 +66,6 @@ jobs:
               fi
           - name: PVS-Studio static analysis
             run: |
-              if [[ ! -f pvs-studio.lic ]];
-              then
-                echo "PVS Studio license is missing. No analysis will be performed."
-                echo "If you have a PVS Studio license please create a project secret named PVS_STUDIO_LICENSE with your license."
-                echo "You may use a free license. More information at https://www.viva64.com/en/b/0457/"
-                exit 0
-              fi
               cd projects
               git clone --depth=1 https://github.com/nem0/lumixengine_linux_3rdparty_bin.git
               mkdir -p ../externals/cmft/lib/linux64_gmake/release
