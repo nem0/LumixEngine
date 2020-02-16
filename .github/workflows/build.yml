@@ -10,9 +10,9 @@ jobs:
             - name: make project
               working-directory: projects
               run: |
-			    pushd ..\plugins
+                pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
-				popd
+                popd
                 ./genie.exe --static-plugins vs2019
             - name: build engine
               working-directory: projects
