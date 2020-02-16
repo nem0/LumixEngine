@@ -469,7 +469,7 @@ void ParticleEmitter::emit(const float* args)
 				++m_particles_count;
 				return;
 			case Instructions::MOV: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 				u8 dst_idx = blob.read<u8>();
 				ASSERT(dst_type == Compiler::DataStream::CHANNEL);
 				const float value = readSingleValue(blob);
@@ -477,7 +477,7 @@ void ParticleEmitter::emit(const float* args)
 				break;
 			}
 			case Instructions::RAND: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 				ASSERT(dst_type == Compiler::DataStream::CHANNEL);
 				u8 dst_idx = blob.read<u8>();
 				
@@ -569,7 +569,7 @@ static float4* getStream(const ParticleEmitter& emitter
 	, float4* register_mem)
 {
 	switch(type) {
-		case Compiler::DataStream::CHANNEL: return (float4*)emitter.getChannelData(idx);
+		case Compiler::DataStream::CHANNEL: return (float4*)emitter.getChannelData(idx); //-V1032
 		case Compiler::DataStream::REGISTER: return register_mem + particles_count * idx;
 		default: ASSERT(false); return nullptr;
 	}
@@ -609,11 +609,11 @@ void ParticleEmitter::update(float dt)
 			case Instructions::END:
 				goto end;
 			case Instructions::MUL: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 				const u8 dst_idx = blob.read<u8>();
-				const auto arg0_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type arg0_type = blob.read<Compiler::DataStream::Type>();
 				const u8 arg0_idx = blob.read<u8>();
-				const auto arg1_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type arg1_type = blob.read<Compiler::DataStream::Type>();
 				
 				const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin());
 				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
@@ -637,9 +637,9 @@ void ParticleEmitter::update(float dt)
 				break;
 			}
 			case Instructions::MOV: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 				const u8 dst_idx = blob.read<u8>();
-				const auto src_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type src_type = blob.read<Compiler::DataStream::Type>();
 				const u8 src_idx = blob.read<u8>();
 				
 				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
@@ -663,11 +663,11 @@ void ParticleEmitter::update(float dt)
 				break;
 			}
 			case Instructions::ADD: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 				const u8 dst_idx = blob.read<u8>();
-				const auto arg0_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type arg0_type = blob.read<Compiler::DataStream::Type>();
 				const u8 arg0_idx = blob.read<u8>();
-				const auto arg1_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type arg1_type = blob.read<Compiler::DataStream::Type>();
 				const u8 arg1_idx = blob.read<u8>();
 				
 				// TODO
@@ -694,9 +694,9 @@ void ParticleEmitter::update(float dt)
 				break;
 			}
 			case Instructions::COS: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 				const u8 dst_idx = blob.read<u8>();
-				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
 				const u8 arg_idx = blob.read<u8>();
 				
 				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
@@ -709,9 +709,9 @@ void ParticleEmitter::update(float dt)
 				break;
 			}
 			case Instructions::SIN: {
-				const auto dst_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 				const u8 dst_idx = blob.read<u8>();
-				const auto arg_type = blob.read<Compiler::DataStream::Type>();
+				const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
 				const u8 arg_idx = blob.read<u8>();
 				
 				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
@@ -772,9 +772,9 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 				case Instructions::END:
 					return;
 				case Instructions::SIN: {
-					const auto dst_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 					const u8 dst_idx = blob.read<u8>();
-					const auto arg_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
 					const u8 arg_idx = blob.read<u8>();
 				
 					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
@@ -787,9 +787,9 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 					break;
 				}
 				case Instructions::COS: {
-					const auto dst_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 					const u8 dst_idx = blob.read<u8>();
-					const auto arg_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
 					const u8 arg_idx = blob.read<u8>();
 				
 					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
@@ -802,11 +802,11 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 					break;
 				}
 				case Instructions::MUL: {
-					const auto dst_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
 					const u8 dst_idx = blob.read<u8>();
-					const auto arg0_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type arg0_type = blob.read<Compiler::DataStream::Type>();
 					const u8 arg0_idx = blob.read<u8>();
-					const auto arg1_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type arg1_type = blob.read<Compiler::DataStream::Type>();
 				
 					float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
 					const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
@@ -831,7 +831,7 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 				}
 				case Instructions::OUTPUT: {
 					const int stride = m_resource->getOutputsCount();
-					const auto arg_type = blob.read<Compiler::DataStream::Type>();
+					const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
 					const u8 arg_idx = blob.read<u8>();
 					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
 					float* dst = data + output_idx + offset * stride;

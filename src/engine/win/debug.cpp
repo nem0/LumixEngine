@@ -128,7 +128,7 @@ StackNode* StackTree::getParent(StackNode* node)
 bool StackTree::getFunction(StackNode* node, Span<char> out, Ref<int> line)
 {
 	HANDLE process = GetCurrentProcess();
-	u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)] = {};
+	alignas(SYMBOL_INFO) u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)] = {};
 	SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
 	symbol->MaxNameLen = 255;
 	symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -154,7 +154,7 @@ void StackTree::printCallstack(StackNode* node)
 	while (node)
 	{
 		HANDLE process = GetCurrentProcess();
-		u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
+		alignas(SYMBOL_INFO) u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)];
 		SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbol_mem);
 		memset(symbol_mem, 0, sizeof(symbol_mem));
 		symbol->MaxNameLen = 255;
@@ -298,7 +298,7 @@ void Allocator::checkLeaks()
 		AllocationInfo* info = m_root;
 		while (info != last_sentinel)
 		{
-			StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n");
+			StaticString<2048> tmp("\nAllocation size : ", info->size, " , memory ", (u64)(info + sizeof(info)), "\n"); //-V568
 			OutputDebugString(tmp);
 			m_stack_tree.printCallstack(info->stack_leaf);
 			info = info->next;
@@ -677,7 +677,7 @@ static void getStack(CONTEXT& context, Span<char> out)
 {
 	BOOL result;
 	STACKFRAME64 stack;
-	char symbol_mem[sizeof(IMAGEHLP_SYMBOL64) + 256];
+	alignas(IMAGEHLP_SYMBOL64) char symbol_mem[sizeof(IMAGEHLP_SYMBOL64) + 256];
 	IMAGEHLP_SYMBOL64* symbol = (IMAGEHLP_SYMBOL64*)symbol_mem;
 	char name[256];
 	copyString(out, "Crash callstack:\n");

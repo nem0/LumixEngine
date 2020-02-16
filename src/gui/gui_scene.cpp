@@ -808,6 +808,9 @@ struct GUISceneImpl final : public GUIScene
 						handleKeyboardButtonEvent(event);
 					}
 					break;
+				case InputSystem::Event::DEVICE_ADDED:	
+				case InputSystem::Event::DEVICE_REMOVED:
+					break;
 			}
 		}
 	}

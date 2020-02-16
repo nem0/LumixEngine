@@ -126,7 +126,7 @@ u32 Texture::getPixel(float x, float y) const
 	int w3 = (int)(fx1 * fy * 256.0f);
 	int w4 = (int)(fx * fy * 256.0f);
 
-	u8 res[4];
+	alignas(u32) u8 res[4];
 	res[0] = (u8)((p1[0] * w1 + p2[0] * w2 + p3[0] * w3 + p4[0] * w4) >> 8);
 	res[1] = (u8)((p1[1] * w1 + p2[1] * w2 + p3[1] * w3 + p4[1] * w4) >> 8);
 	res[2] = (u8)((p1[2] * w1 + p2[2] * w2 + p3[2] * w3 + p4[2] * w4) >> 8);

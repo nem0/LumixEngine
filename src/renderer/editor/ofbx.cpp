@@ -544,7 +544,7 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 			OptionalError<u32> length = read<u32>(cursor);
 			OptionalError<u32> encoding = read<u32>(cursor);
 			OptionalError<u32> comp_len = read<u32>(cursor);
-			if (length.isError() | encoding.isError() | comp_len.isError()) return Error();
+			if (length.isError() | encoding.isError() | comp_len.isError()) return Error(); //-V792
 			if (cursor->current + comp_len.getValue() > cursor->end) return Error("Reading past the end");
 			cursor->current += comp_len.getValue();
 			break;
@@ -984,7 +984,6 @@ struct MeshImpl : Mesh
 {
 	MeshImpl(const Scene& _scene, const IElement& _element)
 		: Mesh(_scene, _element)
-		, scene(_scene)
 	{
 		is_node = true;
 	}
@@ -1018,7 +1017,6 @@ struct MeshImpl : Mesh
 
 	const Pose* pose = nullptr;
 	const Geometry* geometry = nullptr;
-	const Scene& scene;
 	std::vector<const Material*> materials;
 };
 
@@ -2315,7 +2313,6 @@ static OptionalError<Object*> parseGeometryTangents(
 	if (!layer_tangent_element ) {
 		layer_tangent_element = findChild(element, "LayerElementTangent");
 	}
-	layer_tangent_element = findChild(element, "LayerElementTangent");
 	if (layer_tangent_element)
 	{
 		std::vector<Vec3> tmp;

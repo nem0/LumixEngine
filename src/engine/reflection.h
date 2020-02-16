@@ -717,7 +717,7 @@ struct ConstArrayProperty : IArrayProperty
 
 
 	void addItem(ComponentUID cmp, int index) const override { ASSERT(false); }
-	void removeItem(ComponentUID cmp, int index) const override { ASSERT(false); }
+	void removeItem(ComponentUID cmp, int index) const override { ASSERT(false); } //-V524
 
 
 	int getCount(ComponentUID cmp) const override
@@ -763,7 +763,7 @@ namespace internal
 #if defined(_MSC_VER) && !defined(__clang__)
 			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			static char typeName[size] = {};
-			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u);
+			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u); //-V594
 #else
 			static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
 			static char typeName[size] = {};

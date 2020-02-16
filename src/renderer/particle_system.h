@@ -74,7 +74,7 @@ public:
 private:
 	struct Channel
 	{
-		float* data = nullptr;
+		alignas(16) float* data = nullptr;
 		u32 name = 0;
 	};
 

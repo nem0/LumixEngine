@@ -68,8 +68,8 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 		curve.frames.resize(keys_count);
 		curve.values.resize(keys_count);
 		for (int j = 0; j < keys_count; ++j) {
-			serializer.read(Ref(curve.frames[i]));
-			serializer.read(Ref(curve.values[i]));
+			serializer.read(Ref(curve.frames[j]));
+			serializer.read(Ref(curve.values[j]));
 		}
 	}
 	return true;

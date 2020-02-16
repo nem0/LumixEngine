@@ -508,7 +508,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		Array<int> subblobs(allocator);
 		subblobs.reserve(vertex_count);
 
-		const int* materials = geom->getMaterials();
+		const int* geom_materials = geom->getMaterials();
 		Array<ofbx::Vec3> computed_tangents(allocator);
 		if (!tangents && normals && uvs) {
 			computeTangents(computed_tangents, vertex_count, vertices, normals, uvs);
@@ -517,7 +517,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 
 		for (int i = 0; i < vertex_count; ++i)
 		{
-			if (materials && materials[i / 3] != material_idx) continue;
+			if (geom_materials && geom_materials[i / 3] != material_idx) continue;
 
 			blob.clear();
 			ofbx::Vec3 cp = vertices[i];
@@ -576,7 +576,7 @@ static int detectMeshLOD(const FBXImporter::ImportMesh& mesh)
 	{
 		char mesh_name[256];
 		FBXImporter::getImportMeshName(mesh, mesh_name);
-		const char* lod_str = stristr(mesh_name, "_LOD");
+		lod_str = stristr(mesh_name, "_LOD");
 		if (!lod_str) return 0;
 	}
 
@@ -1132,7 +1132,7 @@ static void fill(const ofbx::Object& bone, double anim_len, const ofbx::Animatio
 static bool shouldSample(u32 keyframe_count, float anim_len, float fps, u32 data_size) {
 	const u32 sampled_frame_count = u32(anim_len * fps);
 	const u32 sampled_size = sampled_frame_count * data_size;
-	const u32 time_size = sizeof(sizeof(u16));
+	const u32 time_size = sizeof(u16);
 	const u32 keyframed_size = keyframe_count * (data_size + time_size);
 
 	// * 4 / 3 -> prefer sampled even when a bit bigger, since sampled tracks are faster
@@ -1189,19 +1189,19 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 		const ofbx::AnimationStack* stack = anim.fbx;
 		const ofbx::AnimationLayer* layer = stack->getLayer(0);
-		const ofbx::IScene& scene = *anim.scene;
-		const float fps = scene.getSceneFrameRate();
-		const ofbx::TakeInfo* take_info = scene.getTakeInfo(stack->name);
+		ASSERT(anim.scene == scene);
+		const float fps = scene->getSceneFrameRate();
+		const ofbx::TakeInfo* take_info = scene->getTakeInfo(stack->name);
 		if(!take_info && startsWith(stack->name, "AnimStack::")) {
-			take_info = scene.getTakeInfo(stack->name + 11);
+			take_info = scene->getTakeInfo(stack->name + 11);
 		}
 
 		double anim_len;
 		if (take_info) {
 			anim_len = take_info->local_time_to - take_info->local_time_from;
 		}
-		else if(scene.getGlobalSettings()) {
-			anim_len = scene.getGlobalSettings()->TimeSpanStop;
+		else if(scene->getGlobalSettings()) {
+			anim_len = scene->getGlobalSettings()->TimeSpanStop;
 		}
 		else {
 			logError("Renderer") << "Unsupported animation in " << src;

@@ -286,9 +286,10 @@ inline u32 getBytesPerPixel(gpu::TextureFormat format) {
 			return 8;
 		case gpu::TextureFormat::RGBA32F:
 			return 16;
+		default:
+			ASSERT(false);
+			return 0;
 	}
-	ASSERT(false);
-	return 0;
 }
 
 } // namespace gpu

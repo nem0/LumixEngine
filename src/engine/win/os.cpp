@@ -356,7 +356,7 @@ static void processEvents()
 				HRAWINPUT hRawInput = (HRAWINPUT)msg.lParam;
 				UINT dataSize;
 				GetRawInputData(hRawInput, RID_INPUT, NULL, &dataSize, sizeof(RAWINPUTHEADER));
-				char dataBuf[1024];
+				alignas(RAWINPUT) char dataBuf[1024];
 				if (dataSize == 0 || dataSize > sizeof(dataBuf)) break;
 
 				GetRawInputData(hRawInput, RID_INPUT, dataBuf, &dataSize, sizeof(RAWINPUTHEADER));

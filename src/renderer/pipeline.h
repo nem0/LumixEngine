@@ -59,9 +59,9 @@ class LUMIX_RENDERER_API Pipeline
 public:
 	struct Stats
 	{
-		int draw_call_count;
-		int instance_count;
-		int triangle_count;
+		u32 draw_call_count;
+		u32 instance_count;
+		u32 triangle_count;
 	};
 
 	struct CustomCommandHandler

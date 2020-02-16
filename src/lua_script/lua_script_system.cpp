@@ -273,7 +273,7 @@ namespace Lumix
 					lua_setfenv(script.m_state, -2);
 
 					m_scene.m_current_script_instance = &script;
-					errors = errors || lua_pcall(script.m_state, 0, 0, 0) != 0; // [env]
+					errors = lua_pcall(script.m_state, 0, 0, 0) != 0; // [env]
 					if (errors)
 					{
 						logError("Lua Script") << script.m_script->getPath() << ": "
@@ -999,7 +999,7 @@ namespace Lumix
 			ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
 			lua_setfenv(script.m_state, -2);
 
-			errors = errors || lua_pcall(state, 0, 0, 0) != 0;
+			errors = lua_pcall(state, 0, 0, 0) != 0;
 
 			if (errors)
 			{
