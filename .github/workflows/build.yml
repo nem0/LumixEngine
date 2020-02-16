@@ -80,6 +80,7 @@ jobs:
               cp lumixengine_linux_3rdparty_bin/nvtt/* ../externals/nvtt/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/physx/* ../externals/physx/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/recast/* ../externals/recast/lib/linux64_gmake/release
+              ls ../externals/recast/lib/linux64_gmake/release
           - name: PVS-Studio static analysis
             run: |
               cd projects
