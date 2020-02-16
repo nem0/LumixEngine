@@ -10,7 +10,7 @@ jobs:
             - name: make project
               working-directory: projects
               run: |
-                mkdir plugins
+                mkdir ..\plugins
                 pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
                 popd
