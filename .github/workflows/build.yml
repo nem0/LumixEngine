@@ -63,6 +63,8 @@ jobs:
                 sudo apt-get update
                 sudo apt-get install mesa-common-dev
                 sudo apt-get install libasound2-dev
+                sudo apt-get install libgl1-mesa-dev
+                sudo apt-get install libgl1-mesa-glx
               fi
           - name: Download 3rdparties
             run: |
