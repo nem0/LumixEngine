@@ -9,8 +9,24 @@ jobs:
                 fetch-depth: 1
             - name: make project
               working-directory: projects
-              run: ./genie.exe --static-plugins vs2019 
+              run: |
+			    pushd ..\plugins
+                git.exe clone https://github.com/nem0/lumixengine_maps.git maps
+				popd
+                ./genie.exe --static-plugins vs2019
             - name: build engine
+              working-directory: projects
+              shell: cmd
+              run: |
+                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+            - name: make dx11 project
+              working-directory: projects
+              run: |
+			    pushd ..\plugins
+                git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
+				popd
+                ./genie.exe --static-plugins vs2019
+            - name: build dx11 engine
               working-directory: projects
               shell: cmd
               run: |
