@@ -22,9 +22,9 @@ jobs:
             - name: make dx11 project
               working-directory: projects
               run: |
-			    pushd ..\plugins
+                pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
-				popd
+                popd
                 ./genie.exe --static-plugins vs2019
             - name: build dx11 engine
               working-directory: projects
