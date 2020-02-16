@@ -13,6 +13,8 @@ jobs:
                 mkdir ..\plugins
                 pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
+                git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
+                git.exe clone https://github.com/nem0/lumixengine_gltf.git gltf_import
                 popd
                 ./genie.exe --static-plugins vs2019
             - name: build engine
