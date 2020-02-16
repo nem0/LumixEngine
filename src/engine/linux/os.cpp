@@ -421,6 +421,7 @@ void getDropFile(const Event& event, int idx, Span<char> out)
 int getDropFileCount(const Event& event)
 {
     ASSERT(false); // not supported, processEvents does not generate the drop event
+	return 0;
 }
 
 
@@ -943,11 +944,17 @@ bool copyFile(const char* from, const char* to)
 	char buf[BUFSIZ];
     size_t size;
     while ((size = read(source, buf, BUFSIZ)) > 0) {
-        write(dest, buf, size);
+        const ssize_t res = write(dest, buf, size); //-V512
+		if (res == -1) {
+			close(source);
+			close(dest);
+			return false;
+		}
     }
 
     close(source);
     close(dest);
+	return true;
 }
 
 

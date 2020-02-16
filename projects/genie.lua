@@ -73,6 +73,11 @@ newoption {
 }
 
 newoption {
+	trigger = "pvs-studio-build",
+	description = "PVS Studio static analysis."
+}
+
+newoption {
 	trigger = "static-physx",
 	description = "Linked physx static lib."
 }
@@ -492,6 +497,10 @@ solution "LumixEngine"
 
 	if _OPTIONS["static-plugins"] then
 		defines {"STATIC_PLUGINS"}
+	end
+
+	if _OPTIONS["pvs-studio-build"] ~= nil then
+		defines {"LUMIX_PVS_STUDIO_BUILD"}
 	end
 
 project "engine"

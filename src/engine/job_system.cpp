@@ -404,7 +404,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 		else {
 			Profiler::endBlock();
 			Profiler::beginBlock("job");
-			if (isValid(job.dec_on_finish) || isValid(job.precondition)) {
+			if (isValid(job.dec_on_finish) || isValid(job.precondition)) { //-V614
 				Profiler::pushJobInfo(job.dec_on_finish, job.precondition);
 			}
 			this_fiber->current_job = job;
