@@ -4,7 +4,11 @@
 #include "engine/lumix.h"
 
 
-#define LUMIX_FATAL(cond) Lumix::fatal((cond), #cond);
+#ifdef LUMIX_PVS_STUDIO_BUILD
+	#define LUMIX_FATAL(cond) { false ? (void)(cond) : (void)0; }
+#else
+	#define LUMIX_FATAL(cond) Lumix::fatal((cond), #cond);
+#endif
 
 
 namespace Lumix

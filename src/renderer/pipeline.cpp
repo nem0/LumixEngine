@@ -30,7 +30,7 @@
 #include "terrain.h"
 #include "texture.h"
 
-
+//-V:WRITE:568
 namespace Lumix
 {
 
@@ -3396,17 +3396,17 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 				gpu::pushDebugGroup(name);
-				renderer->beginProfileBlock(name, profiler_link);
+				renderer->beginProfileBlock(name, link);
 			}
 			StaticString<32> name;
 			Renderer* renderer;
-			i64 profiler_link;
+			i64 link;
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->name = name;
 		cmd->renderer = &m_renderer;
 		m_profiler_link = Profiler::createNewLinkID();
-		cmd->profiler_link = m_profiler_link;
+		cmd->link = m_profiler_link;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 

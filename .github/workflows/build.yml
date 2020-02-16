@@ -58,8 +58,8 @@ jobs:
           - name: PVS-Studio static analysis
             run: |
               cd projects
-              ./genie --static-plugins gmake
+              ./genie --static-plugins --pvs-studio-build gmake
               cd tmp/gmake
               pvs-studio-analyzer trace -- make -j EXTRA_WARNINGS=1
               pvs-studio-analyzer analyze -e ../../../src/renderer/editor/miniz.c -e ../../../external -l ../../../pvs-studio.lic -o pvs-studio.log
-              plog-converter -a 'GA:1,2;OP:1' -d V730,V1001 -t errorfile -w pvs-studio.log
+              plog-converter -a 'GA:1,2;OP:1' -d V730,V1001,V530,V1048,V763 -t errorfile -w pvs-studio.log
