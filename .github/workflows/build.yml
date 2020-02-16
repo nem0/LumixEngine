@@ -60,12 +60,11 @@ jobs:
                 sudo wget -O /etc/apt/sources.list.d/viva64.list https://files.viva64.com/etc/viva64.list
                 sudo apt-get update
                 sudo apt-get install -y pvs-studio
-                sudo apt-get update
-                sudo apt-get install mesa-common-dev
-                sudo apt-get install libasound2-dev
-                sudo apt-get install libgl1-mesa-dev
-                sudo apt-get install libgl1-mesa-glx
               fi
+              sudo apt-get install mesa-common-dev
+              sudo apt-get install libasound2-dev
+              sudo apt-get install libgl1-mesa-dev
+              sudo apt-get install libgl1-mesa-glx
           - name: Download 3rdparties
             run: |
               cd projects
@@ -88,5 +87,5 @@ jobs:
               ./genie --static-plugins gmake
               cd tmp/gmake
               pvs-studio-analyzer trace -- make EXTRA_WARNINGS=1
-              pvs-studio-analyzer analyze -e ../../../src/engine/engine.cpp -l ../../pvs-studio.lic -o pvs-studio.log
+              pvs-studio-analyzer analyze -e ../../../src/engine/engine.cpp -l ../../../pvs-studio.lic -o pvs-studio.log
               plog-converter -a 'GA:1,2;OP:1' -t errorfile -w pvs-studio.log
