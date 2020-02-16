@@ -15,33 +15,7 @@ jobs:
               shell: cmd
               run: |
                 "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
-    linux:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v1
-              with:
-                fetch-depth: 1
-            - name: make project
-              working-directory: projects
-              run: ./genie --static-plugins gmake
-            - name: install packages
-              run: |
-                sudo apt-get update
-                sudo apt-get install mesa-common-dev
-                sudo apt-get install libasound2-dev
-            - name: build engine
-              working-directory: projects/tmp/gmake
-              run: |
-                make engine
-                make audio
-                make animation
-                make physics
-                make navigation
-                make gui
-                make lua_script
-                make renderer
-                make editor
-    static_analysis:
+    linux_and_static_analysis:
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v1
