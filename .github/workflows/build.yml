@@ -7,15 +7,22 @@ jobs:
             - uses: actions/checkout@v1
               with:
                 fetch-depth: 1
+            - name: fetch maps plugin
+              working-directory: .
+              run: |
+                mkdir plugins
+                git.exe clone https://github.com/nem0/lumixengine_maps.git maps
+            - name: fetch gltf plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_gltf.git gltf_import
+            - name: fetch shader_editor plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
             - name: make project
               working-directory: projects
               run: |
-                mkdir ..\plugins
-                pushd ..\plugins
-                git.exe clone https://github.com/nem0/lumixengine_maps.git maps
-                git.exe clone https://github.com/nem0/lumixengine_gltf.git gltf_import
-                git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
-                popd
                 ./genie.exe --static-plugins vs2019
             - name: build engine
               working-directory: projects
