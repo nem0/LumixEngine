@@ -2,7 +2,7 @@
 
 #include "lumix.h"
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(LUMIX_NO_CUSTOM_CRT)
 	#define LUMIX_CRT_API LUMIX_LIBRARY_IMPORT
 	#ifndef MCW_EM
 		#define _EM_OVERFLOW	0x00000004
