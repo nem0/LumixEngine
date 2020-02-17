@@ -36,7 +36,6 @@ namespace Lumix::OS
 
 static DefaultAllocator s_allocator;
 static HashMap<KeySym, Keycode> s_from_x11_keysym(s_allocator);
-static KeySym s_to_x11_keysym[256];
 static const char* s_keycode_names[256];
 
 static struct
@@ -60,6 +59,17 @@ static struct
 	Atom wm_protocols_atom;
 	Atom wm_delete_window_atom;
 } G;
+
+static Keycode getKeycode(KeySym keysym) {
+	auto iter = s_from_x11_keysym.find(keysym);
+	if (iter.isValid()) return iter.value();
+
+	if ((u8)keysym >= 'a' && (u8)keysym <= 'z' || (u8)keysym >= 'A' && (u8)keysym <= 'Z' || (u8)keysym >= '0' && (u8)keysym <= '9') {
+		return (Keycode)keysym;
+	}
+	
+	return Keycode::INVALID;
+}
 
 void init() {
 	static bool once = true;
@@ -249,10 +259,8 @@ void init() {
 		{ 'z', Keycode::Z, "Z" },
 	};
 
-	for (KeySym& i : s_to_x11_keysym) i = XK_VoidSymbol;
 	for (const auto& m : map) {
 		s_from_x11_keysym.insert(m.x11, m.lumix);
-		s_to_x11_keysym[(u8)m.lumix] = m.x11;
 		s_keycode_names[(u8)m.lumix] = m.name;
 	}
 
@@ -479,17 +487,17 @@ static void processEvents()
 		Event e;
 		switch (xevent.type) {
 			case KeyPress: {
-				KeySym keysym = XLookupKeysym(&xevent.xkey, 0);
-				auto iter = s_from_x11_keysym.find(keysym);
+				KeySym keysym;
+				Status status = 0;
+				u32 utf8;
+				const int len = Xutf8LookupString(G.ic, &xevent.xkey, (char*)&utf8, sizeof(utf8), &keysym, &status);
+
 				e.type = Event::Type::KEY;
 				e.key.down = true;
-				e.key.keycode = iter.isValid() ? iter.value() : Keycode::INVALID;
+				e.key.keycode = getKeycode(keysym);
 				G.key_states[(u8)e.key.keycode] = true;
 				G.iface->onEvent(e);
 
-				Status status = 0;
-				u32 utf8;
-				int len = Xutf8LookupString(G.ic, &xevent.xkey, (char*)&utf8, sizeof(utf8), &keysym, &status);
 				switch (status) {
 					case XLookupChars:
 					case XLookupBoth:
@@ -505,10 +513,9 @@ static void processEvents()
 			}
 			case KeyRelease: {
 				const KeySym keysym = XLookupKeysym(&xevent.xkey, 0);
-				auto iter = s_from_x11_keysym.find(keysym);
 				e.type = Event::Type::KEY;
 				e.key.down = false;
-				e.key.keycode = iter.isValid() ? iter.value() : Keycode::INVALID;
+				e.key.keycode = getKeycode(keysym);
 				G.key_states[(u8)e.key.keycode] = false;
 				G.iface->onEvent(e);
 				break;
@@ -664,6 +671,12 @@ bool isKeyDown(Keycode keycode)
 
 void getKeyName(Keycode keycode, Span<char> out)
 {
+	ASSERT(out.length() > 1);
+	if ((u8)keycode >= 'a' && (u8)keycode <= 'z' || (u8)keycode >= 'A' && (u8)keycode <= 'Z' || (u8)keycode >= '0' && (u8)keycode <= '9') {
+		out[0] = (char)keycode;
+		out[1] = '\0';
+		return;
+	}
 	const char* name = s_keycode_names[(u8)keycode];
 	copyString(out, name ? name : keycode != Keycode::INVALID ? "N/A" : ""); 
 }
