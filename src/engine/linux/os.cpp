@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,9 +21,14 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <X11/Xatom.h>
 #include <X11/Xlib.h>
+#include <X11/Xmd.h>
+#include <X11/Xresource.h>
 #define GLX_GLXEXT_LEGACY
 #include <GL/glx.h>
+
+#define _NET_WM_STATE_ADD           1
 
 namespace Lumix::OS
 {
@@ -33,10 +39,37 @@ static HashMap<KeySym, Keycode> s_from_x11_keysym(s_allocator);
 static KeySym s_to_x11_keysym[256];
 static const char* s_keycode_names[256];
 
+static struct
+{
+	bool finished = false;
+	Interface* iface = nullptr;
+	Point relative_mode_pos = {};
+	bool relative_mouse = false;
+	WindowHandle win = INVALID_WINDOW;
+
+	int argc = 0;
+	char** argv = nullptr;
+	Display* display = nullptr; 
+	XIC ic;
+	XIM im;
+	IVec2 mouse_screen_pos = {};
+	bool key_states[256] = {};
+    Atom net_wm_state_atom;
+	Atom net_wm_state_maximized_vert_atom;
+	Atom net_wm_state_maximized_horz_atom;
+	Atom wm_protocols_atom;
+	Atom wm_delete_window_atom;
+} G;
+
 void init() {
 	static bool once = true;
 	ASSERT(once);
 	once = false;
+
+	XInitThreads();
+	G.display = XOpenDisplay(nullptr);
+	G.im = XOpenIM(G.display, nullptr, nullptr, nullptr);
+
 	struct {
 		KeySym x11;
 		Keycode lumix;
@@ -222,27 +255,13 @@ void init() {
 		s_to_x11_keysym[(u8)m.lumix] = m.x11;
 		s_keycode_names[(u8)m.lumix] = m.name;
 	}
+
+    G.net_wm_state_atom = XInternAtom(G.display, "_NET_WM_STATE", False);
+    G.net_wm_state_maximized_horz_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+    G.net_wm_state_maximized_vert_atom = XInternAtom(G.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+	G.wm_protocols_atom = XInternAtom(G.display, "WM_PROTOCOLS", False);
+	G.wm_delete_window_atom = XInternAtom(G.display, "WM_DELETE_WINDOW", False);
 }
-
-
-
-static struct
-{
-	bool finished = false;
-	Interface* iface = nullptr;
-	Point relative_mode_pos = {};
-	bool relative_mouse = false;
-	WindowHandle win = INVALID_WINDOW;
-
-	int argc = 0;
-	char** argv = nullptr;
-	Display* display = nullptr; 
-	XIC ic;
-	XIM im;
-	IVec2 mouse_screen_pos = {};
-	bool key_states[256] = {};
-} G;
-
 
 InputFile::InputFile()
 {
@@ -430,6 +449,24 @@ void finishDrag(const Event& event)
     ASSERT(false); // not supported, processEvents does not generate the drop event
 }
 
+static unsigned long get_window_property(Window win, Atom property, Atom type, unsigned char** value) {
+    Atom actual_type;
+    int format;
+    unsigned long count, bytes_after;
+    XGetWindowProperty(G.display
+		, win
+		, property
+		, 0
+		, LONG_MAX
+		, False
+		, type
+		, &actual_type
+		, &format
+		, &count
+		, &bytes_after
+		, value);
+    return count;
+}
 
 static void processEvents()
 {
@@ -478,17 +515,37 @@ static void processEvents()
 			}
 			case ButtonPress:
 			case ButtonRelease:
-				e.type = Event::Type::MOUSE_BUTTON;
 				e.window = (WindowHandle)xevent.xbutton.window;
-				switch (xevent.xbutton.button) {
-					case Button1: e.mouse_button.button = MouseButton::LEFT; break;
-					case Button2: e.mouse_button.button = MouseButton::MIDDLE; break;
-					case Button3: e.mouse_button.button = MouseButton::RIGHT; break;
-					default: e.mouse_button.button = MouseButton::EXTENDED; break;
+				if (xevent.xbutton.button <= Button3) {
+					e.type = Event::Type::MOUSE_BUTTON;
+					switch (xevent.xbutton.button) {
+						case Button1: e.mouse_button.button = MouseButton::LEFT; break;
+						case Button2: e.mouse_button.button = MouseButton::MIDDLE; break;
+						case Button3: e.mouse_button.button = MouseButton::RIGHT; break;
+						default: e.mouse_button.button = MouseButton::EXTENDED; break;
+					}
+					e.mouse_button.down = xevent.type == ButtonPress;
+					G.iface->onEvent(e);
 				}
-				e.mouse_button.down = xevent.type == ButtonPress;
-				G.iface->onEvent(e);
-				break;			
+				else {
+					e.type = Event::Type::MOUSE_WHEEL;
+					switch (xevent.xbutton.button) {
+						case 4: e.mouse_wheel.amount = 1; break;
+						case 5: e.mouse_wheel.amount = -1; break;
+					}
+					G.iface->onEvent(e);
+				}
+				break;
+	        case ClientMessage:
+	            if (xevent.xclient.message_type == G.wm_protocols_atom) {
+					const Atom protocol = xevent.xclient.data.l[0];
+					if (protocol == G.wm_delete_window_atom) {
+						e.window = (WindowHandle)xevent.xclient.window;
+						e.type = Event::Type::WINDOW_CLOSE;
+						G.iface->onEvent(e);
+					}
+				}
+				break;
 			case ConfigureNotify:
 				e.window = (WindowHandle)xevent.xconfigure.window;
 
@@ -582,6 +639,8 @@ WindowHandle createWindow(const InitWindowArgs& args)
 			, NULL
 			);
 
+	Atom protocols = G.wm_delete_window_atom;
+	XSetWMProtocols(G.display, (Window)win, &protocols, 1);
 
 	// TODO glx context fails to create without this
 	for (int i = 0; i < 100; ++i) { processEvents(); }
@@ -657,15 +716,29 @@ void setWindowScreenRect(WindowHandle win, const Rect& rect)
 
 u32 getMonitors(Span<Monitor> monitors)
 {
-	//ASSERT(false);
-    // TODO
-    return {};
+	ASSERT(monitors.length() > 0);
+
+	const int count = minimum(ScreenCount(G.display), monitors.length());
+	for (int i = 0; i < count; ++i) {
+		Monitor& m = monitors[i];
+		m.primary = true;
+		m.work_rect.left = 0;
+		m.work_rect.top = 0;
+		Window root = RootWindow(G.display, i);
+		XWindowAttributes attrs;
+		XGetWindowAttributes(G.display, root, &attrs);
+		m.work_rect.width = attrs.width;
+		m.work_rect.height = attrs.height;
+		m.monitor_rect = monitors[0].work_rect;
+	}
+
+	return count;
 }
 
 void setMouseScreenPos(int x, int y)
 {
-	//ASSERT(false);
-    // TODO
+	Window root = DefaultRootWindow(G.display);
+	XWarpPointer(G.display, None, root, 0, 0, 0, 0, x, y);
 }
 
 Point getMousePos(WindowHandle win)
@@ -704,10 +777,30 @@ WindowHandle getFocused()
 	return (WindowHandle)win;
 }
 
+
 bool isMaximized(WindowHandle win) {
-	//ASSERT(false);
-    // TODO
-    return false;
+    if (!G.net_wm_state_atom) return false;
+    if (!G.net_wm_state_maximized_horz_atom) return false;
+    if (!G.net_wm_state_maximized_vert_atom) return false;
+
+	Atom* states;
+    const unsigned long count =
+        get_window_property((Window)win,
+			G.net_wm_state_atom,
+			XA_ATOM,
+			(unsigned char**) &states);
+
+    bool maximized = false;
+    for (unsigned long i = 0; i < count; ++i) {
+        if (states[i] == G.net_wm_state_maximized_horz_atom || states[i] == G.net_wm_state_maximized_vert_atom) {
+            maximized = true;
+            break;
+        }
+    }
+
+    XFree(states);
+
+    return maximized;
 }
 
 void restore(WindowHandle win, WindowState state) {
@@ -723,8 +816,24 @@ WindowState setFullscreen(WindowHandle win) {
 
 void maximizeWindow(WindowHandle win)
 {
-	ASSERT(false);
-    // TODO
+	XEvent event = { ClientMessage };
+    event.xclient.window = (Window)win;
+    event.xclient.format = 32;
+    event.xclient.message_type = G.net_wm_state_atom;
+	event.xclient.data.l[0] = _NET_WM_STATE_ADD;
+    event.xclient.data.l[1] = G.net_wm_state_maximized_vert_atom;
+    event.xclient.data.l[2] = G.net_wm_state_maximized_horz_atom;
+    event.xclient.data.l[3] = 1;
+    event.xclient.data.l[4] = 0;
+
+	XWindowAttributes attrs;
+	XGetWindowAttributes(G.display, (Window)win, &attrs);
+	Window root = RootWindowOfScreen(attrs.screen);
+    XSendEvent(G.display
+		, root
+		, False
+		, SubstructureNotifyMask | SubstructureRedirectMask
+		, &event);
 }
 
 
@@ -736,10 +845,6 @@ bool isRelativeMouseMode()
 
 void run(Interface& iface)
 {
-	XInitThreads();
-	G.display = XOpenDisplay(nullptr);
-	G.im = XOpenIM(G.display, nullptr, nullptr, nullptr);
-
 	G.iface = &iface;
 	G.iface->onInit();
 	while (!G.finished) {
@@ -751,12 +856,24 @@ void run(Interface& iface)
 	XCloseDisplay(G.display);
 }
 
+int getDPI() {
+	float dpi = DisplayWidth(G.display, 0) * 25.4f / DisplayWidthMM(G.display, 0);
+    char* rms = XResourceManagerString(G.display);
+    if (rms) {
+        XrmDatabase db = XrmGetStringDatabase(rms);
+        if (db) {
+            XrmValue value;
+            char* type;
+            if (XrmGetResource(db, "Xft.dpi", "Xft.Dpi", &type, &value)) {
+                if (type && strcmp(type, "String") == 0) {
+                    dpi = atof(value.addr);
+                }
+            }
+            XrmDestroyDatabase(db);
+        }
+    }
 
-int getDPI()
-{
-	//ASSERT(false);
-    // TODO
-    return 96;
+    return int(dpi + 0.5f);
 }
 
 u32 getMemPageSize() {
@@ -913,7 +1030,23 @@ u64 getLastModified(const char* path)
 
 bool makePath(const char* path)
 {
-	return mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0;
+	char tmp[MAX_PATH_LENGTH];
+	const char* cin = path;
+	char* cout = tmp;
+
+	while (*cin) {
+		*cout = *cin;
+		if (*cout == '\\' || *cout == '/' || *cout == '\0'){
+			if (cout != tmp) {
+				*cout = '\0';
+				mkdir(tmp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+				*cout = *cin;
+			}
+		}
+		++cout;
+		++cin;
+	}
+	return mkdir(path, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != -1;
 }
 
 
@@ -960,9 +1093,14 @@ bool copyFile(const char* from, const char* to)
 
 void getExecutablePath(Span<char> buffer)
 {
-	ASSERT(false);
-    // TODO
-    ;
+	char self[PATH_MAX] = {};
+	const int res = readlink("/proc/self/exe", self, sizeof(self));
+
+	if (res < 0) {
+		copyString(buffer, "");
+		return;
+	}
+	copyString(buffer, self);
 }
 
 
