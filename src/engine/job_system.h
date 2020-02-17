@@ -1,19 +1,11 @@
 #pragma once
-
-
 #include "lumix.h"
 
-
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct IAllocator;
 
-
-namespace JobSystem
-{
-
+namespace JobSystem {
 
 using SignalHandle = u32;
 constexpr u8 ANY_WORKER = 0xff;
@@ -72,8 +64,6 @@ void forEach(u32 count, const F& f)
 	wait(signal);
 }
 
-
 } // namespace JobSystem
-
 
 } // namespace Lumix

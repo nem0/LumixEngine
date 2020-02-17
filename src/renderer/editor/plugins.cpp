@@ -2350,8 +2350,6 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if(resources.length() > 1) return;
 
 		auto* shader = static_cast<Shader*>(resources[0]);
-		char basename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(Span(basename), shader->getPath().c_str());
 		if (ImGui::Button("Open in external editor"))
 		{
 			m_app.getAssetBrowser().openInExternalEditor(shader->getPath().c_str());

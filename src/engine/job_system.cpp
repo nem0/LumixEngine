@@ -69,7 +69,6 @@ struct System
 		, m_free_queue(allocator)
 		, m_free_fibers(allocator)
 		, m_backup_workers(allocator)
-		, m_outside_job_semaphore(0, 1)
 	{
 		m_signals_pool.resize(4096);
 		m_free_queue.resize(4096);
@@ -83,7 +82,6 @@ struct System
 
 	MT::CriticalSection m_sync;
 	MT::CriticalSection m_job_queue_sync;
-	MT::Semaphore m_outside_job_semaphore;
 	Array<WorkerTask*> m_workers;
 	Array<WorkerTask*> m_backup_workers;
 	Array<Job> m_job_queue;
@@ -517,61 +515,44 @@ void wait(SignalHandle handle)
 		return;
 	}
 	
-	if (getWorker()) {
-		Profiler::blockColor(0xff, 0, 0);
-		FiberDecl* this_fiber = getWorker()->m_current_fiber;
+	ASSERT(getWorker());
 
-		runInternal(this_fiber, [](void* data){
-			MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
-			FiberDecl* fiber = (FiberDecl*)data;
-			if (fiber->current_job.worker_index == ANY_WORKER) {
-				g_system->m_ready_fibers.push(fiber);
-				for (WorkerTask* worker : g_system->m_workers) {
-					worker->wakeup();
-				}
-			}
-			else {
-				WorkerTask* worker = g_system->m_workers[fiber->current_job.worker_index % g_system->m_workers.size()];
-				worker->m_ready_fibers.push(fiber);
+	Profiler::blockColor(0xff, 0, 0);
+	FiberDecl* this_fiber = getWorker()->m_current_fiber;
+
+	runInternal(this_fiber, [](void* data){
+		MT::CriticalSectionLock lock(g_system->m_job_queue_sync);
+		FiberDecl* fiber = (FiberDecl*)data;
+		if (fiber->current_job.worker_index == ANY_WORKER) {
+			g_system->m_ready_fibers.push(fiber);
+			for (WorkerTask* worker : g_system->m_workers) {
 				worker->wakeup();
 			}
-		}, handle, false, nullptr, 0);
-		
-		const Profiler::FiberSwitchData& switch_data = Profiler::beginFiberWait(handle);
-		FiberDecl* new_fiber = g_system->m_free_fibers.back();
-		g_system->m_free_fibers.pop();
-		if (!Fiber::isValid(new_fiber->fiber)) {
-			new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
 		}
-		getWorker()->m_current_fiber = new_fiber;
-		Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
-		getWorker()->m_current_fiber = this_fiber;
-		g_system->m_sync.exit();
-		Profiler::endFiberWait(handle, switch_data);
-		
-		#ifdef LUMIX_DEBUG
-			g_system->m_sync.enter();
-			ASSERT(isSignalZero(handle, false));
-			g_system->m_sync.exit();
-		#endif
+		else {
+			WorkerTask* worker = g_system->m_workers[fiber->current_job.worker_index % g_system->m_workers.size()];
+			worker->m_ready_fibers.push(fiber);
+			worker->wakeup();
+		}
+	}, handle, false, nullptr, 0);
+	
+	const Profiler::FiberSwitchData& switch_data = Profiler::beginFiberWait(handle);
+	FiberDecl* new_fiber = g_system->m_free_fibers.back();
+	g_system->m_free_fibers.pop();
+	if (!Fiber::isValid(new_fiber->fiber)) {
+		new_fiber->fiber = Fiber::create(64 * 1024, manage, new_fiber);
 	}
-	else
-	{
-		// TODO maybe handle this externally since main thread is no more
-		PROFILE_BLOCK("not a job waiting");
-		Profiler::blockColor(0xff, 0, 0);
-
-		static bool singleton = true;
-		ASSERT(singleton); // only one external thread supported
-		singleton = false;
-		runInternal(nullptr, [](void* data) {
-			g_system->m_outside_job_semaphore.signal();
-		}, handle, false, nullptr, 0);
-
+	getWorker()->m_current_fiber = new_fiber;
+	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
+	getWorker()->m_current_fiber = this_fiber;
+	g_system->m_sync.exit();
+	Profiler::endFiberWait(handle, switch_data);
+	
+	#ifdef LUMIX_DEBUG
+		g_system->m_sync.enter();
+		ASSERT(isSignalZero(handle, false));
 		g_system->m_sync.exit();
-		g_system->m_outside_job_semaphore.wait();
-		singleton = true;
-	}
+	#endif
 }
 
 

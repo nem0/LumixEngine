@@ -310,12 +310,19 @@ public:
 
 	void run() override
 	{
-		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
-		JobSystem::runEx(this, [](void* data) {
-			Lumix::OS::run(*(StudioAppImpl*)data);
-		}, &finished, JobSystem::INVALID_HANDLE, 0);
 		Profiler::setThreadName("Main thread");
-		JobSystem::wait(finished);
+		MT::Semaphore semaphore(0, 1);
+		struct Data {
+			StudioAppImpl* that;
+			MT::Semaphore* semaphore;
+		} data = {this, &semaphore};
+		JobSystem::runEx(&data, [](void* ptr) {
+			Data* data = (Data*)ptr;
+			Lumix::OS::run(*data->that);
+			data->semaphore->signal();
+		}, nullptr, JobSystem::INVALID_HANDLE, 0);
+		PROFILE_BLOCK("sleeping");
+		semaphore.wait();
 	}
 
 	
