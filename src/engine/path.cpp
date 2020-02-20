@@ -33,7 +33,7 @@ struct PathManagerImpl : PathManager
 	}
 
 	void serialize(IOutputStream& serializer) override {
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		clear();
 		serializer.write((i32)m_paths.size());
 		for (int i = 0; i < m_paths.size(); ++i) {
@@ -42,7 +42,7 @@ struct PathManagerImpl : PathManager
 	}
 
 	void deserialize(IInputStream& serializer) override {
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		i32 size;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i) {
@@ -64,12 +64,12 @@ struct PathManagerImpl : PathManager
 	}
 
 	PathInternal* getPath(u32 hash, const char* path) {
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		return getPathMultithreadUnsafe(hash, path);
 	}
 
 	PathInternal* getPath(u32 hash) {
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		int index = m_paths.find(hash);
 		if (index < 0) {
 			return nullptr;
@@ -93,12 +93,12 @@ struct PathManagerImpl : PathManager
 	}
 
 	void incrementRefCount(PathInternal* path) {
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		++path->m_ref_count;
 	}
 
 	void decrementRefCount(PathInternal* path) {
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		--path->m_ref_count;
 		if (path->m_ref_count == 0) {
 			m_paths.erase(path->m_id);
@@ -108,7 +108,7 @@ struct PathManagerImpl : PathManager
 
 	IAllocator& m_allocator;
 	AssociativeArray<u32, PathInternal*> m_paths;
-	MT::CriticalSection m_mutex;
+	MT::Mutex m_mutex;
 	Path* m_empty_path;
 };
 

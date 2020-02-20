@@ -128,10 +128,10 @@ struct MTBucketArray
 
 	static inline MTBucketArray* s_free_arrays[64] = {};
 	static inline u32 s_num_free_arrays = 0;
-	static inline MT::CriticalSection s_cs;
+	static inline MT::Mutex s_cs;
 
 	static MTBucketArray* allocArray(IAllocator& allocator) {
-		MT::CriticalSectionLock lock(s_cs);
+		MT::MutexGuard lock(s_cs);
 		if (s_num_free_arrays == 0) {
 			return LUMIX_NEW(allocator, MTBucketArray<T>)(allocator);
 		}
@@ -149,7 +149,7 @@ struct MTBucketArray
 	}
 
 	static void freeArray(MTBucketArray* a) {
-		MT::CriticalSectionLock lock(s_cs);
+		MT::MutexGuard lock(s_cs);
 		a->clear();
 		ASSERT(s_num_free_arrays < lengthOf(s_free_arrays) - 1);
 		s_free_arrays[s_num_free_arrays] = a;
@@ -210,7 +210,7 @@ struct MTBucketArray
 	void end(const Bucket& bucket)
 	{
 		const int bucket_idx = int(((u8*)bucket.values - m_values_mem) / BUCKET_SIZE);
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		m_counts[bucket_idx] = bucket.count;
 	}
 
@@ -242,7 +242,7 @@ struct MTBucketArray
 	T* value_ptr() const { return (T*)m_values_mem; }
 
 	IAllocator& m_allocator;
-	MT::CriticalSection m_mutex;
+	MT::Mutex m_mutex;
 	u8* const m_keys_mem;
 	u8* const m_values_mem;
 	u8* m_keys_end;
@@ -2718,7 +2718,7 @@ struct PipelineImpl final : Pipeline
 
 			u32 m_histogram[SIZE];
 			bool m_sorted;
-			MT::CriticalSection m_cs;
+			MT::Mutex m_cs;
 
 			void compute(const u64* keys, const u64* values, int size, u16 shift) {
 				memset(m_histogram, 0, sizeof(m_histogram));
@@ -2748,7 +2748,7 @@ struct PipelineImpl final : Pipeline
 						begin = MT::atomicAdd(&counter, STEP);
 					}
 
-					MT::CriticalSectionLock lock(m_cs);
+					MT::MutexGuard lock(m_cs);
 					m_sorted &= sorted;
 					for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
 						m_histogram[i] += histogram[i]; 

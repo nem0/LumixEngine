@@ -11,7 +11,7 @@ struct IAllocator;
 namespace MT
 {
 
-class CriticalSection;
+class Mutex;
 
 class LUMIX_ENGINE_API Thread
 {
@@ -27,7 +27,7 @@ public:
 	void setAffinityMask(u64 affinity_mask);
 
 	// call only from task's thread
-	void sleep(CriticalSection& cs);
+	void sleep(Mutex& cs);
 	void wakeup();
 
 	bool isRunning() const;

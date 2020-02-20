@@ -46,36 +46,31 @@ ConditionVariable::ConditionVariable() {
 	InitializeConditionVariable(cv);
 }
 
-void ConditionVariable::sleep(CriticalSection& cs) { SleepConditionVariableCS((CONDITION_VARIABLE*)data, (CRITICAL_SECTION*)cs.data, INFINITE); }
+void ConditionVariable::sleep(Mutex& mutex) { SleepConditionVariableSRW((CONDITION_VARIABLE*)data, (SRWLOCK*)mutex.data, INFINITE, 0); }
 void ConditionVariable::wakeup() { WakeConditionVariable((CONDITION_VARIABLE*)data); }
 
-CriticalSection::CriticalSection()
+Mutex::Mutex()
 {
-	static_assert(sizeof(data) >= sizeof(CRITICAL_SECTION), "Size is not enough");
-	static_assert(alignof(CriticalSection) == alignof(CRITICAL_SECTION), "Alignment does not match");
+	static_assert(sizeof(data) >= sizeof(SRWLOCK), "Size is not enough");
+	static_assert(alignof(Mutex) == alignof(SRWLOCK), "Alignment does not match");
 	memset(data, 0, sizeof(data));
-	CRITICAL_SECTION* cs = new (NewPlaceholder(), data) CRITICAL_SECTION;
-	InitializeCriticalSectionAndSpinCount(cs, 0x400);
+	SRWLOCK* lock = new (NewPlaceholder(), data) SRWLOCK;
+	InitializeSRWLock(lock);
 }
 
-
-CriticalSection::~CriticalSection()
-{
-	CRITICAL_SECTION* cs = (CRITICAL_SECTION*)data;
-	DeleteCriticalSection(cs);
-	cs->~CRITICAL_SECTION();
+Mutex::~Mutex() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	lock->~SRWLOCK();
 }
 
-void CriticalSection::enter()
-{
-	CRITICAL_SECTION* cs = (CRITICAL_SECTION*)data;
-	EnterCriticalSection(cs);
+void Mutex::enter() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	AcquireSRWLockExclusive(lock);
 }
 
-void CriticalSection::exit()
-{
-	CRITICAL_SECTION* cs = (CRITICAL_SECTION*)data;
-	LeaveCriticalSection(cs);
+void Mutex::exit() {
+	SRWLOCK* lock = (SRWLOCK*)data;
+	ReleaseSRWLockExclusive (lock);
 }
 
 

@@ -114,7 +114,7 @@ static struct {
 	Pool<Buffer, Buffer::MAX_COUNT> buffers;
 	Pool<Texture, Texture::MAX_COUNT> textures;
 	Pool<Program, Program::MAX_COUNT> programs;
-	MT::CriticalSection handle_mutex;
+	MT::Mutex handle_mutex;
 	Lumix::OS::ThreadID thread;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
@@ -1290,7 +1290,7 @@ void destroy(ProgramHandle program)
 	const GLuint handle = p.handle;
 	CHECK_GL(glDeleteProgram(handle));
 
-	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	MT::MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.programs.dealloc(program.value);
 }
 
@@ -1552,7 +1552,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 ProgramHandle allocProgramHandle()
 {
-	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	MT::MutexGuard lock(g_gpu.handle_mutex);
 
 	if(g_gpu.programs.isFull()) {
 		logError("Renderer") << "Not enough free program slots.";
@@ -1569,7 +1569,7 @@ ProgramHandle allocProgramHandle()
 
 BufferHandle allocBufferHandle()
 {
-	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	MT::MutexGuard lock(g_gpu.handle_mutex);
 
 	if(g_gpu.buffers.isFull()) {
 		logError("Renderer") << "Not enough free buffer slots.";
@@ -1586,7 +1586,7 @@ BufferHandle allocBufferHandle()
 
 TextureHandle allocTextureHandle()
 {
-	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	MT::MutexGuard lock(g_gpu.handle_mutex);
 
 	if(g_gpu.textures.isFull()) {
 		logError("Renderer") << "Not enough free texture slots.";
@@ -1722,7 +1722,7 @@ void destroy(TextureHandle texture)
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteTextures(1, &handle));
 
-	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	MT::MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.textures.dealloc(texture.value);
 }
 
@@ -1735,7 +1735,7 @@ void destroy(BufferHandle buffer)
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteBuffers(1, &handle));
 
-	MT::CriticalSectionLock lock(g_gpu.handle_mutex);
+	MT::MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.buffers.dealloc(buffer.value);
 }
 

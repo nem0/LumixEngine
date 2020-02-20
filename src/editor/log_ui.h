@@ -63,7 +63,7 @@ class LUMIX_EDITOR_API LogUI
 		bool m_are_notifications_hovered;
 		bool m_scroll_to_bottom = false;
 		bool m_autoscroll = true;
-		MT::CriticalSection m_guard;
+		MT::Mutex m_guard;
 };
 
 
