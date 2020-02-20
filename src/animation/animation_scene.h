@@ -54,9 +54,9 @@ struct AnimationScene : public IScene
 	virtual void setAnimatorSource(EntityRef entity, const Path& path) = 0;
 	virtual class Path getAnimatorSource(EntityRef entity) = 0;
 	virtual int getAnimatorInputIndex(EntityRef entity, const char* name) const = 0;
-	virtual void applyAnimatorSet(EntityRef entity, const char* set_name) = 0;
-	virtual void setAnimatorDefaultSet(EntityRef entity, u32 set) = 0;
-	virtual int getAnimatorDefaultSet(EntityRef entity) = 0;
+	virtual void applyAnimatorSet(EntityRef entity, u32 idx) = 0;
+	virtual void setAnimatorDefaultSet(EntityRef entity, u32 idx) = 0;
+	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
 	virtual float getAnimationLength(int animation_idx) = 0;
 };
 

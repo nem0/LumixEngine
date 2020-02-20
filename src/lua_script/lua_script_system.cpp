@@ -453,7 +453,7 @@ namespace Lumix
 		}
 
 
-		void getScriptData(EntityRef entity, OutputMemoryStream& blob) override
+		void getScriptData(EntityRef entity, IOutputStream& blob) override
 		{
 			auto* scr = m_scripts[entity];
 			blob.write(scr->m_scripts.size());
@@ -704,7 +704,6 @@ namespace Lumix
 			void visit(const Reflection::IArrayProperty& prop) override {}
 			void visit(const Reflection::IEnumProperty& prop) override {}
 			void visit(const Reflection::IBlobProperty& prop) override {}
-			void visit(const Reflection::ISampledFuncProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -764,7 +763,6 @@ namespace Lumix
 			void visit(const Reflection::IArrayProperty& prop) override {}
 			void visit(const Reflection::IEnumProperty& prop) override {}
 			void visit(const Reflection::IBlobProperty& prop) override {}
-			void visit(const Reflection::ISampledFuncProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;

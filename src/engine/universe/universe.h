@@ -22,7 +22,7 @@ struct ISerializer;
 struct PrefabResource;
 
 
-struct EntityMap {
+struct LUMIX_ENGINE_API EntityMap {
 	EntityMap(IAllocator& allocator);
 	void reserve(u32 count);
 	EntityPtr get(EntityPtr e) const;

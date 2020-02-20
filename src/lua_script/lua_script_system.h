@@ -80,7 +80,7 @@ public:
 	virtual const char* getPropertyName(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual Property::Type getPropertyType(EntityRef entity, int scr_index, int prop_index) = 0;
 	virtual ResourceType getPropertyResourceType(EntityRef entity, int scr_index, int prop_index) = 0;
-	virtual void getScriptData(EntityRef entity, OutputMemoryStream& blob) = 0;
+	virtual void getScriptData(EntityRef entity, IOutputStream& blob) = 0;
 	virtual void setScriptData(EntityRef entity, InputMemoryStream& blob) = 0;
 };
 

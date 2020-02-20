@@ -839,7 +839,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
-			const Vec2 delta = m_app.getMouseMove();
+			Vec2 delta(0, 0);
+			const OS::Event* events = m_app.getEvents();
+			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
+				const OS::Event& e = events[i];
+				if (e.type == OS::Event::Type::MOUSE_MOVE) {
+					delta += Vec2((float)e.mouse_move.xrel, (float)e.mouse_move.yrel);
+				}
+			}
 
 			if (!m_is_mouse_captured)
 			{
@@ -1271,15 +1278,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const EntityPtr mesh_entity = entity_map.m_map[0];
 		if (!mesh_entity.isValid()) return;
 
-		if (!render_scene->getUniverse().hasComponent((EntityRef)mesh_entity, MODEL_INSTANCE_TYPE)) return;
-
-		Model* model = render_scene->getModelInstanceModel((EntityRef)mesh_entity);
-		if (!model) return;
-
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
 		m_tile.entity = mesh_entity;
-		model->onLoaded<&ModelPlugin::renderPrefabSecondStage>(this);
+		prefab->onLoaded<&ModelPlugin::renderPrefabSecondStage>(this);
 	}
 
 
@@ -3539,7 +3541,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			vb_offset = 0;
 			ib_offset = 0;
 			for (WindowDrawData& dd : window_draw_data) {
-				// TODO window could be destroyed by now
 				gpu::setCurrentWindow(dd.window);
 				gpu::setFramebuffer(nullptr, 0, 0);
 				gpu::viewport(0, 0, dd.w, dd.h);

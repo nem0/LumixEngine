@@ -781,8 +781,7 @@ int ExpressionCompiler::compile(const char* src,
 
 int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 {
-	static const struct { const char* c; bool binary; ExpressionCompiler::Token::Operator op; } OPERATORS[] =
-	{
+	static const struct { const char* c; bool binary; ExpressionCompiler::Token::Operator op; } OPERATORS[] = {
 		{"<>", true, ExpressionCompiler::Token::NOT_EQUAL },
 		{"=", true, ExpressionCompiler::Token::EQUAL },
 		{"*", true, ExpressionCompiler::Token::MULTIPLY},
@@ -799,15 +798,12 @@ int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 	const char* c = src;
 	u32 token_count = 0;
 	bool binary = false;
-	while (*c)
-	{
+	while (*c) {
 		ExpressionCompiler::Token token = { Token::EMPTY, int(c - src) };
 
-		for (auto& i : OPERATORS)
-		{
+		for (auto& i : OPERATORS) {
 			if (strncmp(c, i.c, strlen(i.c)) != 0) continue;
-			if (i.binary && !binary)
-			{
+			if (i.binary && !binary) {
 				m_compile_time_error = Condition::Error::MISSING_BINARY_OPERAND;
 				m_compile_time_offset = token.offset;
 				return -1;
@@ -820,25 +816,21 @@ int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 			break;
 		}
 
-		if (token.type == Token::EMPTY)
-		{
-			switch (*c)
-			{
-			case ' ':
-			case '\n':
-			case '\t': ++c; continue;
-			case '-':
-				token.type = Token::OPERATOR;
-				token.oper = binary ? Token::SUBTRACT : Token::UNARY_MINUS;
-				binary = false;
-				break;
+		if (token.type == Token::EMPTY) {
+			switch (*c) {
+				case ' ':
+				case '\n':
+				case '\t': ++c; continue;
+				case '-':
+					token.type = Token::OPERATOR;
+					token.oper = binary ? Token::SUBTRACT : Token::UNARY_MINUS;
+					binary = false;
+					break;
 			}
 		}
 
-		if (token.type == Token::EMPTY)
-		{
-			if (isIdentifierChar(*c))
-			{
+		if (token.type == Token::EMPTY) {
+			if (isIdentifierChar(*c)) {
 				token.offset = int(c - src);
 				++c;
 				token.type = Token::IDENTIFIER;
@@ -847,44 +839,36 @@ int ExpressionCompiler::tokenize(const char* src, const Span<Token>& tokens)
 				token.size = int(c - src) - token.offset;
 				--c;
 			}
-			else if (*c == '(')
-			{
+			else if (*c == '(') {
 				binary = false;
 				token.type = Token::LEFT_PARENTHESIS;
 			}
-			else if (*c == ')')
-			{
+			else if (*c == ')') {
 				token.type = Token::RIGHT_PARENTHESIS;
 				binary = true;
 			}
-			else if (*c == ',')
-			{
+			else if (*c == ',') {
 				token.type = Token::COMMA;
 				binary = false;
 			}
-			else if (*c >= '0' && *c <= '9')
-			{
+			else if (*c >= '0' && *c <= '9') {
 				token.type = Token::NUMBER;
 				char* out;
 				token.number = strtof(c, &out);
 				c = out - 1;
 				binary = true;
 			}
-			else
-			{
+			else {
 				m_compile_time_error = Condition::Error::UNEXPECTED_CHAR;
 				m_compile_time_offset = token.offset;
 				return -1;
 			}
 		}
-		if(token.type != Token::EMPTY)
-		{
-			if(token_count < tokens.length())
-			{
+		if (token.type != Token::EMPTY) {//-V547
+			if(token_count < tokens.length()) {
 				tokens[token_count] = token;
 			}
-			else
-			{
+			else {
 				m_compile_time_error = Condition::Error::OUT_OF_MEMORY;
 				return -1;
 			}

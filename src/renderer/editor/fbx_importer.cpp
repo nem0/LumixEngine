@@ -744,21 +744,24 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		: m_gb0(gb0)
 		, m_gb1(gb1)
 		, m_tile_size(size)
-		, m_programs(allocator)
+		, m_drawcalls(allocator)
 	{
 	}
 
 	void setup() override {
+		m_aabb = m_model->getAABB();
+		m_radius = m_model->getBoundingRadius();
 		for (u32 i = 0; i <= (u32)m_model->getLODs()[0].to_mesh; ++i) {
 			const Mesh& mesh = m_model->getMesh(i);
 			Shader* shader = mesh.material->getShader();
-			const gpu::ProgramHandle p = shader->getProgram(mesh.vertex_decl, m_capture_define | mesh.material->getDefineMask());
-			m_programs.push(p);
+			Drawcall& dc = m_drawcalls.emplace();
+			dc.program = shader->getProgram(mesh.vertex_decl, m_capture_define | mesh.material->getDefineMask());
+			dc.mesh = mesh.render_data;
+			dc.material = mesh.material->getRenderData();
 		}
 	}
 
 	void execute() override {
-		// TODO can't use m_model in render thread
 		gpu::TextureHandle gbs[] = { gpu::allocTextureHandle(), gpu::allocTextureHandle(), gpu::allocTextureHandle() };
 
 		gpu::BufferHandle pass_buf = gpu::allocBufferHandle();
@@ -769,11 +772,9 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
 		gpu::bindUniformBuffer(4, ub, 0, 256);
 
-		const AABB aabb = m_model->getAABB();
-		const Vec3 center = (aabb.min + aabb.max) * 0.5f;
-		const float radius = m_model->getBoundingRadius();
+		const Vec3 center = (m_aabb.min + m_aabb.max) * 0.5f;
 		Vec2 min, max;
-		getBBProjection(aabb, Ref(min), Ref(max));
+		getBBProjection(m_aabb, Ref(min), Ref(max));
 		const Vec2 size = max - min;
 
 		m_tile_size = IVec2(int(IMPOSTOR_TILE_SIZE * size.x / size.y), IMPOSTOR_TILE_SIZE);
@@ -791,14 +792,9 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
 				gpu::viewport(i * m_tile_size->x, j * m_tile_size->y, m_tile_size->x, m_tile_size->y);
-				for (u32 k = 0; k <= (u32)m_model->getLODs()[0].to_mesh; ++k) {
-					const Mesh& mesh = m_model->getMesh(k);
-
-					const Material* material = mesh.material;
-					const Mesh::RenderData* rd = mesh.render_data;
-
-					const Material::RenderData* mat_rd = material->getRenderData();
-					gpu::bindTextures(mat_rd->textures, 0, mat_rd->textures_count);
+				for (const Drawcall& dc : m_drawcalls) {
+					const Mesh::RenderData* rd = dc.mesh;
+					gpu::bindTextures(dc.material->textures, 0, dc.material->textures_count);
 
 					const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
 
@@ -811,8 +807,8 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					}
 					gpu::update(ub, &model_mtx.m11, sizeof(model_mtx));
 					PassState pass_state;
-					pass_state.view.lookAt(center + Vec3(0, 0, 2 * radius), center, {0, 1, 0});
-					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * radius, false, true);
+					pass_state.view.lookAt(center + Vec3(0, 0, 2 * m_radius), center, {0, 1, 0});
+					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, false, true);
 					pass_state.inv_projection = pass_state.projection.inverted();
 					pass_state.inv_view = pass_state.view.fastInverted();
 					pass_state.view_projection = pass_state.projection * pass_state.view;
@@ -820,11 +816,11 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 
 					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
-					gpu::useProgram(m_programs[k]);
+					gpu::useProgram(dc.program);
 					gpu::bindIndexBuffer(rd->index_buffer_handle);
 					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-					gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | material->getRenderStates());
+					gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | dc.material->render_states);
 					gpu::drawTriangles(rd->indices_count, rd->index_type);
 				}
 			}
@@ -850,7 +846,15 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::destroy(gbs[2]);
 	}
 
-	Array<gpu::ProgramHandle> m_programs;
+	struct Drawcall {
+		gpu::ProgramHandle program;
+		const Mesh::RenderData* mesh;
+		const Material::RenderData* material;
+	};
+
+	Array<Drawcall> m_drawcalls;
+	AABB m_aabb;
+	float m_radius;
 	Ref<Array<u32>> m_gb0;
 	Ref<Array<u32>> m_gb1;
 	Model* m_model;

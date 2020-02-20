@@ -344,6 +344,7 @@ void GroupNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion
 		data.t += ctx.time_delta;
 
 		if (m_blend_length < data.t) {
+			// TODO root motion in data.from 
 			m_children[data.from].node->skip(ctx);
 			data.from = data.to;
 			data.t = Time::fromSeconds(0);
@@ -353,9 +354,11 @@ void GroupNode::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion
 		}
 
 		ctx.data.write(data);
-		// TODO root motion
+		
 		m_children[data.from].node->update(ctx, root_motion);
-		m_children[data.to].node->update(ctx, root_motion);
+		LocalRigidTransform tmp;
+		m_children[data.to].node->update(ctx, Ref(tmp));
+		root_motion = root_motion->interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
 		return;
 	}
 

@@ -121,7 +121,6 @@ public:
 	virtual Action* getAction(const char* name) = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual bool makeFile(const char* path, const char* content) = 0;
-	virtual Vec2 getMouseMove() const = 0;
 	virtual struct Settings& getSettings() = 0;
 
 	virtual const OS::Event* getEvents() const = 0;

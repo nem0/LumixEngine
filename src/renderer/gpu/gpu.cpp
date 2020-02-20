@@ -1104,6 +1104,14 @@ void unmap(BufferHandle buffer)
 	CHECK_GL(glUnmapNamedBuffer(buf));
 }
 
+void updatePart(BufferHandle buffer, size_t offset, const void* data, size_t size)
+{
+	checkThread();
+	const Buffer& b = g_gpu.buffers[buffer.value];
+	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
+	const GLuint buf = b.handle;
+	CHECK_GL(glNamedBufferSubData(buf, offset, size, data));
+}
 
 void update(BufferHandle buffer, const void* data, size_t size)
 {

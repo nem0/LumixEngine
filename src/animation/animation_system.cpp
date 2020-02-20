@@ -32,7 +32,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 	}
 
 
-	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
+	void getValue(ComponentUID cmp, int index, IOutputStream& stream) const override
 	{
 		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
 		int value = scene->getControllerDefaultSet((EntityRef)cmp.entity);
@@ -128,9 +128,8 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 		),
 		component("animator",
 			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
-				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE))//,
-			// TODO
-			//AnimSetProperty()
+				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE)),
+			property("Default set", LUMIX_PROP(AnimationScene, AnimatorDefaultSet))
 		),
 		component("animable",
 			property("Animation", LUMIX_PROP(AnimationScene, Animation),

@@ -550,7 +550,6 @@ struct SetPropertyLuaVisitor : public Reflection::IPropertyVisitor
 
 
 	void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
-	void visit(const Reflection::ISampledFuncProperty& prop) override { notSupported(prop); }
 
 
 	void notSupported(const Reflection::PropertyBase& prop)
