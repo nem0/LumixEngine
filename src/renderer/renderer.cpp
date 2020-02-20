@@ -122,6 +122,7 @@ struct FrameData {
 		: jobs(allocator)
 		, renderer(renderer)
 		, to_compile_shaders(allocator)
+		, material_updates(allocator)
 	{}
 
 	struct ShaderToCompile {
@@ -132,8 +133,14 @@ struct FrameData {
 		Shader::Sources sources;
 	};
 
+	struct MaterialUpdates {
+		u32 idx;
+		MaterialConsts value;
+	};
+
 	TransientBuffer transient_buffer;
 
+	Array<MaterialUpdates> material_updates;
 	Array<Renderer::RenderJob*> jobs;
 	MT::CriticalSection shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
@@ -577,17 +584,27 @@ struct RendererImpl final : public Renderer
 
 			renderer.m_profiler.init();
 
-			renderer.m_material_buffer.buffer = gpu::allocBufferHandle();
-			renderer.m_material_buffer.data.resize(400);
-			renderer.m_material_buffer.map.insert(0, 0);
-			gpu::createBuffer(renderer.m_material_buffer.buffer, (u32)gpu::BufferFlags::UNIFORM_BUFFER, renderer.m_material_buffer.data.byte_size(), nullptr);
-
-			const u32 max_mat_count = renderer.m_material_buffer.data.size();
-			for (u32 i = 0; i < max_mat_count; ++i) {
-				*(u32*)&renderer.m_material_buffer.data[i] = i + 1;
+			MaterialBuffer& mb = renderer.m_material_buffer;
+			mb.buffer = gpu::allocBufferHandle();
+			mb.map.insert(0, 0);
+			mb.data.resize(400);
+			mb.data[0].hash = 0;
+			mb.data[0].ref_count = 1;
+			mb.first_free = 1;
+			for (int i = 1; i < 400; ++i) {
+				mb.data[i].ref_count = 0;
+				mb.data[i].next_free = i + 1;
 			}
-			*(u32*)&renderer.m_material_buffer.data[max_mat_count - 1] = 0xffFFffFF;
-			renderer.m_material_buffer.data[0].color = Vec4(1, 0, 1, 1);
+			mb.data.back().next_free = -1;
+			gpu::createBuffer(mb.buffer
+				, (u32)gpu::BufferFlags::UNIFORM_BUFFER
+				, 400 * sizeof(MaterialConsts) 
+				, nullptr
+			);
+
+			MaterialConsts* default_mat = (MaterialConsts*)gpu::map(mb.buffer, sizeof(MaterialConsts));
+			default_mat->color = Vec4(1, 0, 1, 1);
+			gpu::unmap(mb.buffer);
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 
@@ -776,18 +793,17 @@ struct RendererImpl final : public Renderer
 			idx = iter.value();
 		}
 		else {
-			idx = m_material_buffer.first_free;
-			if (idx == 0xffFFffFF) {
+			if (m_material_buffer.first_free == -1) {
+				ASSERT(false);
 				++m_material_buffer.data[0].ref_count;
 				return 0;
 			}
-			const u32 next_free = *(u32*)&m_material_buffer.data[m_material_buffer.first_free];
-			memcpy(&m_material_buffer.data[m_material_buffer.first_free], &data, sizeof(data));
-			m_material_buffer.data[m_material_buffer.first_free].ref_count = 0;
-			m_material_buffer.first_free = next_free;
-			ASSERT(next_free != 0xffFFffFF);
-			m_material_buffer.dirty = true;
+			idx = m_material_buffer.first_free;
+			m_material_buffer.first_free = m_material_buffer.data[m_material_buffer.first_free].next_free;
+			m_material_buffer.data[idx].ref_count = 0;
+			m_material_buffer.data[idx].hash = crc32(&data, sizeof(data));
 			m_material_buffer.map.insert(hash, idx);
+			m_cpu_frame->material_updates.push({idx, data});
 		}
 		++m_material_buffer.data[idx].ref_count;
 		return idx;
@@ -795,12 +811,12 @@ struct RendererImpl final : public Renderer
 
 	void destroyMaterialConstants(u32 idx) override {
 		--m_material_buffer.data[idx].ref_count;
-		if(m_material_buffer.data[idx].ref_count == 0) {
-			const u32 hash = crc32(&m_material_buffer.data[idx], sizeof(m_material_buffer.data[idx]));
-			*(u32*)&m_material_buffer.data[idx] = m_material_buffer.first_free;
-			m_material_buffer.first_free = idx;
-			m_material_buffer.map.erase(hash);
-		}
+		if (m_material_buffer.data[idx].ref_count > 0) return;
+			
+		const u32 hash = m_material_buffer.data[idx].hash;
+		m_material_buffer.data[idx].next_free = m_material_buffer.first_free;
+		m_material_buffer.first_free = idx;
+		m_material_buffer.map.erase(hash);
 	}
 
 
@@ -988,7 +1004,6 @@ struct RendererImpl final : public Renderer
 	{
 		cmd->profiler_link = profiler_link;
 		
-		JobSystem::wait(m_cpu_frame->can_setup);
 		m_cpu_frame->jobs.push(cmd);
 
 		JobSystem::run(cmd, [](void* data){
@@ -1095,10 +1110,10 @@ struct RendererImpl final : public Renderer
 		}
 		frame.to_compile_shaders.clear();
 
-		if (m_material_buffer.dirty) {
-			gpu::update(m_material_buffer.buffer, m_material_buffer.data.begin(), m_material_buffer.data.byte_size());
-			m_material_buffer.dirty = false;
+		for (const auto& i : frame.material_updates) {
+			gpu::updatePart(m_material_buffer.buffer, i.idx * sizeof(MaterialConsts), &i.value, sizeof(i.value));
 		}
+		frame.material_updates.clear();
 
 		gpu::useProgram(gpu::INVALID_PROGRAM);
 		gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -1154,6 +1169,7 @@ struct RendererImpl final : public Renderer
 		
 		++m_cpu_frame;
 		if(m_cpu_frame == m_frames.end()) m_cpu_frame = m_frames.begin();
+		JobSystem::wait(m_cpu_frame->can_setup);
 
 		JobSystem::runEx(this, [](void* ptr){
 			auto* renderer = (RendererImpl*)ptr;
@@ -1181,13 +1197,23 @@ struct RendererImpl final : public Renderer
 	GPUProfiler m_profiler;
 
 	struct MaterialBuffer {
-		MaterialBuffer(IAllocator& alloc) : map(alloc), data(alloc) {}
+		MaterialBuffer(IAllocator& alloc) 
+			: map(alloc)
+			, data(alloc)
+		{}
+
+		struct Data {
+			u32 ref_count;
+			union {
+				u32 hash;
+				u32 next_free;
+			};
+		};
+
 		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
-		Array<MaterialConsts> data;
+		Array<Data> data;
+		int first_free;
 		HashMap<u32, u32> map;
-		u32 first_free = 1;
-		// TODO this is not MT safe
-		bool dirty = false;
 	} m_material_buffer;
 };
 

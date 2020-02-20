@@ -446,7 +446,7 @@ struct UniverseViewImpl final : UniverseView {
 };
 
 struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
-	PropertyDeserializeVisitor(IInputStream& deserializer
+	PropertyDeserializeVisitor(InputMemoryStream& deserializer
 		, ComponentUID cmp
 		, const HashMap<EntityPtr, u32>& map
 		, Span<const EntityRef> entities)
@@ -459,21 +459,18 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	void begin(const Reflection::ComponentBase&) override {}
 	void end(const Reflection::ComponentBase&) override {}
 
-	template <typename T>
-	void visit_generic(const Reflection::Property<T>& prop) {
-		T value;
-		deserializer.read(Ref(value));
-		InputMemoryStream str(&value, sizeof(value));
-		prop.setValue(cmp, idx, str);
-	}
-
-	void visit(const Reflection::Property<float>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<int>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<u32>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<Vec3>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
+	void visit(const Reflection::Property<float>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<int>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<u32>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<Vec2>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<Vec3>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<IVec3>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<Vec4>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<bool>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::IEnumProperty& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::IBlobProperty& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<const char*>& prop) override { prop.setValue(cmp, idx, deserializer); }
+	void visit(const Reflection::Property<Path>& prop) override { prop.setValue(cmp, idx, deserializer); }
 	
 	void visit(const Reflection::Property<EntityPtr>& prop) override { 
 		EntityPtr value;
@@ -482,13 +479,6 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 		if (iter.isValid()) value = entities[iter.value()];
 		
 		InputMemoryStream str(&value, sizeof(value));
-		prop.setValue(cmp, idx, str);
-	}
-
-	void visit(const Reflection::Property<Path>& prop) override { 
-		char buf[MAX_PATH_LENGTH];
-		deserializer.readString(Span(buf));
-		InputMemoryStream str(buf, strlen(buf));
 		prop.setValue(cmp, idx, str);
 	}
 
@@ -504,28 +494,8 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 		}
 		idx = idx_backup;
 	}
-	
-	void visit(const Reflection::IEnumProperty& prop) override {
-		int value;
-		deserializer.read(Ref(value));
-		InputMemoryStream str(&value, sizeof(value));
-		prop.setValue(cmp, idx, str);
-	}
 
-	void visit(const Reflection::Property<const char*>& prop) override { 
-		// TODO support bigger strings
-		char buf[4096];
-		deserializer.readString(Span(buf));
-		InputMemoryStream str(buf, strlen(buf));
-		prop.setValue(cmp, idx, str);
-	}
-
-	// TODO
-	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
-	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
-	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
-
-	IInputStream& deserializer;
+	InputMemoryStream& deserializer;
 	ComponentUID cmp;
 	const HashMap<EntityPtr, u32>& map;
 	Span<const EntityRef> entities;
@@ -533,34 +503,24 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 };
 
 struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
-	PropertySerializeVisitor(IOutputStream& serializer, ComponentUID cmp)
+	PropertySerializeVisitor(OutputMemoryStream& serializer, ComponentUID cmp)
 		: serializer(serializer)
 		, cmp(cmp)
 	{}
 
-	template <typename T>
-	void visit_generic(const Reflection::Property<T>& prop) {
-		T value;
-		OutputMemoryStream str(&value, sizeof(value));
-		prop.getValue(cmp, idx, str);
-		serializer.write(value);
-	}
-
-	void visit(const Reflection::Property<float>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<int>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<u32>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<EntityPtr>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<Vec3>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<IVec3>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<Vec4>& prop) override { visit_generic(prop); }
-	void visit(const Reflection::Property<bool>& prop) override { visit_generic(prop); }
-
-	void visit(const Reflection::Property<Path>& prop) override { 
-		char tmp[MAX_PATH_LENGTH];
-		OutputMemoryStream str(tmp, sizeof(tmp));
-		prop.getValue(cmp, idx, str);
-		serializer.writeString(tmp);
-	}
+	void visit(const Reflection::Property<float>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<int>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<u32>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<EntityPtr>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<Vec2>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<Vec3>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<IVec3>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<Vec4>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<bool>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::IEnumProperty& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::IBlobProperty& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<Path>& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const Reflection::Property<const char*>& prop) override { prop.getValue(cmp, idx, serializer); }
 
 	void visit(const Reflection::IArrayProperty& prop) override {
 		const int count = prop.getCount(cmp);
@@ -573,26 +533,7 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 		idx = idx_backup;
 	}
 
-	void visit(const Reflection::IEnumProperty& prop) override { 
-		int value;
-		OutputMemoryStream str(&value, sizeof(value));
-		prop.getValue(cmp, idx, str);
-		serializer.write(value);
-	}
-
-	void visit(const Reflection::Property<const char*>& prop) override { 
-		char tmp[4096];
-		OutputMemoryStream str(tmp, sizeof(tmp));
-		prop.getValue(cmp, idx, str);
-		serializer.writeString(tmp);
-	}
-
-	// TODO
-	void visit(const Reflection::Property<Vec2>& prop) override { ASSERT(false); }
-	void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
-	void visit(const Reflection::ISampledFuncProperty& prop) override { ASSERT(false); }
-
-	IOutputStream& serializer;
+	OutputMemoryStream& serializer;
 	ComponentUID cmp;
 	int idx;
 };
@@ -2371,7 +2312,7 @@ public:
 		return *m_prefab_system;
 	}
 
-	void copyEntities(const EntityRef* entities, int count, IOutputStream& serializer)
+	void copyEntities(const EntityRef* entities, int count, OutputMemoryStream& serializer)
 	{
 		serializer.write(count);
 		for (int i = 0; i < count; ++i) {

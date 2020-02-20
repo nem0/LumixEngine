@@ -542,7 +542,6 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 		app.getSettings().setValue("is_script_console_open", open);
 	}
 
-	// TODO
 	/*static const int LUA_CALL_EVENT_SIZE = 32;
 
 	void pluginAdded(GUIPlugin& plugin) override

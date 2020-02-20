@@ -53,6 +53,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		Anim::Controller* resource = nullptr;
 		u32 default_set = 0;
 		Anim::RuntimeContext* ctx = nullptr;
+		LocalRigidTransform root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 
 		struct IK {
 			float weight = 0;
@@ -442,8 +443,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		unloadResource(animator.resource);
 		setAnimatorSource(animator, path.isValid() ? loadController(path) : nullptr);
 		if (animator.resource && animator.resource->isReady() && m_is_game_running) {
-			ASSERT(false);
-			// TODO
+			animator.ctx = animator.resource->createRuntime(animator.default_set);
 		}
 	}
 
@@ -572,55 +572,33 @@ struct AnimationSceneImpl final : public AnimationScene
 
 	LocalRigidTransform getAnimatorRootMotion(EntityRef entity) override
 	{
-		ASSERT(false);
-		// TODO
-		return {};
+		Animator& animator = m_animators[m_animator_map[entity]];
+		return animator.root_motion;
 	}
 
 
-	void applyAnimatorSet(EntityRef entity, const char* set_name) override
+	void applyAnimatorSet(EntityRef entity, u32 idx) override
 	{
-		/*Animator& ctrl = m_animators[entity];
-		const u32 set_name_hash = crc32(set_name);
-		int set_idx = ctrl.resource->m_sets_names.find([set_name_hash](const StaticString<32>& val) {
-			return crc32(val) == set_name_hash;
-		});
-		if (set_idx < 0) return;
-
-		for (auto& entry : ctrl.resource->m_animation_set)
+		Animator& animator = m_animators[m_animator_map[entity]];
+		for (auto& entry : animator.resource->m_animation_entries)
 		{
-			if (entry.set != set_idx) continue;
-			ctrl.animations[entry.hash] = entry.animation;
+			if (entry.set != idx) continue;
+			animator.ctx->animations[entry.slot] = entry.animation;
 		}
-		ASSERT(false);
-		// TODO
-		//if (ctrl.root) ctrl.root->onAnimationSetUpdated(ctrl.animations);*/
 	}
 
 
-	void setAnimatorDefaultSet(EntityRef entity, u32 set) override
+	void setAnimatorDefaultSet(EntityRef entity, u32 idx) override
 	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& ctrl = m_animators.get(entity);
-		ctrl.default_set = ctrl.resource ? crc32(ctrl.resource->m_sets_names[set]) : 0;*/
+		Animator& animator = m_animators[m_animator_map[entity]];
+		animator.default_set = idx;
 	}
 
 
-	int getAnimatorDefaultSet(EntityRef entity) override
+	u32 getAnimatorDefaultSet(EntityRef entity) override
 	{
-		// TODO
-		ASSERT(false);
-		/*
-		Animator& ctrl = m_animators.get(entity);
-		auto is_default_set = [&ctrl](const StaticString<32>& val) {
-			return crc32(val) == ctrl.default_set;
-		};
-		int idx = 0;
-		if(ctrl.resource) idx = ctrl.resource->m_sets_names.find(is_default_set);
-		return idx < 0 ? 0 : idx;*/
-		return -1;
+		Animator& animator = m_animators[m_animator_map[entity]];
+		return animator.default_set;
 	}
 
 	void updateAnimator(Animator& animator, float time_delta)
@@ -643,13 +621,12 @@ struct AnimationSceneImpl final : public AnimationScene
 		animator.ctx->time_delta = Time::fromSeconds(time_delta);
 		// TODO
 		animator.ctx->root_bone_hash = crc32("RigRoot");
-		LocalRigidTransform root_motion;
-		animator.resource->update(*animator.ctx, Ref(root_motion));
+		animator.resource->update(*animator.ctx, Ref(animator.root_motion));
 
 		if (animator.resource->m_flags.isSet(Anim::Controller::Flags::USE_ROOT_MOTION)) {
 			Transform tr = m_universe.getTransform(entity);
-			tr.rot = tr.rot * root_motion.rot; 
-			tr.pos = tr.pos + tr.rot.rotate(root_motion.pos);
+			tr.rot = tr.rot * animator.root_motion.rot; 
+			tr.pos = tr.pos + tr.rot.rotate(animator.root_motion.pos);
 			m_universe.setTransform(entity, tr);
 		}
 

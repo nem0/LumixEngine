@@ -12,7 +12,6 @@ class ArrayDescriptorBase;
 struct ComponentUID;
 struct IEnumPropertyDescriptor;
 class PropertyDescriptorBase;
-struct ISampledFunctionDescriptor;
 class WorldEditor;
 class StudioApp;
 

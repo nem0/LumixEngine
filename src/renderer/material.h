@@ -24,8 +24,7 @@ struct  MaterialConsts {
 	float roughness;
 	float metallic;
 	float emission;
-	float custom[56];
-	u32 ref_count;
+	float custom[57];
 };
 
 class MaterialManager : public ResourceManager {

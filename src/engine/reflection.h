@@ -222,12 +222,6 @@ template <typename T> struct Property : PropertyBase {};
 struct IBlobProperty : PropertyBase {};
 
 
-struct ISampledFuncProperty : PropertyBase
-{
-	virtual float getMaxX() const = 0;
-};
-
-
 struct IEnumProperty : public PropertyBase
 {
 	void visit(IAttributeVisitor& visitor) const override {}
@@ -267,7 +261,6 @@ struct IPropertyVisitor
 	virtual void visit(const IArrayProperty& prop) = 0;
 	virtual void visit(const IEnumProperty& prop) = 0;
 	virtual void visit(const IBlobProperty& prop) = 0;
-	virtual void visit(const ISampledFuncProperty& prop) = 0;
 	virtual void end(const ComponentBase&) {}
 };
 
@@ -290,7 +283,6 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 	void visit(const IArrayProperty& prop) override { visitProperty(prop); }
 	void visit(const IEnumProperty& prop) override { visitProperty(prop); }
 	void visit(const IBlobProperty& prop) override { visitProperty(prop); }
-	void visit(const ISampledFuncProperty& prop) override { visitProperty(prop); }
 };
 
 
@@ -412,42 +404,6 @@ struct DynEnumProperty : IEnumProperty
 	Setter setter;
 	Counter counter;
 	Namer namer;
-};
-
-
-template <typename Getter, typename Setter, typename Counter>
-struct SampledFuncProperty : ISampledFuncProperty
-{
-	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
-	{
-		ASSERT(index == -1);
-		using C = typename ClassOf<Getter>::Type;
-		C* inst = static_cast<C*>(cmp.scene);
-		int count = (inst->*counter)(cmp.entity);
-		stream.write(count);
-		const Vec2* values = (inst->*getter)(cmp.entity);
-		stream.write(values, sizeof(float) * 2 * count);
-	}
-
-	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
-	{
-		ASSERT(index == -1);
-		using C = typename ClassOf<Getter>::Type;
-		C* inst = static_cast<C*>(cmp.scene);
-		int count;
-		stream.read(count);
-		auto* buf = (const Vec2*)stream.skip(sizeof(float) * 2 * count);
-		(inst->*setter)(cmp.entity, buf, count);
-	}
-
-	float getMaxX() const override { return max_x; }
-
-	void visit(IAttributeVisitor& visitor) const override {}
-
-	Getter getter;
-	Setter setter;
-	Counter counter;
-	float max_x;
 };
 
 
@@ -1017,19 +973,6 @@ auto blob_property(const char* name, Getter getter, Setter setter, Attributes...
 	p.getter = getter;
 	p.setter = setter;
 	p.name = name;
-	return p;
-}
-
-
-template <typename Getter, typename Setter, typename Counter>
-auto sampled_func_property(const char* name, Getter getter, Setter setter, Counter counter, float max_x)
-{
-	SampledFuncProperty<Getter, Setter, Counter> p;
-	p.getter = getter;
-	p.setter = setter;
-	p.counter = counter;
-	p.name = name;
-	p.max_x = max_x;
 	return p;
 }
 

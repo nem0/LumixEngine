@@ -239,6 +239,7 @@ QueryHandle createQuery();
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
 void update(BufferHandle buffer, const void* data, size_t size);
+void updatePart(BufferHandle buffer, size_t offset, const void* data, size_t size);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size);

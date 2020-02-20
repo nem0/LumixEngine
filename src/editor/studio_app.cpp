@@ -197,6 +197,7 @@ public:
 		const bool handle_input = isFocused();
 		m_events.push(event);
 		switch (event.type) {
+			case OS::Event::Type::MOUSE_MOVE: break;
 			case OS::Event::Type::FOCUS: break;
 			case OS::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
@@ -211,11 +212,6 @@ public:
 				if (handle_input) {
 					ImGuiIO& io = ImGui::GetIO();
 					io.MouseWheel = event.mouse_wheel.amount;
-				}
-				break;
-			case OS::Event::Type::MOUSE_MOVE:
-				if (handle_input) {
-					m_mouse_move += {(float)event.mouse_move.xrel, (float)event.mouse_move.yrel};
 				}
 				break;
 			case OS::Event::Type::WINDOW_SIZE:
@@ -860,7 +856,6 @@ public:
 		m_log_ui->update(time_delta);
 
 		guiEndFrame();
-		m_mouse_move.set(0, 0);
 	}
 
 
@@ -2488,7 +2483,6 @@ public:
 		void visit(const Reflection::IArrayProperty& prop) override { notSupported(prop); }
 		void visit(const Reflection::IEnumProperty& prop) override { notSupported(prop); }
 		void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
-		void visit(const Reflection::ISampledFuncProperty& prop) override { notSupported(prop); }
 
 
 		void notSupported(const Reflection::PropertyBase& prop)
@@ -2989,10 +2983,6 @@ public:
 	int getEventsCount() const override { return m_events.size(); }
 
 	
-	// TODO remove
-	Vec2 getMouseMove() const override { return m_mouse_move; }
-
-
 	static void checkWorkingDirectory()
 	{
 		if (!OS::fileExists("../LumixStudio.lnk")) return;
@@ -3104,6 +3094,10 @@ public:
 
 	ImFont* getBoldFont() override { return m_bold_font; }
 
+	struct WindowToDestroy {
+		OS::WindowHandle window;
+		u32 counter;
+	};
 
 	DefaultAllocator m_main_allocator;
 	#ifdef LUMIX_DEBUG
@@ -3137,7 +3131,6 @@ public:
 	ProfilerUI* m_profiler_ui;
 	Settings m_settings;
 	Array<OS::Event> m_events;
-	Vec2 m_mouse_move;
 	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];

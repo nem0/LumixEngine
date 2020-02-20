@@ -353,65 +353,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	void visit(const Reflection::IBlobProperty& prop) override {}
 
 
-	void visit(const Reflection::ISampledFuncProperty& prop) override
-	{
-		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
-
-		struct Point
-		{
-			Vec2 prev_tangent;
-			Vec2 p;
-			Vec2 next_tangent;
-		};
-
-		OutputMemoryStream blob(m_editor.getAllocator());
-		prop.getValue(cmp, -1, blob);
-		blob.reserve(blob.getPos() + sizeof(Point));
-		int count;
-		InputMemoryStream input(blob);
-		input.read(count);
-		count /= 3;
-		Point* points = (Point*)input.skip(sizeof(Point) * count);
-
-		bool changed = false;
-		int new_count;
-		int changed_idx = ImGui::CurveEditor(prop.name, (float*)points, count, ImVec2(-1, -1), 0, &new_count);
-		if (changed_idx >= 0)
-		{
-			changed = true;
-			points[changed_idx].p.x = clamp(points[changed_idx].p.x, 0.0f, 1.0f);
-			points[changed_idx].p.y = clamp(points[changed_idx].p.y, 0.0f, 1.0f);
-		}
-		if (new_count != count)
-		{
-			changed = true;
-			if (new_count > count)
-				blob.resize(blob.getPos() + sizeof(Point));
-			else
-				blob.resize(blob.getPos() - sizeof(Point));
-			count = new_count;
-			*(int*)blob.getData() = count * 3;
-		}
-		
-		if (changed)
-		{
-			for (int i = 1; i < count; ++i)
-			{
-				auto prev_p = points[i-1].p;
-				auto next_p = points[i].p;
-				auto& tangent = points[i - 1].next_tangent;
-				auto& tangent2 = points[i].prev_tangent;
-				float half = 0.5f * (next_p.x - prev_p.x);
-				tangent = tangent.normalized() * half;
-				tangent2 = tangent2.normalized() * half;
-			}
-			points[0].p.x = 0;
-			points[count - 1].p.x = prop.getMaxX();
-			m_editor.setProperty(cmp.type, -1, prop, &m_entities[0], m_entities.size(), blob.getData(), (int)blob.getPos());
-		}
-	}
-
 	void visit(const Reflection::IArrayProperty& prop) override
 	{
 		if (skipProperty(prop)) return;
