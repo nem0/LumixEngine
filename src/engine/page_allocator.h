@@ -28,7 +28,7 @@ private:
 	u32 allocated_count = 0;
 	u32 reserved_count = 0;
 	void* free_pages = nullptr;
-	MT::CriticalSection mutex;
+	MT::Mutex mutex;
 };
 
 

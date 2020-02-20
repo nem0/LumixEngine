@@ -180,7 +180,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void addResource(ResourceType type, const char* path) override {
 		const Path path_obj(path);
 		const u32 hash = path_obj.getHash();
-		MT::CriticalSectionLock lock(m_resources_mutex);
+		MT::MutexGuard lock(m_resources_mutex);
 		if(m_resources.find(hash).isValid()) {
 			m_resources[hash] = {path_obj, type};
 		}
@@ -311,7 +311,7 @@ struct AssetCompilerImpl : AssetCompiler
 				if (lua_type(L, -1) != LUA_TTABLE) return;
 
 				{
-					MT::CriticalSectionLock lock(m_resources_mutex);
+					MT::MutexGuard lock(m_resources_mutex);
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
 						if (type != INVALID_RESOURCE_TYPE) {
@@ -362,7 +362,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		Array<Path> res(m_app.getAllocator());
 
-		MT::CriticalSectionLock lock(m_resources_mutex);
+		MT::MutexGuard lock(m_resources_mutex);
 		m_resources.eraseIf([&](const ResourceItem& ri){
 			if (!equalStrings(getResourceFilePath(ri.path.c_str()), path)) return false;
 			res.push(ri.path);
@@ -391,7 +391,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		if (startsWith(path, ".lumix")) return;
 		
-		MT::CriticalSectionLock lock(m_changed_mutex);
+		MT::MutexGuard lock(m_changed_mutex);
 		m_changed_files.push(Path(path));
 	}
 
@@ -452,7 +452,7 @@ struct AssetCompilerImpl : AssetCompiler
 		char ext[16];
 		PathUtils::getExtension(Span(ext), Span(src.c_str(), src.length()));
 		const u32 hash = crc32(ext);
-		MT::CriticalSectionLock lock(m_plugin_mutex);
+		MT::MutexGuard lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
 		if (!iter.isValid()) {
 			logError("Editor") << "Unknown resource type " << src;
@@ -496,7 +496,7 @@ struct AssetCompilerImpl : AssetCompiler
 			)
 		{
 			logInfo("Editor") << res.getPath() << " is not compiled, pushing to compile queue";
-			MT::CriticalSectionLock lock(m_to_compile_mutex);
+			MT::MutexGuard lock(m_to_compile_mutex);
 			const Path path(filepath);
 			auto iter = m_to_compile_subresources.find(path);
 			if (!iter.isValid()) {
@@ -516,7 +516,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	Path popCompiledResource()
 	{
-		MT::CriticalSectionLock lock(m_compiled_mutex);
+		MT::MutexGuard lock(m_compiled_mutex);
 		if(m_compiled.empty()) return Path();
 		const Path p = m_compiled.back();
 		m_compiled.pop();
@@ -535,7 +535,7 @@ struct AssetCompilerImpl : AssetCompiler
 		AssetCompilerImpl* compiler = LuaWrapper::toType<AssetCompilerImpl*>(L, index);
 		ASSERT(compiler);
 
-		MT::CriticalSectionLock lock(compiler->m_resources_mutex);
+		MT::MutexGuard lock(compiler->m_resources_mutex);
 		lua_createtable(L, 0, compiler->m_resources.size());
 		for (ResourceItem& ri : compiler->m_resources) {
 			lua_pushinteger(L, ri.type.type);
@@ -566,7 +566,7 @@ struct AssetCompilerImpl : AssetCompiler
 			ImGui::ProgressBar(((float)m_compile_batch_count - m_batch_remaining_count) / m_compile_batch_count);
 			StaticString<MAX_PATH_LENGTH> path;
 			{
-				MT::CriticalSectionLock lock(m_to_compile_mutex);
+				MT::MutexGuard lock(m_to_compile_mutex);
 				path = m_res_in_progress;
 			}
 			ImGui::TextWrapped("%s", path.data);
@@ -582,7 +582,7 @@ struct AssetCompilerImpl : AssetCompiler
 			if (!p.isValid()) break;
 
 			// this can take some time, mutex is probably not the best option
-			MT::CriticalSectionLock lock(m_compiled_mutex);
+			MT::MutexGuard lock(m_compiled_mutex);
 
 			for (Resource* r : m_to_compile_subresources[p]) {
 				m_load_hook.continueLoad(*r);
@@ -593,7 +593,7 @@ struct AssetCompilerImpl : AssetCompiler
 		for (;;) {
 			Path path_obj;
 			{
-				MT::CriticalSectionLock lock(m_changed_mutex);
+				MT::MutexGuard lock(m_changed_mutex);
 				if (m_changed_files.empty()) break;
 
 				m_changed_files.removeDuplicates();
@@ -627,7 +627,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void removePlugin(IPlugin& plugin) override
 	{
-		MT::CriticalSectionLock lock(m_plugin_mutex);
+		MT::MutexGuard lock(m_plugin_mutex);
 		bool removed;
 		do {
 			removed = false;
@@ -646,7 +646,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const char** i = extensions;
 		while(*i) {
 			const u32 hash = crc32(*i);
-			MT::CriticalSectionLock lock(m_plugin_mutex);
+			MT::MutexGuard lock(m_plugin_mutex);
 			m_plugins.insert(hash, &plugin);
 			++i;
 		}
@@ -662,10 +662,10 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	MT::Semaphore m_semaphore;
-	MT::CriticalSection m_to_compile_mutex;
-	MT::CriticalSection m_compiled_mutex;
-	MT::CriticalSection m_plugin_mutex;
-	MT::CriticalSection m_changed_mutex;
+	MT::Mutex m_to_compile_mutex;
+	MT::Mutex m_compiled_mutex;
+	MT::Mutex m_plugin_mutex;
+	MT::Mutex m_changed_mutex;
 	HashMap<Path, Array<Resource*>> m_to_compile_subresources; 
 	HashMap<Path, Array<Path>> m_dependencies;
 	Array<Path> m_changed_files;
@@ -676,7 +676,7 @@ struct AssetCompilerImpl : AssetCompiler
 	HashMap<u32, IPlugin*, HashFuncDirect<u32>> m_plugins;
 	AssetCompilerTask m_task;
 	FileSystemWatcher* m_watcher;
-	MT::CriticalSection m_resources_mutex;
+	MT::Mutex m_resources_mutex;
 	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
 
@@ -691,7 +691,7 @@ int AssetCompilerTask::task()
 	while (!m_finished) {
 		m_compiler.m_semaphore.wait();
 		const Path p = [&]{
-			MT::CriticalSectionLock lock(m_compiler.m_to_compile_mutex);
+			MT::MutexGuard lock(m_compiler.m_to_compile_mutex);
 			Path p = m_compiler.m_to_compile.back();
 			m_compiler.m_res_in_progress = p.c_str();
 			m_compiler.m_to_compile.pop();
@@ -705,7 +705,7 @@ int AssetCompilerTask::task()
 			if (!compiled) {
 				logError("Editor") << "Failed to compile resource " << p;
 			}
-			MT::CriticalSectionLock lock(m_compiler.m_compiled_mutex);
+			MT::MutexGuard lock(m_compiler.m_compiled_mutex);
 			m_compiler.m_compiled.push(p);
 		}
 	}

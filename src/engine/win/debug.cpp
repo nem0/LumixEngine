@@ -488,7 +488,7 @@ void Allocator::deallocate_aligned(void* user_ptr)
 		}
 
 		{
-			MT::CriticalSectionLock lock(m_mutex);
+			MT::MutexGuard lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;
@@ -537,7 +537,7 @@ void* Allocator::allocate(size_t size)
 	AllocationInfo* info;
 	size_t system_size = getNeededMemory(size);
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		system_ptr = m_source.allocate(system_size);
 		info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
 
@@ -593,7 +593,7 @@ void Allocator::deallocate(void* user_ptr)
 		}
 
 		{
-			MT::CriticalSectionLock lock(m_mutex);
+			MT::MutexGuard lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;

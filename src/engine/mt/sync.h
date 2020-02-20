@@ -26,21 +26,21 @@ namespace MT
 #endif
 
 
-class alignas(8) LUMIX_ENGINE_API CriticalSection
+class alignas(8) LUMIX_ENGINE_API Mutex
 {
 friend class ConditionVariable;
 public:
-	CriticalSection();
-	~CriticalSection();
+	Mutex();
+	~Mutex();
 
-	CriticalSection(const CriticalSection&) = delete;
+	Mutex(const Mutex&) = delete;
 
 	void enter();
 	void exit();
 
 private:
 	#ifdef _WIN32
-		u8 data[64];
+		u8 data[8];
 	#else
 		pthread_mutex_t mutex;
 	#endif
@@ -67,7 +67,7 @@ class ConditionVariable
 public:
 	ConditionVariable();
 	~ConditionVariable();
-	void sleep(CriticalSection& cs);
+	void sleep(Mutex& cs);
 	void wakeup();
 private:
 	#ifdef _WIN32
@@ -78,21 +78,21 @@ private:
 };
 
 
-class CriticalSectionLock
+class MutexGuard
 {
 public:
-	explicit CriticalSectionLock(CriticalSection& cs)
-		: m_critical_section(cs)
+	explicit MutexGuard(Mutex& cs)
+		: m_mutex(cs)
 	{
 		cs.enter();
 	}
-	~CriticalSectionLock() { m_critical_section.exit(); }
+	~MutexGuard() { m_mutex.exit(); }
 
-	CriticalSectionLock(const CriticalSectionLock&) = delete;
-	void operator=(const CriticalSectionLock&) = delete;
+	MutexGuard(const MutexGuard&) = delete;
+	void operator=(const MutexGuard&) = delete;
 
 private:
-	CriticalSection& m_critical_section;
+	Mutex& m_mutex;
 };
 
 

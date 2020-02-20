@@ -134,8 +134,8 @@ void Thread::setAffinityMask(u64 affinity_mask)
 	}
 }
 
-void Thread::sleep(CriticalSection& cs) {
-	m_implementation->m_cv.sleep(cs);
+void Thread::sleep(Mutex& mutex) {
+	m_implementation->m_cv.sleep(mutex);
 }
 
 void Thread::wakeup() {

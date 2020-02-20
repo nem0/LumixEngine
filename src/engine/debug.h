@@ -88,7 +88,7 @@ private:
 private:
 	IAllocator& m_source;
 	StackTree m_stack_tree;
-	MT::CriticalSection m_mutex;
+	MT::Mutex m_mutex;
 	AllocationInfo* m_root;
 	AllocationInfo m_sentinels[2];
 	size_t m_total_size;

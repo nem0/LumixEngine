@@ -92,7 +92,7 @@ struct FileSystemImpl final : public FileSystem
 
 	bool hasWork() override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		return !m_queue.empty();
 	}
 
@@ -128,7 +128,7 @@ struct FileSystemImpl final : public FileSystem
 	{
 		if (!file.isValid()) return AsyncHandle::invalid();
 
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		AsyncItem& item = m_queue.emplace(m_allocator);
 		++m_last_id;
 		if (m_last_id == 0) ++m_last_id;
@@ -142,7 +142,7 @@ struct FileSystemImpl final : public FileSystem
 
 	void cancel(AsyncHandle async) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		for (AsyncItem& item : m_queue) {
 			if (item.id == async.value) {
 				item.flags.set(AsyncItem::Flags::CANCELED);
@@ -269,7 +269,7 @@ struct FileSystemImpl final : public FileSystem
 	Array<AsyncItem> m_queue;
 	Array<AsyncItem> m_finished;
 	Array<u8> m_bundled;
-	MT::CriticalSection m_mutex;
+	MT::Mutex m_mutex;
 	MT::Semaphore m_semaphore;
 
 	u32 m_last_id;
@@ -284,7 +284,7 @@ int FSTask::task()
 
 		StaticString<MAX_PATH_LENGTH> path;
 		{
-			MT::CriticalSectionLock lock(m_fs.m_mutex);
+			MT::MutexGuard lock(m_fs.m_mutex);
 			ASSERT(!m_fs.m_queue.empty());
 			path = m_fs.m_queue[0].path;
 			if (m_fs.m_queue[0].isCanceled()) {
@@ -312,7 +312,7 @@ int FSTask::task()
 		}
 
 		{
-			MT::CriticalSectionLock lock(m_fs.m_mutex);
+			MT::MutexGuard lock(m_fs.m_mutex);
 			if (!m_fs.m_queue[0].isCanceled()) {
 				m_fs.m_finished.emplace(static_cast<AsyncItem&&>(m_fs.m_queue[0]));
 				m_fs.m_finished.back().data = static_cast<OutputMemoryStream&&>(data);
