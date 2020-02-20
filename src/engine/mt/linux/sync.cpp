@@ -24,7 +24,7 @@ ConditionVariable::~ConditionVariable() {
 	ASSERT(res == 0);
 }
 
-void ConditionVariable::sleep(CriticalSection& cs) {
+void ConditionVariable::sleep(Mutex& cs) {
 	const int res = pthread_cond_wait(&cv, &cs.mutex);
 	ASSERT(res == 0);
 }
@@ -80,26 +80,26 @@ void Semaphore::wait()
 }
 
 
-CriticalSection::CriticalSection()
+Mutex::Mutex()
 {
 	const int res = pthread_mutex_init(&mutex, nullptr);
 	ASSERT(res == 0);
 }
 
 
-CriticalSection::~CriticalSection()
+Mutex::~Mutex()
 {
 	const int res = pthread_mutex_destroy(&mutex);
 	ASSERT(res == 0);
 }
 
-void CriticalSection::enter()
+void Mutex::enter()
 {
 	const int res = pthread_mutex_lock(&mutex);
 	ASSERT(res == 0);
 }
 
-void CriticalSection::exit()
+void Mutex::exit()
 {
 	const int res = pthread_mutex_unlock(&mutex);
 	ASSERT(res == 0);

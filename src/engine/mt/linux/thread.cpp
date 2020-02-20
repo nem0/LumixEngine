@@ -55,9 +55,9 @@ Thread::~Thread()
 	LUMIX_DELETE(m_implementation->allocator, m_implementation);
 }
 
-void Thread::sleep(CriticalSection& cs) {
+void Thread::sleep(Mutex& mutex) {
 	ASSERT(pthread_self() == m_implementation->handle);
-	m_implementation->cv.sleep(cs);
+	m_implementation->cv.sleep(mutex);
 }
 
 void Thread::wakeup() { m_implementation->cv.wakeup(); }

@@ -59,7 +59,7 @@ public:
 		int sample_rate,
 		int flags) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(flags == 0); // nothing else supported yet
 		for(int i = 0, c = m_buffers.size(); i < c; ++i)
 		{
@@ -86,7 +86,7 @@ public:
 		float left_delay,
 		float right_delay) override 
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -99,7 +99,7 @@ public:
 		float delay,
 		i32 phase) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -108,7 +108,7 @@ public:
 	{
 		memset(output, 0, size_bytes);
 
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		for (Buffer& buffer : m_buffers)
 		{
 			if((buffer.runtime_flags & (u8)Buffer::RuntimeFlags::PLAYING) == 0) continue;
@@ -137,7 +137,7 @@ public:
 
 	void play(BufferHandle buffer, bool looped) override 
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags |= (u8)Buffer::RuntimeFlags::PLAYING;
 		if(looped)
@@ -153,7 +153,7 @@ public:
 
 	bool isPlaying(BufferHandle buffer) override 
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		return m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::PLAYING;
 	}
@@ -161,7 +161,7 @@ public:
 
 	void stop(BufferHandle buffer) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags &= ~(u8)Buffer::RuntimeFlags::PLAYING;
 		m_buffers[buffer].cursor = 0;
@@ -170,7 +170,7 @@ public:
 
 	bool isEnd(BufferHandle buffer) override
 	{ 
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		return m_buffers[buffer].cursor >= m_buffers[buffer].data.size();
 	}
@@ -178,7 +178,7 @@ public:
 
 	void pause(BufferHandle buffer) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags &= ~(u8)Buffer::RuntimeFlags::PLAYING;
 	}
@@ -186,14 +186,14 @@ public:
 
 	void setMasterVolume(float volume) override 
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
 
 	void setVolume(BufferHandle buffer, float volume) override 
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -201,7 +201,7 @@ public:
 
 	void setFrequency(BufferHandle buffer, float frequency) override 
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -209,7 +209,7 @@ public:
 
 	void setCurrentTime(BufferHandle handle, float time_seconds) override 
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[handle].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		
 		Buffer& buffer = m_buffers[handle];
@@ -222,7 +222,7 @@ public:
 
 	float getCurrentTime(BufferHandle handle) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[handle].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		
 		Buffer& buffer = m_buffers[handle];
@@ -233,7 +233,7 @@ public:
 
 	void setListenerPosition(const DVec3& pos) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -245,14 +245,14 @@ public:
 		float up_y,
 		float up_z) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 	
 
 	void setSourcePosition(BufferHandle buffer, const DVec3& pos) override
 	{
-		MT::CriticalSectionLock lock(m_mutex);
+		MT::MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -407,7 +407,7 @@ public:
 	Array<Buffer> m_buffers;
 	AudioTask* m_task = nullptr;
 	Engine& m_engine;
-	MT::CriticalSection m_mutex;
+	MT::Mutex m_mutex;
 	void* m_alsa_lib = nullptr;
 	snd_pcm_t* m_device = nullptr;
 	API m_api;
