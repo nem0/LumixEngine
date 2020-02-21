@@ -738,9 +738,9 @@ struct PipelineImpl final : Pipeline
 			void execute() override {
 				PROFILE_FUNCTION();
 				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
-				gpu::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
-				gpu::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
-				gpu::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, 32 * 1024);
+				gpu::bindUniformBuffer(0, global_state_buffer, sizeof(GlobalState));
+				gpu::bindUniformBuffer(1, pass_state_buffer, sizeof(PassState));
+				gpu::bindUniformBuffer(4, pipeline->m_drawcall_ub, 32 * 1024);
 				pipeline->m_stats = {};
 			}
 			void setup() override {}
@@ -1567,7 +1567,7 @@ struct PipelineImpl final : Pipeline
 			void execute() override {
 				PROFILE_FUNCTION();
 				gpu::update(pass_state_buffer, &pass_state, sizeof(pass_state));
-				gpu::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
+				gpu::bindUniformBuffer(1, pass_state_buffer, sizeof(PassState));
 			}
 			void setup() override {}
 

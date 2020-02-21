@@ -1096,14 +1096,14 @@ void bindUniformBuffer(u32 index, BufferGroupHandle buffer, size_t element_index
 	CHECK_GL(glBindBufferBase(GL_UNIFORM_BUFFER, index, 0));
 }
 
-void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {
+void bindUniformBuffer(u32 index, BufferHandle buffer, size_t size) {
 	checkThread();
 	if (buffer.isValid()) {
 		const GLuint buf = g_gpu.buffers[buffer.value].handle;
-		CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size));
+		CHECK_GL(glBindBufferBase(GL_UNIFORM_BUFFER, index, buf));
 		return;
 	}
-	CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, 0, offset, size));
+	CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, 0, 0, size));
 }
 
 

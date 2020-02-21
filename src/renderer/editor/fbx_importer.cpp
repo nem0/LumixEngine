@@ -768,8 +768,8 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::createBuffer(ub, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
 		const u32 pass_buf_size = (sizeof(PassState) + 255) & ~255;
 		gpu::createBuffer(pass_buf, (u32)gpu::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
-		gpu::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
-		gpu::bindUniformBuffer(4, ub, 0, 256);
+		gpu::bindUniformBuffer(1, pass_buf, pass_buf_size);
+		gpu::bindUniformBuffer(4, ub, 256);
 
 		const Vec3 center = (m_aabb.min + m_aabb.max) * 0.5f;
 		Vec2 min, max;

@@ -240,7 +240,7 @@ void update(BufferHandle buffer, const void* data, size_t size);
 void update(BufferGroupHandle group, const void* data, size_t element_index);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
-void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
+void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t size);
 void bindUniformBuffer(u32 ub_index, BufferGroupHandle group, size_t element_index);
 void copy(TextureHandle dst, TextureHandle src);
 void readTexture(TextureHandle texture, Span<u8> buf);
