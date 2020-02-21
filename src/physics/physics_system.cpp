@@ -7,7 +7,7 @@
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "physics/physics_geometry.h"
 #include "physics/physics_scene.h"
 #include "renderer/texture.h"
@@ -149,7 +149,7 @@ namespace Lumix
 	}
 
 
-	struct CustomErrorCallback : public physx::PxErrorCallback
+	struct CustomErrorCallback : physx::PxErrorCallback
 	{
 		void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line) override
 		{
@@ -158,9 +158,8 @@ namespace Lumix
 	};
 
 
-	class AssertNullAllocator : public physx::PxAllocatorCallback
+	struct AssertNullAllocator : physx::PxAllocatorCallback
 	{
-	public:
 		AssertNullAllocator(IAllocator& source)
 			: source(source)
 		{}
@@ -180,7 +179,7 @@ namespace Lumix
 	};
 
 
-	struct PhysicsGeometryManager final : public ResourceManager
+	struct PhysicsGeometryManager final : ResourceManager
 	{
 		PhysicsGeometryManager(PhysicsSystem& system, IAllocator& allocator)
 			: ResourceManager(allocator)
@@ -201,7 +200,7 @@ namespace Lumix
 	};
 
 
-	struct PhysicsSystemImpl final : public PhysicsSystem
+	struct PhysicsSystemImpl final : PhysicsSystem
 	{
 		explicit PhysicsSystemImpl(Engine& engine)
 			: m_allocator(engine.getAllocator())

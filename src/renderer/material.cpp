@@ -3,7 +3,7 @@
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
@@ -614,7 +614,7 @@ int texture(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	char material_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(Span(material_dir), material->getPath().c_str());
+	Path::getDir(Span(material_dir), material->getPath().c_str());
 
 	if (lua_istable(L, 1)) {
 		lua_getfield(L, 1, "source");

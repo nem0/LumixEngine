@@ -150,7 +150,7 @@ template <int SIZE> struct StaticString
 };
 
 
-class LUMIX_ENGINE_API String
+struct LUMIX_ENGINE_API String
 {
 public:
 	explicit String(IAllocator& allocator);
@@ -183,7 +183,7 @@ public:
 	void insert(int position, const char* value);
 	void eraseAt(int position);
 
-	template <class V> String& cat(V value)
+	template <typename V> String& cat(V value)
 	{
 		char tmp[30];
 		toCString(value, Span<char>(tmp, 30));

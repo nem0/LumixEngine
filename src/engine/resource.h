@@ -10,10 +10,6 @@ namespace Lumix
 {
 
 
-class ResourceManagerHub;
-class ResourceManager;
-
-
 struct LUMIX_ENGINE_API ResourceType
 {
 	ResourceType() : type(0) {}
@@ -27,11 +23,11 @@ inline bool isValid(ResourceType type) { return type.type != 0; }
 const ResourceType INVALID_RESOURCE_TYPE("");
 
 
-class LUMIX_ENGINE_API Resource
+struct LUMIX_ENGINE_API Resource
 {
 public:
-	friend class ResourceManager;
-	friend class ResourceManagerHub;
+	friend struct ResourceManager;
+	friend struct ResourceManagerHub;
 
 	enum class State : u32
 	{
@@ -40,7 +36,7 @@ public:
 		FAILURE,
 	};
 
-	typedef DelegateList<void(State, State, Resource&)> ObserverCallback;
+	using ObserverCallback = DelegateList<void(State, State, Resource&)>;
 
 public:
 	virtual ~Resource();
@@ -54,7 +50,7 @@ public:
 	ObserverCallback& getObserverCb() { return m_cb; }
 	size_t size() const { return m_size; }
 	const Path& getPath() const { return m_path; }
-	ResourceManager& getResourceManager() { return m_resource_manager; }
+	struct ResourceManager& getResourceManager() { return m_resource_manager; }
 
 	template <auto Function, typename C> void onLoaded(C* instance)
 	{
@@ -105,7 +101,7 @@ private:
 	u16 m_failed_dep_count;
 	State m_current_state;
 	FileSystem::AsyncHandle m_async_op;
-}; // class Resource
+}; // struct Resource
 
 
 } // namespace Lumix

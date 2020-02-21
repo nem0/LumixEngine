@@ -28,7 +28,7 @@ struct KeyboardDevice : InputSystem::Device
 };
 
 
-struct InputSystemImpl final : public InputSystem
+struct InputSystemImpl final : InputSystem
 {
 	explicit InputSystemImpl(Engine& engine)
 		: m_engine(engine)
@@ -107,9 +107,9 @@ struct InputSystemImpl final : public InputSystem
 			case OS::Event::Type::MOUSE_BUTTON: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::BUTTON;
-				input_event.device = getMouseDevice();
+				input_event.device = m_mouse_device;
 				input_event.data.button.key_id = (int)event.mouse_button.button;
-				input_event.data.button.state = event.mouse_button.down ? InputSystem::ButtonEvent::DOWN : InputSystem::ButtonEvent::UP;
+				input_event.data.button.down = event.mouse_button.down;
 				const OS::Point cp = OS::getMousePos(event.window);
 				input_event.data.button.x_abs = (float)cp.x;
 				input_event.data.button.y_abs = (float)cp.y;
@@ -119,7 +119,7 @@ struct InputSystemImpl final : public InputSystem
 			case OS::Event::Type::MOUSE_MOVE: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::AXIS;
-				input_event.device = getMouseDevice();
+				input_event.device = m_mouse_device;
 				const OS::Point cp = OS::getMousePos(event.window);
 				input_event.data.axis.x_abs = (float)cp.x;
 				input_event.data.axis.y_abs = (float)cp.y;
@@ -131,8 +131,8 @@ struct InputSystemImpl final : public InputSystem
 			case OS::Event::Type::KEY: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::BUTTON;
-				input_event.device = getKeyboardDevice();
-				input_event.data.button.state = event.key.down ? InputSystem::ButtonEvent::DOWN : InputSystem::ButtonEvent::UP;
+				input_event.device = m_keyboard_device;
+				input_event.data.button.down = event.key.down;
 				input_event.data.button.key_id = (int)event.key.keycode;
 				injectEvent(input_event);
 				break;
@@ -140,7 +140,7 @@ struct InputSystemImpl final : public InputSystem
 			case OS::Event::Type::CHAR: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::TEXT_INPUT;
-				input_event.device = getKeyboardDevice();
+				input_event.device = m_keyboard_device;
 				input_event.data.text.utf8 = event.text_input.utf8;
 				injectEvent(input_event);
 				break;
@@ -161,8 +161,6 @@ struct InputSystemImpl final : public InputSystem
 
 	int getDevicesCount() const override { return m_devices.size(); }
 	Device* getDevice(int index) override { return m_devices[index]; }
-	Device* getMouseDevice() override { return m_mouse_device; }
-	Device* getKeyboardDevice() override { return m_keyboard_device; }
 	void registerLuaAPI();
 
 

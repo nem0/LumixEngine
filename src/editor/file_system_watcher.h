@@ -6,16 +6,13 @@
 namespace Lumix
 {
 
-struct IAllocator;
-
-class LUMIX_EDITOR_API FileSystemWatcher
+struct LUMIX_EDITOR_API FileSystemWatcher
 {
-	public:
-		virtual ~FileSystemWatcher() {}
+	virtual ~FileSystemWatcher() {}
 
-		static FileSystemWatcher* create(const char* path, IAllocator& allocator);
-		static void destroy(FileSystemWatcher* watcher); 
-		virtual Delegate<void (const char*)>& getCallback() = 0;
+	static FileSystemWatcher* create(const char* path, struct IAllocator& allocator);
+	static void destroy(FileSystemWatcher* watcher); 
+	virtual Delegate<void (const char*)>& getCallback() = 0;
 };
 
 

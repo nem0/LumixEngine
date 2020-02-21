@@ -8,137 +8,79 @@ namespace Lumix
 {
 
 struct DVec3;
-class InputMemoryStream;
-class OutputMemoryStream;
+struct InputMemoryStream;
+struct OutputMemoryStream;
 struct LocalRigidTransform;
 struct Quat;
 struct RigidTransform;
-class String;
+struct String;
 struct Transform;
 struct IVec3;
 struct Vec3;
 struct Vec4;
 
-
-struct LUMIX_ENGINE_API ISerializer
-{
-	virtual ~ISerializer() {}
-
-	virtual void write(const char* label, EntityPtr entity) = 0;
-	virtual void write(const char* label, EntityRef entity) = 0;
-	virtual void write(const char* label, const Transform& value) = 0;
-	virtual void write(const char* label, const RigidTransform& value) = 0;
-	virtual void write(const char* label, const LocalRigidTransform& value) = 0;
-	virtual void write(const char* label, const Vec4& value) = 0;
-	virtual void write(const char* label, const DVec3& value) = 0;
-	virtual void write(const char* label, const Vec3& value) = 0;
-	virtual void write(const char* label, const IVec3& value) = 0;
-	virtual void write(const char* label, const Quat& value) = 0;
-	virtual void write(const char* label, float value) = 0;
-	virtual void write(const char* label, double value) = 0;
-	virtual void write(const char* label, bool value) = 0;
-	virtual void write(const char* label, i64 value) = 0;
-	virtual void write(const char* label, u64 value) = 0;
-	virtual void write(const char* label, i32 value) = 0;
-	virtual void write(const char* label, u32 value) = 0;
-	virtual void write(const char* label, u16 value) = 0;
-	virtual void write(const char* label, i8 value) = 0;
-	virtual void write(const char* label, u8 value) = 0;
-	virtual void write(const char* label, const char* value) = 0;
-};
-
-
-struct LUMIX_ENGINE_API IDeserializer
-{
-	virtual ~IDeserializer() {}
-
-	virtual void read(Ref<EntityPtr> entity) = 0;
-	virtual void read(Ref<EntityRef> entity) = 0;
-	virtual void read(Ref<Transform> value) = 0;
-	virtual void read(Ref<RigidTransform> value) = 0;
-	virtual void read(Ref<LocalRigidTransform> value) = 0;
-	virtual void read(Ref<Vec4> value) = 0;
-	virtual void read(Ref<DVec3> value) = 0;
-	virtual void read(Ref<Vec3> value) = 0;
-	virtual void read(Ref<IVec3> value) = 0;
-	virtual void read(Ref<Quat> value) = 0;
-	virtual void read(Ref<float> value) = 0;
-	virtual void read(Ref<double> value) = 0;
-	virtual void read(Ref<bool> value) = 0;
-	virtual void read(Ref<u64> value) = 0;
-	virtual void read(Ref<i64> value) = 0;
-	virtual void read(Ref<u32> value) = 0;
-	virtual void read(Ref<i32> value) = 0;
-	virtual void read(Ref<u16> value) = 0;
-	virtual void read(Ref<u8> value) = 0;
-	virtual void read(Ref<i8> value) = 0;
-	virtual void read(Span<char> value) = 0;
-	virtual void read(Ref<String> value) = 0;
-};
-
-
-struct LUMIX_ENGINE_API TextSerializer final : public ISerializer
+struct LUMIX_ENGINE_API TextSerializer
 {
 	TextSerializer(OutputMemoryStream& _blob)
 		: blob(_blob)
 	{
 	}
 
-	void write(const char* label, EntityPtr entity)  override;
-	void write(const char* label, EntityRef entity)  override;
-	void write(const char* label, const RigidTransform& value)  override;
-	void write(const char* label, const LocalRigidTransform& value)  override;
-	void write(const char* label, const Transform& value)  override;
-	void write(const char* label, const Vec4& value)  override;
-	void write(const char* label, const DVec3& value)  override;
-	void write(const char* label, const Vec3& value)  override;
-	void write(const char* label, const IVec3& value)  override;
-	void write(const char* label, const Quat& value)  override;
-	void write(const char* label, float value)  override;
-	void write(const char* label, double value)  override;
-	void write(const char* label, bool value)  override;
-	void write(const char* label, i64 value)  override;
-	void write(const char* label, u64 value)  override;
-	void write(const char* label, i32 value)  override;
-	void write(const char* label, u32 value)  override;
-	void write(const char* label, u16 value)  override;
-	void write(const char* label, i8 value)  override;
-	void write(const char* label, u8 value)  override;
-	void write(const char* label, const char* value)  override;
+	void write(const char* label, EntityPtr entity);
+	void write(const char* label, EntityRef entity);
+	void write(const char* label, const RigidTransform& value);
+	void write(const char* label, const LocalRigidTransform& value);
+	void write(const char* label, const Transform& value);
+	void write(const char* label, const Vec4& value);
+	void write(const char* label, const DVec3& value);
+	void write(const char* label, const Vec3& value);
+	void write(const char* label, const IVec3& value);
+	void write(const char* label, const Quat& value);
+	void write(const char* label, float value);
+	void write(const char* label, double value);
+	void write(const char* label, bool value);
+	void write(const char* label, i64 value);
+	void write(const char* label, u64 value);
+	void write(const char* label, i32 value);
+	void write(const char* label, u32 value);
+	void write(const char* label, u16 value);
+	void write(const char* label, i8 value);
+	void write(const char* label, u8 value);
+	void write(const char* label, const char* value);
 
 	OutputMemoryStream& blob;
 };
 
 
-struct LUMIX_ENGINE_API TextDeserializer final : public IDeserializer
+struct LUMIX_ENGINE_API TextDeserializer
 {
 	TextDeserializer(InputMemoryStream& _blob)
 		: blob(_blob)
 	{
 	}
 
-	void read(Ref<EntityPtr> entity)  override;
-	void read(Ref<EntityRef> entity)  override;
-	void read(Ref<RigidTransform> value)  override;
-	void read(Ref<LocalRigidTransform> value)  override;
-	void read(Ref<Transform> value)  override;
-	void read(Ref<Vec4> value)  override;
-	void read(Ref<DVec3> value)  override;
-	void read(Ref<Vec3> value)  override;
-	void read(Ref<IVec3> value)  override;
-	void read(Ref<Quat> value)  override;
-	void read(Ref<float> value)  override;
-	void read(Ref<double> value)  override;
-	void read(Ref<bool> value)  override;
-	void read(Ref<u64> value)  override;
-	void read(Ref<i64> value)  override;
-	void read(Ref<u32> value)  override;
-	void read(Ref<i32> value)  override;
-	void read(Ref<u16> value)  override;
-	void read(Ref<u8> value)  override;
-	void read(Ref<i8> value)  override;
-	void read(Span<char> value)  override;
-	void read(Ref<String> value)  override;
+	void read(Ref<EntityPtr> entity);
+	void read(Ref<EntityRef> entity);
+	void read(Ref<RigidTransform> value);
+	void read(Ref<LocalRigidTransform> value);
+	void read(Ref<Transform> value);
+	void read(Ref<Vec4> value);
+	void read(Ref<DVec3> value);
+	void read(Ref<Vec3> value);
+	void read(Ref<IVec3> value);
+	void read(Ref<Quat> value);
+	void read(Ref<float> value);
+	void read(Ref<double> value);
+	void read(Ref<bool> value);
+	void read(Ref<u64> value);
+	void read(Ref<i64> value);
+	void read(Ref<u32> value);
+	void read(Ref<i32> value);
+	void read(Ref<u16> value);
+	void read(Ref<u8> value);
+	void read(Ref<i8> value);
+	void read(Span<char> value);
+	void read(Ref<String> value);
 
 	void skip();
 	u32 readU32();

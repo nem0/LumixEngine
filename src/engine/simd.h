@@ -15,7 +15,7 @@ namespace Lumix
 
 
 #ifdef _WIN32
-	typedef __m128 float4;
+	using float4 = __m128;
 
 
 	LUMIX_FORCE_INLINE float4 f4LoadUnaligned(const void* src)

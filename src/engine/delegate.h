@@ -8,14 +8,14 @@
 namespace Lumix
 {
 
-template <typename T> class Delegate;
+template <typename T> struct Delegate;
 
 
-template <typename R, typename... Args> class Delegate<R(Args...)>
+template <typename R, typename... Args> struct Delegate<R(Args...)>
 {
 private:
-	typedef void* InstancePtr;
-	typedef R (*InternalFunction)(InstancePtr, Args...);
+	using InstancePtr = void*;
+	using InternalFunction = R (*)(InstancePtr, Args...);
 	struct Stub
 	{
 		InstancePtr first;
@@ -27,13 +27,13 @@ private:
 		return (Function)(args...);
 	}
 
-	template <class C, R(C::*Function)(Args...)>
+	template <typename C, R(C::*Function)(Args...)>
 	static R ClassMethodStub(InstancePtr instance, Args... args)
 	{
 		return (static_cast<C*>(instance)->*Function)(args...);
 	}
 
-	template <class C, R(C::*Function)(Args...) const>
+	template <typename C, R(C::*Function)(Args...) const>
 	static R ClassMethodStub(InstancePtr instance, Args... args)
 	{
 		return (static_cast<C*>(instance)->*Function)(args...);
@@ -54,7 +54,7 @@ public:
 		m_stub.second = &FunctionStub<Function>;
 	}
 
-	template <auto F, class C> void bind(C* instance)
+	template <auto F, typename C> void bind(C* instance)
 	{
 		m_stub.first = instance;
 		m_stub.second = &ClassMethodStub<C, F>;

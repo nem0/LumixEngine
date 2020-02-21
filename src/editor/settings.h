@@ -12,8 +12,8 @@ namespace Lumix
 {
 
 
-class WorldEditor;
-class StudioApp;
+struct WorldEditor;
+struct StudioApp;
 
 
 struct LUMIX_EDITOR_API Settings

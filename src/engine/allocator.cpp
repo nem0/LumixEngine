@@ -1,6 +1,6 @@
 #include "engine/allocator.h"
 #include "engine/crt.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #ifndef _WIN32
 	#include <string.h>
 	#include <malloc.h>
@@ -87,7 +87,7 @@ BaseProxyAllocator::~BaseProxyAllocator() { ASSERT(m_allocation_count == 0); }
 
 void* BaseProxyAllocator::allocate_aligned(size_t size, size_t align)
 {
-	MT::atomicIncrement(&m_allocation_count);
+	atomicIncrement(&m_allocation_count);
 	return m_source.allocate_aligned(size, align);
 }
 
@@ -96,7 +96,7 @@ void BaseProxyAllocator::deallocate_aligned(void* ptr)
 {
 	if(ptr)
 	{
-		MT::atomicDecrement(&m_allocation_count);
+		atomicDecrement(&m_allocation_count);
 		m_source.deallocate_aligned(ptr);
 	}
 }
@@ -104,15 +104,15 @@ void BaseProxyAllocator::deallocate_aligned(void* ptr)
 
 void* BaseProxyAllocator::reallocate_aligned(void* ptr, size_t size, size_t align)
 {
-	if (!ptr) MT::atomicIncrement(&m_allocation_count);
-	if (size == 0) MT::atomicDecrement(&m_allocation_count);
+	if (!ptr) atomicIncrement(&m_allocation_count);
+	if (size == 0) atomicDecrement(&m_allocation_count);
 	return m_source.reallocate_aligned(ptr, size, align);
 }
 
 
 void* BaseProxyAllocator::allocate(size_t size)
 {
-	MT::atomicIncrement(&m_allocation_count);
+	atomicIncrement(&m_allocation_count);
 	return m_source.allocate(size);
 }
 
@@ -120,15 +120,15 @@ void BaseProxyAllocator::deallocate(void* ptr)
 {
 	if (ptr)
 	{
-		MT::atomicDecrement(&m_allocation_count);
+		atomicDecrement(&m_allocation_count);
 		m_source.deallocate(ptr);
 	}
 }
 
 void* BaseProxyAllocator::reallocate(void* ptr, size_t size)
 {
-	if (!ptr) MT::atomicIncrement(&m_allocation_count);
-	if (size == 0) MT::atomicDecrement(&m_allocation_count);
+	if (!ptr) atomicIncrement(&m_allocation_count);
+	if (size == 0) atomicDecrement(&m_allocation_count);
 	return m_source.reallocate(ptr, size);
 }
 

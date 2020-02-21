@@ -1,25 +1,24 @@
 #include <imgui/imgui.h>
 
-#include "engine/engine.h"
+#include "engine/atomic.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
+#include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/input_system.h"
-#include "engine/iplugin.h"
-#include "engine/mt/atomic.h"
+#include "engine/plugin.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
-#include "engine/plugin_manager.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 
 namespace Lumix
@@ -31,16 +30,15 @@ static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
 
 
 #pragma pack(1)
-class SerializedEngineHeader
+struct SerializedEngineHeader
 {
-public:
 	u32 m_magic;
 	u32 m_reserved; // for crc
 };
 #pragma pack()
 
 
-struct PrefabResourceManager final : public ResourceManager
+struct PrefabResourceManager final : ResourceManager
 {
 	explicit PrefabResourceManager(IAllocator& allocator)
 		: m_allocator(allocator)
@@ -61,7 +59,7 @@ struct PrefabResourceManager final : public ResourceManager
 };
 
 
-class EngineImpl final : public Engine
+struct EngineImpl final : Engine
 {
 public:
 	void operator=(const EngineImpl&) = delete;

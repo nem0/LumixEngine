@@ -9,39 +9,36 @@ namespace Lumix
 {
 
 
-class Engine;
-class Model;
-class Pipeline;
-class RenderScene;
-class WorldEditor;
+struct Engine;
+struct Model;
+struct Pipeline;
+struct RenderScene;
+struct WorldEditor;
 
 
-class EditorIcons
+struct EditorIcons
 {
-	public:
-		struct Hit
-		{
-			EntityPtr entity;
-			float t;
-		};
+	struct Hit
+	{
+		EntityPtr entity;
+		float t;
+	};
 
-		struct RenderData
-		{
-			Matrix mtx;
-			RenderInterface::ModelHandle model;
-		};
+	struct RenderData {
+		Matrix mtx;
+		RenderInterface::ModelHandle model;
+	};
 
-	public:
-		static EditorIcons* create(WorldEditor& editor);
-		static void destroy(EditorIcons& icons);
+	static EditorIcons* create(WorldEditor& editor);
+	static void destroy(EditorIcons& icons);
 
-		virtual ~EditorIcons() {}
+	virtual ~EditorIcons() {}
 
-		virtual void setRenderInterface(class RenderInterface* render_interface) = 0;
-		virtual void clear() = 0;
-		virtual void getRenderData(Array<RenderData>* data) = 0;
-		virtual void refresh() = 0;
-		virtual Hit raycast(const DVec3& origin, const Vec3& dir) = 0;
+	virtual void setRenderInterface(struct RenderInterface* render_interface) = 0;
+	virtual void clear() = 0;
+	virtual void getRenderData(Array<RenderData>* data) = 0;
+	virtual void refresh() = 0;
+	virtual Hit raycast(const DVec3& origin, const Vec3& dir) = 0;
 };
 
 

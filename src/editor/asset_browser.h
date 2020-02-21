@@ -7,20 +7,20 @@
 #include "engine/delegate_list.h"
 #include "engine/path.h"
 #include "engine/resource.h"
-#include "engine/mt/sync.h"
+#include "engine/sync.h"
 
 
 namespace Lumix
 {
 
 struct Action;
-class Material;
-class OutputMemoryStream;
-class StudioApp;
-class WorldEditor;
+struct Material;
+struct OutputMemoryStream;
+struct StudioApp;
+struct WorldEditor;
 
 
-class LUMIX_EDITOR_API AssetBrowser
+struct LUMIX_EDITOR_API AssetBrowser
 {
 public:
 	struct LUMIX_EDITOR_API IPlugin
@@ -42,7 +42,7 @@ public:
 		virtual void update() {}
 	};
 
-	typedef DelegateList<void(const Path&, const char*)> OnResourceChanged;
+	using OnResourceChanged = DelegateList<void(const Path&, const char*)>;
 
 public:
 	explicit AssetBrowser(StudioApp& app);

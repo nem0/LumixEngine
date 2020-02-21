@@ -4,7 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/flag_set.h"
 #include "engine/math.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "gpu/gpu.h"
 
 
@@ -17,23 +17,23 @@ namespace Lumix
 
 struct AABB;
 struct CullResult;
-class Engine;
+struct Engine;
 struct Frustum;
 struct IAllocator;
-class Material;
+struct Material;
 struct Mesh;
-class Model;
-class Path;
+struct Model;
+struct Path;
 struct Pose;
 struct RayCastModelHit;
-class Renderer;
-class Shader;
+struct Renderer;
+struct Shader;
 struct ShiftedFrustum;
-class Terrain;
-class Texture;
-class Universe;
-template <typename T> class Array;
-template <typename T, typename T2> class AssociativeArray;
+struct Terrain;
+struct Texture;
+struct Universe;
+template <typename T> struct Array;
+template <typename T, typename T2> struct AssociativeArray;
 
 
 struct Camera
@@ -202,9 +202,8 @@ struct TextMeshVertex
 };
 
 
-class LUMIX_RENDERER_API RenderScene : public IScene
+struct LUMIX_RENDERER_API RenderScene : IScene
 {
-public:
 	static RenderScene* createInstance(Renderer& renderer,
 		Engine& engine,
 		Universe& universe,
@@ -276,7 +275,7 @@ public:
 
 	virtual void setParticleEmitterPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getParticleEmitterPath(EntityRef entity) = 0;
-	virtual const AssociativeArray<EntityRef, class ParticleEmitter*>& getParticleEmitters() const = 0;
+	virtual const AssociativeArray<EntityRef, struct ParticleEmitter*>& getParticleEmitters() const = 0;
 
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;
@@ -362,8 +361,6 @@ public:
 	virtual void setTextMeshCameraOriented(EntityRef entity, bool is_oriented) = 0;
 	virtual void getTextMeshesVertices(TextMeshVertex* vertices, const DVec3& cam_pos, const Quat& rot) = 0;
 	virtual u32 getTextMeshesVerticesCount() const = 0;
-
-protected:
-	virtual ~RenderScene() {}
 };
+
 }

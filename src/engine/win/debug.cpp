@@ -10,9 +10,9 @@
 #include "engine/crt.h"
 #include "engine/debug.h"
 #include "engine/log.h"
-#include "engine/mt/atomic.h"
-#include "engine/path_utils.h"
+#include "engine/atomic.h"
 #include "engine/os.h"
+#include "engine/path.h"
 #include "engine/string.h"
 
 
@@ -61,9 +61,8 @@ void debugBreak()
 int StackTree::s_instances = 0;
 
 
-class StackNode
+struct StackNode
 {
-public:
 	~StackNode()
 	{
 		LUMIX_DELETE(xxallocator, m_next);
@@ -80,7 +79,7 @@ public:
 StackTree::StackTree()
 {
 	m_root = nullptr;
-	if (MT::atomicIncrement(&s_instances) == 1)
+	if (atomicIncrement(&s_instances) == 1)
 	{
 		HANDLE process = GetCurrentProcess();
 		SymInitialize(process, nullptr, TRUE);
@@ -91,7 +90,7 @@ StackTree::StackTree()
 StackTree::~StackTree()
 {
 	LUMIX_DELETE(xxallocator, m_root);
-	if (MT::atomicDecrement(&s_instances) == 0)
+	if (atomicDecrement(&s_instances) == 0)
 	{
 		HANDLE process = GetCurrentProcess();
 		SymCleanup(process);
@@ -488,7 +487,7 @@ void Allocator::deallocate_aligned(void* user_ptr)
 		}
 
 		{
-			MT::MutexGuard lock(m_mutex);
+			MutexGuard lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;
@@ -537,7 +536,7 @@ void* Allocator::allocate(size_t size)
 	AllocationInfo* info;
 	size_t system_size = getNeededMemory(size);
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		system_ptr = m_source.allocate(system_size);
 		info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
 
@@ -593,7 +592,7 @@ void Allocator::deallocate(void* user_ptr)
 		}
 
 		{
-			MT::MutexGuard lock(m_mutex);
+			MutexGuard lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;
@@ -625,7 +624,7 @@ BOOL SendFile(LPCSTR lpszSubject,
 	if (!hMAPI) return FALSE;
 	LPMAPISENDMAIL lpfnMAPISendMail = (LPMAPISENDMAIL)::GetProcAddress(hMAPI, "MAPISendMail");
 
-	PathUtils::FileInfo fi(lpszFullFileName);
+	PathInfo fi(lpszFullFileName);
 
 	char szFileName[MAX_PATH] = {0};
 	strcat_s(szFileName, fi.m_basename);

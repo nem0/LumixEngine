@@ -4,7 +4,7 @@
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/allocator.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
@@ -37,7 +37,6 @@ struct CellIndices
 struct CellIndicesHasher
 {
 	// http://www.beosil.com/download/CollisionDetectionHashing_VMV03.pdf
-	// TODO check collisions
 	static u32 get(const CellIndices& indices) {
 		// TODO indices.is_big, indices.type
 		return (u32)indices.pos.x * 73856093 + (u32)indices.pos.y * 19349663 + (u32)indices.pos.z * 83492791; 
@@ -63,7 +62,7 @@ struct alignas(4096) CellPage {
 static_assert(sizeof(CellPage) == PageAllocator::PAGE_SIZE);
 
 
-struct CullingSystemImpl final : public CullingSystem
+struct CullingSystemImpl final : CullingSystem
 {
 	CullingSystemImpl(IAllocator& allocator, PageAllocator& page_allocator) 
 		: m_allocator(allocator)
@@ -314,7 +313,7 @@ struct CullingSystemImpl final : public CullingSystem
 			const Vec3 v3_2_cell_size(2 * m_cell_size);
 			CullResult* result = nullptr;
 			for(;;) {
-				const i32 idx = MT::atomicIncrement(&cell_idx) - 1;
+				const i32 idx = atomicIncrement(&cell_idx) - 1;
 				if (idx >= m_cells.size()) return;
 
 				CellPage& cell = *m_cells[idx];

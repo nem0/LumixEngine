@@ -10,11 +10,13 @@ struct IAllocator;
 namespace gpu {
 
 
+struct BufferGroupHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct BufferHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct ProgramHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct TextureHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 struct QueryHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 
+const BufferGroupHandle INVALID_BUFFER_GROUP = { 0xffFFffFF };
 const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
 const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
 const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
@@ -23,11 +25,6 @@ const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 enum class InitFlags : u32 {
 	DEBUG_OUTPUT,
 	VSYNC
-};
-
-enum class Backend {
-	OPENGL,
-	DX11
 };
 
 enum class FramebufferFlags : u32 {
@@ -194,7 +191,6 @@ struct MemoryStats {
 void preinit(IAllocator& allocator);
 bool init(void* window_handle, u32 flags);
 void setCurrentWindow(void* window_handle);
-Backend getBackend();
 bool getMemoryStats(Ref<MemoryStats> stats);
 void swapBuffers();
 bool isHomogenousDepth();
@@ -223,12 +219,14 @@ inline u64 getStencilStateBits(u8 write_mask, StencilFuncs func, u8 ref, u8 mask
 
 TextureHandle allocTextureHandle();
 BufferHandle allocBufferHandle();
+BufferGroupHandle allocBufferGroupHandle();
 ProgramHandle allocProgramHandle();
 
 void setState(u64 state);
 bool createProgram(ProgramHandle program, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
 
+void createBufferGroup(BufferGroupHandle handle, u32 flags, size_t element_size, size_t elements_count, const void* data);
 void createBuffer(BufferHandle handle, u32 flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, u32 flags, const void* data, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture);
@@ -239,10 +237,11 @@ QueryHandle createQuery();
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
 void update(BufferHandle buffer, const void* data, size_t size);
-void updatePart(BufferHandle buffer, size_t offset, const void* data, size_t size);
+void update(BufferGroupHandle group, const void* data, size_t element_index);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
-void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size);
+void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);
+void bindUniformBuffer(u32 ub_index, BufferGroupHandle group, size_t element_index);
 void copy(TextureHandle dst, TextureHandle src);
 void readTexture(TextureHandle texture, Span<u8> buf);
 TextureInfo getTextureInfo(const void* data);
@@ -253,6 +252,7 @@ bool isQueryReady(QueryHandle query);
 
 void destroy(ProgramHandle program);
 void destroy(BufferHandle buffer);
+void destroy(BufferGroupHandle buffer);
 void destroy(TextureHandle texture);
 void destroy(QueryHandle query);
 

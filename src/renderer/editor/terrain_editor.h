@@ -2,9 +2,8 @@
 
 
 #include "engine/array.h"
-#include "engine/binary_array.h"
 #include "engine/math.h"
-#include "engine/universe/component.h"
+#include "engine/universe.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
 
@@ -13,14 +12,14 @@ namespace Lumix
 {
 
 
-class Material;
-class Model;
+struct Material;
+struct Model;
 struct PrefabResource;
-class RenderScene;
-class Texture;
+struct RenderScene;
+struct Texture;
 
 
-class TerrainEditor final : public WorldEditor::Plugin
+struct TerrainEditor final : WorldEditor::Plugin
 {
 public:
 	enum ActionType
@@ -37,7 +36,7 @@ public:
 		NOT_SET
 	};
 
-	TerrainEditor(WorldEditor& editor, class StudioApp& app);
+	TerrainEditor(WorldEditor& editor, struct StudioApp& app);
 	~TerrainEditor();
 
 	bool onMouseDown(const WorldEditor::RayHit& hit, int, int) override;
@@ -84,7 +83,7 @@ private:
 	Action* m_smooth_terrain_action;
 	Action* m_remove_entity_action;
 	Action* m_remove_grass_action;
-	BinaryArray m_brush_mask;
+	Array<bool> m_brush_mask;
 	Texture* m_brush_texture;
 	Vec2 m_size_spread;
 	Vec2 m_y_spread;

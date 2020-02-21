@@ -43,7 +43,7 @@ struct LUMIX_EDITOR_API Action
 };
 
 
-class WorldEditor;
+struct WorldEditor;
 
 
 LUMIX_EDITOR_API void getEntityListDisplayName(WorldEditor& editor, Span<char> buf, EntityPtr entity);

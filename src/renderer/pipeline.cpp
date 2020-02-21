@@ -5,18 +5,18 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
-#include "engine/mt/sync.h"
+#include "engine/sync.h"
 #include "engine/os.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "culling_system.h"
 #include "font.h"
 #include "material.h"
@@ -128,10 +128,10 @@ struct MTBucketArray
 
 	static inline MTBucketArray* s_free_arrays[64] = {};
 	static inline u32 s_num_free_arrays = 0;
-	static inline MT::Mutex s_cs;
+	static inline Mutex s_cs;
 
 	static MTBucketArray* allocArray(IAllocator& allocator) {
-		MT::MutexGuard lock(s_cs);
+		MutexGuard lock(s_cs);
 		if (s_num_free_arrays == 0) {
 			return LUMIX_NEW(allocator, MTBucketArray<T>)(allocator);
 		}
@@ -149,7 +149,7 @@ struct MTBucketArray
 	}
 
 	static void freeArray(MTBucketArray* a) {
-		MT::MutexGuard lock(s_cs);
+		MutexGuard lock(s_cs);
 		a->clear();
 		ASSERT(s_num_free_arrays < lengthOf(s_free_arrays) - 1);
 		s_free_arrays[s_num_free_arrays] = a;
@@ -210,7 +210,7 @@ struct MTBucketArray
 	void end(const Bucket& bucket)
 	{
 		const int bucket_idx = int(((u8*)bucket.values - m_values_mem) / BUCKET_SIZE);
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		m_counts[bucket_idx] = bucket.count;
 	}
 
@@ -242,7 +242,7 @@ struct MTBucketArray
 	T* value_ptr() const { return (T*)m_values_mem; }
 
 	IAllocator& m_allocator;
-	MT::Mutex m_mutex;
+	Mutex m_mutex;
 	u8* const m_keys_mem;
 	u8* const m_values_mem;
 	u8* m_keys_end;
@@ -1474,7 +1474,7 @@ struct PipelineImpl final : Pipeline
 		}
 		const CameraParams cp = checkCameraParams(L, 2);
 		
-		struct Cmd : public Renderer::RenderJob
+		struct Cmd : Renderer::RenderJob
 		{
 			struct Probe
 			{
@@ -2306,7 +2306,7 @@ struct PipelineImpl final : Pipeline
 				Stats stats = {};
 
 				const u64 render_states = m_render_state;
-				const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
+				const gpu::BufferGroupHandle material_ub = renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
 				CmdPage* page = m_cmds;
 				while (page) {
@@ -2327,7 +2327,7 @@ struct PipelineImpl final : Pipeline
 								gpu::bindTextures(material->textures, 0, material->textures_count);
 								gpu::setState(material->render_states | render_states);
 								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants);
 									material_ub_idx = material->material_constants;
 								}
 
@@ -2362,7 +2362,7 @@ struct PipelineImpl final : Pipeline
 
 								gpu::setState(material->render_states | render_states);
 								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants);
 									material_ub_idx = material->material_constants;
 								}
 
@@ -2420,7 +2420,7 @@ struct PipelineImpl final : Pipeline
 								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 								gpu::bindVertexBuffer(1, buffer, offset, 48);
 								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants);
 									material_ub_idx = material->material_constants;
 								}
 								struct {
@@ -2589,14 +2589,14 @@ struct PipelineImpl final : Pipeline
 		{
 			PROFILE_FUNCTION();
 			
-			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			const gpu::BufferGroupHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
 			u64 state = m_render_state;
 			for (Instance& inst : m_instances) {
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
 				gpu::useProgram(inst.program);
-				gpu::bindUniformBuffer(2, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+				gpu::bindUniformBuffer(2, material_ub, inst.material->material_constants);
 				
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -2718,7 +2718,7 @@ struct PipelineImpl final : Pipeline
 
 			u32 m_histogram[SIZE];
 			bool m_sorted;
-			MT::Mutex m_cs;
+			Mutex m_cs;
 
 			void compute(const u64* keys, const u64* values, int size, u16 shift) {
 				memset(m_histogram, 0, sizeof(m_histogram));
@@ -2731,7 +2731,7 @@ struct PipelineImpl final : Pipeline
 					bool sorted = true;
 					memset(histogram, 0, sizeof(histogram));
 
-					i32 begin = MT::atomicAdd(&counter, STEP);
+					i32 begin = atomicAdd(&counter, STEP);
 
 					while(begin < size) {
 						const i32 end = minimum(size, begin + STEP);
@@ -2745,10 +2745,10 @@ struct PipelineImpl final : Pipeline
 							sorted &= prev_key <= key;
 							prev_key = key;
 						}
-						begin = MT::atomicAdd(&counter, STEP);
+						begin = atomicAdd(&counter, STEP);
 					}
 
-					MT::MutexGuard lock(m_cs);
+					MutexGuard lock(m_cs);
 					m_sorted &= sorted;
 					for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
 						m_histogram[i] += histogram[i]; 
@@ -3297,7 +3297,7 @@ struct PipelineImpl final : Pipeline
 	
 			volatile i32 counter = 0;
 			JobSystem::runOnWorkers([&](){
-				i32 begin = MT::atomicAdd(&counter, STEP);
+				i32 begin = atomicAdd(&counter, STEP);
 				while(begin < size) {
 					const i32 s = minimum(STEP, size - begin);
 					i32 step_idx = begin / STEP;
@@ -3309,7 +3309,7 @@ struct PipelineImpl final : Pipeline
 
 					createCommands(page, renderables + begin, sort_keys + begin, s);
 
-					begin = MT::atomicAdd(&counter, STEP);
+					begin = atomicAdd(&counter, STEP);
 				}
 			});
 

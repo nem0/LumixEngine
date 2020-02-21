@@ -2,11 +2,11 @@
 #include "engine/array.h"
 #include "engine/log.h"
 #include "engine/engine.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/log.h"
 #include "engine/math.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
+#include "engine/sync.h"
+#include "engine/thread.h"
 #include "engine/os.h"
 #include <alsa/asoundlib.h>
 
@@ -15,9 +15,9 @@ namespace Lumix
 {
 
 
-struct AudioTask : MT::Thread
+struct AudioTask : Thread
 {
-	AudioTask(class AudioDeviceImpl& device, IAllocator& allocator)
+	AudioTask(struct AudioDeviceImpl& device, IAllocator& allocator)
 		: Thread(allocator)
 		, m_device(device)
 	{}
@@ -30,9 +30,8 @@ struct AudioTask : MT::Thread
 };
 
 
-class AudioDeviceImpl : public AudioDevice
+struct AudioDeviceImpl : AudioDevice
 {
-public:
 	struct Buffer
 	{
 		enum class RuntimeFlags
@@ -59,7 +58,7 @@ public:
 		int sample_rate,
 		int flags) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(flags == 0); // nothing else supported yet
 		for(int i = 0, c = m_buffers.size(); i < c; ++i)
 		{
@@ -86,7 +85,7 @@ public:
 		float left_delay,
 		float right_delay) override 
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -99,7 +98,7 @@ public:
 		float delay,
 		i32 phase) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -108,7 +107,7 @@ public:
 	{
 		memset(output, 0, size_bytes);
 
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		for (Buffer& buffer : m_buffers)
 		{
 			if((buffer.runtime_flags & (u8)Buffer::RuntimeFlags::PLAYING) == 0) continue;
@@ -137,7 +136,7 @@ public:
 
 	void play(BufferHandle buffer, bool looped) override 
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags |= (u8)Buffer::RuntimeFlags::PLAYING;
 		if(looped)
@@ -153,7 +152,7 @@ public:
 
 	bool isPlaying(BufferHandle buffer) override 
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		return m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::PLAYING;
 	}
@@ -161,7 +160,7 @@ public:
 
 	void stop(BufferHandle buffer) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags &= ~(u8)Buffer::RuntimeFlags::PLAYING;
 		m_buffers[buffer].cursor = 0;
@@ -170,7 +169,7 @@ public:
 
 	bool isEnd(BufferHandle buffer) override
 	{ 
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		return m_buffers[buffer].cursor >= m_buffers[buffer].data.size();
 	}
@@ -178,7 +177,7 @@ public:
 
 	void pause(BufferHandle buffer) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		m_buffers[buffer].runtime_flags &= ~(u8)Buffer::RuntimeFlags::PLAYING;
 	}
@@ -186,14 +185,14 @@ public:
 
 	void setMasterVolume(float volume) override 
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
 
 	void setVolume(BufferHandle buffer, float volume) override 
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -201,7 +200,7 @@ public:
 
 	void setFrequency(BufferHandle buffer, float frequency) override 
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -209,7 +208,7 @@ public:
 
 	void setCurrentTime(BufferHandle handle, float time_seconds) override 
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[handle].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		
 		Buffer& buffer = m_buffers[handle];
@@ -222,7 +221,7 @@ public:
 
 	float getCurrentTime(BufferHandle handle) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[handle].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		
 		Buffer& buffer = m_buffers[handle];
@@ -233,7 +232,7 @@ public:
 
 	void setListenerPosition(const DVec3& pos) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 
@@ -245,14 +244,14 @@ public:
 		float up_y,
 		float up_z) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(false); // not implemented yet
 	}
 	
 
 	void setSourcePosition(BufferHandle buffer, const DVec3& pos) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		ASSERT(m_buffers[buffer].runtime_flags & (u8)Buffer::RuntimeFlags::READY);
 		ASSERT(false); // not implemented yet
 	}
@@ -407,7 +406,7 @@ public:
 	Array<Buffer> m_buffers;
 	AudioTask* m_task = nullptr;
 	Engine& m_engine;
-	MT::Mutex m_mutex;
+	Mutex m_mutex;
 	void* m_alsa_lib = nullptr;
 	snd_pcm_t* m_device = nullptr;
 	API m_api;
@@ -468,9 +467,8 @@ int AudioTask::task()
 }
 
 
-class NullAudioDevice final : public AudioDevice
+struct NullAudioDevice final : AudioDevice
 {
-public:
 	BufferHandle createBuffer(const void* data,
 		int size_bytes,
 		int channels,

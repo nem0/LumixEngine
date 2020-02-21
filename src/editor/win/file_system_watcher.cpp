@@ -1,6 +1,6 @@
 #include "engine/allocator.h"
 #include "engine/crt.h"
-#include "engine/mt/thread.h"
+#include "engine/thread.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include "file_system_watcher.h"
@@ -12,7 +12,7 @@ namespace Lumix
 {
 
 
-class FileSystemWatcherPC;
+struct FileSystemWatcherPC;
 
 
 static const DWORD READ_DIR_CHANGE_FILTER =
@@ -21,7 +21,7 @@ static const DWORD READ_DIR_CHANGE_FILTER =
 	FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_FILE_NAME;
 
 
-struct FileSystemWatcherTask final : public MT::Thread
+struct FileSystemWatcherTask final : Thread
 {
 	FileSystemWatcherTask(const char* path,
 		FileSystemWatcherPC& watcher,
@@ -45,9 +45,8 @@ struct FileSystemWatcherTask final : public MT::Thread
 };
 
 
-class FileSystemWatcherPC final : public FileSystemWatcher
+struct FileSystemWatcherPC final : FileSystemWatcher
 {
-public:
 	explicit FileSystemWatcherPC(IAllocator& allocator)
 		: m_allocator(allocator)
 	{

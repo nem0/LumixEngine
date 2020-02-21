@@ -1,16 +1,8 @@
 #pragma once
 
-
 #include "engine/lumix.h"
 
-
-namespace Lumix
-{
-
-
-namespace Profiler
-{
-
+namespace Lumix::Profiler {
 // writing API
 
 LUMIX_ENGINE_API void pause(bool paused);
@@ -159,8 +151,6 @@ struct LUMIX_ENGINE_API ThreadState {
 };
 
 
-} // namespace Profiler
-
 #define LUMIX_CONCAT2(a, b) a ## b
 #define LUMIX_CONCAT(a, b) LUMIX_CONCAT2(a, b)
 
@@ -168,4 +158,4 @@ struct LUMIX_ENGINE_API ThreadState {
 #define PROFILE_BLOCK(name) Profiler::Scope LUMIX_CONCAT(profile_scope, __LINE__)(name);
 
 
-} // namespace Lumix
+} // namespace Lumix::Profiler

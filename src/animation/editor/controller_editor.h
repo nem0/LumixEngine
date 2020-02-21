@@ -6,7 +6,7 @@
 
 namespace Lumix {
 
-class Model;
+struct Model;
 
 namespace Anim {
 
@@ -19,7 +19,7 @@ struct ControllerEditor : StudioApp::GUIPlugin {
 	const char* getName() const override { return "Animation Editor"; }
 
 	StudioApp& m_app;
-	class Controller* m_controller;
+	struct Controller* m_controller;
 	struct GroupNode* m_current_level;
 	Model* m_model = nullptr;
 };

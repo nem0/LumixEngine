@@ -6,7 +6,7 @@
 #include "lua_wrapper.h"
 #include "prefab.h"
 #include "reflection.h"
-#include "universe/universe.h"
+#include "universe.h"
 
 
 namespace Lumix {
@@ -384,7 +384,7 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 } // namespace LuaImGui
 
 
-struct SetPropertyLuaVisitor : public Reflection::IPropertyVisitor
+struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 {
 	void visit(const Reflection::Property<float>& prop) override
 	{
@@ -1025,8 +1025,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_DEVICE_MOUSE", InputSystem::Device::MOUSE);
 	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_DEVICE_CONTROLLER", InputSystem::Device::CONTROLLER);
 
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_BUTTON_STATE_UP", InputSystem::ButtonEvent::UP);
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_BUTTON_STATE_DOWN", InputSystem::ButtonEvent::DOWN);
 	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_BUTTON", InputSystem::Event::BUTTON);
 	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_AXIS", InputSystem::Event::AXIS);
 	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_TEXT_INPUT", InputSystem::Event::TEXT_INPUT);

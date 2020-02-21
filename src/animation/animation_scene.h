@@ -2,7 +2,7 @@
 
 
 #include "engine/lumix.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 
 
 struct lua_State;
@@ -11,14 +11,14 @@ struct lua_State;
 namespace Lumix
 {
 
-class Animation;
+struct Animation;
 struct IAllocator;
-class OutputMemoryStream;
-class Path;
+struct OutputMemoryStream;
+struct Path;
 
 namespace Anim
 {
-class Controller;
+struct Controller;
 }
 
 
@@ -30,7 +30,7 @@ struct Animable
 };
 
 
-struct AnimationScene : public IScene
+struct AnimationScene : IScene
 {
 	static AnimationScene* create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator);
 	static void destroy(AnimationScene& scene);
@@ -41,7 +41,7 @@ struct AnimationScene : public IScene
 	virtual void setPropertyAnimation(EntityRef entity, const Path& path) = 0;
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;
 	virtual void enablePropertyAnimator(EntityRef entity, bool enabled) = 0;
-	virtual class Animation* getAnimableAnimation(EntityRef entity) = 0;
+	virtual struct Animation* getAnimableAnimation(EntityRef entity) = 0;
 	virtual Path getAnimation(EntityRef entity) = 0;
 	virtual void setAnimation(EntityRef entity, const Path& path) = 0;
 	virtual void updateAnimable(EntityRef entity, float time_delta) = 0;
@@ -52,7 +52,7 @@ struct AnimationScene : public IScene
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) = 0;
 	virtual struct LocalRigidTransform getAnimatorRootMotion(EntityRef entity) = 0;
 	virtual void setAnimatorSource(EntityRef entity, const Path& path) = 0;
-	virtual class Path getAnimatorSource(EntityRef entity) = 0;
+	virtual struct Path getAnimatorSource(EntityRef entity) = 0;
 	virtual int getAnimatorInputIndex(EntityRef entity, const char* name) const = 0;
 	virtual void applyAnimatorSet(EntityRef entity, u32 idx) = 0;
 	virtual void setAnimatorDefaultSet(EntityRef entity, u32 idx) = 0;

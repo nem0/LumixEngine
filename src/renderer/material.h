@@ -14,10 +14,10 @@ struct lua_State;
 namespace Lumix
 {
 
-class Renderer;
-class ResourceManagerHub;
-class Shader;
-class Texture;
+struct Renderer;
+struct ResourceManagerHub;
+struct Shader;
+struct Texture;
 
 struct  MaterialConsts {
 	Vec4 color;
@@ -27,23 +27,23 @@ struct  MaterialConsts {
 	float custom[57];
 };
 
-class MaterialManager : public ResourceManager {
+struct MaterialManager : ResourceManager {
 public:
 	MaterialManager(Renderer& renderer, IAllocator& allocator);
 	~MaterialManager() override;
 
 	Resource* createResource(const Path& path) override;
 	void destroyResource(Resource& resource) override;
-	lua_State* getState(class Material& material) const;
+	lua_State* getState(struct Material& material) const;
 
 private:
 	Renderer& m_renderer; 
 	lua_State* m_state;
 };
 
-class LUMIX_RENDERER_API Material final : public Resource
+struct LUMIX_RENDERER_API Material final : Resource
 {
-friend class MaterialManager;
+friend struct MaterialManager;
 public:
 	static const int MAX_TEXTURE_COUNT = 16;
 

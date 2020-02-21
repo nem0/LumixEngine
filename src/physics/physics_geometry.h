@@ -16,10 +16,10 @@ namespace Lumix
 {
 
 
-class PhysicsSystem;
+struct PhysicsSystem;
 
 
-class PhysicsGeometry final : public Resource
+struct PhysicsGeometry final : Resource
 {
 	public:
 		static const u32 HEADER_MAGIC = 0x5f4c5046; // '_LPF'

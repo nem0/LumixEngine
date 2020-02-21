@@ -9,15 +9,15 @@ namespace Lumix
 {
 
 
-template <typename T> class Array;
+template <typename T> struct Array;
 struct IAllocator;
 struct Mesh;
 struct MeshInstance;
 struct AABB;
-class Universe;
+struct Universe;
 
 
-class OcclusionBuffer
+struct OcclusionBuffer
 {
 public:
 	OcclusionBuffer(IAllocator& allocator);
@@ -31,14 +31,14 @@ public:
 
 private:
 	void init();
+	Vec3 transform(const Transform& world_transform, float x, float y, float z);
 
 	using Mip = Array<int>;
 
 	IAllocator& m_allocator;
 	Array<Mip> m_mips;
-	Matrix m_projection_matrix;
+	Matrix m_view_projection_matrix;
 	DVec3 m_camera_pos;
-	Quat m_camera_rot;
 };
 
 

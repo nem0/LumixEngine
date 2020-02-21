@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 
 
 struct lua_State;
@@ -11,9 +11,9 @@ namespace Lumix
 {
 
 
-class AudioSystem;
-class Clip;
-class Path;
+struct AudioSystem;
+struct Clip;
+struct Path;
 
 
 struct SoundAnimationEvent
@@ -44,11 +44,10 @@ struct ChorusZone
 };
 
 
-class AudioScene : public IScene
+struct AudioScene : IScene
 {
-public:
-	typedef int SoundHandle;
-	static const SoundHandle INVALID_SOUND_HANDLE = -1;
+	using SoundHandle = i32;
+	static constexpr SoundHandle INVALID_SOUND_HANDLE = -1;
 
 	struct ClipInfo
 	{
@@ -59,7 +58,6 @@ public:
 		float volume = 1;
 	};
 
-public:
 	static AudioScene* createInstance(AudioSystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);

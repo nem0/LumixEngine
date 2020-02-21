@@ -7,7 +7,7 @@
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
@@ -438,7 +438,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	if (object_count <= 0) return false;
 
 	char model_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(Span(model_dir), getPath().c_str());
+	Path::getDir(Span(model_dir), getPath().c_str());
 
 	m_meshes.reserve(object_count);
 	for (int i = 0; i < object_count; ++i)

@@ -3,7 +3,7 @@
 
 #include "engine/allocator.h"
 #include "engine/lumix.h"
-#include "engine/mt/sync.h"
+#include "engine/sync.h"
 
 
 namespace Lumix
@@ -17,10 +17,10 @@ LUMIX_ENGINE_API void debugOutput(const char* message);
 LUMIX_ENGINE_API void enableFloatingPointTraps(bool enable);
 
 
-class StackNode;
+struct StackNode;
 
 
-class LUMIX_ENGINE_API StackTree
+struct LUMIX_ENGINE_API StackTree
 {
 public:
 	StackTree();
@@ -42,7 +42,7 @@ private:
 };
 
 
-class LUMIX_ENGINE_API Allocator final : public IAllocator
+struct LUMIX_ENGINE_API Allocator final : IAllocator
 {
 public:
 	struct AllocationInfo
@@ -88,7 +88,7 @@ private:
 private:
 	IAllocator& m_source;
 	StackTree m_stack_tree;
-	MT::Mutex m_mutex;
+	Mutex m_mutex;
 	AllocationInfo* m_root;
 	AllocationInfo m_sentinels[2];
 	size_t m_total_size;

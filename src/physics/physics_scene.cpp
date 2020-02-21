@@ -4,7 +4,7 @@
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -15,7 +15,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "physics/physics_geometry.h"
 #include "physics/physics_system.h"
@@ -83,7 +83,7 @@ struct Ragdoll
 };
 
 
-struct OutputStream final : public PxOutputStream
+struct OutputStream final : PxOutputStream
 {
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
@@ -119,7 +119,7 @@ struct OutputStream final : public PxOutputStream
 };
 
 
-struct InputStream final : public PxInputStream
+struct InputStream final : PxInputStream
 {
 	InputStream(unsigned char* data, int size)
 	{
@@ -229,7 +229,7 @@ struct Heightfield
 };
 
 
-struct PhysicsSceneImpl final : public PhysicsScene
+struct PhysicsSceneImpl final : PhysicsScene
 {
 	struct CPUDispatcher : physx::PxCpuDispatcher
 	{
@@ -248,7 +248,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	};
 
 
-	struct PhysxContactCallback final : public PxSimulationEventCallback
+	struct PhysxContactCallback final : PxSimulationEventCallback
 	{
 		explicit PhysxContactCallback(PhysicsSceneImpl& scene)
 			: m_scene(scene)
@@ -307,7 +307,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	};
 
 
-	class RigidActor
+	struct RigidActor
 	{
 	public:
 		RigidActor(PhysicsSceneImpl& _scene, EntityRef entity)
@@ -2633,7 +2633,7 @@ struct PhysicsSceneImpl final : public PhysicsScene
 		return INVALID_ENTITY;
 	}
 
-	struct Filter : public PxQueryFilterCallback
+	struct Filter : PxQueryFilterCallback
 	{
 		PxQueryHitType::Enum preFilter(const PxFilterData& filterData,
 			const PxShape* shape,
@@ -4259,7 +4259,6 @@ struct PhysicsSceneImpl final : public PhysicsScene
 	PhysxContactCallback m_contact_callback;
 	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
 	PxScene* m_scene;
-	// TODO reverse dependency, lua_script should depend on physics 
 	LuaScriptScene* m_script_scene;
 	PhysicsSystem* m_system;
 	PxRigidDynamic* m_dummy_actor;

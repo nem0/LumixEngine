@@ -11,13 +11,12 @@
 #include "engine/geometry.h"
 #include "engine/log.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
+#include "engine/path.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "physics/physics_scene.h"
 #include "renderer/culling_system.h"
 #include "renderer/material.h"
@@ -41,7 +40,7 @@ static const char* DETAIL_ALBEDO_SLOT_NAME = "Detail albedo";
 static const float MIN_BRUSH_SIZE = 0.5f;
 
 
-struct PaintTerrainCommand final : public IEditorCommand
+struct PaintTerrainCommand final : IEditorCommand
 {
 	struct Rectangle
 	{
@@ -66,7 +65,7 @@ struct PaintTerrainCommand final : public IEditorCommand
 		TerrainEditor::ActionType action_type,
 		u64 textures_mask,
 		const DVec3& hit_pos,
-		BinaryArray& mask,
+		const Array<bool>& mask,
 		float radius,
 		float rel_amount,
 		u16 flat_height,
@@ -598,7 +597,7 @@ private:
 	Array<Item> m_items;
 	ComponentUID m_terrain;
 	WorldEditor& m_world_editor;
-	BinaryArray m_mask;
+	Array<bool> m_mask;
 	u16 m_flat_height;
 	u32 m_layers_masks;
 	Vec2 m_fixed_value;

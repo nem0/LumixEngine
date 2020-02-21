@@ -244,6 +244,7 @@ struct LUMIX_ENGINE_API AABB
 
 
 	void transform(const Matrix& matrix);
+	void getCorners(const Transform& tr, DVec3* points) const;
 	void getCorners(const Matrix& matrix, Vec3* points) const;
 	static Vec3 minCoords(const Vec3& a, const Vec3& b);
 	static Vec3 maxCoords(const Vec3& a, const Vec3& b);

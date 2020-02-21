@@ -10,8 +10,7 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
+#include "engine/path.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -29,7 +28,7 @@ namespace Lumix
 {
 
 
-typedef StaticString<MAX_PATH_LENGTH> PathBuilder;
+using PathBuilder = StaticString<MAX_PATH_LENGTH>;
 
 
 
@@ -142,7 +141,7 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 
 			if (!tex.is_valid)
 			{
-				PathUtils::FileInfo file_info(tex.path);
+				PathInfo file_info(tex.path);
 				tex.src = src_dir;
 				tex.src << file_info.m_basename << "." << file_info.m_extension;
 				tex.is_valid = OS::fileExists(tex.src);
@@ -162,7 +161,7 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 			}
 
 			char tmp[MAX_PATH_LENGTH];
-			PathUtils::normalize(tex.src, Span(tmp));
+			Path::normalize(tex.src, Span(tmp));
 			tex.src = tmp;
 
 			tex.import = true;
@@ -272,7 +271,7 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 			{
 				char tmp[MAX_PATH_LENGTH];
 				take_info->filename.toString(tmp);
-				PathUtils::getBasename(Span(anim.name.data), tmp);
+				Path::getBasename(Span(anim.name.data), tmp);
 			}
 			if (anim.name.empty()) anim.name << "anim";
 		}
@@ -673,7 +672,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 	}
 
 	char src_dir[MAX_PATH_LENGTH];
-	PathUtils::getDir(Span(src_dir), filename);
+	Path::getDir(Span(src_dir), filename);
 	gatherMeshes(scene);
 
 	gatherAnimations(*scene);
@@ -885,7 +884,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION()
-	const PathUtils::FileInfo src_info(src);
+	const PathInfo src_info(src);
 	for (const ImportMaterial& material : materials) {
 		if (!material.import) continue;
 
@@ -1604,7 +1603,7 @@ void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
 
 void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig& cfg)
 {
-	const PathUtils::FileInfo src_info(src);
+	const PathInfo src_info(src);
 	i32 mesh_count = 0;
 	if (mesh_idx >= 0) {
 		mesh_count = 1;
@@ -1884,7 +1883,7 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 {
 	OS::OutputFile file;
-	PathUtils::FileInfo file_info(src);
+	PathInfo file_info(src);
 	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
 	if (!filesystem.open(tmp, Ref(file))) return;
 
@@ -1895,7 +1894,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	const int count = meshes.size();
 	serializer.write("entity_count", count + 1);
 	char normalized_tmp_rel[MAX_PATH_LENGTH];
-	PathUtils::normalize(tmp, Span(normalized_tmp_rel));
+	Path::normalize(tmp, Span(normalized_tmp_rel));
 	const u64 prefab = crc32(normalized_tmp_rel);
 
 	serializer.write("prefab", prefab);

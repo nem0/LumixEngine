@@ -12,9 +12,9 @@
 #include "engine/geometry.h"
 #include "engine/log.h"
 #include "engine/math.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/reflection.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "physics/physics_geometry.h"
 #include "physics/physics_scene.h"
 #include "renderer/model.h"
@@ -44,7 +44,7 @@ Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
 RigidTransform fromPhysx(const physx::PxTransform& v) { return{ DVec3(fromPhysx(v.p)), fromPhysx(v.q) }; }
 
 
-struct GizmoPlugin final : public WorldEditor::Plugin
+struct GizmoPlugin final : WorldEditor::Plugin
 {
 	explicit GizmoPlugin(WorldEditor& editor)
 		: m_editor(editor)
@@ -349,7 +349,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 };
 
 
-struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
+struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 {
 	explicit PhysicsUIPlugin(StudioApp& app)
 		: m_editor(app.getWorldEditor())
@@ -378,7 +378,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 		};
 		for (const char* dll : physx_dlls)
 		{
-			PathUtils::getDir(Span(exe_dir), exe_path);
+			Path::getDir(Span(exe_dir), exe_path);
 			StaticString<MAX_PATH_LENGTH> tmp(exe_dir, dll);
 			if (!OS::fileExists(tmp)) return false;
 			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
@@ -947,7 +947,7 @@ struct PhysicsUIPlugin final : public StudioApp::GUIPlugin
 
 
 
-struct PhysicsGeometryPlugin final : public AssetBrowser::IPlugin
+struct PhysicsGeometryPlugin final : AssetBrowser::IPlugin
 {
 	explicit PhysicsGeometryPlugin(StudioApp& app)
 		: m_app(app)

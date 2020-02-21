@@ -7,12 +7,12 @@
 #include "engine/input_system.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
-#include "engine/mt/thread.h"
+#include "engine/thread.h"
 #include "engine/os.h"
 #include "engine/path_utils.h"
 #include "engine/plugin_manager.h"
 #include "engine/reflection.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/pipeline.h"
 #include "renderer/render_scene.h"
@@ -23,12 +23,12 @@ using namespace Lumix;
 static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
 static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
 
-struct Runner final : public OS::Interface
+struct Runner final : OS::Interface
 {
 	Runner() 
 		: m_allocator(m_main_allocator) 
 	{
-		if (!JobSystem::init(MT::getCPUsCount(), m_allocator)) {
+		if (!JobSystem::init(getCPUsCount(), m_allocator)) {
 			logError("Engine") << "Failed to initialize job system.";
 		}
 	}
@@ -56,7 +56,7 @@ struct Runner final : public OS::Interface
 		m_pipeline = Pipeline::create(*m_renderer, pres, "APP", m_engine->getAllocator());
 
 		while (m_engine->getFileSystem().hasWork()) {
-			MT::sleep(100);
+			sleep(100);
 			m_engine->getFileSystem().processCallbacks();
 		}
 

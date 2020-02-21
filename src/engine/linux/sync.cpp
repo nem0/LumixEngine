@@ -1,7 +1,7 @@
 #include "engine/allocator.h"
 #include "engine/crt.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/atomic.h"
+#include "engine/sync.h"
+#include "engine/atomic.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include <errno.h>
@@ -10,8 +10,6 @@
 #include <unistd.h>
 
 namespace Lumix
-{
-namespace MT
 {
 
 ConditionVariable::ConditionVariable() {
@@ -67,7 +65,7 @@ void Semaphore::wait()
 	int res = pthread_mutex_lock(&m_id.mutex);
 	ASSERT(res == 0);
 	
-	while(m_id.count <= 0)
+	while (m_id.count <= 0)
 	{
 		res = pthread_cond_wait(&m_id.cond, &m_id.mutex);
 		ASSERT(res == 0);
@@ -106,5 +104,4 @@ void Mutex::exit()
 }
 
 
-} // namespace MT
 } // namespace Lumix

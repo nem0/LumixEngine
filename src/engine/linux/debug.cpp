@@ -1,5 +1,5 @@
 #include "engine/debug.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/string.h"
 #include <cstdlib>
 #include <cstring>
@@ -32,9 +32,8 @@ void debugBreak()
 int StackTree::s_instances = 0;
 
 
-class StackNode
+struct StackNode
 {
-public:
 	~StackNode()
 	{
 		delete m_next;
@@ -264,7 +263,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 
 	size_t system_size = getNeededMemory(size, align);
 	{
-		MT::SpinLock lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		system_ptr = m_source.allocate_aligned(system_size, align);
 		user_ptr = getUserFromSystem(system_ptr, align);
 		info = new (NewPlaceholder(), getAllocationInfoFromUser(user_ptr)) AllocationInfo();
@@ -278,7 +277,7 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 		m_root = info;
 
 		m_total_size += size;
-	} // because of the SpinLock
+	} // because of the MutexGuard
 
 	info->align = u16(align);
 	info->stack_leaf = m_stack_tree.record();
@@ -321,7 +320,7 @@ void Allocator::deallocate_aligned(void* user_ptr)
 		}
 
 		{
-			MT::SpinLock lock(m_mutex);
+			MutexGuard lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;
@@ -330,7 +329,7 @@ void Allocator::deallocate_aligned(void* user_ptr)
 			info->next->previous = info->previous;
 
 			m_total_size -= info->size;
-		} // because of the SpinLock
+		} // because of the MutexGuard
 
 		info->~AllocationInfo();
 
@@ -370,7 +369,7 @@ void* Allocator::allocate(size_t size)
 	AllocationInfo* info;
 	size_t system_size = getNeededMemory(size);
 	{
-		MT::SpinLock lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		system_ptr = m_source.allocate(system_size);
 		info = new (NewPlaceholder(), getAllocationInfoFromSystem(system_ptr)) AllocationInfo();
 
@@ -383,7 +382,7 @@ void* Allocator::allocate(size_t size)
 		m_root = info;
 
 		m_total_size += size;
-	} // because of the SpinLock
+	} // because of the MutexGuard
 
 	void* user_ptr = getUserFromSystem(system_ptr, 0);
 	info->stack_leaf = m_stack_tree.record();
@@ -426,7 +425,7 @@ void Allocator::deallocate(void* user_ptr)
 		}
 
 		{
-			MT::SpinLock lock(m_mutex);
+			MutexGuard lock(m_mutex);
 			if (info == m_root)
 			{
 				m_root = info->next;
@@ -435,7 +434,7 @@ void Allocator::deallocate(void* user_ptr)
 			info->next->previous = info->previous;
 
 			m_total_size -= info->size;
-		} // because of the SpinLock
+		} // because of the MutexGuard
 
 		info->~AllocationInfo();
 

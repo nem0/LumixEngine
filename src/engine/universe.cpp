@@ -1,20 +1,18 @@
 #include "universe.h"
 #include "engine/crc32.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
-#include "engine/universe/component.h"
 
 
 namespace Lumix
 {
 
-
 static constexpr int RESERVED_ENTITIES_COUNT = 1024;
 
-
+const ComponentUID ComponentUID::INVALID(INVALID_ENTITY, { -1 }, 0);
 
 EntityMap::EntityMap(IAllocator& allocator) 
 	: m_map(allocator)

@@ -1,4 +1,4 @@
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "job_system.h"
 #include "engine/array.h"
 #include "engine/engine.h"
@@ -6,8 +6,8 @@
 #include "engine/allocator.h"
 #include "engine/log.h"
 #include "engine/math.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
+#include "engine/sync.h"
+#include "engine/thread.h"
 #include "engine/profiler.h"
 
 
@@ -80,8 +80,8 @@ struct System
 	}
 
 
-	MT::Mutex m_sync;
-	MT::Mutex m_job_queue_sync;
+	Mutex m_sync;
+	Mutex m_job_queue_sync;
 	Array<WorkerTask*> m_workers;
 	Array<WorkerTask*> m_backup_workers;
 	Array<Job> m_job_queue;
@@ -105,7 +105,7 @@ WorkerTask* getWorker()
 #pragma optimize( "", on )
 
 
-struct WorkerTask : MT::Thread
+struct WorkerTask : Thread
 {
 	WorkerTask(System& system, u8 worker_index) 
 		: Thread(system.m_allocator)
@@ -189,7 +189,7 @@ void trigger(SignalHandle handle)
 {
 	LUMIX_FATAL((handle & HANDLE_ID_MASK) < 4096);
 
-	MT::MutexGuard lock(g_system->m_sync);
+	MutexGuard lock(g_system->m_sync);
 	
 	Signal& counter = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	--counter.value;
@@ -199,7 +199,7 @@ void trigger(SignalHandle handle)
 	while (isValid(iter)) {
 		Signal& signal = g_system->m_signals_pool[iter & HANDLE_ID_MASK];
 		if(signal.next_job.task) {
-			MT::MutexGuard queue_lock(g_system->m_job_queue_sync);
+			MutexGuard queue_lock(g_system->m_job_queue_sync);
 			pushJob(signal.next_job);
 		}
 		signal.generation = (((signal.generation >> 16) + 1) & 0xffFF) << 16;
@@ -250,7 +250,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 	if (on_finish) *on_finish = j.dec_on_finish;
 
 	if (!isValid(precondition) || isSignalZero(precondition, false)) {
-		MT::MutexGuard lock(g_system->m_job_queue_sync);
+		MutexGuard lock(g_system->m_job_queue_sync);
 		pushJob(j);
 	}
 	else {
@@ -273,7 +273,7 @@ static LUMIX_FORCE_INLINE void runInternal(void* data
 
 void enableBackupWorker(bool enable)
 {
-	MT::MutexGuard lock(g_system->m_sync);
+	MutexGuard lock(g_system->m_sync);
 
 	for (WorkerTask* task : g_system->m_backup_workers) {
 		if (task->m_is_enabled != enable) {
@@ -300,7 +300,7 @@ void enableBackupWorker(bool enable)
 void incSignal(SignalHandle* signal)
 {
 	ASSERT(signal);
-	MT::MutexGuard lock(g_system->m_sync);
+	MutexGuard lock(g_system->m_sync);
 	
 	if (isValid(*signal) && !isSignalZero(*signal, false)) {
 		++g_system->m_signals_pool[*signal & HANDLE_ID_MASK].value;
@@ -344,7 +344,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 	WorkerTask* worker = getWorker();
 	while (!worker->m_finished) {
 		if (worker->m_is_backup) {
-			MT::MutexGuard guard(g_system->m_sync);
+			MutexGuard guard(g_system->m_sync);
 			while (!worker->m_is_enabled) {
 				PROFILE_BLOCK("disabled");
 				Profiler::blockColor(0xff, 0, 0xff);
@@ -355,7 +355,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 		FiberDecl* fiber = nullptr;
 		Job job;
 		while (!worker->m_finished) {
-			MT::MutexGuard lock(g_system->m_job_queue_sync);
+			MutexGuard lock(g_system->m_job_queue_sync);
 
 			if (!worker->m_ready_fibers.empty()) {
 				fiber = worker->m_ready_fibers.back();
@@ -470,12 +470,12 @@ void shutdown()
 	if (!g_system) return;
 
 	IAllocator& allocator = g_system->m_allocator;
-	for (MT::Thread* task : g_system->m_workers)
+	for (Thread* task : g_system->m_workers)
 	{
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
 	}
-	for (MT::Thread* task : g_system->m_backup_workers) {
+	for (Thread* task : g_system->m_backup_workers) {
 		WorkerTask* wt = (WorkerTask*)task;
 		wt->m_finished = true;
 		wt->wakeup();
@@ -521,7 +521,7 @@ void wait(SignalHandle handle)
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;
 
 	runInternal(this_fiber, [](void* data){
-		MT::MutexGuard lock(g_system->m_job_queue_sync);
+		MutexGuard lock(g_system->m_job_queue_sync);
 		FiberDecl* fiber = (FiberDecl*)data;
 		if (fiber->current_job.worker_index == ANY_WORKER) {
 			g_system->m_ready_fibers.push(fiber);

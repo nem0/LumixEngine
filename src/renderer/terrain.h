@@ -14,20 +14,20 @@ namespace Lumix
 struct AABB;
 struct Frustum;
 struct IAllocator;
-class Material;
+struct Material;
 struct Mesh;
-class Model;
+struct Model;
 struct RayCastModelHit;
-class Renderer;
-class RenderScene;
+struct Renderer;
+struct RenderScene;
 struct ShiftedFrustum;
 struct TerrainQuad;
 struct TerrainInfo;
-class Texture;
-class Universe;
+struct Texture;
+struct Universe;
 
 
-class Terrain
+struct Terrain
 {
 	public:
 		enum { TEXTURES_COUNT = 6 };

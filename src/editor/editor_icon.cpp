@@ -6,7 +6,7 @@
 #include "engine/os.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "render_interface.h"
 #include "world_editor.h"
 
@@ -48,7 +48,7 @@ const char* ICONS[(int)IconType::COUNT] =
 static const float ORTHO_SIZE_SCALE = 1 / 20.0f;
 
 
-struct EditorIconsImpl final : public EditorIcons
+struct EditorIconsImpl final : EditorIcons
 {
 	struct Icon
 	{

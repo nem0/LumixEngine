@@ -12,12 +12,11 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/page_allocator.h"
-#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "renderer/culling_system.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
@@ -147,7 +146,7 @@ static RenderableTypes getRenderableType(const Model& model)
 }
 
 
-class RenderSceneImpl final : public RenderScene
+struct RenderSceneImpl final : RenderScene
 {
 public:
 	RenderSceneImpl(Renderer& renderer,

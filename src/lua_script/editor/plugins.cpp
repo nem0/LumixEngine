@@ -16,10 +16,10 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/reflection.h"
 #include "engine/stream.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
 
@@ -34,9 +34,9 @@ namespace
 {
 
 
-struct PropertyGridPlugin final : public PropertyGrid::IPlugin
+struct PropertyGridPlugin final : PropertyGrid::IPlugin
 {
-	struct AddLuaScriptCommand final : public IEditorCommand
+	struct AddLuaScriptCommand final : IEditorCommand
 	{
 		static IEditorCommand* deserialize(lua_State* L, WorldEditor& editor) {
 			const EntityRef e = LuaWrapper::checkArg<EntityRef>(L, 1);
@@ -79,7 +79,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 	};
 
 
-	struct MoveScriptCommand final : public IEditorCommand
+	struct MoveScriptCommand final : IEditorCommand
 	{
 		explicit MoveScriptCommand(LuaScriptScene* scene, EntityRef entity, int src_index, bool up, IAllocator& allocator)
 			: blob(allocator)
@@ -118,7 +118,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 	};
 
 
-	struct RemoveScriptCommand final : public IEditorCommand
+	struct RemoveScriptCommand final : IEditorCommand
 	{
 		explicit RemoveScriptCommand(EntityRef entity, int scr_index, WorldEditor& editor)
 			: blob(editor.getAllocator())
@@ -158,7 +158,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 	};
 
 
-	struct SetPropertyCommand final : public IEditorCommand
+	struct SetPropertyCommand final : IEditorCommand
 	{
 		static IEditorCommand* deserialize(lua_State* L, WorldEditor& editor) {
 			const EntityRef e = LuaWrapper::checkArg<EntityRef>(L, 1);
@@ -305,7 +305,7 @@ struct PropertyGridPlugin final : public PropertyGrid::IPlugin
 			char buf[MAX_PATH_LENGTH];
 			copyString(buf, scene->getScriptPath(entity, j).c_str());
 			StaticString<MAX_PATH_LENGTH + 20> header;
-			PathUtils::getBasename(Span(header.data), buf);
+			Path::getBasename(Span(header.data), buf);
 			if (header.empty()) header << j;
 			ImGui::Unindent();
 			bool open = ImGui::TreeNodeEx(StaticString<32>("###", j), ImGuiTreeNodeFlags_AllowItemOverlap);
@@ -520,7 +520,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 };
 
 
-struct ConsolePlugin final : public StudioApp::GUIPlugin
+struct ConsolePlugin final : StudioApp::GUIPlugin
 {
 	explicit ConsolePlugin(StudioApp& _app)
 		: app(_app)
@@ -765,7 +765,7 @@ struct ConsolePlugin final : public StudioApp::GUIPlugin
 };
 
 
-struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
+struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 {
 	explicit AddComponentPlugin(StudioApp& _app)
 		: app(_app)
@@ -847,7 +847,7 @@ struct AddComponentPlugin final : public StudioApp::IAddComponentPlugin
 };
 
 
-struct GizmoPlugin : public WorldEditor::Plugin
+struct GizmoPlugin : WorldEditor::Plugin
 {
 	explicit GizmoPlugin(WorldEditor& _editor)
 		: editor(_editor)

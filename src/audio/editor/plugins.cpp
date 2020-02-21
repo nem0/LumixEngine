@@ -11,9 +11,8 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
-#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "renderer/render_scene.h"
 
 
@@ -24,7 +23,7 @@ namespace
 {
 
 
-struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
+struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 {
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
@@ -108,7 +107,7 @@ struct AssetBrowserPlugin final : public AssetBrowser::IPlugin
 };
 
 
-struct ClipManagerUI final : public StudioApp::GUIPlugin
+struct ClipManagerUI final : StudioApp::GUIPlugin
 {
 	explicit ClipManagerUI(StudioApp& app)
 		: m_app(app)
@@ -212,7 +211,7 @@ struct ClipManagerUI final : public StudioApp::GUIPlugin
 };
 
 
-struct GizmoPlugin final : public WorldEditor::Plugin
+struct GizmoPlugin final : WorldEditor::Plugin
 {
 	explicit GizmoPlugin(WorldEditor& editor)
 		: m_editor(editor)

@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 	
-class Engine;
+struct Engine;
 
 
 struct ProfilerUI

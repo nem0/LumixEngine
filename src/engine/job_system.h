@@ -55,7 +55,7 @@ void forEach(u32 count, const F& f)
 		JobSystem::run(&data, [](void* ptr){
 			Data& data = *(Data*)ptr;
 			for(;;) {
-				const u32 idx = MT::atomicIncrement(&data.offset) - 1;
+				const u32 idx = atomicIncrement(&data.offset) - 1;
 				if(idx >= data.count) break;
 				(*data.f)(idx);
 			}

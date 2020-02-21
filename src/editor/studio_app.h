@@ -29,12 +29,11 @@ struct Action;
 struct ComponentUID;
 struct ResourceType;
 struct Vec2;
-class WorldEditor;
+struct WorldEditor;
 
 
-class LUMIX_EDITOR_API StudioApp : public OS::Interface
+struct LUMIX_EDITOR_API StudioApp : OS::Interface
 {
-public:
 	struct IPlugin
 	{
 		virtual ~IPlugin() {}
@@ -76,7 +75,7 @@ public:
 
 	struct LUMIX_EDITOR_API StaticPluginRegister
 	{
-		typedef IPlugin* (*Creator)(StudioApp& app);
+		using Creator = IPlugin* (*)(StudioApp& app);
 		StaticPluginRegister(const char* name, Creator creator);
 
 		static void create(StudioApp& app);
@@ -86,16 +85,15 @@ public:
 		const char* name;
 	};
 
-public:
 	static StudioApp* create();
 	static void destroy(StudioApp& app);
 
 	virtual IAllocator& getAllocator() = 0;
-	virtual class Engine& getEngine() = 0;
+	virtual struct Engine& getEngine() = 0;
 	virtual void run() = 0;
-	virtual class PropertyGrid& getPropertyGrid() = 0;
-	virtual class LogUI& getLogUI() = 0;
-	virtual class AssetBrowser& getAssetBrowser() = 0;
+	virtual struct PropertyGrid& getPropertyGrid() = 0;
+	virtual struct LogUI& getLogUI() = 0;
+	virtual struct AssetBrowser& getAssetBrowser() = 0;
 	virtual struct AssetCompiler& getAssetCompiler() = 0;
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void initPlugins() = 0;

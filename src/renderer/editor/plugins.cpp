@@ -13,20 +13,19 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
+#include "engine/path.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/queue.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "renderer/culling_system.h"
@@ -245,7 +244,7 @@ static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
 }
 
 
-struct FontPlugin final : public AssetBrowser::IPlugin, AssetCompiler::IPlugin
+struct FontPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	FontPlugin(StudioApp& app) 
 		: m_app(app) 
@@ -706,7 +705,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override
 	{
-		ASSERT(PathUtils::hasExtension(src.c_str(), "fbx"));
+		ASSERT(Path::hasExtension(src.c_str(), "fbx"));
 		const char* filepath = getResourceFilePath(src.c_str());
 		FBXImporter::ImportConfig cfg;
 		const Meta meta = getMeta(Path(filepath));
@@ -715,7 +714,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.mesh_scale = meta.scale;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
-		const PathUtils::FileInfo src_info(filepath);
+		const PathInfo src_info(filepath);
 		m_fbx_importer.setSource(filepath, false);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
@@ -1141,7 +1140,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				IVec2 tile_size;
 				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(tile_size));
 				postprocessImpostor(Ref(gb0), Ref(gb1), tile_size, allocator);
-				const PathUtils::FileInfo fi(model->getPath().c_str());
+				const PathInfo fi(model->getPath().c_str());
 				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
@@ -1184,7 +1183,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ResourceManagerHub& resource_manager = engine.getResourceManager();
 
 		Resource* resource;
-		if (PathUtils::hasExtension(path.c_str(), "fab")) {
+		if (Path::hasExtension(path.c_str(), "fab")) {
 			resource = resource_manager.load<PrefabResource>(path);
 		}
 		else {
@@ -1217,6 +1216,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	void update() override
 	{
+		if (m_tile.waiting) {
+			if (!m_app.getEngine().getFileSystem().hasWork()) {
+				renderPrefabSecondStage();
+				m_tile.waiting = false;
+			}
+		}
 		if (m_tile.frame_countdown >= 0) {
 			--m_tile.frame_countdown;
 			if (m_tile.frame_countdown == -1) {
@@ -1281,11 +1286,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
 		m_tile.entity = mesh_entity;
-		prefab->onLoaded<&ModelPlugin::renderPrefabSecondStage>(this);
+		m_tile.waiting = true;
 	}
 
 
-	void renderPrefabSecondStage(Resource::State old_state, Resource::State new_state, Resource& resource)
+	void renderPrefabSecondStage()
 	{
 		Engine& engine = m_app.getEngine();
 
@@ -1295,11 +1300,26 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 		if (!renderer) return;
 
-		if (new_state != Resource::State::READY) return;
-		Model* model = (Model*)&resource;
-		if (!model->isReady()) return;
+		AABB aabb({0, 0, 0}, {0, 0, 0});
 
-		AABB aabb = model->getAABB();
+		Universe& universe = *m_tile.universe;
+		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
+			EntityRef ent = (EntityRef)e;
+			const DVec3 pos = universe.getPosition(ent);
+			aabb.addPoint(pos.toFloat());
+			if (universe.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
+				RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
+				Model* model = scene->getModelInstanceModel(ent);
+				if (model->isReady()) {
+					const Transform tr = universe.getTransform(ent);
+					DVec3 points[8];
+					model->getAABB().getCorners(tr, points);
+					for (const DVec3& p : points) {
+						aabb.addPoint(p.toFloat());
+					}
+				}
+			}
+		}
 
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
@@ -1394,8 +1414,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		TileData(IAllocator& allocator)
 			: data(allocator)
-			, queue(allocator)
 			, paths(allocator)
+			, queue()
 		{
 		}
 
@@ -1408,6 +1428,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
 		Queue<Resource*, 8> queue;
 		Array<Path> paths;
+		bool waiting = false;
 	} m_tile;
 	
 
@@ -1497,7 +1518,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
 			Array<u8> resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-			if (PathUtils::hasExtension(m_in_path, "dds")) {
+			if (Path::hasExtension(m_in_path, "dds")) {
 				OS::InputFile file;
 				if (!file.open(m_in_path)) {
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
@@ -1587,7 +1608,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
-		if (type == Texture::TYPE && !PathUtils::hasExtension(in_path, "ltc") && !PathUtils::hasExtension(in_path, "raw")) {
+		if (type == Texture::TYPE && !Path::hasExtension(in_path, "ltc") && !Path::hasExtension(in_path, "raw")) {
 			IAllocator& allocator = m_app.getAllocator();
 			FileSystem& fs = m_app.getEngine().getFileSystem();
 			auto* job = LUMIX_NEW(allocator, TextureTileJob)(fs, allocator);
@@ -1929,7 +1950,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		output.setOutputHandler(&output_handler);
 
 		nvtt::CompressionOptions compression;
-		compression.setFormat(meta.is_normalmap ? nvtt::Format_DXT5n : (has_alpha ? nvtt::Format_DXT5 :  nvtt::Format_DXT1));
+		compression.setFormat(meta.is_normalmap ? nvtt::Format_DXT5n : (has_alpha ? nvtt::Format_DXT5 : nvtt::Format_DXT1));
 		compression.setQuality(nvtt::Quality_Normal);
 
 		if (!context.process(input, compression, output)) {
@@ -1972,7 +1993,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool compile(const Path& src) override
 	{
 		char ext[4] = {};
-		PathUtils::getExtension(Span(ext), Span(src.c_str(), src.length()));
+		Path::getExtension(Span(ext), Span(src.c_str(), src.length()));
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		Array<u8> src_data(m_app.getAllocator());
@@ -2194,7 +2215,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
 		}
 
-		if (PathUtils::hasExtension(texture->getPath().c_str(), "ltc")) compositeGUI(*texture);
+		if (Path::hasExtension(texture->getPath().c_str(), "ltc")) compositeGUI(*texture);
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			
@@ -2414,7 +2435,7 @@ void captureCubemap(StudioApp& app
 	, const DVec3& position
 	, Ref<Array<Vec4>> data
 	, F&& f) {
-	MT::memoryBarrier();
+	memoryBarrier();
 
 	WorldEditor& world_editor = app.getWorldEditor();
 	Engine& engine = app.getEngine();
@@ -2475,7 +2496,7 @@ void captureCubemap(StudioApp& app
 	renderer->queue(rjob, 0);
 }
 
-struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
+struct LightProbeGridPlugin final : PropertyGrid::IPlugin {
 	struct Job {
 		Job(LightProbeGridPlugin& plugin, u32 idx, IAllocator& allocator) 
 			: plugin(plugin)
@@ -2559,7 +2580,7 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 					}
 
 					pjob->plugin.m_result[pjob->index].compute(pjob->data);
-					MT::memoryBarrier();
+					memoryBarrier();
 					pjob->done = true;
 				}, nullptr);
 
@@ -2680,7 +2701,7 @@ struct LightProbeGridPlugin final : public PropertyGrid::IPlugin {
 	Array<Job*> m_jobs;
 };
 
-struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
+struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 {
 	explicit EnvironmentProbePlugin(StudioApp& app)
 		: m_app(app)
@@ -2860,7 +2881,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			}
 		}
 
-		MT::memoryBarrier();
+		memoryBarrier();
 		for (ProbeJob* j : m_probes) {
 			if (j->done && !j->done_counted) {
 				j->done_counted = true;
@@ -2954,7 +2975,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 			saveCubemap(job.probe.guid, &job.data[0], texture_size, "", nvtt::Format_DXT1);
 		}*/
 
-		MT::memoryBarrier();
+		memoryBarrier();
 		job.done = true;
 	}
 
@@ -2995,7 +3016,7 @@ struct EnvironmentProbePlugin final : public PropertyGrid::IPlugin
 };
 
 
-struct TerrainPlugin final : public PropertyGrid::IPlugin
+struct TerrainPlugin final : PropertyGrid::IPlugin
 {
 	explicit TerrainPlugin(StudioApp& app)
 		: m_app(app)
@@ -3022,7 +3043,7 @@ struct TerrainPlugin final : public PropertyGrid::IPlugin
 };
 
 
-struct RenderInterfaceImpl final : public RenderInterfaceBase
+struct RenderInterfaceImpl final : RenderInterfaceBase
 {
 	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline, Renderer& renderer)
 		: m_pipeline(pipeline)
@@ -3362,7 +3383,7 @@ struct RenderInterfaceImpl final : public RenderInterfaceBase
 };
 
 
-struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
+struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 {
 	struct RenderCommand : Renderer::RenderJob
 	{
@@ -3484,7 +3505,6 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 			u32 elem_offset = 0;
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
-			// TODO enable only when dc.textures[0].value != m_scene_view.getTextureHandle().value);
 			const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 			gpu::setState((u64)gpu::StateFlags::SCISSOR_TEST | blend_state);
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
@@ -3681,7 +3701,7 @@ struct EditorUIRenderPlugin final : public StudioApp::GUIPlugin
 };
 
 
-struct GizmoPlugin final : public WorldEditor::Plugin
+struct GizmoPlugin final : WorldEditor::Plugin
 {
 	void showLightProbeGridGizmo(ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
@@ -3809,7 +3829,7 @@ struct GizmoPlugin final : public WorldEditor::Plugin
 };
 
 
-struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
+struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 {
 	explicit AddTerrainComponentPlugin(StudioApp& _app)
 		: app(_app)
@@ -3820,9 +3840,9 @@ struct AddTerrainComponentPlugin final : public StudioApp::IAddComponentPlugin
 	bool createHeightmap(const char* material_path, int size)
 	{
 		char normalized_material_path[MAX_PATH_LENGTH];
-		PathUtils::normalize(material_path, Span(normalized_material_path));
+		Path::normalize(material_path, Span(normalized_material_path));
 
-		PathUtils::FileInfo info(normalized_material_path);
+		PathInfo info(normalized_material_path);
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
 		OS::OutputFile file;
 		if (!file.open(hm_path))

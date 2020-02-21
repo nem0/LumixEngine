@@ -6,17 +6,16 @@
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/log.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
+#include "engine/sync.h"
+#include "engine/thread.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe/component.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "renderer/font.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -49,7 +48,7 @@ struct TransientBuffer {
 	Renderer::TransientSlice alloc(u32 size) {
 		Renderer::TransientSlice slice;
 		size = (size + 15) & ~15;
-		slice.offset = MT::atomicAdd(&m_offset, size);
+		slice.offset = atomicAdd(&m_offset, size);
 		slice.size = size;
 		if (slice.offset + size <= m_size) {
 			slice.buffer = m_buffer;
@@ -57,7 +56,7 @@ struct TransientBuffer {
 			return slice;
 		}
 
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		if (!m_overflow.buffer.isValid()) {
 			m_overflow.buffer = gpu::allocBufferHandle();
 			m_overflow.data = (u8*)OS::memReserve(128 * 1024 * 1024);
@@ -106,7 +105,7 @@ struct TransientBuffer {
 	i32 m_offset = 0;
 	u32 m_size = 0;
 	u8* m_ptr = nullptr;
-	MT::Mutex m_mutex;
+	Mutex m_mutex;
 
 	struct {
 		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
@@ -142,7 +141,7 @@ struct FrameData {
 
 	Array<MaterialUpdates> material_updates;
 	Array<Renderer::RenderJob*> jobs;
-	MT::Mutex shader_mutex;
+	Mutex shader_mutex;
 	Array<ShaderToCompile> to_compile_shaders;
 	RendererImpl& renderer;
 	JobSystem::SignalHandle can_setup = JobSystem::INVALID_HANDLE;
@@ -151,7 +150,7 @@ struct FrameData {
 
 
 template <typename T>
-struct RenderResourceManager : public ResourceManager
+struct RenderResourceManager : ResourceManager
 {
 	RenderResourceManager(Renderer& renderer, IAllocator& allocator) 
 		: ResourceManager(allocator)
@@ -254,7 +253,7 @@ struct GPUProfiler
 
 	void beginQuery(const char* name, i64 profiler_link)
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		Query& q = m_queries.emplace();
 		q.profiler_link = profiler_link;
 		q.name = name;
@@ -267,7 +266,7 @@ struct GPUProfiler
 
 	void endQuery()
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		Query& q = m_queries.emplace();
 		q.is_end = true;
 		q.is_frame = false;
@@ -279,7 +278,7 @@ struct GPUProfiler
 	void frame()
 	{
 		PROFILE_FUNCTION();
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		Query frame_query;
 		frame_query.is_frame = true;
 		m_queries.push(frame_query);
@@ -309,7 +308,7 @@ struct GPUProfiler
 
 	Array<Query> m_queries;
 	Array<gpu::QueryHandle> m_pool;
-	MT::Mutex m_mutex;
+	Mutex m_mutex;
 	i64 m_gpu_to_cpu_offset;
 };
 
@@ -480,7 +479,7 @@ static void registerProperties(IAllocator& allocator)
 }
 
 
-struct RendererImpl final : public Renderer
+struct RendererImpl final : Renderer
 {
 	explicit RendererImpl(Engine& engine)
 		: m_engine(engine)
@@ -585,7 +584,7 @@ struct RendererImpl final : public Renderer
 			renderer.m_profiler.init();
 
 			MaterialBuffer& mb = renderer.m_material_buffer;
-			mb.buffer = gpu::allocBufferHandle();
+			mb.buffer = gpu::allocBufferGroupHandle();
 			mb.map.insert(0, 0);
 			mb.data.resize(400);
 			mb.data[0].hash = 0;
@@ -596,15 +595,16 @@ struct RendererImpl final : public Renderer
 				mb.data[i].next_free = i + 1;
 			}
 			mb.data.back().next_free = -1;
-			gpu::createBuffer(mb.buffer
+			gpu::createBufferGroup(mb.buffer
 				, (u32)gpu::BufferFlags::UNIFORM_BUFFER
-				, 400 * sizeof(MaterialConsts) 
+				, sizeof(MaterialConsts)
+				, 400
 				, nullptr
 			);
 
-			MaterialConsts* default_mat = (MaterialConsts*)gpu::map(mb.buffer, sizeof(MaterialConsts));
-			default_mat->color = Vec4(1, 0, 1, 1);
-			gpu::unmap(mb.buffer);
+			MaterialConsts default_mat;
+			default_mat.color = Vec4(1, 0, 1, 1);
+			gpu::update(mb.buffer, &default_mat, 0);
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 
@@ -781,7 +781,7 @@ struct RendererImpl final : public Renderer
 		return m_cpu_frame->transient_buffer.alloc(size);
 	}
 	
-	gpu::BufferHandle getMaterialUniformBuffer() override {
+	gpu::BufferGroupHandle getMaterialUniformBuffer() override {
 		return m_material_buffer.buffer;
 	}
 
@@ -1032,7 +1032,7 @@ struct RendererImpl final : public Renderer
 
 	gpu::ProgramHandle queueShaderCompile(Shader& shader, gpu::VertexDecl decl, u32 defines) override {
 		ASSERT(shader.isReady());
-		MT::MutexGuard lock(m_cpu_frame->shader_mutex);
+		MutexGuard lock(m_cpu_frame->shader_mutex);
 		
 		for (const auto& i : m_cpu_frame->to_compile_shaders) {
 			if (i.shader == &shader && decl.hash == i.decl.hash && defines == i.defines) {
@@ -1049,7 +1049,7 @@ struct RendererImpl final : public Renderer
 
 	u8 getShaderDefineIdx(const char* define) override
 	{
-		MT::MutexGuard lock(m_shader_defines_mutex);
+		MutexGuard lock(m_shader_defines_mutex);
 		for (int i = 0; i < m_shader_defines.size(); ++i)
 		{
 			if (m_shader_defines[i] == define)
@@ -1111,7 +1111,7 @@ struct RendererImpl final : public Renderer
 		frame.to_compile_shaders.clear();
 
 		for (const auto& i : frame.material_updates) {
-			gpu::updatePart(m_material_buffer.buffer, i.idx * sizeof(MaterialConsts), &i.value, sizeof(i.value));
+			gpu::update(m_material_buffer.buffer, &i.value, i.idx);
 		}
 		frame.material_updates.clear();
 
@@ -1180,7 +1180,7 @@ struct RendererImpl final : public Renderer
 	Engine& m_engine;
 	IAllocator& m_allocator;
 	Array<StaticString<32>> m_shader_defines;
-	MT::Mutex m_shader_defines_mutex;
+	Mutex m_shader_defines_mutex;
 	Array<StaticString<32>> m_layers;
 	FontManager* m_font_manager;
 	MaterialManager m_material_manager;
@@ -1210,7 +1210,7 @@ struct RendererImpl final : public Renderer
 			};
 		};
 
-		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
+		gpu::BufferGroupHandle buffer = gpu::INVALID_BUFFER_GROUP;
 		Array<Data> data;
 		int first_free;
 		HashMap<u32, u32> map;

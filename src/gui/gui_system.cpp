@@ -7,10 +7,9 @@
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/path.h"
-#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
 #include "renderer/font.h"
@@ -29,7 +28,7 @@ namespace Lumix
 struct GUISystemImpl;
 
 
-struct SpriteManager final : public ResourceManager
+struct SpriteManager final : ResourceManager
 {
 	SpriteManager(IAllocator& allocator)
 		: ResourceManager(allocator)
@@ -49,7 +48,7 @@ struct SpriteManager final : public ResourceManager
 };
 
 
-struct GUISystemImpl final : public GUISystem
+struct GUISystemImpl final : GUISystem
 {
 	static const char* getTextHAlignName(int index)
 	{

@@ -13,14 +13,14 @@ namespace Lumix
 {
 
 
-class Path;
-class Pipeline;
+struct Path;
+struct Pipeline;
 struct PlatformData;
-class RenderScene;
-class StudioApp;
+struct RenderScene;
+struct StudioApp;
 
 
-class GameView : public StudioApp::GUIPlugin
+struct GameView : StudioApp::GUIPlugin
 {
 friend struct GUIInterface;
 public:

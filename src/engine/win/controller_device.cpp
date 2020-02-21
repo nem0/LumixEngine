@@ -49,7 +49,7 @@ struct XInputControllerDevice : ControllerDevice
 					event.device = this;
 					event.type = InputSystem::Event::BUTTON;
 					event.data.button.key_id = i;
-					event.data.button.state = new_bit != 0 ? InputSystem::ButtonEvent::DOWN : InputSystem::ButtonEvent::UP;
+					event.data.button.down = new_bit != 0;
 					input.injectEvent(event);
 				}
 			}

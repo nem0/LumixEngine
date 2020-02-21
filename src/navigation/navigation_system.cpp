@@ -5,7 +5,7 @@
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/reflection.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include <DetourAlloc.h>
@@ -49,7 +49,7 @@ struct Agent
 };
 
 
-struct NavigationSystem final : public IPlugin
+struct NavigationSystem final : IPlugin
 {
 	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)

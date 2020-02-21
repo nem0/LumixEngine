@@ -17,28 +17,25 @@ namespace Lumix
 {
 
 
-class Clip;
+struct Clip;
 struct DVec3;
-class Engine;
+struct Engine;
 struct IAllocator;
-class Path;
+struct Path;
 
 
-class LUMIX_AUDIO_API AudioDevice
+struct LUMIX_AUDIO_API AudioDevice
 {
-public:
-	enum class BufferFlags
-	{
+	enum class BufferFlags {
 		IS3D = 1,
 		LOOPED = 1 << 1
 	};
 
-	static const int MAX_PLAYING_SOUNDS = 256;
+	static constexpr int MAX_PLAYING_SOUNDS = 256;
 
-	typedef int BufferHandle;
-	static const BufferHandle INVALID_BUFFER_HANDLE = -1;
+	using BufferHandle = i32;
+	static constexpr BufferHandle INVALID_BUFFER_HANDLE = -1;
 
-public:
 	virtual ~AudioDevice() {}
 
 	static AudioDevice* create(Engine& engine);

@@ -1,7 +1,7 @@
 #pragma once
 #include "engine/lumix.h"
 #include "engine/math.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 
 
 struct dtCrowdAgent;
@@ -12,7 +12,7 @@ namespace Lumix
 
 
 struct IAllocator;
-template <typename T> class DelegateList;
+template <typename T> struct DelegateList;
 
 
 struct NavmeshZone {
@@ -20,9 +20,8 @@ struct NavmeshZone {
 };
 
 
-class NavigationScene : public IScene
+struct NavigationScene : IScene
 {
-public:
 	static NavigationScene* create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator);
 	static void destroy(NavigationScene& scene);
 

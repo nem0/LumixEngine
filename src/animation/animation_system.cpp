@@ -6,15 +6,15 @@
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 
 namespace Lumix
 {
 
-class Animation;
-class Engine;
-class Universe;
+struct Animation;
+struct Engine;
+struct Universe;
 
 enum class AnimationSceneVersion
 {
@@ -24,7 +24,7 @@ enum class AnimationSceneVersion
 };
 
 /*
-struct AnimSetProperty : public Reflection::IEnumProperty
+struct AnimSetProperty : Reflection::IEnumProperty
 {
 	AnimSetProperty() 
 	{ 
@@ -68,7 +68,7 @@ struct AnimSetProperty : public Reflection::IEnumProperty
 */
 
 template <typename T>
-struct AnimResourceManager final : public ResourceManager
+struct AnimResourceManager final : ResourceManager
 {
 	explicit AnimResourceManager(IAllocator& allocator)
 		: ResourceManager(allocator)
@@ -87,7 +87,7 @@ struct AnimResourceManager final : public ResourceManager
 };
 
 
-struct AnimationSystemImpl final : public IPlugin
+struct AnimationSystemImpl final : IPlugin
 {
 	void operator=(const AnimationSystemImpl&) = delete;
 	AnimationSystemImpl(const AnimationSystemImpl&) = delete;

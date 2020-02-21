@@ -3,7 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/log.h"
-#include "engine/mt/sync.h"
+#include "engine/sync.h"
 #include "engine/string.h"
 
 
@@ -11,7 +11,7 @@ namespace Lumix
 {
 
 
-class LUMIX_EDITOR_API LogUI
+struct LUMIX_EDITOR_API LogUI
 {
 	public:
 		explicit LogUI(IAllocator& allocator);
@@ -63,7 +63,7 @@ class LUMIX_EDITOR_API LogUI
 		bool m_are_notifications_hovered;
 		bool m_scroll_to_bottom = false;
 		bool m_autoscroll = true;
-		MT::Mutex m_guard;
+		Mutex m_guard;
 };
 
 

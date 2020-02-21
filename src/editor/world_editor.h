@@ -22,18 +22,17 @@ namespace OS {
 	using WindowHandle = void*; 
 }
 
-template <typename T> class DelegateList;
-template <typename T> class Array;
+template <typename T> struct DelegateList;
+template <typename T> struct Array;
 struct ComponentUID;
-class Engine;
+struct Engine;
 struct IAllocator;
 struct IPlugin;
-struct ISerializer;
-class Path;
-class PrefabSystem;
+struct Path;
+struct PrefabSystem;
 struct Quat;
-class RenderInterface;
-class Universe;
+struct RenderInterface;
+struct Universe;
 struct Viewport;
 
 
@@ -74,9 +73,8 @@ struct UniverseView {
 	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
 };
 
-class LUMIX_EDITOR_API WorldEditor
+struct LUMIX_EDITOR_API WorldEditor
 {
-public:
 	enum class Coordinate : int
 	{
 		X,
@@ -105,7 +103,6 @@ public:
 
 	using CommandCreator = IEditorCommand* (lua_State*, WorldEditor&);
 
-public:
 	static WorldEditor* create(const char* base_path, Engine& engine, IAllocator& allocator);
 	static void destroy(WorldEditor* editor, IAllocator& allocator);
 
@@ -116,8 +113,8 @@ public:
 	virtual Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual UniverseView& getView() = 0;
-	virtual class EditorIcons& getIcons() = 0;
-	virtual class Gizmo& getGizmo() = 0;
+	virtual struct EditorIcons& getIcons() = 0;
+	virtual struct Gizmo& getGizmo() = 0;
 	virtual Span<Plugin*> getPlugins() = 0;
 	
 	// commands
@@ -184,7 +181,7 @@ public:
 	virtual bool isMeasureToolActive() const = 0;
 	virtual double getMeasuredDistance() const = 0;
 	virtual void toggleMeasure() = 0;
-	virtual class MeasureTool* getMeasureTool() const = 0;
+	virtual struct MeasureTool* getMeasureTool() const = 0;
 	virtual void snapEntities(const DVec3& hit_pos) = 0;
 
 	virtual bool isGameMode() const = 0;

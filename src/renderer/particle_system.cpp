@@ -1,7 +1,7 @@
 #include "particle_system.h"
 #include "engine/crc32.h"
 #include "engine/crt.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
@@ -14,7 +14,7 @@
 #include "editor/world_editor.h"
 #include "renderer/material.h"
 #include "renderer/render_scene.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 
 namespace Lumix
@@ -851,7 +851,7 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 		volatile i32 counter = 0;
 		JobSystem::runOnWorkers([&](){
 			for(;;) {
-				const i32 i = MT::atomicAdd(&counter, 16 * 1024);
+				const i32 i = atomicAdd(&counter, 16 * 1024);
 				if (i >= m_particles_count) return;
 				sim((u32)i, minimum((m_particles_count - i + 3) & ~3, 16 * 1024));
 			}

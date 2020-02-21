@@ -17,9 +17,9 @@ namespace OS
 {
 
 #ifdef _WIN32
-	typedef u32 ThreadID;
+	using ThreadID = u32;
 #else
-	typedef pthread_t ThreadID;
+	using ThreadID = pthread_t;
 #endif
 
 enum class Keycode : u8;
@@ -106,7 +106,7 @@ struct Monitor {
 	bool primary;
 };
 	
-class LUMIX_ENGINE_API InputFile final : public IInputStream
+struct LUMIX_ENGINE_API InputFile final : IInputStream
 {
 public:
 	InputFile();
@@ -128,7 +128,7 @@ private:
 };
 	
 
-class LUMIX_ENGINE_API OutputFile final : public IOutputStream
+struct LUMIX_ENGINE_API OutputFile final : IOutputStream
 {
 public:
 	OutputFile();

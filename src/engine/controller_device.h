@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-struct ControllerDevice : public InputSystem::Device
+struct ControllerDevice : InputSystem::Device
 {
 	static void init(InputSystem& input_system);
 	static void frame(float dt);

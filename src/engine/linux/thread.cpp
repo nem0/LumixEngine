@@ -1,15 +1,13 @@
 #include "engine/allocator.h"
 #include "engine/lumix.h"
-#include "engine/mt/thread.h"
-#include "engine/mt/sync.h"
+#include "engine/thread.h"
+#include "engine/sync.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include <pthread.h>
 
 
 namespace Lumix
-{
-namespace MT
 {
 
 struct ThreadImpl
@@ -108,6 +106,5 @@ IAllocator& Thread::getAllocator()
 	return m_implementation->allocator;
 }
 
-} // namespace MT
 } // namespace Lumix
 

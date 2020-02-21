@@ -1,6 +1,6 @@
 #include "engine/allocator.h"
 #include "engine/crt.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/page_allocator.h"
 #include "engine/os.h"
 

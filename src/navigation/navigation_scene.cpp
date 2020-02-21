@@ -10,7 +10,7 @@
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -81,7 +81,7 @@ struct Agent
 };
 
 
-struct NavigationSceneImpl final : public NavigationScene
+struct NavigationSceneImpl final : NavigationScene
 {
 	NavigationSceneImpl(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -1536,7 +1536,6 @@ struct NavigationSceneImpl final : public NavigationScene
 	rcConfig m_config;
 	int m_num_tiles_x;
 	int m_num_tiles_z;
-	// TODO reverse dependency, lua_script should depend on nav 
 	LuaScriptScene* m_script_scene;
 	DelegateList<void(float)> m_on_update;
 };

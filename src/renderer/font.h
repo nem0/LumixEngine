@@ -13,8 +13,8 @@ namespace Lumix
 
 
 struct Font;
-class Renderer;
-class Texture;
+struct Renderer;
+struct Texture;
 
 
 struct Glyph {
@@ -29,9 +29,8 @@ LUMIX_RENDERER_API Vec2 measureTextA(const Font& font, const char* str, const ch
 LUMIX_RENDERER_API const Glyph* findGlyph(const Font& font, u32 codepoint);
 
 
-class LUMIX_RENDERER_API FontResource final : public Resource
+struct LUMIX_RENDERER_API FontResource final : Resource
 {
-public:
 	FontResource(const Path& path, ResourceManager& manager, IAllocator& allocator);
 
 	ResourceType getType() const override { return TYPE; }
@@ -46,9 +45,9 @@ public:
 };
 
 
-class LUMIX_RENDERER_API FontManager final : public ResourceManager
+struct LUMIX_RENDERER_API FontManager final : ResourceManager
 {
-friend class FontResource;
+friend struct FontResource;
 public:
 	FontManager(Renderer& renderer, IAllocator& allocator);
 	~FontManager();

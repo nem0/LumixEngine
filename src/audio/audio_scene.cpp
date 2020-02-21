@@ -12,7 +12,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 namespace Lumix
 {
@@ -56,7 +56,7 @@ struct PlayingSound
 };
 
 
-struct AudioSceneImpl final : public AudioScene
+struct AudioSceneImpl final : AudioScene
 {
 	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)

@@ -1,15 +1,15 @@
 #pragma once
 
 
-#include "mt/atomic.h"
-#include "mt/sync.h"
+#include "atomic.h"
+#include "sync.h"
 
 
 namespace Lumix
 {
 
 
-class LUMIX_ENGINE_API PageAllocator final
+struct LUMIX_ENGINE_API PageAllocator final
 {
 public:
 	enum { PAGE_SIZE = 16384 };
@@ -28,7 +28,7 @@ private:
 	u32 allocated_count = 0;
 	u32 reserved_count = 0;
 	void* free_pages = nullptr;
-	MT::Mutex mutex;
+	Mutex mutex;
 };
 
 
@@ -44,7 +44,7 @@ struct PagedListIterator
 		for (;;) {
 			volatile T* tmp = value;
 			if(!tmp) return nullptr;
-			if (MT::compareAndExchange64((volatile i64*)&value, (i64)tmp->header.next, (i64)tmp)) return (T*)tmp;
+			if (compareAndExchange64((volatile i64*)&value, (i64)tmp->header.next, (i64)tmp)) return (T*)tmp;
 		}
 	}
 

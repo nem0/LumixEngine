@@ -14,10 +14,9 @@
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
-#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
 #include "renderer/draw2d.h"
@@ -40,7 +39,7 @@ static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_b
 static const ComponentType GUI_RENDER_TARGET_TYPE = Reflection::getComponentType("gui_render_target");
 
 
-struct SpritePlugin final : public AssetBrowser::IPlugin
+struct SpritePlugin final : AssetBrowser::IPlugin
 {
 	SpritePlugin(StudioApp& app) 
 		: app(app) 
@@ -203,20 +202,20 @@ struct SpritePlugin final : public AssetBrowser::IPlugin
 };
 
 
-class GUIEditor final : public StudioApp::GUIPlugin
+struct GUIEditor final : StudioApp::GUIPlugin
 {
-enum class EdgeMask
-{
-	LEFT = 1 << 0,
-	RIGHT = 1 << 1,
-	TOP = 1 << 2,
-	BOTTOM = 1 << 3,
-	CENTER_HORIZONTAL = 1 << 4,
-	CENTER_VERTICAL = 1 << 5,
-	ALL = LEFT | RIGHT | TOP | BOTTOM,
-	HORIZONTAL = LEFT | RIGHT,
-	VERTICAL = TOP | BOTTOM
-};
+	enum class EdgeMask
+	{
+		LEFT = 1 << 0,
+		RIGHT = 1 << 1,
+		TOP = 1 << 2,
+		BOTTOM = 1 << 3,
+		CENTER_HORIZONTAL = 1 << 4,
+		CENTER_VERTICAL = 1 << 5,
+		ALL = LEFT | RIGHT | TOP | BOTTOM,
+		HORIZONTAL = LEFT | RIGHT,
+		VERTICAL = TOP | BOTTOM
+	};
 
 public:
 	GUIEditor(StudioApp& app)

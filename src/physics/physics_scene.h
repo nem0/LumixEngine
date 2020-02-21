@@ -2,7 +2,7 @@
 
 
 #include "engine/lumix.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/math.h"
 
 
@@ -28,16 +28,16 @@ namespace Lumix
 {
 
 
-class Engine;
+struct Engine;
 struct IAllocator;
 struct Matrix;
-class Path;
-class PhysicsSystem;
+struct Path;
+struct PhysicsSystem;
 struct Quat;
 struct RagdollBone;
 struct RigidTransform;
-class Universe;
-template <typename T> class DelegateList;
+struct Universe;
+template <typename T> struct DelegateList;
 
 
 struct RaycastHit
@@ -48,9 +48,8 @@ struct RaycastHit
 };
 
 
-class LUMIX_PHYSICS_API PhysicsScene : public IScene
+struct LUMIX_PHYSICS_API PhysicsScene : IScene
 {
-public:
 	enum class D6Motion : int
 	{
 		LOCKED,
@@ -83,7 +82,7 @@ public:
 		EntityRef e2;
 	};
 
-	typedef int ContactCallbackHandle;
+	using ContactCallbackHandle = int;
 
 	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 	static void destroy(PhysicsScene* scene);

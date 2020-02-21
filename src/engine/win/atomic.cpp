@@ -1,10 +1,8 @@
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include <intrin.h>
 
 
 namespace Lumix
-{
-namespace MT
 {
 
 i64 atomicIncrement(i64 volatile* value)
@@ -58,5 +56,4 @@ LUMIX_ENGINE_API void memoryBarrier()
 }
 
 
-} // namespace MT
 } // namespace Lumix
