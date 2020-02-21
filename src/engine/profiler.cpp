@@ -7,12 +7,11 @@
 
 #include "engine/array.h"
 #include "engine/crt.h"
-#include "engine/fibers.h"
 #include "engine/hash_map.h"
 #include "engine/allocator.h"
-#include "engine/mt/atomic.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
+#include "engine/atomic.h"
+#include "engine/sync.h"
+#include "engine/thread.h"
 #include "engine/os.h"
 #include "profiler.h"
 
@@ -40,7 +39,7 @@ struct ThreadContext
 	u32 end = 0;
 	u32 rows = 0;
 	bool open = false;
-	MT::Mutex mutex;
+	Mutex mutex;
 	StaticString<64> name;
 	bool show_in_profiler = false;
 	u32 thread_id;
@@ -76,7 +75,7 @@ struct ThreadContext
 	};
 
 
-	struct TraceTask : MT::Thread {
+	struct TraceTask : Thread {
 		TraceTask(IAllocator& allocator);
 
 		int task() override;
@@ -155,7 +154,7 @@ static struct Instance
 		thread_local ThreadContext* ctx = [&](){
 			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(allocator);
 			new_ctx->thread_id = OS::getCurrentThreadID();
-			MT::MutexGuard lock(mutex);
+			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
 			return new_ctx;
 		}();
@@ -166,7 +165,7 @@ static struct Instance
 
 	DefaultAllocator allocator;
 	Array<ThreadContext*> contexts;
-	MT::Mutex mutex;
+	Mutex mutex;
 	OS::Timer timer;
 	bool paused = false;
 	bool context_switches_enabled = false;
@@ -195,7 +194,7 @@ void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
 	v.header.time = timestamp;
 	v.value = value;
 
-	MT::MutexGuard lock(ctx.mutex);
+	MutexGuard lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
 	const int buf_size = ctx.buffer.size();
 
@@ -232,7 +231,7 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 	v.header.time = OS::Timer::getRawTimestamp();
 	v.value = value;
 
-	MT::MutexGuard lock(ctx.mutex);
+	MutexGuard lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
 	const int buf_size = ctx.buffer.size();
 
@@ -264,7 +263,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	header.size = u16(sizeof(header) + size);
 	header.time = OS::Timer::getRawTimestamp();
 
-	MT::MutexGuard lock(ctx.mutex);
+	MutexGuard lock(ctx.mutex);
 	u8* buf = ctx.buffer.begin();
 	const u32 buf_size = ctx.buffer.size();
 
@@ -292,7 +291,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 
 #ifdef _WIN32
 	TraceTask::TraceTask(IAllocator& allocator)
-		: MT::Thread(allocator)
+		: Thread(allocator)
 	{}
 
 
@@ -375,7 +374,7 @@ void endGPUBlock(u64 timestamp)
 i64 createNewLinkID()
 {
 	static i64 counter = 0;
-	return MT::atomicIncrement(&counter);
+	return atomicIncrement(&counter);
 }
 
 
@@ -422,7 +421,7 @@ void pushJobInfo(u32 signal_on_finish, u32 precondition)
 FiberSwitchData beginFiberWait(u32 job_system_signal)
 {
 	FiberWaitRecord r;
-	r.id = MT::atomicIncrement(&g_instance.fiber_wait_id);
+	r.id = atomicIncrement(&g_instance.fiber_wait_id);
 	r.job_system_signal = job_system_signal;
 
 	FiberSwitchData res;
@@ -492,7 +491,7 @@ void frame()
 void showInProfiler(bool show)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	MT::MutexGuard lock(ctx->mutex);
+	MutexGuard lock(ctx->mutex);
 
 	ctx->show_in_profiler = show;
 }
@@ -501,7 +500,7 @@ void showInProfiler(bool show)
 void setThreadName(const char* name)
 {
 	ThreadContext* ctx = g_instance.getThreadContext();
-	MT::MutexGuard lock(ctx->mutex);
+	MutexGuard lock(ctx->mutex);
 
 	ctx->name = name;
 }
@@ -529,7 +528,7 @@ int GlobalState::threadsCount() const
 const char* GlobalState::getThreadName(int idx) const
 {
 	ThreadContext* ctx = g_instance.contexts[idx];
-	MT::MutexGuard lock(ctx->mutex);
+	MutexGuard lock(ctx->mutex);
 	return ctx->name;
 }
 

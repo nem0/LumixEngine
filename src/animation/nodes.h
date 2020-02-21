@@ -7,13 +7,13 @@
 namespace Lumix
 {
 
-class Model;
+struct Model;
 struct Pose;
 
 namespace Anim
 {
 
-class Controller;
+struct Controller;
 struct GroupNode;
 
 struct RuntimeContext {

@@ -9,7 +9,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/reflection.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "navigation/navigation_scene.h"
 
 
@@ -125,7 +125,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 };
 
 
-struct GizmoPlugin final : public WorldEditor::Plugin {
+struct GizmoPlugin final : WorldEditor::Plugin {
 	GizmoPlugin(WorldEditor& editor) : m_editor(editor) {}
 
 	bool showGizmo(ComponentUID cmp) override {

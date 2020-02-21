@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 
 
 namespace Lumix
@@ -9,18 +9,11 @@ namespace Lumix
 
 namespace gpu { struct TextureHandle; }
 
-class GUISystem;
-class Path;
-class Pipeline;
-class string;
-struct Vec2;
-struct Vec4;
-template <typename T> class DelegateList;
+template <typename T> struct DelegateList;
 
 
-class GUIScene : public IScene
+struct GUIScene : IScene
 {
-public:
 	enum class TextHAlign : int
 	{
 		LEFT,
@@ -33,12 +26,12 @@ public:
 		float x, y, w, h;
 	};
 
-	static GUIScene* createInstance(GUISystem& system,
+	static GUIScene* createInstance(struct GUISystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);
 	static void destroyInstance(GUIScene* scene);
 
-	virtual void render(Pipeline& pipeline, const Vec2& canvas_size) = 0;
+	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size) = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
 	virtual Rect getRectOnCanvas(EntityPtr entity, const Vec2& canva_size) const = 0;
@@ -69,7 +62,7 @@ public:
 	virtual float getRectBottomRelative(EntityRef entity) = 0;
 	virtual void setRectBottomRelative(EntityRef entity, float value) = 0;
 
-	virtual Vec4 getButtonNormalColorRGBA(EntityRef entity) = 0;
+	virtual struct Vec4 getButtonNormalColorRGBA(EntityRef entity) = 0;
 	virtual void setButtonNormalColorRGBA(EntityRef entity, const Vec4& color) = 0;
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0;
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
@@ -78,7 +71,7 @@ public:
 	virtual bool isImageEnabled(EntityRef entity) = 0;
 	virtual Vec4 getImageColorRGBA(EntityRef entity) = 0;
 	virtual void setImageColorRGBA(EntityRef entity, const Vec4& color) = 0;
-	virtual Path getImageSprite(EntityRef entity) = 0;
+	virtual struct Path getImageSprite(EntityRef entity) = 0;
 	virtual void setImageSprite(EntityRef entity, const Path& path) = 0;
 
 	virtual void setText(EntityRef entity, const char* text) = 0;

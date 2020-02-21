@@ -7,7 +7,7 @@
 namespace Lumix
 {
 
-class Model;
+struct Model;
 struct Pose;
 struct Quat;
 struct Vec3;
@@ -21,7 +21,7 @@ struct BoneMask
 };
 
 
-class Animation final : public Resource
+struct Animation final : Resource
 {
 	public:
 		static const u32 HEADER_MAGIC = 0x5f4c4146; // '_LAF'

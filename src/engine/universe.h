@@ -3,7 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/delegate_list.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/string.h"
@@ -14,12 +14,7 @@ namespace Lumix
 
 
 struct ComponentUID;
-struct IDeserializer;
-struct IInputStream;
-struct IOutputStream;
 struct IScene;
-struct ISerializer;
-struct PrefabResource;
 
 
 struct LUMIX_ENGINE_API EntityMap {
@@ -33,11 +28,11 @@ struct LUMIX_ENGINE_API EntityMap {
 };
 
 
-class LUMIX_ENGINE_API Universe
+struct LUMIX_ENGINE_API Universe
 {
 public:
-	typedef void (IScene::*Create)(EntityRef);
-	typedef void (IScene::*Destroy)(EntityRef);
+	using Create = void (IScene::*)(EntityRef);
+	using Destroy = void (IScene::*)(EntityRef);
 	struct ComponentTypeEntry
 	{
 		IScene* scene = nullptr;
@@ -139,8 +134,8 @@ public:
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
-	void serialize(IOutputStream& serializer);
-	void deserialize(IInputStream& serializer, Ref<EntityMap> entity_map);
+	void serialize(struct IOutputStream& serializer);
+	void deserialize(struct IInputStream& serializer, Ref<EntityMap> entity_map);
 
 	IScene* getScene(ComponentType type) const;
 	IScene* getScene(u32 hash) const;
@@ -182,6 +177,36 @@ private:
 	DelegateList<void(const ComponentUID&)> m_component_added;
 	int m_first_free_slot;
 	StaticString<64> m_name;
+};
+
+
+struct LUMIX_ENGINE_API ComponentUID final
+{
+	ComponentUID()
+	{
+		scene = nullptr;
+		entity = INVALID_ENTITY;
+		type = {-1};
+	}
+
+	ComponentUID(EntityPtr _entity, ComponentType _type, IScene* _scene)
+		: entity(_entity)
+		, type(_type)
+		, scene(_scene)
+	{
+	}
+
+	EntityPtr entity; 
+	ComponentType type;
+	IScene* scene;
+
+	static const ComponentUID INVALID;
+
+	bool operator==(const ComponentUID& rhs) const
+	{
+		return type == rhs.type && scene == rhs.scene && entity == rhs.entity;
+	}
+	bool isValid() const { return entity.isValid(); }
 };
 
 

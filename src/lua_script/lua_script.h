@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-class LuaScript final : public Resource
+struct LuaScript final : Resource
 {
 public:
 	LuaScript(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);

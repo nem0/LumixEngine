@@ -7,13 +7,7 @@
 namespace Lumix
 {
 
-
-class Renderer;
-struct TextSerializer;
-class Texture;
-
-
-class Sprite final : public Resource
+struct Sprite final : Resource
 {
 public:
 	enum Type
@@ -28,10 +22,10 @@ public:
 
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
-	bool save(TextSerializer& serializer);
+	bool save(struct TextSerializer& serializer);
 	
 	void setTexture(const Path& path);
-	Texture* getTexture() const { return m_texture; }
+	struct Texture* getTexture() const { return m_texture; }
 
 	Type type;
 	int top;

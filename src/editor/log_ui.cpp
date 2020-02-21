@@ -49,7 +49,7 @@ int LogUI::addNotification(const char* text)
 
 void LogUI::push(LogLevel level, const char* message)
 {
-	MT::MutexGuard lock(m_guard);
+	MutexGuard lock(m_guard);
 	++m_new_message_count[(int)level];
 	Message& msg = m_messages.emplace(m_allocator);
 	msg.text = message;
@@ -133,7 +133,7 @@ int LogUI::getUnreadErrorCount() const
 
 void LogUI::onGUI()
 {
-	MT::MutexGuard lock(m_guard);
+	MutexGuard lock(m_guard);
 	showNotifications();
 
 	if (!m_is_open) return;

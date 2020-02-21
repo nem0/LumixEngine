@@ -15,14 +15,13 @@ namespace Lumix
 
 struct AABB;
 struct Pose;
-class Path;
+struct Path;
 struct ShiftedFrustum;
 
 
-class RenderInterface
+struct RenderInterface
 {
-public:
-	typedef int ModelHandle;
+	using ModelHandle = int;
 
 	struct Vertex
 	{
@@ -30,7 +29,6 @@ public:
 		u32 color;
 	};
 
-public:
 	virtual ~RenderInterface() {}
 
 	virtual AABB getEntityAABB(Universe& universe, EntityRef entity, const DVec3& base) = 0;

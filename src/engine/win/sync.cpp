@@ -1,7 +1,7 @@
 #include "engine/allocator.h"
 #include "engine/crt.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/atomic.h"
+#include "engine/sync.h"
+#include "engine/atomic.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
 #include "engine/win/simple_win.h"
@@ -9,8 +9,6 @@
 
 
 namespace Lumix
-{
-namespace MT
 {
 
 
@@ -74,5 +72,4 @@ void Mutex::exit() {
 }
 
 
-} // namespace MT
 } // namespace Lumix

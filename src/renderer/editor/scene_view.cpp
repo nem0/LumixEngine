@@ -15,15 +15,13 @@
 #include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/path.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
+#include "engine/path.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
-#include "engine/universe/component.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -437,7 +435,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		if (handler.invoke(m_app, x, y, hit)) return;
 	}
 
-	if (PathUtils::hasExtension(path, "fbx"))
+	if (Path::hasExtension(path, "fbx"))
 	{
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
 
@@ -449,14 +447,14 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
 		m_editor.endCommandGroup();
 	}
-	else if (PathUtils::hasExtension(path, "fab"))
+	else if (Path::hasExtension(path, "fab"))
 	{
 		ResourceManagerHub& manager = m_editor.getEngine().getResourceManager();
 		PrefabResource* prefab = manager.load<PrefabResource>(Path(path));
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
 		m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, 1);
 	}
-	else if (PathUtils::hasExtension(path, "phy"))
+	else if (Path::hasExtension(path, "phy"))
 	{
 		if (hit.is_hit && hit.entity.isValid())
 		{
@@ -481,7 +479,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.endCommandGroup();
 		}
 	}
-	else if (hit.is_hit && PathUtils::hasExtension(path, "mat") && hit.mesh)
+	else if (hit.is_hit && Path::hasExtension(path, "mat") && hit.mesh)
 	{
 		const EntityRef e = (EntityRef)hit.entity;
 		m_editor.selectEntities(&e, 1, false);

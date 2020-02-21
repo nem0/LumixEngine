@@ -11,18 +11,17 @@ namespace Lumix
 struct DVec3;
 struct IInputStream;
 struct IOutputStream;
-class Path;
+struct Path;
 struct PrefabResource;
 struct Quat;
 struct Vec3;
-class WorldEditor;
-class StudioApp;
+struct WorldEditor;
+struct StudioApp;
 
 using PrefabHandle = u32;
 
-class LUMIX_EDITOR_API PrefabSystem
+struct LUMIX_EDITOR_API PrefabSystem
 {
-public:
 	static PrefabSystem* create(WorldEditor& editor);
 	static void destroy(PrefabSystem* system);
 	static void createEditorPlugins(StudioApp& app, PrefabSystem& system);
@@ -34,7 +33,6 @@ public:
 	virtual void deserialize(IInputStream& serializer, const struct EntityMap& entity_map) = 0;
 	virtual EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, float scale) = 0;
 	virtual PrefabHandle getPrefab(EntityRef entity) const = 0;
-	virtual int getMaxEntityIndex() const = 0;
 	virtual void setPrefab(EntityRef entity, PrefabHandle prefab) = 0;
 	virtual void savePrefab(const Path& path) = 0;
 	virtual PrefabResource* getPrefabResource(EntityRef entity) = 0;

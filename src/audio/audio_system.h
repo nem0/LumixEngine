@@ -1,21 +1,17 @@
 #pragma once
 
 
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 
 
 namespace Lumix
 {
 
 
-class AudioDevice;
-
-
-class AudioSystem : public IPlugin
+struct AudioSystem : IPlugin
 {
-	public:
-		virtual AudioDevice& getDevice() = 0;
-		virtual Engine& getEngine() = 0;
+	virtual struct AudioDevice& getDevice() = 0;
+	virtual Engine& getEngine() = 0;
 };
 
 

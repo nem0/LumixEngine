@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 
 
 namespace Lumix
@@ -11,13 +11,12 @@ namespace Lumix
 struct Vec2;
 
 
-class GUISystem : public IPlugin
+struct GUISystem : IPlugin
 {
-public:
 	struct Interface
 	{
 		virtual ~Interface() {}
-		virtual class Pipeline* getPipeline() = 0;
+		virtual struct Pipeline* getPipeline() = 0;
 		virtual Vec2 getPos() const = 0;
 		virtual Vec2 getSize() const = 0;
 		virtual void enableCursor(bool enable) = 0;

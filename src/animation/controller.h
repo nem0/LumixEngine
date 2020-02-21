@@ -16,7 +16,7 @@ namespace Anim {
 struct GroupNode;
 struct RuntimeContext;
 
-class Controller final : public Resource {
+struct Controller final : Resource {
 public:
 	Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 	~Controller();

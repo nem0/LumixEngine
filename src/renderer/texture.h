@@ -10,7 +10,7 @@ namespace Lumix
 {
 struct IInputStream;
 struct IOutputStream;
-class Renderer;
+struct Renderer;
 
 #pragma pack(1)
 struct TGAHeader
@@ -51,7 +51,7 @@ struct RawTextureHeader {
 };
 
 
-class LUMIX_RENDERER_API Texture final : public Resource
+struct LUMIX_RENDERER_API Texture final : Resource
 {
 public: 
 	enum class Flags : u32 {

@@ -6,11 +6,14 @@
 namespace Lumix
 {
 
+struct LUMIX_ENGINE_API PathInfo
+{
+	explicit PathInfo(const char* path);
 
-struct IAllocator;
-struct IInputStream;
-struct IOutputStream;
-
+	char m_extension[10];
+	char m_basename[MAX_PATH_LENGTH];
+	char m_dir[MAX_PATH_LENGTH];
+};
 
 struct PathInternal
 {
@@ -19,9 +22,16 @@ struct PathInternal
 	volatile i32 m_ref_count;
 };
 
-
-class LUMIX_ENGINE_API Path
+struct LUMIX_ENGINE_API Path
 {
+public:
+	static void normalize(const char* path, Span<char> out);
+	static void getDir(Span<char> dir, const char* src);
+	static void getBasename(Span<char> basename, const char* src);
+	static void getExtension(Span<char> extension, Span<const char> src);
+	static bool hasExtension(const char* filename, const char* ext);
+	static bool replaceExtension(char* path, const char* ext);
+
 public:
 	Path();
 	Path(const Path& rhs);
@@ -46,14 +56,14 @@ private:
 
 struct LUMIX_ENGINE_API PathManager
 {
-	static PathManager* create(IAllocator& allocator);
+	static PathManager* create(struct IAllocator& allocator);
 	static void destroy(PathManager& obj);
 	static const Path& getEmptyPath();
 	
 	virtual ~PathManager() {};
 
-	virtual void serialize(IOutputStream& serializer) = 0;
-	virtual void deserialize(IInputStream& serializer) = 0;
+	virtual void serialize(struct IOutputStream& serializer) = 0;
+	virtual void deserialize(struct IInputStream& serializer) = 0;
 
 	virtual void clear() = 0;
 };

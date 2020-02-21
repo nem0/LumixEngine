@@ -10,7 +10,7 @@ namespace Lumix
 {
 
 
-class Engine;
+struct Engine;
 
 
 namespace Fiber

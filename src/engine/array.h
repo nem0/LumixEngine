@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-template <typename T> class Array
+template <typename T> struct Array
 {
 public:
 	explicit Array(IAllocator& allocator)
@@ -279,11 +279,11 @@ public:
 	}
 
 
-	template <class _Ty> struct remove_reference { typedef _Ty type; };
-	template <class _Ty> struct remove_reference<_Ty&> { typedef _Ty type; };
-	template <class _Ty> struct remove_reference<_Ty&&> { typedef _Ty type; };
+	template <typename _Ty> struct remove_reference { typedef _Ty type; };
+	template <typename _Ty> struct remove_reference<_Ty&> { typedef _Ty type; };
+	template <typename _Ty> struct remove_reference<_Ty&&> { typedef _Ty type; };
 
-	template <class _Ty> _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
+	template <typename _Ty> _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
 	{
 		return (static_cast<_Ty&&>(_Arg));
 	}
@@ -372,6 +372,16 @@ public:
 
 	u32 byte_size() const { return m_size * sizeof(T); }
 	int size() const { return m_size; }
+	
+	// can be used instead of resize when resize won't compile because of unsuitable constructor
+	void shrink(u32 new_size) { 
+		ASSERT(new_size <= m_size);
+		for (u32 i = new_size; i < m_size; ++i) {
+			m_data[i].~T();
+		}
+		m_size = new_size;
+	}
+
 	u32 capacity() const { return m_capacity; }
 
 private:

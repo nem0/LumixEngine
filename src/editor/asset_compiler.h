@@ -9,12 +9,12 @@ namespace Lumix
 {
 
 
-class OutputMemoryStream;
-class Path;
+struct OutputMemoryStream;
+struct Path;
 struct ResourceType;
-class StudioApp;
-template <typename T> class Array;
-template <typename T> class DelegateList;
+struct StudioApp;
+template <typename T> struct Array;
+template <typename T> struct DelegateList;
 
 
 template<>

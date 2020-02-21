@@ -7,9 +7,9 @@
 
 namespace Lumix
 {
-template <typename T> class DelegateList;
+template <typename T> struct DelegateList;
 
-template <typename R, typename... Args> class DelegateList<R(Args...)>
+template <typename R, typename... Args> struct DelegateList<R(Args...)>
 {
 public:
 	explicit DelegateList(IAllocator& allocator)

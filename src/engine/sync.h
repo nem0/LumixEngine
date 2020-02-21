@@ -6,34 +6,14 @@
 
 namespace Lumix
 {
-namespace MT
+
+struct alignas(8) LUMIX_ENGINE_API Mutex
 {
-
-
-#if defined _WIN32
-	typedef void* SemaphoreHandle;
-	typedef void* MutexHandle;
-	typedef void* EventHandle;
-#elif defined __linux__
-	struct SemaphoreHandle
-	{
-		pthread_mutex_t mutex;
-		pthread_cond_t cond;
-		i32 count;
-	};
-	typedef pthread_mutex_t MutexHandle;
-	using EventHandle = int;
-#endif
-
-
-class alignas(8) LUMIX_ENGINE_API Mutex
-{
-friend class ConditionVariable;
+friend struct ConditionVariable;
 public:
 	Mutex();
-	~Mutex();
-
 	Mutex(const Mutex&) = delete;
+	~Mutex();
 
 	void enter();
 	void exit();
@@ -47,26 +27,36 @@ private:
 };
 
 
-class LUMIX_ENGINE_API Semaphore
+struct LUMIX_ENGINE_API Semaphore
 {
 public:
 	Semaphore(int init_count, int max_count);
+	Semaphore(const Semaphore&) = delete;
 	~Semaphore();
 
 	void signal();
-
 	void wait();
 
 private:
-	SemaphoreHandle m_id;
+	#if defined _WIN32
+		void* m_id;
+	#elif defined __linux__
+		struct {
+			pthread_mutex_t mutex;
+			pthread_cond_t cond;
+			volatile i32 count;
+		} m_id;
+	#endif
 };
 
 
-class ConditionVariable
+struct ConditionVariable
 {
 public:
 	ConditionVariable();
+	ConditionVariable(const ConditionVariable&) = delete;
 	~ConditionVariable();
+
 	void sleep(Mutex& cs);
 	void wakeup();
 private:
@@ -78,7 +68,7 @@ private:
 };
 
 
-class MutexGuard
+struct MutexGuard
 {
 public:
 	explicit MutexGuard(Mutex& cs)
@@ -95,6 +85,4 @@ private:
 	Mutex& m_mutex;
 };
 
-
-} // namespace MT
 } // namespace Lumix

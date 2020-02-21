@@ -7,11 +7,10 @@
 #include "engine/flag_set.h"
 #include "engine/hash_map.h"
 #include "engine/log.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
+#include "engine/sync.h"
+#include "engine/thread.h"
 #include "engine/os.h"
 #include "engine/path.h"
-#include "engine/path_utils.h"
 #include "engine/profiler.h"
 #include "engine/queue.h"
 #include "engine/stream.h"
@@ -44,11 +43,11 @@ struct AsyncItem
 struct FileSystemImpl;
 
 
-class FSTask final : public MT::Thread
+struct FSTask final : Thread
 {
 public:
 	FSTask(FileSystemImpl& fs, IAllocator& allocator)
-		: MT::Thread(allocator)
+		: Thread(allocator)
 		, m_fs(fs)
 	{
 	}
@@ -66,7 +65,7 @@ private:
 };
 
 
-struct FileSystemImpl final : public FileSystem
+struct FileSystemImpl final : FileSystem
 {
 	explicit FileSystemImpl(const char* base_path, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -92,7 +91,7 @@ struct FileSystemImpl final : public FileSystem
 
 	bool hasWork() override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		return !m_queue.empty();
 	}
 
@@ -103,7 +102,7 @@ struct FileSystemImpl final : public FileSystem
 
 	void setBasePath(const char* dir) override
 	{ 
-		PathUtils::normalize(dir, Span(m_base_path.data));
+		Path::normalize(dir, Span(m_base_path.data));
 		if (!endsWith(m_base_path, "/") && !endsWith(m_base_path, "\\")) {
 			m_base_path << '/';
 		}
@@ -128,7 +127,7 @@ struct FileSystemImpl final : public FileSystem
 	{
 		if (!file.isValid()) return AsyncHandle::invalid();
 
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		AsyncItem& item = m_queue.emplace(m_allocator);
 		++m_last_id;
 		if (m_last_id == 0) ++m_last_id;
@@ -142,7 +141,7 @@ struct FileSystemImpl final : public FileSystem
 
 	void cancel(AsyncHandle async) override
 	{
-		MT::MutexGuard lock(m_mutex);
+		MutexGuard lock(m_mutex);
 		for (AsyncItem& item : m_queue) {
 			if (item.id == async.value) {
 				item.flags.set(AsyncItem::Flags::CANCELED);
@@ -269,8 +268,8 @@ struct FileSystemImpl final : public FileSystem
 	Array<AsyncItem> m_queue;
 	Array<AsyncItem> m_finished;
 	Array<u8> m_bundled;
-	MT::Mutex m_mutex;
-	MT::Semaphore m_semaphore;
+	Mutex m_mutex;
+	Semaphore m_semaphore;
 
 	u32 m_last_id;
 };
@@ -284,7 +283,7 @@ int FSTask::task()
 
 		StaticString<MAX_PATH_LENGTH> path;
 		{
-			MT::MutexGuard lock(m_fs.m_mutex);
+			MutexGuard lock(m_fs.m_mutex);
 			ASSERT(!m_fs.m_queue.empty());
 			path = m_fs.m_queue[0].path;
 			if (m_fs.m_queue[0].isCanceled()) {
@@ -312,7 +311,7 @@ int FSTask::task()
 		}
 
 		{
-			MT::MutexGuard lock(m_fs.m_mutex);
+			MutexGuard lock(m_fs.m_mutex);
 			if (!m_fs.m_queue[0].isCanceled()) {
 				m_fs.m_finished.emplace(static_cast<AsyncItem&&>(m_fs.m_queue[0]));
 				m_fs.m_finished.back().data = static_cast<OutputMemoryStream&&>(data);

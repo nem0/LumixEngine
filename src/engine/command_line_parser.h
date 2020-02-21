@@ -8,7 +8,7 @@ namespace Lumix
 {
 
 
-class CommandLineParser
+struct CommandLineParser
 {
 public:
 	explicit CommandLineParser(const char* cmd_line)

@@ -6,10 +6,9 @@
 #include "engine/input_system.h"
 #include "engine/log.h"
 #include "engine/os.h"
-#include "engine/plugin_manager.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "gui_scene.h"
 #include "gui_system.h"
 #include "renderer/font.h"
@@ -146,7 +145,7 @@ struct GUIRect
 };
 
 
-struct GUISceneImpl final : public GUIScene
+struct GUISceneImpl final : GUIScene
 {
 	GUISceneImpl(GUISystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
@@ -661,7 +660,7 @@ struct GUISceneImpl final : public GUIScene
 	void handleMouseButtonEvent(const Rect& parent_rect, GUIRect& rect, const InputSystem::Event& event)
 	{
 		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
-		bool is_up = event.data.button.state == InputSystem::ButtonEvent::UP;
+		const bool is_up = !event.data.button.down;
 
 		Vec2 pos(event.data.button.x_abs, event.data.button.y_abs);
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
@@ -739,7 +738,7 @@ struct GUISceneImpl final : public GUIScene
 	{
 		const GUIRect* rect = getInput(m_focused_entity);
 		if (!rect) return;
-		if (event.data.button.state != InputSystem::ButtonEvent::DOWN) return;
+		if (!event.data.button.down) return;
 
 		rect->input_field->anim = 0;
 
@@ -795,13 +794,13 @@ struct GUISceneImpl final : public GUIScene
 				case InputSystem::Event::BUTTON:
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
-						if (event.data.button.state == InputSystem::ButtonEvent::DOWN)
+						if (event.data.button.down)
 						{
 							m_mouse_down_pos.x = event.data.button.x_abs;
 							m_mouse_down_pos.y = event.data.button.y_abs;
 						}
 						handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
-						if (event.data.button.state == InputSystem::ButtonEvent::UP) m_buttons_down_count = 0;
+						if (!event.data.button.down) m_buttons_down_count = 0;
 					}
 					else if (event.device->type == InputSystem::Device::KEYBOARD)
 					{

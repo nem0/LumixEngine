@@ -9,7 +9,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/hash_map.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
@@ -19,15 +19,14 @@
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
 #include "engine/string.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 namespace Lumix
 {
 
 
-class AssetBrowserPlugin final : public AssetBrowser::IPlugin, public AssetCompiler::IPlugin
+struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
-public:
 	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
 		: system(system)
 		, editor(app.getWorldEditor())
@@ -65,9 +64,9 @@ public:
 };
 
 
-class PrefabSystemImpl final : public PrefabSystem
+struct PrefabSystemImpl final : PrefabSystem
 {
-	struct InstantiatePrefabCommand final : public IEditorCommand
+	struct InstantiatePrefabCommand final : IEditorCommand
 	{
 		InstantiatePrefabCommand(WorldEditor& editor)
 			: editor(editor)
@@ -243,12 +242,6 @@ public:
 	{
 		if (entity.index >= m_entity_to_prefab.size()) return 0;
 		return m_entity_to_prefab[entity.index];
-	}
-
-
-	int getMaxEntityIndex() const override
-	{
-		return m_entity_to_prefab.size();
 	}
 
 
@@ -593,7 +586,7 @@ private:
 	Universe* m_universe;
 	WorldEditor& m_editor;
 	bool m_check_update = false;
-}; // class PrefabSystemImpl
+}; // struct PrefabSystemImpl
 
 
 PrefabSystem* PrefabSystem::create(WorldEditor& editor)

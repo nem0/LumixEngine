@@ -6,7 +6,7 @@
 #include "engine/resource.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "engine/universe/component.h"
+#include "engine/universe.h"
 
 
 #define LUMIX_PROP(Scene, Property) &Scene::get##Property, &Scene::set##Property
@@ -18,10 +18,10 @@ namespace Lumix
 {
 
 
-template <typename T> class Array;
+template <typename T> struct Array;
 struct IAllocator;
-class Path;
-class PropertyDescriptorBase;
+struct Path;
+struct PropertyDescriptorBase;
 struct IVec2;
 struct IVec3;
 struct Vec2;
@@ -222,7 +222,7 @@ template <typename T> struct Property : PropertyBase {};
 struct IBlobProperty : PropertyBase {};
 
 
-struct IEnumProperty : public PropertyBase
+struct IEnumProperty : PropertyBase
 {
 	void visit(IAttributeVisitor& visitor) const override {}
 	virtual int getEnumCount(ComponentUID cmp) const = 0;
@@ -911,7 +911,7 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 	using F = R(C::*)(Args...);
 	F function;
 
-	int getArgCount() const override { return ArgCount<F>::result; }
+	int getArgCount() const override { return sizeof...(Args); }
 	const char* getReturnType() const override { return getTypeName<typename ResultOf<F>::Type>(); }
 	
 	const char* getArgType(int i) const override

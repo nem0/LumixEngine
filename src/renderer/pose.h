@@ -10,7 +10,7 @@ namespace Lumix
 
 struct IAllocator;
 struct Matrix;
-class Model;
+struct Model;
 struct Quat;
 struct Vec3;
 

@@ -3,11 +3,10 @@
 #include "utils.h"
 #include "engine/math.h"
 #include "engine/path.h"
-#include "engine/path_utils.h"
 #include "engine/reflection.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 
 namespace Lumix
@@ -191,7 +190,7 @@ void getEntityListDisplayName(WorldEditor& editor, Span<char> buf, EntityPtr ent
 
 			char basename[MAX_PATH_LENGTH];
 			copyString(buf, path.c_str());
-			PathUtils::getBasename(Span(basename), path.c_str());
+			Path::getBasename(Span(basename), path.c_str());
 			if (name && name[0] != '\0')
 				copyString(buf, name);
 			else

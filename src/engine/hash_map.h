@@ -3,7 +3,6 @@
 
 #include "engine/allocator.h"
 #include "engine/lumix.h"
-#include "engine/metaprogramming.h"
 #include "engine/math.h"
 #include "engine/string.h"
 
@@ -12,7 +11,7 @@ namespace Lumix
 {
 
 
-template<class Key> 
+template <typename Key> 
 struct HashFunc
 {
 	static u32 get(const Key& key);
@@ -128,8 +127,8 @@ struct HashFuncDirect {
 	static u32 get(T key) { return key; }
 };
 
-template<class Key, class Value, class Hasher = HashFunc<Key>>
-class HashMap
+template<typename Key, typename Value, typename Hasher = HashFunc<Key>>
+struct HashMap
 {
 private:
 	struct Slot {

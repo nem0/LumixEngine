@@ -3,10 +3,10 @@
 #include "audio_scene.h"
 #include "clip.h"
 #include "engine/engine.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 
 namespace Lumix
@@ -35,7 +35,7 @@ static void registerProperties(IAllocator& allocator)
 }
 
 
-struct ClipManager final : public ResourceManager
+struct ClipManager final : ResourceManager
 {
 	explicit ClipManager(IAllocator& allocator)
 		: ResourceManager(allocator)
@@ -55,7 +55,7 @@ struct ClipManager final : public ResourceManager
 };
 
 
-struct AudioSystemImpl final : public AudioSystem
+struct AudioSystemImpl final : AudioSystem
 {
 	explicit AudioSystemImpl(Engine& engine)
 		: m_engine(engine)

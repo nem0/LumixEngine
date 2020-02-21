@@ -23,11 +23,11 @@ namespace gpu {
 struct Draw2D;
 struct IAllocator;
 struct Mesh;
-class Path;
-class Renderer;
-class RenderScene;
+struct Path;
+struct Renderer;
+struct RenderScene;
 struct Viewport;
-template <typename T> class Delegate;
+template <typename T> struct Delegate;
 
 struct PassState
 {
@@ -54,9 +54,8 @@ struct LUMIX_RENDERER_API PipelineResource : Resource
 };
 
 
-class LUMIX_RENDERER_API Pipeline
+struct LUMIX_RENDERER_API Pipeline
 {
-public:
 	struct Stats
 	{
 		u32 draw_call_count;
@@ -71,14 +70,13 @@ public:
 		u32 hash;
 	};
 
-public:
 	static Pipeline* create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator);
 	static void destroy(Pipeline* pipeline);
 
 	virtual ~Pipeline() {}
 
 	virtual bool render(bool only_2d) = 0;
-	virtual void setUniverse(class Universe* universe) = 0;
+	virtual void setUniverse(struct Universe* universe) = 0;
 	virtual RenderScene* getScene() const = 0;
 	virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
 	virtual bool isReady() const = 0;

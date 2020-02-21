@@ -11,7 +11,7 @@ struct TextSerializer;
 namespace Reflection { struct  PropertyBase; }
 
 
-class PropertyAnimation final : public Resource
+struct PropertyAnimation final : Resource
 {
 public:
 	struct Curve

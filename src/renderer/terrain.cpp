@@ -14,7 +14,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/shader.h"
 #include "renderer/texture.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 
 
 namespace Lumix

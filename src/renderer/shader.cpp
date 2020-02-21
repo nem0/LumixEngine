@@ -5,7 +5,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/log.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "renderer/renderer.h"

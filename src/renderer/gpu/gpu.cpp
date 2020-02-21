@@ -4,7 +4,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/math.h"
-#include "engine/mt/sync.h"
+#include "engine/sync.h"
 #include "engine/os.h"
 #include "engine/stream.h"
 #ifdef _WIN32
@@ -37,6 +37,16 @@ struct Buffer
 	
 	GLuint handle;
 	u32 flags;
+};
+
+struct BufferGroup
+{
+	enum { MAX_COUNT = 64 };
+	
+	GLuint handle;
+	u32 flags;
+	size_t element_size;
+	size_t elements_count;
 };
 
 
@@ -112,9 +122,10 @@ static struct {
 	IAllocator* allocator;
 	WindowContext contexts[64];
 	Pool<Buffer, Buffer::MAX_COUNT> buffers;
+	Pool<BufferGroup, BufferGroup::MAX_COUNT> buffer_groups;
 	Pool<Texture, Texture::MAX_COUNT> textures;
 	Pool<Program, Program::MAX_COUNT> programs;
-	MT::Mutex handle_mutex;
+	Mutex handle_mutex;
 	Lumix::OS::ThreadID thread;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
@@ -1074,9 +1085,18 @@ void drawArrays(u32 offset, u32 count, PrimitiveType type)
 	CHECK_GL(glDrawArrays(pt, offset, count));
 }
 
+void bindUniformBuffer(u32 index, BufferGroupHandle buffer, size_t element_index) {
+	checkThread();
+	if (buffer.isValid()) {
+		const BufferGroup& g = g_gpu.buffer_groups[buffer.value];
+		ASSERT(element_index < g.elements_count);
+		CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, g.handle, g.element_size * element_index, g.element_size));
+		return;
+	}
+	CHECK_GL(glBindBufferBase(GL_UNIFORM_BUFFER, index, 0));
+}
 
-void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size)
-{
+void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {
 	checkThread();
 	if (buffer.isValid()) {
 		const GLuint buf = g_gpu.buffers[buffer.value].handle;
@@ -1104,15 +1124,6 @@ void unmap(BufferHandle buffer)
 	CHECK_GL(glUnmapNamedBuffer(buf));
 }
 
-void updatePart(BufferHandle buffer, size_t offset, const void* data, size_t size)
-{
-	checkThread();
-	const Buffer& b = g_gpu.buffers[buffer.value];
-	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
-	const GLuint buf = b.handle;
-	CHECK_GL(glNamedBufferSubData(buf, offset, size, data));
-}
-
 void update(BufferHandle buffer, const void* data, size_t size)
 {
 	checkThread();
@@ -1120,6 +1131,14 @@ void update(BufferHandle buffer, const void* data, size_t size)
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
 	const GLuint buf = b.handle;
 	CHECK_GL(glNamedBufferSubData(buf, 0, size, data));
+}
+
+void update(BufferGroupHandle buffer, const void* data, size_t element_index) {
+	checkThread();
+	const BufferGroup& b = g_gpu.buffer_groups[buffer.value];
+	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
+	const GLuint buf = b.handle;
+	CHECK_GL(glNamedBufferSubData(buf, element_index * b.element_size, b.element_size, data));
 }
 
 
@@ -1137,8 +1156,6 @@ void stopCapture()
 		g_gpu.rdoc_api->EndFrameCapture(nullptr, nullptr);
 	}
 }
-
-Backend getBackend() { return Backend::OPENGL; }
 
 static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char *message, const void *userParam)
 {
@@ -1281,6 +1298,22 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	g_gpu.buffers[buffer.value].flags = flags;
 }
 
+void createBufferGroup(BufferGroupHandle buffer, u32 flags, size_t element_size, size_t element_count, const void* data) {
+	checkThread();
+	GLuint buf;
+	CHECK_GL(glCreateBuffers(1, &buf));
+	
+	GLbitfield gl_flags = 0;
+	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT;
+	// there's no gpu::* api to use groups as anything else but uniform buffers
+	ASSERT((flags & (u32)BufferFlags::UNIFORM_BUFFER) != 0); 
+	CHECK_GL(glNamedBufferStorage(buf, element_size * element_count, data, gl_flags));
+
+	g_gpu.buffer_groups[buffer.value].handle = buf;
+	g_gpu.buffer_groups[buffer.value].flags = flags;
+	g_gpu.buffer_groups[buffer.value].element_size = element_size;
+	g_gpu.buffer_groups[buffer.value].elements_count = element_count;
+}
 
 void destroy(ProgramHandle program)
 {
@@ -1290,7 +1323,7 @@ void destroy(ProgramHandle program)
 	const GLuint handle = p.handle;
 	CHECK_GL(glDeleteProgram(handle));
 
-	MT::MutexGuard lock(g_gpu.handle_mutex);
+	MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.programs.dealloc(program.value);
 }
 
@@ -1552,7 +1585,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 ProgramHandle allocProgramHandle()
 {
-	MT::MutexGuard lock(g_gpu.handle_mutex);
+	MutexGuard lock(g_gpu.handle_mutex);
 
 	if(g_gpu.programs.isFull()) {
 		logError("Renderer") << "Not enough free program slots.";
@@ -1569,7 +1602,7 @@ ProgramHandle allocProgramHandle()
 
 BufferHandle allocBufferHandle()
 {
-	MT::MutexGuard lock(g_gpu.handle_mutex);
+	MutexGuard lock(g_gpu.handle_mutex);
 
 	if(g_gpu.buffers.isFull()) {
 		logError("Renderer") << "Not enough free buffer slots.";
@@ -1583,17 +1616,31 @@ BufferHandle allocBufferHandle()
 	return { (u32)id };
 }
 
+BufferGroupHandle allocBufferGroupHandle() {
+	MutexGuard lock(g_gpu.handle_mutex);
+
+	if(g_gpu.buffer_groups.isFull()) {
+		logError("Renderer") << "Not enough free buffer group slots.";
+		return INVALID_BUFFER_GROUP;
+	}
+	const int id = g_gpu.buffer_groups.alloc();
+	ASSERT(id >= 0);
+
+	BufferGroup& t = g_gpu.buffer_groups[id];
+	t.handle = 0;
+	return { (u32)id };
+}
 
 TextureHandle allocTextureHandle()
 {
-	MT::MutexGuard lock(g_gpu.handle_mutex);
+	MutexGuard lock(g_gpu.handle_mutex);
 
 	if(g_gpu.textures.isFull()) {
 		logError("Renderer") << "Not enough free texture slots.";
 		return INVALID_TEXTURE;
 	}
 	const int id = g_gpu.textures.alloc();
-	if (id < 0) return INVALID_TEXTURE;
+	ASSERT(id >= 0);
 
 	Texture& t = g_gpu.textures[id];
 	t.handle = 0;
@@ -1722,23 +1769,31 @@ void destroy(TextureHandle texture)
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteTextures(1, &handle));
 
-	MT::MutexGuard lock(g_gpu.handle_mutex);
+	MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.textures.dealloc(texture.value);
 }
 
-
-void destroy(BufferHandle buffer)
-{
+void destroy(BufferHandle buffer) {
 	checkThread();
 	
 	Buffer& t = g_gpu.buffers[buffer.value];
 	const GLuint handle = t.handle;
 	CHECK_GL(glDeleteBuffers(1, &handle));
 
-	MT::MutexGuard lock(g_gpu.handle_mutex);
+	MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.buffers.dealloc(buffer.value);
 }
 
+void destroy(BufferGroupHandle buffer) {
+	checkThread();
+	
+	BufferGroup& t = g_gpu.buffer_groups[buffer.value];
+	const GLuint handle = t.handle;
+	CHECK_GL(glDeleteBuffers(1, &handle));
+
+	MutexGuard lock(g_gpu.handle_mutex);
+	g_gpu.buffer_groups.dealloc(buffer.value);
+}
 
 void clear(u32 flags, const float* color, float depth)
 {
@@ -1894,6 +1949,7 @@ void preinit(IAllocator& allocator)
 	g_gpu.allocator = &allocator;
 	g_gpu.textures.init();
 	g_gpu.buffers.init();
+	g_gpu.buffer_groups.init();
 	g_gpu.programs.init();
 }
 

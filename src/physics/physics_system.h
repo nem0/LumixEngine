@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 
 
 namespace physx
@@ -18,18 +18,15 @@ namespace Lumix
 {
 
 
-class PhysicsSystem : public IPlugin
+struct PhysicsSystem : IPlugin
 {
-	friend class PhysicsScene;
+	friend struct PhysicsScene;
 	friend struct PhysicsSceneImpl;
-	public:
-		const char* getName() const override { return "physics"; }
-		
-		virtual physx::PxPhysics* getPhysics() = 0;
-		virtual physx::PxCooking* getCooking() = 0;
 
-	protected:
-		PhysicsSystem() {}
+	const char* getName() const override { return "physics"; }
+	
+	virtual physx::PxPhysics* getPhysics() = 0;
+	virtual physx::PxCooking* getCooking() = 0;
 };
 
 

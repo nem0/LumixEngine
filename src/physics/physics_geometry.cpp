@@ -13,7 +13,7 @@ namespace Lumix
 {
 
 
-struct OutputStream final : public physx::PxOutputStream
+struct OutputStream final : physx::PxOutputStream
 {
 	explicit OutputStream(IAllocator& allocator)
 		: allocator(allocator)
@@ -49,7 +49,7 @@ struct OutputStream final : public physx::PxOutputStream
 };
 
 
-struct InputStream final : public physx::PxInputStream
+struct InputStream final : physx::PxInputStream
 {
 	InputStream(unsigned char* data, int size)
 	{

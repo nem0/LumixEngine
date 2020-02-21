@@ -7,10 +7,6 @@ namespace Lumix
 {
 
 
-struct IAllocator;
-class String;
-
-
 struct LUMIX_ENGINE_API IOutputStream
 {
 	virtual bool write(const void* buffer, u64 size) = 0;
@@ -22,7 +18,7 @@ struct LUMIX_ENGINE_API IOutputStream
 	IOutputStream& operator << (u32 value);
 	IOutputStream& operator << (float value);
 	IOutputStream& operator << (double value);
-	template <class T> void write(const T& value);
+	template <typename T> void write(const T& value);
 	void writeString(const char* string);
 };
 
@@ -33,20 +29,20 @@ struct LUMIX_ENGINE_API IInputStream
 	virtual const void* getBuffer() const = 0;
 	virtual u64 size() const = 0;
 	
-	template <class T> void read(T& value) { read(&value, sizeof(T)); }
-	template <class T> T read();
-	template <class T> void read(Ref<T> val) { val = read<T>(); }
+	template <typename T> void read(T& value) { read(&value, sizeof(T)); }
+	template <typename T> T read();
+	template <typename T> void read(Ref<T> val) { val = read<T>(); }
 	bool readString(const Span<char>& data);
 };
 
 
-class InputMemoryStream;
+struct InputMemoryStream;
 
 
-class LUMIX_ENGINE_API OutputMemoryStream final : public IOutputStream
+struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream
 {
 	public:
-		explicit OutputMemoryStream(IAllocator& allocator);
+		explicit OutputMemoryStream(struct IAllocator& allocator);
 		OutputMemoryStream(void* data, u64 size);
 		OutputMemoryStream(OutputMemoryStream&& rhs);
 		OutputMemoryStream(const OutputMemoryStream& rhs);
@@ -63,8 +59,8 @@ class LUMIX_ENGINE_API OutputMemoryStream final : public IOutputStream
 		const u8* getData() const { return m_data; }
 		u8* getMutableData() { return m_data; }
 		u64 getPos() const { return m_pos; }
-		void write(const String& string);
-		template <class T> void write(const T& value);
+		void write(const struct String& string);
+		template <typename T> void write(const T& value);
 		void clear();
 		void* skip(int size);
 		bool empty() const { return m_pos == 0; }
@@ -77,7 +73,7 @@ class LUMIX_ENGINE_API OutputMemoryStream final : public IOutputStream
 };
 
 
-template <class T> void OutputMemoryStream::write(const T& value)
+template <typename T> void OutputMemoryStream::write(const T& value)
 {
 	write(&value, sizeof(T));
 }
@@ -89,7 +85,7 @@ template <> inline void OutputMemoryStream::write<bool>(const bool& value)
 }
 
 
-class LUMIX_ENGINE_API InputMemoryStream final : public IInputStream
+struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream
 {
 	public:
 		InputMemoryStream(const void* data, u64 size);
@@ -114,7 +110,7 @@ class LUMIX_ENGINE_API InputMemoryStream final : public IInputStream
 		u64 m_pos;
 };
 
-template <class T> T IInputStream::read()
+template <typename T> T IInputStream::read()
 {
 	T v;
 	read(&v, sizeof(v));
@@ -129,7 +125,7 @@ template <> inline bool IInputStream::read<bool>()
 }
 
 
-template <class T> void IOutputStream::write(const T& value)
+template <typename T> void IOutputStream::write(const T& value)
 {
 	write(&value, sizeof(T));
 }

@@ -13,20 +13,18 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "render_interface.h"
 
 
@@ -557,7 +555,7 @@ static void load(ComponentUID cmp, int index, InputMemoryStream& blob)
 }
 
 
-struct BeginGroupCommand final : public IEditorCommand
+struct BeginGroupCommand final : IEditorCommand
 {
 	BeginGroupCommand() = default;
 	explicit BeginGroupCommand(WorldEditor&) {}
@@ -569,7 +567,7 @@ struct BeginGroupCommand final : public IEditorCommand
 };
 
 
-struct EndGroupCommand final : public IEditorCommand
+struct EndGroupCommand final : IEditorCommand
 {
 	EndGroupCommand() = default;
 	EndGroupCommand(WorldEditor&) {}
@@ -583,7 +581,7 @@ struct EndGroupCommand final : public IEditorCommand
 };
 
 
-class SetEntityNameCommand final : public IEditorCommand
+struct SetEntityNameCommand final : IEditorCommand
 {
 public:
 	SetEntityNameCommand(WorldEditor& editor, EntityRef entity, const char* name)
@@ -634,7 +632,7 @@ private:
 };
 
 
-class MoveEntityCommand final : public IEditorCommand
+struct MoveEntityCommand final : IEditorCommand
 {
 public:
 	explicit MoveEntityCommand(WorldEditor& editor)
@@ -747,7 +745,7 @@ private:
 };
 
 
-class LocalMoveEntityCommand final : public IEditorCommand
+struct LocalMoveEntityCommand final : IEditorCommand
 {
 public:
 	explicit LocalMoveEntityCommand(WorldEditor& editor)
@@ -846,7 +844,7 @@ private:
 };
 
 
-class ScaleEntityCommand final : public IEditorCommand
+struct ScaleEntityCommand final : IEditorCommand
 {
 public:
 	explicit ScaleEntityCommand(WorldEditor& editor)
@@ -1018,7 +1016,7 @@ struct SaveVisitor : Reflection::ISimpleComponentVisitor
 };
 
 
-class RemoveArrayPropertyItemCommand final : public IEditorCommand
+struct RemoveArrayPropertyItemCommand final : IEditorCommand
 {
 
 public:
@@ -1072,7 +1070,7 @@ private:
 };
 
 
-class AddArrayPropertyItemCommand final : public IEditorCommand
+struct AddArrayPropertyItemCommand final : IEditorCommand
 {
 
 public:
@@ -1116,7 +1114,7 @@ private:
 };
 
 
-class SetPropertyCommand final : public IEditorCommand
+struct SetPropertyCommand final : IEditorCommand
 {
 public:
 	explicit SetPropertyCommand(WorldEditor& editor)
@@ -1218,18 +1216,18 @@ private:
 	const Reflection::PropertyBase* m_property;
 };
 
-class PasteEntityCommand;
+struct PasteEntityCommand;
 
 
 bool WorldEditor::Plugin::showGizmo(ComponentUID) { return false; }
 
 
 
-struct WorldEditorImpl final : public WorldEditor
+struct WorldEditorImpl final : WorldEditor
 {
-	friend class PasteEntityCommand;
+	friend struct PasteEntityCommand;
 private:
-	struct AddComponentCommand final : public IEditorCommand
+	struct AddComponentCommand final : IEditorCommand
 	{
 		AddComponentCommand(WorldEditorImpl& editor,
 							Span<const EntityRef> entities,
@@ -1292,7 +1290,7 @@ private:
 	};
 
 
-	class MakeParentCommand final : public IEditorCommand
+	struct MakeParentCommand final : IEditorCommand
 	{
 	public:
 		explicit MakeParentCommand(WorldEditor& editor)
@@ -1347,7 +1345,7 @@ private:
 	};
 
 
-	class DestroyEntitiesCommand final : public IEditorCommand
+	struct DestroyEntitiesCommand final : IEditorCommand
 	{
 	public:
 		explicit DestroyEntitiesCommand(WorldEditor& editor)
@@ -1533,7 +1531,7 @@ private:
 	};
 
 
-	class DestroyComponentCommand final : public IEditorCommand
+	struct DestroyComponentCommand final : IEditorCommand
 	{
 	public:
 		explicit DestroyComponentCommand(WorldEditor& editor)
@@ -1632,7 +1630,7 @@ private:
 	};
 
 
-	struct AddEntityCommand final : public IEditorCommand
+	struct AddEntityCommand final : IEditorCommand
 	{
 		AddEntityCommand(WorldEditorImpl& editor, const DVec3& position)
 			: m_editor(editor)
@@ -1887,7 +1885,7 @@ public:
 	}
 
 
-	void setRenderInterface(class RenderInterface* interface) override
+	void setRenderInterface(struct RenderInterface* interface) override
 	{
 		m_render_interface = interface;
 		m_editor_icons->setRenderInterface(m_render_interface);
@@ -2832,7 +2830,7 @@ private:
 };
 
 
-class PasteEntityCommand final : public IEditorCommand
+struct PasteEntityCommand final : IEditorCommand
 {
 public:
 	PasteEntityCommand(WorldEditor& editor, const OutputMemoryStream& copy_buffer, bool identity = false)

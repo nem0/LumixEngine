@@ -8,15 +8,15 @@ namespace Lumix
 {
 
 
-class ArrayDescriptorBase;
+struct ArrayDescriptorBase;
 struct ComponentUID;
 struct IEnumPropertyDescriptor;
-class PropertyDescriptorBase;
-class WorldEditor;
-class StudioApp;
+struct PropertyDescriptorBase;
+struct WorldEditor;
+struct StudioApp;
 
 
-class LUMIX_EDITOR_API PropertyGrid
+struct LUMIX_EDITOR_API PropertyGrid
 {
 friend struct GridUIVisitor;
 public:

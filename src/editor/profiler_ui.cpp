@@ -4,9 +4,8 @@
 #include "engine/crt.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
-#include "engine/fibers.h"
 #include "engine/file_system.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -89,7 +88,7 @@ static const char* getContexSwitchReasonString(i8 reason)
 }
 
 
-struct ProfilerUIImpl final : public ProfilerUI
+struct ProfilerUIImpl final : ProfilerUI
 {
 	ProfilerUIImpl(Debug::Allocator* allocator, Engine& engine)
 		: m_main_allocator(allocator)

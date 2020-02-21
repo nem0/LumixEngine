@@ -4,7 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/string.h"
 #include <dlfcn.h>
 #include <dirent.h>

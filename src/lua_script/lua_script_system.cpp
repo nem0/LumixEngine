@@ -2,14 +2,13 @@
 #include "animation/animation_scene.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
-#include "engine/binary_array.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
 #include "engine/flag_set.h"
 #include "engine/allocator.h"
 #include "engine/input_system.h"
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/profiler.h"
@@ -17,7 +16,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "gui/gui_scene.h"
 #include "lua_script/lua_script.h"
 
@@ -38,7 +37,7 @@ namespace Lumix
 	};
 
 
-	struct LuaScriptManager final : public ResourceManager
+	struct LuaScriptManager final : ResourceManager
 	{
 		LuaScriptManager(IAllocator& allocator)
 			: ResourceManager(allocator)
@@ -58,9 +57,8 @@ namespace Lumix
 	};
 
 
-	class LuaScriptSystemImpl final : public IPlugin
+	struct LuaScriptSystemImpl final : IPlugin
 	{
-	public:
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
@@ -75,7 +73,7 @@ namespace Lumix
 	};
 
 
-	struct LuaScriptSceneImpl final : public LuaScriptScene
+	struct LuaScriptSceneImpl final : LuaScriptScene
 	{
 		struct TimerData
 		{
@@ -147,9 +145,13 @@ namespace Lumix
 				ASSERT(lua_type(L, -1) == LUA_TTABLE);
 				lua_pushnil(L); // [env, nil]
 				IAllocator& allocator = m_scene.m_system.m_allocator;
-				BinaryArray valid_properties(allocator);
-				valid_properties.resize(inst.m_properties.size());
-				valid_properties.setAllZeros();
+				u32 valid_properties[256];
+				if (inst.m_properties.size() >= sizeof(valid_properties) * 8) {
+					logError("Lua Script") << "Too many properties in " << inst.m_script->getPath() << ", entity " << m_entity.index
+						<< ". Some will be ignored.";
+					inst.m_properties.shrink(sizeof(valid_properties) * 8);
+				}
+				memset(valid_properties, 0, (inst.m_properties.size() + 7) / 8);
 
 				while (lua_next(L, -2)) // [env, key, value] | [env]
 				{
@@ -166,32 +168,34 @@ namespace Lumix
 							if (hash != INDEX_HASH && hash != THIS_HASH)
 							{
 								int prop_index = getProperty(inst, hash);
-								if (prop_index >= 0)
-								{
-									valid_properties[prop_index] = true;
+								if (prop_index >= 0) {
+									valid_properties[prop_index / 8] |=  1 << (prop_index % 8);
 									Property& existing_prop = inst.m_properties[prop_index];
-									if (existing_prop.type == Property::ANY)
-									{
-										switch (lua_type(inst.m_state, -1))
-										{
-										case LUA_TSTRING: existing_prop.type = Property::STRING; break;
-										case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
-										default: existing_prop.type = Property::FLOAT;
+									if (existing_prop.type == Property::ANY) {
+										switch (lua_type(inst.m_state, -1)) {
+											case LUA_TSTRING: existing_prop.type = Property::STRING; break;
+											case LUA_TBOOLEAN: existing_prop.type = Property::BOOLEAN; break;
+											default: existing_prop.type = Property::FLOAT;
 										}
 									}
 									m_scene.applyProperty(inst, existing_prop, existing_prop.stored_value.c_str());
 								}
-								else
-								{
-									auto& prop = inst.m_properties.emplace(allocator);
-									valid_properties.push(true);
-									switch (lua_type(inst.m_state, -1))
-									{
-									case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
-									case LUA_TSTRING: prop.type = Property::STRING; break;
-									default: prop.type = Property::FLOAT;
+								else {
+									const int prop_index = inst.m_properties.size();
+									if (inst.m_properties.size() < sizeof(valid_properties) * 8) {
+										auto& prop = inst.m_properties.emplace(allocator);
+										valid_properties[prop_index / 8] |=  1 << (prop_index % 8);
+										switch (lua_type(inst.m_state, -1)) {
+											case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
+											case LUA_TSTRING: prop.type = Property::STRING; break;
+											default: prop.type = Property::FLOAT;
+										}
+										prop.name_hash = hash;
 									}
-									prop.name_hash = hash;
+									else {
+										logError("Lua Script") << "Too many properties in " << inst.m_script->getPath() << ", entity " << m_entity.index
+											<< ". Some will be ignored.";
+									}
 								}
 							}
 						}
@@ -201,7 +205,7 @@ namespace Lumix
 				// [env]
 				for (int i = inst.m_properties.size() - 1; i >= 0; --i)
 				{
-					if (valid_properties[i]) continue;
+					if (valid_properties[i / 8] & (i % 8)) continue;
 					inst.m_properties.swapAndPop(i);
 				}
 				lua_pop(L, 1);
@@ -1517,8 +1521,8 @@ namespace Lumix
 				case InputSystem::Event::DEVICE_REMOVED:
 					break;
 				case InputSystem::Event::BUTTON:
-					LuaWrapper::push(L, (u32)event.data.button.state); // [lua_event, button.state]
-					lua_setfield(L, -2, "state"); // [lua_event]
+					LuaWrapper::push(L, event.data.button.down); // [lua_event, button.down]
+					lua_setfield(L, -2, "down"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.x_abs]
 					lua_setfield(L, -2, "key_id"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.x_abs); // [lua_event, button.x_abs]

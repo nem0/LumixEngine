@@ -14,12 +14,8 @@
 namespace Lumix
 {
 
-
-struct IAllocator;
 struct Log;
-class Path;
-class String;
-template <typename T> class DelegateList;
+template <typename T> struct DelegateList;
 
 enum class LogLevel {
 	INFO,
@@ -32,25 +28,25 @@ enum class LogLevel {
 using LogCallback = DelegateList<void (LogLevel, const char*, const char*)>;
 
 
-class LUMIX_ENGINE_API LogProxy {
-	public:
-		LogProxy(Log* log, const char* system);
-		~LogProxy();
+struct LUMIX_ENGINE_API LogProxy {
+public:
+	LogProxy(Log* log, const char* system);
+	~LogProxy();
 
-		LogProxy& operator <<(const char* message);
-		LogProxy& operator <<(float message);
-		LogProxy& operator <<(i32 message);
-		LogProxy& operator <<(u32 message);
-		LogProxy& operator <<(u64 message);
-		LogProxy& operator <<(const String& path);
-		LogProxy& operator <<(const Path& path);
-			
-	private:
-		Log* log;
-		const char* system;
+	LogProxy& operator <<(const char* message);
+	LogProxy& operator <<(float message);
+	LogProxy& operator <<(i32 message);
+	LogProxy& operator <<(u32 message);
+	LogProxy& operator <<(u64 message);
+	LogProxy& operator <<(const struct String& path);
+	LogProxy& operator <<(const struct Path& path);
+		
+private:
+	Log* log;
+	const char* system;
 
-		LogProxy(const LogProxy&) = delete;
-		void operator = (const LogProxy&) = delete;
+	LogProxy(const LogProxy&) = delete;
+	void operator = (const LogProxy&) = delete;
 };
 
 

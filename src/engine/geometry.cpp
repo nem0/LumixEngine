@@ -490,6 +490,25 @@ void AABB::getCorners(const Matrix& matrix, Vec3* points) const
 	points[7] = matrix.transformPoint(p);
 }
 
+void AABB::getCorners(const Transform& tr, DVec3* points) const
+{
+	DVec3 p(min.x, min.y, min.z);
+	points[0] = tr.transform(p);
+	p = DVec3(min.x, min.y, max.z);
+	points[1] = tr.transform(p);
+	p = DVec3(min.x, max.y, min.z);
+	points[2] = tr.transform(p);
+	p = DVec3(min.x, max.y, max.z);
+	points[3] = tr.transform(p);
+	p = DVec3(max.x, min.y, min.z);
+	points[4] = tr.transform(p);
+	p = DVec3(max.x, min.y, max.z);
+	points[5] = tr.transform(p);
+	p = DVec3(max.x, max.y, min.z);
+	points[6] = tr.transform(p);
+	p = DVec3(max.x, max.y, max.z);
+	points[7] = tr.transform(p);
+}
 
 Vec3 AABB::minCoords(const Vec3& a, const Vec3& b)
 {

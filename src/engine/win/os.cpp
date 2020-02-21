@@ -2,7 +2,7 @@
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/string.h"
 #define UNICODE
 #pragma warning(push)
@@ -872,7 +872,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 
 	char tmp[MAX_PATH_LENGTH];
 	fromWChar(Span(tmp), wtmp);
-	if (res) PathUtils::normalize(tmp, out);
+	if (res) Path::normalize(tmp, out);
 	return res;
 }
 
@@ -924,7 +924,7 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 	if (res) {
 		char tmp[MAX_PATH_LENGTH];
 		fromWChar(Span(tmp), wout);
-		PathUtils::normalize(tmp, out);
+		Path::normalize(tmp, out);
 	}
 	else {
 		auto err = CommDlgExtendedError();

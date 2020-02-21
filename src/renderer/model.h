@@ -19,12 +19,12 @@ struct lua_State;
 namespace Lumix
 {
 
-class Material;
+struct Material;
 struct Mesh;
-class Model;
+struct Model;
 struct Pose;
-class Renderer;
-class InputMemoryStream;
+struct Renderer;
+struct InputMemoryStream;
 
 
 struct LUMIX_RENDERER_API RayCastModelHit
@@ -125,7 +125,7 @@ struct LODMeshIndices
 };
 
 
-class LUMIX_RENDERER_API Model final : public Resource
+struct LUMIX_RENDERER_API Model final : Resource
 {
 public:
 	using BoneMap = HashMap<u32, int, HashFuncDirect<u32>>;

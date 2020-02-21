@@ -13,13 +13,12 @@ namespace Lumix
 struct Transform;
 struct Vec3;
 struct Viewport;
-class WorldEditor;
-template <typename T> class Array;
+struct WorldEditor;
+template <typename T> struct Array;
 
 
-class LUMIX_EDITOR_API Gizmo
+struct LUMIX_EDITOR_API Gizmo
 {
-public:
 	struct RenderData
 	{
 		RenderData(IAllocator& allocator) 

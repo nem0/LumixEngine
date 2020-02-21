@@ -13,11 +13,11 @@ namespace Lumix
 
 
 struct DVec3;
-class Material;
-class Renderer;
+struct Material;
+struct Renderer;
 
 
-class ParticleEmitterResource final : public Resource
+struct ParticleEmitterResource final : Resource
 {
 public:
 	static const ResourceType TYPE;
@@ -48,11 +48,11 @@ private:
 
 
 
-class Material;
-class ResourceManagerHub;
+struct Material;
+struct ResourceManagerHub;
 
 
-class LUMIX_RENDERER_API ParticleEmitter
+struct LUMIX_RENDERER_API ParticleEmitter
 {
 public:
 	ParticleEmitter(EntityPtr entity, IAllocator& allocator);

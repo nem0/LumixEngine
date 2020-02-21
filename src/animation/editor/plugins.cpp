@@ -17,7 +17,7 @@
 #include "controller_editor.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"

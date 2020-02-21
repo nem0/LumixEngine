@@ -13,11 +13,11 @@ namespace Lumix
 {
 
 
-class Renderer;
-class Texture;
+struct Renderer;
+struct Texture;
 
 
-class LUMIX_RENDERER_API Shader final : public Resource
+struct LUMIX_RENDERER_API Shader final : Resource
 {
 public:
 	struct TextureSlot

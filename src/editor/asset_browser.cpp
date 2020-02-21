@@ -9,8 +9,8 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/log.h"
-#include "engine/path_utils.h"
 #include "engine/os.h"
+#include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
@@ -141,7 +141,7 @@ void AssetBrowser::changeDir(const char* path)
 	}
 	m_file_infos.clear();
 
-	PathUtils::normalize(path, Span(m_dir.data));
+	Path::normalize(path, Span(m_dir.data));
 	int len = stringLength(m_dir);
 	if (len > 0 && (m_dir[len - 1] == '/' || m_dir[len - 1] == '\\')) {
 		m_dir.data[len - 1] = '\0';
@@ -170,10 +170,10 @@ void AssetBrowser::changeDir(const char* path)
 			copyNString(Span(filename), subres.begin(), subres.length());
 			catString(filename, ":");
 			const int tmp_len = stringLength(filename);
-			PathUtils::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), res.path.c_str());
+			Path::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), res.path.c_str());
 		}
 		else {
-			PathUtils::getBasename(Span(filename), res.path.c_str());
+			Path::getBasename(Span(filename), res.path.c_str());
 		}
 		clampText(filename, TILE_SIZE);
 
@@ -227,7 +227,7 @@ void AssetBrowser::dirColumn()
 	if (ImGui::Selectable("..", &b))
 	{
 		char dir[MAX_PATH_LENGTH];
-		PathUtils::getDir(Span(dir), m_dir);
+		Path::getDir(Span(dir), m_dir);
 		changeDir(dir);
 	}
 
@@ -459,7 +459,7 @@ void AssetBrowser::fileColumn()
 		if (ImGui::BeginMenu("Rename")) {
 			ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp));
 			if (ImGui::Button("Rename", ImVec2(100, 0))) {
-				PathUtils::FileInfo fi(m_file_infos[m_context_resource].filepath);
+				PathInfo fi(m_file_infos[m_context_resource].filepath);
 				StaticString<MAX_PATH_LENGTH> new_path(fi.m_dir, tmp, ".", fi.m_extension);
 				if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
 					logError("Editor") << "Failed to rename " << m_file_infos[m_context_resource].filepath << " to " << new_path;
@@ -683,7 +683,7 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 
 static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 {
-	PathUtils::FileInfo fi(src);
+	PathInfo fi(src);
 	StaticString<MAX_PATH_LENGTH> dst_dir(dest, "/", fi.m_basename);
 	OS::makePath(dst_dir);
 	OS::FileIterator* iter = OS::createFileIterator(src, allocator);
@@ -716,7 +716,7 @@ bool AssetBrowser::onDropFile(const char* path)
 		IAllocator& allocator = m_app.getAllocator();
 		copyDir(path, tmp, allocator);
 	}
-	PathUtils::FileInfo fi(path);
+	PathInfo fi(path);
 	StaticString<MAX_PATH_LENGTH> dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
 	return OS::copyFile(path, dest);
 }
@@ -774,7 +774,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 			char ext[10];
 			const char* path = (const char*)payload->Data;
 			Span<const char> subres = getSubresource(path);
-			PathUtils::getExtension(Span(ext), subres);
+			Path::getExtension(Span(ext), subres);
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
 			if (compiler.acceptExtension(ext, type)) {
 				copyString(buf, path);

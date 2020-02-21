@@ -116,7 +116,7 @@ struct FBXImporter
 		Matrix transform_matrix = Matrix::IDENTITY;
 	};
 
-	FBXImporter(class StudioApp& app);
+	FBXImporter(struct StudioApp& app);
 	~FBXImporter();
 	bool setSource(const char* filename, bool ignore_geometry);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
@@ -124,7 +124,7 @@ struct FBXImporter
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
 	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* src, const ImportConfig& cfg);
-	bool createImpostorTextures(class Model* model, Ref<Array<u32>> gb0_rgba, Ref<Array<u32>> gb1_rgba, Ref<IVec2> size);
+	bool createImpostorTextures(struct Model* model, Ref<Array<u32>> gb0_rgba, Ref<Array<u32>> gb1_rgba, Ref<IVec2> size);
 
 	const Array<ImportMesh>& getMeshes() const { return meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return animations; }
@@ -167,7 +167,7 @@ private:
 
 	
 	IAllocator& allocator;
-	class FileSystem& filesystem;
+	struct FileSystem& filesystem;
 	StudioApp& app;
 	struct AssetCompiler& compiler;
 	Array<ImportMaterial> materials;

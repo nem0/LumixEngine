@@ -10,11 +10,11 @@ namespace Lumix
 {
 
 
-class Animation;
+struct Animation;
 struct IAllocator;
-class OutputMemoryStream;
-template<class Key> struct HashFunc;
-template <typename K, typename V, typename H> class HashMap;
+struct OutputMemoryStream;
+template <typename Key> struct HashFunc;
+template <typename K, typename V, typename H> struct HashMap;
 
 
 namespace Anim

@@ -4,9 +4,6 @@
 
 namespace Lumix
 {
-namespace MT
-{
-
 
 LUMIX_ENGINE_API i64 atomicIncrement(i64 volatile* value);
 LUMIX_ENGINE_API i32 atomicIncrement(i32 volatile* value);
@@ -19,6 +16,4 @@ LUMIX_ENGINE_API bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 c
 LUMIX_ENGINE_API bool compareAndExchange64(i64 volatile* dest, i64 exchange, i64 comperand);
 LUMIX_ENGINE_API void memoryBarrier();
 
-
-} // namespace MT
 } // namespace Lumix

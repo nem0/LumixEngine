@@ -1,7 +1,7 @@
 #include "engine/lumix.h"
 #include "engine/allocator.h"
-#include "engine/mt/sync.h"
-#include "engine/mt/thread.h"
+#include "engine/sync.h"
+#include "engine/thread.h"
 #include "engine/os.h"
 #include "engine/win/simple_win.h"
 #include "engine/profiler.h"
@@ -9,11 +9,9 @@
 
 namespace Lumix
 {
-namespace MT
-{
 
 
-const u32 STACK_SIZE = 0x8000;
+static constexpr u32 STACK_SIZE = 0x8000;
 
 struct ThreadImpl
 {
@@ -30,7 +28,7 @@ struct ThreadImpl
 	volatile bool m_is_running;
 	volatile bool m_exited;
 	const char* m_thread_name;
-	MT::ConditionVariable m_cv;
+	ConditionVariable m_cv;
 	Thread* m_owner;
 };
 
@@ -157,6 +155,5 @@ IAllocator& Thread::getAllocator()
 	return m_implementation->m_allocator;
 }
 
-} // namespace MT
 } // namespace Lumix
 

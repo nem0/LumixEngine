@@ -3,7 +3,7 @@
 #include "engine/geometry.h"
 #include "engine/math.h"
 #include "engine/os.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "render_interface.h"
 
 
@@ -54,7 +54,7 @@ enum class CoordSystem
 };
 
 
-struct GizmoImpl final : public Gizmo
+struct GizmoImpl final : Gizmo
 {
 	static const int MAX_GIZMOS = 16;
 	

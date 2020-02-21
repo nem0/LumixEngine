@@ -85,7 +85,7 @@ static const struct
 	{"finishing", Types::BOOL, {Types::NONE}}};
 
 
-class ExpressionCompiler
+struct ExpressionCompiler
 {
 public:
 	struct Token
@@ -195,7 +195,7 @@ private:
 };
 
 
-class ExpressionVM
+struct ExpressionVM
 {
 public:
 	static const int STACK_SIZE = 50;

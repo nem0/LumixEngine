@@ -8,22 +8,15 @@ namespace Lumix
 {
 
 
-class FileSystem;
-class Path;
-class Resource;
-struct ResourceType;
-class ResourceManagerHub;
-
-
-class LUMIX_ENGINE_API ResourceManager
+struct LUMIX_ENGINE_API ResourceManager
 {
-	friend class Resource;
-	friend class ResourceManagerHub;
+	friend struct Resource;
+	friend struct ResourceManagerHub;
 public:
-	using ResourceTable = HashMap<u32, Resource*, HashFuncDirect<u32>>;
+	using ResourceTable = HashMap<u32, struct Resource*, HashFuncDirect<u32>>;
 
 public:
-	void create(ResourceType type, ResourceManagerHub& owner);
+	void create(struct ResourceType type, struct ResourceManagerHub& owner);
 	void destroy();
 
 	void enableUnload(bool enable);
@@ -31,7 +24,7 @@ public:
 	void load(Resource& resource);
 	void removeUnreferenced();
 
-	void unload(const Path& path);
+	void unload(const struct Path& path);
 	void unload(Resource& resource);
 
 	void reload(const Path& path);
@@ -56,9 +49,9 @@ protected:
 };
 
 
-class LUMIX_ENGINE_API ResourceManagerHub
+struct LUMIX_ENGINE_API ResourceManagerHub
 {
-	typedef HashMap<u32, ResourceManager*> ResourceManagerTable;
+	using ResourceManagerTable = HashMap<u32, ResourceManager*>;
 
 public:
 	struct LUMIX_ENGINE_API LoadHook
@@ -73,7 +66,7 @@ public:
 	explicit ResourceManagerHub(IAllocator& allocator);
 	~ResourceManagerHub();
 
-	void init(FileSystem& fs);
+	void init(struct FileSystem& fs);
 
 	IAllocator& getAllocator() { return m_allocator; }
 	ResourceManager* get(ResourceType type);

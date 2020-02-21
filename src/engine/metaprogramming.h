@@ -5,26 +5,26 @@ namespace Lumix
 {
 
 
-template <class T> struct RemoveReference { using Type = T; };
-template <class T> struct RemoveReference<T&> { using Type = T; };
-template <class T> struct RemoveReference<T&&> { using Type = T; };
-template <class T> struct RemoveConst { using Type = T; };
-template <class T> struct RemoveConst<const T> { using Type = T; };
-template <class T> struct RemoveVolatile { using Type = T; };
-template <class T> struct RemoveVolatile<volatile T> { using Type = T; };
-template <class T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::Type>::Type;
-template <class T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
-template< class T > constexpr typename RemoveReference<T>::Type&& Move(T&& t) { 
+template <typename T> struct RemoveReference { using Type = T; };
+template <typename T> struct RemoveReference<T&> { using Type = T; };
+template <typename T> struct RemoveReference<T&&> { using Type = T; };
+template <typename T> struct RemoveConst { using Type = T; };
+template <typename T> struct RemoveConst<const T> { using Type = T; };
+template <typename T> struct RemoveVolatile { using Type = T; };
+template <typename T> struct RemoveVolatile<volatile T> { using Type = T; };
+template <typename T> using RemoveCR = typename RemoveConst<typename RemoveReference<T>::Type>::Type;
+template <typename T> using RemoveCVR = typename RemoveVolatile<RemoveCR<T>>::Type;
+template < typename T > constexpr typename RemoveReference<T>::Type&& Move(T&& t) { 
 	return static_cast<typename RemoveReference<T>::Type&&>(t);
 }
 
-template<typename T1, typename T2>
+template <typename T1, typename T2>
 struct IsSame
 {
 	enum { result = false };
 };
 
-template<typename T>
+template <typename T>
 struct IsSame<T, T>
 {
 	enum { result = true };
@@ -89,50 +89,50 @@ auto makeTuple(Types... types)
 	return Tuple<Types...>(types...);
 }
 
-template<class T> struct TupleSize;
+template <typename T> struct TupleSize;
 
-template<class... Types>
+template <typename... Types>
 struct TupleSize<const Tuple<Types...> >
 {
 	enum { result = sizeof...(Types) };
 };
 
-template<class... Types>
+template <typename... Types>
 struct TupleSize<Tuple<Types...> >
 {
 	enum { result = sizeof...(Types) };
 };
 
-template<int Index, class Tuple> struct TupleElement;
+template <int Index, typename Tuple> struct TupleElement;
 
-template<class HeadType, class... TailTypes>
+template <typename HeadType, typename... TailTypes>
 struct TupleElement<0, const Tuple<HeadType, TailTypes...> >
 {
 	using Head = HeadType;
 	using Tail = const Tuple<HeadType, TailTypes...>;
 };
 
-template<int Index, class Head, class... Tail>
+template <int Index, typename Head, typename... Tail>
 struct TupleElement<Index, const Tuple<Head, Tail...> >
-	: public TupleElement<Index - 1, const Tuple<Tail...> >
+	: TupleElement<Index - 1, const Tuple<Tail...> >
 {
 };
 
-template<class HeadType, class... TailTypes>
+template <typename HeadType, typename... TailTypes>
 struct TupleElement<0, Tuple<HeadType, TailTypes...> >
 {
 	using Head = HeadType;
 	using Tail = Tuple<HeadType, TailTypes...>;
 };
 
-template<int Index, class Head, class... Tail>
+template <int Index, typename Head, typename... Tail>
 struct TupleElement<Index, Tuple<Head, Tail...> >
-	: public TupleElement<Index - 1, Tuple<Tail...> >
+	: TupleElement<Index - 1, Tuple<Tail...> >
 {
 };
 
 
-template<int Index, typename... Types>
+template <int Index, typename... Types>
 constexpr auto& get(const Tuple<Types...>& tuple)
 {
 	using Subtuple = typename TupleElement<Index, const ::Lumix::Tuple<Types...> >::Tail;
@@ -140,7 +140,7 @@ constexpr auto& get(const Tuple<Types...>& tuple)
 }
 
 
-template<int Index, typename... Types>
+template <int Index, typename... Types>
 constexpr auto& get(Tuple<Types...>& tuple)
 {
 	using Subtuple = typename TupleElement<Index, ::Lumix::Tuple<Types...> >::Tail;
@@ -148,7 +148,7 @@ constexpr auto& get(Tuple<Types...>& tuple)
 }
 
 
-template <class F, class Tuple, int... I>
+template <typename F, typename Tuple, int... I>
 constexpr void apply_impl(F& f, Tuple& t, Indices<I...>)
 {
 	using expand = bool[];
@@ -161,17 +161,17 @@ constexpr void apply_impl(F& f, Tuple& t, Indices<I...>)
 	};
 }
 
-template <class F, class Tuple>
+template <typename F, typename Tuple>
 constexpr void apply_impl(F& f, Tuple& t, Indices<>) {}
 
-template <class F, class Tuple>
+template <typename F, typename Tuple>
 constexpr void apply(F& f, Tuple& t)
 {
 	apply_impl(f, t, typename BuildIndices<-1, TupleSize<Tuple>::result>::result{});
 }
 
 
-template <class F, class Tuple, int... I>
+template <typename F, typename Tuple, int... I>
 constexpr void apply_impl(const F& f, Tuple& t, Indices<I...>)
 {
 	using expand = bool[];
@@ -184,10 +184,10 @@ constexpr void apply_impl(const F& f, Tuple& t, Indices<I...>)
 	};
 }
 
-template <class F, class Tuple>
+template <typename F, typename Tuple>
 constexpr void apply_impl(const F& f, Tuple& t, Indices<>) {}
 
-template <class F, class Tuple>
+template <typename F, typename Tuple>
 constexpr void apply(const F& f, Tuple& t)
 {
 	apply_impl(f, t, typename BuildIndices<-1, TupleSize<Tuple>::result>::result{});
@@ -198,19 +198,6 @@ template <typename T> struct ResultOf;
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)const> { using Type = R; };
 template <typename R, typename C> struct ResultOf<R(C::*)> { using Type = R; };
-
-template <typename T> struct ArgCount;
-template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args...)> { static const int result = sizeof...(Args); };
-template <typename R, typename C, typename... Args> struct ArgCount<R(C::*)(Args...) const> { static const int result = sizeof...(Args); };
-
-template <typename R, typename C, typename... Args> Tuple<Args...> argsToTuple(R(C::*)(Args...));
-template <typename R, typename C, typename... Args> Tuple<Args...> argsToTuple(R(C::*)(Args...) const);
-template <typename R, typename... Args> Tuple<Args...> argsToTuple(R(Args...));
-template <typename F> decltype(argsToTuple(&F::operator())) argsToTuple(F);
-
-template <int N, typename T> struct ArgNType;
-template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...)> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
-template <int N, typename R, typename C, typename... Args> struct ArgNType<N, R(C::*)(Args...) const> { using Type = typename TupleElement<N, Tuple<Args...>>::Head; };
 
 
 template <typename T> struct ClassOf;

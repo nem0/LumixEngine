@@ -10,14 +10,14 @@ namespace Lumix
 {
 
 
-template <typename T> class Delegate;
-class LogUI;
-class Model;
-class StudioApp;
-class Pipeline;
+template <typename T> struct Delegate;
+struct LogUI;
+struct Model;
+struct StudioApp;
+struct Pipeline;
 struct RayCastModelHit;
-class Shader;
-class Universe;
+struct Shader;
+struct Universe;
 
 
 struct RenderInterfaceBase : RenderInterface {
@@ -25,10 +25,10 @@ struct RenderInterfaceBase : RenderInterface {
 };
 
 
-class SceneView : public StudioApp::GUIPlugin
+struct SceneView : StudioApp::GUIPlugin
 {
 	public:
-		typedef Delegate<bool(StudioApp&, float, float, const RayCastModelHit&)> DropHandler;
+		using DropHandler = Delegate<bool(StudioApp&, float, float, const RayCastModelHit&)>;
 
 	public:
 		explicit SceneView(StudioApp& app);

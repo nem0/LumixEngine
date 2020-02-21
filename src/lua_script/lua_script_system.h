@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "engine/iplugin.h"
+#include "engine/plugin.h"
 #include "engine/path.h"
 #include "engine/resource.h"
 #include "engine/string.h"
@@ -14,12 +14,11 @@ namespace Lumix
 {
 
 
-class LuaScript;
+struct LuaScript;
 
 
-class LuaScriptScene : public IScene
+struct LuaScriptScene : IScene
 {
-public:
 	struct Property
 	{
 		enum Type : int
@@ -56,9 +55,8 @@ public:
 	};
 
 
-	typedef int (*lua_CFunction) (lua_State *L);
+	using lua_CFunction = int (*) (lua_State *L);
 
-public:
 	virtual Path getScriptPath(EntityRef entity, int scr_index) = 0;	
 	virtual void setScriptPath(EntityRef entity, int scr_index, const Path& path) = 0;
 	virtual int getEnvironment(EntityRef entity, int scr_index) = 0;

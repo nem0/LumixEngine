@@ -8,26 +8,25 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "nodes.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
-#include "string.h" // memcpy
 
 
 namespace Lumix
 {
 
-class Animation;
-class Engine;
-class Universe;
+struct Animation;
+struct Engine;
+struct Universe;
 
 enum class AnimationSceneVersion
 {
@@ -43,7 +42,7 @@ static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType
 static const ComponentType ANIMATOR_TYPE = Reflection::getComponentType("animator");
 
 
-struct AnimationSceneImpl final : public AnimationScene
+struct AnimationSceneImpl final : AnimationScene
 {
 	friend struct AnimationSystemImpl;
 	
@@ -824,7 +823,7 @@ struct AnimationSceneImpl final : public AnimationScene
 		JobSystem::runOnWorkers([&](){
 			PROFILE_BLOCK("update animators");
 			for(;;) {
-				const i32 idx = MT::atomicIncrement(&animator_idx) - 1;
+				const i32 idx = atomicIncrement(&animator_idx) - 1;
 				if (idx >= (i32)m_animators.size()) return;
 				updateAnimator(m_animators[idx], time_delta);
 			}

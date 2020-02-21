@@ -3,13 +3,12 @@
 
 #include "engine/allocator.h"
 #include "engine/crt.h"
-#include "engine/metaprogramming.h"
 
 
 namespace Lumix
 {
 	template <typename Key, typename Value>
-	class AssociativeArray
+	struct AssociativeArray
 	{
 		public:
 			explicit AssociativeArray(IAllocator& allocator)
@@ -44,27 +43,13 @@ namespace Lumix
 			}
 
 
-			template <class _Ty> struct remove_reference
-			{
-				typedef _Ty type;
-			};
+			template <typename T> struct remove_reference { using type = T; };
+			template <typename T> struct remove_reference<T&> { using type = T; };
+			template <typename T> struct remove_reference<T&&> { using type = T; };
 
 
-			template <class _Ty> struct remove_reference<_Ty&>
-			{
-				typedef _Ty type;
-			};
-
-
-			template <class _Ty> struct remove_reference<_Ty&&>
-			{
-				typedef _Ty type;
-			};
-
-
-			template <class _Ty> _Ty&& myforward(typename remove_reference<_Ty>::type& _Arg)
-			{
-				return (static_cast<_Ty&&>(_Arg));
+			template <typename T> T&& myforward(typename remove_reference<T>::type& _Arg) {
+				return (static_cast<T&&>(_Arg));
 			}
 
 

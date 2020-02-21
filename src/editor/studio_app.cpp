@@ -18,17 +18,16 @@
 #include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/input_system.h"
-#include "engine/mt/atomic.h"
+#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
+#include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/universe/universe.h"
+#include "engine/universe.h"
 #include "log_ui.h"
 #include "profiler_ui.h"
 #include "property_grid.h"
@@ -66,7 +65,7 @@ struct TarHeader {
 #define NO_ICON "       "
 
 
-struct LuaPlugin : public StudioApp::GUIPlugin
+struct LuaPlugin : StudioApp::GUIPlugin
 {
 	LuaPlugin(StudioApp& app, const char* src, const char* filename)
 		: app(app)
@@ -154,9 +153,8 @@ struct LuaPlugin : public StudioApp::GUIPlugin
 };
 
 
-class StudioAppImpl final : public StudioApp
+struct StudioAppImpl final : StudioApp
 {
-public:
 	StudioAppImpl()
 		: m_is_entity_list_open(true)
 		, m_is_save_as_dialog_open(false)
@@ -307,10 +305,10 @@ public:
 	void run() override
 	{
 		Profiler::setThreadName("Main thread");
-		MT::Semaphore semaphore(0, 1);
+		Semaphore semaphore(0, 1);
 		struct Data {
 			StudioAppImpl* that;
-			MT::Semaphore* semaphore;
+			Semaphore* semaphore;
 		} data = {this, &semaphore};
 		JobSystem::runEx(&data, [](void* ptr) {
 			Data* data = (Data*)ptr;
@@ -576,7 +574,7 @@ public:
 		ResourceType resource_type,
 		const Reflection::PropertyBase& property) override
 	{
-		struct Plugin final : public IAddComponentPlugin
+		struct Plugin final : IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
@@ -649,7 +647,7 @@ public:
 
 	void registerComponent(const char* type, const char* label) override
 	{
-		struct Plugin final : public IAddComponentPlugin
+		struct Plugin final : IAddComponentPlugin
 		{
 			void onGUI(bool create_entity, bool from_filter) override
 			{
@@ -886,7 +884,7 @@ public:
 				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
 					const StaticString<MAX_PATH_LENGTH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[MAX_PATH_LENGTH];
-					PathUtils::getDir(Span(dir), path);
+					Path::getDir(Span(dir), path);
 					OS::makePath(dir);
 					if (!OS::fileExists(path)) {
 						OS::OutputFile file;
@@ -1220,7 +1218,7 @@ public:
 		char tmp[MAX_PATH_LENGTH];
 		if (OS::getSaveFilename(Span(tmp), "Prefab files\0*.fab\0", "fab"))
 		{
-			PathUtils::normalize(tmp, Span(filename));
+			Path::normalize(tmp, Span(filename));
 			const char* base_path = m_engine->getFileSystem().getBasePath();
 			if (startsWith(filename, base_path))
 			{
@@ -2061,15 +2059,15 @@ public:
 		char tmp_path[MAX_PATH_LENGTH];
 		OS::getExecutablePath(Span(tmp_path));
 		StaticString<MAX_PATH_LENGTH> copy_path;
-		PathUtils::getDir(Span(copy_path.data), tmp_path);
+		Path::getDir(Span(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
 		OS::makePath(copy_path);
-		PathUtils::getBasename(Span(tmp_path), src);
+		Path::getBasename(Span(tmp_path), src);
 		copy_path << "/" << tmp_path << "." << getPluginExtension();
 #ifdef _WIN32
 		StaticString<MAX_PATH_LENGTH> src_pdb(src);
 		StaticString<MAX_PATH_LENGTH> dest_pdb(copy_path);
-		if (PathUtils::replaceExtension(dest_pdb.data, "pdb") && PathUtils::replaceExtension(src_pdb.data, "pda"))
+		if (Path::replaceExtension(dest_pdb.data, "pdb") && Path::replaceExtension(src_pdb.data, "pda"))
 		{
 			OS::deleteFile(dest_pdb);
 			if (!OS::copyFile(src_pdb, dest_pdb))
@@ -2127,9 +2125,9 @@ public:
 			{
 				char dir[MAX_PATH_LENGTH];
 				char basename[MAX_PATH_LENGTH];
-				PathUtils::getBasename(Span(basename), src);
+				Path::getBasename(Span(basename), src);
 				m_watched_plugin.basename = basename;
-				PathUtils::getDir(Span(dir), src);
+				Path::getDir(Span(dir), src);
 				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
 				m_watched_plugin.watcher->getCallback().bind<&StudioAppImpl::onPluginChanged>(this);
 				m_watched_plugin.dir = dir;
@@ -2156,15 +2154,15 @@ public:
 	void onPluginChanged(const char* path)
 	{
 		const char* ext = getPluginExtension();
-		if (!PathUtils::hasExtension(path, ext)
+		if (!Path::hasExtension(path, ext)
 #ifdef _WIN32
-			&& !PathUtils::hasExtension(path, "pda")
+			&& !Path::hasExtension(path, "pda")
 #endif
 		)
 			return;
 
 		char basename[MAX_PATH_LENGTH];
-		PathUtils::getBasename(Span(basename), path);
+		Path::getBasename(Span(basename), path);
 		if (!equalIStrings(basename, m_watched_plugin.basename)) return;
 
 		m_watched_plugin.reload_request = true;
@@ -2385,7 +2383,7 @@ public:
 	}
 
 
-	struct SetPropertyVisitor : public Reflection::IPropertyVisitor
+	struct SetPropertyVisitor : Reflection::IPropertyVisitor
 	{
 		void visit(const Reflection::Property<int>& prop) override
 		{
@@ -2703,7 +2701,7 @@ public:
 		while (OS::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
-			PathUtils::normalize(info.filename, Span(normalized_path));
+			Path::normalize(info.filename, Span(normalized_path));
 			if (info.is_directory)
 			{
 				if (!includeDirInPack(normalized_path)) continue;
@@ -2879,7 +2877,7 @@ public:
 		{
 			char tmp[MAX_PATH_LENGTH];
 			OS::getExecutablePath(Span(tmp));
-			PathUtils::getDir(Span(src_dir.data), tmp);
+			Path::getDir(Span(src_dir.data), tmp);
 		}
 		for (auto& file : bin_files)
 		{
@@ -2939,7 +2937,7 @@ public:
 			if (startsWith(info.filename, "__")) continue;
 
 			char basename[MAX_PATH_LENGTH];
-			PathUtils::getBasename(Span(basename), info.filename);
+			Path::getBasename(Span(basename), info.filename);
 			m_universes.emplace(basename);
 		}
 		OS::destroyFileIterator(iter);
@@ -2953,7 +2951,7 @@ public:
 		while (OS::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
-			PathUtils::normalize(info.filename, Span(normalized_path));
+			Path::normalize(info.filename, Span(normalized_path));
 			if (normalized_path[0] == '.') continue;
 			if (info.is_directory)
 			{
@@ -2966,7 +2964,7 @@ public:
 			else
 			{
 				char ext[5];
-				PathUtils::getExtension(Span(ext), Span(info.filename, stringLength(info.filename)));
+				Path::getExtension(Span(ext), Span(info.filename, stringLength(info.filename)));
 				if (equalStrings(ext, "lua"))
 				{
 					loadLuaPlugin(dir, info.filename);

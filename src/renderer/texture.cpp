@@ -2,7 +2,7 @@
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
-#include "engine/path_utils.h"
+#include "engine/path.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
@@ -266,7 +266,7 @@ void Texture::save()
 {
 	char ext[5];
 	ext[0] = 0;
-	PathUtils::getExtension(Span(ext), Span(getPath().c_str(), getPath().length()));
+	Path::getExtension(Span(ext), Span(getPath().c_str(), getPath().length()));
 	if (equalStrings(ext, "raw") && format == gpu::TextureFormat::R16)
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
