@@ -205,7 +205,7 @@ namespace Lumix
 				// [env]
 				for (int i = inst.m_properties.size() - 1; i >= 0; --i)
 				{
-					if (valid_properties[i / 8] & (i % 8)) continue;
+					if (valid_properties[i / 8] & (1 << (i % 8))) continue;
 					inst.m_properties.swapAndPop(i);
 				}
 				lua_pop(L, 1);
