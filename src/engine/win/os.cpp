@@ -348,8 +348,6 @@ static void processEvents()
 				e.type = Event::Type::CHAR;
 				e.text_input.utf8 = 0;
 				UTF32ToUTF8((u32)msg.wParam, (char*)&e.text_input.utf8);
-				// TODO msg.wParam is utf16, convert
-				// e.g. https://github.com/SFML/SFML/blob/master/src/SFML/Window/Win32/WindowImplWin32.cpp#L694
 				G.iface->onEvent(e);
 				break;
 			case WM_INPUT: {
