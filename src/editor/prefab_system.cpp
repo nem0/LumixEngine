@@ -455,7 +455,7 @@ public:
 
 
 	void recreateInstances(PrefabHandle prefab) {
-		for (PrefabHandle p : m_entity_to_prefab) {
+		for (PrefabHandle& p : m_entity_to_prefab) {
 			if (p != prefab) continue;
 			const i32 idx = i32(&p - m_entity_to_prefab.begin());
 			const EntityRef e = {idx};
