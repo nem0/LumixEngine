@@ -318,8 +318,8 @@ int FSTask::task()
 				if(!success) {
 					m_fs.m_finished.back().flags.set(AsyncItem::Flags::FAILED);
 				}
-				m_fs.m_queue.erase(0);
 			}
+			m_fs.m_queue.erase(0);
 		}
 	}
 	return 0;

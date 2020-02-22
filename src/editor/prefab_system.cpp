@@ -223,7 +223,6 @@ public:
 
 	void setPrefab(EntityRef entity, PrefabHandle prefab) override
 	{
-		// TODO remove prefab (root entity), then undo it, does it work?
 		reserve(entity);
 		m_entity_to_prefab[entity.index] = prefab;
 	}
