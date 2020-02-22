@@ -690,7 +690,10 @@ Point getMousePos(WindowHandle win)
 	POINT p;
 	BOOL b = GetCursorPos(&p);
 	ScreenToClient((HWND)win, &p);
-	ASSERT(b);
+	if (!b) {
+		auto err = GetLastError();
+		ASSERT(false);
+	}
 	return {p.x, p.y};
 }
 
@@ -698,7 +701,10 @@ Point getMouseScreenPos()
 {
 	POINT p;
 	BOOL b = GetCursorPos(&p);
-	ASSERT(b);
+	if (!b) {
+		auto err = GetLastError();
+		ASSERT(false);
+	}
 	return {p.x, p.y};
 }
 

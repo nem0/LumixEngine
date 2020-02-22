@@ -324,6 +324,7 @@ public:
 		const EntityRef dst_e = dst_u.createEntity({0, 0, 0}, {0, 0, 0, 1});
 		if (dst_parent.isValid()) {
 			dst_u.setParent(dst_parent, dst_e);
+			dst_u.setLocalTransform(dst_e, src_u.getLocalTransform(src_e));
 		}
 		const char* name = src_u.getEntityName(src_e);
 		if (name[0]) {
