@@ -534,7 +534,6 @@ public:
 
 	void deserialize(IInputStream& serializer, const EntityMap& entity_map) override
 	{
-		// TODO additive loading
 		u32 count;
 		serializer.read(count);
 		m_entity_to_prefab.resize(count);

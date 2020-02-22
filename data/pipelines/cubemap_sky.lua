@@ -1,5 +1,5 @@
 sky = -1
-Editor.setPropertyType("sky", Editor.RESOURCE_PROPERTY, "texture")
+Editor.setPropertyType(this, "sky", Editor.RESOURCE_PROPERTY, "texture")
 
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end

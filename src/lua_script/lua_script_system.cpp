@@ -547,19 +547,29 @@ namespace Lumix
 
 		static int setPropertyType(lua_State* L)
 		{
-			const char* prop_name = LuaWrapper::checkArg<const char*>(L, 1);
-			int type = LuaWrapper::checkArg<int>(L, 2);
+			LuaWrapper::DebugGuard guard(L);
+			LuaWrapper::checkTableArg(L, 1);
+			const char* prop_name = LuaWrapper::checkArg<const char*>(L, 2);
+			int type = LuaWrapper::checkArg<int>(L, 3);
 			ResourceType resource_type;
-			if (type == Property::Type::RESOURCE)
-			{
-				resource_type = ResourceType(LuaWrapper::checkArg<const char*>(L, 3));
+			if (type == Property::Type::RESOURCE) {
+				resource_type = ResourceType(LuaWrapper::checkArg<const char*>(L, 4));
 			}
-			lua_getglobal(L, "g_scene_lua_script");
-			if(lua_type(L, -1) == LUA_TLIGHTUSERDATA) {
-				luaL_error(L, "%s", "Invalid g_scene_lua_script");
+
+			lua_getfield(L, 1, "universe");
+			if (!lua_istable(L, -1)) {
+				luaL_error(L, "%s", "Invalid `this.universe`");
 			}
-			auto* scene = LuaWrapper::toType<LuaScriptSceneImpl*>(L, -1);
-			lua_pop(L, -1);
+
+			lua_getfield(L, -1, "value");
+			if (!lua_islightuserdata(L, -1)) {
+				luaL_error(L, "%s", "Invalid `this.universe.value`");
+			}
+
+			auto* universe = LuaWrapper::toType<Universe*>(L, -1);
+			auto* scene = (LuaScriptSceneImpl*)universe->getScene(LUA_SCRIPT_TYPE);
+
+			lua_pop(L, 2);
 			u32 prop_name_hash = crc32(prop_name);
 			for (auto& prop : scene->m_current_script_instance->m_properties)
 			{
