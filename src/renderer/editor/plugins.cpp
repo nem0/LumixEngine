@@ -1279,13 +1279,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		EntityMap entity_map(m_app.getAllocator());
 		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, Ref(entity_map))) return;
-		// TODO there can be more than one model or model not in root
-		const EntityPtr mesh_entity = entity_map.m_map[0];
-		if (!mesh_entity.isValid()) return;
+		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
 
 		m_tile.path_hash = prefab->getPath().getHash();
 		prefab->getResourceManager().unload(*prefab);
-		m_tile.entity = mesh_entity;
+		m_tile.entity = entity_map.m_map[0];
 		m_tile.waiting = true;
 	}
 
