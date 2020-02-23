@@ -3931,7 +3931,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			if (!create_empty)
 			{
 				auto* prop = Reflection::getProperty(TERRAIN_TYPE, "Material");
-				editor.setProperty(TERRAIN_TYPE, -1, *prop, &entity, 1, buf, stringLength(buf) + 1);
+				editor.setProperty(TERRAIN_TYPE, "Material", Span(&entity, 1), Span((u8*)buf, stringLength(buf) + 1));
 			}
 
 			ImGui::CloseCurrentPopup();
@@ -3966,18 +3966,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("environment", "Render / Environment");
 		m_app.registerComponent("light_probe_grid", "Render / Light probe grid");
 
-		m_app.registerComponentWithResource(
-			"model_instance", "Render / Mesh", Model::TYPE, *Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source"));
-		m_app.registerComponentWithResource("particle_emitter",
-			"Render / Particle emitter",
-			ParticleEmitterResource::TYPE,
-			*Reflection::getProperty(PARTICLE_EMITTER_TYPE, "Resource"));
+		m_app.registerComponentWithResource("model_instance", "Render / Mesh", Model::TYPE, "Source");
+		m_app.registerComponentWithResource("particle_emitter", "Render / Particle emitter", ParticleEmitterResource::TYPE, "Resource");
 		m_app.registerComponent("point_light", "Render / Point light");
 		m_app.registerComponent("decal", "Render / Decal");
 		m_app.registerComponent("bone_attachment", "Render / Bone attachment");
 		m_app.registerComponent("environment_probe", "Render / Environment probe");
-		m_app.registerComponentWithResource(
-			"text_mesh", "Render / Text 3D", FontResource::TYPE, *Reflection::getProperty(TEXT_MESH_TYPE, "Font"));
+		m_app.registerComponentWithResource("text_mesh", "Render / Text 3D", FontResource::TYPE, "Font");
 
 		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
 		m_app.registerComponent("terrain", *m_add_terrain_plugin);

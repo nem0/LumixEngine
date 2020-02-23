@@ -1133,8 +1133,8 @@ struct Prop {
 	template <typename S> void setterStub(T value) const { (*(const S*)m_setter)(value); }
 	template <typename G> T getterStub() const { return (*(const G*)m_getter)(); }
 
-	T get() { return (this->*m_getter_stub)(); }
-	void set(T value) { (this->*m_setter_stub)(value); }
+	T get() const { return (this->*m_getter_stub)(); }
+	void set(T value) const { (this->*m_setter_stub)(value); }
 
 	const char* m_name;
 	const void* m_getter;

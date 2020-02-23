@@ -384,7 +384,7 @@ private:
 		for (int i = 0; i < m_copy_position_buffer_count; ++i)
 		{
 			CopyPositionBufferItem& item = m_copy_position_buffer[i];
-			m_editor->setProperty(GUI_RECT_TYPE, -1, *item.prop, &e, 1, &item.value, sizeof(item.value));
+			m_editor->setProperty(GUI_RECT_TYPE, item.prop->name, Span(&e, 1), Span((u8*)&item.value, sizeof(item.value)));
 		}
 		m_editor->endCommandGroup();
 	}
@@ -562,7 +562,7 @@ private:
 	{
 		const Reflection::PropertyBase* prop = Reflection::getProperty(GUI_RECT_TYPE, crc32(prop_name));
 		ASSERT(prop);
-		m_editor->setProperty(GUI_RECT_TYPE, -1, *prop, &e, 1, &value, sizeof(value));
+		m_editor->setProperty(GUI_RECT_TYPE, prop_name, Span(&e, 1), Span((u8*)&value, sizeof(value)));
 	}
 
 
@@ -773,7 +773,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		m_app.registerComponent("gui_button", "GUI / Button");
-		m_app.registerComponentWithResource("gui_image", "GUI / Image", Sprite::TYPE, *Reflection::getProperty(GUI_IMAGE_TYPE, "Sprite"));
+		m_app.registerComponentWithResource("gui_image", "GUI / Image", Sprite::TYPE, "Sprite");
 		m_app.registerComponent("gui_input_field", "GUI / Input field");
 		m_app.registerComponent("gui_rect", "GUI / Rect");
 		m_app.registerComponent("gui_render_target", "GUI / Render target");

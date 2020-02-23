@@ -1207,43 +1207,127 @@ private:
 struct SetPropertyCommand final : IEditorCommand
 {
 public:
-	explicit SetPropertyCommand(WorldEditor& editor)
-		: m_editor(editor)
-		, m_entities(editor.getAllocator())
-		, m_new_value(editor.getAllocator())
-		, m_old_value(editor.getAllocator())
-	{
-	}
+	struct GetterVisitor : IXXVisitor {
+		template <typename T>
+		bool isSrc(const Prop<T>& prop) {
+			const char* src = cmd->m_property.c_str();
+			if (!startsWith(src, prop.m_name)) return false;
+			const char c = src[stringLength(prop.m_name)];
+			return c == '\0';
+		}
 
+		template <typename T>
+		void get(const Prop<T>& prop) {
+			if (!isSrc(prop)) return;
+			const T val = prop.get();
+			buf->write(&val, sizeof(val));
+		}
+
+		void visit(Prop<float> prop) override { get(prop); }
+		void visit(Prop<bool> prop) override { get(prop); }
+		void visit(Prop<i32> prop) override { get(prop); }
+		void visit(Prop<u32> prop) override { get(prop); }
+		void visit(Prop<Vec2> prop) override { get(prop); }
+		void visit(Prop<Vec3> prop) override { get(prop); }
+		void visit(Prop<IVec3> prop) override { get(prop); }
+		void visit(Prop<Vec4> prop) override { get(prop); }
+		void visit(Prop<EntityPtr> prop) override { get(prop); }
+		
+		void visit(Prop<Path> prop) override { 
+			if (!isSrc(prop)) return;
+			const Path val = prop.get();
+			buf->write(val.c_str(), val.length() + 1);
+		}
+		void visit(Prop<const char*> prop) override { 
+			if (!isSrc(prop)) return;
+			const char* val = prop.get();
+			buf->write(val, stringLength(val) + 1);
+		}
+	
+		void beginArray(const char* name, Counter count, Adder add, Remover remove) override {}
+			
+		OutputMemoryStream* buf;
+		SetPropertyCommand* cmd;
+	};
+
+	struct SetterVisitor : IXXVisitor {
+		template <typename T>
+		bool isSrc(const Prop<T>& prop) {
+			const char* src = cmd->m_property.c_str();
+			if (!startsWith(src, prop.m_name)) return false;
+			const char c = src[stringLength(prop.m_name)];
+			return c == '\0';
+		}
+
+		template <typename T>
+		void set(const Prop<T>& prop) {
+			if (!isSrc(prop)) return;
+			T val;
+			buf->read(Ref(val));
+			prop.set(val);
+		}
+
+		void visit(Prop<float> prop) override { set(prop); }
+		void visit(Prop<bool> prop) override { set(prop); }
+		void visit(Prop<i32> prop) override { set(prop); }
+		void visit(Prop<u32> prop) override { set(prop); }
+		void visit(Prop<Vec2> prop) override { set(prop); }
+		void visit(Prop<Vec3> prop) override { set(prop); }
+		void visit(Prop<IVec3> prop) override { set(prop); }
+		void visit(Prop<Vec4> prop) override { set(prop); }
+		void visit(Prop<EntityPtr> prop) override { set(prop); }
+		
+		void visit(Prop<Path> prop) override {
+			if (!isSrc(prop)) return;
+			char val[MAX_PATH_LENGTH];
+			ASSERT(buf->size() <= sizeof(val));
+			buf->read(val, buf->size());
+			prop.set(Path(val));
+		}
+		void visit(Prop<const char*> prop) override { 
+			if (!isSrc(prop)) return;
+			// TODO any string size
+			char val[4096];
+			ASSERT(buf->size() <= sizeof(val));
+			buf->read(val, buf->size());
+			prop.set(val);
+		}
+	
+		void beginArray(const char* name, Counter count, Adder add, Remover remove) override {}
+			
+		InputMemoryStream* buf;
+		SetPropertyCommand* cmd;
+	};
 
 	SetPropertyCommand(WorldEditor& editor,
-		const EntityRef* entities,
-		int count,
+		Span<const EntityRef> entities,
 		ComponentType component_type,
-		int index,
-		const Reflection::PropertyBase& property,
-		const void* data,
-		int size)
+		const char* property,
+		Span<const u8> data)
 		: m_component_type(component_type)
 		, m_entities(editor.getAllocator())
-		, m_property(&property)
+		, m_property(property, editor.getAllocator())
 		, m_editor(editor)
 		, m_new_value(editor.getAllocator())
 		, m_old_value(editor.getAllocator())
 	{
 		auto& prefab_system = editor.getPrefabSystem();
-		m_entities.reserve(count);
+		m_entities.reserve(entities.length());
 
-		for (int i = 0; i < count; ++i)
+		for (u32 i = 0; i < entities.length(); ++i)
 		{
-			if (!m_editor.getUniverse()->getComponent(entities[i], m_component_type).isValid()) continue;
-			ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], component_type);
-			m_property->getValue(component, index, m_old_value);
+			ComponentUID component = m_editor.getUniverse()->getComponent(entities[i], m_component_type);
+			if (!component.isValid()) continue;
+			
+			GetterVisitor v;
+			v.cmd = this;
+			v.buf = &m_old_value;
+			editor.getUniverse()->getScene(component_type)->visit(entities[i], component_type, v);
+
 			m_entities.push(entities[i]);
 		}
 
-		m_index = index;
-		m_new_value.write(data, size);
+		m_new_value.write(data.begin(), data.length());
 	}
 
 
@@ -1251,11 +1335,12 @@ public:
 	{
 		InputMemoryStream blob(m_new_value);
 		for (EntityPtr entity : m_entities) {
-			if(entity.isValid()) {
-				ComponentUID component = m_editor.getUniverse()->getComponent((EntityRef)entity, m_component_type);
-				blob.rewind();
-				m_property->setValue(component, m_index, blob);
-			}
+			blob.rewind();
+
+			SetterVisitor v;
+			v.cmd = this;
+			v.buf = &blob;
+			m_editor.getUniverse()->getScene(m_component_type)->visit((EntityRef)entity, m_component_type, v);
 		}
 		return true;
 	}
@@ -1265,10 +1350,10 @@ public:
 	{
 		InputMemoryStream blob(m_old_value);
 		for (EntityPtr entity : m_entities) {
-			if (entity.isValid()) {
-				ComponentUID component = m_editor.getUniverse()->getComponent((EntityRef)entity, m_component_type);
-				m_property->setValue(component, m_index, blob);
-			}
+			SetterVisitor v;
+			v.cmd = this;
+			v.buf = &blob;
+			m_editor.getUniverse()->getScene(m_component_type)->visit((EntityRef)entity, m_component_type, v);
 		}
 	}
 
@@ -1282,8 +1367,7 @@ public:
 		SetPropertyCommand& src = static_cast<SetPropertyCommand&>(command);
 		if (m_component_type == src.m_component_type &&
 			m_entities.size() == src.m_entities.size() &&
-			src.m_property == m_property &&
-			m_index == src.m_index)
+			src.m_property == m_property)
 		{
 			for (int i = 0, c = m_entities.size(); i < c; ++i)
 			{
@@ -1302,8 +1386,7 @@ private:
 	Array<EntityPtr> m_entities;
 	OutputMemoryStream m_new_value;
 	OutputMemoryStream m_old_value;
-	int m_index;
-	const Reflection::PropertyBase* m_property;
+	String m_property;
 };
 
 struct PasteEntityCommand;
@@ -2686,26 +2769,10 @@ public:
 		Span<const EntityRef> entities,
 		Span<const u8> data) override
 	{
-		const Reflection::PropertyBase* prop = Reflection::getProperty(component_type, prop_name);
-		IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
-			*this, entities.begin(), entities.length(), component_type, -1, *prop, data.begin(), data.length());
+		IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(*this, entities, component_type, prop_name, data);
 		executeCommand(command);
 	}
 
-
-
-	void setProperty(ComponentType component_type,
-		int index,
-		const Reflection::PropertyBase& property,
-		const EntityRef* entities,
-		int count,
-		const void* data,
-		int size) override
-	{
-		IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand)(
-			*this, entities, count, component_type, index, property, data, size);
-		executeCommand(command);
-	}
 
 	void selectEntities(const EntityRef* entities, int count, bool toggle) override
 	{

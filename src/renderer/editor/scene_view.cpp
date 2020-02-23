@@ -443,8 +443,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		EntityRef entity = m_editor.addEntity();
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
 		m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
-		auto* prop = Reflection::getProperty(MODEL_INSTANCE_TYPE, "Source");
-		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
+		m_editor.setProperty(MODEL_INSTANCE_TYPE, "Source", Span(&entity, 1), Span((u8*)path, stringLength(path) + 1));
 		m_editor.endCommandGroup();
 	}
 	else if (Path::hasExtension(path, "fab"))
@@ -462,8 +461,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			const EntityRef e = (EntityRef)hit.entity;
 			m_editor.selectEntities(&e, 1, false);
 			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
-			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
-			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &e, 1, path, stringLength(path) + 1);
+			m_editor.setProperty(MESH_ACTOR_TYPE, "Source", Span(&e, 1), Span((u8*)path, stringLength(path) + 1));
 			m_editor.endCommandGroup();
 		}
 		else
@@ -475,13 +473,14 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.selectEntities(&entity, 1, false);
 			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
 			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
-			m_editor.setProperty(MESH_ACTOR_TYPE, -1, *prop, &entity, 1, path, stringLength(path) + 1);
+			m_editor.setProperty(MESH_ACTOR_TYPE, "Source", Span(&entity, 1), Span((u8*)path, stringLength(path) + 1));
 			m_editor.endCommandGroup();
 		}
 	}
 	else if (hit.is_hit && Path::hasExtension(path, "mat") && hit.mesh)
 	{
-		const EntityRef e = (EntityRef)hit.entity;
+		// TODO
+		/*const EntityRef e = (EntityRef)hit.entity;
 		m_editor.selectEntities(&e, 1, false);
 		RenderScene* scene = m_pipeline->getScene();
 		Model* model = scene->getModelInstanceModel(e);
@@ -495,7 +494,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			}
 		}
 		auto* prop= Reflection::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
-		m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &e, 1, path, stringLength(path) + 1);
+		m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &e, 1, path, stringLength(path) + 1);*/
 	}
 }
 

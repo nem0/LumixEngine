@@ -572,7 +572,7 @@ struct StudioAppImpl final : StudioApp
 	void registerComponentWithResource(const char* type,
 		const char* label,
 		ResourceType resource_type,
-		const Reflection::PropertyBase& property) override
+		const char* property) override
 	{
 		struct Plugin final : IAddComponentPlugin
 		{
@@ -599,12 +599,9 @@ struct StudioAppImpl final : StudioApp
 					if (!create_empty)
 					{
 						editor->setProperty(type,
-							-1,
-							*property,
-							&editor->getSelectedEntities()[0],
-							editor->getSelectedEntities().size(),
-							buf,
-							stringLength(buf) + 1);
+							property,
+							editor->getSelectedEntities(),
+							Span((u8*)buf, stringLength(buf) + 1));
 					}
 					ImGui::CloseCurrentPopup();
 				}
@@ -619,7 +616,7 @@ struct StudioAppImpl final : StudioApp
 			WorldEditor* editor;
 			ComponentType type;
 			ResourceType resource_type;
-			const Reflection::PropertyBase* property;
+			StaticString<64> property;
 			char label[50];
 		};
 
@@ -629,7 +626,7 @@ struct StudioAppImpl final : StudioApp
 		plugin->asset_browser = m_asset_browser;
 		plugin->type = Reflection::getComponentType(type);
 		plugin->editor = m_editor;
-		plugin->property = &property;
+		plugin->property = property;
 		plugin->resource_type = resource_type;
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
@@ -917,12 +914,10 @@ struct StudioAppImpl final : StudioApp
 		Span<EntityRef> entities(&env, 1);
 		m_editor->addComponent(entities, env_cmp_type);
 		m_editor->addComponent(entities, lua_script_cmp_type);
-		auto* intensity_prop = Reflection::getProperty(env_cmp_type, "Intensity");
-		auto* indirect_intensity_prop = Reflection::getProperty(env_cmp_type, "Indirect intensity");
 		const float intensity = 3;
-		m_editor->setProperty(env_cmp_type, -1, *intensity_prop, &env, 1, &intensity, sizeof(intensity));
+		m_editor->setProperty(env_cmp_type, "Intensity", Span(&env, 1), Span((u8*)&intensity, sizeof(intensity)));
 		const float indirect_intensity = 0.3f;
-		m_editor->setProperty(env_cmp_type, -1, *indirect_intensity_prop, &env, 1, &indirect_intensity, sizeof(indirect_intensity));
+		m_editor->setProperty(env_cmp_type, "Indirect intensity", Span(&env, 1), Span((u8*)&indirect_intensity, sizeof(indirect_intensity)));
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);
@@ -2391,7 +2386,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isnumber(L, -1)) return;
 
 			int val = (int)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
 		void visit(const Reflection::Property<u32>& prop) override
@@ -2400,7 +2395,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isnumber(L, -1)) return;
 
 			const u32 val = (u32)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
 		void visit(const Reflection::Property<float>& prop) override
@@ -2409,7 +2404,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isnumber(L, -1)) return;
 
 			float val = (float)lua_tonumber(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
 		void visit(const Reflection::Property<Vec2>& prop) override
@@ -2418,7 +2413,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
 
 			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
 		void visit(const Reflection::Property<Vec3>& prop) override
@@ -2427,7 +2422,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
 
 			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
 		void visit(const Reflection::Property<IVec3>& prop) override
@@ -2436,7 +2431,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
 
 			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
 		void visit(const Reflection::Property<Vec4>& prop) override
@@ -2445,7 +2440,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
 
 			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 		
 		void visit(const Reflection::Property<const char*>& prop) override
@@ -2454,7 +2449,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, str, stringLength(str) + 1);
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)str, stringLength(str) + 1));
 		}
 
 
@@ -2464,7 +2459,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, str, stringLength(str) + 1);
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)str, stringLength(str) + 1));
 		}
 
 
@@ -2474,7 +2469,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isboolean(L, -1)) return;
 
 			bool val = lua_toboolean(L, -1) != 0;
-			editor->setProperty(cmp_type, 0, prop, &entity, 1, &val, sizeof(val));
+			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
 		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
