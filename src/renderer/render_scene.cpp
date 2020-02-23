@@ -203,6 +203,125 @@ public:
 	}
 
 
+	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+		using namespace Reflection;
+		if (cmp_type == BONE_ATTACHMENT_TYPE) {
+			Lumix::visit(v, "Parent", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentParent));
+			Lumix::visit(v, "Relative position", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentPosition));
+			Lumix::visit(v, "Relative rotation", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentRotation), RadiansAttribute());
+			//BoneProperty()
+			ASSERT(false); // TODO
+			return;
+		}
+		if (cmp_type == ENVIRONMENT_PROBE_TYPE) {
+			EnvironmentProbe& probe = getEnvironmentProbe(entity);
+			Lumix::visit(v, "Enabled", this, entity, &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe);
+			Lumix::visit(v, "Enabled reflection", this, entity, &RenderScene::isEnvironmentProbeReflectionEnabled, &RenderScene::enableEnvironmentProbeReflection);
+			Lumix::visit(v, "Enabled specular", this, entity, &RenderScene::isEnvironmentProbeSpecular, &RenderScene::enableEnvironmentProbeSpecular);
+			Lumix::visit(v, "Enabled diffuse", this, entity, &RenderScene::isEnvironmentProbeDiffuse, &RenderScene::enableEnvironmentProbeDiffuse);
+			Lumix::visit(v, "Override global size", this, entity, &RenderScene::isEnvironmentProbeCustomSize, &RenderScene::enableEnvironmentProbeCustomSize);
+			Lumix::visit(v, "Half extents", Ref(probe.half_extents));
+			Lumix::visit(v, "Radiance size", Ref(probe.radiance_size));
+			return;
+		}
+		if (cmp_type == ENVIRONMENT_TYPE) {
+			Environment& env = getEnvironment(entity);
+			Lumix::visit(v, "Color", Ref(env.diffuse_color), ColorAttribute());
+			Lumix::visit(v, "Intensity", Ref(env.diffuse_intensity), MinAttribute(0));
+			Lumix::visit(v, "Indirect intensity", Ref(env.indirect_intensity), MinAttribute(0));
+			Lumix::visit(v, "Fog density", Ref(env.fog_density), ClampAttribute(0, 1));
+			Lumix::visit(v, "Fog bottom", Ref(env.fog_bottom));
+			Lumix::visit(v, "Fog height", Ref(env.fog_height), MinAttribute(0));
+			Lumix::visit(v, "Fog color", Ref(env.fog_color), ColorAttribute());
+			Lumix::visit(v, "Shadow cascades", this, entity, LUMIX_PROP(RenderScene, ShadowmapCascades));
+			Lumix::visit(v, "Cast shadows", this, entity, LUMIX_PROP(RenderScene, EnvironmentCastShadows));
+			return;
+		}
+		if (cmp_type == PARTICLE_EMITTER_TYPE) {
+			Lumix::visit(v, "Resource", this, entity, LUMIX_PROP(RenderScene, ParticleEmitterPath), ResourceAttribute("Particle emitter (*.par)", ParticleEmitterResource::TYPE));
+			return;
+		}
+		if (cmp_type == MODEL_INSTANCE_TYPE) {
+			Lumix::visit(v, "Enabled", this, entity, &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance);
+			Lumix::visit(v, "Source", this, entity, LUMIX_PROP(RenderScene, ModelInstancePath), ResourceAttribute("Mesh (*.msh)", Model::TYPE));
+			return;
+		}
+		if (cmp_type == LIGHT_PROBE_GRID_TYPE) {
+			LightProbeGrid& grid = getLightProbeGrid(entity);
+			Lumix::visit(v, "Resolution", Ref(grid.resolution));
+			Lumix::visit(v, "Half extents", Ref(grid.half_extents));
+			return;
+		}
+		if (cmp_type == POINT_LIGHT_TYPE) {
+			PointLight& l = getPointLight(entity);
+			Lumix::visit(v, "Cast shadows", Ref(l.cast_shadows));
+			Lumix::visit(v, "Intensity", Ref(l.intensity), MinAttribute(0));
+			Lumix::visit(v, "FOV", Ref(l.fov), ClampAttribute(0, 360), RadiansAttribute());
+			Lumix::visit(v, "Attenuation", Ref(l.attenuation_param), ClampAttribute(0, 100));
+			Lumix::visit(v, "Color", Ref(l.color), ColorAttribute());
+			Lumix::visit(v, "Range", this, entity, LUMIX_PROP(RenderScene, LightRange), MinAttribute(0));
+			return;
+		}
+		if (cmp_type == DECAL_TYPE) {
+			Lumix::visit(v, "Material", this, entity, LUMIX_PROP(RenderScene, DecalMaterialPath),
+				ResourceAttribute("Material (*.mat)", Material::TYPE));
+			Lumix::visit(v, "Half extents", this, entity, LUMIX_PROP(RenderScene, DecalHalfExtents), 
+				MinAttribute(0));
+			return;
+		}
+		if (cmp_type == TERRAIN_TYPE) {
+			Terrain* terrain = getTerrain(entity);
+			Lumix::visit(v, "Material", this, entity, LUMIX_PROP(RenderScene, TerrainMaterialPath),
+				ResourceAttribute("Material (*.mat)", Material::TYPE));
+			Lumix::visit(v, "XZ scale", this, entity, LUMIX_PROP(RenderScene, TerrainXZScale),
+				MinAttribute(0));
+			Lumix::visit(v, "Height scale", this, entity, LUMIX_PROP(RenderScene, TerrainYScale),
+				MinAttribute(0));
+			v.beginArray("Grass",
+				[terrain](){ return terrain->getGrassTypeCount(); },
+				[terrain](){ return terrain->addGrassType(-1); },
+				[terrain](u32 idx){ return terrain->removeGrassType(idx); }
+			);
+			for (int i = 0; i < terrain->getGrassTypeCount(); ++i) {
+				Lumix::visit(v, "Mesh", this, entity, i, LUMIX_PROP(RenderScene, GrassPath), ResourceAttribute("Mesh (*.msh)", Model::TYPE));
+				Lumix::visit(v, "Distance", this, entity, i, LUMIX_PROP(RenderScene, GrassDistance));
+				Lumix::visit(v, "Density", this, entity, i, LUMIX_PROP(RenderScene, GrassDensity));
+				//enum_property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), rotationModeDesc)
+				// TODO
+				ASSERT(false);
+				v.nextArrayItem();
+			}
+
+			v.endArray();
+			return;
+		}
+		if (cmp_type == CAMERA_TYPE) {
+			Camera& cam = m_cameras[entity];
+			Lumix::visit(v, "Orthographic", Ref(cam.is_ortho));
+			if (cam.is_ortho) {
+				Lumix::visit(v, "Orthographic size", Ref(cam.ortho_size));
+			}
+			else {
+				Lumix::visit(v, "FOV", Ref(cam.fov));
+			}
+			Lumix::visit(v, "Near", Ref(cam.near));
+			Lumix::visit(v, "Far", Ref(cam.far));
+			return;
+		}
+		if (cmp_type == TEXT_MESH_TYPE) {
+			TextMesh* mesh = m_text_meshes[entity];
+			Lumix::visit(v, "Text", Ref(mesh->text));
+			Lumix::visit(v, "Font", this, entity, LUMIX_PROP(RenderScene, TextMeshFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE));
+			Lumix::visit(v, "Font size", this, entity, LUMIX_PROP(RenderScene, TextMeshFontSize));
+			Lumix::visit(v, "Camera-oriented", this, entity, &RenderScene::isTextMeshCameraOriented, &RenderScene::setTextMeshCameraOriented);
+			Lumix::visit(v, "Color", this, entity, LUMIX_PROP(RenderScene, TextMeshColorRGBA), ColorAttribute());
+			return;
+		}
+
+		ASSERT(false);
+	}
+
+
 	void clear() override
 	{
 		auto& rm = m_engine.getResourceManager();

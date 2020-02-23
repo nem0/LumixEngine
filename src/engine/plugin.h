@@ -43,6 +43,7 @@ struct LUMIX_ENGINE_API IScene
 	virtual void stopGame() {}
 	virtual int getVersion() const { return -1; }
 	virtual void clear() = 0;
+	virtual void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& visitor) {};
 };
 
 

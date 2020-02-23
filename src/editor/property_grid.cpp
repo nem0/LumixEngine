@@ -39,7 +39,7 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-struct GridUIVisitor final : Reflection::IPropertyVisitor
+struct GridUIVisitor final : IXXVisitor
 {
 	GridUIVisitor(StudioApp& app, int index, const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)
@@ -51,122 +51,73 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	{}
 
 
-	ComponentUID getComponent() const
+	template <typename T>
+	bool skipProperty(const Prop<T>& prop)
 	{
-		ComponentUID first_entity_cmp;
-		first_entity_cmp.type = m_cmp_type;
-		first_entity_cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
-		first_entity_cmp.entity = m_entities[0];
-		return first_entity_cmp;
+		return equalStrings(prop.m_name, "Enabled");
 	}
+	
 
-
-	struct Attributes : Reflection::IAttributeVisitor
-	{
-		void visit(const Reflection::IAttribute& attr) override
-		{
-			switch (attr.getType())
-			{
-				case Reflection::IAttribute::RADIANS:
-					is_radians = true;
-					break;
-				case Reflection::IAttribute::COLOR:
-					is_color = true;
-					break;
-				case Reflection::IAttribute::MIN:
-					min = ((Reflection::MinAttribute&)attr).min;
-					break;
-				case Reflection::IAttribute::CLAMP:
-					min = ((Reflection::ClampAttribute&)attr).min;
-					max = ((Reflection::ClampAttribute&)attr).max;
-					break;
-				case Reflection::IAttribute::RESOURCE:
-					resource_type = ((Reflection::ResourceAttribute&)attr).type;
-					break;
-			}
+	void beginArray(const char* name, Counter count, Adder add, Remover remove) override {
+		if (ImGui::Button("Add")) {
+			add();
 		}
-
-		float max = FLT_MAX;
-		float min = -FLT_MAX;
-		bool is_color = false;
-		bool is_radians = false;
-		ResourceType resource_type;
-	};
-
-
-	static Attributes getAttributes(const Reflection::PropertyBase& prop)
-	{
-		Attributes attrs;
-		prop.visit(attrs);
-		return attrs;
+		ImGui::Indent();
 	}
 
 
-	bool skipProperty(const Reflection::PropertyBase& prop)
-	{
-		return equalStrings(prop.name, "Enabled");
+	void endArray() override {
+		ImGui::Unindent();
 	}
 
+	template <typename T>
+	static Vec2 getMinMax(const Prop<T>& prop) {
+		Vec2 res(-FLT_MAX, FLT_MAX);
+		auto min = (Reflection::MinAttribute*)prop.getAttribute(Reflection::IAttribute::MIN);
+		auto clamp = (Reflection::ClampAttribute*)prop.getAttribute(Reflection::IAttribute::CLAMP);
+		if (min) res.x = min->min;
+		if (clamp) res = Vec2(clamp->min, clamp->max);
+		return res;
+	}
 
-	void visit(const Reflection::Property<float>& prop) override
-	{
+	void visit(Prop<float> prop) override {
 		if (skipProperty(prop)) return;
-		Attributes attrs = getAttributes(prop);
-		ComponentUID cmp = getComponent();
-		float f;
-		OutputMemoryStream blob(&f, sizeof(f));
-		prop.getValue(cmp, m_index, blob);
+		float f = prop.get();
 
-		if (attrs.is_radians) f = radiansToDegrees(f);
-		if (ImGui::DragFloat(prop.name, &f, 1, attrs.min, attrs.max))
-		{
-			f = clamp(f, attrs.min, attrs.max);
-			if (attrs.is_radians) f = degreesToRadians(f);
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &f, sizeof(f));
+		const bool is_radians = prop.getAttribute(Reflection::IAttribute::RADIANS);
+		if (is_radians) f = radiansToDegrees(f);
+		const Vec2 min_max = getMinMax(prop);
+		if (ImGui::DragFloat(prop.m_name, &f, 1, min_max.x, min_max.y)) {
+			f = clamp(f, min_max.x, min_max.y);
+			if (is_radians) f = degreesToRadians(f);
+			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&f, sizeof(f)));
 		}
 	}
 
-
-	void visit(const Reflection::Property<int>& prop) override
-	{
+	void visit(Prop<i32> prop) override {
 		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
-		int value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
+		i32 value = prop.get();
 
-		if (ImGui::InputInt(prop.name, &value))
-		{
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		if (ImGui::InputInt(prop.m_name, &value)) {
+			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-
-	void visit(const Reflection::Property<u32>& prop) override
-	{
+	void visit(Prop<u32> prop) override {
 		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
-		u32 value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
+		u32 value = prop.get();
 
-		if (ImGui::InputScalar(prop.name, ImGuiDataType_U32, &value))
-		{
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		if (ImGui::InputScalar(prop.m_name, ImGuiDataType_U32, &value)) {
+			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-
-	void visit(const Reflection::Property<EntityPtr>& prop) override
-	{
-		ComponentUID cmp = getComponent();
-		EntityPtr entity;
-		OutputMemoryStream blob(&entity, sizeof(entity));
-		prop.getValue(cmp, m_index, blob);
+	void visit(Prop<EntityPtr> prop) override {
+		EntityPtr entity = prop.get();
 
 		char buf[128];
 		getEntityListDisplayName(m_editor, Span(buf), entity);
-		ImGui::PushID(prop.name);
+		ImGui::PushID(prop.m_name);
 		
 		float item_w = ImGui::CalcItemWidth();
 		auto& style = ImGui::GetStyle();
@@ -181,16 +132,15 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		ImGui::PopTextWrapPos();
 		ImGui::SameLine();
 		ImGui::SetCursorPos(pos);
-		if (ImGui::Button("..."))
-		{
-			ImGui::OpenPopup(prop.name);
+		if (ImGui::Button("...")) {
+			ImGui::OpenPopup(prop.m_name);
 		}
 		ImGui::EndGroup();
 		ImGui::SameLine();
-		ImGui::Text("%s", prop.name);
+		ImGui::Text("%s", prop.m_name);
 
 		Universe& universe = *m_editor.getUniverse();
-		if (ImGui::BeginPopup(prop.name))
+		if (ImGui::BeginPopup(prop.m_name))
 		{
 			if (entity.isValid() && ImGui::Button("Select")) m_grid.m_deferred_select = entity;
 
@@ -202,7 +152,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 				bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
 				if (show && ImGui::Selectable(buf))
 				{
-					m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &i, sizeof(i));
+					m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&i, sizeof(i)));
 				}
 			}
 			ImGui::EndPopup();
@@ -210,149 +160,112 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		ImGui::PopID();
 	}
 
-
-	void visit(const Reflection::Property<Vec2>& prop) override
-	{
+	void visit(Prop<Vec2> prop) override {
 		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
-		Vec2 value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
-		if (ImGui::DragFloat2(prop.name, &value.x))
-		{
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		Vec2 value = prop.get();
+
+		if (ImGui::DragFloat2(prop.m_name, &value.x)) {
+			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-
-	void visit(const Reflection::Property<Vec3>& prop) override
-	{
+	void visit(Prop<Vec3> prop) override {
 		if (skipProperty(prop)) return;
-		Attributes attrs = getAttributes(prop);
-		ComponentUID cmp = getComponent();
-		Vec3 value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
+		Vec3 value = prop.get();
 
-		if (attrs.is_color)
-		{
-			if (ImGui::ColorEdit3(prop.name, &value.x))
-			{
-				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		if (prop.getAttribute(Reflection::IAttribute::COLOR)) {
+			if (ImGui::ColorEdit3(prop.m_name, &value.x)) {
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
-		else
-		{
-			if (attrs.is_radians) value = radiansToDegrees(value);
-			if (ImGui::DragFloat3(prop.name, &value.x, 1, attrs.min, attrs.max))
-			{
-				if (attrs.is_radians) value = degreesToRadians(value);
-				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		else {
+			const bool is_radians = prop.getAttribute(Reflection::IAttribute::RADIANS);
+			if (is_radians) value = radiansToDegrees(value);
+			const Vec2 min_max = getMinMax(prop);
+			if (ImGui::DragFloat3(prop.m_name, &value.x, 1, min_max.x, min_max.y)) {
+				if (is_radians) value = degreesToRadians(value);
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
 	}
 
-
-	void visit(const Reflection::Property<IVec3>& prop) override
-	{
+	void visit(Prop<IVec3> prop) override {
 		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
-		IVec3 value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
+		IVec3 value = prop.get();
 		
-		if (ImGui::DragInt3(prop.name, &value.x)) {
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		if (ImGui::DragInt3(prop.m_name, &value.x)) {
+			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-
-	void visit(const Reflection::Property<Vec4>& prop) override
-	{
+	void visit(Prop<Vec4> prop) override {
 		if (skipProperty(prop)) return;
-		Attributes attrs = getAttributes(prop);
-		ComponentUID cmp = getComponent();
-		Vec4 value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
+		Vec4 value = prop.get();
 
-		if (attrs.is_color)
-		{
-			if (ImGui::ColorEdit4(prop.name, &value.x))
-			{
-				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		if (prop.getAttribute(Reflection::IAttribute::COLOR)) {
+			if (ImGui::ColorEdit4(prop.m_name, &value.x)) {
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
-		else
-		{
-			if (ImGui::DragFloat4(prop.name, &value.x))
-			{
-				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		else {
+			if (ImGui::DragFloat4(prop.m_name, &value.x)) {
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
 	}
 
-
-	void visit(const Reflection::Property<bool>& prop) override
-	{
+	void visit(Prop<bool> prop) override {
 		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
-		bool value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
+		bool value = prop.get();
 
-		if (ImGui::CheckboxEx(prop.name, &value))
-		{
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), &value, sizeof(value));
+		if (ImGui::CheckboxEx(prop.m_name, &value)) {
+			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-
-	void visit(const Reflection::Property<Path>& prop) override
-	{
+	void visit(Prop<Path> prop) override {
 		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
+		char tmp[MAX_PATH_LENGTH];
+		Path value = prop.get();
+		copyString(tmp, value.c_str());
+
+		auto* res = (Reflection::ResourceAttribute*)prop.getAttribute(Reflection::IAttribute::RESOURCE);
+
+		if (res) {
+			if (m_app.getAssetBrowser().resourceInput(prop.m_name, StaticString<20>("", (u64)&prop), Span(tmp), res->type)) {
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
+			}
+		}
+		else {
+			if (ImGui::InputText(prop.m_name, tmp, sizeof(tmp))) {
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
+			}
+		}
+	}
+
+	void visit(Prop<const char*> prop) override {
+		if (skipProperty(prop)) return;
 		char tmp[1024];
-		OutputMemoryStream blob(&tmp, sizeof(tmp));
-		prop.getValue(cmp, m_index, blob);
+		const char* value = prop.get();
+		copyString(tmp, value);
+		auto* res = (Reflection::ResourceAttribute*)prop.getAttribute(Reflection::IAttribute::RESOURCE);
 
-		Attributes attrs = getAttributes(prop);
-
-		if (attrs.resource_type != INVALID_RESOURCE_TYPE)
-		{
-			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), Span(tmp), attrs.resource_type))
-			{
-				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+		if (res) {
+			if (m_app.getAssetBrowser().resourceInput(prop.m_name, StaticString<20>("", (u64)&prop), Span(tmp), res->type)) {
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
 			}
 		}
-		else
-		{
-			if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
-			{
-				m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
+		else {
+			if (ImGui::InputText(prop.m_name, tmp, sizeof(tmp))) {
+				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
 			}
 		}
 	}
 
-
-	void visit(const Reflection::Property<const char*>& prop) override
-	{
-		if (skipProperty(prop)) return;
-		ComponentUID cmp = getComponent();
-		char tmp[1024];
-		OutputMemoryStream blob(&tmp, sizeof(tmp));
-		prop.getValue(cmp, m_index, blob);
-
-		if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
-		{
-			m_editor.setProperty(m_cmp_type, m_index, prop, &m_entities[0], m_entities.size(), tmp, stringLength(tmp) + 1);
-		}
-	}
-
-
+	/*
 	void visit(const Reflection::IBlobProperty& prop) override {}
 
-
+	
 	void visit(const Reflection::IArrayProperty& prop) override
 	{
 		if (skipProperty(prop)) return;
@@ -418,7 +331,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		ImGui::Indent();
 	}
 
-
+	
 	void visit(const Reflection::IEnumProperty& prop) override
 	{
 		if (skipProperty(prop)) return;
@@ -458,7 +371,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			const EntityRef e = (EntityRef)cmp.entity;
 			m_editor.setProperty(cmp.type, m_index, prop, &e, 1, &value, sizeof(value));
 		}
-	}
+	}*/
 
 
 	StudioApp& m_app;
@@ -519,9 +432,10 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 
 	if (!is_open) return;
 
-	const Reflection::ComponentBase* component = Reflection::getComponent(cmp_type);
 	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
-	if (component) component->visit(visitor);
+	IScene* scene = m_editor.getUniverse()->getScene(cmp_type);
+	// TODO multiple entities
+	scene->visit(entities[0], cmp_type, visitor);
 
 	if (m_deferred_select.isValid())
 	{

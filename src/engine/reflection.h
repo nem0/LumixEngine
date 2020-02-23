@@ -1045,4 +1045,172 @@ auto array(const char* name, Counter counter, Adder adder, Remover remover, Prop
 } // namespace Reflection
 
 
+struct Counter {
+	template <typename F>
+	Counter(const F& f) {
+		data = (void*)&f;
+		fn = &Counter::stub<F>;
+	}
+
+	template <typename F>
+	u32 stub() {
+		auto& f = *(const F*)data;
+		return f();
+	}
+	
+	u32 operator()() { return (this->*fn)(); }
+
+	void* data;
+	u32 (Counter::*fn)();
+};
+
+struct Adder {
+	template <typename F>
+	Adder(const F& f) {
+		data = (void*)&f;
+		fn = &Adder::stub<F>;
+	}
+
+	template <typename F>
+	void stub() {
+		auto& f = *(const F*)data;
+		f();
+	}
+	
+	void operator()() { (this->*fn)(); }
+
+	void* data;
+	void (Adder::*fn)();
+};
+
+struct Remover {
+	template <typename F>
+	Remover(const F& f) {
+		data = (void*)&f;
+		fn = &Remover::stub<F>;
+	}
+
+	template <typename F>
+	void stub(u32 idx) {
+		auto& f = *(const F*)data;
+		f(idx);
+	}
+	
+	void operator()(u32 idx) { (this->*fn)(idx); }
+
+	void* data;
+	void (Remover::*fn)(u32);
+};
+
+template <typename T>
+struct Prop {
+	template <typename G, typename S>
+	Prop(const char* name, const G& getter, const S& setter, Span<Reflection::IAttribute*> attrs) {
+		m_getter = &getter;
+		m_setter = &setter;
+		m_getter_stub = &Prop::getterStub<G>;
+		m_setter_stub = &Prop::setterStub<S>;
+		m_attributes = attrs;
+		m_name = name;
+	}
+
+	template <typename G, typename S>
+	Prop(const char* name, const G& getter, const S& setter) {
+		m_getter = &getter;
+		m_setter = &setter;
+		m_getter_stub = &Prop::getterStub<G>;
+		m_setter_stub = &Prop::setterStub<S>;
+		m_name = name;
+	}
+
+	Reflection::IAttribute* getAttribute(Reflection::IAttribute::Type type) const {
+		for (Reflection::IAttribute* attr : m_attributes) {
+			if (attr->getType() == type) return attr;
+		}
+		return nullptr;
+	}
+
+	template <typename S> void setterStub(T value) const { (*(const S*)m_setter)(value); }
+	template <typename G> T getterStub() const { return (*(const G*)m_getter)(); }
+
+	T get() { return (this->*m_getter_stub)(); }
+	void set(T value) { (this->*m_setter_stub)(value); }
+
+	const char* m_name;
+	const void* m_getter;
+	const void* m_setter;
+	T (Prop::*m_getter_stub)() const;
+	void (Prop::*m_setter_stub)(T) const;
+	Span<Reflection::IAttribute*> m_attributes;
+};
+
+struct IXXVisitor {
+	virtual void visit(Prop<float> prop) = 0;
+	virtual void visit(Prop<bool> prop) = 0;
+	virtual void visit(Prop<i32> prop) = 0;
+	virtual void visit(Prop<u32> prop) = 0;
+	virtual void visit(Prop<Vec2> prop) = 0;
+	virtual void visit(Prop<Vec3> prop) = 0;
+	virtual void visit(Prop<IVec3> prop) = 0;
+	virtual void visit(Prop<Vec4> prop) = 0;
+	virtual void visit(Prop<Path> prop) = 0;
+	virtual void visit(Prop<EntityPtr> prop) = 0;
+	virtual void visit(Prop<const char*> prop) = 0;
+	
+	virtual void beginArray(const char* name, Counter count, Adder add, Remover remove) = 0;
+	virtual void nextArrayItem() {};
+	virtual void endArray() {}
+};
+
+
+template <typename T, typename... Attrs>
+inline void visit(IXXVisitor& visitor, const char* name, Ref<T> value, Attrs... attrs) {
+	Reflection::IAttribute* attrs_array[sizeof...(attrs) + 1] = {
+		&attrs...,
+		nullptr
+	};
+	Prop<T> p(name,
+		[&](){ return value.value; },
+		[&](T v){ value = v; },
+		Span(attrs_array, attrs_array + sizeof...(attrs)));
+	visitor.visit(p);
+}
+
+template <typename C, typename G, typename S, typename... Attrs>
+inline void visit(IXXVisitor& visitor, const char* name, C* inst, EntityRef e, G getter, S setter, Attrs... attrs) {
+	using T = typename ResultOf<G>::Type;
+	Reflection::IAttribute* attrs_array[sizeof...(attrs) + 1] = {
+		&attrs...,
+		nullptr
+	};
+	const Prop<T> p(name,
+		[&](){ return (inst->*getter)(e); },
+		[&](T v){ (inst->*setter)(e, v); },
+		Span(attrs_array, attrs_array + sizeof...(attrs)));
+	visitor.visit(p);
+}
+
+template <typename C, typename G, typename S, typename... Attrs>
+inline void visit(IXXVisitor& visitor, const char* name, C* inst, EntityRef e, int idx, G getter, S setter, Attrs... attrs) {
+	using T = typename ResultOf<G>::Type;
+	Reflection::IAttribute* attrs_array[sizeof...(attrs) + 1] = {
+		&attrs...,
+		nullptr
+	};
+	const Prop<T> p(name,
+		[&](){ return (inst->*getter)(e, idx); },
+		[&](T v){ (inst->*setter)(e, idx, v); },
+		Span(attrs_array, attrs_array + sizeof...(attrs)));
+	visitor.visit(p);
+}
+
+inline void visit(IXXVisitor& visitor, const char* name, Ref<String> value) {
+	Prop<const char*> p(name,
+		[&](){ return value.value.c_str(); },
+		[&](const char* v){ value = v; }
+	);
+	visitor.visit(p);
+}
+
+
 } // namespace Lumix

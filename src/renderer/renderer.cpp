@@ -447,7 +447,7 @@ static void registerProperties(IAllocator& allocator)
 			property("Text", LUMIX_PROP(RenderScene, TextMeshText)),
 			property("Font", LUMIX_PROP(RenderScene, TextMeshFontPath),
 				ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
-			property("Font Size", LUMIX_PROP(RenderScene, TextMeshFontSize)),
+			property("Font size", LUMIX_PROP(RenderScene, TextMeshFontSize)),
 			property("Color", LUMIX_PROP(RenderScene, TextMeshColorRGBA),
 				ColorAttribute()),
 			property("Camera-oriented", &RenderScene::isTextMeshCameraOriented, &RenderScene::setTextMeshCameraOriented)

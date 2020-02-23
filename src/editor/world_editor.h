@@ -146,6 +146,10 @@ struct LUMIX_EDITOR_API WorldEditor
 		int count) = 0;
 	virtual void setEntityName(EntityRef entity, const char* name) = 0;
 	virtual void setProperty(ComponentType component,
+		const char* prop_name,
+		Span<const EntityRef> entities,
+		Span<const u8> data) = 0;
+	virtual void setProperty(ComponentType component,
 		int index,
 		const Reflection::PropertyBase& property,
 		const EntityRef* entities,
