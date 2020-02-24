@@ -41,11 +41,10 @@ PropertyGrid::~PropertyGrid()
 
 struct GridUIVisitor final : IXXVisitor
 {
-	GridUIVisitor(StudioApp& app, int index, const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor)
+	GridUIVisitor(StudioApp& app, const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)
 		, m_cmp_type(cmp_type)
 		, m_editor(editor)
-		, m_index(index)
 		, m_grid(app.getPropertyGrid())
 		, m_app(app)
 	{}
@@ -71,7 +70,7 @@ struct GridUIVisitor final : IXXVisitor
 		if (prop.canAddRemove()) {
 			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Add").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 			if (ImGui::SmallButton("Add")) {
-				//m_editor.addArrayPropertyItem(cmp, prop);
+				m_editor.addArrayPropertyItem(m_entities[0], m_cmp_type, name, prop.count());
 			}
 		}
 
@@ -80,17 +79,17 @@ struct GridUIVisitor final : IXXVisitor
 
 	void endArray() override { ImGui::TreePop(); }
 	
-	bool beginArrayItem(u32 i, const ArrayProp& prop) override {	
+	bool beginArrayItem(const char* name, u32 i, const ArrayProp& prop) override {	
 		char tmp[10];
 		toCString(i, Span(tmp));
-		ImGui::PushID(i);
+		ImGui::PushID(i + 1);
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
 		bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
 		if (prop.canAddRemove()) {
 			ImGuiStyle& style = ImGui::GetStyle();
 			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 			if (ImGui::SmallButton("Remove")) {
-				//m_editor.removeArrayPropertyItem(cmp, i, prop);
+				m_editor.removeArrayPropertyItem(m_entities[0], m_cmp_type, name, i);
 				if (is_open) ImGui::TreePop();
 				ImGui::PopID();
 				return false;
@@ -314,83 +313,11 @@ struct GridUIVisitor final : IXXVisitor
 		}
 	}
 
-	/*
-	void visit(const Reflection::IBlobProperty& prop) override {}
-
-	
-	void visit(const Reflection::IArrayProperty& prop) override
-	{
-		if (skipProperty(prop)) return;
-		ImGui::Unindent();
-		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap);
-		if (m_entities.size() > 1)
-		{
-			ImGui::Text("Multi-object editing not supported.");
-			if (is_open) ImGui::TreePop();
-			ImGui::Indent();
-			return;
-		}
-
-		ComponentUID cmp = getComponent();
-		int count = prop.getCount(cmp);
-		const ImGuiStyle& style = ImGui::GetStyle();
-		if (prop.canAddRemove())
-		{
-			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Add").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
-			if (ImGui::SmallButton("Add"))
-			{
-				m_editor.addArrayPropertyItem(cmp, prop);
-				count = prop.getCount(cmp);
-			}
-		}
-		if (!is_open)
-		{
-			ImGui::Indent();
-			return;
-		}
-
-		for (int i = 0; i < count; ++i)
-		{
-			char tmp[10];
-			toCString(i, Span(tmp));
-			ImGui::PushID(i);
-			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
-			bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
-			if (prop.canAddRemove())
-			{
-				ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
-				if (ImGui::SmallButton("Remove"))
-				{
-					m_editor.removeArrayPropertyItem(cmp, i, prop);
-					--i;
-					count = prop.getCount(cmp);
-					if(is_open) ImGui::TreePop();
-					ImGui::PopID();
-					continue;
-				}
-			}
-
-			if (is_open)
-			{
-				GridUIVisitor v(m_app, i, m_entities, m_cmp_type, m_editor);
-				prop.visit(v);
-				if (prop.canAddRemove()) ImGui::TreePop();
-			}
-
-			ImGui::PopID();
-		}
-		ImGui::TreePop();
-		ImGui::Indent();
-	}
-
-	*/
-
 
 	StudioApp& m_app;
 	WorldEditor& m_editor;
 	ComponentType m_cmp_type;
 	const Array<EntityRef>& m_entities;
-	int m_index;
 	PropertyGrid& m_grid;
 };
 
@@ -443,7 +370,7 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 
 	if (!is_open) return;
 
-	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
+	GridUIVisitor visitor(m_app, entities, cmp_type, m_editor);
 	IScene* scene = m_editor.getUniverse()->getScene(cmp_type);
 	// TODO multiple entities
 	scene->visit(entities[0], cmp_type, visitor);

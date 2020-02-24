@@ -499,12 +499,12 @@ public:
 		blob.read(count);
 		for (int i = 0; i < count; ++i)
 		{
-			int idx = addScript(entity);
-			auto& inst = scr->m_scripts[idx];
+			addScript(entity, i);
+			auto& inst = scr->m_scripts[i];
 			char tmp[MAX_PATH_LENGTH];
 			blob.readString(Span(tmp));
 			blob.read(inst.m_flags);
-			setScriptPath(entity, idx, Path(tmp));
+			setScriptPath(entity, i, Path(tmp));
 				
 			int prop_count;
 			blob.read(prop_count);
@@ -515,18 +515,18 @@ public:
 				int prop_index = scr->getProperty(inst, hash);
 				if (prop_index < 0)
 				{
-					scr->m_scripts[idx].m_properties.emplace(m_system.m_allocator);
-					prop_index = scr->m_scripts[idx].m_properties.size() - 1;
+					scr->m_scripts[i].m_properties.emplace(m_system.m_allocator);
+					prop_index = scr->m_scripts[i].m_properties.size() - 1;
 				}
-				auto& prop = scr->m_scripts[idx].m_properties[prop_index];
+				auto& prop = scr->m_scripts[i].m_properties[prop_index];
 				prop.name_hash = hash;
 				blob.read(prop.type);
 				char tmp[1024];
 				blob.readString(Span(tmp));
 				prop.stored_value = tmp;
-				if (scr->m_scripts[idx].m_state) applyProperty(scr->m_scripts[idx], prop, tmp);
+				if (scr->m_scripts[i].m_state) applyProperty(scr->m_scripts[i], prop, tmp);
 			}
-			sortProperties(scr->m_scripts[idx].m_properties);
+			sortProperties(scr->m_scripts[i].m_properties);
 		}
 	}
 
@@ -1732,11 +1732,10 @@ public:
 	}
 
 
-	int addScript(EntityRef entity) override
+	void addScript(EntityRef entity, u32 index) override
 	{
 		ScriptComponent* script_cmp = m_scripts[entity];
-		script_cmp->m_scripts.emplace(m_system.m_allocator);
-		return script_cmp->m_scripts.size() - 1;
+		script_cmp->m_scripts.emplaceAt(index, m_system.m_allocator);
 	}
 
 
@@ -1796,7 +1795,7 @@ public:
 	void removeScript(EntityRef entity, int scr_index) override
 	{
 		setScriptPath(entity, scr_index, Path());
-		m_scripts[entity]->m_scripts.swapAndPop(scr_index);
+		m_scripts[entity]->m_scripts.erase(scr_index);
 	}
 
 
@@ -1858,7 +1857,7 @@ public:
 		ScriptComponent* cmp = m_scripts[entity];
 		struct : ArrayProp {
 			u32 count() const override { return that->m_scripts[entity]->m_scripts.size(); }
-			void add() const override { that->addScript(entity); }
+			void add(u32 idx) const override { that->addScript(entity, idx); }
 			void remove(u32 idx) const override { that->removeScript(entity, idx); }
 			LuaScriptSceneImpl* that;
 			EntityRef entity;
@@ -1868,7 +1867,7 @@ public:
 
 		if (!v.beginArray("Scripts", ar)) return;
 		for (u32 i = 0; i < (u32)cmp->m_scripts.size(); ++i) {
-			if (!v.beginArrayItem(i, ar)) continue;
+			if (!v.beginArrayItem("Scripts", i, ar)) continue;
 
 			ScriptInstance& scr = cmp->m_scripts[i];
 			Lumix::visit(v, "Path", this, entity, (int)i, LUMIX_PROP(LuaScriptScene, ScriptPath), Reflection::ResourceAttribute("*.lua", ResourceType("lua_script")));

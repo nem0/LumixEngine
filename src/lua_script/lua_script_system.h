@@ -65,7 +65,7 @@ struct LuaScriptScene : IScene
 	virtual int getScriptCount(EntityRef entity) = 0;
 	virtual lua_State* getState(EntityRef entity, int scr_index) = 0;
 	virtual void insertScript(EntityRef entity, int idx) = 0;
-	virtual int addScript(EntityRef entity) = 0;
+	virtual void addScript(EntityRef entity, u32 index) = 0;
 	virtual void removeScript(EntityRef entity, int scr_index) = 0;
 	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
 	virtual bool isScriptEnabled(EntityRef entity, int scr_index) const = 0;

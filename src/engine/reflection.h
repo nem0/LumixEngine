@@ -1071,7 +1071,7 @@ struct Prop {
 
 struct ArrayProp {
 	virtual u32 count() const = 0;
-	virtual void add() const = 0;
+	virtual void add(u32 idx) const = 0;
 	virtual void remove(u32 idx) const = 0;
 	virtual bool canAddRemove() const { return true; }
 };
@@ -1090,7 +1090,7 @@ struct IXXVisitor {
 	virtual void visit(const Prop<const char*>& prop) = 0;
 	
 	virtual bool beginArray(const char* name, const ArrayProp& prop) = 0;
-	virtual bool beginArrayItem(u32 idx, const ArrayProp& prop) { return true; }
+	virtual bool beginArrayItem(const char* name, u32 idx, const ArrayProp& prop) { return true; }
 	virtual void endArrayItem() {};
 	virtual void endArray() {}
 };
@@ -1137,7 +1137,7 @@ template <typename C, typename Count, typename Add, typename Remove, typename It
 inline void visitArray(IXXVisitor& v, const char* name, C* inst, EntityRef e, Count count, Add add, Remove remove, Iter iter, Attrs... attrs) {
 	struct : ArrayProp {
 		u32 count() const override { return (inst->*counter)(e); }
-		void add() const override {  (inst->*adder)(e, -1);  }
+		void add(u32 idx) const override {  (inst->*adder)(e, idx);  }
 		void remove(u32 idx) const override { (inst->*remover)(e, idx); }
 
 		C* inst;
@@ -1153,7 +1153,7 @@ inline void visitArray(IXXVisitor& v, const char* name, C* inst, EntityRef e, Co
 	ar.e = e;
 	if(!v.beginArray(name, ar)) return;
 	for (u32 i = 0; i < (u32)(inst->*count)(e); ++i) {
-		if (!v.beginArrayItem(i, ar)) continue;
+		if (!v.beginArrayItem(name, i, ar)) continue;
 		iter(i);
 		v.endArrayItem();
 	}

@@ -149,8 +149,8 @@ struct LUMIX_EDITOR_API WorldEditor
 		const char* prop_name,
 		Span<const EntityRef> entities,
 		Span<const u8> data) = 0;
-	virtual void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) = 0;
-	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) = 0;
+	virtual void addArrayPropertyItem(EntityRef entity, ComponentType cmp_type, const char* prop_name, u32 index) = 0;
+	virtual void removeArrayPropertyItem(EntityRef entity, ComponentType cmp_type, const char* prop_name, u32 index) = 0;
 	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(EntityRef entity) const = 0;
 	virtual void makeParent(EntityPtr parent, EntityRef child) = 0;

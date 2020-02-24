@@ -492,7 +492,7 @@ struct PropertyDeserializeVisitor : IXXVisitor {
 			prop.remove(prop.count() - 1);
 		}
 		while (prop.count() < wanted) {
-			prop.add();
+			prop.add(prop.count());
 		}
 		return true;
 	}
@@ -1108,89 +1108,239 @@ struct SaveVisitor : Reflection::ISimpleComponentVisitor
 };
 
 
+static void addArrayItem(WorldEditor& editor, Span<const EntityRef> entities, ComponentType cmp_type, const char* prop_name, u32 index)
+{
+	struct : IXXVisitor {
+		void visit(const Prop<float>& prop) override {}
+		void visit(const Prop<bool>& prop) override {}
+		void visit(const Prop<i32>& prop) override {}
+		void visit(const Prop<u32>& prop) override {}
+		void visit(const Prop<Vec2>& prop) override {}
+		void visit(const Prop<Vec3>& prop) override {}
+		void visit(const Prop<IVec3>& prop) override {}
+		void visit(const Prop<Vec4>& prop) override {}
+		void visit(const Prop<Path>& prop) override {}
+		void visit(const Prop<EntityPtr>& prop) override {}
+		void visit(const Prop<const char*>& prop) override {}
+	
+		bool beginArray(const char* name, const ArrayProp& prop) override {
+			if (equalStrings(name, prop_name)) {
+				prop.add(index);
+			}
+			return false;
+		}
+		const char* prop_name;
+		u32 index;
+	} v; 
+
+	v.prop_name = prop_name;
+	v.index = index;
+
+	for (const EntityRef& e : entities) {
+		editor.getUniverse()->getScene(cmp_type)->visit(e, cmp_type, v);
+	}
+}
+
+
+static void removeArrayItem(WorldEditor& editor, Span<const EntityRef> entities, ComponentType cmp_type, const char* prop_name, u32 index)
+{
+	struct : IXXVisitor {
+		void visit(const Prop<float>& prop) override {}
+		void visit(const Prop<bool>& prop) override {}
+		void visit(const Prop<i32>& prop) override {}
+		void visit(const Prop<u32>& prop) override {}
+		void visit(const Prop<Vec2>& prop) override {}
+		void visit(const Prop<Vec3>& prop) override {}
+		void visit(const Prop<IVec3>& prop) override {}
+		void visit(const Prop<Vec4>& prop) override {}
+		void visit(const Prop<Path>& prop) override {}
+		void visit(const Prop<EntityPtr>& prop) override {}
+		void visit(const Prop<const char*>& prop) override {}
+	
+		bool beginArray(const char* name, const ArrayProp& prop) override {
+			if (equalStrings(name, prop_name)) {
+				prop.remove(index);
+			}
+			return false;
+		}
+		const char* prop_name;
+		u32 index;
+	} v; 
+
+	v.index = index;
+	v.prop_name = prop_name;
+	for (const EntityRef& e : entities) {
+		editor.getUniverse()->getScene(cmp_type)->visit(e, cmp_type, v);
+	}
+}
+
+static void saveArrayItem(WorldEditor& editor, EntityRef e, ComponentType cmp_type, const char* name, u32 idx, Ref<OutputMemoryStream> out) {
+	struct : IXXVisitor {
+		void visit(const Prop<float>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<bool>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<i32>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<u32>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<Vec2>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<Vec3>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<IVec3>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<Vec4>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<EntityPtr>& prop) override { if(save) (*out)->write(prop.get()); }
+		void visit(const Prop<Path>& prop) override { if(save) (*out)->writeString(prop.get().c_str()); }
+		void visit(const Prop<const char*>& prop) override { if(save) (*out)->writeString(prop.get()); }
+	
+		bool beginArray(const char* name, const ArrayProp& prop) override { return true; }
+		bool beginArrayItem(const char* name, u32 idx, const ArrayProp& prop) { 
+			if (idx == index && equalStrings(name, prop_name)) {
+				save = true;
+				return true;
+			}
+			return false; 
+		}
+		void endArrayItem() { save = false; };
+		void endArray() {}
+
+		bool save = false;
+		u32 index;
+		const char* prop_name;
+		Ref<OutputMemoryStream>* out;
+	} v;
+
+	v.out = &out;
+	v.index = idx;
+	v.prop_name = name;
+
+	editor.getUniverse()->getScene(cmp_type)->visit(e, cmp_type, v);
+}
+
+struct LoadArrayItemVisitor : IXXVisitor {
+	template <typename T>
+	void read(const Prop<T>& prop) {
+		if (!load) return;
+
+		T val;
+		in->read(val);
+		prop.set(val);
+	}
+
+	void visit(const Prop<float>& prop) override { read(prop); }
+	void visit(const Prop<bool>& prop) override { read(prop); }
+	void visit(const Prop<i32>& prop) override { read(prop); }
+	void visit(const Prop<u32>& prop) override { read(prop); }
+	void visit(const Prop<Vec2>& prop) override { read(prop); }
+	void visit(const Prop<Vec3>& prop) override { read(prop); }
+	void visit(const Prop<IVec3>& prop) override { read(prop); }
+	void visit(const Prop<Vec4>& prop) override { read(prop); }
+	void visit(const Prop<EntityPtr>& prop) override { read(prop); }
+	void visit(const Prop<Path>& prop) override {
+		if (!load) return;
+
+		char val[MAX_PATH_LENGTH];
+		in->readString(Span(val));
+		prop.set(Path(val));
+	}
+
+	void visit(const Prop<const char*>& prop) override { 
+		if (!load) return;
+
+		// TODO longer strings
+		char val[1024];
+		in->readString(Span(val));
+		prop.set(val);
+	}
+	
+	bool beginArray(const char* name, const ArrayProp& prop) override { return true; }
+	bool beginArrayItem(const char* name, u32 idx, const ArrayProp& prop) { 
+		if (idx == index && equalStrings(name, prop_name)) {
+			load = true;
+			return true;
+		}
+		return false; 
+	}
+	void endArrayItem() { load = false; };
+	void endArray() {}
+
+	bool load = false;
+	u32 index;
+	const char* prop_name;
+	InputMemoryStream* in;
+};
+
+static void loadArrayItem(WorldEditor& editor, EntityRef e, ComponentType cmp_type, const char* name, u32 idx, InputMemoryStream& in) {
+	LoadArrayItemVisitor v;
+
+	v.in = &in;
+	v.prop_name = name;
+	v.index = idx;
+
+	editor.getUniverse()->getScene(cmp_type)->visit(e, cmp_type, v);
+}
 struct RemoveArrayPropertyItemCommand final : IEditorCommand
 {
-
 public:
-	explicit RemoveArrayPropertyItemCommand(WorldEditor& editor)
-		: m_old_values(editor.getAllocator())
-	{
-	}
-
 	RemoveArrayPropertyItemCommand(WorldEditor& editor,
-		const ComponentUID& component,
-		int index,
-		const Reflection::IArrayProperty& property)
-		: m_component(component)
+		EntityRef entity, 
+		ComponentType cmp_type, 
+		const char* prop_name,
+		u32 index)
+		: m_cmp_type(cmp_type)
+		, m_prop_name(prop_name)
+		, m_entity(entity)
+		, m_editor(editor)
 		, m_index(index)
-		, m_property(&property)
 		, m_old_values(editor.getAllocator())
 	{
-		SaveVisitor save;
-		save.cmp = m_component;
-		save.stream = &m_old_values;
-		save.index = m_index;
-		m_property->visit(save);
+		saveArrayItem(editor, entity, cmp_type, prop_name, index, Ref(m_old_values));
 	}
 
-
-	bool execute() override
-	{
-		m_property->removeItem(m_component, m_index);
+	bool execute() override {
+		removeArrayItem(m_editor, Span(&m_entity, 1), m_cmp_type, m_prop_name, m_index);
 		return true;
 	}
 
-
-	void undo() override
-	{
-		m_property->addItem(m_component, m_index);
+	void undo() override {
+		addArrayItem(m_editor, Span(&m_entity, 1), m_cmp_type, m_prop_name, m_index);
 		InputMemoryStream old_values(m_old_values);
-		load(m_component, m_index, old_values);
+		loadArrayItem(m_editor, m_entity, m_cmp_type, m_prop_name, m_index, old_values);
 	}
 
-
 	const char* getType() override { return "remove_array_property_item"; }
-
 
 	bool merge(IEditorCommand&) override { return false; }
 
 private:
-	ComponentUID m_component;
-	int m_index;
-	const Reflection::IArrayProperty *m_property;
+	WorldEditor& m_editor;
+	ComponentType m_cmp_type;
+	EntityRef m_entity;
+	u32 m_index;
 	OutputMemoryStream m_old_values;
+	const char* m_prop_name;
 };
 
 
 struct AddArrayPropertyItemCommand final : IEditorCommand
 {
-
 public:
-	explicit AddArrayPropertyItemCommand(WorldEditor& editor)
-	{
-	}
-
 	AddArrayPropertyItemCommand(WorldEditor& editor,
-		const ComponentUID& component,
-		const Reflection::IArrayProperty& property)
-		: m_component(component)
-		, m_index(-1)
-		, m_property(&property)
+		EntityRef entity, 
+		ComponentType cmp_type, 
+		const char* prop_name,
+		u32 index)
+		: m_cmp_type(cmp_type)
+		, m_prop_name(prop_name)
+		, m_entity(entity)
+		, m_editor(editor)
+		, m_index(index)
 	{
 	}
 
-
-	bool execute() override
-	{
-		m_property->addItem(m_component, -1);
-		m_index = m_property->getCount(m_component) - 1;
+	bool execute() override {
+		addArrayItem(m_editor, Span(&m_entity, 1), m_cmp_type, m_prop_name, m_index);
 		return true;
 	}
 
 
-	void undo() override
-	{
-		m_property->removeItem(m_component, m_index);
+	void undo() override {
+		removeArrayItem(m_editor, Span(&m_entity, 1), m_cmp_type, m_prop_name, m_index);
 	}
 
 
@@ -1200,9 +1350,11 @@ public:
 	bool merge(IEditorCommand&) override { return false; }
 
 private:
-	ComponentUID m_component;
-	int m_index;
-	const Reflection::IArrayProperty *m_property;
+	WorldEditor& m_editor;
+	ComponentType m_cmp_type;
+	EntityRef m_entity;
+	u32 m_index;
+	const char* m_prop_name;
 };
 
 
@@ -2744,25 +2896,17 @@ public:
 	void setToggleSelection(bool is_toggle) override { m_is_toggle_selection = is_toggle; }
 
 
-	void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) override
+	void addArrayPropertyItem(EntityRef entity, ComponentType cmp_type, const char* prop_name, u32 index) override
 	{
-		if (cmp.isValid())
-		{
-			IEditorCommand* command =
-				LUMIX_NEW(m_allocator, AddArrayPropertyItemCommand)(*this, cmp, property);
-			executeCommand(command);
-		}
+		IEditorCommand* command = LUMIX_NEW(m_allocator, AddArrayPropertyItemCommand)(*this, entity, cmp_type, prop_name, index);
+		executeCommand(command);
 	}
 
 
-	void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) override
+	void removeArrayPropertyItem(EntityRef entity, ComponentType cmp_type, const char* prop_name, u32 index) override
 	{
-		if (cmp.isValid())
-		{
-			IEditorCommand* command =
-				LUMIX_NEW(m_allocator, RemoveArrayPropertyItemCommand)(*this, cmp, index, property);
-			executeCommand(command);
-		}
+		IEditorCommand* command = LUMIX_NEW(m_allocator, RemoveArrayPropertyItemCommand)(*this, entity, cmp_type, prop_name, index);
+		executeCommand(command);
 	}
 
 
