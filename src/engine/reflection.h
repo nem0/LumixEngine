@@ -1073,6 +1073,7 @@ struct ArrayProp {
 	virtual u32 count() const = 0;
 	virtual void add() const = 0;
 	virtual void remove(u32 idx) const = 0;
+	virtual bool canAddRemove() const { return true; }
 };
 
 struct IXXVisitor {

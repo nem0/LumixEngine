@@ -59,19 +59,52 @@ struct GridUIVisitor final : IXXVisitor
 	
 
 	bool beginArray(const char* name, const ArrayProp& prop) override {
-		ImGui::Separator();
-		ImGui::TextUnformatted(name);
-		if (ImGui::Button("Add")) {
-			prop.add();
+		bool is_open = ImGui::TreeNodeEx(name, ImGuiTreeNodeFlags_AllowItemOverlap);
+		if (m_entities.size() > 1) {
+			ImGui::Text("Multi-object editing not supported.");
+			if (is_open) ImGui::TreePop();
+			return false;
 		}
-		ImGui::Indent();
-		return true;
+
+		int count = prop.count();
+		const ImGuiStyle& style = ImGui::GetStyle();
+		if (prop.canAddRemove()) {
+			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Add").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
+			if (ImGui::SmallButton("Add")) {
+				//m_editor.addArrayPropertyItem(cmp, prop);
+			}
+		}
+
+		return is_open;
 	}
 
-
-	void endArray() override {
-		ImGui::Unindent();
+	void endArray() override { ImGui::TreePop(); }
+	
+	bool beginArrayItem(u32 i, const ArrayProp& prop) override {	
+		char tmp[10];
+		toCString(i, Span(tmp));
+		ImGui::PushID(i);
+		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
+		bool is_open = !prop.canAddRemove() || ImGui::TreeNodeEx(tmp, flags);
+		if (prop.canAddRemove()) {
+			ImGuiStyle& style = ImGui::GetStyle();
+			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
+			if (ImGui::SmallButton("Remove")) {
+				//m_editor.removeArrayPropertyItem(cmp, i, prop);
+				if (is_open) ImGui::TreePop();
+				ImGui::PopID();
+				return false;
+			}
+		}
+		if (!is_open) ImGui::PopID();
+		return is_open;
 	}
+
+	void endArrayItem() {
+		ImGui::TreePop();
+		ImGui::PopID();
+	}
+
 
 	template <typename T>
 	static Vec2 getMinMax(const Prop<T>& prop) {
