@@ -32,6 +32,25 @@
 namespace Lumix
 {
 
+struct GrassRotationModeAttr : Reflection::EnumAttribute {
+	u32 count() const override { return (u32)Terrain::GrassType::RotationMode::COUNT; }
+	const char* getName(u32 value) const override {
+		switch ((Terrain::GrassType::RotationMode)value) {
+			case Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL: return "Align with normal";
+			case Terrain::GrassType::RotationMode::ALL_RANDOM: return "All random";
+			case Terrain::GrassType::RotationMode::Y_UP: return "Y up";
+			default: ASSERT(false); return "N/A";
+		}
+	}
+};
+
+struct BoneAttr : Reflection::EnumAttribute {
+	BoneAttr(Model* model) : model(model) {}
+	u32 count() const override { return model ? model->getBoneCount() : 0; }
+	const char* getName(u32 value) const override {	return model ? model->getBone(value).name.c_str() : "N/A - No model"; }
+
+	Model* model;
+};
 
 enum class RenderSceneVersion : int
 {
@@ -209,8 +228,8 @@ public:
 			Lumix::visit(v, "Parent", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentParent));
 			Lumix::visit(v, "Relative position", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentPosition));
 			Lumix::visit(v, "Relative rotation", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentRotation), RadiansAttribute());
-			//BoneProperty()
-			ASSERT(false); // TODO
+			Model* model = getModelInstanceModel(entity);
+			Lumix::visit(v, "Bone", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentBone), BoneAttr(model));
 			return;
 		}
 		if (cmp_type == ENVIRONMENT_PROBE_TYPE) {
@@ -263,36 +282,24 @@ public:
 			return;
 		}
 		if (cmp_type == DECAL_TYPE) {
-			Lumix::visit(v, "Material", this, entity, LUMIX_PROP(RenderScene, DecalMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE));
-			Lumix::visit(v, "Half extents", this, entity, LUMIX_PROP(RenderScene, DecalHalfExtents), 
-				MinAttribute(0));
+			Lumix::visit(v, "Material", this, entity, LUMIX_PROP(RenderScene, DecalMaterialPath), ResourceAttribute("Material (*.mat)", Material::TYPE));
+			Lumix::visit(v, "Half extents", this, entity, LUMIX_PROP(RenderScene, DecalHalfExtents), MinAttribute(0));
 			return;
 		}
 		if (cmp_type == TERRAIN_TYPE) {
 			Terrain* terrain = getTerrain(entity);
-			Lumix::visit(v, "Material", this, entity, LUMIX_PROP(RenderScene, TerrainMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE));
-			Lumix::visit(v, "XZ scale", this, entity, LUMIX_PROP(RenderScene, TerrainXZScale),
-				MinAttribute(0));
-			Lumix::visit(v, "Height scale", this, entity, LUMIX_PROP(RenderScene, TerrainYScale),
-				MinAttribute(0));
-			v.beginArray("Grass",
-				[terrain](){ return terrain->getGrassTypeCount(); },
-				[terrain](){ return terrain->addGrassType(-1); },
-				[terrain](u32 idx){ return terrain->removeGrassType(idx); }
-			);
-			for (int i = 0; i < terrain->getGrassTypeCount(); ++i) {
+			Lumix::visit(v, "Material", this, entity, LUMIX_PROP(RenderScene, TerrainMaterialPath), ResourceAttribute("Material (*.mat)", Material::TYPE));
+			Lumix::visit(v, "XZ scale", this, entity, LUMIX_PROP(RenderScene, TerrainXZScale), MinAttribute(0));
+			Lumix::visit(v, "Height scale", this, entity, LUMIX_PROP(RenderScene, TerrainYScale), MinAttribute(0));
+			
+			Lumix::visitArray(v, "Grass", this, entity, &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass, [&](u32 idx){
+				int i = idx;
 				Lumix::visit(v, "Mesh", this, entity, i, LUMIX_PROP(RenderScene, GrassPath), ResourceAttribute("Mesh (*.msh)", Model::TYPE));
 				Lumix::visit(v, "Distance", this, entity, i, LUMIX_PROP(RenderScene, GrassDistance));
 				Lumix::visit(v, "Density", this, entity, i, LUMIX_PROP(RenderScene, GrassDensity));
-				//enum_property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), rotationModeDesc)
-				// TODO
-				ASSERT(false);
-				v.nextArrayItem();
-			}
-
-			v.endArray();
+				Lumix::visit(v, "Mode", this, entity, i, LUMIX_PROP(RenderScene, GrassRotationMode), GrassRotationModeAttr());
+			});
+		
 			return;
 		}
 		if (cmp_type == CAMERA_TYPE) {

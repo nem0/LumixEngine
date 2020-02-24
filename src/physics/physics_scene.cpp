@@ -404,6 +404,140 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
+	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+		using namespace Reflection;
+		if (cmp_type == RAGDOLL_TYPE) {
+			blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
+			Lumix::visit(v, "Layer", this, entity, LUMIX_PROP(PhysicsScene, RagdollLayer));
+			return;
+		}
+		if (cmp_type == D6_JOINT_TYPE) {
+			struct D6MotionAttr : EnumAttribute {
+				u32 count() const override { return 3; }
+				const char* getName(u32 value) const override {
+					switch((D6Motion)value) {
+						case D6Motion::FREE: return "Free";
+						case D6Motion::LIMITED: return "Limited";
+						case D6Motion::LOCKED: return "Locked";
+						default: ASSERT(false); return "N/A";
+					}
+				}
+			};
+
+			Lumix::visit(v, "Connected body", this, entity, LUMIX_PROP(PhysicsScene, JointConnectedBody));
+			Lumix::visit(v, "Axis position", this, entity, LUMIX_PROP(PhysicsScene, JointAxisPosition));
+			Lumix::visit(v, "Axis direction", this, entity, LUMIX_PROP(PhysicsScene, JointAxisDirection));
+			Lumix::visitEnum(v, "X motion", this, entity, LUMIX_PROP(PhysicsScene, D6JointXMotion), D6MotionAttr());
+			Lumix::visitEnum(v, "Y motion", this, entity, LUMIX_PROP(PhysicsScene, D6JointYMotion), D6MotionAttr());
+			Lumix::visitEnum(v, "Z motion", this, entity, LUMIX_PROP(PhysicsScene, D6JointZMotion), D6MotionAttr());
+			Lumix::visitEnum(v, "Swing 1", this, entity, LUMIX_PROP(PhysicsScene, D6JointSwing1Motion), D6MotionAttr());
+			Lumix::visitEnum(v, "Swing 2", this, entity, LUMIX_PROP(PhysicsScene, D6JointSwing2Motion), D6MotionAttr());
+			Lumix::visitEnum(v, "Twist", this, entity, LUMIX_PROP(PhysicsScene, D6JointTwistMotion), D6MotionAttr());
+			Lumix::visit(v, "Linear limit", this, entity, LUMIX_PROP(PhysicsScene, D6JointLinearLimit), MinAttribute(0));
+			Lumix::visit(v, "Swing limit", this, entity, LUMIX_PROP(PhysicsScene, D6JointSwingLimit), RadiansAttribute());
+			Lumix::visit(v, "Twist limit", this, entity, LUMIX_PROP(PhysicsScene, D6JointTwistLimit), RadiansAttribute());
+			Lumix::visit(v, "Damping", this, entity, LUMIX_PROP(PhysicsScene, D6JointDamping));
+			Lumix::visit(v, "Stiffness", this, entity, LUMIX_PROP(PhysicsScene, D6JointStiffness));
+			Lumix::visit(v, "Restitution", this, entity, LUMIX_PROP(PhysicsScene, D6JointRestitution));
+			return;
+		}
+		if (cmp_type == SPHERICAL_JOINT_TYPE) {
+			Lumix::visit(v, "Connected body", this, entity,  LUMIX_PROP(PhysicsScene, JointConnectedBody));
+			Lumix::visit(v, "Axis position", this, entity,  LUMIX_PROP(PhysicsScene, JointAxisPosition));
+			Lumix::visit(v, "Axis direction", this, entity,  LUMIX_PROP(PhysicsScene, JointAxisDirection));
+			Lumix::visit(v, "Use limit", this, entity,  LUMIX_PROP(PhysicsScene, SphericalJointUseLimit));
+			Lumix::visit(v, "Limit", this, entity, LUMIX_PROP(PhysicsScene, SphericalJointLimit), RadiansAttribute());
+			return;
+		}
+		if (cmp_type == DISTANCE_JOINT_TYPE) {
+			Lumix::visit(v, "Connected body", this, entity,  LUMIX_PROP(PhysicsScene, JointConnectedBody));
+			Lumix::visit(v, "Axis position", this, entity,  LUMIX_PROP(PhysicsScene, JointAxisPosition));
+			Lumix::visit(v, "Damping", this, entity, LUMIX_PROP(PhysicsScene, DistanceJointDamping), MinAttribute(0));
+			Lumix::visit(v, "Stiffness", this, entity, LUMIX_PROP(PhysicsScene, DistanceJointStiffness), MinAttribute(0));
+			Lumix::visit(v, "Tolerance", this, entity, LUMIX_PROP(PhysicsScene, DistanceJointTolerance), MinAttribute(0));
+			Lumix::visit(v, "Limits", this, entity, LUMIX_PROP(PhysicsScene, DistanceJointLimits));
+			return;
+		}
+		if (cmp_type == HINGE_JOINT_TYPE) {
+			Lumix::visit(v, "Connected body", this, entity, LUMIX_PROP(PhysicsScene, JointConnectedBody));
+			Lumix::visit(v, "Damping", this, entity, LUMIX_PROP(PhysicsScene, HingeJointDamping), MinAttribute(0));
+			Lumix::visit(v, "Stiffness", this, entity, LUMIX_PROP(PhysicsScene, HingeJointStiffness), MinAttribute(0));
+			Lumix::visit(v, "Axis position", this, entity, LUMIX_PROP(PhysicsScene, JointAxisPosition));
+			Lumix::visit(v, "Axis direction", this, entity, LUMIX_PROP(PhysicsScene, JointAxisDirection));
+			Lumix::visit(v, "Use limit", this, entity, LUMIX_PROP(PhysicsScene, HingeJointUseLimit));
+			Lumix::visit(v, "Limit", this, entity, LUMIX_PROP(PhysicsScene, HingeJointLimit), RadiansAttribute());
+			return;
+		}
+		if (cmp_type == CONTROLLER_TYPE) {
+			Lumix::visit(v, "Radius", this, entity, LUMIX_PROP(PhysicsScene, ControllerRadius));
+			Lumix::visit(v, "Height", this, entity, LUMIX_PROP(PhysicsScene, ControllerHeight));
+			Lumix::visit(v, "Layer", this, entity, LUMIX_PROP(PhysicsScene, ControllerLayer));
+			Lumix::visit(v, "Use Custom Gravity", this, entity, LUMIX_PROP(PhysicsScene, ControllerCustomGravity));
+			Lumix::visit(v, "Custom Gravity Acceleration", this, entity, LUMIX_PROP(PhysicsScene, ControllerCustomGravityAcceleration));
+			return;
+		}
+		if (cmp_type == RIGID_ACTOR_TYPE) {
+			struct DynamicTypeAttr : EnumAttribute {
+				u32 count() const override { return 3; }
+				const char* getName(u32 value) const override { 
+					switch((DynamicType)value) {
+						case DynamicType::DYNAMIC: return "Dynamic";
+						case DynamicType::KINEMATIC: return "Kinematic";
+						case DynamicType::STATIC: return "Static";
+						default: ASSERT(false); return "N/A";
+					}
+				}
+			};
+
+			Lumix::visit(v, "Layer", this, entity, LUMIX_PROP(PhysicsScene, ActorLayer));
+			Lumix::visitEnum(v, "Dynamic", this, entity, LUMIX_PROP(PhysicsScene, DynamicType), DynamicTypeAttr());
+			Lumix::visit(v, "Trigger", this, entity, LUMIX_PROP(PhysicsScene, IsTrigger));
+			Lumix::visitArray(v, "Box geometry", this, entity, &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry, [&](u32 i){
+				int idx = i;
+				Lumix::visit(v, "Size", this, entity, idx, LUMIX_PROP(PhysicsScene, BoxGeomHalfExtents));
+				Lumix::visit(v, "Position offset", this, entity, idx, LUMIX_PROP(PhysicsScene, BoxGeomOffsetPosition));
+				Lumix::visit(v, "Rotation offset", this, entity, idx, LUMIX_PROP(PhysicsScene, BoxGeomOffsetRotation), RadiansAttribute());
+			});
+			Lumix::visitArray(v, "Sphere geometry", this, entity, &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry, [&](u32 i){
+				int idx = i;
+				Lumix::visit(v, "Radius", this ,entity, idx, LUMIX_PROP(PhysicsScene, SphereGeomRadius), MinAttribute(0)),
+				Lumix::visit(v, "Position offset", this ,entity, idx, LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition)),
+				Lumix::visit(v, "Rotation offset", this ,entity, idx, LUMIX_PROP(PhysicsScene, SphereGeomOffsetRotation), RadiansAttribute());
+			});
+			return;
+		}
+		if (cmp_type == WHEEL_TYPE) {
+			struct WheelSlotAttr : EnumAttribute {
+				u32 count() const override { return 4; }
+				const char* getName(u32 value) const override { 
+					switch((WheelSlot)value) {
+						case WheelSlot::FRONT_LEFT: return "Front left";
+						case WheelSlot::FRONT_RIGHT: return "Front right";
+						case WheelSlot::REAR_LEFT: return "Rear left";
+						case WheelSlot::REAR_RIGHT: return "Rear right";
+						default: ASSERT(false); return "N/A";
+					}
+				}
+			};
+
+			Lumix::visit(v, "Radius", this, entity, LUMIX_PROP(PhysicsScene, WheelRadius), MinAttribute(0));
+			Lumix::visit(v, "Width", this, entity, LUMIX_PROP(PhysicsScene, WheelWidth), MinAttribute(0));
+			Lumix::visit(v, "Mass", this, entity, LUMIX_PROP(PhysicsScene, WheelMass), MinAttribute(0));
+			Lumix::visit(v, "MOI", this, entity, LUMIX_PROP(PhysicsScene, WheelMOI), MinAttribute(0));
+			Lumix::visitEnum(v, "Slot", this, entity, LUMIX_PROP(PhysicsScene, WheelSlot), WheelSlotAttr());
+			return;
+		}
+		if (cmp_type == HEIGHTFIELD_TYPE) {
+			Lumix::visit(v, "Layer", this, entity, LUMIX_PROP(PhysicsScene, HeightfieldLayer));
+			Lumix::visit(v, "Heightmap", this, entity, LUMIX_PROP(PhysicsScene, HeightmapSource), ResourceAttribute("Image (*.raw)", Texture::TYPE));
+			Lumix::visit(v, "Y scale", this, entity,  LUMIX_PROP(PhysicsScene, HeightmapYScale), MinAttribute(0));
+			Lumix::visit(v, "XZ scale", this, entity,  LUMIX_PROP(PhysicsScene, HeightmapXZScale), MinAttribute(0));
+			return;
+		}
+		ASSERT(false);
+	}
+
+
 	PxBatchQuery* createVehicleBatchQuery(u8* mem)
 	{
 		const PxU32 maxNumQueriesInBatch = 64;

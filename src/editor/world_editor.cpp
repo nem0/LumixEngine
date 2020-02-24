@@ -450,20 +450,20 @@ struct PropertyDeserializeVisitor : IXXVisitor {
 	{}
 
 	template <typename T> 
-	void set(Prop<T> prop) {
+	void set(const Prop<T>& prop) {
 		prop.set(blob->read<T>());
 	}
 
-	void visit(Prop<float> prop) override { set(prop); }
-	void visit(Prop<i32> prop) override { set(prop); }
-	void visit(Prop<u32> prop) override { set(prop); }
-	void visit(Prop<Vec2> prop) override { set(prop); }
-	void visit(Prop<Vec3> prop) override { set(prop); }
-	void visit(Prop<IVec3> prop) override { set(prop); }
-	void visit(Prop<Vec4> prop) override { set(prop); }
-	void visit(Prop<bool> prop) override { set(prop); }
+	void visit(const Prop<float>& prop) override { set(prop); }
+	void visit(const Prop<i32>& prop) override { set(prop); }
+	void visit(const Prop<u32>& prop) override { set(prop); }
+	void visit(const Prop<Vec2>& prop) override { set(prop); }
+	void visit(const Prop<Vec3>& prop) override { set(prop); }
+	void visit(const Prop<IVec3>& prop) override { set(prop); }
+	void visit(const Prop<Vec4>& prop) override { set(prop); }
+	void visit(const Prop<bool>& prop) override { set(prop); }
 	
-	void visit(Prop<EntityPtr> prop) override { 
+	void visit(const Prop<EntityPtr>& prop) override { 
 		EntityPtr value;
 		blob->read(Ref(value));
 		auto iter = map.find(value);
@@ -471,7 +471,7 @@ struct PropertyDeserializeVisitor : IXXVisitor {
 		prop.set(value);
 	}
 	
-	void visit(Prop<const char*> prop) override 
+	void visit(const Prop<const char*>& prop) override 
 	{
 		// TODO support bigger strings
 		char tmp[1024];
@@ -479,21 +479,22 @@ struct PropertyDeserializeVisitor : IXXVisitor {
 		prop.set(tmp);
 	}
 	
-	void visit(Prop<Path> prop) override {
+	void visit(const Prop<Path>& prop) override {
 		char tmp[MAX_PATH_LENGTH];
 		blob->readString(Span(tmp));
 		Path path(tmp);
 		prop.set(path);
 	}
 
-	void beginArray(const char* name, Counter count, Adder add, Remover remove) override {
+	bool beginArray(const char* name, const ArrayProp& prop) override {
 		const u32 wanted = blob->read<u32>();
-		while (count() > wanted) {
-			remove(count() - 1);
+		while (prop.count() > wanted) {
+			prop.remove(prop.count() - 1);
 		}
-		while (count() < wanted) {
-			add();
+		while (prop.count() < wanted) {
+			prop.add();
 		}
+		return true;
 	}
 
 	const HashMap<EntityPtr, u32>& map;
@@ -563,26 +564,27 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 
 
 struct PropertySerializeVisitor : IXXVisitor {
-	void visit(Prop<float> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<i32> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<u32> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<Vec2> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<Vec3> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<IVec3> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<Vec4> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<bool> prop) override { serializer->write(prop.get()); }
-	void visit(Prop<const char*> prop) override { serializer->writeString(prop.get()); }
+	void visit(const Prop<float>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<i32>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<u32>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<Vec2>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<Vec3>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<IVec3>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<Vec4>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<bool>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<const char*>& prop) override { serializer->writeString(prop.get()); }
 	
-	void visit(Prop<EntityPtr> prop) override { serializer->write(prop.get().index); }
+	void visit(const Prop<EntityPtr>& prop) override { serializer->write(prop.get().index); }
 
 
-	void visit(Prop<Path> prop) override { 
+	void visit(const Prop<Path>& prop) override { 
 		serializer->writeString(prop.get().c_str()); 
 	}
 
-	void beginArray(const char* name, Counter count, Adder add, Remover remove) override {
-		const u32 c = count();
+	bool beginArray(const char* name, const ArrayProp& prop) override {
+		const u32 c = prop.count();
 		serializer->write(c);
+		return true;
 	}
 
 	OutputMemoryStream* serializer;
@@ -1211,8 +1213,8 @@ public:
 		template <typename T>
 		bool isSrc(const Prop<T>& prop) {
 			const char* src = cmd->m_property.c_str();
-			if (!startsWith(src, prop.m_name)) return false;
-			const char c = src[stringLength(prop.m_name)];
+			if (!startsWith(src, prop.name)) return false;
+			const char c = src[stringLength(prop.name)];
 			return c == '\0';
 		}
 
@@ -1223,28 +1225,28 @@ public:
 			buf->write(&val, sizeof(val));
 		}
 
-		void visit(Prop<float> prop) override { get(prop); }
-		void visit(Prop<bool> prop) override { get(prop); }
-		void visit(Prop<i32> prop) override { get(prop); }
-		void visit(Prop<u32> prop) override { get(prop); }
-		void visit(Prop<Vec2> prop) override { get(prop); }
-		void visit(Prop<Vec3> prop) override { get(prop); }
-		void visit(Prop<IVec3> prop) override { get(prop); }
-		void visit(Prop<Vec4> prop) override { get(prop); }
-		void visit(Prop<EntityPtr> prop) override { get(prop); }
+		void visit(const Prop<float>& prop) override { get(prop); }
+		void visit(const Prop<bool>& prop) override { get(prop); }
+		void visit(const Prop<i32>& prop) override { get(prop); }
+		void visit(const Prop<u32>& prop) override { get(prop); }
+		void visit(const Prop<Vec2>& prop) override { get(prop); }
+		void visit(const Prop<Vec3>& prop) override { get(prop); }
+		void visit(const Prop<IVec3>& prop) override { get(prop); }
+		void visit(const Prop<Vec4>& prop) override { get(prop); }
+		void visit(const Prop<EntityPtr>& prop) override { get(prop); }
 		
-		void visit(Prop<Path> prop) override { 
+		void visit(const Prop<Path>& prop) override { 
 			if (!isSrc(prop)) return;
 			const Path val = prop.get();
 			buf->write(val.c_str(), val.length() + 1);
 		}
-		void visit(Prop<const char*> prop) override { 
+		void visit(const Prop<const char*>& prop) override { 
 			if (!isSrc(prop)) return;
 			const char* val = prop.get();
 			buf->write(val, stringLength(val) + 1);
 		}
 	
-		void beginArray(const char* name, Counter count, Adder add, Remover remove) override {}
+		bool beginArray(const char* name, const ArrayProp& prop) override { return true; }
 			
 		OutputMemoryStream* buf;
 		SetPropertyCommand* cmd;
@@ -1254,8 +1256,8 @@ public:
 		template <typename T>
 		bool isSrc(const Prop<T>& prop) {
 			const char* src = cmd->m_property.c_str();
-			if (!startsWith(src, prop.m_name)) return false;
-			const char c = src[stringLength(prop.m_name)];
+			if (!startsWith(src, prop.name)) return false;
+			const char c = src[stringLength(prop.name)];
 			return c == '\0';
 		}
 
@@ -1267,24 +1269,24 @@ public:
 			prop.set(val);
 		}
 
-		void visit(Prop<float> prop) override { set(prop); }
-		void visit(Prop<bool> prop) override { set(prop); }
-		void visit(Prop<i32> prop) override { set(prop); }
-		void visit(Prop<u32> prop) override { set(prop); }
-		void visit(Prop<Vec2> prop) override { set(prop); }
-		void visit(Prop<Vec3> prop) override { set(prop); }
-		void visit(Prop<IVec3> prop) override { set(prop); }
-		void visit(Prop<Vec4> prop) override { set(prop); }
-		void visit(Prop<EntityPtr> prop) override { set(prop); }
+		void visit(const Prop<float>& prop) override { set(prop); }
+		void visit(const Prop<bool>& prop) override { set(prop); }
+		void visit(const Prop<i32>& prop) override { set(prop); }
+		void visit(const Prop<u32>& prop) override { set(prop); }
+		void visit(const Prop<Vec2>& prop) override { set(prop); }
+		void visit(const Prop<Vec3>& prop) override { set(prop); }
+		void visit(const Prop<IVec3>& prop) override { set(prop); }
+		void visit(const Prop<Vec4>& prop) override { set(prop); }
+		void visit(const Prop<EntityPtr>& prop) override { set(prop); }
 		
-		void visit(Prop<Path> prop) override {
+		void visit(const Prop<Path>& prop) override {
 			if (!isSrc(prop)) return;
 			char val[MAX_PATH_LENGTH];
 			ASSERT(buf->size() <= sizeof(val));
 			buf->read(val, buf->size());
 			prop.set(Path(val));
 		}
-		void visit(Prop<const char*> prop) override { 
+		void visit(const Prop<const char*>& prop) override { 
 			if (!isSrc(prop)) return;
 			// TODO any string size
 			char val[4096];
@@ -1293,7 +1295,7 @@ public:
 			prop.set(val);
 		}
 	
-		void beginArray(const char* name, Counter count, Adder add, Remover remove) override {}
+		bool beginArray(const char* name, const ArrayProp& prop) override { return true; }
 			
 		InputMemoryStream* buf;
 		SetPropertyCommand* cmd;

@@ -93,6 +93,38 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 
+	virtual void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+		if (cmp_type == AMBIENT_SOUND_TYPE) {
+			struct ClipAttr : Reflection::EnumAttribute {
+				ClipAttr(AudioScene& that) : that(that) {}
+				u32 count() const override { return that.getClipCount(); }
+				const char* getName(u32 value) const override { return that.getClipName(value); }
+				AudioScene& that;
+			};
+			Lumix::visit(v, "3D", this, entity, &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D);
+			Lumix::visit(v, "Sound", this, entity, LUMIX_PROP(AudioScene, AmbientSoundClipIndex), ClipAttr(*this));
+			return;
+		}
+		if (cmp_type == ECHO_ZONE_TYPE) {
+			EchoZone& zone = m_echo_zones[entity];
+			Lumix::visit(v, "Radius", Ref(zone.radius), Reflection::MinAttribute(0));
+			Lumix::visit(v, "Delay (ms)", Ref(zone.delay), Reflection::MinAttribute(0));
+			return;
+		}
+		if (cmp_type == CHORUS_ZONE_TYPE) {
+			ChorusZone& zone = m_chorus_zones[entity];
+			Lumix::visit(v, "Radius", Ref(zone.radius), Reflection::MinAttribute(0));
+			Lumix::visit(v, "Delay (ms)", Ref(zone.delay), Reflection::MinAttribute(0));
+			return;
+		}
+		if (cmp_type == LISTENER_TYPE) {
+			// no properties
+			return;
+		}
+		ASSERT(false);
+	}
+
+
 	int getVersion() const override { return (int)AudioSceneVersion::LAST; }
 
 

@@ -186,6 +186,57 @@ struct GUISceneImpl final : GUIScene
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 
+	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+		if (cmp_type == GUI_TEXT_TYPE) {
+			struct HAlignAttr : Reflection::EnumAttribute {
+				u32 count() const override { return (u32)GUIScene::TextHAlign::COUNT; }
+				const char* getName(u32 value) const {
+					switch((GUIScene::TextHAlign)value) {
+						case GUIScene::TextHAlign::LEFT: return "Left";
+						case GUIScene::TextHAlign::RIGHT: return "Right";
+						case GUIScene::TextHAlign::CENTER: return "Center";
+						default: ASSERT(false); return "N/A";
+					}
+				}
+			};
+			Lumix::visit(v, "Text", this, entity, LUMIX_PROP(GUIScene, Text));
+			Lumix::visit(v, "Font", this, entity, LUMIX_PROP(GUIScene, TextFontPath), Reflection::ResourceAttribute("Font (*.ttf)", FontResource::TYPE));
+			Lumix::visitEnum(v, "Horizontal align", this, entity, LUMIX_PROP(GUIScene, TextHAlign), HAlignAttr());
+			Lumix::visit(v, "Font Size", this, entity, LUMIX_PROP(GUIScene, TextFontSize));
+			Lumix::visit(v, "Color", this, entity, LUMIX_PROP(GUIScene, TextColorRGBA), Reflection::ColorAttribute());
+			return;
+		}
+		if (cmp_type == GUI_INPUT_FIELD_TYPE) {
+			// no properties
+			return;
+		}
+		if (cmp_type == GUI_BUTTON_TYPE) {
+			Lumix::visit(v, "Normal color", this, entity, LUMIX_PROP(GUIScene, ButtonNormalColorRGBA), Reflection::ColorAttribute());
+			Lumix::visit(v, "Hovered color", this, entity, LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA), Reflection::ColorAttribute());
+			return;
+		}
+		if (cmp_type == GUI_IMAGE_TYPE) {
+			Lumix::visit(v, "Enabled",this, entity, &GUIScene::isImageEnabled, &GUIScene::enableImage);
+			Lumix::visit(v, "Color",this, entity, LUMIX_PROP(GUIScene, ImageColorRGBA), Reflection::ColorAttribute());
+			Lumix::visit(v, "Sprite",this, entity, LUMIX_PROP(GUIScene, ImageSprite), Reflection::ResourceAttribute("Sprite (*.spr)", Sprite::TYPE));
+			return;
+		}
+		if (cmp_type == GUI_RECT_TYPE) {
+			Lumix::visit(v, "Enabled", this, entity, &GUIScene::isRectEnabled, &GUIScene::enableRect);
+			Lumix::visit(v, "Clip content", this, entity, LUMIX_PROP(GUIScene, RectClip));
+			Lumix::visit(v, "Top Points", this, entity, LUMIX_PROP(GUIScene, RectTopPoints));
+			Lumix::visit(v, "Top Relative", this, entity, LUMIX_PROP(GUIScene, RectTopRelative));
+			Lumix::visit(v, "Right Points", this, entity, LUMIX_PROP(GUIScene, RectRightPoints));
+			Lumix::visit(v, "Right Relative", this, entity, LUMIX_PROP(GUIScene, RectRightRelative));
+			Lumix::visit(v, "Bottom Points", this, entity, LUMIX_PROP(GUIScene, RectBottomPoints));
+			Lumix::visit(v, "Bottom Relative", this, entity, LUMIX_PROP(GUIScene, RectBottomRelative));
+			Lumix::visit(v, "Left Points", this, entity, LUMIX_PROP(GUIScene, RectLeftPoints));
+			Lumix::visit(v, "Left Relative", this, entity, LUMIX_PROP(GUIScene, RectLeftRelative));
+			return;
+		}
+		ASSERT(false);		
+	}
+
 	void renderTextCursor(GUIRect& rect, Draw2D& draw, const Vec2& pos)
 	{
 		if (!rect.input_field) return;

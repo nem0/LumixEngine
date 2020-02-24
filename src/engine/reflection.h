@@ -41,7 +41,8 @@ struct IAttribute
 		CLAMP,
 		RADIANS,
 		COLOR,
-		RESOURCE
+		RESOURCE,
+		ENUM
 	};
 
 	virtual ~IAttribute() {}
@@ -189,6 +190,14 @@ struct MinAttribute : IAttribute
 	int getType() const override { return MIN; }
 
 	float min;
+};
+
+
+struct EnumAttribute : IAttribute {
+	virtual u32 count() const = 0;
+	virtual const char* getName(u32 value) const = 0;
+
+	int getType() const override { return ENUM; }
 };
 
 
@@ -1044,124 +1053,67 @@ auto array(const char* name, Counter counter, Adder adder, Remover remover, Prop
 
 } // namespace Reflection
 
-
-struct Counter {
-	template <typename F>
-	Counter(const F& f) {
-		data = (void*)&f;
-		fn = &Counter::stub<F>;
-	}
-
-	template <typename F>
-	u32 stub() {
-		auto& f = *(const F*)data;
-		return f();
-	}
-	
-	u32 operator()() { return (this->*fn)(); }
-
-	void* data;
-	u32 (Counter::*fn)();
-};
-
-struct Adder {
-	template <typename F>
-	Adder(const F& f) {
-		data = (void*)&f;
-		fn = &Adder::stub<F>;
-	}
-
-	template <typename F>
-	void stub() {
-		auto& f = *(const F*)data;
-		f();
-	}
-	
-	void operator()() { (this->*fn)(); }
-
-	void* data;
-	void (Adder::*fn)();
-};
-
-struct Remover {
-	template <typename F>
-	Remover(const F& f) {
-		data = (void*)&f;
-		fn = &Remover::stub<F>;
-	}
-
-	template <typename F>
-	void stub(u32 idx) {
-		auto& f = *(const F*)data;
-		f(idx);
-	}
-	
-	void operator()(u32 idx) { (this->*fn)(idx); }
-
-	void* data;
-	void (Remover::*fn)(u32);
-};
-
 template <typename T>
 struct Prop {
-	template <typename G, typename S>
-	Prop(const char* name, const G& getter, const S& setter, Span<Reflection::IAttribute*> attrs) {
-		m_getter = &getter;
-		m_setter = &setter;
-		m_getter_stub = &Prop::getterStub<G>;
-		m_setter_stub = &Prop::setterStub<S>;
-		m_attributes = attrs;
-		m_name = name;
-	}
+	const char* name;
+	Span<Reflection::IAttribute*> attributes;
 
-	template <typename G, typename S>
-	Prop(const char* name, const G& getter, const S& setter) {
-		m_getter = &getter;
-		m_setter = &setter;
-		m_getter_stub = &Prop::getterStub<G>;
-		m_setter_stub = &Prop::setterStub<S>;
-		m_name = name;
-	}
+	virtual T get() const = 0;
+	virtual void set(T) const = 0;
 
 	Reflection::IAttribute* getAttribute(Reflection::IAttribute::Type type) const {
-		for (Reflection::IAttribute* attr : m_attributes) {
+		for (Reflection::IAttribute* attr : attributes) {
 			if (attr->getType() == type) return attr;
 		}
 		return nullptr;
 	}
+};
 
-	template <typename S> void setterStub(T value) const { (*(const S*)m_setter)(value); }
-	template <typename G> T getterStub() const { return (*(const G*)m_getter)(); }
-
-	T get() const { return (this->*m_getter_stub)(); }
-	void set(T value) const { (this->*m_setter_stub)(value); }
-
-	const char* m_name;
-	const void* m_getter;
-	const void* m_setter;
-	T (Prop::*m_getter_stub)() const;
-	void (Prop::*m_setter_stub)(T) const;
-	Span<Reflection::IAttribute*> m_attributes;
+struct ArrayProp {
+	virtual u32 count() const = 0;
+	virtual void add() const = 0;
+	virtual void remove(u32 idx) const = 0;
 };
 
 struct IXXVisitor {
-	virtual void visit(Prop<float> prop) = 0;
-	virtual void visit(Prop<bool> prop) = 0;
-	virtual void visit(Prop<i32> prop) = 0;
-	virtual void visit(Prop<u32> prop) = 0;
-	virtual void visit(Prop<Vec2> prop) = 0;
-	virtual void visit(Prop<Vec3> prop) = 0;
-	virtual void visit(Prop<IVec3> prop) = 0;
-	virtual void visit(Prop<Vec4> prop) = 0;
-	virtual void visit(Prop<Path> prop) = 0;
-	virtual void visit(Prop<EntityPtr> prop) = 0;
-	virtual void visit(Prop<const char*> prop) = 0;
+	virtual void visit(const Prop<float>& prop) = 0;
+	virtual void visit(const Prop<bool>& prop) = 0;
+	virtual void visit(const Prop<i32>& prop) = 0;
+	virtual void visit(const Prop<u32>& prop) = 0;
+	virtual void visit(const Prop<Vec2>& prop) = 0;
+	virtual void visit(const Prop<Vec3>& prop) = 0;
+	virtual void visit(const Prop<IVec3>& prop) = 0;
+	virtual void visit(const Prop<Vec4>& prop) = 0;
+	virtual void visit(const Prop<Path>& prop) = 0;
+	virtual void visit(const Prop<EntityPtr>& prop) = 0;
+	virtual void visit(const Prop<const char*>& prop) = 0;
 	
-	virtual void beginArray(const char* name, Counter count, Adder add, Remover remove) = 0;
-	virtual void nextArrayItem() {};
+	virtual bool beginArray(const char* name, const ArrayProp& prop) = 0;
+	virtual bool beginArrayItem(u32 idx, const ArrayProp& prop) { return true; }
+	virtual void endArrayItem() {};
 	virtual void endArray() {}
 };
 
+
+template <typename G, typename S, typename... Attrs>
+inline void visitFunctor(IXXVisitor& visitor, const char* name, G getter, S setter, Attrs... attrs) {
+	using T = decltype(getter());
+	Reflection::IAttribute* attrs_array[sizeof...(attrs) + 1] = {
+		&attrs...,
+		nullptr
+	};
+	struct : Prop<T> {
+		T get() const override { return (*getter)(); }
+		void set(T v) const override { (*setter)(v); }
+		const G* getter;
+		const S* setter;
+	} p;
+	p.name = name;
+	p.getter = &getter;
+	p.setter = &setter;
+	p.attributes = Span(attrs_array, attrs_array + sizeof...(attrs));
+	visitor.visit(p);
+}
 
 template <typename T, typename... Attrs>
 inline void visit(IXXVisitor& visitor, const char* name, Ref<T> value, Attrs... attrs) {
@@ -1169,12 +1121,44 @@ inline void visit(IXXVisitor& visitor, const char* name, Ref<T> value, Attrs... 
 		&attrs...,
 		nullptr
 	};
-	Prop<T> p(name,
-		[&](){ return value.value; },
-		[&](T v){ value = v; },
-		Span(attrs_array, attrs_array + sizeof...(attrs)));
+	struct : Prop<T> {
+		T get() const override { return value->value; }
+		void set(T v) const override { *value = v; }
+		Ref<T>* value;
+	} p;
+	p.value = &value;
+	p.name = name;
+	p.attributes = Span(attrs_array, attrs_array + sizeof...(attrs));
 	visitor.visit(p);
 }
+
+template <typename C, typename Count, typename Add, typename Remove, typename Iter, typename... Attrs>
+inline void visitArray(IXXVisitor& v, const char* name, C* inst, EntityRef e, Count count, Add add, Remove remove, Iter iter, Attrs... attrs) {
+	struct : ArrayProp {
+		u32 count() const override { return (inst->*counter)(e); }
+		void add() const override {  (inst->*adder)(e, -1);  }
+		void remove(u32 idx) const override { (inst->*remover)(e, idx); }
+
+		C* inst;
+		Count counter;
+		Add adder; 
+		Remove remover;
+		EntityRef e;
+	} ar;
+	ar.counter = count;
+	ar.inst = inst;
+	ar.adder = add;
+	ar.remover = remove;
+	ar.e = e;
+	if(!v.beginArray(name, ar)) return;
+	for (u32 i = 0; i < (u32)(inst->*count)(e); ++i) {
+		if (!v.beginArrayItem(i, ar)) continue;
+		iter(i);
+		v.endArrayItem();
+	}
+	v.endArray();
+}
+
 
 template <typename C, typename G, typename S, typename... Attrs>
 inline void visit(IXXVisitor& visitor, const char* name, C* inst, EntityRef e, G getter, S setter, Attrs... attrs) {
@@ -1183,10 +1167,45 @@ inline void visit(IXXVisitor& visitor, const char* name, C* inst, EntityRef e, G
 		&attrs...,
 		nullptr
 	};
-	const Prop<T> p(name,
-		[&](){ return (inst->*getter)(e); },
-		[&](T v){ (inst->*setter)(e, v); },
-		Span(attrs_array, attrs_array + sizeof...(attrs)));
+	struct : Prop<T> {
+		T get() const override { return (inst->*getter)(e); }
+		void set(T v) const override { (inst->*setter)(e, v); }
+		C* inst;
+		EntityRef e;
+		G getter;
+		S setter;
+	} p;
+	p.name = name;
+	p.inst = inst;
+	p.getter = getter;
+	p.setter = setter;
+	p.e = e;
+	p.attributes = Span(attrs_array, attrs_array + sizeof...(attrs));
+	visitor.visit(p);
+}
+
+template <typename C, typename G, typename S, typename... Attrs>
+inline void visitEnum(IXXVisitor& visitor, const char* name, C* inst, EntityRef e, G getter, S setter, Attrs... attrs) {
+	using T = i32;
+	using EnumT = typename ResultOf<G>::Type;
+	Reflection::IAttribute* attrs_array[sizeof...(attrs) + 1] = {
+		&attrs...,
+		nullptr
+	};
+	struct : Prop<T> {
+		T get() const override { return (i32)(inst->*getter)(e); }
+		void set(T v) const override { (inst->*setter)(e, (EnumT)v); }
+		C* inst;
+		EntityRef e;
+		G getter;
+		S setter;
+	} p;
+	p.name = name;
+	p.inst = inst;
+	p.getter = getter;
+	p.setter = setter;
+	p.e = e;
+	p.attributes = Span(attrs_array, attrs_array + sizeof...(attrs));
 	visitor.visit(p);
 }
 
@@ -1197,18 +1216,33 @@ inline void visit(IXXVisitor& visitor, const char* name, C* inst, EntityRef e, i
 		&attrs...,
 		nullptr
 	};
-	const Prop<T> p(name,
-		[&](){ return (inst->*getter)(e, idx); },
-		[&](T v){ (inst->*setter)(e, idx, v); },
-		Span(attrs_array, attrs_array + sizeof...(attrs)));
+	struct : Prop<T> {
+		T get() const override { return (inst->*getter)(e, idx); }
+		void set(T v) const override { (inst->*setter)(e, idx, v); }
+		C* inst;
+		EntityRef e;
+		G getter;
+		S setter;
+		int idx;
+	} p;
+	p.name = name;
+	p.inst = inst;
+	p.getter = getter;
+	p.setter = setter;
+	p.e = e;
+	p.idx = idx;
+	p.attributes = Span(attrs_array, attrs_array + sizeof...(attrs));
 	visitor.visit(p);
 }
 
 inline void visit(IXXVisitor& visitor, const char* name, Ref<String> value) {
-	Prop<const char*> p(name,
-		[&](){ return value.value.c_str(); },
-		[&](const char* v){ value = v; }
-	);
+	struct : Prop<const char*> {
+		const char* get() const override { return value->value.c_str(); }
+		void set(const char* val) const override { *value = val; }
+		Ref<String>* value;
+	} p;
+	p.name = name;
+	p.value = &value;
 	visitor.visit(p);
 }
 

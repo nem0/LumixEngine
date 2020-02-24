@@ -1856,20 +1856,22 @@ public:
 	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
 		ASSERT(cmp_type == LUA_SCRIPT_TYPE);
 		ScriptComponent* cmp = m_scripts[entity];
-		v.beginArray("Scripts", 
-			[cmp](){ return cmp->m_scripts.size(); },
-			[this, entity](){ addScript(entity); },
-			[this, entity](u32 idx){ removeScript(entity, idx); }
-		);
+		struct : ArrayProp {
+			u32 count() const override { return that->m_scripts[entity]->m_scripts.size(); }
+			void add() const override { that->addScript(entity); }
+			void remove(u32 idx) const override { that->removeScript(entity, idx); }
+			LuaScriptSceneImpl* that;
+			EntityRef entity;
+		} ar;
+		ar.that = this;
+		ar.entity = entity;
+
+		if (!v.beginArray("Scripts", ar)) return;
 		for (u32 i = 0; i < (u32)cmp->m_scripts.size(); ++i) {
+			if (!v.beginArrayItem(i, ar)) continue;
+
 			ScriptInstance& scr = cmp->m_scripts[i];
-			Reflection::ResourceAttribute attr("*.lua", ResourceType("lua_script"));
-			Reflection::IAttribute* attrs = &attr; 
-			v.visit(Prop<Path>("Path",
-					[&scr]() -> Path { return scr.m_script ? scr.m_script->getPath() : Path(); }, 
-					[i, entity, this](Path value) { setScriptPath(entity, i, value); },
-					Span(&attrs, &attrs + 1))
-			);
+			Lumix::visit(v, "Path", this, entity, (int)i, LUMIX_PROP(LuaScriptScene, ScriptPath), Reflection::ResourceAttribute("*.lua", ResourceType("lua_script")));
 			for (u32 j = 0; j < (u32)scr.m_properties.size(); ++j) {
 				Property& prop = scr.m_properties[j];
 				const char* name = getName(prop);
@@ -1881,21 +1883,21 @@ public:
 
 				switch (prop.type) {
 					case Property::BOOLEAN:
-						v.visit(Prop<bool>(name, 
-								[buf](){ return equalIStrings(buf, "true"); },
-								[j, this, &scr, &prop](bool v){
-									const char* tmp = v ? "true" : "false";
-									if (scr.m_state) {
-										applyProperty(scr, prop, tmp);
-									}
-									else {
-										prop.stored_value = tmp;
-									}
+						Lumix::visitFunctor(v, name,
+							[buf](){ return equalIStrings(buf, "true"); },
+							[j, this, &scr, &prop](bool v){
+								const char* tmp = v ? "true" : "false";
+								if (scr.m_state) {
+									applyProperty(scr, prop, tmp);
 								}
-							));
+								else {
+									prop.stored_value = tmp;
+								}
+							}
+						);
 						break;
 					case Property::INT:
-						v.visit(Prop<i32>(name,
+						Lumix::visitFunctor(v, name,
 							[buf](){ return atoi(buf); },
 							[j, this, &scr, &prop](i32 v){
 								char tmp[64];
@@ -1907,10 +1909,10 @@ public:
 									prop.stored_value = tmp;
 								}
 							}
-						));
+						);
 						break;
 					case Property::FLOAT:
-						v.visit(Prop<float>(name, 
+						Lumix::visitFunctor(v, name, 
 							[buf](){ return (float)atof(buf); },
 							[j, this, &scr, &prop](float v){
 								char tmp[64];
@@ -1922,13 +1924,10 @@ public:
 									prop.stored_value = tmp;
 								}
 							}
-						));
+						);
 						break;
 					case Property::RESOURCE: {
-						Reflection::ResourceAttribute attr("", prop.resource_type);
-						Reflection::IAttribute* attr_ptr = &attr;
-						Span<Reflection::IAttribute*> attrs(&attr_ptr, 1);
-						v.visit(Prop<Path>(name,
+						Lumix::visitFunctor(v, name,
 							[buf](){ return Path(buf); },
 							[j, this, &scr, &prop](Path v){
 								if (scr.m_state) {
@@ -1938,13 +1937,13 @@ public:
 									prop.stored_value = v.c_str();
 								}
 							},
-							attrs
-						));
+							Reflection::ResourceAttribute("", prop.resource_type)
+						);
 						break;
 					}
 					case Property::STRING:
 					case Property::ANY:
-						v.visit(Prop<const char*>(name,
+						Lumix::visitFunctor(v, name,
 							[buf](){ return buf; },
 							[j, this, &scr, &prop](const char* v){
 								if (scr.m_state) {
@@ -1954,10 +1953,10 @@ public:
 									prop.stored_value = v;
 								}
 							}
-						));
+						);
 						break;
 					case Property::ENTITY:
-						v.visit(Prop<EntityPtr>(name,
+						Lumix::visitFunctor(v, name,
 							[buf](){ return EntityPtr{atoi(buf)}; },
 							[j, this, &scr, &prop](EntityPtr v){
 								char buf[64];
@@ -1969,12 +1968,12 @@ public:
 									prop.stored_value = buf;
 								}
 							}
-						));
+						);
 						break;
 					default: ASSERT(false); break;
 				}
 			}
-			v.nextArrayItem();
+			v.endArrayItem();
 		}
 		v.endArray();
 	}

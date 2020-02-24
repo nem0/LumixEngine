@@ -18,7 +18,9 @@ struct GUIScene : IScene
 	{
 		LEFT,
 		CENTER,
-		RIGHT
+		RIGHT,
+		
+		COUNT
 	};
 
 	struct Rect

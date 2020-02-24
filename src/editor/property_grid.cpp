@@ -54,15 +54,18 @@ struct GridUIVisitor final : IXXVisitor
 	template <typename T>
 	bool skipProperty(const Prop<T>& prop)
 	{
-		return equalStrings(prop.m_name, "Enabled");
+		return equalStrings(prop.name, "Enabled");
 	}
 	
 
-	void beginArray(const char* name, Counter count, Adder add, Remover remove) override {
+	bool beginArray(const char* name, const ArrayProp& prop) override {
+		ImGui::Separator();
+		ImGui::TextUnformatted(name);
 		if (ImGui::Button("Add")) {
-			add();
+			prop.add();
 		}
 		ImGui::Indent();
+		return true;
 	}
 
 
@@ -80,44 +83,60 @@ struct GridUIVisitor final : IXXVisitor
 		return res;
 	}
 
-	void visit(Prop<float> prop) override {
+	void visit(const Prop<float>& prop) override {
 		if (skipProperty(prop)) return;
 		float f = prop.get();
 
 		const bool is_radians = prop.getAttribute(Reflection::IAttribute::RADIANS);
 		if (is_radians) f = radiansToDegrees(f);
 		const Vec2 min_max = getMinMax(prop);
-		if (ImGui::DragFloat(prop.m_name, &f, 1, min_max.x, min_max.y)) {
+		if (ImGui::DragFloat(prop.name, &f, 1, min_max.x, min_max.y)) {
 			f = clamp(f, min_max.x, min_max.y);
 			if (is_radians) f = degreesToRadians(f);
-			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&f, sizeof(f)));
+			m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&f, sizeof(f)));
 		}
 	}
 
-	void visit(Prop<i32> prop) override {
+	void visit(const Prop<i32>& prop) override {
 		if (skipProperty(prop)) return;
 		i32 value = prop.get();
 
-		if (ImGui::InputInt(prop.m_name, &value)) {
-			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+		auto* enum_attr = (Reflection::EnumAttribute*)prop.getAttribute(Reflection::IAttribute::ENUM);
+
+		if (enum_attr) {
+			const char* preview = enum_attr->getName(value);
+			if (ImGui::BeginCombo(prop.name, preview)) {
+				for (u32 i = 0, c = enum_attr->count(); i < c; ++i) {
+					if (ImGui::Selectable(enum_attr->getName(i))) {
+						value = i;
+						m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
+					}
+				}
+				ImGui::EndCombo();
+			}
+		}
+		else {
+			if (ImGui::InputInt(prop.name, &value)) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
+			}
 		}
 	}
 
-	void visit(Prop<u32> prop) override {
+	void visit(const Prop<u32>& prop) override {
 		if (skipProperty(prop)) return;
 		u32 value = prop.get();
 
-		if (ImGui::InputScalar(prop.m_name, ImGuiDataType_U32, &value)) {
-			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+		if (ImGui::InputScalar(prop.name, ImGuiDataType_U32, &value)) {
+			m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-	void visit(Prop<EntityPtr> prop) override {
+	void visit(const Prop<EntityPtr>& prop) override {
 		EntityPtr entity = prop.get();
 
 		char buf[128];
 		getEntityListDisplayName(m_editor, Span(buf), entity);
-		ImGui::PushID(prop.m_name);
+		ImGui::PushID(prop.name);
 		
 		float item_w = ImGui::CalcItemWidth();
 		auto& style = ImGui::GetStyle();
@@ -133,14 +152,14 @@ struct GridUIVisitor final : IXXVisitor
 		ImGui::SameLine();
 		ImGui::SetCursorPos(pos);
 		if (ImGui::Button("...")) {
-			ImGui::OpenPopup(prop.m_name);
+			ImGui::OpenPopup(prop.name);
 		}
 		ImGui::EndGroup();
 		ImGui::SameLine();
-		ImGui::Text("%s", prop.m_name);
+		ImGui::Text("%s", prop.name);
 
 		Universe& universe = *m_editor.getUniverse();
-		if (ImGui::BeginPopup(prop.m_name))
+		if (ImGui::BeginPopup(prop.name))
 		{
 			if (entity.isValid() && ImGui::Button("Select")) m_grid.m_deferred_select = entity;
 
@@ -152,7 +171,7 @@ struct GridUIVisitor final : IXXVisitor
 				bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
 				if (show && ImGui::Selectable(buf))
 				{
-					m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&i, sizeof(i)));
+					m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&i, sizeof(i)));
 				}
 			}
 			ImGui::EndPopup();
@@ -160,70 +179,70 @@ struct GridUIVisitor final : IXXVisitor
 		ImGui::PopID();
 	}
 
-	void visit(Prop<Vec2> prop) override {
+	void visit(const Prop<Vec2>& prop) override {
 		if (skipProperty(prop)) return;
 		Vec2 value = prop.get();
 
-		if (ImGui::DragFloat2(prop.m_name, &value.x)) {
-			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+		if (ImGui::DragFloat2(prop.name, &value.x)) {
+			m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-	void visit(Prop<Vec3> prop) override {
+	void visit(const Prop<Vec3>& prop) override {
 		if (skipProperty(prop)) return;
 		Vec3 value = prop.get();
 
 		if (prop.getAttribute(Reflection::IAttribute::COLOR)) {
-			if (ImGui::ColorEdit3(prop.m_name, &value.x)) {
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+			if (ImGui::ColorEdit3(prop.name, &value.x)) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
 		else {
 			const bool is_radians = prop.getAttribute(Reflection::IAttribute::RADIANS);
 			if (is_radians) value = radiansToDegrees(value);
 			const Vec2 min_max = getMinMax(prop);
-			if (ImGui::DragFloat3(prop.m_name, &value.x, 1, min_max.x, min_max.y)) {
+			if (ImGui::DragFloat3(prop.name, &value.x, 1, min_max.x, min_max.y)) {
 				if (is_radians) value = degreesToRadians(value);
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
 	}
 
-	void visit(Prop<IVec3> prop) override {
+	void visit(const Prop<IVec3>& prop) override {
 		if (skipProperty(prop)) return;
 		IVec3 value = prop.get();
 		
-		if (ImGui::DragInt3(prop.m_name, &value.x)) {
-			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+		if (ImGui::DragInt3(prop.name, &value.x)) {
+			m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-	void visit(Prop<Vec4> prop) override {
+	void visit(const Prop<Vec4>& prop) override {
 		if (skipProperty(prop)) return;
 		Vec4 value = prop.get();
 
 		if (prop.getAttribute(Reflection::IAttribute::COLOR)) {
-			if (ImGui::ColorEdit4(prop.m_name, &value.x)) {
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+			if (ImGui::ColorEdit4(prop.name, &value.x)) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
 		else {
-			if (ImGui::DragFloat4(prop.m_name, &value.x)) {
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+			if (ImGui::DragFloat4(prop.name, &value.x)) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 			}
 		}
 	}
 
-	void visit(Prop<bool> prop) override {
+	void visit(const Prop<bool>& prop) override {
 		if (skipProperty(prop)) return;
 		bool value = prop.get();
 
-		if (ImGui::CheckboxEx(prop.m_name, &value)) {
-			m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)&value, sizeof(value)));
+		if (ImGui::CheckboxEx(prop.name, &value)) {
+			m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)&value, sizeof(value)));
 		}
 	}
 
-	void visit(Prop<Path> prop) override {
+	void visit(const Prop<Path>& prop) override {
 		if (skipProperty(prop)) return;
 		char tmp[MAX_PATH_LENGTH];
 		Path value = prop.get();
@@ -232,18 +251,18 @@ struct GridUIVisitor final : IXXVisitor
 		auto* res = (Reflection::ResourceAttribute*)prop.getAttribute(Reflection::IAttribute::RESOURCE);
 
 		if (res) {
-			if (m_app.getAssetBrowser().resourceInput(prop.m_name, StaticString<20>("", (u64)&prop), Span(tmp), res->type)) {
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
+			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), Span(tmp), res->type)) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
 			}
 		}
 		else {
-			if (ImGui::InputText(prop.m_name, tmp, sizeof(tmp))) {
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
+			if (ImGui::InputText(prop.name, tmp, sizeof(tmp))) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
 			}
 		}
 	}
 
-	void visit(Prop<const char*> prop) override {
+	void visit(const Prop<const char*>& prop) override {
 		if (skipProperty(prop)) return;
 		char tmp[1024];
 		const char* value = prop.get();
@@ -251,13 +270,13 @@ struct GridUIVisitor final : IXXVisitor
 		auto* res = (Reflection::ResourceAttribute*)prop.getAttribute(Reflection::IAttribute::RESOURCE);
 
 		if (res) {
-			if (m_app.getAssetBrowser().resourceInput(prop.m_name, StaticString<20>("", (u64)&prop), Span(tmp), res->type)) {
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
+			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), Span(tmp), res->type)) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
 			}
 		}
 		else {
-			if (ImGui::InputText(prop.m_name, tmp, sizeof(tmp))) {
-				m_editor.setProperty(m_cmp_type, prop.m_name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
+			if (ImGui::InputText(prop.name, tmp, sizeof(tmp))) {
+				m_editor.setProperty(m_cmp_type, prop.name, m_entities, Span((u8*)tmp, stringLength(tmp) + 1));
 			}
 		}
 	}
@@ -331,47 +350,7 @@ struct GridUIVisitor final : IXXVisitor
 		ImGui::Indent();
 	}
 
-	
-	void visit(const Reflection::IEnumProperty& prop) override
-	{
-		if (skipProperty(prop)) return;
-		if (m_entities.size() > 1)
-		{
-			ImGui::LabelText(prop.name, "Multi-object editing not supported.");
-			return;
-		}
-
-		ComponentUID cmp = getComponent();
-		int value;
-		OutputMemoryStream blob(&value, sizeof(value));
-		prop.getValue(cmp, m_index, blob);
-		int count = prop.getEnumCount(cmp);
-
-		struct Data
-		{
-			const Reflection::IEnumProperty* prop;
-			ComponentUID cmp;
-		};
-
-		auto getter = [](void* data, int index, const char** out) -> bool {
-			Data* combo_data = (Data*)data;
-			*out = combo_data->prop->getEnumName(combo_data->cmp, index);
-			return true;
-		};
-
-		Data data;
-		data.cmp = cmp;
-		data.prop = &prop;
-
-		int idx = prop.getEnumValueIndex(cmp, value);
-		if (ImGui::Combo(prop.name, &idx, getter, &data, count))
-		{
-			value = prop.getEnumValue(cmp, idx);
-			ASSERT(cmp.isValid());
-			const EntityRef e = (EntityRef)cmp.entity;
-			m_editor.setProperty(cmp.type, m_index, prop, &e, 1, &value, sizeof(value));
-		}
-	}*/
+	*/
 
 
 	StudioApp& m_app;

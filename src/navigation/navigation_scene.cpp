@@ -124,6 +124,22 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
+	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+		if (cmp_type == NAVMESH_ZONE_TYPE) {
+			NavmeshZone& zone = getZone(entity);
+			Lumix::visit(v, "Extents", Ref(zone.extents));
+			return;
+		}
+		if (cmp_type == NAVMESH_AGENT_TYPE) {
+			Lumix::visit(v, "Radius", this, entity, LUMIX_PROP(NavigationScene, AgentRadius), Reflection::MinAttribute(0));
+			Lumix::visit(v, "Height", this, entity, LUMIX_PROP(NavigationScene, AgentHeight), Reflection::MinAttribute(0));
+			Lumix::visit(v, "Use root motion", this, entity, &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion);
+			return;
+		}
+		ASSERT(false);
+	}
+
+
 	void onEntityMoved(EntityRef entity)
 	{
 		auto iter = m_agents.find(entity);

@@ -119,6 +119,25 @@ struct AnimationSceneImpl final : AnimationScene
 	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
 
 
+	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+		if (cmp_type == PROPERTY_ANIMATOR_TYPE) {
+			Lumix::visit(v, "Enabled", this, entity, &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator);
+			Lumix::visit(v, "Animation", this, entity, LUMIX_PROP(AnimationScene, PropertyAnimation), Reflection::ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE));
+			return;
+		}
+		if (cmp_type == ANIMABLE_TYPE) {
+			Lumix::visit(v, "Animation", this, entity, LUMIX_PROP(AnimationScene, Animation), Reflection::ResourceAttribute("Animation (*.ani)", Animation::TYPE));
+			return;
+		}
+		if (cmp_type == ANIMATOR_TYPE) {
+			Lumix::visit(v, "Source", this, entity, LUMIX_PROP(AnimationScene, AnimatorSource), Reflection::ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE));
+			Lumix::visit(v, "Default set", this, entity, LUMIX_PROP(AnimationScene, AnimatorDefaultSet));
+			return;
+		}
+		ASSERT(false);
+	}
+
+
 	const OutputMemoryStream& getEventStream() const override
 	{
 		return m_event_stream;
