@@ -93,7 +93,7 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 
-	virtual void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+	virtual void visit(EntityRef entity, ComponentType cmp_type, struct IComponentVisitor& v) override {
 		if (cmp_type == AMBIENT_SOUND_TYPE) {
 			struct ClipAttr : Reflection::EnumAttribute {
 				ClipAttr(AudioScene& that) : that(that) {}

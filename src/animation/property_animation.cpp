@@ -35,8 +35,8 @@ bool PropertyAnimation::save(TextSerializer& serializer)
 	serializer.write("count", curves.size());
 	for (Curve& curve : curves)
 	{
-		serializer.write("component", Reflection::getComponent(curve.cmp_type)->name);
-		serializer.write("property", curve.property->name);
+		serializer.write("component", Reflection::getComponentName(curve.cmp_type));
+		serializer.write("property", curve.property.data);
 		serializer.write("keys_count", curve.frames.size());
 		for (int i = 0; i < curve.frames.size(); ++i)
 		{

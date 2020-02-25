@@ -100,6 +100,7 @@ template <typename T, u32 count> constexpr u32 lengthOf(const T (&)[count])
 template <typename T>
 struct Ref {
 	Ref(const Ref<T>& value) : value(value.value) {}
+	template <typename T2> Ref(const Ref<T2>& rhs) : value(static_cast<T2&>(rhs.value)) {}
 	explicit Ref(T& value) : value(value) {}
 	operator T&() { return value; }
 	T* operator->() { return &value; } 

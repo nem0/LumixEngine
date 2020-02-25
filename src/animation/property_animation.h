@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/resource.h"
+#include "engine/string.h"
 
 
 namespace Lumix
@@ -19,7 +20,7 @@ public:
 		Curve(IAllocator& allocator) : frames(allocator), values(allocator) {}
 
 		ComponentType cmp_type;
-		const Reflection::PropertyBase* property;
+		StaticString<32> property;
 		
 		Array<int> frames;
 		Array<float> values;

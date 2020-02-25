@@ -60,7 +60,6 @@ struct NavigationSystem final : IPlugin
 		dtAllocSetCustom(&detourAlloc, &detourFree);
 		rcAllocSetCustom(&recastAlloc, &recastFree);
 		registerLuaAPI(m_engine.getState());
-		registerProperties();
 		// register flags
 		Material::getCustomFlag("no_navigation");
 		Material::getCustomFlag("nonwalkable");
@@ -100,7 +99,6 @@ struct NavigationSystem final : IPlugin
 	static NavigationSystem* s_instance;
 
 
-	void registerProperties();
 	const char* getName() const override { return "navigation"; }
 	void createScenes(Universe& universe) override;
 	void destroyScene(IScene* scene) override;
@@ -111,32 +109,6 @@ struct NavigationSystem final : IPlugin
 
 
 NavigationSystem* NavigationSystem::s_instance = nullptr;
-
-
-void NavigationSystem::registerProperties()
-{
-	using namespace Reflection;
-	static auto navigation_scene = scene("navigation",
-		functions(
-			function(LUMIX_FUNC(NavigationScene::load))
-		),
-		component("navmesh_zone", 
-			var_property("Extents", &NavigationScene::getZone, &NavmeshZone::extents)
-		),
-		component("navmesh_agent",
-			functions(
-				function(LUMIX_FUNC(NavigationScene::navigate))
-			),
-			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
-				MinAttribute(0)),
-			property("Height", LUMIX_PROP(NavigationScene, AgentHeight),
-				MinAttribute(0)),
-			property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion)
-			//property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
-		)
-	);
-	registerScene(navigation_scene);
-}
 
 
 void NavigationSystem::createScenes(Universe& universe)

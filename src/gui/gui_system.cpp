@@ -69,53 +69,6 @@ struct GUISystemImpl final : GUISystem
 	{
 		registerLuaAPI();
 
-		using namespace Reflection;
-
-		static auto textHAlignDesc = enumDesciptor<GUIScene::TextHAlign>(
-			LUMIX_ENUM_VALUE(GUIScene::TextHAlign::LEFT),
-			LUMIX_ENUM_VALUE(GUIScene::TextHAlign::RIGHT),
-			LUMIX_ENUM_VALUE(GUIScene::TextHAlign::CENTER)
-		);
-		registerEnum(textHAlignDesc);
-
-		static auto lua_scene = scene("gui",
-			component("gui_text",
-				property("Text", LUMIX_PROP(GUIScene, Text)),
-				property("Font", LUMIX_PROP(GUIScene, TextFontPath),
-					ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
-				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
-				enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), textHAlignDesc),
-				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA),
-					ColorAttribute())
-			),
-			component("gui_input_field"),
-			component("gui_button",
-				property("Normal color", LUMIX_PROP(GUIScene, ButtonNormalColorRGBA),
-					ColorAttribute()),
-				property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA),
-					ColorAttribute())
-			),
-			component("gui_image",
-				property("Enabled", &GUIScene::isImageEnabled, &GUIScene::enableImage),
-				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA),
-					ColorAttribute()),
-				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite),
-					ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
-			),
-			component("gui_rect",
-				property("Enabled", &GUIScene::isRectEnabled, &GUIScene::enableRect),
-				property("Clip content", LUMIX_PROP(GUIScene, RectClip)),
-				property("Top Points", LUMIX_PROP(GUIScene, RectTopPoints)),
-				property("Top Relative", LUMIX_PROP(GUIScene, RectTopRelative)),
-				property("Right Points", LUMIX_PROP(GUIScene, RectRightPoints)),
-				property("Right Relative", LUMIX_PROP(GUIScene, RectRightRelative)),
-				property("Bottom Points", LUMIX_PROP(GUIScene, RectBottomPoints)),
-				property("Bottom Relative", LUMIX_PROP(GUIScene, RectBottomRelative)),
-				property("Left Points", LUMIX_PROP(GUIScene, RectLeftPoints)),
-				property("Left Relative", LUMIX_PROP(GUIScene, RectLeftRelative))
-			)
-		);
-		registerScene(lua_scene);
 		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
 

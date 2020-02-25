@@ -119,25 +119,6 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	m_property_animation_manager.create(PropertyAnimation::TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(Anim::Controller::TYPE, m_engine.getResourceManager());
 
-	using namespace Reflection;
-	static auto anim_scene = scene("animation",
-		component("property_animator", 
-			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
-				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE)),
-			property("Enabled", &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator)
-		),
-		component("animator",
-			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
-				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE)),
-			property("Default set", LUMIX_PROP(AnimationScene, AnimatorDefaultSet))
-		),
-		component("animable",
-			property("Animation", LUMIX_PROP(AnimationScene, Animation),
-				ResourceAttribute("Animation (*.ani)", Animation::TYPE))
-		)
-	);
-	registerScene(anim_scene);
-
 	registerLuaAPI();
 }
 

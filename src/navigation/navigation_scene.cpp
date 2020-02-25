@@ -124,7 +124,7 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
-	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+	void visit(EntityRef entity, ComponentType cmp_type, struct IComponentVisitor& v) override {
 		if (cmp_type == NAVMESH_ZONE_TYPE) {
 			NavmeshZone& zone = getZone(entity);
 			Lumix::visit(v, "Extents", Ref(zone.extents));

@@ -222,7 +222,7 @@ public:
 	}
 
 
-	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+	void visit(EntityRef entity, ComponentType cmp_type, struct IComponentVisitor& v) override {
 		using namespace Reflection;
 		if (cmp_type == BONE_ATTACHMENT_TYPE) {
 			Lumix::visit(v, "Parent", this, entity, LUMIX_PROP(RenderScene, BoneAttachmentParent));

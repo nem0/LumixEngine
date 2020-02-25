@@ -472,13 +472,13 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1, false);
 			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
-			auto* prop = Reflection::getProperty(MESH_ACTOR_TYPE, "Source");
 			m_editor.setProperty(MESH_ACTOR_TYPE, "Source", Span(&entity, 1), Span((u8*)path, stringLength(path) + 1));
 			m_editor.endCommandGroup();
 		}
 	}
 	else if (hit.is_hit && Path::hasExtension(path, "mat") && hit.mesh)
 	{
+		ASSERT(false);
 		// TODO
 		/*const EntityRef e = (EntityRef)hit.entity;
 		m_editor.selectEntities(&e, 1, false);
@@ -493,8 +493,8 @@ void SceneView::handleDrop(const char* path, float x, float y)
 				break;
 			}
 		}
-		auto* prop= Reflection::getProperty(MODEL_INSTANCE_TYPE, "Materials", "Source");
-		m_editor.setProperty(MODEL_INSTANCE_TYPE, mesh_index, *prop, &e, 1, path, stringLength(path) + 1);*/
+		StaticString<256> prop_path("Materials[", mesh_idx, "].Source");
+		m_editor.setProperty(MODEL_INSTANCE_TYPE, prop_path, &e, 1, path, stringLength(path) + 1);*/
 	}
 }
 

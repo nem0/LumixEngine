@@ -14,6 +14,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/os.h"
+#include "engine/string.h"
 #include "controller_editor.h"
 #include "engine/reflection.h"
 #include "engine/serializer.h"
@@ -111,39 +112,50 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (!ImGui::BeginMenu("Add curve")) return;
 
 		Universe* universe = editor.getUniverse();
-		;
+
 		for (ComponentUID cmp = universe->getFirstComponent(selected_entities[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp))
 		{
 			const char* cmp_type_name = m_app.getComponentTypeName(cmp.type);
 			if (!ImGui::BeginMenu(cmp_type_name)) continue;
 
-			const Reflection::ComponentBase* component = Reflection::getComponent(cmp.type);
-			struct : Reflection::ISimpleComponentVisitor
+			struct : IComponentVisitor
 			{
-				void visitProperty(const Reflection::PropertyBase& prop) override {}
-				void visit(const Reflection::Property<float>& prop) override
-				{
+				void visit(const Prop<bool>& prop) override {}
+				void visit(const Prop<i32>& prop) override {}
+				void visit(const Prop<u32>& prop) override {}
+				void visit(const Prop<Vec2>& prop) override {}
+				void visit(const Prop<Vec3>& prop) override {}
+				void visit(const Prop<IVec3>& prop) override {}
+				void visit(const Prop<Vec4>& prop) override {}
+				void visit(const Prop<Path>& prop) override {}
+				void visit(const Prop<EntityPtr>& prop) override {}
+				void visit(const Prop<const char*>& prop) override {}
+				
+				bool beginArray(const char* name, const ArrayProp& prop) override { return false; }
+				bool beginArrayItem(const char* name, u32 idx, const ArrayProp& prop) override { return false; }
+				
+				void visit(const Prop<float>& prop) override {
 					int idx = animation->curves.find([&](PropertyAnimation::Curve& rhs) {
-						return rhs.cmp_type == cmp.type && rhs.property == &prop;
+						return rhs.cmp_type == cmp_type && equalStrings(rhs.property.data, prop_name);
 					});
-					if (idx < 0 &&ImGui::MenuItem(prop.name))
-					{
+					if (idx < 0 &&ImGui::MenuItem(prop.name)) {
 						PropertyAnimation::Curve& curve = animation->addCurve();
-						curve.cmp_type = cmp.type;
-						curve.property = &prop;
+						curve.cmp_type = cmp_type;
+						curve.property = prop_name;
 						curve.frames.push(0);
 						curve.frames.push(animation->curves.size() > 1 ? animation->curves[0].frames.back() : 1);
 						curve.values.push(0);
 						curve.values.push(0);
 					}
 				}
+				const char* prop_name;
 				PropertyAnimation* animation;
-				ComponentUID cmp;
+				ComponentType cmp_type;
 			} visitor;
 
 			visitor.animation = animation;
-			visitor.cmp = cmp;
-			component->visit(visitor);
+			visitor.cmp_type = cmp.type;
+			cmp.scene->visit((EntityRef)cmp.entity, cmp.type, visitor);
 
 			ImGui::EndMenu();
 		}
@@ -197,7 +209,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		{
 			PropertyAnimation::Curve& curve = animation->curves[i];
 			const char* cmp_name = m_app.getComponentTypeName(curve.cmp_type);
-			StaticString<64> tmp(cmp_name, " - ", curve.property->name);
+			StaticString<64> tmp(cmp_name, " - ", curve.property.data);
 			if (ImGui::Selectable(tmp, m_selected_curve == i)) m_selected_curve = i;
 		}
 

@@ -119,7 +119,7 @@ struct AnimationSceneImpl final : AnimationScene
 	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
 
 
-	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+	void visit(EntityRef entity, ComponentType cmp_type, struct IComponentVisitor& v) override {
 		if (cmp_type == PROPERTY_ANIMATOR_TYPE) {
 			Lumix::visit(v, "Enabled", this, entity, &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator);
 			Lumix::visit(v, "Animation", this, entity, LUMIX_PROP(AnimationScene, PropertyAnimation), Reflection::ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE));
@@ -786,8 +786,7 @@ struct AnimationSceneImpl final : AnimationScene
 					cmp.type = curve.cmp_type;
 					cmp.scene = m_universe.getScene(cmp.type);
 					cmp.entity = entity;
-					InputMemoryStream blob(&v, sizeof(v));
-					curve.property->setValue(cmp, -1, blob);
+					Reflection::setProperty(*cmp.scene, entity, curve.cmp_type, curve.property, Span((u8*)&v, sizeof(v)));
 					break;
 				}
 			}

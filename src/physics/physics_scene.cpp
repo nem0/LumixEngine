@@ -404,10 +404,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+	void visit(EntityRef entity, ComponentType cmp_type, struct IComponentVisitor& v) override {
 		using namespace Reflection;
 		if (cmp_type == RAGDOLL_TYPE) {
-			blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
+			//blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
 			Lumix::visit(v, "Layer", this, entity, LUMIX_PROP(PhysicsScene, RagdollLayer));
 			return;
 		}

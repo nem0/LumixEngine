@@ -679,7 +679,7 @@ public:
 		*dest = 0;
 	}
 
-	struct LuaPropGetterVisitor  : Reflection::IPropertyVisitor
+	struct LuaPropGetterVisitor final : IComponentVisitor
 	{
 		static bool isSameProperty(const char* name, const char* lua_name) {
 			char tmp[50];
@@ -688,59 +688,48 @@ public:
 		}
 
 		template <typename T>
-		void get(const Reflection::Property<T>& prop)
+		void get(const Prop<T>& prop)
 		{
 			if (!isSameProperty(prop.name, prop_name)) return;
 				
-			T val;
-			OutputMemoryStream blob(&val, sizeof(val));
-			prop.getValue(cmp, idx, blob);
+			T val = prop.get();
 			count = 1;
 			LuaWrapper::push(L, val);
 		}
 
-		void visit(const Reflection::Property<float>& prop) override { get(prop); }
-		void visit(const Reflection::Property<int>& prop) override { get(prop); }
-		void visit(const Reflection::Property<u32>& prop) override { get(prop); }
-		void visit(const Reflection::Property<EntityPtr>& prop) override { get(prop); }
-		void visit(const Reflection::Property<Vec2>& prop) override { get(prop); }
-		void visit(const Reflection::Property<Vec3>& prop) override { get(prop); }
-		void visit(const Reflection::Property<IVec3>& prop) override { get(prop); }
-		void visit(const Reflection::Property<Vec4>& prop) override { get(prop); }
-		void visit(const Reflection::Property<bool>& prop) override { get(prop); }
+		void visit(const Prop<float>& prop) override { get(prop); }
+		void visit(const Prop<int>& prop) override { get(prop); }
+		void visit(const Prop<u32>& prop) override { get(prop); }
+		void visit(const Prop<EntityPtr>& prop) override { get(prop); }
+		void visit(const Prop<Vec2>& prop) override { get(prop); }
+		void visit(const Prop<Vec3>& prop) override { get(prop); }
+		void visit(const Prop<IVec3>& prop) override { get(prop); }
+		void visit(const Prop<Vec4>& prop) override { get(prop); }
+		void visit(const Prop<bool>& prop) override { get(prop); }
 
-		void visit(const Reflection::Property<Path>& prop) override { 
+		void visit(const Prop<Path>& prop) override { 
 			if (!isSameProperty(prop.name, prop_name)) return;
 				
-			char tmp[MAX_PATH_LENGTH];
-			OutputMemoryStream blob(tmp, sizeof(tmp));
-			prop.getValue(cmp, idx, blob);
+			const Path p = prop.get();
 			count = 1;
-			LuaWrapper::push(L, tmp);
+			LuaWrapper::push(L, p.c_str());
 		}
 
-		void visit(const Reflection::Property<const char*>& prop) override { 
+		void visit(const Prop<const char*>& prop) override { 
 			if (!isSameProperty(prop.name, prop_name)) return;
 				
-			char tmp[1024];
-			OutputMemoryStream blob(tmp, sizeof(tmp));
-			prop.getValue(cmp, idx, blob);
 			count = 1;
-			LuaWrapper::push(L, tmp);
+			LuaWrapper::push(L, prop.get());
 		}
+		
+		bool beginArray(const char* name, const ArrayProp& prop) override { return false; }
 
-		void visit(const Reflection::IArrayProperty& prop) override {}
-		void visit(const Reflection::IEnumProperty& prop) override {}
-		void visit(const Reflection::IBlobProperty& prop) override {}
-
-		ComponentUID cmp;
 		const char* prop_name;
-		int idx;
 		u32 count = 0;
 		lua_State* L;
 	};
 		
-	struct LuaPropSetterVisitor  : Reflection::IPropertyVisitor
+	struct LuaPropSetterVisitor final : IComponentVisitor
 	{
 		bool isSameProperty(const char* name, const char* lua_name) {
 			char tmp[50];
@@ -753,48 +742,42 @@ public:
 		}
 
 		template <typename T>
-		void set(const Reflection::Property<T>& prop)
+		void set(const Prop<T>& prop)
 		{
 			if (!isSameProperty(prop.name, prop_name)) return;
 				
 			const T val = LuaWrapper::toType<T>(L, 3);
-			InputMemoryStream blob(&val, sizeof(val));
-			prop.setValue(cmp, idx, blob);
+			prop.set(val);
 		}
 
-		void visit(const Reflection::Property<float>& prop) override { set(prop); }
-		void visit(const Reflection::Property<int>& prop) override { set(prop); }
-		void visit(const Reflection::Property<u32>& prop) override { set(prop); }
-		void visit(const Reflection::Property<EntityPtr>& prop) override { set(prop); }
-		void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
-		void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
-		void visit(const Reflection::Property<IVec3>& prop) override { set(prop); }
-		void visit(const Reflection::Property<Vec4>& prop) override { set(prop); }
-		void visit(const Reflection::Property<bool>& prop) override { set(prop); }
+		void visit(const Prop<float>& prop) override { set(prop); }
+		void visit(const Prop<int>& prop) override { set(prop); }
+		void visit(const Prop<u32>& prop) override { set(prop); }
+		void visit(const Prop<EntityPtr>& prop) override { set(prop); }
+		void visit(const Prop<Vec2>& prop) override { set(prop); }
+		void visit(const Prop<Vec3>& prop) override { set(prop); }
+		void visit(const Prop<IVec3>& prop) override { set(prop); }
+		void visit(const Prop<Vec4>& prop) override { set(prop); }
+		void visit(const Prop<bool>& prop) override { set(prop); }
 
-		void visit(const Reflection::Property<Path>& prop) override {
+		void visit(const Prop<Path>& prop) override {
 			if (!isSameProperty(prop.name, prop_name)) return;
 				
 			const char* val = LuaWrapper::toType<const char*>(L, 3);
 			InputMemoryStream blob(val, 1 + stringLength(val));
-			prop.setValue(cmp, idx, blob);
+			prop.set(Path(val));
 		}
 
-		void visit(const Reflection::Property<const char*>& prop) override { 
+		void visit(const Prop<const char*>& prop) override { 
 			if (!isSameProperty(prop.name, prop_name)) return;
-				
+
 			const char* val = LuaWrapper::toType<const char*>(L, 3);
-			InputMemoryStream blob(val, 1 + stringLength(val));
-			prop.setValue(cmp, idx, blob);
+			prop.set(val);	
 		}
 
-		void visit(const Reflection::IArrayProperty& prop) override {}
-		void visit(const Reflection::IEnumProperty& prop) override {}
-		void visit(const Reflection::IBlobProperty& prop) override {}
+		bool beginArray(const char* name, const ArrayProp& prop) override { return false; }
 
-		ComponentUID cmp;
 		const char* prop_name;
-		int idx;
 		lua_State* L;
 		bool found = false;
 	};
@@ -824,17 +807,15 @@ public:
 		LuaPropGetterVisitor v;
 		v.prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 		v.L = L;
-		v.idx = -1;
-		v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
-		const Reflection::ComponentBase* cmp = Reflection::getComponent(v.cmp.type);
+		const ComponentType cmp_type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
 
 		lua_getfield(L, 1, "scene");
-		v.cmp.scene = LuaWrapper::toType<IScene*>(L, -1);
+		IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
 		lua_getfield(L, 1, "entity");
-		v.cmp.entity = LuaWrapper::toType<EntityRef>(L, -1);
+		const EntityRef e = LuaWrapper::toType<EntityRef>(L, -1);
 		lua_pop(L, 2);
 
-		cmp->visit(v);
+		scene->visit(e, cmp_type, v);
 
 		if (v.count == 0) {
 			luaL_error(L, "Property `%s` does not exist", v.prop_name);
@@ -849,17 +830,15 @@ public:
 		LuaPropSetterVisitor v;
 		v.prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 		v.L = L;
-		v.idx = -1;
-		v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
-		const Reflection::ComponentBase* cmp = Reflection::getComponent(v.cmp.type);
+		const ComponentType cmp_type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
 
 		lua_getfield(L, 1, "scene");
-		v.cmp.scene = LuaWrapper::toType<IScene*>(L, -1);
+		IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
 		lua_getfield(L, 1, "entity");
-		v.cmp.entity = LuaWrapper::toType<EntityRef>(L, -1);
+		const EntityRef e = LuaWrapper::toType<EntityRef>(L, -1);
 		lua_pop(L, 2);
 
-		cmp->visit(v);
+		scene->visit(e, cmp_type, v);
 
 		if (!v.found) {
 			luaL_error(L, "Property `%s` does not exist", v.prop_name);
@@ -1852,7 +1831,7 @@ public:
 		return "N/A";
 	}
 
-	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+	void visit(EntityRef entity, ComponentType cmp_type, struct IComponentVisitor& v) override {
 		ASSERT(cmp_type == LUA_SCRIPT_TYPE);
 		ScriptComponent* cmp = m_scripts[entity];
 		struct : ArrayProp {
@@ -2000,14 +1979,6 @@ LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 	, m_script_manager(m_allocator)
 {
 	m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
-
-	using namespace Reflection;
-	static auto lua_scene = scene("lua_script",
-		component("lua_script",
-			blob_property("data", LUMIX_PROP(LuaScriptScene, ScriptData))
-		)
-	);
-	registerScene(lua_scene);
 }
 
 

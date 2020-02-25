@@ -2378,10 +2378,9 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	struct SetPropertyVisitor : Reflection::IPropertyVisitor
+	struct SetPropertyVisitor : IComponentVisitor
 	{
-		void visit(const Reflection::Property<int>& prop) override
-		{
+		void visit(const Prop<i32>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
@@ -2389,8 +2388,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
-		void visit(const Reflection::Property<u32>& prop) override
-		{
+		void visit(const Prop<u32>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
@@ -2398,8 +2396,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
-		void visit(const Reflection::Property<float>& prop) override
-		{
+		void visit(const Prop<float>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
@@ -2407,8 +2404,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
-		void visit(const Reflection::Property<Vec2>& prop) override
-		{
+		void visit(const Prop<Vec2>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
 
@@ -2416,8 +2412,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
-		void visit(const Reflection::Property<Vec3>& prop) override
-		{
+		void visit(const Prop<Vec3>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
 
@@ -2425,8 +2420,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
-		void visit(const Reflection::Property<IVec3>& prop) override
-		{
+		void visit(const Prop<IVec3>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
 
@@ -2434,8 +2428,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
-		void visit(const Reflection::Property<Vec4>& prop) override
-		{
+		void visit(const Prop<Vec4>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
 
@@ -2443,8 +2436,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 		
-		void visit(const Reflection::Property<const char*>& prop) override
-		{
+		void visit(const Prop<const char*>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isstring(L, -1)) return;
 
@@ -2453,8 +2445,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 
-		void visit(const Reflection::Property<Path>& prop) override
-		{
+		void visit(const Prop<Path>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isstring(L, -1)) return;
 
@@ -2463,8 +2454,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 
-		void visit(const Reflection::Property<bool>& prop) override
-		{
+		void visit(const Prop<bool>& prop) override {
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isboolean(L, -1)) return;
 
@@ -2472,17 +2462,12 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, prop.name, Span(&entity, 1), Span((u8*)&val, sizeof(val)));
 		}
 
-		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const Reflection::IArrayProperty& prop) override { notSupported(prop); }
-		void visit(const Reflection::IEnumProperty& prop) override { notSupported(prop); }
-		void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
-
-
-		void notSupported(const Reflection::PropertyBase& prop)
-		{
+		void visit(const Prop<EntityPtr>& prop) override { 
 			if (!equalStrings(property_name, prop.name)) return;
 			logError("Lua Script") << "Property " << prop.name << " has unsupported type";
 		}
+
+		bool beginArray(const char* name, const ArrayProp& prop) override { return false; }
 
 
 		lua_State* L;
@@ -2532,7 +2517,6 @@ struct StudioAppImpl final : StudioApp
 				if (scene)
 				{
 					ComponentUID cmp(e, cmp_type, scene);
-					const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);
@@ -2546,7 +2530,7 @@ struct StudioAppImpl final : StudioApp
 							v.cmp_type = cmp.type;
 							v.L = L;
 							v.editor = &editor;
-							cmp_des->visit(v);
+							scene->visit((EntityRef)cmp.entity, cmp.type, v);
 
 							lua_pop(L, 1);
 						}

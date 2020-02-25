@@ -3930,7 +3930,6 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 			if (!create_empty)
 			{
-				auto* prop = Reflection::getProperty(TERRAIN_TYPE, "Material");
 				editor.setProperty(TERRAIN_TYPE, "Material", Span(&entity, 1), Span((u8*)buf, stringLength(buf) + 1));
 			}
 

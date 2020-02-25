@@ -186,7 +186,7 @@ struct GUISceneImpl final : GUIScene
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 
-	void visit(EntityRef entity, ComponentType cmp_type, struct IXXVisitor& v) override {
+	void visit(EntityRef entity, ComponentType cmp_type, struct IComponentVisitor& v) override {
 		if (cmp_type == GUI_TEXT_TYPE) {
 			struct HAlignAttr : Reflection::EnumAttribute {
 				u32 count() const override { return (u32)GUIScene::TextHAlign::COUNT; }

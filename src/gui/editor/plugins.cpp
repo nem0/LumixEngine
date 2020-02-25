@@ -335,9 +335,7 @@ private:
 
 		void set(GUIScene* scene, EntityRef e, const char* prop_name)
 		{
-			prop = Reflection::getProperty(GUI_RECT_TYPE, prop_name);
-			OutputMemoryStream blob(&value, sizeof(value));
-			prop->getValue({ e, GUI_RECT_TYPE, scene }, -1, blob);
+			Reflection::getProperty(*scene, e, GUI_RECT_TYPE, prop_name, Span((u8*)&value, sizeof(value)));
 		}
 	} m_copy_position_buffer[8];
 	
@@ -560,8 +558,6 @@ private:
 
 	void setRectProperty(EntityRef e, const char* prop_name, float value)
 	{
-		const Reflection::PropertyBase* prop = Reflection::getProperty(GUI_RECT_TYPE, crc32(prop_name));
-		ASSERT(prop);
 		m_editor->setProperty(GUI_RECT_TYPE, prop_name, Span(&e, 1), Span((u8*)&value, sizeof(value)));
 	}
 

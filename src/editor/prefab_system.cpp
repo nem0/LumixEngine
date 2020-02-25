@@ -305,20 +305,6 @@ public:
 	}
 
 
-	struct PropertyCloner : Reflection::ISimpleComponentVisitor {
-		void visitProperty(const Reflection::PropertyBase& prop) override {
-			stream->clear();
-			prop.getValue(src, -1, *stream);
-			InputMemoryStream tmp(*stream);
-			prop.setValue(dst, -1, tmp);
-		}
-
-		ComponentUID src;
-		ComponentUID dst;
-		OutputMemoryStream* stream;
-	};
-
-
 	EntityRef cloneEntity(Universe& src_u, EntityRef src_e, Universe& dst_u, EntityPtr dst_parent, Ref<Array<EntityRef>> entities) {
 		entities->push(src_e);
 		const EntityRef dst_e = dst_u.createEntity({0, 0, 0}, {0, 0, 0, 1});
@@ -343,19 +329,18 @@ public:
 			}
 		}
 
-		OutputMemoryStream tmp_stream(m_editor.getAllocator());
+		OutputMemoryStream out(m_editor.getAllocator());
+		HashMap<EntityPtr, u32> map(m_editor.getAllocator());
 		for (ComponentUID cmp = src_u.getFirstComponent(src_e); cmp.isValid(); cmp = src_u.getNextComponent(cmp)) {
 			dst_u.createComponent(cmp.type, dst_e);
 
-			const Reflection::ComponentBase* cmp_tpl = Reflection::getComponent(cmp.type);
-	
-			PropertyCloner property_cloner;
-			property_cloner.src = cmp;
-			property_cloner.dst.type = cmp.type;
-			property_cloner.dst.entity = dst_e;
-			property_cloner.dst.scene = dst_u.getScene(cmp.type);
-			property_cloner.stream = &tmp_stream;
-			cmp_tpl->visit(property_cloner);
+			out.clear();
+			Reflection::serializeComponent(*cmp.scene, (EntityRef)cmp.entity, cmp.type, Ref(out));
+			InputMemoryStream in(out);
+			// TODO mapping
+			map.clear();
+			map.insert(dst_e, 0);
+			Reflection::deserializeComponent(*dst_u.getScene(cmp.type), dst_e, cmp.type, map, Span(&dst_e, 1), Ref(in));
 		}
 
 		return dst_e;

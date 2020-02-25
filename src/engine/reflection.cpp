@@ -1,6 +1,7 @@
 #include "engine/reflection.h"
 #include "engine/crc32.h"
 #include "engine/allocator.h"
+#include "engine/hash_map.h"
 #include "engine/log.h"
 
 
@@ -76,142 +77,233 @@ struct ComponentLink
 static ComponentLink* g_first_component = nullptr;
 
 
-const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type)
+struct ComponentBase
 {
-	struct AttrVisitor : IAttributeVisitor
-	{
-		void visit(const IAttribute& attr) override
-		{
-			if (attr.getType() == type) result = &attr;
-		}
-		const IAttribute* result = nullptr;
-		IAttribute::Type type;
-	} attr_visitor;
-	attr_visitor.type = type;
-	prop.visit(attr_visitor);
-	return attr_visitor.result;
-}
+	virtual ~ComponentBase() {}
+
+	virtual int getPropertyCount() const = 0;
+	virtual int getFunctionCount() const = 0;
+
+	const char* name;
+	ComponentType component_type;
+};
 
 
-const ComponentBase* getComponent(ComponentType cmp_type)
+const char* getComponentName(ComponentType cmp_type)
 {
 	ComponentLink* link = g_first_component;
 	while (link)
 	{
-		if (link->desc->component_type == cmp_type) return link->desc;
+		if (link->desc->component_type == cmp_type) return link->desc->name;
 		link = link->next;
 	}
 
-	return nullptr;
+	return "Unknown component";
 }
 
+struct GetPropertyVisitor : IComponentVisitor {
+	template <typename T>
+	void get(const Prop<T>& prop) {
+		if (equalStrings(prop.name, prop_name)) {
+			T val = prop.get();
+			memcpy(value.begin(), &val, minimum(sizeof(val), value.length()));
+			found = true;
+		}
+	}
 
-const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash)
-{
-	auto* cmp = getComponent(cmp_type);
-	if (!cmp) return nullptr;
-	struct Visitor : ISimpleComponentVisitor
+	void visit(const Prop<float>& prop) override { get(prop); }
+	void visit(const Prop<bool>& prop) override { get(prop); }
+	void visit(const Prop<i32>& prop) override { get(prop); }
+	void visit(const Prop<u32>& prop) override { get(prop); }
+	void visit(const Prop<Vec2>& prop) override { get(prop); }
+	void visit(const Prop<Vec3>& prop) override { get(prop); }
+	void visit(const Prop<IVec3>& prop) override { get(prop); }
+	void visit(const Prop<Vec4>& prop) override { get(prop); }
+	void visit(const Prop<EntityPtr>& prop) override { get(prop); }
+
+	void visit(const Prop<Path>& prop) override { 
+		if (equalStrings(prop.name, prop_name)) {
+			Path p = prop.get();
+			copyString(Span((char*)value.begin(), value.length()), p.c_str());
+			found = true;
+		}
+	}
+
+	void visit(const Prop<const char*>& prop) override { 
+		if (equalStrings(prop.name, prop_name)) {
+			copyString(Span((char*)value.begin(), value.length()), prop.get());
+			found = true;
+		}
+	}
+
+	bool beginArray(const char* name, const ArrayProp& prop) override { return false; }
+
+	const char* prop_name;
+	Span<u8> value;
+	bool found = false;
+};
+
+struct PropertyDeserializeVisitor : IComponentVisitor {
+	PropertyDeserializeVisitor(const HashMap<EntityPtr, u32>& map, Span<const EntityRef> entities)
+		: map(map)
+		, entities(entities)
+	{}
+
+	template <typename T> 
+	void set(const Prop<T>& prop) {
+		prop.set(blob->read<T>());
+	}
+
+	void visit(const Prop<float>& prop) override { set(prop); }
+	void visit(const Prop<i32>& prop) override { set(prop); }
+	void visit(const Prop<u32>& prop) override { set(prop); }
+	void visit(const Prop<Vec2>& prop) override { set(prop); }
+	void visit(const Prop<Vec3>& prop) override { set(prop); }
+	void visit(const Prop<IVec3>& prop) override { set(prop); }
+	void visit(const Prop<Vec4>& prop) override { set(prop); }
+	void visit(const Prop<bool>& prop) override { set(prop); }
+	
+	void visit(const Prop<EntityPtr>& prop) override { 
+		EntityPtr value;
+		blob->read(Ref(value));
+		auto iter = map.find(value);
+		if (iter.isValid()) value = entities[iter.value()];
+		prop.set(value);
+	}
+	
+	void visit(const Prop<const char*>& prop) override 
 	{
-		void visitProperty(const PropertyBase& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const IArrayProperty& prop) override {
-			if (result) return;
-			visitProperty(prop);
-			prop.visit(*this);
-		}
+		// TODO support bigger strings
+		char tmp[1024];
+		blob->readString(Span(tmp));
+		prop.set(tmp);
+	}
+	
+	void visit(const Prop<Path>& prop) override {
+		char tmp[MAX_PATH_LENGTH];
+		blob->readString(Span(tmp));
+		Path path(tmp);
+		prop.set(path);
+	}
 
-		u32 property_name_hash;
-		const PropertyBase* result = nullptr;
-	} visitor;
-	visitor.property_name_hash = property_name_hash;
-	cmp->visit(visitor);
-	return visitor.result;
+	bool beginArray(const char* name, const ArrayProp& prop) override {
+		const u32 wanted = blob->read<u32>();
+		while (prop.count() > wanted) {
+			prop.remove(prop.count() - 1);
+		}
+		while (prop.count() < wanted) {
+			prop.add(prop.count());
+		}
+		return true;
+	}
+
+	const HashMap<EntityPtr, u32>& map;
+	Span<const EntityRef> entities;
+	IInputStream* blob;
+};
+
+struct PropertySerializeVisitor : IComponentVisitor {
+	void visit(const Prop<float>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<i32>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<u32>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<Vec2>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<Vec3>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<IVec3>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<Vec4>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<bool>& prop) override { serializer->write(prop.get()); }
+	void visit(const Prop<const char*>& prop) override { serializer->writeString(prop.get()); }
+	
+	void visit(const Prop<EntityPtr>& prop) override { serializer->write(prop.get().index); }
+
+
+	void visit(const Prop<Path>& prop) override { 
+		serializer->writeString(prop.get().c_str()); 
+	}
+
+	bool beginArray(const char* name, const ArrayProp& prop) override {
+		const u32 c = prop.count();
+		serializer->write(c);
+		return true;
+	}
+
+	IOutputStream* serializer;
+};
+
+struct SetPropertyVisitor : IComponentVisitor {
+	template <typename T>
+	void get(const Prop<T>& prop) {
+		if (equalStrings(prop.name, prop_name)) {
+			T val;
+			memcpy(&val, value.begin(), minimum(sizeof(val), value.length()));
+			prop.set(val);
+		}
+	}
+
+	void visit(const Prop<float>& prop) override { get(prop); }
+	void visit(const Prop<bool>& prop) override { get(prop); }
+	void visit(const Prop<i32>& prop) override { get(prop); }
+	void visit(const Prop<u32>& prop) override { get(prop); }
+	void visit(const Prop<Vec2>& prop) override { get(prop); }
+	void visit(const Prop<Vec3>& prop) override { get(prop); }
+	void visit(const Prop<IVec3>& prop) override { get(prop); }
+	void visit(const Prop<Vec4>& prop) override { get(prop); }
+	void visit(const Prop<EntityPtr>& prop) override { get(prop); }
+
+	void visit(const Prop<Path>& prop) override { 
+		if (equalStrings(prop.name, prop_name)) {
+			char tmp[MAX_PATH_LENGTH];
+			memcpy(tmp, value.begin(), minimum(value.length(), sizeof(tmp)));
+			prop.set(Path(tmp));
+		}
+	}
+
+	void visit(const Prop<const char*>& prop) override { 
+		if (equalStrings(prop.name, prop_name)) {
+			// TODO bigger strings
+			char tmp[4096];
+			memcpy(tmp, value.begin(), minimum(value.length(), sizeof(tmp)));
+			tmp[4095] = '\0';
+			prop.set(tmp);
+		}
+	}
+
+	bool beginArray(const char* name, const ArrayProp& prop) override { return false; }
+
+	const char* prop_name;
+	Span<const u8> value;
+};
+
+void setProperty(IScene& scene, EntityRef e, ComponentType cmp_type, const char* property, Span<const u8> in) {
+	SetPropertyVisitor v;
+	v.value = in;
+	v.prop_name = property;
+	scene.visit(e, cmp_type, v);
 }
 
-
-
-const PropertyBase* getProperty(ComponentType cmp_type, const char* property, const char* subproperty)
-{
-	auto* cmp = getComponent(cmp_type);
-	if (!cmp) return nullptr;
-	struct Visitor : ISimpleComponentVisitor
-	{
-		void visitProperty(const PropertyBase& prop) override {}
-
-		void visit(const IArrayProperty& prop) override {
-			if (equalStrings(prop.name, property))
-			{
-				struct Subvisitor : ISimpleComponentVisitor
-				{
-					void visitProperty(const PropertyBase& prop) override {
-						if (equalStrings(prop.name, property)) result = &prop;
-					}
-					const char* property;
-					const PropertyBase* result = nullptr;
-				} subvisitor;
-				subvisitor.property = subproperty;
-				prop.visit(subvisitor);
-				result = subvisitor.result;
-			}
-		}
-
-		const char* subproperty;
-		const char* property;
-		const PropertyBase* result = nullptr;
-	} visitor;
-	visitor.subproperty = subproperty;
-	visitor.property = property;
-	cmp->visit(visitor);
-	return visitor.result;
+void serializeComponent(IScene& scene, EntityRef e, ComponentType cmp_type, Ref<IOutputStream> out) {
+	PropertySerializeVisitor v;
+	v.serializer = &out.value;
+	scene.visit(e, cmp_type, v);
 }
 
-
-
-const PropertyBase* getProperty(ComponentType cmp_type, const char* property)
+void deserializeComponent(IScene& scene
+	, EntityRef e
+	, ComponentType cmp_type
+	, const HashMap<EntityPtr, u32>& map
+	, Span<const EntityRef> entities
+	, Ref<IInputStream> in)
 {
-	auto* cmp = getComponent(cmp_type);
-	if (!cmp) return nullptr;
-	struct Visitor : ISimpleComponentVisitor
-	{
-		void visitProperty(const PropertyBase& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-
-		const char* property;
-		const PropertyBase* result = nullptr;
-	} visitor;
-	visitor.property = property;
-	cmp->visit(visitor);
-	return visitor.result;
+	PropertyDeserializeVisitor v(map, entities);
+	v.blob = &in.value;
+	scene.visit(e, cmp_type, v);
 }
 
-
-void registerComponent(const ComponentBase& desc)
-{
-	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
-	link->next = g_first_component;
-	link->desc = &desc;
-	g_first_component = link;
-}
-
-
-void registerEnum(const EnumBase& e)
-{
-	g_enums->push(&e);
-}
-
-
-void registerScene(const SceneBase& scene)
-{
-	struct : ISceneVisitor
-	{
-		void visit(const ComponentBase& cmp) override
-		{
-			registerComponent(cmp);
-		}
-	} visitor;
-	scene.visit(visitor);
+bool getProperty(IScene& scene, EntityRef e, ComponentType cmp_type, const char* property, Span<u8> out) {
+	GetPropertyVisitor v;
+	v.value = out;
+	v.prop_name = property;
+	scene.visit(e, cmp_type, v);
+	return v.found;
 }
 
 
