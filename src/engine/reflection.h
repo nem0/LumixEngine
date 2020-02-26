@@ -221,6 +221,9 @@ template <typename T> struct Property : PropertyBase {};
 
 struct IBlobProperty : PropertyBase {};
 
+struct IDynamicProperties : PropertyBase {
+	virtual void visit(ComponentUID cmp, int index, IPropertyVisitor& visitor) const = 0;
+};
 
 struct IEnumProperty : PropertyBase
 {
@@ -258,6 +261,7 @@ struct IPropertyVisitor
 	virtual void visit(const Property<Path>& prop) = 0;
 	virtual void visit(const Property<bool>& prop) = 0;
 	virtual void visit(const Property<const char*>& prop) = 0;
+	virtual void visit(const IDynamicProperties& prop) {}
 	virtual void visit(const IArrayProperty& prop) = 0;
 	virtual void visit(const IEnumProperty& prop) = 0;
 	virtual void visit(const IBlobProperty& prop) = 0;
@@ -283,6 +287,7 @@ struct ISimpleComponentVisitor : IPropertyVisitor
 	void visit(const IArrayProperty& prop) override { visitProperty(prop); }
 	void visit(const IEnumProperty& prop) override { visitProperty(prop); }
 	void visit(const IBlobProperty& prop) override { visitProperty(prop); }
+	void visit(const IDynamicProperties& prop) override { visitProperty(prop); }
 };
 
 

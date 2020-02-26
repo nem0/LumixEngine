@@ -108,6 +108,12 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	}
 
 
+	void visit(const Reflection::IDynamicProperties& prop) override {
+		ComponentUID cmp = getComponent();;
+		prop.visit(cmp, m_index, *this);
+	}
+
+
 	void visit(const Reflection::Property<float>& prop) override
 	{
 		if (skipProperty(prop)) return;

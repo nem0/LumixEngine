@@ -470,6 +470,10 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::Property<const char*>& prop) override { prop.setValue(cmp, idx, deserializer); }
 	void visit(const Reflection::Property<Path>& prop) override { prop.setValue(cmp, idx, deserializer); }
 	
+	void visit(const Reflection::IDynamicProperties& prop) override {
+		prop.visit(cmp, idx, *this);
+	}
+
 	void visit(const Reflection::Property<EntityPtr>& prop) override { 
 		EntityPtr value;
 		deserializer.read(Ref(value));
@@ -519,6 +523,10 @@ struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 	void visit(const Reflection::IBlobProperty& prop) override { prop.getValue(cmp, idx, serializer); }
 	void visit(const Reflection::Property<Path>& prop) override { prop.getValue(cmp, idx, serializer); }
 	void visit(const Reflection::Property<const char*>& prop) override { prop.getValue(cmp, idx, serializer); }
+
+	void visit(const Reflection::IDynamicProperties& prop) override {
+		prop.visit(cmp, idx, *this);
+	}
 
 	void visit(const Reflection::IArrayProperty& prop) override {
 		const int count = prop.getCount(cmp);

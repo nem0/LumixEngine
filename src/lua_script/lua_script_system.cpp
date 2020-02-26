@@ -89,6 +89,7 @@ namespace Lumix
 			int environment;
 		};
 
+		struct ScriptComponent;
 
 		struct ScriptInstance
 		{
@@ -106,6 +107,8 @@ namespace Lumix
 			{
 				m_flags.set(ENABLED);
 			}
+
+			void onScriptLoaded(LuaScriptSceneImpl& scene, ScriptComponent& cmp, int scr_index);
 
 			LuaScript* m_script;
 			lua_State* m_state;
@@ -214,98 +217,15 @@ namespace Lumix
 
 			void onScriptLoaded(Resource::State, Resource::State, Resource& resource)
 			{
-				lua_State* L = m_scene.m_system.m_engine.getState();
 				for (int scr_index = 0, c = m_scripts.size(); scr_index < c; ++scr_index)
 				{
-					auto& script = m_scripts[scr_index];
-					if (!script.m_script) continue;
-					if (!script.m_script->isReady()) continue;
-					if (script.m_script != &resource) continue;
-
-					bool is_reload = true;
-					if (!script.m_state)
-					{
-						is_reload = false;
-
-						script.m_state = lua_newthread(L); // [thread]
-						LuaWrapper::DebugGuard guard(script.m_state, 1);
-						script.m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
-						lua_newtable(script.m_state); // [env]
-						// reference environment
-						lua_pushvalue(script.m_state, -1); // [env, env]
-						script.m_environment = luaL_ref(script.m_state, LUA_REGISTRYINDEX); // [env]
-
-						// environment's metatable & __index
-						lua_pushvalue(script.m_state, -1); // [env, env]
-						lua_setmetatable(script.m_state, -2); // [env]
-						lua_pushvalue(script.m_state, LUA_GLOBALSINDEX); // [evn, _G]
-						lua_setfield(script.m_state, -2, "__index");  // [env]
-
-						// set this
-						lua_getglobal(script.m_state, "Lumix"); // [env, Lumix]
-						lua_getfield(script.m_state, -1, "Entity"); // [env, Lumix, Lumix.Entity]
-						lua_remove(script.m_state, -2); // [env, Lumix.Entity]
-						lua_getfield(script.m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
-						lua_pushvalue(script.m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
-						lua_remove(script.m_state, -3); // [env, Entity.new, Lumix.Entity]
-						LuaWrapper::push(script.m_state, &m_scene.m_universe); // [env, Entity.new, Lumix.Entity, universe]
-						LuaWrapper::push(script.m_state, m_entity.index); // [env, Entity.new, Lumix.Entity, universe, entity_index]
-						const bool error = !LuaWrapper::pcall(script.m_state, 3, 1); // [env, entity]
-						ASSERT(!error);
-						lua_setfield(script.m_state, -2, "this"); // [env]
-					}
-					else
-					{
-						lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment); // [env]
-						ASSERT(lua_type(script.m_state, -1) == LUA_TTABLE);
-					}
-
-					bool errors = luaL_loadbuffer(script.m_state,
-						script.m_script->getSourceCode(),
-						stringLength(script.m_script->getSourceCode()),
-						script.m_script->getPath().c_str()) != 0; // [env, func]
-
-					if (errors)
-					{
-						logError("Lua Script") << script.m_script->getPath() << ": "
-							<< lua_tostring(script.m_state, -1);
-						lua_pop(script.m_state, 1);
-						continue;
-					}
-
-					lua_pushvalue(script.m_state, -2); // [env, func, env]
-					lua_setfenv(script.m_state, -2);
-
-					m_scene.m_current_script_instance = &script;
-					errors = lua_pcall(script.m_state, 0, 0, 0) != 0; // [env]
-					if (errors)
-					{
-						logError("Lua Script") << script.m_script->getPath() << ": "
-							<< lua_tostring(script.m_state, -1);
-						lua_pop(script.m_state, 1);
-					}
-					lua_pop(script.m_state, 1); // []
-
-					detectProperties(script);
+					ScriptInstance& script = m_scripts[scr_index];
 					
-					bool enabled = script.m_flags.isSet(ScriptInstance::ENABLED);
-					m_scene.setEnableProperty(m_entity, scr_index, script, enabled);
-
-					lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
-					lua_getfield(script.m_state, -1, "awake");
-					if (lua_type(script.m_state, -1) != LUA_TFUNCTION)
-					{
-						lua_pop(script.m_state, 2);
-					}
-					else {
-						if (lua_pcall(script.m_state, 0, 0, 0) != 0) {
-							logError("Lua Script") << lua_tostring(script.m_state, -1);
-							lua_pop(script.m_state, 1);
-						}
-					}
-					lua_pop(script.m_state, 1);
-
-					if (m_scene.m_is_game_running) m_scene.startScript(script, is_reload);
+					if (!script.m_script) continue;
+					if (script.m_script != &resource) continue;
+					if (!script.m_script->isReady()) continue;
+					
+					script.onScriptLoaded(m_scene, *this, scr_index);
 				}
 			}
 
@@ -488,7 +408,7 @@ namespace Lumix
 			blob.read(count);
 			for (int i = 0; i < count; ++i)
 			{
-				int idx = addScript(entity);
+				int idx = addScript(entity, -1);
 				auto& inst = scr->m_scripts[idx];
 				char tmp[MAX_PATH_LENGTH];
 				blob.readString(Span(tmp));
@@ -1145,8 +1065,11 @@ namespace Lumix
 			}
 			ResourceManagerHub& rm = m_system.m_engine.getResourceManager();
 			inst.m_script = path.isValid() ? rm.load<LuaScript>(path) : nullptr;
-			if (inst.m_script)
-			{
+			if (inst.m_script && inst.m_script->isReady()) {
+				const int idx = int(&inst - cmp.m_scripts.begin());
+				inst.onScriptLoaded(*this, cmp, idx);
+			}
+			else if (inst.m_script) {
 				inst.m_script->onLoaded<&ScriptComponent::onScriptLoaded>(&cmp);
 			}
 		}
@@ -1725,9 +1648,10 @@ namespace Lumix
 		}
 
 
-		int addScript(EntityRef entity) override
+		int addScript(EntityRef entity, int scr_index) override
 		{
 			ScriptComponent* script_cmp = m_scripts[entity];
+			ASSERT(scr_index == -1 || scr_index == script_cmp->m_scripts.size());// TODO
 			script_cmp->m_scripts.emplace(m_system.m_allocator);
 			return script_cmp->m_scripts.size() - 1;
 		}
@@ -1856,6 +1780,123 @@ namespace Lumix
 		AnimationScene* m_animation_scene;
 	};
 
+	void LuaScriptSceneImpl::ScriptInstance::onScriptLoaded(LuaScriptSceneImpl& scene, struct ScriptComponent& cmp, int scr_index) {
+		lua_State* L = scene.m_system.m_engine.getState();
+		bool is_reload = true;
+		if (!m_state)
+		{
+			is_reload = false;
+
+			m_state = lua_newthread(L); // [thread]
+			LuaWrapper::DebugGuard guard(m_state, 1);
+			m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
+			lua_newtable(m_state); // [env]
+			// reference environment
+			lua_pushvalue(m_state, -1); // [env, env]
+			m_environment = luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
+
+			// environment's metatable & __index
+			lua_pushvalue(m_state, -1); // [env, env]
+			lua_setmetatable(m_state, -2); // [env]
+			lua_pushvalue(m_state, LUA_GLOBALSINDEX); // [evn, _G]
+			lua_setfield(m_state, -2, "__index");  // [env]
+
+			// set this
+			lua_getglobal(m_state, "Lumix"); // [env, Lumix]
+			lua_getfield(m_state, -1, "Entity"); // [env, Lumix, Lumix.Entity]
+			lua_remove(m_state, -2); // [env, Lumix.Entity]
+			lua_getfield(m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
+			lua_pushvalue(m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
+			lua_remove(m_state, -3); // [env, Entity.new, Lumix.Entity]
+			LuaWrapper::push(m_state, &scene.m_universe); // [env, Entity.new, Lumix.Entity, universe]
+			LuaWrapper::push(m_state, cmp.m_entity.index); // [env, Entity.new, Lumix.Entity, universe, entity_index]
+			const bool error = !LuaWrapper::pcall(m_state, 3, 1); // [env, entity]
+			ASSERT(!error);
+			lua_setfield(m_state, -2, "this"); // [env]
+		}
+		else
+		{
+			lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
+			ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
+		}
+
+		bool errors = luaL_loadbuffer(m_state,
+			m_script->getSourceCode(),
+			stringLength(m_script->getSourceCode()),
+			m_script->getPath().c_str()) != 0; // [env, func]
+
+		if (errors) {
+			logError("Lua Script") << m_script->getPath() << ": "
+				<< lua_tostring(m_state, -1);
+			lua_pop(m_state, 1);
+			return;
+		}
+
+		lua_pushvalue(m_state, -2); // [env, func, env]
+		lua_setfenv(m_state, -2);
+
+		scene.m_current_script_instance = this;
+		errors = lua_pcall(m_state, 0, 0, 0) != 0; // [env]
+		if (errors)	{
+			logError("Lua Script") << m_script->getPath() << ": "
+				<< lua_tostring(m_state, -1);
+			lua_pop(m_state, 1);
+		}
+		lua_pop(m_state, 1); // []
+
+		cmp.detectProperties(*this);
+					
+		bool enabled = m_flags.isSet(ScriptInstance::ENABLED);
+		scene.setEnableProperty(cmp.m_entity, scr_index, *this, enabled);
+
+		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment);
+		lua_getfield(m_state, -1, "awake");
+		if (lua_type(m_state, -1) != LUA_TFUNCTION)
+		{
+			lua_pop(m_state, 2);
+		}
+		else {
+			if (lua_pcall(m_state, 0, 0, 0) != 0) {
+				logError("Lua Script") << lua_tostring(m_state, -1);
+				lua_pop(m_state, 1);
+			}
+		}
+		lua_pop(m_state, 1);
+
+		if (scene.m_is_game_running) scene.startScript(*this, is_reload);
+	}
+
+
+	struct SortedProperty
+	{
+		int index;
+		const char* name;
+	};
+
+
+	static void getSortedProperties(Array<SortedProperty>& props, LuaScriptScene& scene, EntityRef entity, int script_index)
+	{
+		int property_count = scene.getPropertyCount(entity, script_index);
+		props.resize(property_count);
+		
+		for (int i = 0; i < property_count; ++i)
+		{
+			props[i].index = i;
+			props[i].name = scene.getPropertyName(entity, script_index, i);
+		}
+
+		if (!props.empty())
+		{
+			qsort(&props[0], props.size(), sizeof(props[0]), [](const void* a, const void* b) -> int {
+				auto* pa = (SortedProperty*)a;
+				auto* pb = (SortedProperty*)b;
+
+				if (!pa->name) return -1;
+				if (!pb->name) return 1;
+				return compareString(pa->name, pb->name);
+			});
+		}
+	}
 
 	LuaScriptSystemImpl::LuaScriptSystemImpl(Engine& engine)
 		: m_engine(engine)
@@ -1865,9 +1906,171 @@ namespace Lumix
 		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
 		using namespace Reflection;
+		struct LuaProperties : IDynamicProperties {
+			LuaProperties() { name = "lua_properties"; }
+			void visit(IAttributeVisitor& visitor) const override {}
+			void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override {}
+			void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override {}
+			
+
+			void visit(ComponentUID cmp, int index, IPropertyVisitor& visitor) const override {
+				LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+				const EntityRef e = (EntityRef)cmp.entity;
+				const int count = scene.getPropertyCount(e, index);
+
+				Array<SortedProperty> props(scene.m_system.m_allocator);
+				getSortedProperties(props, scene, e, index);
+				
+				for (int idx = 0; idx < count; ++idx) {
+					const int i = props[idx].index;
+					const char* prop_name = props[idx].name;
+					const LuaScriptScene::Property::Type type = scene.getPropertyType(e, index, i);
+					switch (type) {
+						case LuaScriptScene::Property::RESOURCE: {
+							struct : Property<Path> {
+								void visit(IAttributeVisitor& visitor) const override {
+									ResourceAttribute attr("*.*", res_type);
+									visitor.visit(attr);
+								}
+								void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
+									const char* str = Reflection::detail::readFromStream<const char*>(stream);
+									scene->setPropertyValue((EntityRef)cmp.entity, index, name, str);
+								}
+								void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
+									char tmp[MAX_PATH_LENGTH];
+									scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
+									stream.write(tmp, stringLength(tmp) + 1);
+								}
+								LuaScriptScene* scene;
+								ResourceType res_type;
+							} p;
+							p.res_type = scene.getPropertyResourceType(e, index, i);
+							p.scene = &scene;
+							p.name = prop_name;
+							visitor.visit(p);
+							break;
+						}
+
+						case LuaScriptScene::Property::STRING: {
+							struct : Property<const char*> {
+								void visit(IAttributeVisitor& visitor) const override {}
+								void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
+									const char* str = Reflection::detail::readFromStream<const char*>(stream);
+									scene->setPropertyValue((EntityRef)cmp.entity, index, name, str);
+								}
+								void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
+									// TODO bigger string
+									char tmp[1024];
+									scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
+									stream.write(tmp, stringLength(tmp) + 1);
+								}
+								LuaScriptScene* scene;
+							} p;
+							p.scene = &scene;
+							p.name = prop_name;
+							visitor.visit(p);
+							break;
+						}
+						case LuaScriptScene::Property::FLOAT: {
+							struct : Property<float> {
+								void visit(IAttributeVisitor& visitor) const override {}
+								void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
+									const float f = stream.read<float>();
+									char tmp[64];
+									toCString(f, Span(tmp), 10);
+									scene->setPropertyValue((EntityRef)cmp.entity, index, name, tmp);
+								}
+								void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
+									char tmp[64];
+									scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
+									const float f = (float)atof(tmp);
+									stream.write(f);
+								}
+								LuaScriptScene* scene;
+							} p;
+							p.scene = &scene;
+							p.name = prop_name;
+							visitor.visit(p);
+							break;
+						}
+						case LuaScriptScene::Property::INT: {
+							struct : Property<i32> {
+								void visit(IAttributeVisitor& visitor) const override {}
+								void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
+									const i32 v = stream.read<i32>();
+									char tmp[64];
+									toCString(v, Span(tmp));
+									scene->setPropertyValue((EntityRef)cmp.entity, index, name, tmp);
+								}
+								void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
+									char tmp[64];
+									scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
+									const i32 v = atoi(tmp);
+									stream.write(v);
+								}
+								LuaScriptScene* scene;
+							} p;
+							p.scene = &scene;
+							p.name = prop_name;
+							visitor.visit(p);
+							break;
+						}
+						case LuaScriptScene::Property::BOOLEAN: {
+							struct : Property<bool> {
+								void visit(IAttributeVisitor& visitor) const override {}
+								void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
+									const bool v = stream.read<bool>();
+									scene->setPropertyValue((EntityRef)cmp.entity, index, name, v ? "true" : "false");
+								}
+								void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
+									char tmp[64];
+									scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
+									const bool v = equalIStrings(tmp, "true");
+									stream.write(v);
+								}
+								LuaScriptScene* scene;
+							} p;
+							p.scene = &scene;
+							p.name = prop_name;
+							visitor.visit(p);
+							break;
+						}
+						case LuaScriptScene::Property::ENTITY: {
+							struct : Property<EntityPtr> {
+								void visit(IAttributeVisitor& visitor) const override {}
+								void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
+									const EntityPtr v = stream.read<EntityPtr>();
+									char tmp[64];
+									toCString(v.index, Span(tmp));
+									scene->setPropertyValue((EntityRef)cmp.entity, index, name, tmp);
+								}
+								void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
+									char tmp[64];
+									scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
+									EntityPtr v;
+									fromCString(Span(tmp), Ref(v.index));
+									stream.write(v);
+								}
+								LuaScriptScene* scene;
+							} p;
+							p.scene = &scene;
+							p.name = prop_name;
+							visitor.visit(p);
+							break;
+						}
+						default: ASSERT(false); break;
+					}
+				}
+			}
+		};
+		
 		static auto lua_scene = scene("lua_script",
 			component("lua_script",
-				blob_property("data", LUMIX_PROP(LuaScriptScene, ScriptData))
+				array("scripts", &LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript, 
+					property("Path", LUMIX_PROP(LuaScriptScene, ScriptPath), ResourceAttribute("Lua script (*.lua)", LuaScript::TYPE)),
+					LuaProperties()
+				)
+				//blob_property("data", LUMIX_PROP(LuaScriptScene, ScriptData))
 			)
 		);
 		registerScene(lua_scene);
