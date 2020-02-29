@@ -195,13 +195,12 @@ public:
 	explicit HashMap(IAllocator& allocator) 
 		: m_allocator(allocator) 
 	{
-		init(8, true); 
 	}
 
 	HashMap(u32 size, IAllocator& allocator) 
 		: m_allocator(allocator) 
 	{
-		init(size, true); 
+		init(size, true);
 	}
 
 	~HashMap()
@@ -268,6 +267,10 @@ public:
 	}
 
 	Value& insert(const Key& key, Value&& value) {
+		if (m_size >= m_capacity * 3 / 4) {
+			grow((m_capacity << 1) < 8 ? 8 : m_capacity << 1);
+		}
+
 		u32 pos = Hasher::get(key) & m_mask;
 		while (m_keys[pos].valid) ++pos;
 		if(pos == m_capacity) {
@@ -279,16 +282,15 @@ public:
 		new (NewPlaceholder(), &m_values[pos]) Value(value);
 		++m_size;
 		m_keys[pos].valid = true;
-
-		if (m_size > m_capacity * 3 / 4) {
-			grow(m_capacity << 1);
-			return find(key).value();
-		}
 
 		return m_values[pos];
 	}
 
 	iterator insert(const Key& key, const Value& value) {
+		if (m_size >= m_capacity * 3 / 4) {
+			grow((m_capacity << 1) < 8 ? 8 : m_capacity << 1);
+		}
+
 		u32 pos = Hasher::get(key) & m_mask;
 		while (m_keys[pos].valid) ++pos;
 		if(pos == m_capacity) {
@@ -300,10 +302,6 @@ public:
 		new (NewPlaceholder(), &m_values[pos]) Value(value);
 		++m_size;
 		m_keys[pos].valid = true;
-
-		if (m_size > m_capacity * 3 / 4) {
-			grow(m_capacity << 1);
-		}
 
 		return { this, pos };
 	}
@@ -402,6 +400,10 @@ private:
 	u32 findPos(const Key& key) const {
 		u32 pos = Hasher::get(key) & m_mask;
 		const Slot* LUMIX_RESTRICT keys = m_keys;
+		if (!keys) {
+			ASSERT(m_capacity == 0);
+			return 0;
+		}
 		while (keys[pos].valid) {
 			if (*((Key*)keys[pos].key_mem) == key) return pos;
 			++pos;
@@ -431,11 +433,11 @@ private:
 	}
 
 	IAllocator& m_allocator;
-	Slot* m_keys;
-	Value* m_values;
-	u32 m_capacity;
-	u32 m_size;
-	u32 m_mask;
+	Slot* m_keys = nullptr;
+	Value* m_values = nullptr;
+	u32 m_capacity = 0;
+	u32 m_size = 0;
+	u32 m_mask = 0;
 };
 
 
