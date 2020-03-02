@@ -701,7 +701,11 @@ Point getMouseScreenPos()
 	BOOL b = GetCursorPos(&p);
 	if (!b) {
 		auto err = GetLastError();
-		ASSERT(false);
+		BOOL b2 = GetCursorPos(&p);
+		if (!b2) {
+			auto err2 = GetLastError();
+			ASSERT(false);
+		}
 	}
 	return {p.x, p.y};
 }
