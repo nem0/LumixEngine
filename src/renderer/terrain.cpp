@@ -408,8 +408,7 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Unive
 {
 	m_entity = entity;
 	serializer.read(m_layer_mask);
-	char path[MAX_PATH_LENGTH];
-	serializer.readString(Span(path));
+	const char* path = serializer.readString();
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
@@ -427,7 +426,7 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Unive
 	}
 	for(int i = 0; i < count; ++i)
 	{
-		serializer.readString(Span(path));
+		const char* path = serializer.readString();
 		serializer.read(m_grass_types[i].m_density);
 		serializer.read(m_grass_types[i].m_distance);
 		serializer.read(m_grass_types[i].m_rotation_mode);

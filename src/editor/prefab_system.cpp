@@ -554,8 +554,7 @@ public:
 		ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 		m_resources.reserve(count);
 		for (u32 i = 0; i < count; ++i) {
-			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			u32 content_hash;
 			serializer.read(content_hash);
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));

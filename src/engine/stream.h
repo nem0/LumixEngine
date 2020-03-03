@@ -46,8 +46,9 @@ struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream
 		OutputMemoryStream(const OutputMemoryStream& rhs);
 		OutputMemoryStream(const OutputMemoryStream& blob, IAllocator& allocator);
 		OutputMemoryStream(const InputMemoryStream& blob, IAllocator& allocator);
-		void operator =(const OutputMemoryStream& rhs);
 		~OutputMemoryStream();
+		void operator =(const OutputMemoryStream& rhs);
+		void operator =(OutputMemoryStream&& rhs);
 
 		bool write(const void* data, u64 size) override;
 
@@ -101,7 +102,7 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream
 		void setPosition(u64 pos) { m_pos = pos; }
 		void rewind() { m_pos = 0; }
 		u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
-		bool readString(const Span<char>& data);
+		const char* readString();
 
 		using IInputStream::read;
 	private:

@@ -449,7 +449,7 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 		, ComponentUID cmp
 		, const HashMap<EntityPtr, u32>& map
 		, Span<const EntityRef> entities)
-		: deserializer(deserializer.value)
+		: deserializer(deserializer.value) //-V1041
 		, cmp(cmp)
 		, map(map)
 		, entities(entities)
@@ -476,16 +476,14 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 		u32 c;
 		deserializer.read(c);
 		for (u32 i = 0; i < c; ++i) {
-			char name[128];
-			deserializer.readString(Span(name));
+			const char* name = deserializer.readString();
 			Reflection::IDynamicProperties::Type type;
 			deserializer.read(type);
 			switch(type) {
 				case Reflection::IDynamicProperties::RESOURCE:	
 				case Reflection::IDynamicProperties::STRING: {
 					// TODO string length
-					char tmp[MAX_PATH_LENGTH];
-					deserializer.readString(Span(tmp));
+					const char* tmp = deserializer.readString();
 					Reflection::IDynamicProperties::Value v;
 					v.s = tmp;
 					prop.set(cmp, idx, name, type, v);
@@ -536,7 +534,7 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 
 struct PropertySerializeVisitor : Reflection::IPropertyVisitor {
 	PropertySerializeVisitor(Ref<OutputMemoryStream> serializer, ComponentUID cmp)
-		: serializer(serializer.value)
+		: serializer(serializer.value) //-V1041
 		, cmp(cmp)
 	{}
 
@@ -1572,8 +1570,7 @@ private:
 				EntityRef new_entity = m_entities[i];
 				universe->setTransform(new_entity, m_transformations[i]);
 				int cmps_count;
-				char name[Universe::ENTITY_NAME_MAX_LENGTH];
-				blob.readString(Span(name));
+				const char* name = blob.readString();
 				universe->setEntityName(new_entity, name);
 				EntityPtr parent;
 				blob.read(parent);
@@ -2979,19 +2976,16 @@ public:
 		base_tr.scale = 1;
 		base_tr.rot = Quat(0, 0, 0, 1);
 		m_map.reserve(entity_count);
-		if (!is_redo) {
-			for (int i = 0; i < entity_count; ++i) {
-				EntityRef orig_e;
-				blob.read(Ref(orig_e));
-				m_map.insert(orig_e, i);
-			}
+		for (int i = 0; i < entity_count; ++i) {
+			EntityRef orig_e;
+			blob.read(Ref(orig_e));
+			if (!is_redo) m_map.insert(orig_e, i);
 		}
 		for (int i = 0; i < entity_count; ++i)
 		{
 			Transform tr;
 			blob.read(Ref(tr));
-			char name[256];
-			blob.readString(Span(name));
+			const char* name = blob.readString();
 			if (name[0]) universe.setEntityName(m_entities[i], name);
 			EntityPtr parent;
 			blob.read(Ref(parent));

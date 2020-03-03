@@ -273,11 +273,11 @@ struct Compiler
 void ParticleEmitterResource::setMaterial(const Path& path)
 {
 	Material* material = m_resource_manager.getOwner().load<Material>(path);
-	if (m_material) {
-		Material* material = m_material;
+	if (m_material) { //-V1051
+		Material* tmp = m_material;
 		m_material = nullptr;
-		removeDependency(*material);
-		material->getResourceManager().unload(*material);
+		removeDependency(*tmp);
+		tmp->getResourceManager().unload(*tmp);
 	}
 	m_material = material;
 	if (m_material) {
@@ -447,9 +447,8 @@ float ParticleEmitter::readSingleValue(InputMemoryStream& blob) const
 
 void ParticleEmitter::emit(const float* args)
 {
-	const int channels_count = m_resource->getChannelsCount();
-	if (m_particles_count == m_capacity)
-	{
+	if (m_particles_count == m_capacity) {
+		const int channels_count = m_resource->getChannelsCount();
 		int new_capacity = maximum(16, m_capacity << 1);
 		for (int i = 0; i < channels_count; ++i)
 		{
@@ -505,8 +504,7 @@ void ParticleEmitter::serialize(OutputMemoryStream& blob)
 void ParticleEmitter::deserialize(InputMemoryStream& blob, ResourceManagerHub& manager)
 {
 	blob.read(m_entity);
-	char path[MAX_PATH_LENGTH];
-	blob.readString(Span(path));
+	const char* path = blob.readString();
 	auto* res = manager.load<ParticleEmitterResource>(Path(path));
 	setResource(res);
 }

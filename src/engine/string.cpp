@@ -54,6 +54,18 @@ String::String(String&& rhs)
 	rhs.m_size = 0;
 }
 
+void String::operator=(String&& rhs)
+{
+	if (&rhs != this)
+	{
+		m_allocator.deallocate(m_cstr);
+		m_cstr = rhs.m_cstr;
+		m_size = rhs.m_size;
+		rhs.m_cstr = nullptr;
+		rhs.m_size = 0;
+	}
+}
+
 
 String::String(const char* rhs, IAllocator& allocator)
 	: m_allocator(allocator)

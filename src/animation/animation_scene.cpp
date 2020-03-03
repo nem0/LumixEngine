@@ -392,8 +392,7 @@ struct AnimationSceneImpl final : AnimationScene
 			animable.entity = entity_map.get(animable.entity);
 			animable.time = Time::fromSeconds(0);
 
-			char path[MAX_PATH_LENGTH];
-			serializer.readString(Span(path));
+			const char* path = serializer.readString();
 			animable.animation = path[0] == '\0' ? nullptr : loadAnimation(Path(path));
 			m_animables.insert(animable.entity, animable);
 			m_universe.onComponentCreated(animable.entity, ANIMABLE_TYPE, this);
@@ -408,8 +407,7 @@ struct AnimationSceneImpl final : AnimationScene
 			entity = entity_map.get(entity);
 
 			PropertyAnimator& animator = m_property_animators.emplace(entity, m_allocator);
-			char path[MAX_PATH_LENGTH];
-			serializer.readString(Span(path));
+			const char* path = serializer.readString();
 			serializer.read(animator.flags.base);
 			animator.time = 0;
 			animator.animation = loadPropertyAnimation(Path(path));
@@ -426,8 +424,7 @@ struct AnimationSceneImpl final : AnimationScene
 			serializer.read(animator.entity);
 			animator.entity = entity_map.get(animator.entity);
 
-			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			setAnimatorSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_animator_map.insert(animator.entity, m_animators.size());
 			m_animators.emplace(static_cast<Animator&&>(animator));

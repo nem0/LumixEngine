@@ -170,6 +170,7 @@ public:
 	char operator[](int index) const;
 	void set(const char* rhs, int size);
 	void operator=(const String& rhs);
+	void operator=(String&& rhs);
 	void operator=(const char* rhs);
 	bool operator!=(const String& rhs) const;
 	bool operator!=(const char* rhs) const;

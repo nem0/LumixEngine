@@ -1071,12 +1071,11 @@ struct GUISceneImpl final : GUIScene
 				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
 			}
 
-			char tmp[MAX_PATH_LENGTH];
 			bool has_image = serializer.read<bool>();
 			if (has_image)
 			{
 				rect->image = LUMIX_NEW(m_allocator, GUIImage);
-				serializer.readString(Span(tmp));
+				const char* tmp = serializer.readString();
 				if (tmp[0] == '\0')
 				{
 					rect->image->sprite = nullptr;
@@ -1102,7 +1101,7 @@ struct GUISceneImpl final : GUIScene
 			{
 				rect->text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 				GUIText& text = *rect->text;
-				serializer.readString(Span(tmp));
+				const char* tmp = serializer.readString();
 				serializer.read(text.horizontal_align);
 				serializer.read(text.color);
 				int font_size;

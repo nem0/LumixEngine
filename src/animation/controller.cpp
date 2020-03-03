@@ -176,8 +176,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 	m_animation_slots.reserve(slots_count);
 	for (u32 i = 0; i < slots_count; ++i) {
 		String& slot = m_animation_slots.emplace(m_allocator);
-		char tmp[64];
-		stream.readString(Span(tmp));
+		const char* tmp = stream.readString();
 		slot = tmp;
 	}
 
@@ -187,8 +186,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		AnimationEntry& entry = m_animation_entries.emplace();
 		stream.read(entry.slot);
 		stream.read(entry.set);
-		char path[MAX_PATH_LENGTH];
-		stream.readString(Span(path));
+		const char* path = stream.readString();
 		entry.animation = path[0] ? m_resource_manager.getOwner().load<Animation>(Path(path)) : nullptr;
 	}
 

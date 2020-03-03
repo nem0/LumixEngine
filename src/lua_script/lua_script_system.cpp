@@ -1348,8 +1348,7 @@ namespace Lumix
 				{
 					auto& scr = script->m_scripts.emplace(allocator);
 
-					char tmp[MAX_PATH_LENGTH];
-					serializer.readString(Span(tmp));
+					const char* tmp = serializer.readString();
 					serializer.read(scr.m_flags);
 					scr.m_state = nullptr;
 					int prop_count;
@@ -1360,9 +1359,7 @@ namespace Lumix
 						Property& prop = scr.m_properties.emplace(allocator);
 						prop.type = Property::ANY;
 						serializer.read(prop.name_hash);
-						char tmp[1024];
-						tmp[0] = 0;
-						serializer.readString(Span(tmp));
+						const char* tmp = serializer.readString();
 						// TODO map entities if property is of entity type
 						prop.stored_value = tmp;
 					}
@@ -1751,19 +1748,17 @@ namespace Lumix
 		{
 			auto& scr = m_scripts[entity]->m_scripts[scr_index];
 			int count;
-			char path[MAX_PATH_LENGTH];
-			blob.readString(Span(path));
+			const char* path = blob.readString();
 			blob.read(scr.m_flags);
 			blob.read(count);
 			scr.m_environment = -1;
 			scr.m_properties.clear();
-			char buf[256];
 			for (int i = 0; i < count; ++i)
 			{
 				auto& prop = scr.m_properties.emplace(m_system.m_allocator);
 				prop.type = Property::ANY;
 				blob.read(prop.name_hash);
-				blob.readString(Span(buf));
+				const char* buf = blob.readString();
 				prop.stored_value = buf;
 			}
 			setScriptPath(entity, scr_index, Path(path));

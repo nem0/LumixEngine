@@ -272,22 +272,11 @@ template <typename Base, typename... T>
 struct TupleHolder {
 	TupleHolder() {}
 	
-	TupleHolder(const TupleHolder& rhs) {
-		objects = rhs.objects;
-		int i = 0;
-		apply([&](auto& v){
-			ptrs[i] = &v;
-			++i;
-		}, objects);
-	}
-	
-	template <typename T2, typename... T3>
-	TupleHolder(T2 head, T3... tail)
-	{
-		*this = makeTuple(head, tail...);
-	}
+	TupleHolder(Tuple<T...> tuple) { init(tuple); }
+	TupleHolder(TupleHolder&& rhs) { init(rhs.objects); }
+	TupleHolder(const TupleHolder& rhs) { init(rhs.objects); }
 
-	TupleHolder(Tuple<T...> tuple)
+	void init(const Tuple<T...>& tuple)
 	{
 		objects = tuple;
 		int i = 0;
@@ -297,15 +286,9 @@ struct TupleHolder {
 		}, objects);
 	}
 
-	void operator =(Tuple<T...>&& tuple) {
-		objects = tuple;
-		int i = 0;
-		apply([&](auto& v){
-			ptrs[i] = &v;
-			++i;
-		}, objects);
-	}
-
+	void operator =(Tuple<T...>&& tuple) { init(tuple); }
+	void operator =(const TupleHolder& rhs) { init(rhs.objects); }
+	void operator =(TupleHolder&& rhs) { init(rhs.objects); }
 
 	Span<const Base* const> get() const {
 		return Span(static_cast<const Base*const*>(ptrs), (u32)sizeof...(T));

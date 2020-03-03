@@ -836,8 +836,7 @@ public:
 			e = entity_map.get(e);
 			TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
 			m_text_meshes.insert(e, &text);
-			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			serializer.read(text.color);
 			int font_size;
 			serializer.read(font_size);
@@ -856,12 +855,11 @@ public:
 		serializer.read(count);
 		m_decals.reserve(count + m_decals.size());
 		for (u32 i = 0; i < count; ++i) {
-			char tmp[MAX_PATH_LENGTH];
 			Decal decal;
 			serializer.read(decal.entity);
 			decal.entity = entity_map.get(decal.entity);
 			serializer.read(decal.half_extents);
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
 			setDecalMaterialPath(decal.entity, Path(tmp));

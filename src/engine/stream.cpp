@@ -178,6 +178,22 @@ void OutputMemoryStream::operator =(const OutputMemoryStream& rhs)
 		m_size = 0;
 	}
 }
+
+
+void OutputMemoryStream::operator =(OutputMemoryStream&& rhs)
+{
+	ASSERT(rhs.m_allocator);
+	if (m_allocator) m_allocator->deallocate(m_data);
+		
+	m_allocator = rhs.m_allocator;
+	m_pos = rhs.m_pos;
+	m_data = rhs.m_data;
+	m_size = rhs.m_size;
+
+	rhs.m_pos = 0;
+	rhs.m_size = 0;
+	rhs.m_data = nullptr;
+}
 	
 
 void OutputMemoryStream::write(const String& string)
@@ -216,15 +232,11 @@ bool OutputMemoryStream::write(const void* data, u64 size)
 
 void OutputMemoryStream::writeString(const char* string)
 {
-	if (string)
-	{
-		i32 size = stringLength(string) + 1;
-		write(size);
+	if (string) {
+		const i32 size = stringLength(string) + 1;
 		write(string, size);
-	}
-	else
-	{
-		write((i32)0);
+	} else {
+		write((char)0);
 	}
 }
 
@@ -331,20 +343,14 @@ bool InputMemoryStream::read(String& string)
 }
 
 
-bool InputMemoryStream::readString(const Span<char>& value)
+const char* InputMemoryStream::readString()
 {
-	u32 size;
-	IInputStream::read(size);
-	const u32 max_size = value.length();
-	ASSERT(size < value.length());
-	char* data = value.m_begin;
-	bool res = read(data, size < max_size - 1 ? size : max_size - 1);
-	data[size < max_size - 1 ? size : max_size - 1] = 0;
-	for (u32 i = max_size; i < size; ++i) {
-		char dummy;
-		read(dummy);
-	}
-	return res && size <= max_size;
+	char c;
+	const char* ret = (const char*)m_data + m_pos;
+	do {
+		c = IInputStream::read<char>();
+	} while(c != '\0');
+	return ret;
 }
 
 

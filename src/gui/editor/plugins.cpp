@@ -406,7 +406,7 @@ private:
 			scene->render(*m_pipeline, { size.x, size.y });
 			
 			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *scene, { size.x, size.y }, mouse_canvas_pos);
-			if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode;
+			if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode; //-V1051
 			if (ImGui::IsMouseReleased(0)) m_mouse_mode = MouseMode::NONE;
 			
 			if (m_editor->getSelectedEntities().size() == 1)

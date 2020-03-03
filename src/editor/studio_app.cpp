@@ -1892,13 +1892,13 @@ struct StudioAppImpl final : StudioApp
 		m_font = addFontFromFile("editor/fonts/OpenSans-Regular.ttf", (float)m_settings.m_font_size * font_scale, true);
 		m_bold_font = addFontFromFile("editor/fonts/OpenSans-Bold.ttf", (float)m_settings.m_font_size * font_scale, true);
 
-		if (m_font) {
+		if (m_font && m_bold_font) {
 			m_font->DisplayOffset.y = 0;
 			m_bold_font->DisplayOffset.y = 0;
 		}
 		else {
 			OS::messageBox(
-				"Could not open editor/fonts/opensans-regular.ttf\n"
+				"Could not open editor/fonts/OpenSans-Regular.ttf or editor/fonts/OpenSans-Bold.ttf\n"
 				"It very likely means that data are not bundled with\n"
 				"the exe and the exe is not in the correct directory.\n"
 				"The program will eventually crash!"
