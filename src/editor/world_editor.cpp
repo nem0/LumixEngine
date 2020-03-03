@@ -482,7 +482,6 @@ struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 			switch(type) {
 				case Reflection::IDynamicProperties::RESOURCE:	
 				case Reflection::IDynamicProperties::STRING: {
-					// TODO string length
 					const char* tmp = deserializer.readString();
 					Reflection::IDynamicProperties::Value v;
 					v.s = tmp;

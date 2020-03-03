@@ -1694,13 +1694,13 @@ public:
 	void forceGrassUpdate(EntityRef entity) override { m_terrains[entity]->forceGrassUpdate(); }
 
 
-	void getTerrainInfos(const ShiftedFrustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) override
+	void getTerrainInfos(Array<TerrainInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
-		for (auto* terrain : m_terrains)
-		{
-			terrain->getInfos(infos, frustum, lod_ref_point);
+		for (auto* terrain : m_terrains) {
+			const TerrainInfo info = terrain->getInfo();
+			if (info.terrain) infos.push(info);
 		}
 	}
 

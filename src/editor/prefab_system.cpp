@@ -306,7 +306,7 @@ public:
 
 	struct PropertyCloner : Reflection::IPropertyVisitor {
 		template <typename T>
-		void clone(const Reflection::Property<T>& prop) { prop.set(src, index, prop.get(src, index)); }
+		void clone(const Reflection::Property<T>& prop) { prop.set(dst, index, prop.get(src, index)); }
 
 		void visit(const Reflection::Property<float>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<int>& prop) override { clone(prop); }
@@ -319,11 +319,36 @@ public:
 		void visit(const Reflection::Property<Path>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<bool>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<const char*>& prop) override { clone(prop); }
-		// TODO
-		void visit(const Reflection::IDynamicProperties& prop) override { ASSERT(false); }
-		void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
-		void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
+		
+		void visit(const Reflection::IArrayProperty& prop) override {
+			const i32 c = prop.getCount(src);
+			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
+			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
+			
+			ASSERT(index == -1);
+			for (int i = 0; i < c; ++i) {
+				index = i;
+				prop.visit(*this);
+			}
+			index = -1;
+		}
 
+		void visit(const Reflection::IDynamicProperties& prop) override { 
+			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
+				const char* name = prop.getName(src, index, i);
+				Reflection::IDynamicProperties::Type type = prop.getType(src, index, i);
+				Reflection::IDynamicProperties::Value val = prop.getValue(src, index, i);
+
+				prop.set(dst, index, name, type, val);
+			}
+		}
+		void visit(const Reflection::IBlobProperty& prop) override { 
+			OutputMemoryStream tmp(*allocator);
+			prop.getValue(src, index, tmp);
+			prop.setValue(dst, index, InputMemoryStream(tmp));
+		}
+
+		IAllocator* allocator;
 		ComponentUID src;
 		ComponentUID dst;
 		int index = -1;
@@ -360,6 +385,7 @@ public:
 			const Reflection::ComponentBase* cmp_tpl = Reflection::getComponent(cmp.type);
 	
 			PropertyCloner property_cloner;
+			property_cloner.allocator = &m_editor.getAllocator();
 			property_cloner.src = cmp;
 			property_cloner.dst.type = cmp.type;
 			property_cloner.dst.entity = dst_e;

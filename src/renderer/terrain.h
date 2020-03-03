@@ -115,7 +115,7 @@ struct Terrain
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);
 
-		void getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point);
+		TerrainInfo getInfo();
 
 		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
 		void serialize(OutputMemoryStream& serializer);

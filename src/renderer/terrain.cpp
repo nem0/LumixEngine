@@ -454,30 +454,16 @@ void Terrain::serialize(OutputMemoryStream& serializer)
 }
 
 
-void Terrain::getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point)
+TerrainInfo Terrain::getInfo()
 {
-	if (!m_material || !m_material->isReady()) return;
+	if (!m_material || !m_material->isReady()) return {};
 	
-	TerrainInfo& info = infos.emplace();
+	TerrainInfo info;
 	info.shader = m_material->getShader();
 	info.position = m_scene.getUniverse().getPosition(m_entity);
 	info.rot = m_scene.getUniverse().getRotation(m_entity);
 	info.terrain = this;
-		
-	/*
-	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
-	Matrix inv_matrix = matrix;
-	inv_matrix.fastInverse();
-	
-	Vec3 local_lod_ref_point = inv_matrix.transformPoint(lod_ref_point);
-	local_lod_ref_point.x /= m_scale.x;
-	local_lod_ref_point.z /= m_scale.z;
-
-	Frustum rel_frustum = frustum;
-	rel_frustum.transform(inv_matrix);
-	m_root->getInfos(infos, local_lod_ref_point, this, matrix, rel_frustum);*/
-	// TODO
-	//ASSERT(false);
+	return info;
 }
 
 
