@@ -19,7 +19,6 @@ struct LUMIX_ENGINE_API IOutputStream
 	IOutputStream& operator << (float value);
 	IOutputStream& operator << (double value);
 	template <typename T> void write(const T& value);
-	void writeString(const char* string);
 };
 
 
@@ -32,7 +31,6 @@ struct LUMIX_ENGINE_API IInputStream
 	template <typename T> void read(T& value) { read(&value, sizeof(T)); }
 	template <typename T> T read();
 	template <typename T> void read(Ref<T> val) { val = read<T>(); }
-	bool readString(const Span<char>& data);
 };
 
 
@@ -60,6 +58,7 @@ struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream
 		u8* getMutableData() { return m_data; }
 		u64 getPos() const { return m_pos; }
 		void write(const struct String& string);
+		void writeString(const char* string);
 		template <typename T> void write(const T& value);
 		void clear();
 		void* skip(int size);
@@ -102,6 +101,7 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream
 		void setPosition(u64 pos) { m_pos = pos; }
 		void rewind() { m_pos = 0; }
 		u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
+		bool readString(const Span<char>& data);
 
 		using IInputStream::read;
 	private:

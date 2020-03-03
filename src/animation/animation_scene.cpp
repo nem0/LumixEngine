@@ -767,8 +767,7 @@ struct AnimationSceneImpl final : AnimationScene
 					cmp.type = curve.cmp_type;
 					cmp.scene = m_universe.getScene(cmp.type);
 					cmp.entity = entity;
-					InputMemoryStream blob(&v, sizeof(v));
-					curve.property->setValue(cmp, -1, blob);
+					curve.property->set(cmp, -1, v);
 					break;
 				}
 			}

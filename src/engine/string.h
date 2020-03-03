@@ -16,7 +16,9 @@ LUMIX_ENGINE_API bool toCStringHex(u8 value, Span<char> output);
 LUMIX_ENGINE_API bool toCStringPretty(i32 value, Span<char> output);
 LUMIX_ENGINE_API bool toCStringPretty(u32 value, Span<char> output);
 LUMIX_ENGINE_API bool toCStringPretty(u64 value, Span<char> output);
+LUMIX_ENGINE_API bool toCString(bool value, Span<char> output);
 LUMIX_ENGINE_API bool toCString(i32 value, Span<char> output);
+inline bool toCString(EntityPtr value, Span<char> output) { return toCString(value.index, output); }
 LUMIX_ENGINE_API bool toCString(i64 value, Span<char> output);
 LUMIX_ENGINE_API bool toCString(u64 value, Span<char> output);
 LUMIX_ENGINE_API bool toCString(u32 value, Span<char> output);
@@ -29,6 +31,8 @@ LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u64> value)
 LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<i64> value);
 LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u32> value);
 LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<u16> value);
+LUMIX_ENGINE_API const char* fromCString(Span<const char> input, Ref<bool> value);
+inline const char* fromCString(Span<const char> input, Ref<EntityPtr> value) { return fromCString(input, Ref(value->index)); };
 LUMIX_ENGINE_API bool copyString(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool copyString(Span<char> output, Span<const char> source);
 LUMIX_ENGINE_API bool copyNString(Span<char> output, const char* source, int N);

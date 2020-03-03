@@ -321,6 +321,15 @@ bool equalIStrings(const char* lhs, const char* rhs)
 #endif
 }
 
+bool equalIStrings(Span<const char> lhs, const char* rhs)
+{
+#ifdef _WIN32
+	return _strnicmp(lhs.begin(), rhs, lhs.length()) == 0 && strlen(rhs) == lhs.length();
+#else
+	return strncasecmp(lhs.begin(), rhs, lhs.length()) == 0 && strlen(rhs) == lhs.length();
+#endif
+}
+
 
 int stringLength(const char* str)
 {
@@ -631,6 +640,11 @@ const char* fromCString(Span<const char> input, Ref<u64> value)
 	return nullptr;
 }
 
+const char* fromCString(Span<const char> input, Ref<bool> value)
+{
+	value = equalIStrings(input, "true");
+	return input.end();
+}
 
 bool toCStringPretty(i32 value, Span<char> output)
 {
@@ -943,6 +957,8 @@ bool toCString(float value, Span<char> out, int after_point)
 		increment(output, c - 1, length > 1);
 	return true;
 }
+
+bool toCString(bool value, Span<char> output) { return copyString(output, value ? "true" : "false"); }
 
 
 bool toCString(double value, Span<char> out, int after_point)

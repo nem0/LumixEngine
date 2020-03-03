@@ -304,18 +304,29 @@ public:
 		return root;
 	}
 
+	struct PropertyCloner : Reflection::IPropertyVisitor {
+		template <typename T>
+		void clone(const Reflection::Property<T>& prop) { prop.set(src, index, prop.get(src, index)); }
 
-	struct PropertyCloner : Reflection::ISimpleComponentVisitor {
-		void visitProperty(const Reflection::PropertyBase& prop) override {
-			stream->clear();
-			prop.getValue(src, -1, *stream);
-			InputMemoryStream tmp(*stream);
-			prop.setValue(dst, -1, tmp);
-		}
+		void visit(const Reflection::Property<float>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<int>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<u32>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<EntityPtr>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Vec2>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Vec3>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<IVec3>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Vec4>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Path>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<bool>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<const char*>& prop) override { clone(prop); }
+		// TODO
+		void visit(const Reflection::IDynamicProperties& prop) override { ASSERT(false); }
+		void visit(const Reflection::IArrayProperty& prop) override { ASSERT(false); }
+		void visit(const Reflection::IBlobProperty& prop) override { ASSERT(false); }
 
 		ComponentUID src;
 		ComponentUID dst;
-		OutputMemoryStream* stream;
+		int index = -1;
 	};
 
 
@@ -343,7 +354,6 @@ public:
 			}
 		}
 
-		OutputMemoryStream tmp_stream(m_editor.getAllocator());
 		for (ComponentUID cmp = src_u.getFirstComponent(src_e); cmp.isValid(); cmp = src_u.getNextComponent(cmp)) {
 			dst_u.createComponent(cmp.type, dst_e);
 
@@ -354,7 +364,6 @@ public:
 			property_cloner.dst.type = cmp.type;
 			property_cloner.dst.entity = dst_e;
 			property_cloner.dst.scene = dst_u.getScene(cmp.type);
-			property_cloner.stream = &tmp_stream;
 			cmp_tpl->visit(property_cloner);
 		}
 
@@ -513,7 +522,7 @@ public:
 		}
 	}
 
-	void serialize(IOutputStream& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write((u32)m_entity_to_prefab.size());
 		if (!m_entity_to_prefab.empty()) serializer.write(m_entity_to_prefab.begin(), m_entity_to_prefab.byte_size());
@@ -532,7 +541,7 @@ public:
 	}
 
 
-	void deserialize(IInputStream& serializer, const EntityMap& entity_map) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
 		u32 count;
 		serializer.read(count);

@@ -392,22 +392,33 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_isnumber(L, -1))
 		{
 			float f = (float)lua_tonumber(L, -1);
-			InputMemoryStream input_blob(&f, sizeof(f));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, f);
 		}
 	}
-
 
 	void visit(const Reflection::Property<int>& prop) override
 	{
 		if (!equalStrings(property_name, prop.name)) return;
+
+		for (const Reflection::IAttribute* attr : prop.getAttributes()) {
+			if (attr->getType() == Reflection::IAttribute::ENUM) continue;
+			const auto* enum_attr = (const Reflection::EnumAttribute*)attr;
+			if (lua_isstring(L, -1)) {
+				const char* str = lua_tostring(L, -1);
+				for (int i = 0, c = enum_attr->count(cmp); i < c; ++i) {
+					if (equalStrings(enum_attr->name(cmp, i), str)) {
+						const int value = i;
+						prop.set(cmp, -1, value);
+					}
+				}
+			}
+			return;
+		}
 		if (lua_isnumber(L, -1))
 		{
 			int i = (int)lua_tointeger(L, -1);
-			InputMemoryStream input_blob(&i, sizeof(i));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, i);
 		}
-
 	}
 
 
@@ -417,8 +428,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_isnumber(L, -1))
 		{
 			const u32 i = (u32)lua_tointeger(L, -1);
-			InputMemoryStream input_blob(&i, sizeof(i));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, i);
 		}
 
 	}
@@ -429,9 +439,8 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (!equalStrings(property_name, prop.name)) return;
 		if (lua_isnumber(L, -1))
 		{
-			int i = (int)lua_tointeger(L, -1);
-			InputMemoryStream input_blob(&i, sizeof(i));
-			prop.setValue(cmp, -1, input_blob);
+			EntityPtr e = {(int)lua_tointeger(L, -1)};
+			prop.set(cmp, -1, e);
 		}
 
 	}
@@ -443,8 +452,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_istable(L, -1))
 		{
 			auto v = LuaWrapper::toType<Vec2>(L, -1);
-			InputMemoryStream input_blob(&v, sizeof(v));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, v);
 		}
 	}
 
@@ -455,8 +463,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_istable(L, -1))
 		{
 			auto v = LuaWrapper::toType<Vec3>(L, -1);
-			InputMemoryStream input_blob(&v, sizeof(v));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, v);
 		}
 	}
 
@@ -467,8 +474,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_istable(L, -1))
 		{
 			auto v = LuaWrapper::toType<IVec3>(L, -1);
-			InputMemoryStream input_blob(&v, sizeof(v));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, v);
 		}
 	}
 
@@ -479,8 +485,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_istable(L, -1))
 		{
 			auto v = LuaWrapper::toType<Vec4>(L, -1);
-			InputMemoryStream input_blob(&v, sizeof(v));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, v);
 		}
 	}
 
@@ -491,8 +496,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_isstring(L, -1))
 		{
 			const char* str = lua_tostring(L, -1);
-			InputMemoryStream input_blob(str, stringLength(str) + 1);
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, Path(str));
 		}
 	}
 
@@ -503,8 +507,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_isboolean(L, -1))
 		{
 			bool b = lua_toboolean(L, -1) != 0;
-			InputMemoryStream input_blob(&b, sizeof(b));
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, b);
 		}
 	}
 
@@ -515,8 +518,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 		if (lua_isstring(L, -1))
 		{
 			const char* str = lua_tostring(L, -1);
-			InputMemoryStream input_blob(str, stringLength(str) + 1);
-			prop.setValue(cmp, -1, input_blob);
+			prop.set(cmp, -1, str);
 		}
 	}
 
@@ -534,26 +536,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 	}
 
 
-	void visit(const Reflection::IEnumProperty& prop) override { 
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_isstring(L, -1)) {
-			const char* str = lua_tostring(L, -1);
-			for (int i = 0, c = prop.getEnumCount(cmp); i < c; ++i) {
-				if (equalStrings(prop.getEnumName(cmp, i), str)) {
-					const int value = prop.getEnumValue(cmp, i);
-					InputMemoryStream input_blob(&value, sizeof(value));
-					prop.setValue(cmp, -1, input_blob);
-				}
-			}
-		}
-	}
-
-
-	void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
-
-
-	void notSupported(const Reflection::PropertyBase& prop)
-	{
+	void visit(const Reflection::IBlobProperty& prop) override {
 		if (!equalStrings(property_name, prop.name)) return;
 		logError("Lua Script") << "Property " << prop.name << " has unsupported type";
 	}

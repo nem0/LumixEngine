@@ -13,7 +13,6 @@ namespace Lumix
 
 namespace Reflection
 {
-	struct PropertyBase;
 	struct IArrayProperty;
 }
 
@@ -145,14 +144,20 @@ struct LUMIX_EDITOR_API WorldEditor
 		const Quat* rotation,
 		int count) = 0;
 	virtual void setEntityName(EntityRef entity, const char* name) = 0;
-	virtual void setProperty(ComponentType component,
-		int index,
-		const Reflection::PropertyBase& property,
-		const EntityRef* entities,
-		int count,
-		const void* data,
-		int size) = 0;
-	virtual void addArrayPropertyItem(const ComponentUID& cmp, const Reflection::IArrayProperty& property) = 0;
+	
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, float value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, i32 value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, u32 value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, EntityPtr value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const char* value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Path& value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, bool value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Vec2& value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Vec3& value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Vec4& value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const IVec3& value) = 0;
+	
+	virtual void addArrayPropertyItem(const ComponentUID& cmp, const char* property) = 0;
 	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) = 0;
 	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(EntityRef entity) const = 0;

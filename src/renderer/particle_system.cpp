@@ -495,14 +495,14 @@ void ParticleEmitter::emit(const float* args)
 }
 
 
-void ParticleEmitter::serialize(IOutputStream& blob)
+void ParticleEmitter::serialize(OutputMemoryStream& blob)
 {
 	blob.write(m_entity);
 	blob.writeString(m_resource ? m_resource->getPath().c_str() : "");
 }
 
 
-void ParticleEmitter::deserialize(IInputStream& blob, ResourceManagerHub& manager)
+void ParticleEmitter::deserialize(InputMemoryStream& blob, ResourceManagerHub& manager)
 {
 	blob.read(m_entity);
 	char path[MAX_PATH_LENGTH];

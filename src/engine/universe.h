@@ -134,8 +134,8 @@ public:
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentAdded() { return m_component_added; }
 
-	void serialize(struct IOutputStream& serializer);
-	void deserialize(struct IInputStream& serializer, Ref<EntityMap> entity_map);
+	void serialize(struct OutputMemoryStream& serializer);
+	void deserialize(struct InputMemoryStream& serializer, Ref<EntityMap> entity_map);
 
 	IScene* getScene(ComponentType type) const;
 	IScene* getScene(u32 hash) const;

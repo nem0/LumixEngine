@@ -214,7 +214,7 @@ bool OutputMemoryStream::write(const void* data, u64 size)
 }
 
 
-void IOutputStream::writeString(const char* string)
+void OutputMemoryStream::writeString(const char* string)
 {
 	if (string)
 	{
@@ -331,7 +331,7 @@ bool InputMemoryStream::read(String& string)
 }
 
 
-bool IInputStream::readString(const Span<char>& value)
+bool InputMemoryStream::readString(const Span<char>& value)
 {
 	u32 size;
 	IInputStream::read(size);

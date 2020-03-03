@@ -118,8 +118,8 @@ struct Terrain
 		void getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point);
 
 		RayCastModelHit castRay(const DVec3& origin, const Vec3& dir);
-		void serialize(IOutputStream& serializer);
-		void deserialize(EntityRef entity, IInputStream& serializer, Universe& universe, RenderScene& scene);
+		void serialize(OutputMemoryStream& serializer);
+		void deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene);
 
 		void addGrassType(int index);
 		void removeGrassType(int index);

@@ -749,7 +749,7 @@ public:
 	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
 
 
-	void serializeBoneAttachments(IOutputStream& serializer)
+	void serializeBoneAttachments(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_bone_attachments.size());
 		for (auto& attachment : m_bone_attachments)
@@ -761,7 +761,7 @@ public:
 		}
 	}
 
-	void serializeCameras(IOutputStream& serializer)
+	void serializeCameras(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_cameras.size());
 		for (Camera& camera : m_cameras)
@@ -770,7 +770,7 @@ public:
 		}
 	}
 
-	void serializeLights(IOutputStream& serializer)
+	void serializeLights(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_point_lights.size());
 		for (const PointLight& pl : m_point_lights) {
@@ -785,7 +785,7 @@ public:
 		serializer.write(m_active_global_light_entity);
 	}
 
-	void serializeModelInstances(IOutputStream& serializer)
+	void serializeModelInstances(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_model_instances.size());
 		for (auto& r : m_model_instances)
@@ -799,7 +799,7 @@ public:
 		}
 	}
 
-	void serializeTerrains(IOutputStream& serializer)
+	void serializeTerrains(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_terrains.size());
 		for (auto* terrain : m_terrains)
@@ -809,7 +809,7 @@ public:
 		}
 	}
 
-	void serializeTextMeshes(IOutputStream& serializer)
+	void serializeTextMeshes(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_text_meshes.size());
 		for (int i = 0, n = m_text_meshes.size(); i < n; ++i)
@@ -824,7 +824,7 @@ public:
 		}
 	}
 
-	void deserializeTextMeshes(IInputStream& serializer, const EntityMap& entity_map)
+	void deserializeTextMeshes(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		u32 count;
 		serializer.read(count);
@@ -850,7 +850,7 @@ public:
 	}
 
 
-	void deserializeDecals(IInputStream& serializer, const EntityMap& entity_map)
+	void deserializeDecals(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		u32 count;
 		serializer.read(count);
@@ -870,7 +870,7 @@ public:
 	}
 
 
-	void serializeDecals(IOutputStream& serializer)
+	void serializeDecals(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_decals.size());
 		for (auto& decal : m_decals)
@@ -881,7 +881,7 @@ public:
 		}
 	}
 
-	void serializeLightProbeGrids(IOutputStream& serializer) {
+	void serializeLightProbeGrids(OutputMemoryStream& serializer) {
 		const i32 count = m_light_probe_grids.size();
 		serializer.write(count);
 		for (auto iter : m_light_probe_grids) {
@@ -892,7 +892,7 @@ public:
 		}
 	}
 
-	void serializeEnvironmentProbes(IOutputStream& serializer)
+	void serializeEnvironmentProbes(OutputMemoryStream& serializer)
 	{
 		i32 count = m_environment_probes.size();
 		serializer.write(count);
@@ -1000,7 +1000,7 @@ public:
 	}
 
 
-	void serializeParticleEmitters(IOutputStream& serializer)
+	void serializeParticleEmitters(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_particle_emitters.size());
 		for (auto* emitter : m_particle_emitters)

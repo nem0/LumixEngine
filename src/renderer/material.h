@@ -103,7 +103,7 @@ public:
 	bool isTextureDefine(u8 define_idx) const;
 	void setTexture(u32 i, Texture* texture);
 	void setTexturePath(int i, const Path& path);
-	bool save(IOutputStream& file);
+	bool save(struct IOutputStream& file);
 	int getUniformCount() const { return m_uniforms.size(); }
 	Uniform& getUniform(int index) { return m_uniforms[index]; }
 	const Uniform& getUniform(int index) const { return m_uniforms[index]; }

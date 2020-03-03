@@ -372,15 +372,19 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			{
 				OS::OutputFile file;
 				FileSystem& fs = app.getEngine().getFileSystem();
-				if (file.open(full_path))
-				{
-					new_created = true;
-					fs.makeRelative(Span(buf), full_path);
-					file.close();
+				if(fs.makeRelative(Span(buf), full_path)) {
+					if (file.open(full_path))
+					{
+						new_created = true;
+						file.close();
+					}
+					else
+					{
+						logError("Lua Script") << "Failed to create " << buf;
+					}
 				}
-				else
-				{
-					logError("Lua Script") << "Failed to create " << buf;
+				else {
+					logError("Renderer") << "Can not create " << full_path << " because it's not in root directory.";
 				}
 			}
 		}
@@ -403,22 +407,16 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 				editor.addComponent(Span(&entity, 1), LUA_SCRIPT_TYPE);
 			}
 
-			ASSERT(false);
-			// TODO
-			/*
-			IAllocator& allocator = editor.getAllocator();
-			auto* cmd = LUMIX_NEW(allocator, PropertyGridPlugin::AddLuaScriptCommand)(entity, editor);
-
-			auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));
-			editor.executeCommand(cmd);
+			const ComponentUID cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE);
+			editor.beginCommandGroup(crc32("add_lua_script"));
+			editor.addArrayPropertyItem(cmp, "scripts");
 
 			if (!create_empty) {
+				auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));
 				int scr_count = script_scene->getScriptCount(entity);
-				auto* set_source_cmd = LUMIX_NEW(allocator, PropertyGridPlugin::SetPropertyCommand)(
-					editor, entity, scr_count - 1, "-source", buf, allocator);
-				editor.executeCommand(set_source_cmd);
+				editor.setProperty(cmp.type, scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), Path(buf));
 			}
-			*/
+			editor.endCommandGroup();
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndMenu();

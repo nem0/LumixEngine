@@ -36,6 +36,27 @@ namespace Lumix
 		LATEST
 	};
 
+	template <typename T> static T fromString(const char* val) {
+		T res;
+		fromCString(Span(val, stringLength(val) + 1), Ref(res));
+		return res;
+	}
+
+	template <> const char* fromString(const char* val) { return val; }
+	template <> float fromString(const char* val) { return (float)atof(val); }
+	template <> bool fromString(const char* val) { return equalIStrings(val, "true"); }
+
+	template <typename T> static void toString(T val, Ref<String> out) {
+		char tmp[128];
+		toCString(val, Span(tmp));
+		out = tmp;
+	}
+
+	template <> void toString(float val, Ref<String> out) {
+		char tmp[128];
+		toCString(val, Span(tmp), 10);
+		out = tmp;
+	}
 
 	struct LuaScriptManager final : ResourceManager
 	{
@@ -536,10 +557,8 @@ namespace Lumix
 			{
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
-				T val;
-				OutputMemoryStream blob(&val, sizeof(val));
-				prop.getValue(cmp, idx, blob);
-				count = 1;
+				const T val = prop.get(cmp, idx);
+				found = true;
 				LuaWrapper::push(L, val);
 			}
 
@@ -556,35 +575,30 @@ namespace Lumix
 			void visit(const Reflection::Property<Path>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
-				char tmp[MAX_PATH_LENGTH];
-				OutputMemoryStream blob(tmp, sizeof(tmp));
-				prop.getValue(cmp, idx, blob);
-				count = 1;
-				LuaWrapper::push(L, tmp);
+				const Path p = prop.get(cmp, idx);
+				found = true;
+				LuaWrapper::push(L, p.c_str());
 			}
 
 			void visit(const Reflection::Property<const char*>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
-				char tmp[1024];
-				OutputMemoryStream blob(tmp, sizeof(tmp));
-				prop.getValue(cmp, idx, blob);
-				count = 1;
+				const char* tmp = prop.get(cmp, idx);
+				found = true;
 				LuaWrapper::push(L, tmp);
 			}
 
 			void visit(const Reflection::IArrayProperty& prop) override {}
-			void visit(const Reflection::IEnumProperty& prop) override {}
 			void visit(const Reflection::IBlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
 			int idx;
-			u32 count = 0;
+			bool found = false;
 			lua_State* L;
 		};
 		
-		struct LuaPropSetterVisitor  : Reflection::IPropertyVisitor
+		struct LuaPropSetterVisitor : Reflection::IPropertyVisitor
 		{
 			bool isSameProperty(const char* name, const char* lua_name) {
 				char tmp[50];
@@ -602,8 +616,7 @@ namespace Lumix
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const T val = LuaWrapper::toType<T>(L, 3);
-				InputMemoryStream blob(&val, sizeof(val));
-				prop.setValue(cmp, idx, blob);
+				prop.set(cmp, idx, val);
 			}
 
 			void visit(const Reflection::Property<float>& prop) override { set(prop); }
@@ -620,20 +633,17 @@ namespace Lumix
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
-				InputMemoryStream blob(val, 1 + stringLength(val));
-				prop.setValue(cmp, idx, blob);
+				prop.set(cmp, idx, Path(val));
 			}
 
 			void visit(const Reflection::Property<const char*>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
-				InputMemoryStream blob(val, 1 + stringLength(val));
-				prop.setValue(cmp, idx, blob);
+				prop.set(cmp, idx, val);
 			}
 
 			void visit(const Reflection::IArrayProperty& prop) override {}
-			void visit(const Reflection::IEnumProperty& prop) override {}
 			void visit(const Reflection::IBlobProperty& prop) override {}
 
 			ComponentUID cmp;
@@ -680,11 +690,11 @@ namespace Lumix
 
 			cmp->visit(v);
 
-			if (v.count == 0) {
+			if (!v.found) {
 				luaL_error(L, "Property `%s` does not exist", v.prop_name);
 			}
 
-			return v.count;
+			return v.found ? 1 : 0;
 		}
 
 		static int lua_prop_setter(lua_State* L) {
@@ -823,7 +833,7 @@ namespace Lumix
 		}
 
 
-		void applyResourceProperty(ScriptInstance& script, const char* name, Property& prop, const char* value)
+		void applyResourceProperty(ScriptInstance& script, const char* name, Property& prop, const char* path)
 		{
 			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment);
 			ASSERT(lua_type(script.m_state, -1));
@@ -832,12 +842,28 @@ namespace Lumix
 			m_system.m_engine.unloadLuaResource(res_idx);
 			lua_pop(script.m_state, 1);
 
-			int new_res = value[0] ? m_system.m_engine.addLuaResource(Path(value), prop.resource_type) : -1;
+			int new_res = path[0] ? m_system.m_engine.addLuaResource(Path(path), prop.resource_type) : -1;
 			lua_pushinteger(script.m_state, new_res);
 			lua_setfield(script.m_state, -2, name);
 			lua_pop(script.m_state, 1);
 		}
 
+		template <typename T>
+		void applyProperty(ScriptInstance& script, Property& prop, T value) {
+			char tmp[64];
+			toCString(value, Span(tmp));
+			applyProperty(script, prop, tmp);
+		}
+
+		void applyProperty(ScriptInstance& script, Property& prop, float value) {
+			char tmp[64];
+			toCString(value, Span(tmp), 10);
+			applyProperty(script, prop, tmp);
+		}
+
+		void applyProperty(ScriptInstance& script, Property& prop, char* value) {
+			applyProperty(script, prop, (const char*)value);
+		}
 
 		void applyProperty(ScriptInstance& script, Property& prop, const char* value)
 		{
@@ -878,6 +904,18 @@ namespace Lumix
 			}
 		}
 
+		template <typename T>
+		void setPropertyValue(EntityRef entity, int scr_index, const char* property_name, T value) {
+			auto* script_cmp = m_scripts[entity];
+			if (!script_cmp) return;
+			Property& prop = getScriptProperty(entity, scr_index, property_name);
+			if (!script_cmp->m_scripts[scr_index].m_state) {
+				toString(value, Ref(prop.stored_value));
+				return;
+			}
+
+			applyProperty(script_cmp->m_scripts[scr_index], prop, value);
+		}
 
 		void setPropertyValue(EntityRef entity,
 			int scr_index,
@@ -1141,7 +1179,21 @@ namespace Lumix
 			m_universe.onComponentDestroyed(entity, LUA_SCRIPT_TYPE, this);
 		}
 
-
+		template <typename T>
+		T getPropertyValue(EntityRef entity, int scr_index, const char* property_name) {
+			u32 hash = crc32(property_name);
+			auto& inst = m_scripts[entity]->m_scripts[scr_index];
+			for (auto& prop : inst.m_properties)
+			{
+				if (prop.name_hash == hash)
+				{
+					if (inst.m_script->isReady()) return getProperty<T>(prop, property_name, inst);
+					return fromString<T>(prop.stored_value.c_str());
+				}
+			}
+			return {};
+		}
+		
 		void getPropertyValue(EntityRef entity,
 			int scr_index,
 			const char* property_name,
@@ -1165,6 +1217,21 @@ namespace Lumix
 			out[0] = '\0';
 		}
 
+
+		template <typename T> T getProperty(Property& prop, const char* prop_name, ScriptInstance& scr) {
+			if (!scr.m_state) return {};
+
+			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
+			lua_getfield(scr.m_state, -1, prop_name);
+			
+			if (!LuaWrapper::isType<T>(scr.m_state, -1)) {
+				lua_pop(scr.m_state, 2);
+				return {};
+			}
+			const T res = LuaWrapper::toType<T>(scr.m_state, -1);
+			lua_pop(scr.m_state, 2);
+			return res;
+		}
 
 		void getProperty(Property& prop, const char* prop_name, ScriptInstance& scr, Span<char> out)
 		{
@@ -1555,6 +1622,7 @@ namespace Lumix
 			script_cmp->m_scripts[scr_index].m_properties.emplace(m_system.m_allocator);
 			auto& prop = script_cmp->m_scripts[scr_index].m_properties.back();
 			prop.name_hash = name_hash;
+			prop.type = Property::ANY;
 			return prop;
 		}
 
@@ -1589,9 +1657,9 @@ namespace Lumix
 		int addScript(EntityRef entity, int scr_index) override
 		{
 			ScriptComponent* script_cmp = m_scripts[entity];
-			ASSERT(scr_index == -1 || scr_index == script_cmp->m_scripts.size());// TODO
-			script_cmp->m_scripts.emplace(m_system.m_allocator);
-			return script_cmp->m_scripts.size() - 1;
+			if (scr_index == -1) scr_index = script_cmp->m_scripts.size();
+			script_cmp->m_scripts.emplaceAt(scr_index, m_system.m_allocator);
+			return scr_index;
 		}
 
 
@@ -1805,198 +1873,103 @@ namespace Lumix
 	}
 
 
-	struct SortedProperty
-	{
-		int index;
-		const char* name;
-	};
-
-
-	static void getSortedProperties(Array<SortedProperty>& props, LuaScriptScene& scene, EntityRef entity, int script_index)
-	{
-		int property_count = scene.getPropertyCount(entity, script_index);
-		props.resize(property_count);
-		
-		for (int i = 0; i < property_count; ++i)
-		{
-			props[i].index = i;
-			props[i].name = scene.getPropertyName(entity, script_index, i);
-		}
-
-		if (!props.empty())
-		{
-			qsort(&props[0], props.size(), sizeof(props[0]), [](const void* a, const void* b) -> int {
-				auto* pa = (SortedProperty*)a;
-				auto* pb = (SortedProperty*)b;
-
-				if (!pa->name) return -1;
-				if (!pb->name) return 1;
-				return compareString(pa->name, pb->name);
-			});
-		}
-	}
-
 	struct LuaProperties : Reflection::IDynamicProperties {
 		LuaProperties() { name = "lua_properties"; }
-
-		void visit(Reflection::IAttributeVisitor& visitor) const override {}
 		
-		void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override { 
-			ASSERT(false);
-		}
-		
-		void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override { 
-			// TODO save/load prefab
-			ASSERT(false); 
-		}
-
-		void visit(ComponentUID cmp, int index, Reflection::IPropertyVisitor& visitor) const override {
+		u32 getCount(ComponentUID cmp, int index) const override { 
 			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
 			const EntityRef e = (EntityRef)cmp.entity;
-			const int count = scene.getPropertyCount(e, index);
+			return scene.getPropertyCount(e, index);
+		}
 
-			Array<SortedProperty> props(scene.m_system.m_allocator);
-			getSortedProperties(props, scene, e, index);
-				
-			for (int idx = 0; idx < count; ++idx) {
-				const int i = props[idx].index;
-				const char* prop_name = props[idx].name;
-				const LuaScriptScene::Property::Type type = scene.getPropertyType(e, index, i);
-				switch (type) {
-					case LuaScriptScene::Property::RESOURCE: {
-						struct : Reflection::Property<Path> {
-							void visit(Reflection::IAttributeVisitor& visitor) const override {
-								Reflection::ResourceAttribute attr("*.*", res_type);
-								visitor.visit(attr);
-							}
-							void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
-								const char* str = Reflection::detail::readFromStream<const char*>(stream);
-								scene->setPropertyValue((EntityRef)cmp.entity, index, name, str);
-							}
-							void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
-								char tmp[MAX_PATH_LENGTH];
-								scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
-								stream.write(tmp, stringLength(tmp) + 1);
-							}
-							LuaScriptScene* scene;
-							ResourceType res_type;
-						} p;
-						p.res_type = scene.getPropertyResourceType(e, index, i);
-						p.scene = &scene;
-						p.name = prop_name;
-						visitor.visit(p);
-						break;
-					}
+		Type getType(ComponentUID cmp, int array_idx, u32 idx) const override { 
+			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			const EntityRef e = (EntityRef)cmp.entity;
+			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
+			switch(type) {
+				case LuaScriptScene::Property::Type::BOOLEAN: return BOOLEAN;
+				case LuaScriptScene::Property::Type::INT: return I32;
+				case LuaScriptScene::Property::Type::FLOAT: return FLOAT;
+				case LuaScriptScene::Property::Type::STRING: return STRING;
+				case LuaScriptScene::Property::Type::ENTITY: return ENTITY;
+				case LuaScriptScene::Property::Type::RESOURCE: return RESOURCE;
+				default: ASSERT(false); return NONE;
+			}
+		}
 
-					case LuaScriptScene::Property::STRING: {
-						struct : Reflection::Property<const char*> {
-							void visit(Reflection::IAttributeVisitor& visitor) const override {}
-							void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
-								const char* str = Reflection::detail::readFromStream<const char*>(stream);
-								scene->setPropertyValue((EntityRef)cmp.entity, index, name, str);
-							}
-							void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
-								// TODO bigger string
-								char tmp[1024];
-								scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
-								stream.write(tmp, stringLength(tmp) + 1);
-							}
-							LuaScriptScene* scene;
-						} p;
-						p.scene = &scene;
-						p.name = prop_name;
-						visitor.visit(p);
-						break;
+		const char* getName(ComponentUID cmp, int array_idx, u32 idx) const override {
+			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			const EntityRef e = (EntityRef)cmp.entity;
+			return scene.getPropertyName(e, array_idx, idx);
+		}
+
+		Reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const override {
+			Reflection::ResourceAttribute attr;
+			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			const EntityRef e = (EntityRef)cmp.entity;
+			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
+			ASSERT(type == LuaScriptScene::Property::Type::RESOURCE);
+			attr.file_type = "*.*";
+			attr.type  = scene.getPropertyResourceType(e, array_idx, idx);
+			return attr;
+		}
+
+
+		Value getValue(ComponentUID cmp, int array_idx, u32 idx) const override { 
+			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			const EntityRef e = (EntityRef)cmp.entity;
+			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
+			const char* name = scene.getPropertyName(e, array_idx, idx);
+			Value v = {};
+			switch(type) {
+				case LuaScriptScene::Property::Type::BOOLEAN: Reflection::set(v, scene.getPropertyValue<bool>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::INT: Reflection::set(v, scene.getPropertyValue<i32>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::FLOAT: Reflection::set(v, scene.getPropertyValue<float>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::STRING: Reflection::set(v, scene.getPropertyValue<const char*>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::ENTITY: Reflection::set(v, scene.getPropertyValue<EntityPtr>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::RESOURCE: {
+					const i32 res_idx = scene.getPropertyValue<i32>(e, array_idx, name);
+					if (res_idx < 0) {
+						Reflection::set(v, ""); 
 					}
-					case LuaScriptScene::Property::FLOAT: {
-						struct : Reflection::Property<float> {
-							void visit(Reflection::IAttributeVisitor& visitor) const override {}
-							void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
-								const float f = stream.read<float>();
-								char tmp[64];
-								toCString(f, Span(tmp), 10);
-								scene->setPropertyValue((EntityRef)cmp.entity, index, name, tmp);
-							}
-							void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
-								char tmp[64];
-								scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
-								const float f = (float)atof(tmp);
-								stream.write(f);
-							}
-							LuaScriptScene* scene;
-						} p;
-						p.scene = &scene;
-						p.name = prop_name;
-						visitor.visit(p);
-						break;
+					else {
+						Resource* res = scene.m_system.m_engine.getLuaResource(res_idx);
+						Reflection::set(v, res ? res->getPath().c_str() : ""); 
 					}
-					case LuaScriptScene::Property::INT: {
-						struct : Reflection::Property<i32> {
-							void visit(Reflection::IAttributeVisitor& visitor) const override {}
-							void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
-								const i32 v = stream.read<i32>();
-								char tmp[64];
-								toCString(v, Span(tmp));
-								scene->setPropertyValue((EntityRef)cmp.entity, index, name, tmp);
-							}
-							void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
-								char tmp[64];
-								scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
-								const i32 v = atoi(tmp);
-								stream.write(v);
-							}
-							LuaScriptScene* scene;
-						} p;
-						p.scene = &scene;
-						p.name = prop_name;
-						visitor.visit(p);
-						break;
-					}
-					case LuaScriptScene::Property::BOOLEAN: {
-						struct : Reflection::Property<bool> {
-							void visit(Reflection::IAttributeVisitor& visitor) const override {}
-							void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
-								const bool v = stream.read<bool>();
-								scene->setPropertyValue((EntityRef)cmp.entity, index, name, v ? "true" : "false");
-							}
-							void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
-								char tmp[64];
-								scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
-								const bool v = equalIStrings(tmp, "true");
-								stream.write(v);
-							}
-							LuaScriptScene* scene;
-						} p;
-						p.scene = &scene;
-						p.name = prop_name;
-						visitor.visit(p);
-						break;
-					}
-					case LuaScriptScene::Property::ENTITY: {
-						struct : Reflection::Property<EntityPtr> {
-							void visit(Reflection::IAttributeVisitor& visitor) const override {}
-							void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const {
-								const EntityPtr v = stream.read<EntityPtr>();
-								char tmp[64];
-								toCString(v.index, Span(tmp));
-								scene->setPropertyValue((EntityRef)cmp.entity, index, name, tmp);
-							}
-							void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const {
-								char tmp[64];
-								scene->getPropertyValue((EntityRef)cmp.entity, index, name, Span(tmp));
-								EntityPtr v;
-								fromCString(Span(tmp), Ref(v.index));
-								stream.write(v);
-							}
-							LuaScriptScene* scene;
-						} p;
-						p.scene = &scene;
-						p.name = prop_name;
-						visitor.visit(p);
-						break;
-					}
-					default: ASSERT(false); break;
+					break;
 				}
+				default: ASSERT(false); break;
+			}
+			return v;
+		}
+		
+		void set(ComponentUID cmp, int array_idx, const char* name, Type type, Value v) const override { 
+			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			const EntityRef e = (EntityRef)cmp.entity;
+			switch(type) {
+				case BOOLEAN: scene.setPropertyValue(e, array_idx, name, v.b); break;
+				case I32: scene.setPropertyValue(e, array_idx, name, v.i); break;
+				case FLOAT: scene.setPropertyValue(e, array_idx, name, v.f); break;
+				case STRING: scene.setPropertyValue(e, array_idx, name, v.s); break;
+				case ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
+				case RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
+				default: ASSERT(false); break;
+			}
+		}
+
+		void set(ComponentUID cmp, int array_idx, u32 idx, Value v) const override {
+			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
+			const EntityRef e = (EntityRef)cmp.entity;
+			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
+			const char* name = scene.getPropertyName(e, array_idx, idx);
+			switch(type) {
+				case LuaScriptScene::Property::Type::BOOLEAN: scene.setPropertyValue(e, array_idx, name, v.b); break;
+				case LuaScriptScene::Property::Type::INT: scene.setPropertyValue(e, array_idx, name, v.i); break;
+				case LuaScriptScene::Property::Type::FLOAT: scene.setPropertyValue(e, array_idx, name, v.f); break;
+				case LuaScriptScene::Property::Type::STRING: scene.setPropertyValue(e, array_idx, name, v.s); break;
+				case LuaScriptScene::Property::Type::ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
+				case LuaScriptScene::Property::Type::RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
+				default: ASSERT(false); break;
 			}
 		}
 	};
@@ -2027,7 +2000,6 @@ namespace Lumix
 	{
 		m_script_manager.destroy();
 	}
-
 
 	void LuaScriptSystemImpl::createScenes(Universe& ctx)
 	{

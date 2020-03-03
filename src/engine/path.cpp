@@ -32,7 +32,7 @@ struct PathManagerImpl : PathManager
 		g_path_manager = nullptr;
 	}
 
-	void serialize(IOutputStream& serializer) override {
+	void serialize(OutputMemoryStream& serializer) override {
 		MutexGuard lock(m_mutex);
 		clear();
 		serializer.write((i32)m_paths.size());
@@ -41,7 +41,7 @@ struct PathManagerImpl : PathManager
 		}
 	}
 
-	void deserialize(IInputStream& serializer) override {
+	void deserialize(InputMemoryStream& serializer) override {
 		MutexGuard lock(m_mutex);
 		i32 size;
 		serializer.read(size);

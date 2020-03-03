@@ -404,7 +404,7 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(EntityRef entity, IInputStream& serializer, Universe& universe, RenderScene& scene)
+void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene)
 {
 	m_entity = entity;
 	serializer.read(m_layer_mask);
@@ -437,7 +437,7 @@ void Terrain::deserialize(EntityRef entity, IInputStream& serializer, Universe& 
 }
 
 	
-void Terrain::serialize(IOutputStream& serializer)
+void Terrain::serialize(OutputMemoryStream& serializer)
 {
 	serializer.write(m_layer_mask);
 	serializer.writeString(m_material ? m_material->getPath().c_str() : "");

@@ -227,12 +227,13 @@ struct FileSystemImpl final : FileSystem
 		catString(absolute, relative);
 	}
 
-	void makeRelative(Span<char> relative, const char* absolute) const override {
+	bool makeRelative(Span<char> relative, const char* absolute) const override {
 		if (startsWith(absolute, m_base_path)) {
 			copyString(relative, absolute + stringLength(m_base_path));
-			return;
+			return true;
 		}
 		copyString(relative, absolute);
+		return false;
 	}
 
 	void processCallbacks() override
