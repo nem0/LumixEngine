@@ -345,7 +345,8 @@ public:
 		void visit(const Reflection::IBlobProperty& prop) override { 
 			OutputMemoryStream tmp(*allocator);
 			prop.getValue(src, index, tmp);
-			prop.setValue(dst, index, InputMemoryStream(tmp));
+			InputMemoryStream blob(tmp);
+			prop.setValue(dst, index, blob);
 		}
 
 		IAllocator* allocator;
