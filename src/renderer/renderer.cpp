@@ -313,44 +313,9 @@ struct GPUProfiler
 };
 
 
-struct BoneProperty : Reflection::IEnumProperty
+struct BoneEnum : Reflection::EnumAttribute
 {
-	BoneProperty() 
-	{ 
-		name = "Bone"; 
-	}
-
-
-	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
-	{
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		int value = scene->getBoneAttachmentBone((EntityRef)cmp.entity);
-		stream.write(value);
-	}
-
-
-	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
-	{
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		int value = stream.read<int>();
-		scene->setBoneAttachmentBone((EntityRef)cmp.entity, value);
-	}
-
-
-	EntityPtr getModelInstance(RenderScene* render_scene, EntityRef bone_attachment) const
-	{
-		EntityPtr parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
-		if (!parent_entity.isValid()) return INVALID_ENTITY;
-		return render_scene->getUniverse().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
-	}
-
-
-	int getEnumValueIndex(ComponentUID cmp, int value) const override  { return value; }
-	int getEnumValue(ComponentUID cmp, int index) const override { return index; }
-
-
-	int getEnumCount(ComponentUID cmp) const override
-	{
+	u32 count(ComponentUID cmp) const override {
 		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
 		EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
 		if (!model_instance.isValid()) return 0;
@@ -361,9 +326,7 @@ struct BoneProperty : Reflection::IEnumProperty
 		return model->getBoneCount();
 	}
 
-
-	const char* getEnumName(ComponentUID cmp, int index) const override
-	{
+	const char* name(ComponentUID cmp, u32 idx) const override {
 		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
 		EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
 		if (!model_instance.isValid()) return "";
@@ -371,7 +334,15 @@ struct BoneProperty : Reflection::IEnumProperty
 		auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
 		if (!model) return "";
 
-		return model->getBone(index).name.c_str();
+		return model->getBone(idx).name.c_str();
+	}
+
+
+	EntityPtr getModelInstance(RenderScene* render_scene, EntityRef bone_attachment) const
+	{
+		EntityPtr parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
+		if (!parent_entity.isValid()) return INVALID_ENTITY;
+		return render_scene->getUniverse().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
 	}
 };
 
@@ -380,20 +351,25 @@ static void registerProperties(IAllocator& allocator)
 {
 	using namespace Reflection;
 
-	static auto rotationModeDesc = enumDesciptor<Terrain::GrassType::RotationMode>(
-		LUMIX_ENUM_VALUE(Terrain::GrassType::RotationMode::ALL_RANDOM),
-		LUMIX_ENUM_VALUE(Terrain::GrassType::RotationMode::Y_UP),
-		LUMIX_ENUM_VALUE(Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL)
-	);
-	registerEnum(rotationModeDesc);
+	struct RotationModeEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return 3; }
+		const char* name(ComponentUID cmp, u32 idx) const override {
+			switch((Terrain::GrassType::RotationMode)idx) {
+				case Terrain::GrassType::RotationMode::ALL_RANDOM: return "All random";
+				case Terrain::GrassType::RotationMode::Y_UP: return "Y up";
+				case Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL: return "Align with normal";
+				default: ASSERT(false); return "N/A";
+			}
+		}
+	};
 
-	static auto render_scene = scene("renderer", 
+	static auto render_scene = scene("renderer",
 		component("bone_attachment",
 			property("Parent", LUMIX_PROP(RenderScene, BoneAttachmentParent)),
 			property("Relative position", LUMIX_PROP(RenderScene, BoneAttachmentPosition)),
 			property("Relative rotation", LUMIX_PROP(RenderScene, BoneAttachmentRotation), 
 				RadiansAttribute()),
-			BoneProperty()
+			property("Bone", LUMIX_PROP(RenderScene, BoneAttachmentBone), BoneEnum()) 
 		),
 		component("environment_probe",
 			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
@@ -471,7 +447,7 @@ static void registerProperties(IAllocator& allocator)
 				property("Distance", LUMIX_PROP(RenderScene, GrassDistance),
 					MinAttribute(1)),
 				property("Density", LUMIX_PROP(RenderScene, GrassDensity)),
-				enum_property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), rotationModeDesc)
+				property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), RotationModeEnum())
 			)
 		)
 	);

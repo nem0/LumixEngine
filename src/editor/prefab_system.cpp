@@ -304,18 +304,55 @@ public:
 		return root;
 	}
 
+	struct PropertyCloner : Reflection::IPropertyVisitor {
+		template <typename T>
+		void clone(const Reflection::Property<T>& prop) { prop.set(dst, index, prop.get(src, index)); }
 
-	struct PropertyCloner : Reflection::ISimpleComponentVisitor {
-		void visitProperty(const Reflection::PropertyBase& prop) override {
-			stream->clear();
-			prop.getValue(src, -1, *stream);
-			InputMemoryStream tmp(*stream);
-			prop.setValue(dst, -1, tmp);
+		void visit(const Reflection::Property<float>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<int>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<u32>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<EntityPtr>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Vec2>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Vec3>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<IVec3>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Vec4>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<Path>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<bool>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<const char*>& prop) override { clone(prop); }
+		
+		void visit(const Reflection::IArrayProperty& prop) override {
+			const i32 c = prop.getCount(src);
+			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
+			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
+			
+			ASSERT(index == -1);
+			for (int i = 0; i < c; ++i) {
+				index = i;
+				prop.visit(*this);
+			}
+			index = -1;
 		}
 
+		void visit(const Reflection::IDynamicProperties& prop) override { 
+			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
+				const char* name = prop.getName(src, index, i);
+				Reflection::IDynamicProperties::Type type = prop.getType(src, index, i);
+				Reflection::IDynamicProperties::Value val = prop.getValue(src, index, i);
+
+				prop.set(dst, index, name, type, val);
+			}
+		}
+		void visit(const Reflection::IBlobProperty& prop) override { 
+			OutputMemoryStream tmp(*allocator);
+			prop.getValue(src, index, tmp);
+			InputMemoryStream blob(tmp);
+			prop.setValue(dst, index, blob);
+		}
+
+		IAllocator* allocator;
 		ComponentUID src;
 		ComponentUID dst;
-		OutputMemoryStream* stream;
+		int index = -1;
 	};
 
 
@@ -343,18 +380,17 @@ public:
 			}
 		}
 
-		OutputMemoryStream tmp_stream(m_editor.getAllocator());
 		for (ComponentUID cmp = src_u.getFirstComponent(src_e); cmp.isValid(); cmp = src_u.getNextComponent(cmp)) {
 			dst_u.createComponent(cmp.type, dst_e);
 
 			const Reflection::ComponentBase* cmp_tpl = Reflection::getComponent(cmp.type);
 	
 			PropertyCloner property_cloner;
+			property_cloner.allocator = &m_editor.getAllocator();
 			property_cloner.src = cmp;
 			property_cloner.dst.type = cmp.type;
 			property_cloner.dst.entity = dst_e;
 			property_cloner.dst.scene = dst_u.getScene(cmp.type);
-			property_cloner.stream = &tmp_stream;
 			cmp_tpl->visit(property_cloner);
 		}
 
@@ -513,7 +549,7 @@ public:
 		}
 	}
 
-	void serialize(IOutputStream& serializer) override
+	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write((u32)m_entity_to_prefab.size());
 		if (!m_entity_to_prefab.empty()) serializer.write(m_entity_to_prefab.begin(), m_entity_to_prefab.byte_size());
@@ -532,7 +568,7 @@ public:
 	}
 
 
-	void deserialize(IInputStream& serializer, const EntityMap& entity_map) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
 		u32 count;
 		serializer.read(count);
@@ -545,8 +581,7 @@ public:
 		ResourceManagerHub& resource_manager = m_editor.getEngine().getResourceManager();
 		m_resources.reserve(count);
 		for (u32 i = 0; i < count; ++i) {
-			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			u32 content_hash;
 			serializer.read(content_hash);
 			auto* res = resource_manager.load<PrefabResource>(Path(tmp));

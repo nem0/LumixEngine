@@ -62,8 +62,8 @@ struct LUMIX_ENGINE_API PathManager
 	
 	virtual ~PathManager() {};
 
-	virtual void serialize(struct IOutputStream& serializer) = 0;
-	virtual void deserialize(struct IInputStream& serializer) = 0;
+	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
+	virtual void deserialize(struct InputMemoryStream& serializer) = 0;
 
 	virtual void clear() = 0;
 };

@@ -15,11 +15,16 @@ namespace Lumix
 
 static void registerProperties(IAllocator& allocator)
 {
+	struct ClipIndexEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return ((AudioScene*)cmp.scene)->getClipCount(); }
+		const char* name(ComponentUID cmp, u32 idx) const override { return ((AudioScene*)cmp.scene)->getClipName(idx); }
+	};
+
 	using namespace Reflection;
 	static auto audio_scene = scene("audio",
 		component("ambient_sound",
 			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
-			dyn_enum_property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClipIndex), &AudioScene::getClipCount, &AudioScene::getClipName)
+			property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClipIndex), ClipIndexEnum())
 		),
 		component("audio_listener"),
 		component("echo_zone",

@@ -2161,7 +2161,7 @@ static void triangulate(
 	for (int i = 0; i < old_indices.size(); ++i)
 	{
 		int idx = getIdx(i);
-		if (in_polygon_idx <= 2)
+		if (in_polygon_idx <= 2) //-V1051
 		{
 			to_old_vertices->push_back(idx);
 			to_old_indices->push_back(i);

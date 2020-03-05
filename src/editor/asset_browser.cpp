@@ -863,9 +863,13 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New")) {
 		char full_path[MAX_PATH_LENGTH];
 		if (OS::getSaveFilename(Span(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
-			if (plugin->createResource(full_path)) {
-				fs.makeRelative(buf, full_path);
-				return true;
+			if (fs.makeRelative(buf, full_path)) {
+				if (plugin->createResource(full_path)) {
+					return true;
+				}
+			}
+			else {
+				logError("Editor") << "Can not create " << full_path << " because it's outside of root directory.";
 			}
 		}
 	}

@@ -4051,8 +4051,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			terrain.m_scene = this;
 			serializer.read(terrain.m_entity);
 			terrain.m_entity = entity_map.get(terrain.m_entity);
-			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			serializer.read(terrain.m_xz_scale);
 			serializer.read(terrain.m_y_scale);
 			serializer.read(terrain.m_layer);

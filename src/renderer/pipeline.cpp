@@ -2567,7 +2567,7 @@ struct PipelineImpl final : Pipeline
 		{
 			PROFILE_FUNCTION();
 			Array<TerrainInfo> infos(m_allocator);
-			m_pipeline->m_scene->getTerrainInfos(m_camera_params.frustum, m_camera_params.pos, infos);
+			m_pipeline->m_scene->getTerrainInfos(infos);
 			if(infos.empty()) return;
 
 			m_instances.reserve(infos.size());

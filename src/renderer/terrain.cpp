@@ -404,12 +404,11 @@ void Terrain::setMaterial(Material* material)
 	}
 }
 
-void Terrain::deserialize(EntityRef entity, IInputStream& serializer, Universe& universe, RenderScene& scene)
+void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Universe& universe, RenderScene& scene)
 {
 	m_entity = entity;
 	serializer.read(m_layer_mask);
-	char path[MAX_PATH_LENGTH];
-	serializer.readString(Span(path));
+	const char* path = serializer.readString();
 	serializer.read(m_scale.x);
 	serializer.read(m_scale.y);
 	m_scale.z = m_scale.x;
@@ -427,7 +426,7 @@ void Terrain::deserialize(EntityRef entity, IInputStream& serializer, Universe& 
 	}
 	for(int i = 0; i < count; ++i)
 	{
-		serializer.readString(Span(path));
+		const char* path = serializer.readString();
 		serializer.read(m_grass_types[i].m_density);
 		serializer.read(m_grass_types[i].m_distance);
 		serializer.read(m_grass_types[i].m_rotation_mode);
@@ -437,7 +436,7 @@ void Terrain::deserialize(EntityRef entity, IInputStream& serializer, Universe& 
 }
 
 	
-void Terrain::serialize(IOutputStream& serializer)
+void Terrain::serialize(OutputMemoryStream& serializer)
 {
 	serializer.write(m_layer_mask);
 	serializer.writeString(m_material ? m_material->getPath().c_str() : "");
@@ -455,30 +454,16 @@ void Terrain::serialize(IOutputStream& serializer)
 }
 
 
-void Terrain::getInfos(Array<TerrainInfo>& infos, const ShiftedFrustum& frustum, const DVec3& lod_ref_point)
+TerrainInfo Terrain::getInfo()
 {
-	if (!m_material || !m_material->isReady()) return;
+	if (!m_material || !m_material->isReady()) return {};
 	
-	TerrainInfo& info = infos.emplace();
+	TerrainInfo info;
 	info.shader = m_material->getShader();
 	info.position = m_scene.getUniverse().getPosition(m_entity);
 	info.rot = m_scene.getUniverse().getRotation(m_entity);
 	info.terrain = this;
-		
-	/*
-	Matrix matrix = m_scene.getUniverse().getMatrix(m_entity);
-	Matrix inv_matrix = matrix;
-	inv_matrix.fastInverse();
-	
-	Vec3 local_lod_ref_point = inv_matrix.transformPoint(lod_ref_point);
-	local_lod_ref_point.x /= m_scale.x;
-	local_lod_ref_point.z /= m_scale.z;
-
-	Frustum rel_frustum = frustum;
-	rel_frustum.transform(inv_matrix);
-	m_root->getInfos(infos, local_lod_ref_point, this, matrix, rel_frustum);*/
-	// TODO
-	//ASSERT(false);
+	return info;
 }
 
 

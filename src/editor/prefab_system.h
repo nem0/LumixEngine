@@ -9,8 +9,6 @@ namespace Lumix
 
 
 struct DVec3;
-struct IInputStream;
-struct IOutputStream;
 struct Path;
 struct PrefabResource;
 struct Quat;
@@ -29,8 +27,8 @@ struct LUMIX_EDITOR_API PrefabSystem
 
 	virtual ~PrefabSystem() {}
 	virtual void update() = 0;
-	virtual void serialize(IOutputStream& serializer) = 0;
-	virtual void deserialize(IInputStream& serializer, const struct EntityMap& entity_map) = 0;
+	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
+	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map) = 0;
 	virtual EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, float scale) = 0;
 	virtual PrefabHandle getPrefab(EntityRef entity) const = 0;
 	virtual void setPrefab(EntityRef entity, PrefabHandle prefab) = 0;

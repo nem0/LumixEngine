@@ -71,36 +71,35 @@ struct GUISystemImpl final : GUISystem
 
 		using namespace Reflection;
 
-		static auto textHAlignDesc = enumDesciptor<GUIScene::TextHAlign>(
-			LUMIX_ENUM_VALUE(GUIScene::TextHAlign::LEFT),
-			LUMIX_ENUM_VALUE(GUIScene::TextHAlign::RIGHT),
-			LUMIX_ENUM_VALUE(GUIScene::TextHAlign::CENTER)
-		);
-		registerEnum(textHAlignDesc);
+		struct TextHAlignEnum : Reflection::EnumAttribute {
+			u32 count(ComponentUID cmp) const override { return 3; }
+			const char* name(ComponentUID cmp, u32 idx) const override {
+				switch((GUIScene::TextHAlign)idx) {
+					case GUIScene::TextHAlign::LEFT: return "Left";
+					case GUIScene::TextHAlign::RIGHT: return "Right";
+					case GUIScene::TextHAlign::CENTER: return "Center";
+					default: ASSERT(false); return "N/A";
+				}
+			}
+		};
 
 		static auto lua_scene = scene("gui",
 			component("gui_text",
 				property("Text", LUMIX_PROP(GUIScene, Text)),
-				property("Font", LUMIX_PROP(GUIScene, TextFontPath),
-					ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
+				property("Font", LUMIX_PROP(GUIScene, TextFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
 				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
-				enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), textHAlignDesc),
-				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA),
-					ColorAttribute())
+				enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), TextHAlignEnum()),
+				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA), ColorAttribute())
 			),
 			component("gui_input_field"),
 			component("gui_button",
-				property("Normal color", LUMIX_PROP(GUIScene, ButtonNormalColorRGBA),
-					ColorAttribute()),
-				property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA),
-					ColorAttribute())
+				property("Normal color", LUMIX_PROP(GUIScene, ButtonNormalColorRGBA), ColorAttribute()),
+				property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA), ColorAttribute())
 			),
 			component("gui_image",
 				property("Enabled", &GUIScene::isImageEnabled, &GUIScene::enableImage),
-				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA),
-					ColorAttribute()),
-				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite),
-					ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
+				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA), ColorAttribute()),
+				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite), ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
 			),
 			component("gui_rect",
 				property("Enabled", &GUIScene::isRectEnabled, &GUIScene::enableRect),

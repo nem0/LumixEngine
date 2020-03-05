@@ -32,7 +32,7 @@ struct PathManagerImpl : PathManager
 		g_path_manager = nullptr;
 	}
 
-	void serialize(IOutputStream& serializer) override {
+	void serialize(OutputMemoryStream& serializer) override {
 		MutexGuard lock(m_mutex);
 		clear();
 		serializer.write((i32)m_paths.size());
@@ -41,14 +41,13 @@ struct PathManagerImpl : PathManager
 		}
 	}
 
-	void deserialize(IInputStream& serializer) override {
+	void deserialize(InputMemoryStream& serializer) override {
 		MutexGuard lock(m_mutex);
 		i32 size;
 		serializer.read(size);
 		for (int i = 0; i < size; ++i) {
-			char path[MAX_PATH_LENGTH];
-			serializer.readString(Span(path));
-			u32 hash = crc32(path);
+			const char* path = serializer.readString();
+			const u32 hash = crc32(path);
 			PathInternal* internal = getPathMultithreadUnsafe(hash, path);
 			--internal->m_ref_count;
 		}

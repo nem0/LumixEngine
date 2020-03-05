@@ -297,7 +297,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual void forceGrassUpdate(EntityRef entity) = 0;
 	virtual Terrain* getTerrain(EntityRef entity) = 0;
-	virtual void getTerrainInfos(const ShiftedFrustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) = 0;
+	virtual void getTerrainInfos(Array<TerrainInfo>& infos) = 0;
 	virtual float getTerrainHeightAt(EntityRef entity, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) = 0;
 	virtual void setTerrainMaterialPath(EntityRef entity, const Path& path) = 0;

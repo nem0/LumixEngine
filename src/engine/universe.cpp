@@ -636,7 +636,7 @@ float Universe::getLocalScale(EntityRef entity) const
 }
 
 
-void Universe::serialize(IOutputStream& serializer)
+void Universe::serialize(OutputMemoryStream& serializer)
 {
 	serializer.write((u32)m_entities.size());
 
@@ -659,7 +659,7 @@ void Universe::serialize(IOutputStream& serializer)
 }
 
 
-void Universe::deserialize(IInputStream& serializer, Ref<EntityMap> entity_map)
+void Universe::deserialize(InputMemoryStream& serializer, Ref<EntityMap> entity_map)
 {
 	u32 to_reserve;
 	serializer.read(to_reserve);
@@ -678,7 +678,7 @@ void Universe::deserialize(IInputStream& serializer, Ref<EntityMap> entity_map)
 		EntityName& name = m_names.emplace();
 		serializer.read(name.entity);
 		name.entity = entity_map->get(name.entity);
-		serializer.readString(Span(name.name));
+		copyString(name.name, serializer.readString());
 		m_entities[name.entity.index].name = m_names.size() - 1;
 	}
 

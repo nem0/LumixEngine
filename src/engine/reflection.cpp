@@ -12,10 +12,6 @@ namespace Reflection
 {
 
 
-namespace detail
-{
-
-
 template <> Path readFromStream<Path>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
@@ -53,8 +49,6 @@ template <> void writeToStream<const char*>(OutputMemoryStream& stream, const ch
 }
 
 
-}
-
 struct ComponentTypeData
 {
 	char id[50];
@@ -63,7 +57,6 @@ struct ComponentTypeData
 
 
 static IAllocator* g_allocator = nullptr;
-static Array<const EnumBase*>* g_enums = nullptr;
 
 
 struct ComponentLink
@@ -74,23 +67,6 @@ struct ComponentLink
 
 
 static ComponentLink* g_first_component = nullptr;
-
-
-const IAttribute* getAttribute(const PropertyBase& prop, IAttribute::Type type)
-{
-	struct AttrVisitor : IAttributeVisitor
-	{
-		void visit(const IAttribute& attr) override
-		{
-			if (attr.getType() == type) result = &attr;
-		}
-		const IAttribute* result = nullptr;
-		IAttribute::Type type;
-	} attr_visitor;
-	attr_visitor.type = type;
-	prop.visit(attr_visitor);
-	return attr_visitor.result;
-}
 
 
 const ComponentBase* getComponent(ComponentType cmp_type)
@@ -106,87 +82,6 @@ const ComponentBase* getComponent(ComponentType cmp_type)
 }
 
 
-const PropertyBase* getProperty(ComponentType cmp_type, u32 property_name_hash)
-{
-	auto* cmp = getComponent(cmp_type);
-	if (!cmp) return nullptr;
-	struct Visitor : ISimpleComponentVisitor
-	{
-		void visitProperty(const PropertyBase& prop) override {
-			if (crc32(prop.name) == property_name_hash) result = &prop;
-		}
-		void visit(const IArrayProperty& prop) override {
-			if (result) return;
-			visitProperty(prop);
-			prop.visit(*this);
-		}
-
-		u32 property_name_hash;
-		const PropertyBase* result = nullptr;
-	} visitor;
-	visitor.property_name_hash = property_name_hash;
-	cmp->visit(visitor);
-	return visitor.result;
-}
-
-
-
-const PropertyBase* getProperty(ComponentType cmp_type, const char* property, const char* subproperty)
-{
-	auto* cmp = getComponent(cmp_type);
-	if (!cmp) return nullptr;
-	struct Visitor : ISimpleComponentVisitor
-	{
-		void visitProperty(const PropertyBase& prop) override {}
-
-		void visit(const IArrayProperty& prop) override {
-			if (equalStrings(prop.name, property))
-			{
-				struct Subvisitor : ISimpleComponentVisitor
-				{
-					void visitProperty(const PropertyBase& prop) override {
-						if (equalStrings(prop.name, property)) result = &prop;
-					}
-					const char* property;
-					const PropertyBase* result = nullptr;
-				} subvisitor;
-				subvisitor.property = subproperty;
-				prop.visit(subvisitor);
-				result = subvisitor.result;
-			}
-		}
-
-		const char* subproperty;
-		const char* property;
-		const PropertyBase* result = nullptr;
-	} visitor;
-	visitor.subproperty = subproperty;
-	visitor.property = property;
-	cmp->visit(visitor);
-	return visitor.result;
-}
-
-
-
-const PropertyBase* getProperty(ComponentType cmp_type, const char* property)
-{
-	auto* cmp = getComponent(cmp_type);
-	if (!cmp) return nullptr;
-	struct Visitor : ISimpleComponentVisitor
-	{
-		void visitProperty(const PropertyBase& prop) override {
-			if (equalStrings(prop.name, property)) result = &prop;
-		}
-
-		const char* property;
-		const PropertyBase* result = nullptr;
-	} visitor;
-	visitor.property = property;
-	cmp->visit(visitor);
-	return visitor.result;
-}
-
-
 void registerComponent(const ComponentBase& desc)
 {
 	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
@@ -196,22 +91,10 @@ void registerComponent(const ComponentBase& desc)
 }
 
 
-void registerEnum(const EnumBase& e)
-{
-	g_enums->push(&e);
-}
-
-
-void registerScene(const SceneBase& scene)
-{
-	struct : ISceneVisitor
-	{
-		void visit(const ComponentBase& cmp) override
-		{
-			registerComponent(cmp);
-		}
-	} visitor;
-	scene.visit(visitor);
+void registerScene(const SceneBase& scene) {
+	for (const ComponentBase* cmp : scene.getComponents()) {
+		registerComponent(*cmp);
+	}
 }
 
 
@@ -226,7 +109,6 @@ static Array<ComponentTypeData>& getComponentTypes()
 void init(IAllocator& allocator)
 {
 	g_allocator = &allocator;
-	g_enums = LUMIX_NEW(allocator, Array<const EnumBase*>)(allocator);
 }
 
 
@@ -241,7 +123,6 @@ static void destroy(ComponentLink* link)
 void shutdown()
 {
 	destroy(g_first_component);
-	LUMIX_DELETE(*g_allocator, g_enums);
 	g_allocator = nullptr;
 }
 
@@ -302,18 +183,6 @@ int getComponentTypesCount()
 const char* getComponentTypeID(int index)
 {
 	return getComponentTypes()[index].id;
-}
-
-
-int getEnumsCount()
-{
-	return g_enums->size();
-}
-
-
-const EnumBase& getEnum(int index)
-{
-	return *(*g_enums)[index];
 }
 
 

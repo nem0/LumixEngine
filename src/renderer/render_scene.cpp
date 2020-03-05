@@ -749,7 +749,7 @@ public:
 	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
 
 
-	void serializeBoneAttachments(IOutputStream& serializer)
+	void serializeBoneAttachments(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_bone_attachments.size());
 		for (auto& attachment : m_bone_attachments)
@@ -761,7 +761,7 @@ public:
 		}
 	}
 
-	void serializeCameras(IOutputStream& serializer)
+	void serializeCameras(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_cameras.size());
 		for (Camera& camera : m_cameras)
@@ -770,7 +770,7 @@ public:
 		}
 	}
 
-	void serializeLights(IOutputStream& serializer)
+	void serializeLights(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_point_lights.size());
 		for (const PointLight& pl : m_point_lights) {
@@ -785,7 +785,7 @@ public:
 		serializer.write(m_active_global_light_entity);
 	}
 
-	void serializeModelInstances(IOutputStream& serializer)
+	void serializeModelInstances(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_model_instances.size());
 		for (auto& r : m_model_instances)
@@ -799,7 +799,7 @@ public:
 		}
 	}
 
-	void serializeTerrains(IOutputStream& serializer)
+	void serializeTerrains(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_terrains.size());
 		for (auto* terrain : m_terrains)
@@ -809,7 +809,7 @@ public:
 		}
 	}
 
-	void serializeTextMeshes(IOutputStream& serializer)
+	void serializeTextMeshes(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_text_meshes.size());
 		for (int i = 0, n = m_text_meshes.size(); i < n; ++i)
@@ -824,7 +824,7 @@ public:
 		}
 	}
 
-	void deserializeTextMeshes(IInputStream& serializer, const EntityMap& entity_map)
+	void deserializeTextMeshes(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		u32 count;
 		serializer.read(count);
@@ -836,8 +836,7 @@ public:
 			e = entity_map.get(e);
 			TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
 			m_text_meshes.insert(e, &text);
-			char tmp[MAX_PATH_LENGTH];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			serializer.read(text.color);
 			int font_size;
 			serializer.read(font_size);
@@ -850,18 +849,17 @@ public:
 	}
 
 
-	void deserializeDecals(IInputStream& serializer, const EntityMap& entity_map)
+	void deserializeDecals(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		u32 count;
 		serializer.read(count);
 		m_decals.reserve(count + m_decals.size());
 		for (u32 i = 0; i < count; ++i) {
-			char tmp[MAX_PATH_LENGTH];
 			Decal decal;
 			serializer.read(decal.entity);
 			decal.entity = entity_map.get(decal.entity);
 			serializer.read(decal.half_extents);
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
 			setDecalMaterialPath(decal.entity, Path(tmp));
@@ -870,7 +868,7 @@ public:
 	}
 
 
-	void serializeDecals(IOutputStream& serializer)
+	void serializeDecals(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_decals.size());
 		for (auto& decal : m_decals)
@@ -881,7 +879,7 @@ public:
 		}
 	}
 
-	void serializeLightProbeGrids(IOutputStream& serializer) {
+	void serializeLightProbeGrids(OutputMemoryStream& serializer) {
 		const i32 count = m_light_probe_grids.size();
 		serializer.write(count);
 		for (auto iter : m_light_probe_grids) {
@@ -892,7 +890,7 @@ public:
 		}
 	}
 
-	void serializeEnvironmentProbes(IOutputStream& serializer)
+	void serializeEnvironmentProbes(OutputMemoryStream& serializer)
 	{
 		i32 count = m_environment_probes.size();
 		serializer.write(count);
@@ -1000,7 +998,7 @@ public:
 	}
 
 
-	void serializeParticleEmitters(IOutputStream& serializer)
+	void serializeParticleEmitters(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_particle_emitters.size());
 		for (auto* emitter : m_particle_emitters)
@@ -1696,13 +1694,13 @@ public:
 	void forceGrassUpdate(EntityRef entity) override { m_terrains[entity]->forceGrassUpdate(); }
 
 
-	void getTerrainInfos(const ShiftedFrustum& frustum, const DVec3& lod_ref_point, Array<TerrainInfo>& infos) override
+	void getTerrainInfos(Array<TerrainInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
 		infos.reserve(m_terrains.size());
-		for (auto* terrain : m_terrains)
-		{
-			terrain->getInfos(infos, frustum, lod_ref_point);
+		for (auto* terrain : m_terrains) {
+			const TerrainInfo info = terrain->getInfo();
+			if (info.terrain) infos.push(info);
 		}
 	}
 
