@@ -58,8 +58,8 @@ public:
 	ParticleEmitter(EntityPtr entity, IAllocator& allocator);
 	~ParticleEmitter();
 
-	void serialize(IOutputStream& blob);
-	void deserialize(IInputStream& blob, ResourceManagerHub& manager);
+	void serialize(OutputMemoryStream& blob);
+	void deserialize(InputMemoryStream& blob, ResourceManagerHub& manager);
 	void update(float dt);
 	void emit(const float* args);
 	void fillInstanceData(const DVec3& cam_pos, float* data);

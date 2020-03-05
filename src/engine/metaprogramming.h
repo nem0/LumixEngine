@@ -103,6 +103,12 @@ struct TupleSize<Tuple<Types...> >
 	enum { result = sizeof...(Types) };
 };
 
+template <typename Tuple, typename Element> struct TupleIndex;
+
+template <typename T, typename... TailTypes> struct TupleIndex<Tuple<T, TailTypes...>, T> { static constexpr int value = 0; };
+template <typename T, typename HeadType, typename... TailTypes>
+struct TupleIndex<Tuple<HeadType, TailTypes...>, T> { static constexpr int value = 1 + TupleIndex<Tuple<TailTypes...>, T>::value; };
+
 template <int Index, typename Tuple> struct TupleElement;
 
 template <typename HeadType, typename... TailTypes>

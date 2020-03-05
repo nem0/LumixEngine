@@ -19,26 +19,42 @@ namespace Lumix
 	{
 		using namespace Reflection;
 
-		static auto dynamicTypeDesc = enumDesciptor<PhysicsScene::DynamicType>(
-			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::DYNAMIC),
-			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::STATIC),
-			LUMIX_ENUM_VALUE(PhysicsScene::DynamicType::KINEMATIC)
-			);
-		registerEnum(dynamicTypeDesc);
+		struct DynamicTypeEnum : Reflection::EnumAttribute {
+			u32 count(ComponentUID cmp) const override { return 3; }
+			const char* name(ComponentUID cmp, u32 idx) const override { 
+				switch ((PhysicsScene::DynamicType)idx) {
+					case PhysicsScene::DynamicType::DYNAMIC: return "Dynamic";
+					case PhysicsScene::DynamicType::STATIC: return "Static";
+					case PhysicsScene::DynamicType::KINEMATIC: return "Kinematic";
+					default: ASSERT(false); return "N/A";
+				}
+			}
+		};
 
-		static auto d6MotionNameDesc = enumDesciptor<PhysicsScene::D6Motion>(
-			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::LOCKED),
-			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::LIMITED),
-			LUMIX_ENUM_VALUE(PhysicsScene::D6Motion::FREE)
-			);
-		registerEnum(d6MotionNameDesc);
-		static auto wheelSlotNameDesc = enumDesciptor<PhysicsScene::WheelSlot>(
-			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::FRONT_LEFT),
-			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::FRONT_RIGHT),
-			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::REAR_LEFT),
-			LUMIX_ENUM_VALUE(PhysicsScene::WheelSlot::REAR_RIGHT)
-			);
-		registerEnum(wheelSlotNameDesc);
+		struct D6MotionEnum : Reflection::EnumAttribute {
+			u32 count(ComponentUID cmp) const override { return 3; }
+			const char* name(ComponentUID cmp, u32 idx) const override { 
+				switch ((PhysicsScene::D6Motion)idx) {
+					case PhysicsScene::D6Motion::LOCKED: return "Locked";
+					case PhysicsScene::D6Motion::LIMITED: return "Limited";
+					case PhysicsScene::D6Motion::FREE: return "Free";
+					default: ASSERT(false); return "N/A";
+				}
+			}
+		};
+
+		struct WheelSlotEnum : Reflection::EnumAttribute {
+			u32 count(ComponentUID cmp) const override { return 4; }
+			const char* name(ComponentUID cmp, u32 idx) const override { 
+				switch ((PhysicsScene::WheelSlot)idx) {
+					case PhysicsScene::WheelSlot::FRONT_LEFT: return "Front left";
+					case PhysicsScene::WheelSlot::FRONT_RIGHT: return "Front right";
+					case PhysicsScene::WheelSlot::REAR_LEFT: return "Rear left";
+					case PhysicsScene::WheelSlot::REAR_RIGHT: return "Rear right";
+					default: ASSERT(false); return "N/A";
+				}
+			}
+		};
 
 		static auto phy_scene = scene("physics",
 			functions(
@@ -53,18 +69,15 @@ namespace Lumix
 				property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
 				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
 				property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
-				enum_property("X motion", LUMIX_PROP(PhysicsScene, D6JointXMotion), d6MotionNameDesc),
-				enum_property("Y motion", LUMIX_PROP(PhysicsScene, D6JointYMotion), d6MotionNameDesc),
-				enum_property("Z motion", LUMIX_PROP(PhysicsScene, D6JointZMotion), d6MotionNameDesc),
-				enum_property("Swing 1", LUMIX_PROP(PhysicsScene, D6JointSwing1Motion), d6MotionNameDesc),
-				enum_property("Swing 2", LUMIX_PROP(PhysicsScene, D6JointSwing2Motion), d6MotionNameDesc),
-				enum_property("Twist", LUMIX_PROP(PhysicsScene, D6JointTwistMotion), d6MotionNameDesc),
-				property("Linear limit", LUMIX_PROP(PhysicsScene, D6JointLinearLimit),
-					MinAttribute(0)),
-				property("Swing limit", LUMIX_PROP(PhysicsScene, D6JointSwingLimit),
-					RadiansAttribute()),
-				property("Twist limit", LUMIX_PROP(PhysicsScene, D6JointTwistLimit),
-					RadiansAttribute()),
+				enum_property("X motion", LUMIX_PROP(PhysicsScene, D6JointXMotion), D6MotionEnum()),
+				enum_property("Y motion", LUMIX_PROP(PhysicsScene, D6JointYMotion), D6MotionEnum()),
+				enum_property("Z motion", LUMIX_PROP(PhysicsScene, D6JointZMotion), D6MotionEnum()),
+				enum_property("Swing 1", LUMIX_PROP(PhysicsScene, D6JointSwing1Motion), D6MotionEnum()),
+				enum_property("Swing 2", LUMIX_PROP(PhysicsScene, D6JointSwing2Motion), D6MotionEnum()),
+				enum_property("Twist", LUMIX_PROP(PhysicsScene, D6JointTwistMotion), D6MotionEnum()),
+				property("Linear limit", LUMIX_PROP(PhysicsScene, D6JointLinearLimit), MinAttribute(0)),
+				property("Swing limit", LUMIX_PROP(PhysicsScene, D6JointSwingLimit), RadiansAttribute()),
+				property("Twist limit", LUMIX_PROP(PhysicsScene, D6JointTwistLimit), RadiansAttribute()),
 				property("Damping", LUMIX_PROP(PhysicsScene, D6JointDamping)),
 				property("Stiffness", LUMIX_PROP(PhysicsScene, D6JointStiffness)),
 				property("Restitution", LUMIX_PROP(PhysicsScene, D6JointRestitution))
@@ -74,31 +87,24 @@ namespace Lumix
 				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
 				property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
 				property("Use limit", LUMIX_PROP(PhysicsScene, SphericalJointUseLimit)),
-				property("Limit", LUMIX_PROP(PhysicsScene, SphericalJointLimit),
-					RadiansAttribute())
+				property("Limit", LUMIX_PROP(PhysicsScene, SphericalJointLimit), RadiansAttribute())
 			),
 			component("distance_joint",
 				property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
 				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
-				property("Damping", LUMIX_PROP(PhysicsScene, DistanceJointDamping),
-					MinAttribute(0)),
-				property("Stiffness", LUMIX_PROP(PhysicsScene, DistanceJointStiffness),
-					MinAttribute(0)),
-				property("Tolerance", LUMIX_PROP(PhysicsScene, DistanceJointTolerance),
-					MinAttribute(0)),
+				property("Damping", LUMIX_PROP(PhysicsScene, DistanceJointDamping),	MinAttribute(0)),
+				property("Stiffness", LUMIX_PROP(PhysicsScene, DistanceJointStiffness), MinAttribute(0)),
+				property("Tolerance", LUMIX_PROP(PhysicsScene, DistanceJointTolerance), MinAttribute(0)),
 				property("Limits", LUMIX_PROP(PhysicsScene, DistanceJointLimits))
 			),
 			component("hinge_joint",
 				property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
-				property("Damping", LUMIX_PROP(PhysicsScene, HingeJointDamping),
-					MinAttribute(0)),
-				property("Stiffness", LUMIX_PROP(PhysicsScene, HingeJointStiffness),
-					MinAttribute(0)),
+				property("Damping", LUMIX_PROP(PhysicsScene, HingeJointDamping), MinAttribute(0)),
+				property("Stiffness", LUMIX_PROP(PhysicsScene, HingeJointStiffness), MinAttribute(0)),
 				property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
 				property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
 				property("Use limit", LUMIX_PROP(PhysicsScene, HingeJointUseLimit)),
-				property("Limit", LUMIX_PROP(PhysicsScene, HingeJointLimit),
-					RadiansAttribute())
+				property("Limit", LUMIX_PROP(PhysicsScene, HingeJointLimit), RadiansAttribute())
 			),
 			component("physical_controller",
 				functions(
@@ -112,37 +118,29 @@ namespace Lumix
 			),
 			component("rigid_actor",
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
-				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), dynamicTypeDesc),
+				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), DynamicTypeEnum()),
 				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)),
 				array("Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
 					property("Size", LUMIX_PROP(PhysicsScene, BoxGeomHalfExtents)),
 					property("Position offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetPosition)),
-					property("Rotation offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetRotation),
-						RadiansAttribute())
-					),
+					property("Rotation offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetRotation), RadiansAttribute())),
 				array("Sphere geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
-					property("Radius", LUMIX_PROP(PhysicsScene, SphereGeomRadius),
-						MinAttribute(0)),
+					property("Radius", LUMIX_PROP(PhysicsScene, SphereGeomRadius), MinAttribute(0)),
 					property("Position offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition)),
-					property("Rotation offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetRotation),
-						RadiansAttribute())
-					)
+					property("Rotation offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetRotation), RadiansAttribute()))
 			),
 			component("wheel",
 				property("Radius", LUMIX_PROP(PhysicsScene, WheelRadius), MinAttribute(0)),
 				property("Width", LUMIX_PROP(PhysicsScene, WheelWidth), MinAttribute(0)),
 				property("Mass", LUMIX_PROP(PhysicsScene, WheelMass), MinAttribute(0)),
 				property("MOI", LUMIX_PROP(PhysicsScene, WheelMOI), MinAttribute(0)),
-				enum_property("Slot", LUMIX_PROP(PhysicsScene, WheelSlot), wheelSlotNameDesc)
+				enum_property("Slot", LUMIX_PROP(PhysicsScene, WheelSlot), WheelSlotEnum())
 			),
 			component("physical_heightfield",
 				property("Layer", LUMIX_PROP(PhysicsScene, HeightfieldLayer)),
-				property("Heightmap", LUMIX_PROP(PhysicsScene, HeightmapSource),
-					ResourceAttribute("Image (*.raw)", Texture::TYPE)),
-				property("Y scale", LUMIX_PROP(PhysicsScene, HeightmapYScale),
-					MinAttribute(0)),
-				property("XZ scale", LUMIX_PROP(PhysicsScene, HeightmapXZScale),
-					MinAttribute(0))
+				property("Heightmap", LUMIX_PROP(PhysicsScene, HeightmapSource), ResourceAttribute("Image (*.raw)", Texture::TYPE)),
+				property("Y scale", LUMIX_PROP(PhysicsScene, HeightmapYScale), MinAttribute(0)),
+				property("XZ scale", LUMIX_PROP(PhysicsScene, HeightmapXZScale), MinAttribute(0))
 			)
 		);
 		registerScene(phy_scene);

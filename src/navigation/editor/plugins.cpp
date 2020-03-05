@@ -8,6 +8,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/log.h"
 #include "engine/reflection.h"
 #include "engine/universe.h"
 #include "navigation/navigation_scene.h"
@@ -69,8 +70,12 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			char path[MAX_PATH_LENGTH];
 			if (OS::getOpenFilename(Span(path), "Navmesh\0*.nav\0", nullptr)) {
 				char rel[MAX_PATH_LENGTH];
-				fs.makeRelative(Span(rel), path);
-				scene->load((EntityRef)cmp.entity, rel);
+				if (fs.makeRelative(Span(rel), path)) {
+					scene->load((EntityRef)cmp.entity, rel);
+				}
+				else {
+					logError("Navigation") << "Can not load " << path << " because it's not in root directory.";
+				}
 			}		
 		}
 
@@ -80,8 +85,12 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 				char path[MAX_PATH_LENGTH];
 				if (OS::getSaveFilename(Span(path), "Navmesh\0*.nav\0", "nav")) {
 					char rel[MAX_PATH_LENGTH];
-					fs.makeRelative(Span(rel), path);
-					scene->save((EntityRef)cmp.entity, rel);
+					if (fs.makeRelative(Span(rel), path)) {
+						scene->save((EntityRef)cmp.entity, rel);
+					}
+					else {
+						logError("Renderer") << "Can not save " << path << " because it's not in root directory.";
+					}
 				}
 			}
 		}

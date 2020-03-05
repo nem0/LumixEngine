@@ -54,6 +54,18 @@ String::String(String&& rhs)
 	rhs.m_size = 0;
 }
 
+void String::operator=(String&& rhs)
+{
+	if (&rhs != this)
+	{
+		m_allocator.deallocate(m_cstr);
+		m_cstr = rhs.m_cstr;
+		m_size = rhs.m_size;
+		rhs.m_cstr = nullptr;
+		rhs.m_size = 0;
+	}
+}
+
 
 String::String(const char* rhs, IAllocator& allocator)
 	: m_allocator(allocator)
@@ -318,6 +330,15 @@ bool equalIStrings(const char* lhs, const char* rhs)
 	return _stricmp(lhs, rhs) == 0;
 #else
 	return strcasecmp(lhs, rhs) == 0;
+#endif
+}
+
+bool equalIStrings(Span<const char> lhs, const char* rhs)
+{
+#ifdef _WIN32
+	return _strnicmp(lhs.begin(), rhs, lhs.length()) == 0 && strlen(rhs) == lhs.length();
+#else
+	return strncasecmp(lhs.begin(), rhs, lhs.length()) == 0 && strlen(rhs) == lhs.length();
 #endif
 }
 
@@ -631,6 +652,11 @@ const char* fromCString(Span<const char> input, Ref<u64> value)
 	return nullptr;
 }
 
+const char* fromCString(Span<const char> input, Ref<bool> value)
+{
+	value = equalIStrings(input, "true");
+	return input.end();
+}
 
 bool toCStringPretty(i32 value, Span<char> output)
 {
@@ -943,6 +969,8 @@ bool toCString(float value, Span<char> out, int after_point)
 		increment(output, c - 1, length > 1);
 	return true;
 }
+
+bool toCString(bool value, Span<char> output) { return copyString(output, value ? "true" : "false"); }
 
 
 bool toCString(double value, Span<char> out, int after_point)

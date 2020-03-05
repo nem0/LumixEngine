@@ -407,10 +407,9 @@ struct AudioSceneImpl final : AudioScene
 			clip->volume = 1;
 			serializer.read(clip->volume);
 			serializer.read(clip->looped);
-			serializer.readString(Span(clip->name));
+			copyString(clip->name, serializer.readString());
 			clip->name_hash = crc32(clip->name);
-			char path[MAX_PATH_LENGTH];
-			serializer.readString(Span(path));
+			const char* path = serializer.readString();
 
 			clip->clip = m_system.getEngine().getResourceManager().load<Clip>(Path(path));
 		}

@@ -118,9 +118,8 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			if (!ImGui::BeginMenu(cmp_type_name)) continue;
 
 			const Reflection::ComponentBase* component = Reflection::getComponent(cmp.type);
-			struct : Reflection::ISimpleComponentVisitor
+			struct : Reflection::IEmptyPropertyVisitor
 			{
-				void visitProperty(const Reflection::PropertyBase& prop) override {}
 				void visit(const Reflection::Property<float>& prop) override
 				{
 					int idx = animation->curves.find([&](PropertyAnimation::Curve& rhs) {
@@ -384,9 +383,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponentWithResource("property_animator", "Animation / Property animator", PropertyAnimation::TYPE, *Reflection::getProperty(PROPERTY_ANIMATOR_TYPE, "Animation"));
-		m_app.registerComponentWithResource("animable", "Animation / Animable", Animation::TYPE, *Reflection::getProperty(ANIMABLE_TYPE, "Animation"));
-		m_app.registerComponentWithResource("animator", "Animation / Animator", Anim::Controller::TYPE, *Reflection::getProperty(ANIMATOR_TYPE, "Source"));
+		m_app.registerComponent("property_animator", "Animation / Property animator", PropertyAnimation::TYPE, "Animation");
+		m_app.registerComponent("animable", "Animation / Animable", Animation::TYPE, "Animation");
+		m_app.registerComponent("animator", "Animation / Animator", Anim::Controller::TYPE, "Source");
 		m_app.registerComponent("shared_anim_controller", "Animation / Shared controller");
 
 		IAllocator& allocator = m_app.getAllocator();

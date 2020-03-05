@@ -373,8 +373,7 @@ public:
 		serializer.read(count);
 		for (int i = 0; i < count; ++i)
 		{
-			char tmp[32];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			if (!m_plugin_manager->getPlugin(tmp))
 			{
 				logError("Core") << "Missing plugin " << tmp;
@@ -425,8 +424,7 @@ public:
 		serializer.read(scene_count);
 		for (int i = 0; i < scene_count; ++i)
 		{
-			char tmp[32];
-			serializer.readString(Span(tmp));
+			const char* tmp = serializer.readString();
 			IScene* scene = ctx.getScene(crc32(tmp));
 			scene->deserialize(serializer, entity_map);
 		}

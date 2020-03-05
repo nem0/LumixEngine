@@ -43,7 +43,7 @@ struct LUMIX_ENGINE_API FileSystem
 	virtual const char* getBasePath() const = 0;
 	virtual void processCallbacks() = 0;
 	virtual bool hasWork() = 0;
-	virtual void makeRelative(Span<char> relative, const char* absolute) const = 0;
+	[[nodiscard]] virtual bool makeRelative(Span<char> relative, const char* absolute) const = 0;
 	virtual void makeAbsolute(Span<char> absolute, const char* relative) const = 0;
 
 	virtual bool getContentSync(const struct Path& file, Ref<Array<u8>> content) =  0;

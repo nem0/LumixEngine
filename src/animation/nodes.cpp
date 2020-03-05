@@ -319,7 +319,7 @@ void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 	stream.read(c);
 	for (u32 i = 0; i < c; ++i) {
 		Layer& layer = m_layers.emplace(m_parent, m_allocator);
-		stream.readString(Span(layer.name.data));
+		layer.name = stream.readString();
 		stream.read(layer.mask);
 		layer.node.deserialize(stream, ctrl);
 	}
@@ -445,8 +445,7 @@ void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 		Node::Type type;
 		stream.read(type);
 		m_children.emplace(m_allocator);
-		char tmp[256];
-		stream.readString(Span(tmp));
+		const char* tmp = stream.readString();
 		m_children[i].condition_str = tmp;
 		m_children[i].condition.compile(tmp, ctrl.m_inputs);
 		m_children[i].node = Node::create(this, type, m_allocator);
@@ -459,8 +458,7 @@ void Node::serialize(OutputMemoryStream& stream) const {
 }
 
 void Node::deserialize(InputMemoryStream& stream, Controller& ctrl) {
-	char tmp[64];
-	stream.readString(Span(tmp));
+	const char* tmp = stream.readString();
  	m_name = tmp;
 }
 

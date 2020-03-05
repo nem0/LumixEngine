@@ -698,15 +698,11 @@ Point getMousePos(WindowHandle win)
 Point getMouseScreenPos()
 {
 	POINT p;
-	BOOL b = GetCursorPos(&p);
-	if (!b) {
-		auto err = GetLastError();
-		BOOL b2 = GetCursorPos(&p);
-		if (!b2) {
-			auto err2 = GetLastError();
-			ASSERT(false);
-		}
-	}
+	static POINT last_p = {};
+	const BOOL b = GetCursorPos(&p);
+	// under some unknown (permission denied...) rare circumstances GetCursorPos fails, we returns last known position
+	if (!b) p = last_p;
+	last_p = p;
 	return {p.x, p.y};
 }
 
