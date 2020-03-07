@@ -232,16 +232,11 @@ public:
 		Renderer& renderer = *static_cast<Renderer*>(m_editor->getEngine().getPluginManager().getPlugin("renderer"));
 		PipelineResource* pres = m_editor->getEngine().getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
 		m_pipeline = Pipeline::create(renderer, pres, "", allocator);
-
-		m_editor->universeCreated().bind<&GUIEditor::onUniverseChanged>(this);
-		m_editor->universeDestroyed().bind<&GUIEditor::onUniverseChanged>(this);
 	}
 
 
 	~GUIEditor()
 	{
-		m_editor->universeCreated().unbind<&GUIEditor::onUniverseChanged>(this);
-		m_editor->universeDestroyed().unbind<&GUIEditor::onUniverseChanged>(this);
 		Pipeline::destroy(m_pipeline);
 	}
 
@@ -263,18 +258,6 @@ private:
 
 	void onAction() { m_is_window_open = !m_is_window_open; }
 	bool isOpen() const { return m_is_window_open; }
-
-
-	void onUniverseChanged()
-	{
-		Universe* universe = m_editor->getUniverse();
-		if (!universe)
-		{
-			m_pipeline->setUniverse(nullptr);
-			return;
-		}
-		m_pipeline->setUniverse(universe);
-	}
 
 
 	MouseMode drawGizmo(Draw2D& draw, GUIScene& scene, const Vec2& canvas_size, const ImVec2& mouse_canvas_pos)
@@ -402,6 +385,9 @@ private:
 				ImGui::End();
 				return;
 			}
+
+			m_pipeline->setUniverse(m_editor->getUniverse());
+
 			GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 			scene->render(*m_pipeline, { size.x, size.y });
 			
@@ -783,7 +769,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getAssetBrowser().addPlugin(*m_sprite_plugin);
 	}
 
-
+	bool showGizmo(ComponentUID) override { return false; }
+	
 	~StudioAppPlugin()
 	{
 		IAllocator& allocator = m_app.getAllocator();

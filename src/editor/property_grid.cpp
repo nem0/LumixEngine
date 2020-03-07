@@ -458,7 +458,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 			if (ImGui::SmallButton("Remove"))
 			{
-				m_editor.removeArrayPropertyItem(cmp, i, prop);
+				m_editor.removeArrayPropertyItem(cmp, i, prop.name);
 				--i;
 				count = prop.getCount(cmp);
 				if(is_open) ImGui::TreePop();

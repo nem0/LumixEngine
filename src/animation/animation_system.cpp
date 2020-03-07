@@ -23,50 +23,6 @@ enum class AnimationSceneVersion
 	LATEST
 };
 
-/*
-struct AnimSetProperty : Reflection::IEnumProperty
-{
-	AnimSetProperty() 
-	{ 
-		name = "Default set"; 
-	}
-
-
-	void getValue(ComponentUID cmp, int index, IOutputStream& stream) const override
-	{
-		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
-		int value = scene->getControllerDefaultSet((EntityRef)cmp.entity);
-		stream.write(value);
-	}
-
-
-	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
-	{
-		AnimationScene* scene = static_cast<AnimationScene*>(cmp.scene);
-		int value = stream.read<int>();
-		scene->setControllerDefaultSet((EntityRef)cmp.entity, value);
-	}
-
-
-	int getEnumValueIndex(ComponentUID cmp, int value) const override { return value; }
-	int getEnumValue(ComponentUID cmp, int index) const override { return index; }
-
-
-	int getEnumCount(ComponentUID cmp) const override
-	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource((EntityRef)cmp.entity);
-		return res ? res->m_sets_names.size() : 0;
-	}
-
-
-	const char* getEnumName(ComponentUID cmp, int index) const override
-	{
-		Anim::ControllerResource* res = static_cast<AnimationScene*>(cmp.scene)->getControllerResource((EntityRef)cmp.entity);
-		return res->m_sets_names[index];
-	}
-};
-*/
-
 template <typename T>
 struct AnimResourceManager final : ResourceManager
 {

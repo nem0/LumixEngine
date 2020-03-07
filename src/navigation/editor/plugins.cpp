@@ -8,6 +8,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/geometry.h"
 #include "engine/log.h"
 #include "engine/reflection.h"
 #include "engine/universe.h"
@@ -96,8 +97,9 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
-			const DVec3 camera_hit = m_app.getWorldEditor().getCameraRaycastHit();
-			scene->generateTileAt((EntityRef)cmp.entity, camera_hit, true);
+			UniverseView& view = m_app.getWorldEditor().getView();
+			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
+			scene->generateTileAt((EntityRef)cmp.entity, hit.pos, true);
 		}
 
 		static bool debug_draw_navmesh = false;
@@ -109,7 +111,9 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			ImGui::Checkbox("Inner boundaries", &inner_boundaries);
 			ImGui::Checkbox("Outer boundaries", &outer_boundaries);
 			ImGui::Checkbox("Portals", &portals);
-			scene->debugDrawNavmesh((EntityRef)cmp.entity, m_app.getWorldEditor().getCameraRaycastHit(), inner_boundaries, outer_boundaries, portals);
+			UniverseView& view = m_app.getWorldEditor().getView();
+			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
+			scene->debugDrawNavmesh((EntityRef)cmp.entity, hit.pos, inner_boundaries, outer_boundaries, portals);
 		}
 
 		if (scene->hasDebugDrawData((EntityRef)cmp.entity)) {
@@ -134,34 +138,6 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 };
 
 
-struct GizmoPlugin final : WorldEditor::Plugin {
-	GizmoPlugin(WorldEditor& editor) : m_editor(editor) {}
-
-	bool showGizmo(ComponentUID cmp) override {
-		if(cmp.type != NAVMESH_ZONE_TYPE) return false;
-
-		auto* scene = static_cast<NavigationScene*>(cmp.scene);
-		Universe& universe = scene->getUniverse();
-		
-		RenderInterface* ri = m_editor.getRenderInterface();
-		if (!ri) return false;
-
-		const NavmeshZone& zone = scene->getZone((EntityRef)cmp.entity);
-		const Transform tr = universe.getTransform((EntityRef)cmp.entity);
-
-		const Vec3 x = tr.rot.rotate(Vec3(zone.extents.x, 0, 0));
-		const Vec3 y = tr.rot.rotate(Vec3(0, zone.extents.y, 0));
-		const Vec3 z = tr.rot.rotate(Vec3(0, 0, zone.extents.z));
-
-		ri->addDebugCube(tr.pos, z, y, x, 0xffff0000);
-
-		return true; 
-	}
-
-	WorldEditor& m_editor;
-};
-
-
 struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
@@ -176,18 +152,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.registerComponent("navmesh_agent", "Navmesh / Agent");
 		m_app.registerComponent("navmesh_zone", "Navmesh / Zone");
-
-		WorldEditor& editor = m_app.getWorldEditor();
-		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
-		editor.addPlugin(*m_gizmo_plugin);
 	}
 
 	~StudioAppPlugin() {
 		IAllocator& allocator = m_app.getAllocator();
-		
-		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
 
-		LUMIX_DELETE(allocator, m_gizmo_plugin);
 		m_app.getPropertyGrid().removePlugin(*m_zone_pg_plugin);
 		LUMIX_DELETE(allocator, m_zone_pg_plugin);
 	}
@@ -196,9 +165,29 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		return "navigation";
 	}
 
+	bool showGizmo(ComponentUID cmp) override {
+		if(cmp.type != NAVMESH_ZONE_TYPE) return false;
+
+		auto* scene = static_cast<NavigationScene*>(cmp.scene);
+		Universe& universe = scene->getUniverse();
+		
+		RenderInterface* ri = m_app.getRenderInterface();
+		if (!ri) return false;
+
+		const NavmeshZone& zone = scene->getZone((EntityRef)cmp.entity);
+		const Transform tr = universe.getTransform((EntityRef)cmp.entity);
+
+		const Vec3 x = tr.rot.rotate(Vec3(zone.extents.x, 0, 0));
+		const Vec3 y = tr.rot.rotate(Vec3(0, zone.extents.y, 0));
+		const Vec3 z = tr.rot.rotate(Vec3(0, 0, zone.extents.z));
+
+		ri->addDebugCube(tr.pos, z, y, x, 0xffff0000);
+
+		return true; 
+	}
+
 	StudioApp& m_app;
 	PropertyGridPlugin* m_zone_pg_plugin;
-	GizmoPlugin* m_gizmo_plugin;
 };
 
 

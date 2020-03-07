@@ -111,7 +111,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (!ImGui::BeginMenu("Add curve")) return;
 
 		Universe* universe = editor.getUniverse();
-		;
+		
 		for (ComponentUID cmp = universe->getFirstComponent(selected_entities[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp))
 		{
 			const char* cmp_type_name = m_app.getComponentTypeName(cmp.type);
@@ -407,7 +407,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(m_anim_editor);
 	}
 
-
+	bool showGizmo(ComponentUID) override { return false; }
+	
 	~StudioAppPlugin()
 	{
 		m_app.getAssetCompiler().removePlugin(*m_anim_ctrl_plugin);

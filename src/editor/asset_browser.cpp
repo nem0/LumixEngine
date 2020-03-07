@@ -65,7 +65,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 AssetBrowser::~AssetBrowser()
 {
 	unloadResources();
-	RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
+	RenderInterface* ri = m_app.getRenderInterface();
 	for (FileInfo& info : m_file_infos) {
 		ri->unloadTexture(info.tex);
 	}
@@ -135,7 +135,7 @@ static Span<const char> getSubresource(const char* str)
 void AssetBrowser::changeDir(const char* path)
 {
 	WorldEditor& editor = m_app.getWorldEditor();
-	RenderInterface* ri = editor.getRenderInterface();
+	RenderInterface* ri = m_app.getRenderInterface();
 	for (FileInfo& info : m_file_infos) {
 		ri->unloadTexture(info.tex);
 	}
@@ -291,7 +291,7 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 {
 	ImGui::BeginGroup();
 	ImVec2 img_size((float)TILE_SIZE, (float)TILE_SIZE);
-	RenderInterface* ri = m_app.getWorldEditor().getRenderInterface();
+	RenderInterface* ri = m_app.getRenderInterface();
 	if (tile.tex)
 	{
 		if(ri->isValid(tile.tex)) {

@@ -18,18 +18,6 @@ template < typename T > constexpr typename RemoveReference<T>::Type&& Move(T&& t
 	return static_cast<typename RemoveReference<T>::Type&&>(t);
 }
 
-template <typename T1, typename T2>
-struct IsSame
-{
-	enum { result = false };
-};
-
-template <typename T>
-struct IsSame<T, T>
-{
-	enum { result = true };
-};
-
 template <int... T> struct Indices {};
 
 template <int offset, int size, int... T>

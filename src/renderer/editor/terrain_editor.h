@@ -3,6 +3,7 @@
 
 #include "engine/array.h"
 #include "engine/math.h"
+#include "editor/studio_app.h"
 #include "engine/universe.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
@@ -19,7 +20,7 @@ struct RenderScene;
 struct Texture;
 
 
-struct TerrainEditor final : WorldEditor::Plugin
+struct TerrainEditor final : StudioApp::MousePlugin
 {
 public:
 	enum ActionType
@@ -39,9 +40,9 @@ public:
 	TerrainEditor(WorldEditor& editor, struct StudioApp& app);
 	~TerrainEditor();
 
-	bool onMouseDown(const WorldEditor::RayHit& hit, int, int) override;
-	void onMouseMove(int x, int y, int /*rel_x*/, int /*rel_y*/) override;
-	void onMouseUp(int, int, OS::MouseButton) override;
+	bool onMouseDown(UniverseView& view, int, int) override;
+	void onMouseMove(UniverseView& view, int x, int y, int /*rel_x*/, int /*rel_y*/) override;
+	void onMouseUp(UniverseView& view, int, int, OS::MouseButton) override {};
 	void onGUI();
 	void setComponent(ComponentUID cmp) { m_component = cmp; }
 

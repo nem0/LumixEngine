@@ -8,6 +8,7 @@
 #include "engine/array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/plugin.h"
 #include "engine/log.h"
@@ -42,7 +43,9 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		if (ImGui::Button("instantiate")) {
 			Array<EntityRef> entities(editor.getAllocator());
-			system.instantiatePrefab(*(PrefabResource*)resources[0], editor.getCameraRaycastHit(), {0, 0, 0, 1}, 1);
+			UniverseView& view = editor.getView();
+			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
+			system.instantiatePrefab(*(PrefabResource*)resources[0], hit.pos, {0, 0, 0, 1}, 1);
 		}
 	}
 	
@@ -154,16 +157,12 @@ public:
 		, m_entity_to_prefab(editor.getAllocator())
 		, m_deferred_instances(editor.getAllocator())
 	{
-		editor.universeCreated().bind<&PrefabSystemImpl::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<&PrefabSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(editor.getUniverse());
 	}
 
 
 	~PrefabSystemImpl()
 	{
-		m_editor.universeCreated().unbind<&PrefabSystemImpl::onUniverseCreated>(this);
-		m_editor.universeDestroyed().unbind<&PrefabSystemImpl::onUniverseDestroyed>(this);
 		setUniverse(nullptr);
 	}
 
@@ -171,41 +170,23 @@ public:
 	WorldEditor& getEditor() const { return m_editor; }
 
 
-	void setUniverse(Universe* universe)
-	{
-		if (m_universe)
-		{
+	void setUniverse(Universe* universe) override {
+		if (universe == m_universe) return;
+
+		if (m_universe) {
 			m_universe->entityDestroyed().unbind<&PrefabSystemImpl::onEntityDestroyed>(this);
 		}
+
+		m_roots.clear();
+		for (const PrefabVersion& prefab : m_resources) {
+			prefab.resource->getResourceManager().unload(*prefab.resource);
+		}
+		m_resources.clear();
+		m_entity_to_prefab.clear();
 		m_universe = universe;
-		if (m_universe)
-		{
+		if (m_universe) {
 			m_universe->entityDestroyed().bind<&PrefabSystemImpl::onEntityDestroyed>(this);
 		}
-	}
-
-
-	void onUniverseCreated()
-	{
-		m_roots.clear();
-		for (const PrefabVersion& prefab : m_resources) {
-			prefab.resource->getResourceManager().unload(*prefab.resource);
-		}
-		m_resources.clear();
-		m_entity_to_prefab.clear();
-		setUniverse(m_editor.getUniverse());
-	}
-
-
-	void onUniverseDestroyed()
-	{
-		m_roots.clear();
-		for (const PrefabVersion& prefab : m_resources) {
-			prefab.resource->getResourceManager().unload(*prefab.resource);
-		}
-		m_resources.clear();
-		m_entity_to_prefab.clear();
-		setUniverse(nullptr);
 	}
 
 

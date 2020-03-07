@@ -221,10 +221,7 @@ bool Settings::load()
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
 	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.0f);
 	m_mouse_sensitivity.y = getFloat(L, "mouse_sensitivity_y", 200.0f);
-	const float fov = degreesToRadians(getFloat(L, "fov", 60));
-	Viewport vp = m_editor->getView().getViewport();
-	vp.fov = fov;
-	m_editor->getView().setViewport(vp);
+	m_app.setFOV(degreesToRadians(getFloat(L, "fov", 60)));
 	m_font_size = getInteger(L, "font_size", 13);
 
 	auto& actions = m_app.getActions();
@@ -320,7 +317,7 @@ bool Settings::save()
 		<< ", h = " << m_window.h << " }\n";
 
 	file << "maximized = " << (m_is_maximized ? "true" : "false") << "\n";
-	file << "fov = " << radiansToDegrees(m_editor->getView().getViewport().fov) << "\n";
+	file << "fov = " << radiansToDegrees(m_app.getFOV()) << "\n";
 
 	auto writeBool = [&file](const char* name, bool value) {
 		file << name << " = " << (value ? "true\n" : "false\n");
@@ -506,11 +503,10 @@ void Settings::onGUI()
 				}
 			}
 			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
-			Viewport vp = m_editor->getView().getViewport();
-			vp.fov = radiansToDegrees(vp.fov);
-			if (ImGui::SliderFloat("FOV", &vp.fov, 0, 180)) {
-				vp.fov = degreesToRadians(vp.fov);
-				m_editor->getView().setViewport(vp);
+			float fov = radiansToDegrees(m_app.getFOV());
+			if (ImGui::SliderFloat("FOV", &fov, 0.1f, 180)) {
+				fov = degreesToRadians(fov);
+				m_app.setFOV(fov);
 			}
 		}
 
