@@ -46,7 +46,6 @@ struct RenderInterface
 	virtual UniverseView::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual ImFont* addFont(const char* filename, int size) = 0;
-	virtual void addText2D(float x, float y, u32 color, const char* text) = 0;
 	virtual ShiftedFrustum getFrustum(EntityRef camera, const Vec2& a, const Vec2& b) = 0;
 	virtual void setUniverse(Universe* universe) = 0;
 };

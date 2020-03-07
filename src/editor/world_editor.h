@@ -62,6 +62,7 @@ struct UniverseView {
 	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
 	virtual RayHit getCameraRaycastHit(int cam_x, int cam_y) = 0;
 	virtual Vertex* render(bool lines, u32 vertex_count) = 0;
+	virtual void addText2D(float x, float y, Color color, const char* text) = 0;
 };
 
 LUMIX_EDITOR_API void addSphere(UniverseView& view, const DVec3& center, float radius, Color color);

@@ -3052,9 +3052,6 @@ struct RenderInterfaceImpl final : RenderInterface
 		m_model_index = 0;
 		auto& rm = m_editor.getEngine().getResourceManager();
 		
-		Path shader_path("pipelines/debug_shape.shd");
-		m_shader = rm.load<Shader>(shader_path);
-		
 		Path font_path("editor/fonts/OpenSans-Regular.ttf");
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
@@ -3063,14 +3060,7 @@ struct RenderInterfaceImpl final : RenderInterface
 
 	~RenderInterfaceImpl()
 	{
-		m_shader->getResourceManager().unload(*m_shader);
 		m_font_res->getResourceManager().unload(*m_font_res);
-	}
-
-
-	void addText2D(float x, float y, u32 color, const char* text) override
-	{
-		if (m_font) m_pipeline.getDraw2D().addText(*m_font, {x, y}, Color(color), text);
 	}
 
 
@@ -3232,7 +3222,6 @@ struct RenderInterfaceImpl final : RenderInterface
 
 
 	WorldEditor& m_editor;
-	Shader* m_shader;
 	FontResource* m_font_res;
 	Font* m_font;
 	RenderScene* m_render_scene;
