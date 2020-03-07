@@ -6,6 +6,7 @@
 #include "engine/allocator.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/os.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
 #include "engine/profiler.h"
@@ -345,7 +346,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 	while (!worker->m_finished) {
 		if (worker->m_is_backup) {
 			MutexGuard guard(g_system->m_sync);
-			while (!worker->m_is_enabled) {
+			while (!worker->m_is_enabled && !worker->m_finished) {
 				PROFILE_BLOCK("disabled");
 				Profiler::blockColor(0xff, 0, 0xff);
 				worker->sleep(g_system->m_sync);
@@ -515,7 +516,15 @@ void wait(SignalHandle handle)
 		return;
 	}
 	
-	ASSERT(getWorker());
+	if (!getWorker()) {
+		while (!isSignalZero(handle, false)) {
+			g_system->m_sync.exit();
+			OS::sleep(1);
+			g_system->m_sync.enter();
+		}
+		g_system->m_sync.exit();
+		return;
+	}
 
 	Profiler::blockColor(0xff, 0, 0);
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;

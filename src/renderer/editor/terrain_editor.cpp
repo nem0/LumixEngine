@@ -613,7 +613,7 @@ TerrainEditor::~TerrainEditor()
 		m_brush_texture->destroy();
 		LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 	}
-	// TODO check if destruction of this is correct
+	m_app.removePlugin(*this);
 }
 
 
