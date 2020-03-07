@@ -990,7 +990,7 @@ struct StudioAppImpl final : StudioApp
 				ImGui::SameLine();
 				if (ImGui::Button("Change...")) {
 					char dir[MAX_PATH_LENGTH];
-					if (OS::getOpenDirectory(Span(dir), ".")) {
+					if (OS::getOpenDirectory(Span(dir), m_engine->getFileSystem().getBasePath())) {
 						OS::OutputFile cfg_file;
 						if (cfg_file.open(".lumixuser")) {
 							cfg_file << dir;
@@ -2843,7 +2843,7 @@ struct StudioAppImpl final : StudioApp
 			ImGui::SameLine();
 			if (ImGui::Button("Choose dir"))
 			{
-				if (OS::getOpenDirectory(Span(m_pack.dest_dir.data), "."))
+				if (OS::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath()))
 				{
 					m_pack.dest_dir << "/";
 				}
