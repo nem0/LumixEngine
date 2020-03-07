@@ -33,6 +33,7 @@ struct {
 	u64 active_id = ~(u64)0;
 	Axis axis = Axis::NONE;
 	DVec3 prev_point;
+	DVec3 start_pos;
 	Quat start_rot;
 } g_gizmo_state;
 
@@ -510,6 +511,7 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
 			g_gizmo_state.prev_point = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
+			g_gizmo_state.start_pos = gizmo.pos;
 		}
 		return false;
 	}
@@ -526,9 +528,18 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 	const Vec3 delta_vec = (pos - g_gizmo_state.prev_point).toFloat();
 	DVec3 res = tr->pos + delta_vec;
 
+	auto print_delta = [&](){
+		const Vec2 p = view.getViewport().worldToScreenPixels(gizmo.pos);
+		const Vec3 from_start = (tr->pos - g_gizmo_state.start_pos).toFloat();
+		StaticString<128> tmp("", from_start.x, "; ", from_start.y, "; ", from_start.z);
+		view.addText2D(p.x + 31, p.y + 31, 0xff000000, tmp);
+		view.addText2D(p.x + 30, p.y + 30, 0xffffFFFF, tmp);
+	};
+
 	if (!cfg.is_step || cfg.getStep() <= 0) {
 		g_gizmo_state.prev_point = pos;
 		tr->pos = res;
+		print_delta();		
 		return delta_vec.squaredLength() > 0.f;
 	}
 
@@ -539,8 +550,10 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 	if (res.x != tr->pos.x || res.y != tr->pos.y || res.z != tr->pos.z) {
 		g_gizmo_state.prev_point = res;
 		tr->pos = res;
+		print_delta();
 		return true;
 	}
+	print_delta();
 	return false;
 }
 
@@ -637,7 +650,6 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 		}
 
 		if (cfg.is_step && fabs(angle) > degreesToRadians(cfg.getStep())) {
-			// -42, zv - 2
 			angle = angle - fmodf(angle, degreesToRadians(cfg.getStep()));
 			tr->rot = Quat(normal.normalized(), angle) * g_gizmo_state.start_rot;
 			tr->rot.normalize();

@@ -23,6 +23,7 @@
 #include "engine/universe.h"
 #include "renderer/culling_system.h"
 #include "renderer/draw2d.h"
+#include "renderer/font.h"
 #include "renderer/gpu/gpu.h"
 #include "renderer/editor/editor_icon.h"
 #include "renderer/material.h"
@@ -74,9 +75,15 @@ struct UniverseViewImpl final : UniverseView {
 		m_viewport.fov = view.m_app.getFOV();
 		m_viewport.near = 0.1f;
 		m_viewport.far = 100000.f;
+
+		ResourceManagerHub& rm = m_editor.getEngine().getResourceManager();
+		Path font_path("editor/fonts/OpenSans-Regular.ttf");
+		m_font_res = rm.load<FontResource>(font_path);
+		m_font = m_font_res->addRef(16);
 	}
 
 	~UniverseViewImpl() {
+		m_font_res->getResourceManager().unload(*m_font_res);
 		ASSERT(!m_icons);
 	}
 
@@ -539,6 +546,10 @@ struct UniverseViewImpl final : UniverseView {
 		res.is_hit = false;
 		return res;
 	}
+	
+	void addText2D(float x, float y, Color color, const char* text) override {
+		if (m_font) m_scene_view.m_pipeline->getDraw2D().addText(*m_font, {x, y}, color, text);
+	}
 
 	Vertex* render(bool lines, u32 vertex_count) override {
 		m_draw_vertices.resize(m_draw_vertices.size() + vertex_count);
@@ -568,6 +579,8 @@ struct UniverseViewImpl final : UniverseView {
 	WorldEditor& m_editor;
 	SceneView& m_scene_view;
 	Viewport m_viewport;
+	FontResource* m_font_res;
+	Font* m_font;
 
 	MouseMode m_mouse_mode = MouseMode::NONE;
 	SnapMode m_snap_mode = SnapMode::NONE;
