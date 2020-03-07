@@ -51,6 +51,12 @@ struct ScaleGizmo {
 	DVec3 pos;
 };
 
+float getScale(const Viewport& viewport, const DVec3& pos) {
+	if (viewport.is_ortho) return 2;
+	float scale = tanf(viewport.fov * 0.5f) * (pos - viewport.pos).toFloat().length() * 2;
+	return scale / 10;
+}
+
 template <typename T>
 T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
 {
@@ -75,12 +81,6 @@ T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
 	if (dotProduct(cam_dir, gizmo.z) > 0) gizmo.z = -gizmo.z;
 
 	return gizmo;
-}
-
-float getScale(const Viewport& viewport, const DVec3& pos) {
-	if (viewport.is_ortho) return 2;
-	float scale = tanf(viewport.fov * 0.5f) * (pos - viewport.pos).toFloat().length() * 2;
-	return scale / 10;
 }
 
 Axis collide(const ScaleGizmo& gizmo, const UniverseView& view) {
