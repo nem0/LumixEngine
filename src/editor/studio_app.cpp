@@ -827,7 +827,8 @@ struct StudioAppImpl final : StudioApp
 		Universe* universe = m_editor->getUniverse();
 
 		RenderInterface* ri = m_editor->getRenderInterface();
-		const DVec3 cam_pos = m_editor->getView().getViewport().pos;
+		UniverseView& view = m_editor->getView();
+		const DVec3 cam_pos = view.getViewport().pos;
 		if (ents.size() > 1) {
 			AABB aabb = ri->getEntityAABB(*universe, ents[0], cam_pos);
 			for (int i = 1; i < ents.size(); ++i) {
@@ -835,11 +836,10 @@ struct StudioAppImpl final : StudioApp
 				aabb.merge(entity_aabb);
 			}
 
-			ri->addDebugCube(cam_pos + aabb.min, cam_pos + aabb.max, 0xffffff00);
+			addCube(view, cam_pos + aabb.min, cam_pos + aabb.max, 0xffffff00);
 			return;
 		}
 
-		UniverseView& view = m_editor->getView();
 		for (ComponentUID cmp = universe->getFirstComponent(ents[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp)) {
 			for (auto* plugin : m_plugins) {
 				if (plugin->showGizmo(view, cmp)) break;
