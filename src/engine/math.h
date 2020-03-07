@@ -651,6 +651,7 @@ struct LUMIX_ENGINE_API Quat
 };
 
 
+LUMIX_ENGINE_API Vec3 slerp(const Vec3& a, const Vec3& b, float t);
 LUMIX_ENGINE_API Quat nlerp(const Quat& q1, const Quat& q2, float t);
 
 

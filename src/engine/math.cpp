@@ -251,12 +251,18 @@ void Quat::normalize()
 }
 
 
-Quat Quat::normalized() const
-{
+Quat Quat::normalized() const {
 	float l = 1 / sqrt(x * x + y * y + z * z + w * w);
 	return Quat(x * l, y * l, z * l, w * l);
 }
 
+Vec3 slerp(const Vec3& a, const Vec3& b, float t) {
+     float d = dotProduct(a, b);
+     d = clamp(d, -1.f, 1.f);
+     const float s = acosf(d) * t;
+     const Vec3 r = (b - a * d).normalized();
+     return a * cosf(s) + r * sinf(s);
+}
 
 Quat nlerp(const Quat& q1, const Quat& q2, float t)
 {

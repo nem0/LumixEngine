@@ -41,7 +41,7 @@ struct LUMIX_ENGINE_API IScene
 	virtual struct Universe& getUniverse() = 0;
 	virtual void startGame() {}
 	virtual void stopGame() {}
-	virtual int getVersion() const { return -1; }
+	virtual i32 getVersion() const { return -1; }
 	virtual void clear() = 0;
 };
 

@@ -10,29 +10,10 @@ struct lua_State;
 namespace Lumix
 {
 
-
-namespace Reflection
-{
-	struct IArrayProperty;
-}
-
-namespace OS { 
-	enum class MouseButton; 
-	using WindowHandle = void*; 
-}
+namespace OS { enum class MouseButton; }
 
 template <typename T> struct DelegateList;
 template <typename T> struct Array;
-struct ComponentUID;
-struct Engine;
-struct IAllocator;
-struct IPlugin;
-struct Path;
-struct PrefabSystem;
-struct Quat;
-struct RenderInterface;
-struct Universe;
-struct Viewport;
 
 
 struct IEditorCommand
@@ -47,8 +28,20 @@ struct IEditorCommand
 };
 
 struct UniverseView {
+	struct RayHit {
+		bool is_hit;
+		float t;
+		EntityPtr entity;
+		DVec3 pos;
+	};
+
+	struct Vertex {
+		Vec3 pos;
+		u32 abgr;
+	};
+
 	virtual ~UniverseView() = default;
-	virtual const Viewport& getViewport() = 0;
+	virtual const struct Viewport& getViewport() const = 0;
 	virtual void setViewport(const Viewport& vp) = 0;
 	virtual void lookAtSelected() = 0;
 	virtual void setTopView() = 0;
@@ -61,62 +54,39 @@ struct UniverseView {
 
 	virtual bool isMouseDown(OS::MouseButton button) const = 0;
 	virtual bool isMouseClick(OS::MouseButton button) const = 0;
-	virtual void inputFrame() = 0;
-	virtual void onMouseDown(int x, int y, OS::MouseButton button) = 0;
-	virtual void onMouseMove(int x, int y, int relx, int rely) = 0;
-	virtual void onMouseUp(int x, int y, OS::MouseButton button) = 0;
 	virtual Vec2 getMousePos() const = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;
 	virtual Vec2 getMouseSensitivity() = 0;
 	virtual void setCustomPivot() = 0;
+	virtual void resetPivot() = 0;
 	virtual void setSnapMode(bool enable, bool vertex_snap) = 0;
+	virtual RayHit getCameraRaycastHit(int cam_x, int cam_y) = 0;
+	virtual Vertex* render(bool lines, u32 vertex_count) = 0;
 };
 
 struct LUMIX_EDITOR_API WorldEditor
 {
-	enum class Coordinate : int
-	{
+	enum class Coordinate : i32	{
 		X,
 		Y,
 		Z,
 		NONE
 	};
 
-	struct RayHit
-	{
-		bool is_hit;
-		float t;
-		EntityPtr entity;
-		DVec3 pos;
-	};
-
-	struct LUMIX_EDITOR_API Plugin
-	{
-		virtual ~Plugin() {}
-
-		virtual bool onMouseDown(const RayHit& /*hit*/, int /*x*/, int /*y*/) { return false; }
-		virtual void onMouseUp(int /*x*/, int /*y*/, OS::MouseButton /*button*/) {}
-		virtual void onMouseMove(int /*x*/, int /*y*/, int /*rel_x*/, int /*rel_y*/) {}
-		virtual bool showGizmo(ComponentUID /*cmp*/);
-	};
-
 	using CommandCreator = IEditorCommand* (lua_State*, WorldEditor&);
 
-	static WorldEditor* create(const char* base_path, Engine& engine, IAllocator& allocator);
+	static WorldEditor* create(struct Engine& engine, struct IAllocator& allocator);
 	static void destroy(WorldEditor* editor, IAllocator& allocator);
 
-	virtual void setRenderInterface(RenderInterface* interface) = 0;
+	virtual void setRenderInterface(struct RenderInterface* interface) = 0;
 	virtual RenderInterface* getRenderInterface() = 0;
 	virtual void update() = 0;
 	virtual Engine& getEngine() = 0;
-	virtual Universe* getUniverse() = 0;
+	virtual struct Universe* getUniverse() = 0;
 	virtual IAllocator& getAllocator() = 0;
 	virtual UniverseView& getView() = 0;
-	virtual struct EditorIcons& getIcons() = 0;
-	virtual struct Gizmo& getGizmo() = 0;
-	virtual Span<Plugin*> getPlugins() = 0;
+	virtual void setView(UniverseView* view) = 0;
 	
-	// commands
 	virtual void beginCommandGroup(u32 type) = 0;
 	virtual void endCommandGroup() = 0;
 	virtual void executeCommand(IEditorCommand* command) = 0;
@@ -150,20 +120,19 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, u32 value) = 0;
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, EntityPtr value) = 0;
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const char* value) = 0;
-	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Path& value) = 0;
+	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const struct Path& value) = 0;
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, bool value) = 0;
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Vec2& value) = 0;
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Vec3& value) = 0;
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const Vec4& value) = 0;
 	virtual void setProperty(ComponentType component, int index, const char* property, Span<const EntityRef> entities, const IVec3& value) = 0;
 	
-	virtual void addArrayPropertyItem(const ComponentUID& cmp, const char* property) = 0;
-	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) = 0;
+	virtual void addArrayPropertyItem(const struct ComponentUID& cmp, const char* property) = 0;
+	virtual void removeArrayPropertyItem(const ComponentUID& cmp, int index, const char* property) = 0;
 	virtual const Array<EntityRef>& getSelectedEntities() const = 0;
 	virtual bool isEntitySelected(EntityRef entity) const = 0;
 	virtual void makeParent(EntityPtr parent, EntityRef child) = 0;
 
-	//
 	virtual void copyEntities() = 0;
 	virtual bool canPasteEntities() const = 0;
 	virtual void pasteEntities() = 0;
@@ -179,15 +148,8 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 
-	virtual void addPlugin(Plugin& plugin) = 0;
-	virtual void removePlugin(Plugin& plugin) = 0;
-	virtual PrefabSystem& getPrefabSystem() = 0;
-	virtual DVec3 getCameraRaycastHit() = 0;
-	virtual bool isMeasureToolActive() const = 0;
-	virtual double getMeasuredDistance() const = 0;
-	virtual void toggleMeasure() = 0;
-	virtual struct MeasureTool* getMeasureTool() const = 0;
-	virtual void snapEntities(const DVec3& hit_pos) = 0;
+	virtual struct PrefabSystem& getPrefabSystem() = 0;
+	virtual void snapEntities(const DVec3& hit_pos, bool translate_mode) = 0;
 
 	virtual bool isGameMode() const = 0;
 

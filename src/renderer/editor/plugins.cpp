@@ -3041,12 +3041,11 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 };
 
 
-struct RenderInterfaceImpl final : RenderInterfaceBase
+struct RenderInterfaceImpl final : RenderInterface
 {
 	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline, Renderer& renderer)
 		: m_pipeline(pipeline)
 		, m_editor(editor)
-		, m_models(editor.getAllocator())
 		, m_textures(editor.getAllocator())
 		, m_renderer(renderer)
 	{
@@ -3059,9 +3058,6 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 		Path font_path("editor/fonts/OpenSans-Regular.ttf");
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
-
-		editor.universeCreated().bind<&RenderInterfaceImpl::onUniverseCreated>(this);
-		editor.universeDestroyed().bind<&RenderInterfaceImpl::onUniverseDestroyed>(this);
 	}
 
 
@@ -3069,74 +3065,12 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 	{
 		m_shader->getResourceManager().unload(*m_shader);
 		m_font_res->getResourceManager().unload(*m_font_res);
-
-		m_editor.universeCreated().unbind<&RenderInterfaceImpl::onUniverseCreated>(this);
-		m_editor.universeDestroyed().unbind<&RenderInterfaceImpl::onUniverseDestroyed>(this);
 	}
 
 
 	void addText2D(float x, float y, u32 color, const char* text) override
 	{
 		if (m_font) m_pipeline.getDraw2D().addText(*m_font, {x, y}, Color(color), text);
-	}
-
-
-	void addRect2D(const Vec2& a, const Vec2& b, u32 color) override
-	{
-		m_pipeline.getDraw2D().addRect(a, b, *(Color*)&color, 1);
-	}
-
-
-	void addRectFilled2D(const Vec2& a, const Vec2& b, u32 color) override
-	{
-		m_pipeline.getDraw2D().addRectFilled(a, b, *(Color*)&color);
-	}
-
-
-	DVec3 getClosestVertex(Universe* universe, EntityRef entity, const DVec3& wpos) override
-	{
-		const Transform tr = universe->getTransform(entity);
-		const Vec3 lpos = tr.rot.conjugated() * (wpos - tr.pos).toFloat();
-		auto* scene = (RenderScene*)universe->getScene(MODEL_INSTANCE_TYPE);
-		if (!universe->hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
-
-		Model* model = scene->getModelInstanceModel(entity);
-
-		float min_dist_squared = FLT_MAX;
-		Vec3 closest_vertex = lpos;
-		auto processVertex = [&](const Vec3& vertex) {
-			float dist_squared = (vertex - lpos).squaredLength();
-			if (dist_squared < min_dist_squared)
-			{
-				min_dist_squared = dist_squared;
-				closest_vertex = vertex;
-			}
-		};
-
-		for (int i = 0, c = model->getMeshCount(); i < c; ++i)
-		{
-			Mesh& mesh = model->getMesh(i);
-
-			if (mesh.areIndices16())
-			{
-				const u16* indices = (const u16*)&mesh.indices[0];
-				for (int i = 0, c = mesh.indices.size() >> 1; i < c; ++i)
-				{
-					Vec3 vertex = mesh.vertices[indices[i]];
-					processVertex(vertex);
-				}
-			}
-			else
-			{
-				const u32* indices = (const u32*)&mesh.indices[0];
-				for (int i = 0, c = mesh.indices.size() >> 2; i < c; ++i)
-				{
-					Vec3 vertex = mesh.vertices[indices[i]];
-					processVertex(vertex);
-				}
-			}
-		}
-		return tr.pos + tr.rot * closest_vertex;
 	}
 
 
@@ -3166,14 +3100,6 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 		}
 
 		return font;
-	}
-
-
-	ModelHandle loadModel(Path& path) override
-	{
-		m_models.insert(m_model_index, m_editor.getEngine().getResourceManager().load<Model>(path));
-		++m_model_index;
-		return m_model_index - 1;
 	}
 
 
@@ -3249,7 +3175,7 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 	}
 
 
-	WorldEditor::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
+	UniverseView::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
 	{
 		const RayCastModelHit hit = m_render_scene->castRay(origin, dir, ignored);
 
@@ -3296,18 +3222,6 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 	}
 
 
-	Model* getModel(ModelHandle handle) override {
-		return m_models[handle];
-	}
-
-	void unloadModel(ModelHandle handle) override
-	{
-		auto* model = m_models[handle];
-		model->getResourceManager().unload(*model);
-		m_models.erase(handle);
-	}
-
-
 	Vec2 getCameraScreenSize(EntityRef entity) override { return m_render_scene->getCameraScreenSize(entity); }
 
 
@@ -3319,22 +3233,9 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 
 	float getCameraFOV(EntityRef entity) override { return m_render_scene->getCamera(entity).fov; }
 
-
-	float castRay(ModelHandle model, const Vec3& origin, const Vec3& dir, const Pose* pose) override
-	{
-		RayCastModelHit hit = m_models[model]->castRay(origin, dir, pose);
-		return hit.is_hit ? hit.t : -1;
+	void setUniverse(Universe* universe) override {
+		m_render_scene = universe ? static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE)) : nullptr;
 	}
-
-
-	void onUniverseCreated()
-	{
-		m_render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(MODEL_INSTANCE_TYPE));
-	}
-
-
-	void onUniverseDestroyed() { m_render_scene = nullptr; }
-
 
 	Vec3 getModelCenter(EntityRef entity) override
 	{
@@ -3354,20 +3255,6 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 	}
 
 
-	void getRenderables(Array<EntityRef>& entities, const ShiftedFrustum& frustum) override
-	{
-		for (int i = 0; i < (int)RenderableTypes::COUNT; ++i) {
-			CullResult* renderables = m_render_scene->getRenderables(frustum, (RenderableTypes)i);
-			while (renderables) {
-				for (u32 i = 0; i < renderables->header.count; ++i) {
-					entities.push(renderables->entities[i]);
-				}
-				renderables = renderables->header.next;
-			}
-		}
-	}
-
-
 	WorldEditor& m_editor;
 	Shader* m_shader;
 	FontResource* m_font_res;
@@ -3375,7 +3262,6 @@ struct RenderInterfaceImpl final : RenderInterfaceBase
 	RenderScene* m_render_scene;
 	Renderer& m_renderer;
 	Pipeline& m_pipeline;
-	HashMap<int, Model*> m_models;
 	HashMap<void*, Texture*> m_textures;
 	int m_model_index;
 };
@@ -3699,134 +3585,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 };
 
 
-struct GizmoPlugin final : WorldEditor::Plugin
-{
-	void showLightProbeGridGizmo(ComponentUID cmp) {
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		const Universe& universe = scene->getUniverse();
-		EntityRef e = (EntityRef)cmp.entity;
-		const LightProbeGrid& lpg = scene->getLightProbeGrid(e);
-		const DVec3 pos = universe.getPosition(e);
-
-		scene->addDebugCube(pos - lpg.half_extents, pos + lpg.half_extents, 0xff0000ff);
-	}
-
-	void showEnvironmentProbeGizmo(ComponentUID cmp) {
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		const Universe& universe = scene->getUniverse();
-		EntityRef e = (EntityRef)cmp.entity;
-		const EnvironmentProbe& p = scene->getEnvironmentProbe(e);
-		const DVec3 pos = universe.getPosition(e);
-
-		scene->addDebugCube(pos - p.half_extents, pos + p.half_extents, 0xff0000ff);
-	}
-
-	void showPointLightGizmo(ComponentUID light)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		Universe& universe = scene->getUniverse();
-
-		const float range = scene->getLightRange((EntityRef)light.entity);
-
-		const DVec3 pos = universe.getPosition((EntityRef)light.entity);
-		scene->addDebugSphere(pos, range, 0xff0000ff);
-	}
-
-
-	static Vec3 minCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(minimum(a.x, b.x), minimum(a.y, b.y), minimum(a.z, b.z));
-	}
-
-
-	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
-	{
-		return Vec3(maximum(a.x, b.x), maximum(a.y, b.y), maximum(a.z, b.z));
-	}
-
-
-	void showGlobalLightGizmo(ComponentUID light)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(light.scene);
-		const Universe& universe = scene->getUniverse();
-		const EntityRef entity = (EntityRef)light.entity;
-		const DVec3 pos = universe.getPosition(entity);
-
-		const Vec3 dir = universe.getRotation(entity).rotate(Vec3(0, 0, 1));
-		const Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
-		const Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
-
-		scene->addDebugLine(pos, pos + dir, 0xff0000ff);
-		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff);
-		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff);
-		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff);
-		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff);
-
-		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff);
-		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff);
-		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff);
-		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff);
-
-		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff);
-	}
-
-
-	void showDecalGizmo(ComponentUID cmp)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		Universe& universe = scene->getUniverse();
-		Vec3 half_extents = scene->getDecalHalfExtents((EntityRef)cmp.entity);
-		const RigidTransform tr = universe.getTransform((EntityRef)cmp.entity).getRigidPart();
-		const Vec3 x = tr.rot * Vec3(1, 0, 0) * half_extents.x;
-		const Vec3 y = tr.rot * Vec3(0, 1, 0) * half_extents.y;
-		const Vec3 z = tr.rot * Vec3(0, 0, 1) * half_extents.z;
-		scene->addDebugCube(tr.pos, x, y, z, 0xff0000ff);
-	}
-
-
-	void showCameraGizmo(ComponentUID cmp)
-	{
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-
-		scene->addDebugFrustum(scene->getCameraFrustum((EntityRef)cmp.entity), 0xffff0000);
-	}
-
-
-	bool showGizmo(ComponentUID cmp) override
-	{
-		if (cmp.type == CAMERA_TYPE)
-		{
-			showCameraGizmo(cmp);
-			return true;
-		}
-		if (cmp.type == DECAL_TYPE)
-		{
-			showDecalGizmo(cmp);
-			return true;
-		}
-		if (cmp.type == POINT_LIGHT_TYPE)
-		{
-			showPointLightGizmo(cmp);
-			return true;
-		}
-		if (cmp.type == ENVIRONMENT_TYPE)
-		{
-			showGlobalLightGizmo(cmp);
-			return true;
-		}
-		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
-			showEnvironmentProbeGizmo(cmp);
-			return true;
-		}
-		if (cmp.type == LIGHT_PROBE_GRID_TYPE) {
-			showLightProbeGridGizmo(cmp);
-			return true;
-		}
-		return false;
-	}
-};
-
-
 struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 {
 	explicit AddTerrainComponentPlugin(StudioApp& _app)
@@ -4031,11 +3789,131 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(*m_scene_view);
 		m_app.addPlugin(*m_game_view);
 		m_app.addPlugin(*m_editor_ui_render_plugin);
-
-		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)();
-		m_app.getWorldEditor().addPlugin(*m_gizmo_plugin);
 	}
 
+	void showLightProbeGridGizmo(ComponentUID cmp) {
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		const Universe& universe = scene->getUniverse();
+		EntityRef e = (EntityRef)cmp.entity;
+		const LightProbeGrid& lpg = scene->getLightProbeGrid(e);
+		const DVec3 pos = universe.getPosition(e);
+
+		scene->addDebugCube(pos - lpg.half_extents, pos + lpg.half_extents, 0xff0000ff);
+	}
+
+	void showEnvironmentProbeGizmo(ComponentUID cmp) {
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		const Universe& universe = scene->getUniverse();
+		EntityRef e = (EntityRef)cmp.entity;
+		const EnvironmentProbe& p = scene->getEnvironmentProbe(e);
+		const DVec3 pos = universe.getPosition(e);
+
+		scene->addDebugCube(pos - p.half_extents, pos + p.half_extents, 0xff0000ff);
+	}
+
+	void showPointLightGizmo(ComponentUID light)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(light.scene);
+		Universe& universe = scene->getUniverse();
+
+		const float range = scene->getLightRange((EntityRef)light.entity);
+
+		const DVec3 pos = universe.getPosition((EntityRef)light.entity);
+		scene->addDebugSphere(pos, range, 0xff0000ff);
+	}
+
+
+	static Vec3 minCoords(const Vec3& a, const Vec3& b)
+	{
+		return Vec3(minimum(a.x, b.x), minimum(a.y, b.y), minimum(a.z, b.z));
+	}
+
+
+	static Vec3 maxCoords(const Vec3& a, const Vec3& b)
+	{
+		return Vec3(maximum(a.x, b.x), maximum(a.y, b.y), maximum(a.z, b.z));
+	}
+
+
+	void showGlobalLightGizmo(ComponentUID light)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(light.scene);
+		const Universe& universe = scene->getUniverse();
+		const EntityRef entity = (EntityRef)light.entity;
+		const DVec3 pos = universe.getPosition(entity);
+
+		const Vec3 dir = universe.getRotation(entity).rotate(Vec3(0, 0, 1));
+		const Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
+		const Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
+
+		scene->addDebugLine(pos, pos + dir, 0xff0000ff);
+		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff);
+		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff);
+		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff);
+		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff);
+
+		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff);
+		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff);
+		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff);
+		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff);
+
+		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff);
+	}
+
+
+	void showDecalGizmo(ComponentUID cmp)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		Universe& universe = scene->getUniverse();
+		Vec3 half_extents = scene->getDecalHalfExtents((EntityRef)cmp.entity);
+		const RigidTransform tr = universe.getTransform((EntityRef)cmp.entity).getRigidPart();
+		const Vec3 x = tr.rot * Vec3(1, 0, 0) * half_extents.x;
+		const Vec3 y = tr.rot * Vec3(0, 1, 0) * half_extents.y;
+		const Vec3 z = tr.rot * Vec3(0, 0, 1) * half_extents.z;
+		scene->addDebugCube(tr.pos, x, y, z, 0xff0000ff);
+	}
+
+
+	void showCameraGizmo(ComponentUID cmp)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+
+		scene->addDebugFrustum(scene->getCameraFrustum((EntityRef)cmp.entity), 0xffff0000);
+	}
+
+
+	bool showGizmo(ComponentUID cmp) override
+	{
+		if (cmp.type == CAMERA_TYPE)
+		{
+			showCameraGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == DECAL_TYPE)
+		{
+			showDecalGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == POINT_LIGHT_TYPE)
+		{
+			showPointLightGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == ENVIRONMENT_TYPE)
+		{
+			showGlobalLightGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
+			showEnvironmentProbeGizmo(cmp);
+			return true;
+		}
+		if (cmp.type == LIGHT_PROBE_GRID_TYPE) {
+			showLightProbeGridGizmo(cmp);
+			return true;
+		}
+		return false;
+	}
 
 	~StudioAppPlugin()
 	{
@@ -4083,9 +3961,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		LUMIX_DELETE(allocator, m_scene_view);
 		LUMIX_DELETE(allocator, m_game_view);
 		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
-
-		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
-		LUMIX_DELETE(allocator, m_gizmo_plugin);
 	}
 
 
@@ -4104,7 +3979,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	SceneView* m_scene_view;
 	GameView* m_game_view;
 	EditorUIRenderPlugin* m_editor_ui_render_plugin;
-	GizmoPlugin* m_gizmo_plugin;
 };
 
 

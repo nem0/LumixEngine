@@ -1,8 +1,6 @@
 #include "world_editor.h"
 
-#include "editor/editor_icon.h"
 #include "editor/gizmo.h"
-#include "editor/measure_tool.h"
 #include "editor/prefab_system.h"
 #include "engine/array.h"
 #include "engine/associative_array.h"
@@ -35,414 +33,6 @@ namespace Lumix
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
-
-struct UniverseViewImpl final : UniverseView {
-	enum class MouseMode
-	{
-		NONE,
-		SELECT,
-		NAVIGATE,
-		PAN,
-
-		CUSTOM
-	};
-
-	enum class SnapMode
-	{
-		NONE,
-		FREE,
-		VERTEX
-	};
-
-	UniverseViewImpl(WorldEditor& editor) 
-		: m_editor(editor) 
-		, m_orbit_delta(0)
-	{}
-
-	void setSnapMode(bool enable, bool vertex_snap) override
-	{
-		m_snap_mode = enable ? (vertex_snap ? SnapMode::VERTEX : SnapMode::FREE) : SnapMode::NONE;
-	}
-
-	void previewSnapVertex()
-	{
-		if (m_snap_mode != SnapMode::VERTEX) return;
-
-		DVec3 origin;
-		Vec3 dir;
-		m_viewport.getRay(m_mouse_pos, origin, dir);
-		const WorldEditor::RayHit hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
-		if (!hit.is_hit) return;
-
-		const DVec3 snap_pos = getClosestVertex(hit);
-		m_editor.getRenderInterface()->addDebugCross(snap_pos, 1, 0xfff00fff);
-	}
-
-	Vec2 getMouseSensitivity() override
-	{
-		return m_mouse_sensitivity;
-	}
-
-	void setMouseSensitivity(float x, float y) override
-	{
-		m_mouse_sensitivity.x = 10000 / x;
-		m_mouse_sensitivity.y = 10000 / y;
-	}
-
-	void rectSelect()
-	{
-		Array<EntityRef> entities(m_editor.getAllocator());
-
-		Vec2 min = m_rect_selection_start;
-		Vec2 max = m_mouse_pos;
-		if (min.x > max.x) swap(min.x, max.x);
-		if (min.y > max.y) swap(min.y, max.y);
-		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
-		m_editor.getRenderInterface()->getRenderables(entities, frustum);
-		m_editor.selectEntities(entities.empty() ? nullptr : &entities[0], entities.size(), false);
-	}
-
-	void onMouseUp(int x, int y, OS::MouseButton button) override
-	{
-		m_mouse_pos = {(float)x, (float)y};
-		if (m_mouse_mode == MouseMode::SELECT)
-		{
-			if (m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y)
-			{
-				rectSelect();
-			}
-			else
-			{
-				DVec3 origin;
-				Vec3 dir;
-				m_viewport.getRay(m_mouse_pos, origin, dir);
-				auto hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
-
-				const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-				if (m_snap_mode != SnapMode::NONE && !selected_entities.empty() && hit.is_hit)
-				{
-					DVec3 snap_pos = origin + dir * hit.t;
-					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
-					const Quat rot = m_editor.getUniverse()->getRotation(selected_entities[0]);
-					const Vec3 offset = rot.rotate(m_editor.getGizmo().getOffset());
-					m_editor.snapEntities(snap_pos - offset);
-				}
-				else
-				{
-					auto icon_hit = m_editor.getIcons().raycast(origin, dir);
-					if (icon_hit.entity != INVALID_ENTITY)
-					{
-						if(icon_hit.entity.isValid()) {
-							EntityRef e = (EntityRef)icon_hit.entity;
-							m_editor.selectEntities(&e, 1, true);
-						}
-					}
-					else if (hit.is_hit)
-					{
-						if(hit.entity.isValid()) {
-							EntityRef entity = (EntityRef)hit.entity;
-							m_editor.selectEntities(&entity, 1, true);
-						}
-					}
-				}
-			}
-		}
-
-		m_is_mouse_down[(int)button] = false;
-		if (m_mouse_handling_plugin)
-		{
-			m_mouse_handling_plugin->onMouseUp(x, y, button);
-			m_mouse_handling_plugin = nullptr;
-		}
-		m_mouse_mode = MouseMode::NONE;
-	}
-
-	Vec2 getMousePos() const override { return m_mouse_pos; }
-	void setCustomPivot() override
-	{
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (selected_entities.empty()) return;
-
-		DVec3 origin;
-		Vec3 dir;		
-		m_viewport.getRay(m_mouse_pos, origin, dir);
-		auto hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
-		if (!hit.is_hit || hit.entity != selected_entities[0]) return;
-
-		const DVec3 snap_pos = getClosestVertex(hit);
-
-		const Transform tr = m_editor.getUniverse()->getTransform(selected_entities[0]);
-		m_editor.getGizmo().setOffset(tr.rot.conjugated() * (snap_pos - tr.pos).toFloat());
-	}
-
-	DVec3 getClosestVertex(const WorldEditor::RayHit& hit)
-	{
-		ASSERT(hit.is_hit);
-		return m_editor.getRenderInterface()->getClosestVertex(m_editor.getUniverse(), (EntityRef)hit.entity, hit.pos);
-	}
-
-	void inputFrame() override
-	{
-		for (auto& i : m_is_mouse_click) i = false;
-	}
-
-	bool isMouseClick(OS::MouseButton button) const override
-	{
-		return m_is_mouse_click[(int)button];
-	}
-
-	bool isMouseDown(OS::MouseButton button) const override
-	{
-		return m_is_mouse_down[(int)button];
-	}
-
-	void onMouseMove(int x, int y, int relx, int rely) override
-	{
-		PROFILE_FUNCTION();
-		m_mouse_pos.set((float)x, (float)y);
-		
-		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
-
-		switch (m_mouse_mode)
-		{
-			case MouseMode::CUSTOM:
-			{
-				if (m_mouse_handling_plugin)
-				{
-					m_mouse_handling_plugin->onMouseMove(x, y, relx, rely);
-				}
-			}
-			break;
-			case MouseMode::NAVIGATE: {
-				const float yaw = -signum(relx) * (powf(fabsf((float)relx / m_mouse_sensitivity.x), 1.2f));
-				const float pitch = -signum(rely) * (powf(fabsf((float)rely / m_mouse_sensitivity.y), 1.2f));
-				rotateCamera(yaw, pitch);
-				break;
-			}
-			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
-			case MouseMode::NONE:
-			case MouseMode::SELECT:
-				break;
-		}
-	}
-
-	void onMouseDown(int x, int y, OS::MouseButton button) override
-	{
-		m_is_mouse_click[(int)button] = true;
-		m_is_mouse_down[(int)button] = true;
-		if(button == OS::MouseButton::MIDDLE)
-		{
-			m_mouse_mode = MouseMode::PAN;
-		}
-		else if (button == OS::MouseButton::RIGHT)
-		{
-			m_mouse_mode = MouseMode::NAVIGATE;
-		}
-		else if (button == OS::MouseButton::LEFT)
-		{
-			DVec3 origin;
-			Vec3 dir;
-			m_viewport.getRay({(float)x, (float)y}, origin, dir);
-			const WorldEditor::RayHit hit = m_editor.getRenderInterface()->castRay(origin, dir, INVALID_ENTITY);
-			if (m_editor.getGizmo().isActive()) return;
-
-			for (WorldEditor::Plugin* plugin : m_editor.getPlugins())
-			{
-				if (plugin->onMouseDown(hit, x, y))
-				{
-					m_mouse_handling_plugin = plugin;
-					m_mouse_mode = MouseMode::CUSTOM;
-					return;
-				}
-			}
-			m_mouse_mode = MouseMode::SELECT;
-			m_rect_selection_start = {(float)x, (float)y};
-		}
-	}
-
-	const Viewport& getViewport() override { return m_viewport; }
-	void setViewport(const Viewport& vp) override { m_viewport = vp; }
-
-	void copyTransform() override {
-		if (m_editor.getSelectedEntities().empty()) return;
-
-		m_editor.setEntitiesPositionsAndRotations(m_editor.getSelectedEntities().begin(), &m_viewport.pos, &m_viewport.rot, 1);
-	}
-
-	void lookAtSelected() override {
-		const Universe* universe = m_editor.getUniverse();
-		if (m_editor.getSelectedEntities().empty()) return;
-
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		const Vec3 dir = m_viewport.rot.rotate(Vec3(0, 0, 1));
-		m_go_to_parameters.m_to = universe->getPosition(m_editor.getSelectedEntities()[0]) + dir * 10;
-		const double len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
-		m_go_to_parameters.m_speed = maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
-		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = m_viewport.rot;
-
-	}
-	
-	void setTopView() override {
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_is_orbit && !selected_entities.empty()) {
-			auto* universe = m_editor.getUniverse();
-			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 10, 0);
-		}
-		m_go_to_parameters.m_speed = 2.0f;
-		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(1, 0, 0), -PI * 0.5f);
-	}
-
-	void setFrontView() override {
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_is_orbit && !selected_entities.empty()) {
-			auto* universe = m_editor.getUniverse();
-			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 0, -10);
-		}
-		m_go_to_parameters.m_speed = 2.0f;
-		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), PI);
-	}
-
-
-	void setSideView() override {
-		m_go_to_parameters.m_is_active = true;
-		m_go_to_parameters.m_t = 0;
-		m_go_to_parameters.m_from = m_viewport.pos;
-		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
-		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_is_orbit && !selected_entities.empty()) {
-			auto* universe = m_editor.getUniverse();
-			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(-10, 0, 0);
-		}
-		m_go_to_parameters.m_speed = 2.0f;
-		m_go_to_parameters.m_from_rot = m_viewport.rot;
-		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -PI * 0.5f);
-	}
-	
-	bool isOrbitCamera() const override { return m_is_orbit; }
-
-	void setOrbitCamera(bool enable) override
-	{
-		m_orbit_delta = Vec2(0, 0);
-		m_is_orbit = enable;
-	}
-
-	void moveCamera(float forward, float right, float up, float speed) override
-	{
-		const Quat rot = m_viewport.rot;
-
-		right = m_is_orbit ? 0 : right;
-
-		m_viewport.pos += rot.rotate(Vec3(0, 0, -1)) * forward * speed;
-		m_viewport.pos += rot.rotate(Vec3(1, 0, 0)) * right * speed;
-		m_viewport.pos += rot.rotate(Vec3(0, 1, 0)) * up * speed;
-	}
-
-	void rotateCamera(float yaw, float pitch) {
-		const Universe* universe = m_editor.getUniverse();
-		DVec3 pos = m_viewport.pos;
-		Quat rot = m_viewport.rot;
-		const Quat old_rot = rot;
-
-		Quat yaw_rot(Vec3(0, 1, 0), yaw);
-		rot = yaw_rot * rot;
-		rot.normalize();
-
-		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-		const Quat pitch_rot(pitch_axis, pitch);
-		rot = pitch_rot * rot;
-		rot.normalize();
-
-		if (m_is_orbit && !m_editor.getSelectedEntities().empty())
-		{
-			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-			const DVec3 entity_pos = universe->getPosition(m_editor.getSelectedEntities()[0]);
-			DVec3 nondelta_pos = pos;
-
-			nondelta_pos -= old_rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
-			nondelta_pos -= old_rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
-
-			const float dist = float((entity_pos - nondelta_pos).length());
-			pos = entity_pos + dir * dist;
-			pos += rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
-			pos += rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
-		}
-
-		m_viewport.pos = pos;
-		m_viewport.rot = rot;
-	}
-
-	void panCamera(float x, float y) {
-		const Quat rot = m_viewport.rot;
-
-		if (m_is_orbit) {
-			m_orbit_delta.x += x;
-			m_orbit_delta.y += y;
-		}
-
-		m_viewport.pos += rot.rotate(Vec3(x, 0, 0));
-		m_viewport.pos += rot.rotate(Vec3(0, -y, 0));
-	}
-
-	void update() {
-		previewSnapVertex();
-		
-		if (m_is_mouse_down[(int)OS::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT) {
-			m_editor.getRenderInterface()->addRect2D(m_rect_selection_start, m_mouse_pos, 0xfffffFFF);
-			m_editor.getRenderInterface()->addRect2D(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), 0xff000000);
-		}
-
-		if (!m_go_to_parameters.m_is_active) return;
-
-		float t = easeInOut(m_go_to_parameters.m_t);
-		m_go_to_parameters.m_t += m_editor.getEngine().getLastTimeDelta() * m_go_to_parameters.m_speed;
-		DVec3 pos = m_go_to_parameters.m_from * (1 - t) + m_go_to_parameters.m_to * t;
-		Quat rot;
-		rot = nlerp(m_go_to_parameters.m_from_rot, m_go_to_parameters.m_to_rot, t);
-		if (m_go_to_parameters.m_t >= 1)
-		{
-			pos = m_go_to_parameters.m_to;
-			m_go_to_parameters.m_is_active = false;
-		}
-		m_viewport.pos = pos;
-		m_viewport.rot = rot;
-	}
-
-	struct {
-		bool m_is_active = false;
-		DVec3 m_from;
-		DVec3 m_to;
-		Quat m_from_rot;
-		Quat m_to_rot;
-		float m_t;
-		float m_speed;
-	} m_go_to_parameters;
-
-	bool m_is_orbit = false;
-	Vec2 m_orbit_delta;
-	WorldEditor& m_editor;
-	Viewport m_viewport;
-
-	MouseMode m_mouse_mode = MouseMode::NONE;
-	SnapMode m_snap_mode = SnapMode::NONE;
-	Vec2 m_mouse_pos;
-	Vec2 m_mouse_sensitivity{200, 200};
-	bool m_is_mouse_down[(int)OS::MouseButton::EXTENDED] = {};
-	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED] = {};
-	WorldEditor::Plugin* m_mouse_handling_plugin = nullptr;
-	Vec2 m_rect_selection_start;
-};
 
 struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	PropertyDeserializeVisitor(Ref<InputMemoryStream> deserializer
@@ -1315,10 +905,6 @@ private:
 struct PasteEntityCommand;
 
 
-bool WorldEditor::Plugin::showGizmo(ComponentUID) { return false; }
-
-
-
 struct WorldEditorImpl final : WorldEditor
 {
 	friend struct PasteEntityCommand;
@@ -1767,8 +1353,9 @@ private:
 public:
 	IAllocator& getAllocator() override { return m_allocator; }
 
-	UniverseView& getView() override { return m_view; }
+	UniverseView& getView() override { ASSERT(m_view); return *m_view; }
 
+	void setView(UniverseView* view) override { m_view = view; }
 
 	Universe* getUniverse() override
 	{
@@ -1777,45 +1364,6 @@ public:
 
 
 	Engine& getEngine() override { return m_engine; }
-
-
-	void showGizmos()
-	{
-		if (m_selected_entities.empty()) return;
-
-		Universe* universe = getUniverse();
-
-		if (m_selected_entities.size() > 1)
-		{
-			AABB aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[0], m_view.m_viewport.pos);
-			for (int i = 1; i < m_selected_entities.size(); ++i)
-			{
-				AABB entity_aabb = m_render_interface->getEntityAABB(*universe, m_selected_entities[i], m_view.m_viewport.pos);
-				aabb.merge(entity_aabb);
-			}
-
-			m_render_interface->addDebugCube(m_view.m_viewport.pos + aabb.min, m_view.m_viewport.pos + aabb.max, 0xffffff00);
-			return;
-		}
-
-		for (ComponentUID cmp = universe->getFirstComponent(m_selected_entities[0]);
-			cmp.isValid();
-			cmp = universe->getNextComponent(cmp))
-		{
-			for (auto* plugin : m_plugins)
-			{
-				if (plugin->showGizmo(cmp)) break;
-			}
-		}
-	}
-
-
-	void createEditorLines()
-	{
-		PROFILE_FUNCTION();
-		showGizmos();
-		m_measure_tool->createEditorLines(*m_render_interface);
-	}
 
 
 	void update() override
@@ -1831,17 +1379,7 @@ public:
 			doExecute(cmd);
 		}
 
-		m_view.update();
 		m_prefab_system->update();
-
-		if (!m_selected_entities.empty())
-		{
-			m_gizmo->add(m_selected_entities[0]);
-		}
-
-
-		createEditorLines();
-		m_gizmo->update(m_view.m_viewport);
 	}
 
 
@@ -1849,26 +1387,17 @@ public:
 	{
 		destroyUniverse();
 
-		Gizmo::destroy(*m_gizmo);
-		m_gizmo = nullptr;
-
-		removePlugin(*m_measure_tool);
-		LUMIX_DELETE(m_allocator, m_measure_tool);
-		ASSERT(m_plugins.empty());
-
-		EditorIcons::destroy(*m_editor_icons);
 		PrefabSystem::destroy(m_prefab_system);
 
 		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
 
 
-	void snapEntities(const DVec3& hit_pos) override
+	void snapEntities(const DVec3& hit_pos, bool translate_mode) override
 	{
 		Array<DVec3> positions(m_allocator);
 		Array<Quat> rotations(m_allocator);
-		if(m_gizmo->isTranslateMode())
-		{
+		if(translate_mode) {
 			for(auto e : m_selected_entities)
 			{
 				positions.push(hit_pos);
@@ -1907,22 +1436,6 @@ public:
 			positions.size(),
 			m_allocator);
 		executeCommand(cmd);
-	}
-
-
-	DVec3 getClosestVertex(const RayHit& hit)
-	{
-		ASSERT(hit.is_hit);
-		return m_render_interface->getClosestVertex(m_universe, (EntityRef)hit.entity, hit.pos);
-	}
-
-
-	void addPlugin(Plugin& plugin) override { m_plugins.push(&plugin); }
-
-
-	void removePlugin(Plugin& plugin) override
-	{
-		m_plugins.swapAndPopItem(&plugin);
 	}
 
 
@@ -1977,7 +1490,6 @@ public:
 	void setRenderInterface(struct RenderInterface* interface) override
 	{
 		m_render_interface = interface;
-		m_editor_icons->setRenderInterface(m_render_interface);
 		createUniverse();
 	}
 
@@ -2038,7 +1550,7 @@ public:
 
 	EntityRef addEntity() override
 	{
-		return addEntityAt(m_view.m_viewport.w >> 1, m_view.m_viewport.h >> 1);
+		return addEntityAt(m_view->getViewport().w >> 1, m_view->getViewport().h >> 1);
 	}
 
 
@@ -2047,38 +1559,12 @@ public:
 		DVec3 origin;
 		Vec3 dir;
 
-		m_view.m_viewport.getRay({(float)camera_x, (float)camera_y}, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-		DVec3 pos;
-		if (hit.is_hit) {
-			pos = origin + dir * hit.t;
-		}
-		else {
-			pos = m_view.m_viewport.pos + m_view.m_viewport.rot.rotate(Vec3(0, 0, -2));
-		}
-		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
+		const UniverseView::RayHit hit = m_view->getCameraRaycastHit(camera_x, camera_y);
+
+		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, hit.pos);
 		executeCommand(command);
 
 		return (EntityRef)command->getEntity();
-	}
-
-
-	DVec3 getCameraRaycastHit() override
-	{
-		const Vec2 center(float(m_view.m_viewport.w >> 1), float(m_view.m_viewport.h >> 1));
-
-		DVec3 origin;
-		Vec3 dir;
-		m_view.m_viewport.getRay(center, origin, dir);
-		auto hit = m_render_interface->castRay(origin, dir, INVALID_ENTITY);
-		DVec3 pos;
-		if (hit.is_hit) {
-			pos = origin + dir * hit.t;
-		}
-		else {
-			pos = m_view.m_viewport.pos + m_view.m_viewport.rot.rotate(Vec3(0, 0, -2));
-		}
-		return pos;
 	}
 
 
@@ -2135,8 +1621,7 @@ public:
 			poss.push(universe->getPosition(entities[i]));
 			(&poss[i].x)[(int)coord] = value;
 		}
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, &poss[0], &rots[0], count, m_allocator);
+		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, &poss[0], &rots[0], count, m_allocator);
 		executeCommand(command);
 	}
 
@@ -2368,16 +1853,18 @@ public:
 		m_engine.getResourceManager().enableUnload(false);
 		m_engine.stopGame(*m_universe);
 		selectEntities(nullptr, 0, false);
-		m_gizmo->clearEntities();
-		m_editor_icons->clear();
 		m_is_game_mode = false;
 		if (reload)
 		{
 			m_universe_destroyed.invoke();
+			m_render_interface->setUniverse(nullptr);
+			m_prefab_system->setUniverse(nullptr);
 			StaticString<64> name(m_universe->getName());
 			m_engine.destroyUniverse(*m_universe);
 			
 			m_universe = &m_engine.createUniverse(true);
+			m_render_interface->setUniverse(m_universe);
+			m_prefab_system->setUniverse(m_universe);
 			m_universe_created.invoke();
 			m_universe->setName(name);
 			m_universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
@@ -2493,7 +1980,6 @@ public:
 			logError("Editor") << "Failed to open " << path;
 			newUniverse();
 		}
-		m_editor_icons->refresh();
 	}
 
 
@@ -2588,29 +2074,11 @@ public:
 	}
 
 
-	template <typename T>
-	static IEditorCommand* constructEditorCommand(WorldEditor& editor)
-	{
-		return LUMIX_NEW(editor.getAllocator(), T)(editor);
-	}
-
-
-	Gizmo& getGizmo() override { return *m_gizmo; }
-
-
-	EditorIcons& getIcons() override
-	{
-		return *m_editor_icons;
-	}
-
-
-	WorldEditorImpl(const char* base_path, Engine& engine, IAllocator& allocator)
+	WorldEditorImpl(Engine& engine, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_universe_destroyed(m_allocator)
 		, m_universe_created(m_allocator)
 		, m_selected_entities(m_allocator)
-		, m_editor_icons(nullptr)
-		, m_plugins(m_allocator)
 		, m_undo_stack(m_allocator)
 		, m_copy_buffer(m_allocator)
 		, m_is_loading(false)
@@ -2623,25 +2091,10 @@ public:
 		, m_engine(engine)
         , m_game_mode_file(m_allocator)
 		, m_command_queue(m_allocator)
-		, m_view(*this)
 	{
 		logInfo("Editor") << "Initializing editor...";
-		m_view.m_viewport.is_ortho = false;
-		m_view.m_viewport.pos = DVec3(0);
-		m_view.m_viewport.rot.set(0, 0, 0, 1);
-		m_view.m_viewport.w = -1;
-		m_view.m_viewport.h = -1;
-		m_view.m_viewport.fov = degreesToRadians(60.f);
-		m_view.m_viewport.near = 0.1f;
-		m_view.m_viewport.far = 100000.f;
-
-		m_measure_tool = LUMIX_NEW(m_allocator, MeasureTool)();
-		addPlugin(*m_measure_tool);
 
 		m_prefab_system = PrefabSystem::create(*this);
-
-		m_gizmo = Gizmo::create(*this);
-		m_editor_icons = EditorIcons::create(*this);
 	}
 
 
@@ -2670,11 +2123,11 @@ public:
 	}
 
 
-	void removeArrayPropertyItem(const ComponentUID& cmp, int index, const Reflection::IArrayProperty& property) override
+	void removeArrayPropertyItem(const ComponentUID& cmp, int index, const char* property) override
 	{
 		if (cmp.isValid())
 		{
-			IEditorCommand* command = LUMIX_NEW(m_allocator, RemoveArrayPropertyItemCommand)(*this, cmp, index, property.name);
+			IEditorCommand* command = LUMIX_NEW(m_allocator, RemoveArrayPropertyItemCommand)(*this, cmp, index, property);
 			executeCommand(command);
 		}
 	}
@@ -2703,7 +2156,6 @@ public:
 	{
 		if (!toggle || !m_is_toggle_selection)
 		{
-			m_gizmo->clearEntities();
 			m_selected_entities.clear();
 			for (int i = 0; i < count; ++i)
 			{
@@ -2743,8 +2195,8 @@ public:
 		ASSERT(m_universe);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
-		m_editor_icons->clear();
-		m_gizmo->clearEntities();
+		m_render_interface->setUniverse(nullptr);
+		m_prefab_system->setUniverse(nullptr);
 		selectEntities(nullptr, 0, false);
 		m_engine.destroyUniverse(*m_universe);
 		m_universe = nullptr;
@@ -2785,9 +2237,11 @@ public:
 
 		universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 
-		m_view.m_is_orbit = false;
+		m_view->setOrbitCamera(false);
 		m_selected_entities.clear();
 		m_universe_created.invoke();
+		m_render_interface->setUniverse(universe);
+		m_prefab_system->setUniverse(universe);
 	}
 
 
@@ -2856,30 +2310,6 @@ public:
 	}
 
 
-	MeasureTool* getMeasureTool() const override
-	{
-		return m_measure_tool;
-	}
-
-
-	double getMeasuredDistance() const override
-	{
-		return m_measure_tool->getDistance();
-	}
-
-
-	bool isMeasureToolActive() const override
-	{
-		return m_measure_tool->isEnabled();
-	}
-
-
-	void toggleMeasure() override
-	{
-		m_measure_tool->enable(!m_measure_tool->isEnabled());
-	}
-
-
 	static int getEntitiesCount(Universe& universe)
 	{
 		int count = 0;
@@ -2887,18 +2317,15 @@ public:
 		return count;
 	}
 
-	Span<Plugin*> getPlugins() override { return m_plugins; }
-
 private:
 	IAllocator& m_allocator;
 	Engine& m_engine;
 	RenderInterface* m_render_interface;
-	UniverseViewImpl m_view;
+	UniverseView* m_view = nullptr;
 	PrefabSystem* m_prefab_system;
 	Universe* m_universe;
 	bool m_is_loading;
 	bool m_is_universe_changed;
-	Array<Plugin*> m_plugins;
 	
 	Array<IEditorCommand*> m_undo_stack;
 	Array<IEditorCommand*> m_command_queue;
@@ -2907,10 +2334,6 @@ private:
 
 	Array<EntityRef> m_selected_entities;
 	EntityPtr m_selected_entity_on_game_mode;
-
-	Gizmo* m_gizmo;
-	EditorIcons* m_editor_icons;
-	MeasureTool* m_measure_tool;
 
 	bool m_is_toggle_selection;
 
@@ -2930,11 +2353,13 @@ public:
 	PasteEntityCommand(WorldEditor& editor, const OutputMemoryStream& copy_buffer, bool identity = false)
 		: m_copy_buffer(copy_buffer)
 		, m_editor(editor)
-		, m_position(editor.getCameraRaycastHit())
 		, m_entities(editor.getAllocator())
 		, m_map(editor.getAllocator())
 		, m_identity(identity)
 	{
+		UniverseView& view = editor.getView();
+		const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
+		m_position = hit.pos;
 	}
 
 
@@ -3080,9 +2505,9 @@ void WorldEditorImpl::duplicateEntities()
 }
 
 
-WorldEditor* WorldEditor::create(const char* base_path, Engine& engine, IAllocator& allocator)
+WorldEditor* WorldEditor::create(Engine& engine, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, WorldEditorImpl)(base_path, engine, allocator);
+	return LUMIX_NEW(allocator, WorldEditorImpl)(engine, allocator);
 }
 
 

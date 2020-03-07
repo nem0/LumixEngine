@@ -27,7 +27,6 @@ public:
 	explicit GameView(StudioApp& app);
 	~GameView();
 
-	void setScene(RenderScene* scene);
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
 	void enableIngameCursor(bool enable);
@@ -43,8 +42,6 @@ public:
 private:
 	void toggleFullscreen();
 	void processInputEvents();
-	void onUniverseCreated();
-	void onUniverseDestroyed();
 	void onFullscreenGUI();
 	void setFullscreen(bool fullscreen);
 	void onStatsGUI(const ImVec2& view_pos);

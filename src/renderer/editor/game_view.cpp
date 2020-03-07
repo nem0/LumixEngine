@@ -79,10 +79,6 @@ GameView::GameView(StudioApp& app)
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW", engine.getAllocator());
 
-	editor.universeCreated().bind<&GameView::onUniverseCreated>(this);
-	editor.universeDestroyed().bind<&GameView::onUniverseDestroyed>(this);
-	if (editor.getUniverse()) onUniverseCreated();
-
 	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
 	if (gui)
 	{
@@ -94,8 +90,6 @@ GameView::GameView(StudioApp& app)
 
 GameView::~GameView()
 {
-	m_editor.universeCreated().unbind<&GameView::onUniverseCreated>(this);
-	m_editor.universeDestroyed().unbind<&GameView::onUniverseDestroyed>(this);
 	auto* gui = static_cast<GUISystem*>(m_editor.getEngine().getPluginManager().getPlugin("gui"));
 	if (gui)
 	{
@@ -114,25 +108,6 @@ void GameView::enableIngameCursor(bool enable)
 	if (!m_is_mouse_captured) return;
 
 	OS::showCursor(m_is_ingame_cursor);
-}
-
-
-void GameView::onUniverseCreated()
-{
-	m_pipeline->setUniverse(m_editor.getUniverse());
-}
-
-
-void GameView::onUniverseDestroyed()
-{
-	m_pipeline->setUniverse(nullptr);
-}
-
-
-
-void GameView::setScene(RenderScene* scene)
-{
-	m_pipeline->setUniverse(scene ? &scene->getUniverse() : nullptr);
 }
 
 
@@ -296,6 +271,8 @@ void GameView::onWindowGUI()
 		captureMouse(false);
 		return;
 	}
+
+	m_pipeline->setUniverse(m_editor.getUniverse());
 
 	ImGuiIO& io = ImGui::GetIO();
 	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode())) {

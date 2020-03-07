@@ -193,7 +193,6 @@ struct IPropertyVisitor
 {
 	virtual ~IPropertyVisitor() {}
 
-	virtual void begin(const ComponentBase&) {}
 	virtual void visit(const Property<float>& prop) = 0;
 	virtual void visit(const Property<int>& prop) = 0;
 	virtual void visit(const Property<u32>& prop) = 0;
@@ -208,7 +207,6 @@ struct IPropertyVisitor
 	virtual void visit(const IDynamicProperties& prop) {}
 	virtual void visit(const IArrayProperty& prop) = 0;
 	virtual void visit(const IBlobProperty& prop) = 0;
-	virtual void end(const ComponentBase&) {}
 };
 
 
@@ -550,9 +548,7 @@ struct Component<Tuple<Funcs...>, Props> : ComponentBase
 
 	void visit(IPropertyVisitor& visitor) const override
 	{
-		visitor.begin(*this);
 		apply([&](auto& x) { visitor.visit(x); }, properties);
-		visitor.end(*this);
 	}
 
 	Span<const FunctionBase* const> getFunctions() const override { return functions.get(); }

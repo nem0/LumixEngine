@@ -28,20 +28,29 @@ struct ComponentUID;
 struct ResourceType;
 struct Vec2;
 struct WorldEditor;
+namespace Gizmo { struct Config; }
 
 
 struct LUMIX_EDITOR_API StudioApp : OS::Interface
 {
-	struct IPlugin
-	{
+	struct IPlugin {
 		virtual ~IPlugin() {}
 		virtual void init() = 0;
 		virtual bool dependsOn(IPlugin& plugin) const { return false; }
 		virtual const char* getName() const = 0;
+
+		virtual bool showGizmo(struct ComponentUID cmp) = 0;
 	};
 
-	struct GUIPlugin
-	{
+	struct MousePlugin {
+		virtual ~MousePlugin() {}
+
+		virtual bool onMouseDown(struct UniverseView& view, int x, int y) { return false; }
+		virtual void onMouseUp(UniverseView& view, int x, int y, OS::MouseButton button) {}
+		virtual void onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) {}
+	};
+
+	struct GUIPlugin {
 		virtual ~GUIPlugin() {}
 
 		virtual void onWindowGUI() = 0;
@@ -96,9 +105,12 @@ struct LUMIX_EDITOR_API StudioApp : OS::Interface
 	virtual WorldEditor& getWorldEditor() = 0;
 	virtual void initPlugins() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
+	virtual void addPlugin(MousePlugin& plugin) = 0;
 	virtual void addPlugin(GUIPlugin& plugin) = 0;
 	virtual void removePlugin(GUIPlugin& plugin) = 0;
+	virtual void removePlugin(MousePlugin& plugin) = 0;
 	virtual GUIPlugin* getPlugin(const char* name) = 0;
+	virtual Span<MousePlugin*> getMousePlugins() = 0;
 	virtual const char* getComponentTypeName(ComponentType cmp_type) const = 0;
 	virtual void registerComponent(const char* id, const char* label) = 0;
 	virtual void registerComponent(const char* id, IAddComponentPlugin& plugin) = 0;
@@ -115,6 +127,10 @@ struct LUMIX_EDITOR_API StudioApp : OS::Interface
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual bool makeFile(const char* path, const char* content) = 0;
 	virtual struct Settings& getSettings() = 0;
+	virtual struct RenderInterface* getRenderInterface() = 0;
+	virtual float getFOV() const = 0;
+	virtual void setFOV(float fov_radians) = 0;
+	virtual Gizmo::Config& getGizmoConfig() = 0;
 
 	virtual const OS::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;

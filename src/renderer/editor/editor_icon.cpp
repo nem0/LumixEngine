@@ -1,4 +1,5 @@
 #include "editor_icon.h"
+#include "editor/world_editor.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
@@ -7,8 +8,8 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
-#include "render_interface.h"
-#include "world_editor.h"
+#include "renderer/model.h"
+#include "renderer/render_scene.h"
 
 
 namespace Lumix
@@ -58,37 +59,46 @@ struct EditorIconsImpl final : EditorIcons
 	};
 
 
-	explicit EditorIconsImpl(WorldEditor& editor)
+	explicit EditorIconsImpl(WorldEditor& editor, RenderScene& scene)
 		: m_editor(editor)
 		, m_icons(editor.getAllocator())
+		, m_scene(scene)
 	{
-		m_render_interface = nullptr;
 		m_icons.reserve(200);
-		editor.universeDestroyed().bind<&EditorIconsImpl::clear>(this);
-		editor.universeCreated().bind<&EditorIconsImpl::onUniverseCreated>(this);
-		if (m_editor.getUniverse()) onUniverseCreated();
+
+		auto& universe = scene.getUniverse();
+		universe.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
+		universe.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
+		universe.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
+
+		Engine& engine = m_editor.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+		ResourceManagerHub& rm = engine.getResourceManager();
+		for (u32 i = 0; i < lengthOf(ICONS); ++i)
+		{
+			StaticString<MAX_PATH_LENGTH> tmp("editor/models/", ICONS[i], "_3d.fbx");
+			m_is_3d[i] = fs.fileExists(tmp);
+			if (m_is_3d[i])
+			{
+				Path path(tmp);
+				m_models[i] = rm.load<Model>(path);
+			}
+			else
+			{
+				tmp.data[0] = '\0';
+				tmp << "editor/models/" << ICONS[i] << ".fbx";
+				Path path(tmp);
+				m_models[i] = rm.load<Model>(path);
+			}
+		}
 	}
 
 
 	~EditorIconsImpl()
 	{
-		m_editor.universeDestroyed().unbind<&EditorIconsImpl::clear>(this);
-		m_editor.universeCreated().unbind<&EditorIconsImpl::onUniverseCreated>(this);
-		setRenderInterface(nullptr);
+		for (auto& model : m_models) model->getResourceManager().unload(*model);
 
-		if(m_editor.getUniverse())
-		{
-			auto& universe = *m_editor.getUniverse();
-			universe.entityDestroyed().unbind<&EditorIconsImpl::destroyIcon>(this);
-			universe.componentAdded().unbind<&EditorIconsImpl::refreshIcon>(this);
-			universe.componentDestroyed().unbind<&EditorIconsImpl::refreshIcon>(this);
-		}
-	}
-
-
-	void onUniverseCreated()
-	{
-		auto& universe = *m_editor.getUniverse();
+		auto& universe = m_scene.getUniverse();
 		universe.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);
 		universe.componentAdded().bind<&EditorIconsImpl::refreshIcon>(this);
 		universe.componentDestroyed().bind<&EditorIconsImpl::refreshIcon>(this);
@@ -152,29 +162,11 @@ struct EditorIconsImpl final : EditorIcons
 
 
 
-	void refresh() override
-	{
-		clear();
-		auto& universe = *m_editor.getUniverse();
-		for (EntityPtr entity = universe.getFirstEntity(); entity.isValid(); entity = universe.getNextEntity((EntityRef)entity)) {
-			if (universe.getFirstComponent((EntityRef)entity).isValid()) {
-				createIcon((EntityRef)entity);
-			}
-		}
-	}
-
-
-	void clear() override
-	{
-		m_icons.clear();
-	}
-
-
 	Hit raycast(const DVec3& origin, const Vec3& dir) override
 	{
-		Hit hit;
-		hit.t = -1;
-		hit.entity = INVALID_ENTITY;
+		Hit res;
+		res.t = -1;
+		res.entity = INVALID_ENTITY;
 
 		const Viewport& vp = m_editor.getView().getViewport();
 
@@ -183,48 +175,14 @@ struct EditorIconsImpl final : EditorIcons
 			
 			const Vec3 rel_origin = icon_tr.rot.conjugated() * (origin - icon_tr.pos).toFloat();
 			const Vec3 rel_dir = icon_tr.rot.conjugated() * dir;
-			RenderInterface* ri = m_editor.getRenderInterface();
-			const float t = ri->castRay(m_models[(int)icon.type], rel_origin, rel_dir, nullptr);
-			if (t >= 0 && (t < hit.t || hit.t < 0)) {
-				hit.t = t;
-				hit.entity = icon.entity;
+			const RayCastModelHit hit = m_models[(int)icon.type]->castRay(rel_origin, rel_dir, nullptr);
+			if (hit.t >= 0 && (hit.t < res.t || res.t < 0)) {
+				res.t = hit.t;
+				res.entity = icon.entity;
 			}
 		}
 
-		return hit;
-	}
-
-	void setRenderInterface(RenderInterface* render_interface) override
-	{
-		if (m_render_interface)
-		{
-			for (auto& model : m_models)
-			{
-				m_render_interface->unloadModel(model);
-			}
-		}
-		m_render_interface = render_interface;
-		FileSystem& fs = m_editor.getEngine().getFileSystem();
-		if (m_render_interface)
-		{
-			for (u32 i = 0; i < lengthOf(ICONS); ++i)
-			{
-				StaticString<MAX_PATH_LENGTH> tmp("editor/models/", ICONS[i], "_3d.fbx");
-				m_is_3d[i] = fs.fileExists(tmp);
-				if (m_is_3d[i])
-				{
-					Path path(tmp);
-					m_models[i] = m_render_interface->loadModel(path);
-				}
-				else
-				{
-					tmp.data[0] = '\0';
-					tmp << "editor/models/" << ICONS[i] << ".fbx";
-					Path path(tmp);
-					m_models[i] = m_render_interface->loadModel(path);
-				}
-			}
-		}
+		return res;
 	}
 
 
@@ -290,16 +248,16 @@ struct EditorIconsImpl final : EditorIcons
 	}
 
 	Array<Icon> m_icons;
-	RenderInterface::ModelHandle m_models[(int)IconType::COUNT];
+	Model* m_models[(int)IconType::COUNT];
 	bool m_is_3d[(int)IconType::COUNT];
 	WorldEditor& m_editor;
-	RenderInterface* m_render_interface;
+	RenderScene& m_scene;
 };
 
 
-EditorIcons* EditorIcons::create(WorldEditor& editor)
+EditorIcons* EditorIcons::create(WorldEditor& editor, RenderScene& scene)
 {
-	return LUMIX_NEW(editor.getAllocator(), EditorIconsImpl)(editor);
+	return LUMIX_NEW(editor.getAllocator(), EditorIconsImpl)(editor, scene);
 }
 
 

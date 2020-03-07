@@ -28,11 +28,8 @@ namespace Lumix
 	static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
 
 
-	enum class LuaSceneVersion : int
+	enum class LuaSceneVersion : i32
 	{
-		PROPERTY_TYPE,
-		FLAGS,
-
 		LATEST
 	};
 

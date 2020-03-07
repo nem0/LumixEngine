@@ -20,13 +20,9 @@ struct Shader;
 struct Universe;
 
 
-struct RenderInterfaceBase : RenderInterface {
-	virtual Model* getModel(RenderInterface::ModelHandle handle) = 0;
-};
-
-
 struct SceneView : StudioApp::GUIPlugin
 {
+	friend struct UniverseViewImpl;
 	public:
 		using DropHandler = Delegate<bool(StudioApp&, float, float, const RayCastModelHit&)>;
 
@@ -43,11 +39,10 @@ struct SceneView : StudioApp::GUIPlugin
 		const char* getName() const override { return "scene_view"; }
 
 	private:
+		void manipulate();
 		void renderSelection();
 		void renderGizmos();
 		void renderIcons();
-		void onUniverseCreated();
-		void onUniverseDestroyed();
 		void captureMouse(bool capture);
 		RayCastModelHit castRay(float x, float y);
 		void handleDrop(const char* path, float x, float y);
@@ -80,6 +75,12 @@ struct SceneView : StudioApp::GUIPlugin
 		LogUI& m_log_ui;
 		Array<DropHandler> m_drop_handlers;
 		Shader* m_debug_shape_shader;
+		struct UniverseViewImpl* m_view;
+
+		bool m_is_measure_active = false;
+		bool m_is_measure_from_set = false;
+		DVec3 m_measure_to = {0, 0, 0};
+		DVec3 m_measure_from = {0, 0, 0};
 };
 
 

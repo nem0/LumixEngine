@@ -613,8 +613,7 @@ TerrainEditor::~TerrainEditor()
 		m_brush_texture->destroy();
 		LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 	}
-
-	m_world_editor.removePlugin(*this);
+	// TODO check if destruction of this is correct
 }
 
 
@@ -664,7 +663,7 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	m_remove_entity_action->is_global = false;
 	app.addAction(m_remove_entity_action);
 
-	editor.addPlugin(*this);
+	app.addPlugin(*this);
 	m_terrain_brush_size = 10;
 	m_terrain_brush_strength = 0.1f;
 	m_action_type = RAISE_HEIGHT;
@@ -810,11 +809,10 @@ u16 TerrainEditor::getHeight(const DVec3& world_pos) const
 }
 
 
-bool TerrainEditor::onMouseDown(const WorldEditor::RayHit& hit, int, int)
+bool TerrainEditor::onMouseDown(UniverseView& view, int x, int y)
 {
-
 	if (!m_is_enabled) return false;
-	if (!hit.is_hit) return false;
+	const UniverseView::RayHit hit = view.getCameraRaycastHit(x, y);
 	if (!hit.entity.isValid()) return false;
 	const auto& selected_entities = m_world_editor.getSelectedEntities();
 	if (selected_entities.size() != 1) return false;
@@ -1101,7 +1099,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 }
 
 
-void TerrainEditor::onMouseMove(int x, int y, int, int)
+void TerrainEditor::onMouseMove(UniverseView& view, int x, int y, int, int)
 {
 	if (!m_is_enabled) return;
 
@@ -1110,7 +1108,7 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 	RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 	DVec3 origin;
 	Vec3 dir;
-	m_world_editor.getView().getViewport().getRay({(float)x, (float)y}, origin, dir);
+	view.getViewport().getRay({(float)x, (float)y}, origin, dir);
 	RayCastModelHit hit = scene->castRayTerrain((EntityRef)m_component.entity, origin, dir);
 	if (hit.is_hit) {
 		bool is_terrain = m_world_editor.getUniverse()->hasComponent((EntityRef)hit.entity, TERRAIN_TYPE);
@@ -1130,11 +1128,6 @@ void TerrainEditor::onMouseMove(int x, int y, int, int)
 			default: ASSERT(false); break;
 		}
 	}
-}
-
-
-void TerrainEditor::onMouseUp(int, int, OS::MouseButton)
-{
 }
 
 
@@ -1261,7 +1254,7 @@ void TerrainEditor::onGUI()
 						LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
 					}
 
-					IPlugin* plugin = m_world_editor.getEngine().getPluginManager().getPlugin("renderer");
+					Lumix::IPlugin* plugin = m_world_editor.getEngine().getPluginManager().getPlugin("renderer");
 					Renderer& renderer = *static_cast<Renderer*>(plugin);
 					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Texture)(
 						Path("brush_texture"), *rm.get(Texture::TYPE), renderer, m_world_editor.getAllocator());

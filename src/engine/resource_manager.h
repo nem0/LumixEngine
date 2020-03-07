@@ -65,6 +65,7 @@ public:
 public:
 	explicit ResourceManagerHub(IAllocator& allocator);
 	~ResourceManagerHub();
+	ResourceManagerHub(const ResourceManagerHub& rhs) = delete;
 
 	void init(struct FileSystem& fs);
 

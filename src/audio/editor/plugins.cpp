@@ -211,12 +211,33 @@ struct ClipManagerUI final : StudioApp::GUIPlugin
 };
 
 
-struct GizmoPlugin final : WorldEditor::Plugin
+struct StudioAppPlugin : StudioApp::IPlugin
 {
-	explicit GizmoPlugin(WorldEditor& editor)
-		: m_editor(editor)
+	explicit StudioAppPlugin(StudioApp& app)
+		: m_app(app)
 	{
 	}
+
+
+	const char* getName() const override { return "audio"; }
+
+
+	void init() override 
+	{
+		m_app.registerComponent("ambient_sound", "Audio / Ambient sound");
+		m_app.registerComponent("audio_listener", "Audio / Listener");
+		m_app.registerComponent("echo_zone", "Audio / Echo zone");
+		m_app.registerComponent("chorus_zone", "Audio / Chorus zone");
+
+		IAllocator& allocator = m_app.getAllocator();
+
+		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(m_app);
+		m_app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
+
+		m_clip_manager_ui = LUMIX_NEW(allocator, ClipManagerUI)(m_app);
+		m_app.addPlugin(*m_clip_manager_ui);
+	}
+
 
 	bool showGizmo(ComponentUID cmp) override
 	{
@@ -252,52 +273,15 @@ struct GizmoPlugin final : WorldEditor::Plugin
 		return false;
 	}
 
-	WorldEditor& m_editor;
-};
-
-
-struct StudioAppPlugin : StudioApp::IPlugin
-{
-	explicit StudioAppPlugin(StudioApp& app)
-		: m_app(app)
-	{
-	}
-
-
-	const char* getName() const override { return "audio"; }
-
-
-	void init() override 
-	{
-		m_app.registerComponent("ambient_sound", "Audio / Ambient sound");
-		m_app.registerComponent("audio_listener", "Audio / Listener");
-		m_app.registerComponent("echo_zone", "Audio / Echo zone");
-		m_app.registerComponent("chorus_zone", "Audio / Chorus zone");
-
-		IAllocator& allocator = m_app.getAllocator();
-
-		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(m_app);
-		m_app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
-
-		m_clip_manager_ui = LUMIX_NEW(allocator, ClipManagerUI)(m_app);
-		m_app.addPlugin(*m_clip_manager_ui);
-
-		WorldEditor& editor = m_app.getWorldEditor();
-		m_gizmo_plugin = LUMIX_NEW(allocator, GizmoPlugin)(editor);
-		editor.addPlugin(*m_gizmo_plugin);
-	}
-
 
 	~StudioAppPlugin()
 	{
 		IAllocator& allocator = m_app.getAllocator();
 
 		m_app.getAssetBrowser().removePlugin(*m_asset_browser_plugin);
-		m_app.getWorldEditor().removePlugin(*m_gizmo_plugin);
 		m_app.removePlugin(*m_clip_manager_ui);
 
 		LUMIX_DELETE(allocator, m_asset_browser_plugin);
-		LUMIX_DELETE(allocator, m_gizmo_plugin);
 		LUMIX_DELETE(allocator, m_clip_manager_ui);
 	}
 
@@ -305,7 +289,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	StudioApp& m_app;
 	AssetBrowserPlugin* m_asset_browser_plugin;
 	ClipManagerUI* m_clip_manager_ui;
-	GizmoPlugin* m_gizmo_plugin;
 };
 
 

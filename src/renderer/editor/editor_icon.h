@@ -2,19 +2,12 @@
 
 
 #include "engine/math.h"
-#include "render_interface.h"
 
 
 namespace Lumix
 {
 
-
-struct Engine;
-struct Model;
-struct Pipeline;
-struct RenderScene;
-struct WorldEditor;
-
+template <typename T> struct Array;
 
 struct EditorIcons
 {
@@ -26,18 +19,15 @@ struct EditorIcons
 
 	struct RenderData {
 		Matrix mtx;
-		RenderInterface::ModelHandle model;
+		struct Model* model;
 	};
 
-	static EditorIcons* create(WorldEditor& editor);
+	static EditorIcons* create(struct WorldEditor& editor, struct RenderScene& scene);
 	static void destroy(EditorIcons& icons);
 
 	virtual ~EditorIcons() {}
 
-	virtual void setRenderInterface(struct RenderInterface* render_interface) = 0;
-	virtual void clear() = 0;
 	virtual void getRenderData(Array<RenderData>* data) = 0;
-	virtual void refresh() = 0;
 	virtual Hit raycast(const DVec3& origin, const Vec3& dir) = 0;
 };
 

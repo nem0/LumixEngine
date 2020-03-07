@@ -172,6 +172,7 @@ struct StudioAppImpl final : StudioApp
 		, m_editor(nullptr)
 		, m_settings(*this)
 		, m_gui_plugins(m_allocator)
+		, m_mouse_plugins(m_allocator)
 		, m_plugins(m_allocator)
 		, m_add_cmp_plugins(m_allocator)
 		, m_component_labels(m_allocator)
@@ -372,7 +373,7 @@ struct StudioAppImpl final : StudioApp
 		createLua();
 		extractBundled();
 
-		m_editor = WorldEditor::create(current_dir, *m_engine, m_allocator);
+		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		m_settings.m_editor = m_editor;
 		scanUniverses();
 		loadUserPlugins();
@@ -389,14 +390,23 @@ struct StudioAppImpl final : StudioApp
 		loadSettings();
 		initIMGUI();
 
-		m_custom_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Set Custom Pivot",
+		m_set_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Set custom pivot",
 			"Set Custom Pivot",
 			"set_custom_pivot",
 			OS::Keycode::K,
 			OS::Keycode::INVALID,
 			OS::Keycode::INVALID);
-		m_custom_pivot_action->is_global = false;
-		addAction(m_custom_pivot_action);
+		m_set_pivot_action->is_global = false;
+		addAction(m_set_pivot_action);
+
+		m_reset_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Reset pivot",
+			"Reset pivot",
+			"reset_pivot",
+			OS::Keycode::LSHIFT,
+			OS::Keycode::K,
+			OS::Keycode::INVALID);
+		m_reset_pivot_action->is_global = false;
+		addAction(m_reset_pivot_action);
 
 		setStudioApp();
 		loadIcons();
@@ -441,13 +451,14 @@ struct StudioAppImpl final : StudioApp
 
 		destroyAddCmpTreeNode(m_add_cmp_root.child);
 
-		for (auto* i : m_plugins)
-		{
+		for (auto* i : m_plugins) {
 			LUMIX_DELETE(m_editor->getAllocator(), i);
 		}
 		m_plugins.clear();
+
 		PrefabSystem::destroyEditorPlugins(*this);
 		ASSERT(m_gui_plugins.empty());
+		ASSERT(m_mouse_plugins.empty());
 
 		for (auto* i : m_add_cmp_plugins)
 		{
@@ -602,7 +613,7 @@ struct StudioAppImpl final : StudioApp
 							-1,
 							property,
 							editor->getSelectedEntities(),
-							buf);
+							Path(buf));
 					}
 					ImGui::CloseCurrentPopup();
 				}
@@ -809,6 +820,32 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
+	void showGizmos() {
+		const Array<EntityRef>& ents = m_editor->getSelectedEntities();
+		if (ents.empty()) return;
+
+		Universe* universe = m_editor->getUniverse();
+
+		RenderInterface* ri = m_editor->getRenderInterface();
+		const DVec3 cam_pos = m_editor->getView().getViewport().pos;
+		if (ents.size() > 1) {
+			AABB aabb = ri->getEntityAABB(*universe, ents[0], cam_pos);
+			for (int i = 1; i < ents.size(); ++i) {
+				const AABB entity_aabb = ri->getEntityAABB(*universe, ents[i], cam_pos);
+				aabb.merge(entity_aabb);
+			}
+
+			ri->addDebugCube(cam_pos + aabb.min, cam_pos + aabb.max, 0xffffff00);
+			return;
+		}
+
+		for (ComponentUID cmp = universe->getFirstComponent(ents[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp)) {
+			for (auto* plugin : m_plugins) {
+				if (plugin->showGizmo(cmp)) break;
+			}
+		}
+	}
+
 	void update()
 	{
 		PROFILE_FUNCTION();
@@ -827,10 +864,13 @@ struct StudioAppImpl final : StudioApp
 		else if (io.KeyCtrl) {
 			m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 		}
-		if (m_custom_pivot_action->isActive()) m_editor->getView().setCustomPivot();
+		if (m_set_pivot_action->isActive()) m_editor->getView().setCustomPivot();
+		if (m_reset_pivot_action->isActive()) m_editor->getView().resetPivot();
 
 		m_editor->getView().setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
+		showGizmos();
+		
 		m_engine->update(*m_editor->getUniverse());
 
 		++m_fps_frame;
@@ -1139,6 +1179,7 @@ struct StudioAppImpl final : StudioApp
 		return nullptr;
 	}
 
+	Gizmo::Config& getGizmoConfig() { return m_gizmo_config; }
 
 	void undo() { m_editor->undo(); }
 	void redo() { m_editor->redo(); }
@@ -1150,12 +1191,9 @@ struct StudioAppImpl final : StudioApp
 	void setTopView() { m_editor->getView().setTopView(); }
 	void setFrontView() { m_editor->getView().setFrontView(); }
 	void setSideView() { m_editor->getView().setSideView(); }
-	void setLocalCoordSystem() { m_editor->getGizmo().setLocalCoordSystem(); }
-	void setGlobalCoordSystem() { m_editor->getGizmo().setGlobalCoordSystem(); }
-	void setPivotOrigin() { m_editor->getGizmo().setPivotOrigin(); }
-	void setPivotCenter() { m_editor->getGizmo().setPivotCenter(); }
+	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
+	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
 	void addEntity() { m_editor->addEntity(); }
-	void toggleMeasure() { m_editor->toggleMeasure(); }
 	void snapDown() { m_editor->snapDown(); }
 	void setEditCamTransform() { m_is_edit_cam_transform_ui_open = !m_is_edit_cam_transform_ui_open; }
 	void lookAtSelected() { m_editor->getView().lookAtSelected(); }
@@ -1188,9 +1226,9 @@ struct StudioAppImpl final : StudioApp
 		return *m_log_ui;
 	}
 	void toggleGameMode() { m_editor->toggleGameMode(); }
-	void setTranslateGizmoMode() { m_editor->getGizmo().setTranslateMode(); }
-	void setRotateGizmoMode() { m_editor->getGizmo().setRotateMode(); }
-	void setScaleGizmoMode() { m_editor->getGizmo().setScaleMode(); }
+	void setTranslateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::TRANSLATE; }
+	void setRotateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::ROTATE; }
+	void setScaleGizmoMode() { getGizmoConfig().mode = Gizmo::Config::SCALE; }
 
 
 	void makeParent()
@@ -1231,8 +1269,8 @@ struct StudioAppImpl final : StudioApp
 
 	void autosnapDown()
 	{
-		auto& gizmo = m_editor->getGizmo();
-		gizmo.setAutosnapDown(!gizmo.isAutosnapDown());
+		Gizmo::Config& cfg = getGizmoConfig();
+		cfg.setAutosnapDown(!cfg.isAutosnapDown());
 	}
 
 
@@ -1394,8 +1432,6 @@ struct StudioAppImpl final : StudioApp
 		doMenuItem(*getAction("setTranslateGizmoMode"), true);
 		doMenuItem(*getAction("setRotateGizmoMode"), true);
 		doMenuItem(*getAction("setScaleGizmoMode"), true);
-		doMenuItem(*getAction("setPivotCenter"), true);
-		doMenuItem(*getAction("setPivotOrigin"), true);
 		doMenuItem(*getAction("setLocalCoordSystem"), true);
 		doMenuItem(*getAction("setGlobalCoordSystem"), true);
 		if (ImGui::BeginMenu(ICON_FA_CAMERA "View", true))
@@ -1451,7 +1487,6 @@ struct StudioAppImpl final : StudioApp
 		doMenuItem(*getAction("lookAtSelected"), is_any_entity_selected);
 		doMenuItem(*getAction("copyViewTransform"), is_any_entity_selected);
 		doMenuItem(*getAction("toggleGameMode"), true);
-		doMenuItem(*getAction("toggleMeasure"), true);
 		doMenuItem(*getAction("snapDown"), is_any_entity_selected);
 		doMenuItem(*getAction("autosnapDown"), true);
 		doMenuItem(*getAction("pack_data"), true);
@@ -1932,12 +1967,11 @@ struct StudioAppImpl final : StudioApp
 		style.ItemInnerSpacing.x = 2;
 	}
 
+	RenderInterface* getRenderInterface() override { return m_editor->getRenderInterface(); }
 
-	Settings& getSettings() override
-	{
-		return m_settings;
-	}
-
+	float getFOV() const { return m_fov; }
+	void setFOV(float fov_radians) { m_fov = fov_radians; }
+	Settings& getSettings() override { return m_settings; }
 
 	void loadSettings()
 	{
@@ -2004,22 +2038,18 @@ struct StudioAppImpl final : StudioApp
 		addAction<&StudioAppImpl::toggleOrbitCamera>(NO_ICON "Orbit camera", "Orbit camera", "orbitCamera")
 			.is_selected.bind<&StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>(ICON_FA_ARROWS "Translate", "Set translate mode", "setTranslateGizmoMode")
-			.is_selected.bind<&Gizmo::isTranslateMode>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::Config::isTranslateMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setRotateGizmoMode>(ICON_FA_REPEAT "Rotate", "Set rotate mode", "setRotateGizmoMode")
-			.is_selected.bind<&Gizmo::isRotateMode>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::Config::isRotateMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setScaleGizmoMode>(NO_ICON "Scale", "Set scale mode", "setScaleGizmoMode")
-			.is_selected.bind<&Gizmo::isScaleMode>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::Config::isScaleMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setTopView>(NO_ICON "Top", "Set top camera view", "viewTop");
 		addAction<&StudioAppImpl::setFrontView>(NO_ICON "Front", "Set front camera view", "viewFront");
 		addAction<&StudioAppImpl::setSideView>(NO_ICON "Side", "Set side camera view", "viewSide");
 		addAction<&StudioAppImpl::setLocalCoordSystem>(NO_ICON "Local", "Set local transform system", "setLocalCoordSystem")
-			.is_selected.bind<&Gizmo::isLocalCoordSystem>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::Config::isLocalCoordSystem>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setGlobalCoordSystem>(ICON_FA_GLOBE "Global", "Set global transform system", "setGlobalCoordSystem")
-			.is_selected.bind<&Gizmo::isGlobalCoordSystem>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setPivotCenter>(ICON_FA_ALIGN_CENTER "Center", "Set center transform system", "setPivotCenter")
-			.is_selected.bind<&Gizmo::isPivotCenter>(&m_editor->getGizmo());
-		addAction<&StudioAppImpl::setPivotOrigin>(NO_ICON "Pivot", "Set pivot transform system", "setPivotOrigin")
-			.is_selected.bind<&Gizmo::isPivotOrigin>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::Config::isGlobalCoordSystem>(&getGizmoConfig());
 
 		addAction<&StudioAppImpl::addEntity>(ICON_FA_PLUS_SQUARE_O "Create empty", "Create empty entity", "createEntity");
 		addAction<&StudioAppImpl::destroySelectedEntity>(ICON_FA_MINUS_SQUARE_O "Destroy",
@@ -2034,10 +2064,8 @@ struct StudioAppImpl final : StudioApp
 
 		addAction<&StudioAppImpl::toggleGameMode>(ICON_FA_PLAY "Game Mode", "Toggle game mode", "toggleGameMode")
 			.is_selected.bind<&WorldEditor::isGameMode>(m_editor);
-		addAction<&StudioAppImpl::toggleMeasure>(NO_ICON "Toggle measure", "Toggle measure mode", "toggleMeasure")
-			.is_selected.bind<&WorldEditor::isMeasureToolActive>(m_editor);
 		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
-			.is_selected.bind<&Gizmo::isAutosnapDown>(&m_editor->getGizmo());
+			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
 		addAction<&StudioAppImpl::setEditCamTransform>(NO_ICON "Camera transform", "Set camera transformation", "setEditCamTransform");
 		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
@@ -2268,7 +2296,8 @@ struct StudioAppImpl final : StudioApp
 			break;
 		}
 	}
-
+	
+	Span<MousePlugin*> getMousePlugins() override { return m_mouse_plugins; }
 
 	GUIPlugin* getPlugin(const char* name) override
 	{
@@ -2316,8 +2345,14 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
+	void addPlugin(MousePlugin& plugin) override
+	{
+		m_mouse_plugins.push(&plugin);
+	}
+
 
 	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
+	void removePlugin(MousePlugin& plugin) override { m_mouse_plugins.swapAndPopItem(&plugin); }
 
 
 	void setStudioApp()
@@ -2913,8 +2948,7 @@ struct StudioAppImpl final : StudioApp
 			file.read(src.begin(), size);
 			src[size] = 0;
 
-			LuaPlugin* plugin =
-				LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, (const char*)src.begin(), filename);
+			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, (const char*)src.begin(), filename);
 			addPlugin(*plugin);
 
 			file.close();
@@ -3005,7 +3039,7 @@ struct StudioAppImpl final : StudioApp
 
 	void unloadIcons()
 	{
-		auto& render_interface = *m_editor->getRenderInterface();
+		auto& render_interface = *getRenderInterface();
 		for (auto* action : m_actions)
 		{
 			render_interface.unloadTexture(action->icon);
@@ -3016,7 +3050,7 @@ struct StudioAppImpl final : StudioApp
 	void loadIcons()
 	{
 		logInfo("Editor") << "Loading icons...";
-		RenderInterface& render_interface = *m_editor->getRenderInterface();
+		RenderInterface& render_interface = *getRenderInterface();
 		FileSystem& fs = m_engine->getFileSystem();
 		for (auto* action : m_actions)
 		{
@@ -3112,13 +3146,16 @@ struct StudioAppImpl final : StudioApp
 	Array<Action*> m_window_actions;
 	Array<Action*> m_toolbar_actions;
 	Array<GUIPlugin*> m_gui_plugins;
+	Array<MousePlugin*> m_mouse_plugins;
 	Array<IPlugin*> m_plugins;
 	Array<IAddComponentPlugin*> m_add_cmp_plugins;
 	Array<StaticString<MAX_PATH_LENGTH>> m_universes;
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
 	WorldEditor* m_editor;
-	Action* m_custom_pivot_action;
+	Action* m_set_pivot_action;
+	Action* m_reset_pivot_action;
+	Gizmo::Config m_gizmo_config;
 	bool m_confirm_exit;
 	bool m_confirm_load;
 	bool m_confirm_new;
@@ -3129,6 +3166,7 @@ struct StudioAppImpl final : StudioApp
 	LogUI* m_log_ui;
 	ProfilerUI* m_profiler_ui;
 	Settings m_settings;
+	float m_fov = degreesToRadians(60);
 	Array<OS::Event> m_events;
 	char m_template_name[100];
 	char m_open_filter[64];
