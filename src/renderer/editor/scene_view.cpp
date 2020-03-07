@@ -85,7 +85,9 @@ struct UniverseViewImpl final : UniverseView {
 
 	~UniverseViewImpl() {
 		m_font_res->getResourceManager().unload(*m_font_res);
-		ASSERT(!m_icons);
+		m_editor.universeCreated().unbind<&UniverseViewImpl::onUniverseCreated>(this);
+		m_editor.universeDestroyed().unbind<&UniverseViewImpl::onUniverseDestroyed>(this);
+		onUniverseDestroyed();
 	}
 
 	void addCross(const DVec3& pos, float size, Color color) {
@@ -669,6 +671,8 @@ void SceneView::resetCameraSpeed()
 
 SceneView::~SceneView()
 {
+	m_editor.setView(nullptr);
+	LUMIX_DELETE(m_app.getAllocator(), m_view);
 	Pipeline::destroy(m_pipeline);
 	m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
 	m_pipeline = nullptr;

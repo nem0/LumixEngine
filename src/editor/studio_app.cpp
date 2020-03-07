@@ -476,6 +476,7 @@ struct StudioAppImpl final : StudioApp
 		LUMIX_DELETE(m_allocator, m_asset_browser);
 		LUMIX_DELETE(m_allocator, m_property_grid);
 		LUMIX_DELETE(m_allocator, m_log_ui);
+		LUMIX_DELETE(m_allocator, m_render_interface);
 		AssetCompiler::destroy(*m_asset_compiler);
 		WorldEditor::destroy(m_editor, m_allocator);
 		Engine::destroy(m_engine, m_allocator);
@@ -2370,12 +2371,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void addPlugin(MousePlugin& plugin) override
-	{
-		m_mouse_plugins.push(&plugin);
-	}
-
-
+	void addPlugin(MousePlugin& plugin) override { m_mouse_plugins.push(&plugin); }
 	void removePlugin(GUIPlugin& plugin) override { m_gui_plugins.swapAndPopItem(&plugin); }
 	void removePlugin(MousePlugin& plugin) override { m_mouse_plugins.swapAndPopItem(&plugin); }
 
