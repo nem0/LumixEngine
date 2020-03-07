@@ -407,7 +407,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(m_anim_editor);
 	}
 
-	bool showGizmo(ComponentUID) override { return false; }
+	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
 	
 	~StudioAppPlugin()
 	{

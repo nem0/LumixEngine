@@ -839,9 +839,10 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
+		UniverseView& view = m_editor->getView();
 		for (ComponentUID cmp = universe->getFirstComponent(ents[0]); cmp.isValid(); cmp = universe->getNextComponent(cmp)) {
 			for (auto* plugin : m_plugins) {
-				if (plugin->showGizmo(cmp)) break;
+				if (plugin->showGizmo(view, cmp)) break;
 			}
 		}
 	}

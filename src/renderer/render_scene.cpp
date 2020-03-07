@@ -1998,56 +1998,6 @@ public:
 	const Array<DebugLine>& getDebugLines() const override { return m_debug_lines; }
 
 
-	void addDebugSphere(const DVec3& center,
-		float radius,
-		u32 color) override
-	{
-		static const int COLS = 36;
-		static const int ROWS = COLS >> 1;
-		static const float STEP = (PI / 180.0f) * 360.0f / COLS;
-		int p2 = COLS >> 1;
-		int r2 = ROWS >> 1;
-		float prev_ci = 1;
-		float prev_si = 0;
-		for (int y = -r2; y < r2; ++y)
-		{
-			float cy = cosf(y * STEP);
-			float cy1 = cosf((y + 1) * STEP);
-			float sy = sinf(y * STEP);
-			float sy1 = sinf((y + 1) * STEP);
-
-			for (int i = -p2; i < p2; ++i)
-			{
-				float ci = cosf(i * STEP);
-				float si = sinf(i * STEP);
-				addDebugLine(DVec3(center.x + radius * ci * cy,
-								  center.y + radius * sy,
-								  center.z + radius * si * cy),
-							 DVec3(center.x + radius * ci * cy1,
-								  center.y + radius * sy1,
-								  center.z + radius * si * cy1),
-							 color);
-				addDebugLine(DVec3(center.x + radius * ci * cy,
-								  center.y + radius * sy,
-								  center.z + radius * si * cy),
-							 DVec3(center.x + radius * prev_ci * cy,
-								  center.y + radius * sy,
-								  center.z + radius * prev_si * cy),
-							 color);
-				addDebugLine(DVec3(center.x + radius * prev_ci * cy1,
-								  center.y + radius * sy1,
-								  center.z + radius * prev_si * cy1),
-							 DVec3(center.x + radius * ci * cy1,
-								  center.y + radius * sy1,
-								  center.z + radius * si * cy1),
-							 color);
-				prev_ci = ci;
-				prev_si = si;
-			}
-		}
-	}
-
-
 	void addDebugHalfSphere(const RigidTransform& transform, float radius, bool top, u32 color)
 	{
 		const DVec3 center = transform.pos;
@@ -2148,91 +2098,6 @@ public:
 		tri.p1 = p1;
 		tri.p2 = p2;
 		tri.color = ARGBToABGR(color);
-	}
-
-
-	void addDebugCapsule(const DVec3& position,
-		float height,
-		float radius,
-		u32 color) override
-	{
-		addDebugHalfSphere(position + Vec3(0, radius, 0), radius, false, color);
-		addDebugHalfSphere(position + Vec3(0, radius + height, 0), radius, true, color);
-
-		Vec3 z_vec(0, 0, 1.0f);
-		Vec3 x_vec(1.0f, 0, 0);
-		z_vec.normalize();
-		x_vec.normalize();
-		const DVec3 bottom = position + Vec3(0, radius, 0);
-		const DVec3 top = bottom + Vec3(0, height, 0);
-		for (int i = 1; i <= 32; ++i) {
-			const float a = i / 32.0f * 2 * PI;
-			const float x = cosf(a) * radius;
-			const float z = sinf(a) * radius;
-			addDebugLine(bottom + x_vec * x + z_vec * z,
-				top + x_vec * x + z_vec * z,
-				color);
-		}
-	}
-
-
-	void addDebugCapsule(const RigidTransform& transform,
-		float height,
-		float radius,
-		u32 color) override
-	{
-		const Vec3 x_vec = transform.rot.rotate(Vec3(1, 0, 0));
-		const Vec3 y_vec = transform.rot.rotate(Vec3(0, 1, 0));
-		const Vec3 z_vec = transform.rot.rotate(Vec3(0, 0, 1));
-		DVec3 position = transform.pos;
-
-		RigidTransform tmp = transform;
-		tmp.pos = transform.pos + y_vec * radius;
-		addDebugHalfSphere(tmp, radius, false, color);
-		tmp.pos = transform.pos + y_vec * (radius + height);
-		addDebugHalfSphere(tmp, radius, true, color);
-
-		DVec3 bottom = position + y_vec * radius;
-		DVec3 top = bottom + y_vec * height;
-		for (int i = 1; i <= 32; ++i) {
-			float a = i / 32.0f * 2 * PI;
-			float x = cosf(a) * radius;
-			float z = sinf(a) * radius;
-			addDebugLine(bottom + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z, color);
-		}
-	}
-
-
-
-	void addDebugCylinder(const DVec3& position,
-								  const Vec3& up,
-								  float radius,
-								  u32 color) override
-	{
-		Vec3 z_vec(-up.y, up.x, 0);
-		Vec3 x_vec = crossProduct(up, z_vec);
-		float prevx = radius;
-		float prevz = 0;
-		z_vec.normalize();
-		x_vec.normalize();
-		const DVec3 top = position + up;
-		for (int i = 1; i <= 32; ++i)
-		{
-			float a = i / 32.0f * 2 * PI;
-			float x = cosf(a) * radius;
-			float z = sinf(a) * radius;
-			addDebugLine(position + x_vec * x + z_vec * z,
-						 position + x_vec * prevx + z_vec * prevz,
-						 color);
-			addDebugLine(top + x_vec * x + z_vec * z,
-						 top + x_vec * prevx + z_vec * prevz,
-						 color);
-			addDebugLine(position + x_vec * x + z_vec * z,
-						 top + x_vec * x + z_vec * z,
-						 color);
-			prevx = x;
-			prevz = z;
-		}
 	}
 
 
@@ -2370,46 +2235,6 @@ public:
 	}
 
 
-	void addDebugFrustum(const ShiftedFrustum& frustum, u32 color) override
-	{
-		const DVec3 o = frustum.origin;
-		addDebugLine(o + frustum.points[0], o + frustum.points[1], color);
-		addDebugLine(o + frustum.points[1], o + frustum.points[2], color);
-		addDebugLine(o + frustum.points[2], o + frustum.points[3], color);
-		addDebugLine(o + frustum.points[3], o + frustum.points[0], color);
-
-		addDebugLine(o + frustum.points[4], o + frustum.points[5], color);
-		addDebugLine(o + frustum.points[5], o + frustum.points[6], color);
-		addDebugLine(o + frustum.points[6], o + frustum.points[7], color);
-		addDebugLine(o + frustum.points[7], o + frustum.points[4], color);
-
-		addDebugLine(o + frustum.points[0], o + frustum.points[4], color);
-		addDebugLine(o + frustum.points[1], o + frustum.points[5], color);
-		addDebugLine(o + frustum.points[2], o + frustum.points[6], color);
-		addDebugLine(o + frustum.points[3], o + frustum.points[7], color);
-	}
-
-
-	void addDebugCircle(const DVec3& center, const Vec3& up, float radius, u32 color) override
-	{
-		Vec3 z_vec(-up.y, up.x, 0);
-		Vec3 x_vec = crossProduct(up, z_vec);
-		float prevx = radius;
-		float prevz = 0;
-		z_vec.normalize();
-		x_vec.normalize();
-		for (int i = 1; i <= 64; ++i)
-		{
-			float a = i / 64.0f * 2 * PI;
-			float x = cosf(a) * radius;
-			float z = sinf(a) * radius;
-			addDebugLine(center + x_vec * x + z_vec * z, center + x_vec * prevx + z_vec * prevz, color);
-			prevx = x;
-			prevz = z;
-		}
-	}
-
-
 	void addDebugCross(const DVec3& center, float size, u32 color) override
 	{
 		addDebugLine(center, DVec3(center.x - size, center.y, center.z), color);
@@ -2418,27 +2243,6 @@ public:
 		addDebugLine(center, DVec3(center.x, center.y + size, center.z), color);
 		addDebugLine(center, DVec3(center.x, center.y, center.z - size), color);
 		addDebugLine(center, DVec3(center.x, center.y, center.z + size), color);
-	}
-
-
-	void addDebugCone(const DVec3& vertex,
-		const Vec3& dir,
-		const Vec3& axis0,
-		const Vec3& axis1,
-		u32 color) override
-	{
-		const DVec3 base_center = vertex + dir;
-		DVec3 prev_p = base_center + axis0;
-		for (int i = 1; i <= 32; ++i)
-		{
-			float angle = i / 32.0f * 2 * PI;
-			const Vec3 x = cosf(angle) * axis0;
-			const Vec3 z = sinf(angle) * axis1;
-			const DVec3 p = base_center + x + z;
-			addDebugLine(p, prev_p, color);
-			addDebugLine(vertex, p, color);
-			prev_p = p;
-		}
 	}
 
 
@@ -3189,8 +2993,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);
-	REGISTER_FUNCTION(addDebugCircle);
-	REGISTER_FUNCTION(addDebugSphere);
 	REGISTER_FUNCTION(getTerrainMaterial);
 	REGISTER_FUNCTION(getTerrainNormalAt);
 	REGISTER_FUNCTION(setTerrainHeightAt);

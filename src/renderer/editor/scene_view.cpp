@@ -80,6 +80,12 @@ struct UniverseViewImpl final : UniverseView {
 		ASSERT(!m_icons);
 	}
 
+	void addCross(const DVec3& pos, float size, Color color) {
+		addLine(*this, pos - Vec3(size, 0, 0), pos + Vec3(size, 0, 0), color);
+		addLine(*this, pos - Vec3(0, size, 0), pos + Vec3(0, size, 0), color);
+		addLine(*this, pos - Vec3(0, 0, size), pos + Vec3(0, 0, size), color);
+	}
+
 	void onUniverseCreated(){
 		m_scene = (RenderScene*)m_editor.getUniverse()->getScene(crc32("renderer"));
 		m_icons = EditorIcons::create(m_editor, *m_scene);
@@ -106,7 +112,7 @@ struct UniverseViewImpl final : UniverseView {
 		if (!hit.is_hit) return;
 
 		const DVec3 snap_pos = getClosestVertex(hit);
-		m_scene->addDebugCross(snap_pos, 1, 0xfff00fff);
+		addCross(snap_pos, 1, Color::RED);
 	}
 
 	Vec2 getMouseSensitivity() override
@@ -718,11 +724,9 @@ void SceneView::update(float time_delta)
 	m_pipeline->setUniverse(m_editor.getUniverse());
 	m_view->update();
 	if (m_is_measure_active) {
-		static const u32 COLOR = 0x00ff00ff;
-		RenderScene* scene = m_pipeline->getScene();
-		scene->addDebugCross(m_measure_from, 0.3f, COLOR);
-		scene->addDebugCross(m_measure_to, 0.3f, COLOR);
-		scene->addDebugLine(m_measure_from, m_measure_to, COLOR);
+		m_view->addCross(m_measure_from, 0.3f, Color::BLUE);
+		m_view->addCross(m_measure_to, 0.3f, Color::BLUE);
+		addLine(*m_view, m_measure_from, m_measure_to, Color::BLUE);
 	}
 
 	manipulate();
@@ -1228,6 +1232,8 @@ void SceneView::onWindowGUI()
 		m_view->setViewport(vp);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
+		m_view->m_draw_cmds.clear();
+		m_view->m_draw_vertices.clear();
 		m_view->inputFrame();
 
 		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();

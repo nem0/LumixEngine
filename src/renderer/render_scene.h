@@ -237,19 +237,12 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual DebugTriangle* addDebugTriangles(int count) = 0;
 	virtual void addDebugTriangle(const DVec3& p0, const DVec3& p1, const DVec3& p2, u32 color) = 0;
-	virtual void addDebugCone(const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, u32 color) = 0;
 	virtual void addDebugLine(const DVec3& from, const DVec3& to, u32 color) = 0; 
 	virtual DebugLine* addDebugLines(int count) = 0;
 	virtual void addDebugCross(const DVec3& center, float size, u32 color) = 0;
 	virtual void addDebugCube(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, u32 color) = 0;
 	virtual void addDebugCube(const DVec3& from, const DVec3& max, u32 color) = 0;
 	virtual void addDebugCubeSolid(const DVec3& from, const DVec3& max, u32 color) = 0;
-	virtual void addDebugCircle(const DVec3& center, const Vec3& up, float radius, u32 color) = 0;
-	virtual void addDebugSphere(const DVec3& center, float radius, u32 color) = 0;
-	virtual void addDebugFrustum(const ShiftedFrustum& frustum, u32 color) = 0;
-	virtual void addDebugCapsule(const DVec3& position, float height, float radius, u32 color) = 0;
-	virtual void addDebugCapsule(const RigidTransform& transform, float height, float radius, u32 color) = 0;
-	virtual void addDebugCylinder(const DVec3& position, const Vec3& up, float radius, u32 color) = 0;
 
 	virtual EntityPtr getBoneAttachmentParent(EntityRef entity) = 0;
 	virtual void setBoneAttachmentParent(EntityRef entity, EntityPtr parent) = 0;

@@ -34,6 +34,281 @@ namespace Lumix
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
 
+static u32 ARGBToABGR(u32 color)
+{
+	return ((color & 0xff) << 16) | (color & 0xff00) | ((color & 0xff0000) >> 16) | (color & 0xff000000);
+}
+
+void addCube(UniverseView& view, const DVec3& pos, const Vec3& right, const Vec3& up, const Vec3& dir, Color color) {
+	UniverseView::Vertex* vertices = view.render(true, 24);
+	const DVec3& cam_pos = view.getViewport().pos;
+
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+
+	add_line(pos + dir + up + right, pos + dir + up - right);
+	add_line(pos - dir + up + right, pos - dir + up - right);
+	add_line(pos + dir + up + right, pos - dir + up + right);
+	add_line(pos + dir + up - right, pos - dir + up - right);
+
+	add_line(pos + dir - up + right, pos + dir - up - right);
+	add_line(pos - dir - up + right, pos - dir - up - right);
+	add_line(pos + dir - up + right, pos - dir - up + right);
+	add_line(pos + dir - up - right, pos - dir - up - right);
+
+	add_line(pos + dir + up + right, pos + dir - up + right);
+	add_line(pos + dir + up - right, pos + dir - up - right);
+	add_line(pos - dir + up + right, pos - dir - up + right);
+	add_line(pos - dir + up - right, pos - dir - up - right);
+}
+
+void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color) {
+	DVec3 a = min;
+	DVec3 b = min;
+	b.x = max.x;
+	
+	UniverseView::Vertex* vertices = view.render(true, 24);
+	const DVec3 cam_pos = view.getViewport().pos;
+
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+
+	add_line(a, b);
+	a = DVec3(b.x, b.y, max.z);
+	add_line(a, b);
+	b = DVec3(min.x, a.y, a.z);
+	add_line(a, b);
+	a = DVec3(b.x, b.y, min.z);
+	add_line(a, b);
+
+	a = min;
+	a.y = max.y;
+	b = a;
+	b.x = max.x;
+	add_line(a, b);
+	a = DVec3(b.x, b.y, max.z);
+	add_line(a, b);
+	b = DVec3(min.x, a.y, a.z);
+	add_line(a, b);
+	a = DVec3(b.x, b.y, min.z);
+	add_line(a, b);
+
+	a = min;
+	b = a;
+	b.y = max.y;
+	add_line(a, b);
+	a.x = max.x;
+	b.x = max.x;
+	add_line(a, b);
+	a.z = max.z;
+	b.z = max.z;
+	add_line(a, b);
+	a.x = min.x;
+	b.x = min.x;
+	add_line(a, b);
+}
+
+void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color) {
+	UniverseView::Vertex* vertices = view.render(true, 24);
+	const DVec3 cam_pos = view.getViewport().pos;
+	vertices[0].pos = (a - cam_pos).toFloat();
+	vertices[1].pos = (b - cam_pos).toFloat();
+	vertices[0].abgr = color.abgr();
+	vertices[1].abgr = color.abgr();
+}
+
+void addCone(UniverseView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color) {
+	UniverseView::Vertex* vertices = view.render(true, 32 * 4);
+	const DVec3 cam_pos = view.getViewport().pos;
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+
+	const DVec3 base_center = vertex + dir;
+	DVec3 prev_p = base_center + axis0;
+	for (int i = 1; i <= 32; ++i)
+	{
+		float angle = i / 32.0f * 2 * PI;
+		const Vec3 x = cosf(angle) * axis0;
+		const Vec3 z = sinf(angle) * axis1;
+		const DVec3 p = base_center + x + z;
+		add_line(p, prev_p);
+		add_line(vertex, p);
+		prev_p = p;
+	}
+}
+
+void addHalfSphere(UniverseView& view, const DVec3& center, float radius, bool top, Color color)
+{
+	static const int COLS = 36;
+	static const int ROWS = COLS >> 1;
+	static const float STEP = (PI / 180.0f) * 360.0f / COLS;
+	int p2 = COLS >> 1;
+	int yfrom = top ? 0 : -(ROWS >> 1);
+	int yto = top ? ROWS >> 1 : 0;
+
+	UniverseView::Vertex* vertices = view.render(true, (yto - yfrom) * 2 * p2 * 6);
+	const DVec3 cam_pos = view.getViewport().pos;
+
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+
+	for (int y = yfrom; y < yto; ++y)
+	{
+		float cy = cosf(y * STEP);
+		float cy1 = cosf((y + 1) * STEP);
+		float sy = sinf(y * STEP);
+		float sy1 = sinf((y + 1) * STEP);
+		float prev_ci = cosf((-p2 - 1) * STEP);
+		float prev_si = sinf((-p2 - 1) * STEP);
+
+		for (int i = -p2; i < p2; ++i)
+		{
+			float ci = cosf(i * STEP);
+			float si = sinf(i * STEP);
+			add_line(DVec3(center.x + radius * ci * cy,
+				center.y + radius * sy,
+				center.z + radius * si * cy),
+				DVec3(center.x + radius * ci * cy1,
+				center.y + radius * sy1,
+				center.z + radius * si * cy1));
+			add_line(DVec3(center.x + radius * ci * cy,
+				center.y + radius * sy,
+				center.z + radius * si * cy),
+				DVec3(center.x + radius * prev_ci * cy,
+				center.y + radius * sy,
+				center.z + radius * prev_si * cy));
+			add_line(DVec3(center.x + radius * prev_ci * cy1,
+				center.y + radius * sy1,
+				center.z + radius * prev_si * cy1),
+				DVec3(center.x + radius * ci * cy1,
+				center.y + radius * sy1,
+				center.z + radius * si * cy1));
+			prev_ci = ci;
+			prev_si = si;
+		}
+	}
+}
+
+void addCapsule(UniverseView& view, const DVec3& position, float height, float radius, Color color) {
+	addHalfSphere(view, position + Vec3(0, radius, 0), radius, false, color);
+	addHalfSphere(view, position + Vec3(0, radius + height, 0), radius, true, color);
+
+	Vec3 z_vec(0, 0, 1.0f);
+	Vec3 x_vec(1.0f, 0, 0);
+	z_vec.normalize();
+	x_vec.normalize();
+	const DVec3 bottom = position + Vec3(0, radius, 0);
+	const DVec3 top = bottom + Vec3(0, height, 0);
+	UniverseView::Vertex* vertices = view.render(true, 32 * 2);
+	const DVec3 cam_pos = view.getViewport().pos;
+
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+
+	for (int i = 1; i <= 32; ++i) {
+		const float a = i / 32.0f * 2 * PI;
+		const float x = cosf(a) * radius;
+		const float z = sinf(a) * radius;
+		add_line(bottom + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z);
+	}
+}
+
+void addFrustum(UniverseView& view, const struct ShiftedFrustum& frustum, Color color) {
+	const DVec3 o = frustum.origin;
+
+	UniverseView::Vertex* vertices = view.render(true, 24);
+	const DVec3 cam_pos = view.getViewport().pos;
+
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+	
+	add_line(o + frustum.points[0], o + frustum.points[1]);
+	add_line(o + frustum.points[1], o + frustum.points[2]);
+	add_line(o + frustum.points[2], o + frustum.points[3]);
+	add_line(o + frustum.points[3], o + frustum.points[0]);
+
+	add_line(o + frustum.points[4], o + frustum.points[5]);
+	add_line(o + frustum.points[5], o + frustum.points[6]);
+	add_line(o + frustum.points[6], o + frustum.points[7]);
+	add_line(o + frustum.points[7], o + frustum.points[4]);
+
+	add_line(o + frustum.points[0], o + frustum.points[4]);
+	add_line(o + frustum.points[1], o + frustum.points[5]);
+	add_line(o + frustum.points[2], o + frustum.points[6]);
+	add_line(o + frustum.points[3], o + frustum.points[7]);
+}
+
+void addSphere(UniverseView& view, const DVec3& center, float radius, Color color) {
+	static const int COLS = 36;
+	static const int ROWS = COLS >> 1;
+	static const float STEP = (PI / 180.0f) * 360.0f / COLS;
+	int p2 = COLS >> 1;
+	int r2 = ROWS >> 1;
+	float prev_ci = 1;
+	float prev_si = 0;
+
+	const u32 count = 2 * r2 * 2 * p2;
+	UniverseView::Vertex* vertices = view.render(true, count * 6);
+	const DVec3& cam_pos = view.getViewport().pos;
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+
+	for (int y = -r2; y < r2; ++y) {
+		float cy = cosf(y * STEP);
+		float cy1 = cosf((y + 1) * STEP);
+		float sy = sinf(y * STEP);
+		float sy1 = sinf((y + 1) * STEP);
+
+		for (int i = -p2; i < p2; ++i) {
+			float ci = cosf(i * STEP);
+			float si = sinf(i * STEP);
+			add_line(DVec3(center.x + radius * ci * cy, center.y + radius * sy, center.z + radius * si * cy),
+					DVec3(center.x + radius * ci * cy1, center.y + radius * sy1, center.z + radius * si * cy1));
+			add_line(DVec3(center.x + radius * ci * cy, center.y + radius * sy, center.z + radius * si * cy),
+					DVec3(center.x + radius * prev_ci * cy, center.y + radius * sy, center.z + radius * prev_si * cy));
+			add_line(DVec3(center.x + radius * prev_ci * cy1, center.y + radius * sy1, center.z + radius * prev_si * cy1),
+					DVec3(center.x + radius * ci * cy1, center.y + radius * sy1, center.z + radius * si * cy1));
+			prev_ci = ci;
+			prev_si = si;
+		}
+	}
+}
+
 struct PropertyDeserializeVisitor : Reflection::IPropertyVisitor {
 	PropertyDeserializeVisitor(Ref<InputMemoryStream> deserializer
 		, ComponentUID cmp
