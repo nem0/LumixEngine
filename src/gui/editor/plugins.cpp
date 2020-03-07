@@ -769,7 +769,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getAssetBrowser().addPlugin(*m_sprite_plugin);
 	}
 
-	bool showGizmo(ComponentUID) override { return false; }
+	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
 	
 	~StudioAppPlugin()
 	{

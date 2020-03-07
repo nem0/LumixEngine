@@ -165,7 +165,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		return "navigation";
 	}
 
-	bool showGizmo(ComponentUID cmp) override {
+	bool showGizmo(UniverseView& view, ComponentUID cmp) override {
 		if(cmp.type != NAVMESH_ZONE_TYPE) return false;
 
 		auto* scene = static_cast<NavigationScene*>(cmp.scene);
@@ -181,7 +181,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const Vec3 y = tr.rot.rotate(Vec3(0, zone.extents.y, 0));
 		const Vec3 z = tr.rot.rotate(Vec3(0, 0, zone.extents.z));
 
-		ri->addDebugCube(tr.pos, z, y, x, 0xffff0000);
+		addCube(view, tr.pos, z, y, x, Color::BLUE);
 
 		return true; 
 	}

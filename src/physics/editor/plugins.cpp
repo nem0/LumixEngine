@@ -43,7 +43,7 @@ Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
 Quat fromPhysx(const physx::PxQuat& v) { return Quat(v.x, v.y, v.z, v.w); }
 RigidTransform fromPhysx(const physx::PxTransform& v) { return{ DVec3(fromPhysx(v.p)), fromPhysx(v.q) }; }
 
-void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_scene, physx::PxD6Joint* joint)
+void showD6JointGizmo(UniverseView& view, const RigidTransform& global_frame, physx::PxD6Joint* joint)
 {
 	physx::PxRigidActor* actors[2];
 	joint->getActors(actors[0], actors[1]);
@@ -53,9 +53,9 @@ void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_sc
 	const DVec3 joint_pos = global_frame0.pos;
 	const Quat rot0 = global_frame0.rot;
 
-	render_scene.addDebugLine(joint_pos, joint_pos + rot0 * Vec3(1, 0, 0), 0xffff0000);
-	render_scene.addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 1, 0), 0xff00ff00);
-	render_scene.addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 0, 1), 0xff0000ff);
+	addLine(view, joint_pos, joint_pos + rot0 * Vec3(1, 0, 0), Color::RED);
+	addLine(view, joint_pos, joint_pos + rot0 * Vec3(0, 1, 0), Color::GREEN);
+	addLine(view, joint_pos, joint_pos + rot0 * Vec3(0, 0, 1), Color::BLUE);
 
 	RigidTransform global_frame1 = global_frame0;
 	if (actors[1]) {
@@ -63,9 +63,9 @@ void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_sc
 		const RigidTransform global_frame1 = fromPhysx(actors[1]->getGlobalPose() * local_frame1);
 		const Quat rot1 = global_frame1.rot;
 
-		render_scene.addDebugLine(joint_pos, joint_pos + rot1 * Vec3(1, 0, 0), 0xffff0000);
-		render_scene.addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 1, 0), 0xff00ff00);
-		render_scene.addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 0, 1), 0xff0000ff);
+		addLine(view, joint_pos, joint_pos + rot1 * Vec3(1, 0, 0), Color::RED);
+		addLine(view, joint_pos, joint_pos + rot1 * Vec3(0, 1, 0), Color::GREEN);
+		addLine(view, joint_pos, joint_pos + rot1 * Vec3(0, 0, 1), Color::BLUE);
 	}
 	const bool is_swing1_limited = joint->getMotion(physx::PxD6Axis::eSWING1) == physx::PxD6Motion::eLIMITED;
 	const bool is_swing2_limited = joint->getMotion(physx::PxD6Axis::eSWING2) == physx::PxD6Motion::eLIMITED;
@@ -74,11 +74,11 @@ void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_sc
 	{
 		const float swing1 = joint->getSwingLimit().yAngle;
 		const float swing2 = joint->getSwingLimit().zAngle;
-		render_scene.addDebugCone(joint_pos,
+		addCone(view, joint_pos,
 			rot1 * Vec3(1, 0, 0),
 			rot1 * Vec3(0, 1, 0) * tanf(swing1),
 			rot1 * Vec3(0, 0, 1) * tanf(swing2),
-			0xff555555);
+			Color(0x55, 0x55, 0x55, 0xff));
 	}
 	else if (is_swing1_limited)
 	{
@@ -86,17 +86,17 @@ void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_sc
 		const Vec3 z_vec = rot1 * Vec3(0, 0, 1);
 		float swing1 = joint->getSwingLimit().yAngle;
 		DVec3 prev_pos = joint_pos + z_vec * sinf(-swing1) + x_vec * cosf(-swing1);
-		render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555);
+		addLine(view, prev_pos, joint_pos, Color(0x55, 0x55, 0x55, 0xff));
 		for (int i = 1; i <= 32; ++i)
 		{
 			float angle = -swing1 + (2*swing1) * i / 32.0f;
 			float s = sinf(angle);
 			float c = cosf(angle);
 			DVec3 pos = joint_pos + z_vec * s + x_vec * c;
-			render_scene.addDebugLine(pos, prev_pos, 0xff555555);
+			addLine(view, pos, prev_pos, Color(0x55, 0x55, 0x55, 0xff));
 			prev_pos = pos;
 		}
-		render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555);
+		addLine(view, prev_pos, joint_pos, Color(0x55, 0x55, 0x55, 0xff));
 	}
 	else if (is_swing2_limited)
 	{
@@ -104,17 +104,17 @@ void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_sc
 		Vec3 x_vec = rot1 * Vec3(1, 0, 0);
 		float swing2 = joint->getSwingLimit().zAngle;
 		DVec3 prev_pos = joint_pos + y_vec * sinf(-swing2) + x_vec * cosf(-swing2);
-		render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555);
+		addLine(view, prev_pos, joint_pos, Color(0x55, 0x55, 0x55, 0xff));
 		for (int i = 1; i <= 32; ++i)
 		{
 			float angle = -swing2 + (2 * swing2) * i / 32.0f;
 			float s = sinf(angle);
 			float c = cosf(angle);
 			DVec3 pos = joint_pos + y_vec * s + x_vec * c;
-			render_scene.addDebugLine(pos, prev_pos, 0xff555555);
+			addLine(view, pos, prev_pos, Color(0x55, 0x55, 0x55, 0xff));
 			prev_pos = pos;
 		}
-		render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555);
+		addLine(view, prev_pos, joint_pos, Color(0x55, 0x55, 0x55, 0xff));
 	}
 
 	bool is_twist_limited = joint->getMotion(physx::PxD6Axis::eTWIST) == physx::PxD6Motion::eLIMITED;
@@ -125,27 +125,24 @@ void showD6JointGizmo(const RigidTransform& global_frame, RenderScene& render_sc
 		float lower = joint->getTwistLimit().lower;
 		float upper = joint->getTwistLimit().upper;
 		DVec3 prev_pos = joint_pos + y_vec * sinf(lower) + z_vec * cosf(lower);
-		render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555);
+		addLine(view, prev_pos, joint_pos, Color(0x55, 0x55, 0x55, 0xff));
 		for (int i = 1; i <= 32; ++i)
 		{
 			float angle = lower + (upper - lower) * i / 32.0f;
 			float s = sinf(angle);
 			float c = cosf(angle);
 			DVec3 pos = joint_pos + y_vec * s + z_vec * c;
-			render_scene.addDebugLine(pos, prev_pos, 0xff555555);
+			addLine(view, pos, prev_pos, Color(0x55, 0x55, 0x55, 0xff));
 			prev_pos = pos;
 		}
-		render_scene.addDebugLine(prev_pos, joint_pos, 0xff555555);
+		addLine(view, prev_pos, joint_pos, Color(0x55, 0x55, 0x55, 0xff));
 	}
 }
 
-
-void showSphericalJointGizmo(ComponentUID cmp)
+void showSphericalJointGizmo(UniverseView& view, ComponentUID cmp)
 {
 	auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 	Universe& universe = phy_scene->getUniverse();
-	auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
-	if (!render_scene) return;
 
 	const EntityRef entity = (EntityRef)cmp.entity;
 	EntityPtr other_entity = phy_scene->getJointConnectedBody(entity);
@@ -157,9 +154,9 @@ void showSphericalJointGizmo(ComponentUID cmp)
 	const DVec3 joint_pos = global_frame0.pos;
 	const Quat rot0 = global_frame0.rot;
 
-	render_scene->addDebugLine(joint_pos, joint_pos + rot0 * Vec3(1, 0, 0), 0xffff0000);
-	render_scene->addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 1, 0), 0xff00ff00);
-	render_scene->addDebugLine(joint_pos, joint_pos + rot0 * Vec3(0, 0, 1), 0xff0000ff);
+	addLine(view, joint_pos, joint_pos + rot0 * Vec3(1, 0, 0), Color::RED);
+	addLine(view, joint_pos, joint_pos + rot0 * Vec3(0, 1, 0), Color::GREEN);
+	addLine(view, joint_pos, joint_pos + rot0 * Vec3(0, 0, 1), Color::BLUE);
 
 	RigidTransform local_frame1 = phy_scene->getJointConnectedBodyLocalFrame(entity);
 	RigidTransform global_frame1 = universe.getTransform((EntityRef)other_entity).getRigidPart() * local_frame1;
@@ -170,31 +167,29 @@ void showSphericalJointGizmo(ComponentUID cmp)
 	{
 		Vec2 limit = phy_scene->getSphericalJointLimit(entity);
 		DVec3 other_pos = universe.getPosition((EntityRef)other_entity);
-		render_scene->addDebugLine(joint_pos, other_pos, 0xffff0000);
-		render_scene->addDebugCone(joint_pos,
+		addLine(view, joint_pos, other_pos, Color::RED);
+		addCone(view, joint_pos,
 			rot1 * Vec3(1, 0, 0),
 			rot1 * Vec3(0, 1, 0) * tanf(limit.y),
 			rot1 * Vec3(0, 0, 1) * tanf(limit.x),
-			0xff555555);
+			Color(0xff555555));
 	}
 	else
 	{
-		render_scene->addDebugLine(joint_pos, joint_pos + rot1 * Vec3(1, 0, 0), 0xffff0000);
-		render_scene->addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 1, 0), 0xff00ff00);
-		render_scene->addDebugLine(joint_pos, joint_pos + rot1 * Vec3(0, 0, 1), 0xff0000ff);
+		addLine(view, joint_pos, joint_pos + rot1 * Vec3(1, 0, 0), Color::RED);
+		addLine(view, joint_pos, joint_pos + rot1 * Vec3(0, 1, 0), Color::GREEN);
+		addLine(view, joint_pos, joint_pos + rot1 * Vec3(0, 0, 1), Color::BLUE);
 	}
 }
 
 
-void showDistanceJointGizmo(ComponentUID cmp)
+void showDistanceJointGizmo(UniverseView& view, ComponentUID cmp)
 {
 	static const int SEGMENT_COUNT = 100;
 	static const int TWIST_COUNT = 5;
 
 	auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 	Universe& universe = phy_scene->getUniverse();
-	auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
-	if (!render_scene) return;
 
 	const EntityRef entity = (EntityRef)cmp.entity;
 	EntityPtr other_entity = phy_scene->getJointConnectedBody(entity);
@@ -221,7 +216,7 @@ void showDistanceJointGizmo(ComponentUID cmp)
 
 	float t = minimum(force.length() / 10.0f, 1.0f);
 	u32 color = 0xff000000 + (u32(t * 0xff) << 16) + u32((1 - t) * 0xff);
-	render_scene->addDebugLine(pos + right, pos, color);
+	addLine(view, pos + right, pos, color);
 	static const float ANGLE_STEP = PI * 2 * float(TWIST_COUNT) / SEGMENT_COUNT;
 	float c = cosf(0);
 	float s = sinf(0);
@@ -230,35 +225,32 @@ void showDistanceJointGizmo(ComponentUID cmp)
 		float angle = ANGLE_STEP * i;
 		float c2 = cosf(angle + ANGLE_STEP);
 		float s2 = sinf(angle + ANGLE_STEP);
-		render_scene->addDebugLine(pos + c * right + s * up, pos + c2 * right + s2 * up + dir, color);
+		addLine(view, pos + c * right + s * up, pos + c2 * right + s2 * up + dir, color);
 		c = c2;
 		s = s2;
 		pos += dir;
 	}
-	render_scene->addDebugLine(pos + right, other_pos, color);
+	addLine(view, pos + right, other_pos, color);
 }
 
-void showHingeJointGizmo(PhysicsScene& phy_scene,
+void showHingeJointGizmo(UniverseView& view, 
+	PhysicsScene& phy_scene,
 	const Vec2& limit,
 	bool use_limit,
 	const RigidTransform& global_frame1)
 {
 	Universe& universe = phy_scene.getUniverse();
-	auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
-	if (!render_scene) return;
 	Vec3 y_vec = global_frame1.rot * Vec3(0, 1, 0);
 	Vec3 z_vec = global_frame1.rot * Vec3(0, 0, 1);
 
-	render_scene->addDebugLine(global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(1, 0, 0), 0xffff0000);
-	render_scene->addDebugLine(global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(0, 1, 0), 0xff00ff00);
-	render_scene->addDebugLine(global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(0, 0, 1), 0xff0000ff);
+	addLine(view, global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(1, 0, 0), 0xffff0000);
+	addLine(view, global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(0, 1, 0), 0xff00ff00);
+	addLine(view, global_frame1.pos, global_frame1.pos + global_frame1.rot * Vec3(0, 0, 1), 0xff0000ff);
 
 	if (use_limit)
 	{
-		render_scene->addDebugLine(
-			global_frame1.pos, global_frame1.pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x), 0xff555555);
-		render_scene->addDebugLine(
-			global_frame1.pos, global_frame1.pos + y_vec * sinf(limit.y) + z_vec * cosf(limit.y), 0xff555555);
+		addLine(view, global_frame1.pos, global_frame1.pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x), 0xff555555);
+		addLine(view, global_frame1.pos, global_frame1.pos + y_vec * sinf(limit.y) + z_vec * cosf(limit.y), 0xff555555);
 
 		
 		DVec3 prev_pos = global_frame1.pos + y_vec * sinf(limit.x) + z_vec * cosf(limit.x);
@@ -268,13 +260,13 @@ void showHingeJointGizmo(PhysicsScene& phy_scene,
 			float s = sinf(angle);
 			float c = cosf(angle);
 			const DVec3 pos = global_frame1.pos + y_vec * s + z_vec * c;
-			render_scene->addDebugLine(pos, prev_pos, 0xff555555);
+			addLine(view, pos, prev_pos, 0xff555555);
 			prev_pos = pos;
 		}
 	}
 }
 
-void showHingeJointGizmo(ComponentUID cmp)
+void showHingeJointGizmo(UniverseView& view, ComponentUID cmp)
 {
 	auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 	const EntityRef entity = (EntityRef)cmp.entity;
@@ -284,7 +276,7 @@ void showHingeJointGizmo(ComponentUID cmp)
 	if (!connected_body.isValid()) return;
 	RigidTransform global_frame1 = phy_scene->getJointConnectedBodyLocalFrame(entity);
 	global_frame1 = phy_scene->getUniverse().getTransform((EntityRef)connected_body).getRigidPart() * global_frame1;
-	showHingeJointGizmo(*phy_scene, limit, use_limit, global_frame1);
+	showHingeJointGizmo(view, *phy_scene, limit, use_limit, global_frame1);
 }
 
 struct PhysicsUIPlugin final : StudioApp::GUIPlugin
@@ -444,21 +436,22 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				{
 					case physx::PxJointConcreteType::eDISTANCE:
 						cmp.type = DISTANCE_JOINT_TYPE;
-						showDistanceJointGizmo(cmp);
+						//showDistanceJointGizmo(cmp);
 						break;
 					case physx::PxJointConcreteType::eREVOLUTE:
 						cmp.type = HINGE_JOINT_TYPE;
-						showHingeJointGizmo(cmp);
+						//showHingeJointGizmo(cmp);
 						break;
 					case physx::PxJointConcreteType::eSPHERICAL:
 						cmp.type = SPHERICAL_JOINT_TYPE;
-						showSphericalJointGizmo(cmp);
+						//showSphericalJointGizmo(view, cmp); // TODO
 						break;
 					case physx::PxJointConcreteType::eD6:
 						cmp.type = D6_JOINT_TYPE;
-						showD6JointGizmo(m_editor.getUniverse()->getTransform(entity).getRigidPart(),
+						/*showD6JointGizmo(m_editor.getUniverse()->getTransform(entity).getRigidPart(),
 							*render_scene,
-							static_cast<physx::PxD6Joint*>(joint));
+							static_cast<physx::PxD6Joint*>(joint));*/
+						// TODO
 						break;
 					default: ASSERT(false); break;
 				}
@@ -936,12 +929,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 
-	bool showGizmo(ComponentUID cmp) override
+	bool showGizmo(UniverseView& view, ComponentUID cmp) override
 	{
 		auto* phy_scene = static_cast<PhysicsScene*>(cmp.scene);
 		Universe& universe = phy_scene->getUniverse();
-		auto* render_scene = static_cast<RenderScene*>(universe.getScene(RENDERER_HASH));
-		if (!render_scene) return false;
 		
 		const EntityRef entity = (EntityRef)cmp.entity;
 		if (cmp.type == CONTROLLER_TYPE)
@@ -950,32 +941,32 @@ struct StudioAppPlugin : StudioApp::IPlugin
 			float radius = phy_scene->getControllerRadius(entity);
 
 			const DVec3 pos = universe.getPosition(entity);
-			render_scene->addDebugCapsule(pos, height, radius, 0xff0000ff);
+			addCapsule(view, pos, height, radius, Color::BLUE);
 			return true;
 		}
 
 		if (cmp.type == DISTANCE_JOINT_TYPE)
 		{
-			showDistanceJointGizmo(cmp);
+			showDistanceJointGizmo(view, cmp);
 			return true;
 		}
 
 		if (cmp.type == HINGE_JOINT_TYPE)
 		{
-			showHingeJointGizmo(cmp);
+			showHingeJointGizmo(view, cmp);
 			return true;
 		}
 
 		if (cmp.type == SPHERICAL_JOINT_TYPE)
 		{
-			showSphericalJointGizmo(cmp);
+			showSphericalJointGizmo(view, cmp);
 			return true;
 		}
 
 		if (cmp.type == D6_JOINT_TYPE)
 		{
 			physx::PxD6Joint* joint = static_cast<physx::PxD6Joint*>(phy_scene->getJoint(entity));
-			showD6JointGizmo(universe.getTransform(entity).getRigidPart(), *render_scene, joint);
+			showD6JointGizmo(view, universe.getTransform(entity).getRigidPart(), joint);
 			return true;
 		}
 

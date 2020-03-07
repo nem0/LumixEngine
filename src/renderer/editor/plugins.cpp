@@ -3791,27 +3791,27 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(*m_editor_ui_render_plugin);
 	}
 
-	void showLightProbeGridGizmo(ComponentUID cmp) {
+	void showLightProbeGridGizmo(UniverseView& view, ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		const Universe& universe = scene->getUniverse();
 		EntityRef e = (EntityRef)cmp.entity;
 		const LightProbeGrid& lpg = scene->getLightProbeGrid(e);
 		const DVec3 pos = universe.getPosition(e);
 
-		scene->addDebugCube(pos - lpg.half_extents, pos + lpg.half_extents, 0xff0000ff);
+		addCube(view, pos - lpg.half_extents, pos + lpg.half_extents, Color::BLUE);
 	}
 
-	void showEnvironmentProbeGizmo(ComponentUID cmp) {
+	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		const Universe& universe = scene->getUniverse();
 		EntityRef e = (EntityRef)cmp.entity;
 		const EnvironmentProbe& p = scene->getEnvironmentProbe(e);
 		const DVec3 pos = universe.getPosition(e);
 
-		scene->addDebugCube(pos - p.half_extents, pos + p.half_extents, 0xff0000ff);
+		addCube(view, pos - p.half_extents, pos + p.half_extents, Color::BLUE);
 	}
 
-	void showPointLightGizmo(ComponentUID light)
+	void showPointLightGizmo(UniverseView& view, ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		Universe& universe = scene->getUniverse();
@@ -3819,7 +3819,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const float range = scene->getLightRange((EntityRef)light.entity);
 
 		const DVec3 pos = universe.getPosition((EntityRef)light.entity);
-		scene->addDebugSphere(pos, range, 0xff0000ff);
+		addSphere(view, pos, range, Color::BLUE);
 	}
 
 
@@ -3835,7 +3835,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 
-	void showGlobalLightGizmo(ComponentUID light)
+	void showGlobalLightGizmo(UniverseView& view, ComponentUID light)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(light.scene);
 		const Universe& universe = scene->getUniverse();
@@ -3846,22 +3846,22 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const Vec3 right = universe.getRotation(entity).rotate(Vec3(1, 0, 0));
 		const Vec3 up = universe.getRotation(entity).rotate(Vec3(0, 1, 0));
 
-		scene->addDebugLine(pos, pos + dir, 0xff0000ff);
-		scene->addDebugLine(pos + right, pos + dir + right, 0xff0000ff);
-		scene->addDebugLine(pos - right, pos + dir - right, 0xff0000ff);
-		scene->addDebugLine(pos + up, pos + dir + up, 0xff0000ff);
-		scene->addDebugLine(pos - up, pos + dir - up, 0xff0000ff);
+		addLine(view, pos, pos + dir, Color::BLUE);
+		addLine(view, pos + right, pos + dir + right, Color::BLUE);
+		addLine(view, pos - right, pos + dir - right, Color::BLUE);
+		addLine(view, pos + up, pos + dir + up, Color::BLUE);
+		addLine(view, pos - up, pos + dir - up, Color::BLUE);
 
-		scene->addDebugLine(pos + right + up, pos + dir + right + up, 0xff0000ff);
-		scene->addDebugLine(pos + right - up, pos + dir + right - up, 0xff0000ff);
-		scene->addDebugLine(pos - right - up, pos + dir - right - up, 0xff0000ff);
-		scene->addDebugLine(pos - right + up, pos + dir - right + up, 0xff0000ff);
+		addLine(view, pos + right + up, pos + dir + right + up, Color::BLUE);
+		addLine(view, pos + right - up, pos + dir + right - up, Color::BLUE);
+		addLine(view, pos - right - up, pos + dir - right - up, Color::BLUE);
+		addLine(view, pos - right + up, pos + dir - right + up, Color::BLUE);
 
-		scene->addDebugSphere(pos - dir, 0.1f, 0xff0000ff);
+		addSphere(view, pos - dir, 0.1f, Color::BLUE);
 	}
 
 
-	void showDecalGizmo(ComponentUID cmp)
+	void showDecalGizmo(UniverseView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		Universe& universe = scene->getUniverse();
@@ -3870,46 +3870,46 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const Vec3 x = tr.rot * Vec3(1, 0, 0) * half_extents.x;
 		const Vec3 y = tr.rot * Vec3(0, 1, 0) * half_extents.y;
 		const Vec3 z = tr.rot * Vec3(0, 0, 1) * half_extents.z;
-		scene->addDebugCube(tr.pos, x, y, z, 0xff0000ff);
+		addCube(view, tr.pos, x, y, z, Color::BLUE);
 	}
 
 
-	void showCameraGizmo(ComponentUID cmp)
+	void showCameraGizmo(UniverseView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 
-		scene->addDebugFrustum(scene->getCameraFrustum((EntityRef)cmp.entity), 0xffff0000);
+		addFrustum(view, scene->getCameraFrustum((EntityRef)cmp.entity), Color::BLUE);
 	}
 
 
-	bool showGizmo(ComponentUID cmp) override
+	bool showGizmo(UniverseView& view, ComponentUID cmp) override
 	{
 		if (cmp.type == CAMERA_TYPE)
 		{
-			showCameraGizmo(cmp);
+			showCameraGizmo(view, cmp);
 			return true;
 		}
 		if (cmp.type == DECAL_TYPE)
 		{
-			showDecalGizmo(cmp);
+			showDecalGizmo(view, cmp);
 			return true;
 		}
 		if (cmp.type == POINT_LIGHT_TYPE)
 		{
-			showPointLightGizmo(cmp);
+			showPointLightGizmo(view, cmp);
 			return true;
 		}
 		if (cmp.type == ENVIRONMENT_TYPE)
 		{
-			showGlobalLightGizmo(cmp);
+			showGlobalLightGizmo(view, cmp);
 			return true;
 		}
 		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
-			showEnvironmentProbeGizmo(cmp);
+			showEnvironmentProbeGizmo(view, cmp);
 			return true;
 		}
 		if (cmp.type == LIGHT_PROBE_GRID_TYPE) {
-			showLightProbeGridGizmo(cmp);
+			showLightProbeGridGizmo(view, cmp);
 			return true;
 		}
 		return false;

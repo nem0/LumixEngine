@@ -39,13 +39,13 @@ struct LUMIX_EDITOR_API StudioApp : OS::Interface
 		virtual bool dependsOn(IPlugin& plugin) const { return false; }
 		virtual const char* getName() const = 0;
 
-		virtual bool showGizmo(struct ComponentUID cmp) = 0;
+		virtual bool showGizmo(struct UniverseView& view, struct ComponentUID cmp) = 0;
 	};
 
 	struct MousePlugin {
 		virtual ~MousePlugin() {}
 
-		virtual bool onMouseDown(struct UniverseView& view, int x, int y) { return false; }
+		virtual bool onMouseDown(UniverseView& view, int x, int y) { return false; }
 		virtual void onMouseUp(UniverseView& view, int x, int y, OS::MouseButton button) {}
 		virtual void onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) {}
 	};

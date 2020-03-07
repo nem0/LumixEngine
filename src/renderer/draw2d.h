@@ -9,24 +9,6 @@ namespace Lumix
 
 namespace gpu { struct TextureHandle; }
 
-#pragma pack(1)
-struct Color {
-	Color(u32 v) { 
-		r = u8(v & 0xff);
-		g = u8((v >> 8) & 0xff);
-		b = u8((v >> 16) & 0xff);
-		a = u8((v >> 24) & 0xff);
-	}
-
-	Color(u8 r, u8 g, u8 b, u8 a) : r(r), g(g), b(b), a(a) {}
-
-	u8 r;
-	u8 g;
-	u8 b;
-	u8 a;
-};
-#pragma pack()
-
 struct Font;
 
 struct LUMIX_RENDERER_API Draw2D {

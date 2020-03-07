@@ -13,7 +13,6 @@
 #include "engine/engine.h"
 #include "engine/reflection.h"
 #include "engine/universe.h"
-#include "renderer/render_scene.h"
 
 
 using namespace Lumix;
@@ -239,7 +238,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 
-	bool showGizmo(ComponentUID cmp) override
+	bool showGizmo(UniverseView& view, ComponentUID cmp) override
 	{
 		static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
 		static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
@@ -252,9 +251,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 			Universe& universe = audio_scene->getUniverse();
 			const DVec3 pos = universe.getPosition(entity);
 
-			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
-			if (!scene) return true;
-			scene->addDebugSphere(pos, radius, 0xff0000ff);
+			addSphere(view, pos, radius, Color::BLUE);
 			return true;
 		}
 		else if (cmp.type == CHORUS_ZONE_TYPE)
@@ -264,9 +261,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 			Universe& universe = audio_scene->getUniverse();
 			const DVec3 pos = universe.getPosition(entity);
 
-			auto* scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
-			if (!scene) return true;
-			scene->addDebugSphere(pos, radius, 0xff0000ff);
+			addSphere(view, pos, radius, Color::BLUE);
 			return true;
 		}
 

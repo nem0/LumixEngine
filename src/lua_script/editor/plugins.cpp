@@ -471,7 +471,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		LUMIX_DELETE(allocator, m_console_plugin);
 	}
 
-	bool showGizmo(ComponentUID cmp) override
+	bool showGizmo(UniverseView& view, ComponentUID cmp) override
 	{
 		if (cmp.type == LUA_SCRIPT_TYPE)
 		{
