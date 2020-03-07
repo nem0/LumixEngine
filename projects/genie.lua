@@ -123,11 +123,6 @@ newoption {
 }
 
 newoption {
-	trigger = "with-unit-tests",
-	description = "Build unit tests."
-}
-
-newoption {
 	trigger = "with-app",
 	description = "Do build app."
 }
@@ -590,6 +585,10 @@ if has_plugin("animation") then
 		
 		useLua()
 		defaultConfigurations()
+end
+
+if _OPTIONS["with-game"] ~= nil then
+	dofile("../../" .. _OPTIONS["with-game"] .. "/genie.lua")
 end
 
 for _, plugin in ipairs(plugins) do

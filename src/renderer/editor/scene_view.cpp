@@ -80,6 +80,7 @@ struct UniverseViewImpl final : UniverseView {
 		Path font_path("editor/fonts/OpenSans-Regular.ttf");
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
+		onUniverseCreated();
 	}
 
 	~UniverseViewImpl() {

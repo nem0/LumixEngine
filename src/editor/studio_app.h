@@ -10,9 +10,9 @@ struct ImFont;
 
 #ifdef STATIC_PLUGINS
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
-		extern "C" StudioApp::IPlugin* setStudioApp_##plugin_name(StudioApp& app); \
-		extern "C" { StudioApp::StaticPluginRegister s_##plugin_name##_editor_register(#plugin_name, setStudioApp_##plugin_name); } \
-		extern "C" StudioApp::IPlugin* setStudioApp_##plugin_name(StudioApp& app)
+		extern "C" Lumix::StudioApp::IPlugin* setStudioApp_##plugin_name(Lumix::StudioApp& app); \
+		extern "C" { Lumix::StudioApp::StaticPluginRegister s_##plugin_name##_editor_register(#plugin_name, setStudioApp_##plugin_name); } \
+		extern "C" Lumix::StudioApp::IPlugin* setStudioApp_##plugin_name(Lumix::StudioApp& app)
 #else
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
 		extern "C" LUMIX_LIBRARY_EXPORT StudioApp::IPlugin* setStudioApp(StudioApp& app)
