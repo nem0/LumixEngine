@@ -3169,35 +3169,11 @@ struct RenderInterfaceImpl final : RenderInterface
 	}
 
 
-	void addDebugCross(const DVec3& pos, float size, u32 color) override
-	{
-		m_render_scene->addDebugCross(pos, size, color);
-	}
-
-
 	UniverseView::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
 	{
 		const RayCastModelHit hit = m_render_scene->castRay(origin, dir, ignored);
 
 		return {hit.is_hit, hit.t, hit.entity, hit.origin + hit.dir * hit.t};
-	}
-
-
-	void addDebugLine(const DVec3& from, const DVec3& to, u32 color) override
-	{
-		m_render_scene->addDebugLine(from, to, color);
-	}
-
-
-	void addDebugCube(const DVec3& minimum, const DVec3& maximum, u32 color) override
-	{
-		m_render_scene->addDebugCube(minimum, maximum, color);
-	}
-
-
-	void addDebugCube(const DVec3& pos, const Vec3& dir, const Vec3& up, const Vec3& right, u32 color) override
-	{
-		m_render_scene->addDebugCube(pos, dir, up, right, color);
 	}
 
 
