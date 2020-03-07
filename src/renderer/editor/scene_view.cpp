@@ -99,7 +99,7 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void onUniverseDestroyed(){
-		EditorIcons::destroy(*m_icons);
+		if (m_icons) EditorIcons::destroy(*m_icons);
 		m_icons = nullptr;
 	}
 
@@ -728,7 +728,7 @@ void SceneView::manipulate() {
 		}
 		default: ASSERT(false); break;
 	}
-	if (cfg.isAutosnapDown()) m_editor.snapDown();
+	if (cfg.isAutosnapDown()) m_app.snapDown();
 }
 
 void SceneView::update(float time_delta)

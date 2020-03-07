@@ -126,8 +126,10 @@ struct LUMIX_EDITOR_API StudioApp : OS::Interface
 	virtual Action* getAction(const char* name) = 0;
 	virtual void setFullscreen(bool fullscreen) = 0;
 	virtual bool makeFile(const char* path, const char* content) = 0;
+	virtual void snapDown() = 0;
 	virtual struct Settings& getSettings() = 0;
 	virtual struct RenderInterface* getRenderInterface() = 0;
+	virtual void setRenderInterface(RenderInterface* ifc) = 0;
 	virtual float getFOV() const = 0;
 	virtual void setFOV(float fov_radians) = 0;
 	virtual Gizmo::Config& getGizmoConfig() = 0;

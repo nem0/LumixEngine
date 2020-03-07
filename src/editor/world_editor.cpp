@@ -1632,10 +1632,7 @@ public:
 
 	void setView(UniverseView* view) override { m_view = view; }
 
-	Universe* getUniverse() override
-	{
-		return m_universe; 
-	}
+	Universe* getUniverse() override { return m_universe; }
 
 
 	Engine& getEngine() override { return m_engine; }
@@ -1663,8 +1660,6 @@ public:
 		destroyUniverse();
 
 		PrefabSystem::destroy(m_prefab_system);
-
-		LUMIX_DELETE(m_allocator, m_render_interface);
 	}
 
 
@@ -1759,53 +1754,6 @@ public:
 		file.write(blob.getData(), blob.getPos());
 
 		logInfo("editor") << "Universe saved";
-	}
-
-
-	void setRenderInterface(struct RenderInterface* interface) override
-	{
-		m_render_interface = interface;
-		createUniverse();
-	}
-
-
-	RenderInterface* getRenderInterface() override
-	{
-		return m_render_interface;
-	}
-
-
-	void snapDown() override
-	{
-		if (m_selected_entities.empty()) return;
-
-		Array<DVec3> new_positions(m_allocator);
-		Universe* universe = getUniverse();
-
-		for (int i = 0; i < m_selected_entities.size(); ++i)
-		{
-			EntityRef entity = m_selected_entities[i];
-
-			DVec3 origin = universe->getPosition(entity);
-			auto hit = m_render_interface->castRay(origin, Vec3(0, -1, 0), m_selected_entities[i]);
-			if (hit.is_hit)
-			{
-				new_positions.push(origin + Vec3(0, -hit.t, 0));
-			}
-			else
-			{
-				hit = m_render_interface->castRay(origin, Vec3(0, 1, 0), m_selected_entities[i]);
-				if (hit.is_hit)
-				{
-					new_positions.push(origin + Vec3(0, hit.t, 0));
-				}
-				else
-				{
-					new_positions.push(universe->getPosition(m_selected_entities[i]));
-				}
-			}
-		}
-		setEntitiesPositions(&m_selected_entities[0], &new_positions[0], new_positions.size());
 	}
 
 
@@ -2132,13 +2080,11 @@ public:
 		if (reload)
 		{
 			m_universe_destroyed.invoke();
-			m_render_interface->setUniverse(nullptr);
 			m_prefab_system->setUniverse(nullptr);
 			StaticString<64> name(m_universe->getName());
 			m_engine.destroyUniverse(*m_universe);
 			
 			m_universe = &m_engine.createUniverse(true);
-			m_render_interface->setUniverse(m_universe);
 			m_prefab_system->setUniverse(m_universe);
 			m_universe_created.invoke();
 			m_universe->setName(name);
@@ -2359,7 +2305,6 @@ public:
 		, m_is_loading(false)
 		, m_universe(nullptr)
 		, m_is_toggle_selection(false)
-		, m_render_interface(nullptr)
 		, m_selected_entity_on_game_mode(INVALID_ENTITY)
 		, m_is_game_mode(false)
 		, m_undo_index(-1)
@@ -2370,6 +2315,7 @@ public:
 		logInfo("Editor") << "Initializing editor...";
 
 		m_prefab_system = PrefabSystem::create(*this);
+		createUniverse();
 	}
 
 
@@ -2470,7 +2416,6 @@ public:
 		ASSERT(m_universe);
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
-		m_render_interface->setUniverse(nullptr);
 		m_prefab_system->setUniverse(nullptr);
 		selectEntities(nullptr, 0, false);
 		m_engine.destroyUniverse(*m_universe);
@@ -2512,10 +2457,9 @@ public:
 
 		universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 
-		m_view->setOrbitCamera(false);
+		if (m_view) m_view->setOrbitCamera(false);
 		m_selected_entities.clear();
 		m_universe_created.invoke();
-		m_render_interface->setUniverse(universe);
 		m_prefab_system->setUniverse(universe);
 	}
 
@@ -2595,7 +2539,6 @@ public:
 private:
 	IAllocator& m_allocator;
 	Engine& m_engine;
-	RenderInterface* m_render_interface;
 	UniverseView* m_view = nullptr;
 	PrefabSystem* m_prefab_system;
 	Universe* m_universe;

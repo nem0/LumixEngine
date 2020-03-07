@@ -5,6 +5,7 @@
 #include "engine/path.h"
 #include "engine/reflection.h"
 #include "editor/render_interface.h"
+#include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/universe.h"
 
@@ -164,7 +165,7 @@ bool Action::isActive()
 }
 
 
-void getEntityListDisplayName(WorldEditor& editor, Span<char> buf, EntityPtr entity)
+void getEntityListDisplayName(StudioApp& app, Span<char> buf, EntityPtr entity)
 {
 	if (!entity.isValid())
 	{
@@ -173,12 +174,13 @@ void getEntityListDisplayName(WorldEditor& editor, Span<char> buf, EntityPtr ent
 	}
 
 	EntityRef e = (EntityRef)entity;
+	WorldEditor& editor = app.getWorldEditor();
 	const char* name = editor.getUniverse()->getEntityName(e);
 	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 	if (editor.getUniverse()->hasComponent(e, MODEL_INSTANCE_TYPE))
 	{
-		auto* render_interface = editor.getRenderInterface();
-		auto path = render_interface->getModelInstancePath(e);
+		RenderInterface* render_interface = app.getRenderInterface();
+		auto path = render_interface->getModelInstancePath(*editor.getUniverse(), e);
 		if (path.isValid())
 		{
 			const char* c = path.c_str();

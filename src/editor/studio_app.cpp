@@ -826,13 +826,12 @@ struct StudioAppImpl final : StudioApp
 
 		Universe* universe = m_editor->getUniverse();
 
-		RenderInterface* ri = m_editor->getRenderInterface();
 		UniverseView& view = m_editor->getView();
 		const DVec3 cam_pos = view.getViewport().pos;
 		if (ents.size() > 1) {
-			AABB aabb = ri->getEntityAABB(*universe, ents[0], cam_pos);
+			AABB aabb = m_render_interface->getEntityAABB(*universe, ents[0], cam_pos);
 			for (int i = 1; i < ents.size(); ++i) {
-				const AABB entity_aabb = ri->getEntityAABB(*universe, ents[i], cam_pos);
+				const AABB entity_aabb = m_render_interface->getEntityAABB(*universe, ents[i], cam_pos);
 				aabb.merge(entity_aabb);
 			}
 
@@ -1195,7 +1194,6 @@ struct StudioAppImpl final : StudioApp
 	void setLocalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::LOCAL; }
 	void setGlobalCoordSystem() { getGizmoConfig().coord_system = Gizmo::Config::GLOBAL; }
 	void addEntity() { m_editor->addEntity(); }
-	void snapDown() { m_editor->snapDown(); }
 	void setEditCamTransform() { m_is_edit_cam_transform_ui_open = !m_is_edit_cam_transform_ui_open; }
 	void lookAtSelected() { m_editor->getView().lookAtSelected(); }
 	void copyViewTransform() { m_editor->getView().copyTransform(); }
@@ -1267,6 +1265,31 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
+	void snapDown() {
+		const Array<EntityRef>& selected = m_editor->getSelectedEntities();
+		if (selected.empty()) return;
+
+		Array<DVec3> new_positions(m_allocator);
+		Universe* universe = m_editor->getUniverse();
+
+		for (EntityRef entity : selected) {
+			const DVec3 origin = universe->getPosition(entity);
+			auto hit = getRenderInterface()->castRay(*universe, origin, Vec3(0, -1, 0), entity);
+			if (hit.is_hit) {
+				new_positions.push(origin + Vec3(0, -hit.t, 0));
+			}
+			else {
+				hit = getRenderInterface()->castRay(*universe, origin, Vec3(0, 1, 0), entity);
+				if (hit.is_hit) {
+					new_positions.push(origin + Vec3(0, hit.t, 0));
+				}
+				else {
+					new_positions.push(universe->getPosition(entity));
+				}
+			}
+		}
+		m_editor->setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
+	}
 
 	void autosnapDown()
 	{
@@ -1618,7 +1641,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
-		getEntityListDisplayName(*m_editor, Span(buffer), entity);
+		getEntityListDisplayName(*this, Span(buffer), entity);
 		bool selected = selected_entities.indexOf(entity) >= 0;
 		ImGui::PushID(entity.index);
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
@@ -1727,7 +1750,7 @@ struct StudioAppImpl final : StudioApp
 						 e = universe->getNextEntity((EntityRef)e))
 					{
 						char buffer[1024];
-						getEntityListDisplayName(*m_editor, Span(buffer), e);
+						getEntityListDisplayName(*this, Span(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
@@ -1968,7 +1991,8 @@ struct StudioAppImpl final : StudioApp
 		style.ItemInnerSpacing.x = 2;
 	}
 
-	RenderInterface* getRenderInterface() override { return m_editor->getRenderInterface(); }
+	void setRenderInterface(RenderInterface* ri) override { m_render_interface = ri; }
+	RenderInterface* getRenderInterface() override { return m_render_interface; }
 
 	float getFOV() const { return m_fov; }
 	void setFOV(float fov_radians) { m_fov = fov_radians; }
@@ -3168,6 +3192,7 @@ struct StudioAppImpl final : StudioApp
 	ProfilerUI* m_profiler_ui;
 	Settings m_settings;
 	float m_fov = degreesToRadians(60);
+	RenderInterface* m_render_interface = nullptr;
 	Array<OS::Event> m_events;
 	char m_template_name[100];
 	char m_open_filter[64];

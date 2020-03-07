@@ -3044,69 +3044,11 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 struct RenderInterfaceImpl final : RenderInterface
 {
 	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline, Renderer& renderer)
-		: m_pipeline(pipeline)
-		, m_editor(editor)
+		: m_editor(editor)
 		, m_textures(editor.getAllocator())
 		, m_renderer(renderer)
-	{
-		m_model_index = 0;
-		auto& rm = m_editor.getEngine().getResourceManager();
-		
-		Path font_path("editor/fonts/OpenSans-Regular.ttf");
-		m_font_res = rm.load<FontResource>(font_path);
-		m_font = m_font_res->addRef(16);
-	}
+	{}
 
-
-	~RenderInterfaceImpl()
-	{
-		m_font_res->getResourceManager().unload(*m_font_res);
-	}
-
-
-	ImFont* addFont(const char* filename, int size) override
-	{
-		ImGuiIO& io = ImGui::GetIO();
-		ImFont* font = io.Fonts->AddFontFromFileTTF(filename, (float)size);
-
-		Engine& engine = m_editor.getEngine();
-		unsigned char* pixels;
-		int width, height;
-
-		ImGuiFreeType::BuildFontAtlas(ImGui::GetIO().Fonts);
-		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-		Material* material = engine.getResourceManager().load<Material>(Path("pipelines/imgui/imgui.mat"));
-
-		Texture* old_texture = material->getTexture(0);
-		Texture* texture = LUMIX_NEW(engine.getAllocator(), Texture)(
-			Path("font"), *engine.getResourceManager().get(Texture::TYPE), m_renderer, engine.getAllocator());
-
-		texture->create(width, height, gpu::TextureFormat::RGBA8, pixels, width * height * 4);
-		material->setTexture(0, texture);
-		if (old_texture)
-		{
-			old_texture->destroy();
-			LUMIX_DELETE(engine.getAllocator(), old_texture);
-		}
-
-		return font;
-	}
-
-
-	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) override
-	{
-		Path path(path_cstr);
-		OS::OutputFile file;
-		if (!file.open(path_cstr)) return false;
-
-		if (!Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (const u8*)pixels, upper_left_origin, path, engine.getAllocator())) {
-			file.close();
-			return false;
-		}
-
-		file.close();
-		return true;
-	}
 
 
 	ImTextureID createTexture(const char* name, const void* pixels, int w, int h) override
@@ -3159,9 +3101,10 @@ struct RenderInterfaceImpl final : RenderInterface
 	}
 
 
-	UniverseView::RayHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
+	UniverseView::RayHit castRay(Universe& universe, const DVec3& origin, const Vec3& dir, EntityPtr ignored) override
 	{
-		const RayCastModelHit hit = m_render_scene->castRay(origin, dir, ignored);
+		RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+		const RayCastModelHit hit = scene->castRay(origin, dir, ignored);
 
 		return {hit.is_hit, hit.t, hit.entity, hit.origin + hit.dir * hit.t};
 	}
@@ -3172,7 +3115,8 @@ struct RenderInterfaceImpl final : RenderInterface
 		AABB aabb;
 
 		if (universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-			Model* model = m_render_scene->getModelInstanceModel(entity);
+			RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+			Model* model = scene->getModelInstanceModel(entity);
 			if (!model) return aabb;
 
 			aabb = model->getAABB();
@@ -3188,47 +3132,15 @@ struct RenderInterfaceImpl final : RenderInterface
 	}
 
 
-	Vec2 getCameraScreenSize(EntityRef entity) override { return m_render_scene->getCameraScreenSize(entity); }
-
-
-	float getCameraOrthoSize(EntityRef entity) override { return m_render_scene->getCamera(entity).ortho_size; }
-
-
-	bool isCameraOrtho(EntityRef entity) override { return m_render_scene->getCamera(entity).is_ortho; }
-
-
-	float getCameraFOV(EntityRef entity) override { return m_render_scene->getCamera(entity).fov; }
-
-	void setUniverse(Universe* universe) override {
-		m_render_scene = universe ? static_cast<RenderScene*>(universe->getScene(MODEL_INSTANCE_TYPE)) : nullptr;
-	}
-
-	Vec3 getModelCenter(EntityRef entity) override
-	{
-		if (!m_render_scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE)) return Vec3::ZERO;
-		Model* model = m_render_scene->getModelInstanceModel(entity);
-		if (!model) return Vec3(0, 0, 0);
-		return (model->getAABB().min + model->getAABB().max) * 0.5f;
-	}
-
-
-	Path getModelInstancePath(EntityRef entity) override { return m_render_scene->getModelInstancePath(entity); }
-
-
-	ShiftedFrustum getFrustum(EntityRef camera, const Vec2& viewport_min, const Vec2& viewport_max) override
-	{
-		return m_render_scene->getCameraFrustum(camera, viewport_min, viewport_max);
+	Path getModelInstancePath(Universe& universe, EntityRef entity) override {
+		RenderScene* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
+		return scene->getModelInstancePath(entity); 
 	}
 
 
 	WorldEditor& m_editor;
-	FontResource* m_font_res;
-	Font* m_font;
-	RenderScene* m_render_scene;
 	Renderer& m_renderer;
-	Pipeline& m_pipeline;
 	HashMap<void*, Texture*> m_textures;
-	int m_model_index;
 };
 
 
@@ -3505,9 +3417,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 		IAllocator& allocator = app.getAllocator();
 		WorldEditor& editor = app.getWorldEditor();
-		RenderInterface* render_interface =
-			LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline(), *renderer);
-		editor.setRenderInterface(render_interface);
+		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline(), *renderer);
+		app.setRenderInterface(render_interface);
 	}
 
 
