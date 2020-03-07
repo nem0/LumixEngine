@@ -285,6 +285,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		: m_editor(app.getWorldEditor())
 		, m_selected_bone(-1)
 		, m_is_window_open(false)
+		, m_app(app)
 	{
 		Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "Toggle physics UI", "physics");
 		action->func.bind<&PhysicsUIPlugin::onAction>(this);
@@ -458,13 +459,13 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 				ImGui::PushID(i);
 				char tmp[256];
-				getEntityListDisplayName(m_editor, Span(tmp), cmp.entity);
+				getEntityListDisplayName(m_app, Span(tmp), cmp.entity);
 				bool b = false;
 				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&entity, 1, false);
 				ImGui::NextColumn();
 
 				EntityPtr other_entity = scene->getJointConnectedBody(entity);
-				getEntityListDisplayName(m_editor, Span(tmp), other_entity);
+				getEntityListDisplayName(m_app, Span(tmp), other_entity);
 				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) {
 					const EntityRef e = (EntityRef)other_entity;
 					m_editor.selectEntities(&e, 1, false);
@@ -535,7 +536,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		};
 		
 		char tmp[255];
-		getEntityListDisplayName(m_editor, Span(tmp), e);
+		getEntityListDisplayName(m_app, Span(tmp), e);
 
 		ImGui::Text("%s", tmp);
 		ImGui::SameLine();
@@ -874,6 +875,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	bool m_is_window_open;
 	int m_selected_bone;
 	WorldEditor& m_editor;
+	StudioApp& m_app;
 };
 
 
