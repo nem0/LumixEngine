@@ -90,6 +90,7 @@ struct GUIScene : IScene
 	virtual DelegateList<void(EntityRef)>& buttonClicked() = 0;
 	virtual DelegateList<void(EntityRef)>& rectHovered() = 0;
 	virtual DelegateList<void(EntityRef)>& rectHoveredOut() = 0;
+	virtual DelegateList<void(bool, i32, i32)>& mousedButtonUnhandled() = 0;
 };
 
 
