@@ -61,7 +61,7 @@ struct XInputControllerDevice : ControllerDevice
 				InputSystem::Event event;
 				event.device = this;
 				event.type = InputSystem::Event::AXIS;
-				event.data.axis.x_abs = new_state / max_value;
+				event.data.axis.x = new_state / max_value;
 				event.data.axis.axis = axis;
 				input.injectEvent(event);
 			}
@@ -77,8 +77,8 @@ struct XInputControllerDevice : ControllerDevice
 				InputSystem::Event event;
 				event.device = this;
 				event.type = InputSystem::Event::AXIS;
-				event.data.axis.x_abs = new_x / max_value;
-				event.data.axis.y_abs = new_y / max_value;
+				event.data.axis.x = new_x / max_value;
+				event.data.axis.y = new_y / max_value;
 				event.data.axis.axis = axis;
 				input.injectEvent(event);
 			}

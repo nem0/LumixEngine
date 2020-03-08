@@ -208,7 +208,6 @@ LUMIX_ENGINE_API int getDropFileCount(const Event& event);
 LUMIX_ENGINE_API void finishDrag(const Event& event);
 
 LUMIX_ENGINE_API Point getMouseScreenPos();
-LUMIX_ENGINE_API Point getMousePos(WindowHandle win);
 LUMIX_ENGINE_API void setMouseScreenPos(int x, int y);
 LUMIX_ENGINE_API void showCursor(bool show);
 

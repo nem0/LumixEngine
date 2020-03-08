@@ -1457,10 +1457,10 @@ namespace Lumix
 					lua_setfield(L, -2, "down"); // [lua_event]
 					LuaWrapper::push(L, event.data.button.key_id); // [lua_event, button.x_abs]
 					lua_setfield(L, -2, "key_id"); // [lua_event]
-					LuaWrapper::push(L, event.data.button.x_abs); // [lua_event, button.x_abs]
-					lua_setfield(L, -2, "x_abs"); // [lua_event]
-					LuaWrapper::push(L, event.data.button.y_abs); // [lua_event, button.y_abs]
-					lua_setfield(L, -2, "y_abs"); // [lua_event]
+					LuaWrapper::push(L, event.data.button.x); // [lua_event, button.x_abs]
+					lua_setfield(L, -2, "x"); // [lua_event]
+					LuaWrapper::push(L, event.data.button.y); // [lua_event, button.y_abs]
+					lua_setfield(L, -2, "y"); // [lua_event]
 					break;
 				case InputSystem::Event::AXIS:
 					LuaWrapper::push(L, event.data.axis.x); // [lua_event, axis.x]

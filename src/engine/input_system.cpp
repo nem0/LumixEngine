@@ -101,7 +101,7 @@ struct InputSystemImpl final : InputSystem
 	}
 
 
-	void injectEvent(const OS::Event& event) override
+	void injectEvent(const OS::Event& event, int mouse_base_x, int mouse_base_y) override
 	{
 		switch (event.type) {
 			case OS::Event::Type::MOUSE_BUTTON: {
@@ -110,9 +110,9 @@ struct InputSystemImpl final : InputSystem
 				input_event.device = m_mouse_device;
 				input_event.data.button.key_id = (int)event.mouse_button.button;
 				input_event.data.button.down = event.mouse_button.down;
-				const OS::Point cp = OS::getMousePos(event.window);
-				input_event.data.button.x_abs = (float)cp.x;
-				input_event.data.button.y_abs = (float)cp.y;
+				const OS::Point cp = OS::getMouseScreenPos();
+				input_event.data.button.x = (float)cp.x - mouse_base_x;
+				input_event.data.button.y = (float)cp.y - mouse_base_y;
 				injectEvent(input_event);
 				break;
 			}
@@ -120,9 +120,9 @@ struct InputSystemImpl final : InputSystem
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::AXIS;
 				input_event.device = m_mouse_device;
-				const OS::Point cp = OS::getMousePos(event.window);
-				input_event.data.axis.x_abs = (float)cp.x;
-				input_event.data.axis.y_abs = (float)cp.y;
+				const OS::Point cp = OS::getMouseScreenPos();
+				input_event.data.axis.x_abs = (float)cp.x - mouse_base_x;
+				input_event.data.axis.y_abs = (float)cp.y - mouse_base_y;
 				input_event.data.axis.x = (float)event.mouse_move.xrel;
 				input_event.data.axis.y = (float)event.mouse_move.xrel;
 				injectEvent(input_event);
