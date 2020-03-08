@@ -3,6 +3,7 @@
 #include "game_view.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -129,6 +130,13 @@ void GameView::captureMouse(bool capture)
 	}
 }
 
+void GameView::onSettingsLoaded() {
+	m_is_open = m_studio_app.getSettings().getValue("is_game_view_open", false);
+}
+
+void GameView::onBeforeSettingsSaved() {
+	m_studio_app.getSettings().setValue("is_game_view_open", m_is_open);
+}
 
 void GameView::onFullscreenGUI()
 {

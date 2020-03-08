@@ -40,6 +40,8 @@ public:
 	bool m_is_open;
 
 private:
+	void onSettingsLoaded() override;
+	void onBeforeSettingsSaved() override;
 	void toggleFullscreen();
 	void processInputEvents();
 	void onFullscreenGUI();
