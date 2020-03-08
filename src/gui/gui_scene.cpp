@@ -1121,6 +1121,7 @@ struct GUISceneImpl final : GUIScene
 			e = entity_map.get(e);
 			GUIButton& button = m_buttons.emplace(e);
 			serializer.read(button);
+			m_universe.onComponentCreated(e, GUI_BUTTON_TYPE, this);
 		}
 		m_root = findRoot();
 	}
