@@ -336,10 +336,10 @@ bool InputMemoryStream::read(void* data, u64 size)
 
 bool InputMemoryStream::read(String& string)
 {
-	u32 size;
-	IInputStream::read(size);
-	string.resize(size);
-	return read(string.getData(), size);
+	const char* str = readString();
+	const int s = stringLength(str);
+	string.resize(s + 1);
+	return memcpy(string.getData(), str, s);
 }
 
 
