@@ -3049,7 +3049,20 @@ struct RenderInterfaceImpl final : RenderInterface
 		, m_renderer(renderer)
 	{}
 
+	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) override
+	{
+		Path path(path_cstr);
+		OS::OutputFile file;
+		if (!file.open(path_cstr)) return false;
 
+		if (!Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (const u8*)pixels, upper_left_origin, path, engine.getAllocator())) {
+			file.close();
+			return false;
+		}
+
+		file.close();
+		return true;
+	}
 
 	ImTextureID createTexture(const char* name, const void* pixels, int w, int h) override
 	{
