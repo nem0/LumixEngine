@@ -155,6 +155,7 @@ struct GUISceneImpl final : GUIScene
 		, m_buttons(allocator)
 		, m_rect_hovered(allocator)
 		, m_rect_hovered_out(allocator)
+		, m_unhandled_mouse_button(allocator)
 		, m_button_clicked(allocator)
 		, m_buttons_down_count(0)
 		, m_canvas_size(800, 600)
@@ -657,18 +658,19 @@ struct GUISceneImpl final : GUIScene
 	}
 
 
-	void handleMouseButtonEvent(const Rect& parent_rect, GUIRect& rect, const InputSystem::Event& event)
+	bool handleMouseButtonEvent(const Rect& parent_rect, GUIRect& rect, const InputSystem::Event& event)
 	{
-		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
+		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return false;
 		const bool is_up = !event.data.button.down;
 
 		Vec2 pos(event.data.button.x, event.data.button.y);
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
+		bool handled = false;
 		
-		if (contains(r, pos) && contains(r, m_mouse_down_pos))
-		{
+		if (contains(r, pos) && contains(r, m_mouse_down_pos)) {
 			if (m_buttons.find(rect.entity) >= 0)
 			{
+				handled = true;
 				if (is_up && isButtonDown(rect.entity))
 				{
 					m_focused_entity = INVALID_ENTITY;
@@ -688,8 +690,8 @@ struct GUISceneImpl final : GUIScene
 				}
 			}
 			
-			if (rect.input_field && is_up)
-			{
+			if (rect.input_field && is_up) {
+				handled = true;
 				m_focused_entity = rect.entity;
 				if (rect.text)
 				{
@@ -703,8 +705,9 @@ struct GUISceneImpl final : GUIScene
 		{
 			int idx = m_rects.find((EntityRef)e);
 			if (idx < 0) continue;
-			handleMouseButtonEvent(r, *m_rects.at(idx), event);
+			handled = handleMouseButtonEvent(r, *m_rects.at(idx), event) || handled;
 		}
+		return handled;
 	}
 
 
@@ -800,8 +803,12 @@ struct GUISceneImpl final : GUIScene
 							m_mouse_down_pos.x = event.data.button.x;
 							m_mouse_down_pos.y = event.data.button.y;
 						}
-						handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
+						const bool handled = handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
 						if (!event.data.button.down) m_buttons_down_count = 0;
+
+						if (!handled) {
+							m_unhandled_mouse_button.invoke(event.data.button.down, (i32)event.data.button.x, (i32)event.data.button.y);
+						}
 					}
 					else if (event.device->type == InputSystem::Device::KEYBOARD)
 					{
@@ -1135,22 +1142,10 @@ struct GUISceneImpl final : GUIScene
 	}
 
 	
-	DelegateList<void(EntityRef)>& buttonClicked() override
-	{
-		return m_button_clicked;
-	}
-
-
-	DelegateList<void(EntityRef)>& rectHovered() override
-	{
-		return m_rect_hovered;
-	}
-
-
-	DelegateList<void(EntityRef)>& rectHoveredOut() override
-	{
-		return m_rect_hovered_out;
-	}
+	DelegateList<void(EntityRef)>& buttonClicked() override { return m_button_clicked; }
+	DelegateList<void(EntityRef)>& rectHovered() override { return m_rect_hovered; }
+	DelegateList<void(EntityRef)>& rectHoveredOut() override { return m_rect_hovered_out; }
+	DelegateList<void(bool, int, int)>& mousedButtonUnhandled() override { return m_unhandled_mouse_button; }
 
 
 	Universe& getUniverse() override { return m_universe; }
@@ -1172,6 +1167,7 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)> m_button_clicked;
 	DelegateList<void(EntityRef)> m_rect_hovered;
 	DelegateList<void(EntityRef)> m_rect_hovered_out;
+	DelegateList<void(bool, i32, i32)> m_unhandled_mouse_button;
 };
 
 
