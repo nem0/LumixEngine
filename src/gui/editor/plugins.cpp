@@ -526,14 +526,18 @@ private:
 				if (ImGui::BeginMenu("Layout")) {
 					static int cols = 1;
 					static int row_height = 20;
+					static int row_spacing = 0;
+					static int col_spacing = 0;
 					ImGui::InputInt("Columns", &cols);
 					ImGui::InputInt("Row height", &row_height);
+					ImGui::InputInt("Row spacing", &row_spacing);
+					ImGui::InputInt("Column spacing", &col_spacing);
 					if (m_editor->getSelectedEntities().empty()) {
 						ImGui::TextUnformatted("Please select an entity");
 					}
 					else {
 						if (ImGui::Button("Do")) {
-							layout(cols, row_height);
+							layout(cols, row_height, row_spacing, col_spacing);
 						}
 					}
 					ImGui::EndMenu();
@@ -548,7 +552,7 @@ private:
 	}
 
 
-	void layout(u32 cols, u32 row_height) {
+	void layout(u32 cols, u32 row_height, u32 row_spacing, u32 col_spacing) {
 		const Array<EntityRef>& selected = m_editor->getSelectedEntities();
 		ASSERT(!selected.empty());
 		ASSERT(cols > 0);
@@ -565,16 +569,19 @@ private:
 			if (!universe.hasComponent(ch, GUI_RECT_TYPE)) continue;
 
 			setRectProperty(ch, "Top Points", (float)y);
+			setRectProperty(ch, "Bottom Points", (float)y + row_height);
 
 			const float l = col / (float)cols;
 			const float r = (col + 1) / (float)cols;
 			setRectProperty(ch, "Left Relative", l);
+			setRectProperty(ch, "Right Points", -(float)(col_spacing / 2));
+			setRectProperty(ch, "Left Points", (float)((col_spacing + 1) / 2));
 			setRectProperty(ch, "Right Relative", r);
 
 			++col;
 			if (col == cols) {
 				col = 0;
-				y += row_height;
+				y += row_height + row_spacing;
 			}
 		}
 
