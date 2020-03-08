@@ -2136,21 +2136,28 @@ public:
 		}
 	}
 
-	void copyEntities() override
-	{
+	void gatherHierarchy(EntityRef e, Ref<Array<EntityRef>> entities) {
+		entities->push(e);
+		for (EntityPtr child = m_universe->getFirstChild(e); 
+			child.isValid(); 
+			child = m_universe->getNextSibling((EntityRef)child)) 
+		{
+			const EntityRef ch = (EntityRef)child;
+			if (entities->indexOf(ch) < 0) {
+				gatherHierarchy(ch, entities);
+			}
+		}
+	}
+
+	void copyEntities() override {
 		if (m_selected_entities.empty()) return;
 
 		m_copy_buffer.clear();
 
 		Array<EntityRef> entities(m_allocator);
-		entities = m_selected_entities;
-		for (EntityRef e : entities) {
-			for (EntityPtr child = m_universe->getFirstChild(e); 
-				child.isValid(); 
-				child = m_universe->getNextSibling((EntityRef)child)) 
-			{
-				if(entities.indexOf((EntityRef)child) < 0) entities.push((EntityRef)child);
-			}
+		entities.reserve(m_selected_entities.size());
+		for (EntityRef e : m_selected_entities) {
+			gatherHierarchy(e, Ref(entities));
 		}
 		copyEntities(&entities[0], entities.size(), m_copy_buffer);
 	}
