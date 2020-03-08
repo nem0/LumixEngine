@@ -958,7 +958,6 @@ struct GUISceneImpl final : GUIScene
 		{
 			LUMIX_DELETE(m_allocator, rect);
 			m_rects.erase(entity);
-			
 		}
 		if (rect == m_root)
 		{
@@ -1062,7 +1061,9 @@ struct GUISceneImpl final : GUIScene
 			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
 			serializer.read(rect->flags);
 			serializer.read(rect->entity);
-			rect->entity = entity_map.get(rect->entity);
+			if (rect->flags.isSet(GUIRect::IS_VALID)) {
+				rect->entity = entity_map.get(rect->entity);
+			}
 			serializer.read(rect->top);
 			serializer.read(rect->right);
 			serializer.read(rect->bottom);
