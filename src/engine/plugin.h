@@ -33,6 +33,7 @@ struct LUMIX_ENGINE_API IScene
 {
 	virtual ~IScene() {}
 
+	virtual void init() {}
 	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
 	virtual void deserialize(struct InputMemoryStream& serialize, const struct EntityMap& entity_map) = 0;
 	virtual IPlugin& getPlugin() const = 0;
@@ -68,6 +69,7 @@ struct LUMIX_ENGINE_API StaticPluginRegister
 	StaticPluginRegister(const char* name, Creator creator);
 	
 	static IPlugin* create(const char* name, Engine& engine);
+	static void createAll(Engine& engine);
 
 	StaticPluginRegister* next;
 	Creator creator;
