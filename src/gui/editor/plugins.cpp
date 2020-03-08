@@ -523,11 +523,62 @@ private:
 					ImGui::EndMenu();
 				}
 
+				if (ImGui::BeginMenu("Layout")) {
+					static int cols = 1;
+					static int row_height = 20;
+					ImGui::InputInt("Columns", &cols);
+					ImGui::InputInt("Row height", &row_height);
+					if (m_editor->getSelectedEntities().empty()) {
+						ImGui::TextUnformatted("Please select an entity");
+					}
+					else {
+						if (ImGui::Button("Do")) {
+							layout(cols, row_height);
+						}
+					}
+					ImGui::EndMenu();
+				}
+
+
 				ImGui::EndPopup();
 			}
 		}
 
 		ImGui::End();
+	}
+
+
+	void layout(u32 cols, u32 row_height) {
+		const Array<EntityRef>& selected = m_editor->getSelectedEntities();
+		ASSERT(!selected.empty());
+		ASSERT(cols > 0);
+		const Universe& universe = *m_editor->getUniverse();
+		const EntityRef e = selected[0];
+
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+		m_editor->beginCommandGroup(crc32("layout_gui"));
+
+		u32 y = 0;
+		u32 col = 0;
+		for (EntityPtr child = universe.getFirstChild(e); child.isValid(); child = universe.getNextSibling((EntityRef)child)) {
+			const EntityRef ch = (EntityRef)child;
+			if (!universe.hasComponent(ch, GUI_RECT_TYPE)) continue;
+
+			setRectProperty(ch, "Top Points", (float)y);
+
+			const float l = col / (float)cols;
+			const float r = (col + 1) / (float)cols;
+			setRectProperty(ch, "Left Relative", l);
+			setRectProperty(ch, "Right Relative", r);
+
+			++col;
+			if (col == cols) {
+				col = 0;
+				y += row_height;
+			}
+		}
+
+		m_editor->endCommandGroup();
 	}
 
 
