@@ -26,6 +26,14 @@ namespace Lumix
 		s_first_plugin = this;
 	}
 
+	void StaticPluginRegister::createAll(Engine& engine) {
+		auto* i = s_first_plugin;
+		while (i) {
+			IPlugin* p = i->creator(engine);
+			engine.getPluginManager().addPlugin(p);
+			i = i->next;
+		}
+	}
 
 	IPlugin* StaticPluginRegister::create(const char* name, Engine& engine)
 	{

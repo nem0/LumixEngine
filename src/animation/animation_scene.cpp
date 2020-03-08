@@ -99,7 +99,6 @@ struct AnimationSceneImpl final : AnimationScene
 		, m_animator_map(allocator)
 	{
 		m_is_game_running = false;
-		m_render_scene = static_cast<RenderScene*>(universe.getScene(crc32("renderer")));
 		universe.registerComponentType(PROPERTY_ANIMATOR_TYPE
 			, this
 			, &AnimationSceneImpl::createPropertyAnimator
@@ -112,6 +111,10 @@ struct AnimationSceneImpl final : AnimationScene
 			, this
 			, &AnimationSceneImpl::createAnimator
 			, &AnimationSceneImpl::destroyAnimator);
+	}
+
+	void init() override {
+		m_render_scene = static_cast<RenderScene*>(m_universe.getScene(crc32("renderer")));
 		ASSERT(m_render_scene);
 	}
 

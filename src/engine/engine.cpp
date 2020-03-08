@@ -123,6 +123,8 @@ public:
 
 		logInfo("Core") << "Engine created.";
 
+		StaticPluginRegister::createAll(*this);
+		
 		for (auto* plugin_name : init_data.plugins) {
 			if (plugin_name[0] && !m_plugin_manager->load(plugin_name)) {
 				logInfo("Editor") << plugin_name << " plugin has not been loaded";
@@ -207,6 +209,10 @@ public:
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins) {
 			plugin->createScenes(*universe);
+		}
+
+		for (IScene* scene : universe->getScenes()) {
+			scene->init();
 		}
 
 		if (is_main_universe) {
