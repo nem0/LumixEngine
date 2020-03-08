@@ -150,6 +150,8 @@ struct Color {
 	static constexpr u32 RED = 0xff0000ff;
 	static constexpr u32 GREEN = 0xff00ff00;
 	static constexpr u32 BLUE = 0xffff0000;
+	static constexpr u32 BLACK = 0xff000000;
+	static constexpr u32 WHITE = 0xffFFffFF;
 };
 
 #pragma pack()

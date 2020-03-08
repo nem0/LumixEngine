@@ -270,7 +270,8 @@ private:
 
 		const GUIScene::Rect rect = scene.getRectOnCanvas(e, canvas_size);
 		const Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
-		draw.addRect({ rect.x, rect.y }, bottom_right, {0xff, 0xf0, 0x0f, 0xff}, 1);
+		draw.addRect({ rect.x, rect.y }, bottom_right, Color::BLACK, 1);
+		draw.addRect({ rect.x - 1, rect.y - 1 }, bottom_right + Vec2(1, 1), Color::WHITE, 1);
 		const Vec2 mid = { rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f };
 
 		auto drawHandle = [&](const Vec2& pos, const ImVec2& mouse_pos) {
@@ -279,8 +280,8 @@ private:
 			float dy = pos.y - mouse_pos.y;
 			bool is_hovered = fabsf(dx) < SIZE && fabsf(dy) < SIZE;
 			
-			draw.addRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? Color{0xff, 0xff, 0xff, 0xff} : Color{0xff, 0xff, 0xff, 0x77});
-			draw.addRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), {0xff, 0xff, 0xff, 0x77}, 1);
+			draw.addRectFilled(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), is_hovered ? Color::WHITE : Color{0xff, 0xff, 0xff, 0x77});
+			draw.addRect(pos - Vec2(SIZE, SIZE), pos + Vec2(SIZE, SIZE), Color::BLACK, 1);
 
 			return is_hovered && ImGui::IsMouseClicked(0);
 		};
