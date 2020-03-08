@@ -237,7 +237,7 @@ void GameView::processInputEvents()
 	InputSystem& input = m_editor.getEngine().getInputSystem();
 	const OS::Event* events = m_studio_app.getEvents();
 	for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i) {
-		input.injectEvent(events[i]);
+		input.injectEvent(events[i], int(m_pos.x), int(m_pos.y));
 	}
 }
 
@@ -298,7 +298,7 @@ void GameView::onWindowGUI()
 		is_game_view_visible = true;
 		view_pos = ImGui::GetCursorScreenPos();
 
-		const ImVec2 content_min = ImGui::GetCursorScreenPos();
+		const ImVec2 content_min = view_pos;
 		ImVec2 size = ImGui::GetContentRegionAvail();
 		size.y -= ImGui::GetTextLineHeightWithSpacing();
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);

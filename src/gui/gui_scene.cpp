@@ -662,7 +662,7 @@ struct GUISceneImpl final : GUIScene
 		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
 		const bool is_up = !event.data.button.down;
 
-		Vec2 pos(event.data.button.x_abs, event.data.button.y_abs);
+		Vec2 pos(event.data.button.x, event.data.button.y);
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
 		
 		if (contains(r, pos) && contains(r, m_mouse_down_pos))
@@ -775,6 +775,7 @@ struct GUISceneImpl final : GUIScene
 		InputSystem& input = m_system.getEngine().getInputSystem();
 		const InputSystem::Event* events = input.getEvents();
 		int events_count = input.getEventsCount();
+		static Vec2 old_pos = {0, 0};
 		for (int i = 0; i < events_count; ++i)
 		{
 			const InputSystem::Event& event = events[i];
@@ -787,8 +788,8 @@ struct GUISceneImpl final : GUIScene
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
 						Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
-						Vec2 old_pos = pos - Vec2(event.data.axis.x, event.data.axis.y);
 						handleMouseAxisEvent({0, 0,  m_canvas_size.x, m_canvas_size.y }, *m_root, pos, old_pos);
+						old_pos = pos;
 					}
 					break;
 				case InputSystem::Event::BUTTON:
@@ -796,8 +797,8 @@ struct GUISceneImpl final : GUIScene
 					{
 						if (event.data.button.down)
 						{
-							m_mouse_down_pos.x = event.data.button.x_abs;
-							m_mouse_down_pos.y = event.data.button.y_abs;
+							m_mouse_down_pos.x = event.data.button.x;
+							m_mouse_down_pos.y = event.data.button.y;
 						}
 						handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *m_root, event);
 						if (!event.data.button.down) m_buttons_down_count = 0;

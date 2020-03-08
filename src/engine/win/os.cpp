@@ -683,18 +683,6 @@ void setMouseScreenPos(int x, int y)
 	SetCursorPos(x, y);
 }
 
-Point getMousePos(WindowHandle win)
-{
-	POINT p;
-	BOOL b = GetCursorPos(&p);
-	ScreenToClient((HWND)win, &p);
-	if (!b) {
-		auto err = GetLastError();
-		ASSERT(false);
-	}
-	return {p.x, p.y};
-}
-
 Point getMouseScreenPos()
 {
 	POINT p;
