@@ -353,7 +353,7 @@ public:
 	u32 size() const { return m_size; }
 
 	void reserve(u32 new_capacity) {
-		if (new_capacity > m_capacity) grow(new_capacity);
+		if (new_capacity > m_capacity) grow(nextPow2(new_capacity));
 	}
 
 private:
