@@ -27,7 +27,6 @@ struct Action;
 struct ComponentUID;
 struct ResourceType;
 struct Vec2;
-struct WorldEditor;
 namespace Gizmo { struct Config; }
 
 
@@ -102,7 +101,7 @@ struct LUMIX_EDITOR_API StudioApp : OS::Interface
 	virtual struct LogUI& getLogUI() = 0;
 	virtual struct AssetBrowser& getAssetBrowser() = 0;
 	virtual struct AssetCompiler& getAssetCompiler() = 0;
-	virtual WorldEditor& getWorldEditor() = 0;
+	virtual struct WorldEditor& getWorldEditor() = 0;
 	virtual void initPlugins() = 0;
 	virtual void addPlugin(IPlugin& plugin) = 0;
 	virtual void addPlugin(MousePlugin& plugin) = 0;

@@ -602,7 +602,6 @@ struct UniverseViewImpl final : UniverseView {
 
 SceneView::SceneView(StudioApp& app)
 	: m_app(app)
-	, m_drop_handlers(app.getAllocator())
 	, m_log_ui(app.getLogUI())
 	, m_editor(m_app.getWorldEditor())
 {
@@ -865,7 +864,7 @@ void SceneView::renderSelection()
 					const Mesh& mesh = model->getMesh(i);
 					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;
-					item.mtx = universe.getRelativeMatrix(e, m_editor->getView().getViewport().pos);
+					item.mtx = universe.getRelativeMatrix(e, m_cam_pos);
 					item.material = mesh.material->getRenderData();
 					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | item.material->define_mask);
 				}
@@ -902,6 +901,7 @@ void SceneView::renderSelection()
 		Pipeline* m_pipeline;
 		WorldEditor* m_editor;
 		u32 m_define_mask;
+		DVec3 m_cam_pos;
 	};
 
 	Engine& engine = m_editor.getEngine();
@@ -911,6 +911,7 @@ void SceneView::renderSelection()
 	job->m_define_mask = 1 << renderer->getShaderDefineIdx("DEPTH");
 	job->m_pipeline = m_pipeline;
 	job->m_editor = &m_editor;
+	job->m_cam_pos = m_view->getViewport().pos;
 	renderer->queue(job, 0);
 }
 
@@ -1016,26 +1017,9 @@ RayCastModelHit SceneView::castRay(float x, float y)
 }
 
 
-void SceneView::addDropHandler(DropHandler handler)
-{
-	m_drop_handlers.push(handler);
-}
-
-
-void SceneView::removeDropHandler(DropHandler handler)
-{
-	m_drop_handlers.swapAndPopItem(handler);
-}
-
-
 void SceneView::handleDrop(const char* path, float x, float y)
 {
-	auto hit = castRay(x, y);
-
-	for (DropHandler handler : m_drop_handlers)
-	{
-		if (handler.invoke(m_app, x, y, hit)) return;
-	}
+	const RayCastModelHit hit = castRay(x, y);
 
 	if (Path::hasExtension(path, "fbx"))
 	{

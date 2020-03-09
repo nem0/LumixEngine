@@ -17,7 +17,6 @@ struct Action;
 struct Material;
 struct OutputMemoryStream;
 struct StudioApp;
-struct WorldEditor;
 
 
 struct LUMIX_EDITOR_API AssetBrowser

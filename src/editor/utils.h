@@ -43,10 +43,7 @@ struct LUMIX_EDITOR_API Action
 };
 
 
-struct WorldEditor;
-
-
-LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, Span<char> buf, EntityPtr entity);
+LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct WorldEditor& editor, Span<char> buf, EntityPtr entity);
 
 
 } // namespace Lumix

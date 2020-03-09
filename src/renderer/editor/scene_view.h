@@ -34,8 +34,6 @@ struct SceneView : StudioApp::GUIPlugin
 		void setUniverse(Universe* universe);
 		void onWindowGUI() override;
 		Pipeline* getPipeline() { return m_pipeline; }
-		void addDropHandler(DropHandler handler);
-		void removeDropHandler(DropHandler handler);
 		const char* getName() const override { return "scene_view"; }
 
 	private:
@@ -73,7 +71,6 @@ struct SceneView : StudioApp::GUIPlugin
 		WorldEditor& m_editor;
 		Pipeline* m_pipeline;
 		LogUI& m_log_ui;
-		Array<DropHandler> m_drop_handlers;
 		Shader* m_debug_shape_shader;
 		struct UniverseViewImpl* m_view;
 

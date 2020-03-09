@@ -10,60 +10,69 @@ namespace Lumix
 String::String(IAllocator& allocator)
 	: m_allocator(allocator)
 {
-	m_cstr = nullptr;
+	m_small[0] = '\0';
 	m_size = 0;
 }
 
 
-String::String(const String& rhs, int start, i32 length)
+String::String(const String& rhs, u32 start, u32 length)
 	: m_allocator(rhs.m_allocator)
 {
-	m_size = length - start <= rhs.m_size ? length : rhs.m_size - start;
-	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-	memcpy(m_cstr, rhs.m_cstr + start, m_size * sizeof(char));
-	m_cstr[m_size] = 0;
+	m_size = 0;
+	*this = Span(rhs.c_str() + start, length);
 }
+
 
 
 String::String(Span<const char> rhs, IAllocator& allocator)
 	: m_allocator(allocator)
 {
-	m_size = rhs.length();
-	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-	memcpy(m_cstr, rhs.begin(), m_size * sizeof(char));
-	m_cstr[m_size] = 0;
+	m_size = 0;
+	*this = rhs;
 }
 
 
 String::String(const String& rhs)
 	: m_allocator(rhs.m_allocator)
 {
-	m_cstr = (char*)m_allocator.allocate((rhs.m_size + 1) * sizeof(char));
-	m_size = rhs.m_size;
-	memcpy(m_cstr, rhs.m_cstr, m_size * sizeof(char));
-	m_cstr[m_size] = 0;
+	m_size = 0;
+	*this = Span(rhs.c_str(), rhs.length());
 }
 
 
 String::String(String&& rhs)
 	: m_allocator(rhs.m_allocator)
 {
-	m_cstr = rhs.m_cstr;
+	if (rhs.isSmall()) {
+		memcpy(m_small, rhs.m_small, sizeof(m_small));
+		rhs.m_small[0] = '\0';
+	}
+	else {
+		m_big = rhs.m_big;
+		rhs.m_big = nullptr;
+	}
 	m_size = rhs.m_size;
-	rhs.m_cstr = nullptr;
 	rhs.m_size = 0;
 }
 
 void String::operator=(String&& rhs)
 {
-	if (&rhs != this)
-	{
-		m_allocator.deallocate(m_cstr);
-		m_cstr = rhs.m_cstr;
-		m_size = rhs.m_size;
-		rhs.m_cstr = nullptr;
-		rhs.m_size = 0;
+	if (&rhs == this) return;
+
+	if (!isSmall()) {
+		m_allocator.deallocate(m_big);
 	}
+
+	if (rhs.isSmall()) {
+		memcpy(m_small, rhs.m_small, sizeof(m_small));
+		rhs.m_small[0] = '\0';
+	}
+	else {
+		m_big = rhs.m_big;
+		rhs.m_big = nullptr;
+	}
+	m_size = rhs.m_size;
+	rhs.m_size = 0;
 }
 
 
@@ -71,141 +80,141 @@ String::String(const char* rhs, IAllocator& allocator)
 	: m_allocator(allocator)
 {
 	m_size = stringLength(rhs);
-	m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-	memcpy(m_cstr, rhs, sizeof(char) * (m_size + 1));
+	if (isSmall()) {
+		memcpy(m_small, rhs, m_size + 1);
+	}
+	else {
+		m_big = (char*)m_allocator.allocate(m_size + 1);
+		memcpy(m_big, rhs, m_size + 1);
+	}
 }
 
 
-String::~String() { m_allocator.deallocate(m_cstr); }
+String::~String() { if (!isSmall()) m_allocator.deallocate(m_big); }
 
 
 char String::operator[](int index) const
 {
 	ASSERT(index >= 0 && index < m_size);
-	return m_cstr[index];
-}
-
-
-void String::set(const char* rhs, int size)
-{
-	if (rhs < m_cstr || rhs >= m_cstr + m_size)
-	{
-		m_allocator.deallocate(m_cstr);
-		m_size = size;
-		m_cstr = (char*)m_allocator.allocate(m_size + 1);
-		memcpy(m_cstr, rhs, size);
-		m_cstr[size] = '\0';
-	}
+	return isSmall() ? m_small[index] : m_big[index];
 }
 
 
 void String::operator=(const String& rhs)
 {
-	if (&rhs != this)
-	{
-		m_allocator.deallocate(m_cstr);
-		m_cstr = (char*)m_allocator.allocate((rhs.m_size + 1) * sizeof(char));
-		m_size = rhs.m_size;
-		memcpy(m_cstr, rhs.m_cstr, sizeof(char) * (m_size + 1));
+	if (&rhs == this) return;
+
+	*this = Span(rhs.c_str(), rhs.length());
+}
+
+void String::operator=(Span<const char> rhs)
+{
+	if (!isSmall()) {
+		m_allocator.deallocate(m_big);
 	}
+		
+	if (rhs.length() < sizeof(m_small)) {
+		memcpy(m_small, rhs.m_begin, rhs.length());
+		m_small[rhs.length()] = '\0';
+	}
+	else {
+		m_big = (char*)m_allocator.allocate(rhs.length() + 1);
+		memcpy(m_big, rhs.m_begin, rhs.length());
+		m_big[rhs.length()] = '\0';
+	}
+	m_size = rhs.length();
 }
 
 
 void String::operator=(const char* rhs)
 {
-	if (rhs < m_cstr || rhs >= m_cstr + m_size)
-	{
-		m_allocator.deallocate(m_cstr);
-		if (rhs)
-		{
-			m_size = stringLength(rhs);
-			m_cstr = (char*)m_allocator.allocate((m_size + 1) * sizeof(char));
-			memcpy(m_cstr, rhs, sizeof(char) * (m_size + 1));
-		}
-		else
-		{
-			m_size = 0;
-			m_cstr = nullptr;
-		}
-	}
+	*this = Span(rhs, stringLength(rhs));
 }
 
 
 bool String::operator!=(const String& rhs) const
 {
-	return compareString(m_cstr, rhs.m_cstr) != 0;
+	return compareString(c_str(), rhs.c_str()) != 0;
 }
 
 
 bool String::operator!=(const char* rhs) const
 {
-	return compareString(m_cstr, rhs) != 0;
+	return compareString(c_str(), rhs) != 0;
 }
 
 
 bool String::operator==(const String& rhs) const
 {
-	return compareString(m_cstr, rhs.m_cstr) == 0;
+	return compareString(c_str(), rhs.c_str()) == 0;
 }
 
 
 bool String::operator==(const char* rhs) const
 {
-	return compareString(m_cstr, rhs) == 0;
+	return compareString(c_str(), rhs) == 0;
 }
 
 
 bool String::operator<(const String& rhs) const
 {
-	return compareString(m_cstr, rhs.m_cstr) < 0;
+	return compareString(c_str(), rhs.c_str()) < 0;
 }
 
 
 bool String::operator>(const String& rhs) const
 {
-	return compareString(m_cstr, rhs.m_cstr) > 0;
+	return compareString(c_str(), rhs.c_str()) > 0;
 }
 
 
-String String::substr(int start, int length) const
+String String::substr(u32 start, u32 length) const
 {
 	return String(*this, start, length);
 }
 
 
-void String::resize(int size)
+void String::resize(u32 size)
 {
 	ASSERT(size > 0);
-	if (size <= 0) return;
+	if (size == 0) return;
 	
-	m_cstr = (char*)m_allocator.reallocate(m_cstr, size);
-	m_size = size - 1;
-	m_cstr[size - 1] = '\0';
+	if (isSmall()) {
+		if (size < sizeof(m_small)) {
+			m_size = size;
+			m_small[size] = '\0';
+		}
+		else {
+			char* tmp = (char*)m_allocator.allocate(size + 1);
+			memcpy(tmp, m_small, m_size + 1);
+			m_size = size;
+			m_big = tmp;
+		}
+	}
+	else {
+		if (size < sizeof(m_small)) {
+			char* tmp = m_big;
+			memcpy(m_small, tmp, m_size >= sizeof(m_small) ? sizeof(m_small) - 1 : m_size + 1);
+			m_small[size] = '\0';
+			m_allocator.deallocate(tmp);
+		}
+		else {
+			m_big = (char*)m_allocator.reallocate(m_big, size + 1);
+			m_size = size;
+			m_big[size] = '\0';
+		}
+	}
 }
 
 
 String& String::cat(Span<const char> value)
 {
-	const u32 length = value.length();
-	if (value.begin() < m_cstr || value.begin() >= m_cstr + m_size)
-	{
-		if (m_cstr)
-		{
-			i32 new_size = m_size + length;
-			char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
-			memcpy(new_cstr, m_cstr, sizeof(char) * m_size + 1);
-			m_allocator.deallocate(m_cstr);
-			m_cstr = new_cstr;
-			m_size = new_size;
-			catNString(Span(m_cstr, m_size + 1), value.begin(), length);
-		}
-		else
-		{
-			m_size = length;
-			m_cstr = (char*)m_allocator.allocate(m_size + 1);
-			copyNString(Span(m_cstr, m_size + 1), value.begin(), length);
-		}
-	}
+	ASSERT(value.begin() < c_str() || value.begin() >= c_str() + m_size);
+
+	const int old_s = m_size;
+	resize(m_size + value.length());
+	memcpy(getData() + old_s, value.m_begin, value.length());
+	getData()[old_s + value.length()] = '\0';
 	return *this;
 }
 
@@ -226,60 +235,39 @@ String& String::cat(char* value)
 }
 
 
-void String::eraseAt(int position)
+void String::eraseAt(u32 position)
 {
-	if (position < 0 || position >= m_size) return;
-	memmove(m_cstr + position, m_cstr + position + 1, m_size - position - 1);
+	ASSERT(position < m_size);
+	if (position >= m_size) return;
+	
+	memmove(getData() + position, getData() + position + 1, m_size - position - 1);
 	--m_size;
-	m_cstr[m_size] = '\0';
+	getData()[m_size] = '\0';
 }
 
 
-void String::insert(int position, const char* value)
+void String::insert(u32 position, const char* value)
 {
-	if (m_cstr)
-	{
-		int value_len = stringLength(value);
-		i32 new_size = m_size + value_len;
-		char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
-		if (position > 0) memcpy(new_cstr, m_cstr, sizeof(char) * position);
-		if (value_len > 0) memcpy(new_cstr + position, value, sizeof(char) * value_len);
-		memcpy(new_cstr + position + value_len, m_cstr + position, sizeof(char) * (m_size - position) + 1);
-		
-		m_allocator.deallocate(m_cstr);
-		m_cstr = new_cstr;
-		m_size = new_size;
-	}
-	else
-	{
-		m_size = stringLength(value);
-		m_cstr = (char*)m_allocator.allocate(m_size + 1);
-		copyString(Span(m_cstr, m_size + 1), value);
-	}
+	ASSERT(value < c_str() || value > c_str() + m_size);
+	
+	const int old_size = m_size;
+	const int len = stringLength(value);
+	resize(old_size + len);
+
+	char* tmp = getData();
+	memmove(tmp + position + len, tmp + position, old_size - position);
+	memcpy(tmp + position, value, len);
 }
 
 
 String& String::cat(const char* rhs)
 {
-	if (rhs < m_cstr || rhs >= m_cstr + m_size)
-	{
-		if (m_cstr)
-		{
-			i32 new_size = m_size + stringLength(rhs);
-			char* new_cstr = (char*)m_allocator.allocate(new_size + 1);
-			memcpy(new_cstr, m_cstr, sizeof(char) * m_size + 1);
-			m_allocator.deallocate(m_cstr);
-			m_cstr = new_cstr;
-			m_size = new_size;
-			catString(Span(m_cstr, m_size + 1), rhs);
-		}
-		else
-		{
-			m_size = stringLength(rhs);
-			m_cstr = (char*)m_allocator.allocate(m_size + 1);
-			copyString(Span(m_cstr, m_size + 1), rhs);
-		}
-	}
+	ASSERT(rhs < c_str() || rhs >= c_str() + m_size);
+	
+	const int len = stringLength(rhs);
+	const int old_s = m_size;
+	resize(len + old_s);
+	memcpy(getData() + old_s, rhs, len + 1);
 	return *this;
 }
 

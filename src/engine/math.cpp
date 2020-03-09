@@ -761,6 +761,16 @@ void Matrix::setIdentity()
 }
 
 
+Vec2 degreesToRadians(const Vec2& v)
+{
+	return Vec2(degreesToRadians(v.x), degreesToRadians(v.y));
+}
+
+Vec2 radiansToDegrees(const Vec2& v)
+{
+	return Vec2(radiansToDegrees(v.x), radiansToDegrees(v.y));
+}
+
 Vec3 degreesToRadians(const Vec3& v)
 {
 	return Vec3(degreesToRadians(v.x), degreesToRadians(v.y), degreesToRadians(v.z));

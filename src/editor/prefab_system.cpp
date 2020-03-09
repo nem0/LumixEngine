@@ -30,24 +30,13 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	AssetBrowserPlugin(StudioApp& app, PrefabSystem& system)
 		: system(system)
-		, editor(app.getWorldEditor())
 		, app(app)
 	{
 		app.getAssetCompiler().registerExtension("fab", PrefabResource::TYPE);
 	}
 
 
-	void onGUI(Span<Resource*> resources) override
-	{
-		if (resources.length() > 1) return;
-
-		if (ImGui::Button("instantiate")) {
-			Array<EntityRef> entities(editor.getAllocator());
-			UniverseView& view = editor.getView();
-			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
-			system.instantiatePrefab(*(PrefabResource*)resources[0], hit.pos, {0, 0, 0, 1}, 1);
-		}
-	}
+	void onGUI(Span<Resource*> resources) override {}
 	
 	
 	bool compile(const Path& src) override
@@ -62,7 +51,6 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 
 	PrefabSystem& system;
-	WorldEditor& editor;
 	StudioApp& app;
 };
 

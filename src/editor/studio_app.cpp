@@ -369,7 +369,6 @@ struct StudioAppImpl final : StudioApp
 		extractBundled();
 
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
-		m_settings.m_editor = m_editor;
 		scanUniverses();
 		loadUserPlugins();
 		addActions();
@@ -424,7 +423,7 @@ struct StudioAppImpl final : StudioApp
 		if (io.WantSaveIniSettings) {
 			size_t size;
 			const char* data = ImGui::SaveIniSettingsToMemory(&size);
-			FileSystem& fs = m_editor->getEngine().getFileSystem();
+			FileSystem& fs = m_engine->getFileSystem();
 			OS::OutputFile file;
 			if (fs.open("imgui.ini", Ref(file))) {
 				file.write(data ,size);
@@ -437,9 +436,8 @@ struct StudioAppImpl final : StudioApp
 		saveSettings();
 		unloadIcons();
 
-		while (m_editor->getEngine().getFileSystem().hasWork())
-		{
-			m_editor->getEngine().getFileSystem().processCallbacks();
+		while (m_engine->getFileSystem().hasWork()) {
+			m_engine->getFileSystem().processCallbacks();
 		}
 
 		m_editor->newUniverse();
@@ -851,7 +849,7 @@ struct StudioAppImpl final : StudioApp
 
 		guiBeginFrame();
 
-		float time_delta = m_editor->getEngine().getLastTimeDelta();
+		float time_delta = m_engine->getLastTimeDelta();
 
 		ImGuiIO& io = ImGui::GetIO();
 		if (!io.KeyShift) {
@@ -1637,7 +1635,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
-		getEntityListDisplayName(*this, Span(buffer), entity);
+		getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), entity);
 		bool selected = selected_entities.indexOf(entity) >= 0;
 		ImGui::PushID(entity.index);
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
@@ -1746,7 +1744,7 @@ struct StudioAppImpl final : StudioApp
 						 e = universe->getNextEntity((EntityRef)e))
 					{
 						char buffer[1024];
-						getEntityListDisplayName(*this, Span(buffer), e);
+						getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
@@ -1814,7 +1812,7 @@ struct StudioAppImpl final : StudioApp
 
 
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
-		FileSystem& fs = m_editor->getEngine().getFileSystem();
+		FileSystem& fs = m_engine->getFileSystem();
 		Array<u8> data(m_allocator);
 		if (!fs.getContentSync(Path(path), Ref(data))) return nullptr;
 		ImGuiIO& io = ImGui::GetIO();
@@ -2142,7 +2140,7 @@ struct StudioAppImpl final : StudioApp
 		OS::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
-		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		auto& plugin_manager = m_engine->getPluginManager();
 		while (parser.next())
 		{
 			if (!parser.currentEquals("-plugin")) continue;
@@ -2231,7 +2229,7 @@ struct StudioAppImpl final : StudioApp
 
 		OutputMemoryStream blob(m_allocator);
 		blob.reserve(16 * 1024);
-		PluginManager& plugin_manager = m_editor->getEngine().getPluginManager();
+		PluginManager& plugin_manager = m_engine->getPluginManager();
 
 		Universe* universe = m_editor->getUniverse();
 		for (IScene* scene : universe->getScenes())
@@ -2376,7 +2374,7 @@ struct StudioAppImpl final : StudioApp
 #ifdef STATIC_PLUGINS
 		StudioApp::StaticPluginRegister::create(*this);
 #else
-		auto& plugin_manager = m_editor->getEngine().getPluginManager();
+		auto& plugin_manager = m_engine->getPluginManager();
 		for (auto* lib : plugin_manager.getLibraries())
 		{
 			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) OS::getLibrarySymbol(lib, "setStudioApp");
@@ -2793,7 +2791,7 @@ struct StudioAppImpl final : StudioApp
 
 	void packDataScanResources(AssociativeArray<u32, PackFileInfo>& infos)
 	{
-		ResourceManagerHub& rm = m_editor->getEngine().getResourceManager();
+		ResourceManagerHub& rm = m_engine->getResourceManager();
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
 		{
 			const auto& resources = iter.value()->getResourceTable();
@@ -2900,7 +2898,7 @@ struct StudioAppImpl final : StudioApp
 		{
 			OS::InputFile src;
 			size_t src_size = OS::getFileSize(info.path);
-			if (!m_editor->getEngine().getFileSystem().open(info.path, Ref(src)))
+			if (!m_engine->getFileSystem().open(info.path, Ref(src)))
 			{
 				file.close();
 				logError("Editor") << "Could not open " << info.path;

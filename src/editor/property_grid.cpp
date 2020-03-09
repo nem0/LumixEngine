@@ -242,7 +242,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		EntityPtr entity = prop.get(cmp, m_index);
 
 		char buf[128];
-		getEntityListDisplayName(m_app, Span(buf), entity);
+		getEntityListDisplayName(m_app, m_editor, Span(buf), entity);
 		ImGui::PushID(prop.name);
 		
 		float item_w = ImGui::CalcItemWidth();
@@ -275,7 +275,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter));
 			for (EntityPtr i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity((EntityRef)i))
 			{
-				getEntityListDisplayName(m_app, Span(buf), i);
+				getEntityListDisplayName(m_app, m_editor, Span(buf), i);
 				bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
 				if (show && ImGui::Selectable(buf))
 				{
@@ -293,9 +293,12 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		Vec2 value = prop.get(cmp, m_index);
+		Attributes attrs = getAttributes(prop);
 
+		if (attrs.is_radians) value = radiansToDegrees(value);
 		if (ImGui::DragFloat2(prop.name, &value.x))
 		{
+			if (attrs.is_radians) value = degreesToRadians(value);
 			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
 		}
 	}
@@ -489,7 +492,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 };
 
 
-static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const EntityRef* entities, int entities_count)
+static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType cmp_type, const EntityRef* entities, int entities_count)
 {
 	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_AllowItemOverlap;
 	ImGui::Separator();
@@ -497,17 +500,17 @@ static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Enti
 	ImGui::PushFont(app.getBoldFont());
 	bool is_open;
 	bool enabled = true;
-	IScene* scene = app.getWorldEditor().getUniverse()->getScene(cmp_type);
+	IScene* scene = editor.getUniverse()->getScene(cmp_type);
 	if (entities_count == 1 && Reflection::getPropertyValue(*scene, entities[0], cmp_type, "Enabled", Ref(enabled))) {
 		is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", "");
 		ImGui::SameLine();
 		ComponentUID cmp;
 		cmp.type = cmp_type;
 		cmp.entity = entities[0];
-		cmp.scene = app.getWorldEditor().getUniverse()->getScene(cmp_type);
+		cmp.scene = editor.getUniverse()->getScene(cmp_type);
 		if(ImGui::Checkbox(cmp_type_name, &enabled))
 		{
-			app.getWorldEditor().setProperty(cmp_type, -1, "Enabled", Span(entities, entities_count), enabled);
+			editor.setProperty(cmp_type, -1, "Enabled", Span(entities, entities_count), enabled);
 		}
 	}
 	else
@@ -521,7 +524,7 @@ static bool componentTreeNode(StudioApp& app, ComponentType cmp_type, const Enti
 
 void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type)
 {
-	bool is_open = componentTreeNode(m_app, cmp_type, &entities[0], entities.size());
+	bool is_open = componentTreeNode(m_app, m_editor, cmp_type, &entities[0], entities.size());
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize("Remove").x - style.FramePadding.x * 2 - style.WindowPadding.x - 15);
 	if (ImGui::SmallButton("Remove"))
@@ -559,96 +562,6 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 }
 
 
-bool PropertyGrid::entityInput(const char* label, const char* str_id, EntityPtr& entity)
-{
-	const auto& style = ImGui::GetStyle();
-	float item_w = ImGui::CalcItemWidth();
-	ImGui::PushItemWidth(
-		item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2 - style.ItemSpacing.x);
-	char buf[50];
-	getEntityListDisplayName(m_app, Span(buf), entity);
-	ImGui::LabelText("", "%s", buf);
-	ImGui::SameLine();
-	StaticString<30> popup_name("pu", str_id);
-	if (ImGui::Button(StaticString<30>("...###br", str_id)))
-	{
-		ImGui::OpenPopup(popup_name);
-	}
-
-	if (ImGui::BeginDragDropTarget())
-	{
-		if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
-		{
-			entity = *(EntityRef*)payload->Data;
-			ImGui::EndDragDropTarget();
-			return true;
-		}
-		ImGui::EndDragDropTarget();
-	}
-
-	ImGui::SameLine();
-	ImGui::Text("%s", label);
-	ImGui::PopItemWidth();
-
-	if (ImGui::BeginPopup(popup_name))
-	{
-		if (entity.isValid())
-		{
-			if (ImGui::Button("Select current")) m_deferred_select = entity;
-			ImGui::SameLine();
-			if (ImGui::Button("Empty"))
-			{
-				entity = INVALID_ENTITY;
-				ImGui::CloseCurrentPopup();
-				ImGui::EndPopup();
-				return true;
-			}
-		}
-		Universe* universe = m_editor.getUniverse();
-		static char entity_filter[32] = {};
-		ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter));
-		if (ImGui::ListBoxHeader("Entities"))
-		{
-			if (entity_filter[0])
-			{
-				for (EntityPtr i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity((EntityRef)i))
-				{
-					getEntityListDisplayName(m_app, Span(buf), i);
-					if (stristr(buf, entity_filter) == nullptr) continue;
-					if (ImGui::Selectable(buf))
-					{
-						ImGui::ListBoxFooter();
-						entity = i;
-						ImGui::CloseCurrentPopup();
-						ImGui::EndPopup();
-						return true;
-					}
-				}
-			}
-			else
-			{
-				for (EntityPtr i = universe->getFirstEntity(); i.isValid(); i = universe->getNextEntity((EntityRef)i))
-				{
-					getEntityListDisplayName(m_app, Span(buf), i);
-					if (ImGui::Selectable(buf))
-					{
-						ImGui::ListBoxFooter();
-						entity = i;
-						ImGui::CloseCurrentPopup();
-						ImGui::EndPopup();
-						return true;
-					}
-				}
-			}
-			ImGui::ListBoxFooter();
-		}
-
-		ImGui::EndPopup();
-	}
-	return false;
-}
-
-
 void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 {
 	char name[256];
@@ -678,7 +591,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 		EntityPtr parent = m_editor.getUniverse()->getParent(entities[0]);
 		if (parent.isValid())
 		{
-			getEntityListDisplayName(m_app, Span(name), parent);
+			getEntityListDisplayName(m_app, m_editor, Span(name), parent);
 			ImGui::LabelText("Parent", "%s", name);
 
 			Transform tr = m_editor.getUniverse()->getLocalTransform(entities[0]);
@@ -788,7 +701,7 @@ void PropertyGrid::onGUI()
 
 	if (!m_is_open) return;
 
-	auto& ents = m_editor.getSelectedEntities();
+	const Array<EntityRef>& ents = m_editor.getSelectedEntities();
 	if (ImGui::Begin("Properties", &m_is_open) && !ents.empty())
 	{
 		if (ImGui::Button("Add component"))

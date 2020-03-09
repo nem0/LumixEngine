@@ -34,7 +34,6 @@ public:
 	void addPlugin(IPlugin& plugin) { m_plugins.push(&plugin); }
 	void removePlugin(IPlugin& plugin) { m_plugins.eraseItem(&plugin); }
 	void onGUI();
-	bool entityInput(const char* label, const char* str_id, EntityPtr& entity);
 
 public:
 	bool m_is_open;

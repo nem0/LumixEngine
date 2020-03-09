@@ -50,7 +50,7 @@ struct GUIInterface : GUISystem::Interface
 
 
 GameView::GameView(StudioApp& app)
-	: m_studio_app(app)
+	: m_app(app)
 	, m_is_open(false)
 	, m_is_fullscreen(false)
 	, m_pipeline(nullptr)
@@ -66,13 +66,13 @@ GameView::GameView(StudioApp& app)
 	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 
-	WorldEditor& editor = app.getWorldEditor();
-	Action* action = LUMIX_NEW(editor.getAllocator(), Action)("Game View", "Toggle game view", "game_view");
+	IAllocator& allocator = app.getAllocator();
+	Action* action = LUMIX_NEW(allocator, Action)("Game View", "Toggle game view", "game_view");
 	action->func.bind<&GameView::onAction>(this);
 	action->is_selected.bind<&GameView::isOpen>(this);
 	app.addWindowAction(action);
 
-	Action* fullscreen_action = LUMIX_NEW(editor.getAllocator(), Action)("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen");
+	Action* fullscreen_action = LUMIX_NEW(allocator, Action)("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen");
 	fullscreen_action->func.bind<&GameView::toggleFullscreen>(this);
 	app.addAction(fullscreen_action);
 
@@ -91,11 +91,11 @@ GameView::GameView(StudioApp& app)
 
 GameView::~GameView()
 {
-	auto* gui = static_cast<GUISystem*>(m_editor.getEngine().getPluginManager().getPlugin("gui"));
-	if (gui)
-	{
+	Engine& engine = m_app.getEngine();
+	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
+	if (gui) {
 		gui->setInterface(nullptr);
-		LUMIX_DELETE(m_editor.getEngine().getAllocator(), m_gui_interface);
+		LUMIX_DELETE(engine.getAllocator(), m_gui_interface);
 	}
 	Pipeline::destroy(m_pipeline);
 	m_pipeline = nullptr;
@@ -131,11 +131,11 @@ void GameView::captureMouse(bool capture)
 }
 
 void GameView::onSettingsLoaded() {
-	m_is_open = m_studio_app.getSettings().getValue("is_game_view_open", false);
+	m_is_open = m_app.getSettings().getValue("is_game_view_open", false);
 }
 
 void GameView::onBeforeSettingsSaved() {
-	m_studio_app.getSettings().setValue("is_game_view_open", m_is_open);
+	m_app.getSettings().setValue("is_game_view_open", m_is_open);
 }
 
 void GameView::onFullscreenGUI()
@@ -199,7 +199,7 @@ void GameView::toggleFullscreen()
 void GameView::setFullscreen(bool fullscreen)
 {
 	captureMouse(fullscreen);
-	m_studio_app.setFullscreen(fullscreen);
+	m_app.setFullscreen(fullscreen);
 	m_is_fullscreen = fullscreen;
 }
 
@@ -242,23 +242,25 @@ void GameView::processInputEvents()
 {
 	if (!m_is_mouse_captured) return;
 	
-	InputSystem& input = m_editor.getEngine().getInputSystem();
-	const OS::Event* events = m_studio_app.getEvents();
-	for (int i = 0, c = m_studio_app.getEventsCount(); i < c; ++i) {
+	Engine& engine = m_app.getEngine();
+	InputSystem& input = engine.getInputSystem();
+	const OS::Event* events = m_app.getEvents();
+	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
 		input.injectEvent(events[i], int(m_pos.x), int(m_pos.y));
 	}
 }
 
 void GameView::controlsGUI() {
-	if (ImGui::Checkbox("Pause", &m_paused)) m_editor.getEngine().pause(m_paused);
+	Engine& engine = m_app.getEngine();
+	if (ImGui::Checkbox("Pause", &m_paused)) engine.pause(m_paused);
 	if (m_paused) {
 		ImGui::SameLine();
-		if (ImGui::Button("Next frame")) m_editor.getEngine().nextFrame();
+		if (ImGui::Button("Next frame")) engine.nextFrame();
 	}
 	ImGui::SameLine();
 	ImGui::PushItemWidth(50);
 	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
-		m_editor.getEngine().setTimeMultiplier(m_time_multiplier);
+		engine.setTimeMultiplier(m_time_multiplier);
 	}
 	ImGui::PopItemWidth();
 	if(m_editor.isGameMode()) {

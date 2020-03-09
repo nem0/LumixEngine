@@ -158,18 +158,18 @@ struct LUMIX_ENGINE_API String
 {
 public:
 	explicit String(IAllocator& allocator);
-	String(const String& rhs, int start, i32 length);
+	String(const String& rhs, u32 start, u32 length);
 	String(Span<const char> rhs, IAllocator& allocator);
 	String(const String& rhs);
 	String(String&& rhs);
 	String(const char* rhs, IAllocator& allocator);
 	~String();
 
-	void resize(int size);
-	char* getData() { return m_cstr; }
+	void resize(u32 size);
+	char* getData() { return isSmall() ? m_small : m_big; }
 	char operator[](int index) const;
-	void set(const char* rhs, int size);
 	void operator=(const String& rhs);
+	void operator=(Span<const char> rhs);
 	void operator=(String&& rhs);
 	void operator=(const char* rhs);
 	bool operator!=(const String& rhs) const;
@@ -179,27 +179,33 @@ public:
 	bool operator<(const String& rhs) const;
 	bool operator>(const String& rhs) const;
 	int length() const { return m_size; }
-	const char* c_str() const { return m_cstr; }
-	String substr(int start, int length) const;
+	const char* c_str() const { return isSmall() ? m_small : m_big; }
+	String substr(u32 start, u32 length) const;
 	String& cat(Span<const char> value);
 	String& cat(float value);
 	String& cat(char* value);
 	String& cat(const char* value);
-	void insert(int position, const char* value);
-	void eraseAt(int position);
+	void insert(u32 position, const char* value);
+	void eraseAt(u32 position);
 
 	template <typename V> String& cat(V value)
 	{
-		char tmp[30];
-		toCString(value, Span<char>(tmp, 30));
+		char tmp[64];
+		toCString(value, Span<char>(tmp));
 		cat(tmp);
 		return *this;
 	}
 
 	IAllocator& m_allocator;
 private:
+	bool isSmall() const { return m_size < sizeof(m_small); }
+	void ensure(u32 size);
+
 	i32 m_size;
-	char* m_cstr;
+	union {
+		char* m_big;
+		char m_small[16];
+	};
 };
 
 
