@@ -93,7 +93,7 @@ String::String(const char* rhs, IAllocator& allocator)
 String::~String() { if (!isSmall()) m_allocator.deallocate(m_big); }
 
 
-char String::operator[](int index) const
+char String::operator[](u32 index) const
 {
 	ASSERT(index >= 0 && index < m_size);
 	return isSmall() ? m_small[index] : m_big[index];
