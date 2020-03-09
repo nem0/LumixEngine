@@ -167,7 +167,7 @@ public:
 
 	void resize(u32 size);
 	char* getData() { return isSmall() ? m_small : m_big; }
-	char operator[](int index) const;
+	char operator[](u32 index) const;
 	void operator=(const String& rhs);
 	void operator=(Span<const char> rhs);
 	void operator=(String&& rhs);
@@ -201,7 +201,7 @@ private:
 	bool isSmall() const { return m_size < sizeof(m_small); }
 	void ensure(u32 size);
 
-	i32 m_size;
+	u32 m_size;
 	union {
 		char* m_big;
 		char m_small[16];
