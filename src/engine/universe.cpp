@@ -53,6 +53,7 @@ Universe::Universe(IAllocator& allocator)
 	, m_scenes(m_allocator)
 	, m_hierarchy(m_allocator)
 	, m_transforms(m_allocator)
+	, m_name(m_allocator)
 {
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);

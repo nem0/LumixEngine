@@ -918,18 +918,13 @@ struct RemoveArrayPropertyItemCommand final : IEditorCommand
 {
 
 public:
-	explicit RemoveArrayPropertyItemCommand(WorldEditor& editor)
-		: m_old_values(editor.getAllocator())
-	{
-	}
-
 	RemoveArrayPropertyItemCommand(WorldEditor& editor,
 		const ComponentUID& component,
 		int index,
 		const char* property)
 		: m_component(component)
 		, m_index(index)
-		, m_property(property)
+		, m_property(property, editor.getAllocator())
 		, m_old_values(editor.getAllocator())
 	{
 		save(m_component, Ref(m_old_values));
@@ -947,7 +942,7 @@ public:
 			const char* propname;
 			int index;
 		} v;
-		v.propname = m_property;
+		v.propname = m_property.c_str();
 		v.cmp = m_component;
 		v.index = m_index;
 		Reflection::getComponent(m_component.type)->visit(v);
@@ -970,7 +965,7 @@ public:
 private:
 	ComponentUID m_component;
 	int m_index;
-	StaticString<128> m_property;
+	String m_property;
 	OutputMemoryStream m_old_values;
 };
 
@@ -1061,7 +1056,7 @@ public:
 		T value)
 		: m_component_type(component_type)
 		, m_entities(editor.getAllocator())
-		, m_property_name(property_name)
+		, m_property_name(property_name, editor.getAllocator())
 		, m_editor(editor)
 		, m_index(index)
 		, m_old_values(editor.getAllocator())
@@ -1174,7 +1169,7 @@ private:
 	typename StoredType<T>::Type m_new_value;
 	OutputMemoryStream m_old_values;
 	int m_index;
-	StaticString<128> m_property_name;
+	String m_property_name;
 };
 
 struct PasteEntityCommand;

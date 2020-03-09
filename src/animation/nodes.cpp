@@ -267,6 +267,7 @@ void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 
 LayersNode::Layer::Layer(GroupNode* parent, IAllocator& allocator) 
  : node(parent, allocator)
+ , name(allocator)
 {
 }
 
@@ -308,7 +309,7 @@ void LayersNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 
 void LayersNode::serialize(OutputMemoryStream& stream) const {
 	stream.write((u32)m_layers.size());
 	for (const Layer& layer : m_layers) {
-		stream.writeString(layer.name.data);
+		stream.writeString(layer.name.c_str());
 		stream.write(layer.mask);
 		layer.node.serialize(stream);
 	}

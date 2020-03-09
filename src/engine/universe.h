@@ -123,11 +123,8 @@ public:
 	float getScale(EntityRef entity) const;
 	const DVec3& getPosition(EntityRef entity) const;
 	const Quat& getRotation(EntityRef entity) const;
-	const char* getName() const { return m_name; }
-	void setName(const char* name) 
-	{ 
-		m_name = name; 
-	}
+	const char* getName() const { return m_name.c_str(); }
+	void setName(const char* name) { m_name = name; }
 
 	DelegateList<void(EntityRef)>& entityTransformed() { return m_entity_moved; }
 	DelegateList<void(EntityRef)>& entityDestroyed() { return m_entity_destroyed; }
@@ -176,7 +173,7 @@ private:
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_added;
 	int m_first_free_slot;
-	StaticString<64> m_name;
+	String m_name;
 };
 
 

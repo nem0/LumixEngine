@@ -52,8 +52,8 @@ private:
 private:
 	Pipeline* m_pipeline;
 	WorldEditor& m_editor;
+	StudioApp& m_app;
 	float m_time_multiplier;
-	StudioApp& m_studio_app;
 	Vec2 m_pos;
 	Vec2 m_size;
 	struct GUIInterface* m_gui_interface;

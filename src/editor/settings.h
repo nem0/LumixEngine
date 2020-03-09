@@ -8,16 +8,10 @@
 struct lua_State;
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
-struct WorldEditor;
-struct StudioApp;
-
-
-struct LUMIX_EDITOR_API Settings
-{
+struct LUMIX_EDITOR_API Settings {
 	// gui - not saved
 	bool m_is_open;
 	char m_filter[100];
@@ -44,9 +38,8 @@ struct LUMIX_EDITOR_API Settings
 	Vec2 m_mouse_sensitivity;
 	float m_mouse_sensitivity_y;
 	int m_font_size = 13;
-	WorldEditor* m_editor;
 
-	explicit Settings(StudioApp& app);
+	explicit Settings(struct StudioApp& app);
 	~Settings();
 
 	bool save();

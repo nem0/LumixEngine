@@ -134,7 +134,7 @@ static Span<const char> getSubresource(const char* str)
 
 void AssetBrowser::changeDir(const char* path)
 {
-	WorldEditor& editor = m_app.getWorldEditor();
+	Engine& engine = m_app.getEngine();
 	RenderInterface* ri = m_app.getRenderInterface();
 	for (FileInfo& info : m_file_infos) {
 		ri->unloadTexture(info.tex);
@@ -147,7 +147,7 @@ void AssetBrowser::changeDir(const char* path)
 		m_dir.data[len - 1] = '\0';
 	}
 
-	FileSystem& fs = editor.getEngine().getFileSystem();
+	FileSystem& fs = engine.getFileSystem();
 	OS::FileIterator* iter = fs.createFileIterator(m_dir);
 	OS::FileInfo info;
 	m_subdirs.clear();

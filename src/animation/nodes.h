@@ -164,7 +164,7 @@ struct LayersNode final : Node {
 		Layer(GroupNode* parent, IAllocator& allocator);
 		GroupNode node;
 		u32 mask = 0;
-		StaticString<32> name;
+		String name;
 	};
 
 	IAllocator& m_allocator;

@@ -1205,8 +1205,10 @@ LUMIX_FORCE_INLINE float radiansToDegrees(float angle)
 }
 
 
+LUMIX_ENGINE_API Vec2 radiansToDegrees(const Vec2& v);
 LUMIX_ENGINE_API Vec3 radiansToDegrees(const Vec3& v);
-
+LUMIX_ENGINE_API Vec2 degreesToRadians(const Vec2& v);
+LUMIX_ENGINE_API Vec3 degreesToRadians(const Vec3& v);
 
 inline float easeInOut(float t)
 {
@@ -1220,7 +1222,6 @@ inline float easeInOut(float t)
 }
 
 
-LUMIX_ENGINE_API Vec3 degreesToRadians(const Vec3& v);
 LUMIX_ENGINE_API float angleDiff(float a, float b);
 LUMIX_ENGINE_API u64 randGUID();
 LUMIX_ENGINE_API u32 rand();

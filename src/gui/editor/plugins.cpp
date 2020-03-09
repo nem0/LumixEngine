@@ -229,8 +229,9 @@ public:
 		app.addWindowAction(action);
 
 		m_editor = &app.getWorldEditor();
-		Renderer& renderer = *static_cast<Renderer*>(m_editor->getEngine().getPluginManager().getPlugin("renderer"));
-		PipelineResource* pres = m_editor->getEngine().getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
+		Engine& engine = app.getEngine();
+		Renderer& renderer = *static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
 		m_pipeline = Pipeline::create(renderer, pres, "", allocator);
 	}
 

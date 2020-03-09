@@ -165,7 +165,7 @@ bool Action::isActive()
 }
 
 
-void getEntityListDisplayName(StudioApp& app, Span<char> buf, EntityPtr entity)
+void getEntityListDisplayName(StudioApp& app, WorldEditor& editor, Span<char> buf, EntityPtr entity)
 {
 	if (!entity.isValid())
 	{
@@ -174,7 +174,6 @@ void getEntityListDisplayName(StudioApp& app, Span<char> buf, EntityPtr entity)
 	}
 
 	EntityRef e = (EntityRef)entity;
-	WorldEditor& editor = app.getWorldEditor();
 	const char* name = editor.getUniverse()->getEntityName(e);
 	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 	if (editor.getUniverse()->hasComponent(e, MODEL_INSTANCE_TYPE))
