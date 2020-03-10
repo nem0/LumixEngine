@@ -837,6 +837,7 @@ struct GUISceneImpl final : GUIScene
 	{
 		if (paused) return;
 
+		m_root = findRoot();
 		handleInput();
 		blinkCursor(time_delta);
 	}
