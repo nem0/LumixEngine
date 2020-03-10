@@ -918,7 +918,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(cloneEntity);
 	REGISTER_FUNCTION(destroyEntity);
 	//REGISTER_FUNCTION(findByName);
-	//REGISTER_FUNCTION(getFirstChild);
+	REGISTER_FUNCTION(getFirstChild);
 	//REGISTER_FUNCTION(getFirstEntity);
 	//REGISTER_FUNCTION(getNextEntity);
 	//REGISTER_FUNCTION(getNextSibling);
@@ -1040,6 +1040,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				return LumixAPI.getEntityPosition(table._universe, table._entity)
 			elseif key == "parent" then
 				local p = LumixAPI.getParent(table._universe, table._entity)
+				if p < 0 then return nil end
+				return Lumix.Entity:new(table._universe, p)
+			elseif key == "first_child" then
+				local p = LumixAPI.getFirstChild(table._universe, table._entity)
+				if p < 0 then return nil end
 				return Lumix.Entity:new(table._universe, p)
 			elseif key == "rotation" then
 				return LumixAPI.getEntityRotation(table._universe, table._entity)

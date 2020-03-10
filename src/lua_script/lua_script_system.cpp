@@ -111,24 +111,77 @@ namespace Lumix
 
 		struct ScriptInstance
 		{
-			enum Flags : u32
-			{
-				ENABLED = 1 << 0
+			enum Flags : u32 {
+				ENABLED = 1 << 0,
+				LOADED = 1 << 1
 			};
 
-			explicit ScriptInstance(IAllocator& allocator)
+			explicit ScriptInstance(ScriptComponent& cmp, IAllocator& allocator)
 				: m_properties(allocator)
-				, m_script(nullptr)
-				, m_state(nullptr)
 				, m_environment(-1)
 				, m_thread_ref(-1)
+				, m_cmp(&cmp)
 			{
+				LuaScriptSceneImpl& scene = cmp.m_scene;
+				Engine& engine = scene.m_system.m_engine;
+				lua_State* L = engine.getState();
+				m_state = lua_newthread(L);
+				m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
+				lua_newtable(m_state); // [env]
+				// reference environment
+				lua_pushvalue(m_state, -1); // [env, env]
+				m_environment = luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
+
+				// environment's metatable & __index
+				lua_pushvalue(m_state, -1); // [env, env]
+				lua_setmetatable(m_state, -2); // [env]
+				lua_pushvalue(m_state, LUA_GLOBALSINDEX); // [evn, _G]
+				lua_setfield(m_state, -2, "__index");  // [env]
+
+				// set this
+				lua_getglobal(m_state, "Lumix"); // [env, Lumix]
+				lua_getfield(m_state, -1, "Entity"); // [env, Lumix, Lumix.Entity]
+				lua_remove(m_state, -2); // [env, Lumix.Entity]
+				lua_getfield(m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
+				lua_pushvalue(m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
+				lua_remove(m_state, -3); // [env, Entity.new, Lumix.Entity]
+				LuaWrapper::push(m_state, &scene.m_universe); // [env, Entity.new, Lumix.Entity, universe]
+				LuaWrapper::push(m_state, cmp.m_entity.index); // [env, Entity.new, Lumix.Entity, universe, entity_index]
+				const bool error = !LuaWrapper::pcall(m_state, 3, 1); // [env, entity]
+				ASSERT(!error);
+				lua_setfield(m_state, -2, "this"); // [env]
+				lua_pop(m_state, 1); // []
+
 				m_flags.set(ENABLED);
+			}
+
+			~ScriptInstance() {
+				if (m_script) m_script->getObserverCb().unbind<&ScriptComponent::onScriptLoaded>(m_cmp);
+
+				lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
+				ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
+				lua_getfield(m_state, -1, "onDestroy"); // [env, onDestroy]
+				if (lua_type(m_state, -1) != LUA_TFUNCTION) {
+					lua_pop(m_state, 2); // []
+				}
+				else {
+					if (lua_pcall(m_state, 0, 0, 0) != 0) { // [env]
+						logError("Lua Script") << lua_tostring(m_state, -1);
+						lua_pop(m_state, 1);
+					}
+					lua_pop(m_state, 1); // []
+				}
+
+				m_cmp->m_scene.disableScript(*this);
+
+				luaL_unref(m_state, LUA_REGISTRYINDEX, m_thread_ref);
+				luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
 			}
 
 			void onScriptLoaded(LuaScriptSceneImpl& scene, ScriptComponent& cmp, int scr_index);
 
-			LuaScript* m_script;
+			ScriptComponent* m_cmp;
+			LuaScript* m_script = nullptr;
 			lua_State* m_state;
 			int m_environment;
 			int m_thread_ref;
@@ -318,8 +371,8 @@ namespace Lumix
 			registerAPI();
 			ctx.registerComponentType(LUA_SCRIPT_TYPE
 				, this
-				, &LuaScriptSceneImpl::createLuaScriptComponent
-				, &LuaScriptSceneImpl::destroyLuaScriptComponent);
+				, &LuaScriptSceneImpl::createComponent
+				, &LuaScriptSceneImpl::destroyComponent);
 		}
 
 
@@ -398,14 +451,8 @@ namespace Lumix
 		void clear() override
 		{
 			Path invalid_path;
-			for (auto* script_cmp : m_scripts)
-			{
-				if (!script_cmp) continue;
-
-				for (auto script : script_cmp->m_scripts)
-				{
-					setScriptPath(*script_cmp, script, invalid_path);
-				}
+			for (auto* script_cmp : m_scripts) {
+				ASSERT(script_cmp);
 				LUMIX_DELETE(m_system.m_allocator, script_cmp);
 			}
 			m_scripts.clear();
@@ -513,28 +560,22 @@ namespace Lumix
 			return 1;
 		}
 		
-		static void convertPropertyToLuaName(const char* src, Span<char> out)
-		{
+		static void convertPropertyToLuaName(const char* src, Span<char> out) {
 			const u32 max_size = out.length();
 			ASSERT(max_size > 0);
-			bool to_upper = true;
 			char* dest = out.begin();
-			while (*src && dest - out.begin() < max_size - 1)
-			{
-				if (isLetter(*src))
-				{
-					*dest = to_upper && !isUpperCase(*src) ? *src - 'a' + 'A' : *src;
-					to_upper = false;
+			while (*src && dest - out.begin() < max_size - 1) {
+				if (isLetter(*src)) {
+					*dest = isUpperCase(*src) ? *src - 'A' + 'a' : *src;
 					++dest;
 				}
-				else if (isNumeric(*src))
-				{
+				else if (isNumeric(*src)) {
 					*dest = *src;
 					++dest;
 				}
-				else
-				{
-					to_upper = true;
+				else {
+					*dest = '_';
+					++dest;
 				}
 				++src;
 			}
@@ -997,63 +1038,28 @@ namespace Lumix
 		}
 
 
-		void destroyInstance(ScriptComponent& scr,  ScriptInstance& inst)
-		{
-			lua_rawgeti(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
-			ASSERT(lua_type(inst.m_state, -1) == LUA_TTABLE);
-			lua_getfield(inst.m_state, -1, "onDestroy");
-			if (lua_type(inst.m_state, -1) != LUA_TFUNCTION)
-			{
-				lua_pop(inst.m_state, 2);
-			}
-			else
-			{
-				if (lua_pcall(inst.m_state, 0, 0, 0) != 0)
-				{
-					logError("Lua Script") << lua_tostring(inst.m_state, -1);
-					lua_pop(inst.m_state, 1);
-				}
-				lua_pop(inst.m_state, 1);
-			}
-
-			disableScript(inst);
-
-			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_thread_ref);
-			luaL_unref(inst.m_state, LUA_REGISTRYINDEX, inst.m_environment);
-			inst.m_state = nullptr;
-		}
-
-
 		void setScriptPath(ScriptComponent& cmp, ScriptInstance& inst, const Path& path)
 		{
 			registerAPI();
 
-			if (inst.m_script)
-			{
-				if (inst.m_state) destroyInstance(cmp, inst);
-				inst.m_properties.clear();
+			if (inst.m_script) {
 				auto& cb = inst.m_script->getObserverCb();
 				cb.unbind<&ScriptComponent::onScriptLoaded>(&cmp);
 				inst.m_script->getResourceManager().unload(*inst.m_script);
 			}
+
 			ResourceManagerHub& rm = m_system.m_engine.getResourceManager();
 			inst.m_script = path.isValid() ? rm.load<LuaScript>(path) : nullptr;
-			if (inst.m_script && inst.m_script->isReady()) {
-				const int idx = int(&inst - cmp.m_scripts.begin());
-				inst.onScriptLoaded(*this, cmp, idx);
-			}
-			else if (inst.m_script) {
-				inst.m_script->onLoaded<&ScriptComponent::onScriptLoaded>(&cmp);
-			}
+			if (inst.m_script) inst.m_script->onLoaded<&ScriptComponent::onScriptLoaded>(&cmp);
 		}
 
 
-		void startScript(ScriptInstance& instance, bool is_restart)
+		void startScript(ScriptInstance& instance, bool is_reload)
 		{
 			if (!instance.m_flags.isSet(ScriptInstance::ENABLED)) return;
 			if (!instance.m_state) return;
 
-			if (is_restart) disableScript(instance);
+			if (is_reload) disableScript(instance);
 			
 			lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment);
 			if (lua_type(instance.m_state, -1) != LUA_TTABLE)
@@ -1081,7 +1087,7 @@ namespace Lumix
 			}
 			lua_pop(instance.m_state, 1);
 
-			if (!is_restart)
+			if (!is_reload)
 			{
 				lua_getfield(instance.m_state, -1, "start");
 				if (lua_type(instance.m_state, -1) != LUA_TFUNCTION)
@@ -1149,29 +1155,16 @@ namespace Lumix
 		}
 
 
-		void createLuaScriptComponent(EntityRef entity)
-		{
+		void createComponent(EntityRef entity) {
 			auto& allocator = m_system.m_allocator;
 			ScriptComponent* script = LUMIX_NEW(allocator, ScriptComponent)(*this, entity, allocator);
 			m_scripts.insert(entity, script);
 			m_universe.onComponentCreated(entity, LUA_SCRIPT_TYPE, this);
 		}
 
-
-		void destroyLuaScriptComponent(EntityRef entity)
-		{
-			auto* script = m_scripts[entity];
-			for (auto& scr : script->m_scripts)
-			{
-				if (scr.m_state) destroyInstance(*script, scr);
-				if (scr.m_script)
-				{
-					auto& cb = scr.m_script->getObserverCb();
-					cb.unbind<&ScriptComponent::onScriptLoaded>(script);
-					m_system.getScriptManager().unload(*scr.m_script);
-				}
-			}
-			LUMIX_DELETE(m_system.m_allocator, script);
+		void destroyComponent(EntityRef entity) {
+			ScriptComponent* cmp = m_scripts[entity];
+			LUMIX_DELETE(m_system.m_allocator, cmp);
 			m_scripts.erase(entity);
 			m_universe.onComponentDestroyed(entity, LUA_SCRIPT_TYPE, this);
 		}
@@ -1343,11 +1336,10 @@ namespace Lumix
 				serializer.read(scr_count);
 				for (int j = 0; j < scr_count; ++j)
 				{
-					auto& scr = script->m_scripts.emplace(allocator);
+					auto& scr = script->m_scripts.emplace(*script, allocator);
 
 					const char* tmp = serializer.readString();
 					serializer.read(scr.m_flags);
-					scr.m_state = nullptr;
 					int prop_count;
 					serializer.read(prop_count);
 					scr.m_properties.reserve(prop_count);
@@ -1644,7 +1636,8 @@ namespace Lumix
 
 		void insertScript(EntityRef entity, int idx) override
 		{
-			m_scripts[entity]->m_scripts.emplaceAt(idx, m_system.m_allocator);
+			ScriptComponent* cmp = m_scripts[entity];
+			cmp->m_scripts.emplaceAt(idx, *cmp, m_system.m_allocator);
 		}
 
 
@@ -1652,7 +1645,7 @@ namespace Lumix
 		{
 			ScriptComponent* script_cmp = m_scripts[entity];
 			if (scr_index == -1) scr_index = script_cmp->m_scripts.size();
-			script_cmp->m_scripts.emplaceAt(scr_index, m_system.m_allocator);
+			script_cmp->m_scripts.emplaceAt(scr_index, *script_cmp, m_system.m_allocator);
 			return scr_index;
 		}
 
@@ -1710,9 +1703,7 @@ namespace Lumix
 		}
 
 
-		void removeScript(EntityRef entity, int scr_index) override
-		{
-			setScriptPath(entity, scr_index, Path());
+		void removeScript(EntityRef entity, int scr_index) override {
 			m_scripts[entity]->m_scripts.swapAndPop(scr_index);
 		}
 
@@ -1779,44 +1770,12 @@ namespace Lumix
 	};
 
 	void LuaScriptSceneImpl::ScriptInstance::onScriptLoaded(LuaScriptSceneImpl& scene, struct ScriptComponent& cmp, int scr_index) {
-		lua_State* L = scene.m_system.m_engine.getState();
-		bool is_reload = true;
-		if (!m_state)
-		{
-			is_reload = false;
-
-			m_state = lua_newthread(L); // [thread]
-			LuaWrapper::DebugGuard guard(m_state, 1);
-			m_thread_ref = luaL_ref(L, LUA_REGISTRYINDEX); // []
-			lua_newtable(m_state); // [env]
-			// reference environment
-			lua_pushvalue(m_state, -1); // [env, env]
-			m_environment = luaL_ref(m_state, LUA_REGISTRYINDEX); // [env]
-
-			// environment's metatable & __index
-			lua_pushvalue(m_state, -1); // [env, env]
-			lua_setmetatable(m_state, -2); // [env]
-			lua_pushvalue(m_state, LUA_GLOBALSINDEX); // [evn, _G]
-			lua_setfield(m_state, -2, "__index");  // [env]
-
-			// set this
-			lua_getglobal(m_state, "Lumix"); // [env, Lumix]
-			lua_getfield(m_state, -1, "Entity"); // [env, Lumix, Lumix.Entity]
-			lua_remove(m_state, -2); // [env, Lumix.Entity]
-			lua_getfield(m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
-			lua_pushvalue(m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
-			lua_remove(m_state, -3); // [env, Entity.new, Lumix.Entity]
-			LuaWrapper::push(m_state, &scene.m_universe); // [env, Entity.new, Lumix.Entity, universe]
-			LuaWrapper::push(m_state, cmp.m_entity.index); // [env, Entity.new, Lumix.Entity, universe, entity_index]
-			const bool error = !LuaWrapper::pcall(m_state, 3, 1); // [env, entity]
-			ASSERT(!error);
-			lua_setfield(m_state, -2, "this"); // [env]
-		}
-		else
-		{
-			lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
-			ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
-		}
+		LuaWrapper::DebugGuard guard(m_state);
+		
+		bool is_reload = m_flags.isSet(LOADED);
+		
+		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
+		ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
 
 		bool errors = luaL_loadbuffer(m_state,
 			m_script->getSourceCode(),
@@ -1824,9 +1783,8 @@ namespace Lumix
 			m_script->getPath().c_str()) != 0; // [env, func]
 
 		if (errors) {
-			logError("Lua Script") << m_script->getPath() << ": "
-				<< lua_tostring(m_state, -1);
-			lua_pop(m_state, 1);
+			logError("Lua Script") << m_script->getPath() << ": " << lua_tostring(m_state, -1);
+			lua_pop(m_state, 2);
 			return;
 		}
 
@@ -1836,8 +1794,7 @@ namespace Lumix
 		scene.m_current_script_instance = this;
 		errors = lua_pcall(m_state, 0, 0, 0) != 0; // [env]
 		if (errors)	{
-			logError("Lua Script") << m_script->getPath() << ": "
-				<< lua_tostring(m_state, -1);
+			logError("Lua Script") << m_script->getPath() << ": " << lua_tostring(m_state, -1);
 			lua_pop(m_state, 1);
 		}
 		lua_pop(m_state, 1); // []
@@ -1846,12 +1803,13 @@ namespace Lumix
 					
 		bool enabled = m_flags.isSet(ScriptInstance::ENABLED);
 		scene.setEnableProperty(cmp.m_entity, scr_index, *this, enabled);
+		m_flags.set(LOADED);
 
-		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment);
-		lua_getfield(m_state, -1, "awake");
+		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
+		lua_getfield(m_state, -1, "awake"); // [env, awake]
 		if (lua_type(m_state, -1) != LUA_TFUNCTION)
 		{
-			lua_pop(m_state, 2);
+			lua_pop(m_state, 2); // []
 		}
 		else {
 			if (lua_pcall(m_state, 0, 0, 0) != 0) {
@@ -1859,7 +1817,6 @@ namespace Lumix
 				lua_pop(m_state, 1);
 			}
 		}
-		lua_pop(m_state, 1);
 
 		if (scene.m_is_game_running) scene.startScript(*this, is_reload);
 	}
