@@ -1656,9 +1656,9 @@ namespace Lumix
 			if (!up && scr_index > script_cmp->m_scripts.size() - 2) return;
 			if (up && scr_index == 0) return;
 			int other = up ? scr_index - 1 : scr_index + 1;
-			ScriptInstance tmp = script_cmp->m_scripts[scr_index]; //-v1659
-			script_cmp->m_scripts[scr_index] = script_cmp->m_scripts[other]; //-v1659
-			script_cmp->m_scripts[other] = tmp; //-v1659
+			ScriptInstance tmp = script_cmp->m_scripts[scr_index]; //-V1659
+			script_cmp->m_scripts[scr_index] = script_cmp->m_scripts[other]; //-V1659
+			script_cmp->m_scripts[other] = tmp; //-V1659
 		}
 
 
