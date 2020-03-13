@@ -1812,10 +1812,11 @@ namespace Lumix
 			lua_pop(m_state, 2); // []
 		}
 		else {
-			if (lua_pcall(m_state, 0, 0, 0) != 0) {
+			if (lua_pcall(m_state, 0, 0, 0) != 0) { // [env] | [env, error]
 				logError("Lua Script") << lua_tostring(m_state, -1);
-				lua_pop(m_state, 1);
+				lua_pop(m_state, 1); // [env]
 			}
+			lua_pop(m_state, 1); // []
 		}
 
 		if (scene.m_is_game_running) scene.startScript(*this, is_reload);
