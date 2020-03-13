@@ -1786,6 +1786,15 @@ public:
 	}
 
 
+	EntityRef addEntityAt(const DVec3& pos) override
+	{
+		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
+		executeCommand(command);
+
+		return (EntityRef)command->getEntity();
+	}
+
+
 	void setEntitiesScales(const EntityRef* entities, const float* scales, int count) override
 	{
 		if (count <= 0) return;

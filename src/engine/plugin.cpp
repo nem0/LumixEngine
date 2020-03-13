@@ -30,7 +30,7 @@ namespace Lumix
 		auto* i = s_first_plugin;
 		while (i) {
 			IPlugin* p = i->creator(engine);
-			engine.getPluginManager().addPlugin(p);
+			if (p) engine.getPluginManager().addPlugin(p);
 			i = i->next;
 		}
 	}

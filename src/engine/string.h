@@ -124,6 +124,12 @@ template <int SIZE> struct StaticString
 		toCString(value, Span<char>(data).fromLeft(len), 3);
 	}
 
+	void add(double value)
+	{
+		int len = stringLength(data);
+		toCString(value, Span<char>(data).fromLeft(len), 10);
+	}
+
 	template <typename T> void add(T value)
 	{
 		int len = stringLength(data);
