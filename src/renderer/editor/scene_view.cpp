@@ -501,8 +501,6 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void update() {
-		m_draw_vertices.clear();
-		m_draw_cmds.clear();
 		m_viewport.fov = m_scene_view.m_app.getFOV();
 		previewSnapVertex();
 		
@@ -932,10 +930,9 @@ void SceneView::renderGizmos()
 			cmds.swap(view->m_view->m_draw_cmds);
 			Engine& engine = view->m_editor.getEngine();
 			renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-			const auto& vertices = view->m_view->m_draw_vertices;
+			auto& vertices = view->m_view->m_draw_vertices;
 			vb = renderer->allocTransient(vertices.byte_size());
 			memcpy(vb.ptr, vertices.begin(), vertices.byte_size());
-			view->m_view->m_draw_vertices.clear();
 		}
 
 		void execute() override {
@@ -1236,8 +1233,8 @@ void SceneView::onWindowGUI()
 		m_view->setViewport(vp);
 		m_pipeline->setViewport(vp);
 		m_pipeline->render(false);
-		m_view->m_draw_cmds.clear();
 		m_view->m_draw_vertices.clear();
+		m_view->m_draw_cmds.clear();
 		m_view->inputFrame();
 
 		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
@@ -1277,6 +1274,8 @@ void SceneView::onWindowGUI()
 	}
 	else {
 		m_view->inputFrame();
+		m_view->m_draw_vertices.clear();
+		m_view->m_draw_cmds.clear();
 	}
 
 	if (m_is_mouse_captured && OS::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) {
