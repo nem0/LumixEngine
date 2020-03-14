@@ -908,7 +908,9 @@ u32 getMemPageSize() {
 }
 
 void* memReserve(size_t size) {
-	return malloc(size);
+	void* mem = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	ASSERT(mem);
+	return mem;
 }
 
 void memCommit(void* ptr, size_t size) {

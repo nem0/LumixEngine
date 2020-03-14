@@ -176,7 +176,7 @@ struct CullingSystemImpl final : CullingSystem
 	CellPage& getCell(const Sphere& sphere) const
 	{
 		const intptr_t ptr = (intptr_t)&sphere;
-		const intptr_t page_ptr = ptr - (ptr % 16384);
+		const intptr_t page_ptr = ptr - (ptr % PageAllocator::PAGE_SIZE);
 		return *(CellPage*)page_ptr;
 	}
 
