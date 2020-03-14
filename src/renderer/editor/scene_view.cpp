@@ -501,6 +501,8 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void update() {
+		m_draw_vertices.clear();
+		m_draw_cmds.clear();
 		m_viewport.fov = m_scene_view.m_app.getFOV();
 		previewSnapVertex();
 		
