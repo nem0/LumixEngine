@@ -592,8 +592,21 @@ void destroyWindow(WindowHandle window)
 Point toScreen(WindowHandle win, int x, int y)
 {
 	XWindowAttributes attrs;
-	XGetWindowAttributes(G.display, (Window)win, &attrs);
-    return {x + attrs.x, y + attrs.y};
+	Point p;
+	p.x = x;
+	p.y = y;
+	while (win != INVALID_WINDOW) {
+		XGetWindowAttributes(G.display, (Window)win, &attrs);
+		p.x += attrs.x;
+		p.y += attrs.y;
+		Window root, parent;
+		Window* children;
+		u32 children_count;
+		XQueryTree(G.display, (Window)win, &root, &parent, &children, &children_count);
+		win = (WindowHandle)parent;
+	}
+    
+	return p;
 }
 
 WindowHandle createWindow(const InitWindowArgs& args)
