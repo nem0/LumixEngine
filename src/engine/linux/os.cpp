@@ -64,9 +64,8 @@ static Keycode getKeycode(KeySym keysym) {
 	auto iter = s_from_x11_keysym.find(keysym);
 	if (iter.isValid()) return iter.value();
 
-	if ((u8)keysym >= 'a' && (u8)keysym <= 'z' || (u8)keysym >= 'A' && (u8)keysym <= 'Z' || (u8)keysym >= '0' && (u8)keysym <= '9') {
-		return (Keycode)keysym;
-	}
+	if ((u8)keysym >= 'a' && (u8)keysym <= 'z') return (Keycode)(keysym - 'a' + 'A');
+	if ((u8)keysym >= 'A' && (u8)keysym <= 'Z' || (u8)keysym >= '0' && (u8)keysym <= '9') return (Keycode)keysym;
 	
 	return Keycode::INVALID;
 }
