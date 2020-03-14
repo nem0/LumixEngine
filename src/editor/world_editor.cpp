@@ -119,7 +119,7 @@ void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color
 }
 
 void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color) {
-	UniverseView::Vertex* vertices = view.render(true, 24);
+	UniverseView::Vertex* vertices = view.render(true, 2);
 	const DVec3 cam_pos = view.getViewport().pos;
 	vertices[0].pos = (a - cam_pos).toFloat();
 	vertices[1].pos = (b - cam_pos).toFloat();
