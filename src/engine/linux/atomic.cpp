@@ -21,12 +21,12 @@ i32 atomicDecrement(i32 volatile* value)
 
 i32 atomicAdd(i32 volatile* addend, i32 value)
 {
-	return __sync_fetch_and_add(addend, value) + value;
+	return __sync_fetch_and_add(addend, value);
 }
 
 i32 atomicSubtract(i32 volatile* addend, i32 value)
 {
-	return __sync_fetch_and_sub(addend, value) - value;
+	return __sync_fetch_and_sub(addend, value);
 }
 
 bool compareAndExchange(i32 volatile* dest, i32 exchange, i32 comperand)
