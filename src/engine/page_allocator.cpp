@@ -46,7 +46,7 @@ void* PageAllocator::allocate(bool lock)
 	++reserved_count;
 	if (lock) mutex.exit();
 	void* mem = OS::memReserve(PAGE_SIZE);
-	ASSERT(intptr_t(mem) % PAGE_SIZE == 0);
+	ASSERT(uintptr(mem) % PAGE_SIZE == 0);
 	OS::memCommit(mem, PAGE_SIZE);
 	return mem;
 }
