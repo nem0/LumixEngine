@@ -1297,11 +1297,11 @@ void swapBuffers()
 				ASSERT(res);
 			}
 		}
+		BOOL res = wglMakeCurrent(g_gpu.contexts[0].device_context, g_gpu.contexts[0].hglrc);
+		ASSERT(res);
 	#else
 		glXSwapBuffers(gdisplay, (Window)g_gpu.contexts[0].window_handle);
 	#endif
-	BOOL res = wglMakeCurrent(g_gpu.contexts[0].device_context, g_gpu.contexts[0].hglrc);
-	ASSERT(res);
 	++g_gpu.frame;
 }
 
