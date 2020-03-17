@@ -638,6 +638,16 @@ static bool LUA_createComponent(Universe* universe, EntityRef entity, const char
 }
 
 
+static bool LUA_hasComponent(Universe* universe, EntityRef entity, const char* type)
+{
+	if (!universe) return false;
+	ComponentType cmp_type = Reflection::getComponentType(type);
+	IScene* scene = universe->getScene(cmp_type);
+	if (!scene) return false;
+	return universe->hasComponent(entity, cmp_type);
+}
+
+
 static EntityRef LUA_createEntity(Universe* universe)
 {
 	return universe->createEntity({0, 0, 0}, Quat::IDENTITY);
@@ -876,6 +886,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			&LuaWrapper::wrap<LUA_##name>); \
 
 	REGISTER_FUNCTION(createComponent);
+	REGISTER_FUNCTION(hasComponent);
 	REGISTER_FUNCTION(createEntity);
 	REGISTER_FUNCTION(createUniverse);
 	REGISTER_FUNCTION(destroyUniverse);
@@ -923,7 +934,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(getNextEntity);
 	//REGISTER_FUNCTION(getNextSibling);
 	REGISTER_FUNCTION(getParent);
-	//REGISTER_FUNCTION(hasComponent);
 	REGISTER_FUNCTION(setParent);
 
 	#undef REGISTER_FUNCTION
@@ -1034,6 +1044,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		end
 		function Lumix.Entity:getComponent(cmp)
 			return Lumix[cmp]:new(self._universe, self._entity)
+		end
+		function Lumix.Entity:hasComponent(cmp)
+			return LumixAPI.hasComponent(self._universe, self._entity, cmp)
 		end
 		Lumix.Entity.__index = function(table, key)
 			if key == "position" then

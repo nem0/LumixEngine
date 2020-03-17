@@ -109,6 +109,7 @@ struct Pool
 };
 
 struct WindowContext {
+	u32 last_frame;
 	void* window_handle = nullptr;
 	GLuint vao;
 #ifdef _WIN32
@@ -118,6 +119,7 @@ struct WindowContext {
 };
 
 static struct {
+	u32 frame = 0;
 	RENDERDOC_API_1_0_2* rdoc_api;
 	IAllocator* allocator;
 	WindowContext contexts[64];
@@ -1195,6 +1197,8 @@ void setCurrentWindow(void* window_handle) {
 			return g_gpu.contexts[0];
 		}();
 
+		ctx.last_frame = g_gpu.frame;
+
 		if (!ctx.hglrc) {
 			const HDC hdc = ctx.device_context;
 			const PIXELFORMATDESCRIPTOR pfd =
@@ -1276,12 +1280,29 @@ void swapBuffers()
 	checkThread();
 	glFinish();
 	#ifdef _WIN32
-		for (const WindowContext& ctx : g_gpu.contexts) {
-			SwapBuffers(ctx.device_context);
+		for (WindowContext& ctx : g_gpu.contexts) {
+			if (!ctx.window_handle) continue;
+			if (g_gpu.frame == ctx.last_frame) {
+				SwapBuffers(ctx.device_context);
+			}
+			else {
+				BOOL res = wglMakeCurrent(ctx.device_context, ctx.hglrc);
+				ASSERT(res);
+				glDeleteVertexArrays(1, &ctx.vao);
+				SwapBuffers(ctx.device_context);
+				
+				ASSERT(res);
+				res = wglDeleteContext(ctx.hglrc);
+				ctx.window_handle = nullptr;
+				ASSERT(res);
+			}
 		}
 	#else
 		glXSwapBuffers(gdisplay, (Window)g_gpu.contexts[0].window_handle);
 	#endif
+	BOOL res = wglMakeCurrent(g_gpu.contexts[0].device_context, g_gpu.contexts[0].hglrc);
+	ASSERT(res);
+	++g_gpu.frame;
 }
 
 void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)

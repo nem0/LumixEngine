@@ -850,6 +850,7 @@ struct GUISceneImpl final : GUIScene
 		if (idx >= 0)
 		{
 			rect = m_rects.at(idx);
+			*rect = GUIRect();
 		}
 		else
 		{
