@@ -184,6 +184,7 @@ struct StudioAppImpl final : StudioApp
 		, m_universes(m_allocator)
 		, m_events(m_allocator)
 		, m_windows(m_allocator)
+		, m_deferred_destroy_windows(m_allocator)
 	{
 		if (!JobSystem::init(OS::getCPUsCount(), m_allocator)) {
 			logError("Engine") << "Failed to initialize job system.";
@@ -842,6 +843,14 @@ struct StudioAppImpl final : StudioApp
 
 	void update()
 	{
+		for (i32 i = m_deferred_destroy_windows.size() - 1; i >= 0; --i) {
+			--m_deferred_destroy_windows[i].counter;
+			if (m_deferred_destroy_windows[i].counter == 0) {
+				OS::destroyWindow(m_deferred_destroy_windows[i].window);
+				m_deferred_destroy_windows.swapAndPop(i);
+			}
+		}
+
 		PROFILE_FUNCTION();
 		Profiler::blockColor(0x7f, 0x7f, 0x7f);
 		m_asset_compiler->update();
@@ -1852,7 +1861,7 @@ struct StudioAppImpl final : StudioApp
 		};
 		pio.Platform_DestroyWindow = [](ImGuiViewport* vp){
 			OS::WindowHandle w = (OS::WindowHandle)vp->PlatformHandle;
-			OS::destroyWindow(w);
+			that->m_deferred_destroy_windows.push({w, 3});
 			vp->PlatformHandle = nullptr;
 			vp->PlatformUserData = nullptr;
 			that->m_windows.eraseItem(w);
@@ -3154,6 +3163,7 @@ struct StudioAppImpl final : StudioApp
 	#endif
 	Engine* m_engine;
 	Array<OS::WindowHandle> m_windows;
+	Array<WindowToDestroy> m_deferred_destroy_windows;
 	OS::WindowHandle m_main_window;
 	OS::WindowState m_fullscreen_restore_state;
 	Array<Action*> m_actions;

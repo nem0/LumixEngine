@@ -728,10 +728,6 @@ namespace Lumix
 
 			cmp->visit(v);
 
-			if (!v.found) {
-				luaL_error(L, "Property `%s` does not exist", v.prop_name);
-			}
-
 			return v.found ? 1 : 0;
 		}
 
