@@ -40,7 +40,7 @@ Terrain::Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllo
 	, m_width(0)
 	, m_height(0)
 	, m_layer_mask(1)
-	, m_scale(1, 1, 1)
+	, m_scale(1, 100, 1)
 	, m_entity(entity)
 	, m_scene(scene)
 	, m_allocator(allocator)

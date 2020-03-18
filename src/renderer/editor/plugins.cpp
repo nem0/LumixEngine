@@ -3489,6 +3489,8 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 		PathInfo info(normalized_material_path);
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
+		StaticString<MAX_PATH_LENGTH> albedo_path(info.m_dir, "albedo_detail.ltc");
+		StaticString<MAX_PATH_LENGTH> normal_path(info.m_dir, "normal_detail.ltc");
 		OS::OutputFile file;
 		if (!file.open(hm_path))
 		{
@@ -3505,28 +3507,75 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			header.channel_type = RawTextureHeader::ChannelType::U16;
 			header.channels_count = 1;
 			file.write(&header, sizeof(header));
-			u16 tmp = 0xffff >> 1;
+			u16 tmp = 0;
 			for (int i = 0; i < size * size; ++i) {
 				file.write(&tmp, sizeof(tmp));
 			}
 			file.close();
 		}
+		
+		if (!file.open(albedo_path)) {
+			logError("Editor") << "Failed to create texture " << albedo_path;
+			OS::deleteFile(hm_path);
+			return false;
+		}
+		file << R"#(
+			layer {
+				red = { "/textures/common/white.tga", 0 },
+				green = { "/textures/common/white.tga", 1 },
+				blue = { "/textures/common/white.tga", 2 },
+				alpha = { "/textures/common/white.tga", 3 }
+			}
+			layer {
+				red = { "/textures/common/white.tga", 0 },
+				green = { "/textures/common/white.tga", 1 },
+				blue = { "/textures/common/white.tga", 2 },
+				alpha = { "/textures/common/white.tga", 3 }
+			}
+		)#";
+		file.close();
+
+		if (!file.open(normal_path)) {
+			logError("Editor") << "Failed to create texture " << normal_path;
+			OS::deleteFile(albedo_path);
+			OS::deleteFile(hm_path);
+			return false;
+		}
+		file << R"#(
+			layer {
+				red = { "/textures/common/default_normal.tga", 0 },
+				green = { "/textures/common/default_normal.tga", 1 },
+				blue = { "/textures/common/default_normal.tga", 2 },
+				alpha = { "/textures/common/default_normal.tga", 3 }
+			}
+			layer {
+				red = { "/textures/common/default_normal.tga", 0 },
+				green = { "/textures/common/default_normal.tga", 1 },
+				blue = { "/textures/common/default_normal.tga", 2 },
+				alpha = { "/textures/common/default_normal.tga", 3 }
+			}
+		)#";
+		file.close();
 
 		if (!file.open(normalized_material_path))
 		{
 			logError("Editor") << "Failed to create material " << normalized_material_path;
+			OS::deleteFile(normal_path);
+			OS::deleteFile(albedo_path);
 			OS::deleteFile(hm_path);
 			return false;
 		}
 
 		file << R"#(
-			shader "pipelines/terrain.shd"
+			shader "/pipelines/terrain.shd"
 			texture ")#";
 		file << info.m_basename;
 		file << R"#(.raw"
-			texture "/textures/common/white.tga"
+			texture "albedo_detail.ltc"
+			texture "normal_detail.ltc"
 			texture ""
-			texture ""
+			uniform("Detail distance", 50.000000)
+			uniform("Detail scale", 1.000000)
 		)#";
 
 		file.close();

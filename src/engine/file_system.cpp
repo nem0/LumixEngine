@@ -174,7 +174,7 @@ struct FileSystemImpl final : FileSystem
 	bool deleteFile(const char* path) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
-		return OS::deleteFile(path);
+		return OS::deleteFile(full_path);
 	}
 
 
