@@ -1282,7 +1282,7 @@ void swapBuffers()
 	#ifdef _WIN32
 		for (WindowContext& ctx : g_gpu.contexts) {
 			if (!ctx.window_handle) continue;
-			if (g_gpu.frame == ctx.last_frame) {
+			if (g_gpu.frame == ctx.last_frame || &ctx == g_gpu.contexts) {
 				SwapBuffers(ctx.device_context);
 			}
 			else {

@@ -446,6 +446,10 @@ struct AnimationSceneImpl final : AnimationScene
 		}
 	}
 
+	Anim::Controller* getAnimatorController(EntityRef entity) override {
+		const Animator& animator = m_animators[m_animator_map[entity]];
+		return animator.resource;
+	}
 
 	Path getAnimatorSource(EntityRef entity) override
 	{
@@ -545,8 +549,8 @@ struct AnimationSceneImpl final : AnimationScene
 	void setAnimatorInput(EntityRef entity, u32 input_idx, float value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx >= lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type != Anim::InputDecl::FLOAT);
+		ASSERT(input_idx < lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::FLOAT);
 
 		*(float*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
@@ -554,17 +558,44 @@ struct AnimationSceneImpl final : AnimationScene
 	void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx >= lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type != Anim::InputDecl::BOOL);
+		ASSERT(input_idx < lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::BOOL);
 
 		*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
+	}
+
+	float getAnimatorFloatInput(EntityRef entity, u32 input_idx) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		ASSERT(input_idx < lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::FLOAT);
+
+		return *(float*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
+	}
+
+	bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		ASSERT(input_idx < lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::BOOL);
+
+		return *(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
+	}
+
+	u32 getAnimatorU32Input(EntityRef entity, u32 input_idx) override {
+		Animator& animator = m_animators[m_animator_map[entity]];
+		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		ASSERT(input_idx < lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::U32);
+
+		return *(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
 	}
 
 	void setAnimatorInput(EntityRef entity, u32 input_idx, u32 value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx >= lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type != Anim::InputDecl::U32);
+		ASSERT(input_idx < lengthOf(decl.inputs));
+		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::U32);
 
 		*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}

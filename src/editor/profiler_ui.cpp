@@ -962,7 +962,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 
 		if (ImGui::IsMouseHoveringRect(ImVec2(from_x, from_y), ImVec2(to_x, ImGui::GetCursorScreenPos().y))) {
-			if (ImGui::IsMouseDragging()) {
+			if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
 				m_end -= i64((ImGui::GetIO().MouseDelta.x / (to_x - from_x)) * m_range);
 			}
 			const u64 cursor = u64(((ImGui::GetMousePos().x - from_x) / (to_x - from_x)) * m_range) + view_start;

@@ -403,7 +403,7 @@ void Settings::showToolbarSettings() const
 			dragged = nullptr;
 			break;
 		}
-		if (ImGui::IsItemActive() && ImGui::IsMouseDragging())
+		if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
 		{
 			dragged = action;
 			actions.eraseItem(action);

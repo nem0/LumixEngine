@@ -12,16 +12,10 @@ namespace Anim {
 
 
 struct ControllerEditor : StudioApp::GUIPlugin {
-	ControllerEditor(StudioApp& app);
-	~ControllerEditor();
+	static ControllerEditor& create(StudioApp& app);
+	static void destroy(ControllerEditor& editor);
 
-	void onWindowGUI() override;
-	const char* getName() const override { return "Animation Editor"; }
-
-	StudioApp& m_app;
-	struct Controller* m_controller;
-	struct GroupNode* m_current_level;
-	Model* m_model = nullptr;
+	virtual ~ControllerEditor() {}
 };
 
 
