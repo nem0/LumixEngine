@@ -312,7 +312,7 @@ struct UniverseViewImpl final : UniverseView {
 			case MouseMode::NAVIGATE: {
 				const float yaw = -signum(relx) * (powf(fabsf((float)relx / m_mouse_sensitivity.x), 1.2f));
 				const float pitch = -signum(rely) * (powf(fabsf((float)rely / m_mouse_sensitivity.y), 1.2f));
-				rotateCamera(yaw, pitch);
+				rotateCamera(yaw, pitch, m_scene_view.m_orbit_action->isActive());
 				break;
 			}
 			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
@@ -454,7 +454,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_viewport.pos += rot.rotate(Vec3(0, 1, 0)) * up * speed;
 	}
 
-	void rotateCamera(float yaw, float pitch) {
+	void rotateCamera(float yaw, float pitch, bool force_orbit) {
 		const Universe* universe = m_editor.getUniverse();
 		DVec3 pos = m_viewport.pos;
 		Quat rot = m_viewport.rot;
@@ -469,7 +469,7 @@ struct UniverseViewImpl final : UniverseView {
 		rot = pitch_rot * rot;
 		rot.normalize();
 
-		if (m_is_orbit && !m_editor.getSelectedEntities().empty())
+		if ((m_is_orbit || force_orbit) && !m_editor.getSelectedEntities().empty())
 		{
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 			const DVec3 entity_pos = universe->getPosition(m_editor.getSelectedEntities()[0]);
@@ -620,6 +620,10 @@ SceneView::SceneView(StudioApp& app)
 
 	ResourceManagerHub& rm = engine.getResourceManager();
 	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
+
+	m_orbit_action = LUMIX_NEW(allocator, Action)("Orbit", "Orbit with RMB", "orbitRMB");
+	m_orbit_action->is_global = false;
+	m_app.addAction(m_orbit_action);
 
 	m_toggle_gizmo_step_action = LUMIX_NEW(allocator, Action)("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep");
 	m_toggle_gizmo_step_action->is_global = false;
