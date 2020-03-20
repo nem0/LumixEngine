@@ -1,43 +1,28 @@
 #pragma once
 
-
 #include "engine/lumix.h"
 #include "engine/plugin.h"
 
-
 struct lua_State;
-
 
 namespace Lumix
 {
 
-struct Animation;
-struct IAllocator;
-struct OutputMemoryStream;
-struct Path;
+namespace Anim { struct Controller; }
 
-namespace Anim
-{
-struct Controller;
-}
-
-
-struct Animable
-{
+struct Animable {
 	Time time;
-	Animation* animation;
+	struct Animation* animation;
 	EntityRef entity;
 };
 
-
-struct AnimationScene : IScene
-{
-	static AnimationScene* create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator);
+struct AnimationScene : IScene {
+	static AnimationScene* create(Engine& engine, IPlugin& plugin, Universe& universe, struct IAllocator& allocator);
 	static void destroy(AnimationScene& scene);
 	static void registerLuaAPI(lua_State* L);
 
-	virtual const OutputMemoryStream& getEventStream() const = 0;
-	virtual Path getPropertyAnimation(EntityRef entity) = 0;
+	virtual const struct OutputMemoryStream& getEventStream() const = 0;
+	virtual struct Path getPropertyAnimation(EntityRef entity) = 0;
 	virtual void setPropertyAnimation(EntityRef entity, const Path& path) = 0;
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;
 	virtual void enablePropertyAnimator(EntityRef entity, bool enabled) = 0;
@@ -50,6 +35,9 @@ struct AnimationScene : IScene
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, u32 value) = 0;
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, float value) = 0;
 	virtual void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) = 0;
+	virtual float getAnimatorFloatInput(EntityRef entity, u32 input_idx) = 0;
+	virtual bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) = 0;
+	virtual u32 getAnimatorU32Input(EntityRef entity, u32 input_idx) = 0;
 	virtual struct LocalRigidTransform getAnimatorRootMotion(EntityRef entity) = 0;
 	virtual void setAnimatorSource(EntityRef entity, const Path& path) = 0;
 	virtual struct Path getAnimatorSource(EntityRef entity) = 0;
@@ -57,6 +45,7 @@ struct AnimationScene : IScene
 	virtual void applyAnimatorSet(EntityRef entity, u32 idx) = 0;
 	virtual void setAnimatorDefaultSet(EntityRef entity, u32 idx) = 0;
 	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
+	virtual Anim::Controller* getAnimatorController(EntityRef entity) = 0;
 	virtual float getAnimationLength(int animation_idx) = 0;
 };
 

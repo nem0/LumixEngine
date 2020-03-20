@@ -35,6 +35,7 @@ void Controller::unload() {
 void Controller::initEmpty() {
 	ASSERT(!m_root);
 	m_root = LUMIX_NEW(m_allocator, GroupNode)(nullptr, m_allocator);
+	m_root->m_name = "Root";
 }
 
 bool Controller::load(u64 size, const u8* mem) {
@@ -63,6 +64,7 @@ void Controller::destroyRuntime(RuntimeContext& ctx) {
 RuntimeContext* Controller::createRuntime(u32 anim_set) {
 	RuntimeContext* ctx = LUMIX_NEW(m_allocator, RuntimeContext)(*this, m_allocator);
 	ctx->inputs.resize(computeInputsSize(*this));
+	memset(ctx->inputs.begin(), 0, ctx->inputs.byte_size());
 	ctx->animations.resize(m_animation_slots.size());
 	memset(ctx->animations.begin(), 0, ctx->animations.byte_size());
 	for (AnimationEntry& anim : m_animation_entries) {

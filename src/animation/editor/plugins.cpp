@@ -373,7 +373,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
-		, m_anim_editor(app)
+		, m_anim_editor(nullptr)
 	{
 	}
 
@@ -404,7 +404,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_animable_plugin = LUMIX_NEW(allocator, AnimablePropertyGridPlugin)(m_app);
 		m_app.getPropertyGrid().addPlugin(*m_animable_plugin);
 		
-		m_app.addPlugin(m_anim_editor);
+		m_anim_editor = &Anim::ControllerEditor::create(m_app);
+		m_app.addPlugin(*m_anim_editor);
 	}
 
 	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
@@ -426,7 +427,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getPropertyGrid().removePlugin(*m_animable_plugin);
 		LUMIX_DELETE(allocator, m_animable_plugin);
 
-		m_app.removePlugin(m_anim_editor);
+		m_app.removePlugin(*m_anim_editor);
+		Anim::ControllerEditor::destroy(*m_anim_editor);
 	}
 
 
@@ -435,7 +437,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	AnimationAssetBrowserPlugin* m_animtion_plugin;
 	PropertyAnimationAssetBrowserPlugin* m_prop_anim_plugin;
 	AnimControllerAssetBrowserPlugin* m_anim_ctrl_plugin;
-	Lumix::Anim::ControllerEditor m_anim_editor;
+	Anim::ControllerEditor* m_anim_editor;
 };
 
 

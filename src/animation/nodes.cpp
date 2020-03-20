@@ -21,7 +21,7 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* ani
 		root_motion.pos = Vec3::ZERO;
 	}
 	if (rotation_idx >= 0) {
-		root_motion.rot = anim->getRotation(time, translation_idx);
+		root_motion.rot = anim->getRotation(time, rotation_idx);
 	}
 	else {
 		root_motion.rot = Quat::IDENTITY;

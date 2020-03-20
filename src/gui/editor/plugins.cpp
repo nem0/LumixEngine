@@ -140,7 +140,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin
 			if (ImGui::IsItemActive())
 			{
 				static int start_drag_value;
-				if (ImGui::IsMouseDragging())
+				if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
 				{
 					ImVec2 drag = ImGui::GetMouseDragDelta();
 					if (vertical)
