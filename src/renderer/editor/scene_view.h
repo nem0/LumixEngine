@@ -51,6 +51,7 @@ struct SceneView : StudioApp::GUIPlugin
 
 	private:
 		StudioApp& m_app;
+		Action* m_orbit_action;
 		Action* m_toggle_gizmo_step_action;
 		Action* m_move_forward_action;
 		Action* m_move_back_action;
