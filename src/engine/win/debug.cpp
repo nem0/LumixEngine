@@ -20,7 +20,7 @@
 
 
 static bool g_is_crash_reporting_enabled = false;
-static Lumix::DefaultAllocator xxallocator;
+static Lumix::DefaultAllocator stack_node_allocator;
 
 
 namespace Lumix
@@ -65,8 +65,8 @@ struct StackNode
 {
 	~StackNode()
 	{
-		LUMIX_DELETE(xxallocator, m_next);
-		LUMIX_DELETE(xxallocator, m_first_child);
+		LUMIX_DELETE(stack_node_allocator, m_next);
+		LUMIX_DELETE(stack_node_allocator, m_first_child);
 	}
 
 	void* m_instruction;
@@ -89,7 +89,7 @@ StackTree::StackTree()
 
 StackTree::~StackTree()
 {
-	LUMIX_DELETE(xxallocator, m_root);
+	LUMIX_DELETE(stack_node_allocator, m_root);
 	if (atomicDecrement(&s_instances) == 0)
 	{
 		HANDLE process = GetCurrentProcess();
@@ -191,7 +191,7 @@ StackNode* StackTree::insertChildren(StackNode* root_node, void** instruction, v
 	StackNode* node = root_node;
 	while (instruction >= stack)
 	{
-		StackNode* new_node = LUMIX_NEW(xxallocator, StackNode)();
+		StackNode* new_node = LUMIX_NEW(stack_node_allocator, StackNode)();
 		node->m_first_child = new_node;
 		new_node->m_parent = node;
 		new_node->m_next = nullptr;
@@ -213,7 +213,7 @@ StackNode* StackTree::record()
 	void** ptr = stack + captured_frames_count - 1;
 	if (!m_root)
 	{
-		m_root = LUMIX_NEW(xxallocator, StackNode)();
+		m_root = LUMIX_NEW(stack_node_allocator, StackNode)();
 		m_root->m_instruction = *ptr;
 		m_root->m_first_child = nullptr;
 		m_root->m_next = nullptr;
@@ -231,7 +231,7 @@ StackNode* StackTree::record()
 		}
 		if (node->m_instruction != *ptr)
 		{
-			node->m_next = LUMIX_NEW(xxallocator, StackNode);
+			node->m_next = LUMIX_NEW(stack_node_allocator, StackNode);
 			node->m_next->m_parent = node->m_parent;
 			node->m_next->m_instruction = *ptr;
 			node->m_next->m_next = nullptr;
@@ -400,9 +400,6 @@ u8* Allocator::getSystemFromUser(void* user_ptr)
 
 void* Allocator::reallocate(void* user_ptr, size_t size)
 {
-#ifndef LUMIX_DEBUG
-	return m_source.reallocate(user_ptr, size);
-#else
 	if (user_ptr == nullptr) return allocate(size);
 	if (size == 0) return nullptr;
 
@@ -415,15 +412,11 @@ void* Allocator::reallocate(void* user_ptr, size_t size)
 	deallocate(user_ptr);
 
 	return new_data;
-#endif
 }
 
 
 void* Allocator::allocate_aligned(size_t size, size_t align)
 {
-#ifndef LUMIX_DEBUG
-	return m_source.allocate_aligned(size, align);
-#else
 	void* system_ptr;
 	AllocationInfo* info;
 	u8* user_ptr;
@@ -461,15 +454,11 @@ void* Allocator::allocate_aligned(size_t size, size_t align)
 	}
 
 	return user_ptr;
-#endif
 }
 
 
 void Allocator::deallocate_aligned(void* user_ptr)
 {
-#ifndef LUMIX_DEBUG
-	m_source.deallocate_aligned(user_ptr);
-#else
 	if (user_ptr)
 	{
 		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
@@ -502,15 +491,11 @@ void Allocator::deallocate_aligned(void* user_ptr)
 
 		m_source.deallocate_aligned((void*)system_ptr);
 	}
-#endif
 }
 
 
 void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align)
 {
-#ifndef LUMIX_DEBUG
-	return m_source.reallocate_aligned(user_ptr, size, align);
-#else
 	if (user_ptr == nullptr) return allocate_aligned(size, align);
 	if (size == 0) return nullptr;
 
@@ -523,15 +508,11 @@ void* Allocator::reallocate_aligned(void* user_ptr, size_t size, size_t align)
 	deallocate_aligned(user_ptr);
 
 	return new_data;
-#endif
 }
 
 
 void* Allocator::allocate(size_t size)
 {
-#ifndef LUMIX_DEBUG
-	return m_source.allocate(size);
-#else
 	void* system_ptr;
 	AllocationInfo* info;
 	size_t system_size = getNeededMemory(size);
@@ -567,14 +548,10 @@ void* Allocator::allocate(size_t size)
 	}
 
 	return user_ptr;
-#endif
 }
 
 void Allocator::deallocate(void* user_ptr)
 {
-#ifndef LUMIX_DEBUG
-	m_source.deallocate(user_ptr);
-#else
 	if (user_ptr)
 	{
 		AllocationInfo* info = getAllocationInfoFromUser(user_ptr);
@@ -607,7 +584,6 @@ void Allocator::deallocate(void* user_ptr)
 
 		m_source.deallocate((void*)system_ptr);
 	}
-#endif
 }
 
 
@@ -671,7 +647,6 @@ BOOL SendFile(LPCSTR lpszSubject,
 	return (nSent == SUCCESS_SUCCESS || nSent == MAPI_E_USER_ABORT);
 }
 
-
 static void getStack(CONTEXT& context, Span<char> out)
 {
 	BOOL result;
@@ -732,8 +707,9 @@ static void getStack(CONTEXT& context, Span<char> out)
 		symbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
 		symbol->MaxNameLength = 255;
 
-		SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
-		UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
+		BOOL sybol_valid = SymGetSymFromAddr64(process, (ULONG64)stack.AddrPC.Offset, &displacement, symbol);
+		auto err = GetLastError();
+		DWORD num_char = UnDecorateSymbolName(symbol->Name, (PSTR)name, 256, UNDNAME_COMPLETE);
 
 		if (!catString(out, symbol->Name)) return;
 		if (!catString(out, "\n")) return;
@@ -745,6 +721,10 @@ static void getStack(CONTEXT& context, Span<char> out)
 static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 {
 	if (!g_is_crash_reporting_enabled) return EXCEPTION_CONTINUE_SEARCH;
+
+	HANDLE process = GetCurrentProcess();
+	SymInitialize(process, nullptr, TRUE);
+	Debug::StackTree::refreshModuleList();
 
 	struct CrashInfo
 	{
