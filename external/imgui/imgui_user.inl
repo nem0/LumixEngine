@@ -59,7 +59,8 @@ namespace ImGui
 		{
 			const float check_sz = ImMin(check_bb.GetWidth(), check_bb.GetHeight());
 			const float pad = ImMax(1.0f, (float)(int)(check_sz / 6.0f));
-			RenderCheckMark(check_bb.Min + ImVec2(pad, pad), GetColorU32(ImGuiCol_CheckMark), check_bb.GetWidth() - pad*2.0f);
+			ImDrawList* draw_list = GetWindowDrawList();
+			RenderCheckMark(draw_list, check_bb.Min + ImVec2(pad, pad), GetColorU32(ImGuiCol_CheckMark), check_bb.GetWidth() - pad*2.0f);
 		}
 
 		if (g.LogEnabled)
