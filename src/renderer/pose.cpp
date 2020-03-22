@@ -78,7 +78,7 @@ void Pose::computeRelative(Model& model)
 	for (int i = count - 1; i >= model.getFirstNonrootBoneIndex(); --i)
 	{
 		int parent = model.getBone(i).parent_idx;
-		positions[i] = -rotations[parent].conjugated().rotate(positions[i] - positions[parent]);
+		positions[i] = rotations[parent].conjugated().rotate(positions[i] - positions[parent]);
 		rotations[i] = rotations[parent].conjugated() * rotations[i];
 	}
 	is_absolute = false;
