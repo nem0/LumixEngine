@@ -4,6 +4,7 @@
 #include "animation/animation_scene.h"
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
+#include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -27,6 +28,11 @@ struct ControllerEditorImpl : ControllerEditor {
 		ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
 		ASSERT(res_manager);
 
+		Action* action = LUMIX_NEW(allocator, Action)("Animation editor", "Toggle animation editor", "animation_editor");
+		action->func.bind<&ControllerEditorImpl::toggleOpen>(this);
+		action->is_selected.bind<&ControllerEditorImpl::isOpen>(this);
+		app.addWindowAction(action);
+
 		m_controller = LUMIX_NEW(allocator, Controller)(Path("anim_editor"), *res_manager, allocator);
 		m_controller->initEmpty();
 		m_current_node = m_controller->m_root;
@@ -37,6 +43,9 @@ struct ControllerEditorImpl : ControllerEditor {
 		m_controller->destroy();
 		LUMIX_DELETE(allocator, m_controller);
 	}
+
+	bool isOpen() const { return m_open; }
+	void toggleOpen() { m_open = !m_open; }
 
 	static void createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
 		Node* node = nullptr;
@@ -297,7 +306,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	void debuggerUI() {
-		if (ImGui::Begin("Animation debugger")) {
+		if (ImGui::Begin("Animation debugger", &m_open)) {
 			const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 			if (selected.empty()) {
 				ImGui::End();
@@ -346,9 +355,11 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	void onWindowGUI() override {
+		if (!m_open) return;
+
 		debuggerUI();
 
-		if (ImGui::Begin("Animation hierarchy", nullptr, ImGuiWindowFlags_MenuBar)) {
+		if (ImGui::Begin("Animation hierarchy", &m_open, ImGuiWindowFlags_MenuBar)) {
 			if (ImGui::BeginMenuBar()) {
 				if (ImGui::BeginMenu("File")) {
 					if (ImGui::MenuItem("Save")) {
@@ -396,25 +407,6 @@ struct ControllerEditorImpl : ControllerEditor {
 					}
 				}
 
-				/*if (ImGui::BeginMenu("Nodes")) {
-					if (ImGui::BeginMenu("Create")) {
-						if (ImGui::MenuItem("Animation")) {
-							createChild(*m_current_node, Node::ANIMATION, m_controller->m_allocator);
-						}
-						if (ImGui::MenuItem("Blend 1D")) {
-							createChild(*m_current_level, Node::BLEND1D, m_controller->m_allocator);
-						}
-						if (ImGui::MenuItem("Group")) {
-							createChild(*m_current_level, Node::GROUP, m_controller->m_allocator);
-						}
-						if (ImGui::MenuItem("Layers")) {
-							createChild(*m_current_level, Node::LAYERS, m_controller->m_allocator);
-						}
-						ImGui::EndMenu();
-					}
-					ImGui::EndMenu();
-				}*/
-
 				ImGui::EndMenuBar();
 			}
 
@@ -426,7 +418,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 		ImGui::End();
 
-		if (ImGui::Begin("Animation controller", nullptr)) {
+		if (ImGui::Begin("Animation controller", &m_open)) {
 			if (ImGui::CollapsingHeader("Inputs")) {
 				InputDecl& inputs = m_controller->m_inputs;
 				
@@ -518,6 +510,7 @@ struct ControllerEditorImpl : ControllerEditor {
 				}
 			}
 
+			// TODO
 			/*if (ImGui::CollapsingHeader("Transitions")) {
 				Array<GroupNode::Child>& children = m_current_level->m_children;
 				if (children.empty()) {
@@ -669,7 +662,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	Controller* m_controller;
 	Node* m_current_node = nullptr;
 	Model* m_model = nullptr;
-
+	bool m_open = false;
 }; // ControllerEditorImpl
 
 ControllerEditor& ControllerEditor::create(StudioApp& app) {
