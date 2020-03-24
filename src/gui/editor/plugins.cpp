@@ -39,12 +39,16 @@ static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_b
 static const ComponentType GUI_RENDER_TARGET_TYPE = Reflection::getComponentType("gui_render_target");
 
 
-struct SpritePlugin final : AssetBrowser::IPlugin
+struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	SpritePlugin(StudioApp& app) 
-		: app(app) 
+		: m_app(app) 
 	{
-		app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
+		m_app.getAssetCompiler().registerExtension("spr", Sprite::TYPE);
+	}
+
+	bool compile(const Path& src) override {
+		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
 	bool canCreateResource() const override { return true; }
@@ -70,15 +74,16 @@ struct SpritePlugin final : AssetBrowser::IPlugin
 		if (resources.length() > 1) return;
 
 		Sprite* sprite = (Sprite*)resources[0];
+		if (!sprite->isReady()) return;
 		
 		if (ImGui::Button("Save")) saveSprite(*sprite);
 		ImGui::SameLine();
-		if (ImGui::Button("Open in external editor")) app.getAssetBrowser().openInExternalEditor(sprite);
+		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(sprite);
 
 		char tmp[MAX_PATH_LENGTH];
 		Texture* tex = sprite->getTexture();
 		copyString(tmp, tex ? tex->getPath().c_str() : "");
-		if (app.getAssetBrowser().resourceInput("Texture", "texture", Span(tmp), Texture::TYPE))
+		if (m_app.getAssetBrowser().resourceInput("Texture", "texture", Span(tmp), Texture::TYPE))
 		{
 			sprite->setTexture(Path(tmp));
 		}
@@ -179,16 +184,15 @@ struct SpritePlugin final : AssetBrowser::IPlugin
 
 	void saveSprite(Sprite& sprite)
 	{
-		if (OutputMemoryStream* file = app.getAssetBrowser().beginSaveResource(sprite))
+		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(sprite))
 		{
-			TextSerializer serializer(*file);
 			bool success = true;
-			if (!sprite.save(serializer))
+			if (!sprite.save(*file))
 			{
 				success = false;
 				logError("Editor") << "Could not save file " << sprite.getPath().c_str();
 			}
-			app.getAssetBrowser().endSaveResource(sprite, *file, success);
+			m_app.getAssetBrowser().endSaveResource(sprite, *file, success);
 		}
 	}
 
@@ -198,7 +202,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin
 	ResourceType getResourceType() const override { return Sprite::TYPE; }
 
 
-	StudioApp& app;
+	StudioApp& m_app;
 };
 
 
@@ -827,6 +831,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_sprite_plugin = LUMIX_NEW(allocator, SpritePlugin)(m_app);
 		m_app.getAssetBrowser().addPlugin(*m_sprite_plugin);
+
+		const char* sprite_exts[] = { "spr", nullptr };
+		m_app.getAssetCompiler().addPlugin(*m_sprite_plugin, sprite_exts);
 	}
 
 	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
@@ -837,6 +844,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.removePlugin(*m_gui_editor);
 		LUMIX_DELETE(allocator, m_gui_editor);
 
+		m_app.getAssetCompiler().removePlugin(*m_sprite_plugin);
 		m_app.getAssetBrowser().removePlugin(*m_sprite_plugin);
 		LUMIX_DELETE(allocator, m_sprite_plugin);
 	}

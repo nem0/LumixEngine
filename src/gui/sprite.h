@@ -22,16 +22,16 @@ public:
 
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
-	bool save(struct TextSerializer& serializer);
+	bool save(struct IOutputStream& serializer);
 	
 	void setTexture(const Path& path);
 	struct Texture* getTexture() const { return m_texture; }
 
-	Type type;
-	int top;
-	int bottom;
-	int left;
-	int right;
+	Type type = SIMPLE;
+	int top = 0;
+	int bottom = 0;
+	int left = 0;
+	int right = 0;
 
 	static const ResourceType TYPE;
 
