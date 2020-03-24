@@ -336,20 +336,18 @@ bool InputMemoryStream::read(void* data, u64 size)
 
 bool InputMemoryStream::read(String& string)
 {
-	const char* str = readString();
-	const int s = stringLength(str);
-	string.resize(s + 1);
-	return memcpy(string.getData(), str, s);
+	string = readString();
+	return true;
 }
 
 
 const char* InputMemoryStream::readString()
 {
-	char c;
 	const char* ret = (const char*)m_data + m_pos;
-	do {
-		c = IInputStream::read<char>();
-	} while(c != '\0');
+	const char* end = (const char*)m_data + m_size;
+	while (m_pos < m_size && m_data[m_pos]) ++m_pos;
+	ASSERT(m_pos < m_size);
+	++m_pos;
 	return ret;
 }
 
