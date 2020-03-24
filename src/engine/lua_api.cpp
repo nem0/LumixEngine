@@ -757,12 +757,19 @@ static Quat LUA_getEntityRotation(Universe* universe, EntityRef entity)
 }
 
 
+static float LUA_getEntityScale(Universe* universe, EntityRef entity)
+{
+	return universe->getScale(entity);
+}
+
+
 static Vec3 LUA_getEntityDirection(Universe* universe, EntityRef entity)
 {
 	Quat rot = universe->getRotation(entity);
 	return rot.rotate(Vec3(0, 0, 1));
 }
 
+static void LUA_setEntityScale(Universe* univ, EntityRef entity, float scale) { univ->setScale(entity, scale); }
 static void LUA_setEntityPosition(Universe* univ, EntityRef entity, const DVec3& pos) { univ->setPosition(entity, pos); }
 static float LUA_getLastTimeDelta(Engine* engine) { return engine->getLastTimeDelta(); }
 static void LUA_unloadResource(Engine* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
@@ -896,6 +903,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(getEntityDirection);
 	REGISTER_FUNCTION(getEntityPosition);
 	REGISTER_FUNCTION(getEntityRotation);
+	REGISTER_FUNCTION(getEntityScale);
 	//REGISTER_FUNCTION(getLastTimeDelta);
 	//REGISTER_FUNCTION(getScene);
 	//REGISTER_FUNCTION(getSceneUniverse);
@@ -912,6 +920,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(setEntityLocalRotation);
 	REGISTER_FUNCTION(setEntityPosition);
 	REGISTER_FUNCTION(setEntityRotation);
+	REGISTER_FUNCTION(setEntityScale);
 	//REGISTER_FUNCTION(setTimeMultiplier);
 	//REGISTER_FUNCTION(startGame);
 	REGISTER_FUNCTION(unloadResource);
@@ -1061,6 +1070,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				return Lumix.Entity:new(table._universe, p)
 			elseif key == "rotation" then
 				return LumixAPI.getEntityRotation(table._universe, table._entity)
+			elseif key == "scale" then
+				return LumixAPI.getEntityScale(table._universe, table._entity)
 			elseif key == "universe" then
 				return Lumix.Universe:new(table._universe)
 			elseif Lumix.Entity[key] ~= nil then
@@ -1074,6 +1085,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 				LumixAPI.setEntityPosition(table._universe, table._entity, value)
 			elseif key == "rotation" then
 				LumixAPI.setEntityRotation(table._universe, table._entity, value)
+			elseif key == "scale" then
+				LumixAPI.setEntityScale(table._universe, table._entity, value)
 			elseif key == "parent" then
 				LumixAPI.setParent(table._universe, value._entity, table._entity)
 			elseif Lumix.Entity[key] ~= nil then
