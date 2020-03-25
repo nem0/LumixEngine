@@ -417,7 +417,7 @@ namespace Lumix
 
 			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != 0)
 			{
-				logWarning("Lua Script") << lua_tostring(script.m_state, -1);
+				logError("Lua Script") << lua_tostring(script.m_state, -1);
 				lua_pop(script.m_state, 1);
 			}
 			lua_pop(script.m_state, 1);

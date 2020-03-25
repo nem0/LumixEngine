@@ -764,6 +764,8 @@ struct LUMIX_ENGINE_API Transform
 	DVec3 pos;
 	Quat rot;
 	float scale;
+
+	static const Transform IDENTITY;
 };
 
 

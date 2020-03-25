@@ -51,10 +51,10 @@ bool Sprite::save(IOutputStream& out)
 	if (!isReady()) return false;
 
 	out << "type " << (type == PATCH9 ? "\"patch9\"\n" : "\"simple\"\n");
-	out << "top " << top << "\n";
-	out << "bottom " << bottom << "\n";
-	out << "left " << left << "\n";
-	out << "right " << right << "\n";
+	out << "top(" << top << ")\n";
+	out << "bottom(" << bottom << ")\n";
+	out << "left(" << left << ")\n";
+	out << "right(" << right << ")\n";
 	out << "texture \"" << (m_texture ? m_texture->getPath().c_str() : "") << "\"";
 
 	return true;

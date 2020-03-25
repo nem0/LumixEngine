@@ -1,6 +1,7 @@
 #include "engine/engine.h"
 #include "engine/allocator.h"
 #include "engine/associative_array.h"
+#include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/flag_set.h"
 #include "engine/input_system.h"
@@ -92,8 +93,12 @@ private:
 
 struct GUIButton
 {
+	GUIButton(IAllocator& allocator) : event(allocator) {}
+
 	u32 normal_color = 0xffFFffFF;
 	u32 hovered_color = 0xffFFffFF;
+	String event;
+	u32 event_hash = 0;
 };
 
 
@@ -157,6 +162,7 @@ struct GUISceneImpl final : GUIScene
 		, m_rect_hovered_out(allocator)
 		, m_unhandled_mouse_button(allocator)
 		, m_button_clicked(allocator)
+		, m_event(allocator)
 		, m_buttons_down_count(0)
 		, m_canvas_size(800, 600)
 	{
@@ -219,6 +225,7 @@ struct GUISceneImpl final : GUIScene
 
 		if (rect.image && rect.image->flags.isSet(GUIImage::IS_ENABLED))
 		{
+			const Color color = *(Color*)&rect.image->color;
 			if (rect.image->sprite && rect.image->sprite->getTexture())
 			{
 				Sprite* sprite = rect.image->sprite;
@@ -240,33 +247,32 @@ struct GUISceneImpl final : GUIScene
 						sprite->bottom / (float)tex->height
 					};
 
-					draw.addImage(&tex->handle, { l, t }, { pos.l, pos.t }, { 0, 0 }, { uvs.l, uvs.t });
-					draw.addImage(&tex->handle, { pos.l, t }, { pos.r, pos.t }, { uvs.l, 0 }, { uvs.r, uvs.t });
-					draw.addImage(&tex->handle, { pos.r, t }, { r, pos.t }, { uvs.r, 0 }, { 1, uvs.t });
+					draw.addImage(&tex->handle, { l, t }, { pos.l, pos.t }, { 0, 0 }, { uvs.l, uvs.t }, color);
+					draw.addImage(&tex->handle, { pos.l, t }, { pos.r, pos.t }, { uvs.l, 0 }, { uvs.r, uvs.t }, color);
+					draw.addImage(&tex->handle, { pos.r, t }, { r, pos.t }, { uvs.r, 0 }, { 1, uvs.t }, color);
 
-					draw.addImage(&tex->handle, { l, pos.t }, { pos.l, pos.b }, { 0, uvs.t }, { uvs.l, uvs.b });
-					draw.addImage(&tex->handle, { pos.l, pos.t }, { pos.r, pos.b }, { uvs.l, uvs.t }, { uvs.r, uvs.b });
-					draw.addImage(&tex->handle, { pos.r, pos.t }, { r, pos.b }, { uvs.r, uvs.t }, { 1, uvs.b });
+					draw.addImage(&tex->handle, { l, pos.t }, { pos.l, pos.b }, { 0, uvs.t }, { uvs.l, uvs.b }, color);
+					draw.addImage(&tex->handle, { pos.l, pos.t }, { pos.r, pos.b }, { uvs.l, uvs.t }, { uvs.r, uvs.b }, color);
+					draw.addImage(&tex->handle, { pos.r, pos.t }, { r, pos.b }, { uvs.r, uvs.t }, { 1, uvs.b }, color);
 
-					draw.addImage(&tex->handle, { l, pos.b }, { pos.l, b }, { 0, uvs.b }, { uvs.l, 1 });
-					draw.addImage(&tex->handle, { pos.l, pos.b }, { pos.r, b }, { uvs.l, uvs.b }, { uvs.r, 1 });
-					draw.addImage(&tex->handle, { pos.r, pos.b }, { r, b }, { uvs.r, uvs.b }, { 1, 1 });
-
+					draw.addImage(&tex->handle, { l, pos.b }, { pos.l, b }, { 0, uvs.b }, { uvs.l, 1 }, color);
+					draw.addImage(&tex->handle, { pos.l, pos.b }, { pos.r, b }, { uvs.l, uvs.b }, { uvs.r, 1 }, color);
+					draw.addImage(&tex->handle, { pos.r, pos.b }, { r, b }, { uvs.r, uvs.b }, { 1, 1 }, color);
 				}
 				else
 				{
-					draw.addImage(&tex->handle, { l, t }, { r, b }, {0, 0}, {1, 1});
+					draw.addImage(&tex->handle, { l, t }, { r, b }, {0, 0}, {1, 1}, color);
 				}
 			}
 			else
 			{
-				draw.addRectFilled({ l, t }, { r, b }, *(Color*)&rect.image->color);
+				draw.addRectFilled({ l, t }, { r, b }, color);
 			}
 		}
 
 		if (rect.render_target && rect.render_target->isValid())
 		{
-			draw.addImage(rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1});
+			draw.addImage(rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1}, Color::WHITE);
 		}
 
 		if (rect.text)
@@ -303,6 +309,7 @@ struct GUISceneImpl final : GUIScene
 		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.popClipRect();
 	}
 
+	IVec2 getCursorPosition() override { return m_cursor_pos; }
 
 	void render(Pipeline& pipeline, const Vec2& canvas_size) override
 	{
@@ -324,6 +331,14 @@ struct GUISceneImpl final : GUIScene
 		m_buttons[entity].normal_color = RGBAVec4ToABGRu32(color);
 	}
 
+	void setButtonEvent(EntityRef entity, const char* text) override {
+		m_buttons[entity].event = text;
+		m_buttons[entity].event_hash = crc32(text);
+	}
+
+	const char* getButtonEvent(EntityRef entity) override {
+		return m_buttons[entity].event.c_str();
+	}
 
 	Vec4 getButtonHoveredColorRGBA(EntityRef entity) override
 	{
@@ -594,10 +609,10 @@ struct GUISceneImpl final : GUIScene
 
 	void hoverOut(const GUIRect& rect)
 	{
-		int idx = m_buttons.find(rect.entity);
-		if (idx < 0) return;
+		auto iter = m_buttons.find(rect.entity);
+		if (!iter.isValid()) return;
 
-		const GUIButton& button = m_buttons.at(idx);
+		const GUIButton& button = iter.value();
 
 		if (rect.image) rect.image->color = button.normal_color;
 		if (rect.text) rect.text->color = button.normal_color;
@@ -608,10 +623,10 @@ struct GUISceneImpl final : GUIScene
 
 	void hover(const GUIRect& rect)
 	{
-		int idx = m_buttons.find(rect.entity);
-		if (idx < 0) return;
+		auto iter = m_buttons.find(rect.entity);
+		if (!iter.isValid()) return;
 
-		const GUIButton& button = m_buttons.at(idx);
+		const GUIButton& button = iter.value();
 
 		if (rect.image) rect.image->color = button.hovered_color;
 		if (rect.text) rect.text->color = button.hovered_color;
@@ -628,7 +643,7 @@ struct GUISceneImpl final : GUIScene
 
 		bool is = contains(r, mouse_pos);
 		bool was = contains(r, prev_mouse_pos);
-		if (is != was && m_buttons.find(rect.entity) >= 0)
+		if (is != was && m_buttons.find(rect.entity).isValid())
 		{
 			is ? hover(rect) : hoverOut(rect);
 		}
@@ -668,13 +683,18 @@ struct GUISceneImpl final : GUIScene
 		bool handled = false;
 		
 		if (contains(r, pos) && contains(r, m_mouse_down_pos)) {
-			if (m_buttons.find(rect.entity) >= 0)
+			auto button_iter = m_buttons.find(rect.entity);
+			if (button_iter.isValid())
 			{
 				handled = true;
 				if (is_up && isButtonDown(rect.entity))
 				{
 					m_focused_entity = INVALID_ENTITY;
 					m_button_clicked.invoke(rect.entity);
+					const GUIButton& button = button_iter.value();
+					if (button.event.length() > 0) {
+						m_event.invoke(button.event_hash);
+					}
 				}
 				if (!is_up)
 				{
@@ -791,6 +811,7 @@ struct GUISceneImpl final : GUIScene
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
 						Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
+						m_cursor_pos = IVec2((i32)pos.x, (i32)pos.y);
 						handleMouseAxisEvent({0, 0,  m_canvas_size.x, m_canvas_size.y }, *m_root, pos, old_pos);
 						old_pos = pos;
 					}
@@ -902,7 +923,7 @@ struct GUISceneImpl final : GUIScene
 			idx = m_rects.find(entity);
 		}
 		GUIImage* image = m_rects.at(idx)->image;
-		GUIButton& button = m_buttons.emplace(entity);
+		GUIButton& button = m_buttons.insert(entity, GUIButton(m_allocator));
 		if (image)
 		{
 			button.hovered_color = image->color;
@@ -1052,11 +1073,14 @@ struct GUISceneImpl final : GUIScene
 		}
 
 		serializer.write(m_buttons.size());
-		for (int i = 0, c = m_buttons.size(); i < c; ++i)
+		
+		for (auto iter = m_buttons.begin(); iter.isValid(); ++iter)
 		{
-			serializer.write(m_buttons.getKey(i));
-			const GUIButton& button = m_buttons.at(i);
-			serializer.write(button);
+			serializer.write(iter.key());
+			const GUIButton& button = iter.value();
+			serializer.write(button.normal_color);
+			serializer.write(button.hovered_color);
+			serializer.write(button.event);
 		}
 
 	}
@@ -1130,8 +1154,11 @@ struct GUISceneImpl final : GUIScene
 			EntityRef e;
 			serializer.read(e);
 			e = entity_map.get(e);
-			GUIButton& button = m_buttons.emplace(e);
-			serializer.read(button);
+			GUIButton& button = m_buttons.insert(e, GUIButton(m_allocator));
+			serializer.read(button.normal_color);
+			serializer.read(button.hovered_color);
+			serializer.read(button.event);
+			button.event_hash = button.event.length() > 0 ? crc32(button.event.c_str()) : 0;
 			m_universe.onComponentCreated(e, GUI_BUTTON_TYPE, this);
 		}
 		m_root = findRoot();
@@ -1148,7 +1175,7 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)>& rectHovered() override { return m_rect_hovered; }
 	DelegateList<void(EntityRef)>& rectHoveredOut() override { return m_rect_hovered_out; }
 	DelegateList<void(bool, int, int)>& mousedButtonUnhandled() override { return m_unhandled_mouse_button; }
-
+	DelegateList<void(u32)>& event() override { return m_event; }
 
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }
@@ -1158,11 +1185,12 @@ struct GUISceneImpl final : GUIScene
 	GUISystem& m_system;
 	
 	AssociativeArray<EntityRef, GUIRect*> m_rects;
-	AssociativeArray<EntityRef, GUIButton> m_buttons;
+	HashMap<EntityRef, GUIButton> m_buttons;
 	EntityRef m_buttons_down[16];
 	u32 m_buttons_down_count;
 	EntityPtr m_focused_entity = INVALID_ENTITY;
 	GUIRect* m_root = nullptr;
+	IVec2 m_cursor_pos;
 	FontManager* m_font_manager = nullptr;
 	Vec2 m_canvas_size;
 	Vec2 m_mouse_down_pos;
@@ -1170,6 +1198,7 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)> m_rect_hovered;
 	DelegateList<void(EntityRef)> m_rect_hovered_out;
 	DelegateList<void(bool, i32, i32)> m_unhandled_mouse_button;
+	DelegateList<void(u32)> m_event;
 };
 
 

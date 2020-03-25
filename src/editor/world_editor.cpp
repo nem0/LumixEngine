@@ -1139,8 +1139,20 @@ public:
 	}
 
 
-	const char* getType() override { return "set_property_values"; }
+	const char* getType() override { return getTypeByT<T>(); }
 
+	template <typename T2> static const char* getTypeByT();
+	template <> static const char* getTypeByT<i32>() { return "set_property_values_i32"; }
+	template <> static const char* getTypeByT<u32>() { return "set_property_values_u32"; }
+	template <> static const char* getTypeByT<float>() { return "set_property_values_float"; }
+	template <> static const char* getTypeByT<Vec2>() { return "set_property_values_vec2"; }
+	template <> static const char* getTypeByT<Vec3>() { return "set_property_values_vec3"; }
+	template <> static const char* getTypeByT<Vec4>() { return "set_property_values_vec4"; }
+	template <> static const char* getTypeByT<IVec3>() { return "set_property_values_ivec3"; }
+	template <> static const char* getTypeByT<Path>() { return "set_property_values_path"; }
+	template <> static const char* getTypeByT<const char*>() { return "set_property_values_cstr"; }
+	template <> static const char* getTypeByT<EntityPtr>() { return "set_property_values_entity"; }
+	template <> static const char* getTypeByT<bool>() { return "set_property_values_bool"; }
 
 	bool merge(IEditorCommand& command) override
 	{

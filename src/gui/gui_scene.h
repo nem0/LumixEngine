@@ -32,6 +32,7 @@ struct GUIScene : IScene
 	static void destroyInstance(GUIScene* scene);
 
 	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size) = 0;
+	virtual IVec2 getCursorPosition() = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
 	virtual Rect getRectOnCanvas(EntityPtr entity, const Vec2& canva_size) const = 0;
@@ -66,6 +67,8 @@ struct GUIScene : IScene
 	virtual void setButtonNormalColorRGBA(EntityRef entity, const Vec4& color) = 0;
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0;
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
+	virtual void setButtonEvent(EntityRef entity, const char* text) = 0;
+	virtual const char* getButtonEvent(EntityRef entity) = 0;
 
 	virtual void enableImage(EntityRef entity, bool enable) = 0;
 	virtual bool isImageEnabled(EntityRef entity) = 0;
@@ -91,6 +94,7 @@ struct GUIScene : IScene
 	virtual DelegateList<void(EntityRef)>& rectHovered() = 0;
 	virtual DelegateList<void(EntityRef)>& rectHoveredOut() = 0;
 	virtual DelegateList<void(bool, i32, i32)>& mousedButtonUnhandled() = 0;
+	virtual DelegateList<void(u32)>& event() = 0;
 };
 
 

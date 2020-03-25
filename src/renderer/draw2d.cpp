@@ -128,7 +128,7 @@ void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 	cmd->indices_count += 6;
 }
 
-void Draw2D::addImage(gpu::TextureHandle* tex, const Vec2& from, const Vec2& to, const Vec2& uv0, const Vec2& uv1) {
+void Draw2D::addImage(gpu::TextureHandle* tex, const Vec2& from, const Vec2& to, const Vec2& uv0, const Vec2& uv1, Color color) {
 	Cmd* cmd = &m_cmds.back();
 
 	if (cmd->texture != tex && cmd->indices_count != 0) {
@@ -149,8 +149,6 @@ void Draw2D::addImage(gpu::TextureHandle* tex, const Vec2& from, const Vec2& to,
 	m_indices.push(voff);
 	m_indices.push(voff + 2);
 	m_indices.push(voff + 3);
-
-	const Color color(0xff, 0xff, 0xff, 0xff);
 
 	m_vertices.push({from, uv0, color});
 	m_vertices.push({{from.x, to.y}, {uv0.x, uv1.y}, color});
