@@ -1044,6 +1044,19 @@ template <> struct StoredType<const char*> {
 };
 
 
+template <typename T2> static const char* getSetPropertyCmdName();
+template <> static const char* getSetPropertyCmdName<i32>() { return "set_property_values_i32"; }
+template <> static const char* getSetPropertyCmdName<u32>() { return "set_property_values_u32"; }
+template <> static const char* getSetPropertyCmdName<float>() { return "set_property_values_float"; }
+template <> static const char* getSetPropertyCmdName<Vec2>() { return "set_property_values_vec2"; }
+template <> static const char* getSetPropertyCmdName<Vec3>() { return "set_property_values_vec3"; }
+template <> static const char* getSetPropertyCmdName<Vec4>() { return "set_property_values_vec4"; }
+template <> static const char* getSetPropertyCmdName<IVec3>() { return "set_property_values_ivec3"; }
+template <> static const char* getSetPropertyCmdName<Path>() { return "set_property_values_path"; }
+template <> static const char* getSetPropertyCmdName<const char*>() { return "set_property_values_cstr"; }
+template <> static const char* getSetPropertyCmdName<EntityPtr>() { return "set_property_values_entity"; }
+template <> static const char* getSetPropertyCmdName<bool>() { return "set_property_values_bool"; }
+
 template <typename T>
 struct SetPropertyCommand final : IEditorCommand
 {
@@ -1139,20 +1152,7 @@ public:
 	}
 
 
-	const char* getType() override { return getTypeByT<T>(); }
-
-	template <typename T2> static const char* getTypeByT();
-	template <> static const char* getTypeByT<i32>() { return "set_property_values_i32"; }
-	template <> static const char* getTypeByT<u32>() { return "set_property_values_u32"; }
-	template <> static const char* getTypeByT<float>() { return "set_property_values_float"; }
-	template <> static const char* getTypeByT<Vec2>() { return "set_property_values_vec2"; }
-	template <> static const char* getTypeByT<Vec3>() { return "set_property_values_vec3"; }
-	template <> static const char* getTypeByT<Vec4>() { return "set_property_values_vec4"; }
-	template <> static const char* getTypeByT<IVec3>() { return "set_property_values_ivec3"; }
-	template <> static const char* getTypeByT<Path>() { return "set_property_values_path"; }
-	template <> static const char* getTypeByT<const char*>() { return "set_property_values_cstr"; }
-	template <> static const char* getTypeByT<EntityPtr>() { return "set_property_values_entity"; }
-	template <> static const char* getTypeByT<bool>() { return "set_property_values_bool"; }
+	const char* getType() override { return getSetPropertyCmdName<T>(); }
 
 	bool merge(IEditorCommand& command) override
 	{
