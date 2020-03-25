@@ -21,6 +21,7 @@ const Vec4 Vec4::MAX = Vec4(FLT_MAX);
 const Vec4 Vec4::MIN = Vec4(-FLT_MAX);
 const Vec4 Vec4::ZERO = Vec4(0);
 
+const Transform Transform::IDENTITY = Transform({0, 0, 0}, {0, 0, 0, 1}, 1.f);
 
 float Vec2::squaredLength() const
 {

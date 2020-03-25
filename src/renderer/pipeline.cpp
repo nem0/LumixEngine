@@ -1003,7 +1003,7 @@ struct PipelineImpl final : Pipeline
 					if (!texture_id.isValid()) texture_id = atlas_texture;
 
 					gpu::bindTextures(&texture_id, 0, 1);
-					gpu::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), num_indices, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
+					gpu::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
 
 					elem_offset += cmd.indices_count;
 				}

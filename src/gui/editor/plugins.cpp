@@ -63,7 +63,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return false;
 		}
 
-		file << "{ \"type\" : \"simple\" }";
+		file << "type \"simple\"";
 		file.close();
 		return true;
 	}
@@ -601,7 +601,10 @@ private:
 		EntityRef child = m_editor->addEntity();
 		m_editor->makeParent(entity, child);
 		m_editor->selectEntities(&child, 1, false);
-		m_editor->addComponent(Span(&child, 1), child_type);
+		m_editor->addComponent(Span(&child, 1), GUI_RECT_TYPE);
+		if (child_type != GUI_RECT_TYPE) {
+			m_editor->addComponent(Span(&child, 1), child_type);
+		}
 		m_editor->endCommandGroup();
 	}
 
