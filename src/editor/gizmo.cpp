@@ -145,7 +145,7 @@ Axis collide(const RotationGizmo& gizmo, const UniverseView& view) {
 	return axis;
 }
 
-Axis collide(const TranslationGizmo& gizmo, const UniverseView& view) {
+Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const UniverseView& view, const Gizmo::Config& cfg) {
 	DVec3 origin;
 	Vec3 dir;
 	const Viewport viewport = view.getViewport();
@@ -171,9 +171,14 @@ Axis collide(const TranslationGizmo& gizmo, const UniverseView& view) {
 
 	if (transform_axis != Axis::NONE) return transform_axis;
 
-	const float x_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.x);
-	const float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.y);
-	const float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.z);
+	const bool is_global = cfg.coord_system == Gizmo::Config::CoordSystem::GLOBAL;
+	const float scale = gizmo.x.length();
+	const Vec3 x = is_global ? gizmo.x : tr.rot.rotate(Vec3(scale, 0, 0));
+	const Vec3 y = is_global ? gizmo.y : tr.rot.rotate(Vec3(0, scale, 0));
+	const Vec3 z = is_global ? gizmo.z : tr.rot.rotate(Vec3(0, 0, scale));
+	const float x_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + x);
+	const float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + y);
+	const float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + z);
 
 	const float influenced_dist = gizmo.x.length() * INFLUENCE_DISTANCE;
 	if (x_dist < y_dist && x_dist < z_dist && x_dist < influenced_dist) return Axis::X;
@@ -217,22 +222,28 @@ DVec3 getMousePlaneIntersection(const UniverseView& view, const Gizmo& gizmo, Ax
 	return gizmo.pos + axis * d;
 }
 
-void draw(UniverseView& view, const TranslationGizmo& gizmo, Axis axis) {
+void draw(UniverseView& view, const TranslationGizmo& gizmo, const Transform& tr, Axis axis, const Gizmo::Config& cfg) {
 	const DVec3 cam_pos = view.getViewport().pos;
 	const Vec3 rel_pos = (gizmo.pos - cam_pos).toFloat();
+
+	const bool is_global = cfg.coord_system == Gizmo::Config::CoordSystem::GLOBAL;
+	const float scale = gizmo.x.length();
+	const Vec3 x = is_global ? gizmo.x : tr.rot.rotate(Vec3(scale, 0, 0));
+	const Vec3 y = is_global ? gizmo.y : tr.rot.rotate(Vec3(0, scale, 0));
+	const Vec3 z = is_global ? gizmo.z : tr.rot.rotate(Vec3(0, 0, scale));
 
 	UniverseView::Vertex* line_vertices = view.render(true, 6);
 	line_vertices[0].pos = rel_pos;
 	line_vertices[0].abgr = axis == Axis::X ? SELECTED_COLOR : X_COLOR;
-	line_vertices[1].pos = rel_pos + gizmo.x;
+	line_vertices[1].pos = rel_pos + x;
 	line_vertices[1].abgr = line_vertices[0].abgr;
 	line_vertices[2].pos = rel_pos;
 	line_vertices[2].abgr = axis == Axis::Y ? SELECTED_COLOR : Y_COLOR;
-	line_vertices[3].pos = rel_pos + gizmo.y;
+	line_vertices[3].pos = rel_pos + y;
 	line_vertices[3].abgr = line_vertices[2].abgr;
 	line_vertices[4].pos = rel_pos;
 	line_vertices[4].abgr = axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
-	line_vertices[5].pos = rel_pos + gizmo.z;
+	line_vertices[5].pos = rel_pos + z;
 	line_vertices[5].abgr = line_vertices[4].abgr;
 
 	UniverseView::Vertex* vertices = view.render(false, 9);
@@ -498,15 +509,15 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
 	const bool other_is_active = !none_active && id != g_gizmo_state.dragged_id;
 	if (other_is_active) {
-		draw(view, gizmo, Axis::NONE);
+		draw(view, gizmo, tr, Axis::NONE, cfg);
 		return false;
 	}
 
 	if (none_active) {
-		const Axis axis = collide(gizmo, view);
+		const Axis axis = collide(gizmo, tr, view, cfg);
 		if (axis != Axis::NONE) g_gizmo_state.active_id = id;
 		else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
-		draw(view, gizmo, axis);
+		draw(view, gizmo, tr, axis, cfg);
 		if (view.isMouseClick(OS::MouseButton::LEFT) && axis != Axis::NONE) {
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
@@ -522,7 +533,7 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 		return false;
 	}
 		
-	draw(view, gizmo, g_gizmo_state.axis);
+	draw(view, gizmo, tr, g_gizmo_state.axis, cfg);
 		
 	const DVec3 pos = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
 	const Vec3 delta_vec = (pos - g_gizmo_state.prev_point).toFloat();
