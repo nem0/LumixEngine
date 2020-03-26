@@ -1043,19 +1043,20 @@ template <> struct StoredType<const char*> {
 	static const char* get(const String& value) { return value.c_str(); }
 };
 
-
-template <typename T2> static const char* getSetPropertyCmdName();
-template <> static const char* getSetPropertyCmdName<i32>() { return "set_property_values_i32"; }
-template <> static const char* getSetPropertyCmdName<u32>() { return "set_property_values_u32"; }
-template <> static const char* getSetPropertyCmdName<float>() { return "set_property_values_float"; }
-template <> static const char* getSetPropertyCmdName<Vec2>() { return "set_property_values_vec2"; }
-template <> static const char* getSetPropertyCmdName<Vec3>() { return "set_property_values_vec3"; }
-template <> static const char* getSetPropertyCmdName<Vec4>() { return "set_property_values_vec4"; }
-template <> static const char* getSetPropertyCmdName<IVec3>() { return "set_property_values_ivec3"; }
-template <> static const char* getSetPropertyCmdName<Path>() { return "set_property_values_path"; }
-template <> static const char* getSetPropertyCmdName<const char*>() { return "set_property_values_cstr"; }
-template <> static const char* getSetPropertyCmdName<EntityPtr>() { return "set_property_values_entity"; }
-template <> static const char* getSetPropertyCmdName<bool>() { return "set_property_values_bool"; }
+namespace {
+template <typename T2> const char* getSetPropertyCmdName();
+template <> const char* getSetPropertyCmdName<i32>() { return "set_property_values_i32"; }
+template <> const char* getSetPropertyCmdName<u32>() { return "set_property_values_u32"; }
+template <> const char* getSetPropertyCmdName<float>() { return "set_property_values_float"; }
+template <> const char* getSetPropertyCmdName<Vec2>() { return "set_property_values_vec2"; }
+template <> const char* getSetPropertyCmdName<Vec3>() { return "set_property_values_vec3"; }
+template <> const char* getSetPropertyCmdName<Vec4>() { return "set_property_values_vec4"; }
+template <> const char* getSetPropertyCmdName<IVec3>() { return "set_property_values_ivec3"; }
+template <> const char* getSetPropertyCmdName<Path>() { return "set_property_values_path"; }
+template <> const char* getSetPropertyCmdName<const char*>() { return "set_property_values_cstr"; }
+template <> const char* getSetPropertyCmdName<EntityPtr>() { return "set_property_values_entity"; }
+template <> const char* getSetPropertyCmdName<bool>() { return "set_property_values_bool"; }
+}
 
 template <typename T>
 struct SetPropertyCommand final : IEditorCommand
