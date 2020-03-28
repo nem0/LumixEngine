@@ -262,6 +262,13 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		{
 			ImGui::OpenPopup(prop.name);
 		}
+		if (ImGui::BeginDragDropTarget()) {
+			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+				EntityRef dropped_entity = *(EntityRef*)payload->Data;
+				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, dropped_entity);
+			}
+		}
+
 		ImGui::EndGroup();
 		ImGui::SameLine();
 		ImGui::Text("%s", prop.name);

@@ -1652,7 +1652,6 @@ struct StudioAppImpl final : StudioApp
 		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
 		if (selected) flags |= ImGuiTreeNodeFlags_Selected;
 		bool node_open = ImGui::TreeNodeEx(buffer, flags);
-		if (ImGui::IsItemClicked(0)) m_editor->selectEntities(&entity, 1, true);
 		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
 		if (ImGui::BeginPopup("entity_context_menu"))
 		{
@@ -1673,6 +1672,11 @@ struct StudioAppImpl final : StudioApp
 			ImGui::Text("%s", buffer);
 			ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
 			ImGui::EndDragDropSource();
+		}
+		else {
+			if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+				m_editor->selectEntities(&entity, 1, true);
+			}
 		}
 		if (ImGui::BeginDragDropTarget())
 		{
