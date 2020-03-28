@@ -524,8 +524,7 @@ public:
 		if (!m_entity_to_prefab.empty()) serializer.write(m_entity_to_prefab.begin(), m_entity_to_prefab.byte_size());
 
 		serializer.write((u32)m_resources.size());
-		for (const PrefabVersion& prefab : m_resources)
-		{
+		for (const PrefabVersion& prefab : m_resources) {
 			serializer.writeString(prefab.resource->getPath().c_str());
 			serializer.write(prefab.content_hash);
 		}
