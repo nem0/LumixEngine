@@ -156,7 +156,10 @@ namespace Lumix
 			}
 
 			~ScriptInstance() {
-				if (m_script) m_script->getObserverCb().unbind<&ScriptComponent::onScriptLoaded>(m_cmp);
+				if (m_script) {
+					m_script->getObserverCb().unbind<&ScriptComponent::onScriptLoaded>(m_cmp);
+					m_script->getResourceManager().unload(*m_script);
+				}
 
 				lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
 				ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
