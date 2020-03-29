@@ -315,6 +315,10 @@ namespace Lumix
 				++parameter_count;
 			}
 
+			void add(EntityPtr parameter) override {
+				lua_pushinteger(state, parameter.index);
+				++parameter_count;
+			}
 
 			void add(bool parameter) override
 			{

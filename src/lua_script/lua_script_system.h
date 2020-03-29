@@ -51,6 +51,7 @@ struct LuaScriptScene : IScene
 		virtual void add(bool parameter) = 0;
 		virtual void add(float parameter) = 0;
 		virtual void add(void* parameter) = 0;
+		virtual void add(EntityPtr parameter) = 0;
 		virtual void addEnvironment(int env) = 0;
 	};
 
