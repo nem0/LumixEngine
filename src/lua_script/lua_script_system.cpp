@@ -1306,6 +1306,7 @@ namespace Lumix
 					for (Property& prop : scr.m_properties)
 					{
 						serializer.write(prop.name_hash);
+						serializer.write(prop.type);
 						int idx = m_property_names.find(prop.name_hash);
 						if (idx >= 0)
 						{
@@ -1353,9 +1354,19 @@ namespace Lumix
 						Property& prop = scr.m_properties.emplace(allocator);
 						prop.type = Property::ANY;
 						serializer.read(prop.name_hash);
+						Property::Type type;
+						serializer.read(type);
 						const char* tmp = serializer.readString();
-						// TODO map entities if property is of entity type
-						prop.stored_value = tmp;
+						if (type == Property::ENTITY) {
+							EntityPtr entity;
+							fromCString(Span(tmp, stringLength(tmp)), Ref(entity.index));
+							entity = entity_map.get(entity);
+							StaticString<64> buf(entity.index);
+							prop.stored_value = buf;
+						}
+						else {
+							prop.stored_value = tmp;
+						}
 					}
 					setScriptPath(*script, scr, Path(tmp));
 				}

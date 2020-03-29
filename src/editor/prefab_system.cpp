@@ -280,7 +280,18 @@ public:
 		void visit(const Reflection::Property<float>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<int>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<u32>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<EntityPtr>& prop) override { clone(prop); }
+		void visit(const Reflection::Property<EntityPtr>& prop) override { 
+			EntityPtr e = prop.get(src, index);
+			auto iter = map->find(e);
+			if (iter.isValid()) {
+				e = iter.value();
+			}
+			else {
+				e = INVALID_ENTITY;
+			}
+			prop.set(dst, index, e);
+			clone(prop); 
+		}
 		void visit(const Reflection::Property<Vec2>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<Vec3>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<IVec3>& prop) override { clone(prop); }
@@ -307,7 +318,15 @@ public:
 				const char* name = prop.getName(src, index, i);
 				Reflection::IDynamicProperties::Type type = prop.getType(src, index, i);
 				Reflection::IDynamicProperties::Value val = prop.getValue(src, index, i);
-
+				if (type == Reflection::IDynamicProperties::ENTITY) {
+					auto iter = map->find(val.e);
+					if (iter.isValid()) {
+						val.e = iter.value();
+					}
+					else {
+						val.e = INVALID_ENTITY;
+					}
+				}
 				prop.set(dst, index, name, type, val);
 			}
 		}
@@ -318,6 +337,7 @@ public:
 			prop.setValue(dst, index, blob);
 		}
 
+		const HashMap<EntityPtr, EntityPtr>* map; 
 		IAllocator* allocator;
 		ComponentUID src;
 		ComponentUID dst;
@@ -325,9 +345,9 @@ public:
 	};
 
 
-	EntityRef cloneEntity(Universe& src_u, EntityRef src_e, Universe& dst_u, EntityPtr dst_parent, Ref<Array<EntityRef>> entities) {
+	EntityRef cloneEntity(Universe& src_u, EntityRef src_e, Universe& dst_u, EntityPtr dst_parent, Ref<Array<EntityRef>> entities, const HashMap<EntityPtr, EntityPtr>& map) {
 		entities->push(src_e);
-		const EntityRef dst_e = dst_u.createEntity({0, 0, 0}, {0, 0, 0, 1});
+		const EntityRef dst_e = (EntityRef)map[src_e];
 		if (dst_parent.isValid()) {
 			dst_u.setParent(dst_parent, dst_e);
 			dst_u.setLocalTransform(dst_e, src_u.getLocalTransform(src_e));
@@ -339,13 +359,13 @@ public:
 
 		const EntityPtr c = src_u.getFirstChild(src_e);
 		if (c.isValid()) {
-			cloneEntity(src_u, (EntityRef)c, dst_u, dst_e, entities);
+			cloneEntity(src_u, (EntityRef)c, dst_u, dst_e, entities, map);
 		}
 
 		if (dst_parent.isValid()) {
 			const EntityPtr s = src_u.getNextSibling(src_e);
 			if (s.isValid()) {
-				cloneEntity(src_u, (EntityRef)s, dst_u, dst_parent, entities);
+				cloneEntity(src_u, (EntityRef)s, dst_u, dst_parent, entities, map);
 			}
 		}
 
@@ -360,19 +380,37 @@ public:
 			property_cloner.dst.type = cmp.type;
 			property_cloner.dst.entity = dst_e;
 			property_cloner.dst.scene = dst_u.getScene(cmp.type);
+			property_cloner.map = &map;
 			cmp_tpl->visit(property_cloner);
 		}
 
 		return dst_e;
 	}
 
+	void cloneHierarchy(const Universe& src, EntityRef src_e, Universe& dst, bool clone_siblings, Ref<HashMap<EntityPtr, EntityPtr>> map) {
+		const EntityPtr child = src.getFirstChild(src_e);
+		const EntityPtr sibling = src.getNextSibling(src_e);
+
+		const EntityRef dst_e = dst.createEntity({0, 0, 0}, Quat::IDENTITY);
+		map->insert(src_e, dst_e);
+
+		if (child.isValid()) {
+			cloneHierarchy(src, (EntityRef)child, dst, true, map);
+		}
+		if (clone_siblings && sibling.isValid()) {
+			cloneHierarchy(src, (EntityRef)sibling, dst, true, map);
+		}
+	}
 
 	Universe& createPrefabUniverse(EntityRef src_e, Ref<Array<EntityRef>> entities) {
 		Engine& engine = m_editor.getEngine();
 		Universe& dst = engine.createUniverse(false);
 		Universe& src = *m_editor.getUniverse();
-		
-		cloneEntity(src, src_e, dst, INVALID_ENTITY, entities);
+
+		HashMap<EntityPtr, EntityPtr> map(m_editor.getAllocator());
+		map.reserve(256);
+		cloneHierarchy(src, src_e, dst, false, Ref(map));
+		cloneEntity(src, src_e, dst, INVALID_ENTITY, entities, map);
 		return dst;
 	}
 
