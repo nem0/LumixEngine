@@ -34,7 +34,8 @@ namespace LuaWrapper
 
 		~DebugGuard()
 		{
-			ASSERT(lua_gettop(L) == top);
+			const int current_top = lua_gettop(L);
+			ASSERT(current_top == top);
 		}
 	private:
 		lua_State* L;
