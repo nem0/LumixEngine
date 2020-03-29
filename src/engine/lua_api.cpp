@@ -1078,7 +1078,11 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			elseif Lumix.Entity[key] ~= nil then
 				return Lumix.Entity[key]
 			else 
-				error("key " .. tostring(key) .. " not found")
+				if LumixAPI.hasComponent(self._universe, self._entity, key) then
+					return Lumix[key]:new(self._universe, self._entity)
+				else
+					return nil
+				end
 			end
 		end
 		Lumix.Entity.__newindex = function(table, key, value)

@@ -535,15 +535,18 @@ namespace Lumix
 
 		static int getEnvironment(lua_State* L)
 		{
-			auto* scene = LuaWrapper::checkArg<LuaScriptScene*>(L, 1);
+			auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
 			EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
 			int scr_index = LuaWrapper::checkArg<int>(L, 3);
 
-			if (!scene->getUniverse().hasComponent(entity, LUA_SCRIPT_TYPE))
+			if (!universe->hasComponent(entity, LUA_SCRIPT_TYPE))
 			{
 				lua_pushnil(L);
 				return 1;
 			}
+			
+			LuaScriptScene* scene = (LuaScriptScene*)universe->getScene(LUA_SCRIPT_TYPE);
+
 			int count = scene->getScriptCount(entity);
 			if (scr_index >= count)
 			{
@@ -837,8 +840,7 @@ namespace Lumix
 			
 			registerProperties();
 			registerPropertyAPI();
-			LuaWrapper::createSystemFunction(
-				engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
+			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
 			
 			#define REGISTER_FUNCTION(F) \
 				do { \
