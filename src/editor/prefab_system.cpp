@@ -523,11 +523,23 @@ public:
 		serializer.write((u32)m_entity_to_prefab.size());
 		if (!m_entity_to_prefab.empty()) serializer.write(m_entity_to_prefab.begin(), m_entity_to_prefab.byte_size());
 
-		serializer.write((u32)m_resources.size());
+		u32 res_count = 0;
+		for (PrefabVersion& prefab : m_resources) prefab.instance_count = 0;
+		for (auto iter = m_roots.begin(); iter.isValid(); ++iter) {
+			PrefabVersion& p = m_resources[iter.value()];
+			if (p.instance_count == 0) ++res_count;
+			++p.instance_count;
+		}
+
+		serializer.write(res_count);
+
 		for (const PrefabVersion& prefab : m_resources) {
+			if (prefab.instance_count == 0) continue;
+
 			serializer.writeString(prefab.resource->getPath().c_str());
 			serializer.write(prefab.content_hash);
 		}
+
 		serializer.write((u32)m_roots.size());
 		for (auto iter = m_roots.begin(), end = m_roots.end(); iter != end; ++iter) {
 			serializer.write(iter.key());
@@ -579,6 +591,7 @@ private:
 	struct PrefabVersion {
 		u32 content_hash;
 		PrefabResource* resource;
+		u32 instance_count = 0;
 	};
 
 	Array<PrefabHandle> m_entity_to_prefab;
