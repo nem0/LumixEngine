@@ -111,6 +111,10 @@ struct GUIInputField
 
 struct GUIImage
 {
+	~GUIImage() {
+		if (sprite) sprite->getResourceManager().unload(*sprite);
+	}
+
 	enum Flags
 	{
 		IS_ENABLED = 1 << 1
