@@ -1052,6 +1052,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			return Lumix[cmp]:new(self._universe, self._entity)
 		end
 		function Lumix.Entity:getComponent(cmp)
+			if not LumixAPI.hasComponent(self._universe, self._entity, cmp) then return nil end
 			return Lumix[cmp]:new(self._universe, self._entity)
 		end
 		function Lumix.Entity:hasComponent(cmp)
