@@ -398,7 +398,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 		if (attrs.resource_type != INVALID_RESOURCE_TYPE)
 		{
-			if (m_app.getAssetBrowser().resourceInput(prop.name, StaticString<20>("", (u64)&prop), Span(tmp), attrs.resource_type))
+			if (m_app.getAssetBrowser().resourceInput(prop.name, prop.name, Span(tmp), attrs.resource_type))
 			{
 				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, Path(tmp));
 			}
