@@ -147,7 +147,8 @@ template <> inline bool isType<u8>(lua_State* L, int index)
 }
 template <> inline bool isType<EntityRef>(lua_State* L, int index)
 {
-	return lua_isnumber(L, index) != 0;
+	if (lua_isnumber(L, index) == 0) return false;
+	return lua_tointeger(L, index) >= 0;
 }
 template <> inline bool isType<EntityPtr>(lua_State* L, int index)
 {
