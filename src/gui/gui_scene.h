@@ -67,8 +67,6 @@ struct GUIScene : IScene
 	virtual void setButtonNormalColorRGBA(EntityRef entity, const Vec4& color) = 0;
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0;
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
-	virtual void setButtonEvent(EntityRef entity, const char* text) = 0;
-	virtual const char* getButtonEvent(EntityRef entity) = 0;
 
 	virtual void enableImage(EntityRef entity, bool enable) = 0;
 	virtual bool isImageEnabled(EntityRef entity) = 0;
@@ -94,7 +92,6 @@ struct GUIScene : IScene
 	virtual DelegateList<void(EntityRef)>& rectHovered() = 0;
 	virtual DelegateList<void(EntityRef)>& rectHoveredOut() = 0;
 	virtual DelegateList<void(bool, i32, i32)>& mousedButtonUnhandled() = 0;
-	virtual DelegateList<void(u32)>& event() = 0;
 };
 
 
