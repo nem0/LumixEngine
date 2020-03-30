@@ -861,15 +861,25 @@ static int LUA_loadUniverse(lua_State* L)
 }
 
 
-static int LUA_instantiatePrefab(lua_State* L)
-{
-	auto* engine = LuaWrapper::checkArg<Engine*>(L, 1);
-	auto* universe = LuaWrapper::checkArg<Universe*>(L, 2);
-	DVec3 position = LuaWrapper::checkArg<DVec3>(L, 3);
-	int prefab_id = LuaWrapper::checkArg<int>(L, 4);
+static int LUA_instantiatePrefab(lua_State* L) {
+	const int index = lua_upvalueindex(1);
+	if (!LuaWrapper::isType<Engine>(L, index)) {
+		logError("Lua") << "Invalid Lua closure";
+		ASSERT(false);
+		return 0;
+	}
+	Engine* engine = LuaWrapper::checkArg<Engine*>(L, index);
+	LuaWrapper::checkTableArg(L, 1);
+	if (LuaWrapper::getField(L, 1, "value") != LUA_TLIGHTUSERDATA) {
+		LuaWrapper::argError(L, 1, "universe");
+	}
+	auto* universe = LuaWrapper::toType<Universe*>(L, -1);
+	lua_pop(L, 1);
+	DVec3 position = LuaWrapper::checkArg<DVec3>(L, 2);
+	int prefab_id = LuaWrapper::checkArg<int>(L, 3);
 	PrefabResource* prefab = static_cast<PrefabResource*>(engine->getLuaResource(prefab_id));
 	if (!prefab) {
-		luaL_argerror(L, 4, "Unknown prefab.");
+		luaL_argerror(L, 3, "Unknown prefab.");
 	}
 	if (!prefab->isReady()) { //-V1004
 		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
@@ -905,7 +915,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(getEntityRotation);
 	REGISTER_FUNCTION(getEntityScale);
 	//REGISTER_FUNCTION(getLastTimeDelta);
-	//REGISTER_FUNCTION(getScene);
+	REGISTER_FUNCTION(getScene);
 	//REGISTER_FUNCTION(getSceneUniverse);
 	//REGISTER_FUNCTION(hasFilesystemWork);
 	REGISTER_FUNCTION(loadResource);
@@ -947,7 +957,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 
 	#undef REGISTER_FUNCTION
 
-	//LuaWrapper::createSystemFunction(L, "Engine", "instantiatePrefab", &LUA_instantiatePrefab);
+	LuaWrapper::createSystemClosure(L, "LumixAPI", engine, "instantiatePrefab", &LUA_instantiatePrefab);
 	//LuaWrapper::createSystemFunction(L, "Engine", "multVecQuat", &LUA_multVecQuat);
 
 	lua_newtable(L);

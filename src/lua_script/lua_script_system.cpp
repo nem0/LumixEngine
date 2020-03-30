@@ -535,6 +535,51 @@ namespace Lumix
 			LuaWrapper::createSystemVariable(L, "Editor", "RESOURCE_PROPERTY", Property::RESOURCE);
 		}
 
+		static int rescan(lua_State* L) {
+			const auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
+			const EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
+			const int scr_index = LuaWrapper::checkArg<int>(L, 3);
+
+			if (!universe->hasComponent(entity, LUA_SCRIPT_TYPE)) {
+				return 0;
+			}
+			
+			LuaScriptSceneImpl* scene = (LuaScriptSceneImpl*)universe->getScene(LUA_SCRIPT_TYPE);
+
+			const int count = scene->getScriptCount(entity);
+			if (scr_index >= count) {
+				return 0;
+			}
+
+			/////
+			const ScriptInstance& instance = scene->m_scripts[entity]->m_scripts[scr_index];
+			LuaWrapper::DebugGuard guard(instance.m_state);
+			lua_rawgeti(instance.m_state, LUA_REGISTRYINDEX, instance.m_environment);
+			if (lua_type(instance.m_state, -1) != LUA_TTABLE) {
+				ASSERT(false);
+				lua_pop(instance.m_state, 1);
+				return 0;
+			}
+			lua_getfield(instance.m_state, -1, "update");
+			if (lua_type(instance.m_state, -1) == LUA_TFUNCTION) {
+				auto& update_data = scene->m_updates.emplace();
+				update_data.script = instance.m_script;
+				update_data.state = instance.m_state;
+				update_data.environment = instance.m_environment;
+			}
+			lua_pop(instance.m_state, 1);
+			lua_getfield(instance.m_state, -1, "onInputEvent");
+			if (lua_type(instance.m_state, -1) == LUA_TFUNCTION) {
+				auto& callback = scene->m_input_handlers.emplace();
+				callback.script = instance.m_script;
+				callback.state = instance.m_state;
+				callback.environment = instance.m_environment;
+			}
+			lua_pop(instance.m_state, 1);
+			lua_pop(instance.m_state, 1);
+
+			return 0;
+		}
 
 		static int getEnvironment(lua_State* L)
 		{
@@ -844,6 +889,7 @@ namespace Lumix
 			registerProperties();
 			registerPropertyAPI();
 			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "getEnvironment", &LuaScriptSceneImpl::getEnvironment);
+			LuaWrapper::createSystemFunction(engine_state, "LuaScript", "rescan", &LuaScriptSceneImpl::rescan);
 			
 			#define REGISTER_FUNCTION(F) \
 				do { \
@@ -1546,6 +1592,7 @@ namespace Lumix
 			for (int i = 0; i < m_updates.size(); ++i)
 			{
 				CallbackData update_item = m_updates[i];
+				LuaWrapper::DebugGuard guard(update_item.state, 0);
 				lua_rawgeti(update_item.state, LUA_REGISTRYINDEX, update_item.environment);
 				if (lua_type(update_item.state, -1) != LUA_TTABLE)
 				{
@@ -1559,11 +1606,7 @@ namespace Lumix
 				}
 
 				lua_pushnumber(update_item.state, time_delta);
-				if (lua_pcall(update_item.state, 1, 0, 0) != 0)
-				{
-					logError("Lua Script") << lua_tostring(update_item.state, -1);
-					lua_pop(update_item.state, 1);
-				}
+				LuaWrapper::pcall(update_item.state, 1, 0);
 				lua_pop(update_item.state, 1);
 			}
 

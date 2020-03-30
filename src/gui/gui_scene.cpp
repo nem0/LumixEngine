@@ -93,12 +93,8 @@ private:
 
 struct GUIButton
 {
-	GUIButton(IAllocator& allocator) : event(allocator) {}
-
 	u32 normal_color = 0xffFFffFF;
 	u32 hovered_color = 0xffFFffFF;
-	String event;
-	u32 event_hash = 0;
 };
 
 
@@ -166,7 +162,6 @@ struct GUISceneImpl final : GUIScene
 		, m_rect_hovered_out(allocator)
 		, m_unhandled_mouse_button(allocator)
 		, m_button_clicked(allocator)
-		, m_event(allocator)
 		, m_buttons_down_count(0)
 		, m_canvas_size(800, 600)
 	{
@@ -333,15 +328,6 @@ struct GUISceneImpl final : GUIScene
 	void setButtonNormalColorRGBA(EntityRef entity, const Vec4& color) override
 	{
 		m_buttons[entity].normal_color = RGBAVec4ToABGRu32(color);
-	}
-
-	void setButtonEvent(EntityRef entity, const char* text) override {
-		m_buttons[entity].event = text;
-		m_buttons[entity].event_hash = crc32(text);
-	}
-
-	const char* getButtonEvent(EntityRef entity) override {
-		return m_buttons[entity].event.c_str();
 	}
 
 	Vec4 getButtonHoveredColorRGBA(EntityRef entity) override
@@ -695,10 +681,6 @@ struct GUISceneImpl final : GUIScene
 				{
 					m_focused_entity = INVALID_ENTITY;
 					m_button_clicked.invoke(rect.entity);
-					const GUIButton& button = button_iter.value();
-					if (button.event.length() > 0) {
-						m_event.invoke(button.event_hash);
-					}
 				}
 				if (!is_up)
 				{
@@ -927,7 +909,7 @@ struct GUISceneImpl final : GUIScene
 			idx = m_rects.find(entity);
 		}
 		GUIImage* image = m_rects.at(idx)->image;
-		GUIButton& button = m_buttons.insert(entity, GUIButton(m_allocator));
+		GUIButton& button = m_buttons.insert(entity, GUIButton());
 		if (image)
 		{
 			button.hovered_color = image->color;
@@ -1084,7 +1066,6 @@ struct GUISceneImpl final : GUIScene
 			const GUIButton& button = iter.value();
 			serializer.write(button.normal_color);
 			serializer.write(button.hovered_color);
-			serializer.write(button.event);
 		}
 
 	}
@@ -1158,11 +1139,9 @@ struct GUISceneImpl final : GUIScene
 			EntityRef e;
 			serializer.read(e);
 			e = entity_map.get(e);
-			GUIButton& button = m_buttons.insert(e, GUIButton(m_allocator));
+			GUIButton& button = m_buttons.insert(e, GUIButton());
 			serializer.read(button.normal_color);
 			serializer.read(button.hovered_color);
-			serializer.read(button.event);
-			button.event_hash = button.event.length() > 0 ? crc32(button.event.c_str()) : 0;
 			m_universe.onComponentCreated(e, GUI_BUTTON_TYPE, this);
 		}
 		m_root = findRoot();
@@ -1179,7 +1158,6 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)>& rectHovered() override { return m_rect_hovered; }
 	DelegateList<void(EntityRef)>& rectHoveredOut() override { return m_rect_hovered_out; }
 	DelegateList<void(bool, int, int)>& mousedButtonUnhandled() override { return m_unhandled_mouse_button; }
-	DelegateList<void(u32)>& event() override { return m_event; }
 
 	Universe& getUniverse() override { return m_universe; }
 	IPlugin& getPlugin() const override { return m_system; }
@@ -1202,7 +1180,6 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)> m_rect_hovered;
 	DelegateList<void(EntityRef)> m_rect_hovered_out;
 	DelegateList<void(bool, i32, i32)> m_unhandled_mouse_button;
-	DelegateList<void(u32)> m_event;
 };
 
 
