@@ -822,6 +822,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override
 	{
 		m_app.registerComponent("gui_button", "GUI / Button");
+		m_app.registerComponent("gui_canvas", "GUI / Canvas");
 		m_app.registerComponent("gui_image", "GUI / Image", Sprite::TYPE, "Sprite");
 		m_app.registerComponent("gui_input_field", "GUI / Input field");
 		m_app.registerComponent("gui_rect", "GUI / Rect");
