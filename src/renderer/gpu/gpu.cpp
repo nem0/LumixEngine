@@ -784,8 +784,8 @@ void VertexDecl::addAttribute(u8 idx, u8 byte_offset, u8 components_num, Attribu
 	attr.flags = flags;
 	attr.type = type;
 	attr.byte_offset = byte_offset;
-	hash = crc32(attributes, sizeof(Attribute) * attributes_count);
 	++attributes_count;
+	hash = crc32(attributes, sizeof(Attribute) * attributes_count);
 }
 
 
