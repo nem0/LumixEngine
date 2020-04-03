@@ -422,11 +422,7 @@ namespace Lumix
 			auto& script = m_function_call.cmp->m_scripts[m_function_call.scr_index];
 			if (!script.m_state) return;
 
-			if (lua_pcall(script.m_state, m_function_call.parameter_count, 0, 0) != 0)
-			{
-				logError("Lua Script") << lua_tostring(script.m_state, -1);
-				lua_pop(script.m_state, 1);
-			}
+			LuaWrapper::pcall(script.m_state, m_function_call.parameter_count, 0);
 			lua_pop(script.m_state, 1);
 		}
 
