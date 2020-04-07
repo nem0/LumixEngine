@@ -16,21 +16,7 @@ fragment_shader [[
 	layout (location = 0) out vec4 o_color;
 
 	vec3 air_color = vec3(0.18867780436772762, 0.4978442963618773, 0.6616065586417131);
-	float rtop = 6478e3;
-	float rbot = 6378e3;
 	
-	// mie - Schlick appoximation phase function of Henyey-Greenstein
-	float miePhase(float g, float cos_theta)
-	{
-		float tmp = 1 + g * cos_theta;
-		return (1 - g * g) / (4 * M_PI + tmp * tmp);
-	}
-
-	float rayleighPhase(float cos_theta)
-	{
-		return 3/(16.0 * M_PI) * (1 + cos_theta * cos_theta);
-	}
-
 	float phase(float alpha, float g)
 	{
 		float a = 3.0*(1.0-g*g);
@@ -103,84 +89,13 @@ fragment_shader [[
 		return res;
 	}
 
-	vec3 transmittance(vec3 extinction, float len) {
-		return exp(-len * extinction);
-	}
-	
-	vec2 ray_sphere_intersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
-		vec3 s0_r0 = s0 - r0;
-		float tc = dot(s0_r0, rd);
-		float d2 = dot(s0_r0, s0_r0) - tc * tc;
-		float sr2 = sr * sr;
-		if (d2 > sr2) return vec2(-1);
-		float td2 = sr2 - d2;
-		float td = sqrt(td2);
-		return vec2(tc - td, tc + td);
-	}
-
-	float toTopAtmoLightDir(vec3 p) {
-		vec2 t = ray_sphere_intersect(p, u_light_direction.xyz, vec3(0), rtop);
-		return t.y;
-	}
-
-	// extinction == absorption + outscatter
-
 	void main()
 	{
-#if 1
-		const int STEP_COUNT = 100;
-
-		vec3 sunlight = vec3(1);
-		vec3 scatter_rayleigh = vec3(5.8e-6, 1.35e-5, 3.31e-5); // m-1
-		vec3 extinction_rayleigh = scatter_rayleigh;
-		vec3 scatter_mie = vec3(2e-5);
-		vec3 extinction_mie = 1.11 * scatter_mie;
-
-		vec3 eyedir = getWorldNormal(v_uv);
-		vec3 lightdir = u_light_direction.xyz;
-
-		vec3 campos = vec3(0, 6378e3, 0);
-		vec2 atmo_isect = ray_sphere_intersect(campos, eyedir, vec3(0), rtop);
-		if(atmo_isect.y < 0) {
-			o_color = vec4(0);
-			return;
-		}
-		atmo_isect.x = max(0, atmo_isect.x);
-
-		float mu = eyedir.y;
-		vec3 rayleigh = vec3(0);
-		vec3 mie = vec3(0);
-		vec3 p = campos;
-		const float step_len = (atmo_isect.y - atmo_isect.x) / STEP_COUNT;
-		const vec3 step = step_len * eyedir;
-		p += step * 0.5;
-		for (int i = 0; i < STEP_COUNT; ++i) {
-			const float cos_theta = dot(normalize(p - campos), lightdir);
-			float p_to_top_atmo = toTopAtmoLightDir(p);
-			float p_dens_rayleigh_0 = exp(min(0, -(length(p) - rbot) / 16000));
-			float p_dens_rayleigh_1 = exp(min(0, -(length(p) - rbot) / 4000));
-			float p_dens_mie_0 = exp(min(0, -(length(p) - rbot) / 1200));
-			float p_dens_mie_1 = exp(min(0, -(length(p) - rbot) / 1200));
-			vec3 rayleigh_inscatter = (sunlight * rayleighPhase(cos_theta) * scatter_rayleigh * step_len)
-				* transmittance(extinction_rayleigh * p_dens_rayleigh_0, p_to_top_atmo) 
-				* transmittance(extinction_rayleigh * p_dens_rayleigh_1, length(p - campos));
-			
-			vec3 mie_inscatter = (sunlight * miePhase(0.75, cos_theta) * scatter_mie * step_len)
-				* transmittance(extinction_mie * p_dens_mie_0, p_to_top_atmo) 
-				* transmittance(extinction_mie * p_dens_mie_1, length(p - campos));
-
-			rayleigh += rayleigh_inscatter;
-			mie += mie_inscatter;
-			p += step; 
-		}
-		o_color.rgb = rayleigh /*+ mie*/;
-		o_color.w = 1;
-#else
 		const vec3 strength = vec3(0.028, 0.139, 0.0264);
 		const vec3 brightness = vec3(5, 0.15, 200);
 		const float rayleigh_collection_power = 0.51f;
 		const float mie_collection_power = 0.39f;
-		const float mie_distribution = 0.758;
+		const float mie_distribution = 0.13f;
 
 		const float sun_size = 150;
 		const float surface_height = 0.993;
@@ -190,11 +105,11 @@ fragment_shader [[
 		vec3 lightdir = u_light_direction.xyz;
 		vec3 eyedir = getWorldNormal(v_uv);
 		
-		float cos_theta = dot(eyedir, lightdir);
+		float alpha = dot(eyedir, lightdir);
 		
-		float rayleigh_factor = rayleighPhase(cos_theta) * brightness.x;
-		float mie_factor = miePhase(mie_distribution, cos_theta) * brightness.y;
-		float spot = smoothstep(0.0, sun_size, phase(cos_theta, 0.9995)) * brightness.z;
+		float rayleigh_factor = phase(alpha, -0.01) * brightness.x;
+		float mie_factor = phase(alpha, mie_distribution) * brightness.y;
+		float spot = smoothstep(0.0, sun_size, phase(alpha, 0.9995)) * brightness.z;
 		
 		vec3 eye_position = vec3(0.0, surface_height, 0.0);
 		float eye_depth = atmospheric_depth(eye_position, eyedir);
@@ -220,9 +135,8 @@ fragment_shader [[
 		
 		vec3 color = vec3(spot * mie_collected + mie_factor * mie_collected + rayleigh_factor * rayleigh_collected);
 		
-		float fog_factor = 0;//getFogFactorSky(u_camera_world_pos.y, eyedir, u_fog_params.x, u_fog_params.y, u_fog_params.z);
+		float fog_factor = getFogFactorSky(u_camera_world_pos.y, eyedir, u_fog_params.x, u_fog_params.y, u_fog_params.z);
 		o_color.xyz = mix(color.rgb, u_fog_color.rgb, fog_factor);
 		o_color.w = 1;
-#endif
 	}
 ]]
