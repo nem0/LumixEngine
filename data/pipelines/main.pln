@@ -256,7 +256,7 @@ end
 function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local prev = hdr_buffer
 	if _G["postprocesses"] ~= nil then
-		for _, value in ipairs(_G["postprocesses"]) do
+		for _, value in pairs(_G["postprocesses"]) do
 			prev = value(getfenv(1), phase, prev, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 		end
 	end
