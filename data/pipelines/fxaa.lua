@@ -18,19 +18,11 @@ function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbu
 	return res
 end
 
-
 function awake()
-	if _G["postprocesses"] == nil then
-		_G["postprocesses"] = {}
-	end
-	table.insert(_G["postprocesses"], postprocess)
+	_G["postprocesses"] = _G["postprocesses"] or {}
+	_G["postprocesses"]["fxaa"] = postprocess
 end
 
 function onDestroy()
-	for i, v in ipairs(_G["postprocesses"]) do
-		if v == postprocess then
-			table.remove(_G["postprocesses"], i)
-			break;
-		end
-	end
+	_G["postprocesses"]["fxaa"] = nil
 end
