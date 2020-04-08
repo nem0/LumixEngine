@@ -1776,8 +1776,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		IAllocator& allocator = m_app.getAllocator();
 		TextureComposite tc(allocator);
 		if (!tc.init(Span(src_data.begin(), src_data.end()), src_path)) return false;
+		struct Src {
+			stbi_uc* data;
+			int w, h;
+			Path path;
+		};
 
-		HashMap<u32, stbi_uc*> sources(allocator);
+		HashMap<u32, Src> sources(allocator);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		Array<u8> tmp_src(allocator);
 		int w = -1, h = -1;
@@ -1797,7 +1802,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				return false;
 			}
 
-			sources.insert(ch.path.getHash(), data);
+			sources.insert(ch.path.getHash(), {data, w, h, ch.path});
 			return true;
 		};
 
@@ -1815,6 +1820,16 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return true;
 		}
 
+		if (sources.size() == 0) return false;
+		const Src first_src = sources.begin().value(); 
+		for (auto iter = sources.begin(); iter.isValid(); ++iter) {
+			if (iter.value().w != first_src.w || iter.value().h != first_src.h) {
+				logError("Renderer") << src_path << ": " << first_src.path << "(" << first_src.w << "x" << first_src.h << ") does not match "
+					<< iter.value().path << "(" << iter.value().w << "x" << iter.value().h << ")";
+				return false;
+			}
+		}
+
 		nvtt::InputOptions input;
 		input.setMipmapGeneration(true);
 		input.setAlphaCoverageMipScale(meta.scale_coverage, 4);
@@ -1829,7 +1844,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			for (u32 ch = 0; ch < 4; ++ch) {
 				const Path& p = layer.getChannel(ch).path;
 				if (!p.isValid()) continue;
-				stbi_uc* from = sources[p.getHash()];
+				stbi_uc* from = sources[p.getHash()].data;
 				if (!from) continue;
 				u32 from_ch = layer.getChannel(ch).src_channel;
 				if (from_ch == 0) from_ch = 2;
@@ -1845,8 +1860,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			input.setMipmapData(out_data.begin(), w, h, 1, idx);
 		}
 
-		for (stbi_uc* i : sources) {
-			free(i);
+		for (const Src& i : sources) {
+			free(i.data);
 		}
 
 		nvtt::OutputOptions output;
@@ -3491,6 +3506,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
 		StaticString<MAX_PATH_LENGTH> albedo_path(info.m_dir, "albedo_detail.ltc");
 		StaticString<MAX_PATH_LENGTH> normal_path(info.m_dir, "normal_detail.ltc");
+		StaticString<MAX_PATH_LENGTH> splatmap_path(info.m_dir, "splatmap.tga");
 		OS::OutputFile file;
 		if (!file.open(hm_path))
 		{
@@ -3514,9 +3530,26 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			file.close();
 		}
 		
+		if (!file.open(splatmap_path)) {
+			logError("Editor") << "Failed to create texture " << splatmap_path;
+			OS::deleteFile(hm_path);
+			return false;
+		}
+
+		Array<u8> splatmap(app.getAllocator());
+		splatmap.resize(size * size * 4);
+		memset(splatmap.begin(), 0, size * size * 4);
+		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.begin(), true, Path(splatmap_path), app.getAllocator())) {
+			logError("Editor") << "Failed to create texture " << splatmap_path;
+			OS::deleteFile(hm_path);
+			return false;
+		}
+		file.close();
+
 		if (!file.open(albedo_path)) {
 			logError("Editor") << "Failed to create texture " << albedo_path;
 			OS::deleteFile(hm_path);
+			OS::deleteFile(splatmap_path);
 			return false;
 		}
 		file << R"#(
@@ -3539,6 +3572,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			logError("Editor") << "Failed to create texture " << normal_path;
 			OS::deleteFile(albedo_path);
 			OS::deleteFile(hm_path);
+			OS::deleteFile(splatmap_path);
 			return false;
 		}
 		file << R"#(
@@ -3563,6 +3597,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			OS::deleteFile(normal_path);
 			OS::deleteFile(albedo_path);
 			OS::deleteFile(hm_path);
+			OS::deleteFile(splatmap_path);
 			return false;
 		}
 
@@ -3573,7 +3608,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		file << R"#(.raw"
 			texture "albedo_detail.ltc"
 			texture "normal_detail.ltc"
-			texture ""
+			texture "splatmap.tga"
 			uniform("Detail distance", 50.000000)
 			uniform("Detail scale", 1.000000)
 		)#";
