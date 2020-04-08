@@ -166,13 +166,25 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	
 	beginBlock("direct")
 	drawArray(0, 4, direct_shader,
-	{
-		gbuffer0,
-		gbuffer1,
-		gbuffer2,
-		gbuffer_depth,
-		shadowmap
-	}, {}, {}, { depth_test = false, blending = "add"})
+		{
+			gbuffer0,
+			gbuffer1,
+			gbuffer2,
+			gbuffer_depth,
+			shadowmap
+		}, {}, {}, 
+		{ 
+			depth_test = false,
+			blending = "add",
+			stencil_write_mask = 0,
+			stencil_func = STENCIL_EQUAL,
+			stencil_ref = 1,
+			stencil_mask = 0xff,
+			stencil_sfail = STENCIL_KEEP,
+			stencil_zfail = STENCIL_KEEP,
+			stencil_zpass = STENCIL_REPLACE,
+		}
+	)
 
 	endBlock()
 	
