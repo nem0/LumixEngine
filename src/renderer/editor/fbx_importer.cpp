@@ -20,6 +20,7 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
+#include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
 
@@ -1882,6 +1883,10 @@ bool FBXImporter::writePhysics(const char* basename, const char* output_dir)
 
 void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 {
+	Engine& engine = app.getWorldEditor().getEngine();
+	Universe& universe = engine.createUniverse(false);
+
+
 	OS::OutputFile file;
 	PathInfo file_info(src);
 	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
@@ -1889,45 +1894,23 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 
 	OutputMemoryStream blob(allocator);
 	TextSerializer serializer(blob);
+	
+	const EntityRef root = universe.createEntity({0, 0, 0}, Quat::IDENTITY);
 
-	serializer.write("version", (u32)PrefabVersion::LAST);
-	const int count = meshes.size();
-	serializer.write("entity_count", count + 1);
-	char normalized_tmp_rel[MAX_PATH_LENGTH];
-	Path::normalize(tmp, Span(normalized_tmp_rel));
-	const u64 prefab = crc32(normalized_tmp_rel);
-
-	serializer.write("prefab", prefab);
-	serializer.write("parent", INVALID_ENTITY);
-	serializer.write("cmp_end", 0);
-
+	static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
 	for(int i  = 0; i < meshes.size(); ++i) {
-		serializer.write("prefab", prefab | (((u64)i + 1) << 32));
-		const EntityRef root = {0};		
-		serializer.write("parent", root);
-		static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-
-		RigidTransform tr;
-		//tr.rot = meshes[i].transform_matrix.getRotation();
-		//tr.pos = DVec3(meshes[i].transform_matrix.getTranslation());
-		tr.pos = DVec3(0);
-		tr.rot = Quat::IDENTITY;
-		const float scale = 1;
-		serializer.write("transform", tr);
-		serializer.write("scale", scale);
-
-		const char* cmp_name = Reflection::getComponentTypeID(MODEL_INSTANCE_TYPE.index);
-		const u32 type_hash = Reflection::getComponentTypeHash(MODEL_INSTANCE_TYPE);
-		serializer.write(cmp_name, type_hash);
-		serializer.write("scene_version", (int)0);
-		
+		const EntityRef e = universe.createEntity({0, 0, 0}, Quat::IDENTITY);
+		universe.createComponent(MODEL_INSTANCE_TYPE, e);
+		universe.setParent(root, e);
 		char mesh_name[256];
 		getImportMeshName(meshes[i], mesh_name);
 		StaticString<MAX_PATH_LENGTH> mesh_path(mesh_name, ".fbx:", src);
-		serializer.write("source", (const char*)mesh_path);
-		serializer.write("flags", u8(2 /*enabled*/));
-		serializer.write("cmp_end", 0);
+		RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
+		scene->setModelInstancePath(e, Path(mesh_path));
 	}
+
+	engine.serialize(universe, blob);
+	engine.destroyUniverse(universe);
 
 	file.write(blob.getData(), blob.getPos());
 	file.close();
