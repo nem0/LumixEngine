@@ -754,56 +754,50 @@ struct StudioAppImpl final : StudioApp
 
 	void guiEndFrame()
 	{
-		if (m_is_welcome_screen_open)
-		{
-			ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-										ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-										ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
-										ImGuiWindowFlags_NoDocking;
-			ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos, ImGuiCond_FirstUseEver);
-			if (ImGui::Begin("MainDockspace", nullptr, flags))
-			{
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+									ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+									ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
+									ImGuiWindowFlags_NoDocking;
+		const OS::Rect main_win_rect = OS::getWindowClientRect(m_main_window);
+		const OS::Point p = OS::toScreen(m_main_window, main_win_rect.left, main_win_rect.top);
+		if (m_is_welcome_screen_open) {
+			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
+				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
+				ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
+				ImGui::Begin("MainDockspace", nullptr, flags);
 				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
 				ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
-			}
-			ImGui::End();
-			showWelcomeScreen();
-		}
-		else
-		{
-			if (ImGui::GetIO().DisplaySize.y > 0)
-			{
-				ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-										 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-										 ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
-										 ImGuiWindowFlags_NoDocking;
-				ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-				ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos, ImGuiCond_FirstUseEver);
-				if (ImGui::Begin("MainDockspace", nullptr, flags))
-				{
-					float menu_height = showMainMenu();
-					showMainToolbar(menu_height);
-					ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
-					ImGui::Dummy(ImVec2(2, 2));
-					ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
-				}
 				ImGui::End();
+				showWelcomeScreen();
 			}
-			m_profiler_ui->onGUI();
-			m_asset_browser->onGUI();
-			m_log_ui->onGUI();
-			m_asset_compiler->onGUI();
-			m_property_grid->onGUI();
-			onEntityListGUI();
-			onEditCameraGUI();
-			onSaveAsDialogGUI();
-			for (auto* plugin : m_gui_plugins)
-			{
-				plugin->onWindowGUI();
+		}
+		else {
+			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
+				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
+				ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
+				ImGui::Begin("MainDockspace", nullptr, flags);
+				float menu_height = showMainMenu();
+				showMainToolbar(menu_height);
+				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
+				ImGui::Dummy(ImVec2(2, 2));
+				ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
+				ImGui::End();
+			
+				m_profiler_ui->onGUI();
+				m_asset_browser->onGUI();
+				m_log_ui->onGUI();
+				m_asset_compiler->onGUI();
+				m_property_grid->onGUI();
+				onEntityListGUI();
+				onEditCameraGUI();
+				onSaveAsDialogGUI();
+				for (auto* plugin : m_gui_plugins)
+				{
+					plugin->onWindowGUI();
+				}
+				m_settings.onGUI();
+				onPackDataGUI();
 			}
-			m_settings.onGUI();
-			onPackDataGUI();
 		}
 		ImGui::PopFont();
 		ImGui::Render();
@@ -975,9 +969,10 @@ struct StudioAppImpl final : StudioApp
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 								 ImGuiWindowFlags_NoSavedSettings;
-		const ImVec2 size = ImGui::GetIO().DisplaySize;
-		ImGui::SetNextWindowSize(size);
-		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos, ImGuiCond_FirstUseEver);
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->GetWorkPos());
+        ImGui::SetNextWindowSize(viewport->GetWorkSize());
+		ImGui::SetNextWindowViewport(viewport->ID);
 		if (ImGui::Begin("Welcome", nullptr, flags))
 		{
 			ImGui::Text("Welcome to Lumix Studio");
