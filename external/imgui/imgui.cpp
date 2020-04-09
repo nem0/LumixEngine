@@ -5,12 +5,13 @@
 // - Read FAQ at http://dearimgui.org/faq
 // - Newcomers, read 'Programmer guide' below for notes on how to setup Dear ImGui in your codebase.
 // - Call and read ImGui::ShowDemoWindow() in imgui_demo.cpp for demo code. All applications in examples/ are doing that.
+// Read imgui.cpp for details, links and comments.
 
 // Resources:
 // - FAQ                   http://dearimgui.org/faq
 // - Homepage & latest     https://github.com/ocornut/imgui
 // - Releases & changelog  https://github.com/ocornut/imgui/releases
-// - Gallery               https://github.com/ocornut/imgui/issues/2847 (please post your screenshots/video there!)
+// - Gallery               https://github.com/ocornut/imgui/issues/3075 (please post your screenshots/video there!)
 // - Glossary              https://github.com/ocornut/imgui/wiki/Glossary
 // - Wiki                  https://github.com/ocornut/imgui/wiki
 // - Issues & support      https://github.com/ocornut/imgui/issues
@@ -39,7 +40,7 @@ DOCUMENTATION
   - READ FIRST
   - HOW TO UPDATE TO A NEWER VERSION OF DEAR IMGUI
   - GETTING STARTED WITH INTEGRATING DEAR IMGUI IN YOUR CODE/ENGINE
-  - HOW A SIMPLE APPLICATION MAY LOOK LIKE (2 variations)
+  - HOW A SIMPLE APPLICATION MAY LOOK LIKE
   - HOW A SIMPLE RENDERING FUNCTION MAY LOOK LIKE
   - USING GAMEPAD/KEYBOARD NAVIGATION CONTROLS
 - API BREAKING CHANGES (read me when you update!)
@@ -140,7 +141,7 @@ CODE
  - Call and read ImGui::ShowDemoWindow() for demo code demonstrating most features.
  - The library is designed to be built from sources. Avoid pre-compiled binaries and packaged versions. See imconfig.h to configure your build.
  - Dear ImGui is an implementation of the IMGUI paradigm (immediate-mode graphical user interface, a term coined by Casey Muratori).
-   You can learn about IMGUI principles at http://www.johno.se/book/imgui.html, http://mollyrocket.com/861 & more links docs/README.md.
+   You can learn about IMGUI principles at http://www.johno.se/book/imgui.html, http://mollyrocket.com/861 & more links in the FAQ.
  - Dear ImGui is a "single pass" rasterizing implementation of the IMGUI paradigm, aimed at ease of use and high-performances.
    For every application frame your UI code will be called only once. This is in contrast to e.g. Unity's own implementation of an IMGUI,
    where the UI code is called multiple times ("multiple passes") from a single entry point. There are pros and cons to both approaches.
@@ -154,6 +155,7 @@ CODE
    However, imgui_internal.h can optionally export math operators for ImVec2/ImVec4, which we use in this codebase.
  - C++: pay attention that ImVector<> manipulates plain-old-data and does not honor construction/destruction (avoid using it in your code!).
 
+
  HOW TO UPDATE TO A NEWER VERSION OF DEAR IMGUI
  ----------------------------------------------
  - Overwrite all the sources files except for imconfig.h (if you have made modification to your copy of imconfig.h)
@@ -163,6 +165,7 @@ CODE
    from the public API. If you have a problem with a missing function/symbols, search for its name in the code, there will
    likely be a comment about it. Please report any issue to the GitHub page!
  - Try to keep your copy of dear imgui reasonably up to date.
+
 
  GETTING STARTED WITH INTEGRATING DEAR IMGUI IN YOUR CODE/ENGINE
  ---------------------------------------------------------------
@@ -178,9 +181,11 @@ CODE
  - Refer to the bindings and demo applications in the examples/ folder for instruction on how to setup your code.
  - If you are running over a standard OS with a common graphics API, you should be able to use unmodified imgui_impl_*** files from the examples/ folder.
 
+
  HOW A SIMPLE APPLICATION MAY LOOK LIKE
  --------------------------------------
- EXHIBIT 1: USING THE EXAMPLE BINDINGS (imgui_impl_XXX.cpp files from the examples/ folder).
+ EXHIBIT 1: USING THE EXAMPLE BINDINGS (= imgui_impl_XXX.cpp files from the examples/ folder).
+ The sub-folders in examples/ contains examples applications following this structure.
 
      // Application init: create a dear imgui context, setup some options, load fonts
      ImGui::CreateContext();
@@ -269,8 +274,15 @@ CODE
      // Shutdown
      ImGui::DestroyContext();
 
+ To decide whether to dispatch mouse/keyboard inputs to Dear ImGui to the rest your application,
+ you should read the 'io.WantCaptureMouse', 'io.WantCaptureKeyboard' and 'io.WantTextInput' flags!
+ Please read the FAQ and example applications for details about this!
+
+
  HOW A SIMPLE RENDERING FUNCTION MAY LOOK LIKE
  ---------------------------------------------
+ The bindings in impl_impl_XXX.cpp files contains many working implementations of a rendering function.
+
     void void MyImGuiRenderFunction(ImDrawData* draw_data)
     {
        // TODO: Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled
@@ -315,11 +327,6 @@ CODE
        }
     }
 
- - The examples/ folders contains many actual implementation of the pseudo-codes above.
- - When calling NewFrame(), the 'io.WantCaptureMouse', 'io.WantCaptureKeyboard' and 'io.WantTextInput' flags are updated.
-   They tell you if Dear ImGui intends to use your inputs. When a flag is set you want to hide the corresponding inputs from the
-   rest of your application. In every cases you need to pass on the inputs to Dear ImGui.
- - Refer to the FAQ for more information. Amusingly, it is called a FAQ because people frequently run into the same issues!
 
  USING GAMEPAD/KEYBOARD NAVIGATION CONTROLS
  ------------------------------------------
@@ -377,7 +384,7 @@ CODE
 
 
  - 2020/01/22 (1.75) - ImDrawList::AddCircle()/AddCircleFilled() functions don't accept negative radius any more.
- - 2019/12/17 (1.75) - made Columns() limited to 64 columns by asserting above that limit. While the current code technically supports it, future code may not so we're putting the restriction ahead.
+ - 2019/12/17 (1.75) - [undid this change in 1.76] made Columns() limited to 64 columns by asserting above that limit. While the current code technically supports it, future code may not so we're putting the restriction ahead.
  - 2019/12/13 (1.75) - [imgui_internal.h] changed ImRect() default constructor initializes all fields to 0.0f instead of (FLT_MAX,FLT_MAX,-FLT_MAX,-FLT_MAX). If you used ImRect::Add() to create bounding boxes by adding multiple points into it, you may need to fix your initial value.
  - 2019/12/08 (1.75) - removed redirecting functions/enums that were marked obsolete in 1.53 (December 2017):
                        - ShowTestWindow()                    -> use ShowDemoWindow()
@@ -794,7 +801,7 @@ CODE
     - If you are experienced with Dear ImGui and C++, look at the github issues, look at the Wiki, read docs/TODO.txt
       and see how you want to help and can help!
     - Disclose your usage of Dear ImGui via a dev blog post, a tweet, a screenshot, a mention somewhere etc.
-      You may post screenshot or links in the gallery threads (github.com/ocornut/imgui/issues/2847). Visuals are ideal as they inspire other programmers.
+      You may post screenshot or links in the gallery threads (github.com/ocornut/imgui/issues/3075). Visuals are ideal as they inspire other programmers.
       But even without visuals, disclosing your use of dear imgui help the library grow credibility, and help other teams and programmers with taking decisions.
     - If you have issues or if you need to hack into the library, even if you don't expect any support it is useful that you share your issues (on github or privately).
 
@@ -1049,7 +1056,7 @@ ImGuiStyle::ImGuiStyle()
     TabBorderSize           = 0.0f;             // Thickness of border around tabs.
     ColorButtonPosition     = ImGuiDir_Right;   // Side of the color button in the ColorEdit4 widget (left/right). Defaults to ImGuiDir_Right.
     ButtonTextAlign         = ImVec2(0.5f,0.5f);// Alignment of button text when button is larger than text.
-    SelectableTextAlign     = ImVec2(0.0f,0.0f);// Alignment of selectable text when button is larger than text.
+    SelectableTextAlign     = ImVec2(0.0f,0.0f);// Alignment of selectable text. Defaults to (0.0f, 0.0f) (top-left aligned). It's generally important to keep this left-aligned if you want to lay multiple items on a same line.
     DisplayWindowPadding    = ImVec2(19,19);    // Window position are clamped to be visible within the display area or monitors by at least this amount. Only applies to regular windows.
     DisplaySafeAreaPadding  = ImVec2(3,3);      // If you cannot see the edge of your screen (e.g. on a TV) increase the safe area padding. Covers popups/tooltips as well regular windows.
     MouseCursorScale        = 1.0f;             // Scale software rendered mouse cursor (when io.MouseDrawCursor is enabled). May be removed later.
@@ -2262,7 +2269,9 @@ void ImGui::CalcListClipping(int items_count, float items_height, int* out_items
     // We create the union of the ClipRect and the NavScoringRect which at worst should be 1 page away from ClipRect
     ImRect unclipped_rect = window->ClipRect;
     if (g.NavMoveRequest)
-        unclipped_rect.Add(g.NavScoringRectScreen);
+        unclipped_rect.Add(g.NavScoringRect);
+    if (g.NavJustMovedToId && window->NavLastIds[0] == g.NavJustMovedToId)
+        unclipped_rect.Add(ImRect(window->Pos + window->NavRectRel[0].Min, window->Pos + window->NavRectRel[0].Max));
 
     const ImVec2 pos = window->DC.CursorPos;
     int start = (int)((unclipped_rect.Min.y - pos.y) / items_height);
@@ -3200,7 +3209,7 @@ bool ImGui::IsClippedEx(const ImRect& bb, ImGuiID id, bool clip_even_when_logged
     ImGuiContext& g = *GImGui;
     ImGuiWindow* window = g.CurrentWindow;
     if (!bb.Overlaps(window->ClipRect))
-        if (id == 0 || id != g.ActiveId)
+        if (id == 0 || (id != g.ActiveId && id != g.NavId))
             if (clip_even_when_logged || !g.LogEnabled)
                 return true;
     return false;
@@ -3852,7 +3861,7 @@ void ImGui::UpdateHoveredWindowAndCaptureFlags()
     g.IO.WantTextInput = (g.WantTextInputNextFrame != -1) ? (g.WantTextInputNextFrame != 0) : false;
 }
 
-static ImGuiKeyModFlags GetMergedKeyModFlags()
+ImGuiKeyModFlags ImGui::GetMergedKeyModFlags()
 {
     ImGuiContext& g = *GImGui;
     ImGuiKeyModFlags key_mod_flags = ImGuiKeyModFlags_None;
@@ -3975,7 +3984,7 @@ void ImGui::NewFrame()
     for (int i = 0; i < IM_ARRAYSIZE(g.IO.KeysDown); i++)
         g.IO.KeysDownDuration[i] = g.IO.KeysDown[i] ? (g.IO.KeysDownDuration[i] < 0.0f ? 0.0f : g.IO.KeysDownDuration[i] + g.IO.DeltaTime) : -1.0f;
 
-    // Update gamepad/keyboard directional navigation
+    // Update gamepad/keyboard navigation
     NavUpdate();
 
     // Update mouse input state
@@ -7405,6 +7414,14 @@ static void ImGui::ErrorCheckNewFrameSanityChecks()
 {
     ImGuiContext& g = *GImGui;
 
+    // Check user IM_ASSERT macro
+    // (IF YOU GET A WARNING OR COMPILE ERROR HERE: it means you assert macro is incorrectly defined!
+    //  If your macro uses multiple statements, it NEEDS to be surrounded by a 'do { ... } while (0)' block.
+    //  This is a common C/C++ idiom to allow multiple statements macros to be used in control flow blocks.)
+    // #define IM_ASSERT(EXPR)   SomeCode(EXPR); SomeMoreCode();                    // Wrong!
+    // #define IM_ASSERT(EXPR)   do { SomeCode(EXPR); SomeMoreCode(); } while (0)   // Correct!
+    if (true) IM_ASSERT(1); else IM_ASSERT(0);
+
     // Check user data
     // (We pass an error message in the assert expression to make it visible to programmers who are not using a debugger, as most assert handlers display their argument)
     IM_ASSERT(g.Initialized);
@@ -7556,6 +7573,8 @@ static void ImGui::ErrorCheckBeginEndCompareStacksSize(ImGuiWindow* window, bool
 //-----------------------------------------------------------------------------
 
 // Advance cursor given item size for layout.
+// Register minimum needed size so it can extend the bounding box used for auto-fit calculation.
+// See comments in ItemAdd() about how/why the size provided to ItemSize() vs ItemAdd() may often different.
 void ImGui::ItemSize(const ImVec2& size, float text_baseline_y)
 {
     ImGuiContext& g = *GImGui;
@@ -7596,7 +7615,7 @@ void ImGui::ItemSize(const ImRect& bb, float text_baseline_y)
 
 // Declare item bounding box for clipping and interaction.
 // Note that the size can be different than the one provided to ItemSize(). Typically, widgets that spread over available surface
-// declare their minimum size requirement to ItemSize() and then use a larger region for drawing/interaction, which is passed to ItemAdd().
+// declare their minimum size requirement to ItemSize() and provide a larger region to ItemAdd() which is used drawing/interaction.
 bool ImGui::ItemAdd(const ImRect& bb, ImGuiID id, const ImRect* nav_bb_arg)
 {
     ImGuiContext& g = *GImGui;
@@ -8022,7 +8041,8 @@ static ImVec2 CalcNextScrollFromScrollTargetAndClamp(ImGuiWindow* window, bool s
             target_y = window->ContentSize.y + window->WindowPadding.y * 2.0f;
         scroll.y = target_y - cr_y * (window->SizeFull.y - window->ScrollbarSizes.y - decoration_up_height);
     }
-    scroll = ImMax(scroll, ImVec2(0.0f, 0.0f));
+    scroll.x = IM_FLOOR(ImMax(scroll.x, 0.0f));
+    scroll.y = IM_FLOOR(ImMax(scroll.y, 0.0f));
     if (!window->Collapsed && !window->SkipItems)
     {
         scroll.x = ImMin(scroll.x, window->ScrollMax.x);
@@ -8359,7 +8379,7 @@ void ImGui::ClosePopupToLevel(int remaining, bool restore_focus_to_window_under_
         }
         else
         {
-            if (g.NavLayer == 0 && focus_window)
+            if (g.NavLayer == ImGuiNavLayer_Main && focus_window)
                 focus_window = NavRestoreLastChildNavWindow(focus_window);
             FocusWindow(focus_window);
         }
@@ -8736,7 +8756,7 @@ static void inline NavClampRectToVisibleAreaForMoveDir(ImGuiDir move_dir, ImRect
     }
 }
 
-// Scoring function for directional navigation. Based on https://gist.github.com/rygorous/6981057
+// Scoring function for gamepad/keyboard directional navigation. Based on https://gist.github.com/rygorous/6981057
 static bool ImGui::NavScoreItem(ImGuiNavMoveResult* result, ImRect cand)
 {
     ImGuiContext& g = *GImGui;
@@ -8744,7 +8764,7 @@ static bool ImGui::NavScoreItem(ImGuiNavMoveResult* result, ImRect cand)
     if (g.NavLayer != window->DC.NavLayerCurrent)
         return false;
 
-    const ImRect& curr = g.NavScoringRectScreen; // Current modified source rect (NB: we've applied Max.x = Min.x in NavUpdate() to inhibit the effect of having varied item width)
+    const ImRect& curr = g.NavScoringRect; // Current modified source rect (NB: we've applied Max.x = Min.x in NavUpdate() to inhibit the effect of having varied item width)
     g.NavScoringCount++;
 
     // When entering through a NavFlattened border, we consider child window items as fully clipped for scoring
@@ -8858,7 +8878,7 @@ static bool ImGui::NavScoreItem(ImGuiNavMoveResult* result, ImRect cand)
     // 2017/09/29: FIXME: This now currently only enabled inside menu bars, ideally we'd disable it everywhere. Menus in particular need to catch failure. For general navigation it feels awkward.
     // Disabling it may lead to disconnected graphs when nodes are very spaced out on different axis. Perhaps consider offering this as an option?
     if (result->DistBox == FLT_MAX && dist_axial < result->DistAxial)  // Check axial match
-        if (g.NavLayer == 1 && !(g.NavWindow->Flags & ImGuiWindowFlags_ChildMenu))
+        if (g.NavLayer == ImGuiNavLayer_Menu && !(g.NavWindow->Flags & ImGuiWindowFlags_ChildMenu))
             if ((g.NavMoveDir == ImGuiDir_Left && dax < 0.0f) || (g.NavMoveDir == ImGuiDir_Right && dax > 0.0f) || (g.NavMoveDir == ImGuiDir_Up && day < 0.0f) || (g.NavMoveDir == ImGuiDir_Down && day > 0.0f))
             {
                 result->DistAxial = dist_axial;
@@ -8969,7 +8989,7 @@ void ImGui::NavMoveRequestForward(ImGuiDir move_dir, ImGuiDir clip_dir, const Im
 void ImGui::NavMoveRequestTryWrapping(ImGuiWindow* window, ImGuiNavMoveFlags move_flags)
 {
     ImGuiContext& g = *GImGui;
-    if (g.NavWindow != window || !NavMoveRequestButNoResultYet() || g.NavMoveRequestForward != ImGuiNavForward_None || g.NavLayer != 0)
+    if (g.NavWindow != window || !NavMoveRequestButNoResultYet() || g.NavMoveRequestForward != ImGuiNavForward_None || g.NavLayer != ImGuiNavLayer_Main)
         return;
     IM_ASSERT(move_flags != 0); // No points calling this with no wrapping
     ImRect bb_rel = window->NavRectRel[0];
@@ -9219,7 +9239,7 @@ static void ImGui::NavUpdate()
     // Store our return window (for returning from Layer 1 to Layer 0) and clear it as soon as we step back in our own Layer 0
     if (g.NavWindow)
         NavSaveLastChildNavWindowIntoParent(g.NavWindow);
-    if (g.NavWindow && g.NavWindow->NavLastChildNavWindow != NULL && g.NavLayer == 0)
+    if (g.NavWindow && g.NavWindow->NavLastChildNavWindow != NULL && g.NavLayer == ImGuiNavLayer_Main)
         g.NavWindow->NavLastChildNavWindow = NULL;
 
     // Update CTRL+TAB and Windowing features (hold Square to move/resize/etc.)
@@ -9256,7 +9276,7 @@ static void ImGui::NavUpdate()
             if (!(g.OpenPopupStack.back().Window->Flags & ImGuiWindowFlags_Modal))
                 ClosePopupToLevel(g.OpenPopupStack.Size - 1, true);
         }
-        else if (g.NavLayer != 0)
+        else if (g.NavLayer != ImGuiNavLayer_Main)
         {
             // Leave the "menu" layer
             NavRestoreLayer(ImGuiNavLayer_Main);
@@ -9330,6 +9350,7 @@ static void ImGui::NavUpdate()
     if (g.NavMoveDir != ImGuiDir_None)
     {
         g.NavMoveRequest = true;
+        g.NavMoveRequestKeyMods = g.IO.KeyMods;
         g.NavMoveDirLast = g.NavMoveDir;
     }
     if (g.NavMoveRequest && g.NavId == 0)
@@ -9377,7 +9398,7 @@ static void ImGui::NavUpdate()
     g.NavMoveResultOther.Clear();
 
     // When we have manually scrolled (without using navigation) and NavId becomes out of bounds, we project its bounding box to the visible area to restart navigation within visible items
-    if (g.NavMoveRequest && g.NavMoveFromClampedRefRect && g.NavLayer == 0)
+    if (g.NavMoveRequest && g.NavMoveFromClampedRefRect && g.NavLayer == ImGuiNavLayer_Main)
     {
         ImGuiWindow* window = g.NavWindow;
         ImRect window_rect_rel(window->InnerRect.Min - window->Pos - ImVec2(1,1), window->InnerRect.Max - window->Pos + ImVec2(1,1));
@@ -9393,11 +9414,11 @@ static void ImGui::NavUpdate()
 
     // For scoring we use a single segment on the left side our current item bounding box (not touching the edge to avoid box overlap with zero-spaced items)
     ImRect nav_rect_rel = (g.NavWindow && !g.NavWindow->NavRectRel[g.NavLayer].IsInverted()) ? g.NavWindow->NavRectRel[g.NavLayer] : ImRect(0,0,0,0);
-    g.NavScoringRectScreen = g.NavWindow ? ImRect(g.NavWindow->Pos + nav_rect_rel.Min, g.NavWindow->Pos + nav_rect_rel.Max) : ImRect(0,0,0,0);
-    g.NavScoringRectScreen.TranslateY(nav_scoring_rect_offset_y);
-    g.NavScoringRectScreen.Min.x = ImMin(g.NavScoringRectScreen.Min.x + 1.0f, g.NavScoringRectScreen.Max.x);
-    g.NavScoringRectScreen.Max.x = g.NavScoringRectScreen.Min.x;
-    IM_ASSERT(!g.NavScoringRectScreen.IsInverted()); // Ensure if we have a finite, non-inverted bounding box here will allows us to remove extraneous ImFabs() calls in NavScoreItem().
+    g.NavScoringRect = g.NavWindow ? ImRect(g.NavWindow->Pos + nav_rect_rel.Min, g.NavWindow->Pos + nav_rect_rel.Max) : ImRect(0,0,0,0);
+    g.NavScoringRect.TranslateY(nav_scoring_rect_offset_y);
+    g.NavScoringRect.Min.x = ImMin(g.NavScoringRect.Min.x + 1.0f, g.NavScoringRect.Max.x);
+    g.NavScoringRect.Max.x = g.NavScoringRect.Min.x;
+    IM_ASSERT(!g.NavScoringRect.IsInverted()); // Ensure if we have a finite, non-inverted bounding box here will allows us to remove extraneous ImFabs() calls in NavScoreItem().
     //GetForegroundDrawList()->AddRect(g.NavScoringRectScreen.Min, g.NavScoringRectScreen.Max, IM_COL32(255,200,0,255)); // [DEBUG]
     g.NavScoringCount = 0;
 #if IMGUI_DEBUG_NAV_RECTS
@@ -9440,7 +9461,7 @@ static void ImGui::NavUpdateMoveResult()
     IM_ASSERT(g.NavWindow && result->Window);
 
     // Scroll to keep newly navigated item fully into view.
-    if (g.NavLayer == 0)
+    if (g.NavLayer == ImGuiNavLayer_Main)
     {
         ImVec2 delta_scroll;
         if (g.NavMoveRequestFlags & ImGuiNavMoveFlags_ScrollToEdge)
@@ -9467,7 +9488,7 @@ static void ImGui::NavUpdateMoveResult()
         // Don't set NavJustMovedToId if just landed on the same spot (which may happen with ImGuiNavMoveFlags_AllowCurrentNavId)
         g.NavJustMovedToId = result->ID;
         g.NavJustMovedToFocusScopeId = result->FocusScopeId;
-
+        g.NavJustMovedToKeyMods = g.NavMoveRequestKeyMods;
     }
     SetNavIDWithRectRel(result->ID, g.NavLayer, result->FocusScopeId, result->RectRel);
     g.NavMoveFromClampedRefRect = false;
@@ -9479,7 +9500,7 @@ static float ImGui::NavUpdatePageUpPageDown()
     ImGuiContext& g = *GImGui;
     if (g.NavMoveDir != ImGuiDir_None || g.NavWindow == NULL)
         return 0.0f;
-    if ((g.NavWindow->Flags & ImGuiWindowFlags_NoNavInputs) || g.NavWindowingTarget != NULL || g.NavLayer != 0)
+    if ((g.NavWindow->Flags & ImGuiWindowFlags_NoNavInputs) || g.NavWindowingTarget != NULL || g.NavLayer != ImGuiNavLayer_Main)
         return 0.0f;
 
     ImGuiWindow* window = g.NavWindow;
@@ -15099,7 +15120,8 @@ void ImGui::ShowMetricsWindow(bool* p_open)
     static bool show_windows_begin_order = false;
     static bool show_tables_rects = false;
     static int  show_tables_rect_type = TRT_WorkRect;
-    static bool show_drawcmd_details = true;
+    static bool show_drawcmd_mesh = true;
+    static bool show_drawcmd_aabb = true;
     static bool show_docking_nodes = false;
 
     // Basic info
@@ -15134,6 +15156,38 @@ void ImGui::ShowMetricsWindow(bool* p_open)
             else if (rect_type == WRT_ContentRegionRect)    { return window->ContentRegionRect; }
             IM_ASSERT(0);
             return ImRect();
+        }
+
+        static void NodeDrawCmdShowMeshAndBoundingBox(ImGuiWindow* window, const ImDrawList* draw_list, const ImDrawCmd* draw_cmd, int elem_offset, bool show_mesh, bool show_aabb)
+        {
+            IM_ASSERT(show_mesh || show_aabb);
+            ImDrawList* fg_draw_list = GetForegroundDrawList(window); // Render additional visuals into the top-most draw list
+            ImDrawIdx* idx_buffer = (draw_list->IdxBuffer.Size > 0) ? draw_list->IdxBuffer.Data : NULL;
+
+            // Draw wire-frame version of all triangles
+            ImRect clip_rect = draw_cmd->ClipRect;
+            ImRect vtxs_rect(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+            ImDrawListFlags backup_flags = fg_draw_list->Flags;
+            fg_draw_list->Flags &= ~ImDrawListFlags_AntiAliasedLines; // Disable AA on triangle outlines is more readable for very large and thin triangles.
+            for (unsigned int base_idx = elem_offset; base_idx < (elem_offset + draw_cmd->ElemCount); base_idx += 3)
+            {
+                ImVec2 triangle[3];
+                for (int n = 0; n < 3; n++)
+                {
+                    ImVec2 p = draw_list->VtxBuffer[idx_buffer ? idx_buffer[base_idx + n] : (base_idx + n)].pos;
+                    triangle[n] = p;
+                    vtxs_rect.Add(p);
+                }
+                if (show_mesh)
+                    fg_draw_list->AddPolyline(triangle, 3, IM_COL32(255, 255, 0, 255), true, 1.0f); // In yellow: mesh triangles
+            }
+            // Draw bounding boxes
+            if (show_aabb)
+            {
+                fg_draw_list->AddRect(ImFloor(clip_rect.Min), ImFloor(clip_rect.Max), IM_COL32(255, 0, 255, 255)); // In pink: clipping rectangle submitted to GPU
+                fg_draw_list->AddRect(ImFloor(vtxs_rect.Min), ImFloor(vtxs_rect.Max), IM_COL32(0, 255, 255, 255)); // In cyan: bounding box of triangles
+            }
+            fg_draw_list->Flags = backup_flags;
         }
 
         static void NodeDrawList(ImGuiWindow* window, ImGuiViewportP* viewport, ImDrawList* draw_list, const char* label)
@@ -15173,15 +15227,8 @@ void ImGui::ShowMetricsWindow(bool* p_open)
                     pcmd->ElemCount/3, (void*)(intptr_t)pcmd->TextureId,
                     pcmd->ClipRect.x, pcmd->ClipRect.y, pcmd->ClipRect.z, pcmd->ClipRect.w);
                 bool pcmd_node_open = ImGui::TreeNode((void*)(pcmd - draw_list->CmdBuffer.begin()), "%s", buf);
-                if (show_drawcmd_details && fg_draw_list && ImGui::IsItemHovered())
-                {
-                    ImRect clip_rect = pcmd->ClipRect;
-                    ImRect vtxs_rect(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
-                    for (unsigned int i = elem_offset; i < elem_offset + (int)pcmd->ElemCount; i++)
-                        vtxs_rect.Add(draw_list->VtxBuffer[idx_buffer ? idx_buffer[i] : i].pos);
-                    fg_draw_list->AddRect(ImFloor(clip_rect.Min), ImFloor(clip_rect.Max), IM_COL32(255,0,255,255));
-                    fg_draw_list->AddRect(ImFloor(vtxs_rect.Min), ImFloor(vtxs_rect.Max), IM_COL32(255,255,0,255));
-                }
+                if (ImGui::IsItemHovered() && (show_drawcmd_mesh || show_drawcmd_aabb) && fg_draw_list)
+                    NodeDrawCmdShowMeshAndBoundingBox(window, draw_list, pcmd, elem_offset, show_drawcmd_mesh, show_drawcmd_aabb);
                 if (!pcmd_node_open)
                     continue;
 
@@ -15199,22 +15246,8 @@ void ImGui::ShowMetricsWindow(bool* p_open)
                 // Display vertex information summary. Hover to get all triangles drawn in wire-frame
                 ImFormatString(buf, IM_ARRAYSIZE(buf), "Mesh: ElemCount: %d, VtxOffset: +%d, IdxOffset: +%d, Area: ~%0.f px", pcmd->ElemCount, pcmd->VtxOffset, pcmd->IdxOffset, total_area);
                 ImGui::Selectable(buf);
-                if (fg_draw_list && ImGui::IsItemHovered() && show_drawcmd_details)
-                {
-                    // Draw wire-frame version of everything
-                    ImDrawListFlags backup_flags = fg_draw_list->Flags;
-                    fg_draw_list->Flags &= ~ImDrawListFlags_AntiAliasedLines; // Disable AA on triangle outlines is more readable for very large and thin triangles.
-                    ImRect clip_rect = pcmd->ClipRect;
-                    fg_draw_list->AddRect(ImFloor(clip_rect.Min), ImFloor(clip_rect.Max), IM_COL32(255, 0, 255, 255));
-                    for (unsigned int base_idx = elem_offset; base_idx < (elem_offset + pcmd->ElemCount); base_idx += 3)
-                    {
-                        ImVec2 triangle[3];
-                        for (int n = 0; n < 3; n++)
-                            triangle[n] = draw_list->VtxBuffer[idx_buffer ? idx_buffer[base_idx + n] : (base_idx + n)].pos;
-                        fg_draw_list->AddPolyline(triangle, 3, IM_COL32(255, 255, 0, 255), true, 1.0f);
-                    }
-                    fg_draw_list->Flags = backup_flags;
-                }
+                if (ImGui::IsItemHovered() && fg_draw_list)
+                    NodeDrawCmdShowMeshAndBoundingBox(window, draw_list, pcmd, elem_offset, true, false);
 
                 // Display individual triangles/vertices. Hover on to get the corresponding triangle highlighted.
                 ImGuiListClipper clipper(pcmd->ElemCount/3); // Manually coarse clip our print out of individual vertices to save CPU, only items that may be visible.
@@ -15280,6 +15313,12 @@ void ImGui::ShowMetricsWindow(bool* p_open)
                 ImGui::GetForegroundDrawList()->AddRect(window->Pos, window->Pos + window->Size, IM_COL32(255, 255, 0, 255));
             if (!open)
                 return;
+
+            if (!window->WasActive)
+                ImGui::TextDisabled("Note: window is not currently visible.");
+            if (window->MemoryCompacted)
+                ImGui::TextDisabled("Note: some memory buffers have been compacted/freed.");
+
             ImGuiWindowFlags flags = window->Flags;
             NodeDrawList(window, window->Viewport, window->DrawList, "DrawList");
             ImGui::BulletText("Pos: (%.1f,%.1f), Size: (%.1f,%.1f), ContentSize (%.1f,%.1f)", window->Pos.x, window->Pos.y, window->Size.x, window->Size.y, window->ContentSize.x, window->ContentSize.y);
@@ -15422,6 +15461,38 @@ void ImGui::ShowMetricsWindow(bool* p_open)
         }
     };
 
+
+    // Tools
+    if (ImGui::TreeNode("Tools"))
+    {
+        // The Item Picker tool is super useful to visually select an item and break into the call-stack of where it was submitted.
+        if (ImGui::Button("Item Picker.."))
+            ImGui::DebugStartItemPicker();
+        ImGui::SameLine();
+        MetricsHelpMarker("Will call the IM_DEBUG_BREAK() macro to break in debugger.\nWarning: If you don't have a debugger attached, this will probably crash.");
+
+        ImGui::Checkbox("Show windows begin order", &show_windows_begin_order);
+        ImGui::Checkbox("Show windows rectangles", &show_windows_rects);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
+        show_windows_rects |= ImGui::Combo("##show_windows_rect_type", &show_windows_rect_type, wrt_rects_names, WRT_Count, WRT_Count);
+        if (show_windows_rects && g.NavWindow)
+        {
+            ImGui::BulletText("'%s':", g.NavWindow->Name);
+            ImGui::Indent();
+            for (int rect_n = 0; rect_n < WRT_Count; rect_n++)
+            {
+                ImRect r = Funcs::GetWindowRect(g.NavWindow, rect_n);
+                ImGui::Text("(%6.1f,%6.1f) (%6.1f,%6.1f) Size (%6.1f,%6.1f) %s", r.Min.x, r.Min.y, r.Max.x, r.Max.y, r.GetWidth(), r.GetHeight(), wrt_rects_names[rect_n]);
+            }
+            ImGui::Unindent();
+        }
+        ImGui::Checkbox("Show mesh when hovering ImDrawCmd", &show_drawcmd_mesh);
+        ImGui::Checkbox("Show bounding boxes when hovering ImDrawCmd", &show_drawcmd_aabb);
+        ImGui::TreePop();
+    }
+
+    // Contents
     Funcs::NodeWindows(g.Windows, "Windows");
     //Funcs::NodeWindows(g.WindowsFocusOrder, "WindowsFocusOrder");
     if (ImGui::TreeNode("Viewport", "Viewports (%d)", g.Viewports.Size))
@@ -15553,35 +15624,6 @@ void ImGui::ShowMetricsWindow(bool* p_open)
         ImGui::Text("NavWindowingTarget: '%s'", g.NavWindowingTarget ? g.NavWindowingTarget->Name : "NULL");
         ImGui::Text("DragDrop: %d, SourceId = 0x%08X, Payload \"%s\" (%d bytes)", g.DragDropActive, g.DragDropPayload.SourceId, g.DragDropPayload.DataType, g.DragDropPayload.DataSize);
         ImGui::Text("MouseViewport: 0x%08X (UserHovered 0x%08X, LastHovered 0x%08X)", g.MouseViewport->ID, g.IO.MouseHoveredViewport, g.MouseLastHoveredViewport ? g.MouseLastHoveredViewport->ID : 0);
-        ImGui::TreePop();
-    }
-
-    // Tools
-    if (ImGui::TreeNode("Tools"))
-    {
-        // The Item Picker tool is super useful to visually select an item and break into the call-stack of where it was submitted.
-        if (ImGui::Button("Item Picker.."))
-            ImGui::DebugStartItemPicker();
-        ImGui::SameLine();
-        MetricsHelpMarker("Will call the IM_DEBUG_BREAK() macro to break in debugger.\nWarning: If you don't have a debugger attached, this will probably crash.");
-
-        ImGui::Checkbox("Show windows begin order", &show_windows_begin_order);
-        ImGui::Checkbox("Show windows rectangles", &show_windows_rects);
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
-        show_windows_rects |= ImGui::Combo("##show_windows_rect_type", &show_windows_rect_type, wrt_rects_names, WRT_Count, WRT_Count);
-        if (show_windows_rects && g.NavWindow)
-        {
-            ImGui::BulletText("'%s':", g.NavWindow->Name);
-            ImGui::Indent();
-            for (int rect_n = 0; rect_n < WRT_Count; rect_n++)
-            {
-                ImRect r = Funcs::GetWindowRect(g.NavWindow, rect_n);
-                ImGui::Text("(%6.1f,%6.1f) (%6.1f,%6.1f) Size (%6.1f,%6.1f) %s", r.Min.x, r.Min.y, r.Max.x, r.Max.y, r.GetWidth(), r.GetHeight(), wrt_rects_names[rect_n]);
-            }
-            ImGui::Unindent();
-        }
-        ImGui::Checkbox("Show details when hovering ImDrawCmd node", &show_drawcmd_details);
         ImGui::TreePop();
     }
 
