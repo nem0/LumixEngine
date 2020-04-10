@@ -83,6 +83,7 @@ struct GUIText
 
 	String text;
 	GUIScene::TextHAlign horizontal_align = GUIScene::TextHAlign::LEFT;
+	GUIScene::TextVAlign vertical_align = GUIScene::TextVAlign::TOP;
 	u32 color = 0xff000000;
 
 private:
@@ -285,8 +286,7 @@ struct GUISceneImpl final : GUIScene
 			draw.addImage(rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1}, Color::WHITE);
 		}
 
-		if (rect.text)
-		{
+		if (rect.text) {
 			Font* font = rect.text->getFont();
 			if (font) {
 				const char* text_cstr = rect.text->text.c_str();
@@ -294,8 +294,13 @@ struct GUISceneImpl final : GUIScene
 				Vec2 text_size = measureTextA(*font, text_cstr, nullptr);
 				Vec2 text_pos(l, t + font_size);
 
-				switch (rect.text->horizontal_align)
-				{
+				switch (rect.text->vertical_align) {
+					case TextVAlign::TOP: break;
+					case TextVAlign::MIDDLE: text_pos.y = (t + b + font_size) * 0.5f; break;
+					case TextVAlign::BOTTOM: text_pos.y = b; break;
+				}
+
+				switch (rect.text->horizontal_align) {
 					case TextHAlign::LEFT: break;
 					case TextHAlign::RIGHT: text_pos.x = r - text_size.x; break;
 					case TextHAlign::CENTER: text_pos.x = (r + l - text_size.x) * 0.5f; break;
@@ -577,9 +582,17 @@ struct GUISceneImpl final : GUIScene
 	{
 		GUIText* gui_text = m_rects[entity]->text;
 		return gui_text->horizontal_align;
-		
 	}
 
+	TextVAlign getTextVAlign(EntityRef entity) override {
+		GUIText* gui_text = m_rects[entity]->text;
+		return gui_text->vertical_align;
+	}
+
+	void setTextVAlign(EntityRef entity, TextVAlign align) override {
+		GUIText* gui_text = m_rects[entity]->text;
+		gui_text->vertical_align = align;
+	}
 
 	void setTextHAlign(EntityRef entity, TextHAlign value) override
 	{
@@ -1087,6 +1100,7 @@ struct GUISceneImpl final : GUIScene
 			{
 				serializer.writeString(rect->text->getFontResource() ? rect->text->getFontResource()->getPath().c_str() : "");
 				serializer.write(rect->text->horizontal_align);
+				serializer.write(rect->text->vertical_align);
 				serializer.write(rect->text->color);
 				serializer.write(rect->text->getFontSize());
 				serializer.write(rect->text->text);
@@ -1163,6 +1177,7 @@ struct GUISceneImpl final : GUIScene
 				GUIText& text = *rect->text;
 				const char* tmp = serializer.readString();
 				serializer.read(text.horizontal_align);
+				serializer.read(text.vertical_align);
 				serializer.read(text.color);
 				int font_size;
 				serializer.read(font_size);
