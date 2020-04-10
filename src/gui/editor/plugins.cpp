@@ -125,7 +125,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImDrawList* draw = ImGui::GetWindowDrawList();
 		ImVec2 a = ImGui::GetItemRectMin();
 		ImVec2 b = ImGui::GetItemRectMax();
-		draw->AddImage(&texture->handle, a, b);
+		draw->AddImage((ImTextureID)(intptr_t)texture->handle.value, a, b);
 
 		auto drawHandle = [&](const char* id, const ImVec2& a, const ImVec2& b, int* value, bool vertical) {
 			const float SIZE = 5;
