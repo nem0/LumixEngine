@@ -83,12 +83,25 @@ struct GUISystemImpl final : GUISystem
 			}
 		};
 
+		struct TextVAlignEnum : Reflection::EnumAttribute {
+			u32 count(ComponentUID cmp) const override { return 3; }
+			const char* name(ComponentUID cmp, u32 idx) const override {
+				switch((GUIScene::TextVAlign)idx) {
+					case GUIScene::TextVAlign::TOP: return "Top";
+					case GUIScene::TextVAlign::MIDDLE: return "Middle";
+					case GUIScene::TextVAlign::BOTTOM: return "Bottom";
+					default: ASSERT(false); return "N/A";
+				}
+			}
+		};
+
 		static auto lua_scene = scene("gui",
 			component("gui_text",
 				property("Text", LUMIX_PROP(GUIScene, Text)),
 				property("Font", LUMIX_PROP(GUIScene, TextFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
 				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
 				enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), TextHAlignEnum()),
+				enum_property("Vertical align", LUMIX_PROP(GUIScene, TextVAlign), TextVAlignEnum()),
 				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA), ColorAttribute())
 			),
 			component("gui_input_field"),
