@@ -26,7 +26,7 @@ public:
 
 	RuntimeContext* createRuntime(u32 anim_set);
 	void destroyRuntime(RuntimeContext& ctx);
-	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion);
+	void update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const;
 	void getPose(RuntimeContext& ctx, Ref<struct Pose> pose);
 	void initEmpty();
 	void destroy();
