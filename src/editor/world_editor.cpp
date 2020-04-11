@@ -1638,7 +1638,9 @@ public:
 
 	UniverseView& getView() override { ASSERT(m_view); return *m_view; }
 
-	void setView(UniverseView* view) override { m_view = view; }
+	void setView(UniverseView* view) override { 
+		m_view = view; 
+	}
 
 	Universe* getUniverse() override { return m_universe; }
 
@@ -1757,6 +1759,9 @@ public:
 
 		header.engine_hash = m_engine.serialize(*m_universe, blob);
 		m_prefab_system->serialize(blob);
+		const Viewport& vp = getView().getViewport();
+		blob.write(vp.pos);
+		blob.write(vp.rot);
 		header.hash = crc32((const u8*)blob.getData() + hashed_offset, (int)blob.getPos() - hashed_offset);
 		*(Header*)blob.getData() = header;
 		file.write(blob.getData(), blob.getPos());
@@ -2236,8 +2241,9 @@ public:
 	}
 
 
-	enum class SerializedVersion : int
+	enum class SerializedVersion : i32
 	{
+		CAMERA,
 		LATEST
 	};
 
@@ -2308,6 +2314,19 @@ public:
 		if (m_engine.deserialize(*m_universe, blob, Ref(entity_map)))
 		{
 			m_prefab_system->deserialize(blob, entity_map);
+			if (header.version > (i32)SerializedVersion::CAMERA) {
+				DVec3 pos;
+				Quat rot;
+				blob.read(pos);
+				blob.read(rot);
+				if (m_view) {
+					Viewport vp = m_view->getViewport();
+					vp.pos = pos;
+					vp.rot = rot;
+					m_view->setViewport(vp);
+				}
+
+			}
 			logInfo("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
 			m_is_loading = false;
 			return true;
