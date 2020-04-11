@@ -1809,7 +1809,6 @@ struct StudioAppImpl final : StudioApp
 		m_settings.m_is_log_open = m_log_ui->m_is_open;
 		m_settings.m_is_profiler_open = m_profiler_ui->m_is_open;
 		m_settings.m_is_properties_open = m_property_grid->m_is_open;
-		m_settings.m_mouse_sensitivity = m_editor->getView().getMouseSensitivity();
 
 		for (auto* i : m_gui_plugins) {
 			i->onBeforeSettingsSaved();
