@@ -635,16 +635,16 @@ template <typename T> inline Variant::Type getVariantType() { return _getVariant
 template <typename F> struct Function;
 
 template <typename T> static T fromVariant(int i, Span<Variant> args);
-template <> static bool fromVariant(int i, Span<Variant> args) { return args[i].b; }
-template <> static float fromVariant(int i, Span<Variant> args) { return args[i].f; }
-template <> static const char* fromVariant(int i, Span<Variant> args) { return args[i].s; }
-template <> static i32 fromVariant(int i, Span<Variant> args) { return args[i].i; }
-template <> static u32 fromVariant(int i, Span<Variant> args) { return args[i].u; }
-template <> static Vec2 fromVariant(int i, Span<Variant> args) { return args[i].v2; }
-template <> static Vec3 fromVariant(int i, Span<Variant> args) { return args[i].v3; }
-template <> static DVec3 fromVariant(int i, Span<Variant> args) { return args[i].dv3; }
-template <> static EntityPtr fromVariant(int i, Span<Variant> args) { return args[i].e; }
-template <> static EntityRef fromVariant(int i, Span<Variant> args) { return (EntityRef)args[i].e; }
+template <> bool fromVariant(int i, Span<Variant> args) { return args[i].b; }
+template <> float fromVariant(int i, Span<Variant> args) { return args[i].f; }
+template <> const char* fromVariant(int i, Span<Variant> args) { return args[i].s; }
+template <> i32 fromVariant(int i, Span<Variant> args) { return args[i].i; }
+template <> u32 fromVariant(int i, Span<Variant> args) { return args[i].u; }
+template <> Vec2 fromVariant(int i, Span<Variant> args) { return args[i].v2; }
+template <> Vec3 fromVariant(int i, Span<Variant> args) { return args[i].v3; }
+template <> DVec3 fromVariant(int i, Span<Variant> args) { return args[i].dv3; }
+template <> EntityPtr fromVariant(int i, Span<Variant> args) { return args[i].e; }
+template <> EntityRef fromVariant(int i, Span<Variant> args) { return (EntityRef)args[i].e; }
 
 template <typename T, typename... Args>
 struct ToVariant {

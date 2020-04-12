@@ -2,6 +2,7 @@
 
 
 #include "engine/plugin.h"
+#include "engine/os.h"
 
 
 namespace Lumix
@@ -20,6 +21,7 @@ struct GUISystem : IPlugin
 		virtual Vec2 getPos() const = 0;
 		virtual Vec2 getSize() const = 0;
 		virtual void enableCursor(bool enable) = 0;
+		virtual void setCursor(OS::CursorType type) = 0;
 	};
 
 	virtual void setInterface(Interface* interface) = 0;
