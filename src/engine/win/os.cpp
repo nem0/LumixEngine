@@ -10,6 +10,7 @@
 #include <ShlObj.h>
 #pragma warning(pop)
 #include <Windows.h>
+#pragma warning(disable : 4996)
 
 
 //Request high performace profiles from mobile chipsets
@@ -258,7 +259,6 @@ void logVersion() {
 	DWORD dwMinorVersion = 0;
 	DWORD dwBuild = 0;
 	
-	#pragma warning(disable : 4996)
 	dwVersion = GetVersion();
 
 	dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
