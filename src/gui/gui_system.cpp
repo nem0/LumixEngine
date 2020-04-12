@@ -96,6 +96,9 @@ struct GUISystemImpl final : GUISystem
 		};
 
 		static auto lua_scene = scene("gui",
+			functions(
+				function(LUMIX_FUNC(GUIScene::getRectAt))
+			),
 			component("gui_text",
 				property("Text", LUMIX_PROP(GUIScene, Text)),
 				property("Font", LUMIX_PROP(GUIScene, TextFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),

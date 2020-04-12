@@ -1088,8 +1088,8 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 			elseif Lumix.Entity[key] ~= nil then
 				return Lumix.Entity[key]
 			else 
-				if LumixAPI.hasComponent(self._universe, self._entity, key) then
-					return Lumix[key]:new(self._universe, self._entity)
+				if LumixAPI.hasComponent(table._universe, table._entity, key) then
+					return Lumix[key]:new(table._universe, table._entity)
 				else
 					return nil
 				end

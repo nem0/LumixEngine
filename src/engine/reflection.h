@@ -600,6 +600,23 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 	}
 };
 
+template <typename R, typename C, typename... Args>
+struct Function<R (C::*)(Args...) const> : FunctionBase
+{
+	using F = R(C::*)(Args...) const;
+	F function;
+
+	int getArgCount() const override { return sizeof...(Args); }
+	const char* getReturnType() const override { return getTypeName<typename ResultOf<F>::Type>(); }
+	
+	const char* getArgType(int i) const override
+	{
+		const char* expand[] = {
+			getTypeName<Args>()...
+		};
+		return expand[i];
+	}
+};
 
 template <typename F>
 auto function(F func, const char* decl_code)

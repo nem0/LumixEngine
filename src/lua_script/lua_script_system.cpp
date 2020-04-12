@@ -1159,7 +1159,20 @@ namespace Lumix
 		void onButtonClicked(EntityRef e) { onGUIEvent(e, "onButtonClicked"); }
 		void onRectHovered(EntityRef e) { onGUIEvent(e, "onRectHovered"); }
 		void onRectHoveredOut(EntityRef e) { onGUIEvent(e, "onRectHoveredOut"); }
+		
+		void onRectMouseDown(EntityRef e, float x, float y) { 
+			if (!m_universe.hasComponent(e, LUA_SCRIPT_TYPE)) return;
 
+			for (int i = 0, c = getScriptCount(e); i < c; ++i)
+			{
+				auto* call = beginFunctionCall(e, i, "onRectMouseDown");
+				if (call) {
+					call->add(x);
+					call->add(y);
+					endFunctionCall();
+				}
+			}
+		}
 
 		LUMIX_FORCE_INLINE void onGUIEvent(EntityRef e, const char* event)
 		{
@@ -1172,7 +1185,6 @@ namespace Lumix
 			}
 		}
 
-
 		void startGame() override
 		{
 			m_animation_scene = (AnimationScene*)m_universe.getScene(crc32("animation"));
@@ -1183,6 +1195,7 @@ namespace Lumix
 				m_gui_scene->buttonClicked().bind<&LuaScriptSceneImpl::onButtonClicked>(this);
 				m_gui_scene->rectHovered().bind<&LuaScriptSceneImpl::onRectHovered>(this);
 				m_gui_scene->rectHoveredOut().bind<&LuaScriptSceneImpl::onRectHoveredOut>(this);
+				m_gui_scene->rectMouseDown().bind<&LuaScriptSceneImpl::onRectMouseDown>(this);
 			}
 		}
 
@@ -1194,6 +1207,7 @@ namespace Lumix
 				m_gui_scene->buttonClicked().unbind<&LuaScriptSceneImpl::onButtonClicked>(this);
 				m_gui_scene->rectHovered().unbind<&LuaScriptSceneImpl::onRectHovered>(this);
 				m_gui_scene->rectHoveredOut().unbind<&LuaScriptSceneImpl::onRectHoveredOut>(this);
+				m_gui_scene->rectMouseDown().unbind<&LuaScriptSceneImpl::onRectMouseDown>(this);
 			}
 			m_gui_scene = nullptr;
 			m_scripts_start_called = false;
