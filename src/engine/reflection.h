@@ -685,7 +685,8 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 	}
 	
 	Variant invoke(void* obj, Span<Variant> args) const override {
-		return ToVariant<R, Args...>::call((C*)obj, function, args, typename BuildIndices<-1, sizeof...(Args)>::result{});
+		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
+		return ToVariant<R, Args...>::call((C*)obj, function, args, indices);
 	}
 };
 
@@ -707,7 +708,8 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 	}
 
 	Variant invoke(void* obj, Span<Variant> args) const override {
-		return ToVariant<R, Args...>::call((const C*)obj, function, args, typename BuildIndices<-1, sizeof...(Args)>::result{});
+		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
+		return ToVariant<R, Args...>::call((const C*)obj, function, args, indices);
 	}
 };
 

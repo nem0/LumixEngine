@@ -1410,28 +1410,6 @@ namespace Lumix
 			lua_pop(scr.m_state, 2);
 			return res;
 		}
-		
-		template <> EntityPtr getProperty(Property& prop, const char* prop_name, ScriptInstance& scr) {
-			if (!scr.m_state) return {};
-
-			LuaWrapper::DebugGuard guard(scr.m_state);
-			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
-			lua_getfield(scr.m_state, -1, prop_name);
-			
-			if (!lua_istable(scr.m_state, -1)) {
-				lua_pop(scr.m_state, 2);
-				return INVALID_ENTITY;
-			}
-			
-			if (LuaWrapper::getField(scr.m_state, -1, "_entity") != LUA_TNUMBER) {
-				lua_pop(scr.m_state, 3);
-				return INVALID_ENTITY;
-			}
-			
-			EntityRef res = {LuaWrapper::toType<i32>(scr.m_state, -1)};
-			lua_pop(scr.m_state, 3);
-			return res;
-		}
 
 		void getProperty(Property& prop, const char* prop_name, ScriptInstance& scr, Span<char> out)
 		{
