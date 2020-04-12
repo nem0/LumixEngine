@@ -24,6 +24,15 @@ namespace OS
 
 enum class Keycode : u8;
 
+enum class CursorType {
+	DEFAULT,
+	SIZE_NS,
+	SIZE_WE,
+	SIZE_NWSE,
+	LOAD,
+	TEXT_INPUT
+};
+
 enum class ExecuteOpenResult : int
 {
 	SUCCESS,
@@ -198,6 +207,7 @@ LUMIX_ENGINE_API bool dirExists(const char* path);
 LUMIX_ENGINE_API u64 getLastModified(const char* file);
 LUMIX_ENGINE_API bool makePath(const char* path);
 
+LUMIX_ENGINE_API void setCursor(CursorType type);
 LUMIX_ENGINE_API void clipCursor(int screen_x, int screen_y, int w, int h);
 LUMIX_ENGINE_API void unclipCursor();
 

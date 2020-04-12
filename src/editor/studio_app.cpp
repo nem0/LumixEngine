@@ -721,7 +721,16 @@ struct StudioAppImpl final : StudioApp
 		io.MousePos.x = (float)cp.x;
 		io.MousePos.y = (float)cp.y;
 
+		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
 		ImGui::NewFrame();
+		switch (imgui_cursor) {
+			case ImGuiMouseCursor_Arrow: OS::setCursor(OS::CursorType::DEFAULT); break;
+			case ImGuiMouseCursor_ResizeNS: OS::setCursor(OS::CursorType::SIZE_NS); break;
+			case ImGuiMouseCursor_ResizeEW: OS::setCursor(OS::CursorType::SIZE_WE); break;
+			case ImGuiMouseCursor_ResizeNWSE: OS::setCursor(OS::CursorType::SIZE_NWSE); break;
+			case ImGuiMouseCursor_TextInput: OS::setCursor(OS::CursorType::TEXT_INPUT); break;
+			default: OS::setCursor(OS::CursorType::DEFAULT); break;
+		}
 		ImGui::PushFont(m_font);
 	}
 
@@ -1936,7 +1945,7 @@ struct StudioAppImpl final : StudioApp
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
 		io.IniFilename = nullptr;
-		io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports;
+		io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
 
 		initIMGUIPlatformIO();
 

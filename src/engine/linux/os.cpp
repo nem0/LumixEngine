@@ -693,6 +693,10 @@ void getKeyName(Keycode keycode, Span<char> out)
 	copyString(out, name ? name : keycode != Keycode::INVALID ? "N/A" : ""); 
 }
 
+void setCursor(CursorType type) {
+	//ASSERT(false);
+    // TODO
+}
 
 void showCursor(bool show)
 {

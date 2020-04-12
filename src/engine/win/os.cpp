@@ -30,6 +30,14 @@ static struct
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	bool raw_input_registered = false;
+	struct {
+		HCURSOR load;
+		HCURSOR size_ns;
+		HCURSOR size_we;
+		HCURSOR size_nwse;
+		HCURSOR arrow;
+		HCURSOR text_input;
+	} cursors;
 } G;
 
 
@@ -249,7 +257,7 @@ void logVersion() {
 	DWORD dwMajorVersion = 0;
 	DWORD dwMinorVersion = 0;
 	DWORD dwBuild = 0;
-
+	
 	#pragma warning(disable : 4996)
 	dwVersion = GetVersion();
 
@@ -605,8 +613,26 @@ void showCursor(bool show)
 }
 
 
-void init() {}
+void init() {
+	G.cursors.arrow = LoadCursor(NULL, IDC_ARROW);
+	G.cursors.text_input = LoadCursor(NULL, IDC_IBEAM);
+	G.cursors.load = LoadCursor(NULL, IDC_WAIT);
+	G.cursors.size_ns = LoadCursor(NULL, IDC_SIZENS);
+	G.cursors.size_we = LoadCursor(NULL, IDC_SIZEWE);
+	G.cursors.size_nwse = LoadCursor(NULL, IDC_SIZENWSE);
+}
 
+void setCursor(CursorType type) {
+	switch (type) {
+		case CursorType::DEFAULT: SetCursor(G.cursors.arrow); break;
+		case CursorType::LOAD: SetCursor(G.cursors.load); break;
+		case CursorType::SIZE_NS: SetCursor(G.cursors.size_ns); break;
+		case CursorType::SIZE_WE: SetCursor(G.cursors.size_we); break;
+		case CursorType::SIZE_NWSE: SetCursor(G.cursors.size_nwse); break;
+		case CursorType::TEXT_INPUT: SetCursor(G.cursors.text_input); break;
+		default: ASSERT(false); break;
+	}
+}
 
 void setWindowTitle(WindowHandle win, const char* title)
 {
