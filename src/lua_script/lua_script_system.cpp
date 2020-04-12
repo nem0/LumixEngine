@@ -917,6 +917,33 @@ namespace Lumix
 			return nullptr;
 		}
 
+		void applyEntityProperty(ScriptInstance& script, const char* name, Property& prop, const char* value)
+		{
+			LuaWrapper::DebugGuard guard(script.m_state);
+			lua_rawgeti(script.m_state, LUA_REGISTRYINDEX, script.m_environment); // [env]
+			ASSERT(lua_type(script.m_state, -1));
+			const EntityPtr e = fromString<EntityPtr>(value);
+
+			if (!e.isValid()) {
+				lua_newtable(script.m_state); // [env, {}]
+				lua_setfield(script.m_state, -2, name); // [env]
+				lua_pop(script.m_state, 1);
+				return;
+			}
+
+			lua_getglobal(script.m_state, "Lumix"); // [env, Lumix]
+			lua_getfield(script.m_state, -1, "Entity"); // [env, Lumix, Lumix.Entity]
+			lua_remove(script.m_state, -2); // [env, Lumix.Entity]
+			lua_getfield(script.m_state, -1, "new"); // [env, Lumix.Entity, Entity.new]
+			lua_pushvalue(script.m_state, -2); // [env, Lumix.Entity, Entity.new, Lumix.Entity]
+			lua_remove(script.m_state, -3); // [env, Entity.new, Lumix.Entity]
+			LuaWrapper::push(script.m_state, &m_universe); // [env, Entity.new, Lumix.Entity, universe]
+			LuaWrapper::push(script.m_state, e.index); // [env, Entity.new, Lumix.Entity, universe, entity_index]
+			const bool error = !LuaWrapper::pcall(script.m_state, 3, 1); // [env, entity]
+			ASSERT(!error);
+			lua_setfield(script.m_state, -2, name); // [env]
+			lua_pop(script.m_state, 1);
+		}
 
 		void applyResourceProperty(ScriptInstance& script, const char* name, Property& prop, const char* path)
 		{
@@ -964,6 +991,12 @@ namespace Lumix
 			if (prop.type == Property::RESOURCE)
 			{
 				applyResourceProperty(script, name, prop, value);
+				return;
+			}
+
+			if (prop.type == Property::ENTITY)
+			{
+				applyEntityProperty(script, name, prop, value);
 				return;
 			}
 
@@ -1286,6 +1319,28 @@ namespace Lumix
 			lua_pop(scr.m_state, 2);
 			return res;
 		}
+		
+		template <> EntityPtr getProperty(Property& prop, const char* prop_name, ScriptInstance& scr) {
+			if (!scr.m_state) return {};
+
+			LuaWrapper::DebugGuard guard(scr.m_state);
+			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
+			lua_getfield(scr.m_state, -1, prop_name);
+			
+			if (!lua_istable(scr.m_state, -1)) {
+				lua_pop(scr.m_state, 2);
+				return INVALID_ENTITY;
+			}
+			
+			if (LuaWrapper::getField(scr.m_state, -1, "_entity") != LUA_TNUMBER) {
+				lua_pop(scr.m_state, 3);
+				return INVALID_ENTITY;
+			}
+			
+			const EntityRef res = LuaWrapper::toType<EntityRef>(scr.m_state, -1);
+			lua_pop(scr.m_state, 3);
+			return res;
+		}
 
 		void getProperty(Property& prop, const char* prop_name, ScriptInstance& scr, Span<char> out)
 		{
@@ -1327,8 +1382,11 @@ namespace Lumix
 				break;
 				case Property::ENTITY:
 				{
-					EntityRef val = { (int)lua_tointeger(scr.m_state, -1) };
-					toCString(val.index, out);
+					EntityPtr e = INVALID_ENTITY;
+					if (LuaWrapper::getField(scr.m_state, -1, "_entity") == LUA_TNUMBER) {
+						e = { (i32)lua_tointeger(scr.m_state, -1) };
+					}
+					toCString(e.index, out);
 				}
 				break;
 				case Property::STRING:
