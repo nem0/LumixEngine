@@ -158,6 +158,21 @@ struct GUISystemImpl final : GUISystem
 		GUIScene::destroyInstance(static_cast<GUIScene*>(scene));
 	}
 
+	static int LUA_setCursor(lua_State* L) {
+		const int index = lua_upvalueindex(1);
+		const i32 type = LuaWrapper::checkArg<i32>(L, 1);
+		GUISystemImpl* system = LuaWrapper::toType<GUISystemImpl*>(L, index);
+		system->setCursor((OS::CursorType)type);
+		return 0;
+	}
+
+	static int LUA_enableCursor(lua_State* L) {
+		const bool enable = LuaWrapper::checkArg<bool>(L, 1);
+		const int index = lua_upvalueindex(1);
+		GUISystemImpl* system = LuaWrapper::toType<GUISystemImpl*>(L, index);
+		system->enableCursor(enable);
+		return 0;
+	}
 
 	static int LUA_GUIRect_getScreenRect(lua_State* L)
 	{
@@ -190,15 +205,19 @@ struct GUISystemImpl final : GUISystem
 		REGISTER_FUNCTION(enableCursor);
 
 		LuaWrapper::createSystemFunction(L, "Gui", "getScreenRect", LUA_GUIRect_getScreenRect);
+		LuaWrapper::createSystemClosure(L, "Gui", this, "enableCursor", LUA_enableCursor);
+		LuaWrapper::createSystemClosure(L, "Gui", this, "setCursor", LUA_setCursor);
 
 		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
 
 		#undef REGISTER_FUNCTION
 	}
 
+	void setCursor(OS::CursorType type) override {
+		if (m_interface) m_interface->setCursor(type);
+	}
 
-	void enableCursor(bool enable) override
-	{
+	void enableCursor(bool enable) override {
 		if (m_interface) m_interface->enableCursor(enable);
 	}
 

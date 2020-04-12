@@ -723,13 +723,15 @@ struct StudioAppImpl final : StudioApp
 
 		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
 		ImGui::NewFrame();
-		switch (imgui_cursor) {
-			case ImGuiMouseCursor_Arrow: OS::setCursor(OS::CursorType::DEFAULT); break;
-			case ImGuiMouseCursor_ResizeNS: OS::setCursor(OS::CursorType::SIZE_NS); break;
-			case ImGuiMouseCursor_ResizeEW: OS::setCursor(OS::CursorType::SIZE_WE); break;
-			case ImGuiMouseCursor_ResizeNWSE: OS::setCursor(OS::CursorType::SIZE_NWSE); break;
-			case ImGuiMouseCursor_TextInput: OS::setCursor(OS::CursorType::TEXT_INPUT); break;
-			default: OS::setCursor(OS::CursorType::DEFAULT); break;
+		if (!m_cursor_captured) {
+			switch (imgui_cursor) {
+				case ImGuiMouseCursor_Arrow: OS::setCursor(OS::CursorType::DEFAULT); break;
+				case ImGuiMouseCursor_ResizeNS: OS::setCursor(OS::CursorType::SIZE_NS); break;
+				case ImGuiMouseCursor_ResizeEW: OS::setCursor(OS::CursorType::SIZE_WE); break;
+				case ImGuiMouseCursor_ResizeNWSE: OS::setCursor(OS::CursorType::SIZE_NWSE); break;
+				case ImGuiMouseCursor_TextInput: OS::setCursor(OS::CursorType::TEXT_INPUT); break;
+				default: OS::setCursor(OS::CursorType::DEFAULT); break;
+			}
 		}
 		ImGui::PushFont(m_font);
 	}
@@ -1187,6 +1189,8 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	Gizmo::Config& getGizmoConfig() { return m_gizmo_config; }
+	
+	void setCursorCaptured(bool captured) override { m_cursor_captured = captured; }
 
 	void undo() { m_editor->undo(); }
 	void redo() { m_editor->redo(); }
@@ -3187,6 +3191,7 @@ struct StudioAppImpl final : StudioApp
 	Action* m_set_pivot_action;
 	Action* m_reset_pivot_action;
 	Gizmo::Config m_gizmo_config;
+	bool m_cursor_captured = false;
 	bool m_confirm_exit;
 	bool m_confirm_load;
 	bool m_confirm_new;

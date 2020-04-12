@@ -501,7 +501,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 		wc.cbWndExtra = 0;
 		wc.hInstance = GetModuleHandle(NULL);
 		wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-		wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+		wc.hCursor = NULL;
 		wc.hbrBackground = NULL;
 		wc.lpszClassName = cls_name;
 
