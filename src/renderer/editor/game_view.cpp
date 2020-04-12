@@ -38,6 +38,9 @@ struct GUIInterface : GUISystem::Interface
 	Vec2 getPos() const override { return m_game_view.m_pos; }
 	Vec2 getSize() const override { return m_game_view.m_size; }
 
+	void setCursor(OS::CursorType type) {
+		OS::setCursor(type);
+	}
 	
 	void enableCursor(bool enable) override
 	{ 
