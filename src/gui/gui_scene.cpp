@@ -536,7 +536,6 @@ struct GUISceneImpl final : GUIScene
 	float getRectBottomRelative(EntityRef entity) override { return m_rects[entity]->bottom.relative; }
 	void setRectBottomRelative(EntityRef entity, float value) override { m_rects[entity]->bottom.relative = value; }
 
-
 	void setTextFontSize(EntityRef entity, int value) override
 	{
 		GUIText* gui_text = m_rects[entity]->text;

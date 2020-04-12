@@ -2616,7 +2616,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
 		{
 			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
-			LuaWrapper::push(L, hit.entity);
+			LuaWrapper::pushEntity(L, hit.entity, &scene->m_universe);
 			LuaWrapper::push(L, hit.position);
 			LuaWrapper::push(L, hit.normal);
 			return 4;

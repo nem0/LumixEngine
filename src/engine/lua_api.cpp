@@ -621,30 +621,30 @@ static void LUA_startGame(Engine* engine, Universe* universe)
 }
 
 
-static bool LUA_createComponent(Universe* universe, EntityRef entity, const char* type)
+static bool LUA_createComponent(Universe* universe, i32 entity, const char* type)
 {
 	if (!universe) return false;
 	ComponentType cmp_type = Reflection::getComponentType(type);
 	IScene* scene = universe->getScene(cmp_type);
 	if (!scene) return false;
-	if (universe->hasComponent(entity, cmp_type))
+	if (universe->hasComponent({entity}, cmp_type))
 	{
-		logError("Lua Script") << "Component " << type << " already exists in entity " << entity.index;
+		logError("Lua Script") << "Component " << type << " already exists in entity " << entity;
 		return false;
 	}
 
-	universe->createComponent(cmp_type, entity);
+	universe->createComponent(cmp_type, {entity});
 	return true;
 }
 
 
-static bool LUA_hasComponent(Universe* universe, EntityRef entity, const char* type)
+static bool LUA_hasComponent(Universe* universe, i32 entity, const char* type)
 {
 	if (!universe) return false;
 	ComponentType cmp_type = Reflection::getComponentType(type);
 	IScene* scene = universe->getScene(cmp_type);
 	if (!scene) return false;
-	return universe->hasComponent(entity, cmp_type);
+	return universe->hasComponent({entity}, cmp_type);
 }
 
 
@@ -745,36 +745,53 @@ static int LUA_multVecQuat(lua_State* L)
 }
 
 
-static DVec3 LUA_getEntityPosition(Universe* universe, EntityRef entity)
+static DVec3 LUA_getEntityPosition(Universe* universe, i32 entity)
 {
-	return universe->getPosition(entity);
+	return universe->getPosition({entity});
 }
 
 
-static Quat LUA_getEntityRotation(Universe* universe, EntityRef entity)
+static Quat LUA_getEntityRotation(Universe* universe, i32 entity)
 {
-	return universe->getRotation(entity);
+	return universe->getRotation({entity});
 }
 
 
-static float LUA_getEntityScale(Universe* universe, EntityRef entity)
+static float LUA_getEntityScale(Universe* universe, i32 entity)
 {
-	return universe->getScale(entity);
+	return universe->getScale({entity});
 }
 
 
-static Vec3 LUA_getEntityDirection(Universe* universe, EntityRef entity)
+static i32 LUA_getFirstChild(Universe* universe, i32 entity)
 {
-	Quat rot = universe->getRotation(entity);
+	return universe->getFirstChild({entity}).index;
+}
+
+static i32 LUA_getParent(Universe* universe, i32 entity)
+{
+	return universe->getParent({entity}).index;
+}
+
+static void LUA_setParent(Universe* universe, i32 parent, i32 child)
+{
+	return universe->setParent({parent}, {child});
+}
+
+
+static Vec3 LUA_getEntityDirection(Universe* universe, i32 entity)
+{
+	Quat rot = universe->getRotation({entity});
 	return rot.rotate(Vec3(0, 0, 1));
 }
 
-static void LUA_setEntityScale(Universe* univ, EntityRef entity, float scale) { univ->setScale(entity, scale); }
-static void LUA_setEntityPosition(Universe* univ, EntityRef entity, const DVec3& pos) { univ->setPosition(entity, pos); }
+static void LUA_setEntityScale(Universe* univ, i32 entity, float scale) { univ->setScale({entity}, scale); }
+static void LUA_setEntityPosition(Universe* univ, i32 entity, const DVec3& pos) { univ->setPosition({entity}, pos); }
 static float LUA_getLastTimeDelta(Engine* engine) { return engine->getLastTimeDelta(); }
 static void LUA_unloadResource(Engine* engine, int resource_idx) { engine->unloadLuaResource(resource_idx); }
 static Universe* LUA_createUniverse(Engine* engine) { return &engine->createUniverse(false); }
 static void LUA_destroyUniverse(Engine* engine, Universe* universe) { engine->destroyUniverse(*universe); }
+static void LUA_destroyEntity(Universe* universe, i32 entity) { universe->destroyEntity({entity}); }
 static Universe* LUA_getSceneUniverse(IScene* scene) { return &scene->getUniverse(); }
 static void LUA_logError(const char* text) { logError("Lua Script") << text; }
 static void LUA_logInfo(const char* text) { logInfo("Lua Script") << text; }
@@ -886,7 +903,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 	}
 	EntityMap entity_map(engine->getAllocator());
 	if (engine->instantiatePrefab(*universe, *prefab, position, {0, 0, 0, 1}, 1, Ref(entity_map))) {
-		LuaWrapper::push(L, entity_map.m_map[0]);
+		LuaWrapper::pushEntity(L, entity_map.m_map[0], universe);
 		return 1;
 	}
 	luaL_error(L, "Failed to instantiate prefab");
@@ -906,6 +923,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(hasComponent);
 	REGISTER_FUNCTION(createEntity);
 	REGISTER_FUNCTION(createUniverse);
+	REGISTER_FUNCTION(destroyEntity);
 	REGISTER_FUNCTION(destroyUniverse);
 	//REGISTER_FUNCTION(getComponentType);
 	//REGISTER_FUNCTION(getComponentTypeByIndex);
@@ -914,6 +932,9 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(getEntityPosition);
 	REGISTER_FUNCTION(getEntityRotation);
 	REGISTER_FUNCTION(getEntityScale);
+	REGISTER_FUNCTION(getFirstChild);
+	REGISTER_FUNCTION(getParent);
+	REGISTER_FUNCTION(setParent);
 	//REGISTER_FUNCTION(getLastTimeDelta);
 	REGISTER_FUNCTION(getScene);
 	//REGISTER_FUNCTION(getSceneUniverse);
@@ -946,14 +967,10 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		} while(false)
 
 	//REGISTER_FUNCTION(cloneEntity);
-	REGISTER_FUNCTION(destroyEntity);
 	//REGISTER_FUNCTION(findByName);
-	REGISTER_FUNCTION(getFirstChild);
 	//REGISTER_FUNCTION(getFirstEntity);
 	//REGISTER_FUNCTION(getNextEntity);
 	//REGISTER_FUNCTION(getNextSibling);
-	REGISTER_FUNCTION(getParent);
-	REGISTER_FUNCTION(setParent);
 
 	#undef REGISTER_FUNCTION
 
@@ -1131,6 +1148,10 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 		function Lumix.Universe:createEntity()
 			local e = LumixAPI.createEntity(self.value)
 			return Lumix.Entity:new(self.value, e)
+		end
+		function Lumix.Universe:getScene(scene_name)
+			local scene = LumixAPI.getScene(self.value, scene_name)	
+			return Lumix[scene_name]:new(scene)
 		end
 		function Lumix.Universe:createEntityEx(desc)
 			local ent = self:createEntity()

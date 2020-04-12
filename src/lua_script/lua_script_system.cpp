@@ -654,12 +654,19 @@ namespace Lumix
 			void visit(const Reflection::Property<float>& prop) override { get(prop); }
 			void visit(const Reflection::Property<int>& prop) override { get(prop); }
 			void visit(const Reflection::Property<u32>& prop) override { get(prop); }
-			void visit(const Reflection::Property<EntityPtr>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec2>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec3>& prop) override { get(prop); }
 			void visit(const Reflection::Property<IVec3>& prop) override { get(prop); }
 			void visit(const Reflection::Property<Vec4>& prop) override { get(prop); }
 			void visit(const Reflection::Property<bool>& prop) override { get(prop); }
+
+			void visit(const Reflection::Property<EntityPtr>& prop) override { 
+				if (!isSameProperty(prop.name, prop_name)) return;
+				
+				const EntityPtr val = prop.get(cmp, idx);
+				found = true;
+				LuaWrapper::pushEntity(L, val, &cmp.scene->getUniverse());
+			}
 
 			void visit(const Reflection::Property<Path>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
@@ -746,7 +753,7 @@ namespace Lumix
 			LuaWrapper::DebugGuard guard(L, 1);
 			LuaWrapper::checkTableArg(L, 1); // self
 			const Universe* universe = LuaWrapper::checkArg<Universe*>(L, 2);
-			const EntityRef e = LuaWrapper::checkArg<EntityRef>(L, 3);
+			const EntityRef e = {LuaWrapper::checkArg<i32>(L, 3)};
 			
 			LuaWrapper::getField(L, 1, "cmp_type");
 			const int cmp_type = LuaWrapper::toType<int>(L, -1);
@@ -754,8 +761,8 @@ namespace Lumix
 			IScene* scene = universe->getScene(ComponentType{cmp_type});
 
 			lua_newtable(L);
-			LuaWrapper::setField(L, -1, "entity", e);
-			LuaWrapper::setField(L, -1, "scene", scene);
+			LuaWrapper::setField(L, -1, "_entity", e);
+			LuaWrapper::setField(L, -1, "_scene", scene);
 			lua_pushvalue(L, 1);
 			lua_setmetatable(L, -2);
 			return 1;
@@ -771,10 +778,10 @@ namespace Lumix
 			v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
 			const Reflection::ComponentBase* cmp = Reflection::getComponent(v.cmp.type);
 
-			lua_getfield(L, 1, "scene");
+			lua_getfield(L, 1, "_scene");
 			v.cmp.scene = LuaWrapper::toType<IScene*>(L, -1);
-			lua_getfield(L, 1, "entity");
-			v.cmp.entity = LuaWrapper::toType<EntityRef>(L, -1);
+			lua_getfield(L, 1, "_entity");
+			v.cmp.entity.index = LuaWrapper::toType<i32>(L, -1);
 			lua_pop(L, 2);
 
 			cmp->visit(v);
@@ -792,10 +799,10 @@ namespace Lumix
 			v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
 			const Reflection::ComponentBase* cmp = Reflection::getComponent(v.cmp.type);
 
-			lua_getfield(L, 1, "scene");
+			lua_getfield(L, 1, "_scene");
 			v.cmp.scene = LuaWrapper::toType<IScene*>(L, -1);
-			lua_getfield(L, 1, "entity");
-			v.cmp.entity = LuaWrapper::toType<EntityRef>(L, -1);
+			lua_getfield(L, 1, "_entity");
+			v.cmp.entity.index = LuaWrapper::toType<i32>(L, -1);
 			lua_pop(L, 2);
 
 			cmp->visit(v);
@@ -807,11 +814,95 @@ namespace Lumix
 			return 0;
 		}
 
+		static int lua_new_scene(lua_State* L) {
+			LuaWrapper::DebugGuard guard(L, 1);
+			LuaWrapper::checkTableArg(L, 1); // self
+			IScene* scene = LuaWrapper::checkArg<IScene*>(L, 2);
+			
+			lua_newtable(L);
+			LuaWrapper::setField(L, -1, "_scene", scene);
+			lua_pushvalue(L, 1);
+			lua_setmetatable(L, -2);
+			return 1;
+		}
+
+		static int lua_scene_call_member(lua_State* L) {
+			LuaWrapper::checkTableArg(L, 1); // self
+			if (LuaWrapper::getField(L, 1, "_scene") != LUA_TLIGHTUSERDATA) {
+				ASSERT(false);
+				return 0;
+			}
+			IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
+			lua_pop(L, 1);
+
+			Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+			Reflection::Variant args[64];
+			for (i32 i = 0; i < f->getArgCount(); ++i) {
+				Reflection::Variant::Type type = f->getArgType(i);
+				switch(type) {
+					case Reflection::Variant::BOOL: args[i] = LuaWrapper::toType<bool>(L, i + 2); break;
+					case Reflection::Variant::U32: args[i] = LuaWrapper::toType<u32>(L, i + 2); break;
+					case Reflection::Variant::I32: args[i] = LuaWrapper::toType<i32>(L, i + 2); break;
+					case Reflection::Variant::FLOAT: args[i] = LuaWrapper::toType<float>(L, i + 2); break;
+					case Reflection::Variant::CSTR: args[i] = LuaWrapper::toType<const char*>(L, i + 2); break;
+					case Reflection::Variant::ENTITY: args[i] = EntityPtr{LuaWrapper::toType<i32>(L, i + 2)}; break;
+					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 2); break;
+					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 2); break;
+					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 2); break;
+					default: ASSERT(false); break;
+				}
+			}
+			const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+			switch(res.type) {
+				case Reflection::Variant::VOID: return 0;
+				case Reflection::Variant::BOOL: LuaWrapper::push(L, res.b); break;
+				case Reflection::Variant::U32: LuaWrapper::push(L, res.u); break;
+				case Reflection::Variant::I32: LuaWrapper::push(L, res.i); break;
+				case Reflection::Variant::FLOAT: LuaWrapper::push(L, res.f); break;
+				case Reflection::Variant::CSTR: LuaWrapper::push(L, res.s); break;
+				case Reflection::Variant::ENTITY: LuaWrapper::pushEntity(L, res.e, &scene->getUniverse()); break;
+				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
+				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
+				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
+				default: ASSERT(false); break;
+			}
+			return 1;
+		}
+
 		void registerProperties()
 		{
-			int cmps_count = Reflection::getComponentTypesCount();
 			lua_State* L = m_system.m_engine.getState();
 			LuaWrapper::DebugGuard guard(L);
+
+			Reflection::SceneBase* scene = Reflection::getFirstScene();
+			while (scene) {
+				lua_newtable(L); // [ scene ]
+				lua_getglobal(L, "Lumix"); // [ scene, Lumix ]
+				lua_pushvalue(L, -2); // [ scene, Lumix, scene]
+				lua_setfield(L, -2, scene->name); // [ scene, Lumix ]
+				lua_pop(L, 1); // [ scene ]
+
+				lua_pushvalue(L, -1); // [ scene, scene ]
+				lua_setfield(L, -2, "__index"); // [ scene ]
+
+
+				lua_pushcfunction(L, lua_new_scene); // [ scene, fn_new_scene ]
+				lua_setfield(L, -2, "new"); // [ scene ]
+
+				for (const Reflection::FunctionBase* f :  scene->getFunctions()) {
+					const char* c = f->decl_code;
+					while (*c != ':') ++c;
+					c += 2;
+					lua_pushlightuserdata(L, (void*)f); // [scene, f]
+					lua_pushcclosure(L, lua_scene_call_member, 1); // [scene, fn]
+					lua_setfield(L, -2, c); // [scene]
+				}
+				lua_pop(L, 1); // []
+
+				scene = scene->next;
+			}
+
+			int cmps_count = Reflection::getComponentTypesCount();
 			for (int i = 0; i < cmps_count; ++i) {
 				const char* cmp_name = Reflection::getComponentTypeID(i);
 				const ComponentType cmp_type = Reflection::getComponentType(cmp_name);
@@ -1337,7 +1428,7 @@ namespace Lumix
 				return INVALID_ENTITY;
 			}
 			
-			const EntityRef res = LuaWrapper::toType<EntityRef>(scr.m_state, -1);
+			EntityRef res = {LuaWrapper::toType<i32>(scr.m_state, -1)};
 			lua_pop(scr.m_state, 3);
 			return res;
 		}

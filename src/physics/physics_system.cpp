@@ -58,8 +58,8 @@ namespace Lumix
 
 		static auto phy_scene = scene("physics",
 			functions(
-				function(LUMIX_FUNC(PhysicsScene::raycast)),
-				function(LUMIX_FUNC(PhysicsScene::raycastEx))
+				LUMIX_FUNC(PhysicsScene::raycast)
+				//function(LUMIX_FUNC(PhysicsScene::raycastEx))
 			),
 			component("ragdoll",
 				blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
@@ -108,7 +108,7 @@ namespace Lumix
 			),
 			component("physical_controller",
 				functions(
-					function(LUMIX_FUNC(PhysicsScene::moveController))
+					LUMIX_FUNC(PhysicsScene::moveController)
 				),
 				property("Radius", LUMIX_PROP(PhysicsScene, ControllerRadius)),
 				property("Height", LUMIX_PROP(PhysicsScene, ControllerHeight)),

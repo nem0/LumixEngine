@@ -224,7 +224,6 @@ inline EntityPtr::operator EntityRef() const
 	#pragma warning(disable : 4251)
 	// this is disabled because VS19 16.5.0 has false positives :(
 	#pragma warning(disable : 4724)
-	#pragma warning(disable : 4996)
 	#if _MSC_VER == 1900 
 		#pragma warning(disable : 4091)
 	#endif
