@@ -553,18 +553,6 @@ struct FunctionBase
 	virtual Variant invoke(void* obj, Span<Variant> args) const = 0;
 
 	const char* decl_code;
-
-	template <typename T> static T get(int i, Span<Variant> args);
-	template <> static bool get(int i, Span<Variant> args) { return args[i].b; }
-	template <> static float get(int i, Span<Variant> args) { return args[i].f; }
-	template <> static const char* get(int i, Span<Variant> args) { return args[i].s; }
-	template <> static i32 get(int i, Span<Variant> args) { return args[i].i; }
-	template <> static u32 get(int i, Span<Variant> args) { return args[i].u; }
-	template <> static Vec2 get(int i, Span<Variant> args) { return args[i].v2; }
-	template <> static Vec3 get(int i, Span<Variant> args) { return args[i].v3; }
-	template <> static DVec3 get(int i, Span<Variant> args) { return args[i].dv3; }
-	template <> static EntityPtr get(int i, Span<Variant> args) { return args[i].e; }
-	template <> static EntityRef get(int i, Span<Variant> args) { return (EntityRef)args[i].e; }
 };
 
 struct SceneBase
@@ -646,12 +634,24 @@ template <typename T> inline Variant::Type getVariantType() { return _getVariant
 
 template <typename F> struct Function;
 
+template <typename T> static T fromVariant(int i, Span<Variant> args);
+template <> static bool fromVariant(int i, Span<Variant> args) { return args[i].b; }
+template <> static float fromVariant(int i, Span<Variant> args) { return args[i].f; }
+template <> static const char* fromVariant(int i, Span<Variant> args) { return args[i].s; }
+template <> static i32 fromVariant(int i, Span<Variant> args) { return args[i].i; }
+template <> static u32 fromVariant(int i, Span<Variant> args) { return args[i].u; }
+template <> static Vec2 fromVariant(int i, Span<Variant> args) { return args[i].v2; }
+template <> static Vec3 fromVariant(int i, Span<Variant> args) { return args[i].v3; }
+template <> static DVec3 fromVariant(int i, Span<Variant> args) { return args[i].dv3; }
+template <> static EntityPtr fromVariant(int i, Span<Variant> args) { return args[i].e; }
+template <> static EntityRef fromVariant(int i, Span<Variant> args) { return (EntityRef)args[i].e; }
+
 template <typename T, typename... Args>
 struct ToVariant {
 	template <typename C, typename F, int... I>
 	static Variant call(C* inst, F f, Span<Variant> args, Indices<I...>& indices) {
 		Variant v;
-		v = (inst->*f)(FunctionBase::get<RemoveCVR<Args>>(I, args)...);
+		v = (inst->*f)(fromVariant<RemoveCVR<Args>>(I, args)...);
 		return v;
 	}
 };
@@ -662,7 +662,7 @@ struct ToVariant<void, Args...> {
 	static Variant call(C* inst, F f, Span<Variant> args, Indices<I...>& indices) {
 		Variant v;
 		v.type = Variant::VOID;
-		(inst->*f)(FunctionBase::get<RemoveCVR<Args>>(I, args)...);
+		(inst->*f)(fromVariant<RemoveCVR<Args>>(I, args)...);
 		return v;
 	}
 };
