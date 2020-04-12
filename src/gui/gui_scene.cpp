@@ -168,6 +168,7 @@ struct GUISceneImpl final : GUIScene
 		, m_canvas(allocator)
 		, m_rect_hovered(allocator)
 		, m_rect_hovered_out(allocator)
+		, m_rect_mouse_down(allocator)
 		, m_unhandled_mouse_button(allocator)
 		, m_button_clicked(allocator)
 		, m_buttons_down_count(0)
@@ -461,9 +462,10 @@ struct GUISceneImpl final : GUIScene
 
 		return intersect ? rect.entity : INVALID_ENTITY;
 	}
+	
+	EntityPtr getRectAt(const Vec2& pos) const override { return getRectAtEx(pos, m_canvas_size); }
 
-
-	EntityPtr getRectAt(const Vec2& pos, const Vec2& canvas_size) const override
+	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size) const override
 	{
 		for (const GUICanvas& canvas : m_canvas) {
 			const int idx = m_rects.find(canvas.entity);
@@ -490,17 +492,17 @@ struct GUISceneImpl final : GUIScene
 
 	Rect getRect(EntityRef entity) const override
 	{
-		return getRectOnCanvas(entity, m_canvas_size);
+		return getRectEx(entity, m_canvas_size);
 	}
 
 
-	Rect getRectOnCanvas(EntityPtr entity, const Vec2& canvas_size) const override
+	Rect getRectEx(EntityPtr entity, const Vec2& canvas_size) const override
 	{
 		if (!entity.isValid()) return { 0, 0, canvas_size.x, canvas_size.y };
 		int idx = m_rects.find((EntityRef)entity);
 		if (idx < 0) return { 0, 0, canvas_size.x, canvas_size.y };
 		EntityPtr parent = m_universe.getParent((EntityRef)entity);
-		Rect parent_rect = getRectOnCanvas(parent, canvas_size);
+		Rect parent_rect = getRectEx(parent, canvas_size);
 		GUIRect* gui = m_rects[(EntityRef)entity];
 		float l = parent_rect.x + parent_rect.w * gui->left.relative + gui->left.points;
 		float r = parent_rect.x + parent_rect.w * gui->right.relative + gui->right.points;
@@ -704,37 +706,40 @@ struct GUISceneImpl final : GUIScene
 		const Rect& r = getRectOnCanvas(parent_rect, rect);
 		bool handled = false;
 		
-		if (contains(r, pos) && contains(r, m_mouse_down_pos)) {
-			auto button_iter = m_buttons.find(rect.entity);
-			if (button_iter.isValid())
-			{
-				handled = true;
-				if (is_up && isButtonDown(rect.entity))
+		if (contains(r, pos)) {
+			m_rect_mouse_down.invoke(rect.entity, event.data.button.x, event.data.button.y);
+			if (contains(r, m_mouse_down_pos)) {
+				auto button_iter = m_buttons.find(rect.entity);
+				if (button_iter.isValid())
 				{
-					m_focused_entity = INVALID_ENTITY;
-					m_button_clicked.invoke(rect.entity);
-				}
-				if (!is_up)
-				{
-					if (m_buttons_down_count < lengthOf(m_buttons_down))
+					handled = true;
+					if (is_up && isButtonDown(rect.entity))
 					{
-						m_buttons_down[m_buttons_down_count] = rect.entity;
-						++m_buttons_down_count;
+						m_focused_entity = INVALID_ENTITY;
+						m_button_clicked.invoke(rect.entity);
 					}
-					else
+					if (!is_up)
 					{
-						logError("GUI") << "Too many buttons pressed at once";
+						if (m_buttons_down_count < lengthOf(m_buttons_down))
+						{
+							m_buttons_down[m_buttons_down_count] = rect.entity;
+							++m_buttons_down_count;
+						}
+						else
+						{
+							logError("GUI") << "Too many buttons pressed at once";
+						}
 					}
 				}
-			}
 			
-			if (rect.input_field && is_up) {
-				handled = true;
-				m_focused_entity = rect.entity;
-				if (rect.text)
-				{
-					rect.input_field->cursor = rect.text->text.length();
-					rect.input_field->anim = 0;
+				if (rect.input_field && is_up) {
+					handled = true;
+					m_focused_entity = rect.entity;
+					if (rect.text)
+					{
+						rect.input_field->cursor = rect.text->text.length();
+						rect.input_field->anim = 0;
+					}
 				}
 			}
 		}
@@ -1221,6 +1226,7 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)>& buttonClicked() override { return m_button_clicked; }
 	DelegateList<void(EntityRef)>& rectHovered() override { return m_rect_hovered; }
 	DelegateList<void(EntityRef)>& rectHoveredOut() override { return m_rect_hovered_out; }
+	DelegateList<void(EntityRef, float, float)>& rectMouseDown() override { return m_rect_mouse_down; }
 	DelegateList<void(bool, int, int)>& mousedButtonUnhandled() override { return m_unhandled_mouse_button; }
 
 	Universe& getUniverse() override { return m_universe; }
@@ -1243,6 +1249,7 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)> m_button_clicked;
 	DelegateList<void(EntityRef)> m_rect_hovered;
 	DelegateList<void(EntityRef)> m_rect_hovered_out;
+	DelegateList<void(EntityRef, float, float)> m_rect_mouse_down;
 	DelegateList<void(bool, i32, i32)> m_unhandled_mouse_button;
 };
 

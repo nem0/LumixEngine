@@ -42,9 +42,10 @@ struct GUIScene : IScene
 	virtual IVec2 getCursorPosition() = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
-	virtual Rect getRectOnCanvas(EntityPtr entity, const Vec2& canva_size) const = 0;
+	virtual Rect getRectEx(EntityPtr entity, const Vec2& canva_size) const = 0;
 	virtual Rect getRect(EntityRef entity) const = 0;
-	virtual EntityPtr getRectAt(const Vec2& pos, const Vec2& canvas_size) const = 0;
+	virtual EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size) const = 0;
+	virtual EntityPtr getRectAt(const Vec2& pos) const = 0;
 
 	virtual void enableRect(EntityRef entity, bool enable) = 0;
 	virtual bool isRectEnabled(EntityRef entity) = 0;
@@ -100,6 +101,7 @@ struct GUIScene : IScene
 	virtual DelegateList<void(EntityRef)>& buttonClicked() = 0;
 	virtual DelegateList<void(EntityRef)>& rectHovered() = 0;
 	virtual DelegateList<void(EntityRef)>& rectHoveredOut() = 0;
+	virtual DelegateList<void(EntityRef, float, float)>& rectMouseDown() = 0;
 	virtual DelegateList<void(bool, i32, i32)>& mousedButtonUnhandled() = 0;
 };
 

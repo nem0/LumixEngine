@@ -273,7 +273,7 @@ private:
 		EntityRef e = selected_entities[0];
 		if (!scene.hasGUI(e)) return MouseMode::NONE;
 
-		const GUIScene::Rect rect = scene.getRectOnCanvas(e, canvas_size);
+		const GUIScene::Rect rect = scene.getRectEx(e, canvas_size);
 		const Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
 		draw.addRect({ rect.x, rect.y }, bottom_right, Color::BLACK, 1);
 		draw.addRect({ rect.x - 1, rect.y - 1 }, bottom_right + Vec2(1, 1), Color::WHITE, 1);
@@ -451,7 +451,7 @@ private:
 
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
-				EntityPtr e = scene->getRectAt(toLumix(mouse_canvas_pos), toLumix(size));
+				EntityPtr e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size));
 				if (e.isValid()) {
 					EntityRef r = (EntityRef)e;
 					m_editor->selectEntities(&r, 1, false);
@@ -620,8 +620,8 @@ private:
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 
 		EntityRef parent = (EntityRef)scene->getUniverse().getParent(entity);
-		GUIScene::Rect parent_rect = scene->getRectOnCanvas(parent, canvas_size);
-		GUIScene::Rect child_rect = scene->getRectOnCanvas(entity, canvas_size);
+		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
+		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
 
 		m_editor->beginCommandGroup(crc32("make_gui_rect_absolute"));
 
@@ -757,8 +757,8 @@ private:
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 		
 		EntityPtr parent = scene->getUniverse().getParent(entity);
-		GUIScene::Rect parent_rect = scene->getRectOnCanvas(parent, canvas_size);
-		GUIScene::Rect child_rect = scene->getRectOnCanvas(entity, canvas_size);
+		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
+		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
 
 		m_editor->beginCommandGroup(crc32("make_gui_rect_relative"));
 		
