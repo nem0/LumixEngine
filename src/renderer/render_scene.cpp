@@ -2989,7 +2989,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 
 	REGISTER_FUNCTION(setGlobalLODMultiplier);
 	REGISTER_FUNCTION(getGlobalLODMultiplier);
-	REGISTER_FUNCTION(getActiveEnvironment);
+	//REGISTER_FUNCTION(getActiveEnvironment);
 	REGISTER_FUNCTION(getModelInstanceModel);
 	REGISTER_FUNCTION(addDebugCross);
 	REGISTER_FUNCTION(addDebugLine);

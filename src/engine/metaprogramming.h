@@ -190,7 +190,7 @@ constexpr void apply(const F& f, Tuple& t)
 
 template <typename T> struct ResultOf;
 template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)> { using Type = R; };
-template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...)const> { using Type = R; };
+template <typename R, typename C, typename... Args> struct ResultOf<R(C::*)(Args...) const> { using Type = R; };
 template <typename R, typename C> struct ResultOf<R(C::*)> { using Type = R; };
 
 

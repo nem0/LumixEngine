@@ -56,7 +56,6 @@ struct ComponentTypeData
 };
 
 
-static IAllocator* g_allocator = nullptr;
 
 
 struct ComponentLink
@@ -66,7 +65,9 @@ struct ComponentLink
 };
 
 
+static IAllocator* g_allocator = nullptr;
 static ComponentLink* g_first_component = nullptr;
+static SceneBase* g_first_scene = nullptr;
 
 
 const ComponentBase* getComponent(ComponentType cmp_type)
@@ -90,8 +91,12 @@ void registerComponent(const ComponentBase& desc)
 	g_first_component = link;
 }
 
+SceneBase* getFirstScene() { return g_first_scene; }
 
-void registerScene(const SceneBase& scene) {
+void registerScene(SceneBase& scene) {
+	if(g_first_scene) scene.next = g_first_scene;
+	g_first_scene = &scene;
+
 	for (const ComponentBase* cmp : scene.getComponents()) {
 		registerComponent(*cmp);
 	}

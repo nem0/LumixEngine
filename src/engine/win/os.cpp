@@ -250,6 +250,7 @@ void logVersion() {
 	DWORD dwMinorVersion = 0;
 	DWORD dwBuild = 0;
 
+	#pragma warning(disable : 4996)
 	dwVersion = GetVersion();
 
 	dwMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
