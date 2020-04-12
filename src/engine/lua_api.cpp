@@ -1033,15 +1033,15 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "Unindent", &LuaWrapper::wrap<&ImGui::Unindent>);
 	LuaImGui::registerCFunction(L, "LabelText", &LuaImGui::LabelText);
 
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_DEVICE_KEYBOARD", InputSystem::Device::KEYBOARD);
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_DEVICE_MOUSE", InputSystem::Device::MOUSE);
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_DEVICE_CONTROLLER", InputSystem::Device::CONTROLLER);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_DEVICE_KEYBOARD", InputSystem::Device::KEYBOARD);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_DEVICE_MOUSE", InputSystem::Device::MOUSE);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_DEVICE_CONTROLLER", InputSystem::Device::CONTROLLER);
 
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_BUTTON", InputSystem::Event::BUTTON);
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_AXIS", InputSystem::Event::AXIS);
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_TEXT_INPUT", InputSystem::Event::TEXT_INPUT);
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_DEVICE_ADDED", InputSystem::Event::DEVICE_ADDED);
-	LuaWrapper::createSystemVariable(L, "Engine", "INPUT_EVENT_DEVICE_REMOVED", InputSystem::Event::DEVICE_REMOVED);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_EVENT_BUTTON", InputSystem::Event::BUTTON);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_EVENT_AXIS", InputSystem::Event::AXIS);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_EVENT_TEXT_INPUT", InputSystem::Event::TEXT_INPUT);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_EVENT_DEVICE_ADDED", InputSystem::Event::DEVICE_ADDED);
+	LuaWrapper::createSystemVariable(L, "LumixAPI", "INPUT_EVENT_DEVICE_REMOVED", InputSystem::Event::DEVICE_REMOVED);
 
 	lua_pop(L, 1);
 
