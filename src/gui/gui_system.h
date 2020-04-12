@@ -26,6 +26,7 @@ struct GUISystem : IPlugin
 
 	virtual void setInterface(Interface* interface) = 0;
 	virtual void enableCursor(bool enable) = 0;
+	virtual void setCursor(OS::CursorType type) = 0;
 	virtual Engine& getEngine() = 0;
 };
 

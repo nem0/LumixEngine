@@ -3,6 +3,7 @@
 
 #include "editor/studio_app.h"
 #include "engine/math.h"
+#include "engine/os.h"
 #include "renderer/gpu/gpu.h"
 
 
@@ -30,6 +31,7 @@ public:
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
 	void enableIngameCursor(bool enable);
+	void setCursor(OS::CursorType type);
 	void forceViewport(bool enable, int w, int h);
 	const char* getName() const override { return "game_view"; }
 	bool isOpen() const { return m_is_open; }
@@ -62,6 +64,7 @@ private:
 	bool m_paused;
 	bool m_is_fullscreen;
 	bool m_show_stats;
+	OS::CursorType m_cursor_type = OS::CursorType::DEFAULT;
 	struct
 	{
 		bool enabled = false;
