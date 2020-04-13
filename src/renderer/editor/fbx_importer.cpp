@@ -433,9 +433,9 @@ static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx
 		const ofbx::Vec3 v0 = vertices[i + 0];
 		const ofbx::Vec3 v1 = vertices[i + 1];
 		const ofbx::Vec3 v2 = vertices[i + 2];
-		const ofbx::Vec2 uv0 = uvs[0];
-		const ofbx::Vec2 uv1 = uvs[1];
-		const ofbx::Vec2 uv2 = uvs[2];
+		const ofbx::Vec2 uv0 = uvs[i + 0];
+		const ofbx::Vec2 uv1 = uvs[i + 1];
+		const ofbx::Vec2 uv2 = uvs[i + 2];
 
 		const ofbx::Vec3 dv10 = v1 - v0;
 		const ofbx::Vec3 dv20 = v2 - v0;
@@ -447,7 +447,13 @@ static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx
 		tangent.x = (dv20.x * duv10.y - dv10.x * duv20.y) * dir;
 		tangent.y = (dv20.y * duv10.y - dv10.y * duv20.y) * dir;
 		tangent.z = (dv20.z * duv10.y - dv10.z * duv20.y) * dir;
-		out[i] = tangent;
+		const float l = 1 / sqrtf(float(tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z));
+		tangent.x *= l;
+		tangent.y *= l;
+		tangent.z *= l;
+		out[i + 0] = tangent;
+		out[i + 1] = tangent;
+		out[i + 2] = tangent;
 	}
 }
 
