@@ -846,6 +846,7 @@ struct GUISceneImpl final : GUIScene
 				case InputSystem::Event::BUTTON:
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
+						if (event.data.button.key_id != (u32)OS::MouseButton::LEFT) break;
 						if (event.data.button.down)
 						{
 							m_mouse_down_pos.x = event.data.button.x;
