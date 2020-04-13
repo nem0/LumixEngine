@@ -124,7 +124,7 @@ struct InputSystemImpl final : InputSystem
 				input_event.data.axis.x_abs = (float)cp.x - mouse_base_x;
 				input_event.data.axis.y_abs = (float)cp.y - mouse_base_y;
 				input_event.data.axis.x = (float)event.mouse_move.xrel;
-				input_event.data.axis.y = (float)event.mouse_move.xrel;
+				input_event.data.axis.y = (float)event.mouse_move.yrel;
 				injectEvent(input_event);
 				break;
 			}
