@@ -1135,12 +1135,22 @@ struct GUISceneImpl final : GUIScene
 		u32 count = serializer.read<u32>();
 		for (u32 i = 0; i < count; ++i)
 		{
-			GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-			serializer.read(rect->flags);
-			serializer.read(rect->entity);
-			if (rect->flags.isSet(GUIRect::IS_VALID)) {
-				rect->entity = entity_map.get(rect->entity);
+			u32 flags;
+			EntityRef entity;
+			serializer.read(flags);
+			serializer.read(entity);
+
+			entity = entity_map.get(entity);
+			int idx = m_rects.find(entity);
+			if (idx < 0) {
+				GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
+				idx = m_rects.insert(entity, rect);
 			}
+			GUIRect* rect = m_rects.at(idx);
+			static_assert(sizeof(flags) == sizeof(rect->flags));
+			rect->entity = entity;
+			rect->flags.base = flags;
+
 			serializer.read(rect->top);
 			serializer.read(rect->right);
 			serializer.read(rect->bottom);
