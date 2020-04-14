@@ -525,7 +525,7 @@ inline void pushEntity(lua_State* L, EntityPtr value, Universe* universe)
 	lua_getfield(L, -1, "new"); // [Lumix.Entity, Entity.new]
 	lua_pushvalue(L, -2); // [Lumix.Entity, Entity.new, Lumix.Entity]
 	lua_remove(L, -3); // [Entity.new, Lumix.Entity]
-	lua_pushlightuserdata(L, &universe); // [Entity.new, Lumix.Entity, universe]
+	lua_pushlightuserdata(L, universe); // [Entity.new, Lumix.Entity, universe]
 	lua_pushnumber(L, value.index); // [Entity.new, Lumix.Entity, universe, entity_index]
 	const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
 	ASSERT(!error);
