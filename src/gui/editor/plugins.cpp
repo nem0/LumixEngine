@@ -273,11 +273,33 @@ private:
 		EntityRef e = selected_entities[0];
 		if (!scene.hasGUI(e)) return MouseMode::NONE;
 
+		const EntityPtr parent = scene.getUniverse().getParent(e);
 		const GUIScene::Rect rect = scene.getRectEx(e, canvas_size);
+		GUIScene::Rect parent_rect = scene.getRectEx(parent, canvas_size);
+
+		const float br = scene.getRectBottomRelative(e);
+		const float tr = scene.getRectTopRelative(e);
+		const float lr = scene.getRectLeftRelative(e);
+		const float rr = scene.getRectRightRelative(e);
+
 		const Vec2 bottom_right = { rect.x + rect.w, rect.y + rect.h };
 		draw.addRect({ rect.x, rect.y }, bottom_right, Color::BLACK, 1);
 		draw.addRect({ rect.x - 1, rect.y - 1 }, bottom_right + Vec2(1, 1), Color::WHITE, 1);
 		const Vec2 mid = { rect.x + rect.w * 0.5f, rect.y + rect.h * 0.5f };
+
+		auto drawAnchor = [&draw](const Vec2& pos, bool top, bool left){
+			const float SIZE = 10;
+			const Vec2 h = left ? Vec2(-SIZE, 0) : Vec2(SIZE, 0);
+			const Vec2 v = top ? Vec2(0, -SIZE) : Vec2(0, SIZE);
+			draw.addLine(pos, pos + v, Color::RED, 1);
+			draw.addLine(pos + h, pos + v, Color::RED, 1);
+			draw.addLine(pos + h, pos, Color::RED, 1);
+		};
+
+		drawAnchor(Vec2(parent_rect.x + parent_rect.w * lr, parent_rect.y + parent_rect.h * tr), true, true);
+		drawAnchor(Vec2(parent_rect.x + parent_rect.w * lr, parent_rect.y + parent_rect.h * br), false, true);
+		drawAnchor(Vec2(parent_rect.x + parent_rect.w * rr, parent_rect.y + parent_rect.h * br), false, false);
+		drawAnchor(Vec2(parent_rect.x + parent_rect.w * rr, parent_rect.y + parent_rect.h * tr), true, false);
 
 		auto drawHandle = [&](const Vec2& pos, const ImVec2& mouse_pos) {
 			const float SIZE = 5;
@@ -408,23 +430,27 @@ private:
 				{
 					case MouseMode::RESIZE:
 					{
+						m_editor->beginCommandGroup(crc32("gui_mouse_resize"));
 						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
-						scene->setRectBottomPoints(e, b);
+						setRectProperty(e, "Bottom Points", b);
 						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
-						scene->setRectRightPoints(e, r);
+						setRectProperty(e, "Right Points", r);
+						m_editor->endCommandGroup();
 					}
 					break;
 					case MouseMode::MOVE:
 					{
+						m_editor->beginCommandGroup(crc32("gui_mouse_move"));
 						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
-						scene->setRectBottomPoints(e, b);
+						setRectProperty(e, "Bottom Points", b);
 						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
-						scene->setRectRightPoints(e, r);
+						setRectProperty(e, "Right Points", r);
 
 						float t = m_top_left_start_move.y + ImGui::GetMouseDragDelta(0).y;
-						scene->setRectTopPoints(e, t);
+						setRectProperty(e, "Top Points", t);
 						float l = m_top_left_start_move.x + ImGui::GetMouseDragDelta(0).x;
-						scene->setRectLeftPoints(e, l);
+						setRectProperty(e, "Left Points", l);
+						m_editor->endCommandGroup();
 					}
 					break;
 				}
@@ -466,6 +492,36 @@ private:
 			if (has_rect && ImGui::BeginPopupContextItem("context"))
 			{
 				EntityRef e = m_editor->getSelectedEntities()[0];
+				if (ImGui::BeginMenu("Create child"))
+				{
+					if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE);
+					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE);
+					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE);
+					if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE);
+					if (ImGui::MenuItem("Render target")) createChild(e, GUI_RENDER_TARGET_TYPE);
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Align"))
+				{
+					if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP);
+					if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM);
+					if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT);
+					if (ImGui::MenuItem("Center horizontal")) align(e, (u8)EdgeMask::CENTER_HORIZONTAL);
+					if (ImGui::MenuItem("Center vertical")) align(e, (u8)EdgeMask::CENTER_VERTICAL);
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Expand"))
+				{
+					if (ImGui::MenuItem("All")) expand(e, (u8)EdgeMask::ALL);
+					if (ImGui::MenuItem("Top")) expand(e, (u8)EdgeMask::TOP);
+					if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM);
+					if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT);
+					if (ImGui::MenuItem("Horizontal")) expand(e, (u8)EdgeMask::HORIZONTAL);
+					if (ImGui::MenuItem("Vertical")) expand(e, (u8)EdgeMask::VERTICAL);
+					ImGui::EndMenu();
+				}
 				if (ImGui::BeginMenu("Make relative"))
 				{
 					if (ImGui::MenuItem("All")) makeRelative(e, toLumix(size), (u8)EdgeMask::ALL);
@@ -485,25 +541,16 @@ private:
 					if (ImGui::MenuItem("Left")) makeAbsolute(e, toLumix(size), (u8)EdgeMask::LEFT);
 					ImGui::EndMenu();
 				}
-				if (ImGui::BeginMenu("Expand"))
-				{
-					if (ImGui::MenuItem("All")) expand(e, (u8)EdgeMask::ALL);
-					if (ImGui::MenuItem("Top")) expand(e, (u8)EdgeMask::TOP);
-					if (ImGui::MenuItem("Right")) expand(e, (u8)EdgeMask::RIGHT);
-					if (ImGui::MenuItem("Bottom")) expand(e, (u8)EdgeMask::BOTTOM);
-					if (ImGui::MenuItem("Left")) expand(e, (u8)EdgeMask::LEFT);
-					if (ImGui::MenuItem("Horizontal")) expand(e, (u8)EdgeMask::HORIZONTAL);
-					if (ImGui::MenuItem("Vertical")) expand(e, (u8)EdgeMask::VERTICAL);
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Align"))
-				{
-					if (ImGui::MenuItem("Top")) align(e, (u8)EdgeMask::TOP);
-					if (ImGui::MenuItem("Right")) align(e, (u8)EdgeMask::RIGHT);
-					if (ImGui::MenuItem("Bottom")) align(e, (u8)EdgeMask::BOTTOM);
-					if (ImGui::MenuItem("Left")) align(e, (u8)EdgeMask::LEFT);
-					if (ImGui::MenuItem("Center horizontal")) align(e, (u8)EdgeMask::CENTER_HORIZONTAL);
-					if (ImGui::MenuItem("Center vertical")) align(e, (u8)EdgeMask::CENTER_VERTICAL);
+				if (ImGui::BeginMenu("Anchor")) {
+					if (ImGui::MenuItem("Center")) anchor(e, (u8)EdgeMask::CENTER_HORIZONTAL |  (u8)EdgeMask::CENTER_VERTICAL);
+					if (ImGui::MenuItem("Left middle")) anchor(e, (u8)EdgeMask::LEFT |  (u8)EdgeMask::CENTER_VERTICAL);
+					if (ImGui::MenuItem("Right middle")) anchor(e, (u8)EdgeMask::RIGHT |  (u8)EdgeMask::CENTER_VERTICAL);
+					if (ImGui::MenuItem("Top center")) anchor(e, (u8)EdgeMask::TOP |  (u8)EdgeMask::CENTER_HORIZONTAL);
+					if (ImGui::MenuItem("Bottom center")) anchor(e, (u8)EdgeMask::BOTTOM |  (u8)EdgeMask::CENTER_HORIZONTAL);
+					if (ImGui::MenuItem("Top left")) anchor(e, (u8)EdgeMask::TOP |  (u8)EdgeMask::LEFT);
+					if (ImGui::MenuItem("Top right")) anchor(e, (u8)EdgeMask::TOP |  (u8)EdgeMask::RIGHT);
+					if (ImGui::MenuItem("Bottom left")) anchor(e, (u8)EdgeMask::BOTTOM |  (u8)EdgeMask::LEFT);
+					if (ImGui::MenuItem("Bottom right")) anchor(e, (u8)EdgeMask::BOTTOM |  (u8)EdgeMask::RIGHT);
 					ImGui::EndMenu();
 				}
 				if (ImGui::BeginMenu("Copy position"))
@@ -518,16 +565,6 @@ private:
 					ImGui::EndMenu();
 				}
 				if (ImGui::MenuItem("Paste")) paste(e);
-
-				if (ImGui::BeginMenu("Create child"))
-				{
-					if (ImGui::MenuItem("Button")) createChild(e, GUI_BUTTON_TYPE);
-					if (ImGui::MenuItem("Image")) createChild(e, GUI_IMAGE_TYPE);
-					if (ImGui::MenuItem("Rect")) createChild(e, GUI_RECT_TYPE);
-					if (ImGui::MenuItem("Text")) createChild(e, GUI_TEXT_TYPE);
-					if (ImGui::MenuItem("Render target")) createChild(e, GUI_RENDER_TARGET_TYPE);
-					ImGui::EndMenu();
-				}
 
 				if (ImGui::BeginMenu("Layout")) {
 					static int cols = 1;
@@ -615,8 +652,7 @@ private:
 	}
 
 
-	void makeAbsolute(EntityRef entity, const Vec2& canvas_size, u8 mask)
-	{
+	void makeAbsolute(EntityRef entity, const Vec2& canvas_size, u8 mask) {
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 
 		EntityRef parent = (EntityRef)scene->getUniverse().getParent(entity);
@@ -625,26 +661,22 @@ private:
 
 		m_editor->beginCommandGroup(crc32("make_gui_rect_absolute"));
 
-		if (mask & (u8)EdgeMask::TOP)
-		{
+		if (mask & (u8)EdgeMask::TOP) {
 			setRectProperty(entity, "Top Relative", 0);
 			setRectProperty(entity, "Top Points", child_rect.y - parent_rect.y);
 		}
 		
-		if (mask & (u8)EdgeMask::LEFT)
-		{
+		if (mask & (u8)EdgeMask::LEFT) {
 			setRectProperty(entity, "Left Relative", 0);
 			setRectProperty(entity, "Left Points", child_rect.x - parent_rect.x);
 		}
 
-		if (mask & (u8)EdgeMask::RIGHT)
-		{
+		if (mask & (u8)EdgeMask::RIGHT) {
 			setRectProperty(entity, "Right Relative", 0);
 			setRectProperty(entity, "Right Points", child_rect.x + child_rect.w - parent_rect.x);
 		}
 		
-		if (mask & (u8)EdgeMask::BOTTOM)
-		{
+		if (mask & (u8)EdgeMask::BOTTOM) {
 			setRectProperty(entity, "Bottom Relative", 0);
 			setRectProperty(entity, "Bottom Points", child_rect.y + child_rect.h - parent_rect.y);
 		}
@@ -652,6 +684,48 @@ private:
 		m_editor->endCommandGroup();
 	}
 
+	void anchor(EntityRef entity, u8 mask) {
+		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
+
+		m_editor->beginCommandGroup(crc32("anchor_gui_rect"));
+
+		float br = scene->getRectBottomRelative(entity);
+		float tr = scene->getRectTopRelative(entity);
+		float rr = scene->getRectRightRelative(entity);
+		float lr = scene->getRectLeftRelative(entity);
+
+		if (mask & (u8)EdgeMask::TOP) {
+			setRectProperty(entity, "Bottom Relative", 0);
+			setRectProperty(entity, "Top Relative", 0);
+		}
+
+		if (mask & (u8)EdgeMask::LEFT) {
+			setRectProperty(entity, "Right Relative", 0);
+			setRectProperty(entity, "Left Relative", 0);
+		}
+
+		if (mask & (u8)EdgeMask::RIGHT) {
+			setRectProperty(entity, "Left Relative", 1);
+			setRectProperty(entity, "Right Relative", 1);
+		}
+
+		if (mask & (u8)EdgeMask::BOTTOM) {
+			setRectProperty(entity, "Top Relative", 1);
+			setRectProperty(entity, "Bottom Relative", 1);
+		}
+
+		if (mask & (u8)EdgeMask::CENTER_VERTICAL) {
+			setRectProperty(entity, "Top Relative", 0.5f);
+			setRectProperty(entity, "Bottom Relative", 0.5f);
+		}
+
+		if (mask & (u8)EdgeMask::CENTER_HORIZONTAL) {
+			setRectProperty(entity, "Left Relative", 0.5f);
+			setRectProperty(entity, "Right Relative", 0.5f);
+		}
+
+		m_editor->endCommandGroup();
+	}
 
 	void align(EntityRef entity, u8 mask)
 	{
