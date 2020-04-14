@@ -1400,11 +1400,11 @@ namespace Lumix
 			if (!scr.m_state) return {};
 
 			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
-			lua_getfield(scr.m_state, -1, prop_name);
+			lua_getfield(scr.m_state, -1, prop_name);	
 			
 			if (!LuaWrapper::isType<T>(scr.m_state, -1)) {
 				lua_pop(scr.m_state, 2);
-				return {};
+				return T();
 			}
 			const T res = LuaWrapper::toType<T>(scr.m_state, -1);
 			lua_pop(scr.m_state, 2);
