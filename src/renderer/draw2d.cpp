@@ -174,6 +174,9 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char*
 	cmd->texture = nullptr;
 	
 	Vec2 p = pos;
+	p.x = float(int(p.x));
+	p.y = float(int(p.y));
+
 	for (const char* c = str; *c; ++c) {
 		const Glyph* glyph = findGlyph(font, *c);
 		if (!glyph) {
