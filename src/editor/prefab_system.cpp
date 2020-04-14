@@ -488,6 +488,7 @@ public:
 			prefab_res = resource_manager.load<PrefabResource>(path);
 			const u32 content_hash = crc32(blob.getData(), (u32)blob.getPos());
 			m_resources.insert(path.getHash(), { content_hash, prefab_res});
+			m_roots.insert(entity, prefab);
 		}
 
 
@@ -614,6 +615,7 @@ public:
 			EntityRef e;
 			serializer.read(e);
 			serializer.read(p);
+			e = entity_map.get(e);
 			m_roots.insert(e, p);
 		}
 	}
