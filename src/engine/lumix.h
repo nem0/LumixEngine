@@ -59,7 +59,9 @@ struct EntityRef;
 
 struct EntityPtr
 {
-	int index;
+	EntityPtr() : index(-1) {}
+	EntityPtr(i32 index) : index(index) {}
+	i32 index;
 	bool operator==(const EntityPtr& rhs) const { return rhs.index == index; }
 	bool operator<(const EntityPtr& rhs) const { return rhs.index < index; }
 	bool operator>(const EntityPtr& rhs) const { return rhs.index > index; }

@@ -154,6 +154,7 @@ struct IDynamicProperties {
 		NONE
 	};
 	union Value {
+		Value(){}
 		EntityPtr e;
 		i32 i;
 		float f;
