@@ -163,7 +163,10 @@ template <> inline bool isType<EntityRef>(lua_State* L, int index)
 }
 template <> inline bool isType<EntityPtr>(lua_State* L, int index)
 {
-	return lua_isnumber(L, index) != 0;
+	if (lua_istable(L, index) == 0) return false;
+	const bool is_entity = getField(L, index, "_entity") == LUA_TNUMBER;
+	lua_pop(L, 1);
+	return is_entity;
 }
 template <> inline bool isType<ComponentType>(lua_State* L, int index)
 {
