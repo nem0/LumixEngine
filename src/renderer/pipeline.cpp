@@ -980,8 +980,9 @@ struct PipelineImpl final : Pipeline
 
 				gpu::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
 				u32 elem_offset = 0;
-				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::setState(blend_state);
+				u64 state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				state |= (u64)gpu::StateFlags::SCISSOR_TEST;
+				gpu::setState(state);
 				gpu::useProgram(program);
 				gpu::bindIndexBuffer(idx_buffer_mem.buffer);
 				gpu::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
@@ -992,10 +993,19 @@ struct PipelineImpl final : Pipeline
 						gpu::scissor(0, 0, pipeline->m_viewport.w, pipeline->m_viewport.h);
 					}
 					else {
-						gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
-							u32(maximum(cmd.clip_pos.x, 0.0f)),
-							u32(minimum(cmd.clip_size.x, 65535.0f)),
-							u32(minimum(cmd.clip_size.y, 65535.0f)));
+						const u32 h = u32(clamp(cmd.clip_size.y, 0.f, 65535.f));
+						if (gpu::isOriginBottomLeft()) {
+							gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+								pipeline->m_viewport.h - u32(maximum(cmd.clip_pos.y, 0.0f)) - h,
+								u32(minimum(cmd.clip_size.x, 65535.0f)),
+								u32(minimum(cmd.clip_size.y, 65535.0f)));
+						}
+						else {
+							gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+								u32(maximum(cmd.clip_pos.y, 0.0f)),
+								u32(minimum(cmd.clip_size.x, 65535.0f)),
+								u32(minimum(cmd.clip_size.y, 65535.0f)));
+						}
 					}
 			
 					gpu::TextureHandle texture_id = atlas_texture;

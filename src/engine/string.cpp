@@ -265,6 +265,7 @@ String& String::cat(const char* rhs)
 	ASSERT(rhs < c_str() || rhs >= c_str() + m_size);
 	
 	const int len = stringLength(rhs);
+	if(len == 0) return *this;
 	const int old_s = m_size;
 	resize(len + old_s);
 	memcpy(getData() + old_s, rhs, len + 1);

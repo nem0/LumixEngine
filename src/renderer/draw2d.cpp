@@ -25,7 +25,8 @@ void Draw2D::clear(Vec2 atlas_size) {
 	cmd.index_offset = 0;
 	cmd.clip_pos = { -1, -1 };
 	cmd.clip_size = { -1, -1 };
-	m_clip_queue.push({{-1, -1}, {-1, -1}});
+	m_clip_queue.clear();
+	m_clip_queue.push({{-1, -1}, {-2, -2}});
 }
 
 void Draw2D::pushClipRect(const Vec2& from, const Vec2& to) {
@@ -33,7 +34,7 @@ void Draw2D::pushClipRect(const Vec2& from, const Vec2& to) {
 	Cmd& cmd = m_cmds.emplace();
 	cmd.texture = nullptr;
 	cmd.clip_pos = from;
-	cmd.clip_size = to;
+	cmd.clip_size = to - from;
 	cmd.indices_count = 0;
 	cmd.index_offset = m_indices.size();
 }
@@ -44,7 +45,7 @@ void Draw2D::popClipRect() {
 	Cmd& cmd = m_cmds.emplace();
 	cmd.texture = nullptr;
 	cmd.clip_pos = r.from;
-	cmd.clip_size = r.to;
+	cmd.clip_size = r.to - r.from;
 	cmd.indices_count = 0;
 	cmd.index_offset = m_indices.size();
 }
@@ -56,7 +57,7 @@ void Draw2D::addLine(const Vec2& p0, const Vec2& p1, Color color, float width) {
 		cmd = &m_cmds.emplace();
 		const Rect& r = m_clip_queue.back();
 		cmd->clip_pos = r.from;
-		cmd->clip_size = r.to;
+		cmd->clip_size = r.to - r.from;
 		cmd->indices_count = 0;
 		cmd->index_offset = m_indices.size();
 	}
@@ -103,7 +104,7 @@ void Draw2D::addRectFilled(const Vec2& from, const Vec2& to, Color color) {
 		cmd = &m_cmds.emplace();
 		const Rect& r = m_clip_queue.back();
 		cmd->clip_pos = r.from;
-		cmd->clip_size = r.to;
+		cmd->clip_size = r.to - r.from;
 		cmd->indices_count = 0;
 		cmd->index_offset = m_indices.size();
 	}
@@ -135,7 +136,7 @@ void Draw2D::addImage(gpu::TextureHandle* tex, const Vec2& from, const Vec2& to,
 		cmd = &m_cmds.emplace();
 		const Rect& r = m_clip_queue.back();
 		cmd->clip_pos = r.from;
-		cmd->clip_size = r.to;
+		cmd->clip_size = r.to - r.from;
 		cmd->indices_count = 0;
 		cmd->index_offset = m_indices.size();
 	}
@@ -166,7 +167,7 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char*
 		cmd = &m_cmds.emplace();
 		const Rect& r = m_clip_queue.back();
 		cmd->clip_pos = r.from;
-		cmd->clip_size = r.to;
+		cmd->clip_size = r.to - r.from;
 		cmd->indices_count = 0;
 		cmd->index_offset = m_indices.size();
 	}
