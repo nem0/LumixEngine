@@ -25,6 +25,10 @@ struct Font {
 	u32 ref = 0;
 };
 
+float getAdvanceY(const Font& font) {
+	return float(font.font_size);
+}
+
 const Glyph* findGlyph(const Font& font, u32 codepoint) {
 	auto iter = font.glyphs.find(codepoint);
 	if (!iter.isValid()) return nullptr;
