@@ -66,6 +66,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		float min = -FLT_MAX;
 		bool is_color = false;
 		bool is_radians = false;
+		bool is_multiline = false;
 		ResourceType resource_type;
 	};
 
@@ -80,6 +81,9 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 					break;
 				case Reflection::IAttribute::COLOR:
 					attrs.is_color = true;
+					break;
+				case Reflection::IAttribute::MULTILINE:
+					attrs.is_multiline = true;
 					break;
 				case Reflection::IAttribute::MIN:
 					attrs.min = ((Reflection::MinAttribute&)*attr).min;
@@ -418,13 +422,20 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 	{
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
+		const Attributes attrs = getAttributes(prop);
 		
 		char tmp[1024];
 		copyString(tmp, prop.get(cmp, m_index));
 
-		if (ImGui::InputText(prop.name, tmp, sizeof(tmp)))
-		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, tmp);
+		if(attrs.is_multiline) {
+			if (ImGui::InputTextMultiline(prop.name, tmp, sizeof(tmp))) {
+				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, tmp);
+			}
+		}
+		else {
+			if (ImGui::InputText(prop.name, tmp, sizeof(tmp))) {
+				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, tmp);
+			}
 		}
 	}
 

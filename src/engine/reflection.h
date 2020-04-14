@@ -38,7 +38,8 @@ struct IAttribute {
 		RADIANS,
 		COLOR,
 		RESOURCE,
-		ENUM
+		ENUM,
+		MULTILINE
 	};
 
 	virtual ~IAttribute() {}
@@ -116,6 +117,10 @@ struct RadiansAttribute : IAttribute
 	int getType() const override { return RADIANS; }
 };
 
+struct MultilineAttribute : IAttribute
+{
+	int getType() const override { return MULTILINE; }
+};
 
 struct ColorAttribute : IAttribute
 {

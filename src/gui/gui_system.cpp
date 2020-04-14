@@ -100,7 +100,7 @@ struct GUISystemImpl final : GUISystem
 				LUMIX_FUNC(GUIScene::getRectAt)
 			),
 			component("gui_text",
-				property("Text", LUMIX_PROP(GUIScene, Text)),
+				property("Text", LUMIX_PROP(GUIScene, Text), MultilineAttribute()),
 				property("Font", LUMIX_PROP(GUIScene, TextFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
 				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
 				enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), TextHAlignEnum()),

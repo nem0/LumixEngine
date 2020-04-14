@@ -178,6 +178,12 @@ void Draw2D::addText(const Font& font, const Vec2& pos, Color color, const char*
 	p.y = float(int(p.y));
 
 	for (const char* c = str; *c; ++c) {
+		if (*c == '\r') continue;
+		if (*c == '\n') {
+			p.x = float(int(pos.x));
+			p.y += getAdvanceY(font);
+			continue;
+		}
 		const Glyph* glyph = findGlyph(font, *c);
 		if (!glyph) {
 			p.x += 16;
