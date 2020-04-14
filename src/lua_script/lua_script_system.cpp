@@ -1423,7 +1423,8 @@ namespace Lumix
 			out[0] = '\0';
 			lua_rawgeti(scr.m_state, LUA_REGISTRYINDEX, scr.m_environment);
 			lua_getfield(scr.m_state, -1, prop_name);
-			if (lua_type(scr.m_state, -1) == LUA_TNIL)
+			const int type = lua_type(scr.m_state, -1);
+			if (type == LUA_TNIL)
 			{
 				copyString(out, prop.stored_value.c_str());
 				lua_pop(scr.m_state, 2);
@@ -1452,8 +1453,14 @@ namespace Lumix
 				case Property::ENTITY:
 				{
 					EntityPtr e = INVALID_ENTITY;
-					if (LuaWrapper::getField(scr.m_state, -1, "_entity") == LUA_TNUMBER) {
-						e = { (i32)lua_tointeger(scr.m_state, -1) };
+					if (type != LUA_TTABLE) {
+						e = INVALID_ENTITY;
+					}
+					else {
+						if (LuaWrapper::getField(scr.m_state, -1, "_entity") == LUA_TNUMBER) {
+							e = { (i32)lua_tointeger(scr.m_state, -1) };
+						}
+						lua_pop(scr.m_state, 1);
 					}
 					toCString(e.index, out);
 				}
