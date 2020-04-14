@@ -1729,6 +1729,8 @@ public:
 		StaticString<MAX_PATH_LENGTH> dir(m_engine.getFileSystem().getBasePath(), "universes/", basename);
 		OS::makePath(dir);
 		StaticString<MAX_PATH_LENGTH> path(dir, "/entities.unv");
+		StaticString<MAX_PATH_LENGTH> bkp_path(dir, "/entities.unv.bak");
+		if (OS::fileExists(path)) OS::copyFile(path, bkp_path);
 		OS::OutputFile file;
 		if (file.open(path)) {
 			save(file);
