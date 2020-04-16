@@ -22,12 +22,14 @@ struct Font {
 	FontResource* resource;
 	HashMap<u32, Glyph> glyphs;
 	u32 font_size = 0;
+	float descender = 0;
+	float ascender = 0;
 	u32 ref = 0;
 };
 
-float getAdvanceY(const Font& font) {
-	return float(font.font_size);
-}
+float getAdvanceY(const Font& font) { return float(font.font_size); }
+float getDescender(const Font& font) { return font.descender; }
+float getAscender(const Font& font) { return font.ascender; }
 
 const Glyph* findGlyph(const Font& font, u32 codepoint) {
 	auto iter = font.glyphs.find(codepoint);
@@ -152,6 +154,8 @@ bool FontManager::build()
 			continue;
 		}
 		
+		font->descender = face->descender / 64.f;
+		font->ascender = face->ascender / 64.f;
 		for (Glyph& c : font->glyphs) {
 			c.u0 = c.v0 = 0;
 			c.u1 = c.v1 = 1;
