@@ -1147,8 +1147,9 @@ struct GUISceneImpl final : GUIScene
 			EntityRef entity;
 			serializer.read(flags);
 			serializer.read(entity);
-
-			entity = entity_map.get(entity);
+			if (flags & (u32)GUIRect::IS_VALID) {
+				entity = entity_map.get(entity);
+			}
 			int idx = m_rects.find(entity);
 			if (idx < 0) {
 				GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
