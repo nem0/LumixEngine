@@ -28,6 +28,8 @@ struct Glyph {
 LUMIX_RENDERER_API Vec2 measureTextA(const Font& font, const char* str, const char* str_end);
 LUMIX_RENDERER_API const Glyph* findGlyph(const Font& font, u32 codepoint);
 LUMIX_RENDERER_API float getAdvanceY(const Font& font);
+LUMIX_RENDERER_API float getDescender(const Font& font);
+LUMIX_RENDERER_API float getAscender(const Font& font);
 
 
 struct LUMIX_RENDERER_API FontResource final : Resource

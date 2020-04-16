@@ -297,8 +297,8 @@ struct GUISceneImpl final : GUIScene
 
 				switch (rect.text->vertical_align) {
 					case TextVAlign::TOP: break;
-					case TextVAlign::MIDDLE: text_pos.y = (t + b + font_size) * 0.5f; break;
-					case TextVAlign::BOTTOM: text_pos.y = b; break;
+					case TextVAlign::MIDDLE: text_pos.y = (t + b + getAscender(*font) - getDescender(*font)) * 0.5f; break;
+					case TextVAlign::BOTTOM: text_pos.y = b + getDescender(*font); break;
 				}
 
 				switch (rect.text->horizontal_align) {
