@@ -30,11 +30,24 @@ void Draw2D::clear(Vec2 atlas_size) {
 }
 
 void Draw2D::pushClipRect(const Vec2& from, const Vec2& to) {
-	m_clip_queue.push({from, to});
+	Rect r = {from, to};
+	if (!m_clip_queue.empty()) {
+		const Rect prev =  m_clip_queue.back();
+		if (prev.to.x >= 0) {
+			r.from.x = maximum(r.from.x, prev.from.x);
+			r.from.y = maximum(r.from.y, prev.from.y);
+			r.to.x = minimum(r.to.x, prev.to.x);
+			r.to.y = minimum(r.to.y, prev.to.y);
+		}
+	}
+	r.to.x = maximum(r.from.x, r.to.x);
+	r.to.y = maximum(r.from.y, r.to.y);
+
+	m_clip_queue.push({r.from, r.to});
 	Cmd& cmd = m_cmds.emplace();
 	cmd.texture = nullptr;
-	cmd.clip_pos = from;
-	cmd.clip_size = to - from;
+	cmd.clip_pos = r.from;
+	cmd.clip_size = r.to - r.from;
 	cmd.indices_count = 0;
 	cmd.index_offset = m_indices.size();
 }

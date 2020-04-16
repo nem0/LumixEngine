@@ -403,7 +403,8 @@ template <> inline float toType(lua_State* L, int index)
 }
 template <> inline const char* toType(lua_State* L, int index)
 {
-	return lua_tostring(L, index);
+	const char* res = lua_tostring(L, index);
+	return res ? res : "";
 }
 template <> inline void* toType(lua_State* L, int index)
 {
@@ -511,7 +512,27 @@ inline void push(lua_State* L, EntityRef value)
 {
 	lua_pushinteger(L, value.index);
 }
- 
+
+inline bool toEntity(lua_State* L, int idx, Ref<Universe*> universe, Ref<EntityRef> entity)
+{
+	if (!lua_istable(L, idx)) return false;
+	if (getField(L, 1, "_entity") != LUA_TNUMBER) {
+		lua_pop(L, 1);
+		return false;
+	}
+	entity = EntityRef {toType<i32>(L, -1)};
+	lua_pop(L, 1);
+
+	if (getField(L, 1, "_universe") != LUA_TLIGHTUSERDATA) {
+		lua_pop(L, 1);
+		return false;
+	}
+	universe = toType<Universe*>(L, -1);
+	lua_pop(L, 1);
+	
+	return true;
+}
+
 inline void pushEntity(lua_State* L, EntityPtr value, Universe* universe)
 {
 	if (!value.isValid()) {
