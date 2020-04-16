@@ -176,8 +176,10 @@ struct GUISystemImpl final : GUISystem
 
 	static int LUA_GUIRect_getScreenRect(lua_State* L)
 	{
-		GUIScene* scene = LuaWrapper::checkArg<GUIScene*>(L, 1);
-		EntityRef e = LuaWrapper::checkArg<EntityRef>(L, 2);
+		EntityRef e;
+		Universe* universe;
+		if (!LuaWrapper::toEntity(L, 1, Ref(universe), Ref(e))) return 0;
+		GUIScene* scene = (GUIScene*)universe->getScene(crc32("gui"));
 		GUIScene::Rect rect = scene->getRect(e);
 		lua_newtable(L);
 		LuaWrapper::push(L, rect.x);

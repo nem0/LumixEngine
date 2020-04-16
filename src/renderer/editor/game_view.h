@@ -56,8 +56,8 @@ private:
 	WorldEditor& m_editor;
 	StudioApp& m_app;
 	float m_time_multiplier;
-	Vec2 m_pos;
-	Vec2 m_size;
+	Vec2 m_pos = Vec2(0);
+	Vec2 m_size = Vec2(0);
 	struct GUIInterface* m_gui_interface;
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;

@@ -579,9 +579,25 @@ namespace Lumix
 
 		static int getEnvironment(lua_State* L)
 		{
-			auto* universe = LuaWrapper::checkArg<Universe*>(L, 1);
-			EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-			int scr_index = LuaWrapper::checkArg<int>(L, 3);
+			if (!lua_istable(L, 1)) {
+				LuaWrapper::argError(L, 1, "entity");
+			}
+
+			if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
+				lua_pop(L, 1);
+				LuaWrapper::argError(L, 1, "entity");
+			}
+			const EntityRef entity = {LuaWrapper::toType<i32>(L, -1)};
+			lua_pop(L, 1);
+
+			if (LuaWrapper::getField(L, 1, "_universe") != LUA_TLIGHTUSERDATA) {
+				lua_pop(L, 1);
+				LuaWrapper::argError(L, 1, "entity");
+			}
+			Universe* universe = LuaWrapper::toType<Universe*>(L, -1);
+			lua_pop(L, 1);
+
+			const i32 scr_index = LuaWrapper::checkArg<i32>(L, 2);
 
 			if (!universe->hasComponent(entity, LUA_SCRIPT_TYPE))
 			{
@@ -771,6 +787,25 @@ namespace Lumix
 		static int lua_prop_getter(lua_State* L) {
 			LuaWrapper::checkTableArg(L, 1); // self
 
+			lua_getfield(L, 1, "_scene");
+			LuaScriptSceneImpl* scene = LuaWrapper::toType<LuaScriptSceneImpl*>(L, -1);
+			lua_getfield(L, 1, "_entity");
+			const EntityRef entity = {LuaWrapper::toType<i32>(L, -1)};
+			lua_pop(L, 2);
+
+			if (lua_isnumber(L, 2)) {
+				const i32 scr_index = LuaWrapper::toType<i32>(L, 2);
+				int env = scene->getEnvironment(entity, scr_index);
+				if (env < 0) {
+					lua_pushnil(L);
+				}
+				else {
+					lua_rawgeti(L, LUA_REGISTRYINDEX, env);
+					ASSERT(lua_type(L, -1) == LUA_TTABLE);
+				}
+				return 1;
+			}
+
 			LuaPropGetterVisitor v;
 			v.prop_name = LuaWrapper::checkArg<const char*>(L, 2);
 			v.L = L;
@@ -778,11 +813,8 @@ namespace Lumix
 			v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
 			const Reflection::ComponentBase* cmp = Reflection::getComponent(v.cmp.type);
 
-			lua_getfield(L, 1, "_scene");
-			v.cmp.scene = LuaWrapper::toType<IScene*>(L, -1);
-			lua_getfield(L, 1, "_entity");
-			v.cmp.entity.index = LuaWrapper::toType<i32>(L, -1);
-			lua_pop(L, 2);
+			v.cmp.scene = scene;
+			v.cmp.entity = entity;
 
 			cmp->visit(v);
 
@@ -884,7 +916,6 @@ namespace Lumix
 
 				lua_pushvalue(L, -1); // [ scene, scene ]
 				lua_setfield(L, -2, "__index"); // [ scene ]
-
 
 				lua_pushcfunction(L, lua_new_scene); // [ scene, fn_new_scene ]
 				lua_setfield(L, -2, "new"); // [ scene ]

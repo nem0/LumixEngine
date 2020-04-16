@@ -42,7 +42,7 @@ struct GUIScene : IScene
 	virtual IVec2 getCursorPosition() = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
-	virtual Rect getRectEx(EntityPtr entity, const Vec2& canva_size) const = 0;
+	virtual Rect getRectEx(EntityPtr entity, const Vec2& canvas_size) const = 0;
 	virtual Rect getRect(EntityRef entity) const = 0;
 	virtual EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size) const = 0;
 	virtual EntityPtr getRectAt(const Vec2& pos) const = 0;
