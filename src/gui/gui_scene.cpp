@@ -252,6 +252,12 @@ struct GUISceneImpl final : GUIScene
 						r - tex->width + sprite->right,
 						b - tex->height + sprite->bottom
 					};
+					if (pos.l > pos.r) {
+						pos.l = pos.r = (pos.l + pos.r) * 0.5f;
+					}
+					if (pos.t > pos.b) {
+						pos.t = pos.b = (pos.t + pos.b) * 0.5f;
+					}
 					Quad uvs = {
 						sprite->left / (float)tex->width,
 						sprite->top / (float)tex->height,
