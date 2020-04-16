@@ -435,9 +435,11 @@ struct GUISceneImpl final : GUIScene
 	}
 
 
-	EntityPtr getRectAt(const GUIRect& rect, const Vec2& pos, const Rect& parent_rect) const
+	EntityPtr getRectAt(const GUIRect& rect, const Vec2& pos, const Rect& parent_rect, EntityPtr limit) const
 	{
 		if (!rect.flags.isSet(GUIRect::IS_VALID)) return INVALID_ENTITY;
+		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return INVALID_ENTITY;
+		if (rect.entity.index == limit.index) return INVALID_ENTITY;
 
 		Rect r;
 		r.x = parent_rect.x + rect.left.points + parent_rect.w * rect.left.relative;
@@ -456,22 +458,22 @@ struct GUISceneImpl final : GUIScene
 			if (idx < 0) continue;
 
 			GUIRect* child_rect = m_rects.at(idx);
-			EntityPtr entity = getRectAt(*child_rect, pos, r);
+			EntityPtr entity = getRectAt(*child_rect, pos, r, limit);
 			if (entity.isValid()) return entity;
 		}
 
 		return intersect ? rect.entity : INVALID_ENTITY;
 	}
 	
-	EntityPtr getRectAt(const Vec2& pos) const override { return getRectAtEx(pos, m_canvas_size); }
+	EntityPtr getRectAt(const Vec2& pos) const override { return getRectAtEx(pos, m_canvas_size, INVALID_ENTITY); }
 
-	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size) const override
+	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit) const override
 	{
 		for (const GUICanvas& canvas : m_canvas) {
 			const int idx = m_rects.find(canvas.entity);
 			if (idx >= 0) {
 				const GUIRect* r = m_rects.at(idx);
-				const EntityPtr e = getRectAt(*r, pos, { 0, 0, canvas_size.x, canvas_size.y });
+				const EntityPtr e = getRectAt(*r, pos, { 0, 0, canvas_size.x, canvas_size.y }, limit);
 				if (e.isValid()) return e;
 			}
 		}

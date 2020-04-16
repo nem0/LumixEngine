@@ -477,7 +477,11 @@ private:
 
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered() && m_mouse_mode == MouseMode::NONE)
 			{
-				EntityPtr e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size));
+				const Array<EntityRef>& selected = m_editor->getSelectedEntities();
+				EntityPtr e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), selected.empty() ? INVALID_ENTITY : selected[0]);
+				if (!e.isValid()) {
+					e = scene->getRectAtEx(toLumix(mouse_canvas_pos), toLumix(size), INVALID_ENTITY);
+				}
 				if (e.isValid()) {
 					EntityRef r = (EntityRef)e;
 					m_editor->selectEntities(&r, 1, false);
