@@ -8,6 +8,7 @@ namespace Lumix
 {
 
 namespace gpu { struct TextureHandle; }
+namespace OS { enum class CursorType : u32; }
 
 template <typename T> struct DelegateList;
 
@@ -38,7 +39,7 @@ struct GUIScene : IScene
 		struct IAllocator& allocator);
 	static void destroyInstance(GUIScene* scene);
 
-	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size) = 0;
+	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main) = 0;
 	virtual IVec2 getCursorPosition() = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
@@ -71,10 +72,10 @@ struct GUIScene : IScene
 	virtual float getRectBottomRelative(EntityRef entity) = 0;
 	virtual void setRectBottomRelative(EntityRef entity, float value) = 0;
 
-	virtual struct Vec4 getButtonNormalColorRGBA(EntityRef entity) = 0;
-	virtual void setButtonNormalColorRGBA(EntityRef entity, const Vec4& color) = 0;
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0;
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
+	virtual OS::CursorType getButtonHoveredCursor(EntityRef entity) = 0;
+	virtual void setButtonHoveredCursor(EntityRef entity, OS::CursorType cursor) = 0;
 
 	virtual void enableImage(EntityRef entity, bool enable) = 0;
 	virtual bool isImageEnabled(EntityRef entity) = 0;

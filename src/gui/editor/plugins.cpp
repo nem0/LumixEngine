@@ -417,7 +417,7 @@ private:
 			m_pipeline->setUniverse(m_editor->getUniverse());
 
 			GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
-			scene->render(*m_pipeline, { size.x, size.y });
+			scene->render(*m_pipeline, { size.x, size.y }, false);
 			
 			MouseMode new_mode = drawGizmo(m_pipeline->getDraw2D(), *scene, { size.x, size.y }, mouse_canvas_pos);
 			if (m_mouse_mode == MouseMode::NONE) m_mouse_mode = new_mode; //-V1051
