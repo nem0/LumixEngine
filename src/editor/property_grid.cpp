@@ -21,6 +21,8 @@
 namespace Lumix
 {
 
+static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
+
 
 PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
@@ -584,7 +586,8 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 {
 	char name[256];
-	const char* tmp = m_editor.getUniverse()->getEntityName(entities[0]);
+	Universe& universe = *m_editor.getUniverse();
+	const char* tmp = universe.getEntityName(entities[0]);
 	copyString(name, tmp);
 	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
 	ImGui::PushFont(m_app.getBoldFont());
@@ -600,30 +603,38 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 		PrefabResource* prefab = prefab_system.getPrefabResource(entities[0]);
 		if (prefab)
 		{
-			ImGui::SameLine();
+			ImGui::LabelText("Prefab", "%s", prefab->getPath().c_str());
 			if (ImGui::Button("Save prefab"))
 			{
 				prefab_system.savePrefab(prefab->getPath());
 			}
+			ImGui::SameLine();
+			if (ImGui::Button("Break prefab"))
+			{
+				prefab_system.breakPrefab(entities[0]);
+			}
 		}
 
-		EntityPtr parent = m_editor.getUniverse()->getParent(entities[0]);
+		ImGui::LabelText("ID", "%d", entities[0].index);
+		EntityPtr parent = universe.getParent(entities[0]);
 		if (parent.isValid())
 		{
 			getEntityListDisplayName(m_app, m_editor, Span(name), parent);
 			ImGui::LabelText("Parent", "%s", name);
 
-			Transform tr = m_editor.getUniverse()->getLocalTransform(entities[0]);
-			DVec3 old_pos = tr.pos;
-			if (ImGui::DragScalarN("Local position", ImGuiDataType_Double, &tr.pos.x, 3, 1.f))
-			{
-				WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
-				if (tr.pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
-				if (tr.pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
-				if (tr.pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
-				if (coord != WorldEditor::Coordinate::NONE)
+			if (!universe.hasComponent(entities[0], GUI_RECT_TYPE)) {
+				Transform tr = universe.getLocalTransform(entities[0]);
+				DVec3 old_pos = tr.pos;
+				if (ImGui::DragScalarN("Local position", ImGuiDataType_Double, &tr.pos.x, 3, 1.f))
 				{
-					m_editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
+					WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
+					if (tr.pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
+					if (tr.pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
+					if (tr.pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
+					if (coord != WorldEditor::Coordinate::NONE)
+					{
+						m_editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
+					}
 				}
 			}
 		}
@@ -635,49 +646,50 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 	}
 
 
-	DVec3 pos = m_editor.getUniverse()->getPosition(entities[0]);
-	DVec3 old_pos = pos;
-	if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &pos.x, 3, 1.f))
-	{
-		WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
-		if (pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
-		if (pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
-		if (pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
-		if (coord != WorldEditor::Coordinate::NONE)
+	if (!universe.hasComponent(entities[0], GUI_RECT_TYPE)) {
+		DVec3 pos = universe.getPosition(entities[0]);
+		DVec3 old_pos = pos;
+		if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &pos.x, 3, 1.f))
 		{
-			m_editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
+			WorldEditor::Coordinate coord = WorldEditor::Coordinate::NONE;
+			if (pos.x != old_pos.x) coord = WorldEditor::Coordinate::X;
+			if (pos.y != old_pos.y) coord = WorldEditor::Coordinate::Y;
+			if (pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
+			if (coord != WorldEditor::Coordinate::NONE)
+			{
+				m_editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
+			}
 		}
-	}
 
-	Universe* universe = m_editor.getUniverse();
-	Quat rot = universe->getRotation(entities[0]);
-	Vec3 old_euler = rot.toEuler();
-	Vec3 euler = radiansToDegrees(old_euler);
-	if (ImGui::DragFloat3("Rotation", &euler.x))
-	{
-		if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
-		euler.x = degreesToRadians(clamp(euler.x, -90.0f, 90.0f));
-		euler.y = degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);
-		euler.z = degreesToRadians(fmodf(euler.z + 180, 360.0f) - 180);
-		rot.fromEuler(euler);
+		Quat rot = universe.getRotation(entities[0]);
+		Vec3 old_euler = rot.toEuler();
+		Vec3 euler = radiansToDegrees(old_euler);
+		if (ImGui::DragFloat3("Rotation", &euler.x))
+		{
+			if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
+			euler.x = degreesToRadians(clamp(euler.x, -90.0f, 90.0f));
+			euler.y = degreesToRadians(fmodf(euler.y + 180, 360.0f) - 180);
+			euler.z = degreesToRadians(fmodf(euler.z + 180, 360.0f) - 180);
+			rot.fromEuler(euler);
 		
-		Array<Quat> rots(m_editor.getAllocator());
-		for (EntityRef entity : entities)
-		{
-			Vec3 tmp = universe->getRotation(entity).toEuler();
+			Array<Quat> rots(m_editor.getAllocator());
+			for (EntityRef entity : entities)
+			{
+				Vec3 tmp = universe.getRotation(entity).toEuler();
 			
-			if (fabs(euler.x - old_euler.x) > 0.01f) tmp.x = euler.x;
-			if (fabs(euler.y - old_euler.y) > 0.01f) tmp.y = euler.y;
-			if (fabs(euler.z - old_euler.z) > 0.01f) tmp.z = euler.z;
-			rots.emplace().fromEuler(tmp);
+				if (fabs(euler.x - old_euler.x) > 0.01f) tmp.x = euler.x;
+				if (fabs(euler.y - old_euler.y) > 0.01f) tmp.y = euler.y;
+				if (fabs(euler.z - old_euler.z) > 0.01f) tmp.z = euler.z;
+				rots.emplace().fromEuler(tmp);
+			}
+			m_editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
 		}
-		m_editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
-	}
 
-	float scale = m_editor.getUniverse()->getScale(entities[0]);
-	if (ImGui::DragFloat("Scale", &scale, 0.1f))
-	{
-		m_editor.setEntitiesScale(&entities[0], entities.size(), scale);
+		float scale = universe.getScale(entities[0]);
+		if (ImGui::DragFloat("Scale", &scale, 0.1f))
+		{
+			m_editor.setEntitiesScale(&entities[0], entities.size(), scale);
+		}
 	}
 	ImGui::TreePop();
 }

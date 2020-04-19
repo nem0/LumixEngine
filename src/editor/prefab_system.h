@@ -26,6 +26,7 @@ struct LUMIX_EDITOR_API PrefabSystem
 	virtual PrefabHandle getPrefab(EntityRef entity) const = 0;
 	virtual void setPrefab(EntityRef entity, PrefabHandle prefab) = 0;
 	virtual void savePrefab(const struct Path& path) = 0;
+	virtual void breakPrefab(EntityRef e) = 0;
 	virtual PrefabResource* getPrefabResource(EntityRef entity) = 0;
 };
 

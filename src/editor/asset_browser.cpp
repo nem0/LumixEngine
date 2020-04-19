@@ -747,7 +747,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 	ImGui::PushID(str_id);
 	float item_w = ImGui::CalcItemWidth();
 	auto& style = ImGui::GetStyle();
-	float text_width = maximum(50.0f, item_w - ImGui::CalcTextSize(" ... ").x - style.FramePadding.x * 2);
+	float text_width = maximum(50.0f, item_w - ImGui::CalcTextSize("...").x - style.FramePadding.x * 2);
 	
 	auto pos = ImGui::GetCursorPos();
 	pos.x += text_width;
@@ -762,7 +762,7 @@ bool AssetBrowser::resourceInput(const char* label, const char* str_id, Span<cha
 	ImGui::PopTextWrapPos();
 	ImGui::SameLine();
 	ImGui::SetCursorPos(pos);
-	if (ImGui::Button(" ... ")) {
+	if (ImGui::Button("...")) {
 		ImGui::OpenPopup("popup");
 	}
 	ImGui::EndGroup();

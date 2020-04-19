@@ -91,6 +91,7 @@ public:
 		m_component_type_map[type.index].destroy = static_cast<Destroy>(destroy);
 	}
 
+	bool isValid(EntityRef e) const { return m_entities[e.index].valid; }
 	EntityPtr getFirstEntity() const;
 	EntityPtr getNextEntity(EntityRef entity) const;
 	const char* getEntityName(EntityRef entity) const;
