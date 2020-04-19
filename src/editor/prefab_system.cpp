@@ -180,13 +180,13 @@ public:
 
 	void onEntityDestroyed(EntityRef entity)
 	{
+		m_roots.erase(entity);
+		
 		if (entity.index >= m_entity_to_prefab.size()) return;
-
 		const PrefabHandle prefab = m_entity_to_prefab[entity.index];
 		if (prefab == 0) return;
 
 		m_entity_to_prefab[entity.index] = 0;
-		m_roots.erase(entity);
 	}
 
 
@@ -430,6 +430,27 @@ public:
 		universe.destroyEntity(e);
 	}
 
+	void breakPrefabRecursive(EntityRef e) {
+		m_entity_to_prefab[e.index] = 0;
+		const EntityPtr child = m_universe->getFirstChild(e);
+		if (child.isValid()) {
+			breakPrefabRecursive((EntityRef)child);
+		}
+		const EntityPtr sibling = m_universe->getNextSibling(e);
+		if (sibling.isValid()) {
+			breakPrefabRecursive((EntityRef)sibling);
+		}
+	}
+
+	void breakPrefab(EntityRef e) override {
+		const EntityRef root = getPrefabRoot(e);
+		const EntityPtr child = m_universe->getFirstChild(root);
+		if (child.isValid()) {
+			breakPrefabRecursive((EntityRef)child);
+		}
+		m_entity_to_prefab[root.index] = 0;
+		m_roots.erase(root);
+	}
 
 	void savePrefab(const Path& path) override
 	{
@@ -591,9 +612,17 @@ public:
 	{
 		u32 count;
 		serializer.read(count);
-		m_entity_to_prefab.resize(count);
-		if (count > 0) {
-			serializer.read(m_entity_to_prefab.begin(), m_entity_to_prefab.byte_size());
+		m_entity_to_prefab.reserve(count);
+		for (u32 i = 0; i < count; ++i) {
+			const EntityPtr e = entity_map.get(EntityPtr{(i32)i});
+			PrefabHandle prefab;
+			serializer.read(prefab);
+
+			if (!e.isValid()) continue;
+			while (e.index >= m_entity_to_prefab.size()) {
+				m_entity_to_prefab.push(0);
+			}
+			m_entity_to_prefab[e.index] = prefab;
 		}
 
 		serializer.read(count);

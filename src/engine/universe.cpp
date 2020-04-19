@@ -23,7 +23,7 @@ void EntityMap::reserve(u32 count) {
 }
 
 EntityPtr EntityMap::get(EntityPtr e) const {
-	return e.isValid() ? m_map[e.index] : INVALID_ENTITY;
+	return e.isValid() && e.index < m_map.size() ? m_map[e.index] : INVALID_ENTITY;
 }
 
 EntityRef EntityMap::get(EntityRef e) const {

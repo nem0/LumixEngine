@@ -910,16 +910,17 @@ struct GUISceneImpl final : GUIScene
 	{
 		int idx = m_rects.find(entity);
 		GUIRect* rect;
-		if (idx >= 0)
-		{
+		if (idx >= 0) {
 			rect = m_rects.at(idx);
-			*rect = GUIRect();
 		}
-		else
-		{
+		else {
 			rect = LUMIX_NEW(m_allocator, GUIRect);
 			m_rects.insert(entity, rect);
 		}
+		rect->top = {0, 0};
+		rect->right = {0, 1};
+		rect->bottom = {0, 1};
+		rect->left = {0, 0};
 		rect->entity = entity;
 		rect->flags.set(GUIRect::IS_VALID);
 		rect->flags.set(GUIRect::IS_ENABLED);
@@ -1031,7 +1032,7 @@ struct GUISceneImpl final : GUIScene
 	{
 		GUIRect* rect = m_rects[entity];
 		rect->flags.set(GUIRect::IS_VALID, false);
-		if (rect->image == nullptr && rect->text == nullptr && rect->input_field == nullptr)
+		if (!rect->image && !rect->text && !rect->input_field && !rect->render_target)
 		{
 			LUMIX_DELETE(m_allocator, rect);
 			m_rects.erase(entity);
@@ -1056,6 +1057,7 @@ struct GUISceneImpl final : GUIScene
 		GUIRect* rect = m_rects[entity];
 		rect->render_target = nullptr;
 		m_universe.onComponentDestroyed(entity, GUI_RENDER_TARGET_TYPE, this);
+		checkGarbage(*rect);
 	}
 
 
@@ -1065,6 +1067,20 @@ struct GUISceneImpl final : GUIScene
 		LUMIX_DELETE(m_allocator, rect->input_field);
 		rect->input_field = nullptr;
 		m_universe.onComponentDestroyed(entity, GUI_INPUT_FIELD_TYPE, this);
+		checkGarbage(*rect);
+	}
+
+
+	void checkGarbage(GUIRect& rect) {
+		if (rect.image) return;
+		if (rect.text) return;
+		if (rect.input_field) return;
+		if (rect.render_target) return;
+		if (rect.flags.isSet(GUIRect::IS_VALID)) return;
+			
+		const EntityRef e = rect.entity;
+		LUMIX_DELETE(m_allocator, &rect);
+		m_rects.erase(e);
 	}
 
 
@@ -1074,6 +1090,7 @@ struct GUISceneImpl final : GUIScene
 		LUMIX_DELETE(m_allocator, rect->image);
 		rect->image = nullptr;
 		m_universe.onComponentDestroyed(entity, GUI_IMAGE_TYPE, this);
+		checkGarbage(*rect);
 	}
 
 
@@ -1083,6 +1100,7 @@ struct GUISceneImpl final : GUIScene
 		LUMIX_DELETE(m_allocator, rect->text);
 		rect->text = nullptr;
 		m_universe.onComponentDestroyed(entity, GUI_TEXT_TYPE, this);
+		checkGarbage(*rect);
 	}
 
 
@@ -1147,9 +1165,7 @@ struct GUISceneImpl final : GUIScene
 			EntityRef entity;
 			serializer.read(flags);
 			serializer.read(entity);
-			if (flags & (u32)GUIRect::IS_VALID) {
-				entity = entity_map.get(entity);
-			}
+			entity = entity_map.get(entity);
 			int idx = m_rects.find(entity);
 			if (idx < 0) {
 				GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
