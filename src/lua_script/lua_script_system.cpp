@@ -877,7 +877,7 @@ namespace Lumix
 					case Reflection::Variant::I32: args[i] = LuaWrapper::toType<i32>(L, i + 2); break;
 					case Reflection::Variant::FLOAT: args[i] = LuaWrapper::toType<float>(L, i + 2); break;
 					case Reflection::Variant::CSTR: args[i] = LuaWrapper::toType<const char*>(L, i + 2); break;
-					case Reflection::Variant::ENTITY: args[i] = EntityPtr{LuaWrapper::toType<i32>(L, i + 2)}; break;
+					case Reflection::Variant::ENTITY: args[i] = LuaWrapper::toType<EntityPtr>(L, i + 2); break;
 					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 2); break;
 					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 2); break;
 					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 2); break;

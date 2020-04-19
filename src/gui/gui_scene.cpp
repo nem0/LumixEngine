@@ -488,6 +488,11 @@ struct GUISceneImpl final : GUIScene
 	
 	EntityPtr getRectAt(const Vec2& pos) const override { return getRectAtEx(pos, m_canvas_size, INVALID_ENTITY); }
 
+	bool isOver(const Vec2& pos, EntityRef e) override {
+		const Rect r =  getRect(e);
+		return pos.x >= r.x && pos.y >= r.y && pos.x <= r.x + r.w && pos.y <= r.y + r.h;
+	}
+
 	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit) const override
 	{
 		for (const GUICanvas& canvas : m_canvas) {

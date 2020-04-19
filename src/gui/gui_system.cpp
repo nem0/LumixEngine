@@ -113,7 +113,8 @@ struct GUISystemImpl final : GUISystem
 
 		static auto lua_scene = scene("gui",
 			functions(
-				LUMIX_FUNC(GUIScene::getRectAt)
+				LUMIX_FUNC(GUIScene::getRectAt),
+				LUMIX_FUNC(GUIScene::isOver)
 			),
 			component("gui_text",
 				property("Text", LUMIX_PROP(GUIScene, Text), MultilineAttribute()),
