@@ -47,6 +47,7 @@ struct GUIScene : IScene
 	virtual Rect getRect(EntityRef entity) const = 0;
 	virtual EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit) const = 0;
 	virtual EntityPtr getRectAt(const Vec2& pos) const = 0;
+	virtual bool isOver(const Vec2& pos, EntityRef e) = 0;
 
 	virtual void enableRect(EntityRef entity, bool enable) = 0;
 	virtual bool isRectEnabled(EntityRef entity) = 0;
