@@ -24,13 +24,15 @@ namespace OS
 
 enum class Keycode : u8;
 
-enum class CursorType {
+enum class CursorType : u32 {
 	DEFAULT,
 	SIZE_NS,
 	SIZE_WE,
 	SIZE_NWSE,
 	LOAD,
-	TEXT_INPUT
+	TEXT_INPUT,
+
+	UNDEFINED
 };
 
 enum class ExecuteOpenResult : int
