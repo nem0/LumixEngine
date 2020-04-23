@@ -54,18 +54,15 @@ ResourceLocator::ResourceLocator(const Span<const char>& path)
 }
 
 
-Action::Action(const char* label_short, const char* label_long, const char* name)
+Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon)
 	: label_long(label_long)
 	, label_short(label_short)
+	, font_icon(font_icon)
 	, name(name)
 	, plugin(nullptr)
 	, is_global(true)
-	, icon(nullptr)
+	, shortcut(OS::Keycode::INVALID)
 {
-	this->label_short = label_short;
-	this->label_long = label_long;
-	this->name = name;
-	shortcut[0] = shortcut[1] = shortcut[2] = OS::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
 
@@ -73,32 +70,30 @@ Action::Action(const char* label_short, const char* label_long, const char* name
 Action::Action(const char* label_short,
 	const char* label_long,
 	const char* name,
-	OS::Keycode shortcut0,
-	OS::Keycode shortcut1,
-	OS::Keycode shortcut2)
+	const char* font_icon,
+	OS::Keycode shortcut,
+	u8 modifiers)
 	: label_long(label_long)
 	, label_short(label_short)
 	, name(name)
+	, font_icon(font_icon)
 	, plugin(nullptr)
 	, is_global(true)
-	, icon(nullptr)
+	, shortcut(shortcut)
+	, modifiers(modifiers)
 {
-	shortcut[0] = shortcut0;
-	shortcut[1] = shortcut1;
-	shortcut[2] = shortcut2;
 	is_selected.bind<falseConst>();
 }
 
 
-bool Action::toolbarButton()
+bool Action::toolbarButton(ImFont* font)
 {
-	if (!icon) return false;
+	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
+	const ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
 
-	ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
-	ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
-	int* t = (int*)icon; 
-	if (ImGui::ToolbarButton((void*)(uintptr)*t, bg_color, label_long))
-	{
+	if (!font_icon[0]) return false;
+
+	if(ImGui::ToolbarButton(font, font_icon, bg_color, label_long)) {
 		func.invoke();
 		return true;
 	}
@@ -106,62 +101,18 @@ bool Action::toolbarButton()
 }
 
 
-void Action::getIconPath(Span<char> path)
-{
-	copyString(path, "editor/icons/icon_"); 
-		
-	char tmp[1024];
-	const char* c = name;
-	char* out = tmp;
-	while (*c)
-	{
-		if (*c >= 'A' && *c <= 'Z') *out = *c - ('A' - 'a');
-		else if (*c >= 'a' && *c <= 'z') *out = *c;
-		else *out = '_';
-		++out;
-		++c;
-	}
-	*out = 0;
-
-	catString(path, tmp);
-	catString(path, ".dds");
-}
-
-
-bool Action::isRequested()
-{
-	if (ImGui::IsAnyItemActive()) return false;
-
-	bool* keys_down = ImGui::GetIO().KeysDown;
-	float* keys_down_duration = ImGui::GetIO().KeysDownDuration;
-	if (shortcut[0] == OS::Keycode::INVALID) return false;
-
-	for (u32 i = 0; i < lengthOf(shortcut) + 1; ++i)
-	{
-		if (i == lengthOf(shortcut) || shortcut[i] == OS::Keycode::INVALID)
-		{
-			return true;
-		}
-
-		if (!keys_down[(int)shortcut[i]] || keys_down_duration[(int)shortcut[i]] > 0) return false;
-	}
-	return false;
-}
-
-
-
 bool Action::isActive()
 {
 	if (ImGui::IsAnyItemFocused()) return false;
-	if (shortcut[0] == OS::Keycode::INVALID) return false;
+	if (shortcut == OS::Keycode::INVALID && modifiers == 0) return false;
 
-	for (u32 i = 0; i < lengthOf(shortcut) + 1; ++i) {
-		if (i == lengthOf(shortcut) || shortcut[i] == OS::Keycode::INVALID) {
-			return true;
-		}
-		if (!OS::isKeyDown(shortcut[i])) return false;
-	}
-	return false;
+	if (shortcut != OS::Keycode::INVALID && !OS::isKeyDown(shortcut)) return false;
+	
+	if ((modifiers & (u8)Modifiers::ALT) != 0 && !OS::isKeyDown(OS::Keycode::MENU)) return false;
+	if ((modifiers & (u8)Modifiers::SHIFT) != 0 && !OS::isKeyDown(OS::Keycode::SHIFT)) return false;
+	if ((modifiers & (u8)Modifiers::CTRL) != 0 && !OS::isKeyDown(OS::Keycode::CTRL)) return false;
+
+	return true;
 }
 
 

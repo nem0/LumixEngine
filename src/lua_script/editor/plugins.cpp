@@ -58,24 +58,30 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		if (m_text_buffer[0] == '\0')
 		{
-			copyString(m_text_buffer, script->getSourceCode());
+			m_too_long = !copyString(m_text_buffer, script->getSourceCode());
 		}
-		ImGui::InputTextMultiline("Code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
-		if (ImGui::Button("Save"))
-		{
-			FileSystem& fs = m_app.getEngine().getFileSystem();
-			OS::OutputFile file;
-			if (!fs.open(script->getPath().c_str(), Ref(file)))
+		ImGui::SetNextItemWidth(-1);
+		if (!m_too_long) {
+			ImGui::InputTextMultiline("##code", m_text_buffer, sizeof(m_text_buffer), ImVec2(0, 300));
+			if (ImGui::Button(ICON_FA_SAVE "Save"))
 			{
-				logWarning("Lua Script") << "Could not save " << script->getPath();
-				return;
-			}
+				FileSystem& fs = m_app.getEngine().getFileSystem();
+				OS::OutputFile file;
+				if (!fs.open(script->getPath().c_str(), Ref(file)))
+				{
+					logWarning("Lua Script") << "Could not save " << script->getPath();
+					return;
+				}
 
-			file.write(m_text_buffer, stringLength(m_text_buffer));
-			file.close();
+				file.write(m_text_buffer, stringLength(m_text_buffer));
+				file.close();
+			}
+			ImGui::SameLine();
 		}
-		ImGui::SameLine();
-		if (ImGui::Button("Open in external editor"))
+		else {
+			ImGui::Text(ICON_FA_EXCLAMATION_TRIANGLE "File is too big to be edited here");
+		}
+		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally"))
 		{
 			m_app.getAssetBrowser().openInExternalEditor(script);
 		}
@@ -102,6 +108,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	StudioApp& m_app;
 	char m_text_buffer[8192];
+	bool m_too_long = false;
 };
 
 
@@ -253,7 +260,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	void onWindowGUI() override
 	{
 		if (!open) return;
-		if (ImGui::Begin("Script console", &open))
+		if (ImGui::Begin(ICON_FA_SCROLL "Lua console##lua_console", &open))
 		{
 			if (ImGui::Button("Execute"))
 			{
@@ -447,7 +454,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		IAllocator& allocator = m_app.getAllocator();
 
 		m_add_component_plugin = LUMIX_NEW(allocator, AddComponentPlugin)(m_app);
-		m_app.registerComponent("lua_script", *m_add_component_plugin);
+		m_app.registerComponent(ICON_FA_MOON, "lua_script", *m_add_component_plugin);
 
 		m_asset_plugin = LUMIX_NEW(allocator, AssetPlugin)(m_app);
 		m_app.getAssetBrowser().addPlugin(*m_asset_plugin);

@@ -637,15 +637,6 @@ TerrainEditor::TerrainEditor(WorldEditor& editor, StudioApp& app)
 	, m_size_spread(1, 1)
 	, m_y_spread(0, 0)
 {
-	m_increase_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Increase brush size", "Terrain editor - Increase brush size", "increaseBrushSize");
-	m_increase_brush_size->is_global = false;
-	m_increase_brush_size->func.bind<&TerrainEditor::increaseBrushSize>(this);
-	m_decrease_brush_size = LUMIX_NEW(editor.getAllocator(), Action)("Decrease brush size", "Terrain editor - decrease brush size", "decreaseBrushSize");
-	m_decrease_brush_size->func.bind<&TerrainEditor::decreaseBrushSize>(this);
-	m_decrease_brush_size->is_global = false;
-	app.addAction(m_increase_brush_size);
-	app.addAction(m_decrease_brush_size);
-
 	m_smooth_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Smooth terrain", "Terrain editor - smooth", "smoothTerrain");
 	m_smooth_terrain_action->is_global = false;
 	m_lower_terrain_action = LUMIX_NEW(editor.getAllocator(), Action)("Lower terrain", "Terrain editor - lower", "lowerTerrain");
@@ -1141,9 +1132,6 @@ Material* TerrainEditor::getMaterial() const
 
 void TerrainEditor::onGUI()
 {
-	if (m_decrease_brush_size->isRequested()) m_decrease_brush_size->func.invoke();
-	if (m_increase_brush_size->isRequested()) m_increase_brush_size->func.invoke();
-
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
 	ImGui::Unindent();
 	if (!ImGui::TreeNodeEx("Terrain editor"))

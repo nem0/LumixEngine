@@ -1102,7 +1102,6 @@ namespace Lumix
 		void applyProperty(ScriptInstance& script, Property& prop, const char* value)
 		{
 			if (!value) return;
-			if (!value[0]) return;
 
 			lua_State* state = script.m_state;
 			if (!state) return;

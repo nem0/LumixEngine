@@ -653,7 +653,7 @@ SceneView::SceneView(StudioApp& app)
 	m_move_down_action->is_global = false;
 	m_app.addAction(m_move_down_action);
 
-	m_camera_speed_action = LUMIX_NEW(allocator, Action)("Camera speed", "Reset camera speed", "cameraSpeed");
+	m_camera_speed_action = LUMIX_NEW(allocator, Action)(ICON_FA_CAMERA "Camera speed", "Reset camera speed", "cameraSpeed", ICON_FA_CAMERA);
 	m_camera_speed_action->is_global = false;
 	m_camera_speed_action->func.bind<&SceneView::resetCameraSpeed>(this);
 	m_app.addAction(m_camera_speed_action);
@@ -1084,11 +1084,11 @@ void SceneView::onToolbar()
 		for (auto* action_name : actions_names)
 		{
 			auto* action = m_app.getAction(action_name);
-			action->toolbarButton();
+			action->toolbarButton(m_app.getBigIconFont());
 		}
 	}
 
-	m_app.getAction("cameraSpeed")->toolbarButton();
+	m_app.getAction("cameraSpeed")->toolbarButton(m_app.getBigIconFont());
 
 	ImGui::PushItemWidth(50);
 	ImGui::SameLine();
@@ -1113,9 +1113,7 @@ void SceneView::onToolbar()
 	pos.y -= offset;
 	ImGui::SetCursorPos(pos);
 	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
-	const gpu::TextureHandle t = *(gpu::TextureHandle*)mode_action->icon;
-	ImGui::Image((void*)(uintptr)t.value, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), tint_color);
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
+	ImGui::TextUnformatted(mode_action->font_icon);
 
 	ImGui::SameLine();
 	pos = ImGui::GetCursorPos();
@@ -1126,6 +1124,7 @@ void SceneView::onToolbar()
 	{
 		m_app.getGizmoConfig().setStep(step);
 	}
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
 
 	ImGui::SameLine(0, 20);
 	ImGui::Checkbox("Stats", &m_show_stats);
@@ -1224,8 +1223,8 @@ void SceneView::onWindowGUI()
 
 	bool is_open = false;
 	ImVec2 view_pos;
-	const char* title = "Scene View###Scene View";
-	if (m_log_ui.getUnreadErrorCount() > 0) title = "Scene View | errors in log###Scene View";
+	const char* title = ICON_FA_GLOBE "Scene View###Scene View";
+	if (m_log_ui.getUnreadErrorCount() > 0) title = ICON_FA_GLOBE "Scene View | " ICON_FA_EXCLAMATION_TRIANGLE " errors in log###Scene View";
 
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
 		is_open = true;

@@ -57,7 +57,8 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 		if(resources.length() > 1) return;
 
 		auto* clip = static_cast<Clip*>(resources[0]);
-		ImGui::LabelText("Length", "%f", clip->getLengthSeconds());
+		ImGuiEx::Label("Length");
+		ImGui::Text("%f", clip->getLengthSeconds());
 		auto& device = getAudioDevice(m_app.getEngine());
 
 		if (m_playing_clip >= 0)
@@ -68,7 +69,8 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 				return;
 			}
 			float time = device.getCurrentTime(m_playing_clip);
-			if (ImGui::SliderFloat("Time", &time, 0, clip->getLengthSeconds(), "%.2fs"))
+			ImGuiEx::Label("Time");
+			if (ImGui::SliderFloat("##time", &time, 0, clip->getLengthSeconds(), "%.2fs"))
 			{
 				device.setCurrentTime(m_playing_clip, time);
 			}
@@ -164,7 +166,8 @@ struct ClipManagerUI final : StudioApp::GUIPlugin
 		if (!m_is_open) return; 
 
 		if (ImGui::Begin("Clip Manager", &m_is_open)) {
-			ImGui::InputText("Filter", m_filter, sizeof(m_filter));
+			ImGui::SetNextItemWidth(-1);
+			ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
 
 			Universe* universe = m_app.getWorldEditor().getUniverse();
 			auto* audio_scene = static_cast<AudioScene*>(universe->getScene(crc32("audio")));
@@ -183,11 +186,14 @@ struct ClipManagerUI final : StudioApp::GUIPlugin
 					}
 					char path[MAX_PATH_LENGTH];
 					copyString(path, clip_info->clip ? clip_info->clip->getPath().c_str() : "");
-					if (m_app.getAssetBrowser().resourceInput("Clip", "clip", Span(path), Clip::TYPE)) {
+					ImGuiEx::Label("Clip");
+					if (m_app.getAssetBrowser().resourceInput("clip", Span(path), Clip::TYPE)) {
 						audio_scene->setClip(clip_id, Path(path));
 					}
-					ImGui::InputFloat("Volume", &clip_info->volume);
-					ImGui::Checkbox("Looped", &clip_info->looped);
+					ImGuiEx::Label("Volume");
+					ImGui::InputFloat("##volume", &clip_info->volume);
+					ImGuiEx::Label("Looped");
+					ImGui::Checkbox("##looped", &clip_info->looped);
 					if (ImGui::Button("Remove")) {
 						audio_scene->removeClip(clip_info);
 						--clip_count;
@@ -223,10 +229,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override 
 	{
-		m_app.registerComponent("ambient_sound", "Audio / Ambient sound");
-		m_app.registerComponent("audio_listener", "Audio / Listener");
-		m_app.registerComponent("echo_zone", "Audio / Echo zone");
-		m_app.registerComponent("chorus_zone", "Audio / Chorus zone");
+		m_app.registerComponent("", "ambient_sound", "Audio / Ambient sound");
+		m_app.registerComponent(ICON_FA_HEADPHONES, "audio_listener", "Audio / Listener");
+		m_app.registerComponent("", "echo_zone", "Audio / Echo zone");
+		m_app.registerComponent("", "chorus_zone", "Audio / Chorus zone");
 
 		IAllocator& allocator = m_app.getAllocator();
 

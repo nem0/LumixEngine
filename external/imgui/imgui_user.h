@@ -1,4 +1,5 @@
 #pragma once
+#include <imgui/IconsFontAwesome5.h>
 
 
 struct lua_State;
@@ -15,7 +16,7 @@ IMGUI_API void BringToFront();
 
 IMGUI_API bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size);
 IMGUI_API void EndToolbar();
-IMGUI_API bool ToolbarButton(ImTextureID texture, const ImVec4& bg_color, const char* tooltip);
+IMGUI_API bool ToolbarButton(ImFont* font, const char* font_icon, const ImVec4& bg_color, const char* tooltip);
 
 IMGUI_API void BeginNode(ImGuiID id, ImVec2 screen_pos);
 IMGUI_API void EndNode(ImVec2& pos);
@@ -45,3 +46,8 @@ IMGUI_API void VSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
 
 } // namespace ImGui
+
+namespace ImGuiEx {
+	void Label(const char* label);
+	bool IconButton(const char* icon, const char* tooltip);
+}

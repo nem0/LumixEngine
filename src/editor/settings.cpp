@@ -22,6 +22,17 @@ static const char DEFAULT_SETTINGS_PATH[] = "studio_default.ini";
 static const char SETTINGS_PATH[] = "studio.ini";
 
 
+namespace LuaWrapper {
+	void getOptionalField(lua_State* L, int idx, const char* field_name, ImVec2* out) {
+		if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<Vec2>(L, -1)) {
+			const Vec2 tmp = toType<Vec2>(L, -1);
+			out->x = tmp.x; 
+			out->y = tmp.y; 
+		}
+		lua_pop(L, 1);
+	}
+}
+
 static void loadStyle(lua_State* L)
 {
 	lua_getglobal(L, "style");
@@ -46,10 +57,74 @@ static void loadStyle(lua_State* L)
 			}
 			lua_pop(L, 1);
 		}
+
+		char tmp[32];
+		if (LuaWrapper::getOptionalStringField(L, -1, "WindowMenuButtonPosition", Span(tmp))) {
+			if (equalIStrings(tmp, "left")) style.WindowMenuButtonPosition = ImGuiDir_Left;
+			if (equalIStrings(tmp, "right")) style.WindowMenuButtonPosition = ImGuiDir_Right;
+			if (equalIStrings(tmp, "up")) style.WindowMenuButtonPosition = ImGuiDir_Up;
+			if (equalIStrings(tmp, "down")) style.WindowMenuButtonPosition = ImGuiDir_Down;
+			if (equalIStrings(tmp, "none")) style.WindowMenuButtonPosition = ImGuiDir_None;
+		}
+
+		#define LOAD_FLOAT(name) LuaWrapper::getOptionalField(L, -1, #name, &style.name);
+		#define LOAD_BOOL(name) LuaWrapper::getOptionalField(L, -1, #name, &style.name);
+		#define LOAD_VEC2(name) LuaWrapper::getOptionalField(L, -1, #name, &style.name);
+
+		LOAD_FLOAT(Alpha);
+		LOAD_VEC2(WindowPadding);
+		LOAD_FLOAT(WindowRounding);
+		LOAD_FLOAT(WindowBorderSize);
+		LOAD_VEC2(WindowMinSize);
+		LOAD_VEC2(WindowTitleAlign);
+		LOAD_FLOAT(ChildRounding);
+		LOAD_FLOAT(ChildBorderSize);
+		LOAD_FLOAT(PopupRounding);
+		LOAD_FLOAT(PopupBorderSize);
+		LOAD_VEC2(FramePadding);
+		LOAD_FLOAT(FrameRounding);
+		LOAD_FLOAT(FrameBorderSize);
+		LOAD_VEC2(ItemSpacing);
+		LOAD_VEC2(ItemInnerSpacing);
+		LOAD_VEC2(TouchExtraPadding);
+		LOAD_FLOAT(IndentSpacing);
+		LOAD_FLOAT(ColumnsMinSpacing);
+		LOAD_FLOAT(ScrollbarSize);
+		LOAD_FLOAT(ScrollbarRounding);
+		LOAD_FLOAT(GrabMinSize);
+		LOAD_FLOAT(GrabRounding);
+		LOAD_FLOAT(TabRounding);
+		LOAD_FLOAT(TabBorderSize);
+		LOAD_VEC2(ButtonTextAlign);
+		LOAD_VEC2(SelectableTextAlign);
+		LOAD_VEC2(DisplayWindowPadding);
+		LOAD_VEC2(DisplaySafeAreaPadding);
+		LOAD_FLOAT(MouseCursorScale);
+		LOAD_BOOL(AntiAliasedLines);           
+		LOAD_BOOL(AntiAliasedFill);            
+		LOAD_FLOAT(CurveTessellationTol);
+		LOAD_FLOAT(CircleSegmentMaxError);
+
+		#undef LOAD_FLOAT
+		#undef LOAD_BOOL
+		#undef LOAD_VEC2
+		style.ScaleAllSizes(OS::getDPI() / 96.f);
 	}
 	lua_pop(L, 1);
+
 }
 
+static const char* toString(ImGuiDir dir)
+{
+	switch(dir) {
+		case ImGuiDir_Up: return "up";
+		case ImGuiDir_Down: return "down";
+		case ImGuiDir_Left: return "left";
+		case ImGuiDir_Right: return "right";
+		case ImGuiDir_None: return "none";
+		default: return "N/A";
+	}
+}
 
 static void saveStyle(OS::OutputFile& file)
 {
@@ -57,37 +132,104 @@ static void saveStyle(OS::OutputFile& file)
 	file << "style = {";
 	for (int i = 0; i < ImGuiCol_COUNT; ++i)
 	{
-		file << ImGui::GetStyleColorName(i) << " = {" << style.Colors[i].x
+		file << "\t" << ImGui::GetStyleColorName(i) << " = {" << style.Colors[i].x
 			<< ", " << style.Colors[i].y
 			<< ", " << style.Colors[i].z
 			<< ", " << style.Colors[i].w << "},\n";
 	}
+
+	file << "\tWindowMenuButtonPosition = \"" << toString(style.WindowMenuButtonPosition) << "\",\n";
+
+	#define SAVE_FLOAT(name) do { file << "\t" #name " = " << style.name << ",\n"; } while(false)
+	#define SAVE_BOOL(name) do { file << "\t" #name " = " << (style.name ? "true" : "false") << ",\n"; } while(false)
+	#define SAVE_VEC2(name) do { file << "\t" #name " = {" << style.name.x << ", " << style.name.y << "},\n"; } while(false)
+
+    SAVE_FLOAT(Alpha);
+    SAVE_VEC2(WindowPadding);
+    SAVE_FLOAT(WindowRounding);
+    SAVE_FLOAT(WindowBorderSize);
+    SAVE_VEC2(WindowMinSize);
+    SAVE_VEC2(WindowTitleAlign);
+    SAVE_FLOAT(ChildRounding);
+    SAVE_FLOAT(ChildBorderSize);
+    SAVE_FLOAT(PopupRounding);
+    SAVE_FLOAT(PopupBorderSize);
+    SAVE_VEC2(FramePadding);
+    SAVE_FLOAT(FrameRounding);
+    SAVE_FLOAT(FrameBorderSize);
+    SAVE_VEC2(ItemSpacing);
+    SAVE_VEC2(ItemInnerSpacing);
+    SAVE_VEC2(TouchExtraPadding);
+    SAVE_FLOAT(IndentSpacing);
+    SAVE_FLOAT(ColumnsMinSpacing);
+    SAVE_FLOAT(ScrollbarSize);
+    SAVE_FLOAT(ScrollbarRounding);
+    SAVE_FLOAT(GrabMinSize);
+    SAVE_FLOAT(GrabRounding);
+    SAVE_FLOAT(TabRounding);
+    SAVE_FLOAT(TabBorderSize);
+    SAVE_VEC2(ButtonTextAlign);
+    SAVE_VEC2(SelectableTextAlign);
+    SAVE_VEC2(DisplayWindowPadding);
+    SAVE_VEC2(DisplaySafeAreaPadding);
+    SAVE_FLOAT(MouseCursorScale);
+    SAVE_BOOL(AntiAliasedLines);           
+    SAVE_BOOL(AntiAliasedFill);            
+    SAVE_FLOAT(CurveTessellationTol);
+    SAVE_FLOAT(CircleSegmentMaxError);
+
+	#undef SAVE_BOOL
+	#undef SAVE_FLOAT
+	#undef SAVE_VEC2
+
 	file << "}\n";
 }
 
 
-static void shortcutInput(OS::Keycode& shortcut)
+static bool shortcutInput(Ref<Action> action, bool edit)
 {
-	StaticString<50> popup_name("");
-	popup_name << (i64)&shortcut;
-
 	char tmp[32];
-	OS::getKeyName(shortcut, Span(tmp));
-	StaticString<50> button_label(tmp[0] || shortcut == OS::Keycode::INVALID ? tmp : "Unknown");
-	button_label << "###" << (i64)&shortcut;
+	OS::getKeyName(action->shortcut, Span(tmp));
+	
+	const char* mod0 = (action->modifiers & (u8)Action::Modifiers::CTRL) ? "CTRL " : "";
+	const char* mod1 = (action->modifiers & (u8)Action::Modifiers::SHIFT) ? "SHIFT " : "";
+	const char* mod2 = (action->modifiers & (u8)Action::Modifiers::ALT) ? "ALT " : "";
 
-	if (ImGui::Button(button_label, ImVec2(65, 0))) shortcut = OS::Keycode::INVALID;
+	StaticString<64> button_label(mod0, mod1, mod2, action->shortcut == OS::Keycode::INVALID ? "" : tmp, "");
 
-	if (ImGui::IsItemHovered()) {
+	bool res = false;
+	ImGui::SetNextItemWidth(-30);
+	ImGui::InputText("", button_label.data, sizeof(button_label.data), ImGuiInputTextFlags_ReadOnly);
+	if (ImGui::IsItemActive()) {
+		if (OS::isKeyDown(OS::Keycode::SHIFT)) action->modifiers |= (u8)Action::Modifiers::SHIFT;
+		if (OS::isKeyDown(OS::Keycode::MENU)) action->modifiers |= (u8)Action::Modifiers::ALT;
+		if (OS::isKeyDown(OS::Keycode::CTRL)) action->modifiers |= (u8)Action::Modifiers::CTRL;
+
 		for (int i = 0; i < (int)OS::Keycode::MAX; ++i) {
 			const auto kc= (OS::Keycode)i;
 			const bool is_mouse = kc == OS::Keycode::LBUTTON || kc == OS::Keycode::RBUTTON || kc == OS::Keycode::MBUTTON;
-			if (OS::isKeyDown(kc) && !is_mouse) {
-				shortcut = (OS::Keycode)i;
+			const bool is_modifier = kc == OS::Keycode::SHIFT 
+				|| kc == OS::Keycode::LSHIFT 
+				|| kc == OS::Keycode::RSHIFT 
+				|| kc == OS::Keycode::MENU 
+				|| kc == OS::Keycode::LMENU 
+				|| kc == OS::Keycode::RMENU 
+				|| kc == OS::Keycode::CTRL 
+				|| kc == OS::Keycode::LCTRL 
+				|| kc == OS::Keycode::RCTRL;
+			if (OS::isKeyDown(kc) && !is_mouse && !is_modifier) {
+				action->shortcut = (OS::Keycode)i;
 				break;
 			}
 		}
 	}
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
+		action->modifiers = 0;
+		action->shortcut = OS::Keycode::INVALID;
+	}
+	
+	return res;
 }
 
 
@@ -157,6 +299,7 @@ Settings::Settings(StudioApp& app)
 	, m_force_no_crash_report(false)
 	, m_mouse_sensitivity(80.0f, 80.0f)
 	, m_font_size(13)
+	, m_imgui_state(app.getAllocator())
 {
 	m_filter[0] = 0;
 	m_window.x = m_window.y = 0;
@@ -194,6 +337,26 @@ bool Settings::load()
 		return false;
 	}
 
+	bool valid_version = false;
+	lua_getglobal(L, "version");
+	if (lua_type(L, -1) == LUA_TNUMBER) {
+		const int version = (int)lua_tonumber(L, -1);
+		valid_version = version == 1;
+	}
+	lua_pop(L, 1);
+
+	if (!valid_version) {
+		if (!fs.getContentSync(Path(DEFAULT_SETTINGS_PATH), Ref(buf))) {
+			logError("Editor") << "Failed to open " << DEFAULT_SETTINGS_PATH;
+			return false;
+		}
+
+		Span<const char> content((const char*)buf.begin(), buf.size());
+		if (!LuaWrapper::execute(L, content, "settings", 0)) {
+			return false;
+		}
+	}
+
 	lua_getglobal(L, "window");
 	if (lua_type(L, -1) == LUA_TTABLE)
 	{
@@ -205,6 +368,12 @@ bool Settings::load()
 	lua_pop(L, 1);
 
 	loadStyle(L);
+
+	lua_getglobal(L, "imgui");
+	if (lua_type(L, -1) == LUA_TSTRING) {
+		m_imgui_state = lua_tostring(L, -1);
+	}
+	lua_pop(L, 1);
 
 	m_is_maximized = getBoolean(L, "maximized", true);
 	
@@ -232,15 +401,14 @@ bool Settings::load()
 			lua_getfield(L, -1, actions[i]->name);
 			if (lua_type(L, -1) == LUA_TTABLE)
 			{
-				for (u32 j = 0; j < lengthOf(actions[i]->shortcut); ++j)
-				{
-					lua_rawgeti(L, -1, 1 + j);
-					if (lua_type(L, -1) == LUA_TNUMBER)
-					{
-						actions[i]->shortcut[j] = (OS::Keycode)lua_tointeger(L, -1);
-					}
-					lua_pop(L, 1);
+				if (LuaWrapper::getField(L, -1, "key") == LUA_TNUMBER) {
+					actions[i]->shortcut = (OS::Keycode)lua_tointeger(L, -1);
 				}
+				lua_pop(L, 1);
+				if (LuaWrapper::getField(L, -1, "modifiers") == LUA_TNUMBER) {
+					actions[i]->modifiers = (u8)lua_tointeger(L, -1);
+				}
+				lua_pop(L, 1);
 			}
 			lua_pop(L, 1);
 		}
@@ -310,6 +478,8 @@ bool Settings::save()
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (!fs.open(SETTINGS_PATH, Ref(file))) return false;
 
+	file << "version = 1\n";
+
 	file << "window = { x = " << m_window.x 
 		<< ", y = " << m_window.y 
 		<< ", w = " << m_window.w
@@ -336,6 +506,8 @@ bool Settings::save()
 	file << "asset_browser_left_column_width = " << m_asset_browser_left_column_width << "\n";
 	
 	saveStyle(file);
+
+	file << "imgui = [[" << m_imgui_state.c_str() << "]]\n";
 
 	file << "custom = {\n";
 	lua_getglobal(m_state, "custom");
@@ -366,10 +538,9 @@ bool Settings::save()
 	file << "actions = {\n";
 	for (int i = 0; i < actions.size(); ++i)
 	{
-		file << "\t" << actions[i]->name << " = {" 
-			<< (int)actions[i]->shortcut[0] << ", "
-			<< (int)actions[i]->shortcut[1] << ", " 
-			<< (int)actions[i]->shortcut[2] << "},\n";
+		file << "\t" << actions[i]->name << " = { key = " 
+			<< (int)actions[i]->shortcut << ", modifiers = "
+			<< (int)actions[i]->modifiers << "},\n";
 	}
 	file << "}\n";
 
@@ -392,11 +563,10 @@ void Settings::showToolbarSettings() const
 	auto& actions = m_app.getToolbarActions();
 	static Action* dragged = nullptr;
 	
-	ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
+	ImGui::PushFont(m_app.getBigIconFont());
 	for (auto* action : actions)
 	{
-		int* t = (int*)action->icon;
-		ImGui::ImageButton((void*)(uintptr_t)*t, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, ImVec4(0, 0, 0, 0), tint_color);
+		ImGui::Button(action->font_icon);
 		if (dragged && ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
 		{
 			actions.insert(actions.indexOf(action), dragged);
@@ -412,6 +582,7 @@ void Settings::showToolbarSettings() const
 		ImGui::SameLine();
 	}
 	ImGui::NewLine();
+	ImGui::PopFont();
 
 	if (dragged) ImGui::SetTooltip("%s", dragged->label_long.data);
 	if (ImGui::IsMouseReleased(0)) dragged = nullptr;
@@ -426,7 +597,7 @@ void Settings::showToolbarSettings() const
 	int count = 0;
 	for (auto* action : m_app.getActions())
 	{
-		if (action->icon && action->is_global)
+		if (action->font_icon[0] && action->is_global)
 		{
 			tools[count] = action;
 			++count;
@@ -445,42 +616,27 @@ void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
 	ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
-	ImGui::Columns(4);
-	ImGui::Text("Label");
-	ImGui::NextColumn();
-	ImGui::Text("Shortcut key 1");
-	ImGui::NextColumn();
-	ImGui::Text("Shortcut key 2");
-	ImGui::NextColumn();
-	ImGui::Text("Shortcut key 3");
-	ImGui::NextColumn();
-	ImGui::Separator();
 
 	for (int i = 0; i < actions.size(); ++i)
 	{
 		Action& a = *actions[i];
 		if (m_filter[0] == 0 || stristr(a.label_long, m_filter) != 0)
 		{
-			ImGui::AlignTextToFramePadding();
-			ImGui::Text("%s", a.label_long.data);
-			ImGui::NextColumn();
-			shortcutInput(a.shortcut[0]);
-			ImGui::NextColumn();
-			shortcutInput(a.shortcut[1]);
-			ImGui::NextColumn();
-			shortcutInput(a.shortcut[2]);
-			ImGui::NextColumn();
+			ImGui::PushID(&a);
+			ImGuiEx::Label(a.label_long.data);
+			if (shortcutInput(Ref(a), &a == m_edit_action)) {
+				m_edit_action = &a;
+			}
+			ImGui::PopID();
 		}
 	}
-	ImGui::Columns(1);
-
 }
 
 
 void Settings::onGUI()
 {
 	if (!m_is_open) return;
-	if (ImGui::Begin("Settings", &m_is_open))
+	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open))
 	{
 		if (ImGui::Button("Save")) save();
 		ImGui::SameLine();
@@ -488,34 +644,45 @@ void Settings::onGUI()
 		ImGui::SameLine();
 		ImGui::Text("Settings are saved when the application closes");
 
-		if (ImGui::CollapsingHeader("General"))
-		{
-			if (m_force_no_crash_report)
-			{
-				ImGui::Text("Crash reporting disabled from command line");
-			}
-			else
-			{
-				if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
-				{
-					enableCrashReporting(m_is_crash_reporting_enabled);
-				}
-			}
-			ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
-			float fov = radiansToDegrees(m_app.getFOV());
-			if (ImGui::SliderFloat("FOV", &fov, 0.1f, 180)) {
-				fov = degreesToRadians(fov);
-				m_app.setFOV(fov);
-			}
-		}
+		if (ImGui::BeginTabBar("tabs")) {
 
-		if (ImGui::CollapsingHeader("Shortcuts")) showShortcutSettings();
-		if (ImGui::CollapsingHeader("Toolbar")) showToolbarSettings();
-		if (ImGui::CollapsingHeader("Style"))
-		{
-			ImGui::InputInt("Font size (needs restart)", &m_font_size);
-			ImGui::ShowStyleEditor();
-		}
+			if (ImGui::BeginTabItem("General")) {
+				if (m_force_no_crash_report)
+				{
+					ImGui::Text("Crash reporting disabled from command line");
+				}
+				else
+				{
+					if (ImGui::Checkbox("Crash reporting", &m_is_crash_reporting_enabled))
+					{
+						enableCrashReporting(m_is_crash_reporting_enabled);
+					}
+				}
+				ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
+				float fov = radiansToDegrees(m_app.getFOV());
+				if (ImGui::SliderFloat("FOV", &fov, 0.1f, 180)) {
+					fov = degreesToRadians(fov);
+					m_app.setFOV(fov);
+				}
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("Shortcuts")) {
+				showShortcutSettings();
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("Toolbar")) {
+				showToolbarSettings();
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("Style"))
+			{
+				ImGui::InputInt("Font size (needs restart)", &m_font_size);
+				ImGui::ShowStyleEditor();
+				ImGui::EndTabItem();
+			}
+			ImGui::EndTabBar();
+		}	
 	}
 	ImGui::End();
 }

@@ -78,8 +78,6 @@ private:
 	Vec3 m_color;
 	int m_current_brush;
 	Array<PrefabResource*> m_selected_prefabs;
-	Action* m_increase_brush_size;
-	Action* m_decrease_brush_size;
 	Action* m_lower_terrain_action;
 	Action* m_smooth_terrain_action;
 	Action* m_remove_entity_action;

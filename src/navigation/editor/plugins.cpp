@@ -150,8 +150,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_zone_pg_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(m_app);
 		m_app.getPropertyGrid().addPlugin(*m_zone_pg_plugin);
 
-		m_app.registerComponent("navmesh_agent", "Navmesh / Agent");
-		m_app.registerComponent("navmesh_zone", "Navmesh / Zone");
+		m_app.registerComponent(ICON_FA_STREET_VIEW, "navmesh_agent", "Navmesh / Agent");
+		m_app.registerComponent(ICON_FA_MAP_MARKED_ALT, "navmesh_zone", "Navmesh / Zone");
 	}
 
 	~StudioAppPlugin() {

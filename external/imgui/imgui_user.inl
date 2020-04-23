@@ -70,34 +70,34 @@ namespace ImGui
 
 		return pressed;
 	}
+	
 
-
-	bool ToolbarButton(ImTextureID texture, const ImVec4& bg_color, const char* tooltip)
+	bool ToolbarButton(ImFont* font, const char* font_icon, const ImVec4& bg_color, const char* tooltip)
 	{
 		auto frame_padding = ImGui::GetStyle().FramePadding;
-		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+		ImGui::PushStyleColor(ImGuiCol_FrameBg, bg_color);
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
 
 		bool ret = false;
 		ImGui::SameLine();
-		ImVec4 tint_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
-		if (ImGui::ImageButton(texture, ImVec2(24, 24), ImVec2(0, 0), ImVec2(1, 1), -1, bg_color, tint_color))
-		{
+		ImGui::PushFont(font);
+		if (ImGui::Button(font_icon)) {
 			ret = true;
 		}
-		if (ImGui::IsItemHovered())
-		{
-			ImGui::SetTooltip("%s", tooltip);
-		}
+		ImGui::PopFont();
 		ImGui::PopStyleColor(3);
 		ImGui::PopStyleVar(3);
+		if (ImGui::IsItemHovered()) {
+			ImGui::BeginTooltip();
+			ImGui::TextUnformatted(tooltip);
+			ImGui::EndTooltip();
+		}
 		return ret;
 	}
-
 
 
 	bool BeginToolbar(const char* str_id, ImVec2 screen_pos, ImVec2 size)
@@ -835,3 +835,49 @@ namespace ImGui
 
 } // namespace ImGui
 
+namespace ImGuiEx {
+	bool IconButton(const char* icon, const char* tooltip) {
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
+		bool res = ImGui::SmallButton(icon);
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("%s", tooltip);
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+		return res;
+	}
+	
+	void Label(const char* label) {
+		ImGuiWindow* window = ImGui::GetCurrentWindow();
+		const ImVec2 lineStart = ImGui::GetCursorScreenPos();
+		const ImGuiStyle& style = ImGui::GetStyle();
+		float fullWidth = ImGui::GetContentRegionAvail().x;
+		float itemWidth = fullWidth * 0.6f;
+		ImVec2 textSize = ImGui::CalcTextSize(label);
+		ImRect textRect;
+		textRect.Min = ImGui::GetCursorScreenPos();
+		textRect.Max = textRect.Min;
+		textRect.Max.x += fullWidth - itemWidth;
+		textRect.Max.y += textSize.y;
+
+		ImGui::SetCursorScreenPos(textRect.Min);
+
+		ImGui::AlignTextToFramePadding();
+		textRect.Min.y += window->DC.CurrLineTextBaseOffset;
+		textRect.Max.y += window->DC.CurrLineTextBaseOffset;
+
+		ImGui::ItemSize(textRect);
+		if (ImGui::ItemAdd(textRect, window->GetID(label)))
+		{
+			ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), textRect.Min, textRect.Max, textRect.Max.x,
+				textRect.Max.x, label, nullptr, &textSize);
+
+			if (textRect.GetWidth() < textSize.x && ImGui::IsItemHovered())
+				ImGui::SetTooltip("%s", label);
+		}
+		ImGui::SetCursorScreenPos(textRect.Max - ImVec2{0, textSize.y + window->DC.CurrLineTextBaseOffset});
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(itemWidth);
+	}
+}

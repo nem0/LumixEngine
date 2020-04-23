@@ -1,5 +1,4 @@
 #include <imgui/imgui.h>
-#include <imgui/IconsFontAwesome4.h>
 
 #include "animation/animation_scene.h"
 #include "controller_editor.h"
@@ -492,7 +491,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					ImGui::PushItemWidth(-1);
 					char path[MAX_PATH_LENGTH];
 					copyString(path, entry.animation ? entry.animation->getPath().c_str() : "");
-					if (m_app.getAssetBrowser().resourceInput("", "anim", Span(path), Animation::TYPE)) {
+					if (m_app.getAssetBrowser().resourceInput("anim", Span(path), Animation::TYPE)) {
 						if (entry.animation) entry.animation->getResourceManager().unload(*entry.animation);
 						ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
 						entry.animation = res_manager.load<Animation>(Path(path));
@@ -548,7 +547,8 @@ struct ControllerEditorImpl : ControllerEditor {
 			if (ImGui::CollapsingHeader("Bone masks")) {
 				char model_path[MAX_PATH_LENGTH];
 				copyString(model_path, m_model ? m_model->getPath().c_str() : "");
-				if (m_app.getAssetBrowser().resourceInput("Model", "model", Span(model_path), Model::TYPE)) {
+				ImGuiEx::Label("Model");
+				if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
 					m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
 				}
 
@@ -556,13 +556,15 @@ struct ControllerEditorImpl : ControllerEditor {
 					for (BoneMask& mask : m_controller->m_bone_masks) {
 						if (!ImGui::TreeNodeEx(&mask, 0, "%s", mask.name.data)) continue;
 				
-						ImGui::InputText("Name", mask.name.data, sizeof(mask.name.data));
+						ImGuiEx::Label("Name");
+						ImGui::InputText("##name", mask.name.data, sizeof(mask.name.data));
 						for (u32 i = 0, c = m_model->getBoneCount(); i < c; ++i) {
 							const char* bone_name = m_model->getBone(i).name.c_str();
 							const u32 bone_name_hash = crc32(bone_name);
 							const bool is_masked = mask.bones.find(bone_name_hash).isValid();
 							bool b = is_masked;
-							if (ImGui::Checkbox(bone_name, &b)) {
+							ImGuiEx::Label(bone_name);
+							if (ImGui::Checkbox(StaticString<256>("##", bone_name), &b)) {
 								ASSERT(b != is_masked);
 								if (is_masked) {
 									mask.bones.erase(bone_name_hash);
@@ -581,7 +583,8 @@ struct ControllerEditorImpl : ControllerEditor {
 			if (ImGui::CollapsingHeader("IK")) {
 				char model_path[MAX_PATH_LENGTH];
 				copyString(model_path, m_model ? m_model->getPath().c_str() : "");
-				if (m_app.getAssetBrowser().resourceInput("Model", "model", Span(model_path), Model::TYPE)) {
+				ImGuiEx::Label("Model");
+				if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
 					m_model = m_app.getEngine().getResourceManager().load<Model>(Path(model_path));
 				}
 				if(m_model) {
@@ -592,7 +595,8 @@ struct ControllerEditorImpl : ControllerEditor {
 							ASSERT(ik.bones_count > 0);
 							const u32 bones_count = m_model->getBoneCount();
 							auto leaf_iter = m_model->getBoneIndex(ik.bones[ik.bones_count - 1]);
-							if (ImGui::BeginCombo("Leaf", leaf_iter.isValid() ? m_model->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
+							ImGuiEx::Label("Leaf");
+							if (ImGui::BeginCombo("##leaf", leaf_iter.isValid() ? m_model->getBone(leaf_iter.value()).name.c_str() : "N/A")) {
 								for (u32 j = 0; j < bones_count; ++j) {
 									const char* bone_name = m_model->getBone(j).name.c_str();
 									if (ImGui::Selectable(bone_name)) {

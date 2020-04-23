@@ -354,7 +354,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 	void onGUIMultiple(Span<Resource*> resources) {
-		if (ImGui::Button("Open in external editor")) {
+		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 			for (Resource* res : resources) {
 				m_app.getAssetBrowser().openInExternalEditor(res);
 			}
@@ -367,7 +367,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Save")) {
+		if (ImGui::Button(ICON_FA_SAVE "Save")) {
 			for (Resource* res : resources) {
 				saveMaterial(static_cast<Material*>(res));
 			}
@@ -390,14 +390,12 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			copyString(buf, "<different values>");
 		}
 
-		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", Span(buf), Shader::TYPE)) {
+		ImGuiEx::Label("Shader");
+		if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
 			for (Resource* res : resources) {
 				static_cast<Material*>(res)->setShader(Path(buf));
 			}
 		}
-
-		if (!same_shader) return;
-
 	}
 
 	void onGUI(Span<Resource*> resources) override {
@@ -407,10 +405,10 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		Material* material = static_cast<Material*>(resources[0]);
-		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(material);
+		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) m_app.getAssetBrowser().openInExternalEditor(material);
 
-		if (ImGui::Button("Save")) saveMaterial(material);
 		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_SAVE "Save")) saveMaterial(material);
 
 		auto* plugin = m_app.getEngine().getPluginManager().getPlugin("renderer");
 		auto* renderer = static_cast<Renderer*>(plugin);
@@ -418,17 +416,20 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
 
 		bool b = material->isBackfaceCulling();
-		if (ImGui::Checkbox("Backface culling", &b)) material->enableBackfaceCulling(b);
+		ImGuiEx::Label("Backface culling");
+		if (ImGui::Checkbox("##bfcul", &b)) material->enableBackfaceCulling(b);
 
 		if (material->getShader() 
 			&& material->getShader()->isReady() 
 			&& material->getShader()->hasDefine(alpha_cutout_define))
 		{
 			b = material->isDefined(alpha_cutout_define);
-			if (ImGui::Checkbox("Is alpha cutout", &b)) material->setDefine(alpha_cutout_define, b);
+			ImGuiEx::Label("Is alpha cutout");
+			if (ImGui::Checkbox("##acut", &b)) material->setDefine(alpha_cutout_define, b);
 			if (b) {
 				float tmp = material->getAlphaRef();
-				if (ImGui::DragFloat("Alpha reference value", &tmp, 0.01f, 0.0f, 1.0f)) {
+				ImGuiEx::Label("Alpha reference value");
+				if (ImGui::DragFloat("##acutref", &tmp, 0.01f, 0.0f, 1.0f)) {
 					material->setAlphaRef(tmp);
 				}
 			}
@@ -438,28 +439,32 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (shader) {
 			if (!shader->isIgnored(Shader::COLOR)) {
 				Vec4 color = material->getColor();
-				if (ImGui::ColorEdit4("Color", &color.x)) {
+				ImGuiEx::Label("Color");
+				if (ImGui::ColorEdit4("##col", &color.x)) {
 					material->setColor(color);
 				}
 			}
 
 			if (!shader->isIgnored(Shader::ROUGHNESS)) {
 				float roughness = material->getRoughness();
-				if (ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f)) {
+				ImGuiEx::Label("Roughness");
+				if (ImGui::DragFloat("##rgh", &roughness, 0.01f, 0.0f, 1.0f)) {
 					material->setRoughness(roughness);
 				}
 			}
 
 			if (!shader->isIgnored(Shader::METALLIC)) {
 				float metallic = material->getMetallic();
-				if (ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.0f, 1.0f)) {
+				ImGuiEx::Label("Metallic");
+				if (ImGui::DragFloat("##met", &metallic, 0.01f, 0.0f, 1.0f)) {
 					material->setMetallic(metallic);
 				}
 			}
 			
 			if (!shader->isIgnored(Shader::EMISSION)) {
 				float emission = material->getEmission();
-				if (ImGui::DragFloat("Emission", &emission, 0.01f, 0.0f)) {
+				ImGuiEx::Label("Emission");
+				if (ImGui::DragFloat("##emis", &emission, 0.01f, 0.0f)) {
 					material->setEmission(emission);
 				}
 			}
@@ -467,12 +472,14 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		char buf[MAX_PATH_LENGTH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		if (m_app.getAssetBrowser().resourceInput("Shader", "shader", Span(buf), Shader::TYPE)) {
+		ImGuiEx::Label("Shader");
+		if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
 			material->setShader(Path(buf));
 		}
 
 		const char* current_layer_name = renderer->getLayerName(material->getLayer());
-		if (ImGui::BeginCombo("Layer", current_layer_name)) {
+		ImGuiEx::Label("Layer");
+		if (ImGui::BeginCombo("##layer", current_layer_name)) {
 			for (u8 i = 0, c = renderer->getLayersCount(); i < c; ++i) {
 				const char* name = renderer->getLayerName(i);
 				if (ImGui::Selectable(name)) {
@@ -496,8 +503,9 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				"");
 			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
-			if (m_app.getAssetBrowser().resourceInput(
-					slot.name, StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE))
+
+			ImGuiEx::Label(slot.name);
+			if (m_app.getAssetBrowser().resourceInput(StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE))
 			{
 				material->setTexturePath(i, Path(buf));
 			}
@@ -532,27 +540,32 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				switch (shader_uniform.type) {
 					case Shader::Uniform::FLOAT:
-						if (ImGui::DragFloat(shader_uniform.name, &uniform->float_value)) {
+						ImGuiEx::Label(shader_uniform.name);
+						if (ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value)) {
 							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::VEC3:
-						if (ImGui::DragFloat3(shader_uniform.name, uniform->vec3)) {
+						ImGuiEx::Label(shader_uniform.name);
+						if (ImGui::DragFloat3(StaticString<256>("##", shader_uniform.name), uniform->vec3)) {
 							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::VEC4:
-						if (ImGui::DragFloat4(shader_uniform.name, uniform->vec4)) {
+						ImGuiEx::Label(shader_uniform.name);
+						if (ImGui::DragFloat4(StaticString<256>("##", shader_uniform.name), uniform->vec4)) {
 							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::VEC2:
-						if (ImGui::DragFloat2(shader_uniform.name, uniform->vec2)) {
+						ImGuiEx::Label(shader_uniform.name);
+						if (ImGui::DragFloat2(StaticString<256>("##", shader_uniform.name), uniform->vec2)) {
 							material->updateRenderData(false);
 						}
 						break;
 					case Shader::Uniform::COLOR:
-						if (ImGui::ColorEdit3(shader_uniform.name, uniform->vec3)) {
+						ImGuiEx::Label(shader_uniform.name);
+						if (ImGui::ColorEdit3(StaticString<256>("##", shader_uniform.name), uniform->vec3)) {
 							material->updateRenderData(false);
 						}
 						break;
@@ -994,84 +1007,90 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		auto* model = static_cast<Model*>(resources[0]);
 
 		if (model->isReady()) {
-			ImGui::LabelText("Bounding radius", "%f", model->getBoundingRadius());
+			ImGuiEx::Label("Bounding radius");
+			ImGui::Text("%f", model->getBoundingRadius());
 
-			auto* lods = model->getLODs();
-			if (lods[0].to_mesh >= 0 && !model->isFailure())
-			{
-				ImGui::Separator();
-				ImGui::Columns(4);
-				ImGui::Text("LOD");
-				ImGui::NextColumn();
-				ImGui::Text("Distance");
-				ImGui::NextColumn();
-				ImGui::Text("# of meshes");
-				ImGui::NextColumn();
-				ImGui::Text("# of triangles");
-				ImGui::NextColumn();
-				ImGui::Separator();
-				int lod_count = 1;
-				for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
+			if (ImGui::CollapsingHeader("LODs")) {
+				auto* lods = model->getLODs();
+				if (lods[0].to_mesh >= 0 && !model->isFailure())
 				{
-					ImGui::PushID(i);
-					ImGui::Text("%d", i);
+					ImGui::Separator();
+					ImGui::Columns(4);
+					ImGui::Text("LOD");
 					ImGui::NextColumn();
-					if (lods[i].distance == FLT_MAX)
+					ImGui::Text("Distance");
+					ImGui::NextColumn();
+					ImGui::Text("# of meshes");
+					ImGui::NextColumn();
+					ImGui::Text("# of triangles");
+					ImGui::NextColumn();
+					ImGui::Separator();
+					int lod_count = 1;
+					for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
 					{
-						ImGui::Text("Infinite");
-					}
-					else
-					{
-						float dist = sqrtf(lods[i].distance);
-						if (ImGui::DragFloat("", &dist))
+						ImGui::PushID(i);
+						ImGui::Text("%d", i);
+						ImGui::NextColumn();
+						if (lods[i].distance == FLT_MAX)
 						{
-							lods[i].distance = dist * dist;
+							ImGui::Text("Infinite");
 						}
-					}
-					ImGui::NextColumn();
-					ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
-					ImGui::NextColumn();
-					int tri_count = 0;
-					for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
-					{
-						int indices_count = model->getMesh(j).indices.size() >> 1;
-						if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
-							indices_count >>= 1;
+						else
+						{
+							float dist = sqrtf(lods[i].distance);
+							if (ImGui::DragFloat("", &dist))
+							{
+								lods[i].distance = dist * dist;
+							}
 						}
-						tri_count += indices_count / 3;
+						ImGui::NextColumn();
+						ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
+						ImGui::NextColumn();
+						int tri_count = 0;
+						for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
+						{
+							int indices_count = model->getMesh(j).indices.size() >> 1;
+							if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
+								indices_count >>= 1;
+							}
+							tri_count += indices_count / 3;
 
+						}
+
+						ImGui::Text("%d", tri_count);
+						ImGui::NextColumn();
+						++lod_count;
+						ImGui::PopID();
 					}
 
-					ImGui::Text("%d", tri_count);
-					ImGui::NextColumn();
-					++lod_count;
-					ImGui::PopID();
+					ImGui::Columns(1);
 				}
-
-				ImGui::Columns(1);
 			}
-
-			ImGui::Separator();
 		}
 
-		for (int i = 0; i < model->getMeshCount(); ++i)
-		{
-			auto& mesh = model->getMesh(i);
-			if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
+		if (ImGui::CollapsingHeader("Meshes")) {
+			for (int i = 0; i < model->getMeshCount(); ++i)
 			{
-				ImGui::LabelText("Triangle count", "%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
-				ImGui::LabelText("Material", "%s", mesh.material->getPath().c_str());
-				ImGui::SameLine();
-				if (ImGui::Button("->"))
+				auto& mesh = model->getMesh(i);
+				if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
 				{
-					m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
+					ImGuiEx::Label("Triangle count");
+					ImGui::Text("%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
+					ImGuiEx::Label("Material");
+					ImGui::TextUnformatted(mesh.material->getPath().c_str());
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
+					{
+						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
+					}
+					ImGui::TreePop();
 				}
-				ImGui::TreePop();
 			}
 		}
 
-		if (model->isReady()) {
-			ImGui::LabelText("Bone count", "%d", model->getBoneCount());
+		if (model->isReady() && ImGui::CollapsingHeader("Bones")) {
+			ImGuiEx::Label("Count");
+			ImGui::Text("%d", model->getBoneCount());
 			if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
 				ImGui::Columns(3);
 				for (int i = 0; i < model->getBoneCount(); ++i)
@@ -1094,11 +1113,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_meta = getMeta(model->getPath());
 				m_meta_res = model->getPath().getHash();
 			}
-			ImGui::InputFloat("Max position error", &m_meta.position_error);
-			ImGui::InputFloat("Max rotation error", &m_meta.rotation_error);
-			ImGui::InputFloat("Scale", &m_meta.scale);
-			ImGui::Checkbox("Split", &m_meta.split);
-			ImGui::Checkbox("Create impostor", &m_meta.create_impostor);
+			ImGuiEx::Label("Max position error");
+			ImGui::InputFloat("##maxposer", &m_meta.position_error);
+			ImGuiEx::Label("Max rotation error");
+			ImGui::InputFloat("##maxroter", &m_meta.rotation_error);
+			ImGuiEx::Label("Scale");
+			ImGui::InputFloat("##scale", &m_meta.scale);
+			ImGuiEx::Label("Split");
+			ImGui::Checkbox("##split", &m_meta.split);
+			ImGuiEx::Label("Create impostor");
+			ImGui::Checkbox("##creimp", &m_meta.create_impostor);
 			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 				bool infinite = m_meta.lods_distances[i] <= 0;
 				if(ImGui::Checkbox(StaticString<32>("Infinite LOD ", i), &infinite)) {
@@ -1106,9 +1130,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 				if (m_meta.lods_distances[i] > 0) {
 					ImGui::SameLine();
-					ImGui::PushItemWidth(-1);
+					ImGui::SetNextItemWidth(-1);
 					ImGui::DragFloat(StaticString<32>("##lod", i), &m_meta.lods_distances[i]);
-					ImGui::PopItemWidth();
 				}
 			}
 			
@@ -2110,32 +2133,42 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					
 					if (show_channels) {
 						copyString(Span(tmp), layer.red.path.c_str());
-						if (m_app.getAssetBrowser().resourceInput("Red", "r", Span(tmp), Texture::TYPE)) {
+						ImGuiEx::Label("Red");
+						if (m_app.getAssetBrowser().resourceInput("r", Span(tmp), Texture::TYPE)) {
 							layer.red.path = tmp;
 						}
-						ImGui::Combo("Red source channel", (int*)&layer.red.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						ImGuiEx::Label("Red source channel");
+						ImGui::Combo("##rsrcch", (int*)&layer.red.src_channel, "Red\0Green\0Blue\0Alpha\0");
 
 						copyString(Span(tmp), layer.green.path.c_str());
-						if (m_app.getAssetBrowser().resourceInput("Green", "g", Span(tmp), Texture::TYPE)) {
+						ImGuiEx::Label("Green");
+						if (m_app.getAssetBrowser().resourceInput("g", Span(tmp), Texture::TYPE)) {
 							layer.green.path = tmp;
 						}
-						ImGui::Combo("Green source channel", (int*)&layer.green.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						ImGuiEx::Label("Green source channel");
+						ImGui::Combo("##gsrcch", (int*)&layer.green.src_channel, "Red\0Green\0Blue\0Alpha\0");
 
 						copyString(Span(tmp), layer.blue.path.c_str());
-						if (m_app.getAssetBrowser().resourceInput("Blue", "b", Span(tmp), Texture::TYPE)) {
+						ImGuiEx::Label("Blue");
+						if (m_app.getAssetBrowser().resourceInput("b", Span(tmp), Texture::TYPE)) {
 							layer.blue.path = tmp;
 						}
-						ImGui::Combo("Blue source channel", (int*)&layer.blue.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						
+						ImGuiEx::Label("Blue source channel");
+						ImGui::Combo("##bsrcch", (int*)&layer.blue.src_channel, "Red\0Green\0Blue\0Alpha\0");
 				
 						copyString(Span(tmp), layer.alpha.path.c_str());
-						if (m_app.getAssetBrowser().resourceInput("Alpha", "a", Span(tmp), Texture::TYPE)) {
+						ImGuiEx::Label("Alpha");
+						if (m_app.getAssetBrowser().resourceInput("a", Span(tmp), Texture::TYPE)) {
 							layer.alpha.path = tmp;
 						}
-						ImGui::Combo("Alpha source channel", (int*)&layer.alpha.src_channel, "Red\0Green\0Blue\0Alpha\0");
+						ImGuiEx::Label("Alpha source channel");
+						ImGui::Combo("##asrch", (int*)&layer.alpha.src_channel, "Red\0Green\0Blue\0Alpha\0");
 					}
 					else {
 						copyString(Span(tmp), layer.red.path.c_str());
-						if (m_app.getAssetBrowser().resourceInput("Source", "rgba", Span(tmp), Texture::TYPE)) {
+						ImGuiEx::Label("Source");
+						if (m_app.getAssetBrowser().resourceInput("rgba", Span(tmp), Texture::TYPE)) {
 							layer.red.path = tmp;
 							layer.green.path = tmp;
 							layer.blue.path = tmp;
@@ -2153,7 +2186,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button("Add layer")) {
 				m_composite.layers.emplace();
 			}
-			if (ImGui::Button("Save")) {
+			if (ImGui::Button(ICON_FA_SAVE "Save")) {
 				const StaticString<MAX_PATH_LENGTH> out_path(fs.getBasePath(), "/", texture.getPath().c_str());
 				OS::OutputFile file;
 				if (file.open(out_path)) {
@@ -2172,7 +2205,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Open in external editor")) {
+			if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 				m_app.getAssetBrowser().openInExternalEditor(texture.getPath().c_str());
 			}
 		}
@@ -2184,8 +2217,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		auto* texture = static_cast<Texture*>(resources[0]);
 
-		ImGui::LabelText("Size", "%dx%d", texture->width, texture->height);
-		ImGui::LabelText("Mips", "%d", texture->mips);
+		ImGuiEx::Label("Size");
+		ImGui::Text("%dx%d", texture->width, texture->height);
+		ImGuiEx::Label("Mips");
+		ImGui::Text("%d", texture->mips);
 		const char* format = "unknown";
 		switch(texture->format) {
 			case gpu::TextureFormat::R8: format = "R8"; break;
@@ -2200,7 +2235,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case gpu::TextureFormat::SRGBA: format = "SRGBA"; break;
 			default: ASSERT(false); break;
 		}
-		ImGui::LabelText("Format", "%s", format);
+		ImGuiEx::Label("Format");
+		ImGui::TextUnformatted(format);
 		if (texture->handle.isValid()) {
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height) {
@@ -2237,19 +2273,28 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_meta_res = texture->getPath().getHash();
 			}
 			
-			ImGui::Checkbox("SRGB", &m_meta.srgb);
-			ImGui::Checkbox("Convert to RAW", &m_meta.convert_to_raw);
+			ImGuiEx::Label("SRGB");
+			ImGui::Checkbox("##srgb", &m_meta.srgb);
+			ImGuiEx::Label("Convert to RAW");
+			ImGui::Checkbox("##cvt2raw", &m_meta.convert_to_raw);
 			bool scale_coverage = m_meta.scale_coverage >= 0;
-			if (ImGui::Checkbox("Mipmap scale coverage", &scale_coverage)) {
+			ImGuiEx::Label("Mipmap scale coverage");
+			if (ImGui::Checkbox("mmapsccov", &scale_coverage)) {
 				m_meta.scale_coverage *= -1;
 			}
 			if (m_meta.scale_coverage >= 0) {
-				ImGui::SliderFloat("Coverage alpha ref", &m_meta.scale_coverage, 0, 1);
+				ImGuiEx::Label("Coverage alpha ref");
+				ImGui::SliderFloat("##covaref", &m_meta.scale_coverage, 0, 1);
 			}
-			ImGui::Checkbox("Is normalmap", &m_meta.is_normalmap);
-			ImGui::Combo("U Wrap mode", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
-			ImGui::Combo("V Wrap mode", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0");
-			ImGui::Combo("W Wrap mode", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0");
+			ImGuiEx::Label("Is normalmap");
+			ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap);
+			ImGuiEx::Label("U Wrap mode");
+			ImGui::Combo("##uwrp", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
+			ImGuiEx::Label("V Wrap mode");
+			ImGui::Combo("##vwrp", (int*)&m_meta.wrap_mode_v, "Repeat\0Clamp\0");
+			ImGuiEx::Label("W Wrap mode");
+			ImGui::Combo("##wwrp", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0");
+			ImGuiEx::Label("Filter");
 			ImGui::Combo("Filter", (int*)&m_meta.filter, "Linear\0Point\0");
 
 			if (ImGui::Button("Apply")) {
@@ -2386,7 +2431,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if(resources.length() > 1) return;
 
 		auto* shader = static_cast<Shader*>(resources[0]);
-		if (ImGui::Button("Open in external editor"))
+		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally"))
 		{
 			m_app.getAssetBrowser().openInExternalEditor(shader->getPath().c_str());
 		}
@@ -3696,19 +3741,19 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		IAllocator& allocator = m_app.getAllocator();
 
-		m_app.registerComponent("camera", "Render / Camera");
-		m_app.registerComponent("environment", "Render / Environment");
-		m_app.registerComponent("light_probe_grid", "Render / Light probe grid");
-		m_app.registerComponent("model_instance", "Render / Mesh", Model::TYPE, "Source");
-		m_app.registerComponent("particle_emitter",	"Render / Particle emitter", ParticleEmitterResource::TYPE, "Resource");
-		m_app.registerComponent("point_light", "Render / Point light");
-		m_app.registerComponent("decal", "Render / Decal");
-		m_app.registerComponent("bone_attachment", "Render / Bone attachment");
-		m_app.registerComponent("environment_probe", "Render / Environment probe");
-		m_app.registerComponent("text_mesh", "Render / Text 3D", FontResource::TYPE, "Font");
+		m_app.registerComponent(ICON_FA_CAMERA, "camera", "Render / Camera");
+		m_app.registerComponent(ICON_FA_GLOBE, "environment", "Render / Environment");
+		m_app.registerComponent("", "light_probe_grid", "Render / Light probe grid");
+		m_app.registerComponent(ICON_FA_CUBES, "model_instance", "Render / Mesh", Model::TYPE, "Source");
+		m_app.registerComponent(ICON_FA_SMOG, "particle_emitter",	"Render / Particle emitter", ParticleEmitterResource::TYPE, "Resource");
+		m_app.registerComponent(ICON_FA_LIGHTBULB, "point_light", "Render / Point light");
+		m_app.registerComponent("", "decal", "Render / Decal");
+		m_app.registerComponent(ICON_FA_BONE, "bone_attachment", "Render / Bone attachment");
+		m_app.registerComponent("", "environment_probe", "Render / Environment probe");
+		m_app.registerComponent(ICON_FA_ALIGN_JUSTIFY, "text_mesh", "Render / Text 3D", FontResource::TYPE, "Font");
 
 		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
-		m_app.registerComponent("terrain", *m_add_terrain_plugin);
+		m_app.registerComponent(ICON_FA_MAP, "terrain", *m_add_terrain_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 

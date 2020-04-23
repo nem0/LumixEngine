@@ -423,6 +423,19 @@ template <typename T> inline bool checkField(lua_State* L, int idx, const char* 
 	return true;
 }
 
+inline bool checkStringField(lua_State* L, int idx, const char* k, Span<char> out)
+{
+	lua_getfield(L, idx, k);
+	if(!isType<const char*>(L, -1)) {
+		lua_pop(L, 1);
+		return false;
+	}
+	const char* tmp = toType<const char*>(L, -1);
+	copyString(out, tmp);
+	lua_pop(L, 1);
+	return true;
+}
+
 template <typename T, typename F> bool forEachArrayItem(lua_State* L, int index, const char* error_msg, F&& func)
 {
 	if (!lua_istable(L, index)) {
