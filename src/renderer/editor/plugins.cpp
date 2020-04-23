@@ -911,7 +911,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		for (i32 j = 0; j < size.y; ++j) {
 			for (i32 i = 0; i < size.x; ++i) {
 				const u32 idx = i + j * size.x;
-				if (data[idx] & 0x000000ff) {
+				if (data[idx] & 0xff000000) {
 					cells[i].x = i;
 					cells[i].y = j;
 				}
@@ -929,7 +929,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		for (i32 j = 0; j < size.y; ++j) {
 			for (i32 i = 0; i < size.x; ++i) {
 				const u32 idx = i + j * size.x;
-				if (data[idx] & 0x000000ff) {
+				if (data[idx] & 0xff000000) {
 					cells[idx].x = i;
 					cells[idx].y = j;
 				}
@@ -955,7 +955,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		for (i32 j = size.y - 1; j >= 0; --j) {
 			for (i32 i = size.x - 1; i>= 0; --i) {
 				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff) {
+				if (data[idx] & 0xff000000) {
 					cells[idx].x = i;
 					cells[idx].y = j;
 				}
@@ -980,24 +980,31 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Array<u32> tmp(allocator);
 		tmp.resize(gb0->size());
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				const u8 alpha = data[idx] >> 24;
-				tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
-				tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
+		if (cells[0].x >= 0) {
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					const u8 alpha = data[idx] >> 24;
+					tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
+					tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
+				}
 			}
-		}
-		memcpy(gb0->begin(), tmp.begin(), tmp.byte_size());
+			memcpy(gb0->begin(), tmp.begin(), tmp.byte_size());
 
-		const u32* gb1_data = gb1->begin();
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
+			const u32* gb1_data = gb1->begin();
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
+				}
 			}
+			memcpy(gb1->begin(), tmp.begin(), tmp.byte_size());
 		}
-		memcpy(gb1->begin(), tmp.begin(), tmp.byte_size());
+		else {
+			// nothing was rendered
+			memset(gb0->begin(), 0xff, gb0->byte_size());
+			memset(gb1->begin(), 0xff, gb1->byte_size());
+		}
 	}
 
 	void onGUI(Span<Resource*> resources) override
@@ -1168,8 +1175,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
 				OS::OutputFile file;
-				if (file.open(img_path)) {
-					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), true, Path(img_path), allocator);
+				FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+				if (fs.open(img_path, Ref(file))) {
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
 				}
 				else {
@@ -1178,8 +1186,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				img_path = fi.m_dir;
 				img_path << fi.m_basename << "_impostor1.tga";
-				if (file.open(img_path)) {
-					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), true, Path(img_path), allocator);
+				if (fs.open(img_path, Ref(file))) {
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
 				}
 				else {
@@ -2279,7 +2287,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Checkbox("##cvt2raw", &m_meta.convert_to_raw);
 			bool scale_coverage = m_meta.scale_coverage >= 0;
 			ImGuiEx::Label("Mipmap scale coverage");
-			if (ImGui::Checkbox("mmapsccov", &scale_coverage)) {
+			if (ImGui::Checkbox("##mmapsccov", &scale_coverage)) {
 				m_meta.scale_coverage *= -1;
 			}
 			if (m_meta.scale_coverage >= 0) {
