@@ -76,20 +76,22 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Sprite* sprite = (Sprite*)resources[0];
 		if (!sprite->isReady()) return;
 		
-		if (ImGui::Button("Save")) saveSprite(*sprite);
+		if (ImGui::Button(ICON_FA_SAVE "Save")) saveSprite(*sprite);
 		ImGui::SameLine();
-		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(sprite);
+		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) m_app.getAssetBrowser().openInExternalEditor(sprite);
 
 		char tmp[MAX_PATH_LENGTH];
 		Texture* tex = sprite->getTexture();
 		copyString(tmp, tex ? tex->getPath().c_str() : "");
-		if (m_app.getAssetBrowser().resourceInput("Texture", "texture", Span(tmp), Texture::TYPE))
+		ImGuiEx::Label("Texture");
+		if (m_app.getAssetBrowser().resourceInput("texture", Span(tmp), Texture::TYPE))
 		{
 			sprite->setTexture(Path(tmp));
 		}
 
 		static const char* TYPES_STR[] = { "9 patch", "Simple" };
-		if (ImGui::BeginCombo("Type", TYPES_STR[sprite->type]))
+		ImGuiEx::Label("type");
+		if (ImGui::BeginCombo("##type", TYPES_STR[sprite->type]))
 		{
 			if (ImGui::Selectable("9 patch")) sprite->type = Sprite::Type::PATCH9;
 			if (ImGui::Selectable("Simple")) sprite->type = Sprite::Type::SIMPLE;
@@ -98,10 +100,14 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		switch (sprite->type)
 		{
 			case Sprite::Type::PATCH9:
-				ImGui::InputInt("Top", &sprite->top);
-				ImGui::InputInt("Right", &sprite->right);
-				ImGui::InputInt("Bottom", &sprite->bottom);
-				ImGui::InputInt("Left", &sprite->left);
+				ImGuiEx::Label("Top");
+				ImGui::InputInt("##top", &sprite->top);
+				ImGuiEx::Label("Right");
+				ImGui::InputInt("##right", &sprite->right);
+				ImGuiEx::Label("Bottom");
+				ImGui::InputInt("##bottom", &sprite->bottom);
+				ImGuiEx::Label("Left");
+				ImGui::InputInt("##left", &sprite->left);
 				patch9edit(sprite);
 				break;
 			case Sprite::Type::SIMPLE: break;
@@ -899,13 +905,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponent("gui_button", "GUI / Button");
-		m_app.registerComponent("gui_canvas", "GUI / Canvas");
-		m_app.registerComponent("gui_image", "GUI / Image", Sprite::TYPE, "Sprite");
-		m_app.registerComponent("gui_input_field", "GUI / Input field");
-		m_app.registerComponent("gui_rect", "GUI / Rect");
-		m_app.registerComponent("gui_render_target", "GUI / Render target");
-		m_app.registerComponent("gui_text", "GUI / Text");
+		m_app.registerComponent("", "gui_button", "GUI / Button");
+		m_app.registerComponent("", "gui_canvas", "GUI / Canvas");
+		m_app.registerComponent(ICON_FA_IMAGE, "gui_image", "GUI / Image", Sprite::TYPE, "Sprite");
+		m_app.registerComponent(ICON_FA_KEYBOARD, "gui_input_field", "GUI / Input field");
+		m_app.registerComponent("", "gui_rect", "GUI / Rect");
+		m_app.registerComponent("", "gui_render_target", "GUI / Render target");
+		m_app.registerComponent(ICON_FA_FONT, "gui_text", "GUI / Text");
 
 		IAllocator& allocator = m_app.getAllocator();
 		m_gui_editor = LUMIX_NEW(allocator, GUIEditor)(m_app);

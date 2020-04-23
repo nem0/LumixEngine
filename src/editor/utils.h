@@ -22,22 +22,27 @@ struct LUMIX_EDITOR_API ResourceLocator {
 
 struct LUMIX_EDITOR_API Action
 {
-	Action(const char* label_short, const char* label_long, const char* name);
-	Action(const char* label_short, const char* label_long, const char* name, OS::Keycode key0, OS::Keycode key1, OS::Keycode key2);
-	bool toolbarButton();
+	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon = "");
+	Action(const char* label_short, const char* label_long, const char* name, const char* font_icon, OS::Keycode key0, u8 modifiers);
+	bool toolbarButton(ImFont* font);
 	bool isActive();
-	void getIconPath(Span<char> path);
-	bool isRequested();
 
 	static bool falseConst() { return false; }
 
-	OS::Keycode shortcut[3];
+	enum class Modifiers : u8 {
+		SHIFT = 1 << 0,
+		ALT = 1 << 1,
+		CTRL = 1 << 2
+	};
+
+	u8 modifiers = 0;
+	OS::Keycode shortcut = OS::Keycode::INVALID;
 	StaticString<32> name;
 	StaticString<32> label_short;
 	StaticString<64> label_long;
+	StaticString<5> font_icon;
 	bool is_global;
 	void* plugin;
-	ImTextureID icon;
 	Delegate<void ()> func;
 	Delegate<bool ()> is_selected;
 };

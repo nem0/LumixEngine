@@ -3,6 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/math.h"
+#include "engine/string.h"
 
 
 struct lua_State;
@@ -38,6 +39,7 @@ struct LUMIX_EDITOR_API Settings {
 	Vec2 m_mouse_sensitivity;
 	float m_mouse_sensitivity_y;
 	int m_font_size = 13;
+	String m_imgui_state;
 
 	explicit Settings(struct StudioApp& app);
 	~Settings();
@@ -52,6 +54,7 @@ struct LUMIX_EDITOR_API Settings {
 
 private:
 	StudioApp& m_app;
+	struct Action* m_edit_action = nullptr;
 	lua_State* m_state;
 
 private:

@@ -50,7 +50,8 @@ struct AnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (resources.length() > 1) return;
 
 		auto* animation = static_cast<Animation*>(resources[0]);
-		ImGui::LabelText("Length", "%.3fs", animation->getLength().seconds());
+		ImGuiEx::Label("Length");
+		ImGui::Text("%.3fs", animation->getLength().seconds());
 	}
 
 
@@ -174,16 +175,17 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		auto* animation = static_cast<PropertyAnimation*>(resources[0]);
 		if (!animation->isReady()) return;
 
-		if (ImGui::Button("Save")) savePropertyAnimation(*animation);
+		if (ImGui::Button(ICON_FA_SAVE "Save")) savePropertyAnimation(*animation);
 		ImGui::SameLine();
-		if (ImGui::Button("Open in external editor")) m_app.getAssetBrowser().openInExternalEditor(animation);
+		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) m_app.getAssetBrowser().openInExternalEditor(animation);
 			
 		ShowAddCurveMenu(animation);
 
 		if (!animation->curves.empty())
 		{
 			int frames = animation->curves[0].frames.back();
-			if (ImGui::InputInt("Frames", &frames))
+			ImGuiEx::Label("Frames");
+			if (ImGui::InputInt("##frames", &frames))
 			{
 				for (auto& curve : animation->curves)
 				{
@@ -252,8 +254,10 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 		if (m_selected_point >= 0 && m_selected_point < curve.frames.size())
 		{
-			ImGui::InputInt("Frame", &curve.frames[m_selected_point]);
-			ImGui::InputFloat("Value", &curve.values[m_selected_point]);
+			ImGuiEx::Label("Frame");
+			ImGui::InputInt("##frame", &curve.frames[m_selected_point]);
+			ImGuiEx::Label("Value");
+			ImGui::InputFloat("##val", &curve.values[m_selected_point]);
 		}
 
 		ImGui::HSplitter("sizer", &size);
@@ -383,10 +387,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponent("property_animator", "Animation / Property animator", PropertyAnimation::TYPE, "Animation");
-		m_app.registerComponent("animable", "Animation / Animable", Animation::TYPE, "Animation");
-		m_app.registerComponent("animator", "Animation / Animator", Anim::Controller::TYPE, "Source");
-		m_app.registerComponent("shared_anim_controller", "Animation / Shared controller");
+		m_app.registerComponent("", "property_animator", "Animation / Property animator", PropertyAnimation::TYPE, "Animation");
+		m_app.registerComponent("", "animable", "Animation / Animable", Animation::TYPE, "Animation");
+		m_app.registerComponent("", "animator", "Animation / Animator", Anim::Controller::TYPE, "Source");
 
 		IAllocator& allocator = m_app.getAllocator();
 		m_animtion_plugin = LUMIX_NEW(allocator, AnimationAssetBrowserPlugin)(m_app);

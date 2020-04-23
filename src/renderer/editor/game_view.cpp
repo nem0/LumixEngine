@@ -289,9 +289,9 @@ void GameView::onWindowGUI()
 		captureMouse(false);
 	}
 
-	const char* window_name = "Game View###game_view";
+	const char* window_name = ICON_FA_CAMERA "Game View###game_view";
 	if (m_is_mouse_captured) {
-		window_name = "Game View (mouse captured)###game_view";
+		window_name = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
 		OS::setCursor(m_cursor_type);
 	}
 	

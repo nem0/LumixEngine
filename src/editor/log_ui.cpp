@@ -137,7 +137,7 @@ void LogUI::onGUI()
 	showNotifications();
 
 	if (!m_is_open) return;
-	if (ImGui::Begin("Log", &m_is_open))
+	if (ImGui::Begin(ICON_FA_COMMENT_ALT "Log##log", &m_is_open))
 	{
 		const char* labels[] = {"Info", "Warning", "Error"};
 		for (u32 i = 0; i < lengthOf(labels); ++i)
@@ -159,6 +159,7 @@ void LogUI::onGUI()
 		ImGui::SameLine();
 		char filter[128] = "";
 		ImGui::Checkbox("Autoscroll", &m_autoscroll);
+		ImGui::SetNextItemWidth(-1);
 		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 		int len = 0;
 
