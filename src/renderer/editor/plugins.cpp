@@ -1128,13 +1128,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::InputFloat("##scale", &m_meta.scale);
 			ImGuiEx::Label("Split");
 			ImGui::Checkbox("##split", &m_meta.split);
-			ImGuiEx::Label("Create impostor");
+			ImGuiEx::Label("Create impostor mesh");
 			ImGui::Checkbox("##creimp", &m_meta.create_impostor);
 			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 				bool infinite = m_meta.lods_distances[i] <= 0;
 				if(ImGui::Checkbox(StaticString<32>("Infinite LOD ", i), &infinite)) {
 					m_meta.lods_distances[i] *= -1;
 				}
+				if (infinite) break;
+
 				if (m_meta.lods_distances[i] > 0) {
 					ImGui::SameLine();
 					ImGui::SetNextItemWidth(-1);
@@ -1142,7 +1144,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 			
-			if (ImGui::Button("Apply")) {
+			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				String src(m_app.getAllocator());
 				src.cat("create_impostor=").cat(m_meta.create_impostor ? "true" : "false")
 					.cat("\nposition_error = ").cat(m_meta.position_error)
@@ -1162,6 +1164,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					model->getResourceManager().reload(*model);
 				}
 			}
+			ImGui::SameLine();
 			if (ImGui::Button("Create impostor texture")) {
 				FBXImporter importer(m_app);
 				IAllocator& allocator = m_app.getAllocator();
@@ -1194,7 +1197,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					logError("Renderer") << "Failed to open " << img_path;
 				}
 			}
-		}
+			ImGui::SameLine();
+			ImGui::TextDisabled("(?)");
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("%s", "To use impostors, check `Create impostor mesh` and press this button. "
+				"When the mesh changes, you need to regenerate the impostor texture by pressing this button again.");
+			}
 
 		showPreview(*model);
 	}
@@ -2305,7 +2313,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGuiEx::Label("Filter");
 			ImGui::Combo("Filter", (int*)&m_meta.filter, "Linear\0Point\0");
 
-			if (ImGui::Button("Apply")) {
+			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
 					, "\nconvert_to_raw = ", m_meta.convert_to_raw ? "true" : "false"
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
