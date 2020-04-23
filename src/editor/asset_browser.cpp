@@ -175,7 +175,7 @@ void AssetBrowser::changeDir(const char* path)
 		else {
 			Path::getBasename(Span(filename), res.path.c_str());
 		}
-		clampText(filename, TILE_SIZE);
+		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
 
 		tile.file_path_hash = res.path.getHash();
 		tile.filepath = res.path.c_str();
@@ -290,7 +290,7 @@ void AssetBrowser::createTile(FileInfo& tile, const char* out_path)
 void AssetBrowser::thumbnail(FileInfo& tile)
 {
 	ImGui::BeginGroup();
-	ImVec2 img_size((float)TILE_SIZE, (float)TILE_SIZE);
+	ImVec2 img_size((float)TILE_SIZE * m_thumbnail_size, (float)TILE_SIZE * m_thumbnail_size);
 	RenderInterface* ri = m_app.getRenderInterface();
 	if (tile.tex)
 	{
@@ -325,7 +325,7 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	}
 	ImVec2 text_size = ImGui::CalcTextSize(tile.clamped_filename);
 	ImVec2 pos = ImGui::GetCursorPos();
-	pos.x += (TILE_SIZE - text_size.x) * 0.5f;
+	pos.x += (TILE_SIZE * m_thumbnail_size - text_size.x) * 0.5f;
 	ImGui::SetCursorPos(pos);
 	ImGui::Text("%s", tile.clamped_filename.data);
 	ImGui::EndGroup();
@@ -343,7 +343,7 @@ void AssetBrowser::fileColumn()
 	ImGui::BeginChild("main_col");
 
 	float w = ImGui::GetContentRegionAvail().x;
-	int columns = m_show_thumbnails ? (int)w / TILE_SIZE : 1;
+	int columns = m_show_thumbnails ? (int)w / int(TILE_SIZE * m_thumbnail_size) : 1;
 	columns = maximum(columns, 1);
 	int tile_count = m_filtered_file_infos.empty() ? m_file_infos.size() : m_filtered_file_infos.size();
 	int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
@@ -590,6 +590,27 @@ void AssetBrowser::detailsGUI()
 }
 
 
+void AssetBrowser::refreshLabels()
+{
+	for(FileInfo& tile : m_file_infos) {
+		char filename[MAX_PATH_LENGTH];
+		Span<const char> subres = getSubresource(tile.filepath.data);
+		if (*subres.end()) {
+			copyNString(Span(filename), subres.begin(), subres.length());
+			catString(filename, ":");
+			const int tmp_len = stringLength(filename);
+			Path::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), tile.filepath.data);
+		}
+		else {
+			Path::getBasename(Span(filename), tile.filepath.data);
+		}
+		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
+
+		tile.clamped_filename = filename;
+	}
+}
+
+
 void AssetBrowser::onGUI()
 {
 	if (m_dir.data[0] == '\0') changeDir(".");
@@ -611,6 +632,11 @@ void AssetBrowser::onGUI()
 		}
 
 		float checkbox_w = ImGui::GetCursorPosX();
+		ImGui::SetNextItemWidth(100);
+		if (ImGui::SliderFloat("##icon_size", &m_thumbnail_size, 0.3f, 3.f)) {
+			refreshLabels();
+		}
+		ImGui::SameLine();
 		ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
 		ImGui::SameLine();
 		checkbox_w = ImGui::GetCursorPosX() - checkbox_w;

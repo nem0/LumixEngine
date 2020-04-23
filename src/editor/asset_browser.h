@@ -62,7 +62,7 @@ public:
 public:
 	bool m_is_open;
 	float m_left_column_width = 120;
-	static const int TILE_SIZE = 64;
+	static const int TILE_SIZE = 96;
 
 private:
 	struct FileInfo
@@ -75,6 +75,7 @@ private:
 	};
 
 private:
+	void refreshLabels();
 	void dirColumn();
 	void fileColumn();
 	void detailsGUI();
@@ -106,6 +107,7 @@ private:
 	Path m_wanted_resource;
 	bool m_is_focus_requested;
 	bool m_show_thumbnails;
+	float m_thumbnail_size = 1.f;
 	Action* m_back_action;
 	Action* m_forward_action;
 };
