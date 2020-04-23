@@ -820,9 +820,11 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.view_projection = pass_state.projection * pass_state.view;
 					pass_state.inv_view_projection = pass_state.view_projection.inverted();
 					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
-
 					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
+
+
 					gpu::useProgram(dc.program);
+					gpu::bindUniformBuffer(2, m_material_ub, dc.material->material_constants);
 					gpu::bindIndexBuffer(rd->index_buffer_handle);
 					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -861,6 +863,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	Array<Drawcall> m_drawcalls;
 	AABB m_aabb;
 	float m_radius;
+	gpu::BufferGroupHandle m_material_ub;
 	Ref<Array<u32>> m_gb0;
 	Ref<Array<u32>> m_gb1;
 	Model* m_model;
@@ -880,6 +883,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0_rgba, gb1_rgba, size, allocator);
 	job->m_model = model;
 	job->m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
+	job->m_material_ub = renderer->getMaterialUniformBuffer();
 	renderer->queue(job, 0);
 	renderer->frame();
 	renderer->waitForRender();
