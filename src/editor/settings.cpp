@@ -643,7 +643,7 @@ void Settings::onGUI()
 	if (!m_is_open) return;
 	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open))
 	{
-		if (ImGui::Button(ICON_FA_SAVE "Save")) save();
+		if (ImGui::Button(ICON_FA_SAVE "Save")) m_app.saveSettings();
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_REDO_ALT "Reload")) load();
 		ImGui::SameLine();

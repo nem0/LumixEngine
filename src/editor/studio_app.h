@@ -134,6 +134,7 @@ struct LUMIX_EDITOR_API StudioApp : OS::Interface
 	virtual void setFOV(float fov_radians) = 0;
 	virtual Gizmo::Config& getGizmoConfig() = 0;
 	virtual void setCursorCaptured(bool captured) = 0;
+	virtual void saveSettings() = 0;
 
 	virtual const OS::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;
