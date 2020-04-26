@@ -1884,7 +1884,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void saveSettings()
+	void saveSettings() override
 	{
 		m_settings.m_is_asset_browser_open = m_asset_browser->m_is_open;
 		m_settings.m_asset_browser_left_column_width = m_asset_browser->m_left_column_width;

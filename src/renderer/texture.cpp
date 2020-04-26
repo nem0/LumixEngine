@@ -433,7 +433,7 @@ bool Texture::loadTGA(IInputStream& file)
 		height = header.height;
 		mips = 1;
 		if (data_reference) mem = renderer.copy(image_dest, image_size);
-		const bool is_srgb = flags & (u32)gpu::TextureFlags::SRGB;
+		const bool is_srgb = flags & (u32)Flags::SRGB;
 		format = is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8;
 		handle = renderer.createTexture(header.width
 			, header.height
@@ -549,7 +549,7 @@ bool Texture::loadTGA(IInputStream& file)
 
 	mips = 1;
 	if (data_reference) mem = renderer.copy(image_dest, image_size);
-	const bool is_srgb = flags & (u32)gpu::TextureFlags::SRGB;
+	const bool is_srgb = flags & (u32)Flags::SRGB;
 	format = is_srgb ? gpu::TextureFormat::SRGBA : gpu::TextureFormat::RGBA8;
 	handle = renderer.createTexture(header.width
 		, header.height
