@@ -159,8 +159,12 @@ void LogUI::onGUI()
 		ImGui::SameLine();
 		char filter[128] = "";
 		ImGui::Checkbox("Autoscroll", &m_autoscroll);
-		ImGui::SetNextItemWidth(-1);
+		ImGui::SetNextItemWidth(-20);
 		ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
+		ImGui::SameLine();
+		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+			filter[0] = '\0';
+		}
 		int len = 0;
 
 		if (ImGui::BeginChild("log_messages", ImVec2(0, 0), true))

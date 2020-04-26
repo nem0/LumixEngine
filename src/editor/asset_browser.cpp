@@ -637,13 +637,20 @@ void AssetBrowser::onGUI()
 			refreshLabels();
 		}
 		ImGui::SameLine();
-		ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
-		ImGui::SameLine();
 		checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
 		ImGui::PushItemWidth(100);
 		if (ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter))) doFilter();
 		ImGui::PopItemWidth();
-		ImGui::SameLine(130 + checkbox_w);
+		ImGui::SameLine();
+		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Reset filter")) {
+			m_filter[0] = '\0';
+			doFilter();
+		}
+
+		ImGui::SameLine();
+		ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
+		
+		ImGui::SameLine();
 		breadcrumbs();
 		ImGui::Separator();
 
@@ -912,7 +919,12 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	}
 
 	static char filter[128] = "";
+	ImGui::SetNextItemWidth(-20);
 	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+		filter[0] = '\0';
+	}
 
 	ImGui::BeginChild("Resources", ImVec2(0, height - ImGui::GetTextLineHeight() * 3), false, ImGuiWindowFlags_HorizontalScrollbar);
 	AssetCompiler& compiler = m_app.getAssetCompiler();

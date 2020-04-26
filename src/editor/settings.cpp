@@ -615,7 +615,12 @@ void Settings::showToolbarSettings() const
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
+	ImGui::SetNextItemWidth(-20);
 	ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+		m_filter[0] = '\0';
+	}
 
 	for (int i = 0; i < actions.size(); ++i)
 	{
@@ -638,11 +643,15 @@ void Settings::onGUI()
 	if (!m_is_open) return;
 	if (ImGui::Begin(ICON_FA_COG "Settings##settings", &m_is_open))
 	{
-		if (ImGui::Button("Save")) save();
+		if (ImGui::Button(ICON_FA_SAVE "Save")) save();
 		ImGui::SameLine();
-		if (ImGui::Button("Reload")) load();
+		if (ImGui::Button(ICON_FA_REDO_ALT "Reload")) load();
 		ImGui::SameLine();
-		ImGui::Text("Settings are saved when the application closes");
+		ImGui::TextDisabled("(?)");
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("%s", "Settings are saved in studio.ini when the application closes");
+		}
 
 		if (ImGui::BeginTabBar("tabs")) {
 

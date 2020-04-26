@@ -1334,7 +1334,13 @@ void TerrainEditor::onGUI()
 			
 			static char filter[100] = {0};
 			static ImVec2 size(-1, 100);
+			ImGui::SetNextItemWidth(-20);
 			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+				filter[0] = '\0';
+			}
+			
 			if (ImGui::ListBoxHeader("Prefabs", size)) {
 				auto& resources = m_app.getAssetCompiler().lockResources();
 				u32 count = 0;

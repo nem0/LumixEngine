@@ -227,7 +227,12 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
+	ImGui::SetNextItemWidth(-20);
 	ImGui::InputTextWithHint("##resource_filter", "Filter", m_resource_filter, sizeof(m_resource_filter));
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+		m_resource_filter[0] = '\0';
+	}
 
 	static const ResourceType RESOURCE_TYPES[] = { ResourceType("animation"),
 		ResourceType("material"),
