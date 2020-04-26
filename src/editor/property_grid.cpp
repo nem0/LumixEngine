@@ -229,10 +229,13 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			return;
 		}
 
-		if (ImGui::InputInt(prop.name, &value))
+		ImGui::PushID(&prop);
+		ImGuiEx::Label(prop.name);
+		if (ImGui::InputInt("##v", &value))
 		{
 			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
 		}
+		ImGui::PopID();
 	}
 
 
