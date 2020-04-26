@@ -1678,7 +1678,7 @@ struct StudioAppImpl final : StudioApp
 		
 		bool node_open;
 		if (m_renaming_entity == entity) {
-			node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "");
+			node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", "");
 			ImGui::SameLine();
 			ImGui::SetNextItemWidth(-1);
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
