@@ -1134,33 +1134,30 @@ void TerrainEditor::onGUI()
 {
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
 	ImGui::Unindent();
-	if (!ImGui::TreeNodeEx("Terrain editor"))
-	{
+	if (!ImGui::CollapsingHeader("Terrain editor")) {
 		ImGui::Indent();
 		return;
 	}
+	ImGui::Indent();
 
-	ImGui::Checkbox("Editor enabled", &m_is_enabled);
-	if (!m_is_enabled)
-	{
-		ImGui::TreePop();
-		ImGui::Indent();
-		return;
-	}
+	ImGuiEx::Label("Enable");
+	ImGui::Checkbox("##ed_enabled", &m_is_enabled);
+	if (!m_is_enabled) return;
 
 	if (!getMaterial())
 	{
 		ImGui::Text("No heightmap");
-		ImGui::TreePop();
-		ImGui::Indent();
 		return;
 	}
 
 	bool is_grass_enabled = scene->isGrassEnabled();
-	if (ImGui::Checkbox("Enable grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
+	ImGuiEx::Label("Enable grass");
+	if (ImGui::Checkbox("##enable_grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
 
-	ImGui::SliderFloat("Brush size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
-	ImGui::SliderFloat("Brush strength", &m_terrain_brush_strength, 0, 1.0f);
+	ImGuiEx::Label("Brush size");
+	ImGui::SliderFloat("##br_size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
+	ImGuiEx::Label("Brush strength");
+	ImGui::SliderFloat("##br_str", &m_terrain_brush_strength, 0, 1.0f);
 
 	enum BrushType
 	{
@@ -1170,7 +1167,8 @@ void TerrainEditor::onGUI()
 		GRASS
 	};
 
-	if (ImGui::Combo("Brush type", &m_current_brush, "Height\0Layer\0Entity\0Grass\0"))
+	ImGuiEx::Label("Brush type");
+	if (ImGui::Combo("##br_type", &m_current_brush, "Height\0Layer\0Entity\0Grass\0"))
 	{
 		m_action_type = m_current_brush == HEIGHT ? TerrainEditor::RAISE_HEIGHT : m_action_type;
 	}
@@ -1333,15 +1331,15 @@ void TerrainEditor::onGUI()
 			m_action_type = TerrainEditor::ENTITY;
 			
 			static char filter[100] = {0};
-			static ImVec2 size(-1, 100);
 			ImGui::SetNextItemWidth(-20);
 			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 				filter[0] = '\0';
 			}
-			
-			if (ImGui::ListBoxHeader("Prefabs", size)) {
+
+			static ImVec2 size(-1, 200);
+			if (ImGui::ListBoxHeader("##prefabs", size)) {
 				auto& resources = m_app.getAssetCompiler().lockResources();
 				u32 count = 0;
 				for (const AssetCompiler::ResourceItem& res : resources) {
@@ -1429,11 +1427,7 @@ void TerrainEditor::onGUI()
 		default: ASSERT(false); break;
 	}
 
-	if (!m_component.isValid() || m_action_type == NOT_SET || !m_is_enabled)
-	{
-		ImGui::TreePop();
-		ImGui::Indent();
-
+	if (!m_component.isValid() || m_action_type == NOT_SET || !m_is_enabled) {
 		return;
 	}
 
@@ -1451,13 +1445,9 @@ void TerrainEditor::onGUI()
 		if(hit.is_hit) {
 			DVec3 center = hit.origin + hit.dir * hit.t;
 			drawCursor(*scene, entity, center);
-			ImGui::TreePop();
-			ImGui::Indent();
 			return;
 		}
 	}
-	ImGui::TreePop();
-	ImGui::Indent();
 }
 
 
