@@ -150,7 +150,7 @@ vertex_shader [[
 		ivec2 ij = ivec2(u_from_to.x + (gl_VertexID >> 1), u_from_to.y + gl_InstanceID + (gl_VertexID & 1));
 	
 		vec3 v = vec3(ij.x, 0.0, ij.y) * u_cell_size;
-		int mask = u_cell_size < 1/8.f ? ~3 : ~1;
+		int mask = ~1;
 		vec3 npos = vec3(ij.x & mask, 0.0, ij.y & mask) * u_cell_size;
 	
 		vec2 size = vec2(u_from_to_sup.zw - u_from_to_sup.xy);

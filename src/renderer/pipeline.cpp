@@ -2634,10 +2634,10 @@ struct PipelineImpl final : Pipeline
 				bool first = true;
 				for (;;) {
 					// round 
-					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(first ? 128 : 64);
+					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(first ? 256 : 128);
+					IVec2 to = from + IVec2(128);
 					// clamp
 					dc_data.from_to_sup = IVec4(from, to);
 					
