@@ -297,11 +297,17 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 
 		Universe& universe = *m_editor.getUniverse();
-		if (ImGui::BeginPopup("popup"))
+		if (ImGui::BeginResizablePopup("popup", ImVec2(200, 300)))
 		{
 			static char entity_filter[32] = {};
+			ImGui::SetNextItemWidth(-20);
 			ImGui::InputTextWithHint("##filter", "Filter", entity_filter, sizeof(entity_filter));
-			if (ImGui::BeginChild("list", ImVec2(0, 200))) {
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+				entity_filter[0] = '\0';
+			}
+			
+			if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
 				for (EntityPtr i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity((EntityRef)i))
 				{
 					getEntityListDisplayName(m_app, m_editor, Span(buf), i);
@@ -800,8 +806,14 @@ void PropertyGrid::onGUI()
 			ImGui::OpenPopup("AddComponentPopup");
 		}
 		
-		if (ImGui::BeginPopup("AddComponentPopup")) {
+		if (ImGui::BeginResizablePopup("AddComponentPopup", ImVec2(300, 300))) {
+			ImGui::SetNextItemWidth(-20);
 			ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
+			ImGui::SameLine();
+			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+				m_component_filter[0] = '\0';
+			}
+
 			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter);
 			ImGui::EndPopup();
 		}
