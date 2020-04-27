@@ -1,8 +1,8 @@
 #include "engine/lumix.h"
 #include "engine/path.h"
 
-#include "engine/associative_array.h"
 #include "engine/crc32.h"
+#include "engine/hash_map.h"
 #include "engine/sync.h"
 #include "engine/path.h"
 #include "engine/stream.h"
@@ -36,8 +36,8 @@ struct PathManagerImpl : PathManager
 		MutexGuard lock(m_mutex);
 		clear();
 		serializer.write((i32)m_paths.size());
-		for (int i = 0; i < m_paths.size(); ++i) {
-			serializer.writeString(m_paths.at(i)->m_path);
+		for (PathInternal* path : m_paths) {
+			serializer.writeString(path->m_path);
 		}
 	}
 
@@ -54,12 +54,13 @@ struct PathManagerImpl : PathManager
 	}
 
 	void clear() override {
-		for (int i = m_paths.size() - 1; i >= 0; --i) {
-			if (m_paths.at(i)->m_ref_count == 0) {
-				LUMIX_DELETE(m_allocator, m_paths.at(i));
-				m_paths.eraseAt(i);
+		m_paths.eraseIf([&](PathInternal* path){
+			if (path->m_ref_count == 0) {
+				LUMIX_DELETE(m_allocator, path);
+				return true;
 			}
-		}
+			return false;
+		});
 	}
 
 	PathInternal* getPath(u32 hash, const char* path) {
@@ -69,17 +70,17 @@ struct PathManagerImpl : PathManager
 
 	PathInternal* getPath(u32 hash) {
 		MutexGuard lock(m_mutex);
-		int index = m_paths.find(hash);
-		if (index < 0) {
+		auto iter = m_paths.find(hash);
+		if (!iter.isValid()) {
 			return nullptr;
 		}
-		++m_paths.at(index)->m_ref_count;
-		return m_paths.at(index);
+		++iter.value()->m_ref_count;
+		return iter.value();
 	}
 
 	PathInternal* getPathMultithreadUnsafe(u32 hash, const char* path) {
-		int index = m_paths.find(hash);
-		if (index < 0) {
+		auto iter = m_paths.find(hash);
+		if (!iter.isValid()) {
 			PathInternal* internal = LUMIX_NEW(m_allocator, PathInternal);
 			internal->m_ref_count = 1;
 			internal->m_id = hash;
@@ -87,8 +88,8 @@ struct PathManagerImpl : PathManager
 			m_paths.insert(hash, internal);
 			return internal;
 		}
-		++m_paths.at(index)->m_ref_count;
-		return m_paths.at(index);
+		++iter.value()->m_ref_count;
+		return iter.value();
 	}
 
 	void incrementRefCount(PathInternal* path) {
@@ -106,7 +107,7 @@ struct PathManagerImpl : PathManager
 	}
 
 	IAllocator& m_allocator;
-	AssociativeArray<u32, PathInternal*> m_paths;
+	HashMap<u32, PathInternal*> m_paths;
 	Mutex m_mutex;
 	Path* m_empty_path;
 };

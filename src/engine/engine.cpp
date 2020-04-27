@@ -24,6 +24,27 @@
 namespace Lumix
 {
 
+struct GatherPathsVisitor final : Reflection::IEmptyPropertyVisitor {
+	void visit(const Reflection::IArrayProperty& prop) override {
+		int count = prop.getCount(cmp);
+		for (int i = 0; i < count; ++i) {
+			index = i;
+			prop.visit(*this);
+		}
+		index = -1;
+	}
+
+	void visit(const Reflection::Property<Path>& prop) override {
+		const Path path = prop.get(cmp, index);
+		paths->push(path);
+	}
+
+	ResourceManagerHub* resource_manager;
+	ComponentUID cmp;
+	int index = -1;
+	Array<Path>* paths;
+};
+
 void registerEngineAPI(lua_State* L, Engine* engine);
 
 static const u32 SERIALIZED_ENGINE_MAGIC = 0x5f4c454e; // == '_LEN'
@@ -392,13 +413,14 @@ public:
 
 	u32 serialize(Universe& ctx, OutputMemoryStream& serializer) override
 	{
+		GatherPathsVisitor visitor;
+
 		SerializedEngineHeader header;
 		header.m_magic = SERIALIZED_ENGINE_MAGIC; // == '_LEN'
 		header.m_reserved = 0;
 		serializer.write(header);
 		serializePluginList(serializer);
 		serializeSceneVersions(serializer, ctx);
-		m_path_manager->serialize(serializer);
 		int pos = (int)serializer.getPos();
 		ctx.serialize(serializer);
 		serializer.write((i32)ctx.getScenes().size());
@@ -424,7 +446,6 @@ public:
 		if (!hasSerializedPlugins(serializer)) return false;
 		if (!hasSupportedSceneVersions(serializer, ctx)) return false;
 
-		m_path_manager->deserialize(serializer);
 		ctx.deserialize(serializer, entity_map);
 		i32 scene_count;
 		serializer.read(scene_count);
@@ -434,7 +455,6 @@ public:
 			IScene* scene = ctx.getScene(crc32(tmp));
 			scene->deserialize(serializer, entity_map);
 		}
-		m_path_manager->clear();
 		return true;
 	}
 
