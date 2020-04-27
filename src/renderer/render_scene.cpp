@@ -791,9 +791,8 @@ public:
 		for (auto& r : m_model_instances)
 		{
 			serializer.write(r.flags.base);
-			if(r.flags.isSet(ModelInstance::VALID))
-			{
-				serializer.write(r.model ? r.model->getPath().getHash() : 0);
+			if(r.flags.isSet(ModelInstance::VALID)) {
+				serializer.writeString(r.model ? r.model->getPath().c_str() : "");
 			}
 			
 		}
@@ -1040,12 +1039,12 @@ public:
 		}
 	}
 
-	void deserializeModelInstances(IInputStream& serializer, const EntityMap& entity_map)
+	void deserializeModelInstances(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		u32 size = 0;
 		serializer.read(size);
-		m_model_instances.reserve(size + m_model_instances.size());
-		m_mesh_sort_data.reserve(size + m_mesh_sort_data.size());
+		m_model_instances.reserve(nextPow2(size + m_model_instances.size()));
+		m_mesh_sort_data.reserve(nextPow2(size + m_mesh_sort_data.size()));
 		for (u32 i = 0; i < size; ++i) {
 			FlagSet<ModelInstance::Flags, u8> flags;
 			serializer.read(flags);
@@ -1068,10 +1067,10 @@ public:
 				r.meshes = nullptr;
 				r.mesh_count = 0;
 
-				u32 path;
-				serializer.read(path);
+				char path[MAX_PATH_LENGTH];
+				copyString(path, serializer.readString());
 
-				if (path != 0) {
+				if (path[0] != 0) {
 					Model* model = m_engine.getResourceManager().load<Model>(Path(path));
 					setModel(e, model);
 				}

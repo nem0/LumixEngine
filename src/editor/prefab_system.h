@@ -23,6 +23,7 @@ struct LUMIX_EDITOR_API PrefabSystem
 	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
 	virtual void deserialize(struct InputMemoryStream& serializer, const struct EntityMap& entity_map) = 0;
 	virtual EntityPtr instantiatePrefab(struct PrefabResource& prefab, const struct DVec3& pos, const struct Quat& rot, float scale) = 0;
+	virtual void instantiatePrefabs(struct PrefabResource& prefab, Span<struct Transform> transforms) = 0;
 	virtual PrefabHandle getPrefab(EntityRef entity) const = 0;
 	virtual void setPrefab(EntityRef entity, PrefabHandle prefab) = 0;
 	virtual void savePrefab(const struct Path& path) = 0;

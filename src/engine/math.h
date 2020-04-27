@@ -290,6 +290,7 @@ struct LUMIX_ENGINE_API DVec3
 	DVec3 operator-() const { return {-x, -y, -z}; }
 	DVec3 operator*(float rhs) const { return {x * rhs, y * rhs, z * rhs}; }
 	DVec3 operator/(float rhs) const { return {x / rhs, y / rhs, z / rhs}; }
+	DVec3 operator/(const DVec3& rhs) const { return {x / rhs.x, y / rhs.y, z / rhs.z}; }
 	DVec3 operator-(const DVec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
 	DVec3 operator+(const DVec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
 	DVec3 operator-(const Vec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }

@@ -77,7 +77,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_viewport.far = 100000.f;
 
 		ResourceManagerHub& rm = m_editor.getEngine().getResourceManager();
-		Path font_path("editor/fonts/OpenSans-Regular.ttf");
+		Path font_path("editor/fonts/NotoSans-Regular.ttf");
 		m_font_res = rm.load<FontResource>(font_path);
 		m_font = m_font_res->addRef(16);
 		onUniverseCreated();
