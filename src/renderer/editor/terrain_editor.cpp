@@ -1155,7 +1155,7 @@ void TerrainEditor::onGUI()
 	if (ImGui::Checkbox("##enable_grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
 
 	ImGuiEx::Label("Brush size");
-	ImGui::SliderFloat("##br_size", &m_terrain_brush_size, MIN_BRUSH_SIZE, 100);
+	ImGui::DragFloat("##br_size", &m_terrain_brush_size, 1, MIN_BRUSH_SIZE, FLT_MAX);
 	ImGuiEx::Label("Brush strength");
 	ImGui::SliderFloat("##br_str", &m_terrain_brush_strength, 0, 1.0f);
 
