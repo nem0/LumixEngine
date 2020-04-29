@@ -2303,7 +2303,6 @@ public:
 		return hit;
 	}
 
-
 	RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignored_model_instance) override
 	{
 		PROFILE_FUNCTION();
@@ -2352,7 +2351,6 @@ public:
 		hit.dir = dir;
 		return hit;
 	}
-
 	
 	Vec4 getShadowmapCascades(EntityRef entity) override
 	{

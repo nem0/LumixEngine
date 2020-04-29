@@ -161,7 +161,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
 	{
 		Mesh& mesh = m_meshes[mesh_index];
-		bool is_mesh_skinned = !mesh.skin.empty();
+		bool is_mesh_skinned = !mesh.skin.empty() && is_skinned;
 		u16* indices16 = (u16*)&mesh.indices[0];
 		u32* indices32 = (u32*)&mesh.indices[0];
 		bool is16 = mesh.flags.isSet(Mesh::Flags::INDICES_16_BIT);
