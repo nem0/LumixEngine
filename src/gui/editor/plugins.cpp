@@ -399,7 +399,7 @@ private:
 		for (int i = 0; i < m_copy_position_buffer_count; ++i)
 		{
 			CopyPositionBufferItem& item = m_copy_position_buffer[i];
-			m_editor->setProperty(GUI_RECT_TYPE, -1, item.prop, Span(&e, 1), item.value);
+			m_editor->setProperty(GUI_RECT_TYPE, "", -1, item.prop, Span(&e, 1), item.value);
 		}
 		m_editor->endCommandGroup();
 	}
@@ -658,7 +658,7 @@ private:
 
 	void setRectProperty(EntityRef e, const char* prop_name, float value)
 	{
-		m_editor->setProperty(GUI_RECT_TYPE, -1, prop_name, Span(&e, 1), value);
+		m_editor->setProperty(GUI_RECT_TYPE, "", -1, prop_name, Span(&e, 1), value);
 	}
 
 

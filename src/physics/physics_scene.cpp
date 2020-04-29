@@ -346,7 +346,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(Universe& context, IAllocator& allocator)
+	PhysicsSceneImpl(Universe& context, PhysicsSystem& system, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_controllers(m_allocator)
 		, m_actors(m_allocator)
@@ -359,25 +359,15 @@ struct PhysicsSceneImpl final : PhysicsScene
 		, m_is_game_running(false)
 		, m_contact_callback(*this)
 		, m_contact_callbacks(m_allocator)
-		, m_layers_count(2)
 		, m_joints(m_allocator)
 		, m_script_scene(nullptr)
 		, m_debug_visualization_flags(0)
 		, m_is_updating_ragdoll(false)
 		, m_update_in_progress(nullptr)
 		, m_vehicle_batch_query(nullptr)
+		, m_system(&system)
+		, m_layers(m_system->getCollisionLayers())
 	{
-
-		memset(m_layers_names, 0, sizeof(m_layers_names));
-		for (u32 i = 0; i < lengthOf(m_layers_names); ++i)
-		{
-			copyString(m_layers_names[i], "Layer");
-			char tmp[3];
-			toCString(i, Span(tmp));
-			catString(m_layers_names[i], tmp);
-			m_collision_filter[i] = 0xffffFFFF;
-		}
-
 		m_physics_cmps_mask = 0;
 
 		#define REGISTER_COMPONENT(TYPE, COMPONENT)      \
@@ -590,13 +580,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void setControllerLayer(EntityRef entity, u32 layer) override
 	{
-		ASSERT(layer < lengthOf(m_layers_names));
+		ASSERT(layer < lengthOf(m_layers.names));
 		auto& controller = m_controllers[entity];
 		controller.m_layer = layer;
 
 		PxFilterData data;
 		data.word0 = 1 << layer;
-		data.word1 = m_collision_filter[layer];
+		data.word1 = m_layers.filter[layer];
 		controller.m_filter_data = data;
 		PxShape* shapes[8];
 		int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
@@ -634,7 +624,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void setActorLayer(EntityRef entity, u32 layer) override
 	{
-		ASSERT(layer < lengthOf(m_layers_names));
+		ASSERT(layer < lengthOf(m_layers.names));
 		auto* actor = m_actors[entity];
 		actor->layer = layer;
 		if (actor->physx_actor)
@@ -669,7 +659,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void setHeightfieldLayer(EntityRef entity, u32 layer) override
 	{
-		ASSERT(layer < lengthOf(m_layers_names));
+		ASSERT(layer < lengthOf(m_layers.names));
 		auto& terrain = m_terrains[entity];
 		terrain.m_layer = layer;
 
@@ -677,7 +667,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		{
 			PxFilterData data;
 			data.word0 = 1 << layer;
-			data.word1 = m_collision_filter[layer];
+			data.word1 = m_layers.filter[layer];
 			PxShape* shapes[8];
 			int shapes_count = terrain.m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
@@ -1335,7 +1325,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxFilterData data;
 		int controller_layer = c.m_layer;
 		data.word0 = 1 << controller_layer;
-		data.word1 = m_collision_filter[controller_layer];
+		data.word1 = m_layers.filter[controller_layer];
 		c.m_filter_data = data;
 		PxShape* shapes[8];
 		int shapes_count = c.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
@@ -2500,6 +2490,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		initJoints();
 		initVehicles();
+
+		updateFilterData();
 	}
 
 
@@ -2635,6 +2627,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	struct Filter : PxQueryFilterCallback
 	{
+		bool canLayersCollide(int layer1, int layer2) const { return (scene->m_layers.filter[layer1] & (1 << layer2)) != 0; }
+
 		PxQueryHitType::Enum preFilter(const PxFilterData& filterData,
 			const PxShape* shape,
 			const PxRigidActor* actor,
@@ -2647,7 +2641,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				if (iter.isValid())
 				{
 					const RigidActor* actor = iter.value();
-					if (!scene->canLayersCollide(actor->layer, layer)) return PxQueryHitType::eNONE;
+					if (!canLayersCollide(actor->layer, layer)) return PxQueryHitType::eNONE;
 				}
 			}
 			if (entity.index == (int)(intptr_t)actor->userData) return PxQueryHitType::eNONE;
@@ -2855,7 +2849,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				PxFilterData data;
 				int terrain_layer = terrain.m_layer;
 				data.word0 = 1 << terrain_layer;
-				data.word1 = m_collision_filter[terrain_layer];
+				data.word1 = m_layers.filter[terrain_layer];
 				PxShape* shapes[8];
 				int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
 				for (int i = 0; i < shapes_count; ++i)
@@ -2872,60 +2866,11 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void addCollisionLayer() override { m_layers_count = minimum(lengthOf(m_layers_names), m_layers_count + 1); }
-
-
-	void removeCollisionLayer() override
-	{
-		m_layers_count = maximum(0, m_layers_count - 1);
-		for (auto* actor : m_actors)
-		{
-			actor->layer = minimum(m_layers_count - 1, actor->layer);
-		}
-		for (auto& controller : m_controllers)
-		{
-			controller.m_layer = minimum(m_layers_count - 1, controller.m_layer);
-		}
-		for (auto& terrain : m_terrains)
-		{
-			terrain.m_layer = minimum(m_layers_count - 1, terrain.m_layer);
-		}
-
-		updateFilterData();
-	}
-
-
-	void setCollisionLayerName(int index, const char* name) override { copyString(m_layers_names[index], name); }
-
-
-	const char* getCollisionLayerName(int index) override { return m_layers_names[index]; }
-
-
-	bool canLayersCollide(int layer1, int layer2) override { return (m_collision_filter[layer1] & (1 << layer2)) != 0; }
-
-
-	void setLayersCanCollide(int layer1, int layer2, bool can_collide) override
-	{
-		if (can_collide)
-		{
-			m_collision_filter[layer1] |= 1 << layer2;
-			m_collision_filter[layer2] |= 1 << layer1;
-		}
-		else
-		{
-			m_collision_filter[layer1] &= ~(1 << layer2);
-			m_collision_filter[layer2] &= ~(1 << layer1);
-		}
-
-		updateFilterData();
-	}
-
-
 	void updateFilterData(PxRigidActor* actor, int layer)
 	{
 		PxFilterData data;
 		data.word0 = 1 << layer;
-		data.word1 = m_collision_filter[layer];
+		data.word1 = m_layers.filter[layer];
 		PxShape* shapes[8];
 		int shapes_count = actor->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
@@ -2959,7 +2904,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			Tmp tmp;
 			int layer = ragdoll.layer;
 			tmp.data.word0 = 1 << layer;
-			tmp.data.word1 = m_collision_filter[layer];
+			tmp.data.word1 = m_layers.filter[layer];
 			tmp(ragdoll.root);
 		}
 
@@ -2969,7 +2914,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			PxFilterData data;
 			int actor_layer = actor->layer;
 			data.word0 = 1 << actor_layer;
-			data.word1 = m_collision_filter[actor_layer];
+			data.word1 = m_layers.filter[actor_layer];
 			PxShape* shapes[8];
 			int shapes_count = actor->physx_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
@@ -2983,7 +2928,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			PxFilterData data;
 			int controller_layer = controller.m_layer;
 			data.word0 = 1 << controller_layer;
-			data.word1 = m_collision_filter[controller_layer];
+			data.word1 = m_layers.filter[controller_layer];
 			controller.m_filter_data = data;
 			PxShape* shapes[8];
 			int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
@@ -3001,7 +2946,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			PxFilterData data;
 			int terrain_layer = terrain.m_layer;
 			data.word0 = 1 << terrain_layer;
-			data.word1 = m_collision_filter[terrain_layer];
+			data.word1 = m_layers.filter[terrain_layer];
 			PxShape* shapes[8];
 			int shapes_count = terrain.m_actor->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
@@ -3010,9 +2955,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 	}
-
-
-	int getCollisionsLayersCount() const override { return m_layers_count; }
 
 
 	bool getIsTrigger(EntityRef entity) override { return m_actors[entity]->is_trigger; }
@@ -3138,17 +3080,20 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	Vec3 getGeomOffsetRotation(EntityRef entity, int index, PxGeometryType::Enum type)
+	Quat getGeomOffsetRotation(EntityRef entity, int index, PxGeometryType::Enum type)
 	{
 		PxShape* shape = getShape(entity, index, type);
 		PxTransform tr = shape->getLocalPose();
-		return fromPhysx(tr.q).toEuler();
+		return fromPhysx(tr.q);
 	}
 
+	Quat getBoxGeomOffsetRotationQuat(EntityRef entity, int index) override {
+		return getGeomOffsetRotation(entity, index, PxGeometryType::eBOX);
+	}
 
 	Vec3 getBoxGeomOffsetRotation(EntityRef entity, int index) override
 	{
-		return getGeomOffsetRotation(entity, index, PxGeometryType::eBOX);
+		return getGeomOffsetRotation(entity, index, PxGeometryType::eBOX).toEuler();
 	}
 
 
@@ -3262,18 +3207,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void setSphereGeomOffsetPosition(EntityRef entity, int index, const Vec3& pos) override
 	{
 		setGeomOffsetPosition(entity, index, pos, PxGeometryType::eSPHERE);
-	}
-
-
-	Vec3 getSphereGeomOffsetRotation(EntityRef entity, int index) override
-	{
-		return getGeomOffsetRotation(entity, index, PxGeometryType::eSPHERE);
-	}
-
-
-	void setSphereGeomOffsetRotation(EntityRef entity, int index, const Vec3& euler_angles) override
-	{
-		setGeomOffsetRotation(entity, index, euler_angles, PxGeometryType::eSPHERE);
 	}
 
 
@@ -3410,9 +3343,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void serialize(OutputMemoryStream& serializer) override
 	{
-		serializer.write(m_layers_count);
-		serializer.write(m_layers_names);
-		serializer.write(m_collision_filter);
 		serializer.write((i32)m_actors.size());
 		for (auto* actor : m_actors)
 		{
@@ -4069,11 +3999,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
 	{
-		// TODO this does not work with additive loading
-		serializer.read(m_layers_count);
-		serializer.read(m_layers_names);
-		serializer.read(m_collision_filter);
-
 		deserializeActors(serializer, entity_map);
 		deserializeControllers(serializer, entity_map);
 		deserializeTerrains(serializer, entity_map);
@@ -4283,16 +4208,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 	bool m_is_game_running;
 	bool m_is_updating_ragdoll;
 	u32 m_debug_visualization_flags;
-	u32 m_collision_filter[32];
-	char m_layers_names[32][30];
-	int m_layers_count;
 	CPUDispatcher m_cpu_dispatcher;
+	CollisionLayers& m_layers;
 };
 
 
 PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
 {
-	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, allocator);
+	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, system, allocator);
 	impl->m_universe.entityTransformed().bind<&PhysicsSceneImpl::onEntityMoved>(impl);
 	impl->m_universe.entityDestroyed().bind<&PhysicsSceneImpl::onEntityDestroyed>(impl);
 	impl->m_engine = &engine;
@@ -4312,7 +4235,6 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 
 	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
 
-	impl->m_system = &system;
 	impl->m_default_material = impl->m_system->getPhysics()->createMaterial(0.5f, 0.5f, 0.1f);
 	PxSphereGeometry geom(1);
 	impl->m_dummy_actor =

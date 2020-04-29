@@ -55,6 +55,9 @@ struct AnimationSystemImpl final : IPlugin
 	void createScenes(Universe& ctx) override;
 	void destroyScene(IScene* scene) override;
 	const char* getName() const override { return "animation"; }
+	u32 getVersion() const override { return 0; }
+	void serialize(OutputMemoryStream& stream) const override {}
+	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	IAllocator& m_allocator;
 	Engine& m_engine;

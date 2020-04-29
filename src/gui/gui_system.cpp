@@ -264,6 +264,9 @@ struct GUISystemImpl final : GUISystem
 
 	const char* getName() const override { return "gui"; }
 
+	u32 getVersion() const override { return 0; }
+	void serialize(OutputMemoryStream& stream) const override {}
+	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	Engine& m_engine;
 	SpriteManager m_sprite_manager;

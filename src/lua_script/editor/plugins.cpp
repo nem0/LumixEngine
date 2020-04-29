@@ -421,7 +421,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			if (!create_empty) {
 				auto* script_scene = static_cast<LuaScriptScene*>(editor.getUniverse()->getScene(LUA_SCRIPT_TYPE));
 				int scr_count = script_scene->getScriptCount(entity);
-				editor.setProperty(cmp.type, scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), Path(buf));
+				editor.setProperty(cmp.type, "scripts", scr_count - 1, "Path", Span((const EntityRef*)&entity, 1), Path(buf));
 			}
 			editor.endCommandGroup();
 			ImGui::CloseCurrentPopup();

@@ -208,6 +208,7 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setBoxGeomHalfExtents(EntityRef entity, int index, const Vec3& size) = 0;
 	virtual Vec3 getBoxGeomOffsetPosition(EntityRef entity, int index) = 0;
 	virtual void setBoxGeomOffsetPosition(EntityRef entity, int index, const Vec3& pos) = 0;
+	virtual Quat getBoxGeomOffsetRotationQuat(EntityRef entity, int index) = 0;
 	virtual Vec3 getBoxGeomOffsetRotation(EntityRef entity, int index) = 0;
 	virtual void setBoxGeomOffsetRotation(EntityRef entity, int index, const Vec3& euler_angles) = 0;
 
@@ -218,8 +219,6 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setSphereGeomRadius(EntityRef entity, int index, float size) = 0;
 	virtual Vec3 getSphereGeomOffsetPosition(EntityRef entity, int index) = 0;
 	virtual void setSphereGeomOffsetPosition(EntityRef entity, int index, const Vec3& pos) = 0;
-	virtual Vec3 getSphereGeomOffsetRotation(EntityRef entity, int index) = 0;
-	virtual void setSphereGeomOffsetRotation(EntityRef entity, int index, const Vec3& euler_angles) = 0;
 
 	virtual BoneOrientation getNewBoneOrientation() const = 0;
 	virtual void setNewBoneOrientation(BoneOrientation orientation) = 0;
@@ -256,14 +255,6 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setWheelMOI(EntityRef entity, float moi) = 0;
 	virtual WheelSlot getWheelSlot(EntityRef entity) = 0;
 	virtual void setWheelSlot(EntityRef entity, WheelSlot s) = 0;
-
-	virtual const char* getCollisionLayerName(int index) = 0;
-	virtual void setCollisionLayerName(int index, const char* name) = 0;
-	virtual bool canLayersCollide(int layer1, int layer2) = 0;
-	virtual void setLayersCanCollide(int layer1, int layer2, bool can_collide) = 0;
-	virtual int getCollisionsLayersCount() const = 0;
-	virtual void addCollisionLayer() = 0;
-	virtual void removeCollisionLayer() = 0;
 
 	virtual u32 getDebugVisualizationFlags() const = 0;
 	virtual void setDebugVisualizationFlags(u32 flags) = 0;

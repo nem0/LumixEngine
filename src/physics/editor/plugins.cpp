@@ -9,6 +9,7 @@
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
+#include "engine/engine.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
 #include "engine/math.h"
@@ -17,6 +18,7 @@
 #include "engine/universe.h"
 #include "physics/physics_geometry.h"
 #include "physics/physics_scene.h"
+#include "physics/physics_system.h"
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
 
@@ -182,6 +184,33 @@ void showSphericalJointGizmo(UniverseView& view, ComponentUID cmp)
 	}
 }
 
+void showRigidActorGizmo(UniverseView& view, ComponentUID cmp)
+{
+	auto* scene = static_cast<PhysicsScene*>(cmp.scene);
+	const EntityRef e = (EntityRef)cmp.entity;
+	Universe& universe = scene->getUniverse();
+	const DVec3 pos = universe.getPosition(e);
+	const Quat rot = universe.getRotation(e);
+	const i32 box_count = scene->getBoxGeometryCount(e);
+	for (i32 i = 0; i < box_count; ++i) {
+		const Vec3 half = scene->getBoxGeomHalfExtents(e, i);
+		const Vec3 p = scene->getBoxGeomOffsetPosition(e, i);
+		const Quat r = rot * scene->getBoxGeomOffsetRotationQuat(e, i);
+
+		addCube(view
+			, pos + rot.rotate(p)
+			, r.rotate(Vec3(half.x, 0, 0))
+			, r.rotate(Vec3(0, half.y, 0))
+			, r.rotate(Vec3(0, 0, half.z))
+			, Color::BLUE);
+	}
+	const i32 sphere_count = scene->getSphereGeometryCount(e);
+	for (i32 i = 0; i < sphere_count; ++i) {
+		const float r = scene->getSphereGeomRadius(e, i);
+		const Vec3 p = scene->getSphereGeomOffsetPosition(e, i);
+		addSphere(view, pos + rot.rotate(p), r, Color::BLUE);
+	}
+}
 
 void showDistanceJointGizmo(UniverseView& view, ComponentUID cmp)
 {
@@ -331,30 +360,30 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onLayersGUI()
 	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_editor.getEngine().getPluginManager().getPlugin("physics"));
 		if (ImGui::CollapsingHeader("Layers"))
 		{
-			for (int i = 0; i < scene->getCollisionsLayersCount(); ++i)
+			for (int i = 0; i < system->getCollisionsLayersCount(); ++i)
 			{
 				char buf[30];
-				copyString(buf, scene->getCollisionLayerName(i));
+				copyString(buf, system->getCollisionLayerName(i));
 				char label[10];
 				toCString(i, Span(label));
 				if (ImGui::InputText(label, buf, sizeof(buf)))
 				{
-					scene->setCollisionLayerName(i, buf);
+					system->setCollisionLayerName(i, buf);
 				}
 			}
 			if (ImGui::Button("Add layer"))
 			{
-				scene->addCollisionLayer();
+				system->addCollisionLayer();
 			}
-			if (scene->getCollisionsLayersCount() > 1)
+			if (system->getCollisionsLayersCount() > 1)
 			{
 				ImGui::SameLine();
 				if (ImGui::Button("Remove layer"))
 				{
-					scene->removeCollisionLayer();
+					system->removeCollisionLayer();
 				}
 			}
 		}
@@ -363,23 +392,23 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onCollisionMatrixGUI()
 	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_editor.getEngine().getPluginManager().getPlugin("physics"));
 		if (ImGui::CollapsingHeader("Collision matrix"))
 		{
-			ImGui::Columns(1 + scene->getCollisionsLayersCount(), "collision_matrix_col");
+			ImGui::Columns(1 + system->getCollisionsLayersCount(), "collision_matrix_col");
 			ImGui::NextColumn();
 			ImGui::PushTextWrapPos(1);
 			float basic_offset = 0;
-			for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
+			for (int i = 0, c = system->getCollisionsLayersCount(); i < c; ++i)
 			{
-				auto* layer_name = scene->getCollisionLayerName(i);
+				auto* layer_name = system->getCollisionLayerName(i);
 				basic_offset = maximum(basic_offset, ImGui::CalcTextSize(layer_name).x);
 			}
 			basic_offset += ImGui::GetStyle().FramePadding.x * 2 + ImGui::GetStyle().WindowPadding.x;
 
-			for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
+			for (int i = 0, c = system->getCollisionsLayersCount(); i < c; ++i)
 			{
-				auto* layer_name = scene->getCollisionLayerName(i);
+				auto* layer_name = system->getCollisionLayerName(i);
 				float offset = basic_offset + i * 35.0f;
 				ImGui::SetColumnOffset(-1, offset);
 				ImGui::Text("%s", layer_name);
@@ -388,17 +417,17 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			ImGui::PopTextWrapPos();
 
 			ImGui::Separator();
-			for (int i = 0, c = scene->getCollisionsLayersCount(); i < c; ++i)
+			for (int i = 0, c = system->getCollisionsLayersCount(); i < c; ++i)
 			{
-				ImGui::Text("%s", scene->getCollisionLayerName(i));
+				ImGui::Text("%s", system->getCollisionLayerName(i));
 				ImGui::NextColumn();
 
 				for (int j = 0; j <= i; ++j)
 				{
-					bool b = scene->canLayersCollide(i, j);
+					bool b = system->canLayersCollide(i, j);
 					if (ImGui::Checkbox(StaticString<10>("###", i, "-") << j, &b))
 					{
-						scene->setLayersCanCollide(i, j, b);
+						system->setLayersCanCollide(i, j, b);
 					}
 					ImGui::NextColumn();
 				}
@@ -937,6 +966,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		Universe& universe = phy_scene->getUniverse();
 		
 		const EntityRef entity = (EntityRef)cmp.entity;
+		
+		if (cmp.type == RIGID_ACTOR_TYPE) {
+			showRigidActorGizmo(view, cmp);
+			return true;
+		}
+		
 		if (cmp.type == CONTROLLER_TYPE)
 		{
 			float height = phy_scene->getControllerHeight(entity);

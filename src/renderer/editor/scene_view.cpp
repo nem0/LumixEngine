@@ -1032,7 +1032,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		EntityRef entity = m_editor.addEntity();
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
 		m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
-		m_editor.setProperty(MODEL_INSTANCE_TYPE, -1, "Source", Span(&entity, 1), Path(path));
+		m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
 		m_editor.endCommandGroup();
 	}
 	else if (Path::hasExtension(path, "fab"))
@@ -1050,7 +1050,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			const EntityRef e = (EntityRef)hit.entity;
 			m_editor.selectEntities(&e, 1, false);
 			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
-			m_editor.setProperty(MESH_ACTOR_TYPE, -1, "Source", Span(&e, 1), path);
+			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Source", Span(&e, 1), path);
 			m_editor.endCommandGroup();
 		}
 		else
@@ -1061,7 +1061,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(&entity, 1, false);
 			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
-			m_editor.setProperty(MESH_ACTOR_TYPE, -1, "Source", Span(&entity, 1), path);
+			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Source", Span(&entity, 1), path);
 			m_editor.endCommandGroup();
 		}
 	}

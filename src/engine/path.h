@@ -35,37 +35,21 @@ public:
 public:
 	Path();
 	Path(const Path& rhs);
-	explicit Path(u32 hash);
 	explicit Path(const char* path);
-	~Path();
 
 	void operator=(const Path& rhs);
 	void operator=(const char* rhs);
 	bool operator==(const Path& rhs) const;
 	bool operator!=(const Path& rhs) const;
 
-	int length() const;
-	u32 getHash() const;
-	const char* c_str() const;
-	bool isValid() const;
+	i32 length() const;
+	u32 getHash() const { return m_hash; }
+	const char* c_str() const { return m_path; }
+	bool isValid() const { return m_path[0] != '\0'; }
 
 private:
-	PathInternal* m_data;
-};
-
-
-struct LUMIX_ENGINE_API PathManager
-{
-	static PathManager* create(struct IAllocator& allocator);
-	static void destroy(PathManager& obj);
-	static const Path& getEmptyPath();
-	
-	virtual ~PathManager() {};
-
-	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
-	virtual void deserialize(struct InputMemoryStream& serializer) = 0;
-
-	virtual void clear() = 0;
+	char m_path[MAX_PATH_LENGTH];
+	u32 m_hash;
 };
 
 

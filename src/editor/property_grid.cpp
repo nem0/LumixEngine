@@ -191,7 +191,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		{
 			f = clamp(f, attrs.min, attrs.max);
 			if (attrs.is_radians) f = degreesToRadians(f);
-			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, f);
+			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, f);
 		}
 		ImGui::PopID();
 	}
@@ -205,7 +205,8 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 		if (enum_attr) {
 			if (m_entities.size() > 1) {
-				ImGui::LabelText(prop.name, "Multi-object editing not supported.");
+				ImGuiEx::Label(prop.name);
+				ImGui::TextUnformatted("Multi-object editing not supported.");
 				return;
 			}
 
@@ -220,7 +221,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 					if (ImGui::Selectable(val_name)) {
 						value = i;
 						const EntityRef e = (EntityRef)cmp.entity;
-						m_editor.setProperty(cmp.type, m_index, prop.name, Span(&e, 1), value);
+						m_editor.setProperty(cmp.type, m_array, m_index, prop.name, Span(&e, 1), value);
 					}
 				}
 				ImGui::EndCombo();
@@ -233,7 +234,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		ImGuiEx::Label(prop.name);
 		if (ImGui::InputInt("##v", &value))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
 	}
@@ -244,12 +245,40 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		u32 value = prop.get(cmp, m_index);
+		
+		auto* enum_attr = (Reflection::EnumAttribute*)Reflection::getAttribute(prop, Reflection::IAttribute::ENUM);
+		if (enum_attr) {
+			if (m_entities.size() > 1) {
+				ImGuiEx::Label(prop.name);
+				ImGui::TextUnformatted("Multi-object editing not supported.");
+				return;
+			}
+
+			const int count = enum_attr->count(cmp);
+
+			const char* preview = enum_attr->name(cmp, value);
+			ImGuiEx::Label(prop.name);
+			ImGui::PushID(&prop);
+			if (ImGui::BeginCombo("##v", preview)) {
+				for (int i = 0; i < count; ++i) {
+					const char* val_name = enum_attr->name(cmp, i);
+					if (ImGui::Selectable(val_name)) {
+						value = i;
+						const EntityRef e = (EntityRef)cmp.entity;
+						m_editor.setProperty(cmp.type, m_array, m_index, prop.name, Span(&e, 1), value);
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::PopID();
+			return;
+		}
 
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(&prop);
 		if (ImGui::InputScalar("##v", ImGuiDataType_U32, &value))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
 	}
@@ -282,7 +311,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (ImGui::BeginDragDropTarget()) {
 			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
 				EntityRef dropped_entity = *(EntityRef*)payload->Data;
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, dropped_entity);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, dropped_entity);
 			}
 		}
 
@@ -293,7 +322,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			}
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, INVALID_ENTITY);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, INVALID_ENTITY);
 			}
 		}
 		ImGui::PopStyleVar();
@@ -317,7 +346,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 					bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
 					if (show && ImGui::Selectable(buf))
 					{
-						m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, i);
+						m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, i);
 					}
 				}
 			}
@@ -341,7 +370,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		if (ImGui::DragFloat2("##v", &value.x))
 		{
 			if (attrs.is_radians) value = degreesToRadians(value);
-			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
 	}
@@ -360,7 +389,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		{
 			if (ImGui::ColorEdit3("##v", &value.x))
 			{
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 			}
 		}
 		else
@@ -369,7 +398,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			if (ImGui::DragFloat3("##v", &value.x, 1, attrs.min, attrs.max))
 			{
 				if (attrs.is_radians) value = degreesToRadians(value);
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 			}
 		}
 		ImGui::PopID();
@@ -385,7 +414,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(&prop);
 		if (ImGui::DragInt3("##v", &value.x)) {
-			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
 	}
@@ -404,14 +433,14 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		{
 			if (ImGui::ColorEdit4("##v", &value.x))
 			{
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 			}
 		}
 		else
 		{
 			if (ImGui::DragFloat4("##v", &value.x))
 			{
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 			}
 		}
 		ImGui::PopID();
@@ -428,7 +457,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		ImGui::PushID(&prop);
 		if (ImGui::Checkbox("##v", &value))
 		{
-			m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, value);
+			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
 	}
@@ -450,14 +479,14 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		{
 			if (m_app.getAssetBrowser().resourceInput(prop.name, Span(tmp), attrs.resource_type))
 			{
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, Path(tmp));
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, Path(tmp));
 			}
 		}
 		else
 		{
 			if (ImGui::InputText("##v", tmp, sizeof(tmp)))
 			{
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, Path(tmp));
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, Path(tmp));
 			}
 		}
 		ImGui::PopID();
@@ -477,12 +506,12 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		ImGui::PushID(&prop);
 		if(attrs.is_multiline) {
 			if (ImGui::InputTextMultiline("##v", tmp, sizeof(tmp))) {
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, tmp);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, tmp);
 			}
 		}
 		else {
 			if (ImGui::InputText("##v", tmp, sizeof(tmp))) {
-				m_editor.setProperty(m_cmp_type, m_index, prop.name, m_entities, tmp);
+				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, tmp);
 			}
 		}
 		ImGui::PopID();
@@ -504,6 +533,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			return;
 		}
 
+		ImGui::PushID(&prop);
 		ComponentUID cmp = getComponent();
 		int count = prop.getCount(cmp);
 		const ImGuiStyle& style = ImGui::GetStyle();
@@ -515,6 +545,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		}
 		if (!is_open)
 		{
+			ImGui::PopID();
 			ImGui::Indent();
 			return;
 		}
@@ -540,17 +571,20 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			if (is_open)
 			{
 				GridUIVisitor v(m_app, i, m_entities, m_cmp_type, m_editor);
+				v.m_array = prop.name;
 				prop.visit(v);
 				ImGui::TreePop();
 			}
 
 			ImGui::PopID();
 		}
+		ImGui::PopID();
 		ImGui::TreePop();
 		ImGui::Indent();
 	}
 
 
+	const char* m_array = "";
 	StudioApp& m_app;
 	WorldEditor& m_editor;
 	ComponentType m_cmp_type;
@@ -579,7 +613,7 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 		cmp.scene = editor.getUniverse()->getScene(cmp_type);
 		if(ImGui::Checkbox(StaticString<256>(icon, cmp_type_name), &enabled))
 		{
-			editor.setProperty(cmp_type, -1, "Enabled", Span(entities, entities_count), enabled);
+			editor.setProperty(cmp_type, "", -1, "Enabled", Span(entities, entities_count), enabled);
 		}
 	}
 	else
