@@ -190,14 +190,14 @@ struct UniverseViewImpl final : UniverseView {
 					{
 						if(icon_hit.entity.isValid()) {
 							EntityRef e = (EntityRef)icon_hit.entity;
-							m_editor.selectEntities(Span(&e, 1), true);
+							m_editor.selectEntities(Span(&e, 1), ImGui::GetIO().KeyCtrl);
 						}
 					}
 					else if (hit.is_hit)
 					{
 						if(hit.entity.isValid()) {
 							EntityRef entity = (EntityRef)hit.entity;
-							m_editor.selectEntities(Span(&entity, 1), true);
+							m_editor.selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
 						}
 					}
 				}
