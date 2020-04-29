@@ -860,7 +860,7 @@ void PropertyGrid::onGUI()
 	if (m_deferred_select.isValid())
 	{
 		const EntityRef e = (EntityRef)m_deferred_select;
-		m_editor.selectEntities(&e, 1, false);
+		m_editor.selectEntities(Span(&e, 1u), false);
 		m_deferred_select = INVALID_ENTITY;
 	}
 }

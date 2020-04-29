@@ -490,7 +490,7 @@ private:
 				}
 				if (e.isValid()) {
 					EntityRef r = (EntityRef)e;
-					m_editor->selectEntities(&r, 1, false);
+					m_editor->selectEntities(Span(&r, 1), false);
 				}
 			}
 
@@ -647,7 +647,7 @@ private:
 		m_editor->beginCommandGroup(crc32("create_gui_rect_child"));
 		EntityRef child = m_editor->addEntity();
 		m_editor->makeParent(entity, child);
-		m_editor->selectEntities(&child, 1, false);
+		m_editor->selectEntities(Span(&child, 1), false);
 		m_editor->addComponent(Span(&child, 1), GUI_RECT_TYPE);
 		if (child_type != GUI_RECT_TYPE) {
 			m_editor->addComponent(Span(&child, 1), child_type);

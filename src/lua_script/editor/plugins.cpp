@@ -404,7 +404,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			if (create_entity)
 			{
 				EntityRef entity = editor.addEntity();
-				editor.selectEntities(&entity, 1, false);
+				editor.selectEntities(Span(&entity, 1), false);
 			}
 			if (editor.getSelectedEntities().empty()) return;
 			EntityRef entity = editor.getSelectedEntities()[0];

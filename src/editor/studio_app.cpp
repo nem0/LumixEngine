@@ -201,7 +201,6 @@ struct StudioAppImpl final : StudioApp
 			case OS::Event::Type::FOCUS: break;
 			case OS::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
-				m_editor->setToggleSelection(io.KeyCtrl);
 				m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 				if (handle_input || !event.mouse_button.down) {
 					io.MouseDown[(int)event.mouse_button.button] = event.mouse_button.down;
@@ -601,7 +600,7 @@ struct StudioAppImpl final : StudioApp
 					if (create_entity)
 					{
 						EntityRef entity = editor->addEntity();
-						editor->selectEntities(&entity, 1, false);
+						editor->selectEntities(Span(&entity, 1), false);
 					}
 
 					const Array<EntityRef>& selected_entites = editor->getSelectedEntities();
@@ -673,7 +672,7 @@ struct StudioAppImpl final : StudioApp
 					if (create_entity)
 					{
 						EntityRef entity = editor->addEntity();
-						editor->selectEntities(&entity, 1, false);
+						editor->selectEntities(Span(&entity, 1), false);
 					}
 
 					editor->addComponent(editor->getSelectedEntities(), type);
@@ -1739,7 +1738,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		else {
 			if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-				m_editor->selectEntities(&entity, 1, true);
+				m_editor->selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
 			}
 		}
 		if (ImGui::BeginDragDropTarget())
@@ -1844,7 +1843,7 @@ struct StudioAppImpl final : StudioApp
 						bool selected = entities.indexOf(e_ref) >= 0;
 						if (ImGui::Selectable(buffer, &selected))
 						{
-							m_editor->selectEntities(&e_ref, 1, true);
+							m_editor->selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
 						}
 						if (ImGui::BeginDragDropSource())
 						{
@@ -2522,14 +2521,13 @@ struct StudioAppImpl final : StudioApp
 	void destroyEntity(EntityRef e) { m_editor->destroyEntities(&e, 1); }
 
 
-	void selectEntity(EntityRef e) { m_editor->selectEntities(&e, 1, false); }
+	void selectEntity(EntityRef e) { m_editor->selectEntities(Span(&e, 1), false); }
 
 
 	EntityRef createEntity() { return m_editor->addEntity(); }
 
 	void createComponent(EntityRef e, int type)
 	{
-		m_editor->selectEntities(&e, 1, false);
 		m_editor->addComponent(Span(&e, 1), {type});
 	}
 
@@ -2670,7 +2668,7 @@ struct StudioAppImpl final : StudioApp
 		WorldEditor& editor = *studio->m_editor;
 		editor.beginCommandGroup(crc32("createEntityEx"));
 		EntityRef e = editor.addEntity();
-		editor.selectEntities(&e, 1, false);
+		editor.selectEntities(Span(&e, 1), false);
 
 		lua_pushvalue(L, 2);
 		lua_pushnil(L);

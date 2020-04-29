@@ -490,14 +490,14 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				char tmp[256];
 				getEntityListDisplayName(m_app, m_app.getWorldEditor(), Span(tmp), cmp.entity);
 				bool b = false;
-				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(&entity, 1, false);
+				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(Span(&entity, 1), false);
 				ImGui::NextColumn();
 
 				EntityPtr other_entity = scene->getJointConnectedBody(entity);
 				getEntityListDisplayName(m_app, m_app.getWorldEditor(), Span(tmp), other_entity);
 				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) {
 					const EntityRef e = (EntityRef)other_entity;
-					m_editor.selectEntities(&e, 1, false);
+					m_editor.selectEntities(Span(&e, 1), false);
 				}
 				ImGui::NextColumn();
 				ImGui::PopID();

@@ -1384,7 +1384,7 @@ private:
 
 		bool execute() override
 		{
-			m_editor.selectEntities(nullptr, 0, false);
+			m_editor.selectEntities({}, false);
 			Universe* universe = m_editor.getUniverse();
 			m_transformations.clear();
 			m_old_values.clear();
@@ -1629,7 +1629,7 @@ private:
 				m_entity = m_editor.getUniverse()->createEntity(m_position, Quat(0, 0, 0, 1));
 			}
 			const EntityRef e = (EntityRef)m_entity;
-			m_editor.selectEntities(&e, 1, false);
+			m_editor.selectEntities(Span(&e, 1), false);
 			return true;
 		}
 
@@ -2121,7 +2121,7 @@ public:
 		ASSERT(m_universe);
 		m_engine.getResourceManager().enableUnload(false);
 		m_engine.stopGame(*m_universe);
-		selectEntities(nullptr, 0, false);
+		selectEntities({}, false);
 		m_is_game_mode = false;
 		if (reload)
 		{
@@ -2142,7 +2142,7 @@ public:
 		m_game_mode_file.clear();
 		if(m_selected_entity_on_game_mode.isValid()) {
 			EntityRef e = (EntityRef)m_selected_entity_on_game_mode;
-			selectEntities(&e, 1, false);
+			selectEntities(Span(&e, 1), false);
 		}
 		m_engine.getResourceManager().enableUnload(true);
 	}
@@ -2417,7 +2417,6 @@ public:
 		, m_copy_buffer(m_allocator)
 		, m_is_loading(false)
 		, m_universe(nullptr)
-		, m_is_toggle_selection(false)
 		, m_selected_entity_on_game_mode(INVALID_ENTITY)
 		, m_is_game_mode(false)
 		, m_undo_index(-1)
@@ -2443,9 +2442,6 @@ public:
 	{
 		return m_selected_entities;
 	}
-
-
-	void setToggleSelection(bool is_toggle) override { m_is_toggle_selection = is_toggle; }
 
 
 	void addArrayPropertyItem(const ComponentUID& cmp, const char* property) override
@@ -2487,27 +2483,20 @@ public:
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const Vec4& val) override { set(cmp, array, idx, prop, entities, val); }
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const IVec3& val) override { set(cmp, array, idx, prop, entities, val); }
 
-	void selectEntities(const EntityRef* entities, int count, bool toggle) override
-	{
-		if (!toggle || !m_is_toggle_selection)
-		{
+	void selectEntities(Span<const EntityRef> entities, bool toggle) override {
+		if (!toggle) {
 			m_selected_entities.clear();
-			for (int i = 0; i < count; ++i)
-			{
-				m_selected_entities.push(entities[i]);
+			for (EntityRef e : entities) {
+				m_selected_entities.push(e);
 			}
 		}
-		else
-		{
-			for (int i = 0; i < count; ++i)
-			{
-				int idx = m_selected_entities.indexOf(entities[i]);
-				if (idx < 0)
-				{
-					m_selected_entities.push(entities[i]);
+		else {
+			for (EntityRef e : entities) { 
+				const i32 idx = m_selected_entities.indexOf(e);
+				if (idx < 0) {
+					m_selected_entities.push(e);
 				}
-				else
-				{
+				else {
 					m_selected_entities.swapAndPop(idx);
 				}
 			}
@@ -2531,7 +2520,7 @@ public:
 		destroyUndoStack();
 		m_universe_destroyed.invoke();
 		m_prefab_system->setUniverse(nullptr);
-		selectEntities(nullptr, 0, false);
+		selectEntities({}, false);
 		m_engine.destroyUniverse(*m_universe);
 		m_universe = nullptr;
 	}
@@ -2666,8 +2655,6 @@ private:
 
 	Array<EntityRef> m_selected_entities;
 	EntityPtr m_selected_entity_on_game_mode;
-
-	bool m_is_toggle_selection;
 
 	bool m_is_game_mode;
 	int m_game_mode_commands;
