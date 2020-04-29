@@ -144,13 +144,13 @@ struct UniverseViewImpl final : UniverseView {
 		if (min.y > max.y) swap(min.y, max.y);
 		const ShiftedFrustum frustum = m_viewport.getFrustum(min, max);
 		
-		m_editor.selectEntities(nullptr, 0, false);
+		m_editor.selectEntities({}, false);
 		
 		for (int i = 0; i < (int)RenderableTypes::COUNT; ++i) {
 			CullResult* renderables = m_scene->getRenderables(frustum, (RenderableTypes)i);
 			CullResult* first = renderables;
 			while (renderables) {
-				m_editor.selectEntities(renderables->entities, renderables->header.count, true);
+				m_editor.selectEntities(Span(renderables->entities, renderables->header.count), true);
 				renderables = renderables->header.next;
 			}
 			if (first) first->free(m_editor.getEngine().getPageAllocator());
@@ -190,14 +190,14 @@ struct UniverseViewImpl final : UniverseView {
 					{
 						if(icon_hit.entity.isValid()) {
 							EntityRef e = (EntityRef)icon_hit.entity;
-							m_editor.selectEntities(&e, 1, true);
+							m_editor.selectEntities(Span(&e, 1), true);
 						}
 					}
 					else if (hit.is_hit)
 					{
 						if(hit.entity.isValid()) {
 							EntityRef entity = (EntityRef)hit.entity;
-							m_editor.selectEntities(&entity, 1, true);
+							m_editor.selectEntities(Span(&entity, 1), true);
 						}
 					}
 				}
@@ -1048,7 +1048,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		{
 			m_editor.beginCommandGroup(crc32("insert_phy_component"));
 			const EntityRef e = (EntityRef)hit.entity;
-			m_editor.selectEntities(&e, 1, false);
+			m_editor.selectEntities(Span(&e, 1), false);
 			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
 			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Source", Span(&e, 1), path);
 			m_editor.endCommandGroup();
@@ -1059,7 +1059,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 			m_editor.beginCommandGroup(crc32("insert_phy"));
 			EntityRef entity = m_editor.addEntity();
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
-			m_editor.selectEntities(&entity, 1, false);
+			m_editor.selectEntities(Span(&entity, 1), false);
 			m_editor.addComponent(Span(&entity, 1), MESH_ACTOR_TYPE);
 			m_editor.setProperty(MESH_ACTOR_TYPE, "", -1, "Source", Span(&entity, 1), path);
 			m_editor.endCommandGroup();

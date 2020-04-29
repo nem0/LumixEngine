@@ -109,7 +109,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) = 0;
 	virtual EntityRef addEntity() = 0;
 	virtual void destroyEntities(const EntityRef* entities, int count) = 0;
-	virtual void selectEntities(const EntityRef* entities, int count, bool toggle) = 0;
+	virtual void selectEntities(Span<const EntityRef> entities, bool toggle) = 0;
 	virtual EntityRef addEntityAt(int camera_x, int camera_y) = 0;
 	virtual EntityRef addEntityAt(const DVec3& pos) = 0;
 	virtual void setEntitiesPositions(const EntityRef* entities, const DVec3* positions, int count) = 0;
@@ -151,7 +151,6 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void saveUniverse(const char* basename, bool save_path) = 0;
 	virtual void newUniverse() = 0;
 	virtual void toggleGameMode() = 0;
-	virtual void setToggleSelection(bool is_toggle) = 0;
 	
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
