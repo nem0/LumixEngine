@@ -164,14 +164,14 @@ struct ControllerEditorImpl : ControllerEditor {
 		return app.getWorldEditor().getUniverse()->hasComponent(selected[0], Reflection::getComponentType("animator"));
 	}
 
-	static const char* getPathFromEntity(StudioApp& app) {
+	static Path getPathFromEntity(StudioApp& app) {
 		const Array<EntityRef>& selected = app.getWorldEditor().getSelectedEntities();
-		if (selected.size() != 1) return "";
+		if (selected.size() != 1) return Path();
 		Universe* universe = app.getWorldEditor().getUniverse();
 		const ComponentType cmp_type = Reflection::getComponentType("animator");
-		if (!universe->hasComponent(selected[0], cmp_type)) return "";
+		if (!universe->hasComponent(selected[0], cmp_type)) return Path();
 		AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
-		return scene->getAnimatorSource(selected[0]).c_str();
+		return scene->getAnimatorSource(selected[0]);
 	}
 
 	void load(ControllerEditor& editor, const char* path) {
@@ -389,7 +389,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity(m_app))) {
 						char tmp[MAX_PATH_LENGTH];
 						copyString(tmp, m_app.getEngine().getFileSystem().getBasePath());
-						catString(tmp, getPathFromEntity(m_app));
+						catString(tmp, getPathFromEntity(m_app).c_str());
 						load(*this, tmp);
 					}
 					ImGui::EndMenu();
