@@ -608,881 +608,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 };
 
 
-struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
-{
-	struct Meta
-	{
-		float scale = 1;
-		bool split = false;
-		bool create_impostor = false;
-		float lods_distances[4] = { -1, -1, -1, -1 };
-		float position_error = 0.02f;
-		float rotation_error = 0.001f;
-	};
-
-	explicit ModelPlugin(StudioApp& app)
-		: m_app(app)
-		, m_mesh(INVALID_ENTITY)
-		, m_pipeline(nullptr)
-		, m_universe(nullptr)
-		, m_is_mouse_captured(false)
-		, m_tile(app.getAllocator())
-		, m_fbx_importer(app)
-	{
-		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
-		createPreviewUniverse();
-		createTileUniverse();
-		m_viewport.is_ortho = false;
-		m_viewport.fov = degreesToRadians(60.f);
-		m_viewport.near = 0.1f;
-		m_viewport.far = 10000.f;
-	}
-
-
-	~ModelPlugin()
-	{
-		JobSystem::wait(m_subres_signal);
-		auto& engine = m_app.getEngine();
-		engine.destroyUniverse(*m_universe);
-		Pipeline::destroy(m_pipeline);
-		engine.destroyUniverse(*m_tile.universe);
-		Pipeline::destroy(m_tile.pipeline);
-	}
-
-
-	Meta getMeta(const Path& path) const
-	{
-		Meta meta;
-		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "position_error", &meta.position_error);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "rotation_error", &meta.rotation_error);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
-			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
-			
-			for (u32 i = 0; i < lengthOf(meta.lods_distances); ++i) {
-				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &meta.lods_distances[i]);
-			}
-		});
-		return meta;
-	}
-
-	void addSubresources(AssetCompiler& compiler, const char* path) override {
-		compiler.addResource(Model::TYPE, path);
-
-		const Meta meta = getMeta(Path(path));
-		struct JobData {
-			ModelPlugin* plugin;
-			StaticString<MAX_PATH_LENGTH> path;
-			Meta meta;
-		};
-		JobData* data = LUMIX_NEW(m_app.getAllocator(), JobData);
-		data->plugin = this;
-		data->path = path;
-		data->meta = meta;
-		JobSystem::runEx(data, [](void* ptr) {
-			JobData* data = (JobData*)ptr;
-			ModelPlugin* plugin = data->plugin;
-			FBXImporter importer(plugin->m_app);
-			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
-
-			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path.data;
-			importer.setSource(path, true);
-
-			if(data->meta.split) {
-				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
-				for (int i = 0; i < meshes.size(); ++i) {
-					char mesh_name[256];
-					importer.getImportMeshName(meshes[i], mesh_name);
-					StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ".fbx:", path);
-					compiler.addResource(Model::TYPE, tmp);
-				}
-			}
-
-			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
-			for (const FBXImporter::ImportAnimation& anim : animations) {
-				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ".ani:", path);
-				compiler.addResource(ResourceType("animation"), tmp);
-			}
-
-			LUMIX_DELETE(plugin->m_app.getAllocator(), data);
-		}, &m_subres_signal, JobSystem::INVALID_HANDLE, 2);			
-	}
-
-	static const char* getResourceFilePath(const char* str)
-	{
-		const char* c = str;
-		while (*c && *c != ':') ++c;
-		return *c != ':' ? str : c + 1;
-	}
-
-	bool compile(const Path& src) override
-	{
-		ASSERT(Path::hasExtension(src.c_str(), "fbx"));
-		const char* filepath = getResourceFilePath(src.c_str());
-		FBXImporter::ImportConfig cfg;
-		const Meta meta = getMeta(Path(filepath));
-		cfg.rotation_error = meta.rotation_error;
-		cfg.position_error = meta.position_error;
-		cfg.mesh_scale = meta.scale;
-		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
-		cfg.create_impostor = meta.create_impostor;
-		const PathInfo src_info(filepath);
-		m_fbx_importer.setSource(filepath, false);
-		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
-			if (m_fbx_importer.getOFBXScene()) {
-				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-					logError("Editor") << "No meshes with materials found in " << src;
-				}
-				else {
-					logError("Editor") << "No meshes or animations found in " << src;
-				}
-			}
-		}
-
-		const StaticString<32> hash_str("", src.getHash());
-		if (meta.split) {
-			//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
-			m_fbx_importer.writeSubmodels(filepath, cfg);
-			m_fbx_importer.writePrefab(filepath, cfg);
-		}
-		m_fbx_importer.writeModel(src.c_str(), cfg);
-		m_fbx_importer.writeMaterials(filepath, cfg);
-		m_fbx_importer.writeAnimations(filepath, cfg);
-		return true;
-	}
-
-
-	void createTileUniverse()
-	{
-		Engine& engine = m_app.getEngine();
-		m_tile.universe = &engine.createUniverse(false);
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_tile.pipeline = Pipeline::create(*renderer, pres, "PREVIEW", engine.getAllocator());
-
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		const EntityRef env_probe = m_tile.universe->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_tile.universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
-		render_scene->getEnvironmentProbe(env_probe).half_extents = Vec3(1e3);
-
-		Matrix mtx;
-		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
-		m_tile.universe->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
-		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
-		
-		m_tile.pipeline->setUniverse(m_tile.universe);
-	}
-
-
-	void createPreviewUniverse()
-	{
-		auto& engine = m_app.getEngine();
-		m_universe = &engine.createUniverse(false);
-		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*renderer, pres, "PREVIEW",  engine.getAllocator());
-
-		const EntityRef mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
-		m_mesh = mesh_entity;
-		m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
-
-		const EntityRef env_probe = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
-		m_universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
-		render_scene->getEnvironmentProbe(env_probe).half_extents = Vec3(1e3);
-
-		Matrix mtx;
-		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
-		const EntityRef light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
-		m_universe->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
-		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
-
-		m_pipeline->setUniverse(m_universe);
-	}
-
-
-	void showPreview(Model& model)
-	{
-		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
-		if (!render_scene) return;
-		if (!model.isReady()) return;
-		if (!m_mesh.isValid()) return;
-
-		if (render_scene->getModelInstanceModel((EntityRef)m_mesh) != &model)
-		{
-			render_scene->setModelInstancePath((EntityRef)m_mesh, model.getPath());
-			AABB aabb = model.getAABB();
-
-			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
-			m_viewport.rot = Quat::vec3ToVec3({0, 0, 1}, {1, 1, 1});
-		}
-		ImVec2 image_size(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x);
-
-		m_viewport.w = (int)image_size.x;
-		m_viewport.h = (int)image_size.y;
-		m_pipeline->setViewport(m_viewport);
-		m_pipeline->render(false);
-		m_preview = m_pipeline->getOutput();
-		ImGui::Image((void*)(uintptr_t)m_preview.value, image_size);
-		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
-		if (m_is_mouse_captured && !mouse_down)
-		{
-			m_is_mouse_captured = false;
-			OS::showCursor(true);
-			OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
-		}
-
-		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
-
-		if (ImGui::BeginPopup("PreviewPopup"))
-		{
-			if (ImGui::Selectable("Save preview"))
-			{
-				model.getResourceManager().load(model);
-				renderTile(&model, &m_viewport.pos, &m_viewport.rot);
-			}
-			ImGui::EndPopup();
-		}
-
-		if (ImGui::IsItemHovered() && mouse_down)
-		{
-			Vec2 delta(0, 0);
-			const OS::Event* events = m_app.getEvents();
-			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-				const OS::Event& e = events[i];
-				if (e.type == OS::Event::Type::MOUSE_MOVE) {
-					delta += Vec2((float)e.mouse_move.xrel, (float)e.mouse_move.yrel);
-				}
-			}
-
-			if (!m_is_mouse_captured)
-			{
-				m_is_mouse_captured = true;
-				OS::showCursor(false);
-				const OS::Point p = OS::getMouseScreenPos();
-				m_captured_mouse_x = p.x;
-				m_captured_mouse_y = p.y;
-			}
-
-			if (delta.x != 0 || delta.y != 0)
-			{
-				const Vec2 MOUSE_SENSITIVITY(50, 50);
-				DVec3 pos = m_viewport.pos;
-				Quat rot = m_viewport.rot;
-
-				float yaw = -signum(delta.x) * (powf(fabsf((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
-				Quat yaw_rot(Vec3(0, 1, 0), yaw);
-				rot = yaw_rot * rot;
-				rot.normalize();
-
-				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
-				float pitch =
-					-signum(delta.y) * (powf(fabsf((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
-				Quat pitch_rot(pitch_axis, pitch);
-				rot = pitch_rot * rot;
-				rot.normalize();
-
-				Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-				Vec3 origin = (model.getAABB().max + model.getAABB().min) * 0.5f;
-
-				float dist = (origin - pos.toFloat()).length();
-				pos = DVec3(0) + origin + dir * dist;
-
-				m_viewport.rot = rot;
-				m_viewport.pos = pos;
-			}
-		}
-	}
-
-
-	static void postprocessImpostor(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, const IVec2& tile_size, IAllocator& allocator) {
-		struct Cell {
-			i16 x, y;
-		};
-		const IVec2 size = tile_size * 9;
-		Array<Cell> cells(allocator);
-		cells.resize(gb0->size());
-		const u32* data = gb0->begin();
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[i].x = i;
-					cells[i].y = j;
-				}
-				else {
-					cells[i].x = -3 * size.x;
-					cells[i].y = -3 * size.y;
-				}
-			}
-		}
-
-		auto pow2 = [](i32 v){
-			return v * v;
-		};
-
-		for (i32 j = 0; j < size.y; ++j) {
-			for (i32 i = 0; i < size.x; ++i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[idx].x = i;
-					cells[idx].y = j;
-				}
-				else {
-					if(i > 0) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_x = pow2(cells[idx - 1].x - i) + pow2(cells[idx - 1].y - j);
-						if(dist_x < dist_0) {
-							cells[idx] = cells[idx - 1];
-						}
-					}					
-					if(j > 0) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_y = pow2(cells[idx - size.x].x - i) + pow2(cells[idx - size.x].y - j);
-						if(dist_y < dist_0) {
-							cells[idx] = cells[idx - size.x];
-						}
-					}					
-				}
-			}
-		}
-
-		for (i32 j = size.y - 1; j >= 0; --j) {
-			for (i32 i = size.x - 1; i>= 0; --i) {
-				const u32 idx = i + j * size.x;
-				if (data[idx] & 0xff000000) {
-					cells[idx].x = i;
-					cells[idx].y = j;
-				}
-				else {
-					if(i < size.x - 1) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_x = pow2(cells[idx + 1].x - i) + pow2(cells[idx + 1].y - j);
-						if(dist_x < dist_0) {
-							cells[idx] = cells[idx + 1];
-						}
-					}					
-					if(j < size.y - 1) {
-						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
-						const u32 dist_y = pow2(cells[idx + size.x].x - i) + pow2(cells[idx + size.x].y - j);
-						if(dist_y < dist_0) {
-							cells[idx] = cells[idx + size.x];
-						}
-					}					
-				}
-			}
-		}
-
-		Array<u32> tmp(allocator);
-		tmp.resize(gb0->size());
-		if (cells[0].x >= 0) {
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					const u8 alpha = data[idx] >> 24;
-					tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
-					tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
-				}
-			}
-			memcpy(gb0->begin(), tmp.begin(), tmp.byte_size());
-
-			const u32* gb1_data = gb1->begin();
-			for (i32 j = 0; j < size.y; ++j) {
-				for (i32 i = 0; i < size.x; ++i) {
-					const u32 idx = i + j * size.x;
-					tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
-				}
-			}
-			memcpy(gb1->begin(), tmp.begin(), tmp.byte_size());
-		}
-		else {
-			// nothing was rendered
-			memset(gb0->begin(), 0xff, gb0->byte_size());
-			memset(gb1->begin(), 0xff, gb1->byte_size());
-		}
-	}
-
-	void onGUI(Span<Resource*> resources) override
-	{
-		if (resources.length() > 1) return;
-
-		auto* model = static_cast<Model*>(resources[0]);
-
-		if (model->isReady()) {
-			ImGuiEx::Label("Bounding radius");
-			ImGui::Text("%f", model->getBoundingRadius());
-
-			if (ImGui::CollapsingHeader("LODs")) {
-				auto* lods = model->getLODs();
-				if (lods[0].to_mesh >= 0 && !model->isFailure())
-				{
-					ImGui::Separator();
-					ImGui::Columns(4);
-					ImGui::Text("LOD");
-					ImGui::NextColumn();
-					ImGui::Text("Distance");
-					ImGui::NextColumn();
-					ImGui::Text("# of meshes");
-					ImGui::NextColumn();
-					ImGui::Text("# of triangles");
-					ImGui::NextColumn();
-					ImGui::Separator();
-					int lod_count = 1;
-					for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
-					{
-						ImGui::PushID(i);
-						ImGui::Text("%d", i);
-						ImGui::NextColumn();
-						if (lods[i].distance == FLT_MAX)
-						{
-							ImGui::Text("Infinite");
-						}
-						else
-						{
-							float dist = sqrtf(lods[i].distance);
-							if (ImGui::DragFloat("", &dist))
-							{
-								lods[i].distance = dist * dist;
-							}
-						}
-						ImGui::NextColumn();
-						ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
-						ImGui::NextColumn();
-						int tri_count = 0;
-						for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
-						{
-							int indices_count = model->getMesh(j).indices.size() >> 1;
-							if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
-								indices_count >>= 1;
-							}
-							tri_count += indices_count / 3;
-
-						}
-
-						ImGui::Text("%d", tri_count);
-						ImGui::NextColumn();
-						++lod_count;
-						ImGui::PopID();
-					}
-
-					ImGui::Columns(1);
-				}
-			}
-		}
-
-		if (ImGui::CollapsingHeader("Meshes")) {
-			for (int i = 0; i < model->getMeshCount(); ++i)
-			{
-				auto& mesh = model->getMesh(i);
-				if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
-				{
-					ImGuiEx::Label("Triangle count");
-					ImGui::Text("%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
-					ImGuiEx::Label("Material");
-					ImGui::TextUnformatted(mesh.material->getPath().c_str());
-					ImGui::SameLine();
-					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
-					{
-						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
-					}
-					ImGui::TreePop();
-				}
-			}
-		}
-
-		if (model->isReady() && ImGui::CollapsingHeader("Bones")) {
-			ImGuiEx::Label("Count");
-			ImGui::Text("%d", model->getBoneCount());
-			if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
-				ImGui::Columns(3);
-				for (int i = 0; i < model->getBoneCount(); ++i)
-				{
-					ImGui::Text("%s", model->getBone(i).name.c_str());
-					ImGui::NextColumn();
-					Vec3 pos = model->getBone(i).transform.pos;
-					ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
-					ImGui::NextColumn();
-					Quat rot = model->getBone(i).transform.rot;
-					ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
-					ImGui::NextColumn();
-				}
-			}
-		}
-
-		if (ImGui::CollapsingHeader("Import")) {
-			AssetCompiler& compiler = m_app.getAssetCompiler();
-			if(m_meta_res != model->getPath().getHash()) {
-				m_meta = getMeta(model->getPath());
-				m_meta_res = model->getPath().getHash();
-			}
-			ImGuiEx::Label("Max position error");
-			ImGui::InputFloat("##maxposer", &m_meta.position_error);
-			ImGuiEx::Label("Max rotation error");
-			ImGui::InputFloat("##maxroter", &m_meta.rotation_error);
-			ImGuiEx::Label("Scale");
-			ImGui::InputFloat("##scale", &m_meta.scale);
-			ImGuiEx::Label("Split");
-			ImGui::Checkbox("##split", &m_meta.split);
-			ImGuiEx::Label("Create impostor mesh");
-			ImGui::Checkbox("##creimp", &m_meta.create_impostor);
-			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
-				bool infinite = m_meta.lods_distances[i] <= 0;
-				if(ImGui::Checkbox(StaticString<32>("Infinite LOD ", i), &infinite)) {
-					m_meta.lods_distances[i] *= -1;
-				}
-				if (infinite) break;
-
-				if (m_meta.lods_distances[i] > 0) {
-					ImGui::SameLine();
-					ImGui::SetNextItemWidth(-1);
-					ImGui::DragFloat(StaticString<32>("##lod", i), &m_meta.lods_distances[i]);
-				}
-			}
-			
-			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
-				String src(m_app.getAllocator());
-				src.cat("create_impostor=").cat(m_meta.create_impostor ? "true" : "false")
-					.cat("\nposition_error = ").cat(m_meta.position_error)
-					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
-					.cat("\nscale = ").cat(m_meta.scale)
-					.cat("\nscale = ").cat(m_meta.scale)
-					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n");
-
-				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
-					if (m_meta.lods_distances[i] > 0) {
-						src.cat("lod").cat(i).cat("_distance").cat(" = ").cat(m_meta.lods_distances[i]).cat("\n");
-					}
-				}
-
-				compiler.updateMeta(model->getPath(), src.c_str());
-				if (compiler.compile(model->getPath())) {
-					model->getResourceManager().reload(*model);
-				}
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Create impostor texture")) {
-				FBXImporter importer(m_app);
-				IAllocator& allocator = m_app.getAllocator();
-				Array<u32> gb0(allocator); 
-				Array<u32> gb1(allocator); 
-				IVec2 tile_size;
-				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(tile_size));
-				postprocessImpostor(Ref(gb0), Ref(gb1), tile_size, allocator);
-				const PathInfo fi(model->getPath().c_str());
-				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
-				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
-				
-				OS::OutputFile file;
-				FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-				if (fs.open(img_path, Ref(file))) {
-					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-					file.close();
-				}
-				else {
-					logError("Renderer") << "Failed to open " << img_path;
-				}
-
-				img_path = fi.m_dir;
-				img_path << fi.m_basename << "_impostor1.tga";
-				if (fs.open(img_path, Ref(file))) {
-					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
-					file.close();
-				}
-				else {
-					logError("Renderer") << "Failed to open " << img_path;
-				}
-			}
-			ImGui::SameLine();
-			ImGui::TextDisabled("(?)");
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("%s", "To use impostors, check `Create impostor mesh` and press this button. "
-				"When the mesh changes, you need to regenerate the impostor texture by pressing this button again.");
-			}
-
-		showPreview(*model);
-	}
-
-	Meta m_meta;
-	u32 m_meta_res = 0;
-
-	void onResourceUnloaded(Resource* resource) override {}
-	const char* getName() const override { return "Model"; }
-	ResourceType getResourceType() const override { return Model::TYPE; }
-
-
-	void pushTileQueue(const Path& path)
-	{
-		ASSERT(!m_tile.queue.full());
-		Engine& engine = m_app.getEngine();
-		ResourceManagerHub& resource_manager = engine.getResourceManager();
-
-		Resource* resource;
-		if (Path::hasExtension(path.c_str(), "fab")) {
-			resource = resource_manager.load<PrefabResource>(path);
-		}
-		else {
-			resource = resource_manager.load<Model>(path);
-		}
-		m_tile.queue.push(resource);
-	}
-
-
-	void popTileQueue()
-	{
-		m_tile.queue.pop();
-		if (m_tile.paths.empty()) return;
-
-		Path path = m_tile.paths.back();
-		m_tile.paths.pop();
-		pushTileQueue(path);
-	}
-	
-	static void destroyEntityRecursive(Universe& universe, EntityPtr entity)
-	{
-		if (!entity.isValid()) return;
-			
-		EntityRef e = (EntityRef)entity;
-		destroyEntityRecursive(universe, universe.getFirstChild(e));
-		destroyEntityRecursive(universe, universe.getNextSibling(e));
-
-		universe.destroyEntity(e);
-	}
-
-	void update() override
-	{
-		if (m_tile.waiting) {
-			if (!m_app.getEngine().getFileSystem().hasWork()) {
-				renderPrefabSecondStage();
-				m_tile.waiting = false;
-			}
-		}
-		if (m_tile.frame_countdown >= 0) {
-			--m_tile.frame_countdown;
-			if (m_tile.frame_countdown == -1) {
-				destroyEntityRecursive(*m_tile.universe, (EntityRef)m_tile.entity);
-				Engine& engine = m_app.getEngine();
-				FileSystem& fs = engine.getFileSystem();
-				StaticString<MAX_PATH_LENGTH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
-				
-				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
-					swap(m_tile.data[i * 4 + 0], m_tile.data[i * 4 + 2]);
-				}
-
-				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
-				memset(m_tile.data.begin(), 0, m_tile.data.byte_size());
-				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-				renderer->destroy(m_tile.texture);
-				m_tile.entity = INVALID_ENTITY;
-			}
-			return;
-		}
-
-		if (m_tile.entity.isValid()) return;
-		if (m_tile.queue.empty()) return;
-
-		Resource* resource = m_tile.queue.front();
-		if (resource->isFailure()) {
-			logError("Editor") << "Failed to load " << resource->getPath();
-			popTileQueue();
-			return;
-		}
-		if (!resource->isReady()) return;
-
-		popTileQueue();
-
-		if (resource->getType() == Model::TYPE) {
-			renderTile((Model*)resource, nullptr, nullptr);
-		}
-		else if (resource->getType() == PrefabResource::TYPE) {
-			renderTile((PrefabResource*)resource);
-		}
-		else {
-			ASSERT(false);
-		}
-	}
-
-
-	void renderTile(PrefabResource* prefab)
-	{
-		Engine& engine = m_app.getEngine();
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		if (!render_scene) return;
-
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		if (!renderer) return;
-
-		EntityMap entity_map(m_app.getAllocator());
-		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, Ref(entity_map))) return;
-		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
-
-		m_tile.path_hash = prefab->getPath().getHash();
-		prefab->getResourceManager().unload(*prefab);
-		m_tile.entity = entity_map.m_map[0];
-		m_tile.waiting = true;
-	}
-
-
-	void renderPrefabSecondStage()
-	{
-		Engine& engine = m_app.getEngine();
-
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		if (!render_scene) return;
-
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		if (!renderer) return;
-
-		AABB aabb({0, 0, 0}, {0, 0, 0});
-
-		Universe& universe = *m_tile.universe;
-		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
-			EntityRef ent = (EntityRef)e;
-			const DVec3 pos = universe.getPosition(ent);
-			aabb.addPoint(pos.toFloat());
-			if (universe.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
-				RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
-				Model* model = scene->getModelInstanceModel(ent);
-				if (model->isReady()) {
-					const Transform tr = universe.getTransform(ent);
-					DVec3 points[8];
-					model->getAABB().getCorners(tr, points);
-					for (const DVec3& p : points) {
-						aabb.addPoint(p.toFloat());
-					}
-				}
-			}
-		}
-
-		Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
-		Matrix mtx;
-		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
-		mtx.inverse();
-		Viewport viewport;
-		viewport.is_ortho = false;
-		viewport.far = 10000.f;
-		viewport.near = 0.1f;
-		viewport.fov = degreesToRadians(60.f);
-		viewport.h = AssetBrowser::TILE_SIZE;
-		viewport.w = AssetBrowser::TILE_SIZE;
-		viewport.pos = DVec3(eye.x, eye.y, eye.z);
-		viewport.rot = mtx.getRotation();
-		m_tile.pipeline->setViewport(viewport);
-		m_tile.pipeline->render(false);
-
-		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		m_tile.texture = gpu::allocTextureHandle(); 
-		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, gpu::TextureFormat::RGBA8,  Span(m_tile.data.begin(), m_tile.data.end()));
-		
-		m_tile.frame_countdown = 2;
-	}
-
-
-	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
-	{
-		Engine& engine = m_app.getEngine();
-		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
-		if (!render_scene) return;
-
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		if (!renderer) return;
-
-		EntityRef mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
-		m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
-
-		render_scene->setModelInstancePath(mesh_entity, model->getPath());
-		AABB aabb = model->getAABB();
-
-		Matrix mtx;
-		Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
-		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
-		mtx.inverse();
-		Viewport viewport;
-		viewport.is_ortho = false;
-		viewport.far = 10000.f;
-		viewport.near = 0.1f;
-		viewport.fov = degreesToRadians(60.f);
-		viewport.h = AssetBrowser::TILE_SIZE;
-		viewport.w = AssetBrowser::TILE_SIZE;
-		viewport.pos = in_pos ? *in_pos : DVec3(eye.x, eye.y, eye.z);
-		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
-		m_tile.pipeline->setViewport(viewport);
-		m_tile.pipeline->render(false);
-
-		m_tile.texture = gpu::allocTextureHandle(); 
-		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, gpu::TextureFormat::RGBA8, Span(m_tile.data.begin(), m_tile.data.end()));
-		
-		m_tile.entity = mesh_entity;
-		m_tile.frame_countdown = 2;
-		m_tile.path_hash = model->getPath().getHash();
-		model->getResourceManager().unload(*model);
-	}
-
-
-	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
-	{
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (type == Material::TYPE) return fs.copyFile("models/editor/tile_material.dds", out_path);
-		if (type == Shader::TYPE) return fs.copyFile("models/editor/tile_shader.dds", out_path);
-
-		if (type != Model::TYPE && type != PrefabResource::TYPE) return false;
-
-		Path path(in_path);
-
-		if (!m_tile.queue.full())
-		{
-			pushTileQueue(path);
-			return true;
-		}
-
-		m_tile.paths.push(path);
-		return true;
-	}
-
-
-	struct TileData
-	{
-		TileData(IAllocator& allocator)
-			: data(allocator)
-			, paths(allocator)
-			, queue()
-		{
-		}
-
-		Universe* universe = nullptr;
-		Pipeline* pipeline = nullptr;
-		EntityPtr entity = INVALID_ENTITY;
-		int frame_countdown = -1;
-		u32 path_hash;
-		Array<u8> data;
-		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
-		Queue<Resource*, 8> queue;
-		Array<Path> paths;
-		bool waiting = false;
-	} m_tile;
-	
-
-	StudioApp& m_app;
-	gpu::TextureHandle m_preview;
-	Universe* m_universe;
-	Viewport m_viewport;
-	Pipeline* m_pipeline;
-	EntityPtr m_mesh = INVALID_ENTITY;
-	bool m_is_mouse_captured;
-	int m_captured_mouse_x;
-	int m_captured_mouse_y;
-	FBXImporter m_fbx_importer;
-	JobSystem::SignalHandle m_subres_signal = JobSystem::INVALID_HANDLE;
-};
-
-
 struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
@@ -2345,6 +1470,896 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	u32 m_meta_res = 0;
 	TextureComposite m_composite;
 	void* m_composite_tag = nullptr;
+};
+
+
+struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
+{
+	struct Meta
+	{
+		float scale = 1;
+		bool split = false;
+		bool create_impostor = false;
+		float lods_distances[4] = { -1, -1, -1, -1 };
+		float position_error = 0.02f;
+		float rotation_error = 0.001f;
+	};
+
+	explicit ModelPlugin(StudioApp& app)
+		: m_app(app)
+		, m_mesh(INVALID_ENTITY)
+		, m_pipeline(nullptr)
+		, m_universe(nullptr)
+		, m_is_mouse_captured(false)
+		, m_tile(app.getAllocator())
+		, m_fbx_importer(app)
+	{
+		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
+		createPreviewUniverse();
+		createTileUniverse();
+		m_viewport.is_ortho = false;
+		m_viewport.fov = degreesToRadians(60.f);
+		m_viewport.near = 0.1f;
+		m_viewport.far = 10000.f;
+	}
+
+
+	~ModelPlugin()
+	{
+		JobSystem::wait(m_subres_signal);
+		auto& engine = m_app.getEngine();
+		engine.destroyUniverse(*m_universe);
+		Pipeline::destroy(m_pipeline);
+		engine.destroyUniverse(*m_tile.universe);
+		Pipeline::destroy(m_tile.pipeline);
+	}
+
+
+	Meta getMeta(const Path& path) const
+	{
+		Meta meta;
+		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "position_error", &meta.position_error);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "rotation_error", &meta.rotation_error);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
+			
+			for (u32 i = 0; i < lengthOf(meta.lods_distances); ++i) {
+				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &meta.lods_distances[i]);
+			}
+		});
+		return meta;
+	}
+
+	void addSubresources(AssetCompiler& compiler, const char* path) override {
+		compiler.addResource(Model::TYPE, path);
+
+		const Meta meta = getMeta(Path(path));
+		struct JobData {
+			ModelPlugin* plugin;
+			StaticString<MAX_PATH_LENGTH> path;
+			Meta meta;
+		};
+		JobData* data = LUMIX_NEW(m_app.getAllocator(), JobData);
+		data->plugin = this;
+		data->path = path;
+		data->meta = meta;
+		JobSystem::runEx(data, [](void* ptr) {
+			JobData* data = (JobData*)ptr;
+			ModelPlugin* plugin = data->plugin;
+			FBXImporter importer(plugin->m_app);
+			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
+
+			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path.data;
+			importer.setSource(path, true);
+
+			if(data->meta.split) {
+				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
+				for (int i = 0; i < meshes.size(); ++i) {
+					char mesh_name[256];
+					importer.getImportMeshName(meshes[i], mesh_name);
+					StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ".fbx:", path);
+					compiler.addResource(Model::TYPE, tmp);
+				}
+			}
+
+			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
+			for (const FBXImporter::ImportAnimation& anim : animations) {
+				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ".ani:", path);
+				compiler.addResource(ResourceType("animation"), tmp);
+			}
+
+			LUMIX_DELETE(plugin->m_app.getAllocator(), data);
+		}, &m_subres_signal, JobSystem::INVALID_HANDLE, 2);			
+	}
+
+	static const char* getResourceFilePath(const char* str)
+	{
+		const char* c = str;
+		while (*c && *c != ':') ++c;
+		return *c != ':' ? str : c + 1;
+	}
+
+	bool compile(const Path& src) override
+	{
+		ASSERT(Path::hasExtension(src.c_str(), "fbx"));
+		const char* filepath = getResourceFilePath(src.c_str());
+		FBXImporter::ImportConfig cfg;
+		const Meta meta = getMeta(Path(filepath));
+		cfg.rotation_error = meta.rotation_error;
+		cfg.position_error = meta.position_error;
+		cfg.mesh_scale = meta.scale;
+		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
+		cfg.create_impostor = meta.create_impostor;
+		const PathInfo src_info(filepath);
+		m_fbx_importer.setSource(filepath, false);
+		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
+			if (m_fbx_importer.getOFBXScene()) {
+				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
+					logError("Editor") << "No meshes with materials found in " << src;
+				}
+				else {
+					logError("Editor") << "No meshes or animations found in " << src;
+				}
+			}
+		}
+
+		const StaticString<32> hash_str("", src.getHash());
+		if (meta.split) {
+			//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+			m_fbx_importer.writeSubmodels(filepath, cfg);
+			m_fbx_importer.writePrefab(filepath, cfg);
+		}
+		m_fbx_importer.writeModel(src.c_str(), cfg);
+		m_fbx_importer.writeMaterials(filepath, cfg);
+		m_fbx_importer.writeAnimations(filepath, cfg);
+		return true;
+	}
+
+
+	void createTileUniverse()
+	{
+		Engine& engine = m_app.getEngine();
+		m_tile.universe = &engine.createUniverse(false);
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_tile.pipeline = Pipeline::create(*renderer, pres, "PREVIEW", engine.getAllocator());
+
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		const EntityRef env_probe = m_tile.universe->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_tile.universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		render_scene->getEnvironmentProbe(env_probe).half_extents = Vec3(1e3);
+
+		Matrix mtx;
+		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
+		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
+		m_tile.universe->createComponent(ENVIRONMENT_TYPE, light_entity);
+		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
+		
+		m_tile.pipeline->setUniverse(m_tile.universe);
+	}
+
+
+	void createPreviewUniverse()
+	{
+		auto& engine = m_app.getEngine();
+		m_universe = &engine.createUniverse(false);
+		auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		m_pipeline = Pipeline::create(*renderer, pres, "PREVIEW",  engine.getAllocator());
+
+		const EntityRef mesh_entity = m_universe->createEntity({0, 0, 0}, {0, 0, 0, 1});
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
+		m_mesh = mesh_entity;
+		m_universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+
+		const EntityRef env_probe = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
+		m_universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
+		render_scene->getEnvironmentProbe(env_probe).half_extents = Vec3(1e3);
+
+		Matrix mtx;
+		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
+		const EntityRef light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
+		m_universe->createComponent(ENVIRONMENT_TYPE, light_entity);
+		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
+
+		m_pipeline->setUniverse(m_universe);
+	}
+
+
+	void showPreview(Model& model)
+	{
+		auto* render_scene = static_cast<RenderScene*>(m_universe->getScene(MODEL_INSTANCE_TYPE));
+		if (!render_scene) return;
+		if (!model.isReady()) return;
+		if (!m_mesh.isValid()) return;
+
+		if (render_scene->getModelInstanceModel((EntityRef)m_mesh) != &model)
+		{
+			render_scene->setModelInstancePath((EntityRef)m_mesh, model.getPath());
+			AABB aabb = model.getAABB();
+
+			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
+			m_viewport.rot = Quat::vec3ToVec3({0, 0, 1}, {1, 1, 1});
+		}
+		ImVec2 image_size(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x);
+
+		m_viewport.w = (int)image_size.x;
+		m_viewport.h = (int)image_size.y;
+		m_pipeline->setViewport(m_viewport);
+		m_pipeline->render(false);
+		m_preview = m_pipeline->getOutput();
+		ImGui::Image((void*)(uintptr_t)m_preview.value, image_size);
+		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
+		if (m_is_mouse_captured && !mouse_down)
+		{
+			m_is_mouse_captured = false;
+			OS::showCursor(true);
+			OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
+		}
+
+		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
+
+		if (ImGui::BeginPopup("PreviewPopup"))
+		{
+			if (ImGui::Selectable("Save preview"))
+			{
+				model.getResourceManager().load(model);
+				renderTile(&model, &m_viewport.pos, &m_viewport.rot);
+			}
+			ImGui::EndPopup();
+		}
+
+		if (ImGui::IsItemHovered() && mouse_down)
+		{
+			Vec2 delta(0, 0);
+			const OS::Event* events = m_app.getEvents();
+			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
+				const OS::Event& e = events[i];
+				if (e.type == OS::Event::Type::MOUSE_MOVE) {
+					delta += Vec2((float)e.mouse_move.xrel, (float)e.mouse_move.yrel);
+				}
+			}
+
+			if (!m_is_mouse_captured)
+			{
+				m_is_mouse_captured = true;
+				OS::showCursor(false);
+				const OS::Point p = OS::getMouseScreenPos();
+				m_captured_mouse_x = p.x;
+				m_captured_mouse_y = p.y;
+			}
+
+			if (delta.x != 0 || delta.y != 0)
+			{
+				const Vec2 MOUSE_SENSITIVITY(50, 50);
+				DVec3 pos = m_viewport.pos;
+				Quat rot = m_viewport.rot;
+
+				float yaw = -signum(delta.x) * (powf(fabsf((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
+				Quat yaw_rot(Vec3(0, 1, 0), yaw);
+				rot = yaw_rot * rot;
+				rot.normalize();
+
+				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
+				float pitch =
+					-signum(delta.y) * (powf(fabsf((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
+				Quat pitch_rot(pitch_axis, pitch);
+				rot = pitch_rot * rot;
+				rot.normalize();
+
+				Vec3 dir = rot.rotate(Vec3(0, 0, 1));
+				Vec3 origin = (model.getAABB().max + model.getAABB().min) * 0.5f;
+
+				float dist = (origin - pos.toFloat()).length();
+				pos = DVec3(0) + origin + dir * dist;
+
+				m_viewport.rot = rot;
+				m_viewport.pos = pos;
+			}
+		}
+	}
+
+
+	static void postprocessImpostor(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, const IVec2& tile_size, IAllocator& allocator) {
+		struct Cell {
+			i16 x, y;
+		};
+		const IVec2 size = tile_size * 9;
+		Array<Cell> cells(allocator);
+		cells.resize(gb0->size());
+		const u32* data = gb0->begin();
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0xff000000) {
+					cells[i].x = i;
+					cells[i].y = j;
+				}
+				else {
+					cells[i].x = -3 * size.x;
+					cells[i].y = -3 * size.y;
+				}
+			}
+		}
+
+		auto pow2 = [](i32 v){
+			return v * v;
+		};
+
+		for (i32 j = 0; j < size.y; ++j) {
+			for (i32 i = 0; i < size.x; ++i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0xff000000) {
+					cells[idx].x = i;
+					cells[idx].y = j;
+				}
+				else {
+					if(i > 0) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_x = pow2(cells[idx - 1].x - i) + pow2(cells[idx - 1].y - j);
+						if(dist_x < dist_0) {
+							cells[idx] = cells[idx - 1];
+						}
+					}					
+					if(j > 0) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_y = pow2(cells[idx - size.x].x - i) + pow2(cells[idx - size.x].y - j);
+						if(dist_y < dist_0) {
+							cells[idx] = cells[idx - size.x];
+						}
+					}					
+				}
+			}
+		}
+
+		for (i32 j = size.y - 1; j >= 0; --j) {
+			for (i32 i = size.x - 1; i>= 0; --i) {
+				const u32 idx = i + j * size.x;
+				if (data[idx] & 0xff000000) {
+					cells[idx].x = i;
+					cells[idx].y = j;
+				}
+				else {
+					if(i < size.x - 1) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_x = pow2(cells[idx + 1].x - i) + pow2(cells[idx + 1].y - j);
+						if(dist_x < dist_0) {
+							cells[idx] = cells[idx + 1];
+						}
+					}					
+					if(j < size.y - 1) {
+						const u32 dist_0 = pow2(cells[idx].x - i) + pow2(cells[idx].y - j);
+						const u32 dist_y = pow2(cells[idx + size.x].x - i) + pow2(cells[idx + size.x].y - j);
+						if(dist_y < dist_0) {
+							cells[idx] = cells[idx + size.x];
+						}
+					}					
+				}
+			}
+		}
+
+		Array<u32> tmp(allocator);
+		tmp.resize(gb0->size());
+		if (cells[0].x >= 0) {
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					const u8 alpha = data[idx] >> 24;
+					tmp[idx] = data[cells[idx].x + cells[idx].y * size.x];
+					tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
+				}
+			}
+			memcpy(gb0->begin(), tmp.begin(), tmp.byte_size());
+
+			const u32* gb1_data = gb1->begin();
+			for (i32 j = 0; j < size.y; ++j) {
+				for (i32 i = 0; i < size.x; ++i) {
+					const u32 idx = i + j * size.x;
+					tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
+				}
+			}
+			memcpy(gb1->begin(), tmp.begin(), tmp.byte_size());
+		}
+		else {
+			// nothing was rendered
+			memset(gb0->begin(), 0xff, gb0->byte_size());
+			memset(gb1->begin(), 0xff, gb1->byte_size());
+		}
+	}
+
+	void onGUI(Span<Resource*> resources) override
+	{
+		if (resources.length() > 1) return;
+
+		auto* model = static_cast<Model*>(resources[0]);
+
+		if (model->isReady()) {
+			ImGuiEx::Label("Bounding radius");
+			ImGui::Text("%f", model->getBoundingRadius());
+
+			if (ImGui::CollapsingHeader("LODs")) {
+				auto* lods = model->getLODs();
+				if (lods[0].to_mesh >= 0 && !model->isFailure())
+				{
+					ImGui::Separator();
+					ImGui::Columns(4);
+					ImGui::Text("LOD");
+					ImGui::NextColumn();
+					ImGui::Text("Distance");
+					ImGui::NextColumn();
+					ImGui::Text("# of meshes");
+					ImGui::NextColumn();
+					ImGui::Text("# of triangles");
+					ImGui::NextColumn();
+					ImGui::Separator();
+					int lod_count = 1;
+					for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
+					{
+						ImGui::PushID(i);
+						ImGui::Text("%d", i);
+						ImGui::NextColumn();
+						if (lods[i].distance == FLT_MAX)
+						{
+							ImGui::Text("Infinite");
+						}
+						else
+						{
+							float dist = sqrtf(lods[i].distance);
+							if (ImGui::DragFloat("", &dist))
+							{
+								lods[i].distance = dist * dist;
+							}
+						}
+						ImGui::NextColumn();
+						ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
+						ImGui::NextColumn();
+						int tri_count = 0;
+						for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
+						{
+							int indices_count = model->getMesh(j).indices.size() >> 1;
+							if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
+								indices_count >>= 1;
+							}
+							tri_count += indices_count / 3;
+
+						}
+
+						ImGui::Text("%d", tri_count);
+						ImGui::NextColumn();
+						++lod_count;
+						ImGui::PopID();
+					}
+
+					ImGui::Columns(1);
+				}
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Meshes")) {
+			for (int i = 0; i < model->getMeshCount(); ++i)
+			{
+				auto& mesh = model->getMesh(i);
+				if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
+				{
+					ImGuiEx::Label("Triangle count");
+					ImGui::Text("%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
+					ImGuiEx::Label("Material");
+					ImGui::TextUnformatted(mesh.material->getPath().c_str());
+					ImGui::SameLine();
+					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
+					{
+						m_app.getAssetBrowser().selectResource(mesh.material->getPath(), true, false);
+					}
+					ImGui::TreePop();
+				}
+			}
+		}
+
+		if (model->isReady() && ImGui::CollapsingHeader("Bones")) {
+			ImGuiEx::Label("Count");
+			ImGui::Text("%d", model->getBoneCount());
+			if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
+				ImGui::Columns(3);
+				for (int i = 0; i < model->getBoneCount(); ++i)
+				{
+					ImGui::Text("%s", model->getBone(i).name.c_str());
+					ImGui::NextColumn();
+					Vec3 pos = model->getBone(i).transform.pos;
+					ImGui::Text("%f; %f; %f", pos.x, pos.y, pos.z);
+					ImGui::NextColumn();
+					Quat rot = model->getBone(i).transform.rot;
+					ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
+					ImGui::NextColumn();
+				}
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Import")) {
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			if(m_meta_res != model->getPath().getHash()) {
+				m_meta = getMeta(model->getPath());
+				m_meta_res = model->getPath().getHash();
+			}
+			ImGuiEx::Label("Max position error");
+			ImGui::InputFloat("##maxposer", &m_meta.position_error);
+			ImGuiEx::Label("Max rotation error");
+			ImGui::InputFloat("##maxroter", &m_meta.rotation_error);
+			ImGuiEx::Label("Scale");
+			ImGui::InputFloat("##scale", &m_meta.scale);
+			ImGuiEx::Label("Split");
+			ImGui::Checkbox("##split", &m_meta.split);
+			ImGuiEx::Label("Create impostor mesh");
+			ImGui::Checkbox("##creimp", &m_meta.create_impostor);
+			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
+				bool infinite = m_meta.lods_distances[i] <= 0;
+				if(ImGui::Checkbox(StaticString<32>("Infinite LOD ", i), &infinite)) {
+					m_meta.lods_distances[i] *= -1;
+				}
+				if (infinite) break;
+
+				if (m_meta.lods_distances[i] > 0) {
+					ImGui::SameLine();
+					ImGui::SetNextItemWidth(-1);
+					ImGui::DragFloat(StaticString<32>("##lod", i), &m_meta.lods_distances[i]);
+				}
+			}
+			
+			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
+				String src(m_app.getAllocator());
+				src.cat("create_impostor=").cat(m_meta.create_impostor ? "true" : "false")
+					.cat("\nposition_error = ").cat(m_meta.position_error)
+					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
+					.cat("\nscale = ").cat(m_meta.scale)
+					.cat("\nscale = ").cat(m_meta.scale)
+					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n");
+
+				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
+					if (m_meta.lods_distances[i] > 0) {
+						src.cat("lod").cat(i).cat("_distance").cat(" = ").cat(m_meta.lods_distances[i]).cat("\n");
+					}
+				}
+
+				compiler.updateMeta(model->getPath(), src.c_str());
+				if (compiler.compile(model->getPath())) {
+					model->getResourceManager().reload(*model);
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Create impostor texture")) {
+				FBXImporter importer(m_app);
+				IAllocator& allocator = m_app.getAllocator();
+				Array<u32> gb0(allocator); 
+				Array<u32> gb1(allocator); 
+				IVec2 tile_size;
+				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(tile_size));
+				postprocessImpostor(Ref(gb0), Ref(gb1), tile_size, allocator);
+				const PathInfo fi(model->getPath().c_str());
+				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
+				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
+				
+				OS::OutputFile file;
+				FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+				if (fs.open(img_path, Ref(file))) {
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+					file.close();
+				}
+				else {
+					logError("Renderer") << "Failed to open " << img_path;
+				}
+
+				img_path = fi.m_dir;
+				img_path << fi.m_basename << "_impostor1.tga";
+				if (fs.open(img_path, Ref(file))) {
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+					file.close();
+				}
+				else {
+					logError("Renderer") << "Failed to open " << img_path;
+				}
+			}
+			ImGui::SameLine();
+			ImGui::TextDisabled("(?)");
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("%s", "To use impostors, check `Create impostor mesh` and press this button. "
+				"When the mesh changes, you need to regenerate the impostor texture by pressing this button again.");
+			}
+
+		showPreview(*model);
+	}
+
+	Meta m_meta;
+	u32 m_meta_res = 0;
+
+	void onResourceUnloaded(Resource* resource) override {}
+	const char* getName() const override { return "Model"; }
+	ResourceType getResourceType() const override { return Model::TYPE; }
+
+
+	void pushTileQueue(const Path& path)
+	{
+		ASSERT(!m_tile.queue.full());
+		Engine& engine = m_app.getEngine();
+		ResourceManagerHub& resource_manager = engine.getResourceManager();
+
+		Resource* resource;
+		if (Path::hasExtension(path.c_str(), "fab")) {
+			resource = resource_manager.load<PrefabResource>(path);
+		}
+		else if (Path::hasExtension(path.c_str(), "mat")) {
+			resource = resource_manager.load<Material>(path);
+		}
+		else {
+			resource = resource_manager.load<Model>(path);
+		}
+		m_tile.queue.push(resource);
+	}
+
+
+	void popTileQueue()
+	{
+		m_tile.queue.pop();
+		if (m_tile.paths.empty()) return;
+
+		Path path = m_tile.paths.back();
+		m_tile.paths.pop();
+		pushTileQueue(path);
+	}
+	
+	static void destroyEntityRecursive(Universe& universe, EntityPtr entity)
+	{
+		if (!entity.isValid()) return;
+			
+		EntityRef e = (EntityRef)entity;
+		destroyEntityRecursive(universe, universe.getFirstChild(e));
+		destroyEntityRecursive(universe, universe.getNextSibling(e));
+
+		universe.destroyEntity(e);
+	}
+
+	void update() override
+	{
+		if (m_tile.waiting) {
+			if (!m_app.getEngine().getFileSystem().hasWork()) {
+				renderPrefabSecondStage();
+				m_tile.waiting = false;
+			}
+		}
+		if (m_tile.frame_countdown >= 0) {
+			--m_tile.frame_countdown;
+			if (m_tile.frame_countdown == -1) {
+				destroyEntityRecursive(*m_tile.universe, (EntityRef)m_tile.entity);
+				Engine& engine = m_app.getEngine();
+				FileSystem& fs = engine.getFileSystem();
+				StaticString<MAX_PATH_LENGTH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
+				
+				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
+					swap(m_tile.data[i * 4 + 0], m_tile.data[i * 4 + 2]);
+				}
+
+				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+				memset(m_tile.data.begin(), 0, m_tile.data.byte_size());
+				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+				renderer->destroy(m_tile.texture);
+				m_tile.entity = INVALID_ENTITY;
+			}
+			return;
+		}
+
+		if (m_tile.entity.isValid()) return;
+		if (m_tile.queue.empty()) return;
+
+		Resource* resource = m_tile.queue.front();
+		if (resource->isFailure()) {
+			logError("Editor") << "Failed to load " << resource->getPath();
+			popTileQueue();
+			return;
+		}
+		if (!resource->isReady()) return;
+
+		popTileQueue();
+
+		if (resource->getType() == Model::TYPE) {
+			renderTile((Model*)resource, nullptr, nullptr);
+		}
+		else if (resource->getType() == Material::TYPE) {
+			renderTile((Material*)resource);
+		}
+		else if (resource->getType() == PrefabResource::TYPE) {
+			renderTile((PrefabResource*)resource);
+		}
+		else {
+			ASSERT(false);
+		}
+	}
+
+
+	void renderTile(PrefabResource* prefab)
+	{
+		Engine& engine = m_app.getEngine();
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		if (!render_scene) return;
+
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+		if (!renderer) return;
+
+		EntityMap entity_map(m_app.getAllocator());
+		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, Ref(entity_map))) return;
+		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
+
+		m_tile.path_hash = prefab->getPath().getHash();
+		prefab->getResourceManager().unload(*prefab);
+		m_tile.entity = entity_map.m_map[0];
+		m_tile.waiting = true;
+	}
+
+
+	void renderPrefabSecondStage()
+	{
+		Engine& engine = m_app.getEngine();
+
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		if (!render_scene) return;
+
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+		if (!renderer) return;
+
+		AABB aabb({0, 0, 0}, {0, 0, 0});
+
+		Universe& universe = *m_tile.universe;
+		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
+			EntityRef ent = (EntityRef)e;
+			const DVec3 pos = universe.getPosition(ent);
+			aabb.addPoint(pos.toFloat());
+			if (universe.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
+				RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
+				Model* model = scene->getModelInstanceModel(ent);
+				if (model->isReady()) {
+					const Transform tr = universe.getTransform(ent);
+					DVec3 points[8];
+					model->getAABB().getCorners(tr, points);
+					for (const DVec3& p : points) {
+						aabb.addPoint(p.toFloat());
+					}
+				}
+			}
+		}
+
+		Vec3 center = (aabb.max + aabb.min) * 0.5f;
+		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
+		Matrix mtx;
+		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
+		mtx.inverse();
+		Viewport viewport;
+		viewport.is_ortho = false;
+		viewport.far = 10000.f;
+		viewport.near = 0.1f;
+		viewport.fov = degreesToRadians(60.f);
+		viewport.h = AssetBrowser::TILE_SIZE;
+		viewport.w = AssetBrowser::TILE_SIZE;
+		viewport.pos = DVec3(eye.x, eye.y, eye.z);
+		viewport.rot = mtx.getRotation();
+		m_tile.pipeline->setViewport(viewport);
+		m_tile.pipeline->render(false);
+
+		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+		m_tile.texture = gpu::allocTextureHandle(); 
+		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, gpu::TextureFormat::RGBA8,  Span(m_tile.data.begin(), m_tile.data.end()));
+		
+		m_tile.frame_countdown = 2;
+	}
+
+
+	void renderTile(Material* material) {
+		if (material->getTextureCount() == 0) return;
+		const char* in_path = material->getTexture(0)->getPath().c_str();
+		Engine& engine = m_app.getEngine();
+		StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".dds");
+
+		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
+	}
+
+	void renderTile(Model* model, const DVec3* in_pos, const Quat* in_rot)
+	{
+		Engine& engine = m_app.getEngine();
+		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
+		if (!render_scene) return;
+
+		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
+		if (!renderer) return;
+
+		EntityRef mesh_entity = m_tile.universe->createEntity({ 0, 0, 0 }, { 0, 0, 0, 1 });
+		m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
+
+		render_scene->setModelInstancePath(mesh_entity, model->getPath());
+		AABB aabb = model->getAABB();
+
+		Matrix mtx;
+		Vec3 center = (aabb.max + aabb.min) * 0.5f;
+		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
+		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
+		mtx.inverse();
+		Viewport viewport;
+		viewport.is_ortho = false;
+		viewport.far = 10000.f;
+		viewport.near = 0.1f;
+		viewport.fov = degreesToRadians(60.f);
+		viewport.h = AssetBrowser::TILE_SIZE;
+		viewport.w = AssetBrowser::TILE_SIZE;
+		viewport.pos = in_pos ? *in_pos : DVec3(eye.x, eye.y, eye.z);
+		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
+		m_tile.pipeline->setViewport(viewport);
+		m_tile.pipeline->render(false);
+
+		m_tile.texture = gpu::allocTextureHandle(); 
+		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
+		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, gpu::TextureFormat::RGBA8, Span(m_tile.data.begin(), m_tile.data.end()));
+		
+		m_tile.entity = mesh_entity;
+		m_tile.frame_countdown = 2;
+		m_tile.path_hash = model->getPath().getHash();
+		model->getResourceManager().unload(*model);
+	}
+
+
+	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
+	{
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (type == Shader::TYPE) return fs.copyFile("models/editor/tile_shader.dds", out_path);
+
+		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE) return false;
+
+		Path path(in_path);
+
+		if (!m_tile.queue.full())
+		{
+			pushTileQueue(path);
+			return true;
+		}
+
+		m_tile.paths.push(path);
+		return true;
+	}
+
+
+	struct TileData
+	{
+		TileData(IAllocator& allocator)
+			: data(allocator)
+			, paths(allocator)
+			, queue()
+		{
+		}
+
+		Universe* universe = nullptr;
+		Pipeline* pipeline = nullptr;
+		EntityPtr entity = INVALID_ENTITY;
+		int frame_countdown = -1;
+		u32 path_hash;
+		Array<u8> data;
+		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
+		Queue<Resource*, 8> queue;
+		Array<Path> paths;
+		bool waiting = false;
+	} m_tile;
+	
+
+	StudioApp& m_app;
+	gpu::TextureHandle m_preview;
+	Universe* m_universe;
+	Viewport m_viewport;
+	Pipeline* m_pipeline;
+	EntityPtr m_mesh = INVALID_ENTITY;
+	bool m_is_mouse_captured;
+	int m_captured_mouse_x;
+	int m_captured_mouse_y;
+	TexturePlugin* m_texture_plugin;
+	FBXImporter m_fbx_importer;
+	JobSystem::SignalHandle m_subres_signal = JobSystem::INVALID_HANDLE;
 };
 
 
@@ -3794,6 +3809,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.addPlugin(*m_material_plugin, material_exts);
 
 		m_model_plugin = LUMIX_NEW(allocator, ModelPlugin)(m_app);
+		m_model_plugin->m_texture_plugin = m_texture_plugin;
 		const char* model_exts[] = {"fbx", nullptr};
 		asset_compiler.addPlugin(*m_model_plugin, model_exts);
 
