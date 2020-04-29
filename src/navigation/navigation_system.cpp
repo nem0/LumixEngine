@@ -72,6 +72,9 @@ struct NavigationSystem final : IPlugin
 		s_instance = nullptr;
 	}
 
+	u32 getVersion() const override { return 0; }
+	void serialize(OutputMemoryStream& stream) const override {}
+	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	static void detourFree(void* ptr)
 	{

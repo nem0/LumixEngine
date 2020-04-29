@@ -54,6 +54,9 @@ struct LUMIX_ENGINE_API IPlugin
 	virtual void init() {}
 	virtual void update(float) {}
 	virtual const char* getName() const = 0;
+	virtual u32 getVersion() const = 0;
+	virtual void serialize(OutputMemoryStream& serializer) const = 0;
+	virtual bool deserialize(u32 version, InputMemoryStream& serializer) = 0;
 	virtual void pluginAdded(IPlugin& plugin) {}
 
 	virtual void createScenes(Universe&) {}

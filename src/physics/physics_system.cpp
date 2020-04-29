@@ -19,6 +19,16 @@ namespace Lumix
 	{
 		using namespace Reflection;
 
+		struct LayerEnum : Reflection::EnumAttribute {
+			u32 count(ComponentUID cmp) const override { 
+				return ((PhysicsScene*)cmp.scene)->getSystem().getCollisionsLayersCount();
+			}
+			const char* name(ComponentUID cmp, u32 idx) const override { 
+				PhysicsSystem& system = ((PhysicsScene*)cmp.scene)->getSystem();
+				return system.getCollisionLayerName(idx);
+			}
+		};
+
 		struct DynamicTypeEnum : Reflection::EnumAttribute {
 			u32 count(ComponentUID cmp) const override { return 3; }
 			const char* name(ComponentUID cmp, u32 idx) const override { 
@@ -63,7 +73,7 @@ namespace Lumix
 			),
 			component("ragdoll",
 				blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
-				property("Layer", LUMIX_PROP(PhysicsScene, RagdollLayer))
+				property("Layer", LUMIX_PROP(PhysicsScene, RagdollLayer), LayerEnum())
 			),
 			component("d6_joint",
 				property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
@@ -112,22 +122,21 @@ namespace Lumix
 				),
 				property("Radius", LUMIX_PROP(PhysicsScene, ControllerRadius)),
 				property("Height", LUMIX_PROP(PhysicsScene, ControllerHeight)),
-				property("Layer", LUMIX_PROP(PhysicsScene, ControllerLayer)),
+				property("Layer", LUMIX_PROP(PhysicsScene, ControllerLayer), LayerEnum()),
 				property("Use Custom Gravity", LUMIX_PROP(PhysicsScene, ControllerCustomGravity)),
 				property("Custom Gravity Acceleration", LUMIX_PROP(PhysicsScene, ControllerCustomGravityAcceleration))
 			),
 			component("rigid_actor",
-				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer)),
+				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer), LayerEnum()),
 				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), DynamicTypeEnum()),
 				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)),
 				array("Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
 					property("Size", LUMIX_PROP(PhysicsScene, BoxGeomHalfExtents)),
 					property("Position offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetPosition)),
 					property("Rotation offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetRotation), RadiansAttribute())),
-				array("Sphere geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
+				array("Sphere geometry", &PhysicsScene::getSphereGeometryCount, &PhysicsScene::addSphereGeometry, &PhysicsScene::removeSphereGeometry,
 					property("Radius", LUMIX_PROP(PhysicsScene, SphereGeomRadius), MinAttribute(0)),
-					property("Position offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition)),
-					property("Rotation offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetRotation), RadiansAttribute()))
+					property("Position offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition)))
 			),
 			component("wheel",
 				property("Radius", LUMIX_PROP(PhysicsScene, WheelRadius), MinAttribute(0)),
@@ -137,7 +146,7 @@ namespace Lumix
 				enum_property("Slot", LUMIX_PROP(PhysicsScene, WheelSlot), WheelSlotEnum())
 			),
 			component("physical_heightfield",
-				property("Layer", LUMIX_PROP(PhysicsScene, HeightfieldLayer)),
+				property("Layer", LUMIX_PROP(PhysicsScene, HeightfieldLayer), LayerEnum()),
 				property("Heightmap", LUMIX_PROP(PhysicsScene, HeightmapSource), ResourceAttribute("Image (*.raw)", Texture::TYPE)),
 				property("Y scale", LUMIX_PROP(PhysicsScene, HeightmapYScale), MinAttribute(0)),
 				property("XZ scale", LUMIX_PROP(PhysicsScene, HeightmapXZScale), MinAttribute(0))
@@ -206,6 +215,17 @@ namespace Lumix
 			, m_manager(*this, engine.getAllocator())
 			, m_physx_allocator(m_allocator)
 		{
+			m_layers.count = 2;
+			memset(m_layers.names, 0, sizeof(m_layers.names));
+			for (u32 i = 0; i < lengthOf(m_layers.names); ++i)
+			{
+				copyString(m_layers.names[i], "Layer");
+				char tmp[3];
+				toCString(i, Span(tmp));
+				catString(m_layers.names[i], tmp);
+				m_layers.filter[i] = 0xffffFFFF;
+			}
+			
 			registerProperties(engine.getAllocator());
 			m_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());
 			PhysicsScene::registerLuaAPI(m_engine.getState());
@@ -236,13 +256,28 @@ namespace Lumix
 			m_foundation->release();
 		}
 
+		u32 getVersion() const override { return 0; }
+
+		void serialize(OutputMemoryStream& serializer) const override {
+			serializer.write(m_layers.count);
+			serializer.write(m_layers.names);
+			serializer.write(m_layers.filter);
+		}
+
+		bool deserialize(u32 version, InputMemoryStream& serializer) override {
+			if (version != 0) return false;
+
+			serializer.read(m_layers.count);
+			serializer.read(m_layers.names);
+			serializer.read(m_layers.filter);
+			return true;
+		}
 
 		void createScenes(Universe& universe) override
 		{
 			auto* scene = PhysicsScene::create(*this, universe, m_engine, m_allocator);
 			universe.addScene(scene);
 		}
-
 
 		void destroyScene(IScene* scene) override { PhysicsScene::destroy(static_cast<PhysicsScene*>(scene)); }
 
@@ -256,6 +291,8 @@ namespace Lumix
 		{
 			return m_cooking;
 		}
+	
+		CollisionLayers& getCollisionLayers() override { return m_layers; }
 
 		bool connect2VisualDebugger()
 		{
@@ -274,6 +311,26 @@ namespace Lumix
 			return false;
 		}
 
+
+		int getCollisionsLayersCount() const override { return m_layers.count; }
+		void addCollisionLayer() override { m_layers.count = minimum(lengthOf(m_layers.names), m_layers.count + 1); }
+		void removeCollisionLayer() override { m_layers.count = maximum(0, m_layers.count - 1); }
+		void setCollisionLayerName(int index, const char* name) override { copyString(m_layers.names[index], name); }
+		const char* getCollisionLayerName(int index) override { return m_layers.names[index]; }
+		bool canLayersCollide(int layer1, int layer2) override { return (m_layers.filter[layer1] & (1 << layer2)) != 0; }
+
+		void setLayersCanCollide(int layer1, int layer2, bool can_collide) override {
+			if (can_collide) {
+				m_layers.filter[layer1] |= 1 << layer2;
+				m_layers.filter[layer2] |= 1 << layer1;
+			}
+			else {
+				m_layers.filter[layer1] &= ~(1 << layer2);
+				m_layers.filter[layer2] &= ~(1 << layer1);
+			}
+		}
+
+
 		IAllocator& m_allocator;
 		physx::PxPhysics* m_physics;
 		physx::PxFoundation* m_foundation;
@@ -283,6 +340,7 @@ namespace Lumix
 		physx::PxCooking* m_cooking;
 		PhysicsGeometryManager m_manager;
 		Engine& m_engine;
+		CollisionLayers m_layers;
 	};
 
 

@@ -76,6 +76,9 @@ struct AudioSystemImpl final : AudioSystem
 		m_manager.destroy();
 	}
 
+	u32 getVersion() const override { return 0; }
+	void serialize(OutputMemoryStream& stream) const override {}
+	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	void init() override
 	{

@@ -609,6 +609,7 @@ struct StudioAppImpl final : StudioApp
 					if (!create_empty)
 					{
 						editor->setProperty(type,
+							"",
 							-1,
 							property,
 							editor->getSelectedEntities(),
@@ -976,15 +977,15 @@ struct StudioAppImpl final : StudioApp
 		m_editor->addComponent(entities, env_cmp_type);
 		m_editor->addComponent(entities, lua_script_cmp_type);
 		const float intensity = 3;
-		m_editor->setProperty(env_cmp_type, -1, "Intensity", Span(&env, 1), intensity);
+		m_editor->setProperty(env_cmp_type, "", -1, "Intensity", Span(&env, 1), intensity);
 		const float indirect_intensity = 0.3f;
-		m_editor->setProperty(env_cmp_type, -1, "Indirect intensity", Span(&env, 1), indirect_intensity);
+		m_editor->setProperty(env_cmp_type, "", -1, "Indirect intensity", Span(&env, 1), indirect_intensity);
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);
 		const ComponentUID cmp = m_editor->getUniverse()->getComponent(env, lua_script_cmp_type);
 		m_editor->addArrayPropertyItem(cmp, "scripts");
-		m_editor->setProperty(lua_script_cmp_type, 0, "Path", entities, Path("pipelines/sky.lua"));
+		m_editor->setProperty(lua_script_cmp_type, "scripts", 0, "Path", entities, Path("pipelines/sky.lua"));
 	}
 
 
@@ -1019,6 +1020,7 @@ struct StudioAppImpl final : StudioApp
 						}
 						m_engine->getFileSystem().setBasePath(dir);
 						extractBundled();
+						m_editor->loadProject();
 						scanUniverses();
 					}
 				}
@@ -2554,7 +2556,7 @@ struct StudioAppImpl final : StudioApp
 			}
 
 			int val = (int)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const Reflection::Property<u32>& prop) override
@@ -2563,7 +2565,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isnumber(L, -1)) return;
 
 			const u32 val = (u32)lua_tointeger(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const Reflection::Property<float>& prop) override
@@ -2572,7 +2574,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isnumber(L, -1)) return;
 
 			float val = (float)lua_tonumber(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const Reflection::Property<Vec2>& prop) override
@@ -2581,7 +2583,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
 
 			const Vec2 val = LuaWrapper::toType<Vec2>(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const Reflection::Property<Vec3>& prop) override
@@ -2590,7 +2592,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
 
 			const Vec3 val = LuaWrapper::toType<Vec3>(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const Reflection::Property<IVec3>& prop) override
@@ -2599,7 +2601,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
 
 			const IVec3 val = LuaWrapper::toType<IVec3>(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const Reflection::Property<Vec4>& prop) override
@@ -2608,7 +2610,7 @@ struct StudioAppImpl final : StudioApp
 			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
 
 			const Vec4 val = LuaWrapper::toType<Vec4>(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 		
 		void visit(const Reflection::Property<const char*>& prop) override
@@ -2617,7 +2619,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), str);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), str);
 		}
 
 
@@ -2627,7 +2629,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isstring(L, -1)) return;
 
 			const char* str = lua_tostring(L, -1);
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), str);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), str);
 		}
 
 
@@ -2637,7 +2639,7 @@ struct StudioAppImpl final : StudioApp
 			if (!lua_isboolean(L, -1)) return;
 
 			bool val = lua_toboolean(L, -1) != 0;
-			editor->setProperty(cmp_type, 0, prop.name, Span(&entity, 1), val);
+			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
 		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }

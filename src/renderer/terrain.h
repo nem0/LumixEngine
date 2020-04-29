@@ -4,6 +4,7 @@
 #include "engine/array.h"
 #include "engine/math.h"
 #include "engine/resource.h"
+#include "engine/stream.h"
 #include "gpu/gpu.h"
 
 

@@ -3726,7 +3726,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 			if (!create_empty)
 			{
-				editor.setProperty(TERRAIN_TYPE, -1, "Material", Span(&entity, 1), Path(buf));
+				editor.setProperty(TERRAIN_TYPE, "", -1, "Material", Span(&entity, 1), Path(buf));
 			}
 
 			ImGui::CloseCurrentPopup();

@@ -32,7 +32,6 @@ public:
 	virtual void destroyUniverse(Universe& context) = 0;
 	virtual OS::WindowHandle getWindowHandle() = 0;
 
-	virtual struct PathManager& getPathManager() = 0;
 	virtual struct FileSystem& getFileSystem() = 0;
 	virtual struct InputSystem& getInputSystem() = 0;
 	virtual struct PluginManager& getPluginManager() = 0;
@@ -52,6 +51,8 @@ public:
 	virtual void update(Universe& context) = 0;
 	virtual u32 serialize(Universe& ctx, struct OutputMemoryStream& serializer) = 0;
 	virtual bool deserialize(Universe& ctx, struct InputMemoryStream& serializer, Ref<struct EntityMap> entity_map) = 0;
+	virtual bool deserializeProject(InputMemoryStream& serializer) = 0;
+	virtual void serializeProject(OutputMemoryStream& serializer) const = 0;
 	virtual float getLastTimeDelta() const = 0;
 	virtual void setTimeMultiplier(float multiplier) = 0;
 	virtual void pause(bool pause) = 0;

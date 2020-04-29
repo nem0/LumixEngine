@@ -480,6 +480,9 @@ struct RendererImpl final : Renderer
 		m_frames.emplace(*this, m_allocator);
 	}
 
+	u32 getVersion() const override { return 0; }
+	void serialize(OutputMemoryStream& stream) const override {}
+	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
 
 	~RendererImpl()
 	{

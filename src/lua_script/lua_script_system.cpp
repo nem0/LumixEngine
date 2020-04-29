@@ -84,6 +84,9 @@ namespace Lumix
 		void destroyScene(IScene* scene) override;
 		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
+		u32 getVersion() const override { return 0; }
+		void serialize(OutputMemoryStream& stream) const override {}
+		bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
 
 		Engine& m_engine;
 		IAllocator& m_allocator;

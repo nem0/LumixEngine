@@ -1148,7 +1148,7 @@ template <typename T> LUMIX_FORCE_INLINE T signum(T a)
 }
 
 
-template <typename T> LUMIX_FORCE_INLINE T clamp(T value, T min_value, T max_value)
+template <typename T1, typename T2, typename T3> LUMIX_FORCE_INLINE T1 clamp(T1 value, T2 min_value, T3 max_value)
 {
 	return minimum(maximum(value, min_value), max_value);
 }
