@@ -186,7 +186,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 		if (attrs.is_radians) f = radiansToDegrees(f);
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (ImGui::DragFloat("##v", &f, 1, attrs.min, attrs.max))
 		{
 			f = clamp(f, attrs.min, attrs.max);
@@ -214,7 +214,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 			const char* preview = enum_attr->name(cmp, value);
 			ImGuiEx::Label(prop.name);
-			ImGui::PushID(&prop);
+			ImGui::PushID(prop.name);
 			if (ImGui::BeginCombo("##v", preview)) {
 				for (int i = 0; i < count; ++i) {
 					const char* val_name = enum_attr->name(cmp, i);
@@ -230,7 +230,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			return;
 		}
 
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		ImGuiEx::Label(prop.name);
 		if (ImGui::InputInt("##v", &value))
 		{
@@ -258,7 +258,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 			const char* preview = enum_attr->name(cmp, value);
 			ImGuiEx::Label(prop.name);
-			ImGui::PushID(&prop);
+			ImGui::PushID(prop.name);
 			if (ImGui::BeginCombo("##v", preview)) {
 				for (int i = 0; i < count; ++i) {
 					const char* val_name = enum_attr->name(cmp, i);
@@ -275,7 +275,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		}
 
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (ImGui::InputScalar("##v", ImGuiDataType_U32, &value))
 		{
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
@@ -366,7 +366,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 		if (attrs.is_radians) value = radiansToDegrees(value);
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (ImGui::DragFloat2("##v", &value.x))
 		{
 			if (attrs.is_radians) value = degreesToRadians(value);
@@ -384,7 +384,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		Vec3 value = prop.get(cmp, m_index);
 
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (attrs.is_color)
 		{
 			if (ImGui::ColorEdit3("##v", &value.x))
@@ -412,7 +412,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		IVec3 value = prop.get(cmp, m_index);
 		
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (ImGui::DragInt3("##v", &value.x)) {
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
@@ -428,7 +428,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		Vec4 value = prop.get(cmp, m_index);
 
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (attrs.is_color)
 		{
 			if (ImGui::ColorEdit4("##v", &value.x))
@@ -454,7 +454,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		bool value = prop.get(cmp, m_index);
 
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (ImGui::Checkbox("##v", &value))
 		{
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
@@ -474,7 +474,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		Attributes attrs = getAttributes(prop);
 
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if (attrs.resource_type != INVALID_RESOURCE_TYPE)
 		{
 			if (m_app.getAssetBrowser().resourceInput(prop.name, Span(tmp), attrs.resource_type))
@@ -503,7 +503,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		copyString(tmp, prop.get(cmp, m_index));
 
 		ImGuiEx::Label(prop.name);
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		if(attrs.is_multiline) {
 			if (ImGui::InputTextMultiline("##v", tmp, sizeof(tmp))) {
 				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, tmp);
@@ -533,7 +533,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			return;
 		}
 
-		ImGui::PushID(&prop);
+		ImGui::PushID(prop.name);
 		ComponentUID cmp = getComponent();
 		int count = prop.getCount(cmp);
 		const ImGuiStyle& style = ImGui::GetStyle();

@@ -1409,7 +1409,6 @@ void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, Textur
 			break;
 		}
 	}
-
 }
 
 
