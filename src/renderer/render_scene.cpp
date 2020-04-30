@@ -1659,7 +1659,7 @@ public:
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
 			const DVec3 pos = m_universe.getPosition(entity);
-			const float radius = model_instance.model->getBoundingRadius();
+			const float radius = model_instance.model->getBoundingRadius() * m_universe.getScale(entity);
 			if (!m_culling_system->isAdded(entity)) {
 				const RenderableTypes type = getRenderableType(*model_instance.model);
 				m_culling_system->add(entity, (u8)type, pos, radius);

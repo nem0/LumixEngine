@@ -4,6 +4,7 @@
 #include "engine/hash_map.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/stream.h"
 #include "engine/sync.h"
 #include "engine/os.h"
 #include "engine/stream.h"
@@ -1496,6 +1497,8 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 		CHECK_GL(glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name));
 	}
 
+	OutputMemoryStream unpacked(*g_gpu.allocator);
+
 	for (int layer = 0; layer < layers; ++layer) {
 		for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
 			u32 width = hdr.dwWidth;
@@ -1508,19 +1511,17 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
-				Array<u8> data(*g_gpu.allocator);
-				data.resize(size);
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
-					blob.read(&data[0], size);
+					const u8* data_ptr = (u8*)blob.skip(size);
 					if(layers > 1) {
-						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, internal_format, size, &data[0]));
+						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, internal_format, size, data_ptr));
 					}
 					else if (is_cubemap) {
 						ASSERT(layer == 0);
-						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, side, width, height, 1, internal_format, size, &data[0]));
+						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, side, width, height, 1, internal_format, size, data_ptr));
 					}
 					else {
-						CHECK_GL(glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, &data[0]));
+						CHECK_GL(glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, data_ptr));
 					}
 					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
 					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
@@ -1539,23 +1540,20 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 					CHECK_GL(glDeleteTextures(1, &texture));
 					return false;
 				}
-				Array<u8> data(*g_gpu.allocator);
-				data.resize(size);
-				u32 palette[256];
-				Array<u32> unpacked(*g_gpu.allocator);
 				unpacked.resize(size);
-				blob.read(palette, 4 * 256);
+				u32* unpacked_ptr = (u32*)unpacked.getMutableData();
+				const u32* palette = (u32*)blob.skip(4 * 256);
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
-					blob.read(&data[0], size);
+					const u8* data_ptr = (u8*)blob.skip(size);
 					for (u32 zz = 0; zz < size; ++zz) {
-						unpacked[zz] = palette[data[zz]];
+						unpacked_ptr[zz] = palette[data_ptr[zz]];
 					}
 					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if(layers > 1) {
-						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, &unpacked[0]));
+						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, unpacked_ptr));
 					}
 					else {
-						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, &unpacked[0]));
+						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, unpacked_ptr));
 					}
 					width = maximum(1, width >> 1);
 					height = maximum(1, height >> 1);
@@ -1567,16 +1565,14 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 					CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE));
 				}
 				u32 size = width * height * li->blockBytes;
-				Array<u8> data(*g_gpu.allocator);
-				data.resize(size);
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
-					blob.read(&data[0], size);
+					const u8* data_ptr = (u8*)blob.skip(size);
 					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if (layers > 1) {
-						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, &data[0]));
+						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, data_ptr));
 					}
 					else {
-						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, &data[0]));
+						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, data_ptr));
 					}
 					width = maximum(1, width >> 1);
 					height = maximum(1, height >> 1);

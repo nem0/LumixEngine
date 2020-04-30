@@ -347,6 +347,15 @@ bool endsWith(const char* str, const char* substr)
 	return equalStrings(str + len - len2, substr);
 }
 
+bool contains(const char* haystack, char needle)
+{
+	const char* c = haystack;
+	while (*c) {
+		if (*c == needle) return true;
+		++c;
+	}
+	return false;
+}
 
 const char* stristr(const char* haystack, const char* needle)
 {

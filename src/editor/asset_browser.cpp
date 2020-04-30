@@ -36,6 +36,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_app(app)
 	, m_is_open(false)
 	, m_show_thumbnails(true)
+	, m_show_subresources(true)
 	, m_history_index(-1)
 	, m_file_infos(app.getAllocator())
 	, m_filtered_file_infos(app.getAllocator())
@@ -162,6 +163,7 @@ void AssetBrowser::changeDir(const char* path)
 	auto& resources = compiler.lockResources();
 	for (const AssetCompiler::ResourceItem& res : resources) {
 		if (res.dir_hash != dir_hash) continue;
+		if (!m_show_subresources && contains(res.path.c_str(), ':')) continue;
 
 		FileInfo tile;
 		char filename[MAX_PATH_LENGTH];
@@ -649,6 +651,10 @@ void AssetBrowser::onGUI()
 
 		ImGui::SameLine();
 		ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
+		ImGui::SameLine();
+		if (ImGui::Checkbox("Subresources", &m_show_subresources)) {
+			changeDir(m_dir);
+		}
 		
 		ImGui::SameLine();
 		breadcrumbs();
