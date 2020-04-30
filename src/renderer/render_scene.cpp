@@ -2322,9 +2322,9 @@ public:
 			const double dist = (pos - origin).length();
 			if (dist - radius > cur_dist) continue;
 			
-			Vec3 intersection;
+			float intersection_t;
 			const Vec3 rel_pos = (origin - pos).toFloat();
-			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection)) {
+			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, Ref(intersection_t)) && intersection_t >= 0) {
 				RayCastModelHit new_hit = r.model->castRay(rel_pos / scale, dir, r.pose);
 				if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
 					new_hit.entity = entity;

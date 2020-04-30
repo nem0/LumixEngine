@@ -811,17 +811,16 @@ bool getRaySphereIntersection(const Vec3& origin,
 	const Vec3& dir,
 	const Vec3& center,
 	float radius,
-	Vec3& out)
+	Ref<float> out)
 {
 	ASSERT(dir.length() < 1.01f && dir.length() > 0.99f);
 	Vec3 L = center - origin;
 	float tca = dotProduct(L, dir);
-	if (tca < 0) return false;
 	float d2 = dotProduct(L, L) - tca * tca;
 	if (d2 > radius * radius) return false;
 	float thc = sqrt(radius * radius - d2);
-	float t0 = tca - thc;
-	out = origin + dir * t0;
+	float t = tca - thc;
+	out = t >= 0 ? t : tca + thc;
 	return true;
 }
 

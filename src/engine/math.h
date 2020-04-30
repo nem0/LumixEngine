@@ -1066,7 +1066,7 @@ LUMIX_ENGINE_API bool getRaySphereIntersection(const Vec3& origin,
 	const Vec3& dir,
 	const Vec3& center,
 	float radius,
-	Vec3& out);
+	Ref<float> out);
 
 
 LUMIX_ENGINE_API bool getRayAABBIntersection(const Vec3& origin,

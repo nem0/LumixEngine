@@ -693,7 +693,7 @@ void SceneView::manipulate() {
 	tr.pos += tr.rot.rotate(cfg.getOffset());
 	const Transform old_pivot_tr = tr;
 			
-	if (!Gizmo::manipulate(0, *m_view, Ref(tr), cfg)) return;
+	if (!Gizmo::manipulate(selected[0].index, *m_view, Ref(tr), cfg)) return;
 
 	const Transform new_pivot_tr = tr;
 	tr.pos -= tr.rot.rotate(cfg.getOffset());
