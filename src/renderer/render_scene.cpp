@@ -1419,8 +1419,11 @@ public:
 
 		if (m_culling_system->isAdded(entity)) {
 			if (m_universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) {
-				const DVec3 position = m_universe.getPosition(entity);
-				m_culling_system->setPosition(entity, position);
+				const Transform& tr = m_universe.getTransform(entity);
+				const Model* model = m_model_instances[entity.index].model;
+				ASSERT(model);
+				const float bounding_radius = model->getBoundingRadius();
+				m_culling_system->set(entity, tr.pos, bounding_radius * tr.scale);
 			}
 			else if (m_universe.hasComponent(entity, DECAL_TYPE)) {
 				auto iter = m_decals.find(entity);

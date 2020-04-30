@@ -205,6 +205,24 @@ struct CullingSystemImpl final : CullingSystem
 		return m_entity_to_cell[entity.index]->radius;
 	}
 
+	void set(EntityRef entity, const DVec3& pos, float radius) override {
+		Sphere* sphere = m_entity_to_cell[entity.index];
+		CellPage& cell = getCell(*sphere);
+		const IVec3 new_indices(pos * (1 / m_cell_size));
+		
+		const bool was_big = cell.header.indices.is_big;
+		const bool is_big = radius > m_cell_size;
+
+		if (was_big == is_big && new_indices == cell.header.indices.pos) {
+			sphere->radius = radius;
+			sphere->position = (pos - cell.header.origin).toFloat();
+			return;
+		}
+
+		const u8 type = cell.header.indices.type;
+		remove(entity);
+		add(entity, type, pos, radius);
+	}
 	
 	void setRadius(EntityRef entity, float radius) override
 	{
