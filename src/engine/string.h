@@ -12,6 +12,7 @@ struct IAllocator;
 
 
 LUMIX_ENGINE_API const char* stristr(const char* haystack, const char* needle);
+LUMIX_ENGINE_API bool contains(const char* haystack, char needle);
 LUMIX_ENGINE_API bool toCStringHex(u8 value, Span<char> output);
 LUMIX_ENGINE_API bool toCStringPretty(i32 value, Span<char> output);
 LUMIX_ENGINE_API bool toCStringPretty(u32 value, Span<char> output);
