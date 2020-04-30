@@ -62,6 +62,7 @@ struct LUMIX_RENDERER_API CullingSystem
 
 	virtual void setPosition(EntityRef entity, const DVec3& pos) = 0;
 	virtual void setRadius(EntityRef entity, float radius) = 0;
+	virtual void set(EntityRef entity, const DVec3& pos, float radius) = 0;
 
 	virtual float getRadius(EntityRef entity) = 0;
 };
