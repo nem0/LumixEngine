@@ -53,6 +53,7 @@ struct SceneView : StudioApp::GUIPlugin
 		StudioApp& m_app;
 		Action* m_orbit_action;
 		Action* m_toggle_gizmo_step_action;
+		Action* m_copy_move_action;
 		Action* m_move_forward_action;
 		Action* m_move_back_action;
 		Action* m_move_left_action;
@@ -61,6 +62,7 @@ struct SceneView : StudioApp::GUIPlugin
 		Action* m_move_down_action;
 		Action* m_camera_speed_action;
 		bool m_is_mouse_captured;
+		bool m_copy_moved = false;
 		bool m_show_stats;
 		int m_screen_x;
 		int m_screen_y;
