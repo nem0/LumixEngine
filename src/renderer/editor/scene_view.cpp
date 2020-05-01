@@ -161,7 +161,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_mouse_pos = {(float)x, (float)y};
 		if (m_mouse_mode == MouseMode::SELECT)
 		{
-			if (m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y)
+			if ((m_rect_selection_start.x != m_mouse_pos.x || m_rect_selection_start.y != m_mouse_pos.y) && m_rect_selection_timer > 0.1f)
 			{
 				rectSelect();
 			}
@@ -361,6 +361,7 @@ struct UniverseViewImpl final : UniverseView {
 			}
 			m_mouse_mode = MouseMode::SELECT;
 			m_rect_selection_start = {(float)x, (float)y};
+			m_rect_selection_timer = 0;
 		}
 	}
 
@@ -479,7 +480,11 @@ struct UniverseViewImpl final : UniverseView {
 		m_viewport.pos += rot.rotate(Vec3(0, -y, 0));
 	}
 
-	void update() {
+	void update(float time_delta) {
+		if (m_mouse_mode == MouseMode::SELECT) {
+			m_rect_selection_timer += time_delta;
+		}
+
 		m_viewport.fov = m_scene_view.m_app.getFOV();
 		previewSnapVertex();
 		
@@ -570,6 +575,7 @@ struct UniverseViewImpl final : UniverseView {
 	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED] = {};
 	StudioApp::MousePlugin* m_mouse_handling_plugin = nullptr;
 	Vec2 m_rect_selection_start;
+	float m_rect_selection_timer = 0;
 	EditorIcons* m_icons = nullptr;
 	RenderScene* m_scene;
 	Array<Vertex> m_draw_vertices;
@@ -720,7 +726,7 @@ void SceneView::update(float time_delta)
 {
 	PROFILE_FUNCTION();
 	m_pipeline->setUniverse(m_editor.getUniverse());
-	m_view->update();
+	m_view->update(time_delta);
 	if (m_is_measure_active) {
 		m_view->addCross(m_measure_from, 0.3f, Color::BLUE);
 		m_view->addCross(m_measure_to, 0.3f, Color::BLUE);
