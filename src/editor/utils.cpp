@@ -89,7 +89,7 @@ Action::Action(const char* label_short,
 bool Action::toolbarButton(ImFont* font)
 {
 	const ImVec4 col_active = ImGui::GetStyle().Colors[ImGuiCol_ButtonActive];
-	const ImVec4 bg_color = is_selected.invoke() ? col_active : ImVec4(0, 0, 0, 0);
+	const ImVec4 bg_color = is_selected.invoke() ? col_active : ImGui::GetStyle().Colors[ImGuiCol_Text];
 
 	if (!font_icon[0]) return false;
 

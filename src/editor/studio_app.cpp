@@ -156,7 +156,6 @@ struct StudioAppImpl final : StudioApp
 {
 	StudioAppImpl()
 		: m_is_entity_list_open(true)
-		, m_is_save_as_dialog_open(false)
 		, m_finished(false)
 		, m_deferred_game_mode_exit(false)
 		, m_profiler_ui(nullptr)
@@ -749,32 +748,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	float showMainToolbar(float menu_height)
-	{
-		if (m_toolbar_actions.empty())
-		{
-			ImGui::SetCursorPosY(menu_height);
-			return menu_height;
-		}
-
-		auto frame_padding = ImGui::GetStyle().FramePadding;
-		float padding = frame_padding.y * 2;
-		ImVec2 toolbar_size(ImGui::GetIO().DisplaySize.x, 24 + padding);
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-		const ImVec2 pos = ImGui::GetMainViewport()->Pos;
-		if (ImGui::BeginToolbar("main_toolbar", ImVec2(pos.x + 1, pos.y + menu_height), toolbar_size))
-		{
-			for (auto* action : m_toolbar_actions)
-			{
-				action->toolbarButton(m_big_icon_font);
-			}
-		}
-		ImGui::EndToolbar();
-		ImGui::PopStyleVar();
-		return menu_height + 24 + padding;
-	}
-
-
 	void guiEndFrame()
 	{
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -799,10 +772,8 @@ struct StudioAppImpl final : StudioApp
 				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
 				ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
 				ImGui::Begin("MainDockspace", nullptr, flags);
-				float menu_height = showMainMenu();
-				showMainToolbar(menu_height);
+				mainMenu();
 				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
-				ImGui::Dummy(ImVec2(2, 2));
 				ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
 				ImGui::End();
 			
@@ -1137,23 +1108,24 @@ struct StudioAppImpl final : StudioApp
 
 	void onSaveAsDialogGUI()
 	{
-		if (!m_is_save_as_dialog_open) return;
-
-		if (ImGui::Begin("Save Universe As", &m_is_save_as_dialog_open))
+		if (m_save_as_request) {
+			ImGui::OpenPopup("Save Universe As");
+			m_save_as_request = false;
+		}
+		if (ImGui::BeginPopupModal("Save Universe As"))
 		{
 			static char name[64] = "";
-			ImGui::InputText("Name", name, lengthOf(name));
-			if (ImGui::Button("Save"))
-			{
-				m_is_save_as_dialog_open = false;
+			ImGuiEx::Label("Name");
+			ImGui::InputText("##name", name, lengthOf(name));
+			if (ImGui::Button(ICON_FA_SAVE "Save")) {
 				setTitle(name);
 				m_editor->saveUniverse(name, true);
 				scanUniverses();
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("Close")) m_is_save_as_dialog_open = false;
+			if (ImGui::Button(ICON_FA_TIMES "Cancel")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
 		}
-		ImGui::End();
 	}
 
 
@@ -1165,7 +1137,7 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
-		m_is_save_as_dialog_open = true;
+		m_save_as_request = true;
 	}
 
 
@@ -1573,7 +1545,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	float showMainMenu()
+	void mainMenu()
 	{
 		if (m_confirm_exit)
 		{
@@ -1631,7 +1603,6 @@ struct StudioAppImpl final : StudioApp
 			ImGui::EndPopup();
 		}
 
-		float menu_height = 0;
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 		if (ImGui::BeginMainMenuBar())
 		{
@@ -1640,6 +1611,12 @@ struct StudioAppImpl final : StudioApp
 			entityMenu();
 			toolsMenu();
 			viewMenu();
+
+			float w = ImGui::GetWindowContentRegionWidth() * 0.5f - m_toolbar_actions.size() * 15 - ImGui::GetCursorPosX();
+			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight()));
+			for (auto* action : m_toolbar_actions) {
+				action->toolbarButton(m_big_icon_font);
+			}
 
 			StaticString<200> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << ICON_FA_HOURGLASS_HALF "Loading... | ";
@@ -1665,11 +1642,10 @@ struct StudioAppImpl final : StudioApp
 				ImGui::SameLine(ImGui::GetContentRegionMax().x - stats_size.x - error_stats_size.x);
 				ImGui::TextColored(ImVec4(1, 0, 0, 1), "%s", (const char*)error_stats);
 			}
-			menu_height = ImGui::GetWindowSize().y;
 			ImGui::EndMainMenuBar();
 		}
 		ImGui::PopStyleVar();
-		return menu_height;
+		ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing()));
 	}
 
 
@@ -2040,7 +2016,7 @@ struct StudioAppImpl final : StudioApp
 		
 		Array<u8> data(m_allocator);
 		if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), Ref(data))) {
-			const float size = (float)m_settings.m_font_size * font_scale * 1.5f;
+			const float size = (float)m_settings.m_font_size * font_scale * 1.25f;
 			ImFontConfig cfg;
 			copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
 			cfg.FontDataOwnedByAtlas = false;
@@ -3222,6 +3198,7 @@ struct StudioAppImpl final : StudioApp
 	Action* m_set_pivot_action;
 	Action* m_reset_pivot_action;
 	Gizmo::Config m_gizmo_config;
+	bool m_save_as_request = false;
 	bool m_cursor_captured = false;
 	bool m_confirm_exit;
 	bool m_confirm_load;
@@ -3269,7 +3246,6 @@ struct StudioAppImpl final : StudioApp
 	bool m_set_rename_focus = false;
 	char m_rename_buf[256];
 	bool m_is_f2_pressed = false;
-	bool m_is_save_as_dialog_open;
 	bool m_is_edit_cam_transform_ui_open = false;
 	ImFont* m_font;
 	ImFont* m_big_icon_font;
