@@ -9,6 +9,7 @@
 #include "engine/string.h"
 #include "engine/math.h"
 #include "engine/resource.h"
+#include "engine/stream.h"
 #include "gpu/gpu.h"
 #include "renderer.h"
 
@@ -103,7 +104,7 @@ struct LUMIX_RENDERER_API Mesh
 	bool areIndices16() const { return flags.isSet(Flags::INDICES_16_BIT); }
 
 	Type type;
-	Array<u8> indices;
+	OutputMemoryStream indices;
 	Array<Vec3> vertices;
 	Array<Skin> skin;
 	FlagSet<Flags, u8> flags;

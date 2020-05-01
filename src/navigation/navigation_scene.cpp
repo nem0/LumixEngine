@@ -266,8 +266,8 @@ struct NavigationSceneImpl final : NavigationScene
 				bool is_walkable = !mesh.material->isCustomFlag(nonwalkable_flag);
 				auto* vertices = &mesh.vertices[0];
 				if (is16) {
-					const u16* indices16 = (const u16*)&mesh.indices[0];
-					for (int i = 0; i < mesh.indices.size() / 2; i += 3) {
+					const u16* indices16 = (const u16*)mesh.indices.data();
+					for (i32 i = 0; i < (i32)mesh.indices.size() / 2; i += 3) {
 						Vec3 a = mtx.transformPoint(vertices[indices16[i]]);
 						Vec3 b = mtx.transformPoint(vertices[indices16[i + 1]]);
 						Vec3 c = mtx.transformPoint(vertices[indices16[i + 2]]);
@@ -278,8 +278,8 @@ struct NavigationSceneImpl final : NavigationScene
 					}
 				}
 				else {
-					const u32* indices32 = (const u32*)&mesh.indices[0];
-					for (int i = 0; i < mesh.indices.size() / 4; i += 3) {
+					const u32* indices32 = (const u32*)mesh.indices.data();
+					for (i32 i = 0; i < (i32)mesh.indices.size() / 4; i += 3) {
 						Vec3 a = mtx.transformPoint(vertices[indices32[i]]);
 						Vec3 b = mtx.transformPoint(vertices[indices32[i + 1]]);
 						Vec3 c = mtx.transformPoint(vertices[indices32[i + 2]]);

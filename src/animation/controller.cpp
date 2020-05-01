@@ -96,7 +96,7 @@ void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motio
 
 void Controller::getPose(RuntimeContext& ctx, Ref<Pose> pose) {
 	ASSERT(&ctx.controller == this);
-	ctx.input_runtime.set(ctx.data.getData(), ctx.data.getPos());
+	ctx.input_runtime.set(ctx.data.data(), ctx.data.size());
 	
 	LocalRigidTransform root_bind_pose;
 	auto root_bone_iter = ctx.model->getBoneIndex(ctx.root_bone_hash);

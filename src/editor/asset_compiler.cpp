@@ -150,7 +150,7 @@ struct AssetCompilerImpl : AssetCompiler
 		return fs.copyFile(src.c_str(), dst);
 	}
 
-	bool writeCompiledResource(const char* locator, Span<u8> data) override {
+	bool writeCompiledResource(const char* locator, Span<const u8> data) override {
 		char normalized[MAX_PATH_LENGTH];
 		Path::normalize(locator, Span(normalized));
 		const u32 hash = crc32(normalized);

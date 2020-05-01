@@ -264,8 +264,8 @@ struct UniverseViewImpl final : UniverseView {
 
 			if (mesh.areIndices16())
 			{
-				const u16* indices = (const u16*)&mesh.indices[0];
-				for (int i = 0, c = mesh.indices.size() >> 1; i < c; ++i)
+				const u16* indices = (const u16*)mesh.indices.data();
+				for (i32 i = 0, c = (i32)mesh.indices.size() >> 1; i < c; ++i)
 				{
 					Vec3 vertex = mesh.vertices[indices[i]];
 					processVertex(vertex);
@@ -273,8 +273,8 @@ struct UniverseViewImpl final : UniverseView {
 			}
 			else
 			{
-				const u32* indices = (const u32*)&mesh.indices[0];
-				for (int i = 0, c = mesh.indices.size() >> 2; i < c; ++i)
+				const u32* indices = (const u32*)mesh.indices.data();
+				for (i32 i = 0, c = (i32)mesh.indices.size() >> 2; i < c; ++i)
 				{
 					Vec3 vertex = mesh.vertices[indices[i]];
 					processVertex(vertex);

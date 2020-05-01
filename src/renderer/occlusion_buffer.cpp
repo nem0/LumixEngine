@@ -353,8 +353,8 @@ template <typename IndexType>
 static void rasterizeOccludingTriangles(const Mesh* mesh, const Matrix& mvp_mtx, int* depth)
 {
 	const Vec3* LUMIX_RESTRICT vertices = &mesh->vertices[0];
-	const IndexType* LUMIX_RESTRICT indices = (const IndexType*)&mesh->indices[0];
-	for (int i = 0, n = mesh->indices.size() / sizeof(IndexType); i < n; i += 3)
+	const IndexType* LUMIX_RESTRICT indices = (const IndexType*)mesh->indices.data();
+	for (i32 i = 0, n = (i32)mesh->indices.size() / sizeof(IndexType); i < n; i += 3)
 	{
 		Vec4 v[64*3] = {
 			mvp_mtx * Vec4(vertices[indices[i + 0]], 1),

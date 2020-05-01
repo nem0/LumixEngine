@@ -344,19 +344,16 @@ int include(lua_State* L)
 
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 
-	Array<u8> content(shader->m_allocator);
+	OutputMemoryStream content(shader->m_allocator);
 	if (!fs.getContentSync(Path(path), Ref(content))) {
 		logError("Renderer") << "Failed to open/read include " << path << " included from " << shader->getPath();
 		return 0;
 	}
 	
 	if (!content.empty()) {
-		content.resize(content.size() + 2);
-		content[content.size() - 2] = '\n';
-		content.back() = '\0';
+		content << "\n";
+		shader->m_sources.common.cat(Span((const char*)content.data(), (u32)content.size()));
 	}
-
-	shader->m_sources.common.cat((const char*)content.begin());
 
 	return 0;
 }

@@ -5,6 +5,7 @@
 #include "engine/delegate_list.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "renderer/draw2d.h"
 
 
@@ -43,7 +44,7 @@ struct LUMIX_RENDERER_API FontResource final : Resource
 	Font* addRef(int font_size);
 	void removeRef(Font& font);
 
-	Array<u8> file_data;
+	OutputMemoryStream file_data;
 	static const ResourceType TYPE;
 };
 

@@ -559,14 +559,14 @@ static int LUA_packageLoader(lua_State* L)
 	auto* engine = (Engine*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	auto& fs = engine->getFileSystem();
-	Array<u8> buf(engine->getAllocator());
+	OutputMemoryStream buf(engine->getAllocator());
 	if (!fs.getContentSync(Path(tmp), Ref(buf))) {
 		logError("Engine") << "Failed to open file " << tmp;
 		StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
 		msg << tmp;
 		lua_pushstring(L, msg);
 	}
-	else if (luaL_loadbuffer(L, (const char*)buf.begin(), buf.byte_size(), tmp) != 0) {
+	else if (luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), tmp) != 0) {
 		logError("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
 	}
 	return 1;

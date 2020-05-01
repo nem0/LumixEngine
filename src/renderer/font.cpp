@@ -130,7 +130,7 @@ bool FontManager::build()
 
 	for(Font* font : m_fonts) {
 		FT_Face face;
-		error = FT_New_Memory_Face(ft_library, font->resource->file_data.begin(), font->resource->file_data.byte_size(), 0, &face);
+		error = FT_New_Memory_Face(ft_library, font->resource->file_data.data(), (u32)font->resource->file_data.size(), 0, &face);
 		if (error != 0) {
 			logError("Renderer") << "Failed to create font " << font->resource->getPath();
 			continue;
@@ -243,7 +243,7 @@ bool FontResource::load(u64 size, const u8* mem)
 	if (size <= 0) return false;
 	
 	file_data.resize((int)size);
-	memcpy(file_data.begin(), mem, size);
+	memcpy(file_data.getMutableData(), mem, size);
 	return true;
 }
 

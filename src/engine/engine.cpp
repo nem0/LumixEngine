@@ -188,7 +188,7 @@ public:
 		Ref<EntityMap> entity_map) override
 	{
 		ASSERT(prefab.isReady());
-		InputMemoryStream blob(prefab.data.begin(), prefab.data.byte_size());
+		InputMemoryStream blob(prefab.data);
 		if (!deserialize(universe, blob, entity_map)) {
 			logError("Engine") << "Failed to instantiate prefab " << prefab.getPath();
 			return false;
@@ -435,7 +435,7 @@ public:
 		serializer.write(header);
 		serializePluginList(serializer);
 		serializeSceneVersions(serializer, ctx);
-		int pos = (int)serializer.getPos();
+		i32 pos = (i32)serializer.size();
 		ctx.serialize(serializer);
 		serializer.write((i32)ctx.getScenes().size());
 		for (IScene* scene : ctx.getScenes())
@@ -443,7 +443,7 @@ public:
 			serializer.writeString(scene->getPlugin().getName());
 			scene->serialize(serializer);
 		}
-		u32 crc = crc32((const u8*)serializer.getData() + pos, (int)serializer.getPos() - pos);
+		u32 crc = crc32((const u8*)serializer.data() + pos, (i32)serializer.size() - pos);
 		return crc;
 	}
 

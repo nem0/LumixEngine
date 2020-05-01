@@ -94,7 +94,7 @@ u32 Texture::getPixelNearest(u32 x, u32 y) const
 {
 	if (data.empty() || x >= width || y >= height || x < 0 || y < 0 || format != gpu::TextureFormat::RGBA8) return 0;
 
-	return *(u32*)&data.getData()[(x + y * width) * 4];
+	return *(u32*)&data.data()[(x + y * width) * 4];
 }
 
 
@@ -109,7 +109,7 @@ u32 Texture::getPixel(float x, float y) const
 	// http://fastcpp.blogspot.sk/2011/06/bilinear-pixel-interpolation-using-sse.html
 	int px = (int)x;
 	int py = (int)y;
-	const u32* p0 = (u32*)&data.getData()[(px + py * width) * 4];
+	const u32* p0 = (u32*)&data.data()[(px + py * width) * 4];
 
 	const u8* p1 = (u8*)p0;
 	const u8* p2 = (u8*)(p0 + 1);
@@ -253,7 +253,7 @@ static void saveTGA(Texture& texture)
 		texture.width,
 		texture.height,
 		texture.format,
-		texture.data.getData(),
+		texture.data.data(),
 		false,
 		texture.getPath(),
 		texture.allocator);
@@ -285,7 +285,7 @@ void Texture::save()
 		header.depth = depth;
 
 		file.write(&header, sizeof(header));
-		file.write(data.getData(), data.getPos());
+		file.write(data.data(), data.size());
 		file.close();
 	}
 	else if (equalStrings(ext, "tga") && format == gpu::TextureFormat::RGBA8)
@@ -305,7 +305,7 @@ void Texture::onDataUpdated(u32 x, u32 y, u32 w, u32 h)
 
 	u32 bytes_per_pixel = getBytesPerPixel(format);
 
-	const u8* src_mem = (const u8*)data.getData();
+	const u8* src_mem = (const u8*)data.data();
 	const Renderer::MemRef mem = renderer.allocate(w * h * bytes_per_pixel);
 	u8* dst_mem = (u8*)mem.data;
 

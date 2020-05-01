@@ -679,7 +679,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			u32 hash = crc32(m_in_path);
 			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
-			Array<u8> resized_data(allocator);
+			OutputMemoryStream resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 			if (Path::hasExtension(m_in_path, "dds")) {
 				OS::InputFile file;
@@ -700,7 +700,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					return;
 				}
 
-				Array<u8> decompressed(allocator);
+				OutputMemoryStream decompressed(allocator);
 				const int w = surface.width();
 				const int h = surface.height();
 				decompressed.resize(4 * w * h);
@@ -709,16 +709,16 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					for (int j = 0; j < h; ++j) {
 						for (int i = 0; i < w; ++i) {
 							const u8 p = u8(data[j * w + i] * 255.f + 0.5f);
-							decompressed[(j * w + i) * 4 + c] = p;
+							decompressed.getMutableData()[(j * w + i) * 4 + c] = p;
 						}
 					}
 				}
 
-				stbir_resize_uint8((const u8*)decompressed.begin(),
+				stbir_resize_uint8(decompressed.data(),
 					w,
 					h,
 					0,
-					&resized_data[0],
+					resized_data.getMutableData(),
 					AssetBrowser::TILE_SIZE,
 					AssetBrowser::TILE_SIZE,
 					0,
@@ -739,18 +739,18 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					w,
 					h,
 					0,
-					&resized_data[0],
+					resized_data.getMutableData(),
 					AssetBrowser::TILE_SIZE,
 					AssetBrowser::TILE_SIZE,
 					0,
 					4);
 				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
-					swap(resized_data[i * 4 + 0], resized_data[i * 4 + 2]);
+					swap(resized_data.getMutableData()[i * 4 + 0], resized_data.getMutableData()[i * 4 + 2]);
 				}
 				stbi_image_free(data);
 			}
 
-			if (!saveAsDDS(m_out_path, &resized_data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE)) {
+			if (!saveAsDDS(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE)) {
 				logError("Editor") << "Failed to save " << m_out_path;
 			}
 		}
@@ -909,7 +909,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			: layers(allocator)
 		{}
 
-		bool init(Span<u8> data, const char* src_path) {
+		bool init(Span<const u8> data, const char* src_path) {
 			layers.clear();
 			output = Output::BC1;
 
@@ -937,10 +937,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Output output = Output::BC1;
 	};
 
-	bool createComposite(const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
+	bool createComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
 		IAllocator& allocator = m_app.getAllocator();
 		TextureComposite tc(allocator);
-		if (!tc.init(Span(src_data.begin(), src_data.end()), src_path)) return false;
+		if (!tc.init(Span(src_data.data(), (u32)src_data.size()), src_path)) return false;
 		struct Src {
 			stbi_uc* data;
 			int w, h;
@@ -949,7 +949,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		HashMap<u32, Src> sources(allocator);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		Array<u8> tmp_src(allocator);
+		OutputMemoryStream tmp_src(allocator);
 		int w = -1, h = -1;
 
 		auto prepare_source =[&](const TextureComposite::ChannelSource& ch){
@@ -962,7 +962,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 
 			int cmp;
-			stbi_uc* data = stbi_load_from_memory(tmp_src.begin(), tmp_src.byte_size(), &w, &h, &cmp, 4);
+			stbi_uc* data = stbi_load_from_memory(tmp_src.data(), (i32)tmp_src.size(), &w, &h, &cmp, 4);
 			if (!data) {
 				return false;
 			}
@@ -1002,7 +1002,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		input.setNormalMap(meta.is_normalmap);
 		input.setTextureLayout(nvtt::TextureType_Array, w, h, 1, tc.layers.size());
 		
-		Array<u8> out_data(allocator);
+		OutputMemoryStream out_data(allocator);
 		out_data.resize(w * h * 4);
 		for (TextureComposite::Layer& layer : tc.layers) {
 			const u32 idx = u32(&layer - tc.layers.begin());
@@ -1017,12 +1017,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				for (u32 j = 0; j < (u32)h; ++j) {
 					for (u32 i = 0; i < (u32)w; ++i) {
-						out_data[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
+						out_data.getMutableData()[(j * w + i) * 4 + ch] = from[(i + j * w) * 4 + from_ch];
 					}
 				}
 			}
 
-			input.setMipmapData(out_data.begin(), w, h, 1, idx);
+			input.setMipmapData(out_data.data(), w, h, 1, idx);
 		}
 
 		for (const Src& i : sources) {
@@ -1062,16 +1062,16 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return true;
 	}
 
-	bool compileImage(const Path& path, const Array<u8>& src_data, OutputMemoryStream& dst, const Meta& meta)
+	bool compileImage(const Path& path, const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta)
 	{
 		PROFILE_FUNCTION();
 		int w, h, comps;
-		const bool is_16_bit = stbi_is_16_bit_from_memory(src_data.begin(), src_data.byte_size());
+		const bool is_16_bit = stbi_is_16_bit_from_memory(src_data.data(), (i32)src_data.size());
 		if (is_16_bit) {
 			logError("Renderer") << path << ": 16bit images not yet supported.";
 		}
 
-		stbi_uc* data = stbi_load_from_memory(src_data.begin(), src_data.byte_size(), &w, &h, &comps, 4);
+		stbi_uc* data = stbi_load_from_memory(src_data.data(), (i32)src_data.size(), &w, &h, &comps, 4);
 		if (!data) return false;
 
 		if(meta.convert_to_raw) {
@@ -1175,7 +1175,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Path::getExtension(Span(ext), Span(src.c_str(), src.length()));
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		Array<u8> src_data(m_app.getAllocator());
+		OutputMemoryStream src_data(m_app.getAllocator());
 		if (!fs.getContentSync(src, Ref(src_data))) return false;
 		
 		OutputMemoryStream out(m_app.getAllocator());
@@ -1189,7 +1189,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
 				flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
 				out.write(flags);
-				out.write(src_data.begin(), src_data.byte_size());
+				out.write(src_data.data(), src_data.size());
 			}
 			else {
 				compileImage(src, src_data, out, meta);
@@ -1207,7 +1207,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ASSERT(false);
 		}
 
-		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span((u8*)out.getData(), (i32)out.getPos()));
+		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(out.data(), (i32)out.size()));
 	}
 
 	const char* toString(Meta::Filter filter) {
@@ -1231,9 +1231,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_composite_tag != &texture) {
 			m_composite_tag = &texture;
 			IAllocator& allocator = m_app.getAllocator();
-			Array<u8> content(allocator);
+			OutputMemoryStream content(allocator);
 			fs.getContentSync(texture.getPath(), Ref(content));
-			m_composite.init(Span(content.begin(), content.end()), texture.getPath().c_str());
+			m_composite.init(Span(content.data(), (u32)content.size()), texture.getPath().c_str());
 		}
 
 		if (ImGui::CollapsingHeader("Edit")) {
@@ -1930,7 +1930,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						int tri_count = 0;
 						for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
 						{
-							int indices_count = model->getMesh(j).indices.size() >> 1;
+							i32 indices_count = (i32)model->getMesh(j).indices.size() >> 1;
 							if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {
 								indices_count >>= 1;
 							}
@@ -1956,7 +1956,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (ImGui::TreeNode(&mesh, "%s", mesh.name.length() > 0 ? mesh.name.c_str() : "N/A"))
 				{
 					ImGuiEx::Label("Triangle count");
-					ImGui::Text("%d", (mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
+					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
 					ImGuiEx::Label("Material");
 					ImGui::TextUnformatted(mesh.material->getPath().c_str());
 					ImGui::SameLine();
@@ -2146,12 +2146,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				FileSystem& fs = engine.getFileSystem();
 				StaticString<MAX_PATH_LENGTH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
 				
+				u8* raw_tile_data = m_tile.data.getMutableData();
 				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
-					swap(m_tile.data[i * 4 + 0], m_tile.data[i * 4 + 2]);
+					swap(raw_tile_data[i * 4 + 0], raw_tile_data[i * 4 + 2]);
 				}
 
-				saveAsDDS(path, &m_tile.data[0], AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
-				memset(m_tile.data.begin(), 0, m_tile.data.byte_size());
+				saveAsDDS(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 				renderer->destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
@@ -2257,7 +2258,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 		m_tile.texture = gpu::allocTextureHandle(); 
-		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, gpu::TextureFormat::RGBA8,  Span(m_tile.data.begin(), m_tile.data.end()));
+		renderer->getTextureImage(m_tile.pipeline->getOutput()
+			, AssetBrowser::TILE_SIZE
+			, AssetBrowser::TILE_SIZE
+			, gpu::TextureFormat::RGBA8
+			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
 		
 		m_tile.frame_countdown = 2;
 	}
@@ -2306,7 +2311,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		m_tile.texture = gpu::allocTextureHandle(); 
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		renderer->getTextureImage(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, gpu::TextureFormat::RGBA8, Span(m_tile.data.begin(), m_tile.data.end()));
+		renderer->getTextureImage(m_tile.pipeline->getOutput()
+			, AssetBrowser::TILE_SIZE
+			, AssetBrowser::TILE_SIZE
+			, gpu::TextureFormat::RGBA8
+			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
 		
 		m_tile.entity = mesh_entity;
 		m_tile.frame_countdown = 2;
@@ -2349,7 +2358,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		EntityPtr entity = INVALID_ENTITY;
 		int frame_countdown = -1;
 		u32 path_hash;
-		Array<u8> data;
+		OutputMemoryStream data;
 		gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
 		Queue<Resource*, 8> queue;
 		Array<Path> paths;
@@ -2390,9 +2399,9 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (!file.open(path[0] == '/' ? path + 1 : path)) return;
 		
 		IAllocator& allocator = m_app.getAllocator();
-		Array<u8> content(allocator);
+		OutputMemoryStream content(allocator);
 		content.resize((int)file.size());
-		file.read(content.begin(), content.byte_size());
+		file.read(content.getMutableData(), content.size());
 		file.close();
 
 		struct Context {
@@ -2401,7 +2410,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			u8* content;
 			u32 content_len;
 			int idx;
-		} ctx = { path, this, content.begin(), content.byte_size(), 0 };
+		} ctx = { path, this, content.getMutableData(), (u32)content.size(), 0 };
 
 		lua_pushlightuserdata(L, &ctx);
 		lua_setfield(L, LUA_GLOBALSINDEX, "this");
@@ -3621,10 +3630,10 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			return false;
 		}
 
-		Array<u8> splatmap(app.getAllocator());
+		OutputMemoryStream splatmap(app.getAllocator());
 		splatmap.resize(size * size * 4);
-		memset(splatmap.begin(), 0, size * size * 4);
-		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.begin(), true, Path(splatmap_path), app.getAllocator())) {
+		memset(splatmap.getMutableData(), 0, size * size * 4);
+		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.data(), true, Path(splatmap_path), app.getAllocator())) {
 			logError("Editor") << "Failed to create texture " << splatmap_path;
 			OS::deleteFile(hm_path);
 			return false;

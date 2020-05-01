@@ -1204,7 +1204,7 @@ struct PipelineImpl final : Pipeline
 					float* instance_data = (float*)str.skip(size);
 					emitter->fillInstanceData(m_camera_params.pos, instance_data);
 				}
-				m_size = (u32)str.getPos();
+				m_size = (u32)str.size();
 			}
 
 			void execute() override

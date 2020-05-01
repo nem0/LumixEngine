@@ -66,7 +66,7 @@ struct TarHeader {
 
 struct LuaPlugin : StudioApp::GUIPlugin
 {
-	LuaPlugin(StudioApp& app, const char* src, const char* filename)
+	LuaPlugin(StudioApp& app, Span<const char> src, const char* filename)
 		: app(app)
 	{
 		L = lua_newthread(app.getEngine().getState());						 // [thread]
@@ -83,7 +83,7 @@ struct LuaPlugin : StudioApp::GUIPlugin
 		lua_pushvalue(L, LUA_GLOBALSINDEX);
 		lua_setfield(L, -2, "__index"); // [env]
 
-		bool errors = luaL_loadbuffer(L, src, stringLength(src), filename) != 0; // [env, func]
+		bool errors = luaL_loadbuffer(L, src.m_begin, src.length(), filename) != 0; // [env, func]
 
 		lua_pushvalue(L, -2); // [env, func, env]
 		lua_setfenv(L, -2);   // function's environment [env, func]
@@ -1878,13 +1878,13 @@ struct StudioAppImpl final : StudioApp
 
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
 		FileSystem& fs = m_engine->getFileSystem();
-		Array<u8> data(m_allocator);
+		OutputMemoryStream data(m_allocator);
 		if (!fs.getContentSync(Path(path), Ref(data))) return nullptr;
 		ImGuiIO& io = ImGui::GetIO();
 		ImFontConfig cfg;
 		copyString(cfg.Name, path);
 		cfg.FontDataOwnedByAtlas = false;
-		auto font = io.Fonts->AddFontFromMemoryTTF(data.begin(), data.byte_size(), size, &cfg);
+		auto font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg);
 		if(merge_icons) {
 			ImFontConfig config;
 			copyString(config.Name, "editor/fonts/fa-regular-400.ttf");
@@ -1892,15 +1892,15 @@ struct StudioAppImpl final : StudioApp
 			config.FontDataOwnedByAtlas = false;
 			config.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
 			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-			Array<u8> icons_data(m_allocator);
+			OutputMemoryStream icons_data(m_allocator);
 			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), Ref(icons_data))) {
-				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF(icons_data.begin(), icons_data.byte_size(), size * 0.75f, &config, icon_ranges);
+				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
 			copyString(config.Name, "editor/fonts/fa-solid-900.ttf");
 			icons_data.clear();
 			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), Ref(icons_data))) {
-				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF(icons_data.begin(), icons_data.byte_size(), size * 0.75f, &config, icon_ranges);
+				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
 		}
@@ -2015,7 +2015,7 @@ struct StudioAppImpl final : StudioApp
 		m_font = addFontFromFile("editor/fonts/NotoSans-Regular.ttf", (float)m_settings.m_font_size * font_scale, true);
 		m_bold_font = addFontFromFile("editor/fonts/NotoSans-Bold.ttf", (float)m_settings.m_font_size * font_scale, true);
 		
-		Array<u8> data(m_allocator);
+		OutputMemoryStream data(m_allocator);
 		if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), Ref(data))) {
 			const float size = (float)m_settings.m_font_size * font_scale * 1.25f;
 			ImFontConfig cfg;
@@ -2023,11 +2023,11 @@ struct StudioAppImpl final : StudioApp
 			cfg.FontDataOwnedByAtlas = false;
 			cfg.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
 			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
-			m_big_icon_font = io.Fonts->AddFontFromMemoryTTF(data.begin(), data.byte_size(), size, &cfg, icon_ranges);
+			m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 			cfg.MergeMode = true;
 			copyString(cfg.Name, "editor/fonts/fa-regular-400.ttf");
 			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), Ref(data))) {
-				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF(data.begin(), data.byte_size(), size, &cfg, icon_ranges);
+				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 				ASSERT(icons_font);
 			}
 		}
@@ -3038,22 +3038,13 @@ struct StudioAppImpl final : StudioApp
 		StaticString<MAX_PATH_LENGTH> path(dir, filename);
 		OS::InputFile file;
 
-		if (m_engine->getFileSystem().open(path, Ref(file)))
-		{
-			const int size = (int)file.size();
-			Array<u8> src(m_engine->getAllocator());
-			src.resize(size + 1);
-			file.read(src.begin(), size);
-			src[size] = 0;
-
-			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, (const char*)src.begin(), filename);
+		OutputMemoryStream src(m_engine->getAllocator());
+		if (m_engine->getFileSystem().getContentSync(Path(path), Ref(src))) {
+			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, Span((const char*)src.data(), (u32)src.size()), filename);
 			addPlugin(*plugin);
-
-			file.close();
 		}
-		else
-		{
-			logWarning("Editor") << "Failed to open " << path;
+		else {
+			logWarning("Editor") << "Failed to load " << path;
 		}
 	}
 

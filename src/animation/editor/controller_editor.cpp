@@ -368,7 +368,7 @@ struct ControllerEditorImpl : ControllerEditor {
 							m_controller->serialize(str);
 							OS::OutputFile file;
 							if (file.open(path)) {
-								if (!file.write(str.getData(), str.getPos())) {
+								if (!file.write(str.data(), str.size())) {
 									logError("Animation") << "Failed to write " << path;
 								}
 								file.close();

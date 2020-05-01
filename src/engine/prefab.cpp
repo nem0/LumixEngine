@@ -25,7 +25,7 @@ void PrefabResource::unload() { data.clear(); }
 bool PrefabResource::load(u64 size, const u8* mem)
 {
 	data.resize((int)size);
-	memcpy(data.begin(), mem, size);
+	memcpy(data.getMutableData(), mem, size);
 	content_hash = crc32(mem, (u32)size);
 	return true;
 }
