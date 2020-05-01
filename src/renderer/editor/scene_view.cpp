@@ -60,7 +60,6 @@ struct UniverseViewImpl final : UniverseView {
 	UniverseViewImpl(SceneView& view) 
 		: m_scene_view(view)
 		, m_editor(view.m_editor) 
-		, m_orbit_delta(0)
 		, m_scene(nullptr)
 		, m_draw_cmds(view.m_app.getAllocator())
 		, m_draw_vertices(view.m_app.getAllocator())
@@ -312,7 +311,7 @@ struct UniverseViewImpl final : UniverseView {
 			case MouseMode::NAVIGATE: {
 				const float yaw = -signum(relx) * (powf(fabsf((float)relx / m_mouse_sensitivity.x), 1.2f));
 				const float pitch = -signum(rely) * (powf(fabsf((float)rely / m_mouse_sensitivity.y), 1.2f));
-				rotateCamera(yaw, pitch, m_scene_view.m_orbit_action->isActive());
+				rotateCamera(yaw, pitch);
 				break;
 			}
 			case MouseMode::PAN: panCamera(relx * MOUSE_MULTIPLIER, rely * MOUSE_MULTIPLIER); break;
@@ -395,7 +394,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_is_orbit && !selected_entities.empty()) {
+		if (m_scene_view.m_orbit_action->isActive() && !selected_entities.empty()) {
 			auto* universe = m_editor.getUniverse();
 			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 10, 0);
 		}
@@ -410,7 +409,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_is_orbit && !selected_entities.empty()) {
+		if (m_scene_view.m_orbit_action->isActive() && !selected_entities.empty()) {
 			auto* universe = m_editor.getUniverse();
 			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 0, -10);
 		}
@@ -426,7 +425,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_is_orbit && !selected_entities.empty()) {
+		if (m_scene_view.m_orbit_action->isActive() && !selected_entities.empty()) {
 			auto* universe = m_editor.getUniverse();
 			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(-10, 0, 0);
 		}
@@ -434,27 +433,19 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from_rot = m_viewport.rot;
 		m_go_to_parameters.m_to_rot = Quat(Vec3(0, 1, 0), -PI * 0.5f);
 	}
-	
-	bool isOrbitCamera() const override { return m_is_orbit; }
-
-	void setOrbitCamera(bool enable) override
-	{
-		m_orbit_delta = Vec2(0, 0);
-		m_is_orbit = enable;
-	}
 
 	void moveCamera(float forward, float right, float up, float speed) override
 	{
 		const Quat rot = m_viewport.rot;
 
-		right = m_is_orbit ? 0 : right;
+		right = m_scene_view.m_orbit_action->isActive() ? 0 : right;
 
 		m_viewport.pos += rot.rotate(Vec3(0, 0, -1)) * forward * speed;
 		m_viewport.pos += rot.rotate(Vec3(1, 0, 0)) * right * speed;
 		m_viewport.pos += rot.rotate(Vec3(0, 1, 0)) * up * speed;
 	}
 
-	void rotateCamera(float yaw, float pitch, bool force_orbit) {
+	void rotateCamera(float yaw, float pitch) {
 		const Universe* universe = m_editor.getUniverse();
 		DVec3 pos = m_viewport.pos;
 		Quat rot = m_viewport.rot;
@@ -469,19 +460,12 @@ struct UniverseViewImpl final : UniverseView {
 		rot = pitch_rot * rot;
 		rot.normalize();
 
-		if ((m_is_orbit || force_orbit) && !m_editor.getSelectedEntities().empty())
+		if (m_scene_view.m_orbit_action->isActive() && !m_editor.getSelectedEntities().empty())
 		{
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 			const DVec3 entity_pos = universe->getPosition(m_editor.getSelectedEntities()[0]);
-			DVec3 nondelta_pos = pos;
-
-			nondelta_pos -= old_rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
-			nondelta_pos -= old_rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
-
-			const float dist = float((entity_pos - nondelta_pos).length());
+			const float dist = float((entity_pos - pos).length());
 			pos = entity_pos + dir * dist;
-			pos += rot.rotate(Vec3(1, 0, 0)) * m_orbit_delta.x;
-			pos += rot.rotate(Vec3(0, -1, 0)) * m_orbit_delta.y;
 		}
 
 		m_viewport.pos = pos;
@@ -490,11 +474,6 @@ struct UniverseViewImpl final : UniverseView {
 
 	void panCamera(float x, float y) {
 		const Quat rot = m_viewport.rot;
-
-		if (m_is_orbit) {
-			m_orbit_delta.x += x;
-			m_orbit_delta.y += y;
-		}
 
 		m_viewport.pos += rot.rotate(Vec3(x, 0, 0));
 		m_viewport.pos += rot.rotate(Vec3(0, -y, 0));
@@ -577,8 +556,6 @@ struct UniverseViewImpl final : UniverseView {
 		float m_speed;
 	} m_go_to_parameters;
 
-	bool m_is_orbit = false;
-	Vec2 m_orbit_delta;
 	WorldEditor& m_editor;
 	SceneView& m_scene_view;
 	Viewport m_viewport;
@@ -1026,7 +1003,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 
 	if (Path::hasExtension(path, "fbx"))
 	{
-		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
+		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
 
 		m_editor.beginCommandGroup(crc32("insert_mesh"));
 		EntityRef entity = m_editor.addEntity();
@@ -1266,7 +1243,7 @@ void SceneView::onWindowGUI()
 
 			if (ImGui::BeginDragDropTarget()) {
 				if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
-					const ImVec2 drop_pos = ImGui::GetMousePos() - view_pos / size;
+					const ImVec2 drop_pos = (ImGui::GetMousePos() - view_pos) / size;
 					handleDrop((const char*)payload->Data, drop_pos.x, drop_pos.y);
 				}
 				ImGui::EndDragDropTarget();

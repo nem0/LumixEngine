@@ -1215,8 +1215,6 @@ struct StudioAppImpl final : StudioApp
 	void copy() { m_editor->copyEntities(); }
 	void paste() { m_editor->pasteEntities(); }
 	void duplicate() { m_editor->duplicateEntities(); }
-	bool isOrbitCamera() { return m_editor->getView().isOrbitCamera(); }
-	void toggleOrbitCamera() { m_editor->getView().setOrbitCamera(!m_editor->getView().isOrbitCamera()); }
 	void setTopView() { m_editor->getView().setTopView(); }
 	void setFrontView() { m_editor->getView().setFrontView(); }
 	void setSideView() { m_editor->getView().setSideView(); }
@@ -1484,7 +1482,6 @@ struct StudioAppImpl final : StudioApp
 		doMenuItem(*getAction("paste"), m_editor->canPasteEntities());
 		doMenuItem(*getAction("duplicate"), is_any_entity_selected);
 		ImGui::Separator();
-		doMenuItem(*getAction("orbitCamera"), is_any_entity_selected || m_editor->getView().isOrbitCamera());
 		doMenuItem(*getAction("setTranslateGizmoMode"), true);
 		doMenuItem(*getAction("setRotateGizmoMode"), true);
 		doMenuItem(*getAction("setScaleGizmoMode"), true);
@@ -2026,7 +2023,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		logInfo("Editor") << "Initializing imgui...";
 		ImGuiIO& io = ImGui::GetIO();
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
 		io.IniFilename = nullptr;
 		io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
 
@@ -2167,8 +2164,6 @@ struct StudioAppImpl final : StudioApp
 			ICON_FA_PASTE "Paste", "Paste entity", "paste", ICON_FA_PASTE, OS::Keycode::V, (u8)Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::duplicate>(
 			ICON_FA_CLONE "Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, OS::Keycode::D, (u8)Action::Modifiers::CTRL);
-		addAction<&StudioAppImpl::toggleOrbitCamera>(NO_ICON "Orbit camera", "Orbit camera", "orbitCamera")
-			.is_selected.bind<&StudioAppImpl::isOrbitCamera>(this);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>(ICON_FA_ARROWS_ALT "Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
 			.is_selected.bind<&Gizmo::Config::isTranslateMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setRotateGizmoMode>(ICON_FA_UNDO "Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)

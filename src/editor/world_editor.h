@@ -47,8 +47,6 @@ struct UniverseView {
 	virtual void setTopView() = 0;
 	virtual void setFrontView() = 0;
 	virtual void setSideView() = 0;
-	virtual bool isOrbitCamera() const = 0;
-	virtual void setOrbitCamera(bool enable) = 0;
 	virtual void moveCamera(float forward, float right, float up, float speed) = 0;
 	virtual void copyTransform() = 0;
 
