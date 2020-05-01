@@ -249,7 +249,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 			int tx = int(sm_pos.x) + int(sm_pos.y) * splat_map->width;
 			tx = clamp(tx, 0, max_idx - 1);
 
-			const u32 pixel_value = ((const u32*)&splat_map->data.getData()[0])[tx];
+			const u32 pixel_value = ((const u32*)&splat_map->data.data()[0])[tx];
 
 			const int ground_mask = (pixel_value >> 16) & 0xffff;
 			if ((ground_mask & (1 << patch.m_type->m_idx)) == 0) continue;

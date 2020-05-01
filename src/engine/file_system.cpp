@@ -73,7 +73,6 @@ struct FileSystemImpl final : FileSystem
 		, m_finished(allocator)	
 		, m_last_id(0)
 		, m_semaphore(0, 0xffFF)
-		, m_bundled(allocator)
 	{
 		setBasePath(base_path);
 		m_task = LUMIX_NEW(m_allocator, FSTask)(*this, m_allocator);
@@ -108,14 +107,14 @@ struct FileSystemImpl final : FileSystem
 		}
 	}
 
-	bool getContentSync(const Path& path, Ref<Array<u8>> content) override {
+	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
 		OS::InputFile file;
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path.c_str());
 
 		if (!file.open(full_path)) return false;
 
 		content->resize((int)file.size());
-		if (!file.read(content->begin(), content->byte_size())) {
+		if (!file.read(content->getMutableData(), content->size())) {
 			file.close();
 			return false;
 		}
@@ -254,7 +253,7 @@ struct FileSystemImpl final : FileSystem
 			m_mutex.exit();
 
 			if(!item.isCanceled()) {
-				item.callback.invoke(item.data.getPos(), (const u8*)item.data.getData(), !item.isFailed());
+				item.callback.invoke(item.data.size(), (const u8*)item.data.data(), !item.isFailed());
 			}
 
 			if (timer.getTimeSinceStart() > 0.1f) {
@@ -268,7 +267,6 @@ struct FileSystemImpl final : FileSystem
 	StaticString<MAX_PATH_LENGTH> m_base_path;
 	Array<AsyncItem> m_queue;
 	Array<AsyncItem> m_finished;
-	Array<u8> m_bundled;
 	Mutex m_mutex;
 	Semaphore m_semaphore;
 
@@ -302,7 +300,7 @@ int FSTask::task()
 		
 		if (file.open(full_path)) {
 			data.resize((int)file.size());
-			if (!file.read(data.getMutableData(), data.getPos())) {
+			if (!file.read(data.getMutableData(), data.size())) {
 				success = false;
 			}
 			file.close();

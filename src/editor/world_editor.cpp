@@ -1786,9 +1786,9 @@ public:
 		const Viewport& vp = getView().getViewport();
 		blob.write(vp.pos);
 		blob.write(vp.rot);
-		header.hash = crc32((const u8*)blob.getData() + hashed_offset, (int)blob.getPos() - hashed_offset);
-		*(Header*)blob.getData() = header;
-		file.write(blob.getData(), blob.getPos());
+		header.hash = crc32((const u8*)blob.data() + hashed_offset, (int)blob.size() - hashed_offset);
+		memcpy(blob.getMutableData(), &header, sizeof(header));
+		file.write(blob.data(), blob.size());
 
 		logInfo("editor") << "Universe saved";
 	}
@@ -2213,7 +2213,7 @@ public:
 
 	bool canPasteEntities() const override
 	{
-		return m_copy_buffer.getPos() > 0;
+		return m_copy_buffer.size() > 0;
 	}
 
 
@@ -2244,7 +2244,7 @@ public:
 			OutputMemoryStream stream(m_allocator);
 			m_engine.serializeProject(stream);
 			bool saved = true;
-			if (!file.write(stream.getData(), stream.getPos())) {
+			if (!file.write(stream.data(), stream.size())) {
 				logError("Editor") << "Failed to save project " << path;
 				saved = false;
 			}
@@ -2266,14 +2266,14 @@ public:
 				file.close();
 				return false;
 			}
-			Array<u8> data(m_allocator);
+			OutputMemoryStream data(m_allocator);
 			data.resize((u32)size);
-			if (!file.read(data.begin(), data.byte_size())) {
+			if (!file.read(data.getMutableData(), data.size())) {
 				logError("Editor") << "Failed to read " << path;
 				file.close();
 				return false;
 			}
-			InputMemoryStream stream(data.begin(), data.byte_size());
+			InputMemoryStream stream(data);
 			bool res = m_engine.deserializeProject(stream);
 			file.close();
 			return res;
@@ -2349,16 +2349,16 @@ public:
 
 		OS::Timer timer;
 		logInfo("Editor") << "Parsing universe...";
-		Array<u8> data(m_allocator);
+		OutputMemoryStream data(m_allocator);
 		if (!file.getBuffer()) {
 			data.resize((u32)file_size);
-			if (!file.read(data.begin(), data.byte_size())) {
+			if (!file.read(data.getMutableData(), data.size())) {
 				logError("Editor") << "Failed to load file.";
 				m_is_loading = false;
 				return false;
 			}
 		}
-		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.begin(), (int)file_size);
+		InputMemoryStream blob(file.getBuffer() ? file.getBuffer() : data.data(), (int)file_size);
 		u32 hash = 0;
 		blob.read(hash);
 		header.version = -1;

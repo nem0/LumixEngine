@@ -34,7 +34,7 @@ struct ThreadContext
 	}
 
 	Array<const char*> open_blocks;
-	Array<u8> buffer;
+	OutputMemoryStream buffer;
 	u32 begin = 0;
 	u32 end = 0;
 	u32 rows = 0;
@@ -195,8 +195,8 @@ void write(ThreadContext& ctx, u64 timestamp, EventType type, const T& value)
 	v.value = value;
 
 	MutexGuard lock(ctx.mutex);
-	u8* buf = ctx.buffer.begin();
-	const int buf_size = ctx.buffer.size();
+	u8* buf = ctx.buffer.getMutableData();
+	const u32 buf_size = (u32)ctx.buffer.size();
 
 	while (sizeof(v) + ctx.end - ctx.begin > buf_size) {
 		const u8 size = buf[ctx.begin % buf_size];
@@ -232,8 +232,8 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 	v.value = value;
 
 	MutexGuard lock(ctx.mutex);
-	u8* buf = ctx.buffer.begin();
-	const int buf_size = ctx.buffer.size();
+	u8* buf = ctx.buffer.getMutableData();
+	const u32 buf_size = (u32)ctx.buffer.size();
 
 	while (sizeof(v) + ctx.end - ctx.begin > buf_size) {
 		const u8 size = buf[ctx.begin % buf_size];
@@ -264,8 +264,8 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	header.time = OS::Timer::getRawTimestamp();
 
 	MutexGuard lock(ctx.mutex);
-	u8* buf = ctx.buffer.begin();
-	const u32 buf_size = ctx.buffer.size();
+	u8* buf = ctx.buffer.getMutableData();
+	const u32 buf_size = (u32)ctx.buffer.size();
 
 	while (header.size + ctx.end - ctx.begin > buf_size) {
 		const u8 size = buf[ctx.begin % buf_size];
@@ -541,8 +541,8 @@ ThreadState::ThreadState(GlobalState& reader, int thread_idx)
 	ThreadContext& ctx = thread_idx >= 0 ? *g_instance.contexts[thread_idx] : g_instance.global_context;
 
 	ctx.mutex.enter();
-	buffer = ctx.buffer.begin();
-	buffer_size = ctx.buffer.size();
+	buffer = ctx.buffer.getMutableData();
+	buffer_size = (u32)ctx.buffer.size();
 	begin = ctx.begin;
 	end = ctx.end;
 	thread_id = ctx.thread_id;

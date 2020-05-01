@@ -2,6 +2,7 @@
 
 
 #include "engine/resource.h"
+#include "engine/stream.h"
 
 
 namespace Lumix
@@ -24,7 +25,7 @@ struct LUMIX_ENGINE_API PrefabResource final : Resource
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 
-	Array<u8> data;
+	OutputMemoryStream data;
 	u32 content_hash;
 	static const ResourceType TYPE;
 };

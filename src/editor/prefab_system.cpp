@@ -515,7 +515,7 @@ public:
 		engine.serialize(prefab_universe, blob);
 		engine.destroyUniverse(prefab_universe);
 
-		if (!file.write(blob.getData(), blob.getPos())) {
+		if (!file.write(blob.data(), blob.size())) {
 			logError("Editor") << "Failed to write " << path.c_str();
 			file.close();
 			return;
@@ -545,7 +545,7 @@ public:
 		else {
 			ResourceManagerHub& resource_manager = engine.getResourceManager();
 			prefab_res = resource_manager.load<PrefabResource>(path);
-			const u32 content_hash = crc32(blob.getData(), (u32)blob.getPos());
+			const u32 content_hash = crc32(blob.data(), (u32)blob.size());
 			m_resources.insert(path.getHash(), { content_hash, prefab_res});
 			m_roots.insert(entity, prefab);
 		}

@@ -162,11 +162,11 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 	{
 		Mesh& mesh = m_meshes[mesh_index];
 		bool is_mesh_skinned = !mesh.skin.empty() && is_skinned;
-		u16* indices16 = (u16*)&mesh.indices[0];
-		u32* indices32 = (u32*)&mesh.indices[0];
+		u16* indices16 = (u16*)mesh.indices.getMutableData();
+		u32* indices32 = (u32*)mesh.indices.getMutableData();
 		bool is16 = mesh.flags.isSet(Mesh::Flags::INDICES_16_BIT);
 		int index_size = is16 ? 2 : 4;
-		for(int i = 0, c = mesh.indices.size() / index_size; i < c; i += 3)
+		for(i32 i = 0, c = (i32)mesh.indices.size() / index_size; i < c; i += 3)
 		{
 			Vec3 p0, p1, p2;
 			if (is16)
@@ -479,10 +479,10 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		if (indices_count <= 0) return false;
 		mesh.indices.resize(index_size * indices_count);
 		mesh.render_data->indices_count = indices_count;
-		file.read(&mesh.indices[0], mesh.indices.size());
+		file.read(mesh.indices.getMutableData(), mesh.indices.size());
 
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
-		const Renderer::MemRef mem = m_renderer.copy(&mesh.indices[0], mesh.indices.size());
+		const Renderer::MemRef mem = m_renderer.copy(mesh.indices.data(), (u32)mesh.indices.size());
 		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::IMMUTABLE);
 		mesh.render_data->index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
 		if (!mesh.render_data->index_buffer_handle.isValid()) return false;

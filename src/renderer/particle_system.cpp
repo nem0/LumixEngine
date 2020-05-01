@@ -349,7 +349,7 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 	}
 	lua_pop(L, 1);
 	compiler.m_bytecode.write(Instructions::END);
-	m_emit_byte_offset = (int)compiler.m_bytecode.getPos();
+	m_emit_byte_offset = (int)compiler.m_bytecode.size();
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "emit");
 	if(lua_isfunction(L, -1)) {
@@ -374,7 +374,7 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 	lua_pop(L, 1);
 	compiler.m_bytecode.write(Instructions::END);
 
-	m_output_byte_offset = (int)compiler.m_bytecode.getPos();
+	m_output_byte_offset = (int)compiler.m_bytecode.size();
 	lua_getfield(L, LUA_GLOBALSINDEX, "output");
 	if(lua_isfunction(L, -1)) {
 		if(lua_pcall(L, 0, 0, 0) != 0) {
@@ -459,8 +459,8 @@ void ParticleEmitter::emit(const float* args)
 
 
 	const OutputMemoryStream& bytecode = m_resource->getBytecode();
-	const u8* emit_bytecode = (const u8*)bytecode.getData() + m_resource->getEmitByteOffset();
-	InputMemoryStream blob(emit_bytecode, bytecode.getPos() - m_resource->getEmitByteOffset());
+	const u8* emit_bytecode = (const u8*)bytecode.data() + m_resource->getEmitByteOffset();
+	InputMemoryStream blob(emit_bytecode, bytecode.size() - m_resource->getEmitByteOffset());
 	for (;;) {
 		const u8 instruction = blob.read<u8>();
 		switch((Instructions)instruction) {
@@ -593,7 +593,7 @@ void ParticleEmitter::update(float dt)
 	m_emit_buffer.clear();
 	m_constants[0].value = dt;
 	const OutputMemoryStream& bytecode = m_resource->getBytecode();
-	InputMemoryStream blob(bytecode.getData(), bytecode.getPos());
+	InputMemoryStream blob(bytecode.data(), bytecode.size());
 	// TODO
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
@@ -762,7 +762,7 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 
 	auto sim = [&](u32 offset, u32 count){
 		PROFILE_BLOCK("particle simulation");
-		InputMemoryStream blob((u8*)bytecode.getData() + output_offset, bytecode.getPos());
+		InputMemoryStream blob((u8*)bytecode.data() + output_offset, bytecode.size());
 		int output_idx = 0;
 		for (;;) {
 			u8 instruction = blob.read<u8>();

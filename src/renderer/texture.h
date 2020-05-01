@@ -71,8 +71,8 @@ public:
 	bool create(u32 w, u32 h, gpu::TextureFormat format, const void* data, u32 size);
 	void destroy();
 
-	const u8* getData() const { return (const u8*)data.getData(); }
-	u8* getData() { return (u8*)data.getMutableData(); }
+	const u8* getData() const { return data.data(); }
+	u8* getData() { return data.getMutableData(); }
 	void addDataReference();
 	void removeDataReference();
 	void onDataUpdated(u32 x, u32 y, u32 w, u32 h);

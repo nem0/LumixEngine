@@ -326,13 +326,13 @@ bool Settings::load()
 	const bool has_settings = fs.fileExists(SETTINGS_PATH);
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
 	
-	Array<u8> buf(m_app.getAllocator());
+	OutputMemoryStream buf(m_app.getAllocator());
 	if (!fs.getContentSync(Path(path), Ref(buf))) {
 		logError("Editor") << "Failed to open " << path;
 		return false;
 	}
 
-	Span<const char> content((const char*)buf.begin(), buf.size());
+	Span<const char> content((const char*)buf.data(), (u32)buf.size());
 	if (!LuaWrapper::execute(L, content, "settings", 0)) {
 		return false;
 	}
@@ -351,7 +351,7 @@ bool Settings::load()
 			return false;
 		}
 
-		Span<const char> content((const char*)buf.begin(), buf.size());
+		Span<const char> content((const char*)buf.data(), (u32)buf.size());
 		if (!LuaWrapper::execute(L, content, "settings", 0)) {
 			return false;
 		}

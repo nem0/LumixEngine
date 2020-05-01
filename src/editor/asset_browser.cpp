@@ -884,7 +884,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 		logError("Editor") << "Could not save file " << resource.getPath().c_str();
 		return;
 	}
-	f.write(stream.getData(), stream.getPos());
+	f.write(stream.data(), stream.size());
 	f.close();
 	LUMIX_DELETE(m_app.getAllocator(), &stream);
 

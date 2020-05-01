@@ -52,20 +52,21 @@ public:
 	Span<u8> releaseOwnership();
 	void resize(u64 size);
 	void reserve(u64 size);
-	const u8* getData() const { return m_data; }
+	const u8* data() const { return m_data; }
 	u8* getMutableData() { return m_data; }
-	u64 getPos() const { return m_pos; }
+	u64 size() const { return m_size; }
 	void write(const struct String& string);
 	void writeString(const char* string);
 	template <typename T> void write(const T& value);
 	void clear();
-	void* skip(int size);
-	bool empty() const { return m_pos == 0; }
+	void* skip(u64 size);
+	bool empty() const { return m_size == 0; }
+	void free();
 
 private:
 	u8* m_data;
+	u64 m_capacity;
 	u64 m_size;
-	u64 m_pos;
 	IAllocator* m_allocator;
 };
 

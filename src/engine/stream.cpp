@@ -10,52 +10,52 @@ namespace Lumix
 OutputMemoryStream::OutputMemoryStream(IAllocator& allocator)
 	: m_allocator(&allocator)
 	, m_data(nullptr)
+	, m_capacity(0)
 	, m_size(0)
-	, m_pos(0)
 {}
 
 
 OutputMemoryStream::OutputMemoryStream(void* data, u64 size)
 	: m_data((u8*)data)
-	, m_size(size)
+	, m_capacity(size)
 	, m_allocator(nullptr)
-	, m_pos(0)
+	, m_size(0)
 {
 }
 
 
 OutputMemoryStream::OutputMemoryStream(const OutputMemoryStream& blob, IAllocator& allocator)
 	: m_allocator(&allocator)
-	, m_pos(blob.m_pos)
+	, m_size(blob.m_size)
 {
-	if (blob.m_size > 0)
+	if (blob.m_capacity > 0)
 	{
-		m_data = (u8*)allocator.allocate(blob.m_size);
-		memcpy(m_data, blob.m_data, blob.m_size);
-		m_size = blob.m_size;
+		m_data = (u8*)allocator.allocate(blob.m_capacity);
+		memcpy(m_data, blob.m_data, blob.m_capacity);
+		m_capacity = blob.m_capacity;
 	}
 	else
 	{
 		m_data = nullptr;
-		m_size = 0;
+		m_capacity = 0;
 	}
 }
 
 
 OutputMemoryStream::OutputMemoryStream(const InputMemoryStream& blob, IAllocator& allocator)
 	: m_allocator(&allocator)
-	, m_pos(blob.size())
+	, m_size(blob.size())
 {
 	if (blob.size() > 0)
 	{
 		m_data = (u8*)allocator.allocate(blob.size());
 		memcpy(m_data, blob.getData(), blob.size());
-		m_size = blob.size();
+		m_capacity = blob.size();
 	}
 	else
 	{
 		m_data = nullptr;
-		m_size = 0;
+		m_capacity = 0;
 	}
 }
 
@@ -130,13 +130,13 @@ IOutputStream& IOutputStream::operator << (double value)
 OutputMemoryStream::OutputMemoryStream(OutputMemoryStream&& rhs)
 {
 	m_allocator = rhs.m_allocator;
-	m_pos = rhs.m_pos;
 	m_size = rhs.m_size;
+	m_capacity = rhs.m_capacity;
 	m_data = rhs.m_data;
 	
 	rhs.m_data = nullptr;
+	rhs.m_capacity = 0;
 	rhs.m_size = 0;
-	rhs.m_pos = 0;
 }
 
 
@@ -144,17 +144,17 @@ OutputMemoryStream::OutputMemoryStream(OutputMemoryStream&& rhs)
 OutputMemoryStream::OutputMemoryStream(const OutputMemoryStream& rhs)
 {
 	m_allocator = rhs.m_allocator;
-	m_pos = rhs.m_pos;
-	if (rhs.m_size > 0)
+	m_size = rhs.m_size;
+	if (rhs.m_capacity > 0)
 	{
-		m_data = (u8*)m_allocator->allocate(rhs.m_size);
-		memcpy(m_data, rhs.m_data, rhs.m_size);
-		m_size = rhs.m_size;
+		m_data = (u8*)m_allocator->allocate(rhs.m_capacity);
+		memcpy(m_data, rhs.m_data, rhs.m_capacity);
+		m_capacity = rhs.m_capacity;
 	}
 	else
 	{
 		m_data = nullptr;
-		m_size = 0;
+		m_capacity = 0;
 	}
 }
 
@@ -165,17 +165,17 @@ void OutputMemoryStream::operator =(const OutputMemoryStream& rhs)
 	if (m_allocator) m_allocator->deallocate(m_data);
 		
 	m_allocator = rhs.m_allocator;
-	m_pos = rhs.m_pos;
-	if (rhs.m_size > 0)
+	m_size = rhs.m_size;
+	if (rhs.m_capacity > 0)
 	{
-		m_data = (u8*)m_allocator->allocate(rhs.m_size);
-		memcpy(m_data, rhs.m_data, rhs.m_size);
-		m_size = rhs.m_size;
+		m_data = (u8*)m_allocator->allocate(rhs.m_capacity);
+		memcpy(m_data, rhs.m_data, rhs.m_capacity);
+		m_capacity = rhs.m_capacity;
 	}
 	else
 	{
 		m_data = nullptr;
-		m_size = 0;
+		m_capacity = 0;
 	}
 }
 
@@ -186,12 +186,12 @@ void OutputMemoryStream::operator =(OutputMemoryStream&& rhs)
 	if (m_allocator) m_allocator->deallocate(m_data);
 		
 	m_allocator = rhs.m_allocator;
-	m_pos = rhs.m_pos;
-	m_data = rhs.m_data;
 	m_size = rhs.m_size;
+	m_data = rhs.m_data;
+	m_capacity = rhs.m_capacity;
 
-	rhs.m_pos = 0;
 	rhs.m_size = 0;
+	rhs.m_capacity = 0;
 	rhs.m_data = nullptr;
 }
 	
@@ -202,16 +202,16 @@ void OutputMemoryStream::write(const String& string)
 }
 
 
-void* OutputMemoryStream::skip(int size)
+void* OutputMemoryStream::skip(u64 size)
 {
 	ASSERT(size > 0);
 
-	if (m_pos + size > m_size)
+	if (m_size + size > m_capacity)
 	{
-		reserve((m_pos + size) << 1);
+		reserve((m_size + size) << 1);
 	}
-	void* ret = (u8*)m_data + m_pos;
-	m_pos += size;
+	void* ret = (u8*)m_data + m_size;
+	m_size += size;
 	return ret;
 }
 
@@ -220,12 +220,12 @@ bool OutputMemoryStream::write(const void* data, u64 size)
 {
 	if (!size) return true;
 
-	if (m_pos + size > m_size)
+	if (m_size + size > m_capacity)
 	{
-		reserve((m_pos + size) << 1);
+		reserve((m_size + size) << 1);
 	}
-	memcpy((u8*)m_data + m_pos, data, size);
-	m_pos += size;
+	memcpy((u8*)m_data + m_size, data, size);
+	m_size += size;
 	return true;
 }
 
@@ -243,42 +243,51 @@ void OutputMemoryStream::writeString(const char* string)
 
 void OutputMemoryStream::clear()
 {
-	m_pos = 0;
+	m_size = 0;
+}
+
+
+void OutputMemoryStream::free()
+{
+	m_allocator->deallocate(m_data);
+	m_size = 0;
+	m_capacity = 0;
+	m_data = nullptr;
 }
 
 
 void OutputMemoryStream::reserve(u64 size)
 {
-	if (size <= m_size) return;
+	if (size <= m_capacity) return;
 
 	ASSERT(m_allocator);
 	u8* tmp = (u8*)m_allocator->allocate(size);
-	memcpy(tmp, m_data, m_size);
+	memcpy(tmp, m_data, m_capacity);
 	m_allocator->deallocate(m_data);
 	m_data = tmp;
-	m_size = size;
+	m_capacity = size;
 }
 
 
 Span<u8> OutputMemoryStream::releaseOwnership() {
-	Span<u8> res((u8*)m_data, (u8*)m_data + m_size);
+	Span<u8> res((u8*)m_data, (u8*)m_data + m_capacity);
 	m_data = nullptr;
-	m_pos = m_size = 0;
+	m_size = m_capacity = 0;
 	return res;
 }
 
 
 void OutputMemoryStream::resize(u64 size)
 {
-	m_pos = size;
-	if (size <= m_size) return;
+	m_size = size;
+	if (size <= m_capacity) return;
 
 	ASSERT(m_allocator);
 	u8* tmp = (u8*)m_allocator->allocate(size);
-	memcpy(tmp, m_data, m_size);
+	memcpy(tmp, m_data, m_capacity);
 	m_allocator->deallocate(m_data);
 	m_data = tmp;
-	m_size = size;
+	m_capacity = size;
 }
 
 
@@ -291,8 +300,8 @@ InputMemoryStream::InputMemoryStream(const void* data, u64 size)
 
 
 InputMemoryStream::InputMemoryStream(const OutputMemoryStream& blob)
-	: m_data((const u8*)blob.getData())
-	, m_size(blob.getPos())
+	: m_data((const u8*)blob.data())
+	, m_size(blob.size())
 	, m_pos(0)
 {}
 
