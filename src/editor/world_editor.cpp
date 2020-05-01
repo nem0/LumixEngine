@@ -1672,6 +1672,7 @@ public:
 	{
 		PROFILE_FUNCTION();
 
+		Gizmo::frame();
 		// TODO do not allow user interaction (e.g. saving universe) while queue is not empty
 		while (!m_command_queue.empty()) {
 			if (!m_command_queue[0]->isReady()) break;
@@ -2152,8 +2153,9 @@ public:
 		return *m_prefab_system;
 	}
 
-	void copyEntities(const EntityRef* entities, int count, OutputMemoryStream& serializer)
+	void copyEntities(Span<const EntityRef> entities, OutputMemoryStream& serializer)
 	{
+		i32 count = entities.length();
 		serializer.write(count);
 		for (int i = 0; i < count; ++i) {
 			m_copy_buffer.write(entities[i]);
@@ -2194,6 +2196,7 @@ public:
 		}
 	}
 
+
 	void copyEntities() override {
 		if (m_selected_entities.empty()) return;
 
@@ -2204,7 +2207,7 @@ public:
 		for (EntityRef e : m_selected_entities) {
 			gatherHierarchy(e, Ref(entities));
 		}
-		copyEntities(&entities[0], entities.size(), m_copy_buffer);
+		copyEntities(entities, m_copy_buffer);
 	}
 
 
@@ -2679,18 +2682,6 @@ public:
 		m_position = hit.pos;
 	}
 
-
-	PasteEntityCommand(WorldEditor& editor, const DVec3& pos, const OutputMemoryStream& copy_buffer, bool identity = false)
-		: m_copy_buffer(copy_buffer)
-		, m_editor(editor)
-		, m_position(pos)
-		, m_entities(editor.getAllocator())
-		, m_map(editor.getAllocator())
-		, m_identity(identity)
-	{
-	}
-
-
 	bool execute() override
 	{
 		InputMemoryStream blob(m_copy_buffer);
@@ -2711,6 +2702,7 @@ public:
 				m_entities[i] = universe.createEntity(DVec3(0), Quat(0, 0, 0, 1));
 			}
 		}
+		m_editor.selectEntities(m_entities, false);
 
 		Transform base_tr;
 		base_tr.pos = m_position;

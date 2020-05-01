@@ -29,6 +29,8 @@ enum class Axis : u32
 };
 
 struct {
+	u64 frame = 0;
+	u64 last_manipulate_frame = 0;
 	u64 dragged_id = ~(u64)0;
 	u64 active_id = ~(u64)0;
 	Axis axis = Axis::NONE;
@@ -502,6 +504,18 @@ void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis) {
 	renderCube(view, axis == Axis::Z ? SELECTED_COLOR : Z_COLOR, rel_pos + gizmo.z);
 }
 
+void frame() {
+	++g_gizmo_state.frame;
+	if (g_gizmo_state.last_manipulate_frame < g_gizmo_state.frame - 2) {
+		g_gizmo_state.active_id = ~(u64)0;
+		g_gizmo_state.dragged_id = ~(u64)0;
+	}
+}
+
+void setDragged(u64 id) {
+	g_gizmo_state.dragged_id = id;
+}
+
 bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg) {
 	const float scale = getScale(view.getViewport(), tr->pos);
 	TranslationGizmo gizmo = getGizmo<TranslationGizmo>(view, tr, cfg);
@@ -675,6 +689,7 @@ bool isActive() { return g_gizmo_state.active_id != ~(u64)0 || g_gizmo_state.dra
 
 
 bool manipulate(u64 id, UniverseView& view, Ref<Transform> tr, const Config& cfg) {
+	g_gizmo_state.last_manipulate_frame = g_gizmo_state.frame;
 	switch (cfg.mode) {
 		case Gizmo::Config::TRANSLATE: return translate(id, view, tr, cfg);
 		case Gizmo::Config::ROTATE: return rotate(id, view, tr, cfg);

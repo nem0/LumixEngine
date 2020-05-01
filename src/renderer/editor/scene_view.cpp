@@ -604,6 +604,10 @@ SceneView::SceneView(StudioApp& app)
 	ResourceManagerHub& rm = engine.getResourceManager();
 	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 
+	m_copy_move_action = LUMIX_NEW(allocator, Action)("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove");
+	m_copy_move_action->is_global = false;
+	m_app.addAction(m_copy_move_action);
+
 	m_orbit_action = LUMIX_NEW(allocator, Action)("Orbit", "Orbit with RMB", "orbitRMB");
 	m_orbit_action->is_global = false;
 	m_app.addAction(m_orbit_action);
@@ -665,18 +669,30 @@ SceneView::~SceneView()
 }
 
 void SceneView::manipulate() {
-	const Array<EntityRef>& selected = m_editor.getSelectedEntities();
-	if (selected.empty()) return;
+	const Array<EntityRef>* selected = &m_editor.getSelectedEntities();
+	if (selected->empty()) return;
 
 	const bool is_snap = m_toggle_gizmo_step_action->isActive();
 	Gizmo::Config& cfg = m_app.getGizmoConfig();
 	cfg.enableStep(is_snap);
 		
-	Transform tr = m_editor.getUniverse()->getTransform(selected[0]);
+	Transform tr = m_editor.getUniverse()->getTransform((*selected)[0]);
 	tr.pos += tr.rot.rotate(cfg.getOffset());
 	const Transform old_pivot_tr = tr;
 			
-	if (!Gizmo::manipulate(selected[0].index, *m_view, Ref(tr), cfg)) return;
+	const bool copy_move = m_copy_move_action->isActive();
+	if (!copy_move || !m_view->m_is_mouse_down[0]) {
+		m_copy_moved = false;
+	}
+
+	if (!Gizmo::manipulate((*selected)[0].index, *m_view, Ref(tr), cfg)) return;
+
+	if (copy_move && !m_copy_moved) {
+		m_editor.duplicateEntities();
+		selected = &m_editor.getSelectedEntities();
+		Gizmo::setDragged((*selected)[0].index);
+		m_copy_moved = true;
+	}
 
 	const Transform new_pivot_tr = tr;
 	tr.pos -= tr.rot.rotate(cfg.getOffset());
@@ -685,35 +701,35 @@ void SceneView::manipulate() {
 		case Gizmo::Config::TRANSLATE: {
 			const DVec3 diff = new_pivot_tr.pos - old_pivot_tr.pos;
 			Array<DVec3> positions(m_app.getAllocator());
-			positions.resize(selected.size());
-			for (u32 i = 0, c = selected.size(); i < c; ++i) {
-				positions[i] = universe.getPosition(selected[i]) + diff;
+			positions.resize(selected->size());
+			for (u32 i = 0, c = selected->size(); i < c; ++i) {
+				positions[i] = universe.getPosition((*selected)[i]) + diff;
 			}
-			m_editor.setEntitiesPositions(&selected[0], positions.begin(), positions.size());
+			m_editor.setEntitiesPositions(selected->begin(), positions.begin(), positions.size());
 			break;
 		}
 		case Gizmo::Config::ROTATE: {
 			Array<DVec3> poss(m_app.getAllocator());
 			Array<Quat> rots(m_app.getAllocator());
-			rots.resize(selected.size());
-			poss.resize(selected.size());
-			for (u32 i = 0, c = selected.size(); i < c; ++i) {
-				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * universe.getTransform(selected[i]);
+			rots.resize(selected->size());
+			poss.resize(selected->size());
+			for (u32 i = 0, c = selected->size(); i < c; ++i) {
+				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * universe.getTransform((*selected)[i]);
 				poss[i] = t.pos;
 				rots[i] = t.rot.normalized();
 			}
-			m_editor.setEntitiesPositionsAndRotations(&selected[0], poss.begin(), rots.begin(), rots.size());
+			m_editor.setEntitiesPositionsAndRotations(selected->begin(), poss.begin(), rots.begin(), rots.size());
 
 			break;
 		}
 		case Gizmo::Config::SCALE: {
 			const float diff = new_pivot_tr.scale / old_pivot_tr.scale;
 			Array<float> scales(m_app.getAllocator());
-			scales.resize(selected.size());
-			for (u32 i = 0, c = selected.size(); i < c; ++i) {
-				scales[i] = universe.getScale(selected[i]) * diff;
+			scales.resize(selected->size());
+			for (u32 i = 0, c = selected->size(); i < c; ++i) {
+				scales[i] = universe.getScale((*selected)[i]) * diff;
 			}
-			m_editor.setEntitiesScales(&selected[0], scales.begin(), scales.size());
+			m_editor.setEntitiesScales(selected->begin(), scales.begin(), scales.size());
 
 			break;
 		}
