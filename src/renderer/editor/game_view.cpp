@@ -307,6 +307,7 @@ void GameView::onWindowGUI()
 
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(window_name, &m_is_open, ImGuiWindowFlags_NoNavInputs)) {
 		is_game_view_visible = true;
 		view_pos = ImGui::GetCursorScreenPos();
@@ -367,6 +368,7 @@ void GameView::onWindowGUI()
 	}
 	if (m_is_mouse_captured && OS::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
 	ImGui::End();
+	ImGui::PopStyleVar();
 	if (is_game_view_visible) onStatsGUI(view_pos);
 }
 

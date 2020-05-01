@@ -1055,6 +1055,7 @@ void SceneView::onToolbar()
 {
 	static const char* actions_names[] = { "setTranslateGizmoMode",
 		"setRotateGizmoMode",
+		"setScaleGizmoMode",
 		"setLocalCoordSystem",
 		"setGlobalCoordSystem",
 		"viewTop",
@@ -1177,7 +1178,7 @@ void SceneView::statsUI(float x, float y) {
 	float toolbar_height = 24 + ImGui::GetStyle().FramePadding.y * 2;
 	ImVec2 view_pos(x, y);
 	view_pos.x += ImGui::GetStyle().FramePadding.x;
-	view_pos.y += ImGui::GetStyle().FramePadding.y + toolbar_height;
+	view_pos.y += ImGui::GetStyle().FramePadding.y;
 	ImGui::SetNextWindowPos(view_pos);
 	auto col = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
 	col.w = 0.3f;
@@ -1209,8 +1210,10 @@ void SceneView::onWindowGUI()
 	const char* title = ICON_FA_GLOBE "Scene View###Scene View";
 	if (m_log_ui.getUnreadErrorCount() > 0) title = ICON_FA_GLOBE "Scene View | " ICON_FA_EXCLAMATION_TRIANGLE " errors in log###Scene View";
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoScrollWithMouse)) {
 		is_open = true;
+		ImGui::Dummy(ImVec2(2, 2));
 		onToolbar();
 		const ImVec2 size = ImGui::GetContentRegionAvail();
 		Viewport vp = m_view->getViewport();
@@ -1231,6 +1234,7 @@ void SceneView::onWindowGUI()
 			m_width = int(size.x);
 			m_height = int(size.y);
 			view_pos = ImGui::GetCursorScreenPos();
+			
 			if (texture_handle.isValid()) {
 				void* t = (void*)(uintptr)texture_handle.value;
 				if (gpu::isOriginBottomLeft()) {
@@ -1268,6 +1272,7 @@ void SceneView::onWindowGUI()
 		captureMouse(false);
 	}
 	ImGui::End();
+	ImGui::PopStyleVar();
 
 	if (is_open) statsUI(view_pos.x, view_pos.y);
 }
