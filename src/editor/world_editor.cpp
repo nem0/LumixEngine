@@ -2560,7 +2560,6 @@ public:
 
 		universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
 
-		if (m_view) m_view->setOrbitCamera(false);
 		m_selected_entities.clear();
 		m_universe_created.invoke();
 		m_prefab_system->setUniverse(universe);
