@@ -75,10 +75,11 @@ namespace ImGui
 	bool ToolbarButton(ImFont* font, const char* font_icon, const ImVec4& bg_color, const char* tooltip)
 	{
 		auto frame_padding = ImGui::GetStyle().FramePadding;
-		ImGui::PushStyleColor(ImGuiCol_FrameBg, bg_color);
+		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+		ImGui::PushStyleColor(ImGuiCol_Text, bg_color);
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, ImGui::GetStyle().FramePadding.y));
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
 
@@ -89,7 +90,7 @@ namespace ImGui
 			ret = true;
 		}
 		ImGui::PopFont();
-		ImGui::PopStyleColor(3);
+		ImGui::PopStyleColor(4);
 		ImGui::PopStyleVar(3);
 		if (ImGui::IsItemHovered()) {
 			ImGui::BeginTooltip();
