@@ -635,7 +635,7 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 		ImGui::OpenPopup("ctx");
 	}
 	if (ImGui::BeginPopup("ctx")) {
-		if (ImGui::Selectable("Remove")) {
+		if (ImGui::Selectable("Remove component")) {
 			m_editor.destroyComponent(entities, cmp_type);
 			ImGui::EndPopup();
 			if (is_open) ImGui::TreePop();

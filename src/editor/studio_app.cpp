@@ -1604,6 +1604,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 4));
 		if (ImGui::BeginMainMenuBar())
 		{
 			fileMenu();
@@ -1611,6 +1612,7 @@ struct StudioAppImpl final : StudioApp
 			entityMenu();
 			toolsMenu();
 			viewMenu();
+			ImGui::PopStyleVar(2);
 
 			float w = ImGui::GetWindowContentRegionWidth() * 0.5f - m_toolbar_actions.size() * 15 - ImGui::GetCursorPosX();
 			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight()));
@@ -1644,7 +1646,6 @@ struct StudioAppImpl final : StudioApp
 			}
 			ImGui::EndMainMenuBar();
 		}
-		ImGui::PopStyleVar();
 		ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing()));
 	}
 
