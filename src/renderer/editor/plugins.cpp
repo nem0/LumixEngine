@@ -624,6 +624,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool is_normalmap = false;
 		float scale_coverage = -1;
 		bool convert_to_raw = false;
+		bool compress = false;
 		WrapMode wrap_mode_u = WrapMode::REPEAT;
 		WrapMode wrap_mode_v = WrapMode::REPEAT;
 		WrapMode wrap_mode_w = WrapMode::REPEAT;
@@ -1140,8 +1141,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	Meta getMeta(const Path& path) const
 	{
 		Meta meta;
-		m_app.getAssetCompiler().getMeta(path, [&meta](lua_State* L){
+		m_app.getAssetCompiler().getMeta(path, [&path, &meta](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "srgb", &meta.srgb);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "compress", &meta.compress);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "convert_to_raw", &meta.convert_to_raw);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
@@ -1178,7 +1180,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		OutputMemoryStream out(m_app.getAllocator());
 		Meta meta = getMeta(src);
-		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || equalStrings(ext, "tga")) {
+		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress)) {
 			if (meta.scale_coverage < 0 || !equalStrings(ext, "tga")) {
 				out.write(ext, sizeof(ext) - 1);
 				u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
@@ -1193,7 +1195,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				compileImage(src, src_data, out, meta);
 			}
 		}
-		else if(equalStrings(ext, "jpg") || equalStrings(ext, "png")) {
+		else if(equalStrings(ext, "jpg") || equalStrings(ext, "png") || (equalStrings(ext, "tga") && meta.compress)) {
 			compileImage(src, src_data, out, meta);
 		}
 		else if (equalStrings(ext, "ltc")) {
@@ -1416,6 +1418,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			
 			ImGuiEx::Label("SRGB");
 			ImGui::Checkbox("##srgb", &m_meta.srgb);
+			
+			if (Path::hasExtension(texture->getPath().c_str(), "tga")) {
+				ImGuiEx::Label("Compress");
+				ImGui::Checkbox("##cmprs", &m_meta.compress);
+			}
+			
 			ImGuiEx::Label("Convert to RAW");
 			ImGui::Checkbox("##cvt2raw", &m_meta.convert_to_raw);
 			bool scale_coverage = m_meta.scale_coverage >= 0;
@@ -1440,6 +1448,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"
+					, "\ncompress = ", m_meta.compress ? "true" : "false"
 					, "\nconvert_to_raw = ", m_meta.convert_to_raw ? "true" : "false"
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
