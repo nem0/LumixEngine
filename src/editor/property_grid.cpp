@@ -690,7 +690,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 			ImGui::TextUnformatted(prefab->getPath().c_str());
 			if (ImGui::Button(ICON_FA_SAVE "Save prefab"))
 			{
-				prefab_system.savePrefab(prefab->getPath());
+				prefab_system.savePrefab(entities[0], prefab->getPath());
 			}
 			ImGui::SameLine();
 			if (ImGui::Button(ICON_FA_UNLINK "Break prefab"))

@@ -99,6 +99,8 @@ private:
 	Array<FileInfo> m_file_infos;
 	Array<int> m_filtered_file_infos;
 	Array<Path> m_history;
+	EntityPtr m_dropped_entity = INVALID_ENTITY;
+	char m_prefab_name[MAX_PATH_LENGTH] = "";
 	int m_history_index;
 	HashMap<ResourceType, IPlugin*> m_plugins;
 	Array<Resource*> m_selected_resources;

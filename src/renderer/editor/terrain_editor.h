@@ -47,6 +47,8 @@ public:
 	void setComponent(ComponentUID cmp) { m_component = cmp; }
 
 private:
+	void layerGUI();
+	void entityGUI();
 	void splitSplatmap(const char* dir);
 	void mergeSplatmap(const char* dir);
 	void onUniverseDestroyed();
