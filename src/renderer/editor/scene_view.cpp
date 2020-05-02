@@ -1147,7 +1147,7 @@ void SceneView::onToolbar()
 }
 
 void SceneView::handleEvents() {
-	const bool handle_input = m_is_mouse_captured || ImGui::IsItemHovered() && OS::getFocused() == ImGui::GetWindowViewport()->PlatformHandle;
+	const bool handle_input = m_is_mouse_captured || (ImGui::IsItemHovered() && OS::getFocused() == ImGui::GetWindowViewport()->PlatformHandle);
 	const OS::Event* events = m_app.getEvents();
 	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
 		const OS::Event& event = events[i];
