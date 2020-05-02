@@ -2,6 +2,7 @@
 
 #include "asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -500,6 +501,30 @@ void AssetBrowser::fileColumn()
 	}
 
 	ImGui::EndChild();
+	if (ImGui::BeginDragDropTarget()) {
+		if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+			m_dropped_entity = *(EntityRef*)payload->Data;
+			ImGui::OpenPopup("Save sa prefab");
+		}
+		ImGui::EndDragDropTarget();
+	}
+	ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
+	if (ImGui::BeginPopupModal("Save sa prefab")) {
+		ImGuiEx::Label("Name");
+		ImGui::InputText("##name", m_prefab_name, sizeof(m_prefab_name));
+		if (ImGui::Button(ICON_FA_SAVE "Save")) {
+			StaticString<MAX_PATH_LENGTH> path(m_dir, "/", m_prefab_name, ".fab");
+			m_app.getWorldEditor().getPrefabSystem().savePrefab((EntityRef)m_dropped_entity, Path(path));
+			m_dropped_entity = INVALID_ENTITY;
+			changeDir(m_dir);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_SAVE "Cancel")) {
+			m_dropped_entity = INVALID_ENTITY;
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
 }
 
 

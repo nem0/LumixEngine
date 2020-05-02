@@ -1253,13 +1253,17 @@ struct StudioAppImpl final : StudioApp
 		{
 			Path::normalize(tmp, Span(filename));
 			const char* base_path = m_engine->getFileSystem().getBasePath();
+			auto& selected_entities = m_editor->getSelectedEntities();
+			if (selected_entities.size() != 1) return;
+
+			EntityRef entity = selected_entities[0];
 			if (startsWith(filename, base_path))
 			{
-				m_editor->getPrefabSystem().savePrefab(Path(filename + stringLength(base_path)));
+				m_editor->getPrefabSystem().savePrefab(entity, Path(filename + stringLength(base_path)));
 			}
 			else
 			{
-				m_editor->getPrefabSystem().savePrefab(Path(filename));
+				m_editor->getPrefabSystem().savePrefab(entity, Path(filename));
 			}
 		}
 	}
@@ -2487,7 +2491,13 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void savePrefabAs(const char* path) { m_editor->getPrefabSystem().savePrefab(Path(path)); }
+	void savePrefabAs(const char* path) {
+		auto& selected_entities = m_editor->getSelectedEntities();
+		if (selected_entities.size() != 1) return;
+
+		EntityRef entity = selected_entities[0];
+		m_editor->getPrefabSystem().savePrefab(entity, Path(path)); 
+	}
 
 
 	void destroyEntity(EntityRef e) { m_editor->destroyEntities(&e, 1); }

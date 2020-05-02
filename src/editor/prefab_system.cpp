@@ -490,12 +490,8 @@ public:
 		m_roots.erase(root);
 	}
 
-	void savePrefab(const Path& path) override
+	void savePrefab(EntityRef entity, const Path& path) override
 	{
-		auto& selected_entities = m_editor.getSelectedEntities();
-		if (selected_entities.size() != 1) return;
-
-		EntityRef entity = selected_entities[0];
 		if (getPrefab(entity) != 0) entity = getPrefabRoot(entity);
 
 		Engine& engine = m_editor.getEngine();

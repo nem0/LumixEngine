@@ -1130,171 +1130,86 @@ Material* TerrainEditor::getMaterial() const
 }
 
 
-void TerrainEditor::onGUI()
-{
+void TerrainEditor::layerGUI() {
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
-	ImGui::Unindent();
-	if (!ImGui::CollapsingHeader("Terrain editor")) {
-		ImGui::Indent();
-		return;
-	}
-	ImGui::Indent();
-
-	ImGuiEx::Label("Enable");
-	ImGui::Checkbox("##ed_enabled", &m_is_enabled);
-	if (!m_is_enabled) return;
-
-	if (!getMaterial())
+	if (getMaterial()
+		&& getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)
+		&& ImGui::Button("Save"))
 	{
-		ImGui::Text("No heightmap");
-		return;
+		getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)->save();
 	}
 
-	bool is_grass_enabled = scene->isGrassEnabled();
-	ImGuiEx::Label("Enable grass");
-	if (ImGui::Checkbox("##enable_grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
-
-	ImGuiEx::Label("Brush size");
-	ImGui::DragFloat("##br_size", &m_terrain_brush_size, 1, MIN_BRUSH_SIZE, FLT_MAX);
-	ImGuiEx::Label("Brush strength");
-	ImGui::SliderFloat("##br_str", &m_terrain_brush_strength, 0, 1.0f);
-
-	enum BrushType
+	if (m_brush_texture)
 	{
-		HEIGHT,
-		LAYER,
-		ENTITY,
-		GRASS
-	};
-
-	ImGuiEx::Label("Brush type");
-	if (ImGui::Combo("##br_type", &m_current_brush, "Height\0Layer\0Entity\0Grass\0"))
-	{
-		m_action_type = m_current_brush == HEIGHT ? TerrainEditor::RAISE_HEIGHT : m_action_type;
-	}
-
-	switch (m_current_brush)
-	{
-		case HEIGHT:
-			if (getMaterial() 
-				&& getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)
-				&&ImGui::Button("Save heightmap")) 
-			{
-				getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)->save();
-			}
-			break;
-		case GRASS:
-		case LAYER:
-			if (getMaterial()
-				&& getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)
-				&& ImGui::Button("Save layermap and grassmap"))
-			{
-				getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)->save();
-			}
-			break;
-		case ENTITY: break;
-	}
-
-	if (m_current_brush == LAYER || m_current_brush == GRASS)
-	{
-		if (m_brush_texture)
+		const gpu::TextureHandle th = m_brush_texture->handle;
+		ImGui::Image((void*)(uintptr_t)th.value, ImVec2(100, 100));
+		if (ImGui::Button("Clear mask"))
 		{
-			const gpu::TextureHandle th = m_brush_texture->handle;
-			ImGui::Image((void*)(uintptr_t)th.value, ImVec2(100, 100));
-			if (ImGui::Button("Clear mask"))
-			{
-				m_brush_texture->destroy();
-				LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
-				m_brush_mask.clear();
-				m_brush_texture = nullptr;
-			}
-			ImGui::SameLine();
+			m_brush_texture->destroy();
+			LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
+			m_brush_mask.clear();
+			m_brush_texture = nullptr;
 		}
-
 		ImGui::SameLine();
-		if (ImGui::Button("Select mask"))
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Select mask"))
+	{
+		char filename[MAX_PATH_LENGTH];
+		if (OS::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
 		{
-			char filename[MAX_PATH_LENGTH];
-			if (OS::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
+			int image_width;
+			int image_height;
+			int image_comp;
+			auto* data = stbi_load(filename, &image_width, &image_height, &image_comp, 4);
+			if (data)
 			{
-				int image_width;
-				int image_height;
-				int image_comp;
-				auto* data = stbi_load(filename, &image_width, &image_height, &image_comp, 4);
-				if (data)
+				m_brush_mask.resize(image_width * image_height);
+				for (int j = 0; j < image_width; ++j)
 				{
-					m_brush_mask.resize(image_width * image_height);
-					for (int j = 0; j < image_width; ++j)
+					for (int i = 0; i < image_width; ++i)
 					{
-						for (int i = 0; i < image_width; ++i)
-						{
-							m_brush_mask[i + j * image_width] =
-								data[image_comp * (i + j * image_width)] > 128;
-						}
+						m_brush_mask[i + j * image_width] =
+							data[image_comp * (i + j * image_width)] > 128;
 					}
-
-					auto& rm = m_world_editor.getEngine().getResourceManager();
-					if (m_brush_texture)
-					{
-						m_brush_texture->destroy();
-						LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
-					}
-
-					Lumix::IPlugin* plugin = m_world_editor.getEngine().getPluginManager().getPlugin("renderer");
-					Renderer& renderer = *static_cast<Renderer*>(plugin);
-					m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Texture)(
-						Path("brush_texture"), *rm.get(Texture::TYPE), renderer, m_world_editor.getAllocator());
-					m_brush_texture->create(image_width, image_height, gpu::TextureFormat::RGBA8, data, image_width * image_height * 4);
-
-					stbi_image_free(data);
 				}
+
+				auto& rm = m_world_editor.getEngine().getResourceManager();
+				if (m_brush_texture)
+				{
+					m_brush_texture->destroy();
+					LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
+				}
+
+				Lumix::IPlugin* plugin = m_world_editor.getEngine().getPluginManager().getPlugin("renderer");
+				Renderer& renderer = *static_cast<Renderer*>(plugin);
+				m_brush_texture = LUMIX_NEW(m_world_editor.getAllocator(), Texture)(
+					Path("brush_texture"), *rm.get(Texture::TYPE), renderer, m_world_editor.getAllocator());
+				m_brush_texture->create(image_width, image_height, gpu::TextureFormat::RGBA8, data, image_width * image_height * 4);
+
+				stbi_image_free(data);
 			}
 		}
 	}
 
-
-	switch (m_current_brush)
-	{
-		case HEIGHT:
-		{
-			bool is_flat_tool = m_action_type == TerrainEditor::FLAT_HEIGHT;
-			if (ImGui::Checkbox("Flat", &is_flat_tool))
-			{
-				m_action_type = is_flat_tool ? TerrainEditor::FLAT_HEIGHT : TerrainEditor::RAISE_HEIGHT;
+	m_action_type = TerrainEditor::ADD_GRASS;
+	int type_count = scene->getGrassCount((EntityRef)m_component.entity);
+	for (int i = 0; i < type_count; ++i) {
+		if (i % 4 != 0) ImGui::SameLine();
+		bool b = (m_grass_mask & (1 << i)) != 0;
+		if (ImGui::Checkbox(StaticString<20>("Grass ", i, "###rb", i), &b)) {
+			if (b) {
+				m_grass_mask |= 1 << i;
 			}
-
-			if (m_action_type == TerrainEditor::FLAT_HEIGHT)
-			{
-				ImGui::SameLine();
-				ImGui::Text("- Press Ctrl to pick height");
+			else {
+				m_grass_mask &= ~(1 << i);
 			}
-			break;
 		}
-		case GRASS:
-		{
-			m_action_type = TerrainEditor::ADD_GRASS;
-			int type_count = scene->getGrassCount((EntityRef)m_component.entity);
-			for (int i = 0; i < type_count; ++i)
-			{
-				if (i % 4 != 0) ImGui::SameLine();
-				bool b = (m_grass_mask & (1 << i)) != 0;
-				if (ImGui::Checkbox(StaticString<20>("", i, "###rb", i), &b))
-				{
-					if (b)
-					{
-						m_grass_mask |= 1 << i;
-					}
-					else
-					{
-						m_grass_mask &= ~(1 << i);
-					}
-				}
-			}
-			break;
-		}
-		case LAYER:
-		{
-			m_action_type = TerrainEditor::LAYER;
+	}
+
+#if 0
+	m_action_type = TerrainEditor::LAYER;
 			Texture* tex = getMaterial()->getTextureByName(DETAIL_ALBEDO_SLOT_NAME);
 			if (tex) {
 				bool primary = m_layers_mask & 0b1;
@@ -1324,107 +1239,169 @@ void TerrainEditor::onGUI()
 				}
 
 			}
-			break;
-		}
-		case ENTITY:
-		{
-			m_action_type = TerrainEditor::ENTITY;
+#endif
+}
+
+
+void TerrainEditor::entityGUI() {
+	m_action_type = TerrainEditor::ENTITY;
 			
-			static char filter[100] = {0};
-			ImGui::SetNextItemWidth(-20);
-			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
-			ImGui::SameLine();
-			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-				filter[0] = '\0';
-			}
+	static char filter[100] = {0};
+	ImGui::SetNextItemWidth(-20);
+	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
+	ImGui::SameLine();
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
+		filter[0] = '\0';
+	}
 
-			static ImVec2 size(-1, 200);
-			if (ImGui::ListBoxHeader("##prefabs", size)) {
-				auto& resources = m_app.getAssetCompiler().lockResources();
-				u32 count = 0;
-				for (const AssetCompiler::ResourceItem& res : resources) {
-					if (res.type != PrefabResource::TYPE) continue;
-					++count;
-					if (filter[0] != 0 && stristr(res.path.c_str(), filter) == nullptr) continue;
-					int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
-						return r && r->getPath() == res.path;
-					});
-					bool selected = selected_idx >= 0;
-					if (ImGui::Checkbox(res.path.c_str(), &selected)) {
-						if (selected) {
-							ResourceManagerHub& manager = m_world_editor.getEngine().getResourceManager();
-							PrefabResource* prefab = manager.load<PrefabResource>(res.path);
-							m_selected_prefabs.push(prefab);
-						}
-						else {
-							PrefabResource* prefab = m_selected_prefabs[selected_idx];
-							m_selected_prefabs.swapAndPop(selected_idx);
-							prefab->getResourceManager().unload(*prefab);
-						}
-					}
+	static ImVec2 size(-1, 200);
+	if (ImGui::ListBoxHeader("##prefabs", size)) {
+		auto& resources = m_app.getAssetCompiler().lockResources();
+		u32 count = 0;
+		for (const AssetCompiler::ResourceItem& res : resources) {
+			if (res.type != PrefabResource::TYPE) continue;
+			++count;
+			if (filter[0] != 0 && stristr(res.path.c_str(), filter) == nullptr) continue;
+			int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
+				return r && r->getPath() == res.path;
+			});
+			bool selected = selected_idx >= 0;
+			if (ImGui::Checkbox(res.path.c_str(), &selected)) {
+				if (selected) {
+					ResourceManagerHub& manager = m_world_editor.getEngine().getResourceManager();
+					PrefabResource* prefab = manager.load<PrefabResource>(res.path);
+					m_selected_prefabs.push(prefab);
 				}
-				if (count == 0) ImGui::TextUnformatted("No prefabs");
-				m_app.getAssetCompiler().unlockResources();
-				ImGui::ListBoxFooter();
-			}
-			ImGui::HSplitter("after_prefab", &size);
-
-			if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
-			{
-				if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_y = m_is_rotate_z = false;
-			}
-			if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
-			{
-				if (m_is_rotate_x) m_is_align_with_normal = false;
-			}
-			if (m_is_rotate_x)
-			{
-				Vec2 tmp = m_rotate_x_spread;
-				tmp.x = radiansToDegrees(tmp.x);
-				tmp.y = radiansToDegrees(tmp.y);
-				if (ImGui::DragFloat2("Rotate X spread", &tmp.x))
-				{
-					m_rotate_x_spread.x = degreesToRadians(tmp.x);
-					m_rotate_x_spread.y = degreesToRadians(tmp.y);
+				else {
+					PrefabResource* prefab = m_selected_prefabs[selected_idx];
+					m_selected_prefabs.swapAndPop(selected_idx);
+					prefab->getResourceManager().unload(*prefab);
 				}
 			}
-			if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y))
-			{
-				if (m_is_rotate_y) m_is_align_with_normal = false;
-			}
-			if (m_is_rotate_y)
-			{
-				Vec2 tmp = m_rotate_y_spread;
-				tmp.x = radiansToDegrees(tmp.x);
-				tmp.y = radiansToDegrees(tmp.y);
-				if (ImGui::DragFloat2("Rotate Y spread", &tmp.x))
-				{
-					m_rotate_y_spread.x = degreesToRadians(tmp.x);
-					m_rotate_y_spread.y = degreesToRadians(tmp.y);
-				}
-			}
-			if(ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
-			{
-				if(m_is_rotate_z) m_is_align_with_normal = false;
-			}
-			if (m_is_rotate_z)
-			{
-				Vec2 tmp = m_rotate_z_spread;
-				tmp.x = radiansToDegrees(tmp.x);
-				tmp.y = radiansToDegrees(tmp.y);
-				if (ImGui::DragFloat2("Rotate Z spread", &tmp.x))
-				{
-					m_rotate_z_spread.x = degreesToRadians(tmp.x);
-					m_rotate_z_spread.y = degreesToRadians(tmp.y);
-				}
-			}
-			ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
-			m_size_spread.x = minimum(m_size_spread.x, m_size_spread.y);
-			ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
-			m_y_spread.x = minimum(m_y_spread.x, m_y_spread.y);
 		}
-		break;
-		default: ASSERT(false); break;
+		if (count == 0) ImGui::TextUnformatted("No prefabs");
+		m_app.getAssetCompiler().unlockResources();
+		ImGui::ListBoxFooter();
+	}
+	ImGui::HSplitter("after_prefab", &size);
+
+	if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
+	{
+		if(m_is_align_with_normal) m_is_rotate_x = m_is_rotate_y = m_is_rotate_z = false;
+	}
+	if (ImGui::Checkbox("Rotate around X", &m_is_rotate_x))
+	{
+		if (m_is_rotate_x) m_is_align_with_normal = false;
+	}
+	if (m_is_rotate_x)
+	{
+		Vec2 tmp = m_rotate_x_spread;
+		tmp.x = radiansToDegrees(tmp.x);
+		tmp.y = radiansToDegrees(tmp.y);
+		if (ImGui::DragFloat2("Rotate X spread", &tmp.x))
+		{
+			m_rotate_x_spread.x = degreesToRadians(tmp.x);
+			m_rotate_x_spread.y = degreesToRadians(tmp.y);
+		}
+	}
+	if (ImGui::Checkbox("Rotate around Y", &m_is_rotate_y))
+	{
+		if (m_is_rotate_y) m_is_align_with_normal = false;
+	}
+	if (m_is_rotate_y)
+	{
+		Vec2 tmp = m_rotate_y_spread;
+		tmp.x = radiansToDegrees(tmp.x);
+		tmp.y = radiansToDegrees(tmp.y);
+		if (ImGui::DragFloat2("Rotate Y spread", &tmp.x))
+		{
+			m_rotate_y_spread.x = degreesToRadians(tmp.x);
+			m_rotate_y_spread.y = degreesToRadians(tmp.y);
+		}
+	}
+	if(ImGui::Checkbox("Rotate around Z", &m_is_rotate_z))
+	{
+		if(m_is_rotate_z) m_is_align_with_normal = false;
+	}
+	if (m_is_rotate_z)
+	{
+		Vec2 tmp = m_rotate_z_spread;
+		tmp.x = radiansToDegrees(tmp.x);
+		tmp.y = radiansToDegrees(tmp.y);
+		if (ImGui::DragFloat2("Rotate Z spread", &tmp.x))
+		{
+			m_rotate_z_spread.x = degreesToRadians(tmp.x);
+			m_rotate_z_spread.y = degreesToRadians(tmp.y);
+		}
+	}
+	ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
+	m_size_spread.x = minimum(m_size_spread.x, m_size_spread.y);
+	ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
+	m_y_spread.x = minimum(m_y_spread.x, m_y_spread.y);		
+}
+
+
+void TerrainEditor::onGUI()
+{
+	auto* scene = static_cast<RenderScene*>(m_component.scene);
+	ImGui::Unindent();
+	if (!ImGui::CollapsingHeader("Terrain editor")) {
+		ImGui::Indent();
+		return;
+	}
+	ImGui::Indent();
+
+	ImGuiEx::Label("Enable");
+	ImGui::Checkbox("##ed_enabled", &m_is_enabled);
+	if (!m_is_enabled) return;
+
+	if (!getMaterial())
+	{
+		ImGui::Text("No heightmap");
+		return;
+	}
+
+	bool is_grass_enabled = scene->isGrassEnabled();
+	ImGuiEx::Label("Enable grass");
+	if (ImGui::Checkbox("##enable_grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
+
+	ImGuiEx::Label("Brush size");
+	ImGui::DragFloat("##br_size", &m_terrain_brush_size, 1, MIN_BRUSH_SIZE, FLT_MAX);
+	ImGuiEx::Label("Brush strength");
+	ImGui::SliderFloat("##br_str", &m_terrain_brush_strength, 0, 1.0f);
+
+	if (ImGui::BeginTabBar("brush_type")) {
+		if (ImGui::BeginTabItem("Height")) {
+			if (getMaterial() 
+				&& getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)
+				&&ImGui::Button("Save")) 
+			{
+				getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)->save();
+			}
+			bool is_flat_tool = m_action_type == TerrainEditor::FLAT_HEIGHT;
+			if (ImGui::Checkbox("Flat", &is_flat_tool))
+			{
+				m_action_type = is_flat_tool ? TerrainEditor::FLAT_HEIGHT : TerrainEditor::RAISE_HEIGHT;
+			}
+
+			if (m_action_type == TerrainEditor::FLAT_HEIGHT)
+			{
+				ImGui::SameLine();
+				ImGui::Text("- Press Ctrl to pick height");
+			}
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Textures and grass")) {
+			layerGUI();
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Entity")) {
+			entityGUI();
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
 	}
 
 	if (!m_component.isValid() || m_action_type == NOT_SET || !m_is_enabled) {
