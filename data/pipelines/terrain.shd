@@ -27,11 +27,14 @@ texture_slot {
 
 texture_slot {
 	name = "Noise",
-	default_texture = "textures/common/white.tga"
+	default_texture = "textures/common/blue_noise.tga"
 }
 
 uniform("Detail distance", "float")
 uniform("Detail scale", "float")
+uniform("Noise UV scale", "float")
+uniform("Detail diffusion", "float")
+uniform("Detail power", "float")
 
 common [[
 	layout(binding=0) uniform sampler2D u_hm;
@@ -101,7 +104,7 @@ common [[
 		return detail;
 	}
 
-	Detail getDetail(vec2 uv_global, vec2 uv_detail) {
+	Detail getDetail(vec2 uv_global, vec2 uv_detail, float power) {
 		// TODO one noise texture
 		float r = texture(u_noise, uv_global * 256).x * 2 - 1;
 		float r2 = texture(u_noise, uv_global.yx * 256).x * 0.6 - 0.3;
@@ -110,7 +113,7 @@ common [[
 		vec2 uv = uv_global * u_hm_size + vec2(0.5);
 		vec2 xy = floor(uv);
 		vec2 uv_ratio = uv - xy;
-		uv_ratio = pow(uv_ratio, vec2(16));
+		uv_ratio = pow(uv_ratio, vec2(1));
 		vec2 uv_opposite = 1.0 - uv_ratio;
 
 		vec4 bicoef = vec4(
@@ -158,14 +161,16 @@ vertex_shader [[
 		
 		rel = saturate(abs(rel - vec2(0.5)) * 10 - 4);
 		v.xz = mix(v.xz, npos.xz, rel.yx);
-		v_uv = (v.xz + vec2(0.5 * u_terrain_scale.xz)) / u_hm_size;
+		v.xz = clamp(v.xz, vec2(0), u_hm_size.xy);
+
+		v_uv = (v.xz / (u_hm_size + 1)) + 0.5 / (u_hm_size + 1);
 		
 		// because of float precision
 		vec2 detail_uv_offset = floor(u_rel_camera_pos.xz);
  		v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
 		float h = texture(u_hm, v_uv).x * u_terrain_scale.y;
 		if (u_cell_size < 0.5) {
-			Detail d = getDetail(v_uv, v_uv_detail);
+			Detail d = getDetail(v_uv, v_uv_detail, u_detail_power);
 			float dist = max(0, length(vec4(u_position.xyz + v + vec3(0, h, 0), 1)) - 4);
 			const float detail_h_scale = 0.3 * saturate(1 - dist / 3);
 			h += d.albedo.a * detail_h_scale - detail_h_scale * 0.5;
@@ -223,14 +228,14 @@ fragment_shader [[
 		if(v_dist2 < u_detail_distance * u_detail_distance) {
 			vec2 uvx = v_uv;
 
-			float r = texture(u_noise, uvx*256).x * 2 - 1;
-			float r2 = texture(u_noise, uvx.yx*256).x * 0.6 - 0.3;
+			float r = texture(u_noise, uvx * u_noise_uv_scale * u_hm_size / u_terrain_scale.xz).x * u_detail_diffusion * 2 - u_detail_diffusion;
+			float r2 = texture(u_noise, uvx.yx * u_noise_uv_scale * u_hm_size / u_terrain_scale.xz).x * u_detail_diffusion * 2 - u_detail_diffusion;
 			uvx += vec2(r, r2) / u_hm_size;
 
-			vec2 uv = uvx * u_hm_size + vec2(0.5);
+			vec2 uv = uvx * u_hm_size / u_terrain_scale.xz;
 			vec2 xy = floor(uv);
 			vec2 uv_ratio = uv - xy;
-			uv_ratio = pow(uv_ratio, vec2(16));
+			uv_ratio = pow(uv_ratio, vec2(u_detail_power));
 			vec2 uv_opposite = 1.0 - uv_ratio;
 
 			vec4 bicoef = vec4(
@@ -242,10 +247,10 @@ fragment_shader [[
 
 			vec2 half_texel = vec2(0.5) / u_hm_size;
 
-			vec4 splat00 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(0, 0));
-			vec4 splat10 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(1, 0));
-			vec4 splat01 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(0, 1));
-			vec4 splat11 = textureLodOffset(u_splatmap, uvx - half_texel, 0, ivec2(1, 1));
+			vec4 splat00 = textureLodOffset(u_splatmap, uvx, 0, ivec2(0, 0));
+			vec4 splat10 = textureLodOffset(u_splatmap, uvx, 0, ivec2(1, 0));
+			vec4 splat01 = textureLodOffset(u_splatmap, uvx, 0, ivec2(0, 1));
+			vec4 splat11 = textureLodOffset(u_splatmap, uvx, 0, ivec2(1, 1));
 
 			float noise = texture(u_noise, 0.1 * v_uv * u_hm_size).x;
 

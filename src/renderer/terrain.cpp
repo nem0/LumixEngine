@@ -217,6 +217,7 @@ void Terrain::generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& ter
 {
 	if (m_splatmap->data.empty()) return;
 
+
 	ASSERT(quad_pos.x >= 0);
 	ASSERT(quad_pos.y >= 0);
 	ASSERT(m_splatmap->format == gpu::TextureFormat::RGBA8);

@@ -3439,31 +3439,39 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		StaticString<MAX_PATH_LENGTH> albedo_path(info.m_dir, "albedo_detail.ltc");
 		StaticString<MAX_PATH_LENGTH> normal_path(info.m_dir, "normal_detail.ltc");
 		StaticString<MAX_PATH_LENGTH> splatmap_path(info.m_dir, "splatmap.tga");
+		StaticString<MAX_PATH_LENGTH> splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
 		OS::OutputFile file;
 		if (!file.open(hm_path))
 		{
 			logError("Editor") << "Failed to create heightmap " << hm_path;
 			return false;
 		}
-		else
-		{
-			RawTextureHeader header;
-			header.width = size;
-			header.height = size;
-			header.depth = 1;
-			header.is_array = false;
-			header.channel_type = RawTextureHeader::ChannelType::U16;
-			header.channels_count = 1;
-			file.write(&header, sizeof(header));
-			u16 tmp = 0;
-			for (int i = 0; i < size * size; ++i) {
-				file.write(&tmp, sizeof(tmp));
-			}
-			file.close();
+		RawTextureHeader header;
+		header.width = size;
+		header.height = size;
+		header.depth = 1;
+		header.is_array = false;
+		header.channel_type = RawTextureHeader::ChannelType::U16;
+		header.channels_count = 1;
+		file.write(&header, sizeof(header));
+		u16 tmp = 0;
+		for (int i = 0; i < size * size; ++i) {
+			file.write(&tmp, sizeof(tmp));
 		}
+		file.close();
 		
+		if (!file.open(splatmap_meta_path)) {
+			logError("Editor") << "Failed to create meta " << splatmap_meta_path;
+			OS::deleteFile(hm_path);
+			return false;
+		}
+
+		file << "filter = \"point\"";
+		file.close();
+
 		if (!file.open(splatmap_path)) {
 			logError("Editor") << "Failed to create texture " << splatmap_path;
+			OS::deleteFile(splatmap_meta_path);
 			OS::deleteFile(hm_path);
 			return false;
 		}
@@ -3482,20 +3490,21 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			logError("Editor") << "Failed to create texture " << albedo_path;
 			OS::deleteFile(hm_path);
 			OS::deleteFile(splatmap_path);
+			OS::deleteFile(splatmap_meta_path);
 			return false;
 		}
 		file << R"#(
 			layer {
-				red = { "/textures/common/white.tga", 0 },
-				green = { "/textures/common/white.tga", 1 },
-				blue = { "/textures/common/white.tga", 2 },
-				alpha = { "/textures/common/white.tga", 3 }
+				red = { "/textures/common/red.tga", 0 },
+				green = { "/textures/common/red.tga", 1 },
+				blue = { "/textures/common/red.tga", 2 },
+				alpha = { "/textures/common/red.tga", 3 }
 			}
 			layer {
-				red = { "/textures/common/white.tga", 0 },
-				green = { "/textures/common/white.tga", 1 },
-				blue = { "/textures/common/white.tga", 2 },
-				alpha = { "/textures/common/white.tga", 3 }
+				red = { "/textures/common/green.tga", 0 },
+				green = { "/textures/common/green.tga", 1 },
+				blue = { "/textures/common/green.tga", 2 },
+				alpha = { "/textures/common/green.tga", 3 }
 			}
 		)#";
 		file.close();
@@ -3505,6 +3514,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			OS::deleteFile(albedo_path);
 			OS::deleteFile(hm_path);
 			OS::deleteFile(splatmap_path);
+			OS::deleteFile(splatmap_meta_path);
 			return false;
 		}
 		file << R"#(
@@ -3530,6 +3540,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			OS::deleteFile(albedo_path);
 			OS::deleteFile(hm_path);
 			OS::deleteFile(splatmap_path);
+			OS::deleteFile(splatmap_meta_path);
 			return false;
 		}
 
@@ -3543,6 +3554,9 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			texture "splatmap.tga"
 			uniform("Detail distance", 50.000000)
 			uniform("Detail scale", 1.000000)
+			uniform("Noise UV scale", 0.200000)
+			uniform("Detail diffusion", 0.500000)
+			uniform("Detail power", 16.000000)
 		)#";
 
 		file.close();
