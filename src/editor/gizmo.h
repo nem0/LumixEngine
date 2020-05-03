@@ -33,6 +33,7 @@ struct LUMIX_EDITOR_API Config {
 	float steps[3] = {};
 	bool is_step = false;
 	Vec3 offset = {};
+	float scale = 1.f;
 
 	bool isTranslateMode() const { return mode == TRANSLATE; }
 	bool isRotateMode() const { return mode == ROTATE; }

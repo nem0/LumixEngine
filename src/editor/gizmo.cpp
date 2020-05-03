@@ -54,10 +54,10 @@ struct ScaleGizmo {
 	DVec3 pos;
 };
 
-float getScale(const Viewport& viewport, const DVec3& pos) {
+float getScale(const Viewport& viewport, const DVec3& pos, const Gizmo::Config& cfg) {
 	if (viewport.is_ortho) return 2;
 	float scale = tanf(viewport.fov * 0.5f) * (pos - viewport.pos).toFloat().length() * 2;
-	return scale / 10;
+	return cfg.scale * scale / 10;
 }
 
 template <typename T>
@@ -66,7 +66,7 @@ T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
 	T gizmo;
 	gizmo.pos = tr->pos;
 
-	const float scale = getScale(view.getViewport(), tr->pos);
+	const float scale = getScale(view.getViewport(), tr->pos, cfg);
 	if (cfg.coord_system == Gizmo::Config::GLOBAL) {
 		gizmo.x = Vec3(scale, 0, 0);
 		gizmo.y = Vec3(0, scale, 0);
@@ -86,9 +86,9 @@ T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
 	return gizmo;
 }
 
-Axis collide(const ScaleGizmo& gizmo, const UniverseView& view) {
+Axis collide(const ScaleGizmo& gizmo, const UniverseView& view, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
-	const float scale = getScale(vp, gizmo.pos);
+	const float scale = getScale(vp, gizmo.pos, cfg);
 
 	const Vec3 pos = (gizmo.pos - vp.pos).toFloat();
 	DVec3 origin;
@@ -107,10 +107,10 @@ Axis collide(const ScaleGizmo& gizmo, const UniverseView& view) {
 	return z_dist < influenced_dist ? Axis::Z : Axis::NONE;
 }
 
-Axis collide(const RotationGizmo& gizmo, const UniverseView& view) { 
+Axis collide(const RotationGizmo& gizmo, const UniverseView& view, const Gizmo::Config& cfg) { 
 	const Viewport vp = view.getViewport();
 	const Vec3 pos = (gizmo.pos - vp.pos).toFloat();
-	const float scale = getScale(vp, gizmo.pos);
+	const float scale = getScale(vp, gizmo.pos, cfg);
 
 	DVec3 origin;
 	Vec3 dir;
@@ -366,9 +366,9 @@ void renderArc(UniverseView& view, const Vec3& pos, const Vec3& n, const Vec3& o
 	}
 }
 
-void draw(UniverseView& view, const RotationGizmo& gizmo, Axis axis, bool active, const DVec3& current) {
+void draw(UniverseView& view, const RotationGizmo& gizmo, Axis axis, bool active, const DVec3& current, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
-	const float scale = getScale(vp, gizmo.pos);
+	const float scale = getScale(vp, gizmo.pos, cfg);
 	const Vec3 rel_pos = (gizmo.pos - vp.pos).toFloat();
 
 	if (!active) {
@@ -440,9 +440,9 @@ float computeRotateAngle(UniverseView& view, const RotationGizmo& gizmo, Axis no
 	return -atan2f(x, y);
 }
 	
-void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis) {
+void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
-	const float scale = getScale(vp, gizmo.pos);
+	const float scale = getScale(vp, gizmo.pos, cfg);
 	const Vec3 rel_pos = (gizmo.pos - vp.pos).toFloat();
 
 	{
@@ -517,7 +517,7 @@ void setDragged(u64 id) {
 }
 
 bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg) {
-	const float scale = getScale(view.getViewport(), tr->pos);
+	const float scale = getScale(view.getViewport(), tr->pos, cfg);
 	TranslationGizmo gizmo = getGizmo<TranslationGizmo>(view, tr, cfg);
 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -588,15 +588,15 @@ bool scale(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& c
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
 	const bool other_is_active = !none_active && id != g_gizmo_state.dragged_id;
 	if (other_is_active) {
-		draw(view, gizmo, Axis::NONE);
+		draw(view, gizmo, Axis::NONE, cfg);
 		return false;
 	}
 
 	if (none_active) {
-		const Axis axis = collide(gizmo, view);
+		const Axis axis = collide(gizmo, view, cfg);
 		if (axis != Axis::NONE) g_gizmo_state.active_id = id;
 		else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
-		draw(view, gizmo, axis);
+		draw(view, gizmo, axis, cfg);
 		if (view.isMouseClick(OS::MouseButton::LEFT) && axis != Axis::NONE) {
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
@@ -615,7 +615,7 @@ bool scale(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& c
 	Vec3 delta = (p - g_gizmo_state.prev_point).toFloat();
 	const float sign = dotProduct(delta, (p - gizmo.pos).toFloat()) < 0 ? -1.f : 1.f;
 
-	draw(view, gizmo, g_gizmo_state.axis);
+	draw(view, gizmo, g_gizmo_state.axis, cfg);
 	if (delta.squaredLength() > 0) {
 		g_gizmo_state.prev_point = p;
 		tr->scale += delta.length() * sign;
@@ -631,15 +631,15 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
 	const bool other_is_active = !none_active && id != g_gizmo_state.dragged_id;
 	if (other_is_active) {
-		draw(view, gizmo, Axis::NONE, false, 0);
+		draw(view, gizmo, Axis::NONE, false, 0, cfg);
 		return false;
 	}
 
 	if (none_active) {
-		const Axis axis = collide(gizmo, view);
+		const Axis axis = collide(gizmo, view, cfg);
 		if (axis != Axis::NONE) g_gizmo_state.active_id = id;
 		else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
-		draw(view, gizmo, axis, false, 0);
+		draw(view, gizmo, axis, false, 0, cfg);
 		if (view.isMouseClick(OS::MouseButton::LEFT) && axis != Axis::NONE) {
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
@@ -656,7 +656,7 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 	}
 
 	const DVec3 current = getMousePlaneIntersection(view, gizmo, toPlane(g_gizmo_state.axis));
-	draw(view, gizmo, g_gizmo_state.axis, g_gizmo_state.dragged_id == id, current);
+	draw(view, gizmo, g_gizmo_state.axis, g_gizmo_state.dragged_id == id, current, cfg);
 
 	float angle = computeRotateAngle(view, gizmo, g_gizmo_state.axis);
 	if(angle != 0) {
