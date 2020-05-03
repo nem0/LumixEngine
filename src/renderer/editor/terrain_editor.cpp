@@ -1230,8 +1230,12 @@ void TerrainEditor::layerGUI() {
 
 	bool primary = m_layers_mask & 0b1;
 	bool secondary = m_layers_mask & 0b10;
-		
-	ImGuiEx::Label("Primary surface");
+
+
+	// TODO shader does not handle secondary surfaces now, so pretend they don't exist
+	// uncomment once shader is ready
+	m_layers_mask = 0xb11;
+	/*ImGuiEx::Label("Primary surface");
 	ImGui::Checkbox("##prim", &primary);
 	ImGuiEx::Label("Secondary surface");
 	ImGui::Checkbox("##sec", &secondary);
@@ -1245,7 +1249,7 @@ void TerrainEditor::layerGUI() {
 		ImGuiEx::Label("Min/max");
 			ImGui::DragFloatRange2("##minmax", &m_fixed_value.x, &m_fixed_value.y, 0.01f, 0, 1);
 		}
-	}
+	}*/
 
 	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 	if (albedo->getPath() != m_albedo_composite_path) {
