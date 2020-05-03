@@ -29,8 +29,9 @@
 #include "fbx_importer.h"
 #include "game_view.h"
 #include "renderer/culling_system.h"
-#include "renderer/gpu/gpu.h"
+#include "renderer/editor/composite_texture.h"
 #include "renderer/font.h"
+#include "renderer/gpu/gpu.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/particle_system.h"
@@ -787,159 +788,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return false;
 	}
 
-	struct TextureComposite {
-		struct ChannelSource {
-			Path path;
-			u32 src_channel = 0;
-		};
-		
-		struct Layer {
-			ChannelSource red = {{}, 0};
-			ChannelSource green = {{}, 1};
-			ChannelSource blue = {{}, 2};
-			ChannelSource alpha = {{}, 3};
-
-			ChannelSource& getChannel(u32 i) {
-				switch(i) {
-					case 0: return red;
-					case 1: return green;
-					case 2: return blue;
-					case 3: return alpha;
-					default: ASSERT(false); return red;
-				}
-			}
-		};
-
-		enum class Output {
-			BC1,
-			BC3
-		};
-
-		static TextureComposite& getThis(lua_State* L) {
-			lua_getfield(L, LUA_GLOBALSINDEX, "this");
-			TextureComposite* tc = (TextureComposite*)lua_touserdata(L, -1);
-			lua_pop(L, 1);
-			ASSERT(tc);
-			return *tc;
-		}
-
-		static ChannelSource toChannelSource(lua_State* L, int idx) {
-			ChannelSource res;
-			if (!lua_istable(L, idx)) {
-				luaL_argerror(L, 1, "unexpected form");
-			}
-			const size_t l = lua_objlen(L, idx);
-			if (l == 0) {
-				luaL_argerror(L, 1, "unexpected form");
-			}
-			lua_rawgeti(L, idx, 1);
-			if (!lua_isstring(L, -1)) {
-				luaL_argerror(L, 1, "unexpected form");
-			}
-			res.path = lua_tostring(L, -1);
-			lua_pop(L, 1);
-
-			if (l > 1) {
-				lua_rawgeti(L, idx, 2);
-				if (!lua_isnumber(L, -1)) {
-					luaL_argerror(L, 1, "unexpected form");
-				}
-				res.src_channel = (u32)lua_tointeger(L, -1);
-				lua_pop(L, 1);
-			}
-
-			return res;
-		}
-
-		static int LUA_layer(lua_State* L) {
-			LuaWrapper::DebugGuard guard(L);
-			LuaWrapper::checkTableArg(L, 1);
-			TextureComposite& that = getThis(L);
-
-			Layer& layer = that.layers.emplace();
-
-			lua_pushnil(L);
-			while (lua_next(L, 1)) {
-				const char* key = LuaWrapper::toType<const char*>(L, -2);
-				if (equalIStrings(key, "rgb")) {
-					layer.red = toChannelSource(L, -1);
-					layer.green = layer.red;
-					layer.blue = layer.red;
-					layer.red.src_channel = 0;
-					layer.green.src_channel = 1;
-					layer.blue.src_channel = 2;
-				}
-				else if (equalIStrings(key, "alpha")) {
-					layer.alpha = toChannelSource(L, -1);
-				}
-				else if (equalIStrings(key, "red")) {
-					layer.red = toChannelSource(L, -1);
-				}
-				else if (equalIStrings(key, "green")) {
-					layer.green = toChannelSource(L, -1);
-				}
-				else if (equalIStrings(key, "blue")) {
-					layer.blue = toChannelSource(L, -1);
-				}
-				else {
-					luaL_argerror(L, 1, StaticString<128>("unknown key ", key));
-				}
-				lua_pop(L, 1);
-			}
-			return 0;
-		}
-
-		static int LUA_output(lua_State* L) {
-			const char* type = LuaWrapper::checkArg<const char*>(L, 1);
-			
-			TextureComposite& that = getThis(L);
-			if (equalIStrings(type, "bc1")) {
-				that.output = Output::BC1;
-			}
-			else if (equalIStrings(type, "bc3")) {
-				that.output = Output::BC3;
-			}
-			else {
-				luaL_argerror(L, 1, "unknown value");
-			}
-			return 0;
-		}
-
-		TextureComposite(IAllocator& allocator)
-			: layers(allocator)
-		{}
-
-		bool init(Span<const u8> data, const char* src_path) {
-			layers.clear();
-			output = Output::BC1;
-
-			lua_State* L = luaL_newstate();
-			luaL_openlibs(L);
-
-			lua_pushlightuserdata(L, this);
-			lua_setfield(L, LUA_GLOBALSINDEX, "this");
-		
-			#define DEFINE_LUA_FUNC(func) \
-				lua_pushcfunction(L, TextureComposite::LUA_##func); \
-				lua_setfield(L, LUA_GLOBALSINDEX, #func); 
-
-			DEFINE_LUA_FUNC(layer)
-			DEFINE_LUA_FUNC(output)
-		
-			#undef DEFINE_LUA_FUNC
-
-			bool success = LuaWrapper::execute(L, Span((const char*)data.begin(), (const char*)data.end()), src_path, 0);
-			lua_close(L);
-			return success;
-		}
-
-		Array<Layer> layers;
-		Output output = Output::BC1;
-	};
-
 	bool createComposite(const OutputMemoryStream& src_data, OutputMemoryStream& dst, const Meta& meta, const char* src_path) {
 		IAllocator& allocator = m_app.getAllocator();
-		TextureComposite tc(allocator);
+		CompositeTexture tc(allocator);
 		if (!tc.init(Span(src_data.data(), (u32)src_data.size()), src_path)) return false;
 		struct Src {
 			stbi_uc* data;
@@ -952,7 +803,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		OutputMemoryStream tmp_src(allocator);
 		int w = -1, h = -1;
 
-		auto prepare_source =[&](const TextureComposite::ChannelSource& ch){
+		auto prepare_source =[&](const CompositeTexture::ChannelSource& ch){
 			if (!ch.path.isValid()) return false;
 			if (sources.find(ch.path.getHash()).isValid()) return true;
 
@@ -972,7 +823,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 
 		bool success = true;
-		for (TextureComposite::Layer& layer : tc.layers) {
+		for (CompositeTexture::Layer& layer : tc.layers) {
 			success = success && prepare_source(layer.red);
 			success = success && prepare_source(layer.green);
 			success = success && prepare_source(layer.blue);
@@ -1004,7 +855,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		OutputMemoryStream out_data(allocator);
 		out_data.resize(w * h * 4);
-		for (TextureComposite::Layer& layer : tc.layers) {
+		for (CompositeTexture::Layer& layer : tc.layers) {
 			const u32 idx = u32(&layer - tc.layers.begin());
 			for (u32 ch = 0; ch < 4; ++ch) {
 				const Path& p = layer.getChannel(ch).path;
@@ -1239,7 +1090,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (ImGui::CollapsingHeader("Edit")) {
 			static bool show_channels = false;
 			bool same_channels = true;
-			for (TextureComposite::Layer& layer : m_composite.layers) {
+			for (CompositeTexture::Layer& layer : m_composite.layers) {
 				if (layer.red.path != layer.green.path
 					|| layer.red.path != layer.blue.path
 					|| layer.red.path != layer.alpha.path) 
@@ -1263,7 +1114,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			else {
 				show_channels = true;
 			}
-			for (TextureComposite::Layer& layer : m_composite.layers) {
+			for (CompositeTexture::Layer& layer : m_composite.layers) {
 				const u32 idx = u32(&layer - m_composite.layers.begin());
 				if (ImGui::TreeNodeEx(&layer, 0, "%d", idx)) {
 					if (ImGui::Button("Remove")) {
@@ -1330,21 +1181,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_composite.layers.emplace();
 			}
 			if (ImGui::Button(ICON_FA_SAVE "Save")) {
-				const StaticString<MAX_PATH_LENGTH> out_path(fs.getBasePath(), "/", texture.getPath().c_str());
-				OS::OutputFile file;
-				if (file.open(out_path)) {
-					for (TextureComposite::Layer& layer : m_composite.layers) {
-						file << "layer {\n";
-						file << "\tred = { \"" << layer.red.path.c_str() << "\", " << layer.red.src_channel << " },\n";
-						file << "\tgreen = { \"" << layer.green.path.c_str() << "\", " << layer.green.src_channel << " },\n";
-						file << "\tblue = { \"" << layer.blue.path.c_str() << "\", " << layer.blue.src_channel << " },\n";
-						file << "\talpha = { \"" << layer.alpha.path.c_str() << "\", " << layer.alpha.src_channel << " },\n";
-						file << "}\n";
-					}
-					file.close();
-				}
-				else {
-					logError("Renderer") << "Failed to create " << out_path;
+				if (!m_composite.save(fs, texture.getPath())) {
+					logError("Renderer") << "Failed to save " << texture.getPath();
 				}
 			}
 			ImGui::SameLine();
@@ -1477,7 +1315,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	JobSystem::SignalHandle m_tile_signal = JobSystem::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
-	TextureComposite m_composite;
+	CompositeTexture m_composite;
 	void* m_composite_tag = nullptr;
 };
 

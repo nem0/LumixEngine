@@ -325,6 +325,7 @@ static void processEvents()
 {
 	MSG msg;
 	while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+		bool discard = false;
 		Event e;
 		e.window = msg.hwnd;
 		switch (msg.message) {
@@ -340,6 +341,9 @@ static void processEvents()
 			case WM_CLOSE: 
 				e.type = Event::Type::WINDOW_CLOSE; 
 				G.iface->onEvent(e);
+				break;
+			case WM_SYSKEYDOWN:
+				discard = msg.wParam == VK_MENU;
 				break;
 			case WM_KEYDOWN:
 				e.type = Event::Type::KEY;
@@ -431,8 +435,10 @@ static void processEvents()
 			}
 		}
 
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+		if (!discard) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
 	}
 }
 

@@ -85,6 +85,25 @@ Action::Action(const char* label_short,
 	is_selected.bind<falseConst>();
 }
 
+bool Action::shortcutText(Span<char> out) {
+	if (shortcut == OS::Keycode::INVALID && modifiers == 0) {
+		copyString(out, "");
+		return false;
+	}
+	char tmp[32];
+	OS::getKeyName(shortcut, Span(tmp));
+	
+	copyString(out, "");
+	if (modifiers & (u8)Action::Modifiers::CTRL) catString(out, "Ctrl ");
+	if (modifiers & (u8)Action::Modifiers::SHIFT) catString(out, "Shift ");
+	if (modifiers & (u8)Action::Modifiers::ALT) catString(out, "Alt ");
+	catString(out, shortcut == OS::Keycode::INVALID ? "" : tmp);
+	const i32 len = stringLength(out.m_begin);
+	if (len > 0 && out[len - 1] == ' ') {
+		out[len - 1] = '\0';
+	}
+	return true;
+}
 
 bool Action::toolbarButton(ImFont* font)
 {
@@ -93,6 +112,7 @@ bool Action::toolbarButton(ImFont* font)
 
 	if (!font_icon[0]) return false;
 
+	ImGui::SameLine();
 	if(ImGui::ToolbarButton(font, font_icon, bg_color, label_long)) {
 		func.invoke();
 		return true;
