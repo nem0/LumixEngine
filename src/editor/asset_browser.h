@@ -56,6 +56,7 @@ public:
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
 	bool resourceList(Span<char> buf, Ref<u32> selected_idx, ResourceType type, float height, bool can_create_new) const;
+	void tile(const Path& path, bool selected);
 	OutputMemoryStream* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);
 
@@ -74,13 +75,17 @@ private:
 		bool create_called = false;
 	};
 
+	struct ImmediateTile : FileInfo{
+		u32 gc_counter;
+	};
+
 private:
 	void refreshLabels();
 	void dirColumn();
 	void fileColumn();
 	void detailsGUI();
 	void createTile(FileInfo& tile, const char* out_path);
-	void thumbnail(FileInfo& tile);
+	void thumbnail(FileInfo& tile, float scale);
 	int getThumbnailIndex(int i, int j, int columns) const;
 	void doFilter();
 	void breadcrumbs();
@@ -97,6 +102,7 @@ private:
 	StaticString<MAX_PATH_LENGTH> m_dir;
 	Array<StaticString<MAX_PATH_LENGTH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
+	Array<ImmediateTile> m_immediate_tiles;
 	Array<int> m_filtered_file_infos;
 	Array<Path> m_history;
 	EntityPtr m_dropped_entity = INVALID_ENTITY;

@@ -7,6 +7,7 @@
 #include "engine/universe.h"
 #include "editor/world_editor.h"
 #include "editor/utils.h"
+#include "renderer/editor/composite_texture.h"
 
 
 namespace Lumix
@@ -23,6 +24,12 @@ struct Texture;
 struct TerrainEditor final : StudioApp::MousePlugin
 {
 public:
+	enum class Mode {
+		LAYER,
+		HEIGHT,
+		ENTITY
+	};
+
 	enum ActionType
 	{
 		RAISE_HEIGHT,
@@ -30,11 +37,7 @@ public:
 		SMOOTH_HEIGHT,
 		FLAT_HEIGHT,
 		LAYER,
-		ENTITY,
-		REMOVE_ENTITY,
-		ADD_GRASS,
-		REMOVE_GRASS,
-		NOT_SET
+		REMOVE_GRASS
 	};
 
 	TerrainEditor(WorldEditor& editor, struct StudioApp& app);
@@ -47,12 +50,13 @@ public:
 	void setComponent(ComponentUID cmp) { m_component = cmp; }
 
 private:
+	void compositeTextureRemoveLayer(const Path& path, i32 layer);
+	void saveCompositeTexture(const Path& path, const char* channel);
 	void layerGUI();
 	void entityGUI();
 	void splitSplatmap(const char* dir);
 	void mergeSplatmap(const char* dir);
 	void onUniverseDestroyed();
-	void detectModifiers();
 	void drawCursor(RenderScene& scene, EntityRef terrain, const DVec3& center);
 	Material* getMaterial() const;
 	void paint(const DVec3& hit, TerrainEditor::ActionType action_type, bool new_stroke);
@@ -68,7 +72,8 @@ private:
 private:
 	WorldEditor& m_world_editor;
 	StudioApp& m_app;
-	ActionType m_action_type;
+	Mode m_mode = Mode::HEIGHT;
+	bool m_is_flat_height = false;
 	ComponentUID m_component;
 	float m_terrain_brush_strength;
 	float m_terrain_brush_size;
@@ -96,6 +101,13 @@ private:
 	Vec2 m_rotate_x_spread;
 	Vec2 m_rotate_y_spread;
 	Vec2 m_rotate_z_spread;
+	CompositeTexture m_albedo_composite;
+	Path m_albedo_composite_path;
+
+	struct {
+		char albedo[MAX_PATH_LENGTH] = "";
+		char normal[MAX_PATH_LENGTH] = "";
+	} m_add_layer_popup;
 };
 
 

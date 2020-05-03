@@ -188,18 +188,12 @@ static void saveStyle(OS::OutputFile& file)
 
 static bool shortcutInput(Ref<Action> action, bool edit)
 {
-	char tmp[32];
-	OS::getKeyName(action->shortcut, Span(tmp));
-	
-	const char* mod0 = (action->modifiers & (u8)Action::Modifiers::CTRL) ? "CTRL " : "";
-	const char* mod1 = (action->modifiers & (u8)Action::Modifiers::SHIFT) ? "SHIFT " : "";
-	const char* mod2 = (action->modifiers & (u8)Action::Modifiers::ALT) ? "ALT " : "";
-
-	StaticString<64> button_label(mod0, mod1, mod2, action->shortcut == OS::Keycode::INVALID ? "" : tmp, "");
+	char button_label[64];
+	action->shortcutText(Span(button_label));
 
 	bool res = false;
 	ImGui::SetNextItemWidth(-30);
-	ImGui::InputText("", button_label.data, sizeof(button_label.data), ImGuiInputTextFlags_ReadOnly);
+	ImGui::InputText("", button_label, sizeof(button_label), ImGuiInputTextFlags_ReadOnly);
 	if (ImGui::IsItemActive()) {
 		if (OS::isKeyDown(OS::Keycode::SHIFT)) action->modifiers |= (u8)Action::Modifiers::SHIFT;
 		if (OS::isKeyDown(OS::Keycode::MENU)) action->modifiers |= (u8)Action::Modifiers::ALT;

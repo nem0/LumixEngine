@@ -40,6 +40,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	, m_show_subresources(true)
 	, m_history_index(-1)
 	, m_file_infos(app.getAllocator())
+	, m_immediate_tiles(app.getAllocator())
 	, m_filtered_file_infos(app.getAllocator())
 	, m_subdirs(app.getAllocator())
 {
@@ -72,6 +73,10 @@ AssetBrowser::~AssetBrowser()
 		ri->unloadTexture(info.tex);
 	}
 	m_file_infos.clear();
+	for (FileInfo& info : m_immediate_tiles) {
+		ri->unloadTexture(info.tex);
+	}
+	m_immediate_tiles.clear();
 
 	ASSERT(m_plugins.size() == 0);
 }
@@ -95,6 +100,16 @@ void AssetBrowser::unloadResources()
 void AssetBrowser::update()
 {
 	PROFILE_FUNCTION();
+
+	RenderInterface* ri = m_app.getRenderInterface();
+	for (i32 i = m_immediate_tiles.size() - 1; i >= 0; --i) {
+		u32& counter = m_immediate_tiles[i].gc_counter;
+		--counter;
+		if (counter == 0) {
+			ri->unloadTexture(m_immediate_tiles[i].tex);
+			m_immediate_tiles.swapAndPop(i);
+		}
+	}
 
 	for (auto* plugin : m_plugins) plugin->update();
 }
@@ -290,10 +305,10 @@ void AssetBrowser::createTile(FileInfo& tile, const char* out_path)
 }
 
 
-void AssetBrowser::thumbnail(FileInfo& tile)
+void AssetBrowser::thumbnail(FileInfo& tile, float size)
 {
 	ImGui::BeginGroup();
-	ImVec2 img_size((float)TILE_SIZE * m_thumbnail_size, (float)TILE_SIZE * m_thumbnail_size);
+	ImVec2 img_size(size, size);
 	RenderInterface* ri = m_app.getRenderInterface();
 	if (tile.tex)
 	{
@@ -328,7 +343,7 @@ void AssetBrowser::thumbnail(FileInfo& tile)
 	}
 	ImVec2 text_size = ImGui::CalcTextSize(tile.clamped_filename);
 	ImVec2 pos = ImGui::GetCursorPos();
-	pos.x += (TILE_SIZE * m_thumbnail_size - text_size.x) * 0.5f;
+	pos.x += (size - text_size.x) * 0.5f;
 	ImGui::SetCursorPos(pos);
 	ImGui::Text("%s", tile.clamped_filename.data);
 	ImGui::EndGroup();
@@ -385,7 +400,7 @@ void AssetBrowser::fileColumn()
 					int idx = getThumbnailIndex(i, j, columns);
 					if (idx < 0) break;
 					FileInfo& tile = m_file_infos[idx];
-					thumbnail(tile);
+					thumbnail(tile, m_thumbnail_size * TILE_SIZE);
 					callbacks(tile, idx);
 				}
 			}
@@ -926,6 +941,41 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	if (!OS::moveFile(src_full_path, dest_full_path))
 	{
 		logError("Editor") << "Could not save file " << resource.getPath().c_str();
+	}
+}
+
+void AssetBrowser::tile(const Path& path, bool selected) {
+	i32 idx = m_immediate_tiles.find([&path](const FileInfo& fi){
+		return fi.file_path_hash == path.getHash();
+	});
+	if (idx < 0) {
+		FileInfo& fi = m_immediate_tiles.emplace();
+		fi.file_path_hash = path.getHash();
+		fi.filepath = path.c_str();
+
+		char filename[MAX_PATH_LENGTH];
+		Span<const char> subres = getSubresource(path.c_str());
+		if (*subres.end()) {
+			copyNString(Span(filename), subres.begin(), subres.length());
+			catString(filename, ":");
+			const int tmp_len = stringLength(filename);
+			Path::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), path.c_str());
+		}
+		else {
+			Path::getBasename(Span(filename), path.c_str());
+		}
+		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
+		fi.clamped_filename = filename;
+		fi.create_called = false;
+		idx = m_immediate_tiles.size() - 1;
+	}
+
+	m_immediate_tiles[idx].gc_counter = 2;
+	thumbnail(m_immediate_tiles[idx], 50.f);
+	if (selected) {
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const u32 color = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+		dl->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), color, 0, 0, 3.f);
 	}
 }
 

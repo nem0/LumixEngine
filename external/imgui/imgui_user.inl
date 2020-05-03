@@ -84,7 +84,6 @@ namespace ImGui
 		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
 
 		bool ret = false;
-		ImGui::SameLine();
 		ImGui::PushFont(font);
 		if (ImGui::Button(font_icon)) {
 			ret = true;

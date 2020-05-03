@@ -760,7 +760,9 @@ struct StudioAppImpl final : StudioApp
 			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
 				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
 				ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
+			    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 				ImGui::Begin("MainDockspace", nullptr, flags);
+				ImGui::PopStyleVar();
 				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
 				ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_KeepAliveOnly);
 				ImGui::End();
@@ -771,7 +773,9 @@ struct StudioAppImpl final : StudioApp
 			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
 				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
 				ImGui::SetNextWindowPos(ImVec2((float)p.x, (float)p.y));
+			    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 				ImGui::Begin("MainDockspace", nullptr, flags);
+				ImGui::PopStyleVar();
 				mainMenu();
 				ImGuiID dockspace_id = ImGui::GetID("MyDockspace");
 				ImGui::DockSpace(dockspace_id, ImVec2(0, 0));
@@ -1650,7 +1654,7 @@ struct StudioAppImpl final : StudioApp
 			}
 			ImGui::EndMainMenuBar();
 		}
-		ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing()));
+		ImGui::Dummy(ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().FramePadding.y * 2));
 	}
 
 
