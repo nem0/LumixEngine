@@ -8,6 +8,7 @@
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
 #include "engine/os.h"
+#include "editor/gizmo.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "utils.h"
@@ -381,8 +382,9 @@ bool Settings::load()
 	m_is_properties_open = getBoolean(L, "properties_opened", false);
 	m_is_crash_reporting_enabled = getBoolean(L, "error_reporting_enabled", true);
 	enableCrashReporting(m_is_crash_reporting_enabled && !m_force_no_crash_report);
-	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.0f);
-	m_mouse_sensitivity.y = getFloat(L, "mouse_sensitivity_y", 200.0f);
+	m_app.getGizmoConfig().scale = getFloat(L, "gizmo_scale", 1.f);
+	m_mouse_sensitivity.x = getFloat(L, "mouse_sensitivity_x", 200.f);
+	m_mouse_sensitivity.y = getFloat(L, "mouse_sensitivity_y", 200.f);
 	m_app.setFOV(degreesToRadians(getFloat(L, "fov", 60)));
 	m_font_size = getInteger(L, "font_size", 13);
 
@@ -494,6 +496,7 @@ bool Settings::save()
 	writeBool("profiler_opened", m_is_profiler_open);
 	writeBool("properties_opened", m_is_properties_open);
 	writeBool("error_reporting_enabled", m_is_crash_reporting_enabled);
+	file << "gizmo_scale = " << m_app.getGizmoConfig().scale << "\n";
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
 	file << "font_size = " << m_font_size << "\n";
@@ -661,12 +664,13 @@ void Settings::onGUI()
 						enableCrashReporting(m_is_crash_reporting_enabled);
 					}
 				}
-				ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 0.1f, 500.0f);
+				ImGui::DragFloat2("Mouse sensitivity", &m_mouse_sensitivity.x, 1.f, 0.1f, 500.0f);
 				float fov = radiansToDegrees(m_app.getFOV());
 				if (ImGui::SliderFloat("FOV", &fov, 0.1f, 180)) {
 					fov = degreesToRadians(fov);
 					m_app.setFOV(fov);
 				}
+				ImGui::DragFloat("Gizmo scale", &m_app.getGizmoConfig().scale, 0.1f);
 				ImGui::EndTabItem();
 			}
 
