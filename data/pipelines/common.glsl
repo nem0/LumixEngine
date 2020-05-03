@@ -90,7 +90,7 @@ float D_GGX(float ndoth, float roughness)
 {
 	float a = roughness * roughness;
 	float a2 = a * a;
-	float f = (ndoth * ndoth) * (a2 - 1) + 1;
+	float f = max(1e-5, (ndoth * ndoth) * (a2 - 1) + 1);
 	return a2 / (f * f * M_PI);
 }
 		
@@ -122,12 +122,12 @@ vec3 PBR_ComputeDirectLight(vec3 albedo
 	vec3 F0 = vec3(0.04);
 	F0 = mix(F0, albedo, metallic);		
 	
-	float ndotv = abs( dot (N , V )) + 1e-5f;
-	vec3 H = normalize (V + L);
-	float ldoth = saturate ( dot (L , H ));
-	float ndoth = saturate ( dot (N , H ));
-	float ndotl = saturate ( dot (N , L ));
-	float hdotv = saturate ( dot (H , V ));
+	float ndotv = abs(dot(N, V)) + 1e-5f;
+	vec3 H = normalize(V + L);
+	float ldoth = saturate(dot(L, H));
+	float ndoth = saturate(dot(N, H));
+	float ndotl = saturate(dot(N, L));
+	float hdotv = saturate(dot(H, V));
 	
 	float D = D_GGX(ndoth, roughness);
 	float G = G_SmithSchlickGGX(ndotl, ndotv, roughness);
@@ -136,7 +136,7 @@ vec3 PBR_ComputeDirectLight(vec3 albedo
 	
 	vec3 kS = F;
 	vec3 kD = vec3(1.0) - kS;
-	kD *= 1.0 - metallic;	  
+	kD *= 1.0 - metallic;
 	return (kD * albedo / M_PI + specular) * light_color * ndotl;
 }	
 
