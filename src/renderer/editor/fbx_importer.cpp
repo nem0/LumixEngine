@@ -1941,11 +1941,11 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		writeMeshes(src, i, cfg);
 		writeGeometry(i);
 		const ofbx::Skin* skin = meshes[i].fbx->getGeometry()->getSkin();
-		if (!skin) {
-			write((int)0);
+		if (meshes[i].is_skinned) {
+			writeSkeleton(cfg);
 		}
 		else {
-			writeSkeleton(cfg);
+			write((i32)0);
 		}
 
 		// lods
