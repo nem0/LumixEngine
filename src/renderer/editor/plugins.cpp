@@ -1319,6 +1319,42 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void* m_composite_tag = nullptr;
 };
 
+struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
+	ModelPropertiesPlugin(StudioApp& app) : m_app(app) {}
+	
+	void update() {}
+	
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) {
+		if (cmp.type != MODEL_INSTANCE_TYPE) return;
+
+		RenderScene* scene = (RenderScene*)cmp.scene;
+		Model* model = scene->getModelInstanceModel((EntityRef)cmp.entity);
+		if (!model || !model->isReady()) return;
+
+		const i32 count = model->getMeshCount();
+		bool open = true;
+		if (count > 1) {
+			open = ImGui::TreeNodeEx("Materials", ImGuiTreeNodeFlags_DefaultOpen);
+		}
+		if (open) {
+			for (i32 i = 0; i < count; ++i) {
+				Material* material = model->getMesh(i).material;
+				if(count == 1) ImGuiEx::Label("Material");
+				
+				const float w = ImGui::GetContentRegionAvail().x - 20;
+				ImGuiEx::TextClipped(material->getPath().c_str(), w);
+				ImGui::SameLine();
+				if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
+				{
+					m_app.getAssetBrowser().selectResource(material->getPath(), true, false);
+				}
+			}
+			if(count > 1) ImGui::TreePop();
+		}
+	}
+
+	StudioApp& m_app;
+};
 
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
@@ -1796,7 +1832,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					ImGuiEx::Label("Triangle count");
 					ImGui::Text("%d", ((i32)mesh.indices.size() >> (mesh.areIndices16() ? 1 : 2))/ 3);
 					ImGuiEx::Label("Material");
-					ImGui::TextUnformatted(mesh.material->getPath().c_str());
+					const float w = ImGui::GetContentRegionAvail().x - 20;
+					ImGuiEx::TextClipped(mesh.material->getPath().c_str(), w);
 					ImGui::SameLine();
 					if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to"))
 					{
@@ -3695,10 +3732,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_shader_plugin);
 		asset_browser.addPlugin(*m_texture_plugin);
 
+		m_model_properties_plugin = LUMIX_NEW(allocator, ModelPropertiesPlugin)(m_app);
 		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(m_app);
 		m_light_probe_grid_plugin = LUMIX_NEW(allocator, LightProbeGridPlugin)(m_app);
 		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(m_app);
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
+		property_grid.addPlugin(*m_model_properties_plugin);
 		property_grid.addPlugin(*m_env_probe_plugin);
 		property_grid.addPlugin(*m_light_probe_grid_plugin);
 		property_grid.addPlugin(*m_terrain_plugin);
@@ -3866,10 +3905,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
+		property_grid.removePlugin(*m_model_properties_plugin);
 		property_grid.removePlugin(*m_env_probe_plugin);
 		property_grid.removePlugin(*m_light_probe_grid_plugin);
 		property_grid.removePlugin(*m_terrain_plugin);
 
+		LUMIX_DELETE(allocator, m_model_properties_plugin);
 		LUMIX_DELETE(allocator, m_env_probe_plugin);
 		LUMIX_DELETE(allocator, m_light_probe_grid_plugin);
 		LUMIX_DELETE(allocator, m_terrain_plugin);
@@ -3893,6 +3934,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	FontPlugin* m_font_plugin;
 	TexturePlugin* m_texture_plugin;
 	ShaderPlugin* m_shader_plugin;
+	ModelPropertiesPlugin* m_model_properties_plugin;
 	EnvironmentProbePlugin* m_env_probe_plugin;
 	LightProbeGridPlugin* m_light_probe_grid_plugin;
 	TerrainPlugin* m_terrain_plugin;
