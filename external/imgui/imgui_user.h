@@ -49,5 +49,6 @@ IMGUI_API void Rect(float w, float h, ImU32 color);
 
 namespace ImGuiEx {
 	void Label(const char* label);
+	void TextClipped(const char* text, float size);
 	bool IconButton(const char* icon, const char* tooltip);
 }
