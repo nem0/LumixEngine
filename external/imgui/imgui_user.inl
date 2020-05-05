@@ -848,6 +848,19 @@ namespace ImGuiEx {
 		return res;
 	}
 	
+	void TextClipped(const char* text, float size) {
+		ImDrawList* dl = ImGui::GetWindowDrawList();
+		const ImVec2 min = ImGui::GetCursorScreenPos();
+		ImVec2 max = min;
+		max.y += ImGui::GetTextLineHeight();
+		max.x += size;
+		ImGui::RenderTextEllipsis(dl, min, max, max.x, max.x, text, nullptr, nullptr);
+		ImRect text_rect;
+		text_rect.Min = min;
+		text_rect.Max = max;
+		ImGui::ItemSize(text_rect);
+	}
+
 	void Label(const char* label) {
 		ImGuiWindow* window = ImGui::GetCurrentWindow();
 		const ImVec2 lineStart = ImGui::GetCursorScreenPos();
