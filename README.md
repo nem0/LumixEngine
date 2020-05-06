@@ -15,7 +15,6 @@ HEAD of master is not stable, for stable version use [this](https://github.com/n
 * [Features](https://github.com/nem0/LumixEngine/wiki/Features)
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg/videos)
 * [Plugins](https://github.com/nem0/LumixEngine/wiki/available-plugins)
-* [Roadmap](https://github.com/nem0/LumixEngine/milestones)
 
 ![Editor screenshot](https://user-images.githubusercontent.com/153526/29975939-9c3db48e-8f38-11e7-80f1-2a777e7a43c8.png)
 
@@ -42,3 +41,5 @@ Project generator
 * [Genie](https://github.com/bkaradzic/genie)
 
 Contact: mikulas.florek@gamedev.sk
+[Gitter](https://gitter.im/nem0/LumixEngine)
+[Discord](https://discord.gg/RgFybs6)
