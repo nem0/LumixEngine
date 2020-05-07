@@ -3,7 +3,7 @@
 
 [![Build Status](https://github.com/nem0/lumixengine/workflows/build/badge.svg)](https://github.com/nem0/lumixengine/actions)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nem0/LumixEngine?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Discord Chat](https://img.shields.io/discord/480318777943392266.svg)](https://discord.gg/pS4kZB) 
+[![Discord Chat](https://img.shields.io/discord/480318777943392266.svg)](https://discord.gg/RgFybs6) 
 [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 [![Twitter](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/mikulasflorek)
 
