@@ -2328,14 +2328,15 @@ public:
 			if (dist - radius > cur_dist) continue;
 			
 			float intersection_t;
-			const Vec3 rel_pos = (origin - pos).toFloat();
+			Vec3 rel_pos = (origin - pos).toFloat();
 			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, Ref(intersection_t)) && intersection_t >= 0) {
 				Vec3 aabb_hit;
-				const Quat aabb_rot = universe.getRotation(entity).conjugated();
-				const Vec3 aabb_dir = aabb_rot.rotate(dir);
+				const Quat rot = universe.getRotation(entity).conjugated();
+				const Vec3 rel_dir = rot.rotate(dir);
 				const AABB& aabb = r.model->getAABB();
-				if (getRayAABBIntersection(aabb_rot.rotate(rel_pos), aabb_dir, aabb.min, aabb.max - aabb.min, Ref(aabb_hit))) {
-					RayCastModelHit new_hit = r.model->castRay(rel_pos / scale, dir, r.pose);
+				rel_pos = rot.rotate(rel_pos / scale);
+				if (getRayAABBIntersection(rel_pos, rel_dir, aabb.min, aabb.max - aabb.min, Ref(aabb_hit))) {
+					RayCastModelHit new_hit = r.model->castRay(rel_pos, rel_dir, r.pose);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
 						new_hit.entity = entity;
 						new_hit.component_type = MODEL_INSTANCE_TYPE;
@@ -2715,7 +2716,7 @@ public:
 		light.indirect_intensity = 1;
 		light.fog_color.set(1, 1, 1);
 		light.fog_density = 0;
-		light.cascades.set(3, 8, 100, 300);
+		light.cascades.set(3, 8, 20, 60);
 		light.fog_bottom = 0.0f;
 		light.fog_height = 10.0f;
 
@@ -2778,6 +2779,7 @@ public:
 		probe.flags.set(EnvironmentProbe::ENABLED);
 		probe.flags.set(EnvironmentProbe::DIFFUSE);
 		memset(probe.sh_coefs, 0, sizeof(probe.sh_coefs));
+		probe.sh_coefs[0] = Vec3(0.5f, 0.5f, 0.5f);
 
 		m_universe.onComponentCreated(entity, ENVIRONMENT_PROBE_TYPE, this);
 	}

@@ -119,6 +119,7 @@ enum class TextureFormat : u32 {
 	R16F,
 	R16,
 	R32F,
+	RG32F,
 	SRGB,
 	SRGBA
 };

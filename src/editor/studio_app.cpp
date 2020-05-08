@@ -1125,6 +1125,7 @@ struct StudioAppImpl final : StudioApp
 				setTitle(name);
 				m_editor->saveUniverse(name, true);
 				scanUniverses();
+				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine();
 			if (ImGui::Button(ICON_FA_TIMES "Cancel")) ImGui::CloseCurrentPopup();
