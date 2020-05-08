@@ -267,10 +267,8 @@ struct LUMIX_ENGINE_API Viewport
 
 
 	bool is_ortho;
-	union {
-		float fov;
-		float ortho_size;
-	};
+	float fov;
+	float ortho_size = 100.f;
 	int w;
 	int h;
 	DVec3 pos;
@@ -279,5 +277,15 @@ struct LUMIX_ENGINE_API Viewport
 	float far;
 };
 
+
+LUMIX_FORCE_INLINE Vec4 makePlane(const Vec3& normal, const Vec3& point) {
+	ASSERT(normal.squaredLength() < 1.001f);
+	ASSERT(normal.squaredLength() > 0.999f);
+	return Vec4(normal, -dotProduct(normal, point));
+}
+
+LUMIX_FORCE_INLINE float planeDist(const Vec4& plane, const Vec3& point) {
+	return plane.x * point.x + plane.y * point.y + plane.z * point.z + plane.w;
+}
 
 } // namespace Lumix

@@ -28,7 +28,25 @@ enum class Axis : u32
 	YZ
 };
 
+enum class BoxAxis : u32 {
+	XP,
+	XN,
+	YP,
+	YN,
+	ZP,
+	ZN,
+
+	NONE
+};
+
 struct {
+	struct {
+		Transform start_transform;
+		Vec3 start_half_extents;
+		DVec3 start_pos;
+		BoxAxis axis;
+	} box;
+
 	u64 frame = 0;
 	u64 last_manipulate_frame = 0;
 	u64 dragged_id = ~(u64)0;
@@ -38,6 +56,11 @@ struct {
 	DVec3 start_pos;
 	Quat start_rot;
 } g_gizmo_state;
+
+struct BoxGizmo {
+	Vec3 x, y, z;
+	DVec3 pos;
+};
 
 struct TranslationGizmo {
 	Vec3 x, y, z;
@@ -54,10 +77,47 @@ struct ScaleGizmo {
 	DVec3 pos;
 };
 
-float getScale(const Viewport& viewport, const DVec3& pos, const Gizmo::Config& cfg) {
+void renderCube(UniverseView& view, u32 color, const Vec3& pos, float scale, const Vec3& x, const Vec3& y, const Vec3& z) {
+	UniverseView::Vertex* vertices = view.render(false, 36);
+
+	UniverseView::Vertex tmp[8];
+	for (int i = 0; i < 8; ++i) tmp[i].abgr = color;
+
+	tmp[0].pos = pos + (-x - y - z) * scale;
+	tmp[1].pos = pos + (x - y - z) * scale;
+	tmp[2].pos = pos + (x - y + z) * scale;
+	tmp[3].pos = pos + (-x - y + z) * scale;
+
+	tmp[4].pos = pos + (-x + y - z) * scale;
+	tmp[5].pos = pos + (x + y - z) * scale;
+	tmp[6].pos = pos + (x + y + z) * scale;
+	tmp[7].pos = pos + (-x + y + z) * scale;
+
+	const u16 indices[36] =
+	{
+		0, 1, 2,
+		0, 2, 3,
+		4, 6, 5,
+		4, 7, 6,
+		0, 4, 5,
+		0, 5, 1,
+		2, 6, 7,
+		2, 7, 3,
+		0, 3, 7,
+		0, 7, 4,
+		1, 2, 6,
+		1, 6, 5
+	};
+
+	for (u32 i = 0; i < lengthOf(indices); ++i) {
+		vertices[i] = tmp[indices[i]];
+	}
+}
+
+float getScale(const Viewport& viewport, const DVec3& pos, float base_scale) {
 	if (viewport.is_ortho) return 2;
 	float scale = tanf(viewport.fov * 0.5f) * (pos - viewport.pos).toFloat().length() * 2;
-	return cfg.scale * scale / 10;
+	return base_scale * scale / 10;
 }
 
 template <typename T>
@@ -66,7 +126,7 @@ T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
 	T gizmo;
 	gizmo.pos = tr->pos;
 
-	const float scale = getScale(view.getViewport(), tr->pos, cfg);
+	const float scale = getScale(view.getViewport(), tr->pos, cfg.scale);
 	if (cfg.coord_system == Gizmo::Config::GLOBAL) {
 		gizmo.x = Vec3(scale, 0, 0);
 		gizmo.y = Vec3(0, scale, 0);
@@ -88,7 +148,7 @@ T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
 
 Axis collide(const ScaleGizmo& gizmo, const UniverseView& view, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
-	const float scale = getScale(vp, gizmo.pos, cfg);
+	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 
 	const Vec3 pos = (gizmo.pos - vp.pos).toFloat();
 	DVec3 origin;
@@ -110,7 +170,7 @@ Axis collide(const ScaleGizmo& gizmo, const UniverseView& view, const Gizmo::Con
 Axis collide(const RotationGizmo& gizmo, const UniverseView& view, const Gizmo::Config& cfg) { 
 	const Viewport vp = view.getViewport();
 	const Vec3 pos = (gizmo.pos - vp.pos).toFloat();
-	const float scale = getScale(vp, gizmo.pos, cfg);
+	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 
 	DVec3 origin;
 	Vec3 dir;
@@ -368,7 +428,7 @@ void renderArc(UniverseView& view, const Vec3& pos, const Vec3& n, const Vec3& o
 
 void draw(UniverseView& view, const RotationGizmo& gizmo, Axis axis, bool active, const DVec3& current, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
-	const float scale = getScale(vp, gizmo.pos, cfg);
+	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 	const Vec3 rel_pos = (gizmo.pos - vp.pos).toFloat();
 
 	if (!active) {
@@ -442,7 +502,7 @@ float computeRotateAngle(UniverseView& view, const RotationGizmo& gizmo, Axis no
 	
 void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
-	const float scale = getScale(vp, gizmo.pos, cfg);
+	const float scale = getScale(vp, gizmo.pos, cfg.scale) * 0.1f;
 	const Vec3 rel_pos = (gizmo.pos - vp.pos).toFloat();
 
 	{
@@ -462,46 +522,13 @@ void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis, const Gizmo::C
 		vertices[5].abgr = axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
 	}
 
-	auto renderCube = [scale](UniverseView& view, u32 color, const Vec3& pos) 
-	{
-		UniverseView::Vertex* vertices = view.render(false, 36);
+	const Vec3 x = gizmo.x.normalized();
+	const Vec3 y = gizmo.y.normalized();
+	const Vec3 z = gizmo.z.normalized();
 
-		UniverseView::Vertex tmp[8];
-		for (int i = 0; i < 8; ++i) tmp[i].abgr = color;
-
-		tmp[0].pos = pos + Vec3(-0.1f, -0.1f, -0.1f) * scale;
-		tmp[1].pos = pos + Vec3(0.1f, -0.1f, -0.1f) * scale;
-		tmp[2].pos = pos + Vec3(0.1f, -0.1f, 0.1f) * scale;
-		tmp[3].pos = pos + Vec3(-0.1f, -0.1f, 0.1f) * scale;
-
-		tmp[4].pos = pos + Vec3(-0.1f, 0.1f, -0.1f) * scale;
-		tmp[5].pos = pos + Vec3(0.1f, 0.1f, -0.1f) * scale;
-		tmp[6].pos = pos + Vec3(0.1f, 0.1f, 0.1f) * scale;
-		tmp[7].pos = pos + Vec3(-0.1f, 0.1f, 0.1f) * scale;
-
-		const u16 indices[36] =
-		{
-			0, 1, 2,
-			0, 2, 3,
-			4, 6, 5,
-			4, 7, 6,
-			0, 4, 5,
-			0, 5, 1,
-			2, 6, 7,
-			2, 7, 3,
-			0, 3, 7,
-			0, 7, 4,
-			1, 2, 6,
-			1, 6, 5
-		};
-
-		for (u32 i = 0; i < lengthOf(indices); ++i) {
-			vertices[i] = tmp[indices[i]];
-		}
-	};
-	renderCube(view, axis == Axis::X ? SELECTED_COLOR : X_COLOR, rel_pos + gizmo.x);
-	renderCube(view, axis == Axis::Y ? SELECTED_COLOR : Y_COLOR, rel_pos + gizmo.y);
-	renderCube(view, axis == Axis::Z ? SELECTED_COLOR : Z_COLOR, rel_pos + gizmo.z);
+	renderCube(view, axis == Axis::X ? SELECTED_COLOR : X_COLOR, rel_pos + gizmo.x, scale, x, y, z);
+	renderCube(view, axis == Axis::Y ? SELECTED_COLOR : Y_COLOR, rel_pos + gizmo.y, scale, x, y, z);
+	renderCube(view, axis == Axis::Z ? SELECTED_COLOR : Z_COLOR, rel_pos + gizmo.z, scale, x, y, z);
 }
 
 void frame() {
@@ -517,7 +544,7 @@ void setDragged(u64 id) {
 }
 
 bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg) {
-	const float scale = getScale(view.getViewport(), tr->pos, cfg);
+	const float scale = getScale(view.getViewport(), tr->pos, cfg.scale);
 	TranslationGizmo gizmo = getGizmo<TranslationGizmo>(view, tr, cfg);
 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -686,6 +713,149 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 
 
 bool isActive() { return g_gizmo_state.active_id != ~(u64)0 || g_gizmo_state.dragged_id != ~(u64)0; }
+
+
+bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, const Config& cfg, bool keep_center) {
+	id |= u64(0xff) << 56;
+	const Vec3 xn = tr->rot.rotate(Vec3(1, 0, 0));
+	const Vec3 yn = tr->rot.rotate(Vec3(0, 1, 0));
+	const Vec3 zn = tr->rot.rotate(Vec3(0, 0, 1));
+	const Vec3 x = xn * half_extents->x;
+	const Vec3 y = yn * half_extents->y;
+	const Vec3 z = zn * half_extents->z;
+	addCube(view, tr->pos, x, y, z, Color::BLUE);
+	
+	const Viewport vp = view.getViewport();
+	const float scale = getScale(vp, tr->pos, cfg.scale) * 0.1f;
+
+	DVec3 origin;
+	Vec3 dir;
+	const Vec2 mp = view.getMousePos();
+	vp.getRay(mp, origin, dir);
+	u32 xp_color = X_COLOR;
+	u32 xn_color = X_COLOR;
+	u32 yp_color = X_COLOR;
+	u32 yn_color = X_COLOR;
+	u32 zp_color = X_COLOR;
+	u32 zn_color = X_COLOR;
+	
+	const Vec3 pos = (origin - tr->pos).toFloat();
+	const Vec3 center = (tr->pos - vp.pos).toFloat();
+	auto cube = [&](u32 color, Vec3 p, Ref<float> prev_t){
+		float t;
+		if (getRaySphereIntersection(pos, dir, p, scale * 1.414f, Ref(t)) && (prev_t.value < 0 || t < prev_t.value)) {
+			renderCube(view, SELECTED_COLOR, center + p, scale, xn, yn, zn);
+			UniverseView::Vertex* line = view.render(true, 2);
+			line[0].pos = center;
+			line[0].abgr = color;
+			line[1].pos = center + 2 * p;
+			line[1].abgr = color;
+			prev_t = t;
+			return true;
+		}
+		renderCube(view, color, center + p, scale, xn, yn, zn);
+		return false;
+	};
+
+	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
+	const bool other_is_active = !none_active && id != g_gizmo_state.dragged_id;
+	if (other_is_active) return false;
+
+	BoxAxis axis = BoxAxis::NONE;
+	float t = -1;
+	if (cube(X_COLOR, x, Ref(t))) axis = BoxAxis::XP;
+	if (cube(X_COLOR, -x, Ref(t))) axis = BoxAxis::XN;
+	if (cube(Y_COLOR, y, Ref(t))) axis = BoxAxis::YP;
+	if (cube(Y_COLOR, -y, Ref(t))) axis = BoxAxis::YN;
+	if (cube(Z_COLOR, z, Ref(t))) axis = BoxAxis::ZP;
+	if (cube(Z_COLOR, -z, Ref(t))) axis = BoxAxis::ZN;
+
+	if (axis != BoxAxis::NONE) g_gizmo_state.active_id = id;
+	BoxGizmo gizmo = getGizmo<BoxGizmo>(view, tr, cfg);
+	if (view.isMouseClick(OS::MouseButton::LEFT) && t >= 0) {
+		switch(axis) {
+			case BoxAxis::XP:
+			case BoxAxis::XN:
+				g_gizmo_state.axis = Axis::X;
+				break;
+			case BoxAxis::YP:
+			case BoxAxis::YN:
+				g_gizmo_state.axis = Axis::Y;
+				break;
+			case BoxAxis::ZP:
+			case BoxAxis::ZN:
+				g_gizmo_state.axis = Axis::Z;
+				break;
+		}
+		g_gizmo_state.box.axis = axis;
+		g_gizmo_state.box.start_transform = tr;
+		g_gizmo_state.box.start_half_extents = half_extents;
+		g_gizmo_state.box.start_pos = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
+		g_gizmo_state.dragged_id = id;
+	}
+
+	if (none_active) return false;
+
+	if (!view.isMouseDown(OS::MouseButton::LEFT)) {
+		g_gizmo_state.dragged_id = ~(u64)0;
+		g_gizmo_state.axis = Axis::NONE;
+		return false;
+	}
+
+	const Vec3 diff = (getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis) - g_gizmo_state.box.start_pos).toFloat();
+	switch (g_gizmo_state.box.axis) {
+		case BoxAxis::XN:
+		case BoxAxis::XP: {
+			const float sign = g_gizmo_state.box.axis == BoxAxis::XN ? -1.f : 1.f;
+			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - xn *  g_gizmo_state.box.start_half_extents.x * sign;
+			if (keep_center) {
+				const float half = g_gizmo_state.box.start_half_extents.x + dotProduct(diff, xn) * sign;
+				half_extents->x = half;
+			}
+			else {
+				const float half = g_gizmo_state.box.start_half_extents.x + dotProduct(diff, xn) * 0.5f * sign;
+				const DVec3 c = e0 + xn * half * sign;
+				tr->pos = c;
+				half_extents->x = half;
+			}
+			return true;
+		}
+		case BoxAxis::YN:
+		case BoxAxis::YP: {
+			const float sign = g_gizmo_state.box.axis == BoxAxis::YN ? -1.f : 1.f;
+			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - yn *  g_gizmo_state.box.start_half_extents.y * sign;
+			if (keep_center) {
+				const float half = g_gizmo_state.box.start_half_extents.y + dotProduct(diff, yn) * sign;
+				half_extents->y = half;
+			}
+			else {
+				const float half = g_gizmo_state.box.start_half_extents.y + dotProduct(diff, yn) * 0.5f * sign;
+				const DVec3 c = e0 + yn * half * sign;
+				tr->pos = c;
+				half_extents->y = half;
+			}
+			return true;
+		}
+		case BoxAxis::ZN:
+		case BoxAxis::ZP: {
+			const float sign = g_gizmo_state.box.axis == BoxAxis::ZN ? -1.f : 1.f;
+			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - zn *  g_gizmo_state.box.start_half_extents.z * sign;
+			if (keep_center) {
+				const float half = g_gizmo_state.box.start_half_extents.z + dotProduct(diff, zn) * sign;
+				half_extents->z = half;
+			}
+			else {
+				const float half = g_gizmo_state.box.start_half_extents.z + dotProduct(diff, zn) * 0.5f * sign;
+				const DVec3 c = e0 + zn * half * sign;
+				tr->pos = c;
+				half_extents->z = half;
+			}
+			return true;
+		}
+	}
+
+	return false;
+}
 
 
 bool manipulate(u64 id, UniverseView& view, Ref<Transform> tr, const Config& cfg) {

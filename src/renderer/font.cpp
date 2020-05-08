@@ -63,12 +63,12 @@ struct ToChar {
 static void blit(FT_Bitmap* bitmap,  Array<u8>* out) {
 	ASSERT(bitmap->pixel_mode == FT_PIXEL_MODE_GRAY);
 	const u32 offset = out->size();
-    const u32 src_pitch = bitmap->pitch;
+	const u32 src_pitch = bitmap->pitch;
 	const u8* src = bitmap->buffer;
 	u8* dst = out->begin() + offset;
 	out->resize(out->size() + bitmap->width * bitmap->rows);
-    for (u32 y = 0; y < bitmap->rows; ++y, src += src_pitch, dst += bitmap->width) {
-        memcpy(dst, src, bitmap->width);
+	for (u32 y = 0; y < bitmap->rows; ++y, src += src_pitch, dst += bitmap->width) {
+		memcpy(dst, src, bitmap->width);
 	}
 }
 
@@ -137,12 +137,12 @@ bool FontManager::build()
 		}
 	
 		FT_Size_RequestRec size_req;
-        size_req.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;
-        size_req.width = 0;
-        size_req.height = (u32)font->font_size * 64;
-        size_req.horiResolution = 0;
-        size_req.vertResolution = 0;
-        error = FT_Request_Size(face, &size_req);
+		size_req.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;
+		size_req.width = 0;
+		size_req.height = (u32)font->font_size * 64;
+		size_req.horiResolution = 0;
+		size_req.vertResolution = 0;
+		error = FT_Request_Size(face, &size_req);
 		if (error != 0) {
 			logError("Renderer") << "Failed to request font size " << font->font_size << " for " << font->resource->getPath();
 			continue;

@@ -266,6 +266,12 @@ namespace Lumix
 					eraseAt(i);
 				}
 			}
+			Span<Value> values() const {
+				Span<Value> res;
+				res.m_begin = m_values;
+				res.m_end = m_values + m_size;
+				return res;
+			}
 
 			Span<Key> keys() const { 
 				Span<Key> res;

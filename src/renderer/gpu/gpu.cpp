@@ -883,6 +883,17 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 	CHECK_GL(glBindTextures(offset, count, gl_handles));
 }
 
+void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, u32 offset, u32 size)
+{
+	checkThread();
+	if(buffer.isValid()) {
+		const GLuint gl_handle = g_gpu.buffers[buffer.value].handle;
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding_idx, gl_handle, offset, size);
+	}
+	else {
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding_idx, 0, 0, 0);
+	}
+}
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset) {
 	checkThread();
@@ -1126,6 +1137,7 @@ void unmap(BufferHandle buffer)
 	const GLuint buf = g_gpu.buffers[buffer.value].handle;
 	CHECK_GL(glUnmapNamedBuffer(buf));
 }
+
 
 void update(BufferHandle buffer, const void* data, size_t size)
 {
@@ -1895,6 +1907,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		const GLuint shd = glCreateShader(shader_type);
 		combined_srcs[0] = R"#(
 			#version 140
+			#extension GL_ARB_shader_storage_buffer_object : enable
 			#extension GL_ARB_explicit_attrib_location : enable
 			#extension GL_ARB_shading_language_420pack : enable
 			#extension GL_ARB_separate_shader_objects : enable

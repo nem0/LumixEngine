@@ -111,7 +111,8 @@ struct EnvironmentProbe
 
 	Texture* reflection = nullptr;
 	Texture* radiance = nullptr;
-	Vec3 half_extents;
+	Vec3 inner_range;
+	Vec3 outer_range;
 	u64 guid;
 	FlagSet<Flags, u32> flags;
 	int radiance_size = 128;
@@ -328,11 +329,11 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
 
-	virtual Span<EntityRef> getAllEnvironmentProbes() = 0;
+	virtual Span<EntityRef> getEnvironmentProbesEntities() = 0;
 	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
-	virtual void getEnvironmentProbes(Array<EnvProbeInfo>& probes) = 0;
+	virtual Span<const EnvironmentProbe> getEnvironmentProbes() = 0;
 	virtual bool isEnvironmentProbeReflectionEnabled(EntityRef entity) = 0;
 	virtual void enableEnvironmentProbeReflection(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeSpecular(EntityRef entity) = 0;

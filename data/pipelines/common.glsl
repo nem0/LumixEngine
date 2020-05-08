@@ -3,6 +3,45 @@
 
 layout (binding=15) uniform samplerCube u_radiancemap;
 
+struct Probe {
+	vec4 pos;
+	vec4 rot;
+	vec4 inner_range;
+	vec4 outer_range;
+	vec4 sh_coefs[9];
+};
+
+struct Light {
+	vec4 pos_radius;
+	vec4 color_attn;
+};
+
+struct Cluster {
+	int offset;
+	int lights_count;
+	int probes_count;
+};
+
+layout(std430, binding = 0) buffer lights
+{
+	Light b_lights[];
+};
+
+layout(std430, binding = 1) buffer clusters
+{
+	Cluster b_clusters[];
+};
+	
+layout(std430, binding = 2) buffer cluster_maps
+{
+	int b_cluster_map[];
+};
+
+layout(std430, binding = 3) buffer probes
+{
+	Probe b_probes[];
+};
+
 struct PixelData {
 	vec4 albedo;
 	float roughness;
@@ -44,6 +83,38 @@ float shadowmapValue(float frag_z)
 	return exp(38 / 5000.0 * (u_shadow_near_plane - frag_z * (u_shadow_near_plane - u_shadow_far_plane)));
 }
 
+// TODO optimize
+float toLinearDepth(mat4 inv_proj, float ndc_depth)
+{
+	vec4 pos_proj = vec4(0, 0, ndc_depth, 1.0);
+	
+	vec4 view_pos = inv_proj * pos_proj;
+	
+	return -view_pos.z / view_pos.w;
+}
+
+int getClusterIndex(ivec2 fragcoord, float ndc_depth, out ivec3 cluster)
+{
+	cluster = ivec3(fragcoord.xy / 64, 0);
+	float linear_depth = toLinearDepth(u_camera_inv_projection, ndc_depth);
+	cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
+	ivec2 tiles = (u_framebuffer_size + 63) / 64;
+	cluster.y = tiles.y - 1 - cluster.y;
+	return cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
+}
+
+vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord, out float ndc_depth)
+{
+	float z = texture(depth_buffer, tex_coord).r;
+	#ifdef _ORIGIN_BOTTOM_LEFT
+		vec4 pos_proj = vec4(vec2(tex_coord.x, tex_coord.y) * 2 - 1, z, 1.0);
+	#else 
+		vec4 pos_proj = vec4(vec2(tex_coord.x, 1-tex_coord.y) * 2 - 1, z, 1.0);
+	#endif
+	vec4 view_pos = inv_view_proj * pos_proj;
+	ndc_depth = z;
+	return view_pos.xyz / view_pos.w;
+}
 
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 {

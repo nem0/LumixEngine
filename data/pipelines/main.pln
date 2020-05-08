@@ -1,5 +1,6 @@
 local direct_shader = preloadShader("pipelines/direct.shd")
 local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
+local debug_clusters_shader = preloadShader("pipelines/debug_clusters.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local indirect_shader =  preloadShader("pipelines/indirect.shd")
 local light_probe_grid_shader =  preloadShader("pipelines/light_probe_grid.shd")
@@ -8,7 +9,10 @@ local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
 local debug_shadowmap = false
 local debug_normal = false
+local debug_roughness = false
+local debug_metallic = false
 local debug_albedo = false
+local debug_clusters = false
 local screenshot_request = 0
 local enable_icons = true
 
@@ -102,7 +106,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	
 	local view_params = getCameraParams()
 
-	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
+	--[[if PROBE_BOUNCE == nil or PROBE_BOUNCE then
 		beginBlock("indirect diffuse")
 			beginBlock("weights")
 				local wrb = createRenderbuffer(1, 1, true, "r16f", "indirect_weights")
@@ -162,7 +166,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 			}, 0)
 			renderLightProbeGrids(light_probe_grid_shader, view_params);
 		endBlock()
-	end
+	end]]--
 	
 	beginBlock("direct")
 	drawArray(0, 4, direct_shader,
@@ -188,6 +192,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 
 	endBlock()
 	
+	--[[
 	beginBlock("local_lights")
 	bindRenderbuffers({
 		gbuffer0,
@@ -198,16 +203,27 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	}, 0)
 	renderLocalLights("", local_light_shader, local_light_set)
 	endBlock()
+	]]--
 
 	return hdr_rb
 end
 
-function debugRenderbuffer(rb, output, channel_mask)
+function debugClusters(gb_depth, output)
+	setRenderTargets(output)
+	drawArray(0, 4, debug_clusters_shader
+		, { gb_depth }
+		, {}
+		, {}
+		, { depth_test = false });
+end
+
+
+function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 	setRenderTargets(output)
 	
 	drawArray(0, 4, textured_quad_shader
 		, { rb }
-		, { { 0, 0, 1, 1 }, channel_mask }
+		, { { 0, 0, 1, 1 }, r_mask, g_mask, b_mask, a_mask, offsets }
 		, {}
 		, { depth_test = false });
 end
@@ -300,13 +316,22 @@ end
 
 function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	if debug_shadowmap then
-		debugRenderbuffer(shadowmap, output, {1, 1, 1, 1})
+		debugRenderbuffer(shadowmap, output, {1, 0, 0, 0}, {1, 0, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
 	if debug_normal then
-		debugRenderbuffer(gb1, output, {1, 1, 0, 0})
+		debugRenderbuffer(gb1, output, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
 	if debug_albedo then
-		debugRenderbuffer(gb0, output, {1, 1, 1, 0})
+		debugRenderbuffer(gb0, output, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
+	end
+	if debug_roughness then
+		debugRenderbuffer(gb0, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
+	end
+	if debug_metallic then
+		debugRenderbuffer(gb1, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
+	end
+	if debug_clusters then
+		debugClusters(gb_depth, output)
 	end
 end
 
@@ -340,6 +365,11 @@ function main()
 		}
 	)
 
+	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
+		fillClusters(view_params)
+	else
+		fillClusters()
+	end
 	
 	local shadowmap = shadowPass()
 	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set)
@@ -434,6 +464,9 @@ function onGUI()
 		changed, debug_shadowmap = ImGui.Checkbox("Shadowmap", debug_shadowmap)
 		changed, debug_albedo = ImGui.Checkbox("Albedo", debug_albedo)
 		changed, debug_normal = ImGui.Checkbox("Normal", debug_normal)
+		changed, debug_roughness = ImGui.Checkbox("Roughness", debug_roughness)
+		changed, debug_metallic = ImGui.Checkbox("Metallic", debug_metallic)
+		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
 		ImGui.EndPopup()

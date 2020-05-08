@@ -503,7 +503,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		Array<Skin> skinning(allocator);
 		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
 
-		AABB aabb = {{0, 0, 0}, {0, 0, 0}};
+		AABB aabb = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
 		float radius_squared = 0;
 
 		int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
@@ -1483,7 +1483,6 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 
 void FBXImporter::writeGeometry(int mesh_idx)
 {
-	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
 	float radius_squared = 0;
 	OutputMemoryStream vertices_blob(allocator);
 	const ImportMesh& import_mesh = meshes[mesh_idx];
@@ -1508,16 +1507,13 @@ void FBXImporter::writeGeometry(int mesh_idx)
 		write(import_mesh.indices.size());
 		write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 	}
-	aabb.merge(import_mesh.aabb);
 	radius_squared = maximum(radius_squared, import_mesh.radius_squared);
 
 	write((i32)import_mesh.vertex_data.size());
 	write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
 
-	write(sqrtf(radius_squared) * bounding_shape_scale);
-	aabb.min *= bounding_shape_scale;
-	aabb.max *= bounding_shape_scale;
-	write(aabb);
+	write(sqrtf(radius_squared));
+	write(import_mesh.aabb);
 }
 
 
@@ -1572,9 +1568,9 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 		writeImpostorVertices(aabb);
 	}
 
-	write(sqrtf(radius_squared) * bounding_shape_scale);
-	aabb.min *= bounding_shape_scale;
-	aabb.max *= bounding_shape_scale;
+	write(sqrtf(radius_squared));
+	aabb.min;
+	aabb.max;
 	write(aabb);
 }
 

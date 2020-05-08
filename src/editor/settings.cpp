@@ -645,8 +645,7 @@ void Settings::onGUI()
 		if (ImGui::Button(ICON_FA_REDO_ALT "Reload")) load();
 		ImGui::SameLine();
 		ImGui::TextDisabled("(?)");
-		if (ImGui::IsItemHovered())
-		{
+		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("%s", "Settings are saved in studio.ini when the application closes");
 		}
 
