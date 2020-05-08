@@ -50,6 +50,7 @@ struct LUMIX_EDITOR_API Config {
 };
 
 LUMIX_EDITOR_API bool manipulate(u64 id, UniverseView& view, Ref<Transform> tr, const Config& cfg);
+LUMIX_EDITOR_API bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, const Config& cfg, bool keep_center);
 LUMIX_EDITOR_API void setDragged(u64 id);
 LUMIX_EDITOR_API bool isActive();
 LUMIX_EDITOR_API void frame();

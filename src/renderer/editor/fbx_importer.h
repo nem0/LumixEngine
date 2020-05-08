@@ -177,7 +177,6 @@ private:
 	ofbx::IScene* scene;
 	OutputMemoryStream out_file;
 	float time_scale = 1.0f;
-	float bounding_shape_scale = 1.0f;
 	bool cancel_mesh_transforms = false;
 	bool ignore_skeleton = false;
 	bool import_vertex_colors = true;

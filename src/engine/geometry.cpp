@@ -592,6 +592,7 @@ void Viewport::getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const
 	p1 *= 1 / p1.w;
 	dir = (p1 - p0).xyz();
 	dir.normalize();
+	if (is_ortho) dir *= -1.f;
 }
 
 

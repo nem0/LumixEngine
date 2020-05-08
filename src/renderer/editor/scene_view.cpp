@@ -73,7 +73,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_viewport.h = -1;
 		m_viewport.fov = view.m_app.getFOV();
 		m_viewport.near = 0.1f;
-		m_viewport.far = 100000.f;
+		m_viewport.far = 10000.f;
 
 		ResourceManagerHub& rm = m_editor.getEngine().getResourceManager();
 		Path font_path("editor/fonts/NotoSans-Regular.ttf");
@@ -395,7 +395,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_scene_view.m_orbit_action->isActive() && !selected_entities.empty()) {
+		if (!selected_entities.empty()) {
 			auto* universe = m_editor.getUniverse();
 			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 10, 0);
 		}
@@ -410,7 +410,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_scene_view.m_orbit_action->isActive() && !selected_entities.empty()) {
+		if (!selected_entities.empty()) {
 			auto* universe = m_editor.getUniverse();
 			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(0, 0, -10);
 		}
@@ -426,7 +426,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from = m_viewport.pos;
 		m_go_to_parameters.m_to = m_go_to_parameters.m_from;
 		const Array<EntityRef>& selected_entities = m_editor.getSelectedEntities();
-		if (m_scene_view.m_orbit_action->isActive() && !selected_entities.empty()) {
+		if (!selected_entities.empty()) {
 			auto* universe = m_editor.getUniverse();
 			m_go_to_parameters.m_to = universe->getPosition(selected_entities[0]) + Vec3(-10, 0, 0);
 		}
@@ -485,7 +485,9 @@ struct UniverseViewImpl final : UniverseView {
 			m_rect_selection_timer += time_delta;
 		}
 
-		m_viewport.fov = m_scene_view.m_app.getFOV();
+		if (!m_viewport.is_ortho) {
+			m_viewport.fov = m_scene_view.m_app.getFOV();
+		}
 		previewSnapVertex();
 		
 		if (m_is_mouse_down[(int)OS::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT) {
@@ -1126,13 +1128,25 @@ void SceneView::onToolbar()
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", "Snap amount");
 
-	ImGui::SameLine(0, 20);
+	ImGui::SameLine();
+	Viewport vp = m_view->getViewport();
+	if (ImGui::Checkbox("Ortho", &vp.is_ortho)) {
+		m_view->setViewport(vp);
+	}
+	if (vp.is_ortho) {
+		ImGui::SameLine();
+		if (ImGui::DragFloat("Ortho size", &vp.ortho_size)) {
+			m_view->setViewport(vp);
+		}
+	}
+
+	ImGui::SameLine(0);
 	ImGui::Checkbox("Stats", &m_show_stats);
 
-	ImGui::SameLine(0, 20);
+	ImGui::SameLine(0);
 	m_pipeline->callLuaFunction("onGUI");
 
-	ImGui::SameLine(0, 20);
+	ImGui::SameLine(0);
 	ImGui::Checkbox("Measure", &m_is_measure_active);
 
 	if (m_is_measure_active) {

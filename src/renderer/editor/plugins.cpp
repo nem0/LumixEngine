@@ -3,6 +3,7 @@
 #include "animation/animation.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/gizmo.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
 #include "editor/settings.h"
@@ -1245,6 +1246,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
 		}
 
+		bool is_dds = Path::hasExtension(texture->getPath().c_str(), "dds");
 		if (Path::hasExtension(texture->getPath().c_str(), "ltc")) compositeGUI(*texture);
 		if (ImGui::CollapsingHeader("Import")) {
 			AssetCompiler& compiler = m_app.getAssetCompiler();
@@ -1273,8 +1275,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGuiEx::Label("Coverage alpha ref");
 				ImGui::SliderFloat("##covaref", &m_meta.scale_coverage, 0, 1);
 			}
-			ImGuiEx::Label("Is normalmap");
-			ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap);
+			if (!is_dds) {
+				ImGuiEx::Label("Is normalmap (?)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("%s", "Saved as DXT5 R=1, G=y, B=0, A=x");
+				}
+				ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap);
+			}
+
 			ImGuiEx::Label("U Wrap mode");
 			ImGui::Combo("##uwrp", (int*)&m_meta.wrap_mode_u, "Repeat\0Clamp\0");
 			ImGuiEx::Label("V Wrap mode");
@@ -1512,7 +1520,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		RenderScene* render_scene = (RenderScene*)m_tile.universe->getScene(MODEL_INSTANCE_TYPE);
 		const EntityRef env_probe = m_tile.universe->createEntity({0, 0, 0}, Quat::IDENTITY);
 		m_tile.universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
-		render_scene->getEnvironmentProbe(env_probe).half_extents = Vec3(1e3);
+		render_scene->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
+		render_scene->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
@@ -1540,7 +1549,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const EntityRef env_probe = m_universe->createEntity({0, 0, 0}, Quat::IDENTITY);
 		m_universe->createComponent(ENVIRONMENT_PROBE_TYPE, env_probe);
-		render_scene->getEnvironmentProbe(env_probe).half_extents = Vec3(1e3);
+		render_scene->getEnvironmentProbe(env_probe).inner_range = Vec3(1e3);
+		render_scene->getEnvironmentProbe(env_probe).outer_range = Vec3(1e3);
 
 		Matrix mtx;
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
@@ -2772,7 +2782,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		m_pipeline->define("PROBE_BOUNCE", bounce);
 
 		auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
-		const Span<EntityRef> probes = scene->getAllEnvironmentProbes();
+		const Span<EntityRef> probes = scene->getEnvironmentProbesEntities();
 		m_probes.reserve(probes.length());
 		IAllocator& allocator = m_app.getAllocator();
 		for (EntityRef p : probes) {
@@ -2981,6 +2991,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			if (ImGui::CollapsingHeader("Generator")) {
 				ImGui::Checkbox("Fast filter", &m_fast_filter);
 				if (ImGui::Button("Generate")) generateCubemaps(false, m_fast_filter);
+				ImGui::SameLine();
 				if (ImGui::Button("Add bounce")) generateCubemaps(true, m_fast_filter);
 			}
 		}
@@ -3764,10 +3775,37 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 		const Universe& universe = scene->getUniverse();
 		EntityRef e = (EntityRef)cmp.entity;
-		const EnvironmentProbe& p = scene->getEnvironmentProbe(e);
+		EnvironmentProbe& p = scene->getEnvironmentProbe(e);
+		Transform tr = universe.getTransform(e);
 		const DVec3 pos = universe.getPosition(e);
+		const Quat rot = universe.getRotation(e);
 
-		addCube(view, pos - p.half_extents, pos + p.half_extents, Color::BLUE);
+		/*Vec3 x = rot.rotate(Vec3(p.outer_range.x, 0, 0));
+		Vec3 y = rot.rotate(Vec3(0, p.outer_range.y, 0));
+		Vec3 z = rot.rotate(Vec3(0, 0, p.outer_range.z));
+
+		addCube(view, pos, x, y, z, Color::BLUE);
+
+		x = rot.rotate(Vec3(p.inner_range.x, 0, 0));
+		y = rot.rotate(Vec3(0, p.inner_range.y, 0));
+		z = rot.rotate(Vec3(0, 0, p.inner_range.z));
+
+		addCube(view, pos, x, y, z, Color::BLUE);*/
+
+		const Gizmo::Config& cfg = m_app.getGizmoConfig();
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 33), view, Ref(tr), Ref(p.inner_range), cfg, true)) {
+			editor.beginCommandGroup(crc32("env_probe_inner_range"));
+			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Inner range", Span(&e, 1), p.inner_range);
+			editor.setEntitiesPositions(&e, &tr.pos, 1);
+			editor.endCommandGroup();
+		}
+		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, Ref(tr), Ref(p.outer_range), cfg, false)) {
+			editor.beginCommandGroup(crc32("env_probe_outer_range"));
+			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Outer range", Span(&e, 1), p.outer_range);
+			editor.setEntitiesPositions(&e, &tr.pos, 1);
+			editor.endCommandGroup();
+		}
 	}
 
 	void showPointLightGizmo(UniverseView& view, ComponentUID light)

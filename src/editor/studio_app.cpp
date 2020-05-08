@@ -1186,6 +1186,12 @@ struct StudioAppImpl final : StudioApp
 	
 	void setCursorCaptured(bool captured) override { m_cursor_captured = captured; }
 
+	void toggleProjection() { 
+		Viewport vp = m_editor->getView().getViewport(); 
+		vp.is_ortho = !vp.is_ortho;
+		m_editor->getView().setViewport(vp); 
+	}
+
 	void undo() { m_editor->undo(); }
 	void redo() { m_editor->redo(); }
 	void copy() { m_editor->copyEntities(); }
@@ -1469,6 +1475,7 @@ struct StudioAppImpl final : StudioApp
 		doMenuItem(*getAction("setGlobalCoordSystem"), true);
 		if (ImGui::BeginMenu(ICON_FA_CAMERA "View", true))
 		{
+			doMenuItem(*getAction("toggleProjection"), true);
 			doMenuItem(*getAction("viewTop"), true);
 			doMenuItem(*getAction("viewFront"), true);
 			doMenuItem(*getAction("viewSide"), true);
@@ -2155,6 +2162,7 @@ struct StudioAppImpl final : StudioApp
 			.is_selected.bind<&Gizmo::Config::isRotateMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setScaleGizmoMode>(ICON_FA_EXPAND_ALT "Scale", "Set scale mode", "setScaleGizmoMode", ICON_FA_EXPAND_ALT)
 			.is_selected.bind<&Gizmo::Config::isScaleMode>(&getGizmoConfig());
+		addAction<&StudioAppImpl::toggleProjection>(NO_ICON "Ortho/perspective", "Toggle ortho/perspective projection", "toggleProjection");
 		addAction<&StudioAppImpl::setTopView>(NO_ICON "Top", "Set top camera view", "viewTop");
 		addAction<&StudioAppImpl::setFrontView>(NO_ICON "Front", "Set front camera view", "viewFront");
 		addAction<&StudioAppImpl::setSideView>(NO_ICON "Side", "Set side camera view", "viewSide");

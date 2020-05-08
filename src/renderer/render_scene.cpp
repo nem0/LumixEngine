@@ -900,7 +900,8 @@ public:
 			const EnvironmentProbe& probe = m_environment_probes.at(i);
 			serializer.write(probe.guid);
 			serializer.write(probe.flags.base);
-			serializer.write(probe.half_extents);
+			serializer.write(probe.inner_range);
+			serializer.write(probe.outer_range);
 			serializer.write(probe.radiance_size);
 			serializer.write(probe.reflection_size);
 			serializer.write(probe.sh_coefs);
@@ -939,7 +940,8 @@ public:
 			// TODO probes are stored in per-universe directory, that won't work with additive loading
 			serializer.read(probe.guid);
 			serializer.read(probe.flags.base);
-			serializer.read(probe.half_extents);
+			serializer.read(probe.inner_range);
+			serializer.read(probe.outer_range);
 			serializer.read(probe.radiance_size);
 			serializer.read(probe.reflection_size);
 			serializer.read(probe.sh_coefs);
@@ -2328,14 +2330,20 @@ public:
 			float intersection_t;
 			const Vec3 rel_pos = (origin - pos).toFloat();
 			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, Ref(intersection_t)) && intersection_t >= 0) {
-				RayCastModelHit new_hit = r.model->castRay(rel_pos / scale, dir, r.pose);
-				if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
-					new_hit.entity = entity;
-					new_hit.component_type = MODEL_INSTANCE_TYPE;
-					hit = new_hit;
-					hit.t *= scale;
-					hit.is_hit = true;
-					cur_dist = dir.length() * hit.t;
+				Vec3 aabb_hit;
+				const Quat aabb_rot = universe.getRotation(entity).conjugated();
+				const Vec3 aabb_dir = aabb_rot.rotate(dir);
+				const AABB& aabb = r.model->getAABB();
+				if (getRayAABBIntersection(aabb_rot.rotate(rel_pos), aabb_dir, aabb.min, aabb.max - aabb.min, Ref(aabb_hit))) {
+					RayCastModelHit new_hit = r.model->castRay(rel_pos / scale, dir, r.pose);
+					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
+						new_hit.entity = entity;
+						new_hit.component_type = MODEL_INSTANCE_TYPE;
+						hit = new_hit;
+						hit.t *= scale;
+						hit.is_hit = true;
+						cur_dist = dir.length() * hit.t;
+					}
 				}
 			}
 		}
@@ -2398,27 +2406,11 @@ public:
 	}
 
 	
-	void getEnvironmentProbes(Array<EnvProbeInfo>& probes) override
-	{
-		// TODO probes in culling system
-		PROFILE_FUNCTION();
-		probes.reserve(m_environment_probes.size());
-		for (int i = 0; i < m_environment_probes.size(); ++i) {
-			const EnvironmentProbe& probe = m_environment_probes.at(i);
-			const EntityRef entity = m_environment_probes.getKey(i);
-			if(!probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
-			
-			EnvProbeInfo& out = probes.emplace();
-			out.half_extents = probe.half_extents;
-			out.position = m_universe.getPosition(entity);
-			out.radiance = probe.flags.isSet(EnvironmentProbe::SPECULAR) && probe.radiance && probe.radiance->isReady() ? probe.radiance->handle : gpu::INVALID_TEXTURE;
-			out.reflection = probe.flags.isSet(EnvironmentProbe::REFLECTION) && probe.reflection && probe.reflection->isReady() ? probe.reflection->handle : gpu::INVALID_TEXTURE;
-			out.use_irradiance = probe.flags.isSet(EnvironmentProbe::DIFFUSE);
-			memcpy(out.sh_coefs, probe.sh_coefs, sizeof(out.sh_coefs));
-		}
+	Span<const EnvironmentProbe> getEnvironmentProbes() override {
+		return m_environment_probes.values();
 	}
 	
-	Span<EntityRef> getAllEnvironmentProbes() override {
+	Span<EntityRef> getEnvironmentProbesEntities() override {
 		return m_environment_probes.keys();
 	}
 
@@ -2781,7 +2773,8 @@ public:
 		probe.reflection = nullptr;
 		probe.radiance = nullptr;
 
-		probe.half_extents = Vec3(9001.f);
+		probe.outer_range = Vec3(9001.f);
+		probe.inner_range = Vec3(4500.f);
 		probe.flags.set(EnvironmentProbe::ENABLED);
 		probe.flags.set(EnvironmentProbe::DIFFUSE);
 		memset(probe.sh_coefs, 0, sizeof(probe.sh_coefs));
