@@ -1381,7 +1381,8 @@ static struct {
 	{TextureFormat::R16F, GL_R16F, GL_RED, GL_HALF_FLOAT},
 	{TextureFormat::R8, GL_R8, GL_RED, GL_UNSIGNED_BYTE},
 	{TextureFormat::R16, GL_R16, GL_RED, GL_UNSIGNED_SHORT},
-	{TextureFormat::R32F, GL_R32F, GL_RED, GL_FLOAT}
+	{TextureFormat::R32F, GL_R32F, GL_RED, GL_FLOAT},
+	{TextureFormat::RG32F, GL_RG32F, GL_RG, GL_FLOAT}
 };
 
 
@@ -1898,13 +1899,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 
 	for (u32 i = 0; i < num; ++i) {
 		GLenum shader_type;
-		switch (types[i]) {
-			case ShaderType::GEOMETRY: shader_type = GL_GEOMETRY_SHADER; break;
-			case ShaderType::FRAGMENT: shader_type = GL_FRAGMENT_SHADER; break;
-			case ShaderType::VERTEX: shader_type = GL_VERTEX_SHADER; break;
-			default: ASSERT(false); return false;
-		}
-		const GLuint shd = glCreateShader(shader_type);
+		u32 src_idx = 0;
 		combined_srcs[0] = R"#(
 			#version 140
 			#extension GL_ARB_shader_storage_buffer_object : enable
@@ -1913,15 +1908,39 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			#extension GL_ARB_separate_shader_objects : enable
 			#define _ORIGIN_BOTTOM_LEFT
 		)#";
-		combined_srcs[prefixes_count + decl.attributes_count + 1] = srcs[i];
+		++src_idx;
+		switch (types[i]) {
+			case ShaderType::GEOMETRY: {
+				combined_srcs[src_idx] = "#define LUMIX_GEOMETRY_SHADER\n"; 
+				shader_type = GL_GEOMETRY_SHADER;
+				break;
+			}
+			case ShaderType::FRAGMENT: {
+				combined_srcs[src_idx] = "#define LUMIX_FRAGMENT_SHADER\n"; 
+				shader_type = GL_FRAGMENT_SHADER;
+				break;
+			}
+			case ShaderType::VERTEX: {
+				combined_srcs[src_idx] = "#define LUMIX_VERTEX_SHADER\n"; 
+				shader_type = GL_VERTEX_SHADER;
+				break;
+			}
+			default: ASSERT(false); return false;
+		}
+		++src_idx;
+		const GLuint shd = glCreateShader(shader_type);
 		for (u32 j = 0; j < prefixes_count; ++j) {
-			combined_srcs[j + 1] = prefixes[j];
+			combined_srcs[src_idx] = prefixes[j];
+			++src_idx;
 		}
 		for (u32 j = 0; j < decl.attributes_count; ++j) {
-			combined_srcs[j + prefixes_count + 1] = attr_defines[decl.attributes[j].idx];
+			combined_srcs[src_idx] = attr_defines[decl.attributes[j].idx];
+			++src_idx;
 		}
+		combined_srcs[src_idx] = srcs[i];
+		++src_idx;
 
-		CHECK_GL(glShaderSource(shd, 2 + prefixes_count + decl.attributes_count, combined_srcs, 0));
+		CHECK_GL(glShaderSource(shd, src_idx, combined_srcs, 0));
 		CHECK_GL(glCompileShader(shd));
 
 		GLint compile_status;

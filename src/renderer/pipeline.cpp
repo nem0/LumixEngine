@@ -253,7 +253,7 @@ struct MTBucketArray
 
 
 static const float SHADOW_CAM_NEAR = 50.0f;
-static const float SHADOW_CAM_FAR = 5000.0f;
+static const float SHADOW_CAM_FAR = 500.0f;
 
 
 ResourceType PipelineResource::TYPE("pipeline");
@@ -1079,6 +1079,7 @@ struct PipelineImpl final : Pipeline
 			{"r16", gpu::TextureFormat::R16},
 			{"r8", gpu::TextureFormat::R8},
 			{"r32f", gpu::TextureFormat::R32F},
+			{"rg32f", gpu::TextureFormat::RG32F},
 		};
 
 		for (auto& i : FORMATS)
