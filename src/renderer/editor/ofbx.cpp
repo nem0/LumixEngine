@@ -60,7 +60,6 @@ struct Allocator {
 	std::vector<float> tmp;
 	std::vector<int> int_tmp;
 	std::vector<Vec3> vec3_tmp;
-	std::vector<Vec4> vec4_tmp;
 	std::vector<double> double_tmp;
 	std::vector<Vec3> vec3_tmp2;
 };
@@ -2118,7 +2117,7 @@ static bool parseVertexData(const Element& element,
 
 	const Element* mapping_element = findChild(element, "MappingInformationType");
 	const Element* reference_element = findChild(element, "ReferenceInformationType");
-
+	out_indices->clear();
 	if (mapping_element && mapping_element->first_property)
 	{
 		if (mapping_element->first_property->value == "ByPolygonVertex")
