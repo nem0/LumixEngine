@@ -14,6 +14,62 @@ namespace ofbx
 {
 
 
+static volatile u32 xxx = 0;
+struct Allocator {
+	struct Page {
+		struct {
+			Page* next = nullptr;
+			u32 offset = 0;
+		} header;
+		u8 data[4096 * 1024 - 12];
+	};
+	Page* first = nullptr;
+
+	~Allocator() {
+		Page* p = first;
+		while (p) {
+			Page* n = p->header.next;
+			delete p;
+			p = n;
+		}
+	}
+
+	template <typename T, typename... Args> T* allocate(Args&&... args)
+	{
+		assert(sizeof(T) <= sizeof(first->data));
+		if (!first) {
+			first = new Page;
+		}
+		Page* p = first;
+		if (p->header.offset % alignof(T) != 0) {
+			p->header.offset += alignof(T) - p->header.offset % alignof(T);
+		}
+		
+		if (p->header.offset + sizeof(T) > sizeof(p->data)) {
+			p = new Page;
+			p->header.next = first;
+			first = p;
+		}
+		T* res = new (p->data + p->header.offset) T(args...);
+		p->header.offset += sizeof(T);
+		++xxx;
+		return res;
+	}
+
+	// store temporary data, can be reused
+	std::vector<Vec3> vertices;
+	std::vector<int> original_indices;
+	std::vector<int> to_old_indices;
+	std::vector<float> tmp;
+	std::vector<int> int_tmp;
+	std::vector<double> double_tmp;
+	std::vector<Vec2> vec2_tmp;
+	std::vector<Vec3> vec3_tmp;
+	std::vector<Vec3> vec3_tmp2;
+	std::vector<Vec4> vec4_tmp;
+};
+
+
 struct Error
 {
 	Error() {}
@@ -315,6 +371,7 @@ bool DataView::operator==(const char* rhs) const
 struct Property;
 template <typename T> static bool parseArrayRaw(const Property& property, T* out, int max_size);
 template <typename T> static bool parseBinaryArray(const Property& property, std::vector<T>* out);
+static bool parseDouble(Property& property, double* out);
 
 
 struct Property : IElementProperty
@@ -502,11 +559,11 @@ static OptionalError<DataView> readLongString(Cursor* cursor)
 }
 
 
-static OptionalError<Property*> readProperty(Cursor* cursor)
+static OptionalError<Property*> readProperty(Cursor* cursor, Allocator& allocator)
 {
 	if (cursor->current == cursor->end) return Error("Reading past the end");
 
-	std::unique_ptr<Property> prop(new Property());
+	Property* prop = allocator.allocate<Property>();
 	prop->next = nullptr;
 	prop->type = *cursor->current;
 	++cursor->current;
@@ -544,7 +601,7 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 			OptionalError<u32> length = read<u32>(cursor);
 			OptionalError<u32> encoding = read<u32>(cursor);
 			OptionalError<u32> comp_len = read<u32>(cursor);
-			if (length.isError() | encoding.isError() | comp_len.isError()) return Error(); //-V792
+			if (length.isError() | encoding.isError() | comp_len.isError()) return Error();
 			if (cursor->current + comp_len.getValue() > cursor->end) return Error("Reading past the end");
 			cursor->current += comp_len.getValue();
 			break;
@@ -552,29 +609,7 @@ static OptionalError<Property*> readProperty(Cursor* cursor)
 		default: return Error("Unknown property type");
 	}
 	prop->value.end = cursor->current;
-	return prop.release();
-}
-
-
-static void deleteElement(Element* el)
-{
-	if (!el) return;
-
-	Element* iter = el;
-	// do not use recursion to delete siblings to avoid stack overflow
-	do
-	{
-		Element* next = iter->sibling;
-		Property* prop = iter->first_property;
-		while (prop) {
-			Property* tmp = prop->next;
-			delete prop;
-			prop = tmp;
-		}
-		deleteElement(iter->child);
-		delete iter;
-		iter = next;
-	} while (iter);
+	return prop;
 }
 
 
@@ -593,7 +628,7 @@ static OptionalError<u64> readElementOffset(Cursor* cursor, u16 version)
 }
 
 
-static OptionalError<Element*> readElement(Cursor* cursor, u32 version)
+static OptionalError<Element*> readElement(Cursor* cursor, u32 version, Allocator& allocator)
 {
 	OptionalError<u64> end_offset = readElementOffset(cursor, version);
 	if (end_offset.isError()) return Error();
@@ -606,7 +641,7 @@ static OptionalError<Element*> readElement(Cursor* cursor, u32 version)
 	OptionalError<DataView> id = readShortString(cursor);
 	if (id.isError()) return Error();
 
-	Element* element = new Element();
+	Element* element = allocator.allocate<Element>();
 	element->first_property = nullptr;
 	element->id = id.getValue();
 
@@ -616,10 +651,9 @@ static OptionalError<Element*> readElement(Cursor* cursor, u32 version)
 	Property** prop_link = &element->first_property;
 	for (u32 i = 0; i < prop_count.getValue(); ++i)
 	{
-		OptionalError<Property*> prop = readProperty(cursor);
+		OptionalError<Property*> prop = readProperty(cursor, allocator);
 		if (prop.isError())
 		{
-			deleteElement(element);
 			return Error();
 		}
 
@@ -634,20 +668,19 @@ static OptionalError<Element*> readElement(Cursor* cursor, u32 version)
 	Element** link = &element->child;
 	while (cursor->current - cursor->begin < ((ptrdiff_t)end_offset.getValue() - BLOCK_SENTINEL_LENGTH))
 	{
-		OptionalError<Element*> child = readElement(cursor, version);
+		OptionalError<Element*> child = readElement(cursor, version, allocator);
 		if (child.isError())
 		{
-			deleteElement(element);
 			return Error();
 		}
 
 		*link = child.getValue();
+        if (child.getValue() == 0) break;
 		link = &(*link)->sibling;
 	}
 
 	if (cursor->current + BLOCK_SENTINEL_LENGTH > cursor->end)
 	{
-		deleteElement(element);
 		return Error("Reading past the end");
 	}
 
@@ -711,9 +744,9 @@ static DataView readTextToken(Cursor* cursor)
 }
 
 
-static OptionalError<Property*> readTextProperty(Cursor* cursor)
+static OptionalError<Property*> readTextProperty(Cursor* cursor, Allocator& allocator)
 {
-	std::unique_ptr<Property> prop(new Property());
+	Property* prop = allocator.allocate<Property>();
 	prop->value.is_binary = false;
 	prop->next = nullptr;
 	if (*cursor->current == '"')
@@ -727,7 +760,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 		}
 		prop->value.end = cursor->current;
 		if (cursor->current < cursor->end) ++cursor->current; // skip '"'
-		return prop.release();
+		return prop;
 	}
 
 	if (isdigit(*cursor->current) || *cursor->current == '-')
@@ -760,7 +793,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 
 			prop->value.end = cursor->current;
 		}
-		return prop.release();
+		return prop;
 	}
 
 	if (*cursor->current == 'T' || *cursor->current == 'Y' || *cursor->current == 'W')
@@ -770,7 +803,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 		prop->value.begin = cursor->current;
 		++cursor->current;
 		prop->value.end = cursor->current;
-		return prop.release();
+		return prop;
 	}
 
 	if (*cursor->current == '*')
@@ -802,7 +835,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 		if (is_any) ++prop->count;
 		prop->value.end = cursor->current;
 		if (cursor->current < cursor->end) ++cursor->current; // skip '}'
-		return prop.release();
+		return prop;
 	}
 
 	assert(false);
@@ -810,7 +843,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor)
 }
 
 
-static OptionalError<Element*> readTextElement(Cursor* cursor)
+static OptionalError<Element*> readTextElement(Cursor* cursor, Allocator& allocator)
 {
 	DataView id = readTextToken(cursor);
 	if (cursor->current == cursor->end) return Error("Unexpected end of file");
@@ -820,16 +853,15 @@ static OptionalError<Element*> readTextElement(Cursor* cursor)
 	skipInsignificantWhitespaces(cursor);
 	if (cursor->current == cursor->end) return Error("Unexpected end of file");
 
-	Element* element = new Element;
+	Element* element = allocator.allocate<Element>();
 	element->id = id;
 
 	Property** prop_link = &element->first_property;
 	while (cursor->current < cursor->end && *cursor->current != '\n' && *cursor->current != '{')
 	{
-		OptionalError<Property*> prop = readTextProperty(cursor);
+		OptionalError<Property*> prop = readTextProperty(cursor, allocator);
 		if (prop.isError())
 		{
-			deleteElement(element);
 			return Error();
 		}
 		if (cursor->current < cursor->end && *cursor->current == ',')
@@ -850,10 +882,9 @@ static OptionalError<Element*> readTextElement(Cursor* cursor)
 		skipWhitespaces(cursor);
 		while (cursor->current < cursor->end && *cursor->current != '}')
 		{
-			OptionalError<Element*> child = readTextElement(cursor);
+			OptionalError<Element*> child = readTextElement(cursor, allocator);
 			if (child.isError())
 			{
-				deleteElement(element);
 				return Error();
 			}
 			skipWhitespaces(cursor);
@@ -867,14 +898,14 @@ static OptionalError<Element*> readTextElement(Cursor* cursor)
 }
 
 
-static OptionalError<Element*> tokenizeText(const u8* data, size_t size)
+static OptionalError<Element*> tokenizeText(const u8* data, size_t size, Allocator& allocator)
 {
 	Cursor cursor;
 	cursor.begin = data;
 	cursor.current = data;
 	cursor.end = data + size;
 
-	Element* root = new Element();
+	Element* root = allocator.allocate<Element>();
 	root->first_property = nullptr;
 	root->id.begin = nullptr;
 	root->id.end = nullptr;
@@ -890,10 +921,9 @@ static OptionalError<Element*> tokenizeText(const u8* data, size_t size)
 		}
 		else
 		{
-			OptionalError<Element*> child = readTextElement(&cursor);
+			OptionalError<Element*> child = readTextElement(&cursor, allocator);
 			if (child.isError())
 			{
-				deleteElement(root);
 				return Error();
 			}
 			*element = child.getValue();
@@ -906,7 +936,7 @@ static OptionalError<Element*> tokenizeText(const u8* data, size_t size)
 }
 
 
-static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& version)
+static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& version, Allocator& allocator)
 {
 	Cursor cursor;
 	cursor.begin = data;
@@ -917,7 +947,7 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& versio
 	cursor.current += sizeof(*header);
 	version = header->version;
 
-	Element* root = new Element();
+	Element* root = allocator.allocate<Element>();
 	root->first_property = nullptr;
 	root->id.begin = nullptr;
 	root->id.end = nullptr;
@@ -927,10 +957,8 @@ static OptionalError<Element*> tokenize(const u8* data, size_t size, u32& versio
 	Element** element = &root->child;
 	for (;;)
 	{
-		OptionalError<Element*> child = readElement(&cursor, header->version);
-		if (child.isError())
-		{
-			deleteElement(root);
+		OptionalError<Element*> child = readElement(&cursor, header->version, allocator);
+		if (child.isError()) {
 			return Error();
 		}
 		*element = child.getValue();
@@ -984,6 +1012,7 @@ struct MeshImpl : Mesh
 {
 	MeshImpl(const Scene& _scene, const IElement& _element)
 		: Mesh(_scene, _element)
+		, scene(_scene)
 	{
 		is_node = true;
 	}
@@ -1017,6 +1046,7 @@ struct MeshImpl : Mesh
 
 	const Pose* pose = nullptr;
 	const Geometry* geometry = nullptr;
+	const Scene& scene;
 	std::vector<const Material*> materials;
 };
 
@@ -1121,6 +1151,7 @@ struct GeometryImpl : Geometry
 	std::vector<int> materials;
 
 	const Skin* skin = nullptr;
+	const BlendShape* blendShape = nullptr;
 
 	std::vector<int> indices;
 	std::vector<int> to_old_vertices;
@@ -1142,7 +1173,35 @@ struct GeometryImpl : Geometry
 	const Vec4* getColors() const override { return colors.empty() ? nullptr : &colors[0]; }
 	const Vec3* getTangents() const override { return tangents.empty() ? nullptr : &tangents[0]; }
 	const Skin* getSkin() const override { return skin; }
+	const BlendShape* getBlendShape() const override { return blendShape; }
 	const int* getMaterials() const override { return materials.empty() ? nullptr : &materials[0]; }
+};
+
+
+Shape::Shape(const Scene& _scene, const IElement& _element)
+	: Object(_scene, _element)
+{
+}
+
+
+struct ShapeImpl : Shape
+{
+	std::vector<Vec3> vertices;
+	std::vector<Vec3> normals;
+
+	ShapeImpl(const Scene& _scene, const IElement& _element)
+		: Shape(_scene, _element)
+	{
+	}
+
+
+	bool postprocess(GeometryImpl* geom, Allocator& allocator);
+
+
+	Type getType() const override { return Type::SHAPE; }
+	int getVertexCount() const override { return (int)vertices.size(); }
+	const Vec3* getVertices() const override { return &vertices[0]; }
+	const Vec3* getNormals() const override { return normals.empty() ? nullptr : &normals[0]; }
 };
 
 
@@ -1168,34 +1227,34 @@ struct ClusterImpl : Cluster
 	Object* getLink() const override { return link; }
 
 
-	bool postprocess()
+	bool postprocess(Allocator& allocator)
 	{
 		assert(skin);
 
 		GeometryImpl* geom = (GeometryImpl*)skin->resolveObjectLinkReverse(Object::Type::GEOMETRY);
 		if (!geom) return false;
 
-		std::vector<int> old_indices;
+		allocator.int_tmp.clear(); // old indices
 		const Element* indexes = findChild((const Element&)element, "Indexes");
 		if (indexes && indexes->first_property)
 		{
-			if (!parseBinaryArray(*indexes->first_property, &old_indices)) return false;
+			if (!parseBinaryArray(*indexes->first_property, &allocator.int_tmp)) return false;
 		}
 
-		std::vector<double> old_weights;
+		allocator.double_tmp.clear(); // old weights
 		const Element* weights_el = findChild((const Element&)element, "Weights");
 		if (weights_el && weights_el->first_property)
 		{
-			if (!parseBinaryArray(*weights_el->first_property, &old_weights)) return false;
+			if (!parseBinaryArray(*weights_el->first_property, &allocator.double_tmp)) return false;
 		}
 
-		if (old_indices.size() != old_weights.size()) return false;
+		if (allocator.int_tmp.size() != allocator.double_tmp.size()) return false;
 
-		indices.reserve(old_indices.size());
-		weights.reserve(old_indices.size());
-		int* ir = old_indices.empty() ? nullptr : &old_indices[0];
-		double* wr = old_weights.empty() ? nullptr : &old_weights[0];
-		for (int i = 0, c = (int)old_indices.size(); i < c; ++i)
+		indices.reserve(allocator.int_tmp.size());
+		weights.reserve(allocator.int_tmp.size());
+		int* ir = allocator.int_tmp.empty() ? nullptr : &allocator.int_tmp[0];
+		double* wr = allocator.double_tmp.empty() ? nullptr : &allocator.double_tmp[0];
+		for (int i = 0, c = (int)allocator.int_tmp.size(); i < c; ++i)
 		{
 			int old_idx = ir[i];
 			double w = wr[i];
@@ -1301,6 +1360,83 @@ struct SkinImpl : Skin
 	Type getType() const override { return Type::SKIN; }
 
 	std::vector<Cluster*> clusters;
+};
+
+
+BlendShapeChannel::BlendShapeChannel(const Scene& _scene, const IElement& _element)
+	: Object(_scene, _element)
+{
+}
+
+
+struct BlendShapeChannelImpl : BlendShapeChannel
+{
+	BlendShapeChannelImpl(const Scene& _scene, const IElement& _element)
+		: BlendShapeChannel(_scene, _element)
+	{
+	}
+
+	double getDeformPercent() const override { return deformPercent; }
+	int getShapeCount() const override { return (int)shapes.size(); }
+	const Shape* getShape(int idx) const override { return shapes[idx]; }
+
+	Type getType() const override { return Type::BLEND_SHAPE_CHANNEL; }
+
+	bool postprocess(Allocator& allocator)
+	{
+		assert(blendShape);
+
+		GeometryImpl* geom = (GeometryImpl*)blendShape->resolveObjectLinkReverse(Object::Type::GEOMETRY);
+		if (!geom) return false;
+
+		const Element* deform_percent_el = findChild((const Element&)element, "DeformPercent");
+		if (deform_percent_el && deform_percent_el->first_property)
+		{
+			if (!parseDouble(*deform_percent_el->first_property, &deformPercent)) return false;
+		}
+
+		const Element* full_weights_el = findChild((const Element&)element, "FullWeights");
+		if (full_weights_el && full_weights_el->first_property)
+		{
+			if (!parseBinaryArray(*full_weights_el->first_property, &fullWeights)) return false;
+		}
+
+		for (int i = 0; i < shapes.size(); i++)
+		{
+			auto shape = (ShapeImpl*)shapes[i];
+			if (!shape->postprocess(geom, allocator)) return false;
+		}
+
+		return true;
+	}
+
+
+	BlendShape* blendShape = nullptr;
+	double deformPercent = 0;
+	std::vector<double> fullWeights;
+	std::vector<Shape*> shapes;
+};
+
+
+BlendShape::BlendShape(const Scene& _scene, const IElement& _element)
+	: Object(_scene, _element)
+{
+}
+
+
+struct BlendShapeImpl : BlendShape
+{
+	BlendShapeImpl(const Scene& _scene, const IElement& _element)
+		: BlendShape(_scene, _element)
+	{
+	}
+
+	int getBlendShapeChannelCount() const override { return (int)blendShapeChannels.size(); }
+	const BlendShapeChannel* getBlendShapeChannel(int idx) const override { return blendShapeChannels[idx]; }
+
+	Type getType() const override { return Type::BLEND_SHAPE; }
+
+	std::vector<BlendShapeChannel*> blendShapeChannels;
 };
 
 
@@ -1432,15 +1568,7 @@ struct Scene : IScene
 	void destroy() override { delete this; }
 
 
-	~Scene() override
-	{
-		for (auto iter : m_object_map)
-		{
-			delete iter.second.object;
-		}
-
-		deleteElement(m_root_element);
-	}
+	~Scene() override {}
 
 
 	Element* m_root_element = nullptr;
@@ -1454,6 +1582,7 @@ struct Scene : IScene
 	std::vector<Connection> m_connections;
 	std::vector<u8> m_data;
 	std::vector<TakeInfo> m_take_infos;
+	Allocator m_allocator;
 };
 
 
@@ -1585,9 +1714,9 @@ struct AnimationLayerImpl : AnimationLayer
 };
 
 
-struct OptionalError<Object*> parseTexture(const Scene& scene, const Element& element)
+struct OptionalError<Object*> parseTexture(const Scene& scene, const Element& element, Allocator& allocator)
 {
-	TextureImpl* texture = new TextureImpl(scene, element);
+	TextureImpl* texture = allocator.allocate<TextureImpl>(scene, element);
 	const Element* texture_filename = findChild(element, "FileName");
 	if (texture_filename && texture_filename->first_property)
 	{
@@ -1602,9 +1731,9 @@ struct OptionalError<Object*> parseTexture(const Scene& scene, const Element& el
 }
 
 
-struct OptionalError<Object*> parsePose(const Scene& scene, const Element& element)
+struct OptionalError<Object*> parsePose(const Scene& scene, const Element& element, Allocator& allocator)
 {
-	PoseImpl* pose = new PoseImpl(scene, element);
+	PoseImpl* pose = allocator.allocate<PoseImpl>(scene, element);
 	const Element* pose_node = findChild(element, "PoseNode");
 	if (pose_node) {
 		const Element* node = findChild(*pose_node, "Node");
@@ -1620,16 +1749,16 @@ struct OptionalError<Object*> parsePose(const Scene& scene, const Element& eleme
 
 
 template <typename T>
-static OptionalError<Object*> parse(const Scene& scene, const Element& element)
+static OptionalError<Object*> parse(const Scene& scene, const Element& element, Allocator& allocator)
 {
-	T* obj = new T(scene, element);
+	T* obj = allocator.allocate<T>(scene, element);
 	return obj;
 }
 
 
-static OptionalError<Object*> parseCluster(const Scene& scene, const Element& element)
+static OptionalError<Object*> parseCluster(const Scene& scene, const Element& element, Allocator& allocator)
 {
-	std::unique_ptr<ClusterImpl> obj(new ClusterImpl(scene, element));
+	ClusterImpl* obj = allocator.allocate<ClusterImpl>(scene, element);
 
 	const Element* transform_link = findChild(element, "TransformLink");
 	if (transform_link && transform_link->first_property)
@@ -1649,13 +1778,13 @@ static OptionalError<Object*> parseCluster(const Scene& scene, const Element& el
 		}
 	}
 
-	return obj.release();
+	return obj;
 }
 
 
-static OptionalError<Object*> parseNodeAttribute(const Scene& scene, const Element& element)
+static OptionalError<Object*> parseNodeAttribute(const Scene& scene, const Element& element, Allocator& allocator)
 {
-	NodeAttributeImpl* obj = new NodeAttributeImpl(scene, element);
+	NodeAttributeImpl* obj = allocator.allocate<NodeAttributeImpl>(scene, element);
 	const Element* type_flags = findChild(element, "TypeFlags");
 	if (type_flags && type_flags->first_property)
 	{
@@ -1665,7 +1794,7 @@ static OptionalError<Object*> parseNodeAttribute(const Scene& scene, const Eleme
 }
 
 
-static OptionalError<Object*> parseLimbNode(const Scene& scene, const Element& element)
+static OptionalError<Object*> parseLimbNode(const Scene& scene, const Element& element, Allocator& allocator)
 {
 	if (!element.first_property
 		|| !element.first_property->next
@@ -1675,12 +1804,12 @@ static OptionalError<Object*> parseLimbNode(const Scene& scene, const Element& e
 		return Error("Invalid limb node");
 	}
 
-	LimbNodeImpl* obj = new LimbNodeImpl(scene, element);
+	LimbNodeImpl* obj = allocator.allocate<LimbNodeImpl>(scene, element);
 	return obj;
 }
 
 
-static OptionalError<Object*> parseMesh(const Scene& scene, const Element& element)
+static OptionalError<Object*> parseMesh(const Scene& scene, const Element& element, Allocator& allocator)
 {
 	if (!element.first_property
 		|| !element.first_property->next
@@ -1690,13 +1819,13 @@ static OptionalError<Object*> parseMesh(const Scene& scene, const Element& eleme
 		return Error("Invalid mesh");
 	}
 
-	return new MeshImpl(scene, element);
+	return allocator.allocate<MeshImpl>(scene, element);
 }
 
 
-static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& element)
+static OptionalError<Object*> parseMaterial(const Scene& scene, const Element& element, Allocator& allocator)
 {
-	MaterialImpl* material = new MaterialImpl(scene, element);
+	MaterialImpl* material = allocator.allocate<MaterialImpl>(scene, element);
 	const Element* prop = findChild(element, "Properties70");
 	material->diffuse_color = {1, 1, 1};
 	if (prop) prop = prop->child;
@@ -1914,7 +2043,7 @@ template <typename T> static bool parseBinaryArray(const Property& property, std
 }
 
 
-template <typename T> static bool parseDoubleVecData(Property& property, std::vector<T>* out_vec)
+template <typename T> static bool parseDoubleVecData(Property& property, std::vector<T>* out_vec, Allocator& allocator)
 {
 	assert(out_vec);
 	if (!property.value.is_binary)
@@ -1930,16 +2059,41 @@ template <typename T> static bool parseDoubleVecData(Property& property, std::ve
 
 	assert(property.type == 'f');
 	assert(sizeof((*out_vec)[0].x) == sizeof(double));
-	std::vector<float> tmp;
-	if (!parseBinaryArray(property, &tmp)) return false;
+	allocator.tmp.clear();
+	if (!parseBinaryArray(property, &allocator.tmp)) return false;
 	int elem_count = sizeof((*out_vec)[0]) / sizeof((*out_vec)[0].x);
-	out_vec->resize(tmp.size() / elem_count);
+	out_vec->resize(allocator.tmp.size() / elem_count);
 	double* out = &(*out_vec)[0].x;
-	for (int i = 0, c = (int)tmp.size(); i < c; ++i)
+	for (int i = 0, c = (int)allocator.tmp.size(); i < c; ++i)
 	{
-		out[i] = tmp[i];
+		out[i] = allocator.tmp[i];
 	}
 	return true;
+}
+
+
+static bool parseDouble(Property& property, double* out)
+{
+	assert(out);
+    if (property.value.is_binary)
+	{
+		int elem_size = 1;
+		switch (property.type)
+		{
+			case 'D': elem_size = 8; break;
+			case 'F': elem_size = 4; break;
+			default: return false;
+		}
+		const u8* data = property.value.begin;
+		if (data > property.value.end) return false;
+		memcpy(out, data, elem_size);
+		return true;
+	}
+    else
+    {
+        fromString<double>((const char*)property.value.begin, (const char*)property.value.end, out);
+        return true;
+    }
 }
 
 
@@ -1949,7 +2103,8 @@ static bool parseVertexData(const Element& element,
 	const char* index_name,
 	std::vector<T>* out,
 	std::vector<int>* out_indices,
-	GeometryImpl::VertexDataMapping* mapping)
+	GeometryImpl::VertexDataMapping* mapping,
+	Allocator& allocator)
 {
 	assert(out);
 	assert(mapping);
@@ -1994,7 +2149,7 @@ static bool parseVertexData(const Element& element,
 			return false;
 		}
 	}
-	return parseDoubleVecData(*data_element->first_property, out);
+	return parseDoubleVecData(*data_element->first_property, out, allocator);
 }
 
 
@@ -2033,8 +2188,10 @@ static void splat(std::vector<T>* out,
 			int data_size = (int)data.size();
 			for (int i = 0, c = (int)indices.size(); i < c; ++i)
 			{
-				if (indices[i] < data_size)
-					(*out)[i] = data[indices[i]];
+				int index = indices[i];
+
+				if ((index < data_size) && (index >= 0))
+					(*out)[i] = data[index];
 				else
 					(*out)[i] = T();
 			}
@@ -2052,7 +2209,7 @@ static void splat(std::vector<T>* out,
 		for (int i = 0, c = (int)original_indices.size(); i < c; ++i)
 		{
 			int idx = decodeIndex(original_indices[i]);
-			if (idx < data_size)
+			if ((idx < data_size) && (idx >= 0))
 				(*out)[i] = data[idx];
 			else
 				(*out)[i] = T();
@@ -2074,17 +2231,14 @@ template <typename T> static void remap(std::vector<T>* out, const std::vector<i
 	int old_size = (int)old.size();
 	for (int i = 0, c = (int)map.size(); i < c; ++i)
 	{
-		if (map[i] < old_size)
-			out->push_back(old[map[i]]);
-		else
-			out->push_back(T());
+		out->push_back(map[i] < old_size ? old[map[i]] : T());
 	}
 }
 
 
-static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Element& element)
+static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Element& element, Allocator& allocator)
 {
-	std::unique_ptr<AnimationCurveImpl> curve(new AnimationCurveImpl(scene, element));
+	AnimationCurveImpl* curve = allocator.allocate<AnimationCurveImpl>(scene, element);
 
 	const Element* times = findChild(element, "KeyTime");
 	const Element* values = findChild(element, "KeyValueFloat");
@@ -2109,7 +2263,7 @@ static OptionalError<Object*> parseAnimationCurve(const Scene& scene, const Elem
 
 	if (curve->times.size() != curve->values.size()) return Error("Invalid animation curve");
 
-	return curve.release();
+	return curve;
 }
 
 
@@ -2161,7 +2315,7 @@ static void triangulate(
 	for (int i = 0; i < old_indices.size(); ++i)
 	{
 		int idx = getIdx(i);
-		if (in_polygon_idx <= 2) //-V1051
+		if (in_polygon_idx <= 2)
 		{
 			to_old_vertices->push_back(idx);
 			to_old_indices->push_back(i);
@@ -2185,7 +2339,7 @@ static void triangulate(
 
 
 static void buildGeometryVertexData(
-	const std::unique_ptr<GeometryImpl>& geom,
+	GeometryImpl* geom,
 	const std::vector<Vec3>& vertices,
 	const std::vector<int>& original_indices,
 	std::vector<int>& to_old_indices,
@@ -2222,17 +2376,16 @@ static void buildGeometryVertexData(
 
 
 static OptionalError<Object*> parseGeometryMaterials(
-	const std::unique_ptr<GeometryImpl>& geom,
+	GeometryImpl* geom,
 	const Element& element,
-	const std::vector<int>& original_indices)
+	const std::vector<int>& original_indices,
+	Allocator& allocator)
 {
 	const Element* layer_material_element = findChild(element, "LayerElementMaterial");
 	if (layer_material_element)
 	{
 		const Element* mapping_element = findChild(*layer_material_element, "MappingInformationType");
 		const Element* reference_element = findChild(*layer_material_element, "ReferenceInformationType");
-
-		std::vector<int> tmp;
 
 		if (!mapping_element || !reference_element) return Error("Invalid LayerElementMaterial");
 
@@ -2245,15 +2398,15 @@ static OptionalError<Object*> parseGeometryMaterials(
 			const Element* indices_element = findChild(*layer_material_element, "Materials");
 			if (!indices_element || !indices_element->first_property) return Error("Invalid LayerElementMaterial");
 
-			if (!parseBinaryArray(*indices_element->first_property, &tmp)) return Error("Failed to parse material indices");
+			allocator.int_tmp.clear();
+			if (!parseBinaryArray(*indices_element->first_property, &allocator.int_tmp)) return Error("Failed to parse material indices");
 
 			int tmp_i = 0;
-			for (int poly = 0, c = (int)tmp.size(); poly < c; ++poly)
+			for (int poly = 0, c = (int)allocator.int_tmp.size(); poly < c; ++poly)
 			{
 				int tri_count = getTriCountFromPoly(original_indices, &tmp_i);
-				for (int i = 0; i < tri_count; ++i)
-				{
-					geom->materials.push_back(tmp[poly]);
+				for (int i = 0; i < tri_count; ++i) {
+					geom->materials.push_back(allocator.int_tmp[poly]);
 				}
 			}
 		}
@@ -2267,10 +2420,11 @@ static OptionalError<Object*> parseGeometryMaterials(
 
 
 static OptionalError<Object*> parseGeometryUVs(
-	const std::unique_ptr<GeometryImpl>& geom,
+	GeometryImpl* geom,
 	const Element& element,
 	const std::vector<int>& original_indices,
-	const std::vector<int>& to_old_indices)
+	const std::vector<int>& to_old_indices,
+	Allocator& allocator)
 {
 	const Element* layer_uv_element = findChild(element, "LayerElementUV");
 	while (layer_uv_element)
@@ -2281,15 +2435,15 @@ static OptionalError<Object*> parseGeometryUVs(
 		{
 			std::vector<Vec2>& uvs = geom->uvs[uv_index];
 
-			std::vector<Vec2> tmp;
-			std::vector<int> tmp_indices;
+			allocator.vec2_tmp.clear();
 			GeometryImpl::VertexDataMapping mapping;
-			if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", &tmp, &tmp_indices, &mapping))
+			allocator.int_tmp.clear();
+			if (!parseVertexData(*layer_uv_element, "UV", "UVIndex", &allocator.vec2_tmp, &allocator.int_tmp, &mapping, allocator))
 				return Error("Invalid UVs");
-			if (!tmp.empty() && (tmp_indices.empty() || tmp_indices[0] != -1))
+			if (!allocator.vec2_tmp.empty() && (allocator.int_tmp.empty() || allocator.int_tmp[0] != -1))
 			{
-				uvs.resize(tmp_indices.empty() ? tmp.size() : tmp_indices.size());
-				splat(&uvs, mapping, tmp, tmp_indices, original_indices);
+				uvs.resize(allocator.int_tmp.empty() ? allocator.vec2_tmp.size() : allocator.int_tmp.size());
+				splat(&uvs, mapping, allocator.vec2_tmp, allocator.int_tmp, original_indices);
 				remap(&uvs, to_old_indices);
 			}
 		}
@@ -2304,33 +2458,35 @@ static OptionalError<Object*> parseGeometryUVs(
 
 
 static OptionalError<Object*> parseGeometryTangents(
-	const std::unique_ptr<GeometryImpl>& geom,
+	GeometryImpl* geom,
 	const Element& element,
 	const std::vector<int>& original_indices,
-	const std::vector<int>& to_old_indices)
+	const std::vector<int>& to_old_indices,
+	Allocator& allocator)
 {
 	const Element* layer_tangent_element = findChild(element, "LayerElementTangents");
 	if (!layer_tangent_element ) {
 		layer_tangent_element = findChild(element, "LayerElementTangent");
 	}
+	layer_tangent_element = findChild(element, "LayerElementTangent");
 	if (layer_tangent_element)
 	{
-		std::vector<Vec3> tmp;
-		std::vector<int> tmp_indices;
+		allocator.vec3_tmp.clear();
+		allocator.int_tmp.clear();
 		GeometryImpl::VertexDataMapping mapping;
 		if (findChild(*layer_tangent_element, "Tangents"))
 		{
-			if (!parseVertexData(*layer_tangent_element, "Tangents", "TangentsIndex", &tmp, &tmp_indices, &mapping))
+			if (!parseVertexData(*layer_tangent_element, "Tangents", "TangentsIndex", &allocator.vec3_tmp, &allocator.int_tmp, &mapping, allocator))
 				return Error("Invalid tangets");
 		}
 		else
 		{
-			if (!parseVertexData(*layer_tangent_element, "Tangent", "TangentIndex", &tmp, &tmp_indices, &mapping))
+			if (!parseVertexData(*layer_tangent_element, "Tangent", "TangentIndex", &allocator.vec3_tmp, &allocator.int_tmp, &mapping, allocator))
 				return Error("Invalid tangets");
 		}
-		if (!tmp.empty())
+		if (!allocator.vec3_tmp.empty())
 		{
-			splat(&geom->tangents, mapping, tmp, tmp_indices, original_indices);
+			splat(&geom->tangents, mapping, allocator.vec3_tmp, allocator.int_tmp, original_indices);
 			remap(&geom->tangents, to_old_indices);
 		}
 	}
@@ -2339,22 +2495,23 @@ static OptionalError<Object*> parseGeometryTangents(
 
 
 static OptionalError<Object*> parseGeometryColors(
-	const std::unique_ptr<GeometryImpl>& geom,
+	GeometryImpl* geom,
 	const Element& element,
 	const std::vector<int>& original_indices,
-	const std::vector<int>& to_old_indices)
+	const std::vector<int>& to_old_indices,
+	Allocator& allocator)
 {
 	const Element* layer_color_element = findChild(element, "LayerElementColor");
 	if (layer_color_element)
 	{
-		std::vector<Vec4> tmp;
-		std::vector<int> tmp_indices;
+		allocator.vec4_tmp.clear();
+		allocator.int_tmp.clear();
 		GeometryImpl::VertexDataMapping mapping;
-		if (!parseVertexData(*layer_color_element, "Colors", "ColorIndex", &tmp, &tmp_indices, &mapping))
+		if (!parseVertexData(*layer_color_element, "Colors", "ColorIndex", &allocator.vec4_tmp, &allocator.int_tmp, &mapping, allocator))
 			return Error("Invalid colors");
-		if (!tmp.empty())
+		if (!allocator.vec4_tmp.empty())
 		{
-			splat(&geom->colors, mapping, tmp, tmp_indices, original_indices);
+			splat(&geom->colors, mapping, allocator.vec4_tmp, allocator.int_tmp, original_indices);
 			remap(&geom->colors, to_old_indices);
 		}
 	}
@@ -2363,22 +2520,23 @@ static OptionalError<Object*> parseGeometryColors(
 
 
 static OptionalError<Object*> parseGeometryNormals(
-	const std::unique_ptr<GeometryImpl>& geom,
+	GeometryImpl* geom,
 	const Element& element,
 	const std::vector<int>& original_indices,
-	const std::vector<int>& to_old_indices)
+	const std::vector<int>& to_old_indices,
+	Allocator& allocator)
 {
 	const Element* layer_normal_element = findChild(element, "LayerElementNormal");
 	if (layer_normal_element)
 	{
-		std::vector<Vec3> tmp;
-		std::vector<int> tmp_indices;
+		allocator.vec3_tmp.clear();
+		allocator.int_tmp.clear();
 		GeometryImpl::VertexDataMapping mapping;
-		if (!parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", &tmp, &tmp_indices, &mapping))
+		if (!parseVertexData(*layer_normal_element, "Normals", "NormalsIndex", &allocator.vec3_tmp, &allocator.int_tmp, &mapping, allocator))
 			return Error("Invalid normals");
-		if (!tmp.empty())
+		if (!allocator.vec3_tmp.empty())
 		{
-			splat(&geom->normals, mapping, tmp, tmp_indices, original_indices);
+			splat(&geom->normals, mapping, allocator.vec3_tmp, allocator.int_tmp, original_indices);
 			remap(&geom->normals, to_old_indices);
 		}
 	}
@@ -2386,45 +2544,91 @@ static OptionalError<Object*> parseGeometryNormals(
 }
 
 
-static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& element, bool triangulate)
+static OptionalError<Object*> parseGeometry(const Scene& scene, const Element& element, bool triangulate, Allocator& allocator)
 {
 	assert(element.first_property);
 
 	const Element* vertices_element = findChild(element, "Vertices");
 	if (!vertices_element || !vertices_element->first_property)
 	{
-		return new GeometryImpl(scene, element);
+		return allocator.allocate<GeometryImpl>(scene, element);
 	}
 
 	const Element* polys_element = findChild(element, "PolygonVertexIndex");
 	if (!polys_element || !polys_element->first_property) return Error("Indices missing");
 
-	std::unique_ptr<GeometryImpl> geom(new GeometryImpl(scene, element));
+	GeometryImpl* geom = allocator.allocate<GeometryImpl>(scene, element);
 
-	std::vector<Vec3> vertices;
-	if (!parseDoubleVecData(*vertices_element->first_property, &vertices)) return Error("Failed to parse vertices");
-	std::vector<int> original_indices;
-	if (!parseBinaryArray(*polys_element->first_property, &original_indices)) return Error("Failed to parse indices");
+	allocator.vertices.clear();
+	allocator.original_indices.clear();
+	allocator.to_old_indices.clear();
+	if (!parseDoubleVecData(*vertices_element->first_property, &allocator.vertices, allocator)) return Error("Failed to parse vertices");
+	if (!parseBinaryArray(*polys_element->first_property, &allocator.original_indices)) return Error("Failed to parse indices");
 
-	std::vector<int> to_old_indices;
-	buildGeometryVertexData(geom, vertices, original_indices, to_old_indices, triangulate);
+	buildGeometryVertexData(geom, allocator.vertices, allocator.original_indices, allocator.to_old_indices, triangulate);
 
-	OptionalError<Object*> materialParsingError = parseGeometryMaterials(geom, element, original_indices);
+	OptionalError<Object*> materialParsingError = parseGeometryMaterials(geom, element, allocator.original_indices, allocator);
 	if (materialParsingError.isError()) return materialParsingError;
 
-	OptionalError<Object*> uvParsingError = parseGeometryUVs(geom, element, original_indices, to_old_indices);
+	OptionalError<Object*> uvParsingError = parseGeometryUVs(geom, element, allocator.original_indices, allocator.to_old_indices, allocator);
 	if (uvParsingError.isError()) return uvParsingError;
 
-	OptionalError<Object*> tangentsParsingError = parseGeometryTangents(geom, element, original_indices, to_old_indices);
+	OptionalError<Object*> tangentsParsingError = parseGeometryTangents(geom, element, allocator.original_indices, allocator.to_old_indices, allocator);
 	if (tangentsParsingError.isError()) return tangentsParsingError;
 
-	OptionalError<Object*> colorsParsingError = parseGeometryColors(geom, element, original_indices, to_old_indices);
+	OptionalError<Object*> colorsParsingError = parseGeometryColors(geom, element, allocator.original_indices, allocator.to_old_indices, allocator);
 	if (colorsParsingError.isError()) return colorsParsingError;
 
-	OptionalError<Object*> normalsParsingError = parseGeometryNormals(geom, element, original_indices, to_old_indices);
+	OptionalError<Object*> normalsParsingError = parseGeometryNormals(geom, element, allocator.original_indices, allocator.to_old_indices, allocator);
 	if (normalsParsingError.isError()) return normalsParsingError;
 
-	return geom.release();
+	return geom;
+}
+
+
+bool ShapeImpl::postprocess(GeometryImpl* geom, Allocator& allocator)
+{
+	assert(geom);
+	assert(element.first_property);
+
+	const Element* vertices_element = findChild((const Element&)element, "Vertices");
+	const Element* normals_element = findChild((const Element&)element, "Normals");
+	const Element* indexes_element = findChild((const Element&)element, "Indexes");
+	if (!vertices_element || !vertices_element->first_property ||
+		!indexes_element || !indexes_element->first_property)
+	{
+		return false;
+	}
+   
+	allocator.vec3_tmp.clear(); // old vertices
+	allocator.vec3_tmp2.clear(); // old normals
+	allocator.int_tmp.clear(); // old indices
+	if (!parseDoubleVecData(*vertices_element->first_property, &allocator.vec3_tmp, allocator)) return true;
+	if (!parseDoubleVecData(*normals_element->first_property, &allocator.vec3_tmp2, allocator)) return true;
+	if (!parseBinaryArray(*indexes_element->first_property, &allocator.int_tmp)) return true;
+
+	if (allocator.vec3_tmp.size() != allocator.int_tmp.size() || allocator.vec3_tmp2.size() != allocator.int_tmp.size()) return false;
+
+	vertices = geom->vertices;
+	normals = geom->normals;
+
+	Vec3* vr = &allocator.vec3_tmp[0];
+	Vec3* nr = &allocator.vec3_tmp2[0];
+	int* ir = &allocator.int_tmp[0];
+	for (int i = 0, c = (int)allocator.int_tmp.size(); i < c; ++i)
+	{
+		int old_idx = ir[i];
+		GeometryImpl::NewVertex* n = &geom->to_new_vertices[old_idx];
+		if (n->index == -1) continue; // skip vertices which aren't indexed.
+		while (n)
+		{
+			vertices[n->index] = vertices[n->index] + vr[i];
+			normals[n->index] = vertices[n->index] + nr[i];
+			n = n->next;
+		}
+	}
+
+	return true;
 }
 
 
@@ -2449,6 +2653,7 @@ static bool parseConnections(const Element& root, Scene* scene)
 	const Element* connections = findChild(root, "Connections");
 	if (!connections) return true;
 
+	scene->m_connections.reserve(1024);
 	const Element* connection = connections->child;
 	while (connection)
 	{
@@ -2641,14 +2846,15 @@ static void parseGlobalSettings(const Element& root, Scene* scene)
 }
 
 
-static bool parseObjects(const Element& root, Scene* scene, u64 flags)
+static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator& allocator)
 {
 	const bool triangulate = (flags & (u64)LoadFlags::TRIANGULATE) != 0;
 	const bool ignore_geometry = (flags & (u64)LoadFlags::IGNORE_GEOMETRY) != 0;
+	const bool ignore_blend_shapes = (flags & (u64)LoadFlags::IGNORE_BLEND_SHAPES) != 0;
 	const Element* objs = findChild(root, "Objects");
 	if (!objs) return true;
 
-	scene->m_root = new Root(*scene, root);
+	scene->m_root = allocator.allocate<Root>(*scene, root);
 	scene->m_root->id = 0;
 	scene->m_object_map[0] = {&root, scene->m_root};
 
@@ -2678,16 +2884,20 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 			while (last_prop->next) last_prop = last_prop->next;
 			if (last_prop && last_prop->value == "Mesh" && !ignore_geometry)
 			{
-				obj = parseGeometry(*scene, *iter.second.element, triangulate);
+				obj = parseGeometry(*scene, *iter.second.element, triangulate, allocator);
+			}
+			if (last_prop && last_prop->value == "Shape" && !ignore_geometry)
+			{
+				obj = allocator.allocate<ShapeImpl>(*scene, *iter.second.element);
 			}
 		}
 		else if (iter.second.element->id == "Material")
 		{
-			obj = parseMaterial(*scene, *iter.second.element);
+			obj = parseMaterial(*scene, *iter.second.element, allocator);
 		}
 		else if (iter.second.element->id == "AnimationStack")
 		{
-			obj = parse<AnimationStackImpl>(*scene, *iter.second.element);
+			obj = parse<AnimationStackImpl>(*scene, *iter.second.element, allocator);
 			if (!obj.isError())
 			{
 				AnimationStackImpl* stack = (AnimationStackImpl*)obj.getValue();
@@ -2696,15 +2906,15 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 		}
 		else if (iter.second.element->id == "AnimationLayer")
 		{
-			obj = parse<AnimationLayerImpl>(*scene, *iter.second.element);
+			obj = parse<AnimationLayerImpl>(*scene, *iter.second.element, allocator);
 		}
 		else if (iter.second.element->id == "AnimationCurve")
 		{
-			obj = parseAnimationCurve(*scene, *iter.second.element);
+			obj = parseAnimationCurve(*scene, *iter.second.element, allocator);
 		}
 		else if (iter.second.element->id == "AnimationCurveNode")
 		{
-			obj = parse<AnimationCurveNodeImpl>(*scene, *iter.second.element);
+			obj = parse<AnimationCurveNodeImpl>(*scene, *iter.second.element, allocator);
 		}
 		else if (iter.second.element->id == "Deformer")
 		{
@@ -2713,14 +2923,18 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 			if (class_prop)
 			{
 				if (class_prop->getValue() == "Cluster")
-					obj = parseCluster(*scene, *iter.second.element);
+					obj = parseCluster(*scene, *iter.second.element, allocator);
 				else if (class_prop->getValue() == "Skin")
-					obj = parse<SkinImpl>(*scene, *iter.second.element);
+					obj = parse<SkinImpl>(*scene, *iter.second.element, allocator);
+				else if (class_prop->getValue() == "BlendShape" && !ignore_blend_shapes)
+					obj = parse<BlendShapeImpl>(*scene, *iter.second.element, allocator);
+				else if (class_prop->getValue() == "BlendShapeChannel" && !ignore_blend_shapes)
+					obj = parse<BlendShapeChannelImpl>(*scene, *iter.second.element, allocator);
 			}
 		}
 		else if (iter.second.element->id == "NodeAttribute")
 		{
-			obj = parseNodeAttribute(*scene, *iter.second.element);
+			obj = parseNodeAttribute(*scene, *iter.second.element, allocator);
 		}
 		else if (iter.second.element->id == "Model")
 		{
@@ -2730,7 +2944,7 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 			{
 				if (class_prop->getValue() == "Mesh")
 				{
-					obj = parseMesh(*scene, *iter.second.element);
+					obj = parseMesh(*scene, *iter.second.element, allocator);
 					if (!obj.isError())
 					{
 						Mesh* mesh = (Mesh*)obj.getValue();
@@ -2739,18 +2953,18 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 					}
 				}
 				else if (class_prop->getValue() == "LimbNode")
-					obj = parseLimbNode(*scene, *iter.second.element);
+					obj = parseLimbNode(*scene, *iter.second.element, allocator);
 				else
-					obj = parse<NullImpl>(*scene, *iter.second.element);
+					obj = parse<NullImpl>(*scene, *iter.second.element, allocator);
 			}
 		}
 		else if (iter.second.element->id == "Texture")
 		{
-			obj = parseTexture(*scene, *iter.second.element);
+			obj = parseTexture(*scene, *iter.second.element, allocator);
 		}
 		else if (iter.second.element->id == "Pose")
 		{
-			obj = parsePose(*scene, *iter.second.element);
+			obj = parsePose(*scene, *iter.second.element, allocator);
 		}
 
 		if (obj.isError()) return false;
@@ -2825,6 +3039,32 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 				}
 				break;
 			}
+			case Object::Type::BLEND_SHAPE:
+			{
+				BlendShapeImpl* blendShape = (BlendShapeImpl*)parent;
+				if (child->getType() == Object::Type::BLEND_SHAPE_CHANNEL)
+				{
+					BlendShapeChannelImpl* blendShapeChannel = (BlendShapeChannelImpl*)child;
+					blendShape->blendShapeChannels.push_back(blendShapeChannel);
+					if (blendShapeChannel->blendShape)
+					{
+						Error::s_message = "Invalid blend shape";
+						return false;
+					}
+					blendShapeChannel->blendShape = blendShape;
+				}
+				break;
+			}
+			case Object::Type::BLEND_SHAPE_CHANNEL:
+			{
+				BlendShapeChannelImpl* blendShapeChannel = (BlendShapeChannelImpl*)parent;
+				if (child->getType() == Object::Type::SHAPE)
+				{
+					ShapeImpl* shape = (ShapeImpl*)child;
+					blendShapeChannel->shapes.push_back(shape);
+				}
+				break;
+			}
 			case Object::Type::MATERIAL:
 			{
 				MaterialImpl* mat = (MaterialImpl*)parent;
@@ -2851,7 +3091,10 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 			case Object::Type::GEOMETRY:
 			{
 				GeometryImpl* geom = (GeometryImpl*)parent;
-				if (child->getType() == Object::Type::SKIN) geom->skin = (Skin*)child;
+				if (child->getType() == Object::Type::SKIN)
+					geom->skin = (Skin*)child;
+				else if (child->getType() == Object::Type::BLEND_SHAPE)
+					geom->blendShape = (BlendShape*)child;
 				break;
 			}
 			case Object::Type::CLUSTER:
@@ -2912,8 +3155,14 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags)
 			if (!obj) continue;
 			switch (obj->getType()) {
 				case Object::Type::CLUSTER:
-					if (!((ClusterImpl*)iter.second.object)->postprocess()) {
+					if (!((ClusterImpl*)iter.second.object)->postprocess(scene->m_allocator)) {
 						Error::s_message = "Failed to postprocess cluster";
+						return false;
+					}
+					break;
+				case Object::Type::BLEND_SHAPE_CHANNEL:
+					if (!((BlendShapeChannelImpl*)iter.second.object)->postprocess(scene->m_allocator)) {
+						Error::s_message = "Failed to postprocess blend shape channel";
 						return false;
 					}
 					break;
@@ -3122,7 +3371,7 @@ Object* Object::getParent() const
 	Object* parent = nullptr;
 	for (auto& connection : scene.m_connections)
 	{
-		if (connection.from == id && connection.from != connection.to)
+		if (connection.from == id)
 		{
 			Object* obj = scene.m_object_map.find(connection.to)->second.object;
 			if (obj && obj->is_node)
@@ -3146,7 +3395,7 @@ IScene* load(const u8* data, int size, u64 flags)
 	const bool is_binary = size >= 18 && strncmp((const char*)data, "Kaydara FBX Binary", 18) == 0;
 	OptionalError<Element*> root(nullptr);
 	if (is_binary) {
-		root = tokenize(&scene->m_data[0], size, version);
+		root = tokenize(&scene->m_data[0], size, version, scene->m_allocator);
 		if (version < 6200)
 		{
 			Error::s_message = "Unsupported FBX file format version. Minimum supported version is 6.2";
@@ -3159,7 +3408,7 @@ IScene* load(const u8* data, int size, u64 flags)
 		}
 	}
 	else {
-		root = tokenizeText(&scene->m_data[0], size);
+		root = tokenizeText(&scene->m_data[0], size, scene->m_allocator);
 		if (root.isError()) return nullptr;
 	}
 
@@ -3169,7 +3418,7 @@ IScene* load(const u8* data, int size, u64 flags)
 	// if (parseTemplates(*root.getValue()).isError()) return nullptr;
 	if (!parseConnections(*root.getValue(), scene.get())) return nullptr;
 	if (!parseTakes(scene.get())) return nullptr;
-	if (!parseObjects(*root.getValue(), scene.get(), flags)) return nullptr;
+	if (!parseObjects(*root.getValue(), scene.get(), flags, scene->m_allocator)) return nullptr;
 	parseGlobalSettings(*root.getValue(), scene.get());
 
 	return scene.release();
