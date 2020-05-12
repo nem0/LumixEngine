@@ -3,10 +3,12 @@
 #include "editor/asset_compiler.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
+#include "engine/atomic.h"
 #include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/os.h"
@@ -292,7 +294,7 @@ static int findSubblobIndex(const OutputMemoryStream& haystack, const OutputMemo
 	int idx = first_subblob;
 	while(idx != -1)
 	{
-		if (compareMemory(data + idx * step_size, needle_data, step_size) == 0) return idx;
+		if (memcmp(data + idx * step_size, needle_data, step_size) == 0) return idx;
 		idx = subblobs[idx];
 	}
 	return -1;
@@ -466,107 +468,112 @@ static bool doesFlipHandness(const Matrix& mtx) {
 
 void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 {
-	for (int mesh_idx = 0; mesh_idx < meshes.size(); ++mesh_idx)
-	{
-		ImportMesh& import_mesh = meshes[mesh_idx];
-		import_mesh.vertex_data.clear();
-		import_mesh.indices.clear();
+	volatile i32 global_mesh_idx = 0;
+	JobSystem::runOnWorkers([&](){
+		for (;;) {
+			const i32 mesh_idx = atomicIncrement(&global_mesh_idx) - 1;
+			if (mesh_idx >= meshes.size()) break;
 
-		const ofbx::Mesh& mesh = *import_mesh.fbx;
-		const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
-		int vertex_count = geom->getVertexCount();
-		const ofbx::Vec3* vertices = geom->getVertices();
-		const ofbx::Vec3* normals = geom->getNormals();
-		const ofbx::Vec3* tangents = geom->getTangents();
-		const ofbx::Vec4* colors = import_vertex_colors ? geom->getColors() : nullptr;
-		const ofbx::Vec2* uvs = geom->getUVs();
+			ImportMesh& import_mesh = meshes[mesh_idx];
+			import_mesh.vertex_data.clear();
+			import_mesh.indices.clear();
 
-		Matrix transform_matrix = Matrix::IDENTITY;
-		Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
-		transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
-		if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
-		if (cfg.origin != ImportConfig::Origin::SOURCE) {
-			centerMesh(vertices, vertex_count, cfg.origin, &transform_matrix);
-		}
-		import_mesh.transform_matrix = transform_matrix;
-		import_mesh.transform_matrix.inverse();
+			const ofbx::Mesh& mesh = *import_mesh.fbx;
+			const ofbx::Geometry* geom = import_mesh.fbx->getGeometry();
+			int vertex_count = geom->getVertexCount();
+			const ofbx::Vec3* vertices = geom->getVertices();
+			const ofbx::Vec3* normals = geom->getNormals();
+			const ofbx::Vec3* tangents = geom->getTangents();
+			const ofbx::Vec4* colors = import_vertex_colors ? geom->getColors() : nullptr;
+			const ofbx::Vec2* uvs = geom->getUVs();
 
-		const bool flip_handness = doesFlipHandness(transform_matrix);
-		if (flip_handness) {
-			logError("FBX") << "Mesh " << mesh.name << " in " << path << " flips handness. This is not supported and the mesh will not display correctly.";
-		}
-
-		OutputMemoryStream blob(allocator);
-		int vertex_size = getVertexSize(import_mesh);
-		import_mesh.vertex_data.reserve(vertex_count * vertex_size);
-
-		Array<Skin> skinning(allocator);
-		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
-
-		AABB aabb = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
-		float radius_squared = 0;
-
-		int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
-		ASSERT(material_idx >= 0);
-
-		int first_subblob[256];
-		for (int& subblob : first_subblob) subblob = -1;
-		Array<int> subblobs(allocator);
-		subblobs.reserve(vertex_count);
-
-		const int* geom_materials = geom->getMaterials();
-		Array<ofbx::Vec3> computed_tangents(allocator);
-		if (!tangents && normals && uvs) {
-			computeTangents(computed_tangents, vertex_count, vertices, normals, uvs);
-			tangents = computed_tangents.begin();
-		}
-
-		for (int i = 0; i < vertex_count; ++i)
-		{
-			if (geom_materials && geom_materials[i / 3] != material_idx) continue;
-
-			blob.clear();
-			ofbx::Vec3 cp = vertices[i];
-			// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
-			Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * fbx_scale;
-			pos = fixOrientation(pos);
-			blob.write(pos);
-
-			float sq_len = pos.squaredLength();
-			radius_squared = maximum(radius_squared, sq_len);
-
-			aabb.min.x = minimum(aabb.min.x, pos.x);
-			aabb.min.y = minimum(aabb.min.y, pos.y);
-			aabb.min.z = minimum(aabb.min.z, pos.z);
-			aabb.max.x = maximum(aabb.max.x, pos.x);
-			aabb.max.y = maximum(aabb.max.y, pos.y);
-			aabb.max.z = maximum(aabb.max.z, pos.z);
-
-			if (normals) writePackedVec3(normals[i], transform_matrix, &blob);
-			if (uvs) writeUV(uvs[i], &blob);
-			if (colors) writeColor(colors[i], &blob);
-			if (tangents) writePackedVec3(tangents[i], transform_matrix, &blob);
-			if (import_mesh.is_skinned) writeSkin(skinning[i], &blob);
-
-			u8 first_byte = blob.data()[0];
-
-			int idx = findSubblobIndex(import_mesh.vertex_data, blob, subblobs, first_subblob[first_byte]);
-			if (idx == -1)
-			{
-				subblobs.push(first_subblob[first_byte]);
-				first_subblob[first_byte] = subblobs.size() - 1;
-				import_mesh.indices.push((int)import_mesh.vertex_data.size() / vertex_size);
-				import_mesh.vertex_data.write(blob.data(), vertex_size);
+			Matrix transform_matrix = Matrix::IDENTITY;
+			Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
+			transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
+			if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
+			if (cfg.origin != ImportConfig::Origin::SOURCE) {
+				centerMesh(vertices, vertex_count, cfg.origin, &transform_matrix);
 			}
-			else
-			{
-				import_mesh.indices.push(idx);
-			}
-		}
+			import_mesh.transform_matrix = transform_matrix;
+			import_mesh.transform_matrix.inverse();
 
-		import_mesh.aabb = aabb;
-		import_mesh.radius_squared = radius_squared;
-	}
+			const bool flip_handness = doesFlipHandness(transform_matrix);
+			if (flip_handness) {
+				logError("FBX") << "Mesh " << mesh.name << " in " << path << " flips handness. This is not supported and the mesh will not display correctly.";
+			}
+
+			OutputMemoryStream blob(allocator);
+			int vertex_size = getVertexSize(import_mesh);
+			import_mesh.vertex_data.reserve(vertex_count * vertex_size);
+
+			Array<Skin> skinning(allocator);
+			if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
+
+			AABB aabb = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
+			float radius_squared = 0;
+
+			int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
+			ASSERT(material_idx >= 0);
+
+			int first_subblob[256];
+			for (int& subblob : first_subblob) subblob = -1;
+			Array<int> subblobs(allocator);
+			subblobs.reserve(vertex_count);
+
+			const int* geom_materials = geom->getMaterials();
+			Array<ofbx::Vec3> computed_tangents(allocator);
+			if (!tangents && normals && uvs) {
+				computeTangents(computed_tangents, vertex_count, vertices, normals, uvs);
+				tangents = computed_tangents.begin();
+			}
+
+			for (int i = 0; i < vertex_count; ++i)
+			{
+				if (geom_materials && geom_materials[i / 3] != material_idx) continue;
+
+				blob.clear();
+				ofbx::Vec3 cp = vertices[i];
+				// premultiply control points here, so we can have constantly-scaled meshes without scale in bones
+				Vec3 pos = transform_matrix.transformPoint(toLumixVec3(cp)) * cfg.mesh_scale * fbx_scale;
+				pos = fixOrientation(pos);
+				blob.write(pos);
+
+				float sq_len = pos.squaredLength();
+				radius_squared = maximum(radius_squared, sq_len);
+
+				aabb.min.x = minimum(aabb.min.x, pos.x);
+				aabb.min.y = minimum(aabb.min.y, pos.y);
+				aabb.min.z = minimum(aabb.min.z, pos.z);
+				aabb.max.x = maximum(aabb.max.x, pos.x);
+				aabb.max.y = maximum(aabb.max.y, pos.y);
+				aabb.max.z = maximum(aabb.max.z, pos.z);
+
+				if (normals) writePackedVec3(normals[i], transform_matrix, &blob);
+				if (uvs) writeUV(uvs[i], &blob);
+				if (colors) writeColor(colors[i], &blob);
+				if (tangents) writePackedVec3(tangents[i], transform_matrix, &blob);
+				if (import_mesh.is_skinned) writeSkin(skinning[i], &blob);
+
+				u8 first_byte = blob.data()[0] ^ blob.data()[1] ^ blob.data()[4] ^ blob.data()[8];
+
+				int idx = findSubblobIndex(import_mesh.vertex_data, blob, subblobs, first_subblob[first_byte]);
+				if (idx == -1)
+				{
+					subblobs.push(first_subblob[first_byte]);
+					first_subblob[first_byte] = subblobs.size() - 1;
+					import_mesh.indices.push((int)import_mesh.vertex_data.size() / vertex_size);
+					import_mesh.vertex_data.write(blob.data(), vertex_size);
+				}
+				else
+				{
+					import_mesh.indices.push(idx);
+				}
+			}
+
+			import_mesh.aabb = aabb;
+			import_mesh.radius_squared = radius_squared;
+		}
+	});
 	for (int mesh_idx = meshes.size() - 1; mesh_idx >= 0; --mesh_idx)
 	{
 		if (meshes[mesh_idx].indices.empty()) meshes.swapAndPop(mesh_idx);
@@ -645,6 +652,19 @@ FBXImporter::FBXImporter(StudioApp& app)
 }
 
 
+static void ofbx_job_processor(ofbx::JobFunction fn, void*, void* data, u32 size, u32 count) {
+	volatile i32 counter = 0;
+	JobSystem::runOnWorkers([&](){
+		for (;;) {
+			const i32 i = atomicIncrement(&counter) - 1;
+			if (i >= (i32)count) break;
+			u8* ptr = (u8*)data;
+			fn(ptr + i * size);
+		}
+	});
+}
+
+
 bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 {
 	out_file.reserve(1024 * 1024);
@@ -662,7 +682,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 	if (!filesystem.getContentSync(Path(filename), Ref(data))) return false;
 	
 	const u64 flags = ignore_geometry ? (u64)ofbx::LoadFlags::IGNORE_GEOMETRY : (u64)ofbx::LoadFlags::TRIANGULATE;
-	scene = ofbx::load(data.data(), (i32)data.size(), flags);
+	scene = ofbx::load(data.data(), (i32)data.size(), flags, &ofbx_job_processor, nullptr);
 	if (!scene)
 	{
 		logError("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError() << "\n"
