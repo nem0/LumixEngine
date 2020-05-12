@@ -373,13 +373,12 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("environment_probe",
 			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
-			property("Enabled reflection", &RenderScene::isEnvironmentProbeReflectionEnabled, &RenderScene::enableEnvironmentProbeReflection),
-			property("Enabled specular", &RenderScene::isEnvironmentProbeSpecular, &RenderScene::enableEnvironmentProbeSpecular),
-			property("Enabled diffuse", &RenderScene::isEnvironmentProbeDiffuse, &RenderScene::enableEnvironmentProbeDiffuse),
-			property("Override global size", &RenderScene::isEnvironmentProbeCustomSize, &RenderScene::enableEnvironmentProbeCustomSize),
 			var_property("Inner range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::inner_range),
-			var_property("Outer range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::outer_range),
-			var_property("Radiance size", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::radiance_size)
+			var_property("Outer range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::outer_range)
+		),
+		component("reflection_probe",
+			property("Enabled", &RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe),
+			var_property("size", &RenderScene::getReflectionProbe, &ReflectionProbe::size)
 		),
 		component("particle_emitter",
 			property("Resource", LUMIX_PROP(RenderScene, ParticleEmitterPath),
