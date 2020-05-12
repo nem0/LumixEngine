@@ -36,15 +36,8 @@ typedef unsigned short u16;
 typedef int i32;
 typedef unsigned int u32;
 typedef unsigned int u32;
-
-#ifdef _WIN32
-	typedef long long i64;
-	typedef unsigned long long u64;
-#else
-	typedef long i64;
-	typedef unsigned long u64;
-#endif
-
+typedef long long i64;
+typedef unsigned long long u64;
 typedef u64 uintptr;
 
 static_assert(sizeof(uintptr) == sizeof(void*), "Incorrect size of uintptr");

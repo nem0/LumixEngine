@@ -1589,8 +1589,6 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 	}
 
 	write(sqrtf(radius_squared));
-	aabb.min;
-	aabb.max;
 	write(aabb);
 }
 
