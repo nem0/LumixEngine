@@ -138,7 +138,8 @@ enum class TextureFlags : u32 {
 
 enum class BufferFlags : u32 {
 	IMMUTABLE = 1 << 0,
-	UNIFORM_BUFFER = 1 << 1
+	UNIFORM_BUFFER = 1 << 1,
+	SHADER_BUFFER = 1 << 2
 };
 
 enum class DataType {
