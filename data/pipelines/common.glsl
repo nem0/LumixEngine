@@ -41,22 +41,22 @@ struct Cluster {
 	int probes_count;
 };
 
-layout(std430, binding = 6) buffer lights
+layout(std430, binding = 6) readonly buffer lights
 {
 	Light b_lights[];
 };
 
-layout(std430, binding = 7) buffer clusters
+layout(std430, binding = 7) readonly buffer clusters
 {
 	Cluster b_clusters[];
 };
 	
-layout(std430, binding = 8) buffer cluster_maps
+layout(std430, binding = 8) readonly buffer cluster_maps
 {
 	int b_cluster_map[];
 };
 
-layout(std430, binding = 9) buffer probes
+layout(std430, binding = 9) readonly buffer probes
 {
 	Probe b_probes[];
 };
@@ -112,15 +112,22 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 	return -view_pos.z / view_pos.w;
 }
 
-int getClusterIndex(ivec2 fragcoord, float ndc_depth, out ivec3 cluster)
-{
-	cluster = ivec3(fragcoord.xy / 64, 0);
-	float linear_depth = toLinearDepth(u_camera_inv_projection, ndc_depth);
-	cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
-	ivec2 tiles = (u_framebuffer_size + 63) / 64;
-	cluster.y = tiles.y - 1 - cluster.y;
-	return cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
-}
+#ifdef LUMIX_FRAGMENT_SHADER
+	int getClusterIndex(float ndc_depth, out ivec3 cluster)
+	{
+		ivec2 fragcoord = ivec2(gl_FragCoord.xy);
+		#ifndef _ORIGIN_BOTTOM_LEFT
+			fragcoord.y = u_framebuffer_size.y - fragcoord.y - 1;
+		#endif
+
+		cluster = ivec3(fragcoord.xy / 64, 0);
+		float linear_depth = toLinearDepth(u_camera_inv_projection, ndc_depth);
+		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
+		ivec2 tiles = (u_framebuffer_size + 63) / 64;
+		cluster.y = tiles.y - 1 - cluster.y;
+		return cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
+	}
+#endif
 
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord, out float ndc_depth)
 {

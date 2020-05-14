@@ -53,7 +53,7 @@ fragment_shader [[
 		o_color.rgb = mix(direct, u_fog_color.rgb, fog_factor);
 
 		ivec3 cluster;
-		int cluster_idx = getClusterIndex(ivec2(gl_FragCoord.xy), ndc_depth, cluster);
+		int cluster_idx = getClusterIndex(ndc_depth, cluster);
 
 		int offset = b_clusters[cluster_idx].offset;
 		int end_lights = offset + b_clusters[cluster_idx].lights_count;

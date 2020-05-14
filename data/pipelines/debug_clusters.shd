@@ -28,10 +28,9 @@ fragment_shader [[
 		vec3 wpos = getViewPosition(u_texture, u_camera_inv_view_projection, screen_uv, ndc_depth);
 
 		ivec3 cluster;
-		int cluster_idx = getClusterIndex(ivec2(gl_FragCoord.xy), ndc_depth, cluster);
+		int cluster_idx = getClusterIndex(ndc_depth, cluster);
 
-
-		#if 0
+		#if 1
 			// debug number of lights per cluster
 			int c = b_clusters[cluster_idx].lights_count;
 			if (c < 10)
