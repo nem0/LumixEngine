@@ -365,14 +365,15 @@ function main()
 		}
 	)
 
+	local shadowmap = shadowPass()
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set)
+
 	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
 		fillClusters(view_params)
 	else
 		fillClusters()
 	end
-	
-	local shadowmap = shadowPass()
-	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set)
+
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
 	
 	local res = hdr_buffer		
