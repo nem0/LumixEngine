@@ -238,7 +238,7 @@ QueryHandle createQuery();
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
-void bindShaderBuffer(BufferHandle buffer, u32 binding_point, u32 offset, u32 size);
+void bindShaderBuffer(BufferHandle buffer, u32 binding_point);
 void update(BufferHandle buffer, const void* data, size_t size);
 void update(BufferGroupHandle group, const void* data, size_t element_index);
 void* map(BufferHandle buffer, size_t size);

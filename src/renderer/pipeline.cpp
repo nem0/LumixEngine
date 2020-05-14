@@ -2387,49 +2387,27 @@ struct PipelineImpl final : Pipeline
 
 		void execute() override {
 			PROFILE_FUNCTION();
-			const u32 map_size = ((m_map.byte_size() + 15) & ~15);
-			const u32 clusters_size = ((m_clusters.byte_size() + 15) & ~15);
-			const u32 lights_size = ((m_point_lights.byte_size() + 15) & ~15);
-			const u32 probes_size = ((m_probes.byte_size() + 15) & ~15);
-			const u32 total_size = map_size + lights_size + clusters_size + probes_size;
 
-			if (m_pipeline->m_clusters_buffer_size < total_size) {
-				if (m_pipeline->m_clusters_buffer.isValid()) gpu::destroy(m_pipeline->m_clusters_buffer);
-				m_pipeline->m_clusters_buffer = gpu::allocBufferHandle();
-				gpu::createBuffer(m_pipeline->m_clusters_buffer, 0, total_size, nullptr);
-				m_pipeline->m_clusters_buffer_size = total_size;
-			}
+			auto bind = [](auto& buffer, const auto& data, i32 idx){
+				const u32 capacity = (data.byte_size() + 15) & ~15;
+				if (buffer.capacity < capacity) {
+					if (buffer.buffer.isValid()) gpu::destroy(buffer.buffer);
+					buffer.buffer = gpu::allocBufferHandle();
+					gpu::createBuffer(buffer.buffer, (u32)gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
+					buffer.capacity = capacity;
+				}
+				if (!data.empty()) {
+					u8* mem = (u8*)gpu::map(buffer.buffer, capacity);
+					memcpy(mem, data.begin(), data.byte_size());
+					gpu::unmap(buffer.buffer);
+					gpu::bindShaderBuffer(buffer.buffer, idx);
+				}
+			};
 
-			u8* mem = (u8*)gpu::map(m_pipeline->m_clusters_buffer, total_size);
-			if (!m_clusters.empty()) {
-				memcpy(mem, m_clusters.begin(), m_clusters.byte_size());
-				mem += clusters_size;
-			}
-			if (!m_map.empty()) {
-				memcpy(mem, m_map.begin(), m_map.byte_size());
-				mem += map_size;
-			}
-			if (!m_point_lights.empty()) {
-				memcpy(mem, m_point_lights.begin(), m_point_lights.byte_size());
-				mem += lights_size;
-			}
-			if (!m_probes.empty()) {
-				memcpy(mem, m_probes.begin(), m_probes.byte_size());
-			}
-			gpu::unmap(m_pipeline->m_clusters_buffer);
-			
-			if (lights_size > 0) { 
-				gpu::bindShaderBuffer(m_pipeline->m_clusters_buffer, 0, clusters_size + map_size, lights_size);
-			}
-			if (clusters_size > 0) {
-				gpu::bindShaderBuffer(m_pipeline->m_clusters_buffer, 1, 0, clusters_size);
-			}
-			if (map_size > 0) {
-				gpu::bindShaderBuffer(m_pipeline->m_clusters_buffer, 2, clusters_size, map_size);
-			}
-			if (probes_size > 0) { 
-				gpu::bindShaderBuffer(m_pipeline->m_clusters_buffer, 3, clusters_size + map_size + lights_size, probes_size);
-			}
+			bind(m_pipeline->m_cluster_buffers.lights, m_point_lights, 6);
+			bind(m_pipeline->m_cluster_buffers.clusters, m_clusters, 7);
+			bind(m_pipeline->m_cluster_buffers.maps, m_map, 8);
+			bind(m_pipeline->m_cluster_buffers.probes, m_probes, 9);
 		}
 
 
@@ -3887,8 +3865,16 @@ struct PipelineImpl final : Pipeline
 	gpu::BufferHandle m_cube_vb;
 	gpu::BufferHandle m_cube_ib;
 	gpu::BufferHandle m_drawcall_ub = gpu::INVALID_BUFFER;
-	gpu::BufferHandle m_clusters_buffer = gpu::INVALID_BUFFER;
-	u32 m_clusters_buffer_size = 0;
+	struct {
+		struct Buffer {
+			gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
+			u32 capacity = 0;
+		};
+		Buffer lights;
+		Buffer clusters;
+		Buffer maps;
+		Buffer probes;
+	} m_cluster_buffers;
 	CameraParams m_shadow_camera_params[4];
 };
 

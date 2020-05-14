@@ -41,22 +41,22 @@ struct Cluster {
 	int probes_count;
 };
 
-layout(std430, binding = 0) buffer lights
+layout(std430, binding = 6) buffer lights
 {
 	Light b_lights[];
 };
 
-layout(std430, binding = 1) buffer clusters
+layout(std430, binding = 7) buffer clusters
 {
 	Cluster b_clusters[];
 };
 	
-layout(std430, binding = 2) buffer cluster_maps
+layout(std430, binding = 8) buffer cluster_maps
 {
 	int b_cluster_map[];
 };
 
-layout(std430, binding = 3) buffer probes
+layout(std430, binding = 9) buffer probes
 {
 	Probe b_probes[];
 };

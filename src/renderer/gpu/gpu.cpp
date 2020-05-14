@@ -883,12 +883,12 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 	CHECK_GL(glBindTextures(offset, count, gl_handles));
 }
 
-void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, u32 offset, u32 size)
+void bindShaderBuffer(BufferHandle handle, u32 binding_idx)
 {
 	checkThread();
-	if(buffer.isValid()) {
-		const GLuint gl_handle = g_gpu.buffers[buffer.value].handle;
-		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding_idx, gl_handle, offset, size);
+	if(handle.isValid()) {
+		const Buffer& buffer = g_gpu.buffers[handle.value];
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_idx, buffer.handle);
 	}
 	else {
 		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding_idx, 0, 0, 0);
