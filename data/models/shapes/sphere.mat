@@ -2,8 +2,8 @@ shader "pipelines/standard.shd"
 backface_culling(true)
 layer "default"
 emission(0.000000)
-metallic(0.000000)
-roughness(1.000000)
+metallic(1.000000)
+roughness(0.050000)
 alpha_ref(0.300000)
 defines {}
 color { 1.000000, 1.000000, 1.000000, 1.000000 }

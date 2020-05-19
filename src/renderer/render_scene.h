@@ -59,14 +59,6 @@ struct TerrainInfo
 	int index;
 };
 
-struct LightProbeGrid {
-	EntityRef entity;
-	IVec3 resolution;
-	Vec3 half_extents;
-	u64 guid;
-	Texture* data[7] = {};
-};
-
 struct Environment
 {
 	enum Flags : u32{
@@ -103,10 +95,11 @@ struct ReflectionProbe
 		ENABLED = 1 << 2,
 	};
 
-	Texture* radiance = nullptr;
+	Texture* texture = nullptr;
 	u64 guid;
 	FlagSet<Flags, u32> flags;
 	u32 size = 128;
+	Vec3 half_extents;
 };
 
 struct EnvironmentProbe
@@ -234,9 +227,6 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual Vec4 getShadowmapCascades(EntityRef entity) = 0;
 	virtual void setShadowmapCascades(EntityRef entity, const Vec4& value) = 0;
 
-	virtual LightProbeGrid& getLightProbeGrid(EntityRef entity) = 0;
-	virtual Span<LightProbeGrid> getLightProbeGrids() = 0;
-
 	virtual DebugTriangle* addDebugTriangles(int count) = 0;
 	virtual void addDebugTriangle(const DVec3& p0, const DVec3& p1, const DVec3& p2, u32 color) = 0;
 	virtual void addDebugLine(const DVec3& from, const DVec3& to, u32 color) = 0; 
@@ -330,9 +320,11 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
 
+	virtual Span<EntityRef> getReflectionProbesEntities() = 0;
 	virtual ReflectionProbe& getReflectionProbe(EntityRef entity) = 0;
 	virtual void enableReflectionProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isReflectionProbeEnabled(EntityRef entity) = 0;
+	virtual Span<const ReflectionProbe> getReflectionProbes() = 0;
 
 	virtual Span<EntityRef> getEnvironmentProbesEntities() = 0;
 	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;

@@ -62,7 +62,6 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
-static const ComponentType LIGHT_PROBE_GRID_TYPE = Reflection::getComponentType("light_probe_grid");
 
 
 
@@ -2489,211 +2488,6 @@ void captureCubemap(StudioApp& app
 	renderer->queue(rjob, 0);
 }
 
-struct LightProbeGridPlugin final : PropertyGrid::IPlugin {
-	struct Job {
-		Job(LightProbeGridPlugin& plugin, u32 idx, IAllocator& allocator) 
-			: plugin(plugin)
-			, data(allocator)
-			, index(idx)
-		{}
-
-		u32 index;
-		LightProbeGridPlugin& plugin;
-		Array<Vec4> data;
-		bool done = false;
-	};
-	
-	LightProbeGridPlugin(StudioApp& app)
-		: m_app(app)
-		, m_jobs(app.getAllocator())
-		, m_result(app.getAllocator())
-	{
-		Engine& engine = app.getEngine();
-		PluginManager& plugin_manager = engine.getPluginManager();
-		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-		IAllocator& allocator = app.getAllocator();
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
-	}
-	
-	~LightProbeGridPlugin() {
-		Pipeline::destroy(m_pipeline);
-	}
-
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
-		if (cmp.type != LIGHT_PROBE_GRID_TYPE) return;
-
-		if (ImGui::CollapsingHeader("Generator")) {
-			if (ImGui::Button("Generate")) generate(cmp, false);
-			if (ImGui::Button("Add bounce")) generate(cmp, true);
-		}
-	}
-
-	void generate(ComponentUID cmp, bool bounce) {
-		m_bounce = bounce;
-		RenderScene* scene = (RenderScene*)cmp.scene;
-		EntityRef e = (EntityRef)cmp.entity;
-		Universe& universe = scene->getUniverse();
-		m_grid = scene->getLightProbeGrid(e);
-		m_to_dispatch = m_grid.resolution.x * m_grid.resolution.y * m_grid.resolution.z;
-		m_total = m_to_dispatch;
-		m_position = universe.getPosition(e);
-		m_result.resize(m_total);
-	}
-
-	void update() override {
-		IAllocator& allocator = m_app.getAllocator();
-		if (m_to_dispatch > 0) {
-			--m_to_dispatch;
-			Job* job = LUMIX_NEW(allocator, Job)(*this, m_to_dispatch, allocator);
-
-			m_pipeline->define("PROBE_BOUNCE", m_bounce);
-			const Vec3 cell_size = 2.f * m_grid.half_extents / m_grid.resolution;
-			const DVec3 origin = m_position - m_grid.half_extents + cell_size * 0.5f;
-			const IVec3 loc(m_to_dispatch % m_grid.resolution.x
-				, (m_to_dispatch / m_grid.resolution.x) % m_grid.resolution.y
-				, m_to_dispatch / (m_grid.resolution.x * m_grid.resolution.y));
-			const DVec3 pos = origin + cell_size * loc;
-			captureCubemap(m_app, *m_pipeline, 32, pos, Ref(job->data), [job](){
-				JobSystem::run(job, [](void* ptr) {
-					Job* pjob = (Job*)ptr;
-
-					const bool ndc_bottom_left = gpu::isOriginBottomLeft();
-					if (!ndc_bottom_left) {
-						const u32 texture_size = (u32)sqrtf(pjob->data.size() / 6.f);
-						for (int i = 0; i < 6; ++i) {
-							Vec4* tmp = &pjob->data[i * texture_size * texture_size];
-							if (i == 2 || i == 3) {
-								flipY(tmp, texture_size);
-							}
-							else {
-								flipX(tmp, texture_size);
-							}
-						}
-					}
-
-					pjob->plugin.m_result[pjob->index].compute(pjob->data);
-					memoryBarrier();
-					pjob->done = true;
-				}, nullptr);
-
-			});
-			m_jobs.push(job);
-		}
-
-		if (m_total > 0) {
-			const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
-
-			const ImVec2 pos = ImGui::GetMainViewport()->Pos;
-			ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f + pos.x, 30 + pos.y));
-			ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
-			ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
-			ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
-				| ImGuiWindowFlags_AlwaysAutoResize
-				| ImGuiWindowFlags_NoMove
-				| ImGuiWindowFlags_NoSavedSettings;
-			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
-			if (ImGui::Begin("Light probe grid generation", nullptr, flags)) {
-				ImGui::Text("%s", "Generating light probe grid...");
-				ImGui::Text("%s", "Manipulating with entities at this time can produce incorrect probes.");
-				ImGui::ProgressBar(((float)m_total - m_to_dispatch) / m_total, ImVec2(-1, 0), StaticString<64>(m_total - m_to_dispatch, " / ", m_total));
-			}
-			ImGui::End();
-			ImGui::PopStyleVar();
-		}
-
-		for (int i = m_jobs.size() - 1; i >= 0; --i) {
-			if (m_jobs[i]->done) {
-				LUMIX_DELETE(allocator, m_jobs[i]);
-				m_jobs.swapAndPop(i);
-			}
-		}
-
-		if (m_total > 0) {
-			if (m_to_dispatch == 0 && m_jobs.empty()) {
-				Universe* universe = m_app.getWorldEditor().getUniverse();
-				const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-				StaticString<MAX_PATH_LENGTH> dir(base_path, "universes/", universe->getName(), "/probes/");
-				if (!OS::makePath(dir) && !OS::dirExists(dir)) {
-					logError("Editor") << "Failed to create " << dir;
-				}
-
-				for (u32 sh_idx = 0; sh_idx < 7; ++sh_idx) {
-					StaticString<MAX_PATH_LENGTH> path(dir, m_grid.guid, "_grid", sh_idx, ".raw");
-					StaticString<MAX_PATH_LENGTH> meta_path(dir, m_grid.guid, "_grid", sh_idx, ".raw.meta");
-					
-					OS::OutputFile meta_file;
-					if (!meta_file.open(meta_path)) {
-						logError("Editor") << "Failed to create " << path;
-					}
-					else {
-						meta_file << "wrap_mode_u = \"clamp\"\n";
-						meta_file << "wrap_mode_v = \"clamp\"\n";
-						meta_file << "wrap_mode_w = \"clamp\"\n";
-					}
-					meta_file.close();
-
-					OS::OutputFile file;
-					if (!file.open(path)) {
-						logError("Editor") << "Failed to create " << path;
-						return;
-					}
-					RawTextureHeader header;
-					header.is_array = false;
-					header.width = m_grid.resolution.x;
-					header.height = m_grid.resolution.y;
-					header.depth = m_grid.resolution.z;
-					header.channels_count = 4;
-					header.channel_type = RawTextureHeader::ChannelType::FLOAT;
-					file.write(&header, sizeof(header));
-					const u32 c0 = (sh_idx * 4 + 0) / 3;
-					const u32 c1 = (sh_idx * 4 + 1) / 3;
-					const u32 c2 = (sh_idx * 4 + 2) / 3;
-					const u32 c3 = (sh_idx * 4 + 3) / 3;
-					const u32 c00 = (sh_idx * 4 + 0) % 3;
-					const u32 c10 = (sh_idx * 4 + 1) % 3;
-					const u32 c20 = (sh_idx * 4 + 2) % 3;
-					const u32 c30 = (sh_idx * 4 + 3) % 3;
-					if (sh_idx == 6) {
-						for (u32 i = 0; i < m_total; ++i) {
-							Vec4 v;
-							v.x = (&m_result[i].coefs[c0].x)[c00];
-							v.y = (&m_result[i].coefs[c1].x)[c10];
-							v.z = (&m_result[i].coefs[c2].x)[c20];
-							v.w = 0;
-							file.write(&v, sizeof(v));
-						}
-					}
-					else {
-						for (u32 i = 0; i < m_total; ++i) {
-							Vec4 v;
-							v.x = (&m_result[i].coefs[c0].x)[c00];
-							v.y = (&m_result[i].coefs[c1].x)[c10];
-							v.z = (&m_result[i].coefs[c2].x)[c20];
-							v.w = (&m_result[i].coefs[c3].x)[c30]; //-V557
-							file.write(&v, sizeof(v));
-						}
-					}
-					file.close();
-				}
-
-				m_total = 0;
-				m_to_dispatch = 0;
-			}
-		}
-	}
-
-	Pipeline* m_pipeline;
-	StudioApp& m_app;
-	bool m_bounce;
-	LightProbeGrid m_grid;
-	Array<SphericalHarmonics> m_result;
-	u32 m_to_dispatch = 0;
-	u32 m_total = 0;
-	DVec3 m_position;
-	Array<Job*> m_jobs;
-};
-
 struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 {
 	explicit EnvironmentProbePlugin(StudioApp& app)
@@ -2715,7 +2509,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	bool saveCubemap(u64 probe_guid, const u8* data, int texture_size, const char* postfix, nvtt::Format format)
+	bool saveCubemap(u64 probe_guid, const Vec4* data, int texture_size)
 	{
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
@@ -2727,7 +2521,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		if (!OS::makePath(path) && !OS::dirExists(path)) {
 			logError("Editor") << "Failed to create " << path;
 		}
-		path << probe_guid << postfix << ".dds";
+		path << probe_guid << ".dds";
 		OS::OutputFile file;
 		if (!file.open(path)) {
 			logError("Editor") << "Failed to create " << path;
@@ -2741,9 +2535,20 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		input.setAlphaMode(nvtt::AlphaMode_None);
 		input.setNormalMap(false);
 		input.setTextureLayout(nvtt::TextureType_Cube, texture_size, texture_size);
+		Array<Color> rgbm(m_app.getAllocator());
+		rgbm.resize(texture_size * texture_size * 4);
 		for (int i = 0; i < 6; ++i) {
+			const Vec4* face = &data[texture_size * texture_size * i];
+			for (u32 j = 0, c = texture_size * texture_size; j < c; ++j) {
+				const float m = clamp(maximum(face[j].x, face[j].y, face[j].z), 1/64.f, 4.f);
+				rgbm[j].r = u8(clamp(face[j].z / m * 255, 0.f, 255.f));
+				rgbm[j].g = u8(clamp(face[j].y / m * 255, 0.f, 255.f));
+				rgbm[j].b = u8(clamp(face[j].x / m * 255, 0.f, 255.f));
+				rgbm[j].a = u8(clamp(255.f * m / 4, 1.f, 255.f));
+			}
+
 			const int step = texture_size * texture_size * 4;
-			input.setMipmapData(data + step * i, texture_size, texture_size, 1, i);
+			input.setMipmapData(rgbm.begin(), texture_size, texture_size, 1, i);
 		}
 		
 		nvtt::OutputOptions output;
@@ -2759,7 +2564,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		output.setOutputHandler(&output_handler);
 
 		nvtt::CompressionOptions compression;
-		compression.setFormat(format);
+		compression.setFormat(nvtt::Format::Format_BC3);
 		compression.setQuality(nvtt::Quality_Fastest);
 
 		if (!context.process(input, compression, output)) {
@@ -2769,6 +2574,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		file.close();
 		return true;
 	}
+
 
 
 	void generateCubemaps(bool bounce, bool fast_filter) {
@@ -2783,23 +2589,33 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		m_pipeline->define("PROBE_BOUNCE", bounce);
 
 		auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
-		const Span<EntityRef> probes = scene->getEnvironmentProbesEntities();
-		m_probes.reserve(probes.length());
+		const Span<EntityRef> env_probes = scene->getEnvironmentProbesEntities();
+		const Span<EntityRef> reflection_probes = scene->getReflectionProbesEntities();
+		m_probes.reserve(env_probes.length() + reflection_probes.length());
 		IAllocator& allocator = m_app.getAllocator();
-		for (EntityRef p : probes) {
+		for (EntityRef p : env_probes) {
 			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, p, allocator);
 			
 			const EntityPtr env_entity = scene->getActiveEnvironment();
 			job->env_probe = scene->getEnvironmentProbe(p);
 			job->is_reflection = false;
 			job->position = universe->getPosition(p);
-			job->universe_name = universe->getName();
-			if (env_entity.isValid()) {
-				job->fast_filter = fast_filter;
-			}
 
 			m_probes.push(job);
 		}
+
+		for (EntityRef p : reflection_probes) {
+			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, p, allocator);
+			
+			job->reflection_probe = scene->getReflectionProbe(p);
+			job->is_reflection = true;
+			job->position = universe->getPosition(p);
+			job->universe_name = universe->getName();
+			job->fast_filter = fast_filter;
+
+			m_probes.push(job);
+		}
+
 		m_probe_counter += m_probes.size();
 	}
 
@@ -2885,6 +2701,15 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		}
 
 		if (m_done_counter == m_probe_counter) {
+			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
+			StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
+			if (!OS::dirExists(path) && !OS::makePath(path)) {
+				logError("Editor") << "Failed to create " << path;
+			}
+			path << "/probes/";
+			if (!OS::dirExists(path) && !OS::makePath(path)) {
+				logError("Editor") << "Failed to create " << path;
+			}
 			while (!m_probes.empty()) {
 				ProbeJob& job = *m_probes.back();
 				m_probes.pop();
@@ -2892,16 +2717,15 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				ASSERT(job.done_counted);
 
 				if (job.is_reflection) {
-					auto move = [job](u64 guid, const char* postfix){
-						const StaticString<MAX_PATH_LENGTH> tmp_path("universes/", job.universe_name, "/probes_tmp/", guid, postfix, ".dds");
-						const StaticString<MAX_PATH_LENGTH> path("universes/", job.universe_name, "/probes/", guid, postfix, ".dds");
-						if (!OS::fileExists(tmp_path)) return;
-						if (!OS::moveFile(tmp_path, path)) {
-							logError("Editor") << "Failed to move file " << tmp_path;
-						}
-					};
-					move(job.reflection_probe.guid, "");
-					move(job.reflection_probe.guid, "_radiance");
+
+					const u64 guid = job.reflection_probe.guid;
+
+					const StaticString<MAX_PATH_LENGTH> tmp_path(base_path, "/universes/", job.universe_name, "/probes_tmp/", guid, ".dds");
+					const StaticString<MAX_PATH_LENGTH> path(base_path, "/universes/", job.universe_name, "/probes/", guid, ".dds");
+					if (!OS::fileExists(tmp_path)) return;
+					if (!OS::moveFile(tmp_path, path)) {
+						logError("Editor") << "Failed to move file " << tmp_path << " to " << path;
+					}
 				}
 
 				Universe* universe = m_app.getWorldEditor().getUniverse();
@@ -2952,22 +2776,16 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					, 128
 					, cmft::LightingModel::BlinnBrdf
 					, false
-					, 1
+					, 7
 					, 10
 					, 1
 					, cmft::EdgeFixup::None
 					, OS::getCPUsCount()
 				);
 			}
-			cmft::imageFromRgba32f(image, cmft::TextureFormat::RGBA8);
-			saveCubemap(job.reflection_probe.guid, (u8*)image.m_data, 128, "_radiance", nvtt::Format_DXT1);
+			saveCubemap(job.reflection_probe.guid, (Vec4*)image.m_data, 128);
 		}
 
-		// TODO save reflection, careful, job.data is float
-		/*if (job.probe.flags.isSet(EnvironmentProbe::REFLECTION)) {
-			for (int i = 3; i < job.data.size(); i += 4) job.data[i] = 0xff; 
-			saveCubemap(job.probe.guid, &job.data[0], texture_size, "", nvtt::Format_DXT1);
-		}*/
 
 		memoryBarrier();
 		job.done = true;
@@ -2996,9 +2814,10 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			if (m_probe_counter) ImGui::Text("Generating...");
 			else {
 				const ReflectionProbe& probe = scene->getReflectionProbe(e);
-				if (probe.radiance && probe.flags.isSet(ReflectionProbe::ENABLED)) {
-					ImGui::LabelText("Path", "%s", probe.radiance->getPath().c_str());
-					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(probe.radiance->getPath(), true, false);
+				if (probe.texture && probe.flags.isSet(ReflectionProbe::ENABLED)) {
+					ImGuiEx::Label("Path");
+					ImGui::TextUnformatted(probe.texture->getPath().c_str());
+					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(probe.texture->getPath(), true, false);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
 					ImGui::Checkbox("Fast filter", &m_fast_filter);
@@ -3705,7 +3524,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.registerComponent(ICON_FA_CAMERA, "camera", "Render / Camera");
 		m_app.registerComponent(ICON_FA_GLOBE, "environment", "Render / Environment");
-		m_app.registerComponent("", "light_probe_grid", "Render / Light probe grid");
 		m_app.registerComponent(ICON_FA_CUBES, "model_instance", "Render / Mesh", Model::TYPE, "Source");
 		m_app.registerComponent(ICON_FA_SMOG, "particle_emitter",	"Render / Particle emitter", ParticleEmitterResource::TYPE, "Resource");
 		m_app.registerComponent(ICON_FA_LIGHTBULB, "point_light", "Render / Point light");
@@ -3759,12 +3577,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_model_properties_plugin = LUMIX_NEW(allocator, ModelPropertiesPlugin)(m_app);
 		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(m_app);
-		m_light_probe_grid_plugin = LUMIX_NEW(allocator, LightProbeGridPlugin)(m_app);
 		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(m_app);
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(*m_model_properties_plugin);
 		property_grid.addPlugin(*m_env_probe_plugin);
-		property_grid.addPlugin(*m_light_probe_grid_plugin);
 		property_grid.addPlugin(*m_terrain_plugin);
 
 		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
@@ -3773,16 +3589,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.addPlugin(*m_scene_view);
 		m_app.addPlugin(*m_game_view);
 		m_app.addPlugin(*m_editor_ui_render_plugin);
-	}
-
-	void showLightProbeGridGizmo(UniverseView& view, ComponentUID cmp) {
-		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
-		const Universe& universe = scene->getUniverse();
-		EntityRef e = (EntityRef)cmp.entity;
-		const LightProbeGrid& lpg = scene->getLightProbeGrid(e);
-		const DVec3 pos = universe.getPosition(e);
-
-		addCube(view, pos - lpg.half_extents, pos + lpg.half_extents, Color::BLUE);
 	}
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
@@ -3817,6 +3623,26 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, Ref(tr), Ref(p.outer_range), cfg, false)) {
 			editor.beginCommandGroup(crc32("env_probe_outer_range"));
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Outer range", Span(&e, 1), p.outer_range);
+			editor.setEntitiesPositions(&e, &tr.pos, 1);
+			editor.endCommandGroup();
+		}
+	}
+
+	
+	void showReflectionProbeGizmo(UniverseView& view, ComponentUID cmp) {
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		const Universe& universe = scene->getUniverse();
+		EntityRef e = (EntityRef)cmp.entity;
+		ReflectionProbe& p = scene->getReflectionProbe(e);
+		Transform tr = universe.getTransform(e);
+		const DVec3 pos = universe.getPosition(e);
+		const Quat rot = universe.getRotation(e);
+
+		const Gizmo::Config& cfg = m_app.getGizmoConfig();
+		WorldEditor& editor = m_app.getWorldEditor();
+		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, Ref(tr), Ref(p.half_extents), cfg, false)) {
+			editor.beginCommandGroup(crc32("refl_probe_half_ext"));
+			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Half extents", Span(&e, 1), p.half_extents);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();
 		}
@@ -3919,8 +3745,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 			showEnvironmentProbeGizmo(view, cmp);
 			return true;
 		}
-		if (cmp.type == LIGHT_PROBE_GRID_TYPE) {
-			showLightProbeGridGizmo(view, cmp);
+		if (cmp.type == REFLECTION_PROBE_TYPE) {
+			showReflectionProbeGizmo(view, cmp);
 			return true;
 		}
 		return false;
@@ -3959,12 +3785,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		property_grid.removePlugin(*m_model_properties_plugin);
 		property_grid.removePlugin(*m_env_probe_plugin);
-		property_grid.removePlugin(*m_light_probe_grid_plugin);
 		property_grid.removePlugin(*m_terrain_plugin);
 
 		LUMIX_DELETE(allocator, m_model_properties_plugin);
 		LUMIX_DELETE(allocator, m_env_probe_plugin);
-		LUMIX_DELETE(allocator, m_light_probe_grid_plugin);
 		LUMIX_DELETE(allocator, m_terrain_plugin);
 
 		m_app.removePlugin(*m_scene_view);
@@ -3988,7 +3812,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	ShaderPlugin* m_shader_plugin;
 	ModelPropertiesPlugin* m_model_properties_plugin;
 	EnvironmentProbePlugin* m_env_probe_plugin;
-	LightProbeGridPlugin* m_light_probe_grid_plugin;
 	TerrainPlugin* m_terrain_plugin;
 	SceneView* m_scene_view;
 	GameView* m_game_view;

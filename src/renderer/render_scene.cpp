@@ -49,7 +49,6 @@ static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain"
 static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
-static const ComponentType LIGHT_PROBE_GRID_TYPE = Reflection::getComponentType("light_probe_grid");
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 
 
@@ -261,16 +260,10 @@ public:
 		m_culling_system->clear();
 
 		for (auto& probe : m_reflection_probes) {
-			if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
+			if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
 		}
 
-		for (auto& lpg : m_light_probe_grids)
-		{
-			for (Texture* t : lpg.data) {
-				if (t) t->getResourceManager().unload(*t);
-			}
-		}
-
+		m_reflection_probes.clear();
 		m_environment_probes.clear();
 	}
 
@@ -587,18 +580,6 @@ public:
 		}
 	}
 
-	void loadLightProbeGridData(LightProbeGrid& lp) const {
-		StaticString<MAX_PATH_LENGTH> dir("universes/", m_universe.getName(), "/probes/");
-		ResourceManagerHub& manager = m_engine.getResourceManager();
-		for (u32 i = 0; i < lengthOf(lp.data); ++i) {
-			const StaticString<MAX_PATH_LENGTH> path_str(dir, lp.guid, "_grid", i, ".raw");
-			lp.data[i] = manager.load<Texture>(Path(path_str));
-			lp.data[i]->setFlag(Texture::Flags::CLAMP_U, true);
-			lp.data[i]->setFlag(Texture::Flags::CLAMP_V, true);
-			lp.data[i]->setFlag(Texture::Flags::CLAMP_W, true);
-		}
-	}
-
 	void setTextMeshText(EntityRef entity, const char* text) override
 	{
 		m_text_meshes.get(entity)->text = text;
@@ -877,17 +858,6 @@ public:
 		}
 	}
 
-	void serializeLightProbeGrids(OutputMemoryStream& serializer) {
-		const i32 count = m_light_probe_grids.size();
-		serializer.write(count);
-		for (auto iter : m_light_probe_grids) {
-			serializer.write(iter.entity);
-			serializer.write(iter.guid);
-			serializer.write(iter.resolution);
-			serializer.write(iter.half_extents);
-		}
-	}
-
 	void serializeEnvironmentProbes(OutputMemoryStream& serializer)
 	{
 		i32 count = m_environment_probes.size();
@@ -912,26 +882,10 @@ public:
 			serializer.write(probe.guid);
 			serializer.write(probe.flags.base);
 			serializer.write(probe.size);
+			serializer.write(probe.half_extents);
 		}
 	}
 
-	void deserializeLightProbeGrids(InputMemoryStream& serializer, const EntityMap& entity_map) {
-		u32 count;
-		serializer.read(count);
-		m_light_probe_grids.reserve(count + m_light_probe_grids.size());
-		for (u32 i = 0; i < count; ++i) {
-			LightProbeGrid lp;
-			serializer.read(lp.entity);
-			lp.entity = entity_map.get(lp.entity);
-			serializer.read(lp.guid);
-			serializer.read(lp.resolution);
-			serializer.read(lp.half_extents);
-			loadLightProbeGridData(lp);
-			m_light_probe_grids.insert(lp.entity, lp);
-			m_universe.onComponentCreated(lp.entity, LIGHT_PROBE_GRID_TYPE, this);
-		}
-	}
-	
 	void deserializeReflectionProbes(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
 		u32 count;
@@ -948,9 +902,10 @@ public:
 			serializer.read(probe.guid);
 			serializer.read(probe.flags.base);
 			serializer.read(probe.size);
-			ASSERT(probe.radiance == nullptr);
+			serializer.read(probe.half_extents);
+			ASSERT(probe.texture == nullptr);
 			StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
-			probe.radiance = manager.load<Texture>(Path(path_str));
+			probe.texture = manager.load<Texture>(Path(path_str));
 
 			m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
 		}
@@ -1032,7 +987,6 @@ public:
 		serializeBoneAttachments(serializer);
 		serializeEnvironmentProbes(serializer);
 		serializeReflectionProbes(serializer);
-		serializeLightProbeGrids(serializer);
 		serializeDecals(serializer);
 		serializeTextMeshes(serializer);
 	}
@@ -1153,7 +1107,6 @@ public:
 		deserializeBoneAttachments(serializer, entity_map);
 		deserializeEnvironmentProbes(serializer, entity_map);
 		deserializeReflectionProbes(serializer, entity_map);
-		deserializeLightProbeGrids(serializer, entity_map);
 		deserializeDecals(serializer, entity_map);
 		deserializeTextMeshes(serializer, entity_map);
 	}
@@ -1175,7 +1128,7 @@ public:
 	void destroyReflectionProbe(EntityRef entity)
 	{
 		ReflectionProbe& probe = m_reflection_probes[entity];
-		if (probe.radiance) probe.radiance->getResourceManager().unload(*probe.radiance);
+		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
 		m_reflection_probes.erase(entity);
 		m_universe.onComponentDestroyed(entity, REFLECTION_PROBE_TYPE, this);
 	}
@@ -1196,15 +1149,6 @@ public:
 		model_instance.flags.clear();
 		model_instance.flags.set(ModelInstance::VALID, false);
 		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
-	}
-
-	void destroyLightProbeGrid(EntityRef entity) {
-		const LightProbeGrid& lp = m_light_probe_grids[entity];
-		m_universe.onComponentDestroyed(entity, LIGHT_PROBE_GRID_TYPE, this);
-		for (Texture* t : lp.data) {
-			if (t) t->getResourceManager().unload(*t);
-		}
-		m_light_probe_grids.erase(entity);
 	}
 
 	void destroyEnvironment(EntityRef entity)
@@ -2282,14 +2226,6 @@ public:
 		line.to = to;
 		line.color = ARGBToABGR(color);
 	}
-	
-	Span<LightProbeGrid> getLightProbeGrids() override {
-		return Span(m_light_probe_grids.begin(), m_light_probe_grids.size());
-	}
-
-	LightProbeGrid& getLightProbeGrid(EntityRef entity) override {
-		return m_light_probe_grids[entity];
-	}
 
 	DebugTriangle* addDebugTriangles(int count) override
 	{
@@ -2437,12 +2373,20 @@ public:
 		return m_reflection_probes[entity].flags.isSet(ReflectionProbe::ENABLED);
 	}
 	
+	Span<const ReflectionProbe> getReflectionProbes() override {
+		return m_reflection_probes.values();
+	}
+	
 	Span<const EnvironmentProbe> getEnvironmentProbes() override {
 		return m_environment_probes.values();
 	}
 	
 	Span<EntityRef> getEnvironmentProbesEntities() override {
 		return m_environment_probes.keys();
+	}
+	
+	Span<EntityRef> getReflectionProbesEntities() override {
+		return m_reflection_probes.keys();
 	}
 
 	EnvironmentProbe& getEnvironmentProbe(EntityRef entity) override
@@ -2652,18 +2596,6 @@ public:
 
 	IAllocator& getAllocator() override { return m_allocator; }
 
-	void createLightProbeGrid(EntityRef entity) {
-		LightProbeGrid lp = {};
-		lp.entity = entity;
-		lp.guid = randGUID();
-		lp.resolution = IVec3(32, 8, 32);
-		lp.half_extents = Vec3(16.f, 4.f, 16.f);
-		loadLightProbeGridData(lp);
-		m_light_probe_grids.insert(entity, lp);
-
-		m_universe.onComponentCreated(entity, LIGHT_PROBE_GRID_TYPE, this);
-	}
-
 	void createEnvironment(EntityRef entity)
 	{
 		Environment light;
@@ -2743,7 +2675,7 @@ public:
 		probe.guid = randGUID();
 
 		StaticString<MAX_PATH_LENGTH> path;
-		probe.radiance = nullptr;
+		probe.texture = nullptr;
 		probe.flags.set(ReflectionProbe::ENABLED);
 
 		m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
@@ -2821,7 +2753,6 @@ private:
 	Array<ModelInstance> m_model_instances;
 	Array<MeshSortData> m_mesh_sort_data;
 	HashMap<EntityRef, Environment> m_environments;
-	AssociativeArray<EntityRef, LightProbeGrid> m_light_probe_grids;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera = INVALID_ENTITY;
 	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
@@ -2861,7 +2792,6 @@ static struct
 } COMPONENT_INFOS[] = {
 	COMPONENT_TYPE(MODEL_INSTANCE_TYPE, ModelInstance),
 	COMPONENT_TYPE(ENVIRONMENT_TYPE, Environment),
-	COMPONENT_TYPE(LIGHT_PROBE_GRID_TYPE, LightProbeGrid),
 	COMPONENT_TYPE(POINT_LIGHT_TYPE, PointLight),
 	COMPONENT_TYPE(DECAL_TYPE, Decal),
 	COMPONENT_TYPE(CAMERA_TYPE, Camera),
@@ -2906,7 +2836,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
 	, m_mesh_sort_data(m_allocator)
-	, m_light_probe_grids(m_allocator)
 {
 
 	m_universe.entityTransformed().bind<&RenderSceneImpl::onEntityMoved>(this);

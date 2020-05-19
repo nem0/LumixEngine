@@ -51,7 +51,7 @@ fragment_shader [[
 
 		float fog_factor = getFogFactor(u_camera_world_pos.y, u_camera_world_pos.y + wpos.y, wpos, u_fog_params.x, u_fog_params.y, u_fog_params.z);
 		o_color.rgb = mix(direct, u_fog_color.rgb, fog_factor);
-
+		
 		ivec3 cluster;
 		int cluster_idx = getClusterIndex(ndc_depth, cluster);
 
@@ -105,7 +105,7 @@ fragment_shader [[
 				+ b_probes[probe_idx].sh_coefs[8].rgb * (N.x * N.x - N.y * N.y);
 			irradiance = max(vec3(0), irradiance);
 			vec3 indirect = PBR_ComputeIndirectDiffuse(irradiance, albedo, metallic, N, V);
-			probe_light += (indirect * u_light_indirect_intensity) * w;
+			probe_light += (indirect * u_light_indirect_intensity) * w / M_PI;
 			if (remaining_w <= 0) break;
 		}
 		if (remaining_w < 1) {

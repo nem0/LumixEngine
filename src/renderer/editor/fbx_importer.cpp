@@ -935,6 +935,8 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 
 		writeString("shader \"pipelines/standard.shd\"\n");
 		if (material.alpha_cutout) writeString("defines {\"ALPHA_CUTOUT\"}\n");
+		if (material.textures[2].is_valid) writeString("metallic(1.000000)");
+
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {
 				const StaticString<MAX_PATH_LENGTH> meta_path(texture.src, ".meta");
