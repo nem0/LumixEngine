@@ -950,10 +950,6 @@ struct StudioAppImpl final : StudioApp
 		Span<EntityRef> entities(&env, 1);
 		m_editor->addComponent(entities, env_cmp_type);
 		m_editor->addComponent(entities, lua_script_cmp_type);
-		const float intensity = 3;
-		m_editor->setProperty(env_cmp_type, "", -1, "Intensity", Span(&env, 1), intensity);
-		const float indirect_intensity = 0.3f;
-		m_editor->setProperty(env_cmp_type, "", -1, "Indirect intensity", Span(&env, 1), indirect_intensity);
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
 		m_editor->setEntitiesRotations(&env, &rot, 1);

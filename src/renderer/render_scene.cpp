@@ -2602,7 +2602,7 @@ public:
 		light.flags.set(Environment::CAST_SHADOWS);
 		light.entity = entity;
 		light.diffuse_color.set(1, 1, 1);
-		light.diffuse_intensity = 0;
+		light.diffuse_intensity = 1;
 		light.indirect_intensity = 1;
 		light.fog_color.set(1, 1, 1);
 		light.fog_density = 0;
