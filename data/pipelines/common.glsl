@@ -20,8 +20,6 @@ const vec2 POISSON_DISK_16[16] = vec2[](
 	vec2(0.6104985,0.7838438)
 );
 
-layout (binding=15) uniform samplerCube u_radiancemap;
-
 struct Probe {
 	vec4 pos;
 	vec4 rot;
@@ -265,13 +263,24 @@ vec3 PBR_ComputeDirectLight(vec3 albedo
 	float ndotl = saturate(dot(N, L));
 	float hdotv = saturate(dot(H, V));
 	
-	float D = D_GGX(ndoth, roughness);
-	float G = G_SmithSchlickGGX(ndotl, ndotv, roughness);
-	vec3 F = F_Schlick(hdotv, F0);
-	vec3 specular = (D * G * F) / max(4 * ndotv * ndotl, 0.001);
+	// D GGX
+	float a = roughness * roughness;
+	float a2 = a * a;
+	float f = max(1e-5, (ndoth * ndoth) * (a2 - 1) + 1);
+	float D = a2 / (f * f * M_PI);
+
+	// G SmithSchlickGGX
+	float k = max(1e-5, a * 0.5);
+	float l = ndotl / (ndotl * (1.0 - k) + k);
+	float v = ndotv / (ndotv * (1.0 - k) + k);
+	float G = l * v;
 	
-	vec3 kS = F;
-	vec3 kD = vec3(1.0) - kS;
+	// F Schlick 
+	vec3 F = mix(F0, vec3(1), pow(1.0 - hdotv, 5.0)); 
+	
+	vec3 specular = D * G * F / max(1e-5, 4 * ndotv * ndotl);
+	
+	vec3 kD = vec3(1.0) - F;
 	kD *= 1.0 - metallic;
 	return (kD * albedo / M_PI + specular) * light_color * ndotl;
 }	
@@ -305,17 +314,18 @@ vec3 PBR_ComputeIndirectSpecular(samplerCube radiancemap, vec3 albedo, float met
 	vec3 F0 = mix(vec3(0.04), albedo, metallic);		
 	float lod = roughness * 8;
 	vec3 RV = reflect(-V, N);
-	vec3 radiance = textureLod(radiancemap, RV, lod).rgb;    
+	vec4 radiance_rgbm = textureLod(radiancemap, RV, lod);
+	vec3 radiance = radiance_rgbm.rgb * radiance_rgbm.a * 4;
 	return radiance * env_brdf_approx(F0, roughness, ndotv);
 }
 
 vec3 PBR_ComputeIndirectLight(vec3 albedo, float roughness, float metallic, vec3 N, vec3 V)
 {
-	// TODO diffuse
+	// TODO
 	//vec3 diffuse = PBR_ComputeIndirectDiffuse(u_irradiancemap, albedo, metallic, N, V);
-	vec3 specular = PBR_ComputeIndirectSpecular(u_radiancemap, albedo, metallic, roughness, N, V);
+	//vec3 specular = PBR_ComputeIndirectSpecular(u_radiancemap, albedo, metallic, roughness, N, V);
 	
-	return /*diffuse + */specular;
+	return /*diffuse + specular*/ vec3(0);
 }
 
 vec3 rotateByQuat(vec4 rot, vec3 pos)

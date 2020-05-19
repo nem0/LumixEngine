@@ -378,7 +378,8 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("reflection_probe",
 			property("Enabled", &RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe),
-			var_property("size", &RenderScene::getReflectionProbe, &ReflectionProbe::size)
+			var_property("size", &RenderScene::getReflectionProbe, &ReflectionProbe::size),
+			var_property("half_extents", &RenderScene::getReflectionProbe, &ReflectionProbe::half_extents)
 		),
 		component("particle_emitter",
 			property("Resource", LUMIX_PROP(RenderScene, ParticleEmitterPath),
@@ -395,10 +396,6 @@ static void registerProperties(IAllocator& allocator)
 			property("Enabled", &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
 				ResourceAttribute("Mesh (*.msh)", Model::TYPE))
-		),
-		component("light_probe_grid",
-			var_property("Resolution", &RenderScene::getLightProbeGrid, &LightProbeGrid::resolution),
-			var_property("Half extents", &RenderScene::getLightProbeGrid, &LightProbeGrid::half_extents)
 		),
 		component("environment",
 			var_property("Color", &RenderScene::getEnvironment, &Environment::diffuse_color, ColorAttribute()),

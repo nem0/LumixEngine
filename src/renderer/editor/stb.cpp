@@ -1,5 +1,6 @@
 // stb_image is already implemented in cmft and nvtt
 //#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #if defined _MSC_VER && _MSC_VER == 1900 
 #pragma warning(disable : 4312)

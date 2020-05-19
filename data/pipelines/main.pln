@@ -1,10 +1,9 @@
-local direct_shader = preloadShader("pipelines/direct.shd")
+local lighting_shader = preloadShader("pipelines/lighting.shd")
 local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local debug_clusters_shader = preloadShader("pipelines/debug_clusters.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
-local indirect_shader =  preloadShader("pipelines/indirect.shd")
-local light_probe_grid_shader =  preloadShader("pipelines/light_probe_grid.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
+local indirect_specular_shader = preloadShader("pipelines/indirect_specular.shd")
 local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
 local debug_shadowmap = false
@@ -105,71 +104,9 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
 	local view_params = getCameraParams()
-
-	--[[if PROBE_BOUNCE == nil or PROBE_BOUNCE then
-		beginBlock("indirect diffuse")
-			beginBlock("weights")
-				local wrb = createRenderbuffer(1, 1, true, "r16f", "indirect_weights")
-				setRenderTargetsReadonlyDS(wrb, gbuffer_depth)
-				clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
-				bindRenderbuffers({
-					gbuffer0,
-					gbuffer1,
-					gbuffer2,
-					gbuffer_depth,
-				}, 0)
-				renderEnvProbeVolumes(indirect_shader, view_params, false, true)
-			endBlock()
-
-			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
-			bindRenderbuffers({
-				gbuffer0,
-				gbuffer1,
-				gbuffer2,
-				gbuffer_depth,
-				wrb,
-			}, 0)
-			renderEnvProbeVolumes(indirect_shader, view_params, false, false)
-		endBlock()
-
-		beginBlock("indirect specular")
-			beginBlock("weights")
-				setRenderTargetsReadonlyDS(wrb, gbuffer_depth)
-				clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
-				bindRenderbuffers({
-					gbuffer0,
-					gbuffer1,
-					gbuffer2,
-					gbuffer_depth,
-				}, 0)
-				renderEnvProbeVolumes(indirect_shader, view_params, true, true)
-			endBlock()
-
-			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
-			bindRenderbuffers({
-				gbuffer0,
-				gbuffer1,
-				gbuffer2,
-				gbuffer_depth,
-				wrb,
-			}, 0)
-			renderEnvProbeVolumes(indirect_shader, view_params, true, false)
-		endBlock()
-
-		beginBlock("light probe grid")
-			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
-			bindRenderbuffers({
-				gbuffer0,
-				gbuffer1,
-				gbuffer2,
-				gbuffer_depth,
-			}, 0)
-			renderLightProbeGrids(light_probe_grid_shader, view_params);
-		endBlock()
-	end]]--
 	
-	beginBlock("direct")
-	drawArray(0, 4, direct_shader,
+	beginBlock("lighting")
+	drawArray(0, 4, lighting_shader,
 		{
 			gbuffer0,
 			gbuffer1,
@@ -189,9 +126,21 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 			stencil_zpass = STENCIL_REPLACE,
 		}
 	)
-
 	endBlock()
 	
+	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
+		beginBlock("indirect_specular")
+			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
+			bindRenderbuffers({
+				gbuffer0,
+				gbuffer1,
+				gbuffer2,
+				gbuffer_depth
+			}, 0)
+			renderReflectionVolumes(view_params, indirect_specular_shader, 4)
+		endBlock()
+	end
+
 	--[[
 	beginBlock("local_lights")
 	bindRenderbuffers({
@@ -390,7 +339,9 @@ function main()
 		res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 	
-	res = tonemap(res)
+	if PROBE == nil then
+		res = tonemap(res)
+	end
 
 	if PREVIEW == nil and PROBE == nil then
 		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)

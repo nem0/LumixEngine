@@ -131,6 +131,7 @@ struct Span
 
 #pragma pack(1)
 struct Color {
+	Color() {}
 	Color(u32 abgr) { 
 		r = u8(abgr & 0xff);
 		g = u8((abgr >> 8) & 0xff);
