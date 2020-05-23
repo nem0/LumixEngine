@@ -69,7 +69,7 @@ struct LuaScriptScene : IScene
 	virtual int addScript(EntityRef entity, int scr_index) = 0;
 	virtual void removeScript(EntityRef entity, int scr_index) = 0;
 	virtual void enableScript(EntityRef entity, int scr_index, bool enable) = 0;
-	virtual bool isScriptEnabled(EntityRef entity, int scr_index) const = 0;
+	virtual bool isScriptEnabled(EntityRef entity, int scr_index) = 0;
 	virtual void moveScript(EntityRef entity, int scr_index, bool up) = 0;
 	virtual void serializeScript(EntityRef entity, int scr_index, OutputMemoryStream& blob) = 0;
 	virtual void deserializeScript(EntityRef entity, int scr_index, InputMemoryStream& blob) = 0;

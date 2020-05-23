@@ -102,13 +102,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		return attrs;
 	}
 
-
-	template <typename T>
-	bool skipProperty(const Reflection::Property<T>& prop)
-	{
-		return equalStrings(prop.name, "Enabled");
-	}
-
 	template <typename T>
 	void dynamicProperty(const ComponentUID& cmp, const Reflection::IDynamicProperties& prop, u32 prop_index) {
 		struct : Reflection::Property<T> {
@@ -179,7 +172,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<float>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		float f = prop.get(cmp, m_index);
@@ -198,7 +190,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<int>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		int value = prop.get(cmp, m_index);
 		auto* enum_attr = (Reflection::EnumAttribute*)Reflection::getAttribute(prop, Reflection::IAttribute::ENUM);
@@ -242,7 +233,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<u32>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		u32 value = prop.get(cmp, m_index);
 		
@@ -359,7 +349,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Vec2>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		Vec2 value = prop.get(cmp, m_index);
 		Attributes attrs = getAttributes(prop);
@@ -378,7 +367,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Vec3>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec3 value = prop.get(cmp, m_index);
@@ -407,7 +395,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<IVec3>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		IVec3 value = prop.get(cmp, m_index);
 		
@@ -422,7 +409,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Vec4>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec4 value = prop.get(cmp, m_index);
@@ -449,7 +435,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<bool>& prop) override
 	{
-		if (skipProperty(prop)) return;
+		if (equalIStrings(prop.name, "enabled") && m_index == -1 && m_entities.size() == 1) return;
 		ComponentUID cmp = getComponent();
 		bool value = prop.get(cmp, m_index);
 
@@ -465,7 +451,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<Path>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		const Path p = prop.get(cmp, m_index);
 		char tmp[MAX_PATH_LENGTH];
@@ -495,7 +480,6 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::Property<const char*>& prop) override
 	{
-		if (skipProperty(prop)) return;
 		ComponentUID cmp = getComponent();
 		const Attributes attrs = getAttributes(prop);
 		
