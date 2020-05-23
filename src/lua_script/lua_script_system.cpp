@@ -1936,7 +1936,7 @@ namespace Lumix
 		}
 
 
-		bool isScriptEnabled(EntityRef entity, int scr_index) const override
+		bool isScriptEnabled(EntityRef entity, int scr_index) override
 		{
 			return m_scripts[entity]->m_scripts[scr_index].m_flags.isSet(ScriptInstance::ENABLED);
 		}
@@ -2176,6 +2176,7 @@ namespace Lumix
 		static auto lua_scene = scene("lua_script",
 			component("lua_script",
 				array("scripts", &LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript, 
+					property("Enabled", &LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript),
 					property("Path", LUMIX_PROP(LuaScriptScene, ScriptPath), ResourceAttribute("Lua script (*.lua)", LuaScript::TYPE)),
 					LuaProperties()
 				)
