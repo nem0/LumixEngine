@@ -862,10 +862,10 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::TextureHandle staging = gpu::allocTextureHandle();
 		const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
 		gpu::createTexture(staging, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
-		gpu::copy(staging, gbs[0]);
-		gpu::readTexture(staging, Span((u8*)m_gb0->begin(), m_gb0->byte_size()));
-		gpu::copy(staging, gbs[1]);
-		gpu::readTexture(staging, Span((u8*)m_gb1->begin(), m_gb1->byte_size()));
+		gpu::copy(staging, gbs[0], 0);
+		gpu::readTexture(staging, 0, Span((u8*)m_gb0->begin(), m_gb0->byte_size()));
+		gpu::copy(staging, gbs[1], 0);
+		gpu::readTexture(staging, 0, Span((u8*)m_gb1->begin(), m_gb1->byte_size()));
 		gpu::destroy(staging);
 
 		gpu::destroy(ub);

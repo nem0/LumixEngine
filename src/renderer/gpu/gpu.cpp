@@ -1429,13 +1429,18 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
 	const bool no_mips = flags & (u32)TextureFlags::NO_MIPS;
 	const bool is_3d = depth > 1 && (flags & (u32)TextureFlags::IS_3D);
+	const bool is_cubemap = flags & (u32)TextureFlags::IS_CUBE;
+
+	ASSERT((!is_3d && !is_cubemap) || depth == 1);
+	ASSERT(!is_cubemap || !is_3d);
+	ASSERT(!is_cubemap || no_mips || !data);
 	ASSERT(!is_srgb); // use format argument to enable srgb
 	ASSERT(debug_name && debug_name[0]);
 
 	GLuint texture;
 	int found_format = 0;
 	GLenum internal_format = 0;
-	const GLenum target = depth <= 1 ? GL_TEXTURE_2D : (is_3d ? GL_TEXTURE_3D : GL_TEXTURE_2D_ARRAY);
+	const GLenum target = is_3d ? GL_TEXTURE_3D : (is_cubemap ? GL_TEXTURE_CUBE_MAP : (depth > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D));
 	const u32 mip_count = no_mips ? 1 : 1 + log2(maximum(w, h, depth));
 
 	CHECK_GL(glCreateTextures(target, 1, &texture));
@@ -1445,15 +1450,33 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 			if(depth <= 1) {
 				CHECK_GL(glTextureStorage2D(texture, mip_count, s_texture_formats[i].gl_internal, w, h));
 				if (data) {
-					CHECK_GL(glTextureSubImage2D(texture
-						, 0
-						, 0
-						, 0
-						, w
-						, h
-						, s_texture_formats[i].gl_format
-						, s_texture_formats[i].type
-						, data));
+					if (is_cubemap) {
+						for (u32 face = 0; face < 6; ++face) {
+							ASSERT(format == TextureFormat::RGBA32F);
+							CHECK_GL(glTextureSubImage3D(texture
+								, 0
+								, 0
+								, 0
+								, face
+								, w
+								, h
+								, 1
+								, s_texture_formats[i].gl_format
+								, s_texture_formats[i].type
+								, ((u8*)data) + face * w * h * sizeof(float) * 4));
+						}
+					}
+					else {
+						CHECK_GL(glTextureSubImage2D(texture
+							, 0
+							, 0
+							, 0
+							, w
+							, h
+							, s_texture_formats[i].gl_format
+							, s_texture_formats[i].type
+							, data));
+					}
 				}
 			}
 			else {
@@ -1821,19 +1844,27 @@ bool isHomogenousDepth() { return false; }
 bool isOriginBottomLeft() { return true; }
 
 
-void copy(TextureHandle dst_handle, TextureHandle src_handle) {
+void copy(TextureHandle dst_handle, TextureHandle src_handle, u32 mip) {
 	checkThread();
 	Texture& dst = g_gpu.textures[dst_handle.value];
 	Texture& src = g_gpu.textures[src_handle.value];
-	ASSERT(src.target == GL_TEXTURE_2D);
+	ASSERT(src.target == GL_TEXTURE_2D || src.target == GL_TEXTURE_CUBE_MAP);
 	ASSERT(src.target == dst.target);
 	ASSERT(dst.width == src.width);
 	ASSERT(dst.height == src.height);
 
-	CHECK_GL(glCopyImageSubData(src.handle, src.target, 0, 0, 0, 0, dst.handle, dst.target, 0, 0, 0, 0, src.width, src.height, 1));
+	const u32 w = maximum(src.width >> mip, 1);
+	const u32 h = maximum(src.height >> mip, 1);
+
+	if (src.target == GL_TEXTURE_CUBE_MAP) {
+		CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 6));
+	}
+	else {
+		CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 1));
+	}
 }
 
-void readTexture(TextureHandle texture, Span<u8> buf)
+void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 {
 	checkThread();
 
@@ -1843,7 +1874,7 @@ void readTexture(TextureHandle texture, Span<u8> buf)
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if (s_texture_formats[i].gl_internal == t.format) {
 			const auto& f = s_texture_formats[i];
-			CHECK_GL(glGetTextureImage(handle, 0, f.gl_format, f.type, buf.length(), buf.begin()));
+			CHECK_GL(glGetTextureImage(handle, mip, f.gl_format, f.type, buf.length(), buf.begin()));
 			return;
 		}
 	}
@@ -1901,6 +1932,30 @@ void queryTimestamp(QueryHandle query)
 	glQueryCounter(query.value, GL_TIMESTAMP);
 }
 
+void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
+{
+	const GLuint t = g_gpu.textures[cube.value].handle;
+	checkThread();
+	CHECK_GL(glDisable(GL_FRAMEBUFFER_SRGB));
+	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
+	CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, t, mip));
+
+	GLint max_attachments = 0;
+	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
+	for(int i = 1; i < max_attachments; ++i) {
+		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
+	}
+	glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+	glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
+	auto status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	ASSERT(status == GL_FRAMEBUFFER_COMPLETE);
+
+	GLenum db = GL_COLOR_ATTACHMENT0;
+	
+	CHECK_GL(glDrawBuffers(1, &db));
+}
 
 void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 {
