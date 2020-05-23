@@ -63,7 +63,33 @@ static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_m
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
 
+// https://www.khronos.org/opengl/wiki/Cubemap_Texture
+static const Vec3 cube_fwd[6] = {
+	{1, 0, 0},
+	{-1, 0, 0},
+	{0, 1, 0},
+	{0, -1, 0},
+	{0, 0, 1},
+	{0, 0, -1}
+};
 
+static const Vec3 cube_right[6] = {
+	{0, 0, -1},
+	{0, 0, 1},
+	{1, 0, 0},
+	{1, 0, 0},
+	{1, 0, 0},
+	{-1, 0, 0}
+};
+
+static const Vec3 cube_up[6] = {
+	{0, -1, 0},
+	{0, -1, 0},
+	{0, 0, 1},
+	{0, 0, -1},
+	{0, -1, 0},
+	{0, -1, 0}
+};
 
 struct SphericalHarmonics {
 	Vec3 coefs[9];
@@ -2498,8 +2524,10 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		PluginManager& plugin_manager = engine.getPluginManager();
 		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
 		IAllocator& allocator = app.getAllocator();
-		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+		ResourceManagerHub& rm = engine.getResourceManager();
+		PipelineResource* pres = rm.load<PipelineResource>(Path("pipelines/main.pln"));
 		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
+		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
 	}
 
 
@@ -2509,7 +2537,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	bool saveCubemap(u64 probe_guid, const Vec4* data, int texture_size)
+	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 mips_count)
 	{
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
@@ -2536,19 +2564,24 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		input.setNormalMap(false);
 		input.setTextureLayout(nvtt::TextureType_Cube, texture_size, texture_size);
 		Array<Color> rgbm(m_app.getAllocator());
-		rgbm.resize(texture_size * texture_size * 4);
-		for (int i = 0; i < 6; ++i) {
-			const Vec4* face = &data[texture_size * texture_size * i];
-			for (u32 j = 0, c = texture_size * texture_size; j < c; ++j) {
-				const float m = clamp(maximum(face[j].x, face[j].y, face[j].z), 1/64.f, 4.f);
-				rgbm[j].r = u8(clamp(face[j].z / m * 255, 0.f, 255.f));
-				rgbm[j].g = u8(clamp(face[j].y / m * 255, 0.f, 255.f));
-				rgbm[j].b = u8(clamp(face[j].x / m * 255, 0.f, 255.f));
-				rgbm[j].a = u8(clamp(255.f * m / 4, 1.f, 255.f));
-			}
+		rgbm.resize(texture_size * texture_size);
+		
+		const Vec4* data_ptr = data;
+		for (u32 mip = 0; mip < mips_count; ++mip) {
+			const u32 mip_size = texture_size >> mip;
+			for (int i = 0; i < 6; ++i) {
+				const Vec4* face = data_ptr;
+				for (u32 j = 0, c = mip_size * mip_size; j < c; ++j) {
+					const float m = clamp(maximum(face[j].x, face[j].y, face[j].z), 1 / 64.f, 4.f);
+					rgbm[j].r = u8(clamp(face[j].z / m * 255, 0.f, 255.f));
+					rgbm[j].g = u8(clamp(face[j].y / m * 255, 0.f, 255.f));
+					rgbm[j].b = u8(clamp(face[j].x / m * 255, 0.f, 255.f));
+					rgbm[j].a = u8(clamp(255.f * m / 4, 1.f, 255.f));
+				}
 
-			const int step = texture_size * texture_size * 4;
-			input.setMipmapData(rgbm.begin(), texture_size, texture_size, 1, i);
+				data_ptr += mip_size * mip_size;
+				input.setMipmapData(rgbm.begin(), mip_size, mip_size, 1, i, mip);
+			}
 		}
 		
 		nvtt::OutputOptions output;
@@ -2574,7 +2607,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		file.close();
 		return true;
 	}
-
 
 
 	void generateCubemaps(bool bounce, bool fast_filter) {
@@ -2656,9 +2688,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		});
 	}
 
-
 	void update() override
 	{
+		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program.isValid()) {
+			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::VertexDecl(), 0);
+		}
+
 		if (m_done_counter != m_probe_counter) {
 			const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
 
@@ -2742,6 +2777,91 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		}
 	}
 
+	void radianceFilter(const Vec4* data, u32 size, u64 guid) {
+		PROFILE_FUNCTION();
+		if (!m_ibl_filter_shader->isReady()) {
+			logError("Renderer") << m_ibl_filter_shader->getPath() << "is not ready";
+			return;
+		}
+		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
+		PluginManager& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+
+		auto lambda = [&](){
+			renderer->beginProfileBlock("radiance_filter", 0);
+			gpu::TextureHandle src = gpu::allocTextureHandle();
+			gpu::TextureHandle dst = gpu::allocTextureHandle();
+			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, (u32)gpu::TextureFlags::IS_CUBE | (u32)gpu::TextureFlags::NO_MIPS, data, "env");
+			ASSERT(created);
+			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, (u32)gpu::TextureFlags::IS_CUBE, nullptr, "env_filtered");
+			ASSERT(created);
+			gpu::BufferHandle buf = gpu::allocBufferHandle();
+			gpu::createBuffer(buf, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+
+			const u32 roughness_levels = 5;
+			
+			gpu::startCapture();
+			gpu::useProgram(m_ibl_filter_program);
+			gpu::bindTextures(&src, 0, 1);
+			for (u32 mip = 0; mip < roughness_levels; ++mip) {
+				const float roughness = float(mip) / (roughness_levels - 1);
+				for (u32 face = 0; face < 6; ++face) {
+					gpu::setFramebufferCube(dst, face, mip);
+					gpu::bindUniformBuffer(4, buf, 256);
+					struct {
+						float roughness;
+						u32 face;
+						u32 mip;
+					} drawcall = {roughness, face, mip};
+					gpu::setState(0);
+					gpu::viewport(0, 0, size >> mip, size >> mip);
+					gpu::update(buf, &drawcall, sizeof(drawcall));
+					gpu::drawArrays(0, 4, gpu::PrimitiveType::TRIANGLE_STRIP);
+				}
+			}
+
+			gpu::TextureHandle staging = gpu::allocTextureHandle();
+			const u32 flags = u32(gpu::TextureFlags::IS_CUBE) | u32(gpu::TextureFlags::READBACK);
+			gpu::createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, nullptr, "staging_buffer");
+			
+			u32 data_size = 0;
+			u32 mip_size = size;
+			for (u32 mip = 0; mip < roughness_levels; ++mip) {
+				data_size += mip_size * mip_size * sizeof(Vec4) * 6;
+				mip_size >>= 1;
+			}
+
+			Array<u8> tmp(m_app.getAllocator());
+			tmp.resize(data_size);
+			u8* tmp_ptr = tmp.begin();
+
+			mip_size = size;
+			for (u32 mip = 0; mip < roughness_levels; ++mip) {
+				gpu::copy(staging, dst, mip);
+				gpu::readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
+				tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
+				mip_size >>= 1;
+			}
+			gpu::stopCapture();
+
+			saveCubemap(guid, (Vec4*)tmp.begin(), size, roughness_levels);
+			gpu::destroy(staging);
+			gpu::popDebugGroup();
+
+			gpu::destroy(buf);
+			gpu::destroy(src);
+			gpu::destroy(dst);
+			renderer->endProfileBlock();
+		};
+		
+		// TODO RenderJob
+		JobSystem::runEx(&lambda, [](void* data){
+			auto* l = ((decltype(lambda)*)data);
+			(*l)();
+		}, &finished, JobSystem::INVALID_HANDLE, 1);
+		JobSystem::wait(finished);
+	}
+
 	void processData(ProbeJob& job) {
 		Array<Vec4>& data = job.data;
 		const u32 texture_size = (u32)sqrtf(data.size() / 6.f);
@@ -2763,15 +2883,16 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			job.sh.compute(data);
 		}
 		else {
-			cmft::Image image;	
+			cmft::Image image;
 			cmft::imageCreate(image, texture_size, texture_size, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA32F);
 			memcpy(image.m_data, data.begin(), data.byte_size());
+			cmft::imageResize(image, 128, 128);
 			if (job.fast_filter) {
-				cmft::imageResize(image, 128, 128);
+				saveCubemap(job.reflection_probe.guid, (Vec4*)image.m_data, 128, 1);
 			}
 			else {
-				PROFILE_BLOCK("radiance");
-				cmft::imageRadianceFilter(
+				radianceFilter((Vec4*)image.m_data, 128, job.reflection_probe.guid);
+				/*cmft::imageRadianceFilter(
 					image
 					, 128
 					, cmft::LightingModel::BlinnBrdf
@@ -2782,10 +2903,10 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					, cmft::EdgeFixup::None
 					, OS::getCPUsCount()
 				);
+				saveCubemap(job.reflection_probe.guid, (Vec4*)image.m_data, 128);
+				*/
 			}
-			saveCubemap(job.reflection_probe.guid, (Vec4*)image.m_data, 128);
 		}
-
 
 		memoryBarrier();
 		job.done = true;
@@ -2832,6 +2953,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 	StudioApp& m_app;
 	Pipeline* m_pipeline;
+	Shader* m_ibl_filter_shader = nullptr;
+	gpu::ProgramHandle m_ibl_filter_program = gpu::INVALID_PROGRAM;
 	
 	// TODO to be used with http://casual-effects.blogspot.com/2011/08/plausible-environment-lighting-in-two.html
 	Array<ProbeJob*> m_probes;

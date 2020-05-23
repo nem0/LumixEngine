@@ -312,7 +312,7 @@ vec3 PBR_ComputeIndirectDiffuse(samplerCube irradiancemap, vec3 albedo, float me
 vec3 PBR_ComputeIndirectSpecular(samplerCube radiancemap, vec3 albedo, float metallic, float roughness, vec3 N, vec3 V) {
 	float ndotv = clamp(dot(N , V ), 1e-5, 1.0);
 	vec3 F0 = mix(vec3(0.04), albedo, metallic);		
-	float lod = roughness * 8;
+	float lod = roughness * 5;
 	vec3 RV = reflect(-V, N);
 	vec4 radiance_rgbm = textureLod(radiancemap, RV, lod);
 	vec3 radiance = radiance_rgbm.rgb * radiance_rgbm.a * 4;
