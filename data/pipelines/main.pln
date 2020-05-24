@@ -141,19 +141,6 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 		endBlock()
 	end
 
-	--[[
-	beginBlock("local_lights")
-	bindRenderbuffers({
-		gbuffer0,
-		gbuffer1,
-		gbuffer2,
-		gbuffer_depth,
-		shadowmap
-	}, 0)
-	renderLocalLights("", local_light_shader, local_light_set)
-	endBlock()
-	]]--
-
 	return hdr_rb
 end
 

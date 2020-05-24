@@ -2821,6 +2821,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				}
 			}
 
+			gpu::setFramebuffer(nullptr, 0, 0);
+
 			gpu::TextureHandle staging = gpu::allocTextureHandle();
 			const u32 flags = u32(gpu::TextureFlags::IS_CUBE) | u32(gpu::TextureFlags::READBACK);
 			gpu::createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, nullptr, "staging_buffer");
@@ -2834,14 +2836,13 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 			Array<u8> tmp(m_app.getAllocator());
 			tmp.resize(data_size);
-			u8* tmp_ptr = tmp.begin();
 
-			mip_size = size;
+			gpu::copy(staging, dst);
+			u8* tmp_ptr = tmp.begin();
 			for (u32 mip = 0; mip < roughness_levels; ++mip) {
-				gpu::copy(staging, dst, mip);
+				const u32 mip_size = size >> mip;
 				gpu::readTexture(staging, mip, Span(tmp_ptr, mip_size * mip_size * sizeof(Vec4) * 6));
 				tmp_ptr += mip_size * mip_size * sizeof(Vec4) * 6;
-				mip_size >>= 1;
 			}
 			gpu::stopCapture();
 
