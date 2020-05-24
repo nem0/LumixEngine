@@ -61,6 +61,7 @@ struct Texture
 	GLenum format;
 	u32 width;
 	u32 height;
+	u32 flags;
 };
 
 
@@ -1333,6 +1334,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	t.width = hdr.dwWidth;
 	t.height = hdr.dwHeight;
+	t.flags = flags;
 	return true;
 }
 
@@ -1534,6 +1536,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	t.format = internal_format;
 	t.width = w;
 	t.height = h;
+	t.flags = flags;
 
 	return true;
 }
@@ -1844,7 +1847,7 @@ bool isHomogenousDepth() { return false; }
 bool isOriginBottomLeft() { return true; }
 
 
-void copy(TextureHandle dst_handle, TextureHandle src_handle, u32 mip) {
+void copy(TextureHandle dst_handle, TextureHandle src_handle) {
 	checkThread();
 	Texture& dst = g_gpu.textures[dst_handle.value];
 	Texture& src = g_gpu.textures[src_handle.value];
@@ -1853,14 +1856,20 @@ void copy(TextureHandle dst_handle, TextureHandle src_handle, u32 mip) {
 	ASSERT(dst.width == src.width);
 	ASSERT(dst.height == src.height);
 
-	const u32 w = maximum(src.width >> mip, 1);
-	const u32 h = maximum(src.height >> mip, 1);
+	u32 mip = 0;
+	while ((src.width >> mip) != 0 || (src.height >> mip) != 0) {
+		const u32 w = maximum(src.width >> mip, 1);
+		const u32 h = maximum(src.height >> mip, 1);
 
-	if (src.target == GL_TEXTURE_CUBE_MAP) {
-		CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 6));
-	}
-	else {
-		CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 1));
+		if (src.target == GL_TEXTURE_CUBE_MAP) {
+			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 6));
+		}
+		else {
+			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 1));
+		}
+		++mip;
+		if (src.flags & (u32)TextureFlags::NO_MIPS) break;
+		if (dst.flags & (u32)TextureFlags::NO_MIPS) break;
 	}
 }
 
