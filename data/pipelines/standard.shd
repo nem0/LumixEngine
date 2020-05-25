@@ -159,7 +159,7 @@ fragment_shader [[
 		
 		data.wpos = v_wpos.xyz;
 		data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
-		data.metallic  = texture(u_roughnessmap, v_uv).b * u_metallic;
+		data.metallic  = texture(u_metallicmap, v_uv).b * u_metallic;
 		data.normal.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
 		data.normal.y = sqrt(clamp(1 - dot(data.normal.xz, data.normal.xz), 0, 1)); 
 		data.normal = tbn * data.normal;
