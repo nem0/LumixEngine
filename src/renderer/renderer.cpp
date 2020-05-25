@@ -685,7 +685,7 @@ struct RendererImpl final : Renderer
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::update(handle, 0, x, y, w, h, format, mem.data);
+				gpu::update(handle, 0, 0, x, y, w, h, format, mem.data);
 				if (mem.own) {
 					renderer->free(mem);
 				}

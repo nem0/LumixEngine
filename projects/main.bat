@@ -131,10 +131,9 @@ exit /B 0
 	echo  2. Download, build and deploy all
 	echo  3. NVTT
 	echo  4. Recast navigation
-	echo  5. CMFT
-	echo  6. PhysX
-	echo  7. LuaJIT
-	echo  8. FreeType2
+	echo  5. PhysX
+	echo  6. LuaJIT
+	echo  7. FreeType2
 	echo ===============================
 	choice /C 12345678 /N /M "Your choice:"
 	echo.
@@ -142,30 +141,26 @@ exit /B 0
 	if %errorlevel%==2 call :all_3rdparty
 	if %errorlevel%==3 call :nvtt
 	if %errorlevel%==4 call :recast
-	if %errorlevel%==5 call :cmft
-	if %errorlevel%==6 call :physx
-	if %errorlevel%==7 call :luajit
-	if %errorlevel%==8 call :freetype
+	if %errorlevel%==5 call :physx
+	if %errorlevel%==6 call :luajit
+	if %errorlevel%==7 call :freetype
 goto :third_party
 
 :all_3rdparty
 	call :download_physx
 	call :download_nvtt
-	call :download_cmft
 	call :download_recast
 	call :download_luajit
 	call :download_freetype
 	
 	call :build_physx
 	call :build_nvtt
-	call :build_cmft
 	call :build_recast
 	call :build_luajit
 	call :build_freetype
 	
 	call :deploy_physx
 	call :deploy_nvtt
-	call :deploy_cmft
 	call :deploy_recast
 	call :deploy_luajit
 	call :deploy_freetype
@@ -372,41 +367,6 @@ exit /B 0
 	%msbuild_cmd% 3rdparty\recast\_project\RecastDetour.sln /p:Configuration=Release /p:Platform=x64
 exit /B 0
 
-:cmft 
-	cls
-	echo CMFT
-	echo ===============================
-	echo  1. Go back
-	echo  2. Download
-	echo  3. Build
-	echo  4. Deploy
-	echo  5. Open in VS
-	echo ===============================
-	choice /C 12345 /N /M "Your choice:"
-	echo.
-	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :download_cmft
-	if %errorlevel%==3 call :build_cmft
-	if %errorlevel%==4 call :deploy_cmft
-	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\cmft\_projects\vs2019\cmft.sln"
-	pause
-goto :cmft
-
-:build_cmft
-	cd 3rdparty\cmft\scripts
-	copy ..\..\..\genie.exe genie.exe
-	genie.exe --file=main.lua vs2019
-	del genie.exe
-	cd ..\..\..
-	%msbuild_cmd% 3rdparty\cmft\_projects\vs2019\cmft.vcxproj /p:Configuration=Release /p:Platform=x64
-exit /B 0
-
-:deploy_cmft
-	del /Q ..\external\cmft\include\cmft\*
-	copy 3rdparty\cmft\include\cmft\* ..\external\cmft\include\cmft\
-	copy 3rdparty\cmft\_build\win64_vs2019\bin\cmftRelease.lib ..\external\cmft\lib\win64_vs2017\release\cmft.lib
-exit /B 0
-
 :nvtt
 	cls
 	echo NVTT
@@ -493,19 +453,6 @@ exit /B 0
 		echo No.
 	)
 	pause
-exit /B 0
-
-:download_cmft
-	if not exist 3rdparty mkdir 3rdparty
-	cd 3rdparty
-	if not exist cmft (
-		git.exe clone --depth=1 https://github.com/nem0/cmft.git
-	) else (
-		cd cmft
-		git pull
-		cd ..
-	)
-	cd ..
 exit /B 0
 
 :download_freetype

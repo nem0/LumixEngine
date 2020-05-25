@@ -548,14 +548,13 @@ if has_plugin("renderer") then
 
 		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c"}
 		files { "../data/pipelines/**.*"}
-		includedirs { "../src", "../external/cmft/include", "../external/nvtt/include", "../external/freetype/include" }
+		includedirs { "../src", "../external/nvtt/include", "../external/freetype/include" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
 
 		if build_studio then
 			links { "editor" }
 			linkLib "nvtt"
-			linkLib "cmft"
 		end
 		linkLib "freetype"
 		linkOpenGL()
@@ -724,7 +723,6 @@ if build_app then
 			links { "editor", "engine" }
 			linkLib "nvtt"
 			linkLib "freetype"
-			linkLib "cmft"
 			linkLib "luajit"
 			linkLib "recast"
 			
@@ -737,7 +735,6 @@ if build_app then
 		end
 		if build_studio then
 			linkLib "nvtt"
-			linkLib "cmft"
 		end
 		
 		linkLib "luajit"
@@ -852,7 +849,6 @@ if build_studio then
 			links { "editor", "engine" }
 			linkLib "nvtt"
 			linkLib "freetype"
-			linkLib "cmft"
 			linkLib "luajit"
 			linkLib "recast"
 			

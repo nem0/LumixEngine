@@ -31,7 +31,6 @@ Who is using it?
 * [PhysX](https://developer.nvidia.com/physx-sdk)
 * [dear imgui](https://github.com/ocornut/imgui)
 * [stb](https://github.com/nothings/stb)
-* [cmft](https://github.com/dariomanesku/cmft)
 * [lent](https://github.com/nem0/lent/)
 * [lucy](https://github.com/nem0/lucy_job_system)
 * [freetype](https://github.com/aseprite/freetype2)
