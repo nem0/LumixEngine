@@ -45,7 +45,6 @@
 #include "stb/stb_image.h"
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
-#include <cmft/cubemapfilter.h>
 #include <nvtt.h>
 
 
@@ -2609,7 +2608,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	void generateCubemaps(bool bounce, bool fast_filter) {
+	void generateCubemaps(bool bounce) {
 		ASSERT(m_probes.empty());
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
@@ -2643,7 +2642,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			job->is_reflection = true;
 			job->position = universe->getPosition(p);
 			job->universe_name = universe->getName();
-			job->fast_filter = fast_filter;
 
 			m_probes.push(job);
 		}
@@ -2667,7 +2665,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		bool is_reflection = false;
 		EnvironmentProbePlugin& plugin;
 		DVec3 position;
-		bool fast_filter = false;
 
 		Array<Vec4> data;
 		SphericalHarmonics sh;
@@ -2677,7 +2674,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	};
 
 	void render(ProbeJob& job) {
-		const u32 texture_size = job.is_reflection ? job.reflection_probe.size * 4 : 128;
+		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
 		captureCubemap(m_app, *m_pipeline, texture_size, job.position, Ref(job.data), [&job](){
 			JobSystem::run(&job, [](void* ptr) {
@@ -2792,8 +2789,12 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			gpu::pushDebugGroup("radiance_filter");
 			gpu::TextureHandle src = gpu::allocTextureHandle();
 			gpu::TextureHandle dst = gpu::allocTextureHandle();
-			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, (u32)gpu::TextureFlags::IS_CUBE | (u32)gpu::TextureFlags::NO_MIPS, data, "env");
+			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, (u32)gpu::TextureFlags::IS_CUBE, nullptr, "env");
 			ASSERT(created);
+			for (u32 face = 0; face < 6; ++face) {
+				gpu::update(src, 0, face, 0, 0, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face));
+			}
+			gpu::generateMipmaps(src);
 			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, (u32)gpu::TextureFlags::IS_CUBE, nullptr, "env_filtered");
 			ASSERT(created);
 			gpu::BufferHandle buf = gpu::allocBufferHandle();
@@ -2881,33 +2882,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			}
 		}
 
-		if (!job.is_reflection) {
-			job.sh.compute(data);
+		if (job.is_reflection) {
+			radianceFilter(data.begin(), texture_size, job.reflection_probe.guid);
 		}
 		else {
-			cmft::Image image;
-			cmft::imageCreate(image, texture_size, texture_size, 0x303030ff, 1, 6, cmft::TextureFormat::RGBA32F);
-			memcpy(image.m_data, data.begin(), data.byte_size());
-			cmft::imageResize(image, 128, 128);
-			if (job.fast_filter) {
-				saveCubemap(job.reflection_probe.guid, (Vec4*)image.m_data, 128, 1);
-			}
-			else {
-				radianceFilter((Vec4*)image.m_data, 128, job.reflection_probe.guid);
-				/*cmft::imageRadianceFilter(
-					image
-					, 128
-					, cmft::LightingModel::BlinnBrdf
-					, false
-					, 7
-					, 10
-					, 1
-					, cmft::EdgeFixup::None
-					, OS::getCPUsCount()
-				);
-				saveCubemap(job.reflection_probe.guid, (Vec4*)image.m_data, 128);
-				*/
-			}
+			job.sh.compute(data);
 		}
 
 		memoryBarrier();
@@ -2923,10 +2902,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			else {
 				const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
 				if (ImGui::CollapsingHeader("Generator")) {
-					ImGui::Checkbox("Fast filter", &m_fast_filter);
-					if (ImGui::Button("Generate")) generateCubemaps(false, m_fast_filter);
+					if (ImGui::Button("Generate")) generateCubemaps(false);
 					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true, m_fast_filter);
+					if (ImGui::Button("Add bounce")) generateCubemaps(true);
 				}
 			}
 		}
@@ -2943,10 +2921,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(probe.texture->getPath(), true, false);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
-					ImGui::Checkbox("Fast filter", &m_fast_filter);
-					if (ImGui::Button("Generate")) generateCubemaps(false, m_fast_filter);
+					if (ImGui::Button("Generate")) generateCubemaps(false);
 					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true, m_fast_filter);
+					if (ImGui::Button("Add bounce")) generateCubemaps(true);
 				}
 			}
 		}
@@ -2962,7 +2939,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	Array<ProbeJob*> m_probes;
 	u32 m_done_counter = 0;
 	u32 m_probe_counter = 0;
-	bool m_fast_filter = true;
 };
 
 

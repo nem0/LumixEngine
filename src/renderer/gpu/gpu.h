@@ -233,8 +233,9 @@ void createBufferGroup(BufferGroupHandle handle, u32 flags, size_t element_size,
 void createBuffer(BufferHandle handle, u32 flags, size_t size, const void* data);
 bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, u32 flags, const void* data, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture);
+void generateMipmaps(TextureHandle handle);
 bool loadTexture(TextureHandle handle, const void* data, int size, u32 flags, const char* debug_name);
-void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf);
+void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf);
 QueryHandle createQuery();
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);

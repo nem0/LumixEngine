@@ -219,7 +219,6 @@ float getShadow(sampler2D shadowmap, vec3 wpos)
 	return 1;
 }
 
-
 float D_GGX(float ndoth, float roughness)
 {
 	float a = roughness * roughness;

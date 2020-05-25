@@ -1134,7 +1134,7 @@ TextureInfo getTextureInfo(const void* data)
 }
 
 
-void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf)
+void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf)
 {
 	checkThread();
 	Texture& t = g_gpu.textures[texture.value];
@@ -1143,7 +1143,13 @@ void update(TextureHandle texture, u32 level, u32 x, u32 y, u32 w, u32 h, Textur
 		if (s_texture_formats[i].format == format) {
 			const auto& f = s_texture_formats[i];
 			CHECK_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
-			CHECK_GL(glTextureSubImage2D(handle, level, x, y, w, h, f.gl_format, f.type, buf));
+			if (t.flags & (u32)TextureFlags::IS_CUBE) {
+				CHECK_GL(glTextureSubImage3D(handle, level, x, y, slice, w, h, 1, f.gl_format, f.type, buf));
+			}
+			else {
+				ASSERT(slice == 0);
+				CHECK_GL(glTextureSubImage2D(handle, level, x, y, w, h, f.gl_format, f.type, buf));
+			}
 			break;
 		}
 	}
@@ -1541,6 +1547,11 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	return true;
 }
 
+void generateMipmaps(TextureHandle handle)
+{
+	Texture& t = g_gpu.textures[handle.value];
+	CHECK_GL(glGenerateTextureMipmap(t.handle));
+}
 
 void destroy(TextureHandle texture)
 {
