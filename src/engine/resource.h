@@ -101,6 +101,9 @@ private:
 	u16 m_failed_dep_count;
 	State m_current_state;
 	FileSystem::AsyncHandle m_async_op;
+	#ifdef LUMIX_DEBUG
+		bool m_invoking = false;
+	#endif
 }; // struct Resource
 
 
