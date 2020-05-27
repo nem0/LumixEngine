@@ -61,7 +61,7 @@ public:
 
 	void invoke(Args... args)
 	{
-		for (auto& i : m_delegates) i.invoke(args...);
+		for (i32 i = 0, c = m_delegates.size(); i < c; ++i) m_delegates[i].invoke(args...);
 	}
 
 private:
