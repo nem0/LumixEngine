@@ -2532,6 +2532,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 	~EnvironmentProbePlugin()
 	{
+		m_ibl_filter_shader->getResourceManager().unload(*m_ibl_filter_shader);
 		Pipeline::destroy(m_pipeline);
 	}
 
