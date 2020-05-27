@@ -3042,10 +3042,7 @@ struct PipelineImpl final : Pipeline
 			ASSERT(renderables);
 			if (renderables->header.count == 0 && !renderables->header.next) return;
 			PagedListIterator<const CullResult> iterator(renderables);
-			
-			const u8 local_light_layer = m_pipeline->m_renderer.getLayerIdx("local_light");
-			const u8 local_light_bucket = m_bucket_map[local_light_layer];
-			
+
 			JobSystem::runOnWorkers([&](){
 				PROFILE_BLOCK("create keys");
 				int total = 0;
@@ -3065,11 +3062,13 @@ struct PipelineImpl final : Pipeline
 					const EntityRef* LUMIX_RESTRICT renderables = page->entities;
 					switch(type) {
 						case RenderableTypes::LOCAL_LIGHT: {
+							// TODO use this for fillClusters
+							/*
 							if(local_light_bucket < 0xff) {
 								for (int i = 0, c = page->header.count; i < c; ++i) {
 									result.push((u64)local_light_bucket << 56, renderables[i].index | type_mask);
 								}
-							}
+							}*/
 							break;
 						}
 						case RenderableTypes::GRASS: {
