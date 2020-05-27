@@ -105,6 +105,19 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	
 	local view_params = getCameraParams()
 	
+	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
+		beginBlock("indirect_specular")
+			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
+			bindRenderbuffers({
+				gbuffer0,
+				gbuffer1,
+				gbuffer2,
+				gbuffer_depth
+			}, 0)
+			renderReflectionVolumes(view_params, indirect_specular_shader, 4)
+		endBlock()
+	end
+
 	beginBlock("lighting")
 	drawArray(0, 4, lighting_shader,
 		{
@@ -128,19 +141,6 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local
 	)
 	endBlock()
 	
-	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
-		beginBlock("indirect_specular")
-			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
-			bindRenderbuffers({
-				gbuffer0,
-				gbuffer1,
-				gbuffer2,
-				gbuffer_depth
-			}, 0)
-			renderReflectionVolumes(view_params, indirect_specular_shader, 4)
-		endBlock()
-	end
-
 	return hdr_rb
 end
 

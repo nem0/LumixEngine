@@ -53,7 +53,17 @@ fragment_shader [[
 		vec3 V = normalize(-wpos);
 		
 		o_color.rgb = PBR_ComputeIndirectSpecular(u_radiancemap, albedo, metallic, roughness, normal, V);
-		//o_color.rgb  = vec3(1, 0, 0);
-		o_color.a = 1;
+		
+		vec4 inv_rot = u_rot;
+		inv_rot.w = -inv_rot.w;
+		vec3 lpos = abs(rotateByQuat(inv_rot, wpos - u_pos.xyz) / u_half_extents.xyz);
+
+		//if (any(greaterThan(abs(lpos), u_half_extents))) discard;
+		float m = saturate(max(max(lpos.x, lpos.y), lpos.z) * 2 - 0.5);
+		m = 1 - m * m;
+	
+		o_color.rgb *= m;
+
+		o_color.a = m;
 	}
 ]]
