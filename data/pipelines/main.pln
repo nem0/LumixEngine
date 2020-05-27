@@ -93,7 +93,7 @@ function geomPass(default_set, decal_set)
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
 end
 
-function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
+function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local hdr_rb = 0
 	if PROBE ~= nil then
 		hdr_rb = createRenderbuffer(1, 1, true, "rgba32f", "hdr")
@@ -291,11 +291,10 @@ end
 
 function main()
 	local view_params = getCameraParams()
-	local default_set, decal_set, local_light_set, transparent_set, water_set = prepareCommands(view_params, 
+	local default_set, decal_set, transparent_set, water_set = prepareCommands(view_params, 
 		{ 
 			{ layers = { "default" }, defines = { "DEFERRED" } },
 			{ layers = { "decal" } },
-			{ layers = { "local_light" } },
 			{ layers = { "transparent" }, sort = "depth" },
 			{ layers = { "water" }, sort = "depth" }
 		}
@@ -310,7 +309,7 @@ function main()
 		fillClusters()
 	end
 
-	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap, local_light_set)
+	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	
 	local res = hdr_buffer		
 	if PREVIEW == nil then
