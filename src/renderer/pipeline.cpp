@@ -2110,6 +2110,7 @@ struct PipelineImpl final : Pipeline
 				if (!probe.texture) continue;
 				if (!probe.texture->isReady()) continue;
 
+				// TODO frustum culling
 				Probe& p = m_probes.emplace();
 				p.half_extents = probe.half_extents;
 				p.texture = probe.texture->handle;
@@ -2118,6 +2119,17 @@ struct PipelineImpl final : Pipeline
 				p.pos = (pos - m_camera_params.pos).toFloat();
 				p.rot = universe.getRotation(e);
 				p.intersecting = m_camera_params.frustum.intersectNearPlane(pos, p.half_extents.length());
+			}
+
+			
+			if (!m_probes.empty()) {
+				qsort(m_probes.begin(), m_probes.size(), sizeof(m_probes[0]), [](const void* a, const void* b) -> int {
+					Probe* pa = (Probe*)a;
+					Probe* pb = (Probe*)b;
+					float sa = pa->half_extents.x * pa->half_extents.y * pa->half_extents.z;
+					float sb = pb->half_extents.x * pb->half_extents.y * pb->half_extents.z;
+					return sa < sb ? -1 : (sa > sb ? 1 : 0);
+				});
 			}
 		}
 
@@ -2130,7 +2142,6 @@ struct PipelineImpl final : Pipeline
 			gpu::bindVertexBuffer(0, m_vb, 0, 12);
 			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			const DVec3 cam_pos = m_camera_params.pos;
-			const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			for (const Probe& p : m_probes) {
 				Vec4* dc_mem = (Vec4*)gpu::map(m_pipeline->m_drawcall_ub, sizeof(Vec4) * 3);
 				dc_mem[0] = Vec4(p.pos, 0);
@@ -2140,6 +2151,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::bindTextures(&p.texture, m_texture_offset, 1);
 					
+				u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE);
 				const u64 state = p.intersecting
 					? (u64)gpu::StateFlags::CULL_FRONT
 					: (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK;
