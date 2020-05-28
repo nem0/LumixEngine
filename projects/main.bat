@@ -23,12 +23,11 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	echo   8. Open chat
 	echo   9. 3rd party
 	echo   A. Plugins
-	echo   B. Download Godot Engine
-	echo   C. Create project - static physx
-	echo   D. Push to itch.io
-	echo   E. Create project with app 
+	echo   B. Create project - static physx
+	echo   C. Push to itch.io
+	echo   D. Create project with app 
 	echo ===============================
-	choice /C 123456789ABCDE /N /M "Your choice:"
+	choice /C 123456789ABCD /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 goto :EOF
@@ -38,13 +37,12 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==5 call :open_in_vs
 	if %errorlevel%==6 call :create_bundle
 	if %errorlevel%==7 call :git_pull
-	if %errorlevel%==8 call :open_gitter
+	if %errorlevel%==8 call :open_discord
 	if %errorlevel%==9 call :third_party
 	if %errorlevel%==10 call :plugins
-	if %errorlevel%==11 call :download_godot
-	if %errorlevel%==12 call :create_project_static_physx
-	if %errorlevel%==13 call :push_to_itch_io
-	if %errorlevel%==14 call :create_project_with_app
+	if %errorlevel%==11 call :create_project_static_physx
+	if %errorlevel%==12 call :push_to_itch_io
+	if %errorlevel%==13 call :create_project_with_app
 goto :begin
 
 :plugins 
@@ -445,16 +443,6 @@ exit /B 0
 	pause
 exit /B 0
 
-:download_godot
-	if %RANDOM% gtr 16000 (
-		start "" "https://godotengine.org/"
-		echo Son, I'm disappointed.
-	) else (
-		echo No.
-	)
-	pause
-exit /B 0
-
 :download_freetype
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
@@ -507,8 +495,8 @@ exit /B 0
 	cd ..
 exit /B 0
 
-:open_gitter
-	start "" "https://gitter.im/nem0/LumixEngine"
+:open_discord
+	start "" "https://discord.gg/RgFybs6"
 	pause
 exit /B 0
 
