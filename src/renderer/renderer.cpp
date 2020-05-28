@@ -676,7 +676,7 @@ struct RendererImpl final : Renderer
 	}
 
 
-	void updateTexture(gpu::TextureHandle handle, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override
+	void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override
 	{
 		ASSERT(mem.size > 0);
 		ASSERT(handle.isValid());
@@ -685,14 +685,14 @@ struct RendererImpl final : Renderer
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::update(handle, 0, 0, x, y, w, h, format, mem.data);
+				gpu::update(handle, 0, slice, x, y, w, h, format, mem.data);
 				if (mem.own) {
 					renderer->free(mem);
 				}
 			}
 
 			gpu::TextureHandle handle;
-			u32 x, y, w, h;
+			u32 x, y, w, h, slice;
 			gpu::TextureFormat format;
 			MemRef mem;
 			RendererImpl* renderer;
@@ -704,6 +704,7 @@ struct RendererImpl final : Renderer
 		cmd->y = y;
 		cmd->w = w;
 		cmd->h = h;
+		cmd->slice = slice;
 		cmd->format = format;
 		cmd->mem = mem;
 		cmd->renderer = this;

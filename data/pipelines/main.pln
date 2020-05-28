@@ -125,7 +125,8 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 			gbuffer1,
 			gbuffer2,
 			gbuffer_depth,
-			shadowmap
+			shadowmap,
+			SHADOW_ATLAS
 		}, {}, {}, 
 		{ 
 			depth_test = false,
@@ -288,8 +289,26 @@ function renderSelectionOutline(output)
 	
 end
 
+function bakeShadow()
+	local rb = createRenderbuffer(1, 1, true, "r32f", "baked_shadowmap")
+	local depthbuf = createRenderbuffer(1, 1, true, "depth32", "shadowmap_depth")
+	setRenderTargets(rb, depthbuf)
+	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
+	local view_params = getCameraParams()
+	local shadow_set = prepareCommands(view_params, { { layers = { "default" }, defines = { "DEPTH" } } })
+				
+	pass(view_params)
+	renderBucket(shadow_set, {})
+	renderTerrains(view_params, {})
+	setOutput(rb)
+end
 
 function main()
+	if BAKE_SHADOW ~= nil then
+		bakeShadow()
+		return
+	end
+
 	local view_params = getCameraParams()
 	local default_set, decal_set, transparent_set, water_set = prepareCommands(view_params, 
 		{ 

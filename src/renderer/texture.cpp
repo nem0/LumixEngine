@@ -315,7 +315,7 @@ void Texture::onDataUpdated(u32 x, u32 y, u32 w, u32 h)
 			&src_mem[(x + (y + j) * width) * bytes_per_pixel],
 			bytes_per_pixel * w);
 	}
-	renderer.updateTexture(handle, x, y, w, h, format, mem);
+	renderer.updateTexture(handle, 0, x, y, w, h, format, mem);
 }
 
 
@@ -404,6 +404,26 @@ static void flipVertical(u32* image, int width, int height)
 	}
 }
 
+
+struct TexLoader {
+	enum Result {
+		YIELD,
+		DONE
+	};
+
+	using Processor = void (TexLoader::*)(OS::InputFile& file);
+	Processor processor = &TexLoader::start;
+
+	void start(OS::InputFile& file) {
+		char data[8];
+		file.read(data, 7);
+		processor = &TexLoader::load_dds;
+	}
+
+	void load_dds(OS::InputFile& file) {
+		processor = nullptr;
+	}
+};
 
 bool Texture::loadTGA(IInputStream& file)
 {

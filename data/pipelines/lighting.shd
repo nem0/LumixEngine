@@ -20,6 +20,7 @@ fragment_shader [[
 	layout (binding=2) uniform sampler2D u_gbuffer2;
 	layout (binding=3) uniform sampler2D u_gbuffer_depth;
 	layout (binding=4) uniform sampler2D u_shadowmap;
+	layout (binding=5) uniform sampler2DArray u_shadow_atlas;
 	
 	void main()
 	{
@@ -68,6 +69,26 @@ fragment_shader [[
 			float attn = pow(max(0, 1 - dist / b_lights[light_idx].pos_radius.w), b_lights[light_idx].color_attn.w);
 			if (attn > 1e-5) {
 				vec3 direct_light = PBR_ComputeDirectLight(albedo.rgb, N, L, V, b_lights[light_idx].color_attn.rgb, roughness, metallic);
+				int atlas_idx = b_lights[light_idx].atlas_idx;
+				if (atlas_idx >= 0) {
+					vec4 proj_pos = u_shadow_atlas_matrices[atlas_idx] * vec4(lpos, 1);
+					proj_pos /= proj_pos.w;
+					attn *= texture(u_shadow_atlas, vec3(proj_pos.xy, atlas_idx)).r;
+					o_color.rgb = vec3(abs(proj_pos.r) > 0.25 ? 1: 0, abs(proj_pos.g) > 0.25 ? 1: 0, 0);
+					o_color.a = 1;
+					return;
+				}
+
+				float fov = b_lights[light_idx].fov;
+				if (fov < M_PI) {
+					vec3 dir = rotateByQuat(b_lights[light_idx].rot, vec3(0, 0, -1));
+					float cosDir = dot(normalize(dir), normalize(lpos));
+					float cosCone = cos(fov * 0.5);
+
+					if (cosDir < cosCone) discard;
+					attn *= (cosDir - cosCone) / (1 - cosCone);
+				}
+
 				o_color.rgb += direct_light * attn;
 			}
 		}
