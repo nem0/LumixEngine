@@ -3,6 +3,7 @@
 #include "animation/animation_scene.h"
 #include "controller_editor.h"
 #include "editor/asset_browser.h"
+#include "editor/settings.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
@@ -41,6 +42,13 @@ struct ControllerEditorImpl : ControllerEditor {
 		IAllocator& allocator = m_app.getAllocator();
 		m_controller->destroy();
 		LUMIX_DELETE(allocator, m_controller);
+	}
+
+	void onSettingsLoaded() override {
+		m_open = m_app.getSettings().getValue("is_anim_editor_open", false);
+	}
+	void onBeforeSettingsSaved() override {
+		m_app.getSettings().setValue("is_anim_editor_open", m_open);
 	}
 
 	bool isOpen() const { return m_open; }
