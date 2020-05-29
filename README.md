@@ -40,6 +40,4 @@ Project generator
 
 Contact: mikulas.florek@gamedev.sk
 
-[Gitter](https://gitter.im/nem0/LumixEngine)
-
 [Discord](https://discord.gg/RgFybs6)
