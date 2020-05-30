@@ -405,26 +405,6 @@ static void flipVertical(u32* image, int width, int height)
 }
 
 
-struct TexLoader {
-	enum Result {
-		YIELD,
-		DONE
-	};
-
-	using Processor = void (TexLoader::*)(OS::InputFile& file);
-	Processor processor = &TexLoader::start;
-
-	void start(OS::InputFile& file) {
-		char data[8];
-		file.read(data, 7);
-		processor = &TexLoader::load_dds;
-	}
-
-	void load_dds(OS::InputFile& file) {
-		processor = nullptr;
-	}
-};
-
 bool Texture::loadTGA(IInputStream& file)
 {
 	PROFILE_FUNCTION();
