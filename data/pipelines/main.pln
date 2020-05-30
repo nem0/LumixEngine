@@ -21,7 +21,7 @@ local decal_state = {
 }
 
 local transparent_state = {
-	blending = "add",
+	blending = "alpha",
 	depth_write = false
 }
 
