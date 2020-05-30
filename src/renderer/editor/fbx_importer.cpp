@@ -18,6 +18,7 @@
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/serializer.h"
+#include "mikktspace.h"
 #include "physics/physics_geometry.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -427,35 +428,65 @@ static ofbx::Vec2 operator-(const ofbx::Vec2& a, const ofbx::Vec2& b)
 }
 
 
-static void computeTangents(Array<ofbx::Vec3>& out, int vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs)
+static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs, const char* path)
 {
 	out.resize(vertex_count);
-	memset(out.begin(), 0, out.byte_size());
-	for (int i = 0; i < vertex_count; i += 3) {
-		const ofbx::Vec3 v0 = vertices[i + 0];
-		const ofbx::Vec3 v1 = vertices[i + 1];
-		const ofbx::Vec3 v2 = vertices[i + 2];
-		const ofbx::Vec2 uv0 = uvs[i + 0];
-		const ofbx::Vec2 uv1 = uvs[i + 1];
-		const ofbx::Vec2 uv2 = uvs[i + 2];
 
-		const ofbx::Vec3 dv10 = v1 - v0;
-		const ofbx::Vec3 dv20 = v2 - v0;
-		const ofbx::Vec2 duv10 = uv1 - uv0;
-		const ofbx::Vec2 duv20 = uv2 - uv0;
+	struct {
+		Array<ofbx::Vec3>* out;
+		i32 vertex_count;
+		const ofbx::Vec3* vertices;
+		const ofbx::Vec3* normals;
+		const ofbx::Vec2* uvs;
+	} data;
 
-		const float dir = duv20.x * duv10.y - duv20.y * duv10.x < 0 ? -1.f : 1.f;
-		ofbx::Vec3 tangent; 
-		tangent.x = (dv20.x * duv10.y - dv10.x * duv20.y) * dir;
-		tangent.y = (dv20.y * duv10.y - dv10.y * duv20.y) * dir;
-		tangent.z = (dv20.z * duv10.y - dv10.z * duv20.y) * dir;
-		const float l = 1 / sqrtf(float(tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z));
-		tangent.x *= l;
-		tangent.y *= l;
-		tangent.z *= l;
-		out[i + 0] = tangent;
-		out[i + 1] = tangent;
-		out[i + 2] = tangent;
+	data.out = &out;
+	data.vertex_count = vertex_count;
+	data.vertices = vertices;
+	data.normals = normals;
+	data.uvs = uvs;
+
+	SMikkTSpaceInterface iface = {};
+	iface.m_getNumFaces = [](const SMikkTSpaceContext * pContext) -> int {
+		auto* ptr = (decltype(data)*)pContext->m_pUserData;
+		return ptr->vertex_count / 3;
+	};
+	iface.m_getNumVerticesOfFace = [](const SMikkTSpaceContext * pContext, const int face) -> int { return 3; };
+	iface.m_getPosition = [](const SMikkTSpaceContext * pContext, float fvPosOut[], const int iFace, const int iVert) { 
+		auto* ptr = (decltype(data)*)pContext->m_pUserData;
+		ofbx::Vec3 p = ptr->vertices[iFace * 3 + iVert];
+		fvPosOut[0] = (float)p.x;
+		fvPosOut[1] = (float)p.y;
+		fvPosOut[2] = (float)p.z;
+	};
+	iface.m_getNormal = [](const SMikkTSpaceContext * pContext, float fvNormOut[], const int iFace, const int iVert) { 
+		auto* ptr = (decltype(data)*)pContext->m_pUserData;
+		ofbx::Vec3 p = ptr->normals[iFace * 3 + iVert];
+		fvNormOut[0] = (float)p.x;
+		fvNormOut[1] = (float)p.y;
+		fvNormOut[2] = (float)p.z;
+	};
+	iface.m_getTexCoord = [](const SMikkTSpaceContext * pContext, float fvTexcOut[], const int iFace, const int iVert) { 
+		auto* ptr = (decltype(data)*)pContext->m_pUserData;
+		ofbx::Vec2 p = ptr->uvs[iFace * 3 + iVert];
+		fvTexcOut[0] = (float)p.x;
+		fvTexcOut[1] = (float)p.y;
+	};
+	iface.m_setTSpaceBasic  = [](const SMikkTSpaceContext * pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert) {
+		auto* ptr = (decltype(data)*)pContext->m_pUserData;
+		ofbx::Vec3 t;
+		t.x = fvTangent[0];
+		t.y = fvTangent[1];
+		t.z = fvTangent[2];
+		(*ptr->out)[iFace * 3 + iVert] = t;
+	};
+
+	SMikkTSpaceContext ctx;
+	ctx.m_pUserData = &data;
+	ctx.m_pInterface = &iface;
+	tbool res = genTangSpaceDefault(&ctx);
+	if (!res) {
+		logError("Renderer") << path << ": failed to generate tangent space";
 	}
 }
 
@@ -523,7 +554,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			const int* geom_materials = geom->getMaterials();
 			Array<ofbx::Vec3> computed_tangents(allocator);
 			if (!tangents && normals && uvs) {
-				computeTangents(computed_tangents, vertex_count, vertices, normals, uvs);
+				computeTangents(computed_tangents, vertex_count, vertices, normals, uvs, path);
 				tangents = computed_tangents.begin();
 			}
 
