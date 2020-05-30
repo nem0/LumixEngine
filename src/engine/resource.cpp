@@ -35,6 +35,14 @@ Resource::Resource(const Path& path, ResourceManager& resource_manager, IAllocat
 Resource::~Resource() = default;
 
 
+void Resource::refresh() {
+	const State old_state = m_current_state;
+	m_current_state = State::EMPTY;	
+	m_cb.invoke(old_state, m_current_state, *this);
+	checkState();
+}
+
+
 void Resource::checkState()
 {
 	auto old_state = m_current_state;
