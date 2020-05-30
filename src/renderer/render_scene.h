@@ -3,6 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/flag_set.h"
+#include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
@@ -87,6 +88,8 @@ struct PointLight
 	float attenuation_param;
 	float range;
 	bool cast_shadows;
+	u64 guid;
+	i32 shadow_atlas_idx = -1;
 };
 
 struct ReflectionProbe
@@ -315,8 +318,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;
 	virtual Environment& getEnvironment(EntityRef entity) = 0;
+	virtual const HashMap<EntityRef, PointLight>& getPointLights() = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
-	virtual int getClosestShadowcastingPointLights(const DVec3& reference_pos, u32 max_count, PointLight* lights) = 0;
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
 

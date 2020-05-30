@@ -61,6 +61,7 @@ struct Texture
 	GLenum format;
 	u32 width;
 	u32 height;
+	u32 depth;
 	u32 flags;
 };
 
@@ -1143,7 +1144,7 @@ void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u3
 		if (s_texture_formats[i].format == format) {
 			const auto& f = s_texture_formats[i];
 			CHECK_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
-			if (t.flags & (u32)TextureFlags::IS_CUBE) {
+			if (t.flags & (u32)TextureFlags::IS_CUBE || t.depth > 1) {
 				CHECK_GL(glTextureSubImage3D(handle, level, x, y, slice, w, h, 1, f.gl_format, f.type, buf));
 			}
 			else {
@@ -1340,6 +1341,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	t.width = hdr.dwWidth;
 	t.height = hdr.dwHeight;
+	t.depth = layers;
 	t.flags = flags;
 	return true;
 }
@@ -1542,6 +1544,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	t.format = internal_format;
 	t.width = w;
 	t.height = h;
+	t.depth = depth;
 	t.flags = flags;
 
 	return true;

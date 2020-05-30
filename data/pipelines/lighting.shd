@@ -20,6 +20,7 @@ fragment_shader [[
 	layout (binding=2) uniform sampler2D u_gbuffer2;
 	layout (binding=3) uniform sampler2D u_gbuffer_depth;
 	layout (binding=4) uniform sampler2D u_shadowmap;
+	layout (binding=5) uniform sampler2DArray u_shadow_atlas;
 	
 	void main()
 	{
@@ -48,6 +49,7 @@ fragment_shader [[
 			, roughness
 			, metallic);
 		direct += getTranslucency(albedo, translucency, V, L, N, shadow);
+		direct += emission * albedo;
 
 		float fog_factor = getFogFactor(u_camera_world_pos.y, u_camera_world_pos.y + wpos.y, wpos, u_fog_params.x, u_fog_params.y, u_fog_params.z);
 		o_color.rgb = mix(direct, u_fog_color.rgb, fog_factor);
@@ -62,12 +64,34 @@ fragment_shader [[
 		// point lights
 		for (int i = offset; i < end_lights; ++i) {
 			int light_idx = b_cluster_map[i]; 
-			vec3 lpos = b_lights[light_idx].pos_radius.xyz - wpos.xyz;
+			vec3 lpos = wpos.xyz - b_lights[light_idx].pos_radius.xyz;
 			float dist = length(lpos);
-			vec3 L = lpos / max(dist, 1e-5);
 			float attn = pow(max(0, 1 - dist / b_lights[light_idx].pos_radius.w), b_lights[light_idx].color_attn.w);
 			if (attn > 1e-5) {
 				vec3 direct_light = PBR_ComputeDirectLight(albedo.rgb, N, L, V, b_lights[light_idx].color_attn.rgb, roughness, metallic);
+				int atlas_idx = b_lights[light_idx].atlas_idx;
+				if (atlas_idx >= 0) {
+					vec4 proj_pos = u_shadow_atlas_matrices[atlas_idx] * vec4(lpos, 1);
+					proj_pos /= proj_pos.w;
+
+					vec2 shadow_uv = proj_pos.xy * 0.5 + 0.5;
+					float occluder = texture(u_shadow_atlas, vec3(shadow_uv, atlas_idx)).r;
+					float receiver = shadowmapValue(proj_pos.z);
+					float m =  receiver / occluder;
+					attn *= clamp(1 - (1 - m) * 512, 0.0, 1.0);
+				}
+
+				float fov = b_lights[light_idx].fov;
+				if (fov < M_PI) {
+					// TODO replace rot with dir
+					vec3 dir = rotateByQuat(b_lights[light_idx].rot, vec3(0, 0, -1));
+					vec3 L = lpos / max(dist, 1e-5);
+					float cosDir = dot(normalize(dir), L);
+					float cosCone = cos(fov * 0.5);
+
+					attn *= cosDir < cosCone ? 0 : (cosDir - cosCone) / (1 - cosCone);
+				}
+
 				o_color.rgb += direct_light * attn;
 			}
 		}

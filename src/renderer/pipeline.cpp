@@ -251,6 +251,19 @@ struct MTBucketArray
 	int m_total_count = 0;
 };
 
+struct ShadowAtlas {
+	ShadowAtlas(IAllocator& allocator)
+		: map(allocator)
+	{
+		for (EntityPtr& e : inv_map) e = INVALID_ENTITY;
+	}
+
+	gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
+	gpu::BufferHandle uniform_buffer = gpu::INVALID_BUFFER;
+	HashMap<EntityRef, u32> map;
+	EntityPtr inv_map[128];
+};
+
 
 static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 500.0f;
@@ -305,6 +318,7 @@ struct PipelineImpl final : Pipeline
 		, m_output(-1)
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
+		, m_shadow_atlas(allocator)
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
@@ -327,6 +341,10 @@ struct PipelineImpl final : Pipeline
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
 		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)gpu::BufferFlags::IMMUTABLE);
+
+		Renderer::MemRef no_mem;
+		no_mem.size = sizeof(Matrix) * 128;
+		m_shadow_atlas.uniform_buffer = m_renderer.createBuffer(no_mem, (u32)gpu::BufferFlags::UNIFORM_BUFFER);
 
 		u16 cube_indices[] = {
 			0, 1, 2,
@@ -583,6 +601,11 @@ struct PipelineImpl final : Pipeline
 				m_renderbuffers.swapAndPop(i);
 			}
 		}
+	}
+
+	void refreshShadowAtlas() override {
+		m_shadow_atlas.map.clear();
+		for (EntityPtr& e : m_shadow_atlas.inv_map) e = INVALID_ENTITY;
 	}
 
 	void define(const char* define, bool enable) override {
@@ -1669,7 +1692,12 @@ struct PipelineImpl final : Pipeline
 				}
 
 				const int rb_idx = (int)lua_tointeger(L, -1);
-				cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
+				if (rb_idx == -2) {
+					cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_shadow_atlas.texture;
+				}
+				else {
+					cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
+				}
 				++cmd->m_textures_count;
 				lua_pop(L, 1);
 			}
@@ -1706,7 +1734,7 @@ struct PipelineImpl final : Pipeline
 				while (lua_next(L, 6) != 0) {
 					if(lua_type(L, -1) != LUA_TSTRING) {
 						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays");
+						return luaL_error(L, "%s", "Incorrect define arguments of drawArrays");
 					}
 					const char* define = lua_tostring(L, -1);
 					cmd->m_define_mask |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);
@@ -1767,77 +1795,6 @@ struct PipelineImpl final : Pipeline
 			lua_rawseti(L, -2, i + 1);
 		}
 		lua_setfield(L, -2, "projection");
-	}
-
-
-	static int prepareShadowcastingLocalLights(lua_State* L)
-	{
-		/*const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		const Universe& universe = pipeline->m_scene->getUniverse();
-		const CameraParams cp = checkCameraParams(L, 1);
-		const int shadowmap_width = LuaWrapper::checkArg<int>(L, 2);
-		const int shadowmap_height = LuaWrapper::checkArg<int>(L, 3);
-		const int tile_width = LuaWrapper::checkArg<int>(L, 4);
-		const int tile_height = LuaWrapper::checkArg<int>(L, 5);
-
-		const int cols = shadowmap_width / tile_width;
-		const int rows = shadowmap_height / tile_height;
-		PointLight lights[16];
-		const int max_count = maximum(lengthOf(lights), cols * rows);
-		const int count = pipeline->m_scene->getClosestShadowcastingPointLights(cp.pos, max_count, lights);
-
-		IAllocator& allocator = pipeline->m_renderer.getAllocator();
-		PageAllocator& page_allocator = pipeline->m_renderer.getEngine().getPageAllocator();
-
-		lua_createtable(L, count, 0);
-		for (int i = 0; i < count; ++i) {
-			PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator, page_allocator);
-			cmd->m_bucket_count = 1;
-
-			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, 6, nullptr, [&](const char* layer_name) {
-				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
-				cmd->m_bucket_map[layer] = 0;
-				});
-			if (!ok) {
-				LUMIX_DELETE(allocator, cmd);
-				return luaL_argerror(L, 2, "'layers' must be array of strings");
-			}
-			CommandSet* cmd_set = LUMIX_NEW(allocator, CommandSet)(allocator);
-			pipeline->m_command_sets.push(cmd_set);
-			const PointLight& pl = lights[i];
-			cmd->m_command_sets[0] = cmd_set;
-
-			lua_createtable(L, 0, 6);
-			LuaWrapper::setField(L, -1, "entity", pl.entity.index);
-			LuaWrapper::setField(L, -1, "viewport_x", (i % cols) * tile_width);
-			LuaWrapper::setField(L, -1, "viewport_y", (i / cols) * tile_height);
-			LuaWrapper::setField(L, -1, "viewport_w", tile_width);
-			LuaWrapper::setField(L, -1, "viewport_h", tile_height);
-			LuaWrapper::setField(L, -1, "bucket", cmd_set);
-			lua_rawseti(L, -2, i + 1);
-			
-			// TODO light camera params
-			CameraParams shadow_cam = cp;
-			shadow_cam.pos = universe.getPosition(pl.entity);
-			const Quat rot = universe.getRotation(pl.entity);
-			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-			const Vec3 up = rot.rotate(Vec3(0, 1, 0));
-			shadow_cam.frustum.computePerspective(shadow_cam.pos, dir, up, pl.fov, 1, 0.1f, pl.range);
-			shadow_cam.is_shadow = true;
-			cmd->m_camera_params = shadow_cam;
-			cmd->m_pipeline = pipeline;
-			const int num_cmd_sets = cmd->m_bucket_count;
-			pipeline->m_renderer.queue(cmd);
-		}
-
-		return 1;*/
-		ASSERT(false);
-		// TODO
-		return 0;
 	}
 
 
@@ -2250,12 +2207,19 @@ struct PipelineImpl final : Pipeline
 
 			lights->forEach([&](EntityRef e){
 				i32 idx = point_lights.size();
-				const PointLight& pl = scene->getPointLight(e);
+				PointLight& pl = scene->getPointLight(e);
 				ClusterPointLight& light = point_lights.emplace();
 				light.radius = pl.range;
 				light.pos = (universe.getPosition(e) - cam_pos).toFloat();
+				light.rot = universe.getRotation(e);
+				light.fov = pl.fov;
 				light.color = pl.color * pl.intensity;
 				light.attenuation_param = pl.attenuation_param;
+				light.atlas_idx = pl.shadow_atlas_idx;
+
+				if (pl.cast_shadows) {
+					m_pipeline->addToShadowAtlas(pl, m_shadow_atlas_matrices);
+				}
 			});
 
 			const Span<const EnvironmentProbe> env_probes = scene->getEnvironmentProbes();
@@ -2383,6 +2347,9 @@ struct PipelineImpl final : Pipeline
 		void execute() override {
 			PROFILE_FUNCTION();
 
+			gpu::update(m_pipeline->m_shadow_atlas.uniform_buffer, m_shadow_atlas_matrices, sizeof(m_shadow_atlas_matrices));
+			gpu::bindUniformBuffer(3, m_pipeline->m_shadow_atlas.uniform_buffer, sizeof(m_shadow_atlas_matrices));
+
 			auto bind = [](auto& buffer, const auto& data, i32 idx){
 				const u32 capacity = (data.byte_size() + 15) & ~15;
 				if (buffer.capacity < capacity) {
@@ -2415,9 +2382,12 @@ struct PipelineImpl final : Pipeline
 		struct ClusterPointLight {
 			Vec3 pos;
 			float radius;
+			Quat rot;
 			Vec3 color;
-			//float fov;
 			float attenuation_param;
+			u32 atlas_idx;
+			float fov;
+			Vec2 padding;
 		};
 
 		struct ClusterEnvProbe {
@@ -2435,12 +2405,76 @@ struct PipelineImpl final : Pipeline
 		Array<Cluster> m_clusters;
 		Array<ClusterPointLight> m_point_lights;
 		Array<ClusterEnvProbe> m_probes;
+		Matrix m_shadow_atlas_matrices[128];
 
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		bool m_is_clear = false;
 	};
 	
+	Matrix getShadowMatrix(const PointLight& light) {
+		Matrix prj;
+		prj.setPerspective(light.fov, 1, 0.1f, light.range, gpu::isHomogenousDepth(), true);
+		const Quat rot = -m_scene->getUniverse().getRotation(light.entity);
+		
+		const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
+		const Matrix bias_matrix(
+				0.5, 0.0, 0.0, 0.0,
+				0.0, ymul, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.5, 0.5, 0.0, 1.0);
+
+		Matrix view = rot.toMatrix();
+		return /*bias_matrix * */prj * view;
+	}
+
+	void addToShadowAtlas(PointLight& light, Matrix (&matrices)[128]) {
+		ASSERT(light.cast_shadows);
+		
+		auto iter = m_shadow_atlas.map.find(light.entity);
+		if (!iter.isValid()) {
+			for (u32 i = 0; i < 128; ++i) {
+				if (m_shadow_atlas.inv_map[i].isValid()) continue;
+				m_shadow_atlas.inv_map[i] = light.entity;
+				m_shadow_atlas.map.insert(light.entity, i);
+				light.shadow_atlas_idx = i;
+
+				// TODO load async
+				const char* base_path = m_renderer.getEngine().getFileSystem().getBasePath();
+				const StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_scene->getUniverse().getName(), "/shadowmaps/", light.guid, ".dat");
+				OS::InputFile file;
+				if (!file.open(path)) {
+					logError("Renderer") << "Failed to open " << path;
+					return;
+				}
+				struct {
+					u32 magic;
+					u32 version;
+					u32 w;
+					u32 h;
+				} header;
+				file.read(&header, sizeof(header));
+				u32 size = header.w * header.h * sizeof(float);
+				Renderer::MemRef mem = m_renderer.allocate(size);
+				file.read(mem.data, size);
+
+				if (!m_shadow_atlas.texture.isValid()) {
+					Renderer::MemRef mem;
+					m_shadow_atlas.texture = m_renderer.createTexture(header.w, header.h, 128, gpu::TextureFormat::R32F, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
+				}
+
+				m_renderer.updateTexture(m_shadow_atlas.texture, i, 0, 0, header.w, header.h, gpu::TextureFormat::R32F, mem);
+				file.close();
+				break;
+			}
+			iter = m_shadow_atlas.map.find(light.entity);
+		}
+
+		const Matrix mtx = getShadowMatrix(light);
+		matrices[iter.value()] = mtx;
+
+	}
+
 	static int renderReflectionVolumes(lua_State* L) {
 
 		const int pipeline_idx = lua_upvalueindex(1);
@@ -3782,6 +3816,8 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(viewport);
 
+		lua_pushinteger(L, -2); lua_setfield(L, -2, "SHADOW_ATLAS");
+
 		registerConst("CLEAR_DEPTH", (u32)gpu::ClearFlags::DEPTH);
 		registerConst("CLEAR_COLOR", (u32)gpu::ClearFlags::COLOR);
 		registerConst("CLEAR_ALL", (u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH | (u32)gpu::ClearFlags::STENCIL);
@@ -3796,7 +3832,6 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("bindRenderbuffers", PipelineImpl::bindRenderbuffers);
 		registerCFunction("bindTextures", PipelineImpl::bindTextures);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
-		registerCFunction("prepareShadowcastingLocalLights", PipelineImpl::prepareShadowcastingLocalLights);
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
 		registerCFunction("pass", PipelineImpl::pass);
@@ -3897,6 +3932,9 @@ struct PipelineImpl final : Pipeline
 	gpu::BufferHandle m_cube_vb;
 	gpu::BufferHandle m_cube_ib;
 	gpu::BufferHandle m_drawcall_ub = gpu::INVALID_BUFFER;
+	
+	ShadowAtlas m_shadow_atlas;
+
 	struct {
 		struct Buffer {
 			gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
