@@ -603,6 +603,11 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
+	void refreshShadowAtlas() override {
+		m_shadow_atlas.map.clear();
+		for (EntityPtr& e : m_shadow_atlas.inv_map) e = INVALID_ENTITY;
+	}
+
 	void define(const char* define, bool enable) override {
 		LuaWrapper::DebugGuard guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -2210,6 +2215,7 @@ struct PipelineImpl final : Pipeline
 				light.fov = pl.fov;
 				light.color = pl.color * pl.intensity;
 				light.attenuation_param = pl.attenuation_param;
+				light.atlas_idx = pl.shadow_atlas_idx;
 
 				if (pl.cast_shadows) {
 					m_pipeline->addToShadowAtlas(pl, m_shadow_atlas_matrices);
@@ -2408,14 +2414,18 @@ struct PipelineImpl final : Pipeline
 	
 	Matrix getShadowMatrix(const PointLight& light) {
 		Matrix prj;
-		prj.setPerspective(light.fov, 1, 0.1f, light.range, false, true);
-		Matrix view;
-		const DVec3 pos = m_scene->getUniverse().getPosition(light.entity);
-		const Quat rot = m_scene->getUniverse().getRotation(light.entity);
-		const Vec3 lpos = (pos - m_viewport.pos).toFloat();
+		prj.setPerspective(light.fov, 1, 0.1f, light.range, gpu::isHomogenousDepth(), true);
+		const Quat rot = -m_scene->getUniverse().getRotation(light.entity);
 		
-		view.lookAt(lpos, lpos + rot.rotate(Vec3(0, 0, -1)), rot.rotate(Vec3(0, 1, 0)));
-		return prj * view.inverted();
+		const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
+		const Matrix bias_matrix(
+				0.5, 0.0, 0.0, 0.0,
+				0.0, ymul, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				0.5, 0.5, 0.0, 1.0);
+
+		Matrix view = rot.toMatrix();
+		return /*bias_matrix * */prj * view;
 	}
 
 	void addToShadowAtlas(PointLight& light, Matrix (&matrices)[128]) {

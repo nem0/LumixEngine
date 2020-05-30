@@ -3,6 +3,7 @@
 
 #include "engine/lumix.h"
 #include "engine/flag_set.h"
+#include "engine/hash_map.h"
 #include "engine/math.h"
 #include "engine/plugin.h"
 #include "gpu/gpu.h"
@@ -317,6 +318,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual bool getEnvironmentCastShadows(EntityRef entity) = 0;
 	virtual void setEnvironmentCastShadows(EntityRef entity, bool enable) = 0;
 	virtual Environment& getEnvironment(EntityRef entity) = 0;
+	virtual const HashMap<EntityRef, PointLight>& getPointLights() = 0;
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;

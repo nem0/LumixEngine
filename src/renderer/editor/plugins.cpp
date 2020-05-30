@@ -2514,9 +2514,10 @@ void captureCubemap(StudioApp& app
 }
 
 struct PointLightPlugin final : PropertyGrid::IPlugin {
-	explicit PointLightPlugin(StudioApp& app)
+	explicit PointLightPlugin(SceneView& scene_view, StudioApp& app)
 		: m_app(app)
 		, m_jobs(app.getAllocator())
+		, m_scene_view(scene_view)
 	{
 		Engine& engine = app.getEngine();
 		PluginManager& plugin_manager = engine.getPluginManager();
@@ -2538,14 +2539,32 @@ struct PointLightPlugin final : PropertyGrid::IPlugin {
 		const PointLight& pl = scene->getPointLight((EntityRef)cmp.entity);
 		if (!pl.cast_shadows) return;
 
-		if (ImGui::Button("Bake shadowmap")) {
-			// TODO do not switch universe before everything is processed, do the same for probes
-			m_jobs.push((EntityRef)cmp.entity);
+		if(m_jobs.empty()) {
+			if (ImGui::Button("Bake shadowmap")) {
+				// TODO do not switch universe before everything is processed, do the same for probes
+				m_jobs.push((EntityRef)cmp.entity);
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Bake all")) {
+				const HashMap<EntityRef, PointLight>& lights = scene->getPointLights();
+				for (const PointLight& l : lights) {
+					if (l.cast_shadows) m_jobs.push((EntityRef)l.entity);
+				}
+			}
+		}
+		else {
+			ImGui::TextUnformatted("Baking");
 		}
 	}
 	
 	void update() override {
-		if (m_jobs.empty()) return;
+		if (m_jobs.empty()) {
+			if (m_refresh) {
+				m_scene_view.getPipeline()->refreshShadowAtlas();
+				m_refresh = false;
+			}
+			return;
+		}
 
 		Engine& engine = m_app.getEngine();
 		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
@@ -2567,8 +2586,15 @@ struct PointLightPlugin final : PropertyGrid::IPlugin {
 		vp.h = 256;
 		vp.is_ortho = false;
 		vp.pos = universe->getPosition(e);
-		vp.rot = -universe->getRotation(e);
+		vp.rot = universe->getRotation(e);
 		m_pipeline->setViewport(vp);
+
+		struct RenderJob2 : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override { gpu::startCapture(); }
+		};
+		RenderJob2* rjob2 = LUMIX_NEW(renderer->getAllocator(), RenderJob2);
+		renderer->queue(rjob2, 0);
 		m_pipeline->render(false);
 
 		const gpu::TextureHandle res = m_pipeline->getOutput();
@@ -2583,6 +2609,7 @@ struct PointLightPlugin final : PropertyGrid::IPlugin {
 
 			void setup() override {}
 			void execute() override {
+				gpu::stopCapture();
 				const char* base_path = plugin->m_app.getEngine().getFileSystem().getBasePath();
 				StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", universe_name.c_str(), "/shadowmaps/");
 				OS::makePath(path);
@@ -2603,6 +2630,7 @@ struct PointLightPlugin final : PropertyGrid::IPlugin {
 
 				file.write(data.begin(), data.byte_size());
 				file.close();
+				plugin->m_refresh = true;
 			}
 			Array<float> data; 
 			PointLightPlugin* plugin;
@@ -2630,6 +2658,8 @@ struct PointLightPlugin final : PropertyGrid::IPlugin {
 	Array<EntityRef> m_jobs;
 	Pipeline* m_pipeline;
 	StudioApp& m_app;
+	SceneView& m_scene_view;
+	bool m_refresh = false;
 };
 
 struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
@@ -2852,7 +2882,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			}
 		}
 
-		if (m_done_counter == m_probe_counter) {
+		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 			StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 			if (!OS::dirExists(path) && !OS::makePath(path)) {
@@ -3796,9 +3826,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_shader_plugin);
 		asset_browser.addPlugin(*m_texture_plugin);
 
+		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
+		m_game_view = LUMIX_NEW(allocator, GameView)(m_app);
+		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view);
+		m_app.addPlugin(*m_scene_view);
+		m_app.addPlugin(*m_game_view);
+		m_app.addPlugin(*m_editor_ui_render_plugin);
+
 		m_model_properties_plugin = LUMIX_NEW(allocator, ModelPropertiesPlugin)(m_app);
 		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(m_app);
-		m_point_light_plugin = LUMIX_NEW(allocator, PointLightPlugin)(m_app);
+		m_point_light_plugin = LUMIX_NEW(allocator, PointLightPlugin)(*m_scene_view, m_app);
 		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(m_app);
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(*m_model_properties_plugin);
@@ -3806,12 +3843,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.addPlugin(*m_point_light_plugin);
 		property_grid.addPlugin(*m_terrain_plugin);
 
-		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
-		m_game_view = LUMIX_NEW(allocator, GameView)(m_app);
-		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view);
-		m_app.addPlugin(*m_scene_view);
-		m_app.addPlugin(*m_game_view);
-		m_app.addPlugin(*m_editor_ui_render_plugin);
 	}
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
@@ -3877,9 +3908,17 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		Universe& universe = scene->getUniverse();
 
 		const float range = scene->getLightRange((EntityRef)light.entity);
+		const float fov = scene->getPointLight((EntityRef)light.entity).fov;
 
 		const DVec3 pos = universe.getPosition((EntityRef)light.entity);
-		addSphere(view, pos, range, Color::BLUE);
+		if (fov > PI) {
+			addSphere(view, pos, range, Color::BLUE);
+		}
+		else {
+			const Quat rot = universe.getRotation((EntityRef)light.entity);
+			const float t = tanf(fov * 0.5f);
+			addCone(view, pos, rot.rotate(Vec3(0, 0, -range)), rot.rotate(Vec3(0, range * t, 0)), rot.rotate(Vec3(range * t, 0, 0)), Color::BLUE);
+		}
 	}
 
 
@@ -4004,6 +4043,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		LUMIX_DELETE(allocator, m_texture_plugin);
 		LUMIX_DELETE(allocator, m_shader_plugin);
 
+		m_app.removePlugin(*m_scene_view);
+		m_app.removePlugin(*m_game_view);
+		m_app.removePlugin(*m_editor_ui_render_plugin);
+
+		LUMIX_DELETE(allocator, m_scene_view);
+		LUMIX_DELETE(allocator, m_game_view);
+		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
+
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
 		property_grid.removePlugin(*m_model_properties_plugin);
@@ -4015,14 +4062,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		LUMIX_DELETE(allocator, m_env_probe_plugin);
 		LUMIX_DELETE(allocator, m_point_light_plugin);
 		LUMIX_DELETE(allocator, m_terrain_plugin);
-
-		m_app.removePlugin(*m_scene_view);
-		m_app.removePlugin(*m_game_view);
-		m_app.removePlugin(*m_editor_ui_render_plugin);
-
-		LUMIX_DELETE(allocator, m_scene_view);
-		LUMIX_DELETE(allocator, m_game_view);
-		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
 	}
 
 

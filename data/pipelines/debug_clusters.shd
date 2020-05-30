@@ -30,7 +30,7 @@ fragment_shader [[
 		ivec3 cluster;
 		int cluster_idx = getClusterIndex(ndc_depth, cluster);
 
-		#if 0
+		#if 1
 			// debug number of lights per cluster
 			int c = b_clusters[cluster_idx].lights_count;
 			if (c < 10)
