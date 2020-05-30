@@ -15,7 +15,7 @@ HEAD of master is not stable, for stable version use [this](https://github.com/n
 * [Videos](https://www.youtube.com/channel/UCtjtIy0ldsq-9siM1Gm_rXg/videos)
 * [Plugins](https://github.com/nem0/LumixEngine/wiki/available-plugins)
 
-![Editor screenshot](https://user-images.githubusercontent.com/153526/29975939-9c3db48e-8f38-11e7-80f1-2a777e7a43c8.png)
+![Editor screenshot](https://raw.githubusercontent.com/wiki/nem0/LumixEngine/files/features/editor.jpg)
 
 Who is using it?
 
