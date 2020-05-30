@@ -75,6 +75,11 @@ int Material::getCustomFlagCount()
 	return s_custom_flags.count;
 }
 
+void Material::setLayer(u8 layer) { 
+	if (m_layer == layer) return;
+	m_layer = layer;
+	refresh();
+}
 
 u32 Material::getCustomFlag(const char* flag_name)
 {

@@ -118,7 +118,7 @@ public:
 	bool isCustomFlag(u32 flag) const { return (m_custom_flags & flag) == flag; }
 
 	u8 getLayer() const { return m_layer; }
-	void setLayer(u8 layer) { m_layer = layer; }
+	void setLayer(u8 layer);
 	u32 getSortKey() const { return m_sort_key; }
 
 	static u32 getCustomFlag(const char* flag_name);

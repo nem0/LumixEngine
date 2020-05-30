@@ -83,6 +83,7 @@ protected:
 
 protected:
 	void checkState();
+	void refresh();
 
 private:
 	void doLoad();
