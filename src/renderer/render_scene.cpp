@@ -1058,6 +1058,7 @@ public:
 		for (u32 i = 0; i < size; ++i) {
 			PointLight light;
 			serializer.read(light);
+			light.shadow_atlas_idx = -1;
 			light.entity = entity_map.get(light.entity);
 			m_point_lights.insert(light.entity, light);
 			const DVec3 pos = m_universe.getPosition(light.entity);
@@ -1253,70 +1254,6 @@ public:
 		m_universe.onComponentCreated(entity, PARTICLE_EMITTER_TYPE, this);
 	}
 
-
-	int getClosestShadowcastingPointLights(const DVec3& reference_pos, u32 max_lights, PointLight* lights) override
-	{
-
-		float dists[16];
-		ASSERT(max_lights <= lengthOf(dists));
-		ASSERT(max_lights > 0);
-		if (m_point_lights.empty()) return 0;
-
-		u32 light_count = 0;
-		auto iter = m_point_lights.begin();
-		auto end = m_point_lights.end();
-		while (iter != end && light_count < max_lights) {
-			const PointLight& light = iter.value();
-			++iter;
-
-			if (!light.cast_shadows) continue;
-			const DVec3 light_pos = m_universe.getPosition(light.entity);
-			float dist_squared = float((reference_pos - light_pos).squaredLength());
-
-			dists[light_count] = dist_squared;
-			lights[light_count] = light;
-
-			for (int i = light_count; i > 0 && dists[i - 1] > dists[i]; --i) {
-				float tmp = dists[i];
-				dists[i] = dists[i - 1];
-				dists[i - 1] = tmp;
-
-				const PointLight tmp2 = lights[i];
-				lights[i] = lights[i - 1];
-				lights[i - 1] = tmp2;
-			}
-			++light_count;
-		}
-
-		while(iter != end) {
-			const PointLight& light = iter.value();
-			++iter;
-
-			if (!light.cast_shadows) continue;
-			const DVec3 light_pos = m_universe.getPosition(light.entity);
-			float dist_squared = float((reference_pos - light_pos).squaredLength());
-
-			if (dist_squared < dists[max_lights - 1]) {
-				dists[max_lights - 1] = dist_squared;
-				lights[max_lights - 1] = light;
-
-				for (int i = max_lights - 1; i > 0 && dists[i - 1] > dists[i];
-					--i)
-				{
-					float tmp = dists[i];
-					dists[i] = dists[i - 1];
-					dists[i - 1] = tmp;
-
-					const PointLight tmp2 = lights[i];
-					lights[i] = lights[i - 1];
-					lights[i - 1] = tmp2;
-				}
-			}
-		}
-
-		return light_count;
-	}
-
 	bool getEnvironmentCastShadows(EntityRef entity) override {
 		return m_environments[entity].flags.isSet(Environment::CAST_SHADOWS);
 	}
@@ -1330,6 +1267,11 @@ public:
 		return m_environments[entity];
 	}
 
+
+	const HashMap<EntityRef, PointLight>& getPointLights() override
+	{
+		return m_point_lights;
+	}
 
 	PointLight& getPointLight(EntityRef entity) override
 	{
@@ -2627,6 +2569,7 @@ public:
 		light.cast_shadows = false;
 		light.attenuation_param = 2;
 		light.range = 10;
+		light.guid = randGUID();
 		const DVec3 pos = m_universe.getPosition(entity);
 		m_point_lights.insert(entity, light);
 		m_culling_system->add(entity, (u8)RenderableTypes::LOCAL_LIGHT, pos, light.range);

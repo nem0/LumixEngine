@@ -30,7 +30,11 @@ struct Probe {
 
 struct Light {
 	vec4 pos_radius;
+	vec4 rot;
 	vec4 color_attn;
+	int atlas_idx;
+	float fov;
+	vec2 padding;
 };
 
 struct Cluster {
