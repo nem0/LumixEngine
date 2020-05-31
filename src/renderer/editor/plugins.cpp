@@ -1371,6 +1371,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 		}
 		if (open) {
 			for (i32 i = 0; i < count; ++i) {
+				ImGui::PushID(i);
 				Material* material = model->getMesh(i).material;
 				if(count == 1) ImGuiEx::Label("Material");
 				
@@ -1381,6 +1382,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 				{
 					m_app.getAssetBrowser().selectResource(material->getPath(), true, false);
 				}
+				ImGui::PopID();
 			}
 			if(count > 1) ImGui::TreePop();
 		}
