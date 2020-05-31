@@ -121,6 +121,33 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 }
 
 
+static void extractEmbedded(const ofbx::Texture* texture, const char* src_dir)
+{
+	const ofbx::DataView embedded = texture->getEmebeddedData();
+	if (embedded.end < embedded.begin + 4) return;
+
+	ofbx::DataView filename = texture->getRelativeFileName();
+	if (filename == "") filename = texture->getFileName();
+	char path[MAX_PATH_LENGTH];
+	filename.toString(path);
+	const PathInfo pi(path);
+	const StaticString<MAX_PATH_LENGTH> fullpath(src_dir, pi.m_basename, ".", pi.m_extension);
+
+	if (OS::fileExists(fullpath)) return;
+
+	OS::OutputFile file;
+	if (!file.open(fullpath)) {
+		logError("Renderer") << "Failed to save " << fullpath;
+		return;
+	}
+
+	if (!file.write(embedded.begin + 4, embedded.end - embedded.begin - 4)) {
+		logError("Renderer") << "Failed to write " << fullpath;
+	}
+	file.close();
+}
+
+
 void FBXImporter::gatherMaterials(const char* src_dir)
 {
 	for (ImportMesh& mesh : meshes)
@@ -134,6 +161,8 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 		auto gatherTexture = [&mat, src_dir](ofbx::Texture::TextureType type) {
 			const ofbx::Texture* texture = mat.fbx->getTexture(type);
 			if (!texture) return;
+
+			extractEmbedded(texture, src_dir);
 
 			ImportTexture& tex = mat.textures[type];
 			tex.fbx = texture;
