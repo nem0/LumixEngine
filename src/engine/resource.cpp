@@ -36,6 +36,8 @@ Resource::~Resource() = default;
 
 
 void Resource::refresh() {
+	if (m_current_state == State::EMPTY) return;
+
 	const State old_state = m_current_state;
 	m_current_state = State::EMPTY;	
 	m_cb.invoke(old_state, m_current_state, *this);
