@@ -8,13 +8,8 @@ namespace ofbx
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
-#ifdef _WIN32
-	typedef long long i64;	
-	typedef unsigned long long u64;	
-#else	
-	typedef long i64;	
-	typedef unsigned long u64;
-#endif
+typedef unsigned long long u64;
+typedef long long i64;
 
 static_assert(sizeof(u8) == 1, "u8 is not 1 byte");
 static_assert(sizeof(u32) == 4, "u32 is not 4 bytes");
@@ -112,7 +107,8 @@ struct IElementProperty
 		ARRAY_DOUBLE = 'd',
 		ARRAY_INT = 'i',
 		ARRAY_LONG = 'l',
-		ARRAY_FLOAT = 'f'
+		ARRAY_FLOAT = 'f',
+		BINARY = 'R'
 	};
 	virtual ~IElementProperty() {}
 	virtual Type getType() const = 0;
@@ -239,7 +235,10 @@ struct Texture : Object
 		DIFFUSE,
 		NORMAL,
 		SPECULAR,
-
+        SHININESS,
+        AMBIENT,
+        EMISSIVE,
+        REFLECTION,
 		COUNT
 	};
 
@@ -248,6 +247,7 @@ struct Texture : Object
 	Texture(const Scene& _scene, const IElement& _element);
 	virtual DataView getFileName() const = 0;
 	virtual DataView getRelativeFileName() const = 0;
+	virtual DataView getEmebeddedData() const = 0;
 };
 
 
@@ -259,6 +259,19 @@ struct Material : Object
 
 	virtual Color getDiffuseColor() const = 0;
 	virtual Color getSpecularColor() const = 0;
+    virtual Color getReflectionColor() const = 0;
+    virtual Color getAmbientColor() const = 0;
+    virtual Color getEmissiveColor() const = 0;
+
+    virtual double getDiffuseFactor() const = 0;
+    virtual double getSpecularFactor() const = 0;
+    virtual double getReflectionFactor() const = 0;
+    virtual double getShininess() const = 0;
+    virtual double getShininessExponent() const = 0;
+    virtual double getAmbientFactor() const = 0;
+    virtual double getBumpFactor() const = 0;
+    virtual double getEmissiveFactor() const = 0;
+
 	virtual const Texture* getTexture(Texture::TextureType type) const = 0;
 };
 
