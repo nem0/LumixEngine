@@ -81,13 +81,18 @@ struct Environment
 
 struct PointLight
 {
+	enum Flags : u32 {
+		CAST_SHADOWS = 1 << 0,
+		DYNAMIC = 1 << 1
+	};
+
 	Vec3 color;
 	float intensity;
 	EntityRef entity;
 	float fov;
 	float attenuation_param;
 	float range;
-	bool cast_shadows;
+	FlagSet<Flags, u32> flags;
 	u64 guid;
 	i32 shadow_atlas_idx = -1;
 };
@@ -322,6 +327,10 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual PointLight& getPointLight(EntityRef entity) = 0;
 	virtual float getLightRange(EntityRef entity) = 0;
 	virtual void setLightRange(EntityRef entity, float value) = 0;
+	virtual bool getPointLightCastShadows(EntityRef entity) = 0;
+	virtual void setPointLightCastShadows(EntityRef entity, bool value) = 0;
+	virtual bool getPointLightDynamic(EntityRef entity) = 0;
+	virtual void setPointLightDynamic(EntityRef entity, bool value) = 0;
 
 	virtual Span<EntityRef> getReflectionProbesEntities() = 0;
 	virtual ReflectionProbe& getReflectionProbe(EntityRef entity) = 0;

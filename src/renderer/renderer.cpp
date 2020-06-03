@@ -409,7 +409,8 @@ static void registerProperties(IAllocator& allocator)
 			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows))
 		),
 		component("point_light",
-			var_property("Cast shadows", &RenderScene::getPointLight, &PointLight::cast_shadows),
+			property("Cast shadows", LUMIX_PROP(RenderScene, PointLightCastShadows)),
+			property("Dynamic", LUMIX_PROP(RenderScene, PointLightDynamic)),
 			var_property("Intensity", &RenderScene::getPointLight, &PointLight::intensity, MinAttribute(0)),
 			var_property("FOV", &RenderScene::getPointLight, &PointLight::fov, ClampAttribute(0, 360), RadiansAttribute()),
 			var_property("Attenuation", &RenderScene::getPointLight, &PointLight::attenuation_param, ClampAttribute(0, 100)),
@@ -653,7 +654,7 @@ struct RendererImpl final : Renderer
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
 				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
 				gpu::createTexture(staging, w, h, 1, out_format, flags, nullptr, "staging_buffer");
-				gpu::copy(staging, handle);
+				gpu::copy(staging, handle, 0, 0);
 				gpu::readTexture(staging, 0, buf);
 				gpu::destroy(staging);
 				gpu::popDebugGroup();

@@ -12,6 +12,7 @@ local debug_roughness = false
 local debug_metallic = false
 local debug_albedo = false
 local debug_clusters = false
+local debug_shadow_atlas = false
 local screenshot_request = 0
 local enable_icons = true
 
@@ -267,6 +268,9 @@ function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	if debug_metallic then
 		debugRenderbuffer(gb1, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
+	if debug_shadow_atlas then
+		debugRenderbuffer(SHADOW_ATLAS, output, {1, 0, 0, 0}, {1, 0, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
+	end
 	if debug_clusters then
 		debugClusters(gb_depth, output)
 	end
@@ -289,7 +293,7 @@ function renderSelectionOutline(output)
 	
 end
 
-function bakeShadow()
+function main_shadowmap()
 	local rb = createRenderbuffer(1, 1, true, "r32f", "baked_shadowmap")
 	local depthbuf = createRenderbuffer(1, 1, true, "depth32", "shadowmap_depth")
 	setRenderTargets(rb, depthbuf)
@@ -305,7 +309,7 @@ end
 
 function main()
 	if BAKE_SHADOW ~= nil then
-		bakeShadow()
+		main_shadowmap()
 		return
 	end
 
@@ -419,6 +423,7 @@ function onGUI()
 
 	if ImGui.BeginPopup("debug_popup") then
 		changed, debug_shadowmap = ImGui.Checkbox("Shadowmap", debug_shadowmap)
+		changed, debug_shadow_atlas = ImGui.Checkbox("Shadow atlas", debug_shadow_atlas)
 		changed, debug_albedo = ImGui.Checkbox("Albedo", debug_albedo)
 		changed, debug_normal = ImGui.Checkbox("Normal", debug_normal)
 		changed, debug_roughness = ImGui.Checkbox("Roughness", debug_roughness)

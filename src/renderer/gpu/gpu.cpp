@@ -1861,14 +1861,12 @@ bool isHomogenousDepth() { return false; }
 bool isOriginBottomLeft() { return true; }
 
 
-void copy(TextureHandle dst_handle, TextureHandle src_handle) {
+void copy(TextureHandle dst_handle, TextureHandle src_handle, u32 dst_x, u32 dst_y) {
 	checkThread();
 	Texture& dst = g_gpu.textures[dst_handle.value];
 	Texture& src = g_gpu.textures[src_handle.value];
 	ASSERT(src.target == GL_TEXTURE_2D || src.target == GL_TEXTURE_CUBE_MAP);
 	ASSERT(src.target == dst.target);
-	ASSERT(dst.width == src.width);
-	ASSERT(dst.height == src.height);
 
 	u32 mip = 0;
 	while ((src.width >> mip) != 0 || (src.height >> mip) != 0) {
@@ -1876,10 +1874,10 @@ void copy(TextureHandle dst_handle, TextureHandle src_handle) {
 		const u32 h = maximum(src.height >> mip, 1);
 
 		if (src.target == GL_TEXTURE_CUBE_MAP) {
-			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 6));
+			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 6));
 		}
 		else {
-			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, 0, 0, 0, w, h, 1));
+			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 1));
 		}
 		++mip;
 		if (src.flags & (u32)TextureFlags::NO_MIPS) break;

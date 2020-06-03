@@ -247,7 +247,7 @@ void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t size);
 void bindUniformBuffer(u32 ub_index, BufferGroupHandle group, size_t element_index);
-void copy(TextureHandle dst, TextureHandle src);
+void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
 void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
 TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
