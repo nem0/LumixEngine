@@ -20,7 +20,7 @@ fragment_shader [[
 	layout (binding=2) uniform sampler2D u_gbuffer2;
 	layout (binding=3) uniform sampler2D u_gbuffer_depth;
 	layout (binding=4) uniform sampler2D u_shadowmap;
-	layout (binding=5) uniform sampler2DArray u_shadow_atlas;
+	layout (binding=5) uniform sampler2D u_shadow_atlas;
 	
 	void main()
 	{
@@ -74,8 +74,8 @@ fragment_shader [[
 					vec4 proj_pos = u_shadow_atlas_matrices[atlas_idx] * vec4(lpos, 1);
 					proj_pos /= proj_pos.w;
 
-					vec2 shadow_uv = proj_pos.xy * 0.5 + 0.5;
-					float occluder = texture(u_shadow_atlas, vec3(shadow_uv, atlas_idx)).r;
+					vec2 shadow_uv = proj_pos.xy;
+					float occluder = texture(u_shadow_atlas, shadow_uv).r;
 					float receiver = shadowmapValue(proj_pos.z);
 					float m =  receiver / occluder;
 					attn *= clamp(1 - (1 - m) * 512, 0.0, 1.0);

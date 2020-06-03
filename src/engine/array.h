@@ -320,7 +320,7 @@ public:
 	const T& back() const { return m_data[m_size - 1]; }
 
 
-	T& back() { return m_data[m_size - 1]; }
+	T& back() { ASSERT(m_size > 0); return m_data[m_size - 1]; }
 
 
 	void pop()

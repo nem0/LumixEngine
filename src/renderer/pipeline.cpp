@@ -252,6 +252,11 @@ struct MTBucketArray
 };
 
 struct ShadowAtlas {
+	static constexpr u32 SIZE = 2048;
+	// TODO variable size, needs packer
+	static constexpr u32 TILE_SIZE = 256;
+	static constexpr u32 COLS = SIZE / TILE_SIZE;
+	
 	ShadowAtlas(IAllocator& allocator)
 		: map(allocator)
 	{
@@ -603,11 +608,6 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void refreshShadowAtlas() override {
-		m_shadow_atlas.map.clear();
-		for (EntityPtr& e : m_shadow_atlas.inv_map) e = INVALID_ENTITY;
-	}
-
 	void define(const char* define, bool enable) override {
 		LuaWrapper::DebugGuard guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -698,8 +698,59 @@ struct PipelineImpl final : Pipeline
 		return {(float)atlas_texture->width, (float)atlas_texture->height};
 	}
 
+	bool bakeShadow(const PointLight& light) {
+		PROFILE_FUNCTION();
+		const Universe& universe = m_scene->getUniverse();
+		const Viewport backup_viewport = m_viewport;
+
+		m_viewport.is_ortho = false;
+		m_viewport.pos = universe.getPosition(light.entity);
+		m_viewport.rot = universe.getRotation(light.entity);
+		m_viewport.fov = light.fov;
+		m_viewport.near = 0.1f;
+		m_viewport.far = light.range;
+		m_viewport.w = 256;
+		m_viewport.h = 256;
+
+		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		lua_getfield(m_lua_state, -1, "main_shadowmap");
+		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
+			lua_pop(m_lua_state, 2);
+			logError("Renderer") << getPath() << ": can not bake shadows because main_shadowmap() is missing";
+			return false;
+		}
+		LuaWrapper::pcall(m_lua_state, 0, 0);
+		lua_pop(m_lua_state, 1);
+
+		struct BlitJob : Renderer::RenderJob {
+			void execute() override { gpu::copy(dst, src, x, y); }
+			void setup() override {}
+
+			gpu::TextureHandle src;
+			gpu::TextureHandle dst;
+			u32 x, y;
+		};
+
+		const gpu::TextureHandle src = getOutput();
+		if (!src.isValid()) {
+			logError("Renderer") << getPath() << ": can not bake shadows because the pipeline has no output";
+			return false;
+		}
+
+		BlitJob* job = LUMIX_NEW(m_renderer.getAllocator(), BlitJob);
+		job->dst = m_shadow_atlas.texture;
+		job->src = src;
+		job->x = ShadowAtlas::TILE_SIZE * (light.shadow_atlas_idx % ShadowAtlas::COLS);
+		job->y = ShadowAtlas::TILE_SIZE * (light.shadow_atlas_idx / ShadowAtlas::COLS);
+
+		m_renderer.queue(job, m_profiler_link);
+		m_viewport = backup_viewport;
+		return true;
+	}
+
 	bool render(bool only_2d) override 
-	{ 
+	{
 		PROFILE_FUNCTION();
 
 		if (!isReady() || m_viewport.w <= 0 || m_viewport.h <= 0) {
@@ -1522,6 +1573,17 @@ struct PipelineImpl final : Pipeline
 		return 0;
 	}
 
+
+	void renderShadow() {
+		/*const gpu::TextureHandle renderbuffers[] = {
+			&m_shadow_atlas.tile_texture,
+			&m_shadow_atlas.tile_depth
+		};
+		setRenderTargets(Span(renderbuffers));
+		prepareCommands()
+*/
+	}
+
 	
 	static int prepareCommands(lua_State* L)
 	{
@@ -1534,19 +1596,16 @@ struct PipelineImpl final : Pipeline
 
 		LuaWrapper::checkTableArg(L, 1);
 		const CameraParams cp = checkCameraParams(L, 1);
-
-		IAllocator& allocator = pipeline->m_renderer.getAllocator();
-		PageAllocator& page_allocator = pipeline->m_renderer.getEngine().getPageAllocator();
-		PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator, page_allocator);
-
+		
 		LuaWrapper::checkTableArg(L, 2);
 
-		const int table_len = (int)lua_objlen(L, 2);
-		cmd->m_bucket_count = table_len;
-		for(int i = 0; i < table_len; ++i) {
+		const int bucket_count = (int)lua_objlen(L, 2);
+		RenderBucket buckets[64];
+		ASSERT(bucket_count < (i32)lengthOf(buckets));
+
+		for(int i = 0; i < bucket_count; ++i) {
 			lua_rawgeti(L, 2, i + 1);
 			if(!lua_istable(L, -1)) {
-				LUMIX_DELETE(allocator, cmd);
 				return luaL_argerror(L, 2, "Incorrect bucket configuration");
 			}
 
@@ -1558,44 +1617,37 @@ struct PipelineImpl final : Pipeline
 					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
 			}
 
-			cmd->m_define_mask[i] = 0;
-			cmd->m_bucket_sort_order[i] = order;
+			buckets[i].define_mask = 0;
+			buckets[i].order = order;
 
 			lua_getfield(L, -1, "layers");
 			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* layer_name){
-				const int layer = pipeline->m_renderer.getLayerIdx(layer_name);
-				cmd->m_bucket_map[layer] = i | (order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
+				buckets[i].layer = pipeline->m_renderer.getLayerIdx(layer_name);
 			});
 			lua_pop(L, 1);
 
 			lua_getfield(L, -1, "defines");
 			if (lua_istable(L, -1)) {
 				LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* define){
-					cmd->m_define_mask[i] |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);
+					buckets[i].define_mask |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);
 				});
 			}
 			lua_pop(L, 1);
 
-			if(!ok) {
-				LUMIX_DELETE(allocator, cmd);
+			if (!ok) {
 				return luaL_argerror(L, 2, "'layers' must be array of strings");
 			}
 			
 			lua_pop(L, 1);
 		}
 
-		static_assert(sizeof(CmdPage) == PageAllocator::PAGE_SIZE, "Wrong page size");
-		for(int i = 0; i < cmd->m_bucket_count; ++i) {
-			CmdPage* page = new (NewPlaceholder(), page_allocator.allocate(true)) CmdPage;
-			cmd->m_command_sets[i] = page;
-			LuaWrapper::push(L, page);
-		}
-		cmd->m_camera_params = cp;
-		cmd->m_pipeline = pipeline;
-		const int num_cmd_sets = cmd->m_bucket_count;
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+		CmdPage* pages[64];
+		pipeline->prepareCommands(cp, Span(buckets, bucket_count), Span(pages));
 
-		return num_cmd_sets;
+		for (i32 i = 0; i < bucket_count; ++i) {
+			LuaWrapper::push(L, pages[i]);
+		}
+		return bucket_count;
 	}
 
 
@@ -1826,12 +1878,12 @@ struct PipelineImpl final : Pipeline
 		, const Frustum& camera_frustum
 		, ShiftedFrustum* shadow_camera_frustum)
 	{
-		/*static const Frustum::Planes planes[] = {
+		static const Frustum::Planes planes[] = {
 			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
 		bool prev_side = dotProduct(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
 		int out_plane = (int)Frustum::Planes::EXTRA0;
 		Vec3 camera_frustum_center = camera_frustum.computeBoundingSphere().position;
-		for (int i = 0; i < lengthOf(planes); ++i)
+		for (u32 i = 0; i < lengthOf(planes); ++i)
 		{
 			bool side = dotProduct(light_forward, camera_frustum.getNormal(planes[i])) < 0;
 			if (prev_side != side)
@@ -1839,19 +1891,14 @@ struct PipelineImpl final : Pipeline
 				Vec3 n0 = camera_frustum.getNormal(planes[i]);
 				Vec3 n1 = camera_frustum.getNormal(planes[(i + lengthOf(planes) - 1) % lengthOf(planes)]);
 				Vec3 line_dir = crossProduct(n1, n0);
-				Vec3 n = crossProduct(light_forward, line_dir);
-				float d = -dotProduct(camera_position, n);
-				if (dotProduct(camera_frustum_center, n) + d < 0) {
-					n = -n;
-					d = -dotProduct(camera_position, n);
-				}
-				shadow_camera_frustum->setPlane((Frustum::Planes)out_plane, n, d);
+				Vec3 n = crossProduct(light_forward, line_dir).normalized();
+				if (dotProduct(camera_frustum_center, n) < 0) n = -n;
+				shadow_camera_frustum->setPlane((Frustum::Planes)out_plane, n, Vec3::ZERO);
 				++out_plane;
 				if (out_plane >(int)Frustum::Planes::EXTRA1) break;
 			}
 			prev_side = side;
-		}*/
-		// TODO
+		}
 	}
 
 
@@ -2165,7 +2212,6 @@ struct PipelineImpl final : Pipeline
 			const DVec3 cam_pos = m_camera_params.pos;
 			Universe& universe = scene->getUniverse();
 			const ShiftedFrustum& frustum = m_camera_params.frustum;
-			CullResult* lights = scene->getRenderables(frustum, RenderableTypes::LOCAL_LIGHT);
 			Vec4 xplanes[65];
 			Vec4 yplanes[65];
 			Vec4 zplanes[17];
@@ -2204,23 +2250,6 @@ struct PipelineImpl final : Pipeline
 
 			ASSERT(lengthOf(xplanes) >= (u32)size.x);
 			ASSERT(lengthOf(yplanes) >= (u32)size.y);
-
-			lights->forEach([&](EntityRef e){
-				i32 idx = point_lights.size();
-				PointLight& pl = scene->getPointLight(e);
-				ClusterPointLight& light = point_lights.emplace();
-				light.radius = pl.range;
-				light.pos = (universe.getPosition(e) - cam_pos).toFloat();
-				light.rot = universe.getRotation(e);
-				light.fov = pl.fov;
-				light.color = pl.color * pl.intensity;
-				light.attenuation_param = pl.attenuation_param;
-				light.atlas_idx = pl.shadow_atlas_idx;
-
-				if (pl.cast_shadows) {
-					m_pipeline->addToShadowAtlas(pl, m_shadow_atlas_matrices);
-				}
-			});
 
 			const Span<const EnvironmentProbe> env_probes = scene->getEnvironmentProbes();
 			const Span<EntityRef> probe_entities = scene->getEnvironmentProbesEntities();
@@ -2405,11 +2434,11 @@ struct PipelineImpl final : Pipeline
 		Array<Cluster> m_clusters;
 		Array<ClusterPointLight> m_point_lights;
 		Array<ClusterEnvProbe> m_probes;
-		Matrix m_shadow_atlas_matrices[128];
 
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
 		bool m_is_clear = false;
+		Matrix m_shadow_atlas_matrices[128];
 	};
 	
 	Matrix getShadowMatrix(const PointLight& light) {
@@ -2424,52 +2453,44 @@ struct PipelineImpl final : Pipeline
 				0.0, 0.0, 1.0, 0.0,
 				0.5, 0.5, 0.0, 1.0);
 
+		const float x = (light.shadow_atlas_idx % ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
+		const float y = (light.shadow_atlas_idx / ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
+		const Matrix to_tile(
+				1.f/ShadowAtlas::COLS, 0.0, 0.0, 0.0,
+				0.0, 1.f/ShadowAtlas::COLS, 0.0, 0.0,
+				0.0, 0.0, 1.0, 0.0,
+				x, y, 0.0, 1.0);
+
 		Matrix view = rot.toMatrix();
-		return /*bias_matrix * */prj * view;
+		return to_tile * bias_matrix * prj * view;
 	}
 
 	void addToShadowAtlas(PointLight& light, Matrix (&matrices)[128]) {
-		ASSERT(light.cast_shadows);
+		ASSERT(light.flags.isSet(PointLight::CAST_SHADOWS));
 		
 		auto iter = m_shadow_atlas.map.find(light.entity);
 		if (!iter.isValid()) {
+			if (!m_shadow_atlas.texture.isValid()) {
+				Renderer::MemRef mem;
+				m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::R32F, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
+			}
 			for (u32 i = 0; i < 128; ++i) {
 				if (m_shadow_atlas.inv_map[i].isValid()) continue;
+
 				m_shadow_atlas.inv_map[i] = light.entity;
 				m_shadow_atlas.map.insert(light.entity, i);
 				light.shadow_atlas_idx = i;
 
-				// TODO load async
-				const char* base_path = m_renderer.getEngine().getFileSystem().getBasePath();
-				const StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_scene->getUniverse().getName(), "/shadowmaps/", light.guid, ".dat");
-				OS::InputFile file;
-				if (!file.open(path)) {
-					logError("Renderer") << "Failed to open " << path;
-					return;
-				}
-				struct {
-					u32 magic;
-					u32 version;
-					u32 w;
-					u32 h;
-				} header;
-				file.read(&header, sizeof(header));
-				u32 size = header.w * header.h * sizeof(float);
-				Renderer::MemRef mem = m_renderer.allocate(size);
-				file.read(mem.data, size);
-
-				if (!m_shadow_atlas.texture.isValid()) {
-					Renderer::MemRef mem;
-					m_shadow_atlas.texture = m_renderer.createTexture(header.w, header.h, 128, gpu::TextureFormat::R32F, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
-				}
-
-				m_renderer.updateTexture(m_shadow_atlas.texture, i, 0, 0, header.w, header.h, gpu::TextureFormat::R32F, mem);
-				file.close();
+				// TODO scene might not be fully loaded yet
+				bakeShadow(light);
 				break;
 			}
 			iter = m_shadow_atlas.map.find(light.entity);
 		}
 
+		if (light.flags.isSet(PointLight::DYNAMIC)) {
+			bakeShadow(light);
+		}
 		const Matrix mtx = getShadowMatrix(light);
 		matrices[iter.value()] = mtx;
 
@@ -2534,6 +2555,28 @@ struct PipelineImpl final : Pipeline
 		else {
 			job->m_is_clear = true;
 		}
+
+		CullResult* lights = pipeline->m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
+		const Universe& universe = pipeline->m_scene->getUniverse();
+		const DVec3 cam_pos = pipeline->m_viewport.pos;
+		lights->forEach([&](EntityRef e){
+			PointLight& pl = pipeline->m_scene->getPointLight(e);
+			i32 idx = job->m_point_lights.size();
+			FillClustersJob::ClusterPointLight& light = job->m_point_lights.emplace();
+			light.radius = pl.range;
+			light.pos = (universe.getPosition(e) - cam_pos).toFloat();
+			light.rot = universe.getRotation(e);
+			light.fov = pl.fov;
+			light.color = pl.color * pl.intensity;
+			light.attenuation_param = pl.attenuation_param;
+			light.atlas_idx = pl.shadow_atlas_idx;
+
+			if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
+				pipeline->addToShadowAtlas(pl, job->m_shadow_atlas_matrices);
+			}
+		});
+		lights->free(pipeline->m_renderer.getEngine().getPageAllocator());
+
 		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
 		return 0;
 	}
@@ -2749,22 +2792,8 @@ struct PipelineImpl final : Pipeline
 		pushCameraParams(L, pipeline->m_shadow_camera_params[slice]);
 		return 1;
 	}
-
-	static int setRenderTargets(lua_State* L, bool readonly_ds) {
-		PROFILE_FUNCTION();
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx );
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-
-		const u32 rb_count = lua_gettop(L);
-		int rbs[16];
-		if(rb_count > lengthOf(rbs)) {
-			logError("Renderer") << "Too many render buffers in " << pipeline->getPath();	
-			return 0;
-		}
-
+	
+	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, bool readonly_ds, bool srgb) {
 		struct Cmd : Renderer::RenderJob
 		{
 			void setup() override { }
@@ -2785,24 +2814,48 @@ struct PipelineImpl final : Pipeline
 			u32 h;
 		};
 
-		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
-		for(u32 i = 0; i < rb_count; ++i) {
-			const int rb_idx = LuaWrapper::checkArg<int>(L, i + 1);
-			cmd->rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		ASSERT(renderbuffers.length() < lengthOf(cmd->rbs));
+
+		for (u32 i = 0; i < renderbuffers.length(); ++i) {
+			cmd->rbs[i] = renderbuffers[i];
 		}
 
-		cmd->pipeline = pipeline;
-		cmd->count = rb_count;
-		cmd->flags = (u32)gpu::FramebufferFlags::SRGB;
+		cmd->pipeline = this;
+		cmd->count = renderbuffers.length();
+		cmd->flags = srgb ? (u32)gpu::FramebufferFlags::SRGB : 0;
 		if (readonly_ds) {
 			cmd->flags |= (u32)gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
 		}
-		cmd->w = pipeline->m_viewport.w;
-		cmd->h = pipeline->m_viewport.h;
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+		cmd->w = m_viewport.w;
+		cmd->h = m_viewport.h;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
 
+	static int setRenderTargets(lua_State* L, bool readonly_ds) {
+		PROFILE_FUNCTION();
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx );
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		const u32 rb_count = lua_gettop(L);
+		gpu::TextureHandle rbs[16];
+		if(rb_count > lengthOf(rbs)) {
+			logError("Renderer") << "Too many render buffers in " << pipeline->getPath();	
+			return 0;
+		}
+
+		for(u32 i = 0; i < rb_count; ++i) {
+			const int rb_idx = LuaWrapper::checkArg<int>(L, i + 1);
+			rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
+		}
+
+		pipeline->setRenderTargets(Span(rbs, rb_count), readonly_ds, true);
 		return 0;
 	}
+
 
 	static int setRenderTargets(lua_State* L) { 
 		return setRenderTargets(L, false);
@@ -3599,7 +3652,35 @@ struct PipelineImpl final : Pipeline
 		u32 m_define_mask[255];
 		u8 m_bucket_count;
 	};
+	
+	struct RenderBucket {
+		u32 define_mask;
+		PrepareCommandsRenderJob::SortOrder order;
+		i32 layer;
+	};
 
+	void prepareCommands(const CameraParams& cp, Span<RenderBucket> buckets, Span<CmdPage*> out)
+	{
+		ASSERT(out.length() >= buckets.length());
+		IAllocator& allocator = m_renderer.getAllocator();
+		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
+		PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator, page_allocator);
+
+		static_assert(sizeof(CmdPage) == PageAllocator::PAGE_SIZE, "Wrong page size");
+		for(u32 i = 0; i < buckets.length(); ++i) {
+			CmdPage* page = new (NewPlaceholder(), page_allocator.allocate(true)) CmdPage;
+			cmd->m_command_sets[i] = page;
+			cmd->m_define_mask[i] = buckets[i].define_mask;
+			cmd->m_bucket_sort_order[i] = buckets[i].order;
+			cmd->m_bucket_map[buckets[i].layer] = i | (buckets[i].order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
+			out[i] = page;
+		}
+		cmd->m_camera_params = cp;
+		cmd->m_pipeline = this;
+		cmd->m_bucket_count = buckets.length();
+
+		m_renderer.queue(cmd, m_profiler_link);
+	}
 
 	void clear(u32 flags, float r, float g, float b, float a, float depth)
 	{
@@ -3748,7 +3829,7 @@ struct PipelineImpl final : Pipeline
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
 				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
 				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
-				gpu::copy(staging, handle);
+				gpu::copy(staging, handle, 0, 0);
 				gpu::readTexture(staging, 0, Span((u8*)pixels.begin(), pixels.byte_size()));
 				gpu::destroy(staging);
 

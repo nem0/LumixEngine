@@ -2284,6 +2284,21 @@ public:
 		return m_point_lights[entity].range;
 	}
 
+	bool getPointLightCastShadows(EntityRef entity) override {
+		return m_point_lights[entity].flags.isSet(PointLight::CAST_SHADOWS);
+	}
+
+	void setPointLightCastShadows(EntityRef entity, bool value) override {
+		m_point_lights[entity].flags.set(PointLight::CAST_SHADOWS, value);
+	}
+
+	bool getPointLightDynamic(EntityRef entity) override {
+		return m_point_lights[entity].flags.isSet(PointLight::DYNAMIC);
+	}
+
+	void setPointLightDynamic(EntityRef entity, bool value) override {
+		m_point_lights[entity].flags.set(PointLight::DYNAMIC, value);
+	}
 
 	void setLightRange(EntityRef entity, float value) override
 	{
@@ -2566,7 +2581,7 @@ public:
 		light.color.set(1, 1, 1);
 		light.intensity = 1;
 		light.fov = degreesToRadians(360);
-		light.cast_shadows = false;
+		light.flags.base = 0;
 		light.attenuation_param = 2;
 		light.range = 10;
 		light.guid = randGUID();

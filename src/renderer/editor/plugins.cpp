@@ -2515,155 +2515,6 @@ void captureCubemap(StudioApp& app
 	renderer->queue(rjob, 0);
 }
 
-struct PointLightPlugin final : PropertyGrid::IPlugin {
-	explicit PointLightPlugin(SceneView& scene_view, StudioApp& app)
-		: m_app(app)
-		, m_jobs(app.getAllocator())
-		, m_scene_view(scene_view)
-	{
-		Engine& engine = app.getEngine();
-		PluginManager& plugin_manager = engine.getPluginManager();
-		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-		IAllocator& allocator = app.getAllocator();
-		ResourceManagerHub& rm = engine.getResourceManager();
-		PipelineResource* pres = rm.load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*renderer, pres, "BAKE_SHADOW", allocator);
-	}
-
-	~PointLightPlugin() override {
-		Pipeline::destroy(m_pipeline);
-	}
-
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
-		if (cmp.type != POINT_LIGHT_TYPE) return;
-	
-		RenderScene* scene = (RenderScene*)cmp.scene;
-		const PointLight& pl = scene->getPointLight((EntityRef)cmp.entity);
-		if (!pl.cast_shadows) return;
-
-		if(m_jobs.empty()) {
-			if (ImGui::Button("Bake shadowmap")) {
-				// TODO do not switch universe before everything is processed, do the same for probes
-				m_jobs.push((EntityRef)cmp.entity);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Bake all")) {
-				const HashMap<EntityRef, PointLight>& lights = scene->getPointLights();
-				for (const PointLight& l : lights) {
-					if (l.cast_shadows) m_jobs.push((EntityRef)l.entity);
-				}
-			}
-		}
-		else {
-			ImGui::TextUnformatted("Baking");
-		}
-	}
-	
-	void update() override {
-		if (m_jobs.empty()) {
-			if (m_refresh) {
-				m_scene_view.getPipeline()->refreshShadowAtlas();
-				m_refresh = false;
-			}
-			return;
-		}
-
-		Engine& engine = m_app.getEngine();
-		Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
-		ASSERT(renderer);
-
-		const EntityRef e = m_jobs.back();
-		m_jobs.pop();
-
-		Universe* universe = m_app.getWorldEditor().getUniverse();
-		m_pipeline->setUniverse(universe);
-		Viewport vp;
-		RenderScene* scene = m_pipeline->getScene();
-		const PointLight& pl = scene->getPointLight(e);
-		vp.near = 0.1f;
-		vp.far = pl.range;
-		vp.fov = pl.fov;
-		// TODO
-		vp.w = 256;
-		vp.h = 256;
-		vp.is_ortho = false;
-		vp.pos = universe->getPosition(e);
-		vp.rot = universe->getRotation(e);
-		m_pipeline->setViewport(vp);
-
-		struct RenderJob2 : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override { gpu::startCapture(); }
-		};
-		RenderJob2* rjob2 = LUMIX_NEW(renderer->getAllocator(), RenderJob2);
-		renderer->queue(rjob2, 0);
-		m_pipeline->render(false);
-
-		const gpu::TextureHandle res = m_pipeline->getOutput();
-		ASSERT(res.isValid());
-
-		struct RenderJob : Renderer::RenderJob {
-			RenderJob(IAllocator& allocator) 
-				: data(allocator)
-				, universe_name(allocator)
-			{
-			}
-
-			void setup() override {}
-			void execute() override {
-				gpu::stopCapture();
-				const char* base_path = plugin->m_app.getEngine().getFileSystem().getBasePath();
-				StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", universe_name.c_str(), "/shadowmaps/");
-				OS::makePath(path);
-				path << guid << ".dat";
-				OS::OutputFile file;
-				if (!file.open(path)) {
-					logError("Renderer") << "Failed to save " << path;
-					return;
-				}
-				struct Header {
-					u32 magic = '_LSH';
-					u32 version = 0;
-					u32 w = 256;
-					u32 h = 256;
-				} header;
-
-				file.write(&header, sizeof(header));
-
-				file.write(data.begin(), data.byte_size());
-				file.close();
-				plugin->m_refresh = true;
-			}
-			Array<float> data; 
-			PointLightPlugin* plugin;
-			u64 guid;
-			String universe_name;
-		};
-
-		const u32 sm_size = 256;
-		RenderJob* rjob = LUMIX_NEW(renderer->getAllocator(), RenderJob)(m_app.getAllocator());
-		rjob->data.resize(sm_size * sm_size);
-
-		renderer->getTextureImage(res
-			, sm_size
-			, sm_size
-			, gpu::TextureFormat::R32F
-			, Span((u8*)rjob->data.begin(), rjob->data.byte_size())
-		);
-
-		rjob->plugin = this;
-		rjob->guid = m_pipeline->getScene()->getPointLight(e).guid;
-		rjob->universe_name = universe->getName();
-		renderer->queue(rjob, 0);
-	}
-
-	Array<EntityRef> m_jobs;
-	Pipeline* m_pipeline;
-	StudioApp& m_app;
-	SceneView& m_scene_view;
-	bool m_refresh = false;
-};
-
 struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 {
 	explicit EnvironmentProbePlugin(StudioApp& app)
@@ -2990,7 +2841,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			Array<u8> tmp(m_app.getAllocator());
 			tmp.resize(data_size);
 
-			gpu::copy(staging, dst);
+			gpu::copy(staging, dst, 0, 0);
 			u8* tmp_ptr = tmp.begin();
 			for (u32 mip = 0; mip < roughness_levels; ++mip) {
 				const u32 mip_size = size >> mip;
@@ -3837,12 +3688,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_model_properties_plugin = LUMIX_NEW(allocator, ModelPropertiesPlugin)(m_app);
 		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(m_app);
-		m_point_light_plugin = LUMIX_NEW(allocator, PointLightPlugin)(*m_scene_view, m_app);
 		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(m_app);
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(*m_model_properties_plugin);
 		property_grid.addPlugin(*m_env_probe_plugin);
-		property_grid.addPlugin(*m_point_light_plugin);
 		property_grid.addPlugin(*m_terrain_plugin);
 
 	}
@@ -4057,12 +3906,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		property_grid.removePlugin(*m_model_properties_plugin);
 		property_grid.removePlugin(*m_env_probe_plugin);
-		property_grid.removePlugin(*m_point_light_plugin);
 		property_grid.removePlugin(*m_terrain_plugin);
 
 		LUMIX_DELETE(allocator, m_model_properties_plugin);
 		LUMIX_DELETE(allocator, m_env_probe_plugin);
-		LUMIX_DELETE(allocator, m_point_light_plugin);
 		LUMIX_DELETE(allocator, m_terrain_plugin);
 	}
 
@@ -4078,7 +3925,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	ShaderPlugin* m_shader_plugin;
 	ModelPropertiesPlugin* m_model_properties_plugin;
 	EnvironmentProbePlugin* m_env_probe_plugin;
-	PointLightPlugin* m_point_light_plugin;
 	TerrainPlugin* m_terrain_plugin;
 	SceneView* m_scene_view;
 	GameView* m_game_view;
