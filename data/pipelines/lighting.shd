@@ -75,7 +75,7 @@ fragment_shader [[
 					proj_pos /= proj_pos.w;
 
 					vec2 shadow_uv = proj_pos.xy;
-					float occluder = texture(u_shadow_atlas, shadow_uv).r;
+					float occluder = textureLod(u_shadow_atlas, shadow_uv, 0).r;
 					float receiver = shadowmapValue(proj_pos.z);
 					float m =  receiver / occluder;
 					attn *= clamp(1 - (1 - m) * 512, 0.0, 1.0);
