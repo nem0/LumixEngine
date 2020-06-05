@@ -203,7 +203,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 			const int count = enum_attr->count(cmp);
 
-			const char* preview = enum_attr->name(cmp, value);
+			const char* preview = count ? enum_attr->name(cmp, value) : "";
 			ImGuiEx::Label(prop.name);
 			ImGui::PushID(prop.name);
 			if (ImGui::BeginCombo("##v", preview)) {
