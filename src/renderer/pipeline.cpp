@@ -2453,8 +2453,8 @@ struct PipelineImpl final : Pipeline
 				0.0, 0.0, 1.0, 0.0,
 				0.5, 0.5, 0.0, 1.0);
 
-		const float x = (light.shadow_atlas_idx % ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
-		const float y = (light.shadow_atlas_idx / ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
+		const float x = float(light.shadow_atlas_idx % ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
+		const float y = float(light.shadow_atlas_idx / ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
 		const Matrix to_tile(
 				1.f/ShadowAtlas::COLS, 0.0, 0.0, 0.0,
 				0.0, 1.f/ShadowAtlas::COLS, 0.0, 0.0,

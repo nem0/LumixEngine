@@ -613,7 +613,7 @@ static OptionalError<Property*> readProperty(Cursor* cursor, Allocator& allocato
 			OptionalError<u32> length = read<u32>(cursor);
 			OptionalError<u32> encoding = read<u32>(cursor);
 			OptionalError<u32> comp_len = read<u32>(cursor);
-			if (length.isError() | encoding.isError() | comp_len.isError()) return Error();
+			if (length.isError() || encoding.isError() || comp_len.isError()) return Error();
 			if (cursor->current + comp_len.getValue() > cursor->end) return Error("Reading past the end");
 			cursor->current += comp_len.getValue();
 			break;
@@ -1024,7 +1024,6 @@ struct MeshImpl : Mesh
 {
 	MeshImpl(const Scene& _scene, const IElement& _element)
 		: Mesh(_scene, _element)
-		, scene(_scene)
 	{
 		is_node = true;
 	}
@@ -1058,7 +1057,6 @@ struct MeshImpl : Mesh
 
 	const Pose* pose = nullptr;
 	const Geometry* geometry = nullptr;
-	const Scene& scene;
 	std::vector<const Material*> materials;
 };
 
@@ -2340,7 +2338,7 @@ static void splat(std::vector<T>* out,
 		for (int i = 0, c = (int)original_indices.size(); i < c; ++i)
 		{
 			int idx = decodeIndex(original_indices[i]);
-			if ((idx < data_size) && (idx >= 0))
+			if ((idx < data_size) && (idx >= 0)) //-V560
 				(*out)[i] = data[idx];
 			else
 				(*out)[i] = T();
@@ -2446,7 +2444,7 @@ static void triangulate(
 	for (int i = 0; i < old_indices.size(); ++i)
 	{
 		int idx = getIdx(i);
-		if (in_polygon_idx <= 2)
+		if (in_polygon_idx <= 2) //-V1051
 		{
 			to_old_vertices->push_back(idx);
 			to_old_indices->push_back(i);
@@ -2598,7 +2596,6 @@ static OptionalError<Object*> parseGeometryTangents(
 	if (!layer_tangent_element ) {
 		layer_tangent_element = findChild(element, "LayerElementTangent");
 	}
-	layer_tangent_element = findChild(element, "LayerElementTangent");
 	if (layer_tangent_element)
 	{
 		GeometryImpl::VertexDataMapping mapping;
