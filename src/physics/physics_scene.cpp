@@ -1455,33 +1455,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	Path getShapeSource(EntityRef entity) override
-	{
-		return m_actors[entity]->resource ? m_actors[entity]->resource->getPath() : Path("");
-	}
-
-
-	void setShapeSource(EntityRef entity, const Path& str) override
-	{
-		ASSERT(m_actors[entity]);
-		auto& actor = *m_actors[entity];
-		if (actor.resource && actor.resource->getPath() == str)
-		{
-			bool is_kinematic =
-				actor.physx_actor->is<PxRigidBody>()->getRigidBodyFlags().isSet(PxRigidBodyFlag::eKINEMATIC);
-			if (actor.dynamic_type == DynamicType::KINEMATIC && is_kinematic) return;
-			if (actor.dynamic_type == DynamicType::DYNAMIC && actor.physx_actor->is<PxRigidDynamic>()) return;
-			if (actor.dynamic_type == DynamicType::STATIC && actor.physx_actor->is<PxRigidStatic>()) return;
-		}
-
-		ResourceManagerHub& manager = m_engine->getResourceManager();
-		PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(str);
-
-		actor.setPhysxActor(nullptr);
-		actor.setResource(geom_res);
-	}
-
-
 	bool isActorDebugEnabled(EntityRef entity) const override
 	{
 		auto* px_actor = m_actors[entity]->physx_actor;
@@ -3155,6 +3128,16 @@ struct PhysicsSceneImpl final : PhysicsScene
 		return getGeometryCount(actor, PxGeometryType::eBOX);
 	}
 
+	Path getMeshGeomPath(EntityRef entity) override {
+		RigidActor* actor = m_actors[entity];
+		return actor->resource ? actor->resource->getPath() : Path();
+	}
+	
+	void setMeshGeomPath(EntityRef entity, const Path& path) override {
+		ResourceManagerHub& manager = m_engine->getResourceManager();
+		PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(path);
+		m_actors[entity]->setResource(geom_res);
+	}
 
 	void addSphereGeometry(EntityRef entity, int index) override
 	{
@@ -3243,7 +3226,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 			actor->physx_actor->getShapes(&shape, 1, i);
 			duplicateShape(shape, new_physx_actor);
 		}
-		PxRigidBodyExt::updateMassAndInertia(*new_physx_actor->is<PxRigidBody>(), 1);
+		PxRigidBody* rigid_body = new_physx_actor->is<PxRigidBody>();
+		if (rigid_body) {
+			PxRigidBodyExt::updateMassAndInertia(*rigid_body, 1);
+		}
 		actor->setPhysxActor(new_physx_actor);
 	}
 
@@ -3277,6 +3263,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 				new_shape->setLocalPose(shape->getLocalPose());
 				break;
 			}
+			case PxGeometryType::eTRIANGLEMESH:
+			{
+				PxTriangleMeshGeometry geom;
+				shape->getTriangleMeshGeometry(geom);
+				new_shape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
+				new_shape->setLocalPose(shape->getLocalPose());
+				break;
+			}
 			default: ASSERT(false); return;
 		}
 		new_shape->userData = shape->userData;
@@ -3289,6 +3283,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		auto* px_actor = actor->physx_actor;
 		PxShape* shape;
 		int shape_count = px_actor->getNbShapes();
+		serializer.writeString(actor->resource ? actor->resource->getPath().c_str() : "");
 		serializer.write(shape_count);
 		for (int i = 0; i < shape_count; ++i)
 		{
@@ -3300,44 +3295,26 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.write(tr);
 			switch (type)
 			{
-				case PxGeometryType::eBOX:
-				{
+				case PxGeometryType::eBOX: {
 					PxBoxGeometry geom;
 					shape->getBoxGeometry(geom);
 					serializer.write(geom.halfExtents.x);
 					serializer.write(geom.halfExtents.y);
 					serializer.write(geom.halfExtents.z);
+					break;
 				}
-				break;
-				case PxGeometryType::eSPHERE:
-				{
+				case PxGeometryType::eSPHERE: {
 					PxSphereGeometry geom;
 					shape->getSphereGeometry(geom);
 					serializer.write(geom.radius);
+					break;
 				}
-				break;
+				case PxGeometryType::eCONVEXMESH:
+				case PxGeometryType::eTRIANGLEMESH:
+					break;
 				default: ASSERT(false); break;
 			}
 		}
-	}
-
-	PxRigidActor* createPhysXActor(RigidActor* actor, const PxTransform transform, const PxGeometry& geometry)
-	{
-		switch (actor->dynamic_type)
-		{
-			case DynamicType::DYNAMIC:
-				return PxCreateDynamic(*m_system->getPhysics(), transform, geometry, *m_default_material, 1.0f);
-			case DynamicType::KINEMATIC:
-			{
-				PxRigidDynamic* physx_actor =
-					PxCreateDynamic(*m_system->getPhysics(), transform, geometry, *m_default_material, 1.0f);
-				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
-				return physx_actor;
-			}
-			case DynamicType::STATIC:
-				return PxCreateStatic(*m_system->getPhysics(), transform, geometry, *m_default_material);
-		}
-		return nullptr;
 	}
 
 
@@ -3737,6 +3714,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			m_actors.insert(actor->entity, actor);
 			actor->layer = 0;
 			serializer.read(actor->layer);
+			
+			const char* path = serializer.readString();
 
 			PxTransform transform = toPhysx(m_universe.getTransform(actor->entity).getRigidPart());
 			PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC
@@ -3751,30 +3730,36 @@ struct PhysicsSceneImpl final : PhysicsScene
 				PxShape* shape = nullptr;
 				switch (type)
 				{
-				case PxGeometryType::eBOX:
-				{
-					PxBoxGeometry box_geom;
-					serializer.read(box_geom.halfExtents.x);
-					serializer.read(box_geom.halfExtents.y);
-					serializer.read(box_geom.halfExtents.z);
+					case PxGeometryType::eBOX: {
+						PxBoxGeometry box_geom;
+						serializer.read(box_geom.halfExtents.x);
+						serializer.read(box_geom.halfExtents.y);
+						serializer.read(box_geom.halfExtents.z);
 
-					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, box_geom, *m_default_material);
-					shape->setLocalPose(tr);
-				}
-				break;
-				case PxGeometryType::eSPHERE:
-				{
-					PxSphereGeometry geom;
-					serializer.read(geom.radius);
-					shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
-					shape->setLocalPose(tr);
-				}
-				break;
-				default: ASSERT(false); break;
+						shape = PxRigidActorExt::createExclusiveShape(*physx_actor, box_geom, *m_default_material);
+						shape->setLocalPose(tr);
+						break;
+					}
+					case PxGeometryType::eSPHERE: {
+						PxSphereGeometry geom;
+						serializer.read(geom.radius);
+						shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
+						shape->setLocalPose(tr);
+						break;
+					}
+					case PxGeometryType::eCONVEXMESH:
+					case PxGeometryType::eTRIANGLEMESH:
+						break;
+					default: ASSERT(false); break;
 				}
 				if (shape) shape->userData = (void*)(intptr_t)index;
 			}
 			actor->setPhysxActor(physx_actor);
+			if (path[0]) {
+				ResourceManagerHub& manager = m_engine->getResourceManager();
+				PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(Path(path));
+				actor->setResource(geom_res);
+			}
 			m_universe.onComponentCreated(actor->entity, RIGID_ACTOR_TYPE, this);
 		}
 	}
@@ -4256,27 +4241,23 @@ void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::Sta
 {
 	if (new_state == Resource::State::READY)
 	{
-		setPhysxActor(nullptr);
-
-		PxTransform transform = toPhysx(scene.getUniverse().getTransform(entity).getRigidPart());
-
+#if 0
+		moveShapeIndices(entity, index, PxGeometryType::eBOX);
+		PxRigidActor* actor = m_actors[entity]->physx_actor;
+		PxBoxGeometry geom;
+		geom.halfExtents.x = 1;
+		geom.halfExtents.y = 1;
+		geom.halfExtents.z = 1;
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, geom, *m_default_material);
+		shape->userData = (void*)(intptr_t)index;
+#endif
 		scale = scene.getUniverse().getScale(entity);
 		PxMeshScale pxscale(scale);
 		PxConvexMeshGeometry convex_geom(resource->convex_mesh, pxscale);
 		PxTriangleMeshGeometry tri_geom(resource->tri_mesh, pxscale);
-		const PxGeometry* geom =
-			resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
-
-		PxRigidActor* actor = scene.createPhysXActor(this, transform, *geom);
-
-		if (actor)
-		{
-			setPhysxActor(actor);
-		}
-		else
-		{
-			logError("Physics") << "Could not create PhysX mesh " << resource->getPath().c_str();
-		}
+		const PxGeometry* geom = resource->convex_mesh ? static_cast<PxGeometry*>(&convex_geom) : static_cast<PxGeometry*>(&tri_geom);
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*physx_actor, *geom, *scene.m_default_material);
+		(void)shape;
 	}
 }
 
@@ -4309,6 +4290,20 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
 
 void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
 {
+	if (physx_actor) {
+		const i32 shape_count = physx_actor->getNbShapes();
+		PxShape* shape;
+		for (int i = 0; i < shape_count; ++i) {
+			physx_actor->getShapes(&shape, 1, i);
+			if (shape->getGeometryType() == physx::PxGeometryType::eCONVEXMESH ||
+				shape->getGeometryType() == physx::PxGeometryType::eTRIANGLEMESH)
+			{
+				physx_actor->detachShape(*shape);
+				break;
+			}
+		}
+	}
+
 	if (resource)
 	{
 		resource->getObserverCb().unbind<&RigidActor::onStateChanged>(this);

@@ -136,7 +136,8 @@ namespace Lumix
 					property("Rotation offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetRotation), RadiansAttribute())),
 				array("Sphere geometry", &PhysicsScene::getSphereGeometryCount, &PhysicsScene::addSphereGeometry, &PhysicsScene::removeSphereGeometry,
 					property("Radius", LUMIX_PROP(PhysicsScene, SphereGeomRadius), MinAttribute(0)),
-					property("Position offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition)))
+					property("Position offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition))),
+				property("Mesh", LUMIX_PROP(PhysicsScene, MeshGeomPath), ResourceAttribute("Mesh (*.msh)", PhysicsGeometry::TYPE))
 			),
 			component("wheel",
 				property("Radius", LUMIX_PROP(PhysicsScene, WheelRadius), MinAttribute(0)),

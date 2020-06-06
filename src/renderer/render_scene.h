@@ -107,7 +107,7 @@ struct ReflectionProbe
 	u64 guid;
 	FlagSet<Flags, u32> flags;
 	u32 size = 128;
-	Vec3 half_extents;
+	Vec3 half_extents = Vec3(100, 100, 100);
 };
 
 struct EnvironmentProbe
