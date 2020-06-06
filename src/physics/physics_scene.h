@@ -101,8 +101,6 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setIsTrigger(EntityRef entity, bool is_trigger) = 0;
 	virtual DynamicType getDynamicType(EntityRef entity) = 0;
 	virtual void setDynamicType(EntityRef entity, DynamicType) = 0;
-	virtual Path getShapeSource(EntityRef entity) = 0;
-	virtual void setShapeSource(EntityRef entity, const Path& str) = 0;
 	virtual Path getHeightmapSource(EntityRef entity) = 0;
 	virtual void setHeightmapSource(EntityRef entity, const Path& path) = 0;
 	virtual float getHeightmapXZScale(EntityRef entity) = 0;
@@ -211,6 +209,9 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual Quat getBoxGeomOffsetRotationQuat(EntityRef entity, int index) = 0;
 	virtual Vec3 getBoxGeomOffsetRotation(EntityRef entity, int index) = 0;
 	virtual void setBoxGeomOffsetRotation(EntityRef entity, int index, const Vec3& euler_angles) = 0;
+
+	virtual Path getMeshGeomPath(EntityRef entity) = 0;
+	virtual void setMeshGeomPath(EntityRef entity, const Path& path) = 0;
 
 	virtual void addSphereGeometry(EntityRef entity, int index) = 0;
 	virtual void removeSphereGeometry(EntityRef entity, int index) = 0;
