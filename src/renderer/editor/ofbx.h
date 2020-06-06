@@ -8,8 +8,13 @@ namespace ofbx
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
-typedef unsigned long long u64;
-typedef long long i64;
+#ifdef _WIN32
+	typedef long long i64;	
+	typedef unsigned long long u64;	
+#else	
+	typedef long i64;	
+	typedef unsigned long u64;
+#endif
 
 static_assert(sizeof(u8) == 1, "u8 is not 1 byte");
 static_assert(sizeof(u32) == 4, "u32 is not 4 bytes");

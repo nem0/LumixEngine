@@ -1994,6 +1994,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 		return;
 	}
 
+	u32 rb_count = 0;
 	bool depth_bound = false;
 	for (u32 i = 0; i < num; ++i) {
 		const GLuint t = g_gpu.textures[attachments[i].value].handle;
