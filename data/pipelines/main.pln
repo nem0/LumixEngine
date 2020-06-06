@@ -308,11 +308,6 @@ function main_shadowmap()
 end
 
 function main()
-	if BAKE_SHADOW ~= nil then
-		main_shadowmap()
-		return
-	end
-
 	local view_params = getCameraParams()
 	local default_set, decal_set, transparent_set, water_set = prepareCommands(view_params, 
 		{ 

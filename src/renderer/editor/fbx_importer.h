@@ -24,9 +24,15 @@ struct FBXImporter
 			CENTER,
 			BOTTOM
 		};
+		enum class Physics {
+			NONE,
+			CONVEX,
+			TRIMESH
+		};
 		float mesh_scale;
 		Origin origin = Origin::SOURCE;
 		bool create_impostor = false;
+		Physics physics = Physics::NONE;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
@@ -106,7 +112,6 @@ struct FBXImporter
 		bool is_skinned = false;
 		int bone_idx = -1;
 		bool import = true;
-		bool import_physics = false;
 		u32 lod = 0;
 		int submesh = -1;
 		OutputMemoryStream vertex_data;
@@ -124,10 +129,11 @@ struct FBXImporter
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
 	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* src, const ImportConfig& cfg);
+	void writePhysics(const char* src, const ImportConfig& cfg);
 	bool createImpostorTextures(struct Model* model, Ref<Array<u32>> gb0_rgba, Ref<Array<u32>> gb1_rgba, Ref<IVec2> size);
 
-	const Array<ImportMesh>& getMeshes() const { return meshes; }
-	const Array<ImportAnimation>& getAnimations() const { return animations; }
+	const Array<ImportMesh>& getMeshes() const { return m_meshes; }
+	const Array<ImportAnimation>& getAnimations() const { return m_animations; }
 
 	static void getImportMeshName(const ImportMesh& mesh, char (&name)[256]);
 	ofbx::IScene* getOFBXScene() { return scene; }
@@ -161,28 +167,25 @@ private:
 	int getAttributeCount(const ImportMesh& mesh) const;
 	bool areIndices16Bit(const ImportMesh& mesh) const;
 	void writeModelHeader();
-	void writePhysicsHeader(OS::OutputFile& file) const;
-	void writePhysicsTriMesh(OS::OutputFile& file);
-	bool writePhysics(const char* basename, const char* output_dir);
+	void writePhysicsTriMesh(OutputMemoryStream& file);
 
 	
-	IAllocator& allocator;
-	struct FileSystem& filesystem;
-	StudioApp& app;
-	struct AssetCompiler& compiler;
-	Array<ImportMaterial> materials;
-	Array<ImportMesh> meshes;
-	Array<ImportAnimation> animations;
-	Array<const ofbx::Object*> bones;
+	IAllocator& m_allocator;
+	struct FileSystem& m_filesystem;
+	StudioApp& m_app;
+	struct AssetCompiler& m_compiler;
+	Array<ImportMaterial> m_materials;
+	Array<ImportMesh> m_meshes;
+	Array<ImportAnimation> m_animations;
+	Array<const ofbx::Object*> m_bones;
 	ofbx::IScene* scene;
 	OutputMemoryStream out_file;
-	float time_scale = 1.0f;
+	float m_time_scale = 1.0f;
 	bool cancel_mesh_transforms = false;
-	bool ignore_skeleton = false;
-	bool import_vertex_colors = true;
-	bool make_convex = false;
-	float fbx_scale = 1.f;
-	Orientation orientation = Orientation::Y_UP;
+	bool m_ignore_skeleton = false;
+	bool m_import_vertex_colors = true;
+	float m_fbx_scale = 1.f;
+	Orientation m_orientation = Orientation::Y_UP;
 };
 
 

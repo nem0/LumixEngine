@@ -1401,6 +1401,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
+		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
 	};
 
 	explicit ModelPlugin(StudioApp& app)
@@ -1443,6 +1444,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			
+			char tmp[64];
+			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
+				if (equalIStrings(tmp, "trimesh")) meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
+				else if (equalIStrings(tmp, "convex")) meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
+				else meta.physics = FBXImporter::ImportConfig::Physics::NONE;
+			}
+
+
 			for (u32 i = 0; i < lengthOf(meta.lods_distances); ++i) {
 				LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, StaticString<32>("lod", i, "_distance"), &meta.lods_distances[i]);
 			}
@@ -1482,6 +1491,12 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 
+			if (data->meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
+				StaticString<MAX_PATH_LENGTH> tmp(".phy:", path);
+				ResourceType physics_geom("physics");
+				compiler.addResource(physics_geom, tmp);
+			}
+
 			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
 			for (const FBXImporter::ImportAnimation& anim : animations) {
 				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ".ani:", path);
@@ -1508,6 +1523,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.rotation_error = meta.rotation_error;
 		cfg.position_error = meta.position_error;
 		cfg.mesh_scale = meta.scale;
+		cfg.physics = meta.physics;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		const PathInfo src_info(filepath);
@@ -1532,6 +1548,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_fbx_importer.writeModel(src.c_str(), cfg);
 		m_fbx_importer.writeMaterials(filepath, cfg);
 		m_fbx_importer.writeAnimations(filepath, cfg);
+		m_fbx_importer.writePhysics(filepath, cfg);
 		return true;
 	}
 
@@ -1792,6 +1809,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
+	static const char* toString(FBXImporter::ImportConfig::Physics value) {
+		switch (value) {
+			case FBXImporter::ImportConfig::Physics::TRIMESH: return "trimesh";
+			case FBXImporter::ImportConfig::Physics::CONVEX: return "convex";
+			case FBXImporter::ImportConfig::Physics::NONE: return "none";
+			default: ASSERT(false); return "none";
+		}
+	}
+
 	void onGUI(Span<Resource*> resources) override
 	{
 		if (resources.length() > 1) return;
@@ -1916,6 +1942,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Checkbox("##split", &m_meta.split);
 			ImGuiEx::Label("Create impostor mesh");
 			ImGui::Checkbox("##creimp", &m_meta.create_impostor);
+			
+			ImGuiEx::Label("Physics");
+			if (ImGui::BeginCombo("##phys", toString(m_meta.physics))) {
+				if (ImGui::Selectable("none")) m_meta.physics = FBXImporter::ImportConfig::Physics::NONE;
+				if (ImGui::Selectable("convex")) m_meta.physics = FBXImporter::ImportConfig::Physics::CONVEX;
+				if (ImGui::Selectable("trimesh")) m_meta.physics = FBXImporter::ImportConfig::Physics::TRIMESH;
+				ImGui::EndCombo();
+			}
+
 			for(u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 				bool infinite = m_meta.lods_distances[i] <= 0;
 				if(ImGui::Checkbox(StaticString<32>("Infinite LOD ", i), &infinite)) {
@@ -1932,9 +1967,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				String src(m_app.getAllocator());
-				src.cat("create_impostor=").cat(m_meta.create_impostor ? "true" : "false")
+				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
 					.cat("\nposition_error = ").cat(m_meta.position_error)
 					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
+					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
 					.cat("\nscale = ").cat(m_meta.scale)
 					.cat("\nscale = ").cat(m_meta.scale)
 					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n");
