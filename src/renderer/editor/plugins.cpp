@@ -1057,7 +1057,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		OutputMemoryStream out(m_app.getAllocator());
 		Meta meta = getMeta(src);
-		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress)) {
+		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress && !meta.is_normalmap)) {
 			if (meta.scale_coverage < 0 || !equalStrings(ext, "tga")) {
 				out.write(ext, sizeof(ext) - 1);
 				u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
