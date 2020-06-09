@@ -2611,10 +2611,10 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				const Vec4* face = data_ptr;
 				for (u32 j = 0, c = mip_size * mip_size; j < c; ++j) {
 					const float m = clamp(maximum(face[j].x, face[j].y, face[j].z), 1 / 64.f, 4.f);
-					rgbm[j].r = u8(clamp(face[j].z / m * 255, 0.f, 255.f));
-					rgbm[j].g = u8(clamp(face[j].y / m * 255, 0.f, 255.f));
-					rgbm[j].b = u8(clamp(face[j].x / m * 255, 0.f, 255.f));
-					rgbm[j].a = u8(clamp(255.f * m / 4, 1.f, 255.f));
+					rgbm[j].r = u8(clamp(face[j].z / m * 255 + 0.5f, 0.f, 255.f));
+					rgbm[j].g = u8(clamp(face[j].y / m * 255 + 0.5f, 0.f, 255.f));
+					rgbm[j].b = u8(clamp(face[j].x / m * 255 + 0.5f, 0.f, 255.f));
+					rgbm[j].a = u8(clamp(255.f * m / 4 + 0.5f, 1.f, 255.f));
 				}
 
 				data_ptr += mip_size * mip_size;
