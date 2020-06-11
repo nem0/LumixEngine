@@ -1515,7 +1515,7 @@ struct TextureImpl : Texture
 
 	DataView getRelativeFileName() const override { return relative_filename; }
 	DataView getFileName() const override { return filename; }
-	DataView getEmebeddedData() const override;
+	DataView getEmbeddedData() const override;
 
 	DataView media;
 	DataView filename;
@@ -1569,6 +1569,17 @@ struct Scene : IScene
 
 	int getAllObjectCount() const override { return (int)m_all_objects.size(); }
 
+	int getEmbeddedDataCount() const override {
+		return (int)m_videos.size();
+	}
+
+	DataView getEmbeddedData(int index) const override {
+		return m_videos[index].content;
+	}
+
+	DataView getEmbeddedFilename(int index) const override {
+		return m_videos[index].filename;
+	}
 
 	const AnimationStack* getAnimationStack(int index) const override
 	{
@@ -1622,7 +1633,7 @@ struct Scene : IScene
 };
 
 
-DataView TextureImpl::getEmebeddedData() const {
+DataView TextureImpl::getEmbeddedData() const {
 	if (!media.begin) return media;
 	for (const Video& v : scene.m_videos) {
 		if (v.media.end - v.media.begin != media.end - media.begin) continue;

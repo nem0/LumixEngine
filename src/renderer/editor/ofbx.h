@@ -252,7 +252,7 @@ struct Texture : Object
 	Texture(const Scene& _scene, const IElement& _element);
 	virtual DataView getFileName() const = 0;
 	virtual DataView getRelativeFileName() const = 0;
-	virtual DataView getEmebeddedData() const = 0;
+	virtual DataView getEmbeddedData() const = 0;
 };
 
 
@@ -525,6 +525,9 @@ struct IScene
 	virtual const AnimationStack* getAnimationStack(int index) const = 0;
 	virtual const Object* const* getAllObjects() const = 0;
 	virtual int getAllObjectCount() const = 0;
+	virtual int getEmbeddedDataCount() const = 0;
+	virtual DataView getEmbeddedData(int index) const = 0;
+	virtual DataView getEmbeddedFilename(int index) const = 0;
 
 protected:
 	virtual ~IScene() {}
