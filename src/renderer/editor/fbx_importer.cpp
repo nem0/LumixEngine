@@ -121,30 +121,30 @@ static ofbx::Matrix getBindPoseMatrix(const FBXImporter::ImportMesh* mesh, const
 }
 
 
-static void extractEmbedded(const ofbx::Texture* texture, const char* src_dir)
+static void extractEmbedded(const ofbx::IScene& scene, const char* src_dir)
 {
-	const ofbx::DataView embedded = texture->getEmebeddedData();
-	if (embedded.end < embedded.begin + 4) return;
+	for (int i = 0, c = scene.getEmbeddedDataCount(); i < c; ++i) {
+		const ofbx::DataView embedded = scene.getEmbeddedData(i);
 
-	ofbx::DataView filename = texture->getRelativeFileName();
-	if (filename == "") filename = texture->getFileName();
-	char path[MAX_PATH_LENGTH];
-	filename.toString(path);
-	const PathInfo pi(path);
-	const StaticString<MAX_PATH_LENGTH> fullpath(src_dir, pi.m_basename, ".", pi.m_extension);
+		ofbx::DataView filename = scene.getEmbeddedFilename(i);
+		char path[MAX_PATH_LENGTH];
+		filename.toString(path);
+		const PathInfo pi(path);
+		const StaticString<MAX_PATH_LENGTH> fullpath(src_dir, pi.m_basename, ".", pi.m_extension);
 
-	if (OS::fileExists(fullpath)) return;
+		if (OS::fileExists(fullpath)) return;
 
-	OS::OutputFile file;
-	if (!file.open(fullpath)) {
-		logError("Renderer") << "Failed to save " << fullpath;
-		return;
+		OS::OutputFile file;
+		if (!file.open(fullpath)) {
+			logError("Renderer") << "Failed to save " << fullpath;
+			return;
+		}
+
+		if (!file.write(embedded.begin + 4, embedded.end - embedded.begin - 4)) {
+			logError("Renderer") << "Failed to write " << fullpath;
+		}
+		file.close();
 	}
-
-	if (!file.write(embedded.begin + 4, embedded.end - embedded.begin - 4)) {
-		logError("Renderer") << "Failed to write " << fullpath;
-	}
-	file.close();
 }
 
 
@@ -162,7 +162,6 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 			const ofbx::Texture* texture = mat.fbx->getTexture(type);
 			if (!texture) return;
 
-			extractEmbedded(texture, src_dir);
 
 			ImportTexture& tex = mat.textures[type];
 			tex.fbx = texture;
@@ -760,6 +759,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 
 	char src_dir[MAX_PATH_LENGTH];
 	Path::getDir(Span(src_dir), filename);
+	if (!ignore_geometry) extractEmbedded(*scene, src_dir);
 	gatherMeshes(scene);
 
 	gatherAnimations(*scene);
