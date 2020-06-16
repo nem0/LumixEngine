@@ -294,6 +294,8 @@ function renderSelectionOutline(output)
 end
 
 function main_shadowmap()
+	beginBlock("bake_shadow")
+
 	local rb = createRenderbuffer(1, 1, true, "r32f", "baked_shadowmap")
 	local depthbuf = createRenderbuffer(1, 1, true, "depth32", "shadowmap_depth")
 	setRenderTargets(rb, depthbuf)
@@ -304,7 +306,10 @@ function main_shadowmap()
 	pass(view_params)
 	renderBucket(shadow_set, {})
 	renderTerrains(view_params, {})
+	releaseRenderbuffer(depthbuf)
 	setOutput(rb)
+
+	endBlock()
 end
 
 function main()

@@ -1058,7 +1058,6 @@ public:
 		for (u32 i = 0; i < size; ++i) {
 			PointLight light;
 			serializer.read(light);
-			light.shadow_atlas_idx = -1;
 			light.entity = entity_map.get(light.entity);
 			m_point_lights.insert(light.entity, light);
 			const DVec3 pos = m_universe.getPosition(light.entity);

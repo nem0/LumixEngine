@@ -94,7 +94,6 @@ struct PointLight
 	float range;
 	FlagSet<Flags, u32> flags;
 	u64 guid;
-	i32 shadow_atlas_idx = -1;
 };
 
 struct ReflectionProbe
