@@ -253,9 +253,6 @@ struct MTBucketArray
 
 struct ShadowAtlas {
 	static constexpr u32 SIZE = 2048;
-	// TODO variable size, needs packer
-	static constexpr u32 TILE_SIZE = 256;
-	static constexpr u32 COLS = SIZE / TILE_SIZE;
 	
 	ShadowAtlas(IAllocator& allocator)
 		: map(allocator)
@@ -263,10 +260,59 @@ struct ShadowAtlas {
 		for (EntityPtr& e : inv_map) e = INVALID_ENTITY;
 	}
 
+	static Vec4 getUV(u32 idx) {
+		switch(getGroup(idx)) {
+			case 0: return Vec4(0, 0, 0.5f, 0.5f);
+			case 1: return Vec4(
+				0.5f + ((idx - 1) % 2) * 0.25f,
+				((idx - 1) / 2) * 0.25f,
+				0.25f,
+				0.25f
+			);
+			case 2: return Vec4(
+				((idx - 5) % 8) * 0.125f,
+				0.5f + ((idx - 5) / 8) * 0.125f,
+				0.125f,
+				0.125f
+			);
+		}
+		ASSERT(false);
+		return Vec4(-1);
+	}
+
+	static u32 getGroup(u32 idx) {
+		if (idx < 1) return 0;
+		if (idx < 5) return 1;
+		return 2;
+	}
+
+	u32 add(u32 group, EntityRef e) {
+		ASSERT(group < 3);
+		u32 group_starts[] = { 0, 1, 5 };
+		u32 group_sizes[] = { 1, 4, 32 };
+
+		for (u32 i = group_starts[group], c = group_starts[group] + group_sizes[group]; i < c; ++i) {
+			if (!inv_map[i].isValid()) {
+				map.insert(e, i);
+				inv_map[i] = e;
+				return i;
+			}
+		}
+		ASSERT(false);
+		return -1;
+	}
+
+	void remove(EntityRef e) {
+		auto iter = map.find(e);
+		u32 idx = iter.value();
+		map.erase(iter);
+		inv_map[idx] = INVALID_ENTITY;
+	}
+
 	gpu::TextureHandle texture = gpu::INVALID_TEXTURE;
 	gpu::BufferHandle uniform_buffer = gpu::INVALID_BUFFER;
 	HashMap<EntityRef, u32> map;
-	EntityPtr inv_map[128];
+	EntityPtr inv_map[64];
 };
 
 
@@ -601,7 +647,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		for(int i = m_renderbuffers.size() - 1; i >= 0; --i) {
-			if (m_renderbuffers[i].frame_counter > 1) {
+			if (m_renderbuffers[i].frame_counter > 2) {
 				m_renderer.destroy(m_renderbuffers[i].handle);
 				m_renderbuffers.swapAndPop(i);
 			}
@@ -698,19 +744,20 @@ struct PipelineImpl final : Pipeline
 		return {(float)atlas_texture->width, (float)atlas_texture->height};
 	}
 
-	bool bakeShadow(const PointLight& light) {
+	bool bakeShadow(const PointLight& light, u32 atlas_idx) {
 		PROFILE_FUNCTION();
 		const Universe& universe = m_scene->getUniverse();
 		const Viewport backup_viewport = m_viewport;
 
+		const Vec4 uv = ShadowAtlas::getUV(atlas_idx);
 		m_viewport.is_ortho = false;
 		m_viewport.pos = universe.getPosition(light.entity);
 		m_viewport.rot = universe.getRotation(light.entity);
 		m_viewport.fov = light.fov;
 		m_viewport.near = 0.1f;
 		m_viewport.far = light.range;
-		m_viewport.w = 256;
-		m_viewport.h = 256;
+		m_viewport.w = u32(ShadowAtlas::SIZE * uv.z + 0.5f);
+		m_viewport.h = u32(ShadowAtlas::SIZE * uv.w + 0.5f);;
 
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -733,6 +780,7 @@ struct PipelineImpl final : Pipeline
 		};
 
 		const gpu::TextureHandle src = getOutput();
+		m_renderbuffers[m_output].frame_counter = 1;
 		if (!src.isValid()) {
 			logError("Renderer") << getPath() << ": can not bake shadows because the pipeline has no output";
 			return false;
@@ -741,8 +789,8 @@ struct PipelineImpl final : Pipeline
 		BlitJob* job = LUMIX_NEW(m_renderer.getAllocator(), BlitJob);
 		job->dst = m_shadow_atlas.texture;
 		job->src = src;
-		job->x = ShadowAtlas::TILE_SIZE * (light.shadow_atlas_idx % ShadowAtlas::COLS);
-		job->y = ShadowAtlas::TILE_SIZE * (light.shadow_atlas_idx / ShadowAtlas::COLS);
+		job->x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
+		job->y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
 
 		m_renderer.queue(job, m_profiler_link);
 		m_viewport = backup_viewport;
@@ -763,20 +811,6 @@ struct PipelineImpl final : Pipeline
 		}
 
 		clearBuffers();
-
-		{
-			PROFILE_BLOCK("destroy renderbuffers");
-			for (int i = m_renderbuffers.size() - 1; i >= 0; --i) {
-				Renderbuffer& rb = m_renderbuffers[i];
-				if (!rb.use_realtive_size) continue;
-				const u32 w = u32(rb.relative_size.x * m_viewport.w + 0.5f);
-				const u32 h = u32(rb.relative_size.y * m_viewport.h + 0.5f);
-				if (rb.width != w || rb.height != h) {
-					m_renderer.destroy(rb.handle);
-					m_renderbuffers.swapAndPop(i);
-				}
-			}
-		}
 
 		const Matrix view = m_viewport.getViewRotation();
 		const Matrix projection = m_viewport.getProjection(gpu::isHomogenousDepth());
@@ -1166,6 +1200,9 @@ struct PipelineImpl final : Pipeline
 		return gpu::TextureFormat::RGBA8;
 	}
 
+	void releaseRenderbuffer(u32 idx) {
+		m_renderbuffers[idx].frame_counter = 1;
+	}
 
 	int createRenderbuffer(float w, float h, bool relative, const char* format_str, const char* debug_name)
 	{
@@ -2441,7 +2478,7 @@ struct PipelineImpl final : Pipeline
 		Matrix m_shadow_atlas_matrices[128];
 	};
 	
-	Matrix getShadowMatrix(const PointLight& light) {
+	Matrix getShadowMatrix(const PointLight& light, u32 atlas_idx) {
 		Matrix prj;
 		prj.setPerspective(light.fov, 1, 0.1f, light.range, gpu::isHomogenousDepth(), true);
 		const Quat rot = -m_scene->getUniverse().getRotation(light.entity);
@@ -2453,47 +2490,16 @@ struct PipelineImpl final : Pipeline
 				0.0, 0.0, 1.0, 0.0,
 				0.5, 0.5, 0.0, 1.0);
 
-		const float x = float(light.shadow_atlas_idx % ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
-		const float y = float(light.shadow_atlas_idx / ShadowAtlas::COLS) / (float)ShadowAtlas::COLS;
+		const Vec4 uv = ShadowAtlas::getUV(atlas_idx);
+
 		const Matrix to_tile(
-				1.f/ShadowAtlas::COLS, 0.0, 0.0, 0.0,
-				0.0, 1.f/ShadowAtlas::COLS, 0.0, 0.0,
+				uv.z, 0.0, 0.0, 0.0,
+				0.0, uv.w, 0.0, 0.0,
 				0.0, 0.0, 1.0, 0.0,
-				x, y, 0.0, 1.0);
+				uv.x, uv.y, 0.0, 1.0);
 
 		Matrix view = rot.toMatrix();
 		return to_tile * bias_matrix * prj * view;
-	}
-
-	void addToShadowAtlas(PointLight& light, Matrix (&matrices)[128]) {
-		ASSERT(light.flags.isSet(PointLight::CAST_SHADOWS));
-		
-		auto iter = m_shadow_atlas.map.find(light.entity);
-		if (!iter.isValid()) {
-			if (!m_shadow_atlas.texture.isValid()) {
-				Renderer::MemRef mem;
-				m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::R32F, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
-			}
-			for (u32 i = 0; i < 128; ++i) {
-				if (m_shadow_atlas.inv_map[i].isValid()) continue;
-
-				m_shadow_atlas.inv_map[i] = light.entity;
-				m_shadow_atlas.map.insert(light.entity, i);
-				light.shadow_atlas_idx = i;
-
-				// TODO scene might not be fully loaded yet
-				bakeShadow(light);
-				break;
-			}
-			iter = m_shadow_atlas.map.find(light.entity);
-		}
-
-		if (light.flags.isSet(PointLight::DYNAMIC)) {
-			bakeShadow(light);
-		}
-		const Matrix mtx = getShadowMatrix(light);
-		matrices[iter.value()] = mtx;
-
 	}
 
 	static int renderReflectionVolumes(lua_State* L) {
@@ -2533,6 +2539,38 @@ struct PipelineImpl final : Pipeline
 		return 0;
 	}
 
+	struct AtlasSorter {
+		void push(u32 light_idx, float priority, EntityRef e) {
+			u32 idx = 0;
+			while (idx < count) {
+				if (lights[idx].priority < priority) break;
+				++idx;
+			}
+
+			if (idx == lengthOf(lights)) return;
+
+			if (count == lengthOf(lights)) --count;
+			
+			memmove(&lights[idx + 1], &lights[idx], sizeof(lights[0]) * (count - idx));
+			lights[idx].idx = light_idx;
+			lights[idx].priority = priority;
+			lights[idx].entity = e;
+			++count;
+		}
+
+		struct Light {
+			u32 idx;
+			float priority;
+			EntityRef entity;
+		};
+		u32 count = 0;
+		Light lights[64];
+	};
+
+	static float computePriority(const FillClustersJob::ClusterPointLight& light, const DVec3& light_pos, const DVec3& cam_pos) {
+		return float(light.radius / (cam_pos - light_pos).length());
+	}
+
 	static int fillClusters(lua_State* L) {
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
@@ -2559,22 +2597,59 @@ struct PipelineImpl final : Pipeline
 		CullResult* lights = pipeline->m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
 		const Universe& universe = pipeline->m_scene->getUniverse();
 		const DVec3 cam_pos = pipeline->m_viewport.pos;
+
+		AtlasSorter atlas_sorter;
 		lights->forEach([&](EntityRef e){
 			PointLight& pl = pipeline->m_scene->getPointLight(e);
 			i32 idx = job->m_point_lights.size();
 			FillClustersJob::ClusterPointLight& light = job->m_point_lights.emplace();
 			light.radius = pl.range;
-			light.pos = (universe.getPosition(e) - cam_pos).toFloat();
+			const DVec3 light_pos = universe.getPosition(e);
+			light.pos = (light_pos - cam_pos).toFloat();
 			light.rot = universe.getRotation(e);
 			light.fov = pl.fov;
 			light.color = pl.color * pl.intensity;
 			light.attenuation_param = pl.attenuation_param;
-			light.atlas_idx = pl.shadow_atlas_idx;
 
+			auto iter = pipeline->m_shadow_atlas.map.find(e);
 			if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
-				pipeline->addToShadowAtlas(pl, job->m_shadow_atlas_matrices);
+				light.atlas_idx = iter.isValid() ? iter.value() : -1;
+				atlas_sorter.push(job->m_point_lights.size() - 1, computePriority(light, light_pos, cam_pos), e);
+			}
+			else if(iter.isValid()) {
+				light.atlas_idx = -1;
+				pipeline->m_shadow_atlas.remove(e);
 			}
 		});
+
+		for (u32 i = 0; i < atlas_sorter.count; ++i) {
+			FillClustersJob::ClusterPointLight& light = job->m_point_lights[atlas_sorter.lights[i].idx];
+			if (light.atlas_idx != -1 && ShadowAtlas::getGroup(i) != ShadowAtlas::getGroup(light.atlas_idx)) {
+				pipeline->m_shadow_atlas.remove(atlas_sorter.lights[i].entity);
+				light.atlas_idx = -1;
+			}
+		}
+		
+		if (!pipeline->m_shadow_atlas.texture.isValid()) {
+			Renderer::MemRef mem;
+			pipeline->m_shadow_atlas.texture = pipeline->m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::R32F, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
+		}
+
+		for (u32 i = 0; i < atlas_sorter.count; ++i) {
+			FillClustersJob::ClusterPointLight& light = job->m_point_lights[atlas_sorter.lights[i].idx];
+			EntityRef e = atlas_sorter.lights[i].entity;
+			PointLight& pl = pipeline->m_scene->getPointLight(e);
+			if (light.atlas_idx == -1) {
+				light.atlas_idx = pipeline->m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
+				pipeline->bakeShadow(pl, light.atlas_idx);
+			}
+			else if (pl.flags.isSet(PointLight::DYNAMIC)) {
+				pipeline->bakeShadow(pl, light.atlas_idx);
+			}
+			const Matrix mtx = pipeline->getShadowMatrix(pl, light.atlas_idx);
+			job->m_shadow_atlas_matrices[light.atlas_idx] = mtx;
+		}
+
 		lights->free(pipeline->m_renderer.getEngine().getPageAllocator());
 
 		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
@@ -3885,6 +3960,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(beginBlock);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(releaseRenderbuffer);
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
