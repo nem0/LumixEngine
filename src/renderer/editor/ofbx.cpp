@@ -14,7 +14,6 @@ namespace ofbx
 {
 
 
-static volatile u32 xxx = 0;
 struct Allocator {
 	struct Page {
 		struct {
@@ -52,7 +51,6 @@ struct Allocator {
 		}
 		T* res = new (p->data + p->header.offset) T(args...);
 		p->header.offset += sizeof(T);
-		++xxx;
 		return res;
 	}
 
@@ -739,7 +737,7 @@ static void skipWhitespaces(Cursor* cursor)
 
 static bool isTextTokenChar(char c)
 {
-	return isalnum(c) || c == '_';
+	return isalnum(c) || c == '_' || c == '-';
 }
 
 
@@ -808,7 +806,7 @@ static OptionalError<Property*> readTextProperty(Cursor* cursor, Allocator& allo
 		return prop;
 	}
 
-	if (*cursor->current == 'T' || *cursor->current == 'Y' || *cursor->current == 'W')
+	if (*cursor->current == 'T' || *cursor->current == 'Y' || *cursor->current == 'W' || *cursor->current == 'C')
 	{
 		// WTF is this
 		prop->type = *cursor->current;
@@ -1614,7 +1612,10 @@ struct Scene : IScene
 	void destroy() override { delete this; }
 
 
-	~Scene() override {}
+	~Scene() override {
+		for(auto ptr : m_all_objects)
+			ptr->~Object();
+	}
 
 
 	Element* m_root_element = nullptr;
