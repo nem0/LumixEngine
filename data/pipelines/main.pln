@@ -4,7 +4,6 @@ local debug_clusters_shader = preloadShader("pipelines/debug_clusters.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
 local indirect_specular_shader = preloadShader("pipelines/indirect_specular.shd")
-local local_light_shader = preloadShader("pipelines/local_light.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
 local debug_shadowmap = false
 local debug_normal = false

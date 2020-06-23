@@ -355,6 +355,7 @@ int include(lua_State* L)
 	
 	if (!content.empty()) {
 		content << "\n";
+		shader->m_sources.common.cat("#line 0\n");
 		shader->m_sources.common.cat(Span((const char*)content.data(), (u32)content.size()));
 	}
 

@@ -119,6 +119,7 @@ fragment_shader [[
 	layout (binding=2) uniform sampler2D u_roughnessmap;
 	layout (binding=3) uniform sampler2D u_metallicmap;
 	layout (binding=4) uniform sampler2D u_shadowmap;
+	layout (binding=5) uniform sampler2D u_shadow_atlas;
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 1) in vec3 v_normal;
 	layout (location = 2) in vec3 v_tangent;
@@ -135,9 +136,12 @@ fragment_shader [[
 		layout(location = 0) out vec4 o_color;
 	#endif
 
-	void getData()
+	Surface getSurface()
 	{
-		data.albedo = texture(u_albedomap, v_uv) * u_material_color;
+		Surface data;
+		vec4 c = texture(u_albedomap, v_uv) * u_material_color;
+		data.albedo = c.rgb;
+		data.alpha = c.a;
 		#ifdef ALPHA_CUTOUT
 			if(data.albedo.a < 0.5) discard;
 		#endif
@@ -160,30 +164,32 @@ fragment_shader [[
 		data.wpos = v_wpos.xyz;
 		data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
 		data.metallic  = texture(u_metallicmap, v_uv).b * u_metallic;
-		data.normal.xz = texture(u_normalmap, v_uv).wy * 2 - 1;
-		data.normal.y = sqrt(clamp(1 - dot(data.normal.xz, data.normal.xz), 0, 1)); 
-		data.normal = tbn * data.normal;
+		data.N.xz = texture(u_normalmap, v_uv).wy * 2 - 1;
+		data.N.y = sqrt(clamp(1 - dot(data.N.xz, data.N.xz), 0, 1)); 
+		data.N = tbn * data.N;
 		data.emission = packEmission(u_emission);
+		return data;
 	}
 	
 	#ifdef DEPTH
 		void main()
 		{
 			#ifdef ALPHA_CUTOUT
+				Surface data = getSurface();
 				data.albedo = texture(u_albedomap, v_uv);
-				if(data.albedo.a < 0.5) discard;
+				if(data.alpha < 0.5) discard;
 			#endif
 			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		}
 	#elif defined DEFERRED
 		void main()
 		{
-			getData();
+			Surface data = getSurface();
 			o_gbuffer0 = vec4(data.albedo.rgb, data.roughness);
 			#ifdef GRASS
 				o_gbuffer0.rgb *= v_darken;
 			#endif
-			o_gbuffer1 = vec4(data.normal * 0.5 + 0.5, data.metallic);
+			o_gbuffer1 = vec4(data.N * 0.5 + 0.5, data.metallic);
 			float translucency = 0;
 			#if defined(VEGETATION) && defined(ALPHA_CUTOUT)
 				translucency = 1;
@@ -193,25 +199,32 @@ fragment_shader [[
 	#else 
 		void main()
 		{
-			getData();
+			Surface data = getSurface();
 			
 			vec3 V = normalize(-data.wpos);
 			vec3 L = normalize(u_light_direction.xyz);
 		
 			float shadow = getShadow(u_shadowmap, data.wpos);
 		
-			o_color.rgb = pbr(data.albedo.rgb
-				, data.roughness
-				, data.metallic
-				, data.emission
-				, data.normal
-				, V
+			o_color.rgb = pbr(data
 				, L
 				, shadow
 				, u_light_color.rgb * u_light_intensity
 				, u_light_indirect_intensity);
 			
-			o_color.w = data.albedo.a;
+			ivec3 cluster;
+			float linear_depth = dot(data.wpos.xyz, u_pass_view_dir.xyz);
+			int cluster_idx = getClusterIndexLinearDepth(linear_depth, cluster);
+
+			int offset = b_clusters[cluster_idx].offset;
+			int end_lights = offset + b_clusters[cluster_idx].lights_count;
+			int end_end_probes = end_lights + b_clusters[cluster_idx].probes_count;
+
+			// point lights
+			o_color.rgb += pointLightLighting(offset, end_lights, data, data.wpos, u_shadow_atlas);
+			/**/
+
+			o_color.w = data.alpha;
 		}
 	#endif
 ]]
