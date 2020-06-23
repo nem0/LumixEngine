@@ -43,6 +43,17 @@ struct Cluster {
 	int probes_count;
 };
 
+struct Surface {
+	vec3 albedo;
+	float alpha;
+	float roughness;
+	float metallic;
+	float emission;
+	vec3 N;
+	vec3 V;
+	vec3 wpos;
+};
+
 layout(std430, binding = 6) readonly buffer lights
 {
 	Light b_lights[];
@@ -62,15 +73,6 @@ layout(std430, binding = 9) readonly buffer probes
 {
 	Probe b_probes[];
 };
-
-struct PixelData {
-	vec4 albedo;
-	float roughness;
-	float metallic;
-	float emission;
-	vec3 normal;
-	vec3 wpos;
-} data;
 
 
 float saturate(float a) { return clamp(a, 0, 1); }
@@ -124,6 +126,20 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 
 		cluster = ivec3(fragcoord.xy / 64, 0);
 		float linear_depth = toLinearDepth(u_camera_inv_projection, ndc_depth);
+		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
+		ivec2 tiles = (u_framebuffer_size + 63) / 64;
+		cluster.y = tiles.y - 1 - cluster.y;
+		return cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
+	}
+
+	int getClusterIndexLinearDepth(float linear_depth, out ivec3 cluster)
+	{
+		ivec2 fragcoord = ivec2(gl_FragCoord.xy);
+		#ifndef _ORIGIN_BOTTOM_LEFT
+			fragcoord.y = u_framebuffer_size.y - fragcoord.y - 1;
+		#endif
+
+		cluster = ivec3(fragcoord.xy / 64, 0);
 		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
 		ivec2 tiles = (u_framebuffer_size + 63) / 64;
 		cluster.y = tiles.y - 1 - cluster.y;
@@ -247,27 +263,20 @@ vec3 F_Schlick(float cos_theta, vec3 F0)
 	return mix(F0, vec3(1), pow(1.0 - cos_theta, 5.0)); 
 }
 
-
-vec3 PBR_ComputeDirectLight(vec3 albedo
-	, vec3 N
-	, vec3 L
-	, vec3 V
-	, vec3 light_color
-	, float roughness
-	, float metallic)
+vec3 PBR_ComputeDirectLight(Surface surface, vec3 L, vec3 light_color)
 {
 	vec3 F0 = vec3(0.04);
-	F0 = mix(F0, albedo, metallic);		
+	F0 = mix(F0, surface.albedo, surface.metallic);		
 	
-	float ndotv = abs(dot(N, V)) + 1e-5f;
-	vec3 H = normalize(V + L);
+	float ndotv = abs(dot(surface.N, surface.V)) + 1e-5f;
+	vec3 H = normalize(surface.V + L);
 	float ldoth = saturate(dot(L, H));
-	float ndoth = saturate(dot(N, H));
-	float ndotl = saturate(dot(N, L));
-	float hdotv = saturate(dot(H, V));
+	float ndoth = saturate(dot(surface.N, H));
+	float ndotl = saturate(dot(surface.N, L));
+	float hdotv = saturate(dot(H, surface.V));
 	
 	// D GGX
-	float a = roughness * roughness;
+	float a = surface.roughness * surface.roughness;
 	float a2 = a * a;
 	float f = max(1e-5, (ndoth * ndoth) * (a2 - 1) + 1);
 	float D = a2 / (f * f * M_PI);
@@ -284,8 +293,8 @@ vec3 PBR_ComputeDirectLight(vec3 albedo
 	vec3 specular = D * G * F / max(1e-5, 4 * ndotv * ndotl);
 	
 	vec3 kD = vec3(1.0) - F;
-	kD *= 1.0 - metallic;
-	return (kD * albedo / M_PI + specular) * light_color * ndotl;
+	kD *= 1.0 - surface.metallic;
+	return (kD * surface.albedo / M_PI + specular) * light_color * ndotl;
 }	
 
 
@@ -299,18 +308,14 @@ vec3 env_brdf_approx (vec3 F0, float roughness, float NoV)
 	return F0 * AB.x + AB.y;
 }
 
-vec3 PBR_ComputeIndirectDiffuse(vec3 irradiance, vec3 albedo, float metallic, vec3 N, vec3 V) {
-	float ndotv = clamp(dot(N , V), 1e-5f, 1);
-	vec3 F0 = mix(vec3(0.04), albedo, metallic);		
+vec3 PBR_ComputeIndirectDiffuse(vec3 irradiance, Surface surface) {
+	float ndotv = clamp(dot(surface.N , surface.V), 1e-5f, 1);
+	vec3 F0 = mix(vec3(0.04), surface.albedo, surface.metallic);		
 	vec3 F = F_Schlick(ndotv, F0);
-	vec3 kd = mix(vec3(1.0) - F, vec3(0.0), metallic);
-	return kd * albedo * irradiance;
+	vec3 kd = mix(vec3(1.0) - F, vec3(0.0), surface.metallic);
+	return kd * surface.albedo * irradiance;
 }
 
-vec3 PBR_ComputeIndirectDiffuse(samplerCube irradiancemap, vec3 albedo, float metallic, vec3 N, vec3 V) {
-	vec3 irradiance = texture(irradiancemap, N).rgb;
-	return PBR_ComputeIndirectDiffuse(irradiance, albedo, metallic, N, V);
-}
 
 vec3 PBR_ComputeIndirectSpecular(samplerCube radiancemap, vec3 albedo, float metallic, float roughness, vec3 N, vec3 V) {
 	float ndotv = clamp(dot(N , V ), 1e-5, 1.0);
@@ -322,7 +327,19 @@ vec3 PBR_ComputeIndirectSpecular(samplerCube radiancemap, vec3 albedo, float met
 	return radiance * env_brdf_approx(F0, roughness, ndotv);
 }
 
-vec3 PBR_ComputeIndirectLight(vec3 albedo, float roughness, float metallic, vec3 N, vec3 V)
+vec3 evalSH(vec4[9] sh_coefs, vec3 N) {
+	return sh_coefs[0].rgb
+	+ sh_coefs[1].rgb * (N.y)
+	+ sh_coefs[2].rgb * (N.z)
+	+ sh_coefs[3].rgb * (N.x)
+	+ sh_coefs[4].rgb * (N.y * N.x)
+	+ sh_coefs[5].rgb * (N.y * N.z)
+	+ sh_coefs[6].rgb * (3.0 * N.z * N.z - 1.0)
+	+ sh_coefs[7].rgb * (N.z * N.x)
+	+ sh_coefs[8].rgb * (N.x * N.x - N.y * N.y);
+}
+
+vec3 PBR_ComputeIndirectLight(Surface surface)
 {
 	// TODO
 	//vec3 diffuse = PBR_ComputeIndirectDiffuse(u_irradiancemap, albedo, metallic, N, V);
@@ -342,32 +359,59 @@ vec3 rotateByQuat(vec4 rot, vec3 pos)
 }
 	
 
-vec3 pbr(vec3 albedo
-	, float roughness
-	, float metallic
-	, float emission
-	, vec3 N
-	, vec3 V
+vec3 pbr(Surface surface
 	, vec3 L
 	, float shadow
 	, vec3 light_color
 	, float indirect_intensity)
 {
-	vec3 indirect = PBR_ComputeIndirectLight(albedo, roughness, metallic, N, V);
-
-	vec3 direct = PBR_ComputeDirectLight(albedo
-		, N
-		, L
-		, V
-		, light_color
-		, roughness
-		, metallic);
+	vec3 indirect = PBR_ComputeIndirectLight(surface);
+	vec3 direct = PBR_ComputeDirectLight(surface, L, light_color);
 
 	return 
 		+ direct * shadow
 		+ indirect * indirect_intensity
-		+ emission * albedo
+		+ surface.emission * surface.albedo
 	;
+}
+
+vec3 pointLightLighting(int from, int to, Surface surface, vec3 wpos, sampler2D shadow_atlas) {
+	vec3 res = vec3(0);
+	for (int i = from; i < to; ++i) {
+		int light_idx = b_cluster_map[i]; 
+		vec3 lpos = wpos.xyz - b_lights[light_idx].pos_radius.xyz;
+		float dist = length(lpos);
+		float attn = pow(max(0, 1 - dist / b_lights[light_idx].pos_radius.w), b_lights[light_idx].color_attn.w);
+		vec3 L = -lpos / dist;
+		if (attn > 1e-5) {
+			vec3 direct_light = PBR_ComputeDirectLight(surface, L, b_lights[light_idx].color_attn.rgb);
+			int atlas_idx = b_lights[light_idx].atlas_idx;
+			if (atlas_idx >= 0) {
+				vec4 proj_pos = u_shadow_atlas_matrices[atlas_idx] * vec4(lpos, 1);
+				proj_pos /= proj_pos.w;
+
+				vec2 shadow_uv = proj_pos.xy;
+				float occluder = textureLod(shadow_atlas, shadow_uv, 0).r;
+				float receiver = shadowmapValue(proj_pos.z);
+				float m =  receiver / occluder;
+				attn *= clamp(1 - (1 - m) * 512, 0.0, 1.0);
+			}
+
+			float fov = b_lights[light_idx].fov;
+			if (fov < M_PI) {
+				// TODO replace rot with dir
+				vec3 dir = rotateByQuat(b_lights[light_idx].rot, vec3(0, 0, -1));
+				vec3 L = lpos / max(dist, 1e-5);
+				float cosDir = dot(normalize(dir), L);
+				float cosCone = cos(fov * 0.5);
+
+				attn *= cosDir < cosCone ? 0 : (cosDir - cosCone) / (1 - cosCone);
+			}
+
+			res += direct_light * attn;
+		}
+	}
+	return res;
 }
 
 float rand(vec3 seed)

@@ -97,11 +97,14 @@ fragment_shader [[
 		layout(location = 0) out vec4 o_color;
 	#endif
 
-	void getData()
+	Surface getSurface()
 	{
-		data.albedo = texture(u_albedomap, v_uv) * u_material_color;
+		Surface data;
+		vec4 c = texture(u_albedomap, v_uv) * u_material_color;
+		data.albedo = c.rgb;
 		#ifdef ALPHA_CUTOUT
-			if(data.albedo.a < 0.5) discard;
+			data.alpha = c.a;
+			if(data.alpha < 0.5) discard;
 		#endif
 		mat3 tbn = mat3(
 				normalize(v_tangent),
@@ -115,26 +118,27 @@ fragment_shader [[
 		data.normal = texture(u_normalmap, v_uv).xzy * 2 - 1;
 		data.normal = tbn * data.normal;
 		data.emission = packEmission(u_emission);
+		return data;
 	}
 	
 	#ifdef DEPTH
 		void main()
 		{
 			#ifdef ALPHA_CUTOUT
-				data.albedo = texture(u_albedomap, v_uv);
-				if(data.albedo.a < 0.5) discard;
+				vec4 c = texture(u_albedomap, v_uv);
+				if(c.a < 0.5) discard;
 			#endif
 			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		}
 	#else
 		void main()
 		{
-			getData();
+			Surface data = getSurface();
 			o_gbuffer0 = vec4(data.albedo.rgb, data.roughness);
 			#ifdef GRASS
 				o_gbuffer0.rgb *= v_darken;
 			#endif
-			o_gbuffer1 = vec4(data.normal * 0.5 + 0.5, data.metallic);
+			o_gbuffer1 = vec4(data.N * 0.5 + 0.5, data.metallic);
 			o_gbuffer2 = vec4(data.emission, 0, 0, 1);
 		}
 	#endif
