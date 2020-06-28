@@ -117,8 +117,9 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 }
 
 #ifdef LUMIX_FRAGMENT_SHADER
-	int getClusterIndex(float ndc_depth, out ivec3 cluster)
+	Cluster getCluster(float ndc_depth)
 	{
+		ivec3 cluster;
 		ivec2 fragcoord = ivec2(gl_FragCoord.xy);
 		#ifndef _ORIGIN_BOTTOM_LEFT
 			fragcoord.y = u_framebuffer_size.y - fragcoord.y - 1;
@@ -129,11 +130,12 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
 		ivec2 tiles = (u_framebuffer_size + 63) / 64;
 		cluster.y = tiles.y - 1 - cluster.y;
-		return cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
+		return b_clusters[cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y];
 	}
 
-	int getClusterIndexLinearDepth(float linear_depth, out ivec3 cluster)
+	Cluster getClusterLinearDepth(float linear_depth)
 	{
+		ivec3 cluster;
 		ivec2 fragcoord = ivec2(gl_FragCoord.xy);
 		#ifndef _ORIGIN_BOTTOM_LEFT
 			fragcoord.y = u_framebuffer_size.y - fragcoord.y - 1;
@@ -143,7 +145,7 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
 		ivec2 tiles = (u_framebuffer_size + 63) / 64;
 		cluster.y = tiles.y - 1 - cluster.y;
-		return cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y;
+		return b_clusters[cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y];
 	}
 #endif
 
@@ -170,15 +172,6 @@ vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 	#endif
 	vec4 view_pos = inv_view_proj * pos_proj;
 	return view_pos.xyz / view_pos.w;
-}
-
-vec3 getTranslucency(vec3 albedo, float translucency, vec3 V, vec3 L, vec3 N, float shadow)
-{
-	float w = pow(max(0, dot(-V, L)), 64) * shadow;
-	w += abs(dot(V, N)) * 0.1;
-	w *= max(0.5, dot(-L, N));
-	w *= max(0.5, dot(N, V));
-	return vec3(albedo * translucency * w);
 }
 
 float random (vec2 st) {
@@ -375,11 +368,43 @@ vec3 pbr(Surface surface
 	;
 }
 
-vec3 pointLightLighting(int from, int to, Surface surface, vec3 wpos, sampler2D shadow_atlas) {
-	vec3 res = vec3(0);
+vec3 envProbesLighting(Cluster cluster, Surface surface) {
+	float remaining_w = 1;
+	vec3 probe_light = vec3(0);
+	int from = cluster.offset + cluster.lights_count;
+	int to = from + cluster.probes_count;
 	for (int i = from; i < to; ++i) {
+		int probe_idx = b_cluster_map[i]; 
+		vec3 lpos = b_probes[probe_idx].pos.xyz - surface.wpos.xyz;
+		vec4 rot = b_probes[probe_idx].rot;
+		vec3 outer_range = b_probes[probe_idx].outer_range.xyz;
+		vec3 inner_range = b_probes[probe_idx].inner_range.xyz;
+			
+		lpos = rotateByQuat(rot, lpos);
+		lpos = max(abs(lpos) - inner_range, vec3(0));
+		vec3 range = max(outer_range - inner_range, vec3(1e-5));
+
+		vec3 rel = saturate(abs(lpos / range));
+		float w = 1 - max(max(rel.x, rel.z), rel.y);
+		if (w < 1e-5) continue;
+			
+		w = min(remaining_w, w);
+		remaining_w -= w;
+
+		vec3 irradiance = evalSH(b_probes[probe_idx].sh_coefs, surface.N);
+		irradiance = max(vec3(0), irradiance);
+		vec3 indirect = PBR_ComputeIndirectDiffuse(irradiance, surface);
+		probe_light += (indirect * u_light_indirect_intensity) * w / M_PI;
+		if (remaining_w <= 0) break;
+	}
+	return remaining_w < 1 ? probe_light / (1 - remaining_w) : vec3(0);
+}
+
+vec3 pointLightsLighting(Cluster cluster, Surface surface, sampler2D shadow_atlas) {
+	vec3 res = vec3(0);
+	for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
 		int light_idx = b_cluster_map[i]; 
-		vec3 lpos = wpos.xyz - b_lights[light_idx].pos_radius.xyz;
+		vec3 lpos = surface.wpos.xyz - b_lights[light_idx].pos_radius.xyz;
 		float dist = length(lpos);
 		float attn = pow(max(0, 1 - dist / b_lights[light_idx].pos_radius.w), b_lights[light_idx].color_attn.w);
 		vec3 L = -lpos / dist;

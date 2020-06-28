@@ -27,12 +27,11 @@ fragment_shader [[
 		float ndc_depth;
 		vec3 wpos = getViewPosition(u_texture, u_camera_inv_view_projection, screen_uv, ndc_depth);
 
-		ivec3 cluster;
-		int cluster_idx = getClusterIndex(ndc_depth, cluster);
+		Cluster cluster = getCluster(ndc_depth);
 
 		#if 1
 			// debug number of lights per cluster
-			int c = b_clusters[cluster_idx].lights_count;
+			int c = cluster.lights_count;
 			if (c < 10)
 				o_color.rgb = vec3(0, 0, c / 10.0);
 			else if (c < 50)
@@ -41,7 +40,7 @@ fragment_shader [[
 				o_color.rgb = vec3((c - 50) / 200.0, 0, 0);
 		#elif 1
 			// debug number of probes per cluster
-			int c = b_clusters[cluster_idx].probes_count;
+			int c = cluster.probes_count;
 			if (c < 10)
 				o_color.rgb = vec3(0, 0, c / 10.0);
 			else if (c < 50)
