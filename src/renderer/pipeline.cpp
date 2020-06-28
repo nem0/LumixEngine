@@ -831,7 +831,7 @@ struct PipelineImpl final : Pipeline
 			if(global_light.isValid()) {
 				EntityRef gl = (EntityRef)global_light;
 				const Environment& env = m_scene->getEnvironment(gl);
-				global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)), 456); 
+				global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)).normalized(), 456); 
 				global_state.light_color = Vec4(env.diffuse_color, 456);
 				global_state.light_intensity = env.diffuse_intensity;
 				global_state.light_indirect_intensity = env.indirect_intensity;

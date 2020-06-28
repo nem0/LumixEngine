@@ -33,64 +33,27 @@ fragment_shader [[
 		surface.N = gb1.rgb * 2 - 1;
 		surface.roughness = gb0.w;
 		surface.metallic = gb1.w;
-		float emission = unpackEmission(gb2.x);
-		float translucency = gb2.y;
+		surface.emission = unpackEmission(gb2.x);
 
 		float ndc_depth;
 		surface.wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, v_uv, ndc_depth);
 		surface.V = normalize(-surface.wpos);
-		vec3 L = normalize(u_light_direction.xyz);
+		vec3 L = u_light_direction.xyz;
 		
 		float shadow = getShadow(u_shadowmap, surface.wpos);
 		vec3 direct = PBR_ComputeDirectLight(surface
 			, L
 			, u_light_color.rgb * u_light_intensity * shadow);
-		direct += getTranslucency(surface.albedo, translucency, surface.V, L, surface.N, shadow);
-		direct += emission * surface.albedo;
+		direct += surface.emission * surface.albedo;
 
 		float fog_factor = getFogFactor(u_camera_world_pos.y, u_camera_world_pos.y + surface.wpos.y, surface.wpos, u_fog_params.x, u_fog_params.y, u_fog_params.z);
 		o_color.rgb = mix(direct, u_fog_color.rgb, fog_factor);
 		
-		ivec3 cluster;
-		int cluster_idx = getClusterIndex(ndc_depth, cluster);
+		Cluster cluster = getCluster(ndc_depth);
 
-		int offset = b_clusters[cluster_idx].offset;
-		int end_lights = offset + b_clusters[cluster_idx].lights_count;
-		int end_end_probes = end_lights + b_clusters[cluster_idx].probes_count;
-
-		// point lights
-		o_color.rgb += pointLightLighting(offset, end_lights, surface, surface.wpos, u_shadow_atlas);
-
-		// env probes
-		float remaining_w = 1;
-		vec3 probe_light = vec3(0);
-		for (int i = end_lights; i < end_end_probes; ++i) {
-			int probe_idx = b_cluster_map[i]; 
-			vec3 lpos = b_probes[probe_idx].pos.xyz - surface.wpos.xyz;
-			vec4 rot = b_probes[probe_idx].rot;
-			vec3 outer_range = b_probes[probe_idx].outer_range.xyz;
-			vec3 inner_range = b_probes[probe_idx].inner_range.xyz;
-			
-			lpos = rotateByQuat(rot, lpos);
-			lpos = max(abs(lpos) - inner_range, vec3(0));
-			vec3 range = max(outer_range - inner_range, vec3(1e-5));
-
-			vec3 rel = saturate(abs(lpos / range));
-			float w = 1 - max(max(rel.x, rel.z), rel.y);
-			if (w < 1e-5) continue;
-			
-			w = min(remaining_w, w);
-			remaining_w -= w;
-
-			vec3 irradiance = evalSH(b_probes[probe_idx].sh_coefs, surface.N);
-			irradiance = max(vec3(0), irradiance);
-			vec3 indirect = PBR_ComputeIndirectDiffuse(irradiance, surface);
-			probe_light += (indirect * u_light_indirect_intensity) * w / M_PI;
-			if (remaining_w <= 0) break;
-		}
-		if (remaining_w < 1) {
-			o_color.rgb += probe_light / (1 - remaining_w);
-		}
+		o_color.rgb += pointLightsLighting(cluster, surface, u_shadow_atlas);
+		o_color.rgb += envProbesLighting(cluster, surface);
+		
 
 		o_color.w = 1;
 	}

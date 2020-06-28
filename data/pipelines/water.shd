@@ -152,7 +152,7 @@ fragment_shader [[
 	void main()
 	{
 		vec3 V = normalize(-v_wpos.xyz);
-		vec3 L = normalize(u_light_direction.xyz);
+		vec3 L = u_light_direction.xyz;
 		
 		float shadow = getShadow(u_shadowmap, data.wpos);
 		
