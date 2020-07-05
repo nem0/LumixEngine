@@ -182,7 +182,6 @@ private:
 	OutputMemoryStream out_file;
 	float m_time_scale = 1.0f;
 	bool cancel_mesh_transforms = false;
-	bool m_ignore_skeleton = false;
 	bool m_import_vertex_colors = true;
 	float m_fbx_scale = 1.f;
 	Orientation m_orientation = Orientation::Y_UP;

@@ -1312,7 +1312,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		initControllerDesc(cDesc);
 		DVec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		Controller& c = m_controllers.insert(entity);
+		Controller& c = m_controllers.insert(entity, Controller());
 		c.m_controller = m_controller_manager->createController(cDesc);
 		c.m_entity = entity;
 		c.m_frame_change.set(0, 0, 0);
@@ -2686,10 +2686,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if ((cmp_mask & m_physics_cmps_mask) == 0) return;
 		
 		if (m_universe.hasComponent(entity, CONTROLLER_TYPE)) {
-			int ctrl_idx = m_controllers.find(entity);
-			if (ctrl_idx >= 0)
+			auto iter = m_controllers.find(entity);
+			if (iter.isValid())
 			{
-				auto& controller = m_controllers.at(ctrl_idx);
+				Controller& controller = iter.value();
 				DVec3 pos = m_universe.getPosition(entity);
 				PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
 				controller.m_controller->setFootPosition(pvec);
@@ -3773,7 +3773,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			EntityRef entity;
 			serializer.read(entity);
 			entity = entity_map.get(entity);
-			Controller& c = m_controllers.insert(entity);
+			Controller& c = m_controllers.insert(entity, Controller());
 			c.m_frame_change.set(0, 0, 0);
 
 			serializer.read(c.m_layer);
@@ -4177,7 +4177,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	HashMap<EntityRef, RigidActor*> m_actors;
 	HashMap<EntityRef, Ragdoll> m_ragdolls;
 	AssociativeArray<EntityRef, Joint> m_joints;
-	AssociativeArray<EntityRef, Controller> m_controllers;
+	HashMap<EntityRef, Controller> m_controllers;
 	HashMap<EntityRef, Heightfield> m_terrains;
 	HashMap<EntityRef, Vehicle> m_vehicles;
 	HashMap<EntityRef, Wheel> m_wheels;

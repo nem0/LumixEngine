@@ -108,18 +108,6 @@ namespace Lumix
 			}
 
 
-			bool find(const Key& key, Value& value) const
-			{
-				int i = find(key);
-				if (i < 0)
-				{
-					return false;
-				}
-				value = m_values[i];
-				return true;
-			}
-
-
 			int find(const Key& key) const
 			{
 				int l = 0;
@@ -168,7 +156,8 @@ namespace Lumix
 				}
 				else
 				{
-					return m_values[insert(key, Value())];
+					ASSERT(false);
+					return m_values[0];
 				}
 			}
 

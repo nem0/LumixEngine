@@ -3118,7 +3118,7 @@ struct PipelineImpl final : Pipeline
 
 					i32 begin = atomicAdd(&counter, STEP);
 
-					while(begin < size) {
+					while (begin < size) {
 						const i32 end = minimum(size, begin + STEP);
 
 						u64 key = begin > 0 ? keys[begin - 1] : keys[0];
@@ -3354,7 +3354,7 @@ struct PipelineImpl final : Pipeline
 				RenderableTypes::GRASS,
 				RenderableTypes::LOCAL_LIGHT
 			};
-			JobSystem::forEach(lengthOf(types), [&](int idx){
+			JobSystem::forEach(lengthOf(types), 1, [&](i32 idx, i32){
 				if (m_camera_params.is_shadow && types[idx] == RenderableTypes::GRASS) return;
 				CullResult* renderables = scene->getRenderables(m_camera_params.frustum, types[idx]);
 				if (renderables) {
@@ -3679,22 +3679,16 @@ struct PipelineImpl final : Pipeline
 			}
 			m_page_allocator.unlock();
 	
-			volatile i32 counter = 0;
-			JobSystem::runOnWorkers([&](){
-				i32 begin = atomicAdd(&counter, STEP);
-				while(begin < size) {
-					const i32 s = minimum(STEP, size - begin);
-					i32 step_idx = begin / STEP;
-					CmdPage* page = first;
-					while (step_idx) {
-						page = page->header.next_init;
-						--step_idx;
-					}
-
-					createCommands(page, renderables + begin, sort_keys + begin, s);
-
-					begin = atomicAdd(&counter, STEP);
+			JobSystem::forEach(size, STEP, [&](i32 begin, i32 end){
+				const i32 s = end - begin;
+				i32 step_idx = begin / STEP;
+				CmdPage* page = first;
+				while (step_idx) {
+					page = page->header.next_init;
+					--step_idx;
 				}
+
+				createCommands(page, renderables + begin, sort_keys + begin, s);
 			});
 
 			CmdPage* page = first;

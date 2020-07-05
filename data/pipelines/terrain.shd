@@ -223,8 +223,9 @@ fragment_shader [[
 		return detail;
 	}
 
-	void getData()
+	Surface getSurface()
 	{
+		Surface surface;
 		if(v_dist2 < u_detail_distance * u_detail_distance) {
 			vec2 uvx = v_uv;
 
@@ -273,18 +274,19 @@ fragment_shader [[
 
 			vec3 n = v4.w > v4_2.w + a ? n0.rgb : n0_2.rgb;
 
-			data.normal = normalize(getTBN(v_uv) * n);
-			data.albedo.rgb = v4.w > v4_2.w + a ? v4.rgb : v4_2.rgb;
-			data.albedo.w = 1;
+			surface.N = normalize(getTBN(v_uv) * n);
+			surface.albedo.rgb = v4.w > v4_2.w + a ? v4.rgb : v4_2.rgb;
+			surface.alpha = 1;
 		}
 		else {
-			data.normal = getTBN(v_uv)[1];
-			data.albedo = texture(u_satellite, vec3(v_uv, 0).xy);
+			surface.normal = getTBN(v_uv)[1];
+			surface.albedo = texture(u_satellite, vec3(v_uv, 0).xy);
 		}
-		data.wpos = vec3(0);
-		data.roughness = 0.9;
-		data.metallic  = 0;
-		data.emission = 0;
+		surface.wpos = vec3(0);
+		surface.roughness = 0.9;
+		surface.metallic  = 0;
+		surface.emission = 0;
+		return surface;
 	}
 	
 	void main()
@@ -292,10 +294,8 @@ fragment_shader [[
 		#ifdef DEPTH
 			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		#elif defined DEFERRED
-			getData();
-			o_gbuffer0 = vec4(data.albedo.rgb, data.roughness);
-			o_gbuffer1 = vec4(data.normal * 0.5 + 0.5, data.metallic);
-			o_gbuffer2 = vec4(packEmission(data.emission), 0, 0, 1);
+			Surface surface = getSurface();
+			packSurface(surface, o_gbuffer0, o_gbuffer1, o_gbuffer2);
 		#else 
 			o_color.rgb = vec3(1, 0, 1);
 			o_color.w = 1;

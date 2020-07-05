@@ -336,10 +336,10 @@ struct GUISceneImpl final : GUIScene
 		EntityPtr child = m_universe.getFirstChild(rect.entity);
 		while (child.isValid())
 		{
-			int idx = m_rects.find((EntityRef)child);
-			if (idx >= 0)
+			auto iter = m_rects.find((EntityRef)child);
+			if (iter.isValid())
 			{
-				renderRect(*m_rects.at(idx), pipeline, { l, t, r - l, b - t }, is_main);
+				renderRect(*iter.value(), pipeline, { l, t, r - l, b - t }, is_main);
 			}
 			child = m_universe.getNextSibling((EntityRef)child);
 		}
@@ -355,9 +355,9 @@ struct GUISceneImpl final : GUIScene
 			m_cursor_set = false;
 		}
 		for (GUICanvas& canvas : m_canvas) {
-			const int idx = m_rects.find(canvas.entity);
-			if (idx >= 0) {
-				GUIRect* r = m_rects.at(idx);
+			auto iter = m_rects.find(canvas.entity);
+			if (iter.isValid()) {
+				GUIRect* r = iter.value();
 				renderRect(*r, pipeline, {0, 0, canvas_size.x, canvas_size.y}, is_main);
 			}
 		}
@@ -450,9 +450,9 @@ struct GUISceneImpl final : GUIScene
 
 	bool hasGUI(EntityRef entity) const override
 	{
-		int idx = m_rects.find(entity);
-		if (idx < 0) return false;
-		return m_rects.at(idx)->flags.isSet(GUIRect::IS_VALID);
+		auto iter = m_rects.find(entity);
+		if (!iter.isValid()) return false;
+		return iter.value()->flags.isSet(GUIRect::IS_VALID);
 	}
 
 
@@ -475,10 +475,10 @@ struct GUISceneImpl final : GUIScene
 
 		for (EntityPtr child = m_universe.getFirstChild(rect.entity); child.isValid(); child = m_universe.getNextSibling((EntityRef)child))
 		{
-			int idx = m_rects.find((EntityRef)child);
-			if (idx < 0) continue;
+			auto iter = m_rects.find((EntityRef)child);
+			if (!iter.isValid()) continue;
 
-			GUIRect* child_rect = m_rects.at(idx);
+			GUIRect* child_rect = iter.value();
 			EntityPtr entity = getRectAt(*child_rect, pos, r, limit);
 			if (entity.isValid()) return entity;
 		}
@@ -496,9 +496,9 @@ struct GUISceneImpl final : GUIScene
 	EntityPtr getRectAtEx(const Vec2& pos, const Vec2& canvas_size, EntityPtr limit) const override
 	{
 		for (const GUICanvas& canvas : m_canvas) {
-			const int idx = m_rects.find(canvas.entity);
-			if (idx >= 0) {
-				const GUIRect* r = m_rects.at(idx);
+			auto iter = m_rects.find(canvas.entity);
+			if (iter.isValid()) {
+				const GUIRect* r = iter.value();
 				const EntityPtr e = getRectAt(*r, pos, { 0, 0, canvas_size.x, canvas_size.y }, limit);
 				if (e.isValid()) return e;
 			}
@@ -527,8 +527,9 @@ struct GUISceneImpl final : GUIScene
 	Rect getRectEx(EntityPtr entity, const Vec2& canvas_size) const override
 	{
 		if (!entity.isValid()) return { 0, 0, canvas_size.x, canvas_size.y };
-		int idx = m_rects.find((EntityRef)entity);
-		if (idx < 0) return { 0, 0, canvas_size.x, canvas_size.y };
+		auto iter = m_rects.find((EntityRef)entity);
+		if (!iter.isValid()) return { 0, 0, canvas_size.x, canvas_size.y };
+
 		EntityPtr parent = m_universe.getParent((EntityRef)entity);
 		Rect parent_rect = getRectEx(parent, canvas_size);
 		GUIRect* gui = m_rects[(EntityRef)entity];
@@ -690,9 +691,9 @@ struct GUISceneImpl final : GUIScene
 
 		for (EntityPtr e = m_universe.getFirstChild(rect.entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e))
 		{
-			int idx = m_rects.find((EntityRef)e);
-			if (idx < 0) continue;
-			handleMouseAxisEvent(r, *m_rects.at(idx), mouse_pos, prev_mouse_pos);
+			auto iter = m_rects.find((EntityRef)e);
+			if (!iter.isValid()) continue;
+			handleMouseAxisEvent(r, *iter.value(), mouse_pos, prev_mouse_pos);
 		}
 	}
 
@@ -762,9 +763,9 @@ struct GUISceneImpl final : GUIScene
 
 		for (EntityPtr e = m_universe.getFirstChild(rect.entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e))
 		{
-			int idx = m_rects.find((EntityRef)e);
-			if (idx < 0) continue;
-			handled = handleMouseButtonEvent(r, *m_rects.at(idx), event) || handled;
+			auto iter = m_rects.find((EntityRef)e);
+			if (!iter.isValid()) continue;
+			handled = handleMouseButtonEvent(r, *iter.value(), event) || handled;
 		}
 		return handled;
 	}
@@ -774,10 +775,10 @@ struct GUISceneImpl final : GUIScene
 	{
 		if (!e.isValid()) return nullptr;
 
-		int rect_idx = m_rects.find((EntityRef)e);
-		if (rect_idx < 0) return nullptr;
+		auto iter = m_rects.find((EntityRef)e);
+		if (!iter.isValid()) return nullptr;
 
-		GUIRect* rect = m_rects.at(rect_idx);
+		GUIRect* rect = iter.value();
 		if (!rect->text) return nullptr;
 		if (!rect->input_field) return nullptr;
 
@@ -851,9 +852,9 @@ struct GUISceneImpl final : GUIScene
 						Vec2 pos(event.data.axis.x_abs, event.data.axis.y_abs);
 						m_cursor_pos = IVec2((i32)pos.x, (i32)pos.y);
 						for (const GUICanvas& canvas : m_canvas) {
-							const int idx = m_rects.find(canvas.entity);
-							if (idx >= 0) {
-								GUIRect* r = m_rects.at(idx);
+							auto iter = m_rects.find(canvas.entity);
+							if (iter.isValid()) {
+								GUIRect* r = iter.value();
 								handleMouseAxisEvent({0, 0,  m_canvas_size.x, m_canvas_size.y }, *r, pos, old_pos);
 							}
 						}
@@ -871,9 +872,9 @@ struct GUISceneImpl final : GUIScene
 						}
 						bool handled = false;
 						for (const GUICanvas& canvas : m_canvas) {
-							const int idx = m_rects.find(canvas.entity);
-							if (idx >= 0) {
-								GUIRect* r = m_rects.at(idx);
+							auto iter = m_rects.find(canvas.entity);
+							if (iter.isValid()) {
+								GUIRect* r = iter.value();
 								handled = handleMouseButtonEvent({ 0, 0, m_canvas_size.x, m_canvas_size.y }, *r, event);
 								if (handled) break;
 							}
@@ -918,10 +919,10 @@ struct GUISceneImpl final : GUIScene
 
 	void createRect(EntityRef entity)
 	{
-		int idx = m_rects.find(entity);
+		auto iter = m_rects.find(entity);
 		GUIRect* rect;
-		if (idx >= 0) {
-			rect = m_rects.at(idx);
+		if (iter.isValid()) {
+			rect = iter.value();
 		}
 		else {
 			rect = LUMIX_NEW(m_allocator, GUIRect);
@@ -940,13 +941,13 @@ struct GUISceneImpl final : GUIScene
 
 	void createText(EntityRef entity)
 	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
+		auto iter = m_rects.find(entity);
+		if (!iter.isValid())
 		{
 			createRect(entity);
-			idx = m_rects.find(entity);
+			iter = m_rects.find(entity);
 		}
-		GUIRect& rect = *m_rects.at(idx);
+		GUIRect& rect = *iter.value();
 		rect.text = LUMIX_NEW(m_allocator, GUIText)(m_allocator);
 
 		m_universe.onComponentCreated(entity, GUI_TEXT_TYPE, this);
@@ -955,26 +956,26 @@ struct GUISceneImpl final : GUIScene
 
 	void createRenderTarget(EntityRef entity)
 	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
+		auto iter = m_rects.find(entity);
+		if (!iter.isValid())
 		{
 			createRect(entity);
-			idx = m_rects.find(entity);
+			iter = m_rects.find(entity);
 		}
-		m_rects.at(idx)->render_target = &EMPTY_RENDER_TARGET;
+		iter.value()->render_target = &EMPTY_RENDER_TARGET;
 		m_universe.onComponentCreated(entity, GUI_RENDER_TARGET_TYPE, this);
 	}
 
 
 	void createButton(EntityRef entity)
 	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
+		auto iter = m_rects.find(entity);
+		if (!iter.isValid())
 		{
 			createRect(entity);
-			idx = m_rects.find(entity);
+			iter = m_rects.find(entity);
 		}
-		GUIImage* image = m_rects.at(idx)->image;
+		GUIImage* image = iter.value()->image;
 		GUIButton& button = m_buttons.insert(entity, GUIButton());
 		if (image) {
 			button.hovered_color = image->color;
@@ -985,19 +986,20 @@ struct GUISceneImpl final : GUIScene
 
 	void createCanvas(EntityRef entity)
 	{
-		m_canvas.insert(entity).entity = entity;
+		GUICanvas& canvas = m_canvas.insert(entity, {});
+		canvas.entity = entity;
 		m_universe.onComponentCreated(entity, GUI_CANVAS_TYPE, this);
 	}
 
 	void createInputField(EntityRef entity)
 	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
+		auto iter = m_rects.find(entity);
+		if (!iter.isValid())
 		{
 			createRect(entity);
-			idx = m_rects.find(entity);
+			iter = m_rects.find(entity);
 		}
-		GUIRect& rect = *m_rects.at(idx);
+		GUIRect& rect = *iter.value();
 		rect.input_field = LUMIX_NEW(m_allocator, GUIInputField);
 
 		m_universe.onComponentCreated(entity, GUI_INPUT_FIELD_TYPE, this);
@@ -1006,33 +1008,17 @@ struct GUISceneImpl final : GUIScene
 
 	void createImage(EntityRef entity)
 	{
-		int idx = m_rects.find(entity);
-		if (idx < 0)
+		auto iter = m_rects.find(entity);
+		if (!iter.isValid())
 		{
 			createRect(entity);
-			idx = m_rects.find(entity);
+			iter = m_rects.find(entity);
 		}
-		GUIRect& rect = *m_rects.at(idx);
+		GUIRect& rect = *iter.value();
 		rect.image = LUMIX_NEW(m_allocator, GUIImage);
 		rect.image->flags.set(GUIImage::IS_ENABLED);
 
 		m_universe.onComponentCreated(entity, GUI_IMAGE_TYPE, this);
-	}
-
-
-	GUIRect* findRoot()
-	{
-		if (m_rects.size() == 0) return nullptr;
-		for (int i = 0, n = m_rects.size(); i < n; ++i)
-		{
-			GUIRect& rect = *m_rects.at(i);
-			if (!rect.flags.isSet(GUIRect::IS_VALID)) continue;
-			EntityRef e = m_rects.getKey(i);
-			EntityPtr parent = m_universe.getParent(e);
-			if (!parent.isValid()) return &rect;
-			if (m_rects.find((EntityRef)parent) < 0) return &rect;
-		}
-		return nullptr;
 	}
 
 
@@ -1174,12 +1160,12 @@ struct GUISceneImpl final : GUIScene
 			serializer.read(flags);
 			serializer.read(entity);
 			entity = entity_map.get(entity);
-			int idx = m_rects.find(entity);
-			if (idx < 0) {
+			auto iter = m_rects.find(entity);
+			if (!iter.isValid()) {
 				GUIRect* rect = LUMIX_NEW(m_allocator, GUIRect);
-				idx = m_rects.insert(entity, rect);
+				iter = m_rects.insert(entity, rect);
 			}
-			GUIRect* rect = m_rects.at(idx);
+			GUIRect* rect = iter.value();
 			static_assert(sizeof(flags) == sizeof(rect->flags));
 			rect->entity = entity;
 			rect->flags.base = flags;
@@ -1253,7 +1239,7 @@ struct GUISceneImpl final : GUIScene
 			GUICanvas canvas;
 			serializer.read(canvas);
 			canvas.entity = entity_map.get(canvas.entity);
-			m_canvas.insert(canvas.entity) = canvas;
+			m_canvas.insert(canvas.entity, canvas);
 			
 			m_universe.onComponentCreated(canvas.entity, GUI_CANVAS_TYPE, this);
 		}
@@ -1278,9 +1264,9 @@ struct GUISceneImpl final : GUIScene
 	Universe& m_universe;
 	GUISystem& m_system;
 	
-	AssociativeArray<EntityRef, GUIRect*> m_rects;
+	HashMap<EntityRef, GUIRect*> m_rects;
 	HashMap<EntityRef, GUIButton> m_buttons;
-	AssociativeArray<EntityRef, GUICanvas> m_canvas;
+	HashMap<EntityRef, GUICanvas> m_canvas;
 	EntityRef m_buttons_down[16];
 	u32 m_buttons_down_count;
 	EntityPtr m_focused_entity = INVALID_ENTITY;

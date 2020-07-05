@@ -26,8 +26,6 @@ static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chor
 
 enum class AudioSceneVersion : int
 {
-	CHORUS = 0,
-
 	LAST
 };
 
@@ -471,7 +469,7 @@ struct AudioSceneImpl final : AudioScene
 
 	void removeClip(ClipInfo* info) override
 	{
-		for (auto& i : m_playing_sounds)
+		for (PlayingSound& i : m_playing_sounds)
 		{
 			if (i.clip == info && i.buffer_id != AudioDevice::INVALID_BUFFER_HANDLE)
 			{
@@ -489,7 +487,7 @@ struct AudioSceneImpl final : AudioScene
 			}
 		}
 
-		auto* clip = info->clip;
+		Clip* clip = info->clip;
 		if (clip)
 		{
 			clip->getResourceManager().unload(*clip);
