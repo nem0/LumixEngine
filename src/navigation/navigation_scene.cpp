@@ -29,9 +29,6 @@ namespace Lumix
 
 enum class NavigationSceneVersion : int
 {
-	USE_ROOT_MOTION,
-	ROOT_MOTION_FROM_ANIM,
-
 	LATEST
 };
 

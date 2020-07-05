@@ -159,17 +159,17 @@ fragment_shader [[
 		#endif
 
 		mat3 tbn = mat3(
-				normalize(tangent),
-				normalize(N),
-				normalize(cross(N, tangent))
-				);
+			normalize(tangent),
+			normalize(N),
+			normalize(cross(N, tangent))
+			);
 		
 		data.wpos = v_wpos.xyz;
 		data.V = normalize(-data.wpos);
 		data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
 		data.metallic  = texture(u_metallicmap, v_uv).b * u_metallic;
 		data.N.xz = texture(u_normalmap, v_uv).wy * 2 - 1;
-		data.N.y = sqrt(clamp(1 - dot(data.N.xz, data.N.xz), 0, 1)); 
+		data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 		data.N = tbn * data.N;
 		data.emission = u_emission;
 		return data;
@@ -188,31 +188,17 @@ fragment_shader [[
 		void main()
 		{
 			Surface data = getSurface();
-			o_gbuffer0 = vec4(data.albedo.rgb, data.roughness);
-			o_gbuffer1 = vec4(data.N * 0.5 + 0.5, data.metallic);
-			o_gbuffer2 = vec4(packEmission(data.emission), 0, 0, 1);
+			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
 		}
 	#else 
 		void main()
 		{
 			Surface data = getSurface();
 			
-			vec3 L = u_light_direction.xyz;
-		
-			float shadow = getShadow(u_shadowmap, data.wpos);
-		
-			o_color.rgb = pbr(data
-				, L
-				, shadow
-				, u_light_color.rgb * u_light_intensity
-				, u_light_indirect_intensity);
 			float linear_depth = dot(data.wpos.xyz, u_pass_view_dir.xyz);
 			Cluster cluster = getClusterLinearDepth(linear_depth);
-
-			o_color.rgb += pointLightsLighting(cluster, data, u_shadow_atlas);
-			o_color.rgb += envProbesLighting(cluster, data);
-
-			o_color.w = data.alpha;
+			o_color.rgb = computeLighting(cluster, data, u_light_direction.xyz, u_light_color.rgb * u_light_intensity, u_shadowmap, u_shadow_atlas);
+			o_color.a = data.alpha;
 		}
 	#endif
 ]]

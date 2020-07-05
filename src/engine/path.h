@@ -15,13 +15,6 @@ struct LUMIX_ENGINE_API PathInfo
 	char m_dir[MAX_PATH_LENGTH];
 };
 
-struct PathInternal
-{
-	char m_path[MAX_PATH_LENGTH];
-	u32 m_id;
-	volatile i32 m_ref_count;
-};
-
 struct LUMIX_ENGINE_API Path
 {
 public:

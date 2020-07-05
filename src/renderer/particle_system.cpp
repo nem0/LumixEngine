@@ -845,20 +845,9 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 			}
 		}
 	};
-	if(m_particles_count > 16 * 1024) {
-		volatile i32 counter = 0;
-		JobSystem::runOnWorkers([&](){
-			for(;;) {
-				const i32 i = atomicAdd(&counter, 16 * 1024);
-				if (i >= m_particles_count) return;
-				sim((u32)i, minimum((m_particles_count - i + 3) & ~3, 16 * 1024));
-			}
-		});
-	}
-	else {
-		sim(0, (m_particles_count + 3) & ~3);
-	}
-
+	JobSystem::forEach(m_particles_count, 16 * 1024, [&](i32 from, i32 to){
+		sim((u32)from, (to + 3) & ~3);
+	});
 }
 
 // TODO

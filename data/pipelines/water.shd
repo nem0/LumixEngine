@@ -139,8 +139,8 @@ fragment_shader [[
 		wnormal1.xz = (texture(u_normalmap, vec2(0.5, 0.5) - tc1).xy + texture(u_normalmap, (vec2(0.5, 0.5) - tc1) * 2.3).xy) - 0.5;
 		wnormal1.xz = wnormal1.xz * 2 - 1;
 		
-		wnormal0.y = sqrt(clamp(1 - dot(wnormal0.xz, wnormal0.xz), 0, 1)); 
-		wnormal1.y = sqrt(clamp(1 - dot(wnormal1.xz, wnormal1.xz), 0, 1)); 
+		wnormal0.y = sqrt(saturate(1 - dot(wnormal0.xz, wnormal0.xz))); 
+		wnormal1.y = sqrt(saturate(1 - dot(wnormal1.xz, wnormal1.xz))); 
 
 		float noise = texture(u_noise, uv * 30).x;
 		float t = fract(u_time * 0.6 + noise * 2);

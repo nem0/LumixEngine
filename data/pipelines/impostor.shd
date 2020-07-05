@@ -134,9 +134,7 @@ fragment_shader [[
 		void main()
 		{
 			Surface data = getSurface();
-			o_gbuffer0 = vec4(data.albedo.rgb, data.roughness);
-			o_gbuffer1 = vec4(data.N * 0.5 + 0.5, data.metallic);
-			o_gbuffer2 = vec4(packEmission(data.emission), 0, 0, 1);
+			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
 		}
 	#endif
 ]]

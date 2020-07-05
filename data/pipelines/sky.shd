@@ -83,9 +83,9 @@ fragment_shader [[
 		float to_top = max(0, (fog_bottom + fog_height) - cam_height);
 
 		float avg_y = (fog_bottom + fog_height + cam_height) * 0.5;
-		float avg_density = fog_density * clamp(1 - (avg_y - fog_bottom) / fog_height, 0, 1);
+		float avg_density = fog_density * saturate(1 - (avg_y - fog_bottom) / fog_height);
 		float res = exp(-pow(avg_density * to_top / eye_dir.y, 2));
-		res =  1 - clamp(res - (1-min(0.2, eye_dir.y)*5), 0, 1);
+		res =  1 - saturate(res - (1-min(0.2, eye_dir.y)*5));
 		return res;
 	}
 

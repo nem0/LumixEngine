@@ -24,37 +24,17 @@ fragment_shader [[
 
 	void main()
 	{
-		vec4 gb0 = texture(u_gbuffer0, v_uv);
-		vec4 gb1 = texture(u_gbuffer1, v_uv);
-		vec4 gb2 = texture(u_gbuffer2, v_uv);
-
-		Surface surface;
-		surface.albedo = gb0.rgb;
-		surface.N = gb1.rgb * 2 - 1;
-		surface.roughness = gb0.w;
-		surface.metallic = gb1.w;
-		surface.emission = unpackEmission(gb2.x);
-
 		float ndc_depth;
-		surface.wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, v_uv, ndc_depth);
-		surface.V = normalize(-surface.wpos);
-		vec3 L = u_light_direction.xyz;
-		
-		float shadow = getShadow(u_shadowmap, surface.wpos);
-		vec3 direct = PBR_ComputeDirectLight(surface
-			, L
-			, u_light_color.rgb * u_light_intensity * shadow);
-		direct += surface.emission * surface.albedo;
-
-		float fog_factor = getFogFactor(u_camera_world_pos.y, u_camera_world_pos.y + surface.wpos.y, surface.wpos, u_fog_params.x, u_fog_params.y, u_fog_params.z);
-		o_color.rgb = mix(direct, u_fog_color.rgb, fog_factor);
-		
+		Surface surface = unpackSurface(v_uv, u_gbuffer0, u_gbuffer1, u_gbuffer2, u_gbuffer_depth, ndc_depth);
 		Cluster cluster = getCluster(ndc_depth);
 
-		o_color.rgb += pointLightsLighting(cluster, surface, u_shadow_atlas);
-		o_color.rgb += envProbesLighting(cluster, surface);
-		
+		o_color.rgb = computeLighting(cluster
+			, surface
+			, u_light_direction.xyz
+			, u_light_color.rgb * u_light_intensity
+			, u_shadowmap
+			, u_shadow_atlas);
 
-		o_color.w = 1;
+		o_color.a = 1;
 	}
 ]]

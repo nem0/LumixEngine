@@ -40,24 +40,32 @@ void runOnWorkers(const F& f)
 
 
 template <typename F>
-void forEach(u32 count, const F& f)
+void forEach(i32 count, i32 step, const F& f)
 {
+	if (count == 0) return;
+	if (count <= step) {
+		f(0, count);
+		return;
+	}
+
 	struct Data {
 		const F* f;
 		volatile i32 offset = 0;
-		u32 count;
+		i32 count;
+		i32 step;
 	} data;
 	data.count = count;
+	data.step = step;
 	data.f = &f;
 	
 	SignalHandle signal = JobSystem::INVALID_HANDLE;
-	for(u32 i = 0; i < count; ++i) {
+	for(i32 i = 0; i < count; ++i) {
 		JobSystem::run(&data, [](void* ptr){
 			Data& data = *(Data*)ptr;
 			for(;;) {
-				const u32 idx = atomicIncrement(&data.offset) - 1;
-				if(idx >= data.count) break;
-				(*data.f)(idx);
+				const i32 idx = atomicAdd(&data.offset, data.step);
+				if (idx >= data.count) break;
+				(*data.f)(idx, minimum(idx + data.step, data.count));
 			}
 		}, &signal);
 	}

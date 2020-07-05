@@ -33,8 +33,7 @@ struct LUMIX_ENGINE_API Universe
 public:
 	using Create = void (IScene::*)(EntityRef);
 	using Destroy = void (IScene::*)(EntityRef);
-	struct ComponentTypeEntry
-	{
+	struct ComponentTypeEntry {
 		IScene* scene = nullptr;
 		void (IScene::*create)(EntityRef);
 		void (IScene::*destroy)(EntityRef);
@@ -42,21 +41,15 @@ public:
 
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
 
-	struct EntityData
-	{
+	struct EntityData {
 		EntityData() {}
 
 		int hierarchy;
 		int name;
 
-		union
-		{
-			struct 
-			{
-				u64 components;
-			};
-			struct
-			{
+		union {
+			u64 components;
+			struct {
 				int prev;
 				int next;
 			};
