@@ -25,7 +25,15 @@ struct Probe {
 	vec4 rot;
 	vec4 inner_range;
 	vec4 outer_range;
-	vec4 sh_coefs[9];
+	vec4 sh_coefs0;
+	vec4 sh_coefs1;
+	vec4 sh_coefs2;
+	vec4 sh_coefs3;
+	vec4 sh_coefs4;
+	vec4 sh_coefs5;
+	vec4 sh_coefs6;
+	vec4 sh_coefs7;
+	vec4 sh_coefs8;
 };
 
 struct Light {
@@ -320,16 +328,16 @@ vec3 computeIndirectSpecular(samplerCube radiancemap, Surface surface) {
 	return radiance * env_brdf_approx(F0, surface.roughness, ndotv);
 }
 
-vec3 evalSH(vec4[9] sh_coefs, vec3 N) {
-	return sh_coefs[0].rgb
-	+ sh_coefs[1].rgb * (N.y)
-	+ sh_coefs[2].rgb * (N.z)
-	+ sh_coefs[3].rgb * (N.x)
-	+ sh_coefs[4].rgb * (N.y * N.x)
-	+ sh_coefs[5].rgb * (N.y * N.z)
-	+ sh_coefs[6].rgb * (3.0 * N.z * N.z - 1.0)
-	+ sh_coefs[7].rgb * (N.z * N.x)
-	+ sh_coefs[8].rgb * (N.x * N.x - N.y * N.y);
+vec3 evalSH(Probe probe, vec3 N) {
+	return probe.sh_coefs0.rgb
+	+ probe.sh_coefs1.rgb * (N.y)
+	+ probe.sh_coefs2.rgb * (N.z)
+	+ probe.sh_coefs3.rgb * (N.x)
+	+ probe.sh_coefs4.rgb * (N.y * N.x)
+	+ probe.sh_coefs5.rgb * (N.y * N.z)
+	+ probe.sh_coefs6.rgb * (3.0 * N.z * N.z - 1.0)
+	+ probe.sh_coefs7.rgb * (N.z * N.x)
+	+ probe.sh_coefs8.rgb * (N.x * N.x - N.y * N.y);
 }
 
 vec3 rotateByQuat(vec4 rot, vec3 pos)
@@ -365,7 +373,7 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 		w = min(remaining_w, w);
 		remaining_w -= w;
 
-		vec3 irradiance = evalSH(b_probes[probe_idx].sh_coefs, surface.N);
+		vec3 irradiance = evalSH(b_probes[probe_idx], surface.N);
 		irradiance = max(vec3(0), irradiance);
 		vec3 indirect = computeIndirectDiffuse(irradiance, surface);
 		probe_light += (indirect * u_light_indirect_intensity) * w / M_PI;
