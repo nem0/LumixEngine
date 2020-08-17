@@ -279,8 +279,9 @@ fragment_shader [[
 			surface.alpha = 1;
 		}
 		else {
-			surface.normal = getTBN(v_uv)[1];
-			surface.albedo = texture(u_satellite, vec3(v_uv, 0).xy);
+			surface.N = getTBN(v_uv)[1];
+			surface.albedo = texture(u_satellite, vec3(v_uv, 0).xy).rgb;
+			surface.alpha = 1;
 		}
 		surface.wpos = vec3(0);
 		surface.roughness = 0.9;
