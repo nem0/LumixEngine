@@ -55,7 +55,8 @@ enum class PrimitiveType : u32 {
 enum class ShaderType : u32 {
 	VERTEX,
 	FRAGMENT,
-	GEOMETRY
+	GEOMETRY,
+	COMPUTE
 };
 
 
@@ -228,6 +229,7 @@ ProgramHandle allocProgramHandle();
 void setState(u64 state);
 bool createProgram(ProgramHandle program, const VertexDecl& decl, const char** srcs, const ShaderType* types, u32 num, const char** prefixes, u32 prefixes_count, const char* name);
 void useProgram(ProgramHandle prg);
+void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
 
 void createBufferGroup(BufferGroupHandle handle, u32 flags, size_t element_size, size_t elements_count, const void* data);
 void createBuffer(BufferHandle handle, u32 flags, size_t size, const void* data);
