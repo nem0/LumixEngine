@@ -332,6 +332,13 @@ int fragment_shader(lua_State* L)
 }
 
 
+int compute_shader(lua_State* L)
+{
+	source(L, gpu::ShaderType::COMPUTE);
+	return 0;
+}
+
+
 int geometry_shader(lua_State* L)
 {
 	source(L, gpu::ShaderType::GEOMETRY);
@@ -379,6 +386,8 @@ bool Shader::load(u64 size, const u8* mem)
 	lua_setfield(L, LUA_GLOBALSINDEX, "vertex_shader");
 	lua_pushcfunction(L, LuaAPI::fragment_shader);
 	lua_setfield(L, LUA_GLOBALSINDEX, "fragment_shader");
+	lua_pushcfunction(L, LuaAPI::compute_shader);
+	lua_setfield(L, LUA_GLOBALSINDEX, "compute_shader");
 	lua_pushcfunction(L, LuaAPI::geometry_shader);
 	lua_setfield(L, LUA_GLOBALSINDEX, "geometry_shader");
 	lua_pushcfunction(L, LuaAPI::include);

@@ -566,6 +566,11 @@ static void setVAO(const VertexDecl& decl) {
 	}
 }
 
+void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z)
+{
+	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
+}
+
 void useProgram(ProgramHandle handle)
 {
 	const Program& prg = g_gpu.programs.values[handle.value];
@@ -1665,7 +1670,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		GLenum shader_type;
 		u32 src_idx = 0;
 		combined_srcs[0] = R"#(
-			#version 140
+			#version 330
 			#extension GL_ARB_shader_storage_buffer_object : enable
 			#extension GL_ARB_explicit_attrib_location : enable
 			#extension GL_ARB_shading_language_420pack : enable
@@ -1677,6 +1682,11 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			case ShaderType::GEOMETRY: {
 				combined_srcs[src_idx] = "#define LUMIX_GEOMETRY_SHADER\n"; 
 				shader_type = GL_GEOMETRY_SHADER;
+				break;
+			}
+			case ShaderType::COMPUTE: {
+				combined_srcs[src_idx] = "#define LUMIX_COMPUTE_SHADER\n"; 
+				shader_type = GL_COMPUTE_SHADER;
 				break;
 			}
 			case ShaderType::FRAGMENT: {
