@@ -38,6 +38,7 @@ struct PassState
 	Matrix view_projection;
 	Matrix inv_view_projection;
 	Vec4 view_dir;
+	Vec4 camera_planes[6];
 };
 
 struct LUMIX_RENDERER_API PipelineResource : Resource

@@ -34,22 +34,14 @@ vertex_shader [[
 	#else 
 		const vec3 a_tangent = vec3(0, 1, 0);
 	#endif
-	#ifdef GRASS
-		layout(location = 4) in vec4 i_rot_quat;
-		layout(location = 5) in vec4 i_pos_scale;
-		layout(location = 6) in vec4 i_grass_normal;
-		layout(std140, binding = 4) uniform Model {
-			mat4 u_model;
-			float u_max_dist;
-		};
-	#elif defined SKINNED
+	#if defined SKINNED
 		layout(location = 4) in ivec4 a_indices;
 		layout(location = 5) in vec4 a_weights;
 		layout(std140, binding = 4) uniform Model {
 			mat4 u_model;
 			mat4 u_bones[256];
 		};
-	#elif defined INSTANCED
+	#elif defined INSTANCED || defined GRASS
 		layout(location = 4) in vec4 i_rot_quat;
 		layout(location = 5) in vec4 i_pos_scale;
 	#else
@@ -67,18 +59,7 @@ vertex_shader [[
 	
 	void main() {
 		v_uv = a_uv;
-		#ifdef GRASS
-			v_normal = rotateByQuat(i_rot_quat, a_normal);
-			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
-			vec3 p = a_position;
-			vec3 v = (u_model * vec4(i_pos_scale.xyz, 1)).xyz;
-			const float scale_dist = 10;
-			const float dist = length(v) - (u_max_dist - scale_dist);
-			p *= 1 - saturate(dist / scale_dist);
-			v_wpos = u_model * vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p * i_pos_scale.w), 1);
-			v_wpos.x += p.y > 0.1 ? cos((i_pos_scale.x + i_pos_scale.y + i_pos_scale.z +  i_rot_quat.w * 5) * 0.3 + u_time * 2) * p.y * 0.1 : 0;
-			v_darken = a_position.y > 0.1 ? 1 : 0.0;
-		#elif defined INSTANCED
+		#if defined INSTANCED || defined GRASS
 			v_normal = rotateByQuat(i_rot_quat, a_normal);
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position * i_pos_scale.w;
@@ -86,6 +67,13 @@ vertex_shader [[
 				p = vegetationAnim(i_pos_scale.xyz, p);
 			#endif
 			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
+			#ifdef GRASS
+				v_darken = 0.0;
+				if (a_position.y > 0.1) {
+					v_wpos.x += cos((u_camera_world_pos.x + u_camera_world_pos.y + u_camera_world_pos.z + i_pos_scale.x + i_pos_scale.y + i_pos_scale.z + i_rot_quat.w * 5) * 0.3 + u_time * 2) * a_position.y * 0.1;
+					v_darken = 1;
+				}
+			#endif
 		#elif defined SKINNED
 			mat4 model_mtx = u_model * (a_weights.x * u_bones[a_indices.x] + 
 			a_weights.y * u_bones[a_indices.y] +
@@ -128,7 +116,7 @@ fragment_shader [[
 		layout (location = 4) in float v_darken;
 	#endif
 
-	#ifdef DEFERRED
+	#if defined DEFERRED || defined GRASS
 		layout(location = 0) out vec4 o_gbuffer0;
 		layout(location = 1) out vec4 o_gbuffer1;
 		layout(location = 2) out vec4 o_gbuffer2;
@@ -139,14 +127,14 @@ fragment_shader [[
 	Surface getSurface()
 	{
 		Surface data;
-		vec4 c = texture(u_albedomap, v_uv) * u_material_color;
+		vec4 c = texture(u_albedomap, v_uv, -2) * u_material_color;
 		data.albedo = c.rgb;
 		#ifdef GRASS
 			data.albedo *= v_darken;
 		#endif
 		data.alpha = c.a;
 		#ifdef ALPHA_CUTOUT
-			if(data.alpha < 0.5) discard;
+			if(data.alpha < 0.1) discard;
 		#endif
 
 		vec3 N = v_normal;
@@ -184,7 +172,7 @@ fragment_shader [[
 			#endif
 			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		}
-	#elif defined DEFERRED
+	#elif defined DEFERRED || defined GRASS
 		void main()
 		{
 			Surface data = getSurface();

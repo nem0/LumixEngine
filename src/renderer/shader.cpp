@@ -94,6 +94,7 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 			mat4 u_pass_view_projection;
 			mat4 u_pass_inv_view_projection;
 			vec4 u_pass_view_dir;
+			vec4 u_pass_camera_planes[6];
 		};
 		layout (std140, binding = 3) uniform ShadowAtlas {
 			mat4 u_shadow_atlas_matrices[128];

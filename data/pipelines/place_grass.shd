@@ -1,0 +1,99 @@
+include "pipelines/common.glsl"
+
+compute_shader [[
+	struct Indirect {
+		uint vertex_count;
+		uint instance_count;
+		uint first_index;
+		uint base_vertex;
+		uint base_instance;
+	};
+	
+	layout(local_size_x = 16, local_size_y = 16) in;
+
+	layout(binding = 0, std430) writeonly buffer OutData {
+		vec4 b_data[];
+	};
+	layout(binding = 1, std430) writeonly buffer OutDrawcall {
+		Indirect b_indirect;
+	};
+	layout (binding = 2) uniform sampler2D u_heightmap;
+	layout (binding = 3) uniform sampler2D u_splatmap;
+
+	layout(std140, binding = 4) uniform Grass {
+		vec4 u_pos;
+		ivec2 u_from;
+		ivec2 u_to;
+		vec2 u_terrain_size;
+		float u_terrain_y_scale;
+		float u_distance;
+		float u_density;
+		float u_grass_height;
+		uint u_vertex_count;
+		uint u_type;
+	};
+	
+	float hash(float n) { return fract(sin(n) * 1e4); }
+	float hash(vec2 p) { return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) * (0.1 + abs(sin(p.y * 13.0 + p.x)))); }
+
+	float noise(float x) {
+		float i = floor(x);
+		float f = fract(x);
+		float u = f * f * (3.0 - 2.0 * f);
+		return mix(hash(i), hash(i + 1.0), u);
+	}
+
+	// https://www.shadertoy.com/view/4dS3Wd
+	float noise(vec2 x) {
+		vec2 i = floor(x);
+		vec2 f = fract(x);
+
+		float a = hash(i);
+		float b = hash(i + vec2(1.0, 0.0));
+		float c = hash(i + vec2(0.0, 1.0));
+		float d = hash(i + vec2(1.0, 1.0));
+
+		vec2 u = f * f * (3.0 - 2.0 * f);
+		return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+	}
+
+	void main() {
+		uint id = gl_GlobalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
+		
+		float prob = fract(noise(vec2(u_from + gl_GlobalInvocationID.xy) * (u_type + 1)));
+		vec3 inst_pos = vec3(0);
+		inst_pos.xz = (u_from + vec2(gl_GlobalInvocationID.xy)) * 0.25;
+		
+		if (any(lessThan(inst_pos.xz, vec2(0)))) return;
+		uvec4 splat = uvec4(texture(u_splatmap, (inst_pos.xz + 0.5) / u_terrain_size) * 256.0);
+
+		uint mask = (splat.w << 8) | splat.z;
+		
+		if (prob < u_density && (mask & (1 << u_type)) != 0) {
+			vec4 p;
+			float r = rand(vec3(u_from + gl_GlobalInvocationID.xy, 2)) * M_PI;
+
+			inst_pos.x += (fract(r * 2531) * 2 - 1) * 0.5;
+			inst_pos.z += (fract(r * 2819) * 2 - 1) * 0.5;
+			inst_pos.y += texture(u_heightmap, (inst_pos.xz + 0.5) / u_terrain_size).x * u_terrain_y_scale;
+
+			inst_pos += u_pos.xyz;
+			float dist_t = saturate(length(inst_pos) / u_distance);
+			float scale = 1 - dist_t * dist_t * dist_t;
+			
+			vec4 cullp = vec4(inst_pos, 1);
+			float radius = 1;
+			for (int i = 0; i < 6; ++i) {
+				if (dot(u_pass_camera_planes[i], cullp) < -radius) {
+					return;
+				}
+			}
+
+			if (scale > 0.01) {
+				uint i = atomicAdd(b_indirect.instance_count, 1);
+				b_data[i * 2 + 1] = vec4(inst_pos, scale);
+				b_data[i * 2] = vec4(0, sin(r*16), 0, cos(r*16));
+			}
+		}
+	}
+]]

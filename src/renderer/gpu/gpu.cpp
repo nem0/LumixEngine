@@ -749,6 +749,19 @@ void bindIndexBuffer(BufferHandle handle)
 }
 
 
+void bindIndirectBuffer(BufferHandle handle)
+{
+	checkThread();
+	if(handle.isValid()) {	
+		const GLuint ib = g_gpu.buffers[handle.value].handle;
+		CHECK_GL(glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ib));
+		return;
+	}
+
+	CHECK_GL(glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0));
+}
+
+
 void drawElements(u32 offset, u32 count, PrimitiveType primitive_type, DataType type)
 {
 	checkThread();
@@ -770,6 +783,12 @@ void drawElements(u32 offset, u32 count, PrimitiveType primitive_type, DataType 
 	}
 
 	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)offset));
+}
+
+void drawIndirect(DataType index_type)
+{
+	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+	glMultiDrawElementsIndirect(GL_TRIANGLES, type, nullptr, 1, 0);
 }
 
 void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType index_type)
@@ -1056,7 +1075,7 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	CHECK_GL(glCreateBuffers(1, &buf));
 	
 	GLbitfield gl_flags = 0;
-	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT;
+	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
 	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
 
 	g_gpu.buffers[buffer.value].handle = buf;
@@ -1670,7 +1689,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		GLenum shader_type;
 		u32 src_idx = 0;
 		combined_srcs[0] = R"#(
-			#version 330
+			#version 430
 			#extension GL_ARB_shader_storage_buffer_object : enable
 			#extension GL_ARB_explicit_attrib_location : enable
 			#extension GL_ARB_shading_language_420pack : enable

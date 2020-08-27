@@ -1479,7 +1479,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			AssetCompiler& compiler = plugin->m_app.getAssetCompiler();
 
 			const char* path = data->path[0] == '/' ? data->path.data + 1 : data->path.data;
-			importer.setSource(path, true);
+			importer.setSource(path, true, false);
 
 			if(data->meta.split) {
 				const Array<FBXImporter::ImportMesh>& meshes = importer.getMeshes();
@@ -1527,7 +1527,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		const PathInfo src_info(filepath);
-		m_fbx_importer.setSource(filepath, false);
+		m_fbx_importer.setSource(filepath, false, false);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {

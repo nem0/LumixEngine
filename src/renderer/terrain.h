@@ -54,33 +54,6 @@ struct Terrain
 			RotationMode m_rotation_mode = RotationMode::Y_UP;
 		};
 
-		struct GrassPatch
-		{
-			struct InstanceData
-			{
-				Quat rot;
-				Vec4 pos_scale;
-				Vec4 normal;
-			};
-			explicit GrassPatch(IAllocator& allocator)
-				: instance_data(allocator)
-			{ }
-
-			Array<InstanceData> instance_data;
-			GrassType* m_type;
-		};
-
-		struct GrassQuad
-		{
-			explicit GrassQuad(IAllocator& allocator)
-				: m_patches(allocator)
-			{}
-
-			Array<GrassPatch> m_patches;
-			Vec3 pos;
-			float radius;
-		};
-
 	public:
 		Terrain(Renderer& renderer, EntityPtr entity, RenderScene& scene, IAllocator& allocator);
 		~Terrain();
@@ -124,14 +97,9 @@ struct Terrain
 
 		void addGrassType(int index);
 		void removeGrassType(int index);
-		void forceGrassUpdate();
-		void updateGrass(int view, const DVec3& position);
 
 	private: 
-		Array<Terrain::GrassQuad*>& getQuads(int view);
-		void generateGrassTypeQuad(GrassPatch& patch, const RigidTransform& terrain_tr, const Vec2& quad_pos_hm_space);
 		void onMaterialLoaded(Resource::State, Resource::State new_state, Resource&);
-		void grassLoaded(Resource::State, Resource::State, Resource&);
 
 	public:
 		IAllocator& m_allocator;
@@ -146,9 +114,6 @@ struct Terrain
 		Texture* m_albedomap;
 		RenderScene& m_scene;
 		Array<GrassType> m_grass_types;
-		Array<Array<GrassQuad*> > m_grass_quads;
-		Array<DVec3> m_last_camera_position;
-		bool m_force_grass_update;
 		Renderer& m_renderer;
 };
 

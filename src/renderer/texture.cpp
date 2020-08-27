@@ -254,7 +254,7 @@ static void saveTGA(Texture& texture)
 		texture.height,
 		texture.format,
 		texture.data.data(),
-		false,
+		true,
 		texture.getPath(),
 		texture.allocator);
 

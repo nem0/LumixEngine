@@ -216,7 +216,7 @@ void FBXImporter::insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx:
 }
 
 
-void FBXImporter::sortBones()
+void FBXImporter::sortBones(bool force_skinned)
 {
 	int count = m_bones.size();
 	for (int i = 0; i < count; ++i)
@@ -234,20 +234,22 @@ void FBXImporter::sortBones()
 		}
 	}
 
-	for (const ofbx::Object*& bone : m_bones) {
-		const int idx = m_meshes.find([&](const ImportMesh& mesh){
-			return mesh.fbx == bone;
-		});
+	if (force_skinned) {
+		for (const ofbx::Object*& bone : m_bones) {
+			const int idx = m_meshes.find([&](const ImportMesh& mesh){
+				return mesh.fbx == bone;
+			});
 
-		if (idx >= 0) {
-			m_meshes[idx].is_skinned = true;
-			m_meshes[idx].bone_idx = int(&bone - m_bones.begin());
+			if (idx >= 0) {
+				m_meshes[idx].is_skinned = true;
+				m_meshes[idx].bone_idx = int(&bone - m_bones.begin());
+			}
 		}
 	}
 }
 
 
-void FBXImporter::gatherBones(const ofbx::IScene& scene)
+void FBXImporter::gatherBones(const ofbx::IScene& scene, bool force_skinned)
 {
 	for (const ImportMesh& mesh : m_meshes)
 	{
@@ -279,7 +281,7 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene)
 	}
 
 	m_bones.removeDuplicates();
-	sortBones();
+	sortBones(force_skinned);
 }
 
 
@@ -718,7 +720,7 @@ static void ofbx_job_processor(ofbx::JobFunction fn, void*, void* data, u32 size
 }
 
 
-bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
+bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool force_skinned)
 {
 	out_file.reserve(1024 * 1024);
 	PROFILE_FUNCTION();
@@ -760,7 +762,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry)
 	if (!ignore_geometry) {
 		gatherMaterials(src_dir);
 		m_materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
-		gatherBones(*scene);
+		gatherBones(*scene, force_skinned);
 	}
 
 	return true;
