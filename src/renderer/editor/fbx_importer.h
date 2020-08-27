@@ -123,7 +123,7 @@ struct FBXImporter
 
 	FBXImporter(struct StudioApp& app);
 	~FBXImporter();
-	bool setSource(const char* filename, bool ignore_geometry);
+	bool setSource(const char* filename, bool ignore_geometry, bool force_skinned);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
 	void writeAnimations(const char* src, const ImportConfig& cfg);
 	void writeSubmodels(const char* src, const ImportConfig& cfg);
@@ -142,8 +142,8 @@ private:
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
 	void gatherMaterials(const char* src_dir);
 
-	void sortBones();
-	void gatherBones(const ofbx::IScene& scene);
+	void sortBones(bool force_skinned);
+	void gatherBones(const ofbx::IScene& scene, bool force_skinned);
 	void gatherAnimations(const ofbx::IScene& scene);
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg, const char* path);

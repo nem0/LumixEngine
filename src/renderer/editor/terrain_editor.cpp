@@ -487,7 +487,6 @@ private:
 		}
 		texture->onDataUpdated(m_x, m_y, m_width, m_height);
 		const EntityRef e = (EntityRef)m_terrain.entity;
-		static_cast<RenderScene*>(m_terrain.scene)->forceGrassUpdate(e);
 
 		if (m_action_type != TerrainEditor::LAYER && m_action_type != TerrainEditor::REMOVE_GRASS)
 		{
@@ -1462,10 +1461,6 @@ void TerrainEditor::onGUI()
 		ImGui::Text("No heightmap");
 		return;
 	}
-
-	bool is_grass_enabled = scene->isGrassEnabled();
-	ImGuiEx::Label("Enable grass");
-	if (ImGui::Checkbox("##enable_grass", &is_grass_enabled)) scene->enableGrass(is_grass_enabled);
 
 	ImGuiEx::Label("Brush size");
 	ImGui::DragFloat("##br_size", &m_terrain_brush_size, 1, MIN_BRUSH_SIZE, FLT_MAX);

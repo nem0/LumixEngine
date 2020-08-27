@@ -3552,7 +3552,7 @@ Object* Object::getParent() const
 		if (connection.from == id)
 		{
 			Object* obj = scene.m_object_map.find(connection.to)->second.object;
-			if (obj && obj->is_node)
+			if (obj && obj->is_node && obj != this)
 			{
 				assert(parent == nullptr);
 				parent = obj;

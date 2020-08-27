@@ -42,6 +42,19 @@ local default_state = {
 	wireframe = false
 }
 
+local grass_state = {
+	define = "GRASS",
+	depth_write = true,
+	stencil_func = STENCIL_ALWAYS,
+	stencil_write_mask = 0xff,
+	stencil_ref = 1,
+	stencil_mask = 0xff, 
+	stencil_sfail = STENCIL_REPLACE,
+	stencil_zfail = STENCIL_REPLACE,
+	stencil_zpass = STENCIL_REPLACE,
+	wireframe = false
+}
+
 function waterPass(water_set, colorbuffer, dsbuffer)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
@@ -79,6 +92,7 @@ function geomPass(default_set, decal_set)
 		local view_params = getCameraParams()
 		pass(view_params)
 		renderTerrains(view_params, default_state)
+		renderGrass(view_params, grass_state)
 		renderBucket(default_set, default_state)
 	endBlock()
 

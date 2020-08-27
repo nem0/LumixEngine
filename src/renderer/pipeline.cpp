@@ -376,6 +376,7 @@ struct PipelineImpl final : Pipeline
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 		m_text_mesh_shader = rm.load<Shader>(Path("pipelines/text_mesh.shd"));
+		m_place_grass_shader = rm.load<Shader>(Path("pipelines/place_grass.shd"));
 		m_default_cubemap = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 
 		m_draw2d.clear({1, 1});
@@ -470,6 +471,7 @@ struct PipelineImpl final : Pipeline
 		m_draw2d_shader->getResourceManager().unload(*m_draw2d_shader);
 		m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
 		m_text_mesh_shader->getResourceManager().unload(*m_text_mesh_shader);
+		m_place_grass_shader->getResourceManager().unload(*m_place_grass_shader);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
 		for(ShaderRef& shader : m_shaders) {
@@ -1267,6 +1269,38 @@ struct PipelineImpl final : Pipeline
 	}
 	
 
+	static int renderGrass(lua_State* L)
+	{
+		PROFILE_FUNCTION();
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		if (!pipeline->m_place_grass_shader->isReady()) return 0;
+
+		const CameraParams cp = checkCameraParams(L, 1);
+		u64 state = 0;
+		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
+			state = getState(L, 2);
+		}
+		IAllocator& allocator = pipeline->m_renderer.getAllocator();
+		RenderGrassCommand* cmd = LUMIX_NEW(allocator, RenderGrassCommand)(allocator);
+
+		char tmp[64];
+		if (LuaWrapper::getOptionalStringField(L, 2, "define", Span(tmp))) {
+			cmd->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
+		}
+		
+		cmd->m_render_state = state;
+		cmd->m_pipeline = pipeline;
+		cmd->m_camera_params = cp;
+		cmd->m_compute_shader = pipeline->m_place_grass_shader->getProgram(gpu::VertexDecl(), 0);
+
+		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+		return 0;
+	}
+
 	static int renderParticles(lua_State* L)
 	{
 		const int pipeline_idx = lua_upvalueindex(1);
@@ -1604,12 +1638,22 @@ struct PipelineImpl final : Pipeline
 		cmd->pass_state.view_projection = cp.projection * cp.view;
 		cmd->pass_state.inv_view_projection = cmd->pass_state.view_projection.inverted();
 		cmd->pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
+		toPlanes(cp, Span(cmd->pass_state.camera_planes));
 		
 		cmd->pass_state_buffer = pipeline->m_pass_state_buffer;
 		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
 		return 0;
 	}
 
+	static void toPlanes(const CameraParams& cp, Span<Vec4> planes) {
+		ASSERT(planes.length() >= 6);
+		for (int i = 0; i < 6; ++i) {
+			planes[i].x = cp.frustum.xs[i];
+			planes[i].y = cp.frustum.ys[i];
+			planes[i].z = cp.frustum.zs[i];
+			planes[i].w = cp.frustum.ds[i];
+		}
+	}
 
 	void renderShadow() {
 		/*const gpu::TextureHandle renderbuffers[] = {
@@ -2787,7 +2831,7 @@ struct PipelineImpl final : Pipeline
 								READ(int, instances_count);
 								READ(gpu::BufferHandle, buffer);
 								READ(u32, offset);
-								
+								/*
 								renderer.beginProfileBlock("grass", 0);
 								gpu::useProgram(program);
 								gpu::bindTextures(material->textures, 0, material->textures_count);
@@ -2811,7 +2855,7 @@ struct PipelineImpl final : Pipeline
 								renderer.endProfileBlock();
 								++stats.draw_call_count;
 								stats.triangle_count += mesh->indices_count / 3 * instances_count;
-								stats.instance_count += instances_count;
+								stats.instance_count += instances_count;*/
 								break;
 							}
 							default: ASSERT(false); break;
@@ -2939,6 +2983,166 @@ struct PipelineImpl final : Pipeline
 	static int setRenderTargetsReadonlyDS(lua_State* L) { 
 		return setRenderTargets(L, true);
 	}
+
+	struct RenderGrassCommand : Renderer::RenderJob
+	{
+		RenderGrassCommand(IAllocator& allocator)
+			: m_allocator(allocator)
+			, m_grass(allocator)
+		{
+		}
+
+		void setup() override {
+			PROFILE_FUNCTION();
+			const HashMap<EntityRef, Terrain*>& terrains = m_pipeline->m_scene->getTerrains();
+			const Universe& universe = m_pipeline->m_scene->getUniverse();
+
+			for (Terrain* terrain : terrains) {
+				const Transform tr = universe.getTransform(terrain->m_entity);
+				Transform rel_tr = tr;
+				rel_tr.pos = tr.pos - m_camera_params.pos;
+				
+				for (Terrain::GrassType& type : terrain->m_grass_types) {
+					if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
+
+					const i32 mesh_count = type.m_grass_model->getMeshCount();
+					for (i32 i = 0; i < 1; ++i) {
+						const Mesh& mesh = type.m_grass_model->getMesh(i);
+						Grass& grass = m_grass.emplace();
+						grass.mesh = mesh.render_data;
+						grass.material = mesh.material->getRenderData();
+						grass.distance = type.m_distance;
+						grass.density = type.m_density / 100.f;
+						grass.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
+						grass.mtx = Matrix(rel_tr.pos.toFloat(), rel_tr.rot);
+						IVec2 from = IVec2((-rel_tr.pos.toFloat().xz() - Vec2(type.m_distance)) / 16);
+						IVec2 to = IVec2((-rel_tr.pos.toFloat().xz() + Vec2(type.m_distance + 15.99f)) / 16);
+						grass.from = from * 64;
+						grass.to = to * 64;
+						grass.heightmap = terrain->m_heightmap ? terrain->m_heightmap->handle : gpu::INVALID_TEXTURE;
+						grass.splatmap = terrain->m_splatmap ? terrain->m_splatmap->handle : gpu::INVALID_TEXTURE;
+						grass.terrain_size = terrain->getSize();
+						grass.terrain_y_scale = terrain->getYScale();
+						grass.grass_height = type.m_grass_model->getAABB().max.y;
+						grass.type = u32(&type - terrain->m_grass_types.begin());
+					}
+				}
+			}
+		}
+
+		void execute() override {
+			if (m_grass.empty()) return;
+			if (!m_compute_shader.isValid()) return;
+
+			Renderer& renderer = m_pipeline->m_renderer;
+			const gpu::BufferGroupHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			u32 material_ub_idx = 0xffFFffFF;
+			renderer.beginProfileBlock("grass", 0);
+			
+			// TODO reuse
+			gpu::BufferHandle data = gpu::allocBufferHandle();
+			gpu::BufferHandle indirect = gpu::allocBufferHandle();
+			gpu::createBuffer(data, (u32)gpu::BufferFlags::SHADER_BUFFER, 1024 * 256 * 8, nullptr);
+			struct Indirect {
+				u32 vertex_count;
+				u32 instance_count;
+				u32 first_index;
+				u32 base_vertex;
+				u32 base_instance;
+			};
+			gpu::createBuffer(indirect, (u32)gpu::BufferFlags::SHADER_BUFFER, sizeof(Indirect), nullptr);
+
+			for (const Grass& grass : m_grass) {
+				struct {
+					Vec4 pos;
+					IVec2 from;
+					IVec2 to;
+					Vec2 terrain_size;
+					float terrain_y_scale;
+					float distance;
+					float density;
+					float grass_height;
+					u32 indices_count;
+					u32 type;
+				} dc;
+				dc.pos = Vec4(grass.mtx.getTranslation(), 1);
+				dc.from = grass.from;
+				dc.to = grass.to;
+				dc.terrain_size = grass.terrain_size;
+				dc.terrain_y_scale = grass.terrain_y_scale;
+				dc.distance = grass.distance;
+				dc.density = grass.density;
+				dc.grass_height = grass.grass_height;
+				dc.indices_count = grass.mesh->indices_count;
+				dc.type = grass.type;
+				gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
+
+				Indirect indirect_dc;
+				indirect_dc.base_instance = 0;
+				indirect_dc.base_vertex = 0;
+				indirect_dc.first_index = 0;
+				indirect_dc.vertex_count = grass.mesh->indices_count;
+				indirect_dc.instance_count = 0;
+				gpu::update(indirect, &indirect_dc, sizeof(indirect_dc));
+
+				gpu::bindShaderBuffer(data, 0);
+				gpu::bindShaderBuffer(indirect, 1);
+				gpu::bindTextures(&grass.heightmap, 2, 1);
+				gpu::bindTextures(&grass.splatmap, 3, 1);
+				gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, sizeof(dc));
+				gpu::useProgram(m_compute_shader);
+				const IVec2 size =  grass.to - grass.from;
+				renderer.beginProfileBlock("grass cs", 0); // TODO remove before commit
+				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
+				renderer.endProfileBlock();
+				
+				gpu::useProgram(grass.program);
+				gpu::bindTextures(grass.material->textures, 0, grass.material->textures_count);
+				gpu::bindIndexBuffer(grass.mesh->index_buffer_handle);
+				gpu::bindVertexBuffer(0, grass.mesh->vertex_buffer_handle, 0, grass.mesh->vb_stride);
+				gpu::bindVertexBuffer(1, data, 0, 32);
+				if (material_ub_idx != grass.material->material_constants) {
+					gpu::bindUniformBuffer(2, material_ub, grass.material->material_constants);
+					material_ub_idx = grass.material->material_constants;
+				}
+
+				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | m_render_state);
+				gpu::bindIndirectBuffer(indirect);
+				gpu::drawIndirect(grass.mesh->index_type);
+				m_pipeline->m_stats.triangle_count += size.x * size.y * grass.mesh->indices_count / 3; // TODO
+			}
+			renderer.endProfileBlock();
+			gpu::destroy(indirect);
+			gpu::destroy(data);
+			m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
+			m_pipeline->m_stats.draw_call_count += m_grass.size();
+		}
+
+		struct Grass {
+			Mesh::RenderData* mesh;
+			Material::RenderData* material;
+			float distance;
+			float density;
+			Matrix mtx;
+			gpu::TextureHandle heightmap;
+			gpu::TextureHandle splatmap;
+			gpu::ProgramHandle program;
+			Vec2 terrain_size;
+			float terrain_y_scale;
+			float grass_height;
+			IVec2 from;
+			IVec2 to;
+			u32 type;
+		};
+
+		IAllocator& m_allocator;
+		gpu::ProgramHandle m_compute_shader;
+		Array<Grass> m_grass;
+		PipelineImpl* m_pipeline;
+		CameraParams m_camera_params;
+		u64 m_render_state;
+		u32 m_define_mask = 0;
+	};
 
 	struct RenderTerrainsCommand : Renderer::RenderJob
 	{
@@ -3075,7 +3279,6 @@ struct PipelineImpl final : Pipeline
 		gpu::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
 		u32 m_define_mask = 0;
-
 	};
 
 
@@ -3231,39 +3434,6 @@ struct PipelineImpl final : Pipeline
 									result.push((u64)local_light_bucket << 56, renderables[i].index | type_mask);
 								}
 							}*/
-							break;
-						}
-						case RenderableTypes::GRASS: {
-							for (int i = 0, c = page->header.count; i < c; ++i) {
-								const EntityRef e = renderables[i];
-								Terrain* terrain = scene->getTerrain(e);
-								if (!terrain) continue;
-								if (terrain->m_grass_quads.empty()) continue;
-								const Transform& tr = scene->getUniverse().getTransform(e);
-								
-								ASSERT(terrain->m_grass_quads[0].size() < 0xffff);
-								for (u16 q = 0; q < terrain->m_grass_quads[0].size(); ++q) {
-									const Terrain::GrassQuad* quad = terrain->m_grass_quads[0][q];
-									const DVec3 quad_pos = tr.transform(DVec3(quad->pos));
-									if (!m_camera_params.frustum.intersectsAABB(quad_pos - DVec3(quad->radius), Vec3(2 * quad->radius))) continue;
-
-									ASSERT(quad->m_patches.size() < 0xff);
-									for (u8 p = 0; p < quad->m_patches.size(); ++p) {
-										Model* model = quad->m_patches[p].m_type->m_grass_model;
-										if (!model->isReady()) continue;
-										ASSERT(model->getMeshCount() == 1);
-
-										const Mesh& mesh = model->getMesh(0);
-										const u8 bucket = bucket_map[mesh.material->getLayer()];
-										if (bucket < 0xff) {
-											const float squared_length = (float)quad_pos.squaredLength();
-											const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-											const u64 subrenderable = e.index | type_mask | ((u64)p << 40) | ((u64)q << 48);
-											result.push(mesh.material->getSortKey() | ((u64)bucket << 56) | ((u64)depth_bits << 24), subrenderable);
-										}
-									}
-								}
-							}
 							break;
 						}
 						case RenderableTypes::DECAL: {
@@ -3597,62 +3767,6 @@ struct PipelineImpl final : Pipeline
 						WRITE(slice.offset);
 
 						--i;
-						break;
-					}
-					case RenderableTypes::GRASS: {
-						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-
-						u32 start_i = i;
-						const u64 sort_key_mask = 0xffFFffFF;
-						const u64 key = sort_keys[i] & sort_key_mask;
-						const u64 entity_mask = 0xffFFffFF;
-						u32 instance_data_size = 0;
-						while (i < c && (sort_keys[i] & sort_key_mask) == key && (renderables[i] & entity_mask) == e.index) {
-							const u16 quad_idx = u16(renderables[i] >> 48);
-							const u8 patch_idx = u8(renderables[i] >> 40);
-							const Terrain* t = scene->getTerrain(e);
-							// TODO this crashes if the shader is reloaded
-							// TODO 0 const in following:
-							const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
-							instance_data_size += p.instance_data.byte_size();
-							++i;
-						}
-						const Renderer::TransientSlice slice = renderer.allocTransient(instance_data_size);
-
-						u32 mem_offset = 0;
-						const Mesh* mesh = nullptr;
-						float distance = 0;
-						for (u32 j = start_i; j < i; ++j) {
-							const u16 quad_idx = u16(renderables[j] >> 48);
-							const u8 patch_idx = u8(renderables[j] >> 40);
-							const Terrain* t = scene->getTerrain(e);
-							const Terrain::GrassPatch& p = t->m_grass_quads[0][quad_idx]->m_patches[patch_idx];
-							mesh = &p.m_type->m_grass_model->getMesh(0);
-							distance = p.m_type->m_distance;
-							memcpy(slice.ptr + mem_offset, p.instance_data.begin(), p.instance_data.byte_size());
-							mem_offset += p.instance_data.byte_size();
-						}
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 57) {
-							new_page(bucket);
-						}
-
-						Shader* shader = mesh->material->getShader();
-						const gpu::ProgramHandle prg = shader->getProgram(mesh->vertex_decl, grass_define_mask | mesh->material->getDefineMask());
-
-						WRITE(type);
-						WRITE(tr.rot);
-						WRITE(lpos);
-						WRITE(distance);
-						WRITE(mesh->render_data);
-						WRITE_FN(mesh->material->getRenderData());
-						WRITE(prg);
-						const u32 instances_count = instance_data_size / sizeof(Terrain::GrassPatch::InstanceData);
-						WRITE(instances_count);
-						WRITE(slice.buffer);
-						WRITE(slice.offset);
-						--i;
-
 						break;
 					}
 					default: ASSERT(false); break;
@@ -3991,6 +4105,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("renderBucket", PipelineImpl::renderBucket);
 		registerCFunction("renderParticles", PipelineImpl::renderParticles);
 		registerCFunction("renderReflectionVolumes", PipelineImpl::renderReflectionVolumes);
+		registerCFunction("renderGrass", PipelineImpl::renderGrass);
 		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
 		registerCFunction("setRenderTargetsReadonlyDS", PipelineImpl::setRenderTargetsReadonlyDS);
@@ -4066,6 +4181,7 @@ struct PipelineImpl final : Pipeline
 	int m_output;
 	Shader* m_debug_shape_shader;
 	Shader* m_text_mesh_shader;
+	Shader* m_place_grass_shader;
 	Texture* m_default_cubemap;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;

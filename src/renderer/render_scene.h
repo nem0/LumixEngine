@@ -287,8 +287,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;
 	virtual Material* getDecalMaterial(EntityRef entity) const = 0;
 
-	virtual void forceGrassUpdate(EntityRef entity) = 0;
 	virtual Terrain* getTerrain(EntityRef entity) = 0;
+	virtual const HashMap<EntityRef, Terrain*>& getTerrains() = 0;
 	virtual void getTerrainInfos(Array<TerrainInfo>& infos) = 0;
 	virtual float getTerrainHeightAt(EntityRef entity, float x, float z) = 0;
 	virtual Vec3 getTerrainNormalAt(EntityRef entity, float x, float z) = 0;
@@ -305,12 +305,10 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual EntityPtr getFirstTerrain() = 0;
 	virtual EntityPtr getNextTerrain(EntityRef entity) = 0;
 
-	virtual bool isGrassEnabled() const = 0;
 	virtual int getGrassRotationMode(EntityRef entity, int index) = 0;
 	virtual void setGrassRotationMode(EntityRef entity, int index, int value) = 0;
 	virtual float getGrassDistance(EntityRef entity, int index) = 0;
 	virtual void setGrassDistance(EntityRef entity, int index, float value) = 0;
-	virtual void enableGrass(bool enabled) = 0;
 	virtual void setGrassPath(EntityRef entity, int index, const Path& path) = 0;
 	virtual Path getGrassPath(EntityRef entity, int index) = 0;
 	virtual void setGrassDensity(EntityRef entity, int index, int density) = 0;

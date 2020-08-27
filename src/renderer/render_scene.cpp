@@ -1371,6 +1371,9 @@ public:
 
 	Engine& getEngine() const override { return m_engine; }
 
+	const HashMap<EntityRef, Terrain*>& getTerrains() override {
+		return m_terrains;
+	}
 
 	Terrain* getTerrain(EntityRef entity) override
 	{
@@ -1599,9 +1602,6 @@ public:
 	}
 
 
-	void forceGrassUpdate(EntityRef entity) override { m_terrains[entity]->forceGrassUpdate(); }
-
-
 	void getTerrainInfos(Array<TerrainInfo>& infos) override
 	{
 		PROFILE_FUNCTION();
@@ -1718,12 +1718,6 @@ public:
 	}
 
 
-	bool isGrassEnabled() const override
-	{
-		return m_is_grass_enabled;
-	}
-
-
 	int getGrassRotationMode(EntityRef entity, int index) override
 	{
 		return (int)m_terrains[entity]->getGrassTypeRotationMode(index);
@@ -1746,9 +1740,6 @@ public:
 	{
 		m_terrains[entity]->setGrassTypeDistance(index, value);
 	}
-
-
-	void enableGrass(bool enabled) override { m_is_grass_enabled = enabled; }
 
 
 	void setGrassDensity(EntityRef entity, int index, int density) override
@@ -1827,28 +1818,6 @@ public:
 
 	CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const override
 	{
-		if(type == RenderableTypes::GRASS) {
-			if (m_is_grass_enabled && !m_terrains.empty()) {
-				PageAllocator& page_allocator = m_engine.getPageAllocator();
-				CullResult* result = (CullResult*)page_allocator.allocate(true);
-				CullResult* iter = result; 
-				result->header.count = 0;
-				result->header.next = nullptr;
-				for (auto* terrain : m_terrains) {
-					terrain->updateGrass(0, frustum.origin);
-					if(iter->header.count == lengthOf(iter->entities)) {
-						iter->header.next = (CullResult*)page_allocator.allocate(true);
-						iter->header.next->header.next = nullptr;
-						iter->header.next->header.count = 0;
-						iter = iter->header.next;
-					}
-					iter->entities[iter->header.count] = terrain->m_entity;
-					++iter->header.count;
-				}
-
-				return result;
-			}
-		}
 		return m_culling_system->cull(frustum, static_cast<u8>(type));
 	}
 
@@ -2725,7 +2694,6 @@ private:
 	float m_time;
 	float m_lod_multiplier;
 	bool m_is_updating_attachments;
-	bool m_is_grass_enabled;
 	bool m_is_game_running;
 
 	HashMap<Model*, EntityRef> m_model_entity_map;
@@ -2782,7 +2750,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_debug_lines(m_allocator)
 	, m_active_global_light_entity(INVALID_ENTITY)
 	, m_active_camera(INVALID_ENTITY)
-	, m_is_grass_enabled(true)
 	, m_is_game_running(false)
 	, m_particle_emitters(m_allocator)
 	, m_bone_attachments(m_allocator)
