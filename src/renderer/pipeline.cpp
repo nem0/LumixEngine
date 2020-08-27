@@ -2821,43 +2821,6 @@ struct PipelineImpl final : Pipeline
 								stats.instance_count += count;
 								break;
 							}
-							case RenderableTypes::GRASS: {
-								READ(Quat, rot);
-								READ(Vec3, pos);
-								READ(float, distance);
-								READ(Mesh::RenderData*, mesh);
-								READ(Material::RenderData*, material);
-								READ(gpu::ProgramHandle, program);
-								READ(int, instances_count);
-								READ(gpu::BufferHandle, buffer);
-								READ(u32, offset);
-								/*
-								renderer.beginProfileBlock("grass", 0);
-								gpu::useProgram(program);
-								gpu::bindTextures(material->textures, 0, material->textures_count);
-								gpu::bindIndexBuffer(mesh->index_buffer_handle);
-								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-								gpu::bindVertexBuffer(1, buffer, offset, 48);
-								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants);
-									material_ub_idx = material->material_constants;
-								}
-								struct {
-									Matrix mtx;
-									float distance;
-								} dc;
-								dc.mtx = Matrix(pos, rot);
-								dc.distance = distance;
-								gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
-
-								gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | render_states);
-								gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-								renderer.endProfileBlock();
-								++stats.draw_call_count;
-								stats.triangle_count += mesh->indices_count / 3 * instances_count;
-								stats.instance_count += instances_count;*/
-								break;
-							}
 							default: ASSERT(false); break;
 						}
 					}
@@ -3521,11 +3484,9 @@ struct PipelineImpl final : Pipeline
 				RenderableTypes::MESH_GROUP,
 				RenderableTypes::SKINNED,
 				RenderableTypes::DECAL,
-				RenderableTypes::GRASS,
 				RenderableTypes::LOCAL_LIGHT
 			};
 			JobSystem::forEach(lengthOf(types), 1, [&](i32 idx, i32){
-				if (m_camera_params.is_shadow && types[idx] == RenderableTypes::GRASS) return;
 				CullResult* renderables = scene->getRenderables(m_camera_params.frustum, types[idx]);
 				if (renderables) {
 					createSortKeys(renderables, types[idx], *sort_keys);
@@ -3578,7 +3539,6 @@ struct PipelineImpl final : Pipeline
 
 			u32 instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 			u32 skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
-			u32 grass_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("GRASS"));
 
 			auto new_page = [&](u8 bucket){
 				cmd_page->header.size = int(out - cmd_page->data);
@@ -3590,7 +3550,6 @@ struct PipelineImpl final : Pipeline
 				define_mask = m_define_mask[bucket];
 				instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 				skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
-				grass_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("GRASS"));
 				const bool sort_depth = m_bucket_map[bucket] > 0xff;
 				instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 			};
