@@ -855,6 +855,24 @@ bool AssetBrowser::resourceInput(const char* str_id, Span<char> buf, ResourceTyp
 	if (span.length() > 0 && ImGui::IsItemHovered()) {
 		ImGui::SetTooltip("%s", buf.m_begin);
 	}
+	
+	if (ImGui::BeginDragDropTarget()) {
+		if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
+			char ext[10];
+			const char* path = (const char*)payload->Data;
+			Span<const char> subres = getSubresource(path);
+			Path::getExtension(Span(ext), subres);
+			const AssetCompiler& compiler = m_app.getAssetCompiler();
+			if (compiler.acceptExtension(ext, type)) {
+				copyString(buf, path);
+				ImGui::EndDragDropTarget();
+				ImGui::PopStyleVar();
+				ImGui::PopID();
+				return true;
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
 	if (span.length() > 0) {
 		ImGui::SameLine();
 		if (ImGuiEx::IconButton(ICON_FA_BULLSEYE, "Go to")) {
@@ -871,23 +889,6 @@ bool AssetBrowser::resourceInput(const char* str_id, Span<char> buf, ResourceTyp
 		}
 	}
 	ImGui::PopStyleVar();
-
-	if (ImGui::BeginDragDropTarget()) {
-		if (auto* payload = ImGui::AcceptDragDropPayload("path")) {
-			char ext[10];
-			const char* path = (const char*)payload->Data;
-			Span<const char> subres = getSubresource(path);
-			Path::getExtension(Span(ext), subres);
-			const AssetCompiler& compiler = m_app.getAssetCompiler();
-			if (compiler.acceptExtension(ext, type)) {
-				copyString(buf, path);
-				ImGui::EndDragDropTarget();
-				ImGui::PopID();
-				return true;
-			}
-		}
-		ImGui::EndDragDropTarget();
-	}
 
 	if (ImGui::BeginResizablePopup("popup", ImVec2(300, 300))) {
 		static u32 selected_path_hash = 0;
