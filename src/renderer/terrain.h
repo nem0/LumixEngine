@@ -47,7 +47,6 @@ struct Terrain
 			{
 				Y_UP,
 				ALL_RANDOM,
-				ALIGN_WITH_NORMAL,
 
 				COUNT,
 			};

@@ -352,12 +352,11 @@ static void registerProperties(IAllocator& allocator)
 	using namespace Reflection;
 
 	struct RotationModeEnum : Reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return 3; }
+		u32 count(ComponentUID cmp) const override { return 2; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
 			switch((Terrain::GrassType::RotationMode)idx) {
 				case Terrain::GrassType::RotationMode::ALL_RANDOM: return "All random";
 				case Terrain::GrassType::RotationMode::Y_UP: return "Y up";
-				case Terrain::GrassType::RotationMode::ALIGN_WITH_NORMAL: return "Align with normal";
 				default: ASSERT(false); return "N/A";
 			}
 		}
