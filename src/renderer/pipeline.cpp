@@ -2988,6 +2988,7 @@ struct PipelineImpl final : Pipeline
 						grass.terrain_y_scale = terrain->getYScale();
 						grass.grass_height = type.m_grass_model->getAABB().max.y;
 						grass.type = u32(&type - terrain->m_grass_types.begin());
+						grass.radius = type.m_grass_model->getBoundingRadius();
 					}
 				}
 			}
@@ -3027,6 +3028,7 @@ struct PipelineImpl final : Pipeline
 					float grass_height;
 					u32 indices_count;
 					u32 type;
+					float radius;
 				} dc;
 				dc.pos = Vec4(grass.mtx.getTranslation(), 1);
 				dc.from = grass.from;
@@ -3038,6 +3040,7 @@ struct PipelineImpl final : Pipeline
 				dc.grass_height = grass.grass_height;
 				dc.indices_count = grass.mesh->indices_count;
 				dc.type = grass.type;
+				dc.radius = grass.radius;
 				gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
 
 				Indirect indirect_dc;
@@ -3096,6 +3099,7 @@ struct PipelineImpl final : Pipeline
 			IVec2 from;
 			IVec2 to;
 			u32 type;
+			float radius;
 		};
 
 		IAllocator& m_allocator;
