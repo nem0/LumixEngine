@@ -32,6 +32,7 @@ compute_shader [[
 		uint u_vertex_count;
 		uint u_type;
 		float u_radius;
+		uint u_rotation_mode;
 	};
 	
 	float hash(float n) { return fract(sin(n) * 1e4); }
@@ -92,7 +93,16 @@ compute_shader [[
 			if (scale > 0.01) {
 				uint i = atomicAdd(b_indirect.instance_count, 1);
 				b_data[i * 2 + 1] = vec4(inst_pos, scale);
-				b_data[i * 2] = vec4(0, sin(r*16), 0, cos(r*16));
+				switch(u_rotation_mode) {
+					case 1: 
+						vec3 axis = normalize(vec3(fract(r * 2531), fract(r * 2819), fract(r * 13)) * 2 - 1);
+						b_data[i * 2] = vec4(axis, cos(r*16));
+						break;
+					default:
+					case 0: 
+						b_data[i * 2] = vec4(0, sin(r*16), 0, cos(r*16));
+						break;
+				}
 			}
 		}
 	}
