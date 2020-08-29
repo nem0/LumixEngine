@@ -310,16 +310,16 @@ vec3 env_brdf_approx (vec3 F0, float roughness, float NoV)
 }
 
 vec3 computeIndirectDiffuse(vec3 irradiance, Surface surface) {
-	float ndotv = clamp(dot(surface.N , surface.V), 1e-5f, 1);
+	float ndotv = abs(dot(surface.N , surface.V)) + 1e-5f;
 	vec3 F0 = mix(vec3(0.04), surface.albedo, surface.metallic);		
 	vec3 F = F_Schlick(ndotv, F0);
 	vec3 kd = mix(vec3(1.0) - F, vec3(0.0), surface.metallic);
-	return kd * surface.albedo * irradiance;
+	return surface.albedo * irradiance;
 }
 
 
 vec3 computeIndirectSpecular(samplerCube radiancemap, Surface surface) {
-	float ndotv = clamp(dot(surface.N, surface.V), 1e-5, 1.0);
+	float ndotv = abs(dot(surface.N , surface.V)) + 1e-5f;
 	vec3 F0 = mix(vec3(0.04), surface.albedo, surface.metallic);		
 	float lod = surface.roughness * 5;
 	vec3 RV = reflect(-surface.V, surface.N);

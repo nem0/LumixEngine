@@ -34,7 +34,7 @@ fragment_shader [[
 			, u_light_color.rgb * u_light_intensity
 			, u_shadowmap
 			, u_shadow_atlas);
-		
+
 		o_color.a = 1;
 	}
 ]]
