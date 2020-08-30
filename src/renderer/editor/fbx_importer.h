@@ -32,6 +32,7 @@ struct FBXImporter
 		float mesh_scale;
 		Origin origin = Origin::SOURCE;
 		bool create_impostor = false;
+		bool mikktspace_tangents = false;
 		Physics physics = Physics::NONE;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
 		float position_error = 0.02f;

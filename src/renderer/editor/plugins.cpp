@@ -1405,6 +1405,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		float scale = 1;
 		bool split = false;
 		bool create_impostor = false;
+		bool use_mikktspace = false;
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
@@ -1445,6 +1446,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	{
 		Meta meta;
 		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &meta.use_mikktspace);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "position_error", &meta.position_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "rotation_error", &meta.rotation_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
@@ -1529,6 +1531,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const Meta meta = getMeta(Path(filepath));
 		cfg.rotation_error = meta.rotation_error;
 		cfg.position_error = meta.position_error;
+		cfg.mikktspace_tangents = meta.use_mikktspace;
 		cfg.mesh_scale = meta.scale;
 		cfg.physics = meta.physics;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
@@ -1939,6 +1942,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				m_meta = getMeta(model->getPath());
 				m_meta_res = model->getPath().getHash();
 			}
+			ImGuiEx::Label("Mikktspace tangents");
+			ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace);
 			ImGuiEx::Label("Max position error");
 			ImGui::InputFloat("##maxposer", &m_meta.position_error);
 			ImGuiEx::Label("Max rotation error");
@@ -1975,6 +1980,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				String src(m_app.getAllocator());
 				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
+					.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace)
 					.cat("\nposition_error = ").cat(m_meta.position_error)
 					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
