@@ -190,7 +190,6 @@ enum class RenderableTypes : u8 {
 	SKINNED,
 	DECAL,
 	LOCAL_LIGHT,
-	GRASS,
 
 	COUNT
 };
