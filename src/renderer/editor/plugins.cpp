@@ -1409,6 +1409,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
+		FBXImporter::ImportConfig::Origin origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		FBXImporter::ImportConfig::Physics physics = FBXImporter::ImportConfig::Physics::NONE;
 	};
 
@@ -1839,8 +1840,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Text("%f", model->getBoundingRadius());
 
 			if (ImGui::CollapsingHeader("LODs")) {
-				auto* lods = model->getLODs();
-				if (lods[0].to_mesh >= 0 && !model->isFailure())
+				auto* lods = model->getLODIndices();
+				auto* distances = model->getLODDistances();
+				if (lods[0].to >= 0 && !model->isFailure())
 				{
 					ImGui::Separator();
 					ImGui::Columns(4);
@@ -1854,28 +1856,28 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					ImGui::NextColumn();
 					ImGui::Separator();
 					int lod_count = 1;
-					for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to_mesh >= 0; ++i)
+					for (int i = 0; i < Model::MAX_LOD_COUNT && lods[i].to >= 0; ++i)
 					{
 						ImGui::PushID(i);
 						ImGui::Text("%d", i);
 						ImGui::NextColumn();
-						if (lods[i].distance == FLT_MAX)
+						if (distances[i] == FLT_MAX)
 						{
 							ImGui::Text("Infinite");
 						}
 						else
 						{
-							float dist = sqrtf(lods[i].distance);
+							float dist = sqrtf(distances[i]);
 							if (ImGui::DragFloat("", &dist))
 							{
-								lods[i].distance = dist * dist;
+								distances[i] = dist * dist;
 							}
 						}
 						ImGui::NextColumn();
-						ImGui::Text("%d", lods[i].to_mesh - lods[i].from_mesh + 1);
+						ImGui::Text("%d", lods[i].to - lods[i].from + 1);
 						ImGui::NextColumn();
 						int tri_count = 0;
-						for (int j = lods[i].from_mesh; j <= lods[i].to_mesh; ++j)
+						for (int j = lods[i].from; j <= lods[i].to; ++j)
 						{
 							i32 indices_count = (i32)model->getMesh(j).indices.size() >> 1;
 							if (!model->getMesh(j).flags.isSet(Mesh::Flags::INDICES_16_BIT)) {

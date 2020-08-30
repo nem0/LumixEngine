@@ -795,7 +795,7 @@ void SceneView::renderIcons()
 				const Model* model = rd.model;
 				if (!model || !model->isReady()) continue;
 
-				for (int i = 0; i <= model->getLODs()[0].to_mesh; ++i) {
+				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 					const Mesh& mesh = model->getMesh(i);
 					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;
@@ -865,7 +865,7 @@ void SceneView::renderSelection()
 				const Model* model = scene->getModelInstanceModel(e);
 				if (!model || !model->isReady()) continue;
 
-				for (int i = 0; i <= model->getLODs()[0].to_mesh; ++i) {
+				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 					const Mesh& mesh = model->getMesh(i);
 					Item& item = m_items.emplace();
 					item.mesh = mesh.render_data;

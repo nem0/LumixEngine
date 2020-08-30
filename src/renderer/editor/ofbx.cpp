@@ -1558,6 +1558,7 @@ struct Scene : IScene
 
 
 	int getAnimationStackCount() const override { return (int)m_animation_stacks.size(); }
+	int getGeometryCount() const override { return (int)m_geometries.size(); }
 	int getMeshCount() const override { return (int)m_meshes.size(); }
 	float getSceneFrameRate() const override { return m_scene_frame_rate; }
 	const GlobalSettings* getGlobalSettings() const override { return &m_settings; }
@@ -1595,6 +1596,14 @@ struct Scene : IScene
 	}
 
 
+	const Geometry* getGeometry(int index) const override
+	{
+		assert(index >= 0);
+		assert(index < m_geometries.size());
+		return m_geometries[index];
+	}
+
+
 	const TakeInfo* getTakeInfo(const char* name) const override
 	{
 		for (const TakeInfo& info : m_take_infos)
@@ -1625,6 +1634,7 @@ struct Scene : IScene
 	std::unordered_map<u64, ObjectPair> m_object_map;
 	std::vector<Object*> m_all_objects;
 	std::vector<Mesh*> m_meshes;
+	std::vector<Geometry*> m_geometries;
 	std::vector<AnimationStack*> m_animation_stacks;
 	std::vector<Connection> m_connections;
 	std::vector<u8> m_data;
@@ -3034,6 +3044,7 @@ static bool parseObjects(const Element& root, Scene* scene, u64 flags, Allocator
 			if (last_prop && last_prop->value == "Mesh" && !ignore_geometry)
 			{
 				GeometryImpl* geom = allocator.allocate<GeometryImpl>(*scene, *iter.second.element);
+				scene->m_geometries.push_back(geom);
 				ParseGeometryJob job {iter.second.element, triangulate, geom, iter.first, false};
 				parse_geom_jobs.push_back(job);
 				continue;

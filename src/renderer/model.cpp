@@ -96,10 +96,14 @@ Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& rend
 	, m_first_nonroot_bone_index(0)
 	, m_renderer(renderer)
 {
-	m_lods[0] = { 0, -1, FLT_MAX };
-	m_lods[1] = { 0, -1, FLT_MAX };
-	m_lods[2] = { 0, -1, FLT_MAX };
-	m_lods[3] = { 0, -1, FLT_MAX };
+	m_lod_indices[0] = { 0, -1 };
+	m_lod_indices[1] = { 0, -1 };
+	m_lod_indices[2] = { 0, -1 };
+	m_lod_indices[3] = { 0, -1 };
+	m_lod_distances[0] = FLT_MAX;
+	m_lod_distances[1] = FLT_MAX;
+	m_lod_distances[2] = FLT_MAX;
+	m_lod_distances[3] = FLT_MAX;
 }
 
 
@@ -148,7 +152,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 	Matrix matrices[256];
 	ASSERT(!pose || pose->count <= lengthOf(matrices));
 	bool is_skinned = false;
-	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
+	for (int mesh_index = m_lod_indices[0].from; mesh_index <= m_lod_indices[0].to; ++mesh_index)
 	{
 		Mesh& mesh = m_meshes[mesh_index];
 		is_skinned = pose && !mesh.skin.empty() && pose->count <= lengthOf(matrices);
@@ -158,7 +162,7 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 		computeSkinMatrices(*pose, *this, matrices);
 	}
 
-	for (int mesh_index = m_lods[0].from_mesh; mesh_index <= m_lods[0].to_mesh; ++mesh_index)
+	for (int mesh_index = m_lod_indices[0].from; mesh_index <= m_lod_indices[0].to; ++mesh_index)
 	{
 		Mesh& mesh = m_meshes[mesh_index];
 		bool is_mesh_skinned = !mesh.skin.empty() && is_skinned;
@@ -532,15 +536,15 @@ bool Model::parseLODs(InputMemoryStream& file)
 {
 	u32 lod_count;
 	file.read(lod_count);
-	if (lod_count <= 0 || lod_count > lengthOf(m_lods))
+	if (lod_count <= 0 || lod_count > lengthOf(m_lod_indices))
 	{
 		return false;
 	}
 	for (u32 i = 0; i < lod_count; ++i)
 	{
-		file.read(m_lods[i].to_mesh);
-		file.read(m_lods[i].distance);
-		m_lods[i].from_mesh = i > 0 ? m_lods[i - 1].to_mesh + 1 : 0;
+		file.read(m_lod_indices[i].to);
+		file.read(m_lod_distances[i]);
+		m_lod_indices[i].from = i > 0 ? m_lod_indices[i - 1].to + 1 : 0;
 	}
 	return true;
 }

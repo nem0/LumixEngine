@@ -33,6 +33,7 @@ struct FBXImporter
 		Origin origin = Origin::SOURCE;
 		bool create_impostor = false;
 		bool mikktspace_tangents = false;
+		bool import_vertex_colors = true;
 		Physics physics = Physics::NONE;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
 		float position_error = 0.02f;
@@ -100,6 +101,22 @@ struct FBXImporter
 		char shader[20];
 	};
 
+	struct ImportGeometry
+	{
+		ImportGeometry(IAllocator& allocator)
+			: indices(allocator)
+			, vertex_data(allocator)
+			, computed_tangents(allocator)
+		{
+		}
+
+		const ofbx::Geometry* fbx = nullptr;
+		Array<u32> indices;
+		OutputMemoryStream vertex_data;
+		Array<ofbx::Vec3> computed_tangents;
+		u32 unique_vertex_count;
+	};
+
 	struct ImportMesh
 	{
 		ImportMesh(IAllocator& allocator)
@@ -140,6 +157,7 @@ struct FBXImporter
 	ofbx::IScene* getOFBXScene() { return scene; }
 
 private:
+	const ImportGeometry& FBXImporter::getImportGeometry(const ofbx::Geometry* geom) const;
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
 	void gatherMaterials(const char* src_dir);
 
@@ -149,26 +167,27 @@ private:
 	void writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const;
 	void postprocessMeshes(const ImportConfig& cfg, const char* path);
 	void gatherMeshes(ofbx::IScene* scene);
+	void gatherGeometries(ofbx::IScene* scene);
 	void insertHierarchy(Array<const ofbx::Object*>& bones, const ofbx::Object* node);
 	
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
 	void writeString(const char* str);
-	int getVertexSize(const ImportMesh& mesh) const;
+	int getVertexSize(const ofbx::Geometry& geom, bool is_skinned, bool import_colors) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;
 	void writeImpostorVertices(const AABB& aabb);
 	void writeGeometry(const ImportConfig& cfg);
-	void writeGeometry(int mesh_idx);
+	void writeGeometry(int mesh_idx, const ImportConfig& cfg);
 	void writeImpostorMesh(const char* dir, const char* model_name);
 	void writeMeshes(const char* src, int mesh_idx, const ImportConfig& cfg);
 	void writeSkeleton(const ImportConfig& cfg);
 	void writeLODs(const ImportConfig& cfg);
-	int getAttributeCount(const ImportMesh& mesh) const;
-	bool areIndices16Bit(const ImportMesh& mesh) const;
+	int getAttributeCount(const ImportMesh& mesh, bool import_vertex_colors) const;
+	bool areIndices16Bit(const ImportMesh& mesh, bool import_vertex_colors) const;
 	void writeModelHeader();
-	void writePhysicsTriMesh(OutputMemoryStream& file);
+	void writePhysicsTriMesh(OutputMemoryStream& file, const ImportConfig& cfg);
 
 	
 	IAllocator& m_allocator;
@@ -177,13 +196,13 @@ private:
 	struct AssetCompiler& m_compiler;
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
+	Array<ImportGeometry> m_geometries;
 	Array<ImportAnimation> m_animations;
 	Array<const ofbx::Object*> m_bones;
 	ofbx::IScene* scene;
 	OutputMemoryStream out_file;
 	float m_time_scale = 1.0f;
 	bool cancel_mesh_transforms = false;
-	bool m_import_vertex_colors = true;
 	float m_fbx_scale = 1.f;
 	Orientation m_orientation = Orientation::Y_UP;
 };
