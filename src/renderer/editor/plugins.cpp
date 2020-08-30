@@ -1371,8 +1371,15 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 		}
 		if (open) {
 			for (i32 i = 0; i < count; ++i) {
-				ImGui::PushID(i);
 				Material* material = model->getMesh(i).material;
+				bool duplicate = false;
+				for (i32 j = 0; j < i; ++j) {
+					if (model->getMesh(j).material == material) {
+						duplicate = true;
+					}
+				}
+				if (duplicate) continue;
+				ImGui::PushID(i);
 				if(count == 1) ImGuiEx::Label("Material");
 				
 				const float w = ImGui::GetContentRegionAvail().x - 20;
