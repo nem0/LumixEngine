@@ -546,9 +546,9 @@ if has_plugin("renderer") then
 	project "renderer"
 		libType()
 
-		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c"}
-		files { "../data/pipelines/**.*"}
-		includedirs { "../src", "../external/nvtt/include", "../external/freetype/include" }
+		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c", "../external/meshoptimizer/**.*" }
+		files { "../data/pipelines/**.*" }
+		includedirs { "../src", "../external/nvtt/include", "../external/freetype/include", "../external/" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
 

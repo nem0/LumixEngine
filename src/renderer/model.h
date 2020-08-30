@@ -144,14 +144,6 @@ public:
 		LATEST // keep this last
 	};
 
-	struct LOD
-	{
-		int from_mesh;
-		int to_mesh;
-
-		float distance;
-	};
-
 	struct Bone
 	{
 		enum { MAX_COUNT = 196 };
@@ -177,11 +169,12 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	LODMeshIndices getLODMeshIndices(float squared_distance) const
-	{
-		int i = 0;
-		while (squared_distance >= m_lods[i].distance) ++i;
-		return {m_lods[i].from_mesh, m_lods[i].to_mesh};
+	LODMeshIndices getLODMeshIndices(float squared_distance) const {
+		if (squared_distance < m_lod_distances[0]) return m_lod_indices[0];
+		if (squared_distance < m_lod_distances[1]) return m_lod_indices[1];
+		if (squared_distance < m_lod_distances[2]) return m_lod_indices[2];
+		if (squared_distance < m_lod_distances[3]) return m_lod_indices[3];
+		return { 0, -1 };
 	}
 
 	Mesh& getMesh(u32 index) { return m_meshes[index]; }
@@ -196,10 +189,10 @@ public:
 	float getBoundingRadius() const { return m_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
-	const LOD* getLODs() const { return m_lods; }
-	LOD* getLODs() { return m_lods; }
 	void onBeforeReady() override;
 	bool isSkinned() const;
+	float* getLODDistances() { return m_lod_distances; }
+	const LODMeshIndices* getLODIndices() const { return m_lod_indices; }
 
 	static void registerLuaAPI(lua_State* L);
 
@@ -224,7 +217,8 @@ private:
 	Renderer& m_renderer;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
-	LOD m_lods[MAX_LOD_COUNT];
+	LODMeshIndices m_lod_indices[MAX_LOD_COUNT];
+	float m_lod_distances[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;
 	AABB m_aabb;
