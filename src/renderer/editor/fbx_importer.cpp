@@ -458,6 +458,37 @@ static ofbx::Vec2 operator-(const ofbx::Vec2& a, const ofbx::Vec2& b)
 }
 
 
+static void computeTangentsSimple(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec2* uvs) {
+	out.resize(vertex_count);
+	memset(out.begin(), 0, out.byte_size());
+	for (int i = 0; i < vertex_count; i += 3) {
+		const ofbx::Vec3 v0 = vertices[i + 0];
+		const ofbx::Vec3 v1 = vertices[i + 1];
+		const ofbx::Vec3 v2 = vertices[i + 2];
+		const ofbx::Vec2 uv0 = uvs[i + 0];
+		const ofbx::Vec2 uv1 = uvs[i + 1];
+		const ofbx::Vec2 uv2 = uvs[i + 2];
+
+		const ofbx::Vec3 dv10 = v1 - v0;
+		const ofbx::Vec3 dv20 = v2 - v0;
+		const ofbx::Vec2 duv10 = uv1 - uv0;
+		const ofbx::Vec2 duv20 = uv2 - uv0;
+
+		const float dir = duv20.x * duv10.y - duv20.y * duv10.x < 0 ? -1.f : 1.f;
+		ofbx::Vec3 tangent; 
+		tangent.x = (dv20.x * duv10.y - dv10.x * duv20.y) * dir;
+		tangent.y = (dv20.y * duv10.y - dv10.y * duv20.y) * dir;
+		tangent.z = (dv20.z * duv10.y - dv10.z * duv20.y) * dir;
+		const float l = 1 / sqrtf(float(tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z));
+		tangent.x *= l;
+		tangent.y *= l;
+		tangent.z *= l;
+		out[i + 0] = tangent;
+		out[i + 1] = tangent;
+		out[i + 2] = tangent;
+	}
+}
+
 static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs, const char* path)
 {
 	out.resize(vertex_count);
@@ -560,7 +591,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 
 		OutputMemoryStream blob(m_allocator);
 		int vertex_size = getVertexSize(import_mesh);
-		import_mesh.vertex_data.reserve(vertex_count * vertex_size);
+		import_mesh.vertex_data.reserve(vertex_count * vertex_size / 3);
 
 		Array<Skin> skinning(m_allocator);
 		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
@@ -571,7 +602,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
 		ASSERT(material_idx >= 0);
 
-		int first_subblob[256];
+		int first_subblob[4096];
 		for (int& subblob : first_subblob) subblob = -1;
 		Array<int> subblobs(m_allocator);
 		subblobs.reserve(vertex_count);
@@ -579,7 +610,12 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		const int* geom_materials = geom->getMaterials();
 		Array<ofbx::Vec3> computed_tangents(m_allocator);
 		if (!tangents && normals && uvs) {
-			computeTangents(computed_tangents, vertex_count, vertices, normals, uvs, path);
+			if (cfg.mikktspace_tangents) {
+				computeTangents(computed_tangents, vertex_count, vertices, normals, uvs, path);
+			}
+			else {
+				computeTangentsSimple(computed_tangents, vertex_count, vertices, uvs);
+			}
 			tangents = computed_tangents.begin();
 		}
 
@@ -610,7 +646,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			if (tangents) writePackedVec3(tangents[i], transform_matrix, &blob);
 			if (import_mesh.is_skinned) writeSkin(skinning[i], &blob);
 
-			u8 first_byte = blob.data()[0] ^ blob.data()[1] ^ blob.data()[4] ^ blob.data()[8];
+			u8 first_byte = blob.data()[0] ^ (blob.data()[1] << 6) ^ blob.data()[4] ^ (blob.data()[8] << 6);
 
 			int idx = findSubblobIndex(import_mesh.vertex_data, blob, subblobs, first_subblob[first_byte]);
 			if (idx == -1)
