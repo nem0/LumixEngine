@@ -33,6 +33,7 @@ Who is using it?
 * [lent](https://github.com/nem0/lent/)
 * [lucy](https://github.com/nem0/lucy_job_system)
 * [freetype](https://github.com/aseprite/freetype2)
+* [meshoptimizer](https://github.com/zeux/meshoptimizer)
 
 Project generator
 
