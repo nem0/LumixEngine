@@ -157,7 +157,7 @@ struct FBXImporter
 	ofbx::IScene* getOFBXScene() { return scene; }
 
 private:
-	const ImportGeometry& FBXImporter::getImportGeometry(const ofbx::Geometry* geom) const;
+	const ImportGeometry& getImportGeometry(const ofbx::Geometry* geom) const;
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
 	void gatherMaterials(const char* src_dir);
 
