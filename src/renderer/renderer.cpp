@@ -584,9 +584,11 @@ struct RendererImpl final : Renderer
 				, nullptr
 			);
 
-			MaterialConsts default_mat;
-			default_mat.color = Vec4(1, 0, 1, 1);
-			gpu::update(mb.buffer, &default_mat, sizeof(default_mat));
+			;
+
+			MaterialConsts* default_mat = (MaterialConsts*)gpu::map(mb.buffer, sizeof(MaterialConsts) * 400);
+			default_mat->color = Vec4(1, 0, 1, 1);
+			gpu::unmap(mb.buffer);
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 

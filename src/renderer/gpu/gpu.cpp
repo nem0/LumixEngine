@@ -602,7 +602,7 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 	CHECK_GL(glBindTextures(offset, count, gl_handles));
 }
 
-void bindShaderBuffer(BufferHandle handle, u32 binding_idx)
+void bindShaderBuffer(BufferHandle handle, u32 binding_idx, u32 flags)
 {
 	checkThread();
 	if(handle.isValid()) {
