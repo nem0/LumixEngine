@@ -849,10 +849,10 @@ struct PipelineImpl final : Pipeline
 		struct StartPipelineJob : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
-				gpu::bindUniformBuffer(0, global_state_buffer, sizeof(GlobalState));
-				gpu::bindUniformBuffer(1, pass_state_buffer, sizeof(PassState));
-				gpu::bindUniformBuffer(4, pipeline->m_drawcall_ub, 32 * 1024);
+				gpu::update(global_state_buffer, &global_state, 0, sizeof(global_state));
+				gpu::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
+				gpu::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
+				gpu::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, 32 * 1024);
 				pipeline->m_stats = {};
 			}
 			void setup() override {}
@@ -942,7 +942,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::pushDebugGroup("debug triangles");
 
-				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
+				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, 0, sizeof(Matrix));
 
 				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | u64(gpu::StateFlags::CULL_BACK));
 				gpu::useProgram(program);
@@ -1005,7 +1005,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::pushDebugGroup("debug lines");
 
-				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
+				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, 0, sizeof(Matrix));
 
 				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE));
 				gpu::useProgram(program);
@@ -1090,7 +1090,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::pushDebugGroup("draw2d");
 
-				gpu::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
+				gpu::update(pipeline->m_drawcall_ub, &size.x, 0, sizeof(size));
 				u32 elem_offset = 0;
 				u64 state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				state |= (u64)gpu::StateFlags::SCISSOR_TEST;
@@ -1378,7 +1378,7 @@ struct PipelineImpl final : Pipeline
 
 					Matrix mtx = rot.toMatrix();
 					mtx.setTranslation(lpos);
-					gpu::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
+					gpu::update(m_pipeline->m_drawcall_ub, &mtx.m11, 0, sizeof(mtx));
 					gpu::useProgram(program);
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -1615,8 +1615,8 @@ struct PipelineImpl final : Pipeline
 		struct PushPassStateCmd : Renderer::RenderJob {
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::update(pass_state_buffer, &pass_state, sizeof(pass_state));
-				gpu::bindUniformBuffer(1, pass_state_buffer, sizeof(PassState));
+				gpu::update(pass_state_buffer, &pass_state, 0, sizeof(pass_state));
+				gpu::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
 			}
 			void setup() override {}
 
@@ -1745,7 +1745,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindTextures(m_textures_handles, 0, m_textures_count);
 
 				if (m_uniforms_count > 0) {
-					gpu::update(m_pipeline->m_drawcall_ub, m_uniforms, sizeof(m_uniforms[0]) * m_uniforms_count);
+					gpu::update(m_pipeline->m_drawcall_ub, m_uniforms, 0, sizeof(m_uniforms[0]) * m_uniforms_count);
 				}
 
 				gpu::useProgram(m_program);
@@ -2457,8 +2457,8 @@ struct PipelineImpl final : Pipeline
 		void execute() override {
 			PROFILE_FUNCTION();
 
-			gpu::update(m_pipeline->m_shadow_atlas.uniform_buffer, m_shadow_atlas_matrices, sizeof(m_shadow_atlas_matrices));
-			gpu::bindUniformBuffer(3, m_pipeline->m_shadow_atlas.uniform_buffer, sizeof(m_shadow_atlas_matrices));
+			gpu::update(m_pipeline->m_shadow_atlas.uniform_buffer, m_shadow_atlas_matrices, 0, sizeof(m_shadow_atlas_matrices));
+			gpu::bindUniformBuffer(3, m_pipeline->m_shadow_atlas.uniform_buffer, 0, sizeof(m_shadow_atlas_matrices));
 
 			auto bind = [](auto& buffer, const auto& data, i32 idx){
 				const u32 capacity = (data.byte_size() + 15) & ~15;
@@ -2725,7 +2725,7 @@ struct PipelineImpl final : Pipeline
 				Stats stats = {};
 
 				const u64 render_states = m_render_state;
-				const gpu::BufferGroupHandle material_ub = renderer.getMaterialUniformBuffer();
+				const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
 				CmdPage* page = m_cmds;
 				while (page) {
@@ -2746,7 +2746,7 @@ struct PipelineImpl final : Pipeline
 								gpu::bindTextures(material->textures, 0, material->textures_count);
 								gpu::setState(material->render_states | render_states);
 								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants);
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 									material_ub_idx = material->material_constants;
 								}
 
@@ -2781,7 +2781,7 @@ struct PipelineImpl final : Pipeline
 
 								gpu::setState(material->render_states | render_states);
 								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants);
+									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 									material_ub_idx = material->material_constants;
 								}
 
@@ -3000,7 +3000,7 @@ struct PipelineImpl final : Pipeline
 			if (!m_compute_shader.isValid()) return;
 
 			Renderer& renderer = m_pipeline->m_renderer;
-			const gpu::BufferGroupHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
 			renderer.beginProfileBlock("grass", 0);
 			
@@ -3044,7 +3044,7 @@ struct PipelineImpl final : Pipeline
 				dc.type = grass.type;
 				dc.radius = grass.radius;
 				dc.rotation_mode = grass.rotation_mode;
-				gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
+				gpu::update(m_pipeline->m_drawcall_ub, &dc, 0, sizeof(dc));
 
 				Indirect indirect_dc;
 				indirect_dc.base_instance = 0;
@@ -3052,13 +3052,13 @@ struct PipelineImpl final : Pipeline
 				indirect_dc.first_index = 0;
 				indirect_dc.vertex_count = grass.mesh->indices_count;
 				indirect_dc.instance_count = 0;
-				gpu::update(indirect, &indirect_dc, sizeof(indirect_dc));
+				gpu::update(indirect, &indirect_dc, 0, sizeof(indirect_dc));
 
 				gpu::bindShaderBuffer(data, 0);
 				gpu::bindShaderBuffer(indirect, 1);
 				gpu::bindTextures(&grass.heightmap, 2, 1);
 				gpu::bindTextures(&grass.splatmap, 3, 1);
-				gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, sizeof(dc));
+				gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, 0, sizeof(dc));
 				gpu::useProgram(m_compute_shader);
 				const IVec2 size =  grass.to - grass.from;
 				renderer.beginProfileBlock("grass cs", 0); // TODO remove before commit
@@ -3071,7 +3071,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindVertexBuffer(0, grass.mesh->vertex_buffer_handle, 0, grass.mesh->vb_stride);
 				gpu::bindVertexBuffer(1, data, 0, 32);
 				if (material_ub_idx != grass.material->material_constants) {
-					gpu::bindUniformBuffer(2, material_ub, grass.material->material_constants);
+					gpu::bindUniformBuffer(2, material_ub, grass.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 					material_ub_idx = grass.material->material_constants;
 				}
 
@@ -3149,14 +3149,14 @@ struct PipelineImpl final : Pipeline
 		{
 			PROFILE_FUNCTION();
 			
-			const gpu::BufferGroupHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
 			u64 state = m_render_state;
 			for (Instance& inst : m_instances) {
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
 				gpu::useProgram(inst.program);
-				gpu::bindUniformBuffer(2, material_ub, inst.material->material_constants);
+				gpu::bindUniformBuffer(2, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 				
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -3201,7 +3201,7 @@ struct PipelineImpl final : Pipeline
 						dc_data.from_to = IVec4(subfrom, subto);
 						dc_data.terrain_scale = Vec4(inst.scale, 0);
 						dc_data.cell_size = s;
-						gpu::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
+						gpu::update(m_pipeline->m_drawcall_ub, &dc_data, 0, sizeof(dc_data));
 						gpu::drawTriangleStripArraysInstanced((subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
 						m_pipeline->m_stats.draw_call_count += 1;
 						m_pipeline->m_stats.instance_count += 1;

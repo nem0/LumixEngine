@@ -62,7 +62,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 	
 	virtual u32 createMaterialConstants(const MaterialConsts& data) = 0;
 	virtual void destroyMaterialConstants(u32 id) = 0;
-	virtual gpu::BufferGroupHandle getMaterialUniformBuffer() = 0;
+	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 
 	virtual IAllocator& getAllocator() = 0;
 	virtual MemRef allocate(u32 size) = 0;
