@@ -933,8 +933,8 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::createBuffer(ub, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
 		const u32 pass_buf_size = (sizeof(PassState) + 255) & ~255;
 		gpu::createBuffer(pass_buf, (u32)gpu::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
-		gpu::bindUniformBuffer(1, pass_buf, pass_buf_size);
-		gpu::bindUniformBuffer(4, ub, 256);
+		gpu::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
+		gpu::bindUniformBuffer(4, ub, 0, 256);
 
 		const Vec3 center = (m_aabb.min + m_aabb.max) * 0.5f;
 		Vec2 min, max;
@@ -969,7 +969,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					else {
 						model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 1, 0));
 					}
-					gpu::update(ub, &model_mtx.m11, sizeof(model_mtx));
+					gpu::update(ub, &model_mtx.m11, 0, sizeof(model_mtx));
 					PassState pass_state;
 					pass_state.view.lookAt(center + Vec3(0, 0, 2 * m_radius), center, {0, 1, 0});
 					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, false, true);
@@ -978,11 +978,11 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.view_projection = pass_state.projection * pass_state.view;
 					pass_state.inv_view_projection = pass_state.view_projection.inverted();
 					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
-					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
+					gpu::update(pass_buf, &pass_state, 0, sizeof(pass_state));
 
 
 					gpu::useProgram(dc.program);
-					gpu::bindUniformBuffer(2, m_material_ub, dc.material->material_constants);
+					gpu::bindUniformBuffer(2, m_material_ub, dc.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 					gpu::bindIndexBuffer(rd->index_buffer_handle);
 					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -1021,7 +1021,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 	Array<Drawcall> m_drawcalls;
 	AABB m_aabb;
 	float m_radius;
-	gpu::BufferGroupHandle m_material_ub;
+	gpu::BufferHandle m_material_ub;
 	Ref<Array<u32>> m_gb0;
 	Ref<Array<u32>> m_gb1;
 	Model* m_model;

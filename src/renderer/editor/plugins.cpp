@@ -2863,7 +2863,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				const float roughness = float(mip) / (roughness_levels - 1);
 				for (u32 face = 0; face < 6; ++face) {
 					gpu::setFramebufferCube(dst, face, mip);
-					gpu::bindUniformBuffer(4, buf, 256);
+					gpu::bindUniformBuffer(4, buf, 0, 256);
 					struct {
 						float roughness;
 						u32 face;
@@ -2871,7 +2871,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					} drawcall = {roughness, face, mip};
 					gpu::setState(0);
 					gpu::viewport(0, 0, size >> mip, size >> mip);
-					gpu::update(buf, &drawcall, sizeof(drawcall));
+					gpu::update(buf, &drawcall, 0, sizeof(drawcall));
 					gpu::drawArrays(0, 4, gpu::PrimitiveType::TRIANGLE_STRIP);
 				}
 			}
@@ -3249,8 +3249,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			}
 			else {
-				gpu::update(ib, cmd_list.idx_buffer.data, num_indices * sizeof(ImDrawIdx));
-				gpu::update(vb, cmd_list.vtx_buffer.data, num_vertices * sizeof(ImDrawVert));
+				gpu::update(ib, cmd_list.idx_buffer.data, 0, num_indices * sizeof(ImDrawIdx));
+				gpu::update(vb, cmd_list.vtx_buffer.data, 0, num_vertices * sizeof(ImDrawVert));
 
 				gpu::bindIndexBuffer(ib);
 				gpu::bindVertexBuffer(0, vb, 0, sizeof(ImDrawVert));
@@ -3325,8 +3325,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 					Vec4(2.f / dd.w, 0, -1 + (float)-dd.x * 2.f / dd.w, 0),
 					Vec4(0, -2.f / dd.h, 1 + (float)dd.y * 2.f / dd.h, 0)
 				};
-				gpu::update(ub, canvas_mtx, sizeof(canvas_mtx));
-				gpu::bindUniformBuffer(4, ub, sizeof(canvas_mtx));
+				gpu::update(ub, canvas_mtx, 0, sizeof(canvas_mtx));
+				gpu::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
 				Vec4 cc = {1, 0, 1, 1};
 				const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
 				gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH, clear_color, 1.0);
