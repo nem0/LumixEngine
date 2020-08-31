@@ -80,7 +80,7 @@ struct TransientBuffer {
 
 		if (m_overflow.buffer.isValid()) {
 			gpu::createBuffer(m_overflow.buffer, 0, nextPow2(m_overflow.size + m_size), nullptr);
-			gpu::update(m_overflow.buffer, m_overflow.data, 0, m_overflow.size);
+			gpu::update(m_overflow.buffer, m_overflow.data, m_overflow.size);
 			OS::memRelease(m_overflow.data);
 			m_overflow.data = nullptr;
 			m_overflow.commit = 0;
@@ -502,6 +502,7 @@ struct RendererImpl final : Renderer
 				gpu::destroy(frame.transient_buffer.m_buffer);
 			}
 			gpu::destroy(renderer->m_material_buffer.buffer);
+			gpu::destroy(renderer->m_material_buffer.staging_buffer);
 			renderer->m_profiler.clear();
 			gpu::shutdown();
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
@@ -561,6 +562,7 @@ struct RendererImpl final : Renderer
 
 			MaterialBuffer& mb = renderer.m_material_buffer;
 			mb.buffer = gpu::allocBufferHandle();
+			mb.staging_buffer = gpu::allocBufferHandle();
 			mb.map.insert(0, 0);
 			mb.data.resize(400);
 			mb.data[0].hash = 0;
@@ -576,10 +578,15 @@ struct RendererImpl final : Renderer
 				, sizeof(MaterialConsts) * 400
 				, nullptr
 			);
+			gpu::createBuffer(mb.staging_buffer
+				, (u32)gpu::BufferFlags::UNIFORM_BUFFER
+				, sizeof(MaterialConsts)
+				, nullptr
+			);
 
 			MaterialConsts default_mat;
 			default_mat.color = Vec4(1, 0, 1, 1);
-			gpu::update(mb.buffer, &default_mat, 0, sizeof(default_mat));
+			gpu::update(mb.buffer, &default_mat, sizeof(default_mat));
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 
@@ -1087,7 +1094,8 @@ struct RendererImpl final : Renderer
 		frame.to_compile_shaders.clear();
 
 		for (const auto& i : frame.material_updates) {
-			gpu::update(m_material_buffer.buffer, &i.value, i.idx * sizeof(MaterialConsts), sizeof(MaterialConsts));
+			gpu::update(m_material_buffer.staging_buffer, &i.value, sizeof(MaterialConsts));
+			gpu::copy(m_material_buffer.buffer, m_material_buffer.staging_buffer, i.idx * sizeof(MaterialConsts), sizeof(MaterialConsts));
 		}
 		frame.material_updates.clear();
 
@@ -1187,6 +1195,7 @@ struct RendererImpl final : Renderer
 		};
 
 		gpu::BufferHandle buffer = gpu::INVALID_BUFFER;
+		gpu::BufferHandle staging_buffer = gpu::INVALID_BUFFER;
 		Array<Data> data;
 		int first_free;
 		HashMap<u32, u32> map;

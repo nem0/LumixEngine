@@ -969,7 +969,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					else {
 						model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 1, 0));
 					}
-					gpu::update(ub, &model_mtx.m11, 0, sizeof(model_mtx));
+					gpu::update(ub, &model_mtx.m11, sizeof(model_mtx));
 					PassState pass_state;
 					pass_state.view.lookAt(center + Vec3(0, 0, 2 * m_radius), center, {0, 1, 0});
 					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, false, true);
@@ -978,7 +978,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.view_projection = pass_state.projection * pass_state.view;
 					pass_state.inv_view_projection = pass_state.view_projection.inverted();
 					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
-					gpu::update(pass_buf, &pass_state, 0, sizeof(pass_state));
+					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
 
 
 					gpu::useProgram(dc.program);
