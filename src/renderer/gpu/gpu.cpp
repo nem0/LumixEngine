@@ -866,15 +866,24 @@ void unmap(BufferHandle buffer)
 }
 
 
-void update(BufferHandle buffer, const void* data, size_t offset, size_t size)
+void update(BufferHandle buffer, const void* data, size_t size)
 {
 	checkThread();
 	const Buffer& b = g_gpu.buffers[buffer.value];
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
 	const GLuint buf = b.handle;
-	CHECK_GL(glNamedBufferSubData(buf, offset, size, data));
+	CHECK_GL(glNamedBufferSubData(buf, 0, size, data));
 }
 
+void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 size)
+{
+	checkThread();
+	const Buffer& bsrc = g_gpu.buffers[src.value];
+	const Buffer& bdst = g_gpu.buffers[dst.value];
+	ASSERT((bdst.flags & (u32)BufferFlags::IMMUTABLE) == 0);
+
+	glCopyNamedBufferSubData(bsrc.handle, bdst.handle, 0, dst_offset, size);
+}
 
 void startCapture()
 {

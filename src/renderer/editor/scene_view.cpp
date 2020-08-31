@@ -814,7 +814,7 @@ void SceneView::renderIcons()
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
-				gpu::update(drawcall_ub, &item.mtx.m11, 0, sizeof(item.mtx));
+				gpu::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
 				gpu::useProgram(item.program);
 				gpu::bindIndexBuffer(rd->index_buffer_handle);
@@ -884,7 +884,7 @@ void SceneView::renderSelection()
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
-				gpu::update(drawcall_ub, &item.mtx.m11, 0, sizeof(item.mtx));
+				gpu::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
 				gpu::useProgram(item.program);
 				gpu::bindIndexBuffer(rd->index_buffer_handle);
@@ -951,7 +951,7 @@ void SceneView::renderGizmos()
 			const gpu::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
 			const Matrix mtx = Matrix::IDENTITY;
 			for (const UniverseViewImpl::DrawCmd& cmd : cmds) {
-				gpu::update(drawcall_ub, &mtx.m11, 0, sizeof(mtx));
+				gpu::update(drawcall_ub, &mtx.m11, sizeof(mtx));
 				gpu::useProgram(program);
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
