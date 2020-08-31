@@ -123,6 +123,9 @@ enum class TextureFormat : u32 {
 	SRGBA
 };
 
+enum class BindShaderBufferFlags : u32 {
+	OUTPUT = 1 << 0,
+};
 
 enum class TextureFlags : u32 {
 	POINT_FILTER = 1 << 0,
@@ -139,7 +142,8 @@ enum class TextureFlags : u32 {
 enum class BufferFlags : u32 {
 	IMMUTABLE = 1 << 0,
 	UNIFORM_BUFFER = 1 << 1,
-	SHADER_BUFFER = 1 << 2
+	SHADER_BUFFER = 1 << 2,
+	COMPUTE_WRITE = 1 << 3
 };
 
 enum class DataType {
@@ -238,7 +242,7 @@ QueryHandle createQuery();
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
-void bindShaderBuffer(BufferHandle buffer, u32 binding_point);
+void bindShaderBuffer(BufferHandle buffer, u32 binding_point, u32 flags);
 void update(BufferHandle buffer, const void* data, size_t size);
 void updatePartial(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void* map(BufferHandle buffer, size_t size);
