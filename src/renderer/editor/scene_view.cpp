@@ -871,7 +871,7 @@ void SceneView::renderSelection()
 					item.mesh = mesh.render_data;
 					item.mtx = universe.getRelativeMatrix(e, m_cam_pos);
 					item.material = mesh.material->getRenderData();
-					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | item.material->define_mask);
+					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, item.material->define_mask);
 				}
 			}
 		}
@@ -881,6 +881,7 @@ void SceneView::renderSelection()
 			PROFILE_FUNCTION();
 			const gpu::BufferHandle drawcall_ub = m_pipeline->getDrawcallUniformBuffer();
 
+			gpu::pushDebugGroup("selection");
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
@@ -893,6 +894,7 @@ void SceneView::renderSelection()
 				gpu::setState(item.material->render_states);
 				gpu::drawTriangles(rd->indices_count, rd->index_type);
 			}
+			gpu::popDebugGroup();
 		}
 
 		struct Item {
@@ -905,7 +907,6 @@ void SceneView::renderSelection()
 		Array<Item> m_items;
 		Pipeline* m_pipeline;
 		WorldEditor* m_editor;
-		u32 m_define_mask;
 		DVec3 m_cam_pos;
 	};
 
@@ -913,7 +914,6 @@ void SceneView::renderSelection()
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	IAllocator& allocator = renderer->getAllocator();
 	RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
-	job->m_define_mask = 1 << renderer->getShaderDefineIdx("DEPTH");
 	job->m_pipeline = m_pipeline;
 	job->m_editor = &m_editor;
 	job->m_cam_pos = m_view->getViewport().pos;
