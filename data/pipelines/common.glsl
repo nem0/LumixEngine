@@ -258,19 +258,19 @@ vec3 computeDirectLight(Surface surface, vec3 L, vec3 light_color)
 	float f = max(1e-5, (ndoth * ndoth) * (a2 - 1) + 1);
 	float D = a2 / (f * f * M_PI);
 
-	// G SmithSchlickGGX
-	float k = max(1e-5, a * 0.5);
-	float l = ndotl / (ndotl * (1.0 - k) + k);
-	float v = ndotv / (ndotv * (1.0 - k) + k);
-	float G = l * v;
-	
+	// V Smith GGX height-correlated approximation
+    float GGXV = ndotl * (ndotv * (1.0 - a) + a);
+    float GGXL = ndotv * (ndotl * (1.0 - a) + a);
+	float V = 0.5 / (GGXV + GGXL);
+
 	// F Schlick 
-	vec3 F = mix(F0, vec3(1), pow(1.0 - hdotv, 5.0)); 
+	vec3 F = F_Schlick(hdotv, F0);// mix(F0, vec3(1), pow(1.0 - hdotv, 5.0)); 
 	
-	vec3 specular = D * G * F / max(1e-5, 4 * ndotv * ndotl);
+	vec3 specular = D * V * F * 0.25;
 	
 	vec3 kD = vec3(1.0) - F;
 	kD *= 1.0 - surface.metallic;
+	
 	return (kD * surface.albedo / M_PI + specular) * light_color * ndotl;
 }	
 
@@ -432,7 +432,7 @@ float getFogFactor(float cam_height
 
 vec3 vegetationAnim(vec3 obj_pos, vec3 vertex_pos) {
 	obj_pos += u_camera_world_pos.xyz;
-	vertex_pos.x += vertex_pos.y > 0.1 ? cos((obj_pos.x + obj_pos.y + obj_pos.z * 2) * 0.3 + u_time * 2) * vertex_pos.y * 0.03 : 0;
+	vertex_pos.x += vertex_pos.y > 0.1 ? cos((obj_pos.x + obj_pos.y + obj_pos.z * 2) * 0.3 + u_time * 2) * vertex_pos.y * vertex_pos.y * 0.001 : 0;
 	return vertex_pos;
 }
 
