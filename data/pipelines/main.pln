@@ -287,7 +287,7 @@ end
 
 
 function renderSelectionOutline(output)
-	local selection_mask = createRenderbuffer(1, 1, true, "rgba16f", "selection outline")
+	local selection_mask = createRenderbuffer(1, 1, true, "rgba8", "selection outline")
 	setRenderTargets(selection_mask)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	renderSelection()
