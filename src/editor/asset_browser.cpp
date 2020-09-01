@@ -201,6 +201,11 @@ void AssetBrowser::changeDir(const char* path)
 
 		m_file_infos.push(tile);
 	}
+	qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
+		FileInfo* m = (FileInfo*)a;
+		FileInfo* n = (FileInfo*)b;
+		return strcmp(m->filepath.data, n->filepath.data);
+	});
 	compiler.unlockResources();
 
 	doFilter();
