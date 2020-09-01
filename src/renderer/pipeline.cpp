@@ -1232,7 +1232,7 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS, {0, 0}, debug_name);
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS,{0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
 	}
@@ -1655,17 +1655,6 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void renderShadow() {
-		/*const gpu::TextureHandle renderbuffers[] = {
-			&m_shadow_atlas.tile_texture,
-			&m_shadow_atlas.tile_depth
-		};
-		setRenderTargets(Span(renderbuffers));
-		prepareCommands()
-*/
-	}
-
-	
 	static int prepareCommands(lua_State* L)
 	{
 		PROFILE_FUNCTION();
@@ -2676,7 +2665,7 @@ struct PipelineImpl final : Pipeline
 		
 		if (!pipeline->m_shadow_atlas.texture.isValid()) {
 			Renderer::MemRef mem;
-			pipeline->m_shadow_atlas.texture = pipeline->m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::R32F, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
+			pipeline->m_shadow_atlas.texture = pipeline->m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
 		}
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
