@@ -188,7 +188,7 @@ fragment_shader [[
 		layout(location = 0) out vec4 o_gbuffer0;
 		layout(location = 1) out vec4 o_gbuffer1;
 		layout(location = 2) out vec4 o_gbuffer2;
-	#else
+	#elif !defined DEPTH
 		layout(location = 0) out vec4 o_color;
 	#endif
 
@@ -292,12 +292,10 @@ fragment_shader [[
 	
 	void main()
 	{
-		#ifdef DEPTH
-			o_color = vec4(shadowmapValue(gl_FragCoord.z));
-		#elif defined DEFERRED
+		#if defined DEFERRED
 			Surface surface = getSurface();
 			packSurface(surface, o_gbuffer0, o_gbuffer1, o_gbuffer2);
-		#else 
+		#elif !defined DEPTH 
 			o_color.rgb = vec3(1, 0, 1);
 			o_color.w = 1;
 		#endif

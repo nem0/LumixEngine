@@ -201,15 +201,14 @@ end
 
 function shadowPass()
 	if not environmentCastShadows() then
-		local rb = createRenderbuffer(1, 1, false, "r32f", "shadowmap")
+		local rb = createRenderbuffer(1, 1, false, "depth32", "shadowmap")
 		setRenderTargets(rb)
 		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 		return rb
 	else 
 		beginBlock("shadows")
-			local rb = createRenderbuffer(4096, 1024, false, "r32f", "shadowmap")
-			local depthbuf = createRenderbuffer(4096, 1024, false, "depth24", "shadowmap_depth")
-			setRenderTargets(rb, depthbuf)
+			local depthbuf = createRenderbuffer(4096, 1024, false, "depth32", "shadowmap_depth")
+			setRenderTargets(depthbuf)
 			clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 			
 			for slice = 0, 3 do 
@@ -220,15 +219,12 @@ function shadowPass()
 				beginBlock("slice " .. tostring(slice + 1))
 				pass(view_params)
 				renderBucket(shadow_set, {})
-				renderTerrains(view_params, {})
+				renderTerrains(view_params, { define = "DEPTH" })
 				endBlock()
 			end
 		endBlock()
 		
-		beginBlock("shadow_blur")
-			blur(rb, "r32f", 4096, 1024, "shadowmap_blur")
-		endBlock()
-		return rb
+		return depthbuf
 	end
 end
 
@@ -309,18 +305,16 @@ end
 function main_shadowmap()
 	beginBlock("bake_shadow")
 
-	local rb = createRenderbuffer(1, 1, true, "r32f", "baked_shadowmap")
 	local depthbuf = createRenderbuffer(1, 1, true, "depth32", "shadowmap_depth")
-	setRenderTargets(rb, depthbuf)
+	setRenderTargets(depthbuf)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
 	local shadow_set = prepareCommands(view_params, { { layers = { "default" }, defines = { "DEPTH" } } })
 				
 	pass(view_params)
 	renderBucket(shadow_set, {})
-	renderTerrains(view_params, {})
-	releaseRenderbuffer(depthbuf)
-	setOutput(rb)
+	renderTerrains(view_params, { define = "DEPTH"})
+	setOutput(depthbuf)
 
 	endBlock()
 end

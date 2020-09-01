@@ -154,7 +154,7 @@ fragment_shader [[
 		vec3 V = normalize(-v_wpos.xyz);
 		vec3 L = u_light_direction.xyz;
 		
-		float shadow = getShadow(u_shadowmap, data.wpos);
+		float shadow = getShadow(u_shadowmap, data.wpos, data.N);
 		
 		o_color.rgb = vec3(1, 0, 0);
 		o_color.w = 1;

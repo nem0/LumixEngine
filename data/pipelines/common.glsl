@@ -109,11 +109,6 @@ float unpackEmission(float emission)
 }
 
 
-float shadowmapValue(float frag_z)
-{
-	return exp(64 / 5000.0 * (frag_z * (u_shadow_far_plane - u_shadow_near_plane )));
-}
-
 // TODO optimize
 float toLinearDepth(mat4 inv_proj, float ndc_depth)
 {
@@ -186,56 +181,37 @@ float random (vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
-float getShadow(sampler2D shadowmap, vec3 wpos)
+float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 {
 	#ifdef LUMIX_FRAGMENT_SHADER
-		#if 0// PCF
-			vec4 pos = vec4(wpos, 1);
+		vec4 pos = vec4(wpos, 1);
 
-			vec2 sm_size = textureSize(shadowmap, 0) * 0.3;
-			float scales[] = float[](1, 0.5, 0.25, 0.125);
-			float offsets[] = float[](2e-5, 1e-5, 1e-4, 2e-5);
-			for (int slice = 0; slice < 4; ++slice) {
-				vec4 sc = u_shadowmap_matrices[slice] * pos;
-				sc = sc / sc.w;
-				if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
-					// TODO use texture instead
-					float rnd = random(vec2(gl_FragCoord));
-					float c = cos(rnd); 
-					float s = sin(rnd); 
-					mat2 rot = mat2(c, s, -s, c);
-					vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
-					float shadow = 0;
-					float receiver = sc.z;
-					float scale = scales[slice];
-					float offset = offsets[slice];
-					for (int j = 0; j < 16; ++j) {
-						vec2 uv = sm_uv + POISSON_DISK_16[j] * rot / sm_size * scale;
+		vec2 sm_size = 3.0 / textureSize(shadowmap, 0);
+		float offsets[] = float[](0.0002, 0.0005, 0.0014, 0.004);
+		float bias = max(0.05 * (1.0 - saturate(dot(N, u_light_direction.xyz))), 0.005); 
+		float NdL = saturate(dot(N, u_light_direction.xyz));
+		for (int slice = 0; slice < 4; ++slice) {
+			vec4 sc = u_shadowmap_matrices[slice] * pos;
+			sc = sc / sc.w;
+			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
+				// TODO use texture instead
+				float rnd = random(vec2(gl_FragCoord));
+				float c = cos(rnd); 
+				float s = sin(rnd); 
+				mat2 rot = mat2(c, s, -s, c);
+				vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
+				float shadow = 0;
+				float receiver = sc.z;
+				float offset = offsets[slice] * (4 - 3 * NdL * NdL);
+				for (int j = 0; j < 16; ++j) {
+					vec2 uv = sm_uv + POISSON_DISK_16[j] * rot * sm_size;
 
-						float occluder = textureLod(shadowmap, uv, 0).r;
-						float receiver = shadowmapValue(sc.z);
-						float m =  receiver / occluder;
-						shadow += saturate(1 - (1 - m) * 2048);
-					}
-					return shadow / 16;
+					float occluder = textureLod(shadowmap, uv, 0).r;
+					shadow += saturate((receiver + offset - occluder) * 10e3);
 				}
+				return shadow / 16;
 			}
-		#else // NO PCF
-			vec4 pos = vec4(wpos, 1);
-	
-			for (int i = 0; i < 4; ++i) {
-				vec4 sc = u_shadowmap_matrices[i] * pos;
-				sc = sc / sc.w;
-				if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
-					vec2 sm_uv = vec2(sc.x * 0.25 + i * 0.25, sc.y);
-					float occluder = textureLod(shadowmap, sm_uv, 0).r;
-					float receiver = shadowmapValue(sc.z);
-					float m =  receiver / occluder;
-					return saturate(1 - (1 - m) * 1024);
-				}
-			}
-
-		#endif
+		}
 	#endif
 	return 1;
 }
@@ -399,9 +375,8 @@ vec3 pointLightsLighting(Cluster cluster, Surface surface, sampler2D shadow_atla
 
 				vec2 shadow_uv = proj_pos.xy;
 				float occluder = textureLod(shadow_atlas, shadow_uv, 0).r;
-				float receiver = shadowmapValue(proj_pos.z);
-				float m =  receiver / occluder;
-				attn *= saturate(1 - (1 - m) * 512);
+				float receiver = proj_pos.z;
+				attn *= receiver * 1.01 > occluder ? 1 : 0;
 			}
 
 			float fov = b_lights[light_idx].fov;
@@ -484,7 +459,7 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 }
 
 vec3 computeLighting(Cluster cluster, Surface surface, vec3 light_direction, vec3 light, sampler2D shadowmap, sampler2D shadow_atlas) {
-	float shadow = getShadow(shadowmap, surface.wpos);
+	float shadow = getShadow(shadowmap, surface.wpos, surface.N);
 	vec3 res = computeDirectLight(surface
 		, light_direction
 		, light * shadow);

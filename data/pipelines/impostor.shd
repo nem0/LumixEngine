@@ -128,7 +128,6 @@ fragment_shader [[
 				vec4 c = texture(u_albedomap, v_uv);
 				if(c.a < 0.5) discard;
 			#endif
-			o_color = vec4(shadowmapValue(gl_FragCoord.z));
 		}
 	#else
 		void main()
