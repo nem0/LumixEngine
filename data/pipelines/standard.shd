@@ -63,16 +63,12 @@ vertex_shader [[
 			v_normal = rotateByQuat(i_rot_quat, a_normal);
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position * i_pos_scale.w;
-			#ifdef VEGETATION
+			#if defined GRASS || defined VEGETATION
 				p = vegetationAnim(i_pos_scale.xyz, p);
 			#endif
 			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
 			#ifdef GRASS
-				v_darken = 0.0;
-				if (a_position.y > 0.1) {
-					v_wpos.x += cos((u_camera_world_pos.x + u_camera_world_pos.y + u_camera_world_pos.z + i_pos_scale.x + i_pos_scale.y + i_pos_scale.z + i_rot_quat.w * 5) * 0.3 + u_time * 2) * a_position.y * 0.1;
-					v_darken = 1;
-				}
+				v_darken = a_position.y > 0.1 ? 1 : 0.0;
 			#endif
 		#elif defined SKINNED
 			mat4 model_mtx = u_model * (a_weights.x * u_bones[a_indices.x] + 
