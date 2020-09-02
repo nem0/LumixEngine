@@ -6,6 +6,11 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.beginBlock("atmo")
 	if env.atmo_shader == nil then
 		env.atmo_shader = env.preloadShader("pipelines/atmo.shd")
+		env.atmo_scattering_shader = env.preloadShader("pipelines/atmo_scattering.shd")
+		env.atmo_transmittance_shader = env.preloadShader("pipelines/atmo_transmittance.shd")
+		env.inscatter_precomputed = env.createTexture3D(64, 128, 32, "rgba32f")
+		env.transmittance_precomputed = env.createTexture2D(128, 128, "rgba32f")
+		
 	end
 	env.setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 	local state = {
@@ -22,6 +27,16 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		state.stencil_zfail = env.STENCIL_KEEP
 		state.stencil_zpass = env.STENCIL_KEEP
 	end
+	
+	env.beginBlock("precompute_atmo")
+	env.bindImageTexture(env.transmittance_precomputed, 0)
+	env.dispatch(env.atmo_transmittance_shader, 128 / 16, 128 / 16, 1)
+	env.bindImageTexture(env.inscatter_precomputed, 0)
+	env.bindRawTexture(env.transmittance_precomputed, 1)
+	env.dispatch(env.atmo_scattering_shader, 64 / 16, 128 / 16, 32)
+	env.endBlock()
+
+	env.bindRawTexture(env.inscatter_precomputed, 1);
 	env.drawArray(0, 4, env.atmo_shader, { gbuffer_depth }, {}, {}, state)
 	env.endBlock()
 	return hdr_buffer

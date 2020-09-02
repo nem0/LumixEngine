@@ -1496,6 +1496,130 @@ struct PipelineImpl final : Pipeline
 
 		return cp;
 	}
+	
+	static int createTexture2D(lua_State* L)
+	{
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		const u32 width = LuaWrapper::checkArg<u32>(L, 1);
+		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
+		const char* format_str = LuaWrapper::checkArg<const char*>(L, 3);
+		
+		Renderer::MemRef mem;
+		const gpu::TextureFormat format = getFormat(format_str);
+		const gpu::TextureHandle texture = pipeline->m_renderer.createTexture(width
+			, height
+			, 1
+			, format
+			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V
+			, mem
+			, "lua_texture");
+		LuaWrapper::push(L, texture.value);
+		return 1;
+	}
+
+	static int createTexture3D(lua_State* L)
+	{
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+
+		const u32 width = LuaWrapper::checkArg<u32>(L, 1);
+		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
+		const u32 depth = LuaWrapper::checkArg<u32>(L, 3);
+		const char* format_str = LuaWrapper::checkArg<const char*>(L, 4);
+		
+		Renderer::MemRef mem;
+		const gpu::TextureFormat format = getFormat(format_str);
+		const gpu::TextureHandle texture = pipeline->m_renderer.createTexture(width
+			, height
+			, depth
+			, format
+			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::CLAMP_W
+			, mem
+			, "lua_texture");
+		LuaWrapper::push(L, texture.value);
+		return 1;
+	}
+
+	void bindImageTexture(u32 texture_handle, u32 unit) {
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::bindImageTexture(texture, unit);
+			}
+			gpu::TextureHandle texture;
+			u32 unit;
+		};
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->texture.value = texture_handle;
+		cmd->unit = unit;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
+
+	void dispatch(u32 shader_id, u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
+		Engine& engine = m_renderer.getEngine();
+		Shader* shader = nullptr;
+		for (const ShaderRef& s : m_shaders) {
+			if(s.id == shader_id) {
+				shader = s.res;
+				break;
+			}
+		}
+		if (!shader || !shader->isReady()) return;
+
+		gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), 0);
+		if (!program.isValid()) return;
+
+		gpu::TextureHandle textures[16] = {};
+		u32 textures_count = 0;
+
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::useProgram(program);
+				gpu::dispatch(num_groups_x, num_groups_y, num_groups_z);
+			}
+			gpu::ProgramHandle program;
+			u32 num_groups_x;
+			u32 num_groups_y;
+			u32 num_groups_z;
+		};
+
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->num_groups_x = num_groups_x;
+		cmd->num_groups_y = num_groups_y;
+		cmd->num_groups_z = num_groups_z;
+		cmd->program = program;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
+
+	void bindRawTexture(u32 texture_handle, u32 offset)
+	{
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override
+			{
+				PROFILE_FUNCTION();
+				gpu::bindTextures(&handle, offset, 1);
+			}
+
+			gpu::TextureHandle handle;
+			u32 offset = 0;
+		};
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->offset = offset;
+		cmd->handle.value = texture_handle;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
 
 	static int bindTextures(lua_State* L)
 	{
@@ -4027,8 +4151,11 @@ struct PipelineImpl final : Pipeline
 			} while(false) \
 
 		REGISTER_FUNCTION(beginBlock);
+		REGISTER_FUNCTION(bindRawTexture);
+		REGISTER_FUNCTION(bindImageTexture);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(dispatch);
 		REGISTER_FUNCTION(releaseRenderbuffer);
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(environmentCastShadows);
@@ -4057,6 +4184,8 @@ struct PipelineImpl final : Pipeline
 
 		registerCFunction("bindRenderbuffers", PipelineImpl::bindRenderbuffers);
 		registerCFunction("bindTextures", PipelineImpl::bindTextures);
+		registerCFunction("createTexture2D", PipelineImpl::createTexture2D);
+		registerCFunction("createTexture3D", PipelineImpl::createTexture3D);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
