@@ -1,0 +1,177 @@
+include "pipelines/common.glsl"
+
+
+compute_shader [[
+	// https://media.contentapi.ea.com/content/dam/eacom/frostbite/files/s2016-pbs-frostbite-sky-clouds-new.pdf
+	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+	
+	layout(std140, binding = 4) uniform Data {
+		float u_height;
+	};
+	layout (rgba32f, binding = 0) uniform writeonly image3D u_inscatter;
+	layout (binding = 1) uniform sampler2D u_transmittance;
+	
+	const float TO_METERS = 1;//6378e3 / 95.0; // convert engine units to meters
+	
+	float rtop = 6478e3;
+	float rbot = 6378e3;
+	const int STEP_COUNT = 50;
+
+	vec3 sunlight = u_light_color.rgb * 10;
+	const vec3 scatter_rayleigh = vec3(5.8e-6, 1.35e-5, 3.31e-5); // m-1
+	// extinction == absorption + outscatter
+	const vec3 extinction_rayleigh = scatter_rayleigh;
+	const vec3 scatter_mie = vec3(5e-5);
+	const vec3 extinction_mie = 1.11 * scatter_mie;
+	const vec3 cam_origin = vec3(0, 6378e3, 0);
+	
+	// mie - Schlick appoximation phase function of Henyey-Greenstein
+	float miePhase(float g, float cos_theta)
+	{
+		float k = 1.55*g - 0.55*g*g*g; 
+		float tmp = 1 + k * cos_theta;
+		return (1 - k * k) / (4 * M_PI * tmp * tmp);
+	}
+
+	float rayleighPhase(float cos_theta)
+	{
+		return 3 / (16.0 * M_PI) * (1 + cos_theta * cos_theta);
+	}
+
+	float phase(float alpha, float g)
+	{
+		float a = 3.0*(1.0-g*g);
+		float b = 2.0*(2.0+g*g);
+		float c = 1.0+alpha*alpha;
+		float d = pow(1.0+g*g-2.0*g*alpha, 1.5);
+		return (a/b)*(c/d);
+	}
+
+	vec3 getWorldNormal(vec2 frag_coord)
+	{
+		float z = 1;
+		#ifdef _ORIGIN_BOTTOM_LEFT
+			vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
+		#else
+			vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
+		#endif
+		vec4 wpos = u_camera_inv_view_projection * posProj;
+		wpos /= wpos.w;
+		vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
+
+		return -normalize(view);
+	}
+	
+	float getFogFactorSky(float cam_height, vec3 eye_dir, float fog_density, float fog_bottom, float fog_height) 
+	{
+		if(eye_dir.y == 0) return 1.0;
+		float to_top = max(0, (fog_bottom + fog_height) - cam_height);
+
+		float avg_y = (fog_bottom + fog_height + cam_height) * 0.5;
+		float avg_density = fog_density * clamp(1 - (avg_y - fog_bottom) / fog_height, 0, 1);
+		float res = exp(-pow(avg_density * to_top / eye_dir.y, 2));
+		res =  1 - clamp(res - (1-min(0.2, eye_dir.y)*5), 0, 1);
+		return res;
+	}
+
+	vec3 transmittance(vec3 extinction, float len) {
+		return exp(-len * extinction);
+	}
+	
+	vec2 ray_sphere_intersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
+		vec3 s0_r0 = s0 - r0;
+		float tc = dot(s0_r0, rd);
+		float d2 = dot(s0_r0, s0_r0) - tc * tc;
+		float sr2 = sr * sr;
+		if (d2 > sr2) return vec2(-1);
+		float td2 = sr2 - d2;
+		float td = sqrt(td2);
+		return vec2(tc - td, tc + td);
+	}
+
+	vec3 getTopAtmoLightDir(vec3 p) {
+		vec2 t = ray_sphere_intersect(p, u_light_direction.xyz, vec3(0), rtop);
+		return p + t.y * u_light_direction.xyz;
+	}
+
+
+	float computeDensity(vec3 a, vec3 b, float distribution) {
+		float l = length(a - b);
+		int step_count = int(clamp(l / 1000, 1.0, 7.0));
+		float dens = 0;
+		vec3 step = (b - a) / step_count;
+		float step_len = l / step_count;
+		vec3 p = a;
+		for (int i = 0; i < step_count; ++i) {
+			float h = length(p);
+			float tmp = exp(min(0, (rbot - h) / distribution));
+			dens += step_len * tmp;
+			p += step;
+		}
+		return dens;
+	}
+
+
+	void main()
+	{
+		float zenith_angle = gl_GlobalInvocationID.y / float(gl_NumWorkGroups.y * gl_WorkGroupSize.y) * M_PI * 0.5;
+		float yaw = gl_GlobalInvocationID.x / float(gl_NumWorkGroups.x * gl_WorkGroupSize.x) * 2 * M_PI;
+		float cos_zenith = cos(zenith_angle);
+		vec3 eyedir = vec3(cos(yaw) * cos_zenith, sin(zenith_angle), sin(yaw) * cos_zenith);
+		vec3 lightdir = u_light_direction.xyz;
+
+		vec3 campos = cam_origin + u_camera_world_pos.xyz * TO_METERS;
+		vec2 atmo_isect = ray_sphere_intersect(campos, eyedir, vec3(0), rtop);
+		
+		const float cos_theta = dot(eyedir, lightdir);
+		float spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
+		if (atmo_isect.y < 0) {
+			imageStore(u_inscatter, ivec3(gl_GlobalInvocationID.xyz), vec4(0));
+			return;
+		}
+		atmo_isect.x = max(0, atmo_isect.x);
+
+		float mu = eyedir.y;
+		vec3 rayleigh = vec3(0);
+		vec3 mie = vec3(0);
+		vec3 p = campos;//+ atmo_isect.x * eyedir;
+		const float step_len = (atmo_isect.y - atmo_isect.x) / STEP_COUNT;
+		const vec3 step = step_len * eyedir;
+
+		float height_b = saturate((length(campos) - rbot) / (rtop - rbot));
+		vec4 trns_b = texture(u_transmittance, vec2(eyedir.y, height_b));
+		for (int i = 0; i < STEP_COUNT; ++i) {
+			const float cos_theta = dot(normalize(step), lightdir);
+
+			float height_a = saturate((length(p) - rbot) / (rtop - rbot));
+			float cos_angle = saturate(dot(u_light_direction.xyz, normalize(p)));
+
+			vec4 trns_a = texture(u_transmittance, vec2(cos_angle, height_a));
+			vec4 trns_c = texture(u_transmittance, vec2(saturate(dot(eyedir, normalize(p))), height_a));
+
+			vec3 rayleigh_inscatter = (sunlight * rayleighPhase(cos_theta) * computeDensity(p, p + step, 8000) * scatter_rayleigh)
+				* transmittance(extinction_rayleigh, computeDensity(p, getTopAtmoLightDir(p), 8000))
+				//* trns_a.rgb
+
+				* transmittance(extinction_rayleigh, computeDensity(campos, p, 8000))
+				//* trns_b.rgb / trns_c.rgb
+				;
+			
+			vec3 mie_inscatter = (sunlight * miePhase(0.75, cos_theta) * computeDensity(p, p + step, 1200) * scatter_mie)
+				* transmittance(extinction_mie, computeDensity(p, getTopAtmoLightDir(p), 1200))
+				* transmittance(extinction_mie, computeDensity(campos, p, 1200))
+				//* vec3(trns_a.a)
+				//* vec3(trns_b.a / trns_c.a)
+				;
+
+			rayleigh += rayleigh_inscatter;
+			mie += mie_inscatter;
+			p += step; 
+		}
+		
+		imageStore(u_inscatter, ivec3(gl_GlobalInvocationID.xyz), vec4(
+			rayleigh
+			//+ mie
+			, 1));
+	}
+]]

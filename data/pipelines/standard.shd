@@ -69,6 +69,7 @@ vertex_shader [[
 			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
 			#ifdef GRASS
 				v_darken = a_position.y > 0.1 ? 1 : 0.0;
+				v_normal = rotateByQuat(i_rot_quat, normalize(a_position));
 			#endif
 		#elif defined SKINNED
 			mat4 model_mtx = u_model * (a_weights.x * u_bones[a_indices.x] + 
@@ -126,7 +127,7 @@ fragment_shader [[
 		vec4 c = texture(u_albedomap, v_uv, -2) * u_material_color;
 		data.albedo = c.rgb;
 		#ifdef GRASS
-			data.albedo *= v_darken;
+			//data.albedo *= v_darken;
 		#endif
 		data.alpha = c.a;
 		#ifdef ALPHA_CUTOUT
@@ -156,6 +157,10 @@ fragment_shader [[
 		data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 		data.N = tbn * data.N;
 		data.emission = u_emission;
+		#ifdef GRASS 
+			data.N = normalize(v_normal);
+			data.N = normalize(mix(data.N, u_light_direction.xyz, 0.2));
+		#endif
 		return data;
 	}
 	

@@ -583,6 +583,10 @@ void useProgram(ProgramHandle handle)
 	}
 }
 
+void bindImageTexture(TextureHandle texture, u32 unit) {
+	Texture& t = g_gpu.textures[texture.value];
+	glBindImageTexture(unit, t.handle, 0, GL_TRUE, 0, GL_READ_WRITE, t.format);
+}
 
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 {
@@ -1411,7 +1415,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	const bool is_3d = depth > 1 && (flags & (u32)TextureFlags::IS_3D);
 	const bool is_cubemap = flags & (u32)TextureFlags::IS_CUBE;
 
-	ASSERT((!is_3d && !is_cubemap) || depth == 1);
+	ASSERT(!is_cubemap || depth == 1);
 	ASSERT(!is_cubemap || !is_3d);
 	ASSERT(!is_cubemap || no_mips || !data);
 	ASSERT(!is_srgb); // use format argument to enable srgb
