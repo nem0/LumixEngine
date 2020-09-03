@@ -2,7 +2,7 @@ include "pipelines/common.glsl"
 
 compute_shader [[
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-	layout (rgba32f, binding = 0) uniform writeonly image2D u_transmittance;
+	layout (rg32f, binding = 0) uniform writeonly image2D u_transmittance;
 
 	const float rtop = 6478e3;
 	const float rbot = 6378e3;
@@ -32,15 +32,15 @@ compute_shader [[
 		return exp(-len * extinction);
 	}
 
-	float computeDensity(vec3 a, vec3 b, float distribution) {
+	float opticalDepth(vec3 a, vec3 b, float distribution) {
 		float l = length(a - b);
-		int step_count = int(clamp(l / 1000, 1.0, 7.0));
+		int step_count = 50; //int(clamp(l / 1000, 1.0, 15.0));
 		float dens = 0;
 		vec3 step = (b - a) / step_count;
 		float step_len = l / step_count;
 		vec3 p = a;
 		for (int i = 0; i < step_count; ++i) {
-			float h = length(p);
+			float h = length(p + step * 0.5);
 			float tmp = exp(min(0, (rbot - h) / distribution));
 			dens += step_len * tmp;
 			p += step;
@@ -54,10 +54,10 @@ compute_shader [[
 		const vec3 p = vec3(0, rbot + (rtop - rbot) * xy.y, 0);
 		const vec3 dir = vec3(sqrt(saturate(1 - xy.x * xy.x)), xy.x, 0);
 
-		vec3 rayleigh = transmittance(extinction_rayleigh, computeDensity(p, getTopAtmo(p, dir), 8000));
-		vec3 mie = transmittance(extinction_mie, computeDensity(p, getTopAtmo(p, dir), 1200));
+		float rayleigh = opticalDepth(p, getTopAtmo(p, dir), 8000);
+		float mie = opticalDepth(p, getTopAtmo(p, dir), 1200);
 
-		imageStore(u_transmittance, ivec2(gl_GlobalInvocationID.xy), vec4(rayleigh, mie.r));
+		imageStore(u_transmittance, ivec2(gl_GlobalInvocationID.xy), vec4(rayleigh, mie, 0, 0));
 	}
 
 ]]

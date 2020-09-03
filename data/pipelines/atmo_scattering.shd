@@ -8,16 +8,14 @@ compute_shader [[
 	layout(std140, binding = 4) uniform Data {
 		float u_height;
 	};
-	layout (rgba32f, binding = 0) uniform writeonly image3D u_inscatter;
+	layout (rgba32f, binding = 0) uniform writeonly image2D u_inscatter;
 	layout (binding = 1) uniform sampler2D u_transmittance;
 	
 	const float TO_METERS = 1;//6378e3 / 95.0; // convert engine units to meters
 	
 	float rtop = 6478e3;
 	float rbot = 6378e3;
-	const int STEP_COUNT = 50;
 
-	vec3 sunlight = u_light_color.rgb * 10;
 	const vec3 scatter_rayleigh = vec3(5.8e-6, 1.35e-5, 3.31e-5); // m-1
 	// extinction == absorption + outscatter
 	const vec3 extinction_rayleigh = scatter_rayleigh;
@@ -95,15 +93,15 @@ compute_shader [[
 	}
 
 
-	float computeDensity(vec3 a, vec3 b, float distribution) {
+	float opticalDepth(vec3 a, vec3 b, float distribution) {
 		float l = length(a - b);
-		int step_count = int(clamp(l / 1000, 1.0, 7.0));
+		int step_count = 50;//int(clamp(l / 1000, 1.0, 15.0));
 		float dens = 0;
 		vec3 step = (b - a) / step_count;
 		float step_len = l / step_count;
 		vec3 p = a;
 		for (int i = 0; i < step_count; ++i) {
-			float h = length(p);
+			float h = length(p + step * 0.5);
 			float tmp = exp(min(0, (rbot - h) / distribution));
 			dens += step_len * tmp;
 			p += step;
@@ -115,63 +113,54 @@ compute_shader [[
 	void main()
 	{
 		float zenith_angle = gl_GlobalInvocationID.y / float(gl_NumWorkGroups.y * gl_WorkGroupSize.y) * M_PI * 0.5;
-		float yaw = gl_GlobalInvocationID.x / float(gl_NumWorkGroups.x * gl_WorkGroupSize.x) * 2 * M_PI;
-		float cos_zenith = cos(zenith_angle);
-		vec3 eyedir = vec3(cos(yaw) * cos_zenith, sin(zenith_angle), sin(yaw) * cos_zenith);
-		vec3 lightdir = u_light_direction.xyz;
+		vec3 eyedir = vec3(cos(zenith_angle), sin(zenith_angle), 0);
 
-		vec3 campos = cam_origin + u_camera_world_pos.xyz * TO_METERS;
+		vec3 campos = cam_origin;// + u_camera_world_pos.xyz * TO_METERS;
 		vec2 atmo_isect = ray_sphere_intersect(campos, eyedir, vec3(0), rtop);
 		
-		const float cos_theta = dot(eyedir, lightdir);
-		float spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
+		const float cos_theta = dot(eyedir, u_light_direction.xyz);
 		if (atmo_isect.y < 0) {
-			imageStore(u_inscatter, ivec3(gl_GlobalInvocationID.xyz), vec4(0));
+			imageStore(u_inscatter, ivec2(gl_GlobalInvocationID.xy), vec4(0));
 			return;
 		}
 		atmo_isect.x = max(0, atmo_isect.x);
 
-		float mu = eyedir.y;
 		vec3 rayleigh = vec3(0);
 		vec3 mie = vec3(0);
 		vec3 p = campos;//+ atmo_isect.x * eyedir;
+		const int STEP_COUNT = 50;
 		const float step_len = (atmo_isect.y - atmo_isect.x) / STEP_COUNT;
 		const vec3 step = step_len * eyedir;
 
 		float height_b = saturate((length(campos) - rbot) / (rtop - rbot));
 		vec4 trns_b = texture(u_transmittance, vec2(eyedir.y, height_b));
+		const float cos_light_up = saturate(u_light_direction.y);
+		const float cos_eye_up = saturate(eyedir.y);
 		for (int i = 0; i < STEP_COUNT; ++i) {
-			const float cos_theta = dot(normalize(step), lightdir);
 
 			float height_a = saturate((length(p) - rbot) / (rtop - rbot));
-			float cos_angle = saturate(dot(u_light_direction.xyz, normalize(p)));
 
-			vec4 trns_a = texture(u_transmittance, vec2(cos_angle, height_a));
-			vec4 trns_c = texture(u_transmittance, vec2(saturate(dot(eyedir, normalize(p))), height_a));
+			// TODO `cos_light_up` and `cos_eye_up` depends on `p`
+			vec4 trns_a = texture(u_transmittance, vec2(cos_light_up, height_a));
+			vec4 trns_c = texture(u_transmittance, vec2(cos_eye_up, height_a));
 
-			vec3 rayleigh_inscatter = (sunlight * rayleighPhase(cos_theta) * computeDensity(p, p + step, 8000) * scatter_rayleigh)
-				* transmittance(extinction_rayleigh, computeDensity(p, getTopAtmoLightDir(p), 8000))
-				//* trns_a.rgb
-
-				* transmittance(extinction_rayleigh, computeDensity(campos, p, 8000))
-				//* trns_b.rgb / trns_c.rgb
-				;
-			
-			vec3 mie_inscatter = (sunlight * miePhase(0.75, cos_theta) * computeDensity(p, p + step, 1200) * scatter_mie)
-				* transmittance(extinction_mie, computeDensity(p, getTopAtmoLightDir(p), 1200))
-				* transmittance(extinction_mie, computeDensity(campos, p, 1200))
-				//* vec3(trns_a.a)
-				//* vec3(trns_b.a / trns_c.a)
+			vec3 top_atmo_light_dir = getTopAtmoLightDir(p);
+			vec3 total_transmittance = 
+				transmittance(extinction_rayleigh, opticalDepth(p, top_atmo_light_dir, 8000))
+				* transmittance(extinction_rayleigh, opticalDepth(campos, p, 8000))
+				* transmittance(extinction_mie, opticalDepth(p, top_atmo_light_dir, 1200))
+				* transmittance(extinction_mie, opticalDepth(campos, p, 1200))
+				//exp(-trns_a.r * extinction_rayleigh)
+				//* exp(-(trns_b.r - trns_c.r) * extinction_rayleigh)
+				//* exp(-trns_a.b * extinction_mie)
+				//* exp(-(trns_b.b - trns_c.b) * extinction_mie)
 				;
 
-			rayleigh += rayleigh_inscatter;
-			mie += mie_inscatter;
+			rayleigh += opticalDepth(p, p + step, 8000) * total_transmittance;
+			mie += opticalDepth(p, p + step, 1200) * total_transmittance;
 			p += step; 
 		}
 		
-		imageStore(u_inscatter, ivec3(gl_GlobalInvocationID.xyz), vec4(
-			rayleigh
-			//+ mie
-			, 1));
+		imageStore(u_inscatter, ivec2(gl_GlobalInvocationID.xy), vec4(rayleigh, mie.b));
 	}
 ]]
