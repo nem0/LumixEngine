@@ -15,7 +15,7 @@ fragment_shader [[
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 0) out vec4 o_color;
 	layout (binding=0) uniform sampler2D u_depth_buffer;
-	layout (binding=1) uniform sampler3D u_inscatter;
+	layout (binding=1) uniform sampler2D u_inscatter;
 	
 	const float rtop = 6478e3;
 	const float rbot = 6378e3;
@@ -71,6 +71,19 @@ fragment_shader [[
 
 		return -normalize(view);
 	}
+	
+	// mie - Schlick appoximation phase function of Henyey-Greenstein
+	float miePhase(float g, float cos_theta)
+	{
+		float k = 1.55*g - 0.55*g*g*g; 
+		float tmp = 1 + k * cos_theta;
+		return (1 - k * k) / (4 * M_PI * tmp * tmp);
+	}
+
+	float rayleighPhase(float cos_theta)
+	{
+		return 3 / (16.0 * M_PI) * (1 + cos_theta * cos_theta);
+	}
 
 	float phase(float alpha, float g)
 	{
@@ -87,15 +100,22 @@ fragment_shader [[
 		const float cos_theta = dot(eyedir, u_light_direction.xyz);
 		float spot = smoothstep(0.0, 1000.0, phase(cos_theta, 0.9995)) * 200;
 
-		vec3 v = vec3(0);
+		vec2 v = vec2(0);
 		v.y = max(0, eyedir.y);
-
+		
 		const vec3 scatter_rayleigh = vec3(5.8e-6, 1.35e-5, 3.31e-5); // m-1
 		const vec3 extinction_rayleigh = scatter_rayleigh;
+		const vec3 scatter_mie = vec3(5e-5);
+		const vec3 extinction_mie = 1.11 * scatter_mie;
 		
+		vec3 sunlight = u_light_color.rgb * 10;
 		const vec3 cam_origin = vec3(0, 6378e3, 0);
 		vec3 p = cam_origin + u_camera_world_pos.xyz;
-		o_color.rgb = textureLod(u_inscatter, v, 0).rgb + spot * transmittance(extinction_rayleigh, computeDensity(p, getTopAtmoLightDir(p), 8000));
+		vec4 insc = textureLod(u_inscatter, v, 0);
+		o_color.rgb = 
+			vec3(insc.a) * miePhase(0.75, -cos_theta) * sunlight * scatter_mie
+			+  insc.rgb * rayleighPhase(-cos_theta) * sunlight * scatter_rayleigh
+			+ spot * transmittance(extinction_rayleigh, computeDensity(p, getTopAtmoLightDir(p), 8000)) * transmittance(extinction_mie, computeDensity(p, getTopAtmoLightDir(p), 1200));
 		o_color.a = 1;
 	}
 ]]
