@@ -19,7 +19,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		env.atmo_scattering_shader = env.preloadShader("pipelines/atmo_scattering.shd")
 		env.atmo_optical_depth_shader = env.preloadShader("pipelines/atmo_optical_depth.shd")
 		env.inscatter_precomputed = env.createTexture2D(64, 128, "rgba32f")
-		env.transmittance_precomputed = env.createTexture2D(128, 128, "rg32f")
+		env.opt_depth_precomputed = env.createTexture2D(128, 128, "rg32f")
 		
 	end
 	env.setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
@@ -39,7 +39,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	end
 	
 	env.beginBlock("precompute_transmittance")
-	env.bindImageTexture(env.transmittance_precomputed, 0)
+	env.bindImageTexture(env.opt_depth_precomputed, 0)
 	env.drawcallUniforms({
 		ground_r * 1000,
 		atmo_r * 1000,
@@ -60,7 +60,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	})
 	env.dispatch(env.atmo_optical_depth_shader, 128 / 16, 128 / 16, 1)
 	env.bindImageTexture(env.inscatter_precomputed, 0)
-	env.bindRawTexture(env.transmittance_precomputed, 1)
+	env.bindRawTexture(env.opt_depth_precomputed, 1)
 	env.endBlock()
 
 	env.beginBlock("precompute_inscatter")
@@ -68,6 +68,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.endBlock()
 
 	env.bindRawTexture(env.inscatter_precomputed, 1);
+	env.bindRawTexture(env.opt_depth_precomputed, 2);
 	env.drawArray(0, 4, env.atmo_shader, { gbuffer_depth }, {}, {}, state)
 	env.endBlock()
 	return hdr_buffer
