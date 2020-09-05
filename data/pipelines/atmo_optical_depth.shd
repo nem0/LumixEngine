@@ -2,15 +2,17 @@ include "pipelines/common.glsl"
 
 compute_shader [[
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-	layout (rg32f, binding = 0) uniform writeonly image2D u_transmittance;
-
-	const float rtop = 6478e3;
-	const float rbot = 6378e3;
-	const vec3 scatter_rayleigh = vec3(5.8e-6, 1.35e-5, 3.31e-5); // m-1
-	// extinction == absorption + outscatter
-	const vec3 extinction_rayleigh = scatter_rayleigh;
-	const vec3 scatter_mie = vec3(5e-5);
-	const vec3 extinction_mie = 1.11 * scatter_mie;
+	layout (rg32f, binding = 0) uniform writeonly image2D u_output;
+	
+	layout(std140, binding = 4) uniform Data {
+		float u_bot;
+		float u_top;
+		float u_distribution_rayleigh;
+		float u_distribution_mie;
+		vec4 u_scatter_rayleigh;
+		vec4 u_scatter_mie;
+		vec4 u_absorb_mie;
+	};
 
 	vec2 ray_sphere_intersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
 		vec3 s0_r0 = s0 - r0;
@@ -24,24 +26,20 @@ compute_shader [[
 	}
 
 	vec3 getTopAtmo(vec3 p, vec3 dir) {
-		vec2 t = ray_sphere_intersect(p, dir, vec3(0), rtop);
+		vec2 t = ray_sphere_intersect(p, dir, vec3(0), u_top);
 		return p + t.y * dir.xyz;
-	}
-
-	vec3 transmittance(vec3 extinction, float len) {
-		return exp(-len * extinction);
 	}
 
 	float opticalDepth(vec3 a, vec3 b, float distribution) {
 		float l = length(a - b);
-		int step_count = 50; //int(clamp(l / 1000, 1.0, 15.0));
+		int step_count = 50;
 		float dens = 0;
 		vec3 step = (b - a) / step_count;
 		float step_len = l / step_count;
 		vec3 p = a;
 		for (int i = 0; i < step_count; ++i) {
 			float h = length(p + step * 0.5);
-			float tmp = exp(min(0, (rbot - h) / distribution));
+			float tmp = exp(min(0, (u_bot - h) / distribution));
 			dens += step_len * tmp;
 			p += step;
 		}
@@ -51,13 +49,13 @@ compute_shader [[
 	void main() {
 		const vec2 xy = gl_GlobalInvocationID.xy / float(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy);
 		float angle = xy.x * M_PI * 0.5;
-		const vec3 p = vec3(0, rbot + (rtop - rbot) * xy.y, 0);
+		const vec3 p = vec3(0, u_bot + (u_top - u_bot) * xy.y, 0);
 		const vec3 dir = vec3(sqrt(saturate(1 - xy.x * xy.x)), xy.x, 0);
 
-		float rayleigh = opticalDepth(p, getTopAtmo(p, dir), 8000);
-		float mie = opticalDepth(p, getTopAtmo(p, dir), 1200);
+		float rayleigh = opticalDepth(p, getTopAtmo(p, dir), u_distribution_rayleigh);
+		float mie = opticalDepth(p, getTopAtmo(p, dir), u_distribution_mie);
 
-		imageStore(u_transmittance, ivec2(gl_GlobalInvocationID.xy), vec4(rayleigh, mie, 0, 0));
+		imageStore(u_output, ivec2(gl_GlobalInvocationID.xy), vec4(rayleigh, mie, 0, 0));
 	}
 
 ]]
