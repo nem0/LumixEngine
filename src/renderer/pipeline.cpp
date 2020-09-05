@@ -1548,6 +1548,47 @@ struct PipelineImpl final : Pipeline
 		return 1;
 	}
 
+	static int drawcallUniforms(lua_State* L) {
+		const int pipeline_idx = lua_upvalueindex(1);
+		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
+			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
+		}
+		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		LuaWrapper::checkTableArg(L, 1);
+		const int len = (int)lua_objlen(L, 1);
+		if (len > 16) {
+			return luaL_error(L, "%s", "Too many uniforms in drawcallUniforms");
+		}
+
+		float values[16];
+
+		for(int i = 0; i < len; ++i) {
+			lua_rawgeti(L, 1, i + 1);
+			if(lua_type(L, -1) != LUA_TNUMBER) {
+				return luaL_error(L, "%s", "array of floats expected");
+			}
+			values[i] = LuaWrapper::toType<float>(L, -1);
+			lua_pop(L, 1);
+		}
+
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::update(drawcall_ub, values, sizeof(values));
+				gpu::bindUniformBuffer(4, drawcall_ub, 0, sizeof(values));
+			}
+			float values[16];
+			gpu::BufferHandle drawcall_ub;
+		};
+		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
+		memcpy(cmd->values, values, sizeof(values));
+		cmd->drawcall_ub = pipeline->m_drawcall_ub;
+		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+
+		return 0;
+	}
+
 	void bindImageTexture(u32 texture_handle, u32 unit) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
@@ -4187,6 +4228,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("createTexture2D", PipelineImpl::createTexture2D);
 		registerCFunction("createTexture3D", PipelineImpl::createTexture3D);
 		registerCFunction("drawArray", PipelineImpl::drawArray);
+		registerCFunction("drawcallUniforms", PipelineImpl::drawcallUniforms);
 		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
 		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
 		registerCFunction("pass", PipelineImpl::pass);
