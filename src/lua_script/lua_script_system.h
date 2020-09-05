@@ -29,6 +29,7 @@ struct LuaScriptScene : IScene
 			ENTITY,
 			RESOURCE,
 			STRING,
+			COLOR,
 			ANY
 		};
 

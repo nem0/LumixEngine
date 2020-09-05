@@ -1105,6 +1105,7 @@ public:
 	static void set(Ref<Reflection::IDynamicProperties::Value> v, const char* val) { Reflection::set(v.value, val); }
 	static void set(Ref<Reflection::IDynamicProperties::Value> v, EntityPtr val) { Reflection::set(v.value, val); }
 	static void set(Ref<Reflection::IDynamicProperties::Value> v, bool val) { Reflection::set(v.value, val); }
+	static void set(Ref<Reflection::IDynamicProperties::Value> v, Vec3 val) { Reflection::set(v.value, val); }
 	static void set(Ref<Reflection::IDynamicProperties::Value> v, const String& val) { Reflection::set(v.value, val.c_str()); }
 
 
