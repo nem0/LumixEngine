@@ -3,12 +3,12 @@ height_distribution_rayleigh = 8000
 height_distribution_mie = 1200
 ground_r = 6378
 atmo_r = 6478
-local scatter_rayleigh = { 5.802 / 33.1, 13.558 / 33.1, 33.1 / 33.1 }
-local scatter_mie = { 1, 1, 1 }
-local absorb_mie = {1, 1, 1 }
---Editor.setPropertyType(this, "scatter_rayleigh", Editor.COLOR_PROPERTY)
---Editor.setPropertyType(this, "scatter_mie", Editor.COLOR_PROPERTY)
---Editor.setPropertyType(this, "absorb_mie", Editor.COLOR_PROPERTY)
+scatter_rayleigh = { 5.802 / 33.1, 13.558 / 33.1, 33.1 / 33.1 }
+scatter_mie = { 1, 1, 1 }
+absorb_mie = {1, 1, 1 }
+Editor.setPropertyType(this, "scatter_rayleigh", Editor.COLOR_PROPERTY)
+Editor.setPropertyType(this, "scatter_mie", Editor.COLOR_PROPERTY)
+Editor.setPropertyType(this, "absorb_mie", Editor.COLOR_PROPERTY)
 
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end

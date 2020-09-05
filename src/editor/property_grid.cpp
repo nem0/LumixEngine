@@ -137,6 +137,32 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 				case Reflection::IDynamicProperties::ENTITY: dynamicProperty<EntityPtr>(cmp, prop, i); break;
 				case Reflection::IDynamicProperties::I32: dynamicProperty<i32>(cmp, prop, i); break;
 				case Reflection::IDynamicProperties::STRING: dynamicProperty<const char*>(cmp, prop, i); break;
+				case Reflection::IDynamicProperties::COLOR: {
+					struct : Reflection::Property<Vec3> {
+						Span<const Reflection::IAttribute* const> getAttributes() const override {
+							return Span((const Reflection::IAttribute*const*)attrs, 1);
+						}
+						
+						Vec3 get(ComponentUID cmp, int array_index) const override {
+							return Reflection::get<Vec3>(prop->getValue(cmp, array_index, index));
+						}
+						void set(ComponentUID cmp, int array_index, Vec3 value) const override {
+							Reflection::IDynamicProperties::Value v;
+							Reflection::set(v, value);
+							prop->set(cmp, array_index, index, v);
+						}
+						const Reflection::IDynamicProperties* prop;
+						ComponentUID cmp;
+						int index;
+						Reflection::ColorAttribute attr;
+						Reflection::IAttribute* attrs[1] = { &attr };
+					} p;
+					p.name = prop.getName(cmp, m_index, i);
+					p.prop = &prop;
+					p.index =  i;
+					visit(p);
+					break;
+				}
 				case Reflection::IDynamicProperties::RESOURCE: {
 					struct : Reflection::Property<Path> {
 						Span<const Reflection::IAttribute* const> getAttributes() const override {

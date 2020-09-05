@@ -42,6 +42,15 @@ namespace Lumix
 	template <> const char* fromString(const char* val) { return val; }
 	template <> float fromString(const char* val) { return (float)atof(val); }
 	template <> bool fromString(const char* val) { return equalIStrings(val, "true"); }
+	template <> Vec3 fromString(const char* val) { 
+		Vec3 r;
+		r.x = (float)atof(val + 1);
+		const char* c = strstr(val + 1, ",");
+		r.y = (float)atof(c + 1);
+		c = strstr(val + 1, ",");
+		r.z = (float)atof(c + 1);
+		return r;
+	}
 
 	template <typename T> static void toString(T val, Ref<String> out) {
 		char tmp[128];
@@ -52,6 +61,11 @@ namespace Lumix
 	template <> void toString(float val, Ref<String> out) {
 		char tmp[128];
 		toCString(val, Span(tmp), 10);
+		out = tmp;
+	}
+
+	template <> void toString(Vec3 val, Ref<String> out) {
+		StaticString<512> tmp("{", val.x, ", ", val.y, ", ", val.z, "}");
 		out = tmp;
 	}
 
@@ -532,6 +546,7 @@ namespace Lumix
 			LuaWrapper::createSystemVariable(L, "Editor", "INT_PROPERTY", Property::INT);
 			LuaWrapper::createSystemVariable(L, "Editor", "ENTITY_PROPERTY", Property::ENTITY);
 			LuaWrapper::createSystemVariable(L, "Editor", "RESOURCE_PROPERTY", Property::RESOURCE);
+			LuaWrapper::createSystemVariable(L, "Editor", "COLOR_PROPERTY", Property::COLOR);
 		}
 
 		static int rescan(lua_State* L) {
@@ -1098,6 +1113,11 @@ namespace Lumix
 			applyProperty(script, prop, tmp);
 		}
 
+		void applyProperty(ScriptInstance& script, Property& prop, Vec3 value) {
+			const StaticString<512> tmp("{", value.x, ",", value.y, ",", value.z, "}");
+			applyProperty(script, prop, tmp.data);
+		}
+
 		void applyProperty(ScriptInstance& script, Property& prop, char* value) {
 			applyProperty(script, prop, (const char*)value);
 		}
@@ -1117,6 +1137,8 @@ namespace Lumix
 				applyResourceProperty(script, name, prop, value);
 				return;
 			}
+
+			if (prop.type != Property::STRING && prop.type != Property::RESOURCE && value[0] == '\0') return;
 
 			if (prop.type == Property::ENTITY)
 			{
@@ -1475,6 +1497,13 @@ namespace Lumix
 				{
 					float val = (float)lua_tonumber(scr.m_state, -1);
 					toCString(val, out, 8);
+				}
+				break;
+				case Property::COLOR:
+				{
+					const Vec3 val = LuaWrapper::toType<Vec3>(scr.m_state, -1);
+					const StaticString<512> tmp("{", val.x, ",", val.y, ",", val.z, "}");
+					copyString(out, tmp.data);
 				}
 				break;
 				case Property::INT:
@@ -2082,6 +2111,7 @@ namespace Lumix
 				case LuaScriptScene::Property::Type::STRING: return STRING;
 				case LuaScriptScene::Property::Type::ENTITY: return ENTITY;
 				case LuaScriptScene::Property::Type::RESOURCE: return RESOURCE;
+				case LuaScriptScene::Property::Type::COLOR: return COLOR;
 				default: ASSERT(false); return NONE;
 			}
 		}
@@ -2111,6 +2141,7 @@ namespace Lumix
 			const char* name = scene.getPropertyName(e, array_idx, idx);
 			Value v = {};
 			switch(type) {
+				case LuaScriptScene::Property::Type::COLOR: Reflection::set(v, scene.getPropertyValue<Vec3>(e, array_idx, name)); break;
 				case LuaScriptScene::Property::Type::BOOLEAN: Reflection::set(v, scene.getPropertyValue<bool>(e, array_idx, name)); break;
 				case LuaScriptScene::Property::Type::INT: Reflection::set(v, scene.getPropertyValue<i32>(e, array_idx, name)); break;
 				case LuaScriptScene::Property::Type::FLOAT: Reflection::set(v, scene.getPropertyValue<float>(e, array_idx, name)); break;
@@ -2142,6 +2173,7 @@ namespace Lumix
 				case STRING: scene.setPropertyValue(e, array_idx, name, v.s); break;
 				case ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
 				case RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
+				case COLOR: scene.setPropertyValue(e, array_idx, name, v.v3); break;
 				default: ASSERT(false); break;
 			}
 		}
@@ -2158,6 +2190,7 @@ namespace Lumix
 				case LuaScriptScene::Property::Type::STRING: scene.setPropertyValue(e, array_idx, name, v.s); break;
 				case LuaScriptScene::Property::Type::ENTITY: scene.setPropertyValue(e, array_idx, name, v.e); break;
 				case LuaScriptScene::Property::Type::RESOURCE: scene.setPropertyValue(e, array_idx, name, v.s); break;
+				case LuaScriptScene::Property::Type::COLOR: scene.setPropertyValue(e, array_idx, name, v.v3); break;
 				default: ASSERT(false); break;
 			}
 		}

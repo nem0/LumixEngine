@@ -150,6 +150,7 @@ struct IDynamicProperties {
 		ENTITY,
 		RESOURCE,
 		BOOLEAN,
+		COLOR,
 
 		NONE
 	};
@@ -160,6 +161,7 @@ struct IDynamicProperties {
 		float f;
 		const char* s;
 		bool b;
+		Vec3 v3;
 	};
 	virtual u32 getCount(ComponentUID cmp, int array_idx) const = 0;
 	virtual Type getType(ComponentUID cmp, int array_idx, u32 idx) const = 0;
@@ -178,6 +180,7 @@ template <> inline i32 get(IDynamicProperties::Value v) { return v.i; }
 template <> inline const char* get(IDynamicProperties::Value v) { return v.s; }
 template <> inline EntityPtr get(IDynamicProperties::Value v) { return v.e; }
 template <> inline bool get(IDynamicProperties::Value v) { return v.b; }
+template <> inline Vec3 get(IDynamicProperties::Value v) { return v.v3; }
 
 template <typename T> inline void set(IDynamicProperties::Value& v, T);
 template <> inline void set(IDynamicProperties::Value& v, float val) { v.f = val; }
@@ -185,6 +188,7 @@ template <> inline void set(IDynamicProperties::Value& v, i32 val) { v.i = val; 
 template <> inline void set(IDynamicProperties::Value& v, const char* val) { v.s = val; }
 template <> inline void set(IDynamicProperties::Value& v, EntityPtr val) { v.e = val; }
 template <> inline void set(IDynamicProperties::Value& v, bool val) { v.b = val; }
+template <> inline void set(IDynamicProperties::Value& v, Vec3 val) { v.v3 = val; }
 
 struct IArrayProperty
 {
