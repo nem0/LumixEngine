@@ -1139,7 +1139,7 @@ namespace Lumix
 				return;
 			}
 
-			if (prop.type != Property::STRING && prop.type != Property::RESOURCE && value[0] == '\0') return;
+			if (prop.type != Property::STRING && prop.type != Property::RESOURCE && value[0] == '\0') return; //-V560
 
 			if (prop.type == Property::ENTITY)
 			{
