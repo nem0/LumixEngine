@@ -1556,11 +1556,10 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 		LuaWrapper::checkTableArg(L, 1);
 		const int len = (int)lua_objlen(L, 1);
-		if (len > 16) {
+		float values[20];
+		if (len > (int)lengthOf(values)) {
 			return luaL_error(L, "%s", "Too many uniforms in drawcallUniforms");
 		}
-
-		float values[16];
 
 		for(int i = 0; i < len; ++i) {
 			lua_rawgeti(L, 1, i + 1);
@@ -1578,7 +1577,7 @@ struct PipelineImpl final : Pipeline
 				gpu::update(drawcall_ub, values, sizeof(values));
 				gpu::bindUniformBuffer(4, drawcall_ub, 0, sizeof(values));
 			}
-			float values[16];
+			float values[20];
 			gpu::BufferHandle drawcall_ub;
 		};
 		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);

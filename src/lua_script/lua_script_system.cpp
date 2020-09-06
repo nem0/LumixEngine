@@ -43,6 +43,7 @@ namespace Lumix
 	template <> float fromString(const char* val) { return (float)atof(val); }
 	template <> bool fromString(const char* val) { return equalIStrings(val, "true"); }
 	template <> Vec3 fromString(const char* val) { 
+		if (val[0] == '\0') return {};
 		Vec3 r;
 		r.x = (float)atof(val + 1);
 		const char* c = strstr(val + 1, ",");
