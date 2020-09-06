@@ -312,9 +312,10 @@ struct AssetCompilerImpl : AssetCompiler
 
 				{
 					MutexGuard lock(m_resources_mutex);
-					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this](const Path& p){
+					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
-						if (type != INVALID_RESOURCE_TYPE) {
+						StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
+						if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
 							m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 						}
 					});
@@ -624,6 +625,9 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 	}
 
+	void removeResource(const Path& path) override {
+		m_resources.erase(path.getHash());
+	}
 
 	void removePlugin(IPlugin& plugin) override
 	{

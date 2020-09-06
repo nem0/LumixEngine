@@ -356,6 +356,9 @@ void AssetBrowser::thumbnail(FileInfo& tile, float size)
 
 void AssetBrowser::deleteTile(u32 idx) {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
+	m_app.getAssetCompiler().removeResource(Path(m_file_infos[idx].filepath));
+	StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", m_file_infos[idx].file_path_hash, ".res");
+	fs.deleteFile(res_path);
 	if (!fs.deleteFile(m_file_infos[idx].filepath)) {
 		logError("Editor") << "Failed to delete " << m_file_infos[idx].filepath;
 	}
