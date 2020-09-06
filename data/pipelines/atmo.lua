@@ -13,6 +13,35 @@ Editor.setPropertyType(this, "scatter_mie", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "absorb_mie", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "sunlight_color", Editor.COLOR_PROPERTY)
 
+function setDrawcallUniforms(env, x, y, z)
+	env.drawcallUniforms({
+		ground_r * 1000,
+		atmo_r * 1000,
+		height_distribution_rayleigh,
+		height_distribution_mie,
+		scatter_rayleigh[1] * 33.1 * 0.000001,
+		scatter_rayleigh[2] * 33.1 * 0.000001,
+		scatter_rayleigh[3] * 33.1 * 0.000001,
+		0,
+		scatter_mie[1] * 3.996 * 0.000001,
+		scatter_mie[2] * 3.996 * 0.000001,
+		scatter_mie[3] * 3.996 * 0.000001,
+		0,
+		absorb_mie[1] * 4.4 * 0.000001,
+		absorb_mie[2] * 4.4 * 0.000001,
+		absorb_mie[3] * 4.4 * 0.000001,
+		0,
+		sunlight_color[1], 
+		sunlight_color[2], 
+		sunlight_color[3],
+		sunlight_strength,
+		x,
+		y,
+		z, 
+		0
+	})
+end
+
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
@@ -43,33 +72,13 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	
 	env.beginBlock("precompute_transmittance")
 	env.bindImageTexture(env.opt_depth_precomputed, 0)
-	env.drawcallUniforms({
-		ground_r * 1000,
-		atmo_r * 1000,
-		height_distribution_rayleigh,
-		height_distribution_mie,
-		scatter_rayleigh[1] * 33.1 * 0.000001,
-		scatter_rayleigh[2] * 33.1 * 0.000001,
-		scatter_rayleigh[3] * 33.1 * 0.000001,
-		0,
-		scatter_mie[1] * 3.996 * 0.000001,
-		scatter_mie[2] * 3.996 * 0.000001,
-		scatter_mie[3] * 3.996 * 0.000001,
-		0,
-		absorb_mie[1] * 4.4 * 0.000001,
-		absorb_mie[2] * 4.4 * 0.000001,
-		absorb_mie[3] * 4.4 * 0.000001,
-		0,
-		sunlight_color[1], 
-		sunlight_color[2], 
-		sunlight_color[3],
-		sunlight_strength
-	})
+	setDrawcallUniforms(env, 128, 128, 1)
 	env.dispatch(env.atmo_optical_depth_shader, 128 / 16, 128 / 16, 1)
 	env.bindImageTexture(env.inscatter_precomputed, 0)
 	env.bindRawTexture(env.opt_depth_precomputed, 1)
 	env.endBlock()
 
+	setDrawcallUniforms(env, 64, 128, 1)
 	env.beginBlock("precompute_inscatter")
 	env.dispatch(env.atmo_scattering_shader, 64 / 16, 128 / 16, 1)
 	env.endBlock()

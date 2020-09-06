@@ -12,6 +12,8 @@ compute_shader [[
 		vec4 u_scatter_rayleigh;
 		vec4 u_scatter_mie;
 		vec4 u_absorb_mie;
+		vec4 u_sunlight;
+		vec4 u_resolution;
 	};
 
 	vec2 ray_sphere_intersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
@@ -47,7 +49,7 @@ compute_shader [[
 	}
 
 	void main() {
-		const vec2 xy = gl_GlobalInvocationID.xy / float(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy);
+		const vec2 xy = gl_GlobalInvocationID.xy / u_resolution.xy;
 		float angle = xy.x * M_PI * 0.5;
 		const vec3 p = vec3(0, u_bot + (u_top - u_bot) * xy.y, 0);
 		const vec3 dir = vec3(sqrt(saturate(1 - xy.x * xy.x)), xy.x, 0);
