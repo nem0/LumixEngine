@@ -257,7 +257,7 @@ struct LUMIX_ENGINE_API AABB
 
 struct LUMIX_ENGINE_API Viewport
 {
-	Matrix getProjection(bool homogenous_depth) const;
+	Matrix getProjection() const;
 	Matrix getView(const DVec3& origin) const;
 	Matrix getViewRotation() const;
 	ShiftedFrustum getFrustum() const;

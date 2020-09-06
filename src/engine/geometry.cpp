@@ -522,7 +522,7 @@ Vec3 AABB::maxCoords(const Vec3& a, const Vec3& b)
 }
 
 
-Matrix Viewport::getProjection(bool is_homogenous_depth) const
+Matrix Viewport::getProjection() const
 {
 	Matrix mtx;
 	const float ratio = h > 0 ? w / (float)h : 1;
@@ -533,12 +533,11 @@ Matrix Viewport::getProjection(bool is_homogenous_depth) const
 			ortho_size,
 			near,
 			far,
-			is_homogenous_depth,
 			true);
 		return mtx;
 	}
 
-	mtx.setPerspective(fov, ratio, near, far, is_homogenous_depth, true);
+	mtx.setPerspective(fov, ratio, near, far, true);
 	return mtx;
 }
 
@@ -572,7 +571,7 @@ void Viewport::getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const
 	const float nx = 2 * (screen_pos.x / w) - 1;
 	const float ny = 2 * ((h - screen_pos.y) / h) - 1;
 
-	const Matrix projection_matrix = getProjection(false);
+	const Matrix projection_matrix = getProjection();
 
 	if (is_ortho) {
 		const Vec3 x = rot * Vec3(1, 0, 0);
@@ -598,7 +597,7 @@ void Viewport::getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const
 
 Vec2 Viewport::worldToScreenPixels(const DVec3& world) const
 {
-	const Matrix mtx = getProjection(true) * getView(world);
+	const Matrix mtx = getProjection() * getView(world);
 	const Vec4 pos = mtx * Vec4(0, 0, 0, 1);
 	const float inv = 1 / pos.w;
 	const Vec2 screen_size((float)w, (float)h);

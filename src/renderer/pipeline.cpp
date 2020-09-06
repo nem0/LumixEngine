@@ -703,7 +703,7 @@ struct PipelineImpl final : Pipeline
 			shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 			Matrix projection_matrix;
-			projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, gpu::isHomogenousDepth(), true);
+			projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, true);
 			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
 			Matrix view_matrix;
 			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
@@ -815,7 +815,7 @@ struct PipelineImpl final : Pipeline
 		clearBuffers();
 
 		const Matrix view = m_viewport.getViewRotation();
-		const Matrix projection = m_viewport.getProjection(gpu::isHomogenousDepth());
+		const Matrix projection = m_viewport.getProjection();
 		GlobalState global_state;
 		global_state.camera_projection = projection;
 		global_state.camera_inv_projection = projection.inverted();
@@ -2101,7 +2101,7 @@ struct PipelineImpl final : Pipeline
 		cp.lod_multiplier = scene->getCameraLODMultiplier(pipeline->m_viewport.fov, pipeline->m_viewport.is_ortho);
 		cp.is_shadow = false;
 		cp.view = pipeline->m_viewport.getView(cp.pos);
-		cp.projection = pipeline->m_viewport.getProjection(gpu::isHomogenousDepth());
+		cp.projection = pipeline->m_viewport.getProjection();
 		pushCameraParams(L, cp);
 
 		return 1;
@@ -2677,7 +2677,7 @@ struct PipelineImpl final : Pipeline
 	
 	Matrix getShadowMatrix(const PointLight& light, u32 atlas_idx) {
 		Matrix prj;
-		prj.setPerspective(light.fov, 1, 0.1f, light.range, gpu::isHomogenousDepth(), true);
+		prj.setPerspective(light.fov, 1, 0.1f, light.range, true);
 		const Quat rot = -m_scene->getUniverse().getRotation(light.entity);
 		
 		const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;

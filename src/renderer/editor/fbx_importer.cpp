@@ -876,7 +876,7 @@ static void getBBProjection(const AABB& aabb, Ref<Vec2> out_min, Ref<Vec2> out_m
 	const Vec3 center = (aabb.min + aabb.max) * 0.5f;
 
 	Matrix proj;
-	proj.setOrtho(-1, 1, -1, 1, 0, radius * 2, false, true);
+	proj.setOrtho(-1, 1, -1, 1, 0, radius * 2, true);
 	Vec2 min(FLT_MAX, FLT_MAX), max(-FLT_MAX, -FLT_MAX);
 	for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 		for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
@@ -972,7 +972,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					gpu::update(ub, &model_mtx.m11, sizeof(model_mtx));
 					PassState pass_state;
 					pass_state.view.lookAt(center + Vec3(0, 0, 2 * m_radius), center, {0, 1, 0});
-					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, false, true);
+					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, true);
 					pass_state.inv_projection = pass_state.projection.inverted();
 					pass_state.inv_view = pass_state.view.fastInverted();
 					pass_state.view_projection = pass_state.projection * pass_state.view;
