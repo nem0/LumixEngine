@@ -52,6 +52,7 @@ struct LUMIX_EDITOR_API AssetCompiler
 	virtual void update() = 0;
 	virtual void addPlugin(IPlugin& plugin, const char** extensions) = 0;
 	virtual void removePlugin(IPlugin& plugin) = 0;
+	virtual void removeResource(const Path& path) = 0;
 	virtual bool compile(const Path& path) = 0;
 	virtual bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const = 0;
 	virtual void updateMeta(const Path& res, const char* src) const = 0;
