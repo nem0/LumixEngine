@@ -998,10 +998,10 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 	}
 
 
-	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool is_homogenous_depth, bool reversed_z);
+	void setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool reversed_z);
 
 
-	void setPerspective(float fov, float ratio, float near_plane, float far_plane, bool is_homogenous_depth, bool invert_z);
+	void setPerspective(float fov, float ratio, float near_plane, float far_plane, bool invert_z);
 
 
 	void fromEuler(float yaw, float pitch, float roll);

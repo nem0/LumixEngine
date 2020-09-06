@@ -1836,7 +1836,6 @@ public:
 		const Camera& camera = m_cameras[entity];
 		Matrix mtx;
 		const float ratio = camera.screen_height > 0 ? camera.screen_width / camera.screen_height : 1;
-		const bool is_homogenous_depth = gpu::isHomogenousDepth();
 		if (camera.is_ortho) {
 			mtx.setOrtho(-camera.ortho_size * ratio,
 				camera.ortho_size * ratio,
@@ -1844,11 +1843,10 @@ public:
 				camera.ortho_size,
 				camera.near,
 				camera.far,
-				is_homogenous_depth,
 				true);
 		}
 		else {
-			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, is_homogenous_depth, true);
+			mtx.setPerspective(camera.fov, ratio, camera.near, camera.far, true);
 		}
 		return mtx;
 	}

@@ -458,7 +458,7 @@ Matrix Matrix::rotationZ(float angle)
 }
 
 
-void Matrix::setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool is_homogenous_depth, bool reversed_z)
+void Matrix::setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool reversed_z)
 {
 	*this = IDENTITY;
 	m11 = 2 / (right - left);
@@ -467,18 +467,18 @@ void Matrix::setOrtho(float left, float right, float bottom, float top, float z_
 	m42 = (top + bottom) / (bottom - top);
 	if (reversed_z)
 	{
-		m33 = (is_homogenous_depth ? 2 : 1) / (z_far - z_near);
-		m43 = is_homogenous_depth ? (z_near + z_far) / (z_far - z_near) : z_far / (z_far - z_near);
+		m33 = 1 / (z_far - z_near);
+		m43 = z_far / (z_far - z_near);
 	}
 	else
 	{
-		m33 = (is_homogenous_depth ? -2 : -1) / (z_far - z_near);
-		m43 = is_homogenous_depth ? (z_near + z_far) / (z_near - z_far) : z_near / (z_near - z_far);
+		m33 = -1 / (z_far - z_near);
+		m43 = z_near / (z_near - z_far);
 	}
 }
 
 
-void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_plane, bool is_homogenous_depth, bool reversed_z)
+void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_plane, bool reversed_z)
 {
 	*this = Matrix::IDENTITY;
 	float f = 1 / tanf(fov * 0.5f);
@@ -490,13 +490,13 @@ void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_
 
 	if (reversed_z)
 	{
-		m33 = (is_homogenous_depth ? near_plane : -far_plane) / z_diff - (is_homogenous_depth ? 0 : 1);
-		m43 = is_homogenous_depth ? far_plane * near_plane / z_diff : -near_plane * far_plane / z_diff;
+		m33 = 0;
+		m43 = near_plane;
 	}
 	else
 	{
-		m33 = (is_homogenous_depth ? far_plane + near_plane : far_plane) / z_diff;
-		m43 = is_homogenous_depth ? 2 * far_plane * near_plane / z_diff : near_plane * far_plane / z_diff;
+		m33 = -1;
+		m43 = -near_plane;
 	}
 }
 

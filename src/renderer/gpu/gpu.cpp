@@ -1822,9 +1822,6 @@ bool init(void* window_handle, u32 init_flags)
 }
 
 
-bool isHomogenousDepth() { return false; }
-
-
 bool isOriginBottomLeft() { return true; }
 
 

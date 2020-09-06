@@ -152,11 +152,13 @@ vertex_shader [[
 	#endif
 
 	void main() {
-		ivec2 ij = ivec2(u_from_to.x + (gl_VertexID >> 1), u_from_to.y + gl_InstanceID + (gl_VertexID & 1));
+		ivec2 ij = u_from_to.xy + ivec2((gl_VertexID >> 1), gl_InstanceID + (gl_VertexID & 1));
 	
-		vec3 v = vec3(ij.x, 0.0, ij.y) * u_cell_size;
+		vec3 v = vec3(0);
+		v.xz = vec2(ij) * u_cell_size;
 		int mask = ~1;
-		vec3 npos = vec3(ij.x & mask, 0.0, ij.y & mask) * u_cell_size;
+		vec3 npos = vec3(0);
+		npos.xz = vec2(ij & mask) * u_cell_size;
 	
 		vec2 size = vec2(u_from_to_sup.zw - u_from_to_sup.xy);
 		vec2 rel = (ij - u_from_to_sup.xy) / size;
