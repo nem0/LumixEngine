@@ -6,9 +6,12 @@ atmo_r = 6478
 scatter_rayleigh = { 5.802 / 33.1, 13.558 / 33.1, 33.1 / 33.1 }
 scatter_mie = { 1, 1, 1 }
 absorb_mie = {1, 1, 1 }
+sunlight_color = {1, 1, 1}
+sunlight_strength = 40
 Editor.setPropertyType(this, "scatter_rayleigh", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "scatter_mie", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "absorb_mie", Editor.COLOR_PROPERTY)
+Editor.setPropertyType(this, "sunlight_color", Editor.COLOR_PROPERTY)
 
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
@@ -56,7 +59,11 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		absorb_mie[1] * 4.4 * 0.000001,
 		absorb_mie[2] * 4.4 * 0.000001,
 		absorb_mie[3] * 4.4 * 0.000001,
-		0
+		0,
+		sunlight_color[1], 
+		sunlight_color[2], 
+		sunlight_color[3],
+		sunlight_strength
 	})
 	env.dispatch(env.atmo_optical_depth_shader, 128 / 16, 128 / 16, 1)
 	env.bindImageTexture(env.inscatter_precomputed, 0)
