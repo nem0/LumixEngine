@@ -74,11 +74,11 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.bindImageTexture(env.opt_depth_precomputed, 0)
 	setDrawcallUniforms(env, 128, 128, 1)
 	env.dispatch(env.atmo_optical_depth_shader, 128 / 16, 128 / 16, 1)
-	env.bindImageTexture(env.inscatter_precomputed, 0)
-	env.bindRawTexture(env.opt_depth_precomputed, 1)
 	env.endBlock()
 
 	setDrawcallUniforms(env, 64, 128, 1)
+	env.bindImageTexture(env.inscatter_precomputed, 0)
+	env.bindRawTexture(env.opt_depth_precomputed, 1)
 	env.beginBlock("precompute_inscatter")
 	env.dispatch(env.atmo_scattering_shader, 64 / 16, 128 / 16, 1)
 	env.endBlock()

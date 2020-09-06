@@ -1515,7 +1515,7 @@ struct PipelineImpl final : Pipeline
 			, height
 			, 1
 			, format
-			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V
+			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE
 			, mem
 			, "lua_texture");
 		LuaWrapper::push(L, texture.value);
@@ -1541,7 +1541,7 @@ struct PipelineImpl final : Pipeline
 			, height
 			, depth
 			, format
-			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::CLAMP_W
+			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::CLAMP_W | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
 			, mem
 			, "lua_texture");
 		LuaWrapper::push(L, texture.value);
@@ -1588,22 +1588,6 @@ struct PipelineImpl final : Pipeline
 		return 0;
 	}
 
-	void bindImageTexture(u32 texture_handle, u32 unit) {
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override {
-				PROFILE_FUNCTION();
-				gpu::bindImageTexture(texture, unit);
-			}
-			gpu::TextureHandle texture;
-			u32 unit;
-		};
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->texture.value = texture_handle;
-		cmd->unit = unit;
-		m_renderer.queue(cmd, m_profiler_link);
-	}
-
 	void dispatch(u32 shader_id, u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
 		Engine& engine = m_renderer.getEngine();
 		Shader* shader = nullptr;
@@ -1639,6 +1623,22 @@ struct PipelineImpl final : Pipeline
 		cmd->num_groups_y = num_groups_y;
 		cmd->num_groups_z = num_groups_z;
 		cmd->program = program;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
+
+	void bindImageTexture(u32 texture_handle, u32 unit) {
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::bindImageTexture(texture, unit);
+			}
+			gpu::TextureHandle texture;
+			u32 unit;
+		};
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->texture.value = texture_handle;
+		cmd->unit = unit;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 

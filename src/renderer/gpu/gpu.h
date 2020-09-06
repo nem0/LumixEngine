@@ -136,7 +136,8 @@ enum class TextureFlags : u32 {
 	SRGB = 1 << 5,
 	READBACK = 1 << 6,
 	IS_3D = 1 << 7,
-	IS_CUBE = 1 << 8
+	IS_CUBE = 1 << 8,
+	COMPUTE_WRITE = 1 << 9
 };
 
 enum class BufferFlags : u32 {
