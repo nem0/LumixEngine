@@ -67,6 +67,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 
 AssetBrowser::~AssetBrowser()
 {
+	m_app.getAssetCompiler().listChanged().unbind<&AssetBrowser::onResourceListChanged>(this);
 	unloadResources();
 	RenderInterface* ri = m_app.getRenderInterface();
 	for (FileInfo& info : m_file_infos) {
@@ -81,6 +82,13 @@ AssetBrowser::~AssetBrowser()
 	ASSERT(m_plugins.size() == 0);
 }
 
+void AssetBrowser::onInitFinished() {
+	m_app.getAssetCompiler().listChanged().bind<&AssetBrowser::onResourceListChanged>(this);
+}
+
+void AssetBrowser::onResourceListChanged() {
+	m_dirty = true;
+}
 
 void AssetBrowser::unloadResources()
 {
@@ -664,7 +672,8 @@ void AssetBrowser::refreshLabels()
 void AssetBrowser::onGUI()
 {
 	if (m_dir.data[0] == '\0') changeDir(".");
-	
+	if (m_dirty) changeDir(m_dir);
+
 	if (m_wanted_resource.isValid())
 	{
 		selectResource(m_wanted_resource, true, false);
