@@ -412,6 +412,7 @@ struct StudioAppImpl final : StudioApp
 		findLuaPlugins("plugins/lua/");
 
 		m_asset_compiler->onInitFinished();
+		m_asset_browser->onInitFinished();
 		m_sleep_when_inactive = shouldSleepWhenInactive();
 
 		checkScriptCommandLine();

@@ -46,6 +46,7 @@ public:
 public:
 	explicit AssetBrowser(StudioApp& app);
 	~AssetBrowser();
+	void onInitFinished();
 	void onGUI();
 	void update();
 	bool onDropFile(const char* path);
@@ -95,11 +96,13 @@ private:
 	void goBack();
 	void goForward();
 	void deleteTile(u32 idx);
+	void onResourceListChanged();
 
 
 private:
 	StudioApp& m_app;
 	StaticString<MAX_PATH_LENGTH> m_dir;
+	bool m_dirty = false;
 	Array<StaticString<MAX_PATH_LENGTH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;

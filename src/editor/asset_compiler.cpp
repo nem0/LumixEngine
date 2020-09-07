@@ -93,6 +93,7 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_to_compile_subresources(app.getAllocator())
 		, m_dependencies(app.getAllocator())
 		, m_changed_files(app.getAllocator())
+		, m_on_list_changed(app.getAllocator())
 	{
 		FileSystem& fs = app.getEngine().getFileSystem();
 		m_watcher = FileSystemWatcher::create(fs.getBasePath(), app.getAllocator());
@@ -141,6 +142,10 @@ struct AssetCompilerImpl : AssetCompiler
 		ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
 		rm.setLoadHook(nullptr);
 		FileSystemWatcher::destroy(m_watcher);
+	}
+	
+	DelegateList<void()>& listChanged() {
+		return m_on_list_changed;
 	}
 
 	bool copyCompile(const Path& src) override {
@@ -591,6 +596,7 @@ struct AssetCompilerImpl : AssetCompiler
 			m_to_compile_subresources.erase(p);
 		}
 
+		bool changed = false;
 		for (;;) {
 			Path path_obj;
 			{
@@ -622,6 +628,10 @@ struct AssetCompilerImpl : AssetCompiler
 					reloadSubresources(removed_subresources);
 				}
 			}
+			changed = true;
+		}
+		if (changed) {
+			m_on_list_changed.invoke();
 		}
 	}
 
@@ -683,6 +693,7 @@ struct AssetCompilerImpl : AssetCompiler
 	Mutex m_resources_mutex;
 	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
+	DelegateList<void()> m_on_list_changed;
 
 	u32 m_compile_batch_count = 0;
 	u32 m_batch_remaining_count = 0;
