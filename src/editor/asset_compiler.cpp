@@ -396,6 +396,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void onFileChanged(const char* path)
 	{
 		if (startsWith(path, ".lumix")) return;
+		if (equalIStrings(path, "lumix.log")) return;
 		
 		MutexGuard lock(m_changed_mutex);
 		m_changed_files.push(Path(path));
