@@ -1580,7 +1580,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 				controller.gravity_speed = 0;
 			}
 
-			PxControllerFilters filters(nullptr, &controller.m_filter_callback);
+			m_filter_callback.m_filter_data = controller.m_filter_data;
+			PxControllerFilters filters(nullptr, &m_filter_callback);
 			controller.m_controller->move(toPhysx(dif), 0.001f, time_delta, filters);
 			PxExtendedVec3 p = controller.m_controller->getFootPosition();
 
@@ -4111,42 +4112,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 		Vec3 force;
 	};
 
-
 	struct Controller
 	{
-		struct FilterCallback : PxQueryFilterCallback
-		{
-			FilterCallback(Controller& controller)
-				: controller(controller)
-			{
-			}
-
-			PxQueryHitType::Enum preFilter(const PxFilterData& filterData,
-				const PxShape* shape,
-				const PxRigidActor* actor,
-				PxHitFlags& queryFlags) override
-			{
-				PxFilterData fd0 = shape->getSimulationFilterData();
-				PxFilterData fd1 = controller.m_filter_data;
-				if (!(fd0.word0 & fd1.word1) || !(fd0.word1 & fd1.word0)) return PxQueryHitType::eNONE;
-				return PxQueryHitType::eBLOCK;
-			}
-
-			PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit) override
-			{
-				return PxQueryHitType::eNONE;
-			}
-
-			Controller& controller;
-		};
-
-
-		Controller()
-			: m_filter_callback(*this)
-		{
-		}
-
-
 		PxController* m_controller;
 		EntityRef m_entity;
 		Vec3 m_frame_change;
@@ -4155,10 +4122,30 @@ struct PhysicsSceneImpl final : PhysicsScene
 		bool m_custom_gravity;
 		float m_custom_gravity_acceleration;
 		u32 m_layer;
-		FilterCallback m_filter_callback;
 		PxFilterData m_filter_data;
 
 		float gravity_speed = 0;
+	};
+	
+	struct FilterCallback : PxQueryFilterCallback
+	{
+		PxQueryHitType::Enum preFilter(const PxFilterData& filterData,
+			const PxShape* shape,
+			const PxRigidActor* actor,
+			PxHitFlags& queryFlags) override
+		{
+			PxFilterData fd0 = shape->getSimulationFilterData();
+			PxFilterData fd1 = m_filter_data;
+			if (!(fd0.word0 & fd1.word1) || !(fd0.word1 & fd1.word0)) return PxQueryHitType::eNONE;
+			return PxQueryHitType::eBLOCK;
+		}
+
+		PxQueryHitType::Enum postFilter(const PxFilterData& filterData, const PxQueryHit& hit) override
+		{
+			return PxQueryHitType::eNONE;
+		}
+
+		PxFilterData m_filter_data;
 	};
 
 	IAllocator& m_allocator;
@@ -4173,6 +4160,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	PxRigidDynamic* m_dummy_actor;
 	PxControllerManager* m_controller_manager;
 	PxMaterial* m_default_material;
+	FilterCallback m_filter_callback;
 
 	HashMap<EntityRef, RigidActor*> m_actors;
 	HashMap<EntityRef, Ragdoll> m_ragdolls;
