@@ -417,15 +417,15 @@ struct ControllerEditorImpl : ControllerEditor {
 				ImGui::EndMenuBar();
 			}
 
-			ImGui::Columns(2);
 			hierarchy_ui(*m_controller->m_root);
-			ImGui::NextColumn();
-			if (m_current_node) ui_dispatch(*m_current_node);
-			ImGui::Columns();
 		}
 		ImGui::End();
 
 		if (ImGui::Begin("Animation controller", &m_open)) {
+			if (m_current_node && ImGui::CollapsingHeader("Node")) {
+				ui_dispatch(*m_current_node);
+			}
+
 			if (ImGui::CollapsingHeader("Inputs")) {
 				InputDecl& inputs = m_controller->m_inputs;
 				
@@ -663,6 +663,12 @@ struct ControllerEditorImpl : ControllerEditor {
 				else {
 					ImGui::Text("Please select a model.");
 				}
+			}
+
+			if (ImGui::CollapsingHeader("Controller properties")) {
+				bool use_root_motion = m_controller->m_flags.isSet(Anim::Controller::Flags::USE_ROOT_MOTION);
+				ImGui::Checkbox("Use root motion", &use_root_motion);
+				m_controller->m_flags.set(Anim::Controller::Flags::USE_ROOT_MOTION, use_root_motion);
 			}
 		}
 		ImGui::End();
