@@ -8,6 +8,11 @@ scatter_mie = { 1, 1, 1 }
 absorb_mie = {1, 1, 1 }
 sunlight_color = {1, 1, 1}
 sunlight_strength = 40
+cloud_param0 = 1
+cloud_param1 = 1
+cloud_param2 = 1
+cloud_param3 = 1
+enable_clouds = false
 Editor.setPropertyType(this, "scatter_rayleigh", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "scatter_mie", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "absorb_mie", Editor.COLOR_PROPERTY)
@@ -48,17 +53,31 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.beginBlock("atmo")
 	if env.atmo_shader == nil then
 		env.atmo_shader = env.preloadShader("pipelines/atmo.shd")
+		env.clouds_shader = env.preloadShader("pipelines/clouds.shd")
+		env.clouds_noise_shader = env.preloadShader("pipelines/clouds_noise.shd")
 		env.atmo_scattering_shader = env.preloadShader("pipelines/atmo_scattering.shd")
 		env.atmo_optical_depth_shader = env.preloadShader("pipelines/atmo_optical_depth.shd")
 		env.inscatter_precomputed = env.createTexture2D(64, 128, "rgba32f")
 		env.opt_depth_precomputed = env.createTexture2D(128, 128, "rg32f")
-		
+		env.clouds_noise_precomputed = env.createTexture3D(128, 128, 128, "rgba32f")
 	end
 	env.setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 	local state = {
 		blending = "add",
 		depth_write = false,
 		depth_test = false
+	}
+	local clouds_state = {
+		blending = "alpha",
+		depth_write = false,
+		depth_test = false,
+		stencil_write_mask = 0,
+		stencil_func = env.STENCIL_NOT_EQUAL,
+		stencil_ref = 1,
+		stencil_mask = 0xff,
+		stencil_sfail = env.STENCIL_KEEP,
+		stencil_zfail = env.STENCIL_KEEP,
+		stencil_zpass = env.STENCIL_KEEP,
 	}
 	if object_atmo == false then
 		state.stencil_write_mask = 0
@@ -75,17 +94,37 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	setDrawcallUniforms(env, 128, 128, 1)
 	env.dispatch(env.atmo_optical_depth_shader, 128 / 16, 128 / 16, 1)
 	env.endBlock()
-
+	
 	setDrawcallUniforms(env, 64, 128, 1)
 	env.bindImageTexture(env.inscatter_precomputed, 0)
 	env.bindRawTexture(env.opt_depth_precomputed, 1)
 	env.beginBlock("precompute_inscatter")
 	env.dispatch(env.atmo_scattering_shader, 64 / 16, 128 / 16, 1)
 	env.endBlock()
-
+	
 	env.bindRawTexture(env.inscatter_precomputed, 1);
 	env.bindRawTexture(env.opt_depth_precomputed, 2);
 	env.drawArray(0, 4, env.atmo_shader, { gbuffer_depth }, {}, {}, state)
+	
+	if enable_clouds then
+		--if cloudsonce == nil then
+			env.beginBlock("clouds_noise")
+			env.bindImageTexture(env.clouds_noise_precomputed, 0)
+			env.dispatch(env.clouds_noise_shader, 128 / 16, 128 / 16, 128)
+			env.endBlock()
+		--end
+		--cloudsonce = true
+		--
+		env.beginBlock("clouds")
+		env.drawcallUniforms({
+			cloud_param0, cloud_param1, cloud_param2, cloud_param3
+		})
+		env.bindRawTexture(env.inscatter_precomputed, 1);
+		env.bindRawTexture(env.clouds_noise_precomputed, 2);
+		env.drawArray(0, 4, env.clouds_shader, { gbuffer_depth }, {}, {}, clouds_state)
+		env.endBlock()
+	end
+	
 	env.endBlock()
 	return hdr_buffer
 end
