@@ -233,13 +233,17 @@ namespace Lumix
 
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);
 
-			m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale());
+			#ifdef LUMIX_DEBUG
+				if (connect2VisualDebugger()) {
+					logInfo("PhysX debugger connected");
+				}
+			#endif
+
+			m_physics = PxCreatePhysics(PX_PHYSICS_VERSION, *m_foundation, physx::PxTolerancesScale(), false, m_pvd);
 			LUMIX_FATAL(m_physics);
 
 			physx::PxTolerancesScale scale;
 			m_cooking = PxCreateCooking(PX_PHYSICS_VERSION, *m_foundation, physx::PxCookingParams(scale));
-			connect2VisualDebugger();
-
 
 			if (!PxInitVehicleSDK(*m_physics)) {
 				LUMIX_FATAL(false);
@@ -254,6 +258,7 @@ namespace Lumix
 			physx::PxCloseVehicleSDK();
 			m_cooking->release();
 			m_physics->release();
+			m_pvd->disconnect();
 			m_foundation->release();
 		}
 
@@ -297,19 +302,12 @@ namespace Lumix
 
 		bool connect2VisualDebugger()
 		{
-			/*if (m_physics->getPvdConnectionManager() == nullptr) return false;
-
-			const char* pvd_host_ip = "127.0.0.1";
-			int port = 5425;
-			unsigned int timeout = 100;
-			physx::PxVisualDebuggerConnectionFlags connectionFlags =
-				physx::PxVisualDebuggerExt::getAllConnectionFlags();
-
-			auto* connection = physx::PxVisualDebuggerExt::createConnection(
-				m_physics->getPvdConnectionManager(), pvd_host_ip, port, timeout, connectionFlags);
-			return connection != nullptr;*/
-			// TODO
-			return false;
+			m_pvd = PxCreatePvd(*m_foundation);
+			if (!m_pvd) return false;
+			
+			//physx::PxPvdTransport* transport = physx::PxDefaultPvdFileTransportCreate("physx.pvd");
+			physx::PxPvdTransport* transport = physx::PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 100);
+			return m_pvd->connect(*transport, physx::PxPvdInstrumentationFlag::eALL);
 		}
 
 
@@ -342,6 +340,7 @@ namespace Lumix
 		PhysicsGeometryManager m_manager;
 		Engine& m_engine;
 		CollisionLayers m_layers;
+		physx::PxPvd* m_pvd = nullptr;;
 	};
 
 
