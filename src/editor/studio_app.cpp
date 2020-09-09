@@ -956,7 +956,7 @@ struct StudioAppImpl final : StudioApp
 		m_editor->setEntitiesRotations(&env, &rot, 1);
 		const ComponentUID cmp = m_editor->getUniverse()->getComponent(env, lua_script_cmp_type);
 		m_editor->addArrayPropertyItem(cmp, "scripts");
-		m_editor->setProperty(lua_script_cmp_type, "scripts", 0, "Path", entities, Path("pipelines/sky.lua"));
+		m_editor->setProperty(lua_script_cmp_type, "scripts", 0, "Path", entities, Path("pipelines/atmo.lua"));
 	}
 
 
