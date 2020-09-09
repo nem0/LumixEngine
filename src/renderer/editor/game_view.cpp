@@ -357,7 +357,7 @@ void GameView::onWindowGUI()
 			m_pos = ImGui::GetItemRectMin();
 			m_size = ImGui::GetItemRectSize();
 
-			if (m_is_mouse_captured && m_is_ingame_cursor) {
+			if (m_is_mouse_captured) {
 				OS::clipCursor((int)m_pos.x, (int)m_pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
