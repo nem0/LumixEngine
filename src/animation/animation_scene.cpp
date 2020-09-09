@@ -546,6 +546,8 @@ struct AnimationSceneImpl final : AnimationScene
 
 	void setAnimatorInput(EntityRef entity, u32 input_idx, float value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return;
+
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
 		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::FLOAT);
@@ -555,6 +557,8 @@ struct AnimationSceneImpl final : AnimationScene
 
 	void setAnimatorInput(EntityRef entity, u32 input_idx, bool value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return;
+
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
 		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::BOOL);
@@ -564,6 +568,8 @@ struct AnimationSceneImpl final : AnimationScene
 
 	float getAnimatorFloatInput(EntityRef entity, u32 input_idx) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return 0;
+
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
 		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::FLOAT);
@@ -573,6 +579,8 @@ struct AnimationSceneImpl final : AnimationScene
 
 	bool getAnimatorBoolInput(EntityRef entity, u32 input_idx) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return 0;
+
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
 		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::BOOL);
@@ -582,6 +590,8 @@ struct AnimationSceneImpl final : AnimationScene
 
 	u32 getAnimatorU32Input(EntityRef entity, u32 input_idx) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return 0;
+
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
 		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::U32);
@@ -591,6 +601,8 @@ struct AnimationSceneImpl final : AnimationScene
 
 	void setAnimatorInput(EntityRef entity, u32 input_idx, u32 value) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
+		if (!animator.ctx) return;
+
 		const Anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
 		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::U32);
