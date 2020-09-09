@@ -179,7 +179,7 @@ void InputSystemImpl::registerLuaAPI()
 	lua_State* state = m_engine.getState();
 
 	#define REGISTER_KEYCODE(KEYCODE) \
-		LuaWrapper::createSystemVariable(state, "Engine", "INPUT_KEYCODE_" #KEYCODE, (int)OS::Keycode::KEYCODE);
+		LuaWrapper::createSystemVariable(state, "LumixAPI", "INPUT_KEYCODE_" #KEYCODE, (int)OS::Keycode::KEYCODE);
 
 		REGISTER_KEYCODE(LBUTTON); 
 		REGISTER_KEYCODE(RBUTTON); 
