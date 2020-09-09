@@ -2138,7 +2138,7 @@ public:
 	DebugTriangle* addDebugTriangles(int count) override
 	{
 		const u32 new_size = m_debug_triangles.size() + count;
-		if (new_size < m_debug_triangles.capacity()) {
+		if (new_size > m_debug_triangles.capacity()) {
 			m_debug_triangles.reserve(maximum(new_size, m_debug_triangles.capacity() * 3 / 2));
 		}
 		m_debug_triangles.resize(new_size);
@@ -2149,7 +2149,7 @@ public:
 	DebugLine* addDebugLines(int count) override
 	{
 		const u32 new_size = m_debug_lines.size() + count;
-		if (new_size < m_debug_lines.capacity()) {
+		if (new_size > m_debug_lines.capacity()) {
 			m_debug_lines.reserve(maximum(new_size, m_debug_lines.capacity() * 3 / 2));
 		}
 		m_debug_lines.resize(new_size);
