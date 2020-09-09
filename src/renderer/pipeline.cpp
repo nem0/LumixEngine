@@ -1541,7 +1541,7 @@ struct PipelineImpl final : Pipeline
 			, height
 			, depth
 			, format
-			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::CLAMP_W | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
+			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
 			, mem
 			, "lua_texture");
 		LuaWrapper::push(L, texture.value);
