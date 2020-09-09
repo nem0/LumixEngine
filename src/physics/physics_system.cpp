@@ -259,6 +259,8 @@ namespace Lumix
 			m_cooking->release();
 			m_physics->release();
 			m_pvd->disconnect();
+			m_pvd->release();
+			m_pvd_transport->release();
 			m_foundation->release();
 		}
 
@@ -306,8 +308,8 @@ namespace Lumix
 			if (!m_pvd) return false;
 			
 			//physx::PxPvdTransport* transport = physx::PxDefaultPvdFileTransportCreate("physx.pvd");
-			physx::PxPvdTransport* transport = physx::PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 100);
-			return m_pvd->connect(*transport, physx::PxPvdInstrumentationFlag::eALL);
+			m_pvd_transport = physx::PxDefaultPvdSocketTransportCreate("127.0.0.1", 5425, 100);
+			return m_pvd->connect(*m_pvd_transport, physx::PxPvdInstrumentationFlag::eALL);
 		}
 
 
@@ -340,7 +342,8 @@ namespace Lumix
 		PhysicsGeometryManager m_manager;
 		Engine& m_engine;
 		CollisionLayers m_layers;
-		physx::PxPvd* m_pvd = nullptr;;
+		physx::PxPvd* m_pvd = nullptr;
+		physx::PxPvdTransport* m_pvd_transport = nullptr;
 	};
 
 

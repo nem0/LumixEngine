@@ -446,8 +446,12 @@ struct StudioAppImpl final : StudioApp
 		}
 		m_plugins.clear();
 
+		for (auto* i : m_gui_plugins) {
+			LUMIX_DELETE(m_editor->getAllocator(), i);
+		}
+		m_gui_plugins.clear();
+
 		PrefabSystem::destroyEditorPlugins(*this);
-		ASSERT(m_gui_plugins.empty());
 		ASSERT(m_mouse_plugins.empty());
 
 		for (auto* i : m_add_cmp_plugins)
