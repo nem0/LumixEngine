@@ -259,9 +259,11 @@ namespace Lumix
 			physx::PxCloseVehicleSDK();
 			m_cooking->release();
 			m_physics->release();
-			m_pvd->disconnect();
-			m_pvd->release();
-			m_pvd_transport->release();
+			if (m_pvd) {
+				m_pvd->disconnect();
+				m_pvd->release();
+				m_pvd_transport->release();
+			}
 			m_foundation->release();
 		}
 
