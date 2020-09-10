@@ -612,7 +612,9 @@ struct AnimationSceneImpl final : AnimationScene
 
 	LocalRigidTransform getAnimatorRootMotion(EntityRef entity) override
 	{
-		Animator& animator = m_animators[m_animator_map[entity]];
+		auto iter = m_animator_map.find(entity);
+		if (!iter.isValid()) return {};
+		Animator& animator = m_animators[iter.value()];
 		return animator.root_motion;
 	}
 
@@ -662,13 +664,6 @@ struct AnimationSceneImpl final : AnimationScene
 		// TODO
 		animator.ctx->root_bone_hash = crc32("RigRoot");
 		animator.resource->update(*animator.ctx, Ref(animator.root_motion));
-
-		if (animator.resource->m_flags.isSet(Anim::Controller::Flags::USE_ROOT_MOTION)) {
-			Transform tr = m_universe.getTransform(entity);
-			tr.rot = tr.rot * animator.root_motion.rot; 
-			tr.pos = tr.pos + tr.rot.rotate(animator.root_motion.pos);
-			m_universe.setTransform(entity, tr);
-		}
 
 		model->getRelativePose(*pose);
 		animator.resource->getPose(*animator.ctx, Ref(*pose));
