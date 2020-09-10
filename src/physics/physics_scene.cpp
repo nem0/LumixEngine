@@ -1,6 +1,7 @@
 #include <PxPhysicsAPI.h>
 
 #include "physics/physics_scene.h"
+#include "animation/animation_scene.h"
 #include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -450,7 +451,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		for (auto& controller : m_controllers)
 		{
-			controller.m_controller->release();
+			controller.controller->release();
 		}
 		m_controllers.clear();
 
@@ -575,26 +576,26 @@ struct PhysicsSceneImpl final : PhysicsScene
 	IPlugin& getPlugin() const override { return *m_system; }
 
 
-	u32 getControllerLayer(EntityRef entity) override { return m_controllers[entity].m_layer; }
+	u32 getControllerLayer(EntityRef entity) override { return m_controllers[entity].layer; }
 
 
 	void setControllerLayer(EntityRef entity, u32 layer) override
 	{
 		ASSERT(layer < lengthOf(m_layers.names));
 		auto& controller = m_controllers[entity];
-		controller.m_layer = layer;
+		controller.layer = layer;
 
 		PxFilterData data;
 		data.word0 = 1 << layer;
 		data.word1 = m_layers.filter[layer];
-		controller.m_filter_data = data;
+		controller.filter_data = data;
 		PxShape* shapes[8];
-		int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		int shapes_count = controller.controller->getActor()->getShapes(shapes, lengthOf(shapes));
 		for (int i = 0; i < shapes_count; ++i)
 		{
 			shapes[i]->setSimulationFilterData(data);
 		}
-		controller.m_controller->invalidateCache();
+		controller.controller->invalidateCache();
 	}
 
 
@@ -1126,7 +1127,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void destroyController(EntityRef entity)
 	{
-		m_controllers[entity].m_controller->release();
+		m_controllers[entity].controller->release();
 		m_controllers.erase(entity);
 		m_universe.onComponentDestroyed(entity, CONTROLLER_TYPE, this);
 	}
@@ -1313,23 +1314,23 @@ struct PhysicsSceneImpl final : PhysicsScene
 		DVec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
 		Controller& c = m_controllers.insert(entity, Controller());
-		c.m_controller = m_controller_manager->createController(cDesc);
-		c.m_entity = entity;
-		c.m_frame_change.set(0, 0, 0);
-		c.m_radius = cDesc.radius;
-		c.m_height = cDesc.height;
-		c.m_custom_gravity = false;
-		c.m_custom_gravity_acceleration = 9.8f;
-		c.m_layer = 0;
+		c.controller = m_controller_manager->createController(cDesc);
+		c.entity = entity;
+		c.frame_change.set(0, 0, 0);
+		c.radius = cDesc.radius;
+		c.height = cDesc.height;
+		c.custom_gravity = false;
+		c.custom_gravity_acceleration = 9.8f;
+		c.layer = 0;
 
 		PxFilterData data;
-		int controller_layer = c.m_layer;
+		int controller_layer = c.layer;
 		data.word0 = 1 << controller_layer;
 		data.word1 = m_layers.filter[controller_layer];
-		c.m_filter_data = data;
+		c.filter_data = data;
 		PxShape* shapes[8];
-		int shapes_count = c.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
-		c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
+		int shapes_count = c.controller->getActor()->getShapes(shapes, lengthOf(shapes));
+		c.controller->getActor()->userData = (void*)(intptr_t)entity.index;
 		for (int i = 0; i < shapes_count; ++i)
 		{
 			shapes[i]->setSimulationFilterData(data);
@@ -1540,29 +1541,20 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	bool isControllerCollisionDown(EntityRef entity) const override
-	{
-		const Controller& ctrl = m_controllers[entity];
-		PxControllerState state;
-		ctrl.m_controller->getState(state);
-		return (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) != 0;
-	}
-
-
 	void updateControllers(float time_delta)
 	{
 		PROFILE_FUNCTION();
 		for (auto& controller : m_controllers)
 		{
-			Vec3 dif = controller.m_frame_change;
-			controller.m_frame_change.set(0, 0, 0);
+			Vec3 dif = controller.frame_change;
+			controller.frame_change.set(0, 0, 0);
 
 			PxControllerState state;
-			controller.m_controller->getState(state);
+			controller.controller->getState(state);
 			float gravity_acceleration = 0.0f;
-			if (controller.m_custom_gravity)
+			if (controller.custom_gravity)
 			{
-				gravity_acceleration = controller.m_custom_gravity_acceleration * -1.0f;
+				gravity_acceleration = controller.custom_gravity_acceleration * -1.0f;
 			}
 			else
 			{
@@ -1580,12 +1572,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 				controller.gravity_speed = 0;
 			}
 
-			m_filter_callback.m_filter_data = controller.m_filter_data;
+			m_filter_callback.m_filter_data = controller.filter_data;
 			PxControllerFilters filters(nullptr, &m_filter_callback);
-			controller.m_controller->move(toPhysx(dif), 0.001f, time_delta, filters);
-			PxExtendedVec3 p = controller.m_controller->getFootPosition();
+			controller.controller->move(toPhysx(dif), 0.001f, time_delta, filters);
+			PxExtendedVec3 p = controller.controller->getFootPosition();
 
-			m_universe.setPosition(controller.m_entity, {p.x, p.y, p.z});
+			m_universe.setPosition(controller.entity, {p.x, p.y, p.z});
 		}
 	}
 
@@ -2139,6 +2131,21 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, count, wheels, nullptr);
 	}
 
+	void lateUpdate(float time_delta, bool paused) override {
+		if (!m_is_game_running || paused) return;
+
+		AnimationScene* anim_scene = (AnimationScene*)m_universe.getScene(crc32("animation"));
+		if (!anim_scene) return;
+
+		for (Controller& ctrl : m_controllers) {
+			if (ctrl.use_root_motion) {
+				const LocalRigidTransform tr = anim_scene->getAnimatorRootMotion(ctrl.entity);
+				const Quat rot = m_universe.getRotation(ctrl.entity);
+				ctrl.frame_change += rot.rotate(tr.pos);
+				m_universe.setRotation(ctrl.entity, rot * tr.rot);
+			}
+		}
+	}
 
 	void update(float time_delta, bool paused) override
 	{
@@ -2472,12 +2479,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void stopGame() override { m_is_game_running = false; }
 
 
-	float getControllerRadius(EntityRef entity) override { return m_controllers[entity].m_radius; }
-	float getControllerHeight(EntityRef entity) override { return m_controllers[entity].m_height; }
-	bool getControllerCustomGravity(EntityRef entity) override { return m_controllers[entity].m_custom_gravity; }
+	float getControllerRadius(EntityRef entity) override { return m_controllers[entity].radius; }
+	float getControllerHeight(EntityRef entity) override { return m_controllers[entity].height; }
+	bool getControllerCustomGravity(EntityRef entity) override { return m_controllers[entity].custom_gravity; }
 	float getControllerCustomGravityAcceleration(EntityRef entity) override
 	{
-		return m_controllers[entity].m_custom_gravity_acceleration;
+		return m_controllers[entity].custom_gravity_acceleration;
 	}
 
 
@@ -2486,9 +2493,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (value <= 0) return;
 
 		Controller& ctrl = m_controllers[entity];
-		ctrl.m_radius = value;
+		ctrl.radius = value;
 
-		PxRigidActor* actor = ctrl.m_controller->getActor();
+		PxRigidActor* actor = ctrl.controller->getActor();
 		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
@@ -2506,9 +2513,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (value <= 0) return;
 
 		Controller& ctrl = m_controllers[entity];
-		ctrl.m_height = value;
+		ctrl.height = value;
 
-		PxRigidActor* actor = ctrl.m_controller->getActor();
+		PxRigidActor* actor = ctrl.controller->getActor();
 		PxShape* shapes;
 		if (actor->getNbShapes() == 1 && actor->getShapes(&shapes, 1))
 		{
@@ -2523,28 +2530,36 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void setControllerCustomGravity(EntityRef entity, bool value) override
 	{
 		Controller& ctrl = m_controllers[entity];
-		ctrl.m_custom_gravity = value;
+		ctrl.custom_gravity = value;
 	}
 
 	void setControllerCustomGravityAcceleration(EntityRef entity, float value) override
 	{
 		Controller& ctrl = m_controllers[entity];
-		ctrl.m_custom_gravity_acceleration = value;
+		ctrl.custom_gravity_acceleration = value;
 	}
 
-	bool isControllerTouchingDown(EntityRef entity) override
+	bool isControllerCollisionDown(EntityRef entity) const override
 	{
+		const Controller& ctrl = m_controllers[entity];
 		PxControllerState state;
-		m_controllers[entity].m_controller->getState(state);
+		ctrl.controller->getState(state);
 		return (state.collisionFlags & PxControllerCollisionFlag::eCOLLISION_DOWN) != 0;
 	}
+	
+	bool getControllerUseRootMotion(EntityRef entity) override {
+		return m_controllers[entity].use_root_motion;
+	}
 
+	void setControllerUseRootMotion(EntityRef entity, bool enable) override {
+		m_controllers[entity].use_root_motion = enable;
+	}
 
 	void resizeController(EntityRef entity, float height) override
 	{
 		Controller& ctrl = m_controllers[entity];
-		ctrl.m_height = height;
-		ctrl.m_controller->resize(height);
+		ctrl.height = height;
+		ctrl.controller->resize(height);
 	}
 
 
@@ -2569,7 +2584,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void moveController(EntityRef entity, const Vec3& v) override { m_controllers[entity].m_frame_change += v; }
+	void moveController(EntityRef entity, const Vec3& v) override { m_controllers[entity].frame_change += v; }
 
 
 	static int LUA_raycast(lua_State* L)
@@ -2693,7 +2708,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				Controller& controller = iter.value();
 				DVec3 pos = m_universe.getPosition(entity);
 				PxExtendedVec3 pvec(pos.x, pos.y, pos.z);
-				controller.m_controller->setFootPosition(pvec);
+				controller.controller->setFootPosition(pvec);
 			}
 		}
 
@@ -2900,17 +2915,17 @@ struct PhysicsSceneImpl final : PhysicsScene
 		for (auto& controller : m_controllers)
 		{
 			PxFilterData data;
-			int controller_layer = controller.m_layer;
+			int controller_layer = controller.layer;
 			data.word0 = 1 << controller_layer;
 			data.word1 = m_layers.filter[controller_layer];
-			controller.m_filter_data = data;
+			controller.filter_data = data;
 			PxShape* shapes[8];
-			int shapes_count = controller.m_controller->getActor()->getShapes(shapes, lengthOf(shapes));
+			int shapes_count = controller.controller->getActor()->getShapes(shapes, lengthOf(shapes));
 			for (int i = 0; i < shapes_count; ++i)
 			{
 				shapes[i]->setSimulationFilterData(data);
 			}
-			controller.m_controller->invalidateCache();
+			controller.controller->invalidateCache();
 		}
 
 		for (auto& terrain : m_terrains)
@@ -3332,12 +3347,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 		serializer.write((i32)m_controllers.size());
 		for (const auto& controller : m_controllers)
 		{
-			serializer.write(controller.m_entity);
-			serializer.write(controller.m_layer);
-			serializer.write(controller.m_radius);
-			serializer.write(controller.m_height);
-			serializer.write(controller.m_custom_gravity);
-			serializer.write(controller.m_custom_gravity_acceleration);
+			serializer.write(controller.entity);
+			serializer.write(controller.layer);
+			serializer.write(controller.radius);
+			serializer.write(controller.height);
+			serializer.write(controller.custom_gravity);
+			serializer.write(controller.custom_gravity_acceleration);
+			serializer.write(controller.use_root_motion);
 		}
 		serializer.write((i32)m_terrains.size());
 		for (auto& terrain : m_terrains)
@@ -3775,23 +3791,24 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.read(entity);
 			entity = entity_map.get(entity);
 			Controller& c = m_controllers.insert(entity, Controller());
-			c.m_frame_change.set(0, 0, 0);
+			c.frame_change.set(0, 0, 0);
 
-			serializer.read(c.m_layer);
-			serializer.read(c.m_radius);
-			serializer.read(c.m_height);
-			serializer.read(c.m_custom_gravity);
-			serializer.read(c.m_custom_gravity_acceleration);
+			serializer.read(c.layer);
+			serializer.read(c.radius);
+			serializer.read(c.height);
+			serializer.read(c.custom_gravity);
+			serializer.read(c.custom_gravity_acceleration);
+			serializer.read(c.use_root_motion);
 			PxCapsuleControllerDesc cDesc;
 			initControllerDesc(cDesc);
-			cDesc.height = c.m_height;
-			cDesc.radius = c.m_radius;
+			cDesc.height = c.height;
+			cDesc.radius = c.radius;
 			DVec3 position = m_universe.getPosition(entity);
 			cDesc.position.set(position.x, position.y - cDesc.height * 0.5f, position.z);
-			c.m_controller = m_controller_manager->createController(cDesc);
-			c.m_controller->getActor()->userData = (void*)(intptr_t)entity.index;
-			c.m_entity = entity;
-			c.m_controller->setFootPosition({position.x, position.y, position.z});
+			c.controller = m_controller_manager->createController(cDesc);
+			c.controller->getActor()->userData = (void*)(intptr_t)entity.index;
+			c.entity = entity;
+			c.controller->setFootPosition({position.x, position.y, position.z});
 			m_universe.onComponentCreated(entity, CONTROLLER_TYPE, this);
 		}
 	}
@@ -4114,16 +4131,17 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	struct Controller
 	{
-		PxController* m_controller;
-		EntityRef m_entity;
-		Vec3 m_frame_change;
-		float m_radius;
-		float m_height;
-		bool m_custom_gravity;
-		float m_custom_gravity_acceleration;
-		u32 m_layer;
-		PxFilterData m_filter_data;
+		PxController* controller;
+		EntityRef entity;
+		Vec3 frame_change;
+		float radius;
+		float height;
+		float custom_gravity_acceleration;
+		u32 layer;
+		PxFilterData filter_data;
 
+		bool custom_gravity = false;
+		bool use_root_motion = 0;
 		float gravity_speed = 0;
 	};
 	

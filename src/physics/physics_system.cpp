@@ -123,8 +123,9 @@ namespace Lumix
 				property("Radius", LUMIX_PROP(PhysicsScene, ControllerRadius)),
 				property("Height", LUMIX_PROP(PhysicsScene, ControllerHeight)),
 				property("Layer", LUMIX_PROP(PhysicsScene, ControllerLayer), LayerEnum()),
-				property("Use Custom Gravity", LUMIX_PROP(PhysicsScene, ControllerCustomGravity)),
-				property("Custom Gravity Acceleration", LUMIX_PROP(PhysicsScene, ControllerCustomGravityAcceleration))
+				property("Use root motion", LUMIX_PROP(PhysicsScene, ControllerUseRootMotion)),
+				property("Use custom gravity", LUMIX_PROP(PhysicsScene, ControllerCustomGravity)),
+				property("Custom gravity acceleration", LUMIX_PROP(PhysicsScene, ControllerCustomGravityAcceleration))
 			),
 			component("rigid_actor",
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer), LayerEnum()),

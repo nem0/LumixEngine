@@ -196,8 +196,9 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setControllerCustomGravity(EntityRef entity, bool gravity) = 0;
 	virtual float getControllerCustomGravityAcceleration(EntityRef entity) = 0;
 	virtual void setControllerCustomGravityAcceleration(EntityRef entity, float gravityacceleration) = 0;
-	virtual bool isControllerTouchingDown(EntityRef entity) = 0;
 	virtual void resizeController(EntityRef entity, float height) = 0;
+	virtual bool getControllerUseRootMotion(EntityRef entity) = 0;
+	virtual void setControllerUseRootMotion(EntityRef entity, bool enable) = 0;
 
 	virtual void addBoxGeometry(EntityRef entity, int index) = 0;
 	virtual void removeBoxGeometry(EntityRef entity, int index) = 0;

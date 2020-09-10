@@ -46,9 +46,7 @@ public:
 	Array<String> m_animation_slots;
 	Array<BoneMask> m_bone_masks;
 	InputDecl m_inputs;
-	enum class Flags : u32 {
-		USE_ROOT_MOTION = 1 << 0
-	};
+	enum class Flags : u32 {};
 	FlagSet<Flags, u32> m_flags;
 	struct IK {
 		enum { MAX_BONES_COUNT = 8 };
