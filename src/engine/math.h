@@ -299,6 +299,8 @@ struct LUMIX_ENGINE_API DVec3
 	double length() const;
 	double squaredLength() const { return x * x + y * y + z * z; }
 	void operator*=(const double& rhs) { x *= rhs; y *= rhs; z *= rhs; }
+	void operator/=(const double& rhs) { x /= rhs; y /= rhs; z /= rhs; }
+	void operator+=(const DVec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
 	Vec3 toFloat() const { return {(float)x, (float)y, (float)z}; }

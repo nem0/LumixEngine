@@ -49,6 +49,9 @@
 		LUMIX_CRT_API float fmodf(float x, float y);
 		double __cdecl fmod(double x, double y);
 		LUMIX_CRT_API void __cdecl free(void* ptr);
+		LUMIX_CRT_API int __cdecl _finite(double x);
+		inline int __cdecl isinf(double x) { return !_finite(x); }
+
 		double __cdecl log10(double x);
 		LUMIX_CRT_API void* __cdecl malloc(size_t size);
 		const void* __cdecl memchr(const void* buf, int val, size_t max_count);
