@@ -3300,6 +3300,7 @@ struct PipelineImpl final : Pipeline
 				inst.hm_size = info.terrain->getSize();
 				inst.program = info.shader->getProgram(gpu::VertexDecl(), m_define_mask);
 				inst.material = info.terrain->m_material->getRenderData();
+				if (isinf(inst.pos.x) || isinf(inst.pos.y) || isinf(inst.pos.z)) m_instances.pop();
 			}
 		}
 
