@@ -697,6 +697,11 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 
 		import_mesh.aabb = aabb;
 		import_mesh.radius_squared = radius_squared;
+
+		if (import_mesh.lod >= 3 && cfg.create_impostor) {
+			logWarning("FBX") << path << " has more than 3 LODs and some are replaced with impostor";
+			import_mesh.import = false;
+		}
 	});
 	for (int mesh_idx = m_meshes.size() - 1; mesh_idx >= 0; --mesh_idx)
 	{
@@ -738,9 +743,7 @@ void FBXImporter::gatherGeometries(ofbx::IScene* scene)
 
 void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 {
-	int min_lod = 2;
 	int c = scene->getMeshCount();
-	int start_index = m_meshes.size();
 	for (int i = 0; i < c; ++i) {
 		const ofbx::Mesh* fbx_mesh = (const ofbx::Mesh*)scene->getMesh(i);
 		const int mat_count = fbx_mesh->getMaterialCount();
@@ -760,12 +763,7 @@ void FBXImporter::gatherMeshes(ofbx::IScene* scene)
 			mesh.fbx_mat = fbx_mesh->getMaterial(j);
 			mesh.submesh = mat_count > 1 ? j : -1;
 			mesh.lod = detectMeshLOD(mesh);
-			min_lod = minimum(min_lod, mesh.lod);
 		}
-	}
-	if (min_lod != 1) return;
-	for (int i = start_index, n = m_meshes.size(); i < n; ++i) {
-		--m_meshes[i].lod;
 	}
 }
 
