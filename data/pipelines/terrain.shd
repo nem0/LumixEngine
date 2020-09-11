@@ -132,10 +132,10 @@ common [[
 
 		float noise = texture(u_noise, 0.1 * uv_global * u_hm_size).x;
 
-		Detail c00 = textureNoTile2(noise, uv_detail, int(splat00.x * 256.0), 1);
-		Detail c01 = textureNoTile2(noise, uv_detail, int(splat01.x * 256.0), 1);
-		Detail c10 = textureNoTile2(noise, uv_detail, int(splat10.x * 256.0), 1);
-		Detail c11 = textureNoTile2(noise, uv_detail, int(splat11.x * 256.0), 1);
+		Detail c00 = textureNoTile2(noise, uv_detail, int(splat00.x * 255.0 + 0.5), 1);
+		Detail c01 = textureNoTile2(noise, uv_detail, int(splat01.x * 255.0 + 0.5), 1);
+		Detail c10 = textureNoTile2(noise, uv_detail, int(splat10.x * 255.0 + 0.5), 1);
+		Detail c11 = textureNoTile2(noise, uv_detail, int(splat11.x * 255.0 + 0.5), 1);
 			
 		Detail res;
 		res.normal = normalize(getTBN(uv_global) * (c00.normal * bicoef.x + c01.normal * bicoef.y + c10.normal * bicoef.z + c11.normal * bicoef.w).xzy);
@@ -267,15 +267,15 @@ fragment_shader [[
 
 				float noise = texture(u_noise, 0.1 * v_uv * u_hm_size).x;
 
-				Detail c00 = textureNoTile(noise, v_uv_detail, int(splat00.x * 256.0), 1);
-				Detail c01 = textureNoTile(noise, v_uv_detail, int(splat01.x * 256.0), 1);
-				Detail c10 = textureNoTile(noise, v_uv_detail, int(splat10.x * 256.0), 1);
-				Detail c11 = textureNoTile(noise, v_uv_detail, int(splat11.x * 256.0), 1);
+				Detail c00 = textureNoTile(noise, v_uv_detail, int(splat00.x * 255.0 + 0.5), 1);
+				Detail c01 = textureNoTile(noise, v_uv_detail, int(splat01.x * 255.0 + 0.5), 1);
+				Detail c10 = textureNoTile(noise, v_uv_detail, int(splat10.x * 255.0 + 0.5), 1);
+				Detail c11 = textureNoTile(noise, v_uv_detail, int(splat11.x * 255.0 + 0.5), 1);
 			
-				Detail s00 = textureNoTile(noise, v_uv_detail, int(splat00.y * 256.0), 1);
-				Detail s01 = textureNoTile(noise, v_uv_detail, int(splat01.y * 256.0), 1);
-				Detail s10 = textureNoTile(noise, v_uv_detail, int(splat10.y * 256.0), 1);
-				Detail s11 = textureNoTile(noise, v_uv_detail, int(splat11.y * 256.0), 1);
+				Detail s00 = textureNoTile(noise, v_uv_detail, int(splat00.y * 255.0 + 0.5), 1);
+				Detail s01 = textureNoTile(noise, v_uv_detail, int(splat01.y * 255.0 + 0.5), 1);
+				Detail s10 = textureNoTile(noise, v_uv_detail, int(splat10.y * 255.0 + 0.5), 1);
+				Detail s11 = textureNoTile(noise, v_uv_detail, int(splat11.y * 255.0 + 0.5), 1);
 
 				vec4 v4 = c00.albedo * bicoef.x + c01.albedo * bicoef.y + c10.albedo * bicoef.z + c11.albedo * bicoef.w;
 				vec4 v4_2 = s00.albedo * bicoef.x + s01.albedo * bicoef.y + s10.albedo * bicoef.z + s11.albedo * bicoef.w;
