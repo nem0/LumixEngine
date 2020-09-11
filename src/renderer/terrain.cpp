@@ -429,7 +429,7 @@ void Terrain::onMaterialLoaded(Resource::State, Resource::State new_state, Resou
 			m_height = m_heightmap->height;
 		}
 
-		m_albedomap = m_material->getTextureByName("Albedo");
+		m_albedomap = m_material->getTextureByName("Detail albedo");
 		m_splatmap = m_material->getTextureByName("Splatmap");
 
 		if (m_splatmap && !m_splatmap->getData()) {
