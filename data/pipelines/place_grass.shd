@@ -97,7 +97,7 @@ compute_shader [[
 		inst_pos.xz = (u_from + vec2(gl_GlobalInvocationID.xy)) * 0.25;
 		
 		if (any(lessThan(inst_pos.xz, vec2(0)))) return;
-		uvec4 splat = uvec4(texture(u_splatmap, (inst_pos.xz + 0.5) / u_terrain_size) * 256.0);
+		uvec4 splat = uvec4(texture(u_splatmap, (inst_pos.xz + 0.5) / u_terrain_size) * 255.0 + 0.5);
 
 		uint mask = (splat.w << 8) | splat.z;
 		
