@@ -671,7 +671,11 @@ void setState(u64 state)
 			GL_DST_COLOR,
 			GL_ONE_MINUS_DST_COLOR,
 			GL_DST_ALPHA,
-			GL_ONE_MINUS_DST_ALPHA
+			GL_ONE_MINUS_DST_ALPHA,
+			GL_SRC1_COLOR,
+			GL_ONE_MINUS_SRC1_COLOR,
+			GL_SRC1_ALPHA,
+			GL_ONE_MINUS_SRC1_ALPHA
 		};
 		return table[(int)factor];
 	};
