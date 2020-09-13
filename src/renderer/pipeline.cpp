@@ -2307,6 +2307,9 @@ struct PipelineImpl final : Pipeline
 			else if(equalIStrings(tmp, "multiply")) {
 				rs |= gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
 			}
+			else if(equalIStrings(tmp, "dual")) {
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+			}
 			else if(equalIStrings(tmp, "")) {
 			}
 			else {
