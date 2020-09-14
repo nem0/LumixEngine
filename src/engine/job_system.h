@@ -48,28 +48,15 @@ void forEach(i32 count, i32 step, const F& f)
 		return;
 	}
 
-	struct Data {
-		const F* f;
-		volatile i32 offset = 0;
-		i32 count;
-		i32 step;
-	} data;
-	data.count = count;
-	data.step = step;
-	data.f = &f;
-	
-	SignalHandle signal = JobSystem::INVALID_HANDLE;
-	for(i32 i = 0; i < count; ++i) {
-		JobSystem::run(&data, [](void* ptr){
-			Data& data = *(Data*)ptr;
-			for(;;) {
-				const i32 idx = atomicAdd(&data.offset, data.step);
-				if (idx >= data.count) break;
-				(*data.f)(idx, minimum(idx + data.step, data.count));
-			}
-		}, &signal);
-	}
-	wait(signal);
+	volatile i32 offset = 0;
+
+	JobSystem::runOnWorkers([&](){
+		for(;;) {
+			const i32 idx = atomicAdd(&offset, step);
+			if (idx >= count) break;
+			f(idx, minimum(idx + step, count));
+		}
+	});
 }
 
 } // namespace JobSystem
