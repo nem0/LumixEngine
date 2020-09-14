@@ -74,8 +74,6 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 			mat4 u_camera_inv_view;
 			mat4 u_camera_view_projection;
 			mat4 u_camera_inv_view_projection;
-			vec4 u_fog_params;
-			vec4 u_fog_color;
 			vec4 u_camera_world_pos;
 			vec4 u_light_direction;
 			vec4 u_light_color;
