@@ -54,7 +54,9 @@ void forEach(i32 count, i32 step, const F& f)
 		for(;;) {
 			const i32 idx = atomicAdd(&offset, step);
 			if (idx >= count) break;
-			f(idx, minimum(idx + step, count));
+			i32 to = idx + step;
+			to = to > count ? count : to;
+			f(idx, to);
 		}
 	});
 }
