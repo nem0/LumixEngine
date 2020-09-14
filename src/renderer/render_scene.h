@@ -69,10 +69,6 @@ struct Environment
 	Vec3 diffuse_color;
 	float diffuse_intensity;
 	float indirect_intensity;
-	Vec3 fog_color;
-	float fog_density;
-	float fog_bottom;
-	float fog_height;
 	EntityRef entity;
 	Vec4 cascades;
 	FlagSet<Flags, u32> flags;

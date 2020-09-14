@@ -2527,11 +2527,7 @@ public:
 		light.diffuse_color.set(1, 1, 1);
 		light.diffuse_intensity = 1;
 		light.indirect_intensity = 1;
-		light.fog_color.set(1, 1, 1);
-		light.fog_density = 0;
 		light.cascades.set(3, 8, 20, 60);
-		light.fog_bottom = 0.0f;
-		light.fog_height = 10.0f;
 
 		if (m_environments.empty()) m_active_global_light_entity = entity;
 

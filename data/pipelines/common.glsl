@@ -181,6 +181,27 @@ float random (vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
+float getShadowSimple(sampler2D shadowmap, vec3 wpos)
+{
+	#ifdef LUMIX_FRAGMENT_SHADER
+		vec4 pos = vec4(wpos, 1);
+
+		vec2 sm_size = 3.0 / textureSize(shadowmap, 0);
+		for (int slice = 0; slice < 4; ++slice) {
+			vec4 sc = u_shadowmap_matrices[slice] * pos;
+			sc = sc / sc.w;
+			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
+				vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
+				float shadow = 0;
+				float receiver = sc.z;
+				float occluder = textureLod(shadowmap, sm_uv, 0).r;
+				return saturate((receiver - occluder) * 10e3);
+			}
+		}
+	#endif
+	return 1;
+}
+
 float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 {
 	#ifdef LUMIX_FRAGMENT_SHADER
@@ -402,34 +423,6 @@ float rand(vec3 seed)
 	return fract(sin(dot_product) * 43758.5453);
 }
 
-float getFogFactor(float cam_height
-	, float frag_height
-	, vec3 to_fragment
-	, float fog_density
-	, float fog_bottom
-	, float fog_height) 
-{ 
-	float fog_top = fog_bottom + fog_height;
-	frag_height = min(frag_height, fog_top);
-	float len = length(to_fragment);
-	vec3 view_dir = to_fragment / len;
-	float y_dir = abs(view_dir.y);
-	
-	cam_height = min(cam_height, fog_top);
-	float avg_y = (frag_height + cam_height) * 0.5;
-	float avg_density = fog_density * saturate(1.0 - (avg_y - fog_bottom) / fog_height);
-
-	float dist = abs(cam_height - frag_height);
-	if (y_dir <= 0) {
-		dist = len;
-	}
-	else {
-		dist = dist / y_dir; 
-	}
-	float res = exp(-pow(avg_density * dist, 2));
-	return 1 - saturate(res);
-}
-
 vec3 vegetationAnim(vec3 obj_pos, vec3 vertex_pos) {
 	obj_pos += u_camera_world_pos.xyz;
 	vertex_pos.x += vertex_pos.y > 0.1 ? cos((obj_pos.x + obj_pos.y + obj_pos.z * 2) * 0.3 + u_time * 2) * vertex_pos.y * vertex_pos.y * 0.001 : 0;
@@ -466,7 +459,5 @@ vec3 computeLighting(Cluster cluster, Surface surface, vec3 light_direction, vec
 	res += surface.emission * surface.albedo;
 	res += pointLightsLighting(cluster, surface, shadow_atlas);
 	res += envProbesLighting(cluster, surface);
-
-	float fog_factor = getFogFactor(u_camera_world_pos.y, u_camera_world_pos.y + surface.wpos.y, surface.wpos, u_fog_params.x, u_fog_params.y, u_fog_params.z);
-	return mix(res, u_fog_color.rgb, fog_factor);
+	return res;
 }

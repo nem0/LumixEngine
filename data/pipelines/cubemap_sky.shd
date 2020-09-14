@@ -47,9 +47,7 @@ fragment_shader [[
 	void main()
 	{
 		vec3 eye_dir = getWorldNormal(v_uv);
-		float fog_factor = getFogFactorSky(u_camera_world_pos.y, eye_dir, u_fog_params.x, u_fog_params.y, u_fog_params.z);
-		vec4 sky_color = texture(u_sky, eye_dir);
-		o_color.xyz = mix(sky_color.rgb, u_fog_color.rgb, fog_factor);
-		o_color.w = 1;
+		o_color.rgb = texture(u_sky, eye_dir).rgb;
+		o_color.a = 1;
 	}
 ]]

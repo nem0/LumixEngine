@@ -4,6 +4,7 @@ height_distribution_mie = 1200
 ground_r = 6378
 atmo_r = 6478
 scatter_rayleigh = { 5.802 / 33.1, 13.558 / 33.1, 33.1 / 33.1 }
+scatter_fog = { 1, 1, 1 }
 scatter_mie = { 1, 1, 1 }
 absorb_mie = {1, 1, 1 }
 sunlight_color = {1, 1, 1}
@@ -13,36 +14,64 @@ cloud_param1 = 1
 cloud_param2 = 1
 cloud_param3 = 1
 enable_clouds = false
+enable_fog = false
+enable_godrays = false
+fog_top = 100
+fog_density = 1
+Editor.setPropertyType(this, "scatter_fog", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "scatter_rayleigh", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "scatter_mie", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "absorb_mie", Editor.COLOR_PROPERTY)
 Editor.setPropertyType(this, "sunlight_color", Editor.COLOR_PROPERTY)
 
 function setDrawcallUniforms(env, x, y, z)
+	local f_fog_enabled = 0
+	if enable_fog then
+		f_fog_enabled = 1
+	end
+	local f_godarys_enabled = 0
+	if enable_godrays then
+		f_godarys_enabled = 1
+	end
 	env.drawcallUniforms({
 		ground_r * 1000,
 		atmo_r * 1000,
 		height_distribution_rayleigh,
 		height_distribution_mie,
+
 		scatter_rayleigh[1] * 33.1 * 0.000001,
 		scatter_rayleigh[2] * 33.1 * 0.000001,
 		scatter_rayleigh[3] * 33.1 * 0.000001,
 		0,
+
 		scatter_mie[1] * 3.996 * 0.000001,
 		scatter_mie[2] * 3.996 * 0.000001,
 		scatter_mie[3] * 3.996 * 0.000001,
 		0,
+
 		absorb_mie[1] * 4.4 * 0.000001,
 		absorb_mie[2] * 4.4 * 0.000001,
 		absorb_mie[3] * 4.4 * 0.000001,
 		0,
+
 		sunlight_color[1], 
 		sunlight_color[2], 
 		sunlight_color[3],
 		sunlight_strength,
+
 		x,
 		y,
 		z, 
+		0,
+
+		scatter_fog[1] * 0.0001 * fog_density,
+		scatter_fog[2] * 0.0001 * fog_density,
+		scatter_fog[3] * 0.0001 * fog_density,
+		0,
+
+		fog_top,
+		f_fog_enabled,
+		f_godarys_enabled,
 		0
 	})
 end
@@ -63,7 +92,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	end
 	env.setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 	local state = {
-		blending = "add",
+		blending = "dual",
 		depth_write = false,
 		depth_test = false
 	}
@@ -102,9 +131,9 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.dispatch(env.atmo_scattering_shader, 64 / 16, 128 / 16, 1)
 	env.endBlock()
 	
-	env.bindRawTexture(env.inscatter_precomputed, 1);
-	env.bindRawTexture(env.opt_depth_precomputed, 2);
-	env.drawArray(0, 4, env.atmo_shader, { gbuffer_depth }, {}, {}, state)
+	env.bindRawTexture(env.inscatter_precomputed, 2);
+	env.bindRawTexture(env.opt_depth_precomputed, 3);
+	env.drawArray(0, 4, env.atmo_shader, { gbuffer_depth, shadowmap }, {}, {}, state)
 	
 	if enable_clouds then
 		--if cloudsonce == nil then

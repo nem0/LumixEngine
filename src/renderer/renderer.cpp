@@ -400,10 +400,6 @@ static void registerProperties(IAllocator& allocator)
 			var_property("Color", &RenderScene::getEnvironment, &Environment::diffuse_color, ColorAttribute()),
 			var_property("Intensity", &RenderScene::getEnvironment, &Environment::diffuse_intensity, MinAttribute(0)),
 			var_property("Indirect intensity", &RenderScene::getEnvironment, &Environment::indirect_intensity, MinAttribute(0)),
-			var_property("Fog density", &RenderScene::getEnvironment, &Environment::fog_density, ClampAttribute(0, 1)),
-			var_property("Fog bottom", &RenderScene::getEnvironment, &Environment::fog_bottom),
-			var_property("Fog height", &RenderScene::getEnvironment, &Environment::fog_height, MinAttribute(0)),
-			var_property("Fog color", &RenderScene::getEnvironment, &Environment::fog_color, ColorAttribute()),
 			property("Shadow cascades", LUMIX_PROP(RenderScene, ShadowmapCascades)),
 			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows))
 		),
