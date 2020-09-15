@@ -133,7 +133,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	
 	env.bindRawTexture(env.inscatter_precomputed, 2);
 	env.bindRawTexture(env.opt_depth_precomputed, 3);
-	env.drawArray(0, 4, env.atmo_shader, { gbuffer_depth, shadowmap }, {}, {}, state)
+	env.drawArray(0, 4, env.atmo_shader, { gbuffer_depth, shadowmap }, state)
 	
 	if enable_clouds then
 		--if cloudsonce == nil then
@@ -150,7 +150,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		)
 		env.bindRawTexture(env.inscatter_precomputed, 1);
 		env.bindRawTexture(env.clouds_noise_precomputed, 2);
-		env.drawArray(0, 4, env.clouds_shader, { gbuffer_depth }, {}, {}, clouds_state)
+		env.drawArray(0, 4, env.clouds_shader, { gbuffer_depth }, clouds_state)
 		env.endBlock()
 	end
 	

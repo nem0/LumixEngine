@@ -22,7 +22,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		depth_write = false,
 		depth_test = false
 	}
-	env.drawArray(0, 4, env.cubemap_sky_shader, {}, {}, {}, state)
+	env.drawArray(0, 4, env.cubemap_sky_shader, {}, state)
 	env.endBlock()
 	return hdr_buffer
 end
