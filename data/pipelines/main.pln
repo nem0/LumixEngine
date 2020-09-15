@@ -78,10 +78,10 @@ end
 
 function geomPass(default_set, decal_set)
 	beginBlock("geom_pass")
-		local gbuffer0 = createRenderbuffer(1, 1, true, "rgba8", "gbuffer0")
-		local gbuffer1 = createRenderbuffer(1, 1, true, "rgba16", "gbuffer1")
-		local gbuffer2 = createRenderbuffer(1, 1, true, "rgba8", "gbuffer2")
-		local dsbuffer = createRenderbuffer(1, 1, true, "depth24stencil8", "gbuffer_ds")
+		local gbuffer0 = createRenderbuffer(viewport_w, viewport_h, "rgba8", "gbuffer0")
+		local gbuffer1 = createRenderbuffer(viewport_w, viewport_h, "rgba16", "gbuffer1")
+		local gbuffer2 = createRenderbuffer(viewport_w, viewport_h, "rgba8", "gbuffer2")
+		local dsbuffer = createRenderbuffer(viewport_w, viewport_h, "depth24stencil8", "gbuffer_ds")
 	
 		setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 		if PREVIEW ~= nil then
@@ -110,9 +110,9 @@ end
 function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local hdr_rb = 0
 	if PROBE ~= nil then
-		hdr_rb = createRenderbuffer(1, 1, true, "rgba32f", "hdr")
+		hdr_rb = createRenderbuffer(viewport_w, viewport_h, "rgba32f", "hdr")
 	else
-		hdr_rb = createRenderbuffer(1, 1, true, "rgba16f", "hdr")
+		hdr_rb = createRenderbuffer(viewport_w, viewport_h, "rgba16f", "hdr")
 	end
 	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
@@ -180,7 +180,7 @@ function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 end
 
 function blur(buffer, format, w, h, tmp_rb_dbg_name) 
-	local blur_buf = createRenderbuffer(w, h, false, format, tmp_rb_dbg_name)
+	local blur_buf = createRenderbuffer(w, h, format, tmp_rb_dbg_name)
 	setRenderTargets(blur_buf)
 	viewport(0, 0, w, h)
 	drawArray(0, 4, blur_shader
@@ -201,13 +201,13 @@ end
 
 function shadowPass()
 	if not environmentCastShadows() then
-		local rb = createRenderbuffer(1, 1, false, "depth32", "shadowmap")
+		local rb = createRenderbuffer(1, 1, "depth32", "shadowmap")
 		setRenderTargets(rb)
 		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 		return rb
 	else 
 		beginBlock("shadows")
-			local depthbuf = createRenderbuffer(4096, 1024, false, "depth32", "shadowmap_depth")
+			local depthbuf = createRenderbuffer(4096, 1024, "depth32", "shadowmap_depth")
 			setRenderTargets(depthbuf)
 			clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 			
@@ -246,9 +246,9 @@ function tonemap(hdr_buffer)
 	beginBlock("tonemap")
 	local rb
 	if APP ~= nil or PREVIEW ~= nil or screenshot_request == 1 then
-		rb = createRenderbuffer(1, 1, true, "rgba8", "tonemap")
+		rb = createRenderbuffer(viewport_w, viewport_h, "rgba8", "tonemap")
 	else
-		rb = createRenderbuffer(1, 1, true, "rgba16f", "tonemap")
+		rb = createRenderbuffer(viewport_w, viewport_h, "rgba16f", "tonemap")
 	end
 	setRenderTargets(rb)
 	drawArray(0, 4, tonemap_shader
@@ -287,7 +287,7 @@ end
 
 
 function renderSelectionOutline(output)
-	local selection_mask = createRenderbuffer(1, 1, true, "rgba8", "selection outline")
+	local selection_mask = createRenderbuffer(viewport_w, viewport_h, "rgba8", "selection outline")
 	setRenderTargets(selection_mask)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	renderSelection()
@@ -305,7 +305,7 @@ end
 function main_shadowmap()
 	beginBlock("bake_shadow")
 
-	local depthbuf = createRenderbuffer(1, 1, true, "depth32", "shadowmap_depth")
+	local depthbuf = createRenderbuffer(viewport_w, viewport_h, "depth32", "shadowmap_depth")
 	setRenderTargets(depthbuf)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
@@ -372,7 +372,7 @@ function main()
 	debugPass(res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local icon_ds = -1
 	if SCENE_VIEW ~= nil then
-		icon_ds = createRenderbuffer(1, 1, true, "depth24stencil8", "icon_ds")
+		icon_ds = createRenderbuffer(viewport_w, viewport_h, "depth24stencil8", "icon_ds")
 		pass(getCameraParams())
 			setRenderTargets(res, icon_ds)
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)

@@ -12,7 +12,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 		env.dof_blur_shader = env.preloadShader("pipelines/dof_blur.shd")
 	end
 
-	local tmp_rb = env.createRenderbuffer(1, 1, true, "rgba16f", "dof_tmp")
+	local tmp_rb = env.createRenderbuffer(env.viewport_w, env.viewport_h, "rgba16f", "dof_tmp")
 	
 	env.setRenderTargets(tmp_rb)
 	env.drawArray(0, 4, env.dof_blur_shader, 

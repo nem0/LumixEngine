@@ -3,7 +3,7 @@ intensity = 1
 local ssao_size = 1024
 
 function blur(env, buffer, format, w, h, tmp_rb_dbg_name) 
-	local blur_buf = env.createRenderbuffer(w, h, false, format, tmp_rb_dbg_name)
+	local blur_buf = env.createRenderbuffer(w, h, format, tmp_rb_dbg_name)
 	env.setRenderTargets(blur_buf)
 	env.viewport(0, 0, w, h)
 	env.drawArray(0, 4, env.blur_shader
@@ -35,7 +35,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	if env.ssao_blit_shader == nil then
 		env.ssao_blit_shader = env.preloadShader("pipelines/ssao_blit.shd")
 	end
-	local ssao_rb = env.createRenderbuffer(ssao_size, ssao_size, false, "r8", "ssao")
+	local ssao_rb = env.createRenderbuffer(ssao_size, ssao_size, "r8", "ssao")
 	env.setRenderTargets(ssao_rb)
 	local state = {
 		depth_write = false,
