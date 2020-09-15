@@ -1226,7 +1226,7 @@ struct PipelineImpl final : Pipeline
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS,{0, 0}, debug_name);
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
 	}

@@ -1,0 +1,60 @@
+include "pipelines/common.glsl"
+
+vertex_shader [[
+	
+	layout (location = 0) out vec2 v_uv;
+	
+	void main()
+	{
+		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
+	}
+]]
+
+fragment_shader [[
+	layout (binding=0) uniform sampler2D u_input0;
+	layout (binding=1) uniform sampler2D u_input1;
+	layout (binding=2) uniform sampler2D u_input2;
+	layout (binding=3) uniform sampler2D u_input3;
+	layout (binding=4) uniform sampler2D u_input4;
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 0) out vec4 o_color;
+
+	vec4 catmullRom(sampler2D tex, vec2 uv)
+	{
+		// https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
+		ivec2 texSize = textureSize(tex, 0);
+		vec2 samplePos = uv * texSize;
+		vec2 texPos1 = floor(samplePos - 0.5f) + 0.5f;
+		vec2 f = samplePos - texPos1;
+		vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+		vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+		vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+		vec2 w3 = f * f * (-0.5 + 0.5 * f);
+		vec2 w12 = w1 + w2;
+		vec2 offset12 = w2 / (w1 + w2);
+		vec2 texPos0 = texPos1 - 1;
+		vec2 texPos3 = texPos1 + 2;
+		vec2 texPos12 = texPos1 + offset12;
+
+		texPos0 /= texSize;
+		texPos3 /= texSize;
+		texPos12 /= texSize;
+
+		vec4 result = vec4(0.0);
+		result += texture(tex, vec2(texPos0.x, texPos0.y), 0.0) * w0.x * w0.y;
+		result += texture(tex, vec2(texPos12.x, texPos0.y), 0.0) * w12.x * w0.y;
+		result += texture(tex, vec2(texPos3.x, texPos0.y), 0.0) * w3.x * w0.y;
+		result += texture(tex, vec2(texPos0.x, texPos12.y), 0.0) * w0.x * w12.y;
+		result += texture(tex, vec2(texPos12.x, texPos12.y), 0.0) * w12.x * w12.y;
+		result += texture(tex, vec2(texPos3.x, texPos12.y), 0.0) * w3.x * w12.y;
+		result += texture(tex, vec2(texPos0.x, texPos3.y), 0.0) * w0.x * w3.y;
+		result += texture(tex, vec2(texPos12.x, texPos3.y), 0.0) * w12.x * w3.y;
+		result += texture(tex, vec2(texPos3.x, texPos3.y), 0.0) * w3.x * w3.y;
+
+		return result;
+	}
+
+	void main() {
+		o_color = (texture(u_input0, v_uv) + texture(u_input1, v_uv) + texture(u_input2, v_uv) + catmullRom(u_input3, v_uv)  + catmullRom(u_input4, v_uv));
+	}
+]]
