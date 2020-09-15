@@ -3,9 +3,9 @@ function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbu
 	if transparent_phase ~= "post_tonemap" then return ldr_buffer end
 	local res
 	if env.SCENE_VIEW ~= nil then
-		res = env.createRenderbuffer(1, 1, true, "rgba16f", "fxaa")
+		res = env.createRenderbuffer(env.viewport_w, env.viewport_h, "rgba16f", "fxaa")
 	else
-		res = env.createRenderbuffer(1, 1, true, "rgba8", "fxaa")
+		res = env.createRenderbuffer(env.viewport_w, env.viewport_h, "rgba8", "fxaa")
 	end
 	env.beginBlock("fxaa")
 	if env.fxaa_shader == nil then

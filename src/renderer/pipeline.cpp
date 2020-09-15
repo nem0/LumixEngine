@@ -869,6 +869,8 @@ struct PipelineImpl final : Pipeline
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
+		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
 		lua_getfield(m_lua_state, -1, "main");
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
 			lua_pop(m_lua_state, 2);
@@ -1202,11 +1204,9 @@ struct PipelineImpl final : Pipeline
 		m_renderbuffers[idx].frame_counter = 1;
 	}
 
-	int createRenderbuffer(float w, float h, bool relative, const char* format_str, const char* debug_name)
+	int createRenderbuffer(u32 rb_w, u32 rb_h, const char* format_str, const char* debug_name)
 	{
 		PROFILE_FUNCTION();
-		const u32 rb_w = u32(relative ? w * m_viewport.w + 0.5f : w);
-		const u32 rb_h = u32(relative ? h * m_viewport.h + 0.5f : h);
 		const gpu::TextureFormat format = getFormat(format_str);
 
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
@@ -1222,8 +1222,6 @@ struct PipelineImpl final : Pipeline
 		}
 
 		Renderbuffer& rb = m_renderbuffers.emplace();
-		rb.use_realtive_size = relative;
-		rb.relative_size.set(w, h);
 		rb.frame_counter = 0;
 		rb.width = rb_w;
 		rb.height = rb_h;
@@ -4282,8 +4280,6 @@ struct PipelineImpl final : Pipeline
 	struct Renderbuffer {
 		u32 width;
 		u32 height;
-		bool use_realtive_size;
-		Vec2 relative_size; 
 		gpu::TextureFormat format;
 		gpu::TextureHandle handle;
 		int frame_counter;
