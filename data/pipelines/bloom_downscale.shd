@@ -1,0 +1,25 @@
+include "pipelines/common.glsl"
+
+vertex_shader [[
+	
+	layout (location = 0) out vec2 v_uv;
+	
+	void main()
+	{
+		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
+	}
+]]
+
+fragment_shader [[
+	layout (binding=0) uniform sampler2D u_input;
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 0) out vec4 o_color;
+
+	void main() {
+		o_color = texture(u_input, v_uv) ;
+		o_color += textureOffset(u_input, v_uv, ivec2(1, 0)) ;
+		o_color += textureOffset(u_input, v_uv, ivec2(1, 1)) ;
+		o_color += textureOffset(u_input, v_uv, ivec2(0, 1)) ;
+		o_color *= 0.25;
+	}
+]]
