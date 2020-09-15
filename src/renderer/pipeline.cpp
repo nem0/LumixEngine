@@ -1548,20 +1548,14 @@ struct PipelineImpl final : Pipeline
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		LuaWrapper::checkTableArg(L, 1);
-		const int len = (int)lua_objlen(L, 1);
+		const int len = lua_gettop(L);
 		float values[32];
 		if (len > (int)lengthOf(values)) {
 			return luaL_error(L, "%s", "Too many uniforms in drawcallUniforms");
 		}
 
 		for(int i = 0; i < len; ++i) {
-			lua_rawgeti(L, 1, i + 1);
-			if(lua_type(L, -1) != LUA_TNUMBER) {
-				return luaL_error(L, "%s", "array of floats expected");
-			}
-			values[i] = LuaWrapper::toType<float>(L, -1);
-			lua_pop(L, 1);
+			values[i] = LuaWrapper::checkArg<float>(L, i + 1);
 		}
 
 		struct Cmd : Renderer::RenderJob {

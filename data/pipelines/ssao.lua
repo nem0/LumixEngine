@@ -42,11 +42,13 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		depth_test = false
 	}
 	env.viewport(0, 0, ssao_size, ssao_size)
+	env.drawcallUniforms( radius, intensity )
+	
 	env.drawArray(0
 		, 4
 		, env.ssao_shader
 		, { gbuffer_depth, gbuffer1 }
-		, { {radius, intensity, 0, 0} }
+		, {}
 		, {}
 		, state
 	)

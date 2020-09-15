@@ -58,7 +58,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	
 	env.setRenderTargets(bloom_rb)
 	env.viewport(0, 0, 0.5 * env.viewport_w, 0.5 * env.viewport_h)
-	env.drawcallUniforms({ luma_limit });
+	env.drawcallUniforms( luma_limit );
 	env.drawArray(0
 		, 4
 		, env.bloom_extract_shader

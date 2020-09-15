@@ -33,7 +33,7 @@ function setDrawcallUniforms(env, x, y, z)
 	if enable_godrays then
 		f_godarys_enabled = 1
 	end
-	env.drawcallUniforms({
+	env.drawcallUniforms(
 		ground_r * 1000,
 		atmo_r * 1000,
 		height_distribution_rayleigh,
@@ -73,7 +73,7 @@ function setDrawcallUniforms(env, x, y, z)
 		f_fog_enabled,
 		f_godarys_enabled,
 		0
-	})
+	)
 end
 
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
@@ -145,9 +145,9 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		--cloudsonce = true
 		--
 		env.beginBlock("clouds")
-		env.drawcallUniforms({
+		env.drawcallUniforms(
 			cloud_param0, cloud_param1, cloud_param2, cloud_param3
-		})
+		)
 		env.bindRawTexture(env.inscatter_precomputed, 1);
 		env.bindRawTexture(env.clouds_noise_precomputed, 2);
 		env.drawArray(0, 4, env.clouds_shader, { gbuffer_depth }, {}, {}, clouds_state)
