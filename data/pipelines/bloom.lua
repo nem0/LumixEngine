@@ -8,19 +8,17 @@ local state = {
 function blur(env, buffer, format, w, h, tmp_rb_dbg_name) 
 	local blur_buf = env.createRenderbuffer(w, h, format, tmp_rb_dbg_name)
 	env.setRenderTargets(blur_buf)
+	env.drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
 	env.viewport(0, 0, w, h)
 	env.drawArray(0, 4, env.blur_shader
 		, { buffer }
-		, { {1.0 / w, 1.0 / h, 0, 0 }}
-		, "BLUR_H"
 		, { depth_test = false, depth_write = false }
+		, "BLUR_H"
 	)
 	env.setRenderTargets(buffer)
 	env.viewport(0, 0, w, h)
 	env.drawArray(0, 4, env.blur_shader
 		, { blur_buf }
-		, { {1.0 / w, 1.0 / h, 0, 0 } }
-		, {}
 		, { depth_test = false, depth_write = false }
 	)
 end
@@ -33,8 +31,6 @@ function downscale(env, big, w, h)
 		, 4
 		, env.bloom_downscale_shader
 		, { big }
-		, {}
-		, {}
 		, state
 	)
 	return small
@@ -63,8 +59,6 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		, 4
 		, env.bloom_extract_shader
 		, { hdr_buffer }
-		, { }
-		, {}
 		, state
 	)
 
@@ -82,8 +76,6 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.setRenderTargets(hdr_buffer)
 	env.drawArray(0, 4, env.bloom_shader
 		, { bloom_rb, bloom2_rb, bloom4_rb, bloom8_rb, bloom16_rb }
-		, {}
-		, {}
 		, { depth_test = false, depth_write = false, blending = "add" });
 	env.endBlock()
 	return hdr_buffer

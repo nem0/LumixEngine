@@ -15,8 +15,6 @@ function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbu
 	env.bindTextures({noise}, 1)
 	env.drawArray(0, 4, env.film_grain_shader, 
 		{ ldr_buffer },
-		{},
-		{},
 		{ depth_test = false, blending = ""}
 	)
 	env.endBlock()

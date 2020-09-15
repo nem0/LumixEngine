@@ -15,14 +15,15 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	local tmp_rb = env.createRenderbuffer(env.viewport_w, env.viewport_h, "rgba16f", "dof_tmp")
 	
 	env.setRenderTargets(tmp_rb)
+	env.drawcallUniforms(near_blur, near_sharp, far_sharp, far_blur)
+
 	env.drawArray(0, 4, env.dof_blur_shader, 
 		{ 
 			input,
 			gbuffer_depth
 		},
-		{ { near_blur, near_sharp, far_sharp, far_blur } },
-		{ "HBLUR", "NEAR" },
-		{ depth_test = false, blending = "alpha"}
+		{ depth_test = false, blending = "alpha"},
+		{ "HBLUR", "NEAR" }
 	)
 
 	env.setRenderTargets(input)
@@ -31,9 +32,8 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 			tmp_rb,
 			gbuffer_depth
 		},
-		{ { near_blur, near_sharp, far_sharp, far_blur } },
-		{ "NEAR" },
-		{ depth_test = false, blending = "alpha"}
+		{ depth_test = false, blending = "alpha"},
+		{ "NEAR" }
 	)
 
 	env.setRenderTargets(tmp_rb)
@@ -42,9 +42,8 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 			input,
 			gbuffer_depth
 		},
-		{ { near_blur, near_sharp, far_sharp, far_blur } },
-		{ "HBLUR", "FAR" },
-		{ depth_test = false, blending = "alpha"}
+		{ depth_test = false, blending = "alpha"},
+		{ "HBLUR", "FAR" }
 	)
 
 	env.setRenderTargets(input)
@@ -53,9 +52,8 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 			tmp_rb,
 			gbuffer_depth
 		},
-		{ { near_blur, near_sharp, far_sharp, far_blur } },
-		{ "FAR" },
-		{ depth_test = false, blending = "alpha"}
+		{ depth_test = false, blending = "alpha"},
+		{ "FAR" }
 	)
 
 

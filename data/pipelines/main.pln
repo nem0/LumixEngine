@@ -141,7 +141,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 			gbuffer_depth,
 			shadowmap,
 			SHADOW_ATLAS
-		}, {}, {}, 
+		}, 
 		{ 
 			depth_test = false,
 			blending = "add",
@@ -163,38 +163,41 @@ function debugClusters(gb_depth, output)
 	setRenderTargets(output)
 	drawArray(0, 4, debug_clusters_shader
 		, { gb_depth }
-		, {}
-		, {}
 		, { depth_test = false });
 end
 
 
 function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 	setRenderTargets(output)
-	
+
+	drawcallUniforms( 
+		0, 0, 1, 1, 
+		r_mask[1], r_mask[2], r_mask[3], r_mask[4], 
+		g_mask[1], g_mask[2], g_mask[3], g_mask[4], 
+		b_mask[1], b_mask[2], b_mask[3], b_mask[4], 
+		a_mask[1], a_mask[2], a_mask[3], a_mask[4], 
+		offsets[1], offsets[2], offsets[3], offsets[4]
+	)
 	drawArray(0, 4, textured_quad_shader
 		, { rb }
-		, { { 0, 0, 1, 1 }, r_mask, g_mask, b_mask, a_mask, offsets }
-		, {}
-		, { depth_test = false });
+		, { depth_test = false }
+	)
 end
 
 function blur(buffer, format, w, h, tmp_rb_dbg_name) 
 	local blur_buf = createRenderbuffer(w, h, format, tmp_rb_dbg_name)
 	setRenderTargets(blur_buf)
 	viewport(0, 0, w, h)
+	drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
 	drawArray(0, 4, blur_shader
 		, { buffer }
-		, { {1.0 / w, 1.0 / h, 0, 0 }}
-		, "BLUR_H"
 		, { depth_test = false, depth_write = false }
+		, "BLUR_H"
 	)
 	setRenderTargets(buffer)
 	viewport(0, 0, w, h)
 	drawArray(0, 4, blur_shader
 		, { blur_buf }
-		, { {1.0 / w, 1.0 / h, 0, 0 } }
-		, {}
 		, { depth_test = false, depth_write = false }
 	)
 end
@@ -253,8 +256,6 @@ function tonemap(hdr_buffer)
 	setRenderTargets(rb)
 	drawArray(0, 4, tonemap_shader
 		, { hdr_buffer }
-		, {}
-		, {}
 		, { depth_test = false }
 	)
 	endBlock()
@@ -295,8 +296,6 @@ function renderSelectionOutline(output)
 	setRenderTargets(output)
 	drawArray(0, 4, selection_outline_shader
 		, { selection_mask }
-		, {}
-		, {}
 		, { depth_test = false }
 	)
 	
@@ -395,11 +394,10 @@ function main()
 
 	if APP ~= nil then
 		setRenderTargets()
+		drawcallUniforms(0, 0, 1, 1, 1, 1, 1, 1)
 		drawArray(0, 4, textured_quad_shader
 			, { res }
-			, { { 0, 0, 1, 1 }, { 1, 1, 1, 1 } }
-			, {}
-			, { depth_test = false });
+			, { depth_test = false })
 	end
 	setOutput(res)
 

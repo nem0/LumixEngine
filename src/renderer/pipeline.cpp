@@ -1920,16 +1920,12 @@ struct PipelineImpl final : Pipeline
 		const int indices_offset = LuaWrapper::checkArg<int>(L, 1);
 		const int indices_count = LuaWrapper::checkArg<int>(L, 2);
 		int shader_id = LuaWrapper::checkArg<int>(L, 3);
-		if(lua_gettop(L) > 3) {
-			LuaWrapper::checkTableArg(L, 4);
-		}
-		if(lua_gettop(L) > 4) {
-			LuaWrapper::checkTableArg(L, 5);
-		}
+		if (lua_gettop(L) > 3) LuaWrapper::checkTableArg(L, 4);
+		
 		const u64 rs = [&](){
-			if(lua_gettop(L) > 6) {
-				LuaWrapper::checkTableArg(L, 7);
-				return getState(L, 7);
+			if(lua_gettop(L) > 4) {
+				LuaWrapper::checkTableArg(L, 5);
+				return getState(L, 5);
 			}
 			return (u64)gpu::StateFlags::DEPTH_WRITE | (u64)gpu::StateFlags::DEPTH_TEST;
 		}();
@@ -1976,29 +1972,6 @@ struct PipelineImpl final : Pipeline
 				lua_pop(L, 1);
 			}
 		
-			if (lua_istable(L, 5)) {
-				for (u32 i = 0, c = (u32)lua_objlen(L, 5); i < c; ++i) {
-					lua_rawgeti(L, 5, i + 1);
-					if(lua_type(L, -1) != LUA_TTABLE) {
-						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays");
-					}
-
-					for(int i = 0; i < 4; ++i) {
-						lua_rawgeti(L, -1, 1 + i);
-						if (lua_type(L, -1) != LUA_TNUMBER) {
-							LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-							return luaL_error(L, "%s", "Incorrect uniform arguments of drawArrays. Uniforms can only be Vec4.");
-						}
-						cmd->m_uniforms[cmd->m_uniforms_count][i] = (float)lua_tonumber(L, -1);
-						lua_pop(L, 1);
-					}
-
-					++cmd->m_uniforms_count;
-					lua_pop(L, 1);
-				}
-			}
-
 			if (lua_isstring(L, 6)) {
 				const char* define = lua_tostring(L, 6);
 				cmd->m_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx(define);
