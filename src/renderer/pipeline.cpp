@@ -90,6 +90,7 @@ struct GlobalState
 	float light_intensity;
 	float light_indirect_intensity;
 	float time;
+	float frame_time_delta;
 	float shadow_cam_near_plane;
 	float shadow_cam_far_plane;
 };
@@ -644,12 +645,9 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
-		}
-
-		for(int i = m_renderbuffers.size() - 1; i >= 0; --i) {
-			if (m_renderbuffers[i].frame_counter > 2) {
-				m_renderer.destroy(m_renderbuffers[i].handle);
-				m_renderbuffers.swapAndPop(i);
+			if (rb.frame_counter > 2 && !rb.persistent && rb.handle.isValid()) {
+				m_renderer.destroy(rb.handle);
+				rb.handle = gpu::INVALID_TEXTURE;
 			}
 		}
 	}
@@ -797,7 +795,7 @@ struct PipelineImpl final : Pipeline
 		return true;
 	}
 
-	bool render(bool only_2d) override 
+	bool render(bool only_2d) override
 	{
 		PROFILE_FUNCTION();
 
@@ -822,6 +820,8 @@ struct PipelineImpl final : Pipeline
 		global_state.camera_view_projection = projection * view;
 		global_state.camera_inv_view_projection = global_state.camera_view_projection.inverted();
 		global_state.time = m_timer.getTimeSinceStart();
+		global_state.frame_time_delta = m_timer.getTimeSinceTick();
+		m_timer.tick();
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
 		global_state.cam_world_pos = Vec4(m_viewport.pos.toFloat(), 1);
@@ -1200,32 +1200,61 @@ struct PipelineImpl final : Pipeline
 		return gpu::TextureFormat::RGBA8;
 	}
 
-	void releaseRenderbuffer(u32 idx) {
-		m_renderbuffers[idx].frame_counter = 1;
+	void releaseRenderbuffer(u32 rb) {
+		if (rb >= 0 && rb < (u32)m_renderbuffers.size()) {
+			m_renderbuffers[rb].frame_counter = 2;
+			m_renderbuffers[rb].persistent = false;
+		}
 	}
 
-	int createRenderbuffer(u32 rb_w, u32 rb_h, const char* format_str, const char* debug_name)
-	{
+	i32 createPersistentRenderbuffer(u32 rb_w, u32 rb_h, const char* format_str, const char* debug_name) {
+		return createRenderbufferInternal(rb_w, rb_h, format_str, debug_name, true);
+	}
+	
+	i32 createRenderbuffer(u32 rb_w, u32 rb_h, const char* format_str, const char* debug_name) {
+		return createRenderbufferInternal(rb_w, rb_h, format_str, debug_name, false);
+	}
+	
+	i32 createRenderbufferInternal(u32 rb_w, u32 rb_h, const char* format_str, const char* debug_name, bool persistent) {
 		PROFILE_FUNCTION();
 		const gpu::TextureFormat format = getFormat(format_str);
 
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
 		{
 			Renderbuffer& rb = m_renderbuffers[i];
-			if (rb.frame_counter == 0) continue;
-			if (rb.width != rb_w) continue;
-			if (rb.height != rb_h) continue;
-			if (rb.format != format) continue;
+			if (!rb.handle.isValid()) {
+				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
+				rb.width = rb_w;
+				rb.height = rb_h;
+				rb.format = format;
+			}
+			else {
+				if (rb.frame_counter < 2) continue;
+				if (rb.persistent) continue;
+				if (rb.width != rb_w) continue;
+				if (rb.height != rb_h) continue;
+				if (rb.format != format) continue;
+			}
 
 			rb.frame_counter = 0;
+			rb.persistent = persistent;
 			return i;
 		}
 
-		Renderbuffer& rb = m_renderbuffers.emplace();
+
+		Renderbuffer& rb = [&]() -> Renderbuffer& {
+			for (int i = 0, n = m_renderbuffers.size(); i < n; ++i) {
+				if (!m_renderbuffers[i].handle.isValid()) {
+					return m_renderbuffers[i];
+				}
+			}	
+			return m_renderbuffers.emplace();
+		}();
 		rb.frame_counter = 0;
 		rb.width = rb_w;
 		rb.height = rb_h;
 		rb.format = format;
+		rb.persistent = persistent;
 		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
@@ -4160,6 +4189,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(bindImageTexture);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(createPersistentRenderbuffer);
 		REGISTER_FUNCTION(dispatch);
 		REGISTER_FUNCTION(releaseRenderbuffer);
 		REGISTER_FUNCTION(endBlock);
@@ -4250,6 +4280,7 @@ struct PipelineImpl final : Pipeline
 		gpu::TextureFormat format;
 		gpu::TextureHandle handle;
 		int frame_counter;
+		bool persistent;
 	};
 
 	struct ShaderRef {
