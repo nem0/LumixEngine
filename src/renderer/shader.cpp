@@ -81,6 +81,7 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 			float u_light_intensity;
 			float u_light_indirect_intensity;
 			float u_time;
+			float u_frame_time_delta;
 			float u_shadow_near_plane;
 			float u_shadow_far_plane;
 		};
