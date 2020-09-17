@@ -20,22 +20,24 @@ fragment_shader [[
 		return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
 	}
 
-	vec3 tonemap(vec3 in_color)
+	vec3 tonemap(vec3 in_color, float avglum )
 	{
 		float midgray = 0.18;
-		float avg_loglum = 0.3;
 		float lum = luma(in_color);
-		float map_middle = (midgray / (avg_loglum + 0.001)) * lum;
+		float map_middle = (midgray / (avglum  + 0.001)) * lum;
 		float ld = Uncharted2Tonemap(map_middle) / Uncharted2Tonemap(11.0);
 		return (in_color / max(0.00001, lum)) * ld;
 	}
 
 	layout (binding=0) uniform sampler2D u_hdrbuffer;
+	layout (binding=1) uniform sampler2D u_luma;
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 0) out vec4 o_color;
 	void main() {
+		float avglum = exp2(texture(u_luma, v_uv).r);
 		const float exposure = 3;
-		o_color.rgb = tonemap(texture(u_hdrbuffer, v_uv, 0).rgb * exposure);
+
+		o_color.rgb = tonemap(texture(u_hdrbuffer, v_uv, 0).rgb * exposure, avglum);
 		o_color.w = 1;
 	}
 ]]

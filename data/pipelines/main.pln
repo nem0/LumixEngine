@@ -340,6 +340,7 @@ function main()
 
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	
+	custom_tonemap = false
 	local res = hdr_buffer		
 	if PREVIEW == nil then
 		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
@@ -355,7 +356,11 @@ function main()
 	end
 	
 	if PROBE == nil then
-		res = tonemap(res)
+		if custom_tonemap == true then
+			res = postprocess("tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+		else
+			res = tonemap(res)
+		end
 	end
 
 	if PREVIEW == nil and PROBE == nil then

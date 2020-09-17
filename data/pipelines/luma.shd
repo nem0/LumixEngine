@@ -1,0 +1,50 @@
+include "pipelines/common.glsl"
+
+vertex_shader [[
+	layout (location = 0) out vec2 v_uv;
+	void main() {
+		vec4 pos = fullscreenQuad(gl_VertexID, v_uv);
+		gl_Position = pos;
+	}
+]]
+
+
+fragment_shader [[
+	#ifdef ACCUM_LUMA
+		layout(std140, binding = 4) uniform Data {
+			float u_accomodation_speed;
+		};
+
+		layout (binding=0) uniform sampler2D u_current;
+		layout (binding=1) uniform sampler2D u_prev;
+	#else
+		layout (binding=0) uniform sampler2D u_texture;
+	#endif
+	layout (location = 0) in vec2 v_uv;
+	layout (location = 0) out vec4 o_color;
+	
+
+
+	void main() {
+		#ifdef EXTRACT_LUMA
+			vec2 texel = 1.0 / textureSize(u_texture, 0);
+			float t = log2(0.05 + luma(texture(u_texture, v_uv + texel * 0.5).rgb));
+				t += log2(0.05 + luma(texture(u_texture, v_uv + texel * vec2(2.5, 0.5)).rgb));
+				t += log2(0.05 + luma(texture(u_texture, v_uv + texel * vec2(2.5, 2.5)).rgb));
+				t += log2(0.05 + luma(texture(u_texture, v_uv + texel * vec2(0.5, 2.5)).rgb));
+			o_color = vec4(t * 0.25);
+		#elif defined ACCUM_LUMA
+			float c = texture(u_current, vec2(0.5)).r;
+			float p = texture(u_prev, vec2(0.5)).r;
+			const float accomodation_speed = 2;
+			o_color = vec4(p + (c - p) * (1 - exp(-u_frame_time_delta * accomodation_speed)));
+		#else
+			vec2 texel = 1.0 / textureSize(u_texture, 0);
+			vec4 t = texture(u_texture, v_uv + texel * 0.5);
+				t += texture(u_texture, v_uv + texel * vec2(2.5, 0.5));
+				t += texture(u_texture, v_uv + texel * vec2(2.5, 2.5));
+				t += texture(u_texture, v_uv + texel * vec2(0.5, 2.5));
+			o_color = vec4(t.r * 0.25);
+		#endif
+	}
+]]
