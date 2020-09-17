@@ -88,6 +88,10 @@ vec2 saturate(vec2 a) { return clamp(a, vec2(0), vec2(1)); }
 vec3 saturate(vec3 a) { return clamp(a, vec3(0), vec3(1)); }
 vec4 saturate(vec4 a) { return clamp(a, vec4(0), vec4(1)); }
 
+float luma(vec3 color) {
+	return dot(vec3(0.2126729, 0.7151522, 0.0721750), color);
+}
+
 vec4 fullscreenQuad(int vertexID, out vec2 uv) {
 	uv = vec2((vertexID & 1), (vertexID & 2) * 0.5);
 	#ifdef _ORIGIN_BOTTOM_LEFT

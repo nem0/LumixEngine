@@ -16,20 +16,13 @@ fragment_shader [[
 	layout (location = 0) out vec4 o_color;
 
 	#define timer u_time.x * 0.01
-	
-	vec3 luma(vec3 _rgb)
-	{
-		float yy = dot(vec3(0.2126729, 0.7151522, 0.0721750), _rgb);
-		return vec3(yy);
-	}
-	
-	
+
 	vec3 filmGrain(vec2 tex_coord, vec2 tex_size, vec3 in_color) 
 	{
 		const float grainamount = 0.01;
 		const float lumamount = 0.1;
 		vec3 noise = texelFetch(u_noise, (ivec2(gl_FragCoord.xy) + ivec2(timer * 1e6)) % ivec2(textureSize(u_noise, 0)), 0).xyz;
-		float luminance = mix(0.0, luma(in_color).x, lumamount);
+		float luminance = mix(0.0, luma(in_color), lumamount);
 		float lum = smoothstep(0.2, 0.0, luminance);
 		lum += luminance;
 		

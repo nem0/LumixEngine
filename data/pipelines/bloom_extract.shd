@@ -12,18 +12,16 @@ vertex_shader [[
 
 fragment_shader [[
 	layout (binding=0) uniform sampler2D u_input;
+	layout (binding=1) uniform sampler2D u_luma_accum;
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 0) out vec4 o_color;
 	layout(std140, binding = 4) uniform Data {
 		float u_luma_limit;
 	};
 
-	float luma(vec3 color) {
-		return dot(vec3(0.2126729, 0.7151522, 0.0721750), color);
-	}
-
 	void main() {
-		vec3 c = texture(u_input, v_uv.xy).rgb;
-		o_color = vec4(luma(c) > u_luma_limit ? max(c - vec3(u_luma_limit), vec3(0)) : vec3(0), 1);
+		float avg_lum = exp2(texture(u_luma_accum, v_uv).r);
+		vec3 c = texture(u_input, v_uv).rgb;
+		o_color = vec4(luma(c) > avg_lum * u_luma_limit ? max(c /*- vec3(avg_lum * u_luma_limit)*/, vec3(0)) : vec3(0), 1);
 	}
 ]]
