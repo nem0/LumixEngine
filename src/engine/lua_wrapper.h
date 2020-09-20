@@ -823,6 +823,20 @@ template <typename T> T checkArg(lua_State* L, int index)
 	return toType<T>(L, index);
 }
 
+template <typename T> T checkArgOptional(lua_State* L, int index, const T& default_value)
+{
+	const int top = lua_gettop(L);
+	if (top < index) {
+		return default_value;
+	}
+
+	if (!isType<T>(L, index))
+	{
+		argError<T>(L, index);
+	}
+	return toType<T>(L, index);
+}
+
 
 inline void checkTableArg(lua_State* L, int index)
 {

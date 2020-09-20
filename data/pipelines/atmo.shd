@@ -198,7 +198,7 @@ fragment_shader [[
 
 				vec3 inscatter = vec3(0);
 				{
-					const int STEP_COUNT = 128;
+					const int STEP_COUNT = u_godarys_enabled > 0 ? 128 : 8;
 					float step_len = length(p1 - p0) / (STEP_COUNT + 1);
 					float offset = rand(p0.xyz) * 2 - 1;
 					for (float f = (0.5 + offset * 0.2) / STEP_COUNT; f < 1; f += 1.0 / (STEP_COUNT + 1)) {
