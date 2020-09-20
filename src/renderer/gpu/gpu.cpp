@@ -239,6 +239,7 @@ static void try_load_renderdoc()
 {
 	#ifdef _WIN32
 		void* lib = OS::loadLibrary("renderdoc.dll");
+		if (!lib) lib = OS::loadLibrary("C:\\Program Files\\RenderDoc\\renderdoc.dll");
 		if (!lib) return;
 		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)OS::getLibrarySymbol(lib, "RENDERDOC_GetAPI");
 		if (RENDERDOC_GetAPI) {
@@ -1728,9 +1729,9 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 }
 
 
-void preinit(IAllocator& allocator)
+void preinit(IAllocator& allocator, bool load_renderdoc)
 {
-	try_load_renderdoc();
+	if (load_renderdoc) try_load_renderdoc();
 	g_gpu.allocator = &allocator;
 	g_gpu.textures.init();
 	g_gpu.buffers.init();

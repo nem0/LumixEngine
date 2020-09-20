@@ -22,7 +22,8 @@ const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 
 enum class InitFlags : u32 {
 	DEBUG_OUTPUT,
-	VSYNC
+	VSYNC,
+	RENDERDOC
 };
 
 enum class FramebufferFlags : u32 {
@@ -199,7 +200,7 @@ struct MemoryStats {
 };
 
 
-void preinit(IAllocator& allocator);
+void preinit(IAllocator& allocator, bool load_renderdoc);
 bool init(void* window_handle, u32 flags);
 void setCurrentWindow(void* window_handle);
 bool getMemoryStats(Ref<MemoryStats> stats);
