@@ -36,16 +36,17 @@ vertex_shader [[
 
 fragment_shader [[
 	layout (binding=0) uniform sampler2D u_input;
+	layout (binding=1) uniform sampler2D u_input2;
 	layout (location = 0) in vec2 v_tc0;
 	layout (location = 1) in vec4 v_tc1;
 	layout (location = 2) in vec4 v_tc2;
 	layout (location = 0) out vec4 o_color;
 
 	void main() {
-		o_color = texture(u_input, v_tc0.xy) * 0.2270270270
-		+ texture(u_input, v_tc1.xy) * 0.3162162162
-		+ texture(u_input, v_tc1.zw) * 0.0702702703
-		+ texture(u_input, v_tc2.xy) * 0.3162162162
-		+ texture(u_input, v_tc2.zw) * 0.0702702703;
+		o_color = (texture(u_input, v_tc0.xy) + texture(u_input2, v_tc0.xy)) * 0.2270270270
+		+ (texture(u_input, v_tc1.xy) + texture(u_input2, v_tc1.xy)) * 0.3162162162
+		+ (texture(u_input, v_tc1.zw) + texture(u_input2, v_tc1.zw)) * 0.0702702703
+		+ (texture(u_input, v_tc2.xy) + texture(u_input2, v_tc2.xy)) * 0.3162162162
+		+ (texture(u_input, v_tc2.zw) + texture(u_input2, v_tc2.zw)) * 0.0702702703;
 	}
 ]]

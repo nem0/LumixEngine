@@ -8,8 +8,7 @@ vertex_shader [[
 	layout(location=2) out vec4 v_uv2;
 	void main() {
 		vec2 ts = 1.0/textureSize(u_source, 0);
-		v_uv0 = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
-		vec4 pos = fullscreenQuad(gl_VertexID, v_uv0);// vec4((gl_VertexID & 1) * 2 - 1, (gl_VertexID & 2) - 1, 0, 1);
+		vec4 pos = fullscreenQuad(gl_VertexID, v_uv0);
 		#ifdef HBLUR
 			v_uv1 = vec4(
 				v_uv0.x + 1.3846153846 * ts.x, v_uv0.y, 
