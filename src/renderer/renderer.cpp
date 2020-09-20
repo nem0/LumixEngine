@@ -467,7 +467,8 @@ struct RendererImpl final : Renderer
 		, m_material_buffer(m_allocator)
 	{
 		m_shader_defines.reserve(32);
-		gpu::preinit(m_allocator);
+
+		gpu::preinit(m_allocator, shouldLoadRenderdoc());
 		m_frames.emplace(*this, m_allocator);
 		m_frames.emplace(*this, m_allocator);
 		m_frames.emplace(*this, m_allocator);
@@ -505,6 +506,17 @@ struct RendererImpl final : Renderer
 		JobSystem::wait(signal);
 	}
 
+	static bool shouldLoadRenderdoc() {
+		char cmd_line[4096];
+		OS::getCommandLine(Span(cmd_line));
+		CommandLineParser cmd_line_parser(cmd_line);
+		while (cmd_line_parser.next()) {
+			if (cmd_line_parser.currentEquals("-renderdoc")) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	void init() override
 	{
