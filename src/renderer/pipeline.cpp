@@ -1531,6 +1531,7 @@ struct PipelineImpl final : Pipeline
 		const u32 width = LuaWrapper::checkArg<u32>(L, 1);
 		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
 		const char* format_str = LuaWrapper::checkArg<const char*>(L, 3);
+		const char* debug_name = LuaWrapper::checkArgOptional<const char*>(L, 4, "lua_texture");
 		
 		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
@@ -1540,7 +1541,7 @@ struct PipelineImpl final : Pipeline
 			, format
 			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE
 			, mem
-			, "lua_texture");
+			, debug_name);
 		LuaWrapper::push(L, texture.value);
 		return 1;
 	}
@@ -1557,6 +1558,7 @@ struct PipelineImpl final : Pipeline
 		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
 		const u32 depth = LuaWrapper::checkArg<u32>(L, 3);
 		const char* format_str = LuaWrapper::checkArg<const char*>(L, 4);
+		const char* debug_name = LuaWrapper::checkArgOptional<const char*>(L, 5, "lua_texture");
 		
 		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
@@ -1566,7 +1568,7 @@ struct PipelineImpl final : Pipeline
 			, format
 			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
 			, mem
-			, "lua_texture");
+			, debug_name);
 		LuaWrapper::push(L, texture.value);
 		return 1;
 	}

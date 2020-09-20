@@ -97,7 +97,7 @@ vec4 fullscreenQuad(int vertexID, out vec2 uv) {
 	#ifdef _ORIGIN_BOTTOM_LEFT
 		return vec4(uv * 2 - 1, 0, 1);
 	#else
-		return vec4(uv.x * 2 - 1, -uv.u * 2 + 1, 0, 1);
+		return vec4(uv.x * 2 - 1, -uv.y * 2 + 1, 0, 1);
 	#endif
 }
 

@@ -34,20 +34,8 @@ compute_shader [[
 		return saturate((length(position) - u_bot) / (u_top - u_bot));
 	}
 
-	float opticalDepth(vec3 a, vec3 b, float distribution) {
-		float l = length(a - b);
-		int step_count = 10;
-		float dens = 0;
-		vec3 step = (b - a) / step_count;
-		float step_len = l / step_count;
-		vec3 p = a;
-		for (int i = 0; i < step_count; ++i) {
-			float h = length(p + step * 0.5);
-			float tmp = exp(min(0, (u_bot - h) / distribution));
-			dens += step_len * tmp;
-			p += step;
-		}
-		return dens;
+	vec4 sampleOpticalDepth(vec3 dir, vec3 up, float height) {
+		return texture(u_optical_depth, vec2(saturate(dot(dir, up)), height));	
 	}
 
 	void main()
@@ -79,17 +67,16 @@ compute_shader [[
 		const vec3 step = step_len * eyedir;
 
 		float height_b = getOptDepthY(campos);
-		vec4 depth_b = texture(u_optical_depth, vec2(eyedir.y, height_b));
+		vec4 depth_b = sampleOpticalDepth(eyedir, vec3(0, 1, 0), height_b);
 		const float cos_light_up = saturate(u_light_direction.y);
 		const float cos_eye_up = saturate(eyedir.y);
 
 		for (int i = 0; i < STEP_COUNT; ++i) {
-
 			float height_a = getOptDepthY(p);
 
 			vec3 up = normalize(p);
-			vec4 depth_a = texture(u_optical_depth, vec2(saturate(dot(u_light_direction.xyz, up)), height_a));
-			vec4 depth_c = texture(u_optical_depth, vec2(saturate(dot(eyedir, up)), height_a));
+			vec4 depth_a = sampleOpticalDepth(u_light_direction.xyz, up, height_a);
+			vec4 depth_c = sampleOpticalDepth(eyedir, up, height_a);
 
 			vec3 total_transmittance = 
 				exp((-depth_a.x - depth_b.x + depth_c.x) * extinction_rayleigh)
