@@ -55,6 +55,6 @@ fragment_shader [[
 	}
 
 	void main() {
-		o_color = (texture(u_input0, v_uv) + texture(u_input1, v_uv) + texture(u_input2, v_uv) + catmullRom(u_input3, v_uv)  + catmullRom(u_input4, v_uv));
+		o_color = texture(u_input0, v_uv);
 	}
 ]]

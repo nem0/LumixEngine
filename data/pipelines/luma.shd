@@ -13,6 +13,7 @@ fragment_shader [[
 	#ifdef ACCUM_LUMA
 		layout(std140, binding = 4) uniform Data {
 			float u_accomodation_speed;
+			float u_max_luminance;
 		};
 
 		layout (binding=0) uniform sampler2D u_current;
@@ -24,14 +25,17 @@ fragment_shader [[
 	layout (location = 0) out vec4 o_color;
 	
 
+	float luminanceClamped(vec3 v) {
+		return clamp(luminance(v), 1e-5, 1.0);
+	}
 
 	void main() {
 		#ifdef EXTRACT_LUMA
 			vec2 texel = 1.0 / textureSize(u_texture, 0);
-			float t = log2(0.05 + luma(texture(u_texture, v_uv + texel * 0.5).rgb));
-				t += log2(0.05 + luma(texture(u_texture, v_uv + texel * vec2(2.5, 0.5)).rgb));
-				t += log2(0.05 + luma(texture(u_texture, v_uv + texel * vec2(2.5, 2.5)).rgb));
-				t += log2(0.05 + luma(texture(u_texture, v_uv + texel * vec2(0.5, 2.5)).rgb));
+			float t = log2(0.05 + luminanceClamped(texture(u_texture, v_uv + texel * 0.5).rgb));
+				t += log2(0.05 + luminanceClamped(texture(u_texture, v_uv + texel * vec2(2.5, 0.5)).rgb));
+				t += log2(0.05 + luminanceClamped(texture(u_texture, v_uv + texel * vec2(2.5, 2.5)).rgb));
+				t += log2(0.05 + luminanceClamped(texture(u_texture, v_uv + texel * vec2(0.5, 2.5)).rgb));
 			o_color = vec4(t * 0.25);
 		#elif defined ACCUM_LUMA
 			float c = texture(u_current, vec2(0.5)).r;

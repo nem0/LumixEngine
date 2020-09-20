@@ -23,7 +23,7 @@ fragment_shader [[
 	vec3 tonemap(vec3 in_color, float avglum )
 	{
 		float midgray = 0.18;
-		float lum = luma(in_color);
+		float lum = luminance(in_color);
 		float map_middle = (midgray / (avglum  + 0.001)) * lum;
 		float ld = Uncharted2Tonemap(map_middle) / Uncharted2Tonemap(11.0);
 		return (in_color / max(0.00001, lum)) * ld;

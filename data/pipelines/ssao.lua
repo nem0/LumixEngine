@@ -7,14 +7,14 @@ function blur(env, buffer, format, w, h, tmp_rb_dbg_name)
 	env.setRenderTargets(blur_buf)
 	env.viewport(0, 0, w, h)
 	env.drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
-	env.drawArray(0, 4, env.blur_shader
+	env.drawArray(0, 3, env.blur_shader
 		, { buffer }
 		, { depth_test = false, depth_write = false }
 		, "BLUR_H"
 	)
 	env.setRenderTargets(buffer)
 	env.viewport(0, 0, w, h)
-	env.drawArray(0, 4, env.blur_shader
+	env.drawArray(0, 3, env.blur_shader
 		, { blur_buf }
 		, { depth_test = false, depth_write = false }
 	)
@@ -43,7 +43,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.drawcallUniforms( radius, intensity )
 	
 	env.drawArray(0
-		, 4
+		, 3
 		, env.ssao_shader
 		, { gbuffer_depth, gbuffer1 }
 		, state
@@ -51,7 +51,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	blur(env, ssao_rb, "r8", ssao_size, ssao_size, "ssao_blur")
 	
 	env.setRenderTargets(hdr_buffer)
-	env.drawArray(0, 4, env.ssao_blit_shader
+	env.drawArray(0, 3, env.ssao_blit_shader
 		, { ssao_rb }
 		, { depth_test = false, depth_write = false, blending = "multiply" });
 		

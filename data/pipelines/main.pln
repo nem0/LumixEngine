@@ -133,7 +133,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 
 	beginBlock("lighting")
-	drawArray(0, 4, lighting_shader,
+	drawArray(0, 3, lighting_shader,
 		{
 			gbuffer0,
 			gbuffer1,
@@ -161,7 +161,7 @@ end
 
 function debugClusters(gb_depth, output)
 	setRenderTargets(output)
-	drawArray(0, 4, debug_clusters_shader
+	drawArray(0, 3, debug_clusters_shader
 		, { gb_depth }
 		, { depth_test = false });
 end
@@ -178,7 +178,7 @@ function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 		a_mask[1], a_mask[2], a_mask[3], a_mask[4], 
 		offsets[1], offsets[2], offsets[3], offsets[4]
 	)
-	drawArray(0, 4, textured_quad_shader
+	drawArray(0, 3, textured_quad_shader
 		, { rb }
 		, { depth_test = false }
 	)
@@ -189,14 +189,14 @@ function blur(buffer, format, w, h, tmp_rb_dbg_name)
 	setRenderTargets(blur_buf)
 	viewport(0, 0, w, h)
 	drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
-	drawArray(0, 4, blur_shader
+	drawArray(0, 3, blur_shader
 		, { buffer }
 		, { depth_test = false, depth_write = false }
 		, "BLUR_H"
 	)
 	setRenderTargets(buffer)
 	viewport(0, 0, w, h)
-	drawArray(0, 4, blur_shader
+	drawArray(0, 3, blur_shader
 		, { blur_buf }
 		, { depth_test = false, depth_write = false }
 	)
@@ -254,7 +254,7 @@ function tonemap(hdr_buffer)
 		rb = createRenderbuffer(viewport_w, viewport_h, "rgba16f", "tonemap")
 	end
 	setRenderTargets(rb)
-	drawArray(0, 4, tonemap_shader
+	drawArray(0, 3, tonemap_shader
 		, { hdr_buffer }
 		, { depth_test = false }
 	)
@@ -294,7 +294,7 @@ function renderSelectionOutline(output)
 	renderSelection()
 	
 	setRenderTargets(output)
-	drawArray(0, 4, selection_outline_shader
+	drawArray(0, 3, selection_outline_shader
 		, { selection_mask }
 		, { depth_test = false }
 	)
@@ -400,7 +400,7 @@ function main()
 	if APP ~= nil then
 		setRenderTargets()
 		drawcallUniforms(0, 0, 1, 1, 1, 1, 1, 1)
-		drawArray(0, 4, textured_quad_shader
+		drawArray(0, 3, textured_quad_shader
 			, { res }
 			, { depth_test = false })
 	end

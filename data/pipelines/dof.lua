@@ -17,7 +17,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	env.setRenderTargets(tmp_rb)
 	env.drawcallUniforms(near_blur, near_sharp, far_sharp, far_blur)
 
-	env.drawArray(0, 4, env.dof_blur_shader, 
+	env.drawArray(0, 3, env.dof_blur_shader, 
 		{ 
 			input,
 			gbuffer_depth
@@ -27,7 +27,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	)
 
 	env.setRenderTargets(input)
-	env.drawArray(0, 4, env.dof_blur_shader, 
+	env.drawArray(0, 3, env.dof_blur_shader, 
 		{
 			tmp_rb,
 			gbuffer_depth
@@ -37,7 +37,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	)
 
 	env.setRenderTargets(tmp_rb)
-	env.drawArray(0, 4, env.dof_blur_shader, 
+	env.drawArray(0, 3, env.dof_blur_shader, 
 		{ 
 			input,
 			gbuffer_depth
@@ -47,7 +47,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 	)
 
 	env.setRenderTargets(input)
-	env.drawArray(0, 4, env.dof_blur_shader, 
+	env.drawArray(0, 3, env.dof_blur_shader, 
 		{
 			tmp_rb,
 			gbuffer_depth
@@ -58,7 +58,7 @@ function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shado
 
 
 	env.setRenderTargets(tmp_rb)
-	env.drawArray(0, 4, env.dof_shader, 
+	env.drawArray(0, 3, env.dof_shader, 
 		{
 			input,
 			gbuffer_depth
