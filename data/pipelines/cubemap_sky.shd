@@ -16,22 +16,6 @@ fragment_shader [[
 	layout (location = 0) out vec4 o_color;
 	layout (binding = 0) uniform samplerCube u_sky;
 
-
-	vec3 getWorldNormal(vec2 frag_coord)
-	{
-		float z = 1;
-		#ifdef _ORIGIN_BOTTOM_LEFT
-			vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
-		#else
-			vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
-		#endif
-		vec4 wpos = u_camera_inv_view_projection * posProj;
-		wpos /= wpos.w;
-		vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
-
-		return -normalize(view);
-	}
-	
 	float getFogFactorSky(float cam_height, vec3 eye_dir, float fog_density, float fog_bottom, float fog_height) 
 	{
 		if(eye_dir.y == 0) return 1.0;

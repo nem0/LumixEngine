@@ -222,7 +222,7 @@ function shadowPass()
 				beginBlock("slice " .. tostring(slice + 1))
 				pass(view_params)
 				renderBucket(shadow_set, {})
-				renderTerrains(view_params, { define = "DEPTH" })
+				renderTerrains(view_params, {})
 				endBlock()
 			end
 		endBlock()
@@ -312,7 +312,7 @@ function main_shadowmap()
 				
 	pass(view_params)
 	renderBucket(shadow_set, {})
-	renderTerrains(view_params, { define = "DEPTH"})
+	renderTerrains(view_params, {define = "DEPTH"})
 	setOutput(depthbuf)
 
 	endBlock()

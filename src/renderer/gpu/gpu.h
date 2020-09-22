@@ -250,7 +250,6 @@ void bindImageTexture(TextureHandle texture, u32 unit);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
 void bindShaderBuffer(BufferHandle buffer, u32 binding_point, u32 flags);
 void update(BufferHandle buffer, const void* data, size_t size);
-void updatePartial(BufferHandle buffer, const void* data, size_t offset, size_t size);
 void* map(BufferHandle buffer, size_t size);
 void unmap(BufferHandle buffer);
 void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t size);

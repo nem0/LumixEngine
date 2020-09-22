@@ -35,58 +35,6 @@ fragment_shader [[
 		float u_godarys_enabled;
 	};
 
-	vec2 raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
-		vec3 s0_r0 = s0 - r0;
-		float tc = dot(s0_r0, rd);
-		float d2 = dot(s0_r0, s0_r0) - tc * tc;
-		float sr2 = sr * sr;
-		if (d2 > sr2) return vec2(-1);
-		float td2 = sr2 - d2;
-		float td = sqrt(td2);
-		return vec2(tc - td, tc + td);
-	}
-
-	vec3 getTopAtmoLightDir(vec3 p) {
-		vec2 t = raySphereIntersect(p, u_light_direction.xyz, vec3(0), u_top);
-		return p + t.y * u_light_direction.xyz;
-	}
-
-	vec3 transmittance(vec3 extinction, float len) {
-		return exp(-len * extinction);
-	}
-
-	float computeDensity(vec3 a, vec3 b, float distribution) {
-		float l = length(a - b);
-		int step_count = int(clamp(l / 1000, 1.0, 7.0));
-		float dens = 0;
-		vec3 step = (b - a) / step_count;
-		float step_len = l / step_count;
-		vec3 p = a;
-		for (int i = 0; i < step_count; ++i) {
-			float h = length(p);
-			float tmp = exp(min(0, (u_bot - h) / distribution));
-			dens += step_len * tmp;
-			p += step;
-		}
-		return dens;
-	}
-	
-	
-	vec3 getWorldNormal(vec2 frag_coord)
-	{
-		float z = 1;
-		#ifdef _ORIGIN_BOTTOM_LEFT
-			vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
-		#else
-			vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
-		#endif
-		vec4 wpos = u_camera_inv_view_projection * posProj;
-		wpos /= wpos.w;
-		vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
-
-		return -normalize(view);
-	}
-	
 	// mie - Schlick appoximation phase function of Henyey-Greenstein
 	float miePhase(float g, float cos_theta)
 	{
@@ -108,7 +56,6 @@ fragment_shader [[
 		float d = pow(1.0+g*g-2.0*g*alpha, 1.5);
 		return (a/b)*(c/d);
 	}
-
 
 	float getFogDensity(float y) {
 		return  y > u_fog_top ? 0 : 1;

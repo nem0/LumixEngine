@@ -52,6 +52,21 @@ namespace LuaWrapper
 	};
 #endif
 
+template <typename T, u32 C>
+struct Array {
+	T& operator[](u32 idx) { ASSERT(idx < size); return values[idx]; }
+	T* begin() { return values; }
+	T* end() { return values + size; }
+	T values[C];
+	u32 size = 0;
+};
+
+template <typename T>
+struct Optional {
+	T get(T default_value) { return valid ? value : default_value; }
+	T value;
+	bool valid = false;
+};
 
 inline int traceback (lua_State *L) {
 	if (!lua_isstring(L, 1)) return 1;
@@ -813,30 +828,58 @@ template <typename T> void argError(lua_State* L, int index)
 	argError(L, index, typeToString<T>());
 }
 
+template <typename T> struct Tag {};
+
+template <typename T> T checkArg(lua_State* L, int index, Tag<T>)
+{
+	if (!isType<T>(L, index))
+	{
+		argError<T>(L, index);
+	}
+	return toType<T>(L, index);
+}
+
+template <typename T> Optional<T> checkArg(lua_State* L, int index, Tag<Optional<T>>)
+{
+	Optional<T> res;
+	if (!isType<T>(L, index)) {
+		res.valid = false;
+	}
+	else {
+		res.value = toType<T>(L, index);
+		res.valid = true;
+	}
+	return res;
+}
+
+template <typename T, u32 C> Array<T, C> checkArg(lua_State* L, int index, Tag<Array<T, C>>)
+{
+	Array<T, C> res;
+	if (!lua_istable(L, index)) {
+		luaL_argerror(L, index, "expected array");
+	}
+	res.size = (u32)lua_objlen(L, index);
+	if (res.size > C) {
+		luaL_argerror(L, index, "array too long");
+	}
+
+	for (u32 i = 0; i < res.size; ++i) {
+		lua_rawgeti(L, index, i + 1);
+		if (!isType<T>(L, -1)) {
+			StaticString<128> buf("expected array of ", typeToString<T>());
+			luaL_argerror(L, index, buf);
+		}
+		res.values[i] = toType<T>(L, -1);
+		lua_pop(L, 1);
+	}
+
+	return res;
+}
 
 template <typename T> T checkArg(lua_State* L, int index)
 {
-	if (!isType<T>(L, index))
-	{
-		argError<T>(L, index);
-	}
-	return toType<T>(L, index);
+	return checkArg(L, index, Tag<T>{});
 }
-
-template <typename T> T checkArgOptional(lua_State* L, int index, const T& default_value)
-{
-	const int top = lua_gettop(L);
-	if (top < index) {
-		return default_value;
-	}
-
-	if (!isType<T>(L, index))
-	{
-		argError<T>(L, index);
-	}
-	return toType<T>(L, index);
-}
-
 
 inline void checkTableArg(lua_State* L, int index)
 {
@@ -845,7 +888,6 @@ inline void checkTableArg(lua_State* L, int index)
 		argError(L, index, "table");
 	}
 }
-
 
 template <typename T>
 inline void getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
@@ -888,13 +930,6 @@ namespace details
 {
 
 
-template <typename T, int index>
-RemoveCVR<T> convert(lua_State* L)
-{
-	return checkArg<RemoveCVR<T>>(L, index);
-}
-
-
 template <typename T> struct Caller;
 
 
@@ -905,7 +940,7 @@ struct Caller<Indices<indices...>>
 	static int callFunction(R (*f)(Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 1);
-		R v = f(convert<Args, indices>(L)...);
+		R v = f(checkArg<RemoveCVR<Args>>(L, indices)...);
 		push(L, v);
 		return 1;
 	}
@@ -915,7 +950,7 @@ struct Caller<Indices<indices...>>
 	static int callFunction(void (*f)(Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 0);
-		f(convert<Args, indices>(L)...);
+		f(checkArg<RemoveCVR<Args>>(L, indices)...);
 		return 0;
 	}
 
@@ -924,7 +959,7 @@ struct Caller<Indices<indices...>>
 	static int callFunction(R(*f)(lua_State*, Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 1);
-		R v = f(L, convert<Args, indices>(L)...);
+		R v = f(L, checkArg<RemoveCVR<Args>>(L, indices)...);
 		push(L, v);
 		return 1;
 	}
@@ -934,7 +969,7 @@ struct Caller<Indices<indices...>>
 	static int callFunction(void(*f)(lua_State*, Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 0);
-		f(L, convert<Args, indices>(L)...);
+		f(L, checkArg<RemoveCVR<Args>>(L, indices)...);
 		return 0;
 	}
 
@@ -943,7 +978,7 @@ struct Caller<Indices<indices...>>
 	static int callMethod(C* inst, void(C::*f)(lua_State*, Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 0);
-		(inst->*f)(L, convert<Args, indices>(L)...);
+		(inst->*f)(L, checkArg<RemoveCVR<Args>>(L, indices)...);
 		return 0;
 	}
 
@@ -952,7 +987,7 @@ struct Caller<Indices<indices...>>
 	static int callMethod(C* inst, R(C::*f)(lua_State*, Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 1);
-		R v = (inst->*f)(L, convert<Args, indices>(L)...);
+		R v = (inst->*f)(L, checkArg<RemoveCVR<Args>>(L, indices)...);
 		push(L, v);
 		return 1;
 	}
@@ -962,7 +997,7 @@ struct Caller<Indices<indices...>>
 	static int callMethod(C* inst, R(C::*f)(lua_State*, Args...) const, lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 1);
-		R v = (inst->*f)(L, convert<Args, indices>(L)...);
+		R v = (inst->*f)(L, checkArg<RemoveCVR<Args>>(L, indices)...);
 		push(L, v);
 		return 1;
 	}
@@ -972,7 +1007,7 @@ struct Caller<Indices<indices...>>
 	static int callMethod(C* inst, void(C::*f)(Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 0);
-		(inst->*f)(convert<Args, indices>(L)...);
+		(inst->*f)(checkArg<RemoveCVR<Args>>(L, indices)...);
 		return 0;
 	}
 
@@ -981,7 +1016,7 @@ struct Caller<Indices<indices...>>
 	static int callMethod(C* inst, R(C::*f)(Args...), lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 1);
-		R v = (inst->*f)(convert<Args, indices>(L)...);
+		R v = (inst->*f)(checkArg<RemoveCVR<Args>>(L, indices)...);
 		push(L, v);
 		return 1;
 	}
@@ -991,7 +1026,7 @@ struct Caller<Indices<indices...>>
 	static int callMethod(C* inst, R(C::*f)(Args...) const, lua_State* L)
 	{
 		LuaWrapper::DebugGuard guard(L, 1);
-		R v = (inst->*f)(convert<Args, indices>(L)...);
+		R v = (inst->*f)(checkArg<RemoveCVR<Args>>(L, indices)...);
 		push(L, v);
 		return 1;
 	}
