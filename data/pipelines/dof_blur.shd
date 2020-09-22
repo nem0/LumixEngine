@@ -41,15 +41,6 @@ fragment_shader [[
 	layout(std140, binding = 4) uniform Drawcall {
 		uniform vec4 u_blur_args;
 	};
-	
-	float toLinearDepth(float ndc_depth)
-	{
-		vec4 pos_proj = vec4(0, 0, ndc_depth, 1.0);
-		
-		vec4 view_pos = u_camera_inv_projection * pos_proj;
-		
-		return -view_pos.z / view_pos.w;
-	}
 
 	layout (binding=0) uniform sampler2D u_source;
 	layout (binding=1) uniform sampler2D u_depth;
@@ -67,7 +58,7 @@ fragment_shader [[
 		+ texture(u_source, v_uv2.zw) * 0.0702702703;
 
 		float depth = texture(u_depth, v_uv0.xy).r;
-		float linear_depth = toLinearDepth(depth);
+		float linear_depth = toLinearDepth(u_camera_inv_projection, depth);
 		#ifdef NEAR
 			color.a = 1 - smoothstep(DOF_NEAR_BLUR, DOF_NEAR_SHARP, linear_depth);
 		#else

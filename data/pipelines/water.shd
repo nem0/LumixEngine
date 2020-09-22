@@ -99,16 +99,6 @@ fragment_shader [[
 		vec3 reflection = reflect(-view, normal);
 		return textureLod(u_reflectionmap, reflection, dist / 2).rgb;
 	}
-	
-	
-	float toLinearDepth(float ndc_depth)
-	{
-		vec4 pos_proj = vec4(0, 0, ndc_depth, 1.0);
-	
-		vec4 view_pos = u_camera_inv_projection * pos_proj;
-	
-		return -view_pos.z / view_pos.w;
-	}
 
 	vec3 getRefractionColor(vec3 wpos, vec3 view, vec3 normal, float wave)
 	{
@@ -179,7 +169,7 @@ fragment_shader [[
 		//float wave = cos(time * WAVE_FREQUENCY + length(v_wpos)*0.5) * WAVE_HEIGHT - WAVE_HEIGHT - WAVE_HEIGHT * noise;
 		//vec3 screen_uv = getScreenCoord(v_wpos);
 		//float depth = texture(u_gbuffer_depth, screen_uv.xy * 0.5 + 0.5).x;
-		//float depth_diff = toLinearDepth(depth) - toLinearDepth(screen_uv.z) + wave;
+		//float depth_diff = toLinearDepth(u_camera_inv_projection, depth) - toLinearDepth(screen_uv.z) + wave;
 
 		//if(depth_diff < FOAM_DEPTH)
 		//{

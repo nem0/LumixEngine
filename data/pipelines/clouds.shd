@@ -23,22 +23,6 @@ fragment_shader [[
 	const float cloud_threshold = 0.2;
 	const float cloud_height = 3000;
 	
-	// TODO this is used in several shaders, e.g. atmo.shd
-	vec3 getWorldNormal(vec2 frag_coord)
-	{
-		float z = 1;
-		#ifdef _ORIGIN_BOTTOM_LEFT
-			vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
-		#else
-			vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
-		#endif
-		vec4 wpos = u_camera_inv_view_projection * posProj;
-		wpos /= wpos.w;
-		vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
-
-		return -normalize(view);
-	}
-
 	float remap( float value, float inMin, float inMax, float outMin, float outMax )
 	{
 		float mappedValue = value;
@@ -180,8 +164,6 @@ fragment_shader [[
     
 		return noise;
 	}
-
-
 	
 	float miePhase(float g, float cos_theta)
 	{

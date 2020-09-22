@@ -156,6 +156,32 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 	}
 #endif
 
+vec2 raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
+	vec3 s0_r0 = s0 - r0;
+	float tc = dot(s0_r0, rd);
+	float d2 = dot(s0_r0, s0_r0) - tc * tc;
+	float sr2 = sr * sr;
+	if (d2 > sr2) return vec2(-1);
+	float td2 = sr2 - d2;
+	float td = sqrt(td2);
+	return vec2(tc - td, tc + td);
+}
+
+vec3 getWorldNormal(vec2 frag_coord)
+{
+	float z = 1;
+	#ifdef _ORIGIN_BOTTOM_LEFT
+		vec4 posProj = vec4(frag_coord * 2 - 1, z, 1.0);
+	#else
+		vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
+	#endif
+	vec4 wpos = u_camera_inv_view_projection * posProj;
+	wpos /= wpos.w;
+	vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
+
+	return -normalize(view);
+}
+
 vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord, out float ndc_depth)
 {
 	float z = texture(depth_buffer, tex_coord).r;

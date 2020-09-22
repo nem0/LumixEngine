@@ -34,8 +34,162 @@
 namespace Lumix
 {
 
+struct CameraParams
+{
+	ShiftedFrustum frustum;
+	DVec3 pos;
+	float lod_multiplier;
+	bool is_shadow;
+	Matrix view;
+	Matrix projection;
+};
+
+struct RenderState {
+	u64 value;
+};
 
 namespace LuaWrapper {
+
+	template <> inline RenderState toType(lua_State* L, int idx)
+	{
+		gpu::StencilFuncs stencil_func = gpu::StencilFuncs::DISABLE;
+		u8 stencil_write_mask = 0xff;
+		u8 stencil_ref = 0;
+		u8 stencil_mask = 0;
+		gpu::StencilOps stencil_sfail = gpu::StencilOps::KEEP;
+		gpu::StencilOps stencil_zfail = gpu::StencilOps::KEEP;
+		gpu::StencilOps stencil_zpass = gpu::StencilOps::KEEP;
+
+		char tmp[64];
+		u64 rs = (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::DEPTH_WRITE;
+		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
+			if(equalIStrings(tmp, "add")) {
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+			}
+			else if(equalIStrings(tmp, "alpha")) {
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+			}
+			else if(equalIStrings(tmp, "multiply")) {
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
+			}
+			else if(equalIStrings(tmp, "dual")) {
+				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+			}
+			else if(equalIStrings(tmp, "")) {
+			}
+			else {
+				luaL_error(L, "Unknown blending mode");
+			}
+		}
+
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)gpu::StateFlags::DEPTH_TEST, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, (u64)gpu::StateFlags::WIREFRAME, false);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, (u64)gpu::StateFlags::DEPTH_WRITE, true);
+		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
+		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
+		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
+		LuaWrapper::getOptionalField(L, idx, "stencil_mask", &stencil_mask);
+		LuaWrapper::getOptionalField(L, idx, "stencil_sfail", reinterpret_cast<u8*>(&stencil_sfail));
+		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<u8*>(&stencil_zfail));
+		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<u8*>(&stencil_zpass));
+
+		rs |= gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
+
+		return {rs};
+	}
+
+	template <> inline CameraParams toType(lua_State* L, int idx)
+	{
+		CameraParams cp;
+
+		lua_getfield(L, idx, "view");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "View matrix is not a table");
+		}
+
+		for (int i = 0; i < 16; ++i) {
+			lua_rawgeti(L, -1, i + 1);
+			if (!LuaWrapper::isType<float>(L, -1)) {
+				lua_pop(L, 2);
+				luaL_error(L, "View matrix must contain exactly 16 floats");
+			}
+			cp.view[i] = LuaWrapper::toType<float>(L, -1);
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		lua_getfield(L, idx, "projection");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "Projection matrix is not a table");
+		}
+
+		for (int i = 0; i < 16; ++i) {
+			lua_rawgeti(L, -1, i + 1);
+			if (!LuaWrapper::isType<float>(L, -1)) {
+				lua_pop(L, 2);
+				luaL_error(L, "Projection matrix must contain exactly 16 floats");
+			}
+			cp.projection[i] = LuaWrapper::toType<float>(L, -1);
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		lua_getfield(L, idx, "frustum");
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 1);
+			luaL_error(L, "Frustum is not a table");
+		}
+		if(!LuaWrapper::checkField(L, -1, "origin", &cp.frustum.origin)) {
+				lua_pop(L, 1);
+				luaL_error(L, "Frustum without origin");
+		}
+		auto load_floats = [L](float* data, int count, int offset) {
+			for (int i = 0; i < count; ++i) {
+				lua_rawgeti(L, -1, offset + i + 1);
+				if(!LuaWrapper::isType<float>(L, -1)) {
+					lua_pop(L, 2);
+					luaL_error(L, "Invalid frustum");
+				}
+				data[i] = LuaWrapper::toType<float>(L, -1);
+				lua_pop(L, 1);
+			}
+		};
+		load_floats(cp.frustum.xs, (int)Frustum::Planes::COUNT, 0);
+		load_floats(cp.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
+		load_floats(cp.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
+		load_floats(cp.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
+		load_floats(&cp.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
+		
+		lua_pop(L, 1);
+		cp.frustum.setPlanesFromPoints();
+		
+		if(!LuaWrapper::checkField(L, idx, "lod_multiplier", &cp.lod_multiplier)) {
+			luaL_error(L, "Missing lod_multiplier in camera params");
+		}
+
+		if (!LuaWrapper::checkField(L, idx, "is_shadow", &cp.is_shadow)) {
+			luaL_error(L, "Missing is_shadow in camera params");
+		}
+
+		if(!LuaWrapper::checkField(L, idx, "position", &cp.pos)) {
+			luaL_error(L, "Missing position in camera params");
+		}
+
+		return cp;
+	}
+
+	template <> inline bool isType<RenderState>(lua_State* L, int index)
+	{
+		return lua_istable(L, index);
+	}
+
+	template <> inline bool isType<CameraParams>(lua_State* L, int index)
+	{
+		return lua_istable(L, index);
+	}
+
 	template <> inline bool isType<Color>(lua_State* L, int index)
 	{
 		return lua_isnumber(L, index) != 0 || lua_istable(L, index);
@@ -69,6 +223,49 @@ namespace LuaWrapper {
 		}
 		return Color(0);
 	}
+
+	void push(lua_State* L, const CameraParams& params)
+	{
+		lua_createtable(L, 0, 4);
+
+		lua_createtable(L, 32+24, 0);
+		const float* frustum = params.frustum.xs; 
+		auto push_floats = [L](const float* values, int count, int offset){
+			for(int i = 0; i < count; ++i) {
+				LuaWrapper::push(L, values[i]);
+				lua_rawseti(L, -2, offset + i + 1);
+			}
+		};
+
+		push_floats(params.frustum.xs, (int)Frustum::Planes::COUNT, 0);
+		push_floats(params.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
+		push_floats(params.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
+		push_floats(params.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
+		push_floats(&params.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
+
+		LuaWrapper::push(L, params.frustum.origin);
+		lua_setfield(L, -2, "origin");
+		lua_setfield(L, -2, "frustum");
+
+		LuaWrapper::setField(L, -1, "is_shadow", params.is_shadow);
+		LuaWrapper::setField(L, -1, "position", params.pos);
+		LuaWrapper::setField(L, -1, "lod_multiplier", params.lod_multiplier);
+
+		lua_createtable(L, 16, 0);
+		for (int i = 0; i < 16; ++i) {
+			LuaWrapper::push(L, params.view[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+		lua_setfield(L, -2, "view");
+
+		lua_createtable(L, 16, 0);
+		for (int i = 0; i < 16; ++i) {
+			LuaWrapper::push(L, params.projection[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+		lua_setfield(L, -2, "projection");
+	}
+
 }
 
 
@@ -1261,78 +1458,48 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	static int renderTerrains(lua_State* L)
+	void renderTerrains(lua_State* L, CameraParams cp, RenderState state)
 	{
 		PROFILE_FUNCTION();
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-
-		const CameraParams cp = checkCameraParams(L, 1);
-		u64 state = 0;
-		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
-			state = getState(L, 2);
-		}
-		IAllocator& allocator = pipeline->m_renderer.getAllocator();
+		IAllocator& allocator = m_renderer.getAllocator();
 		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
 
-		char tmp[64];
-		if (LuaWrapper::getOptionalStringField(L, 2, "define", Span(tmp))) {
-			cmd->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
-		}
-		
-		cmd->m_render_state = state;
-		cmd->m_pipeline = pipeline;
+		const char* define = "";
+		LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
+
+		cmd->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		cmd->m_render_state = state.value;
+		cmd->m_pipeline = this;
 		cmd->m_camera_params = cp;
 
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
-		return 0;
+		m_renderer.queue(cmd, m_profiler_link);
 	}
 	
 
-	static int renderGrass(lua_State* L)
+	void renderGrass(lua_State* L, CameraParams cp, LuaWrapper::Optional<RenderState> state)
 	{
 		PROFILE_FUNCTION();
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		if (!pipeline->m_place_grass_shader->isReady()) return 0;
+		if (!m_place_grass_shader->isReady()) return;
 
-		const CameraParams cp = checkCameraParams(L, 1);
-		u64 state = 0;
-		if (lua_gettop(L) > 1 && lua_istable(L, 2)) {
-			state = getState(L, 2);
-		}
-		IAllocator& allocator = pipeline->m_renderer.getAllocator();
+		IAllocator& allocator = m_renderer.getAllocator();
 		RenderGrassCommand* cmd = LUMIX_NEW(allocator, RenderGrassCommand)(allocator);
 
-		char tmp[64];
-		if (LuaWrapper::getOptionalStringField(L, 2, "define", Span(tmp))) {
-			cmd->m_define_mask = tmp[0] ? 1 << pipeline->m_renderer.getShaderDefineIdx(tmp) : 0;
+		cmd->m_define_mask = 0;
+		if (lua_istable(L, 2)) {
+			const char* define = "";
+			LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
+			cmd->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		}
-		
-		cmd->m_render_state = state;
-		cmd->m_pipeline = pipeline;
+		cmd->m_render_state = state.get({0}).value;
+		cmd->m_pipeline = this;
 		cmd->m_camera_params = cp;
-		cmd->m_compute_shader = pipeline->m_place_grass_shader->getProgram(gpu::VertexDecl(), 0);
+		cmd->m_compute_shader = m_place_grass_shader->getProgram(gpu::VertexDecl(), 0);
 
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
-		return 0;
+		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	static int renderParticles(lua_State* L)
+	void renderParticles(CameraParams cp)
 	{
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		const CameraParams cp = checkCameraParams(L ,1);
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-
 		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderJob
 		{
@@ -1417,26 +1584,12 @@ struct PipelineImpl final : Pipeline
 			u32 m_size;
 		};
 
-		Cmd* cmd = LUMIX_NEW(pipeline->m_allocator, Cmd);
-		cmd->m_pipeline = pipeline;
+		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		cmd->m_pipeline = this;
 		cmd->m_camera_params = cp;
 
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
-
-		return 0;
+		m_renderer.queue(cmd, m_profiler_link);
 	}
-
-
-	struct CameraParams
-	{
-		ShiftedFrustum frustum;
-		DVec3 pos;
-		float lod_multiplier;
-		bool is_shadow;
-		Matrix view;
-		Matrix projection;
-	};
-	
 
 	static CameraParams checkCameraParams(lua_State* L, int idx)
 	{
@@ -1520,57 +1673,75 @@ struct PipelineImpl final : Pipeline
 		return cp;
 	}
 	
-	static int createTexture2D(lua_State* L)
-	{
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+	void bindShaderBuffer(u32 buffer_handle, u32 binding_point) {
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::bindShaderBuffer(buffer, binding_point, (u32)gpu::BindShaderBufferFlags::OUTPUT);
+			}
+			u32 binding_point;
+			gpu::BufferHandle buffer;
+		};
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->binding_point = binding_point;
+		cmd->buffer = {buffer_handle};
+		m_renderer.queue(cmd, m_profiler_link);
+	}
+	
+	void bindUniformBuffer(u32 buffer_handle, u32 binding_point, u32 size) {
+		struct Cmd : Renderer::RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::bindUniformBuffer(binding_point, buffer, 0, size);
+			}
+			u32 binding_point;
+			u32 size;
+			gpu::BufferHandle buffer;
+		};
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->binding_point = binding_point;
+		cmd->buffer = {buffer_handle};
+		cmd->size = size;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
 
-		const u32 width = LuaWrapper::checkArg<u32>(L, 1);
-		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
-		const char* format_str = LuaWrapper::checkArg<const char*>(L, 3);
-		const char* debug_name = LuaWrapper::checkArgOptional<const char*>(L, 4, "lua_texture");
-		
+	u32 createBuffer(u32 size) {
+		Renderer::MemRef mem;
+		mem.own = false;
+		mem.data = nullptr;
+		mem.size = size;
+		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE | (u32)gpu::BufferFlags::COMPUTE_WRITE);
+		return buffer.value;
+	}
+	
+	u32 createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
+	{
 		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
-		const gpu::TextureHandle texture = pipeline->m_renderer.createTexture(width
+		const gpu::TextureHandle texture = m_renderer.createTexture(width
 			, height
 			, 1
 			, format
 			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE
 			, mem
-			, debug_name);
-		LuaWrapper::push(L, texture.value);
-		return 1;
+			, debug_name.get("lua_texture"));
+		return texture.value;
 	}
 
-	static int createTexture3D(lua_State* L)
+	u32 createTexture3D(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
 	{
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-
-		const u32 width = LuaWrapper::checkArg<u32>(L, 1);
-		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
-		const u32 depth = LuaWrapper::checkArg<u32>(L, 3);
-		const char* format_str = LuaWrapper::checkArg<const char*>(L, 4);
-		const char* debug_name = LuaWrapper::checkArgOptional<const char*>(L, 5, "lua_texture");
-		
 		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
-		const gpu::TextureHandle texture = pipeline->m_renderer.createTexture(width
+		const gpu::TextureHandle texture = m_renderer.createTexture(width
 			, height
 			, depth
 			, format
 			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
 			, mem
-			, debug_name);
-		LuaWrapper::push(L, texture.value);
-		return 1;
+			, debug_name.get("lua_texture"));
+		return texture.value;
 	}
 
 	static int drawcallUniforms(lua_State* L) {
@@ -1607,7 +1778,7 @@ struct PipelineImpl final : Pipeline
 		return 0;
 	}
 
-	void dispatch(u32 shader_id, u32 num_groups_x, u32 num_groups_y, u32 num_groups_z) {
+	void dispatch(u32 shader_id, u32 num_groups_x, u32 num_groups_y, u32 num_groups_z, LuaWrapper::Optional<const char*> define) {
 		Engine& engine = m_renderer.getEngine();
 		Shader* shader = nullptr;
 		for (const ShaderRef& s : m_shaders) {
@@ -1618,7 +1789,11 @@ struct PipelineImpl final : Pipeline
 		}
 		if (!shader || !shader->isReady()) return;
 
-		gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), 0);
+		u32 defines = 0;
+		if (define.valid) {
+			defines |= 1 << m_renderer.getShaderDefineIdx(define.value);
+		}
+		gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), defines);
 		if (!program.isValid()) return;
 
 		gpu::TextureHandle textures[16] = {};
@@ -1680,7 +1855,7 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	static int bindTextures(lua_State* L)
+	void bindTextures(lua_State* L, LuaWrapper::Array<i32, 16> texture_handles, LuaWrapper::Optional<u32> offset)
 	{
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
@@ -1695,55 +1870,28 @@ struct PipelineImpl final : Pipeline
 			u32 m_textures_count = 0;
 		};
 
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		LuaWrapper::checkTableArg(L, 1);
-
-		const int offset = lua_gettop(L) > 1 ? LuaWrapper::checkArg<int>(L, 2) : 0;
-
-		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
-		cmd->m_offset = offset;
-
-		Engine& engine = pipeline->m_renderer.getEngine();
-		const int len = (int)lua_objlen(L, 1);
-		for(int i = 0; i < len; ++i) {
-			lua_rawgeti(L, 1, i + 1);
-			if(lua_type(L, -1) != LUA_TNUMBER) {
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Incorrect texture arguments of bindTextures");
-			}
-
-			if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Too many texture in bindTextures");
-			}
-
-			const int res_idx = (int)lua_tointeger(L, -1);
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->m_offset = offset.get(0);
+		
+		Engine& engine = m_renderer.getEngine();
+		for (i32 res_idx : texture_handles) {
 			Resource* res = engine.getLuaResource(res_idx);
 			if (!res || res->getType() != Texture::TYPE) {
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Unknown textures in bindTextures");
+				LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+				luaL_error(L, "%s", "Unknown textures in bindTextures");
 			}
 			cmd->m_textures_handles[cmd->m_textures_count] = ((Texture*)res)->handle;
 			++cmd->m_textures_count;
-
-			lua_pop(L, 1);
-
 		}
 
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
-
-		return 0;
+		m_renderer.queue(cmd, m_profiler_link);
 	};
-
-	static int bindRenderbuffers(lua_State* L)
+	
+	void bindRenderbuffers(LuaWrapper::Array<i32, 16> renderbuffers, LuaWrapper::Optional<u32> offset)
 	{
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
-			void execute() override 
+			void execute() override
 			{
 				PROFILE_FUNCTION();
 				gpu::bindTextures(m_textures_handles, m_offset, m_textures_count);
@@ -1754,45 +1902,19 @@ struct PipelineImpl final : Pipeline
 			u32 m_textures_count = 0;
 		};
 
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		LuaWrapper::checkTableArg(L, 1);
-
-		const int offset = lua_gettop(L) > 1 ? LuaWrapper::checkArg<int>(L, 2) : 0;
-
-		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
-		cmd->m_offset = offset;
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		cmd->m_offset = offset.get(0);
 		
-		const int len = (int)lua_objlen(L, 1);
-		for(int i = 0; i < len; ++i) {
-			lua_rawgeti(L, 1, i + 1);
-			if(lua_type(L, -1) != LUA_TNUMBER) {
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Incorrect texture arguments of bindRenderbuffers");
-			}
-
-			if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
-				LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-				return luaL_error(L, "%s", "Too many texture in bindRenderbuffers");
-			}
-
-			const int rb_idx = (int)lua_tointeger(L, -1);
-			cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
+		Engine& engine = m_renderer.getEngine();
+		for (i32 rb_idx : renderbuffers) {
+			cmd->m_textures_handles[cmd->m_textures_count] = m_renderbuffers[rb_idx].handle;
 			++cmd->m_textures_count;
-
-			lua_pop(L, 1);
-
 		}
 
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
-
-		return 0;
+		m_renderer.queue(cmd, m_profiler_link);
 	};
 
-	static int pass(lua_State* L)
+	void pass(CameraParams cp)
 	{
 		PROFILE_FUNCTION();
 		struct PushPassStateCmd : Renderer::RenderJob {
@@ -1807,13 +1929,7 @@ struct PipelineImpl final : Pipeline
 			PassState pass_state;
 		};
 
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		const CameraParams cp = checkCameraParams(L, 1);
-		PushPassStateCmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), PushPassStateCmd);
+		PushPassStateCmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), PushPassStateCmd);
 		cmd->pass_state.view = cp.view;
 		cmd->pass_state.projection = cp.projection;
 		cmd->pass_state.inv_projection = cp.projection.inverted();
@@ -1823,9 +1939,8 @@ struct PipelineImpl final : Pipeline
 		cmd->pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 		toPlanes(cp, Span(cmd->pass_state.camera_planes));
 		
-		cmd->pass_state_buffer = pipeline->m_pass_state_buffer;
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
-		return 0;
+		cmd->pass_state_buffer = m_pass_state_buffer;
+		m_renderer.queue(cmd, m_profiler_link);
 	}
 
 	static void toPlanes(const CameraParams& cp, Span<Vec4> planes) {
@@ -1904,7 +2019,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 
-	static int drawArray(lua_State* L)
+	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id)
 	{
 		struct Cmd : Renderer::RenderJob {
 			void setup() override { m_program = m_shader->getProgram(gpu::VertexDecl(), m_define_mask); }
@@ -1943,14 +2058,6 @@ struct PipelineImpl final : Pipeline
 
 		LuaWrapper::DebugGuard guard(L);
 
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		const int indices_offset = LuaWrapper::checkArg<int>(L, 1);
-		const int indices_count = LuaWrapper::checkArg<int>(L, 2);
-		int shader_id = LuaWrapper::checkArg<int>(L, 3);
 		if (lua_gettop(L) > 3) LuaWrapper::checkTableArg(L, 4);
 		
 		const u64 rs = [&](){
@@ -1962,42 +2069,42 @@ struct PipelineImpl final : Pipeline
 		}();
 
 		Shader* shader = nullptr;
-		for (const ShaderRef& s : pipeline->m_shaders) {
+		for (const ShaderRef& s : m_shaders) {
 			if(s.id == shader_id) {
 				shader = s.res;
 				break;
 			}
 		}
 		if (!shader) {
-			return luaL_error(L, "Unknown shader id %d in drawArrays.", shader_id);
+			luaL_error(L, "Unknown shader id %d in drawArrays.", shader_id);
 		}
 
 		if (shader->isFailure()) {
-			return luaL_error(L, "Shader %s  failed to load. `drawArrays` has no effect.", shader->getPath().c_str());
+			luaL_error(L, "Shader %s  failed to load. `drawArrays` has no effect.", shader->getPath().c_str());
 		}
-		if (!shader->isReady()) return 0;
+		if (!shader->isReady()) return;
 
-		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
+		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		if(lua_gettop(L) > 3) {
 			const u32 len = (u32)lua_objlen(L, 4);
 			for(u32 i = 0; i < len; ++i) {
 				lua_rawgeti(L, 4, i + 1);
 				if(lua_type(L, -1) != LUA_TNUMBER) {
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					return luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
+					LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+					luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
 				}
 
 				if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
-					LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-					return luaL_error(L, "%s", "Too many texture in drawArray call");
+					LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+					luaL_error(L, "%s", "Too many texture in drawArray call");
 				}
 
 				const int rb_idx = (int)lua_tointeger(L, -1);
 				if (rb_idx == -2) {
-					cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_shadow_atlas.texture;
+					cmd->m_textures_handles[cmd->m_textures_count] = m_shadow_atlas.texture;
 				}
 				else {
-					cmd->m_textures_handles[cmd->m_textures_count] = pipeline->m_renderbuffers[rb_idx].handle;
+					cmd->m_textures_handles[cmd->m_textures_count] = m_renderbuffers[rb_idx].handle;
 				}
 				++cmd->m_textures_count;
 				lua_pop(L, 1);
@@ -2005,98 +2112,41 @@ struct PipelineImpl final : Pipeline
 		
 			if (lua_isstring(L, 6)) {
 				const char* define = lua_tostring(L, 6);
-				cmd->m_define_mask = 1 << pipeline->m_renderer.getShaderDefineIdx(define);
+				cmd->m_define_mask = 1 << m_renderer.getShaderDefineIdx(define);
 			}
 			else if (lua_istable(L, 6)) {
 				lua_pushnil(L);
 				while (lua_next(L, 6) != 0) {
 					if(lua_type(L, -1) != LUA_TSTRING) {
-						LUMIX_DELETE(pipeline->m_renderer.getAllocator(), cmd);
-						return luaL_error(L, "%s", "Incorrect define arguments of drawArrays");
+						LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+						luaL_error(L, "%s", "Incorrect define arguments of drawArrays");
 					}
 					const char* define = lua_tostring(L, -1);
-					cmd->m_define_mask |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);
+					cmd->m_define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
 					lua_pop(L, 1);
 				}
 			}
 
 		}
 	
-		cmd->m_pipeline = pipeline;
+		cmd->m_pipeline = this;
 		cmd->m_render_state = rs;
 		cmd->m_shader = shader;
 		cmd->m_indices_count = indices_count;
 		cmd->m_indices_offset = indices_offset;
-		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
-
-		return 0;
-	}
-	
-
-	static void pushCameraParams(lua_State* L, const CameraParams& params)
-	{
-		lua_createtable(L, 0, 4);
-
-		lua_createtable(L, 32+24, 0);
-		const float* frustum = params.frustum.xs; 
-		auto push_floats = [L](const float* values, int count, int offset){
-			for(int i = 0; i < count; ++i) {
-				LuaWrapper::push(L, values[i]);
-				lua_rawseti(L, -2, offset + i + 1);
-			}
-		};
-
-		push_floats(params.frustum.xs, (int)Frustum::Planes::COUNT, 0);
-		push_floats(params.frustum.ys, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT);
-		push_floats(params.frustum.zs, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 2);
-		push_floats(params.frustum.ds, (int)Frustum::Planes::COUNT, (int)Frustum::Planes::COUNT * 3);
-		push_floats(&params.frustum.points[0].x, 24, (int)Frustum::Planes::COUNT * 4);
-
-		LuaWrapper::push(L, params.frustum.origin);
-		lua_setfield(L, -2, "origin");
-		lua_setfield(L, -2, "frustum");
-
-		LuaWrapper::setField(L, -1, "is_shadow", params.is_shadow);
-		LuaWrapper::setField(L, -1, "position", params.pos);
-		LuaWrapper::setField(L, -1, "lod_multiplier", params.lod_multiplier);
-
-		lua_createtable(L, 16, 0);
-		for (int i = 0; i < 16; ++i) {
-			LuaWrapper::push(L, params.view[i]);
-			lua_rawseti(L, -2, i + 1);
-		}
-		lua_setfield(L, -2, "view");
-
-		lua_createtable(L, 16, 0);
-		for (int i = 0; i < 16; ++i) {
-			LuaWrapper::push(L, params.projection[i]);
-			lua_rawseti(L, -2, i + 1);
-		}
-		lua_setfield(L, -2, "projection");
+		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-
-	static int getCameraParams(lua_State* L)
+	CameraParams getCameraParams()
 	{
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-
-		RenderScene* scene = pipeline->m_scene;
-
 		CameraParams cp;
-
-		cp.pos = pipeline->m_viewport.pos;
-		cp.frustum = pipeline->m_viewport.getFrustum();
-		cp.lod_multiplier = scene->getCameraLODMultiplier(pipeline->m_viewport.fov, pipeline->m_viewport.is_ortho);
+		cp.pos = m_viewport.pos;
+		cp.frustum = m_viewport.getFrustum();
+		cp.lod_multiplier = m_scene->getCameraLODMultiplier(m_viewport.fov, m_viewport.is_ortho);
 		cp.is_shadow = false;
-		cp.view = pipeline->m_viewport.getView(cp.pos);
-		cp.projection = pipeline->m_viewport.getProjection();
-		pushCameraParams(L, cp);
-
-		return 1;
+		cp.view = m_viewport.getView(cp.pos);
+		cp.projection = m_viewport.getProjection();
+		return cp;
 	}
 
 
@@ -2377,10 +2427,12 @@ struct PipelineImpl final : Pipeline
 			const DVec3 cam_pos = m_camera_params.pos;
 			for (const Probe& p : m_probes) {
 				Vec4* dc_mem = (Vec4*)gpu::map(m_pipeline->m_drawcall_ub, sizeof(Vec4) * 3);
-				dc_mem[0] = Vec4(p.pos, 0);
-				memcpy(&dc_mem[1], &p.rot, sizeof(p.rot)); 
-				dc_mem[2] = Vec4(p.half_extents, 0);
-				gpu::unmap(m_pipeline->m_drawcall_ub);
+				if (dc_mem) {
+					dc_mem[0] = Vec4(p.pos, 0);
+					memcpy(&dc_mem[1], &p.rot, sizeof(p.rot)); 
+					dc_mem[2] = Vec4(p.half_extents, 0);
+					gpu::unmap(m_pipeline->m_drawcall_ub);
+				}
 
 				gpu::bindTextures(&p.texture, m_texture_offset, 1);
 					
@@ -2618,8 +2670,10 @@ struct PipelineImpl final : Pipeline
 				}
 				if (!data.empty()) {
 					u8* mem = (u8*)gpu::map(buffer.buffer, capacity);
-					memcpy(mem, data.begin(), data.byte_size());
-					gpu::unmap(buffer.buffer);
+					if (mem) {
+						memcpy(mem, data.begin(), data.byte_size());
+						gpu::unmap(buffer.buffer);
+					}
 					gpu::bindShaderBuffer(buffer.buffer, idx, 0);
 				}
 			};
@@ -2694,20 +2748,9 @@ struct PipelineImpl final : Pipeline
 		return to_tile * bias_matrix * prj * view;
 	}
 
-	static int renderReflectionVolumes(lua_State* L) {
-
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-		LuaWrapper::checkTableArg(L, 1);
-		const CameraParams cp = checkCameraParams(L, 1);
-		const int shader_id = LuaWrapper::checkArg<int>(L, 2);
-		const u32 texture_offset = LuaWrapper::checkArg<u32>(L, 3);
-
+	void renderReflectionVolumes(lua_State* L, CameraParams cp, i32 shader_id, u32 texture_offset) {
 		Shader* shader = [&] {
-			for (const ShaderRef& s : pipeline->m_shaders) {
+			for (const ShaderRef& s : m_shaders) {
 				if(s.id == shader_id) {
 					return s.res;
 				}
@@ -2715,20 +2758,20 @@ struct PipelineImpl final : Pipeline
 			return (Shader*)nullptr;
 		}();
 		if (!shader) {
-			return luaL_error(L, "Unknown shader id %d in renderReflectionVolumes.", shader_id);
+			luaL_error(L, "Unknown shader id %d in renderReflectionVolumes.", shader_id);
+			return;
 		}
-		if (!shader->isReady()) return 0;
+		if (!shader->isReady()) return;
 
-		RenderReflectionVolumesJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderReflectionVolumesJob)(pipeline->m_allocator);
+		RenderReflectionVolumesJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderReflectionVolumesJob)(m_allocator);
 		
-		job->m_program = shader->getProgram(pipeline->m_simple_cube_decl, 0);
-		job->m_ib = pipeline->m_cube_ib;
-		job->m_vb = pipeline->m_cube_vb;
-		job->m_pipeline = pipeline;
+		job->m_program = shader->getProgram(m_simple_cube_decl, 0);
+		job->m_ib = m_cube_ib;
+		job->m_vb = m_cube_vb;
+		job->m_pipeline = this;
 		job->m_camera_params = cp;
 		job->m_texture_offset = texture_offset;
-		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
-		return 0;
+		m_renderer.queue(job, m_profiler_link);
 	}
 
 	struct AtlasSorter {
@@ -2763,36 +2806,24 @@ struct PipelineImpl final : Pipeline
 		return float(light.radius / (cam_pos - light_pos).length());
 	}
 
-	static int fillClusters(lua_State* L) {
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+	void fillClusters(LuaWrapper::Optional<CameraParams> cp) {
+		FillClustersJob* job = LUMIX_NEW(m_renderer.getAllocator(), FillClustersJob)(m_allocator);
 		
-		CameraParams cp;
-		if (lua_gettop(L) > 0) {
-			LuaWrapper::checkTableArg(L, 1);
-			cp = checkCameraParams(L, 1);
-		}
-
-		FillClustersJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), FillClustersJob)(pipeline->m_allocator);
-		
-		job->m_pipeline = pipeline;
-		if (lua_gettop(L) > 0) {
-			job->m_camera_params = cp;
+		job->m_pipeline = this;
+		if (cp.valid) {
+			job->m_camera_params = cp.value;
 		}
 		else {
 			job->m_is_clear = true;
 		}
 
-		CullResult* lights = pipeline->m_scene->getRenderables(cp.frustum, RenderableTypes::LOCAL_LIGHT);
-		const Universe& universe = pipeline->m_scene->getUniverse();
-		const DVec3 cam_pos = pipeline->m_viewport.pos;
+		CullResult* lights = m_scene->getRenderables(cp.value.frustum, RenderableTypes::LOCAL_LIGHT);
+		const Universe& universe = m_scene->getUniverse();
+		const DVec3 cam_pos = m_viewport.pos;
 
 		AtlasSorter atlas_sorter;
 		lights->forEach([&](EntityRef e){
-			PointLight& pl = pipeline->m_scene->getPointLight(e);
+			PointLight& pl = m_scene->getPointLight(e);
 			i32 idx = job->m_point_lights.size();
 			FillClustersJob::ClusterPointLight& light = job->m_point_lights.emplace();
 			light.radius = pl.range;
@@ -2803,52 +2834,51 @@ struct PipelineImpl final : Pipeline
 			light.color = pl.color * pl.intensity;
 			light.attenuation_param = pl.attenuation_param;
 
-			auto iter = pipeline->m_shadow_atlas.map.find(e);
+			auto iter = m_shadow_atlas.map.find(e);
 			if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
 				light.atlas_idx = iter.isValid() ? iter.value() : -1;
 				atlas_sorter.push(job->m_point_lights.size() - 1, computePriority(light, light_pos, cam_pos), e);
 			}
 			else if(iter.isValid()) {
 				light.atlas_idx = -1;
-				pipeline->m_shadow_atlas.remove(e);
+				m_shadow_atlas.remove(e);
 			}
 		});
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
 			FillClustersJob::ClusterPointLight& light = job->m_point_lights[atlas_sorter.lights[i].idx];
 			if (light.atlas_idx != -1 && ShadowAtlas::getGroup(i) != ShadowAtlas::getGroup(light.atlas_idx)) {
-				pipeline->m_shadow_atlas.remove(atlas_sorter.lights[i].entity);
+				m_shadow_atlas.remove(atlas_sorter.lights[i].entity);
 				light.atlas_idx = -1;
 			}
 		}
 		
-		if (!pipeline->m_shadow_atlas.texture.isValid()) {
+		if (!m_shadow_atlas.texture.isValid()) {
 			Renderer::MemRef mem;
-			pipeline->m_shadow_atlas.texture = pipeline->m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
+			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
 		}
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
 			FillClustersJob::ClusterPointLight& light = job->m_point_lights[atlas_sorter.lights[i].idx];
 			EntityRef e = atlas_sorter.lights[i].entity;
-			PointLight& pl = pipeline->m_scene->getPointLight(e);
+			PointLight& pl = m_scene->getPointLight(e);
 			if (light.atlas_idx == -1) {
-				light.atlas_idx = pipeline->m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
-				pipeline->bakeShadow(pl, light.atlas_idx);
+				light.atlas_idx = m_shadow_atlas.add(ShadowAtlas::getGroup(i), e);
+				bakeShadow(pl, light.atlas_idx);
 			}
 			else if (pl.flags.isSet(PointLight::DYNAMIC)) {
-				pipeline->bakeShadow(pl, light.atlas_idx);
+				bakeShadow(pl, light.atlas_idx);
 			}
-			const Matrix mtx = pipeline->getShadowMatrix(pl, light.atlas_idx);
+			const Matrix mtx = getShadowMatrix(pl, light.atlas_idx);
 			job->m_shadow_atlas_matrices[light.atlas_idx] = mtx;
 		}
 
-		lights->free(pipeline->m_renderer.getEngine().getPageAllocator());
+		lights->free(m_renderer.getEngine().getPageAllocator());
 
-		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
-		return 0;
+		m_renderer.queue(job, m_profiler_link);
 	}
 
-	static int renderBucket(lua_State* L)
+	void renderBucket(CmdPage* cmd_page, RenderState state)
 	{
 		PROFILE_FUNCTION();
 		struct RenderJob : Renderer::RenderJob
@@ -2934,9 +2964,11 @@ struct PipelineImpl final : Pipeline
 								}
 
 								u8* dc_mem = (u8*)gpu::map(m_pipeline->m_drawcall_ub, sizeof(Matrix) * (bones_count + 1));
-								memcpy(dc_mem, &model_mtx, sizeof(Matrix));
-								memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
-								gpu::unmap(m_pipeline->m_drawcall_ub);
+								if (dc_mem) {
+									memcpy(dc_mem, &model_mtx, sizeof(Matrix));
+									memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
+									gpu::unmap(m_pipeline->m_drawcall_ub);
+								}
 
 								gpu::useProgram(program);
 
@@ -2990,37 +3022,18 @@ struct PipelineImpl final : Pipeline
 			CmdPage* m_cmds;
 		};
 
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
 
-		CmdPage* cmd_page = LuaWrapper::checkArg<CmdPage*>(L, 1);
-		LuaWrapper::checkTableArg(L, 2);
-		const u64 state = getState(L, 2);
-
-		RenderJob* job = LUMIX_NEW(pipeline->m_renderer.getAllocator(), RenderJob);
-
-		job->m_render_state = state;
-		job->m_pipeline = pipeline;
+		job->m_render_state = state.value;
+		job->m_pipeline = this;
 		job->m_cmds = cmd_page;
-		pipeline->m_renderer.queue(job, pipeline->m_profiler_link);
-		return 0;
+		m_renderer.queue(job, m_profiler_link);
 	}
 
 
-	static int getShadowCameraParams(lua_State* L)
+	CameraParams getShadowCameraParams(i32 slice)
 	{
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-
-		const int slice = LuaWrapper::checkArg<int>(L, 1);
-		pushCameraParams(L, pipeline->m_shadow_camera_params[slice]);
-		return 1;
+		return m_shadow_camera_params[slice];
 	}
 	
 	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, bool readonly_ds, bool srgb) {
@@ -4189,18 +4202,35 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(beginBlock);
 		REGISTER_FUNCTION(bindRawTexture);
 		REGISTER_FUNCTION(bindImageTexture);
+		REGISTER_FUNCTION(bindRenderbuffers);
+		REGISTER_FUNCTION(bindShaderBuffer);
+		REGISTER_FUNCTION(bindTextures);
+		REGISTER_FUNCTION(bindUniformBuffer);
 		REGISTER_FUNCTION(clear);
-		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(createBuffer);
 		REGISTER_FUNCTION(createPersistentRenderbuffer);
+		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(createTexture2D);
+		REGISTER_FUNCTION(createTexture3D);
 		REGISTER_FUNCTION(dispatch);
-		REGISTER_FUNCTION(releaseRenderbuffer);
+		REGISTER_FUNCTION(drawArray);
 		REGISTER_FUNCTION(endBlock);
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
+		REGISTER_FUNCTION(fillClusters);
+		REGISTER_FUNCTION(getCameraParams);
+		REGISTER_FUNCTION(getShadowCameraParams);
+		REGISTER_FUNCTION(pass);
 		REGISTER_FUNCTION(preloadShader);
+		REGISTER_FUNCTION(releaseRenderbuffer);
 		REGISTER_FUNCTION(render2D);
+		REGISTER_FUNCTION(renderBucket);
 		REGISTER_FUNCTION(renderDebugShapes);
+		REGISTER_FUNCTION(renderGrass);
 		REGISTER_FUNCTION(renderLocalLights);
+		REGISTER_FUNCTION(renderParticles);
+		REGISTER_FUNCTION(renderReflectionVolumes);
+		REGISTER_FUNCTION(renderTerrains);
 		REGISTER_FUNCTION(renderTextMeshes);
 		REGISTER_FUNCTION(saveRenderbuffer);
 		REGISTER_FUNCTION(setOutput);
@@ -4219,22 +4249,8 @@ struct PipelineImpl final : Pipeline
 		registerConst("STENCIL_KEEP", (u32)gpu::StencilOps::KEEP);
 		registerConst("STENCIL_REPLACE", (u32)gpu::StencilOps::REPLACE);
 
-		registerCFunction("bindRenderbuffers", PipelineImpl::bindRenderbuffers);
-		registerCFunction("bindTextures", PipelineImpl::bindTextures);
-		registerCFunction("createTexture2D", PipelineImpl::createTexture2D);
-		registerCFunction("createTexture3D", PipelineImpl::createTexture3D);
-		registerCFunction("drawArray", PipelineImpl::drawArray);
 		registerCFunction("drawcallUniforms", PipelineImpl::drawcallUniforms);
-		registerCFunction("getCameraParams", PipelineImpl::getCameraParams);
-		registerCFunction("getShadowCameraParams", PipelineImpl::getShadowCameraParams);
-		registerCFunction("pass", PipelineImpl::pass);
 		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
-		registerCFunction("fillClusters", PipelineImpl::fillClusters);
-		registerCFunction("renderBucket", PipelineImpl::renderBucket);
-		registerCFunction("renderParticles", PipelineImpl::renderParticles);
-		registerCFunction("renderReflectionVolumes", PipelineImpl::renderReflectionVolumes);
-		registerCFunction("renderGrass", PipelineImpl::renderGrass);
-		registerCFunction("renderTerrains", PipelineImpl::renderTerrains);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
 		registerCFunction("setRenderTargetsReadonlyDS", PipelineImpl::setRenderTargetsReadonlyDS);
 

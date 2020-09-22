@@ -19,17 +19,6 @@ compute_shader [[
 	layout (rgba32f, binding = 0) uniform writeonly image2D u_inscatter;
 	layout (binding = 1) uniform sampler2D u_optical_depth;
 	
-	vec2 ray_sphere_intersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
-		vec3 s0_r0 = s0 - r0;
-		float tc = dot(s0_r0, rd);
-		float d2 = dot(s0_r0, s0_r0) - tc * tc;
-		float sr2 = sr * sr;
-		if (d2 > sr2) return vec2(-1);
-		float td2 = sr2 - d2;
-		float td = sqrt(td2);
-		return vec2(tc - td, tc + td);
-	}
-
 	float getOptDepthY(vec3 position) {
 		return saturate((length(position) - u_bot) / (u_top - u_bot));
 	}
@@ -47,7 +36,7 @@ compute_shader [[
 		vec3 eyedir = vec3(cos(zenith_angle), sin(zenith_angle), 0);
 
 		vec3 campos = vec3(0, u_bot, 0) + u_camera_world_pos.xyz;
-		vec2 atmo_isect = ray_sphere_intersect(campos, eyedir, vec3(0), u_top);
+		vec2 atmo_isect = raySphereIntersect(campos, eyedir, vec3(0), u_top);
 		
 		if (atmo_isect.y < 0) {
 			imageStore(u_inscatter, ivec2(gl_GlobalInvocationID.xy), vec4(0));
