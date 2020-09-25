@@ -216,20 +216,6 @@ static LoadInfo* getDXT10LoadInfo(const Header& hdr, const DXT10Header& dxt10_hd
 
 } // namespace DDS
 
-#ifdef LUMIX_DEBUG
-	#define CHECK_GL(gl) \
-		do { \
-			gl; \
-			GLenum err = glGetError(); \
-			if (err != GL_NO_ERROR) { \
-				logError("Renderer") << "OpenGL error " << err; \
-			/*	ASSERT(false);/**/ \
-			} \
-		} while(false)
-#else
-	#define CHECK_GL(gl) do { gl; } while(false)
-#endif
-
 void checkThread()
 {
 	ASSERT(g_gpu.thread == OS::getCurrentThreadID());
@@ -538,19 +524,19 @@ static void setVAO(const VertexDecl& decl) {
 		const bool normalized = attr.flags & Attribute::NORMALIZED;
 		if (attr.flags & Attribute::AS_INT) {
 			ASSERT(!normalized);
-			CHECK_GL(glVertexAttribIFormat(attr.idx, attr.components_count, gl_attr_type, attr.byte_offset));
+			glVertexAttribIFormat(attr.idx, attr.components_count, gl_attr_type, attr.byte_offset);
 		}
 		else {
-			CHECK_GL(glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset));
+			glVertexAttribFormat(attr.idx, attr.components_count, gl_attr_type, normalized, attr.byte_offset);
 		}
-		CHECK_GL(glEnableVertexAttribArray(attr.idx));
+		glEnableVertexAttribArray(attr.idx);
 		mask |= 1 << attr.idx;
-		CHECK_GL(glVertexAttribBinding(attr.idx, instanced ? 1 : 0));
+		glVertexAttribBinding(attr.idx, instanced ? 1 : 0);
 	}
 
 	for (u32 i = 0; i < 16; ++i) {
 		if (!(mask & (1 << i))) {
-			CHECK_GL(glDisableVertexAttribArray(i));
+			glDisableVertexAttribArray(i);
 		}
 	}
 }
@@ -567,14 +553,14 @@ void useProgram(ProgramHandle handle)
 	if (prev != handle.value) {
 		g_gpu.last_program = handle;
 		if (!handle.isValid()) {
-			CHECK_GL(glUseProgram(0));
+			glUseProgram(0);
 		}
 		else {
 			if (!prg.handle) {
-				CHECK_GL(glUseProgram(g_gpu.programs[g_gpu.default_program.value].handle));
+				glUseProgram(g_gpu.programs[g_gpu.default_program.value].handle);
 			}
 			else {
-				CHECK_GL(glUseProgram(prg.handle));
+				glUseProgram(prg.handle);
 			}
 
 			if (prev == 0xffFFffFF || g_gpu.programs.values[handle.value].decl.hash != g_gpu.programs.values[prev].decl.hash) {
@@ -604,7 +590,7 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 		}
 	}
 
-	CHECK_GL(glBindTextures(offset, count, gl_handles));
+	glBindTextures(offset, count, gl_handles);
 }
 
 void bindShaderBuffer(BufferHandle handle, u32 binding_idx, u32 flags)
@@ -624,10 +610,10 @@ void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u
 	ASSERT(binding_idx < 2);
 	if(buffer.isValid()) {
 		const GLuint gl_handle = g_gpu.buffers[buffer.value].handle;
-		CHECK_GL(glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset));
+		glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset);
 	}
 	else {
-		CHECK_GL(glBindVertexBuffer(binding_idx, 0, 0, 0));
+		glBindVertexBuffer(binding_idx, 0, 0, 0);
 	}
 }
 
@@ -639,27 +625,27 @@ void setState(u64 state)
 	if(state == g_gpu.last_state) return;
 	g_gpu.last_state = state;
 
-	if (state & u64(StateFlags::DEPTH_TEST)) CHECK_GL(glEnable(GL_DEPTH_TEST));
-	else CHECK_GL(glDisable(GL_DEPTH_TEST));
+	if (state & u64(StateFlags::DEPTH_TEST)) glEnable(GL_DEPTH_TEST);
+	else glDisable(GL_DEPTH_TEST);
 	
-	CHECK_GL(glDepthMask((state & u64(StateFlags::DEPTH_WRITE)) != 0));
+	glDepthMask((state & u64(StateFlags::DEPTH_WRITE)) != 0);
 	
-	if (state & u64(StateFlags::SCISSOR_TEST)) CHECK_GL(glEnable(GL_SCISSOR_TEST));
-	else CHECK_GL(glDisable(GL_SCISSOR_TEST));
+	if (state & u64(StateFlags::SCISSOR_TEST)) glEnable(GL_SCISSOR_TEST);
+	else glDisable(GL_SCISSOR_TEST);
 	
 	if (state & u64(StateFlags::CULL_BACK)) {
-		CHECK_GL(glEnable(GL_CULL_FACE));
-		CHECK_GL(glCullFace(GL_BACK));
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
 	}
 	else if(state & u64(StateFlags::CULL_FRONT)) {
-		CHECK_GL(glEnable(GL_CULL_FACE));
-		CHECK_GL(glCullFace(GL_FRONT));
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_FRONT);
 	}
 	else {
-		CHECK_GL(glDisable(GL_CULL_FACE));
+		glDisable(GL_CULL_FACE);
 	}
 
-	CHECK_GL(glPolygonMode(GL_FRONT_AND_BACK, state & u64(StateFlags::WIREFRAME) ? GL_LINE : GL_FILL));
+	glPolygonMode(GL_FRONT_AND_BACK, state & u64(StateFlags::WIREFRAME) ? GL_LINE : GL_FILL);
 
 	auto to_gl = [&](BlendFactors factor) -> GLenum{
 		static const GLenum table[] = {
@@ -738,11 +724,11 @@ void bindIndexBuffer(BufferHandle handle)
 	checkThread();
 	if(handle.isValid()) {	
 		const GLuint ib = g_gpu.buffers[handle.value].handle;
-		CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib));
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib);
 		return;
 	}
 
-	CHECK_GL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 
@@ -751,11 +737,11 @@ void bindIndirectBuffer(BufferHandle handle)
 	checkThread();
 	if(handle.isValid()) {	
 		const GLuint ib = g_gpu.buffers[handle.value].handle;
-		CHECK_GL(glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ib));
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ib);
 		return;
 	}
 
-	CHECK_GL(glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0));
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 }
 
 
@@ -779,7 +765,7 @@ void drawElements(u32 offset, u32 count, PrimitiveType primitive_type, DataType 
 		default: ASSERT(0); break;
 	}
 
-	CHECK_GL(glDrawElements(pt, count, t, (void*)(intptr_t)offset));
+	glDrawElements(pt, count, t, (void*)(intptr_t)offset);
 }
 
 void drawIndirect(DataType index_type)
@@ -807,10 +793,10 @@ void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType ind
 		mdi.base_vertex = 0;
 		// we use glMultiDrawElementsIndirect because of 
 		// https://devtalk.nvidia.com/default/topic/1052728/opengl/extremely-slow-gldrawelementsinstanced-compared-to-gldrawarraysinstanced-/
-		CHECK_GL(glMultiDrawElementsIndirect(GL_TRIANGLES, type, &mdi, 1, 0));
+		glMultiDrawElementsIndirect(GL_TRIANGLES, type, &mdi, 1, 0);
 	}
 	else*/ {
-		CHECK_GL(glDrawElementsInstanced(GL_TRIANGLES, indices_count, type, 0, instances_count));
+		glDrawElementsInstanced(GL_TRIANGLES, indices_count, type, 0, instances_count);
 	}
 }
 
@@ -820,7 +806,7 @@ void drawTriangles(u32 indices_count, DataType index_type)
 	checkThread();
 
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-	CHECK_GL(glDrawElements(GL_TRIANGLES, indices_count, type, 0));
+	glDrawElements(GL_TRIANGLES, indices_count, type, 0);
 }
 
 
@@ -843,17 +829,17 @@ void drawArrays(u32 offset, u32 count, PrimitiveType type)
 		default: ASSERT(0); break;
 	}
 
-	CHECK_GL(glDrawArrays(pt, offset, count));
+	glDrawArrays(pt, offset, count);
 }
 
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {
 	checkThread();
 	if (buffer.isValid()) {
 		const GLuint buf = g_gpu.buffers[buffer.value].handle;
-		CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size));
+		glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size);
 		return;
 	}
-	CHECK_GL(glBindBufferRange(GL_UNIFORM_BUFFER, index, 0, 0, size));
+	glBindBufferRange(GL_UNIFORM_BUFFER, index, 0, 0, size);
 }
 
 
@@ -871,7 +857,7 @@ void unmap(BufferHandle buffer)
 {
 	checkThread();
 	const GLuint buf = g_gpu.buffers[buffer.value].handle;
-	CHECK_GL(glUnmapNamedBuffer(buf));
+	glUnmapNamedBuffer(buf);
 }
 
 
@@ -881,7 +867,7 @@ void update(BufferHandle buffer, const void* data, size_t size)
 	const Buffer& b = g_gpu.buffers[buffer.value];
 	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
 	const GLuint buf = b.handle;
-	CHECK_GL(glNamedBufferSubData(buf, 0, size, data));
+	glNamedBufferSubData(buf, 0, size, data);
 }
 
 void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 size)
@@ -1005,16 +991,16 @@ void setCurrentWindow(void* window_handle) {
 			HGLRC hglrc = wglCreateContextAttribsARB(hdc, g_gpu.contexts[0].hglrc, contextAttrs);
 			ctx.hglrc = hglrc;
 			wglMakeCurrent(ctx.device_context, hglrc);
-			CHECK_GL(glGenVertexArrays(1, &ctx.vao));
-			CHECK_GL(glBindVertexArray(ctx.vao));
-			CHECK_GL(glVertexBindingDivisor(0, 0));
-			CHECK_GL(glVertexBindingDivisor(1, 1));
+			glGenVertexArrays(1, &ctx.vao);
+			glBindVertexArray(ctx.vao);
+			glVertexBindingDivisor(0, 0);
+			glVertexBindingDivisor(1, 1);
 
 			#ifdef LUMIX_DEBUG
-				CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
-				CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
-				CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
-				CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
+				glEnable(GL_DEBUG_OUTPUT);
+				glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+				glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE);
+				glDebugMessageCallback(gl_debug_callback, 0);
 			#endif
 
 		}
@@ -1059,11 +1045,11 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 {
 	checkThread();
 	GLuint buf;
-	CHECK_GL(glCreateBuffers(1, &buf));
+	glCreateBuffers(1, &buf);
 	
 	GLbitfield gl_flags = 0;
 	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
-	CHECK_GL(glNamedBufferStorage(buf, size, data, gl_flags));
+	glNamedBufferStorage(buf, size, data, gl_flags);
 
 	g_gpu.buffers[buffer.value].handle = buf;
 	g_gpu.buffers[buffer.value].flags = flags;
@@ -1075,7 +1061,7 @@ void destroy(ProgramHandle program)
 	
 	Program& p = g_gpu.programs[program.value];
 	const GLuint handle = p.handle;
-	CHECK_GL(glDeleteProgram(handle));
+	glDeleteProgram(handle);
 
 	MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.programs.dealloc(program.value);
@@ -1137,13 +1123,13 @@ void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u3
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if (s_texture_formats[i].format == format) {
 			const auto& f = s_texture_formats[i];
-			CHECK_GL(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 			if (t.flags & (u32)TextureFlags::IS_CUBE || t.depth > 1) {
-				CHECK_GL(glTextureSubImage3D(handle, level, x, y, slice, w, h, 1, f.gl_format, f.type, buf));
+				glTextureSubImage3D(handle, level, x, y, slice, w, h, 1, f.gl_format, f.type, buf);
 			}
 			else {
 				ASSERT(slice == 0);
-				CHECK_GL(glTextureSubImage2D(handle, level, x, y, w, h, f.gl_format, f.type, buf));
+				glTextureSubImage2D(handle, level, x, y, w, h, f.gl_format, f.type, buf);
 			}
 			break;
 		}
@@ -1221,18 +1207,18 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	const u32 mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
 
 	GLuint texture;
-	CHECK_GL(glCreateTextures(texture_target, 1, &texture));
+	glCreateTextures(texture_target, 1, &texture);
 	if (texture == 0) {
 		return false;
 	}
 	if(layers > 1) {
-		CHECK_GL(glTextureStorage3D(texture, mipMapCount, internal_format, hdr.dwWidth, hdr.dwHeight, layers));
+		glTextureStorage3D(texture, mipMapCount, internal_format, hdr.dwWidth, hdr.dwHeight, layers);
 	}
 	else {
-		CHECK_GL(glTextureStorage2D(texture, mipMapCount, internal_format, hdr.dwWidth, hdr.dwHeight));
+		glTextureStorage2D(texture, mipMapCount, internal_format, hdr.dwWidth, hdr.dwHeight);
 	}
 	if (debug_name && debug_name[0]) {
-		CHECK_GL(glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name));
+		glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name);
 	}
 
 	OutputMemoryStream unpacked(*g_gpu.allocator);
@@ -1246,23 +1232,23 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 				u32 size = DDS::sizeDXTC(width, height, internal_format);
 				if (!is_dds10 && !is_cubemap && (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)) {
 					logError("Renderer") << "Unsupported format " << debug_name;
-					CHECK_GL(glDeleteTextures(1, &texture));
+					glDeleteTextures(1, &texture);
 					return false;
 				}
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					const u8* data_ptr = (u8*)blob.skip(size);
 					if(layers > 1) {
-						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, internal_format, size, data_ptr));
+						glCompressedTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, internal_format, size, data_ptr);
 					}
 					else if (is_cubemap) {
 						ASSERT(layer == 0);
-						CHECK_GL(glCompressedTextureSubImage3D(texture, mip, 0, 0, side, width, height, 1, internal_format, size, data_ptr));
+						glCompressedTextureSubImage3D(texture, mip, 0, 0, side, width, height, 1, internal_format, size, data_ptr);
 					}
 					else {
-						CHECK_GL(glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, data_ptr));
+						glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, data_ptr);
 					}
-					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
-					CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+					glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+					glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 					width = maximum(1, width >> 1);
 					height = maximum(1, height >> 1);
 					size = DDS::sizeDXTC(width, height, internal_format);
@@ -1270,12 +1256,12 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 			}
 			else if (li->palette) {
 				if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8) {
-					CHECK_GL(glDeleteTextures(1, &texture));
+					glDeleteTextures(1, &texture);
 					return false;
 				}
 				u32 size = hdr.dwPitchOrLinearSize * height;
 				if (size != width * height * li->blockBytes) {
-					CHECK_GL(glDeleteTextures(1, &texture));
+					glDeleteTextures(1, &texture);
 					return false;
 				}
 				unpacked.resize(size);
@@ -1288,10 +1274,10 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 					}
 					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if(layers > 1) {
-						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, unpacked_ptr));
+						glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, unpacked_ptr);
 					}
 					else {
-						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, unpacked_ptr));
+						glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, unpacked_ptr);
 					}
 					width = maximum(1, width >> 1);
 					height = maximum(1, height >> 1);
@@ -1300,34 +1286,34 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 			}
 			else {
 				if (li->swap) {
-					CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE));
+					glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
 				}
 				u32 size = width * height * li->blockBytes;
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					const u8* data_ptr = (u8*)blob.skip(size);
 					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if (layers > 1) {
-						CHECK_GL(glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, data_ptr));
+						glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, data_ptr);
 					}
 					else {
-						CHECK_GL(glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, data_ptr));
+						glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, data_ptr);
 					}
 					width = maximum(1, width >> 1);
 					height = maximum(1, height >> 1);
 					size = width * height * li->blockBytes;
 				}
-				CHECK_GL(glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE));
+				glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
 			}
-			CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1));
+			glTextureParameteri(texture, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
 		}
 	}
 
 	const GLint wrap_u = (flags & (u32)TextureFlags::CLAMP_U) ? GL_CLAMP : GL_REPEAT;
 	const GLint wrap_v = (flags & (u32)TextureFlags::CLAMP_V) ? GL_CLAMP : GL_REPEAT;
 	const GLint wrap_w = (flags & (u32)TextureFlags::CLAMP_W) ? GL_CLAMP : GL_REPEAT;
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w));
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u);
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v);
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w);
 
 	Texture& t = g_gpu.textures[handle.value];
 	t.format = internal_format;
@@ -1399,14 +1385,14 @@ void createTextureView(TextureHandle view_handle, TextureHandle orig_handle)
 	Texture& view = g_gpu.textures[view_handle.value];
 
 	if (view.handle != 0) {
-		CHECK_GL(glDeleteTextures(1, &view.handle));
+		glDeleteTextures(1, &view.handle);
 	}
 
 	view.target = GL_TEXTURE_2D;
 	view.format = orig.format;
 
-	CHECK_GL(glGenTextures(1, &view.handle));
-	CHECK_GL(glTextureView(view.handle, GL_TEXTURE_2D, orig.handle, orig.format, 0, 1, 0, 1));
+	glGenTextures(1, &view.handle);
+	glTextureView(view.handle, GL_TEXTURE_2D, orig.handle, orig.format, 0, 1, 0, 1);
 	view.width = orig.width;
 	view.height = orig.height;
 }
@@ -1432,17 +1418,17 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	const GLenum target = is_3d ? GL_TEXTURE_3D : (is_cubemap ? GL_TEXTURE_CUBE_MAP : (depth > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D));
 	const u32 mip_count = no_mips ? 1 : 1 + log2(maximum(w, h, depth));
 
-	CHECK_GL(glCreateTextures(target, 1, &texture));
+	glCreateTextures(target, 1, &texture);
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if(s_texture_formats[i].format == format) {
 			internal_format = s_texture_formats[i].gl_internal;
 			if(depth <= 1) {
-				CHECK_GL(glTextureStorage2D(texture, mip_count, s_texture_formats[i].gl_internal, w, h));
+				glTextureStorage2D(texture, mip_count, s_texture_formats[i].gl_internal, w, h);
 				if (data) {
 					if (is_cubemap) {
 						for (u32 face = 0; face < 6; ++face) {
 							ASSERT(format == TextureFormat::RGBA32F);
-							CHECK_GL(glTextureSubImage3D(texture
+							glTextureSubImage3D(texture
 								, 0
 								, 0
 								, 0
@@ -1452,11 +1438,11 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 								, 1
 								, s_texture_formats[i].gl_format
 								, s_texture_formats[i].type
-								, ((u8*)data) + face * w * h * sizeof(float) * 4));
+								, ((u8*)data) + face * w * h * sizeof(float) * 4);
 						}
 					}
 					else {
-						CHECK_GL(glTextureSubImage2D(texture
+						glTextureSubImage2D(texture
 							, 0
 							, 0
 							, 0
@@ -1464,14 +1450,14 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 							, h
 							, s_texture_formats[i].gl_format
 							, s_texture_formats[i].type
-							, data));
+							, data);
 					}
 				}
 			}
 			else {
-				CHECK_GL(glTextureStorage3D(texture, mip_count, s_texture_formats[i].gl_internal, w, h, depth));
+				glTextureStorage3D(texture, mip_count, s_texture_formats[i].gl_internal, w, h, depth);
 				if (data) {
-					CHECK_GL(glTextureSubImage3D(texture
+					glTextureSubImage3D(texture
 						, 0
 						, 0
 						, 0
@@ -1481,7 +1467,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 						, depth
 						, s_texture_formats[i].gl_format
 						, s_texture_formats[i].type
-						, data));
+						, data);
 				}
 			}
 			found_format = 1;
@@ -1490,31 +1476,31 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	}
 
 	if(!found_format) {
-		CHECK_GL(glDeleteTextures(1, &texture));
+		glDeleteTextures(1, &texture);
 		ASSERT(false);
 		return false;	
 	}
 
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAX_LEVEL, mip_count - 1));
+	glTextureParameteri(texture, GL_TEXTURE_MAX_LEVEL, mip_count - 1);
 
 	if(debug_name && debug_name[0]) {
-		CHECK_GL(glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name));
+		glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name);
 	}
-	CHECK_GL(glGenerateTextureMipmap(texture));
+	glGenerateTextureMipmap(texture);
 	
 	const GLint wrap_u = (flags & (u32)TextureFlags::CLAMP_U) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
 	const GLint wrap_v = (flags & (u32)TextureFlags::CLAMP_V) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
 	const GLint wrap_w = (flags & (u32)TextureFlags::CLAMP_W) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v));
-	CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w));
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u);
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v);
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w);
 	if (flags & (u32)TextureFlags::POINT_FILTER) {
-		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+		glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	}
 	else {
-		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-		CHECK_GL(glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR));
+		glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
 	}
 
 	Texture& t = g_gpu.textures[handle.value];
@@ -1532,7 +1518,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 void generateMipmaps(TextureHandle handle)
 {
 	Texture& t = g_gpu.textures[handle.value];
-	CHECK_GL(glGenerateTextureMipmap(t.handle));
+	glGenerateTextureMipmap(t.handle);
 }
 
 void destroy(TextureHandle texture)
@@ -1540,7 +1526,7 @@ void destroy(TextureHandle texture)
 	checkThread();
 	Texture& t = g_gpu.textures[texture.value];
 	const GLuint handle = t.handle;
-	CHECK_GL(glDeleteTextures(1, &handle));
+	glDeleteTextures(1, &handle);
 
 	MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.textures.dealloc(texture.value);
@@ -1551,7 +1537,7 @@ void destroy(BufferHandle buffer) {
 	
 	Buffer& t = g_gpu.buffers[buffer.value];
 	const GLuint handle = t.handle;
-	CHECK_GL(glDeleteBuffers(1, &handle));
+	glDeleteBuffers(1, &handle);
 
 	MutexGuard lock(g_gpu.handle_mutex);
 	g_gpu.buffers.dealloc(buffer.value);
@@ -1559,20 +1545,20 @@ void destroy(BufferHandle buffer) {
 
 void clear(u32 flags, const float* color, float depth)
 {
-	CHECK_GL(glUseProgram(0));
+	glUseProgram(0);
 	g_gpu.last_program = INVALID_PROGRAM;
-	CHECK_GL(glDisable(GL_SCISSOR_TEST));
-	CHECK_GL(glDisable(GL_BLEND));
+	glDisable(GL_SCISSOR_TEST);
+	glDisable(GL_BLEND);
 	g_gpu.last_state &= ~u64(0xffFF << 6);
 	checkThread();
 	GLbitfield gl_flags = 0;
 	if (flags & (u32)ClearFlags::COLOR) {
-		CHECK_GL(glClearColor(color[0], color[1], color[2], color[3]));
+		glClearColor(color[0], color[1], color[2], color[3]);
 		gl_flags |= GL_COLOR_BUFFER_BIT;
 	}
 	if (flags & (u32)ClearFlags::DEPTH) {
-		CHECK_GL(glDepthMask(GL_TRUE));
-		CHECK_GL(glClearDepth(depth));
+		glDepthMask(GL_TRUE);
+		glClearDepth(depth);
 		gl_flags |= GL_DEPTH_BUFFER_BIT;
 	}
 	if (flags & (u32)ClearFlags::STENCIL) {
@@ -1581,7 +1567,7 @@ void clear(u32 flags, const float* color, float depth)
 		glClearStencil(0);
 		gl_flags |= GL_STENCIL_BUFFER_BIT;
 	}
-	CHECK_GL(glClear(gl_flags));
+	glClear(gl_flags);
 }
 
 static const char* shaderTypeToString(ShaderType type)
@@ -1626,7 +1612,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 
 	const GLuint prg = glCreateProgram();
 	if (name && name[0]) {
-		CHECK_GL(glObjectLabel(GL_PROGRAM, prg, stringLength(name), name));
+		glObjectLabel(GL_PROGRAM, prg, stringLength(name), name);
 	}
 
 	for (u32 i = 0; i < num; ++i) {
@@ -1677,48 +1663,48 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		combined_srcs[src_idx] = srcs[i];
 		++src_idx;
 
-		CHECK_GL(glShaderSource(shd, src_idx, combined_srcs, 0));
-		CHECK_GL(glCompileShader(shd));
+		glShaderSource(shd, src_idx, combined_srcs, 0);
+		glCompileShader(shd);
 
 		GLint compile_status;
-		CHECK_GL(glGetShaderiv(shd, GL_COMPILE_STATUS, &compile_status));
+		glGetShaderiv(shd, GL_COMPILE_STATUS, &compile_status);
 		if (compile_status == GL_FALSE) {
 			GLint log_len = 0;
-			CHECK_GL(glGetShaderiv(shd, GL_INFO_LOG_LENGTH, &log_len));
+			glGetShaderiv(shd, GL_INFO_LOG_LENGTH, &log_len);
 			if (log_len > 0) {
 				Array<char> log_buf(*g_gpu.allocator);
 				log_buf.resize(log_len);
-				CHECK_GL(glGetShaderInfoLog(shd, log_len, &log_len, &log_buf[0]));
+				glGetShaderInfoLog(shd, log_len, &log_len, &log_buf[0]);
 				logError("Renderer") << name << " - " << shaderTypeToString(types[i]) << ": " << &log_buf[0];
 			}
 			else {
 				logError("Renderer") << "Failed to compile shader " << name << " - " << shaderTypeToString(types[i]);
 			}
-			CHECK_GL(glDeleteShader(shd));
+			glDeleteShader(shd);
 			return false;
 		}
 
-		CHECK_GL(glAttachShader(prg, shd));
-		CHECK_GL(glDeleteShader(shd));
+		glAttachShader(prg, shd);
+		glDeleteShader(shd);
 	}
 
-	CHECK_GL(glLinkProgram(prg));
+	glLinkProgram(prg);
 	GLint linked;
-	CHECK_GL(glGetProgramiv(prg, GL_LINK_STATUS, &linked));
+	glGetProgramiv(prg, GL_LINK_STATUS, &linked);
 
 	if (linked == GL_FALSE) {
 		GLint log_len = 0;
-		CHECK_GL(glGetProgramiv(prg, GL_INFO_LOG_LENGTH, &log_len));
+		glGetProgramiv(prg, GL_INFO_LOG_LENGTH, &log_len);
 		if (log_len > 0) {
 			Array<char> log_buf(*g_gpu.allocator);
 			log_buf.resize(log_len);
-			CHECK_GL(glGetProgramInfoLog(prg, log_len, &log_len, &log_buf[0]));
+			glGetProgramInfoLog(prg, log_len, &log_len, &log_buf[0]);
 			logError("Renderer") << name << ": " << &log_buf[0];
 		}
 		else {
 			logError("Renderer") << "Failed to link program " << name;
 		}
-		CHECK_GL(glDeleteProgram(prg));
+		glDeleteProgram(prg);
 		return false;
 	}
 
@@ -1743,13 +1729,13 @@ bool getMemoryStats(Ref<MemoryStats> stats) {
 	if (!g_gpu.has_gpu_mem_info_ext) return false;
 
 	GLint tmp;
-	CHECK_GL(glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &tmp));
+	glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &tmp);
 	stats->total_available_mem = (u64)tmp * 1024;
 
-	CHECK_GL(glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &tmp));
+	glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &tmp);
 	stats->current_available_mem = (u64)tmp * 1024;
 
-	CHECK_GL(glGetIntegerv(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &tmp));
+	glGetIntegerv(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &tmp);
 	stats->dedicated_vidmem = (u64)tmp * 1024;
 	
 	return true;
@@ -1789,35 +1775,35 @@ bool init(void* window_handle, u32 init_flags)
 	}
 	//const unsigned char* version = glGetString(GL_VERSION);
 
-	CHECK_GL(glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE));
-	CHECK_GL(glDepthFunc(GL_GREATER));
+	glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+	glDepthFunc(GL_GREATER);
 
 	if (debug) {
-		CHECK_GL(glEnable(GL_DEBUG_OUTPUT));
-		CHECK_GL(glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS));
-		CHECK_GL(glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE));
-		CHECK_GL(glDebugMessageCallback(gl_debug_callback, 0));
+		glEnable(GL_DEBUG_OUTPUT);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE);
+		glDebugMessageCallback(gl_debug_callback, 0);
 	}
 
-	CHECK_GL(glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS));
-	CHECK_GL(glBindVertexArray(0));	
-	CHECK_GL(glCreateFramebuffers(1, &g_gpu.framebuffer));
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	glBindVertexArray(0);	
+	glCreateFramebuffers(1, &g_gpu.framebuffer);
 
 	
 	g_gpu.default_program = allocProgramHandle();
 	Program& p = g_gpu.programs[g_gpu.default_program.value];
 	p.handle = glCreateProgram();
-	CHECK_GL(glGenVertexArrays(1, &g_gpu.contexts[0].vao));
-	CHECK_GL(glBindVertexArray(g_gpu.contexts[0].vao));
-	CHECK_GL(glVertexBindingDivisor(0, 0));
-	CHECK_GL(glVertexBindingDivisor(1, 1));
+	glGenVertexArrays(1, &g_gpu.contexts[0].vao);
+	glBindVertexArray(g_gpu.contexts[0].vao);
+	glVertexBindingDivisor(0, 0);
+	glVertexBindingDivisor(1, 1);
 
 	const GLuint vs = glCreateShader(GL_VERTEX_SHADER);
 	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
 	glShaderSource(vs, 1, &vs_src, nullptr);
 	glCompileShader(vs);
 	glAttachShader(p.handle, vs);
-	CHECK_GL(glLinkProgram(p.handle));
+	glLinkProgram(p.handle);
 	glDeleteShader(vs);
 
 	g_gpu.last_state = 1;
@@ -1843,10 +1829,10 @@ void copy(TextureHandle dst_handle, TextureHandle src_handle, u32 dst_x, u32 dst
 		const u32 h = maximum(src.height >> mip, 1);
 
 		if (src.target == GL_TEXTURE_CUBE_MAP) {
-			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 6));
+			glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 6);
 		}
 		else {
-			CHECK_GL(glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 1));
+			glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 1);
 		}
 		++mip;
 		if (src.flags & (u32)TextureFlags::NO_MIPS) break;
@@ -1864,7 +1850,7 @@ void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if (s_texture_formats[i].gl_internal == t.format) {
 			const auto& f = s_texture_formats[i];
-			CHECK_GL(glGetTextureImage(handle, mip, f.gl_format, f.type, buf.length(), buf.begin()));
+			glGetTextureImage(handle, mip, f.gl_format, f.type, buf.length(), buf.begin());
 			return;
 		}
 	}
@@ -1875,21 +1861,21 @@ void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 void popDebugGroup()
 {
 	checkThread();
-	CHECK_GL(glPopDebugGroup());
+	glPopDebugGroup();
 }
 
 
 void pushDebugGroup(const char* msg)
 {
 	checkThread();
-	CHECK_GL(glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, msg));
+	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, msg);
 }
 
 
 QueryHandle createQuery()
 {
 	GLuint q;
-	CHECK_GL(glGenQueries(1, &q));
+	glGenQueries(1, &q);
 	return {q};
 }
 
@@ -1926,9 +1912,9 @@ void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
 {
 	const GLuint t = g_gpu.textures[cube.value].handle;
 	checkThread();
-	CHECK_GL(glDisable(GL_FRAMEBUFFER_SRGB));
-	CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
-	CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, t, mip));
+	glDisable(GL_FRAMEBUFFER_SRGB);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, t, mip);
 
 	GLint max_attachments = 0;
 	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
@@ -1944,7 +1930,7 @@ void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
 
 	GLenum db = GL_COLOR_ATTACHMENT0;
 	
-	CHECK_GL(glDrawBuffers(1, &db));
+	glDrawBuffers(1, &db);
 }
 
 void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
@@ -1952,10 +1938,10 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	checkThread();
 
 	if (flags & (u32)FramebufferFlags::SRGB) {
-		CHECK_GL(glEnable(GL_FRAMEBUFFER_SRGB));
+		glEnable(GL_FRAMEBUFFER_SRGB);
 	}
 	else {
-		CHECK_GL(glDisable(GL_FRAMEBUFFER_SRGB));
+		glDisable(GL_FRAMEBUFFER_SRGB);
 	}
 
 	if(!attachments || num == 0) {
@@ -1968,26 +1954,26 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	for (u32 i = 0; i < num; ++i) {
 		const GLuint t = g_gpu.textures[attachments[i].value].handle;
 		GLint internal_format;
-		CHECK_GL(glBindTexture(GL_TEXTURE_2D, t));
-		CHECK_GL(glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format));
+		glBindTexture(GL_TEXTURE_2D, t);
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
 		
 		switch(internal_format) {
 			case GL_DEPTH24_STENCIL8:
-				CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
-				CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0));
-				CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, t, 0));
+				glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
+				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, t, 0);
 				depth_bound = true;
 				break;
 			case GL_DEPTH_COMPONENT24:
 			case GL_DEPTH_COMPONENT32:
-				CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
-				CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0));
-				CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t, 0));
+				glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
+				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t, 0);
 				depth_bound = true;
 				break;
 			default:
-				CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer));
-				CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, t, 0));
+				glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, t, 0);
 				++rb_count;
 				break;
 		}
@@ -2011,7 +1997,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	GLenum db[16];
 	for (u32 i = 0; i < lengthOf(db); ++i) db[i] = GL_COLOR_ATTACHMENT0 + i;
 	
-	CHECK_GL(glDrawBuffers(rb_count, db));
+	glDrawBuffers(rb_count, db);
 }
 
 
