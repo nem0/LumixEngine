@@ -159,6 +159,7 @@ static Span<const char> getSubresource(const char* str)
 
 void AssetBrowser::changeDir(const char* path)
 {
+	m_dirty = false;
 	Engine& engine = m_app.getEngine();
 	RenderInterface* ri = m_app.getRenderInterface();
 	for (FileInfo& info : m_file_infos) {
