@@ -1,24 +1,6 @@
 radius = 0.2
 intensity = 1
-local ssao_size = 1024
-
-function blur(env, buffer, format, w, h, tmp_rb_dbg_name) 
-	local blur_buf = env.createRenderbuffer(w, h, format, tmp_rb_dbg_name)
-	env.setRenderTargets(blur_buf)
-	env.viewport(0, 0, w, h)
-	env.drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
-	env.drawArray(0, 3, env.blur_shader
-		, { buffer }
-		, { depth_test = false, depth_write = false }
-		, "BLUR_H"
-	)
-	env.setRenderTargets(buffer)
-	env.viewport(0, 0, w, h)
-	env.drawArray(0, 3, env.blur_shader
-		, { blur_buf }
-		, { depth_test = false, depth_write = false }
-	)
-end
+debug = false
 
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
@@ -33,13 +15,15 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	if env.ssao_blit_shader == nil then
 		env.ssao_blit_shader = env.preloadShader("pipelines/ssao_blit.shd")
 	end
-	local ssao_rb = env.createRenderbuffer(ssao_size, ssao_size, "r8", "ssao")
+	local w = env.viewport_w * 0.5
+	local h = env.viewport_h * 0.5
+	local ssao_rb = env.createRenderbuffer(w, h, "r8", "ssao")
 	env.setRenderTargets(ssao_rb)
 	local state = {
 		depth_write = false,
 		depth_test = false
 	}
-	env.viewport(0, 0, ssao_size, ssao_size)
+	env.viewport(0, 0, w, h)
 	env.drawcallUniforms( radius, intensity )
 	
 	env.drawArray(0
@@ -48,14 +32,20 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		, { gbuffer_depth, gbuffer1 }
 		, state
 	)
-	blur(env, ssao_rb, "r8", ssao_size, ssao_size, "ssao_blur")
+	env.blur(ssao_rb, "r8", w, h, "ssao_blur")
 	
+	-- TODO use for indirect light
 	env.setRenderTargets(hdr_buffer)
 	env.drawArray(0, 3, env.ssao_blit_shader
 		, { ssao_rb }
 		, { depth_test = false, depth_write = false, blending = "multiply" });
 		
 	env.endBlock()
+
+	if debug then
+		env.debugRenderbuffer(ssao_rb, hdr_buffer, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 0, 1})
+	end
+
 	return hdr_buffer
 end
 
