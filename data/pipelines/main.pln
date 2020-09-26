@@ -185,6 +185,7 @@ function debugRenderbuffer(rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 end
 
 function blur(buffer, format, w, h, tmp_rb_dbg_name) 
+	beginBlock("blur")
 	local blur_buf = createRenderbuffer(w, h, format, tmp_rb_dbg_name)
 	setRenderTargets(blur_buf)
 	viewport(0, 0, w, h)
@@ -200,6 +201,7 @@ function blur(buffer, format, w, h, tmp_rb_dbg_name)
 		, { blur_buf }
 		, { depth_test = false, depth_write = false }
 	)
+	endBlock()
 end
 
 function shadowPass()

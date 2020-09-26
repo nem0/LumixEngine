@@ -1,6 +1,13 @@
 #define M_PI 3.14159265359
 #define ONE_BY_PI (1 / 3.14159265359)
 
+const vec2 POISSON_DISK_4[4] = vec2[](
+  vec2( -0.94201624, -0.39906216 ),
+  vec2( 0.94558609, -0.76890725 ),
+  vec2( -0.094184101, -0.92938870 ),
+  vec2( 0.34495938, 0.29387760 )
+);
+
 const vec2 POISSON_DISK_16[16] = vec2[](
 	vec2(0.3568125,-0.5825516),
 	vec2(-0.2828444,-0.1149732),
@@ -186,7 +193,7 @@ vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord,
 {
 	float z = texture(depth_buffer, tex_coord).r;
 	#ifdef _ORIGIN_BOTTOM_LEFT
-		vec4 pos_proj = vec4(vec2(tex_coord.x, tex_coord.y) * 2 - 1, z, 1.0);
+		vec4 pos_proj = vec4(tex_coord * 2 - 1, z, 1.0);
 	#else 
 		vec4 pos_proj = vec4(vec2(tex_coord.x, 1-tex_coord.y) * 2 - 1, z, 1.0);
 	#endif
@@ -199,7 +206,7 @@ vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 {
 	float z = texture(depth_buffer, tex_coord).r;
 	#ifdef _ORIGIN_BOTTOM_LEFT
-		vec4 pos_proj = vec4(vec2(tex_coord.x, tex_coord.y) * 2 - 1, z, 1.0);
+		vec4 pos_proj = vec4(tex_coord * 2 - 1, z, 1.0);
 	#else 
 		vec4 pos_proj = vec4(vec2(tex_coord.x, 1-tex_coord.y) * 2 - 1, z, 1.0);
 	#endif

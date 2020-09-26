@@ -124,11 +124,13 @@ fragment_shader [[
 	Surface getSurface()
 	{
 		Surface data;
-		vec4 c = texture(u_albedomap, v_uv, -2) * u_material_color;
-		data.albedo = c.rgb;
 		#ifdef GRASS
+			vec4 c = texture(u_albedomap, v_uv, -2) * u_material_color;
 			//data.albedo *= v_darken;
+		#else
+			vec4 c = texture(u_albedomap, v_uv) * u_material_color;
 		#endif
+		data.albedo = c.rgb;
 		data.alpha = c.a;
 		#ifdef ALPHA_CUTOUT
 			if(data.alpha < 0.1) discard;
