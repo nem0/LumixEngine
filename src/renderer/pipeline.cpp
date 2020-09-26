@@ -98,7 +98,8 @@ namespace LuaWrapper {
 		return {rs};
 	}
 
-	template <> inline CameraParams toType(lua_State* L, int idx)
+	template <>
+	CameraParams toType(lua_State* L, int idx)
 	{
 		CameraParams cp;
 

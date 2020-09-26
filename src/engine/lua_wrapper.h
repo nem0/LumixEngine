@@ -14,6 +14,7 @@ namespace Lumix
 {
 
 struct Universe;
+struct CameraParams;
 
 namespace LuaWrapper
 {
@@ -241,10 +242,13 @@ template <> inline bool isType<void*>(lua_State* L, int index)
 	return lua_islightuserdata(L, index) != 0;
 }
 
+
 template <typename T> inline T toType(lua_State* L, int index)
 {
 	return (T)lua_touserdata(L, index);
 }
+
+template <> CameraParams toType(lua_State* L, int idx);
 
 template <> inline int toType(lua_State* L, int index)
 {
@@ -528,6 +532,9 @@ template <typename T> inline void push(lua_State* L, T* value)
 {
 	lua_pushlightuserdata(L, value);
 }
+
+void push(lua_State* L, const CameraParams& value);
+
 inline void push(lua_State* L, float value)
 {
 	lua_pushnumber(L, value);
