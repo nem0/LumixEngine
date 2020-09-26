@@ -1713,7 +1713,7 @@ struct PipelineImpl final : Pipeline
 		mem.own = false;
 		mem.data = nullptr;
 		mem.size = size;
-		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE | (u32)gpu::BufferFlags::COMPUTE_WRITE);
+		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE);
 		return buffer.value;
 	}
 	
@@ -1880,6 +1880,7 @@ struct PipelineImpl final : Pipeline
 			if (!res || res->getType() != Texture::TYPE) {
 				LUMIX_DELETE(m_renderer.getAllocator(), cmd);
 				luaL_error(L, "%s", "Unknown textures in bindTextures");
+				return;
 			}
 			cmd->m_textures_handles[cmd->m_textures_count] = ((Texture*)res)->handle;
 			++cmd->m_textures_count;
@@ -2078,10 +2079,12 @@ struct PipelineImpl final : Pipeline
 		}
 		if (!shader) {
 			luaL_error(L, "Unknown shader id %d in drawArrays.", shader_id);
+			return;
 		}
 
 		if (shader->isFailure()) {
 			luaL_error(L, "Shader %s  failed to load. `drawArrays` has no effect.", shader->getPath().c_str());
+			return;
 		}
 		if (!shader->isReady()) return;
 
