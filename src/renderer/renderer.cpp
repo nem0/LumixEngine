@@ -40,7 +40,7 @@ struct TransientBuffer {
 	void init() {
 		m_buffer = gpu::allocBufferHandle();
 		m_offset = 0;
-		gpu::createBuffer(m_buffer, 0, INIT_SIZE, nullptr);
+		gpu::createBuffer(m_buffer, (u32)gpu::BufferFlags::MAPPABLE, INIT_SIZE, nullptr);
 		m_size = INIT_SIZE;
 		m_ptr = (u8*)gpu::map(m_buffer, INIT_SIZE);
 	}
@@ -594,11 +594,9 @@ struct RendererImpl final : Renderer
 
 			;
 
-			MaterialConsts* default_mat = (MaterialConsts*)gpu::map(mb.buffer, sizeof(MaterialConsts) * 400);
-			if (default_mat) {
-				default_mat->color = Vec4(1, 0, 1, 1);
-				gpu::unmap(mb.buffer);
-			}
+			MaterialConsts default_mat;
+			default_mat.color = Vec4(1, 0, 1, 1);
+			gpu::update(mb.buffer, &default_mat, sizeof(MaterialConsts));
 		}, &signal, JobSystem::INVALID_HANDLE, 1);
 		JobSystem::wait(signal);
 

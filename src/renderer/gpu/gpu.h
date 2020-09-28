@@ -142,14 +142,16 @@ enum class TextureFlags : u32 {
 	READBACK = 1 << 6,
 	IS_3D = 1 << 7,
 	IS_CUBE = 1 << 8,
-	COMPUTE_WRITE = 1 << 9
+	COMPUTE_WRITE = 1 << 9,
+	RENDER_TARGET = 1 << 10
 };
 
 enum class BufferFlags : u32 {
 	IMMUTABLE = 1 << 0,
 	UNIFORM_BUFFER = 1 << 1,
 	SHADER_BUFFER = 1 << 2,
-	COMPUTE_WRITE = 1 << 3
+	COMPUTE_WRITE = 1 << 3,
+	MAPPABLE = 1 << 4,
 };
 
 enum class DataType {
@@ -202,6 +204,7 @@ struct MemoryStats {
 
 void preinit(IAllocator& allocator, bool load_renderdoc);
 bool init(void* window_handle, u32 flags);
+void launchRenderDoc();
 void setCurrentWindow(void* window_handle);
 bool getMemoryStats(Ref<MemoryStats> stats);
 void swapBuffers();

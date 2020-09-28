@@ -3031,6 +3031,10 @@ struct RenderInterfaceImpl final : RenderInterface
 		, m_renderer(renderer)
 	{}
 
+	void launchRenderDoc() override {
+		gpu::launchRenderDoc();
+	}
+
 	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) override
 	{
 		Path path(path_cstr);
@@ -3261,6 +3265,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			u32 elem_offset = 0;
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
+
 			const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 			gpu::setState((u64)gpu::StateFlags::SCISSOR_TEST | blend_state);
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
@@ -3352,11 +3357,12 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 						layout(location = 0) in vec4 v_color;
 						layout(location = 1) in vec2 v_uv;
 						layout(location = 0) out vec4 o_color;
-						uniform sampler2D u_texture;
+						layout(binding = 0) uniform sampler2D u_texture;
 						void main() {
 							vec4 tc = textureLod(u_texture, v_uv, 0);
 							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
 							o_color.a = v_color.a * tc.a;
+							//o_color = vec4(v_color.rgb, 1);
 						})#";
 					const char* srcs[] = {vs, fs};
 					gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
@@ -3407,7 +3413,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
-		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, 0, mem, "editor_font_atlas");
+		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
 		ImGui::GetIO().Fonts->TexID = (void*)(intptr_t)m_texture.value;
 
 		IAllocator& allocator = app.getAllocator();

@@ -1421,7 +1421,7 @@ struct PipelineImpl final : Pipeline
 		{
 			Renderbuffer& rb = m_renderbuffers[i];
 			if (!rb.handle.isValid()) {
-				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
+				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::RENDER_TARGET | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
 				rb.width = rb_w;
 				rb.height = rb_h;
 				rb.format = format;
@@ -1453,7 +1453,7 @@ struct PipelineImpl final : Pipeline
 		rb.height = rb_h;
 		rb.format = format;
 		rb.persistent = persistent;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::RENDER_TARGET | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
 	}
@@ -2430,13 +2430,11 @@ struct PipelineImpl final : Pipeline
 			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 			const DVec3 cam_pos = m_camera_params.pos;
 			for (const Probe& p : m_probes) {
-				Vec4* dc_mem = (Vec4*)gpu::map(m_pipeline->m_drawcall_ub, sizeof(Vec4) * 3);
-				if (dc_mem) {
-					dc_mem[0] = Vec4(p.pos, 0);
-					memcpy(&dc_mem[1], &p.rot, sizeof(p.rot)); 
-					dc_mem[2] = Vec4(p.half_extents, 0);
-					gpu::unmap(m_pipeline->m_drawcall_ub);
-				}
+				Vec4 dc_mem[3]; 
+				dc_mem[0] = Vec4(p.pos, 0);
+				memcpy(&dc_mem[1], &p.rot, sizeof(p.rot)); 
+				dc_mem[2] = Vec4(p.half_extents, 0);
+				gpu::update(m_pipeline->m_drawcall_ub, dc_mem, sizeof(dc_mem));
 
 				gpu::bindTextures(&p.texture, m_texture_offset, 1);
 					
@@ -2673,11 +2671,7 @@ struct PipelineImpl final : Pipeline
 					buffer.capacity = capacity;
 				}
 				if (!data.empty()) {
-					u8* mem = (u8*)gpu::map(buffer.buffer, capacity);
-					if (mem) {
-						memcpy(mem, data.begin(), data.byte_size());
-						gpu::unmap(buffer.buffer);
-					}
+					gpu::update(buffer.buffer, data.begin(), data.byte_size());
 					gpu::bindShaderBuffer(buffer.buffer, idx, 0);
 				}
 			};
