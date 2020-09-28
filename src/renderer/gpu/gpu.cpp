@@ -221,6 +221,12 @@ void checkThread()
 	ASSERT(g_gpu.thread == OS::getCurrentThreadID());
 }
 
+void launchRenderDoc() {
+	if (g_gpu.rdoc_api) {
+		g_gpu.rdoc_api->LaunchReplayUI(1, "");
+	}
+}
+
 static void try_load_renderdoc()
 {
 	#ifdef _WIN32

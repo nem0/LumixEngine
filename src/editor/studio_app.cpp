@@ -1306,6 +1306,10 @@ struct StudioAppImpl final : StudioApp
 		m_editor->setEntitiesPositions(&selected[0], &new_positions[0], new_positions.size());
 	}
 
+	void launchRenderDoc() {
+		m_render_interface->launchRenderDoc();
+	}
+
 	void autosnapDown()
 	{
 		Gizmo::Config& cfg = getGizmoConfig();
@@ -1539,6 +1543,7 @@ struct StudioAppImpl final : StudioApp
 		doMenuItem(*getAction("snapDown"), is_any_entity_selected);
 		doMenuItem(*getAction("autosnapDown"), true);
 		doMenuItem(*getAction("pack_data"), true);
+		if (renderDocOption()) doMenuItem(*getAction("launch_renderdoc"), true);
 		ImGui::EndMenu();
 	}
 
@@ -2188,6 +2193,7 @@ struct StudioAppImpl final : StudioApp
 			.is_selected.bind<&WorldEditor::isGameMode>(m_editor);
 		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
+		addAction<&StudioAppImpl::launchRenderDoc>(NO_ICON "Launch RenderDoc", "Launch RenderDoc", "launch_renderdoc");
 		addAction<&StudioAppImpl::snapDown>(NO_ICON "Snap down", "Snap entities down", "snapDown");
 		addAction<&StudioAppImpl::setEditCamTransform>(NO_ICON "Camera transform", "Set camera transformation", "setEditCamTransform");
 		addAction<&StudioAppImpl::copyViewTransform>(NO_ICON "Copy view transform", "Copy view transform", "copyViewTransform");
@@ -2366,6 +2372,18 @@ struct StudioAppImpl final : StudioApp
 		*/
 		// TODO
 		ASSERT(false);
+	}
+
+	bool renderDocOption() {
+		char cmd_line[2048];
+		OS::getCommandLine(Span(cmd_line));
+
+		CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-renderdoc")) return true;
+		}
+		return false;
 	}
 
 
