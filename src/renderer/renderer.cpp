@@ -138,6 +138,7 @@ struct FrameData {
 	};
 
 	TransientBuffer transient_buffer;
+	u32 gpu_frame = 0xffFFffFF;
 
 	Array<MaterialUpdates> material_updates;
 	Array<Renderer::RenderJob*> jobs;
@@ -1123,17 +1124,20 @@ struct RendererImpl final : Renderer
 		PROFILE_BLOCK("swap buffers");
 		JobSystem::enableBackupWorker(true);
 			
-		gpu::swapBuffers();
+		frame.gpu_frame = gpu::swapBuffers();
 			
 		JobSystem::enableBackupWorker(false);
 		m_profiler.frame();
 
-		frame.transient_buffer.renderDone();
-		
-		JobSystem::decSignal(frame.can_setup);
-
 		++m_gpu_frame;
 		if (m_gpu_frame == m_frames.end()) m_gpu_frame = m_frames.begin();
+
+		if (m_gpu_frame->gpu_frame != 0xffFFffFF) {
+			gpu::waitFrame(m_gpu_frame->gpu_frame);
+			m_gpu_frame->transient_buffer.renderDone();
+			JobSystem::decSignal(m_gpu_frame->can_setup);
+		}
+		
 	}
 
 	void waitForCommandSetup() override
@@ -1163,12 +1167,13 @@ struct RendererImpl final : Renderer
 		
 		++m_cpu_frame;
 		if(m_cpu_frame == m_frames.end()) m_cpu_frame = m_frames.begin();
-		JobSystem::wait(m_cpu_frame->can_setup);
-
 		JobSystem::runEx(this, [](void* ptr){
 			auto* renderer = (RendererImpl*)ptr;
 			renderer->render();
 		}, nullptr, JobSystem::INVALID_HANDLE, 1);
+
+		JobSystem::wait(m_cpu_frame->can_setup);
+
 	}
 
 	Engine& m_engine;

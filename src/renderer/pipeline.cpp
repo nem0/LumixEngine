@@ -2961,12 +2961,12 @@ struct PipelineImpl final : Pipeline
 									material_ub_idx = material->material_constants;
 								}
 
-								u8* dc_mem = (u8*)gpu::map(m_pipeline->m_drawcall_ub, sizeof(Matrix) * (bones_count + 1));
-								if (dc_mem) {
-									memcpy(dc_mem, &model_mtx, sizeof(Matrix));
-									memcpy(dc_mem + sizeof(Matrix), bones, sizeof(Matrix) * bones_count);
-									gpu::unmap(m_pipeline->m_drawcall_ub);
-								}
+								Matrix dc_bones[256];
+								ASSERT(bones_count < (i32)lengthOf(dc_bones));
+
+								dc_bones[0] = model_mtx;
+								memcpy(&dc_bones[1], bones, sizeof(Matrix) * bones_count);
+								gpu::update(m_pipeline->m_drawcall_ub, dc_bones, sizeof(Matrix) * (bones_count + 1));
 
 								gpu::useProgram(program);
 

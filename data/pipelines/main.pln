@@ -119,9 +119,9 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	
 	local view_params = getCameraParams()
 	
+	setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
 	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
 		beginBlock("indirect_specular")
-			setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
 			bindRenderbuffers({
 				gbuffer0,
 				gbuffer1,
@@ -151,7 +151,7 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 			stencil_mask = 0xff,
 			stencil_sfail = STENCIL_KEEP,
 			stencil_zfail = STENCIL_KEEP,
-			stencil_zpass = STENCIL_REPLACE,
+			stencil_zpass = STENCIL_KEEP,
 		}
 	)
 	endBlock()
