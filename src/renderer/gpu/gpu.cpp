@@ -1017,7 +1017,7 @@ void setCurrentWindow(void* window_handle) {
 }
 
 
-void swapBuffers()
+u32 swapBuffers()
 {
 	checkThread();
 	glFinish();
@@ -1045,7 +1045,10 @@ void swapBuffers()
 		glXSwapBuffers(gdisplay, (Window)g_gpu.contexts[0].window_handle);
 	#endif
 	++g_gpu.frame;
+	return 0;
 }
+
+void waitFrame(u32 frame) {}
 
 void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 {
