@@ -12,13 +12,15 @@ AllowShortLoopsOnASingleLine : true
 AlwaysBreakAfterDefinitionReturnType : None
 BinPackArguments : false
 BinPackParameters : false
-BreakBeforeBraces : Allman
+BreakBeforeBraces : Attach  
 BreakConstructorInitializersBeforeComma  : true
-ColumnLimit  : 120
+ColumnLimit  : 200
 ConstructorInitializerIndentWidth : 4
 ConstructorInitializerAllOnOneLineOrOnePerLine : false
 ContinuationIndentWidth : 4
+FixNamespaceComments : true
 IndentCaseLabels : true
+IndentPPDirectives : BeforeHash
 IndentWidth : 4
 KeepEmptyLinesAtTheStartOfBlocks  : true
 MaxEmptyLinesToKeep : 2
