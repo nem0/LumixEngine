@@ -48,6 +48,9 @@ struct RenderState {
 	u64 value;
 };
 
+using LuaTextureHandle = void*;
+using LuaBufferHandle = void*;
+
 namespace LuaWrapper {
 
 	template <> inline RenderState toType(lua_State* L, int idx)
@@ -1674,7 +1677,7 @@ struct PipelineImpl final : Pipeline
 		return cp;
 	}
 	
-	void bindShaderBuffer(u32 buffer_handle, u32 binding_point) {
+	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
@@ -1686,11 +1689,11 @@ struct PipelineImpl final : Pipeline
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->binding_point = binding_point;
-		cmd->buffer = {buffer_handle};
+		cmd->buffer.value = (decltype(cmd->buffer.value))(uintptr_t)buffer_handle;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 	
-	void bindUniformBuffer(u32 buffer_handle, u32 binding_point, u32 size) {
+	void bindUniformBuffer(LuaBufferHandle buffer_handle, u32 binding_point, u32 size) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
@@ -1703,21 +1706,21 @@ struct PipelineImpl final : Pipeline
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->binding_point = binding_point;
-		cmd->buffer = {buffer_handle};
+		cmd->buffer.value = (decltype(cmd->buffer.value))(uintptr_t)buffer_handle;
 		cmd->size = size;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	u32 createBuffer(u32 size) {
+	LuaBufferHandle createBuffer(u32 size) {
 		Renderer::MemRef mem;
 		mem.own = false;
 		mem.data = nullptr;
 		mem.size = size;
 		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE);
-		return buffer.value;
+		return (LuaBufferHandle)(uintptr_t)buffer.value;
 	}
 	
-	u32 createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
+	LuaTextureHandle createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
 	{
 		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
@@ -1728,10 +1731,10 @@ struct PipelineImpl final : Pipeline
 			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE
 			, mem
 			, debug_name.get("lua_texture"));
-		return texture.value;
+		return (LuaTextureHandle)(uintptr_t)texture.value;
 	}
 
-	u32 createTexture3D(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
+	LuaTextureHandle createTexture3D(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
 	{
 		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
@@ -1742,7 +1745,7 @@ struct PipelineImpl final : Pipeline
 			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
 			, mem
 			, debug_name.get("lua_texture"));
-		return texture.value;
+		return (LuaTextureHandle)(uintptr_t)texture.value;
 	}
 
 	static int drawcallUniforms(lua_State* L) {
@@ -1821,7 +1824,7 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	void bindImageTexture(u32 texture_handle, u32 unit) {
+	void bindImageTexture(LuaTextureHandle texture_handle, u32 unit) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
@@ -1832,12 +1835,12 @@ struct PipelineImpl final : Pipeline
 			u32 unit;
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->texture.value = texture_handle;
+		cmd->texture.value = (decltype(cmd->texture.value))(uintptr_t)texture_handle;
 		cmd->unit = unit;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	void bindRawTexture(u32 texture_handle, u32 offset)
+	void bindRawTexture(LuaTextureHandle texture_handle, u32 offset)
 	{
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
@@ -1852,7 +1855,7 @@ struct PipelineImpl final : Pipeline
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->offset = offset;
-		cmd->handle.value = texture_handle;
+		cmd->handle.value = (decltype(cmd->handle.value))(uintptr_t)texture_handle;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 

@@ -3273,7 +3273,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				ASSERT(!pcmd->UserCallback);
 				if (0 == pcmd->ElemCount) continue;
 
-				gpu::TextureHandle tex = gpu::TextureHandle{(u32)(intptr_t)pcmd->TextureId};
+				gpu::TextureHandle tex = gpu::TextureHandle{(decltype(tex.value))(intptr_t)pcmd->TextureId};
 				if (!tex.isValid()) tex = *default_texture;
 				gpu::bindTextures(&tex, 0, 1);
 

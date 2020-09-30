@@ -10,14 +10,23 @@ struct IAllocator;
 namespace gpu {
 
 
-struct BufferHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
-struct ProgramHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
-struct TextureHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
+#ifdef LUMIX_DX12
+	struct BufferHandle { struct Buffer* value; bool isValid() const { return value; } };
+	struct ProgramHandle { struct Program* value; bool isValid() const { return value; } };
+	struct TextureHandle { struct Texture* value; bool isValid() const { return value; } };
+	const BufferHandle INVALID_BUFFER = { nullptr };
+	const ProgramHandle INVALID_PROGRAM = { nullptr };
+	const TextureHandle INVALID_TEXTURE = { nullptr };
+#else
+	struct BufferHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
+	struct ProgramHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
+	struct TextureHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
+	const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
+	const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
+	const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
+#endif
 struct QueryHandle { u32 value; bool isValid() const { return value != 0xFFffFFff; } };
 
-const BufferHandle INVALID_BUFFER = { 0xffFFffFF };
-const ProgramHandle INVALID_PROGRAM = { 0xffFFffFF };
-const TextureHandle INVALID_TEXTURE = { 0xffFFffFF };
 const QueryHandle INVALID_QUERY = { 0xffFFffFF };
 
 enum class InitFlags : u32 {
