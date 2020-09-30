@@ -281,23 +281,6 @@ function useLua()
 	includedirs { path.join(ROOT_DIR, "external/luajit/include") }
 end
 
-function copyDlls(src_dir, platform_dir, dest_dir)
-	local physx_suffix
-	configuration { "x64", dest_dir, "windows" }
-	physx_suffix = "64"
-
-	if _OPTIONS["static-physx"] == nil then
-		postbuildcommands {
-			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCommon_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXCooking_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysXFoundation_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-			"xcopy /Y \"$(SolutionDir)../../../external/physx/dll/" .. binary_api_dir .. "/" .. platform_dir .. "\\" .. src_dir .. "\\PhysX_".. physx_suffix .. ".dll\" \"$(SolutionDir)bin/" .. dest_dir .. "\"",
-			[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbghelp.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\"",
-			[[xcopy /Y "$(SolutionDir)..\..\..\external\dbghelp\dbgcore.dll" "$(SolutionDir)bin\]] .. dest_dir .. "\""
-		}
-	end
-end
-
 function libType()
 	if _OPTIONS["static-plugins"] then
 		kind "StaticLib"
@@ -531,6 +514,17 @@ if has_plugin("physics") then
 		libType()
 
 		files { "../src/physics/**.h", "../src/physics/**.cpp" }
+
+		configuration { "vs*" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
+			files { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysXCommon_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysXCooking_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysXFoundation_64.dll" }
+			copy { "../external/physx/dll/vs2017/win64/release/PhysX_64.dll" }
+		configuration {}
 
 		includedirs { "../external/physx/include/" }
 		defines { "BUILDING_PHYSICS" }
@@ -872,14 +866,4 @@ if build_studio then
 		
 		useLua()
 		defaultConfigurations()
-		
-		if _ACTION == "vs2019" then
-			copyDlls("Release", "win64", "Debug")
-			copyDlls("Release", "win64", "RelWithDebInfo")
-		end
-		
-		if "linux-gcc" == _OPTIONS["gcc"] then
-			copyDlls("release", "linux64", "Debug")
-			copyDlls("release", "linux64", "Release")
-		end
 end
