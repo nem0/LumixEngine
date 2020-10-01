@@ -131,7 +131,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImDrawList* draw = ImGui::GetWindowDrawList();
 		ImVec2 a = ImGui::GetItemRectMin();
 		ImVec2 b = ImGui::GetItemRectMax();
-		draw->AddImage((ImTextureID)(intptr_t)texture->handle.value, a, b);
+		draw->AddImage(texture->handle, a, b);
 
 		auto drawHandle = [&](const char* id, const ImVec2& a, const ImVec2& b, int* value, bool vertical) {
 			const float SIZE = 5;
@@ -470,13 +470,12 @@ private:
 			if (m_pipeline->render(true)) {
 				m_texture_handle = m_pipeline->getOutput();
 
-				if(m_texture_handle.isValid()) {
-					const ImTextureID img = (ImTextureID)(uintptr)m_texture_handle.value;
+				if(m_texture_handle) {
 					if (gpu::isOriginBottomLeft()) {
-						ImGui::Image(img, size, ImVec2(0, 1), ImVec2(1, 0));
+						ImGui::Image(m_texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 					}
 					else {
-						ImGui::Image(img, size);
+						ImGui::Image(m_texture_handle, size);
 					}
 				}
 			}

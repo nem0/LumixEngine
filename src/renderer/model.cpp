@@ -489,7 +489,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		const Renderer::MemRef mem = m_renderer.copy(mesh.indices.data(), (u32)mesh.indices.size());
 		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::IMMUTABLE);
 		mesh.render_data->index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
-		if (!mesh.render_data->index_buffer_handle.isValid()) return false;
+		if (!mesh.render_data->index_buffer_handle) return false;
 	}
 
 	for (int i = 0; i < object_count; ++i)
@@ -523,7 +523,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 		}
 		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, (u32)gpu::BufferFlags::IMMUTABLE);
-		if (!mesh.render_data->vertex_buffer_handle.isValid()) return false;
+		if (!mesh.render_data->vertex_buffer_handle) return false;
 	}
 	file.read(m_bounding_radius);
 	file.read(m_aabb);
@@ -637,8 +637,8 @@ void Model::unload()
 	for (Mesh& mesh : m_meshes) {
 		m_renderer.runInRenderThread(mesh.render_data, [](Renderer& renderer, void* ptr){
 			Mesh::RenderData* rd = (Mesh::RenderData*)ptr;
-			if (rd->index_buffer_handle.isValid()) gpu::destroy(rd->index_buffer_handle);
-			if (rd->vertex_buffer_handle.isValid()) gpu::destroy(rd->vertex_buffer_handle);
+			if (rd->index_buffer_handle) gpu::destroy(rd->index_buffer_handle);
+			if (rd->vertex_buffer_handle) gpu::destroy(rd->vertex_buffer_handle);
 			LUMIX_DELETE(renderer.getAllocator(), rd); 
 		});
 	}

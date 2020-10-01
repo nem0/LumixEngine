@@ -83,7 +83,7 @@ bool Texture::create(u32 w, u32 h, gpu::TextureFormat format, const void* data, 
 	width = w;
 	height = h;
 
-	const bool isReady = handle.isValid();
+	const bool isReady = handle;
 	onCreated(isReady ? State::READY : State::FAILURE);
 
 	return isReady;
@@ -383,7 +383,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 		, texture.getPath().c_str());
 	texture.mips = 1;
 	texture.is_cubemap = false;
-	return texture.handle.isValid();
+	return texture.handle;
 }
 
 
@@ -444,7 +444,7 @@ bool Texture::loadTGA(IInputStream& file)
 			, getPath().c_str());
 		depth = 1;
 		layers = 1;
-		return handle.isValid();
+		return handle;
 	}
 
 	if (header.bitsPerPixel < 24)
@@ -560,7 +560,7 @@ bool Texture::loadTGA(IInputStream& file)
 		, getPath().c_str());
 	depth = 1;
 	layers = 1;
-	return handle.isValid();
+	return handle;
 }
 
 
@@ -595,7 +595,7 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 	const u8* data = (const u8*)file.getBuffer();
 	Renderer::MemRef mem = texture.renderer.copy(data + 7, (int)file.size() - 7);
 	texture.handle = texture.renderer.loadTexture(mem, texture.getGPUFlags(), &info, texture.getPath().c_str());
-	if (texture.handle.isValid()) {
+	if (texture.handle) {
 		texture.width = info.width;
 		texture.height = info.height;
 		texture.mips = info.mips;
@@ -604,7 +604,7 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 		texture.is_cubemap = info.is_cubemap;
 	}
 
-	return texture.handle.isValid();
+	return texture.handle;
 }
 
 
@@ -661,7 +661,7 @@ bool Texture::load(u64 size, const u8* mem)
 
 void Texture::unload()
 {
-	if (handle.isValid()) {
+	if (handle) {
 		renderer.destroy(handle);
 		handle = gpu::INVALID_TEXTURE;
 	}

@@ -2,12 +2,11 @@
 
 #include "engine/array.h"
 #include "engine/math.h"
+#include "renderer/gpu/gpu.h"
 
 
 namespace Lumix
 {
-
-namespace gpu { struct TextureHandle; }
 
 struct Font;
 

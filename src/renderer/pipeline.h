@@ -5,6 +5,7 @@
 #include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
+#include "renderer/gpu/gpu.h"
 
 
 struct lua_State;
@@ -12,13 +13,6 @@ struct lua_State;
 
 namespace Lumix
 {
-
-namespace gpu { 
-	struct BufferHandle; 
-	struct ProgramHandle; 
-	struct TextureHandle; 
-	struct UniformHandle; 
-}
 
 struct Draw2D;
 struct IAllocator;
