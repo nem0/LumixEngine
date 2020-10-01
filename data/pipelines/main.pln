@@ -66,7 +66,7 @@ function waterPass(water_set, colorbuffer, dsbuffer)
 end
 
 function transparentPass(transparent_set, colorbuffer, dsbuffer)
-	setRenderTargets(colorbuffer, dsbuffer)
+	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
 	beginBlock("transparent_pass")
 	pass(getCameraParams())
