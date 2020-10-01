@@ -33,19 +33,21 @@ namespace gpu {
 #undef GPU_GL_IMPORT_TYPEDEFS
 #undef GPU_GL_IMPORT
 
-struct Buffer
-{
-	enum { MAX_COUNT = 8192 };
-	
-	GLuint handle;
+struct Buffer {
+	~Buffer() {
+		if (gl_handle) glDeleteBuffers(1, &gl_handle);
+	}
+
+	GLuint gl_handle;
 	u32 flags;
 };
 
-struct Texture
-{
-	enum { MAX_COUNT = 8192 };
+struct Texture {
+	~Texture() {
+		if (gl_handle) glDeleteTextures(1, &gl_handle);
+	}
 
-	GLuint handle;
+	GLuint gl_handle;
 	GLenum target;
 	GLenum format;
 	u32 width;
@@ -54,61 +56,23 @@ struct Texture
 	u32 flags;
 };
 
+struct Program {
+	~Program() {
+		if(gl_handle) glDeleteProgram(gl_handle);
+	}
 
-struct Program
-{
-	enum { MAX_COUNT = 2048 };
-	GLuint handle;
+	GLuint gl_handle = 0;
 	VertexDecl decl;
-};
-
-
-template <typename T, u32 MAX_COUNT>
-struct Pool
-{
-	void init()
-	{
-		values = (T*)mem;
-		for (int i = 0; i < MAX_COUNT; ++i) {
-			new (NewPlaceholder(), &values[i]) int(i + 1);
-		}
-		new (NewPlaceholder(), &values[MAX_COUNT - 1]) int(-1);
-		first_free = 0;
-	}
-
-	int alloc()
-	{
-		if(first_free == -1) return -1;
-
-		const int id = first_free;
-		first_free = *((int*)&values[id]);
-		new (NewPlaceholder(), &values[id]) T;
-		return id;
-	}
-
-	void dealloc(u32 idx)
-	{
-		values[idx].~T();
-		new (NewPlaceholder(), &values[idx]) int(first_free);
-		first_free = idx;
-	}
-
-	alignas(T) u8 mem[sizeof(T) * MAX_COUNT];
-	T* values;
-	int first_free;
-
-	T& operator[](int idx) { return values[idx]; }
-	bool isFull() const { return first_free == -1; }
 };
 
 struct WindowContext {
 	u32 last_frame;
 	void* window_handle = nullptr;
 	GLuint vao;
-#ifdef _WIN32
-	HDC device_context;
-	HGLRC hglrc;
-#endif
+	#ifdef _WIN32
+		HDC device_context;
+		HGLRC hglrc;
+	#endif
 };
 
 static struct {
@@ -116,20 +80,15 @@ static struct {
 	RENDERDOC_API_1_0_2* rdoc_api;
 	IAllocator* allocator;
 	WindowContext contexts[64];
-	Pool<Buffer, Buffer::MAX_COUNT> buffers;
-	Pool<Texture, Texture::MAX_COUNT> textures;
-	Pool<Program, Program::MAX_COUNT> programs;
-	Mutex handle_mutex;
 	Lumix::OS::ThreadID thread;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
 	ProgramHandle last_program = INVALID_PROGRAM;
 	u64 last_state = 0;
 	GLuint framebuffer = 0;
-	ProgramHandle default_program;
+	ProgramHandle default_program = INVALID_PROGRAM;
 	bool has_gpu_mem_info_ext = false;
 } g_gpu;
-
 
 namespace DDS
 {
@@ -552,33 +511,31 @@ void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z)
 	glDispatchCompute(num_groups_x, num_groups_y, num_groups_z);
 }
 
-void useProgram(ProgramHandle handle)
+void useProgram(ProgramHandle program)
 {
-	const Program& prg = g_gpu.programs.values[handle.value];
-	const u32 prev = g_gpu.last_program.value;
-	if (prev != handle.value) {
-		g_gpu.last_program = handle;
-		if (!handle.isValid()) {
-			glUseProgram(0);
+	const Program* prev = g_gpu.last_program;
+	if (prev != program) {
+		g_gpu.last_program = program;
+		if (program) {
+			glUseProgram(program->gl_handle);
+
+			if (!prev || program->decl.hash != prev->decl.hash) {
+				setVAO(program->decl);
+			}
 		}
 		else {
-			if (!prg.handle) {
-				glUseProgram(g_gpu.programs[g_gpu.default_program.value].handle);
-			}
-			else {
-				glUseProgram(prg.handle);
-			}
-
-			if (prev == 0xffFFffFF || g_gpu.programs.values[handle.value].decl.hash != g_gpu.programs.values[prev].decl.hash) {
-				setVAO(prg.decl);
-			}
+			glUseProgram(0);
 		}
 	}
 }
 
 void bindImageTexture(TextureHandle texture, u32 unit) {
-	Texture& t = g_gpu.textures[texture.value];
-	glBindImageTexture(unit, t.handle, 0, GL_TRUE, 0, GL_READ_WRITE, t.format);
+	if (texture) {
+		glBindImageTexture(unit, texture->gl_handle, 0, GL_TRUE, 0, GL_READ_WRITE, texture->format);
+	}
+	else {
+		glBindImageTexture(unit, 0, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA8);
+	}
 }
 
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
@@ -588,8 +545,8 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 	ASSERT(handles);
 	
 	for(u32 i = 0; i < count; ++i) {
-		if (handles[i].isValid()) {
-			gl_handles[i] = g_gpu.textures[handles[i].value].handle;
+		if (handles[i]) {
+			gl_handles[i] = handles[i]->gl_handle;
 		}
 		else {
 			gl_handles[i] = 0;
@@ -599,28 +556,16 @@ void bindTextures(const TextureHandle* handles, u32 offset, u32 count)
 	glBindTextures(offset, count, gl_handles);
 }
 
-void bindShaderBuffer(BufferHandle handle, u32 binding_idx, u32 flags)
+void bindShaderBuffer(BufferHandle buffer, u32 binding_idx, u32 flags)
 {
 	checkThread();
-	if(handle.isValid()) {
-		const Buffer& buffer = g_gpu.buffers[handle.value];
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_idx, buffer.handle);
-	}
-	else {
-		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, binding_idx, 0, 0, 0);
-	}
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_idx, buffer ? buffer->gl_handle : 0);
 }
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset) {
 	checkThread();
 	ASSERT(binding_idx < 2);
-	if(buffer.isValid()) {
-		const GLuint gl_handle = g_gpu.buffers[buffer.value].handle;
-		glBindVertexBuffer(binding_idx, gl_handle, buffer_offset, stride_offset);
-	}
-	else {
-		glBindVertexBuffer(binding_idx, 0, 0, 0);
-	}
+	glBindVertexBuffer(binding_idx, buffer ? buffer->gl_handle : 0, buffer_offset, stride_offset);
 }
 
 
@@ -725,29 +670,17 @@ void setState(u64 state)
 }
 
 
-void bindIndexBuffer(BufferHandle handle)
+void bindIndexBuffer(BufferHandle buffer)
 {
 	checkThread();
-	if(handle.isValid()) {	
-		const GLuint ib = g_gpu.buffers[handle.value].handle;
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ib);
-		return;
-	}
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer ? buffer->gl_handle : 0);
 }
 
 
-void bindIndirectBuffer(BufferHandle handle)
+void bindIndirectBuffer(BufferHandle buffer)
 {
 	checkThread();
-	if(handle.isValid()) {	
-		const GLuint ib = g_gpu.buffers[handle.value].handle;
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ib);
-		return;
-	}
-
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer ? buffer->gl_handle : 0);
 }
 
 
@@ -840,50 +773,45 @@ void drawArrays(u32 offset, u32 count, PrimitiveType type)
 
 void bindUniformBuffer(u32 index, BufferHandle buffer, size_t offset, size_t size) {
 	checkThread();
-	if (buffer.isValid()) {
-		const GLuint buf = g_gpu.buffers[buffer.value].handle;
-		glBindBufferRange(GL_UNIFORM_BUFFER, index, buf, offset, size);
-		return;
-	}
-	glBindBufferRange(GL_UNIFORM_BUFFER, index, 0, 0, size);
+	glBindBufferRange(GL_UNIFORM_BUFFER, index, buffer ? buffer->gl_handle : 0, offset, size);
 }
 
 
 void* map(BufferHandle buffer, size_t size)
 {
 	checkThread();
-	const Buffer& b = g_gpu.buffers[buffer.value];
-	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
+	ASSERT(buffer);
+	ASSERT((buffer->flags & (u32)BufferFlags::IMMUTABLE) == 0);
 	const GLbitfield gl_flags = GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_WRITE_BIT;
-	return glMapNamedBufferRange(b.handle, 0, size, gl_flags);
+	return glMapNamedBufferRange(buffer->gl_handle, 0, size, gl_flags);
 }
 
 
 void unmap(BufferHandle buffer)
 {
 	checkThread();
-	const GLuint buf = g_gpu.buffers[buffer.value].handle;
-	glUnmapNamedBuffer(buf);
+	ASSERT(buffer);
+	glUnmapNamedBuffer(buffer->gl_handle);
 }
 
 
 void update(BufferHandle buffer, const void* data, size_t size)
 {
 	checkThread();
-	const Buffer& b = g_gpu.buffers[buffer.value];
-	ASSERT((b.flags & (u32)BufferFlags::IMMUTABLE) == 0);
-	const GLuint buf = b.handle;
+	ASSERT(buffer);
+	ASSERT((buffer->flags & (u32)BufferFlags::IMMUTABLE) == 0);
+	const GLuint buf = buffer->gl_handle;
 	glNamedBufferSubData(buf, 0, size, data);
 }
 
 void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 size)
 {
 	checkThread();
-	const Buffer& bsrc = g_gpu.buffers[src.value];
-	const Buffer& bdst = g_gpu.buffers[dst.value];
-	ASSERT((bdst.flags & (u32)BufferFlags::IMMUTABLE) == 0);
+	ASSERT(src);
+	ASSERT(dst);
+	ASSERT((dst->flags & (u32)BufferFlags::IMMUTABLE) == 0);
 
-	glCopyNamedBufferSubData(bsrc.handle, bdst.handle, 0, dst_offset, size);
+	glCopyNamedBufferSubData(src->gl_handle, dst->gl_handle, 0, dst_offset, size);
 }
 
 void startCapture()
@@ -1053,6 +981,7 @@ void waitFrame(u32 frame) {}
 void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 {
 	checkThread();
+	ASSERT(buffer);
 	GLuint buf;
 	glCreateBuffers(1, &buf);
 	
@@ -1060,20 +989,14 @@ void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
 	if ((flags & (u32)BufferFlags::IMMUTABLE) == 0) gl_flags |= GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
 	glNamedBufferStorage(buf, size, data, gl_flags);
 
-	g_gpu.buffers[buffer.value].handle = buf;
-	g_gpu.buffers[buffer.value].flags = flags;
+	buffer->gl_handle = buf;
+	buffer->flags = flags;
 }
 
 void destroy(ProgramHandle program)
 {
 	checkThread();
-	
-	Program& p = g_gpu.programs[program.value];
-	const GLuint handle = p.handle;
-	glDeleteProgram(handle);
-
-	MutexGuard lock(g_gpu.handle_mutex);
-	g_gpu.programs.dealloc(program.value);
+	LUMIX_DELETE(*g_gpu.allocator, program);
 }
 
 static struct {
@@ -1126,14 +1049,14 @@ TextureInfo getTextureInfo(const void* data)
 
 void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf)
 {
+	ASSERT(texture);
 	checkThread();
-	Texture& t = g_gpu.textures[texture.value];
-	const GLuint handle = t.handle;
+	const GLuint handle = texture->gl_handle;
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
 		if (s_texture_formats[i].format == format) {
 			const auto& f = s_texture_formats[i];
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			if (t.flags & (u32)TextureFlags::IS_CUBE || t.depth > 1) {
+			if (texture->flags & (u32)TextureFlags::IS_CUBE || texture->depth > 1) {
 				glTextureSubImage3D(handle, level, x, y, slice, w, h, 1, f.gl_format, f.type, buf);
 			}
 			else {
@@ -1149,6 +1072,7 @@ void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u3
 bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 flags, const char* debug_name)
 {
 	ASSERT(debug_name && debug_name[0]);
+	ASSERT(handle);
 	checkThread();
 	DDS::Header hdr;
 
@@ -1324,9 +1248,9 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v);
 	glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w);
 
-	Texture& t = g_gpu.textures[handle.value];
+	Texture& t = *handle;
 	t.format = internal_format;
-	t.handle = texture;
+	t.gl_handle = texture;
 	t.target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	t.width = hdr.dwWidth;
 	t.height = hdr.dwHeight;
@@ -1338,78 +1262,53 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 
 ProgramHandle allocProgramHandle()
 {
-	MutexGuard lock(g_gpu.handle_mutex);
+	Program* p = LUMIX_NEW(*g_gpu.allocator, Program)();
 
-	if(g_gpu.programs.isFull()) {
-		logError("Renderer") << "Not enough free program slots.";
-		return INVALID_PROGRAM;
-	}
-	const int id = g_gpu.programs.alloc();
-	if (id < 0) return INVALID_PROGRAM;
-
-	Program& p = g_gpu.programs[id];
-	p.handle = 0;
-	return { (u32)id };
+	p->gl_handle = g_gpu.default_program ? g_gpu.default_program->gl_handle : 0;
+	return { p };
 }
 
 
 BufferHandle allocBufferHandle()
 {
-	MutexGuard lock(g_gpu.handle_mutex);
-
-	if(g_gpu.buffers.isFull()) {
-		logError("Renderer") << "Not enough free buffer slots.";
-		return INVALID_BUFFER;
-	}
-	const int id = g_gpu.buffers.alloc();
-	if (id < 0) return INVALID_BUFFER;
-
-	Buffer& t = g_gpu.buffers[id];
-	t.handle = 0;
-	return { (u32)id };
+	Buffer* b = LUMIX_NEW(*g_gpu.allocator, Buffer);
+	b->gl_handle = 0;
+	return { b };
 }
 
 TextureHandle allocTextureHandle()
 {
-	MutexGuard lock(g_gpu.handle_mutex);
-
-	if(g_gpu.textures.isFull()) {
-		logError("Renderer") << "Not enough free texture slots.";
-		return INVALID_TEXTURE;
-	}
-	const int id = g_gpu.textures.alloc();
-	ASSERT(id >= 0);
-
-	Texture& t = g_gpu.textures[id];
-	t.handle = 0;
-	return { (u32)id };
+	Texture* t = LUMIX_NEW(*g_gpu.allocator, Texture);
+	t->gl_handle = 0;
+	return { t };
 }
 
 
-void createTextureView(TextureHandle view_handle, TextureHandle orig_handle)
+void createTextureView(TextureHandle view, TextureHandle texture)
 {
 	checkThread();
 	
-	const Texture& orig = g_gpu.textures[orig_handle.value];
-	Texture& view = g_gpu.textures[view_handle.value];
+	ASSERT(texture);
+	ASSERT(view);
 
-	if (view.handle != 0) {
-		glDeleteTextures(1, &view.handle);
+	if (view->gl_handle != 0) {
+		glDeleteTextures(1, &view->gl_handle);
 	}
 
-	view.target = GL_TEXTURE_2D;
-	view.format = orig.format;
+	view->target = GL_TEXTURE_2D;
+	view->format = texture->format;
 
-	glGenTextures(1, &view.handle);
-	glTextureView(view.handle, GL_TEXTURE_2D, orig.handle, orig.format, 0, 1, 0, 1);
-	view.width = orig.width;
-	view.height = orig.height;
+	glGenTextures(1, &view->gl_handle);
+	glTextureView(view->gl_handle, GL_TEXTURE_2D, texture->gl_handle, texture->format, 0, 1, 0, 1);
+	view->width = texture->width;
+	view->height = texture->height;
 }
 
 
 bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, u32 flags, const void* data, const char* debug_name)
 {
 	checkThread();
+	ASSERT(handle);
 	const bool is_srgb = flags & (u32)TextureFlags::SRGB;
 	const bool no_mips = flags & (u32)TextureFlags::NO_MIPS;
 	const bool is_3d = depth > 1 && (flags & (u32)TextureFlags::IS_3D);
@@ -1512,44 +1411,32 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
 	}
 
-	Texture& t = g_gpu.textures[handle.value];
-	t.handle = texture;
-	t.target = target;
-	t.format = internal_format;
-	t.width = w;
-	t.height = h;
-	t.depth = depth;
-	t.flags = flags;
+	handle->gl_handle = texture;
+	handle->target = target;
+	handle->format = internal_format;
+	handle->width = w;
+	handle->height = h;
+	handle->depth = depth;
+	handle->flags = flags;
 
 	return true;
 }
 
-void generateMipmaps(TextureHandle handle)
+void generateMipmaps(TextureHandle texture)
 {
-	Texture& t = g_gpu.textures[handle.value];
-	glGenerateTextureMipmap(t.handle);
+	ASSERT(texture);
+	glGenerateTextureMipmap(texture->gl_handle);
 }
 
 void destroy(TextureHandle texture)
 {
 	checkThread();
-	Texture& t = g_gpu.textures[texture.value];
-	const GLuint handle = t.handle;
-	glDeleteTextures(1, &handle);
-
-	MutexGuard lock(g_gpu.handle_mutex);
-	g_gpu.textures.dealloc(texture.value);
+	LUMIX_DELETE(*g_gpu.allocator, texture);
 }
 
 void destroy(BufferHandle buffer) {
 	checkThread();
-	
-	Buffer& t = g_gpu.buffers[buffer.value];
-	const GLuint handle = t.handle;
-	glDeleteBuffers(1, &handle);
-
-	MutexGuard lock(g_gpu.handle_mutex);
-	g_gpu.buffers.dealloc(buffer.value);
+	LUMIX_DELETE(*g_gpu.allocator, buffer);
 }
 
 void clear(u32 flags, const float* color, float depth)
@@ -1717,9 +1604,9 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 		return false;
 	}
 
-	const int id = prog.value;
-	g_gpu.programs[id].handle = prg;
-	g_gpu.programs[id].decl = decl;
+	ASSERT(prog);
+	prog->gl_handle = prg;
+	prog->decl = decl;
 	return true;
 }
 
@@ -1728,9 +1615,6 @@ void preinit(IAllocator& allocator, bool load_renderdoc)
 {
 	if (load_renderdoc) try_load_renderdoc();
 	g_gpu.allocator = &allocator;
-	g_gpu.textures.init();
-	g_gpu.buffers.init();
-	g_gpu.programs.init();
 }
 
 
@@ -1800,8 +1684,9 @@ bool init(void* window_handle, u32 init_flags)
 
 	
 	g_gpu.default_program = allocProgramHandle();
-	Program& p = g_gpu.programs[g_gpu.default_program.value];
-	p.handle = glCreateProgram();
+	ASSERT(g_gpu.default_program);
+	Program& p = *g_gpu.default_program;
+	p.gl_handle = glCreateProgram();
 	glGenVertexArrays(1, &g_gpu.contexts[0].vao);
 	glBindVertexArray(g_gpu.contexts[0].vao);
 	glVertexBindingDivisor(0, 0);
@@ -1811,8 +1696,8 @@ bool init(void* window_handle, u32 init_flags)
 	const char* vs_src = "void main() { gl_Position = vec4(0, 0, 0, 0); }";
 	glShaderSource(vs, 1, &vs_src, nullptr);
 	glCompileShader(vs);
-	glAttachShader(p.handle, vs);
-	glLinkProgram(p.handle);
+	glAttachShader(p.gl_handle, vs);
+	glLinkProgram(p.gl_handle);
 	glDeleteShader(vs);
 
 	g_gpu.last_state = 1;
@@ -1825,39 +1710,38 @@ bool init(void* window_handle, u32 init_flags)
 bool isOriginBottomLeft() { return true; }
 
 
-void copy(TextureHandle dst_handle, TextureHandle src_handle, u32 dst_x, u32 dst_y) {
+void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y) {
 	checkThread();
-	Texture& dst = g_gpu.textures[dst_handle.value];
-	Texture& src = g_gpu.textures[src_handle.value];
-	ASSERT(src.target == GL_TEXTURE_2D || src.target == GL_TEXTURE_CUBE_MAP);
-	ASSERT(src.target == dst.target);
+	ASSERT(dst);
+	ASSERT(src);
+	ASSERT(src->target == GL_TEXTURE_2D || src->target == GL_TEXTURE_CUBE_MAP);
+	ASSERT(src->target == dst->target);
 
 	u32 mip = 0;
-	while ((src.width >> mip) != 0 || (src.height >> mip) != 0) {
-		const u32 w = maximum(src.width >> mip, 1);
-		const u32 h = maximum(src.height >> mip, 1);
+	while ((src->width >> mip) != 0 || (src->height >> mip) != 0) {
+		const u32 w = maximum(src->width >> mip, 1);
+		const u32 h = maximum(src->height >> mip, 1);
 
-		if (src.target == GL_TEXTURE_CUBE_MAP) {
-			glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 6);
+		if (src->target == GL_TEXTURE_CUBE_MAP) {
+			glCopyImageSubData(src->gl_handle, src->target, mip, 0, 0, 0, dst->gl_handle, dst->target, mip, dst_x, dst_y, 0, w, h, 6);
 		}
 		else {
-			glCopyImageSubData(src.handle, src.target, mip, 0, 0, 0, dst.handle, dst.target, mip, dst_x, dst_y, 0, w, h, 1);
+			glCopyImageSubData(src->gl_handle, src->target, mip, 0, 0, 0, dst->gl_handle, dst->target, mip, dst_x, dst_y, 0, w, h, 1);
 		}
 		++mip;
-		if (src.flags & (u32)TextureFlags::NO_MIPS) break;
-		if (dst.flags & (u32)TextureFlags::NO_MIPS) break;
+		if (src->flags & (u32)TextureFlags::NO_MIPS) break;
+		if (dst->flags & (u32)TextureFlags::NO_MIPS) break;
 	}
 }
 
 void readTexture(TextureHandle texture, u32 mip, Span<u8> buf)
 {
 	checkThread();
-
-	Texture& t = g_gpu.textures[texture.value];
-	const GLuint handle = t.handle;
+	ASSERT(texture);
+	const GLuint handle = texture->gl_handle;
 
 	for (int i = 0; i < sizeof(s_texture_formats) / sizeof(s_texture_formats[0]); ++i) {
-		if (s_texture_formats[i].gl_internal == t.format) {
+		if (s_texture_formats[i].gl_internal == texture->format) {
 			const auto& f = s_texture_formats[i];
 			glGetTextureImage(handle, mip, f.gl_format, f.type, buf.length(), buf.begin());
 			return;
@@ -1885,14 +1769,15 @@ QueryHandle createQuery()
 {
 	GLuint q;
 	glGenQueries(1, &q);
-	return {q};
+	ASSERT(q != 0);
+	return {(Query*)(uintptr_t)q};
 }
 
 
 bool isQueryReady(QueryHandle query)
 {
 	GLuint done;
-	glGetQueryObjectuiv(query.value, GL_QUERY_RESULT_AVAILABLE, &done);
+	glGetQueryObjectuiv((GLuint)(uintptr_t)query, GL_QUERY_RESULT_AVAILABLE, &done);
 	return done;
 }
 
@@ -1901,25 +1786,27 @@ u64 getQueryFrequency() { return 1'000'000'000; }
 u64 getQueryResult(QueryHandle query)
 {
 	u64 time;
-	glGetQueryObjectui64v(query.value, GL_QUERY_RESULT, &time);
+	glGetQueryObjectui64v((GLuint)(uintptr_t)query, GL_QUERY_RESULT, &time);
 	return time;
 }
 
 
 void destroy(QueryHandle query)
 {
-	glDeleteQueries(1, &query.value);
+	GLuint q = (GLuint)(uintptr_t)query;
+	glDeleteQueries(1, &q);
 }
 
 
 void queryTimestamp(QueryHandle query)
 {
-	glQueryCounter(query.value, GL_TIMESTAMP);
+	glQueryCounter((GLuint)(uintptr_t)query, GL_TIMESTAMP);
 }
 
 void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
 {
-	const GLuint t = g_gpu.textures[cube.value].handle;
+	ASSERT(cube);
+	const GLuint t = cube->gl_handle;
 	checkThread();
 	glDisable(GL_FRAMEBUFFER_SRGB);
 	glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
@@ -1961,7 +1848,8 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	u32 rb_count = 0;
 	bool depth_bound = false;
 	for (u32 i = 0; i < num; ++i) {
-		const GLuint t = g_gpu.textures[attachments[i].value].handle;
+		ASSERT(attachments[i]);
+		const GLuint t = attachments[i]->gl_handle;
 		GLint internal_format;
 		glBindTexture(GL_TEXTURE_2D, t);
 		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);

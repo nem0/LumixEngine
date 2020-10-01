@@ -57,7 +57,7 @@ struct TransientBuffer {
 		}
 
 		MutexGuard lock(m_mutex);
-		if (!m_overflow.buffer.isValid()) {
+		if (!m_overflow.buffer) {
 			m_overflow.buffer = gpu::allocBufferHandle();
 			m_overflow.data = (u8*)OS::memReserve(128 * 1024 * 1024);
 			m_overflow.size = 0;
@@ -78,7 +78,7 @@ struct TransientBuffer {
 		gpu::unmap(m_buffer);
 		m_ptr = nullptr;
 
-		if (m_overflow.buffer.isValid()) {
+		if (m_overflow.buffer) {
 			gpu::createBuffer(m_overflow.buffer, 0, nextPow2(m_overflow.size + m_size), nullptr);
 			gpu::update(m_overflow.buffer, m_overflow.data, m_overflow.size);
 			OS::memRelease(m_overflow.data);
@@ -88,7 +88,7 @@ struct TransientBuffer {
 	}
 
 	void renderDone() {
-		if (m_overflow.buffer.isValid()) {
+		if (m_overflow.buffer) {
 			m_size = nextPow2(m_overflow.size + m_size);
 			gpu::destroy(m_buffer);
 			m_buffer = m_overflow.buffer;
@@ -696,7 +696,7 @@ struct RendererImpl final : Renderer
 	void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& mem) override
 	{
 		ASSERT(mem.size > 0);
-		ASSERT(handle.isValid());
+		ASSERT(handle);
 
 		struct Cmd : RenderJob {
 			void setup() override {}
@@ -735,7 +735,7 @@ struct RendererImpl final : Renderer
 		ASSERT(memory.size > 0);
 
 		const gpu::TextureHandle handle = gpu::allocTextureHandle();
-		if (!handle.isValid()) return handle;
+		if (!handle) return handle;
 
 		if(info) {
 			*info = gpu::getTextureInfo(memory.data);
@@ -817,7 +817,7 @@ struct RendererImpl final : Renderer
 	gpu::BufferHandle createBuffer(const MemRef& memory, u32 flags) override
 	{
 		gpu::BufferHandle handle = gpu::allocBufferHandle();
-		if(!handle.isValid()) return handle;
+		if(!handle) return handle;
 
 		struct Cmd : RenderJob {
 			void setup() override {}
@@ -935,7 +935,7 @@ struct RendererImpl final : Renderer
 	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) override
 	{
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
-		if(!handle.isValid()) return handle;
+		if(!handle) return handle;
 
 		struct Cmd : RenderJob {
 			void setup() override {}
@@ -975,7 +975,7 @@ struct RendererImpl final : Renderer
 
 	void destroy(gpu::TextureHandle tex) override
 	{
-		ASSERT(tex.isValid());
+		ASSERT(tex);
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 

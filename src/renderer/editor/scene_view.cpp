@@ -1265,8 +1265,8 @@ void SceneView::onWindowGUI()
 			m_height = int(size.y);
 			view_pos = ImGui::GetCursorScreenPos();
 			
-			if (texture_handle.isValid()) {
-				void* t = (void*)(uintptr)texture_handle.value;
+			if (texture_handle) {
+				void* t = texture_handle;
 				if (gpu::isOriginBottomLeft()) {
 					ImGui::Image(t, size, ImVec2(0, 1), ImVec2(1, 0));
 				} 

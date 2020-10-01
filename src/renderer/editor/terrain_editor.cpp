@@ -1118,8 +1118,7 @@ void TerrainEditor::layerGUI() {
 
 	if (m_brush_texture)
 	{
-		const gpu::TextureHandle th = m_brush_texture->handle;
-		ImGui::Image((void*)(uintptr_t)th.value, ImVec2(100, 100));
+		ImGui::Image(m_brush_texture->handle, ImVec2(100, 100));
 		if (ImGui::ToolbarButton(m_app.getBigIconFont(), ICON_FA_TIMES, ImGui::GetStyle().Colors[ImGuiCol_Text], "Clear brush mask"))
 		{
 			m_brush_texture->destroy();

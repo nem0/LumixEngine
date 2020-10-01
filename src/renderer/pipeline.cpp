@@ -48,8 +48,8 @@ struct RenderState {
 	u64 value;
 };
 
-using LuaTextureHandle = void*;
-using LuaBufferHandle = void*;
+using LuaTextureHandle = gpu::TextureHandle;
+using LuaBufferHandle = gpu::BufferHandle;
 
 namespace LuaWrapper {
 
@@ -846,7 +846,7 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		for (Renderbuffer& rb : m_renderbuffers) {
 			++rb.frame_counter;
-			if (rb.frame_counter > 2 && !rb.persistent && rb.handle.isValid()) {
+			if (rb.frame_counter > 2 && !rb.persistent && rb.handle) {
 				m_renderer.destroy(rb.handle);
 				rb.handle = gpu::INVALID_TEXTURE;
 			}
@@ -980,7 +980,7 @@ struct PipelineImpl final : Pipeline
 
 		const gpu::TextureHandle src = getOutput();
 		m_renderbuffers[m_output].frame_counter = 1;
-		if (!src.isValid()) {
+		if (!src) {
 			logError("Renderer") << getPath() << ": can not bake shadows because the pipeline has no output";
 			return false;
 		}
@@ -1321,7 +1321,7 @@ struct PipelineImpl final : Pipeline
 			
 					gpu::TextureHandle texture_id = atlas_texture;
 					if (cmd.texture) texture_id = *cmd.texture;
-					if (!texture_id.isValid()) texture_id = atlas_texture;
+					if (!texture_id) texture_id = atlas_texture;
 
 					gpu::bindTextures(&texture_id, 0, 1);
 					gpu::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
@@ -1423,7 +1423,7 @@ struct PipelineImpl final : Pipeline
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
 		{
 			Renderbuffer& rb = m_renderbuffers[i];
-			if (!rb.handle.isValid()) {
+			if (!rb.handle) {
 				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::RENDER_TARGET | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
 				rb.width = rb_w;
 				rb.height = rb_h;
@@ -1445,7 +1445,7 @@ struct PipelineImpl final : Pipeline
 
 		Renderbuffer& rb = [&]() -> Renderbuffer& {
 			for (int i = 0, n = m_renderbuffers.size(); i < n; ++i) {
-				if (!m_renderbuffers[i].handle.isValid()) {
+				if (!m_renderbuffers[i].handle) {
 					return m_renderbuffers[i];
 				}
 			}	
@@ -1689,7 +1689,7 @@ struct PipelineImpl final : Pipeline
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->binding_point = binding_point;
-		cmd->buffer.value = (decltype(cmd->buffer.value))(uintptr_t)buffer_handle;
+		cmd->buffer = buffer_handle;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 	
@@ -1706,7 +1706,7 @@ struct PipelineImpl final : Pipeline
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->binding_point = binding_point;
-		cmd->buffer.value = (decltype(cmd->buffer.value))(uintptr_t)buffer_handle;
+		cmd->buffer = (gpu::BufferHandle)(uintptr_t)buffer_handle;
 		cmd->size = size;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -1716,8 +1716,8 @@ struct PipelineImpl final : Pipeline
 		mem.own = false;
 		mem.data = nullptr;
 		mem.size = size;
-		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE);
-		return (LuaBufferHandle)(uintptr_t)buffer.value;
+		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE | (u32)gpu::BufferFlags::SHADER_BUFFER);
+		return buffer;
 	}
 	
 	LuaTextureHandle createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
@@ -1731,7 +1731,7 @@ struct PipelineImpl final : Pipeline
 			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE
 			, mem
 			, debug_name.get("lua_texture"));
-		return (LuaTextureHandle)(uintptr_t)texture.value;
+		return texture;
 	}
 
 	LuaTextureHandle createTexture3D(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
@@ -1745,7 +1745,7 @@ struct PipelineImpl final : Pipeline
 			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
 			, mem
 			, debug_name.get("lua_texture"));
-		return (LuaTextureHandle)(uintptr_t)texture.value;
+		return texture;
 	}
 
 	static int drawcallUniforms(lua_State* L) {
@@ -1798,7 +1798,7 @@ struct PipelineImpl final : Pipeline
 			defines |= 1 << m_renderer.getShaderDefineIdx(define.value);
 		}
 		gpu::ProgramHandle program = shader->getProgram(gpu::VertexDecl(), defines);
-		if (!program.isValid()) return;
+		if (!program) return;
 
 		gpu::TextureHandle textures[16] = {};
 		u32 textures_count = 0;
@@ -1835,7 +1835,7 @@ struct PipelineImpl final : Pipeline
 			u32 unit;
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->texture.value = (decltype(cmd->texture.value))(uintptr_t)texture_handle;
+		cmd->texture = texture_handle;
 		cmd->unit = unit;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -1855,7 +1855,7 @@ struct PipelineImpl final : Pipeline
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->offset = offset;
-		cmd->handle.value = (decltype(cmd->handle.value))(uintptr_t)texture_handle;
+		cmd->handle = texture_handle;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -2668,7 +2668,7 @@ struct PipelineImpl final : Pipeline
 			auto bind = [](auto& buffer, const auto& data, i32 idx){
 				const u32 capacity = (data.byte_size() + 15) & ~15;
 				if (buffer.capacity < capacity) {
-					if (buffer.buffer.isValid()) gpu::destroy(buffer.buffer);
+					if (buffer.buffer) gpu::destroy(buffer.buffer);
 					buffer.buffer = gpu::allocBufferHandle();
 					gpu::createBuffer(buffer.buffer, (u32)gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
 					buffer.capacity = capacity;
@@ -2854,7 +2854,7 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 		
-		if (!m_shadow_atlas.texture.isValid()) {
+		if (!m_shadow_atlas.texture) {
 			Renderer::MemRef mem;
 			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
 		}
@@ -3159,7 +3159,7 @@ struct PipelineImpl final : Pipeline
 
 		void execute() override {
 			if (m_grass.empty()) return;
-			if (!m_compute_shader.isValid()) return;
+			if (!m_compute_shader) return;
 
 			Renderer& renderer = m_pipeline->m_renderer;
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();

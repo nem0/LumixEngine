@@ -542,7 +542,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 
 			if (is_node_open) {
-				ImGui::Image((void*)(uintptr_t)texture->handle.value, ImVec2(96, 96));
+				ImGui::Image(texture->handle, ImVec2(96, 96));
 
 				for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
 					bool b = material->isCustomFlag(1 << i);
@@ -674,7 +674,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	~TexturePlugin() {
 		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
-		if(m_texture_view.isValid()) {
+		if(m_texture_view) {
 			renderer->destroy(m_texture_view);
 		}
 	}
@@ -1244,7 +1244,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 		ImGuiEx::Label("Format");
 		ImGui::TextUnformatted(format);
-		if (texture->handle.isValid()) {
+		if (texture->handle) {
 			ImVec2 texture_size(200, 200);
 			if (texture->width > texture->height) {
 				texture_size.y = texture_size.x * texture->height / texture->width;
@@ -1259,14 +1259,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				auto* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 				renderer->runInRenderThread(this, [](Renderer& r, void* ptr){
 					TexturePlugin* p = (TexturePlugin*)ptr;
-					if (!p->m_texture_view.isValid()) {
+					if (!p->m_texture_view) {
 						p->m_texture_view = gpu::allocTextureHandle();
 					}
 					gpu::createTextureView(p->m_texture_view, p->m_texture->handle);
 				});
 			}
 
-			ImGui::Image((void*)(uintptr_t)m_texture_view.value, texture_size);
+			ImGui::Image(m_texture_view, texture_size);
 
 			if (ImGui::Button("Open")) m_app.getAssetBrowser().openInExternalEditor(texture);
 		}
@@ -1641,7 +1641,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
 		m_preview = m_pipeline->getOutput();
-		ImGui::Image((void*)(uintptr_t)m_preview.value, image_size);
+		ImGui::Image(m_preview, image_size);
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
 		if (m_is_mouse_captured && !mouse_down)
 		{
@@ -2543,7 +2543,7 @@ void captureCubemap(StudioApp& app
 		pipeline.render(false);
 
 		const gpu::TextureHandle res = pipeline.getOutput();
-		ASSERT(res.isValid());
+		ASSERT(res);
 		renderer->getTextureImage(res
 			, texture_size
 			, texture_size
@@ -2741,7 +2741,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 	void update() override
 	{
-		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program.isValid()) {
+		if (m_ibl_filter_shader->isReady() && !m_ibl_filter_program) {
 			m_ibl_filter_program = m_ibl_filter_shader->getProgram(gpu::VertexDecl(), 0);
 		}
 
@@ -3059,7 +3059,7 @@ struct RenderInterfaceImpl final : RenderInterface
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
 		texture->create(w, h, gpu::TextureFormat::RGBA8, pixels, w * h * 4);
 		m_textures.insert(&texture->handle, texture);
-		return (ImTextureID)(uintptr_t)texture->handle.value;
+		return (ImTextureID)(uintptr_t)texture->handle;
 	}
 
 
@@ -3077,7 +3077,7 @@ struct RenderInterfaceImpl final : RenderInterface
 
 	bool isValid(ImTextureID texture) override
 	{
-		return texture && ((gpu::TextureHandle*)texture)->isValid();
+		return texture && *((gpu::TextureHandle*)texture);
 	}
 
 
@@ -3219,7 +3219,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				}
 			}
 			
-			if (!plugin->m_index_buffer.isValid()) {
+			if (!plugin->m_index_buffer) {
 				init_render = true;
 				plugin->m_index_buffer = gpu::allocBufferHandle();
 				plugin->m_vertex_buffer = gpu::allocBufferHandle();
@@ -3273,8 +3273,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				ASSERT(!pcmd->UserCallback);
 				if (0 == pcmd->ElemCount) continue;
 
-				gpu::TextureHandle tex = gpu::TextureHandle{(decltype(tex.value))(intptr_t)pcmd->TextureId};
-				if (!tex.isValid()) tex = *default_texture;
+				gpu::TextureHandle tex = (gpu::TextureHandle)(intptr_t)pcmd->TextureId;
+				if (!tex) tex = *default_texture;
 				gpu::bindTextures(&tex, 0, 1);
 
 				const u32 h = u32(clamp(pcmd->ClipRect.w - pcmd->ClipRect.y, 0.f, 65535.f));
@@ -3414,7 +3414,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
 		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
-		ImGui::GetIO().Fonts->TexID = (void*)(intptr_t)m_texture.value;
+		ImGui::GetIO().Fonts->TexID = m_texture;
 
 		IAllocator& allocator = app.getAllocator();
 		WorldEditor& editor = app.getWorldEditor();

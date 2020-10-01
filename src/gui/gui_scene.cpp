@@ -303,7 +303,7 @@ struct GUISceneImpl final : GUIScene
 			}
 		}
 
-		if (rect.render_target && rect.render_target->isValid())
+		if (rect.render_target && *rect.render_target)
 		{
 			draw.addImage(rect.render_target, { l, t }, { r, b }, {0, 0}, {1, 1}, Color::WHITE);
 		}

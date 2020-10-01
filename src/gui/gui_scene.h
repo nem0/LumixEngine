@@ -2,12 +2,11 @@
 
 
 #include "engine/plugin.h"
-
+#include "renderer/gpu/gpu.h"
 
 namespace Lumix
 {
 
-namespace gpu { struct TextureHandle; }
 namespace OS { enum class CursorType : u32; }
 
 template <typename T> struct DelegateList;

@@ -167,11 +167,11 @@ void GameView::onFullscreenGUI()
 		const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
 		if (gpu::isOriginBottomLeft())
 		{
-			ImGui::Image((void*)(uintptr_t)texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
+			ImGui::Image(texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 		}
 		else
 		{
-			ImGui::Image((void*)(uintptr_t)texture_handle.value, size);
+			ImGui::Image(texture_handle, size);
 		}
 	}
 	else {
@@ -341,12 +341,12 @@ void GameView::onWindowGUI()
 			m_pipeline->render(false);
 			const gpu::TextureHandle texture_handle = m_pipeline->getOutput();
 
-			if (texture_handle.isValid()) {
+			if (texture_handle) {
 				if (gpu::isOriginBottomLeft()) {
-					ImGui::Image((void*)(uintptr_t)texture_handle.value, size, ImVec2(0, 1), ImVec2(1, 0));
+					ImGui::Image(texture_handle, size, ImVec2(0, 1), ImVec2(1, 0));
 				}
 				else {
-					ImGui::Image((void*)(uintptr_t)texture_handle.value, size);
+					ImGui::Image(texture_handle, size);
 				}
 			}
 			else {
