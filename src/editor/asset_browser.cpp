@@ -327,8 +327,7 @@ void AssetBrowser::thumbnail(FileInfo& tile, float size)
 	if (tile.tex)
 	{
 		if(ri->isValid(tile.tex)) {
-			int* th = (int*)tile.tex;
-			ImGui::Image((void*)(uintptr)*th, img_size);
+			ImGui::Image(*(void**)tile.tex, img_size);
 		}
 		else {
 			ImGui::Dummy(img_size);
