@@ -491,6 +491,9 @@ struct RendererImpl final : Renderer
 		LUMIX_DELETE(m_allocator, m_font_manager);
 
 		frame();
+		frame();
+		frame();
+
 		waitForRender();
 		
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
@@ -1147,9 +1150,7 @@ struct RendererImpl final : Renderer
 	}
 
 	void waitForRender() override {
-		for(FrameData& f : m_frames) {
-			JobSystem::wait(f.can_setup);
-		}
+		JobSystem::wait(m_last_render);
 	}
 
 	void frame() override
@@ -1170,7 +1171,7 @@ struct RendererImpl final : Renderer
 		JobSystem::runEx(this, [](void* ptr){
 			auto* renderer = (RendererImpl*)ptr;
 			renderer->render();
-		}, nullptr, JobSystem::INVALID_HANDLE, 1);
+		}, &m_last_render, JobSystem::INVALID_HANDLE, 1);
 
 		JobSystem::wait(m_cpu_frame->can_setup);
 
@@ -1192,6 +1193,7 @@ struct RendererImpl final : Renderer
 	Array<FrameData> m_frames;
 	FrameData* m_gpu_frame = nullptr;
 	FrameData* m_cpu_frame = nullptr;
+	JobSystem::SignalHandle m_last_render = JobSystem::INVALID_HANDLE;
 
 	GPUProfiler m_profiler;
 
