@@ -3177,8 +3177,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		gpu::ProgramHandle getProgram(void* window_handle, Ref<bool> new_program) {
 			auto iter = plugin->m_programs.find(window_handle);
 			if (!iter.isValid()) {
-				
-				
 				plugin->m_programs.insert(window_handle, gpu::allocProgramHandle());
 				iter = plugin->m_programs.find(window_handle);
 				new_program = true;
@@ -3426,6 +3424,15 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	~EditorUIRenderPlugin()
 	{
 		shutdownImGui();
+		PluginManager& plugin_manager = m_engine.getPluginManager();
+		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
+		if (m_index_buffer) renderer->destroy(m_index_buffer);
+		if (m_vertex_buffer) renderer->destroy(m_vertex_buffer);
+		if (m_uniform_buffer) renderer->destroy(m_uniform_buffer);
+		for (gpu::ProgramHandle program : m_programs) {
+			renderer->destroy(program);
+		}
+		if (m_texture) renderer->destroy(m_texture);
 	}
 
 
