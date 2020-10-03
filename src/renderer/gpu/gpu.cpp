@@ -54,6 +54,9 @@ struct Texture {
 	u32 height;
 	u32 depth;
 	u32 flags;
+	#ifdef LUMIX_DEBUG
+		StaticString<64> name;
+	#endif
 };
 
 struct Program {
@@ -1418,7 +1421,9 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	handle->height = h;
 	handle->depth = depth;
 	handle->flags = flags;
-
+	#ifdef LUMIX_DEBUG
+		handle->name = debug_name;
+	#endif
 	return true;
 }
 
@@ -1829,7 +1834,7 @@ void setFramebufferCube(TextureHandle cube, u32 face, u32 mip)
 	glDrawBuffers(1, &db);
 }
 
-void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
+void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle ds, u32 flags)
 {
 	checkThread();
 
@@ -1840,51 +1845,44 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 		glDisable(GL_FRAMEBUFFER_SRGB);
 	}
 
-	if(!attachments || num == 0) {
+	if((!attachments || num == 0) && !ds) {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		return;
 	}
 
-	u32 rb_count = 0;
-	bool depth_bound = false;
 	for (u32 i = 0; i < num; ++i) {
 		ASSERT(attachments[i]);
 		const GLuint t = attachments[i]->gl_handle;
-		GLint internal_format;
 		glBindTexture(GL_TEXTURE_2D, t);
-		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
-		
-		switch(internal_format) {
+		glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, t, 0);
+	}
+
+	if (ds) {
+		switch(ds->format) {
 			case GL_DEPTH24_STENCIL8:
 				glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
 				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, t, 0);
-				depth_bound = true;
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, ds->gl_handle, 0);
 				break;
 			case GL_DEPTH_COMPONENT24:
 			case GL_DEPTH_COMPONENT32:
 				glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
 				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, t, 0);
-				depth_bound = true;
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, ds->gl_handle, 0);
 				break;
-			default:
-				glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, t, 0);
-				++rb_count;
-				break;
+			ASSERT(false);
 		}
+	}
+	else {
+		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
 	}
 
 	GLint max_attachments = 0;
 	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_attachments);
-	for(int i = rb_count; i < max_attachments; ++i) {
+	for(int i = num; i < max_attachments; ++i) {
 		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_COLOR_ATTACHMENT0 + i, GL_RENDERBUFFER, 0);
-	}
-
-	if(!depth_bound) {
-		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
-		glNamedFramebufferRenderbuffer(g_gpu.framebuffer, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, g_gpu.framebuffer);
@@ -1894,7 +1892,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags)
 	GLenum db[16];
 	for (u32 i = 0; i < lengthOf(db); ++i) db[i] = GL_COLOR_ATTACHMENT0 + i;
 	
-	glDrawBuffers(rb_count, db);
+	glDrawBuffers(num, db);
 }
 
 

@@ -947,7 +947,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
 		gpu::createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D24S8, (u32)gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gbd");
 		
-		gpu::setFramebuffer(gbs, 3, 0);
+		gpu::setFramebuffer(gbs, 2, gbs[2], 0);
 		const float color[] = {0, 0, 0, 0};
 		gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH | (u32)gpu::ClearFlags::STENCIL, color, 0);
 
@@ -990,7 +990,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 			}
 		}
 
-		gpu::setFramebuffer(nullptr, 0, 0);
+		gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, 0);
 
 		m_gb0->resize(texture_size.x * texture_size.y);
 		m_gb1->resize(m_gb0->size());

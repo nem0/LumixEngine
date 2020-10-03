@@ -83,7 +83,7 @@ function geomPass(default_set, decal_set)
 		local gbuffer2 = createRenderbuffer(viewport_w, viewport_h, "rgba8", "gbuffer2")
 		local dsbuffer = createRenderbuffer(viewport_w, viewport_h, "depth24stencil8", "gbuffer_ds")
 	
-		setRenderTargets(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
+		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 		if PREVIEW ~= nil then
 			clear(CLEAR_ALL, 0.9, 0.9, 0.9, 1, 0)
 		else
@@ -207,13 +207,13 @@ end
 function shadowPass()
 	if not environmentCastShadows() then
 		local rb = createRenderbuffer(1, 1, "depth32", "shadowmap")
-		setRenderTargets(rb)
+		setRenderTargetsDS(rb)
 		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 		return rb
 	else 
 		beginBlock("shadows")
 			local depthbuf = createRenderbuffer(4096, 1024, "depth32", "shadowmap_depth")
-			setRenderTargets(depthbuf)
+			setRenderTargetsDS(depthbuf)
 			clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 			
 			for slice = 0, 3 do 
@@ -307,7 +307,7 @@ function main_shadowmap()
 	beginBlock("bake_shadow")
 
 	local depthbuf = createRenderbuffer(viewport_w, viewport_h, "depth32", "shadowmap_depth")
-	setRenderTargets(depthbuf)
+	setRenderTargetsDS(depthbuf)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
 	local shadow_set = prepareCommands(view_params, { { layers = { "default" }, defines = { "DEPTH" } } })
@@ -380,7 +380,7 @@ function main()
 	if SCENE_VIEW ~= nil then
 		icon_ds = createRenderbuffer(viewport_w, viewport_h, "depth24stencil8", "icon_ds")
 		pass(getCameraParams())
-			setRenderTargets(res, icon_ds)
+			setRenderTargetsDS(res, icon_ds)
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)
 			renderGizmos()
 	end
@@ -391,7 +391,7 @@ function main()
 		renderDebugShapes()
 		renderSelectionOutline(res)
 		if enable_icons then 
-			setRenderTargets(res, icon_ds)
+			setRenderTargetsDS(res, icon_ds)
 			bindRenderbuffers({
 				gbuffer_depth,
 			}, 1)

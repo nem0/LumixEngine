@@ -86,8 +86,8 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		env.clouds_noise_shader = env.preloadShader("pipelines/clouds_noise.shd")
 		env.atmo_scattering_shader = env.preloadShader("pipelines/atmo_scattering.shd")
 		env.atmo_optical_depth_shader = env.preloadShader("pipelines/atmo_optical_depth.shd")
-		env.inscatter_precomputed = env.createTexture2D(64, 128, "rgba32f")
-		env.opt_depth_precomputed = env.createTexture2D(128, 128, "rg32f")
+		env.inscatter_precomputed = env.createTexture2D(64, 128, "rgba32f", "inscatter_precomputed")
+		env.opt_depth_precomputed = env.createTexture2D(128, 128, "rg32f", "opt_depth_precomputed")
 		env.clouds_noise_precomputed = env.createTexture3D(128, 128, 128, "rgba32f", "cloud_noise")
 	end
 	env.setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)

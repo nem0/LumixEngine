@@ -282,7 +282,7 @@ void pushDebugGroup(const char* msg);
 void popDebugGroup();
 
 void setFramebufferCube(TextureHandle cube, u32 face, u32 mip);
-void setFramebuffer(TextureHandle* attachments, u32 num, u32 flags);
+void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle depth_stencil, u32 flags);
 
 inline u32 getBytesPerPixel(gpu::TextureFormat format) {
 	switch (format) {

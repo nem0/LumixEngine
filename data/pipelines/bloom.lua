@@ -69,15 +69,17 @@ function autoexposure(env, hdr_buffer)
 		env.lum_buf = env.createBuffer(2048);
 	end
 	
-	env.bindShaderBuffer(env.lum_buf, 1)
+	env.setRenderTargets()
+
+	env.bindShaderBuffer(env.lum_buf, 1, true)
 	env.dispatch(env.avg_luminance_shader, 256, 1, 1, "PASS0");
 
 	env.bindRenderbuffers({ hdr_buffer }, 0)
-	env.bindShaderBuffer(env.lum_buf, 1)
+	env.bindShaderBuffer(env.lum_buf, 1, true)
 	env.drawcallUniforms(env.viewport_w, env.viewport_h, accomodation_speed) 
 	env.dispatch(env.avg_luminance_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1);
 
-	env.bindShaderBuffer(env.lum_buf, 1)
+	env.bindShaderBuffer(env.lum_buf, 1, true)
 	env.dispatch(env.avg_luminance_shader, 256, 1, 1, "PASS2");
 
 	env.endBlock()
@@ -92,7 +94,7 @@ function tonemap(env, hdr_buffer)
 		rb = env.createRenderbuffer(env.viewport_w, env.viewport_h, "rgba16f", "tonemap_bloom")
 	end
 	env.setRenderTargets(rb)
-	env.bindShaderBuffer(env.lum_buf, 5, 2048)
+	env.bindShaderBuffer(env.lum_buf, 5, false)
 	env.drawArray(0, 3, env.bloom_tonemap_shader
 		, { hdr_buffer }
 		, { depth_test = false }
@@ -102,8 +104,8 @@ function tonemap(env, hdr_buffer)
 end
 
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
-	env.custom_tonemap = true
 	if not enabled then return hdr_buffer end
+	env.custom_tonemap = true
 	if transparent_phase == "tonemap" then return tonemap(env, hdr_buffer) end
 	if transparent_phase ~= "post" then return hdr_buffer end
 	
@@ -127,7 +129,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		env.setRenderTargets(bloom_rb)
 		env.viewport(0, 0, 0.5 * env.viewport_w, 0.5 * env.viewport_h)
 		env.drawcallUniforms(luma_limit)
-		env.bindShaderBuffer(env.lum_buf, 5, 2048)
+		env.bindShaderBuffer(env.lum_buf, 5, false)
 		env.drawArray(0
 			, 3
 			, env.bloom_shader
