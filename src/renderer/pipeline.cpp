@@ -1677,19 +1677,21 @@ struct PipelineImpl final : Pipeline
 		return cp;
 	}
 	
-	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point) {
+	void bindShaderBuffer(LuaBufferHandle buffer_handle, u32 binding_point, bool writable) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::bindShaderBuffer(buffer, binding_point, (u32)gpu::BindShaderBufferFlags::OUTPUT);
+				gpu::bindShaderBuffer(buffer, binding_point, writable ? (u32)gpu::BindShaderBufferFlags::OUTPUT : 0);
 			}
 			u32 binding_point;
+			bool writable;
 			gpu::BufferHandle buffer;
 		};
 		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
 		cmd->binding_point = binding_point;
 		cmd->buffer = buffer_handle;
+		cmd->writable = writable;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 	
@@ -3037,7 +3039,7 @@ struct PipelineImpl final : Pipeline
 		return m_shadow_camera_params[slice];
 	}
 	
-	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, bool readonly_ds, bool srgb) {
+	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, gpu::TextureHandle ds, bool readonly_ds, bool srgb) {
 		struct Cmd : Renderer::RenderJob
 		{
 			void setup() override { }
@@ -3046,12 +3048,13 @@ struct PipelineImpl final : Pipeline
 			{
 				PROFILE_FUNCTION();
 			
-				gpu::setFramebuffer(rbs, count, flags);
+				gpu::setFramebuffer(rbs, count, ds, flags);
 				gpu::viewport(0, 0, w, h);
 			}
 
 			PipelineImpl* pipeline;
-			gpu::TextureHandle rbs[16];
+			gpu::TextureHandle rbs[8];
+			gpu::TextureHandle ds;
 			u32 flags;
 			u32 count;
 			u32 w;
@@ -3066,6 +3069,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		cmd->pipeline = this;
+		cmd->ds = ds;
 		cmd->count = renderbuffers.length();
 		cmd->flags = srgb ? (u32)gpu::FramebufferFlags::SRGB : 0;
 		if (readonly_ds) {
@@ -3076,7 +3080,7 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	static int setRenderTargets(lua_State* L, bool readonly_ds) {
+	static int setRenderTargets(lua_State* L, bool has_ds, bool readonly_ds) {
 		PROFILE_FUNCTION();
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
@@ -3084,7 +3088,7 @@ struct PipelineImpl final : Pipeline
 		}
 		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
 
-		const u32 rb_count = lua_gettop(L);
+		const u32 rb_count = lua_gettop(L) - (has_ds ? 1 : 0);
 		gpu::TextureHandle rbs[16];
 		if(rb_count > lengthOf(rbs)) {
 			logError("Renderer") << "Too many render buffers in " << pipeline->getPath();	
@@ -3096,17 +3100,26 @@ struct PipelineImpl final : Pipeline
 			rbs[i] = pipeline->m_renderbuffers[rb_idx].handle;
 		}
 
-		pipeline->setRenderTargets(Span(rbs, rb_count), readonly_ds, true);
+		gpu::TextureHandle ds = gpu::INVALID_TEXTURE;
+		if (has_ds) {
+			const int ds_idx = LuaWrapper::checkArg<int>(L, rb_count + 1);
+			ds = pipeline->m_renderbuffers[ds_idx].handle;
+		}
+
+		pipeline->setRenderTargets(Span(rbs, rb_count), ds, readonly_ds, true);
 		return 0;
 	}
 
-
 	static int setRenderTargets(lua_State* L) { 
-		return setRenderTargets(L, false);
+		return setRenderTargets(L, false, false);
 	}
 
 	static int setRenderTargetsReadonlyDS(lua_State* L) { 
-		return setRenderTargets(L, true);
+		return setRenderTargets(L, true, true);
+	}
+
+	static int setRenderTargetsDS(lua_State* L) { 
+		return setRenderTargets(L, true, false);
 	}
 
 	struct RenderGrassCommand : Renderer::RenderJob
@@ -4253,6 +4266,7 @@ struct PipelineImpl final : Pipeline
 		registerCFunction("drawcallUniforms", PipelineImpl::drawcallUniforms);
 		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
+		registerCFunction("setRenderTargetsDS", PipelineImpl::setRenderTargetsDS);
 		registerCFunction("setRenderTargetsReadonlyDS", PipelineImpl::setRenderTargetsReadonlyDS);
 
 		#define REGISTER_DRAW2D_FUNCTION(fn_name) \

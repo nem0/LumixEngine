@@ -2876,7 +2876,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				}
 			}
 
-			gpu::setFramebuffer(nullptr, 0, 0);
+			gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, 0);
 
 			gpu::TextureHandle staging = gpu::allocTextureHandle();
 			const u32 flags = u32(gpu::TextureFlags::IS_CUBE) | u32(gpu::TextureFlags::READBACK);
@@ -3323,7 +3323,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			ib_offset = 0;
 			for (WindowDrawData& dd : window_draw_data) {
 				gpu::setCurrentWindow(dd.window);
-				gpu::setFramebuffer(nullptr, 0, 0);
+				gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, 0);
 				gpu::viewport(0, 0, dd.w, dd.h);
 				
 				Vec4 canvas_mtx[] = {
