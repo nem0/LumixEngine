@@ -674,6 +674,10 @@ struct PipelineImpl final : Pipeline
 		m_place_grass_shader->getResourceManager().unload(*m_place_grass_shader);
 		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
 
+		for (const Renderbuffer& rb : m_renderbuffers) {
+			m_renderer.destroy(rb.handle);
+		}
+
 		for(ShaderRef& shader : m_shaders) {
 			shader.res->getResourceManager().unload(*shader.res);
 		}
