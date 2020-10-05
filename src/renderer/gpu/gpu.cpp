@@ -1871,7 +1871,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle ds, u32 f
 				glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
 				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, ds->gl_handle, 0);
 				break;
-			ASSERT(false);
+			default: ASSERT(false);
 		}
 	}
 	else {
