@@ -195,7 +195,7 @@ main_menu()
     select opt in "${options[@]}"
     do
         case "$REPLY" in
-            1 ) ./genie --static-plugins gmake; pause; break;;
+            1 ) ./genie gmake; pause; break;;
             2 ) build relwithdebinfo64; pause; break;;
             3 ) build debug64; pause; break;;
             4 ) thirdparty_menu; break;;

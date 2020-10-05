@@ -43,7 +43,7 @@ end
 function linkPlugin(plugin_name)
 	if build_studio then
 		project "studio"
-			if _OPTIONS["static-plugins"] then	
+			if not _OPTIONS["dynamic-plugins"] then	
 				forceLink("s_" .. plugin_name .. "_plugin_register")
 				forceLink("setStudioApp_" .. plugin_name)
 			end
@@ -53,7 +53,7 @@ function linkPlugin(plugin_name)
 	if build_app then
 		project "app"
 		links {plugin_name}
-		if _OPTIONS["static-plugins"] then	
+		if not _OPTIONS["dynamic-plugins"] then	
 			forceLink ("s_" .. plugin_name .. "_plugin_register")
 		end
 		if build_studio then
@@ -68,8 +68,8 @@ newoption {
 }
 
 newoption {
-	trigger = "static-plugins",
-	description = "Plugins are static libraries."
+	trigger = "dynamic-plugins",
+	description = "Plugins are dynamic libraries."
 }
 
 newoption {
@@ -283,7 +283,7 @@ function useLua()
 end
 
 function libType()
-	if _OPTIONS["static-plugins"] then
+	if not _OPTIONS["dynamic-plugins"] then
 		kind "StaticLib"
 	else
 		kind "SharedLib"
@@ -474,7 +474,7 @@ solution "LumixEngine"
 
 	configuration {}
 
-	if _OPTIONS["static-plugins"] then
+	if not _OPTIONS["dynamic-plugins"] then
 		defines {"STATIC_PLUGINS"}
 	end
 
@@ -498,12 +498,12 @@ project "engine"
 	
 	linkLib "lua51"
 	linkLib "luajit"
-	if not _OPTIONS["static-plugins"] then
+	if _OPTIONS["dynamic-plugins"] then
 		linkLib "freetype"
 	end
 
 	configuration { "vs20*" }
-		if not _OPTIONS["static-plugins"] then
+		if _OPTIONS["dynamic-plugins"] then
 			linkoptions {"/DEF:\"../../../src/engine/engine.def\""}
 		end
 
@@ -543,6 +543,21 @@ if has_plugin("renderer") then
 
 		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c", "../external/meshoptimizer/**.*" }
 		files { "../data/pipelines/**.*" }
+		excludes { 
+			"../external/meshoptimizer/clusterizer.cpp",
+			"../external/meshoptimizer/overdrawanalyzer.cpp",
+			"../external/meshoptimizer/overdrawoptimizer.cpp",
+			"../external/meshoptimizer/simplifier.cpp",
+			"../external/meshoptimizer/spatialorder.cpp",
+			"../external/meshoptimizer/stripifier.cpp",
+			"../external/meshoptimizer/vcacheanalyzer.cpp",
+			"../external/meshoptimizer/vcacheoptimizer.cpp",
+			"../external/meshoptimizer/vertexcodec.cpp",
+			"../external/meshoptimizer/vertexfilter.cpp",
+			"../external/meshoptimizer/vfetchanalyzer.cpp",
+			"../external/meshoptimizer/vfetchoptimizer.cpp"
+		}
+		
 		includedirs { "../src", "../external/nvtt/include", "../external/freetype/include", "../external/" }
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
@@ -700,7 +715,7 @@ if build_app then
 		end
 
 		includedirs { "../src", "../src/app" }
-		if _OPTIONS["static-plugins"] then	
+		if not _OPTIONS["dynamic-plugins"] then	
 			if build_studio then
 				for _, plugin in ipairs(plugins) do
 					forceLink("setStudioApp_" .. plugin)
@@ -793,7 +808,7 @@ if build_studio then
 
 		configuration {}
 
-		if not _OPTIONS["static-plugins"] then	
+		if _OPTIONS["dynamic-plugins"] then	
 			configuration {"vs*"}
 				links { "winmm", "imm32", "version" }
 			configuration {}
@@ -830,7 +845,7 @@ if build_studio then
 
 		includedirs { "../src" }
 
-		if _OPTIONS["static-plugins"] then	
+		if not _OPTIONS["dynamic-plugins"] then	
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt" }
 				linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }

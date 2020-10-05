@@ -213,13 +213,14 @@ struct GPUProfiler
 		gpu::QueryHandle q = gpu::createQuery();
 		gpu::queryTimestamp(q);
 		const u64 cpu_timestamp = OS::Timer::getRawTimestamp();
+
 		u32 try_num = 0;
-		while (!gpu::isQueryReady(q) && try_num < 1000) {
-			OS::sleep(1);
+		while (!gpu::isQueryReady(q) && try_num < 10) {
+			gpu::swapBuffers();
 			++try_num;
 		}
-		if (try_num == 1000) {
-			logError("Renderer") << "Failed to get GPU timestamp, timing are unreliable.";
+		if (try_num == 10) {
+			logError("Renderer") << "Failed to get GPU timestamp, timings are unreliable.";
 			m_gpu_to_cpu_offset = 0;
 		}
 		else {
