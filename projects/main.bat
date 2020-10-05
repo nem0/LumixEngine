@@ -396,19 +396,19 @@ exit /B 0
 
 :create_project
 	echo Creating project...
-	genie.exe --static-plugins vs2019 
+	genie.exe vs2019 
 	pause
 exit /B 0
 
 :create_project_with_app
 	echo Creating project...
-	genie.exe --static-plugins --with-app vs2019 
+	genie.exe --with-app vs2019 
 	pause
 exit /B 0
 
 :create_project_static_physx
 	echo Creating project with statically linked PhysX...
-	genie.exe --static-plugins --static-physx vs2019 
+	genie.exe --static-physx vs2019 
 	pause
 exit /B 0
 
@@ -433,7 +433,7 @@ exit /B 0
 
 :create_bundle
 	echo Creating bundle...
-	genie.exe --embed-resources --static-plugins --static-physx vs2019
+	genie.exe --embed-resources --static-physx vs2019
 	cd ..\data
 	tar -cvf data.tar .
 	move data.tar ../src/studio

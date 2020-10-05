@@ -24,7 +24,7 @@ jobs:
             - name: make project
               working-directory: projects
               run: |
-                ./genie.exe --static-plugins vs2019
+                ./genie.exe vs2019
             - name: build engine
               working-directory: projects
               shell: cmd
@@ -36,7 +36,7 @@ jobs:
                 pushd ..\plugins
                 git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
                 popd
-                ./genie.exe --static-plugins vs2019
+                ./genie.exe vs2019
             - name: build dx11 engine
               working-directory: projects
               shell: cmd
@@ -85,7 +85,7 @@ jobs:
           - name: PVS-Studio static analysis
             run: |
               cd projects
-              ./genie --static-plugins --pvs-studio-build gmake
+              ./genie --pvs-studio-build gmake
               cd tmp/gmake
               pvs-studio-analyzer trace -- make -j EXTRA_WARNINGS=1
               pvs-studio-analyzer analyze -e ../../../src/renderer/editor/mikktspace.c -e ../../../src/renderer/editor/miniz.c -e ../../../external -l ../../../pvs-studio.lic -o pvs-studio.log
