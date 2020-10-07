@@ -1018,7 +1018,8 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	}
 
 	static char filter[128] = "";
-	ImGui::SetNextItemWidth(-20);
+	const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
+	ImGui::SetNextItemWidth(-w);
 	ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {

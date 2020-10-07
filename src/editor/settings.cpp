@@ -612,7 +612,8 @@ void Settings::showToolbarSettings() const
 void Settings::showShortcutSettings()
 {
 	auto& actions = m_app.getActions();
-	ImGui::SetNextItemWidth(-20);
+	const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
+	ImGui::SetNextItemWidth(-w);
 	ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {

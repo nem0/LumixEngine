@@ -1431,7 +1431,8 @@ struct StudioAppImpl final : StudioApp
 	void onCreateEntityWithComponentGUI()
 	{
 		doMenuItem(*getAction("createEntity"), true);
-		ImGui::SetNextItemWidth(-20);
+		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
+		ImGui::SetNextItemWidth(-w);
 		ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
 		ImGui::SameLine();
 		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
@@ -1498,8 +1499,9 @@ struct StudioAppImpl final : StudioApp
 		doMenuItem(*getAction("newUniverse"), true);
 		if (ImGui::BeginMenu(NO_ICON "Open"))
 		{
-			ImGui::Dummy(ImVec2(200, 1)); // to forece minimal menu size
-			ImGui::SetNextItemWidth(-20);
+			ImGui::Dummy(ImVec2(200, 1)); // to force minimal menu size
+			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
+			ImGui::SetNextItemWidth(-w);
 			ImGui::InputTextWithHint("##filter", "Filter", m_open_filter, sizeof(m_open_filter));
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
@@ -1804,7 +1806,8 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
 		{
 			auto* universe = m_editor->getUniverse();
-			ImGui::SetNextItemWidth(-20);
+			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
+			ImGui::SetNextItemWidth(-w);
 			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
 			ImGui::SameLine();
 			if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
