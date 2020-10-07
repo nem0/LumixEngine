@@ -227,7 +227,8 @@ void ProfilerUIImpl::onGUIResources()
 {
 	if (!ImGui::CollapsingHeader("Resources")) return;
 
-	ImGui::SetNextItemWidth(-20);
+	const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
+	ImGui::SetNextItemWidth(-w);
 	ImGui::InputTextWithHint("##resource_filter", "Filter", m_resource_filter, sizeof(m_resource_filter));
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
