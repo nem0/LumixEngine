@@ -919,6 +919,7 @@ struct RendererImpl final : Renderer
 
 	void destroy(gpu::BufferHandle buffer) override
 	{
+		if (!buffer) return;
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
@@ -980,7 +981,7 @@ struct RendererImpl final : Renderer
 
 	void destroy(gpu::TextureHandle tex) override
 	{
-		ASSERT(tex);
+		if (!tex) return;
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override { 
