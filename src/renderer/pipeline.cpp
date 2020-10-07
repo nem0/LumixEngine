@@ -689,6 +689,11 @@ struct PipelineImpl final : Pipeline
 		m_renderer.destroy(m_pass_state_buffer);
 		m_renderer.destroy(m_drawcall_ub);
 		m_renderer.destroy(m_shadow_atlas.uniform_buffer);
+		m_renderer.destroy(m_shadow_atlas.texture);
+		m_renderer.destroy(m_cluster_buffers.clusters.buffer);
+		m_renderer.destroy(m_cluster_buffers.lights.buffer);
+		m_renderer.destroy(m_cluster_buffers.maps.buffer);
+		m_renderer.destroy(m_cluster_buffers.probes.buffer);
 
 		clearBuffers();
 		MTBucketArray<u64>::cleanupArrays();
