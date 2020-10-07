@@ -985,7 +985,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 					gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | dc.material->render_states);
-					gpu::drawTriangles(rd->indices_count, rd->index_type);
+					gpu::drawTriangles(0, rd->indices_count, rd->index_type);
 				}
 			}
 		}

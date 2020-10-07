@@ -467,6 +467,7 @@ struct RendererImpl final : Renderer
 		, m_layers(m_allocator)
 		, m_frames(m_allocator)
 		, m_material_buffer(m_allocator)
+		, m_plugins(m_allocator)
 	{
 		m_shader_defines.reserve(32);
 
@@ -1011,6 +1012,16 @@ struct RendererImpl final : Renderer
 		}, &m_cpu_frame->setup_done);
 	}
 
+	void addPlugin(RenderPlugin& plugin) override {
+		m_plugins.push(&plugin);
+	}
+
+	void removePlugin(RenderPlugin& plugin) override {
+		m_plugins.eraseItem(&plugin);
+	}
+
+	Span<RenderPlugin*> getPlugins() override { return m_plugins; }
+
 
 	ResourceManager& getTextureManager() override { return m_texture_manager; }
 	FontManager& getFontManager() override { return *m_font_manager; }
@@ -1191,6 +1202,7 @@ struct RendererImpl final : Renderer
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
 
+	Array<RenderPlugin*> m_plugins;
 	Array<FrameData> m_frames;
 	FrameData* m_gpu_frame = nullptr;
 	FrameData* m_cpu_frame = nullptr;

@@ -370,6 +370,7 @@ function main()
 	end
 
 	if GAME_VIEW or APP then
+		renderUI()
 		if renderIngameGUI ~= nil then
 			renderIngameGUI()
 		end
