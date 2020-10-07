@@ -439,6 +439,21 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 	StudioApp& app;
 };
 
+struct PropertyGridPlugin final : PropertyGrid::IPlugin
+{
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
+		if (cmp.type != LUA_SCRIPT_TYPE) return;
+
+		LuaScriptScene* scene = (LuaScriptScene*)cmp.scene; 
+		const EntityRef e = (EntityRef)cmp.entity;
+		const u32 count = scene->getScriptCount(e);
+		for (u32 i = 0; i < count; ++i) {
+			if (scene->beginFunctionCall(e, i, "onGUI")) {
+				scene->endFunctionCall();
+			}
+		}
+	}
+};
 
 struct StudioAppPlugin : StudioApp::IPlugin
 {
@@ -463,6 +478,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_console_plugin = LUMIX_NEW(allocator, ConsolePlugin)(m_app);
 		m_app.addPlugin(*m_console_plugin);
+
+		m_property_grid_plugin = LUMIX_NEW(allocator, PropertyGridPlugin);
+		m_app.getPropertyGrid().addPlugin(*m_property_grid_plugin);
 	}
 
 
@@ -476,6 +494,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.removePlugin(*m_console_plugin);
 		LUMIX_DELETE(allocator, m_console_plugin);
+
+		m_app.getPropertyGrid().removePlugin(*m_property_grid_plugin);
+		LUMIX_DELETE(allocator, m_property_grid_plugin);
 	}
 
 	bool showGizmo(UniverseView& view, ComponentUID cmp) override
@@ -500,6 +521,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	AddComponentPlugin* m_add_component_plugin;
 	AssetPlugin* m_asset_plugin;
 	ConsolePlugin* m_console_plugin;
+	PropertyGridPlugin* m_property_grid_plugin;
 };
 
 
