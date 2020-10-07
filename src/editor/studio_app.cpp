@@ -2540,9 +2540,10 @@ struct StudioAppImpl final : StudioApp
 
 	EntityRef createEntity() { return m_editor->addEntity(); }
 
-	void createComponent(EntityRef e, int type)
+	void createComponent(EntityRef e, const char* type)
 	{
-		m_editor->addComponent(Span(&e, 1), {type});
+		const ComponentType cmp_type = Reflection::getComponentType(type);
+		m_editor->addComponent(Span(&e, 1), cmp_type);
 	}
 
 	void exitGameMode() { m_deferred_game_mode_exit = true; }
