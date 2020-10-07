@@ -53,7 +53,7 @@ goto :begin
 	echo  2. Maps
 	echo  3. Shader editor
 	echo  4. GLTF importer
-	echo  5. DX11
+	echo  5. DX11 & DX12
 	echo ===============================
 	choice /C 12345 /N /M "Your choice:"
 	echo.
@@ -61,7 +61,7 @@ goto :begin
 	if %errorlevel%==2 call :map_plugin
 	if %errorlevel%==3 call :shader_editor_plugin
 	if %errorlevel%==4 call :glft_import_plugin
-	if %errorlevel%==5 call :dx11_plugin
+	if %errorlevel%==5 call :dx_plugin
 	pause
 goto :plugins
 
@@ -72,13 +72,13 @@ goto :plugins
 	pause
 exit /B 0
 
-:dx11_plugin
+:dx_plugin
 	if not exist ..\plugins mkdir ..\plugins
 	pushd ..\plugins
-	if not exist dx11 (
-		git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
+	if not exist dx (
+		git.exe clone https://github.com/nem0/lumixengine_dx.git dx
 	) else (
-		cd dx11
+		cd dx
 		git pull
 	)
 	popd
