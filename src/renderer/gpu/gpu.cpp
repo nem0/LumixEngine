@@ -743,12 +743,12 @@ void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType ind
 }
 
 
-void drawTriangles(u32 indices_count, DataType index_type)
+void drawTriangles(u32 indices_byte_offset, u32 indices_count, DataType index_type)
 {
 	checkThread();
 
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-	glDrawElements(GL_TRIANGLES, indices_count, type, 0);
+	glDrawElements(GL_TRIANGLES, indices_count, type, (const GLvoid*)(uintptr_t)indices_byte_offset);
 }
 
 

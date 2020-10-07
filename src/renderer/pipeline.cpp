@@ -867,6 +867,10 @@ struct PipelineImpl final : Pipeline
 
 	gpu::BufferHandle getDrawcallUniformBuffer() override { return m_drawcall_ub; }
 
+	Viewport getViewport() override {
+		return m_viewport;
+	}
+
 	void setViewport(const Viewport& viewport) override 
 	{
 		m_viewport = viewport;
@@ -2207,6 +2211,11 @@ struct PipelineImpl final : Pipeline
 		return out;
 	}
 
+	void renderUI() {
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			plugin->renderUI(*this);
+		}
+	}
 
 	void renderTextMeshes()
 	{
@@ -2453,7 +2462,7 @@ struct PipelineImpl final : Pipeline
 					? (u64)gpu::StateFlags::CULL_FRONT
 					: (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK;
 				gpu::setState(state | blend_state);
-				gpu::drawTriangles(36, gpu::DataType::U16);
+				gpu::drawTriangles(0, 36, gpu::DataType::U16);
 			}
 		}
 
@@ -2983,7 +2992,7 @@ struct PipelineImpl final : Pipeline
 								gpu::bindIndexBuffer(mesh->index_buffer_handle);
 								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 								gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-								gpu::drawTriangles(mesh->indices_count, mesh->index_type);
+								gpu::drawTriangles(0, mesh->indices_count, mesh->index_type);
 								++stats.draw_call_count;
 								stats.triangle_count += mesh->indices_count / 3;
 								++stats.instance_count;
@@ -4251,6 +4260,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderReflectionVolumes);
 		REGISTER_FUNCTION(renderTerrains);
 		REGISTER_FUNCTION(renderTextMeshes);
+		REGISTER_FUNCTION(renderUI);
 		REGISTER_FUNCTION(saveRenderbuffer);
 		REGISTER_FUNCTION(setOutput);
 		REGISTER_FUNCTION(viewport);

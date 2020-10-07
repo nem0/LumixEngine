@@ -79,6 +79,7 @@ struct LUMIX_RENDERER_API Pipeline
 	virtual const Path& getPath() = 0;
 	virtual void callLuaFunction(const char* func) = 0;
 	virtual void setViewport(const Viewport& viewport) = 0;
+	virtual Viewport getViewport() = 0;
 	virtual gpu::BufferHandle getDrawcallUniformBuffer() = 0;
 	virtual void define(const char* define, bool enable) = 0;
 

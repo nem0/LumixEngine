@@ -19,6 +19,9 @@ struct Pipeline;
 struct ResourceManager;
 struct TextureManager;
 
+struct RenderPlugin {
+	virtual void renderUI(Pipeline& pipeline) {};
+};
 
 struct LUMIX_RENDERER_API Renderer : IPlugin 
 {
@@ -59,6 +62,9 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, gpu::VertexDecl decl, u32 defines) = 0;
 	virtual FontManager& getFontManager() = 0;
 	virtual ResourceManager& getTextureManager() = 0;
+	virtual void addPlugin(RenderPlugin& plugin) = 0;
+	virtual void removePlugin(RenderPlugin& plugin) = 0;
+	virtual Span<RenderPlugin*> getPlugins() = 0;
 	
 	virtual u32 createMaterialConstants(const MaterialConsts& data) = 0;
 	virtual void destroyMaterialConstants(u32 id) = 0;
