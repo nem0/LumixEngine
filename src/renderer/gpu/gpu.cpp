@@ -1903,6 +1903,7 @@ void setFramebuffer(TextureHandle* attachments, u32 num, TextureHandle ds, u32 f
 void shutdown()
 {
 	checkThread();
+	destroy(gl->default_program);
 	gl.destroy();
 }
 
