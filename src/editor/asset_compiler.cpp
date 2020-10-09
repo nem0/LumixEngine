@@ -144,7 +144,7 @@ struct AssetCompilerImpl : AssetCompiler
 		FileSystemWatcher::destroy(m_watcher);
 	}
 	
-	DelegateList<void()>& listChanged() {
+	DelegateList<void()>& listChanged() override {
 		return m_on_list_changed;
 	}
 

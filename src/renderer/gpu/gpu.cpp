@@ -1272,7 +1272,7 @@ ProgramHandle allocProgramHandle()
 	Program* p = LUMIX_NEW(gl->allocator, Program)();
 
 	p->gl_handle = gl->default_program ? gl->default_program->gl_handle : 0;
-	return { p };
+	return p;
 }
 
 
@@ -1280,14 +1280,14 @@ BufferHandle allocBufferHandle()
 {
 	Buffer* b = LUMIX_NEW(gl->allocator, Buffer);
 	b->gl_handle = 0;
-	return { b };
+	return b;
 }
 
 TextureHandle allocTextureHandle()
 {
 	Texture* t = LUMIX_NEW(gl->allocator, Texture);
 	t->gl_handle = 0;
-	return { t };
+	return t;
 }
 
 
@@ -1779,7 +1779,7 @@ QueryHandle createQuery()
 	GLuint q;
 	glGenQueries(1, &q);
 	ASSERT(q != 0);
-	return {(Query*)(uintptr_t)q};
+	return (Query*)(uintptr_t)q;
 }
 
 
