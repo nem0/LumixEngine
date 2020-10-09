@@ -1184,7 +1184,7 @@ struct StudioAppImpl final : StudioApp
 		return nullptr;
 	}
 
-	Gizmo::Config& getGizmoConfig() { return m_gizmo_config; }
+	Gizmo::Config& getGizmoConfig() override { return m_gizmo_config; }
 	
 	void setCursorCaptured(bool captured) override { m_cursor_captured = captured; }
 
@@ -1280,7 +1280,7 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-	void snapDown() {
+	void snapDown() override {
 		const Array<EntityRef>& selected = m_editor->getSelectedEntities();
 		if (selected.empty()) return;
 
@@ -2100,8 +2100,8 @@ struct StudioAppImpl final : StudioApp
 	void setRenderInterface(RenderInterface* ri) override { m_render_interface = ri; }
 	RenderInterface* getRenderInterface() override { return m_render_interface; }
 
-	float getFOV() const { return m_fov; }
-	void setFOV(float fov_radians) { m_fov = fov_radians; }
+	float getFOV() const override { return m_fov; }
+	void setFOV(float fov_radians) override { m_fov = fov_radians; }
 	Settings& getSettings() override { return m_settings; }
 
 	void loadSettings()
