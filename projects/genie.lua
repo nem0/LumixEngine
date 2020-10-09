@@ -1,15 +1,21 @@
-local ide_dir = iif(_ACTION == nil, "vs2019", _ACTION)
+local LOCATION = "tmp/"
 if "linux-gcc" == _OPTIONS["gcc"] then
-	ide_dir = "gcc"
+	LOCATION = LOCATION .. "gcc"
+	binary_api_dir = "gmake"
 elseif "linux-gcc-5" == _OPTIONS["gcc"] then
+	LOCATION = LOCATION .. "gcc"
 	ide_dir = "gcc5"
+	binary_api_dir = "gmake"
 elseif "linux-clang" == _OPTIONS["gcc"] then
+	LOCATION = LOCATION .. "gcc"
 	ide_dir = "clang"
+	binary_api_dir = "gmake"
+else
+	LOCATION = LOCATION .. _ACTION
+	binary_api_dir = "vs2017"
 end
-binary_api_dir = iif(ide_dir == "vs2019", "vs2017", ide_dir)
 
 local ROOT_DIR = path.getabsolute("../")
-local LOCATION = "tmp/" .. ide_dir
 local BINARY_DIR = LOCATION .. "/bin/"
 build_app = false
 build_studio = true
