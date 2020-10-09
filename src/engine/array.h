@@ -265,6 +265,17 @@ public:
 			--m_size;
 		}
 	}
+	
+	void push(T&& value)
+	{
+		u32 size = m_size;
+		if (size == m_capacity) {
+			grow();
+		}
+		new (NewPlaceholder(), (char*)(m_data + size)) T(myforward<T>(value));
+		++size;
+		m_size = size;
+	}
 
 	void push(const T& value)
 	{

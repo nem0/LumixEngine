@@ -68,32 +68,26 @@ IScene* Universe::getScene(ComponentType type) const
 
 IScene* Universe::getScene(u32 hash) const
 {
-	for (auto* scene : m_scenes)
+	for (auto& scene : m_scenes)
 	{
 		if (crc32(scene->getPlugin().getName()) == hash)
 		{
-			return scene;
+			return scene.get();
 		}
 	}
 	return nullptr;
 }
 
 
-Array<IScene*>& Universe::getScenes()
+Array<UniquePtr<IScene>>& Universe::getScenes()
 {
 	return m_scenes;
 }
 
 
-void Universe::addScene(IScene* scene)
+void Universe::addScene(UniquePtr<IScene>&& scene)
 {
-	m_scenes.push(scene);
-}
-
-
-void Universe::removeScene(IScene* scene)
-{
-	m_scenes.swapAndPopItem(scene);
+	m_scenes.push(scene.move());
 }
 
 

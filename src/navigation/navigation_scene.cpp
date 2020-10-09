@@ -1538,9 +1538,9 @@ struct NavigationSceneImpl final : NavigationScene
 };
 
 
-NavigationScene* NavigationScene::create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator)
+UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, NavigationSceneImpl)(engine, system, universe, allocator);
+	return UniquePtr<NavigationSceneImpl>::create(allocator, engine, system, universe, allocator);
 }
 
 

@@ -1029,12 +1029,11 @@ struct RendererImpl final : Renderer
 
 	void createScenes(Universe& ctx) override
 	{
-		auto* scene = RenderScene::createInstance(*this, m_engine, ctx, m_allocator);
-		ctx.addScene(scene);
+		UniquePtr<RenderScene> scene = RenderScene::createInstance(*this, m_engine, ctx, m_allocator);
+		ctx.addScene(scene.move());
 	}
 
 
-	void destroyScene(IScene* scene) override { RenderScene::destroyInstance(static_cast<RenderScene*>(scene)); }
 	const char* getName() const override { return "renderer"; }
 	Engine& getEngine() override { return m_engine; }
 	int getShaderDefinesCount() const override { return m_shader_defines.size(); }

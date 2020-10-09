@@ -60,7 +60,6 @@ struct LUMIX_ENGINE_API IPlugin
 	virtual void pluginAdded(IPlugin& plugin) {}
 
 	virtual void createScenes(Universe&) {}
-	virtual void destroyScene(IScene*) { ASSERT(false); }
 	virtual void startGame() {}
 	virtual void stopGame() {}
 };

@@ -210,7 +210,7 @@ public:
 			plugin->createScenes(*universe);
 		}
 
-		for (IScene* scene : universe->getScenes()) {
+		for (UniquePtr<IScene>& scene : universe->getScenes()) {
 			scene->init();
 		}
 
@@ -233,13 +233,11 @@ public:
 
 	void destroyUniverse(Universe& universe) override
 	{
-		auto& scenes = universe.getScenes();
-		for (int i = scenes.size() - 1; i >= 0; --i)
-		{
-			auto* scene = scenes[i];
-			scenes.pop();
+		Array<UniquePtr<IScene>>& scenes = universe.getScenes();
+		while (!scenes.empty()) {
+			UniquePtr<IScene>& scene = scenes.back();
 			scene->clear();
-			scene->getPlugin().destroyScene(scene);
+			scenes.pop();
 		}
 		LUMIX_DELETE(m_allocator, &universe);
 		m_resource_manager.removeUnreferenced();
@@ -250,7 +248,7 @@ public:
 	{
 		ASSERT(!m_is_game_running);
 		m_is_game_running = true;
-		for (auto* scene : context.getScenes())
+		for (UniquePtr<IScene>& scene : context.getScenes())
 		{
 			scene->startGame();
 		}
@@ -265,7 +263,7 @@ public:
 	{
 		ASSERT(m_is_game_running);
 		m_is_game_running = false;
-		for (auto* scene : context.getScenes())
+		for (UniquePtr<IScene>& scene : context.getScenes())
 		{
 			scene->stopGame();
 		}
@@ -306,14 +304,14 @@ public:
 		m_last_time_delta = dt;
 		{
 			PROFILE_BLOCK("update scenes");
-			for (auto* scene : context.getScenes())
+			for (UniquePtr<IScene>& scene : context.getScenes())
 			{
 				scene->update(dt, m_paused);
 			}
 		}
 		{
 			PROFILE_BLOCK("late update scenes");
-			for (auto* scene : context.getScenes())
+			for (UniquePtr<IScene>& scene : context.getScenes())
 			{
 				scene->lateUpdate(dt, m_paused);
 			}
@@ -333,7 +331,7 @@ public:
 	void serializeSceneVersions(OutputMemoryStream& serializer, Universe& ctx)
 	{
 		serializer.write(ctx.getScenes().size());
-		for (auto* scene : ctx.getScenes())
+		for (UniquePtr<IScene>& scene : ctx.getScenes())
 		{
 			serializer.write(crc32(scene->getPlugin().getName()));
 			serializer.write(scene->getVersion());
@@ -438,7 +436,7 @@ public:
 		i32 pos = (i32)serializer.size();
 		ctx.serialize(serializer);
 		serializer.write((i32)ctx.getScenes().size());
-		for (IScene* scene : ctx.getScenes())
+		for (UniquePtr<IScene>& scene : ctx.getScenes())
 		{
 			serializer.writeString(scene->getPlugin().getName());
 			scene->serialize(serializer);

@@ -103,7 +103,6 @@ struct NavigationSystem final : IPlugin
 	void registerProperties();
 	const char* getName() const override { return "navigation"; }
 	void createScenes(Universe& universe) override;
-	void destroyScene(IScene* scene) override;
 
 	IAllocator& m_allocator;
 	Engine& m_engine;
@@ -141,16 +140,9 @@ void NavigationSystem::registerProperties()
 
 void NavigationSystem::createScenes(Universe& universe)
 {
-	NavigationScene* scene = NavigationScene::create(m_engine, *this, universe, m_allocator);
-	universe.addScene(scene);
+	UniquePtr<NavigationScene> scene = NavigationScene::create(m_engine, *this, universe, m_allocator);
+	universe.addScene(scene.move());
 }
-
-
-void NavigationSystem::destroyScene(IScene* scene)
-{
-	LUMIX_DELETE(m_allocator, scene);
-}
-
 
 
 LUMIX_PLUGIN_ENTRY(navigation)

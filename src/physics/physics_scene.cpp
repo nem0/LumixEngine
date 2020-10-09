@@ -4204,7 +4204,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 };
 
 
-PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
+UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
 {
 	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, system, allocator);
 	impl->m_universe.entityTransformed().bind<&PhysicsSceneImpl::onEntityMoved>(impl);
@@ -4221,7 +4221,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	if (!impl->m_scene)
 	{
 		LUMIX_DELETE(allocator, impl);
-		return nullptr;
+		return UniquePtr<PhysicsScene>(nullptr, nullptr);
 	}
 
 	impl->m_controller_manager = PxCreateControllerManager(*impl->m_scene);
@@ -4231,7 +4231,7 @@ PhysicsScene* PhysicsScene::create(PhysicsSystem& system, Universe& context, Eng
 	impl->m_dummy_actor =
 		PxCreateDynamic(impl->m_scene->getPhysics(), PxTransform(PxIdentity), geom, *impl->m_default_material, 1);
 	impl->m_vehicle_batch_query = impl->createVehicleBatchQuery(impl->m_vehicle_query_mem);
-	return impl;
+	return UniquePtr<PhysicsSceneImpl>(impl, &allocator);
 }
 
 

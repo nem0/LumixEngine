@@ -1284,11 +1284,11 @@ struct GUISceneImpl final : GUIScene
 };
 
 
-GUIScene* GUIScene::createInstance(GUISystem& system,
+UniquePtr<GUIScene> GUIScene::createInstance(GUISystem& system,
 	Universe& universe,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, GUISceneImpl)(system, universe, allocator);
+	return UniquePtr<GUISceneImpl>::create(allocator, system, universe, allocator);
 }
 
 

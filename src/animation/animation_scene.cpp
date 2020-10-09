@@ -428,7 +428,7 @@ struct AnimationSceneImpl final : AnimationScene
 			const char* tmp = serializer.readString();
 			setAnimatorSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_animator_map.insert(animator.entity, m_animators.size());
-			m_animators.emplace(static_cast<Animator&&>(animator));
+			m_animators.push(animator);
 			m_universe.onComponentCreated(animator.entity, ANIMATOR_TYPE, this);
 		}
 	}
@@ -969,9 +969,9 @@ struct AnimationSceneImpl final : AnimationScene
 };
 
 
-AnimationScene* AnimationScene::create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator)
+UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, AnimationSceneImpl)(engine, plugin, universe, allocator);
+	return UniquePtr<AnimationSceneImpl>::create(allocator, engine, plugin, universe, allocator);
 }
 
 

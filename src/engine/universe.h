@@ -130,9 +130,8 @@ public:
 
 	IScene* getScene(ComponentType type) const;
 	IScene* getScene(u32 hash) const;
-	Array<IScene*>& getScenes();
-	void addScene(IScene* scene);
-	void removeScene(IScene* scene);
+	Array<UniquePtr<IScene>>& getScenes();
+	void addScene(UniquePtr<IScene>&& scene);
 
 private:
 	void transformEntity(EntityRef entity, bool update_local);
@@ -157,7 +156,7 @@ private:
 private:
 	IAllocator& m_allocator;
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
-	Array<IScene*> m_scenes;
+	Array<UniquePtr<IScene>> m_scenes;
 	Array<Transform> m_transforms;
 	Array<EntityData> m_entities;
 	Array<Hierarchy> m_hierarchy;

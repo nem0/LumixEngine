@@ -2771,18 +2771,12 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 }
 
 
-RenderScene* RenderScene::createInstance(Renderer& renderer,
+UniquePtr<RenderScene> RenderScene::createInstance(Renderer& renderer,
 	Engine& engine,
 	Universe& universe,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, RenderSceneImpl)(renderer, engine, universe, allocator);
-}
-
-
-void RenderScene::destroyInstance(RenderScene* scene)
-{
-	LUMIX_DELETE(scene->getAllocator(), static_cast<RenderSceneImpl*>(scene));
+	return UniquePtr<RenderSceneImpl>::create(allocator, renderer, engine, universe, allocator);
 }
 
 

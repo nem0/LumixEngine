@@ -95,7 +95,7 @@ struct System
 };
 
 
-static System* g_system = nullptr;
+static Local<System> g_system;
 static thread_local WorkerTask* g_worker = nullptr;
 
 #pragma optimize( "", off )
@@ -425,9 +425,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 
 bool init(u8 workers_count, IAllocator& allocator)
 {
-	ASSERT(!g_system);
-
-	g_system = LUMIX_NEW(allocator, System)(allocator);
+	g_system.create(allocator);
 
 	g_system->m_free_fibers.reserve(lengthOf(g_system->m_fiber_pool));
 	for (FiberDecl& fiber : g_system->m_fiber_pool) {
@@ -468,8 +466,6 @@ u8 getWorkersCount()
 
 void shutdown()
 {
-	if (!g_system) return;
-
 	IAllocator& allocator = g_system->m_allocator;
 	for (Thread* task : g_system->m_workers)
 	{
@@ -503,8 +499,7 @@ void shutdown()
 		}
 	}
 
-	LUMIX_DELETE(allocator, g_system);
-	g_system = nullptr;
+	g_system.destroy();
 }
 
 

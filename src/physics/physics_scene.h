@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/allocator.h"
 #include "engine/lumix.h"
 #include "engine/plugin.h"
 #include "engine/math.h"
@@ -84,7 +85,7 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 
 	using ContactCallbackHandle = int;
 
-	static PhysicsScene* create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
+	static UniquePtr<PhysicsScene> create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
 	static void destroy(PhysicsScene* scene);
 	static void registerLuaAPI(lua_State* L);
 
