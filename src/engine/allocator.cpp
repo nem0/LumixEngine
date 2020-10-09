@@ -38,7 +38,7 @@ namespace Lumix
 			_BitScanReverse(&res, ((unsigned long)n - 1) >> 2);
 			return u32(res);
 		#else
-			return 31 - __builtin_clz(n) - 2;
+			return 31 - __builtin_clz((n - 1) >> 2);
 		#endif
 	}
 
