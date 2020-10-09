@@ -286,12 +286,9 @@ namespace Lumix
 
 		void createScenes(Universe& universe) override
 		{
-			auto* scene = PhysicsScene::create(*this, universe, m_engine, m_allocator);
-			universe.addScene(scene);
+			UniquePtr<PhysicsScene> scene = PhysicsScene::create(*this, universe, m_engine, m_allocator);
+			universe.addScene(scene.move());
 		}
-
-		void destroyScene(IScene* scene) override { PhysicsScene::destroy(static_cast<PhysicsScene*>(scene)); }
-
 
 		physx::PxPhysics* getPhysics() override
 		{

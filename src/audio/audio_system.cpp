@@ -98,12 +98,9 @@ struct AudioSystemImpl final : AudioSystem
 
 	void createScenes(Universe& ctx) override
 	{
-		auto* scene = AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
-		ctx.addScene(scene);
+		UniquePtr<AudioScene> scene = AudioScene::createInstance(*this, ctx, m_engine.getAllocator());
+		ctx.addScene(scene.move());
 	}
-
-
-	void destroyScene(IScene* scene) override { AudioScene::destroyInstance(static_cast<AudioScene*>(scene)); }
 
 
 	ClipManager m_manager;

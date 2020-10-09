@@ -53,7 +53,6 @@ struct AnimationSystemImpl final : IPlugin
 
 	void registerLuaAPI() const;
 	void createScenes(Universe& ctx) override;
-	void destroyScene(IScene* scene) override;
 	const char* getName() const override { return "animation"; }
 	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
@@ -117,12 +116,9 @@ void AnimationSystemImpl::registerLuaAPI() const
 
 void AnimationSystemImpl::createScenes(Universe& ctx)
 {
-	AnimationScene* scene = AnimationScene::create(m_engine, *this, ctx, m_allocator);
-	ctx.addScene(scene);
+	UniquePtr<AnimationScene> scene = AnimationScene::create(m_engine, *this, ctx, m_allocator);
+	ctx.addScene(scene.move());
 }
-
-
-void AnimationSystemImpl::destroyScene(IScene* scene) { LUMIX_DELETE(m_allocator, scene); }
 
 
 LUMIX_PLUGIN_ENTRY(animation)

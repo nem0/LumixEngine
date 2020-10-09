@@ -201,11 +201,10 @@ struct TextMeshVertex
 
 struct LUMIX_RENDERER_API RenderScene : IScene
 {
-	static RenderScene* createInstance(Renderer& renderer,
+	static UniquePtr<RenderScene> createInstance(Renderer& renderer,
 		Engine& engine,
 		Universe& universe,
 		IAllocator& allocator);
-	static void destroyInstance(RenderScene* scene);
 	static void registerLuaAPI(lua_State* L);
 
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;

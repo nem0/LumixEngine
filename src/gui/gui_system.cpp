@@ -165,14 +165,8 @@ struct GUISystemImpl final : GUISystem
 	void createScenes(Universe& universe) override
 	{
 		IAllocator& allocator = m_engine.getAllocator();
-		auto* scene = GUIScene::createInstance(*this, universe, allocator);
-		universe.addScene(scene);
-	}
-
-
-	void destroyScene(IScene* scene) override
-	{
-		GUIScene::destroyInstance(static_cast<GUIScene*>(scene));
+		UniquePtr<GUIScene> scene = GUIScene::createInstance(*this, universe, allocator);
+		universe.addScene(scene.move());
 	}
 
 	static int LUA_enableCursor(lua_State* L) {

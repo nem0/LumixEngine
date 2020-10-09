@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include "engine/allocator.h"
 #include "engine/plugin.h"
 
 
@@ -58,10 +59,9 @@ struct AudioScene : IScene
 		float volume = 1;
 	};
 
-	static AudioScene* createInstance(AudioSystem& system,
+	static UniquePtr<AudioScene> createInstance(AudioSystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);
-	static void destroyInstance(AudioScene* scene);
 	static void registerLuaAPI(lua_State* L);
 
 	virtual u32 getClipCount() const = 0;

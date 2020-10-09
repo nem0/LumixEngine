@@ -1,4 +1,5 @@
 #pragma once
+#include "engine/allocator.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/plugin.h"
@@ -22,7 +23,7 @@ struct NavmeshZone {
 
 struct NavigationScene : IScene
 {
-	static NavigationScene* create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator);
+	static UniquePtr<NavigationScene> create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator);
 	static void destroy(NavigationScene& scene);
 
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;

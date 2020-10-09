@@ -33,7 +33,7 @@ struct GUIScene : IScene
 		float x, y, w, h;
 	};
 
-	static GUIScene* createInstance(struct GUISystem& system,
+	static UniquePtr<GUIScene> createInstance(struct GUISystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);
 	static void destroyInstance(GUIScene* scene);

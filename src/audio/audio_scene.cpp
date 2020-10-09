@@ -634,17 +634,11 @@ struct AudioSceneImpl final : AudioScene
 };
 
 
-AudioScene* AudioScene::createInstance(AudioSystem& system,
+UniquePtr<AudioScene> AudioScene::createInstance(AudioSystem& system,
 	Universe& universe,
 	IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, AudioSceneImpl)(system, universe, allocator);
-}
-
-
-void AudioScene::destroyInstance(AudioScene* scene)
-{
-	LUMIX_DELETE(static_cast<AudioSceneImpl*>(scene)->m_allocator, scene);
+	return UniquePtr<AudioSceneImpl>::create(allocator, system, universe, allocator);
 }
 
 

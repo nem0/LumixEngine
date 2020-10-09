@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/allocator.h"
 #include "engine/lumix.h"
 #include "engine/plugin.h"
 
@@ -17,7 +18,7 @@ struct Animable {
 };
 
 struct AnimationScene : IScene {
-	static AnimationScene* create(Engine& engine, IPlugin& plugin, Universe& universe, struct IAllocator& allocator);
+	static UniquePtr<AnimationScene> create(Engine& engine, IPlugin& plugin, Universe& universe, struct IAllocator& allocator);
 	static void destroy(AnimationScene& scene);
 	static void registerLuaAPI(lua_State* L);
 
