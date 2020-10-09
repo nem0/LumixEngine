@@ -96,7 +96,7 @@ struct Local
 	void destroy() {
 		ASSERT(obj);
 		obj->~T();
-		obj = false;
+		obj = nullptr;
 	}
 
 	T& operator*() { ASSERT(obj); return *obj; }
