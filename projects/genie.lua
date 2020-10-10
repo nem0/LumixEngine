@@ -855,7 +855,9 @@ if build_studio then
 		if not _OPTIONS["dynamic-plugins"] then	
 			configuration { "linux" }
 				links { "dl", "GL", "X11", "rt" }
-				linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
+				if _ACTION == "gmake" then
+					linkoptions { "-Wl,-rpath '-Wl,$$ORIGIN'" }
+				end
 				links { "nvimage", "nvcore", "nvmath", "nvthread", "squish", "bc6h", "bc7" } 
 
 			configuration { "vs*" }
