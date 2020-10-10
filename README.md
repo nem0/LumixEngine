@@ -23,7 +23,7 @@ Who is using it?
 
 ![4k_1](https://user-images.githubusercontent.com/153526/31843558-f6f077fe-b5f3-11e7-8883-3244e28b2a9c.jpg)
 
-[3rd party libraries](https://github.com/nem0/lumixengine_3rdparty)
+3rd party libraries
 
 * [LuaJIT](https://github.com/LuaJIT/LuaJIT/)
 * [nvtt](https://github.com/castano/nvidia-texture-tools)
