@@ -13,7 +13,7 @@ elseif "linux-clang" == _OPTIONS["gcc"] then
 	binary_api_dir = "gmake"
 else
 	LOCATION = LOCATION .. _ACTION
-	binary_api_dir = "vs2017"
+	binary_api_dir = iif(_ACTION == "vs2019", "vs2017", "gmake")
 end
 
 local ROOT_DIR = path.getabsolute("../")
