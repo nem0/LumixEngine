@@ -69,14 +69,12 @@ jobs:
           - name: Download 3rdparties
             run: |
               cd projects
-              mkdir -p ../external/cmft/lib/linux64_gmake/release
               mkdir -p ../external/freetype/lib/linux64_gmake/release
               mkdir -p ../external/luajit/lib/linux64_gmake/release
               mkdir -p ../external/nvtt/lib/linux64_gmake/release
               mkdir -p ../external/physx/lib/linux64_gmake/release
               mkdir -p ../external/recast/lib/linux64_gmake/release
               git clone --depth=1 https://github.com/nem0/lumixengine_linux_3rdparty_bin.git
-              cp lumixengine_linux_3rdparty_bin/cmft/* ../external/cmft/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/freetype/* ../external/freetype/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/luajit/* ../external/luajit/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/nvtt/* ../external/nvtt/lib/linux64_gmake/release
