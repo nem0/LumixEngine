@@ -381,7 +381,6 @@ void AssetBrowser::fileColumn()
 	columns = maximum(columns, 1);
 	int tile_count = m_filtered_file_infos.empty() ? m_file_infos.size() : m_filtered_file_infos.size();
 	int row_count = m_show_thumbnails ? (tile_count + columns - 1) / columns : tile_count;
-	ImGuiListClipper clipper(row_count);
 	
 	auto callbacks = [this](FileInfo& tile, int idx) {
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tile.filepath.data);
@@ -404,6 +403,8 @@ void AssetBrowser::fileColumn()
 		}
 	};
 
+	ImGuiListClipper clipper;
+	clipper.Begin(row_count);
 	while (clipper.Step())
 	{
 		for (int j = clipper.DisplayStart; j < clipper.DisplayEnd; ++j)
