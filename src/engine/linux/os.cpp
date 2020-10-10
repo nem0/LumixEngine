@@ -488,7 +488,7 @@ static void processEvents()
 			case KeyPress: {
 				KeySym keysym;
 				Status status = 0;
-				u32 utf8;
+				u32 utf8 = 0;
 				const int len = Xutf8LookupString(G.ic, &xevent.xkey, (char*)&utf8, sizeof(utf8), &keysym, &status);
 
 				e.type = Event::Type::KEY;
