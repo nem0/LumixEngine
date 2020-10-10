@@ -34,6 +34,8 @@
 namespace Lumix
 {
 
+static constexpr u32 DRAWCALL_UB_SIZE = 32*1024;
+
 struct CameraParams
 {
 	ShiftedFrustum frustum;
@@ -626,7 +628,7 @@ struct PipelineImpl final : Pipeline
 		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
 		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)gpu::BufferFlags::UNIFORM_BUFFER);
 
-		const Renderer::MemRef dc_mem = { 32*1024, nullptr, false };
+		const Renderer::MemRef dc_mem = { DRAWCALL_UB_SIZE, nullptr, false };
 		const u32 dc_ub_flags = (u32)gpu::BufferFlags::UNIFORM_BUFFER;
 		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
 
@@ -1063,7 +1065,7 @@ struct PipelineImpl final : Pipeline
 				gpu::update(global_state_buffer, &global_state, sizeof(global_state));
 				gpu::bindUniformBuffer(0, global_state_buffer, 0, sizeof(GlobalState));
 				gpu::bindUniformBuffer(1, pass_state_buffer, 0, sizeof(PassState));
-				gpu::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, 32 * 1024);
+				gpu::bindUniformBuffer(4, pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
 				pipeline->m_stats = {};
 			}
 			void setup() override {}
@@ -2925,6 +2927,7 @@ struct PipelineImpl final : Pipeline
 				Stats stats = {};
 
 				const u64 render_states = m_render_state;
+				gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
 				const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 				u32 material_ub_idx = 0xffFFffFF;
 				CmdPage* page = m_cmds;
