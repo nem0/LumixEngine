@@ -187,11 +187,11 @@ bool Material::save(IOutputStream& file)
 		char path[MAX_PATH_LENGTH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
 			copyString(Span(path), m_textures[i]->getPath().c_str());
+			file << "texture \"/" << path << "\"\n";
 		}
 		else {
-			path[0] = '\0';
+			file << "texture \"\"\n";
 		}
-		file << "texture \"/" << path << "\"\n";
 	}
 
 	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
