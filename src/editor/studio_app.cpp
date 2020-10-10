@@ -734,8 +734,15 @@ struct StudioAppImpl final : StudioApp
 		io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
 
 		const OS::Point cp = OS::getMouseScreenPos();
-		io.MousePos.x = (float)cp.x;
-		io.MousePos.y = (float)cp.y;
+        if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+			io.MousePos.x = (float)cp.x;
+			io.MousePos.y = (float)cp.y;
+		}
+		else {
+			const OS::Rect screen_rect = OS::getWindowScreenRect(m_main_window);
+			io.MousePos.x = (float)cp.x - screen_rect.left;
+			io.MousePos.y = (float)cp.y - screen_rect.top;
+		}
 
 		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
 		ImGui::NewFrame();
@@ -760,7 +767,8 @@ struct StudioAppImpl final : StudioApp
 									ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
 									ImGuiWindowFlags_NoDocking;
 		const OS::Rect main_win_rect = OS::getWindowClientRect(m_main_window);
-		const OS::Point p = OS::toScreen(m_main_window, main_win_rect.left, main_win_rect.top);
+		const bool has_viewports = ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable;
+		const OS::Point p = has_viewports ? OS::toScreen(m_main_window, main_win_rect.left, main_win_rect.top) : OS::Point{0, 0};
 		if (m_is_welcome_screen_open) {
 			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
 				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
@@ -2025,9 +2033,14 @@ struct StudioAppImpl final : StudioApp
 	{
 		logInfo("Editor") << "Initializing imgui...";
 		ImGuiIO& io = ImGui::GetIO();
-		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
 		io.IniFilename = nullptr;
-		io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
+		#ifdef __linux__ 
+			io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+			io.BackendFlags = ImGuiBackendFlags_HasMouseCursors;
+		#else
+			io.ConfigFlags |= ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable;
+			io.BackendFlags = ImGuiBackendFlags_PlatformHasViewports | ImGuiBackendFlags_RendererHasViewports | ImGuiBackendFlags_HasMouseCursors;
+		#endif
 
 		initIMGUIPlatformIO();
 
@@ -2057,11 +2070,7 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 
-		if (m_font && m_bold_font) {
-			m_font->DisplayOffset.y = 0;
-			m_bold_font->DisplayOffset.y = 0;
-		}
-		else {
+		if (!m_font || !m_bold_font) {
 			OS::messageBox(
 				"Could not open editor/fonts/NotoSans-Regular.ttf or editor/fonts/NotoSans-Bold.ttf\n"
 				"It very likely means that data are not bundled with\n"

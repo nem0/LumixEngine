@@ -766,10 +766,7 @@ namespace ImGui
 
 	bool BeginResizablePopup(const char* str_id, const ImVec2& size_on_first_use)
 	{
-		ImGuiContext& g = *GImGui;
-		ImGuiWindow* window = g.CurrentWindow;
-		const ImGuiID id = window->GetID(str_id);
-		if (!IsPopupOpen(id))
+		if (!IsPopupOpen(str_id))
 		{
 			GImGui->NextWindowData.ClearFlags();
 			return false;
@@ -778,7 +775,7 @@ namespace ImGui
 		ImGuiWindowFlags flags = ImGuiWindowFlags_Popup | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
 
 		char name[32];
-		ImFormatString(name, 20, "##popup_%08x", id);
+		ImFormatString(name, 20, "##popup_%s", str_id);
 
 		ImGui::SetNextWindowSize(size_on_first_use, ImGuiCond_FirstUseEver);
 		bool opened = ImGui::Begin(name, NULL, flags);
