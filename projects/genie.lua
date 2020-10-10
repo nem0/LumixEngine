@@ -1,14 +1,15 @@
 local LOCATION = "tmp/"
-if "linux-gcc" == _OPTIONS["gcc"] then
+if _ACTION == nil then
+	LOCATION = LOCATION .. "vs2019"
+	binary_api_dir = "vs2017"
+elseif "linux-gcc" == _OPTIONS["gcc"] then
 	LOCATION = LOCATION .. "gcc"
 	binary_api_dir = "gmake"
 elseif "linux-gcc-5" == _OPTIONS["gcc"] then
 	LOCATION = LOCATION .. "gcc"
-	ide_dir = "gcc5"
 	binary_api_dir = "gmake"
 elseif "linux-clang" == _OPTIONS["gcc"] then
-	LOCATION = LOCATION .. "gcc"
-	ide_dir = "clang"
+	LOCATION = LOCATION .. "clang"
 	binary_api_dir = "gmake"
 else
 	LOCATION = LOCATION .. _ACTION
@@ -390,7 +391,7 @@ end
 
 solution "LumixEngine"
 	flags { "Cpp17" }
-	if _ACTION == "gmake" then
+	if _ACTION == "gmake" or _ACTION == "ninja" then
 		if "linux-gcc" == _OPTIONS["gcc"] then
 			LOCATION = "tmp/gcc"
 
