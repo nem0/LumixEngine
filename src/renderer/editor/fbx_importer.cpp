@@ -1085,7 +1085,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 					}
 				}
 			}
-			if (texture.fbx)
+			if (texture.fbx && texture.src.data[0])
 			{
 				writeString("texture \"/");
 				writeString(texture.src);
