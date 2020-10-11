@@ -39,7 +39,8 @@ struct IAttribute {
 		COLOR,
 		RESOURCE,
 		ENUM,
-		MULTILINE
+		MULTILINE,
+		STRING_ENUM
 	};
 
 	virtual ~IAttribute() {}
@@ -110,6 +111,13 @@ struct EnumAttribute : IAttribute {
 	virtual const char* name(ComponentUID cmp, u32 idx) const = 0;
 	
 	int getType() const override { return ENUM; }
+};
+
+struct StringEnumAttribute : IAttribute {
+	virtual u32 count(ComponentUID cmp) const = 0;
+	virtual const char* name(ComponentUID cmp, u32 idx) const = 0;
+	
+	int getType() const override { return STRING_ENUM; }
 };
 
 struct RadiansAttribute : IAttribute
