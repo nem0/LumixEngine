@@ -499,6 +499,8 @@ project "engine"
 			"../external/imgui/**.cpp",
 			"../external/imgui/**.inl"
 	}
+	excludes { "../external/imgui/imgui_demo.cpp" }
+
 
 	defines { "BUILDING_ENGINE" }
 	includedirs { "../external/luajit/include", "../external/freetype/include" }

@@ -236,10 +236,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		IAllocator& allocator = m_app.getAllocator();
 
-		m_asset_browser_plugin = LUMIX_NEW(allocator, AssetBrowserPlugin)(m_app);
+		m_asset_browser_plugin.create(m_app);
 		m_app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
 
-		m_clip_manager_ui = LUMIX_NEW(allocator, ClipManagerUI)(m_app);
+		m_clip_manager_ui.create(m_app);
 		m_app.addPlugin(*m_clip_manager_ui);
 	}
 
@@ -282,14 +282,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getAssetBrowser().removePlugin(*m_asset_browser_plugin);
 		m_app.removePlugin(*m_clip_manager_ui);
 
-		LUMIX_DELETE(allocator, m_asset_browser_plugin);
-		LUMIX_DELETE(allocator, m_clip_manager_ui);
+		m_asset_browser_plugin.destroy();
+		m_clip_manager_ui.destroy();
 	}
 
 
 	StudioApp& m_app;
-	AssetBrowserPlugin* m_asset_browser_plugin;
-	ClipManagerUI* m_clip_manager_ui;
+	Local<AssetBrowserPlugin> m_asset_browser_plugin;
+	Local<ClipManagerUI> m_clip_manager_ui;
 };
 
 

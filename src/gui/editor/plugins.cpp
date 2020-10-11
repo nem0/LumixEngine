@@ -913,10 +913,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent(ICON_FA_FONT, "gui_text", "GUI / Text");
 
 		IAllocator& allocator = m_app.getAllocator();
-		m_gui_editor = LUMIX_NEW(allocator, GUIEditor)(m_app);
+		m_gui_editor.create(m_app);
 		m_app.addPlugin(*m_gui_editor);
 
-		m_sprite_plugin = LUMIX_NEW(allocator, SpritePlugin)(m_app);
+		m_sprite_plugin.create(m_app);
 		m_app.getAssetBrowser().addPlugin(*m_sprite_plugin);
 
 		const char* sprite_exts[] = { "spr", nullptr };
@@ -929,17 +929,17 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		IAllocator& allocator = m_app.getAllocator();
 		m_app.removePlugin(*m_gui_editor);
-		LUMIX_DELETE(allocator, m_gui_editor);
+		m_gui_editor.destroy();
 
 		m_app.getAssetCompiler().removePlugin(*m_sprite_plugin);
 		m_app.getAssetBrowser().removePlugin(*m_sprite_plugin);
-		LUMIX_DELETE(allocator, m_sprite_plugin);
+		m_sprite_plugin.destroy();
 	}
 
 
 	StudioApp& m_app;
-	GUIEditor* m_gui_editor;
-	SpritePlugin* m_sprite_plugin;
+	Local<GUIEditor> m_gui_editor;
+	Local<SpritePlugin> m_sprite_plugin;
 };
 
 

@@ -147,7 +147,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void init() override {
 		IAllocator& allocator = m_app.getAllocator();
 
-		m_zone_pg_plugin = LUMIX_NEW(allocator, PropertyGridPlugin)(m_app);
+		m_zone_pg_plugin.create(m_app);
 		m_app.getPropertyGrid().addPlugin(*m_zone_pg_plugin);
 
 		m_app.registerComponent(ICON_FA_STREET_VIEW, "navmesh_agent", "Navmesh / Agent");
@@ -155,10 +155,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	~StudioAppPlugin() {
-		IAllocator& allocator = m_app.getAllocator();
-
 		m_app.getPropertyGrid().removePlugin(*m_zone_pg_plugin);
-		LUMIX_DELETE(allocator, m_zone_pg_plugin);
+		m_zone_pg_plugin.destroy();
 	}
 
 	const char* getName() const override {
@@ -187,7 +185,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
-	PropertyGridPlugin* m_zone_pg_plugin;
+	Local<PropertyGridPlugin> m_zone_pg_plugin;
 };
 
 
