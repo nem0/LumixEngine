@@ -8,6 +8,8 @@
 namespace Lumix
 {
 
+template <typename T> struct UniquePtr;
+
 struct LUMIX_ENGINE_API InputSystem
 {
 	struct Device
@@ -78,8 +80,7 @@ struct LUMIX_ENGINE_API InputSystem
 		} data;
 	};
 
-	static InputSystem* create(struct Engine& engine);
-	static void destroy(InputSystem& system);
+	static UniquePtr<InputSystem> create(struct Engine& engine);
 
 	virtual ~InputSystem() {}
 	virtual struct IAllocator& getAllocator() = 0;

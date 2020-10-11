@@ -59,7 +59,6 @@ struct Local
 
 	T& operator*() { ASSERT(obj); return *obj; }
 	T* operator->() const { ASSERT(obj); return obj; }
-	bool isCreated() const { return obj; }
 	T* get() const { return obj; }
 
 private:
@@ -69,6 +68,11 @@ private:
 
 template <typename T>
 struct UniquePtr {
+	UniquePtr()
+		: m_ptr(nullptr)
+		, m_allocator(nullptr)
+	{}
+
 	UniquePtr(T* obj, IAllocator* allocator)
 		: m_ptr(obj)
 		, m_allocator(allocator)
@@ -111,10 +115,18 @@ struct UniquePtr {
 
 	UniquePtr&& move() { return static_cast<UniquePtr&&>(*this); }
 
+	void reset() {
+		if (m_ptr) {
+			LUMIX_DELETE(*m_allocator, m_ptr);
+		}
+		m_ptr = nullptr;
+		m_allocator = nullptr;
+	}
+
 	T* get() const { return m_ptr; }
 	IAllocator* getAllocator() const { return m_allocator; }
-	T& operator *() { ASSERT(m_ptr); return *m_ptr; }
-	T* operator ->() { ASSERT(m_ptr); return m_ptr; }
+	T& operator *() const { ASSERT(m_ptr); return *m_ptr; }
+	T* operator ->() const { ASSERT(m_ptr); return m_ptr; }
 
 private:
 	T* m_ptr = nullptr;

@@ -7,13 +7,13 @@
 namespace Lumix {
 
 struct Model;
+template <typename T> struct UniquePtr;
 
 namespace Anim {
 
 
 struct ControllerEditor : StudioApp::GUIPlugin {
-	static ControllerEditor& create(StudioApp& app);
-	static void destroy(ControllerEditor& editor);
+	static UniquePtr<ControllerEditor> create(StudioApp& app);
 
 	virtual ~ControllerEditor() {}
 };

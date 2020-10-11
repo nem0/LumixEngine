@@ -33,7 +33,7 @@ struct SceneView : StudioApp::GUIPlugin
 		void update(float time_delta) override;
 		void setUniverse(Universe* universe);
 		void onWindowGUI() override;
-		Pipeline* getPipeline() { return m_pipeline; }
+		Pipeline* getPipeline() { return m_pipeline.get(); }
 		const char* getName() const override { return "scene_view"; }
 
 	private:
@@ -72,7 +72,7 @@ struct SceneView : StudioApp::GUIPlugin
 		int m_captured_mouse_y;
 		float m_camera_speed;
 		WorldEditor& m_editor;
-		Pipeline* m_pipeline;
+		UniquePtr<Pipeline> m_pipeline;
 		LogUI& m_log_ui;
 		Shader* m_debug_shape_shader;
 		struct UniverseViewImpl* m_view;

@@ -332,14 +332,9 @@ void FSTask::stop()
 }
 
 
-FileSystem* FileSystem::create(const char* base_path, IAllocator& allocator)
+UniquePtr<FileSystem> FileSystem::create(const char* base_path, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, FileSystemImpl)(base_path, allocator);
-}
-
-void FileSystem::destroy(FileSystem* fs)
-{
-	LUMIX_DELETE(static_cast<FileSystemImpl*>(fs)->m_allocator, fs);
+	return UniquePtr<FileSystemImpl>::create(allocator, base_path, allocator);
 }
 
 

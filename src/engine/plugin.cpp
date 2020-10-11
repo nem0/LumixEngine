@@ -229,16 +229,8 @@ namespace Lumix
 	};
 		
 
-	PluginManager* PluginManager::create(Engine& engine)
+	UniquePtr<PluginManager> PluginManager::create(Engine& engine)
 	{
-		return LUMIX_NEW(engine.getAllocator(), PluginManagerImpl)(engine, engine.getAllocator());
+		return UniquePtr<PluginManagerImpl>::create(engine.getAllocator(), engine, engine.getAllocator());
 	}
-
-
-	void PluginManager::destroy(PluginManager* manager)
-	{
-		LUMIX_DELETE(static_cast<PluginManagerImpl*>(manager)->getAllocator(), manager);
-	}
-
-
 }

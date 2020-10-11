@@ -52,7 +52,7 @@ private:
 	void controlsGUI();
 
 private:
-	Pipeline* m_pipeline;
+	UniquePtr<Pipeline> m_pipeline;
 	WorldEditor& m_editor;
 	StudioApp& m_app;
 	float m_time_multiplier;

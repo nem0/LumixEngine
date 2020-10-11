@@ -9,13 +9,13 @@ namespace Lumix
 
 template <typename T> struct Array;
 template <typename T> struct DelegateList;
+template <typename T> struct UniquePtr;
 
 struct LUMIX_ENGINE_API PluginManager
 {
 	virtual ~PluginManager() {}
 
-	static PluginManager* create(struct Engine& engine);
-	static void destroy(PluginManager* manager);
+	static UniquePtr<PluginManager> create(struct Engine& engine);
 	
 	virtual void initPlugins() = 0;
 	virtual void unload(struct IPlugin* plugin) = 0;

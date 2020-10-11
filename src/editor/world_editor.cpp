@@ -1691,7 +1691,7 @@ public:
 	{
 		destroyUniverse();
 
-		PrefabSystem::destroy(m_prefab_system);
+		m_prefab_system.reset();
 	}
 
 
@@ -2645,7 +2645,7 @@ private:
 	IAllocator& m_allocator;
 	Engine& m_engine;
 	UniverseView* m_view = nullptr;
-	PrefabSystem* m_prefab_system;
+	UniquePtr<PrefabSystem> m_prefab_system;
 	Universe* m_universe;
 	bool m_is_loading;
 	bool m_is_universe_changed;
@@ -2815,15 +2815,9 @@ void WorldEditorImpl::duplicateEntities()
 }
 
 
-WorldEditor* WorldEditor::create(Engine& engine, IAllocator& allocator)
+UniquePtr<WorldEditor> WorldEditor::create(Engine& engine, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, WorldEditorImpl)(engine, allocator);
-}
-
-
-void WorldEditor::destroy(WorldEditor* editor, IAllocator& allocator)
-{
-	LUMIX_DELETE(allocator, static_cast<WorldEditorImpl*>(editor));
+	return UniquePtr<WorldEditorImpl>::create(allocator, engine, allocator);
 }
 
 

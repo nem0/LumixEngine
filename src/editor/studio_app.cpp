@@ -159,15 +159,11 @@ struct StudioAppImpl final : StudioApp
 		: m_is_entity_list_open(true)
 		, m_finished(false)
 		, m_deferred_game_mode_exit(false)
-		, m_profiler_ui(nullptr)
-		, m_asset_compiler(nullptr)
-		, m_property_grid(nullptr)
 		, m_actions(m_allocator)
 		, m_window_actions(m_allocator)
 		, m_toolbar_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
 		, m_is_pack_data_dialog_open(false)
-		, m_editor(nullptr)
 		, m_settings(*this)
 		, m_gui_plugins(m_allocator)
 		, m_mouse_plugins(m_allocator)
@@ -378,10 +374,10 @@ struct StudioAppImpl final : StudioApp
 		addActions();
 
 		m_asset_compiler = AssetCompiler::create(*this);
-		m_asset_browser = LUMIX_NEW(m_allocator, AssetBrowser)(*this);
-		m_property_grid = LUMIX_NEW(m_allocator, PropertyGrid)(*this);
+		m_asset_browser.create(*this);
+		m_property_grid.create(*this);
 		m_profiler_ui = ProfilerUI::create(*m_engine);
-		m_log_ui = LUMIX_NEW(m_allocator, LogUI)(m_editor->getAllocator());
+		m_log_ui.create(m_editor->getAllocator());
 
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
@@ -466,16 +462,14 @@ struct StudioAppImpl final : StudioApp
 		}
 		m_actions.clear();
 
-		ProfilerUI::destroy(*m_profiler_ui);
-		LUMIX_DELETE(m_allocator, m_asset_browser);
-		LUMIX_DELETE(m_allocator, m_property_grid);
-		LUMIX_DELETE(m_allocator, m_log_ui);
+		m_profiler_ui.reset();
+		m_asset_browser.destroy();
+		m_property_grid.destroy();
+		m_log_ui.destroy();
 		LUMIX_DELETE(m_allocator, m_render_interface);
-		AssetCompiler::destroy(*m_asset_compiler);
-		WorldEditor::destroy(m_editor, m_allocator);
-		Engine::destroy(m_engine, m_allocator);
-		m_engine = nullptr;
-		m_editor = nullptr;
+		m_asset_compiler.reset();
+		m_editor.reset();
+		m_engine.reset();
 		
 		JobSystem::shutdown();
 	}
@@ -637,10 +631,10 @@ struct StudioAppImpl final : StudioApp
 
 		auto& allocator = m_editor->getAllocator();
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
-		plugin->property_grid = m_property_grid;
-		plugin->asset_browser = m_asset_browser;
+		plugin->property_grid = m_property_grid.get();
+		plugin->asset_browser = m_asset_browser.get();
 		plugin->type = Reflection::getComponentType(type);
-		plugin->editor = m_editor;
+		plugin->editor = m_editor.get();
 		plugin->property = property;
 		plugin->resource_type = resource_type;
 		copyString(plugin->label, label);
@@ -694,8 +688,8 @@ struct StudioAppImpl final : StudioApp
 
 		auto& allocator = m_editor->getAllocator();
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
-		plugin->property_grid = m_property_grid;
-		plugin->editor = m_editor;
+		plugin->property_grid = m_property_grid.get();
+		plugin->editor = m_editor.get();
 		plugin->type = Reflection::getComponentType(type);
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
@@ -1225,22 +1219,22 @@ struct StudioAppImpl final : StudioApp
 	int getExitCode() const override { return m_exit_code; }
 	AssetBrowser& getAssetBrowser() override
 	{
-		ASSERT(m_asset_browser);
+		ASSERT(m_asset_browser.get());
 		return *m_asset_browser;
 	}
 	AssetCompiler& getAssetCompiler() override
 	{
-		ASSERT(m_asset_compiler);
+		ASSERT(m_asset_compiler.get());
 		return *m_asset_compiler;
 	}
 	PropertyGrid& getPropertyGrid() override
 	{
-		ASSERT(m_property_grid);
+		ASSERT(m_property_grid.get());
 		return *m_property_grid;
 	}
 	LogUI& getLogUI() override
 	{
-		ASSERT(m_log_ui);
+		ASSERT(m_log_ui.get());
 		return *m_log_ui;
 	}
 	void toggleGameMode() { m_editor->toggleGameMode(); }
@@ -2202,7 +2196,7 @@ struct StudioAppImpl final : StudioApp
 		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
 
 		addAction<&StudioAppImpl::toggleGameMode>(ICON_FA_PLAY "Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
-			.is_selected.bind<&WorldEditor::isGameMode>(m_editor);
+			.is_selected.bind<&WorldEditor::isGameMode>(m_editor.get());
 		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
 			.is_selected.bind<&Gizmo::Config::isAutosnapDown>(&getGizmoConfig());
 		addAction<&StudioAppImpl::launchRenderDoc>(NO_ICON "Launch RenderDoc", "Launch RenderDoc", "launch_renderdoc");
@@ -3206,7 +3200,7 @@ struct StudioAppImpl final : StudioApp
 
 	WorldEditor& getWorldEditor() override
 	{
-		ASSERT(m_editor);
+		ASSERT(m_editor.get());
 		return *m_editor;
 	}
 
@@ -3225,7 +3219,7 @@ struct StudioAppImpl final : StudioApp
 	#else
 		IAllocator& m_allocator;
 	#endif
-	Engine* m_engine;
+	UniquePtr<Engine> m_engine;
 	Array<OS::WindowHandle> m_windows;
 	Array<WindowToDestroy> m_deferred_destroy_windows;
 	OS::WindowHandle m_main_window;
@@ -3241,7 +3235,7 @@ struct StudioAppImpl final : StudioApp
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
 	HashMap<ComponentType, String> m_component_icons;
-	WorldEditor* m_editor;
+	UniquePtr<WorldEditor> m_editor;
 	Action* m_set_pivot_action;
 	Action* m_reset_pivot_action;
 	Gizmo::Config m_gizmo_config;
@@ -3251,11 +3245,11 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_load;
 	bool m_confirm_new;
 	char m_universe_to_load[MAX_PATH_LENGTH];
-	AssetBrowser* m_asset_browser;
-	AssetCompiler* m_asset_compiler;
-	PropertyGrid* m_property_grid;
-	LogUI* m_log_ui;
-	ProfilerUI* m_profiler_ui;
+	Local<AssetBrowser> m_asset_browser;
+	UniquePtr<AssetCompiler> m_asset_compiler;
+	Local<PropertyGrid> m_property_grid;
+	Local<LogUI> m_log_ui;
+	UniquePtr<ProfilerUI> m_profiler_ui;
 	Settings m_settings;
 	float m_fov = degreesToRadians(60);
 	RenderInterface* m_render_interface = nullptr;
@@ -3332,8 +3326,9 @@ static void* alignPtr(void* _ptr, size_t _align)
 
 StudioApp* StudioApp::create()
 {
-	static char buf[sizeof(StudioAppImpl) * 2];
-	return new (NewPlaceholder(), alignPtr(buf, alignof(StudioAppImpl))) StudioAppImpl;
+	static Local<StudioAppImpl> studio;
+	studio.create();
+	return studio.get();
 }
 
 

@@ -158,7 +158,7 @@ public:
 	{
 		m_universe.entityTransformed().unbind<&RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().unbind<&RenderSceneImpl::onEntityDestroyed>(this);
-		CullingSystem::destroy(*m_culling_system);
+		m_culling_system.reset();
 	}
 
 
@@ -1651,32 +1651,6 @@ public:
 	}
 
 
-	static Pipeline* LUA_createPipeline(Engine* engine, const char* path)
-	{
-		Renderer& renderer = *static_cast<Renderer*>(engine->getPluginManager().getPlugin("renderer"));
-		PipelineResource* pres = engine->getResourceManager().load<PipelineResource>(Path(path));
-		return Pipeline::create(renderer, pres, "", renderer.getEngine().getAllocator());
-	}
-
-
-	static void LUA_destroyPipeline(Pipeline* pipeline)
-	{
-		Pipeline::destroy(pipeline);
-	}
-
-
-	static void LUA_setPipelineScene(Pipeline* pipeline, RenderScene* scene)
-	{
-		pipeline->setUniverse(&scene->getUniverse());
-	}
-
-
-	static RenderScene* LUA_getPipelineScene(Pipeline* pipeline)
-	{
-		return pipeline->getScene();
-	}
-
-
 	static void LUA_setModelInstancePath(IScene* scene, int component, const char* path)
 	{
 		RenderScene* render_scene = (RenderScene*)scene;
@@ -2663,7 +2637,7 @@ private:
 	Universe& m_universe;
 	Renderer& m_renderer;
 	Engine& m_engine;
-	CullingSystem* m_culling_system;
+	UniquePtr<CullingSystem> m_culling_system;
 	u64 m_render_cmps_mask;
 
 	EntityPtr m_active_global_light_entity;
@@ -2810,10 +2784,6 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
-	REGISTER_FUNCTION(createPipeline);
-	REGISTER_FUNCTION(destroyPipeline);
-	REGISTER_FUNCTION(setPipelineScene);
-	REGISTER_FUNCTION(getPipelineScene);
 	//REGISTER_FUNCTION(setModelInstancePath);
 	REGISTER_FUNCTION(getModelBoneIndex);
 	REGISTER_FUNCTION(makeScreenshot);

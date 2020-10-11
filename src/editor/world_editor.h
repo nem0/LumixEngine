@@ -12,8 +12,9 @@ namespace Lumix
 
 namespace OS { enum class MouseButton; }
 
-template <typename T> struct DelegateList;
 template <typename T> struct Array;
+template <typename T> struct DelegateList;
+template <typename T> struct UniquePtr;
 
 
 struct IEditorCommand
@@ -82,8 +83,7 @@ struct LUMIX_EDITOR_API WorldEditor
 
 	using CommandCreator = IEditorCommand* (lua_State*, WorldEditor&);
 
-	static WorldEditor* create(struct Engine& engine, struct IAllocator& allocator);
-	static void destroy(WorldEditor* editor, IAllocator& allocator);
+	static UniquePtr<WorldEditor> create(struct Engine& engine, struct IAllocator& allocator);
 
 	virtual bool loadProject() = 0;
 	virtual void update() = 0;
@@ -157,8 +157,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual void snapEntities(const DVec3& hit_pos, bool translate_mode) = 0;
 
 	virtual bool isGameMode() const = 0;
-
-protected:
 	virtual ~WorldEditor() {}
 };
+
 }

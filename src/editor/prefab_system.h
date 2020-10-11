@@ -9,11 +9,11 @@ namespace Lumix
 
 
 using PrefabHandle = u32;
+template <typename T> struct UniquePtr;
 
 struct LUMIX_EDITOR_API PrefabSystem
 {
-	static PrefabSystem* create(struct WorldEditor& editor);
-	static void destroy(PrefabSystem* system);
+	static UniquePtr<PrefabSystem> create(struct WorldEditor& editor);
 	static void createEditorPlugins(struct StudioApp& app, PrefabSystem& system);
 	static void destroyEditorPlugins(StudioApp& app);
 

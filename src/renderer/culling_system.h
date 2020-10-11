@@ -8,8 +8,8 @@ namespace Lumix
 {
 
 template <typename T> struct Array;
+template <typename T> struct UniquePtr;
 struct DVec3;
-struct Frustum;
 struct IAllocator;
 struct PageAllocator;
 struct ShiftedFrustum;
@@ -49,8 +49,7 @@ struct LUMIX_RENDERER_API CullingSystem
 	CullingSystem() { }
 	virtual ~CullingSystem() { }
 
-	static CullingSystem* create(IAllocator& allocator, PageAllocator& page_allocator);
-	static void destroy(CullingSystem& culling_system);
+	static UniquePtr<CullingSystem> create(IAllocator& allocator, PageAllocator& page_allocator);
 
 	virtual void clear() = 0;
 

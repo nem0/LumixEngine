@@ -390,14 +390,9 @@ void CullResult::free(PageAllocator& allocator)
 }
 
 
-CullingSystem* CullingSystem::create(IAllocator& allocator, PageAllocator& page_allocator)
+UniquePtr<CullingSystem> CullingSystem::create(IAllocator& allocator, PageAllocator& page_allocator)
 {
-	return LUMIX_NEW(allocator, CullingSystemImpl)(allocator, page_allocator);
+	return UniquePtr<CullingSystemImpl>::create(allocator, allocator, page_allocator);
 }
 
-
-void CullingSystem::destroy(CullingSystem& culling_system)
-{
-	LUMIX_DELETE(static_cast<CullingSystemImpl&>(culling_system).m_allocator, &culling_system);
-}
 }

@@ -9,15 +9,14 @@ namespace Lumix
 
 	
 struct Engine;
-
+template <typename T> struct UniquePtr;
 
 struct ProfilerUI
 {
 	virtual ~ProfilerUI() {}
 	virtual void onGUI() = 0;
 
-	static ProfilerUI* create(Engine& engine);
-	static void destroy(ProfilerUI& ui);
+	static UniquePtr<ProfilerUI> create(Engine& engine);
 
 	bool m_is_open;
 };

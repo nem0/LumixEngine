@@ -1416,7 +1416,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	explicit ModelPlugin(StudioApp& app)
 		: m_app(app)
 		, m_mesh(INVALID_ENTITY)
-		, m_pipeline(nullptr)
 		, m_universe(nullptr)
 		, m_is_mouse_captured(false)
 		, m_tile(app.getAllocator())
@@ -1437,9 +1436,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		JobSystem::wait(m_subres_signal);
 		auto& engine = m_app.getEngine();
 		engine.destroyUniverse(*m_universe);
-		Pipeline::destroy(m_pipeline);
+		m_pipeline.reset();
 		engine.destroyUniverse(*m_tile.universe);
-		Pipeline::destroy(m_tile.pipeline);
+		m_tile.pipeline.reset();
 	}
 
 
@@ -2317,7 +2316,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		Universe* universe = nullptr;
-		Pipeline* pipeline = nullptr;
+		UniquePtr<Pipeline> pipeline;
 		EntityPtr entity = INVALID_ENTITY;
 		int frame_countdown = -1;
 		u32 path_hash;
@@ -2333,7 +2332,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	gpu::TextureHandle m_preview;
 	Universe* m_universe;
 	Viewport m_viewport;
-	Pipeline* m_pipeline;
+	UniquePtr<Pipeline> m_pipeline;
 	EntityPtr m_mesh = INVALID_ENTITY;
 	bool m_is_mouse_captured;
 	int m_captured_mouse_x;
@@ -2586,7 +2585,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	~EnvironmentProbePlugin()
 	{
 		m_ibl_filter_shader->getResourceManager().unload(*m_ibl_filter_shader);
-		Pipeline::destroy(m_pipeline);
 	}
 
 
@@ -2985,7 +2983,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 
 	StudioApp& m_app;
-	Pipeline* m_pipeline;
+	UniquePtr<Pipeline> m_pipeline;
 	Shader* m_ibl_filter_shader = nullptr;
 	gpu::ProgramHandle m_ibl_filter_program = gpu::INVALID_PROGRAM;
 	

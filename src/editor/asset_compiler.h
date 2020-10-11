@@ -42,8 +42,7 @@ struct LUMIX_EDITOR_API AssetCompiler
 		u32 dir_hash;
 	};
 
-	static AssetCompiler* create(StudioApp& app);
-	static void destroy(AssetCompiler& compiler);
+	static UniquePtr<AssetCompiler> create(StudioApp& app);
 
 	virtual void onInitFinished() = 0;
 

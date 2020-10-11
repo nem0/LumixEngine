@@ -1003,17 +1003,10 @@ void ProfilerUIImpl::onGUICPUProfiler()
 }
 
 
-ProfilerUI* ProfilerUI::create(Engine& engine)
+UniquePtr<ProfilerUI> ProfilerUI::create(Engine& engine)
 {
 	Debug::Allocator* allocator = engine.getAllocator().isDebug() ? static_cast<Debug::Allocator*>(&engine.getAllocator()) : nullptr;
-	return LUMIX_NEW(engine.getAllocator(), ProfilerUIImpl)(allocator, engine);
-}
-
-
-void ProfilerUI::destroy(ProfilerUI& ui)
-{
-	auto& ui_impl = static_cast<ProfilerUIImpl&>(ui);
-	LUMIX_DELETE(ui_impl.m_engine.getAllocator(), &ui);
+	return UniquePtr<ProfilerUIImpl>::create(engine.getAllocator(), allocator, engine);
 }
 
 

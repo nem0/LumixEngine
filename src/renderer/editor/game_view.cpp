@@ -34,7 +34,7 @@ struct GUIInterface : GUISystem::Interface
 	{
 	}
 
-	Pipeline* getPipeline() override { return m_game_view.m_pipeline; }
+	Pipeline* getPipeline() override { return m_game_view.m_pipeline.get(); }
 	Vec2 getPos() const override { return m_game_view.m_pos; }
 	Vec2 getSize() const override { return m_game_view.m_size; }
 	void setCursor(OS::CursorType type) override { m_game_view.setCursor(type); }
@@ -48,7 +48,6 @@ GameView::GameView(StudioApp& app)
 	: m_app(app)
 	, m_is_open(false)
 	, m_is_fullscreen(false)
-	, m_pipeline(nullptr)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
@@ -92,9 +91,6 @@ GameView::~GameView()
 		gui->setInterface(nullptr);
 		LUMIX_DELETE(engine.getAllocator(), m_gui_interface);
 	}
-	Pipeline::destroy(m_pipeline);
-	m_pipeline = nullptr;
-
 }
 
 void GameView::setCursor(OS::CursorType type)
