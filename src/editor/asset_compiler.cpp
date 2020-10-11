@@ -320,9 +320,15 @@ struct AssetCompilerImpl : AssetCompiler
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
 						StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
-						if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
-							m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
-						}
+						#if 0 // use this if you want to be able to use cached resources without having the original
+							if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
+								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
+							}
+						#else
+							if (type != INVALID_RESOURCE_TYPE && fs.fileExists(p.c_str())) {
+								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
+							}
+						#endif
 					});
 				}
 				lua_pop(L, 1);

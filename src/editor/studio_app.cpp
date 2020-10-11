@@ -3323,18 +3323,19 @@ static void* alignPtr(void* _ptr, size_t _align)
 	return un.ptr;
 }
 
+static Local<StudioAppImpl> g_studio;
 
 StudioApp* StudioApp::create()
 {
-	static Local<StudioAppImpl> studio;
-	studio.create();
-	return studio.get();
+	g_studio.create();
+	return g_studio.get();
 }
 
 
 void StudioApp::destroy(StudioApp& app)
 {
-	app.~StudioApp();
+	ASSERT(&app == g_studio.get());
+	g_studio.destroy();
 }
 
 
