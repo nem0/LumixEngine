@@ -377,13 +377,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
-		, m_anim_editor(nullptr)
-	{
-	}
-
+	{}
 
 	const char* getName() const override { return "animation"; }
-
 
 	void init() override
 	{
@@ -407,7 +403,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_animable_plugin.create(m_app);
 		m_app.getPropertyGrid().addPlugin(*m_animable_plugin);
 		
-		m_anim_editor = &Anim::ControllerEditor::create(m_app);
+		m_anim_editor = Anim::ControllerEditor::create(m_app);
 		m_app.addPlugin(*m_anim_editor);
 	}
 
@@ -421,17 +417,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(*m_animtion_plugin);
 		asset_browser.removePlugin(*m_prop_anim_plugin);
 		asset_browser.removePlugin(*m_anim_ctrl_plugin);
-
-		IAllocator& allocator = m_app.getAllocator();
-		m_animtion_plugin.destroy();
-		m_prop_anim_plugin.destroy();
-		m_anim_ctrl_plugin.destroy();
-
 		m_app.getPropertyGrid().removePlugin(*m_animable_plugin);
-		m_animable_plugin.destroy();
-
 		m_app.removePlugin(*m_anim_editor);
-		Anim::ControllerEditor::destroy(*m_anim_editor);
 	}
 
 
@@ -440,7 +427,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	Local<AnimationAssetBrowserPlugin> m_animtion_plugin;
 	Local<PropertyAnimationAssetBrowserPlugin> m_prop_anim_plugin;
 	Local<AnimControllerAssetBrowserPlugin> m_anim_ctrl_plugin;
-	Anim::ControllerEditor* m_anim_editor;
+	UniquePtr<Anim::ControllerEditor> m_anim_editor;
 };
 
 

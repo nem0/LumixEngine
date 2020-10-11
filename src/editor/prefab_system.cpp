@@ -707,16 +707,9 @@ private:
 }; // struct PrefabSystemImpl
 
 
-PrefabSystem* PrefabSystem::create(WorldEditor& editor)
+UniquePtr<PrefabSystem> PrefabSystem::create(WorldEditor& editor)
 {
-	return LUMIX_NEW(editor.getAllocator(), PrefabSystemImpl)(editor);
-}
-
-
-void PrefabSystem::destroy(PrefabSystem* system)
-{
-	LUMIX_DELETE(
-		static_cast<PrefabSystemImpl*>(system)->getEditor().getAllocator(), system);
+	return UniquePtr<PrefabSystemImpl>::create(editor.getAllocator(), editor);
 }
 
 

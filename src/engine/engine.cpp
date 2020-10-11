@@ -141,9 +141,9 @@ public:
 		}
 
 		Reflection::shutdown();
-		PluginManager::destroy(m_plugin_manager);
-		if (m_input_system) InputSystem::destroy(*m_input_system);
-		FileSystem::destroy(m_file_system);
+		m_plugin_manager.reset();
+		m_input_system.reset();
+		m_file_system.reset();
 
 		m_prefab_resource_manager.destroy();
 		lua_close(m_state);
@@ -510,13 +510,13 @@ private:
 	IAllocator& m_allocator;
 	PageAllocator m_page_allocator;
 
-	FileSystem* m_file_system;
+	UniquePtr<FileSystem> m_file_system;
 
 	ResourceManagerHub m_resource_manager;
 	
-	PluginManager* m_plugin_manager;
+	UniquePtr<PluginManager> m_plugin_manager;
 	PrefabResourceManager m_prefab_resource_manager;
-	InputSystem* m_input_system;
+	UniquePtr<InputSystem> m_input_system;
 	OS::Timer m_timer;
 	float m_time_multiplier;
 	float m_last_time_delta;
@@ -532,15 +532,9 @@ private:
 };
 
 
-Engine* Engine::create(const InitArgs& init_data, IAllocator& allocator)
+UniquePtr<Engine> Engine::create(const InitArgs& init_data, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, EngineImpl)(init_data, allocator);
-}
-
-
-void Engine::destroy(Engine* engine, IAllocator& allocator)
-{
-	LUMIX_DELETE(allocator, engine);
+	return UniquePtr<EngineImpl>::create(allocator, init_data, allocator);
 }
 
 

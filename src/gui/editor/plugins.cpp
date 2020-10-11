@@ -246,10 +246,7 @@ public:
 	}
 
 
-	~GUIEditor()
-	{
-		Pipeline::destroy(m_pipeline);
-	}
+	~GUIEditor() {}
 
 
 private:
@@ -880,7 +877,7 @@ private:
 
 
 	StudioApp& m_app;
-	Pipeline* m_pipeline = nullptr;
+	UniquePtr<Pipeline> m_pipeline;
 	WorldEditor* m_editor = nullptr;
 	bool m_is_window_open = false;
 	gpu::TextureHandle m_texture_handle;

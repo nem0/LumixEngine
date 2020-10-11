@@ -729,17 +729,8 @@ int AssetCompilerTask::task()
 }
 
 
-AssetCompiler* AssetCompiler::create(StudioApp& app)
-{
-	return LUMIX_NEW(app.getAllocator(), AssetCompilerImpl)(app);
-}
-
-
-void AssetCompiler::destroy(AssetCompiler& compiler)
-{
-	AssetCompilerImpl& impl = (AssetCompilerImpl&)compiler;
-	IAllocator& allocator = impl.m_app.getAllocator();
-	LUMIX_DELETE(allocator, &compiler);
+UniquePtr<AssetCompiler> AssetCompiler::create(StudioApp& app) {
+	return UniquePtr<AssetCompilerImpl>::create(app.getAllocator(), app);
 }
 
 

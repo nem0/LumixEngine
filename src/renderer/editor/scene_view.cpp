@@ -101,8 +101,7 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	void onUniverseDestroyed(){
-		if (m_icons) EditorIcons::destroy(*m_icons);
-		m_icons = nullptr;
+		m_icons.reset();
 	}
 
 	void setSnapMode(bool enable, bool vertex_snap) override
@@ -578,7 +577,7 @@ struct UniverseViewImpl final : UniverseView {
 	StudioApp::MousePlugin* m_mouse_handling_plugin = nullptr;
 	Vec2 m_rect_selection_start;
 	float m_rect_selection_timer = 0;
-	EditorIcons* m_icons = nullptr;
+	UniquePtr<EditorIcons> m_icons;
 	RenderScene* m_scene;
 	Array<Vertex> m_draw_vertices;
 	Array<DrawCmd> m_draw_cmds;
@@ -665,9 +664,7 @@ SceneView::~SceneView()
 {
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
-	Pipeline::destroy(m_pipeline);
 	m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
-	m_pipeline = nullptr;
 }
 
 void SceneView::manipulate() {
@@ -914,7 +911,7 @@ void SceneView::renderSelection()
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	IAllocator& allocator = renderer->getAllocator();
 	RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
-	job->m_pipeline = m_pipeline;
+	job->m_pipeline = m_pipeline.get();
 	job->m_editor = &m_editor;
 	job->m_cam_pos = m_view->getViewport().pos;
 	renderer->queue(job, 0);

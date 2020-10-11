@@ -344,16 +344,9 @@ void InputSystemImpl::registerLuaAPI()
 }
 
 
-InputSystem* InputSystem::create(Engine& engine)
+UniquePtr<InputSystem> InputSystem::create(Engine& engine)
 {
-	return LUMIX_NEW(engine.getAllocator(), InputSystemImpl)(engine);
-}
-
-
-void InputSystem::destroy(InputSystem& system)
-{
-	auto* impl = static_cast<InputSystemImpl*>(&system);
-	LUMIX_DELETE(impl->m_allocator, impl);
+	return UniquePtr<InputSystemImpl>::create(engine.getAllocator(), engine);
 }
 
 

@@ -677,13 +677,8 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool m_open = false;
 }; // ControllerEditorImpl
 
-ControllerEditor& ControllerEditor::create(StudioApp& app) {
-	return *LUMIX_NEW(app.getAllocator(), ControllerEditorImpl)(app);
-}
-
-void ControllerEditor::destroy(ControllerEditor& editor) {
-	ControllerEditorImpl& e = (ControllerEditorImpl&)editor;
-	LUMIX_DELETE(e.m_app.getAllocator(), &editor);
+UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {
+	return UniquePtr<ControllerEditorImpl>::create(app.getAllocator(), app);
 }
 
 } // ns Lumix::Anim

@@ -65,9 +65,8 @@ struct LUMIX_RENDERER_API Pipeline
 		u32 hash;
 	};
 
-	static Pipeline* create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator);
-	static void destroy(Pipeline* pipeline);
-
+	static UniquePtr<Pipeline> create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator);
+	
 	virtual ~Pipeline() {}
 
 	virtual bool render(bool only_2d) = 0;

@@ -5,8 +5,10 @@
 namespace Lumix
 {
 
-template <typename T> struct Delegate;
 template <typename T> struct Array;
+template <typename T> struct Delegate;
+template <typename T> struct UniquePtr;
+
 namespace OS
 {
 	struct FileIterator;
@@ -25,8 +27,7 @@ struct LUMIX_ENGINE_API FileSystem
 		bool isValid() const { return value != 0xffFFffFF; }
 	};
 
-	static FileSystem* create(const char* base_path, struct IAllocator& allocator);
-	static void destroy(FileSystem* fs);
+	static UniquePtr<FileSystem> create(const char* base_path, struct IAllocator& allocator);
 
 	virtual ~FileSystem() {}
 

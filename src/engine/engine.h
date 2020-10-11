@@ -8,6 +8,7 @@ namespace Lumix
 {
 
 namespace OS { using WindowHandle = void*; }
+template <typename T> struct UniquePtr;
 
 struct LUMIX_ENGINE_API Engine
 {
@@ -25,8 +26,7 @@ public:
 public:
 	virtual ~Engine() {}
 
-	static Engine* create(const InitArgs& init_data, struct IAllocator& allocator);
-	static void destroy(Engine* engine, IAllocator& allocator);
+	static UniquePtr<Engine> create(const InitArgs& init_data, struct IAllocator& allocator);
 
 	virtual struct Universe& createUniverse(bool is_main_universe) = 0;
 	virtual void destroyUniverse(Universe& context) = 0;

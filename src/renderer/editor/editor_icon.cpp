@@ -255,16 +255,9 @@ struct EditorIconsImpl final : EditorIcons
 };
 
 
-EditorIcons* EditorIcons::create(WorldEditor& editor, RenderScene& scene)
+UniquePtr<EditorIcons> EditorIcons::create(WorldEditor& editor, RenderScene& scene)
 {
-	return LUMIX_NEW(editor.getAllocator(), EditorIconsImpl)(editor, scene);
-}
-
-
-void EditorIcons::destroy(EditorIcons& icons)
-{
-	auto& i = static_cast<EditorIconsImpl&>(icons);
-	LUMIX_DELETE(i.m_editor.getAllocator(), &icons);
+	return UniquePtr<EditorIconsImpl>::create(editor.getAllocator(), editor, scene);
 }
 
 

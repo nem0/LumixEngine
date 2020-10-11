@@ -4397,16 +4397,9 @@ struct PipelineImpl final : Pipeline
 };
 
 
-Pipeline* Pipeline::create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
+UniquePtr<Pipeline> Pipeline::create(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
 {
-	return LUMIX_NEW(allocator, PipelineImpl)(renderer, resource, define, allocator);
-}
-
-
-void Pipeline::destroy(Pipeline* pipeline)
-{
-	PipelineImpl* p = (PipelineImpl*)pipeline;
-	LUMIX_DELETE(p->m_allocator, p);
+	return UniquePtr<PipelineImpl>::create(allocator, renderer, resource, define, allocator);
 }
 
 
