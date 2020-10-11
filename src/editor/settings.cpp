@@ -792,14 +792,6 @@ void Settings::showStyleEditor() const {
     ImGuiStyle& style = ImGui::GetStyle();
     static ImGuiStyle ref_saved_style;
 
-    // Default to using internal storage as reference
-    static bool init = true;
-    if (init && ref == NULL)
-        ref_saved_style = style;
-    init = false;
-    if (ref == NULL)
-        ref = &ref_saved_style;
-
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.50f);
 
     if (ShowStyleSelector("Colors##Selector"))
