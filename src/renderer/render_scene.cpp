@@ -1077,7 +1077,7 @@ public:
 		EntityPtr tmp;
 		serializer.read(tmp);
 		if (!m_active_global_light_entity.isValid()) {
-			m_active_global_light_entity = tmp;
+			m_active_global_light_entity = entity_map.get(tmp);
 		}
 	}
 
