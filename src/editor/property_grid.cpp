@@ -515,7 +515,28 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
-		if(attrs.is_multiline) {
+		
+		auto* enum_attr = (Reflection::StringEnumAttribute*)Reflection::getAttribute(prop, Reflection::IAttribute::STRING_ENUM);
+		if (enum_attr) {
+			if (m_entities.size() > 1) {
+				ImGui::TextUnformatted("Multi-object editing not supported.");
+				ImGui::PopID();
+				return;
+			}
+
+			const int count = enum_attr->count(cmp);
+
+			if (ImGui::BeginCombo("##v", tmp)) {
+				for (int i = 0; i < count; ++i) {
+					const char* val_name = enum_attr->name(cmp, i);
+					if (ImGui::Selectable(val_name)) {
+						m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, val_name);
+					}
+				}
+				ImGui::EndCombo();
+			}
+		}
+		else if(attrs.is_multiline) {
 			if (ImGui::InputTextMultiline("##v", tmp, sizeof(tmp))) {
 				m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, tmp);
 			}
