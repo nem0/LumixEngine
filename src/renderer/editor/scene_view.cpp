@@ -37,7 +37,7 @@ namespace Lumix
 {
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("mesh_rigid_actor");
+static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
 
 struct UniverseViewImpl final : UniverseView {
 	enum class MouseMode
