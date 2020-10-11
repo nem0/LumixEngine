@@ -1,3 +1,4 @@
+#include "engine/allocators.h"
 #include "engine/crt.h"
 #include "engine/delegate_list.h"
 #include "engine/log.h"

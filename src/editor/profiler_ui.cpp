@@ -1,6 +1,7 @@
 #include <imgui/imgui.h>
 
 #include "profiler_ui.h"
+#include "engine/allocators.h"
 #include "engine/crt.h"
 #include "engine/debug.h"
 #include "engine/engine.h"

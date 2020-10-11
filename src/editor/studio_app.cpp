@@ -1,18 +1,19 @@
 #include <imgui/imgui.h>
 
 #include "studio_app.h"
-#include "asset_browser.h"
 #include "audio/audio_scene.h"
+#include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/file_system_watcher.h"
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
+#include "engine/associative_array.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
-#include "engine/allocator.h"
+#include "engine/allocators.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
@@ -159,7 +160,6 @@ struct StudioAppImpl final : StudioApp
 		, m_finished(false)
 		, m_deferred_game_mode_exit(false)
 		, m_profiler_ui(nullptr)
-		, m_asset_browser(nullptr)
 		, m_asset_compiler(nullptr)
 		, m_property_grid(nullptr)
 		, m_actions(m_allocator)

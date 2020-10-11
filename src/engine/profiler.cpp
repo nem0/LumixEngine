@@ -8,7 +8,7 @@
 #include "engine/array.h"
 #include "engine/crt.h"
 #include "engine/hash_map.h"
-#include "engine/allocator.h"
+#include "engine/allocators.h"
 #include "engine/atomic.h"
 #include "engine/sync.h"
 #include "engine/thread.h"

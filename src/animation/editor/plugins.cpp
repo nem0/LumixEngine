@@ -392,9 +392,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("", "animator", "Animation / Animator", Anim::Controller::TYPE, "Source");
 
 		IAllocator& allocator = m_app.getAllocator();
-		m_animtion_plugin = LUMIX_NEW(allocator, AnimationAssetBrowserPlugin)(m_app);
-		m_prop_anim_plugin = LUMIX_NEW(allocator, PropertyAnimationAssetBrowserPlugin)(m_app);
-		m_anim_ctrl_plugin = LUMIX_NEW(allocator, AnimControllerAssetBrowserPlugin)(m_app);
+		m_animtion_plugin.create(m_app);
+		m_prop_anim_plugin.create(m_app);
+		m_anim_ctrl_plugin.create(m_app);
 		
 		const char* act_exts[] = { "act", nullptr };
 		m_app.getAssetCompiler().addPlugin(*m_anim_ctrl_plugin, act_exts);
@@ -404,7 +404,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_prop_anim_plugin);
 		asset_browser.addPlugin(*m_anim_ctrl_plugin);
 
-		m_animable_plugin = LUMIX_NEW(allocator, AnimablePropertyGridPlugin)(m_app);
+		m_animable_plugin.create(m_app);
 		m_app.getPropertyGrid().addPlugin(*m_animable_plugin);
 		
 		m_anim_editor = &Anim::ControllerEditor::create(m_app);
@@ -423,12 +423,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.removePlugin(*m_anim_ctrl_plugin);
 
 		IAllocator& allocator = m_app.getAllocator();
-		LUMIX_DELETE(allocator, m_animtion_plugin);
-		LUMIX_DELETE(allocator, m_prop_anim_plugin);
-		LUMIX_DELETE(allocator, m_anim_ctrl_plugin);
+		m_animtion_plugin.destroy();
+		m_prop_anim_plugin.destroy();
+		m_anim_ctrl_plugin.destroy();
 
 		m_app.getPropertyGrid().removePlugin(*m_animable_plugin);
-		LUMIX_DELETE(allocator, m_animable_plugin);
+		m_animable_plugin.destroy();
 
 		m_app.removePlugin(*m_anim_editor);
 		Anim::ControllerEditor::destroy(*m_anim_editor);
@@ -436,10 +436,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 
 	StudioApp& m_app;
-	AnimablePropertyGridPlugin* m_animable_plugin;
-	AnimationAssetBrowserPlugin* m_animtion_plugin;
-	PropertyAnimationAssetBrowserPlugin* m_prop_anim_plugin;
-	AnimControllerAssetBrowserPlugin* m_anim_ctrl_plugin;
+	Local<AnimablePropertyGridPlugin> m_animable_plugin;
+	Local<AnimationAssetBrowserPlugin> m_animtion_plugin;
+	Local<PropertyAnimationAssetBrowserPlugin> m_prop_anim_plugin;
+	Local<AnimControllerAssetBrowserPlugin> m_anim_ctrl_plugin;
 	Anim::ControllerEditor* m_anim_editor;
 };
 

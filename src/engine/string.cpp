@@ -337,8 +337,6 @@ int stringLength(const char* str)
 	return (int)strlen(str);
 }
 
-
-
 bool endsWith(const char* str, const char* substr)
 {
 	int len = stringLength(str);

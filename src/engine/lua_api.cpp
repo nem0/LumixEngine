@@ -110,13 +110,6 @@ int SetStyleColor(lua_State* L)
 }
 
 
-int ShowTestWindow(lua_State* L)
-{
-	ImGui::ShowDemoWindow();
-	return 0;
-}
-
-
 int SliderFloat(lua_State* L)
 {
 	auto* name = LuaWrapper::checkArg<const char*>(L, 1);
@@ -1044,7 +1037,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "SetNextWindowPosCenter", &LuaImGui::SetNextWindowPosCenter);
 	LuaImGui::registerCFunction(L, "SetNextWindowSize", &LuaWrapper::wrap<&LuaImGui::SetNextWindowSize>);
 	LuaImGui::registerCFunction(L, "SetStyleColor", &LuaImGui::SetStyleColor);
-	LuaImGui::registerCFunction(L, "ShowTestWindow", &LuaImGui::ShowTestWindow);
 	LuaImGui::registerCFunction(L, "SliderFloat", &LuaImGui::SliderFloat);
 	LuaImGui::registerCFunction(L, "Text", &LuaImGui::Text);
 	LuaImGui::registerCFunction(L, "Unindent", &LuaWrapper::wrap<&ImGui::Unindent>);

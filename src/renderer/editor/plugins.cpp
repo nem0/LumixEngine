@@ -3706,32 +3706,32 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 
-		m_shader_plugin = LUMIX_NEW(allocator, ShaderPlugin)(m_app);
+		m_shader_plugin.create(m_app);
 		const char* shader_exts[] = {"shd", nullptr};
 		asset_compiler.addPlugin(*m_shader_plugin, shader_exts);
 
-		m_texture_plugin = LUMIX_NEW(allocator, TexturePlugin)(m_app);
+		m_texture_plugin.create(m_app);
 		const char* texture_exts[] = { "png", "jpg", "dds", "tga", "raw", "ltc", nullptr};
 		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
 
-		m_pipeline_plugin = LUMIX_NEW(allocator, PipelinePlugin)(m_app);
+		m_pipeline_plugin.create(m_app);
 		const char* pipeline_exts[] = {"pln", nullptr};
 		asset_compiler.addPlugin(*m_pipeline_plugin, pipeline_exts);
 
-		m_particle_emitter_plugin = LUMIX_NEW(allocator, ParticleEmitterPlugin)(m_app);
+		m_particle_emitter_plugin.create(m_app);
 		const char* particle_emitter_exts[] = {"par", nullptr};
 		asset_compiler.addPlugin(*m_particle_emitter_plugin, particle_emitter_exts);
 
-		m_material_plugin = LUMIX_NEW(allocator, MaterialPlugin)(m_app);
+		m_material_plugin.create(m_app);
 		const char* material_exts[] = {"mat", nullptr};
 		asset_compiler.addPlugin(*m_material_plugin, material_exts);
 
-		m_model_plugin = LUMIX_NEW(allocator, ModelPlugin)(m_app);
-		m_model_plugin->m_texture_plugin = m_texture_plugin;
+		m_model_plugin.create(m_app);
+		m_model_plugin->m_texture_plugin = m_texture_plugin.get();
 		const char* model_exts[] = {"fbx", nullptr};
 		asset_compiler.addPlugin(*m_model_plugin, model_exts);
 
-		m_font_plugin = LUMIX_NEW(allocator, FontPlugin)(m_app);
+		m_font_plugin.create(m_app);
 		const char* fonts_exts[] = {"ttf", nullptr};
 		asset_compiler.addPlugin(*m_font_plugin, fonts_exts);
 		
@@ -3743,16 +3743,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_browser.addPlugin(*m_shader_plugin);
 		asset_browser.addPlugin(*m_texture_plugin);
 
-		m_scene_view = LUMIX_NEW(allocator, SceneView)(m_app);
-		m_game_view = LUMIX_NEW(allocator, GameView)(m_app);
-		m_editor_ui_render_plugin = LUMIX_NEW(allocator, EditorUIRenderPlugin)(m_app, *m_scene_view);
+		m_scene_view.create(m_app);
+		m_game_view.create(m_app);
+		m_editor_ui_render_plugin.create(m_app, *m_scene_view);
 		m_app.addPlugin(*m_scene_view);
 		m_app.addPlugin(*m_game_view);
 		m_app.addPlugin(*m_editor_ui_render_plugin);
 
-		m_model_properties_plugin = LUMIX_NEW(allocator, ModelPropertiesPlugin)(m_app);
-		m_env_probe_plugin = LUMIX_NEW(allocator, EnvironmentProbePlugin)(m_app);
-		m_terrain_plugin = LUMIX_NEW(allocator, TerrainPlugin)(m_app);
+		m_model_properties_plugin.create(m_app);
+		m_env_probe_plugin.create(m_app);
+		m_terrain_plugin.create(m_app);
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 		property_grid.addPlugin(*m_model_properties_plugin);
 		property_grid.addPlugin(*m_env_probe_plugin);
@@ -3950,21 +3950,21 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.removePlugin(*m_particle_emitter_plugin);
 		asset_compiler.removePlugin(*m_pipeline_plugin);
 
-		LUMIX_DELETE(allocator, m_model_plugin);
-		LUMIX_DELETE(allocator, m_material_plugin);
-		LUMIX_DELETE(allocator, m_particle_emitter_plugin);
-		LUMIX_DELETE(allocator, m_pipeline_plugin);
-		LUMIX_DELETE(allocator, m_font_plugin);
-		LUMIX_DELETE(allocator, m_texture_plugin);
-		LUMIX_DELETE(allocator, m_shader_plugin);
+		m_model_plugin.destroy();
+		m_material_plugin.destroy();
+		m_particle_emitter_plugin.destroy();
+		m_pipeline_plugin.destroy();
+		m_font_plugin.destroy();
+		m_texture_plugin.destroy();
+		m_shader_plugin.destroy();
 
 		m_app.removePlugin(*m_scene_view);
 		m_app.removePlugin(*m_game_view);
 		m_app.removePlugin(*m_editor_ui_render_plugin);
 
-		LUMIX_DELETE(allocator, m_scene_view);
-		LUMIX_DELETE(allocator, m_game_view);
-		LUMIX_DELETE(allocator, m_editor_ui_render_plugin);
+		m_scene_view.destroy();
+		m_game_view.destroy();
+		m_editor_ui_render_plugin.destroy();
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
@@ -3972,27 +3972,27 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.removePlugin(*m_env_probe_plugin);
 		property_grid.removePlugin(*m_terrain_plugin);
 
-		LUMIX_DELETE(allocator, m_model_properties_plugin);
-		LUMIX_DELETE(allocator, m_env_probe_plugin);
-		LUMIX_DELETE(allocator, m_terrain_plugin);
+		m_model_properties_plugin.destroy();
+		m_env_probe_plugin.destroy();
+		m_terrain_plugin.destroy();
 	}
 
 
 	StudioApp& m_app;
 	AddTerrainComponentPlugin* m_add_terrain_plugin;
-	ModelPlugin* m_model_plugin;
-	MaterialPlugin* m_material_plugin;
-	ParticleEmitterPlugin* m_particle_emitter_plugin;
-	PipelinePlugin* m_pipeline_plugin;
-	FontPlugin* m_font_plugin;
-	TexturePlugin* m_texture_plugin;
-	ShaderPlugin* m_shader_plugin;
-	ModelPropertiesPlugin* m_model_properties_plugin;
-	EnvironmentProbePlugin* m_env_probe_plugin;
-	TerrainPlugin* m_terrain_plugin;
-	SceneView* m_scene_view;
-	GameView* m_game_view;
-	EditorUIRenderPlugin* m_editor_ui_render_plugin;
+	Local<ModelPlugin> m_model_plugin;
+	Local<MaterialPlugin> m_material_plugin;
+	Local<ParticleEmitterPlugin> m_particle_emitter_plugin;
+	Local<PipelinePlugin> m_pipeline_plugin;
+	Local<FontPlugin> m_font_plugin;
+	Local<TexturePlugin> m_texture_plugin;
+	Local<ShaderPlugin> m_shader_plugin;
+	Local<ModelPropertiesPlugin> m_model_properties_plugin;
+	Local<EnvironmentProbePlugin> m_env_probe_plugin;
+	Local<TerrainPlugin> m_terrain_plugin;
+	Local<SceneView> m_scene_view;
+	Local<GameView> m_game_view;
+	Local<EditorUIRenderPlugin> m_editor_ui_render_plugin;
 };
 
 
