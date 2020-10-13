@@ -2341,9 +2341,12 @@ public:
 		r.meshes = &r.model->getMesh(0);
 		r.mesh_count = r.model->getMeshCount();
 
-		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT))
-		{
-			updateBoneAttachment(m_bone_attachments[entity]);
+		if (r.flags.isSet(ModelInstance::IS_BONE_ATTACHMENT_PARENT)) {
+			for (auto& attachment : m_bone_attachments) {
+				if (attachment.parent_entity == entity) {
+					updateBoneAttachment(attachment);
+				}
+			}
 		}
 
 		while (m_mesh_sort_data.size() < m_model_instances.size()) {

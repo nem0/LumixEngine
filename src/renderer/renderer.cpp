@@ -336,7 +336,7 @@ struct BoneEnum : Reflection::EnumAttribute
 		auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
 		if (!model) return "";
 
-		return model->getBone(idx).name.c_str();
+		return idx < (u32)model->getBoneCount() ? model->getBone(idx).name.c_str() : "N/A";
 	}
 
 
