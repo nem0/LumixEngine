@@ -260,6 +260,7 @@ struct AssetCompilerImpl : AssetCompiler
 				copyString(fullpath, dir);
 				if(dir[0]) catString(fullpath, "/");
 				catString(fullpath, info.filename);
+				makeLowercase(Span(fullpath), fullpath);
 
 				if (fs.getLastModified(fullpath[0] == '/' ? fullpath + 1 : fullpath) > list_last_modified) {
 					addResource(fullpath);
