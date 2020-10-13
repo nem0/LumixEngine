@@ -3019,7 +3019,7 @@ struct PipelineImpl final : Pipeline
 								gpu::setState(material->render_states | render_states);
 								gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
 								gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-								gpu::bindVertexBuffer(1, buffer, offset, 44);
+								gpu::bindVertexBuffer(1, buffer, offset, 40);
 
 								gpu::drawTrianglesInstanced(36, count, gpu::DataType::U16);
 								++stats.draw_call_count;
