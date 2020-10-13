@@ -88,6 +88,19 @@ namespace Lumix
 		allocator.deallocate(mem);
 		return new_mem;
 	}
+	
+	static void* reallocSmallAligned(DefaultAllocator& allocator, void* mem, size_t n, size_t align) {
+		DefaultAllocator::Page* p = getPage(mem);
+		if (n <= SMALL_ALLOC_MAX_SIZE) {
+			const u32 bin = sizeToBin(n);
+			if (sizeToBin(p->header.item_size) == bin) return mem;
+		}
+		
+		void* new_mem = allocator.allocate_aligned(n, align);
+		memcpy(new_mem, mem, minimum((size_t)p->header.item_size, n));
+		allocator.deallocate_aligned(mem);
+		return new_mem;
+	}
 
 	static void* allocSmall(DefaultAllocator& allocator, size_t n) {
 		const u32 bin = sizeToBin(n);
@@ -189,7 +202,7 @@ namespace Lumix
 	void* DefaultAllocator::reallocate_aligned(void* ptr, size_t size, size_t align)
 	{
 		if (isSmallAlloc(*this, ptr)) {
-			return reallocSmall(*this, ptr, size);
+			return reallocSmallAligned(*this, ptr, size, align);
 		}
 		return _aligned_realloc(ptr, size, align);
 	}
