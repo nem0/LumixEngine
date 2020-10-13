@@ -286,6 +286,12 @@ int SetNextWindowSize(float w, float h)
 }
 
 
+int OpenPopup(lua_State* L) {
+	auto* str_id = LuaWrapper::checkArg<const char*>(L, 1);
+	ImGui::OpenPopup(str_id);
+	return 0;
+}
+
 int Begin(lua_State* L)
 {
 	auto* label = LuaWrapper::checkArg<const char*>(L, 1);
@@ -1019,7 +1025,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "IsMouseDown", &LuaWrapper::wrap<&LuaImGui::IsMouseDown>);
 	LuaImGui::registerCFunction(L, "NewLine", &LuaWrapper::wrap<&ImGui::NewLine>);
 	LuaImGui::registerCFunction(L, "NextColumn", &LuaWrapper::wrap<&ImGui::NextColumn>);
-	LuaImGui::registerCFunction(L, "OpenPopup", &LuaWrapper::wrap<&ImGui::OpenPopup>);
+	LuaImGui::registerCFunction(L, "OpenPopup", &LuaImGui::OpenPopup);
 	LuaImGui::registerCFunction(L, "PopItemWidth", &LuaWrapper::wrap<&ImGui::PopItemWidth>);
 	LuaImGui::registerCFunction(L, "PopID", &LuaWrapper::wrap<&ImGui::PopID>);
 	LuaImGui::registerCFunction(L, "PopStyleColor", &LuaWrapper::wrap<&ImGui::PopStyleColor>);
