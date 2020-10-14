@@ -612,26 +612,15 @@ struct NullAudioDevice final : AudioDevice
 };
 
 
-static NullAudioDevice g_null_device;
-
-
-AudioDevice* AudioDevice::create(Engine& engine)
+UniquePtr<AudioDevice> AudioDevice::create(Engine& engine)
 {
-	auto* device = LUMIX_NEW(engine.getAllocator(), AudioDeviceImpl);
+	UniquePtr<AudioDeviceImpl> device = UniquePtr<AudioDeviceImpl>::create(engine.getAllocator());
 	if (!device->init(engine))
 	{
-		LUMIX_DELETE(engine.getAllocator(), device);
 		logWarning("Audio") << "Using null device";
-		return &g_null_device;
+		return UniquePtr<NullAudioDevice>::create(engine.getAllocator());
 	}
-	return device;
-}
-
-
-void AudioDevice::destroy(AudioDevice& device)
-{
-	if (&device == &g_null_device) return;
-	LUMIX_DELETE(static_cast<AudioDeviceImpl&>(device).m_engine->getAllocator(), &device);
+	return device.move();
 }
 
 

@@ -22,6 +22,7 @@ struct DVec3;
 struct Engine;
 struct IAllocator;
 struct Path;
+template <typename T> struct UniquePtr;
 
 
 struct LUMIX_AUDIO_API AudioDevice
@@ -38,8 +39,7 @@ struct LUMIX_AUDIO_API AudioDevice
 
 	virtual ~AudioDevice() {}
 
-	static AudioDevice* create(Engine& engine);
-	static void destroy(AudioDevice& device);
+	static UniquePtr<AudioDevice> create(Engine& engine);
 
 	virtual BufferHandle createBuffer(const void* data, int size_bytes, int channels, int sample_rate, int flags) = 0;
 	virtual void setEcho(BufferHandle handle,

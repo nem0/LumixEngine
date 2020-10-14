@@ -233,10 +233,10 @@ public:
 	{
 		IAllocator& allocator = app.getAllocator();
 
-		Action* action = LUMIX_NEW(allocator, Action)("GUI Editor", "Toggle gui editor", "gui_editor");
-		action->func.bind<&GUIEditor::onAction>(this);
-		action->is_selected.bind<&GUIEditor::isOpen>(this);
-		app.addWindowAction(action);
+		m_toggle_ui.init("GUI Editor", "Toggle gui editor", "gui_editor", "", true);
+		m_toggle_ui.func.bind<&GUIEditor::onAction>(this);
+		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
+		app.addWindowAction(&m_toggle_ui);
 
 		m_editor = &app.getWorldEditor();
 		Engine& engine = app.getEngine();
@@ -246,7 +246,9 @@ public:
 	}
 
 
-	~GUIEditor() {}
+	~GUIEditor() {
+		m_app.removeAction(&m_toggle_ui);
+	}
 
 
 private:
@@ -877,6 +879,7 @@ private:
 
 
 	StudioApp& m_app;
+	Action m_toggle_ui;
 	UniquePtr<Pipeline> m_pipeline;
 	WorldEditor* m_editor = nullptr;
 	bool m_is_window_open = false;
@@ -891,6 +894,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
+		, m_sprite_plugin(app)
+		, m_gui_editor(app)
 	{
 	}
 
@@ -910,14 +915,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent(ICON_FA_FONT, "gui_text", "GUI / Text");
 
 		IAllocator& allocator = m_app.getAllocator();
-		m_gui_editor.create(m_app);
-		m_app.addPlugin(*m_gui_editor);
+		m_app.addPlugin(m_gui_editor);
 
-		m_sprite_plugin.create(m_app);
-		m_app.getAssetBrowser().addPlugin(*m_sprite_plugin);
+		m_app.getAssetBrowser().addPlugin(m_sprite_plugin);
 
 		const char* sprite_exts[] = { "spr", nullptr };
-		m_app.getAssetCompiler().addPlugin(*m_sprite_plugin, sprite_exts);
+		m_app.getAssetCompiler().addPlugin(m_sprite_plugin, sprite_exts);
 	}
 
 	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
@@ -925,18 +928,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	~StudioAppPlugin()
 	{
 		IAllocator& allocator = m_app.getAllocator();
-		m_app.removePlugin(*m_gui_editor);
-		m_gui_editor.destroy();
+		m_app.removePlugin(m_gui_editor);
 
-		m_app.getAssetCompiler().removePlugin(*m_sprite_plugin);
-		m_app.getAssetBrowser().removePlugin(*m_sprite_plugin);
-		m_sprite_plugin.destroy();
+		m_app.getAssetCompiler().removePlugin(m_sprite_plugin);
+		m_app.getAssetBrowser().removePlugin(m_sprite_plugin);
 	}
 
 
 	StudioApp& m_app;
-	Local<GUIEditor> m_gui_editor;
-	Local<SpritePlugin> m_sprite_plugin;
+	GUIEditor m_gui_editor;
+	SpritePlugin m_sprite_plugin;
 };
 
 

@@ -68,15 +68,15 @@ struct TarHeader {
 struct LuaPlugin : StudioApp::GUIPlugin
 {
 	LuaPlugin(StudioApp& app, Span<const char> src, const char* filename)
-		: app(app)
+		: m_app(app)
 	{
 		L = lua_newthread(app.getEngine().getState());						 // [thread]
-		thread_ref = luaL_ref(app.getEngine().getState(), LUA_REGISTRYINDEX); // []
+		m_thread_ref = luaL_ref(app.getEngine().getState(), LUA_REGISTRYINDEX); // []
 
 		lua_newtable(L);						  // [env]
 												  // reference environment
 		lua_pushvalue(L, -1);					  // [env, env]
-		env_ref = luaL_ref(L, LUA_REGISTRYINDEX); // [env]
+		m_env_ref = luaL_ref(L, LUA_REGISTRYINDEX); // [env]
 
 		// environment's metatable & __index
 		lua_pushvalue(L, -1);	// [env, env]
@@ -104,9 +104,9 @@ struct LuaPlugin : StudioApp::GUIPlugin
 
 		lua_pop(L, 2); // []
 
-		Action* action = LUMIX_NEW(app.getAllocator(), Action)(name, name, name);
-		action->func.bind<&LuaPlugin::onAction>(this);
-		app.addWindowAction(action);
+		m_toggle_ui.init(name, name, name, "", true);
+		m_toggle_ui.func.bind<&LuaPlugin::onAction>(this);
+		app.addWindowAction(&m_toggle_ui);
 		m_is_open = false;
 
 		lua_pop(L, 1); // plugin_name
@@ -115,9 +115,10 @@ struct LuaPlugin : StudioApp::GUIPlugin
 
 	~LuaPlugin()
 	{
-		lua_State* L = app.getEngine().getState();
-		luaL_unref(L, LUA_REGISTRYINDEX, env_ref);
-		luaL_unref(L, LUA_REGISTRYINDEX, thread_ref);
+		m_app.removeAction(&m_toggle_ui);
+		lua_State* L = m_app.getEngine().getState();
+		luaL_unref(L, LUA_REGISTRYINDEX, m_env_ref);
+		luaL_unref(L, LUA_REGISTRYINDEX, m_thread_ref);
 	}
 
 
@@ -131,7 +132,7 @@ struct LuaPlugin : StudioApp::GUIPlugin
 	{
 		if (!m_is_open) return;
 
-		lua_rawgeti(L, LUA_REGISTRYINDEX, env_ref); // [env]
+		lua_rawgeti(L, LUA_REGISTRYINDEX, m_env_ref); // [env]
 		lua_getfield(L, -1, "onGUI"); // [env, onGUI]
 		if (lua_type(L, -1) == LUA_TFUNCTION) {
 			if (lua_pcall(L, 0, 0, 0) != 0) {
@@ -145,11 +146,12 @@ struct LuaPlugin : StudioApp::GUIPlugin
 		}
 	}
 
-	StudioApp& app;
+	StudioApp& m_app;
 	lua_State* L;
-	int thread_ref;
-	int env_ref;
+	int m_thread_ref;
+	int m_env_ref;
 	bool m_is_open;
+	Action m_toggle_ui;
 };
 
 
@@ -160,6 +162,7 @@ struct StudioAppImpl final : StudioApp
 		, m_finished(false)
 		, m_deferred_game_mode_exit(false)
 		, m_actions(m_allocator)
+		, m_owned_actions(m_allocator)
 		, m_window_actions(m_allocator)
 		, m_toolbar_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
@@ -384,23 +387,23 @@ struct StudioAppImpl final : StudioApp
 		loadSettings();
 		initIMGUI();
 
-		m_set_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Set custom pivot",
-			"Set Custom Pivot",
+		m_set_pivot_action.init("Set custom pivot",
+			"Set custom pivot",
 			"set_custom_pivot",
 			"",
 			OS::Keycode::K,
-			0);
-		m_set_pivot_action->is_global = false;
-		addAction(m_set_pivot_action);
+			0,
+			false);
+		addAction(&m_set_pivot_action);
 
-		m_reset_pivot_action = LUMIX_NEW(m_editor->getAllocator(), Action)("Reset pivot",
+		m_reset_pivot_action.init("Reset pivot",
 			"Reset pivot",
 			"reset_pivot",
 			"",
 			OS::Keycode::K,
-			(u8)Action::Modifiers::SHIFT);
-		m_reset_pivot_action->is_global = false;
-		addAction(m_reset_pivot_action);
+			(u8)Action::Modifiers::SHIFT,
+			false);
+		addAction(&m_reset_pivot_action);
 
 		setStudioApp();
 		loadSettings();
@@ -419,13 +422,15 @@ struct StudioAppImpl final : StudioApp
 
 	~StudioAppImpl()
 	{
+		removeAction(&m_set_pivot_action);
+		removeAction(&m_reset_pivot_action);
 		ImGuiIO& io = ImGui::GetIO();
 		if (io.WantSaveIniSettings) {
 			const char* data = ImGui::SaveIniSettingsToMemory();
 			m_settings.m_imgui_state = data;
 		}
 
-		if (m_watched_plugin.watcher) FileSystemWatcher::destroy(m_watched_plugin.watcher);
+		m_watched_plugin.watcher.reset();
 
 		saveSettings();
 
@@ -456,19 +461,22 @@ struct StudioAppImpl final : StudioApp
 		}
 		m_add_cmp_plugins.clear();
 
-		for (auto* a : m_actions)
-		{
-			LUMIX_DELETE(m_editor->getAllocator(), a);
-		}
-		m_actions.clear();
-
 		m_profiler_ui.reset();
 		m_asset_browser.destroy();
 		m_property_grid.destroy();
 		m_log_ui.destroy();
-		LUMIX_DELETE(m_allocator, m_render_interface);
+		ASSERT(!m_render_interface);
 		m_asset_compiler.reset();
 		m_editor.reset();
+
+		for (Action* action : m_owned_actions) {
+			removeAction(action);
+			LUMIX_DELETE(m_allocator, action);
+		}
+		m_owned_actions.clear();
+		ASSERT(m_actions.empty());
+		m_actions.clear();
+
 		m_engine.reset();
 		
 		JobSystem::shutdown();
@@ -866,8 +874,8 @@ struct StudioAppImpl final : StudioApp
 		else if (io.KeyCtrl) {
 			m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 		}
-		if (m_set_pivot_action->isActive()) m_editor->getView().setCustomPivot();
-		if (m_reset_pivot_action->isActive()) m_editor->getView().resetPivot();
+		if (m_set_pivot_action.isActive()) m_editor->getView().setCustomPivot();
+		if (m_reset_pivot_action.isActive()) m_editor->getView().resetPivot();
 
 		m_editor->getView().setMouseSensitivity(m_settings.m_mouse_sensitivity.x, m_settings.m_mouse_sensitivity.y);
 		m_editor->update();
@@ -1366,9 +1374,11 @@ struct StudioAppImpl final : StudioApp
 	template <void (StudioAppImpl::*Func)()>
 	Action& addAction(const char* label_short, const char* label_long, const char* name, const char* font_icon = "")
 	{
-		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name, font_icon);
+		Action* a = LUMIX_NEW(m_editor->getAllocator(), Action);
+		a->init(label_short, label_long, name, font_icon, true);
 		a->func.bind<Func>(this);
 		addAction(a);
+		m_owned_actions.push(a);
 		return *a;
 	}
 
@@ -1381,8 +1391,10 @@ struct StudioAppImpl final : StudioApp
 		OS::Keycode shortcut,
 		u8 modifiers)
 	{
-		auto* a = LUMIX_NEW(m_editor->getAllocator(), Action)(label_short, label_long, name, font_icon, shortcut, modifiers);
+		Action* a = LUMIX_NEW(m_editor->getAllocator(), Action);
+		a->init(label_short, label_long, name, font_icon, shortcut, modifiers, true);
 		a->func.bind<Func>(this);
+		m_owned_actions.push(a);
 		addAction(a);
 	}
 
@@ -2281,7 +2293,7 @@ struct StudioAppImpl final : StudioApp
 			{
 				logError("Editor") << "Could not load plugin " << src << " requested by command line";
 			}
-			else if (is_full_path && !m_watched_plugin.watcher)
+			else if (is_full_path && !m_watched_plugin.watcher.get())
 			{
 				char dir[MAX_PATH_LENGTH];
 				char basename[MAX_PATH_LENGTH];
@@ -3224,6 +3236,7 @@ struct StudioAppImpl final : StudioApp
 	Array<WindowToDestroy> m_deferred_destroy_windows;
 	OS::WindowHandle m_main_window;
 	OS::WindowState m_fullscreen_restore_state;
+	Array<Action*> m_owned_actions;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
 	Array<Action*> m_toolbar_actions;
@@ -3236,8 +3249,8 @@ struct StudioAppImpl final : StudioApp
 	HashMap<ComponentType, String> m_component_labels;
 	HashMap<ComponentType, String> m_component_icons;
 	UniquePtr<WorldEditor> m_editor;
-	Action* m_set_pivot_action;
-	Action* m_reset_pivot_action;
+	Action m_set_pivot_action;
+	Action m_reset_pivot_action;
 	Gizmo::Config m_gizmo_config;
 	bool m_save_as_request = false;
 	bool m_cursor_captured = false;
@@ -3294,7 +3307,7 @@ struct StudioAppImpl final : StudioApp
 
 	struct WatchedPlugin
 	{
-		FileSystemWatcher* watcher = nullptr;
+		UniquePtr<FileSystemWatcher> watcher;
 		StaticString<MAX_PATH_LENGTH> dir;
 		StaticString<MAX_PATH_LENGTH> basename;
 		Lumix::IPlugin* plugin = nullptr;

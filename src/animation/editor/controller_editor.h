@@ -6,12 +6,12 @@
 
 namespace Lumix {
 
-struct Model;
 template <typename T> struct UniquePtr;
 
 namespace Anim {
 
 
+// TODO this does not need to be hidden by interface, since it's only included once
 struct ControllerEditor : StudioApp::GUIPlugin {
 	static UniquePtr<ControllerEditor> create(StudioApp& app);
 
@@ -19,5 +19,5 @@ struct ControllerEditor : StudioApp::GUIPlugin {
 };
 
 
-} // ns Anim
-} // ns Lumix
+} // namespace Anim
+} // namespace Lumix

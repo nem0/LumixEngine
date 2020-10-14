@@ -98,7 +98,7 @@ struct AudioSceneImpl final : AudioScene
 	{
 		for (auto* clip : m_clips)
 		{
-			clip->clip->getResourceManager().unload(*clip->clip);
+			clip->clip->decRefCount();
 			LUMIX_DELETE(m_allocator, clip);
 		}
 		m_clips.clear();
@@ -490,7 +490,7 @@ struct AudioSceneImpl final : AudioScene
 		Clip* clip = info->clip;
 		if (clip)
 		{
-			clip->getResourceManager().unload(*clip);
+			clip->decRefCount();
 		}
 		LUMIX_DELETE(m_allocator, info);
 		m_clips.eraseItem(info);
@@ -532,7 +532,7 @@ struct AudioSceneImpl final : AudioScene
 		auto* clip = m_clips[clip_id]->clip;
 		if (clip)
 		{
-			clip->getResourceManager().unload(*clip);
+			clip->decRefCount();
 		}
 		auto* new_res = m_system.getEngine().getResourceManager().load<Clip>(path);
 		m_clips[clip_id]->clip = static_cast<Clip*>(new_res);

@@ -377,6 +377,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
+		, m_animable_plugin(app)
+		, m_animtion_plugin(app)
+		, m_prop_anim_plugin(app)
+		, m_anim_ctrl_plugin(app)
 	{}
 
 	const char* getName() const override { return "animation"; }
@@ -387,21 +391,15 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("", "animable", "Animation / Animable", Animation::TYPE, "Animation");
 		m_app.registerComponent("", "animator", "Animation / Animator", Anim::Controller::TYPE, "Source");
 
-		IAllocator& allocator = m_app.getAllocator();
-		m_animtion_plugin.create(m_app);
-		m_prop_anim_plugin.create(m_app);
-		m_anim_ctrl_plugin.create(m_app);
-		
 		const char* act_exts[] = { "act", nullptr };
-		m_app.getAssetCompiler().addPlugin(*m_anim_ctrl_plugin, act_exts);
+		m_app.getAssetCompiler().addPlugin(m_anim_ctrl_plugin, act_exts);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.addPlugin(*m_animtion_plugin);
-		asset_browser.addPlugin(*m_prop_anim_plugin);
-		asset_browser.addPlugin(*m_anim_ctrl_plugin);
+		asset_browser.addPlugin(m_animtion_plugin);
+		asset_browser.addPlugin(m_prop_anim_plugin);
+		asset_browser.addPlugin(m_anim_ctrl_plugin);
 
-		m_animable_plugin.create(m_app);
-		m_app.getPropertyGrid().addPlugin(*m_animable_plugin);
+		m_app.getPropertyGrid().addPlugin(m_animable_plugin);
 		
 		m_anim_editor = Anim::ControllerEditor::create(m_app);
 		m_app.addPlugin(*m_anim_editor);
@@ -411,22 +409,22 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	
 	~StudioAppPlugin()
 	{
-		m_app.getAssetCompiler().removePlugin(*m_anim_ctrl_plugin);
+		m_app.getAssetCompiler().removePlugin(m_anim_ctrl_plugin);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.removePlugin(*m_animtion_plugin);
-		asset_browser.removePlugin(*m_prop_anim_plugin);
-		asset_browser.removePlugin(*m_anim_ctrl_plugin);
-		m_app.getPropertyGrid().removePlugin(*m_animable_plugin);
+		asset_browser.removePlugin(m_animtion_plugin);
+		asset_browser.removePlugin(m_prop_anim_plugin);
+		asset_browser.removePlugin(m_anim_ctrl_plugin);
+		m_app.getPropertyGrid().removePlugin(m_animable_plugin);
 		m_app.removePlugin(*m_anim_editor);
 	}
 
 
 	StudioApp& m_app;
-	Local<AnimablePropertyGridPlugin> m_animable_plugin;
-	Local<AnimationAssetBrowserPlugin> m_animtion_plugin;
-	Local<PropertyAnimationAssetBrowserPlugin> m_prop_anim_plugin;
-	Local<AnimControllerAssetBrowserPlugin> m_anim_ctrl_plugin;
+	AnimablePropertyGridPlugin m_animable_plugin;
+	AnimationAssetBrowserPlugin m_animtion_plugin;
+	PropertyAnimationAssetBrowserPlugin m_prop_anim_plugin;
+	AnimControllerAssetBrowserPlugin m_anim_ctrl_plugin;
 	UniquePtr<Anim::ControllerEditor> m_anim_editor;
 };
 

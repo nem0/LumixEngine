@@ -89,23 +89,14 @@ struct FileSystemWatcherPC final : FileSystemWatcher
 };
 
 
-FileSystemWatcher* FileSystemWatcher::create(const char* path, IAllocator& allocator)
+UniquePtr<FileSystemWatcher> FileSystemWatcher::create(const char* path, IAllocator& allocator)
 {
-	FileSystemWatcherPC* watcher = LUMIX_NEW(allocator, FileSystemWatcherPC)(allocator);
+	UniquePtr<FileSystemWatcherPC> watcher = UniquePtr<FileSystemWatcherPC>::create(allocator, allocator);
 	if (!watcher->start(path))
 	{
-		LUMIX_DELETE(allocator, watcher);
-		return nullptr;
+		return UniquePtr<FileSystemWatcher>();
 	}
-	return watcher;
-}
-
-
-void FileSystemWatcher::destroy(FileSystemWatcher* watcher)
-{
-	if (!watcher) return;
-	FileSystemWatcherPC* pc_watcher = (FileSystemWatcherPC*)watcher;
-	LUMIX_DELETE(pc_watcher->m_allocator, pc_watcher);
+	return watcher.move();
 }
 
 

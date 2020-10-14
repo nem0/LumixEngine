@@ -59,23 +59,21 @@ struct PrefabSystemImpl final : PrefabSystem
 {
 	struct InstantiatePrefabsCommand final : IEditorCommand
 	{
-		InstantiatePrefabsCommand(WorldEditor& editor)
+		InstantiatePrefabsCommand(EntityPtr* output, PrefabResource& prefab, WorldEditor& editor)
 			: editor(editor)
 			, transforms(editor.getAllocator())
 			, entities(editor.getAllocator())
+			, output(output)
+			, prefab(prefab)
 		{
+			ASSERT(prefab.isReady());
+			prefab.incRefCount();
 		}
 
 
 		~InstantiatePrefabsCommand()
 		{
-			prefab->getResourceManager().unload(*prefab);
-		}
-
-
-		bool isReady() override
-		{
-			return prefab->isReady() || prefab->isFailure();
+			prefab.decRefCount();
 		}
 
 
@@ -96,13 +94,18 @@ struct PrefabSystemImpl final : PrefabSystem
 		bool execute() override
 		{
 			ASSERT(entities.empty());
-			if (prefab->isFailure()) return false;
+			if (prefab.isFailure()) return false;
 			
 			entities.reserve(transforms.size());
-			ASSERT(prefab->isReady());
+			ASSERT(prefab.isReady());
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
 
-			system.doInstantiatePrefabs(*prefab, transforms, Ref(entities));
+			system.doInstantiatePrefabs(prefab, transforms, Ref(entities));
+			if (output) {
+				*output = entities[0];
+				output = nullptr;
+			}
+
 			return !entities.empty();
 		}
 
@@ -129,10 +132,11 @@ struct PrefabSystemImpl final : PrefabSystem
 
 		bool merge(IEditorCommand& command) override { return false; }
 
-		PrefabResource* prefab;
+		PrefabResource& prefab;
 		Array<Transform> transforms;
 		WorldEditor& editor;
 		Array<EntityRef> entities;
+		EntityPtr* output;
 	};
 
 public:
@@ -166,7 +170,7 @@ public:
 
 		m_roots.clear();
 		for (const PrefabVersion& prefab : m_resources) {
-			prefab.resource->getResourceManager().unload(*prefab.resource);
+			prefab.resource->decRefCount();
 		}
 		m_resources.clear();
 		m_entity_to_prefab.clear();
@@ -227,7 +231,7 @@ public:
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
 		{
 			m_resources.insert(prefab_res.getPath().getHash(), {prefab_res.content_hash, &prefab_res});
-			prefab_res.getResourceManager().load(prefab_res);
+			prefab_res.incRefCount();
 		}
 		
 		Engine& engine = m_editor.getEngine();
@@ -259,7 +263,7 @@ public:
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
 		{
 			m_resources.insert(prefab_res.getPath().getHash(), {prefab_res.content_hash, &prefab_res});
-			prefab_res.getResourceManager().load(prefab_res);
+			prefab_res.incRefCount();
 		}
 		
 		EntityMap entity_map(m_editor.getAllocator());
@@ -279,23 +283,20 @@ public:
 	}
 
 	void instantiatePrefabs(struct PrefabResource& prefab, Span<struct Transform> transforms) override {
-		InstantiatePrefabsCommand* cmd = LUMIX_NEW(m_editor.getAllocator(), InstantiatePrefabsCommand)(m_editor);
+		UniquePtr<InstantiatePrefabsCommand> cmd = UniquePtr<InstantiatePrefabsCommand>::create(m_editor.getAllocator(), nullptr, prefab, m_editor);
 		cmd->transforms.resize(transforms.length());
 		memcpy(cmd->transforms.begin(), transforms.begin(), transforms.length() * sizeof(transforms[0]));
-		prefab.getResourceManager().load(prefab);
-		cmd->prefab = &prefab;
-		m_editor.executeCommand(cmd);
+		m_editor.executeCommand(cmd.move());
 	}
 
 	EntityPtr instantiatePrefab(PrefabResource& prefab, const DVec3& pos, const Quat& rot, float scale) override
 	{
-		InstantiatePrefabsCommand* cmd = LUMIX_NEW(m_editor.getAllocator(), InstantiatePrefabsCommand)(m_editor);
+		ASSERT(prefab.isReady());
+		EntityPtr res;
+		UniquePtr<InstantiatePrefabsCommand> cmd = UniquePtr<InstantiatePrefabsCommand>::create(m_editor.getAllocator(), &res, prefab, m_editor);
 		cmd->transforms.push({pos, rot, scale});
-		prefab.getResourceManager().load(prefab);
-		cmd->prefab = &prefab;
-		m_editor.executeCommand(cmd);
-		if (cmd->entities.empty()) return INVALID_ENTITY;
-		return cmd->entities[0];
+		m_editor.executeCommand(cmd.move());
+		return res;
 	}
 
 
@@ -597,7 +598,7 @@ public:
 			PrefabResource* res = m_deferred_instances.back().resource;
 			if (res->isFailure()) {
 				logError("Editor") << "Failed to instantiate " << res->getPath();
-				res->getResourceManager().unload(*res);
+				res->decRefCount();
 				m_deferred_instances.pop();
 			} else if (res->isReady()) {
 				DeferredInstance tmp = m_deferred_instances.back();

@@ -34,6 +34,9 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 
 	struct RenderJob
 	{
+		RenderJob() {}
+		RenderJob(const RenderJob& rhs) = delete;
+
 		virtual ~RenderJob() {}
 		virtual void setup() = 0;
 		virtual void execute() = 0;
@@ -86,7 +89,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 	virtual void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) = 0;
 	virtual void destroy(gpu::TextureHandle tex) = 0;
 	
-	virtual void queue(RenderJob* cmd, i64 profiler_link) = 0;
+	virtual void queue(RenderJob& cmd, i64 profiler_link) = 0;
 
 	virtual void beginProfileBlock(const char* name, i64 link) = 0;
 	virtual void endProfileBlock() = 0;
@@ -97,6 +100,19 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 	virtual const char* getLayerName(u8 layer) const = 0;
 
 	virtual Engine& getEngine() = 0;
+
+	template <typename T, typename... Args> T& createJob(Args&&... args) {
+		return *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);
+	}
+
+	template <typename T> void destroyJob(T& job) {
+		job.~T();
+		deallocJob(&job);
+	}
+
+protected:
+	virtual void* allocJob(u32 size, u32 align) = 0;
+	virtual void deallocJob(void* ptr) = 0;
 }; 
 
 

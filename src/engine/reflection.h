@@ -40,7 +40,8 @@ struct IAttribute {
 		RESOURCE,
 		ENUM,
 		MULTILINE,
-		STRING_ENUM
+		STRING_ENUM,
+		NO_UI,
 	};
 
 	virtual ~IAttribute() {}
@@ -135,6 +136,9 @@ struct ColorAttribute : IAttribute
 	int getType() const override { return COLOR; }
 };
 
+struct NoUIAttribute : IAttribute {
+	int getType() const override { return NO_UI; }
+};
 
 template <typename T> struct Property {
 	virtual Span<const IAttribute* const> getAttributes() const = 0;

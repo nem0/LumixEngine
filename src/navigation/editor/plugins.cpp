@@ -142,21 +142,20 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
+		, m_zone_pg_plugin(app)
 	{}
 	
 	void init() override {
 		IAllocator& allocator = m_app.getAllocator();
 
-		m_zone_pg_plugin.create(m_app);
-		m_app.getPropertyGrid().addPlugin(*m_zone_pg_plugin);
+		m_app.getPropertyGrid().addPlugin(m_zone_pg_plugin);
 
 		m_app.registerComponent(ICON_FA_STREET_VIEW, "navmesh_agent", "Navmesh / Agent");
 		m_app.registerComponent(ICON_FA_MAP_MARKED_ALT, "navmesh_zone", "Navmesh / Zone");
 	}
 
 	~StudioAppPlugin() {
-		m_app.getPropertyGrid().removePlugin(*m_zone_pg_plugin);
-		m_zone_pg_plugin.destroy();
+		m_app.getPropertyGrid().removePlugin(m_zone_pg_plugin);
 	}
 
 	const char* getName() const override {
@@ -185,7 +184,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
-	Local<PropertyGridPlugin> m_zone_pg_plugin;
+	PropertyGridPlugin m_zone_pg_plugin;
 };
 
 

@@ -96,7 +96,7 @@ struct EditorIconsImpl final : EditorIcons
 
 	~EditorIconsImpl()
 	{
-		for (auto& model : m_models) model->getResourceManager().unload(*model);
+		for (auto& model : m_models) model->decRefCount();
 
 		auto& universe = m_scene.getUniverse();
 		universe.entityDestroyed().bind<&EditorIconsImpl::destroyIcon>(this);

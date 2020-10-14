@@ -1361,10 +1361,27 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 		if (cmp.type != MODEL_INSTANCE_TYPE) return;
 
 		RenderScene* scene = (RenderScene*)cmp.scene;
-		Model* model = scene->getModelInstanceModel((EntityRef)cmp.entity);
+		EntityRef entity = (EntityRef)cmp.entity;
+		Model* model = scene->getModelInstanceModel(entity);
 		if (!model || !model->isReady()) return;
 
 		const i32 count = model->getMeshCount();
+		if (count == 1) {
+			ImGuiEx::Label("Material");
+			char mat_path[MAX_PATH_LENGTH];
+			Path path = scene->getModelInstanceMaterialOverride(entity);
+			if (!path.isValid()) {
+				path = model->getMesh(0).material->getPath();
+			}
+			copyString(mat_path, path.c_str());
+			if (m_app.getAssetBrowser().resourceInput("##mat", Span(mat_path), Material::TYPE)) {
+				path = mat_path;
+				m_app.getWorldEditor().setProperty(MODEL_INSTANCE_TYPE, "", -1, "Material", Span(&entity, 1), path);
+			}
+			return;
+		}
+		
+
 		bool open = true;
 		if (count > 1) {
 			open = ImGui::TreeNodeEx("Materials", ImGuiTreeNodeFlags_DefaultOpen);
@@ -1655,7 +1672,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			if (ImGui::Selectable("Save preview"))
 			{
-				model.getResourceManager().load(model);
+				model.incRefCount();
 				renderTile(&model, &m_viewport.pos, &m_viewport.rot);
 			}
 			ImGui::EndPopup();
@@ -2164,7 +2181,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
 
 		m_tile.path_hash = prefab->getPath().getHash();
-		prefab->getResourceManager().unload(*prefab);
+		prefab->decRefCount();
 		m_tile.entity = entity_map.m_map[0];
 		m_tile.waiting = true;
 	}
@@ -2282,7 +2299,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.entity = mesh_entity;
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();
-		model->getResourceManager().unload(*model);
+		model->decRefCount();
 	}
 
 
@@ -2561,7 +2578,7 @@ void captureCubemap(StudioApp& app
 		F f;
 	};
 
-	RenderJob* rjob = LUMIX_NEW(renderer->getAllocator(), RenderJob)(static_cast<F&&>(f));
+	RenderJob& rjob = renderer->createJob<RenderJob>(static_cast<F&&>(f));
 	renderer->queue(rjob, 0);
 }
 
@@ -2584,7 +2601,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 	~EnvironmentProbePlugin()
 	{
-		m_ibl_filter_shader->getResourceManager().unload(*m_ibl_filter_shader);
+		m_ibl_filter_shader->decRefCount();
 	}
 
 
@@ -3000,11 +3017,8 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 		: m_app(app)
 	{
 		WorldEditor& editor = app.getWorldEditor();
-		m_terrain_editor = LUMIX_NEW(app.getAllocator(), TerrainEditor)(editor, app);
+		m_terrain_editor = UniquePtr<TerrainEditor>::create(app.getAllocator(), editor, app);
 	}
-
-
-	~TerrainPlugin() { LUMIX_DELETE(m_app.getAllocator(), m_terrain_editor); }
 
 
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
@@ -3017,13 +3031,13 @@ struct TerrainPlugin final : PropertyGrid::IPlugin
 
 
 	StudioApp& m_app;
-	TerrainEditor* m_terrain_editor;
+	UniquePtr<TerrainEditor> m_terrain_editor;
 };
 
 
 struct RenderInterfaceImpl final : RenderInterface
 {
-	RenderInterfaceImpl(WorldEditor& editor, Pipeline& pipeline, Renderer& renderer)
+	RenderInterfaceImpl(WorldEditor& editor, Renderer& renderer)
 		: m_editor(editor)
 		, m_textures(editor.getAllocator())
 		, m_renderer(renderer)
@@ -3093,7 +3107,7 @@ struct RenderInterfaceImpl final : RenderInterface
 		auto iter = m_textures.find(handle);
 		if (iter == m_textures.end()) return;
 		auto* texture = iter.value();
-		texture->getResourceManager().unload(*texture);
+		texture->decRefCount();
 		m_textures.erase(iter);
 	}
 
@@ -3391,7 +3405,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	};
 
 
-	EditorUIRenderPlugin(StudioApp& app, SceneView& scene_view)
+	EditorUIRenderPlugin(StudioApp& app)
 		: m_app(app)
 		, m_engine(app.getEngine())
 		, m_index_buffer(gpu::INVALID_BUFFER)
@@ -3412,15 +3426,15 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
 		ImGui::GetIO().Fonts->TexID = m_texture;
 
-		IAllocator& allocator = app.getAllocator();
 		WorldEditor& editor = app.getWorldEditor();
-		RenderInterface* render_interface = LUMIX_NEW(allocator, RenderInterfaceImpl)(editor, *scene_view.getPipeline(), *renderer);
-		app.setRenderInterface(render_interface);
+		m_render_interface.create(editor, *renderer);
+		app.setRenderInterface(m_render_interface.get());
 	}
 
 
 	~EditorUIRenderPlugin()
 	{
+		m_app.setRenderInterface(nullptr);
 		shutdownImGui();
 		PluginManager& plugin_manager = m_engine.getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
@@ -3449,8 +3463,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	void guiEndFrame() override
 	{
 		Renderer* renderer = static_cast<Renderer*>(m_engine.getPluginManager().getPlugin("renderer"));
-		RenderCommand* cmd = LUMIX_NEW(renderer->getAllocator(), RenderCommand)(renderer->getAllocator());
-		cmd->plugin = this;
+		RenderCommand& cmd = renderer->createJob<RenderCommand>(renderer->getAllocator());
+		cmd.plugin = this;
 		
 		renderer->queue(cmd, 0);
 		renderer->frame();
@@ -3464,6 +3478,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 	gpu::BufferHandle m_index_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle m_vertex_buffer = gpu::INVALID_BUFFER;
 	gpu::BufferHandle m_uniform_buffer = gpu::INVALID_BUFFER;
+	Local<RenderInterfaceImpl> m_render_interface;
 };
 
 
@@ -3677,6 +3692,19 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
+		, m_pipeline_plugin(app)
+		, m_font_plugin(app)
+		, m_material_plugin(app)
+		, m_particle_emitter_plugin(app)
+		, m_shader_plugin(app)
+		, m_model_properties_plugin(app)
+		, m_texture_plugin(app)
+		, m_game_view(app)
+		, m_scene_view(app)
+		, m_editor_ui_render_plugin(app)
+		, m_env_probe_plugin(app)
+		, m_terrain_plugin(app)
+		, m_model_plugin(app)
 	{
 	}
 
@@ -3699,63 +3727,49 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("", "reflection_probe", "Render / Reflection probe");
 		m_app.registerComponent(ICON_FA_ALIGN_JUSTIFY, "text_mesh", "Render / Text 3D", FontResource::TYPE, "Font");
 
-		m_add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
-		m_app.registerComponent(ICON_FA_MAP, "terrain", *m_add_terrain_plugin);
+		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
+		m_app.registerComponent(ICON_FA_MAP, "terrain", *add_terrain_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
 
-		m_shader_plugin.create(m_app);
 		const char* shader_exts[] = {"shd", nullptr};
-		asset_compiler.addPlugin(*m_shader_plugin, shader_exts);
+		asset_compiler.addPlugin(m_shader_plugin, shader_exts);
 
-		m_texture_plugin.create(m_app);
 		const char* texture_exts[] = { "png", "jpg", "dds", "tga", "raw", "ltc", nullptr};
-		asset_compiler.addPlugin(*m_texture_plugin, texture_exts);
+		asset_compiler.addPlugin(m_texture_plugin, texture_exts);
 
-		m_pipeline_plugin.create(m_app);
 		const char* pipeline_exts[] = {"pln", nullptr};
-		asset_compiler.addPlugin(*m_pipeline_plugin, pipeline_exts);
+		asset_compiler.addPlugin(m_pipeline_plugin, pipeline_exts);
 
-		m_particle_emitter_plugin.create(m_app);
 		const char* particle_emitter_exts[] = {"par", nullptr};
-		asset_compiler.addPlugin(*m_particle_emitter_plugin, particle_emitter_exts);
+		asset_compiler.addPlugin(m_particle_emitter_plugin, particle_emitter_exts);
 
-		m_material_plugin.create(m_app);
 		const char* material_exts[] = {"mat", nullptr};
-		asset_compiler.addPlugin(*m_material_plugin, material_exts);
+		asset_compiler.addPlugin(m_material_plugin, material_exts);
 
-		m_model_plugin.create(m_app);
-		m_model_plugin->m_texture_plugin = m_texture_plugin.get();
+		m_model_plugin.m_texture_plugin = &m_texture_plugin;
 		const char* model_exts[] = {"fbx", nullptr};
-		asset_compiler.addPlugin(*m_model_plugin, model_exts);
+		asset_compiler.addPlugin(m_model_plugin, model_exts);
 
-		m_font_plugin.create(m_app);
 		const char* fonts_exts[] = {"ttf", nullptr};
-		asset_compiler.addPlugin(*m_font_plugin, fonts_exts);
+		asset_compiler.addPlugin(m_font_plugin, fonts_exts);
 		
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.addPlugin(*m_model_plugin);
-		asset_browser.addPlugin(*m_particle_emitter_plugin);
-		asset_browser.addPlugin(*m_material_plugin);
-		asset_browser.addPlugin(*m_font_plugin);
-		asset_browser.addPlugin(*m_shader_plugin);
-		asset_browser.addPlugin(*m_texture_plugin);
+		asset_browser.addPlugin(m_model_plugin);
+		asset_browser.addPlugin(m_particle_emitter_plugin);
+		asset_browser.addPlugin(m_material_plugin);
+		asset_browser.addPlugin(m_font_plugin);
+		asset_browser.addPlugin(m_shader_plugin);
+		asset_browser.addPlugin(m_texture_plugin);
 
-		m_scene_view.create(m_app);
-		m_game_view.create(m_app);
-		m_editor_ui_render_plugin.create(m_app, *m_scene_view);
-		m_app.addPlugin(*m_scene_view);
-		m_app.addPlugin(*m_game_view);
-		m_app.addPlugin(*m_editor_ui_render_plugin);
+		m_app.addPlugin(m_scene_view);
+		m_app.addPlugin(m_game_view);
+		m_app.addPlugin(m_editor_ui_render_plugin);
 
-		m_model_properties_plugin.create(m_app);
-		m_env_probe_plugin.create(m_app);
-		m_terrain_plugin.create(m_app);
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
-		property_grid.addPlugin(*m_model_properties_plugin);
-		property_grid.addPlugin(*m_env_probe_plugin);
-		property_grid.addPlugin(*m_terrain_plugin);
-
+		property_grid.addPlugin(m_model_properties_plugin);
+		property_grid.addPlugin(m_env_probe_plugin);
+		property_grid.addPlugin(m_terrain_plugin);
 	}
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
@@ -3932,65 +3946,47 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		IAllocator& allocator = m_app.getAllocator();
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.removePlugin(*m_model_plugin);
-		asset_browser.removePlugin(*m_particle_emitter_plugin);
-		asset_browser.removePlugin(*m_material_plugin);
-		asset_browser.removePlugin(*m_font_plugin);
-		asset_browser.removePlugin(*m_texture_plugin);
-		asset_browser.removePlugin(*m_shader_plugin);
+		asset_browser.removePlugin(m_model_plugin);
+		asset_browser.removePlugin(m_particle_emitter_plugin);
+		asset_browser.removePlugin(m_material_plugin);
+		asset_browser.removePlugin(m_font_plugin);
+		asset_browser.removePlugin(m_texture_plugin);
+		asset_browser.removePlugin(m_shader_plugin);
 
 		AssetCompiler& asset_compiler = m_app.getAssetCompiler();
-		asset_compiler.removePlugin(*m_font_plugin);
-		asset_compiler.removePlugin(*m_shader_plugin);
-		asset_compiler.removePlugin(*m_texture_plugin);
-		asset_compiler.removePlugin(*m_model_plugin);
-		asset_compiler.removePlugin(*m_material_plugin);
-		asset_compiler.removePlugin(*m_particle_emitter_plugin);
-		asset_compiler.removePlugin(*m_pipeline_plugin);
+		asset_compiler.removePlugin(m_font_plugin);
+		asset_compiler.removePlugin(m_shader_plugin);
+		asset_compiler.removePlugin(m_texture_plugin);
+		asset_compiler.removePlugin(m_model_plugin);
+		asset_compiler.removePlugin(m_material_plugin);
+		asset_compiler.removePlugin(m_particle_emitter_plugin);
+		asset_compiler.removePlugin(m_pipeline_plugin);
 
-		m_model_plugin.destroy();
-		m_material_plugin.destroy();
-		m_particle_emitter_plugin.destroy();
-		m_pipeline_plugin.destroy();
-		m_font_plugin.destroy();
-		m_texture_plugin.destroy();
-		m_shader_plugin.destroy();
-
-		m_app.removePlugin(*m_scene_view);
-		m_app.removePlugin(*m_game_view);
-		m_app.removePlugin(*m_editor_ui_render_plugin);
-
-		m_scene_view.destroy();
-		m_game_view.destroy();
-		m_editor_ui_render_plugin.destroy();
+		m_app.removePlugin(m_scene_view);
+		m_app.removePlugin(m_game_view);
+		m_app.removePlugin(m_editor_ui_render_plugin);
 
 		PropertyGrid& property_grid = m_app.getPropertyGrid();
 
-		property_grid.removePlugin(*m_model_properties_plugin);
-		property_grid.removePlugin(*m_env_probe_plugin);
-		property_grid.removePlugin(*m_terrain_plugin);
-
-		m_model_properties_plugin.destroy();
-		m_env_probe_plugin.destroy();
-		m_terrain_plugin.destroy();
+		property_grid.removePlugin(m_model_properties_plugin);
+		property_grid.removePlugin(m_env_probe_plugin);
+		property_grid.removePlugin(m_terrain_plugin);
 	}
 
-
 	StudioApp& m_app;
-	AddTerrainComponentPlugin* m_add_terrain_plugin;
-	Local<ModelPlugin> m_model_plugin;
-	Local<MaterialPlugin> m_material_plugin;
-	Local<ParticleEmitterPlugin> m_particle_emitter_plugin;
-	Local<PipelinePlugin> m_pipeline_plugin;
-	Local<FontPlugin> m_font_plugin;
-	Local<TexturePlugin> m_texture_plugin;
-	Local<ShaderPlugin> m_shader_plugin;
-	Local<ModelPropertiesPlugin> m_model_properties_plugin;
-	Local<EnvironmentProbePlugin> m_env_probe_plugin;
-	Local<TerrainPlugin> m_terrain_plugin;
-	Local<SceneView> m_scene_view;
-	Local<GameView> m_game_view;
-	Local<EditorUIRenderPlugin> m_editor_ui_render_plugin;
+	EditorUIRenderPlugin m_editor_ui_render_plugin;
+	MaterialPlugin m_material_plugin;
+	ParticleEmitterPlugin m_particle_emitter_plugin;
+	PipelinePlugin m_pipeline_plugin;
+	FontPlugin m_font_plugin;
+	ShaderPlugin m_shader_plugin;
+	ModelPropertiesPlugin m_model_properties_plugin;
+	TexturePlugin m_texture_plugin;
+	GameView m_game_view;
+	SceneView m_scene_view;
+	EnvironmentProbePlugin m_env_probe_plugin;
+	TerrainPlugin m_terrain_plugin;
+	ModelPlugin m_model_plugin;
 };
 
 

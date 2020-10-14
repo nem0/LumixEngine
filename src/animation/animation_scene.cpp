@@ -277,7 +277,7 @@ struct AnimationSceneImpl final : AnimationScene
 	{
 		if (!res) return;
 
-		res->getResourceManager().unload(*res);
+		res->decRefCount();
 	}
 
 
@@ -972,13 +972,6 @@ struct AnimationSceneImpl final : AnimationScene
 UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator)
 {
 	return UniquePtr<AnimationSceneImpl>::create(allocator, engine, plugin, universe, allocator);
-}
-
-
-void AnimationScene::destroy(AnimationScene& scene)
-{
-	AnimationSceneImpl& scene_impl = (AnimationSceneImpl&)scene;
-	LUMIX_DELETE(scene_impl.m_allocator, &scene_impl);
 }
 
 

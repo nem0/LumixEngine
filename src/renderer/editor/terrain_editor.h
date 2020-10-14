@@ -85,10 +85,10 @@ private:
 	Vec3 m_color;
 	int m_current_brush;
 	Array<PrefabResource*> m_selected_prefabs;
-	Action* m_lower_terrain_action;
-	Action* m_smooth_terrain_action;
-	Action* m_remove_entity_action;
-	Action* m_remove_grass_action;
+	Action m_lower_terrain_action;
+	Action m_smooth_terrain_action;
+	Action m_remove_entity_action;
+	Action m_remove_grass_action;
 	Array<bool> m_brush_mask;
 	Texture* m_brush_texture;
 	Vec2 m_size_spread;

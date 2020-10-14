@@ -119,11 +119,15 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 		, open(false)
 		, autocomplete(_app.getAllocator())
 	{
-		Action* action = LUMIX_NEW(app.getAllocator(), Action)("Script Console", "Toggle script console", "script_console");
-		action->func.bind<&ConsolePlugin::toggleOpen>(this);
-		action->is_selected.bind<&ConsolePlugin::isOpen>(this);
-		app.addWindowAction(action);
+		m_toggle_ui.init("Script Console", "Toggle script console", "script_console", "", true);
+		m_toggle_ui.func.bind<&ConsolePlugin::toggleOpen>(this);
+		m_toggle_ui.is_selected.bind<&ConsolePlugin::isOpen>(this);
+		app.addWindowAction(&m_toggle_ui);
 		buf[0] = '\0';
+	}
+
+	~ConsolePlugin() {
+		app.removeAction(&m_toggle_ui);
 	}
 
 	void onSettingsLoaded() override {
@@ -348,6 +352,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 
 	StudioApp& app;
+	Action m_toggle_ui;
 	Array<String> autocomplete;
 	bool open;
 	bool open_autocomplete = false;
@@ -459,6 +464,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
+		, m_asset_plugin(app)
+		, m_console_plugin(app)
 	{
 	}
 
@@ -468,35 +475,24 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		IAllocator& allocator = m_app.getAllocator();
 
-		m_add_component_plugin = LUMIX_NEW(allocator, AddComponentPlugin)(m_app);
-		m_app.registerComponent(ICON_FA_MOON, "lua_script", *m_add_component_plugin);
+		AddComponentPlugin* add_cmp_plugin = LUMIX_NEW(m_app.getAllocator(), AddComponentPlugin)(m_app);
+		m_app.registerComponent(ICON_FA_MOON, "lua_script", *add_cmp_plugin);
 
-		m_asset_plugin = LUMIX_NEW(allocator, AssetPlugin)(m_app);
-		m_app.getAssetBrowser().addPlugin(*m_asset_plugin);
 		const char* exts[] = { "lua", nullptr };
-		m_app.getAssetCompiler().addPlugin(*m_asset_plugin, exts);
-
-		m_console_plugin = LUMIX_NEW(allocator, ConsolePlugin)(m_app);
-		m_app.addPlugin(*m_console_plugin);
-
-		m_property_grid_plugin = LUMIX_NEW(allocator, PropertyGridPlugin);
-		m_app.getPropertyGrid().addPlugin(*m_property_grid_plugin);
+		m_app.getAssetCompiler().addPlugin(m_asset_plugin, exts);
+		m_app.getAssetBrowser().addPlugin(m_asset_plugin);
+		m_app.addPlugin(m_console_plugin);
+		m_app.getPropertyGrid().addPlugin(m_property_grid_plugin);
 	}
-
 
 	~StudioAppPlugin()
 	{
 		IAllocator& allocator = m_app.getAllocator();
 		
-		m_app.getAssetCompiler().removePlugin(*m_asset_plugin);
-		m_app.getAssetBrowser().removePlugin(*m_asset_plugin);
-		LUMIX_DELETE(allocator, m_asset_plugin);
-
-		m_app.removePlugin(*m_console_plugin);
-		LUMIX_DELETE(allocator, m_console_plugin);
-
-		m_app.getPropertyGrid().removePlugin(*m_property_grid_plugin);
-		LUMIX_DELETE(allocator, m_property_grid_plugin);
+		m_app.getAssetCompiler().removePlugin(m_asset_plugin);
+		m_app.getAssetBrowser().removePlugin(m_asset_plugin);
+		m_app.removePlugin(m_console_plugin);
+		m_app.getPropertyGrid().removePlugin(m_property_grid_plugin);
 	}
 
 	bool showGizmo(UniverseView& view, ComponentUID cmp) override
@@ -518,10 +514,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 	
 	StudioApp& m_app;
-	AddComponentPlugin* m_add_component_plugin;
-	AssetPlugin* m_asset_plugin;
-	ConsolePlugin* m_console_plugin;
-	PropertyGridPlugin* m_property_grid_plugin;
+	AssetPlugin m_asset_plugin;
+	ConsolePlugin m_console_plugin;
+	PropertyGridPlugin m_property_grid_plugin;
 };
 
 

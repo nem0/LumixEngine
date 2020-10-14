@@ -1036,10 +1036,10 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 	ASSERT(renderer);
 
 	IAllocator& allocator = renderer->getAllocator();
-	CaptureImpostorJob* job = LUMIX_NEW(allocator, CaptureImpostorJob)(gb0_rgba, gb1_rgba, size, allocator);
-	job->m_model = model;
-	job->m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
-	job->m_material_ub = renderer->getMaterialUniformBuffer();
+	CaptureImpostorJob& job = renderer->createJob<CaptureImpostorJob>(gb0_rgba, gb1_rgba, size, allocator);
+	job.m_model = model;
+	job.m_capture_define = 1 << renderer->getShaderDefineIdx("DEFERRED");
+	job.m_material_ub = renderer->getMaterialUniformBuffer();
 	renderer->queue(job, 0);
 	renderer->frame();
 	renderer->waitForRender();

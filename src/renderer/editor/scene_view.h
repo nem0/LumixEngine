@@ -3,6 +3,7 @@
 
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "renderer/gpu/gpu.h"
 
 
@@ -51,16 +52,16 @@ struct SceneView : StudioApp::GUIPlugin
 
 	private:
 		StudioApp& m_app;
-		Action* m_orbit_action;
-		Action* m_toggle_gizmo_step_action;
-		Action* m_copy_move_action;
-		Action* m_move_forward_action;
-		Action* m_move_back_action;
-		Action* m_move_left_action;
-		Action* m_move_right_action;
-		Action* m_move_up_action;
-		Action* m_move_down_action;
-		Action* m_camera_speed_action;
+		Action m_orbit_action;
+		Action m_toggle_gizmo_step_action;
+		Action m_copy_move_action;
+		Action m_move_forward_action;
+		Action m_move_back_action;
+		Action m_move_left_action;
+		Action m_move_right_action;
+		Action m_move_up_action;
+		Action m_move_down_action;
+		Action m_camera_speed_action;
 		bool m_is_mouse_captured;
 		bool m_copy_moved = false;
 		bool m_show_stats;

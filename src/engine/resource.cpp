@@ -214,6 +214,15 @@ void Resource::removeDependency(Resource& dependent_resource)
 	checkState();
 }
 
+u32 Resource::decRefCount() {
+	ASSERT(m_ref_count > 0);
+	--m_ref_count;
+	if (m_ref_count == 0 && m_resource_manager.m_is_unload_enabled) {
+		doUnload();
+	}
+	return m_ref_count;
+}
+
 
 void Resource::onStateChanged(State old_state, State new_state, Resource&)
 {

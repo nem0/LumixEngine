@@ -54,19 +54,19 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	path << "/asset_tiles";
 	OS::makePath(path);
 
-	m_back_action = LUMIX_NEW(allocator, Action)("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT);
-	m_back_action->is_global = false;
-	m_back_action->func.bind<&AssetBrowser::goBack>(this);
-	m_forward_action = LUMIX_NEW(allocator, Action)("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT);
-	m_forward_action->is_global = false;
-	m_forward_action->func.bind<&AssetBrowser::goForward>(this);
-	m_app.addAction(m_back_action);
-	m_app.addAction(m_forward_action);
+	m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
+	m_back_action.func.bind<&AssetBrowser::goBack>(this);
+	m_forward_action.init("Forward", "Forward in asset history", "forward", ICON_FA_ARROW_RIGHT, false);
+	m_forward_action.func.bind<&AssetBrowser::goForward>(this);
+	m_app.addAction(&m_back_action);
+	m_app.addAction(&m_forward_action);
 }
 
 
 AssetBrowser::~AssetBrowser()
 {
+	m_app.removeAction(&m_back_action);
+	m_app.removeAction(&m_forward_action);
 	m_app.getAssetCompiler().listChanged().unbind<&AssetBrowser::onResourceListChanged>(this);
 	unloadResources();
 	RenderInterface* ri = m_app.getRenderInterface();
@@ -98,7 +98,7 @@ void AssetBrowser::unloadResources()
 		for (auto* plugin : m_plugins) {
 			plugin->onResourceUnloaded(res);
 		}
-		res->getResourceManager().unload(*res);
+		res->decRefCount();
 	}
 
 	m_selected_resources.clear();
@@ -571,8 +571,8 @@ void AssetBrowser::detailsGUI()
 		if (m_history.size() > 1) {
 			if (ImGui::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
 			{
-				if (m_history_index > 0) m_back_action->toolbarButton(m_app.getBigIconFont());
-				if (m_history_index < m_history.size() - 1) m_forward_action->toolbarButton(m_app.getBigIconFont());
+				if (m_history_index > 0) m_back_action.toolbarButton(m_app.getBigIconFont());
+				if (m_history_index < m_history.size() - 1) m_forward_action.toolbarButton(m_app.getBigIconFont());
 			}
 			ImGui::EndToolbar();
 		}

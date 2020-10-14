@@ -21,11 +21,7 @@ public:
 
 	void enableUnload(bool enable);
 
-	void load(Resource& resource);
 	void removeUnreferenced();
-
-	void unload(const struct Path& path);
-	void unload(Resource& resource);
 
 	void reload(const Path& path);
 	void reload(Resource& resource);

@@ -144,7 +144,6 @@ struct AssetCompilerImpl : AssetCompiler
 		m_task.destroy();
 		ResourceManagerHub& rm = m_app.getEngine().getResourceManager();
 		rm.setLoadHook(nullptr);
-		FileSystemWatcher::destroy(m_watcher);
 	}
 	
 	DelegateList<void()>& listChanged() override {
@@ -308,6 +307,7 @@ struct AssetCompilerImpl : AssetCompiler
 				fs.deleteFile(StaticString<MAX_PATH_LENGTH>(".lumix/assets/", info.filename));
 			}
 		}
+		OS::destroyFileIterator(iter);
 	}
 
 
@@ -722,7 +722,7 @@ struct AssetCompilerImpl : AssetCompiler
 	LoadHook m_load_hook;
 	HashMap<u32, IPlugin*, HashFuncDirect<u32>> m_plugins;
 	AssetCompilerTask m_task;
-	FileSystemWatcher* m_watcher;
+	UniquePtr<FileSystemWatcher> m_watcher;
 	Mutex m_resources_mutex;
 	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;

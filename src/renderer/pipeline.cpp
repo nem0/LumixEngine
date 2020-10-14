@@ -670,20 +670,20 @@ struct PipelineImpl final : Pipeline
 		m_renderer.frame();
 		m_renderer.frame();
 
-		m_draw2d_shader->getResourceManager().unload(*m_draw2d_shader);
-		m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
-		m_text_mesh_shader->getResourceManager().unload(*m_text_mesh_shader);
-		m_place_grass_shader->getResourceManager().unload(*m_place_grass_shader);
-		m_default_cubemap->getResourceManager().unload(*m_default_cubemap);
+		m_draw2d_shader->decRefCount();
+		m_debug_shape_shader->decRefCount();
+		m_text_mesh_shader->decRefCount();
+		m_place_grass_shader->decRefCount();
+		m_default_cubemap->decRefCount();
 
 		for (const Renderbuffer& rb : m_renderbuffers) {
 			m_renderer.destroy(rb.handle);
 		}
 
 		for(ShaderRef& shader : m_shaders) {
-			shader.res->getResourceManager().unload(*shader.res);
+			shader.res->decRefCount();
 		}
-		if (m_resource) m_resource->getResourceManager().unload(*m_resource);
+		if (m_resource) m_resource->decRefCount();
 
 		m_renderer.destroy(m_cube_ib);
 		m_renderer.destroy(m_cube_vb);
@@ -1001,11 +1001,11 @@ struct PipelineImpl final : Pipeline
 			return false;
 		}
 
-		BlitJob* job = LUMIX_NEW(m_renderer.getAllocator(), BlitJob);
-		job->dst = m_shadow_atlas.texture;
-		job->src = src;
-		job->x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
-		job->y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
+		BlitJob& job = m_renderer.createJob<BlitJob>();
+		job.dst = m_shadow_atlas.texture;
+		job.src = src;
+		job.x = u32(ShadowAtlas::SIZE * uv.x + 0.5f);
+		job.y = u32(ShadowAtlas::SIZE * uv.y + 0.5f);
 
 		m_renderer.queue(job, m_profiler_link);
 		m_viewport = backup_viewport;
@@ -1077,11 +1077,11 @@ struct PipelineImpl final : Pipeline
 			PassState pass_state;
 		};
 
-		StartPipelineJob* start_job = LUMIX_NEW(m_renderer.getAllocator(), StartPipelineJob);
-		start_job->pipeline = this;
-		start_job->global_state = global_state;
-		start_job->global_state_buffer = m_global_state_buffer;
-		start_job->pass_state_buffer = m_pass_state_buffer;
+		StartPipelineJob& start_job = m_renderer.createJob<StartPipelineJob>();
+		start_job.pipeline = this;
+		start_job.global_state = global_state;
+		start_job.global_state_buffer = m_global_state_buffer;
+		start_job.pass_state_buffer = m_pass_state_buffer;
 		m_renderer.queue(start_job, 0);
 		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
@@ -1113,8 +1113,8 @@ struct PipelineImpl final : Pipeline
 			PipelineImpl* pipeline;
 		};
 
-		EndPipelineJob* end_job = LUMIX_NEW(m_renderer.getAllocator(), EndPipelineJob);
-		end_job->pipeline = this;
+		EndPipelineJob& end_job = m_renderer.createJob<EndPipelineJob>();
+		end_job.pipeline = this;
 		m_renderer.queue(end_job, 0);
 		m_renderer.waitForCommandSetup();
 
@@ -1179,10 +1179,9 @@ struct PipelineImpl final : Pipeline
 		const Array<DebugTriangle>& tris = m_scene->getDebugTriangles();
 		if (tris.empty() || !m_debug_shape_shader->isReady()) return;
 
-		IAllocator& allocator = m_renderer.getAllocator();
-		Cmd* cmd = LUMIX_NEW(allocator, Cmd);
-		cmd->pipeline = this;
-		cmd->viewport_pos = m_viewport.pos;
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.pipeline = this;
+		cmd.viewport_pos = m_viewport.pos;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -1243,10 +1242,9 @@ struct PipelineImpl final : Pipeline
 		const Array<DebugLine>& lines = m_scene->getDebugLines();
 		if (lines.empty() || !m_debug_shape_shader->isReady()) return;
 
-		IAllocator& allocator = m_renderer.getAllocator();
-		Cmd* cmd = LUMIX_NEW(allocator, Cmd);
-		cmd->pipeline = this;
-		cmd->viewport_pos = m_viewport.pos;
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.pipeline = this;
+		cmd.viewport_pos = m_viewport.pos;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -1360,10 +1358,11 @@ struct PipelineImpl final : Pipeline
 		};
 
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
+
 		IAllocator& allocator = m_renderer.getAllocator();
-		Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
-		cmd->pipeline = this;
-		cmd->atlas_texture = atlas_texture->handle;
+		Cmd& cmd = m_renderer.createJob<Cmd>(allocator);
+		cmd.pipeline = this;
+		cmd.atlas_texture = atlas_texture->handle;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -1482,15 +1481,15 @@ struct PipelineImpl final : Pipeline
 	{
 		PROFILE_FUNCTION();
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderTerrainsCommand* cmd = LUMIX_NEW(allocator, RenderTerrainsCommand)(allocator);
+		RenderTerrainsCommand& cmd = m_renderer.createJob<RenderTerrainsCommand>(allocator);
 
 		const char* define = "";
 		LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
 
-		cmd->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-		cmd->m_render_state = state.value;
-		cmd->m_pipeline = this;
-		cmd->m_camera_params = cp;
+		cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		cmd.m_render_state = state.value;
+		cmd.m_pipeline = this;
+		cmd.m_camera_params = cp;
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -1502,18 +1501,18 @@ struct PipelineImpl final : Pipeline
 		if (!m_place_grass_shader->isReady()) return;
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderGrassCommand* cmd = LUMIX_NEW(allocator, RenderGrassCommand)(allocator);
+		RenderGrassCommand& cmd = m_renderer.createJob<RenderGrassCommand>(allocator);
 
-		cmd->m_define_mask = 0;
+		cmd.m_define_mask = 0;
 		if (lua_istable(L, 2)) {
 			const char* define = "";
 			LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
-			cmd->m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+			cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		}
-		cmd->m_render_state = state.get({0}).value;
-		cmd->m_pipeline = this;
-		cmd->m_camera_params = cp;
-		cmd->m_compute_shader = m_place_grass_shader->getProgram(gpu::VertexDecl(), 0);
+		cmd.m_render_state = state.get({0}).value;
+		cmd.m_pipeline = this;
+		cmd.m_camera_params = cp;
+		cmd.m_compute_shader = m_place_grass_shader->getProgram(gpu::VertexDecl(), 0);
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -1604,9 +1603,9 @@ struct PipelineImpl final : Pipeline
 			u32 m_size;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->m_pipeline = this;
-		cmd->m_camera_params = cp;
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.m_pipeline = this;
+		cmd.m_camera_params = cp;
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -1704,10 +1703,11 @@ struct PipelineImpl final : Pipeline
 			bool writable;
 			gpu::BufferHandle buffer;
 		};
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->binding_point = binding_point;
-		cmd->buffer = buffer_handle;
-		cmd->writable = writable;
+		
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.binding_point = binding_point;
+		cmd.buffer = buffer_handle;
+		cmd.writable = writable;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 	
@@ -1722,10 +1722,11 @@ struct PipelineImpl final : Pipeline
 			u32 size;
 			gpu::BufferHandle buffer;
 		};
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->binding_point = binding_point;
-		cmd->buffer = (gpu::BufferHandle)(uintptr_t)buffer_handle;
-		cmd->size = size;
+
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.binding_point = binding_point;
+		cmd.buffer = (gpu::BufferHandle)(uintptr_t)buffer_handle;
+		cmd.size = size;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -1792,9 +1793,10 @@ struct PipelineImpl final : Pipeline
 			float values[32];
 			gpu::BufferHandle drawcall_ub;
 		};
-		Cmd* cmd = LUMIX_NEW(pipeline->m_renderer.getAllocator(), Cmd);
-		memcpy(cmd->values, values, sizeof(values));
-		cmd->drawcall_ub = pipeline->m_drawcall_ub;
+
+		Cmd& cmd = pipeline->m_renderer.createJob<Cmd>();
+		memcpy(cmd.values, values, sizeof(values));
+		cmd.drawcall_ub = pipeline->m_drawcall_ub;
 		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
 
 		return 0;
@@ -1834,11 +1836,11 @@ struct PipelineImpl final : Pipeline
 			u32 num_groups_z;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->num_groups_x = num_groups_x;
-		cmd->num_groups_y = num_groups_y;
-		cmd->num_groups_z = num_groups_z;
-		cmd->program = program;
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.num_groups_x = num_groups_x;
+		cmd.num_groups_y = num_groups_y;
+		cmd.num_groups_z = num_groups_z;
+		cmd.program = program;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -1852,9 +1854,10 @@ struct PipelineImpl final : Pipeline
 			gpu::TextureHandle texture;
 			u32 unit;
 		};
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->texture = texture_handle;
-		cmd->unit = unit;
+
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.texture = texture_handle;
+		cmd.unit = unit;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -1871,9 +1874,10 @@ struct PipelineImpl final : Pipeline
 			gpu::TextureHandle handle;
 			u32 offset = 0;
 		};
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->offset = offset;
-		cmd->handle = texture_handle;
+
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.offset = offset;
+		cmd.handle = texture_handle;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -1892,19 +1896,19 @@ struct PipelineImpl final : Pipeline
 			u32 m_textures_count = 0;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->m_offset = offset.get(0);
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.m_offset = offset.get(0);
 		
 		Engine& engine = m_renderer.getEngine();
 		for (i32 res_idx : texture_handles) {
 			Resource* res = engine.getLuaResource(res_idx);
 			if (!res || res->getType() != Texture::TYPE) {
-				LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+				m_renderer.destroyJob(cmd);
 				luaL_error(L, "%s", "Unknown textures in bindTextures");
 				return;
 			}
-			cmd->m_textures_handles[cmd->m_textures_count] = ((Texture*)res)->handle;
-			++cmd->m_textures_count;
+			cmd.m_textures_handles[cmd.m_textures_count] = ((Texture*)res)->handle;
+			++cmd.m_textures_count;
 		}
 
 		m_renderer.queue(cmd, m_profiler_link);
@@ -1925,13 +1929,13 @@ struct PipelineImpl final : Pipeline
 			u32 m_textures_count = 0;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->m_offset = offset.get(0);
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.m_offset = offset.get(0);
 		
 		Engine& engine = m_renderer.getEngine();
 		for (i32 rb_idx : renderbuffers) {
-			cmd->m_textures_handles[cmd->m_textures_count] = m_renderbuffers[rb_idx].handle;
-			++cmd->m_textures_count;
+			cmd.m_textures_handles[cmd.m_textures_count] = m_renderbuffers[rb_idx].handle;
+			++cmd.m_textures_count;
 		}
 
 		m_renderer.queue(cmd, m_profiler_link);
@@ -1952,17 +1956,17 @@ struct PipelineImpl final : Pipeline
 			PassState pass_state;
 		};
 
-		PushPassStateCmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), PushPassStateCmd);
-		cmd->pass_state.view = cp.view;
-		cmd->pass_state.projection = cp.projection;
-		cmd->pass_state.inv_projection = cp.projection.inverted();
-		cmd->pass_state.inv_view = cp.view.fastInverted();
-		cmd->pass_state.view_projection = cp.projection * cp.view;
-		cmd->pass_state.inv_view_projection = cmd->pass_state.view_projection.inverted();
-		cmd->pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
-		toPlanes(cp, Span(cmd->pass_state.camera_planes));
+		PushPassStateCmd& cmd = m_renderer.createJob<PushPassStateCmd>();
+		cmd.pass_state.view = cp.view;
+		cmd.pass_state.projection = cp.projection;
+		cmd.pass_state.inv_projection = cp.projection.inverted();
+		cmd.pass_state.inv_view = cp.view.fastInverted();
+		cmd.pass_state.view_projection = cp.projection * cp.view;
+		cmd.pass_state.inv_view_projection = cmd.pass_state.view_projection.inverted();
+		cmd.pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
+		toPlanes(cp, Span(cmd.pass_state.camera_planes));
 		
-		cmd->pass_state_buffer = m_pass_state_buffer;
+		cmd.pass_state_buffer = m_pass_state_buffer;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -2109,56 +2113,56 @@ struct PipelineImpl final : Pipeline
 		}
 		if (!shader->isReady()) return;
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
+		Cmd& cmd = m_renderer.createJob<Cmd>();
 		if(lua_gettop(L) > 3) {
 			const u32 len = (u32)lua_objlen(L, 4);
 			for(u32 i = 0; i < len; ++i) {
 				lua_rawgeti(L, 4, i + 1);
 				if(lua_type(L, -1) != LUA_TNUMBER) {
-					LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+					m_renderer.destroyJob(cmd);
 					luaL_error(L, "%s", "Incorrect texture arguments of drawArrays");
 				}
 
-				if (cmd->m_textures_count > lengthOf(cmd->m_textures_handles)) {
-					LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+				if (cmd.m_textures_count > lengthOf(cmd.m_textures_handles)) {
+					m_renderer.destroyJob(cmd);
 					luaL_error(L, "%s", "Too many texture in drawArray call");
 				}
 
 				const int rb_idx = (int)lua_tointeger(L, -1);
 				if (rb_idx == -2) {
-					cmd->m_textures_handles[cmd->m_textures_count] = m_shadow_atlas.texture;
+					cmd.m_textures_handles[cmd.m_textures_count] = m_shadow_atlas.texture;
 				}
 				else {
-					cmd->m_textures_handles[cmd->m_textures_count] = m_renderbuffers[rb_idx].handle;
+					cmd.m_textures_handles[cmd.m_textures_count] = m_renderbuffers[rb_idx].handle;
 				}
-				++cmd->m_textures_count;
+				++cmd.m_textures_count;
 				lua_pop(L, 1);
 			}
 		
 			if (lua_isstring(L, 6)) {
 				const char* define = lua_tostring(L, 6);
-				cmd->m_define_mask = 1 << m_renderer.getShaderDefineIdx(define);
+				cmd.m_define_mask = 1 << m_renderer.getShaderDefineIdx(define);
 			}
 			else if (lua_istable(L, 6)) {
 				lua_pushnil(L);
 				while (lua_next(L, 6) != 0) {
 					if(lua_type(L, -1) != LUA_TSTRING) {
-						LUMIX_DELETE(m_renderer.getAllocator(), cmd);
+						m_renderer.destroyJob(cmd);
 						luaL_error(L, "%s", "Incorrect define arguments of drawArrays");
 					}
 					const char* define = lua_tostring(L, -1);
-					cmd->m_define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
+					cmd.m_define_mask |= 1 << m_renderer.getShaderDefineIdx(define);
 					lua_pop(L, 1);
 				}
 			}
 
 		}
 	
-		cmd->m_pipeline = this;
-		cmd->m_render_state = rs;
-		cmd->m_shader = shader;
-		cmd->m_indices_count = indices_count;
-		cmd->m_indices_offset = indices_offset;
+		cmd.m_pipeline = this;
+		cmd.m_render_state = rs;
+		cmd.m_shader = shader;
+		cmd.m_indices_count = indices_count;
+		cmd.m_indices_offset = indices_offset;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -2265,10 +2269,10 @@ struct PipelineImpl final : Pipeline
 
 		Texture* atlas = m_renderer.getFontManager().getAtlasTexture();
 		IAllocator& allocator = m_renderer.getAllocator();
-		RenderJob* job = LUMIX_NEW(allocator, RenderJob);
-		job->m_pipeline = this;
-		job->m_atlas = atlas ? atlas->handle : gpu::INVALID_TEXTURE;
-		job->m_program = m_text_mesh_shader->getProgram(m_text_mesh_decl, 0);
+		RenderJob& job = m_renderer.createJob<RenderJob>();
+		job.m_pipeline = this;
+		job.m_atlas = atlas ? atlas->handle : gpu::INVALID_TEXTURE;
+		job.m_program = m_text_mesh_shader->getProgram(m_text_mesh_decl, 0);
 		m_renderer.queue(job, m_profiler_link);
 	}
 
@@ -2348,11 +2352,11 @@ struct PipelineImpl final : Pipeline
 
 		if (!shader || !shader->isReady()) return;
 
-		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
+		RenderJob& job = m_renderer.createJob<RenderJob>();
 		const u32 define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
-		job->m_pipeline = this;
-		job->m_cmds = cmds;
-		job->m_program = shader->getProgram(m_point_light_decl, define_mask);
+		job.m_pipeline = this;
+		job.m_cmds = cmds;
+		job.m_program = shader->getProgram(m_point_light_decl, define_mask);
 		m_renderer.queue(job, m_profiler_link);
 	}
 
@@ -2787,14 +2791,14 @@ struct PipelineImpl final : Pipeline
 		}
 		if (!shader->isReady()) return;
 
-		RenderReflectionVolumesJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderReflectionVolumesJob)(m_allocator);
+		RenderReflectionVolumesJob& job = m_renderer.createJob<RenderReflectionVolumesJob>(m_allocator);
 		
-		job->m_program = shader->getProgram(m_simple_cube_decl, 0);
-		job->m_ib = m_cube_ib;
-		job->m_vb = m_cube_vb;
-		job->m_pipeline = this;
-		job->m_camera_params = cp;
-		job->m_texture_offset = texture_offset;
+		job.m_program = shader->getProgram(m_simple_cube_decl, 0);
+		job.m_ib = m_cube_ib;
+		job.m_vb = m_cube_vb;
+		job.m_pipeline = this;
+		job.m_camera_params = cp;
+		job.m_texture_offset = texture_offset;
 		m_renderer.queue(job, m_profiler_link);
 	}
 
@@ -2831,14 +2835,14 @@ struct PipelineImpl final : Pipeline
 	}
 
 	void fillClusters(LuaWrapper::Optional<CameraParams> cp) {
-		FillClustersJob* job = LUMIX_NEW(m_renderer.getAllocator(), FillClustersJob)(m_allocator);
+		FillClustersJob& job = m_renderer.createJob<FillClustersJob>(m_allocator);
 		
-		job->m_pipeline = this;
+		job.m_pipeline = this;
 		if (cp.valid) {
-			job->m_camera_params = cp.value;
+			job.m_camera_params = cp.value;
 		}
 		else {
-			job->m_is_clear = true;
+			job.m_is_clear = true;
 		}
 
 		CullResult* lights = m_scene->getRenderables(cp.value.frustum, RenderableTypes::LOCAL_LIGHT);
@@ -2848,8 +2852,8 @@ struct PipelineImpl final : Pipeline
 		AtlasSorter atlas_sorter;
 		lights->forEach([&](EntityRef e){
 			PointLight& pl = m_scene->getPointLight(e);
-			i32 idx = job->m_point_lights.size();
-			FillClustersJob::ClusterPointLight& light = job->m_point_lights.emplace();
+			i32 idx = job.m_point_lights.size();
+			FillClustersJob::ClusterPointLight& light = job.m_point_lights.emplace();
 			light.radius = pl.range;
 			const DVec3 light_pos = universe.getPosition(e);
 			light.pos = (light_pos - cam_pos).toFloat();
@@ -2861,7 +2865,7 @@ struct PipelineImpl final : Pipeline
 			auto iter = m_shadow_atlas.map.find(e);
 			if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
 				light.atlas_idx = iter.isValid() ? iter.value() : -1;
-				atlas_sorter.push(job->m_point_lights.size() - 1, computePriority(light, light_pos, cam_pos), e);
+				atlas_sorter.push(job.m_point_lights.size() - 1, computePriority(light, light_pos, cam_pos), e);
 			}
 			else if(iter.isValid()) {
 				light.atlas_idx = -1;
@@ -2870,7 +2874,7 @@ struct PipelineImpl final : Pipeline
 		});
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
-			FillClustersJob::ClusterPointLight& light = job->m_point_lights[atlas_sorter.lights[i].idx];
+			FillClustersJob::ClusterPointLight& light = job.m_point_lights[atlas_sorter.lights[i].idx];
 			if (light.atlas_idx != -1 && ShadowAtlas::getGroup(i) != ShadowAtlas::getGroup(light.atlas_idx)) {
 				m_shadow_atlas.remove(atlas_sorter.lights[i].entity);
 				light.atlas_idx = -1;
@@ -2883,7 +2887,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
-			FillClustersJob::ClusterPointLight& light = job->m_point_lights[atlas_sorter.lights[i].idx];
+			FillClustersJob::ClusterPointLight& light = job.m_point_lights[atlas_sorter.lights[i].idx];
 			EntityRef e = atlas_sorter.lights[i].entity;
 			PointLight& pl = m_scene->getPointLight(e);
 			if (light.atlas_idx == -1) {
@@ -2894,7 +2898,7 @@ struct PipelineImpl final : Pipeline
 				bakeShadow(pl, light.atlas_idx);
 			}
 			const Matrix mtx = getShadowMatrix(pl, light.atlas_idx);
-			job->m_shadow_atlas_matrices[light.atlas_idx] = mtx;
+			job.m_shadow_atlas_matrices[light.atlas_idx] = mtx;
 		}
 
 		lights->free(m_renderer.getEngine().getPageAllocator());
@@ -2938,7 +2942,8 @@ struct PipelineImpl final : Pipeline
 						READ(RenderableTypes, type);
 						switch(type) {
 							case RenderableTypes::MESH:
-							case RenderableTypes::MESH_GROUP: {
+							case RenderableTypes::MESH_GROUP:
+							case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 								READ(Mesh::RenderData*, mesh);
 								READ(Material::RenderData*, material);
 								READ(gpu::ProgramHandle, program);
@@ -3047,11 +3052,11 @@ struct PipelineImpl final : Pipeline
 			CmdPage* m_cmds;
 		};
 
-		RenderJob* job = LUMIX_NEW(m_renderer.getAllocator(), RenderJob);
+		RenderJob& job = m_renderer.createJob<RenderJob>();
 
-		job->m_render_state = state.value;
-		job->m_pipeline = this;
-		job->m_cmds = cmd_page;
+		job.m_render_state = state.value;
+		job.m_pipeline = this;
+		job.m_cmds = cmd_page;
 		m_renderer.queue(job, m_profiler_link);
 	}
 
@@ -3083,22 +3088,22 @@ struct PipelineImpl final : Pipeline
 			u32 h;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		ASSERT(renderbuffers.length() < lengthOf(cmd->rbs));
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		ASSERT(renderbuffers.length() < lengthOf(cmd.rbs));
 
 		for (u32 i = 0; i < renderbuffers.length(); ++i) {
-			cmd->rbs[i] = renderbuffers[i];
+			cmd.rbs[i] = renderbuffers[i];
 		}
 
-		cmd->pipeline = this;
-		cmd->ds = ds;
-		cmd->count = renderbuffers.length();
-		cmd->flags = srgb ? (u32)gpu::FramebufferFlags::SRGB : 0;
+		cmd.pipeline = this;
+		cmd.ds = ds;
+		cmd.count = renderbuffers.length();
+		cmd.flags = srgb ? (u32)gpu::FramebufferFlags::SRGB : 0;
 		if (readonly_ds) {
-			cmd->flags |= (u32)gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
+			cmd.flags |= (u32)gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
 		}
-		cmd->w = m_viewport.w;
-		cmd->h = m_viewport.h;
+		cmd.w = m_viewport.w;
+		cmd.h = m_viewport.h;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -3645,7 +3650,8 @@ struct PipelineImpl final : Pipeline
 							break;
 						}
 						case RenderableTypes::SKINNED:
-						case RenderableTypes::MESH_GROUP: {
+						case RenderableTypes::MESH_GROUP:
+						case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 							for (int i = 0, c = page->header.count; i < c; ++i) {
 								const EntityRef e = renderables[i];
 								const DVec3 pos = entity_data[e.index].pos;
@@ -3655,18 +3661,19 @@ struct PipelineImpl final : Pipeline
 								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 									const Mesh& mesh = mi.meshes[mesh_idx];
 									const u32 bucket = bucket_map[mesh.layer];
-									const RenderableTypes mesh_type = mesh.type == Mesh::RIGID ? RenderableTypes::MESH_GROUP : RenderableTypes::SKINNED;
-									const u64 type_mask = (u64)mesh_type << 32;
+									const u64 type_mask = (u64)type << 32;
+									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
+									ASSERT(!mi.custom_material || mesh_idx == 0);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
 									if (bucket < 0xff) {
-										const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
+										const u64 key = ((u64)mesh_sort_key<< 32) | ((u64)bucket << 56);
 										result.push(key, subrenderable);
 									} else if (bucket < 0xffFF) {
 										const DVec3 pos = entity_data[e.index].pos;
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-										const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+										const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
 										result.push(key, subrenderable);
 									}
 								}
@@ -3693,6 +3700,7 @@ struct PipelineImpl final : Pipeline
 			const RenderableTypes types[] = {
 				RenderableTypes::MESH,
 				RenderableTypes::MESH_GROUP,
+				RenderableTypes::MESH_MATERIAL_OVERRIDE,
 				RenderableTypes::SKINNED,
 				RenderableTypes::DECAL,
 				RenderableTypes::LOCAL_LIGHT
@@ -3774,6 +3782,42 @@ struct PipelineImpl final : Pipeline
 				}
 
 				switch(type) {
+					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
+						const u32 mesh_idx = renderables[i] >> 40;
+						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+
+						const Renderer::TransientSlice slice = renderer.allocTransient(sizeof(Vec4) * 2);
+						u8* instance_data = slice.ptr;
+						const EntityRef e = { int(renderables[i] & 0xFFffFFff) };
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+						instance_data += sizeof(tr.rot);
+						memcpy(instance_data, &lpos, sizeof(lpos));
+						instance_data += sizeof(lpos);
+						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+						instance_data += sizeof(tr.scale);
+						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 34) {
+							new_page(bucket);
+						}
+
+						const Mesh& mesh = mi->meshes[mesh_idx];
+						Shader* shader = mesh.material->getShader();
+						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+
+						if (mi->custom_material->isReady()) {
+							WRITE(type);
+							WRITE(mesh.render_data);
+							WRITE_FN(mi->custom_material->getRenderData());
+							WRITE(prog);
+							u16 count = 1;
+							WRITE(count);
+							WRITE(slice.buffer);
+							WRITE(slice.offset);
+						}
+							
+						break;
+					}
 					case RenderableTypes::MESH_GROUP:
 					case RenderableTypes::MESH: {
 						const u32 mesh_idx = renderables[i] >> 40;
@@ -4017,20 +4061,20 @@ struct PipelineImpl final : Pipeline
 		ASSERT(out.length() >= buckets.length());
 		IAllocator& allocator = m_renderer.getAllocator();
 		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
-		PrepareCommandsRenderJob* cmd = LUMIX_NEW(allocator, PrepareCommandsRenderJob)(allocator, page_allocator);
+		PrepareCommandsRenderJob& cmd = m_renderer.createJob<PrepareCommandsRenderJob>(allocator, page_allocator);
 
 		static_assert(sizeof(CmdPage) == PageAllocator::PAGE_SIZE, "Wrong page size");
 		for(u32 i = 0; i < buckets.length(); ++i) {
 			CmdPage* page = new (NewPlaceholder(), page_allocator.allocate(true)) CmdPage;
-			cmd->m_command_sets[i] = page;
-			cmd->m_define_mask[i] = buckets[i].define_mask;
-			cmd->m_bucket_sort_order[i] = buckets[i].order;
-			cmd->m_bucket_map[buckets[i].layer] = i | (buckets[i].order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
+			cmd.m_command_sets[i] = page;
+			cmd.m_define_mask[i] = buckets[i].define_mask;
+			cmd.m_bucket_sort_order[i] = buckets[i].order;
+			cmd.m_bucket_map[buckets[i].layer] = i | (buckets[i].order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
 			out[i] = page;
 		}
-		cmd->m_camera_params = cp;
-		cmd->m_pipeline = this;
-		cmd->m_bucket_count = buckets.length();
+		cmd.m_camera_params = cp;
+		cmd.m_pipeline = this;
+		cmd.m_bucket_count = buckets.length();
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -4048,10 +4092,10 @@ struct PipelineImpl final : Pipeline
 			u32 flags;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->color.set(r, g, b, a);
-		cmd->flags = flags;
-		cmd->depth = depth;
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.color.set(r, g, b, a);
+		cmd.flags = flags;
+		cmd.depth = depth;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -4067,11 +4111,11 @@ struct PipelineImpl final : Pipeline
 			int x, y, w, h;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->x = x;
-		cmd->y = y;
-		cmd->w = w;
-		cmd->h = h;
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.x = x;
+		cmd.y = y;
+		cmd.w = w;
+		cmd.h = h;
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -4092,11 +4136,12 @@ struct PipelineImpl final : Pipeline
 			Renderer* renderer;
 			i64 link;
 		};
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->name = name;
-		cmd->renderer = &m_renderer;
+
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.name = name;
+		cmd.renderer = &m_renderer;
 		m_profiler_link = Profiler::createNewLinkID();
-		cmd->link = m_profiler_link;
+		cmd.link = m_profiler_link;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
@@ -4114,8 +4159,9 @@ struct PipelineImpl final : Pipeline
 			}
 			Renderer* renderer;
 		};
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd);
-		cmd->renderer = &m_renderer;
+
+		Cmd& cmd = m_renderer.createJob<Cmd>();
+		cmd.renderer = &m_renderer;
 		m_renderer.queue(cmd, m_profiler_link);
 		m_profiler_link = 0;
 	}
@@ -4203,12 +4249,12 @@ struct PipelineImpl final : Pipeline
 			StaticString<MAX_PATH_LENGTH> path;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_renderer.getAllocator(), Cmd)(m_renderer.getAllocator());
-		cmd->handle = m_renderbuffers[render_buffer].handle;
-		cmd->w = m_viewport.w;
-		cmd->h = m_viewport.h;
-		cmd->path = out_path;
-		cmd->fs = &m_renderer.getEngine().getFileSystem();
+		Cmd& cmd = m_renderer.createJob<Cmd>(m_renderer.getAllocator());
+		cmd.handle = m_renderbuffers[render_buffer].handle;
+		cmd.w = m_viewport.w;
+		cmd.h = m_viewport.h;
+		cmd.path = out_path;
+		cmd.fs = &m_renderer.getEngine().getFileSystem();
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 

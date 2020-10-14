@@ -48,7 +48,7 @@ struct GUIText
 				m_font = nullptr;
 			}
 			m_font_resource->getObserverCb().unbind<&GUIText::onFontLoaded>(this);
-			m_font_resource->getResourceManager().unload(*m_font_resource);
+			m_font_resource->decRefCount();
 		}
 		m_font_resource = res;
 		if (res) res->onLoaded<&GUIText::onFontLoaded>(this);
@@ -115,7 +115,7 @@ struct GUIInputField
 struct GUIImage
 {
 	~GUIImage() {
-		if (sprite) sprite->getResourceManager().unload(*sprite);
+		if (sprite) sprite->decRefCount();
 	}
 
 	enum Flags
@@ -427,7 +427,7 @@ struct GUISceneImpl final : GUIScene
 		GUIImage* image = m_rects[entity]->image;
 		if (image->sprite)
 		{
-			image->sprite->getResourceManager().unload(*image->sprite);
+			image->sprite->decRefCount();
 		}
 		ResourceManagerHub& manager = m_system.getEngine().getResourceManager();
 		if (path.isValid())
@@ -1289,12 +1289,6 @@ UniquePtr<GUIScene> GUIScene::createInstance(GUISystem& system,
 	IAllocator& allocator)
 {
 	return UniquePtr<GUISceneImpl>::create(allocator, system, universe, allocator);
-}
-
-
-void GUIScene::destroyInstance(GUIScene* scene)
-{
-	LUMIX_DELETE(static_cast<GUISceneImpl*>(scene)->m_allocator, scene);
 }
 
 

@@ -77,7 +77,7 @@ static bool hasAttribute(Mesh& mesh, Mesh::AttributeSemantic attribute)
 
 void Mesh::setMaterial(Material* new_material, Model& model, Renderer& renderer)
 {
-	if (material) material->getResourceManager().unload(*material);
+	if (material) material->decRefCount();
 	material = new_material;
 	type = model.getBoneCount() == 0 || skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
 }
@@ -631,7 +631,7 @@ void Model::unload()
 	auto* material_manager = m_resource_manager.getOwner().get(Material::TYPE);
 	for (int i = 0; i < m_meshes.size(); ++i) {
 		removeDependency(*m_meshes[i].material);
-		material_manager->unload(*m_meshes[i].material);
+		m_meshes[i].material->decRefCount();
 	}
 
 	for (Mesh& mesh : m_meshes) {

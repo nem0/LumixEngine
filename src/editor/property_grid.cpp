@@ -69,6 +69,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		bool is_color = false;
 		bool is_radians = false;
 		bool is_multiline = false;
+		bool no_ui = false;
 		ResourceType resource_type;
 	};
 
@@ -80,6 +81,9 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 			switch (attr->getType()) {
 				case Reflection::IAttribute::RADIANS:
 					attrs.is_radians = true;
+					break;
+				case Reflection::IAttribute::NO_UI:
+					attrs.no_ui = true;
 					break;
 				case Reflection::IAttribute::COLOR:
 					attrs.is_color = true;
@@ -484,6 +488,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 		copyString(tmp, p.c_str());
 
 		Attributes attrs = getAttributes(prop);
+		if (attrs.no_ui) return;
 
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);

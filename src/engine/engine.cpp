@@ -137,7 +137,7 @@ public:
 	~EngineImpl()
 	{
 		for (Resource* res : m_lua_resources) {
-			res->getResourceManager().unload(*res);
+			res->decRefCount();
 		}
 
 		Reflection::shutdown();
@@ -477,7 +477,7 @@ public:
 		if (!iter.isValid()) return;
 		Resource* res = iter.value();
 		m_lua_resources.erase(iter);
-		res->getResourceManager().unload(*res);
+		res->decRefCount();
 	}
 
 

@@ -115,10 +115,14 @@ struct ClipManagerUI final : StudioApp::GUIPlugin
 	{
 		m_filter[0] = 0;
 		m_is_open = false;
-		Action* action = LUMIX_NEW(app.getAllocator(), Action)("Clip manager", "Toggle clip manager", "clip_manager");
-		action->func.bind<&ClipManagerUI::onAction>(this);
-		action->is_selected.bind<&ClipManagerUI::isOpen>(this);
-		app.addWindowAction(action);
+		m_toggle_ui.init("Clip manager", "Toggle clip manager", "clip_manager", "", true);
+		m_toggle_ui.func.bind<&ClipManagerUI::onAction>(this);
+		m_toggle_ui.is_selected.bind<&ClipManagerUI::isOpen>(this);
+		app.addWindowAction(&m_toggle_ui);
+	}
+
+	~ClipManagerUI() {
+		m_app.removeAction(&m_toggle_ui);
 	}
 
 	// TODO
@@ -213,6 +217,7 @@ struct ClipManagerUI final : StudioApp::GUIPlugin
 	StudioApp& m_app;
 	char m_filter[256];
 	bool m_is_open;
+	Action m_toggle_ui;
 };
 
 
@@ -220,12 +225,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
-	{
-	}
-
+		, m_asset_browser_plugin(app)
+		, m_clip_manager_ui(app)
+	{}
 
 	const char* getName() const override { return "audio"; }
-
 
 	void init() override 
 	{
@@ -236,11 +240,9 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		IAllocator& allocator = m_app.getAllocator();
 
-		m_asset_browser_plugin.create(m_app);
-		m_app.getAssetBrowser().addPlugin(*m_asset_browser_plugin);
+		m_app.getAssetBrowser().addPlugin(m_asset_browser_plugin);
 
-		m_clip_manager_ui.create(m_app);
-		m_app.addPlugin(*m_clip_manager_ui);
+		m_app.addPlugin(m_clip_manager_ui);
 	}
 
 
@@ -277,19 +279,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		IAllocator& allocator = m_app.getAllocator();
-
-		m_app.getAssetBrowser().removePlugin(*m_asset_browser_plugin);
-		m_app.removePlugin(*m_clip_manager_ui);
-
-		m_asset_browser_plugin.destroy();
-		m_clip_manager_ui.destroy();
+		m_app.getAssetBrowser().removePlugin(m_asset_browser_plugin);
+		m_app.removePlugin(m_clip_manager_ui);
 	}
 
 
 	StudioApp& m_app;
-	Local<AssetBrowserPlugin> m_asset_browser_plugin;
-	Local<ClipManagerUI> m_clip_manager_ui;
+	AssetBrowserPlugin m_asset_browser_plugin;
+	ClipManagerUI m_clip_manager_ui;
 };
 
 

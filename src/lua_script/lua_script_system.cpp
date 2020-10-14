@@ -175,7 +175,7 @@ namespace Lumix
 			~ScriptInstance() {
 				if (m_script) {
 					m_script->getObserverCb().unbind<&ScriptComponent::onScriptLoaded>(m_cmp);
-					m_script->getResourceManager().unload(*m_script);
+					m_script->decRefCount();
 				}
 
 				lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
@@ -1274,7 +1274,7 @@ namespace Lumix
 			if (inst.m_script) {
 				auto& cb = inst.m_script->getObserverCb();
 				cb.unbind<&ScriptComponent::onScriptLoaded>(&cmp);
-				inst.m_script->getResourceManager().unload(*inst.m_script);
+				inst.m_script->decRefCount();
 			}
 
 			ResourceManagerHub& rm = m_system.m_engine.getResourceManager();
