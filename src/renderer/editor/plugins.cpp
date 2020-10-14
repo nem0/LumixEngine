@@ -1397,7 +1397,6 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 				}
 				if (duplicate) continue;
 				ImGui::PushID(i);
-				if(count == 1) ImGuiEx::Label("Material");
 				
 				const float w = ImGui::GetContentRegionAvail().x - 20;
 				ImGuiEx::TextClipped(material->getPath().c_str(), w);

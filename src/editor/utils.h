@@ -25,7 +25,7 @@ struct LUMIX_EDITOR_API Action
 	Action() {}
 	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, OS::Keycode key0, u8 modifiers, bool is_global);
 	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, bool is_global);
-	bool toolbarButton(ImFont* font);
+	bool toolbarButton(struct ImFont* font);
 	bool isActive();
 	bool shortcutText(Span<char> out);
 
