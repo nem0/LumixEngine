@@ -8,6 +8,7 @@
 #include "engine/path.h"
 #include "engine/resource.h"
 #include "engine/sync.h"
+#include "editor/utils.h"
 
 
 namespace Lumix
@@ -120,8 +121,8 @@ private:
 	bool m_show_thumbnails;
 	bool m_show_subresources;
 	float m_thumbnail_size = 1.f;
-	Action* m_back_action;
-	Action* m_forward_action;
+	Action m_back_action;
+	Action m_forward_action;
 };
 
 

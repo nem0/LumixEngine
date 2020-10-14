@@ -426,7 +426,7 @@ void Shader::unload()
 	for (u32 i = 0; i < m_texture_slot_count; ++i) {
 		if (m_texture_slots[i].default_texture) {
 			Texture* t = m_texture_slots[i].default_texture;
-			t->getResourceManager().unload(*t);
+			t->decRefCount();
 			m_texture_slots[i].default_texture = nullptr;
 		}
 	}

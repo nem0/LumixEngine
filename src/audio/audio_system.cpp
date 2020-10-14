@@ -65,14 +65,12 @@ struct AudioSystemImpl final : AudioSystem
 	explicit AudioSystemImpl(Engine& engine)
 		: m_engine(engine)
 		, m_manager(engine.getAllocator())
-		, m_device(nullptr)
 	{
 	}
 
 
 	~AudioSystemImpl()
 	{
-		AudioDevice::destroy(*m_device);
 		m_manager.destroy();
 	}
 
@@ -105,7 +103,7 @@ struct AudioSystemImpl final : AudioSystem
 
 	ClipManager m_manager;
 	Engine& m_engine;
-	AudioDevice* m_device;
+	UniquePtr<AudioDevice> m_device;
 };
 
 

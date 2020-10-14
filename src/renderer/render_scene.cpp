@@ -93,7 +93,7 @@ struct TextMesh
 				m_font = nullptr;
 			}
 			m_font_resource->getObserverCb().unbind<&TextMesh::onFontLoaded>(this);
-			m_font_resource->getResourceManager().unload(*m_font_resource);
+			m_font_resource->decRefCount();
 		}
 		m_font_resource = res;
 		if (res) res->onLoaded<&TextMesh::onFontLoaded>(this); 
@@ -137,9 +137,10 @@ private:
 };
 
 
-static RenderableTypes getRenderableType(const Model& model)
+static RenderableTypes getRenderableType(const Model& model, bool custom_material)
 {
 	ASSERT(model.isReady());
+	if (custom_material) return RenderableTypes::MESH_MATERIAL_OVERRIDE;
 	if (model.isSkinned()) return RenderableTypes::SKINNED;
 	if (model.getMeshCount() > 1) return RenderableTypes::MESH_GROUP;
 	return RenderableTypes::MESH;
@@ -217,7 +218,7 @@ public:
 
 		for (Decal& decal : m_decals)
 		{
-			if (decal.material) material_manager->unload(*decal.material);
+			if (decal.material) decal.material->decRefCount();
 		}
 		m_decals.clear();
 
@@ -239,7 +240,9 @@ public:
 		{
 			if (i.flags.isSet(ModelInstance::VALID) && i.model)
 			{
-				i.model->getResourceManager().unload(*i.model);
+				i.model->decRefCount();
+				if (i.custom_material) i.custom_material->decRefCount();
+				i.custom_material = nullptr;
 				LUMIX_DELETE(m_allocator, i.pose);
 				i.pose = nullptr;
 			}
@@ -260,7 +263,7 @@ public:
 		m_culling_system->clear();
 
 		for (auto& probe : m_reflection_probes) {
-			if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
+			if (probe.texture) probe.texture->decRefCount();
 		}
 
 		m_reflection_probes.clear();
@@ -773,8 +776,8 @@ public:
 			serializer.write(r.flags.base);
 			if(r.flags.isSet(ModelInstance::VALID)) {
 				serializer.writeString(r.model ? r.model->getPath().c_str() : "");
+				serializer.writeString(r.custom_material ? r.custom_material->getPath().c_str() : "");
 			}
-			
 		}
 	}
 
@@ -1045,6 +1048,11 @@ public:
 					setModel(e, model);
 				}
 
+				copyString(path, serializer.readString());
+				if (path[0] != 0) {
+					setModelInstanceMaterialOverride(e, Path(path));
+				}
+
 				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);
 			}
 		}
@@ -1128,7 +1136,7 @@ public:
 	void destroyReflectionProbe(EntityRef entity)
 	{
 		ReflectionProbe& probe = m_reflection_probes[entity];
-		if (probe.texture) probe.texture->getResourceManager().unload(*probe.texture);
+		if (probe.texture) probe.texture->decRefCount();
 		m_reflection_probes.erase(entity);
 		m_universe.onComponentDestroyed(entity, REFLECTION_PROBE_TYPE, this);
 	}
@@ -1148,6 +1156,8 @@ public:
 		model_instance.pose = nullptr;
 		model_instance.flags.clear();
 		model_instance.flags.set(ModelInstance::VALID, false);
+		if (model_instance.custom_material) model_instance.custom_material->decRefCount();
+		model_instance.custom_material = nullptr;
 		m_universe.onComponentDestroyed(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
@@ -1468,7 +1478,7 @@ public:
 		Decal& decal = m_decals[entity];
 		if (decal.material) {
 			removeFromMaterialDecalMap(decal.material, entity);
-			decal.material->getResourceManager().unload(*decal.material);
+			decal.material->decRefCount();
 		}
 
 		if (path.isValid()) {
@@ -1573,7 +1583,7 @@ public:
 			const DVec3 pos = m_universe.getPosition(entity);
 			const float radius = model_instance.model->getBoundingRadius() * m_universe.getScale(entity);
 			if (!m_culling_system->isAdded(entity)) {
-				const RenderableTypes type = getRenderableType(*model_instance.model);
+				const RenderableTypes type = getRenderableType(*model_instance.model, model_instance.custom_material);
 				m_culling_system->add(entity, (u8)type, pos, radius);
 			}
 		}
@@ -1583,6 +1593,36 @@ public:
 		}
 	}
 
+	void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) override {
+		ModelInstance& mi = m_model_instances[entity.index];
+		if (mi.custom_material) {
+			if (mi.custom_material->getPath() == path) return;
+			
+			mi.custom_material->decRefCount();
+			mi.custom_material = nullptr;
+		}
+
+		if (mi.mesh_count > 0 && mi.meshes[0].material->getPath() == path) return;
+
+		if (path.isValid()) {
+			Material* material = m_engine.getResourceManager().load<Material>(path);
+			mi.custom_material = material;
+		}
+
+		if (!mi.model || !mi.model->isReady()) return;
+
+		if (m_culling_system->isAdded(entity)) {
+			m_culling_system->remove(entity);
+		}
+		const RenderableTypes type = getRenderableType(*mi.model, mi.custom_material);
+		const DVec3 pos = m_universe.getPosition(entity);
+		const float radius = mi.model->getBoundingRadius() * m_universe.getScale(entity);
+		m_culling_system->add(entity, (u8)type, pos, radius);
+	}
+
+	Path getModelInstanceMaterialOverride(EntityRef entity) override {
+		return m_model_instances[entity.index].custom_material ? m_model_instances[entity.index].custom_material->getPath() : Path("");
+	}
 
 	Path getModelInstancePath(EntityRef entity) override
 	{
@@ -2328,7 +2368,7 @@ public:
 		const DVec3 pos = m_universe.getPosition(entity);
 		const float radius = bounding_radius * scale;
 		if(r.flags.isSet(ModelInstance::ENABLED)) {
-			const RenderableTypes type = getRenderableType(*model);
+			const RenderableTypes type = getRenderableType(*model, r.custom_material);
 			m_culling_system->add(entity, (u8)type, pos, radius);
 		}
 		ASSERT(!r.pose);
@@ -2465,7 +2505,7 @@ public:
 		bool no_change = model == old_model && old_model;
 		if (no_change)
 		{
-			old_model->getResourceManager().unload(*old_model);
+			old_model->decRefCount();
 			return;
 		}
 		if (old_model)
@@ -2476,7 +2516,7 @@ public:
 			{
 				m_culling_system->remove(entity);
 			}
-			old_model->getResourceManager().unload(*old_model);
+			old_model->decRefCount();
 		}
 		model_instance.model = model;
 		model_instance.meshes = nullptr;

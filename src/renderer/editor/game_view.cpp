@@ -53,7 +53,6 @@ GameView::GameView(StudioApp& app)
 	, m_time_multiplier(1.0f)
 	, m_paused(false)
 	, m_show_stats(false)
-	, m_gui_interface(nullptr)
 	, m_editor(app.getWorldEditor())
 {
 	Engine& engine = app.getEngine();
@@ -61,14 +60,14 @@ GameView::GameView(StudioApp& app)
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
 
 	IAllocator& allocator = app.getAllocator();
-	Action* action = LUMIX_NEW(allocator, Action)("Game View", "Toggle game view", "game_view");
-	action->func.bind<&GameView::onAction>(this);
-	action->is_selected.bind<&GameView::isOpen>(this);
-	app.addWindowAction(action);
+	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", true);
+	m_toggle_ui.func.bind<&GameView::onAction>(this);
+	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
+	app.addWindowAction(&m_toggle_ui);
 
-	Action* fullscreen_action = LUMIX_NEW(allocator, Action)("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen");
-	fullscreen_action->func.bind<&GameView::toggleFullscreen>(this);
-	app.addAction(fullscreen_action);
+	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "", true);
+	m_fullscreen_action.func.bind<&GameView::toggleFullscreen>(this);
+	app.addAction(&m_fullscreen_action);
 
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
@@ -77,19 +76,20 @@ GameView::GameView(StudioApp& app)
 	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
 	if (gui)
 	{
-		m_gui_interface = LUMIX_NEW(engine.getAllocator(), GUIInterface)(*this);
-		gui->setInterface(m_gui_interface);
+		m_gui_interface = UniquePtr<GUIInterface>::create(engine.getAllocator(), *this);
+		gui->setInterface(m_gui_interface.get());
 	}
 }
 
 
 GameView::~GameView()
 {
+	m_app.removeAction(&m_toggle_ui);
+	m_app.removeAction(&m_fullscreen_action);
 	Engine& engine = m_app.getEngine();
 	auto* gui = static_cast<GUISystem*>(engine.getPluginManager().getPlugin("gui"));
 	if (gui) {
 		gui->setInterface(nullptr);
-		LUMIX_DELETE(engine.getAllocator(), m_gui_interface);
 	}
 }
 

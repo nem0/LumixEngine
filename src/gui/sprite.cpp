@@ -24,7 +24,7 @@ void Sprite::unload()
 {
 	if (!m_texture) return;
 	
-	m_texture->getResourceManager().unload(*m_texture);
+	m_texture->decRefCount();
 	m_texture = nullptr;
 }
 
@@ -33,7 +33,7 @@ void Sprite::setTexture(const Path& path)
 {
 	if (m_texture)
 	{
-		m_texture->getResourceManager().unload(*m_texture);
+		m_texture->decRefCount();
 	}
 	if (path.isValid())
 	{

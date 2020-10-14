@@ -130,7 +130,7 @@ void Material::unload()
 	for (u32 i = 0; i < m_texture_count; i++) {
 		if (m_textures[i]) {
 			removeDependency(*m_textures[i]);
-			m_textures[i]->getResourceManager().unload(*m_textures[i]);
+			m_textures[i]->decRefCount();
 		}
 	}
 	m_texture_count = 0;
@@ -284,7 +284,8 @@ void Material::setTexture(u32 i, Texture* texture)
 	if (!texture && m_shader && m_shader->isReady() && m_shader->m_texture_slots[i].default_texture)
 	{
 		texture = m_shader->m_texture_slots[i].default_texture;
-		texture->getResourceManager().load(*texture);
+		ASSERT(texture->wantReady());
+		texture->incRefCount();
 	}
 	if (texture) addDependency(*texture);
 	m_textures[i] = texture;
@@ -292,7 +293,7 @@ void Material::setTexture(u32 i, Texture* texture)
 
 	if (old_texture) {
 		removeDependency(*old_texture);
-		old_texture->getResourceManager().unload(*old_texture);
+		old_texture->decRefCount();
 	}
 	if (isReady() && m_shader)
 	{
@@ -329,7 +330,8 @@ void Material::onBeforeReady()
 		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture) {
 			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
 			if (i >= m_texture_count) m_texture_count = i + 1;
-			m_textures[i]->getResourceManager().load(*m_textures[i]);
+			ASSERT(m_textures[i]->wantReady());
+			m_textures[i]->incRefCount();
 			addDependency(*m_textures[i]);
 			return;
 		}
@@ -430,7 +432,7 @@ void Material::setShader(Shader* shader)
 		Shader* shader = m_shader;
 		m_shader = nullptr;
 		removeDependency(*shader);
-		shader->getResourceManager().unload(*shader);
+		shader->decRefCount();
 	}
 	m_shader = shader;
 	if (m_shader) {

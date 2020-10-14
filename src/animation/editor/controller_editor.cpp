@@ -28,10 +28,10 @@ struct ControllerEditorImpl : ControllerEditor {
 		ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
 		ASSERT(res_manager);
 
-		Action* action = LUMIX_NEW(allocator, Action)("Animation editor", "Toggle animation editor", "animation_editor");
-		action->func.bind<&ControllerEditorImpl::toggleOpen>(this);
-		action->is_selected.bind<&ControllerEditorImpl::isOpen>(this);
-		app.addWindowAction(action);
+		m_toggle_ui.init("Animation editor", "Toggle animation editor", "animation_editor", "", true);
+		m_toggle_ui.func.bind<&ControllerEditorImpl::toggleOpen>(this);
+		m_toggle_ui.is_selected.bind<&ControllerEditorImpl::isOpen>(this);
+		app.addWindowAction(&m_toggle_ui);
 
 		m_controller = LUMIX_NEW(allocator, Controller)(Path("anim_editor"), *res_manager, allocator);
 		m_controller->initEmpty();
@@ -39,6 +39,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	~ControllerEditorImpl() {
+		m_app.removeAction(&m_toggle_ui);
 		IAllocator& allocator = m_app.getAllocator();
 		m_controller->destroy();
 		LUMIX_DELETE(allocator, m_controller);
@@ -500,7 +501,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					char path[MAX_PATH_LENGTH];
 					copyString(path, entry.animation ? entry.animation->getPath().c_str() : "");
 					if (m_app.getAssetBrowser().resourceInput("anim", Span(path), Animation::TYPE)) {
-						if (entry.animation) entry.animation->getResourceManager().unload(*entry.animation);
+						if (entry.animation) entry.animation->decRefCount();
 						ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
 						entry.animation = res_manager.load<Animation>(Path(path));
 					}
@@ -675,6 +676,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	Node* m_current_node = nullptr;
 	Model* m_model = nullptr;
 	bool m_open = false;
+	Action m_toggle_ui;
 }; // ControllerEditorImpl
 
 UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {

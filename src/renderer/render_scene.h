@@ -131,16 +131,17 @@ struct ModelInstance
 	{
 		IS_BONE_ATTACHMENT_PARENT = 1 << 0,
 		ENABLED = 1 << 1,
-		VALID = 1 << 2
+		VALID = 1 << 2,
 	};
 
 	Model* model;
 	Mesh* meshes;
 	Pose* pose;
+	Material* custom_material = nullptr; 
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
 	FlagSet<Flags, u8> flags;
-	u8 mesh_count;
+	u16 mesh_count;
 };
 
 
@@ -186,6 +187,7 @@ enum class RenderableTypes : u8 {
 	SKINNED,
 	DECAL,
 	LOCAL_LIGHT,
+	MESH_MATERIAL_OVERRIDE,
 
 	COUNT
 };
@@ -270,6 +272,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual const ModelInstance* getModelInstances() const = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
+	virtual void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) = 0;
+	virtual Path getModelInstanceMaterialOverride(EntityRef entity) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;
 	virtual EntityPtr getNextModelInstance(EntityPtr entity) = 0;

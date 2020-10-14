@@ -56,14 +56,14 @@ Resource* ResourceManager::load(const Path& path)
 		if (m_owner->onBeforeLoad(*resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 		{
 			resource->m_desired_state = Resource::State::READY;
-			resource->addRef(); // for hook
-			resource->addRef(); // for return value
+			resource->incRefCount(); // for hook
+			resource->incRefCount(); // for return value
 			return resource;
 		}
 		resource->doLoad();
 	}
 
-	resource->addRef();
+	resource->incRefCount();
 	return resource;
 }
 
@@ -84,37 +84,6 @@ void ResourceManager::removeUnreferenced()
 	}
 }
 
-void ResourceManager::load(Resource& resource)
-{
-	if(resource.isEmpty() && resource.m_desired_state == Resource::State::EMPTY)
-	{
-		if (m_owner->onBeforeLoad(resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
-		{
-			resource.addRef(); // for hook
-			return;
-		}
-		resource.doLoad();
-	}
-
-	resource.addRef();
-}
-
-void ResourceManager::unload(const Path& path)
-{
-	Resource* resource = get(path);
-	if (resource) unload(*resource);
-}
-
-void ResourceManager::unload(Resource& resource)
-{
-	int new_ref_count = resource.remRef();
-	ASSERT(new_ref_count >= 0);
-	if(new_ref_count == 0 && m_is_unload_enabled)
-	{
-		resource.doUnload();
-	}
-}
-
 void ResourceManager::reload(const Path& path)
 {
 	Resource* resource = get(path);
@@ -127,8 +96,8 @@ void ResourceManager::reload(Resource& resource)
 	if (m_owner->onBeforeLoad(resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 	{
 		resource.m_desired_state = Resource::State::READY;
-		resource.addRef(); // for hook
-		resource.addRef(); // for return value
+		resource.incRefCount(); // for hook
+		resource.incRefCount(); // for return value
 	}
 	else {
 		resource.doLoad();
@@ -199,7 +168,7 @@ ResourceManager* ResourceManagerHub::get(ResourceType type)
 void ResourceManagerHub::LoadHook::continueLoad(Resource& resource)
 {
 	ASSERT(resource.isEmpty());
-	resource.remRef(); // release from hook
+	resource.decRefCount(); // release from hook
 	resource.m_desired_state = Resource::State::EMPTY;
 	resource.doLoad();
 }

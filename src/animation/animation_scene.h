@@ -19,7 +19,6 @@ struct Animable {
 
 struct AnimationScene : IScene {
 	static UniquePtr<AnimationScene> create(Engine& engine, IPlugin& plugin, Universe& universe, struct IAllocator& allocator);
-	static void destroy(AnimationScene& scene);
 	static void registerLuaAPI(lua_State* L);
 
 	virtual const struct OutputMemoryStream& getEventStream() const = 0;

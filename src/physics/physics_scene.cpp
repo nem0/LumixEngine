@@ -1437,7 +1437,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		auto* old_hm = terrain.m_heightmap;
 		if (old_hm)
 		{
-			old_hm->getResourceManager().unload(*old_hm);
+			old_hm->decRefCount();
 			auto& cb = old_hm->getObserverCb();
 			cb.unbind<&Heightfield::heightmapLoaded>(&terrain);
 		}
@@ -4313,7 +4313,7 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
 	if (resource)
 	{
 		resource->getObserverCb().unbind<&RigidActor::onStateChanged>(this);
-		resource->getResourceManager().unload(*resource);
+		resource->decRefCount();
 	}
 	resource = _resource;
 	if (resource)
@@ -4338,7 +4338,7 @@ Heightfield::~Heightfield()
 	if (m_actor) m_actor->release();
 	if (m_heightmap)
 	{
-		m_heightmap->getResourceManager().unload(*m_heightmap);
+		m_heightmap->decRefCount();
 		m_heightmap->getObserverCb().unbind<&Heightfield::heightmapLoaded>(this);
 	}
 }

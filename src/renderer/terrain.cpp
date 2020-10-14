@@ -53,7 +53,7 @@ Terrain::GrassType::~GrassType()
 {
 	if (m_grass_model)
 	{
-		m_grass_model->getResourceManager().unload(*m_grass_model);
+		m_grass_model->decRefCount();
 	}
 }
 
@@ -168,7 +168,7 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 	GrassType& type = m_grass_types[index];
 	if (type.m_grass_model)
 	{
-		type.m_grass_model->getResourceManager().unload(*type.m_grass_model);
+		type.m_grass_model->decRefCount();
 		type.m_grass_model = nullptr;
 	}
 	if (path.isValid())
@@ -182,7 +182,7 @@ void Terrain::setMaterial(Material* material)
 {
 	if (material != m_material) {
 		if (m_material) {
-			m_material->getResourceManager().unload(*m_material);
+			m_material->decRefCount();
 			m_material->getObserverCb().unbind<&Terrain::onMaterialLoaded>(this);
 		}
 		m_material = material;
@@ -191,7 +191,7 @@ void Terrain::setMaterial(Material* material)
 		}
 	}
 	else if(material) {
-		material->getResourceManager().unload(*material);
+		material->decRefCount();
 	}
 }
 

@@ -21,7 +21,6 @@ struct IEditorCommand
 {
 	virtual ~IEditorCommand() {}
 
-	virtual bool isReady() { return true; }
 	virtual bool execute() = 0;
 	virtual void undo() = 0;
 	virtual const char* getType() = 0;
@@ -81,8 +80,6 @@ struct LUMIX_EDITOR_API WorldEditor
 		NONE
 	};
 
-	using CommandCreator = IEditorCommand* (lua_State*, WorldEditor&);
-
 	static UniquePtr<WorldEditor> create(struct Engine& engine, struct IAllocator& allocator);
 
 	virtual bool loadProject() = 0;
@@ -95,9 +92,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	
 	virtual void beginCommandGroup(u32 type) = 0;
 	virtual void endCommandGroup() = 0;
-	virtual void executeCommand(IEditorCommand* command) = 0;
-	virtual void executeCommand(const char* name, const char* args) = 0;
-	virtual void registerCommand(const char* name, CommandCreator* creator) = 0;
+	virtual void executeCommand(UniquePtr<IEditorCommand>&& command) = 0;
 	virtual bool isUniverseChanged() const = 0;
 	virtual bool canUndo() const = 0;
 	virtual bool canRedo() const = 0;

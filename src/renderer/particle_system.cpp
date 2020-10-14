@@ -277,7 +277,7 @@ void ParticleEmitterResource::setMaterial(const Path& path)
 		Material* tmp = m_material;
 		m_material = nullptr;
 		removeDependency(*tmp);
-		tmp->getResourceManager().unload(*tmp);
+		tmp->decRefCount();
 	}
 	m_material = material;
 	if (m_material) {
@@ -421,7 +421,7 @@ ParticleEmitter::~ParticleEmitter()
 void ParticleEmitter::setResource(ParticleEmitterResource* res)
 {
 	if (m_resource) {
-		m_resource->getResourceManager().unload(*m_resource);
+		m_resource->decRefCount();
 	}
 	m_resource = res;
 }

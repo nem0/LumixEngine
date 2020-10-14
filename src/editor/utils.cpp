@@ -54,34 +54,34 @@ ResourceLocator::ResourceLocator(const Span<const char>& path)
 }
 
 
-Action::Action(const char* label_short, const char* label_long, const char* name, const char* font_icon)
-	: label_long(label_long)
-	, label_short(label_short)
-	, font_icon(font_icon)
-	, name(name)
-	, plugin(nullptr)
-	, is_global(true)
-	, shortcut(OS::Keycode::INVALID)
-{
+void Action::init(const char* label_short, const char* label_long, const char* name, const char* font_icon, bool is_global) {
+	this->label_long = label_long;
+	this->label_short = label_short;
+	this->font_icon = font_icon;
+	this->name = name;
+	this->is_global = is_global;
+	plugin = nullptr;
+	shortcut = OS::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
 
 
-Action::Action(const char* label_short,
+void Action::init(const char* label_short,
 	const char* label_long,
 	const char* name,
 	const char* font_icon,
 	OS::Keycode shortcut,
-	u8 modifiers)
-	: label_long(label_long)
-	, label_short(label_short)
-	, name(name)
-	, font_icon(font_icon)
-	, plugin(nullptr)
-	, is_global(true)
-	, shortcut(shortcut)
-	, modifiers(modifiers)
+	u8 modifiers,
+	bool is_global)
 {
+	this->label_long = label_long;
+	this->label_short = label_short;
+	this->name = name;
+	this->font_icon = font_icon;
+	this->is_global = is_global;
+	this->shortcut = shortcut;
+	this->modifiers = modifiers;
+	plugin = nullptr;
 	is_selected.bind<falseConst>();
 }
 

@@ -316,12 +316,15 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		, m_is_window_open(false)
 		, m_app(app)
 	{
-		Action* action = LUMIX_NEW(m_editor.getAllocator(), Action)("Physics", "Toggle physics UI", "physics");
-		action->func.bind<&PhysicsUIPlugin::onAction>(this);
-		action->is_selected.bind<&PhysicsUIPlugin::isOpen>(this);
-		app.addWindowAction(action);
+		m_toggle_ui.init("Physics", "Toggle physics UI", "physics", "", false);
+		m_toggle_ui.func.bind<&PhysicsUIPlugin::onAction>(this);
+		m_toggle_ui.is_selected.bind<&PhysicsUIPlugin::isOpen>(this);
+		app.addWindowAction(&m_toggle_ui);
 	}
 
+	~PhysicsUIPlugin() {
+		m_app.removeAction(&m_toggle_ui);
+	}
 
 	bool packData(const char* dest_dir) override
 	{
@@ -901,10 +904,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	}
 
 
+	StudioApp& m_app;
+	WorldEditor& m_editor;
 	bool m_is_window_open;
 	int m_selected_bone;
-	WorldEditor& m_editor;
-	StudioApp& m_app;
+	Action m_toggle_ui;
 };
 
 
@@ -934,6 +938,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 {
 	StudioAppPlugin(StudioApp& app)
 		: m_app(app)
+		, m_geom_plugin(app)
+		, m_ui_plugin(app)
 	{
 	}
 
@@ -950,13 +956,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent(ICON_FA_CAR_ALT, "vehicle", "Physics / Vehicle");
 		m_app.registerComponent("", "wheel", "Physics / Wheel");
 
-		IAllocator& allocator = m_app.getAllocator();
-
-		m_ui_plugin = LUMIX_NEW(allocator, PhysicsUIPlugin)(m_app);
-		m_geom_plugin = LUMIX_NEW(allocator, PhysicsGeometryPlugin)(m_app);
-		
-		m_app.addPlugin(*m_ui_plugin);
-		m_app.getAssetBrowser().addPlugin(*m_geom_plugin);
+		m_app.addPlugin(m_ui_plugin);
+		m_app.getAssetBrowser().addPlugin(m_geom_plugin);
 	}
 
 
@@ -1013,20 +1014,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	~StudioAppPlugin()
 	{
-		m_app.removePlugin(*m_ui_plugin);
-		m_app.getAssetBrowser().removePlugin(*m_geom_plugin);
-
-		IAllocator& allocator = m_app.getAllocator();
-		LUMIX_DELETE(allocator, m_ui_plugin);
-		LUMIX_DELETE(allocator, m_geom_plugin);
+		m_app.removePlugin(m_ui_plugin);
+		m_app.getAssetBrowser().removePlugin(m_geom_plugin);
 	}
 
 	const char* getName() const override { return "physics"; }
 
 
 	StudioApp& m_app;
-	PhysicsUIPlugin* m_ui_plugin;
-	PhysicsGeometryPlugin* m_geom_plugin;
+	PhysicsUIPlugin m_ui_plugin;
+	PhysicsGeometryPlugin m_geom_plugin;
 };
 
 

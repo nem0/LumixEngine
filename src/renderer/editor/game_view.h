@@ -2,6 +2,7 @@
 
 
 #include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "renderer/gpu/gpu.h"
@@ -58,7 +59,7 @@ private:
 	float m_time_multiplier;
 	Vec2 m_pos = Vec2(0);
 	Vec2 m_size = Vec2(0);
-	struct GUIInterface* m_gui_interface;
+	struct UniquePtr<GUIInterface> m_gui_interface;
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;
 	bool m_paused;
@@ -72,6 +73,8 @@ private:
 		int height;
 	} m_forced_viewport;
 	int m_captured_mouse_x, m_captured_mouse_y;
+	Action m_toggle_ui;
+	Action m_fullscreen_action;
 };
 
 

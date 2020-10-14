@@ -1367,7 +1367,7 @@ private:
 		{
 			for (Resource* resource : m_resources)
 			{
-				resource->getResourceManager().unload(*resource);
+				resource->decRefCount();
 			}
 		}
 
@@ -1545,7 +1545,7 @@ private:
 		~DestroyComponentCommand()
 		{
 			for (Resource* resource : m_resources) {
-				resource->getResourceManager().unload(*resource);
+				resource->decRefCount();
 			}
 		}
 
@@ -1611,9 +1611,10 @@ private:
 
 	struct AddEntityCommand final : IEditorCommand
 	{
-		AddEntityCommand(WorldEditorImpl& editor, const DVec3& position)
+		AddEntityCommand(WorldEditorImpl& editor, const DVec3& position, EntityRef* output)
 			: m_editor(editor)
 			, m_position(position)
+			, m_output(output)
 		{
 			m_entity = INVALID_ENTITY;
 		}
@@ -1630,6 +1631,9 @@ private:
 			}
 			const EntityRef e = (EntityRef)m_entity;
 			m_editor.selectEntities(Span(&e, 1), false);
+			if (m_output) {
+				*m_output = e;
+			}
 			return true;
 		}
 
@@ -1645,13 +1649,13 @@ private:
 
 		bool merge(IEditorCommand&) override { return false; }
 		const char* getType() override { return "add_entity"; }
-		EntityPtr getEntity() const { return m_entity; }
 
 
 	private:
 		WorldEditorImpl& m_editor;
 		EntityPtr m_entity;
 		DVec3 m_position;
+		EntityRef* m_output;
 	};
 
 public:
@@ -1674,15 +1678,6 @@ public:
 		PROFILE_FUNCTION();
 
 		Gizmo::frame();
-		// TODO do not allow user interaction (e.g. saving universe) while queue is not empty
-		while (!m_command_queue.empty()) {
-			if (!m_command_queue[0]->isReady()) break;
-
-			IEditorCommand* cmd = m_command_queue[0];
-			m_command_queue.erase(0);
-			doExecute(cmd);
-		}
-
 		m_prefab_system->update();
 	}
 
@@ -1731,13 +1726,14 @@ public:
 				rotations.emplace(mtx.getRotation());
 			}
 		}
-		MoveEntityCommand* cmd = LUMIX_NEW(m_allocator, MoveEntityCommand)(*this,
+		UniquePtr<MoveEntityCommand> cmd = UniquePtr<MoveEntityCommand>::create(m_allocator, 
+			*this,
 			&m_selected_entities[0],
 			&positions[0],
 			&rotations[0],
 			positions.size(),
 			m_allocator);
-		executeCommand(cmd);
+		executeCommand(cmd.move());
 	}
 
 
@@ -1797,15 +1793,15 @@ public:
 
 	void makeParent(EntityPtr parent, EntityRef child) override
 	{
-		MakeParentCommand* command = LUMIX_NEW(m_allocator, MakeParentCommand)(*this, parent, child);
-		executeCommand(command);
+		UniquePtr<MakeParentCommand> command = UniquePtr<MakeParentCommand>::create(m_allocator, *this, parent, child);
+		executeCommand(command.move());
 	}
 
 
 	void destroyEntities(const EntityRef* entities, int count) override
 	{
-		DestroyEntitiesCommand* command = LUMIX_NEW(m_allocator, DestroyEntitiesCommand)(*this, entities, count);
-		executeCommand(command);
+		UniquePtr<DestroyEntitiesCommand> command = UniquePtr<DestroyEntitiesCommand>::create(m_allocator, *this, entities, count);
+		executeCommand(command.move());
 	}
 
 
@@ -1822,19 +1818,21 @@ public:
 
 		const UniverseView::RayHit hit = m_view->getCameraRaycastHit(camera_x, camera_y);
 
-		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, hit.pos);
-		executeCommand(command);
+		EntityRef res;
+		UniquePtr<AddEntityCommand> command = UniquePtr<AddEntityCommand>::create(m_allocator, *this, hit.pos, &res);
+		executeCommand(command.move());
 
-		return (EntityRef)command->getEntity();
+		return res;
 	}
 
 
 	EntityRef addEntityAt(const DVec3& pos) override
 	{
-		AddEntityCommand* command = LUMIX_NEW(m_allocator, AddEntityCommand)(*this, pos);
-		executeCommand(command);
+		EntityRef res;
+		UniquePtr<AddEntityCommand> command = UniquePtr<AddEntityCommand>::create(m_allocator, *this, pos, &res);
+		executeCommand(command.move());
 
-		return (EntityRef)command->getEntity();
+		return res;
 	}
 
 
@@ -1842,9 +1840,9 @@ public:
 	{
 		if (count <= 0) return;
 
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, ScaleEntityCommand)(*this, entities, scales, count, m_allocator);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command =
+			UniquePtr<ScaleEntityCommand>::create(m_allocator, *this, entities, scales, count, m_allocator);
+		executeCommand(command.move());
 	}
 
 
@@ -1852,9 +1850,9 @@ public:
 	{
 		if (count <= 0) return;
 
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, ScaleEntityCommand)(*this, entities, count, scale, m_allocator);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command =
+			UniquePtr<ScaleEntityCommand>::create(m_allocator, *this, entities, count, scale, m_allocator);
+		executeCommand(command.move());
 	}
 
 
@@ -1869,9 +1867,9 @@ public:
 		{
 			positions.push(universe->getPosition(entities[i]));
 		}
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, &positions[0], rotations, count, m_allocator);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command =
+			UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, &positions[0], rotations, count, m_allocator);
+		executeCommand(command.move());
 	}
 
 
@@ -1891,8 +1889,8 @@ public:
 			poss.push(universe->getPosition(entities[i]));
 			(&poss[i].x)[(int)coord] = value;
 		}
-		IEditorCommand* command = LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, &poss[0], &rots[0], count, m_allocator);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command = UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, &poss[0], &rots[0], count, m_allocator);
+		executeCommand(command.move());
 	}
 
 
@@ -1909,9 +1907,9 @@ public:
 			poss.push(universe->getLocalTransform(entities[i]).pos);
 			(&poss[i].x)[(int)coord] = value;
 		}
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, LocalMoveEntityCommand)(*this, entities, &poss[0], count, m_allocator);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command =
+			UniquePtr<LocalMoveEntityCommand>::create(m_allocator, *this, entities, &poss[0], count, m_allocator);
+		executeCommand(command.move());
 	}
 
 
@@ -1926,9 +1924,9 @@ public:
 		{
 			rots.push(universe->getRotation(entities[i]));
 		}
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, &rots[0], count, m_allocator);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command =
+			UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, positions, &rots[0], count, m_allocator);
+		executeCommand(command.move());
 	}
 
 	void setEntitiesPositionsAndRotations(const EntityRef* entities,
@@ -1937,26 +1935,26 @@ public:
 		int count) override
 	{
 		if (count <= 0) return;
-		IEditorCommand* command =
-			LUMIX_NEW(m_allocator, MoveEntityCommand)(*this, entities, positions, rotations, count, m_allocator);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command =
+			UniquePtr<MoveEntityCommand>::create(m_allocator, *this, entities, positions, rotations, count, m_allocator);
+		executeCommand(command.move());
 	}
 
 
 	void setEntityName(EntityRef entity, const char* name) override
 	{
-		IEditorCommand* command = LUMIX_NEW(m_allocator, SetEntityNameCommand)(*this, entity, name);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command = UniquePtr<SetEntityNameCommand>::create(m_allocator, *this, entity, name);
+		executeCommand(command.move());
 	}
 
 
 	void beginCommandGroup(u32 type) override
 	{
-		if(m_undo_index < m_undo_stack.size() - 1)
+		while (m_undo_index < m_undo_stack.size() - 1)
 		{
 			for(int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
 			{
-				LUMIX_DELETE(m_allocator, m_undo_stack[i]);
+				m_undo_stack[i].reset();
 			}
 			m_undo_stack.resize(m_undo_index + 1);
 		}
@@ -1966,9 +1964,9 @@ public:
 			static const u32 end_group_hash = crc32("end_group");
 			if(crc32(m_undo_stack[m_undo_index]->getType()) == end_group_hash)
 			{
-				if(static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index])->group_type == type)
+				if(static_cast<EndGroupCommand*>(m_undo_stack[m_undo_index].get())->group_type == type)
 				{
-					LUMIX_DELETE(m_allocator, m_undo_stack[m_undo_index]);
+					m_undo_stack[m_undo_index].reset();
 					--m_undo_index;
 					m_undo_stack.pop();
 					return;
@@ -1977,8 +1975,8 @@ public:
 		}
 
 		m_current_group_type = type;
-		auto* cmd = LUMIX_NEW(m_allocator, BeginGroupCommand);
-		m_undo_stack.push(cmd);
+		UniquePtr<BeginGroupCommand> cmd = UniquePtr<BeginGroupCommand>::create(m_allocator);
+		m_undo_stack.push(cmd.move());
 		++m_undo_index;
 	}
 
@@ -1989,94 +1987,41 @@ public:
 		{
 			for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
 			{
-				LUMIX_DELETE(m_allocator, m_undo_stack[i]);
+				m_undo_stack[i].reset();
 			}
 			m_undo_stack.resize(m_undo_index + 1);
 		}
 
-		auto* cmd = LUMIX_NEW(m_allocator, EndGroupCommand);
+		UniquePtr<EndGroupCommand> cmd = UniquePtr<EndGroupCommand>::create(m_allocator);
 		cmd->group_type = m_current_group_type;
-		m_undo_stack.push(cmd);
+		m_undo_stack.push(cmd.move());
 		++m_undo_index;
 	}
 
-	void registerCommand(const char* name, CommandCreator* creator) override {
-		lua_State* L = m_engine.getState();
-		LuaWrapper::DebugGuard guard(L);
-		lua_getfield(L, LUA_GLOBALSINDEX, "Editor");
-		if (!lua_istable(L, -1)) {
-			lua_pop(L, 1);
-			lua_newtable(L);
-			lua_pushvalue(L, -1);
-			lua_setfield(L, LUA_GLOBALSINDEX, "Editor");
-		}
-
-		lua_getfield(L, -1, name);
-		if (!lua_isnil(L, -1)) {
-			lua_pop(L, 1);
-			logError("Editor") << "Command " << name << " already exists.";
-			return;
-		}
-		lua_pop(L, 1);
-
-		auto f = [](lua_State* L) -> int {
-			auto* creator = LuaWrapper::toType<CommandCreator*>(L, lua_upvalueindex(1));
-			auto* editor = LuaWrapper::toType<WorldEditor*>(L, lua_upvalueindex(2));
-			IEditorCommand* cmd = creator(L, *editor);
-			editor->executeCommand(cmd);
-			return 0;
-		};
-
-		lua_pushlightuserdata(L, reinterpret_cast<void*>(creator));
-		lua_pushlightuserdata(L, this);
-		lua_pushcclosure(L, f, 2);
-		lua_setfield(L, -2, name);
-		lua_pop(L, 1);
-	}
-
-	void executeCommand(const char* name, const char* args) override {
-		lua_State* L = m_engine.getState();
-		StaticString<1024> tmp("Editor.", name, "(", args, ")");
-		LuaWrapper::execute(L, Span(tmp.data, stringLength(tmp.data)), "executeCommand", 0);
-	}
-
-	void executeCommand(IEditorCommand* command) override
+	void executeCommand(UniquePtr<IEditorCommand>&& command) override
 	{
-		if (!m_command_queue.empty() || !command->isReady()) {
-			m_command_queue.push(command);
-			return;
-		}
-
-		doExecute(command);
+		doExecute(command.move());
 	}
 
 
-	void doExecute(IEditorCommand* command)
+	void doExecute(UniquePtr<IEditorCommand>&& command)
 	{
-		ASSERT(command->isReady());
-		
 		m_is_universe_changed = true;
 		if (m_undo_index >= 0 && command->getType() == m_undo_stack[m_undo_index]->getType())
 		{
 			if (command->merge(*m_undo_stack[m_undo_index]))
 			{
 				m_undo_stack[m_undo_index]->execute();
-				LUMIX_DELETE(m_allocator, command);
 				return;
 			}
 		}
 
 		if (command->execute())
 		{
-			if (m_undo_index < m_undo_stack.size() - 1)
-			{
-				for (int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
-				{
-					LUMIX_DELETE(m_allocator, m_undo_stack[i]);
-				}
+			if (m_undo_index < m_undo_stack.size() - 1) {
 				m_undo_stack.resize(m_undo_index + 1);
 			}
-			m_undo_stack.push(command);
+			m_undo_stack.emplace(command.move());
 			if (m_is_game_mode) ++m_game_mode_commands;
 			++m_undo_index;
 			return;
@@ -2084,7 +2029,7 @@ public:
 		else {
 			logError("Editor") << "Editor command failed";
 		}
-		LUMIX_DELETE(m_allocator, command);	
+		command.reset();
 	}
 
 
@@ -2114,7 +2059,6 @@ public:
 	{
 		for (int i = 0; i < m_game_mode_commands; ++i)
 		{
-			LUMIX_DELETE(m_allocator, m_undo_stack.back());
 			m_undo_stack.pop();
 			--m_undo_index;
 		}
@@ -2225,16 +2169,16 @@ public:
 	void destroyComponent(Span<const EntityRef> entities, ComponentType cmp_type) override
 	{
 		ASSERT(entities.length() > 0);
-		IEditorCommand* command = LUMIX_NEW(m_allocator, DestroyComponentCommand)(*this, entities, cmp_type);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command = UniquePtr<DestroyComponentCommand>::create(m_allocator, *this, entities, cmp_type);
+		executeCommand(command.move());
 	}
 
 
 	void addComponent(Span<const EntityRef> entities, ComponentType cmp_type) override
 	{
 		ASSERT(entities.length() > 0);
-		IEditorCommand* command = LUMIX_NEW(m_allocator, AddComponentCommand)(*this, entities, cmp_type);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command = UniquePtr<AddComponentCommand>::create(m_allocator, *this, entities, cmp_type);
+		executeCommand(command.move());
 	}
 
 	void saveProject() {
@@ -2424,8 +2368,7 @@ public:
 		, m_is_game_mode(false)
 		, m_undo_index(-1)
 		, m_engine(engine)
-        , m_game_mode_file(m_allocator)
-		, m_command_queue(m_allocator)
+		, m_game_mode_file(m_allocator)
 	{
 		loadProject();
 		logInfo("Editor") << "Initializing editor...";
@@ -2451,8 +2394,8 @@ public:
 	{
 		if (cmp.isValid())
 		{
-			IEditorCommand* command = LUMIX_NEW(m_allocator, AddArrayPropertyItemCommand)(*this, cmp, property);
-			executeCommand(command);
+			UniquePtr<IEditorCommand> command = UniquePtr<AddArrayPropertyItemCommand>::create(m_allocator, *this, cmp, property);
+			executeCommand(command.move());
 		}
 	}
 
@@ -2461,16 +2404,15 @@ public:
 	{
 		if (cmp.isValid())
 		{
-			IEditorCommand* command = LUMIX_NEW(m_allocator, RemoveArrayPropertyItemCommand)(*this, cmp, index, property);
-			executeCommand(command);
+			UniquePtr<IEditorCommand> command = UniquePtr<RemoveArrayPropertyItemCommand>::create(m_allocator, *this, cmp, index, property);
+			executeCommand(command.move());
 		}
 	}
 
 	template <typename T>
 	void set(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, T val) {
-		IEditorCommand* command = LUMIX_NEW(m_allocator, SetPropertyCommand<T>)(
-			*this, entities, cmp, array, idx, prop, val);
-		executeCommand(command);
+		UniquePtr<IEditorCommand> command = UniquePtr<SetPropertyCommand<T>>::create(m_allocator, *this, entities, cmp, array, idx, prop, val);
+		executeCommand(command.move());
 		
 	}
 
@@ -2544,10 +2486,6 @@ public:
 	void destroyUndoStack()
 	{
 		m_undo_index = -1;
-		for (int i = 0; i < m_undo_stack.size(); ++i)
-		{
-			LUMIX_DELETE(m_allocator, m_undo_stack[i]);
-		}
 		m_undo_stack.clear();
 	}
 
@@ -2650,8 +2588,7 @@ private:
 	bool m_is_loading;
 	bool m_is_universe_changed;
 	
-	Array<IEditorCommand*> m_undo_stack;
-	Array<IEditorCommand*> m_command_queue;
+	Array<UniquePtr<IEditorCommand>> m_undo_stack;
 	int m_undo_index;
 	u32 m_current_group_type;
 
@@ -2801,8 +2738,8 @@ private:
 void WorldEditorImpl::pasteEntities()
 {
 	if (!canPasteEntities()) return;
-	PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer);
-	executeCommand(command);
+	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer);
+	executeCommand(command.move());
 }
 
 
@@ -2810,8 +2747,8 @@ void WorldEditorImpl::duplicateEntities()
 {
 	copyEntities();
 
-	PasteEntityCommand* command = LUMIX_NEW(m_allocator, PasteEntityCommand)(*this, m_copy_buffer, true);
-	executeCommand(command);
+	UniquePtr<PasteEntityCommand> command = UniquePtr<PasteEntityCommand>::create(m_allocator, *this, m_copy_buffer, true);
+	executeCommand(command.move());
 }
 
 

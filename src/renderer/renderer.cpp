@@ -395,8 +395,8 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("model_instance",
 			property("Enabled", &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance),
-			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath),
-				ResourceAttribute("Mesh (*.msh)", Model::TYPE))
+			property("Material", &RenderScene::getModelInstanceMaterialOverride,&RenderScene::setModelInstanceMaterialOverride, NoUIAttribute()),
+			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath), ResourceAttribute("Mesh (*.msh)", Model::TYPE))
 		),
 		component("environment",
 			var_property("Color", &RenderScene::getEnvironment, &Environment::diffuse_color, ColorAttribute()),
@@ -688,12 +688,13 @@ struct RendererImpl final : Renderer
 			Span<u8> buf;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->handle = texture;
-		cmd->w = w;
-		cmd->h = h;
-		cmd->buf = data;
-		cmd->out_format = out_format;
+		
+		Cmd& cmd = createJob<Cmd>();
+		cmd.handle = texture;
+		cmd.w = w;
+		cmd.h = h;
+		cmd.buf = data;
+		cmd.out_format = out_format;
 		queue(cmd, 0);
 	}
 
@@ -720,16 +721,16 @@ struct RendererImpl final : Renderer
 			RendererImpl* renderer;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->handle = handle;
-		cmd->x = x;
-		cmd->y = y;
-		cmd->w = w;
-		cmd->h = h;
-		cmd->slice = slice;
-		cmd->format = format;
-		cmd->mem = mem;
-		cmd->renderer = this;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.handle = handle;
+		cmd.x = x;
+		cmd.y = y;
+		cmd.w = w;
+		cmd.h = h;
+		cmd.slice = slice;
+		cmd.format = format;
+		cmd.mem = mem;
+		cmd.renderer = this;
 
 		queue(cmd, 0);
 	}
@@ -763,12 +764,12 @@ struct RendererImpl final : Renderer
 			RendererImpl* renderer; 
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->debug_name = debug_name;
-		cmd->handle = handle;
-		cmd->memory = memory;
-		cmd->flags = flags;
-		cmd->renderer = this;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.debug_name = debug_name;
+		cmd.handle = handle;
+		cmd.memory = memory;
+		cmd.flags = flags;
+		cmd.renderer = this;
 		queue(cmd, 0);
 
 		return handle;
@@ -841,11 +842,11 @@ struct RendererImpl final : Renderer
 			Renderer* renderer;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->handle = handle;
-		cmd->memory = memory;
-		cmd->renderer = this;
-		cmd->flags = flags;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.handle = handle;
+		cmd.memory = memory;
+		cmd.renderer = this;
+		cmd.flags = flags;
 		queue(cmd, 0);
 
 		return handle;
@@ -890,10 +891,10 @@ struct RendererImpl final : Renderer
 
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->fnc = fnc;
-		cmd->ptr = user_ptr;
-		cmd->renderer = this;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.fnc = fnc;
+		cmd.ptr = user_ptr;
+		cmd.renderer = this;
 		queue(cmd, 0);
 	}
 
@@ -911,9 +912,9 @@ struct RendererImpl final : Renderer
 			RendererImpl* renderer;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->program = program;
-		cmd->renderer = this;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.program = program;
+		cmd.renderer = this;
 		queue(cmd, 0);
 	}
 
@@ -931,9 +932,9 @@ struct RendererImpl final : Renderer
 			RendererImpl* renderer;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->buffer = buffer;
-		cmd->renderer = this;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.buffer = buffer;
+		cmd.renderer = this;
 		queue(cmd, 0);
 	}
 
@@ -963,16 +964,16 @@ struct RendererImpl final : Renderer
 			u32 flags;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->debug_name = debug_name;
-		cmd->handle = handle;
-		cmd->memory = memory;
-		cmd->format = format;
-		cmd->flags = flags;
-		cmd->w = w;
-		cmd->h = h;
-		cmd->depth = depth;
-		cmd->renderer = this;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.debug_name = debug_name;
+		cmd.handle = handle;
+		cmd.memory = memory;
+		cmd.format = format;
+		cmd.flags = flags;
+		cmd.w = w;
+		cmd.h = h;
+		cmd.depth = depth;
+		cmd.renderer = this;
 		queue(cmd, 0);
 
 		return handle;
@@ -993,20 +994,20 @@ struct RendererImpl final : Renderer
 			RendererImpl* renderer;
 		};
 
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
-		cmd->texture = tex;
-		cmd->renderer = this;
+		Cmd& cmd = createJob<Cmd>();
+		cmd.texture = tex;
+		cmd.renderer = this;
 		queue(cmd, 0);
 	}
 
 
-	void queue(RenderJob* cmd, i64 profiler_link) override
+	void queue(RenderJob& cmd, i64 profiler_link) override
 	{
-		cmd->profiler_link = profiler_link;
+		cmd.profiler_link = profiler_link;
 		
-		m_cpu_frame->jobs.push(cmd);
+		m_cpu_frame->jobs.push(&cmd);
 
-		JobSystem::run(cmd, [](void* data){
+		JobSystem::run(&cmd, [](void* data){
 			RenderJob* cmd = (RenderJob*)data;
 			PROFILE_BLOCK("setup_render_job");
 			cmd->setup();
@@ -1033,6 +1034,13 @@ struct RendererImpl final : Renderer
 		ctx.addScene(scene.move());
 	}
 
+	void* allocJob(u32 size, u32 align) override {
+		return m_allocator.allocate_aligned(size, align);
+	}
+
+	void deallocJob(void* job) override {
+		m_allocator.deallocate_aligned(job);
+	}
 
 	const char* getName() const override { return "renderer"; }
 	Engine& getEngine() override { return m_engine; }
@@ -1087,7 +1095,7 @@ struct RendererImpl final : Renderer
 				gpu::startCapture();
 			}
 		};
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		Cmd& cmd = createJob<Cmd>();
 		queue(cmd, 0);
 	}
 
@@ -1101,7 +1109,7 @@ struct RendererImpl final : Renderer
 				gpu::stopCapture();
 			}
 		};
-		Cmd* cmd = LUMIX_NEW(m_allocator, Cmd);
+		Cmd& cmd = createJob<Cmd>();
 		queue(cmd, 0);
 	}
 
@@ -1132,7 +1140,7 @@ struct RendererImpl final : Renderer
 			Profiler::blockColor(0xaa, 0xff, 0xaa);
 			Profiler::link(job->profiler_link);
 			job->execute();
-			LUMIX_DELETE(m_allocator, job);
+			destroyJob(*job);
 		}
 		frame.jobs.clear();
 

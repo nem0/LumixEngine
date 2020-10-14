@@ -83,7 +83,7 @@ struct UniverseViewImpl final : UniverseView {
 	}
 
 	~UniverseViewImpl() {
-		m_font_res->getResourceManager().unload(*m_font_res);
+		m_font_res->decRefCount();
 		m_editor.universeCreated().unbind<&UniverseViewImpl::onUniverseCreated>(this);
 		m_editor.universeDestroyed().unbind<&UniverseViewImpl::onUniverseDestroyed>(this);
 		onUniverseDestroyed();
@@ -438,7 +438,7 @@ struct UniverseViewImpl final : UniverseView {
 	{
 		const Quat rot = m_viewport.rot;
 
-		right = m_scene_view.m_orbit_action->isActive() ? 0 : right;
+		right = m_scene_view.m_orbit_action.isActive() ? 0 : right;
 
 		m_viewport.pos += rot.rotate(Vec3(0, 0, -1)) * forward * speed;
 		m_viewport.pos += rot.rotate(Vec3(1, 0, 0)) * right * speed;
@@ -460,7 +460,7 @@ struct UniverseViewImpl final : UniverseView {
 		rot = pitch_rot * rot;
 		rot.normalize();
 
-		if (m_scene_view.m_orbit_action->isActive() && !m_editor.getSelectedEntities().empty())
+		if (m_scene_view.m_orbit_action.isActive() && !m_editor.getSelectedEntities().empty())
 		{
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 			const DVec3 entity_pos = universe->getPosition(m_editor.getSelectedEntities()[0]);
@@ -605,46 +605,28 @@ SceneView::SceneView(StudioApp& app)
 	ResourceManagerHub& rm = engine.getResourceManager();
 	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 
-	m_copy_move_action = LUMIX_NEW(allocator, Action)("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove");
-	m_copy_move_action->is_global = false;
-	m_app.addAction(m_copy_move_action);
+	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
+	m_orbit_action.init("Orbit", "Orbit with RMB", "orbitRMB", "", false);
+	m_toggle_gizmo_step_action.init("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep", "", false);
+	m_move_forward_action.init("Move forward", "Move camera forward", "moveForward", "", false);
+	m_move_back_action.init("Move back", "Move camera back", "moveBack", "", false);
+	m_move_left_action.init("Move left", "Move camera left", "moveLeft", "", false);
+	m_move_right_action.init("Move right", "Move camera right", "moveRight", "", false);
+	m_move_up_action.init("Move up", "Move camera up", "moveUp", "", false);
+	m_move_down_action.init("Move down", "Move camera down", "moveDown", "", false);
+	m_camera_speed_action.init(ICON_FA_CAMERA "Camera speed", "Reset camera speed", "cameraSpeed", ICON_FA_CAMERA, false);
+	m_camera_speed_action.func.bind<&SceneView::resetCameraSpeed>(this);
 
-	m_orbit_action = LUMIX_NEW(allocator, Action)("Orbit", "Orbit with RMB", "orbitRMB");
-	m_orbit_action->is_global = false;
-	m_app.addAction(m_orbit_action);
-
-	m_toggle_gizmo_step_action = LUMIX_NEW(allocator, Action)("Enable/disable gizmo step", "Enable/disable gizmo step", "toggleGizmoStep");
-	m_toggle_gizmo_step_action->is_global = false;
-	m_app.addAction(m_toggle_gizmo_step_action);
-
-	m_move_forward_action = LUMIX_NEW(allocator, Action)("Move forward", "Move camera forward", "moveForward");
-	m_move_forward_action->is_global = false;
-	m_app.addAction(m_move_forward_action);
-
-	m_move_back_action = LUMIX_NEW(allocator, Action)("Move back", "Move camera back", "moveBack");
-	m_move_back_action->is_global = false;
-	m_app.addAction(m_move_back_action);
-
-	m_move_left_action = LUMIX_NEW(allocator, Action)("Move left", "Move camera left", "moveLeft");
-	m_move_left_action->is_global = false;
-	m_app.addAction(m_move_left_action);
-
-	m_move_right_action = LUMIX_NEW(allocator, Action)("Move right", "Move camera right", "moveRight");
-	m_move_right_action->is_global = false;
-	m_app.addAction(m_move_right_action);
-
-	m_move_up_action = LUMIX_NEW(allocator, Action)("Move up", "Move camera up", "moveUp");
-	m_move_up_action->is_global = false;
-	m_app.addAction(m_move_up_action);
-
-	m_move_down_action = LUMIX_NEW(allocator, Action)("Move down", "Move camera down", "moveDown");
-	m_move_down_action->is_global = false;
-	m_app.addAction(m_move_down_action);
-
-	m_camera_speed_action = LUMIX_NEW(allocator, Action)(ICON_FA_CAMERA "Camera speed", "Reset camera speed", "cameraSpeed", ICON_FA_CAMERA);
-	m_camera_speed_action->is_global = false;
-	m_camera_speed_action->func.bind<&SceneView::resetCameraSpeed>(this);
-	m_app.addAction(m_camera_speed_action);
+	m_app.addAction(&m_copy_move_action);
+	m_app.addAction(&m_orbit_action);
+	m_app.addAction(&m_toggle_gizmo_step_action);
+	m_app.addAction(&m_move_forward_action);
+	m_app.addAction(&m_move_back_action);
+	m_app.addAction(&m_move_left_action);
+	m_app.addAction(&m_move_right_action);
+	m_app.addAction(&m_move_up_action);
+	m_app.addAction(&m_move_down_action);
+	m_app.addAction(&m_camera_speed_action);
 
 	const ResourceType pipeline_type("pipeline");
 	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
@@ -662,16 +644,26 @@ void SceneView::resetCameraSpeed()
 
 SceneView::~SceneView()
 {
+	m_app.removeAction(&m_copy_move_action);
+	m_app.removeAction(&m_orbit_action);
+	m_app.removeAction(&m_toggle_gizmo_step_action);
+	m_app.removeAction(&m_move_forward_action);
+	m_app.removeAction(&m_move_back_action);
+	m_app.removeAction(&m_move_left_action);
+	m_app.removeAction(&m_move_right_action);
+	m_app.removeAction(&m_move_up_action);
+	m_app.removeAction(&m_move_down_action);
+	m_app.removeAction(&m_camera_speed_action);
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
-	m_debug_shape_shader->getResourceManager().unload(*m_debug_shape_shader);
+	m_debug_shape_shader->decRefCount();
 }
 
 void SceneView::manipulate() {
 	const Array<EntityRef>* selected = &m_editor.getSelectedEntities();
 	if (selected->empty()) return;
 
-	const bool is_snap = m_toggle_gizmo_step_action->isActive();
+	const bool is_snap = m_toggle_gizmo_step_action.isActive();
 	Gizmo::Config& cfg = m_app.getGizmoConfig();
 	cfg.enableStep(is_snap);
 		
@@ -679,7 +671,7 @@ void SceneView::manipulate() {
 	tr.pos += tr.rot.rotate(cfg.getOffset());
 	const Transform old_pivot_tr = tr;
 			
-	const bool copy_move = m_copy_move_action->isActive();
+	const bool copy_move = m_copy_move_action.isActive();
 	if (!copy_move || !m_view->m_is_mouse_down[0]) {
 		m_copy_moved = false;
 	}
@@ -764,12 +756,12 @@ void SceneView::update(float time_delta)
 
 	float speed = m_camera_speed * time_delta * 60.f;
 	if (ImGui::GetIO().KeyShift) speed *= 10;
-	if (m_move_forward_action->isActive()) m_view->moveCamera(1.0f, 0, 0, speed);
-	if (m_move_back_action->isActive()) m_view->moveCamera(-1.0f, 0, 0, speed);
-	if (m_move_left_action->isActive()) m_view->moveCamera(0.0f, -1.0f, 0, speed);
-	if (m_move_right_action->isActive()) m_view->moveCamera(0.0f, 1.0f, 0, speed);
-	if (m_move_down_action->isActive()) m_view->moveCamera(0, 0, -1.0f, speed);
-	if (m_move_up_action->isActive()) m_view->moveCamera(0, 0, 1.0f, speed);
+	if (m_move_forward_action.isActive()) m_view->moveCamera(1.0f, 0, 0, speed);
+	if (m_move_back_action.isActive()) m_view->moveCamera(-1.0f, 0, 0, speed);
+	if (m_move_left_action.isActive()) m_view->moveCamera(0.0f, -1.0f, 0, speed);
+	if (m_move_right_action.isActive()) m_view->moveCamera(0.0f, 1.0f, 0, speed);
+	if (m_move_down_action.isActive()) m_view->moveCamera(0, 0, -1.0f, speed);
+	if (m_move_up_action.isActive()) m_view->moveCamera(0, 0, 1.0f, speed);
 }
 
 
@@ -838,8 +830,8 @@ void SceneView::renderIcons()
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	IAllocator& allocator = renderer->getAllocator();
-	RenderJob* cmd = LUMIX_NEW(allocator, RenderJob)(allocator);
-	cmd->m_ui = this;
+	RenderJob& cmd = renderer->createJob<RenderJob>(allocator);
+	cmd.m_ui = this;
 	renderer->queue(cmd, 0);
 }
 
@@ -910,10 +902,10 @@ void SceneView::renderSelection()
 	Engine& engine = m_editor.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	IAllocator& allocator = renderer->getAllocator();
-	RenderJob* job = LUMIX_NEW(allocator, RenderJob)(allocator);
-	job->m_pipeline = m_pipeline.get();
-	job->m_editor = &m_editor;
-	job->m_cam_pos = m_view->getViewport().pos;
+	RenderJob& job = renderer->createJob<RenderJob>(allocator);
+	job.m_pipeline = m_pipeline.get();
+	job.m_editor = &m_editor;
+	job.m_cam_pos = m_view->getViewport().pos;
 	renderer->queue(job, 0);
 }
 
@@ -978,12 +970,12 @@ void SceneView::renderGizmos()
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	IAllocator& allocator = renderer->getAllocator();
-	Cmd* cmd = LUMIX_NEW(allocator, Cmd)(allocator);
+	Cmd& cmd = renderer->createJob<Cmd>(allocator);
 	gpu::VertexDecl decl;
 	decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 	decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-	cmd->program = m_debug_shape_shader->getProgram(decl, 0);
-	cmd->view = this;
+	cmd.program = m_debug_shape_shader->getProgram(decl, 0);
+	cmd.view = this;
 	renderer->queue(cmd, 0);
 }
 
