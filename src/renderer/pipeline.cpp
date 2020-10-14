@@ -572,6 +572,8 @@ struct PipelineImpl final : Pipeline
 		, m_renderbuffers(allocator)
 		, m_shaders(allocator)
 		, m_shadow_atlas(allocator)
+		, m_textures(allocator)
+		, m_buffers(allocator)
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
@@ -666,6 +668,9 @@ struct PipelineImpl final : Pipeline
 
 	~PipelineImpl()
 	{
+		for (gpu::TextureHandle t : m_textures) m_renderer.destroy(t);
+		for (gpu::BufferHandle b : m_buffers) m_renderer.destroy(b);
+
 		m_renderer.frame();
 		m_renderer.frame();
 		m_renderer.frame();
@@ -1736,6 +1741,7 @@ struct PipelineImpl final : Pipeline
 		mem.data = nullptr;
 		mem.size = size;
 		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE | (u32)gpu::BufferFlags::SHADER_BUFFER);
+		m_buffers.push(buffer);
 		return buffer;
 	}
 	
@@ -1750,6 +1756,7 @@ struct PipelineImpl final : Pipeline
 			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE
 			, mem
 			, debug_name.get("lua_texture"));
+		m_textures.push(texture);
 		return texture;
 	}
 
@@ -1764,6 +1771,7 @@ struct PipelineImpl final : Pipeline
 			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
 			, mem
 			, debug_name.get("lua_texture"));
+		m_textures.push(texture);
 		return texture;
 	}
 
@@ -4413,6 +4421,8 @@ struct PipelineImpl final : Pipeline
 	Array<CustomCommandHandler> m_custom_commands_handlers;
 	Array<Renderbuffer> m_renderbuffers;
 	Array<ShaderRef> m_shaders;
+	Array<gpu::TextureHandle> m_textures;
+	Array<gpu::BufferHandle> m_buffers;
 	OS::Timer m_timer;
 	gpu::BufferHandle m_global_state_buffer;
 	gpu::BufferHandle m_pass_state_buffer;
