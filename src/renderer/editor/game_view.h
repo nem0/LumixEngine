@@ -59,7 +59,7 @@ private:
 	float m_time_multiplier;
 	Vec2 m_pos = Vec2(0);
 	Vec2 m_size = Vec2(0);
-	struct UniquePtr<GUIInterface> m_gui_interface;
+	UniquePtr<struct GUIInterface> m_gui_interface;
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;
 	bool m_paused;
