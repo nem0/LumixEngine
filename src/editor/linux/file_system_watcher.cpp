@@ -85,23 +85,14 @@ struct FileSystemWatcherImpl : FileSystemWatcher
 };
 
 
-FileSystemWatcher* FileSystemWatcher::create(const char* path, Lumix::IAllocator& allocator)
+UniquePtr<FileSystemWatcher> FileSystemWatcher::create(const char* path, Lumix::IAllocator& allocator)
 {
-	auto* watcher = LUMIX_NEW(allocator, FileSystemWatcherImpl)(allocator);
+	UniquePtr<FileSystemWatcherImpl> watcher = UniquePtr<FileSystemWatcherImpl>::create(allocator, allocator);
 	if(!watcher->start(path))
     {
-        LUMIX_DELETE(allocator, watcher);
-        return nullptr;
+        return UniquePtr<FileSystemWatcher>();
     }
 	return watcher;
-}
-
-
-void FileSystemWatcher::destroy(FileSystemWatcher* watcher)
-{
-	if (!watcher) return;
-	auto* impl_watcher = (FileSystemWatcherImpl*)watcher;
-	LUMIX_DELETE(impl_watcher->allocator, impl_watcher);
 }
 
 
