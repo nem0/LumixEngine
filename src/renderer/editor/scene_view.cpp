@@ -29,6 +29,7 @@
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
+#include "renderer/pose.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
@@ -840,7 +841,9 @@ void SceneView::renderSelection()
 {
 	struct RenderJob : Renderer::RenderJob
 	{
-		RenderJob(IAllocator& allocator) : m_items(allocator) {}
+		RenderJob(IAllocator& allocator) 
+			: m_allocator(allocator)
+			, m_items(allocator) {}
 
 		void setup() override
 		{
@@ -848,20 +851,34 @@ void SceneView::renderSelection()
 			const Array<EntityRef>& entities = m_editor->getSelectedEntities();
 			RenderScene* scene = m_pipeline->getScene();
 			const Universe& universe = scene->getUniverse();
+			
 			for (EntityRef e : entities) {
 				if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
 
 				const Model* model = scene->getModelInstanceModel(e);
 				if (!model || !model->isReady()) continue;
 
+				const Pose* pose = scene->lockPose(e);
 				for (int i = 0; i <= model->getLODIndices()[0].to; ++i) {
 					const Mesh& mesh = model->getMesh(i);
-					Item& item = m_items.emplace();
+					
+					Item& item = m_items.emplace(m_allocator);
+					item.material = mesh.material->getRenderData();
+					u32 define_mask = item.material->define_mask;
 					item.mesh = mesh.render_data;
 					item.mtx = universe.getRelativeMatrix(e, m_cam_pos);
-					item.material = mesh.material->getRenderData();
-					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, item.material->define_mask);
+					if (pose && pose->count > 0) {
+						define_mask |= skinned_define;
+						item.pose.push(item.mtx);
+						for (int j = 0, c = pose->count; j < c; ++j) {
+							const Model::Bone& bone = model->getBone(j);
+							const LocalRigidTransform tmp = {pose->positions[j], pose->rotations[j]};
+							item.pose.push((tmp * bone.inv_bind_transform).toMatrix());
+						}
+					}
+					item.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, define_mask);
 				}
+				scene->unlockPose(e, false);
 			}
 		}
 
@@ -874,7 +891,14 @@ void SceneView::renderSelection()
 			for (const Item& item : m_items) {
 				const Mesh::RenderData* rd = item.mesh;
 			
-				gpu::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
+				if (item.pose.empty()) {
+					gpu::update(drawcall_ub, &item.mtx.m11, sizeof(item.mtx));
+				}
+				else {
+					gpu::update(drawcall_ub, item.pose.begin(), sizeof(Matrix) * item.pose.size());
+					gpu::bindUniformBuffer(4, drawcall_ub, 0, 32 * 1024);
+				}
+
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
 				gpu::useProgram(item.program);
 				gpu::bindIndexBuffer(rd->index_buffer_handle);
@@ -887,12 +911,16 @@ void SceneView::renderSelection()
 		}
 
 		struct Item {
+			Item(IAllocator& allocator) : pose(allocator) {}
+			Array<Matrix> pose;
 			gpu::ProgramHandle program;
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
 			Matrix mtx;
 		};
 
+		IAllocator& m_allocator;
+		u32 skinned_define;
 		Array<Item> m_items;
 		Pipeline* m_pipeline;
 		WorldEditor* m_editor;
@@ -903,6 +931,7 @@ void SceneView::renderSelection()
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	IAllocator& allocator = renderer->getAllocator();
 	RenderJob& job = renderer->createJob<RenderJob>(allocator);
+	job.skinned_define = 1 << renderer->getShaderDefineIdx("SKINNED");
 	job.m_pipeline = m_pipeline.get();
 	job.m_editor = &m_editor;
 	job.m_cam_pos = m_view->getViewport().pos;
