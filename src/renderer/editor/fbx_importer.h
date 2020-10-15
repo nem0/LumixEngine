@@ -199,6 +199,7 @@ private:
 	Array<ImportGeometry> m_geometries;
 	Array<ImportAnimation> m_animations;
 	Array<const ofbx::Object*> m_bones;
+	Array<Matrix> m_bind_pose;
 	ofbx::IScene* scene;
 	OutputMemoryStream out_file;
 	float m_time_scale = 1.0f;

@@ -783,6 +783,7 @@ FBXImporter::FBXImporter(StudioApp& app)
 	, m_geometries(m_allocator)
 	, m_animations(m_allocator)
 	, m_bones(m_allocator)
+	, m_bind_pose(m_allocator)
 	, out_file(m_allocator)
 	, m_filesystem(app.getEngine().getFileSystem())
 	, m_app(app)
@@ -1342,12 +1343,11 @@ static LocalRigidTransform sample(const ofbx::Object& bone, const ofbx::Animatio
 	return res;
 }
 
-static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& keys, const ofbx::Object& bone, float error) {
+static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& keys, const Vec3& bind_pos, float error) {
 	if (count != 2) return false;
-	const Vec3 p = toLumixVec3(bone.getLocalTranslation());
 	for (const FBXImporter::Key& key : keys) {
 		if (key.flags & 1) continue;
-		const Vec3 d = key.pos - p;
+		const Vec3 d = key.pos - bind_pos;
 		if (d.x > error || d.y > error || d.z > error) return false;
 	}
 	return true;
@@ -1405,7 +1405,8 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 		for (const ofbx::Object*& bone : m_bones) {
 			Array<Key>& keys = all_keys[u32(&bone - m_bones.begin())];
-			const float parent_scale = bone->getParent() ? (float)getScaleX(bone->getParent()->getGlobalTransform()) : 1;
+			ofbx::Object* parent = bone->getParent();
+			const float parent_scale = parent ? (float)getScaleX(parent->getGlobalTransform()) : 1;
 			// TODO skip curves which do not change anything
 			compressRotations(cfg.rotation_error, Ref(keys));
 			compressPositions(cfg.position_error, parent_scale, Ref(keys));
@@ -1421,7 +1422,21 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 				if ((key.flags & 1) == 0) ++count;
 			}
 			if (count == 0) continue;
-			if (isBindPosePositionTrack(count, keys, *bone, cfg.position_error)) continue;
+			const u32 idx = u32(&bone - m_bones.begin());
+
+			ofbx::Object* parent = bone->getParent();
+			Vec3 bind_pos;
+			if (!parent)
+			{
+				bind_pos = m_bind_pose[idx].getTranslation();
+			}
+			else
+			{
+				const int parent_idx = m_bones.indexOf(parent);
+				bind_pos = (m_bind_pose[parent_idx].inverted() * m_bind_pose[idx]).getTranslation();
+			}
+
+			if (isBindPosePositionTrack(count, keys, bind_pos, cfg.position_error)) continue;
 			
 			const u32 name_hash = crc32(bone->name);
 			write(name_hash);
@@ -1854,6 +1869,8 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 {
 	write(m_bones.size());
 
+	u32 idx = 0;
+	m_bind_pose.resize(m_bones.size());
 	for (const ofbx::Object*& node : m_bones)
 	{
 		const char* name = node->name;
@@ -1875,11 +1892,13 @@ void FBXImporter::writeSkeleton(const ImportConfig& cfg)
 		const ImportMesh* mesh = getAnyMeshFromBone(node, int(&node - m_bones.begin()));
 		Matrix tr = toLumix(getBindPoseMatrix(mesh, node));
 		tr.normalizeScale();
+		m_bind_pose[idx] = tr;
 
 		Quat q = fixOrientation(tr.getRotation());
 		Vec3 t = fixOrientation(tr.getTranslation());
 		write(t * cfg.mesh_scale * m_fbx_scale);
 		write(q);
+		++idx;
 	}
 }
 
