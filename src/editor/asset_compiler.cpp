@@ -4,6 +4,7 @@
 #include "editor/file_system_watcher.h"
 #include "editor/log_ui.h"
 #include "editor/studio_app.h"
+#include "editor/utils.h"
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
@@ -292,25 +293,6 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 
-	void cleanCache() {
-		FileSystem& fs = m_app.getEngine().getFileSystem();
-		auto* iter = fs.createFileIterator(".lumix/assets");
-		OS::FileInfo info;
-		while (getNextFile(iter, &info)) {
-			if (info.is_directory) continue;
-			if (equalStrings(info.filename, "_list.txt")) continue;
-
-			u32 hash;
-			fromCString(Span(info.filename, (u32)strlen(info.filename)), Ref(hash));
-
-			if (!m_resources.find(hash).isValid()) {
-				fs.deleteFile(StaticString<MAX_PATH_LENGTH>(".lumix/assets/", info.filename));
-			}
-		}
-		OS::destroyFileIterator(iter);
-	}
-
-
 	void onInitFinished() override
 	{
 		OS::InputFile file;
@@ -341,14 +323,23 @@ struct AssetCompilerImpl : AssetCompiler
 					MutexGuard lock(m_resources_mutex);
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
-						StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
 						#ifdef CACHE_MASTER 
+							StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
 							if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
 								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 							}
 						#else
-							if (type != INVALID_RESOURCE_TYPE && fs.fileExists(p.c_str())) {
-								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
+							if (type != INVALID_RESOURCE_TYPE) {
+								ResourceLocator locator(Span(p.c_str(), (u32)strlen(p.c_str())));
+								char tmp[MAX_PATH_LENGTH];
+								copyString(Span(tmp), locator.resource);
+								if (fs.fileExists(tmp)) {
+									m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
+								}
+								else {
+									StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
+									fs.deleteFile(res_path);
+								}
 							}
 						#endif
 					});
@@ -387,11 +378,6 @@ struct AssetCompilerImpl : AssetCompiler
 
 		const u64 list_last_modified = OS::getLastModified(list_path);
 		processDir("", list_last_modified);
-
-		#ifndef CACHE_MASTER
-			cleanCache();
-		#endif
-
 		registerLuaAPI(m_app.getEngine().getState());
 	}
 
