@@ -8,6 +8,7 @@
 #include "engine/flag_set.h"
 #include "engine/allocator.h"
 #include "engine/input_system.h"
+#include "engine/metaprogramming.h"
 #include "engine/plugin.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
@@ -130,7 +131,8 @@ namespace Lumix
 		{
 			enum Flags : u32 {
 				ENABLED = 1 << 0,
-				LOADED = 1 << 1
+				LOADED = 1 << 1,
+				MOVED_FROM = 1 << 2
 			};
 
 			explicit ScriptInstance(ScriptComponent& cmp, IAllocator& allocator)
@@ -172,30 +174,59 @@ namespace Lumix
 				m_flags.set(ENABLED);
 			}
 
+			ScriptInstance(const ScriptInstance&) = delete;
+
+			ScriptInstance(ScriptInstance&& rhs) 
+				: m_properties(rhs.m_properties)
+				, m_environment(rhs.m_environment)
+				, m_thread_ref(rhs.m_thread_ref)
+				, m_cmp(rhs.m_cmp)
+				, m_script(rhs.m_script)
+				, m_state(rhs.m_state)
+				, m_flags(rhs.m_flags)
+			{
+				rhs.m_script = nullptr;
+				rhs.m_flags.set(MOVED_FROM);
+			}
+
+			void operator =(ScriptInstance&& rhs) 
+			{
+				m_properties = Move(rhs.m_properties);
+				m_environment = rhs.m_environment;
+				m_thread_ref = rhs.m_thread_ref;
+				m_cmp = rhs.m_cmp;
+				m_script = rhs.m_script;
+				m_state = rhs.m_state;
+				m_flags = rhs.m_flags;
+				rhs.m_script = nullptr;
+				rhs.m_flags.set(MOVED_FROM);
+			}
+
 			~ScriptInstance() {
-				if (m_script) {
-					m_script->getObserverCb().unbind<&ScriptComponent::onScriptLoaded>(m_cmp);
-					m_script->decRefCount();
-				}
-
-				lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
-				ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
-				lua_getfield(m_state, -1, "onDestroy"); // [env, onDestroy]
-				if (lua_type(m_state, -1) != LUA_TFUNCTION) {
-					lua_pop(m_state, 2); // []
-				}
-				else {
-					if (lua_pcall(m_state, 0, 0, 0) != 0) { // [env]
-						logError("Lua Script") << lua_tostring(m_state, -1);
-						lua_pop(m_state, 1);
+				if (!m_flags.isSet(MOVED_FROM)) {
+					if (m_script) {
+						m_script->getObserverCb().unbind<&ScriptComponent::onScriptLoaded>(m_cmp);
+						m_script->decRefCount();
 					}
-					lua_pop(m_state, 1); // []
+					lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
+					ASSERT(lua_type(m_state, -1) == LUA_TTABLE);
+					lua_getfield(m_state, -1, "onDestroy"); // [env, onDestroy]
+					if (lua_type(m_state, -1) != LUA_TFUNCTION) {
+						lua_pop(m_state, 2); // []
+					}
+					else {
+						if (lua_pcall(m_state, 0, 0, 0) != 0) { // [env]
+							logError("Lua Script") << lua_tostring(m_state, -1);
+							lua_pop(m_state, 1);
+						}
+						lua_pop(m_state, 1); // []
+					}
+
+					m_cmp->m_scene.disableScript(*this);
+
+					luaL_unref(m_state, LUA_REGISTRYINDEX, m_thread_ref);
+					luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
 				}
-
-				m_cmp->m_scene.disableScript(*this);
-
-				luaL_unref(m_state, LUA_REGISTRYINDEX, m_thread_ref);
-				luaL_unref(m_state, LUA_REGISTRYINDEX, m_environment);
 			}
 
 			void onScriptLoaded(LuaScriptSceneImpl& scene, ScriptComponent& cmp, int scr_index);
@@ -1420,7 +1451,7 @@ namespace Lumix
 			{
 				if (prop.name_hash == hash)
 				{
-					if (inst.m_script->isReady()) return getProperty<T>(prop, property_name, inst);
+					if (inst.m_script && inst.m_script->isReady()) return getProperty<T>(prop, property_name, inst);
 					return fromString<T>(prop.stored_value.c_str());
 				}
 			}
@@ -1924,9 +1955,9 @@ namespace Lumix
 			if (!up && scr_index > script_cmp->m_scripts.size() - 2) return;
 			if (up && scr_index == 0) return;
 			int other = up ? scr_index - 1 : scr_index + 1;
-			ScriptInstance tmp = script_cmp->m_scripts[scr_index]; //-V1002
-			script_cmp->m_scripts[scr_index] = script_cmp->m_scripts[other]; //-V1002
-			script_cmp->m_scripts[other] = tmp; //-V1002
+			ScriptInstance tmp = Move(script_cmp->m_scripts[scr_index]); //-V1002
+			script_cmp->m_scripts[scr_index] = Move(script_cmp->m_scripts[other]); //-V1002
+			script_cmp->m_scripts[other] = Move(tmp); //-V1002
 		}
 
 

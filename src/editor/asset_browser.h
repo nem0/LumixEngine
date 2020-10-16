@@ -61,6 +61,7 @@ public:
 	void tile(const Path& path, bool selected);
 	OutputMemoryStream* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);
+	void releaseResources();
 
 public:
 	bool m_is_open;

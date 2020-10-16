@@ -465,16 +465,15 @@ struct RendererImpl final : Renderer
 		, m_shader_defines(m_allocator)
 		, m_profiler(m_allocator)
 		, m_layers(m_allocator)
-		, m_frames(m_allocator)
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
 	{
 		m_shader_defines.reserve(32);
 
 		gpu::preinit(m_allocator, shouldLoadRenderdoc());
-		m_frames.emplace(*this, m_allocator);
-		m_frames.emplace(*this, m_allocator);
-		m_frames.emplace(*this, m_allocator);
+		m_frames[0].create(*this, m_allocator);
+		m_frames[1].create(*this, m_allocator);
+		m_frames[2].create(*this, m_allocator);
 	}
 
 	u32 getVersion() const override { return 0; }
@@ -501,8 +500,8 @@ struct RendererImpl final : Renderer
 		JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
 		JobSystem::runEx(this, [](void* data) {
 			RendererImpl* renderer = (RendererImpl*)data;
-			for (FrameData& frame : renderer->m_frames) {
-				gpu::destroy(frame.transient_buffer.m_buffer);
+			for (const Local<FrameData>& frame : renderer->m_frames) {
+				gpu::destroy(frame->transient_buffer.m_buffer);
 			}
 			gpu::destroy(renderer->m_material_buffer.buffer);
 			gpu::destroy(renderer->m_material_buffer.staging_buffer);
@@ -566,11 +565,11 @@ struct RendererImpl final : Renderer
 					"dedicated: " << (mem_stats.dedicated_vidmem/ (1024.f * 1024.f)) << "MB\n";
 			}
 
-			for (FrameData& frame : renderer.m_frames) {
-				frame.transient_buffer.init();
+			for (const Local<FrameData>& frame : renderer.m_frames) {
+				frame->transient_buffer.init();
 			}
-			renderer.m_cpu_frame = renderer.m_frames.begin();
-			renderer.m_gpu_frame = renderer.m_frames.begin();
+			renderer.m_cpu_frame = renderer.m_frames[0].get();
+			renderer.m_gpu_frame = renderer.m_frames[0].get();
 
 			renderer.m_profiler.init();
 
@@ -1152,8 +1151,7 @@ struct RendererImpl final : Renderer
 		JobSystem::enableBackupWorker(false);
 		m_profiler.frame();
 
-		++m_gpu_frame;
-		if (m_gpu_frame == m_frames.end()) m_gpu_frame = m_frames.begin();
+		m_gpu_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
 
 		if (m_gpu_frame->gpu_frame != 0xffFFffFF) {
 			gpu::waitFrame(m_gpu_frame->gpu_frame);
@@ -1173,6 +1171,14 @@ struct RendererImpl final : Renderer
 		JobSystem::wait(m_last_render);
 	}
 
+	i32 getFrameIndex(FrameData* frame) const {
+		for (i32 i = 0; i < (i32)lengthOf(m_frames); ++i) {
+			if (frame == m_frames[i].get()) return i;
+		}
+		ASSERT(false);
+		return -1;
+	}
+
 	void frame() override
 	{
 		PROFILE_FUNCTION();
@@ -1186,15 +1192,13 @@ struct RendererImpl final : Renderer
 
 		JobSystem::incSignal(&m_cpu_frame->can_setup);
 		
-		++m_cpu_frame;
-		if(m_cpu_frame == m_frames.end()) m_cpu_frame = m_frames.begin();
+		m_cpu_frame = m_frames[(getFrameIndex(m_cpu_frame) + 1) % lengthOf(m_frames)].get();
 		JobSystem::runEx(this, [](void* ptr){
 			auto* renderer = (RendererImpl*)ptr;
 			renderer->render();
 		}, &m_last_render, JobSystem::INVALID_HANDLE, 1);
 
 		JobSystem::wait(m_cpu_frame->can_setup);
-
 	}
 
 	Engine& m_engine;
@@ -1211,7 +1215,7 @@ struct RendererImpl final : Renderer
 	RenderResourceManager<Texture> m_texture_manager;
 
 	Array<RenderPlugin*> m_plugins;
-	Array<FrameData> m_frames;
+	Local<FrameData> m_frames[3];
 	FrameData* m_gpu_frame = nullptr;
 	FrameData* m_cpu_frame = nullptr;
 	JobSystem::SignalHandle m_last_render = JobSystem::INVALID_HANDLE;

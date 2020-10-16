@@ -422,6 +422,7 @@ struct StudioAppImpl final : StudioApp
 
 	~StudioAppImpl()
 	{
+		m_asset_browser->releaseResources();
 		removeAction(&m_set_pivot_action);
 		removeAction(&m_reset_pivot_action);
 		ImGuiIO& io = ImGui::GetIO();
