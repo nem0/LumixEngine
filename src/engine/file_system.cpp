@@ -6,6 +6,7 @@
 #include "engine/delegate_list.h"
 #include "engine/flag_set.h"
 #include "engine/hash_map.h"
+#include "engine/metaprogramming.h"
 #include "engine/log.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
@@ -247,7 +248,7 @@ struct FileSystemImpl final : FileSystem
 				break;
 			}
 
-			AsyncItem item = static_cast<AsyncItem&&>(m_finished[0]);
+			AsyncItem item = Move(m_finished[0]);
 			m_finished.erase(0);
 
 			m_mutex.exit();
@@ -312,8 +313,8 @@ int FSTask::task()
 		{
 			MutexGuard lock(m_fs.m_mutex);
 			if (!m_fs.m_queue[0].isCanceled()) {
-				m_fs.m_finished.emplace(static_cast<AsyncItem&&>(m_fs.m_queue[0]));
-				m_fs.m_finished.back().data = static_cast<OutputMemoryStream&&>(data);
+				m_fs.m_finished.emplace(Move(m_fs.m_queue[0]));
+				m_fs.m_finished.back().data = Move(data);
 				if(!success) {
 					m_fs.m_finished.back().flags.set(AsyncItem::Flags::FAILED);
 				}

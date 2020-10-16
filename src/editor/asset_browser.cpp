@@ -63,11 +63,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 }
 
 
-AssetBrowser::~AssetBrowser()
-{
-	m_app.removeAction(&m_back_action);
-	m_app.removeAction(&m_forward_action);
-	m_app.getAssetCompiler().listChanged().unbind<&AssetBrowser::onResourceListChanged>(this);
+void AssetBrowser::releaseResources() {
 	unloadResources();
 	RenderInterface* ri = m_app.getRenderInterface();
 	for (FileInfo& info : m_file_infos) {
@@ -78,6 +74,14 @@ AssetBrowser::~AssetBrowser()
 		ri->unloadTexture(info.tex);
 	}
 	m_immediate_tiles.clear();
+}
+
+
+AssetBrowser::~AssetBrowser()
+{
+	m_app.removeAction(&m_back_action);
+	m_app.removeAction(&m_forward_action);
+	m_app.getAssetCompiler().listChanged().unbind<&AssetBrowser::onResourceListChanged>(this);
 
 	ASSERT(m_plugins.size() == 0);
 }

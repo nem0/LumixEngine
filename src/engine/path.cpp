@@ -18,11 +18,11 @@ Path::Path()
 	, m_path{}
 {}
 
-Path::Path(const Path& rhs)
-	: m_hash(rhs.m_hash)
-{
-	copyString(m_path, rhs.m_path);
-}
+//Path::Path(const Path& rhs)
+//	: m_hash(rhs.m_hash)
+//{
+//	copyString(m_path, rhs.m_path);
+//}
 
 Path::Path(const char* path) {
 	normalize(path, Span(m_path));
@@ -31,11 +31,6 @@ Path::Path(const char* path) {
 
 i32 Path::length() const {
 	return stringLength(m_path);
-}
-
-void Path::operator =(const Path& rhs) {
-	copyString(m_path, rhs.m_path);
-	m_hash = crc32(m_path);
 }
 
 void Path::operator =(const char* rhs) {

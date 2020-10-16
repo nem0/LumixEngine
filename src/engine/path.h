@@ -27,10 +27,8 @@ public:
 
 public:
 	Path();
-	Path(const Path& rhs);
 	explicit Path(const char* path);
 
-	void operator=(const Path& rhs);
 	void operator=(const char* rhs);
 	bool operator==(const Path& rhs) const;
 	bool operator!=(const Path& rhs) const;
