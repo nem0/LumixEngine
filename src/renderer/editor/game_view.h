@@ -38,6 +38,7 @@ public:
 	bool isOpen() const { return m_is_open; }
 	void onAction() { m_is_open = !m_is_open; }
 	void onWindowGUI() override;
+	void init();
 
 public:
 	bool m_is_open;

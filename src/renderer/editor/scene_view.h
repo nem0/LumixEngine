@@ -36,6 +36,7 @@ struct SceneView : StudioApp::GUIPlugin
 		void onWindowGUI() override;
 		Pipeline* getPipeline() { return m_pipeline.get(); }
 		const char* getName() const override { return "scene_view"; }
+		void init();
 
 	private:
 		void manipulate();
