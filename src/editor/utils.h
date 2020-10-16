@@ -15,6 +15,7 @@ struct LUMIX_EDITOR_API ResourceLocator {
 	Span<const char> dir;
 	Span<const char> basename;
 	Span<const char> ext;
+	Span<const char> resource;
 
 	Span<const char> full;
 };

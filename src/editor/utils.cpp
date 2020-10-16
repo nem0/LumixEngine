@@ -51,6 +51,8 @@ ResourceLocator::ResourceLocator(const Span<const char>& path)
 		basename.m_begin = dir.m_begin;
 		dir.m_end = dir.m_begin;
 	}
+	resource.m_begin = dir.m_begin;
+	resource.m_end = ext.m_end;
 }
 
 
