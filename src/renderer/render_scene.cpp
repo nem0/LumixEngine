@@ -944,6 +944,7 @@ public:
 			serializer.read(bone_attachment.entity);
 			bone_attachment.entity = entity_map.get(bone_attachment.entity);
 			serializer.read(bone_attachment.parent_entity);
+			bone_attachment.parent_entity = entity_map.get(bone_attachment.parent_entity);
 			serializer.read(bone_attachment.relative_transform);
 			m_bone_attachments.insert(bone_attachment.entity, bone_attachment);
 			m_universe.onComponentCreated(bone_attachment.entity, BONE_ATTACHMENT_TYPE, this);
@@ -1040,17 +1041,15 @@ public:
 				r.meshes = nullptr;
 				r.mesh_count = 0;
 
-				char path[MAX_PATH_LENGTH];
-				copyString(path, serializer.readString());
-
+				const char* path = serializer.readString();
 				if (path[0] != 0) {
 					Model* model = m_engine.getResourceManager().load<Model>(Path(path));
 					setModel(e, model);
 				}
 
-				copyString(path, serializer.readString());
-				if (path[0] != 0) {
-					setModelInstanceMaterialOverride(e, Path(path));
+				const char* mat_path = serializer.readString();
+				if (mat_path[0] != 0) {
+					setModelInstanceMaterialOverride(e, Path(mat_path));
 				}
 
 				m_universe.onComponentCreated(e, MODEL_INSTANCE_TYPE, this);

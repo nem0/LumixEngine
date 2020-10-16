@@ -329,7 +329,6 @@ public:
 				e = INVALID_ENTITY;
 			}
 			prop.set(dst, index, e);
-			clone(prop); 
 		}
 		void visit(const Reflection::Property<Vec2>& prop) override { clone(prop); }
 		void visit(const Reflection::Property<Vec3>& prop) override { clone(prop); }
