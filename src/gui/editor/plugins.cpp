@@ -237,12 +237,14 @@ public:
 		m_toggle_ui.func.bind<&GUIEditor::onAction>(this);
 		m_toggle_ui.is_selected.bind<&GUIEditor::isOpen>(this);
 		app.addWindowAction(&m_toggle_ui);
+	}
 
-		m_editor = &app.getWorldEditor();
-		Engine& engine = app.getEngine();
+	void init() {
+		m_editor = &m_app.getWorldEditor();
+		Engine& engine = m_app.getEngine();
 		Renderer& renderer = *static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 		PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/gui_editor.pln"));
-		m_pipeline = Pipeline::create(renderer, pres, "", allocator);
+		m_pipeline = Pipeline::create(renderer, pres, "", m_app.getAllocator());
 	}
 
 
@@ -906,6 +908,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
+		m_gui_editor.init();
 		m_app.registerComponent("", "gui_button", "GUI / Button");
 		m_app.registerComponent("", "gui_canvas", "GUI / Canvas");
 		m_app.registerComponent(ICON_FA_IMAGE, "gui_image", "GUI / Image", Sprite::TYPE, "Sprite");

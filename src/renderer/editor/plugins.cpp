@@ -1438,12 +1438,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_fbx_importer(app)
 	{
 		app.getAssetCompiler().registerExtension("fbx", Model::TYPE);
-		createPreviewUniverse();
-		createTileUniverse();
-		m_viewport.is_ortho = false;
-		m_viewport.fov = degreesToRadians(60.f);
-		m_viewport.near = 0.1f;
-		m_viewport.far = 10000.f;
 	}
 
 
@@ -1455,6 +1449,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_pipeline.reset();
 		engine.destroyUniverse(*m_tile.universe);
 		m_tile.pipeline.reset();
+	}
+
+
+	void init() {
+		createPreviewUniverse();
+		createTileUniverse();
+		m_viewport.is_ortho = false;
+		m_viewport.fov = degreesToRadians(60.f);
+		m_viewport.near = 0.1f;
+		m_viewport.far = 10000.f;
 	}
 
 
@@ -2587,14 +2591,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		: m_app(app)
 		, m_probes(app.getAllocator())
 	{
-		Engine& engine = app.getEngine();
-		PluginManager& plugin_manager = engine.getPluginManager();
-		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
-		IAllocator& allocator = app.getAllocator();
-		ResourceManagerHub& rm = engine.getResourceManager();
-		PipelineResource* pres = rm.load<PipelineResource>(Path("pipelines/main.pln"));
-		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
-		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
 	}
 
 
@@ -2603,6 +2599,16 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		m_ibl_filter_shader->decRefCount();
 	}
 
+	void init() {
+		Engine& engine = m_app.getEngine();
+		PluginManager& plugin_manager = engine.getPluginManager();
+		Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
+		IAllocator& allocator = m_app.getAllocator();
+		ResourceManagerHub& rm = engine.getResourceManager();
+		PipelineResource* pres = rm.load<PipelineResource>(Path("pipelines/main.pln"));
+		m_pipeline = Pipeline::create(*renderer, pres, "PROBE", allocator);
+		m_ibl_filter_shader = rm.load<Shader>(Path("pipelines/ibl_filter.shd"));
+	}
 
 	bool saveCubemap(u64 probe_guid, const Vec4* data, u32 texture_size, u32 mips_count)
 	{
@@ -3769,6 +3775,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.addPlugin(m_model_properties_plugin);
 		property_grid.addPlugin(m_env_probe_plugin);
 		property_grid.addPlugin(m_terrain_plugin);
+
+		m_scene_view.init();
+		m_game_view.init();
+		m_env_probe_plugin.init();
+		m_model_plugin.init();
 	}
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {

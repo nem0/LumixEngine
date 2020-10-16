@@ -596,15 +596,7 @@ SceneView::SceneView(StudioApp& app)
 
 	Engine& engine = m_editor.getEngine();
 	IAllocator& allocator = engine.getAllocator();
-	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
-	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
-	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW", engine.getAllocator());
-	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
-	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
-	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<&SceneView::renderIcons>(this);
 
-	ResourceManagerHub& rm = engine.getResourceManager();
-	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
 
 	m_copy_move_action.init("Duplicate move", "Duplicate entity when moving with gizmo", "duplicateEntityMove", "", false);
 	m_orbit_action.init("Orbit", "Orbit with RMB", "orbitRMB", "", false);
@@ -636,6 +628,18 @@ SceneView::SceneView(StudioApp& app)
 	m_editor.setView(m_view);
 }
 
+void SceneView::init() {
+	Engine& engine = m_editor.getEngine();
+	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
+	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
+	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW", engine.getAllocator());
+	m_pipeline->addCustomCommandHandler("renderSelection").callback.bind<&SceneView::renderSelection>(this);
+	m_pipeline->addCustomCommandHandler("renderGizmos").callback.bind<&SceneView::renderGizmos>(this);
+	m_pipeline->addCustomCommandHandler("renderIcons").callback.bind<&SceneView::renderIcons>(this);
+
+	ResourceManagerHub& rm = engine.getResourceManager();
+	m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
+}
 
 void SceneView::resetCameraSpeed()
 {

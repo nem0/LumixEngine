@@ -58,17 +58,21 @@ GameView::GameView(StudioApp& app)
 	Engine& engine = app.getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
 	LuaWrapper::createSystemClosure(engine.getState(), "GameView", this, "forceViewport", f);
+}
 
-	IAllocator& allocator = app.getAllocator();
+
+void GameView::init() {
+	IAllocator& allocator = m_app.getAllocator();
 	m_toggle_ui.init("Game View", "Toggle game view", "game_view", "", true);
 	m_toggle_ui.func.bind<&GameView::onAction>(this);
 	m_toggle_ui.is_selected.bind<&GameView::isOpen>(this);
-	app.addWindowAction(&m_toggle_ui);
+	m_app.addWindowAction(&m_toggle_ui);
 
 	m_fullscreen_action.init("Game View fullscreen", "Game View fullscreen", "game_view_fullscreen", "", true);
 	m_fullscreen_action.func.bind<&GameView::toggleFullscreen>(this);
-	app.addAction(&m_fullscreen_action);
+	m_app.addAction(&m_fullscreen_action);
 
+	Engine& engine = m_app.getEngine();
 	auto* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "GAME_VIEW", engine.getAllocator());
