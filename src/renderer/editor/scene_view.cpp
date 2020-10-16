@@ -871,7 +871,7 @@ void SceneView::renderSelection()
 					u32 define_mask = item.material->define_mask;
 					item.mesh = mesh.render_data;
 					item.mtx = universe.getRelativeMatrix(e, m_cam_pos);
-					if (pose && pose->count > 0) {
+					if (pose && pose->count > 0 && mesh.type == Mesh::SKINNED) {
 						define_mask |= skinned_define;
 						item.pose.push(item.mtx);
 						for (int j = 0, c = pose->count; j < c; ++j) {
@@ -900,7 +900,6 @@ void SceneView::renderSelection()
 				}
 				else {
 					gpu::update(drawcall_ub, item.pose.begin(), sizeof(Matrix) * item.pose.size());
-					gpu::bindUniformBuffer(4, drawcall_ub, 0, 32 * 1024);
 				}
 
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);

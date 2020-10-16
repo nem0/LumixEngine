@@ -288,7 +288,11 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 		return m_app.getAssetCompiler().copyCompile(src);
 	}
 
-	void onGUI(Span<Resource*> resources) override {}
+	void onGUI(Span<Resource*> resources) override {
+		if (resources.length() == 1 && ImGui::Button("Open in animation editor")) {
+			m_controller_editor->show(resources[0]->getPath().c_str());
+		}
+	}
 
 
 	void onResourceUnloaded(Resource* resource) override {}
@@ -305,6 +309,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 
 
 	StudioApp& m_app;
+	Anim::ControllerEditor* m_controller_editor = nullptr;
 };
 
 
@@ -378,7 +383,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 		, m_animable_plugin(app)
-		, m_animtion_plugin(app)
+		, m_animation_plugin(app)
 		, m_prop_anim_plugin(app)
 		, m_anim_ctrl_plugin(app)
 	{}
@@ -395,7 +400,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getAssetCompiler().addPlugin(m_anim_ctrl_plugin, act_exts);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.addPlugin(m_animtion_plugin);
+		asset_browser.addPlugin(m_animation_plugin);
 		asset_browser.addPlugin(m_prop_anim_plugin);
 		asset_browser.addPlugin(m_anim_ctrl_plugin);
 
@@ -403,6 +408,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		
 		m_anim_editor = Anim::ControllerEditor::create(m_app);
 		m_app.addPlugin(*m_anim_editor);
+
+		m_anim_ctrl_plugin.m_controller_editor = m_anim_editor.get();
 	}
 
 	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
@@ -412,7 +419,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.getAssetCompiler().removePlugin(m_anim_ctrl_plugin);
 
 		AssetBrowser& asset_browser = m_app.getAssetBrowser();
-		asset_browser.removePlugin(m_animtion_plugin);
+		asset_browser.removePlugin(m_animation_plugin);
 		asset_browser.removePlugin(m_prop_anim_plugin);
 		asset_browser.removePlugin(m_anim_ctrl_plugin);
 		m_app.getPropertyGrid().removePlugin(m_animable_plugin);
@@ -422,7 +429,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	StudioApp& m_app;
 	AnimablePropertyGridPlugin m_animable_plugin;
-	AnimationAssetBrowserPlugin m_animtion_plugin;
+	AnimationAssetBrowserPlugin m_animation_plugin;
 	PropertyAnimationAssetBrowserPlugin m_prop_anim_plugin;
 	AnimControllerAssetBrowserPlugin m_anim_ctrl_plugin;
 	UniquePtr<Anim::ControllerEditor> m_anim_editor;

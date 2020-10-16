@@ -184,8 +184,9 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	void load(ControllerEditor& editor, const char* path) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OS::InputFile file;
-		if (file.open(path)) {
+		if (fs.open(path, Ref(file))) {
 			IAllocator& allocator = m_app.getAllocator();
 			ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
 			Array<u8> data(allocator);
@@ -396,10 +397,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					}
 				
 					if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity(m_app))) {
-						char tmp[MAX_PATH_LENGTH];
-						copyString(tmp, m_app.getEngine().getFileSystem().getBasePath());
-						catString(tmp, getPathFromEntity(m_app).c_str());
-						load(*this, tmp);
+						load(*this, getPathFromEntity(m_app).c_str());
 					}
 					ImGui::EndMenu();
 				}
@@ -670,6 +668,11 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	const char* getName() const override { return "Animation Editor"; }
+
+	void show(const char* path) override {
+		m_open = true;
+		load(*this, path);
+	}
 
 	StudioApp& m_app;
 	Controller* m_controller;
