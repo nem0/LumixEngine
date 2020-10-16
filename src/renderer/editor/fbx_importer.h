@@ -38,6 +38,7 @@ struct FBXImporter
 		float lods_distances[4] = {-10, -100, -1000, -10000};
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
+		float radius_scale = 1.f;
 	};
 
 

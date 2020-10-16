@@ -1418,7 +1418,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
 	{
-		float scale = 1;
+		float scale = 1.f;
+		float culling_scale = 1.f;
 		bool split = false;
 		bool create_impostor = false;
 		bool use_mikktspace = false;
@@ -1470,6 +1471,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "position_error", &meta.position_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "rotation_error", &meta.rotation_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &meta.culling_scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
 			
@@ -1553,6 +1555,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.position_error = meta.position_error;
 		cfg.mikktspace_tangents = meta.use_mikktspace;
 		cfg.mesh_scale = meta.scale;
+		cfg.radius_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
@@ -1971,6 +1974,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::InputFloat("##maxroter", &m_meta.rotation_error);
 			ImGuiEx::Label("Scale");
 			ImGui::InputFloat("##scale", &m_meta.scale);
+			ImGuiEx::Label("Culling scale");
+			ImGui::Text("(?)");
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("%s", "Use this for animated meshes if they are culled when still visible.");
+			}
+			ImGui::SameLine();
+			ImGui::InputFloat("##cull_scale", &m_meta.culling_scale);
 			ImGuiEx::Label("Split");
 			ImGui::Checkbox("##split", &m_meta.split);
 			ImGuiEx::Label("Create impostor mesh");
@@ -2006,7 +2016,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
 					.cat("\nscale = ").cat(m_meta.scale)
-					.cat("\nscale = ").cat(m_meta.scale)
+					.cat("\nculling_scale = ").cat(m_meta.culling_scale)
 					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n");
 
 				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
