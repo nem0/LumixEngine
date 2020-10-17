@@ -85,6 +85,12 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 			property("Enabled", &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator)
 		),
 		component("animator",
+			functions(
+				function((void (AnimationScene::*)(EntityRef, u32, u32))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setU32Input"),
+				function((void (AnimationScene::*)(EntityRef, u32, float))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setFloatInput"),
+				function((void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setBoolInput"),
+				LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex")
+			),
 			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
 				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE)),
 			property("Default set", LUMIX_PROP(AnimationScene, AnimatorDefaultSet))

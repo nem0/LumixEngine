@@ -2563,7 +2563,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos)
+	void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos) override
 	{
 		auto iter = m_actors.find(entity);
 		if (!iter.isValid()) return;
@@ -4362,15 +4362,7 @@ void PhysicsScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
 	} while (false)
 
-	REGISTER_FUNCTION(putToSleep);
-	REGISTER_FUNCTION(getActorSpeed);
-	REGISTER_FUNCTION(getActorVelocity);
-	REGISTER_FUNCTION(applyForceToActor);
-	REGISTER_FUNCTION(applyImpulseToActor);
-	REGISTER_FUNCTION(moveController);
-	REGISTER_FUNCTION(isControllerCollisionDown);
 	REGISTER_FUNCTION(setRagdollKinematic);
-	REGISTER_FUNCTION(addForceAtPos);
 
 	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 

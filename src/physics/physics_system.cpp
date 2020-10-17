@@ -118,7 +118,8 @@ namespace Lumix
 			),
 			component("physical_controller",
 				functions(
-					LUMIX_FUNC_EX(PhysicsScene::moveController, "move")
+					LUMIX_FUNC_EX(PhysicsScene::moveController, "move"),
+					LUMIX_FUNC_EX(PhysicsScene::isControllerCollisionDown, "isCollisionDown")
 				),
 				property("Radius", LUMIX_PROP(PhysicsScene, ControllerRadius)),
 				property("Height", LUMIX_PROP(PhysicsScene, ControllerHeight)),
@@ -128,6 +129,14 @@ namespace Lumix
 				property("Custom gravity acceleration", LUMIX_PROP(PhysicsScene, ControllerCustomGravityAcceleration))
 			),
 			component("rigid_actor",
+				functions(
+					LUMIX_FUNC_EX(PhysicsScene::putToSleep, "putToSleep"),
+					LUMIX_FUNC_EX(PhysicsScene::getActorSpeed, "getSpeed"),
+					LUMIX_FUNC_EX(PhysicsScene::getActorVelocity, "getVelocity"),
+					LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyForce"),
+					LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyImpulse"),
+					LUMIX_FUNC_EX(PhysicsScene::addForceAtPos, "addForceAtPos")
+				),
 				property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer), LayerEnum()),
 				enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), DynamicTypeEnum()),
 				property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)),

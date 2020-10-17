@@ -179,6 +179,7 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual Vec2 getSphericalJointLimit(EntityRef entity) = 0;
 	virtual void setSphericalJointLimit(EntityRef entity, const Vec2& limit) = 0;
 
+	virtual void addForceAtPos(EntityRef entity, const Vec3& force, const Vec3& pos) = 0;
 	virtual void applyForceToActor(EntityRef entity, const Vec3& force) = 0;
 	virtual void applyImpulseToActor(EntityRef entity, const Vec3& force) = 0;
 	virtual Vec3 getActorVelocity(EntityRef entity) = 0;
