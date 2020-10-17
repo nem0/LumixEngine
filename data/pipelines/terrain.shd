@@ -174,12 +174,6 @@ vertex_shader [[
 			vec2 detail_uv_offset = floor(u_rel_camera_pos.xz);
  			v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
 			float h = texture(u_hm, v_uv).x * u_terrain_scale.y;
-			if (u_cell_size < 0.5) {
-				Detail d = getDetail(v_uv, v_uv_detail, u_detail_power);
-				float dist = max(0, length(vec4(u_position.xyz + v + vec3(0, h, 0), 1)) - 4);
-				const float detail_h_scale = 0.3 * saturate(1 - dist / 3);
-				h += d.albedo.a * detail_h_scale - detail_h_scale * 0.5;
-			}
 		#else
 			vec2 uv = (v.xz / (u_hm_size + 1)) + 0.5 / (u_hm_size + 1);
 			float h = texture(u_hm, uv).x * u_terrain_scale.y;
