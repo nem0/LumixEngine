@@ -984,10 +984,6 @@ void AnimationScene::registerLuaAPI(lua_State* L)
 	} while(false) \
 
 	REGISTER_FUNCTION(getAnimationLength);
-	REGISTER_FUNCTION(setAnimatorU32Input);
-	REGISTER_FUNCTION(setAnimatorBoolInput);
-	REGISTER_FUNCTION(setAnimatorFloatInput);
-	REGISTER_FUNCTION(getAnimatorInputIndex);
 
 	#undef REGISTER_FUNCTION
 

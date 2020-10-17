@@ -124,7 +124,9 @@ void NavigationSystem::registerProperties()
 		),
 		component("navmesh_agent",
 			functions(
-				LUMIX_FUNC(NavigationScene::navigate)
+				LUMIX_FUNC_EX(NavigationScene::navigate, "navigate"),
+				LUMIX_FUNC_EX(NavigationScene::cancelNavigation, "cancelNavigation"),
+				LUMIX_FUNC_EX(NavigationScene::getAgentSpeed, "getSpeed")
 			),
 			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
 				MinAttribute(0)),
@@ -160,9 +162,7 @@ static void registerLuaAPI(lua_State* L)
 		} while(false) \
 
 	REGISTER_FUNCTION(generateNavmesh);
-	REGISTER_FUNCTION(navigate);
 	REGISTER_FUNCTION(setActorActive);
-	REGISTER_FUNCTION(cancelNavigation);
 	REGISTER_FUNCTION(debugDrawNavmesh);
 	REGISTER_FUNCTION(debugDrawCompactHeightfield);
 	REGISTER_FUNCTION(debugDrawHeightfield);
@@ -171,7 +171,6 @@ static void registerLuaAPI(lua_State* L)
 	REGISTER_FUNCTION(save);
 	REGISTER_FUNCTION(load);
 	REGISTER_FUNCTION(setGeneratorParams);
-	REGISTER_FUNCTION(getAgentSpeed);
 
 	#undef REGISTER_FUNCTION
 }
