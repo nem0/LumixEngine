@@ -10,7 +10,8 @@
 
 
 #define LUMIX_PROP(Scene, Property) &Scene::get##Property, &Scene::set##Property
-#define LUMIX_FUNC(Func) function(&Func, #Func)
+#define LUMIX_FUNC_EX(Func, name) function(&Func, #Func, name)
+#define LUMIX_FUNC(Func) function(&Func, #Func, nullptr)
 
 namespace Lumix
 {
@@ -575,6 +576,7 @@ struct FunctionBase
 	virtual Variant invoke(void* obj, Span<Variant> args) const = 0;
 
 	const char* decl_code;
+	const char* name;
 };
 
 struct SceneBase
@@ -736,11 +738,12 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 };
 
 template <typename F>
-auto function(F func, const char* decl_code)
+auto function(F func, const char* decl_code, const char* name)
 {
 	Function<F> ret;
 	ret.function = func;
 	ret.decl_code = decl_code;
+	ret.name = name;
 	return ret;
 }
 

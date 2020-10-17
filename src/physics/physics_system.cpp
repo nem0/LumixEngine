@@ -118,7 +118,7 @@ namespace Lumix
 			),
 			component("physical_controller",
 				functions(
-					LUMIX_FUNC(PhysicsScene::moveController)
+					LUMIX_FUNC_EX(PhysicsScene::moveController, "move")
 				),
 				property("Radius", LUMIX_PROP(PhysicsScene, ControllerRadius)),
 				property("Height", LUMIX_PROP(PhysicsScene, ControllerHeight)),

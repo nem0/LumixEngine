@@ -866,8 +866,71 @@ namespace Lumix
 			v.cmp.entity = entity;
 
 			cmp->visit(v);
+			if (v.found) return 1;
 
-			return v.found ? 1 : 0;
+			const auto& functions = cmp->getFunctions();
+			for (auto* f : functions) {
+				if (equalStrings(v.prop_name, f->name)) {
+					lua_pushlightuserdata(L, (void*)f);
+					lua_pushcclosure(L, lua_method_closure, 1);
+					return 1;
+				}
+			}
+
+			return 0;
+		}
+
+		static int lua_method_closure(lua_State* L) {
+			LuaWrapper::checkTableArg(L, 1); // self
+			if (LuaWrapper::getField(L, 1, "_scene") != LUA_TLIGHTUSERDATA) {
+				ASSERT(false);
+				lua_pop(L, 1);
+				return 0;
+			}
+			IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
+			lua_pop(L, 1);
+			
+			if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
+				ASSERT(false);
+				lua_pop(L, 1);
+				return 0;
+			}
+			EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
+			lua_pop(L, 1);
+
+			Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+			Reflection::Variant args[64];
+			args[0] = entity;
+			for (i32 i = 1; i < f->getArgCount(); ++i) {
+				Reflection::Variant::Type type = f->getArgType(i);
+				switch(type) {
+					case Reflection::Variant::BOOL: args[i] = LuaWrapper::toType<bool>(L, i + 1); break;
+					case Reflection::Variant::U32: args[i] = LuaWrapper::toType<u32>(L, i + 1); break;
+					case Reflection::Variant::I32: args[i] = LuaWrapper::toType<i32>(L, i + 1); break;
+					case Reflection::Variant::FLOAT: args[i] = LuaWrapper::toType<float>(L, i + 1); break;
+					case Reflection::Variant::CSTR: args[i] = LuaWrapper::toType<const char*>(L, i + 1); break;
+					case Reflection::Variant::ENTITY: args[i] = LuaWrapper::toType<EntityPtr>(L, i + 1); break;
+					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 1); break;
+					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 1); break;
+					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 1); break;
+					default: ASSERT(false); break;
+				}
+			}
+			const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+			switch(res.type) {
+				case Reflection::Variant::VOID: return 0;
+				case Reflection::Variant::BOOL: LuaWrapper::push(L, res.b); break;
+				case Reflection::Variant::U32: LuaWrapper::push(L, res.u); break;
+				case Reflection::Variant::I32: LuaWrapper::push(L, res.i); break;
+				case Reflection::Variant::FLOAT: LuaWrapper::push(L, res.f); break;
+				case Reflection::Variant::CSTR: LuaWrapper::push(L, res.s); break;
+				case Reflection::Variant::ENTITY: LuaWrapper::pushEntity(L, res.e, &scene->getUniverse()); break;
+				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
+				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
+				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
+				default: ASSERT(false); break;
+			}
+			return 1;
 		}
 
 		static int lua_prop_setter(lua_State* L) {
