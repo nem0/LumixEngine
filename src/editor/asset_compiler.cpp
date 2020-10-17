@@ -330,7 +330,7 @@ struct AssetCompilerImpl : AssetCompiler
 							}
 						#else
 							if (type != INVALID_RESOURCE_TYPE) {
-								ResourceLocator locator(Span(p.c_str(), (u32)strlen(p.c_str())));
+								ResourceLocator locator(Span<const char>(p.c_str(), (u32)strlen(p.c_str())));
 								char tmp[MAX_PATH_LENGTH];
 								copyString(Span(tmp), locator.resource);
 								if (fs.fileExists(tmp)) {
