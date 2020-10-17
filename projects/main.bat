@@ -53,15 +53,17 @@ goto :begin
 	echo  2. Maps
 	echo  3. Shader editor
 	echo  4. GLTF importer
-	echo  5. DX11 & DX12
+	echo  5. DX11 and DX12
+	echo  6. Rml UI
 	echo ===============================
-	choice /C 12345 /N /M "Your choice:"
+	choice /C 123456 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :map_plugin
 	if %errorlevel%==3 call :shader_editor_plugin
 	if %errorlevel%==4 call :glft_import_plugin
 	if %errorlevel%==5 call :dx_plugin
+	if %errorlevel%==6 call :rml_ui_plugin
 	pause
 goto :plugins
 
@@ -91,6 +93,18 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumixengine_gltf.git gltf_import
 	) else (
 		cd gltf_import
+		git pull
+	)
+	popd
+exit /B 0
+
+:rml_ui_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist rml (
+		git.exe clone https://github.com/nem0/lumixengine_rml.git rml
+	) else (
+		cd rml
 		git pull
 	)
 	popd

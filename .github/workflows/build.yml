@@ -21,6 +21,10 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_shader_editor.git shader_editor
+            - name: fetch rml plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_rml.git rml
             - name: make project
               working-directory: projects
               run: |
@@ -38,6 +42,17 @@ jobs:
                 popd
                 ./genie.exe vs2019
             - name: build dx11 engine
+              working-directory: projects
+              shell: cmd
+              run: |
+                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+            - name: make dx12 project
+              working-directory: projects
+              run: |
+                pushd ..\plugins
+                popd
+                ./genie.exe --dx12 vs2019
+            - name: build dx12 engine
               working-directory: projects
               shell: cmd
               run: |
