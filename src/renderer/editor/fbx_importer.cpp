@@ -1433,7 +1433,12 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			else
 			{
 				const int parent_idx = m_bones.indexOf(parent);
-				bind_pos = (m_bind_pose[parent_idx].inverted() * m_bind_pose[idx]).getTranslation();
+				if (m_bind_pose.empty()) {
+					bind_pos = toLumixVec3(bone->getLocalTranslation());
+				}
+				else {
+					bind_pos = (m_bind_pose[parent_idx].inverted() * m_bind_pose[idx]).getTranslation();
+				}
 			}
 
 			if (isBindPosePositionTrack(count, keys, bind_pos, cfg.position_error)) continue;
@@ -2080,6 +2085,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 			writeSkeleton(cfg);
 		}
 		else {
+			m_bind_pose.clear();
 			write((i32)0);
 		}
 
