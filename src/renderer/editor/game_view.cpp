@@ -314,7 +314,7 @@ void GameView::onWindowGUI()
 
 		const ImVec2 content_min = view_pos;
 		ImVec2 size = ImGui::GetContentRegionAvail();
-		size.y -= ImGui::GetTextLineHeightWithSpacing();
+		size.y -= ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 3;
 		ImVec2 content_max(content_min.x + size.x, content_min.y + size.y);
 		if (m_forced_viewport.enabled) size = { (float)m_forced_viewport.width, (float)m_forced_viewport.height };
 		if (size.x > 0 && size.y > 0) {
