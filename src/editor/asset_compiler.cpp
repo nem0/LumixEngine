@@ -190,7 +190,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const u32 hash = path_obj.getHash();
 		MutexGuard lock(m_resources_mutex);
 		if(m_resources.find(hash).isValid()) {
-			m_resources[hash] = {path_obj, type};
+			m_resources[hash] = {path_obj, type, dirHash(path_obj.c_str())};
 		}
 		else {
 			m_resources.insert(hash, {path_obj, type, dirHash(path_obj.c_str())});
