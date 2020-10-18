@@ -2024,8 +2024,11 @@ struct PipelineImpl final : Pipeline
 			buckets[i].order = order;
 
 			lua_getfield(L, -1, "layers");
+			buckets[i].layers_count = 0;
 			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* layer_name){
-				buckets[i].layer = pipeline->m_renderer.getLayerIdx(layer_name);
+				ASSERT(buckets[i].layers_count < lengthOf(buckets[i].layers));
+				buckets[i].layers[buckets[i].layers_count] = pipeline->m_renderer.getLayerIdx(layer_name);
+				++buckets[i].layers_count;
 			});
 			lua_pop(L, 1);
 
@@ -4061,7 +4064,8 @@ struct PipelineImpl final : Pipeline
 	struct RenderBucket {
 		u32 define_mask;
 		PrepareCommandsRenderJob::SortOrder order;
-		i32 layer;
+		i32 layers[4];
+		u32 layers_count = 0;
 	};
 
 	void prepareCommands(const CameraParams& cp, Span<RenderBucket> buckets, Span<CmdPage*> out)
@@ -4077,7 +4081,9 @@ struct PipelineImpl final : Pipeline
 			cmd.m_command_sets[i] = page;
 			cmd.m_define_mask[i] = buckets[i].define_mask;
 			cmd.m_bucket_sort_order[i] = buckets[i].order;
-			cmd.m_bucket_map[buckets[i].layer] = i | (buckets[i].order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
+			for (u32 j = 0; j < buckets[i].layers_count; ++j) {
+				cmd.m_bucket_map[buckets[i].layers[j]] = i | (buckets[i].order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
+			}
 			out[i] = page;
 		}
 		cmd.m_camera_params = cp;

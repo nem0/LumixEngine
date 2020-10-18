@@ -18,6 +18,11 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
+texture_slot {
+	name = "Self shadow",
+	default_texture = "textures/common/white.tga"
+}
+
 include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
@@ -40,16 +45,16 @@ vertex_shader [[
 	layout (location = 1) out vec3 v_normal;
 	layout (location = 2) out vec3 v_tangent;
 	layout (location = 3) out vec4 v_wpos;
-	#ifdef GRASS
-		layout (location = 4) out float v_darken;
+	#if !defined DEPTH && !defined DEFERRED
+		layout (location = 4) out vec4 v_shadow_coefs;
 	#endif
 	
 	vec2 dirToGrid(vec3 vec)
 	{
-		vec.y = max(0.001,vec.y);
-        vec = normalize(vec);
+		vec.y = max(vec.y, 0.001);
+		vec = normalize(vec);
 		vec.xz /= dot( vec3(1.0), abs(vec) );
-		return vec2(vec.x + vec.z, vec.x - vec.z);
+		return vec2(vec.x + vec.z, vec.x - vec.z) * 0.5 + 0.5;
 	}
 
 	void main() {
@@ -59,9 +64,15 @@ vertex_shader [[
 		tangent_space[1] = vec3(0, 1, 0);
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
-		vec3 vd = vec3(u_pass_view_dir.z, 0, u_pass_view_dir.x);
+		vec3 vd = vec3(u_pass_view_dir.x, 0, u_pass_view_dir.z);
 		vd = rotateByQuat(i_rot_quat, vd);
-		vec2 grid = dirToGrid(normalize(vd)) * 0.5 + 0.5;
+		#if !defined DEPTH && !defined DEFERRED
+			vec3 ld = rotateByQuat(i_rot_quat, -u_light_direction.xyz);
+			v_shadow_coefs = max(vec4(ld.x, ld.z, -ld.x, -ld.z), vec4(0));
+			v_shadow_coefs /= dot(v_shadow_coefs, vec4(1));
+			//v_shadow_coefs = normalize(v_shadow_coefs);
+		#endif
+		vec2 grid = dirToGrid(normalize(vd));
 		v_uv = a_uv / 9 + ivec2(grid * 9) / 9.0;
 
 		vec3 p = tangent_space * a_position * i_pos_scale.w;
@@ -83,7 +94,7 @@ fragment_shader [[
 	layout (binding=1) uniform sampler2D u_normalmap;
 	layout (binding=2) uniform sampler2D u_roughnessmap;
 	layout (binding=3) uniform sampler2D u_metallicmap;
-	layout (binding=4) uniform sampler2D u_shadowmap;
+	layout (binding=4) uniform sampler2D u_selfshadow;
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 1) in vec3 v_normal;
 	layout (location = 2) in vec3 v_tangent;
@@ -95,6 +106,7 @@ fragment_shader [[
 		layout(location = 2) out vec4 o_gbuffer2;
 	#elif !defined DEPTH
 		layout(location = 0) out vec4 o_color;
+		layout (location = 4) in vec4 v_shadow_coefs;
 	#endif
 
 	Surface getSurface()
@@ -113,6 +125,7 @@ fragment_shader [[
 				);
 		
 		data.wpos = v_wpos.xyz;
+		data.V = normalize(data.wpos);
 		data.roughness = texture(u_roughnessmap, v_uv).r * u_roughness;
 		data.metallic  = texture(u_metallicmap, v_uv).r * u_metallic;
 		data.N = texture(u_normalmap, v_uv).xzy * 2 - 1;
@@ -129,11 +142,29 @@ fragment_shader [[
 				if(c.a < 0.5) discard;
 			#endif
 		}
-	#else
+	#elif defined DEFERRED
 		void main()
 		{
 			Surface data = getSurface();
 			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
+		}
+	#else
+		void main()
+		{
+			Surface surface = getSurface();
+			vec4 self_shadow = textureLod(u_selfshadow, v_uv, 0);
+			float shadow = dot(self_shadow, v_shadow_coefs);
+			vec3 res = computeDirectLight(surface
+				, u_light_direction.xyz
+				, u_light_color.rgb * u_light_intensity * shadow);
+			res += surface.emission * surface.albedo;
+
+			float linear_depth = dot(surface.wpos.xyz, u_pass_view_dir.xyz);
+			Cluster cluster = getClusterLinearDepth(linear_depth);
+			//res += pointLightsLighting(cluster, surface, shadow_atlas);
+			res += envProbesLighting(cluster, surface);
+
+			o_color = vec4(res, surface.alpha);
 		}
 	#endif
 ]]
