@@ -1173,6 +1173,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 				f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
 				f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
 				f << "defines { \"ALPHA_CUTOUT\" }\n";
+				f << "layer \"impostor\"\n";
 				f << "backface_culling(false)\n";
 				f.close();
 			}
