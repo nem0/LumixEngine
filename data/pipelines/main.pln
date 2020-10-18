@@ -42,6 +42,18 @@ local default_state = {
 	wireframe = false
 }
 
+local impostor_state = {
+	depth_write = true,
+	stencil_func = STENCIL_ALWAYS,
+	stencil_write_mask = 0xff,
+	stencil_ref = 1,
+	stencil_mask = 0xff, 
+	stencil_sfail = STENCIL_REPLACE,
+	stencil_zfail = STENCIL_REPLACE,
+	stencil_zpass = STENCIL_REPLACE,
+	wireframe = false
+}
+
 local grass_state = {
 	define = "GRASS",
 	depth_write = true,
@@ -73,6 +85,15 @@ function transparentPass(transparent_set, colorbuffer, dsbuffer)
 	renderBucket(transparent_set, transparent_state)
 	local view_params = getCameraParams()
 	renderParticles(view_params)
+	endBlock()
+end
+
+function impostorPass(impostor_set, colorbuffer, dsbuffer)
+	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
+
+	beginBlock("impostor_pass")
+	pass(getCameraParams())
+	renderBucket(impostor_set, impostor_state)
 	endBlock()
 end
 
@@ -218,7 +239,7 @@ function shadowPass()
 			
 			for slice = 0, 3 do 
 				local view_params = getShadowCameraParams(slice, 4096)
-				local shadow_set = prepareCommands(view_params, { { layers = { "default" }, defines = { "DEPTH" } } })
+				local shadow_set = prepareCommands(view_params, { { layers = { "impostor", "default" }, defines = { "DEPTH" } } })
 				
 				viewport(slice * 1024, 0, 1024, 1024)
 				beginBlock("slice " .. tostring(slice + 1))
@@ -322,9 +343,10 @@ end
 
 function main()
 	local view_params = getCameraParams()
-	local default_set, decal_set, transparent_set, water_set = prepareCommands(view_params, 
+	local default_set, impostor_set, decal_set, transparent_set, water_set = prepareCommands(view_params, 
 		{ 
 			{ layers = { "default" }, defines = { "DEFERRED" } },
+			{ layers = { "impostor" } },
 			{ layers = { "decal" } },
 			{ layers = { "transparent" }, sort = "depth" },
 			{ layers = { "water" }, sort = "depth" }
@@ -341,6 +363,7 @@ function main()
 	end
 
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+	impostorPass(impostor_set, hdr_buffer, gbuffer_depth)
 	
 	custom_tonemap = false
 	local res = hdr_buffer		

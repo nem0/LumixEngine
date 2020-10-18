@@ -1460,6 +1460,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_viewport.fov = degreesToRadians(60.f);
 		m_viewport.near = 0.1f;
 		m_viewport.far = 10000.f;
+		m_fbx_importer.init();
 	}
 
 
@@ -2033,11 +2034,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::SameLine();
 			if (ImGui::Button("Create impostor texture")) {
 				FBXImporter importer(m_app);
+				importer.init();
 				IAllocator& allocator = m_app.getAllocator();
 				Array<u32> gb0(allocator); 
 				Array<u32> gb1(allocator); 
+				Array<u32> shadow(allocator); 
 				IVec2 tile_size;
-				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(tile_size));
+				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(shadow), Ref(tile_size));
 				postprocessImpostor(Ref(gb0), Ref(gb1), tile_size, allocator);
 				const PathInfo fi(model->getPath().c_str());
 				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
@@ -2057,6 +2060,16 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				img_path << fi.m_basename << "_impostor1.tga";
 				if (fs.open(img_path, Ref(file))) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
+					file.close();
+				}
+				else {
+					logError("Renderer") << "Failed to open " << img_path;
+				}
+
+				img_path = fi.m_dir;
+				img_path << fi.m_basename << "_impostor2.tga";
+				if (fs.open(img_path, Ref(file))) {
+					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
 				}
 				else {

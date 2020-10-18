@@ -142,6 +142,7 @@ struct FBXImporter
 
 	FBXImporter(struct StudioApp& app);
 	~FBXImporter();
+	void init();
 	bool setSource(const char* filename, bool ignore_geometry, bool force_skinned);
 	void writeMaterials(const char* src, const ImportConfig& cfg);
 	void writeAnimations(const char* src, const ImportConfig& cfg);
@@ -149,7 +150,7 @@ struct FBXImporter
 	void writePrefab(const char* src, const ImportConfig& cfg);
 	void writeModel(const char* src, const ImportConfig& cfg);
 	void writePhysics(const char* src, const ImportConfig& cfg);
-	bool createImpostorTextures(struct Model* model, Ref<Array<u32>> gb0_rgba, Ref<Array<u32>> gb1_rgba, Ref<IVec2> size);
+	bool createImpostorTextures(struct Model* model, Ref<Array<u32>> gb0_rgba, Ref<Array<u32>> gb1_rgba, Ref<Array<u32>> shadow, Ref<IVec2> size);
 
 	const Array<ImportMesh>& getMeshes() const { return m_meshes; }
 	const Array<ImportAnimation>& getAnimations() const { return m_animations; }
@@ -194,6 +195,7 @@ private:
 	IAllocator& m_allocator;
 	struct FileSystem& m_filesystem;
 	StudioApp& m_app;
+	struct Shader* m_impostor_shadow_shader = nullptr;
 	struct AssetCompiler& m_compiler;
 	Array<ImportMaterial> m_materials;
 	Array<ImportMesh> m_meshes;
