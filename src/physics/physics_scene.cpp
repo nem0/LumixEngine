@@ -2578,7 +2578,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	void setRagdollKinematic(EntityRef entity, bool is_kinematic)
+	void setRagdollKinematic(EntityRef entity, bool is_kinematic) override
 	{
 		setRagdollBoneKinematicRecursive(m_ragdolls[entity].root, is_kinematic);
 	}
@@ -4355,18 +4355,7 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Re
 
 void PhysicsScene::registerLuaAPI(lua_State* L)
 {
-#define REGISTER_FUNCTION(name) \
-	do \
-	{ \
-		auto f = &LuaWrapper::wrapMethod<&PhysicsSceneImpl::name>; \
-		LuaWrapper::createSystemFunction(L, "Physics", #name, f); \
-	} while (false)
-
-	REGISTER_FUNCTION(setRagdollKinematic);
-
 	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
-
-#undef REGISTER_FUNCTION
 }
 
 

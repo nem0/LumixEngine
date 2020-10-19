@@ -22,6 +22,12 @@ static void registerProperties(IAllocator& allocator)
 
 	using namespace Reflection;
 	static auto audio_scene = scene("audio",
+		functions(
+			LUMIX_FUNC(AudioScene::setMasterVolume),
+			LUMIX_FUNC(AudioScene::playSound),
+			LUMIX_FUNC(AudioScene::setVolume),
+			LUMIX_FUNC(AudioScene::setEcho)
+		),
 		component("ambient_sound",
 			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
 			property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClipIndex), ClipIndexEnum())
@@ -81,7 +87,6 @@ struct AudioSystemImpl final : AudioSystem
 	void init() override
 	{
 		registerProperties(m_engine.getAllocator());
-		AudioScene::registerLuaAPI(m_engine.getState());
 		m_device = AudioDevice::create(m_engine);
 		m_manager.create(Clip::TYPE, m_engine.getResourceManager());
 	}

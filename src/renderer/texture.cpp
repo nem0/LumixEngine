@@ -136,55 +136,6 @@ u32 Texture::getPixel(float x, float y) const
 }
 
 
-unsigned int Texture::compareTGA(IInputStream* file1, IInputStream* file2, int difference, IAllocator& allocator)
-{
-	TGAHeader header1, header2;
-	file1->read(&header1, sizeof(header1));
-	file2->read(&header2, sizeof(header2));
-
-	if (header1.bitsPerPixel != header2.bitsPerPixel ||
-		header1.width != header2.width || header1.height != header2.height ||
-		header1.dataType != header2.dataType ||
-		header1.imageDescriptor != header2.imageDescriptor)
-	{
-		logError("Renderer") << "Trying to compare textures with different formats";
-		return 0xffffFFFF;
-	}
-
-	int color_mode = header1.bitsPerPixel / 8;
-	if (header1.dataType != 2)
-	{
-		logError("Renderer") << "Unsupported texture format";
-		return 0xffffFFFF;
-	}
-
-	int different_pixel_count = 0;
-	size_t pixel_count = header1.width * header1.height;
-	u8* img1 = (u8*)allocator.allocate(pixel_count * color_mode);
-	u8* img2 = (u8*)allocator.allocate(pixel_count * color_mode);
-
-	file1->read(img1, pixel_count * color_mode);
-	file2->read(img2, pixel_count * color_mode);
-
-	for (size_t i = 0; i < pixel_count * color_mode; i += color_mode)
-	{
-		for (int j = 0; j < color_mode; ++j)
-		{
-			if (abs(img1[i + j] - img2[i + j]) > difference)
-			{
-				++different_pixel_count;
-				break;
-			}
-		}
-	}
-
-	allocator.deallocate(img1);
-	allocator.deallocate(img2);
-
-	return different_pixel_count;
-}
-
-
 bool Texture::saveTGA(IOutputStream* file,
 	int width,
 	int height,

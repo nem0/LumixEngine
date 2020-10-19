@@ -19,7 +19,6 @@ struct Animable {
 
 struct AnimationScene : IScene {
 	static UniquePtr<AnimationScene> create(Engine& engine, IPlugin& plugin, Universe& universe, struct IAllocator& allocator);
-	static void registerLuaAPI(lua_State* L);
 
 	virtual const struct OutputMemoryStream& getEventStream() const = 0;
 	virtual struct Path getPropertyAnimation(EntityRef entity) = 0;
@@ -46,6 +45,7 @@ struct AnimationScene : IScene {
 	virtual void setAnimatorDefaultSet(EntityRef entity, u32 idx) = 0;
 	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
 	virtual Anim::Controller* getAnimatorController(EntityRef entity) = 0;
+	virtual void setAnimatorIK(EntityRef entity, u32 index, float weight, const struct Vec3& target) = 0;
 	virtual float getAnimationLength(int animation_idx) = 0;
 };
 

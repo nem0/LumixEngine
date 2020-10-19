@@ -108,7 +108,7 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 
-	int playSound(EntityRef entity, const char* clip_name, bool is_3d)
+	int playSound(EntityRef entity, const char* clip_name, bool is_3d) override
 	{
 		auto* clip = getClipInfo(clip_name);
 		if (clip) return play(entity, clip, is_3d);
@@ -600,7 +600,7 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 
-	void setMasterVolume(float volume) { m_device.setMasterVolume(volume); }
+	void setMasterVolume(float volume) override { m_device.setMasterVolume(volume); }
 
 
 	void setVolume(SoundHandle sound_id, float volume) override
@@ -640,25 +640,6 @@ UniquePtr<AudioScene> AudioScene::createInstance(AudioSystem& system,
 {
 	return UniquePtr<AudioSceneImpl>::create(allocator, system, universe, allocator);
 }
-
-
-void AudioScene::registerLuaAPI(lua_State* L)
-{
-	#define REGISTER_FUNCTION(F) \
-		do { \
-		auto f = &LuaWrapper::wrapMethod<&AudioSceneImpl::F>; \
-		LuaWrapper::createSystemFunction(L, "Audio", #F, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(setEcho);
-	REGISTER_FUNCTION(playSound);
-	REGISTER_FUNCTION(setVolume);
-	REGISTER_FUNCTION(setMasterVolume);
-
-	#undef REGISTER_FUNCTION
-}
-
-
 
 
 } // namespace Lumix

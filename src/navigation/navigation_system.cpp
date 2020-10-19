@@ -22,9 +22,6 @@ enum class NavigationSceneVersion : int
 };
 
 
-static void registerLuaAPI(lua_State* L);
-
-
 struct Agent
 {
 	enum Flags : u32
@@ -56,7 +53,6 @@ struct NavigationSystem final : IPlugin
 		s_instance = this;
 		dtAllocSetCustom(&detourAlloc, &detourFree);
 		rcAllocSetCustom(&recastAlloc, &recastFree);
-		registerLuaAPI(m_engine.getState());
 		registerProperties();
 		// register flags
 		Material::getCustomFlag("no_navigation");
@@ -117,16 +113,27 @@ void NavigationSystem::registerProperties()
 	using namespace Reflection;
 	static auto navigation_scene = scene("navigation",
 		functions(
-			LUMIX_FUNC(NavigationScene::load)
+			LUMIX_FUNC(NavigationScene::setGeneratorParams)
 		),
 		component("navmesh_zone", 
+			functions(
+				LUMIX_FUNC_EX(NavigationScene::debugDrawContours, "drawContours"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawNavmesh, "drawNavmesh"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawCompactHeightfield, "drawCompactHeightfield"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawHeightfield, "drawHeightfield"),
+				LUMIX_FUNC(NavigationScene::save),
+				LUMIX_FUNC(NavigationScene::load),
+				LUMIX_FUNC(NavigationScene::generateNavmesh)
+			),
 			var_property("Extents", &NavigationScene::getZone, &NavmeshZone::extents)
 		),
 		component("navmesh_agent",
 			functions(
+				LUMIX_FUNC_EX(NavigationScene::setActorActive, "setActive"),
 				LUMIX_FUNC_EX(NavigationScene::navigate, "navigate"),
 				LUMIX_FUNC_EX(NavigationScene::cancelNavigation, "cancelNavigation"),
-				LUMIX_FUNC_EX(NavigationScene::getAgentSpeed, "getSpeed")
+				LUMIX_FUNC_EX(NavigationScene::getAgentSpeed, "getSpeed"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawPath, "drawPath")
 			),
 			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
 				MinAttribute(0)),
@@ -150,29 +157,6 @@ void NavigationSystem::createScenes(Universe& universe)
 LUMIX_PLUGIN_ENTRY(navigation)
 {
 	return LUMIX_NEW(engine.getAllocator(), NavigationSystem)(engine);
-}
-
-
-static void registerLuaAPI(lua_State* L)
-{
-	#define REGISTER_FUNCTION(name) \
-		do {\
-			auto f = &LuaWrapper::wrapMethod<&NavigationScene::name>; \
-			LuaWrapper::createSystemFunction(L, "Navigation", #name, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(generateNavmesh);
-	REGISTER_FUNCTION(setActorActive);
-	REGISTER_FUNCTION(debugDrawNavmesh);
-	REGISTER_FUNCTION(debugDrawCompactHeightfield);
-	REGISTER_FUNCTION(debugDrawHeightfield);
-	REGISTER_FUNCTION(debugDrawPath);
-	REGISTER_FUNCTION(debugDrawContours);
-	REGISTER_FUNCTION(save);
-	REGISTER_FUNCTION(load);
-	REGISTER_FUNCTION(setGeneratorParams);
-
-	#undef REGISTER_FUNCTION
 }
 
 

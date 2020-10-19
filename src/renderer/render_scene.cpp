@@ -1678,12 +1678,6 @@ public:
 	}
 
 
-	static float LUA_getTerrainHeightAt(RenderSceneImpl* render_scene, EntityRef entity, int x, int z)
-	{
-		return render_scene->m_terrains[entity]->getHeight(x, z);
-	}
-
-
 	void setTerrainHeightAt(EntityRef entity, int x, int z, float height)
 	{
 		m_terrains[entity]->setHeight(x, z, height);
@@ -1701,27 +1695,6 @@ public:
 	{
 		if (!model) return 0;
 		return model->getBoneIndex(crc32(bone)).value();
-	}
-
-
-	static unsigned int LUA_compareTGA(RenderSceneImpl* scene, const char* path, const char* path_preimage, int min_diff)
-	{
-		OS::InputFile file1, file2;
-		if (!file1.open(path))
-		{
-			logError("render_test") << "Failed to open " << path;
-			return 0xffffFFFF;
-		}
-		else if (!file2.open(path_preimage))
-		{
-			file1.close();
-			logError("render_test") << "Failed to open " << path_preimage;
-			return 0xffffFFFF;
-		}
-		unsigned int result = Texture::compareTGA(&file1, &file2, min_diff, scene->m_allocator);
-		file1.close();
-		file2.close();
-		return result;
 	}
 
 
@@ -1839,8 +1812,8 @@ public:
 	float getCameraScreenHeight(EntityRef camera) override { return m_cameras[camera].screen_height; }
 
 
-	void setGlobalLODMultiplier(float multiplier) { m_lod_multiplier = multiplier; }
-	float getGlobalLODMultiplier() const { return m_lod_multiplier; }
+	void setGlobalLODMultiplier(float multiplier) override { m_lod_multiplier = multiplier; }
+	float getGlobalLODMultiplier() const override { return m_lod_multiplier; }
 
 	Camera& getCamera(EntityRef entity) override { return m_cameras[entity]; }
 
@@ -2806,16 +2779,7 @@ void RenderScene::registerLuaAPI(lua_State* L)
 			LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
-	REGISTER_FUNCTION(setGlobalLODMultiplier);
-	REGISTER_FUNCTION(getGlobalLODMultiplier);
-	//REGISTER_FUNCTION(getActiveEnvironment);
-	REGISTER_FUNCTION(getModelInstanceModel);
-	REGISTER_FUNCTION(addDebugCross);
-	REGISTER_FUNCTION(addDebugLine);
 	REGISTER_FUNCTION(getTerrainMaterial);
-	REGISTER_FUNCTION(getTerrainNormalAt);
-	REGISTER_FUNCTION(setTerrainHeightAt);
-	//REGISTER_FUNCTION(enableModelInstance);
 	REGISTER_FUNCTION(getPoseBonePosition);
 
 	#undef REGISTER_FUNCTION
@@ -2826,11 +2790,8 @@ void RenderScene::registerLuaAPI(lua_State* L)
 		LuaWrapper::createSystemFunction(L, "Renderer", #F, f); \
 		} while(false) \
 
-	//REGISTER_FUNCTION(setModelInstancePath);
 	REGISTER_FUNCTION(getModelBoneIndex);
 	REGISTER_FUNCTION(makeScreenshot);
-	REGISTER_FUNCTION(compareTGA);
-	REGISTER_FUNCTION(getTerrainHeightAt);
 
 	LuaWrapper::createSystemFunction(L, "Renderer", "castCameraRay", &RenderSceneImpl::LUA_castCameraRay);
 

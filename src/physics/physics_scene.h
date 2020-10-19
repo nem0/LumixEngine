@@ -226,6 +226,7 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 
 	virtual BoneOrientation getNewBoneOrientation() const = 0;
 	virtual void setNewBoneOrientation(BoneOrientation orientation) = 0;
+	virtual void setRagdollKinematic(EntityRef entity, bool is_kinematic) = 0;
 	virtual RagdollBone* createRagdollBone(EntityRef entity, u32 bone_name_hash) = 0;
 	virtual void destroyRagdollBone(EntityRef entity, RagdollBone* bone) = 0;
 	virtual physx::PxJoint* getRagdollBoneJoint(RagdollBone* bone) const = 0;

@@ -85,7 +85,6 @@ public:
 	u32 getPixel(float x, float y) const;
 	u32 getGPUFlags() const;
 
-	static unsigned int compareTGA(IInputStream* file1, IInputStream* file2, int difference, IAllocator& allocator);
 	static bool saveTGA(IOutputStream* file,
 		int width,
 		int height,

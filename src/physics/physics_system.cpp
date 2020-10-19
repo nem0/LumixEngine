@@ -72,6 +72,9 @@ namespace Lumix
 				//function(LUMIX_FUNC(PhysicsScene::raycastEx))
 			),
 			component("ragdoll",
+				functions(
+					LUMIX_FUNC(PhysicsScene::setRagdollKinematic)
+				),
 				blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
 				property("Layer", LUMIX_PROP(PhysicsScene, RagdollLayer), LayerEnum())
 			),

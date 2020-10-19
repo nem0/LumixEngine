@@ -1,5 +1,4 @@
 #include "engine/lumix.h"
-#include "renderer/model.h"
 
 #include "engine/array.h"
 #include "engine/crc32.h"
@@ -7,12 +6,14 @@
 #include "engine/file_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/math.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
+#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "engine/math.h"
 #include "renderer/material.h"
+#include "renderer/model.h"
 #include "renderer/pose.h"
 #include "renderer/renderer.h"
 
@@ -601,16 +602,7 @@ static const char* getBoneName(Model* model, int bone_index)
 
 void Model::registerLuaAPI(lua_State* L)
 {
-	#define REGISTER_FUNCTION(F)\
-		do { \
-			auto f = &LuaWrapper::wrapMethod<&Model::F>; \
-			LuaWrapper::createSystemFunction(L, "Model", #F, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(getBoneCount);
-
-	#undef REGISTER_FUNCTION
-	
+	LUMIX_FUNC(Model::getBoneCount);
 
 	#define REGISTER_FUNCTION(F)\
 		do { \

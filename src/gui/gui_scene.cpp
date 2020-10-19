@@ -1245,6 +1245,7 @@ struct GUISceneImpl final : GUIScene
 		}
 	}
 	
+	GUISystem* getSystem() override { return &m_system; }
 
 	void setRenderTarget(EntityRef entity, gpu::TextureHandle* texture_handle) override
 	{

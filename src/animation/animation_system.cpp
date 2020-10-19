@@ -51,7 +51,6 @@ struct AnimationSystemImpl final : IPlugin
 	explicit AnimationSystemImpl(Engine& engine);
 	~AnimationSystemImpl();
 
-	void registerLuaAPI() const;
 	void createScenes(Universe& ctx) override;
 	const char* getName() const override { return "animation"; }
 	u32 getVersion() const override { return 0; }
@@ -89,7 +88,8 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 				function((void (AnimationScene::*)(EntityRef, u32, u32))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setU32Input"),
 				function((void (AnimationScene::*)(EntityRef, u32, float))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setFloatInput"),
 				function((void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setBoolInput"),
-				LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex")
+				LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex"),
+				LUMIX_FUNC_EX(AnimationScene::setAnimatorIK, "setIK")
 			),
 			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
 				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE)),
@@ -101,8 +101,6 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 		)
 	);
 	registerScene(anim_scene);
-
-	registerLuaAPI();
 }
 
 
@@ -111,12 +109,6 @@ AnimationSystemImpl::~AnimationSystemImpl()
 	m_animation_manager.destroy();
 	m_property_animation_manager.destroy();
 	m_controller_manager.destroy();
-}
-
-
-void AnimationSystemImpl::registerLuaAPI() const
-{
-	AnimationScene::registerLuaAPI(m_engine.getState());
 }
 
 

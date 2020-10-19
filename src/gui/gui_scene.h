@@ -39,6 +39,7 @@ struct GUIScene : IScene
 
 	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main) = 0;
 	virtual IVec2 getCursorPosition() = 0;
+	virtual GUISystem* getSystem() = 0;
 
 	virtual bool hasGUI(EntityRef entity) const = 0;
 	virtual Rect getRectEx(EntityPtr entity, const Vec2& canvas_size) const = 0;

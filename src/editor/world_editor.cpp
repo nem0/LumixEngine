@@ -2223,7 +2223,6 @@ public:
 			file.close();
 			return res;
 		}
-		logError("Editor") << "Failed to open " << path;
 		return false;
 	}
 
