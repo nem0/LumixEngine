@@ -222,6 +222,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual float getTime() const = 0;
 	virtual Engine& getEngine() const = 0;
 	virtual IAllocator& getAllocator() = 0;
+	virtual void setGlobalLODMultiplier(float multiplier) = 0;
+	virtual float getGlobalLODMultiplier() const = 0;
 
 	virtual Pose* lockPose(EntityRef entity) = 0;
 	virtual void unlockPose(EntityRef entity, bool changed) = 0;

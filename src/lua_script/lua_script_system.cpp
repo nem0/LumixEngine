@@ -872,7 +872,7 @@ namespace Lumix
 			for (auto* f : functions) {
 				if (equalStrings(v.prop_name, f->name)) {
 					lua_pushlightuserdata(L, (void*)f);
-					lua_pushcclosure(L, lua_method_closure, 1);
+					lua_pushcclosure(L, lua_scene_method_closure, 1);
 					return 1;
 				}
 			}
@@ -880,7 +880,7 @@ namespace Lumix
 			return 0;
 		}
 
-		static int lua_method_closure(lua_State* L) {
+		static int lua_scene_method_closure(lua_State* L) {
 			LuaWrapper::checkTableArg(L, 1); // self
 			if (LuaWrapper::getField(L, 1, "_scene") != LUA_TLIGHTUSERDATA) {
 				ASSERT(false);
@@ -913,6 +913,14 @@ namespace Lumix
 					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 1); break;
 					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 1); break;
 					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 1); break;
+					case Reflection::Variant::PTR: {
+						void* ptr;
+						if (!LuaWrapper::checkField(L, i + 1, "_value", &ptr)) {
+							luaL_argerror(L, i + 1, "expected object");
+						}
+						args[i] = ptr;
+						break;
+					}
 					default: ASSERT(false); break;
 				}
 			}
@@ -928,9 +936,80 @@ namespace Lumix
 				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
 				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
 				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
+				case Reflection::Variant::PTR: pushObject(L, res.ptr, f->getReturnTypeName()); break;
 				default: ASSERT(false); break;
 			}
 			return 1;
+		}
+		
+		static int lua_method_closure(lua_State* L) {
+			LuaWrapper::checkTableArg(L, 1); // self
+			if (LuaWrapper::getField(L, 1, "_value") != LUA_TLIGHTUSERDATA) {
+				ASSERT(false);
+				lua_pop(L, 1);
+				return 0;
+			}
+			void* obj = LuaWrapper::toType<void*>(L, -1);
+			lua_pop(L, 1);
+
+			Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+			Reflection::Variant args[64];
+			for (i32 i = 0; i < f->getArgCount(); ++i) {
+				Reflection::Variant::Type type = f->getArgType(i);
+				switch(type) {
+					case Reflection::Variant::BOOL: args[i] = LuaWrapper::toType<bool>(L, i + 1); break;
+					case Reflection::Variant::U32: args[i] = LuaWrapper::toType<u32>(L, i + 1); break;
+					case Reflection::Variant::I32: args[i] = LuaWrapper::toType<i32>(L, i + 1); break;
+					case Reflection::Variant::FLOAT: args[i] = LuaWrapper::toType<float>(L, i + 1); break;
+					case Reflection::Variant::CSTR: args[i] = LuaWrapper::toType<const char*>(L, i + 1); break;
+					case Reflection::Variant::ENTITY: args[i] = LuaWrapper::toType<EntityPtr>(L, i + 1); break;
+					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 1); break;
+					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 1); break;
+					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 1); break;
+					case Reflection::Variant::PTR: {
+						void* ptr;
+						if (!LuaWrapper::checkField(L, i + 1, "_value", &ptr)) {
+							luaL_argerror(L, i + 1, "expected object");
+						}
+						args[i] = ptr;
+						break;
+					}
+					default: ASSERT(false); break;
+				}
+			}
+			const Reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
+			switch(res.type) {
+				case Reflection::Variant::VOID: return 0;
+				case Reflection::Variant::BOOL: LuaWrapper::push(L, res.b); break;
+				case Reflection::Variant::U32: LuaWrapper::push(L, res.u); break;
+				case Reflection::Variant::I32: LuaWrapper::push(L, res.i); break;
+				case Reflection::Variant::FLOAT: LuaWrapper::push(L, res.f); break;
+				case Reflection::Variant::CSTR: LuaWrapper::push(L, res.s); break;
+				case Reflection::Variant::ENTITY: ASSERT(false); break;
+				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
+				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
+				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
+				case Reflection::Variant::PTR: pushObject(L, res.ptr, f->getReturnTypeName()); break;
+				default: ASSERT(false); break;
+			}
+			return 1;
+		}
+
+		static void pushObject(lua_State* L, void* obj, const char* type_name) {
+			lua_newtable(L);
+			LuaWrapper::DebugGuard guard(L);
+			LuaWrapper::setField(L, -1, "_value", obj);
+			for (Reflection::FunctionBase* f : Reflection::allFunctions()) {
+				const char* obj_name = f->getThisTypeName();
+				if (strncmp(obj_name, type_name, strlen(type_name) - 2) == 0) {
+					lua_pushlightuserdata(L, (void*)f);
+					lua_pushcclosure(L, lua_method_closure, 1);
+					const char* fn_name = f->decl_code + strlen(f->decl_code);
+					while (*fn_name != ':' && fn_name != f->decl_code) --fn_name;
+					if (*fn_name == ':') ++fn_name;
+					lua_setfield(L, -2, fn_name);
+				}
+			}
 		}
 
 		static int lua_prop_setter(lua_State* L) {
@@ -1008,6 +1087,7 @@ namespace Lumix
 				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
 				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
 				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
+				case Reflection::Variant::PTR: pushObject(L, res.ptr, f->getReturnTypeName()); break;
 				default: ASSERT(false); break;
 			}
 			return 1;
@@ -1102,12 +1182,6 @@ namespace Lumix
 		}
 
 
-		void setScriptSource(EntityRef entity, int scr_index, const char* path)
-		{
-			setScriptPath(entity, scr_index, Path(path));
-		}
-
-
 		void registerAPI()
 		{
 			if (m_is_api_registered) return;
@@ -1127,9 +1201,6 @@ namespace Lumix
 					LuaWrapper::createSystemFunction(engine_state, "LuaScript", #F, f); \
 				} while(false)
 
-			REGISTER_FUNCTION(addScript);
-			REGISTER_FUNCTION(getScriptCount);
-			REGISTER_FUNCTION(setScriptSource);
 			REGISTER_FUNCTION(cancelTimer);
 
 			#undef REGISTER_FUNCTION

@@ -99,7 +99,7 @@ private:
 private:
 	ObserverCallback m_cb;
 	Path m_path;
-	u16 m_ref_count;
+	u32 m_ref_count;
 	u16 m_failed_dep_count;
 	State m_current_state;
 	FileSystem::AsyncHandle m_async_op;

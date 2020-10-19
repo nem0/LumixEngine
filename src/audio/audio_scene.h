@@ -62,7 +62,8 @@ struct AudioScene : IScene
 	static UniquePtr<AudioScene> createInstance(AudioSystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);
-	static void registerLuaAPI(lua_State* L);
+
+	virtual void setMasterVolume(float volume) = 0;
 
 	virtual u32 getClipCount() const = 0;
 	virtual const char* getClipName(u32 index) = 0;
@@ -84,6 +85,7 @@ struct AudioScene : IScene
 	virtual bool isAmbientSound3D(EntityRef entity) = 0;
 	virtual void setAmbientSound3D(EntityRef entity, bool is_3d) = 0;
 
+	virtual SoundHandle playSound(EntityRef entity, const char* clip_name, bool is_3d) = 0;
 	virtual SoundHandle play(EntityRef entity, ClipInfo* clip, bool is_3d) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;
 	virtual void setVolume(SoundHandle sound_id, float volume) = 0;

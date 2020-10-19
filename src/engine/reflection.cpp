@@ -70,6 +70,11 @@ static IAllocator* g_allocator = nullptr;
 static ComponentLink* g_first_component = nullptr;
 static SceneBase* g_first_scene = nullptr;
 
+Array<FunctionBase*>& allFunctions() {
+	static DefaultAllocator allocator;
+	static Array<FunctionBase*> fncs(allocator);
+	return fncs;
+}
 
 const ComponentBase* getComponent(ComponentType cmp_type)
 {

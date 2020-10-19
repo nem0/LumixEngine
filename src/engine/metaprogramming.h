@@ -4,7 +4,8 @@
 namespace Lumix
 {
 
-
+template <typename T, typename R> struct IsSame { static constexpr bool Value = false; };
+template <typename T> struct IsSame<T, T> { static constexpr bool Value = true; };
 template <typename T> struct RemoveReference { using Type = T; };
 template <typename T> struct RemoveReference<T&> { using Type = T; };
 template <typename T> struct RemoveReference<T&&> { using Type = T; };
@@ -48,29 +49,6 @@ struct Tuple<Head, Tail...> : Tuple<Tail...>
 	Tuple(const Tuple<Head, Tail...>& rhs) : Tuple<Tail...>(rhs) { value = rhs.value; }
 };
 
-
-template <typename T, typename C> struct TupleContains;
-
-template <typename T, typename... Tail> 
-struct TupleContains<T, Tuple<T, Tail...>>
-{
-	static constexpr bool value = true;
-};
-
-template <typename T>
-struct TupleContains<T, Tuple<>>
-{
-	static constexpr bool value = false;
-};
-
-
-template <typename T, typename Head, typename... Tail> 
-struct TupleContains<T, Tuple<Head, Tail...>> 
-{
-	static constexpr bool value = TupleContains<T, Tuple<Tail...>>::value;
-};
-
-
 template <typename... Types>
 auto makeTuple(Types... types)
 {
@@ -90,12 +68,6 @@ struct TupleSize<Tuple<Types...> >
 {
 	enum { result = sizeof...(Types) };
 };
-
-template <typename Tuple, typename Element> struct TupleIndex;
-
-template <typename T, typename... TailTypes> struct TupleIndex<Tuple<T, TailTypes...>, T> { static constexpr int value = 0; };
-template <typename T, typename HeadType, typename... TailTypes>
-struct TupleIndex<Tuple<HeadType, TailTypes...>, T> { static constexpr int value = 1 + TupleIndex<Tuple<TailTypes...>, T>::value; };
 
 template <int Index, typename Tuple> struct TupleElement;
 

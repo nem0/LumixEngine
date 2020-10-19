@@ -365,6 +365,12 @@ static void registerProperties(IAllocator& allocator)
 	};
 
 	static auto render_scene = scene("renderer",
+		functions(
+			LUMIX_FUNC(RenderScene::setGlobalLODMultiplier),
+			LUMIX_FUNC(RenderScene::getGlobalLODMultiplier),
+			LUMIX_FUNC(RenderScene::addDebugCross),
+			LUMIX_FUNC(RenderScene::addDebugLine)
+		),
 		component("bone_attachment",
 			property("Parent", LUMIX_PROP(RenderScene, BoneAttachmentParent)),
 			property("Relative position", LUMIX_PROP(RenderScene, BoneAttachmentPosition)),
@@ -394,6 +400,9 @@ static void registerProperties(IAllocator& allocator)
 			var_property("Orthographic size", &RenderScene::getCamera, &Camera::ortho_size, MinAttribute(0))
 		),
 		component("model_instance",
+			functions(
+				LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel")
+			),
 			property("Enabled", &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance),
 			property("Material", &RenderScene::getModelInstanceMaterialOverride,&RenderScene::setModelInstanceMaterialOverride, NoUIAttribute()),
 			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath), ResourceAttribute("Mesh (*.msh)", Model::TYPE))
@@ -430,6 +439,10 @@ static void registerProperties(IAllocator& allocator)
 				MinAttribute(0))
 		),
 		component("terrain",
+			functions(
+				LUMIX_FUNC(RenderScene::getTerrainNormalAt),
+				LUMIX_FUNC(RenderScene::getTerrainHeightAt)
+			),
 			property("Material", LUMIX_PROP(RenderScene, TerrainMaterialPath),
 				ResourceAttribute("Material (*.mat)", Material::TYPE)),
 			property("XZ scale", LUMIX_PROP(RenderScene, TerrainXZScale), 

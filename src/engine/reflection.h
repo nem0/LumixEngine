@@ -10,8 +10,8 @@
 
 
 #define LUMIX_PROP(Scene, Property) &Scene::get##Property, &Scene::set##Property
-#define LUMIX_FUNC_EX(Func, name) function(&Func, #Func, name)
-#define LUMIX_FUNC(Func) function(&Func, #Func, nullptr)
+#define LUMIX_FUNC_EX(Func, name) Reflection::function(&Func, #Func, name)
+#define LUMIX_FUNC(Func) Reflection::function(&Func, #Func, nullptr)
 
 namespace Lumix
 {
@@ -533,6 +533,7 @@ struct Variant {
 	Variant() { type = I32; i = 0; }
 	enum Type {
 		VOID,
+		PTR,
 		BOOL,
 		I32,
 		U32,
@@ -553,6 +554,7 @@ struct Variant {
 		Vec2 v2;
 		Vec3 v3;
 		DVec3 dv3;
+		void* ptr;
 	};
 
 	void operator =(bool v) { b = v; type = BOOL; }
@@ -564,6 +566,7 @@ struct Variant {
 	void operator =(Vec2 v) { v2 = v; type = VEC2; }
 	void operator =(Vec3 v) { v3 = v; type = VEC3; }
 	void operator =(const DVec3& v) { dv3 = v; type = DVEC3; }
+	void operator =(void* v) { ptr = v; type = PTR; }
 };
 
 struct FunctionBase
@@ -572,6 +575,8 @@ struct FunctionBase
 
 	virtual int getArgCount() const = 0;
 	virtual Variant::Type getReturnType() const = 0;
+	virtual const char* getReturnTypeName() const = 0;
+	virtual const char* getThisTypeName() const = 0;
 	virtual Variant::Type getArgType(int i) const = 0;
 	virtual Variant invoke(void* obj, Span<Variant> args) const = 0;
 
@@ -643,6 +648,7 @@ auto scene(const char* name, Components... components)
 }
 
 template <typename T> inline Variant::Type _getVariantType();
+template <typename T> inline Variant::Type _getVariantType<T*>() { return Variant::PTR; }
 template <> inline Variant::Type _getVariantType<void>() { return Variant::VOID; }
 template <> inline Variant::Type _getVariantType<bool>() { return Variant::BOOL; }
 template <> inline Variant::Type _getVariantType<i32>() { return Variant::I32; }
@@ -656,40 +662,41 @@ template <> inline Variant::Type _getVariantType<Vec3>() { return Variant::VEC3;
 template <> inline Variant::Type _getVariantType<DVec3>() { return Variant::DVEC3; }
 template <typename T> inline Variant::Type getVariantType() { return _getVariantType<RemoveCVR<T>>(); }
 
-template <typename F> struct Function;
+template <typename T> struct FromVariantTag {};
 
-template <typename T> static T fromVariant(int i, Span<Variant> args);
-template <> bool fromVariant(int i, Span<Variant> args) { return args[i].b; }
-template <> float fromVariant(int i, Span<Variant> args) { return args[i].f; }
-template <> const char* fromVariant(int i, Span<Variant> args) { return args[i].s; }
-template <> i32 fromVariant(int i, Span<Variant> args) { return args[i].i; }
-template <> u32 fromVariant(int i, Span<Variant> args) { return args[i].u; }
-template <> Vec2 fromVariant(int i, Span<Variant> args) { return args[i].v2; }
-template <> Vec3 fromVariant(int i, Span<Variant> args) { return args[i].v3; }
-template <> DVec3 fromVariant(int i, Span<Variant> args) { return args[i].dv3; }
-template <> EntityPtr fromVariant(int i, Span<Variant> args) { return args[i].e; }
-template <> EntityRef fromVariant(int i, Span<Variant> args) { return (EntityRef)args[i].e; }
+inline bool fromVariant(int i, Span<Variant> args, FromVariantTag<bool>) { return args[i].b; }
+inline float fromVariant(int i, Span<Variant> args, FromVariantTag<float>) { return args[i].f; }
+inline const char* fromVariant(int i, Span<Variant> args, FromVariantTag<const char*>) { return args[i].s; }
+inline i32 fromVariant(int i, Span<Variant> args, FromVariantTag<i32>) { return args[i].i; }
+inline u32 fromVariant(int i, Span<Variant> args, FromVariantTag<u32>) { return args[i].u; }
+inline Vec2 fromVariant(int i, Span<Variant> args, FromVariantTag<Vec2>) { return args[i].v2; }
+inline Vec3 fromVariant(int i, Span<Variant> args, FromVariantTag<Vec3>) { return args[i].v3; }
+inline DVec3 fromVariant(int i, Span<Variant> args, FromVariantTag<DVec3>) { return args[i].dv3; }
+inline EntityPtr fromVariant(int i, Span<Variant> args, FromVariantTag<EntityPtr>) { return args[i].e; }
+inline EntityRef fromVariant(int i, Span<Variant> args, FromVariantTag<EntityRef>) { return (EntityRef)args[i].e; }
+inline void* fromVariant(int i, Span<Variant> args, FromVariantTag<void*>) { return args[i].ptr; }
+template <typename T> inline T* fromVariant(int i, Span<Variant> args, FromVariantTag<T*>) { return (T*)args[i].ptr; }
 
-template <typename T, typename... Args>
+template <typename... Args>
 struct ToVariant {
 	template <typename C, typename F, int... I>
 	static Variant call(C* inst, F f, Span<Variant> args, Indices<I...>& indices) {
-		Variant v;
-		v = (inst->*f)(fromVariant<RemoveCVR<Args>>(I, args)...);
-		return v;
+		using R = typename ResultOf<F>::Type;
+		if constexpr (IsSame<R, void>::Value) {
+			Variant v;
+			v.type = Variant::VOID;
+			(inst->*f)(fromVariant(I, args, FromVariantTag<RemoveCVR<Args>>{})...);
+			return v;
+		}
+		else {
+			Variant v;
+			v = (inst->*f)(fromVariant(I, args, FromVariantTag<RemoveCVR<Args>>{})...);
+			return v;
+		}
 	}
 };
 
-template <typename... Args>
-struct ToVariant<void, Args...> {
-	template <typename C, typename F, int... I>
-	static Variant call(C* inst, F f, Span<Variant> args, Indices<I...>& indices) {
-		Variant v;
-		v.type = Variant::VOID;
-		(inst->*f)(fromVariant<RemoveCVR<Args>>(I, args)...);
-		return v;
-	}
-};
+template <typename F> struct Function;
 
 template <typename R, typename C, typename... Args>
 struct Function<R (C::*)(Args...)> : FunctionBase
@@ -699,18 +706,21 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 
 	int getArgCount() const override { return sizeof...(Args); }
 	Variant::Type getReturnType() const override { return getVariantType<R>(); }
+	const char* getReturnTypeName() const override { return getTypeName<R>(); }
+	const char* getThisTypeName() const override { return getTypeName<C>(); }
 	
 	Variant::Type getArgType(int i) const override
 	{
 		Variant::Type expand[] = {
-			getVariantType<Args>()...
+			getVariantType<Args>()...,
+			Variant::Type::VOID
 		};
 		return expand[i];
 	}
 	
 	Variant invoke(void* obj, Span<Variant> args) const override {
 		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		return ToVariant<R, Args...>::call((C*)obj, function, args, indices);
+		return ToVariant<Args...>::call((C*)obj, function, args, indices);
 	}
 };
 
@@ -722,25 +732,31 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 
 	int getArgCount() const override { return sizeof...(Args); }
 	Variant::Type getReturnType() const override { return getVariantType<R>(); }
+	const char* getReturnTypeName() const override { return getTypeName<R>(); }
+	const char* getThisTypeName() const override { return getTypeName<C>(); }
 	
 	Variant::Type getArgType(int i) const override
 	{
 		Variant::Type expand[] = {
-			getVariantType<Args>()...
+			getVariantType<Args>()...,
+			Variant::Type::VOID
 		};
 		return expand[i];
 	}
 
 	Variant invoke(void* obj, Span<Variant> args) const override {
 		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		return ToVariant<R, Args...>::call((const C*)obj, function, args, indices);
+		return ToVariant<Args...>::call((const C*)obj, function, args, indices);
 	}
 };
 
+Array<FunctionBase*>& allFunctions();
+
 template <typename F>
-auto function(F func, const char* decl_code, const char* name)
+auto& function(F func, const char* decl_code, const char* name)
 {
-	Function<F> ret;
+	static Function<F> ret;
+	allFunctions().push(&ret);
 	ret.function = func;
 	ret.decl_code = decl_code;
 	ret.name = name;

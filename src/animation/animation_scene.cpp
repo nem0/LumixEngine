@@ -149,24 +149,12 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 
-	static int setIK(lua_State* L)
-	{
-		AnimationSceneImpl* scene = LuaWrapper::checkArg<AnimationSceneImpl*>(L, 1);
-		EntityRef entity = LuaWrapper::checkArg<EntityRef>(L, 2);
-		auto iter = scene->m_animator_map.find(entity);
-		if (!iter.isValid()) {
-			luaL_argerror(L, 2, "entity does not have animator");
-		}
-		Animator& animator = scene->m_animators[iter.value()];
-		const u32 index = LuaWrapper::checkArg<u32>(L, 3);
-		if (index >= lengthOf(animator.inverse_kinematics)) {
-			luaL_argerror(L, 3, "Inverse kinematics index out of range");
-		}
+	void setAnimatorIK(EntityRef entity, u32 index, float weight, const Vec3& target) override {
+		auto iter = m_animator_map.find(entity);
+		Animator& animator = m_animators[iter.value()];
 		Animator::IK& ik = animator.inverse_kinematics[index];
-		ik.weight = clamp(LuaWrapper::checkArg<float>(L, 4), 0.f, 1.f);
-		ik.target = LuaWrapper::checkArg<Vec3>(L, 5);
-
-		return 0;
+		ik.weight = clamp(weight, 0.f, 1.f);
+		ik.target = target;
 	}
 
 
@@ -972,23 +960,6 @@ struct AnimationSceneImpl final : AnimationScene
 UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin, Universe& universe, IAllocator& allocator)
 {
 	return UniquePtr<AnimationSceneImpl>::create(allocator, engine, plugin, universe, allocator);
-}
-
-
-void AnimationScene::registerLuaAPI(lua_State* L)
-{
-	#define REGISTER_FUNCTION(name) \
-	do {\
-		auto f = &LuaWrapper::wrapMethod<&AnimationSceneImpl::name>; \
-		LuaWrapper::createSystemFunction(L, "Animation", #name, f); \
-	} while(false) \
-
-	REGISTER_FUNCTION(getAnimationLength);
-
-	#undef REGISTER_FUNCTION
-
-	LuaWrapper::createSystemFunction(L, "Animation", "setIK", &AnimationSceneImpl::setIK); \
-
 }
 
 

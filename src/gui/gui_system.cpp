@@ -54,10 +54,10 @@ struct GUISystemImpl final : GUISystem
 	{
 		switch ((GUIScene::TextHAlign) index)
 		{
-		case GUIScene::TextHAlign::LEFT: return "left";
-		case GUIScene::TextHAlign::RIGHT: return "right";
-		case GUIScene::TextHAlign::CENTER: return "center";
-		default: ASSERT(false); return "Unknown";
+			case GUIScene::TextHAlign::LEFT: return "left";
+			case GUIScene::TextHAlign::RIGHT: return "right";
+			case GUIScene::TextHAlign::CENTER: return "center";
+			default: ASSERT(false); return "Unknown";
 		}
 	}
 
@@ -67,7 +67,7 @@ struct GUISystemImpl final : GUISystem
 		, m_interface(nullptr)
 		, m_sprite_manager(engine.getAllocator())
 	{
-		registerLuaAPI();
+		LUMIX_FUNC(GUISystem::enableCursor);
 
 		using namespace Reflection;
 
@@ -114,7 +114,8 @@ struct GUISystemImpl final : GUISystem
 		static auto lua_scene = scene("gui",
 			functions(
 				LUMIX_FUNC(GUIScene::getRectAt),
-				LUMIX_FUNC(GUIScene::isOver)
+				LUMIX_FUNC(GUIScene::isOver),
+				LUMIX_FUNC(GUIScene::getSystem)
 			),
 			component("gui_text",
 				property("Text", LUMIX_PROP(GUIScene, Text), MultilineAttribute()),
@@ -161,60 +162,11 @@ struct GUISystemImpl final : GUISystem
 
 	Engine& getEngine() override { return m_engine; }
 
-
 	void createScenes(Universe& universe) override
 	{
 		IAllocator& allocator = m_engine.getAllocator();
 		UniquePtr<GUIScene> scene = GUIScene::createInstance(*this, universe, allocator);
 		universe.addScene(scene.move());
-	}
-
-	static int LUA_enableCursor(lua_State* L) {
-		const bool enable = LuaWrapper::checkArg<bool>(L, 1);
-		const int index = lua_upvalueindex(1);
-		GUISystemImpl* system = LuaWrapper::toType<GUISystemImpl*>(L, index);
-		system->enableCursor(enable);
-		return 0;
-	}
-
-	static int LUA_GUIRect_getScreenRect(lua_State* L)
-	{
-		EntityRef e;
-		Universe* universe;
-		if (!LuaWrapper::toEntity(L, 1, Ref(universe), Ref(e))) return 0;
-		GUIScene* scene = (GUIScene*)universe->getScene(crc32("gui"));
-		GUIScene::Rect rect = scene->getRect(e);
-		lua_newtable(L);
-		LuaWrapper::push(L, rect.x);
-		lua_setfield(L, -2, "x");
-		LuaWrapper::push(L, rect.y);
-		lua_setfield(L, -2, "y");
-		LuaWrapper::push(L, rect.w);
-		lua_setfield(L, -2, "w");
-		LuaWrapper::push(L, rect.h);
-		lua_setfield(L, -2, "h");
-		return 1;
-	}
-
-
-	void registerLuaAPI()
-	{
-		lua_State* L = m_engine.getState();
-		
-		#define REGISTER_FUNCTION(name) \
-			do {\
-				auto f = &LuaWrapper::wrapMethod<&GUISystemImpl::name>; \
-				LuaWrapper::createSystemFunction(L, "Gui", #name, f); \
-			} while(false) \
-
-		REGISTER_FUNCTION(enableCursor);
-
-		LuaWrapper::createSystemFunction(L, "Gui", "getScreenRect", LUA_GUIRect_getScreenRect);
-		LuaWrapper::createSystemClosure(L, "Gui", this, "enableCursor", LUA_enableCursor);
-
-		LuaWrapper::createSystemVariable(L, "Gui", "instance", this);
-
-		#undef REGISTER_FUNCTION
 	}
 
 	void setCursor(OS::CursorType type) override {

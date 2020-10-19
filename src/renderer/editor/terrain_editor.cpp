@@ -931,6 +931,10 @@ static bool isOBBCollision(RenderScene& scene,
 		const EntityRef* entities = meshes->entities;
 		for (u32 i = 0, c = meshes->header.count; i < c; ++i) {
 			const EntityRef mesh = entities[i];
+			// we resolve collisions when painting by removing recently added mesh, but we do not refresh `meshes`
+			// so it can contain invalid entities
+			if (!universe.hasEntity(mesh)) continue;
+
 			const ModelInstance& model_instance = model_instances[mesh.index];
 			const Transform& tr_b = transforms[mesh.index];
 			const float radius_b = model_instance.model->getBoundingRadius() * tr_b.scale;
