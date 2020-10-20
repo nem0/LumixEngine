@@ -647,35 +647,34 @@ auto scene(const char* name, Components... components)
 	return scene;
 }
 
-template <typename T> inline Variant::Type _getVariantType();
-template <typename T> inline Variant::Type _getVariantType<T*>() { return Variant::PTR; }
-template <> inline Variant::Type _getVariantType<void>() { return Variant::VOID; }
-template <> inline Variant::Type _getVariantType<bool>() { return Variant::BOOL; }
-template <> inline Variant::Type _getVariantType<i32>() { return Variant::I32; }
-template <> inline Variant::Type _getVariantType<u32>() { return Variant::U32; }
-template <> inline Variant::Type _getVariantType<float>() { return Variant::FLOAT; }
-template <> inline Variant::Type _getVariantType<const char*>() { return Variant::CSTR; }
-template <> inline Variant::Type _getVariantType<EntityPtr>() { return Variant::ENTITY; }
-template <> inline Variant::Type _getVariantType<EntityRef>() { return Variant::ENTITY; }
-template <> inline Variant::Type _getVariantType<Vec2>() { return Variant::VEC2; }
-template <> inline Variant::Type _getVariantType<Vec3>() { return Variant::VEC3; }
-template <> inline Variant::Type _getVariantType<DVec3>() { return Variant::DVEC3; }
-template <typename T> inline Variant::Type getVariantType() { return _getVariantType<RemoveCVR<T>>(); }
+template <typename T> struct VariantTag {};
 
-template <typename T> struct FromVariantTag {};
+template <typename T> inline Variant::Type _getVariantType(VariantTag<T*>) { return Variant::PTR; }
+inline Variant::Type _getVariantType(VariantTag<void>) { return Variant::VOID; }
+inline Variant::Type _getVariantType(VariantTag<bool>) { return Variant::BOOL; }
+inline Variant::Type _getVariantType(VariantTag<i32>) { return Variant::I32; }
+inline Variant::Type _getVariantType(VariantTag<u32>) { return Variant::U32; }
+inline Variant::Type _getVariantType(VariantTag<float>) { return Variant::FLOAT; }
+inline Variant::Type _getVariantType(VariantTag<const char*>) { return Variant::CSTR; }
+inline Variant::Type _getVariantType(VariantTag<EntityPtr>) { return Variant::ENTITY; }
+inline Variant::Type _getVariantType(VariantTag<EntityRef>) { return Variant::ENTITY; }
+inline Variant::Type _getVariantType(VariantTag<Vec2>) { return Variant::VEC2; }
+inline Variant::Type _getVariantType(VariantTag<Vec3>) { return Variant::VEC3; }
+inline Variant::Type _getVariantType(VariantTag<DVec3>) { return Variant::DVEC3; }
+template <typename T> inline Variant::Type getVariantType() { return _getVariantType(VariantTag<RemoveCVR<T>>{}); }
 
-inline bool fromVariant(int i, Span<Variant> args, FromVariantTag<bool>) { return args[i].b; }
-inline float fromVariant(int i, Span<Variant> args, FromVariantTag<float>) { return args[i].f; }
-inline const char* fromVariant(int i, Span<Variant> args, FromVariantTag<const char*>) { return args[i].s; }
-inline i32 fromVariant(int i, Span<Variant> args, FromVariantTag<i32>) { return args[i].i; }
-inline u32 fromVariant(int i, Span<Variant> args, FromVariantTag<u32>) { return args[i].u; }
-inline Vec2 fromVariant(int i, Span<Variant> args, FromVariantTag<Vec2>) { return args[i].v2; }
-inline Vec3 fromVariant(int i, Span<Variant> args, FromVariantTag<Vec3>) { return args[i].v3; }
-inline DVec3 fromVariant(int i, Span<Variant> args, FromVariantTag<DVec3>) { return args[i].dv3; }
-inline EntityPtr fromVariant(int i, Span<Variant> args, FromVariantTag<EntityPtr>) { return args[i].e; }
-inline EntityRef fromVariant(int i, Span<Variant> args, FromVariantTag<EntityRef>) { return (EntityRef)args[i].e; }
-inline void* fromVariant(int i, Span<Variant> args, FromVariantTag<void*>) { return args[i].ptr; }
-template <typename T> inline T* fromVariant(int i, Span<Variant> args, FromVariantTag<T*>) { return (T*)args[i].ptr; }
+inline bool fromVariant(int i, Span<Variant> args, VariantTag<bool>) { return args[i].b; }
+inline float fromVariant(int i, Span<Variant> args, VariantTag<float>) { return args[i].f; }
+inline const char* fromVariant(int i, Span<Variant> args, VariantTag<const char*>) { return args[i].s; }
+inline i32 fromVariant(int i, Span<Variant> args, VariantTag<i32>) { return args[i].i; }
+inline u32 fromVariant(int i, Span<Variant> args, VariantTag<u32>) { return args[i].u; }
+inline Vec2 fromVariant(int i, Span<Variant> args, VariantTag<Vec2>) { return args[i].v2; }
+inline Vec3 fromVariant(int i, Span<Variant> args, VariantTag<Vec3>) { return args[i].v3; }
+inline DVec3 fromVariant(int i, Span<Variant> args, VariantTag<DVec3>) { return args[i].dv3; }
+inline EntityPtr fromVariant(int i, Span<Variant> args, VariantTag<EntityPtr>) { return args[i].e; }
+inline EntityRef fromVariant(int i, Span<Variant> args, VariantTag<EntityRef>) { return (EntityRef)args[i].e; }
+inline void* fromVariant(int i, Span<Variant> args, VariantTag<void*>) { return args[i].ptr; }
+template <typename T> inline T* fromVariant(int i, Span<Variant> args, VariantTag<T*>) { return (T*)args[i].ptr; }
 
 template <typename... Args>
 struct VariantCaller {
@@ -685,12 +684,12 @@ struct VariantCaller {
 		if constexpr (IsSame<R, void>::Value) {
 			Variant v;
 			v.type = Variant::VOID;
-			(inst->*f)(fromVariant(I, args, FromVariantTag<RemoveCVR<Args>>{})...);
+			(inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
 			return v;
 		}
 		else {
 			Variant v;
-			v = (inst->*f)(fromVariant(I, args, FromVariantTag<RemoveCVR<Args>>{})...);
+			v = (inst->*f)(fromVariant(I, args, VariantTag<RemoveCVR<Args>>{})...);
 			return v;
 		}
 	}
