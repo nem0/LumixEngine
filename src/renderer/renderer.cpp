@@ -481,6 +481,8 @@ struct RendererImpl final : Renderer
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
 	{
+		LUMIX_FUNC(Model::getBoneCount);
+
 		m_shader_defines.reserve(32);
 
 		gpu::preinit(m_allocator, shouldLoadRenderdoc());

@@ -24,7 +24,184 @@
 
 namespace Lumix
 {
+	static void pushObject(lua_State* L, void* obj, const char* type_name) {
+		LuaWrapper::DebugGuard guard(L, 1);
+		lua_getglobal(L, "LumixAPI");
+		char tmp[64];
+		const char* c = type_name + strlen(type_name);
+		while (*c != ':' && c != type_name) --c;
+		if (*c == ':') ++c;
+		copyNString(Span(tmp), c, int(strlen(c)) - 2);
 
+		if (LuaWrapper::getField(L, -1, tmp) != LUA_TTABLE) {
+			lua_pop(L, 2);
+			lua_newtable(L);
+			lua_pushlightuserdata(L, obj);
+			lua_setfield(L, -2, "_value");
+			ASSERT(false);
+			return;
+		}
+
+		lua_newtable(L); // [LumixAPI, class, obj]
+		lua_pushlightuserdata(L, obj); // [LumixAPI, class, obj, obj_ptr]
+		lua_setfield(L, -2, "_value"); // [LumixAPI, class, obj]
+		lua_pushvalue(L, -2); // [LumixAPI, class, obj, class]
+		lua_setmetatable(L, -2); // [LumixAPI, class, obj]
+		lua_remove(L, -2); // [LumixAPI, obj]
+		lua_remove(L, -2); // [obj]
+	}
+
+	static void toVariant(Reflection::Variant::Type type, lua_State* L, int idx, Ref<Reflection::Variant> val) {
+		switch(type) {
+			case Reflection::Variant::BOOL: val = LuaWrapper::toType<bool>(L, idx); break;
+			case Reflection::Variant::U32: val = LuaWrapper::toType<u32>(L, idx); break;
+			case Reflection::Variant::I32: val = LuaWrapper::toType<i32>(L, idx); break;
+			case Reflection::Variant::FLOAT: val = LuaWrapper::toType<float>(L, idx); break;
+			case Reflection::Variant::ENTITY: val = LuaWrapper::toType<EntityPtr>(L, idx); break;
+			case Reflection::Variant::VEC2: val = LuaWrapper::toType<Vec2>(L, idx); break;
+			case Reflection::Variant::VEC3: val = LuaWrapper::toType<Vec3>(L, idx); break;
+			case Reflection::Variant::DVEC3: val = LuaWrapper::toType<DVec3>(L, idx); break;
+			case Reflection::Variant::CSTR: val = LuaWrapper::toType<const char*>(L, idx); break;
+			case Reflection::Variant::PTR: {
+				void* ptr;
+				if (!LuaWrapper::checkField(L, idx, "_value", &ptr)) {
+					luaL_argerror(L, idx, "expected object");
+				}
+				val = ptr;
+				break;
+			}
+			default: ASSERT(false); break;
+		}	
+	}
+
+	static int push(lua_State* L, const Reflection::Variant& v, const char* type_name) {
+		switch (v.type) {
+			case Reflection::Variant::ENTITY: ASSERT(false); return 0;
+			case Reflection::Variant::VOID: return 0;
+			case Reflection::Variant::BOOL: LuaWrapper::push(L, v.b); return 1;
+			case Reflection::Variant::U32: LuaWrapper::push(L, v.u); return 1;
+			case Reflection::Variant::I32: LuaWrapper::push(L, v.i); return 1;
+			case Reflection::Variant::FLOAT: LuaWrapper::push(L, v.f); return 1;
+			case Reflection::Variant::CSTR: LuaWrapper::push(L, v.s); return 1;
+			case Reflection::Variant::VEC2: LuaWrapper::push(L, v.v2); return 1;
+			case Reflection::Variant::VEC3: LuaWrapper::push(L, v.v3); return 1;
+			case Reflection::Variant::DVEC3: LuaWrapper::push(L, v.dv3); return 1;
+			case Reflection::Variant::PTR: pushObject(L, v.ptr, type_name); return 1;
+			default: ASSERT(false); return 0;
+		}
+	}
+
+	static int luaMethodClosure(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1); // self
+		void* obj;
+		if (!LuaWrapper::checkField(L, 1, "_value", &obj)) {
+			ASSERT(false);
+			return 0;
+		}
+
+		LuaWrapper::DebugGuard guard(L, 1);
+
+		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+		Reflection::Variant args[32];
+		ASSERT(f->getArgCount() <= lengthOf(args));
+		for (i32 i = 0; i < f->getArgCount(); ++i) {
+			Reflection::Variant::Type type = f->getArgType(i);
+			toVariant(type, L, i + 1, Ref(args[i]));
+		}
+
+		const Reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
+		return push(L, res, f->getReturnTypeName());
+	}
+
+	static int luaSceneMethodClosure(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1); // self
+		IScene* scene;
+		if (!LuaWrapper::checkField(L, 1, "_scene", &scene)) {
+			ASSERT(false);
+			return 0;
+		}
+
+		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+		Reflection::Variant args[32];
+		ASSERT(f->getArgCount() <= lengthOf(args));
+		for (i32 i = 0; i < f->getArgCount(); ++i) {
+			Reflection::Variant::Type type = f->getArgType(i);
+			toVariant(type, L, i + 2, Ref(args[i]));
+		}
+		const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+		if (res.type == Reflection::Variant::ENTITY) {
+			LuaWrapper::pushEntity(L, res.e, &scene->getUniverse());
+			return 1;
+		}
+		return push(L, res, f->getReturnTypeName());
+	}
+
+	static int luaCmpMethodClosure(lua_State* L) {
+		LuaWrapper::checkTableArg(L, 1); // self
+		if (LuaWrapper::getField(L, 1, "_scene") != LUA_TLIGHTUSERDATA) {
+			ASSERT(false);
+			lua_pop(L, 1);
+			return 0;
+		}
+		IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
+		lua_pop(L, 1);
+			
+		if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
+			ASSERT(false);
+			lua_pop(L, 1);
+			return 0;
+		}
+		EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
+		lua_pop(L, 1);
+
+		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+		Reflection::Variant args[32];
+		ASSERT(f->getArgCount() < lengthOf(args));
+		args[0] = entity;
+		for (i32 i = 1; i < f->getArgCount(); ++i) {
+			Reflection::Variant::Type type = f->getArgType(i);
+			toVariant(type, L, i + 1, Ref(args[i]));
+		}
+		const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+		if (res.type == Reflection::Variant::ENTITY) {
+			LuaWrapper::pushEntity(L, res.e, &scene->getUniverse());
+			return 1;
+		}
+		return push(L, res, f->getReturnTypeName());
+	}
+
+	static void createClasses(lua_State* L) {
+		LuaWrapper::DebugGuard guard(L);
+		lua_getglobal(L, "LumixAPI");
+		for (auto* f : Reflection::allFunctions()) {
+			const char* obj_type_name = f->getThisTypeName();
+			const char* c = obj_type_name + strlen(obj_type_name);
+			while (*c != ':' && c != obj_type_name) --c;
+			if (*c == ':') ++c;
+			obj_type_name = c;
+			if (LuaWrapper::getField(L, -1, obj_type_name) != LUA_TTABLE) { // [LumixAPI, obj|nil ]
+				lua_pop(L, 1);						// [LumixAPI]
+				lua_newtable(L);					// [LumixAPI, obj]
+				lua_pushvalue(L, -1);				// [LumixAPI, obj, obj]
+				lua_setfield(L, -3, obj_type_name); // [LumixAPI, obj]
+				lua_pushvalue(L, -1); // [LumixAPI, obj, obj]
+				lua_setfield(L, -2, "__index"); // [LumixAPI, obj]
+			}
+			lua_pushlightuserdata(L, f);				// [LumixAPI, obj, f]
+			lua_pushcclosure(L, luaMethodClosure, 1); // [LumixAPI, obj, closure]
+
+			if (f->name) {
+				lua_setfield(L, -2, f->name);
+			} else {
+				const char* fn_name = f->decl_code + strlen(f->decl_code);
+				while (*fn_name != ':' && fn_name != f->decl_code) --fn_name;
+				if (*fn_name == ':') ++fn_name;
+				lua_setfield(L, -2, fn_name);
+			}
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+	}
 
 	static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
 
@@ -96,6 +273,7 @@ namespace Lumix
 		explicit LuaScriptSystemImpl(Engine& engine);
 		virtual ~LuaScriptSystemImpl();
 
+		void init() override;
 		void createScenes(Universe& universe) override;
 		const char* getName() const override { return "lua_script"; }
 		LuaScriptManager& getScriptManager() { return m_script_manager; }
@@ -868,148 +1046,17 @@ namespace Lumix
 			cmp->visit(v);
 			if (v.found) return 1;
 
+			// TODO put this directly in table, so we don't have to look it up here every time
 			const auto& functions = cmp->getFunctions();
 			for (auto* f : functions) {
 				if (equalStrings(v.prop_name, f->name)) {
 					lua_pushlightuserdata(L, (void*)f);
-					lua_pushcclosure(L, lua_scene_method_closure, 1);
+					lua_pushcclosure(L, luaCmpMethodClosure, 1);
 					return 1;
 				}
 			}
 
 			return 0;
-		}
-
-		static int lua_scene_method_closure(lua_State* L) {
-			LuaWrapper::checkTableArg(L, 1); // self
-			if (LuaWrapper::getField(L, 1, "_scene") != LUA_TLIGHTUSERDATA) {
-				ASSERT(false);
-				lua_pop(L, 1);
-				return 0;
-			}
-			IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
-			lua_pop(L, 1);
-			
-			if (LuaWrapper::getField(L, 1, "_entity") != LUA_TNUMBER) {
-				ASSERT(false);
-				lua_pop(L, 1);
-				return 0;
-			}
-			EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
-			lua_pop(L, 1);
-
-			Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
-			Reflection::Variant args[64];
-			args[0] = entity;
-			for (i32 i = 1; i < f->getArgCount(); ++i) {
-				Reflection::Variant::Type type = f->getArgType(i);
-				switch(type) {
-					case Reflection::Variant::BOOL: args[i] = LuaWrapper::toType<bool>(L, i + 1); break;
-					case Reflection::Variant::U32: args[i] = LuaWrapper::toType<u32>(L, i + 1); break;
-					case Reflection::Variant::I32: args[i] = LuaWrapper::toType<i32>(L, i + 1); break;
-					case Reflection::Variant::FLOAT: args[i] = LuaWrapper::toType<float>(L, i + 1); break;
-					case Reflection::Variant::CSTR: args[i] = LuaWrapper::toType<const char*>(L, i + 1); break;
-					case Reflection::Variant::ENTITY: args[i] = LuaWrapper::toType<EntityPtr>(L, i + 1); break;
-					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 1); break;
-					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 1); break;
-					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 1); break;
-					case Reflection::Variant::PTR: {
-						void* ptr;
-						if (!LuaWrapper::checkField(L, i + 1, "_value", &ptr)) {
-							luaL_argerror(L, i + 1, "expected object");
-						}
-						args[i] = ptr;
-						break;
-					}
-					default: ASSERT(false); break;
-				}
-			}
-			const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
-			switch(res.type) {
-				case Reflection::Variant::VOID: return 0;
-				case Reflection::Variant::BOOL: LuaWrapper::push(L, res.b); break;
-				case Reflection::Variant::U32: LuaWrapper::push(L, res.u); break;
-				case Reflection::Variant::I32: LuaWrapper::push(L, res.i); break;
-				case Reflection::Variant::FLOAT: LuaWrapper::push(L, res.f); break;
-				case Reflection::Variant::CSTR: LuaWrapper::push(L, res.s); break;
-				case Reflection::Variant::ENTITY: LuaWrapper::pushEntity(L, res.e, &scene->getUniverse()); break;
-				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
-				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
-				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
-				case Reflection::Variant::PTR: pushObject(L, res.ptr, f->getReturnTypeName()); break;
-				default: ASSERT(false); break;
-			}
-			return 1;
-		}
-		
-		static int lua_method_closure(lua_State* L) {
-			LuaWrapper::checkTableArg(L, 1); // self
-			if (LuaWrapper::getField(L, 1, "_value") != LUA_TLIGHTUSERDATA) {
-				ASSERT(false);
-				lua_pop(L, 1);
-				return 0;
-			}
-			void* obj = LuaWrapper::toType<void*>(L, -1);
-			lua_pop(L, 1);
-
-			Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
-			Reflection::Variant args[64];
-			for (i32 i = 0; i < f->getArgCount(); ++i) {
-				Reflection::Variant::Type type = f->getArgType(i);
-				switch(type) {
-					case Reflection::Variant::BOOL: args[i] = LuaWrapper::toType<bool>(L, i + 1); break;
-					case Reflection::Variant::U32: args[i] = LuaWrapper::toType<u32>(L, i + 1); break;
-					case Reflection::Variant::I32: args[i] = LuaWrapper::toType<i32>(L, i + 1); break;
-					case Reflection::Variant::FLOAT: args[i] = LuaWrapper::toType<float>(L, i + 1); break;
-					case Reflection::Variant::CSTR: args[i] = LuaWrapper::toType<const char*>(L, i + 1); break;
-					case Reflection::Variant::ENTITY: args[i] = LuaWrapper::toType<EntityPtr>(L, i + 1); break;
-					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 1); break;
-					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 1); break;
-					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 1); break;
-					case Reflection::Variant::PTR: {
-						void* ptr;
-						if (!LuaWrapper::checkField(L, i + 1, "_value", &ptr)) {
-							luaL_argerror(L, i + 1, "expected object");
-						}
-						args[i] = ptr;
-						break;
-					}
-					default: ASSERT(false); break;
-				}
-			}
-			const Reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
-			switch(res.type) {
-				case Reflection::Variant::VOID: return 0;
-				case Reflection::Variant::BOOL: LuaWrapper::push(L, res.b); break;
-				case Reflection::Variant::U32: LuaWrapper::push(L, res.u); break;
-				case Reflection::Variant::I32: LuaWrapper::push(L, res.i); break;
-				case Reflection::Variant::FLOAT: LuaWrapper::push(L, res.f); break;
-				case Reflection::Variant::CSTR: LuaWrapper::push(L, res.s); break;
-				case Reflection::Variant::ENTITY: ASSERT(false); break;
-				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
-				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
-				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
-				case Reflection::Variant::PTR: pushObject(L, res.ptr, f->getReturnTypeName()); break;
-				default: ASSERT(false); break;
-			}
-			return 1;
-		}
-
-		static void pushObject(lua_State* L, void* obj, const char* type_name) {
-			lua_newtable(L);
-			LuaWrapper::DebugGuard guard(L);
-			LuaWrapper::setField(L, -1, "_value", obj);
-			for (Reflection::FunctionBase* f : Reflection::allFunctions()) {
-				const char* obj_name = f->getThisTypeName();
-				if (strncmp(obj_name, type_name, strlen(type_name) - 2) == 0) {
-					lua_pushlightuserdata(L, (void*)f);
-					lua_pushcclosure(L, lua_method_closure, 1);
-					const char* fn_name = f->decl_code + strlen(f->decl_code);
-					while (*fn_name != ':' && fn_name != f->decl_code) --fn_name;
-					if (*fn_name == ':') ++fn_name;
-					lua_setfield(L, -2, fn_name);
-				}
-			}
 		}
 
 		static int lua_prop_setter(lua_State* L) {
@@ -1049,50 +1096,6 @@ namespace Lumix
 			return 1;
 		}
 
-		static int lua_scene_call_member(lua_State* L) {
-			LuaWrapper::checkTableArg(L, 1); // self
-			if (LuaWrapper::getField(L, 1, "_scene") != LUA_TLIGHTUSERDATA) {
-				ASSERT(false);
-				return 0;
-			}
-			IScene* scene = LuaWrapper::toType<IScene*>(L, -1);
-			lua_pop(L, 1);
-
-			Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
-			Reflection::Variant args[64];
-			for (i32 i = 0; i < f->getArgCount(); ++i) {
-				Reflection::Variant::Type type = f->getArgType(i);
-				switch(type) {
-					case Reflection::Variant::BOOL: args[i] = LuaWrapper::toType<bool>(L, i + 2); break;
-					case Reflection::Variant::U32: args[i] = LuaWrapper::toType<u32>(L, i + 2); break;
-					case Reflection::Variant::I32: args[i] = LuaWrapper::toType<i32>(L, i + 2); break;
-					case Reflection::Variant::FLOAT: args[i] = LuaWrapper::toType<float>(L, i + 2); break;
-					case Reflection::Variant::CSTR: args[i] = LuaWrapper::toType<const char*>(L, i + 2); break;
-					case Reflection::Variant::ENTITY: args[i] = LuaWrapper::toType<EntityPtr>(L, i + 2); break;
-					case Reflection::Variant::VEC2: args[i] = LuaWrapper::toType<Vec2>(L, i + 2); break;
-					case Reflection::Variant::VEC3: args[i] = LuaWrapper::toType<Vec3>(L, i + 2); break;
-					case Reflection::Variant::DVEC3: args[i] = LuaWrapper::toType<DVec3>(L, i + 2); break;
-					default: ASSERT(false); break;
-				}
-			}
-			const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
-			switch(res.type) {
-				case Reflection::Variant::VOID: return 0;
-				case Reflection::Variant::BOOL: LuaWrapper::push(L, res.b); break;
-				case Reflection::Variant::U32: LuaWrapper::push(L, res.u); break;
-				case Reflection::Variant::I32: LuaWrapper::push(L, res.i); break;
-				case Reflection::Variant::FLOAT: LuaWrapper::push(L, res.f); break;
-				case Reflection::Variant::CSTR: LuaWrapper::push(L, res.s); break;
-				case Reflection::Variant::ENTITY: LuaWrapper::pushEntity(L, res.e, &scene->getUniverse()); break;
-				case Reflection::Variant::VEC2: LuaWrapper::push(L, res.v2); break;
-				case Reflection::Variant::VEC3: LuaWrapper::push(L, res.v3); break;
-				case Reflection::Variant::DVEC3: LuaWrapper::push(L, res.dv3); break;
-				case Reflection::Variant::PTR: pushObject(L, res.ptr, f->getReturnTypeName()); break;
-				default: ASSERT(false); break;
-			}
-			return 1;
-		}
-
 		void registerProperties()
 		{
 			lua_State* L = m_system.m_engine.getState();
@@ -1117,7 +1120,7 @@ namespace Lumix
 					while (*c != ':') ++c;
 					c += 2;
 					lua_pushlightuserdata(L, (void*)f); // [scene, f]
-					lua_pushcclosure(L, lua_scene_call_member, 1); // [scene, fn]
+					lua_pushcclosure(L, luaSceneMethodClosure, 1); // [scene, fn]
 					lua_setfield(L, -2, c); // [scene]
 				}
 				lua_pop(L, 1); // []
@@ -2383,6 +2386,9 @@ namespace Lumix
 		registerScene(lua_scene);
 	}
 
+	void LuaScriptSystemImpl::init() {
+		createClasses(m_engine.getState());
+	}
 
 	LuaScriptSystemImpl::~LuaScriptSystemImpl()
 	{
