@@ -573,7 +573,7 @@ struct FunctionBase
 {
 	virtual ~FunctionBase() {}
 
-	virtual int getArgCount() const = 0;
+	virtual u32 getArgCount() const = 0;
 	virtual Variant::Type getReturnType() const = 0;
 	virtual const char* getReturnTypeName() const = 0;
 	virtual const char* getThisTypeName() const = 0;
@@ -703,7 +703,7 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 	using F = R(C::*)(Args...);
 	F function;
 
-	int getArgCount() const override { return sizeof...(Args); }
+	u32 getArgCount() const override { return sizeof...(Args); }
 	Variant::Type getReturnType() const override { return getVariantType<R>(); }
 	const char* getReturnTypeName() const override { return getTypeName<R>(); }
 	const char* getThisTypeName() const override { return getTypeName<C>(); }
@@ -729,7 +729,7 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 	using F = R(C::*)(Args...) const;
 	F function;
 
-	int getArgCount() const override { return sizeof...(Args); }
+	u32 getArgCount() const override { return sizeof...(Args); }
 	Variant::Type getReturnType() const override { return getVariantType<R>(); }
 	const char* getReturnTypeName() const override { return getTypeName<R>(); }
 	const char* getThisTypeName() const override { return getTypeName<C>(); }

@@ -104,7 +104,7 @@ namespace Lumix
 		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
 		Reflection::Variant args[32];
 		ASSERT(f->getArgCount() <= lengthOf(args));
-		for (i32 i = 0; i < f->getArgCount(); ++i) {
+		for (u32 i = 0; i < f->getArgCount(); ++i) {
 			Reflection::Variant::Type type = f->getArgType(i);
 			toVariant(type, L, i + 1, Ref(args[i]));
 		}
@@ -124,7 +124,7 @@ namespace Lumix
 		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
 		Reflection::Variant args[32];
 		ASSERT(f->getArgCount() <= lengthOf(args));
-		for (i32 i = 0; i < f->getArgCount(); ++i) {
+		for (u32 i = 0; i < f->getArgCount(); ++i) {
 			Reflection::Variant::Type type = f->getArgType(i);
 			toVariant(type, L, i + 2, Ref(args[i]));
 		}
@@ -158,7 +158,7 @@ namespace Lumix
 		Reflection::Variant args[32];
 		ASSERT(f->getArgCount() < lengthOf(args));
 		args[0] = entity;
-		for (i32 i = 1; i < f->getArgCount(); ++i) {
+		for (u32 i = 1; i < f->getArgCount(); ++i) {
 			Reflection::Variant::Type type = f->getArgType(i);
 			toVariant(type, L, i + 1, Ref(args[i]));
 		}
