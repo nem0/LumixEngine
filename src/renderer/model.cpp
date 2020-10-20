@@ -602,8 +602,6 @@ static const char* getBoneName(Model* model, int bone_index)
 
 void Model::registerLuaAPI(lua_State* L)
 {
-	LUMIX_FUNC(Model::getBoneCount);
-
 	#define REGISTER_FUNCTION(F)\
 		do { \
 			auto f = &LuaWrapper::wrap<&F>; \

@@ -678,7 +678,7 @@ inline void* fromVariant(int i, Span<Variant> args, FromVariantTag<void*>) { ret
 template <typename T> inline T* fromVariant(int i, Span<Variant> args, FromVariantTag<T*>) { return (T*)args[i].ptr; }
 
 template <typename... Args>
-struct ToVariant {
+struct VariantCaller {
 	template <typename C, typename F, int... I>
 	static Variant call(C* inst, F f, Span<Variant> args, Indices<I...>& indices) {
 		using R = typename ResultOf<F>::Type;
@@ -720,7 +720,7 @@ struct Function<R (C::*)(Args...)> : FunctionBase
 	
 	Variant invoke(void* obj, Span<Variant> args) const override {
 		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		return ToVariant<Args...>::call((C*)obj, function, args, indices);
+		return VariantCaller<Args...>::call((C*)obj, function, args, indices);
 	}
 };
 
@@ -746,7 +746,7 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 
 	Variant invoke(void* obj, Span<Variant> args) const override {
 		auto indices = typename BuildIndices<-1, sizeof...(Args)>::result{};
-		return ToVariant<Args...>::call((const C*)obj, function, args, indices);
+		return VariantCaller<Args...>::call((const C*)obj, function, args, indices);
 	}
 };
 

@@ -56,9 +56,6 @@ struct ComponentTypeData
 	u32 id_hash;
 };
 
-
-
-
 struct ComponentLink
 {
 	const ComponentBase* desc;
