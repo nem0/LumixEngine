@@ -3,8 +3,9 @@
 #include <PxPhysicsAPI.h>
 
 #include "cooking/PxCooking.h"
-#include "engine/log.h"
 #include "engine/engine.h"
+#include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
@@ -220,6 +221,24 @@ namespace Lumix
 		PhysicsSystem& m_system;
 	};
 
+	static int LUA_raycast(lua_State* L)
+	{
+		auto* scene = LuaWrapper::checkArg<PhysicsScene*>(L, 1);
+		Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
+		Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
+		const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
+		RaycastHit hit;
+		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
+		{
+			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
+			LuaWrapper::pushEntity(L, hit.entity, &scene->getUniverse());
+			LuaWrapper::push(L, hit.position);
+			LuaWrapper::push(L, hit.normal);
+			return 4;
+		}
+		LuaWrapper::push(L, false);
+		return 1;
+	}
 
 	struct PhysicsSystemImpl final : PhysicsSystem
 	{
@@ -242,7 +261,7 @@ namespace Lumix
 			
 			registerProperties(engine.getAllocator());
 			m_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());
-			PhysicsScene::registerLuaAPI(m_engine.getState());
+			LuaWrapper::createSystemFunction(engine.getState(), "Physics", "raycast", &LUA_raycast);
 
 			m_foundation = PxCreateFoundation(PX_PHYSICS_VERSION, m_physx_allocator, m_error_callback);
 

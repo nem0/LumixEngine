@@ -1440,11 +1440,15 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		const gpu::TextureFormat format = getFormat(format_str);
 
+		const u32 flags = (u32)gpu::TextureFlags::RENDER_TARGET 
+			| (u32)gpu::TextureFlags::NO_MIPS 
+			| (u32)gpu::TextureFlags::CLAMP_U 
+			| (u32)gpu::TextureFlags::CLAMP_V;
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
 		{
 			Renderbuffer& rb = m_renderbuffers[i];
 			if (!rb.handle) {
-				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::RENDER_TARGET | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
+				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, {0, 0}, debug_name);
 				rb.width = rb_w;
 				rb.height = rb_h;
 				rb.format = format;
@@ -1476,7 +1480,7 @@ struct PipelineImpl final : Pipeline
 		rb.height = rb_h;
 		rb.format = format;
 		rb.persistent = persistent;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, (u32)gpu::TextureFlags::RENDER_TARGET | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::CLAMP_U | (u32)gpu::TextureFlags::CLAMP_V, {0, 0}, debug_name);
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, {0, 0}, debug_name);
 
 		return m_renderbuffers.size() - 1;
 	}
