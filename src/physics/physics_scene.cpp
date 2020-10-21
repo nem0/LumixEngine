@@ -8,7 +8,6 @@
 #include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
-#include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "engine/path.h"
@@ -2587,26 +2586,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void moveController(EntityRef entity, const Vec3& v) override { m_controllers[entity].frame_change += v; }
 
 
-	static int LUA_raycast(lua_State* L)
-	{
-		auto* scene = LuaWrapper::checkArg<PhysicsSceneImpl*>(L, 1);
-		Vec3 origin = LuaWrapper::checkArg<Vec3>(L, 2);
-		Vec3 dir = LuaWrapper::checkArg<Vec3>(L, 3);
-		const int layer = lua_gettop(L) > 3 ? LuaWrapper::checkArg<int>(L, 4) : -1;
-		RaycastHit hit;
-		if (scene->raycastEx(origin, dir, FLT_MAX, hit, INVALID_ENTITY, layer))
-		{
-			LuaWrapper::push(L, hit.entity != INVALID_ENTITY);
-			LuaWrapper::pushEntity(L, hit.entity, &scene->m_universe);
-			LuaWrapper::push(L, hit.position);
-			LuaWrapper::push(L, hit.normal);
-			return 4;
-		}
-		LuaWrapper::push(L, false);
-		return 1;
-	}
-
-
 	EntityPtr raycast(const Vec3& origin, const Vec3& dir, EntityPtr ignore_entity) override
 	{
 		RaycastHit hit;
@@ -4350,12 +4329,6 @@ void Heightfield::heightmapLoaded(Resource::State, Resource::State new_state, Re
 	{
 		m_scene->heightmapLoaded(*this);
 	}
-}
-
-
-void PhysicsScene::registerLuaAPI(lua_State* L)
-{
-	LuaWrapper::createSystemFunction(L, "Physics", "raycast", &PhysicsSceneImpl::LUA_raycast);
 }
 
 
