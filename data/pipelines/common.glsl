@@ -242,30 +242,30 @@ float getShadowSimple(sampler2D shadowmap, vec3 wpos)
 float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 {
 	#ifdef LUMIX_FRAGMENT_SHADER
-		vec4 pos = vec4(wpos, 1);
+		float NdL = saturate(dot(N, u_light_direction.xyz));
+		
+		float offsets[] = float[](0.01, 0.02, 0.04, 0.1);
+		float slope_bias = 4 - 3 * NdL * NdL;
 
 		vec2 sm_size = 3.0 / textureSize(shadowmap, 0);
-		float offsets[] = float[](0.0002, 0.0005, 0.0014, 0.004);
 		float bias = max(0.05 * (1.0 - saturate(dot(N, u_light_direction.xyz))), 0.005); 
-		float NdL = saturate(dot(N, u_light_direction.xyz));
 		for (int slice = 0; slice < 4; ++slice) {
+			vec4 pos = vec4(wpos + (N * 0.5 + u_light_direction.xyz) * (offsets[slice] * slope_bias), 1);
 			vec4 sc = u_shadowmap_matrices[slice] * pos;
-			sc = sc / sc.w;
-			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
-				// TODO use texture instead
-				float rnd = random(vec2(gl_FragCoord));
-				float c = cos(rnd); 
-				float s = sin(rnd); 
+			if (all(lessThan(sc.xyz, vec3(sc.w * 0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
+				sc = sc / sc.w;
+				float c = random(vec2(gl_FragCoord)) * 2 - 1;
+				float s = sqrt(1 - c * c); 
 				mat2 rot = mat2(c, s, -s, c);
 				vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
 				float shadow = 0;
 				float receiver = sc.z;
-				float offset = offsets[slice] * (4 - 3 * NdL * NdL);
+				float inv_slice_1 = 1.0 / (slice + 1);
 				for (int j = 0; j < 16; ++j) {
-					vec2 uv = sm_uv + POISSON_DISK_16[j] * rot * sm_size;
+					vec2 uv = sm_uv + POISSON_DISK_16[j] * rot * sm_size * inv_slice_1;
 
 					float occluder = textureLod(shadowmap, uv, 0).r;
-					shadow += saturate((receiver + offset - occluder) * 10e3);
+					shadow += receiver > occluder ? 1 : 0;
 				}
 				return shadow / 16;
 			}
