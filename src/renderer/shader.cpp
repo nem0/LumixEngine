@@ -65,9 +65,15 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 	PROFILE_BLOCK("compile_shader");
 	static const char* shader_code_prefix = 
 		R"#(
+		struct SMSlice {
+			mat4 world_to_slice;
+			float size; // in texels
+			float rcp_size;
+			float padding0;
+			float padding1;
+		};
 		layout (std140, binding = 0) uniform GlobalState {
-			mat4 u_shadow_view_projection;
-			mat4 u_shadowmap_matrices[4];
+			SMSlice u_sm_slices[4];
 			mat4 u_camera_projection;
 			mat4 u_camera_inv_projection;
 			mat4 u_camera_view;

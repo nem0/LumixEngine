@@ -278,8 +278,14 @@ namespace LuaWrapper {
 
 struct GlobalState
 {
-	Matrix shadow_view_projection;
-	Matrix shadowmap_matrices[4];
+	struct SMSlice {
+		Matrix world_to_slice;
+		float size;
+		float rcp_size;
+		float padding0;
+		float padding1;
+	};
+	SMSlice sm_slices[4];
 	Matrix camera_projection;
 	Matrix camera_inv_projection;
 	Matrix camera_view;
@@ -933,11 +939,11 @@ struct PipelineImpl final : Pipeline
 				0.0, 0.0, 1.0, 0.0,
 				0.5, 0.5, 0.0, 1.0);
 
-			global_state.shadowmap_matrices[slice] = bias_matrix * projection_matrix * view_matrix;
+			global_state.sm_slices[slice].world_to_slice = bias_matrix * projection_matrix * view_matrix;
+			global_state.sm_slices[slice].size = shadowmap_width;
+			global_state.sm_slices[slice].rcp_size = 1.f / shadowmap_width;
 			global_state.shadow_cam_near_plane = SHADOW_CAM_NEAR;
 			global_state.shadow_cam_far_plane = SHADOW_CAM_FAR;
-
-			global_state.shadow_view_projection = projection_matrix * view_matrix;
 
 			CameraParams& cp = m_shadow_camera_params[slice];
 			cp.view = view_matrix;
