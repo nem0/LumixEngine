@@ -225,7 +225,7 @@ float getShadowSimple(sampler2D shadowmap, vec3 wpos)
 
 		vec2 sm_size = 3.0 / textureSize(shadowmap, 0);
 		for (int slice = 0; slice < 4; ++slice) {
-			vec4 sc = u_shadowmap_matrices[slice] * pos;
+			vec4 sc = u_sm_slices[slice].world_to_slice * pos;
 			sc = sc / sc.w;
 			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 				vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
@@ -251,7 +251,7 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 		float bias = max(0.05 * (1.0 - saturate(dot(N, u_light_direction.xyz))), 0.005); 
 		for (int slice = 0; slice < 4; ++slice) {
 			vec4 pos = vec4(wpos + (N * 0.5 + u_light_direction.xyz) * (offsets[slice] * slope_bias), 1);
-			vec4 sc = u_shadowmap_matrices[slice] * pos;
+			vec4 sc = u_sm_slices[slice].world_to_slice * pos;
 			if (all(lessThan(sc.xyz, vec3(sc.w * 0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 				sc = sc / sc.w;
 				float c = random(vec2(gl_FragCoord)) * 2 - 1;
