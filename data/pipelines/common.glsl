@@ -262,7 +262,7 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 				float receiver = sc.z;
 				float inv_slice_1 = 1.0 / (slice + 1);
 				for (int j = 0; j < 16; ++j) {
-					vec2 uv = sm_uv + POISSON_DISK_16[j] * rot * sm_size * inv_slice_1;
+					vec2 uv = sm_uv + POISSON_DISK_16[j] * rot * u_sm_slices[slice].rcp_size;
 
 					float occluder = textureLod(shadowmap, uv, 0).r;
 					shadow += receiver > occluder ? 1 : 0;
