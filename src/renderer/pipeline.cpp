@@ -280,9 +280,10 @@ struct GlobalState
 {
 	struct SMSlice {
 		Matrix world_to_slice;
+		Matrix world_to_slice_cam;
 		float size;
 		float rcp_size;
-		float padding0;
+		float size_world;
 		float padding1;
 	};
 	SMSlice sm_slices[4];
@@ -928,7 +929,7 @@ struct PipelineImpl final : Pipeline
 
 			Matrix projection_matrix;
 			projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, true);
-			shadow_cam_pos -= light_forward * SHADOW_CAM_FAR * 0.5f;
+			shadow_cam_pos -= light_forward * (SHADOW_CAM_FAR - bb_size);
 			Matrix view_matrix;
 			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
 
@@ -940,8 +941,10 @@ struct PipelineImpl final : Pipeline
 				0.5, 0.5, 0.0, 1.0);
 
 			global_state.sm_slices[slice].world_to_slice = bias_matrix * projection_matrix * view_matrix;
+			global_state.sm_slices[slice].world_to_slice_cam = view_matrix;
 			global_state.sm_slices[slice].size = shadowmap_width;
 			global_state.sm_slices[slice].rcp_size = 1.f / shadowmap_width;
+			global_state.sm_slices[slice].size_world = bb_size * 2;
 			global_state.shadow_cam_near_plane = SHADOW_CAM_NEAR;
 			global_state.shadow_cam_far_plane = SHADOW_CAM_FAR;
 
