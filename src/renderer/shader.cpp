@@ -67,9 +67,10 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 		R"#(
 		struct SMSlice {
 			mat4 world_to_slice;
-			float size; // in texels
+			mat4 world_to_slice_cam;	// world_to_slice without projection
+			float size;					// in texels
 			float rcp_size;
-			float padding0;
+			float size_world;
 			float padding1;
 		};
 		layout (std140, binding = 0) uniform GlobalState {

@@ -244,13 +244,8 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 	#ifdef LUMIX_FRAGMENT_SHADER
 		float NdL = saturate(dot(N, u_light_direction.xyz));
 		
-		float offsets[] = float[](0.01, 0.02, 0.04, 0.1);
-		float slope_bias = 4 - 3 * NdL * NdL;
-
-		vec2 sm_size = 3.0 / textureSize(shadowmap, 0);
-		float bias = max(0.05 * (1.0 - saturate(dot(N, u_light_direction.xyz))), 0.005); 
 		for (int slice = 0; slice < 4; ++slice) {
-			vec4 pos = vec4(wpos + (N * 0.5 + u_light_direction.xyz) * (offsets[slice] * slope_bias), 1);
+			vec4 pos = vec4(wpos, 1);
 			vec4 sc = u_sm_slices[slice].world_to_slice * pos;
 			if (all(lessThan(sc.xyz, vec3(sc.w * 0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 				sc = sc / sc.w;
@@ -260,14 +255,23 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 				vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
 				float shadow = 0;
 				float receiver = sc.z;
-				float inv_slice_1 = 1.0 / (slice + 1);
-				for (int j = 0; j < 16; ++j) {
-					vec2 uv = sm_uv + POISSON_DISK_16[j] * rot * u_sm_slices[slice].rcp_size;
+				
+				float shadow_range = u_shadow_far_plane - u_shadow_near_plane;
+				float offset = (0.01 + u_sm_slices[slice].size_world / u_sm_slices[slice].size / max(NdL, 0.1)) / shadow_range;
 
-					float occluder = textureLod(shadowmap, uv, 0).r;
-					shadow += receiver > occluder ? 1 : 0;
-				}
-				return shadow / 16;
+				#if 1 // PCF
+					for (int j = 0; j < 16; ++j) {
+						vec2 pcf_offset = POISSON_DISK_16[j] * rot;
+						vec2 uv = sm_uv + pcf_offset  * vec2(0.25, 1)* u_sm_slices[slice].rcp_size;
+
+						float occluder = textureLod(shadowmap, uv, 0).r;
+						shadow += receiver > occluder - length(pcf_offset) * offset ? 1 : 0;
+					}
+					return shadow / 16;
+				#else
+					float occluder = textureLod(shadowmap, sm_uv, 0).r;
+					return receiver > occluder - 0.01 / shadow_range / max(NdL, 0.1) ? 1 : 0;
+				#endif
 			}
 		}
 	#endif
