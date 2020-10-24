@@ -781,222 +781,155 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 
 	Matrix() {}
 
-	Matrix(const Vec3& x, const Vec3& y, const Vec3& z)
+	Matrix(const Vec4& col0, const Vec4& col1, const Vec4& col2, const Vec4& col3)
 	{
-		setXVector(x);
-		setYVector(y);
-		setZVector(z);
+		columns[0] = col0;	
+		columns[1] = col1;	
+		columns[2] = col2;	
+		columns[3] = col3;	
 	}
 
 	Matrix(const Vec3& pos, const Quat& rot);
 
-	explicit Matrix(const float* m)
-	{
-		m11 = m[0]; m12 = m[1]; m13 = m[2]; m14 = m[3];
-		m21 = m[4]; m22 = m[5]; m23 = m[6]; m24 = m[7];
-		m31 = m[8]; m32 = m[9]; m33 = m[10]; m34 = m[11];
-		m41 = m[12]; m42 = m[13]; m43 = m[14]; m44 = m[15];
-	}
-
-	Matrix(
-		float r11, float r12, float r13, float r14,
-		float r21, float r22, float r23, float r24,
-		float r31, float r32, float r33, float r34,
-		float r41, float r42, float r43, float r44
-	)
-	{
-		m11 = r11; m12 = r12; m13 = r13; m14 = r14;
-		m21 = r21; m22 = r22; m23 = r23; m24 = r24;
-		m31 = r31; m32 = r32; m33 = r33; m34 = r34;
-		m41 = r41; m42 = r42; m43 = r43; m44 = r44;
-	}
-
 	void decompose(Vec3& position, Quat& rotation, float& scale) const;
 
-	float operator [](int index) const { return (&m11)[index]; }
-	float& operator [](int index) { return (&m11)[index]; }
+	float operator [](int index) const { return (&columns[0].x)[index]; }
+	float& operator [](int index) { return (&columns[0].x)[index]; }
 
-	Matrix operator *(const Matrix& rhs) const;
+	Matrix operator*(const Matrix& rhs) const;
+	Matrix operator+(const Matrix& rhs) const;
+	Matrix operator*(float rhs) const;
+	Vec4 operator*(const Vec4& rhs) const { return columns[0] * rhs.x + columns[1] * rhs.y + columns[2] * rhs.z + columns[3] * rhs.w; }
 
-	Matrix operator +(const Matrix& rhs) const;
-
-	Matrix operator *(float rhs) const;
-
-	Vec4 operator *(const Vec4& rhs) const
-	{
-		return Vec4(
-			m11 * rhs.x + m21 * rhs.y + m31 * rhs.z + m41 * rhs.w,	
-			m12 * rhs.x + m22 * rhs.y + m32 * rhs.z + m42 * rhs.w,	
-			m13 * rhs.x + m23 * rhs.y + m33 * rhs.z + m43 * rhs.w,
-			m14 * rhs.x + m24 * rhs.y + m34 * rhs.z + m44 * rhs.w
-		);
-	}
-
-	Vec3 getZVector() const
-	{
-		return Vec3(m31, m32, m33);
-	}
-
-	Vec3 getYVector() const
-	{
-		return Vec3(m21, m22, m23);
-	}
-
-	Vec3 getXVector() const
-	{
-		return Vec3(m11, m12, m13);
-	}
+	Vec3 getZVector() const { return columns[2].xyz(); }
+	Vec3 getYVector() const { return columns[1].xyz(); }
+	Vec3 getXVector() const { return columns[0].xyz(); }
 
 	void setXVector(const Vec3& v)
 	{
-		m11 = v.x; m12 = v.y; m13 = v.z;
+		columns[0].x = v.x;
+		columns[0].y = v.y;
+		columns[0].z = v.z;
 	}
 
 	void setYVector(const Vec3& v)
 	{
-		m21 = v.x; m22 = v.y; m23 = v.z;
+		columns[1].x = v.x;
+		columns[1].y = v.y;
+		columns[1].z = v.z;
 	}
 
 	void setZVector(const Vec3& v)
 	{
-		m31 = v.x; m32 = v.y; m33 = v.z;
+		columns[2].x = v.x;
+		columns[2].y = v.y;
+		columns[2].z = v.z;
 	}
 
 
 	float determinant() const
 	{
 		return
-			m14 * m23 * m32 * m41  -  m13 * m24 * m32 * m41  -  m14 * m22 * m33 * m41  +  m12 * m24 * m33 * m41 +
-			m13 * m22 * m34 * m41  -  m12 * m23 * m34 * m41  -  m14 * m23 * m31 * m42  +  m13 * m24 * m31 * m42 +
-			m14 * m21 * m33 * m42  -  m11 * m24 * m33 * m42  -  m13 * m21 * m34 * m42  +  m11 * m23 * m34 * m42 +
-			m14 * m22 * m31 * m43  -  m12 * m24 * m31 * m43  -  m14 * m21 * m32 * m43  +  m11 * m24 * m32 * m43 +
-			m12 * m21 * m34 * m43  -  m11 * m22 * m34 * m43  -  m13 * m22 * m31 * m44  +  m12 * m23 * m31 * m44 +
-			m13 * m21 * m32 * m44  -  m11 * m23 * m32 * m44  -  m12 * m21 * m33 * m44  +  m11 * m22 * m33 * m44;
+			columns[0].w * columns[1].z * columns[2].y * columns[3].x  -  columns[0].z * columns[1].w * columns[2].y * columns[3].x  -  columns[0].w * columns[1].y * columns[2].z * columns[3].x  +  columns[0].y * columns[1].w * columns[2].z * columns[3].x +
+			columns[0].z * columns[1].y * columns[2].w * columns[3].x  -  columns[0].y * columns[1].z * columns[2].w * columns[3].x  -  columns[0].w * columns[1].z * columns[2].x * columns[3].y  +  columns[0].z * columns[1].w * columns[2].x * columns[3].y +
+			columns[0].w * columns[1].x * columns[2].z * columns[3].y  -  columns[0].x * columns[1].w * columns[2].z * columns[3].y  -  columns[0].z * columns[1].x * columns[2].w * columns[3].y  +  columns[0].x * columns[1].z * columns[2].w * columns[3].y +
+			columns[0].w * columns[1].y * columns[2].x * columns[3].z  -  columns[0].y * columns[1].w * columns[2].x * columns[3].z  -  columns[0].w * columns[1].x * columns[2].y * columns[3].z  +  columns[0].x * columns[1].w * columns[2].y * columns[3].z +
+			columns[0].y * columns[1].x * columns[2].w * columns[3].z  -  columns[0].x * columns[1].y * columns[2].w * columns[3].z  -  columns[0].z * columns[1].y * columns[2].x * columns[3].w  +  columns[0].y * columns[1].z * columns[2].x * columns[3].w +
+			columns[0].z * columns[1].x * columns[2].y * columns[3].w  -  columns[0].x * columns[1].z * columns[2].y * columns[3].w  -  columns[0].y * columns[1].x * columns[2].z * columns[3].w  +  columns[0].x * columns[1].y * columns[2].z * columns[3].w;
 	}
 
 
-	Matrix inverted() const
-	{
-		Matrix tmp = *this;
-		tmp.inverse();
-		return tmp;
-	}
-
-	void inverse()
-	{
+	Matrix inverted() const {
 		Matrix mtx;
 		float d = determinant();
-		if( d == 0 ) return;
+		if (d == 0) return *this;
 		d = 1.0f / d;
 
-		mtx.m11 = d * (m23 * m34 * m42  -  m24 * m33 * m42  +  m24 * m32 * m43  -  m22 * m34 * m43  -  m23 * m32 * m44  +  m22 * m33 * m44);
-		mtx.m12 = d * (m14 * m33 * m42  -  m13 * m34 * m42  -  m14 * m32 * m43  +  m12 * m34 * m43  +  m13 * m32 * m44  -  m12 * m33 * m44);
-		mtx.m13 = d * (m13 * m24 * m42  -  m14 * m23 * m42  +  m14 * m22 * m43  -  m12 * m24 * m43  -  m13 * m22 * m44  +  m12 * m23 * m44);
-		mtx.m14 = d * (m14 * m23 * m32  -  m13 * m24 * m32  -  m14 * m22 * m33  +  m12 * m24 * m33  +  m13 * m22 * m34  -  m12 * m23 * m34);
-		mtx.m21 = d * (m24 * m33 * m41  -  m23 * m34 * m41  -  m24 * m31 * m43  +  m21 * m34 * m43  +  m23 * m31 * m44  -  m21 * m33 * m44);
-		mtx.m22 = d * (m13 * m34 * m41  -  m14 * m33 * m41  +  m14 * m31 * m43  -  m11 * m34 * m43  -  m13 * m31 * m44  +  m11 * m33 * m44);
-		mtx.m23 = d * (m14 * m23 * m41  -  m13 * m24 * m41  -  m14 * m21 * m43  +  m11 * m24 * m43  +  m13 * m21 * m44  -  m11 * m23 * m44);
-		mtx.m24 = d * (m13 * m24 * m31  -  m14 * m23 * m31  +  m14 * m21 * m33  -  m11 * m24 * m33  -  m13 * m21 * m34  +  m11 * m23 * m34);
-		mtx.m31 = d * (m22 * m34 * m41  -  m24 * m32 * m41  +  m24 * m31 * m42  -  m21 * m34 * m42  -  m22 * m31 * m44  +  m21 * m32 * m44);
-		mtx.m32 = d * (m14 * m32 * m41  -  m12 * m34 * m41  -  m14 * m31 * m42  +  m11 * m34 * m42  +  m12 * m31 * m44  -  m11 * m32 * m44);
-		mtx.m33 = d * (m12 * m24 * m41  -  m14 * m22 * m41  +  m14 * m21 * m42  -  m11 * m24 * m42  -  m12 * m21 * m44  +  m11 * m22 * m44);
-		mtx.m34 = d * (m14 * m22 * m31  -  m12 * m24 * m31  -  m14 * m21 * m32  +  m11 * m24 * m32  +  m12 * m21 * m34  -  m11 * m22 * m34);
-		mtx.m41 = d * (m23 * m32 * m41  -  m22 * m33 * m41  -  m23 * m31 * m42  +  m21 * m33 * m42  +  m22 * m31 * m43  -  m21 * m32 * m43);
-		mtx.m42 = d * (m12 * m33 * m41  -  m13 * m32 * m41  +  m13 * m31 * m42  -  m11 * m33 * m42  -  m12 * m31 * m43  +  m11 * m32 * m43);
-		mtx.m43 = d * (m13 * m22 * m41  -  m12 * m23 * m41  -  m13 * m21 * m42  +  m11 * m23 * m42  +  m12 * m21 * m43  -  m11 * m22 * m43);
-		mtx.m44 = d * (m12 * m23 * m31  -  m13 * m22 * m31  +  m13 * m21 * m32  -  m11 * m23 * m32  -  m12 * m21 * m33  +  m11 * m22*m33);
-
-		*this = mtx;
+		mtx.columns[0] = Vec4(d * (columns[1].z * columns[2].w * columns[3].y  -  columns[1].w * columns[2].z * columns[3].y  +  columns[1].w * columns[2].y * columns[3].z  -  columns[1].y * columns[2].w * columns[3].z  -  columns[1].z * columns[2].y * columns[3].w  +  columns[1].y * columns[2].z * columns[3].w)
+							, d * (columns[0].w * columns[2].z * columns[3].y  -  columns[0].z * columns[2].w * columns[3].y  -  columns[0].w * columns[2].y * columns[3].z  +  columns[0].y * columns[2].w * columns[3].z  +  columns[0].z * columns[2].y * columns[3].w  -  columns[0].y * columns[2].z * columns[3].w)
+							, d * (columns[0].z * columns[1].w * columns[3].y  -  columns[0].w * columns[1].z * columns[3].y  +  columns[0].w * columns[1].y * columns[3].z  -  columns[0].y * columns[1].w * columns[3].z  -  columns[0].z * columns[1].y * columns[3].w  +  columns[0].y * columns[1].z * columns[3].w)
+							, d * (columns[0].w * columns[1].z * columns[2].y  -  columns[0].z * columns[1].w * columns[2].y  -  columns[0].w * columns[1].y * columns[2].z  +  columns[0].y * columns[1].w * columns[2].z  +  columns[0].z * columns[1].y * columns[2].w  -  columns[0].y * columns[1].z * columns[2].w));
+		mtx.columns[1] = Vec4(d * (columns[1].w * columns[2].z * columns[3].x  -  columns[1].z * columns[2].w * columns[3].x  -  columns[1].w * columns[2].x * columns[3].z  +  columns[1].x * columns[2].w * columns[3].z  +  columns[1].z * columns[2].x * columns[3].w  -  columns[1].x * columns[2].z * columns[3].w)
+							, d * (columns[0].z * columns[2].w * columns[3].x  -  columns[0].w * columns[2].z * columns[3].x  +  columns[0].w * columns[2].x * columns[3].z  -  columns[0].x * columns[2].w * columns[3].z  -  columns[0].z * columns[2].x * columns[3].w  +  columns[0].x * columns[2].z * columns[3].w)
+							, d * (columns[0].w * columns[1].z * columns[3].x  -  columns[0].z * columns[1].w * columns[3].x  -  columns[0].w * columns[1].x * columns[3].z  +  columns[0].x * columns[1].w * columns[3].z  +  columns[0].z * columns[1].x * columns[3].w  -  columns[0].x * columns[1].z * columns[3].w)
+							, d * (columns[0].z * columns[1].w * columns[2].x  -  columns[0].w * columns[1].z * columns[2].x  +  columns[0].w * columns[1].x * columns[2].z  -  columns[0].x * columns[1].w * columns[2].z  -  columns[0].z * columns[1].x * columns[2].w  +  columns[0].x * columns[1].z * columns[2].w));
+		mtx.columns[2] = Vec4(d * (columns[1].y * columns[2].w * columns[3].x  -  columns[1].w * columns[2].y * columns[3].x  +  columns[1].w * columns[2].x * columns[3].y  -  columns[1].x * columns[2].w * columns[3].y  -  columns[1].y * columns[2].x * columns[3].w  +  columns[1].x * columns[2].y * columns[3].w)
+							, d * (columns[0].w * columns[2].y * columns[3].x  -  columns[0].y * columns[2].w * columns[3].x  -  columns[0].w * columns[2].x * columns[3].y  +  columns[0].x * columns[2].w * columns[3].y  +  columns[0].y * columns[2].x * columns[3].w  -  columns[0].x * columns[2].y * columns[3].w)
+							, d * (columns[0].y * columns[1].w * columns[3].x  -  columns[0].w * columns[1].y * columns[3].x  +  columns[0].w * columns[1].x * columns[3].y  -  columns[0].x * columns[1].w * columns[3].y  -  columns[0].y * columns[1].x * columns[3].w  +  columns[0].x * columns[1].y * columns[3].w)
+							, d * (columns[0].w * columns[1].y * columns[2].x  -  columns[0].y * columns[1].w * columns[2].x  -  columns[0].w * columns[1].x * columns[2].y  +  columns[0].x * columns[1].w * columns[2].y  +  columns[0].y * columns[1].x * columns[2].w  -  columns[0].x * columns[1].y * columns[2].w));
+		mtx.columns[3] = Vec4(d * (columns[1].z * columns[2].y * columns[3].x  -  columns[1].y * columns[2].z * columns[3].x  -  columns[1].z * columns[2].x * columns[3].y  +  columns[1].x * columns[2].z * columns[3].y  +  columns[1].y * columns[2].x * columns[3].z  -  columns[1].x * columns[2].y * columns[3].z)
+							, d * (columns[0].y * columns[2].z * columns[3].x  -  columns[0].z * columns[2].y * columns[3].x  +  columns[0].z * columns[2].x * columns[3].y  -  columns[0].x * columns[2].z * columns[3].y  -  columns[0].y * columns[2].x * columns[3].z  +  columns[0].x * columns[2].y * columns[3].z)
+							, d * (columns[0].z * columns[1].y * columns[3].x  -  columns[0].y * columns[1].z * columns[3].x  -  columns[0].z * columns[1].x * columns[3].y  +  columns[0].x * columns[1].z * columns[3].y  +  columns[0].y * columns[1].x * columns[3].z  -  columns[0].x * columns[1].y * columns[3].z)
+							, d * (columns[0].y * columns[1].z * columns[2].x  -  columns[0].z * columns[1].y * columns[2].x  +  columns[0].z * columns[1].x * columns[2].y  -  columns[0].x * columns[1].z * columns[2].y  -  columns[0].y * columns[1].x * columns[2].z  +  columns[0].x * columns[1].y * columns[2].z));
+		return mtx;
 	}
 
-	// orthonormal
-	void fastInverse()
-	{
-		float tmp = m21;
-		m21 = m12;
-		m12 = tmp;
-
-		tmp = m32;
-		m32 = m23;
-		m23 = tmp;
-
-		tmp = m31;
-		m31 = m13;
-		m13 = tmp;
-
-		float m41 = -this->m41;
-		float m42 = -this->m42;
-		float m43 = -this->m43;
-		this->m41 = m41 * m11 + m42 * m21 + m43 * m31;
-		this->m42 = m41 * m12 + m42 * m22 + m43 * m32;
-		this->m43 = m41 * m13 + m42 * m23 + m43 * m33;
-	}
-	
 	// orthonormal
 	Matrix fastInverted() const
 	{
 		Matrix ret;
-		ret.m11 = m11;
-		ret.m22 = m22;
-		ret.m33 = m33;
+		ret.columns[0].x = columns[0].x;
+		ret.columns[1].y = columns[1].y;
+		ret.columns[2].z = columns[2].z;
 
-		ret.m21 = m12;
-		ret.m12 = m12;
+		ret.columns[1].x = columns[0].y;
+		ret.columns[0].y = columns[1].x;
 
-		ret.m23 = m32;
-		ret.m32 = m23;
+		ret.columns[1].z = columns[2].y;
+		ret.columns[2].y = columns[1].z;
 
-		ret.m13 = m31;
-		ret.m31 = m13;
+		ret.columns[0].z = columns[2].x;
+		ret.columns[2].x = columns[0].z;
 
-		ret.m41 = -m41;
-		ret.m42 = -m42;
-		ret.m43 = -m43;
-		ret.m41 = ret.m41 * ret.m11 + ret.m42 * ret.m21 + ret.m43 * ret.m31;
-		ret.m42 = ret.m41 * ret.m12 + ret.m42 * ret.m22 + ret.m43 * ret.m32;
-		ret.m43 = ret.m41 * ret.m13 + ret.m42 * ret.m23 + ret.m43 * ret.m33;
+		ret.columns[3].x = -columns[3].x;
+		ret.columns[3].y = -columns[3].y;
+		ret.columns[3].z = -columns[3].z;
+		ret.columns[3].x = ret.columns[3].x * ret.columns[0].x + ret.columns[3].y * ret.columns[1].x + ret.columns[3].z * ret.columns[2].x;
+		ret.columns[3].y = ret.columns[3].x * ret.columns[0].y + ret.columns[3].y * ret.columns[1].y + ret.columns[3].z * ret.columns[2].y;
+		ret.columns[3].z = ret.columns[3].x * ret.columns[0].z + ret.columns[3].y * ret.columns[1].z + ret.columns[3].z * ret.columns[2].z;
 
-		ret.m14 = 0;
-		ret.m24 = 0;
-		ret.m34 = 0;
-		ret.m44 = 1;
+		ret.columns[0].w = 0;
+		ret.columns[1].w = 0;
+		ret.columns[2].w = 0;
+		ret.columns[3].w = 1;
 
 		return ret;
 	}
+	
 	void copy3x3(const Matrix& mtx)
 	{
-		m11 = mtx.m11;
-		m12 = mtx.m12;
-		m13 = mtx.m13;
+		columns[0].x = mtx.columns[0].x;
+		columns[0].y = mtx.columns[0].y;
+		columns[0].z = mtx.columns[0].z;
 
-		m21 = mtx.m21;
-		m22 = mtx.m22;
-		m23 = mtx.m23;
+		columns[1].x = mtx.columns[1].x;
+		columns[1].y = mtx.columns[1].y;
+		columns[1].z = mtx.columns[1].z;
 
-		m31 = mtx.m31;
-		m32 = mtx.m32;
-		m33 = mtx.m33;
+		columns[2].x = mtx.columns[2].x;
+		columns[2].y = mtx.columns[2].y;
+		columns[2].z = mtx.columns[2].z;
 	}
 
 	void translate(const Vec3& t)
 	{
-		m41 += t.x;
-		m42 += t.y;
-		m43 += t.z;
+		columns[3].x += t.x;
+		columns[3].y += t.y;
+		columns[3].z += t.z;
 	}
 
 	void translate(float x, float y, float z)
 	{
-		m41 += x;
-		m42 += y;
-		m43 += z;
+		columns[3].x += x;
+		columns[3].y += y;
+		columns[3].z += z;
 	}
 
 	void setTranslation(const Vec3& t)
 	{
-		m41 = t.x;
-		m42 = t.y;
-		m43 = t.z;
+		columns[3].x = t.x;
+		columns[3].y = t.y;
+		columns[3].z = t.z;
 	}
 
 
@@ -1030,7 +963,7 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 
 	Vec3 getTranslation() const
 	{
-		return Vec3(m41, m42, m43);
+		return columns[3].xyz();
 	}
 
 	Quat getRotation() const;
@@ -1040,10 +973,7 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 	void multiply3x3(float scale);
 	void setIdentity();
 
-	float m11, m12, m13, m14;
-	float m21, m22, m23, m24;
-	float m31, m32, m33, m34;
-	float m41, m42, m43, m44;
+	Vec4 columns[4];
 
 	static const Matrix IDENTITY;
 };
@@ -1051,11 +981,32 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 struct Matrix3x4 {
 	Matrix3x4() {}
 	explicit Matrix3x4(const Matrix& rhs) {
-		columns[0] = Vec4(rhs.m11, rhs.m21, rhs.m31, rhs.m41);
-		columns[1] = Vec4(rhs.m12, rhs.m22, rhs.m32, rhs.m42);
-		columns[2] = Vec4(rhs.m13, rhs.m23, rhs.m33, rhs.m43);
+		columns[0] = rhs.columns[0];
+		columns[1] = rhs.columns[1];
+		columns[2] = rhs.columns[2];
 	}
+
 	Vec4 columns[3];
+};
+
+struct Matrix4x3 {
+	Matrix4x3() {}
+	explicit Matrix4x3(const Matrix& rhs) {
+		columns[0] = rhs.columns[0].xyz();
+		columns[1] = rhs.columns[1].xyz();
+		columns[2] = rhs.columns[2].xyz();
+		columns[3] = rhs.columns[3].xyz();
+	}
+
+	Matrix3x4 transposed() const { 
+		Matrix3x4 res;
+		res.columns[0] = Vec4(columns[0].x, columns[1].x, columns[2].x, columns[3].x);
+		res.columns[1] = Vec4(columns[0].y, columns[1].y, columns[2].y, columns[3].y);
+		res.columns[2] = Vec4(columns[0].z, columns[1].z, columns[2].z, columns[3].z);
+		return res;
+	}
+
+	Vec3 columns[4];
 };
 
 constexpr float PI = 3.14159265f;

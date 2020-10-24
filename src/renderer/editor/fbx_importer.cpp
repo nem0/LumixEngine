@@ -340,7 +340,7 @@ static Matrix toLumix(const ofbx::Matrix& mtx)
 {
 	Matrix res;
 
-	for (int i = 0; i < 16; ++i) (&res.m11)[i] = (float)mtx.m[i];
+	for (int i = 0; i < 16; ++i) (&res.columns[0].x)[i] = (float)mtx.m[i];
 
 	return res;
 }
@@ -626,8 +626,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		if (cfg.origin != ImportConfig::Origin::SOURCE) {
 			centerMesh(vertices, vertex_count, cfg.origin, &transform_matrix);
 		}
-		import_mesh.transform_matrix = transform_matrix;
-		import_mesh.transform_matrix.inverse();
+		import_mesh.transform_matrix = transform_matrix.inverted();
 
 		const bool flip_handness = doesFlipHandness(transform_matrix);
 		if (flip_handness) {
@@ -964,7 +963,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 				else {
 					model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 1, 0));
 				}
-				gpu::update(ub, &model_mtx.m11, sizeof(model_mtx));
+				gpu::update(ub, &model_mtx.columns[0].x, sizeof(model_mtx));
 
 				for (const Drawcall& dc : m_drawcalls) {
 					const Mesh::RenderData* rd = dc.mesh;

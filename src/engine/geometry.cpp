@@ -546,15 +546,13 @@ Matrix Viewport::getView(const DVec3& origin) const
 {
 	Matrix view = rot.toMatrix();
 	view.setTranslation((pos - origin).toFloat());
-	view.fastInverse();
-	return view;
+	return view.fastInverted();
 }
 
 
 Matrix Viewport::getViewRotation() const
 {
-	Matrix view = rot.toMatrix();
-	view.fastInverse();
+	Matrix view = rot.conjugated().toMatrix();
 	return view;
 }
 
@@ -582,8 +580,7 @@ void Viewport::getRay(const Vec2& screen_pos, DVec3& origin, Vec3& dir) const
 	}
 
 	const Matrix view_matrix = getView(origin);
-	Matrix inverted = (projection_matrix * view_matrix);
-	inverted.inverse();
+	const Matrix inverted = (projection_matrix * view_matrix).inverted();
 
 	Vec4 p0 = inverted * Vec4(nx, ny, -1, 1);
 	Vec4 p1 = inverted * Vec4(nx, ny, 1, 1);

@@ -2248,7 +2248,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
 		Matrix mtx;
 		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
-		mtx.inverse();
+		mtx = mtx.inverted();
 		Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.far = 10000.f;
@@ -2301,7 +2301,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
 		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
-		mtx.inverse();
+		mtx = mtx.inverted();
+
 		Viewport viewport;
 		viewport.is_ortho = false;
 		viewport.far = 10000.f;
