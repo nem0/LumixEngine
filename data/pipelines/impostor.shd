@@ -64,14 +64,13 @@ vertex_shader [[
 		tangent_space[1] = vec3(0, 1, 0);
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
-		vec3 vd = vec3(u_pass_view_dir.x, 0, u_pass_view_dir.z);
+		vec3 vd = vec3(N.x, 0, N.z);
 		vec4 to_model_space = vec4(-i_rot_quat.xyz, i_rot_quat.w);
 		vd = rotateByQuat(to_model_space, vd);
 		#if !defined DEPTH && !defined DEFERRED
 			vec3 ld = rotateByQuat(to_model_space, -u_light_direction.xyz);
 			v_shadow_coefs = max(vec4(ld.x, ld.z, -ld.x, -ld.z), vec4(0));
 			v_shadow_coefs /= dot(v_shadow_coefs, vec4(1));
-			//v_shadow_coefs = normalize(v_shadow_coefs);
 		#endif
 		vec2 grid = dirToGrid(normalize(vd));
 		v_uv = a_uv / 9 + ivec2(grid * 9) / 9.0;
@@ -155,6 +154,9 @@ fragment_shader [[
 			Surface surface = getSurface();
 			vec4 self_shadow = textureLod(u_selfshadow, v_uv, 0);
 			float shadow = dot(self_shadow, v_shadow_coefs);
+			shadow *= shadow;
+			shadow *= shadow;
+			
 			vec3 res = computeDirectLight(surface
 				, u_light_direction.xyz
 				, u_light_color.rgb * u_light_intensity * shadow);
