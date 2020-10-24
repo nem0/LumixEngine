@@ -305,8 +305,7 @@ public:
 				+ view.rot * Vec3(0, 1, 0) * ny * camera.ortho_size;
 		}
 
-		Matrix inv_projection = projection_matrix;
-		inv_projection.inverse();
+		const Matrix inv_projection = projection_matrix.inverted();
 
 		Vec4 p0 = inv_projection * Vec4(nx, ny, -1, 1);
 		Vec4 p1 = inv_projection * Vec4(nx, ny, 1, 1);

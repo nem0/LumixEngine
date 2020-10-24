@@ -384,7 +384,7 @@ template <> inline Matrix toType(lua_State* L, int index)
 	for (int i = 0; i < 16; ++i)
 	{
 		lua_rawgeti(L, index, i + 1);
-		(&(v.m11))[i] = (float)lua_tonumber(L, -1);
+		(&(v.columns[0].x))[i] = (float)lua_tonumber(L, -1);
 		lua_pop(L, 1);
 	}
 	return v;
@@ -607,7 +607,7 @@ inline void push(lua_State* L, const Matrix& value)
 
 	for (int i = 0; i < 16; ++i)
 	{
-		lua_pushnumber(L, (&value.m11)[i]);
+		lua_pushnumber(L, (&value.columns[0].x)[i]);
 		lua_rawseti(L, -2, i + 1);
 	}
 }

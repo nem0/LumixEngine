@@ -336,18 +336,18 @@ Matrix Quat::toMatrix() const
 	float fzz = fz*z;
 
 	Matrix mtx;
-	mtx.m11 = 1.0f - (fyy + fzz);
-	mtx.m21 = fxy - fwz;
-	mtx.m31 = fxz + fwy;
-	mtx.m12 = fxy + fwz;
-	mtx.m22 = 1.0f - (fxx + fzz);
-	mtx.m32 = fyz - fwx;
-	mtx.m13 = fxz - fwy;
-	mtx.m23 = fyz + fwx;
-	mtx.m33 = 1.0f - (fxx + fyy);
+	mtx.columns[0].x = 1.0f - (fyy + fzz);
+	mtx.columns[1].x = fxy - fwz;
+	mtx.columns[2].x = fxz + fwy;
+	mtx.columns[0].y = fxy + fwz;
+	mtx.columns[1].y = 1.0f - (fxx + fzz);
+	mtx.columns[2].y = fyz - fwx;
+	mtx.columns[0].z = fxz - fwy;
+	mtx.columns[1].z = fyz + fwx;
+	mtx.columns[2].z = 1.0f - (fxx + fyy);
 
-	mtx.m41 = mtx.m42 = mtx.m43 = mtx.m14 = mtx.m24 = mtx.m34 = 0;
-	mtx.m44 = 1;
+	mtx.columns[3].x = mtx.columns[3].y = mtx.columns[3].z = mtx.columns[0].w = mtx.columns[1].w = mtx.columns[2].w = 0;
+	mtx.columns[3].w = 1;
 	return mtx;
 }
 
@@ -374,10 +374,10 @@ LocalRigidTransform LocalRigidTransform::interpolate(const LocalRigidTransform& 
 
 
 const Matrix Matrix::IDENTITY(
-	1, 0, 0, 0,
-	0, 1, 0, 0,
-	0, 0, 1, 0,
-	0, 0, 0, 1
+	Vec4(1, 0, 0, 0),
+	Vec4(0, 1, 0, 0),
+	Vec4(0, 0, 1, 0),
+	Vec4(0, 0, 0, 1)
 );
 
 
@@ -397,22 +397,22 @@ void Matrix::fromEuler(float yaw, float pitch, float roll)
 	float syaw = sinf(yaw);
 	float cyaw = cosf(yaw);
 
-	m11 = sroll * spitch * syaw + croll * cyaw;
-	m12 = sroll * cpitch;
-	m13 = sroll * spitch * cyaw - croll * syaw;
-	m14 = 0.0f;
-	m21 = croll * spitch * syaw - sroll * cyaw;
-	m22 = croll * cpitch;
-	m23 = croll * spitch * cyaw + sroll * syaw;
-	m24 = 0.0f;
-	m31 = cpitch * syaw;
-	m32 = -spitch;
-	m33 = cpitch * cyaw;
-	m34 = 0.0f;
-	m41 = 0.0f;
-	m42 = 0.0f;
-	m43 = 0.0f;
-	m44 = 1.0f;
+	columns[0].x = sroll * spitch * syaw + croll * cyaw;
+	columns[0].y = sroll * cpitch;
+	columns[0].z = sroll * spitch * cyaw - croll * syaw;
+	columns[0].w = 0.0f;
+	columns[1].x = croll * spitch * syaw - sroll * cyaw;
+	columns[1].y = croll * cpitch;
+	columns[1].z = croll * spitch * cyaw + sroll * syaw;
+	columns[1].w = 0.0f;
+	columns[2].x = cpitch * syaw;
+	columns[2].y = -spitch;
+	columns[2].z = cpitch * cyaw;
+	columns[2].w = 0.0f;
+	columns[3].x = 0.0f;
+	columns[3].y = 0.0f;
+	columns[3].z = 0.0f;
+	columns[3].w = 1.0f;
 }
 
 
@@ -422,9 +422,9 @@ Matrix Matrix::rotationX(float angle)
 	float c = cosf(angle);
 	float s = sinf(angle);
 
-	m.m22 = m.m33 = c;
-	m.m32 = -s;
-	m.m23 = s;
+	m.columns[1].y = m.columns[2].z = c;
+	m.columns[2].y = -s;
+	m.columns[1].z = s;
 
 	return m;
 }
@@ -436,9 +436,9 @@ Matrix Matrix::rotationY(float angle)
 	float c = cosf(angle);
 	float s = sinf(angle);
 
-	m.m11 = m.m33 = c;
-	m.m31 = s;
-	m.m13 = -s;
+	m.columns[0].x = m.columns[2].z = c;
+	m.columns[2].x = s;
+	m.columns[0].z = -s;
 
 	return m;
 }
@@ -450,9 +450,9 @@ Matrix Matrix::rotationZ(float angle)
 	float c = cosf(angle);
 	float s = sinf(angle);
 
-	m.m11 = m.m22 = c;
-	m.m21 = -s;
-	m.m12 = s;
+	m.columns[0].x = m.columns[1].y = c;
+	m.columns[1].x = -s;
+	m.columns[0].y = s;
 	
 	return m;
 }
@@ -461,19 +461,19 @@ Matrix Matrix::rotationZ(float angle)
 void Matrix::setOrtho(float left, float right, float bottom, float top, float z_near, float z_far, bool reversed_z)
 {
 	*this = IDENTITY;
-	m11 = 2 / (right - left);
-	m22 = 2 / (top - bottom);
-	m41 = (right + left) / (left - right);
-	m42 = (top + bottom) / (bottom - top);
+	columns[0].x = 2 / (right - left);
+	columns[1].y = 2 / (top - bottom);
+	columns[3].x = (right + left) / (left - right);
+	columns[3].y = (top + bottom) / (bottom - top);
 	if (reversed_z)
 	{
-		m33 = 1 / (z_far - z_near);
-		m43 = z_far / (z_far - z_near);
+		columns[2].z = 1 / (z_far - z_near);
+		columns[3].z = z_far / (z_far - z_near);
 	}
 	else
 	{
-		m33 = -1 / (z_far - z_near);
-		m43 = z_near / (z_near - z_far);
+		columns[2].z = -1 / (z_far - z_near);
+		columns[3].z = z_near / (z_near - z_far);
 	}
 }
 
@@ -483,20 +483,20 @@ void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_
 	*this = Matrix::IDENTITY;
 	float f = 1 / tanf(fov * 0.5f);
 	float z_diff = near_plane - far_plane;
-	m11 = f / ratio;
-	m22 = f;
-	m44 = 0;
-	m34 = -1.0f;
+	columns[0].x = f / ratio;
+	columns[1].y = f;
+	columns[3].w = 0;
+	columns[2].w = -1.0f;
 
 	if (reversed_z)
 	{
-		m33 = 0;
-		m43 = near_plane;
+		columns[2].z = 0;
+		columns[3].z = near_plane;
 	}
 	else
 	{
-		m33 = -1;
-		m43 = -near_plane;
+		columns[2].z = -1;
+		columns[3].z = -near_plane;
 	}
 }
 
@@ -514,25 +514,25 @@ void Matrix::decompose(Vec3& position, Quat& rotation, float& scale) const
 Matrix Matrix::operator *(float rhs) const
 {
 	Matrix out;
-	out.m11 = m11 * rhs;
-	out.m12 = m12 * rhs;
-	out.m13 = m13 * rhs;
-	out.m14 = m14 * rhs;
+	out.columns[0].x = columns[0].x * rhs;
+	out.columns[0].y = columns[0].y * rhs;
+	out.columns[0].z = columns[0].z * rhs;
+	out.columns[0].w = columns[0].w * rhs;
 
-	out.m21 = m21 * rhs;
-	out.m22 = m22 * rhs;
-	out.m23 = m23 * rhs;
-	out.m24 = m24 * rhs;
+	out.columns[1].x = columns[1].x * rhs;
+	out.columns[1].y = columns[1].y * rhs;
+	out.columns[1].z = columns[1].z * rhs;
+	out.columns[1].w = columns[1].w * rhs;
 
-	out.m31 = m31 * rhs;
-	out.m32 = m32 * rhs;
-	out.m33 = m33 * rhs;
-	out.m34 = m34 * rhs;
+	out.columns[2].x = columns[2].x * rhs;
+	out.columns[2].y = columns[2].y * rhs;
+	out.columns[2].z = columns[2].z * rhs;
+	out.columns[2].w = columns[2].w * rhs;
 
-	out.m41 = m41 * rhs;
-	out.m42 = m42 * rhs;
-	out.m43 = m43 * rhs;
-	out.m44 = m44 * rhs;
+	out.columns[3].x = columns[3].x * rhs;
+	out.columns[3].y = columns[3].y * rhs;
+	out.columns[3].z = columns[3].z * rhs;
+	out.columns[3].w = columns[3].w * rhs;
 
 	return out;
 }
@@ -542,25 +542,25 @@ Matrix Matrix::operator +(const Matrix& rhs) const
 {
 	Matrix out;
 
-	out.m11 = m11 + rhs.m11;
-	out.m12 = m12 + rhs.m12;
-	out.m13 = m13 + rhs.m13;
-	out.m14 = m14 + rhs.m14;
+	out.columns[0].x = columns[0].x + rhs.columns[0].x;
+	out.columns[0].y = columns[0].y + rhs.columns[0].y;
+	out.columns[0].z = columns[0].z + rhs.columns[0].z;
+	out.columns[0].w = columns[0].w + rhs.columns[0].w;
 
-	out.m21 = m21 + rhs.m21;
-	out.m22 = m22 + rhs.m22;
-	out.m23 = m23 + rhs.m23;
-	out.m24 = m24 + rhs.m24;
+	out.columns[1].x = columns[1].x + rhs.columns[1].x;
+	out.columns[1].y = columns[1].y + rhs.columns[1].y;
+	out.columns[1].z = columns[1].z + rhs.columns[1].z;
+	out.columns[1].w = columns[1].w + rhs.columns[1].w;
 
-	out.m31 = m31 + rhs.m31;
-	out.m32 = m32 + rhs.m32;
-	out.m33 = m33 + rhs.m33;
-	out.m34 = m34 + rhs.m34;
+	out.columns[2].x = columns[2].x + rhs.columns[2].x;
+	out.columns[2].y = columns[2].y + rhs.columns[2].y;
+	out.columns[2].z = columns[2].z + rhs.columns[2].z;
+	out.columns[2].w = columns[2].w + rhs.columns[2].w;
 
-	out.m41 = m41 + rhs.m41;
-	out.m42 = m42 + rhs.m42;
-	out.m43 = m43 + rhs.m43;
-	out.m44 = m44 + rhs.m44;
+	out.columns[3].x = columns[3].x + rhs.columns[3].x;
+	out.columns[3].y = columns[3].y + rhs.columns[3].y;
+	out.columns[3].z = columns[3].z + rhs.columns[3].z;
+	out.columns[3].w = columns[3].w + rhs.columns[3].w;
 
 	return out;
 }
@@ -570,54 +570,54 @@ Matrix Matrix::operator *(const Matrix& rhs) const
 {
 	Matrix out;
 
-	const float4 a = f4Load(&m11);
-	const float4 b = f4Load(&m21);
-	const float4 c = f4Load(&m31);
-	const float4 d = f4Load(&m41);
+	const float4 a = f4Load(&columns[0].x);
+	const float4 b = f4Load(&columns[1].x);
+	const float4 c = f4Load(&columns[2].x);
+	const float4 d = f4Load(&columns[3].x);
 
-	float4 t1 = f4Splat(rhs.m11);
+	float4 t1 = f4Splat(rhs.columns[0].x);
 	float4 t2 = f4Mul(a, t1);
-	t1 = f4Splat(rhs.m12);
+	t1 = f4Splat(rhs.columns[0].y);
 	t2 = f4Add(f4Mul(b, t1), t2);
-	t1 = f4Splat(rhs.m13);
+	t1 = f4Splat(rhs.columns[0].z);
 	t2 = f4Add(f4Mul(c, t1), t2);
-	t1 = f4Splat(rhs.m14);
+	t1 = f4Splat(rhs.columns[0].w);
 	t2 = f4Add(f4Mul(d, t1), t2);
 
-	f4Store(&out.m11, t2);
+	f4Store(&out.columns[0].x, t2);
 
-	t1 = f4Splat(rhs.m21);
+	t1 = f4Splat(rhs.columns[1].x);
 	t2 = f4Mul(a, t1);
-	t1 = f4Splat(rhs.m22);
+	t1 = f4Splat(rhs.columns[1].y);
 	t2 = f4Add(f4Mul(b, t1), t2);
-	t1 = f4Splat(rhs.m23);
+	t1 = f4Splat(rhs.columns[1].z);
 	t2 = f4Add(f4Mul(c, t1), t2);
-	t1 = f4Splat(rhs.m24);
+	t1 = f4Splat(rhs.columns[1].w);
 	t2 = f4Add(f4Mul(d, t1), t2);
 
-	f4Store(&out.m21, t2);
+	f4Store(&out.columns[1].x, t2);
 
-	t1 = f4Splat(rhs.m31);
+	t1 = f4Splat(rhs.columns[2].x);
 	t2 = f4Mul(a, t1);
-	t1 = f4Splat(rhs.m32);
+	t1 = f4Splat(rhs.columns[2].y);
 	t2 = f4Add(f4Mul(b, t1), t2);
-	t1 = f4Splat(rhs.m33);
+	t1 = f4Splat(rhs.columns[2].z);
 	t2 = f4Add(f4Mul(c, t1), t2);
-	t1 = f4Splat(rhs.m34);
+	t1 = f4Splat(rhs.columns[2].w);
 	t2 = f4Add(f4Mul(d, t1), t2);
 
-	f4Store(&out.m31, t2);
+	f4Store(&out.columns[2].x, t2);
 
-	t1 = f4Splat(rhs.m41);
+	t1 = f4Splat(rhs.columns[3].x);
 	t2 = f4Mul(a, t1);
-	t1 = f4Splat(rhs.m42);
+	t1 = f4Splat(rhs.columns[3].y);
 	t2 = f4Add(f4Mul(b, t1), t2);
-	t1 = f4Splat(rhs.m43);
+	t1 = f4Splat(rhs.columns[3].z);
 	t2 = f4Add(f4Mul(c, t1), t2);
-	t1 = f4Splat(rhs.m44);
+	t1 = f4Splat(rhs.columns[3].w);
 	t2 = f4Add(f4Mul(d, t1), t2);
 
-	f4Store(&out.m41, t2);
+	f4Store(&out.columns[3].x, t2);
 
 	return out;
 }
@@ -626,29 +626,29 @@ Matrix Matrix::operator *(const Matrix& rhs) const
 void Matrix::normalizeScale()
 {
 	Vec3 scale = {
-		1 / Vec3(m11, m21, m31).length(),
-		1 / Vec3(m12, m22, m32).length(),
-		1 / Vec3(m13, m23, m33).length()
+		1 / Vec3(columns[0].x, columns[1].x, columns[2].x).length(),
+		1 / Vec3(columns[0].y, columns[1].y, columns[2].y).length(),
+		1 / Vec3(columns[0].z, columns[1].z, columns[2].z).length()
 	};
 
-	m11 *= scale.x;
-	m21 *= scale.x;
-	m31 *= scale.x;
+	columns[0].x *= scale.x;
+	columns[1].x *= scale.x;
+	columns[2].x *= scale.x;
 
-	m12 *= scale.y;
-	m22 *= scale.y;
-	m32 *= scale.y;
+	columns[0].y *= scale.y;
+	columns[1].y *= scale.y;
+	columns[2].y *= scale.y;
 
-	m13 *= scale.z;
-	m23 *= scale.z;
-	m33 *= scale.z;
+	columns[0].z *= scale.z;
+	columns[1].z *= scale.z;
+	columns[2].z *= scale.z;
 }
 
 
 Quat Matrix::getRotation() const
 {
 	Quat rot;
-	float tr = m11 + m22 + m33;
+	float tr = columns[0].x + columns[1].y + columns[2].z;
 
 	if (tr > 0)
 	{ 
@@ -656,35 +656,35 @@ Quat Matrix::getRotation() const
 		float s = 1 / sqrt(t) * 0.5f;
 
 		rot.w = s * t;
-		rot.z = (m12 - m21) * s;
-		rot.y = (m31 - m13) * s;
-		rot.x = (m23 - m32) * s;
+		rot.z = (columns[0].y - columns[1].x) * s;
+		rot.y = (columns[2].x - columns[0].z) * s;
+		rot.x = (columns[1].z - columns[2].y) * s;
 	} 
-	else if ((m11 > m22) && (m11 > m33))
+	else if ((columns[0].x > columns[1].y) && (columns[0].x > columns[2].z))
 	{ 
-		float t = 1.0f + m11 - m22 - m33;
+		float t = 1.0f + columns[0].x - columns[1].y - columns[2].z;
 		float s = 1 / sqrt(t) * 0.5f;
 		rot.x = s * t;
-		rot.y = (m12 + m21) * s; 
-		rot.z = (m13 + m31) * s; 
-		rot.w = (m23 - m32) * s;
+		rot.y = (columns[0].y + columns[1].x) * s; 
+		rot.z = (columns[0].z + columns[2].x) * s; 
+		rot.w = (columns[1].z - columns[2].y) * s;
 	}
-	else if (m22 > m33)
+	else if (columns[1].y > columns[2].z)
 	{ 
-		float t = 1.0f + m22 - m11 - m33;
+		float t = 1.0f + columns[1].y - columns[0].x - columns[2].z;
 		float s = 1 / sqrt(t) * 0.5f; 
-		rot.w = (m31 - m13) * s;
-		rot.x = (m12 + m21) * s; 
+		rot.w = (columns[2].x - columns[0].z) * s;
+		rot.x = (columns[0].y + columns[1].x) * s; 
 		rot.y = s * t;
-		rot.z = (m23 + m32) * s; 
+		rot.z = (columns[1].z + columns[2].y) * s; 
 	}
 	else
 	{ 
-		float t = 1.0f + m33 - m11 - m22;
+		float t = 1.0f + columns[2].z - columns[0].x - columns[1].y;
 		float s = 1 / sqrt(t) * 0.5f; 
-		rot.w = (m12 - m21) * s;
-		rot.x = (m31 + m13) * s;
-		rot.y = (m32 + m23) * s;
+		rot.w = (columns[0].y - columns[1].x) * s;
+		rot.x = (columns[2].x + columns[0].z) * s;
+		rot.y = (columns[2].y + columns[1].z) * s;
 		rot.z = s * t;
 	}
 	return rot;
@@ -693,52 +693,52 @@ Quat Matrix::getRotation() const
 
 void Matrix::transpose()
 {
-		float tmp = m21;
-		m21 = m12;
-		m12 = tmp;
+		float tmp = columns[1].x;
+		columns[1].x = columns[0].y;
+		columns[0].y = tmp;
 
-		tmp = m32;
-		m32 = m23;
-		m23 = tmp;
+		tmp = columns[2].y;
+		columns[2].y = columns[1].z;
+		columns[1].z = tmp;
 
-		tmp = m31;
-		m31 = m13;
-		m13 = tmp;
+		tmp = columns[2].x;
+		columns[2].x = columns[0].z;
+		columns[0].z = tmp;
 
-		tmp = m41;
-		m41 = m14;
-		m14 = tmp;
+		tmp = columns[3].x;
+		columns[3].x = columns[0].w;
+		columns[0].w = tmp;
 
-		tmp = m42;
-		m42 = m24;
-		m24 = tmp;
+		tmp = columns[3].y;
+		columns[3].y = columns[1].w;
+		columns[1].w = tmp;
 
-		tmp = m43;
-		m43 = m34;
-		m34 = tmp;
+		tmp = columns[3].z;
+		columns[3].z = columns[2].w;
+		columns[2].w = tmp;
 }
 
 
 void Matrix::multiply3x3(float scale)
 {
-	m11 *= scale;
-	m12 *= scale;
-	m13 *= scale;
-	m21 *= scale;
-	m22 *= scale;
-	m23 *= scale;
-	m31 *= scale;
-	m32 *= scale;
-	m33 *= scale;
+	columns[0].x *= scale;
+	columns[0].y *= scale;
+	columns[0].z *= scale;
+	columns[1].x *= scale;
+	columns[1].y *= scale;
+	columns[1].z *= scale;
+	columns[2].x *= scale;
+	columns[2].y *= scale;
+	columns[2].z *= scale;
 }
 
 
 Vec3 Matrix::transformPoint(const Vec3& rhs) const
 {
 	return Vec3(
-		m11 * rhs.x + m21 * rhs.y + m31 * rhs.z + m41,
-		m12 * rhs.x + m22 * rhs.y + m32 * rhs.z + m42,
-		m13 * rhs.x + m23 * rhs.y + m33 * rhs.z + m43
+		columns[0].x * rhs.x + columns[1].x * rhs.y + columns[2].x * rhs.z + columns[3].x,
+		columns[0].y * rhs.x + columns[1].y * rhs.y + columns[2].y * rhs.z + columns[3].y,
+		columns[0].z * rhs.x + columns[1].z * rhs.y + columns[2].z * rhs.z + columns[3].z
 	);
 }
 
@@ -746,19 +746,19 @@ Vec3 Matrix::transformPoint(const Vec3& rhs) const
 Vec3 Matrix::transformVector(const Vec3& rhs) const
 {
 	return Vec3(
-		m11 * rhs.x + m21 * rhs.y + m31 * rhs.z,
-		m12 * rhs.x + m22 * rhs.y + m32 * rhs.z,
-		m13 * rhs.x + m23 * rhs.y + m33 * rhs.z
+		columns[0].x * rhs.x + columns[1].x * rhs.y + columns[2].x * rhs.z,
+		columns[0].y * rhs.x + columns[1].y * rhs.y + columns[2].y * rhs.z,
+		columns[0].z * rhs.x + columns[1].z * rhs.y + columns[2].z * rhs.z
 	);
 }
 
 
 void Matrix::setIdentity()
 {
-	m11 = 1; m12 = 0; m13 = 0; m14 = 0; 
-	m21 = 0; m22 = 1; m23 = 0; m24 = 0; 
-	m31 = 0; m32 = 0; m33 = 1; m34 = 0; 
-	m41 = 0; m42 = 0; m43 = 0; m44 = 1; 
+	columns[0].x = 1; columns[0].y = 0; columns[0].z = 0; columns[0].w = 0; 
+	columns[1].x = 0; columns[1].y = 1; columns[1].z = 0; columns[1].w = 0; 
+	columns[2].x = 0; columns[2].y = 0; columns[2].z = 1; columns[2].w = 0; 
+	columns[3].x = 0; columns[3].y = 0; columns[3].z = 0; columns[3].w = 1; 
 }
 
 

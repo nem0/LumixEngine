@@ -946,14 +946,14 @@ struct PipelineImpl final : Pipeline
 
 			const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
 			const Matrix bias_matrix(
-				0.5, 0.0, 0.0, 0.0,
-				0.0, ymul, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.5, 0.5, 0.0, 1.0);
+				Vec4(0.5, 0.0, 0.0, 0.0),
+				Vec4(0.0, ymul, 0.0, 0.0),
+				Vec4(0.0, 0.0, 1.0, 0.0),
+				Vec4(0.5, 0.5, 0.0, 1.0));
 
 			Matrix m = bias_matrix * projection_matrix * view_matrix;
 
-			global_state.sm_slices[slice].world_to_slice = Matrix3x4(m);
+			global_state.sm_slices[slice].world_to_slice = Matrix4x3(m).transposed();
 			global_state.sm_slices[slice].size = shadowmap_width;
 			global_state.sm_slices[slice].rcp_size = 1.f / shadowmap_width;
 			global_state.sm_slices[slice].size_world = bb_size * 2;
@@ -1184,7 +1184,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::pushDebugGroup("debug triangles");
 
-				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
+				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
 				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | u64(gpu::StateFlags::CULL_BACK));
 				gpu::useProgram(program);
@@ -1246,7 +1246,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::pushDebugGroup("debug lines");
 
-				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.m11, sizeof(Matrix));
+				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
 				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE));
 				gpu::useProgram(program);
@@ -1618,7 +1618,7 @@ struct PipelineImpl final : Pipeline
 
 					Matrix mtx = rot.toMatrix();
 					mtx.setTranslation(lpos);
-					gpu::update(m_pipeline->m_drawcall_ub, &mtx.m11, sizeof(mtx));
+					gpu::update(m_pipeline->m_drawcall_ub, &mtx.columns[0].x, sizeof(mtx));
 					gpu::useProgram(program);
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
@@ -2249,8 +2249,7 @@ struct PipelineImpl final : Pipeline
 		float frustum_radius,
 		const Matrix& light_mtx)
 	{
-		Matrix inv = light_mtx;
-		inv.fastInverse();
+		Matrix inv = light_mtx.fastInverted();
 		Vec3 out = inv.transformPoint(shadow_cam_pos);
 		float align = 2 * frustum_radius / (shadowmap_width * 0.5f - 2);
 		out.x -= fmodf(out.x, align);
@@ -2796,18 +2795,18 @@ struct PipelineImpl final : Pipeline
 		
 		const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
 		const Matrix bias_matrix(
-				0.5, 0.0, 0.0, 0.0,
-				0.0, ymul, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				0.5, 0.5, 0.0, 1.0);
+				Vec4(0.5, 0.0, 0.0, 0.0),
+				Vec4(0.0, ymul, 0.0, 0.0),
+				Vec4(0.0, 0.0, 1.0, 0.0),
+				Vec4(0.5, 0.5, 0.0, 1.0));
 
 		const Vec4 uv = ShadowAtlas::getUV(atlas_idx);
 
 		const Matrix to_tile(
-				uv.z, 0.0, 0.0, 0.0,
-				0.0, uv.w, 0.0, 0.0,
-				0.0, 0.0, 1.0, 0.0,
-				uv.x, uv.y, 0.0, 1.0);
+				Vec4(uv.z, 0.0, 0.0, 0.0),
+				Vec4(0.0, uv.w, 0.0, 0.0),
+				Vec4(0.0, 0.0, 1.0, 0.0),
+				Vec4(uv.x, uv.y, 0.0, 1.0));
 
 		Matrix view = rot.toMatrix();
 		return to_tile * bias_matrix * prj * view;
