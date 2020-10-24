@@ -214,7 +214,7 @@ vec3 getViewPosition(sampler2D depth_buffer, mat4 inv_view_proj, vec2 tex_coord)
 	return view_pos.xyz / view_pos.w;
 }
 
-float random (vec2 st) {
+float random(vec2 st) {
     return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
@@ -225,8 +225,7 @@ float getShadowSimple(sampler2D shadowmap, vec3 wpos)
 
 		vec2 sm_size = 3.0 / textureSize(shadowmap, 0);
 		for (int slice = 0; slice < 4; ++slice) {
-			vec4 sc = u_sm_slices[slice].world_to_slice * pos;
-			sc = sc / sc.w;
+			vec3 sc = pos * u_sm_slices[slice].world_to_slice;
 			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 				vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
 				float shadow = 0;
@@ -243,12 +242,12 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 {
 	#ifdef LUMIX_FRAGMENT_SHADER
 		float NdL = saturate(dot(N, u_light_direction.xyz));
+		vec4 pos = vec4(wpos, 1);
 		
 		for (int slice = 0; slice < 4; ++slice) {
-			vec4 pos = vec4(wpos, 1);
-			vec4 sc = u_sm_slices[slice].world_to_slice * pos;
-			if (all(lessThan(sc.xyz, vec3(sc.w * 0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
-				sc = sc / sc.w;
+			vec3 sc = pos * u_sm_slices[slice].world_to_slice;
+			
+			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 				float c = random(vec2(gl_FragCoord)) * 2 - 1;
 				float s = sqrt(1 - c * c); 
 				mat2 rot = mat2(c, s, -s, c);
@@ -256,22 +255,15 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 				float shadow = 0;
 				float receiver = sc.z;
 				
-				float shadow_range = u_shadow_far_plane - u_shadow_near_plane;
-				float offset = (0.01 + u_sm_slices[slice].size_world / u_sm_slices[slice].size / max(NdL, 0.1)) / shadow_range;
+				float bias = (0.01 + u_sm_slices[slice].texel_world / max(NdL, 0.1)) * u_shadow_rcp_depth_range;
+				for (int j = 0; j < 16; ++j) {
+					vec2 pcf_offset = POISSON_DISK_16[j] * rot;
+					vec2 uv = sm_uv + pcf_offset * vec2(0.25, 1) * u_sm_slices[slice].rcp_size;
 
-				#if 1 // PCF
-					for (int j = 0; j < 16; ++j) {
-						vec2 pcf_offset = POISSON_DISK_16[j] * rot;
-						vec2 uv = sm_uv + pcf_offset  * vec2(0.25, 1)* u_sm_slices[slice].rcp_size;
-
-						float occluder = textureLod(shadowmap, uv, 0).r;
-						shadow += receiver > occluder - length(pcf_offset) * offset ? 1 : 0;
-					}
-					return shadow / 16;
-				#else
-					float occluder = textureLod(shadowmap, sm_uv, 0).r;
-					return receiver > occluder - 0.01 / shadow_range / max(NdL, 0.1) ? 1 : 0;
-				#endif
+					float occluder = textureLod(shadowmap, uv, 0).r;
+					shadow += receiver > occluder - length(pcf_offset) * bias ? 1 : 0;
+				}
+				return shadow / 16;
 			}
 		}
 	#endif

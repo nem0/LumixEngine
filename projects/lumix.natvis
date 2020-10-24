@@ -15,7 +15,24 @@
 	<Type Name="Lumix::Path">
 		<DisplayString>{m_data->m_path,na}</DisplayString>
 	</Type>
-	
+
+	<Type Name="Lumix::Matrix">
+		<Expand>
+			<Synthetic Name="x vec">
+				<DisplayString> {m11}     {m12}     {m13}     {m14}</DisplayString>
+			</Synthetic>
+			<Synthetic Name="y vec">
+				<DisplayString> {m21}     {m22}     {m23}     {m24}</DisplayString>
+			</Synthetic>
+			<Synthetic Name="z vec">
+				<DisplayString> {m31}     {m32}     {m33}     {m34}</DisplayString>
+			</Synthetic>
+			<Synthetic Name="translation">
+				<DisplayString> {m41}     {m42}     {m43}     {m44}</DisplayString>
+			</Synthetic>
+		</Expand>
+	</Type>
+
 	<Type Name="Lumix::Span&lt;*&gt;">
 		<DisplayString Condition="m_end == m_begin">size=0</DisplayString>
 		<DisplayString Condition="m_end != m_begin">size={m_end - m_begin} [0]=>{m_begin[0]}</DisplayString>
