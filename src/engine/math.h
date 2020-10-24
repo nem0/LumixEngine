@@ -881,12 +881,12 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 		ret.columns[0].z = columns[2].x;
 		ret.columns[2].x = columns[0].z;
 
-		ret.columns[3].x = -columns[3].x;
-		ret.columns[3].y = -columns[3].y;
-		ret.columns[3].z = -columns[3].z;
-		ret.columns[3].x = ret.columns[3].x * ret.columns[0].x + ret.columns[3].y * ret.columns[1].x + ret.columns[3].z * ret.columns[2].x;
-		ret.columns[3].y = ret.columns[3].x * ret.columns[0].y + ret.columns[3].y * ret.columns[1].y + ret.columns[3].z * ret.columns[2].y;
-		ret.columns[3].z = ret.columns[3].x * ret.columns[0].z + ret.columns[3].y * ret.columns[1].z + ret.columns[3].z * ret.columns[2].z;
+		float x = -columns[3].x;
+		float y = -columns[3].y;
+		float z = -columns[3].z;
+		ret.columns[3].x = x * ret.columns[0].x + y * ret.columns[1].x + z * ret.columns[2].x;
+		ret.columns[3].y = x * ret.columns[0].y + y * ret.columns[1].y + z * ret.columns[2].y;
+		ret.columns[3].z = x * ret.columns[0].z + y * ret.columns[1].z + z * ret.columns[2].z;
 
 		ret.columns[0].w = 0;
 		ret.columns[1].w = 0;
