@@ -16,6 +16,23 @@
 		<DisplayString>{m_data->m_path,na}</DisplayString>
 	</Type>
 
+	<Type Name="Lumix::Vec4">
+		<Expand>
+			<Synthetic Name="x">
+				<DisplayString>{x}</DisplayString>
+			</Synthetic>
+			<Synthetic Name="y">
+				<DisplayString>{y}</DisplayString>
+			</Synthetic>
+			<Synthetic Name="z">
+				<DisplayString>{z}</DisplayString>
+			</Synthetic>
+			<Synthetic Name="x">
+				<DisplayString>{w}</DisplayString>
+			</Synthetic>
+		</Expand>
+	</Type>
+
 	<Type Name="Lumix::Matrix">
 		<Expand>
 			<Synthetic Name="x vec">
