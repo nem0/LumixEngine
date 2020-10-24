@@ -66,12 +66,11 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 	static const char* shader_code_prefix = 
 		R"#(
 		struct SMSlice {
-			mat4 world_to_slice;
-			mat4 world_to_slice_cam;	// world_to_slice without projection
+			mat3x4 world_to_slice;
 			float size;					// in texels
 			float rcp_size;
 			float size_world;
-			float padding1;
+			float texel_world;			// size_world / size
 		};
 		layout (std140, binding = 0) uniform GlobalState {
 			SMSlice u_sm_slices[4];
@@ -89,8 +88,8 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 			float u_light_indirect_intensity;
 			float u_time;
 			float u_frame_time_delta;
-			float u_shadow_near_plane;
-			float u_shadow_far_plane;
+			float u_shadow_depth_range;
+			float u_shadow_rcp_depth_range;
 		};
 		layout (std140, binding = 1) uniform PassState {
 			mat4 u_pass_projection;

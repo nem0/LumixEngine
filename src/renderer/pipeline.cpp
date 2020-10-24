@@ -279,12 +279,11 @@ namespace LuaWrapper {
 struct GlobalState
 {
 	struct SMSlice {
-		Matrix world_to_slice;
-		Matrix world_to_slice_cam;
+		Matrix3x4 world_to_slice;
 		float size;
 		float rcp_size;
 		float size_world;
-		float padding1;
+		float texel_world;
 	};
 	SMSlice sm_slices[4];
 	Matrix camera_projection;
@@ -301,8 +300,8 @@ struct GlobalState
 	float light_indirect_intensity;
 	float time;
 	float frame_time_delta;
-	float shadow_cam_near_plane;
-	float shadow_cam_far_plane;
+	float shadow_cam_depth_range;
+	float shadow_cam_rcp_depth_range;
 };
 
 
@@ -525,7 +524,6 @@ struct ShadowAtlas {
 };
 
 
-static const float SHADOW_CAM_NEAR = 50.0f;
 static const float SHADOW_CAM_FAR = 500.0f;
 
 
@@ -927,9 +925,22 @@ struct PipelineImpl final : Pipeline
 			Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
 			shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
+			const Vec3 xvec = light_mtx.getXVector();
+			const Vec3 yvec = light_mtx.getYVector();
+
+			Vec2 min = Vec2(FLT_MAX);
+			Vec2 max = Vec2(-FLT_MAX);
+			for (u32 i = 0; i < 8; ++i) {
+				const Vec2 proj = Vec2(dotProduct(xvec, camera_frustum.points[i] - shadow_cam_pos), dotProduct(yvec, camera_frustum.points[i] - shadow_cam_pos));
+				min.x = minimum(min.x, proj.x);
+				min.y = minimum(min.y, proj.y);
+				max.x = maximum(max.x, proj.x);
+				max.y = maximum(max.y, proj.y);
+			}
+
 			Matrix projection_matrix;
-			projection_matrix.setOrtho(-bb_size, bb_size, -bb_size, bb_size, SHADOW_CAM_NEAR, SHADOW_CAM_FAR, true);
-			shadow_cam_pos -= light_forward * (SHADOW_CAM_FAR - bb_size);
+			projection_matrix.setOrtho(min.x, max.x, min.y, max.y, 0, SHADOW_CAM_FAR, true);
+			shadow_cam_pos -= light_forward * (SHADOW_CAM_FAR - 2 * bb_size);
 			Matrix view_matrix;
 			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
 
@@ -940,13 +951,15 @@ struct PipelineImpl final : Pipeline
 				0.0, 0.0, 1.0, 0.0,
 				0.5, 0.5, 0.0, 1.0);
 
-			global_state.sm_slices[slice].world_to_slice = bias_matrix * projection_matrix * view_matrix;
-			global_state.sm_slices[slice].world_to_slice_cam = view_matrix;
+			Matrix m = bias_matrix * projection_matrix * view_matrix;
+
+			global_state.sm_slices[slice].world_to_slice = Matrix3x4(m);
 			global_state.sm_slices[slice].size = shadowmap_width;
 			global_state.sm_slices[slice].rcp_size = 1.f / shadowmap_width;
 			global_state.sm_slices[slice].size_world = bb_size * 2;
-			global_state.shadow_cam_near_plane = SHADOW_CAM_NEAR;
-			global_state.shadow_cam_far_plane = SHADOW_CAM_FAR;
+			global_state.sm_slices[slice].texel_world = global_state.sm_slices[slice].size_world * global_state.sm_slices[slice].rcp_size;
+			global_state.shadow_cam_depth_range = SHADOW_CAM_FAR;
+			global_state.shadow_cam_rcp_depth_range = 1.f / SHADOW_CAM_FAR;
 
 			CameraParams& cp = m_shadow_camera_params[slice];
 			cp.view = view_matrix;
@@ -959,7 +972,7 @@ struct PipelineImpl final : Pipeline
 				, light_mtx.getYVector()
 				, bb_size
 				, bb_size
-				, SHADOW_CAM_NEAR
+				, 0
 				, SHADOW_CAM_FAR);
 
 			findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);

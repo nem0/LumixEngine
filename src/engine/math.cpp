@@ -503,7 +503,7 @@ void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_
 
 void Matrix::decompose(Vec3& position, Quat& rotation, float& scale) const
 {
-	getTranslation(position);
+	position = getTranslation();
 	scale = getXVector().length();
 	Matrix tmp = *this;
 	tmp.multiply3x3(1 / scale);

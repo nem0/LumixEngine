@@ -1028,11 +1028,6 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 	void normalizeScale();
 
 
-	void getTranslation(Vec3& pos) const
-	{
-		pos.set(m41, m42, m43);
-	}
-
 	Vec3 getTranslation() const
 	{
 		return Vec3(m41, m42, m43);
@@ -1051,6 +1046,16 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 	float m41, m42, m43, m44;
 
 	static const Matrix IDENTITY;
+};
+
+struct Matrix3x4 {
+	Matrix3x4() {}
+	explicit Matrix3x4(const Matrix& rhs) {
+		columns[0] = Vec4(rhs.m11, rhs.m21, rhs.m31, rhs.m41);
+		columns[1] = Vec4(rhs.m12, rhs.m22, rhs.m32, rhs.m42);
+		columns[2] = Vec4(rhs.m13, rhs.m23, rhs.m33, rhs.m43);
+	}
+	Vec4 columns[3];
 };
 
 constexpr float PI = 3.14159265f;
