@@ -862,7 +862,7 @@ static Vec3 impostorToWorld(Vec2 uv) {
 		uv.x - uv.y
 	) * 0.5f;
 
-	position.y = 1.f - fabsf(position.x) - fabsf(position.z);
+	position.y = -(1.f - fabsf(position.x) - fabsf(position.z));
 	return position;
 };
 
@@ -1005,6 +1005,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 			Matrix projection;
 			Matrix view;
 			Matrix proj_to_model;
+			Vec4 center;
 			IVec2 tile;
 			IVec2 tile_size;
 			int size;
@@ -1025,6 +1026,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 				data.proj_to_model = (projection * view * model).inverted();
 				data.projection = projection;
 				data.view = view;
+				data.center = Vec4(center, 1);
 				data.tile = IVec2(i, j);
 				data.tile_size = m_tile_size.value;
 				data.size = IMPOSTOR_COLS;

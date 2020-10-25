@@ -8,27 +8,15 @@ compute_shader [[
 		mat4 u_projection;
 		mat4 u_view;
 		mat4 u_proj_to_model;
+		vec4 u_center;
 		ivec2 u_tile;
 		ivec2 u_tile_size;
 		int u_size;
 	};
 
-	vec3 impostorToWorld(vec2 uv) {
-		uv = uv * 2 - 1;
-		vec3 position = vec3(
-			uv.x + uv.y,
-			0.0,
-			uv.x - uv.y
-		) * 0.5;
-
-		position.y = 1.0 - abs(position.x) - abs(position.z);
-		return position;
-	};
-
 	vec2 worldToImpostor(vec3 vec)
 	{
-		vec.z = -vec.z;
-		vec.y = max(vec.y, 0.001);
+		vec.y = min(vec.y, -0.001);
 		vec = normalize(vec);
 		vec.xz /= dot(vec3(1.0), abs(vec));
 		return vec2(vec.x + vec.z, vec.x - vec.z) * 0.5 + 0.5;
@@ -41,17 +29,18 @@ compute_shader [[
 
 		vec3 up = vec3(0, 1, 0);
 		mat4 model_sm;
-		model_sm[0] = vec4(normalize(cross(up, v_shadow)), 0);
-		model_sm[1] = vec4(up, 0);
-		model_sm[2] = vec4(v_shadow, 0);
+		model_sm[0] = vec4(normalize(cross(up, -v_shadow)), 0);
+		model_sm[1] = vec4(normalize(cross(-v_shadow, model_sm[0].xyz)), 0);
+		model_sm[2] = vec4(-v_shadow, 0);
 		model_sm[3] = vec4(0, 0, 0, 1);
+		model_sm = transpose(model_sm);
 		mat4 to_sm = u_projection * u_view * model_sm * u_proj_to_model;
-		
+
 		float res = 0;
 		vec4 p = to_sm * vec4(tile_uv * 2 - 1, depth, 1);
 		p.xy = p.xy * 0.5 + 0.5;
 		p.xyz /= p.w;
-		const int SPREAD = 1;
+		const int SPREAD = 0;
 		for(int j = -SPREAD; j <= SPREAD; ++j) {
 			for(int i = -SPREAD; i <= SPREAD; ++i) {
 				vec4 p2 = p;
@@ -61,7 +50,7 @@ compute_shader [[
 				}
 				else {
 					float shadow_depth = texture(u_depth, (p2.xy + shadow_tile.xy) / float(u_size)).r;
-					res += shadow_depth* 0.999 < p.z ? 1 : 0;
+					res += shadow_depth * 0.99 < p.z ? 1 : 0;
 				}
 			}
 		}
@@ -76,11 +65,12 @@ compute_shader [[
 		vec2 uv = (u_tile + tile_uv) / float(u_size);
 		float depth = texture(u_depth, uv).r;
 
+		float zenith = -0.5;
 		vec4 res = vec4(
-			0.5f * getShadow(tile_uv, depth, vec3(1, 0.5, 0)) + 0.25f * getShadow(tile_uv, depth, vec3(1, 0.5, -0.2)) + 0.25f * getShadow(tile_uv, depth, vec3(1, 0.5, 0.2)),
-			0.5f * getShadow(tile_uv, depth, vec3(0, 0.5, -1)) + 0.25f * getShadow(tile_uv, depth, vec3(0.2, 0.5, -1)) + 0.25f * getShadow(tile_uv, depth, vec3(-0.2, 0.5, -1)),
-			0.5f * getShadow(tile_uv, depth, vec3(-1, 0.5, 0)) + 0.25f * getShadow(tile_uv, depth, vec3(-1, 0.5, 0.2)) + 0.25f * getShadow(tile_uv, depth, vec3(-1, 0.5, -0.2)),
-			0.5f * getShadow(tile_uv, depth, vec3(0, 0.5, 1)) + 0.25f * getShadow(tile_uv, depth, vec3(0.2, 0.5, 1)) + 0.25f * getShadow(tile_uv, depth, vec3(-0.2, 0.5, 1))
+			0.5 * getShadow(tile_uv, depth, vec3(1, zenith, 0)) + 0.25 * getShadow(tile_uv, depth, vec3(1, zenith, -0.2)) + 0.25 * getShadow(tile_uv, depth, vec3(1, zenith, 0.2)),
+			0.5 * getShadow(tile_uv, depth, vec3(0, zenith, -1)) + 0.25 * getShadow(tile_uv, depth, vec3(0.2, zenith, -1)) + 0.25 * getShadow(tile_uv, depth, vec3(-0.2, zenith, -1)),
+			0.5 * getShadow(tile_uv, depth, vec3(-1, zenith, 0)) + 0.25 * getShadow(tile_uv, depth, vec3(-1, zenith, 0.2)) + 0.25 * getShadow(tile_uv, depth, vec3(-1, zenith, -0.2)),
+			0.5 * getShadow(tile_uv, depth, vec3(0, zenith, 1)) + 0.25 * getShadow(tile_uv, depth, vec3(0.2, zenith, 1)) + 0.25 * getShadow(tile_uv, depth, vec3(-0.2, zenith, 1))
 		);
 
 		imageStore(u_output, ivec2(gl_GlobalInvocationID.xy + u_tile * u_tile_size), res);
