@@ -6,35 +6,59 @@ compute_shader [[
 	layout (binding = 1) uniform sampler2D u_depth;
 	layout(std140, binding = 4) uniform Data {
 		mat4 u_projection;
-		mat4 u_view;
 		mat4 u_proj_to_model;
 		vec4 u_center;
 		ivec2 u_tile;
 		ivec2 u_tile_size;
 		int u_size;
+		float u_radius;
 	};
+
+	vec3 impostorToWorld(vec2 uv) {
+		uv = uv * 2 - 1;
+		vec3 position= vec3(
+			uv.x + uv.y,
+			0,
+			uv.x - uv.y
+		) * 0.5;
+
+		position.y = -(1.0 - abs(position.x) - abs(position.z));
+		return position;
+	}
 
 	vec2 worldToImpostor(vec3 vec)
 	{
-		vec.y = min(vec.y, -0.001);
+		vec.y = min(vec.y, 0);
 		vec = normalize(vec);
 		vec.xz /= dot(vec3(1.0), abs(vec));
 		return vec2(vec.x + vec.z, vec.x - vec.z) * 0.5 + 0.5;
+	}
+
+	mat4 lookAt(vec3 eye, vec3 at, vec3 up)
+	{
+		mat4 res = mat4(1);
+		vec3 f = normalize(eye - at);
+		vec3 r = normalize(cross(up, f));
+		vec3 u = normalize(cross(f, r));
+		
+		res[0].xyz = r;
+		res[1].xyz = u;
+		res[2].xyz = f;
+		res = transpose(res);
+		
+		res[3].xyz = vec3(-dot(r, eye), -dot(u, eye), -dot(f, eye));
+		return res;
 	}
 
 	float getShadow(vec2 tile_uv, float depth, vec3 v_shadow) {
 		v_shadow = normalize(v_shadow);
 		if (depth == 0) return 0;
 		ivec2 shadow_tile = ivec2(0.5 + worldToImpostor(v_shadow) * (u_size - 1)); 
+		v_shadow = impostorToWorld(shadow_tile / float(u_size - 1));
 
-		vec3 up = vec3(0, 1, 0);
-		mat4 model_sm;
-		model_sm[0] = vec4(normalize(cross(up, -v_shadow)), 0);
-		model_sm[1] = vec4(normalize(cross(-v_shadow, model_sm[0].xyz)), 0);
-		model_sm[2] = vec4(-v_shadow, 0);
-		model_sm[3] = vec4(0, 0, 0, 1);
-		model_sm = transpose(model_sm);
-		mat4 to_sm = u_projection * u_view * model_sm * u_proj_to_model;
+		mat4 view = lookAt(u_center.xyz - v_shadow * 2 * u_radius, u_center.xyz, vec3(0, 1, 0));
+		
+		mat4 to_sm = u_projection * view * u_proj_to_model;
 
 		float res = 0;
 		vec4 p = to_sm * vec4(tile_uv * 2 - 1, depth, 1);
@@ -58,6 +82,15 @@ compute_shader [[
 		return res / (2 * SPREAD + 1) /  (2 * SPREAD + 1);
 	}
 
+	float softShadow(vec2 tile_uv, float depth, vec3 mid, vec3 delta) {
+		return 0.5 * getShadow(tile_uv, depth, mid) 
+			+ 0.125 * getShadow(tile_uv, depth, mid + vec3(0, 0.2, 0))
+			+ 0.125 * getShadow(tile_uv, depth, mid - vec3(0, 0.2, 0))
+			+ 0.125 * getShadow(tile_uv, depth, mid + delta)
+			+ 0.125 * getShadow(tile_uv, depth, mid - delta);
+	
+	}
+
 	void main() {
 		if (any(greaterThan(gl_GlobalInvocationID.xy, u_tile_size))) return;
 
@@ -67,10 +100,10 @@ compute_shader [[
 
 		float zenith = -0.5;
 		vec4 res = vec4(
-			0.5 * getShadow(tile_uv, depth, vec3(1, zenith, 0)) + 0.25 * getShadow(tile_uv, depth, vec3(1, zenith, -0.2)) + 0.25 * getShadow(tile_uv, depth, vec3(1, zenith, 0.2)),
-			0.5 * getShadow(tile_uv, depth, vec3(0, zenith, -1)) + 0.25 * getShadow(tile_uv, depth, vec3(0.2, zenith, -1)) + 0.25 * getShadow(tile_uv, depth, vec3(-0.2, zenith, -1)),
-			0.5 * getShadow(tile_uv, depth, vec3(-1, zenith, 0)) + 0.25 * getShadow(tile_uv, depth, vec3(-1, zenith, 0.2)) + 0.25 * getShadow(tile_uv, depth, vec3(-1, zenith, -0.2)),
-			0.5 * getShadow(tile_uv, depth, vec3(0, zenith, 1)) + 0.25 * getShadow(tile_uv, depth, vec3(0.2, zenith, 1)) + 0.25 * getShadow(tile_uv, depth, vec3(-0.2, zenith, 1))
+			softShadow(tile_uv, depth, vec3(1, zenith, 0), vec3(0, 0, 0.2)),
+			softShadow(tile_uv, depth, vec3(0, zenith, -1), vec3(0.2, 0, 0)),
+			softShadow(tile_uv, depth, vec3(-1, zenith, 0), vec3(0, 0, 0.2)),
+			softShadow(tile_uv, depth, vec3(0, zenith, 1), vec3(0.2, 0, 0))
 		);
 
 		imageStore(u_output, ivec2(gl_GlobalInvocationID.xy + u_tile * u_tile_size), res);

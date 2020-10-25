@@ -956,13 +956,11 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
 				gpu::viewport(i * m_tile_size->x, j * m_tile_size->y, m_tile_size->x, m_tile_size->y);
 				const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
+
 				Matrix model_mtx;
-				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) {
-					model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 0, 1));
-				}
-				else {
-					model_mtx.lookAt(Vec3(0, 0, 0), v, Vec3(0, 1, 0));
-				}
+				Vec3 up = Vec3(0, 1, 0);
+				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
+				model_mtx.lookAt(center - v * 2 * m_radius, center, up);
 				gpu::update(ub, &model_mtx.columns[0].x, sizeof(model_mtx));
 
 				for (const Drawcall& dc : m_drawcalls) {
@@ -970,7 +968,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					gpu::bindTextures(dc.material->textures, 0, dc.material->textures_count);
 
 					PassState pass_state;
-					pass_state.view.lookAt(center + Vec3(0, 0, 2 * m_radius), center, {0, 1, 0});
+					pass_state.view = Matrix::IDENTITY;
 					pass_state.projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, true);
 					pass_state.inv_projection = pass_state.projection.inverted();
 					pass_state.inv_view = pass_state.view.fastInverted();
@@ -1003,33 +1001,28 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::bindTextures(&gbs[2], 1, 1);
 		struct {
 			Matrix projection;
-			Matrix view;
 			Matrix proj_to_model;
 			Vec4 center;
 			IVec2 tile;
 			IVec2 tile_size;
 			int size;
+			float radius;
 		} data;
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
-				Matrix model, view, projection;
+				Matrix view, projection;
 				const Vec3 v = impostorToWorld({i / (float)(IMPOSTOR_COLS - 1), j / (float)(IMPOSTOR_COLS - 1)});
-				view.lookAt(center + Vec3(0, 0, 2 * m_radius), center, {0, 1, 0});
+				Vec3 up = Vec3(0, 1, 0);
+				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) up = Vec3(1, 0, 0);
+				view.lookAt(center - v * 2 * m_radius, center, up);
 				projection.setOrtho(min.x, max.x, min.y, max.y, 0, 5 * m_radius, true);
-				if (i == IMPOSTOR_COLS >> 1 && j == IMPOSTOR_COLS >> 1) {
-					model.lookAt(Vec3(0, 0, 0), v, Vec3(0, 0, 1));
-				}
-				else {
-					model.lookAt(Vec3(0, 0, 0), v, Vec3(0, 1, 0));
-				}
-
-				data.proj_to_model = (projection * view * model).inverted();
+				data.proj_to_model = (projection * view).inverted();
 				data.projection = projection;
-				data.view = view;
 				data.center = Vec4(center, 1);
 				data.tile = IVec2(i, j);
 				data.tile_size = m_tile_size.value;
 				data.size = IMPOSTOR_COLS;
+				data.radius = m_radius;
 				gpu::update(ub, &data, sizeof(data));
 				gpu::dispatch((m_tile_size->x + 15) / 16, (m_tile_size->y + 15) / 16, 1);
 			}
@@ -1092,6 +1085,29 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 	renderer->queue(job, 0);
 	renderer->frame();
 	renderer->waitForRender();
+
+	const PathInfo src_info(model->getPath().c_str());
+	const StaticString<MAX_PATH_LENGTH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
+	OS::OutputFile f;
+	if (!m_filesystem.open(mat_src, Ref(f))) {
+		logError("FBX") << "Failed to create " << mat_src;
+	}
+	else {
+		const AABB& aabb = model->getAABB();
+		const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+		f << "shader \"/pipelines/impostor.shd\"\n";
+		f << "texture \"" << src_info.m_basename << "_impostor0.tga\"\n";
+		f << "texture \"" << src_info.m_basename << "_impostor1.tga\"\n";
+		f << "texture \"\"\n";
+		f << "texture \"\"\n";
+		f << "texture \"" << src_info.m_basename << "_impostor2.tga\"\n";
+		f << "defines { \"ALPHA_CUTOUT\" }\n";
+		f << "layer \"impostor\"\n";
+		f << "backface_culling(false)\n";
+		f << "uniform(\"Center\", { " << center.x << ", " << center.y << ", " << center.z << " })\n";
+		f.close();
+	}
+
 	
 	return true;
 }
