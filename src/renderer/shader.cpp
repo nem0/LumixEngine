@@ -28,7 +28,7 @@ u32 Shader::Uniform::size() const {
 		case MATRIX4: return 64;
 		case COLOR: return 16;
 		case VEC2: return 8;
-		case VEC3: return 12;
+		case VEC3: return 16; // pad to vec4
 		case VEC4: return 16;	
 	}
 	ASSERT(false);
@@ -447,7 +447,7 @@ static const char* toString(Shader::Uniform::Type type) {
 		case Shader::Uniform::INT: return "int";
 		case Shader::Uniform::MATRIX4: return "mat4";
 		case Shader::Uniform::VEC2: return "vec2";
-		case Shader::Uniform::VEC3: return "vec3";
+		case Shader::Uniform::VEC3: return "vec4"; // vec4 because of padding padding
 		case Shader::Uniform::VEC4: return "vec4";
 		default: ASSERT(false); return "unknown_type";
 	}
@@ -484,6 +484,7 @@ void Shader::onBeforeReady() {
 			float u_roughness;
 			float u_metallic;
 			float u_emission;
+			float padding;
 		)#");
 
 	for (const Uniform& u : m_uniforms) {

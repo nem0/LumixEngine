@@ -27,6 +27,7 @@ include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
 define "VEGETATION"
+uniform("Center", "vec3")
 
 ------------------
 
@@ -75,7 +76,7 @@ vertex_shader [[
 		vec2 grid = dirToGrid(normalize(vd));
 		v_uv = a_uv / 9 + ivec2(grid * 9) / 9.0;
 
-		vec3 p = tangent_space * a_position * i_pos_scale.w;
+		vec3 p = u_center.xyz + tangent_space * (a_position - u_center.xyz) * i_pos_scale.w;
 		v_tangent = tangent_space[0];
 		v_normal = tangent_space[2];
 		#ifdef VEGETATION
