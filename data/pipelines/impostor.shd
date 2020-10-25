@@ -51,7 +51,7 @@ vertex_shader [[
 	
 	vec2 dirToGrid(vec3 vec)
 	{
-		vec.y = max(vec.y, 0.001);
+		vec.y = min(vec.y, -0.001);
 		vec = normalize(vec);
 		vec.xz /= dot( vec3(1.0), abs(vec) );
 		return vec2(vec.x + vec.z, vec.x - vec.z) * 0.5 + 0.5;
@@ -61,15 +61,15 @@ vertex_shader [[
 		mat3 tangent_space;
 		vec3 N = normalize(i_pos_scale.xyz);
 		tangent_space[0] = normalize(cross(N, vec3(0, 1, 0)));
-		tangent_space[1] = vec3(0, 1, 0);
+		tangent_space[1] = normalize(cross(tangent_space[0], N));
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
 
-		vec3 vd = vec3(N.x, 0, N.z);
+		vec3 vd = vec3(N.x, N.y, N.z);
 		vec4 to_model_space = vec4(-i_rot_quat.xyz, i_rot_quat.w);
 		vd = rotateByQuat(to_model_space, vd);
 		#if !defined DEPTH && !defined DEFERRED
 			vec3 ld = rotateByQuat(to_model_space, -u_light_direction.xyz);
-			v_shadow_coefs = max(vec4(ld.x, ld.z, -ld.x, -ld.z), vec4(0));
+			v_shadow_coefs = max(vec4(ld.x, -ld.z, -ld.x, ld.z), vec4(0));
 			v_shadow_coefs /= dot(v_shadow_coefs, vec4(1));
 		#endif
 		vec2 grid = dirToGrid(normalize(vd));
