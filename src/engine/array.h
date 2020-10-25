@@ -256,7 +256,15 @@ public:
 			m_data[index].~T();
 			if (index < m_size - 1)
 			{
-				memcpy(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
+				if constexpr (__is_trivially_copyable(T)) {
+					memcpy(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
+				}
+				else {
+					for (u32 i = index; i < m_size - 1; ++i) {
+						new (NewPlaceholder(), &m_data[i]) T(static_cast<T&&>(m_data[i + 1]));
+						m_data[i + 1].~T();
+					} 
+				}
 			}
 			--m_size;
 		}
@@ -384,10 +392,16 @@ public:
 	{
 		if (capacity > m_capacity)
 		{
-			T* newData = (T*)m_allocator.allocate_aligned(capacity * sizeof(T), alignof(T));
-			memcpy(newData, m_data, sizeof(T) * m_size);
-			m_allocator.deallocate_aligned(m_data);
-			m_data = newData;
+			if (__is_trivially_copyable(T)) {
+				m_data = (T*)m_allocator.reallocate_aligned(m_data, capacity * sizeof(T), alignof(T));
+			}
+			else {
+				T* new_data = (T*)m_allocator.allocate_aligned(capacity * sizeof(T), alignof(T));
+				moveRange(new_data, m_data, m_size);
+				callDestructors(m_data, m_data + m_size);
+				m_allocator.deallocate_aligned(m_data);
+				m_data = new_data;
+			}
 			m_capacity = capacity;
 		}
 	}
