@@ -60,7 +60,11 @@ vertex_shader [[
 
 	void main() {
 		mat3 tangent_space;
-		vec3 N = normalize(i_pos_scale.xyz);
+		#ifndef DEPTH
+			vec3 N = normalize(i_pos_scale.xyz);
+		#else
+			vec3 N = normalize(u_light_direction.xyz);
+		#endif
 		tangent_space[0] = normalize(cross(N, vec3(0, 1, 0)));
 		tangent_space[1] = normalize(cross(tangent_space[0], N));
 		tangent_space[2] = cross(tangent_space[0], tangent_space[1]);
