@@ -5,7 +5,6 @@
 #include "engine/crt.h"
 #include "engine/engine.h"
 #include "engine/log.h"
-#include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/profiler.h"

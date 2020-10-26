@@ -13,7 +13,6 @@
 #include "engine/geometry.h"
 #include "engine/plugin.h"
 #include "engine/log.h"
-#include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/metaprogramming.h"
 #include "engine/os.h"
