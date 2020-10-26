@@ -1,7 +1,6 @@
 #include "navigation_scene.h"
 #include "animation/animation_scene.h"
 #include "engine/engine.h"
-#include "engine/lua_wrapper.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/reflection.h"

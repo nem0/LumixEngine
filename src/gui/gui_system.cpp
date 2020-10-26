@@ -4,7 +4,6 @@
 #include "engine/engine.h"
 #include "engine/allocator.h"
 #include "engine/input_system.h"
-#include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/path.h"
 #include "engine/reflection.h"

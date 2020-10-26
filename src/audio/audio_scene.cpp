@@ -7,7 +7,6 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/allocator.h"
-#include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
