@@ -97,14 +97,8 @@ Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& rend
 	, m_first_nonroot_bone_index(0)
 	, m_renderer(renderer)
 {
-	m_lod_indices[0] = { 0, -1 };
-	m_lod_indices[1] = { 0, -1 };
-	m_lod_indices[2] = { 0, -1 };
-	m_lod_indices[3] = { 0, -1 };
-	m_lod_distances[0] = FLT_MAX;
-	m_lod_distances[1] = FLT_MAX;
-	m_lod_distances[2] = FLT_MAX;
-	m_lod_distances[3] = FLT_MAX;
+	for (LODMeshIndices& i : m_lod_indices) i = {0, -1};
+	for (float & i : m_lod_distances) i = FLT_MAX;
 }
 
 
@@ -328,8 +322,7 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Me
 	if (!is_skinned) {
 		vertex_decl->addAttribute(4, 0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		vertex_decl->addAttribute(5, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
-		// TODO this is here because of grass, find a better solution
-		//vertex_decl->addAttribute(6, 32, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		vertex_decl->addAttribute(6, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 	}
 
 	return true;
@@ -341,6 +334,12 @@ void Model::onBeforeReady()
 	for (Mesh& mesh : m_meshes) {
 		mesh.type = getBoneCount() == 0 || mesh.skin.empty() ? Mesh::RIGID : Mesh::SKINNED;
 		mesh.layer = mesh.material->getLayer();
+	}
+
+	for (u32 i = 0; i < 4; ++i) {
+		for (i32 j = m_lod_indices[i].from; j <= m_lod_indices[i].to; ++j) {
+			m_meshes[j].lod = float(i);
+		}
 	}
 }
 

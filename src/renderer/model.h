@@ -115,6 +115,7 @@ struct LUMIX_RENDERER_API Mesh
 	gpu::VertexDecl vertex_decl;
 	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
 	RenderData* render_data;
+	float lod = 0;
 	static u32 s_last_sort_key;
 };
 
@@ -169,12 +170,12 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 
-	LODMeshIndices getLODMeshIndices(float squared_distance) const {
-		if (squared_distance < m_lod_distances[0]) return m_lod_indices[0];
-		if (squared_distance < m_lod_distances[1]) return m_lod_indices[1];
-		if (squared_distance < m_lod_distances[2]) return m_lod_indices[2];
-		if (squared_distance < m_lod_distances[3]) return m_lod_indices[3];
-		return { 0, -1 };
+	u32 getLODMeshIndices(float squared_distance) const {
+		if (squared_distance < m_lod_distances[0]) return 0;
+		if (squared_distance < m_lod_distances[1]) return 1;
+		if (squared_distance < m_lod_distances[2]) return 2;
+		if (squared_distance < m_lod_distances[3]) return 3;
+		return 4;
 	}
 
 	Mesh& getMesh(u32 index) { return m_meshes[index]; }
@@ -217,7 +218,7 @@ private:
 	Renderer& m_renderer;
 	Array<Mesh> m_meshes;
 	Array<Bone> m_bones;
-	LODMeshIndices m_lod_indices[MAX_LOD_COUNT];
+	LODMeshIndices m_lod_indices[MAX_LOD_COUNT + 1];
 	float m_lod_distances[MAX_LOD_COUNT];
 	float m_bounding_radius;
 	BoneMap m_bone_map;

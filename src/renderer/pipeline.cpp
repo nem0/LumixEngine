@@ -2998,7 +2998,7 @@ struct PipelineImpl final : Pipeline
 
 								gpu::bindIndexBuffer(mesh->index_buffer_handle);
 								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-								gpu::bindVertexBuffer(1, buffer, offset, 32);
+								gpu::bindVertexBuffer(1, buffer, offset, 36);
 
 								gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
 								++stats.draw_call_count;
@@ -3628,7 +3628,7 @@ struct PipelineImpl final : Pipeline
 				int total = 0;
 				const auto* bucket_map = m_bucket_map;
 				RenderScene* scene = m_pipeline->m_scene;
-				const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
+				ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
 				const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
 				MTBucketArray<u64>::Bucket result = sort_keys.begin();
 				const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
@@ -3691,27 +3691,51 @@ struct PipelineImpl final : Pipeline
 							for (int i = 0, c = page->header.count; i < c; ++i) {
 								const EntityRef e = renderables[i];
 								const DVec3 pos = entity_data[e.index].pos;
-								const ModelInstance& mi = model_instances[e.index];
+								ModelInstance& mi = model_instances[e.index];
 								const float squared_length = float((pos - camera_pos).squaredLength());
-								const LODMeshIndices lod = mi.model->getLODMeshIndices(squared_length);
-								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-									const Mesh& mesh = mi.meshes[mesh_idx];
-									const u32 bucket = bucket_map[mesh.layer];
-									const u64 type_mask = (u64)type << 32;
-									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
-									ASSERT(!mi.custom_material || mesh_idx == 0);
-									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
-									if (bucket < 0xff) {
-										const u64 key = ((u64)mesh_sort_key<< 32) | ((u64)bucket << 56);
-										result.push(key, subrenderable);
-									} else if (bucket < 0xffFF) {
-										const DVec3 pos = entity_data[e.index].pos;
-										const DVec3 rel_pos = pos - camera_pos;
-										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-										const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
-										result.push(key, subrenderable);
+								
+								const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
+
+								auto create_key = [&](const LODMeshIndices& lod){
+									for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
+										const Mesh& mesh = mi.meshes[mesh_idx];
+										const u32 bucket = bucket_map[mesh.layer];
+										const u64 type_mask = (u64)type << 32;
+										const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
+										ASSERT(!mi.custom_material || mesh_idx == 0);
+										const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
+										if (bucket < 0xff) {
+											const u64 key = ((u64)mesh_sort_key<< 32) | ((u64)bucket << 56);
+											result.push(key, subrenderable);
+										} else if (bucket < 0xffFF) {
+											const DVec3 pos = entity_data[e.index].pos;
+											const DVec3 rel_pos = pos - camera_pos;
+											const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+											const u32 depth_bits = floatFlip(*(u32*)&squared_length);
+											const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+											result.push(key, subrenderable);
+										}
 									}
+								};
+
+								if (mi.lod != lod_idx) {
+									const float d = lod_idx - mi.lod;
+									const float ad = fabsf(d);
+									
+									if (ad <= 0.01f) {
+										mi.lod = float(lod_idx);
+										create_key(mi.model->getLODIndices()[lod_idx]);
+									}
+									else {
+										mi.lod += d / ad * 0.01f;
+										const u32 cur_lod_idx = u32(mi.lod);
+										create_key(mi.model->getLODIndices()[cur_lod_idx]);
+										create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+									}
+								}
+								else {
+									const LODMeshIndices& lod = mi.model->getLODIndices()[lod_idx];
+									create_key(lod);
 								}
 							}
 							break;
@@ -3821,6 +3845,7 @@ struct PipelineImpl final : Pipeline
 					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 						const u32 mesh_idx = renderables[i] >> 40;
 						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+						const Mesh& mesh = mi->meshes[mesh_idx];
 
 						const Renderer::TransientSlice slice = renderer.allocTransient(sizeof(Vec4) * 2);
 						u8* instance_data = slice.ptr;
@@ -3833,11 +3858,13 @@ struct PipelineImpl final : Pipeline
 						instance_data += sizeof(lpos);
 						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 						instance_data += sizeof(tr.scale);
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 34) {
+						const float lod_d = model_instances[e.index].lod - mesh.lod;
+						memcpy(instance_data, &lod_d, sizeof(lod_d));
+						instance_data += sizeof(lod_d);
+						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
 							new_page(bucket);
 						}
 
-						const Mesh& mesh = mi->meshes[mesh_idx];
 						Shader* shader = mesh.material->getShader();
 						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
 
@@ -3858,13 +3885,15 @@ struct PipelineImpl final : Pipeline
 					case RenderableTypes::MESH: {
 						const u32 mesh_idx = renderables[i] >> 40;
 						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+						const Mesh& mesh = mi->meshes[mesh_idx];
+						const float mesh_lod = mesh.lod;
 						int start_i = i;
 						const u64 key = sort_keys[i] & instance_key_mask;
 						while (i < c && (sort_keys[i] & instance_key_mask) == key) {
 							++i;
 						}
 						const u16 count = u16(i - start_i);
-						const Renderer::TransientSlice slice = renderer.allocTransient(count * sizeof(Vec4) * 2);
+						const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec4) + sizeof(float)) * 2);
 						u8* instance_data = slice.ptr;
 						for (int j = start_i; j < start_i + count; ++j) {
 							const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
@@ -3876,12 +3905,14 @@ struct PipelineImpl final : Pipeline
 							instance_data += sizeof(lpos);
 							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
 							instance_data += sizeof(tr.scale);
+							const float lod_d = model_instances[e.index].lod - mesh_lod;
+							memcpy(instance_data, &lod_d, sizeof(lod_d));
+							instance_data += sizeof(lod_d);
 						}
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 34) {
+						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
 							new_page(bucket);
 						}
 
-						const Mesh& mesh = mi->meshes[mesh_idx];
 						Shader* shader = mesh.material->getShader();
 						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
 

@@ -140,6 +140,7 @@ struct ModelInstance
 	Material* custom_material = nullptr; 
 	EntityPtr next_model = INVALID_ENTITY;
 	EntityPtr prev_model = INVALID_ENTITY;
+	float lod = 4;
 	FlagSet<Flags, u8> flags;
 	u16 mesh_count;
 };
@@ -272,6 +273,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
 	virtual const MeshSortData* getMeshSortData() const = 0;
 	virtual const ModelInstance* getModelInstances() const = 0;
+	virtual ModelInstance* getModelInstances() = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
 	virtual void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) = 0;

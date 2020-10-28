@@ -99,6 +99,15 @@ float luminance(vec3 color) {
 	return dot(vec3(0.2126729, 0.7151522, 0.0721750), color);
 }
 
+#ifdef LUMIX_FRAGMENT_SHADER
+	bool ditherLOD(float lod){
+		// interleaved gradient noise by Jorge Jimenez
+		float s = fract(52.9829189 * fract(0.06711056 * gl_FragCoord.x + 0.00583715 * gl_FragCoord.y));
+		float ret = lod < 0.0 ? step(s, lod + 1.0) : step(lod, s);
+		return ret < 1e-3;
+	}
+#endif
+
 vec4 fullscreenQuad(int vertexID, out vec2 uv) {
 	uv = vec2((vertexID & 1) * 2, vertexID & 2);
 	#ifdef _ORIGIN_BOTTOM_LEFT
