@@ -369,7 +369,7 @@ namespace Lumix
 
 			void operator =(ScriptInstance&& rhs) 
 			{
-				m_properties = Move(rhs.m_properties);
+				m_properties = rhs.m_properties.move();
 				m_environment = rhs.m_environment;
 				m_thread_ref = rhs.m_thread_ref;
 				m_cmp = rhs.m_cmp;
@@ -2092,9 +2092,7 @@ namespace Lumix
 			if (!up && scr_index > script_cmp->m_scripts.size() - 2) return;
 			if (up && scr_index == 0) return;
 			int other = up ? scr_index - 1 : scr_index + 1;
-			ScriptInstance tmp = Move(script_cmp->m_scripts[scr_index]); //-V1002
-			script_cmp->m_scripts[scr_index] = Move(script_cmp->m_scripts[other]); //-V1002
-			script_cmp->m_scripts[other] = Move(tmp); //-V1002
+			swap(script_cmp->m_scripts[scr_index], script_cmp->m_scripts[other]);
 		}
 
 

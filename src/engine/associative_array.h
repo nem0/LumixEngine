@@ -43,16 +43,6 @@ namespace Lumix
 			}
 
 
-			template <typename T> struct remove_reference { using type = T; };
-			template <typename T> struct remove_reference<T&> { using type = T; };
-			template <typename T> struct remove_reference<T&&> { using type = T; };
-
-
-			template <typename T> T&& myforward(typename remove_reference<T>::type& _Arg) {
-				return (static_cast<T&&>(_Arg));
-			}
-
-
 			template <typename... Params> Value& emplace(const Key& key, Params&&... params)
 			{
 				if (m_capacity == m_size) reserve(m_capacity < 4 ? 4 : m_capacity * 2);
@@ -62,7 +52,7 @@ namespace Lumix
 
 				memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
 				memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
-				new (NewPlaceholder(), &m_values[i]) Value(myforward<Params>(params)...);
+				new (NewPlaceholder(), &m_values[i]) Value(static_cast<Params&&>(params)...);
 				new (NewPlaceholder(), &m_keys[i]) Key(key);
 				++m_size;
 
@@ -79,7 +69,7 @@ namespace Lumix
 				{
 					memmove(m_keys + i + 1, m_keys + i, sizeof(Key) * (m_size - i));
 					memmove(m_values + i + 1, m_values + i, sizeof(Value) * (m_size - i));
-					new (NewPlaceholder(), &m_values[i]) Value(Move(value));
+					new (NewPlaceholder(), &m_values[i]) Value(static_cast<Value&&>(value));
 					new (NewPlaceholder(), &m_keys[i]) Key(key);
 					++m_size;
 

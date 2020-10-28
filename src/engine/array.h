@@ -41,6 +41,9 @@ public:
 	}
 
 
+	Array<T>&& move() { return static_cast<Array<T>&&>(*this); }
+
+
 	T* begin() const { return m_data; }
 
 
@@ -276,7 +279,7 @@ public:
 		if (size == m_capacity) {
 			grow();
 		}
-		new (NewPlaceholder(), (char*)(m_data + size)) T(forward<T>(value));
+		new (NewPlaceholder(), (char*)(m_data + size)) T(static_cast<T&&>(value));
 		++size;
 		m_size = size;
 	}
@@ -293,23 +296,13 @@ public:
 		m_size = size;
 	}
 
-
-	template <typename _Ty> struct remove_reference { typedef _Ty type; };
-	template <typename _Ty> struct remove_reference<_Ty&> { typedef _Ty type; };
-	template <typename _Ty> struct remove_reference<_Ty&&> { typedef _Ty type; };
-
-	template <typename _Ty> _Ty&& forward(typename remove_reference<_Ty>::type& _Arg)
-	{
-		return (static_cast<_Ty&&>(_Arg));
-	}
-
 	template <typename... Params> T& emplace(Params&&... params)
 	{
 		if (m_size == m_capacity)
 		{
 			grow();
 		}
-		new (NewPlaceholder(), (char*)(m_data + m_size)) T(forward<Params>(params)...);
+		new (NewPlaceholder(), (char*)(m_data + m_size)) T(static_cast<Params&&>(params)...);
 		++m_size;
 		return m_data[m_size - 1];
 	}
@@ -326,7 +319,7 @@ public:
 		if constexpr (__is_trivially_copyable(T)) {
 			if (m_size == m_capacity) grow();
 			memmove(&m_data[idx + 1], &m_data[idx], sizeof(m_data[idx]) * (m_size - idx));
-			new (NewPlaceholder(), (char*)(m_data + idx)) T(forward<Params>(params)...);
+			new (NewPlaceholder(), (char*)(m_data + idx)) T(static_cast<Params&&>(params)...);
 		}
 		else {
 			if (m_size == m_capacity) {
@@ -340,7 +333,7 @@ public:
 			else {
 				moveRange(m_data + idx + 1, m_data + idx, m_size - idx);
 			}
-			new (NewPlaceholder(), m_data + idx) T(forward<Params>(params)...);
+			new (NewPlaceholder(), m_data + idx) T(static_cast<Params&&>(params)...);
 		}
 		++m_size;
 		return m_data[idx];
