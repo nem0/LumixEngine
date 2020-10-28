@@ -3847,7 +3847,7 @@ struct PipelineImpl final : Pipeline
 						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 						const Mesh& mesh = mi->meshes[mesh_idx];
 
-						const Renderer::TransientSlice slice = renderer.allocTransient(sizeof(Vec4) * 2);
+						const Renderer::TransientSlice slice = renderer.allocTransient((sizeof(Vec4) + sizeof(float)) * 2);
 						u8* instance_data = slice.ptr;
 						const EntityRef e = { int(renderables[i] & 0xFFffFFff) };
 						const Transform& tr = entity_data[e.index];
