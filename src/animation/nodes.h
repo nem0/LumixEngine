@@ -98,6 +98,7 @@ struct Blend1DNode final : Node {
 
 struct GroupNode final : Node {
 	GroupNode(GroupNode* parent, IAllocator& allocator);
+	GroupNode(GroupNode&& rhs) = default;
 	~GroupNode();
 	Type type() const override { return GROUP; }
 
@@ -162,6 +163,7 @@ struct LayersNode final : Node {
 
 	struct Layer {
 		Layer(GroupNode* parent, IAllocator& allocator);
+
 		GroupNode node;
 		u32 mask = 0;
 		String name;

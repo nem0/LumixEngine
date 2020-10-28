@@ -639,7 +639,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 			auto iter = m_dependencies.find(path_obj);
 			if (iter.isValid()) {
-				const Array<Path> tmp(iter.value());
+				const Array<Path> tmp(iter.value().makeCopy());
 				m_dependencies.erase(iter);
 				for (Path& p : tmp) {
 					Array<Path> removed_subresources = removeResource(p.c_str());

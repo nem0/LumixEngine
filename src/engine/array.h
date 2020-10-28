@@ -20,14 +20,8 @@ public:
 		m_size = 0;
 	}
 
-	explicit Array(const Array& rhs)
-		: m_allocator(rhs.m_allocator)
-	{
-		m_data = nullptr;
-		m_capacity = 0;
-		m_size = 0;
-		*this = rhs;
-	}
+	Array(const Array& rhs) = delete;
+	void operator=(const Array& rhs) = delete;
 
 
 	Array(Array&& rhs)
@@ -107,20 +101,17 @@ public:
 	}
 
 
-	void operator=(const Array& rhs)
-	{
-		if (this != &rhs)
-		{
-			callDestructors(m_data, m_data + m_size);
-			m_allocator.deallocate_aligned(m_data);
-			m_data = (T*)m_allocator.allocate_aligned(rhs.m_capacity * sizeof(T), alignof(T));
-			m_capacity = rhs.m_capacity;
-			m_size = rhs.m_size;
-			for (u32 i = 0; i < m_size; ++i)
-			{
-				new (NewPlaceholder(), (char*)(m_data + i)) T(rhs.m_data[i]);
-			}
+	Array<T> makeCopy() const {
+		Array<T> res(m_allocator);
+		if (m_size == 0) return res;
+
+		res.m_data = (T*)m_allocator.allocate_aligned(m_size * sizeof(T), alignof(T));
+		res.m_capacity = m_size;
+		res.m_size = m_size;
+		for (u32 i = 0; i < m_size; ++i) {
+			new (NewPlaceholder(), res.m_data + i) T(m_data[i]);
 		}
+		return res;
 	}
 
 

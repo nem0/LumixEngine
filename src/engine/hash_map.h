@@ -279,7 +279,7 @@ public:
 		}
 
 		new (NewPlaceholder(), m_keys[pos].key_mem) Key(key);
-		new (NewPlaceholder(), &m_values[pos]) Value(value);
+		new (NewPlaceholder(), &m_values[pos]) Value(static_cast<Value&&>(value));
 		++m_size;
 		m_keys[pos].valid = true;
 
