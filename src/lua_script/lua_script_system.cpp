@@ -355,7 +355,7 @@ namespace Lumix
 			ScriptInstance(const ScriptInstance&) = delete;
 
 			ScriptInstance(ScriptInstance&& rhs) 
-				: m_properties(rhs.m_properties)
+				: m_properties(rhs.m_properties.move())
 				, m_environment(rhs.m_environment)
 				, m_thread_ref(rhs.m_thread_ref)
 				, m_cmp(rhs.m_cmp)

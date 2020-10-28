@@ -63,6 +63,11 @@ public:
 
 	struct Stage {
 		Stage(IAllocator& allocator) : code(allocator) {}
+		Stage(const Stage& rhs)
+			: type(rhs.type)
+			, code(rhs.code.makeCopy())
+		{}
+
 		gpu::ShaderType type;
 		Array<char> code;
 	};
@@ -71,6 +76,11 @@ public:
 		Sources(IAllocator& allocator) 
 			: stages(allocator)
 			, common(allocator)
+		{}
+		Sources(const Sources& rhs)
+			: stages(rhs.stages.makeCopy())
+			, common(rhs.common)
+			, path(rhs.path)
 		{}
 
 		Path path;
