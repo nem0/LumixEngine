@@ -30,8 +30,8 @@ fragment_shader [[
 
 		o_color.rgb = computeLighting(cluster
 			, surface
-			, u_light_direction.xyz
-			, u_light_color.rgb * u_light_intensity
+			, Global.light_dir.xyz
+			, Global.light_color.rgb * Global.light_intensity
 			, u_shadowmap
 			, u_shadow_atlas);
 

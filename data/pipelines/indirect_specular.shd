@@ -18,7 +18,7 @@ vertex_shader [[
 	{
 		vec3 pos = rotateByQuat(u_rot, u_half_extents.xyz * a_position);
 		pos += u_pos.xyz;
-		gl_Position = u_camera_projection * u_camera_view * vec4(pos, 1);
+		gl_Position = Global.projection * Global.view * vec4(pos, 1);
 	}
 ]]
 
@@ -37,7 +37,7 @@ fragment_shader [[
 
 	void main()
 	{
-		vec2 screen_uv = gl_FragCoord.xy / u_framebuffer_size;
+		vec2 screen_uv = gl_FragCoord.xy / Global.framebuffer_size;
 
 		float ndc_depth;
 		Surface surface = unpackSurface(screen_uv, u_gbuffer0, u_gbuffer1, u_gbuffer2, u_gbuffer_depth, ndc_depth);

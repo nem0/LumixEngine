@@ -1,3 +1,5 @@
+include "pipelines/common.glsl"
+
 vertex_shader [[
 	layout(std140, binding = 4) uniform Model {
 		mat4 u_model;
@@ -9,7 +11,7 @@ vertex_shader [[
 	
 	void main() {
 		v_color = vec4(pow(a_color.rgb, vec3(2.2)), a_color.a);
-		gl_Position = u_pass_view_projection * u_model * vec4(a_position, 1);
+		gl_Position = Pass.view_projection * u_model * vec4(a_position, 1);
 	}
 ]]
 

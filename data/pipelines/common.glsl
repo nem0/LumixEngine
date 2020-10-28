@@ -69,6 +69,49 @@ struct Surface {
 	vec3 wpos;
 };
 
+struct SMSlice {
+	mat3x4 world_to_slice;
+	float size;					// in texels
+	float rcp_size;
+	float size_world;
+	float texel_world;			// size_world / size
+};
+
+layout (std140, binding = 0) uniform GlobalState {
+	SMSlice sm_slices[4];
+	mat4 projection;
+	mat4 inv_projection;
+	mat4 view;
+	mat4 inv_view;
+	mat4 view_projection;
+	mat4 inv_view_projection;
+	vec4 camera_world_pos;
+	vec4 light_dir;
+	vec4 light_color;
+	ivec2 framebuffer_size;
+	float light_intensity;
+	float light_indirect_intensity;
+	float time;
+	float frame_time_delta;
+	float shadow_depth_range;
+	float shadow_rcp_depth_range;
+} Global;
+
+layout (std140, binding = 1) uniform PassState {
+	mat4 projection;
+	mat4 inv_projection;
+	mat4 view;
+	mat4 inv_view;
+	mat4 view_projection;
+	mat4 inv_view_projection;
+	vec4 view_dir;
+	vec4 camera_planes[6];
+} Pass;
+ 
+layout (std140, binding = 3) uniform ShadowAtlas {
+	mat4 u_shadow_atlas_matrices[128];
+};
+
 layout(std430, binding = 6) readonly buffer lights
 {
 	Light b_lights[];
@@ -145,13 +188,13 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 		ivec3 cluster;
 		ivec2 fragcoord = ivec2(gl_FragCoord.xy);
 		#ifndef _ORIGIN_BOTTOM_LEFT
-			fragcoord.y = u_framebuffer_size.y - fragcoord.y - 1;
+			fragcoord.y = Global.framebuffer_size.y - fragcoord.y - 1;
 		#endif
 
 		cluster = ivec3(fragcoord.xy / 64, 0);
-		float linear_depth = toLinearDepth(u_camera_inv_projection, ndc_depth);
+		float linear_depth = toLinearDepth(Global.inv_projection, ndc_depth);
 		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
-		ivec2 tiles = (u_framebuffer_size + 63) / 64;
+		ivec2 tiles = (Global.framebuffer_size + 63) / 64;
 		cluster.y = tiles.y - 1 - cluster.y;
 		return b_clusters[cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y];
 	}
@@ -161,12 +204,12 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 		ivec3 cluster;
 		ivec2 fragcoord = ivec2(gl_FragCoord.xy);
 		#ifndef _ORIGIN_BOTTOM_LEFT
-			fragcoord.y = u_framebuffer_size.y - fragcoord.y - 1;
+			fragcoord.y = Global.framebuffer_size.y - fragcoord.y - 1;
 		#endif
 
 		cluster = ivec3(fragcoord.xy / 64, 0);
 		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
-		ivec2 tiles = (u_framebuffer_size + 63) / 64;
+		ivec2 tiles = (Global.framebuffer_size + 63) / 64;
 		cluster.y = tiles.y - 1 - cluster.y;
 		return b_clusters[cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y];
 	}
@@ -191,9 +234,9 @@ vec3 getWorldNormal(vec2 frag_coord)
 	#else
 		vec4 posProj = vec4(vec2(frag_coord.x, 1-frag_coord.y) * 2 - 1, z, 1.0);
 	#endif
-	vec4 wpos = u_camera_inv_view_projection * posProj;
+	vec4 wpos = Global.inv_view_projection * posProj;
 	wpos /= wpos.w;
-	vec3 view = (u_camera_inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
+	vec3 view = (Global.inv_view * vec4(0.0, 0.0, 0.0, 1.0)).xyz - wpos.xyz;
 
 	return -normalize(view);
 }
@@ -234,7 +277,7 @@ float getShadowSimple(sampler2D shadowmap, vec3 wpos)
 
 		vec2 sm_size = 3.0 / textureSize(shadowmap, 0);
 		for (int slice = 0; slice < 4; ++slice) {
-			vec3 sc = pos * u_sm_slices[slice].world_to_slice;
+			vec3 sc = pos * Global.sm_slices[slice].world_to_slice;
 			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 				vec2 sm_uv = vec2(sc.x * 0.25 + slice * 0.25, sc.y);
 				float shadow = 0;
@@ -250,11 +293,11 @@ float getShadowSimple(sampler2D shadowmap, vec3 wpos)
 float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 {
 	#ifdef LUMIX_FRAGMENT_SHADER
-		float NdL = saturate(dot(N, u_light_direction.xyz));
+		float NdL = saturate(dot(N, Global.light_dir.xyz));
 		vec4 pos = vec4(wpos, 1);
 		
 		for (int slice = 0; slice < 4; ++slice) {
-			vec3 sc = pos * u_sm_slices[slice].world_to_slice;
+			vec3 sc = pos * Global.sm_slices[slice].world_to_slice;
 			
 			if (all(lessThan(sc.xyz, vec3(0.99))) && all(greaterThan(sc.xyz, vec3(0.01)))) {
 				float c = random(vec2(gl_FragCoord)) * 2 - 1;
@@ -264,10 +307,10 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 				float shadow = 0;
 				float receiver = sc.z;
 				
-				float bias = (0.01 + u_sm_slices[slice].texel_world / max(NdL, 0.1)) * u_shadow_rcp_depth_range;
+				float bias = (0.01 + Global.sm_slices[slice].texel_world / max(NdL, 0.1)) * Global.shadow_rcp_depth_range;
 				for (int j = 0; j < 16; ++j) {
 					vec2 pcf_offset = POISSON_DISK_16[j] * rot;
-					vec2 uv = sm_uv + pcf_offset * vec2(0.25, 1) * u_sm_slices[slice].rcp_size;
+					vec2 uv = sm_uv + pcf_offset * vec2(0.25, 1) * Global.sm_slices[slice].rcp_size;
 
 					float occluder = textureLod(shadowmap, uv, 0).r;
 					shadow += receiver > occluder - length(pcf_offset) * bias ? 1 : 0;
@@ -415,7 +458,7 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 		vec3 irradiance = evalSH(b_probes[probe_idx], surface.N);
 		irradiance = max(vec3(0), irradiance);
 		vec3 indirect = computeIndirectDiffuse(irradiance, surface);
-		probe_light += (indirect * u_light_indirect_intensity) * w / M_PI;
+		probe_light += (indirect * Global.light_indirect_intensity) * w / M_PI;
 		if (remaining_w <= 0) break;
 	}
 	return remaining_w < 1 ? probe_light / (1 - remaining_w) : vec3(0);
@@ -466,8 +509,8 @@ float rand(vec3 seed)
 }
 
 vec3 vegetationAnim(vec3 obj_pos, vec3 vertex_pos) {
-	obj_pos += u_camera_world_pos.xyz;
-	vertex_pos.x += vertex_pos.y > 0.1 ? cos((obj_pos.x + obj_pos.y + obj_pos.z * 2) * 0.3 + u_time * 2) * vertex_pos.y * vertex_pos.y * 0.001 : 0;
+	obj_pos += Global.camera_world_pos.xyz;
+	vertex_pos.x += vertex_pos.y > 0.1 ? cos((obj_pos.x + obj_pos.y + obj_pos.z * 2) * 0.3 + Global.time * 2) * vertex_pos.y * vertex_pos.y * 0.001 : 0;
 	return vertex_pos;
 }
 
@@ -488,7 +531,7 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 	surface.roughness = gb0.a;
 	surface.metallic = gb1.a;
 	surface.emission = unpackEmission(gb2.x);
-	surface.wpos = getViewPosition(gbuffer_depth, u_camera_inv_view_projection, uv, ndc_depth);
+	surface.wpos = getViewPosition(gbuffer_depth, Global.inv_view_projection, uv, ndc_depth);
 	surface.V = normalize(-surface.wpos);
 	return surface;
 }

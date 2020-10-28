@@ -22,9 +22,9 @@ vertex_shader [[
 	
 	void main() {
 		v_uv = a_uv;
-		vec4 p = u_camera_view * u_model * vec4(a_position,  1);
+		vec4 p = Global.view * u_model * vec4(a_position,  1);
 		v_wpos = p.xyz;
-		gl_Position = u_camera_projection * p;
+		gl_Position = Global.projection * p;
 	}
 ]]
 
@@ -38,8 +38,8 @@ fragment_shader [[
 	layout(location = 0) out vec4 o_color;
 
 	void main() {
-		vec2 screen_uv = gl_FragCoord.xy / u_framebuffer_size;
-		vec3 wpos = getViewPosition(u_gbuffer_depth, u_camera_inv_view_projection, screen_uv);
+		vec2 screen_uv = gl_FragCoord.xy / Global.framebuffer_size;
+		vec3 wpos = getViewPosition(u_gbuffer_depth, Global.inv_view_projection, screen_uv);
 		vec4 albedo = texture(u_albedomap, v_uv);
 		#ifdef ALPHA_CUTOUT
 			if(albedo.a < 0.5) discard;

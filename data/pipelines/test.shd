@@ -4,7 +4,7 @@ fragment_shader [[
 	layout(location = 0) out vec4 out0;
 	in vec4 ;
 	void main() {
-		float v26 = sin(u_time);
+		float v26 = sin(Global.time);
 		out0 = (vec4(0.881188, 0.348985, 0.348985, 1.000000)) * (v26);
 	}
 ]]

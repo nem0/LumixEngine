@@ -96,7 +96,7 @@ vertex_shader [[
 			v_wpos = model_mtx * vec4(p,  1);
 		#endif
 		
-		gl_Position = u_pass_view_projection * v_wpos;		
+		gl_Position = Pass.view_projection * v_wpos;		
 	}
 ]]
 
@@ -168,7 +168,7 @@ fragment_shader [[
 		data.emission = u_emission;
 		#ifdef GRASS 
 			data.N = normalize(v_normal);
-			data.N = normalize(mix(data.N, u_light_direction.xyz, 0.2));
+			data.N = normalize(mix(data.N, Global.light_dir.xyz, 0.2));
 		#endif
 		return data;
 	}
@@ -192,9 +192,9 @@ fragment_shader [[
 		{
 			Surface data = getSurface();
 			
-			float linear_depth = dot(data.wpos.xyz, u_pass_view_dir.xyz);
+			float linear_depth = dot(data.wpos.xyz, Pass.view_dir.xyz);
 			Cluster cluster = getClusterLinearDepth(linear_depth);
-			o_color.rgb = computeLighting(cluster, data, u_light_direction.xyz, u_light_color.rgb * u_light_intensity, u_shadowmap, u_shadow_atlas);
+			o_color.rgb = computeLighting(cluster, data, Global.light_dir.xyz, Global.light_color.rgb * Global.light_intensity, u_shadowmap, u_shadow_atlas);
 			o_color.a = data.alpha;
 		}
 	#endif

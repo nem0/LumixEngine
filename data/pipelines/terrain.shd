@@ -179,11 +179,11 @@ vertex_shader [[
 			float h = texture(u_hm, uv).x * u_terrain_scale.y;
 		#endif
 
-		vec4 p = u_pass_view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
+		vec4 p = Pass.view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);
 		#ifndef DEPTH
  			v_dist2 = dot(p.xyz, p.xyz);
 		#endif
- 		gl_Position = u_pass_projection * p;
+ 		gl_Position = Pass.projection * p;
 	}
 ]]
 

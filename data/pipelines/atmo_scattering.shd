@@ -35,7 +35,7 @@ compute_shader [[
 		float zenith_angle = gl_GlobalInvocationID.y / u_resolution.y * M_PI * 0.5;
 		vec3 eyedir = vec3(cos(zenith_angle), sin(zenith_angle), 0);
 
-		vec3 campos = vec3(0, u_bot, 0) + u_camera_world_pos.xyz;
+		vec3 campos = vec3(0, u_bot, 0) + Global.camera_world_pos.xyz;
 		vec2 atmo_isect = raySphereIntersect(campos, eyedir, vec3(0), u_top);
 		
 		if (atmo_isect.y < 0) {
@@ -57,14 +57,14 @@ compute_shader [[
 
 		float height_b = getOptDepthY(campos);
 		vec4 depth_b = sampleOpticalDepth(eyedir, vec3(0, 1, 0), height_b);
-		const float cos_light_up = saturate(u_light_direction.y);
+		const float cos_light_up = saturate(Global.light_dir.y);
 		const float cos_eye_up = saturate(eyedir.y);
 
 		for (int i = 0; i < STEP_COUNT; ++i) {
 			float height_a = getOptDepthY(p);
 
 			vec3 up = normalize(p);
-			vec4 depth_a = sampleOpticalDepth(u_light_direction.xyz, up, height_a);
+			vec4 depth_a = sampleOpticalDepth(Global.light_dir.xyz, up, height_a);
 			vec4 depth_c = sampleOpticalDepth(eyedir, up, height_a);
 
 			vec3 total_transmittance = 

@@ -1,4 +1,4 @@
-------------------
+include "pipelines/common.glsl"
 
 texture_slot {
 	name = "Atlas",
@@ -18,7 +18,7 @@ vertex_shader [[
 	void main() {
 		v_uv = a_uv;
 		v_color = a_color;	
-		gl_Position = u_camera_projection * u_camera_view * vec4(a_position, 1.0);
+		gl_Position = Global.projection * Global.view * vec4(a_position, 1.0);
 	}
 ]]
 
