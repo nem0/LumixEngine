@@ -253,7 +253,7 @@ struct NavigationSceneImpl final : NavigationScene
 			model_aabb.transform(mtx);
 			if (!model_aabb.overlaps(aabb)) continue;
 
-			auto lod = model->getLODMeshIndices(0);
+			auto lod = model->getLODIndices()[0];
 			for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
 				Mesh& mesh = model->getMesh(mesh_idx);
 				bool is16 = mesh.areIndices16();

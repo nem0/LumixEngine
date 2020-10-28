@@ -1298,6 +1298,12 @@ public:
 	}
 
 
+	ModelInstance* getModelInstances() override
+	{
+		return m_model_instances.empty() ? nullptr : &m_model_instances[0];
+	}
+
+
 	ModelInstance* getModelInstance(EntityRef entity) override
 	{
 		return &m_model_instances[entity.index];
@@ -2357,6 +2363,13 @@ public:
 				if (attachment.parent_entity == entity) {
 					updateBoneAttachment(attachment);
 				}
+			}
+		}
+
+		for (i32 i = 3; i >= 0; --i) {
+			if (r.model->getLODIndices()[i].to != -1) {
+				r.lod = float(i);
+				break;
 			}
 		}
 
