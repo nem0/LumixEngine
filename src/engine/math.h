@@ -1058,9 +1058,9 @@ LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
 
 template <typename T> LUMIX_FORCE_INLINE void swap(T& a, T& b)
 {
-	T tmp = a;
-	a = b;
-	b = tmp;
+	T tmp = static_cast<T&&>(a);
+	a = static_cast<T&&>(b);
+	b = static_cast<T&&>(tmp);
 }
 
 

@@ -2605,7 +2605,7 @@ void captureCubemap(StudioApp& app
 		F f;
 	};
 
-	RenderJob& rjob = renderer->createJob<RenderJob>(Move(f));
+	RenderJob& rjob = renderer->createJob<RenderJob>(static_cast<F&&>(f));
 	renderer->queue(rjob, 0);
 }
 
