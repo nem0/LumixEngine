@@ -1,4 +1,4 @@
-------------------
+include "pipelines/common.glsl"
 
 vertex_shader [[
 	layout(std140, binding = 4) uniform Model {
@@ -8,7 +8,7 @@ vertex_shader [[
 
 	void main() {
 		vec2 pos = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5) * 0.05;
-		gl_Position = u_camera_projection * u_camera_view * u_model * vec4(i_position.xy + pos, i_position.z,  1);
+		gl_Position = Global.projection * Global.view * u_model * vec4(i_position.xy + pos, i_position.z,  1);
 	}
 ]]
 

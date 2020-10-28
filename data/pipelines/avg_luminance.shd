@@ -74,7 +74,7 @@ compute_shader [[
 			if (idx == 0) {
 				float avg_bin = histogram[0] / float(u_size.x * u_size.y);
 				float avg_lum = binToLuminance(avg_bin, min, range);
-				b_accum += (avg_lum - b_accum) * (1 - exp(-u_frame_time_delta * u_accomodation_speed));
+				b_accum += (avg_lum - b_accum) * (1 - exp(-Global.frame_time_delta * u_accomodation_speed));
 			}
 		#endif
 	}

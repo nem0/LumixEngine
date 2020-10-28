@@ -65,7 +65,7 @@ vertex_shader [[
 		#ifndef DEPTH
 			vec3 N = normalize(i_pos_scale.xyz);
 		#else
-			vec3 N = normalize(u_light_direction.xyz);
+			vec3 N = normalize(Global.light_dir.xyz);
 		#endif
 		tangent_space[0] = normalize(cross(N, vec3(0, 1, 0)));
 		tangent_space[1] = normalize(cross(tangent_space[0], N));
@@ -76,7 +76,7 @@ vertex_shader [[
 		vd = rotateByQuat(to_model_space, vd);
 		#if !defined DEPTH && !defined DEFERRED
 			v_lod = i_lod;
-			vec3 ld = rotateByQuat(to_model_space, -u_light_direction.xyz);
+			vec3 ld = rotateByQuat(to_model_space, -Global.light_dir.xyz);
 			v_shadow_coefs = max(vec4(ld.x, -ld.z, -ld.x, ld.z), vec4(0));
 			v_shadow_coefs /= dot(v_shadow_coefs, vec4(1));
 		#endif
@@ -91,7 +91,7 @@ vertex_shader [[
 		#endif
 		v_wpos = vec4(i_pos_scale.xyz + p, 1);
 
-		gl_Position = u_pass_view_projection * v_wpos;		
+		gl_Position = Pass.view_projection * v_wpos;		
 	}
 ]]
 
@@ -169,11 +169,11 @@ fragment_shader [[
 			shadow *= shadow;
 			
 			vec3 res = computeDirectLight(surface
-				, u_light_direction.xyz
-				, u_light_color.rgb * u_light_intensity * shadow);
+				, Global.light_dir.xyz
+				, Global.light_color.rgb * Global.light_intensity * shadow);
 			res += surface.emission * surface.albedo;
 
-			float linear_depth = dot(surface.wpos.xyz, u_pass_view_dir.xyz);
+			float linear_depth = dot(surface.wpos.xyz, Pass.view_dir.xyz);
 			Cluster cluster = getClusterLinearDepth(linear_depth);
 			//res += pointLightsLighting(cluster, surface, shadow_atlas);
 			res += envProbesLighting(cluster, surface);

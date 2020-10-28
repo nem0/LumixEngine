@@ -22,9 +22,9 @@ fragment_shader [[
 			vec4 t = textureLod(u_texture, vec2(v_uv.x, -v_uv.y), 0);
 		#endif
 
-		vec2 screen_uv = gl_FragCoord.xy / u_framebuffer_size;
+		vec2 screen_uv = gl_FragCoord.xy / Global.framebuffer_size;
 		float ndc_depth;
-		vec3 wpos = getViewPosition(u_texture, u_camera_inv_view_projection, screen_uv, ndc_depth);
+		vec3 wpos = getViewPosition(u_texture, Global.inv_view_projection, screen_uv, ndc_depth);
 
 		Cluster cluster = getCluster(ndc_depth);
 

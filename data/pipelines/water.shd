@@ -75,7 +75,7 @@ vertex_shader [[
 			v_wpos = model_mtx * vec4(p,  1);
 		#endif
 		
-		gl_Position = u_pass_view_projection * v_wpos;		
+		gl_Position = Pass.view_projection * v_wpos;		
 	}
 ]]
 
@@ -104,7 +104,7 @@ fragment_shader [[
 	{
 		float fullColorDepth = 1;
 		vec3 water_color = u_material_color.rgb * 0.1;
-		vec4 screen_pos = u_camera_view_projection * vec4(wpos, 1);
+		vec4 screen_pos = Global.view_projection * vec4(wpos, 1);
 		screen_pos /= screen_pos.w;
 		#ifndef _ORIGIN_BOTTOM_LEFT
 			screen_pos.y *= -1;
@@ -119,8 +119,8 @@ fragment_shader [[
 	vec3 getSurfaceNormal(vec2 uv)
 	{
 		float noise_t = texture(u_noise, 1 - uv * 30).x;
-		vec2 tc0 = uv * u_uv_scale + u_flow_dir * u_time;
-		vec2 tc1 = uv * u_uv_scale + u_flow_dir * (u_time + noise_t * 0.1);
+		vec2 tc0 = uv * u_uv_scale + u_flow_dir * Global.time;
+		vec2 tc1 = uv * u_uv_scale + u_flow_dir * (Global.time + noise_t * 0.1);
 
 		vec3 wnormal0;
 		wnormal0.xz = (texture(u_normalmap, tc0).xy + texture(u_normalmap, tc1 * 2.7).xy) - 0.5;
@@ -133,7 +133,7 @@ fragment_shader [[
 		wnormal1.y = sqrt(saturate(1 - dot(wnormal1.xz, wnormal1.xz))); 
 
 		float noise = texture(u_noise, uv * 30).x;
-		float t = fract(u_time * 0.6 + noise * 2);
+		float t = fract(Global.time * 0.6 + noise * 2);
 		vec3 wnormal = mix(wnormal0, wnormal1, abs( 0.5 - t ) / 0.5);
 
 		return normalize(mix(vec3(0, 1, 0), wnormal, u_normal_strength));
@@ -142,7 +142,7 @@ fragment_shader [[
 	void main()
 	{
 		vec3 V = normalize(-v_wpos.xyz);
-		vec3 L = u_light_direction.xyz;
+		vec3 L = Global.light_dir.xyz;
 		
 		float shadow = getShadow(u_shadowmap, data.wpos, data.N);
 		
@@ -169,7 +169,7 @@ fragment_shader [[
 		//float wave = cos(time * WAVE_FREQUENCY + length(v_wpos)*0.5) * WAVE_HEIGHT - WAVE_HEIGHT - WAVE_HEIGHT * noise;
 		//vec3 screen_uv = getScreenCoord(v_wpos);
 		//float depth = texture(u_gbuffer_depth, screen_uv.xy * 0.5 + 0.5).x;
-		//float depth_diff = toLinearDepth(u_camera_inv_projection, depth) - toLinearDepth(screen_uv.z) + wave;
+		//float depth_diff = toLinearDepth(Global.inv_projection, depth) - toLinearDepth(screen_uv.z) + wave;
 
 		//if(depth_diff < FOAM_DEPTH)
 		//{
@@ -183,9 +183,9 @@ fragment_shader [[
 		vec3 refl_color = getReflectionColor(view, wnormal, dist * u_normal_strength);
 		vec3 refr_color = getRefractionColor(v_wpos.xyz, view, wnormal, /*wave*/0);
 		//
-		vec3 halfvec = normalize(mix(u_light_direction.xyz, view, 0.5));
+		vec3 halfvec = normalize(mix(Global.light_dir.xyz, view, 0.5));
 		float spec_strength = pow(max(0.0, dot(halfvec, wnormal)), u_specular_power);
-		vec3 spec_color = u_light_color.rgb * spec_strength * u_specular_multiplier;
+		vec3 spec_color = Global.light_color.rgb * spec_strength * u_specular_multiplier;
 		
 		float fresnel = u_r0 + (1.0 - u_r0) * pow(saturate(1.0 - dot(normalize(view), wnormal)), 5);
 		

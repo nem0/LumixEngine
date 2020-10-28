@@ -63,48 +63,6 @@ bool Shader::hasDefine(u8 define) const {
 
 void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defines, const Sources& sources, Renderer& renderer) {
 	PROFILE_BLOCK("compile_shader");
-	static const char* shader_code_prefix = 
-		R"#(
-		struct SMSlice {
-			mat3x4 world_to_slice;
-			float size;					// in texels
-			float rcp_size;
-			float size_world;
-			float texel_world;			// size_world / size
-		};
-		layout (std140, binding = 0) uniform GlobalState {
-			SMSlice u_sm_slices[4];
-			mat4 u_camera_projection;
-			mat4 u_camera_inv_projection;
-			mat4 u_camera_view;
-			mat4 u_camera_inv_view;
-			mat4 u_camera_view_projection;
-			mat4 u_camera_inv_view_projection;
-			vec4 u_camera_world_pos;
-			vec4 u_light_direction;
-			vec4 u_light_color;
-			ivec2 u_framebuffer_size;
-			float u_light_intensity;
-			float u_light_indirect_intensity;
-			float u_time;
-			float u_frame_time_delta;
-			float u_shadow_depth_range;
-			float u_shadow_rcp_depth_range;
-		};
-		layout (std140, binding = 1) uniform PassState {
-			mat4 u_pass_projection;
-			mat4 u_pass_inv_projection;
-			mat4 u_pass_view;
-			mat4 u_pass_inv_view;
-			mat4 u_pass_view_projection;
-			mat4 u_pass_inv_view_projection;
-			vec4 u_pass_view_dir;
-			vec4 u_pass_camera_planes[6];
-		};
-		layout (std140, binding = 3) uniform ShadowAtlas {
-			mat4 u_shadow_atlas_matrices[128];
-		};
-		)#";
 
 	const char* codes[64];
 	gpu::ShaderType types[64];
@@ -116,18 +74,17 @@ void Shader::compile(gpu::ProgramHandle program, gpu::VertexDecl decl, u32 defin
 	const char* prefixes[35];
 	StaticString<128> defines_code[32];
 	int defines_count = 0;
-	prefixes[0] = shader_code_prefix;
 	if (defines != 0) {
 		for(int i = 0; i < sizeof(defines) * 8; ++i) {
 			if((defines & (1 << i)) == 0) continue;
 			defines_code[defines_count] << "#define " << renderer.getShaderDefine(i) << "\n";
-			prefixes[1 + defines_count] = defines_code[defines_count];
+			prefixes[defines_count] = defines_code[defines_count];
 			++defines_count;
 		}
 	}
-	prefixes[1 + defines_count] = sources.common.length() == 0 ? "" : sources.common.c_str();
+	prefixes[defines_count] = sources.common.length() == 0 ? "" : sources.common.c_str();
 
-	gpu::createProgram(program, decl, codes, types, sources.stages.size(), prefixes, 2 + defines_count, sources.path.c_str());
+	gpu::createProgram(program, decl, codes, types, sources.stages.size(), prefixes, 1 + defines_count, sources.path.c_str());
 }
 
 gpu::ProgramHandle Shader::getProgram(const gpu::VertexDecl& decl, u32 defines) {

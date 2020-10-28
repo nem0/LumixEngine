@@ -183,7 +183,7 @@ fragment_shader [[
 		const vec3 u_scatter_rayleigh = vec3(5.802, 13.558, 33.1 ) * 10e-6;
 
 		const vec3 eyedir = getWorldNormal(uv);
-		const float cos_theta = dot(eyedir, u_light_direction.xyz);
+		const float cos_theta = dot(eyedir, Global.light_dir.xyz);
 		vec2 v = vec2(
 			saturate(linear_depth / 50e3),
 			max(0, eyedir.y)
@@ -252,7 +252,7 @@ fragment_shader [[
 #if 1
 		vec3 eyedir = getWorldNormal(v_uv);
 		float c = 0;
-		vec3 p = u_camera_world_pos.xyz;
+		vec3 p = Global.camera_world_pos.xyz;
 		float transmittance = 1;
 			
 		float cloud_top = cloud_bot + cloud_height;
@@ -293,7 +293,7 @@ fragment_shader [[
 			for (int i = 0; i < 7; ++i) {
 				float dens = cloud(pshadow);
 				shadow_opt_depth += dens;
-				pshadow += u_light_direction.xyz * shadow_step_len;
+				pshadow += Global.light_dir.xyz * shadow_step_len;
 				shadow_step_len *= 1.5;
 			}
 			float transmittance = exp(-opt_depth * extinction);
@@ -303,7 +303,7 @@ fragment_shader [[
 			p += eyedir * step_len;
 			if (total_transmittance < 0.001) break;
 		}
-		o_color.rgb = vec3(saturate(c)) + inscatter(v_uv, length(p - u_camera_world_pos.xyz)) * (1 - total_transmittance);
+		o_color.rgb = vec3(saturate(c)) + inscatter(v_uv, length(p - Global.camera_world_pos.xyz)) * (1 - total_transmittance);
 		//o_color.rgb = vec3(1);// + inscatter(v_uv, length(p));
 		float alpha = saturate(1 - total_transmittance);
 		o_color.a = alpha;

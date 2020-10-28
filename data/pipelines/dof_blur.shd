@@ -58,7 +58,7 @@ fragment_shader [[
 		+ texture(u_source, v_uv2.zw) * 0.0702702703;
 
 		float depth = texture(u_depth, v_uv0.xy).r;
-		float linear_depth = toLinearDepth(u_camera_inv_projection, depth);
+		float linear_depth = toLinearDepth(Global.inv_projection, depth);
 		#ifdef NEAR
 			color.a = 1 - smoothstep(DOF_NEAR_BLUR, DOF_NEAR_SHARP, linear_depth);
 		#else

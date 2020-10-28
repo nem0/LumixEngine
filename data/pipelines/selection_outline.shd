@@ -22,7 +22,7 @@ fragment_shader [[
 	void main() {
 		if(texture(u_mask, v_uv).a > 0) discard;
 		
-		vec2 view_texel = 1.0 / u_framebuffer_size;
+		vec2 view_texel = 1.0 / Global.framebuffer_size;
 		
 		vec4 color = vec4(0, 0, 0, 0);
 		int c = 0;

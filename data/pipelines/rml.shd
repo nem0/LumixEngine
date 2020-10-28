@@ -22,7 +22,7 @@ vertex_shader [[
 			vec2 pos = (u_translation + a_position) / u_canvas_size;
 			pos.y = 1 - pos.y;
 			vec3 p = rotateByQuat(u_rot, vec3(pos, 0)) + u_pos.xyz;
-			gl_Position = u_pass_view_projection * vec4(p, 1);
+			gl_Position = Pass.view_projection * vec4(p, 1);
 		#else
 			vec2 pos = (u_translation + a_position) / u_canvas_size * 2 - 1;
 			pos.y = - pos.y;
