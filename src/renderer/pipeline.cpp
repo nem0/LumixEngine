@@ -554,7 +554,6 @@ struct alignas(4096) CmdPage
 {
 	struct {
 		CmdPage* next = nullptr;
-		CmdPage* next_init = nullptr;
 		int size = 0;
 		u8 bucket = 0;
 	} header;
@@ -564,6 +563,39 @@ struct alignas(4096) CmdPage
 
 struct PipelineImpl final : Pipeline
 {
+	struct Renderbuffer {
+		u32 width;
+		u32 height;
+		gpu::TextureFormat format;
+		gpu::TextureHandle handle;
+		int frame_counter;
+		bool persistent;
+	};
+
+	struct ShaderRef {
+		Lumix::Shader* res;
+		int id;
+	};
+
+	struct Bucket {
+		enum Sort {
+			DEFAULT,
+			DEPTH
+		};
+		u8 layer;
+		Sort sort;
+		u32 view_id;
+		u32 define_mask;
+		CmdPage* cmd_page = nullptr; 
+	};
+
+	struct View {
+		CullResult* renderables = nullptr;
+		MTBucketArray<u64>* sort_keys = nullptr;
+		CameraParams cp;
+		u8 layer_to_bucket[255];
+	};
+
 	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)
@@ -579,6 +611,8 @@ struct PipelineImpl final : Pipeline
 		, m_shadow_atlas(allocator)
 		, m_textures(allocator)
 		, m_buffers(allocator)
+		, m_views(allocator)
+		, m_buckets(allocator)
 	{
 		m_viewport.w = m_viewport.h = 800;
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
@@ -669,8 +703,6 @@ struct PipelineImpl final : Pipeline
 		m_point_light_decl.addAttribute(7, 60, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // fov
 	}
 
-
-
 	~PipelineImpl()
 	{
 		for (gpu::TextureHandle t : m_textures) m_renderer.destroy(t);
@@ -711,7 +743,6 @@ struct PipelineImpl final : Pipeline
 		MTBucketArray<u64>::cleanupArrays();
 	}
 
-
 	void callInitScene()
 	{
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -730,8 +761,6 @@ struct PipelineImpl final : Pipeline
 			lua_pop(m_lua_state, 1);
 		}
 	}
-
-
 	
 	void cleanup()
 	{
@@ -742,7 +771,6 @@ struct PipelineImpl final : Pipeline
 			m_lua_state = nullptr;
 		}
 	}
-
 
 	void setDefine()
 	{
@@ -767,7 +795,6 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-
 	void executeCustomCommand(const char* name)
 	{
 		u32 name_hash = crc32(name);
@@ -780,7 +807,6 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 	}
-
 
 	void exposeCustomCommandToLua(const CustomCommandHandler& handler)
 	{
@@ -804,7 +830,6 @@ struct PipelineImpl final : Pipeline
 			lua_pop(m_lua_state, 1);
 		}
 	}
-
 	
 	void onStateChanged(Resource::State, Resource::State new_state, Resource&)
 	{
@@ -892,7 +917,6 @@ struct PipelineImpl final : Pipeline
 	{
 		m_viewport = viewport;
 	}
-
 
 	void prepareShadowCameras(GlobalState& global_state)
 	{
@@ -1111,6 +1135,11 @@ struct PipelineImpl final : Pipeline
 		start_job.pass_state_buffer = m_pass_state_buffer;
 		m_renderer.queue(start_job, 0);
 		
+		m_buckets_ready = JobSystem::INVALID_HANDLE;
+		JobSystem::incSignal(&m_buckets_ready);
+		m_buckets.clear();
+		m_views.clear();
+		
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
 		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
@@ -1143,6 +1172,7 @@ struct PipelineImpl final : Pipeline
 		EndPipelineJob& end_job = m_renderer.createJob<EndPipelineJob>();
 		end_job.pipeline = this;
 		m_renderer.queue(end_job, 0);
+		processBuckets();
 		m_renderer.waitForCommandSetup();
 
 		return true;
@@ -1275,14 +1305,12 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-
 	void renderDebugShapes()
 	{
 		renderDebugTriangles();
 		renderDebugLines();
 		//renderDebugPoints();
 	}
-
 
 	void render2D()
 	{
@@ -1411,7 +1439,6 @@ struct PipelineImpl final : Pipeline
 		return handler;
 	}
 
-	
 	static gpu::TextureFormat getFormat(const char* name)
 	{
 		static const struct
@@ -1507,7 +1534,6 @@ struct PipelineImpl final : Pipeline
 		return m_renderbuffers.size() - 1;
 	}
 
-
 	void renderTerrains(lua_State* L, CameraParams cp, RenderState state)
 	{
 		PROFILE_FUNCTION();
@@ -1525,7 +1551,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 	
-
 	void renderGrass(lua_State* L, CameraParams cp, LuaWrapper::Optional<RenderState> state)
 	{
 		PROFILE_FUNCTION();
@@ -2014,75 +2039,6 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	static int prepareCommands(lua_State* L)
-	{
-		PROFILE_FUNCTION();
-		const int pipeline_idx = lua_upvalueindex(1);
-		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
-			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
-		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
-
-		LuaWrapper::checkTableArg(L, 1);
-		const CameraParams cp = checkCameraParams(L, 1);
-		
-		LuaWrapper::checkTableArg(L, 2);
-
-		const int bucket_count = (int)lua_objlen(L, 2);
-		RenderBucket buckets[64];
-		ASSERT(bucket_count < (i32)lengthOf(buckets));
-
-		for(int i = 0; i < bucket_count; ++i) {
-			lua_rawgeti(L, 2, i + 1);
-			if(!lua_istable(L, -1)) {
-				return luaL_argerror(L, 2, "Incorrect bucket configuration");
-			}
-
-			PrepareCommandsRenderJob::SortOrder order = PrepareCommandsRenderJob::SortOrder::DEFAULT;
-			char tmp[64];
-			if (LuaWrapper::getOptionalStringField(L, -1, "sort", Span(tmp))) {
-				order = equalIStrings(tmp, "depth") 
-					? PrepareCommandsRenderJob::SortOrder::DEPTH
-					: PrepareCommandsRenderJob::SortOrder::DEFAULT;
-			}
-
-			buckets[i].define_mask = 0;
-			buckets[i].order = order;
-
-			lua_getfield(L, -1, "layers");
-			buckets[i].layers_count = 0;
-			const bool ok = LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* layer_name){
-				ASSERT(buckets[i].layers_count < lengthOf(buckets[i].layers));
-				buckets[i].layers[buckets[i].layers_count] = pipeline->m_renderer.getLayerIdx(layer_name);
-				++buckets[i].layers_count;
-			});
-			lua_pop(L, 1);
-
-			lua_getfield(L, -1, "defines");
-			if (lua_istable(L, -1)) {
-				LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [&](const char* define){
-					buckets[i].define_mask |= 1 << pipeline->m_renderer.getShaderDefineIdx(define);
-				});
-			}
-			lua_pop(L, 1);
-
-			if (!ok) {
-				return luaL_argerror(L, 2, "'layers' must be array of strings");
-			}
-			
-			lua_pop(L, 1);
-		}
-
-		CmdPage* pages[64];
-		pipeline->prepareCommands(cp, Span(buckets, bucket_count), Span(pages));
-
-		for (i32 i = 0; i < bucket_count; ++i) {
-			LuaWrapper::push(L, pages[i]);
-		}
-		return bucket_count;
-	}
-
-
 	void drawArray(lua_State* L, i32 indices_offset, i32 indices_count, i32 shader_id)
 	{
 		struct Cmd : Renderer::RenderJob {
@@ -2214,7 +2170,6 @@ struct PipelineImpl final : Pipeline
 		cp.projection = m_viewport.getProjection();
 		return cp;
 	}
-
 
 	static void findExtraShadowcasterPlanes(const Vec3& light_forward
 		, const Frustum& camera_frustum
@@ -2395,7 +2350,6 @@ struct PipelineImpl final : Pipeline
 		job.m_program = shader->getProgram(m_point_light_decl, define_mask);
 		m_renderer.queue(job, m_profiler_link);
 	}
-
 
 	static u64 getState(lua_State* L, int idx)
 	{
@@ -2870,6 +2824,579 @@ struct PipelineImpl final : Pipeline
 		return float(light.radius / (cam_pos - light_pos).length());
 	}
 
+	u32 cull(CameraParams cp) {
+		View& view = m_views.emplace();
+		view.cp = cp;
+		view.renderables = m_scene->getRenderables(cp.frustum);
+		memset(view.layer_to_bucket, 0xff, sizeof(view.layer_to_bucket));
+		return m_views.size() - 1;
+	}
+
+	struct RenderBucketJob : Renderer::RenderJob {
+		void setup() override {
+			JobSystem::wait(m_pipeline->m_buckets_ready);
+
+			m_cmds = m_pipeline->m_buckets[m_bucket_id].cmd_page;
+		}
+
+		void execute() override {
+			if (!m_cmds) return;
+
+			// inline in debug
+			#define READ(T, N) \
+				const T N = *(T*)cmd; \
+				cmd += sizeof(T); \
+				do {} while(false)
+			PROFILE_FUNCTION();
+			if(m_cmds->header.size == 0 && !m_cmds->header.next) {
+				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
+				return;
+			}
+
+			Renderer& renderer = m_pipeline->m_renderer;
+
+			Stats stats = {};
+
+			const u64 render_states = m_render_state;
+			gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
+			const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
+			u32 material_ub_idx = 0xffFFffFF;
+			CmdPage* page = m_cmds;
+			while (page) {
+				const u8* cmd = page->data;
+				const u8* cmd_end = page->data + page->header.size;
+				while (cmd != cmd_end) {
+					READ(RenderableTypes, type);
+					switch(type) {
+						case RenderableTypes::MESH:
+						case RenderableTypes::MESH_GROUP:
+						case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
+							READ(Mesh::RenderData*, mesh);
+							READ(Material::RenderData*, material);
+							READ(gpu::ProgramHandle, program);
+							READ(u16, instances_count);
+							READ(gpu::BufferHandle, buffer);
+							READ(u32, offset);
+
+							gpu::bindTextures(material->textures, 0, material->textures_count);
+							gpu::setState(material->render_states | render_states);
+							if (material_ub_idx != material->material_constants) {
+								gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+								material_ub_idx = material->material_constants;
+							}
+
+							gpu::useProgram(program);
+
+							gpu::bindIndexBuffer(mesh->index_buffer_handle);
+							gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+							gpu::bindVertexBuffer(1, buffer, offset, 36);
+
+							gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
+							++stats.draw_call_count;
+							stats.triangle_count += instances_count * mesh->indices_count / 3;
+							stats.instance_count += instances_count;
+							break;
+						}
+						case RenderableTypes::SKINNED: {
+							READ(Mesh::RenderData*, mesh);
+							READ(Material::RenderData*, material);
+							READ(gpu::ProgramHandle, program);
+							READ(Vec3, pos);
+							READ(Quat, rot);
+							READ(float, scale);
+							READ(i32, bones_count);
+
+							Matrix* bones = (Matrix*)cmd;
+							cmd += sizeof(bones[0]) * bones_count;
+
+							Matrix model_mtx(pos, rot);
+							model_mtx.multiply3x3(scale);
+
+							gpu::bindTextures(material->textures, 0, material->textures_count);
+
+							gpu::setState(material->render_states | render_states);
+							if (material_ub_idx != material->material_constants) {
+								gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+								material_ub_idx = material->material_constants;
+							}
+
+							Matrix dc_bones[256];
+							ASSERT(bones_count < (i32)lengthOf(dc_bones));
+
+							dc_bones[0] = model_mtx;
+							memcpy(&dc_bones[1], bones, sizeof(Matrix) * bones_count);
+							gpu::update(m_pipeline->m_drawcall_ub, dc_bones, sizeof(Matrix) * (bones_count + 1));
+
+							gpu::useProgram(program);
+
+							gpu::bindIndexBuffer(mesh->index_buffer_handle);
+							gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
+							gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+							gpu::drawTriangles(0, mesh->indices_count, mesh->index_type);
+							++stats.draw_call_count;
+							stats.triangle_count += mesh->indices_count / 3;
+							++stats.instance_count;
+							break;
+						}
+						case RenderableTypes::DECAL: {
+							READ(Material::RenderData*, material);
+							READ(gpu::ProgramHandle, program);
+							READ(gpu::BufferHandle, buffer);
+							READ(u32, offset);
+							READ(u32, count);
+								
+							gpu::bindTextures(material->textures, 0, material->textures_count);
+								
+							gpu::useProgram(program);
+							gpu::setState(material->render_states | render_states);
+							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+							gpu::bindVertexBuffer(1, buffer, offset, 40);
+
+							gpu::drawTrianglesInstanced(36, count, gpu::DataType::U16);
+							++stats.draw_call_count;
+							stats.instance_count += count;
+							break;
+						}
+						default: ASSERT(false); break;
+					}
+				}
+				CmdPage* next = page->header.next;
+				m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(page, true);
+				page = next;
+			}
+			#undef READ
+			Profiler::pushInt("drawcalls", stats.draw_call_count);
+			Profiler::pushInt("instances", stats.instance_count);
+			Profiler::pushInt("triangles", stats.triangle_count);
+			m_pipeline->m_stats.draw_call_count += stats.draw_call_count;
+			m_pipeline->m_stats.instance_count += stats.instance_count;
+			m_pipeline->m_stats.triangle_count += stats.triangle_count;		
+		}
+
+		CmdPage* m_cmds;
+		PipelineImpl* m_pipeline;
+		u32 m_bucket_id;
+		u64 m_render_state;
+	};
+
+	void createCommands(const View& view
+		, CmdPage* first_page
+		, const u64* LUMIX_RESTRICT renderables
+		, const u64* LUMIX_RESTRICT sort_keys
+		, int count)
+	{
+		// because of inlining in debug
+		#define WRITE(x) do { \
+			memcpy(out, &(x), sizeof(x)); \
+			out += sizeof(x); \
+		} while(false)
+				
+		#define WRITE_FN(x) do { \
+			auto* p = x; \
+			memcpy(out, &p, sizeof(p)); \
+			out += sizeof(p); \
+		} while(false)
+
+		PROFILE_BLOCK("create cmds");
+		const Universe& universe = m_scene->getUniverse();
+		Renderer& renderer = m_renderer;
+		RenderScene* scene = m_scene;
+		const ShiftedFrustum frustum = view.cp.frustum;
+		const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
+		const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
+		const DVec3 camera_pos = view.cp.pos;
+				
+		CmdPage* cmd_page = first_page;
+		while (cmd_page->header.next) cmd_page = cmd_page->header.next;
+
+		cmd_page->header.bucket = sort_keys[0] >> 56;
+		const bool sort_depth = m_buckets[cmd_page->header.bucket].sort == Bucket::DEPTH;
+		u64 instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
+		u8* out = cmd_page->data;
+		u32 define_mask = m_buckets[cmd_page->header.bucket].define_mask;
+
+		u32 instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
+		u32 skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
+
+		auto new_page = [&](u8 bucket){
+			cmd_page->header.size = int(out - cmd_page->data);
+			CmdPage* new_page = new (NewPlaceholder(), m_renderer.getEngine().getPageAllocator().allocate(true)) CmdPage;
+			cmd_page->header.next = new_page;
+			cmd_page = new_page;
+			new_page->header.bucket = bucket;
+			out = cmd_page->data;
+			define_mask = m_buckets[bucket].define_mask;
+			instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
+			skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
+			const bool sort_depth = m_buckets[cmd_page->header.bucket].sort == Bucket::DEPTH;
+			instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
+		};
+
+		for (u32 i = 0, c = count; i < c; ++i) {
+			const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
+			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & 0xff);
+			const u8 bucket = sort_keys[i] >> 56;
+			if(bucket != cmd_page->header.bucket) {
+				new_page(bucket);
+			}
+
+			switch(type) {
+				case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
+					const u32 mesh_idx = renderables[i] >> 40;
+					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+					const Mesh& mesh = mi->meshes[mesh_idx];
+
+					const Renderer::TransientSlice slice = renderer.allocTransient((sizeof(Vec4) + sizeof(float)) * 2);
+					u8* instance_data = slice.ptr;
+					const EntityRef e = { int(renderables[i] & 0xFFffFFff) };
+					const Transform& tr = entity_data[e.index];
+					const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+					memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+					instance_data += sizeof(tr.rot);
+					memcpy(instance_data, &lpos, sizeof(lpos));
+					instance_data += sizeof(lpos);
+					memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+					instance_data += sizeof(tr.scale);
+					const float lod_d = model_instances[e.index].lod - mesh.lod;
+					memcpy(instance_data, &lod_d, sizeof(lod_d));
+					instance_data += sizeof(lod_d);
+					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+						new_page(bucket);
+					}
+
+					Shader* shader = mesh.material->getShader();
+					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+
+					if (mi->custom_material->isReady()) {
+						WRITE(type);
+						WRITE(mesh.render_data);
+						WRITE_FN(mi->custom_material->getRenderData());
+						WRITE(prog);
+						u16 count = 1;
+						WRITE(count);
+						WRITE(slice.buffer);
+						WRITE(slice.offset);
+					}
+							
+					break;
+				}
+				case RenderableTypes::MESH_GROUP: {
+					const u32 mesh_idx = renderables[i] >> 40;
+					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+					const Mesh& mesh = mi->meshes[mesh_idx];
+					const float mesh_lod = mesh.lod;
+					int start_i = i;
+					const u64 key = sort_keys[i] & instance_key_mask;
+					while (i < c && (sort_keys[i] & instance_key_mask) == key) {
+						++i;
+					}
+					const u16 count = u16(i - start_i);
+					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec4) + sizeof(float)) * 2);
+					u8* instance_data = slice.ptr;
+					for (int j = start_i; j < start_i + count; ++j) {
+						const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+						instance_data += sizeof(tr.rot);
+						memcpy(instance_data, &lpos, sizeof(lpos));
+						instance_data += sizeof(lpos);
+						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+						instance_data += sizeof(tr.scale);
+						const float lod_d = model_instances[e.index].lod - mesh_lod;
+						memcpy(instance_data, &lod_d, sizeof(lod_d));
+						instance_data += sizeof(lod_d);
+					}
+					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+						new_page(bucket);
+					}
+
+					Shader* shader = mesh.material->getShader();
+					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+
+					WRITE(type);
+					WRITE(mesh.render_data);
+					WRITE_FN(mesh.material->getRenderData());
+					WRITE(prog);
+					WRITE(count);
+					WRITE(slice.buffer);
+					WRITE(slice.offset);
+							
+					--i;
+					break;
+				}
+				case RenderableTypes::MESH: {
+					const u32 mesh_idx = renderables[i] >> 40;
+					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+					const Mesh& mesh = mi->meshes[mesh_idx];
+					const float mesh_lod = mesh.lod;
+					int start_i = i;
+					const u64 key = sort_keys[i] & instance_key_mask;
+					while (i < c && (sort_keys[i] & instance_key_mask) == key) {
+						++i;
+					}
+					const u16 count = u16(i - start_i);
+					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec4) + sizeof(float)) * 2);
+					u8* instance_data = slice.ptr;
+					for (int j = start_i; j < start_i + count; ++j) {
+						const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+						instance_data += sizeof(tr.rot);
+						memcpy(instance_data, &lpos, sizeof(lpos));
+						instance_data += sizeof(lpos);
+						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+						instance_data += sizeof(tr.scale);
+						const float lod_d = 0;
+						memcpy(instance_data, &lod_d, sizeof(lod_d));
+						instance_data += sizeof(lod_d);
+					}
+					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+						new_page(bucket);
+					}
+
+					Shader* shader = mesh.material->getShader();
+					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+
+					WRITE(type);
+					WRITE(mesh.render_data);
+					WRITE_FN(mesh.material->getRenderData());
+					WRITE(prog);
+					WRITE(count);
+					WRITE(slice.buffer);
+					WRITE(slice.offset);
+							
+					--i;
+					break;
+				}
+				case RenderableTypes::SKINNED: {
+					const u32 mesh_idx = renderables[i] >> 40;
+					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+					const Transform& tr = entity_data[e.index];
+					const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
+					const Mesh& mesh = mi->meshes[mesh_idx];
+					Shader* shader = mesh.material->getShader();
+					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, skinned_define_mask | mesh.material->getDefineMask());
+
+					if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 57) {
+						new_page(bucket);
+					}
+
+					WRITE(type);
+					WRITE(mesh.render_data);
+					WRITE_FN(mesh.material->getRenderData());
+					WRITE(prog);
+					WRITE(rel_pos);
+					WRITE(tr.rot);
+					WRITE(tr.scale);
+					WRITE(mi->pose->count);
+
+					const Quat* rotations = mi->pose->rotations;
+					const Vec3* positions = mi->pose->positions;
+
+					Model& model = *mi->model;
+					for (int j = 0, c = mi->pose->count; j < c; ++j) {
+						const Model::Bone& bone = model.getBone(j);
+						const LocalRigidTransform tmp = {positions[j], rotations[j]};
+						const Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
+						WRITE(m);
+					}
+					break;
+				}
+				case RenderableTypes::DECAL: {
+					const Material* material = scene->getDecalMaterial(e);
+
+					int start_i = i;
+					const u64 key = sort_keys[i];
+					while (i < c && sort_keys[i] == key) {
+						++i;
+					}
+					const u32 count = i - start_i;
+					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) * 2 + sizeof(Quat)));
+					const gpu::ProgramHandle prog = material->getShader()->getProgram(m_decal_decl, define_mask | material->getDefineMask());
+
+					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
+						new_page(bucket);
+					}
+					WRITE(type);
+					WRITE_FN(material->getRenderData());
+					WRITE(prog);
+					WRITE(slice.buffer);
+					WRITE(slice.offset);
+					WRITE(count);
+					u8* mem = slice.ptr;
+					for(u32 j = start_i; j < i; ++j) {
+						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						memcpy(mem, &lpos, sizeof(lpos));
+						mem += sizeof(lpos);
+						memcpy(mem, &tr.rot, sizeof(tr.rot));
+						mem += sizeof(tr.rot);
+						const Vec3 half_extents = scene->getDecalHalfExtents(e);
+						memcpy(mem, &half_extents, sizeof(half_extents));
+						mem += sizeof(half_extents);
+					}
+					break;
+				}
+				case RenderableTypes::LOCAL_LIGHT: {
+					const u64 type_bits = (u64)RenderableTypes::LOCAL_LIGHT << 32;
+					const u64 type_mask = (u64)0xff << 32;
+					int start_i = i;
+					while (i < c && (renderables[i] & type_mask) == type_bits) {
+						++i;
+					}
+
+					const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(float) * 16);
+					struct LightData {
+						Quat rot;
+						Vec3 pos;
+						float range;
+						float attenuation;
+						Vec3 color;
+						Vec3 dir;
+						float fov;
+					};
+
+					LightData* beg = (LightData*)slice.ptr;
+					LightData* end = (LightData*)(slice.ptr + slice.size - sizeof(LightData));
+
+					for (u32 j = start_i; j < i; ++j) {
+						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						const PointLight& pl = scene->getPointLight(e);
+						const bool intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
+							
+						LightData* iter = intersecting ? end : beg;
+						iter->pos = lpos;
+						iter->rot = tr.rot;
+						iter->range = pl.range;
+						iter->attenuation = pl.attenuation_param;
+						iter->color = pl.color * pl.intensity;
+						iter->dir = tr.rot * Vec3(0, 0, 1);
+						iter->fov = pl.fov;
+						intersecting ? --end : ++beg;
+					}
+					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 9) {
+						new_page(bucket);
+					}
+					WRITE(type);
+					const u32 total_count = i - start_i;
+					const u32 nonintersecting_count = u32(beg - (LightData*)slice.ptr);
+					WRITE(total_count);
+					WRITE(nonintersecting_count);
+					WRITE(slice.buffer);
+					WRITE(slice.offset);
+
+					--i;
+					break;
+				}
+				default: ASSERT(false); break;
+			}
+		}
+		cmd_page->header.size = int(out - cmd_page->data);
+		#undef WRITE
+		#undef WRITE_FN
+	}
+
+
+	void createCommands(const View& view)
+	{
+		const u64* renderables = view.sort_keys->value_ptr();
+		const u64* sort_keys = view.sort_keys->key_ptr();
+		const int size = view.sort_keys->size();
+		constexpr i32 STEP = 4096;
+		const i32 steps = (size + STEP - 1) / STEP;
+		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
+	
+		volatile i32 iter = 0;
+		CmdPage* all_pages = nullptr;
+		Mutex mutex;
+
+		JobSystem::runOnWorkers([&](){
+			CmdPage* page = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
+			for (;;) {
+				const i32 from = atomicAdd(&iter, STEP);
+				if (from > size) {
+					CmdPage* end = page;
+					while (end->header.next) end = end->header.next;
+
+					MutexGuard guard(mutex);
+					end->header.next = all_pages;
+					all_pages = page;
+					return;
+				}
+
+				const i32 s = minimum(STEP, size - from);
+				createCommands(view, page, renderables + from, sort_keys + from, s);
+			}
+		});
+
+		while (all_pages) {
+			Bucket& bucket = m_buckets[all_pages->header.bucket];
+			CmdPage* page = all_pages;
+			all_pages = all_pages->header.next;
+
+			page->header.next = bucket.cmd_page;
+			bucket.cmd_page = page;
+		}
+	}
+
+	void processBuckets() {
+		for (i32 i = 0; i < m_buckets.size(); ++i) {
+			Bucket& bucket = m_buckets[i];
+			View& view = m_views[bucket.view_id];
+			view.layer_to_bucket[bucket.layer] = i;
+		}
+
+		for (View& view : m_views) {
+			if (!view.renderables) continue;
+
+			view.sort_keys = MTBucketArray<u64>::allocArray(m_allocator);
+			createSortKeys(view);
+			view.renderables->free(m_renderer.getEngine().getPageAllocator());
+			view.sort_keys->merge();
+		}
+
+		for (View& view : m_views) {
+			if (view.sort_keys && view.sort_keys->size() > 0) {
+				radixSort(view.sort_keys->key_ptr(), view.sort_keys->value_ptr(), view.sort_keys->size());
+			}
+		}
+
+		for (View& view : m_views) {
+			if (!view.sort_keys) continue;
+
+			createCommands(view);
+			MTBucketArray<u64>::freeArray(view.sort_keys);
+		}
+
+		JobSystem::decSignal(m_buckets_ready);
+	}
+
+	u32 createBucket(u32 view_id, const char* layer_name, const char* define, LuaWrapper::Optional<const char*> sort_str) {
+		const u8 layer = m_renderer.getLayerIdx(layer_name);
+		const Bucket::Sort sort = equalStrings(sort_str.get(""), "depth") ? Bucket::DEPTH : Bucket::DEFAULT;
+
+		Bucket& bucket = m_buckets.emplace();
+		bucket.layer = layer;
+		bucket.sort = sort;
+		bucket.view_id = view_id;
+		bucket.define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
+		return m_buckets.size() - 1;
+	}
+
+	void renderBucket(u32 bucket_id, RenderState state) {
+		RenderBucketJob& job = m_renderer.createJob<RenderBucketJob>();
+		job.m_render_state = state.value;
+		job.m_pipeline = this;
+		job.m_bucket_id = bucket_id;
+		m_renderer.queue(job, m_profiler_link);
+	}
+
 	void fillClusters(LuaWrapper::Optional<CameraParams> cp) {
 		FillClustersJob& job = m_renderer.createJob<FillClustersJob>(m_allocator);
 		
@@ -2941,161 +3468,6 @@ struct PipelineImpl final : Pipeline
 
 		m_renderer.queue(job, m_profiler_link);
 	}
-
-	void renderBucket(CmdPage* cmd_page, RenderState state)
-	{
-		PROFILE_FUNCTION();
-		struct RenderJob : Renderer::RenderJob
-		{
-			void setup() override {}
-
-			void execute() override
-			{
-				// inline in debug
-				#define READ(T, N) \
-					const T N = *(T*)cmd; \
-					cmd += sizeof(T); \
-					do {} while(false)
-				PROFILE_FUNCTION();
-				if(m_cmds->header.size == 0 && !m_cmds->header.next) {
-					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(m_cmds, true);
-					return;
-				}
-
-				Renderer& renderer = m_pipeline->m_renderer;
-
-				Stats stats = {};
-
-				const u64 render_states = m_render_state;
-				gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
-				const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
-				u32 material_ub_idx = 0xffFFffFF;
-				CmdPage* page = m_cmds;
-				while (page) {
-					const u8* cmd = page->data;
-					const u8* cmd_end = page->data + page->header.size;
-					while (cmd != cmd_end) {
-						READ(RenderableTypes, type);
-						switch(type) {
-							case RenderableTypes::MESH:
-							case RenderableTypes::MESH_GROUP:
-							case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
-								READ(Mesh::RenderData*, mesh);
-								READ(Material::RenderData*, material);
-								READ(gpu::ProgramHandle, program);
-								READ(u16, instances_count);
-								READ(gpu::BufferHandle, buffer);
-								READ(u32, offset);
-
-								gpu::bindTextures(material->textures, 0, material->textures_count);
-								gpu::setState(material->render_states | render_states);
-								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-									material_ub_idx = material->material_constants;
-								}
-
-								gpu::useProgram(program);
-
-								gpu::bindIndexBuffer(mesh->index_buffer_handle);
-								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-								gpu::bindVertexBuffer(1, buffer, offset, 36);
-
-								gpu::drawTrianglesInstanced(mesh->indices_count, instances_count, mesh->index_type);
-								++stats.draw_call_count;
-								stats.triangle_count += instances_count * mesh->indices_count / 3;
-								stats.instance_count += instances_count;
-								break;
-							}
-							case RenderableTypes::SKINNED: {
-								READ(Mesh::RenderData*, mesh);
-								READ(Material::RenderData*, material);
-								READ(gpu::ProgramHandle, program);
-								READ(Vec3, pos);
-								READ(Quat, rot);
-								READ(float, scale);
-								READ(i32, bones_count);
-
-								Matrix* bones = (Matrix*)cmd;
-								cmd += sizeof(bones[0]) * bones_count;
-
-								Matrix model_mtx(pos, rot);
-								model_mtx.multiply3x3(scale);
-
-								gpu::bindTextures(material->textures, 0, material->textures_count);
-
-								gpu::setState(material->render_states | render_states);
-								if (material_ub_idx != material->material_constants) {
-									gpu::bindUniformBuffer(2, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
-									material_ub_idx = material->material_constants;
-								}
-
-								Matrix dc_bones[256];
-								ASSERT(bones_count < (i32)lengthOf(dc_bones));
-
-								dc_bones[0] = model_mtx;
-								memcpy(&dc_bones[1], bones, sizeof(Matrix) * bones_count);
-								gpu::update(m_pipeline->m_drawcall_ub, dc_bones, sizeof(Matrix) * (bones_count + 1));
-
-								gpu::useProgram(program);
-
-								gpu::bindIndexBuffer(mesh->index_buffer_handle);
-								gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
-								gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-								gpu::drawTriangles(0, mesh->indices_count, mesh->index_type);
-								++stats.draw_call_count;
-								stats.triangle_count += mesh->indices_count / 3;
-								++stats.instance_count;
-								break;
-							}
-							case RenderableTypes::DECAL: {
-								READ(Material::RenderData*, material);
-								READ(gpu::ProgramHandle, program);
-								READ(gpu::BufferHandle, buffer);
-								READ(u32, offset);
-								READ(u32, count);
-								
-								gpu::bindTextures(material->textures, 0, material->textures_count);
-								
-								gpu::useProgram(program);
-								gpu::setState(material->render_states | render_states);
-								gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
-								gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-								gpu::bindVertexBuffer(1, buffer, offset, 40);
-
-								gpu::drawTrianglesInstanced(36, count, gpu::DataType::U16);
-								++stats.draw_call_count;
-								stats.instance_count += count;
-								break;
-							}
-							default: ASSERT(false); break;
-						}
-					}
-					CmdPage* next = page->header.next;
-					m_pipeline->m_renderer.getEngine().getPageAllocator().deallocate(page, true);
-					page = next;
-				}
-				#undef READ
-				Profiler::pushInt("drawcalls", stats.draw_call_count);
-				Profiler::pushInt("instances", stats.instance_count);
-				Profiler::pushInt("triangles", stats.triangle_count);
-				m_pipeline->m_stats.draw_call_count += stats.draw_call_count;
-				m_pipeline->m_stats.instance_count += stats.instance_count;
-				m_pipeline->m_stats.triangle_count += stats.triangle_count;
-			}
-
-			u64 m_render_state;
-			PipelineImpl* m_pipeline;
-			CmdPage* m_cmds;
-		};
-
-		RenderJob& job = m_renderer.createJob<RenderJob>();
-
-		job.m_render_state = state.value;
-		job.m_pipeline = this;
-		job.m_cmds = cmd_page;
-		m_renderer.queue(job, m_profiler_link);
-	}
-
 
 	CameraParams getShadowCameraParams(i32 slice)
 	{
@@ -3496,657 +3868,241 @@ struct PipelineImpl final : Pipeline
 		u32 m_define_mask = 0;
 	};
 
+	void createSortKeys(PipelineImpl::View& view) {
+		MTBucketArray<u64>& sort_keys = *view.sort_keys;
+		if (view.renderables->header.count == 0 && !view.renderables->header.next) return;
+		PagedListIterator<const CullResult> iterator(view.renderables);
 
-	struct PrepareCommandsRenderJob : Renderer::RenderJob
-	{
-		enum class SortOrder : u8 {
-			DEFAULT,
-			DEPTH
-		};
-
-
-		PrepareCommandsRenderJob(IAllocator& allocator, PageAllocator& page_allocator) 
-			: m_allocator(allocator)
-			, m_page_allocator(page_allocator)
-		{
-			memset(m_bucket_map, 0xff, sizeof(m_bucket_map));
-		}
-
-
-		struct Histogram {
-			static constexpr u32 BITS = 11;
-			static constexpr u32 SIZE = 1 << BITS;
-			static constexpr u32 BIT_MASK = SIZE - 1;
-			static constexpr i32 STEP = 4096;
-
-			u32 m_histogram[SIZE];
-			bool m_sorted;
-			Mutex m_cs;
-
-			void compute(const u64* keys, const u64* values, int size, u16 shift) {
-				memset(m_histogram, 0, sizeof(m_histogram));
-				m_sorted = true;
-
-				volatile i32 counter = 0;
-				JobSystem::runOnWorkers([&](){
-					PROFILE_FUNCTION();
-					u32 histogram[SIZE];
-					bool sorted = true;
-					memset(histogram, 0, sizeof(histogram));
-
-					i32 begin = atomicAdd(&counter, STEP);
-
-					while (begin < size) {
-						const i32 end = minimum(size, begin + STEP);
-
-						u64 key = begin > 0 ? keys[begin - 1] : keys[0];
-						u64 prev_key = key;
-						for (i32 i = begin; i < end; ++i) {
-							key = keys[i];
-							const u16 index = (key >> shift) & BIT_MASK;
-							++histogram[index];
-							sorted &= prev_key <= key;
-							prev_key = key;
-						}
-						begin = atomicAdd(&counter, STEP);
-					}
-
-					MutexGuard lock(m_cs);
-					m_sorted &= sorted;
-					for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
-						m_histogram[i] += histogram[i]; 
-					}
-				});
+		JobSystem::runOnWorkers([&](){
+			PROFILE_BLOCK("create keys");
+			int total = 0;
+			u32 bucket_map[255];
+			for (u32 i = 0; i < 255; ++i) {
+				bucket_map[i] = view.layer_to_bucket[i];
+				if (bucket_map[i] == 0xff) {
+					bucket_map[i] = 0xffFFffFF;
+				}
+				else if (m_buckets[bucket_map[i]].sort == Bucket::DEPTH) {
+					bucket_map[i] |= 0x100;
+				}
 			}
-		};
-
-
-		void radixSort(u64* _keys, u64* _values, int size)
-		{
-			PROFILE_FUNCTION();
-			Profiler::pushInt("count", size);
-			if(size == 0) return;
-
-			Array<u64> tmp_mem(m_allocator);
-
-			u64* keys = _keys;
-			u64* values = _values;
-			u64* tmp_keys = nullptr;
-			u64* tmp_values = nullptr;
-
-			Histogram histogram;
-			u16 shift = 0;
-
-			for (int pass = 0; pass < 6; ++pass) {
-				histogram.compute(keys, values, size, shift);
-
-				if (histogram.m_sorted) {
-					if (pass & 1) {
-						memcpy(_keys, tmp_mem.begin(), tmp_mem.byte_size() / 2);
-						memcpy(_values, &tmp_mem[size], tmp_mem.byte_size() / 2);
-					}
-					return;
-				}
-
-				if (!tmp_keys) {
-					tmp_mem.resize(size * 2);
-					tmp_keys = tmp_mem.begin();
-					tmp_values = &tmp_mem[size];
-				}
-
-				u32 offset = 0;
-				for (int i = 0; i < Histogram::SIZE; ++i) {
-					const u32 count = histogram.m_histogram[i];
-					histogram.m_histogram[i] = offset;
-					offset += count;
-				}
-
-				for (int i = 0; i < size; ++i) {
-					const u64 key = keys[i];
-					const u16 index = (key >> shift) & Histogram::BIT_MASK;
-					const u32 dest = histogram.m_histogram[index]++;
-					tmp_keys[dest] = key;
-					tmp_values[dest] = values[i];
-				}
-
-				swap(tmp_keys, keys);
-				swap(tmp_values, values);
-
-				shift += Histogram::BITS;
-			}
-		}
-
-
-		void createSortKeys(const CullResult* renderables, RenderableTypes type, MTBucketArray<u64>& sort_keys)
-		{
-			ASSERT(renderables);
-			if (renderables->header.count == 0 && !renderables->header.next) return;
-			PagedListIterator<const CullResult> iterator(renderables);
-
-			JobSystem::runOnWorkers([&](){
-				PROFILE_BLOCK("create keys");
-				int total = 0;
-				const auto* bucket_map = m_bucket_map;
-				RenderScene* scene = m_pipeline->m_scene;
-				ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
-				const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
-				MTBucketArray<u64>::Bucket result = sort_keys.begin();
-				const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
-				const DVec3 camera_pos = m_camera_params.pos;
+			RenderScene* scene = m_scene;
+			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
+			const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
+			MTBucketArray<u64>::Bucket result = sort_keys.begin();
+			const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
+			const DVec3 camera_pos = view.cp.pos;
+				
+			for(;;) {
+				const CullResult* page = iterator.next();
+				if(!page) break;
+				total += page->header.count;
+				const EntityRef* LUMIX_RESTRICT renderables = page->entities;
+				const RenderableTypes type = (RenderableTypes)page->header.type;
 				const u64 type_mask = (u64)type << 32;
 				
-				for(;;) {
-					const CullResult* page = iterator.next();
-					if(!page) break;
-					total += page->header.count;
-					const EntityRef* LUMIX_RESTRICT renderables = page->entities;
-					switch(type) {
-						case RenderableTypes::LOCAL_LIGHT: {
-							// TODO use this for fillClusters
-							/*
-							if(local_light_bucket < 0xff) {
-								for (int i = 0, c = page->header.count; i < c; ++i) {
-									result.push((u64)local_light_bucket << 56, renderables[i].index | type_mask);
-								}
-							}*/
-							break;
-						}
-						case RenderableTypes::DECAL: {
-							for (int i = 0, c = page->header.count; i < c; ++i) {
-								const EntityRef e = renderables[i];
-								const Material* material = scene->getDecalMaterial(e);
-								const int layer = material->getLayer();
-								const u8 bucket = bucket_map[layer];
-								if (bucket < 0xff) {
-									// TODO material can have the same sort key as mesh
-									const u64 subrenderable = e.index | type_mask;
-									result.push(material->getSortKey() | ((u64)bucket << 56), subrenderable);
-								}
-							}
-							break;
-						}
-						case RenderableTypes::MESH: {
-							for (int i = 0, c = page->header.count; i < c; ++i) {
-								const EntityRef e = renderables[i];
-								const MeshSortData& mesh = mesh_data[e.index];
-								const u32 bucket = bucket_map[mesh.layer];
-								const u64 subrenderable = e.index | type_mask;
-								if (bucket < 0xff) {
-									const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
-									result.push(key, subrenderable);
-								} else if (bucket < 0xffFF) {
-									const DVec3 pos = entity_data[e.index].pos;
-									const DVec3 rel_pos = pos - camera_pos;
-									const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-									const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-									const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
-									result.push(key, subrenderable);
-								}
-							}
-							break;
-						}
-						case RenderableTypes::SKINNED:
-						case RenderableTypes::MESH_GROUP:
-						case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
-							for (int i = 0, c = page->header.count; i < c; ++i) {
-								const EntityRef e = renderables[i];
-								const DVec3 pos = entity_data[e.index].pos;
-								ModelInstance& mi = model_instances[e.index];
-								const float squared_length = float((pos - camera_pos).squaredLength());
-								
-								const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
-
-								auto create_key = [&](const LODMeshIndices& lod){
-									for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
-										const Mesh& mesh = mi.meshes[mesh_idx];
-										const u32 bucket = bucket_map[mesh.layer];
-										const u64 type_mask = (u64)type << 32;
-										const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
-										ASSERT(!mi.custom_material || mesh_idx == 0);
-										const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
-										if (bucket < 0xff) {
-											const u64 key = ((u64)mesh_sort_key<< 32) | ((u64)bucket << 56);
-											result.push(key, subrenderable);
-										} else if (bucket < 0xffFF) {
-											const DVec3 pos = entity_data[e.index].pos;
-											const DVec3 rel_pos = pos - camera_pos;
-											const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
-											const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-											const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
-											result.push(key, subrenderable);
-										}
-									}
-								};
-
-								if (mi.lod != lod_idx) {
-									const float d = lod_idx - mi.lod;
-									const float ad = fabsf(d);
-									
-									if (ad <= 0.01f) {
-										mi.lod = float(lod_idx);
-										create_key(mi.model->getLODIndices()[lod_idx]);
-									}
-									else {
-										mi.lod += d / ad * 0.01f;
-										const u32 cur_lod_idx = u32(mi.lod);
-										create_key(mi.model->getLODIndices()[cur_lod_idx]);
-										create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
-									}
-								}
-								else {
-									const LODMeshIndices& lod = mi.model->getLODIndices()[lod_idx];
-									create_key(lod);
-								}
-							}
-							break;
-						}
-					}
-				}
-				result.end();
-				Profiler::pushInt("count", total);
-			});
-		}
-
-
-		void setup() override
-		{
-			PROFILE_FUNCTION();
-			if(!m_pipeline->m_scene) return;
-
-			const RenderScene* scene = m_pipeline->getScene();
-
-			MTBucketArray<u64>* sort_keys = MTBucketArray<u64>::allocArray(m_allocator);
-
-			const RenderableTypes types[] = {
-				RenderableTypes::MESH,
-				RenderableTypes::MESH_GROUP,
-				RenderableTypes::MESH_MATERIAL_OVERRIDE,
-				RenderableTypes::SKINNED,
-				RenderableTypes::DECAL,
-				RenderableTypes::LOCAL_LIGHT
-			};
-			JobSystem::forEach(lengthOf(types), 1, [&](i32 idx, i32){
-				CullResult* renderables = scene->getRenderables(m_camera_params.frustum, types[idx]);
-				if (renderables) {
-					createSortKeys(renderables, types[idx], *sort_keys);
-					renderables->free(m_pipeline->m_renderer.getEngine().getPageAllocator());
-				}
-			});
-			sort_keys->merge();
-
-			if (sort_keys->size() > 0) {
-				radixSort(sort_keys->key_ptr(), sort_keys->value_ptr(), sort_keys->size());
-				createCommands(sort_keys->value_ptr(), sort_keys->key_ptr(), sort_keys->size());
-			}
-
-			MTBucketArray<u64>::freeArray(sort_keys);
-		}
-
-
-		void createCommands(CmdPage* first_page
-			, const u64* LUMIX_RESTRICT renderables
-			, const u64* LUMIX_RESTRICT sort_keys
-			, int count)
-		{
-			// because of inlining in debug
-			#define WRITE(x) do { \
-				memcpy(out, &(x), sizeof(x)); \
-				out += sizeof(x); \
-			} while(false)
-				
-			#define WRITE_FN(x) do { \
-				auto* p = x; \
-				memcpy(out, &p, sizeof(p)); \
-				out += sizeof(p); \
-			} while(false)
-
-			PROFILE_BLOCK("create cmds");
-			const Universe& universe = m_pipeline->m_scene->getUniverse();
-			Renderer& renderer = m_pipeline->m_renderer;
-			RenderScene* scene = m_pipeline->m_scene;
-			const ShiftedFrustum frustum = m_camera_params.frustum;
-			const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
-			const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
-			const DVec3 camera_pos = m_camera_params.pos;
-				
-			CmdPage* cmd_page = first_page;
-			cmd_page->header.bucket = sort_keys[0] >> 56;
-			const bool sort_depth = m_bucket_map[cmd_page->header.bucket] > 0xff;
-			u64 instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
-			u8* out = cmd_page->data;
-			u32 define_mask = m_define_mask[cmd_page->header.bucket];
-
-			u32 instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-			u32 skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
-
-			auto new_page = [&](u8 bucket){
-				cmd_page->header.size = int(out - cmd_page->data);
-				CmdPage* new_page = new (NewPlaceholder(), m_page_allocator.allocate(true)) CmdPage;
-				cmd_page->header.next = new_page;
-				cmd_page = new_page;
-				new_page->header.bucket = bucket;
-				out = cmd_page->data;
-				define_mask = m_define_mask[bucket];
-				instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
-				skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
-				const bool sort_depth = m_bucket_map[bucket] > 0xff;
-				instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
-			};
-
-			for (u32 i = 0, c = count; i < c; ++i) {
-				const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
-				const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & 0xff);
-				const u8 bucket = sort_keys[i] >> 56;
-				if(bucket != cmd_page->header.bucket) {
-					new_page(bucket);
-				}
-
 				switch(type) {
-					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
-						const u32 mesh_idx = renderables[i] >> 40;
-						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-						const Mesh& mesh = mi->meshes[mesh_idx];
-
-						const Renderer::TransientSlice slice = renderer.allocTransient((sizeof(Vec4) + sizeof(float)) * 2);
-						u8* instance_data = slice.ptr;
-						const EntityRef e = { int(renderables[i] & 0xFFffFFff) };
-						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-						instance_data += sizeof(tr.rot);
-						memcpy(instance_data, &lpos, sizeof(lpos));
-						instance_data += sizeof(lpos);
-						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-						instance_data += sizeof(tr.scale);
-						const float lod_d = model_instances[e.index].lod - mesh.lod;
-						memcpy(instance_data, &lod_d, sizeof(lod_d));
-						instance_data += sizeof(lod_d);
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
-							new_page(bucket);
-						}
-
-						Shader* shader = mesh.material->getShader();
-						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
-
-						if (mi->custom_material->isReady()) {
-							WRITE(type);
-							WRITE(mesh.render_data);
-							WRITE_FN(mi->custom_material->getRenderData());
-							WRITE(prog);
-							u16 count = 1;
-							WRITE(count);
-							WRITE(slice.buffer);
-							WRITE(slice.offset);
-						}
-							
-						break;
-					}
-					case RenderableTypes::MESH_GROUP:
-					case RenderableTypes::MESH: {
-						const u32 mesh_idx = renderables[i] >> 40;
-						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-						const Mesh& mesh = mi->meshes[mesh_idx];
-						const float mesh_lod = mesh.lod;
-						int start_i = i;
-						const u64 key = sort_keys[i] & instance_key_mask;
-						while (i < c && (sort_keys[i] & instance_key_mask) == key) {
-							++i;
-						}
-						const u16 count = u16(i - start_i);
-						const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec4) + sizeof(float)) * 2);
-						u8* instance_data = slice.ptr;
-						for (int j = start_i; j < start_i + count; ++j) {
-							const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
-							const Transform& tr = entity_data[e.index];
-							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-							instance_data += sizeof(tr.rot);
-							memcpy(instance_data, &lpos, sizeof(lpos));
-							instance_data += sizeof(lpos);
-							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-							instance_data += sizeof(tr.scale);
-							const float lod_d = model_instances[e.index].lod - mesh_lod;
-							memcpy(instance_data, &lod_d, sizeof(lod_d));
-							instance_data += sizeof(lod_d);
-						}
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
-							new_page(bucket);
-						}
-
-						Shader* shader = mesh.material->getShader();
-						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
-
-						WRITE(type);
-						WRITE(mesh.render_data);
-						WRITE_FN(mesh.material->getRenderData());
-						WRITE(prog);
-						WRITE(count);
-						WRITE(slice.buffer);
-						WRITE(slice.offset);
-							
-						--i;
-						break;
-					}
-					case RenderableTypes::SKINNED: {
-						const u32 mesh_idx = renderables[i] >> 40;
-						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-						const Transform& tr = entity_data[e.index];
-						const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
-						const Mesh& mesh = mi->meshes[mesh_idx];
-						Shader* shader = mesh.material->getShader();
-						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, skinned_define_mask | mesh.material->getDefineMask());
-
-						if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 57) {
-							new_page(bucket);
-						}
-
-						WRITE(type);
-						WRITE(mesh.render_data);
-						WRITE_FN(mesh.material->getRenderData());
-						WRITE(prog);
-						WRITE(rel_pos);
-						WRITE(tr.rot);
-						WRITE(tr.scale);
-						WRITE(mi->pose->count);
-
-						const Quat* rotations = mi->pose->rotations;
-						const Vec3* positions = mi->pose->positions;
-
-						Model& model = *mi->model;
-						for (int j = 0, c = mi->pose->count; j < c; ++j) {
-							const Model::Bone& bone = model.getBone(j);
-							const LocalRigidTransform tmp = {positions[j], rotations[j]};
-							const Matrix m = (tmp * bone.inv_bind_transform).toMatrix();
-							WRITE(m);
-						}
+					case RenderableTypes::LOCAL_LIGHT: {
+						// TODO use this for fillClusters
 						break;
 					}
 					case RenderableTypes::DECAL: {
-						const Material* material = scene->getDecalMaterial(e);
-
-						int start_i = i;
-						const u64 key = sort_keys[i];
-						while (i < c && sort_keys[i] == key) {
-							++i;
-						}
-						const u32 count = i - start_i;
-						const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) * 2 + sizeof(Quat)));
-						const gpu::ProgramHandle prog = material->getShader()->getProgram(m_pipeline->m_decal_decl, define_mask | material->getDefineMask());
-
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
-							new_page(bucket);
-						}
-						WRITE(type);
-						WRITE_FN(material->getRenderData());
-						WRITE(prog);
-						WRITE(slice.buffer);
-						WRITE(slice.offset);
-						WRITE(count);
-						u8* mem = slice.ptr;
-						for(u32 j = start_i; j < i; ++j) {
-							const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-							const Transform& tr = entity_data[e.index];
-							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-							memcpy(mem, &lpos, sizeof(lpos));
-							mem += sizeof(lpos);
-							memcpy(mem, &tr.rot, sizeof(tr.rot));
-							mem += sizeof(tr.rot);
-							const Vec3 half_extents = scene->getDecalHalfExtents(e);
-							memcpy(mem, &half_extents, sizeof(half_extents));
-							mem += sizeof(half_extents);
+						for (int i = 0, c = page->header.count; i < c; ++i) {
+							const EntityRef e = renderables[i];
+							const Material* material = scene->getDecalMaterial(e);
+							const int layer = material->getLayer();
+							const u8 bucket = bucket_map[layer];
+							if (bucket < 0xff) {
+								// TODO material can have the same sort key as mesh
+								const u64 subrenderable = e.index | type_mask;
+								result.push(material->getSortKey() | ((u64)bucket << 56), subrenderable);
+							}
 						}
 						break;
 					}
-					case RenderableTypes::LOCAL_LIGHT: {
-						const u64 type_bits = (u64)RenderableTypes::LOCAL_LIGHT << 32;
-						const u64 type_mask = (u64)0xff << 32;
-						int start_i = i;
-						while (i < c && (renderables[i] & type_mask) == type_bits) {
-							++i;
+					case RenderableTypes::MESH: {
+						for (int i = 0, c = page->header.count; i < c; ++i) {
+							const EntityRef e = renderables[i];
+							const MeshSortData& mesh = mesh_data[e.index];
+							const u32 bucket = bucket_map[mesh.layer];
+							const u64 subrenderable = e.index | type_mask;
+							if (bucket < 0xff) {
+								const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
+								result.push(key, subrenderable);
+							} else if (bucket < 0xffFF) {
+								const DVec3 pos = entity_data[e.index].pos;
+								const DVec3 rel_pos = pos - camera_pos;
+								const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+								const u32 depth_bits = floatFlip(*(u32*)&squared_length);
+								const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+								result.push(key, subrenderable);
+							}
 						}
-
-						const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(float) * 16);
-						struct LightData {
-							Quat rot;
-							Vec3 pos;
-							float range;
-							float attenuation;
-							Vec3 color;
-							Vec3 dir;
-							float fov;
-						};
-
-						LightData* beg = (LightData*)slice.ptr;
-						LightData* end = (LightData*)(slice.ptr + slice.size - sizeof(LightData));
-
-						for (u32 j = start_i; j < i; ++j) {
-							const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-							const Transform& tr = entity_data[e.index];
-							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-							const PointLight& pl = scene->getPointLight(e);
-							const bool intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
-							
-							LightData* iter = intersecting ? end : beg;
-							iter->pos = lpos;
-							iter->rot = tr.rot;
-							iter->range = pl.range;
-							iter->attenuation = pl.attenuation_param;
-							iter->color = pl.color * pl.intensity;
-							iter->dir = tr.rot * Vec3(0, 0, 1);
-							iter->fov = pl.fov;
-							intersecting ? --end : ++beg;
-						}
-						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 9) {
-							new_page(bucket);
-						}
-						WRITE(type);
-						const u32 total_count = i - start_i;
-						const u32 nonintersecting_count = u32(beg - (LightData*)slice.ptr);
-						WRITE(total_count);
-						WRITE(nonintersecting_count);
-						WRITE(slice.buffer);
-						WRITE(slice.offset);
-
-						--i;
 						break;
 					}
-					default: ASSERT(false); break;
+					case RenderableTypes::SKINNED:
+					case RenderableTypes::MESH_GROUP:
+					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
+						for (int i = 0, c = page->header.count; i < c; ++i) {
+							const EntityRef e = renderables[i];
+							const DVec3 pos = entity_data[e.index].pos;
+							ModelInstance& mi = model_instances[e.index];
+							const float squared_length = float((pos - camera_pos).squaredLength());
+								
+							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
+
+							auto create_key = [&](const LODMeshIndices& lod){
+								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
+									const Mesh& mesh = mi.meshes[mesh_idx];
+									const u32 bucket = bucket_map[mesh.layer];
+									const u64 type_mask = (u64)type << 32;
+									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
+									ASSERT(!mi.custom_material || mesh_idx == 0);
+									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
+									if (bucket < 0xff) {
+										const u64 key = ((u64)mesh_sort_key<< 32) | ((u64)bucket << 56);
+										result.push(key, subrenderable);
+									} else if (bucket < 0xffFF) {
+										const DVec3 pos = entity_data[e.index].pos;
+										const DVec3 rel_pos = pos - camera_pos;
+										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
+										const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+										result.push(key, subrenderable);
+									}
+								}
+							};
+
+							if (mi.lod != lod_idx) {
+								const float d = lod_idx - mi.lod;
+								const float ad = fabsf(d);
+									
+								if (ad <= 0.01f) {
+									mi.lod = float(lod_idx);
+									create_key(mi.model->getLODIndices()[lod_idx]);
+								}
+								else {
+									mi.lod += d / ad * 0.01f;
+									const u32 cur_lod_idx = u32(mi.lod);
+									create_key(mi.model->getLODIndices()[cur_lod_idx]);
+									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+								}
+							}
+							else {
+								const LODMeshIndices& lod = mi.model->getLODIndices()[lod_idx];
+								create_key(lod);
+							}
+						}
+						break;
+					}
 				}
 			}
-			cmd_page->header.size = int(out - cmd_page->data);
-			#undef WRITE
-			#undef WRITE_FN
-		}
+			result.end();
+			Profiler::pushInt("count", total);
+		});
+	}
 
+	struct Histogram {
+		static constexpr u32 BITS = 11;
+		static constexpr u32 SIZE = 1 << BITS;
+		static constexpr u32 BIT_MASK = SIZE - 1;
+		static constexpr i32 STEP = 4096;
 
-		void createCommands(const u64* renderables, const u64* sort_keys, int size)
-		{
-			constexpr i32 STEP = 4096;
-			const i32 steps = (size + STEP - 1) / STEP;
-			CmdPage* prev = nullptr;
-			CmdPage* first = nullptr;
-			m_page_allocator.lock();
-			for (i32 i = 0; i < steps; ++i) {
-				CmdPage* page = new (NewPlaceholder(), m_page_allocator.allocate(false)) CmdPage;
-				if (i == 0) first = page;
-				if (prev) prev->header.next_init = page;
-				prev = page;
-			}
-			m_page_allocator.unlock();
-	
-			JobSystem::forEach(size, STEP, [&](i32 begin, i32 end){
-				const i32 s = end - begin;
-				i32 step_idx = begin / STEP;
-				CmdPage* page = first;
-				while (step_idx) {
-					page = page->header.next_init;
-					--step_idx;
+		u32 m_histogram[SIZE];
+		bool m_sorted;
+		Mutex m_cs;
+
+		void compute(const u64* keys, const u64* values, int size, u16 shift) {
+			memset(m_histogram, 0, sizeof(m_histogram));
+			m_sorted = true;
+
+			volatile i32 counter = 0;
+			JobSystem::runOnWorkers([&](){
+				PROFILE_FUNCTION();
+				u32 histogram[SIZE];
+				bool sorted = true;
+				memset(histogram, 0, sizeof(histogram));
+
+				i32 begin = atomicAdd(&counter, STEP);
+
+				while (begin < size) {
+					const i32 end = minimum(size, begin + STEP);
+
+					u64 key = begin > 0 ? keys[begin - 1] : keys[0];
+					u64 prev_key = key;
+					for (i32 i = begin; i < end; ++i) {
+						key = keys[i];
+						const u16 index = (key >> shift) & BIT_MASK;
+						++histogram[index];
+						sorted &= prev_key <= key;
+						prev_key = key;
+					}
+					begin = atomicAdd(&counter, STEP);
 				}
 
-				createCommands(page, renderables + begin, sort_keys + begin, s);
+				MutexGuard lock(m_cs);
+				m_sorted &= sorted;
+				for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
+					m_histogram[i] += histogram[i]; 
+				}
 			});
-
-			CmdPage* page = first;
-			CmdPage* next_init = first->header.next_init;
-			while(page) {
-				m_command_sets[page->header.bucket]->header.next = page;
-				m_command_sets[page->header.bucket] = page;
-				CmdPage* next = page->header.next;
-				page->header.next = nullptr;
-				page = next;
-				if (!page) {
-					page = next_init;
-					next_init = page ? page->header.next_init : nullptr;
-				}
-			}
 		}
-
-
-		void execute() override {}
-
-		IAllocator& m_allocator;
-		PageAllocator& m_page_allocator;
-		CameraParams m_camera_params;
-		PipelineImpl* m_pipeline;
-		gpu::TextureHandle m_global_textures[16];
-		int m_global_textures_count = 0;
-		CmdPage* m_command_sets[255];
-		u32 m_bucket_map[255];
-		SortOrder m_bucket_sort_order[255] = {};
-		u32 m_define_mask[255];
-		u8 m_bucket_count;
-	};
-	
-	struct RenderBucket {
-		u32 define_mask;
-		PrepareCommandsRenderJob::SortOrder order;
-		i32 layers[4];
-		u32 layers_count = 0;
 	};
 
-	void prepareCommands(const CameraParams& cp, Span<RenderBucket> buckets, Span<CmdPage*> out)
+
+	void radixSort(u64* _keys, u64* _values, int size)
 	{
-		ASSERT(out.length() >= buckets.length());
-		IAllocator& allocator = m_renderer.getAllocator();
-		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
-		PrepareCommandsRenderJob& cmd = m_renderer.createJob<PrepareCommandsRenderJob>(allocator, page_allocator);
+		PROFILE_FUNCTION();
+		Profiler::pushInt("count", size);
+		if(size == 0) return;
 
-		static_assert(sizeof(CmdPage) == PageAllocator::PAGE_SIZE, "Wrong page size");
-		for(u32 i = 0; i < buckets.length(); ++i) {
-			CmdPage* page = new (NewPlaceholder(), page_allocator.allocate(true)) CmdPage;
-			cmd.m_command_sets[i] = page;
-			cmd.m_define_mask[i] = buckets[i].define_mask;
-			cmd.m_bucket_sort_order[i] = buckets[i].order;
-			for (u32 j = 0; j < buckets[i].layers_count; ++j) {
-				cmd.m_bucket_map[buckets[i].layers[j]] = i | (buckets[i].order == PrepareCommandsRenderJob::SortOrder::DEPTH ? 256 : 0);
+		Array<u64> tmp_mem(m_allocator);
+
+		u64* keys = _keys;
+		u64* values = _values;
+		u64* tmp_keys = nullptr;
+		u64* tmp_values = nullptr;
+
+		Histogram histogram;
+		u16 shift = 0;
+
+		for (int pass = 0; pass < 6; ++pass) {
+			histogram.compute(keys, values, size, shift);
+
+			if (histogram.m_sorted) {
+				if (pass & 1) {
+					memcpy(_keys, tmp_mem.begin(), tmp_mem.byte_size() / 2);
+					memcpy(_values, &tmp_mem[size], tmp_mem.byte_size() / 2);
+				}
+				return;
 			}
-			out[i] = page;
-		}
-		cmd.m_camera_params = cp;
-		cmd.m_pipeline = this;
-		cmd.m_bucket_count = buckets.length();
 
-		m_renderer.queue(cmd, m_profiler_link);
+			if (!tmp_keys) {
+				tmp_mem.resize(size * 2);
+				tmp_keys = tmp_mem.begin();
+				tmp_values = &tmp_mem[size];
+			}
+
+			u32 offset = 0;
+			for (int i = 0; i < Histogram::SIZE; ++i) {
+				const u32 count = histogram.m_histogram[i];
+				histogram.m_histogram[i] = offset;
+				offset += count;
+			}
+
+			for (int i = 0; i < size; ++i) {
+				const u64 key = keys[i];
+				const u16 index = (key >> shift) & Histogram::BIT_MASK;
+				const u32 dest = histogram.m_histogram[index]++;
+				tmp_keys[dest] = key;
+				tmp_values[dest] = values[i];
+			}
+
+			swap(tmp_keys, keys);
+			swap(tmp_values, values);
+
+			shift += Histogram::BITS;
+		}
 	}
 
 	void clear(u32 flags, float r, float g, float b, float a, float depth)
@@ -4169,7 +4125,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-
 	void viewport(int x, int y, int w, int h)
 	{
 		struct Cmd : Renderer::RenderJob {
@@ -4189,7 +4144,6 @@ struct PipelineImpl final : Pipeline
 
 		m_renderer.queue(cmd, m_profiler_link);
 	}
-
 
 	void beginBlock(const char* name)
 	{
@@ -4215,7 +4169,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-
 	void endBlock()
 	{
 		struct Cmd : Renderer::RenderJob
@@ -4235,7 +4188,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 		m_profiler_link = 0;
 	}
-
 	
 	void setOutput(int rb_index) 
 	{
@@ -4264,7 +4216,6 @@ struct PipelineImpl final : Pipeline
 		return s.id;
 	}
 
-
 	void callLuaFunction(const char* function) override 
 	{
 		if (!m_lua_state) return;
@@ -4284,7 +4235,6 @@ struct PipelineImpl final : Pipeline
 		}
 		lua_pop(m_lua_state, 1);
 	}
-	
 
 	void saveRenderbuffer(int render_buffer, const char* out_path)
 	{
@@ -4328,7 +4278,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-
 	void registerLuaAPI(lua_State* L)
 	{
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
@@ -4359,11 +4308,13 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(bindTextures);
 		REGISTER_FUNCTION(bindUniformBuffer);
 		REGISTER_FUNCTION(clear);
+		REGISTER_FUNCTION(createBucket);
 		REGISTER_FUNCTION(createBuffer);
 		REGISTER_FUNCTION(createPersistentRenderbuffer);
 		REGISTER_FUNCTION(createRenderbuffer);
 		REGISTER_FUNCTION(createTexture2D);
 		REGISTER_FUNCTION(createTexture3D);
+		REGISTER_FUNCTION(cull);
 		REGISTER_FUNCTION(dispatch);
 		REGISTER_FUNCTION(drawArray);
 		REGISTER_FUNCTION(endBlock);
@@ -4403,7 +4354,6 @@ struct PipelineImpl final : Pipeline
 		registerConst("STENCIL_REPLACE", (u32)gpu::StencilOps::REPLACE);
 
 		registerCFunction("drawcallUniforms", PipelineImpl::drawcallUniforms);
-		registerCFunction("prepareCommands", PipelineImpl::prepareCommands);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
 		registerCFunction("setRenderTargetsDS", PipelineImpl::setRenderTargetsDS);
 		registerCFunction("setRenderTargetsReadonlyDS", PipelineImpl::setRenderTargetsReadonlyDS);
@@ -4446,21 +4396,6 @@ struct PipelineImpl final : Pipeline
 		return m_renderbuffers[m_output].handle;
 	}
 
-	struct Renderbuffer {
-		u32 width;
-		u32 height;
-		gpu::TextureFormat format;
-		gpu::TextureHandle handle;
-		int frame_counter;
-		bool persistent;
-	};
-
-	struct ShaderRef {
-		Lumix::Shader* res;
-		int id;
-	};
-
-
 	IAllocator& m_allocator;
 	Renderer& m_renderer;
 	i64 m_profiler_link;
@@ -4474,6 +4409,9 @@ struct PipelineImpl final : Pipeline
 	Shader* m_draw2d_shader;
 	Stats m_last_frame_stats;
 	Stats m_stats; // accessed from render thread
+	Array<View> m_views;
+	Array<Bucket> m_buckets;
+	JobSystem::SignalHandle m_buckets_ready;
 	Viewport m_viewport;
 	int m_output;
 	Shader* m_debug_shape_shader;
