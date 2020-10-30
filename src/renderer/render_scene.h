@@ -279,6 +279,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) = 0;
 	virtual Path getModelInstanceMaterialOverride(EntityRef entity) = 0;
 	virtual CullResult* getRenderables(const ShiftedFrustum& frustum, RenderableTypes type) const = 0;
+	virtual CullResult* getRenderables(const ShiftedFrustum& frustum) const = 0;
 	virtual EntityPtr getFirstModelInstance() = 0;
 	virtual EntityPtr getNextModelInstance(EntityPtr entity) = 0;
 	virtual Model* getModelInstanceModel(EntityRef entity) = 0;

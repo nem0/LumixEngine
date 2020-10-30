@@ -265,7 +265,8 @@ struct CullingSystemImpl final : CullingSystem
 	LUMIX_FORCE_INLINE void doCulling(const CellPage& cell
 		, const Frustum& frustum
 		, CullResult* LUMIX_RESTRICT results
-		, PagedList<CullResult>& list)
+		, PagedList<CullResult>& list
+		, u8 type)
 	{
 		PROFILE_FUNCTION();
 		const Sphere* LUMIX_RESTRICT start = cell.spheres;
@@ -307,6 +308,7 @@ struct CullingSystemImpl final : CullingSystem
 			if(cursor == lengthOf(results->entities)) {
 				results->header.count = cursor;
 				results = list.push();
+				results->header.type = type;
 				cursor = 0;
 			}
 
@@ -316,8 +318,18 @@ struct CullingSystemImpl final : CullingSystem
 		results->header.count = cursor;
 	}
 
-
 	CullResult* cull(const ShiftedFrustum& frustum, u8 type) override
+	{
+		ASSERT(type != 0xff); // 0xff type is reserved for `all types`
+		return cullInternal(frustum, type);
+	}
+
+	CullResult* cull(const ShiftedFrustum& frustum) override
+	{
+		return cullInternal(frustum, 0xff);
+	}
+	
+	CullResult* cullInternal(const ShiftedFrustum& frustum, u8 type)
 	{
 		PROFILE_FUNCTION();
 		if (m_cells.empty()) return nullptr;
@@ -335,8 +347,11 @@ struct CullingSystemImpl final : CullingSystem
 				if (idx >= m_cells.size()) return;
 
 				CellPage& cell = *m_cells[idx];
-				if (cell.header.indices.type != type) continue;
-				if (!result) result = list.push();
+				if (type != 0xff && cell.header.indices.type != type) continue;
+				if (!result || result->header.type != cell.header.indices.type) {
+					result = list.push();
+					result->header.type = cell.header.indices.type;
+				}
 
 				if (frustum.containsAABB(cell.header.origin + v3_cell_size, v3_cell_size)) {
 					int to_cpy = cell.header.count;
@@ -344,6 +359,7 @@ struct CullingSystemImpl final : CullingSystem
 					while (to_cpy > 0) {
 						if(result->header.count == lengthOf(result->entities)) {
 							result = list.push();
+							result->header.type = cell.header.indices.type;
 						}
 						const int rem_space = lengthOf(result->entities) - result->header.count;
 						const int step = minimum(to_cpy, rem_space);
@@ -354,7 +370,7 @@ struct CullingSystemImpl final : CullingSystem
 					}
 				}
 				else if (frustum.intersectsAABB(cell.header.origin - v3_cell_size, v3_2_cell_size)) {
-					doCulling(cell, frustum.getRelative(cell.header.origin), result, list);
+					doCulling(cell, frustum.getRelative(cell.header.origin), result, list, cell.header.indices.type);
 				}
 			}
 		});

@@ -1813,6 +1813,12 @@ public:
 	}
 
 
+	CullResult* getRenderables(const ShiftedFrustum& frustum) const override
+	{
+		return m_culling_system->cull(frustum);
+	}
+
+
 	float getCameraScreenWidth(EntityRef camera) override { return m_cameras[camera].screen_width; }
 	float getCameraScreenHeight(EntityRef camera) override { return m_cameras[camera].screen_height; }
 
@@ -2428,6 +2434,7 @@ public:
 		auto map_iter = m_model_entity_map.find(model);
 		if(map_iter.isValid()) {
 			r.next_model = map_iter.value();
+			m_model_instances[r.next_model.index].prev_model = entity;
 			m_model_entity_map[model] = entity;
 		}
 		else {

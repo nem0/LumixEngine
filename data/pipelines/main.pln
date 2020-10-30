@@ -67,37 +67,40 @@ local grass_state = {
 	wireframe = false
 }
 
-function waterPass(water_set, colorbuffer, dsbuffer)
+function waterPass(entities, colorbuffer, dsbuffer)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
 	beginBlock("water_pass")
 	pass(getCameraParams())
 	bindRenderbuffers({ dsbuffer, }, 4);
-	renderBucket(water_set, water_state)
+	local bucket = createBucket(entities, "water", "", "depth")
+	renderBucket(bucket, water_state)
 	endBlock()
 end
 
-function transparentPass(transparent_set, colorbuffer, dsbuffer)
+function transparentPass(entities, colorbuffer, dsbuffer)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
 	beginBlock("transparent_pass")
 	pass(getCameraParams())
-	renderBucket(transparent_set, transparent_state)
+	local bucket = createBucket(entities, "transparent", "", "depth")
+	renderBucket(bucket, transparent_state)
 	local view_params = getCameraParams()
 	renderParticles(view_params)
 	endBlock()
 end
 
-function impostorPass(impostor_set, colorbuffer, dsbuffer)
+function impostorPass(entities, colorbuffer, dsbuffer)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
 	beginBlock("impostor_pass")
 	pass(getCameraParams())
-	renderBucket(impostor_set, impostor_state)
+	local bucket = createBucket(entities, "impostor", "")
+	renderBucket(bucket, impostor_state)
 	endBlock()
 end
 
-function geomPass(default_set, decal_set)
+function geomPass(entities)
 	beginBlock("geom_pass")
 		local gbuffer0 = createRenderbuffer(viewport_w, viewport_h, "rgba8", "gbuffer0")
 		local gbuffer1 = createRenderbuffer(viewport_w, viewport_h, "rgba16", "gbuffer1")
@@ -114,7 +117,9 @@ function geomPass(default_set, decal_set)
 		pass(view_params)
 		renderTerrains(view_params, default_state)
 		renderGrass(view_params, grass_state)
-		renderBucket(default_set, default_state)
+		local bucket = createBucket(entities, "default", "DEFERRED")
+		
+		renderBucket(bucket, default_state)
 	endBlock()
 
 	beginBlock("decals")
@@ -122,7 +127,8 @@ function geomPass(default_set, decal_set)
 		bindRenderbuffers({
 			dsbuffer,
 		}, 1)
-		renderBucket(decal_set, decal_state)
+		local bucket = createBucket(entities, "decal", "")
+		renderBucket(bucket, decal_state)
 	endBlock()
 	
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
@@ -239,12 +245,17 @@ function shadowPass()
 			
 			for slice = 0, 3 do 
 				local view_params = getShadowCameraParams(slice, 4096)
-				local shadow_set = prepareCommands(view_params, { { layers = { "impostor", "default" }, defines = { "DEPTH" } } })
 				
 				viewport(slice * 1024, 0, 1024, 1024)
 				beginBlock("slice " .. tostring(slice + 1))
 				pass(view_params)
-				renderBucket(shadow_set, {})
+
+				local entities = cull(view_params)
+				local bucket0 = createBucket(entities, "default", "DEPTH")
+				local bucket1 = createBucket(entities, "impostor", "DEPTH")
+				renderBucket(bucket0, {})
+				renderBucket(bucket1, {})
+
 				renderTerrains(view_params, {define = "DEPTH"})
 				endBlock()
 			end
@@ -331,10 +342,12 @@ function main_shadowmap()
 	setRenderTargetsDS(depthbuf)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
-	local shadow_set = prepareCommands(view_params, { { layers = { "default" }, defines = { "DEPTH" } } })
-				
+	
 	pass(view_params)
-	renderBucket(shadow_set, {})
+
+	local entities = cull(view_params)
+	local bucket = createBucket(entities, "default", "DEPTH")
+	renderBucket(bucket, {})
 	renderTerrains(view_params, {define = "DEPTH"})
 	setOutput(depthbuf)
 
@@ -343,18 +356,10 @@ end
 
 function main()
 	local view_params = getCameraParams()
-	local default_set, impostor_set, decal_set, transparent_set, water_set = prepareCommands(view_params, 
-		{ 
-			{ layers = { "default" }, defines = { "DEFERRED" } },
-			{ layers = { "impostor" } },
-			{ layers = { "decal" } },
-			{ layers = { "transparent" }, sort = "depth" },
-			{ layers = { "water" }, sort = "depth" }
-		}
-	)
+	local entities = cull(view_params)
 
 	local shadowmap = shadowPass()
-	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(default_set, decal_set)
+	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(entities)
 
 	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
 		fillClusters(view_params)
@@ -363,7 +368,7 @@ function main()
 	end
 
 	local hdr_buffer = lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
-	impostorPass(impostor_set, hdr_buffer, gbuffer_depth)
+	impostorPass(entities, hdr_buffer, gbuffer_depth)
 	
 	custom_tonemap = false
 	local res = hdr_buffer		
@@ -371,8 +376,8 @@ function main()
 		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 	
-	waterPass(water_set, res, gbuffer_depth)
-	transparentPass(transparent_set, res, gbuffer_depth)
+	waterPass(entities, res, gbuffer_depth)
+	transparentPass(entities, res, gbuffer_depth)
 	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 	renderTextMeshes()
 
