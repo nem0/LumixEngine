@@ -378,6 +378,12 @@ static void registerProperties(IAllocator& allocator)
 				RadiansAttribute()),
 			property("Bone", LUMIX_PROP(RenderScene, BoneAttachmentBone), BoneEnum()) 
 		),
+		component("fur",
+			var_property("Layers", &RenderScene::getFur, &FurComponent::layers),
+			var_property("Scale", &RenderScene::getFur, &FurComponent::scale),
+			var_property("Gravity", &RenderScene::getFur, &FurComponent::gravity),
+			var_property("Enabled", &RenderScene::getFur, &FurComponent::enabled)
+		),
 		component("environment_probe",
 			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
 			var_property("Inner range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::inner_range),
