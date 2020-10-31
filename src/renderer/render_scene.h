@@ -189,8 +189,17 @@ enum class RenderableTypes : u8 {
 	DECAL,
 	LOCAL_LIGHT,
 	MESH_MATERIAL_OVERRIDE,
+	FUR,
 
 	COUNT
+};
+
+
+struct FurComponent {
+	u32 layers = 16;
+	float scale = 0.01f;
+	float gravity = 1.f;
+	bool enabled = true;
 };
 
 
@@ -252,6 +261,9 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void setBoneAttachmentRotation(EntityRef entity, const Vec3& rot) = 0;
 	virtual void setBoneAttachmentRotationQuat(EntityRef entity, const Quat& rot) = 0;
 
+	virtual HashMap<EntityRef, FurComponent>& getFurs() = 0;
+	virtual FurComponent& getFur(EntityRef e) = 0;
+
 	virtual void clearDebugLines() = 0;
 	virtual void clearDebugTriangles() = 0;
 	virtual const Array<DebugTriangle>& getDebugTriangles() const = 0;
@@ -272,8 +284,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;
 	virtual ModelInstance* getModelInstance(EntityRef entity) = 0;
 	virtual const MeshSortData* getMeshSortData() const = 0;
-	virtual const ModelInstance* getModelInstances() const = 0;
-	virtual ModelInstance* getModelInstances() = 0;
+	virtual Span<const ModelInstance> getModelInstances() const = 0;
+	virtual Span<ModelInstance> getModelInstances() = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
 	virtual void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) = 0;

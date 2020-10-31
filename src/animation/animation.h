@@ -16,6 +16,7 @@ struct Vec3;
 struct BoneMask
 {
 	BoneMask(IAllocator& allocator) : bones(allocator) {}
+	BoneMask(BoneMask&& rhs) = default;
 	StaticString<32> name;
 	HashMap<u32, u8, HashFuncDirect<u32>> bones;
 };

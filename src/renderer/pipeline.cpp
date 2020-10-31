@@ -2897,6 +2897,7 @@ struct PipelineImpl final : Pipeline
 							stats.instance_count += instances_count;
 							break;
 						}
+						case RenderableTypes::FUR:
 						case RenderableTypes::SKINNED: {
 							READ(Mesh::RenderData*, mesh);
 							READ(Material::RenderData*, material);
@@ -2905,6 +2906,25 @@ struct PipelineImpl final : Pipeline
 							READ(Quat, rot);
 							READ(float, scale);
 							READ(i32, bones_count);
+							u32 layers = 1;
+
+							struct {
+								float layer;
+								float fur_scale;
+								float gravity;
+								float padding;
+								Matrix bones[256];
+							} dc;
+							ASSERT(bones_count < (i32)lengthOf(dc.bones));
+
+							if (type == RenderableTypes::FUR) {
+								READ(u32, tmp);
+								READ(float, tmp2);
+								READ(float, tmp3);
+								layers = tmp;
+								dc.fur_scale = tmp2;
+								dc.gravity = tmp3;
+							}
 
 							Matrix* bones = (Matrix*)cmd;
 							cmd += sizeof(bones[0]) * bones_count;
@@ -2920,19 +2940,21 @@ struct PipelineImpl final : Pipeline
 								material_ub_idx = material->material_constants;
 							}
 
-							Matrix dc_bones[256];
-							ASSERT(bones_count < (i32)lengthOf(dc_bones));
-
-							dc_bones[0] = model_mtx;
-							memcpy(&dc_bones[1], bones, sizeof(Matrix) * bones_count);
-							gpu::update(m_pipeline->m_drawcall_ub, dc_bones, sizeof(Matrix) * (bones_count + 1));
+							dc.bones[0] = model_mtx;
+							memcpy(&dc.bones[1], bones, sizeof(Matrix) * bones_count);
 
 							gpu::useProgram(program);
 
 							gpu::bindIndexBuffer(mesh->index_buffer_handle);
 							gpu::bindVertexBuffer(0, mesh->vertex_buffer_handle, 0, mesh->vb_stride);
 							gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-							gpu::drawTriangles(0, mesh->indices_count, mesh->index_type);
+							
+							for (u32 i = 0; i < layers; ++i) {
+								dc.layer = float(i) / layers;
+								// TODO do not update whole buffer each layer
+								gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(u32) + sizeof(Matrix) * (bones_count + 1)); 
+								gpu::drawTriangles(0, mesh->indices_count, mesh->index_type);
+							}
 							++stats.draw_call_count;
 							stats.triangle_count += mesh->indices_count / 3;
 							++stats.instance_count;
@@ -3002,13 +3024,19 @@ struct PipelineImpl final : Pipeline
 		const Universe& universe = m_scene->getUniverse();
 		Renderer& renderer = m_renderer;
 		RenderScene* scene = m_scene;
+		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
 		const ShiftedFrustum frustum = view.cp.frustum;
-		const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
+		const ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
 		const Transform* LUMIX_RESTRICT entity_data = universe.getTransforms(); 
 		const DVec3 camera_pos = view.cp.pos;
 				
 		CmdPage* cmd_page = first_page;
 		while (cmd_page->header.next) cmd_page = cmd_page->header.next;
+
+		if (cmd_page->header.size > 0 && cmd_page->header.bucket != sort_keys[0] >> 56) {
+			cmd_page->header.next = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
+			cmd_page = cmd_page->header.next;
+		}
 
 		cmd_page->header.bucket = sort_keys[0] >> 56;
 		const bool sort_depth = m_buckets[cmd_page->header.bucket].sort == Bucket::DEPTH;
@@ -3018,10 +3046,11 @@ struct PipelineImpl final : Pipeline
 
 		u32 instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 		u32 skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
+		u32 fur_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("FUR"));
 
 		auto new_page = [&](u8 bucket){
 			cmd_page->header.size = int(out - cmd_page->data);
-			CmdPage* new_page = new (NewPlaceholder(), m_renderer.getEngine().getPageAllocator().allocate(true)) CmdPage;
+			CmdPage* new_page = new (NewPlaceholder(), page_allocator.allocate(true)) CmdPage;
 			cmd_page->header.next = new_page;
 			cmd_page = new_page;
 			new_page->header.bucket = bucket;
@@ -3029,6 +3058,7 @@ struct PipelineImpl final : Pipeline
 			define_mask = m_buckets[bucket].define_mask;
 			instanced_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("INSTANCED"));
 			skinned_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("SKINNED"));
+			fur_define_mask = define_mask | (1 << renderer.getShaderDefineIdx("FUR"));
 			const bool sort_depth = m_buckets[cmd_page->header.bucket].sort == Bucket::DEPTH;
 			instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 		};
@@ -3171,6 +3201,7 @@ struct PipelineImpl final : Pipeline
 					--i;
 					break;
 				}
+				case RenderableTypes::FUR:
 				case RenderableTypes::SKINNED: {
 					const u32 mesh_idx = renderables[i] >> 40;
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
@@ -3178,7 +3209,9 @@ struct PipelineImpl final : Pipeline
 					const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
 					const Mesh& mesh = mi->meshes[mesh_idx];
 					Shader* shader = mesh.material->getShader();
-					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, skinned_define_mask | mesh.material->getDefineMask());
+					u32 defines = skinned_define_mask | mesh.material->getDefineMask();
+					if (type == RenderableTypes::FUR) defines |= fur_define_mask;
+					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, defines);
 
 					if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 57) {
 						new_page(bucket);
@@ -3192,6 +3225,13 @@ struct PipelineImpl final : Pipeline
 					WRITE(tr.rot);
 					WRITE(tr.scale);
 					WRITE(mi->pose->count);
+
+					if (type == RenderableTypes::FUR) {
+						FurComponent& fur = m_scene->getFur(e);
+						WRITE(fur.layers);
+						WRITE(fur.scale);
+						WRITE(fur.gravity);
+					}
 
 					const Quat* rotations = mi->pose->rotations;
 					const Vec3* positions = mi->pose->positions;
@@ -3311,37 +3351,36 @@ struct PipelineImpl final : Pipeline
 		constexpr i32 STEP = 4096;
 		const i32 steps = (size + STEP - 1) / STEP;
 		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
-	
+
+		Array<CmdPage*> pages(m_allocator);
+		pages.resize(steps);
+
 		volatile i32 iter = 0;
-		CmdPage* all_pages = nullptr;
-		Mutex mutex;
 
 		JobSystem::runOnWorkers([&](){
-			CmdPage* page = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
 			for (;;) {
 				const i32 from = atomicAdd(&iter, STEP);
-				if (from > size) {
-					CmdPage* end = page;
-					while (end->header.next) end = end->header.next;
+				if (from >= size) return;
 
-					MutexGuard guard(mutex);
-					end->header.next = all_pages;
-					all_pages = page;
-					return;
-				}
-
+				const u32 step = from / STEP;
+				pages[step] = new (NewPlaceholder(), page_allocator.allocate(true))(CmdPage);
 				const i32 s = minimum(STEP, size - from);
-				createCommands(view, page, renderables + from, sort_keys + from, s);
+				createCommands(view, pages[step], renderables + from, sort_keys + from, s);
 			}
 		});
 
-		while (all_pages) {
-			Bucket& bucket = m_buckets[all_pages->header.bucket];
-			CmdPage* page = all_pages;
-			all_pages = all_pages->header.next;
-
-			page->header.next = bucket.cmd_page;
-			bucket.cmd_page = page;
+		CmdPage* prev = nullptr;
+		for (CmdPage* page : pages) {
+			while (page) {
+				if (prev) {
+					prev->header.next = prev->header.bucket != page->header.bucket ? nullptr : page;
+				}
+				Bucket& bucket = m_buckets[page->header.bucket];
+				if (!bucket.cmd_page) bucket.cmd_page = page;
+				
+				prev = page;
+				page = page->header.next;
+			}
 		}
 	}
 
@@ -3355,7 +3394,7 @@ struct PipelineImpl final : Pipeline
 		for (View& view : m_views) {
 			if (!view.renderables) continue;
 
-			view.sort_keys = MTBucketArray<u64>::allocArray(m_allocator);
+			if (!view.sort_keys) view.sort_keys = MTBucketArray<u64>::allocArray(m_allocator);
 			createSortKeys(view);
 			view.renderables->free(m_renderer.getEngine().getPageAllocator());
 			view.sort_keys->merge();
@@ -3375,6 +3414,41 @@ struct PipelineImpl final : Pipeline
 		}
 
 		JobSystem::decSignal(m_buckets_ready);
+	}
+
+	void fur(u32 bucket_id) {
+		HashMap<EntityRef, FurComponent>& furs = m_scene->getFurs();
+		if (furs.empty()) return;
+
+
+		const Bucket& bucket = m_buckets[bucket_id];
+		View& view = m_views[bucket.view_id];
+		if (!view.sort_keys) view.sort_keys = MTBucketArray<u64>::allocArray(m_allocator);
+		Span<const ModelInstance> mi = m_scene->getModelInstances();
+		MTBucketArray<u64>::Bucket sort_keys = view.sort_keys->begin();
+		
+		const u64 type_mask = (u64)RenderableTypes::FUR << 32;
+		
+		// TODO handle sort order
+		// TODO frustum culling
+		for (auto iter = furs.begin(); iter.isValid(); ++iter) {
+			const EntityRef e = iter.key();
+			if (e.index >= (i32)mi.length()) continue;
+			if (!mi[e.index].flags.isSet(ModelInstance::VALID)) continue;
+			if (!iter.value().enabled) continue;
+
+			const Model* model = mi[e.index].model;
+			if (!model->isReady()) continue;
+
+			for (i32 i = 0; i < model->getMeshCount(); ++i) {
+				const Mesh& mesh = model->getMesh(i);
+				const u64 key = mesh.sort_key | ((u64)bucket_id << 56);
+				const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
+			
+				sort_keys.push(key, subrenderable);
+			}
+		}
+		sort_keys.end();
 	}
 
 	u32 createBucket(u32 view_id, const char* layer_name, const char* define, LuaWrapper::Optional<const char*> sort_str) {
@@ -3887,7 +3961,7 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 			RenderScene* scene = m_scene;
-			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances();
+			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
 			const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
 			MTBucketArray<u64>::Bucket result = sort_keys.begin();
 			const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
@@ -4321,6 +4395,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(environmentCastShadows);
 		REGISTER_FUNCTION(executeCustomCommand);
 		REGISTER_FUNCTION(fillClusters);
+		REGISTER_FUNCTION(fur);
 		REGISTER_FUNCTION(getCameraParams);
 		REGISTER_FUNCTION(getShadowCameraParams);
 		REGISTER_FUNCTION(pass);

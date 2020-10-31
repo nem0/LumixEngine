@@ -899,7 +899,19 @@ void SceneView::renderSelection()
 					gpu::update(drawcall_ub, &item.mtx.columns[0].x, sizeof(item.mtx));
 				}
 				else {
-					gpu::update(drawcall_ub, item.pose.begin(), sizeof(Matrix) * item.pose.size());
+					struct {
+						float layer;
+						float fur_scale;
+						float gravity;
+						float padding;
+						Matrix bones[256];
+					} dc;
+					ASSERT(item.pose.size() < (i32)lengthOf(dc.bones));
+					dc.layer = 0;
+					dc.fur_scale = 0;
+					dc.gravity = 0;
+					memcpy(dc.bones, item.pose.begin(), item.pose.byte_size());
+					gpu::update(drawcall_ub, &dc, item.pose.byte_size() + sizeof(Vec4));
 				}
 
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);

@@ -50,6 +50,7 @@ static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
+static const ComponentType FUR_TYPE = Reflection::getComponentType("fur");
 
 
 struct Decal
@@ -790,6 +791,29 @@ public:
 		}
 	}
 
+	void serializeFurs(OutputMemoryStream& serializer) {
+		serializer.write(m_furs.size());
+		for (auto iter = m_furs.begin(); iter.isValid(); ++iter) {
+			serializer.write(iter.key());
+			serializer.write(iter.value());
+		}
+	}
+
+	void deserializeFurs(InputMemoryStream& serializer, const EntityMap& entity_map) {
+		u32 count;
+		serializer.read(count);
+		m_furs.reserve(count + m_furs.size());
+		for (u32 i = 0; i < count; ++i) {
+			EntityRef e;
+			serializer.read(e);
+			e = entity_map.get(e);
+			FurComponent fur;
+			serializer.read(fur);
+			m_furs.insert(e, fur);
+			m_universe.onComponentCreated(e, FUR_TYPE, this);
+		}
+	}
+
 	void serializeTextMeshes(OutputMemoryStream& serializer)
 	{
 		serializer.write(m_text_meshes.size());
@@ -992,6 +1016,7 @@ public:
 		serializeReflectionProbes(serializer);
 		serializeDecals(serializer);
 		serializeTextMeshes(serializer);
+		serializeFurs(serializer);
 	}
 
 
@@ -1115,6 +1140,7 @@ public:
 		deserializeReflectionProbes(serializer, entity_map);
 		deserializeDecals(serializer, entity_map);
 		deserializeTextMeshes(serializer, entity_map);
+		deserializeFurs(serializer, entity_map);
 	}
 
 
@@ -1170,6 +1196,10 @@ public:
 		m_environments.erase(entity);
 	}
 
+	void destroyFur(EntityRef entity) {
+		m_furs.erase(entity);
+		m_universe.onComponentDestroyed(entity, FUR_TYPE, this);
+	}
 
 	void destroyDecal(EntityRef entity)
 	{
@@ -1220,6 +1250,11 @@ public:
 		LUMIX_DELETE(m_allocator, emitter);
 	}
 
+
+	void createFur(EntityRef entity) {
+		m_furs.insert(entity, {});
+		m_universe.onComponentCreated(entity, FUR_TYPE, this);
+	}
 
 	void createTextMesh(EntityRef entity)
 	{
@@ -1292,15 +1327,15 @@ public:
 	}
 
 
-	const ModelInstance* getModelInstances() const override
+	Span<const ModelInstance> getModelInstances() const override
 	{
-		return m_model_instances.empty() ? nullptr : &m_model_instances[0];
+		return m_model_instances;
 	}
 
 
-	ModelInstance* getModelInstances() override
+	Span<ModelInstance> getModelInstances() override
 	{
-		return m_model_instances.empty() ? nullptr : &m_model_instances[0];
+		return m_model_instances;
 	}
 
 
@@ -1861,6 +1896,14 @@ public:
 	{
 		auto& cam = m_cameras[{camera.index}];
 		return Vec2(cam.screen_width, cam.screen_height);
+	}
+
+	FurComponent& getFur(EntityRef e) override {
+		return m_furs[e];
+	}
+
+	HashMap<EntityRef, FurComponent>& getFurs() override {
+		return m_furs;
 	}
 
 	void clearDebugLines() override { m_debug_lines.clear(); }
@@ -2692,6 +2735,7 @@ private:
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
+	HashMap<EntityRef, FurComponent> m_furs;
 
 	float m_time;
 	float m_lod_multiplier;
@@ -2727,7 +2771,8 @@ static struct
 	COMPONENT_TYPE(ENVIRONMENT_PROBE_TYPE, EnvironmentProbe),
 	COMPONENT_TYPE(REFLECTION_PROBE_TYPE, ReflectionProbe),
 	COMPONENT_TYPE(PARTICLE_EMITTER_TYPE, ParticleEmitter),
-	COMPONENT_TYPE(TEXT_MESH_TYPE, TextMesh)
+	COMPONENT_TYPE(TEXT_MESH_TYPE, TextMesh),
+	COMPONENT_TYPE(FUR_TYPE, Fur)
 };
 
 #undef COMPONENT_TYPE
@@ -2762,6 +2807,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
 	, m_mesh_sort_data(m_allocator)
+	, m_furs(m_allocator)
 {
 
 	m_universe.entityTransformed().bind<&RenderSceneImpl::onEntityMoved>(this);

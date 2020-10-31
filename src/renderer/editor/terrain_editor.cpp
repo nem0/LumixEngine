@@ -925,7 +925,7 @@ static bool isOBBCollision(RenderScene& scene,
 	float radius_a_squared = model->getBoundingRadius() * model_tr.scale;
 	radius_a_squared = radius_a_squared * radius_a_squared;
 	Universe& universe = scene.getUniverse();
-	const ModelInstance* model_instances = scene.getModelInstances();
+	Span<const ModelInstance> model_instances = scene.getModelInstances();
 	const Transform* transforms = universe.getTransforms();
 	while(meshes) {
 		const EntityRef* entities = meshes->entities;

@@ -203,6 +203,22 @@ public:
 		init(size, true);
 	}
 
+	HashMap(HashMap&& rhs)
+		: m_allocator(rhs.m_allocator)
+	{
+		m_keys = rhs.m_keys;
+		m_values = rhs.m_values;
+		m_capacity = rhs.m_capacity;
+		m_size = rhs.m_size;
+		m_mask = rhs.m_mask;
+		
+		rhs.m_keys = nullptr;
+		rhs.m_values = nullptr;
+		rhs.m_capacity = 0;
+		rhs.m_size = 0;
+		rhs.m_mask = 0;
+	}
+
 	~HashMap()
 	{
 		for(u32 i = 0, c = m_capacity; i < c; ++i) {

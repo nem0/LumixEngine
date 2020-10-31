@@ -25,6 +25,19 @@ define "VEGETATION"
 
 ------------------
 
+common [[
+	#ifdef SKINNED
+			layout(std140, binding = 4) uniform ModelState {
+			float layer;
+			float fur_scale;
+			float fur_gravity;
+			float padding;
+			mat4 matrix;
+			mat4 bones[256];
+		} Model;
+	#endif
+]]
+
 vertex_shader [[
 	layout(location = 0) in vec3 a_position;
 	layout(location = 1) in vec2 a_uv;
@@ -37,18 +50,14 @@ vertex_shader [[
 	#if defined SKINNED
 		layout(location = 4) in ivec4 a_indices;
 		layout(location = 5) in vec4 a_weights;
-		layout(std140, binding = 4) uniform Model {
-			mat4 u_model;
-			mat4 u_bones[256];
-		};
 	#elif defined INSTANCED || defined GRASS
 		layout(location = 4) in vec4 i_rot_quat;
 		layout(location = 5) in vec4 i_pos_scale;
 		layout(location = 6) in float i_lod;
 	#else
-		layout(std140, binding = 4) uniform Model {
-			mat4 u_model;
-		};
+		layout(std140, binding = 4) uniform ModelState {
+			mat4 matrix;
+		} Model;
 	#endif
 	layout (location = 0) out vec2 v_uv;
 	layout (location = 1) out vec3 v_normal;
@@ -76,21 +85,25 @@ vertex_shader [[
 				v_normal = rotateByQuat(i_rot_quat, normalize(a_position));
 			#endif
 		#elif defined SKINNED
-			mat4 model_mtx = u_model * (a_weights.x * u_bones[a_indices.x] + 
-			a_weights.y * u_bones[a_indices.y] +
-			a_weights.z * u_bones[a_indices.z] +
-			a_weights.w * u_bones[a_indices.w]);
+			mat4 model_mtx = Model.matrix * (a_weights.x * Model.bones[a_indices.x] + 
+			a_weights.y * Model.bones[a_indices.y] +
+			a_weights.z * Model.bones[a_indices.z] +
+			a_weights.w * Model.bones[a_indices.w]);
 			v_normal = mat3(model_mtx) * a_normal;
 			v_tangent = mat3(model_mtx) * a_tangent;
-			v_wpos = model_mtx * vec4(a_position,  1);
+			#ifdef FUR
+				v_wpos = model_mtx * vec4(a_position + (a_normal + vec3(0, -Model.fur_gravity, 0)) * Model.layer * Model.fur_scale,  1);
+			#else
+				v_wpos = model_mtx * vec4(a_position,  1);
+			#endif
 		#else 
-			mat4 model_mtx = u_model;
+			mat4 model_mtx = Model.matrix;
 			v_normal = mat3(model_mtx) * a_normal;
 			v_tangent = mat3(model_mtx) * a_tangent;
 
 			vec3 p = a_position;
 			#ifdef VEGETATION
-				p = vegetationAnim(u_model[3].xyz, p);
+				p = vegetationAnim(Model.matrix[3].xyz, p);
 			#endif
 
 			v_wpos = model_mtx * vec4(p,  1);
@@ -139,6 +152,11 @@ fragment_shader [[
 		#endif
 		data.albedo = c.rgb;
 		data.alpha = c.a;
+
+		#ifdef FUR 
+			data.alpha = saturate(data.alpha - Model.layer);
+		#endif
+
 		#ifdef ALPHA_CUTOUT
 			if(data.alpha < 0.1) discard;
 		#endif

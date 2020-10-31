@@ -61,6 +61,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
+static const ComponentType FUR_TYPE = Reflection::getComponentType("fur");
 
 // https://www.khronos.org/opengl/wiki/Cubemap_Texture
 static const Vec3 cube_fwd[6] = {
@@ -3754,6 +3755,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent(ICON_FA_BONE, "bone_attachment", "Render / Bone attachment");
 		m_app.registerComponent("", "environment_probe", "Render / Environment probe");
 		m_app.registerComponent("", "reflection_probe", "Render / Reflection probe");
+		m_app.registerComponent("", "fur", "Render / Fur");
 		m_app.registerComponent(ICON_FA_ALIGN_JUSTIFY, "text_mesh", "Render / Text 3D", FontResource::TYPE, "Font");
 
 		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
