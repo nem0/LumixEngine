@@ -3442,6 +3442,8 @@ struct PipelineImpl final : Pipeline
 
 			for (i32 i = 0; i < model->getMeshCount(); ++i) {
 				const Mesh& mesh = model->getMesh(i);
+				if (mesh.type != Mesh::SKINNED) continue;
+
 				const u64 key = mesh.sort_key | ((u64)bucket_id << 56);
 				const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
 			
