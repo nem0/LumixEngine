@@ -2952,7 +2952,7 @@ struct PipelineImpl final : Pipeline
 							for (u32 i = 0; i < layers; ++i) {
 								dc.layer = float(i) / layers;
 								// TODO do not update whole buffer each layer
-								gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(u32) + sizeof(Matrix) * (bones_count + 1)); 
+								gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(Vec4) + sizeof(Matrix) * (bones_count + 1)); 
 								gpu::drawTriangles(0, mesh->indices_count, mesh->index_type);
 							}
 							++stats.draw_call_count;
@@ -3213,7 +3213,7 @@ struct PipelineImpl final : Pipeline
 					if (type == RenderableTypes::FUR) defines |= fur_define_mask;
 					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, defines);
 
-					if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 57) {
+					if (u32(cmd_page->data + sizeof(cmd_page->data) - out) < (u32)mi->pose->count * sizeof(Matrix) + 69) {
 						new_page(bucket);
 					}
 
