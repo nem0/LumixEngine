@@ -92,7 +92,7 @@ vertex_shader [[
 			v_normal = mat3(model_mtx) * a_normal;
 			v_tangent = mat3(model_mtx) * a_tangent;
 			#ifdef FUR
-				v_wpos = model_mtx * vec4(a_position + (a_normal + vec3(0, -Model.fur_gravity, 0)) * Model.layer * Model.fur_scale,  1);
+				v_wpos = model_mtx * vec4(a_position + (a_normal + vec3(0, -Model.fur_gravity * Model.layer, 0)) * Model.layer * Model.fur_scale,  1);
 			#else
 				v_wpos = model_mtx * vec4(a_position,  1);
 			#endif
