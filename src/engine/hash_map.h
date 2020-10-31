@@ -232,6 +232,8 @@ public:
 		m_allocator.deallocate(m_values);
 	}
 
+	void operator =(HashMap&& rhs) = delete;
+
 	iterator begin() {
 		for (u32 i = 0, c = m_capacity; i < c; ++i) {
 			if (m_keys[i].valid) return { this, i };

@@ -4069,6 +4069,7 @@ struct PipelineImpl final : Pipeline
 						}
 						break;
 					}
+					default: ASSERT(false); break;
 				}
 			}
 			result.end();
