@@ -13,9 +13,11 @@
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
+#include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
+#include "engine/universe.h"
 #include "utils.h"
 
 
@@ -539,8 +541,18 @@ void AssetBrowser::fileColumn()
 	ImGui::EndChild();
 	if (ImGui::BeginDragDropTarget()) {
 		if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
-			m_dropped_entity = *(EntityRef*)payload->Data;
+			const EntityRef e = *(EntityRef*)payload->Data;
+			m_dropped_entity = e;
 			ImGui::OpenPopup("Save sa prefab");
+			Universe* universe = m_app.getWorldEditor().getUniverse();
+			const ComponentType model_inst_type = Reflection::getComponentType("model_instance");
+			IScene* scene = universe->getScene(model_inst_type);
+			if (scene && universe->hasComponent(e, model_inst_type)) {
+				Path source;
+				if (Reflection::getPropertyValue(*scene, e, model_inst_type, "Source", Ref(source))) {
+					Path::getBasename(Span(m_prefab_name), source.c_str());
+				}
+			}
 		}
 		ImGui::EndDragDropTarget();
 	}
