@@ -935,7 +935,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
 		gpu::bindUniformBuffer(4, ub, 0, 512);
 
-		const Vec3 center = (m_aabb.min + m_aabb.max) * 0.5f;
+		const Vec3 center = Vec3(0, (m_aabb.min + m_aabb.max).y * 0.5f, 0);
 		Vec2 min, max;
 		getBBProjection(m_aabb, Ref(min), Ref(max));
 		const Vec2 size = max - min;
@@ -1104,7 +1104,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 		f << "defines { \"ALPHA_CUTOUT\" }\n";
 		f << "layer \"impostor\"\n";
 		f << "backface_culling(false)\n";
-		f << "uniform(\"Center\", { " << center.x << ", " << center.y << ", " << center.z << " })\n";
+		f << "uniform(\"Center\", { 0, " << center.y << ", 0 })\n";
 		f.close();
 	}
 
@@ -1701,7 +1701,7 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 		};
 	#pragma pack()
 
-	const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+	const Vec3 center = Vec3(0, (aabb.max + aabb.min).y * 0.5f, 0);
 
 	Vec2 min, max;
 	getBBProjection(aabb, Ref(min), Ref(max));
