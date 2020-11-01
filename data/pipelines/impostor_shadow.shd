@@ -52,7 +52,7 @@ compute_shader [[
 
 	float getShadow(vec2 tile_uv, float depth, vec3 v_shadow) {
 		v_shadow = normalize(v_shadow);
-		if (depth == 0) return 0;
+		if (depth == 0) return 1;
 		ivec2 shadow_tile = ivec2(0.5 + worldToImpostor(v_shadow) * (u_size - 1)); 
 		v_shadow = impostorToWorld(shadow_tile / float(u_size - 1));
 
