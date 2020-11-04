@@ -232,7 +232,7 @@ static void flipX(Vec4* data, int texture_size)
 	}
 }
 
-static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
+static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool generate_mipmaps) {
 	ASSERT(data);
 	OS::OutputFile file;
 	if (!file.open(path)) return false;
@@ -240,7 +240,7 @@ static bool saveAsDDS(const char* path, const u8* data, int w, int h) {
 	nvtt::Context context;
 		
 	nvtt::InputOptions input;
-	input.setMipmapGeneration(true);
+	input.setMipmapGeneration(generate_mipmaps);
 	input.setAlphaMode(nvtt::AlphaMode_Transparency);
 	input.setAlphaCoverageMipScale(0.3f, 3);
 	input.setNormalMap(false);
@@ -778,7 +778,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				stbi_image_free(data);
 			}
 
-			if (!saveAsDDS(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE)) {
+			if (!saveAsDDS(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false)) {
 				logError("Editor") << "Failed to save " << m_out_path;
 			}
 		}
@@ -2157,7 +2157,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					swap(raw_tile_data[i * 4 + 0], raw_tile_data[i * 4 + 2]);
 				}
 
-				saveAsDDS(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+				saveAsDDS(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false);
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 				renderer->destroy(m_tile.texture);
@@ -2296,22 +2296,23 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
 		render_scene->setModelInstancePath(mesh_entity, model->getPath());
-		AABB aabb = model->getAABB();
+		const AABB aabb = model->getAABB();
+		const float radius = model->getBoundingRadius();
 
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
+		Vec3 eye = center + Vec3(radius * 2);
 		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
 		mtx = mtx.inverted();
 
 		Viewport viewport;
-		viewport.is_ortho = false;
-		viewport.far = 10000.f;
-		viewport.near = 0.1f;
-		viewport.fov = degreesToRadians(60.f);
+		viewport.near = 0.f;
+		viewport.far = 4 * radius;
+		viewport.is_ortho = true;
+		viewport.ortho_size = radius * 1.1f;
 		viewport.h = AssetBrowser::TILE_SIZE;
 		viewport.w = AssetBrowser::TILE_SIZE;
-		viewport.pos = in_pos ? *in_pos : DVec3(eye.x, eye.y, eye.z);
+		viewport.pos = in_pos ? *in_pos : DVec3(eye);
 		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);

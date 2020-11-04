@@ -934,13 +934,25 @@ struct PipelineImpl final : Pipeline
 			const float split_distances[] = { 0.1f, cascades.x, cascades.y, cascades.z, cascades.w };
 
 			Frustum camera_frustum;
-			camera_frustum.computePerspective(Vec3::ZERO,
-				m_viewport.rot * Vec3(0, 0, -1),
-				m_viewport.rot * Vec3(0, 1, 0),
-				camera_fov,
-				camera_ratio,
-				split_distances[slice],
-				split_distances[slice + 1]);
+			if (m_viewport.is_ortho) {
+				const float ratio = m_viewport.h > 0 ? m_viewport.w / (float)m_viewport.h : 1;
+				camera_frustum.computeOrtho(Vec3::ZERO
+					, m_viewport.rot * Vec3(0, 0, -1)
+					, m_viewport.rot * Vec3(0, 1, 0)
+					, m_viewport.ortho_size * ratio
+					, m_viewport.ortho_size
+					, split_distances[slice]
+					, split_distances[slice + 1]);
+			}
+			else {
+				camera_frustum.computePerspective(Vec3::ZERO,
+					m_viewport.rot * Vec3(0, 0, -1),
+					m_viewport.rot * Vec3(0, 1, 0),
+					camera_fov,
+					camera_ratio,
+					split_distances[slice],
+					split_distances[slice + 1]);
+			}
 
 			const Sphere frustum_bounding_sphere = camera_frustum.computeBoundingSphere();
 			const float bb_size = frustum_bounding_sphere.radius;
