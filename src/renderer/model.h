@@ -187,7 +187,8 @@ public:
 	BoneMap::const_iterator getBoneIndex(u32 hash) const { return m_bone_map.find(hash); }
 	void getPose(Pose& pose);
 	void getRelativePose(Pose& pose);
-	float getBoundingRadius() const { return m_bounding_radius; }
+	float getOriginBoundingRadius() const { return m_origin_bounding_radius; }
+	float getCenterBoundingRadius() const { return m_center_bounding_radius; }
 	RayCastModelHit castRay(const Vec3& origin, const Vec3& dir, const Pose* pose);
 	const AABB& getAABB() const { return m_aabb; }
 	void onBeforeReady() override;
@@ -220,7 +221,8 @@ private:
 	Array<Bone> m_bones;
 	LODMeshIndices m_lod_indices[MAX_LOD_COUNT + 1];
 	float m_lod_distances[MAX_LOD_COUNT];
-	float m_bounding_radius;
+	float m_origin_bounding_radius = 0;
+	float m_center_bounding_radius = 0;
 	BoneMap m_bone_map;
 	AABB m_aabb;
 	int m_first_nonroot_bone_index;

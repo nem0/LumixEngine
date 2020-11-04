@@ -1377,7 +1377,7 @@ public:
 				const Transform& tr = m_universe.getTransform(entity);
 				const Model* model = m_model_instances[entity.index].model;
 				ASSERT(model);
-				const float bounding_radius = model->getBoundingRadius();
+				const float bounding_radius = model->getOriginBoundingRadius();
 				m_culling_system->set(entity, tr.pos, bounding_radius * tr.scale);
 			}
 			else if (m_universe.hasComponent(entity, DECAL_TYPE)) {
@@ -1620,7 +1620,7 @@ public:
 			if (!model_instance.model || !model_instance.model->isReady()) return;
 
 			const DVec3 pos = m_universe.getPosition(entity);
-			const float radius = model_instance.model->getBoundingRadius() * m_universe.getScale(entity);
+			const float radius = model_instance.model->getOriginBoundingRadius() * m_universe.getScale(entity);
 			if (!m_culling_system->isAdded(entity)) {
 				const RenderableTypes type = getRenderableType(*model_instance.model, model_instance.custom_material);
 				m_culling_system->add(entity, (u8)type, pos, radius);
@@ -1655,7 +1655,7 @@ public:
 		}
 		const RenderableTypes type = getRenderableType(*mi.model, mi.custom_material);
 		const DVec3 pos = m_universe.getPosition(entity);
-		const float radius = mi.model->getBoundingRadius() * m_universe.getScale(entity);
+		const float radius = mi.model->getOriginBoundingRadius() * m_universe.getScale(entity);
 		m_culling_system->add(entity, (u8)type, pos, radius);
 	}
 
@@ -1668,6 +1668,9 @@ public:
 		return m_model_instances[entity.index].model ? m_model_instances[entity.index].model->getPath() : Path("");
 	}
 
+	void setModelInstanceLOD(EntityRef entity, u32 lod) override {
+		m_model_instances[entity.index].lod = float(lod);
+	}
 
 	void setModelInstancePath(EntityRef entity, const Path& path) override
 	{
@@ -2226,7 +2229,7 @@ public:
 			const EntityRef entity{i};
 			const DVec3& pos = universe.getPosition(entity);
 			float scale = universe.getScale(entity);
-			float radius = r.model->getBoundingRadius() * scale;
+			float radius = r.model->getOriginBoundingRadius() * scale;
 			const double dist = (pos - origin).length();
 			if (dist - radius > cur_dist) continue;
 			
@@ -2389,7 +2392,7 @@ public:
 	{
 		auto& r = m_model_instances[entity.index];
 
-		float bounding_radius = r.model->getBoundingRadius();
+		float bounding_radius = r.model->getOriginBoundingRadius();
 		float scale = m_universe.getScale(entity);
 		const DVec3 pos = m_universe.getPosition(entity);
 		const float radius = bounding_radius * scale;

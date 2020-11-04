@@ -136,7 +136,8 @@ struct FBXImporter
 		OutputMemoryStream vertex_data;
 		Array<int> indices;
 		AABB aabb;
-		float radius_squared;
+		float origin_radius_squared;
+		float center_radius_squared;
 		Matrix transform_matrix = Matrix::IDENTITY;
 	};
 

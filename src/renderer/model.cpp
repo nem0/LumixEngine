@@ -89,7 +89,6 @@ const ResourceType Model::TYPE("model");
 
 Model::Model(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
-	, m_bounding_radius()
 	, m_allocator(allocator)
 	, m_bone_map(m_allocator)
 	, m_meshes(m_allocator)
@@ -525,7 +524,8 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, (u32)gpu::BufferFlags::IMMUTABLE);
 		if (!mesh.render_data->vertex_buffer_handle) return false;
 	}
-	file.read(m_bounding_radius);
+	file.read(m_origin_bounding_radius);
+	file.read(m_center_bounding_radius);
 	file.read(m_aabb);
 
 	return true;

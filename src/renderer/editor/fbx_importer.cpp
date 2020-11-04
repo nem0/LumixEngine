@@ -640,7 +640,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		if (import_mesh.is_skinned) fillSkinInfo(skinning, import_mesh);
 
 		AABB aabb = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
-		float radius_squared = 0;
+		float origin_radius_squared = 0;
 
 		int material_idx = getMaterialIndex(mesh, *import_mesh.fbx_mat);
 		ASSERT(material_idx >= 0);
@@ -670,7 +670,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			import_mesh.vertex_data.write(pos);
 
 			float sq_len = pos.squaredLength();
-			radius_squared = maximum(radius_squared, sq_len);
+			origin_radius_squared = maximum(origin_radius_squared, sq_len);
 
 			aabb.min.x = minimum(aabb.min.x, pos.x);
 			aabb.min.y = minimum(aabb.min.y, pos.y);
@@ -695,7 +695,17 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		}
 
 		import_mesh.aabb = aabb;
-		import_mesh.radius_squared = radius_squared;
+		import_mesh.origin_radius_squared = origin_radius_squared;
+		import_mesh.center_radius_squared = 0;
+		const Vec3 center = (aabb.max + aabb.min) * 0.5f;
+
+		const u8* mem = import_mesh.vertex_data.data();
+		for (u32 i = 0; i < written_idx; ++i) {
+			Vec3 p;
+			memcpy(&p, mem, sizeof(p));
+			import_mesh.center_radius_squared = maximum(import_mesh.center_radius_squared, (p - center).squaredLength());
+			mem += vertex_size;
+		}
 
 		if (import_mesh.lod >= 3 && cfg.create_impostor) {
 			logWarning("FBX") << path << " has more than 3 LODs and some are replaced with impostor";
@@ -913,7 +923,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 
 	void setup() override {
 		m_aabb = m_model->getAABB();
-		m_radius = m_model->getBoundingRadius();
+		m_radius = m_model->getCenterBoundingRadius();
 		for (u32 i = 0; i <= (u32)m_model->getLODIndices()[0].to; ++i) {
 			const Mesh& mesh = m_model->getMesh(i);
 			Shader* shader = mesh.material->getShader();
@@ -1726,7 +1736,8 @@ void FBXImporter::writeImpostorVertices(const AABB& aabb)
 
 void FBXImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg)
 {
-	float radius_squared = 0;
+	float origin_radius_squared = 0;
+	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
 	const ImportMesh& import_mesh = m_meshes[mesh_idx];
 	
@@ -1750,12 +1761,14 @@ void FBXImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg)
 		write(import_mesh.indices.size());
 		write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 	}
-	radius_squared = maximum(radius_squared, import_mesh.radius_squared);
+	origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
+	center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
 
 	write((i32)import_mesh.vertex_data.size());
 	write(import_mesh.vertex_data.data(), import_mesh.vertex_data.size());
 
-	write(sqrtf(radius_squared));
+	write(sqrtf(origin_radius_squared));
+	write(sqrtf(center_radius_squared));
 	write(import_mesh.aabb);
 }
 
@@ -1763,7 +1776,8 @@ void FBXImporter::writeGeometry(int mesh_idx, const ImportConfig& cfg)
 void FBXImporter::writeGeometry(const ImportConfig& cfg)
 {
 	AABB aabb = {{0, 0, 0}, {0, 0, 0}};
-	float radius_squared = 0;
+	float origin_radius_squared = 0;
+	float center_radius_squared = 0;
 	OutputMemoryStream vertices_blob(m_allocator);
 	for (const ImportMesh& import_mesh : m_meshes)
 	{
@@ -1789,7 +1803,8 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 			write(&import_mesh.indices[0], sizeof(import_mesh.indices[0]) * import_mesh.indices.size());
 		}
 		aabb.merge(import_mesh.aabb);
-		radius_squared = maximum(radius_squared, import_mesh.radius_squared);
+		origin_radius_squared = maximum(origin_radius_squared, import_mesh.origin_radius_squared);
+		center_radius_squared = maximum(center_radius_squared, import_mesh.center_radius_squared);
 	}
 
 	if (cfg.create_impostor) {
@@ -1811,7 +1826,8 @@ void FBXImporter::writeGeometry(const ImportConfig& cfg)
 		writeImpostorVertices(aabb);
 	}
 
-	write(sqrtf(radius_squared) * cfg.radius_scale);
+	write(sqrtf(origin_radius_squared) * cfg.radius_scale);
+	write(sqrtf(center_radius_squared) * cfg.radius_scale);
 	write(aabb);
 }
 
