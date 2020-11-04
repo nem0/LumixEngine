@@ -334,7 +334,6 @@ function renderSelectionOutline(output)
 		, { selection_mask }
 		, { depth_test = false }
 	)
-	
 end
 
 function main_shadowmap()
@@ -356,7 +355,33 @@ function main_shadowmap()
 	endBlock()
 end
 
+function render_preview()
+	local view_params = getCameraParams()
+	local entities = cull(view_params)
+	
+	local rb = createRenderbuffer(viewport_w, viewport_h, "rgba16f", "preview_rb")
+	local dsbuffer = createRenderbuffer(viewport_w, viewport_h, "depth32", "gbuffer_ds")
+	
+	setRenderTargetsDS(rb, dsbuffer)
+	clear(CLEAR_ALL, 0.9, 0.9, 0.9, 1, 0)
+
+	pass(view_params)
+	local bucket1 = createBucket(entities, "default", "")
+	local bucket2 = createBucket(entities, "transparent", "", "depth")
+	renderBucket(bucket1, default_state)
+	renderBucket(bucket2, transparent_state)
+
+	local output = tonemap(rb)
+	setOutput(output)
+end
+
 function main()
+	if PREVIEW then
+		render_preview()
+		return
+	end
+
+
 	local view_params = getCameraParams()
 	local entities = cull(view_params)
 
@@ -373,7 +398,7 @@ function main()
 	impostorPass(entities, hdr_buffer, gbuffer_depth)
 	
 	custom_tonemap = false
-	local res = hdr_buffer		
+	local res = hdr_buffer
 	if PREVIEW == nil then
 		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
