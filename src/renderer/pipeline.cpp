@@ -3686,7 +3686,7 @@ struct PipelineImpl final : Pipeline
 						grass.terrain_y_scale = terrain->getYScale();
 						grass.grass_height = type.m_grass_model->getAABB().max.y;
 						grass.type = u32(&type - terrain->m_grass_types.begin());
-						grass.radius = type.m_grass_model->getBoundingRadius();
+						grass.radius = type.m_grass_model->getOriginBoundingRadius();
 						grass.rotation_mode = (u32)type.m_rotation_mode;
 					}
 				}

@@ -1457,10 +1457,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	void init() {
 		createPreviewUniverse();
 		createTileUniverse();
-		m_viewport.is_ortho = false;
-		m_viewport.fov = degreesToRadians(60.f);
-		m_viewport.near = 0.1f;
-		m_viewport.far = 10000.f;
+		m_viewport.is_ortho = true;
+		m_viewport.near = 0.f;
+		m_viewport.far = 1000.f;
 		m_fbx_importer.init();
 	}
 
@@ -1656,12 +1655,19 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
 			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
-			m_viewport.rot = Quat::vec3ToVec3({0, 0, 1}, {1, 1, 1});
+			
+			Matrix mtx;
+			Vec3 eye = center + Vec3(model.getCenterBoundingRadius() * 2);
+			mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
+			mtx = mtx.inverted();
+
+			m_viewport.rot = mtx.getRotation();
 		}
 		ImVec2 image_size(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x);
 
 		m_viewport.w = (int)image_size.x;
 		m_viewport.h = (int)image_size.y;
+		m_viewport.ortho_size = model.getCenterBoundingRadius();
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
 		m_preview = m_pipeline->getOutput();
@@ -1860,8 +1866,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		auto* model = static_cast<Model*>(resources[0]);
 
 		if (model->isReady()) {
-			ImGuiEx::Label("Bounding radius");
-			ImGui::Text("%f", model->getBoundingRadius());
+			ImGuiEx::Label("Bounding radius (from origin)");
+			ImGui::Text("%f", model->getOriginBoundingRadius());
+			ImGuiEx::Label("Bounding radius (from center)");
+			ImGui::Text("%f", model->getCenterBoundingRadius());
 
 			if (ImGui::CollapsingHeader("LODs")) {
 				auto* lods = model->getLODIndices();
@@ -2296,8 +2304,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.universe->createComponent(MODEL_INSTANCE_TYPE, mesh_entity);
 
 		render_scene->setModelInstancePath(mesh_entity, model->getPath());
+		render_scene->setModelInstanceLOD(mesh_entity, 0);
 		const AABB aabb = model->getAABB();
-		const float radius = model->getBoundingRadius();
+		const float radius = model->getCenterBoundingRadius();
 
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;

@@ -287,6 +287,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual Span<const ModelInstance> getModelInstances() const = 0;
 	virtual Span<ModelInstance> getModelInstances() = 0;
 	virtual Path getModelInstancePath(EntityRef entity) = 0;
+	virtual void setModelInstanceLOD(EntityRef entity, u32 lod) = 0;
 	virtual void setModelInstancePath(EntityRef entity, const Path& path) = 0;
 	virtual void setModelInstanceMaterialOverride(EntityRef entity, const Path& path) = 0;
 	virtual Path getModelInstanceMaterialOverride(EntityRef entity) = 0;
