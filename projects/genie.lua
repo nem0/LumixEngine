@@ -712,7 +712,7 @@ if build_app then
 
 		kind "ConsoleApp"
 		
-		if #plugins > 0 then
+		if #plugins > 0 and _OPTIONS["dynamic-plugins"] then
 			local def = ""
 			for idx, plugin in ipairs(plugins) do
 				if idx > 1 then 
@@ -801,7 +801,7 @@ if build_studio then
 			"../external"
 		}
 		
-		if #plugins > 0 then
+		if #plugins > 0 and _OPTIONS["dynamic-plugins"] then
 			local def = ""
 			for idx, plugin in ipairs(plugins) do
 				if idx > 1 then 

@@ -359,11 +359,17 @@ struct StudioAppImpl final : StudioApp
 		char data_dir[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
 
+		const char* plugins[] = { ""	
+			#ifdef LUMIXENGINE_PLUGINS	
+				, LUMIXENGINE_PLUGINS	
+			#endif	
+		};
+
 		Engine::InitArgs init_data = {};
 		init_data.handle_file_drops = true;
 		init_data.window_title = "Lumix Studio";
 		init_data.working_dir = data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir);
-		init_data.plugins = {};
+		init_data.plugins = Span(plugins);
 		m_engine = Engine::create(init_data, m_allocator);
 		m_main_window = m_engine->getWindowHandle();
 		m_windows.push(m_main_window);
@@ -2524,6 +2530,7 @@ struct StudioAppImpl final : StudioApp
 				addPlugin(*plugin);
 			}
 		}
+		initPlugins();
 #endif
 		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}

@@ -749,7 +749,7 @@ struct Function<R (C::*)(Args...) const> : FunctionBase
 	}
 };
 
-Array<FunctionBase*>& allFunctions();
+LUMIX_ENGINE_API Array<FunctionBase*>& allFunctions();
 
 template <typename F>
 auto& function(F func, const char* decl_code, const char* name)
