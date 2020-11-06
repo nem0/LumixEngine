@@ -624,11 +624,12 @@ SceneView::SceneView(StudioApp& app)
 	const ResourceType pipeline_type("pipeline");
 	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
 
-	m_view = LUMIX_NEW(m_editor.getAllocator(), UniverseViewImpl)(*this);
-	m_editor.setView(m_view);
 }
 
 void SceneView::init() {
+	m_view = LUMIX_NEW(m_editor.getAllocator(), UniverseViewImpl)(*this);
+	m_editor.setView(m_view);
+
 	Engine& engine = m_editor.getEngine();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
