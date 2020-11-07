@@ -7,7 +7,7 @@
 	#include <string.h>
 	#include <malloc.h>
 #else
-	#include <immintrin.h>
+	#include <intrin.h>
 #endif
 
 
