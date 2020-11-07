@@ -200,7 +200,6 @@ namespace ImGui
 		last_node_id = id;
 		node_pos = screen_pos;
 		SetCursorScreenPos(screen_pos + GetStyle().WindowPadding);
-		PushItemWidth(150);
 		ImDrawList* draw_list = GetWindowDrawList();
 		draw_list->ChannelsSplit(2);
 		draw_list->ChannelsSetCurrent(1);
@@ -214,12 +213,11 @@ namespace ImGui
 		ImGui::SameLine();
 		EndGroup();
 		const ImVec2 size = ImGui::GetItemRectSize() + ImGui::GetStyle().WindowPadding * 2;
-		PopItemWidth();
 		SetCursorScreenPos(node_pos);
 
 		SetNextWindowPos(node_pos);
 		SetNextWindowSize(size);
-		BeginChild((ImGuiID)last_node_id, size, false, ImGuiWindowFlags_NoInputs);
+		BeginChild((ImGuiID)last_node_id, size, false, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground);
 		EndChild();
 
 		SetCursorScreenPos(node_pos);
@@ -229,9 +227,10 @@ namespace ImGui
 			pos += GetIO().MouseDelta;
 		}
 
+		const ImGuiStyle& style = ImGui::GetStyle();
 		draw_list->ChannelsSetCurrent(0);
-		draw_list->AddRectFilled(node_pos, node_pos + size, ImColor(230, 230, 230), 4.0f);
-		draw_list->AddRect(node_pos, node_pos + size, ImColor(150, 150, 150), 4.0f);
+		draw_list->AddRectFilled(node_pos, node_pos + size, GetColorU32(style.Colors[ImGuiCol_ChildBg]), 4.0f);
+		draw_list->AddRect(node_pos, node_pos + size, GetColorU32(style.Colors[ImGuiCol_Border]), 4.0f);
 
 		PopID();
 		draw_list->ChannelsMerge();

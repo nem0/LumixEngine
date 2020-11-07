@@ -64,6 +64,7 @@ namespace Lumix { struct Vec2; }
         ImVec2 operator+(const ImVec2& rhs) { return ImVec2(x+rhs.x, y+rhs.y); }    \
         ImVec2 operator-(const ImVec2& rhs) { return ImVec2(x-rhs.x, y-rhs.y); }    \
         ImVec2 operator*(const ImVec2& rhs) { return ImVec2(x*rhs.x, y*rhs.y); }    \
+        ImVec2 operator*(float rhs) { return ImVec2(x*rhs, y*rhs); }				\
         ImVec2 operator/(const ImVec2& rhs) { return ImVec2(x/rhs.x, y/rhs.y); }
 /*
 #define IM_VEC4_CLASS_EXTRA                                                 \
