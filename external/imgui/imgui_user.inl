@@ -4,7 +4,7 @@
 #include <math.h>
 
 
-static const float NODE_SLOT_RADIUS = 4.0f;
+static constexpr float HANDLE_RADIUS = 4;
 
 
 ImVec2::ImVec2(const Lumix::Vec2& f) 
@@ -187,141 +187,6 @@ namespace ImGui
 			}
 		}
 		g.Windows.push_back(window);
-	}
-
-
-	static ImVec2 node_pos;
-	static ImGuiID last_node_id;
-
-
-	void BeginNode(ImGuiID id, ImVec2 screen_pos)
-	{
-		PushID(id);
-		last_node_id = id;
-		node_pos = screen_pos;
-		SetCursorScreenPos(screen_pos + GetStyle().WindowPadding);
-		ImDrawList* draw_list = GetWindowDrawList();
-		draw_list->ChannelsSplit(2);
-		draw_list->ChannelsSetCurrent(1);
-		BeginGroup();
-	}
-
-
-	void EndNode(ImVec2& pos)
-	{
-		ImDrawList* draw_list = GetWindowDrawList();
-		ImGui::SameLine();
-		EndGroup();
-		const ImVec2 size = ImGui::GetItemRectSize() + ImGui::GetStyle().WindowPadding * 2;
-		SetCursorScreenPos(node_pos);
-
-		SetNextWindowPos(node_pos);
-		SetNextWindowSize(size);
-		BeginChild((ImGuiID)last_node_id, size, false, ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground);
-		EndChild();
-
-		SetCursorScreenPos(node_pos);
-		InvisibleButton("bg", size);
-		if (IsItemActive() && IsMouseDragging(0))
-		{
-			pos += GetIO().MouseDelta;
-		}
-
-		const ImGuiStyle& style = ImGui::GetStyle();
-		draw_list->ChannelsSetCurrent(0);
-		draw_list->AddRectFilled(node_pos, node_pos + size, GetColorU32(style.Colors[ImGuiCol_ChildBg]), 4.0f);
-		draw_list->AddRect(node_pos, node_pos + size, GetColorU32(style.Colors[ImGuiCol_Border]), 4.0f);
-
-		PopID();
-		draw_list->ChannelsMerge();
-	}
-
-
-	ImVec2 GetNodeInputPos(ImGuiID id, int input)
-	{
-		PushID(id);
-
-		ImGuiWindow* parent_win = GetCurrentWindow();
-		char title[256];
-		ImFormatString(title, IM_ARRAYSIZE(title), "%s/%08X", parent_win->Name, id);
-		ImGuiWindow* win = FindWindowByName(title);
-		if (!win)
-		{
-			PopID();
-			return ImVec2(0, 0);
-		}
-
-		ImVec2 pos = win->Pos;
-		pos.x -= NODE_SLOT_RADIUS;
-		ImGuiStyle& style = GetStyle();
-		pos.y += (GetTextLineHeight() + style.ItemSpacing.y) * input;
-		pos.y += style.WindowPadding.y + GetTextLineHeight() * 0.5f;
-
-
-		PopID();
-		return pos;
-	}
-
-
-	ImVec2 GetNodeOutputPos(ImGuiID id, int output)
-	{
-		PushID(id);
-
-		ImGuiWindow* parent_win = GetCurrentWindow();
-		char title[256];
-		ImFormatString(title, IM_ARRAYSIZE(title), "%s/%08X", parent_win->Name, id);
-		ImGuiWindow* win = FindWindowByName(title);
-		if (!win)
-		{
-			PopID();
-			return ImVec2(0, 0);
-		}
-
-		ImVec2 pos = win->Pos;
-		pos.x += win->Size.x + NODE_SLOT_RADIUS;
-		ImGuiStyle& style = GetStyle();
-		pos.y += (GetTextLineHeight() + style.ItemSpacing.y) * output;
-		pos.y += style.WindowPadding.y + GetTextLineHeight() * 0.5f;
-
-		PopID();
-		return pos;
-	}
-
-
-	bool NodePin(ImGuiID id, ImVec2 screen_pos)
-	{
-		ImDrawList* draw_list = GetWindowDrawList();
-		SetCursorScreenPos(screen_pos - ImVec2(NODE_SLOT_RADIUS, NODE_SLOT_RADIUS));
-		PushID(id);
-		InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
-		bool hovered = IsItemHovered();
-		PopID();
-		draw_list->AddCircleFilled(screen_pos,
-			NODE_SLOT_RADIUS,
-			hovered ? ImColor(0, 150, 0, 150) : ImColor(150, 150, 150, 150));
-		return hovered;
-	}
-
-
-	void NodeLink(ImVec2 from, ImVec2 to)
-	{
-		ImVec2 p1 = from;
-		ImVec2 t1 = ImVec2(+80.0f, 0.0f);
-		ImVec2 p2 = to;
-		ImVec2 t2 = ImVec2(+80.0f, 0.0f);
-		const int STEPS = 12;
-		ImDrawList* draw_list = GetWindowDrawList();
-		for (int step = 0; step <= STEPS; step++)
-		{
-			float t = (float)step / (float)STEPS;
-			float h1 = +2 * t * t * t - 3 * t * t + 1.0f;
-			float h2 = -2 * t * t * t + 3 * t * t;
-			float h3 = t * t * t - 2 * t * t + t;
-			float h4 = t * t * t - t * t;
-			draw_list->PathLineTo(ImVec2(h1 * p1.x + h2 * p2.x + h3 * t1.x + h4 * t2.x,
-				h1 * p1.y + h2 * p2.y + h3 * t1.y + h4 * t2.y));
-		}
-		draw_list->PathStroke(ImColor(200, 200, 100), false, 3.0f);
 	}
 
 
@@ -545,7 +410,7 @@ namespace ImGui
 
 				SetCursorScreenPos(pos - ImVec2(SIZE, SIZE));
 				PushID(idx);
-				InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+				InvisibleButton("", ImVec2(2 * HANDLE_RADIUS, 2 * HANDLE_RADIUS));
 
 				bool is_selected = selected_point && *selected_point == point_idx + idx;
 				float thickness = is_selected ? 2.0f : 1.0f;
@@ -606,7 +471,7 @@ namespace ImGui
 
 				SetCursorScreenPos(tang - ImVec2(SIZE, SIZE));
 				PushID(-idx);
-				InvisibleButton("", ImVec2(2 * NODE_SLOT_RADIUS, 2 * NODE_SLOT_RADIUS));
+				InvisibleButton("", ImVec2(2 * HANDLE_RADIUS, 2 * HANDLE_RADIUS));
 
 				window->DrawList->AddLine(pos, tang, GetColorU32(ImGuiCol_PlotLines));
 
