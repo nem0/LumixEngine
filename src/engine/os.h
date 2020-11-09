@@ -125,7 +125,8 @@ public:
 
 	bool open(const char* path);
 	void close();
-
+	
+	using IInputStream::read;
 	bool read(void* data, u64 size) override;
 	const void* getBuffer() const override { return nullptr; }
 
@@ -150,6 +151,7 @@ public:
 	void flush();
     bool isError() const { return m_is_error; }
 
+	using IOutputStream::write;
 	bool write(const void* data, u64 size) override;
 
 	OutputFile& operator <<(const char* text);
