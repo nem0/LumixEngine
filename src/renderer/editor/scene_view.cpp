@@ -912,7 +912,9 @@ void SceneView::renderSelection()
 					dc.fur_scale = 0;
 					dc.gravity = 0;
 					memcpy(dc.bones, item.pose.begin(), item.pose.byte_size());
-					gpu::update(drawcall_ub, &dc, item.pose.byte_size() + sizeof(Vec4));
+					const u32 size = item.pose.byte_size() + sizeof(Vec4);
+					gpu::update(drawcall_ub, &dc, size);
+					gpu::bindUniformBuffer(4, drawcall_ub, 0, size);
 				}
 
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
