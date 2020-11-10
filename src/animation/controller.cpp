@@ -89,8 +89,14 @@ void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motio
 	if (root_bone_iter.isValid()) {
 		const int root_bone_idx = root_bone_iter.value();
 		const Model::Bone& bone = ctx.model->getBone(root_bone_idx);
-		root_motion->rot = bone.transform.rot * root_motion->rot * bone.transform.rot.conjugated();
-		root_motion->pos = bone.transform.rot.rotate(root_motion->pos);
+		if (m_flags.isSet(Flags::XZ_ROOT_MOTION)) {
+			root_motion->rot = Quat::IDENTITY;
+			root_motion->pos = bone.transform.rot.rotate(Vec3(root_motion->pos.x, 0, root_motion->pos.z));
+		}
+		else {
+			root_motion->rot = bone.transform.rot * root_motion->rot * bone.transform.rot.conjugated();
+			root_motion->pos = bone.transform.rot.rotate(root_motion->pos);
+		}
 	}
 }
 
@@ -111,8 +117,14 @@ void Controller::getPose(RuntimeContext& ctx, Ref<Pose> pose) {
 	// TODO this should be in AnimationNode
 	if (root_bone_iter.isValid()) {
 		const int root_bone_idx = root_bone_iter.value();
-		pose->positions[root_bone_idx] = root_bind_pose.pos;
-		pose->rotations[root_bone_idx] = root_bind_pose.rot;
+		if (m_flags.isSet(Flags::XZ_ROOT_MOTION)) {
+			pose->positions[root_bone_idx].x = root_bind_pose.pos.x;
+			pose->positions[root_bone_idx].z = root_bind_pose.pos.z;
+		}
+		else {
+			pose->positions[root_bone_idx] = root_bind_pose.pos;
+			pose->rotations[root_bone_idx] = root_bind_pose.rot;
+		}
 	}
 }
 
@@ -131,6 +143,7 @@ void Controller::serialize(OutputMemoryStream& stream) {
 	Header header;
 	stream.write(header);
 	stream.write(m_flags);
+	stream.write(m_root_motion_bone);
 	for (const InputDecl::Input& input : m_inputs.inputs) {
 		if (input.type == InputDecl::Type::EMPTY) continue;
 		stream.write(input.type);
@@ -156,6 +169,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 	Header header;
 	stream.read(header);
 	stream.read(m_flags);
+	stream.read(m_root_motion_bone);
 	InputDecl::Type type;
 	stream.read(type);
 	while (type != InputDecl::EMPTY) {

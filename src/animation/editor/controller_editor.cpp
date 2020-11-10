@@ -330,6 +330,10 @@ struct ControllerEditorImpl : ControllerEditor {
 			}
 			AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
 			Controller* ctrl = scene->getAnimatorController(selected[0]);
+			if (!ctrl) {
+				ImGui::End();
+				return;
+			}
 			
 			for (const InputDecl::Input& input : ctrl->m_inputs.inputs) {
 				const u32 idx = u32(&input - ctrl->m_inputs.inputs);
@@ -421,6 +425,14 @@ struct ControllerEditorImpl : ControllerEditor {
 		ImGui::End();
 
 		if (ImGui::Begin("Animation controller", &m_open)) {
+			if (ImGui::CollapsingHeader("Controller")) {
+				ImGui::InputText("Root motion bone", m_controller->m_root_motion_bone.data, sizeof(m_controller->m_root_motion_bone.data));
+				bool xz_root_motion = m_controller->m_flags.isSet(Controller::Flags::XZ_ROOT_MOTION);
+				if (ImGui::Checkbox("XZ root motion", &xz_root_motion)) {
+					m_controller->m_flags.set(Controller::Flags::XZ_ROOT_MOTION, xz_root_motion);
+				}
+			}
+
 			if (m_current_node && ImGui::CollapsingHeader("Node")) {
 				ui_dispatch(*m_current_node);
 			}
