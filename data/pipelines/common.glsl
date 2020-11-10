@@ -310,10 +310,10 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 				float bias = (0.01 + Global.sm_slices[slice].texel_world / max(NdL, 0.1)) * Global.shadow_rcp_depth_range;
 				for (int j = 0; j < 16; ++j) {
 					vec2 pcf_offset = POISSON_DISK_16[j] * rot;
-					vec2 uv = sm_uv + pcf_offset * vec2(0.25, 1) * Global.sm_slices[slice].rcp_size;
+					vec2 uv = sm_uv + pcf_offset * vec2(0.25, 1) * Global.sm_slices[slice].rcp_size * 3;
 
 					float occluder = textureLod(shadowmap, uv, 0).r;
-					shadow += receiver > occluder - length(pcf_offset) * bias ? 1 : 0;
+					shadow += receiver > occluder - length(pcf_offset) * bias * 3 ? 1 : 0;
 				}
 				return shadow / 16;
 			}

@@ -1,0 +1,8 @@
+create_impostor = false
+use_mikktspace = false
+position_error = 0.0199999990
+rotation_error = 0.0010000001
+physics = "trimesh"
+scale = 1.0000000000
+culling_scale = 1.0000000000
+split = false
