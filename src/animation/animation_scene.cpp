@@ -649,8 +649,7 @@ struct AnimationSceneImpl final : AnimationScene
 
 		animator.ctx->model = model;
 		animator.ctx->time_delta = Time::fromSeconds(time_delta);
-		// TODO
-		animator.ctx->root_bone_hash = crc32("RigRoot");
+		animator.ctx->root_bone_hash = crc32(animator.resource->m_root_motion_bone);
 		animator.resource->update(*animator.ctx, Ref(animator.root_motion));
 
 		model->getRelativePose(*pose);

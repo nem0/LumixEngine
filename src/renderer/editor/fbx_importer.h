@@ -72,7 +72,6 @@ struct FBXImporter
 		const ofbx::IScene* scene = nullptr;
 		StaticString<MAX_PATH_LENGTH> name;
 		bool import = true;
-		int root_motion_bone_idx = -1;
 	};
 
 	struct ImportTexture

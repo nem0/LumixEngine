@@ -1464,8 +1464,6 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 		header.frame_count = u32(anim_len * fps + 0.5f);
 		write(header);
 
-		write(anim.root_motion_bone_idx);
-
 		Array<Array<Key>> all_keys(m_allocator);
 		auto fbx_to_anim_time = [anim_len](i64 fbx_time){
 			const double t = clamp(ofbx::fbxTimeToSeconds(fbx_time) / anim_len, 0.0, 1.0);

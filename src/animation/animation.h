@@ -47,7 +47,6 @@ struct Animation final : Resource
 
 		ResourceType getType() const override { return TYPE; }
 
-		int getRootMotionBoneIdx() const { return m_root_motion_bone_idx; }
 		Vec3 getTranslation(Time time, u32 curve_idx) const;
 		Quat getRotation(Time time, u32 curve_idx) const;
 		int getTranslationCurveIndex(u32 name_hash) const;
