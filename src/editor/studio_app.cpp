@@ -1,4 +1,5 @@
 #include <imgui/imgui.h>
+#include <imgui/imnodes.h>
 
 #include "studio_app.h"
 #include "audio/audio_scene.h"
@@ -390,6 +391,7 @@ struct StudioAppImpl final : StudioApp
 
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
+		imnodes::Initialize();
 		loadSettings();
 		initIMGUI();
 
