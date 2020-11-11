@@ -49,6 +49,7 @@
 
 
 using namespace Lumix;
+namespace Lumix { UniquePtr<StudioApp::GUIPlugin> createParticleEditor(StudioApp& app); }
 
 
 static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
@@ -3816,6 +3817,10 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_game_view.init();
 		m_env_probe_plugin.init();
 		m_model_plugin.init();
+
+
+		m_particle_editor = createParticleEditor(m_app);
+		m_app.addPlugin(*m_particle_editor.get());
 	}
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
@@ -4008,6 +4013,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		asset_compiler.removePlugin(m_particle_emitter_plugin);
 		asset_compiler.removePlugin(m_pipeline_plugin);
 
+		m_app.removePlugin(*m_particle_editor.get());
 		m_app.removePlugin(m_scene_view);
 		m_app.removePlugin(m_game_view);
 		m_app.removePlugin(m_editor_ui_render_plugin);
@@ -4020,6 +4026,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
+	UniquePtr<StudioApp::GUIPlugin> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
 	ParticleEmitterPlugin m_particle_emitter_plugin;
