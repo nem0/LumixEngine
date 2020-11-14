@@ -278,6 +278,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 
 	virtual void setParticleEmitterPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getParticleEmitterPath(EntityRef entity) = 0;
+	virtual void setParticleEmitterRate(EntityRef entity, u32 value) = 0;
+	virtual u32 getParticleEmitterRate(EntityRef entity) = 0;
 	virtual const AssociativeArray<EntityRef, struct ParticleEmitter*>& getParticleEmitters() const = 0;
 
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
