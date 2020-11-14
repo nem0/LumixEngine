@@ -1621,6 +1621,7 @@ struct PipelineImpl final : Pipeline
 					const Vec3 lpos = (tr.pos - m_camera_params.pos).toFloat();
 
 					const Material* material = emitter->getResource()->getMaterial();
+					if (!material) continue;
 					str.write(lpos);
 					str.write(tr.rot);
 					str.write(material->getShader()->getProgram(decl, 0));

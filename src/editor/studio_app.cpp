@@ -433,12 +433,6 @@ struct StudioAppImpl final : StudioApp
 		m_asset_browser->releaseResources();
 		removeAction(&m_set_pivot_action);
 		removeAction(&m_reset_pivot_action);
-		ImGuiIO& io = ImGui::GetIO();
-		if (io.WantSaveIniSettings) {
-			const char* data = ImGui::SaveIniSettingsToMemory();
-			m_settings.m_imgui_state = data;
-		}
-
 		m_watched_plugin.watcher.reset();
 
 		saveSettings();
@@ -1909,6 +1903,11 @@ struct StudioAppImpl final : StudioApp
 
 	void saveSettings() override
 	{
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.WantSaveIniSettings) {
+			const char* data = ImGui::SaveIniSettingsToMemory();
+			m_settings.m_imgui_state = data;
+		}
 		m_settings.m_is_asset_browser_open = m_asset_browser->m_is_open;
 		m_settings.m_asset_browser_left_column_width = m_asset_browser->m_left_column_width;
 		m_settings.m_is_entity_list_open = m_is_entity_list_open;
