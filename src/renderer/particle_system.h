@@ -88,8 +88,6 @@ struct ParticleEmitterResource final : Resource
 	);
 
 private:
-	bool loadBinary(u64 size, const u8* mem);
-
 	Array<Instruction> m_instructions;
 	int m_emit_offset;
 	int m_output_offset;

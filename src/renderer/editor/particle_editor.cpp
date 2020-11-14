@@ -44,6 +44,7 @@ struct ParticleEditorResource {
 	};
 
 	struct Node {
+		// this is serialized, do not change order
 		enum Type {
 			OUTPUT,
 			INPUT,
@@ -52,7 +53,9 @@ struct ParticleEditorResource {
 			CONST,
 			LITERAL,
 			EMIT,
-			UPDATE
+			UPDATE,
+			RANDOM,
+			UNARY_FUNCTION
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -114,11 +117,58 @@ struct ParticleEditorResource {
 		u8 m_input_counter;
 		u8 m_output_counter;
 	};
+	
+	struct UnaryFunctionNode : Node {
+		UnaryFunctionNode(ParticleEditorResource& res) : Node(res) {}
+
+		Type getType() const override { return Type::UNARY_FUNCTION; }
+
+		void serialize(OutputMemoryStream& blob) { blob.write(func); }
+		void deserialize(InputMemoryStream& blob) { blob.read(func); }
+		
+		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream output) override {
+			NodeInput input = getInput(0);
+			if (!input.node) return output;
+			
+			Instruction& i = instructions.emplace();
+			switch (func) {
+				case COS: i.type = InstructionType::COS; break;
+				case SIN: i.type = InstructionType::SIN; break;
+				default: ASSERT(false); break;
+			}
+			i.dst = m_resource.streamOrRegister(output);
+			i.op0 = input.generate(instructions, i.op0);
+
+			m_resource.freeRegister(i.op0);
+
+			return i.dst;
+		}
+
+		bool onGUI() override {
+			beginInput();
+			endInput();
+			beginOutput();
+			ImGui::SetNextItemWidth(60);
+			ImGui::Combo("##fn", (int*)&func, "cos\0sin\0");
+			endOutput();
+			return false;
+		}
+
+		enum Function : int {
+			COS,
+			SIN
+		};
+
+		Function func = COS;
+	};
 
 	struct ConstNode : Node {
 		ConstNode(ParticleEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::CONST; }
+
+		void serialize(OutputMemoryStream& blob) { blob.write(idx); }
+		void deserialize(InputMemoryStream& blob) { blob.read(idx); }
 		
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
 			DataStream r;
@@ -135,6 +185,49 @@ struct ParticleEditorResource {
 		}
 
 		u8 idx;
+	};
+
+	struct RandomNode : Node {
+		RandomNode(ParticleEditorResource& res) : Node(res) {}
+		
+		Type getType() const override { return Type::RANDOM; }
+
+		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream output) override {
+			Instruction& i = instructions.emplace();
+			i.type = InstructionType::RAND;
+			i.dst = m_resource.streamOrRegister(output);
+			i.op0.type = DataStream::LITERAL;
+			i.op0.value = from;
+			i.op1.type = DataStream::LITERAL;
+			i.op1.value = to;
+			return i.dst;
+		}
+
+		void serialize(OutputMemoryStream& blob) {
+			blob.write(from);
+			blob.write(to);
+		}
+
+		void deserialize(InputMemoryStream& blob) {
+			blob.read(from);
+			blob.read(to);
+		}
+
+		bool onGUI() override {
+			beginOutput();
+			imnodes::BeginNodeTitleBar();
+			ImGui::Text("Random");
+			imnodes::EndNodeTitleBar();
+			endOutput();
+			ImGui::PushItemWidth(60);
+			ImGui::DragFloat("From", &from);
+			ImGui::DragFloat("To", &to);
+			ImGui::PopItemWidth();
+			return false;
+		}
+
+		float from = 0;
+		float to = 1;
 	};
 
 	struct LiteralNode : Node {
@@ -211,6 +304,7 @@ struct ParticleEditorResource {
 		}
 
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
+			m_resource.m_register_mask = 0;
 			for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
 				const NodeInput input = getInput(i);
 				if (!input.node) continue;
@@ -248,6 +342,7 @@ struct ParticleEditorResource {
 		}
 
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
+			m_resource.m_register_mask = 0;
 			for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
 				const NodeInput input = getInput(i);
 				if (!input.node) continue;
@@ -285,6 +380,7 @@ struct ParticleEditorResource {
 		}
 
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
+			m_resource.m_register_mask = 0;
 			for (i32 i = 0; i < m_resource.m_outputs.size(); ++i) {
 				const NodeInput input = getInput(i);
 				if (!input.node) continue;
@@ -322,19 +418,17 @@ struct ParticleEditorResource {
 			const NodeInput input1 = getInput(1);
 
 			Instruction i;
-			i.op0.type = DataStream::REGISTER;
-			i.op0.index = 0;
-
 			i.op0 = input0.generate(instructions, i.op0);
-
-			i.op1.index = 1;
 			i.op1 = input1.generate(instructions, i.op1);
 
 			i.type = OP_TYPE;
-			i.dst = output;
+			i.dst = m_resource.streamOrRegister(output);
 
 			instructions.push(i);
-			return output;
+			
+			m_resource.freeRegister(i.op0);
+			m_resource.freeRegister(i.op1);
+			return i.dst;
 		}
 
 		bool onGUI() override {
@@ -408,6 +502,7 @@ struct ParticleEditorResource {
 	Node* addNode(Node::Type type) {
 		UniquePtr<Node> node;
 		switch(type) {
+			case Node::RANDOM: node = UniquePtr<RandomNode>::create(m_allocator, *this); break;
 			case Node::EMIT: node = UniquePtr<EmitNode>::create(m_allocator, *this); break;
 			case Node::UPDATE: node = UniquePtr<UpdateNode>::create(m_allocator, *this); break;
 			case Node::INPUT: node = UniquePtr<InputNode>::create(m_allocator, *this); break;
@@ -415,6 +510,7 @@ struct ParticleEditorResource {
 			case Node::MUL: node = UniquePtr<BinaryOpNode<InstructionType::MUL>>::create(m_allocator, *this); break;
 			case Node::ADD: node = UniquePtr<BinaryOpNode<InstructionType::ADD>>::create(m_allocator, *this); break;
 			case Node::CONST: node = UniquePtr<ConstNode>::create(m_allocator, *this); break;
+			case Node::UNARY_FUNCTION: node = UniquePtr<UnaryFunctionNode>::create(m_allocator, *this); break;
 			case Node::LITERAL: node = UniquePtr<LiteralNode>::create(m_allocator, *this); break;
 			default: ASSERT(false);
 		}
@@ -502,6 +598,8 @@ struct ParticleEditorResource {
 		m_outputs.emplace().name = "pos_y";
 		m_outputs.emplace().name = "pos_z";
 
+		m_consts.emplace().name = "delta time";
+
 		m_nodes.push(UniquePtr<UpdateNode>::create(m_allocator, *this));
 		m_nodes.push(UniquePtr<OutputNode>::create(m_allocator, *this));
 		m_nodes.push(UniquePtr<EmitNode>::create(m_allocator, *this));
@@ -512,6 +610,7 @@ struct ParticleEditorResource {
 		m_output.clear();
 		m_emit.clear();
 
+		m_registers_count = 0;
 		m_nodes[0]->generate(m_update, 0, {});
 		m_update.emplace().type = InstructionType::END;
 		m_nodes[1]->generate(m_output, 0, {});
@@ -535,9 +634,12 @@ struct ParticleEditorResource {
 		for (const Instruction& i : instructions) {
 			if (i.type == InstructionType::END) continue;
 			switch (i.type) {
+				case InstructionType::COS: text << "\tcos("; break;
+				case InstructionType::SIN: text << "\tsin("; break;
 				case InstructionType::MOV: text << "\tmov("; break;
 				case InstructionType::ADD: text << "\tadd("; break;
 				case InstructionType::MUL: text << "\tmul("; break;
+				case InstructionType::RAND: text << "\trand("; break;
 				default: ASSERT(false); break;
 			}
 
@@ -553,6 +655,31 @@ struct ParticleEditorResource {
 			text << ")\n";
 		}
 	}
+	
+	void freeRegister(DataStream v) {
+		if (v.type != DataStream::REGISTER) return;
+		m_register_mask &= ~(1 << v.index);
+	}
+
+	DataStream streamOrRegister(DataStream v) {
+		if (v.type == DataStream::NONE) { 
+			DataStream r;
+			r.type = DataStream::REGISTER;
+			r.index = 0xff;
+			for (u32 i = 0; i < 8; ++i) {
+				if ((m_register_mask & (1 << i)) == 0) {
+					r.index = i;
+					break;
+				}
+			}
+			ASSERT(r.index != 0xFF);
+			m_register_mask |= 1 << r.index;
+			m_registers_count = maximum(m_registers_count, r.index + 1);
+			return r;
+		}
+
+		return v;
+	}
 
 	IAllocator& m_allocator;
 	StaticString<MAX_PATH_LENGTH> m_mat_path;
@@ -565,6 +692,8 @@ struct ParticleEditorResource {
 	Array<Instruction> m_emit;
 	Array<Instruction> m_output;
 	int m_last_id = 0;
+	u8 m_register_mask = 0;
+	u8 m_registers_count = 0;
 };
 
 struct ParticleEditor : StudioApp::GUIPlugin {
@@ -606,6 +735,17 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			}
 			if (ImGui::Button("Add##add_stream")) {
 				m_resource->m_streams.emplace();
+			}
+		}
+		if (ImGui::CollapsingHeader("Constants", ImGuiTreeNodeFlags_DefaultOpen)) {
+			for (ParticleEditorResource::Constant& s : m_resource->m_consts) {
+				ImGui::PushID(&s);
+				ImGui::SetNextItemWidth(-1);
+				ImGui::InputText("##v", s.name.data, sizeof(s.name.data));
+				ImGui::PopID();
+			}
+			if (ImGui::Button("Add##add_const")) {
+				m_resource->m_consts.emplace();
 			}
 		}
 		if (m_code.size() > 0 && ImGui::CollapsingHeader("Source", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -684,6 +824,15 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 				if (ImGui::Selectable("Add")) addNode(ParticleEditorResource::Node::ADD);
 				if (ImGui::Selectable("Multiply")) addNode(ParticleEditorResource::Node::MUL);
 				if (ImGui::Selectable("Literal")) addNode(ParticleEditorResource::Node::LITERAL);
+				if (ImGui::Selectable("Random")) addNode(ParticleEditorResource::Node::RANDOM);
+				if (ImGui::Selectable("Sin")) {
+					ParticleEditorResource::Node* n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::SIN;
+				}
+				if (ImGui::Selectable("Cos")) {
+					ParticleEditorResource::Node* n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);
+					((ParticleEditorResource::UnaryFunctionNode*)n)->func = ParticleEditorResource::UnaryFunctionNode::COS;
+				}
 				if (ImGui::BeginMenu("Input")) {
 					for (u8 i = 0; i < m_resource->m_streams.size(); ++i) {
 						if (ImGui::Selectable(m_resource->m_streams[i].name)) {
@@ -775,7 +924,6 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 
 	void pushUndo() {
 		m_resource->generate();
-
 		m_code.clear();
 
 		m_code << "function update()\n";
@@ -789,8 +937,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 		m_code << "function output()\n";
 		m_resource->toString(m_code, m_resource->m_output);
 		m_code << "end\n";
-		m_code.write('\0');
-
+		m_code.write('\0');	
 		// TODO push in undo queue
 	}
 
@@ -814,6 +961,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			m_resource->deserialize(InputMemoryStream(blob), path);
 			m_path = path;
 			m_resource->generate();
+			pushUndo();
 		}
 		else {
 			logError("Renderer") << "Failed to open " << path;
@@ -890,7 +1038,7 @@ bool compileParticleEmitter(InputMemoryStream& input, OutputMemoryStream& output
 	output.write((i32)res.m_update.size());
 	output.write(i32(res.m_update.size() + res.m_emit.size()));
 	output.write((i32)res.m_streams.size());
-	output.write((i32)0);
+	output.write((i32)res.m_registers_count);
 	output.write((i32)res.m_outputs.size());
 	return true;
 }
