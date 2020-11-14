@@ -2706,6 +2706,14 @@ public:
 		return emitter->getResource()->getPath();
 	}
 
+	void setParticleEmitterRate(EntityRef entity, u32 value) override {
+		ParticleEmitter* emitter = m_particle_emitters[entity];
+		emitter->m_emit_rate = value;
+	}
+
+	u32 getParticleEmitterRate(EntityRef entity) override {
+		return m_particle_emitters[entity]->m_emit_rate;
+	}
 
 	const AssociativeArray<EntityRef, ParticleEmitter*>& getParticleEmitters() const override
 	{
