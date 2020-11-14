@@ -395,6 +395,7 @@ static void registerProperties(IAllocator& allocator)
 			var_property("half_extents", &RenderScene::getReflectionProbe, &ReflectionProbe::half_extents)
 		),
 		component("particle_emitter",
+			property("Emit rate", LUMIX_PROP(RenderScene, ParticleEmitterRate)),
 			property("Resource", LUMIX_PROP(RenderScene, ParticleEmitterPath),
 				ResourceAttribute("Particle emitter (*.par)", ParticleEmitterResource::TYPE))
 		),

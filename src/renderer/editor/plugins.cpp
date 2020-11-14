@@ -49,7 +49,10 @@
 
 
 using namespace Lumix;
-namespace Lumix { UniquePtr<StudioApp::GUIPlugin> createParticleEditor(StudioApp& app); }
+namespace Lumix {
+	bool compileParticleEmitter(InputMemoryStream&, OutputMemoryStream&, const char*, IAllocator&);
+	UniquePtr<StudioApp::GUIPlugin> createParticleEditor(StudioApp& app);
+}
 
 
 static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
@@ -319,15 +322,19 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 		app.getAssetCompiler().registerExtension("par", ParticleEmitterResource::TYPE);
 	}
 
+	bool compile(const Path& src) override {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, Ref(src_data))) return false;
 
-	bool compile(const Path& src) override
-	{
-		return m_app.getAssetCompiler().copyCompile(src);
+		InputMemoryStream input(src_data);
+		OutputMemoryStream output(m_app.getAllocator());
+		if (!compileParticleEmitter(input, output, src.c_str(), m_app.getAllocator())) return false;
+
+		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(output.data(), (i32)output.size()));
 	}
 	
-	
 	void onGUI(Span<Resource*> resources) override {}
-
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Particle Emitter"; }

@@ -20,6 +20,9 @@
 namespace Lumix
 {
 
+using DataStream = ParticleEmitterResource::DataStream;
+using InstructionType = ParticleEmitterResource::Instruction::Type;
+using Instruction = ParticleEmitterResource::Instruction;
 
 const ResourceType ParticleEmitterResource::TYPE = ResourceType("particle_emitter");
 
@@ -29,7 +32,7 @@ ParticleEmitterResource::ParticleEmitterResource(const Path& path
 	, Renderer& renderer
 	, IAllocator& allocator)
 	: Resource(path, manager, allocator)
-	, m_bytecode(allocator)
+	, m_instructions(allocator)
 	, m_material(nullptr)
 {
 }
@@ -37,59 +40,14 @@ ParticleEmitterResource::ParticleEmitterResource(const Path& path
 
 void ParticleEmitterResource::unload()
 {
-	m_bytecode.clear();
+	m_instructions.clear();
 }
-
-
-enum class InstructionArgType : u8
-{
-	CHANNEL,
-	CONSTANT,
-	REGISTER,
-	LITERAL
-};
-
-
-enum class Instructions : u8
-{
-	END,
-	ADD,
-	COS,
-	SIN,
-	ADD_CONST,
-	SUB,
-	SUB_CONST,
-	MUL,
-	MULTIPLY_ADD,
-	MULTIPLY_CONST_ADD,
-	LT,
-	OUTPUT,
-	OUTPUT_CONST,
-	MOV,
-	RAND,
-	KILL,
-	EMIT
-};
 
 
 struct Compiler
 {
-	struct DataStream
-	{
-		enum Type : u8 {
-			CHANNEL,
-			CONST,
-			REGISTER,
-			LITERAL
-		};
-
-		Type type;
-		u8 index; // in the group of the same typed streams
-		float value;
-	};
-
-	Compiler(OutputMemoryStream& bytecode) 
-		: m_bytecode(bytecode) 
+	Compiler(Array<ParticleEmitterResource::Instruction>& instructions) 
+		: m_instructions(instructions) 
 	{
 		m_streams[0].type = DataStream::CONST;
 		m_streams[0].index = 0;
@@ -111,7 +69,7 @@ struct Compiler
 		return compiler;
 	}
 
-	void writeDataStream(lua_State* L, int index) const
+	DataStream getDataStream(lua_State* L, int index) const
 	{
 		if(lua_istable(L, index)) {
 			lua_rawgeti(L, index, 1);
@@ -119,15 +77,13 @@ struct Compiler
 			
 			const int ds_idx = (int)lua_tointeger(L, -1);
 			lua_pop(L, 1);
-			const DataStream& d = m_streams[ds_idx];
-			m_bytecode.write(d.type);
-			m_bytecode.write(d.index);
+			return m_streams[ds_idx];
 		}
-		else {
-			const float value = LuaWrapper::checkArg<float>(L, index);
-			m_bytecode.write(DataStream::LITERAL);
-			m_bytecode.write(value);
-		}
+
+		DataStream res;
+		res.value = LuaWrapper::checkArg<float>(L, index);
+		res.type = DataStream::LITERAL;
+		return res;
 	}
 
 	static int material(lua_State* L)
@@ -178,83 +134,76 @@ struct Compiler
 	}
 	
 	
-	static void writeUnaryInstruction(Instructions instruction, lua_State* L)
+	static void writeUnaryInstruction(InstructionType instruction, lua_State* L)
 	{
 		Compiler* c = getCompiler(L);
-		c->m_bytecode.write(instruction);
+		Instruction& i = c->m_instructions.emplace();
+		i.type = instruction;
 		
-		c->writeDataStream(L, 1);
-		c->writeDataStream(L, 2);
+		i.dst = c->getDataStream(L, 1);
+		i.op0 = c->getDataStream(L, 2);
 	}
 	
 	
-	static void writeBinaryInstruction(Instructions instruction, lua_State* L)
+	static void writeBinaryInstruction(InstructionType instruction, lua_State* L)
 	{
 		Compiler* c = getCompiler(L);
-		c->m_bytecode.write(instruction);
+		Instruction& i = c->m_instructions.emplace();
+		i.type = instruction;
 		
-		c->writeDataStream(L, 1);
-		c->writeDataStream(L, 2);
-		c->writeDataStream(L, 3);
+		i.dst = c->getDataStream(L, 1);
+		i.op0 = c->getDataStream(L, 2);
+		i.op1 = c->getDataStream(L, 3);
 	}
 
 	static int sin(lua_State* L)
 	{
-		writeUnaryInstruction(Instructions::SIN, L);
+		writeUnaryInstruction(InstructionType::SIN, L);
 		return 0;
 	}
 
 
 	static int cos(lua_State* L)
 	{
-		writeUnaryInstruction(Instructions::COS, L);
+		writeUnaryInstruction(InstructionType::COS, L);
 		return 0;
 	}
 
 
 	static int mul(lua_State* L)
 	{
-		writeBinaryInstruction(Instructions::MUL, L);
+		writeBinaryInstruction(InstructionType::MUL, L);
 		return 0;
 	}
 
 
 	static int mov(lua_State* L)
 	{
-		writeUnaryInstruction(Instructions::MOV, L);
+		writeUnaryInstruction(InstructionType::MOV, L);
 		return 0;
 	}
 
 
 	static int add(lua_State* L)
 	{
-		writeBinaryInstruction(Instructions::ADD, L);
+		writeBinaryInstruction(InstructionType::ADD, L);
 		return 0;
 	}
 
 
 	static int rand(lua_State* L)
 	{
-		writeBinaryInstruction(Instructions::RAND, L);
+		writeBinaryInstruction(InstructionType::RAND, L);
 		return 0;
 	}
 
 
 	static int sub(lua_State* L)
 	{
-		writeBinaryInstruction(Instructions::SUB, L);
+		writeBinaryInstruction(InstructionType::SUB, L);
 		return 0;
 	}
 
-
-	static int out(lua_State* L)
-	{
-		Compiler* c = getCompiler(L);
-		c->m_bytecode.write(Instructions::OUTPUT);
-		c->writeDataStream(L, 1);
-		++c->m_outputs_count;
-		return 0;
-	}
 
 
 	DataStream m_streams[64];
@@ -265,10 +214,31 @@ struct Compiler
 	int m_constants_count = 0;
 	int m_outputs_count = 0;
 	int m_bytecode_offset = 0;
-	OutputMemoryStream& m_bytecode;
+	Array<ParticleEmitterResource::Instruction>& m_instructions;
 	bool m_error = false;
 };
 
+void ParticleEmitterResource::overrideData(Array<Instruction>&& instructions,
+	int emit_offset,
+	int output_offset,
+	int channels_count,
+	int registers_count,
+	int outputs_count
+)
+{
+	++m_empty_dep_count;
+	checkState();
+	
+	m_instructions = static_cast<Array<Instruction>&&>(instructions);
+	m_emit_offset = emit_offset;
+	m_output_offset = output_offset;
+	m_channels_count = channels_count;
+	m_registers_count = registers_count;
+	m_outputs_count = outputs_count;
+	
+	--m_empty_dep_count;
+	checkState();
+}
 
 void ParticleEmitterResource::setMaterial(const Path& path)
 {
@@ -285,13 +255,40 @@ void ParticleEmitterResource::setMaterial(const Path& path)
 	}
 }
 
+bool ParticleEmitterResource::loadBinary(u64 size, const u8* mem) {
+	Header header;
+	InputMemoryStream blob(mem, size);
+	blob.read(header);
+	if (header.magic != Header::MAGIC) {
+		logError("Renderer") << "Invalid file " << getPath();
+		return false;
+	}
+	if (header.version != 0) {
+		logError("Renderer") << "Unsupported version " << getPath();
+		return false;
+	}
+
+	setMaterial(Path(blob.readString()));
+	const i32 count = blob.read<i32>();
+	m_instructions.resize(count);
+	blob.read(m_instructions.begin(), m_instructions.byte_size());
+	blob.read(m_emit_offset);
+	blob.read(m_output_offset);
+	blob.read(m_channels_count);
+	blob.read(m_registers_count);
+	blob.read(m_outputs_count);
+
+	return true;
+}
 
 bool ParticleEmitterResource::load(u64 size, const u8* mem)
 {
+	return loadBinary(size, mem);
+
 	// TODO reuse state
 	lua_State* L = luaL_newstate();
 
-	Compiler compiler(m_bytecode);
+	Compiler compiler(m_instructions);
 
 	lua_pushlightuserdata(L, &compiler);
 	lua_setfield(L, LUA_GLOBALSINDEX, "this");
@@ -314,8 +311,6 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 	DEFINE_LUA_FUNC(cos);
 	DEFINE_LUA_FUNC(sin);
 	DEFINE_LUA_FUNC(rand);
-
-	DEFINE_LUA_FUNC(out);
 
 	#undef DEFINE_LUA_FUNC
 
@@ -348,8 +343,8 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 		}
 	}
 	lua_pop(L, 1);
-	compiler.m_bytecode.write(Instructions::END);
-	m_emit_byte_offset = (int)compiler.m_bytecode.size();
+	compiler.m_instructions.emplace().type = InstructionType::END;
+	m_emit_offset = compiler.m_instructions.size();
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "emit");
 	if(lua_isfunction(L, -1)) {
@@ -372,9 +367,9 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 		}
 	}
 	lua_pop(L, 1);
-	compiler.m_bytecode.write(Instructions::END);
+	compiler.m_instructions.emplace().type = InstructionType::END;
 
-	m_output_byte_offset = (int)compiler.m_bytecode.size();
+	m_output_offset = compiler.m_instructions.size();
 	lua_getfield(L, LUA_GLOBALSINDEX, "output");
 	if(lua_isfunction(L, -1)) {
 		if(lua_pcall(L, 0, 0, 0) != 0) {
@@ -385,7 +380,7 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem)
 		}
 	}
 	lua_pop(L, 1);
-	compiler.m_bytecode.write(Instructions::END);
+	compiler.m_instructions.emplace().type = InstructionType::END;
 
 	m_channels_count = compiler.m_channels_count;
 	m_registers_count = compiler.m_registers_count;
@@ -412,11 +407,17 @@ ParticleEmitter::ParticleEmitter(EntityPtr entity, IAllocator& allocator)
 
 ParticleEmitter::~ParticleEmitter()
 {
+	setResource(nullptr);
+	setMaterial(nullptr);
 	for (const Channel& c : m_channels) {
 		m_allocator.deallocate_aligned(c.data);
 	}
 }
 
+void ParticleEmitter::setMaterial(Material* material) {
+	if (m_material) m_material->decRefCount();
+	m_material = material;
+}
 
 void ParticleEmitter::setResource(ParticleEmitterResource* res)
 {
@@ -429,12 +430,12 @@ void ParticleEmitter::setResource(ParticleEmitterResource* res)
 
 float ParticleEmitter::readSingleValue(InputMemoryStream& blob) const
 {
-	const auto type = blob.read<Compiler::DataStream::Type>();
+	const auto type = blob.read<DataStream::Type>();
 	switch(type) {
-		case Compiler::DataStream::LITERAL:
+		case DataStream::LITERAL:
 			return blob.read<float>();
 			break;
-		case Compiler::DataStream::CHANNEL: {
+		case DataStream::CHANNEL: {
 			const u8 idx = blob.read<u8>();
 			return m_channels[idx].data[m_particles_count];
 		}
@@ -457,39 +458,36 @@ void ParticleEmitter::emit(const float* args)
 		m_capacity = new_capacity;
 	}
 
+	const Array<Instruction>& instructions = m_resource->getInstructions();
 
-	const OutputMemoryStream& bytecode = m_resource->getBytecode();
-	const u8* emit_bytecode = (const u8*)bytecode.data() + m_resource->getEmitByteOffset();
-	InputMemoryStream blob(emit_bytecode, bytecode.size() - m_resource->getEmitByteOffset());
+	const Instruction* instruction = instructions.begin() + m_resource->getEmitOffset();
 	for (;;) {
-		const u8 instruction = blob.read<u8>();
-		switch((Instructions)instruction) {
-			case Instructions::END:
+		switch((InstructionType)instruction->type) {
+			case InstructionType::END:
 				++m_particles_count;
 				return;
-			case Instructions::MOV: {
-				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-				u8 dst_idx = blob.read<u8>();
-				ASSERT(dst_type == Compiler::DataStream::CHANNEL);
-				const float value = readSingleValue(blob);
-				m_channels[dst_idx].data[m_particles_count] = value;
+			case InstructionType::MOV: {
+				ASSERT(instruction->dst.type == DataStream::CHANNEL);
+				ASSERT(instruction->op0.type == DataStream::LITERAL);
+				m_channels[instruction->dst.index].data[m_particles_count] = instruction->op0.value;
 				break;
 			}
-			case Instructions::RAND: {
-				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-				ASSERT(dst_type == Compiler::DataStream::CHANNEL);
-				u8 dst_idx = blob.read<u8>();
+			case InstructionType::RAND: {
+				ASSERT(instruction->dst.type == DataStream::CHANNEL);
+				ASSERT(instruction->op0.type == DataStream::LITERAL);
+				ASSERT(instruction->op1.type == DataStream::LITERAL);
 				
-				const float from = readSingleValue(blob);
-				const float to = readSingleValue(blob);
+				const float from = instruction->op0.value;
+				const float to = instruction->op1.value;
 				
-				m_channels[dst_idx].data[m_particles_count] = randFloat(from, to);
+				m_channels[instruction->dst.index].data[m_particles_count] = randFloat(from, to);
 				break;
 			}
 			default:
 				ASSERT(false);
 				break;
 		}
+		++instruction;
 	}
 }
 
@@ -498,6 +496,7 @@ void ParticleEmitter::serialize(OutputMemoryStream& blob)
 {
 	blob.write(m_entity);
 	blob.writeString(m_resource ? m_resource->getPath().c_str() : "");
+	blob.writeString(m_material ? m_material->getPath().c_str() : "");
 }
 
 
@@ -507,6 +506,10 @@ void ParticleEmitter::deserialize(InputMemoryStream& blob, ResourceManagerHub& m
 	const char* path = blob.readString();
 	auto* res = manager.load<ParticleEmitterResource>(Path(path));
 	setResource(res);
+
+	const char* matpath = blob.readString();
+	auto* mat = manager.load<Material>(Path(matpath));
+	setMaterial(mat);
 }
 
 
@@ -531,15 +534,15 @@ void ParticleEmitter::execute(InputMemoryStream& blob, int particle_index)
 		u8 instruction = blob.read<u8>();
 		/*u8 flag = */blob.read<u8>();
 
-		switch ((Instructions)instruction)
+		switch ((InstructionType)instruction)
 		{
-			case Instructions::END:
+			case InstructionType::END:
 				return;
-			case Instructions::KILL:
+			case InstructionType::KILL:
 				kill(particle_index);
-				ASSERT(blob.read<u8>() == (u8)Instructions::END);
+				ASSERT(blob.read<u8>() == (u8)InstructionType::END);
 				return;
-			case Instructions::EMIT:
+			case InstructionType::EMIT:
 			{
 				float args[16];
 				u8 arg_count = blob.read<u8>();
@@ -561,14 +564,13 @@ void ParticleEmitter::execute(InputMemoryStream& blob, int particle_index)
 
 
 static float4* getStream(const ParticleEmitter& emitter
-	, Compiler::DataStream::Type type
-	, int idx
+	, DataStream stream
 	, int particles_count
 	, float4* register_mem)
 {
-	switch(type) {
-		case Compiler::DataStream::CHANNEL: return (float4*)emitter.getChannelData(idx); //-V1032
-		case Compiler::DataStream::REGISTER: return register_mem + particles_count * idx;
+	switch (stream.type) {
+		case DataStream::CHANNEL: return (float4*)emitter.getChannelData(stream.index); //-V1032
+		case DataStream::REGISTER: return register_mem + particles_count * stream.index;
 		default: ASSERT(false); return nullptr;
 	}
 }
@@ -577,14 +579,15 @@ static float4* getStream(const ParticleEmitter& emitter
 void ParticleEmitter::update(float dt)
 {
 	if (!m_resource || !m_resource->isReady()) return;
-
-	// TODO remove
-	static bool xx = [&]{
-		for (int i = 0; i < 450'000; ++i) {
+	
+	if (m_emit_rate > 0) {
+		m_emit_timer += dt;
+		const float d = 1.f / m_emit_rate;
+		while(m_emit_timer > 0) {
 			emit(nullptr);
+			m_emit_timer -= d;
 		}
-		return true;
-	}();
+	}
 
 	PROFILE_FUNCTION();
 	Profiler::pushInt("particle count", m_particles_count);
@@ -592,41 +595,30 @@ void ParticleEmitter::update(float dt)
 
 	m_emit_buffer.clear();
 	m_constants[0].value = dt;
-	const OutputMemoryStream& bytecode = m_resource->getBytecode();
-	InputMemoryStream blob(bytecode.data(), bytecode.size());
+	const Instruction* instruction = m_resource->getInstructions().begin();
 	// TODO
 	Array<float4> reg_mem(m_allocator);
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
 	m_instances_count = m_particles_count;
 
-	for (;;)
-	{
-		u8 instruction = blob.read<u8>();
-		switch ((Instructions)instruction)
-		{
-			case Instructions::END:
+	for (;;) {
+		switch ((InstructionType)instruction->type) {
+			case InstructionType::END:
 				goto end;
-			case Instructions::MUL: {
-				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const Compiler::DataStream::Type arg0_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg0_idx = blob.read<u8>();
-				const Compiler::DataStream::Type arg1_type = blob.read<Compiler::DataStream::Type>();
-				
-				const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin());
-				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+			case InstructionType::MUL: {
+				const float4* arg0 = getStream(*this, instruction->op0, m_particles_count, reg_mem.begin());
+				float4* result = getStream(*this, instruction->dst, m_particles_count, reg_mem.begin());
 				const float4* const end = result + ((m_particles_count + 3) >> 2);
 
-				if(arg1_type == Compiler::DataStream::LITERAL) {
-					const float4 arg1 = f4Splat(blob.read<float>());
+				if (instruction->op1.type == DataStream::LITERAL) {
+					const float4 arg1 = f4Splat(instruction->op1.value);
 
 					for (; result != end; ++result, ++arg0) {
 						*result = f4Mul(*arg0, arg1);
 					}
 				}
 				else {
-					const u8 arg1_idx = blob.read<u8>();
-					const float4* arg1 = getStream(*this, arg1_type, arg1_idx, m_particles_count, reg_mem.begin());
+					const float4* arg1 = getStream(*this, instruction->op1, m_particles_count, reg_mem.begin());
 					for (; result != end; ++result, ++arg0, ++arg1) {
 						*result = f4Mul(*arg0, *arg1);
 					}
@@ -634,24 +626,19 @@ void ParticleEmitter::update(float dt)
 
 				break;
 			}
-			case Instructions::MOV: {
-				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const Compiler::DataStream::Type src_type = blob.read<Compiler::DataStream::Type>();
-				const u8 src_idx = blob.read<u8>();
-				
-				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+			case InstructionType::MOV: {
+				float4* result = getStream(*this, instruction->dst, m_particles_count, reg_mem.begin());
 				const float4* const end = result + ((m_particles_count + 3) >> 2);
 				
-				if(src_type == Compiler::DataStream::CONST) {
-					ASSERT(src_idx == 0);
+				if(instruction->op0.type == DataStream::CONST) {
+					ASSERT(instruction->op0.index == 0);
 					const float4 src = f4Splat(dt);
 					for (; result != end; ++result) {
 						*result = src;
 					}
 				}
 				else {
-					const float4* src = getStream(*this, src_type, src_idx, m_particles_count, reg_mem.begin());
+					const float4* src = getStream(*this, instruction->op0, m_particles_count, reg_mem.begin());
 
 					for (; result != end; ++result, ++src) {
 						*result = *src;
@@ -660,21 +647,14 @@ void ParticleEmitter::update(float dt)
 
 				break;
 			}
-			case Instructions::ADD: {
-				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const Compiler::DataStream::Type arg0_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg0_idx = blob.read<u8>();
-				const Compiler::DataStream::Type arg1_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg1_idx = blob.read<u8>();
-				
+			case InstructionType::ADD: {
 				// TODO
-				float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+				float4* result = getStream(*this, instruction->dst, m_particles_count, reg_mem.begin());
 				const float4* const end = result + ((m_particles_count + 3) >> 2);
-				const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin());
+				const float4* arg0 = getStream(*this, instruction->op0, m_particles_count, reg_mem.begin());
 
-				if(arg1_type == Compiler::DataStream::CONST) { 
-					ASSERT(arg1_idx == 0);
+				if (instruction->op1.type == DataStream::CONST) { 
+					ASSERT(instruction->op1.index == 0);
 					const float4 arg1 = f4Splat(dt);
 
 					for (; result != end; ++result, ++arg0) {
@@ -682,7 +662,7 @@ void ParticleEmitter::update(float dt)
 					}
 				}
 				else {
-					const float4* arg1 = getStream(*this, arg1_type, arg1_idx, m_particles_count, reg_mem.begin());
+					const float4* arg1 = getStream(*this, instruction->op1, m_particles_count, reg_mem.begin());
 
 					for (; result != end; ++result, ++arg0, ++arg1) {
 						*result = f4Add(*arg0, *arg1);
@@ -691,14 +671,9 @@ void ParticleEmitter::update(float dt)
 
 				break;
 			}
-			case Instructions::COS: {
-				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg_idx = blob.read<u8>();
-				
-				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
-				float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+			case InstructionType::COS: {
+				const float* arg = (float*)getStream(*this, instruction->op0, m_particles_count, reg_mem.begin());
+				float* result = (float*)getStream(*this, instruction->dst, m_particles_count, reg_mem.begin());
 				const float* const end = result + ((m_particles_count + 3) & ~3);
 
 				for (; result != end; ++result, ++arg) {
@@ -706,14 +681,9 @@ void ParticleEmitter::update(float dt)
 				}
 				break;
 			}
-			case Instructions::SIN: {
-				const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-				const u8 dst_idx = blob.read<u8>();
-				const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
-				const u8 arg_idx = blob.read<u8>();
-				
-				const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin());
-				float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin());
+			case InstructionType::SIN: {
+				const float* arg = (float*)getStream(*this, instruction->op0, m_particles_count, reg_mem.begin());
+				float* result = (float*)getStream(*this, instruction->dst, m_particles_count, reg_mem.begin());
 				const float* const end = result + ((m_particles_count + 3) & ~3);
 
 				for (; result != end; ++result, ++arg) {
@@ -725,6 +695,7 @@ void ParticleEmitter::update(float dt)
 				ASSERT(false);
 				break;
 		}
+		++instruction;
 	}
 
 	end:
@@ -749,9 +720,7 @@ int ParticleEmitter::getInstanceDataSizeBytes() const
 void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 {
 	PROFILE_FUNCTION();
-	const OutputMemoryStream& bytecode = m_resource->getBytecode();
-	const int output_offset = m_resource->getOutputByteOffset();
-	
+
 	// TODO
 	m_constants[1].value = (float)cam_pos.x;
 	m_constants[2].value = (float)cam_pos.y;
@@ -761,22 +730,15 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 	reg_mem.resize(m_resource->getRegistersCount() * ((m_particles_count + 3) >> 2));
 
 	auto sim = [&](u32 offset, u32 count){
+		const Instruction* instruction = m_resource->getInstructions().begin() + m_resource->getOutputOffset();
 		PROFILE_BLOCK("particle simulation");
-		InputMemoryStream blob((u8*)bytecode.data() + output_offset, bytecode.size());
-		int output_idx = 0;
 		for (;;) {
-			u8 instruction = blob.read<u8>();
-			switch ((Instructions)instruction) {
-				case Instructions::END:
+			switch ((InstructionType)instruction->type) {
+				case InstructionType::END:
 					return;
-				case Instructions::SIN: {
-					const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-					const u8 dst_idx = blob.read<u8>();
-					const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
-					const u8 arg_idx = blob.read<u8>();
-				
-					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
-					float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin()) + offset;
+				case InstructionType::SIN: {
+					const float* arg = (float*)getStream(*this, instruction->op0, m_particles_count, reg_mem.begin()) + offset;
+					float* result = (float*)getStream(*this, instruction->dst, m_particles_count, reg_mem.begin()) + offset;
 					const float* const end = result + count;
 
 					for (; result != end; ++result, ++arg) {
@@ -784,14 +746,9 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 					}
 					break;
 				}
-				case Instructions::COS: {
-					const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-					const u8 dst_idx = blob.read<u8>();
-					const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
-					const u8 arg_idx = blob.read<u8>();
-				
-					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
-					float* result = (float*)getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin()) + offset;
+				case InstructionType::COS: {
+					const float* arg = (float*)getStream(*this, instruction->op0, m_particles_count, reg_mem.begin()) + offset;
+					float* result = (float*)getStream(*this, instruction->dst, m_particles_count, reg_mem.begin()) + offset;
 					const float* const end = result + count;
 
 					for (; result != end; ++result, ++arg) {
@@ -799,26 +756,19 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 					}
 					break;
 				}
-				case Instructions::MUL: {
-					const Compiler::DataStream::Type dst_type = blob.read<Compiler::DataStream::Type>();
-					const u8 dst_idx = blob.read<u8>();
-					const Compiler::DataStream::Type arg0_type = blob.read<Compiler::DataStream::Type>();
-					const u8 arg0_idx = blob.read<u8>();
-					const Compiler::DataStream::Type arg1_type = blob.read<Compiler::DataStream::Type>();
-				
-					float4* result = getStream(*this, dst_type, dst_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
-					const float4* arg0 = getStream(*this, arg0_type, arg0_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
+				case InstructionType::MUL: {
+					float4* result = getStream(*this, instruction->dst, m_particles_count, reg_mem.begin()) + (offset >> 2);
+					const float4* arg0 = getStream(*this, instruction->op0, m_particles_count, reg_mem.begin()) + (offset >> 2);
 					const float4* const end = result + (count >> 2);
-					if(arg1_type == Compiler::DataStream::LITERAL) {
-						const float4 arg1 = f4Splat(blob.read<float>());
+					if (instruction->op1.type == DataStream::LITERAL) {
+						const float4 arg1 = f4Splat(instruction->op1.value);
 
 						for (; result != end; ++result, ++arg0) {
 							*result = f4Mul(*arg0, arg1);
 						}
 					}
 					else {
-						const u8 arg1_idx = blob.read<u8>();
-						const float4* arg1 = getStream(*this, arg1_type, arg1_idx, m_particles_count, reg_mem.begin()) + (offset >> 2);
+						const float4* arg1 = getStream(*this, instruction->op1, m_particles_count, reg_mem.begin()) + (offset >> 2);
 
 						for (; result != end; ++result, ++arg0, ++arg1) {
 							*result = f4Mul(*arg0, *arg1);
@@ -827,11 +777,11 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 
 					break;
 				}
-				case Instructions::OUTPUT: {
+				case InstructionType::MOV: {
 					const int stride = m_resource->getOutputsCount();
-					const Compiler::DataStream::Type arg_type = blob.read<Compiler::DataStream::Type>();
-					const u8 arg_idx = blob.read<u8>();
-					const float* arg = (float*)getStream(*this, arg_type, arg_idx, m_particles_count, reg_mem.begin()) + offset;
+					const float* arg = (float*)getStream(*this, instruction->op0, m_particles_count, reg_mem.begin()) + offset;
+					ASSERT(instruction->dst.type == DataStream::OUT);
+					i32 output_idx = instruction->dst.index;
 					float* dst = data + output_idx + offset * stride;
 					++output_idx;
 					for (u32 i = 0, j = 0; i < count; ++i, j += stride) {
@@ -843,6 +793,7 @@ void ParticleEmitter::fillInstanceData(const DVec3& cam_pos, float* data)
 					ASSERT(false);
 					break;
 			}
+			++instruction;
 		}
 	};
 	JobSystem::forEach(m_particles_count, 16 * 1024, [&](i32 from, i32 to){
@@ -871,11 +822,11 @@ bgfx::InstanceDataBuffer ParticleEmitter::generateInstanceBuffer() const
 	for (;;)
 	{
 		u8 instruction = blob.read<u8>();
-		switch ((Instructions)instruction)
+		switch ((InstructionType)instruction)
 		{
-			case Instructions::END:
+			case InstructionType::END:
 				return buffer;
-			case Instructions::OUTPUT:
+			case InstructionType::OUTPUT:
 			{
 				u8 value_idx = blob.read<u8>();
 
@@ -891,7 +842,7 @@ bgfx::InstanceDataBuffer ParticleEmitter::generateInstanceBuffer() const
 				++output_idx;
 				break;
 			}
-			case Instructions::OUTPUT_CONST:
+			case InstructionType::OUTPUT_CONST:
 			{
 				float value = blob.read<float>();
 
