@@ -259,8 +259,7 @@ void ParticleEmitter::update(float dt)
 	m_constants[0].value = dt;
 	// TODO
 	m_instances_count = m_particles_count;
-	Debug::GuardAllocator alloc;
-	Array<u32> kill_list(alloc);
+	Array<u32> kill_list(m_allocator);
 	kill_list.resize(4096);
 	volatile i32 kill_counter = 0;
 

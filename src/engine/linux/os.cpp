@@ -720,10 +720,10 @@ Rect getWindowScreenRect(WindowHandle win)
 	r.top = attrs.y;
 	r.width = attrs.width;
 	r.height = attrs.height;
-	XGetWindowAttributes(G.display, attrs.root, &attrs);
-	r.left += attrs.x;
-	r.top += attrs.y;
-    return r;
+   
+	Window dummy;
+	XTranslateCoordinates(G.display, (Window)win, attrs.root, 0, 0, &r.left, &r.top, &dummy);
+	return r;
 }
 
 Rect getWindowClientRect(WindowHandle win)

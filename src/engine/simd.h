@@ -8,6 +8,7 @@
 	#include <xmmintrin.h>
 #else
 	#include <math.h>
+	#include <string.h>
 #endif
 
 namespace Lumix
@@ -137,15 +138,17 @@ namespace Lumix
 
 	LUMIX_FORCE_INLINE float4 f4CmpGT(float4 a, float4 b)
 	{
-		constexpr union {
+		static const float gt = [](){
 			u32 u = 0xffFFffFF;
 			float f;
-		} gt;
+			memcpy(&f, &u, sizeof(f));
+			return f;
+		}();
 		return {
-			a.x > b.x ? gt.f : 0,
-			a.y > b.y ? gt.f : 0,
-			a.z > b.z ? gt.f : 0,
-			a.w > b.w ? gt.f : 0
+			a.x > b.x ? gt : 0,
+			a.y > b.y ? gt : 0,
+			a.z > b.z ? gt : 0,
+			a.w > b.w ? gt : 0
 		};
 	}
 
