@@ -35,7 +35,7 @@ static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("m
 
 
 struct TransientBuffer {
-	static constexpr u32 INIT_SIZE = 1 * 1024 * 1024;
+	static constexpr u32 INIT_SIZE = 1024 * 1024;
 	
 	void init() {
 		m_buffer = gpu::allocBufferHandle();
@@ -70,6 +70,7 @@ struct TransientBuffer {
 			m_overflow.commit = (m_overflow.size + page_size - 1) & ~(page_size - 1);
 			OS::memCommit(m_overflow.data, m_overflow.commit);
 		}
+		slice.offset = 0;
 		slice.buffer = m_overflow.buffer;
 		return slice;
 	} 
@@ -1174,13 +1175,20 @@ struct RendererImpl final : Renderer
 		m_profiler.frame();
 
 		m_gpu_frame = m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
+		FrameData& check_frame = *m_frames[(getFrameIndex(m_gpu_frame) + 1) % lengthOf(m_frames)].get();
+
+		if (check_frame.gpu_frame != 0xffFFffFF && gpu::frameFinished(check_frame.gpu_frame)) {
+			check_frame.gpu_frame = 0xffFFffFF;
+			check_frame.transient_buffer.renderDone();
+			JobSystem::decSignal(check_frame.can_setup);
+		}
 
 		if (m_gpu_frame->gpu_frame != 0xffFFffFF) {
 			gpu::waitFrame(m_gpu_frame->gpu_frame);
+			m_gpu_frame->gpu_frame = 0xFFffFFff;   
 			m_gpu_frame->transient_buffer.renderDone();
 			JobSystem::decSignal(m_gpu_frame->can_setup);
 		}
-		
 	}
 
 	void waitForCommandSetup() override

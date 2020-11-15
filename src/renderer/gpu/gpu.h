@@ -207,6 +207,7 @@ void setCurrentWindow(void* window_handle);
 bool getMemoryStats(Ref<MemoryStats> stats);
 u32 swapBuffers();
 void waitFrame(u32 frame);
+bool frameFinished(u32 frame);
 LUMIX_RENDERER_API bool isOriginBottomLeft();
 void checkThread();
 void shutdown();
