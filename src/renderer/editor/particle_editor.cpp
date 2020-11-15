@@ -1,5 +1,3 @@
-#pragma once
-
 #define LUMIX_NO_CUSTOM_CRT
 #include "editor/asset_browser.h"
 #include "editor/settings.h"
@@ -125,8 +123,8 @@ struct ParticleEditorResource {
 
 		Type getType() const override { return Type::UNARY_FUNCTION; }
 
-		void serialize(OutputMemoryStream& blob) { blob.write(func); }
-		void deserialize(InputMemoryStream& blob) { blob.read(func); }
+		void serialize(OutputMemoryStream& blob) override { blob.write(func); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(func); }
 		
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream output) override {
 			NodeInput input = getInput(0);
@@ -169,8 +167,8 @@ struct ParticleEditorResource {
 
 		Type getType() const override { return Type::CONST; }
 
-		void serialize(OutputMemoryStream& blob) { blob.write(idx); }
-		void deserialize(InputMemoryStream& blob) { blob.read(idx); }
+		void serialize(OutputMemoryStream& blob) override { blob.write(idx); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 		
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
 			DataStream r;
@@ -205,12 +203,12 @@ struct ParticleEditorResource {
 			return i.dst;
 		}
 
-		void serialize(OutputMemoryStream& blob) {
+		void serialize(OutputMemoryStream& blob) override {
 			blob.write(from);
 			blob.write(to);
 		}
 
-		void deserialize(InputMemoryStream& blob) {
+		void deserialize(InputMemoryStream& blob) override {
 			blob.read(from);
 			blob.read(to);
 		}
@@ -244,8 +242,8 @@ struct ParticleEditorResource {
 			return r;
 		}
 
-		void serialize(OutputMemoryStream& blob) { blob.write(value); }
-		void deserialize(InputMemoryStream& blob) { blob.read(value); }
+		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
 		bool onGUI() override {
 			beginOutput();
@@ -270,8 +268,8 @@ struct ParticleEditorResource {
 			return r;
 		}
 
-		void serialize(OutputMemoryStream& blob) { blob.write(idx); }
-		void deserialize(InputMemoryStream& blob) { blob.read(idx); }
+		void serialize(OutputMemoryStream& blob) override { blob.write(idx); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 
 		bool onGUI() override {
 			beginOutput();
@@ -403,8 +401,8 @@ struct ParticleEditorResource {
 			return false;
 		}
 
-		void serialize(OutputMemoryStream& blob) { blob.write(op); blob.write(value); }
-		void deserialize(InputMemoryStream& blob) { blob.read(op); blob.read(value); }
+		void serialize(OutputMemoryStream& blob) override { blob.write(op); blob.write(value); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(op); blob.read(value); }
 
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
 			const NodeInput input0 = getInput(0);
@@ -484,8 +482,8 @@ struct ParticleEditorResource {
 		
 		Type getType() const override { return Type::MADD; }
 
-		void serialize(OutputMemoryStream& blob) { blob.write(value1); blob.write(value2); }
-		void deserialize(InputMemoryStream& blob) { blob.read(value1); blob.read(value2); }
+		void serialize(OutputMemoryStream& blob) override { blob.write(value1); blob.write(value2); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(value1); blob.read(value2); }
 
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream output) override {
 			ASSERT(output_idx == 0);
@@ -573,8 +571,8 @@ struct ParticleEditorResource {
 			}
 		}
 
-		void serialize(OutputMemoryStream& blob) { blob.write(value); }
-		void deserialize(InputMemoryStream& blob) { blob.read(value); }
+		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream output) override {
 			ASSERT(output_idx == 0);
@@ -1153,7 +1151,8 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			file.close();
 
 			m_resource = UniquePtr<ParticleEditorResource>::create(m_allocator, m_allocator);
-			m_resource->deserialize(InputMemoryStream(blob), path);
+			InputMemoryStream iblob(blob);
+			m_resource->deserialize(iblob, path);
 			m_path = path;
 			m_resource->generate();
 			pushUndo();
