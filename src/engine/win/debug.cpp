@@ -264,6 +264,20 @@ static const u32 UNINITIALIZED_MEMORY_PATTERN = 0xCD;
 static const u32 FREED_MEMORY_PATTERN = 0xDD;
 static const u32 ALLOCATION_GUARD = 0xFDFDFDFD;
 
+void* GuardAllocator::allocate_aligned(size_t size, size_t align) {
+	const size_t pages = 1 + ((size + 4095) >> 12);
+	void* mem = VirtualAlloc(nullptr, pages * 4096, MEM_RESERVE, PAGE_READWRITE);
+	VirtualAlloc(mem, (pages - 1) * 4096, MEM_COMMIT, PAGE_READWRITE);
+	
+	if (align == 4096) return mem;
+
+	u8* ptr = (u8*)mem;
+	return (void*)(uintptr_t(ptr + (pages - 1) * 4096 - size) & ~size_t(align - 1));
+}
+
+void GuardAllocator::deallocate_aligned(void* ptr) {
+	VirtualFree((void*)((uintptr_t)ptr & ~(size_t)4095), 0, MEM_RELEASE);
+}
 
 Allocator::Allocator(IAllocator& source)
 	: m_source(source)

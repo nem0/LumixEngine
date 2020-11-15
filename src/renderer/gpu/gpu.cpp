@@ -983,6 +983,7 @@ u32 swapBuffers()
 	return 0;
 }
 
+bool frameFinished(u32 frame) { return true; }
 void waitFrame(u32 frame) {}
 
 void createBuffer(BufferHandle buffer, u32 flags, size_t size, const void* data)
