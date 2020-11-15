@@ -55,7 +55,8 @@ struct ParticleEditorResource {
 			EMIT,
 			UPDATE,
 			RANDOM,
-			UNARY_FUNCTION
+			UNARY_FUNCTION,
+			MADD
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -400,6 +401,88 @@ struct ParticleEditorResource {
 		}
 	};
 
+	struct MaddNode : Node {
+		MaddNode(ParticleEditorResource& res) : Node(res) {}
+		
+		Type getType() const override { return Type::MADD; }
+
+		void serialize(OutputMemoryStream& blob) { blob.write(value1); blob.write(value2); }
+		void deserialize(InputMemoryStream& blob) { blob.read(value1); blob.read(value2); }
+
+		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream output) override {
+			ASSERT(output_idx == 0);
+			const NodeInput input0 = getInput(0);
+			if (!input0.node) return output;
+			const NodeInput input1 = getInput(1);
+			const NodeInput input2 = getInput(2);
+
+			Instruction i;
+			i.op0 = input0.generate(instructions, i.op0);
+			if (input1.node) {
+				i.op1 = input1.generate(instructions, i.op1);
+			}
+			else {
+				i.op1.type = DataStream::LITERAL;
+				i.op1.value = value1;
+			}
+
+			if (input2.node) {
+				i.op2 = input2.generate(instructions, i.op2);
+			}
+			else {
+				i.op2.type = DataStream::LITERAL;
+				i.op2.value = value2;
+			}
+
+			i.type = InstructionType::MULTIPLY_ADD;
+			i.dst = m_resource.streamOrRegister(output);
+
+			instructions.push(i);
+			
+			m_resource.freeRegister(i.op0);
+			m_resource.freeRegister(i.op1);
+			m_resource.freeRegister(i.op2);
+			return i.dst;
+		}
+
+		bool onGUI() override {
+			imnodes::BeginNodeTitleBar();
+			beginOutput();
+			ImGui::TextUnformatted("Multiply add (A * B + C)");
+			endOutput();
+			imnodes::EndNodeTitleBar();
+
+			beginInput();
+			ImGui::TextUnformatted("A");
+			endInput();
+
+			beginInput();
+			if (getInput(1).node) {
+				ImGui::TextUnformatted("B");
+			}
+			else {
+				ImGui::SetNextItemWidth(60);
+				ImGui::DragFloat("B", &value1);
+			}
+			endInput();
+
+			beginInput();
+			if (getInput(2).node) {
+				ImGui::TextUnformatted("C");
+			}
+			else {
+				ImGui::SetNextItemWidth(60);
+				ImGui::DragFloat("C", &value2);
+			}
+			endInput();
+
+			return false;
+		}
+
+		float value1 = 0;
+		float value2 = 0;
+	};
+
 	template <InstructionType OP_TYPE>
 	struct BinaryOpNode : Node {
 		BinaryOpNode(ParticleEditorResource& res) : Node(res) {}
@@ -412,14 +495,24 @@ struct ParticleEditorResource {
 			}
 		}
 
+		void serialize(OutputMemoryStream& blob) { blob.write(value); }
+		void deserialize(InputMemoryStream& blob) { blob.read(value); }
+
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream output) override {
 			ASSERT(output_idx == 0);
 			const NodeInput input0 = getInput(0);
+			if (!input0.node) return output;
 			const NodeInput input1 = getInput(1);
 
 			Instruction i;
 			i.op0 = input0.generate(instructions, i.op0);
-			i.op1 = input1.generate(instructions, i.op1);
+			if (input1.node) {
+				i.op1 = input1.generate(instructions, i.op1);
+			}
+			else {
+				i.op1.type = DataStream::LITERAL;
+				i.op1.value = value;
+			}
 
 			i.type = OP_TYPE;
 			i.dst = m_resource.streamOrRegister(output);
@@ -447,11 +540,19 @@ struct ParticleEditorResource {
 			endInput();
 
 			beginInput();
-			ImGui::TextUnformatted("B");
+			if (getInput(1).node) {
+				ImGui::TextUnformatted("B");
+			}
+			else {
+				ImGui::SetNextItemWidth(60);
+				ImGui::DragFloat("B", &value);
+			}
 			endInput();
 
 			return false;
 		}
+
+		float value = 0;
 	};
 
 	struct Stream {
@@ -502,6 +603,7 @@ struct ParticleEditorResource {
 	Node* addNode(Node::Type type) {
 		UniquePtr<Node> node;
 		switch(type) {
+			case Node::MADD: node = UniquePtr<MaddNode>::create(m_allocator, *this); break;
 			case Node::RANDOM: node = UniquePtr<RandomNode>::create(m_allocator, *this); break;
 			case Node::EMIT: node = UniquePtr<EmitNode>::create(m_allocator, *this); break;
 			case Node::UPDATE: node = UniquePtr<UpdateNode>::create(m_allocator, *this); break;
@@ -639,6 +741,7 @@ struct ParticleEditorResource {
 				case InstructionType::MOV: text << "\tmov("; break;
 				case InstructionType::ADD: text << "\tadd("; break;
 				case InstructionType::MUL: text << "\tmul("; break;
+				case InstructionType::MULTIPLY_ADD: text << "\tmadd("; break;
 				case InstructionType::RAND: text << "\trand("; break;
 				default: ASSERT(false); break;
 			}
@@ -651,6 +754,10 @@ struct ParticleEditorResource {
 			if (i.op1.type != DataStream::NONE) {
 				text << ", ";
 				toString(text, i.op1);
+			}
+			if (i.op2.type != DataStream::NONE) {
+				text << ", ";
+				toString(text, i.op2);
 			}
 			text << ")\n";
 		}
@@ -749,7 +856,8 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			}
 		}
 		if (m_code.size() > 0 && ImGui::CollapsingHeader("Source", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::InputTextMultiline("Code", (char*)m_code.data(), m_code.size());
+			ImGui::SetNextItemWidth(-1);
+			ImGui::InputTextMultiline("##Code", (char*)m_code.data(), m_code.size());
 		}
 	}
 
@@ -773,6 +881,8 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			return;
 		}
 		
+		ParticleEmitter* emitter = getSelectedEmitter();
+		
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
 				if (ImGui::MenuItem("New")) newGraph();
@@ -780,8 +890,6 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 				if (!m_path.empty() && ImGui::MenuItem("Save")) save(m_path);
 				if (ImGui::MenuItem("Save as")) saveAs();
 				ImGui::Separator();
-
-				ParticleEmitter* emitter = getSelectedEmitter();
 			
 				if (ImGui::MenuItem("Apply", 0, false, emitter && emitter->getResource())) {
 					Array<Instruction> instructions(m_allocator);
@@ -804,9 +912,10 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 		}
 
 		ImGui::Columns(2);
-		
 
-
+		if (emitter) {
+			ImGui::LabelText("Particle count", "%d", emitter->m_particles_count);
+		}
 		leftColumnGUI();
 		
 		ImGui::NextColumn();
@@ -823,6 +932,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			if (ImGui::BeginMenu("Add")) {
 				if (ImGui::Selectable("Add")) addNode(ParticleEditorResource::Node::ADD);
 				if (ImGui::Selectable("Multiply")) addNode(ParticleEditorResource::Node::MUL);
+				if (ImGui::Selectable("Multiply add")) addNode(ParticleEditorResource::Node::MADD);
 				if (ImGui::Selectable("Literal")) addNode(ParticleEditorResource::Node::LITERAL);
 				if (ImGui::Selectable("Random")) addNode(ParticleEditorResource::Node::RANDOM);
 				if (ImGui::Selectable("Sin")) {

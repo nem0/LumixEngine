@@ -1590,24 +1590,19 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		struct Cmd : Renderer::RenderJob
 		{
+			Cmd(IAllocator& allocator) : m_drawcalls(allocator) {}
+
 			void setup() override
 			{
 				PROFILE_FUNCTION();
 				const auto& emitters = m_pipeline->m_scene->getParticleEmitters();
-				m_size = 0;
 				if(emitters.size() == 0) return;
 				
 				Universe& universe = m_pipeline->m_scene->getUniverse();
 
 				u32 byte_size = 0;
-				for (ParticleEmitter* emitter : emitters) {
-					byte_size += emitter->getInstanceDataSizeBytes();
-				}
+				m_drawcalls.reserve(emitters.size());
 
-				byte_size += (sizeof(int) * 2 + sizeof(gpu::ProgramHandle) + sizeof(Vec3) + sizeof(Quat)) * emitters.size();
-				m_vb = m_pipeline->m_renderer.allocTransient(byte_size);
-
-				OutputMemoryStream str(m_vb.ptr, m_vb.size);
 				gpu::VertexDecl decl;
 				decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
@@ -1622,57 +1617,54 @@ struct PipelineImpl final : Pipeline
 
 					const Material* material = emitter->getResource()->getMaterial();
 					if (!material) continue;
-					str.write(lpos);
-					str.write(tr.rot);
-					str.write(material->getShader()->getProgram(decl, 0));
-					str.write(size);
-					str.write(emitter->getInstancesCount());
-					float* instance_data = (float*)str.skip(size);
-					emitter->fillInstanceData(m_camera_params.pos, instance_data);
+
+					Drawcall& dc = m_drawcalls.emplace();
+					dc.pos = lpos;
+					dc.rot = tr.rot;
+					dc.program = material->getShader()->getProgram(decl, 0);
+					dc.size = size;
+					dc.instances_count = emitter->getInstancesCount();
+					dc.slice = m_pipeline->m_renderer.allocTransient(emitter->getInstanceDataSizeBytes());
+					emitter->fillInstanceData((float*)dc.slice.ptr);
 				}
-				m_size = (u32)str.size();
 			}
 
 			void execute() override
 			{
 				PROFILE_FUNCTION();
 				
-				if (m_size == 0) return;
-				
 				gpu::pushDebugGroup("particles");
-				InputMemoryStream blob(m_vb.ptr, m_size);
 				
 				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				gpu::setState(blend_state);
-				while(blob.getPosition() < blob.size()) {
-					const Vec3 lpos = blob.read<Vec3>();
-					const Quat rot = blob.read<Quat>();
-					const gpu::ProgramHandle program = blob.read<gpu::ProgramHandle>();
-					const int byte_size = blob.read<int>();
-					const int instances_count = blob.read<int>();
-
-					const u32 offset = (u32)blob.getPosition();
-					blob.skip(byte_size);
-
-					Matrix mtx = rot.toMatrix();
-					mtx.setTranslation(lpos);
+				for (const Drawcall& dc : m_drawcalls) {
+					Matrix mtx = dc.rot.toMatrix();
+					mtx.setTranslation(dc.pos);
 					gpu::update(m_pipeline->m_drawcall_ub, &mtx.columns[0].x, sizeof(mtx));
-					gpu::useProgram(program);
+					gpu::useProgram(dc.program);
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-					gpu::bindVertexBuffer(1, m_vb.buffer, m_vb.offset + offset, 12);
-					gpu::drawTriangleStripArraysInstanced(4, instances_count);
+					gpu::bindVertexBuffer(1, dc.slice.buffer, dc.slice.offset, 12);
+					gpu::drawTriangleStripArraysInstanced(4, dc.instances_count);
 				}
 				gpu::popDebugGroup();
 			}
 
+			struct Drawcall {
+				Vec3 pos;
+				Quat rot;
+				gpu::ProgramHandle program;
+				int size;
+				int instances_count;
+				Renderer::TransientSlice slice; 
+			};
+
+			Array<Drawcall> m_drawcalls; 
 			PipelineImpl* m_pipeline;
 			CameraParams m_camera_params;
-			Renderer::TransientSlice m_vb;
-			u32 m_size;
 		};
 
-		Cmd& cmd = m_renderer.createJob<Cmd>();
+		Cmd& cmd = m_renderer.createJob<Cmd>(m_renderer.getAllocator());
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
 
