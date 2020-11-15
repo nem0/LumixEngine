@@ -226,57 +226,6 @@ void ParticleEmitter::deserialize(InputMemoryStream& blob, ResourceManagerHub& m
 	setMaterial(mat);
 }
 
-
-void ParticleEmitter::kill(int particle_index)
-{
-	if (particle_index >= m_particles_count) return;
-	const int channels_count = m_resource->getChannelsCount();
-	int last = m_particles_count - 1;
-	for (int i = 0; i < channels_count; ++i) {
-		float* data = m_channels[i].data;
-		data[particle_index] = data[last];
-	}
-	--m_particles_count;
-}
-
-
-void ParticleEmitter::execute(InputMemoryStream& blob, int particle_index)
-{
-	if (particle_index >= m_particles_count) return;
-	for (;;)
-	{
-		u8 instruction = blob.read<u8>();
-		/*u8 flag = */blob.read<u8>();
-
-		switch ((InstructionType)instruction)
-		{
-			case InstructionType::END:
-				return;
-			case InstructionType::KILL:
-				kill(particle_index);
-				ASSERT(blob.read<u8>() == (u8)InstructionType::END);
-				return;
-			case InstructionType::EMIT:
-			{
-				float args[16];
-				u8 arg_count = blob.read<u8>();
-				m_emit_buffer.write(arg_count);
-				ASSERT(arg_count < lengthOf(args));
-				for (int i = 0; i < arg_count; ++i)
-				{
-					u8 ch = blob.read<u8>();
-					m_emit_buffer.write(m_channels[ch].data[particle_index]);
-				}
-				break;
-			}
-			default:
-				ASSERT(false);
-				break;
-		}
-	}
-}
-
-
 static float4* getStream(const ParticleEmitter& emitter
 	, DataStream stream
 	, u32 offset
@@ -310,6 +259,10 @@ void ParticleEmitter::update(float dt)
 	m_constants[0].value = dt;
 	// TODO
 	m_instances_count = m_particles_count;
+	Debug::GuardAllocator alloc;
+	Array<u32> kill_list(alloc);
+	kill_list.resize(4096);
+	volatile i32 kill_counter = 0;
 
 	volatile i32 counter = 0;
 	JobSystem::runOnWorkers([&](){
@@ -318,17 +271,47 @@ void ParticleEmitter::update(float dt)
 		reg_mem.resize(m_resource->getRegistersCount() * 256);
 		for (;;) {
 			const i32 from = atomicAdd(&counter, 1024);
-			if (from >= m_particles_count) return;
+			if (from >= (i32)m_particles_count) return;
 
 			const i32 fromf4 = from / 4;
-			const i32 step_sizef4 = minimum(1024, m_particles_count - from + 3) / 4;
+			const i32 stepf4 = minimum(1024, m_particles_count - from + 3) / 4;
 			const Instruction* instruction = m_resource->getInstructions().begin();
 			while (instruction->type != InstructionType::END) {
 				switch ((InstructionType)instruction->type) {
+					case InstructionType::GT: {
+						const float4* arg0 = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
+						ASSERT(instruction->op0.type == DataStream::LITERAL);
+						const float4 arg1 = f4Splat(instruction->op0.value);
+						const float4* end = arg0 + stepf4;
+					
+						++instruction;
+						for (const float4* beg = arg0; arg0 != end; ++arg0) {
+							const float4 tmp = f4CmpGT(*arg0, arg1);
+							const int m = f4MoveMask(tmp);
+							for (int i = 0; i < 4; ++i) {
+								if ((m & (1 << i))) {
+									switch(instruction->type) {
+										case InstructionType::KILL: {
+											const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
+											if (kill_idx < kill_list.size()) {
+												kill_list[kill_idx] = u32(from + (arg0 - beg) * 4 + i);
+											}
+											else {
+												//ASSERT(false);
+											}
+											break;
+										}
+										default: ASSERT(false); break;
+									}
+								}
+							}
+						}
+						break;
+					}	
 					case InstructionType::MUL: {
 						const float4* arg0 = getStream(*this, instruction->op0, fromf4, reg_mem.begin());
 						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float4* const end = result + step_sizef4;
+						const float4* const end = result + stepf4;
 
 						if (instruction->op1.type == DataStream::LITERAL) {
 							const float4 arg1 = f4Splat(instruction->op1.value);
@@ -348,7 +331,7 @@ void ParticleEmitter::update(float dt)
 					}
 					case InstructionType::MULTIPLY_ADD: {
 						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float4* const end = result + step_sizef4;
+						const float4* const end = result + stepf4;
 
 						if (instruction->op0.type == DataStream::CONST) {
 							ASSERT(instruction->op0.index == 0);
@@ -387,7 +370,7 @@ void ParticleEmitter::update(float dt)
 					}
 					case InstructionType::MOV: {
 						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float4* const end = result + step_sizef4;
+						const float4* const end = result + stepf4;
 				
 						if(instruction->op0.type == DataStream::CONST) {
 							ASSERT(instruction->op0.index == 0);
@@ -409,7 +392,7 @@ void ParticleEmitter::update(float dt)
 					case InstructionType::ADD: {
 						// TODO
 						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float4* const end = result + step_sizef4;
+						const float4* const end = result + stepf4;
 						const float4* arg0 = getStream(*this, instruction->op0, fromf4, reg_mem.begin());
 
 						if (instruction->op1.type == DataStream::LITERAL) { 
@@ -441,7 +424,7 @@ void ParticleEmitter::update(float dt)
 					case InstructionType::COS: {
 						const float* arg = (float*)getStream(*this, instruction->op0, fromf4, reg_mem.begin());
 						float* result = (float*)getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float* const end = result + step_sizef4 * 4;
+						const float* const end = result + stepf4 * 4;
 
 						for (; result != end; ++result, ++arg) {
 							*result = cosf(*arg);
@@ -451,7 +434,7 @@ void ParticleEmitter::update(float dt)
 					case InstructionType::SIN: {
 						const float* arg = (float*)getStream(*this, instruction->op0, fromf4, reg_mem.begin());
 						float* result = (float*)getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float* const end = result + step_sizef4 * 4;
+						const float* const end = result + stepf4 * 4;
 
 						for (; result != end; ++result, ++arg) {
 							*result = sinf(*arg);
@@ -466,6 +449,27 @@ void ParticleEmitter::update(float dt)
 			}
 		}
 	});
+
+	if (kill_counter > 0) {
+		kill_counter = minimum(kill_counter, kill_list.size());
+		qsort(kill_list.begin(), kill_counter, sizeof(u32), [](const void* a, const void* b) -> int {
+			const u32 i = *(u32*)a;
+			const u32 j = *(u32*)b;
+			if (i < j) return -1;
+			if (i > j) return 1;
+			return 0;
+		});
+		const i32 channels_count = m_resource->getChannelsCount();
+		for (i32 j = kill_counter - 1; j >= 0; --j) {
+			const u32 last = m_particles_count - 1;
+			const u32 particle_index = kill_list[j];
+			for (i32 i = 0; i < channels_count; ++i) {
+				float* data = m_channels[i].data;
+				data[particle_index] = data[last];
+			}
+			--m_particles_count;
+		}
+	}
 }
 
 
@@ -485,7 +489,7 @@ void ParticleEmitter::fillInstanceData(float* data) {
 		reg_mem.resize(m_resource->getRegistersCount() * 256);
 		for (;;) {
 			const i32 from = atomicAdd(&counter, 1024);
-			if (from >= m_particles_count) return;
+			if (from >= (i32)m_particles_count) return;
 			const i32 fromf4 = from / 4;
 			const i32 stepf4 = minimum(1024, m_particles_count - from + 3) / 4;
 
@@ -533,13 +537,44 @@ void ParticleEmitter::fillInstanceData(float* data) {
 
 						break;
 					}
+					case InstructionType::ADD: {
+						if (instruction->dst.type == DataStream::OUT) {
+							const int stride = m_resource->getOutputsCount();
+							const float* arg0 = (float*)getStream(*this, instruction->op0, fromf4, reg_mem.begin());
+							const float* arg1 = (float*)getStream(*this, instruction->op1, fromf4, reg_mem.begin());
+							i32 output_idx = instruction->dst.index;
+							float* dst = data + output_idx + fromf4 * 4 * stride;
+							for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
+								dst[j] = arg0[i] + arg1[i];
+							}
+							break;
+						}
+						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
+						const float4* arg0 = getStream(*this, instruction->op0, fromf4, reg_mem.begin());
+						const float4* const end = result + stepf4;
+						if (instruction->op1.type == DataStream::LITERAL) {
+							const float4 arg1 = f4Splat(instruction->op1.value);
+
+							for (; result != end; ++result, ++arg0) {
+								*result = f4Add(*arg0, arg1);
+							}
+						}
+						else {
+							const float4* arg1 = getStream(*this, instruction->op1, fromf4, reg_mem.begin());
+
+							for (; result != end; ++result, ++arg0, ++arg1) {
+								*result = f4Add(*arg0, *arg1);
+							}
+						}
+
+						break;
+					}
 					case InstructionType::MOV: {
 						const int stride = m_resource->getOutputsCount();
 						const float* arg = (float*)getStream(*this, instruction->op0, fromf4, reg_mem.begin());
 						ASSERT(instruction->dst.type == DataStream::OUT);
 						i32 output_idx = instruction->dst.index;
 						float* dst = data + output_idx + fromf4 * 4 * stride;
-						++output_idx;
 						for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
 							dst[j] =  arg[i];
 						}
