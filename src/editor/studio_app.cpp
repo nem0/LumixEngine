@@ -185,7 +185,12 @@ struct StudioAppImpl final : StudioApp
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
 	{
-		if (!JobSystem::init(OS::getCPUsCount(), m_allocator)) {
+		u32 cpus_count = minimum(OS::getCPUsCount(), 64);
+		u32 workers;
+		if (workersCountOption(Ref(workers))) {
+			cpus_count = workers;
+		}
+		if (!JobSystem::init(cpus_count, m_allocator)) {
 			logError("Engine") << "Failed to initialize job system.";
 		}
 	}
@@ -2398,6 +2403,28 @@ struct StudioAppImpl final : StudioApp
 		*/
 		// TODO
 		ASSERT(false);
+	}
+
+	bool workersCountOption(Ref<u32> workers_count) {
+		char cmd_line[2048];
+		OS::getCommandLine(Span(cmd_line));
+
+		CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-workers")) {
+				if(!parser.next()) {
+					logError("Studio") << "command line option '-workers` without value";
+					return false;
+				}
+				char tmp[64];
+				parser.getCurrent(tmp, sizeof(tmp));
+				fromCString(Span(tmp, (u32)strlen(tmp)), workers_count);
+				return true;
+			}
+		}
+		return false;
+
 	}
 
 	bool renderDocOption() {
