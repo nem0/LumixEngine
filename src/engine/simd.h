@@ -41,7 +41,11 @@ namespace Lumix
 		_mm_store_ps((float*)dest, src);
 	}
 
-
+	LUMIX_FORCE_INLINE float4 f4CmpGT(float4 a, float4 b)
+	{
+		return _mm_cmpgt_ps(a, b);
+	}
+	
 	LUMIX_FORCE_INLINE int f4MoveMask(float4 a)
 	{
 		return _mm_movemask_ps(a);
@@ -131,6 +135,19 @@ namespace Lumix
 		(*(float4*)dest) = src;
 	}
 
+	LUMIX_FORCE_INLINE float4 f4CmpGT(float4 a, float4 b)
+	{
+		constexpr union {
+			u32 u = 0xffFFffFF;
+			float f;
+		} gt;
+		return {
+			a.x > b.x ? gt.f : 0,
+			a.y > b.y ? gt.f : 0,
+			a.z > b.z ? gt.f : 0,
+			a.w > b.w ? gt.f : 0
+		};
+	}
 
 	LUMIX_FORCE_INLINE int f4MoveMask(float4 a)
 	{
