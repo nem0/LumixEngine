@@ -51,7 +51,6 @@ struct ParticleEmitterResource final : Resource
 			SUB_CONST,
 			MUL,
 			MULTIPLY_ADD,
-			MULTIPLY_CONST_ADD,
 			LT,
 			MOV,
 			RAND,
@@ -62,6 +61,7 @@ struct ParticleEmitterResource final : Resource
 		DataStream dst;
 		DataStream op0;
 		DataStream op1;
+		DataStream op2;
 	};
 
 	static const ResourceType TYPE;
@@ -111,7 +111,7 @@ public:
 	void deserialize(InputMemoryStream& blob, ResourceManagerHub& manager);
 	void update(float dt);
 	void emit(const float* args);
-	void fillInstanceData(const DVec3& cam_pos, float* data);
+	void fillInstanceData(float* data);
 	int getInstanceDataSizeBytes() const;
 	ParticleEmitterResource* getResource() const { return m_resource; }
 	void setResource(ParticleEmitterResource* res);
@@ -122,6 +122,7 @@ public:
 
 	EntityPtr m_entity;
 	u32 m_emit_rate = 10;
+	int m_particles_count = 0;
 
 private:
 	struct Channel
@@ -145,7 +146,6 @@ private:
 	Constant m_constants[16];
 	Channel m_channels[16];
 	int m_capacity = 0;
-	int m_particles_count = 0;
 	int m_instances_count = 0;
 	float m_emit_timer = 0;
 	Material* m_material = nullptr;
