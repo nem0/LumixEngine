@@ -56,7 +56,8 @@ struct ParticleEditorResource {
 			UPDATE,
 			RANDOM,
 			UNARY_FUNCTION,
-			MADD
+			MADD,
+			CMP
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -334,6 +335,11 @@ struct ParticleEditorResource {
 			imnodes::BeginNodeTitleBar();
 			ImGui::TextUnformatted("Update");
 			imnodes::EndNodeTitleBar();
+
+			beginInput();
+			ImGui::TextUnformatted("Kill");
+			endInput();
+
 			for (const Stream& stream : m_resource.m_streams) {
 				beginInput();
 				ImGui::TextUnformatted(stream.name);
@@ -344,8 +350,14 @@ struct ParticleEditorResource {
 
 		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
 			m_resource.m_register_mask = 0;
+			const NodeInput kill_input = getInput(0);
+			if (kill_input.node) {
+				kill_input.generate(instructions, {});
+				instructions.emplace().type = InstructionType::KILL;
+			}
+
 			for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
-				const NodeInput input = getInput(i);
+				const NodeInput input = getInput(i + 1);
 				if (!input.node) continue;
 
 				DataStream s;
@@ -361,6 +373,72 @@ struct ParticleEditorResource {
 			}
 			return {};
 		}
+	};
+
+	struct CompareNode : Node {
+		CompareNode(ParticleEditorResource& res) : Node(res) {}
+		
+		Type getType() const override { return Type::CMP; }
+
+		bool onGUI() override {
+			beginInput();
+			ImGui::TextUnformatted("A");
+			endInput();
+
+			beginOutput();
+			ImGui::SetNextItemWidth(60);
+			ImGui::Combo("##op", (int*)&op, "A < B\0A > B\0");
+			endOutput();
+
+			beginInput();
+			if (getInput(1).node) {
+				ImGui::TextUnformatted("B");
+			}
+			else {
+				ImGui::SetNextItemWidth(60);
+				ImGui::DragFloat("B", &value);
+			}
+			endInput();
+
+			return false;
+		}
+
+		void serialize(OutputMemoryStream& blob) { blob.write(op); blob.write(value); }
+		void deserialize(InputMemoryStream& blob) { blob.read(op); blob.read(value); }
+
+		DataStream generate(Array<Instruction>& instructions, u8 output_idx, DataStream) override {
+			const NodeInput input0 = getInput(0);
+			const NodeInput input1 = getInput(1);
+			if (!input0.node) return {};
+
+			DataStream i0 = input0.generate(instructions, {});
+			DataStream i1 = input1.node ? input1.generate(instructions, {}) : DataStream{};
+			Instruction& i = instructions.emplace();
+			switch (op) {
+				case LT: i.type = InstructionType::LT; break;
+				case GT: i.type = InstructionType::GT; break;
+				default: ASSERT(false); break;
+			}
+			
+			i.dst = i0;
+			if (input1.node) {
+				i.op0 = i1;
+			}
+			else {
+				i.op0.type = DataStream::LITERAL;
+				i.op0.value = value;
+			}
+
+			return {};
+		}
+
+		enum Op : int {
+			LT,
+			GT
+		};
+
+		Op op = LT;
+		float value = 0;
 	};
 
 	struct OutputNode : Node {
@@ -603,6 +681,7 @@ struct ParticleEditorResource {
 	Node* addNode(Node::Type type) {
 		UniquePtr<Node> node;
 		switch(type) {
+			case Node::CMP: node = UniquePtr<CompareNode>::create(m_allocator, *this); break;
 			case Node::MADD: node = UniquePtr<MaddNode>::create(m_allocator, *this); break;
 			case Node::RANDOM: node = UniquePtr<RandomNode>::create(m_allocator, *this); break;
 			case Node::EMIT: node = UniquePtr<EmitNode>::create(m_allocator, *this); break;
@@ -736,6 +815,9 @@ struct ParticleEditorResource {
 		for (const Instruction& i : instructions) {
 			if (i.type == InstructionType::END) continue;
 			switch (i.type) {
+				case InstructionType::GT: text << "\tgt("; break;
+				case InstructionType::LT: text << "\tlt("; break;
+				case InstructionType::KILL: text << "\tkill("; break;
 				case InstructionType::COS: text << "\tcos("; break;
 				case InstructionType::SIN: text << "\tsin("; break;
 				case InstructionType::MOV: text << "\tmov("; break;
@@ -746,7 +828,9 @@ struct ParticleEditorResource {
 				default: ASSERT(false); break;
 			}
 
-			toString(text, i.dst);
+			if (i.dst.type != DataStream::NONE) {
+				toString(text, i.dst);
+			}
 			if (i.op0.type != DataStream::NONE) {
 				text << ", ";
 				toString(text, i.op0);
@@ -934,6 +1018,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 				if (ImGui::Selectable("Multiply")) addNode(ParticleEditorResource::Node::MUL);
 				if (ImGui::Selectable("Multiply add")) addNode(ParticleEditorResource::Node::MADD);
 				if (ImGui::Selectable("Literal")) addNode(ParticleEditorResource::Node::LITERAL);
+				if (ImGui::Selectable("Compare")) addNode(ParticleEditorResource::Node::CMP);
 				if (ImGui::Selectable("Random")) addNode(ParticleEditorResource::Node::RANDOM);
 				if (ImGui::Selectable("Sin")) {
 					ParticleEditorResource::Node* n = addNode(ParticleEditorResource::Node::UNARY_FUNCTION);

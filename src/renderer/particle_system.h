@@ -55,7 +55,8 @@ struct ParticleEmitterResource final : Resource
 			MOV,
 			RAND,
 			KILL,
-			EMIT
+			EMIT,
+			GT
 		};
 		Type type;
 		DataStream dst;
@@ -122,7 +123,7 @@ public:
 
 	EntityPtr m_entity;
 	u32 m_emit_rate = 10;
-	int m_particles_count = 0;
+	u32 m_particles_count = 0;
 
 private:
 	struct Channel
@@ -137,8 +138,6 @@ private:
 		float value = 0;
 	};
 
-	void execute(InputMemoryStream& blob, int particle_index);
-	void kill(int particle_index);
 	float readSingleValue(InputMemoryStream& blob) const;
 
 	IAllocator& m_allocator;
