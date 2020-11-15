@@ -1,4 +1,5 @@
 #include <imgui/imgui_freetype.h>
+#include <imgui/imnodes.h>
 
 #include "animation/animation.h"
 #include "editor/asset_browser.h"
@@ -3504,6 +3505,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 	void shutdownImGui()
 	{
+		imnodes::Shutdown();
 		ImGui::DestroyContext();
 	}
 
