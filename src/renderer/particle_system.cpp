@@ -270,9 +270,9 @@ struct BinaryHelper {
 	void run(const Instruction& instruction, T&... args) {
 		const DataStream* stream = &instruction.op0 + sizeof...(args);
 		switch(stream->type) {
-			case DataStream::CHANNEL: run<F>(instruction, args..., ChannelGetter()); break;
-			case DataStream::LITERAL: run<F>(instruction, args..., LiteralGetter()); break;
-			case DataStream::CONST: run<F>(instruction, args..., ConstGetter()); break;
+			case DataStream::CHANNEL: { ChannelGetter tmp; run<F>(instruction, args..., tmp); break; }
+			case DataStream::LITERAL: { LiteralGetter tmp; run<F>(instruction, args..., tmp); break; }
+			case DataStream::CONST: { ConstGetter tmp; run<F>(instruction, args..., tmp); break; }
 			default: ASSERT(false);
 		}
 	}
@@ -306,9 +306,9 @@ struct TernaryHelper {
 	void run(const Instruction& instruction, T&... args) {
 		const DataStream* stream = &instruction.op0 + sizeof...(args);
 		switch(stream->type) {
-			case DataStream::CHANNEL: run<F>(instruction, args..., ChannelGetter()); break;
-			case DataStream::LITERAL: run<F>(instruction, args..., LiteralGetter()); break;
-			case DataStream::CONST: run<F>(instruction, args..., ConstGetter()); break;
+			case DataStream::CHANNEL: { ChannelGetter tmp; run<F>(instruction, args..., tmp); break; }
+			case DataStream::LITERAL: { LiteralGetter tmp; run<F>(instruction, args..., tmp); break; }
+			case DataStream::CONST: { ConstGetter tmp; run<F>(instruction, args..., tmp); break; }
 			default: ASSERT(false);
 		}
 	}

@@ -359,8 +359,8 @@ struct AudioDeviceImpl : AudioDevice
 		res = m_api.snd_pcm_start(m_device);
 		if(res < 0) goto error;
 
-		logInfo("Audio") << "PCM name: '" << m_api.snd_pcm_name(m_device) << "'";
-		logInfo("Audio") << "PCM state: '" << m_api.snd_pcm_state(m_device) << "'";
+		logInfo("PCM name: '", m_api.snd_pcm_name(m_device), "'");
+		logInfo("PCM state: '", m_api.snd_pcm_state(m_device), "'");
 
 		m_task = LUMIX_NEW(m_allocator, AudioTask)(*this, m_allocator);
 		m_task->create("AudioTask", true);
@@ -369,7 +369,7 @@ struct AudioDeviceImpl : AudioDevice
 
 		error:
 			const char* error_msg = m_api.snd_strerror(res);
-			logError("Audio") << error_msg;
+			logError(error_msg);
 			return false;
 	}
 
@@ -416,7 +416,7 @@ struct AudioDeviceImpl : AudioDevice
 void AudioTask::handleError(int error_code)
 {
 	const char* error_msg = m_device.m_api.snd_strerror(error_code);
-	logError("Audio") << error_msg;
+	logError(error_msg);
 }
 
 
@@ -518,7 +518,7 @@ UniquePtr<AudioDevice> AudioDevice::create(Engine& engine)
 {
 	UniquePtr<AudioDeviceImpl> device = UniquePtr<AudioDeviceImpl>::create(engine.getAllocator(), engine);
 	if (!device->init()) {
-		logWarning("Audio") << "Using null device";
+		logWarning("Using null device");
 		return UniquePtr<NullAudioDevice>::create(engine.getAllocator());
 	}
 	return device;
