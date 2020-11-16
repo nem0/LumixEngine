@@ -2687,6 +2687,10 @@ public:
 		m_universe.onComponentCreated(entity, MODEL_INSTANCE_TYPE, this);
 	}
 
+	void updateParticleEmitter(EntityRef entity, float dt) override {
+		if (!m_particle_emitters[entity]) return;
+		m_particle_emitters[entity]->update(dt);
+	}
 
 	void setParticleEmitterPath(EntityRef entity, const Path& path) override
 	{
