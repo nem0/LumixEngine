@@ -1250,7 +1250,7 @@ private:
 					ret = true;
 				}
 				else {
-					logError("Editor") << "Failed to create component on entity " << e.index;
+					logError("Failed to create component on entity ", e.index);
 				}
 			}
 			return ret;
@@ -1742,20 +1742,24 @@ public:
 	{
 		saveProject();
 
-		logInfo("Editor") << "Saving universe " << basename << "...";
+		logInfo("Saving universe ", basename, "...");
 		
 		StaticString<MAX_PATH_LENGTH> dir(m_engine.getFileSystem().getBasePath(), "universes/", basename);
-		OS::makePath(dir);
+		if (!OS::makePath(dir)) logError("Could not create ", dir);
 		StaticString<MAX_PATH_LENGTH> path(dir, "/entities.unv");
 		StaticString<MAX_PATH_LENGTH> bkp_path(dir, "/entities.unv.bak");
-		if (OS::fileExists(path)) OS::copyFile(path, bkp_path);
+		if (OS::fileExists(path)) {
+			if (!OS::copyFile(path, bkp_path)) {
+				logError("Could not copy ", path, " to ", bkp_path);
+			}
+		}
 		OS::OutputFile file;
 		if (file.open(path)) {
 			save(file);
 			file.close();
 		}
 		else {
-			logError("Editor") << "Failed to save universe " << basename;
+			logError("Failed to save universe ", basename);
 		}
 		
 		m_is_universe_changed = false;
@@ -1786,7 +1790,7 @@ public:
 		memcpy(blob.getMutableData(), &header, sizeof(header));
 		file.write(blob.data(), blob.size());
 
-		logInfo("editor") << "Universe saved";
+		logInfo("Universe saved");
 	}
 
 
@@ -2026,7 +2030,7 @@ public:
 			return;
 		}
 		else {
-			logError("Editor") << "Editor command failed";
+			logError("Editor command failed");
 		}
 		command.reset();
 	}
@@ -2189,14 +2193,14 @@ public:
 			m_engine.serializeProject(stream);
 			bool saved = true;
 			if (!file.write(stream.data(), stream.size())) {
-				logError("Editor") << "Failed to save project " << path;
+				logError("Failed to save project ", path);
 				saved = false;
 			}
 			file.close();
 			if (!saved) OS::deleteFile(path);
 			return;
 		}
-		logError("Editor") << "Failed to save project " << path;
+		logError("Failed to save project ", path);
 	}
 
 	bool loadProject() override {
@@ -2206,14 +2210,14 @@ public:
 		if (file.open(path)) {
 			const u64 size = file.size();
 			if (size < 8) {
-				logError("Editor") << "Invalid file " << path;
+				logError("Invalid file ", path);
 				file.close();
 				return false;
 			}
 			OutputMemoryStream data(m_allocator);
 			data.resize((u32)size);
 			if (!file.read(data.getMutableData(), data.size())) {
-				logError("Editor") << "Failed to read " << path;
+				logError("Failed to read ", path);
 				file.close();
 				return false;
 			}
@@ -2231,18 +2235,18 @@ public:
 		destroyUniverse();
 		createUniverse();
 		m_universe->setName(basename);
-		logInfo("Editor") << "Loading universe " << basename << "...";
+		logInfo("Loading universe ", basename, "...");
 		OS::InputFile file;
 		const StaticString<MAX_PATH_LENGTH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, "/entities.unv");
 		if (file.open(path)) {
 			if (!load(file)) {
-				logError("Editor") << "Failed to parse " << path;
+				logError("Failed to parse ", path);
 				newUniverse();
 			}
 			file.close();
 		}
 		else {
-			logError("Editor") << "Failed to open " << path;
+			logError("Failed to open ", path);
 			newUniverse();
 		}
 	}
@@ -2252,7 +2256,7 @@ public:
 	{
 		destroyUniverse();
 		createUniverse();
-		logInfo("Editor") << "Universe created.";
+		logInfo("Universe created.");
 	}
 
 
@@ -2280,23 +2284,23 @@ public:
 		Header header;
 		const u64 file_size = file.size();
 		if (file_size < sizeof(header)) {
-			logError("Editor") << "Corrupted file.";
+			logError("Corrupted file.");
 			m_is_loading = false;
 			return false;
 		}
 		if (file_size > 0xffFFffFF) {
-			logError("Editor") << "File too big.";
+			logError("File too big.");
 			m_is_loading = false;
 			return false;
 		}
 
 		OS::Timer timer;
-		logInfo("Editor") << "Parsing universe...";
+		logInfo("Parsing universe...");
 		OutputMemoryStream data(m_allocator);
 		if (!file.getBuffer()) {
 			data.resize((u32)file_size);
 			if (!file.read(data.getMutableData(), data.size())) {
-				logError("Editor") << "Failed to load file.";
+				logError("Failed to load file.");
 				m_is_loading = false;
 				return false;
 			}
@@ -2320,7 +2324,7 @@ public:
 		}
 		if (crc32((const u8*)blob.getData() + hashed_offset, (int)blob.size() - hashed_offset) != hash)
 		{
-			logError("Editor") << "Corrupted file.";
+			logError("Corrupted file.");
 			m_is_loading = false;
 			return false;
 		}
@@ -2342,7 +2346,7 @@ public:
 				}
 
 			}
-			logInfo("Editor") << "Universe parsed in " << timer.getTimeSinceStart() << " seconds";
+			logInfo("Universe parsed in ", timer.getTimeSinceStart(), " seconds");
 			m_is_loading = false;
 			return true;
 		}
@@ -2369,7 +2373,7 @@ public:
 		, m_game_mode_file(m_allocator)
 	{
 		loadProject();
-		logInfo("Editor") << "Initializing editor...";
+		logInfo("Initializing editor...");
 
 		m_prefab_system = PrefabSystem::create(*this);
 		createUniverse();

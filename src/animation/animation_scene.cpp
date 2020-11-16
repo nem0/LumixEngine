@@ -183,7 +183,7 @@ struct AnimationSceneImpl final : AnimationScene
 			memcpy(&animator.ctx->inputs[decl.inputs[input_idx].offset], &value, sizeof(value));
 		}
 		else {
-			logWarning("Animation") << "Trying to set float to " << decl.inputs[input_idx].name;
+			logWarning("Trying to set float to ", decl.inputs[input_idx].name);
 		}
 	}
 
@@ -202,7 +202,7 @@ struct AnimationSceneImpl final : AnimationScene
 			*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 		}
 		else {
-			logWarning("Animation") << "Trying to set int to " << decl.inputs[input_idx].name;
+			logWarning("Trying to set int to ", decl.inputs[input_idx].name);
 		}
 	}
 
@@ -221,7 +221,7 @@ struct AnimationSceneImpl final : AnimationScene
 			*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 		}
 		else {
-			logWarning("Animation") << "Trying to set bool to " << decl.inputs[input_idx].name;
+			logWarning("Trying to set bool to ", decl.inputs[input_idx].name);
 		}
 	}
 

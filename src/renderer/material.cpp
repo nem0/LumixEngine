@@ -643,7 +643,7 @@ int texture(lua_State* L)
 			material->setTexturePath(idx, Path(texture_path));
 		}
 		else {
-			logError("Renderer") << material->getPath() << " texture's source is not a string.";
+			logError(material->getPath(), " texture's source is not a string.");
 			lua_pop(L, 1);
 			return 0;
 		}
@@ -698,7 +698,7 @@ bool Material::load(u64 size, const u8* mem)
 	}
 
 	if (!m_shader) {
-		logError("Renderer") << "Material " << getPath() << " does not have a shader.";
+		logError("Material ", getPath(), " does not have a shader.");
 		return false;
 	}
 

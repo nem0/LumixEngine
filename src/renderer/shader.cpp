@@ -173,7 +173,7 @@ int uniform(lua_State* L)
 	}
 
 	if (!valid) {
-		logError("Renderer") << "Unknown uniform type " << type << " in " << shader->getPath().c_str();
+		logError("Unknown uniform type ", type, " in ", shader->getPath());
 		shader->m_uniforms.pop();
 		return 0;
 	}
@@ -208,7 +208,7 @@ int texture_slot(lua_State* L)
 	Shader* shader = getShader(L);
 
 	if(shader->m_texture_slot_count >= lengthOf(shader->m_texture_slots)) {
-		logError("Renderer") << "Too many texture slots in " << shader->getPath();
+		logError("Too many texture slots in ", shader->getPath());
 		return 0;
 	}
 
@@ -319,7 +319,7 @@ int include(lua_State* L)
 
 	OutputMemoryStream content(shader->m_allocator);
 	if (!fs.getContentSync(Path(path), Ref(content))) {
-		logError("Renderer") << "Failed to open/read include " << path << " included from " << shader->getPath();
+		logError("Failed to open/read include ", path, " included from ", shader->getPath());
 		return 0;
 	}
 	

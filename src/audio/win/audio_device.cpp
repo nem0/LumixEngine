@@ -95,7 +95,7 @@ struct AudioDeviceImpl final : AudioDevice
 		auto coinitialize_result = CoInitialize(nullptr);
 		if (!SUCCEEDED(coinitialize_result))
 		{
-			logError("Audio") << "CoInitialize failed. Error code: " << (u32)coinitialize_result;
+			logError("CoInitialize failed. Error code: ", (u32)coinitialize_result);
 			ASSERT(false);
 			return false;
 		}
@@ -103,14 +103,14 @@ struct AudioDeviceImpl final : AudioDevice
 		m_library = LoadLibrary("dsound.dll");
 		if (!m_library)
 		{
-			logError("Audio") << "Failed to load dsound.dll.";
+			logError("Failed to load dsound.dll.");
 			return false;
 		}
 		auto* dsoundCreate =
 			(decltype(DirectSoundCreate8)*)GetProcAddress(m_library, "DirectSoundCreate8");
 		if (!dsoundCreate)
 		{
-			logError("Audio") << "Failed to get DirectSoundCreate8 from dsound.dll.";
+			logError("Failed to get DirectSoundCreate8 from dsound.dll.");
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -119,7 +119,7 @@ struct AudioDeviceImpl final : AudioDevice
 		auto create_result = dsoundCreate(0, &m_direct_sound, nullptr);
 		if (!SUCCEEDED(create_result))
 		{
-			logError("Audio") << "Failed to create DirectSound. Error code: " << (u32)create_result;
+			logError("Failed to create DirectSound. Error code: ", (u32)create_result);
 			ASSERT(false);
 			FreeLibrary(m_library);
 			return false;
@@ -129,7 +129,7 @@ struct AudioDeviceImpl final : AudioDevice
 		auto result = SUCCEEDED(m_direct_sound->SetCooperativeLevel(hwnd, DSSCL_PRIORITY));
 		if (!result || !initPrimaryBuffer())
 		{
-			logError("Audio") << "Failed to initialize the primary buffer.";
+			logError("Failed to initialize the primary buffer.");
 			ASSERT(false);
 			m_direct_sound->Release();
 			FreeLibrary(m_library);
@@ -513,7 +513,7 @@ struct AudioDeviceImpl final : AudioDevice
 
 		if (FAILED(buffer.handle->Unlock(p1, s1, p2, s2)))
 		{
-			logError("Audio") << "Failed to unlock buffer.";
+			logError("Failed to unlock buffer.");
 		}
 	}
 
@@ -617,7 +617,7 @@ UniquePtr<AudioDevice> AudioDevice::create(Engine& engine)
 	UniquePtr<AudioDeviceImpl> device = UniquePtr<AudioDeviceImpl>::create(engine.getAllocator());
 	if (!device->init(engine))
 	{
-		logWarning("Audio") << "Using null device";
+		logWarning("Using null device");
 		return UniquePtr<NullAudioDevice>::create(engine.getAllocator());
 	}
 	return device.move();

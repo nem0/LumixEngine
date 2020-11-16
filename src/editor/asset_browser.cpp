@@ -52,9 +52,10 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	const char* base_path = app.getEngine().getFileSystem().getBasePath();
 
 	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
-	OS::makePath(path);
+	bool success = OS::makePath(path);
 	path << "/asset_tiles";
-	OS::makePath(path);
+	success = success || OS::makePath(path);
+	if (!success) logError("Could not create ", path);
 
 	m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
 	m_back_action.func.bind<&AssetBrowser::goBack>(this);
@@ -315,7 +316,7 @@ void AssetBrowser::createTile(FileInfo& tile, const char* out_path)
 {
 	if (tile.create_called) return;
 	
-	logInfo("Editor") << "Creating tile for " << tile.filepath;
+	logInfo("Creating tile for ", tile.filepath);
 	tile.create_called = true;
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	for (IPlugin* plugin : m_plugins) {
@@ -374,7 +375,7 @@ void AssetBrowser::deleteTile(u32 idx) {
 	StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", m_file_infos[idx].file_path_hash, ".res");
 	fs.deleteFile(res_path);
 	if (!fs.deleteFile(m_file_infos[idx].filepath)) {
-		logError("Editor") << "Failed to delete " << m_file_infos[idx].filepath;
+		logError("Failed to delete ", m_file_infos[idx].filepath);
 	}
 }
 
@@ -453,7 +454,7 @@ void AssetBrowser::fileColumn()
 			if (ImGui::Button("Create")) {
 				StaticString<MAX_PATH_LENGTH> path(base_path, "/", m_dir, "/", tmp);
 				if (!OS::makePath(path)) {
-					logError("Editor") << "Failed to create " << path;
+					logError("Failed to create ", path);
 				}
 				changeDir(m_dir);
 				ImGui::CloseCurrentPopup();
@@ -503,7 +504,7 @@ void AssetBrowser::fileColumn()
 				PathInfo fi(m_file_infos[m_context_resource].filepath);
 				StaticString<MAX_PATH_LENGTH> new_path(fi.m_dir, tmp, ".", fi.m_extension);
 				if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
-					logError("Editor") << "Failed to rename " << m_file_infos[m_context_resource].filepath << " to " << new_path;
+					logError("Failed to rename ", m_file_infos[m_context_resource].filepath, " to ", new_path);
 				}
 				else {
 					changeDir(m_dir);
@@ -807,7 +808,7 @@ static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 {
 	PathInfo fi(src);
 	StaticString<MAX_PATH_LENGTH> dst_dir(dest, "/", fi.m_basename);
-	OS::makePath(dst_dir);
+	if (!OS::makePath(dst_dir)) logError("Could not create ", dst_dir);
 	OS::FileIterator* iter = OS::createFileIterator(src, allocator);
 
 	OS::FileInfo cfi;
@@ -823,7 +824,7 @@ static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 			StaticString<MAX_PATH_LENGTH> tmp_src(src, "/", cfi.filename);
 			StaticString<MAX_PATH_LENGTH> tmp_dst(dest, "/", fi.m_basename, "/", cfi.filename);
 			if(!OS::copyFile(tmp_src, tmp_dst)) {
-				logError("Editor") << "Failed to copy " << tmp_src << " to " << tmp_dst;
+				logError("Failed to copy ", tmp_src, " to ", tmp_dst);
 			}
 		}
 	}
@@ -956,10 +957,15 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	if (!fs.open(tmp_path, Ref(f)))
 	{
 		LUMIX_DELETE(m_app.getAllocator(), &stream);
-		logError("Editor") << "Could not save file " << resource.getPath().c_str();
+		logError("Could not save file ", resource.getPath());
 		return;
 	}
-	f.write(stream.data(), stream.size());
+	if (!f.write(stream.data(), stream.size())) {
+		f.close();
+		LUMIX_DELETE(m_app.getAllocator(), &stream);
+		logError("Could not write file ", resource.getPath());
+		return;
+	}
 	f.close();
 	LUMIX_DELETE(m_app.getAllocator(), &stream);
 
@@ -975,7 +981,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 
 	if (!OS::moveFile(src_full_path, dest_full_path))
 	{
-		logError("Editor") << "Could not save file " << resource.getPath().c_str();
+		logError("Could not save file ", resource.getPath());
 	}
 }
 
@@ -1029,7 +1035,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 				}
 			}
 			else {
-				logError("Editor") << "Can not create " << full_path << " because it's outside of root directory.";
+				logError("Can not create ", full_path, " because it's outside of root directory.");
 			}
 		}
 	}
@@ -1091,10 +1097,10 @@ void AssetBrowser::openInExternalEditor(const char* path) const
 	full_path << path;
 	const OS::ExecuteOpenResult res = OS::shellExecuteOpen(full_path);
 	if (res == OS::ExecuteOpenResult::NO_ASSOCIATION) {
-		logError("Editor") << full_path << " is not associated with any app.";
+		logError(full_path << " is not associated with any app.");
 	}
 	else if (res == OS::ExecuteOpenResult::OTHER_ERROR) {
-		logError("Editor") << "Failed to open " << full_path << " in exeternal editor.";
+		logError("Failed to open ", full_path, " in exeternal editor.");
 	}
 }
 

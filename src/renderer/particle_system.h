@@ -124,6 +124,7 @@ public:
 	EntityPtr m_entity;
 	u32 m_emit_rate = 10;
 	u32 m_particles_count = 0;
+	float m_constants[16];
 
 private:
 	struct Channel
@@ -132,17 +133,10 @@ private:
 		u32 name = 0;
 	};
 
-	struct Constant
-	{
-		u32 name = 0;
-		float value = 0;
-	};
-
 	float readSingleValue(InputMemoryStream& blob) const;
 
 	IAllocator& m_allocator;
 	OutputMemoryStream m_emit_buffer;
-	Constant m_constants[16];
 	Channel m_channels[16];
 	int m_capacity = 0;
 	int m_instances_count = 0;

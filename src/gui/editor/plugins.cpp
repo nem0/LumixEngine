@@ -59,7 +59,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool createResource(const char* path) override {
 		OS::OutputFile file;
 		if (!file.open(path)) {
-			logError("GUI") << "Failed to create " << path;
+			logError("Failed to create ", path);
 			return false;
 		}
 
@@ -196,7 +196,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (!sprite.save(*file))
 			{
 				success = false;
-				logError("Editor") << "Could not save file " << sprite.getPath().c_str();
+				logError("Could not save file ", sprite.getPath());
 			}
 			m_app.getAssetBrowser().endSaveResource(sprite, *file, success);
 		}

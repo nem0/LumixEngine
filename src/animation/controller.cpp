@@ -180,11 +180,11 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 	}
 	m_inputs.recalculateOffsets();
 	if (header.magic != Header::MAGIC) {
-		logError("Animation") << "Invalid animation controller file " << getPath();
+		logError("Invalid animation controller file ", getPath());
 		return false;
 	}
 	if (header.version > Header::Version::LATEST) {
-		logError("Animation") << "Version of animation controller " << getPath() << " is not supported";
+		logError("Version of animation controller ", getPath(), " is not supported");
 		return false;
 	}
 	initEmpty();

@@ -150,49 +150,6 @@ bool InputFile::seek(u64 pos)
 }
 
 
-OutputFile& OutputFile::operator <<(const char* text)
-{
-	write(text, stringLength(text));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(i32 value)
-{
-	char buf[20];
-	toCString(value, Span(buf));
-	write(buf, stringLength(buf));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(u32 value)
-{
-	char buf[20];
-	toCString(value, Span(buf));
-	write(buf, stringLength(buf));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(u64 value)
-{
-	char buf[30];
-	toCString(value, Span(buf));
-	write(buf, stringLength(buf));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(float value)
-{
-	char buf[128];
-	toCString(value, Span(buf), 7);
-	write(buf, stringLength(buf));
-	return *this;
-}
-
-
 static void fromWChar(Span<char> out, const WCHAR* in)
 {
 	const WCHAR* c = in;
@@ -266,7 +223,7 @@ void logVersion() {
 
 	if (dwVersion < 0x80000000) dwBuild = (DWORD)(HIWORD(dwVersion));
 
-	logInfo("Engine") << "OS Version is " << (u32)dwMajorVersion << "." << (u32)dwMinorVersion << " (" << (u32)dwBuild << ")";
+	logInfo("OS Version is ", u32(dwMajorVersion), ".", u32(dwMinorVersion), " (", u32(dwBuild), ")");
 }
 
 
@@ -1141,7 +1098,7 @@ bool makePath(const char* path)
 
 	const WCharStr<MAX_PATH_LENGTH> wpath(tmp);
 	int error_code = SHCreateDirectoryEx(NULL, wpath, NULL);
-	return error_code == ERROR_SUCCESS;
+	return error_code == ERROR_SUCCESS || error_code == ERROR_ALREADY_EXISTS;
 }
 
 

@@ -87,11 +87,11 @@ bool ParticleEmitterResource::load(u64 size, const u8* mem) {
 	InputMemoryStream blob(mem, size);
 	blob.read(header);
 	if (header.magic != Header::MAGIC) {
-		logError("Renderer") << "Invalid file " << getPath();
+		logError("Invalid file ", getPath());
 		return false;
 	}
 	if (header.version != 0) {
-		logError("Renderer") << "Unsupported version " << getPath();
+		logError("Unsupported version ", getPath());
 		return false;
 	}
 
@@ -238,6 +238,102 @@ static float4* getStream(const ParticleEmitter& emitter
 	}
 }
 
+struct LiteralGetter {
+	float4* get(const ParticleEmitter& emitter, DataStream stream, i32, i32, float4*) {
+		value = f4Splat(stream.value);
+		return &value;
+	}
+
+	static void step(float4*&) {}
+	float4 value;
+};
+
+struct ChannelGetter {
+	float4* get(const ParticleEmitter& emitter, DataStream stream, i32, i32, float4*) {
+		return (float4*)emitter.getChannelData(stream.index);
+	}
+	static void step(float4*& val) { ++val; }
+};
+
+struct ConstGetter {
+	float4* get(const ParticleEmitter& emitter, DataStream stream, i32, i32, float4*) {
+		value = f4Splat(emitter.m_constants[stream.index]);
+		return &value;
+	}
+	static void step(float4*& val) {}
+
+	float4 value;
+};
+
+struct BinaryHelper {
+	template <auto F, typename... T>
+	void run(const Instruction& instruction, T&... args) {
+		const DataStream* stream = &instruction.op0 + sizeof...(args);
+		switch(stream->type) {
+			case DataStream::CHANNEL: run<F>(instruction, args..., ChannelGetter()); break;
+			case DataStream::LITERAL: run<F>(instruction, args..., LiteralGetter()); break;
+			case DataStream::CONST: run<F>(instruction, args..., ConstGetter()); break;
+			default: ASSERT(false);
+		}
+	}
+
+	template <auto F, typename T0, typename T1>
+	void run(const Instruction& instruction, T0& t0, T1& t1) {
+		float4* result = getStream(*emitter, instruction.dst, fromf4, reg_mem);
+
+		float4* arg0 = t0.get(*emitter, instruction.op0, fromf4, stepf4, reg_mem);
+		float4* arg1 = t1.get(*emitter, instruction.op1, fromf4, stepf4, reg_mem);
+		
+		const float4* const end = result + stepf4;
+
+		for (; result != end; ++result, T0::step(arg0), T1::step(arg1)) {
+			*result = F(*arg0, *arg1);
+		}
+	}
+
+	ParticleEmitter* emitter;
+	i32 fromf4;
+	i32 stepf4;
+	float4* reg_mem;
+};
+
+struct TernaryHelper {
+	static float4 madd(float4 a, float4 b, float4 c) {
+		return f4Add(f4Mul(a, b), c);
+	}
+
+	template <auto F, typename... T>
+	void run(const Instruction& instruction, T&... args) {
+		const DataStream* stream = &instruction.op0 + sizeof...(args);
+		switch(stream->type) {
+			case DataStream::CHANNEL: run<F>(instruction, args..., ChannelGetter()); break;
+			case DataStream::LITERAL: run<F>(instruction, args..., LiteralGetter()); break;
+			case DataStream::CONST: run<F>(instruction, args..., ConstGetter()); break;
+			default: ASSERT(false);
+		}
+	}
+
+	template <auto F, typename T0, typename T1, typename T2>
+	void run(const Instruction& instruction, T0& t0, T1& t1, T2& t2) {
+		float4* result = getStream(*emitter, instruction.dst, fromf4, reg_mem);
+
+		float4* arg0 = t0.get(*emitter, instruction.op0, fromf4, stepf4, reg_mem);
+		float4* arg1 = t1.get(*emitter, instruction.op1, fromf4, stepf4, reg_mem);
+		float4* arg2 = t2.get(*emitter, instruction.op2, fromf4, stepf4, reg_mem);
+		
+		const float4* const end = result + stepf4;
+
+		for (; result != end; ++result, T0::step(arg0), T1::step(arg1), T2::step(arg2)) {
+			*result = F(*arg0, *arg1, *arg2);
+		}
+	}
+
+	ParticleEmitter* emitter;
+	i32 fromf4;
+	i32 stepf4;
+	float4* reg_mem;
+};
+
 
 void ParticleEmitter::update(float dt)
 {
@@ -256,7 +352,7 @@ void ParticleEmitter::update(float dt)
 	if (m_particles_count == 0) return;
 
 	m_emit_buffer.clear();
-	m_constants[0].value = dt;
+	m_constants[0] = dt;
 	// TODO
 	m_instances_count = m_particles_count;
 	Array<u32> kill_list(m_allocator);
@@ -308,63 +404,20 @@ void ParticleEmitter::update(float dt)
 						break;
 					}	
 					case InstructionType::MUL: {
-						const float4* arg0 = getStream(*this, instruction->op0, fromf4, reg_mem.begin());
-						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float4* const end = result + stepf4;
-
-						if (instruction->op1.type == DataStream::LITERAL) {
-							const float4 arg1 = f4Splat(instruction->op1.value);
-
-							for (; result != end; ++result, ++arg0) {
-								*result = f4Mul(*arg0, arg1);
-							}
-						}
-						else {
-							const float4* arg1 = getStream(*this, instruction->op1, fromf4, reg_mem.begin());
-							for (; result != end; ++result, ++arg0, ++arg1) {
-								*result = f4Mul(*arg0, *arg1);
-							}
-						}
-
-						break;
+						BinaryHelper helper;
+						helper.emitter = this;
+						helper.fromf4 = fromf4;
+						helper.stepf4 = stepf4;
+						helper.reg_mem = reg_mem.begin();
+						helper.run<f4Mul>(*instruction);
 					}
 					case InstructionType::MULTIPLY_ADD: {
-						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float4* const end = result + stepf4;
-
-						if (instruction->op0.type == DataStream::CONST) {
-							ASSERT(instruction->op0.index == 0);
-							const float4 arg0 = f4Splat(dt);
-							ASSERT(instruction->op1.type == DataStream::LITERAL);
-							const float4 arg1 = f4Splat(instruction->op1.value);
-							const float4* arg2 = getStream(*this, instruction->op2, fromf4, reg_mem.begin());
-
-							const float4 tmp = f4Mul(arg0, arg1);
-							for (; result != end; ++result, ++arg2) {
-								*result = f4Add(tmp, *arg2);
-							}
-							break;
-						}
-
-						const float4* arg0 = getStream(*this, instruction->op0, fromf4, reg_mem.begin());
-						const float4* arg2 = getStream(*this, instruction->op2, fromf4, reg_mem.begin());
-
-						if (instruction->op1.type == DataStream::LITERAL) {
-							const float4 arg1 = f4Splat(instruction->op1.value);
-
-							for (; result != end; ++result, ++arg0, ++arg2) {
-								const float4 tmp = f4Mul(*arg0, arg1);
-								*result = f4Add(tmp, *arg2);
-							}
-						}
-						else {
-							const float4* arg1 = getStream(*this, instruction->op1, fromf4, reg_mem.begin());
-							for (; result != end; ++result, ++arg0, ++arg1, ++arg2) {
-								const float4 tmp = f4Mul(*arg0, *arg1);
-								*result = f4Add(tmp, *arg2);
-							}
-						}
-
+						TernaryHelper helper;
+						helper.emitter = this;
+						helper.fromf4 = fromf4;
+						helper.stepf4 = stepf4;
+						helper.reg_mem = reg_mem.begin();
+						helper.run<TernaryHelper::madd>(*instruction);
 						break;
 					}
 					case InstructionType::MOV: {
@@ -389,34 +442,12 @@ void ParticleEmitter::update(float dt)
 						break;
 					}
 					case InstructionType::ADD: {
-						// TODO
-						float4* result = getStream(*this, instruction->dst, fromf4, reg_mem.begin());
-						const float4* const end = result + stepf4;
-						const float4* arg0 = getStream(*this, instruction->op0, fromf4, reg_mem.begin());
-
-						if (instruction->op1.type == DataStream::LITERAL) { 
-							const float4 arg1 = f4Splat(instruction->op1.value);
-
-							for (; result != end; ++result, ++arg0) {
-								*result = f4Add(*arg0, arg1);
-							}
-						}
-						else if (instruction->op1.type == DataStream::CONST) { 
-							ASSERT(instruction->op1.index == 0);
-							const float4 arg1 = f4Splat(dt);
-
-							for (; result != end; ++result, ++arg0) {
-								*result = f4Add(*arg0, arg1);
-							}
-						}
-						else {
-							const float4* arg1 = getStream(*this, instruction->op1, fromf4, reg_mem.begin());
-
-							for (; result != end; ++result, ++arg0, ++arg1) {
-								*result = f4Add(*arg0, *arg1);
-							}
-						}
-
+						BinaryHelper helper;
+						helper.emitter = this;
+						helper.fromf4 = fromf4;
+						helper.stepf4 = stepf4;
+						helper.reg_mem = reg_mem.begin();
+						helper.run<f4Add>(*instruction);
 						break;
 					}
 			

@@ -160,7 +160,7 @@ namespace Lumix
 					#error Unknown platform
 				#endif
 				if (!Path::hasExtension(path, ext + 1)) catString(path_with_ext, ext);
-				logInfo("Core") << "loading plugin " << path_with_ext;
+				logInfo("loading plugin ", path_with_ext);
 				using PluginCreator = IPlugin* (*)(Engine&);
 				auto* lib = OS::loadLibrary(path_with_ext);
 				if (lib)
@@ -171,7 +171,7 @@ namespace Lumix
 						IPlugin* plugin = creator(m_engine);
 						if (!plugin)
 						{
-							logError("Core") << "createPlugin failed.";
+							logError("createPlugin failed.");
 							LUMIX_DELETE(m_engine.getAllocator(), plugin);
 							ASSERT(false);
 						}
@@ -180,14 +180,14 @@ namespace Lumix
 							addPlugin(plugin);
 							m_libraries.push(lib);
 							m_library_loaded.invoke(lib);
-							logInfo("Core") << "Plugin loaded.";
+							logInfo("Plugin loaded.");
 							Debug::StackTree::refreshModuleList();
 							return plugin;
 						}
 					}
 					else
 					{
-						logError("Core") << "No createPlugin function in plugin.";
+						logError("No createPlugin function in plugin.");
 					}
 					OS::unloadLibrary(lib);
 				}
@@ -196,11 +196,11 @@ namespace Lumix
 					auto* plugin = StaticPluginRegister::create(path, m_engine);
 					if (plugin)
 					{
-						logInfo("Core") << "Plugin loaded.";
+						logInfo("Plugin loaded.");
 						addPlugin(plugin);
 						return plugin;
 					}
-					logWarning("Core") << "Failed to load plugin.";
+					logWarning("Failed to load plugin.");
 				}
 				return nullptr;
 			}

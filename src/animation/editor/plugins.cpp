@@ -93,7 +93,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		OS::OutputFile file;
 		if (!file.open(path))
 		{
-			logError("Animation") << "Failed to create " << path;
+			logError("Failed to create ", path);
 			return false;
 		}
 
@@ -161,7 +161,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			if (!anim.save(serializer))
 			{
 				success = false;
-				logError("Editor") << "Could not save file " << anim.getPath().c_str();
+				logError("Could not save file ", anim.getPath());
 			}
 			m_app.getAssetBrowser().endSaveResource(anim, *file, success);
 		}

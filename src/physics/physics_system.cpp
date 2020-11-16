@@ -175,7 +175,7 @@ namespace Lumix
 	{
 		void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line) override
 		{
-			logError("Physics") << message;
+			logError(message);
 		}
 	};
 

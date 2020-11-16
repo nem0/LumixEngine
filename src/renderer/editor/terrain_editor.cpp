@@ -1323,12 +1323,12 @@ void TerrainEditor::compositeTextureRemoveLayer(const Path& path, i32 layer) {
 	CompositeTexture texture(m_app.getAllocator());
 	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 	if (!texture.loadSync(fs, path)) {
-		logError("Renderer") << "Failed to load " << path;
+		logError("Failed to load ", path);
 	}
 	else {
 		texture.layers.erase(layer);
 		if (!texture.save(fs, path)) {
-			logError("Renderer") << "Failed to save " << path;
+			logError("Failed to save ", path);
 		}
 	}
 }
@@ -1338,7 +1338,7 @@ void TerrainEditor::saveCompositeTexture(const Path& path, const char* channel)
 	CompositeTexture texture(m_app.getAllocator());
 	FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 	if (!texture.loadSync(fs, path)) {
-		logError("Renderer") << "Failed to load " << path;
+		logError("Failed to load ", path);
 	}
 	else {
 		CompositeTexture::Layer new_layer;
@@ -1352,7 +1352,7 @@ void TerrainEditor::saveCompositeTexture(const Path& path, const char* channel)
 		new_layer.alpha.src_channel = 3;
 		texture.layers.push(new_layer);
 		if (!texture.save(fs, path)) {
-			logError("Renderer") << "Failed to save " << path;
+			logError("Failed to save ", path);
 		}
 	}
 }

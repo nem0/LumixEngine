@@ -221,7 +221,7 @@ struct GPUProfiler
 			++try_num;
 		}
 		if (try_num == 10) {
-			logError("Renderer") << "Failed to get GPU timestamp, timings are unreliable.";
+			logError("Failed to get GPU timestamp, timings are unreliable.");
 			m_gpu_to_cpu_offset = 0;
 		}
 		else {
@@ -582,10 +582,10 @@ struct RendererImpl final : Renderer
 
 			gpu::MemoryStats mem_stats;
 			if (gpu::getMemoryStats(Ref(mem_stats))) {
-				logInfo("Renderer") << "Initial GPU memory stats:\n"
-					"total: " << (mem_stats.total_available_mem / (1024.f * 1024.f)) << "MB\n"
-					"currect: " << (mem_stats.current_available_mem / (1024.f * 1024.f)) << "MB\n"
-					"dedicated: " << (mem_stats.dedicated_vidmem/ (1024.f * 1024.f)) << "MB\n";
+				logInfo("Initial GPU memory stats:\n",
+					"total: ", (mem_stats.total_available_mem / (1024.f * 1024.f)), "MB\n"
+					"currect: ", (mem_stats.current_available_mem / (1024.f * 1024.f)), "MB\n"
+					"dedicated: ", (mem_stats.dedicated_vidmem/ (1024.f * 1024.f)), "MB\n");
 			}
 
 			for (const Local<FrameData>& frame : renderer.m_frames) {
@@ -1099,7 +1099,7 @@ struct RendererImpl final : Renderer
 
 		if (m_shader_defines.size() >= MAX_SHADER_DEFINES) {
 			ASSERT(false);
-			logError("Renderer") << "Too many shader defines.";
+			logError("Too many shader defines.");
 		}
 
 		m_shader_defines.emplace(define);

@@ -242,7 +242,7 @@ public:
 		for (const Transform& tr : transforms) {
 			entity_map.m_map.clear();
 			if (!engine.instantiatePrefab(*m_universe, prefab_res, tr.pos, tr.rot, tr.scale, Ref(entity_map))) {
-				logError("Editor") << "Failed to instantiate prefab " << prefab_res.getPath();
+				logError("Failed to instantiate prefab ", prefab_res.getPath());
 				return;
 			}
 
@@ -268,7 +268,7 @@ public:
 		
 		EntityMap entity_map(m_editor.getAllocator());
 		if (!m_editor.getEngine().instantiatePrefab(*m_universe, prefab_res, pos, rot, scale, Ref(entity_map))) {
-			logError("Editor") << "Failed to instantiate prefab " << prefab_res.getPath();
+			logError("Failed to instantiate prefab ", prefab_res.getPath());
 			return INVALID_ENTITY;
 		}
 
@@ -499,7 +499,7 @@ public:
 		OS::OutputFile file;
 		if (!fs.open(path.c_str(), Ref(file)))
 		{
-			logError("Editor") << "Failed to create " << path.c_str();
+			logError("Failed to create ", path);
 			return;
 		}
 
@@ -512,7 +512,7 @@ public:
 		engine.destroyUniverse(prefab_universe);
 
 		if (!file.write(blob.data(), blob.size())) {
-			logError("Editor") << "Failed to write " << path.c_str();
+			logError("Failed to write ", path.c_str());
 			file.close();
 			return;
 		}
@@ -596,7 +596,7 @@ public:
 		while (!m_deferred_instances.empty()) {
 			PrefabResource* res = m_deferred_instances.back().resource;
 			if (res->isFailure()) {
-				logError("Editor") << "Failed to instantiate " << res->getPath();
+				logError("Failed to instantiate ", res->getPath());
 				res->decRefCount();
 				m_deferred_instances.pop();
 			} else if (res->isReady()) {

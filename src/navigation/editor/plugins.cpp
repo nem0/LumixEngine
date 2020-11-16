@@ -75,7 +75,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 					scene->load((EntityRef)cmp.entity, rel);
 				}
 				else {
-					logError("Navigation") << "Can not load " << path << " because it's not in root directory.";
+					logError("Can not load ", path, " because it's not in root directory.");
 				}
 			}		
 		}
@@ -90,7 +90,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 						scene->save((EntityRef)cmp.entity, rel);
 					}
 					else {
-						logError("Renderer") << "Can not save " << path << " because it's not in root directory.";
+						logError("Can not save ", path, " because it's not in root directory.");
 					}
 				}
 			}

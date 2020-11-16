@@ -631,7 +631,7 @@ struct NavigationSceneImpl final : NavigationScene
 			}
 
 			if (!success) {
-				logError("Navigation") << "Could not load navmesh";
+				logError("Could not load navmesh");
 				LUMIX_DELETE(scene.m_allocator, this);
 				return;
 			}
@@ -648,7 +648,7 @@ struct NavigationSceneImpl final : NavigationScene
 			dtNavMeshParams params;
 			file.read(&params, sizeof(params));
 			if (dtStatusFailed(zone.navmesh->init(&params))) {
-				logError("Navigation") << "Could not init Detour navmesh";
+				logError("Could not init Detour navmesh");
 				LUMIX_DELETE(scene.m_allocator, this);
 				return;
 			}
@@ -1062,7 +1062,7 @@ struct NavigationSceneImpl final : NavigationScene
 			agent.is_finished = false;
 		}
 		else {
-			logError("Navigation") << "requestMoveTarget failed";
+			logError("requestMoveTarget failed");
 			agent.is_finished = true;
 		}
 		return !agent.is_finished;
@@ -1130,14 +1130,14 @@ struct NavigationSceneImpl final : NavigationScene
 		rcHeightfield* solid = rcAllocHeightfield();
 		zone.debug_heightfield = keep_data ? solid : nullptr;
 		if (!solid) {
-			logError("Navigation") << "Could not generate navmesh: Out of memory 'solid'.";
+			logError("Could not generate navmesh: Out of memory 'solid'.");
 			return false;
 		}
 
 		if (!rcCreateHeightfield(
 				&ctx, *solid, m_config.width, m_config.height, m_config.bmin, m_config.bmax, m_config.cs, m_config.ch))
 		{
-			logError("Navigation") << "Could not generate navmesh: Could not create solid heightfield.";
+			logError("Could not generate navmesh: Could not create solid heightfield.");
 			return false;
 		}
 
@@ -1151,29 +1151,29 @@ struct NavigationSceneImpl final : NavigationScene
 		rcCompactHeightfield* chf = rcAllocCompactHeightfield();
 		zone.debug_compact_heightfield = keep_data ? chf : nullptr;
 		if (!chf) {
-			logError("Navigation") << "Could not generate navmesh: Out of memory 'chf'.";
+			logError("Could not generate navmesh: Out of memory 'chf'.");
 			return false;
 		}
 
 		if (!rcBuildCompactHeightfield(&ctx, m_config.walkableHeight, m_config.walkableClimb, *solid, *chf)) {
-			logError("Navigation") << "Could not generate navmesh: Could not build compact data.";
+			logError("Could not generate navmesh: Could not build compact data.");
 			return false;
 		}
 
 		if (!zone.debug_heightfield) rcFreeHeightField(solid);
 
 		if (!rcErodeWalkableArea(&ctx, m_config.walkableRadius, *chf)) {
-			logError("Navigation") << "Could not generate navmesh: Could not erode.";
+			logError("Could not generate navmesh: Could not erode.");
 			return false;
 		}
 
 		if (!rcBuildDistanceField(&ctx, *chf)) {
-			logError("Navigation") << "Could not generate navmesh: Could not build distance field.";
+			logError("Could not generate navmesh: Could not build distance field.");
 			return false;
 		}
 
 		if (!rcBuildRegions(&ctx, *chf, m_config.borderSize, m_config.minRegionArea, m_config.mergeRegionArea)) {
-			logError("Navigation") << "Could not generate navmesh: Could not build regions.";
+			logError("Could not generate navmesh: Could not build regions.");
 			return false;
 		}
 
@@ -1185,30 +1185,30 @@ struct NavigationSceneImpl final : NavigationScene
 		}
 
 		if (!rcBuildContours(&ctx, *chf, m_config.maxSimplificationError, m_config.maxEdgeLen, *cset)) {
-			logError("Navigation") << "Could not generate navmesh: Could not create contours.";
+			logError("Could not generate navmesh: Could not create contours.");
 			return false;
 		}
 
 		zone.polymesh = rcAllocPolyMesh();
 		if (!zone.polymesh) {
-			logError("Navigation") << "Could not generate navmesh: Out of memory 'm_polymesh'.";
+			logError("Could not generate navmesh: Out of memory 'm_polymesh'.");
 			return false;
 		}
 		if (!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *zone.polymesh)) {
-			logError("Navigation") << "Could not generate navmesh: Could not triangulate contours.";
+			logError("Could not generate navmesh: Could not triangulate contours.");
 			return false;
 		}
 
 		zone.detail_mesh = rcAllocPolyMeshDetail();
 		if (!zone.detail_mesh) {
-			logError("Navigation") << "Could not generate navmesh: Out of memory 'pmdtl'.";
+			logError("Could not generate navmesh: Out of memory 'pmdtl'.");
 			return false;
 		}
 
 		if (!rcBuildPolyMeshDetail(
 				&ctx, *zone.polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *zone.detail_mesh))
 		{
-			logError("Navigation") << "Could not generate navmesh: Could not build detail mesh.";
+			logError("Could not generate navmesh: Could not build detail mesh.");
 			return false;
 		}
 
@@ -1247,12 +1247,12 @@ struct NavigationSceneImpl final : NavigationScene
 		params.buildBvTree = false;
 
 		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size)) {
-			logError("Navigation") << "Could not build Detour navmesh.";
+			logError("Could not build Detour navmesh.");
 			return false;
 		}
 
 		if (dtStatusFailed(zone.navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr))) {
-			logError("Navigation") << "Could not add Detour tile.";
+			logError("Could not add Detour tile.");
 			return false;
 		}
 		return true;
@@ -1264,18 +1264,18 @@ struct NavigationSceneImpl final : NavigationScene
 
 		zone.navmesh = dtAllocNavMesh();
 		if (!zone.navmesh) {
-			logError("Navigation") << "Could not create Detour navmesh";
+			logError("Could not create Detour navmesh");
 			return false;
 		}
 
 		zone.navquery = dtAllocNavMeshQuery();
 		if (!zone.navquery) {
-			logError("Navigation") << "Could not create Detour navmesh query";
+			logError("Could not create Detour navmesh query");
 			return false;
 		}
 
 		if (dtStatusFailed(zone.navquery->init(zone.navmesh, 2048))) {
-			logError("Navigation") << "Could not init Detour navmesh query";
+			logError("Could not init Detour navmesh query");
 			return false;
 		}
 		return true;
@@ -1304,7 +1304,7 @@ struct NavigationSceneImpl final : NavigationScene
 		params.maxPolys = 1 << (22 - tiles_bits); // keep 10 bits for salt
 
 		if (dtStatusFailed(zone.navmesh->init(&params))) {
-			logError("Navigation") << "Could not init Detour navmesh";
+			logError("Could not init Detour navmesh");
 			return false;
 		}
 
@@ -1334,7 +1334,7 @@ struct NavigationSceneImpl final : NavigationScene
 		params.updateFlags = DT_CROWD_ANTICIPATE_TURNS | DT_CROWD_SEPARATION | DT_CROWD_OBSTACLE_AVOIDANCE | DT_CROWD_OPTIMIZE_TOPO | DT_CROWD_OPTIMIZE_VIS;
 		agent.agent = zone.crowd->addAgent(&pos.x, &params);
 		if (agent.agent < 0) {
-			logError("Navigation") << "Failed to create navigation actor";
+			logError("Failed to create navigation actor");
 		}
 	}
 

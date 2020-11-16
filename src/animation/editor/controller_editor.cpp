@@ -192,7 +192,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			Array<u8> data(allocator);
 			data.resize((u32)file.size());
 			if (!file.read(data.begin(), data.byte_size())) {
-				logError("Animation") << "Failed to read " << path;
+				logError("Failed to read ", path);
 			}
 			else {
 				InputMemoryStream str(data.begin(), data.byte_size());
@@ -209,7 +209,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			file.close();
 		}
 		else {
-			logError("Animation") << "Failed to open " << path;
+			logError("Failed to open ", path);
 		}
 	}
 
@@ -383,12 +383,12 @@ struct ControllerEditorImpl : ControllerEditor {
 							OS::OutputFile file;
 							if (file.open(path)) {
 								if (!file.write(str.data(), str.size())) {
-									logError("Animation") << "Failed to write " << path;
+									logError("Failed to write ", path);
 								}
 								file.close();
 							}
 							else {
-								logError("Animation") << "Failed to create " << path;
+								logError("Failed to create ", path);
 							}
 						}
 					}

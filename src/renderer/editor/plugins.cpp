@@ -362,7 +362,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool createResource(const char* path) override {
 		OS::OutputFile file;
 		if (!file.open(path)) {
-			logError("Renderer") << "Failed to create " << path;
+			logError("Failed to create ", path);
 			return false;
 		}
 
@@ -384,7 +384,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (!material->save(*file))
 			{
 				success = false;
-				logError("Editor") << "Could not save file " << material->getPath().c_str();
+				logError("Could not save file ", material->getPath());
 			}
 			m_app.getAssetBrowser().endSaveResource(*material, *file, success);
 		}
@@ -696,7 +696,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool createResource(const char* path) override { 
 		OS::OutputFile file;
 		if (!file.open(path)) {
-			logError("Renderer") << "Failed to create " << path;
+			logError("Failed to create ", path);
 			return false;
 		}
 
@@ -722,17 +722,22 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				OS::InputFile file;
 				if (!file.open(m_in_path)) {
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
-					logError("Editor") << "Failed to load " << m_in_path;
+					logError("Failed to load ", m_in_path);
 					return;
 				}
 				Array<u8> data(allocator);
 				data.resize((int)file.size());
-				file.read(&data[0], data.size());
+				if (!file.read(&data[0], data.size())) {
+					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					logError("Failed to read ", m_in_path);
+					file.close();
+					return;
+				}
 				file.close();
 
 				nvtt::Surface surface;
 				if (!surface.load(m_in_path, data.begin(), data.byte_size())) {
-					logError("Editor") << "Failed to load " << m_in_path;
+					logError("Failed to load ", m_in_path);
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
@@ -768,7 +773,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				auto data = stbi_load(m_in_path, &w, &h, &image_comp, 4);
 				if (!data)
 				{
-					logError("Editor") << "Failed to load " << m_in_path;
+					logError("Failed to load ", m_in_path);
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
@@ -788,7 +793,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 
 			if (!saveAsDDS(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false)) {
-				logError("Editor") << "Failed to save " << m_out_path;
+				logError("Failed to save ", m_out_path);
 			}
 		}
 
@@ -876,8 +881,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const Src first_src = sources.begin().value(); 
 		for (auto iter = sources.begin(); iter.isValid(); ++iter) {
 			if (iter.value().w != first_src.w || iter.value().h != first_src.h) {
-				logError("Renderer") << src_path << ": " << first_src.path << "(" << first_src.w << "x" << first_src.h << ") does not match "
-					<< iter.value().path << "(" << iter.value().w << "x" << iter.value().h << ")";
+				logError(src_path, ": ", first_src.path, "(", first_src.w, "x", first_src.h, ") does not match "
+					, iter.value().path, "(", iter.value().w, "x", iter.value().h, ")");
 				return false;
 			}
 		}
@@ -955,7 +960,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		int w, h, comps;
 		const bool is_16_bit = stbi_is_16_bit_from_memory(src_data.data(), (i32)src_data.size());
 		if (is_16_bit) {
-			logError("Renderer") << path << ": 16bit images not yet supported.";
+			logError(path, ": 16bit images not yet supported.");
 		}
 
 		stbi_uc* data = stbi_load_from_memory(src_data.data(), (i32)src_data.size(), &w, &h, &comps, 4);
@@ -1218,7 +1223,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			if (ImGui::Button(ICON_FA_SAVE "Save")) {
 				if (!m_composite.save(fs, texture.getPath())) {
-					logError("Renderer") << "Failed to save " << texture.getPath();
+					logError("Failed to save ", texture.getPath());
 				}
 			}
 			ImGui::SameLine();
@@ -1574,10 +1579,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
-					logError("Editor") << "No meshes with materials found in " << src;
+					logError("No meshes with materials found in ", src);
 				}
 				else {
-					logError("Editor") << "No meshes or animations found in " << src;
+					logError("No meshes or animations found in ", src);
 				}
 			}
 		}
@@ -2071,7 +2076,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					file.close();
 				}
 				else {
-					logError("Renderer") << "Failed to open " << img_path;
+					logError("Failed to open ", img_path);
 				}
 
 				img_path = fi.m_dir;
@@ -2081,7 +2086,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					file.close();
 				}
 				else {
-					logError("Renderer") << "Failed to open " << img_path;
+					logError("Failed to open ", img_path);
 				}
 
 				img_path = fi.m_dir;
@@ -2091,7 +2096,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					file.close();
 				}
 				else {
-					logError("Renderer") << "Failed to open " << img_path;
+					logError("Failed to open ", img_path);
 				}
 			}
 			ImGui::SameLine();
@@ -2188,7 +2193,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Resource* resource = m_tile.queue.front();
 		if (resource->isFailure()) {
-			logError("Editor") << "Failed to load " << resource->getPath();
+			logError("Failed to load ", resource->getPath());
 			popTileQueue();
 			return;
 		}
@@ -2427,7 +2432,10 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		IAllocator& allocator = m_app.getAllocator();
 		OutputMemoryStream content(allocator);
 		content.resize((int)file.size());
-		file.read(content.getMutableData(), content.size());
+		if (!file.read(content.getMutableData(), content.size())) {
+			logError("Could not read ", path);
+			content.clear();
+		}
 		file.close();
 
 		struct Context {
@@ -2474,14 +2482,14 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 
 		if (lua_load(L, reader, &ctx, path) != 0) {
-			logError("Engine") << path << ": " << lua_tostring(L, -1);
+			logError(path, ": ", lua_tostring(L, -1));
 			lua_pop(L, 2);
 			lua_close(L);
 			return;
 		}
 
 		if (lua_pcall(L, 0, 0, -2) != 0) {
-			logError("Engine") << lua_tostring(L, -1);
+			logError(lua_tostring(L, -1));
 			lua_pop(L, 2);
 			lua_close(L);
 			return;
@@ -2660,16 +2668,16 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 		if (!OS::makePath(path) && !OS::dirExists(path)) {
-			logError("Editor") << "Failed to create " << path;
+			logError("Failed to create ", path);
 		}
 		path << "/probes_tmp/";
 		if (!OS::makePath(path) && !OS::dirExists(path)) {
-			logError("Editor") << "Failed to create " << path;
+			logError("Failed to create ", path);
 		}
 		path << probe_guid << ".dds";
 		OS::OutputFile file;
 		if (!file.open(path)) {
-			logError("Editor") << "Failed to create " << path;
+			logError("Failed to create ", path);
 			return false;
 		}
 
@@ -2731,7 +2739,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
 		if (universe->getName()[0] == '\0') {
-			logError("Editor") << "Universe must be saved before environment probe can be generated.";
+			logError("Universe must be saved before environment probe can be generated.");
 			return;
 		}
 		
@@ -2854,11 +2862,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 			StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 			if (!OS::dirExists(path) && !OS::makePath(path)) {
-				logError("Editor") << "Failed to create " << path;
+				logError("Failed to create ", path);
 			}
 			path << "/probes/";
 			if (!OS::dirExists(path) && !OS::makePath(path)) {
-				logError("Editor") << "Failed to create " << path;
+				logError("Failed to create ", path);
 			}
 			while (!m_probes.empty()) {
 				ProbeJob& job = *m_probes.back();
@@ -2874,7 +2882,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					const StaticString<MAX_PATH_LENGTH> path(base_path, "/universes/", job.universe_name, "/probes/", guid, ".dds");
 					if (!OS::fileExists(tmp_path)) return;
 					if (!OS::moveFile(tmp_path, path)) {
-						logError("Editor") << "Failed to move file " << tmp_path << " to " << path;
+						logError("Failed to move file ", tmp_path, " to ", path);
 					}
 				}
 
@@ -2895,7 +2903,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void radianceFilter(const Vec4* data, u32 size, u64 guid) {
 		PROFILE_FUNCTION();
 		if (!m_ibl_filter_shader->isReady()) {
-			logError("Renderer") << m_ibl_filter_shader->getPath() << "is not ready";
+			logError(m_ibl_filter_shader->getPath(), "is not ready");
 			return;
 		}
 		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
@@ -3554,7 +3562,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		OS::OutputFile file;
 		if (!file.open(hm_path))
 		{
-			logError("Editor") << "Failed to create heightmap " << hm_path;
+			logError("Failed to create heightmap ", hm_path);
 			return false;
 		}
 		RawTextureHeader header;
@@ -3564,15 +3572,21 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		header.is_array = false;
 		header.channel_type = RawTextureHeader::ChannelType::U16;
 		header.channels_count = 1;
-		file.write(&header, sizeof(header));
+		bool written = file.write(&header, sizeof(header));
 		u16 tmp = 0;
 		for (int i = 0; i < size * size; ++i) {
-			file.write(&tmp, sizeof(tmp));
+			written = written || file.write(&tmp, sizeof(tmp));
 		}
 		file.close();
 		
+		if (!written) {
+			logError("Could not write ", hm_path);
+			OS::deleteFile(hm_path);
+			return false;
+		}
+
 		if (!file.open(splatmap_meta_path)) {
-			logError("Editor") << "Failed to create meta " << splatmap_meta_path;
+			logError("Failed to create meta ", splatmap_meta_path);
 			OS::deleteFile(hm_path);
 			return false;
 		}
@@ -3581,7 +3595,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		file.close();
 
 		if (!file.open(splatmap_path)) {
-			logError("Editor") << "Failed to create texture " << splatmap_path;
+			logError("Failed to create texture ", splatmap_path);
 			OS::deleteFile(splatmap_meta_path);
 			OS::deleteFile(hm_path);
 			return false;
@@ -3591,14 +3605,14 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		splatmap.resize(size * size * 4);
 		memset(splatmap.getMutableData(), 0, size * size * 4);
 		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.data(), true, Path(splatmap_path), app.getAllocator())) {
-			logError("Editor") << "Failed to create texture " << splatmap_path;
+			logError("Failed to create texture ", splatmap_path);
 			OS::deleteFile(hm_path);
 			return false;
 		}
 		file.close();
 
 		if (!file.open(albedo_path)) {
-			logError("Editor") << "Failed to create texture " << albedo_path;
+			logError("Failed to create texture ", albedo_path);
 			OS::deleteFile(hm_path);
 			OS::deleteFile(splatmap_path);
 			OS::deleteFile(splatmap_meta_path);
@@ -3621,7 +3635,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		file.close();
 
 		if (!file.open(normal_path)) {
-			logError("Editor") << "Failed to create texture " << normal_path;
+			logError("Failed to create texture ", normal_path);
 			OS::deleteFile(albedo_path);
 			OS::deleteFile(hm_path);
 			OS::deleteFile(splatmap_path);
@@ -3646,7 +3660,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 		if (!file.open(normalized_material_path))
 		{
-			logError("Editor") << "Failed to create material " << normalized_material_path;
+			logError("Failed to create material ", normalized_material_path);
 			OS::deleteFile(normal_path);
 			OS::deleteFile(albedo_path);
 			OS::deleteFile(hm_path);
@@ -3697,7 +3711,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 						new_created = createHeightmap(buf, size);
 					}
 					else {
-						logError("Renderer") << "Can not create " << save_filename << " because it's not in root directory.";
+						logError("Can not create ", save_filename, " because it's not in root directory.");
 					}
 				}
 			}

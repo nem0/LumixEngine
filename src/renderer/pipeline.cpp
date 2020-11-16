@@ -752,7 +752,7 @@ struct PipelineImpl final : Pipeline
 			lua_pushlightuserdata(m_lua_state, this);
 			if (lua_pcall(m_lua_state, 1, 0, 0) != 0)
 			{
-				logError("lua") << lua_tostring(m_lua_state, -1);
+				logError(lua_tostring(m_lua_state, -1));
 				lua_pop(m_lua_state, 1);
 			}
 		}
@@ -780,7 +780,7 @@ struct PipelineImpl final : Pipeline
 		bool errors = luaL_loadbuffer(m_lua_state, tmp, stringLength(tmp.data), m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
-			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -790,7 +790,7 @@ struct PipelineImpl final : Pipeline
 		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
 		if (errors)
 		{
-			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -826,7 +826,7 @@ struct PipelineImpl final : Pipeline
 
 		if (errors)
 		{
-			logError("Renderer") << lua_tostring(m_lua_state, -1);
+			logError(lua_tostring(m_lua_state, -1));
 			lua_pop(m_lua_state, 1);
 		}
 	}
@@ -870,7 +870,7 @@ struct PipelineImpl final : Pipeline
 			luaL_loadbuffer(m_lua_state, content, content_size, m_resource->getPath().c_str()) != 0;
 		if (errors)
 		{
-			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -880,7 +880,7 @@ struct PipelineImpl final : Pipeline
 		errors = lua_pcall(m_lua_state, 0, 0, 0) != 0;
 		if (errors)
 		{
-			logError("Renderer") << m_resource->getPath().c_str() << ": " << lua_tostring(m_lua_state, -1);
+			logError(m_resource->getPath(), ": ", lua_tostring(m_lua_state, -1));
 			lua_pop(m_lua_state, 1);
 			return;
 		}
@@ -1042,7 +1042,7 @@ struct PipelineImpl final : Pipeline
 		lua_getfield(m_lua_state, -1, "main_shadowmap");
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
 			lua_pop(m_lua_state, 2);
-			logError("Renderer") << getPath() << ": can not bake shadows because main_shadowmap() is missing";
+			logError(getPath(), ": can not bake shadows because main_shadowmap() is missing");
 			return false;
 		}
 		LuaWrapper::pcall(m_lua_state, 0, 0);
@@ -1060,7 +1060,7 @@ struct PipelineImpl final : Pipeline
 		const gpu::TextureHandle src = getOutput();
 		m_renderbuffers[m_output].frame_counter = 1;
 		if (!src) {
-			logError("Renderer") << getPath() << ": can not bake shadows because the pipeline has no output";
+			logError(getPath(), ": can not bake shadows because the pipeline has no output");
 			return false;
 		}
 
@@ -1478,7 +1478,7 @@ struct PipelineImpl final : Pipeline
 		{
 			if (equalStrings(i.name, name)) return i.value;
 		}
-		logError("Renderer") << "Uknown texture format " << name;
+		logError("Uknown texture format ", name);
 		return gpu::TextureFormat::RGBA8;
 	}
 
@@ -3607,7 +3607,7 @@ struct PipelineImpl final : Pipeline
 		const u32 rb_count = lua_gettop(L) - (has_ds ? 1 : 0);
 		gpu::TextureHandle rbs[16];
 		if(rb_count > lengthOf(rbs)) {
-			logError("Renderer") << "Too many render buffers in " << pipeline->getPath();	
+			logError("Too many render buffers in ", pipeline->getPath());	
 			return 0;
 		}
 
@@ -4312,7 +4312,7 @@ struct PipelineImpl final : Pipeline
 
 		if (lua_pcall(m_lua_state, 0, 0, 0) != 0)
 		{
-			logWarning("Renderer") << lua_tostring(m_lua_state, -1);
+			logWarning(lua_tostring(m_lua_state, -1));
 			lua_pop(m_lua_state, 1);
 		}
 		lua_pop(m_lua_state, 1);
@@ -4340,7 +4340,7 @@ struct PipelineImpl final : Pipeline
 					file.close();
 				}
 				else {
-					logError("Renderer") << "Failed to save " << path;
+					logError("Failed to save ", path);
 				}
 			}
 

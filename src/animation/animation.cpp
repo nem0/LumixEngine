@@ -253,7 +253,7 @@ bool Animation::load(u64 mem_size, const u8* mem)
 	InputMemoryStream file(mem, mem_size);
 	file.read(&header, sizeof(header));
 	if (header.magic != HEADER_MAGIC) {
-		logError("Animation") << getPath() << " is not an animation file";
+		logError("Invalid animation file ", getPath());
 		return false;
 	}
 

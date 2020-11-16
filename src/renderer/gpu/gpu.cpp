@@ -214,9 +214,9 @@ static void logVersion() {
 	const char* vendor = (const char*)glGetString(GL_VENDOR);
 	const char* renderer = (const char*)glGetString(GL_RENDERER);
 	if (version) {
-		logInfo("Renderer") << "OpenGL version: " << version;
-		logInfo("Renderer") << "OpenGL vendor: " << vendor;
-		logInfo("Renderer") << "OpenGL renderer: " << renderer;
+		logInfo("OpenGL version: ", version);
+		logInfo("OpenGL vendor: ", vendor);
+		logInfo("OpenGL renderer: ", renderer);
 	}
 }
 
@@ -320,7 +320,7 @@ static bool load_gl_linux(void* wnd){
 		do { \
 			name = (prototype)getGLFunc(#name); \
 			if (!name) { \
-				logError("Renderer") << "Failed to load GL function " #name "."; \
+				logError("Failed to load GL function " #name "."); \
 				return false; \
 			} \
 		} while(0)
@@ -398,8 +398,8 @@ static bool load_gl(void* platform_handle, u32 init_flags)
 		}
 		else {
 			DWORD err = GetLastError();
-			logError("Renderer") << "wglCreateContextAttribsARB failed, GetLastError() = " << (u32) err; 
-			logError("Renderer") << "OpenGL 4.5+ required";
+			logError("wglCreateContextAttribsARB failed, GetLastError() = ", (u32) err); 
+			logError("OpenGL 4.5+ required");
 			logVersion();
 			return false;
 		}
@@ -414,7 +414,7 @@ static bool load_gl(void* platform_handle, u32 init_flags)
 				if (!name && gl_dll) { \
 					name = (prototype)OS::getLibrarySymbol(gl_dll, #name); \
 					if (!name) { \
-						logError("Renderer") << "Failed to load GL function " #name "."; \
+						logError("Failed to load GL function " #name "."); \
 						return false; \
 					} \
 				} \
@@ -840,11 +840,11 @@ static void gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum seve
 {
 	if(GL_DEBUG_TYPE_PUSH_GROUP == type || type == GL_DEBUG_TYPE_POP_GROUP) return;
 	if (type == GL_DEBUG_TYPE_ERROR) {
-		logError("GL") << message;
+		logError(message);
 		//ASSERT(false);
 	}
 	else if (type == GL_DEBUG_TYPE_PERFORMANCE) {
-		logInfo("GL") << message;
+		logInfo(message);
 	}
 	else {
 		//logInfo("GL") << message;
@@ -1090,7 +1090,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
 		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
 	{
-		logError("renderer") << "Wrong dds format or corrupted dds (" << debug_name << ")";
+		logError("Wrong dds format or corrupted dds (", debug_name, ")");
 		return false;
 	}
 
@@ -1172,7 +1172,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, u32 fl
 			if (li->compressed) {
 				u32 size = DDS::sizeDXTC(width, height, internal_format);
 				if (!is_dds10 && !is_cubemap && (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)) {
-					logError("Renderer") << "Unsupported format " << debug_name;
+					logError("Unsupported format ", debug_name);
 					glDeleteTextures(1, &texture);
 					return false;
 				}
@@ -1512,7 +1512,7 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 	enum { MAX_SHADERS_PER_PROGRAM = 16 };
 
 	if (num > MAX_SHADERS_PER_PROGRAM) {
-		logError("Renderer") << "Too many shaders per program in " << name;
+		logError("Too many shaders per program in ", name);
 		return false;
 	}
 
@@ -1581,10 +1581,10 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 				Array<char> log_buf(gl->allocator);
 				log_buf.resize(log_len);
 				glGetShaderInfoLog(shd, log_len, &log_len, &log_buf[0]);
-				logError("Renderer") << name << " - " << shaderTypeToString(types[i]) << ": " << &log_buf[0];
+				logError(name, " - ", shaderTypeToString(types[i]), ": ", &log_buf[0]);
 			}
 			else {
-				logError("Renderer") << "Failed to compile shader " << name << " - " << shaderTypeToString(types[i]);
+				logError("Failed to compile shader ", name, " - ", shaderTypeToString(types[i]));
 			}
 			glDeleteShader(shd);
 			return false;
@@ -1605,10 +1605,10 @@ bool createProgram(ProgramHandle prog, const VertexDecl& decl, const char** srcs
 			Array<char> log_buf(gl->allocator);
 			log_buf.resize(log_len);
 			glGetProgramInfoLog(prg, log_len, &log_len, &log_buf[0]);
-			logError("Renderer") << name << ": " << &log_buf[0];
+			logError(name, ": ", &log_buf[0]);
 		}
 		else {
-			logError("Renderer") << "Failed to link program " << name;
+			logError("Failed to link program ", name);
 		}
 		glDeleteProgram(prg);
 		return false;

@@ -69,17 +69,19 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				OS::OutputFile file;
 				if (!fs.open(script->getPath().c_str(), Ref(file)))
 				{
-					logWarning("Lua Script") << "Could not save " << script->getPath();
+					logWarning("Could not save ", script->getPath());
 					return;
 				}
 
-				file.write(m_text_buffer, stringLength(m_text_buffer));
+				if (!file.write(m_text_buffer, stringLength(m_text_buffer))) {
+					logError("Could not write ", script->getPath());
+				}
 				file.close();
 			}
 			ImGui::SameLine();
 		}
 		else {
-			ImGui::Text(ICON_FA_EXCLAMATION_TRIANGLE "File is too big to be edited here");
+			ImGui::Text(ICON_FA_EXCLAMATION_TRIANGLE "File is too big to be edited here, please use external editor");
 		}
 		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally"))
 		{
@@ -275,7 +277,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 				if (errors)
 				{
-					logError("Lua Script") << lua_tostring(L, -1);
+					logError(lua_tostring(L, -1));
 					lua_pop(L, 1);
 				}
 			}
@@ -292,7 +294,10 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 						size_t size = file.size();
 						Array<char> data(allocator);
 						data.resize((int)size);
-						file.read(&data[0], size);
+						if (!file.read(&data[0], size)) {
+							logError("Could not read ", tmp);
+							data.clear();
+						}
 						file.close();
 						lua_State* L = app.getEngine().getState();
 						bool errors = luaL_loadbuffer(L, &data[0], data.size(), tmp) != 0;
@@ -300,13 +305,13 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 
 						if (errors)
 						{
-							logError("Lua Script") << lua_tostring(L, -1);
+							logError(lua_tostring(L, -1));
 							lua_pop(L, 1);
 						}
 					}
 					else
 					{
-						logError("Lua Script") << "Failed to open file " << tmp;
+						logError("Failed to open file ", tmp);
 					}
 				}
 			}
@@ -392,11 +397,11 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 					}
 					else
 					{
-						logError("Lua Script") << "Failed to create " << buf;
+						logError("Failed to create ", buf);
 					}
 				}
 				else {
-					logError("Renderer") << "Can not create " << full_path << " because it's not in root directory.";
+					logError("Can not create ", full_path, " because it's not in root directory.");
 				}
 			}
 		}

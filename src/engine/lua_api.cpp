@@ -537,7 +537,7 @@ struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
 
 	void visit(const Reflection::IBlobProperty& prop) override {
 		if (!equalStrings(property_name, prop.name)) return;
-		logError("Lua Script") << "Property " << prop.name << " has unsupported type";
+		logError("Property ", prop.name, " has unsupported type");
 	}
 
 
@@ -560,13 +560,13 @@ static int LUA_packageLoader(lua_State* L)
 	auto& fs = engine->getFileSystem();
 	OutputMemoryStream buf(engine->getAllocator());
 	if (!fs.getContentSync(Path(tmp), Ref(buf))) {
-		logError("Engine") << "Failed to open file " << tmp;
+		logError("Failed to open file ", tmp);
 		StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
 		msg << tmp;
 		lua_pushstring(L, msg);
 	}
 	else if (luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), tmp) != 0) {
-		logError("Engine") << "Failed to load package " << tmp << ": " << lua_tostring(L, -1);
+		logError("Failed to load package ", tmp, ": ", lua_tostring(L, -1));
 	}
 	return 1;
 }
@@ -576,7 +576,7 @@ static void installLuaPackageLoader(lua_State* L)
 {
 	lua_getglobal(L, "package");
 	if (lua_type(L, -1) != LUA_TTABLE) {
-		logError("Engine") << "Lua \"package\" is not a table";
+		logError("Lua \"package\" is not a table");
 		return;
 	}
 	lua_getfield(L, -1, "searchers");
@@ -584,7 +584,7 @@ static void installLuaPackageLoader(lua_State* L)
 		lua_pop(L, 1);
 		lua_getfield(L, -1, "loaders");
 		if (lua_type(L, -1) != LUA_TTABLE) {
-			logError("Engine") << "Lua \"package.searchers\"/\"package.loaders\" is not a table";
+			logError("Lua \"package.searchers\"/\"package.loaders\" is not a table");
 			return;
 		}
 	}
@@ -628,7 +628,7 @@ static bool LUA_createComponent(Universe* universe, i32 entity, const char* type
 	if (!scene) return false;
 	if (universe->hasComponent({entity}, cmp_type))
 	{
-		logError("Lua Script") << "Component " << type << " already exists in entity " << entity;
+		logError("Component ", type, " already exists in entity ", entity);
 		return false;
 	}
 
@@ -792,8 +792,8 @@ static Universe* LUA_createUniverse(Engine* engine) { return &engine->createUniv
 static void LUA_destroyUniverse(Engine* engine, Universe* universe) { engine->destroyUniverse(*universe); }
 static void LUA_destroyEntity(Universe* universe, i32 entity) { universe->destroyEntity({entity}); }
 static Universe* LUA_getSceneUniverse(IScene* scene) { return &scene->getUniverse(); }
-static void LUA_logError(const char* text) { logError("Lua Script") << text; }
-static void LUA_logInfo(const char* text) { logInfo("Lua Script") << text; }
+static void LUA_logError(const char* text) { logError(text); }
+static void LUA_logInfo(const char* text) { logInfo(text); }
 static void LUA_pause(Engine* engine, bool pause) { engine->pause(pause); }
 static void LUA_nextFrame(Engine* engine) { engine->nextFrame(); }
 static void LUA_setTimeMultiplier(Engine* engine, float multiplier) { engine->setTimeMultiplier(multiplier); }
@@ -819,7 +819,7 @@ static int LUA_loadUniverse(lua_State* L)
 		{
 			if (!success)
 			{
-				logError("Engine") << "Failed to open universe " << path;
+				logError("Failed to open universe ", path);
 			}
 			else
 			{
@@ -839,7 +839,7 @@ static int LUA_loadUniverse(lua_State* L)
 				EntityMap entity_map(engine->getAllocator());
 				if (!engine->deserialize(*universe, blob, Ref(entity_map)))
 				{
-					logError("Engine") << "Failed to deserialize universe " << path;
+					logError("Failed to deserialize universe ", path);
 				}
 				else
 				{
@@ -851,7 +851,7 @@ static int LUA_loadUniverse(lua_State* L)
 
 					if (lua_pcall(L, 0, 0, 0) != 0)
 					{
-						logError("Engine") << lua_tostring(L, -1);
+						logError(lua_tostring(L, -1));
 						lua_pop(L, 1);
 					}
 				}
@@ -880,7 +880,7 @@ static int LUA_loadUniverse(lua_State* L)
 static int LUA_instantiatePrefab(lua_State* L) {
 	const int index = lua_upvalueindex(1);
 	if (!LuaWrapper::isType<Engine>(L, index)) {
-		logError("Lua") << "Invalid Lua closure";
+		logError("Invalid Lua closure");
 		ASSERT(false);
 		return 0;
 	}
@@ -1172,7 +1172,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	#define TO_STR_HELPER(x) #x
 	#define TO_STR(x) TO_STR_HELPER(x)
 	if (!LuaWrapper::execute(L, Span(entity_src, stringLength(entity_src)), __FILE__ "(" TO_STR(__LINE__) ")", 0)) {
-		logError("Engine") << "Failed to init entity api";
+		logError("Failed to init entity api");
 	}
 
 	installLuaPackageLoader(L);

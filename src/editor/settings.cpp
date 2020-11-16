@@ -323,7 +323,7 @@ bool Settings::load()
 	
 	OutputMemoryStream buf(m_app.getAllocator());
 	if (!fs.getContentSync(Path(path), Ref(buf))) {
-		logError("Editor") << "Failed to open " << path;
+		logError("Failed to open ", path);
 		return false;
 	}
 
@@ -342,7 +342,7 @@ bool Settings::load()
 
 	if (!valid_version) {
 		if (!fs.getContentSync(Path(DEFAULT_SETTINGS_PATH), Ref(buf))) {
-			logError("Editor") << "Failed to open " << DEFAULT_SETTINGS_PATH;
+			logError("Failed to open ", DEFAULT_SETTINGS_PATH);
 			return false;
 		}
 
