@@ -377,48 +377,6 @@ bool InputFile::seek(u64 pos)
 }
 
 
-OutputFile& OutputFile::operator <<(const char* text)
-{
-	write(text, stringLength(text));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(i32 value)
-{
-	char buf[20];
-	toCString(value, Span(buf));
-	write(buf, stringLength(buf));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(u32 value)
-{
-	char buf[20];
-	toCString(value, Span(buf));
-	write(buf, stringLength(buf));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(u64 value)
-{
-	char buf[30];
-	toCString(value, Span(buf));
-	write(buf, stringLength(buf));
-	return *this;
-}
-
-
-OutputFile& OutputFile::operator <<(float value)
-{
-	char buf[128];
-	toCString(value, Span(buf), 7);
-	write(buf, stringLength(buf));
-	return *this;
-}
-
 u32 getCPUsCount() { return sysconf(_SC_NPROCESSORS_ONLN); }
 void sleep(u32 milliseconds) { if (milliseconds) usleep(useconds_t(milliseconds * 1000)); }
 ThreadID getCurrentThreadID() { return pthread_self(); }
@@ -426,14 +384,14 @@ ThreadID getCurrentThreadID() { return pthread_self(); }
 void logVersion() {
     struct utsname tmp;
 	if (uname(&tmp) == 0) {
-		logInfo("Engine") << "sysname: " << tmp.sysname;
-		logInfo("Engine") << "nodename: " << tmp.nodename;
-		logInfo("Engine") << "release: " << tmp.release;
-		logInfo("Engine") << "version: " << tmp.version;
-		logInfo("Engine") << "machine: " << tmp.machine;
+		logInfo("sysname: ", tmp.sysname);
+		logInfo("nodename: ", tmp.nodename);
+		logInfo("release: ", tmp.release);
+		logInfo("version: ", tmp.version);
+		logInfo("machine: ", tmp.machine);
 	}
 	else {
-		logWarning("Engine") << "uname failed";
+		logWarning("uname failed");
 	}
 }
 
