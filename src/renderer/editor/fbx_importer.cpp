@@ -137,12 +137,12 @@ static void extractEmbedded(const ofbx::IScene& scene, const char* src_dir)
 
 		OS::OutputFile file;
 		if (!file.open(fullpath)) {
-			logError("Renderer") << "Failed to save " << fullpath;
+			logError("Failed to save ", fullpath);
 			return;
 		}
 
 		if (!file.write(embedded.begin + 4, embedded.end - embedded.begin - 4)) {
-			logError("Renderer") << "Failed to write " << fullpath;
+			logError("Failed to write ", fullpath);
 		}
 		file.close();
 	}
@@ -548,7 +548,7 @@ static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx
 	ctx.m_pInterface = &iface;
 	tbool res = genTangSpaceDefault(&ctx);
 	if (!res) {
-		logError("Renderer") << path << ": failed to generate tangent space";
+		logError(path, ": failed to generate tangent space");
 	}
 }
 
@@ -630,7 +630,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 
 		const bool flip_handness = doesFlipHandness(transform_matrix);
 		if (flip_handness) {
-			logError("FBX") << "Mesh " << mesh.name << " in " << path << " flips handness. This is not supported and the mesh will not display correctly.";
+			logError("Mesh ", mesh.name, " in ", path, " flips handness. This is not supported and the mesh will not display correctly.");
 		}
 
 		const int vertex_size = getVertexSize(*geom, import_mesh.is_skinned, cfg.import_vertex_colors);
@@ -708,7 +708,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		}
 
 		if (import_mesh.lod >= 3 && cfg.create_impostor) {
-			logWarning("FBX") << path << " has more than 3 LODs and some are replaced with impostor";
+			logWarning(path, " has more than 3 LODs and some are replaced with impostor");
 			import_mesh.import = false;
 		}
 	});
@@ -833,8 +833,8 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 	scene = ofbx::load(data.data(), (i32)data.size(), flags, &ofbx_job_processor, nullptr);
 	if (!scene)
 	{
-		logError("FBX") << "Failed to import \"" << filename << ": " << ofbx::getError() << "\n"
-			<< "Please try to convert the FBX file with Autodesk FBX Converter or some other software to the latest version.";
+		logError("Failed to import \"", filename, ": ", ofbx::getError(), "\n"
+			"Please try to convert the FBX file with Autodesk FBX Converter or some other software to the latest version.");
 		return false;
 	}
 	m_fbx_scale = scene->getGlobalSettings()->UnitScaleFactor * 0.01f;
@@ -1100,7 +1100,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 	const StaticString<MAX_PATH_LENGTH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
 	OS::OutputFile f;
 	if (!m_filesystem.open(mat_src, Ref(f))) {
-		logError("FBX") << "Failed to create " << mat_src;
+		logError("Failed to create ", mat_src);
 	}
 	else {
 		const AABB& aabb = model->getAABB();
@@ -1139,7 +1139,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		OS::OutputFile f;
 		if (!m_filesystem.open(mat_src, Ref(f)))
 		{
-			logError("FBX") << "Failed to create " << mat_src;
+			logError("Failed to create ", mat_src);
 			continue;
 		}
 		out_file.clear();
@@ -1183,7 +1183,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			<< ",1}\n";*/
 
 		if (!f.write(out_file.data(), out_file.size())) {
-			logError("FBX") << "Failed to write " << mat_src;
+			logError("Failed to write ", mat_src);
 		}
 		f.close();
 	}
@@ -1193,7 +1193,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		if (!m_filesystem.fileExists(mat_src)) {
 			OS::OutputFile f;
 			if (!m_filesystem.open(mat_src, Ref(f))) {
-				logError("FBX") << "Failed to create " << mat_src;
+				logError("Failed to create ", mat_src);
 			}
 			else {
 				f << "shader \"/pipelines/impostor.shd\"\n";
@@ -1451,7 +1451,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			anim_len = scene->getGlobalSettings()->TimeSpanStop;
 		}
 		else {
-			logError("Renderer") << "Unsupported animation in " << src;
+			logError("Unsupported animation in ", src);
 			continue;
 		}
 
@@ -2120,7 +2120,10 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	OS::OutputFile file;
 	PathInfo file_info(src);
 	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
-	if (!m_filesystem.open(tmp, Ref(file))) return;
+	if (!m_filesystem.open(tmp, Ref(file))) {
+		logError("Could not create ", tmp);
+		return;
+	}
 
 	OutputMemoryStream blob(m_allocator);
 	
@@ -2141,7 +2144,9 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	engine.serialize(universe, blob);
 	engine.destroyUniverse(universe);
 
-	file.write(blob.data(), blob.size());
+	if (!file.write(blob.data(), blob.size())) {
+		logError("Could not write ", tmp);
+	}
 	file.close();
 }
 

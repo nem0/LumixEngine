@@ -38,7 +38,7 @@ struct LUMIX_EDITOR_API LogUI
 		};
 
 	private:
-		void onLog(LogLevel level, const char* system, const char* message);
+		void onLog(LogLevel level, const char* message);
 		void push(LogLevel level, const char* message);
 		void showNotifications();
 

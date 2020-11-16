@@ -105,7 +105,7 @@ struct AssetCompilerImpl : AssetCompiler
 		m_task.create("Asset compiler", true);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
-		OS::makePath(path);
+		if (!OS::makePath(path)) logError("Could not create ", path);
 		ResourceManagerHub& rm = app.getEngine().getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 	}
@@ -135,7 +135,7 @@ struct AssetCompilerImpl : AssetCompiler
 			fs.moveFile(".lumix/assets/_list.txt_tmp", ".lumix/assets/_list.txt");
 		}
 		else {
-			logError("Editor") << "Could not save .lumix/assets/_list.txt";
+			logError("Could not save .lumix/assets/_list.txt");
 		}
 
 		ASSERT(m_plugins.empty());
@@ -166,11 +166,11 @@ struct AssetCompilerImpl : AssetCompiler
 		StaticString<MAX_PATH_LENGTH> out_path(".lumix/assets/", hash, ".res");
 		OS::OutputFile file;
 		if(!fs.open(out_path, Ref(file))) {
-			logError("Editor") << "Could not create " << out_path;
+			logError("Could not create ", out_path);
 			return false;
 		}
 		const bool written = file.write(data.begin(), data.length());
-		if (!written) logError("Editor") << "Could not write " << out_path;
+		if (!written) logError("Could not write ", out_path);
 		file.close();
 		return written;
 	}
@@ -301,79 +301,84 @@ struct AssetCompilerImpl : AssetCompiler
 		if (fs.open(".lumix/assets/_list.txt", Ref(file))) {
 			Array<char> content(m_app.getAllocator());
 			content.resize((int)file.size());
-			file.read(content.begin(), content.byte_size());
-			file.close();
+			if (!file.read(content.begin(), content.byte_size())) {
+				logError("Failed to read .lumix/assets/_list.txt");
+				file.close();
+			}
+			else {
+				file.close();
 
-			lua_State* L = luaL_newstate();
-			[&](){
-				if (luaL_loadbuffer(L, content.begin(), content.byte_size(), "lumix_asset_list") != 0) {
-					logError("Editor") << list_path << ": " << lua_tostring(L, -1);
-					return;
-				}
+				lua_State* L = luaL_newstate();
+				[&](){
+					if (luaL_loadbuffer(L, content.begin(), content.byte_size(), "lumix_asset_list") != 0) {
+						logError(list_path, ": ", lua_tostring(L, -1));
+						return;
+					}
 
-				if (lua_pcall(L, 0, 0, 0) != 0) {
-					logError("Editor") << list_path << ": " << lua_tostring(L, -1);
-					return;
-				}
+					if (lua_pcall(L, 0, 0, 0) != 0) {
+						logError(list_path, ": ", lua_tostring(L, -1));
+						return;
+					}
 
-				lua_getglobal(L, "resources");
-				if (lua_type(L, -1) != LUA_TTABLE) return;
+					lua_getglobal(L, "resources");
+					if (lua_type(L, -1) != LUA_TTABLE) return;
 
-				{
-					MutexGuard lock(m_resources_mutex);
-					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
-						const ResourceType type = getResourceType(p.c_str());
-						#ifdef CACHE_MASTER 
-							StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
-							if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
-								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
-							}
-						#else
-							if (type != INVALID_RESOURCE_TYPE) {
-								ResourceLocator locator(Span<const char>(p.c_str(), (u32)strlen(p.c_str())));
-								char tmp[MAX_PATH_LENGTH];
-								copyString(Span(tmp), locator.resource);
-								if (fs.fileExists(tmp)) {
+					{
+						MutexGuard lock(m_resources_mutex);
+						LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
+							const ResourceType type = getResourceType(p.c_str());
+							#ifdef CACHE_MASTER 
+								StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
+								if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
 									m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 								}
-								else {
-									StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
-									fs.deleteFile(res_path);
+							#else
+								if (type != INVALID_RESOURCE_TYPE) {
+									ResourceLocator locator(Span<const char>(p.c_str(), (u32)strlen(p.c_str())));
+									char tmp[MAX_PATH_LENGTH];
+									copyString(Span(tmp), locator.resource);
+									if (fs.fileExists(tmp)) {
+										m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
+									}
+									else {
+										StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
+										fs.deleteFile(res_path);
+									}
 								}
-							}
-						#endif
-					});
-				}
-				lua_pop(L, 1);
-
-				lua_getglobal(L, "dependencies");
-				if (lua_type(L, -1) != LUA_TTABLE) return;
-
-				lua_pushnil(L);
-				while (lua_next(L, -2) != 0) {
-					if (!lua_isstring(L, -2) || !lua_istable(L, -1)) {
-						logError("Editor") << "Invalid dependencies in _list.txt";
-						lua_pop(L, 1);
-						continue;
+							#endif
+						});
 					}
-					
-					const char* key = lua_tostring(L, -2);
-					IAllocator& allocator = m_app.getAllocator();
-					const Path key_path(key);
-					m_dependencies.insert(key_path, Array<Path>(allocator));
-					Array<Path>& values = m_dependencies.find(key_path).value();
-
-					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [&values](const Path& p){ 
-						values.push(p); 
-					});
-
 					lua_pop(L, 1);
-				}
-				lua_pop(L, 1);
 
-			}();
+					lua_getglobal(L, "dependencies");
+					if (lua_type(L, -1) != LUA_TTABLE) return;
+
+					lua_pushnil(L);
+					while (lua_next(L, -2) != 0) {
+						if (!lua_isstring(L, -2) || !lua_istable(L, -1)) {
+							logError("Invalid dependencies in _list.txt");
+							lua_pop(L, 1);
+							continue;
+						}
+					
+						const char* key = lua_tostring(L, -2);
+						IAllocator& allocator = m_app.getAllocator();
+						const Path key_path(key);
+						m_dependencies.insert(key_path, Array<Path>(allocator));
+						Array<Path>& values = m_dependencies.find(key_path).value();
+
+						LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [&values](const Path& p){ 
+							values.push(p); 
+						});
+
+						lua_pop(L, 1);
+					}
+					lua_pop(L, 1);
+
+				}();
 		
-			lua_close(L);
+				lua_close(L);
+			}
 		}
 
 		const u64 list_last_modified = OS::getLastModified(list_path);
@@ -438,13 +443,13 @@ struct AssetCompilerImpl : AssetCompiler
 
 		lua_State* L = luaL_newstate();
 		if (luaL_loadbuffer(L, buf.begin(), buf.byte_size(), meta_path) != 0) {
-			logError("Editor") << meta_path << ": " << lua_tostring(L, -1);
+			logError(meta_path, ": ", lua_tostring(L, -1));
 			lua_close(L);
 			return false;
 		}
 
 		if (lua_pcall(L, 0, 0, 0) != 0) {
-			logError("Engine") << meta_path << ": " << lua_tostring(L, -1);
+			logError(meta_path, ": ", lua_tostring(L, -1));
 			lua_close(L);
 			return false;
 		}
@@ -463,11 +468,13 @@ struct AssetCompilerImpl : AssetCompiler
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.open(meta_path, Ref(file))) {
-			logError("Editor") << "Could not create " << meta_path;
+			logError("Could not create ", meta_path);
 			return;
 		}
 
-		file.write(src, stringLength(src));
+		if (!file.write(src, stringLength(src))) {
+			logError("Could not write ", meta_path);
+		}
 		file.close();
 	}
 
@@ -480,7 +487,7 @@ struct AssetCompilerImpl : AssetCompiler
 		MutexGuard lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
 		if (!iter.isValid()) {
-			logError("Editor") << "Unknown resource type " << src;
+			logError("Unknown resource type ", src);
 			return false;
 		}
 		return iter.value()->compile(src);
@@ -520,7 +527,6 @@ struct AssetCompilerImpl : AssetCompiler
 			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
-			logInfo("Editor") << res.getPath() << " is not compiled, pushing to compile queue";
 			MutexGuard lock(m_to_compile_mutex);
 			const Path path(filepath);
 			auto iter = m_to_compile_subresources.find(path);
@@ -553,7 +559,7 @@ struct AssetCompilerImpl : AssetCompiler
 	static int LUA_getResources(lua_State* L) {
 		const int index = lua_upvalueindex(1);
 		if (!LuaWrapper::isType<AssetCompilerImpl*>(L, index)) {
-			logError("Lua") << "Invalid Lua closure";
+			logError("Invalid Lua closure");
 			ASSERT(false);
 			return 0;
 		}
@@ -734,10 +740,10 @@ int AssetCompilerTask::task()
 		if (p.isValid()) {
 			PROFILE_BLOCK("compile asset");
 			Profiler::pushString(p.c_str());
-			logInfo("Editor") << "Compiling " << p << "...";
+			logInfo("Compiling ", p, "...");
 			const bool compiled = m_compiler.compile(p);
 			if (!compiled) {
-				logError("Editor") << "Failed to compile resource " << p;
+				logError("Failed to compile resource ", p);
 			}
 			MutexGuard lock(m_compiler.m_compiled_mutex);
 			m_compiler.m_compiled.push(p);

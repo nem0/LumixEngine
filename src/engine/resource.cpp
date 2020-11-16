@@ -110,7 +110,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success)
 
 	if (!success)
 	{
-		logError("Core") << "Could not open " << getPath().c_str();
+		logError("Could not open ", getPath().c_str());
 		ASSERT(m_empty_dep_count > 0);
 		--m_empty_dep_count;
 		++m_failed_dep_count;

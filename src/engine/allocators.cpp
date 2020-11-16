@@ -36,7 +36,6 @@ namespace Lumix
 		#ifdef _WIN32
 			unsigned long res;
 			return _BitScanReverse(&res, ((unsigned long)n - 1) >> 2) ? res : 0;
-			return u32(res);
 		#else
 			return 31 - __builtin_clz((n - 1) >> 2);
 		#endif
@@ -103,6 +102,10 @@ namespace Lumix
 	}
 
 	static void* allocSmall(DefaultAllocator& allocator, size_t n) {
+		if (!allocator.m_small_allocations) {
+			allocator.m_small_allocations = (u8*)OS::memReserve(PAGE_SIZE * MAX_PAGE_COUNT);
+		}
+
 		const u32 bin = sizeToBin(n);
 
 		MutexGuard guard(allocator.m_mutex);
@@ -139,11 +142,10 @@ namespace Lumix
 	}
 
 	static bool isSmallAlloc(DefaultAllocator& allocator, void* p) {
-		return p >= allocator.m_small_allocations && p < allocator.m_small_allocations + (PAGE_SIZE * MAX_PAGE_COUNT);
+		return allocator.m_small_allocations && p >= allocator.m_small_allocations && p < allocator.m_small_allocations + (PAGE_SIZE * MAX_PAGE_COUNT);
 	}
 
 	DefaultAllocator::DefaultAllocator() {
-		m_small_allocations = (u8*)OS::memReserve(PAGE_SIZE * MAX_PAGE_COUNT);
 		m_page_count = 0;
 		memset(m_free_lists, 0, sizeof(m_free_lists));
 	}

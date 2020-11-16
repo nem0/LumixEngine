@@ -97,7 +97,7 @@ inline bool pcall(lua_State* L, int nargs, int nres)
 	lua_pushcfunction(L, traceback);
 	lua_insert(L, -2 - nargs);
 	if (lua_pcall(L, nargs, nres, -2 - nargs) != 0) {
-		logError("Engine") << lua_tostring(L, -1);
+		logError(lua_tostring(L, -1));
 		lua_pop(L, 2);
 		return false;
 	}
@@ -113,13 +113,13 @@ inline bool execute(lua_State* L
 {
 	lua_pushcfunction(L, traceback);
 	if (luaL_loadbuffer(L, content.begin(), content.length(), name) != 0) {
-		logError("Engine") << name << ": " << lua_tostring(L, -1);
+		logError(name, ": ", lua_tostring(L, -1));
 		lua_pop(L, 2);
 		return false;
 	}
 
 	if (lua_pcall(L, 0, nresults, -2) != 0) {
-		logError("Engine") << lua_tostring(L, -1);
+		logError(lua_tostring(L, -1));
 		lua_pop(L, 2);
 		return false;
 	}
@@ -1102,7 +1102,7 @@ template <auto t> int wrapMethodClosure(lua_State* L)
 	int index = lua_upvalueindex(1);
 	if (!isType<C>(L, index))
 	{
-		logError("Lua") << "Invalid Lua closure";
+		logError("Invalid Lua closure");
 		ASSERT(false);
 		return 0;
 	}

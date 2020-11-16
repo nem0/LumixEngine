@@ -21,7 +21,7 @@ void ResourceManager::destroy()
 		Resource* resource = iter.value();
 		if (!resource->isEmpty())
 		{
-			logError("Engine") << "Leaking resource " << resource->getPath().c_str() << "\n";
+			logError("Leaking resource ", resource->getPath(), "\n");
 		}
 		destroyResource(*resource);
 	}

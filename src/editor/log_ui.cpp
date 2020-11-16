@@ -60,7 +60,7 @@ void LogUI::push(LogLevel level, const char* message)
 }
 
 
-void LogUI::onLog(LogLevel level, const char* system, const char* message)
+void LogUI::onLog(LogLevel level, const char* message)
 {
 	push(level, message);
 }

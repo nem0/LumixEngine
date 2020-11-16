@@ -93,7 +93,7 @@ struct LuaPlugin : StudioApp::GUIPlugin
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0; // [env]
 		if (errors)
 		{
-			logError("Editor") << filename << ": " << lua_tostring(L, -1);
+			logError(filename, ": ", lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
 
@@ -137,7 +137,7 @@ struct LuaPlugin : StudioApp::GUIPlugin
 		lua_getfield(L, -1, "onGUI"); // [env, onGUI]
 		if (lua_type(L, -1) == LUA_TFUNCTION) {
 			if (lua_pcall(L, 0, 0, 0) != 0) {
-				logError("Editor") << "LuaPlugin:" << lua_tostring(L, -1);
+				logError("LuaPlugin:", lua_tostring(L, -1));
 				lua_pop(L, 1);
 			}
 			lua_pop(L, 1);
@@ -191,7 +191,7 @@ struct StudioAppImpl final : StudioApp
 			cpus_count = workers;
 		}
 		if (!JobSystem::init(cpus_count, m_allocator)) {
-			logError("Engine") << "Failed to initialize job system.";
+			logError("Failed to initialize job system.");
 		}
 	}
 
@@ -355,7 +355,9 @@ struct StudioAppImpl final : StudioApp
 		char saved_data_dir[MAX_PATH_LENGTH] = {};
 		OS::InputFile cfg_file;
 		if (cfg_file.open(".lumixuser")) {
-			cfg_file.read(saved_data_dir, minimum(lengthOf(saved_data_dir), (int)cfg_file.size()));
+			if (!cfg_file.read(saved_data_dir, minimum(lengthOf(saved_data_dir), (int)cfg_file.size()))) {
+				logError("Failed to read .lumixuser");
+			}
 			cfg_file.close();
 		}
 
@@ -429,7 +431,7 @@ struct StudioAppImpl final : StudioApp
 
 		checkScriptCommandLine();
 
-		logInfo("Editor") << "Startup took " << init_timer.getTimeSinceStart() << " s"; 
+		logInfo("Startup took ", init_timer.getTimeSinceStart(), " s"); 
 	}
 
 
@@ -941,17 +943,17 @@ struct StudioAppImpl final : StudioApp
 					const StaticString<MAX_PATH_LENGTH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[MAX_PATH_LENGTH];
 					Path::getDir(Span(dir), path);
-					OS::makePath(dir);
+					if (!OS::makePath(dir)) logError("");
 					if (!OS::fileExists(path)) {
 						OS::OutputFile file;
 						if (file.open(path)) {
 							if (!file.write(ptr + 512, size)) {
-								logError("Editor") << "Failed to write " << path;
+								logError("Failed to write ", path);
 							}
 							file.close();
 						}
 						else {
-							logError("Editor") << "Failed to extract " << path;
+							logError("Failed to extract ", path);
 						}
 					}
 				}
@@ -1114,7 +1116,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		if (m_editor->isGameMode())
 		{
-			logError("Editor") << "Could not save while the game is running";
+			logError("Could not save while the game is running");
 			return;
 		}
 
@@ -1157,7 +1159,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		if (m_editor->isGameMode())
 		{
-			logError("Editor") << "Can not save while the game is running";
+			logError("Can not save while the game is running");
 			return;
 		}
 
@@ -2050,7 +2052,7 @@ struct StudioAppImpl final : StudioApp
 
 	void initIMGUI()
 	{
-		logInfo("Editor") << "Initializing imgui...";
+		logInfo("Initializing imgui...");
 		ImGuiIO& io = ImGui::GetIO();
 		io.IniFilename = nullptr;
 		#ifdef __linux__ 
@@ -2134,7 +2136,7 @@ struct StudioAppImpl final : StudioApp
 
 	void loadSettings()
 	{
-		logInfo("Editor") << "Loading settings...";
+		logInfo("Loading settings...");
 		char cmd_line[2048];
 		OS::getCommandLine(Span(cmd_line));
 
@@ -2246,7 +2248,7 @@ struct StudioAppImpl final : StudioApp
 		StaticString<MAX_PATH_LENGTH> copy_path;
 		Path::getDir(Span(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
-		OS::makePath(copy_path);
+		if (!OS::makePath(copy_path)) logError("Could not create ", copy_path);
 		Path::getBasename(Span(tmp_path), src);
 		copy_path << "/" << tmp_path << "." << getPluginExtension();
 #ifdef _WIN32
@@ -2304,7 +2306,7 @@ struct StudioAppImpl final : StudioApp
 
 			if (!loaded_plugin)
 			{
-				logError("Editor") << "Could not load plugin " << src << " requested by command line";
+				logError("Could not load plugin ", src, " requested by command line");
 			}
 			else if (is_full_path && !m_watched_plugin.watcher.get())
 			{
@@ -2387,7 +2389,7 @@ struct StudioAppImpl final : StudioApp
 		m_watched_plugin.plugin = plugin_manager.load(copy_path);
 		if (!m_watched_plugin.plugin)
 		{
-			logError("Editor") << "Failed to load plugin " << copy_path << ". Reload failed.";
+			logError("Failed to load plugin " << copy_path << ". Reload failed.");
 			return;
 		}
 
@@ -2414,7 +2416,7 @@ struct StudioAppImpl final : StudioApp
 		{
 			if (parser.currentEquals("-workers")) {
 				if(!parser.next()) {
-					logError("Studio") << "command line option '-workers` without value";
+					logError("command line option '-workers` without value");
 					return false;
 				}
 				char tmp[64];
@@ -2571,7 +2573,7 @@ struct StudioAppImpl final : StudioApp
 		errors = errors || lua_pcall(L, 0, 0, 0) != 0;
 		if (errors)
 		{
-			logError("Editor") << script_name << ": " << lua_tostring(L, -1);
+			logError(script_name, ": ", lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
 	}
@@ -2717,7 +2719,7 @@ struct StudioAppImpl final : StudioApp
 		void notSupported(const T& prop)
 		{
 			if (!equalStrings(property_name, prop.name)) return;
-			logError("Lua Script") << "Property " << prop.name << " has unsupported type";
+			logError("Property ", prop.name, " has unsupported type");
 		}
 
 
@@ -2877,15 +2879,19 @@ struct StudioAppImpl final : StudioApp
 				{
 					auto size = file.size();
 					auto* src = (char*)m_allocator.allocate(size + 1);
-					file.read(src, size);
-					src[size] = 0;
-					runScript((const char*)src, tmp);
-					m_allocator.deallocate(src);
+					if (file.read(src, size)) {
+						src[size] = 0;
+						runScript((const char*)src, tmp);
+						m_allocator.deallocate(src);
+					}
+					else {
+						logError("Could not read ", tmp);
+					}
 					file.close();
 				}
 				else
 				{
-					logError("Editor") << "Could not open " << tmp;
+					logError("Could not open ", tmp);
 				}
 				break;
 			}
@@ -3048,19 +3054,20 @@ struct StudioAppImpl final : StudioApp
 
 		if (infos.size() == 0)
 		{
-			logError("Editor") << "No files found while trying to create " << dest;
+			logError("No files found while trying to create ", dest);
 			return;
 		}
 
+		bool success;
 		OS::OutputFile file;
 		if (!file.open(dest))
 		{
-			logError("Editor") << "Could not create " << dest;
+			logError("Could not create ", dest);
 			return;
 		}
 
 		int count = infos.size();
-		file.write(&count, sizeof(count));
+		success = file.write(&count, sizeof(count));
 		u64 offset = sizeof(count) + (sizeof(u32) + sizeof(u64) * 2) * count;
 		for (auto& info : infos)
 		{
@@ -3070,9 +3077,9 @@ struct StudioAppImpl final : StudioApp
 
 		for (auto& info : infos)
 		{
-			file.write(&info.hash, sizeof(info.hash));
-			file.write(&info.offset, sizeof(info.offset));
-			file.write(&info.size, sizeof(info.size));
+			success = success || file.write(&info.hash, sizeof(info.hash));
+			success = success || file.write(&info.offset, sizeof(info.offset));
+			success = success || file.write(&info.size, sizeof(info.size));
 		}
 
 		for (auto& info : infos)
@@ -3082,7 +3089,7 @@ struct StudioAppImpl final : StudioApp
 			if (!m_engine->getFileSystem().open(info.path, Ref(src)))
 			{
 				file.close();
-				logError("Editor") << "Could not open " << info.path;
+				logError("Could not open ", info.path);
 				return;
 			}
 			u8 buf[4096];
@@ -3092,15 +3099,19 @@ struct StudioAppImpl final : StudioApp
 				if (!src.read(buf, batch_size))
 				{
 					file.close();
-					logError("Editor") << "Could not read " << info.path;
+					logError("Could not read ", info.path);
 					return;
 				}
-				file.write(buf, batch_size);
+				success = success || file.write(buf, batch_size);
 			}
 			src.close();
 		}
 
 		file.close();
+		if (!success) {
+			logError("Could not write ", dest);
+			return;
+		}
 
 		const char* bin_files[] = {"app.exe", "dbghelp.dll", "dbgcore.dll"};
 		StaticString<MAX_PATH_LENGTH> src_dir("bin/");
@@ -3116,7 +3127,7 @@ struct StudioAppImpl final : StudioApp
 			StaticString<MAX_PATH_LENGTH> src(src_dir, file);
 			if (!OS::copyFile(src, tmp))
 			{
-				logError("Editor") << "Failed to copy " << src << " to " << tmp;
+				logError("Failed to copy ", src, " to ", tmp);
 			}
 		}
 
@@ -3124,7 +3135,7 @@ struct StudioAppImpl final : StudioApp
 		{
 			if (!plugin->packData(m_pack.dest_dir))
 			{
-				logError("Editor") << "Plugin " << plugin->getName() << " failed to pack data.";
+				logError("Plugin ", plugin->getName(), " failed to pack data.");
 			}
 		}
 	}
@@ -3141,7 +3152,7 @@ struct StudioAppImpl final : StudioApp
 			addPlugin(*plugin);
 		}
 		else {
-			logWarning("Editor") << "Failed to load " << path;
+			logWarning("Failed to load ", path);
 		}
 	}
 

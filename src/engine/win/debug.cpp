@@ -211,8 +211,7 @@ StackNode* StackTree::record()
 	USHORT captured_frames_count = CaptureStackBackTrace(2, frames_to_capture, stack, 0);
 
 	void** ptr = stack + captured_frames_count - 1;
-	if (!m_root)
-	{
+	if (!m_root) {
 		m_root = LUMIX_NEW(stack_node_allocator, StackNode)();
 		m_root->m_instruction = *ptr;
 		m_root->m_first_child = nullptr;
@@ -819,7 +818,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 
 	StaticString<4096> message;
 	getStack(*info->ContextRecord, Span(message.data));
-	logError("Engine") << message;
+	logError(message);
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }

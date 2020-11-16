@@ -1370,7 +1370,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void createRigidActor(EntityRef entity)
 	{
 		if (m_actors.find(entity).isValid()) {
-			logError("Physics") << "Entity " << entity.index << " already has rigid actor";
+			logError("Entity ", entity.index, " already has rigid actor");
 			return;
 		}
 		RigidActor* actor = LUMIX_NEW(m_allocator, RigidActor)(*this, entity);
@@ -2204,7 +2204,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 		if (mask != 0b1111) {
-			logError("Physics") << "Vehicle " << entity.index << " does not have exactly one wheel in each slot.";
+			logError("Vehicle ", entity.index, " does not have exactly one wheel in each slot.");
 			return nullptr;
 		}
 
@@ -2428,7 +2428,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 			PxVehicleWheelsSimData* wheel_sim_data = setupWheelsSimulationData(entity);
 			if (!wheel_sim_data) {
-				logError("Physics") << "Failed to init vehicle " << entity.index;
+				logError("Failed to init vehicle ", entity.index);
 				continue;
 			}
 
@@ -2775,7 +2775,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 		else {
-			logError("Physics") << "Unsupported physics heightmap format " << terrain.m_heightmap->getPath();
+			logError("Unsupported physics heightmap format ", terrain.m_heightmap->getPath());
 			return;
 		}
 
@@ -2828,7 +2828,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 			else
 			{
-				logError("Physics") << "Could not create PhysX heightfield " << terrain.m_heightmap->getPath();
+				logError("Could not create PhysX heightfield ", terrain.m_heightmap->getPath());
 			}
 		}
 	}
@@ -4000,7 +4000,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		auto* actor = m_actors[entity];
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			logWarning("Physics") << "Trying to get speed of static object";
+			logWarning("Trying to get speed of static object");
 			return Vec3::ZERO;
 		}
 
@@ -4015,7 +4015,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		auto* actor = m_actors[entity];
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			logWarning("Physics") << "Trying to get speed of static object";
+			logWarning("Trying to get speed of static object");
 			return 0;
 		}
 
@@ -4033,7 +4033,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			logWarning("Physics") << "Trying to put static object to sleep";
+			logWarning("Trying to put static object to sleep");
 			return;
 		}
 
@@ -4051,7 +4051,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			logWarning("Physics") << "Trying to apply force to static object #" << entity.index;
+			logWarning("Trying to apply force to static object #", entity.index);
 			return;
 		}
 
@@ -4069,7 +4069,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		if (actor->dynamic_type != DynamicType::DYNAMIC)
 		{
-			logWarning("Physics") << "Trying to apply force to static object #" << entity.index;
+			logWarning("Trying to apply force to static object #", entity.index);
 			return;
 		}
 

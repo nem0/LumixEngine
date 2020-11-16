@@ -349,7 +349,7 @@ bool Model::parseBones(InputMemoryStream& file)
 	file.read(bone_count);
 	if (bone_count < 0) return false;
 	if (bone_count > Bone::MAX_COUNT) {
-		logWarning("Renderer") << "Model " << getPath().c_str() << " has too many bones.";
+		logWarning("Model ", getPath().c_str(), " has too many bones.");
 		return false;
 	}
 
@@ -376,14 +376,14 @@ bool Model::parseBones(InputMemoryStream& file)
 		Model::Bone& b = m_bones[i];
 		if (b.parent_idx < 0) {
 			if (m_first_nonroot_bone_index != -1) {
-				logError("Renderer") << "Invalid skeleton in " << getPath().c_str();
+				logError("Invalid skeleton in ", getPath());
 				return false;
 			}
 			b.parent_idx = -1;
 		}
 		else {
 			if (b.parent_idx > i) {
-				logError("Renderer") << "Invalid skeleton in " << getPath().c_str();
+				logError("Invalid skeleton in ", getPath());
 				return false;
 			}
 			if (m_first_nonroot_bone_index == -1) m_first_nonroot_bone_index = i;
@@ -559,13 +559,13 @@ bool Model::load(u64 size, const u8* mem)
 
 	if (header.magic != FILE_MAGIC)
 	{
-		logWarning("Renderer") << "Corrupted model " << getPath().c_str();
+		logWarning("Corrupted model ", getPath());
 		return false;
 	}
 
 	if(header.version > (u32)FileVersion::LATEST)
 	{
-		logWarning("Renderer") << "Unsupported version of model " << getPath().c_str();
+		logWarning("Unsupported version of model ", getPath());
 		return false;
 	}
 
@@ -577,7 +577,7 @@ bool Model::load(u64 size, const u8* mem)
 		return true;
 	}
 
-	logError("Renderer") << "Error loading model " << getPath().c_str();
+	logError("Error loading model ", getPath());
 	return false;
 }
 

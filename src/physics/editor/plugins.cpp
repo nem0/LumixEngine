@@ -347,7 +347,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
 			if (!OS::copyFile(tmp, dest))
 			{
-				logError("Physics") << "Failed to copy " << tmp << " to " << dest;
+				logError("Failed to copy ", tmp, " to ", dest);
 				return false;
 			}
 		}

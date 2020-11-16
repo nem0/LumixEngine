@@ -85,12 +85,12 @@ public:
 		init_win_args.name = init_data.window_title;
 		m_window_handle = OS::createWindow(init_win_args);
 		if (m_window_handle == OS::INVALID_WINDOW) {
-			logError("Engine") << "Failed to create main window.";
+			logError("Failed to create main window.");
 		}
 
 		m_is_log_file_open = m_log_file.open("lumix.log");
 		
-		logInfo("Core") << "Creating engine...";
+		logInfo("Creating engine...");
 		Profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
@@ -121,13 +121,13 @@ public:
 		m_plugin_manager = PluginManager::create(*this);
 		m_input_system = InputSystem::create(*this);
 
-		logInfo("Core") << "Engine created.";
+		logInfo("Engine created.");
 
 		StaticPluginRegister::createAll(*this);
 		
 		for (auto* plugin_name : init_data.plugins) {
 			if (plugin_name[0] && !m_plugin_manager->load(plugin_name)) {
-				logInfo("Editor") << plugin_name << " plugin has not been loaded";
+				logInfo(plugin_name, " plugin has not been loaded");
 			}
 		}
 
@@ -154,25 +154,25 @@ public:
 		OS::destroyWindow(m_window_handle);
 	}
 
-	static void logToDebugOutput(LogLevel level, const char* system, const char* message)
+	static void logToDebugOutput(LogLevel level, const char* message)
 	{
 		if(level == LogLevel::ERROR) {
 			Debug::debugOutput("Error: ");
 		}
-		Debug::debugOutput(system);
-		Debug::debugOutput(":: ");
 		Debug::debugOutput(message);
 		Debug::debugOutput("\n");
 	}
 
-	void logToFile(LogLevel level, const char*, const char* message)
+	void logToFile(LogLevel level, const char* message)
 	{
 		if (!m_is_log_file_open) return;
+		bool success = true;
 		if (level == LogLevel::ERROR) {
-			m_log_file.write("Error: ", stringLength("Error :"));
+			success = m_log_file.write("Error: ", stringLength("Error :"));
 		}
-		m_log_file.write(message, stringLength(message));
-		m_log_file.write("\n", 1);
+		success = m_log_file.write(message, stringLength(message)) || success ;
+		success = m_log_file.write("\n", 1) || success ;
+		ASSERT(success);
 		m_log_file.flush();
 	}
 
@@ -190,7 +190,7 @@ public:
 		ASSERT(prefab.isReady());
 		InputMemoryStream blob(prefab.data);
 		if (!deserialize(universe, blob, entity_map)) {
-			logError("Engine") << "Failed to instantiate prefab " << prefab.getPath();
+			logError("Failed to instantiate prefab ", prefab.getPath());
 			return false;
 		}
 
@@ -362,7 +362,7 @@ public:
 			serializer.read(version);
 			if (version != scene->getVersion())
 			{
-				logError("Core") << "Plugin " << scene->getPlugin().getName() << " has incompatible version";
+				logError("Plugin ", scene->getPlugin().getName(), " has incompatible version");
 				return false;
 			}
 		}
@@ -379,7 +379,7 @@ public:
 			const char* tmp = serializer.readString();
 			if (!m_plugin_manager->getPlugin(tmp))
 			{
-				logError("Core") << "Missing plugin " << tmp;
+				logError("Missing plugin ", tmp);
 				return false;
 			}
 		}
@@ -452,7 +452,7 @@ public:
 		serializer.read(header);
 		if (header.magic != SERIALIZED_ENGINE_MAGIC)
 		{
-			logError("Core") << "Wrong or corrupted file";
+			logError("Wrong or corrupted file");
 			return false;
 		}
 		if (!hasSerializedPlugins(serializer)) return false;

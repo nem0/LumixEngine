@@ -744,7 +744,7 @@ struct GUISceneImpl final : GUIScene
 						}
 						else
 						{
-							logError("GUI") << "Too many buttons pressed at once";
+							logError("Too many buttons pressed at once");
 						}
 					}
 				}

@@ -5,7 +5,6 @@
 
 namespace Lumix {
 
-// TODO move to separate file so we dont have to include sync.h here
 struct LUMIX_ENGINE_API DefaultAllocator final : IAllocator {
 	struct Page;
 

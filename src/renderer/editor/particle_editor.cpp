@@ -701,11 +701,11 @@ struct ParticleEditorResource {
 		Header header;
 		blob.read(header);
 		if (header.magic != Header::MAGIC) {
-			logError("Renderer") << "Invalid file " << path;
+			logError("Invalid file ", path);
 			return false;
 		}
 		if (header.version != 0) {
-			logError("Renderer") << "Invalid file version " << path;
+			logError("Invalid file version ", path);
 			return false;
 		}
 
@@ -1144,7 +1144,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			OutputMemoryStream blob(m_allocator);
 			blob.resize(size);
 			if (!file.read(blob.getMutableData(), blob.size())) {
-				logError("Renderer") << "Failed to read " << path;
+				logError("Failed to read ", path);
 				file.close();
 				return;
 			}
@@ -1158,7 +1158,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			pushUndo();
 		}
 		else {
-			logError("Renderer") << "Failed to open " << path;
+			logError("Failed to open ", path);
 		}
 	}
 
@@ -1176,7 +1176,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 		OS::OutputFile file;
 		if (file.open(path)) {
 			if (!file.write(blob.data(), blob.size())) {
-				logError("Renderer") << "Failed to write " << path;
+				logError("Failed to write ", path);
 			}
 			else {
 				m_path = path;
@@ -1184,7 +1184,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 			file.close();
 		}
 		else {
-			logError("Renderer") << "Failed to open " << path;
+			logError("Failed to open ", path);
 		}
 	}
 

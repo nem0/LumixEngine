@@ -123,17 +123,17 @@ public:
 	InputFile();
 	~InputFile();
 
-	bool open(const char* path);
+	[[nodiscard]] bool open(const char* path);
 	void close();
 	
 	using IInputStream::read;
-	bool read(void* data, u64 size) override;
+	[[nodiscard]] bool read(void* data, u64 size) override;
 	const void* getBuffer() const override { return nullptr; }
 
 	u64 size() const override;
 	u64 pos();
 
-	bool seek(u64 pos);
+	[[nodiscard]] bool seek(u64 pos);
 	
 private:
 	void* m_handle;
@@ -146,20 +146,13 @@ public:
 	OutputFile();
 	~OutputFile();
 
-	bool open(const char* path);
+	[[nodiscard]] bool open(const char* path);
 	void close();
 	void flush();
     bool isError() const { return m_is_error; }
 
 	using IOutputStream::write;
-	bool write(const void* data, u64 size) override;
-
-	OutputFile& operator <<(const char* text);
-	OutputFile& operator <<(char c) { write(&c, sizeof(c)); return *this; }
-	OutputFile& operator <<(i32 value);
-	OutputFile& operator <<(u32 value);
-	OutputFile& operator <<(u64 value);
-	OutputFile& operator <<(float value);
+	[[nodiscard]] bool write(const void* data, u64 size) override;
 
 private:
 	void* m_handle;
@@ -196,20 +189,20 @@ LUMIX_ENGINE_API bool getNextFile(FileIterator* iterator, FileInfo* info);
 
 LUMIX_ENGINE_API void setCurrentDirectory(const char* path);
 LUMIX_ENGINE_API void getCurrentDirectory(Span<char> path);
-LUMIX_ENGINE_API bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
-LUMIX_ENGINE_API bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
-LUMIX_ENGINE_API bool getOpenDirectory(Span<char> out, const char* starting_dir);
+LUMIX_ENGINE_API [[nodiscard]] bool getOpenFilename(Span<char> out, const char* filter, const char* starting_file);
+LUMIX_ENGINE_API [[nodiscard]] bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension);
+LUMIX_ENGINE_API [[nodiscard]] bool getOpenDirectory(Span<char> out, const char* starting_dir);
 LUMIX_ENGINE_API ExecuteOpenResult shellExecuteOpen(const char* path);
 LUMIX_ENGINE_API ExecuteOpenResult openExplorer(const char* path);
 LUMIX_ENGINE_API void copyToClipboard(const char* text);
 
 LUMIX_ENGINE_API bool deleteFile(const char* path);
-LUMIX_ENGINE_API bool moveFile(const char* from, const char* to);
+LUMIX_ENGINE_API [[nodiscard]] bool moveFile(const char* from, const char* to);
 LUMIX_ENGINE_API size_t getFileSize(const char* path);
 LUMIX_ENGINE_API bool fileExists(const char* path);
 LUMIX_ENGINE_API bool dirExists(const char* path);
 LUMIX_ENGINE_API u64 getLastModified(const char* file);
-LUMIX_ENGINE_API bool makePath(const char* path);
+LUMIX_ENGINE_API [[nodiscard]] bool makePath(const char* path);
 
 LUMIX_ENGINE_API void setCursor(CursorType type);
 LUMIX_ENGINE_API void clipCursor(int screen_x, int screen_y, int w, int h);
@@ -243,7 +236,7 @@ LUMIX_ENGINE_API bool isKeyDown(Keycode keycode);
 LUMIX_ENGINE_API void getKeyName(Keycode keycode, Span<char> out);
 LUMIX_ENGINE_API int getDPI();
 
-LUMIX_ENGINE_API bool copyFile(const char* from, const char* to);
+LUMIX_ENGINE_API [[nodiscard]] bool copyFile(const char* from, const char* to);
 LUMIX_ENGINE_API void getExecutablePath(Span<char> path);
 LUMIX_ENGINE_API void messageBox(const char* text);
 LUMIX_ENGINE_API void setCommandLine(int, char**);

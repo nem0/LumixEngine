@@ -59,10 +59,8 @@ void Texture::setFlag(Flags flag, bool value)
 
 void Texture::setFlags(u32 flags)
 {
-	if (isReady() && this->flags != flags)
-	{
-		logWarning("Renderer") << "Trying to set different flags for texture " << getPath().c_str()
-									  << ". They are ignored.";
+	if (isReady() && this->flags != flags) {
+		logWarning("Trying to set different flags for texture ", getPath().c_str(), ". They are ignored.");
 		return;
 	}
 	this->flags = flags;
@@ -147,7 +145,7 @@ bool Texture::saveTGA(IOutputStream* file,
 {
 	if (format != gpu::TextureFormat::RGBA8)
 	{
-		logError("Renderer") << "Texture " << path.c_str() << " could not be saved, unsupported TGA format";
+		logError("Texture ", path, " could not be saved, unsupported TGA format");
 		return false;
 	}
 
@@ -188,15 +186,14 @@ static void saveTGA(Texture& texture)
 {
 	if (texture.data.empty())
 	{
-		logError("Renderer") << "Texture " << texture.getPath().c_str()
-									<< " could not be saved, no data was loaded";
+		logError("Texture ", texture.getPath(), " could not be saved, no data was loaded");
 		return;
 	}
 
 	OS::OutputFile file;
 	FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
 	if (!fs.open(texture.getPath().c_str(), Ref(file))) {
-		logError("Renderer") << "Failed to create file " << texture.getPath();
+		logError("Failed to create file ", texture.getPath());
 		return;
 	}
 
@@ -223,7 +220,7 @@ void Texture::save()
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		OS::OutputFile file;
 		if (!fs.open(getPath().c_str(), Ref(file))) {
-			logError("Renderer") << "Failed to create file " << getPath();
+			logError("Failed to create file ", getPath());
 			return;
 		}
 
@@ -235,8 +232,11 @@ void Texture::save()
 		header.height = height;
 		header.depth = depth;
 
-		file.write(&header, sizeof(header));
-		file.write(data.data(), data.size());
+		bool success = file.write(&header, sizeof(header));
+		success = success || file.write(data.data(), data.size());
+		if (!success) {
+			logError("Failed to write ", getPath());
+		}
 		file.close();
 	}
 	else if (equalStrings(ext, "tga") && format == gpu::TextureFormat::RGBA8)
@@ -245,7 +245,7 @@ void Texture::save()
 	}
 	else
 	{
-		logError("Renderer") << "Texture " << getPath().c_str() << " can not be saved - unsupported format";
+		logError("Texture ", getPath(), " can not be saved - unsupported format");
 	}
 }
 
@@ -276,11 +276,11 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 	RawTextureHeader header;
 	file.read(&header, sizeof(header));
 	if (header.magic != RawTextureHeader::MAGIC) {
-		logError("Renderer") << texture.getPath() << ": corruptede file or not raw texture format.";
+		logError(texture.getPath(), ": corruptede file or not raw texture format.");
 		return false;
 	}
 	if (header.version > RawTextureHeader::LAST_VERSION) {
-		logError("Renderer") << texture.getPath() << ": unsupported version.";
+		logError(texture.getPath(), ": unsupported version.");
 		return false;
 	}
 
@@ -368,7 +368,7 @@ bool Texture::loadTGA(IInputStream& file)
 		int w, h, cmp;
 		stbi_uc* stb_data = stbi_load_from_memory(static_cast<const stbi_uc*>(file.getBuffer()) + 7, (int)file.size() - 7, &w, &h, &cmp, 4);
 		if (!stb_data) {
-			logError("Renderer") << "Unsupported texture format " << getPath().c_str();
+			logError("Unsupported texture format ", getPath());
 			return false;
 		}
 		Renderer::MemRef mem;
@@ -400,7 +400,7 @@ bool Texture::loadTGA(IInputStream& file)
 
 	if (header.bitsPerPixel < 24)
 	{
-		logError("Renderer") << "Unsupported color mode " << getPath().c_str();
+		logError("Unsupported color mode ", getPath());
 		return false;
 	}
 
@@ -538,7 +538,7 @@ void Texture::removeDataReference()
 static bool loadDDS(Texture& texture, IInputStream& file)
 {
 	if(texture.data_reference > 0) {
-		logError("Renderer") << "Unsupported texture format " << texture.getPath() << " to access on CPU. Convert to TGA or RAW.";
+		logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Convert to TGA or RAW.");
 		return false;
 	}
 
@@ -601,7 +601,7 @@ bool Texture::load(u64 size, const u8* mem)
 		loaded = loadTGA(file);
 	}
 	if (!loaded) {
-		logWarning("Renderer") << "Error loading texture " << getPath();
+		logWarning("Error loading texture ", getPath());
 		return false;
 	}
 

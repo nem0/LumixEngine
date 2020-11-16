@@ -394,7 +394,7 @@ namespace Lumix
 					}
 					else {
 						if (lua_pcall(m_state, 0, 0, 0) != 0) { // [env]
-							logError("Lua Script") << lua_tostring(m_state, -1);
+							logError(lua_tostring(m_state, -1));
 							lua_pop(m_state, 1);
 						}
 						lua_pop(m_state, 1); // []
@@ -450,8 +450,8 @@ namespace Lumix
 				IAllocator& allocator = m_scene.m_system.m_allocator;
 				u32 valid_properties[256];
 				if (inst.m_properties.size() >= sizeof(valid_properties) * 8) {
-					logError("Lua Script") << "Too many properties in " << inst.m_script->getPath() << ", entity " << m_entity.index
-						<< ". Some will be ignored.";
+					logError("Too many properties in ", inst.m_script->getPath(), ", entity ", m_entity.index
+						, ". Some will be ignored.");
 					inst.m_properties.shrink(sizeof(valid_properties) * 8);
 				}
 				memset(valid_properties, 0, (inst.m_properties.size() + 7) / 8);
@@ -496,8 +496,8 @@ namespace Lumix
 										prop.name_hash = hash;
 									}
 									else {
-										logError("Lua Script") << "Too many properties in " << inst.m_script->getPath() << ", entity " << m_entity.index
-											<< ". Some will be ignored.";
+										logError("Too many properties in ", inst.m_script->getPath(), ", entity ", m_entity.index
+											, ". Some will be ignored.");
 									}
 								}
 							}
@@ -1321,7 +1321,7 @@ namespace Lumix
 			bool errors = luaL_loadbuffer(state, tmp, stringLength(tmp), nullptr) != 0;
 			if (errors)
 			{
-				logError("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
+				logError(script.m_script->getPath(), ": ", lua_tostring(state, -1));
 				lua_pop(state, 1);
 				return;
 			}
@@ -1334,7 +1334,7 @@ namespace Lumix
 
 			if (errors)
 			{
-				logError("Lua Script") << script.m_script->getPath() << ": " << lua_tostring(state, -1);
+				logError(script.m_script->getPath(), ": ", lua_tostring(state, -1));
 				lua_pop(state, 1);
 			}
 		}
@@ -1495,7 +1495,7 @@ namespace Lumix
 
 				if (lua_pcall(instance.m_state, 0, 0, 0) != 0)
 				{
-					logError("Lua Script") << lua_tostring(instance.m_state, -1);
+					logError(lua_tostring(instance.m_state, -1));
 					lua_pop(instance.m_state, 1);
 				}
 			}
@@ -1841,14 +1841,14 @@ namespace Lumix
 
 					if (lua_pcall(timer.state, 0, 0, 0) != 0)
 					{
-						logError("Lua Script") << lua_tostring(timer.state, -1);
+						logError(lua_tostring(timer.state, -1));
 						lua_pop(timer.state, 1);
 					}
 					timers_to_remove[timers_to_remove_count] = i;
 					++timers_to_remove_count;
 					if (timers_to_remove_count >= lengthOf(timers_to_remove))
 					{
-						logError("Lua Script") << "Too many lua timers in one frame, some are not executed";
+						logError("Too many lua timers in one frame, some are not executed");
 						break;
 					}
 				}
@@ -1929,7 +1929,7 @@ namespace Lumix
 			
 			if (lua_pcall(L, 1, 0, 0) != 0)// [lua_event, environment]
 			{
-				logError("Lua Script") << lua_tostring(L, -1);
+				logError(lua_tostring(L, -1));
 				lua_pop(L, 1); // []
 			}
 			lua_pop(L, 2); // []
@@ -2008,7 +2008,7 @@ namespace Lumix
 					if (size + 1 > sizeof(tmp))
 					{
 						blob.skip(size);
-						logError("Lua Script") << "Skipping lua_call animation event because it is too big.";
+						logError("Skipping lua_call animation event because it is too big.");
 					}
 					else
 					{
@@ -2217,7 +2217,7 @@ namespace Lumix
 			m_script->getPath().c_str()) != 0; // [env, func]
 
 		if (errors) {
-			logError("Lua Script") << m_script->getPath() << ": " << lua_tostring(m_state, -1);
+			logError(m_script->getPath(), ": ", lua_tostring(m_state, -1));
 			lua_pop(m_state, 2);
 			return;
 		}
@@ -2228,7 +2228,7 @@ namespace Lumix
 		scene.m_current_script_instance = this;
 		errors = lua_pcall(m_state, 0, 0, 0) != 0; // [env]
 		if (errors)	{
-			logError("Lua Script") << m_script->getPath() << ": " << lua_tostring(m_state, -1);
+			logError(m_script->getPath(), ": ", lua_tostring(m_state, -1));
 			lua_pop(m_state, 1);
 		}
 		lua_pop(m_state, 1); // []
@@ -2247,7 +2247,7 @@ namespace Lumix
 		}
 		else {
 			if (lua_pcall(m_state, 0, 0, 0) != 0) { // [env] | [env, error]
-				logError("Lua Script") << lua_tostring(m_state, -1);
+				logError(lua_tostring(m_state, -1));
 				lua_pop(m_state, 1); // [env]
 			}
 			lua_pop(m_state, 1); // []

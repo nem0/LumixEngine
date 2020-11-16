@@ -132,7 +132,7 @@ bool FontManager::build()
 		FT_Face face;
 		error = FT_New_Memory_Face(ft_library, font->resource->file_data.data(), (u32)font->resource->file_data.size(), 0, &face);
 		if (error != 0) {
-			logError("Renderer") << "Failed to create font " << font->resource->getPath();
+			logError("Failed to create font ", font->resource->getPath());
 			continue;
 		}
 	
@@ -144,13 +144,13 @@ bool FontManager::build()
 		size_req.vertResolution = 0;
 		error = FT_Request_Size(face, &size_req);
 		if (error != 0) {
-			logError("Renderer") << "Failed to request font size " << font->font_size << " for " << font->resource->getPath();
+			logError("Failed to request font size ", font->font_size, " for ", font->resource->getPath());
 			continue;
 		}
 
 		error = FT_Select_Charmap(face, FT_ENCODING_UNICODE);
 		if (error != 0) {
-			logError("Renderer") << "Failed to select unicode charmap of font " << font->resource->getPath();
+			logError("Failed to select unicode charmap of font ", font->resource->getPath());
 			continue;
 		}
 		
