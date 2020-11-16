@@ -314,6 +314,26 @@ struct PipelinePlugin final : AssetCompiler::IPlugin
 	StudioApp& m_app;
 };
 
+struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
+{
+	ParticleEmitterPropertyPlugin(StudioApp& app) : m_app(app) {}
+
+	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
+		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
+
+		if (m_playing && ImGui::Button("Stop")) m_playing = false;
+		else if (!m_playing && ImGui::Button("Play")) m_playing = true;
+
+		if (m_playing) {
+			RenderScene* scene = (RenderScene*)cmp.scene;
+			float dt = m_app.getEngine().getLastTimeDelta();
+			scene->updateParticleEmitter((EntityRef)cmp.entity, dt);
+		}
+	}
+
+	StudioApp& m_app;
+	bool m_playing = false;
+};
 
 struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
@@ -3760,6 +3780,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		, m_font_plugin(app)
 		, m_material_plugin(app)
 		, m_particle_emitter_plugin(app)
+		, m_particle_emitter_property_plugin(app)
 		, m_shader_plugin(app)
 		, m_model_properties_plugin(app)
 		, m_texture_plugin(app)
@@ -3835,6 +3856,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.addPlugin(m_model_properties_plugin);
 		property_grid.addPlugin(m_env_probe_plugin);
 		property_grid.addPlugin(m_terrain_plugin);
+		property_grid.addPlugin(m_particle_emitter_property_plugin);
 
 		m_scene_view.init();
 		m_game_view.init();
@@ -4046,6 +4068,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		property_grid.removePlugin(m_model_properties_plugin);
 		property_grid.removePlugin(m_env_probe_plugin);
 		property_grid.removePlugin(m_terrain_plugin);
+		property_grid.removePlugin(m_particle_emitter_property_plugin);
 	}
 
 	StudioApp& m_app;
@@ -4053,6 +4076,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
 	ParticleEmitterPlugin m_particle_emitter_plugin;
+	ParticleEmitterPropertyPlugin m_particle_emitter_property_plugin;
 	PipelinePlugin m_pipeline_plugin;
 	FontPlugin m_font_plugin;
 	ShaderPlugin m_shader_plugin;
