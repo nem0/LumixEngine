@@ -1,13 +1,30 @@
 include "pipelines/common.glsl"
 
+texture_slot {
+	name = "Texture",
+	default_texture = "textures/common/white.tga"
+}
+
 vertex_shader [[
 	layout(std140, binding = 4) uniform Model {
 		mat4 u_model;
 	};
 	layout(location = 0) in vec3 i_position;
+	layout(location = 1) in float i_scale;
+	layout(location = 2) in vec4 i_color;
+	layout(location = 3) in float i_rot;
+	layout(location = 0) out vec2 v_uv;
+	layout(location = 1) out vec4 v_color;
 
 	void main() {
-		vec2 pos = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5) * 0.05;
+		vec2 pos = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
+		v_uv = pos;
+		float c = cos(i_rot);
+		float s = sin(i_rot);
+		mat2 rotm = mat2(c, s, -s, c);
+		pos = pos * rotm;
+		pos = pos * 2 * i_scale - i_scale;
+		v_color = i_color;
 		gl_Position = Global.projection * Global.view * u_model * vec4(i_position.xy + pos, i_position.z,  1);
 	}
 ]]
@@ -16,9 +33,13 @@ vertex_shader [[
 
 fragment_shader [[
 	
+	layout(location = 0) in vec2 v_uv;
+	layout(location = 1) in vec4 v_color;
 	layout(location = 0) out vec4 o_color;
+	layout (binding=0) uniform sampler2D u_texture;
 	
 	void main() {
-		o_color = vec4(1, 0, 0, 1);
+		vec4 c = texture(u_texture, v_uv) * saturate(v_color);
+		o_color = c;
 	}
 ]]

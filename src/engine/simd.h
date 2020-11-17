@@ -36,6 +36,28 @@ namespace Lumix
 		return _mm_set_ps1(value);
 	}
 
+	LUMIX_FORCE_INLINE float f4GetX(float4 v)
+	{
+		return _mm_cvtss_f32(v);
+	}
+
+	LUMIX_FORCE_INLINE float f4GetY(float4 v)
+	{
+		float4 r = _mm_shuffle_ps(v, v, _MM_SHUFFLE(0, 0, 0, 1));
+		return _mm_cvtss_f32(r);
+	}
+
+	LUMIX_FORCE_INLINE float f4GetZ(float4 v)
+	{
+		float4 r = _mm_shuffle_ps(v, v, _MM_SHUFFLE(0, 0, 0, 2));
+		return _mm_cvtss_f32(r);
+	}
+
+	LUMIX_FORCE_INLINE float f4GetW(float4 v)
+	{
+		float4 r = _mm_shuffle_ps(v, v, _MM_SHUFFLE(0, 0, 0, 3));
+		return _mm_cvtss_f32(r);
+	}
 
 	LUMIX_FORCE_INLINE void f4Store(void* dest, float4 src)
 	{
@@ -128,6 +150,30 @@ namespace Lumix
 	LUMIX_FORCE_INLINE float4 f4Splat(float value)
 	{
 		return {value, value, value, value};
+	}
+
+
+	LUMIX_FORCE_INLINE float f4GetX(float4 v)
+	{
+		return v.x;
+	}
+
+
+	LUMIX_FORCE_INLINE float f4GetY(float4 v)
+	{
+		return v.y;
+	}
+
+
+	LUMIX_FORCE_INLINE float f4GetZ(float4 v)
+	{
+		return v.z;
+	}
+
+
+	LUMIX_FORCE_INLINE float f4GetW(float4 v)
+	{
+		return v.w;
 	}
 
 
