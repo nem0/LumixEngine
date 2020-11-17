@@ -325,14 +325,16 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 		else if (!m_playing && ImGui::Button("Play")) m_playing = true;
 
 		if (m_playing) {
+			ImGui::SliderFloat("Time scale", &m_time_scale, 0, 1);
 			RenderScene* scene = (RenderScene*)cmp.scene;
-			float dt = m_app.getEngine().getLastTimeDelta();
+			float dt = m_app.getEngine().getLastTimeDelta() * m_time_scale;
 			scene->updateParticleEmitter((EntityRef)cmp.entity, dt);
 		}
 	}
 
 	StudioApp& m_app;
 	bool m_playing = false;
+	float m_time_scale = 1.f;
 };
 
 struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
