@@ -918,7 +918,13 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 		if (ImGui::CollapsingHeader("Streams", ImGuiTreeNodeFlags_DefaultOpen)) {
 			for (ParticleEditorResource::Stream& s : m_resource->m_streams) {
 				ImGui::PushID(&s);
-				ImGui::SetNextItemWidth(-1);
+				if (ImGui::Button(ICON_FA_TRASH)) {
+					m_resource->m_streams.erase(u32(&s - m_resource->m_streams.begin()));
+					ImGui::PopID();
+					pushUndo();
+					break;
+				}
+				ImGui::SameLine();				ImGui::SetNextItemWidth(-1);
 				ImGui::InputText("##v", s.name.data, sizeof(s.name.data));
 				ImGui::PopID();
 			}
@@ -926,9 +932,34 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 				m_resource->m_streams.emplace();
 			}
 		}
+		if (ImGui::CollapsingHeader("Outputs", ImGuiTreeNodeFlags_DefaultOpen)) {
+			for (ParticleEditorResource::Output& s : m_resource->m_outputs) {
+				ImGui::PushID(&s);
+				if (ImGui::Button(ICON_FA_TRASH)) {
+					m_resource->m_outputs.erase(u32(&s - m_resource->m_outputs.begin()));
+					ImGui::PopID();
+					pushUndo();
+					break;
+				}
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(-1);
+				ImGui::InputText("##o", s.name.data, sizeof(s.name.data));
+				ImGui::PopID();
+			}
+			if (ImGui::Button("Add##add_output")) {
+				m_resource->m_outputs.emplace();
+			}
+		}
 		if (ImGui::CollapsingHeader("Constants", ImGuiTreeNodeFlags_DefaultOpen)) {
 			for (ParticleEditorResource::Constant& s : m_resource->m_consts) {
 				ImGui::PushID(&s);
+				if (ImGui::Button(ICON_FA_TRASH)) {
+					m_resource->m_consts.erase(u32(&s - m_resource->m_consts.begin()));
+					ImGui::PopID();
+					pushUndo();
+					break;
+				}
+				ImGui::SameLine();
 				ImGui::SetNextItemWidth(-1);
 				ImGui::InputText("##v", s.name.data, sizeof(s.name.data));
 				ImGui::PopID();
