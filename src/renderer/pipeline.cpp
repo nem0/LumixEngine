@@ -1622,6 +1622,7 @@ struct PipelineImpl final : Pipeline
 					dc.pos = lpos;
 					dc.rot = tr.rot;
 					dc.program = material->getShader()->getProgram(decl, 0);
+					dc.material = material->getRenderData();
 					dc.size = size;
 					dc.instances_count = emitter->getInstancesCount();
 					dc.slice = m_pipeline->m_renderer.allocTransient(emitter->getInstanceDataSizeBytes());
@@ -1640,6 +1641,7 @@ struct PipelineImpl final : Pipeline
 				for (const Drawcall& dc : m_drawcalls) {
 					Matrix mtx = dc.rot.toMatrix();
 					mtx.setTranslation(dc.pos);
+					gpu::bindTextures(dc.material->textures, 0, dc.material->textures_count);
 					gpu::update(m_pipeline->m_drawcall_ub, &mtx.columns[0].x, sizeof(mtx));
 					gpu::useProgram(dc.program);
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -1654,6 +1656,7 @@ struct PipelineImpl final : Pipeline
 				Vec3 pos;
 				Quat rot;
 				gpu::ProgramHandle program;
+				Material::RenderData* material;
 				int size;
 				int instances_count;
 				Renderer::TransientSlice slice; 
