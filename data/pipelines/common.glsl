@@ -105,6 +105,7 @@ layout (std140, binding = 1) uniform PassState {
 	mat4 view_projection;
 	mat4 inv_view_projection;
 	vec4 view_dir;
+	vec4 camera_up;
 	vec4 camera_planes[6];
 } Pass;
  

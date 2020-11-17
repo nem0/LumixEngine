@@ -32,6 +32,7 @@ struct PassState
 	Matrix view_projection;
 	Matrix inv_view_projection;
 	Vec4 view_dir;
+	Vec4 camera_up;
 	Vec4 camera_planes[6];
 };
 
