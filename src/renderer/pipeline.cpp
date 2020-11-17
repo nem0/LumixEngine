@@ -1608,6 +1608,7 @@ struct PipelineImpl final : Pipeline
 				decl.addAttribute(1, 12, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// scale
 				decl.addAttribute(2, 16, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);	// color
 				decl.addAttribute(3, 32, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // rot
+				decl.addAttribute(4, 36, 1, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);  // frame
 
 				for (ParticleEmitter* emitter : emitters) {
 					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
@@ -1649,7 +1650,7 @@ struct PipelineImpl final : Pipeline
 					gpu::useProgram(dc.program);
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
-					gpu::bindVertexBuffer(1, dc.slice.buffer, dc.slice.offset, 36);
+					gpu::bindVertexBuffer(1, dc.slice.buffer, dc.slice.offset, 40);
 					gpu::drawTriangleStripArraysInstanced(4, dc.instances_count);
 				}
 				gpu::popDebugGroup();

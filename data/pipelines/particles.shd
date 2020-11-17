@@ -13,17 +13,20 @@ vertex_shader [[
 	layout(location = 1) in float i_scale;
 	layout(location = 2) in vec4 i_color;
 	layout(location = 3) in float i_rot;
+	layout(location = 4) in float i_frame;
 	layout(location = 0) out vec2 v_uv;
 	layout(location = 1) out vec4 v_color;
 
 	void main() {
 		vec2 pos = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
-		v_uv = pos;
+		uint frame = uint(i_frame);
+		v_uv = (pos + vec2(frame & 1, (frame & 2) >> 1)) * 0.5;
+
 		float c = cos(i_rot);
 		float s = sin(i_rot);
 		mat2 rotm = mat2(c, s, -s, c);
-		pos = pos * rotm;
-		pos = pos * 2 * i_scale - i_scale;
+		pos = (pos * 2 - 1) * rotm;
+		pos *= i_scale;
 		v_color = i_color;
 		gl_Position = Global.projection * Global.view * u_model * vec4(i_position.xy + pos, i_position.z,  1);
 	}

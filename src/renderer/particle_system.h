@@ -40,29 +40,24 @@ struct ParticleEmitterResource final : Resource
 		float value;
 	};
 
-	struct Instruction {
-		enum Type : u8 {
-			END,
-			ADD,
-			COS,
-			SIN,
-			ADD_CONST,
-			SUB,
-			SUB_CONST,
-			MUL,
-			MULTIPLY_ADD,
-			LT,
-			MOV,
-			RAND,
-			KILL,
-			EMIT,
-			GT
-		};
-		Type type;
-		DataStream dst;
-		DataStream op0;
-		DataStream op1;
-		DataStream op2;
+	enum class InstructionType : u8{
+		END,
+		ADD,
+		COS,
+		SIN,
+		FREE0,
+		SUB,
+		FREE1,
+		MUL,
+		MULTIPLY_ADD,
+		LT,
+		MOV,
+		RAND,
+		KILL,
+		EMIT,
+		GT,
+		MIX,
+		GRADIENT
 	};
 
 	static const ResourceType TYPE;
@@ -72,7 +67,7 @@ struct ParticleEmitterResource final : Resource
 	ResourceType getType() const override { return TYPE; }
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
-	const Array<Instruction>& getInstructions() const { return m_instructions; }
+	const OutputMemoryStream& getInstructions() const { return m_instructions; }
 	int getEmitOffset() const { return m_emit_offset; }
 	int getOutputOffset() const { return m_output_offset; }
 	int getChannelsCount() const { return m_channels_count; }
@@ -80,7 +75,7 @@ struct ParticleEmitterResource final : Resource
 	int getOutputsCount() const { return m_outputs_count; }
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(const Path& path);
-	void overrideData(Array<Instruction>&& instructions,
+	void overrideData(OutputMemoryStream&& instructions,
 		int emit_offset,
 		int output_offset,
 		int channels_count,
@@ -89,12 +84,12 @@ struct ParticleEmitterResource final : Resource
 	);
 
 private:
-	Array<Instruction> m_instructions;
-	int m_emit_offset;
-	int m_output_offset;
-	int m_channels_count;
-	int m_registers_count;
-	int m_outputs_count;
+	OutputMemoryStream m_instructions;
+	u32 m_emit_offset;
+	u32 m_output_offset;
+	u32 m_channels_count;
+	u32 m_registers_count;
+	u32 m_outputs_count;
 	Material* m_material;
 };
 
