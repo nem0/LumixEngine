@@ -2035,6 +2035,7 @@ struct PipelineImpl final : Pipeline
 		cmd.pass_state.view_projection = cp.projection * cp.view;
 		cmd.pass_state.inv_view_projection = cmd.pass_state.view_projection.inverted();
 		cmd.pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
+		cmd.pass_state.camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
 		toPlanes(cp, Span(cmd.pass_state.camera_planes));
 		
 		cmd.pass_state_buffer = m_pass_state_buffer;

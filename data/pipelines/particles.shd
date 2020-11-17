@@ -22,13 +22,16 @@ vertex_shader [[
 		uint frame = uint(i_frame);
 		v_uv = (pos + vec2(frame & 1, (frame & 2) >> 1)) * 0.5;
 
+		vec3 dir = normalize(i_position);
+
 		float c = cos(i_rot);
 		float s = sin(i_rot);
 		mat2 rotm = mat2(c, s, -s, c);
 		pos = (pos * 2 - 1) * rotm;
 		pos *= i_scale;
+		
 		v_color = i_color;
-		gl_Position = Global.projection * Global.view * u_model * vec4(i_position.xy + pos, i_position.z,  1);
+		gl_Position = Global.projection * ((Global.view * u_model * vec4(i_position.xyz,  1)) + vec4(pos.xy, 0, 1));
 	}
 ]]
 

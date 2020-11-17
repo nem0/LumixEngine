@@ -985,6 +985,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					pass_state.view_projection = pass_state.projection * pass_state.view;
 					pass_state.inv_view_projection = pass_state.view_projection.inverted();
 					pass_state.view_dir = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
+					pass_state.camera_up = Vec4(pass_state.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
 					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
 
 					gpu::useProgram(dc.program);
