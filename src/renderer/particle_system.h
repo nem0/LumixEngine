@@ -36,7 +36,7 @@ struct ParticleEmitterResource final : Resource
 		};
 
 		Type type = NONE;
-		u8 index; // in the group of the same typed streams
+		u8 index;
 		float value;
 	};
 

@@ -732,18 +732,18 @@ void ParticleEmitter::fillInstanceData(float* data) {
 							const float arg = op0.value;
 							ASSERT(dst.type == DataStream::OUT);
 							i32 output_idx = dst.index;
-							float* dst = data + output_idx + fromf4 * 4 * stride;
+							float* res = data + output_idx + fromf4 * 4 * stride;
 							for (i32 i = 0; i < stepf4 * 4; ++i) {
-								dst[i * stride] = arg;
+								res[i * stride] = arg;
 							}
 						}
 						else {
 							const float* arg = (float*)getStream(*this, op0, fromf4, reg_mem.begin());
 							ASSERT(dst.type == DataStream::OUT);
 							i32 output_idx = dst.index;
-							float* dst = data + output_idx + fromf4 * 4 * stride;
+							float* res = data + output_idx + fromf4 * 4 * stride;
 							for (i32 i = 0, j = 0; i < stepf4 * 4; ++i, j += stride) {
-								dst[j] = arg[i];
+								res[j] = arg[i];
 							}
 						}
 						break;

@@ -33,11 +33,17 @@ struct ParticleEditorResource {
 		const u32 magic = MAGIC;
 		u32 version = 0;
 	};
+	
+	enum class ValueType : i32 {
+		FLOAT,
+		VEC3,
+		VEC4
+	};
 
 	struct NodeInput {
 		Node* node;
 		u8 output_idx;
-		DataStream generate(OutputMemoryStream& instructions, DataStream output) const;
+		DataStream generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const;
 	};
 
 	struct Node {
@@ -57,7 +63,8 @@ struct ParticleEditorResource {
 			CMP,
 			COLOR_MIX,
 			GRADIENT,
-			GRADIENT_COLOR
+			GRADIENT_COLOR,
+			VEC3
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -67,7 +74,7 @@ struct ParticleEditorResource {
 		virtual ~Node() {}
 
 		virtual Type getType() const = 0;
-		virtual DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output) = 0;
+		virtual DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) = 0;
 		virtual void serialize(OutputMemoryStream& blob) {}
 		virtual void deserialize(InputMemoryStream& blob) {}
 
@@ -128,12 +135,12 @@ struct ParticleEditorResource {
 		void serialize(OutputMemoryStream& blob) override { blob.write(func); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(func); }
 		
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
 			NodeInput input = getInput(0);
 			if (!input.node) return output;
 			
 			DataStream dst = m_resource.streamOrRegister(output);
-			DataStream op0 = input.generate(instructions, {});
+			DataStream op0 = input.generate(instructions, {}, subindex);
 			switch (func) {
 				case COS: instructions.write(InstructionType::COS); break;
 				case SIN: instructions.write(InstructionType::SIN); break;
@@ -169,17 +176,17 @@ struct ParticleEditorResource {
 		GradientColorNode(ParticleEditorResource& res) : Node(res) {}
 		Type getType() const override { return Type::GRADIENT_COLOR; }
 	
-		DataStream generate(OutputMemoryStream& ip, u8 output_idx, DataStream dst) override {
+		DataStream generate(OutputMemoryStream& ip, u8 output_idx, DataStream dst, u8 subindex) override {
 			const NodeInput input = getInput(0);
 			if (!input.node) {
 				DataStream res;
 				res.type = DataStream::LITERAL;
-				res.value = values[0][output_idx];
+				res.value = values[0][subindex];
 				return res;
 			}
 
 			DataStream op0;
-			op0 = input.generate(ip, op0);
+			op0 = input.generate(ip, op0, subindex);
 
 			dst = m_resource.streamOrRegister(dst);
 			ip.write(InstructionType::GRADIENT);
@@ -188,7 +195,7 @@ struct ParticleEditorResource {
 			ip.write(count);
 			ip.write(keys, sizeof(keys[0]) * count);
 			for (u32 i = 0; i < count; ++i) {
-				ip.write(values[i][output_idx]);
+				ip.write(values[i][subindex]);
 			}
 
 			m_resource.freeRegister(op0);
@@ -199,8 +206,11 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool onGUI() override {
+			beginOutput();
+			endOutput();
+
 			beginInput();
-			ImGui::TextUnformatted("Parameter");
+			ImGui::TextUnformatted("Gradient");
 			endInput();
 			ImGui::PushItemWidth(60);
 			bool changed = false;
@@ -222,21 +232,6 @@ struct ParticleEditorResource {
 				changed = true;
 			}
 
-			beginOutput();
-			ImGui::TextUnformatted("R");
-			endOutput();
-
-			beginOutput();
-			ImGui::TextUnformatted("G");
-			endOutput();
-
-			beginOutput();
-			ImGui::TextUnformatted("B");
-			endOutput();
-
-			beginOutput();
-			ImGui::TextUnformatted("A");
-			endOutput();
 			return changed;
 		}
 
@@ -249,7 +244,7 @@ struct ParticleEditorResource {
 		GradientNode(ParticleEditorResource& res) : Node(res) {}
 		Type getType() const override { return Type::GRADIENT; }
 	
-		DataStream generate(OutputMemoryStream& ip, u8 output_idx, DataStream dst) override {
+		DataStream generate(OutputMemoryStream& ip, u8 output_idx, DataStream dst, u8 subindex) override {
 			const NodeInput input = getInput(0);
 			if (!input.node) {
 				DataStream res;
@@ -259,7 +254,7 @@ struct ParticleEditorResource {
 			}
 
 			DataStream op0;
-			op0 = input.generate(ip, op0);
+			op0 = input.generate(ip, op0, 0);
 
 			dst = m_resource.streamOrRegister(dst);
 			ip.write(InstructionType::GRADIENT);
@@ -277,10 +272,12 @@ struct ParticleEditorResource {
 		void deserialize(InputMemoryStream& blob) override { blob.read(count); blob.read(keys); blob.read(values); }
 
 		bool onGUI() override {
-			beginInput();
-			ImGui::TextUnformatted("Parameter");
-			endInput();
 			beginOutput();
+			endOutput();
+
+			beginInput();
+			ImGui::TextUnformatted("Gradient");
+			endInput();
 			ImGui::PushItemWidth(60);
 			bool changed = false;
 			for (u32 i = 0; i < count; ++i) {
@@ -299,7 +296,6 @@ struct ParticleEditorResource {
 				++count;
 				changed = true;
 			}
-			endOutput();
 			return changed ;
 		}
 
@@ -316,7 +312,7 @@ struct ParticleEditorResource {
 		void serialize(OutputMemoryStream& blob) override { blob.write(idx); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(idx); }
 		
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
 			r.type = DataStream::CONST;
 			r.index = idx;
@@ -338,7 +334,7 @@ struct ParticleEditorResource {
 		
 		Type getType() const override { return Type::RANDOM; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
 			instructions.write(InstructionType::RAND);
 			DataStream op0, op1, dst;
 			dst = m_resource.streamOrRegister(output);
@@ -380,7 +376,7 @@ struct ParticleEditorResource {
 		
 		Type getType() const override { return Type::LITERAL; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
 			r.type = DataStream::LITERAL;
 			r.value = value;
@@ -401,15 +397,75 @@ struct ParticleEditorResource {
 		float value = 0;
 	};
 
+	struct Vec3Node : Node {
+		Vec3Node(ParticleEditorResource& res) : Node(res) {}
+		
+		Type getType() const override { return Type::VEC3; }
+
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
+			const NodeInput input = getInput(subindex);
+			if (input.node) {
+				return input.generate(instructions, output, subindex);
+			}
+
+			DataStream r;
+			r.type = DataStream::LITERAL;
+			r.value = value[subindex];
+			return r;
+		}
+
+		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
+		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
+
+		bool onGUI() override {
+			beginOutput();
+			endOutput();
+			ImGui::PushItemWidth(120);
+			
+			bool changed = false;
+			beginInput();
+			if (getInput(0).node) {
+				ImGui::TextUnformatted("X");
+			}
+			else {
+				changed = ImGui::DragFloat("X", &value.x);
+			}
+			endInput();
+
+			beginInput();
+			if (getInput(1).node) {
+				ImGui::TextUnformatted("Y");
+			}
+			else {
+				changed = ImGui::DragFloat("Y", &value.y) || changed;
+			}
+			endInput();
+			
+			beginInput();
+			if (getInput(2).node) {
+				ImGui::TextUnformatted("Z");
+			}
+			else {
+				changed = ImGui::DragFloat("Z", &value.z) || changed;
+			}
+			endInput();
+			
+			ImGui::PopItemWidth();
+			return changed;
+		}
+
+		Vec3 value = Vec3(0);
+	};
+
 	struct InputNode : Node {
 		InputNode(ParticleEditorResource& res) : Node(res) {}
 
 		Type getType() const override { return Type::INPUT; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			DataStream r;
 			r.type = DataStream::CHANNEL;
-			r.index = idx;
+			r.index = m_resource.getChannelIndex(idx, subindex);
 			return r;
 		}
 
@@ -448,25 +504,69 @@ struct ParticleEditorResource {
 			return false;
 		}
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream) override {
+		DataStream generate(OutputMemoryStream& instructions, u8, DataStream, u8 subindex) override {
 			m_resource.m_register_mask = 0;
+			i32 output_idx = 0;
 			for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
 				const NodeInput input = getInput(i);
-				if (!input.node) continue;
+				const u32 si_count = getCount(m_resource.m_streams[i].type);
 
-				DataStream s;
-				s.type = DataStream::CHANNEL;
-				s.index = i;
-				DataStream o = input.generate(instructions, s);
-				if (o.type != DataStream::CHANNEL || o.index != i) {
-					instructions.write(InstructionType::MOV);
-					instructions.write(s);
-					instructions.write(o);
+				for (u32 si = 0; si < si_count; ++si) {
+					DataStream s;
+					s.type = DataStream::CHANNEL;
+					s.index = output_idx;
+					if (input.node) {
+						DataStream o = input.generate(instructions, s, si);
+						if (o.type != s.type || o.index != s.index) {
+							instructions.write(InstructionType::MOV);
+							instructions.write(s);
+							instructions.write(o);
+						}
+					}
+					else {
+						instructions.write(InstructionType::MOV);
+						instructions.write(s);
+						DataStream l;
+						l.type = DataStream::LITERAL;
+						l.value = 0;
+						instructions.write(l);
+					}
+					++output_idx;
 				}
 			}
 			return {};
 		}
 	};
+
+	static u32 getCount(ValueType type) {
+		switch(type) {
+			case ValueType::VEC3: return 3;
+			case ValueType::VEC4: return 4;
+			case ValueType::FLOAT: return 1;
+			default: ASSERT(false); return 1;
+		}
+	}
+
+	i32 findChannel(const char* name) {
+		for (i32 i = 0; i < m_streams.size(); ++i) {
+			if (m_streams[i].name == name) return i;
+		}
+		return -1;
+	}
+
+	u32 getChannelIndex(u8 stream, u8 subindex) {
+		u32 c = 0;
+		for (u8 i = 0; i < stream; ++i) {
+			c += getCount(m_streams[i].type);
+		}
+		switch (m_streams[stream].type) {
+			case ValueType::FLOAT: return c;
+			case ValueType::VEC3: return c + clamp(subindex, 0, 3);
+			case ValueType::VEC4: return c + clamp(subindex, 0, 4);
+			default: ASSERT(false); return c;
+		}
+		
+	}
 
 	struct UpdateNode : Node {
 		UpdateNode(ParticleEditorResource& res) : Node(res) {}
@@ -490,26 +590,34 @@ struct ParticleEditorResource {
 			return false;
 		}
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			m_resource.m_register_mask = 0;
 			const NodeInput kill_input = getInput(0);
 			if (kill_input.node) {
-				kill_input.generate(instructions, {});
+				kill_input.generate(instructions, {}, 0);
 				instructions.write(InstructionType::KILL);
 			}
 
+			i32 out_index = 0 ;
 			for (i32 i = 0; i < m_resource.m_streams.size(); ++i) {
 				const NodeInput input = getInput(i + 1);
-				if (!input.node) continue;
+				const u32 si_count = getCount(m_resource.m_streams[i].type);
+				if (!input.node) {
+					out_index += si_count;
+					continue;
+				}
 
-				DataStream s;
-				s.type = DataStream::CHANNEL;
-				s.index = i;
-				DataStream o = input.generate(instructions, s);
-				if (o.type != DataStream::CHANNEL || o.index != i) {
-					instructions.write(InstructionType::MOV);
-					instructions.write(s);
-					instructions.write(o);
+				for (u32 si = 0; si < si_count; ++si) {
+					DataStream s;
+					s.type = DataStream::CHANNEL;
+					s.index = out_index;
+					DataStream o = input.generate(instructions, s, si);
+					if (o.type != s.type || o.index != s.index) {
+						instructions.write(InstructionType::MOV);
+						instructions.write(s);
+						instructions.write(o);
+					}
+					++out_index;
 				}
 			}
 			return {};
@@ -547,13 +655,13 @@ struct ParticleEditorResource {
 		void serialize(OutputMemoryStream& blob) override { blob.write(op); blob.write(value); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(op); blob.read(value); }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream, u8 subindex) override {
 			const NodeInput input0 = getInput(0);
 			const NodeInput input1 = getInput(1);
 			if (!input0.node) return {};
 
-			DataStream i0 = input0.generate(instructions, {});
-			DataStream i1 = input1.node ? input1.generate(instructions, {}) : DataStream{};
+			DataStream i0 = input0.generate(instructions, {}, subindex);
+			DataStream i1 = input1.node ? input1.generate(instructions, {}, subindex) : DataStream{};
 			switch (op) {
 				case LT: instructions.write(InstructionType::LT); break;
 				case GT: instructions.write(InstructionType::GT); break;
@@ -600,20 +708,46 @@ struct ParticleEditorResource {
 			return false;
 		}
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream) override {
+		DataStream generate(OutputMemoryStream& instructions, u8, DataStream, u8 subindex) override {
 			m_resource.m_register_mask = 0;
+			u32 output_idx = 0;
 			for (i32 i = 0; i < m_resource.m_outputs.size(); ++i) {
 				const NodeInput input = getInput(i);
-				if (!input.node) continue;
+				const u32 si_count = getCount(m_resource.m_outputs[i].type);
+				if (!input.node) {
+					const i32 ch_idx = m_resource.findChannel(m_resource.m_outputs[i].name);
+					if (ch_idx < 0) {
+						output_idx += si_count;
+						continue;
+					}
+					else {
+						for (u32 si = 0; si < si_count; ++si) {
+							DataStream s;
+							s.type = DataStream::OUT;
+							s.index = output_idx;
+							DataStream o;
+							o.type = DataStream::CHANNEL;
+							o.index = m_resource.getChannelIndex(ch_idx, si);
+							instructions.write(InstructionType::MOV);
+							instructions.write(s);
+							instructions.write(o);
+							++output_idx;
+						}
+						continue;
+					}
+				}
 
-				DataStream s;
-				s.type = DataStream::OUT;
-				s.index = i;
-				DataStream o = input.generate(instructions, s);
-				if (o.type != DataStream::OUT || o.index != i) {
-					instructions.write(InstructionType::MOV);
-					instructions.write(s);
-					instructions.write(o);
+				for (u32 si = 0; si < si_count; ++si) {
+					DataStream s;
+					s.type = DataStream::OUT;
+					s.index = output_idx;
+					DataStream o = input.generate(instructions, s, si);
+					if (o.type != s.type || o.index != s.index) {
+						instructions.write(InstructionType::MOV);
+						instructions.write(s);
+						instructions.write(o);
+					}
+					++output_idx;
 				}
 			}
 			return {};
@@ -625,19 +759,19 @@ struct ParticleEditorResource {
 
 		Type getType() const override { return Type::COLOR_MIX; }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output) override {
+		DataStream generate(OutputMemoryStream& instructions, u8, DataStream output, u8 subindex) override {
 			const NodeInput input = getInput(0);
 			if (!input.node) return {};
 
-			const DataStream w = input.generate(instructions, {});
+			const DataStream w = input.generate(instructions, {}, subindex);
 
 			instructions.write(InstructionType::MIX);
 			DataStream dst, op0, op1;
 			dst = m_resource.streamOrRegister(DataStream());
 			op0.type = DataStream::LITERAL;
-			op0.value = *(&color0.x + output_idx);
+			op0.value = *(&color0.x + subindex);
 			op1.type = DataStream::LITERAL;
-			op1.value = *(&color1.x + output_idx);
+			op1.value = *(&color1.x + subindex);
 			instructions.write(dst);
 			instructions.write(op0);
 			instructions.write(op1);
@@ -656,21 +790,9 @@ struct ParticleEditorResource {
 			changed = ImGui::ColorEdit4("Color B", &color1.x, ImGuiColorEditFlags_NoInputs) || changed;
 			
 			beginOutput();
-			ImGui::TextUnformatted("R");
+			ImGui::TextUnformatted("RGBA");
 			endOutput();
 			
-			beginOutput();
-			ImGui::TextUnformatted("G");
-			endOutput();
-			
-			beginOutput();
-			ImGui::TextUnformatted("B");
-			endOutput();
-			
-			beginOutput();
-			ImGui::TextUnformatted("A");
-			endOutput();
-
 			return changed;
 		}
 
@@ -686,17 +808,16 @@ struct ParticleEditorResource {
 		void serialize(OutputMemoryStream& blob) override { blob.write(value1); blob.write(value2); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(value1); blob.read(value2); }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output) override {
-			ASSERT(output_idx == 0);
+		DataStream generate(OutputMemoryStream& instructions, u8, DataStream output, u8 subindex) override {
 			const NodeInput input0 = getInput(0);
 			if (!input0.node) return output;
 			const NodeInput input1 = getInput(1);
 			const NodeInput input2 = getInput(2);
 
 			DataStream dst, op0, op1, op2;
-			op0 = input0.generate(instructions, op0);
+			op0 = input0.generate(instructions, op0, subindex);
 			if (input1.node) {
-				op1 = input1.generate(instructions, op1);
+				op1 = input1.generate(instructions, op1, subindex);
 			}
 			else {
 				op1.type = DataStream::LITERAL;
@@ -704,7 +825,7 @@ struct ParticleEditorResource {
 			}
 
 			if (input2.node) {
-				op2 = input2.generate(instructions, op2);
+				op2 = input2.generate(instructions, op2, subindex);
 			}
 			else {
 				op2.type = DataStream::LITERAL;
@@ -728,7 +849,7 @@ struct ParticleEditorResource {
 		bool onGUI() override {
 			imnodes::BeginNodeTitleBar();
 			beginOutput();
-			ImGui::TextUnformatted("Multiply add (A * B + C)");
+			ImGui::TextUnformatted("A * B + C");
 			endOutput();
 			imnodes::EndNodeTitleBar();
 
@@ -778,16 +899,16 @@ struct ParticleEditorResource {
 		void serialize(OutputMemoryStream& blob) override { blob.write(value); }
 		void deserialize(InputMemoryStream& blob) override { blob.read(value); }
 
-		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output) override {
+		DataStream generate(OutputMemoryStream& instructions, u8 output_idx, DataStream output, u8 subindex) override {
 			ASSERT(output_idx == 0);
 			const NodeInput input0 = getInput(0);
 			if (!input0.node) return output;
 			const NodeInput input1 = getInput(1);
 
 			DataStream dst, op0, op1;
-			op0 = input0.generate(instructions, op0);
+			op0 = input0.generate(instructions, op0, subindex);
 			if (input1.node) {
-				op1 = input1.generate(instructions, op1);
+				op1 = input1.generate(instructions, op1, subindex);
 			}
 			else {
 				op1.type = DataStream::LITERAL;
@@ -839,14 +960,17 @@ struct ParticleEditorResource {
 
 	struct Stream {
 		StaticString<32> name;
+		ValueType type = ValueType::FLOAT;
 	};
 
 	struct Constant {
 		StaticString<32> name;
+		ValueType type = ValueType::FLOAT;
 	};
 
 	struct Output {
 		StaticString<32> name;
+		ValueType type = ValueType::FLOAT;
 	};
 	
 	struct Link {
@@ -888,6 +1012,7 @@ struct ParticleEditorResource {
 			case Node::CMP: node = UniquePtr<CompareNode>::create(m_allocator, *this); break;
 			case Node::GRADIENT_COLOR: node = UniquePtr<GradientColorNode>::create(m_allocator, *this); break;
 			case Node::GRADIENT: node = UniquePtr<GradientNode>::create(m_allocator, *this); break;
+			case Node::VEC3: node = UniquePtr<Vec3Node>::create(m_allocator, *this); break;
 			case Node::COLOR_MIX: node = UniquePtr<ColorMixNode>::create(m_allocator, *this); break;
 			case Node::MADD: node = UniquePtr<MaddNode>::create(m_allocator, *this); break;
 			case Node::RANDOM: node = UniquePtr<RandomNode>::create(m_allocator, *this); break;
@@ -999,12 +1124,12 @@ struct ParticleEditorResource {
 		m_emit.clear();
 
 		m_registers_count = 0;
-		m_nodes[0]->generate(m_update, 0, {});
+		m_nodes[0]->generate(m_update, 0, {}, 0);
 		
 		m_update.write(InstructionType::END);
-		m_nodes[1]->generate(m_output, 0, {});
+		m_nodes[1]->generate(m_output, 0, {}, 0);
 		m_output.write(InstructionType::END);
-		m_nodes[2]->generate(m_emit, 0, {});
+		m_nodes[2]->generate(m_emit, 0, {}, 0);
 		m_emit.write(InstructionType::END);
 	}
 	
@@ -1086,7 +1211,11 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 					pushUndo();
 					break;
 				}
-				ImGui::SameLine();				ImGui::SetNextItemWidth(-1);
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+				ImGui::Combo("##t", (i32*)&s.type, "float\0vec3\0vec4\0");
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(-1);
 				ImGui::InputText("##v", s.name.data, sizeof(s.name.data));
 				ImGui::PopID();
 			}
@@ -1103,6 +1232,9 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 					pushUndo();
 					break;
 				}
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+				ImGui::Combo("##t", (i32*)&s.type, "float\0vec3\0vec4\0");
 				ImGui::SameLine();
 				ImGui::SetNextItemWidth(-1);
 				ImGui::InputText("##o", s.name.data, sizeof(s.name.data));
@@ -1216,6 +1348,7 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 				if (ImGui::Selectable("Literal")) addNode(ParticleEditorResource::Node::LITERAL);
 				if (ImGui::Selectable("Compare")) addNode(ParticleEditorResource::Node::CMP);
 				if (ImGui::Selectable("Color mix")) addNode(ParticleEditorResource::Node::COLOR_MIX);
+				if (ImGui::Selectable("Vec3")) addNode(ParticleEditorResource::Node::VEC3);
 				if (ImGui::Selectable("Gradient")) addNode(ParticleEditorResource::Node::GRADIENT);
 				if (ImGui::Selectable("Gradient color")) addNode(ParticleEditorResource::Node::GRADIENT_COLOR);
 				if (ImGui::Selectable("Random")) addNode(ParticleEditorResource::Node::RANDOM);
@@ -1406,8 +1539,8 @@ struct ParticleEditor : StudioApp::GUIPlugin {
 	Action m_toggle_ui;
 };
 
-DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output) const {
-	return node ? node->generate(instructions, output_idx, output) : DataStream();
+DataStream ParticleEditorResource::NodeInput::generate(OutputMemoryStream& instructions, DataStream output, u8 subindex) const {
+	return node ? node->generate(instructions, output_idx, output, subindex) : DataStream();
 }
 
 UniquePtr<StudioApp::GUIPlugin> createParticleEditor(StudioApp& app) {
@@ -1430,9 +1563,16 @@ bool compileParticleEmitter(InputMemoryStream& input, OutputMemoryStream& output
 	output.write(res.m_output.data(), res.m_output.size());
 	output.write((u32)res.m_update.size());
 	output.write(u32(res.m_update.size() + res.m_emit.size()));
-	output.write((u32)res.m_streams.size());
+
+	auto getCount = [](const auto& x){
+		u32 c = 0;
+		for (const auto& i : x) c += ParticleEditorResource::getCount(i.type);
+		return c;
+	};
+
+	output.write(getCount(res.m_streams));
 	output.write((u32)res.m_registers_count);
-	output.write((u32)res.m_outputs.size());
+	output.write(getCount(res.m_outputs));
 	return true;
 }
 
