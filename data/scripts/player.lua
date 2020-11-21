@@ -43,6 +43,12 @@ function onInputEvent(event)
     end
 end
 
+function onControllerHit(obj)
+    local a = obj.rigid_actor
+    local dir = {math.sin(yaw), 0, math.cos(yaw)}
+    a:applyForce(dir)
+end
+
 function start()
     speed_input_idx = this.animator:getInputIndex("speed")
     yaw_input_idx = this.animator:getInputIndex("yaw")

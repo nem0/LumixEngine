@@ -366,6 +366,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		, m_update_in_progress(nullptr)
 		, m_vehicle_batch_query(nullptr)
 		, m_system(&system)
+		, m_hit_report(*this)
 		, m_layers(m_system->getCollisionLayers())
 	{
 		m_physics_cmps_mask = 0;
@@ -502,6 +503,17 @@ struct PhysicsSceneImpl final : PhysicsScene
 		send(e2, e1);
 	}
 
+	void onControllerHit(EntityRef controller, EntityRef obj) {
+		if (!m_script_scene) return;
+
+		for (int i = 0, c = m_script_scene->getScriptCount(controller); i < c; ++i) {
+			auto* call = m_script_scene->beginFunctionCall(controller, i, "onControllerHit");
+			if (!call) continue;
+
+			call->add(obj);
+			m_script_scene->endFunctionCall();
+		}
+	}
 
 	void onContact(const ContactData& contact_data)
 	{
@@ -1276,7 +1288,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void initControllerDesc(PxCapsuleControllerDesc& desc)
 	{
-		static struct CB : PxControllerBehaviorCallback
+		static struct : PxControllerBehaviorCallback
 		{
 			PxControllerBehaviorFlags getBehaviorFlags(const PxShape& shape, const PxActor& actor) override
 			{
@@ -1294,7 +1306,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			{
 				return PxControllerBehaviorFlag::eCCT_CAN_RIDE_ON_OBJECT;
 			}
-		} cb;
+		} behaviour_cb;
 
 		desc.material = m_default_material;
 		desc.height = 1.8f;
@@ -1302,7 +1314,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 		desc.slopeLimit = 0.0f;
 		desc.contactOffset = 0.1f;
 		desc.stepOffset = 0.02f;
-		desc.behaviorCallback = &cb;
+		desc.behaviorCallback = &behaviour_cb;
+		desc.reportCallback = &m_hit_report;
 	}
 
 
@@ -1314,6 +1327,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		cDesc.position.set(position.x, position.y, position.z);
 		Controller& c = m_controllers.insert(entity, Controller());
 		c.controller = m_controller_manager->createController(cDesc);
+		c.controller->getActor()->userData = (void*)(uintptr)entity.index;
 		c.entity = entity;
 		c.frame_change.set(0, 0, 0);
 		c.radius = cDesc.radius;
@@ -4145,9 +4159,24 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxFilterData m_filter_data;
 	};
 
-	IAllocator& m_allocator;
+	struct HitReport : PxUserControllerHitReport {
+		HitReport(PhysicsSceneImpl& scene) : scene(scene) {}
+		void onShapeHit(const PxControllerShapeHit& hit) override {
+			void* user_data = hit.controller->getActor()->userData;
+			const EntityRef e1 {(i32)(uintptr)user_data};
+			const EntityRef e2 {(i32)(uintptr)hit.actor->userData};
 
+			scene.onControllerHit(e1, e2);
+		}
+		void onControllerHit(const PxControllersHit& hit) override {}
+		void onObstacleHit(const PxControllerObstacleHit& hit) override {}
+
+		PhysicsSceneImpl& scene;
+	} ;
+
+	IAllocator& m_allocator;
 	Universe& m_universe;
+	HitReport m_hit_report;
 	Engine* m_engine;
 	PhysxContactCallback m_contact_callback;
 	BoneOrientation m_new_bone_orientation = BoneOrientation::X;

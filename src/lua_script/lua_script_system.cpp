@@ -545,7 +545,7 @@ namespace Lumix
 			}
 
 			void add(EntityPtr parameter) override {
-				lua_pushinteger(state, parameter.index);
+				LuaWrapper::pushEntity(state, parameter, &cmp->m_scene.getUniverse());
 				++parameter_count;
 			}
 

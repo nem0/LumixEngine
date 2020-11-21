@@ -12,5 +12,6 @@ data/.lumix
 data/lumix.log
 data/studio.ini
 .lumixuser
+*.unv.bak
 projects/3rdparty
 plugins/
