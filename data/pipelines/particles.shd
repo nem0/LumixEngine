@@ -31,7 +31,7 @@ vertex_shader [[
 		pos *= i_scale;
 		
 		v_color = i_color;
-		gl_Position = Global.projection * ((Global.view * u_model * vec4(i_position.xyz,  1)) + vec4(pos.xy, 0, 1));
+		gl_Position = Pass.projection * ((Pass.view * u_model * vec4(i_position.xyz, 1)) + vec4(pos.xy, 0, 0));
 	}
 ]]
 
