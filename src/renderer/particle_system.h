@@ -113,8 +113,7 @@ public:
 	void setResource(ParticleEmitterResource* res);
 	int getInstancesCount() const { return m_instances_count; }
 	float* getChannelData(int idx) const { return m_channels[idx].data; }
-	void setMaterial(Material* material);
-	Material* getMaterial() { return m_material; }
+	void reset() { m_particles_count = 0; }
 
 	EntityPtr m_entity;
 	u32 m_emit_rate = 10;
@@ -136,7 +135,6 @@ private:
 	int m_capacity = 0;
 	int m_instances_count = 0;
 	float m_emit_timer = 0;
-	Material* m_material = nullptr;
 	ParticleEmitterResource* m_resource = nullptr;
 };
 

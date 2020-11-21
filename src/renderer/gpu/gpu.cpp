@@ -1905,9 +1905,14 @@ void shutdown()
 {
 	checkThread();
 	destroy(gl->default_program);
+	for (WindowContext& ctx : gl->contexts) {
+		if (!ctx.window_handle) continue;
+		wglMakeCurrent(ctx.device_context, 0);
+		wglDeleteContext(ctx.hglrc);
+	}
 	gl.destroy();
 }
 
-} // ns gpu 
+} // namespace gpu
 
-} // ns Lumix
+} // namespace Lumix

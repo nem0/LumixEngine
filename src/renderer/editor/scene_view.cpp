@@ -38,6 +38,7 @@ namespace Lumix
 {
 
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
+static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
 static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
 
 struct UniverseViewImpl final : UniverseView {
@@ -1061,7 +1062,17 @@ void SceneView::handleDrop(const char* path, float x, float y)
 {
 	const RayCastModelHit hit = castRay(x, y);
 
-	if (Path::hasExtension(path, "fbx"))
+	if (Path::hasExtension(path, "par")) {
+		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
+		
+		m_editor.beginCommandGroup(crc32("insert_particle"));
+		EntityRef entity = m_editor.addEntity();
+		m_editor.setEntitiesPositions(&entity, &pos, 1);
+		m_editor.addComponent(Span(&entity, 1), PARTICLE_EMITTER_TYPE);
+		m_editor.setProperty(PARTICLE_EMITTER_TYPE, "", -1, "Source", Span(&entity, 1), Path(path));
+		m_editor.endCommandGroup();
+	}
+	else if (Path::hasExtension(path, "fbx"))
 	{
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
 

@@ -137,6 +137,31 @@ bool Action::isActive()
 	return true;
 }
 
+void getShortcut(const Action& action, Span<char> buf) {
+	buf[0] = 0;
+		
+	if (action.modifiers & (u8)Action::Modifiers::CTRL) catString(buf, "CTRL ");
+	if (action.modifiers & (u8)Action::Modifiers::SHIFT) catString(buf, "SHIFT ");
+	if (action.modifiers & (u8)Action::Modifiers::ALT) catString(buf, "ALT ");
+
+	if (action.shortcut != OS::Keycode::INVALID) {
+		char tmp[64];
+		OS::getKeyName(action.shortcut, Span(tmp));
+		if (tmp[0] == 0) return;
+		catString(buf, " ");
+		catString(buf, tmp);
+	}
+}
+
+void doMenuItem(Action& a, bool enabled)
+{
+	char buf[20];
+	getShortcut(a, Span(buf));
+	if (ImGui::MenuItem(a.label_short, buf, a.is_selected.invoke(), enabled))
+	{
+		a.func.invoke();
+	}
+}
 
 void getEntityListDisplayName(StudioApp& app, WorldEditor& editor, Span<char> buf, EntityPtr entity)
 {

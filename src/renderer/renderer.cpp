@@ -397,7 +397,7 @@ static void registerProperties(IAllocator& allocator)
 		),
 		component("particle_emitter",
 			property("Emit rate", LUMIX_PROP(RenderScene, ParticleEmitterRate)),
-			property("Resource", LUMIX_PROP(RenderScene, ParticleEmitterPath),
+			property("Source", LUMIX_PROP(RenderScene, ParticleEmitterPath),
 				ResourceAttribute("Particle emitter (*.par)", ParticleEmitterResource::TYPE))
 		),
 		component("camera",

@@ -10,6 +10,7 @@
 // [SECTION] API implementation
 
 #include "imnodes.h"
+#include "engine/allocator.h"
 
 #include <imgui/imgui.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -269,7 +270,7 @@ struct StyleElement
 
 // [SECTION] global struct
 // this stores data which only lives for one frame
-struct
+struct imnodesG
 {
     EditorContext* default_editor_ctx;
     EditorContext* editor_ctx;
@@ -326,18 +327,27 @@ struct
     bool middle_mouse_clicked;
     bool left_mouse_dragging;
     bool middle_mouse_dragging;
-} g;
+};
+
+Lumix::Local<imnodesG> gg;
+imnodesG& g() { 
+	static bool once = [](){
+		gg.create();
+		return true;
+	}();
+	return *gg.get();
+}
 
 EditorContext& editor_context_get()
 {
     // No editor context was set! Did you forget to call imnodes::Initialize?
-    assert(g.editor_ctx != NULL);
-    return *g.editor_ctx;
+    assert(g().editor_ctx != NULL);
+    return *g().editor_ctx;
 }
 
 inline bool is_mouse_hovering_near_point(const ImVec2& point, float radius)
 {
-    ImVec2 delta = g.mouse_pos - point;
+    ImVec2 delta = g().mouse_pos - point;
     return (delta.x * delta.x + delta.y * delta.y) < (radius * radius);
 }
 
@@ -393,7 +403,7 @@ inline ImRect get_containing_rect_for_bezier_curve(const BezierCurve& bezier)
     const ImVec2 min = ImVec2(ImMin(bezier.p0.x, bezier.p3.x), ImMin(bezier.p0.y, bezier.p3.y));
     const ImVec2 max = ImVec2(ImMax(bezier.p0.x, bezier.p3.x), ImMax(bezier.p0.y, bezier.p3.y));
 
-    const float hover_distance = g.style.link_hover_distance;
+    const float hover_distance = g().style.link_hover_distance;
 
     ImRect rect(min, max);
     rect.Add(bezier.p1);
@@ -428,7 +438,7 @@ inline LinkBezierData get_link_renderable(
 
 inline bool is_mouse_hovering_near_link(const BezierCurve& bezier, const int num_segments)
 {
-    const ImVec2 mouse_pos = g.mouse_pos;
+    const ImVec2 mouse_pos = g().mouse_pos;
 
     // First, do a simple bounding box test against the box containing the link
     // to see whether calculating the distance to the link is worth doing.
@@ -437,7 +447,7 @@ inline bool is_mouse_hovering_near_link(const BezierCurve& bezier, const int num
     if (link_rect.Contains(mouse_pos))
     {
         const float distance = get_distance_to_cubic_bezier(mouse_pos, bezier, num_segments);
-        if (distance < g.style.link_hover_distance)
+        if (distance < g().style.link_hover_distance)
         {
             return true;
         }
@@ -551,7 +561,7 @@ inline bool rectangle_overlaps_link(
         // link
 
         const LinkBezierData link_data =
-            get_link_renderable(start, end, start_type, g.style.link_line_segments_per_length);
+            get_link_renderable(start, end, start_type, g().style.link_line_segments_per_length);
         return rectangle_overlaps_bezier(rectangle, link_data);
     }
 
@@ -674,9 +684,9 @@ void ImDrawListSplitter_swap_channels(
 
 void draw_list_set(ImDrawList* window_draw_list)
 {
-    g.canvas_draw_list = window_draw_list;
-    g.node_idx_to_submission_idx.Clear();
-    g.node_idx_submission_order.clear();
+    g().canvas_draw_list = window_draw_list;
+    g().node_idx_to_submission_idx.Clear();
+    g().node_idx_submission_order.clear();
 }
 
 // The draw list channels are structured as follows. First we have our base channel, the canvas grid
@@ -700,17 +710,17 @@ void draw_list_set(ImDrawList* window_draw_list)
 
 void draw_list_add_node(const int node_idx)
 {
-    g.node_idx_to_submission_idx.SetInt(
-        static_cast<ImGuiID>(node_idx), g.node_idx_submission_order.Size);
-    g.node_idx_submission_order.push_back(node_idx);
-    ImDrawList_grow_channels(g.canvas_draw_list, 2);
+    g().node_idx_to_submission_idx.SetInt(
+        static_cast<ImGuiID>(node_idx), g().node_idx_submission_order.Size);
+    g().node_idx_submission_order.push_back(node_idx);
+    ImDrawList_grow_channels(g().canvas_draw_list, 2);
 }
 
 void draw_list_append_click_interaction_channel()
 {
     // NOTE: don't use this function outside of EndNodeEditor. Using this before all nodes have been
     // added will screw up the node draw order.
-    ImDrawList_grow_channels(g.canvas_draw_list, 1);
+    ImDrawList_grow_channels(g().canvas_draw_list, 1);
 }
 
 int draw_list_submission_idx_to_background_channel_idx(const int submission_idx)
@@ -726,21 +736,21 @@ int draw_list_submission_idx_to_foreground_channel_idx(const int submission_idx)
 
 void draw_list_activate_click_interaction_channel()
 {
-    g.canvas_draw_list->_Splitter.SetCurrentChannel(
-        g.canvas_draw_list, g.canvas_draw_list->_Splitter._Count - 1);
+    g().canvas_draw_list->_Splitter.SetCurrentChannel(
+        g().canvas_draw_list, g().canvas_draw_list->_Splitter._Count - 1);
 }
 
 void draw_list_activate_current_node_foreground()
 {
     const int foreground_channel_idx =
-        draw_list_submission_idx_to_foreground_channel_idx(g.node_idx_submission_order.Size - 1);
-    g.canvas_draw_list->_Splitter.SetCurrentChannel(g.canvas_draw_list, foreground_channel_idx);
+        draw_list_submission_idx_to_foreground_channel_idx(g().node_idx_submission_order.Size - 1);
+    g().canvas_draw_list->_Splitter.SetCurrentChannel(g().canvas_draw_list, foreground_channel_idx);
 }
 
 void draw_list_activate_node_background(const int node_idx)
 {
     const int submission_idx =
-        g.node_idx_to_submission_idx.GetInt(static_cast<ImGuiID>(node_idx), -1);
+        g().node_idx_to_submission_idx.GetInt(static_cast<ImGuiID>(node_idx), -1);
     // There is a discrepancy in the submitted node count and the rendered node count! Did you call
     // one of the following functions
     // * EditorContextMoveToNode
@@ -751,7 +761,7 @@ void draw_list_activate_node_background(const int node_idx)
     assert(submission_idx != -1);
     const int background_channel_idx =
         draw_list_submission_idx_to_background_channel_idx(submission_idx);
-    g.canvas_draw_list->_Splitter.SetCurrentChannel(g.canvas_draw_list, background_channel_idx);
+    g().canvas_draw_list->_Splitter.SetCurrentChannel(g().canvas_draw_list, background_channel_idx);
 }
 
 void draw_list_swap_submission_indices(const int lhs_idx, const int rhs_idx)
@@ -768,23 +778,23 @@ void draw_list_swap_submission_indices(const int lhs_idx, const int rhs_idx)
         draw_list_submission_idx_to_background_channel_idx(rhs_idx);
 
     ImDrawListSplitter_swap_channels(
-        g.canvas_draw_list->_Splitter, lhs_background_channel_idx, rhs_background_channel_idx);
+        g().canvas_draw_list->_Splitter, lhs_background_channel_idx, rhs_background_channel_idx);
     ImDrawListSplitter_swap_channels(
-        g.canvas_draw_list->_Splitter, lhs_foreground_channel_idx, rhs_foreground_channel_idx);
+        g().canvas_draw_list->_Splitter, lhs_foreground_channel_idx, rhs_foreground_channel_idx);
 }
 
 void draw_list_sort_channels_by_depth(const ImVector<int>& node_idx_depth_order)
 {
-    if (g.node_idx_to_submission_idx.Data.Size < 2)
+    if (g().node_idx_to_submission_idx.Data.Size < 2)
     {
         return;
     }
 
-    assert(node_idx_depth_order.Size == g.node_idx_submission_order.Size);
+    assert(node_idx_depth_order.Size == g().node_idx_submission_order.Size);
 
     int start_idx = node_idx_depth_order.Size - 1;
 
-    while (node_idx_depth_order[start_idx] == g.node_idx_submission_order[start_idx])
+    while (node_idx_depth_order[start_idx] == g().node_idx_submission_order[start_idx])
     {
         if (--start_idx == 0)
         {
@@ -802,9 +812,9 @@ void draw_list_sort_channels_by_depth(const ImVector<int>& node_idx_depth_order)
 
         // Find the current index of the node_idx in the submission order array
         int submission_idx = -1;
-        for (int i = 0; i < g.node_idx_submission_order.Size; ++i)
+        for (int i = 0; i < g().node_idx_submission_order.Size; ++i)
         {
-            if (g.node_idx_submission_order[i] == node_idx)
+            if (g().node_idx_submission_order[i] == node_idx)
             {
                 submission_idx = i;
                 break;
@@ -820,7 +830,7 @@ void draw_list_sort_channels_by_depth(const ImVector<int>& node_idx_depth_order)
         for (int j = submission_idx; j < depth_idx; ++j)
         {
             draw_list_swap_submission_indices(j, j + 1);
-            ImSwap(g.node_idx_submission_order[j], g.node_idx_submission_order[j + 1]);
+            ImSwap(g().node_idx_submission_order[j], g().node_idx_submission_order[j + 1]);
         }
     }
 }
@@ -969,8 +979,8 @@ ImVec2 get_screen_space_pin_coordinates(
     const AttributeType type)
 {
     assert(type == AttributeType_Input || type == AttributeType_Output);
-    const float x = type == AttributeType_Input ? (node_rect.Min.x - g.style.pin_offset)
-                                                : (node_rect.Max.x + g.style.pin_offset);
+    const float x = type == AttributeType_Input ? (node_rect.Min.x - g().style.pin_offset)
+                                                : (node_rect.Max.x + g().style.pin_offset);
     return ImVec2(x, 0.5f * (attribute_rect.Min.y + attribute_rect.Max.y));
 }
 
@@ -988,7 +998,7 @@ ImVec2 get_screen_space_pin_coordinates(const EditorContext& editor, const PinDa
 
 void begin_node_selection(EditorContext& editor, const int node_idx)
 {
-    // Don't start selecting a node if we are e.g. already creating and dragging
+    // Don't start selecting a node if we are e.g(). already creating and dragging
     // a new link! New link creation can happen when the mouse is clicked over
     // a node, but within the hover radius of a pin.
     if (editor.click_interaction_type != ClickInteractionType_None)
@@ -1034,7 +1044,7 @@ void begin_link_detach(EditorContext& editor, const int link_idx, const int deta
     state.link_creation.end_pin_idx.reset();
     state.link_creation.start_pin_idx =
         detach_pin_idx == link.start_pin_idx ? link.end_pin_idx : link.start_pin_idx;
-    g.deleted_link_idx = link_idx;
+    g().deleted_link_idx = link_idx;
 }
 
 void begin_link_interaction(EditorContext& editor, const int link_idx)
@@ -1043,9 +1053,9 @@ void begin_link_interaction(EditorContext& editor, const int link_idx)
     // This may result in a link detach via click and drag.
     if (editor.click_interaction_type == ClickInteractionType_LinkCreation)
     {
-        if ((g.hovered_pin_flags & AttributeFlags_EnableLinkDetachWithDragClick) != 0)
+        if ((g().hovered_pin_flags & AttributeFlags_EnableLinkDetachWithDragClick) != 0)
         {
-            begin_link_detach(editor, link_idx, g.hovered_pin_idx.value());
+            begin_link_detach(editor, link_idx, g().hovered_pin_idx.value());
             editor.click_interaction_state.link_creation.link_creation_type =
                 LinkCreationType_FromDetach;
         }
@@ -1054,16 +1064,16 @@ void begin_link_interaction(EditorContext& editor, const int link_idx)
     // modifier pressed. This may also result in a link detach via clicking.
     else
     {
-        const bool modifier_pressed = g.io.link_detach_with_modifier_click.modifier == NULL
+        const bool modifier_pressed = g().io.link_detach_with_modifier_click.modifier == NULL
                                           ? false
-                                          : *g.io.link_detach_with_modifier_click.modifier;
+                                          : *g().io.link_detach_with_modifier_click.modifier;
 
         if (modifier_pressed)
         {
             const LinkData& link = editor.links.pool[link_idx];
             const PinData& start_pin = editor.pins.pool[link.start_pin_idx];
             const PinData& end_pin = editor.pins.pool[link.end_pin_idx];
-            const ImVec2& mouse_pos = g.mouse_pos;
+            const ImVec2& mouse_pos = g().mouse_pos;
             const float dist_to_start = ImLengthSqr(start_pin.pos - mouse_pos);
             const float dist_to_end = ImLengthSqr(end_pin.pos - mouse_pos);
             const int closest_pin_idx =
@@ -1085,17 +1095,17 @@ void begin_link_creation(EditorContext& editor, const int hovered_pin_idx)
     editor.click_interaction_state.link_creation.start_pin_idx = hovered_pin_idx;
     editor.click_interaction_state.link_creation.end_pin_idx.reset();
     editor.click_interaction_state.link_creation.link_creation_type = LinkCreationType_Standard;
-    g.element_state_change |= ElementStateChange_LinkStarted;
+    g().element_state_change |= ElementStateChange_LinkStarted;
 }
 
 void begin_canvas_interaction(EditorContext& editor)
 {
-    const bool any_ui_element_hovered = g.hovered_node_idx.has_value() ||
-                                        g.hovered_link_idx.has_value() ||
-                                        g.hovered_pin_idx.has_value() || ImGui::IsAnyItemHovered();
+    const bool any_ui_element_hovered = g().hovered_node_idx.has_value() ||
+                                        g().hovered_link_idx.has_value() ||
+                                        g().hovered_pin_idx.has_value() || ImGui::IsAnyItemHovered();
 
     const bool mouse_not_in_canvas =
-        !(g.canvas_rect_screen_space.Contains(ImGui::GetMousePos()) && ImGui::IsWindowHovered());
+        !(g().canvas_rect_screen_space.Contains(ImGui::GetMousePos()) && ImGui::IsWindowHovered());
 
     if (any_ui_element_hovered || mouse_not_in_canvas)
     {
@@ -1103,16 +1113,16 @@ void begin_canvas_interaction(EditorContext& editor)
     }
 
     const bool started_panning =
-        g.io.emulate_three_button_mouse.enabled
-            ? (g.left_mouse_clicked && *g.io.emulate_three_button_mouse.modifier)
-            : g.middle_mouse_clicked;
+        g().io.emulate_three_button_mouse.enabled
+            ? (g().left_mouse_clicked && *g().io.emulate_three_button_mouse.modifier)
+            : g().middle_mouse_clicked;
 
     editor.click_interaction_type =
         started_panning ? ClickInteractionType_Panning : ClickInteractionType_BoxSelection;
 
     if (editor.click_interaction_type == ClickInteractionType_BoxSelection)
     {
-        editor.click_interaction_state.box_selector.rect.Min = g.mouse_pos;
+        editor.click_interaction_state.box_selector.rect.Min = g().mouse_pos;
     }
 }
 
@@ -1181,7 +1191,7 @@ void box_selector_update_selection(EditorContext& editor, ImRect box_rect)
 
 void translate_selected_nodes(EditorContext& editor)
 {
-    if (g.left_mouse_dragging)
+    if (g().left_mouse_dragging)
     {
         const ImGuiIO& io = ImGui::GetIO();
         for (int i = 0; i < editor.selected_node_indices.size(); ++i)
@@ -1239,7 +1249,7 @@ bool should_link_snap_to_pin(
     // The link to be created must not be a duplicate, unless it is the link which was created on
     // snap. In that case we want to snap, since we want it to appear visually as if the created
     // link remains snapped to the pin.
-    if (duplicate_link.has_value() && !(duplicate_link == g.snap_link_idx))
+    if (duplicate_link.has_value() && !(duplicate_link == g().snap_link_idx))
     {
         return false;
     }
@@ -1254,16 +1264,16 @@ void click_interaction_update(EditorContext& editor)
     case ClickInteractionType_BoxSelection:
     {
         ImRect& box_rect = editor.click_interaction_state.box_selector.rect;
-        box_rect.Max = g.mouse_pos;
+        box_rect.Max = g().mouse_pos;
 
         box_selector_update_selection(editor, box_rect);
 
-        const ImU32 box_selector_color = g.style.colors[ColorStyle_BoxSelector];
-        const ImU32 box_selector_outline = g.style.colors[ColorStyle_BoxSelectorOutline];
-        g.canvas_draw_list->AddRectFilled(box_rect.Min, box_rect.Max, box_selector_color);
-        g.canvas_draw_list->AddRect(box_rect.Min, box_rect.Max, box_selector_outline);
+        const ImU32 box_selector_color = g().style.colors[ColorStyle_BoxSelector];
+        const ImU32 box_selector_outline = g().style.colors[ColorStyle_BoxSelectorOutline];
+        g().canvas_draw_list->AddRectFilled(box_rect.Min, box_rect.Max, box_selector_color);
+        g().canvas_draw_list->AddRect(box_rect.Min, box_rect.Max, box_selector_outline);
 
-        if (g.left_mouse_released)
+        if (g().left_mouse_released)
         {
             ImVector<int>& depth_stack = editor.node_depth_order;
             const ImVector<int>& selected_idxs = editor.selected_node_indices;
@@ -1300,7 +1310,7 @@ void click_interaction_update(EditorContext& editor)
     {
         translate_selected_nodes(editor);
 
-        if (g.left_mouse_released)
+        if (g().left_mouse_released)
         {
             editor.click_interaction_type = ClickInteractionType_None;
         }
@@ -1308,7 +1318,7 @@ void click_interaction_update(EditorContext& editor)
     break;
     case ClickInteractionType_Link:
     {
-        if (g.left_mouse_released)
+        if (g().left_mouse_released)
         {
             editor.click_interaction_type = ClickInteractionType_None;
         }
@@ -1320,30 +1330,30 @@ void click_interaction_update(EditorContext& editor)
             editor.pins.pool[editor.click_interaction_state.link_creation.start_pin_idx];
 
         const OptionalIndex maybe_duplicate_link_idx =
-            g.hovered_pin_idx.has_value()
+            g().hovered_pin_idx.has_value()
                 ? find_duplicate_link(
                       editor,
                       editor.click_interaction_state.link_creation.start_pin_idx,
-                      g.hovered_pin_idx.value())
+                      g().hovered_pin_idx.value())
                 : OptionalIndex();
 
         const bool should_snap =
-            g.hovered_pin_idx.has_value() &&
+            g().hovered_pin_idx.has_value() &&
             should_link_snap_to_pin(
-                editor, start_pin, g.hovered_pin_idx.value(), maybe_duplicate_link_idx);
+                editor, start_pin, g().hovered_pin_idx.value(), maybe_duplicate_link_idx);
 
         // If we created on snap and the hovered pin is empty or changed, then we need signal that
         // the link's state has changed.
         const bool snapping_pin_changed =
             editor.click_interaction_state.link_creation.end_pin_idx.has_value() &&
-            !(g.hovered_pin_idx == editor.click_interaction_state.link_creation.end_pin_idx);
+            !(g().hovered_pin_idx == editor.click_interaction_state.link_creation.end_pin_idx);
 
         // Detach the link that was created by this link event if it's no longer in snap range
-        if (snapping_pin_changed && g.snap_link_idx.has_value())
+        if (snapping_pin_changed && g().snap_link_idx.has_value())
         {
             begin_link_detach(
                 editor,
-                g.snap_link_idx.value(),
+                g().snap_link_idx.value(),
                 editor.click_interaction_state.link_creation.end_pin_idx.value());
         }
 
@@ -1352,22 +1362,22 @@ void click_interaction_update(EditorContext& editor)
         // endpoint to it
         const ImVec2 end_pos = should_snap
                                    ? get_screen_space_pin_coordinates(
-                                         editor, editor.pins.pool[g.hovered_pin_idx.value()])
-                                   : g.mouse_pos;
+                                         editor, editor.pins.pool[g().hovered_pin_idx.value()])
+                                   : g().mouse_pos;
 
         const LinkBezierData link_data = get_link_renderable(
-            start_pos, end_pos, start_pin.type, g.style.link_line_segments_per_length);
-        g.canvas_draw_list->AddBezierCurve(
+            start_pos, end_pos, start_pin.type, g().style.link_line_segments_per_length);
+        g().canvas_draw_list->AddBezierCurve(
             link_data.bezier.p0,
             link_data.bezier.p1,
             link_data.bezier.p2,
             link_data.bezier.p3,
-            g.style.colors[ColorStyle_Link],
-            g.style.link_thickness,
+            g().style.colors[ColorStyle_Link],
+            g().style.link_thickness,
             link_data.num_segments);
 
         const bool link_creation_on_snap =
-            g.hovered_pin_idx.has_value() && (editor.pins.pool[g.hovered_pin_idx.value()].flags &
+            g().hovered_pin_idx.has_value() && (editor.pins.pool[g().hovered_pin_idx.value()].flags &
                                               AttributeFlags_EnableLinkCreationOnSnap);
 
         if (!should_snap)
@@ -1375,28 +1385,28 @@ void click_interaction_update(EditorContext& editor)
             editor.click_interaction_state.link_creation.end_pin_idx.reset();
         }
 
-        const bool create_link = should_snap && (g.left_mouse_released || link_creation_on_snap);
+        const bool create_link = should_snap && (g().left_mouse_released || link_creation_on_snap);
 
         if (create_link && !maybe_duplicate_link_idx.has_value())
         {
             // Avoid send OnLinkCreated() events every frame if the snap link is not saved
             // (only applies for EnableLinkCreationOnSnap)
-            if (!g.left_mouse_released &&
-                editor.click_interaction_state.link_creation.end_pin_idx == g.hovered_pin_idx)
+            if (!g().left_mouse_released &&
+                editor.click_interaction_state.link_creation.end_pin_idx == g().hovered_pin_idx)
             {
                 break;
             }
 
-            g.element_state_change |= ElementStateChange_LinkCreated;
-            editor.click_interaction_state.link_creation.end_pin_idx = g.hovered_pin_idx.value();
+            g().element_state_change |= ElementStateChange_LinkCreated;
+            editor.click_interaction_state.link_creation.end_pin_idx = g().hovered_pin_idx.value();
         }
 
-        if (g.left_mouse_released)
+        if (g().left_mouse_released)
         {
             editor.click_interaction_type = ClickInteractionType_None;
             if (!create_link)
             {
-                g.element_state_change |= ElementStateChange_LinkDropped;
+                g().element_state_change |= ElementStateChange_LinkDropped;
             }
         }
     }
@@ -1404,9 +1414,9 @@ void click_interaction_update(EditorContext& editor)
     case ClickInteractionType_Panning:
     {
         const bool dragging =
-            g.io.emulate_three_button_mouse.enabled
-                ? (g.left_mouse_dragging && (*g.io.emulate_three_button_mouse.modifier))
-                : g.middle_mouse_dragging;
+            g().io.emulate_three_button_mouse.enabled
+                ? (g().left_mouse_dragging && (*g().io.emulate_three_button_mouse.modifier))
+                : g().middle_mouse_dragging;
 
         if (dragging)
         {
@@ -1428,7 +1438,7 @@ void click_interaction_update(EditorContext& editor)
 
 OptionalIndex resolve_hovered_node(const EditorContext& editor)
 {
-    if (g.node_indices_overlapping_with_mouse.Size == 0)
+    if (g().node_indices_overlapping_with_mouse.Size == 0)
     {
         return OptionalIndex();
     }
@@ -1437,9 +1447,9 @@ OptionalIndex resolve_hovered_node(const EditorContext& editor)
     int node_idx_on_top = -1;
 
     const ImVector<int>& depth_stack = editor.node_depth_order;
-    for (int i = 0; i < g.node_indices_overlapping_with_mouse.Size; ++i)
+    for (int i = 0; i < g().node_indices_overlapping_with_mouse.Size; ++i)
     {
-        const int node_idx = g.node_indices_overlapping_with_mouse[i];
+        const int node_idx = g().node_indices_overlapping_with_mouse[i];
         for (int depth_idx = 0; depth_idx < depth_stack.Size; ++depth_idx)
         {
             if (depth_stack[depth_idx] == node_idx && (depth_idx > largest_depth_idx))
@@ -1458,12 +1468,12 @@ OptionalIndex resolve_hovered_node(const EditorContext& editor)
 
 inline ImVec2 screen_space_to_grid_space(const EditorContext& editor, const ImVec2& v)
 {
-    return v - g.canvas_origin_screen_space - editor.panning;
+    return v - g().canvas_origin_screen_space - editor.panning;
 }
 
 inline ImVec2 grid_space_to_screen_space(const EditorContext& editor, const ImVec2& v)
 {
-    return v + g.canvas_origin_screen_space + editor.panning;
+    return v + g().canvas_origin_screen_space + editor.panning;
 }
 
 inline ImVec2 grid_space_to_editor_space(const EditorContext& editor, const ImVec2& v)
@@ -1478,7 +1488,7 @@ inline ImVec2 editor_space_to_grid_space(const EditorContext& editor, const ImVe
 
 inline ImVec2 editor_space_to_screen_space(const ImVec2& v)
 {
-    return g.canvas_origin_screen_space + v;
+    return g().canvas_origin_screen_space + v;
 }
 
 inline ImRect get_item_rect() { return ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax()); }
@@ -1510,22 +1520,22 @@ void draw_grid(EditorContext& editor, const ImVec2& canvas_size)
 {
     const ImVec2 offset = editor.panning;
 
-    for (float x = fmodf(offset.x, g.style.grid_spacing); x < canvas_size.x;
-         x += g.style.grid_spacing)
+    for (float x = fmodf(offset.x, g().style.grid_spacing); x < canvas_size.x;
+         x += g().style.grid_spacing)
     {
-        g.canvas_draw_list->AddLine(
+        g().canvas_draw_list->AddLine(
             editor_space_to_screen_space(ImVec2(x, 0.0f)),
             editor_space_to_screen_space(ImVec2(x, canvas_size.y)),
-            g.style.colors[ColorStyle_GridLine]);
+            g().style.colors[ColorStyle_GridLine]);
     }
 
-    for (float y = fmodf(offset.y, g.style.grid_spacing); y < canvas_size.y;
-         y += g.style.grid_spacing)
+    for (float y = fmodf(offset.y, g().style.grid_spacing); y < canvas_size.y;
+         y += g().style.grid_spacing)
     {
-        g.canvas_draw_list->AddLine(
+        g().canvas_draw_list->AddLine(
             editor_space_to_screen_space(ImVec2(0.0f, y)),
             editor_space_to_screen_space(ImVec2(canvas_size.x, y)),
-            g.style.colors[ColorStyle_GridLine]);
+            g().style.colors[ColorStyle_GridLine]);
     }
 }
 
@@ -1585,36 +1595,36 @@ void draw_pin_shape(const ImVec2& pin_pos, const PinData& pin, const ImU32 pin_c
     {
     case PinShape_Circle:
     {
-        g.canvas_draw_list->AddCircle(
+        g().canvas_draw_list->AddCircle(
             pin_pos,
-            g.style.pin_circle_radius,
+            g().style.pin_circle_radius,
             pin_color,
             circle_num_segments,
-            g.style.pin_line_thickness);
+            g().style.pin_line_thickness);
     }
     break;
     case PinShape_CircleFilled:
     {
-        g.canvas_draw_list->AddCircleFilled(
-            pin_pos, g.style.pin_circle_radius, pin_color, circle_num_segments);
+        g().canvas_draw_list->AddCircleFilled(
+            pin_pos, g().style.pin_circle_radius, pin_color, circle_num_segments);
     }
     break;
     case PinShape_Quad:
     {
-        const QuadOffsets offset = calculate_quad_offsets(g.style.pin_quad_side_length);
-        g.canvas_draw_list->AddQuad(
+        const QuadOffsets offset = calculate_quad_offsets(g().style.pin_quad_side_length);
+        g().canvas_draw_list->AddQuad(
             pin_pos + offset.top_left,
             pin_pos + offset.bottom_left,
             pin_pos + offset.bottom_right,
             pin_pos + offset.top_right,
             pin_color,
-            g.style.pin_line_thickness);
+            g().style.pin_line_thickness);
     }
     break;
     case PinShape_QuadFilled:
     {
-        const QuadOffsets offset = calculate_quad_offsets(g.style.pin_quad_side_length);
-        g.canvas_draw_list->AddQuadFilled(
+        const QuadOffsets offset = calculate_quad_offsets(g().style.pin_quad_side_length);
+        g().canvas_draw_list->AddQuadFilled(
             pin_pos + offset.top_left,
             pin_pos + offset.bottom_left,
             pin_pos + offset.bottom_right,
@@ -1624,8 +1634,8 @@ void draw_pin_shape(const ImVec2& pin_pos, const PinData& pin, const ImU32 pin_c
     break;
     case PinShape_Triangle:
     {
-        const TriangleOffsets offset = calculate_triangle_offsets(g.style.pin_triangle_side_length);
-        g.canvas_draw_list->AddTriangle(
+        const TriangleOffsets offset = calculate_triangle_offsets(g().style.pin_triangle_side_length);
+        g().canvas_draw_list->AddTriangle(
             pin_pos + offset.top_left,
             pin_pos + offset.bottom_left,
             pin_pos + offset.right,
@@ -1634,13 +1644,13 @@ void draw_pin_shape(const ImVec2& pin_pos, const PinData& pin, const ImU32 pin_c
             // much thinner than the lines drawn by AddCircle or AddQuad.
             // Multiplying the line thickness by two seemed to solve the
             // problem at a few different thickness values.
-            2.f * g.style.pin_line_thickness);
+            2.f * g().style.pin_line_thickness);
     }
     break;
     case PinShape_TriangleFilled:
     {
-        const TriangleOffsets offset = calculate_triangle_offsets(g.style.pin_triangle_side_length);
-        g.canvas_draw_list->AddTriangleFilled(
+        const TriangleOffsets offset = calculate_triangle_offsets(g().style.pin_triangle_side_length);
+        g().canvas_draw_list->AddTriangleFilled(
             pin_pos + offset.top_left,
             pin_pos + offset.bottom_left,
             pin_pos + offset.right,
@@ -1662,10 +1672,10 @@ void draw_pin(EditorContext& editor, const int pin_idx, const bool left_mouse_cl
 
     ImU32 pin_color = pin.color_style.background;
 
-    if (is_mouse_hovering_near_point(pin.pos, g.style.pin_hover_radius))
+    if (is_mouse_hovering_near_point(pin.pos, g().style.pin_hover_radius))
     {
-        g.hovered_pin_idx = pin_idx;
-        g.hovered_pin_flags = pin.flags;
+        g().hovered_pin_idx = pin_idx;
+        g().hovered_pin_flags = pin.flags;
         pin_color = pin.color_style.hovered;
 
         if (left_mouse_clicked)
@@ -1686,7 +1696,7 @@ void draw_node(EditorContext& editor, const int node_idx)
     ImGui::SetCursorPos(node.origin + editor.panning);
 
     const bool node_hovered =
-        g.hovered_node_idx.has_value() && node_idx == g.hovered_node_idx.value();
+        g().hovered_node_idx.has_value() && node_idx == g().hovered_node_idx.value();
 
     ImU32 node_background = node.color_style.background;
     ImU32 titlebar_background = node.color_style.titlebar;
@@ -1704,7 +1714,7 @@ void draw_node(EditorContext& editor, const int node_idx)
 
     {
         // node base
-        g.canvas_draw_list->AddRectFilled(
+        g().canvas_draw_list->AddRectFilled(
             node.rect.Min, node.rect.Max, node_background, node.layout_style.corner_rounding);
 
         // title bar:
@@ -1712,7 +1722,7 @@ void draw_node(EditorContext& editor, const int node_idx)
         {
             ImRect title_bar_rect = get_node_title_rect(node);
 
-            g.canvas_draw_list->AddRectFilled(
+            g().canvas_draw_list->AddRectFilled(
                 title_bar_rect.Min,
                 title_bar_rect.Max,
                 titlebar_background,
@@ -1720,9 +1730,9 @@ void draw_node(EditorContext& editor, const int node_idx)
                 ImDrawCornerFlags_Top);
         }
 
-        if ((g.style.flags & StyleFlags_NodeOutline) != 0)
+        if ((g().style.flags & StyleFlags_NodeOutline) != 0)
         {
-            g.canvas_draw_list->AddRect(
+            g().canvas_draw_list->AddRect(
                 node.rect.Min,
                 node.rect.Max,
                 node.color_style.outline,
@@ -1732,14 +1742,14 @@ void draw_node(EditorContext& editor, const int node_idx)
 
     for (int i = 0; i < node.pin_indices.size(); ++i)
     {
-        draw_pin(editor, node.pin_indices[i], g.left_mouse_clicked);
+        draw_pin(editor, node.pin_indices[i], g().left_mouse_clicked);
     }
 
     if (node_hovered)
     {
-        g.hovered_node_idx = node_idx;
-        const bool node_ui_interaction = g.interactive_node_idx == node_idx;
-        if (g.left_mouse_clicked && !node_ui_interaction)
+        g().hovered_node_idx = node_idx;
+        const bool node_ui_interaction = g().interactive_node_idx == node_idx;
+        if (g().left_mouse_clicked && !node_ui_interaction)
         {
             begin_node_selection(editor, node_idx);
         }
@@ -1750,7 +1760,7 @@ bool is_link_hovered(const LinkBezierData& link_data)
 {
     // We render nodes on top of links. In order to prevent link interaction when a node is on top
     // of a link, we just early out here if a node is hovered.
-    if (g.hovered_node_idx.has_value())
+    if (g().hovered_node_idx.has_value())
     {
         return false;
     }
@@ -1765,13 +1775,13 @@ void draw_link(EditorContext& editor, const int link_idx)
     const PinData& end_pin = editor.pins.pool[link.end_pin_idx];
 
     const LinkBezierData link_data = get_link_renderable(
-        start_pin.pos, end_pin.pos, start_pin.type, g.style.link_line_segments_per_length);
+        start_pin.pos, end_pin.pos, start_pin.type, g().style.link_line_segments_per_length);
 
     const bool link_hovered = is_link_hovered(link_data);
     if (link_hovered)
     {
-        g.hovered_link_idx = link_idx;
-        if (g.left_mouse_clicked)
+        g().hovered_link_idx = link_idx;
+        if (g().left_mouse_clicked)
         {
             begin_link_interaction(editor, link_idx);
         }
@@ -1782,7 +1792,7 @@ void draw_link(EditorContext& editor, const int link_idx)
     // position.
     //
     // In other words, skip rendering the link if it was deleted.
-    if (g.deleted_link_idx == link_idx)
+    if (g().deleted_link_idx == link_idx)
     {
         return;
     }
@@ -1797,13 +1807,13 @@ void draw_link(EditorContext& editor, const int link_idx)
         link_color = link.color_style.hovered;
     }
 
-    g.canvas_draw_list->AddBezierCurve(
+    g().canvas_draw_list->AddBezierCurve(
         link_data.bezier.p0,
         link_data.bezier.p1,
         link_data.bezier.p2,
         link_data.bezier.p3,
         link_color,
-        g.style.link_thickness,
+        g().style.link_thickness,
         link_data.num_segments);
 }
 
@@ -1815,48 +1825,48 @@ void begin_pin_attribute(
 {
     // Make sure to call BeginNode() before calling
     // BeginAttribute()
-    assert(g.current_scope == Scope_Node);
-    g.current_scope = Scope_Attribute;
+    assert(g().current_scope == Scope_Node);
+    g().current_scope = Scope_Attribute;
 
     ImGui::BeginGroup();
     ImGui::PushID(id);
 
     EditorContext& editor = editor_context_get();
 
-    g.current_attribute_id = id;
+    g().current_attribute_id = id;
 
     const int pin_idx = object_pool_find_or_create_index(editor.pins, id);
-    g.current_pin_idx = pin_idx;
+    g().current_pin_idx = pin_idx;
     PinData& pin = editor.pins.pool[pin_idx];
     pin.id = id;
     pin.parent_node_idx = node_idx;
     pin.type = type;
     pin.shape = shape;
-    pin.flags = g.current_attribute_flags;
-    pin.color_style.background = g.style.colors[ColorStyle_Pin];
-    pin.color_style.hovered = g.style.colors[ColorStyle_PinHovered];
+    pin.flags = g().current_attribute_flags;
+    pin.color_style.background = g().style.colors[ColorStyle_Pin];
+    pin.color_style.hovered = g().style.colors[ColorStyle_PinHovered];
 }
 
 void end_pin_attribute()
 {
-    assert(g.current_scope == Scope_Attribute);
-    g.current_scope = Scope_Node;
+    assert(g().current_scope == Scope_Attribute);
+    g().current_scope = Scope_Node;
 
     ImGui::PopID();
     ImGui::EndGroup();
 
     if (ImGui::IsItemActive())
     {
-        g.active_attribute = true;
-        g.active_attribute_id = g.current_attribute_id;
-        g.interactive_node_idx = g.current_node_idx;
+        g().active_attribute = true;
+        g().active_attribute_id = g().current_attribute_id;
+        g().interactive_node_idx = g().current_node_idx;
     }
 
     EditorContext& editor = editor_context_get();
-    PinData& pin = editor.pins.pool[g.current_pin_idx];
-    NodeData& node = editor.nodes.pool[g.current_node_idx];
+    PinData& pin = editor.pins.pool[g().current_pin_idx];
+    NodeData& node = editor.nodes.pool[g().current_node_idx];
     pin.attribute_rect = get_item_rect();
-    node.pin_indices.push_back(g.current_pin_idx);
+    node.pin_indices.push_back(g().current_pin_idx);
 }
 } // namespace
 
@@ -1890,7 +1900,7 @@ void EditorContextFree(EditorContext* ctx)
     ImGui::MemFree(ctx);
 }
 
-void EditorContextSet(EditorContext* ctx) { g.editor_ctx = ctx; }
+void EditorContextSet(EditorContext* ctx) { g().editor_ctx = ctx; }
 
 ImVec2 EditorContextGetPanning()
 {
@@ -1915,109 +1925,110 @@ void EditorContextMoveToNode(const int node_id)
 
 void Initialize()
 {
-    g.canvas_origin_screen_space = ImVec2(0.0f, 0.0f);
-    g.canvas_rect_screen_space = ImRect(ImVec2(0.f, 0.f), ImVec2(0.f, 0.f));
-    g.current_scope = Scope_None;
+    g().canvas_origin_screen_space = ImVec2(0.0f, 0.0f);
+    g().canvas_rect_screen_space = ImRect(ImVec2(0.f, 0.f), ImVec2(0.f, 0.f));
+    g().current_scope = Scope_None;
 
-    g.current_pin_idx = INT_MAX;
-    g.current_node_idx = INT_MAX;
+    g().current_pin_idx = INT_MAX;
+    g().current_node_idx = INT_MAX;
 
-    g.default_editor_ctx = EditorContextCreate();
-    EditorContextSet(g.default_editor_ctx);
+    g().default_editor_ctx = EditorContextCreate();
+    EditorContextSet(g().default_editor_ctx);
 
     const ImGuiIO& io = ImGui::GetIO();
-    g.io.emulate_three_button_mouse.modifier = &io.KeyAlt;
+    g().io.emulate_three_button_mouse.modifier = &io.KeyAlt;
 
-    g.current_attribute_flags = AttributeFlags_None;
-    g.attribute_flag_stack.push_back(g.current_attribute_flags);
+    g().current_attribute_flags = AttributeFlags_None;
+    g().attribute_flag_stack.push_back(g().current_attribute_flags);
 
     StyleColorsDark();
 }
 
 void Shutdown()
 {
-    EditorContextFree(g.default_editor_ctx);
-    g.editor_ctx = NULL;
-    g.default_editor_ctx = NULL;
+    EditorContextFree(g().default_editor_ctx);
+    g().editor_ctx = NULL;
+    g().default_editor_ctx = NULL;
+	gg.destroy();
 }
 
-IO& GetIO() { return g.io; }
+IO& GetIO() { return g().io; }
 
-Style& GetStyle() { return g.style; }
+Style& GetStyle() { return g().style; }
 
 void StyleColorsDark()
 {
-    g.style.colors[ColorStyle_NodeBackground] = IM_COL32(50, 50, 50, 255);
-    g.style.colors[ColorStyle_NodeBackgroundHovered] = IM_COL32(75, 75, 75, 255);
-    g.style.colors[ColorStyle_NodeBackgroundSelected] = IM_COL32(75, 75, 75, 255);
-    g.style.colors[ColorStyle_NodeOutline] = IM_COL32(100, 100, 100, 255);
+    g().style.colors[ColorStyle_NodeBackground] = IM_COL32(50, 50, 50, 255);
+    g().style.colors[ColorStyle_NodeBackgroundHovered] = IM_COL32(75, 75, 75, 255);
+    g().style.colors[ColorStyle_NodeBackgroundSelected] = IM_COL32(75, 75, 75, 255);
+    g().style.colors[ColorStyle_NodeOutline] = IM_COL32(100, 100, 100, 255);
     // title bar colors match ImGui's titlebg colors
-    g.style.colors[ColorStyle_TitleBar] = IM_COL32(41, 74, 122, 255);
-    g.style.colors[ColorStyle_TitleBarHovered] = IM_COL32(66, 150, 250, 255);
-    g.style.colors[ColorStyle_TitleBarSelected] = IM_COL32(66, 150, 250, 255);
+    g().style.colors[ColorStyle_TitleBar] = IM_COL32(41, 74, 122, 255);
+    g().style.colors[ColorStyle_TitleBarHovered] = IM_COL32(66, 150, 250, 255);
+    g().style.colors[ColorStyle_TitleBarSelected] = IM_COL32(66, 150, 250, 255);
     // link colors match ImGui's slider grab colors
-    g.style.colors[ColorStyle_Link] = IM_COL32(61, 133, 224, 200);
-    g.style.colors[ColorStyle_LinkHovered] = IM_COL32(66, 150, 250, 255);
-    g.style.colors[ColorStyle_LinkSelected] = IM_COL32(66, 150, 250, 255);
+    g().style.colors[ColorStyle_Link] = IM_COL32(61, 133, 224, 200);
+    g().style.colors[ColorStyle_LinkHovered] = IM_COL32(66, 150, 250, 255);
+    g().style.colors[ColorStyle_LinkSelected] = IM_COL32(66, 150, 250, 255);
     // pin colors match ImGui's button colors
-    g.style.colors[ColorStyle_Pin] = IM_COL32(53, 150, 250, 180);
-    g.style.colors[ColorStyle_PinHovered] = IM_COL32(53, 150, 250, 255);
+    g().style.colors[ColorStyle_Pin] = IM_COL32(53, 150, 250, 180);
+    g().style.colors[ColorStyle_PinHovered] = IM_COL32(53, 150, 250, 255);
 
-    g.style.colors[ColorStyle_BoxSelector] = IM_COL32(61, 133, 224, 30);
-    g.style.colors[ColorStyle_BoxSelectorOutline] = IM_COL32(61, 133, 224, 150);
+    g().style.colors[ColorStyle_BoxSelector] = IM_COL32(61, 133, 224, 30);
+    g().style.colors[ColorStyle_BoxSelectorOutline] = IM_COL32(61, 133, 224, 150);
 
-    g.style.colors[ColorStyle_GridBackground] = IM_COL32(40, 40, 50, 200);
-    g.style.colors[ColorStyle_GridLine] = IM_COL32(200, 200, 200, 40);
+    g().style.colors[ColorStyle_GridBackground] = IM_COL32(40, 40, 50, 200);
+    g().style.colors[ColorStyle_GridLine] = IM_COL32(200, 200, 200, 40);
 }
 
 void StyleColorsClassic()
 {
-    g.style.colors[ColorStyle_NodeBackground] = IM_COL32(50, 50, 50, 255);
-    g.style.colors[ColorStyle_NodeBackgroundHovered] = IM_COL32(75, 75, 75, 255);
-    g.style.colors[ColorStyle_NodeBackgroundSelected] = IM_COL32(75, 75, 75, 255);
-    g.style.colors[ColorStyle_NodeOutline] = IM_COL32(100, 100, 100, 255);
-    g.style.colors[ColorStyle_TitleBar] = IM_COL32(69, 69, 138, 255);
-    g.style.colors[ColorStyle_TitleBarHovered] = IM_COL32(82, 82, 161, 255);
-    g.style.colors[ColorStyle_TitleBarSelected] = IM_COL32(82, 82, 161, 255);
-    g.style.colors[ColorStyle_Link] = IM_COL32(255, 255, 255, 100);
-    g.style.colors[ColorStyle_LinkHovered] = IM_COL32(105, 99, 204, 153);
-    g.style.colors[ColorStyle_LinkSelected] = IM_COL32(105, 99, 204, 153);
-    g.style.colors[ColorStyle_Pin] = IM_COL32(89, 102, 156, 170);
-    g.style.colors[ColorStyle_PinHovered] = IM_COL32(102, 122, 179, 200);
-    g.style.colors[ColorStyle_BoxSelector] = IM_COL32(82, 82, 161, 100);
-    g.style.colors[ColorStyle_BoxSelectorOutline] = IM_COL32(82, 82, 161, 255);
-    g.style.colors[ColorStyle_GridBackground] = IM_COL32(40, 40, 50, 200);
-    g.style.colors[ColorStyle_GridLine] = IM_COL32(200, 200, 200, 40);
+    g().style.colors[ColorStyle_NodeBackground] = IM_COL32(50, 50, 50, 255);
+    g().style.colors[ColorStyle_NodeBackgroundHovered] = IM_COL32(75, 75, 75, 255);
+    g().style.colors[ColorStyle_NodeBackgroundSelected] = IM_COL32(75, 75, 75, 255);
+    g().style.colors[ColorStyle_NodeOutline] = IM_COL32(100, 100, 100, 255);
+    g().style.colors[ColorStyle_TitleBar] = IM_COL32(69, 69, 138, 255);
+    g().style.colors[ColorStyle_TitleBarHovered] = IM_COL32(82, 82, 161, 255);
+    g().style.colors[ColorStyle_TitleBarSelected] = IM_COL32(82, 82, 161, 255);
+    g().style.colors[ColorStyle_Link] = IM_COL32(255, 255, 255, 100);
+    g().style.colors[ColorStyle_LinkHovered] = IM_COL32(105, 99, 204, 153);
+    g().style.colors[ColorStyle_LinkSelected] = IM_COL32(105, 99, 204, 153);
+    g().style.colors[ColorStyle_Pin] = IM_COL32(89, 102, 156, 170);
+    g().style.colors[ColorStyle_PinHovered] = IM_COL32(102, 122, 179, 200);
+    g().style.colors[ColorStyle_BoxSelector] = IM_COL32(82, 82, 161, 100);
+    g().style.colors[ColorStyle_BoxSelectorOutline] = IM_COL32(82, 82, 161, 255);
+    g().style.colors[ColorStyle_GridBackground] = IM_COL32(40, 40, 50, 200);
+    g().style.colors[ColorStyle_GridLine] = IM_COL32(200, 200, 200, 40);
 }
 
 void StyleColorsLight()
 {
-    g.style.colors[ColorStyle_NodeBackground] = IM_COL32(240, 240, 240, 255);
-    g.style.colors[ColorStyle_NodeBackgroundHovered] = IM_COL32(240, 240, 240, 255);
-    g.style.colors[ColorStyle_NodeBackgroundSelected] = IM_COL32(240, 240, 240, 255);
-    g.style.colors[ColorStyle_NodeOutline] = IM_COL32(100, 100, 100, 255);
-    g.style.colors[ColorStyle_TitleBar] = IM_COL32(248, 248, 248, 255);
-    g.style.colors[ColorStyle_TitleBarHovered] = IM_COL32(209, 209, 209, 255);
-    g.style.colors[ColorStyle_TitleBarSelected] = IM_COL32(209, 209, 209, 255);
+    g().style.colors[ColorStyle_NodeBackground] = IM_COL32(240, 240, 240, 255);
+    g().style.colors[ColorStyle_NodeBackgroundHovered] = IM_COL32(240, 240, 240, 255);
+    g().style.colors[ColorStyle_NodeBackgroundSelected] = IM_COL32(240, 240, 240, 255);
+    g().style.colors[ColorStyle_NodeOutline] = IM_COL32(100, 100, 100, 255);
+    g().style.colors[ColorStyle_TitleBar] = IM_COL32(248, 248, 248, 255);
+    g().style.colors[ColorStyle_TitleBarHovered] = IM_COL32(209, 209, 209, 255);
+    g().style.colors[ColorStyle_TitleBarSelected] = IM_COL32(209, 209, 209, 255);
     // original imgui values: 66, 150, 250
-    g.style.colors[ColorStyle_Link] = IM_COL32(66, 150, 250, 100);
+    g().style.colors[ColorStyle_Link] = IM_COL32(66, 150, 250, 100);
     // original imgui values: 117, 138, 204
-    g.style.colors[ColorStyle_LinkHovered] = IM_COL32(66, 150, 250, 242);
-    g.style.colors[ColorStyle_LinkSelected] = IM_COL32(66, 150, 250, 242);
+    g().style.colors[ColorStyle_LinkHovered] = IM_COL32(66, 150, 250, 242);
+    g().style.colors[ColorStyle_LinkSelected] = IM_COL32(66, 150, 250, 242);
     // original imgui values: 66, 150, 250
-    g.style.colors[ColorStyle_Pin] = IM_COL32(66, 150, 250, 160);
-    g.style.colors[ColorStyle_PinHovered] = IM_COL32(66, 150, 250, 255);
-    g.style.colors[ColorStyle_BoxSelector] = IM_COL32(90, 170, 250, 30);
-    g.style.colors[ColorStyle_BoxSelectorOutline] = IM_COL32(90, 170, 250, 150);
-    g.style.colors[ColorStyle_GridBackground] = IM_COL32(225, 225, 225, 255);
-    g.style.colors[ColorStyle_GridLine] = IM_COL32(180, 180, 180, 100);
-    g.style.flags = StyleFlags(StyleFlags_None);
+    g().style.colors[ColorStyle_Pin] = IM_COL32(66, 150, 250, 160);
+    g().style.colors[ColorStyle_PinHovered] = IM_COL32(66, 150, 250, 255);
+    g().style.colors[ColorStyle_BoxSelector] = IM_COL32(90, 170, 250, 30);
+    g().style.colors[ColorStyle_BoxSelectorOutline] = IM_COL32(90, 170, 250, 150);
+    g().style.colors[ColorStyle_GridBackground] = IM_COL32(225, 225, 225, 255);
+    g().style.colors[ColorStyle_GridLine] = IM_COL32(180, 180, 180, 100);
+    g().style.flags = StyleFlags(StyleFlags_None);
 }
 
 void BeginNodeEditor()
 {
-    assert(g.current_scope == Scope_None);
-    g.current_scope = Scope_Editor;
+    assert(g().current_scope == Scope_None);
+    g().current_scope = Scope_Editor;
 
     // Reset state from previous pass
 
@@ -2026,39 +2037,39 @@ void BeginNodeEditor()
     object_pool_reset(editor.pins);
     object_pool_reset(editor.links);
 
-    g.hovered_node_idx.reset();
-    g.interactive_node_idx.reset();
-    g.hovered_link_idx.reset();
-    g.hovered_pin_idx.reset();
-    g.hovered_pin_flags = AttributeFlags_None;
-    g.deleted_link_idx.reset();
-    g.snap_link_idx.reset();
+    g().hovered_node_idx.reset();
+    g().interactive_node_idx.reset();
+    g().hovered_link_idx.reset();
+    g().hovered_pin_idx.reset();
+    g().hovered_pin_flags = AttributeFlags_None;
+    g().deleted_link_idx.reset();
+    g().snap_link_idx.reset();
 
-    g.node_indices_overlapping_with_mouse.clear();
+    g().node_indices_overlapping_with_mouse.clear();
 
-    g.element_state_change = ElementStateChange_None;
+    g().element_state_change = ElementStateChange_None;
 
-    g.mouse_pos = ImGui::GetIO().MousePos;
-    g.left_mouse_clicked = ImGui::IsMouseClicked(0);
-    g.left_mouse_released = ImGui::IsMouseReleased(0);
-    g.middle_mouse_clicked = ImGui::IsMouseClicked(2);
-    g.left_mouse_dragging = ImGui::IsMouseDragging(0, 0.0f);
-    g.middle_mouse_dragging = ImGui::IsMouseDragging(2, 0.0f);
+    g().mouse_pos = ImGui::GetIO().MousePos;
+    g().left_mouse_clicked = ImGui::IsMouseClicked(0);
+    g().left_mouse_released = ImGui::IsMouseReleased(0);
+    g().middle_mouse_clicked = ImGui::IsMouseClicked(2);
+    g().left_mouse_dragging = ImGui::IsMouseDragging(0, 0.0f);
+    g().middle_mouse_dragging = ImGui::IsMouseDragging(2, 0.0f);
 
-    g.active_attribute = false;
+    g().active_attribute = false;
 
     ImGui::BeginGroup();
     {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1.f, 1.f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, g.style.colors[ColorStyle_GridBackground]);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, g().style.colors[ColorStyle_GridBackground]);
         ImGui::BeginChild(
             "scrolling_region",
             ImVec2(0.f, 0.f),
             true,
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove |
                 ImGuiWindowFlags_NoScrollWithMouse);
-        g.canvas_origin_screen_space = ImGui::GetCursorScreenPos();
+        g().canvas_origin_screen_space = ImGui::GetCursorScreenPos();
 
         // NOTE: we have to fetch the canvas draw list *after* we call
         // BeginChild(), otherwise the ImGui UI elements are going to be
@@ -2067,11 +2078,11 @@ void BeginNodeEditor()
 
         {
             const ImVec2 canvas_size = ImGui::GetWindowSize();
-            g.canvas_rect_screen_space = ImRect(
+            g().canvas_rect_screen_space = ImRect(
                 editor_space_to_screen_space(ImVec2(0.f, 0.f)),
                 editor_space_to_screen_space(canvas_size));
 
-            if (g.style.flags & StyleFlags_GridLines)
+            if (g().style.flags & StyleFlags_GridLines)
             {
                 draw_grid(editor, canvas_size);
             }
@@ -2081,15 +2092,15 @@ void BeginNodeEditor()
 
 void EndNodeEditor()
 {
-    assert(g.current_scope == Scope_Editor);
-    g.current_scope = Scope_None;
+    assert(g().current_scope == Scope_Editor);
+    g().current_scope = Scope_None;
 
     EditorContext& editor = editor_context_get();
 
     // Resolve which node is actually on top and being hovered. This needs to be done before any of
     // the nodes can be rendered.
 
-    g.hovered_node_idx = resolve_hovered_node(editor);
+    g().hovered_node_idx = resolve_hovered_node(editor);
 
     // Render the nodes and resolve which pin the mouse is hovering over. The hovered pin is needed
     // for handling click interactions.
@@ -2109,7 +2120,7 @@ void EndNodeEditor()
     draw_list_append_click_interaction_channel();
     draw_list_activate_click_interaction_channel();
 
-    if (g.left_mouse_clicked || g.middle_mouse_clicked)
+    if (g().left_mouse_clicked || g().middle_mouse_clicked)
     {
         begin_canvas_interaction(editor);
     }
@@ -2126,7 +2137,7 @@ void EndNodeEditor()
 
     // In order to render the links underneath the nodes, we want to first select the bottom draw
     // channel.
-    g.canvas_draw_list->ChannelsSetCurrent(0);
+    g().canvas_draw_list->ChannelsSetCurrent(0);
 
     for (int link_idx = 0; link_idx < editor.links.pool.size(); ++link_idx)
     {
@@ -2140,7 +2151,7 @@ void EndNodeEditor()
     object_pool_update(editor.links);
 
     // Finally, merge the draw channels
-    g.canvas_draw_list->ChannelsMerge();
+    g().canvas_draw_list->ChannelsMerge();
 
     // pop style
     ImGui::EndChild();      // end scrolling region
@@ -2153,25 +2164,25 @@ void EndNodeEditor()
 void BeginNode(const int node_id)
 {
     // Remember to call BeginNodeEditor before calling BeginNode
-    assert(g.current_scope == Scope_Editor);
-    g.current_scope = Scope_Node;
+    assert(g().current_scope == Scope_Editor);
+    g().current_scope = Scope_Node;
 
     EditorContext& editor = editor_context_get();
 
     const int node_idx = object_pool_find_or_create_index(editor.nodes, node_id);
-    g.current_node_idx = node_idx;
+    g().current_node_idx = node_idx;
 
     NodeData& node = editor.nodes.pool[node_idx];
-    node.color_style.background = g.style.colors[ColorStyle_NodeBackground];
-    node.color_style.background_hovered = g.style.colors[ColorStyle_NodeBackgroundHovered];
-    node.color_style.background_selected = g.style.colors[ColorStyle_NodeBackgroundSelected];
-    node.color_style.outline = g.style.colors[ColorStyle_NodeOutline];
-    node.color_style.titlebar = g.style.colors[ColorStyle_TitleBar];
-    node.color_style.titlebar_hovered = g.style.colors[ColorStyle_TitleBarHovered];
-    node.color_style.titlebar_selected = g.style.colors[ColorStyle_TitleBarSelected];
-    node.layout_style.corner_rounding = g.style.node_corner_rounding;
+    node.color_style.background = g().style.colors[ColorStyle_NodeBackground];
+    node.color_style.background_hovered = g().style.colors[ColorStyle_NodeBackgroundHovered];
+    node.color_style.background_selected = g().style.colors[ColorStyle_NodeBackgroundSelected];
+    node.color_style.outline = g().style.colors[ColorStyle_NodeOutline];
+    node.color_style.titlebar = g().style.colors[ColorStyle_TitleBar];
+    node.color_style.titlebar_hovered = g().style.colors[ColorStyle_TitleBarHovered];
+    node.color_style.titlebar_selected = g().style.colors[ColorStyle_TitleBarSelected];
+    node.layout_style.corner_rounding = g().style.node_corner_rounding;
     node.layout_style.padding =
-        ImVec2(g.style.node_padding_horizontal, g.style.node_padding_vertical);
+        ImVec2(g().style.node_padding_horizontal, g().style.node_padding_vertical);
 
     // ImGui::SetCursorPos sets the cursor position, local to the current widget
     // (in this case, the child object started in BeginNodeEditor). Use
@@ -2187,8 +2198,8 @@ void BeginNode(const int node_id)
 
 void EndNode()
 {
-    assert(g.current_scope == Scope_Node);
-    g.current_scope = Scope_Editor;
+    assert(g().current_scope == Scope_Node);
+    g().current_scope = Scope_Editor;
 
     EditorContext& editor = editor_context_get();
 
@@ -2196,13 +2207,13 @@ void EndNode()
     ImGui::EndGroup();
     ImGui::PopID();
 
-    NodeData& node = editor.nodes.pool[g.current_node_idx];
+    NodeData& node = editor.nodes.pool[g().current_node_idx];
     node.rect = get_item_rect();
     node.rect.Expand(node.layout_style.padding);
 
-    if (node.rect.Contains(g.mouse_pos))
+    if (node.rect.Contains(g().mouse_pos))
     {
-        g.node_indices_overlapping_with_mouse.push_back(g.current_node_idx);
+        g().node_indices_overlapping_with_mouse.push_back(g().current_node_idx);
     }
 }
 
@@ -2217,17 +2228,17 @@ ImVec2 GetNodeDimensions(int node_id)
 
 void BeginNodeTitleBar()
 {
-    assert(g.current_scope == Scope_Node);
+    assert(g().current_scope == Scope_Node);
     ImGui::BeginGroup();
 }
 
 void EndNodeTitleBar()
 {
-    assert(g.current_scope == Scope_Node);
+    assert(g().current_scope == Scope_Node);
     ImGui::EndGroup();
 
     EditorContext& editor = editor_context_get();
-    NodeData& node = editor.nodes.pool[g.current_node_idx];
+    NodeData& node = editor.nodes.pool[g().current_node_idx];
     node.title_bar_content_rect = get_item_rect();
 
     ImGui::ItemAdd(get_node_title_rect(node), ImGui::GetID("title_bar"));
@@ -2237,14 +2248,14 @@ void EndNodeTitleBar()
 
 void BeginInputAttribute(const int id, const PinShape shape)
 {
-    begin_pin_attribute(id, AttributeType_Input, shape, g.current_node_idx);
+    begin_pin_attribute(id, AttributeType_Input, shape, g().current_node_idx);
 }
 
 void EndInputAttribute() { end_pin_attribute(); }
 
 void BeginOutputAttribute(const int id, const PinShape shape)
 {
-    begin_pin_attribute(id, AttributeType_Output, shape, g.current_node_idx);
+    begin_pin_attribute(id, AttributeType_Output, shape, g().current_node_idx);
 }
 
 void EndOutputAttribute() { end_pin_attribute(); }
@@ -2252,10 +2263,10 @@ void EndOutputAttribute() { end_pin_attribute(); }
 void BeginStaticAttribute(const int id)
 {
     // Make sure to call BeginNode() before calling BeginAttribute()
-    assert(g.current_scope == Scope_Node);
-    g.current_scope = Scope_Attribute;
+    assert(g().current_scope == Scope_Node);
+    g().current_scope = Scope_Attribute;
 
-    g.current_attribute_id = id;
+    g().current_attribute_id = id;
 
     ImGui::BeginGroup();
     ImGui::PushID(id);
@@ -2264,48 +2275,48 @@ void BeginStaticAttribute(const int id)
 void EndStaticAttribute()
 {
     // Make sure to call BeginNode() before calling BeginAttribute()
-    assert(g.current_scope == Scope_Attribute);
-    g.current_scope = Scope_Node;
+    assert(g().current_scope == Scope_Attribute);
+    g().current_scope = Scope_Node;
 
     ImGui::PopID();
     ImGui::EndGroup();
 
     if (ImGui::IsItemActive())
     {
-        g.active_attribute = true;
-        g.active_attribute_id = g.current_attribute_id;
-        g.interactive_node_idx = g.current_node_idx;
+        g().active_attribute = true;
+        g().active_attribute_id = g().current_attribute_id;
+        g().interactive_node_idx = g().current_node_idx;
     }
 }
 
 void PushAttributeFlag(AttributeFlags flag)
 {
-    g.current_attribute_flags |= static_cast<int>(flag);
-    g.attribute_flag_stack.push_back(g.current_attribute_flags);
+    g().current_attribute_flags |= static_cast<int>(flag);
+    g().attribute_flag_stack.push_back(g().current_attribute_flags);
 }
 
 void PopAttributeFlag()
 {
     // PopAttributeFlag called without a matching PushAttributeFlag!
     // The bottom value is always the default value, pushed in Initialize().
-    assert(g.attribute_flag_stack.size() > 1);
+    assert(g().attribute_flag_stack.size() > 1);
 
-    g.attribute_flag_stack.pop_back();
-    g.current_attribute_flags = g.attribute_flag_stack.back();
+    g().attribute_flag_stack.pop_back();
+    g().current_attribute_flags = g().attribute_flag_stack.back();
 }
 
 void Link(int id, const int start_attr_id, const int end_attr_id)
 {
-    assert(g.current_scope == Scope_Editor);
+    assert(g().current_scope == Scope_Editor);
 
     EditorContext& editor = editor_context_get();
     LinkData& link = object_pool_find_or_create_object(editor.links, id);
     link.id = id;
     link.start_pin_idx = object_pool_find_or_create_index(editor.pins, start_attr_id);
     link.end_pin_idx = object_pool_find_or_create_index(editor.pins, end_attr_id);
-    link.color_style.base = g.style.colors[ColorStyle_Link];
-    link.color_style.hovered = g.style.colors[ColorStyle_LinkHovered];
-    link.color_style.selected = g.style.colors[ColorStyle_LinkSelected];
+    link.color_style.base = g().style.colors[ColorStyle_Link];
+    link.color_style.hovered = g().style.colors[ColorStyle_LinkHovered];
+    link.color_style.selected = g().style.colors[ColorStyle_LinkSelected];
 
     // Check if this link was created by the current link event
     if ((editor.click_interaction_type == ClickInteractionType_LinkCreation &&
@@ -2315,22 +2326,22 @@ void Link(int id, const int start_attr_id, const int end_attr_id)
         (editor.click_interaction_state.link_creation.start_pin_idx == link.end_pin_idx &&
          editor.click_interaction_state.link_creation.end_pin_idx == link.start_pin_idx))
     {
-        g.snap_link_idx = object_pool_find_or_create_index(editor.links, id);
+        g().snap_link_idx = object_pool_find_or_create_index(editor.links, id);
     }
 }
 
 void PushColorStyle(ColorStyle item, unsigned int color)
 {
-    g.color_modifier_stack.push_back(ColorStyleElement(g.style.colors[item], item));
-    g.style.colors[item] = color;
+    g().color_modifier_stack.push_back(ColorStyleElement(g().style.colors[item], item));
+    g().style.colors[item] = color;
 }
 
 void PopColorStyle()
 {
-    assert(g.color_modifier_stack.size() > 0);
-    const ColorStyleElement elem = g.color_modifier_stack.back();
-    g.style.colors[elem.item] = elem.color;
-    g.color_modifier_stack.pop_back();
+    assert(g().color_modifier_stack.size() > 0);
+    const ColorStyleElement elem = g().color_modifier_stack.back();
+    g().style.colors[elem.item] = elem.color;
+    g().color_modifier_stack.pop_back();
 }
 
 float& lookup_style_var(const StyleVar item)
@@ -2342,16 +2353,16 @@ float& lookup_style_var(const StyleVar item)
     switch (item)
     {
     case StyleVar_GridSpacing:
-        style_var = &g.style.grid_spacing;
+        style_var = &g().style.grid_spacing;
         break;
     case StyleVar_NodeCornerRounding:
-        style_var = &g.style.node_corner_rounding;
+        style_var = &g().style.node_corner_rounding;
         break;
     case StyleVar_NodePaddingHorizontal:
-        style_var = &g.style.node_padding_horizontal;
+        style_var = &g().style.node_padding_horizontal;
         break;
     case StyleVar_NodePaddingVertical:
-        style_var = &g.style.node_padding_vertical;
+        style_var = &g().style.node_padding_vertical;
         break;
     default:
         assert(!"Invalid StyleVar value!");
@@ -2363,15 +2374,15 @@ float& lookup_style_var(const StyleVar item)
 void PushStyleVar(const StyleVar item, const float value)
 {
     float& style_var = lookup_style_var(item);
-    g.style_modifier_stack.push_back(StyleElement(style_var, item));
+    g().style_modifier_stack.push_back(StyleElement(style_var, item));
     style_var = value;
 }
 
 void PopStyleVar()
 {
-    assert(g.style_modifier_stack.size() > 0);
-    const StyleElement style_elem = g.style_modifier_stack.back();
-    g.style_modifier_stack.pop_back();
+    assert(g().style_modifier_stack.size() > 0);
+    const StyleElement style_elem = g().style_modifier_stack.back();
+    g().style_modifier_stack.pop_back();
     float& style_var = lookup_style_var(style_elem.item);
     style_var = style_elem.value;
 }
@@ -2433,61 +2444,61 @@ ImVec2 GetNodeGridSpacePos(int node_id)
 
 bool IsEditorHovered()
 {
-    return g.canvas_rect_screen_space.Contains(ImGui::GetMousePos()) && ImGui::IsWindowHovered();
+    return g().canvas_rect_screen_space.Contains(ImGui::GetMousePos()) && ImGui::IsWindowHovered();
 }
 
 bool IsNodeHovered(int* const node_id)
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     assert(node_id != NULL);
 
-    const bool is_hovered = g.hovered_node_idx.has_value();
+    const bool is_hovered = g().hovered_node_idx.has_value();
     if (is_hovered)
     {
         const EditorContext& editor = editor_context_get();
-        *node_id = editor.nodes.pool[g.hovered_node_idx.value()].id;
+        *node_id = editor.nodes.pool[g().hovered_node_idx.value()].id;
     }
     return is_hovered;
 }
 
 bool IsLinkHovered(int* const link_id)
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     assert(link_id != NULL);
 
-    const bool is_hovered = g.hovered_link_idx.has_value();
+    const bool is_hovered = g().hovered_link_idx.has_value();
     if (is_hovered)
     {
         const EditorContext& editor = editor_context_get();
-        *link_id = editor.links.pool[g.hovered_link_idx.value()].id;
+        *link_id = editor.links.pool[g().hovered_link_idx.value()].id;
     }
     return is_hovered;
 }
 
 bool IsPinHovered(int* const attr)
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     assert(attr != NULL);
 
-    const bool is_hovered = g.hovered_pin_idx.has_value();
+    const bool is_hovered = g().hovered_pin_idx.has_value();
     if (is_hovered)
     {
         const EditorContext& editor = editor_context_get();
-        *attr = editor.pins.pool[g.hovered_pin_idx.value()].id;
+        *attr = editor.pins.pool[g().hovered_pin_idx.value()].id;
     }
     return is_hovered;
 }
 
 int NumSelectedNodes()
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     const EditorContext& editor = editor_context_get();
     return editor.selected_node_indices.size();
 }
 
 int NumSelectedLinks()
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     const EditorContext& editor = editor_context_get();
     return editor.selected_link_indices.size();
 }
@@ -2530,28 +2541,28 @@ void ClearLinkSelection()
 
 bool IsAttributeActive()
 {
-    assert((g.current_scope & Scope_Node) != 0);
+    assert((g().current_scope & Scope_Node) != 0);
 
-    if (!g.active_attribute)
+    if (!g().active_attribute)
     {
         return false;
     }
 
-    return g.active_attribute_id == g.current_attribute_id;
+    return g().active_attribute_id == g().current_attribute_id;
 }
 
 bool IsAnyAttributeActive(int* const attribute_id)
 {
-    assert((g.current_scope & (Scope_Node | Scope_Attribute)) == 0);
+    assert((g().current_scope & (Scope_Node | Scope_Attribute)) == 0);
 
-    if (!g.active_attribute)
+    if (!g().active_attribute)
     {
         return false;
     }
 
     if (attribute_id != NULL)
     {
-        *attribute_id = g.active_attribute_id;
+        *attribute_id = g().active_attribute_id;
     }
 
     return true;
@@ -2560,10 +2571,10 @@ bool IsAnyAttributeActive(int* const attribute_id)
 bool IsLinkStarted(int* const started_at_id)
 {
     // Call this function after EndNodeEditor()!
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     assert(started_at_id != NULL);
 
-    const bool is_started = (g.element_state_change & ElementStateChange_LinkStarted) != 0;
+    const bool is_started = (g().element_state_change & ElementStateChange_LinkStarted) != 0;
     if (is_started)
     {
         const EditorContext& editor = editor_context_get();
@@ -2577,11 +2588,11 @@ bool IsLinkStarted(int* const started_at_id)
 bool IsLinkDropped(int* const started_at_id, const bool including_detached_links)
 {
     // Call this function after EndNodeEditor()!
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
 
     const EditorContext& editor = editor_context_get();
 
-    const bool link_dropped = (g.element_state_change & ElementStateChange_LinkDropped) != 0 &&
+    const bool link_dropped = (g().element_state_change & ElementStateChange_LinkDropped) != 0 &&
                               (including_detached_links ||
                                editor.click_interaction_state.link_creation.link_creation_type !=
                                    LinkCreationType_FromDetach);
@@ -2600,11 +2611,11 @@ bool IsLinkCreated(
     int* const ended_at_pin_id,
     bool* const created_from_snap)
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     assert(started_at_pin_id != NULL);
     assert(ended_at_pin_id != NULL);
 
-    const bool is_created = (g.element_state_change & ElementStateChange_LinkCreated) != 0;
+    const bool is_created = (g().element_state_change & ElementStateChange_LinkCreated) != 0;
 
     if (is_created)
     {
@@ -2641,13 +2652,13 @@ bool IsLinkCreated(
     int* ended_at_pin_id,
     bool* created_from_snap)
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
     assert(started_at_node_id != NULL);
     assert(started_at_pin_id != NULL);
     assert(ended_at_node_id != NULL);
     assert(ended_at_pin_id != NULL);
 
-    const bool is_created = (g.element_state_change & ElementStateChange_LinkCreated) != 0;
+    const bool is_created = (g().element_state_change & ElementStateChange_LinkCreated) != 0;
 
     if (is_created)
     {
@@ -2685,13 +2696,13 @@ bool IsLinkCreated(
 
 bool IsLinkDestroyed(int* const link_id)
 {
-    assert(g.current_scope == Scope_None);
+    assert(g().current_scope == Scope_None);
 
-    const bool link_destroyed = g.deleted_link_idx.has_value();
+    const bool link_destroyed = g().deleted_link_idx.has_value();
     if (link_destroyed)
     {
         const EditorContext& editor = editor_context_get();
-        const int link_idx = g.deleted_link_idx.value();
+        const int link_idx = g().deleted_link_idx.value();
         *link_id = editor.links.pool[link_idx].id;
     }
 

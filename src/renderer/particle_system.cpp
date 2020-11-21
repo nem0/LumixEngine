@@ -40,6 +40,12 @@ ParticleEmitterResource::ParticleEmitterResource(const Path& path
 
 void ParticleEmitterResource::unload()
 {
+	if (m_material) {
+		Material* tmp = m_material;
+		m_material = nullptr;
+		removeDependency(*tmp);
+		tmp->decRefCount();
+	}
 	m_instructions.clear();
 }
 
@@ -119,15 +125,9 @@ ParticleEmitter::ParticleEmitter(EntityPtr entity, IAllocator& allocator)
 ParticleEmitter::~ParticleEmitter()
 {
 	setResource(nullptr);
-	setMaterial(nullptr);
 	for (const Channel& c : m_channels) {
 		m_allocator.deallocate_aligned(c.data);
 	}
-}
-
-void ParticleEmitter::setMaterial(Material* material) {
-	if (m_material) m_material->decRefCount();
-	m_material = material;
 }
 
 void ParticleEmitter::setResource(ParticleEmitterResource* res)
@@ -205,7 +205,6 @@ void ParticleEmitter::serialize(OutputMemoryStream& blob)
 	blob.write(m_entity);
 	blob.write(m_emit_rate);
 	blob.writeString(m_resource ? m_resource->getPath().c_str() : "");
-	blob.writeString(m_material ? m_material->getPath().c_str() : "");
 }
 
 
@@ -216,10 +215,6 @@ void ParticleEmitter::deserialize(InputMemoryStream& blob, ResourceManagerHub& m
 	const char* path = blob.readString();
 	auto* res = manager.load<ParticleEmitterResource>(Path(path));
 	setResource(res);
-
-	const char* matpath = blob.readString();
-	auto* mat = manager.load<Material>(Path(matpath));
-	setMaterial(mat);
 }
 
 static float4* getStream(const ParticleEmitter& emitter
