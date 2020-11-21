@@ -478,7 +478,7 @@ void shutdown()
 		wt->wakeup();
 	}
 
-	for (WorkerTask* task : g_system->m_backup_workers)
+	for (Thread* task : g_system->m_backup_workers)
 	{
 		while (!task->isFinished()) task->wakeup();
 		task->destroy();

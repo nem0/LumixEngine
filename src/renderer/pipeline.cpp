@@ -1641,7 +1641,7 @@ struct PipelineImpl final : Pipeline
 				gpu::pushDebugGroup("particles");
 				
 				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::setState(blend_state);
+				gpu::setState(blend_state | (u32)gpu::StateFlags::DEPTH_TEST);
 				for (const Drawcall& dc : m_drawcalls) {
 					Matrix mtx = dc.rot.toMatrix();
 					mtx.setTranslation(dc.pos);

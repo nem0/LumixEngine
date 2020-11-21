@@ -5,6 +5,7 @@
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
+#include "renderer/editor/particle_editor.h"
 #include "editor/property_grid.h"
 #include "editor/render_interface.h"
 #include "editor/settings.h"
@@ -50,11 +51,6 @@
 
 
 using namespace Lumix;
-namespace Lumix {
-	bool compileParticleEmitter(InputMemoryStream&, OutputMemoryStream&, const char*, IAllocator&);
-	UniquePtr<StudioApp::GUIPlugin> createParticleEditor(StudioApp& app);
-}
-
 
 static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
 static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
@@ -320,21 +316,35 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
 		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
+		RenderScene* scene = (RenderScene*)cmp.scene;
+		const i32 emitter_idx = scene->getParticleEmitters().find((EntityRef)cmp.entity);
+		ASSERT(emitter_idx >= 0);
+		ParticleEmitter* emitter = scene->getParticleEmitters().at(emitter_idx);
 
-		if (m_playing && ImGui::Button("Stop")) m_playing = false;
-		else if (!m_playing && ImGui::Button("Play")) m_playing = true;
+		if (m_playing && ImGui::Button(ICON_FA_STOP " Stop")) m_playing = false;
+		else if (!m_playing && ImGui::Button(ICON_FA_PLAY " Play")) m_playing = true;
 
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_UNDO_ALT " Reset")) emitter->reset();
+
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_EDIT " Edit")) m_particle_editor->open(emitter->getResource()->getPath().c_str());
+
+		ImGuiEx::Label("Time scale");
+		ImGui::SliderFloat("##ts", &m_time_scale, 0, 1);
 		if (m_playing) {
-			ImGui::SliderFloat("Time scale", &m_time_scale, 0, 1);
-			RenderScene* scene = (RenderScene*)cmp.scene;
 			float dt = m_app.getEngine().getLastTimeDelta() * m_time_scale;
 			scene->updateParticleEmitter((EntityRef)cmp.entity, dt);
 		}
+			
+		ImGuiEx::Label("Particle count");
+		ImGui::Text("%d", emitter->m_particles_count);
 	}
 
 	StudioApp& m_app;
 	bool m_playing = false;
 	float m_time_scale = 1.f;
+	ParticleEditor* m_particle_editor;
 };
 
 struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
@@ -352,19 +362,25 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 
 		InputMemoryStream input(src_data);
 		OutputMemoryStream output(m_app.getAllocator());
-		if (!compileParticleEmitter(input, output, src.c_str(), m_app.getAllocator())) return false;
+		if (!m_particle_editor->compile(input, output, src.c_str())) return false;
 
 		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(output.data(), (i32)output.size()));
 	}
 	
-	void onGUI(Span<Resource*> resources) override {}
+	void onGUI(Span<Resource*> resources) override {
+		if (resources.length() != 1) return;
+
+		if (ImGui::Button(ICON_FA_EDIT " Edit")) {
+			m_particle_editor->open(resources[0]->getPath().c_str());
+		}
+	}
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Particle Emitter"; }
 	ResourceType getResourceType() const override { return ParticleEmitterResource::TYPE; }
 
-
 	StudioApp& m_app;
+	ParticleEditor* m_particle_editor;
 };
 
 
@@ -3865,9 +3881,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_env_probe_plugin.init();
 		m_model_plugin.init();
 
-
-		m_particle_editor = createParticleEditor(m_app);
+		m_particle_editor = ParticleEditor::create(m_app);
 		m_app.addPlugin(*m_particle_editor.get());
+
+		m_particle_emitter_plugin.m_particle_editor = m_particle_editor.get();
+		m_particle_emitter_property_plugin.m_particle_editor = m_particle_editor.get();
 	}
 
 	void showEnvironmentProbeGizmo(UniverseView& view, ComponentUID cmp) {
@@ -4074,7 +4092,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	}
 
 	StudioApp& m_app;
-	UniquePtr<StudioApp::GUIPlugin> m_particle_editor;
+	UniquePtr<ParticleEditor> m_particle_editor;
 	EditorUIRenderPlugin m_editor_ui_render_plugin;
 	MaterialPlugin m_material_plugin;
 	ParticleEmitterPlugin m_particle_emitter_plugin;
