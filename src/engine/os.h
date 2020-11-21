@@ -411,6 +411,7 @@ enum class Keycode : u8
 	A = 'A',
 	C = 'C',
 	D = 'D',
+	E = 'E',
 	K = 'K',
 	S = 'S',
 	V = 'V',

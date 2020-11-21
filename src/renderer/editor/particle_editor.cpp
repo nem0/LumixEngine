@@ -1174,9 +1174,14 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_redo_action.func.bind<&ParticleEditorImpl::redo>(this);
 		m_redo_action.plugin = this;
 
+		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", OS::Keycode::E, (u8)Action::Modifiers::CTRL, true);
+		m_apply_action.func.bind<&ParticleEditorImpl::apply>(this);
+		m_apply_action.plugin = this;
+
 		app.addWindowAction(&m_toggle_ui);
 		app.addAction(&m_undo_action);
 		app.addAction(&m_redo_action);
+		app.addAction(&m_apply_action);
 		newGraph();
 	}
 
@@ -1184,6 +1189,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_undo_action);
 		m_app.removeAction(&m_redo_action);
+		m_app.removeAction(&m_apply_action);
 	}
 
 	bool hasFocus() override { return m_has_focus; }
@@ -1366,7 +1372,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				if (ImGui::MenuItem("Save as")) saveAs();
 				ImGui::Separator();
 			
-				if (ImGui::MenuItem("Apply", 0, false, emitter && emitter->getResource())) apply();
+				doMenuItem(m_undo_action, emitter && emitter->getResource());
 				ImGui::MenuItem("Autoapply", nullptr, &m_autoapply, emitter && emitter->getResource());
 
 				ImGui::EndMenu();
@@ -1687,6 +1693,7 @@ struct ParticleEditorImpl : ParticleEditor {
 	Action m_toggle_ui;
 	Action m_undo_action;
 	Action m_redo_action;
+	Action m_apply_action;
 	bool m_has_focus = false;
 };
 
