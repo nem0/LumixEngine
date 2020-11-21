@@ -1907,8 +1907,10 @@ void shutdown()
 	destroy(gl->default_program);
 	for (WindowContext& ctx : gl->contexts) {
 		if (!ctx.window_handle) continue;
-		wglMakeCurrent(ctx.device_context, 0);
-		wglDeleteContext(ctx.hglrc);
+		#ifdef _WIN32
+			wglMakeCurrent(ctx.device_context, 0);
+			wglDeleteContext(ctx.hglrc);
+		#endif
 	}
 	gl.destroy();
 }
