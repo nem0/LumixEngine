@@ -50,6 +50,6 @@ namespace detail {
 }
 
 LogCallback& getLogCallback() { return g_logger.callback; }
-void log(LogLevel level, const char* msg) {  }
+void log(LogLevel level, const char* msg) { g_logger.callback.invoke(level, msg); }
 
 } // namespace Lumix

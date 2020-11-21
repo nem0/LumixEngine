@@ -649,10 +649,12 @@ struct GUISceneImpl final : GUIScene
 	{
 		for (GUIRect* rect : m_rects)
 		{
-			LUMIX_DELETE(m_allocator, rect->input_field);
-			LUMIX_DELETE(m_allocator, rect->image);
-			LUMIX_DELETE(m_allocator, rect->text);
-			LUMIX_DELETE(m_allocator, rect);
+			if (rect->flags.isSet(GUIRect::IS_VALID)) {
+				LUMIX_DELETE(m_allocator, rect->input_field);
+				LUMIX_DELETE(m_allocator, rect->image);
+				LUMIX_DELETE(m_allocator, rect->text);
+				LUMIX_DELETE(m_allocator, rect);
+			}
 		}
 		m_rects.clear();
 		m_buttons.clear();
@@ -1174,7 +1176,6 @@ struct GUISceneImpl final : GUIScene
 			serializer.read(rect->right);
 			serializer.read(rect->bottom);
 			serializer.read(rect->left);
-			m_rects.insert(rect->entity, rect);
 			if (rect->flags.isSet(GUIRect::IS_VALID)) {
 				m_universe.onComponentCreated(rect->entity, GUI_RECT_TYPE, this);
 			}
