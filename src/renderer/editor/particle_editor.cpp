@@ -1538,8 +1538,8 @@ struct ParticleEditorImpl : ParticleEditor {
 
 	void load(const char* path) {
 		if (!path || path[0] == '\0') {
-			return;
 			load();
+			return;
 		}
 		OS::InputFile file;
 		if (file.open(path)) {
