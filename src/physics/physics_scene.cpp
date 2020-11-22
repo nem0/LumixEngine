@@ -505,6 +505,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void onControllerHit(EntityRef controller, EntityRef obj) {
 		if (!m_script_scene) return;
+		if (!m_script_scene->getUniverse().hasComponent(controller, LUA_SCRIPT_TYPE)) return;
 
 		for (int i = 0, c = m_script_scene->getScriptCount(controller); i < c; ++i) {
 			auto* call = m_script_scene->beginFunctionCall(controller, i, "onControllerHit");
