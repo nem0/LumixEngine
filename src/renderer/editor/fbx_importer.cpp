@@ -248,15 +248,9 @@ void FBXImporter::sortBones(bool force_skinned)
 	}
 
 	if (force_skinned) {
-		for (const ofbx::Object*& bone : m_bones) {
-			const int idx = m_meshes.find([&](const ImportMesh& mesh){
-				return mesh.fbx == bone;
-			});
-
-			if (idx >= 0) {
-				m_meshes[idx].is_skinned = true;
-				m_meshes[idx].bone_idx = int(&bone - m_bones.begin());
-			}
+		for (ImportMesh& m : m_meshes) {
+			m.bone_idx = m_bones.indexOf(m.fbx);
+			m.is_skinned = true;
 		}
 	}
 }
@@ -275,6 +269,10 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene, bool force_skinned)
 					const ofbx::Cluster* cluster = skin->getCluster(i);
 					insertHierarchy(m_bones, cluster->getLink());
 				}
+			}
+
+			if (force_skinned) {
+				insertHierarchy(m_bones, mesh.fbx);
 			}
 		}
 	}
@@ -869,7 +867,10 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 	if (!ignore_geometry) {
 		gatherMaterials(filename, src_dir);
 		m_materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
-		gatherBones(*scene, force_skinned);
+		
+		bool any_skinned = false;
+		for (const ImportMesh& m : m_meshes) any_skinned = any_skinned || m.is_skinned;
+		gatherBones(*scene, force_skinned || any_skinned);
 	}
 
 	return true;
@@ -1190,11 +1191,13 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		writeTexture(material.textures[1], 1);
 		writeTexture(material.textures[2], 2);
 		
-/*			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
-		out_file << "color {" << diffuse_color.r 
-			<< "," << diffuse_color.g
-			<< "," << diffuse_color.b
-			<< ",1}\n";*/
+		if (!material.textures[0].fbx) {
+			ofbx::Color diffuse_color = material.fbx->getDiffuseColor();
+			out_file << "color {" << diffuse_color.r 
+				<< "," << diffuse_color.g
+				<< "," << diffuse_color.b
+				<< ",1}\n";
+		}
 
 		if (!f.write(out_file.data(), out_file.size())) {
 			logError("Failed to write ", mat_src);
@@ -1298,6 +1301,9 @@ static void compressPositions(float error, float parent_scale, Ref<Array<FBXImpo
 		else {
 			out[i - 1].flags |= 1;
 		}
+	}
+	for (u32 i = 0; i < (u32)out.size(); ++i) {
+		out[i].pos *= parent_scale;
 	}
 }
 
@@ -1592,7 +1598,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 					bind_rot = (m_bind_pose[parent_idx].inverted() * m_bind_pose[bone_idx]).getRotation();
 				}
 			}
-			if (isBindPoseRotationTrack(count, keys, bind_rot, cfg.rotation_error)) continue;
+			//if (isBindPoseRotationTrack(count, keys, bind_rot, cfg.rotation_error)) continue;
 
 			const u32 name_hash = crc32(bone->name);
 			write(name_hash);
@@ -1623,7 +1629,6 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			++rotation_curves_count;
 		}
 
-		if (rotation_curves_count == 0 && translation_curves_count == 0) continue;
 		memcpy(out_file.getMutableData() + stream_rotations_count_pos, &rotation_curves_count, sizeof(rotation_curves_count));
 
 		const StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ".ani:", src);

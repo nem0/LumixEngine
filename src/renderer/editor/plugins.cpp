@@ -2007,7 +2007,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGuiEx::Label("Count");
 			ImGui::Text("%d", model->getBoneCount());
 			if (model->getBoneCount() > 0 && ImGui::CollapsingHeader("Bones")) {
-				ImGui::Columns(3);
+				ImGui::Columns(4);
 				for (int i = 0; i < model->getBoneCount(); ++i)
 				{
 					ImGui::Text("%s", model->getBone(i).name.c_str());
@@ -2017,6 +2017,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					ImGui::NextColumn();
 					Quat rot = model->getBone(i).transform.rot;
 					ImGui::Text("%f; %f; %f; %f", rot.x, rot.y, rot.z, rot.w);
+					ImGui::NextColumn();
+					const i32 parent = model->getBone(i).parent_idx;
+					if (parent >= 0) {
+						ImGui::Text("%s", model->getBone(parent).name.c_str());
+					}
 					ImGui::NextColumn();
 				}
 			}
