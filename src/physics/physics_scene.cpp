@@ -493,7 +493,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				auto* call = m_script_scene->beginFunctionCall(e1, i, "onTrigger");
 				if (!call) continue;
 
-				call->add(e2.index);
+				call->add(e2);
 				call->add(touch_lost);
 				m_script_scene->endFunctionCall();
 			}
@@ -3732,6 +3732,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 			PxRigidActor* physx_actor = actor->dynamic_type == DynamicType::STATIC
 				? (PxRigidActor*)m_system->getPhysics()->createRigidStatic(transform)
 				: (PxRigidActor*)m_system->getPhysics()->createRigidDynamic(transform);
+			if (actor->dynamic_type == DynamicType::KINEMATIC) {
+				physx_actor->is<PxRigidBody>()->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, true);
+			}
 			int geoms_count = serializer.read<int>();
 			for (int i = 0; i < geoms_count; ++i)
 			{
@@ -3763,7 +3766,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 						break;
 					default: ASSERT(false); break;
 				}
-				if (shape) shape->userData = (void*)(intptr_t)index;
+				if (shape) {
+					shape->userData = (void*)(intptr_t)index;
+					if (actor->is_trigger) {
+						shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false); // must set false first
+						shape->setFlag(PxShapeFlag::eTRIGGER_SHAPE, true);
+					}
+				}
 			}
 			actor->setPhysxActor(physx_actor);
 			if (path[0]) {
