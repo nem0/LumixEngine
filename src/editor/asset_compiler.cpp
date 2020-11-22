@@ -740,7 +740,6 @@ int AssetCompilerTask::task()
 		if (p.isValid()) {
 			PROFILE_BLOCK("compile asset");
 			Profiler::pushString(p.c_str());
-			logInfo("Compiling ", p, "...");
 			const bool compiled = m_compiler.compile(p);
 			if (!compiled) {
 				logError("Failed to compile resource ", p);

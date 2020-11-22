@@ -162,7 +162,7 @@ private:
 	bool findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const;
 	const ImportGeometry& getImportGeometry(const ofbx::Geometry* geom) const;
 	const ImportMesh* getAnyMeshFromBone(const ofbx::Object* node, int bone_idx) const;
-	void gatherMaterials(const char* src_dir);
+	void gatherMaterials(const char* fbx_filename, const char* src_dir);
 
 	void sortBones(bool force_skinned);
 	void gatherBones(const ofbx::IScene& scene, bool force_skinned);
