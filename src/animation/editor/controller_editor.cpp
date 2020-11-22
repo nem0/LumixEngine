@@ -81,6 +81,15 @@ struct ControllerEditorImpl : ControllerEditor {
 			}
 			ImGui::EndCombo();
 		}
+		bool looped = node.m_flags & AnimationNode::LOOPED;
+		if (ImGui::Checkbox("Looped", &looped)) {
+			if (looped) {
+				node.m_flags = node.m_flags | AnimationNode::LOOPED;
+			}
+			else {
+				node.m_flags = node.m_flags & ~AnimationNode::LOOPED;
+			}
+		}
 	}
 
 	void properties_ui(GroupNode& node) {
