@@ -73,7 +73,12 @@ struct AnimationNode final : Node {
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
 
+	enum Flags : u32 {
+		LOOPED = 1 << 0
+	};
+
 	u32 m_slot;
+	u32 m_flags = LOOPED;
 };
 
 struct Blend1DNode final : Node {

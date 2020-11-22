@@ -169,12 +169,12 @@ void Blend1DNode::skip(RuntimeContext& ctx) const {
 	ctx.input_runtime.skip(sizeof(Time));
 }
 
-static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Ref<Pose> pose, u32 mask_idx) {
+static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Ref<Pose> pose, u32 mask_idx, bool looped) {
 	Animation* anim = ctx.animations[slot];
 	if (!anim) return;
 	if (!ctx.model->isReady()) return;
 
-	const Time anim_time = time % anim->getLength();
+	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
 
 	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
 	anim->getRelativePose(anim_time, pose, *ctx.model, weight, mask);
@@ -185,16 +185,16 @@ void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32
 
 	if (m_children.empty()) return;
 	if (m_children.size() == 1) {
-		Anim::getPose(ctx, t, weight, m_children[0].slot, pose, mask);
+		Anim::getPose(ctx, t, weight, m_children[0].slot, pose, mask, true);
 		return;
 	}
 
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
 	
-	Anim::getPose(ctx, t, weight, pair.a->slot, pose, mask);
+	Anim::getPose(ctx, t, weight, pair.a->slot, pose, mask, true);
 	if (pair.b) {
-		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot, pose, mask);
+		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot, pose, mask, true);
 	}
 }
 
@@ -252,17 +252,19 @@ void AnimationNode::skip(RuntimeContext& ctx) const {
 	
 void AnimationNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const {
 	const Time t = ctx.input_runtime.read<Time>();
-	Anim::getPose(ctx, t, weight, m_slot, pose, mask);
+	Anim::getPose(ctx, t, weight, m_slot, pose, mask, m_flags & LOOPED);
 }
 
 void AnimationNode::serialize(OutputMemoryStream& stream) const {
 	Node::serialize(stream);
 	stream.write(m_slot);
+	stream.write(m_flags);
 }
 
 void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 	Node::deserialize(stream, ctrl);
 	stream.read(m_slot);
+	stream.read(m_flags);
 }
 
 LayersNode::Layer::Layer(GroupNode* parent, IAllocator& allocator) 
