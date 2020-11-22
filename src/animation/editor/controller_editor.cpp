@@ -83,7 +83,13 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 	}
 
-	void properties_ui(GroupNode& node) {}
+	void properties_ui(GroupNode& node) {
+		float l = node.m_blend_length.seconds();
+		ImGuiEx::Label("Blend length");
+		if (ImGui::DragFloat("##bl", &l)) {
+			node.m_blend_length = Time::fromSeconds(l);
+		}
+	}
 
 	void properties_ui(Blend1DNode& node) {
 		const InputDecl::Input& input = m_controller->m_inputs.inputs[node.m_input_index];

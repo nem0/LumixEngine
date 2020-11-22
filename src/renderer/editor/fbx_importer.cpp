@@ -1442,10 +1442,10 @@ static bool isBindPoseRotationTrack(u32 count, const Array<FBXImporter::Key>& ke
 	if (count != 2) return false;
 	for (const FBXImporter::Key& key : keys) {
 		if (key.flags & 1) continue;
-		if (fabs(key.rot.x - bind_rot.x > error)) return false;
-		if (fabs(key.rot.y - bind_rot.y > error)) return false;
-		if (fabs(key.rot.z - bind_rot.z > error)) return false;
-		if (fabs(key.rot.w - bind_rot.w > error)) return false;
+		if (fabs(key.rot.x - bind_rot.x) > error) return false;
+		if (fabs(key.rot.y - bind_rot.y) > error) return false;
+		if (fabs(key.rot.z - bind_rot.z) > error) return false;
+		if (fabs(key.rot.w - bind_rot.w) > error) return false;
 	}
 	return true;
 }
