@@ -54,7 +54,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
 	bool success = OS::makePath(path);
 	path << "/asset_tiles";
-	success = success || OS::makePath(path);
+	success = OS::makePath(path) || success;
 	if (!success) logError("Could not create ", path);
 
 	m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
@@ -316,7 +316,6 @@ void AssetBrowser::createTile(FileInfo& tile, const char* out_path)
 {
 	if (tile.create_called) return;
 	
-	logInfo("Creating tile for ", tile.filepath);
 	tile.create_called = true;
 	const AssetCompiler& compiler = m_app.getAssetCompiler();
 	for (IPlugin* plugin : m_plugins) {

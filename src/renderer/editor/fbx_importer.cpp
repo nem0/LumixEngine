@@ -170,7 +170,7 @@ bool FBXImporter::findTexture(const char* src_dir, const char* ext, FBXImporter:
 }
 
 
-void FBXImporter::gatherMaterials(const char* src_dir)
+void FBXImporter::gatherMaterials(const char* fbx_filename, const char* src_dir)
 {
 	for (ImportMesh& mesh : m_meshes)
 	{
@@ -180,7 +180,7 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 		ImportMaterial& mat = m_materials.emplace();
 		mat.fbx = fbx_mat;
 
-		auto gatherTexture = [this, &mat, src_dir](ofbx::Texture::TextureType type) {
+		auto gatherTexture = [this, &mat, src_dir, fbx_filename](ofbx::Texture::TextureType type) {
 			const ofbx::Texture* texture = mat.fbx->getTexture(type);
 			if (!texture) return;
 
@@ -203,6 +203,11 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 			char tmp[MAX_PATH_LENGTH];
 			Path::normalize(tex.src, Span(tmp));
 			tex.src = tmp;
+
+			if (!tex.is_valid) {
+				logInfo(fbx_filename, ": texture ", tex.src, " not found");
+				tex.src = "";
+			}
 
 			tex.import = true;
 		};
@@ -862,7 +867,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 
 	gatherAnimations(*scene);
 	if (!ignore_geometry) {
-		gatherMaterials(src_dir);
+		gatherMaterials(filename, src_dir);
 		m_materials.removeDuplicates([](const ImportMaterial& a, const ImportMaterial& b) { return a.fbx == b.fbx; });
 		gatherBones(*scene, force_skinned);
 	}
@@ -1162,7 +1167,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 				const StaticString<MAX_PATH_LENGTH> meta_path(texture.src, ".meta");
 				if (!m_filesystem.fileExists(meta_path)) {
 					OS::OutputFile file;
-					if (file.open(meta_path)) {
+					if (m_filesystem.open(meta_path, Ref(file))) {
 						
 						file << (idx == 0 ? "srgb = true\n" : "normalmap = true\n");
 						file.close();
@@ -1427,6 +1432,18 @@ static LocalRigidTransform sample(const ofbx::Object& bone, const ofbx::Animatio
 	return res;
 }
 
+static bool isBindPoseRotationTrack(u32 count, const Array<FBXImporter::Key>& keys, const Quat& bind_rot, float error) {
+	if (count != 2) return false;
+	for (const FBXImporter::Key& key : keys) {
+		if (key.flags & 1) continue;
+		if (fabs(key.rot.x - bind_rot.x > error)) return false;
+		if (fabs(key.rot.y - bind_rot.y > error)) return false;
+		if (fabs(key.rot.z - bind_rot.z > error)) return false;
+		if (fabs(key.rot.w - bind_rot.w > error)) return false;
+	}
+	return true;
+}
+
 static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& keys, const Vec3& bind_pos, float error) {
 	if (count != 2) return false;
 	for (const FBXImporter::Key& key : keys) {
@@ -1556,6 +1573,26 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 				if ((key.flags & 2) == 0) ++count;
 			}
 			if (count == 0) continue;
+			
+			Quat bind_rot;
+			const u32 bone_idx = u32(&bone - m_bones.begin());
+			ofbx::Object* parent = bone->getParent();
+			if (!parent)
+			{
+				bind_rot = m_bind_pose[bone_idx].getRotation();
+			}
+			else
+			{
+				const i32 parent_idx = m_bones.indexOf(parent);
+				if (m_bind_pose.empty()) {
+					const Matrix mtx = toLumix(bone->evalLocal(bone->getLocalTranslation(), bone->getLocalRotation()));
+					bind_rot = mtx.getRotation();
+				}
+				else {
+					bind_rot = (m_bind_pose[parent_idx].inverted() * m_bind_pose[bone_idx]).getRotation();
+				}
+			}
+			if (isBindPoseRotationTrack(count, keys, bind_rot, cfg.rotation_error)) continue;
 
 			const u32 name_hash = crc32(bone->name);
 			write(name_hash);
@@ -1585,6 +1622,8 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 			}
 			++rotation_curves_count;
 		}
+
+		if (rotation_curves_count == 0 && translation_curves_count == 0) continue;
 		memcpy(out_file.getMutableData() + stream_rotations_count_pos, &rotation_curves_count, sizeof(rotation_curves_count));
 
 		const StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ".ani:", src);
