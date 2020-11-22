@@ -149,6 +149,27 @@ static void extractEmbedded(const ofbx::IScene& scene, const char* src_dir)
 }
 
 
+bool FBXImporter::findTexture(const char* src_dir, const char* ext, FBXImporter::ImportTexture& tex) const {
+	PathInfo file_info(tex.path);
+	tex.src = src_dir;
+	tex.src << file_info.m_basename << "." << ext;
+	tex.is_valid = m_filesystem.fileExists(tex.src);
+
+	if (!tex.is_valid) {
+		tex.src = src_dir;
+		tex.src << file_info.m_dir << "/" << file_info.m_basename << "." << ext;
+		tex.is_valid = m_filesystem.fileExists(tex.src);
+					
+		if (!tex.is_valid) {
+			tex.src = src_dir;
+			tex.src << "textures/" << file_info.m_basename << "." << ext;
+			tex.is_valid = m_filesystem.fileExists(tex.src);
+		}
+	}
+	return tex.is_valid;
+}
+
+
 void FBXImporter::gatherMaterials(const char* src_dir)
 {
 	for (ImportMesh& mesh : m_meshes)
@@ -159,10 +180,9 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 		ImportMaterial& mat = m_materials.emplace();
 		mat.fbx = fbx_mat;
 
-		auto gatherTexture = [&mat, src_dir](ofbx::Texture::TextureType type) {
+		auto gatherTexture = [this, &mat, src_dir](ofbx::Texture::TextureType type) {
 			const ofbx::Texture* texture = mat.fbx->getTexture(type);
 			if (!texture) return;
-
 
 			ImportTexture& tex = mat.textures[type];
 			tex.fbx = texture;
@@ -170,26 +190,13 @@ void FBXImporter::gatherMaterials(const char* src_dir)
 			if (filename == "") filename = tex.fbx->getFileName();
 			filename.toString(tex.path.data);
 			tex.src = tex.path;
-			tex.is_valid = OS::fileExists(tex.src);
+			tex.is_valid = m_filesystem.fileExists(tex.src);
 
-			if (!tex.is_valid)
-			{
-				PathInfo file_info(tex.path);
-				tex.src = src_dir;
-				tex.src << file_info.m_basename << "." << file_info.m_extension;
-				tex.is_valid = OS::fileExists(tex.src);
-
-				if (!tex.is_valid)
-				{
-					tex.src = src_dir;
-					tex.src << tex.path;
-					tex.is_valid = OS::fileExists(tex.src);
-					
-					if (!tex.is_valid) {
-						tex.src = src_dir;
-						tex.src << "textures/" << file_info.m_basename << "." << file_info.m_extension;
-						tex.is_valid = OS::fileExists(tex.src);
-					}
+			PathInfo file_info(tex.path);
+			if (!tex.is_valid && !findTexture(src_dir, file_info.m_extension, tex)) {
+				const char* exts[] = { "dds", "png", "jpg", "jpeg", "tga", "bmp" };
+				for (const char* ext : exts) {
+					if (findTexture(src_dir, ext, tex)) break;
 				}
 			}
 
@@ -824,6 +831,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 		m_materials.clear();
 		m_animations.clear();
 		m_bones.clear();
+		m_bind_pose.clear();
 	}
 
 	OutputMemoryStream data(m_allocator);
@@ -1152,7 +1160,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {
 				const StaticString<MAX_PATH_LENGTH> meta_path(texture.src, ".meta");
-				if (!OS::fileExists(meta_path)) {
+				if (!m_filesystem.fileExists(meta_path)) {
 					OS::OutputFile file;
 					if (file.open(meta_path)) {
 						

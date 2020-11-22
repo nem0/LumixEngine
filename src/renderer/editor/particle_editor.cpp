@@ -338,15 +338,15 @@ struct ParticleEditorResource {
 		}
 
 		bool onGUI() override {
-			beginOutput();
 			imnodes::BeginNodeTitleBar();
 			ImGui::Text("Random");
 			imnodes::EndNodeTitleBar();
-			endOutput();
+			beginOutput();
 			ImGui::PushItemWidth(60);
 			ImGui::DragFloat("From", &from);
 			ImGui::DragFloat("To", &to);
 			ImGui::PopItemWidth();
+			endOutput();
 			return false;
 		}
 
