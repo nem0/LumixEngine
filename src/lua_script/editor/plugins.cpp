@@ -327,7 +327,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 			if (open_autocomplete)
 			{
 				ImGui::OpenPopup("autocomplete");
-				ImGui::SetNextWindowPos(ImGui::GetOsImePosRequest());
+				ImGui::SetNextWindowPos(ImGuiEx::GetOsImePosRequest());
 			}
 			open_autocomplete = false;
 			if (ImGui::BeginPopup("autocomplete"))

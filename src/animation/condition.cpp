@@ -914,7 +914,7 @@ bool Condition::eval(const RuntimeContext& rc) const
 }
 
 
-Condition::Error Condition::compile(const char* expression, InputDecl& decl)
+void Condition::compile(const char* expression, InputDecl& decl)
 {
 	ExpressionCompiler compiler;
 	ExpressionCompiler::Token tokens[128];
@@ -923,23 +923,26 @@ Condition::Error Condition::compile(const char* expression, InputDecl& decl)
 	if (tokens_count < 0)
 	{
 		compile("1 < 0", decl);
-		return compiler.getError();
+		error = compiler.getError();
+		return;
 	}
 	tokens_count = compiler.toPostfix(expression, tokens, postfix_tokens, tokens_count);
 	if (tokens_count < 0)
 	{
 		compile("1 < 0", decl);
-		return compiler.getError();
+		error = compiler.getError();
+		return;
 	}
 	bytecode.resize(128);
 	int size = compiler.compile(expression, postfix_tokens, tokens_count, &bytecode[0], bytecode.size(), decl);
 	if (size < 0)
 	{
 		compile("1 < 0", decl);
-		return compiler.getError();
+		error = compiler.getError();
+		return;
 	}
 	bytecode.resize(size);
-	return Condition::Error::NONE;
+	error = Condition::Error::NONE;
 }
 
 

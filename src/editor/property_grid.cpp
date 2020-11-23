@@ -349,7 +349,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 
 
 		Universe& universe = *m_editor.getUniverse();
-		if (ImGui::BeginResizablePopup("popup", ImVec2(200, 300)))
+		if (ImGuiEx::BeginResizablePopup("popup", ImVec2(200, 300)))
 		{
 			static char entity_filter[32] = {};
 			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
@@ -880,7 +880,7 @@ void PropertyGrid::onGUI()
 			ImGui::OpenPopup("AddComponentPopup");
 		}
 		
-		if (ImGui::BeginResizablePopup("AddComponentPopup", ImVec2(300, 300))) {
+		if (ImGuiEx::BeginResizablePopup("AddComponentPopup", ImVec2(300, 300))) {
 			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 			ImGui::SetNextItemWidth(-w);
 			ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));

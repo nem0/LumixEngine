@@ -20,9 +20,12 @@
 
 namespace Lumix::Anim {
 
+
+
 struct ControllerEditorImpl : ControllerEditor {
 	ControllerEditorImpl(StudioApp& app)
 		: m_app(app)
+		, m_undo_stack(app.getAllocator())
 	{
 		IAllocator& allocator = app.getAllocator();
 		ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
@@ -31,23 +34,53 @@ struct ControllerEditorImpl : ControllerEditor {
 		m_toggle_ui.init("Animation editor", "Toggle animation editor", "animation_editor", "", true);
 		m_toggle_ui.func.bind<&ControllerEditorImpl::toggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&ControllerEditorImpl::isOpen>(this);
-		app.addWindowAction(&m_toggle_ui);
 
-		m_controller = LUMIX_NEW(allocator, Controller)(Path("anim_editor"), *res_manager, allocator);
-		m_controller->initEmpty();
-		m_current_node = m_controller->m_root;
+		m_undo_action.init(ICON_FA_UNDO "Undo", "Animation editor undo", "animation_editor_undo", ICON_FA_UNDO, true);
+		m_undo_action.func.bind<&ControllerEditorImpl::undo>(this);
+
+		m_redo_action.init(ICON_FA_REDO "Redo", "Animation editor redo", "animation_editor_redo", ICON_FA_REDO, true);
+		m_redo_action.func.bind<&ControllerEditorImpl::redo>(this);
+
+		app.addWindowAction(&m_toggle_ui);
+		app.addWindowAction(&m_undo_action);
+		app.addWindowAction(&m_redo_action);
+
+		newGraph();
 	}
 
 	~ControllerEditorImpl() {
 		m_app.removeAction(&m_toggle_ui);
-		IAllocator& allocator = m_app.getAllocator();
-		m_controller->destroy();
-		LUMIX_DELETE(allocator, m_controller);
+		m_app.removeAction(&m_undo_action);
+		m_app.removeAction(&m_redo_action);
+	}
+
+	template <typename F> void forEachNode(F f, Node* node = nullptr) {
+		if (!node) node = m_controller->m_root;
+		f(*node);
+
+		switch (node->type()) {
+			case Node::ANIMATION: break;
+			case Node::BLEND1D: break;
+			case Node::LAYERS: 
+				LayersNode* n = (LayersNode*)node;
+				for (LayersNode::Layer& layer : n->m_layers) {
+					forEachNode(f, &layer.node);
+				}
+				break;
+			case Node::GROUP: 
+				GroupNode* g = (GroupNode*)node;
+				for (GroupNode::Child& ch : g->m_children) {
+					forEachNode(f, ch.node);
+				}
+				break;
+			default: ASSERT(false); break;
+		}
 	}
 
 	void onSettingsLoaded() override {
 		m_open = m_app.getSettings().getValue("is_anim_editor_open", false);
 	}
+
 	void onBeforeSettingsSaved() override {
 		m_app.getSettings().setValue("is_anim_editor_open", m_open);
 	}
@@ -55,7 +88,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool isOpen() const { return m_open; }
 	void toggleOpen() { m_open = !m_open; }
 
-	static void createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
+	void createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
 		Node* node = nullptr;
 		switch(type) {
 			case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
@@ -67,22 +100,28 @@ struct ControllerEditorImpl : ControllerEditor {
 		node->m_name = "new";
 		parent.m_children.emplace(allocator);
 		parent.m_children.back().node = node;
+		pushUndo();
 	}
 
-	void properties_ui(AnimationNode& node) {
+	bool properties_ui(AnimationNode& node) {
 		const Array<String>& names = m_controller->m_animation_slots;
 	
 		const char* preview = node.m_slot < (u32)names.size() ? names[node.m_slot].c_str() : "";
-		if (ImGui::BeginCombo("Animation", preview)) {
+		bool changed = false;
+		ImGuiEx::Label("Animation");
+		if (ImGui::BeginCombo("##anim", preview)) {
 			for (u32 i = 0; i < (u32)names.size(); ++i) {
 				if (ImGui::Selectable(names[i].c_str())) {
 					node.m_slot = i;
+					changed = true;
 				}
 			}
 			ImGui::EndCombo();
 		}
 		bool looped = node.m_flags & AnimationNode::LOOPED;
-		if (ImGui::Checkbox("Looped", &looped)) {
+		ImGuiEx::Label("Looped");
+		if (ImGui::Checkbox("##looped", &looped)) {
+			changed = true;
 			if (looped) {
 				node.m_flags = node.m_flags | AnimationNode::LOOPED;
 			}
@@ -90,21 +129,27 @@ struct ControllerEditorImpl : ControllerEditor {
 				node.m_flags = node.m_flags & ~AnimationNode::LOOPED;
 			}
 		}
+		return changed;
 	}
 
-	void properties_ui(GroupNode& node) {
+	bool properties_ui(GroupNode& node) {
 		float l = node.m_blend_length.seconds();
 		ImGuiEx::Label("Blend length");
 		if (ImGui::DragFloat("##bl", &l)) {
 			node.m_blend_length = Time::fromSeconds(l);
+			return true;
 		}
+		return false;
 	}
 
-	void properties_ui(Blend1DNode& node) {
+	bool properties_ui(Blend1DNode& node) {
 		const InputDecl::Input& input = m_controller->m_inputs.inputs[node.m_input_index];
-		if (ImGui::BeginCombo("Input", input.name)) {
+		bool changed = false;
+		ImGuiEx::Label("Input");
+		if (ImGui::BeginCombo("##input", input.name)) {
 			for (const InputDecl::Input& input : m_controller->m_inputs.inputs) {
 				if (ImGui::Selectable(input.name)) {
+					changed = true;
 					node.m_input_index = u32(&input - m_controller->m_inputs.inputs);
 				}
 			}
@@ -122,7 +167,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			ImGui::PushID(&child);
 		
 			ImGui::PushItemWidth(-1);
-			ImGui::InputFloat("##val", &child.value);
+			changed = ImGui::InputFloat("##val", &child.value) || changed;
 			ImGui::PopItemWidth();
 			ImGui::NextColumn();
 		
@@ -133,6 +178,7 @@ struct ControllerEditorImpl : ControllerEditor {
 				for (u32 i = 0; i < (u32)slots.size(); ++i) {
 					if (ImGui::Selectable(slots[i].c_str())) {
 						child.slot = i;
+						changed = true;
 					}
 				}
 				ImGui::EndCombo();
@@ -146,59 +192,91 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 		ImGui::Columns();
 		if (ImGui::Button("Add")) {
+			changed = true;
 			node.m_children.emplace();
 			if(node.m_children.size() > 1) {
 				node.m_children.back().value = node.m_children[node.m_children.size() - 2].value;
 			}
 		}
+		return changed;
 	}
 
-	void child_properties_ui(Node& node) {
+	bool child_properties_ui(Node& node) {
+		bool changed = false;
 		if (node.m_parent && node.m_parent->type() == Node::Type::GROUP) {
 			GroupNode* group = (GroupNode*)node.m_parent;
 			for (GroupNode::Child& c : group->m_children) {
 				if (c.node != &node) continue;
 				
-				conditionInput("Condition", m_controller->m_inputs, Ref(c.condition_str), Ref(c.condition));
+				changed = conditionInput("Condition", m_controller->m_inputs, Ref(c.condition_str), Ref(c.condition)) || changed;
 				break;
 			}
 		}
+		return changed;
 	}
 
-	void ui_dispatch(Node& node) {
+	bool ui_dispatch(Node& node) {
 		char tmp[64];
 		copyString(tmp, node.m_name.c_str());
-		if (ImGui::InputText("Name", tmp, sizeof(tmp))) {
+		bool changed = false;
+		
+		ImGuiEx::Label("Name");		
+		if (ImGui::InputText("##name", tmp, sizeof(tmp))) {
 			node.m_name = tmp;
+			changed = true;
 		}
 
-		child_properties_ui(node);
+		changed = child_properties_ui(node) || changed;
 
 		switch(node.type()) {
-			case Node::ANIMATION: properties_ui((AnimationNode&)node); break;
-			case Node::GROUP: properties_ui((GroupNode&)node); break;
-			case Node::BLEND1D: properties_ui((Blend1DNode&)node); break;
-			default: ASSERT(false); break;
+			case Node::ANIMATION: return properties_ui((AnimationNode&)node) || changed;
+			case Node::GROUP: return properties_ui((GroupNode&)node) || changed;
+			case Node::BLEND1D: return properties_ui((Blend1DNode&)node) || changed;
+			default: ASSERT(false); return changed;
 		}
 	}
 
-	static bool canLoadFromEntity(StudioApp& app) {
-		const Array<EntityRef>& selected = app.getWorldEditor().getSelectedEntities();
+	bool canLoadFromEntity() const {
+		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return false;
-		return app.getWorldEditor().getUniverse()->hasComponent(selected[0], Reflection::getComponentType("animator"));
+		Universe* universe = m_app.getWorldEditor().getUniverse();
+		return universe->hasComponent(selected[0], Reflection::getComponentType("animator"));
 	}
 
-	static Path getPathFromEntity(StudioApp& app) {
-		const Array<EntityRef>& selected = app.getWorldEditor().getSelectedEntities();
+	Path getPathFromEntity() const {
+		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return Path();
-		Universe* universe = app.getWorldEditor().getUniverse();
+		Universe* universe = m_app.getWorldEditor().getUniverse();
 		const ComponentType cmp_type = Reflection::getComponentType("animator");
 		if (!universe->hasComponent(selected[0], cmp_type)) return Path();
 		AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
 		return scene->getAnimatorSource(selected[0]);
 	}
 
-	void load(ControllerEditor& editor, const char* path) {
+	void load() {
+		if (m_dirty) {
+			m_confirm_load = true;
+			m_confirm_path = "";
+			return;
+		}
+
+		char path[MAX_PATH_LENGTH];
+		if (!OS::getOpenFilename(Span(path), "Animation controller\0*.act", nullptr)) return;
+		load(path);
+	}
+
+	void load(const char* path) {
+		if (m_dirty) {
+			m_confirm_load = true;
+			m_confirm_path = path;
+			return;
+		}
+
+		if (!path[0]) {
+			load();
+			return;
+		}
+
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OS::InputFile file;
 		if (fs.open(path, Ref(file))) {
@@ -211,15 +289,16 @@ struct ControllerEditorImpl : ControllerEditor {
 			}
 			else {
 				InputMemoryStream str(data.begin(), data.byte_size());
-				Controller* new_controller = LUMIX_NEW(allocator, Controller)(Path("anim_editor"), *res_manager, allocator);
-				if (new_controller ->deserialize(str)) {
-					LUMIX_DELETE(allocator, m_controller);
-					m_controller = new_controller;
+				UniquePtr<Controller> new_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
+				if (new_controller->deserialize(str)) {
+					m_controller = new_controller.move();
 					m_current_node = m_controller->m_root;
+					m_path = path;
+					m_undo_stack.clear();
+					m_undo_idx = -1;
 				}
-				else {
-					LUMIX_DELETE(allocator, new_controller);
-				}
+				pushUndo();
+				m_dirty = false;
 			}
 			file.close();
 		}
@@ -231,7 +310,11 @@ struct ControllerEditorImpl : ControllerEditor {
 	static bool conditionInput(const char* label, InputDecl& input, Ref<String> condition_str, Ref<Condition> condition) {
 		char tmp[1024];
 		copyString(tmp, condition_str->c_str());
-		if (ImGui::InputText(label, tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
+		if (condition->error != Condition::Error::NONE) {
+			ImGui::TextUnformatted(Condition::errorToString(condition->error));
+		}
+		ImGuiEx::Label(label);		
+		if (ImGui::InputText(StaticString<64>("##_", label), tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
 			condition_str = tmp;
 			condition->compile(tmp, input);
 			return true;
@@ -241,7 +324,8 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	static bool nodeInput(const char* label, Ref<u32> value, const Array<GroupNode::Child>& children) {
-		if (!ImGui::BeginCombo(label, children[value].node->m_name.c_str())) return false;
+		ImGuiEx::Label(label);		
+		if (!ImGui::BeginCombo(StaticString<64>("##_", label), children[value].node->m_name.c_str())) return false;
 
 		for (GroupNode::Child& child : children) {
 			if (ImGui::Selectable(child.node->m_name.c_str())) {
@@ -274,7 +358,8 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 	}
 
-	void hierarchy_ui(Node& node) {
+	bool hierarchy_ui(Node& node) {
+		bool changed = false;
 		const bool is_container = isContainer(node);
 		bool is_parent_group = node.m_parent && node.m_parent->type() == Node::Type::GROUP;
 		bool is_layer = node.m_parent && node.m_parent->type() == Node::Type::LAYERS;
@@ -304,7 +389,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					LUMIX_DELETE(m_controller->m_allocator, &node);
 					ImGui::EndPopup();
 					ImGui::TreePop();
-					return;
+					return true;
 				}
 				ImGui::EndPopup();
 			}
@@ -313,26 +398,28 @@ struct ControllerEditorImpl : ControllerEditor {
 				case Node::Type::GROUP: {
 					GroupNode& group = (GroupNode&)node;
 					for (GroupNode::Child& c : group.m_children) {
-						hierarchy_ui(*c.node);
+						changed = hierarchy_ui(*c.node) || changed;
 					}
 					break;
 				}
 				case Node::Type::LAYERS: {
 					LayersNode& layers = (LayersNode&)node;
 					for (LayersNode::Layer& l : layers.m_layers) {
-						hierarchy_ui(l.node);
+						changed = hierarchy_ui(l.node) || changed;
 					}
 					break;
 				}
 			}
 			ImGui::TreePop();
 		}
+		return changed;
 	}
 
 	void debuggerUI() {
 		if (ImGui::Begin("Animation debugger", &m_open)) {
 			const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
-			if (selected.empty()) {
+			if (selected.size() != 1) {
+				ImGui::TextUnformatted(selected.empty() ? "No entity selected" : "Too many entities selected");
 				ImGui::End();
 				return;
 			}
@@ -340,12 +427,15 @@ struct ControllerEditorImpl : ControllerEditor {
 			Universe* universe = m_app.getWorldEditor().getUniverse();
 			const ComponentType cmp_type = Reflection::getComponentType("animator");
 			if (!universe->hasComponent(selected[0], cmp_type)) {
+				ImGui::TextUnformatted("Selected entity does not have animator component");
 				ImGui::End();
 				return;
 			}
+
 			AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
 			Controller* ctrl = scene->getAnimatorController(selected[0]);
 			if (!ctrl) {
+				ImGui::TextUnformatted("Selected entity does not have resource assigned in animator component");
 				ImGui::End();
 				return;
 			}
@@ -356,6 +446,8 @@ struct ControllerEditorImpl : ControllerEditor {
 					case InputDecl::Type::EMPTY: break;
 					case InputDecl::Type::FLOAT: {
 						float val = scene->getAnimatorFloatInput(selected[0], idx);
+		
+						ImGuiEx::Label(input.name);
 						if (ImGui::DragFloat(input.name, &val)) {
 							scene->setAnimatorInput(selected[0], idx, val);
 						}
@@ -363,6 +455,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					}
 					case InputDecl::Type::BOOL: {
 						bool val = scene->getAnimatorBoolInput(selected[0], idx);
+						ImGuiEx::Label(input.name);
 						if (ImGui::Checkbox(input.name, &val)) {
 							scene->setAnimatorInput(selected[0], idx, val);
 						}
@@ -370,6 +463,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					}
 					case InputDecl::Type::U32: {
 						u32 val = scene->getAnimatorU32Input(selected[0], idx);
+						ImGuiEx::Label(input.name);
 						if (ImGui::DragInt(input.name, (int*)&val, 1, 0, 0x7ffFFff)) {
 							scene->setAnimatorInput(selected[0], idx, val);
 						}
@@ -382,42 +476,168 @@ struct ControllerEditorImpl : ControllerEditor {
 		ImGui::End();
 	}
 
+	void save(const char* path) {
+		OutputMemoryStream str(m_controller->m_allocator);
+		m_controller->serialize(str);
+		OS::OutputFile file;
+		if (file.open(path)) {
+			if (!file.write(str.data(), str.size())) {
+				logError("Failed to write ", path);
+			}
+			file.close();
+			m_path = path;
+			m_dirty = false;
+		}
+		else {
+			logError("Failed to create ", path);
+		}
+	}
+
+	void newGraph() {
+		if (m_dirty) {
+			m_confirm_new = true;
+			return;
+		}
+		ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
+		IAllocator& allocator = m_app.getAllocator();
+		m_path = "";
+		m_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
+		m_controller->initEmpty();
+		m_current_node = m_controller->m_root;
+		m_undo_stack.clear();
+		m_undo_idx = -1;
+		pushUndo();
+		m_dirty = false;
+	}
+
+	void save() {
+		if (!m_path.empty()) {
+			save(m_path);
+		}
+		else {
+			saveAs();
+		}
+	}
+
+	void saveAs() {
+		char path[MAX_PATH_LENGTH];
+
+		if (OS::getSaveFilename(Span(path), "Animation controller\0*.act", "act")) {
+			save(path);
+		}
+	}
+
+	void pushUndo(u64 tag = ~u64(0)) {
+		while (m_undo_idx >= m_undo_stack.size()) m_undo_stack.pop();
+
+		if (tag == ~u64(0) || m_undo_stack.back().tag != tag) {
+			UndoRecord& r = m_undo_stack.emplace(m_app.getAllocator());
+			r.tag = tag;
+			m_controller->serialize(r.data);
+			m_undo_idx = m_undo_stack.size() - 1;
+			return;
+		}
+
+		m_undo_stack.back().data.clear();
+		m_controller->serialize(m_undo_stack.back().data);
+		m_dirty = true;
+	}
+
+	void undoRedo() {
+		IAllocator& allocator = m_app.getAllocator();
+		ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
+		UniquePtr<Controller> c = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
+		InputMemoryStream tmp(m_undo_stack[m_undo_idx].data);
+		bool success = c->deserialize(tmp);
+		ASSERT(success);
+		m_controller = c.move();
+		m_current_node = m_controller->m_root;
+	}
+
+	void redo() {
+		if (m_undo_idx >= m_undo_stack.size() - 1) return;
+		
+		++m_undo_idx;
+		undoRedo();
+	}
+
+	void undo() {
+		if (m_undo_idx <= 0) return;
+
+		--m_undo_idx;
+		undoRedo();
+	}
+
+	bool canUndo() const { return m_undo_idx > 0; }
+	bool canRedo() const { return m_undo_idx < m_undo_stack.size() - 1; }
+
+	bool hasFocus() override { return m_has_focus; }
+
 	void onWindowGUI() override {
+		m_has_focus = false;
 		if (!m_open) return;
 
 		debuggerUI();
 
-		if (ImGui::Begin("Animation hierarchy", &m_open, ImGuiWindowFlags_MenuBar)) {
+		if (m_confirm_new) {
+			ImGui::OpenPopup("Confirm##cn");
+			m_confirm_new = false;
+		}
+		if (m_confirm_load) {
+			ImGui::OpenPopup("Confirm##cl");
+			m_confirm_load = false;
+		}
+
+		if (ImGui::BeginPopupModal("Confirm##cn")) {
+			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
+			if (ImGui::Selectable("Yes")) {
+				m_dirty = false;
+				newGraph();
+			}
+			ImGui::Selectable("No");
+			ImGui::EndPopup();
+		}
+
+		if (ImGui::BeginPopupModal("Confirm##cl")) {
+			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
+			if (ImGui::Selectable("Yes")) {
+				m_dirty = false;
+				load(m_confirm_path);
+				m_confirm_path = "";
+			}
+			ImGui::Selectable("No");
+			ImGui::EndPopup();
+		}
+
+		if (ImGui::BeginPopupModal("Confirm##cn")) {
+			ImGui::TextUnformatted("All changes will be lost. Continue anyway?");
+			if (ImGui::Selectable("Yes")) {
+				m_dirty = false;
+				newGraph();
+			}
+			ImGui::Selectable("No");
+			ImGui::EndPopup();
+		}
+
+		if (ImGui::Begin("Animation editor", &m_open, ImGuiWindowFlags_MenuBar)) {
+			m_has_focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+			
 			if (ImGui::BeginMenuBar()) {
 				if (ImGui::BeginMenu("File")) {
-					if (ImGui::MenuItem("Save")) {
-						char path[MAX_PATH_LENGTH];
-						if (OS::getSaveFilename(Span(path), "Animation controller\0*.act", "act")) {
-							OutputMemoryStream str(m_controller->m_allocator);
-							m_controller->serialize(str);
-							OS::OutputFile file;
-							if (file.open(path)) {
-								if (!file.write(str.data(), str.size())) {
-									logError("Failed to write ", path);
-								}
-								file.close();
-							}
-							else {
-								logError("Failed to create ", path);
-							}
-						}
-					}
-					if (ImGui::MenuItem("Load")) {
-						char path[MAX_PATH_LENGTH];
-
-						if (OS::getOpenFilename(Span(path), "Animation controller\0*.act", nullptr)) {
-							load(*this, path);
-						}
-					}
+					if (ImGui::MenuItem("New")) newGraph();
+					if (ImGui::MenuItem("Save")) save();
+					if (ImGui::MenuItem("Save As")) saveAs();
+					if (ImGui::MenuItem("Load")) load();
 				
-					if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity(m_app))) {
-						load(*this, getPathFromEntity(m_app).c_str());
+					if (ImGui::MenuItem("Load from entity", nullptr, false, canLoadFromEntity())) {
+						load(getPathFromEntity().c_str());
 					}
+					ImGui::EndMenu();
+				}
+				
+				if (ImGui::BeginMenu("Edit")) {
+					doMenuItem(m_undo_action, canUndo());
+					doMenuItem(m_redo_action, canRedo());
 					ImGui::EndMenu();
 				}
 
@@ -435,21 +655,25 @@ struct ControllerEditorImpl : ControllerEditor {
 				ImGui::EndMenuBar();
 			}
 
-			hierarchy_ui(*m_controller->m_root);
-		}
-		ImGui::End();
-
-		if (ImGui::Begin("Animation controller", &m_open)) {
-			if (ImGui::CollapsingHeader("Controller")) {
-				ImGui::InputText("Root motion bone", m_controller->m_root_motion_bone.data, sizeof(m_controller->m_root_motion_bone.data));
-				bool xz_root_motion = m_controller->m_flags.isSet(Controller::Flags::XZ_ROOT_MOTION);
-				if (ImGui::Checkbox("XZ root motion", &xz_root_motion)) {
-					m_controller->m_flags.set(Controller::Flags::XZ_ROOT_MOTION, xz_root_motion);
-				}
+			if (hierarchy_ui(*m_controller->m_root)) {
+				pushUndo();
 			}
 
 			if (m_current_node && ImGui::CollapsingHeader("Node")) {
-				ui_dispatch(*m_current_node);
+				if (ui_dispatch(*m_current_node)) {
+					pushUndo((uintptr)m_current_node);
+				}
+			}
+
+			if (ImGui::CollapsingHeader("Controller")) {
+				ImGuiEx::Label("Root motion bone");
+				ImGui::InputText("##rmb", m_controller->m_root_motion_bone.data, sizeof(m_controller->m_root_motion_bone.data));
+				bool xz_root_motion = m_controller->m_flags.isSet(Controller::Flags::XZ_ROOT_MOTION);
+				ImGuiEx::Label("XZ root motion");
+				if (ImGui::Checkbox("##xzrm", &xz_root_motion)) {
+					m_controller->m_flags.set(Controller::Flags::XZ_ROOT_MOTION, xz_root_motion);
+					pushUndo();
+				}
 			}
 
 			if (ImGui::CollapsingHeader("Inputs")) {
@@ -471,6 +695,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					ImGui::SetNextItemWidth(-1);
 					if (ImGui::Combo("##type", (int*)&input.type, "float\0u32\0bool")) {
 						inputs.recalculateOffsets();
+						pushUndo();
 					}
 					ImGui::NextColumn();
 					ImGui::PopID();
@@ -487,10 +712,12 @@ struct ControllerEditorImpl : ControllerEditor {
 					if (ImGui::InputText(StaticString<32>("##", (u64)(uintptr)&slot), tmp, sizeof(tmp))) {
 						// update AnimationNode::m_animation_hash
 						slot = tmp;
+						pushUndo();
 					}
 				}
 				if (ImGui::Button(ICON_FA_PLUS_CIRCLE "##create_slot")) {
 					m_controller->m_animation_slots.emplace("", m_controller->m_allocator);
+					pushUndo();
 				}
 			}
 
@@ -516,6 +743,7 @@ struct ControllerEditorImpl : ControllerEditor {
 						for (u32 i = 0, c = m_controller->m_animation_slots.size(); i < c; ++i) {
 							if (ImGui::Selectable(m_controller->m_animation_slots[i].c_str())) {
 								entry.slot = i;
+								pushUndo();
 							}
 						}
 						ImGui::EndCombo();
@@ -529,6 +757,7 @@ struct ControllerEditorImpl : ControllerEditor {
 						if (entry.animation) entry.animation->decRefCount();
 						ResourceManagerHub& res_manager = m_app.getEngine().getResourceManager();
 						entry.animation = res_manager.load<Animation>(Path(path));
+						pushUndo();
 					}
 					ImGui::PopItemWidth();
 					ImGui::NextColumn();
@@ -540,10 +769,10 @@ struct ControllerEditorImpl : ControllerEditor {
 					entry.animation = nullptr;
 					entry.set = 0;
 					entry.slot = 0;
+					pushUndo();
 				}
 			}
 
-			// TODO
 			/*if (ImGui::CollapsingHeader("Transitions")) {
 				Array<GroupNode::Child>& children = m_current_level->m_children;
 				if (children.empty()) {
@@ -698,15 +927,31 @@ struct ControllerEditorImpl : ControllerEditor {
 
 	void show(const char* path) override {
 		m_open = true;
-		load(*this, path);
+		load(path);
 	}
 
+	struct UndoRecord {
+		UndoRecord(IAllocator& allocator) : data(allocator) {}
+		OutputMemoryStream data;
+		u64 tag;
+	};
+
 	StudioApp& m_app;
-	Controller* m_controller;
+	Array<UndoRecord> m_undo_stack;
+	i32 m_undo_idx;
+	UniquePtr<Controller> m_controller;
 	Node* m_current_node = nullptr;
 	Model* m_model = nullptr;
 	bool m_open = false;
+	bool m_has_focus = false;
+	bool m_dirty = false;
+	bool m_confirm_new = false;
+	bool m_confirm_load = false;
+	StaticString<MAX_PATH_LENGTH> m_confirm_path;
 	Action m_toggle_ui;
+	Action m_undo_action;
+	Action m_redo_action;
+	StaticString<MAX_PATH_LENGTH> m_path;
 }; // ControllerEditorImpl
 
 UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {

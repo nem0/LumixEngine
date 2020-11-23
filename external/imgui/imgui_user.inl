@@ -5,7 +5,7 @@
 
 
 static constexpr float HANDLE_RADIUS = 4;
-
+using namespace ImGui;
 
 ImVec2::ImVec2(const Lumix::Vec2& f) 
 	: x(f.x)
@@ -17,8 +17,7 @@ ImVec2::operator Lumix::Vec2() const {
 }                                               
 
 
-namespace ImGui
-{
+namespace ImGuiEx {
 
 	bool CheckboxEx(const char* label, bool* v)
 	{
@@ -694,9 +693,6 @@ namespace ImGui
 	}
 
 
-} // namespace ImGui
-
-namespace ImGuiEx {
 	bool IconButton(const char* icon, const char* tooltip) {
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);

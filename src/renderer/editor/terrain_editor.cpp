@@ -1129,7 +1129,7 @@ void TerrainEditor::layerGUI() {
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
 	if (getMaterial()
 		&& getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)
-		&& ImGui::ToolbarButton(m_app.getBigIconFont(), ICON_FA_SAVE, ImGui::GetStyle().Colors[ImGuiCol_Text], "Save"))
+		&& ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_SAVE, ImGui::GetStyle().Colors[ImGuiCol_Text], "Save"))
 	{
 		getMaterial()->getTextureByName(SPLATMAP_SLOT_NAME)->save();
 	}
@@ -1137,7 +1137,7 @@ void TerrainEditor::layerGUI() {
 	if (m_brush_texture)
 	{
 		ImGui::Image(m_brush_texture->handle, ImVec2(100, 100));
-		if (ImGui::ToolbarButton(m_app.getBigIconFont(), ICON_FA_TIMES, ImGui::GetStyle().Colors[ImGuiCol_Text], "Clear brush mask"))
+		if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_TIMES, ImGui::GetStyle().Colors[ImGuiCol_Text], "Clear brush mask"))
 		{
 			m_brush_texture->destroy();
 			LUMIX_DELETE(m_world_editor.getAllocator(), m_brush_texture);
@@ -1148,7 +1148,7 @@ void TerrainEditor::layerGUI() {
 	}
 
 	ImGui::SameLine();
-	if (ImGui::ToolbarButton(m_app.getBigIconFont(), ICON_FA_MASK, ImGui::GetStyle().Colors[ImGuiCol_Text], "Select brush mask"))
+	if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_MASK, ImGui::GetStyle().Colors[ImGuiCol_Text], "Select brush mask"))
 	{
 		char filename[MAX_PATH_LENGTH];
 		if (OS::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
@@ -1400,7 +1400,7 @@ void TerrainEditor::entityGUI() {
 		m_app.getAssetCompiler().unlockResources();
 		ImGui::ListBoxFooter();
 	}
-	ImGui::HSplitter("after_prefab", &size);
+	ImGuiEx::HSplitter("after_prefab", &size);
 
 	if(ImGui::Checkbox("Align with normal", &m_is_align_with_normal))
 	{
@@ -1490,7 +1490,7 @@ void TerrainEditor::onGUI()
 	if (ImGui::BeginTabBar("brush_type")) {
 		if (ImGui::BeginTabItem("Height")) {
 			m_mode = Mode::HEIGHT;
-			if (ImGui::ToolbarButton(m_app.getBigIconFont(), ICON_FA_SAVE, ImGui::GetStyle().Colors[ImGuiCol_Text], "Save")) 
+			if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_SAVE, ImGui::GetStyle().Colors[ImGuiCol_Text], "Save")) 
 			{
 				getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME)->save();
 			}

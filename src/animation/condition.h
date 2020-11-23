@@ -90,9 +90,10 @@ struct Condition
 	explicit Condition(IAllocator& allocator);
 
 	bool eval(const struct RuntimeContext& rc) const;
-	Error compile(const char* expression, InputDecl& decl);
+	void compile(const char* expression, InputDecl& decl);
 
 	Array<u8> bytecode;
+	Error error = Error::NONE;
 };
 
 

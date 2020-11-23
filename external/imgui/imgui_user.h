@@ -5,7 +5,7 @@
 struct lua_State;
 
 
-namespace ImGui
+namespace ImGuiEx
 {
 
 IMGUI_API bool CheckboxEx(const char* label, bool* v);
@@ -37,11 +37,9 @@ IMGUI_API void HSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void VSplitter(const char* str_id, ImVec2* size);
 IMGUI_API void Rect(float w, float h, ImU32 color);
 
-} // namespace ImGui
+IMGUI_API void Label(const char* label);
+IMGUI_API void TextClipped(const char* text, float size);
+IMGUI_API bool IconButton(const char* icon, const char* tooltip);
+IMGUI_API bool Gradient4(const char* label, int max_count, int* count, float* keys, float* values);
 
-namespace ImGuiEx {
-	IMGUI_API void Label(const char* label);
-	IMGUI_API void TextClipped(const char* text, float size);
-	IMGUI_API bool IconButton(const char* icon, const char* tooltip);
-	IMGUI_API bool Gradient4(const char* label, int max_count, int* count, float* keys, float* values);
-}
+} // namespace ImGuiEx

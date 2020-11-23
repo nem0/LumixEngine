@@ -115,7 +115,7 @@ bool Action::toolbarButton(ImFont* font)
 	if (!font_icon[0]) return false;
 
 	ImGui::SameLine();
-	if(ImGui::ToolbarButton(font, font_icon, bg_color, label_long)) {
+	if(ImGuiEx::ToolbarButton(font, font_icon, bg_color, label_long)) {
 		func.invoke();
 		return true;
 	}

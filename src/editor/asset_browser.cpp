@@ -341,7 +341,7 @@ void AssetBrowser::thumbnail(FileInfo& tile, float size)
 	}
 	else
 	{
-		ImGui::Rect(img_size.x, img_size.y, 0xffffFFFF);
+		ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
 		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.fileExists(path))
@@ -585,12 +585,12 @@ void AssetBrowser::detailsGUI()
 	{
 		ImVec2 pos = ImGui::GetCursorScreenPos();
 		if (m_history.size() > 1) {
-			if (ImGui::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
+			if (ImGuiEx::BeginToolbar("asset_browser_toolbar", pos, ImVec2(0, 24)))
 			{
 				if (m_history_index > 0) m_back_action.toolbarButton(m_app.getBigIconFont());
 				if (m_history_index < m_history.size() - 1) m_forward_action.toolbarButton(m_app.getBigIconFont());
 			}
-			ImGui::EndToolbar();
+			ImGuiEx::EndToolbar();
 		}
 
 		if (m_selected_resources.empty())
@@ -742,7 +742,7 @@ void AssetBrowser::onGUI()
 		dirColumn();
 
 		ImGui::SameLine();
-		ImGui::VSplitter("vsplit1", &left_size);
+		ImGuiEx::VSplitter("vsplit1", &left_size);
 		if (left_size.x >= 120) {
 			m_left_column_width = left_size.x;
 		}
@@ -924,7 +924,7 @@ bool AssetBrowser::resourceInput(const char* str_id, Span<char> buf, ResourceTyp
 	}
 	ImGui::PopStyleVar();
 
-	if (ImGui::BeginResizablePopup("popup", ImVec2(300, 300))) {
+	if (ImGuiEx::BeginResizablePopup("popup", ImVec2(300, 300))) {
 		static u32 selected_path_hash = 0;
 		if (resourceList(buf, Ref(selected_path_hash), type, 0, true)) {
 			ImGui::EndPopup();

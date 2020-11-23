@@ -875,7 +875,6 @@ private:
 	}
 
 
-	bool hasFocus() override { return false; }
 	void update(float) override {}
 	const char* getName() const override { return "gui_editor"; }
 

@@ -3053,27 +3053,26 @@ struct StudioAppImpl final : StudioApp
 			success = success || file.write(&info.size, sizeof(info.size));
 		}
 
+		FileSystem& fs = m_engine->getFileSystem();
 		for (auto& info : infos)
 		{
 			OS::InputFile src;
-			size_t src_size = OS::getFileSize(info.path);
-			if (!m_engine->getFileSystem().open(info.path, Ref(src)))
-			{
+			if (!fs.open(info.path, Ref(src))) {
 				file.close();
 				logError("Could not open ", info.path);
 				return;
 			}
+			u64 src_size = src.size();
 			u8 buf[4096];
-			for (; src_size > 0; src_size -= minimum(sizeof(buf), src_size))
-			{
+			for (; src_size > 0; src_size -= minimum(sizeof(buf), src_size)) {
 				size_t batch_size = minimum(sizeof(buf), src_size);
-				if (!src.read(buf, batch_size))
-				{
+				if (!src.read(buf, batch_size)) {
 					file.close();
+					src.close();
 					logError("Could not read ", info.path);
 					return;
 				}
-				success = success || file.write(buf, batch_size);
+				success = file.write(buf, batch_size) || success;
 			}
 			src.close();
 		}
