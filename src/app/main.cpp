@@ -91,7 +91,42 @@ struct Runner final : OS::Interface
 
 		m_universe = &m_engine->createUniverse(true);
 		initRenderPipeline();
-		initDemoScene();
+		
+		OS::InputFile file;
+		if (file.open("universes/main/entities.unv")) {
+			OutputMemoryStream data(m_allocator);
+			data.resize(file.size());
+			if (!file.read(data.getMutableData(), data.size())) {
+				logError("Failed to read universes/main/entities.unv");
+				initDemoScene();
+			}
+			else {
+				InputMemoryStream tmp(data);
+				EntityMap entity_map(m_allocator);
+				struct Header {
+					u32 magic;
+					i32 version;
+					u32 hash;
+					u32 engine_hash;
+				} header;
+
+				tmp.read(Ref(header));
+
+				m_universe->setName("main");
+				if (!m_engine->deserialize(*m_universe, tmp, Ref(entity_map))) {
+					logError("Failed to deserialize universes/main/entities.unv");
+				}
+			}
+			file.close();
+		}
+		else {
+			initDemoScene();
+		}
+		while (m_engine->getFileSystem().hasWork()) {
+			OS::sleep(100);
+			m_engine->getFileSystem().processCallbacks();
+		}
+		m_engine->startGame(*m_universe);
 
 		OS::showCursor(false);
 		onResize();
@@ -125,6 +160,16 @@ struct Runner final : OS::Interface
 
 	void onIdle() override {
 		m_engine->update(*m_universe);
+
+		EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
+		if (camera.isValid()) {
+			int w = m_viewport.w;
+			int h = m_viewport.h;
+			m_viewport = m_pipeline->getScene()->getCameraViewport((EntityRef)camera);
+			m_viewport.w = w;
+			m_viewport.h = h;
+		}
+
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
 		m_renderer->frame();
