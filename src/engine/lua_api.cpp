@@ -11,7 +11,6 @@
 
 namespace Lumix {
 
-
 namespace LuaImGui {
 
 int InputTextMultiline(lua_State* L)
@@ -243,7 +242,7 @@ int Separator(lua_State* L)
 
 void Rect(float w, float h, u32 color)
 {
-	ImGui::Rect(w, h, color);
+	ImGuiEx::Rect(w, h, color);
 }
 
 
@@ -381,170 +380,6 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 }
 
 } // namespace LuaImGui
-
-
-struct SetPropertyLuaVisitor : Reflection::IPropertyVisitor
-{
-	void visit(const Reflection::Property<float>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_isnumber(L, -1))
-		{
-			float f = (float)lua_tonumber(L, -1);
-			prop.set(cmp, -1, f);
-		}
-	}
-
-	void visit(const Reflection::Property<int>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-
-		for (const Reflection::IAttribute* attr : prop.getAttributes()) {
-			if (attr->getType() == Reflection::IAttribute::ENUM) continue;
-			const auto* enum_attr = (const Reflection::EnumAttribute*)attr;
-			if (lua_isstring(L, -1)) {
-				const char* str = lua_tostring(L, -1);
-				for (int i = 0, c = enum_attr->count(cmp); i < c; ++i) {
-					if (equalStrings(enum_attr->name(cmp, i), str)) {
-						const int value = i;
-						prop.set(cmp, -1, value);
-					}
-				}
-			}
-			return;
-		}
-		if (lua_isnumber(L, -1))
-		{
-			int i = (int)lua_tointeger(L, -1);
-			prop.set(cmp, -1, i);
-		}
-	}
-
-
-	void visit(const Reflection::Property<u32>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_isnumber(L, -1))
-		{
-			const u32 i = (u32)lua_tointeger(L, -1);
-			prop.set(cmp, -1, i);
-		}
-
-	}
-
-
-	void visit(const Reflection::Property<EntityPtr>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_isnumber(L, -1))
-		{
-			EntityPtr e = {(int)lua_tointeger(L, -1)};
-			prop.set(cmp, -1, e);
-		}
-
-	}
-
-
-	void visit(const Reflection::Property<Vec2>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_istable(L, -1))
-		{
-			auto v = LuaWrapper::toType<Vec2>(L, -1);
-			prop.set(cmp, -1, v);
-		}
-	}
-
-
-	void visit(const Reflection::Property<Vec3>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_istable(L, -1))
-		{
-			auto v = LuaWrapper::toType<Vec3>(L, -1);
-			prop.set(cmp, -1, v);
-		}
-	}
-
-
-	void visit(const Reflection::Property<IVec3>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_istable(L, -1))
-		{
-			auto v = LuaWrapper::toType<IVec3>(L, -1);
-			prop.set(cmp, -1, v);
-		}
-	}
-
-
-	void visit(const Reflection::Property<Vec4>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_istable(L, -1))
-		{
-			auto v = LuaWrapper::toType<Vec4>(L, -1);
-			prop.set(cmp, -1, v);
-		}
-	}
-
-
-	void visit(const Reflection::Property<Path>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_isstring(L, -1))
-		{
-			const char* str = lua_tostring(L, -1);
-			prop.set(cmp, -1, Path(str));
-		}
-	}
-
-
-	void visit(const Reflection::Property<bool>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_isboolean(L, -1))
-		{
-			bool b = lua_toboolean(L, -1) != 0;
-			prop.set(cmp, -1, b);
-		}
-	}
-
-
-	void visit(const Reflection::Property<const char*>& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-		if (lua_isstring(L, -1))
-		{
-			const char* str = lua_tostring(L, -1);
-			prop.set(cmp, -1, str);
-		}
-	}
-
-
-	void visit(const Reflection::IArrayProperty& prop) override
-	{
-		if (!equalStrings(property_name, prop.name)) return;
-			
-		if (lua_istable(L, -1)) {
-			const int count = (int)lua_objlen(L, -1);
-			for (int i = 0; i < count; ++i) {
-				prop.addItem(cmp, prop.getCount(cmp));
-			}
-		}
-	}
-
-
-	void visit(const Reflection::IBlobProperty& prop) override {
-		if (!equalStrings(property_name, prop.name)) return;
-		logError("Property ", prop.name, " has unsupported type");
-	}
-
-
-	lua_State* L;
-	ComponentUID cmp;
-	const char* property_name;
-};
 
 
 static int LUA_packageLoader(lua_State* L)

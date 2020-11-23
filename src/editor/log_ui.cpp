@@ -94,7 +94,7 @@ void LogUI::showNotifications()
 
 	if (ImGui::Button("Close")) m_notifications.clear();
 
-	if (m_move_notifications_to_front) ImGui::BringToFront();
+	if (m_move_notifications_to_front) ImGuiEx::BringToFront();
 	m_move_notifications_to_front = false;
 	for (int i = 0; i < m_notifications.size(); ++i)
 	{

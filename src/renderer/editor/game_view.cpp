@@ -175,7 +175,7 @@ void GameView::onFullscreenGUI()
 		}
 	}
 	else {
-		ImGui::Rect(size.x, size.y, 0xff0000FF);
+		ImGuiEx::Rect(size.x, size.y, 0xff0000FF);
 	}
 	m_pos = ImGui::GetItemRectMin();
 	m_size = ImGui::GetItemRectSize();
@@ -350,7 +350,7 @@ void GameView::onWindowGUI()
 				}
 			}
 			else {
-				ImGui::Rect(size.x, size.y, 0xffFF00FF);
+				ImGuiEx::Rect(size.x, size.y, 0xffFF00FF);
 			}
 			const bool is_hovered = ImGui::IsItemHovered();
 			if (is_hovered && ImGui::IsMouseClicked(0) && m_editor.isGameMode()) captureMouse(true);

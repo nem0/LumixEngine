@@ -1128,7 +1128,7 @@ void SceneView::onToolbar()
 		"viewSide" };
 
 	auto pos = ImGui::GetCursorScreenPos();
-	if (ImGui::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, 24)))
+	if (ImGuiEx::BeginToolbar("scene_view_toolbar", pos, ImVec2(0, 24)))
 	{
 		for (auto* action_name : actions_names)
 		{
@@ -1204,7 +1204,7 @@ void SceneView::onToolbar()
 
 	ImGui::PopItemWidth();
 
-	ImGui::EndToolbar();
+	ImGuiEx::EndToolbar();
 }
 
 void SceneView::handleEvents() {
@@ -1223,7 +1223,7 @@ void SceneView::handleEvents() {
 						ImGui::SetWindowFocus();
 						captureMouse(event.mouse_button.down);
 					}
-					ImGui::ResetActiveID();
+					ImGuiEx::ResetActiveID();
 					if (event.mouse_button.down) {
 						m_view->onMouseDown((int)rel_mp.x, (int)rel_mp.y, event.mouse_button.button);
 					}

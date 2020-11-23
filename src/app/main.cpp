@@ -1,4 +1,5 @@
 #include "engine/command_line_parser.h"
+#include "engine/allocators.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
@@ -9,8 +10,7 @@
 #include "engine/log.h"
 #include "engine/thread.h"
 #include "engine/os.h"
-#include "engine/path_utils.h"
-#include "engine/plugin_manager.h"
+#include "engine/path.h"
 #include "engine/reflection.h"
 #include "engine/universe.h"
 #include "lua_script/lua_script_system.h"
@@ -28,14 +28,14 @@ struct Runner final : OS::Interface
 	Runner() 
 		: m_allocator(m_main_allocator) 
 	{
-		if (!JobSystem::init(getCPUsCount(), m_allocator)) {
-			logError("Engine") << "Failed to initialize job system.";
+		if (!JobSystem::init(OS::getCPUsCount(), m_allocator)) {
+			logError("Failed to initialize job system.");
 		}
 	}
 	~Runner() { ASSERT(!m_universe); }
 
 	void onResize() {
-		if (!m_engine) return;
+		if (!m_engine.get()) return;
 		if (m_engine->getWindowHandle() == OS::INVALID_WINDOW) return;
 
 		const OS::Rect r = OS::getWindowClientRect(m_engine->getWindowHandle());
@@ -56,7 +56,7 @@ struct Runner final : OS::Interface
 		m_pipeline = Pipeline::create(*m_renderer, pres, "APP", m_engine->getAllocator());
 
 		while (m_engine->getFileSystem().hasWork()) {
-			sleep(100);
+			OS::sleep(100);
 			m_engine->getFileSystem().processCallbacks();
 		}
 
@@ -77,7 +77,7 @@ struct Runner final : OS::Interface
 		m_universe->setRotation(env, rot);
 		
 		LuaScriptScene* lua_scene = (LuaScriptScene*)m_universe->getScene(crc32("lua_script"));
-		lua_scene->addScript(env);
+		lua_scene->addScript(env, 0);
 		lua_scene->setScriptPath(env, 0, Path("pipelines/sky.lua"));
 	}
 
@@ -99,17 +99,15 @@ struct Runner final : OS::Interface
 
 	void shutdown() {
 		m_engine->destroyUniverse(*m_universe);
-		Pipeline::destroy(m_pipeline);
-		Engine::destroy(m_engine, m_allocator);
-		m_engine = nullptr;
-		m_pipeline = nullptr;
+		m_pipeline.reset();
+		m_engine.reset();
 		m_universe = nullptr;
 	}
 
 	void onEvent(const OS::Event& event) override {
-		if (m_engine) {
+		if (m_engine.get()) {
 			InputSystem& input = m_engine->getInputSystem();
-			input.injectEvent(event);
+			input.injectEvent(event, 0, 0);
 		}
 		switch (event.type) {
 			case OS::Event::Type::QUIT:
@@ -132,10 +130,10 @@ struct Runner final : OS::Interface
 
 	DefaultAllocator m_main_allocator;
 	Debug::Allocator m_allocator;
-	Engine* m_engine = nullptr;
+	UniquePtr<Engine> m_engine;
 	Renderer* m_renderer = nullptr;
 	Universe* m_universe = nullptr;
-	Pipeline* m_pipeline = nullptr;
+	UniquePtr<Pipeline> m_pipeline;
 	Viewport m_viewport;
 };
 

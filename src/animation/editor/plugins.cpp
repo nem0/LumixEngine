@@ -218,13 +218,13 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		}
 		int new_count;
 		int last_frame = curve.frames.back();
-		int flags = (int)ImGui::CurveEditorFlags::NO_TANGENTS | (int)ImGui::CurveEditorFlags::SHOW_GRID;
+		int flags = (int)ImGuiEx::CurveEditorFlags::NO_TANGENTS | (int)ImGuiEx::CurveEditorFlags::SHOW_GRID;
 		if (m_fit_curve_in_editor)
 		{
-			flags |= (int)ImGui::CurveEditorFlags::RESET;
+			flags |= (int)ImGuiEx::CurveEditorFlags::RESET;
 			m_fit_curve_in_editor = false;
 		}
-		int changed = ImGui::CurveEditor("curve", (float*)points, curve.frames.size(), size, flags, &new_count, &m_selected_point);
+		int changed = ImGuiEx::CurveEditor("curve", (float*)points, curve.frames.size(), size, flags, &new_count, &m_selected_point);
 		if (changed >= 0)
 		{
 			curve.frames[changed] = int(points[changed].x + 0.5f);
@@ -260,7 +260,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			ImGui::InputFloat("##val", &curve.values[m_selected_point]);
 		}
 
-		ImGui::HSplitter("sizer", &size);
+		ImGuiEx::HSplitter("sizer", &size);
 	}
 
 
