@@ -458,7 +458,15 @@ function main()
 
 	if APP ~= nil then
 		setRenderTargets()
-		drawcallUniforms(0, 0, 1, 1, 1, 1, 1, 1)
+		drawcallUniforms( 
+			0, 0, 1, 1, 
+			1, 0, 0, 0, 
+			0, 1, 0, 0, 
+			0, 0, 1, 0, 
+			0, 0, 0, 1, 
+			0, 0, 0, 0
+		)
+
 		drawArray(0, 3, textured_quad_shader
 			, { res }
 			, { depth_test = false })
