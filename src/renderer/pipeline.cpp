@@ -2232,6 +2232,18 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
+	void renderOpaque() {
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			plugin->renderOpaque(*this);
+		}
+	}
+
+	void renderTransparent() {
+		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
+			plugin->renderTransparent(*this);
+		}
+	}
+
 	void renderTextMeshes()
 	{
 		if (!m_text_mesh_shader->isReady()) return;
@@ -4426,6 +4438,8 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderReflectionVolumes);
 		REGISTER_FUNCTION(renderTerrains);
 		REGISTER_FUNCTION(renderTextMeshes);
+		REGISTER_FUNCTION(renderOpaque);
+		REGISTER_FUNCTION(renderTransparent);
 		REGISTER_FUNCTION(renderUI);
 		REGISTER_FUNCTION(saveRenderbuffer);
 		REGISTER_FUNCTION(setOutput);
