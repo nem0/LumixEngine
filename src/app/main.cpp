@@ -78,7 +78,7 @@ struct Runner final : OS::Interface
 		
 		LuaScriptScene* lua_scene = (LuaScriptScene*)m_universe->getScene(crc32("lua_script"));
 		lua_scene->addScript(env, 0);
-		lua_scene->setScriptPath(env, 0, Path("pipelines/sky.lua"));
+		lua_scene->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
 
 	void onInit() override {
@@ -98,6 +98,7 @@ struct Runner final : OS::Interface
 	}
 
 	void shutdown() {
+		m_shutting_down = true;
 		m_engine->destroyUniverse(*m_universe);
 		m_pipeline.reset();
 		m_engine.reset();
@@ -105,6 +106,7 @@ struct Runner final : OS::Interface
 	}
 
 	void onEvent(const OS::Event& event) override {
+		if (m_shutting_down) return;
 		if (m_engine.get()) {
 			InputSystem& input = m_engine->getInputSystem();
 			input.injectEvent(event, 0, 0);
@@ -135,6 +137,7 @@ struct Runner final : OS::Interface
 	Universe* m_universe = nullptr;
 	UniquePtr<Pipeline> m_pipeline;
 	Viewport m_viewport;
+	bool m_shutting_down = false;
 };
 
 int main(int args, char* argv[])

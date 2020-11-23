@@ -21,7 +21,9 @@ struct ResourceManager;
 struct TextureManager;
 
 struct RenderPlugin {
-	virtual void renderUI(Pipeline& pipeline) {};
+	virtual void renderUI(Pipeline& pipeline) {}
+	virtual void renderOpaque(Pipeline& pipeline) {}
+	virtual void renderTransparent(Pipeline& pipeline) {}
 };
 
 struct LUMIX_RENDERER_API Renderer : IPlugin 

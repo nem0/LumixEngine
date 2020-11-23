@@ -89,6 +89,7 @@ function transparentPass(entities, colorbuffer, dsbuffer, shadowmap)
 	renderBucket(bucket, transparent_state)
 	local view_params = getCameraParams()
 	renderParticles(view_params)
+	renderTransparent()
 	endBlock()
 end
 
@@ -120,8 +121,8 @@ function geomPass(entities)
 		renderTerrains(view_params, default_state)
 		renderGrass(view_params, grass_state)
 		local bucket = createBucket(entities, "default", "DEFERRED")
-		
 		renderBucket(bucket, default_state)
+		renderOpaque()
 	endBlock()
 
 	beginBlock("decals")
