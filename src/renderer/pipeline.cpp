@@ -1372,7 +1372,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
 				u32 elem_offset = 0;
-				u64 state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				u64 state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 				state |= (u64)gpu::StateFlags::SCISSOR_TEST;
 				gpu::setState(state);
 				gpu::useProgram(program);
