@@ -1277,7 +1277,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void createHeightfield(EntityRef entity)
 	{
-		Heightfield& terrain = m_terrains.insert(entity, Heightfield());
+		Heightfield& terrain = m_terrains.insert(entity);
 		terrain.m_heightmap = nullptr;
 		terrain.m_scene = this;
 		terrain.m_actor = nullptr;
@@ -1326,7 +1326,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		initControllerDesc(cDesc);
 		DVec3 position = m_universe.getPosition(entity);
 		cDesc.position.set(position.x, position.y, position.z);
-		Controller& c = m_controllers.insert(entity, Controller());
+		Controller& c = m_controllers.insert(entity);
 		c.controller = m_controller_manager->createController(cDesc);
 		c.controller->getActor()->userData = (void*)(uintptr)entity.index;
 		c.entity = entity;
@@ -1371,7 +1371,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void createRagdoll(EntityRef entity)
 	{
-		Ragdoll& ragdoll = m_ragdolls.insert(entity, Ragdoll());
+		Ragdoll& ragdoll = m_ragdolls.insert(entity);
 		ragdoll.entity = entity;
 		ragdoll.root = nullptr;
 		ragdoll.layer = 0;
@@ -3793,7 +3793,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			EntityRef entity;
 			serializer.read(entity);
 			entity = entity_map.get(entity);
-			Controller& c = m_controllers.insert(entity, Controller());
+			Controller& c = m_controllers.insert(entity);
 			c.frame_change.set(0, 0, 0);
 
 			serializer.read(c.layer);
@@ -3835,7 +3835,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		for (u32 i = 0; i < vehicles_count; ++i) {
 			EntityRef e = serializer.read<EntityRef>();
 			e = entity_map.get(e);
-			Vehicle& v = m_vehicles.insert(e, {});
+			Vehicle& v = m_vehicles.insert(e);
 			serializer.read(v.chassis_mass);
 			m_universe.onComponentCreated(e, VEHICLE_TYPE, this);
 		}
@@ -3845,7 +3845,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		for (u32 i = 0; i < wheels_count; ++i) {
 			EntityRef e = serializer.read<EntityRef>();
 			e = entity_map.get(e);
-			Wheel& w = m_wheels.insert(e, {});
+			Wheel& w = m_wheels.insert(e);
 			serializer.read(w.slot);
 			serializer.read(w.radius);
 			serializer.read(w.width);
@@ -3865,7 +3865,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			EntityRef entity;
 			serializer.read(entity);
 			entity = entity_map.get(entity);
-			Ragdoll& ragdoll = m_ragdolls.insert(entity, Ragdoll());
+			Ragdoll& ragdoll = m_ragdolls.insert(entity);
 			ragdoll.layer = 0;
 			ragdoll.root_transform.pos = DVec3(0, 0, 0);
 			ragdoll.root_transform.rot.set(0, 0, 0, 1);

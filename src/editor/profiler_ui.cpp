@@ -15,7 +15,6 @@
 #include "engine/profiler.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "utils.h"
 
 
 namespace Lumix
@@ -41,6 +40,41 @@ enum MemoryColumn
 	SIZE
 };
 
+struct ThreadRecord
+{
+	float y;
+	u32 thread_id;
+	const char* name;
+	bool show;
+	struct {
+		u64 time;
+		bool is_enter;
+	} last_context_switch;
+};
+
+struct ThreadContextProxy {
+	ThreadContextProxy(u8* ptr) 
+	{
+		InputMemoryStream blob(ptr, 9000);
+		name = blob.readString();
+		blob.read(Ref(thread_id));
+		blob.read(Ref(begin));
+		blob.read(Ref(end));
+		default_show = blob.read<u8>();
+		blob.read(Ref(buffer_size));
+		buffer = (u8*)blob.getData() + blob.getPosition();
+	}
+
+	u8* next() { return buffer + buffer_size; }
+
+	const char* name;
+	u32 thread_id;
+	u32 begin;
+	u32 end;
+	u32 buffer_size;
+	bool default_show;
+	u8* buffer;
+};
 
 static const char* getContexSwitchReasonString(i8 reason)
 {
@@ -88,11 +122,54 @@ static const char* getContexSwitchReasonString(i8 reason)
 	return reasons[reason];
 }
 
+template <typename T>
+static void read(const ThreadContextProxy& ctx, u32 p, T& value)
+{
+	const u8* buf = ctx.buffer;
+	const u32 buf_size = ctx.buffer_size;
+	const u32 l = p % buf_size;
+	if (l + sizeof(value) <= buf_size) {
+		memcpy(&value, buf + l, sizeof(value));
+		return;
+	}
+
+	memcpy(&value, buf + l, buf_size - l);
+	memcpy((u8*)&value + (buf_size - l), buf, sizeof(value) - (buf_size - l));
+}
+
+static void read(const ThreadContextProxy& ctx, u32 p, u8* ptr, int size)
+{
+	const u8* buf = ctx.buffer;
+	const u32 buf_size = ctx.buffer_size;
+	const u32 l = p % buf_size;
+	if (l + size <= buf_size) {
+		memcpy(ptr, buf + l, size);
+		return;
+	}
+
+	memcpy(ptr, buf + l, buf_size - l);
+	memcpy(ptr + (buf_size - l), buf, size - (buf_size - l));
+}
+
+template <typename T>
+static void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
+	p = p % ctx.buffer_size;
+	if (ctx.buffer_size - p >= sizeof(v)) {
+		memcpy(ctx.buffer + p, &v, sizeof(v));
+	}
+	else {
+		const u32 prefix_len = ctx.buffer_size - p;
+		memcpy(ctx.buffer + p, &v, prefix_len);
+		memcpy(ctx.buffer, ((u8*)&v) + prefix_len, sizeof(v) - prefix_len);
+	}
+}
 
 struct ProfilerUIImpl final : ProfilerUI
 {
 	ProfilerUIImpl(Debug::Allocator* allocator, Engine& engine)
 		: m_main_allocator(allocator)
+		, m_threads(m_allocator)
+		, m_data(m_allocator)
 		, m_resource_manager(engine.getResourceManager())
 		, m_engine(engine)
 	{
@@ -106,7 +183,6 @@ struct ProfilerUIImpl final : ProfilerUI
 		m_resource_filter[0] = 0;
 	}
 
-
 	~ProfilerUIImpl()
 	{
 		while (m_engine.getFileSystem().hasWork())
@@ -118,6 +194,138 @@ struct ProfilerUIImpl final : ProfilerUI
 		LUMIX_DELETE(m_allocator, m_allocation_root);
 	}
 
+	void onPause() {
+		ASSERT(m_is_paused);
+		m_data.clear();
+		Profiler::serialize(m_data);
+		patchStrings();
+		findEnd();
+	}
+
+	void findEnd() {
+		m_end = 0;
+		forEachThread([&](ThreadContextProxy& ctx){
+			u32 p = ctx.begin;
+			const u32 end = ctx.end;
+			while (p != end) {
+				Profiler::EventHeader header;
+				read(ctx, p, header);
+				m_end = maximum(header.time, m_end);
+				p += header.size;
+			}
+		});
+	}
+
+	void patchStrings() {
+		InputMemoryStream tmp(m_data);
+		tmp.read<u32>();
+		const u32 count = tmp.read<u32>();
+		u8* iter = (u8*)tmp.skip(0);
+		ThreadContextProxy global(iter);
+		iter = global.next();
+		for (u32 i = 0; i < count; ++i) {
+			ThreadContextProxy ctx(iter);
+			iter = ctx.next();
+		}
+
+		HashMap<const void*, const char*> map(m_allocator);
+		map.reserve(512);
+		tmp.setPosition(iter - m_data.data());
+		u32 str_count = tmp.read<u32>();
+		for (u32 i = 0; i < str_count; ++i) {
+			const u64 pos = tmp.getPosition();
+			const char* key = (const char*)(uintptr)tmp.read<u64>();
+			const char* val = tmp.readString();
+			memcpy(m_data.getMutableData() + pos, &val, sizeof(val));
+			map.insert(key, val);
+		}
+
+		forEachThread([&](ThreadContextProxy& ctx){
+			u32 p = ctx.begin;
+			const u32 end = ctx.end;
+			while (p != end) {
+				Profiler::EventHeader header;
+				read(ctx, p, header);
+				switch (header.type) {
+					case Profiler::EventType::BEGIN_BLOCK: {
+						u64 tmp;
+						read(ctx, p + sizeof(Profiler::EventHeader), tmp);
+						const char* name = (const char*)(uintptr)tmp;
+						const char* new_val = map[name];
+						overwrite(ctx, u32(p + sizeof(Profiler::EventHeader)), new_val);
+						break;
+					}
+					case Profiler::EventType::INT: {
+						Profiler::IntRecord r;
+						read(ctx, p + sizeof(Profiler::EventHeader), (u8*)&r, sizeof(r));
+						const char* new_val = map[r.key];
+						r.key = new_val;
+						overwrite(ctx, u32(p + sizeof(Profiler::EventHeader)), r);
+						break;
+					}
+					default: break;
+				}
+				p += header.size;
+			}
+		});
+	}
+
+	void load() {
+		char path[MAX_PATH_LENGTH];
+		if (OS::getOpenFilename(Span(path), "Profile data\0*.lpd", nullptr)) {
+			OS::InputFile file;
+			if (file.open(path)) {
+				m_data.resize(file.size());
+				if (!file.read(m_data.getMutableData(), m_data.size())) {
+					logError("Could not read ", path);
+					m_data.clear();
+				}
+				else {
+					patchStrings();
+					findEnd();
+					m_is_paused = true;
+				}
+				file.close();
+			}
+			else {
+				logError("Could not open ", path);
+			}
+		}
+	}
+
+	template <typename F> void forEachThread(const F& f) {
+		if (m_data.empty()) return;
+
+		InputMemoryStream blob(m_data);
+		const u32 version = blob.read<u32>();
+		const u32 count = blob.read<u32>();
+		u8* iter = (u8*)blob.skip(0);
+		ThreadContextProxy global(iter);
+		f(global);
+		iter = global.next();
+		for (u32 i = 0; i < count; ++i) {
+			ThreadContextProxy ctx(iter);
+			f(ctx);
+			iter = ctx.next();
+		}
+	}
+
+	void save() {
+		char path[MAX_PATH_LENGTH];
+		if (OS::getSaveFilename(Span(path), "Profile data\0*.lpd", "lpd")) {
+			OS::OutputFile file;
+			if (file.open(path)) {
+				if (!file.write(m_data.getMutableData(), m_data.size())) {
+					logError("Could not write ", path);
+				}
+				
+				file.close();
+			}
+			else {
+				logError("Could not open ", path);
+			}
+		}	
+	}
 
 	void onGUI() override
 	{
@@ -196,6 +404,8 @@ struct ProfilerUIImpl final : ProfilerUI
 	char m_filter[100];
 	char m_resource_filter[100];
 	Engine& m_engine;
+	HashMap<u32, ThreadRecord> m_threads;
+	OutputMemoryStream m_data;
 	OS::Timer m_timer;
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
@@ -455,36 +665,6 @@ void ProfilerUIImpl::onGUIMemoryProfiler()
 	ImGui::Columns(1);
 }
 
-template <typename T>
-static void read(Profiler::ThreadState& ctx, u32 p, T& value)
-{
-	const u8* buf = ctx.buffer;
-	const u32 buf_size = ctx.buffer_size;
-	const u32 l = p % buf_size;
-	if (l + sizeof(value) <= buf_size) {
-		memcpy(&value, buf + l, sizeof(value));
-		return;
-	}
-
-	memcpy(&value, buf + l, buf_size - l);
-	memcpy((u8*)&value + (buf_size - l), buf, sizeof(value) - (buf_size - l));
-}
-
-
-static void read(Profiler::ThreadState& ctx, u32 p, u8* ptr, int size)
-{
-	const u8* buf = ctx.buffer;
-	const u32 buf_size = ctx.buffer_size;
-	const u32 l = p % buf_size;
-	if (l + size <= buf_size) {
-		memcpy(ptr, buf + l, size);
-		return;
-	}
-
-	memcpy(ptr, buf + l, buf_size - l);
-	memcpy(ptr + (buf_size - l), buf, size - (buf_size - l));
-}
-
 static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 {
 	const float h = ImGui::GetFontSize() * 1.00f;
@@ -517,39 +697,26 @@ static void renderArrow(ImVec2 p_min, ImGuiDir dir, float scale, ImDrawList* dl)
 	dl->AddTriangleFilled(center + a, center + b, center + c, ImGui::GetColorU32(ImGuiCol_Text));
 }
 
-
-struct VisibleBlock
-{
-	const char* name;
-};
-
-
-struct ThreadRecord
-{
-	float y;
-	u32 thread_id;
-	const char* name;
-	struct {
-		u64 time;
-		bool is_enter;
-	}last_context_switch;
-};
-
-
 void ProfilerUIImpl::onGUICPUProfiler()
 {
 	if (!ImGui::CollapsingHeader("CPU/GPU")) return;
 
-	if (ImGui::Checkbox("Pause", &m_is_paused)) {
+	if (m_autopause > 0 && !m_is_paused && Profiler::getLastFrameDuration() * 1000.f > m_autopause) {
+		m_is_paused = true;
 		Profiler::pause(m_is_paused);
-	}
-	if (!m_is_paused) {
-		m_end = OS::Timer::getRawTimestamp();
+		onPause();
 	}
 
-	Profiler::GlobalState global;
-	const int contexts_count = global.threadsCount();
+	if (ImGui::Button(m_is_paused ? ICON_FA_PLAY : ICON_FA_PAUSE)) {
+		m_is_paused = !m_is_paused;
+		Profiler::pause(m_is_paused);
+		if (m_is_paused) onPause();
+	}
+
+	ImGui::SameLine();
 	if (ImGui::BeginMenu("Advanced")) {
+		if (ImGui::MenuItem("Load")) load();
+		if (ImGui::MenuItem("Save")) save();
 		ImGui::Checkbox("Show frames", &m_show_frames);
 		ImGui::Text("Zoom: %f", m_range / double(DEFAULT_RANGE));
 		if (ImGui::MenuItem("Reset zoom")) m_range = DEFAULT_RANGE;
@@ -561,10 +728,12 @@ void ProfilerUIImpl::onGUICPUProfiler()
 			ImGui::InputFloat("Autopause limit (ms)", &m_autopause, 1.f, 10.f, "%.2f");
 		}
 		if (ImGui::BeginMenu("Threads")) {
-			for (int i = 0; i < contexts_count; ++i) {
-				Profiler::ThreadState ctx(global, i);
-				ImGui::Checkbox(ctx.name, &ctx.show);
-			}
+			forEachThread([&](const ThreadContextProxy& ctx){
+				auto thread = m_threads.find(ctx.thread_id);
+				if (thread.isValid()) {
+					ImGui::Checkbox(StaticString<128>(ctx.name, "##t", ctx.thread_id), &thread.value().show);
+				}
+			});
 			ImGui::EndMenu();
 		}
 		if (Profiler::contextSwitchesEnabled())
@@ -579,6 +748,9 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		ImGui::EndMenu();
 	}
 
+	if (m_data.empty()) return;
+	ThreadContextProxy global(m_data.getMutableData() + 2 * sizeof(u32));
+
 	const u64 view_start = m_end - m_range;
 
 	const float from_x = ImGui::GetCursorScreenPos().x;
@@ -586,24 +758,24 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	const float to_x = from_x + ImGui::GetContentRegionAvail().x;
 	ImDrawList* dl = ImGui::GetWindowDrawList();
 
-	HashMap<u32, ThreadRecord> threads_records(64, m_allocator);
 	auto getThreadName = [&](u32 thread_id){
-		for(auto iter : threads_records) {
-			if(iter.thread_id == thread_id) return iter.name;
-		}
-		return "Unknown";
+		auto iter = m_threads.find(thread_id);
+		return iter.isValid() ? iter.value().name : "Unknown";
 	};
 	bool any_hovered_signal = false;
 	bool any_hovered_link = false;
 	bool hovered_signal_current_pos = false;
 
-	for (int i = 0; i < contexts_count; ++i) {
-		Profiler::ThreadState ctx(global, i);
-		if (!ctx.show) continue;
+	forEachThread([&](const ThreadContextProxy& ctx) {
+		if (ctx.thread_id == 0) return;
+		auto thread = m_threads.find(ctx.thread_id);
 		
-		threads_records.insert(ctx.thread_id, { ImGui::GetCursorScreenPos().y, ctx.thread_id, ctx.name, 0});
-
-		if (!ImGui::TreeNode(ctx.buffer, "%s", ctx.name)) continue;
+		if (!thread.isValid()) {
+			thread = m_threads.insert(ctx.thread_id, { 0, ctx.thread_id, ctx.name, ctx.default_show, 0});
+		}
+		thread.value().y = ImGui::GetCursorScreenPos().y;
+		if (!thread.value().show) return;
+		if (!ImGui::TreeNode(ctx.buffer, "%s", ctx.name)) return;
 
 		float y = ImGui::GetCursorScreenPos().y;
 		float top = y;
@@ -823,7 +995,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		ImGui::Dummy(ImVec2(to_x - from_x, lines * 20.f));
 
 		ImGui::TreePop();
-	}
+	});
 
 	if (!any_hovered_link) hovered_link = 0;
 	if (!any_hovered_signal) hovered_signal.signal = JobSystem::INVALID_HANDLE;
@@ -864,7 +1036,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	};
 
 	{
-		Profiler::ThreadState ctx(global, -1);
+		ThreadContextProxy& ctx = global;
 
 		float before_gpu_y = ImGui::GetCursorScreenPos().y;
 
@@ -950,8 +1122,8 @@ void ProfilerUIImpl::onGUICPUProfiler()
 					if (m_show_context_switches && header.time >= view_start && header.time <= m_end) {
 						Profiler::ContextSwitchRecord r;
 						read(ctx, p + sizeof(Profiler::EventHeader), r);
-						auto new_iter = threads_records.find(r.new_thread_id);
-						auto old_iter = threads_records.find(r.old_thread_id);
+						auto new_iter = m_threads.find(r.new_thread_id);
+						auto old_iter = m_threads.find(r.old_thread_id);
 						const float x = get_view_x(header.time);
 
 						if (new_iter.isValid()) draw_cswitch(x, r, new_iter.value(), true);
@@ -988,17 +1160,11 @@ void ProfilerUIImpl::onGUICPUProfiler()
 		}
 	}
 
-	for (const ThreadRecord& tr : threads_records) {
+	for (const ThreadRecord& tr : m_threads) {
 		if (tr.last_context_switch.is_enter) {
 			const float x = get_view_x(tr.last_context_switch.time);
 			dl->AddLine(ImVec2(to_x, tr.y + 10), ImVec2(x, tr.y + 10), 0xff00ff00);
 		}
-	}
-
-	if (m_autopause > 0 && !m_is_paused && Profiler::getLastFrameDuration() * 1000.f > m_autopause) {
-		m_is_paused = true;
-		Profiler::pause(m_is_paused);
-		m_end = OS::Timer::getRawTimestamp();
 	}
 }
 

@@ -37,8 +37,6 @@ struct ThreadContext
 	OutputMemoryStream buffer;
 	u32 begin = 0;
 	u32 end = 0;
-	u32 rows = 0;
-	bool open = false;
 	Mutex mutex;
 	StaticString<64> name;
 	bool show_in_profiler = false;
@@ -505,60 +503,86 @@ void setThreadName(const char* name)
 	ctx->name = name;
 }
 
-
-GlobalState::GlobalState()
+template <typename T>
+static void read(const ThreadContext& ctx, u32 p, T& value)
 {
-	g_instance.mutex.enter();
+	const u8* buf = ctx.buffer.data();
+	const u32 buf_size = (u32)ctx.buffer.size();
+	const u32 l = p % buf_size;
+	if (l + sizeof(value) <= buf_size) {
+		memcpy(&value, buf + l, sizeof(value));
+		return;
+	}
+
+	memcpy(&value, buf + l, buf_size - l);
+	memcpy((u8*)&value + (buf_size - l), buf, sizeof(value) - (buf_size - l));
 }
 
+static void saveStrings(OutputMemoryStream& blob) {
+	HashMap<const char*, const char*> map(g_instance.allocator);
+	map.reserve(512);
+	auto gather = [&](const ThreadContext& ctx){
+		u32 p = ctx.begin;
+		const u32 end = ctx.end;
+		while (p != end) {
+			Profiler::EventHeader header;
+			read(ctx, p, header);
+			switch (header.type) {
+				case Profiler::EventType::BEGIN_BLOCK: {
+					const char* name;
+					read(ctx, p + sizeof(Profiler::EventHeader), name);
+					if (!map.find(name).isValid()) {
+						map.insert(name, name);
+					}
+					break;
+				}
+				case Profiler::EventType::INT: {
+					IntRecord r;
+					read(ctx, p + sizeof(Profiler::EventHeader), r);
+					if (!map.find(r.key).isValid()) {
+						map.insert(r.key, r.key);
+					}
+					break;
+				}
+				default: break;
+			}
+			p += header.size;
+		}
+	};
 
-GlobalState::~GlobalState()
-{
-	ASSERT(local_readers_count == 0);
-	g_instance.mutex.exit();
+	gather(g_instance.global_context);
+	for (const ThreadContext* ctx : g_instance.contexts) {
+		gather(*ctx);
+	}
+
+	blob.write(map.size());
+	for (auto iter : map) {
+		blob.write((u64)(uintptr)iter);
+		blob.write(iter, strlen(iter) + 1);
+	}
 }
 
-
-int GlobalState::threadsCount() const
-{
-	return g_instance.contexts.size();
+void serialize(OutputMemoryStream& blob, ThreadContext& ctx) {
+	MutexGuard lock(ctx.mutex);
+	blob.writeString(ctx.name);
+	blob.write(ctx.thread_id);
+	blob.write(ctx.begin);
+	blob.write(ctx.end);
+	blob.write((u8)ctx.show_in_profiler);
+	blob.write((u32)ctx.buffer.size());
+	blob.write(ctx.buffer.data(), ctx.buffer.size());
 }
 
-
-const char* GlobalState::getThreadName(int idx) const
-{
-	ThreadContext* ctx = g_instance.contexts[idx];
-	MutexGuard lock(ctx->mutex);
-	return ctx->name;
+void serialize(OutputMemoryStream& blob) {
+	MutexGuard lock(g_instance.mutex);
+	blob.write<u32>(0); // version
+	blob.write((u32)g_instance.contexts.size());
+	serialize(blob, g_instance.global_context);
+	for (ThreadContext* ctx : g_instance.contexts) {
+		serialize(blob, *ctx);
+	}	
+	saveStrings(blob);
 }
-
-
-ThreadState::ThreadState(GlobalState& reader, int thread_idx)
-	: reader(reader)
-	, thread_idx(thread_idx)
-{
-	++reader.local_readers_count;
-	ThreadContext& ctx = thread_idx >= 0 ? *g_instance.contexts[thread_idx] : g_instance.global_context;
-
-	ctx.mutex.enter();
-	buffer = ctx.buffer.getMutableData();
-	buffer_size = (u32)ctx.buffer.size();
-	begin = ctx.begin;
-	end = ctx.end;
-	thread_id = ctx.thread_id;
-	name = ctx.name;
-	show = ctx.show_in_profiler;
-}
-
-
-ThreadState::~ThreadState()
-{
-	ThreadContext& ctx = thread_idx >= 0 ? *g_instance.contexts[thread_idx] : g_instance.global_context;
-	ctx.show_in_profiler = show;
-	ctx.mutex.exit();
-	--reader.local_readers_count;
-}
-
 
 void pause(bool paused)
 {
