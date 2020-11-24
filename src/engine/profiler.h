@@ -2,7 +2,11 @@
 
 #include "engine/lumix.h"
 
-namespace Lumix::Profiler {
+namespace Lumix {
+
+struct OutputMemoryStream;
+
+namespace Profiler {
 // writing API
 
 LUMIX_ENGINE_API void pause(bool paused);
@@ -24,6 +28,7 @@ LUMIX_ENGINE_API void gpuMemStats(u64 total, u64 current, u64 dedicated);
 LUMIX_ENGINE_API void gpuFrame();
 LUMIX_ENGINE_API void link(i64 link);
 LUMIX_ENGINE_API i64 createNewLinkID();
+LUMIX_ENGINE_API void serialize(OutputMemoryStream& blob);
 
 struct FiberSwitchData {
 	i32 id;
@@ -47,6 +52,7 @@ struct Scope
 
 LUMIX_ENGINE_API bool contextSwitchesEnabled();
 LUMIX_ENGINE_API u64 frequency();
+
 
 struct ContextSwitchRecord
 {
@@ -121,36 +127,6 @@ struct EventHeader
 };
 #pragma pack()
 
-
-struct LUMIX_ENGINE_API GlobalState {
-	GlobalState();
-	~GlobalState();
-	
-	int threadsCount() const;
-	const char* getThreadName(int idx) const;
-
-	int local_readers_count = 0;
-};
-
-
-struct LUMIX_ENGINE_API ThreadState {
-	ThreadState(GlobalState& reader, int thread_idx);
-	~ThreadState();
-
-	GlobalState& reader;
-	int thread_idx;
-
-	const char* name;
-	const u8* buffer;
-	u32 buffer_size;
-	u32 begin;
-	u32 end;
-	u32 thread_id;
-
-	bool show;
-};
-
-
 #define LUMIX_CONCAT2(a, b) a ## b
 #define LUMIX_CONCAT(a, b) LUMIX_CONCAT2(a, b)
 
@@ -158,4 +134,5 @@ struct LUMIX_ENGINE_API ThreadState {
 #define PROFILE_BLOCK(name) Profiler::Scope LUMIX_CONCAT(profile_scope, __LINE__)(name);
 
 
-} // namespace Lumix::Profiler
+} // namespace Profiler
+} // namespace Lumix

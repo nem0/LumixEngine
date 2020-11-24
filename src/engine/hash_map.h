@@ -284,7 +284,12 @@ public:
 		return m_values[pos];
 	}
 
-	Value& insert(const Key& key, Value&& value) {
+	Value& insert(const Key& key) {
+		auto iter = insert(key, {});
+		return iter.value();
+	}
+
+	iterator insert(const Key& key, Value&& value) {
 		if (m_size >= m_capacity * 3 / 4) {
 			grow((m_capacity << 1) < 8 ? 8 : m_capacity << 1);
 		}
@@ -301,7 +306,7 @@ public:
 		++m_size;
 		m_keys[pos].valid = true;
 
-		return m_values[pos];
+		return { this, pos };
 	}
 
 	iterator insert(const Key& key, const Value& value) {

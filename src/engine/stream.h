@@ -18,7 +18,7 @@ struct LUMIX_ENGINE_API IOutputStream
 	IOutputStream& operator << (u32 value);
 	IOutputStream& operator << (float value);
 	IOutputStream& operator << (double value);
-	template <typename T> void write(const T& value);
+	template <typename T> bool write(const T& value);
 };
 
 
@@ -124,9 +124,9 @@ template <> inline bool IInputStream::read<bool>()
 }
 
 
-template <typename T> void IOutputStream::write(const T& value)
+template <typename T> bool IOutputStream::write(const T& value)
 {
-	write(&value, sizeof(T));
+	return write(&value, sizeof(T));
 }
 
 

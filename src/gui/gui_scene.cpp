@@ -978,7 +978,7 @@ struct GUISceneImpl final : GUIScene
 			iter = m_rects.find(entity);
 		}
 		GUIImage* image = iter.value()->image;
-		GUIButton& button = m_buttons.insert(entity, GUIButton());
+		GUIButton& button = m_buttons.insert(entity);
 		if (image) {
 			button.hovered_color = image->color;
 		}
@@ -988,7 +988,7 @@ struct GUISceneImpl final : GUIScene
 
 	void createCanvas(EntityRef entity)
 	{
-		GUICanvas& canvas = m_canvas.insert(entity, {});
+		GUICanvas& canvas = m_canvas.insert(entity);
 		canvas.entity = entity;
 		m_universe.onComponentCreated(entity, GUI_CANVAS_TYPE, this);
 	}
@@ -1229,7 +1229,7 @@ struct GUISceneImpl final : GUIScene
 			EntityRef e;
 			serializer.read(e);
 			e = entity_map.get(e);
-			GUIButton& button = m_buttons.insert(e, GUIButton());
+			GUIButton& button = m_buttons.insert(e);
 			serializer.read(button.hovered_color);
 			serializer.read(button.hovered_cursor);
 			m_universe.onComponentCreated(e, GUI_BUTTON_TYPE, this);

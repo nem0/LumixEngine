@@ -155,6 +155,7 @@ public:
 	[[nodiscard]] bool write(const void* data, u64 size) override;
 
 private:
+	OutputFile(const OutputFile&) = delete;
 	void* m_handle;
     bool m_is_error;
 };

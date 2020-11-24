@@ -124,7 +124,16 @@ public:
 		logInfo("Engine created.");
 
 		StaticPluginRegister::createAll(*this);
-		
+
+		#ifdef LUMIXENGINE_PLUGINS
+			const char* plugins[] = { LUMIXENGINE_PLUGINS };
+			for (auto* plugin_name : plugins) {
+				if (plugin_name[0] && !m_plugin_manager->load(plugin_name)) {
+					logInfo(plugin_name, " plugin has not been loaded");
+				}
+			}
+		#endif
+
 		for (auto* plugin_name : init_data.plugins) {
 			if (plugin_name[0] && !m_plugin_manager->load(plugin_name)) {
 				logInfo(plugin_name, " plugin has not been loaded");

@@ -1,5 +1,5 @@
-#include "engine/command_line_parser.h"
 #include "engine/allocators.h"
+#include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
@@ -8,10 +8,11 @@
 #include "engine/input_system.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
-#include "engine/thread.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/profiler.h"
 #include "engine/reflection.h"
+#include "engine/thread.h"
 #include "engine/universe.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/pipeline.h"
@@ -81,55 +82,56 @@ struct Runner final : OS::Interface
 		lua_scene->setScriptPath(env, 0, Path("pipelines/atmo.lua"));
 	}
 
+	bool loadUniverse(const char* path) {
+		OS::InputFile file;
+		if (!file.open(path)) return false;
+
+		OutputMemoryStream data(m_allocator);
+		data.resize(file.size());
+		if (!file.read(data.getMutableData(), data.size())) {
+			logError("Failed to read universes/main/entities.unv");
+			return false;
+		}
+		file.close();
+
+		InputMemoryStream tmp(data);
+		EntityMap entity_map(m_allocator);
+		struct Header {
+			u32 magic;
+			i32 version;
+			u32 hash;
+			u32 engine_hash;
+		} header;
+
+		tmp.read(Ref(header));
+
+		m_universe->setName("main");
+		if (!m_engine->deserialize(*m_universe, tmp, Ref(entity_map))) {
+			logError("Failed to deserialize universes/main/entities.unv");
+			return false;
+		}
+		return true;
+	}
+
 	void onInit() override {
 		Engine::InitArgs init_data;
-		#ifdef LUMIXENGINE_PLUGINS
-			const char* plugins[] = { LUMIXENGINE_PLUGINS };
-			init_data.plugins = Span(plugins);
-		#endif
 		m_engine = Engine::create(init_data, m_allocator);
 
 		m_universe = &m_engine->createUniverse(true);
 		initRenderPipeline();
 		
-		OS::InputFile file;
-		if (file.open("universes/main/entities.unv")) {
-			OutputMemoryStream data(m_allocator);
-			data.resize(file.size());
-			if (!file.read(data.getMutableData(), data.size())) {
-				logError("Failed to read universes/main/entities.unv");
-				initDemoScene();
-			}
-			else {
-				InputMemoryStream tmp(data);
-				EntityMap entity_map(m_allocator);
-				struct Header {
-					u32 magic;
-					i32 version;
-					u32 hash;
-					u32 engine_hash;
-				} header;
-
-				tmp.read(Ref(header));
-
-				m_universe->setName("main");
-				if (!m_engine->deserialize(*m_universe, tmp, Ref(entity_map))) {
-					logError("Failed to deserialize universes/main/entities.unv");
-				}
-			}
-			file.close();
-		}
-		else {
+		if (!loadUniverse("universes/main/entities.unv")) {
 			initDemoScene();
 		}
 		while (m_engine->getFileSystem().hasWork()) {
-			OS::sleep(100);
+			OS::sleep(10);
 			m_engine->getFileSystem().processCallbacks();
 		}
-		m_engine->startGame(*m_universe);
 
 		OS::showCursor(false);
 		onResize();
+		m_engine->startGame(*m_universe);
+		Profiler::pause(false);
 	}
 
 	void shutdown() {
@@ -147,6 +149,17 @@ struct Runner final : OS::Interface
 			input.injectEvent(event, 0, 0);
 		}
 		switch (event.type) {
+			case OS::Event::Type::KEY:
+				if (event.key.keycode == OS::Keycode::Z && event.key.down) {
+					OS::OutputFile file;
+					if (file.open("profile.lpd")) {
+						OutputMemoryStream blob(m_allocator);
+						Profiler::serialize(blob);
+						(void)file.write(blob.data(), blob.size());
+						file.close();
+					}
+				}
+				break;	
 			case OS::Event::Type::QUIT:
 			case OS::Event::Type::WINDOW_CLOSE: 
 				OS::quit();
@@ -187,8 +200,24 @@ struct Runner final : OS::Interface
 
 int main(int args, char* argv[])
 {
-	Runner app;
-	OS::run(app);
-	app.shutdown();
+	Profiler::setThreadName("Main thread");
+	struct Data {
+		Data() : semaphore(0, 1) {}
+		Runner app;
+		Semaphore semaphore;
+	} data;
+
+	JobSystem::runEx(&data, [](void* ptr) {
+		Data* data = (Data*)ptr;
+
+		OS::run(data->app);
+		data->app.shutdown();
+
+		data->semaphore.signal();
+	}, nullptr, JobSystem::INVALID_HANDLE, 0);
+	
+	PROFILE_BLOCK("sleeping");
+	data.semaphore.wait();
+
 	return 0;
 }
