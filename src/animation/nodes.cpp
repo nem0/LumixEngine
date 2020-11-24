@@ -414,7 +414,11 @@ void GroupNode::enter(RuntimeContext& ctx) const {
 }
 
 void GroupNode::skip(RuntimeContext& ctx) const { 
-	ctx.input_runtime.skip(sizeof(RuntimeData));
+	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
+	m_children[data.from].node->skip(ctx);
+	if (data.from != data.to) {
+		m_children[data.to].node->skip(ctx);
+	}
 }
 	
 void GroupNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const {
