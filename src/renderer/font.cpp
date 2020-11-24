@@ -154,8 +154,8 @@ bool FontManager::build()
 			continue;
 		}
 		
-		font->descender = face->descender / 64.f;
-		font->ascender = face->ascender / 64.f;
+		font->descender = face->size->metrics.descender / 64.f;
+		font->ascender = face->size->metrics.ascender / 64.f;
 		for (Glyph& c : font->glyphs) {
 			c.u0 = c.v0 = 0;
 			c.u1 = c.v1 = 1;

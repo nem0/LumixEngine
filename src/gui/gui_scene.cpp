@@ -312,13 +312,13 @@ struct GUISceneImpl final : GUIScene
 			Font* font = rect.text->getFont();
 			if (font) {
 				const char* text_cstr = rect.text->text.c_str();
-				float font_size = (float)rect.text->getFontSize();
+				float ascender = getAscender(*font);
 				Vec2 text_size = measureTextA(*font, text_cstr, nullptr);
-				Vec2 text_pos(l, t + font_size);
+				Vec2 text_pos(l, t + ascender);
 
 				switch (rect.text->vertical_align) {
 					case TextVAlign::TOP: break;
-					case TextVAlign::MIDDLE: text_pos.y = (t + b + getAscender(*font) - getDescender(*font)) * 0.5f; break;
+					case TextVAlign::MIDDLE: text_pos.y = (t + b + ascender + getDescender(*font)) * 0.5f; break;
 					case TextVAlign::BOTTOM: text_pos.y = b + getDescender(*font); break;
 				}
 
