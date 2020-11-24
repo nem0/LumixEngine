@@ -1372,7 +1372,7 @@ struct ParticleEditorImpl : ParticleEditor {
 				if (ImGui::MenuItem("Save as")) saveAs();
 				ImGui::Separator();
 			
-				doMenuItem(m_undo_action, emitter && emitter->getResource());
+				doMenuItem(m_apply_action, emitter && emitter->getResource());
 				ImGui::MenuItem("Autoapply", nullptr, &m_autoapply, emitter && emitter->getResource());
 
 				ImGui::EndMenu();
