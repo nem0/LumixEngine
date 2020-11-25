@@ -295,90 +295,80 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void onInitFinished() override
 	{
-		OS::InputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const StaticString<MAX_PATH_LENGTH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
-		if (fs.open(".lumix/assets/_list.txt", Ref(file))) {
-			Array<char> content(m_app.getAllocator());
-			content.resize((int)file.size());
-			if (!file.read(content.begin(), content.byte_size())) {
-				logError("Failed to read .lumix/assets/_list.txt");
-				file.close();
-			}
-			else {
-				file.close();
+		OutputMemoryStream content(m_app.getAllocator());
+		if (fs.getContentSync(Path(".lumix/assets/_list.txt"), Ref(content))) {
+			lua_State* L = luaL_newstate();
+			[&](){
+				if (luaL_loadbuffer(L, (const char*)content.data(), content.size(), "lumix_asset_list") != 0) {
+					logError(list_path, ": ", lua_tostring(L, -1));
+					return;
+				}
 
-				lua_State* L = luaL_newstate();
-				[&](){
-					if (luaL_loadbuffer(L, content.begin(), content.byte_size(), "lumix_asset_list") != 0) {
-						logError(list_path, ": ", lua_tostring(L, -1));
-						return;
-					}
+				if (lua_pcall(L, 0, 0, 0) != 0) {
+					logError(list_path, ": ", lua_tostring(L, -1));
+					return;
+				}
 
-					if (lua_pcall(L, 0, 0, 0) != 0) {
-						logError(list_path, ": ", lua_tostring(L, -1));
-						return;
-					}
+				lua_getglobal(L, "resources");
+				if (lua_type(L, -1) != LUA_TTABLE) return;
 
-					lua_getglobal(L, "resources");
-					if (lua_type(L, -1) != LUA_TTABLE) return;
-
-					{
-						MutexGuard lock(m_resources_mutex);
-						LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
-							const ResourceType type = getResourceType(p.c_str());
-							#ifdef CACHE_MASTER 
-								StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
-								if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
+				{
+					MutexGuard lock(m_resources_mutex);
+					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
+						const ResourceType type = getResourceType(p.c_str());
+						#ifdef CACHE_MASTER 
+							StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
+							if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
+								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
+							}
+						#else
+							if (type != INVALID_RESOURCE_TYPE) {
+								ResourceLocator locator(Span<const char>(p.c_str(), (u32)strlen(p.c_str())));
+								char tmp[MAX_PATH_LENGTH];
+								copyString(Span(tmp), locator.resource);
+								if (fs.fileExists(tmp)) {
 									m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 								}
-							#else
-								if (type != INVALID_RESOURCE_TYPE) {
-									ResourceLocator locator(Span<const char>(p.c_str(), (u32)strlen(p.c_str())));
-									char tmp[MAX_PATH_LENGTH];
-									copyString(Span(tmp), locator.resource);
-									if (fs.fileExists(tmp)) {
-										m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
-									}
-									else {
-										StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
-										fs.deleteFile(res_path);
-									}
+								else {
+									StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
+									fs.deleteFile(res_path);
 								}
-							#endif
-						});
-					}
-					lua_pop(L, 1);
+							}
+						#endif
+					});
+				}
+				lua_pop(L, 1);
 
-					lua_getglobal(L, "dependencies");
-					if (lua_type(L, -1) != LUA_TTABLE) return;
+				lua_getglobal(L, "dependencies");
+				if (lua_type(L, -1) != LUA_TTABLE) return;
 
-					lua_pushnil(L);
-					while (lua_next(L, -2) != 0) {
-						if (!lua_isstring(L, -2) || !lua_istable(L, -1)) {
-							logError("Invalid dependencies in _list.txt");
-							lua_pop(L, 1);
-							continue;
-						}
-					
-						const char* key = lua_tostring(L, -2);
-						IAllocator& allocator = m_app.getAllocator();
-						const Path key_path(key);
-						m_dependencies.insert(key_path, Array<Path>(allocator));
-						Array<Path>& values = m_dependencies.find(key_path).value();
-
-						LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [&values](const Path& p){ 
-							values.push(p); 
-						});
-
+				lua_pushnil(L);
+				while (lua_next(L, -2) != 0) {
+					if (!lua_isstring(L, -2) || !lua_istable(L, -1)) {
+						logError("Invalid dependencies in _list.txt");
 						lua_pop(L, 1);
+						continue;
 					}
-					lua_pop(L, 1);
+					
+					const char* key = lua_tostring(L, -2);
+					IAllocator& allocator = m_app.getAllocator();
+					const Path key_path(key);
+					m_dependencies.insert(key_path, Array<Path>(allocator));
+					Array<Path>& values = m_dependencies.find(key_path).value();
 
-				}();
+					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [&values](const Path& p){ 
+						values.push(p); 
+					});
+
+					lua_pop(L, 1);
+				}
+				lua_pop(L, 1);
+
+			}();
 		
-				lua_close(L);
-			}
+			lua_close(L);
 		}
 
 		const u64 list_last_modified = OS::getLastModified(list_path);
@@ -415,7 +405,6 @@ struct AssetCompilerImpl : AssetCompiler
 		}
 	}
 
-
 	void onFileChanged(const char* path)
 	{
 		if (startsWith(path, ".lumix")) return;
@@ -427,22 +416,15 @@ struct AssetCompilerImpl : AssetCompiler
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
 	{
-		OS::InputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
 		
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.open(meta_path, Ref(file))) return false;
-
-		Array<char> buf(m_app.getAllocator());
-		buf.resize((int)file.size());
-		const bool read_all = file.read(buf.begin(), buf.byte_size());
-		file.close();
-		if (!read_all) {
-			return false;
-		}
+		OutputMemoryStream buf(m_app.getAllocator());
+		
+		if (!fs.getContentSync(Path(meta_path), Ref(buf))) return false;
 
 		lua_State* L = luaL_newstate();
-		if (luaL_loadbuffer(L, buf.begin(), buf.byte_size(), meta_path) != 0) {
+		if (luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), meta_path) != 0) {
 			logError(meta_path, ": ", lua_tostring(L, -1));
 			lua_close(L);
 			return false;

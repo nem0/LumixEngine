@@ -17,12 +17,9 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 
-namespace Lumix
-{
+namespace Lumix {
 
-
-struct AsyncItem
-{
+struct AsyncItem {
 	enum class Flags : u32 {
 		FAILED = 1 << 0,
 		CANCELED = 1 << 1,
@@ -44,18 +41,13 @@ struct AsyncItem
 struct FileSystemImpl;
 
 
-struct FSTask final : Thread
-{
-public:
+struct FSTask final : Thread {
 	FSTask(FileSystemImpl& fs, IAllocator& allocator)
 		: Thread(allocator)
 		, m_fs(fs)
-	{
-	}
-
+	{}
 
 	~FSTask() = default;
-
 
 	void stop();
 	int task() override;
@@ -66,8 +58,7 @@ private:
 };
 
 
-struct FileSystemImpl final : FileSystem
-{
+struct FileSystemImpl : FileSystem {
 	explicit FileSystemImpl(const char* base_path, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_queue(allocator)	
@@ -76,16 +67,14 @@ struct FileSystemImpl final : FileSystem
 		, m_semaphore(0, 0xffFF)
 	{
 		setBasePath(base_path);
-		m_task = LUMIX_NEW(m_allocator, FSTask)(*this, m_allocator);
+		m_task.create(*this, m_allocator);
 		m_task->create("Filesystem", true);
 	}
 
-
-	~FileSystemImpl()
-	{
+	~FileSystemImpl() override {
 		m_task->stop();
 		m_task->destroy();
-		LUMIX_DELETE(m_allocator, m_task);
+		m_task.destroy();
 	}
 
 
@@ -116,6 +105,7 @@ struct FileSystemImpl final : FileSystem
 
 		content->resize((int)file.size());
 		if (!file.read(content->getMutableData(), content->size())) {
+			logError("Could not read ", path);
 			file.close();
 			return false;
 		}
@@ -264,7 +254,7 @@ struct FileSystemImpl final : FileSystem
 	}
 
 	IAllocator& m_allocator;
-	FSTask* m_task;
+	Local<FSTask> m_task;
 	StaticString<MAX_PATH_LENGTH> m_base_path;
 	Array<AsyncItem> m_queue;
 	Array<AsyncItem> m_finished;
@@ -292,23 +282,8 @@ int FSTask::task()
 			}
 		}
 
-		bool success = true;
-		
 		OutputMemoryStream data(m_fs.m_allocator);
-
-		OS::InputFile file;
-		StaticString<MAX_PATH_LENGTH> full_path(m_fs.m_base_path, path);
-		
-		if (file.open(full_path)) {
-			data.resize((int)file.size());
-			if (!file.read(data.getMutableData(), data.size())) {
-				success = false;
-			}
-			file.close();
-		}
-		else {
-			success = false;
-		}
+		bool success = m_fs.getContentSync(Path(path), Ref(data));
 
 		{
 			MutexGuard lock(m_fs.m_mutex);
@@ -332,10 +307,68 @@ void FSTask::stop()
 	m_fs.m_semaphore.signal();
 }
 
+struct PackFileSystem : FileSystemImpl {
+	PackFileSystem(const char* pak_path, IAllocator& allocator) 
+		: FileSystemImpl("pack://", allocator) 
+		, m_map(allocator)
+	{
+		if (!m_file.open(pak_path)) {
+			logError("Failed to open game.pak");
+			return;
+		}
+		const u32 count = m_file.read<u32>();
+		for (u32 i = 0; i < count; ++i) {
+			const u32 hash = m_file.read<u32>();
+			PackFile& f = m_map.insert(hash);
+			f.offset = m_file.read<u64>();
+			f.size = m_file.read<u64>();
+		}
+	}
+
+	~PackFileSystem() {
+		m_file.close();
+	}
+
+	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
+		char basename[MAX_PATH_LENGTH];
+		Path::getBasename(Span(basename), path.c_str());
+		u32 hash;
+		fromCString(Span(basename), Ref(hash));
+		if (basename[0] < '0' || basename[0] > '9' || hash == 0) {
+			hash = path.getHash();
+		}
+		auto iter = m_map.find(hash);
+		if (!iter.isValid()) return false;
+
+		content->resize(iter.value().size);
+
+		MutexGuard lock(m_mutex);
+		if (!m_file.seek(iter.value().offset) || !m_file.read(content->getMutableData(), content->size())) {
+			logError("Could not read ", path);
+			return false;
+		}
+		return true;
+	}
+	
+	struct PackFile {
+		u64 offset;
+		u64 size;
+	};
+
+	HashMap<u32, PackFile> m_map;
+	Mutex m_mutex;
+	OS::InputFile m_file;
+};
+
 
 UniquePtr<FileSystem> FileSystem::create(const char* base_path, IAllocator& allocator)
 {
 	return UniquePtr<FileSystemImpl>::create(allocator, base_path, allocator);
+}
+
+UniquePtr<FileSystem> FileSystem::createPacked(const char* pak_path, IAllocator& allocator)
+{
+	return UniquePtr<PackFileSystem>::create(allocator, pak_path, allocator);
 }
 
 

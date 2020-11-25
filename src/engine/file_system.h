@@ -28,6 +28,7 @@ struct LUMIX_ENGINE_API FileSystem
 	};
 
 	static UniquePtr<FileSystem> create(const char* base_path, struct IAllocator& allocator);
+	static UniquePtr<FileSystem> createPacked(const char* pak_path, struct IAllocator& allocator);
 
 	virtual ~FileSystem() {}
 

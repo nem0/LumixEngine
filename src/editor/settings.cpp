@@ -316,7 +316,6 @@ Settings::~Settings()
 bool Settings::load()
 {
 	auto L = m_state;
-	OS::InputFile file;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const bool has_settings = fs.fileExists(SETTINGS_PATH);
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;

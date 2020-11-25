@@ -1539,7 +1539,8 @@ struct ParticleEditorImpl : ParticleEditor {
 		ASSERT(emitter);
 
 		const Path& path = emitter->getResource()->getPath();
-		load(path.c_str());
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		load(StaticString<MAX_PATH_LENGTH>(fs.getBasePath(), path.c_str()));
 	}
 
 	void load(const char* path) {
@@ -1637,7 +1638,9 @@ struct ParticleEditorImpl : ParticleEditor {
 			m_confirm_load_path = path;
 			return;
 		}
-		load(path);
+		
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		load(StaticString<MAX_PATH_LENGTH>(fs.getBasePath(), path));
 	}
 
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
