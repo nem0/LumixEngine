@@ -66,7 +66,7 @@ public:
 	void operator=(const EngineImpl&) = delete;
 	EngineImpl(const EngineImpl&) = delete;
 
-	EngineImpl(const InitArgs& init_data, IAllocator& allocator)
+	EngineImpl(InitArgs&& init_data, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_prefab_resource_manager(m_allocator)
 		, m_resource_manager(m_allocator)
@@ -104,7 +104,10 @@ public:
 
 		registerEngineAPI(m_state, this);
 
-		if (init_data.working_dir) {
+		if (init_data.file_system.get()) {
+			m_file_system = static_cast<UniquePtr<FileSystem>&&>(init_data.file_system);
+		}
+		else if (init_data.working_dir) {
 			m_file_system = FileSystem::create(init_data.working_dir, m_allocator);
 		}
 		else {
@@ -541,9 +544,9 @@ private:
 };
 
 
-UniquePtr<Engine> Engine::create(const InitArgs& init_data, IAllocator& allocator)
+UniquePtr<Engine> Engine::create(InitArgs&& init_data, IAllocator& allocator)
 {
-	return UniquePtr<EngineImpl>::create(allocator, init_data, allocator);
+	return UniquePtr<EngineImpl>::create(allocator, static_cast<InitArgs&&>(init_data), allocator);
 }
 
 

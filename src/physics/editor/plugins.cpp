@@ -333,11 +333,10 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		char exe_dir[MAX_PATH_LENGTH];
 
 		const char* physx_dlls[] = {
-			"nvToolsExt64_1.dll",
-			"PhysX3CharacterKinematicCHECKED_x64.dll",
-			"PhysX3CHECKED_x64.dll",
-			"PhysX3CommonCHECKED_x64.dll",
-			"PhysX3CookingCHECKED_x64.dll",
+			"PhysX_64.dll",
+			"PhysXFoundation_64.dll",
+			"PhysXCommon_64.dll",
+			"PhysXCooking_64.dll",
 		};
 		for (const char* dll : physx_dlls)
 		{
@@ -945,7 +944,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponent("", "distance_joint", "Physics / Joints/Distance");
+		m_app.registerComponent("", "distance_joint", "Physics / Joints / Distance");
 		m_app.registerComponent("", "hinge_joint", "Physics / Joints / Hinge");
 		m_app.registerComponent("", "spherical_joint", "Physics / Joints / Spherical");
 		m_app.registerComponent("", "d6_joint", "Physics / Joints / D6");

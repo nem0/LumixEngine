@@ -371,7 +371,7 @@ struct StudioAppImpl final : StudioApp
 		init_data.handle_file_drops = true;
 		init_data.window_title = "Lumix Studio";
 		init_data.working_dir = data_dir[0] ? data_dir : (saved_data_dir[0] ? saved_data_dir : current_dir);
-		m_engine = Engine::create(init_data, m_allocator);
+		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		m_main_window = m_engine->getWindowHandle();
 		m_windows.push(m_main_window);
 
@@ -2826,36 +2826,24 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void checkScriptCommandLine()
-	{
+	void checkScriptCommandLine() {
 		char command_line[1024];
 		OS::getCommandLine(Span(command_line));
 		CommandLineParser parser(command_line);
-		while (parser.next())
-		{
-			if (parser.currentEquals("-run_script"))
-			{
+		while (parser.next()) {
+			if (parser.currentEquals("-run_script")) {
 				if (!parser.next()) break;
+
 				char tmp[MAX_PATH_LENGTH];
 				parser.getCurrent(tmp, lengthOf(tmp));
-				OS::InputFile file;
-				if (m_engine->getFileSystem().open(tmp, Ref(file)))
-				{
-					auto size = file.size();
-					auto* src = (char*)m_allocator.allocate(size + 1);
-					if (file.read(src, size)) {
-						src[size] = 0;
-						runScript((const char*)src, tmp);
-						m_allocator.deallocate(src);
-					}
-					else {
-						logError("Could not read ", tmp);
-					}
-					file.close();
+				OutputMemoryStream content(m_allocator);
+				
+				if (m_engine->getFileSystem().getContentSync(Path(tmp), Ref(content))) {
+					content.write('\0');
+					runScript((const char*)content.data(), tmp);
 				}
-				else
-				{
-					logError("Could not open ", tmp);
+				else {
+					logError("Could not read ", tmp);
 				}
 				break;
 			}
@@ -2868,7 +2856,7 @@ struct StudioAppImpl final : StudioApp
 		if (filename[0] == '.') return false;
 		if (compareStringN("bin/", filename, 4) == 0) return false;
 		if (compareStringN("bin32/", filename, 4) == 0) return false;
-		if (equalStrings("data.pak", filename)) return false;
+		if (equalStrings("main.pak", filename)) return false;
 		if (equalStrings("error.log", filename)) return false;
 		return true;
 	}
@@ -2883,7 +2871,6 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-#pragma pack(1)
 	struct PackFileInfo
 	{
 		u32 hash;
@@ -2892,12 +2879,35 @@ struct StudioAppImpl final : StudioApp
 
 		char path[MAX_PATH_LENGTH];
 	};
-#pragma pack()
 
+	void scanCompiled(AssociativeArray<u32, PackFileInfo>& infos) {
+		OS::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/assets");
+		const char* base_path = m_engine->getFileSystem().getBasePath();
+		OS::FileInfo info;
+		while (OS::getNextFile(iter, &info)) {
+			if (info.is_directory) continue;
+
+			char basename[MAX_PATH_LENGTH];
+			Path::getBasename(Span(basename), info.filename);
+			PackFileInfo rec;
+			fromCString(Span(basename), Ref(rec.hash));
+			rec.offset = 0;
+			rec.size = OS::getFileSize(StaticString<MAX_PATH_LENGTH>(base_path, ".lumix/assets/", info.filename));
+			copyString(rec.path, ".lumix/assets/");
+			catString(rec.path, info.filename);
+			infos.insert(rec.hash, rec);
+		}
+		
+		OS::destroyFileIterator(iter);
+
+		packDataScan("pipelines/", infos);
+		packDataScan("universes/", infos);
+	}
 
 	void packDataScan(const char* dir_path, AssociativeArray<u32, PackFileInfo>& infos)
 	{
 		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
+		const char* base_path = m_engine->getFileSystem().getBasePath();
 		OS::FileInfo info;
 		while (OS::getNextFile(iter, &info))
 		{
@@ -2933,7 +2943,7 @@ struct StudioAppImpl final : StudioApp
 			auto& out_info = infos.emplace(hash);
 			copyString(out_info.path, out_path);
 			out_info.hash = hash;
-			out_info.size = OS::getFileSize(out_path.data);
+			out_info.size = OS::getFileSize(StaticString<MAX_PATH_LENGTH>(base_path, out_path.data));
 			out_info.offset = ~0UL;
 		}
 		OS::destroyFileIterator(iter);
@@ -2977,19 +2987,16 @@ struct StudioAppImpl final : StudioApp
 	void onPackDataGUI()
 	{
 		if (!m_is_pack_data_dialog_open) return;
-		if (ImGui::Begin("Pack data", &m_is_pack_data_dialog_open))
-		{
-			ImGui::LabelText("Destination dir", "%s", m_pack.dest_dir.data);
-			ImGui::SameLine();
-			if (ImGui::Button("Choose dir"))
-			{
-				if (OS::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath()))
-				{
-					m_pack.dest_dir << "/";
+		if (ImGui::Begin("Pack data", &m_is_pack_data_dialog_open)) {
+			ImGuiEx::Label("Destination dir");
+			if (ImGui::Button(m_pack.dest_dir.empty() ? "..." : m_pack.dest_dir.data)) {
+				if (OS::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath())) {
+					m_pack.dest_dir;
 				}
 			}
 
-			ImGui::Combo("Mode", (int*)&m_pack.mode, "All files\0Loaded universe\0");
+			ImGuiEx::Label("Mode");
+			ImGui::Combo("##mode", (int*)&m_pack.mode, "All files\0Loaded universe\0");
 
 			if (ImGui::Button("Pack")) packData();
 		}
@@ -2997,58 +3004,51 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void packData()
-	{
+	void packData() {
 		if (m_pack.dest_dir.empty()) return;
 
 		char dest[MAX_PATH_LENGTH];
 
-		static const char* OUT_FILENAME = "data.pak";
+		static const char* OUT_FILENAME = "main.pak";
 		copyString(dest, m_pack.dest_dir);
 		catString(dest, OUT_FILENAME);
 		AssociativeArray<u32, PackFileInfo> infos(m_allocator);
 		infos.reserve(10000);
 
-		switch (m_pack.mode)
-		{
-			case PackConfig::Mode::ALL_FILES: packDataScan("./", infos); break;
+		switch (m_pack.mode) {
+			case PackConfig::Mode::ALL_FILES: scanCompiled(infos); break;
 			case PackConfig::Mode::CURRENT_UNIVERSE: packDataScanResources(infos); break;
 			default: ASSERT(false); break;
 		}
 
-		if (infos.size() == 0)
-		{
+		if (infos.size() == 0) {
 			logError("No files found while trying to create ", dest);
 			return;
 		}
 
 		bool success;
 		OS::OutputFile file;
-		if (!file.open(dest))
-		{
+		if (!file.open(dest)) {
 			logError("Could not create ", dest);
 			return;
 		}
 
-		int count = infos.size();
+		const u32 count = (u32)infos.size();
 		success = file.write(&count, sizeof(count));
 		u64 offset = sizeof(count) + (sizeof(u32) + sizeof(u64) * 2) * count;
-		for (auto& info : infos)
-		{
+		for (auto& info : infos) {
 			info.offset = offset;
 			offset += info.size;
 		}
 
-		for (auto& info : infos)
-		{
-			success = success || file.write(&info.hash, sizeof(info.hash));
-			success = success || file.write(&info.offset, sizeof(info.offset));
-			success = success || file.write(&info.size, sizeof(info.size));
+		for (auto& info : infos) {
+			success = file.write(&info.hash, sizeof(info.hash)) || success;
+			success = file.write(&info.offset, sizeof(info.offset)) || success;
+			success = file.write(&info.size, sizeof(info.size)) || success;
 		}
 
 		FileSystem& fs = m_engine->getFileSystem();
-		for (auto& info : infos)
-		{
+		for (auto& info : infos) {
 			OS::InputFile src;
 			if (!fs.open(info.path, Ref(src))) {
 				file.close();
@@ -3078,36 +3078,32 @@ struct StudioAppImpl final : StudioApp
 
 		const char* bin_files[] = {"app.exe", "dbghelp.dll", "dbgcore.dll"};
 		StaticString<MAX_PATH_LENGTH> src_dir("bin/");
-		if (!OS::fileExists("bin/app.exe"))
-		{
+		if (!OS::fileExists("bin/app.exe")) {
 			char tmp[MAX_PATH_LENGTH];
 			OS::getExecutablePath(Span(tmp));
 			Path::getDir(Span(src_dir.data), tmp);
 		}
-		for (auto& file : bin_files)
-		{
+
+		for (auto& file : bin_files) {
 			StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir, file);
 			StaticString<MAX_PATH_LENGTH> src(src_dir, file);
-			if (!OS::copyFile(src, tmp))
-			{
+			if (!OS::copyFile(src, tmp)) {
 				logError("Failed to copy ", src, " to ", tmp);
 			}
 		}
 
-		for (GUIPlugin* plugin : m_gui_plugins)
-		{
-			if (!plugin->packData(m_pack.dest_dir))
-			{
+		for (GUIPlugin* plugin : m_gui_plugins)	{
+			if (!plugin->packData(m_pack.dest_dir)) {
 				logError("Plugin ", plugin->getName(), " failed to pack data.");
 			}
 		}
+		logInfo("Packing finished.");
 	}
 
 
 	void loadLuaPlugin(const char* dir, const char* filename)
 	{
 		StaticString<MAX_PATH_LENGTH> path(dir, filename);
-		OS::InputFile file;
 
 		OutputMemoryStream src(m_engine->getAllocator());
 		if (m_engine->getFileSystem().getContentSync(Path(path), Ref(src))) {

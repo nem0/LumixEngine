@@ -2204,29 +2204,11 @@ public:
 	}
 
 	bool loadProject() override {
-		const char* base_path = m_engine.getFileSystem().getBasePath();
-		const StaticString<MAX_PATH_LENGTH> path(base_path, "lumix.prj");
-		OS::InputFile file;
-		if (file.open(path)) {
-			const u64 size = file.size();
-			if (size < 8) {
-				logError("Invalid file ", path);
-				file.close();
-				return false;
-			}
-			OutputMemoryStream data(m_allocator);
-			data.resize((u32)size);
-			if (!file.read(data.getMutableData(), data.size())) {
-				logError("Failed to read ", path);
-				file.close();
-				return false;
-			}
-			InputMemoryStream stream(data);
-			bool res = m_engine.deserializeProject(stream);
-			file.close();
-			return res;
-		}
-		return false;
+		OutputMemoryStream data(m_allocator);
+		if (!m_engine.getFileSystem().getContentSync(Path("lumix.prj"), Ref(data))) return false;
+		
+		InputMemoryStream stream(data);
+		return m_engine.deserializeProject(stream);
 	}
 
 	void loadUniverse(const char* basename) override

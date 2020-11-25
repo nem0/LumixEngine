@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/lumix.h"
+#include "engine/allocator.h"
 
 struct lua_State;
 
@@ -9,6 +10,7 @@ namespace Lumix
 
 namespace OS { using WindowHandle = void*; }
 template <typename T> struct UniquePtr;
+struct FileSystem;
 
 struct LUMIX_ENGINE_API Engine
 {
@@ -19,6 +21,7 @@ public:
 		bool fullscreen = false;
 		bool handle_file_drops = false;
 		const char* window_title = "Lumix App";
+		UniquePtr<FileSystem> file_system; 
 	};
 
 	using LuaResourceHandle = u32;
@@ -26,7 +29,7 @@ public:
 public:
 	virtual ~Engine() {}
 
-	static UniquePtr<Engine> create(const InitArgs& init_data, struct IAllocator& allocator);
+	static UniquePtr<Engine> create(InitArgs&& init_data, struct IAllocator& allocator);
 
 	virtual struct Universe& createUniverse(bool is_main_universe) = 0;
 	virtual void destroyUniverse(Universe& context) = 0;

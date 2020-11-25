@@ -278,32 +278,25 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		OS::InputFile file;
-		if (fs.open(path, Ref(file))) {
-			IAllocator& allocator = m_app.getAllocator();
+		IAllocator& allocator = m_app.getAllocator();
+		OutputMemoryStream data(allocator);
+
+		if (fs.getContentSync(Path(path), Ref(data))) {
 			ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
-			Array<u8> data(allocator);
-			data.resize((u32)file.size());
-			if (!file.read(data.begin(), data.byte_size())) {
-				logError("Failed to read ", path);
+			InputMemoryStream str(data);
+			UniquePtr<Controller> new_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
+			if (new_controller->deserialize(str)) {
+				m_controller = new_controller.move();
+				m_current_node = m_controller->m_root;
+				m_path = path;
+				m_undo_stack.clear();
+				m_undo_idx = -1;
 			}
-			else {
-				InputMemoryStream str(data.begin(), data.byte_size());
-				UniquePtr<Controller> new_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
-				if (new_controller->deserialize(str)) {
-					m_controller = new_controller.move();
-					m_current_node = m_controller->m_root;
-					m_path = path;
-					m_undo_stack.clear();
-					m_undo_idx = -1;
-				}
-				pushUndo();
-				m_dirty = false;
-			}
-			file.close();
+			pushUndo();
+			m_dirty = false;
 		}
 		else {
-			logError("Failed to open ", path);
+			logError("Failed to read ", path);
 		}
 	}
 
@@ -958,4 +951,4 @@ UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {
 	return UniquePtr<ControllerEditorImpl>::create(app.getAllocator(), app);
 }
 
-} // ns Lumix::Anim
+} // namespace Lumix::Anim
