@@ -325,7 +325,7 @@ constexpr ClearFlags operator & (ClearFlags a, ClearFlags b) { return ClearFlags
 constexpr FramebufferFlags operator | (FramebufferFlags a, FramebufferFlags b) { return FramebufferFlags((u32)a | (u32)b); }
 constexpr FramebufferFlags operator & (FramebufferFlags a, FramebufferFlags b) { return FramebufferFlags((u32)a & (u32)b); }
 
-constexpr TextureFlags operator ~(TextureFlags a) { return TextureFlags(~(u64)a); }
+constexpr TextureFlags operator ~(TextureFlags a) { return TextureFlags(~(u32)a); }
 constexpr TextureFlags operator | (TextureFlags a, TextureFlags b) { return TextureFlags((u32)a | (u32)b); }
 constexpr TextureFlags operator & (TextureFlags a, TextureFlags b) { return TextureFlags((u32)a & (u32)b); }
 

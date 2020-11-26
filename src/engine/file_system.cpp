@@ -89,7 +89,7 @@ struct FileSystemImpl : FileSystem {
 	const char* getBasePath() const override { return m_base_path; }
 
 
-	void setBasePath(const char* dir) override
+	void setBasePath(const char* dir) final
 	{ 
 		Path::normalize(dir, Span(m_base_path.data));
 		if (!endsWith(m_base_path, "/") && !endsWith(m_base_path, "\\")) {
