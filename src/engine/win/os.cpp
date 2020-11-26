@@ -3,6 +3,7 @@
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/path.h"
+#include "engine/queue.h"
 #include "engine/string.h"
 #define UNICODE
 #pragma warning(push)
@@ -26,8 +27,7 @@ namespace Lumix::OS
 
 static struct
 {
-	bool finished = false;
-	Interface* iface = nullptr;
+	Queue<Event, 64> event_queue;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	bool raw_input_registered = false;
@@ -278,125 +278,135 @@ static void UTF32ToUTF8(u32 utf32, char* utf8)
 	}
 }
 
-static void processEvents()
-{
+bool getEvent(Ref<Event> event) {
+	if (!G.event_queue.empty()) {
+		event = G.event_queue.front();
+		G.event_queue.pop();
+	}
+
 	MSG msg;
-	while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-		bool discard = false;
-		Event e;
-		e.window = msg.hwnd;
-		switch (msg.message) {
-			case WM_DROPFILES:
-				e.type = Event::Type::DROP_FILE;
-				e.file_drop.handle = (HDROP)msg.wParam;
-				G.iface->onEvent(e);
-				break;
-			case WM_QUIT: 
-				e.type = Event::Type::QUIT; 
-				G.iface->onEvent(e);
-				break;
-			case WM_CLOSE: 
-				e.type = Event::Type::WINDOW_CLOSE; 
-				G.iface->onEvent(e);
-				break;
-			case WM_SYSKEYDOWN:
-				discard = msg.wParam == VK_MENU;
-				break;
-			case WM_KEYDOWN:
-				e.type = Event::Type::KEY;
-				e.key.down = true;
-				e.key.keycode = (Keycode)msg.wParam;
-				G.iface->onEvent(e);
-				break;
-			case WM_KEYUP:
-				e.type = Event::Type::KEY;
-				e.key.down = false;
-				e.key.keycode = (Keycode)msg.wParam;
-				G.iface->onEvent(e);
-				break;
-			case WM_CHAR:
-				e.type = Event::Type::CHAR;
-				e.text_input.utf8 = 0;
-				UTF32ToUTF8((u32)msg.wParam, (char*)&e.text_input.utf8);
-				G.iface->onEvent(e);
-				break;
-			case WM_INPUT: {
-				HRAWINPUT hRawInput = (HRAWINPUT)msg.lParam;
-				UINT dataSize;
-				GetRawInputData(hRawInput, RID_INPUT, NULL, &dataSize, sizeof(RAWINPUTHEADER));
-				alignas(RAWINPUT) char dataBuf[1024];
-				if (dataSize == 0 || dataSize > sizeof(dataBuf)) break;
+	if (!PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) return false;
 
-				GetRawInputData(hRawInput, RID_INPUT, dataBuf, &dataSize, sizeof(RAWINPUTHEADER));
+	bool discard = false;
+	event->window = msg.hwnd;
+	switch (msg.message) {
+		case WM_DROPFILES:
+			event->type = Event::Type::DROP_FILE;
+			event->file_drop.handle = (HDROP)msg.wParam;
+			break;
+		case WM_QUIT: 
+			event->type = Event::Type::QUIT; 
+			break;
+		case WM_CLOSE: 
+			event->type = Event::Type::WINDOW_CLOSE; 
+			break;
+		case WM_SYSKEYDOWN:
+			discard = msg.wParam == VK_MENU;
+			break;
+		case WM_KEYDOWN:
+			event->type = Event::Type::KEY;
+			event->key.down = true;
+			event->key.keycode = (Keycode)msg.wParam;
+			break;
+		case WM_KEYUP:
+			event->type = Event::Type::KEY;
+			event->key.down = false;
+			event->key.keycode = (Keycode)msg.wParam;
+			break;
+		case WM_CHAR:
+			event->type = Event::Type::CHAR;
+			event->text_input.utf8 = 0;
+			UTF32ToUTF8((u32)msg.wParam, (char*)&event->text_input.utf8);
+			break;
+		case WM_INPUT: {
+			HRAWINPUT hRawInput = (HRAWINPUT)msg.lParam;
+			UINT dataSize;
+			GetRawInputData(hRawInput, RID_INPUT, NULL, &dataSize, sizeof(RAWINPUTHEADER));
+			alignas(RAWINPUT) char dataBuf[1024];
+			if (dataSize == 0 || dataSize > sizeof(dataBuf)) break;
 
-				const RAWINPUT* raw = (const RAWINPUT*)dataBuf;
-				if (raw->header.dwType != RIM_TYPEMOUSE) break;
+			GetRawInputData(hRawInput, RID_INPUT, dataBuf, &dataSize, sizeof(RAWINPUTHEADER));
 
-				const RAWMOUSE& mouseData = raw->data.mouse;
-				const USHORT flags = mouseData.usButtonFlags;
-				const short wheel_delta = (short)mouseData.usButtonData;
-				const LONG x = mouseData.lLastX, y = mouseData.lLastY;
+			const RAWINPUT* raw = (const RAWINPUT*)dataBuf;
+			if (raw->header.dwType != RIM_TYPEMOUSE) break;
 
-				if (wheel_delta) {
-					e.mouse_wheel.amount = (float)wheel_delta / WHEEL_DELTA;
-					e.type = Event::Type::MOUSE_WHEEL;
-					G.iface->onEvent(e);
-				}
+			const RAWMOUSE& mouseData = raw->data.mouse;
+			const USHORT flags = mouseData.usButtonFlags;
+			const short wheel_delta = (short)mouseData.usButtonData;
+			const LONG x = mouseData.lLastX, y = mouseData.lLastY;
 
-				if(flags & RI_MOUSE_LEFT_BUTTON_DOWN) {
-					e.type = Event::Type::MOUSE_BUTTON;
-					e.mouse_button.button = MouseButton::LEFT;
-					e.mouse_button.down = true;
-					G.iface->onEvent(e);
-				}
-				if(flags & RI_MOUSE_LEFT_BUTTON_UP) {
-					e.type = Event::Type::MOUSE_BUTTON;
-					e.mouse_button.button = MouseButton::LEFT;
-					e.mouse_button.down = false;
-					G.iface->onEvent(e);
-				}
-					
-				if(flags & RI_MOUSE_RIGHT_BUTTON_UP) {
-					e.type = Event::Type::MOUSE_BUTTON;
-					e.mouse_button.button = MouseButton::RIGHT;
-					e.mouse_button.down = false;
-					G.iface->onEvent(e);
-				}
-				if(flags & RI_MOUSE_RIGHT_BUTTON_DOWN) {
-					e.type = Event::Type::MOUSE_BUTTON;
-					e.mouse_button.button = MouseButton::RIGHT;
-					e.mouse_button.down = true;
-					G.iface->onEvent(e);
-				}
-
-				if(flags & RI_MOUSE_MIDDLE_BUTTON_UP) {
-					e.type = Event::Type::MOUSE_BUTTON;
-					e.mouse_button.button = MouseButton::MIDDLE;
-					e.mouse_button.down = false;
-					G.iface->onEvent(e);
-				}
-				if(flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) {
-					e.type = Event::Type::MOUSE_BUTTON;
-					e.mouse_button.button = MouseButton::MIDDLE;
-					e.mouse_button.down = true;
-					G.iface->onEvent(e);
-				}
-
-				if (x != 0 || y != 0) {
-					e.type = Event::Type::MOUSE_MOVE;
-					e.mouse_move.xrel = x;
-					e.mouse_move.yrel = y;
-					G.iface->onEvent(e);
-				}
-				break;
+			Event e;
+			if (wheel_delta) {
+				e.mouse_wheel.amount = (float)wheel_delta / WHEEL_DELTA;
+				e.type = Event::Type::MOUSE_WHEEL;
+				G.event_queue.push(e);
 			}
-		}
 
-		if (!discard) {
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
+			if(flags & RI_MOUSE_LEFT_BUTTON_DOWN) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::LEFT;
+				e.mouse_button.down = true;
+				G.event_queue.push(e);
+			}
+			if(flags & RI_MOUSE_LEFT_BUTTON_UP) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::LEFT;
+				e.mouse_button.down = false;
+				G.event_queue.push(e);
+			}
+					
+			if(flags & RI_MOUSE_RIGHT_BUTTON_UP) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::RIGHT;
+				e.mouse_button.down = false;
+				G.event_queue.push(e);
+			}
+			if(flags & RI_MOUSE_RIGHT_BUTTON_DOWN) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::RIGHT;
+				e.mouse_button.down = true;
+				G.event_queue.push(e);
+			}
+
+			if(flags & RI_MOUSE_MIDDLE_BUTTON_UP) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::MIDDLE;
+				e.mouse_button.down = false;
+				G.event_queue.push(e);
+			}
+			if(flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) {
+				e.type = Event::Type::MOUSE_BUTTON;
+				e.mouse_button.button = MouseButton::MIDDLE;
+				e.mouse_button.down = true;
+				G.event_queue.push(e);
+			}
+
+			if (x != 0 || y != 0) {
+				e.type = Event::Type::MOUSE_MOVE;
+				e.mouse_move.xrel = x;
+				e.mouse_move.yrel = y;
+				G.event_queue.push(e);
+			}
+				
+			if (G.event_queue.empty()) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+				return false;
+			}
+
+			event = G.event_queue.front();
+			G.event_queue.pop();
+
+			break;
 		}
 	}
+
+	if (discard) return false;
+		
+	TranslateMessage(&msg);
+	DispatchMessage(&msg);
+
+	return true;
 }
 
 
@@ -418,9 +428,7 @@ Point toScreen(WindowHandle win, int x, int y)
 	return res;
 }
 
-WindowHandle createWindow(const InitWindowArgs& args)
-{
-	ASSERT(G.iface);
+WindowHandle createWindow(const InitWindowArgs& args) {
 	WCharStr<MAX_PATH_LENGTH> cls_name("lunex_window");
 	static WNDCLASS wc = [&]() -> WNDCLASS {
 		WNDCLASS wc = {};
@@ -433,17 +441,17 @@ WindowHandle createWindow(const InitWindowArgs& args)
 					e.type = Event::Type::WINDOW_MOVE;
 					e.win_move.x = (i16)LOWORD(lParam);
 					e.win_move.y = (i16)HIWORD(lParam);
-					G.iface->onEvent(e);
+					G.event_queue.push(e);
 					return 0;
 				case WM_SIZE:
 					e.type = Event::Type::WINDOW_SIZE;
 					e.win_size.w = LOWORD(lParam);
 					e.win_size.h = HIWORD(lParam);
-					G.iface->onEvent(e);
+					G.event_queue.push(e);
 					return 0;
 				case WM_CLOSE:
 					e.type = Event::Type::WINDOW_CLOSE;
-					G.iface->onEvent(e);
+					G.event_queue.push(e);
 					return 0;
 				case WM_ACTIVATE:
 					if (wParam == WA_INACTIVE) {
@@ -452,7 +460,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 					}
 					e.type = Event::Type::FOCUS;
 					e.focus.gained = wParam != WA_INACTIVE;
-					G.iface->onEvent(e);
+					G.event_queue.push(e);
 					break;
 			}
 			return DefWindowProc(hWnd, Msg, wParam, lParam);
@@ -515,12 +523,6 @@ WindowHandle createWindow(const InitWindowArgs& args)
 	}
 
 	return hwnd;
-}
-
-
-void quit()
-{
-	G.finished = true;
 }
 
 
@@ -722,19 +724,6 @@ bool isRelativeMouseMode()
 {
 	return G.relative_mouse;
 }
-
-
-void run(Interface& iface)
-{
-	G.iface = &iface;
-	G.iface->onInit();
-	while (!G.finished)
-	{
-		processEvents();
-		G.iface->onIdle();
-	}
-}
-
 
 int getDPI()
 {
