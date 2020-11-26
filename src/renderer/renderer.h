@@ -82,12 +82,12 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 	virtual void free(const MemRef& memory) = 0;
 	
 	virtual TransientSlice allocTransient(u32 size) = 0;
-	virtual gpu::BufferHandle createBuffer(const MemRef& memory, u32 flags) = 0;
+	virtual gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags) = 0;
 	virtual void destroy(gpu::BufferHandle buffer) = 0;
 	virtual void destroy(gpu::ProgramHandle program) = 0;
 	
-	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) = 0;
-	virtual gpu::TextureHandle loadTexture(const MemRef& memory, u32 flags, gpu::TextureInfo* info, const char* debug_name) = 0;
+	virtual gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) = 0;
+	virtual gpu::TextureHandle loadTexture(const MemRef& memory, gpu::TextureFlags flags, gpu::TextureInfo* info, const char* debug_name) = 0;
 	virtual void updateTexture(gpu::TextureHandle handle, u32 slice, u32 x, u32 y, u32 w, u32 h, gpu::TextureFormat format, const MemRef& memory) = 0;
 	virtual void getTextureImage(gpu::TextureHandle texture, u32 w, u32 h, gpu::TextureFormat out_format, Span<u8> data) = 0;
 	virtual void destroy(gpu::TextureHandle tex) = 0;

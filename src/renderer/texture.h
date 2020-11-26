@@ -83,7 +83,7 @@ public:
 	void setFlag(Flags flag, bool value);
 	u32 getPixelNearest(u32 x, u32 y) const;
 	u32 getPixel(float x, float y) const;
-	u32 getGPUFlags() const;
+	gpu::TextureFlags getGPUFlags() const;
 
 	static bool saveTGA(IOutputStream* file,
 		int width,

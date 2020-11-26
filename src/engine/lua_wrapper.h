@@ -915,8 +915,8 @@ inline void getOptionalFlagField(lua_State* L, int idx, const char* field_name, 
 		value = toType<bool>(L, -1);
 	}
 	lua_pop(L, 1);
-	if (value) *out |= flag;
-	else *out &= ~flag;
+	if (value) *out = *out | flag;
+	else *out = *out & ~flag;
 }
 
 inline bool getOptionalStringField(lua_State* L, int idx, const char* field_name, Span<char> out)
