@@ -1,3 +1,5 @@
+#if 0 // set to 0 to build minimal lunex example
+
 #include "engine/allocators.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
@@ -36,7 +38,6 @@ struct GUIInterface : GUISystem::Interface {
 	Pipeline* pipeline;
 };
 
-#if 1 // set to 0 to build minimal lunex example
 
 struct Runner final
 {
@@ -241,6 +242,12 @@ int main(int args, char* argv[])
 }
 
 #else
+
+#include "engine/allocators.h"
+#include "engine/os.h"
+#include "renderer/gpu/gpu.h"
+
+using namespace Lumix;
 
 int main(int args, char* argv[]) {
 	OS::WindowHandle win = OS::createWindow({});
