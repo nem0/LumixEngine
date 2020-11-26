@@ -30,7 +30,7 @@ struct Vec2;
 namespace Gizmo { struct Config; }
 
 
-struct LUMIX_EDITOR_API StudioApp : OS::Interface
+struct LUMIX_EDITOR_API StudioApp
 {
 	struct IPlugin {
 		virtual ~IPlugin() {}

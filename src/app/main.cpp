@@ -36,7 +36,9 @@ struct GUIInterface : GUISystem::Interface {
 	Pipeline* pipeline;
 };
 
-struct Runner final : OS::Interface
+#if 1 // set to 0 to build minimal lunex example
+
+struct Runner final
 {
 	Runner() 
 		: m_allocator(m_main_allocator) 
@@ -45,7 +47,11 @@ struct Runner final : OS::Interface
 			logError("Failed to initialize job system.");
 		}
 	}
-	~Runner() { ASSERT(!m_universe); }
+
+	~Runner() {
+		JobSystem::shutdown();
+		ASSERT(!m_universe); 
+	}
 
 	void onResize() {
 		if (!m_engine.get()) return;
@@ -119,7 +125,7 @@ struct Runner final : OS::Interface
 		return true;
 	}
 
-	void onInit() override {
+	void onInit() {
 		Engine::InitArgs init_data;
 
 		if (OS::fileExists("main.pak")) {
@@ -146,11 +152,9 @@ struct Runner final : OS::Interface
 		OS::showCursor(false);
 		onResize();
 		m_engine->startGame(*m_universe);
-		Profiler::pause(false);
 	}
 
 	void shutdown() {
-		m_shutting_down = true;
 		m_engine->destroyUniverse(*m_universe);
 		auto* gui = static_cast<GUISystem*>(m_engine->getPluginManager().getPlugin("gui"));
 		gui->setInterface(nullptr);
@@ -159,27 +163,15 @@ struct Runner final : OS::Interface
 		m_universe = nullptr;
 	}
 
-	void onEvent(const OS::Event& event) override {
-		if (m_shutting_down) return;
+	void onEvent(const OS::Event& event) {
 		if (m_engine.get()) {
 			InputSystem& input = m_engine->getInputSystem();
 			input.injectEvent(event, 0, 0);
 		}
 		switch (event.type) {
-			case OS::Event::Type::KEY:
-				if (event.key.keycode == OS::Keycode::Z && event.key.down) {
-					OS::OutputFile file;
-					if (file.open("profile.lpd")) {
-						OutputMemoryStream blob(m_allocator);
-						Profiler::serialize(blob);
-						(void)file.write(blob.data(), blob.size());
-						file.close();
-					}
-				}
-				break;	
 			case OS::Event::Type::QUIT:
 			case OS::Event::Type::WINDOW_CLOSE: 
-				OS::quit();
+				m_finished = true;
 				break;
 			case OS::Event::Type::WINDOW_MOVE:
 			case OS::Event::Type::WINDOW_SIZE:
@@ -188,7 +180,7 @@ struct Runner final : OS::Interface
 		}
 	}
 
-	void onIdle() override {
+	void onIdle() {
 		m_engine->update(*m_universe);
 
 		EntityPtr camera = m_pipeline->getScene()->getActiveCamera();
@@ -212,7 +204,7 @@ struct Runner final : OS::Interface
 	Universe* m_universe = nullptr;
 	UniquePtr<Pipeline> m_pipeline;
 	Viewport m_viewport;
-	bool m_shutting_down = false;
+	bool m_finished = false;
 	GUIInterface m_gui_interface;
 };
 
@@ -228,7 +220,15 @@ int main(int args, char* argv[])
 	JobSystem::runEx(&data, [](void* ptr) {
 		Data* data = (Data*)ptr;
 
-		OS::run(data->app);
+		data->app.onInit();
+		while(!data->app.m_finished) {
+			OS::Event e;
+			while(OS::getEvent(Ref(e))) {
+				data->app.onEvent(e);
+			}
+			data->app.onIdle();
+		}
+
 		data->app.shutdown();
 
 		data->semaphore.signal();
@@ -239,3 +239,48 @@ int main(int args, char* argv[])
 
 	return 0;
 }
+
+#else
+
+int main(int args, char* argv[]) {
+	OS::WindowHandle win = OS::createWindow({});
+
+	DefaultAllocator allocator;
+	gpu::preinit(allocator, false);
+	gpu::init(win, gpu::InitFlags::NONE);
+	gpu::ProgramHandle shader = gpu::allocProgramHandle();
+
+	const gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
+	const char* srcs[] = {
+		"void main() { gl_Position = vec4(gl_VertexID & 1, (gl_VertexID >> 1) & 1, 0, 1); }",
+		"layout(location = 0) out vec4 color; void main() { color = vec4(1, 0, 1, 1); }",
+	};
+	gpu::createProgram(shader, {}, srcs, types, 2, nullptr, 0, "shader");
+
+	bool finished = false;
+	while (!finished) {
+		OS::Event e;
+		while (OS::getEvent(Ref(e))) {
+			switch (e.type) {
+				case OS::Event::Type::WINDOW_CLOSE:
+				case OS::Event::Type::QUIT: finished = true; break;
+			}
+		}
+
+		gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
+		const float clear_col[] = {0, 0, 0, 1};
+		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_col, 0);
+		gpu::useProgram(shader);
+		gpu::setState(gpu::StateFlags::NONE);
+		gpu::drawArrays(0, 3, gpu::PrimitiveType::TRIANGLES);
+
+		u32 frame = gpu::swapBuffers();
+		gpu::waitFrame(frame);
+	}
+
+	gpu::shutdown();
+
+	OS::destroyWindow(win);
+}
+
+#endif

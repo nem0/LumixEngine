@@ -103,13 +103,6 @@ struct InitWindowArgs
 };
 
 
-struct LUMIX_ENGINE_API Interface
-{
-	virtual ~Interface() {}
-    virtual void onEvent(const Event& event) = 0;
-    virtual void onInit() = 0;
-    virtual void onIdle() = 0;
-};
 
 struct Monitor {
 	Rect work_rect;
@@ -209,8 +202,6 @@ LUMIX_ENGINE_API void setCursor(CursorType type);
 LUMIX_ENGINE_API void clipCursor(int screen_x, int screen_y, int w, int h);
 LUMIX_ENGINE_API void unclipCursor();
 
-LUMIX_ENGINE_API void quit();
-
 LUMIX_ENGINE_API void getDropFile(const Event& event, int idx, Span<char> out);
 LUMIX_ENGINE_API int getDropFileCount(const Event& event);
 LUMIX_ENGINE_API void finishDrag(const Event& event);
@@ -222,6 +213,7 @@ LUMIX_ENGINE_API void showCursor(bool show);
 LUMIX_ENGINE_API u32 getMonitors(Span<Monitor> monitors);
 LUMIX_ENGINE_API Point toScreen(WindowHandle win, int x, int y);
 LUMIX_ENGINE_API WindowHandle createWindow(const InitWindowArgs& args);
+LUMIX_ENGINE_API bool getEvent(Ref<Event> event);
 LUMIX_ENGINE_API void destroyWindow(WindowHandle wnd);
 LUMIX_ENGINE_API Rect getWindowScreenRect(WindowHandle win);
 LUMIX_ENGINE_API Rect getWindowClientRect(WindowHandle win);
@@ -245,8 +237,6 @@ LUMIX_ENGINE_API bool getCommandLine(Span<char> output);
 LUMIX_ENGINE_API void* loadLibrary(const char* path);
 LUMIX_ENGINE_API void unloadLibrary(void* handle);
 LUMIX_ENGINE_API void* getLibrarySymbol(void* handle, const char* name);
-
-LUMIX_ENGINE_API void run(Interface& iface);
 
 enum class Keycode : u8
 {

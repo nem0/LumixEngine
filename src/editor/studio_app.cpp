@@ -196,7 +196,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void onEvent(const OS::Event& event) override
+	void onEvent(const OS::Event& event)
 	{
 		const bool handle_input = isFocused();
 		m_events.push(event);
@@ -291,7 +291,7 @@ struct StudioAppImpl final : StudioApp
 		return idx >= 0;
 	}
 
-	void onIdle() override
+	void onIdle()
 	{
 		update();
 
@@ -322,7 +322,15 @@ struct StudioAppImpl final : StudioApp
 		} data = {this, &semaphore};
 		JobSystem::runEx(&data, [](void* ptr) {
 			Data* data = (Data*)ptr;
-			Lumix::OS::run(*data->that);
+			data->that->onInit();
+			while (!data->that->m_finished) {
+				OS::Event e;
+				while(OS::getEvent(Ref(e))) {
+					data->that->onEvent(e);
+				}
+				data->that->onIdle();
+			}
+
 			data->semaphore->signal();
 		}, nullptr, JobSystem::INVALID_HANDLE, 0);
 		PROFILE_BLOCK("sleeping");
@@ -342,7 +350,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void onInit() override
+	void onInit()
 	{
 		OS::Timer init_timer;
 
@@ -1139,7 +1147,6 @@ struct StudioAppImpl final : StudioApp
 		}
 		else
 		{
-			OS::quit();
 			m_finished = true;
 		}
 	}
@@ -1569,7 +1576,6 @@ struct StudioAppImpl final : StudioApp
 			ImGui::Text("All unsaved changes will be lost, do you want to continue?");
 			if (ImGui::Button("Continue"))
 			{
-				OS::quit();
 				m_finished = true;
 				ImGui::CloseCurrentPopup();
 			}
@@ -2571,7 +2577,6 @@ struct StudioAppImpl final : StudioApp
 
 	void exitWithCode(int exit_code)
 	{
-		OS::quit();
 		m_finished = true;
 		m_exit_code = exit_code;
 	}
@@ -2990,9 +2995,8 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::Begin("Pack data", &m_is_pack_data_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
 			if (ImGui::Button(m_pack.dest_dir.empty() ? "..." : m_pack.dest_dir.data)) {
-				if (OS::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath())) {
-					m_pack.dest_dir;
-				}
+				bool res = OS::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath());
+				(void)res;
 			}
 
 			ImGuiEx::Label("Mode");

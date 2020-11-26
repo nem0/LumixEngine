@@ -28,7 +28,7 @@ jobs:
             - name: make project
               working-directory: projects
               run: |
-                ./genie.exe vs2019
+                ./genie.exe --with-app vs2019
             - name: build engine
               working-directory: projects
               shell: cmd
