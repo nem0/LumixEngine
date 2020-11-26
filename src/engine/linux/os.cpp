@@ -449,6 +449,8 @@ bool getEvent(Ref<Event> e) {
 	if (XFilterEvent(&xevent, None)) return false;
 
 	switch (xevent.type) {
+		default:
+			goto next;
 		case KeyPress: {
 			KeySym keysym;
 			Status status = 0;

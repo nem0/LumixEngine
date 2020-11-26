@@ -285,10 +285,10 @@ bool getEvent(Ref<Event> event) {
 		return true;
 	}
 
+	retry:
 	MSG msg;
 	if (!PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) return false;
 
-	bool discard = false;
 	event->window = msg.hwnd;
 	switch (msg.message) {
 		case WM_DROPFILES:
@@ -302,7 +302,7 @@ bool getEvent(Ref<Event> event) {
 			event->type = Event::Type::WINDOW_CLOSE; 
 			break;
 		case WM_SYSKEYDOWN:
-			discard = msg.wParam == VK_MENU;
+			if (msg.wParam == VK_MENU) goto retry;
 			break;
 		case WM_KEYDOWN:
 			event->type = Event::Type::KEY;
@@ -400,10 +400,12 @@ bool getEvent(Ref<Event> event) {
 
 			break;
 		}
+		default:
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+			goto retry;
 	}
 
-	if (discard) return false;
-		
 	TranslateMessage(&msg);
 	DispatchMessage(&msg);
 
