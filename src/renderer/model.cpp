@@ -486,7 +486,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 
 		if (index_size == 2) mesh.flags.set(Mesh::Flags::INDICES_16_BIT);
 		const Renderer::MemRef mem = m_renderer.copy(mesh.indices.data(), (u32)mesh.indices.size());
-		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::IMMUTABLE);
+		mesh.render_data->index_buffer_handle = m_renderer.createBuffer(mem, gpu::BufferFlags::IMMUTABLE);
 		mesh.render_data->index_type = index_size == 2 ? gpu::DataType::U16 : gpu::DataType::U32;
 		if (!mesh.render_data->index_buffer_handle) return false;
 	}
@@ -521,7 +521,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 			}
 			mesh.vertices[j] = *(const Vec3*)&vertices[offset + position_attribute_offset];
 		}
-		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, (u32)gpu::BufferFlags::IMMUTABLE);
+		mesh.render_data->vertex_buffer_handle = m_renderer.createBuffer(vertices_mem, gpu::BufferFlags::IMMUTABLE);
 		if (!mesh.render_data->vertex_buffer_handle) return false;
 	}
 	file.read(m_origin_bounding_radius);

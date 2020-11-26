@@ -40,7 +40,7 @@ struct TransientBuffer {
 	void init() {
 		m_buffer = gpu::allocBufferHandle();
 		m_offset = 0;
-		gpu::createBuffer(m_buffer, (u32)gpu::BufferFlags::MAPPABLE, INIT_SIZE, nullptr);
+		gpu::createBuffer(m_buffer, gpu::BufferFlags::MAPPABLE, INIT_SIZE, nullptr);
 		m_size = INIT_SIZE;
 		m_ptr = (u8*)gpu::map(m_buffer, INIT_SIZE);
 	}
@@ -80,7 +80,7 @@ struct TransientBuffer {
 		m_ptr = nullptr;
 
 		if (m_overflow.buffer) {
-			gpu::createBuffer(m_overflow.buffer, 0, nextPow2(m_overflow.size + m_size), nullptr);
+			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::NONE, nextPow2(m_overflow.size + m_size), nullptr);
 			gpu::update(m_overflow.buffer, m_overflow.data, m_overflow.size);
 			OS::memRelease(m_overflow.data);
 			m_overflow.data = nullptr;
@@ -551,7 +551,7 @@ struct RendererImpl final : Renderer
 		registerProperties(m_engine.getAllocator());
 		
 		struct InitData {
-			u32 flags = (u32)gpu::InitFlags::VSYNC;
+			gpu::InitFlags flags = gpu::InitFlags::VSYNC;
 			RendererImpl* renderer;
 		} init_data;
 		init_data.renderer = this;
@@ -561,10 +561,10 @@ struct RendererImpl final : Renderer
 		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next()) {
 			if (cmd_line_parser.currentEquals("-no_vsync")) {
-				init_data.flags &= ~(u32)gpu::InitFlags::VSYNC;
+				init_data.flags = init_data.flags & ~gpu::InitFlags::VSYNC;
 			}
 			else if (cmd_line_parser.currentEquals("-debug_opengl")) {
-				init_data.flags |= (u32)gpu::InitFlags::DEBUG_OUTPUT;
+				init_data.flags = init_data.flags | gpu::InitFlags::DEBUG_OUTPUT;
 			}
 		}
 
@@ -610,12 +610,12 @@ struct RendererImpl final : Renderer
 			}
 			mb.data.back().next_free = -1;
 			gpu::createBuffer(mb.buffer
-				, (u32)gpu::BufferFlags::UNIFORM_BUFFER
+				, gpu::BufferFlags::UNIFORM_BUFFER
 				, sizeof(MaterialConsts) * 400
 				, nullptr
 			);
 			gpu::createBuffer(mb.staging_buffer
-				, (u32)gpu::BufferFlags::UNIFORM_BUFFER
+				, gpu::BufferFlags::UNIFORM_BUFFER
 				, sizeof(MaterialConsts)
 				, nullptr
 			);
@@ -695,7 +695,7 @@ struct RendererImpl final : Renderer
 				PROFILE_FUNCTION();
 				gpu::pushDebugGroup("get image data");
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
-				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
+				const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
 				gpu::createTexture(staging, w, h, 1, out_format, flags, nullptr, "staging_buffer");
 				gpu::copy(staging, handle, 0, 0);
 				gpu::readTexture(staging, 0, buf);
@@ -758,7 +758,7 @@ struct RendererImpl final : Renderer
 	}
 
 
-	gpu::TextureHandle loadTexture(const MemRef& memory, u32 flags, gpu::TextureInfo* info, const char* debug_name) override
+	gpu::TextureHandle loadTexture(const MemRef& memory, gpu::TextureFlags flags, gpu::TextureInfo* info, const char* debug_name) override
 	{
 		ASSERT(memory.size > 0);
 
@@ -782,7 +782,7 @@ struct RendererImpl final : Renderer
 			StaticString<MAX_PATH_LENGTH> debug_name;
 			gpu::TextureHandle handle;
 			MemRef memory;
-			u32 flags;
+			gpu::TextureFlags flags;
 			RendererImpl* renderer; 
 		};
 
@@ -842,7 +842,7 @@ struct RendererImpl final : Renderer
 	}
 
 
-	gpu::BufferHandle createBuffer(const MemRef& memory, u32 flags) override
+	gpu::BufferHandle createBuffer(const MemRef& memory, gpu::BufferFlags flags) override
 	{
 		gpu::BufferHandle handle = gpu::allocBufferHandle();
 		if(!handle) return handle;
@@ -859,7 +859,7 @@ struct RendererImpl final : Renderer
 
 			gpu::BufferHandle handle;
 			MemRef memory;
-			u32 flags;
+			gpu::BufferFlags flags;
 			gpu::TextureFormat format;
 			Renderer* renderer;
 		};
@@ -961,7 +961,7 @@ struct RendererImpl final : Renderer
 	}
 
 
-	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, u32 flags, const MemRef& memory, const char* debug_name) override
+	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) override
 	{
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if(!handle) return handle;
@@ -983,7 +983,7 @@ struct RendererImpl final : Renderer
 			u32 depth;
 			gpu::TextureFormat format;
 			Renderer* renderer;
-			u32 flags;
+			gpu::TextureFlags flags;
 		};
 
 		Cmd& cmd = createJob<Cmd>();

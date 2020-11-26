@@ -47,7 +47,7 @@ struct CameraParams
 };
 
 struct RenderState {
-	u64 value;
+	gpu::StateFlags value;
 };
 
 using LuaTextureHandle = gpu::TextureHandle;
@@ -66,19 +66,19 @@ namespace LuaWrapper {
 		gpu::StencilOps stencil_zpass = gpu::StencilOps::KEEP;
 
 		char tmp[64];
-		u64 rs = (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::DEPTH_WRITE;
+		gpu::StateFlags rs = gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE;
 		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
 			if(equalIStrings(tmp, "add")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			}
 			else if(equalIStrings(tmp, "alpha")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 			}
 			else if(equalIStrings(tmp, "multiply")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
 			}
 			else if(equalIStrings(tmp, "dual")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			}
 			else if(equalIStrings(tmp, "")) {
 			}
@@ -87,9 +87,9 @@ namespace LuaWrapper {
 			}
 		}
 
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)gpu::StateFlags::DEPTH_TEST, true);
-		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, (u64)gpu::StateFlags::WIREFRAME, false);
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, (u64)gpu::StateFlags::DEPTH_WRITE, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, gpu::StateFlags::DEPTH_TEST, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, gpu::StateFlags::WIREFRAME, false);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, gpu::StateFlags::DEPTH_WRITE, true);
 		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
 		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
 		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
@@ -98,7 +98,7 @@ namespace LuaWrapper {
 		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<u8*>(&stencil_zfail));
 		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<u8*>(&stencil_zpass));
 
-		rs |= gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
+		rs = rs | gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
 
 		return {rs};
 	}
@@ -635,11 +635,11 @@ struct PipelineImpl final : Pipeline
 			-1, 1, 1
 		};
 		const Renderer::MemRef vb_mem = m_renderer.copy(cube_verts, sizeof(cube_verts));
-		m_cube_vb = m_renderer.createBuffer(vb_mem, (u32)gpu::BufferFlags::IMMUTABLE);
+		m_cube_vb = m_renderer.createBuffer(vb_mem, gpu::BufferFlags::IMMUTABLE);
 
 		Renderer::MemRef no_mem;
 		no_mem.size = sizeof(Matrix) * 128;
-		m_shadow_atlas.uniform_buffer = m_renderer.createBuffer(no_mem, (u32)gpu::BufferFlags::UNIFORM_BUFFER);
+		m_shadow_atlas.uniform_buffer = m_renderer.createBuffer(no_mem, gpu::BufferFlags::UNIFORM_BUFFER);
 
 		u16 cube_indices[] = {
 			0, 1, 2,
@@ -657,20 +657,20 @@ struct PipelineImpl final : Pipeline
 		};
 
 		const Renderer::MemRef ib_mem = m_renderer.copy(cube_indices, sizeof(cube_indices));
-		m_cube_ib = m_renderer.createBuffer(ib_mem, (u32)gpu::BufferFlags::IMMUTABLE);
+		m_cube_ib = m_renderer.createBuffer(ib_mem, gpu::BufferFlags::IMMUTABLE);
 
 		m_resource->onLoaded<&PipelineImpl::onStateChanged>(this);
 
 		GlobalState global_state;
 		const Renderer::MemRef global_state_mem = m_renderer.copy(&global_state, sizeof(global_state));
-		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, (u32)gpu::BufferFlags::UNIFORM_BUFFER);
+		m_global_state_buffer = m_renderer.createBuffer(global_state_mem, gpu::BufferFlags::UNIFORM_BUFFER);
 		
 		PassState pass_state;
 		const Renderer::MemRef pass_state_mem = m_renderer.copy(&pass_state, sizeof(pass_state));
-		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, (u32)gpu::BufferFlags::UNIFORM_BUFFER);
+		m_pass_state_buffer = m_renderer.createBuffer(pass_state_mem, gpu::BufferFlags::UNIFORM_BUFFER);
 
 		const Renderer::MemRef dc_mem = { DRAWCALL_UB_SIZE, nullptr, false };
-		const u32 dc_ub_flags = (u32)gpu::BufferFlags::UNIFORM_BUFFER;
+		const gpu::BufferFlags dc_ub_flags = gpu::BufferFlags::UNIFORM_BUFFER;
 		m_drawcall_ub = m_renderer.createBuffer(dc_mem, dc_ub_flags);
 
 		m_base_vertex_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
@@ -1228,7 +1228,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
-				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | u64(gpu::StateFlags::CULL_BACK));
+				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::CULL_BACK);
 				gpu::useProgram(program);
 
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -1290,7 +1290,7 @@ struct PipelineImpl final : Pipeline
 
 				gpu::update(pipeline->m_drawcall_ub, &Matrix::IDENTITY.columns[0].x, sizeof(Matrix));
 
-				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE));
+				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
 				gpu::useProgram(program);
 
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
@@ -1372,8 +1372,8 @@ struct PipelineImpl final : Pipeline
 
 				gpu::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
 				u32 elem_offset = 0;
-				u64 state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-				state |= (u64)gpu::StateFlags::SCISSOR_TEST;
+				gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+				state = state | gpu::StateFlags::SCISSOR_TEST;
 				gpu::setState(state);
 				gpu::useProgram(program);
 				gpu::bindIndexBuffer(idx_buffer_mem.buffer);
@@ -1501,10 +1501,10 @@ struct PipelineImpl final : Pipeline
 		PROFILE_FUNCTION();
 		const gpu::TextureFormat format = getFormat(format_str);
 
-		const u32 flags = (u32)gpu::TextureFlags::RENDER_TARGET 
-			| (u32)gpu::TextureFlags::NO_MIPS 
-			| (u32)gpu::TextureFlags::CLAMP_U 
-			| (u32)gpu::TextureFlags::CLAMP_V;
+		const gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET 
+			| gpu::TextureFlags::NO_MIPS 
+			| gpu::TextureFlags::CLAMP_U 
+			| gpu::TextureFlags::CLAMP_V;
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
 		{
 			Renderbuffer& rb = m_renderbuffers[i];
@@ -1577,7 +1577,7 @@ struct PipelineImpl final : Pipeline
 			LuaWrapper::getOptionalField<const char*>(L, 2, "define", &define);
 			cmd.m_define_mask = define[0] ? 1 << m_renderer.getShaderDefineIdx(define) : 0;
 		}
-		cmd.m_render_state = state.get({0}).value;
+		cmd.m_render_state = state.get({gpu::StateFlags::NONE}).value;
 		cmd.m_pipeline = this;
 		cmd.m_camera_params = cp;
 		cmd.m_compute_shader = m_place_grass_shader->getProgram(gpu::VertexDecl(), 0);
@@ -1640,8 +1640,8 @@ struct PipelineImpl final : Pipeline
 				
 				gpu::pushDebugGroup("particles");
 				
-				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::setState(blend_state | (u32)gpu::StateFlags::DEPTH_TEST);
+				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				gpu::setState(blend_state | gpu::StateFlags::DEPTH_TEST);
 				for (const Drawcall& dc : m_drawcalls) {
 					Matrix mtx = dc.rot.toMatrix();
 					mtx.setTranslation(dc.pos);
@@ -1765,7 +1765,7 @@ struct PipelineImpl final : Pipeline
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::bindShaderBuffer(buffer, binding_point, writable ? (u32)gpu::BindShaderBufferFlags::OUTPUT : 0);
+				gpu::bindShaderBuffer(buffer, binding_point, writable ? gpu::BindShaderBufferFlags::OUTPUT : gpu::BindShaderBufferFlags::NONE);
 			}
 			u32 binding_point;
 			bool writable;
@@ -1803,7 +1803,7 @@ struct PipelineImpl final : Pipeline
 		mem.own = false;
 		mem.data = nullptr;
 		mem.size = size;
-		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, (u32)gpu::BufferFlags::COMPUTE_WRITE | (u32)gpu::BufferFlags::SHADER_BUFFER);
+		const gpu::BufferHandle buffer = m_renderer.createBuffer(mem, gpu::BufferFlags::COMPUTE_WRITE | gpu::BufferFlags::SHADER_BUFFER);
 		m_buffers.push(buffer);
 		return buffer;
 	}
@@ -1816,7 +1816,7 @@ struct PipelineImpl final : Pipeline
 			, height
 			, 1
 			, format
-			, (u32)gpu::TextureFlags::CLAMP_U  | (u32)gpu::TextureFlags::CLAMP_V | (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE
+			, gpu::TextureFlags::CLAMP_U | gpu::TextureFlags::CLAMP_V | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE
 			, mem
 			, debug_name.get("lua_texture"));
 		m_textures.push(texture);
@@ -1831,7 +1831,7 @@ struct PipelineImpl final : Pipeline
 			, height
 			, depth
 			, format
-			, (u32)gpu::TextureFlags::IS_3D | (u32)gpu::TextureFlags::COMPUTE_WRITE | (u32)gpu::TextureFlags::NO_MIPS
+			, gpu::TextureFlags::IS_3D | gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS
 			, mem
 			, debug_name.get("lua_texture"));
 		m_textures.push(texture);
@@ -2084,7 +2084,7 @@ struct PipelineImpl final : Pipeline
 			int m_indices_count;
 			int m_indices_offset;
 			u32 m_define_mask = 0;
-			u64 m_render_state;
+			gpu::StateFlags m_render_state;
 			gpu::ProgramHandle m_program;
 
 		};
@@ -2093,12 +2093,12 @@ struct PipelineImpl final : Pipeline
 
 		if (lua_gettop(L) > 3) LuaWrapper::checkTableArg(L, 4);
 		
-		const u64 rs = [&](){
+		const gpu::StateFlags rs = [&](){
 			if(lua_gettop(L) > 4) {
 				LuaWrapper::checkTableArg(L, 5);
 				return getState(L, 5);
 			}
-			return (u64)gpu::StateFlags::DEPTH_WRITE | (u64)gpu::StateFlags::DEPTH_TEST;
+			return gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_TEST;
 		}();
 
 		Shader* shader = nullptr;
@@ -2267,8 +2267,8 @@ struct PipelineImpl final : Pipeline
 				if (vb.size == 0) return;
 
 				gpu::useProgram(m_program);
-				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::setState((u64)gpu::StateFlags::DEPTH_WRITE | (u64)gpu::StateFlags::DEPTH_TEST | blend_state);
+				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				gpu::setState(gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_TEST | blend_state);
 				gpu::bindTextures(&m_atlas, 0, 1);
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, 24);
@@ -2312,7 +2312,7 @@ struct PipelineImpl final : Pipeline
 					return;
 				}
 				
-				const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 				CmdPage* page = m_cmds;
 				while (page) {
 					const u8* cmd = page->data;
@@ -2329,7 +2329,7 @@ struct PipelineImpl final : Pipeline
 						gpu::useProgram(m_program);
 
 						if(total_count - nonintersecting_count) {
-							gpu::setState(blend_state | (u64)gpu::StateFlags::CULL_FRONT);
+							gpu::setState(blend_state | gpu::StateFlags::CULL_FRONT);
 							const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
 							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
 							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
@@ -2338,7 +2338,7 @@ struct PipelineImpl final : Pipeline
 						}
 
 						if (nonintersecting_count) {
-							gpu::setState(blend_state | (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK);
+							gpu::setState(blend_state | gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::CULL_BACK);
 							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
 							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
 							gpu::bindVertexBuffer(1, buffer, offset, 64);
@@ -2376,7 +2376,7 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(job, m_profiler_link);
 	}
 
-	static u64 getState(lua_State* L, int idx)
+	static gpu::StateFlags getState(lua_State* L, int idx)
 	{
 		gpu::StencilFuncs stencil_func = gpu::StencilFuncs::DISABLE;
 		u8 stencil_write_mask = 0xff;
@@ -2387,19 +2387,19 @@ struct PipelineImpl final : Pipeline
 		gpu::StencilOps stencil_zpass = gpu::StencilOps::KEEP;
 
 		char tmp[64];
-		u64 rs = (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::DEPTH_WRITE;
+		gpu::StateFlags rs = gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE;
 		if (LuaWrapper::getOptionalStringField(L, idx, "blending", Span(tmp))) {
 			if(equalIStrings(tmp, "add")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			}
 			else if(equalIStrings(tmp, "alpha")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 			}
 			else if(equalIStrings(tmp, "multiply")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::DST_COLOR, gpu::BlendFactors::ZERO, gpu::BlendFactors::ONE, gpu::BlendFactors::ZERO);
 			}
 			else if(equalIStrings(tmp, "dual")) {
-				rs |= gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+				rs = rs | gpu::getBlendStateBits(gpu::BlendFactors::ONE, gpu::BlendFactors::SRC1_COLOR, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
 			}
 			else if(equalIStrings(tmp, "")) {
 			}
@@ -2408,9 +2408,9 @@ struct PipelineImpl final : Pipeline
 			}
 		}
 
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, (u64)gpu::StateFlags::DEPTH_TEST, true);
-		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, (u64)gpu::StateFlags::WIREFRAME, false);
-		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, (u64)gpu::StateFlags::DEPTH_WRITE, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_test", &rs, gpu::StateFlags::DEPTH_TEST, true);
+		LuaWrapper::getOptionalFlagField(L, idx, "wireframe", &rs, gpu::StateFlags::WIREFRAME, false);
+		LuaWrapper::getOptionalFlagField(L, idx, "depth_write", &rs, gpu::StateFlags::DEPTH_WRITE, true);
 		LuaWrapper::getOptionalField(L, idx, "stencil_func", reinterpret_cast<u8*>(&stencil_func));
 		LuaWrapper::getOptionalField(L, idx, "stencil_write_mask", &stencil_write_mask);
 		LuaWrapper::getOptionalField(L, idx, "stencil_ref", &stencil_ref);
@@ -2419,7 +2419,7 @@ struct PipelineImpl final : Pipeline
 		LuaWrapper::getOptionalField(L, idx, "stencil_zfail", reinterpret_cast<u8*>(&stencil_zfail));
 		LuaWrapper::getOptionalField(L, idx, "stencil_zpass", reinterpret_cast<u8*>(&stencil_zpass));
 
-		rs |= gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
+		rs = rs | gpu::getStencilStateBits(stencil_write_mask, stencil_func, stencil_ref, stencil_mask, stencil_sfail, stencil_zfail, stencil_zpass);
 
 		return rs;
 	}
@@ -2483,10 +2483,10 @@ struct PipelineImpl final : Pipeline
 
 				gpu::bindTextures(&p.texture, m_texture_offset, 1);
 					
-				u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE);
-				const u64 state = p.intersecting
-					? (u64)gpu::StateFlags::CULL_FRONT
-					: (u64)gpu::StateFlags::DEPTH_TEST | (u64)gpu::StateFlags::CULL_BACK;
+				gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE);
+				const gpu::StateFlags state = p.intersecting
+					? gpu::StateFlags::CULL_FRONT
+					: gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::CULL_BACK;
 				gpu::setState(state | blend_state);
 				gpu::drawTriangles(0, 36, gpu::DataType::U16);
 			}
@@ -2712,12 +2712,12 @@ struct PipelineImpl final : Pipeline
 				if (buffer.capacity < capacity) {
 					if (buffer.buffer) gpu::destroy(buffer.buffer);
 					buffer.buffer = gpu::allocBufferHandle();
-					gpu::createBuffer(buffer.buffer, (u32)gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
+					gpu::createBuffer(buffer.buffer, gpu::BufferFlags::SHADER_BUFFER, capacity, nullptr);
 					buffer.capacity = capacity;
 				}
 				if (!data.empty()) {
 					gpu::update(buffer.buffer, data.begin(), data.byte_size());
-					gpu::bindShaderBuffer(buffer.buffer, idx, 0);
+					gpu::bindShaderBuffer(buffer.buffer, idx, gpu::BindShaderBufferFlags::NONE);
 				}
 			};
 
@@ -2882,7 +2882,7 @@ struct PipelineImpl final : Pipeline
 
 			Stats stats = {};
 
-			const u64 render_states = m_render_state;
+			const gpu::StateFlags render_states = m_render_state;
 			gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, 0, DRAWCALL_UB_SIZE);
 			const gpu::BufferHandle material_ub = renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
@@ -3024,7 +3024,7 @@ struct PipelineImpl final : Pipeline
 		CmdPage* m_cmds;
 		PipelineImpl* m_pipeline;
 		u32 m_bucket_id;
-		u64 m_render_state;
+		gpu::StateFlags m_render_state;
 	};
 
 	void createCommands(const View& view
@@ -3547,7 +3547,7 @@ struct PipelineImpl final : Pipeline
 		
 		if (!m_shadow_atlas.texture) {
 			Renderer::MemRef mem;
-			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, (u32)gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
+			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
 		}
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
@@ -3591,7 +3591,7 @@ struct PipelineImpl final : Pipeline
 			PipelineImpl* pipeline;
 			gpu::TextureHandle rbs[8];
 			gpu::TextureHandle ds;
-			u32 flags;
+			gpu::FramebufferFlags flags;
 			u32 count;
 			u32 w;
 			u32 h;
@@ -3607,9 +3607,9 @@ struct PipelineImpl final : Pipeline
 		cmd.pipeline = this;
 		cmd.ds = ds;
 		cmd.count = renderbuffers.length();
-		cmd.flags = srgb ? (u32)gpu::FramebufferFlags::SRGB : 0;
+		cmd.flags = srgb ? gpu::FramebufferFlags::SRGB : gpu::FramebufferFlags::NONE;
 		if (readonly_ds) {
-			cmd.flags |= (u32)gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
+			cmd.flags = cmd.flags | gpu::FramebufferFlags::READONLY_DEPTH_STENCIL;
 		}
 		cmd.w = m_viewport.w;
 		cmd.h = m_viewport.h;
@@ -3718,7 +3718,7 @@ struct PipelineImpl final : Pipeline
 			// TODO reuse
 			gpu::BufferHandle data = gpu::allocBufferHandle();
 			gpu::BufferHandle indirect = gpu::allocBufferHandle();
-			gpu::createBuffer(data, (u32)gpu::BufferFlags::SHADER_BUFFER | (u32)gpu::BufferFlags::COMPUTE_WRITE, 1024 * 256 * 8, nullptr);
+			gpu::createBuffer(data, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE, 1024 * 256 * 8, nullptr);
 			struct Indirect {
 				u32 vertex_count;
 				u32 instance_count;
@@ -3726,7 +3726,7 @@ struct PipelineImpl final : Pipeline
 				u32 base_vertex;
 				u32 base_instance;
 			};
-			gpu::createBuffer(indirect, (u32)gpu::BufferFlags::SHADER_BUFFER | (u32)gpu::BufferFlags::COMPUTE_WRITE, sizeof(Indirect), nullptr);
+			gpu::createBuffer(indirect, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE, sizeof(Indirect), nullptr);
 
 			for (const Grass& grass : m_grass) {
 				struct {
@@ -3765,8 +3765,8 @@ struct PipelineImpl final : Pipeline
 				indirect_dc.instance_count = 0;
 				gpu::update(indirect, &indirect_dc, sizeof(indirect_dc));
 
-				gpu::bindShaderBuffer(data, 0, (u32)gpu::BindShaderBufferFlags::OUTPUT);
-				gpu::bindShaderBuffer(indirect, 1, (u32)gpu::BindShaderBufferFlags::OUTPUT);
+				gpu::bindShaderBuffer(data, 0, gpu::BindShaderBufferFlags::OUTPUT);
+				gpu::bindShaderBuffer(indirect, 1, gpu::BindShaderBufferFlags::OUTPUT);
 				gpu::bindTextures(&grass.heightmap, 2, 1);
 				gpu::bindTextures(&grass.splatmap, 3, 1);
 				gpu::bindUniformBuffer(4, m_pipeline->m_drawcall_ub, 0, sizeof(dc));
@@ -3776,8 +3776,8 @@ struct PipelineImpl final : Pipeline
 				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
 				renderer.endProfileBlock();
 				
-				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, 0);
-				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, 0);
+				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
+				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
 
 				gpu::useProgram(grass.program);
 				gpu::bindTextures(grass.material->textures, 0, grass.material->textures_count);
@@ -3789,7 +3789,7 @@ struct PipelineImpl final : Pipeline
 					material_ub_idx = grass.material->material_constants;
 				}
 
-				gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | m_render_state);
+				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state);
 				gpu::bindIndirectBuffer(indirect);
 				gpu::drawIndirect(grass.mesh->index_type);
 
@@ -3827,7 +3827,7 @@ struct PipelineImpl final : Pipeline
 		Array<Grass> m_grass;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
-		u64 m_render_state;
+		gpu::StateFlags m_render_state;
 		u32 m_define_mask = 0;
 	};
 
@@ -3868,7 +3868,7 @@ struct PipelineImpl final : Pipeline
 			
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
-			u64 state = m_render_state;
+			gpu::StateFlags state = m_render_state;
 			for (Instance& inst : m_instances) {
 				Renderer& renderer = m_pipeline->m_renderer;
 				renderer.beginProfileBlock("terrain", 0);
@@ -3962,7 +3962,7 @@ struct PipelineImpl final : Pipeline
 		IAllocator& m_allocator;
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
-		u64 m_render_state;
+		gpu::StateFlags m_render_state;
 		Array<Instance> m_instances;
 		gpu::TextureHandle m_global_textures[16];
 		int m_global_textures_count = 0;
@@ -4217,12 +4217,12 @@ struct PipelineImpl final : Pipeline
 			}
 			Vec4 color;
 			float depth;
-			u32 flags;
+			gpu::ClearFlags flags;
 		};
 
 		Cmd& cmd = m_renderer.createJob<Cmd>();
 		cmd.color.set(r, g, b, a);
-		cmd.flags = flags;
+		cmd.flags = (gpu::ClearFlags)flags;
 		cmd.depth = depth;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -4348,7 +4348,7 @@ struct PipelineImpl final : Pipeline
 				Array<u32> pixels(allocator);
 				pixels.resize(w * h);
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
-				const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
+				const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
 				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
 				gpu::copy(staging, handle, 0, 0);
 				gpu::readTexture(staging, 0, Span((u8*)pixels.begin(), pixels.byte_size()));

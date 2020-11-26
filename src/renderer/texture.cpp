@@ -76,7 +76,7 @@ void Texture::destroy()
 bool Texture::create(u32 w, u32 h, gpu::TextureFormat format, const void* data, u32 size)
 {
 	Renderer::MemRef memory = renderer.copy(data, size);
-	handle = renderer.createTexture(w, h, 1, format, getGPUFlags() | (u32)gpu::TextureFlags::NO_MIPS, memory, getPath().c_str());
+	handle = renderer.createTexture(w, h, 1, format, getGPUFlags() | gpu::TextureFlags::NO_MIPS, memory, getPath().c_str());
 	mips = 1;
 	width = w;
 	height = h;
@@ -323,13 +323,13 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 
 	const Renderer::MemRef dst_mem = texture.renderer.copy(data, (u32)size);
 
-	const u32 flag_3d = header.depth > 1 && !header.is_array ? (u32)gpu::TextureFlags::IS_3D : 0;
+	const gpu::TextureFlags flag_3d = header.depth > 1 && !header.is_array ? gpu::TextureFlags::IS_3D : gpu::TextureFlags::NONE;
 
 	texture.handle = texture.renderer.createTexture(texture.width
 		, texture.height
 		, texture.depth
 		, texture.format
-		, (texture.getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB) | flag_3d | (u32)gpu::TextureFlags::NO_MIPS 
+		, (texture.getGPUFlags() & ~gpu::TextureFlags::SRGB) | flag_3d | gpu::TextureFlags::NO_MIPS 
 		, dst_mem
 		, texture.getPath().c_str());
 	texture.mips = 1;
@@ -390,7 +390,7 @@ bool Texture::loadTGA(IInputStream& file)
 			, header.height
 			, 1
 			, format
-			, getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
+			, getGPUFlags() & ~gpu::TextureFlags::SRGB
 			, mem
 			, getPath().c_str());
 		depth = 1;
@@ -506,7 +506,7 @@ bool Texture::loadTGA(IInputStream& file)
 		, header.height
 		, 1
 		, format
-		, getGPUFlags() & ~(u32)gpu::TextureFlags::SRGB
+		, getGPUFlags() & ~gpu::TextureFlags::SRGB
 		, mem
 		, getPath().c_str());
 	depth = 1;
@@ -559,23 +559,23 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 }
 
 
-u32 Texture::getGPUFlags() const
+gpu::TextureFlags Texture::getGPUFlags() const
 {
-	u32 gpu_flags = 0;
+	gpu::TextureFlags gpu_flags = gpu::TextureFlags::NONE;
 	if(flags & (u32)Flags::SRGB) {
-		gpu_flags  |= (u32)gpu::TextureFlags::SRGB;
+		gpu_flags = gpu_flags | gpu::TextureFlags::SRGB;
 	}
 	if(flags & (u32)Flags::POINT) {
-		gpu_flags  |= (u32)gpu::TextureFlags::POINT_FILTER;
+		gpu_flags = gpu_flags | gpu::TextureFlags::POINT_FILTER;
 	}
 	if (flags & (u32)Flags::CLAMP_U) {
-		gpu_flags |= (u32)gpu::TextureFlags::CLAMP_U;
+		gpu_flags = gpu_flags | gpu::TextureFlags::CLAMP_U;
 	}
 	if (flags & (u32)Flags::CLAMP_V) {
-		gpu_flags |= (u32)gpu::TextureFlags::CLAMP_V;
+		gpu_flags = gpu_flags | gpu::TextureFlags::CLAMP_V;
 	}
 	if (flags & (u32)Flags::CLAMP_W) {
-		gpu_flags |= (u32)gpu::TextureFlags::CLAMP_W;
+		gpu_flags = gpu_flags | gpu::TextureFlags::CLAMP_W;
 	}
 	return gpu_flags;
 }

@@ -953,9 +953,9 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 
 		gpu::BufferHandle pass_buf = gpu::allocBufferHandle();
 		gpu::BufferHandle ub = gpu::allocBufferHandle();
-		gpu::createBuffer(ub, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 512, nullptr);
+		gpu::createBuffer(ub, gpu::BufferFlags::UNIFORM_BUFFER, 512, nullptr);
 		const u32 pass_buf_size = (sizeof(PassState) + 255) & ~255;
-		gpu::createBuffer(pass_buf, (u32)gpu::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
+		gpu::createBuffer(pass_buf, gpu::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
 		gpu::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
 		gpu::bindUniformBuffer(4, ub, 0, 512);
 
@@ -968,13 +968,13 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		m_tile_size->x = (m_tile_size->x + 3) & ~3;
 		m_tile_size->y = (m_tile_size->y + 3) & ~3;
 		const IVec2 texture_size = m_tile_size.value * IMPOSTOR_COLS;
-		gpu::createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gb0");
-		gpu::createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
-		gpu::createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::POINT_FILTER, nullptr, "impostor_gbd");
+		gpu::createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gb0");
+		gpu::createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, nullptr, "impostor_gb1");
+		gpu::createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::POINT_FILTER, nullptr, "impostor_gbd");
 		
-		gpu::setFramebuffer(gbs, 2, gbs[2], 0);
+		gpu::setFramebuffer(gbs, 2, gbs[2], gpu::FramebufferFlags::NONE);
 		const float color[] = {0, 0, 0, 0};
-		gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH | (u32)gpu::ClearFlags::STENCIL, color, 0);
+		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH | gpu::ClearFlags::STENCIL, color, 0);
 
 		for (u32 j = 0; j < IMPOSTOR_COLS; ++j) {
 			for (u32 i = 0; i < IMPOSTOR_COLS; ++i) {
@@ -1007,20 +1007,20 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					gpu::bindIndexBuffer(rd->index_buffer_handle);
 					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-					gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE) | dc.material->render_states);
+					gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | dc.material->render_states);
 					gpu::drawTriangles(0, rd->indices_count, rd->index_type);
 				}
 			}
 		}
 
-		gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, 0);
+		gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 
 		m_gb0->resize(texture_size.x * texture_size.y);
 		m_gb1->resize(m_gb0->size());
 		m_shadow->resize(m_gb0->size());
 
 		gpu::TextureHandle shadow = gpu::allocTextureHandle();
-		gpu::createTexture(shadow, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS | (u32)gpu::TextureFlags::COMPUTE_WRITE, nullptr, "impostor_shadow");
+		gpu::createTexture(shadow, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE, nullptr, "impostor_shadow");
 		gpu::useProgram(m_shadow_program);
 		gpu::bindImageTexture(shadow, 0);
 		gpu::bindTextures(&gbs[2], 1, 1);
@@ -1054,7 +1054,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		}
 
 		gpu::TextureHandle staging = gpu::allocTextureHandle();
-		const u32 flags = u32(gpu::TextureFlags::NO_MIPS) | u32(gpu::TextureFlags::READBACK);
+		const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
 		gpu::createTexture(staging, texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
 		gpu::copy(staging, gbs[0], 0, 0);
 		gpu::readTexture(staging, 0, Span((u8*)m_gb0->begin(), m_gb0->byte_size()));

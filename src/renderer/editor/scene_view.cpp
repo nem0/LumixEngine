@@ -983,7 +983,7 @@ void SceneView::renderGizmos()
 
 			renderer->beginProfileBlock("gizmos", 0);
 			gpu::pushDebugGroup("gizmos");
-			gpu::setState(u64(gpu::StateFlags::DEPTH_TEST) | u64(gpu::StateFlags::DEPTH_WRITE));
+			gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
 			u32 offset = 0;
 			const gpu::BufferHandle drawcall_ub = view->getPipeline()->getDrawcallUniformBuffer();
 			const Matrix mtx = Matrix::IDENTITY;

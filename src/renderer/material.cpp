@@ -36,7 +36,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_uniforms(allocator)
 	, m_texture_count(0)
 	, m_renderer(renderer)
-	, m_render_states(u64(gpu::StateFlags::CULL_BACK))
+	, m_render_states(gpu::StateFlags::CULL_BACK)
 	, m_color(1, 1, 1, 1)
 	, m_metallic(0.f)
 	, m_roughness(1.f)
@@ -152,7 +152,7 @@ void Material::unload()
 	m_metallic = 0.0f;
 	m_roughness = 1.0f;
 	m_emission = 0.0f;
-	m_render_states = u64(gpu::StateFlags::CULL_BACK);
+	m_render_states = gpu::StateFlags::CULL_BACK;
 }
 
 
@@ -472,17 +472,17 @@ bool Material::isTextureDefine(u8 define_idx) const
 void Material::enableBackfaceCulling(bool enable)
 {
 	if (enable) {
-		m_render_states |= (u64)gpu::StateFlags::CULL_BACK;
+		m_render_states = m_render_states | gpu::StateFlags::CULL_BACK;
 	}
 	else {
-		m_render_states &= ~(u64)gpu::StateFlags::CULL_BACK;
+		m_render_states = m_render_states & ~gpu::StateFlags::CULL_BACK;
 	}
 }
 
 
 bool Material::isBackfaceCulling() const
 {
-	return (m_render_states & (u64)gpu::StateFlags::CULL_BACK) != 0;
+	return u64(m_render_states & gpu::StateFlags::CULL_BACK);
 }
 
 
@@ -688,7 +688,7 @@ bool Material::load(u64 size, const u8* mem)
 	lua_State* L = mng.getState(*this);
 	
 	m_uniforms.clear();
-	m_render_states = u64(gpu::StateFlags::CULL_BACK);
+	m_render_states = gpu::StateFlags::CULL_BACK;
 	m_custom_flags = 0;
 	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 

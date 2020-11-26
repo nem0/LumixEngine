@@ -51,7 +51,7 @@ public:
 	struct RenderData {
 		gpu::TextureHandle textures[MAX_TEXTURE_COUNT];
 		int textures_count;
-		u64 render_states;
+		gpu::StateFlags render_states;
 		u32 material_constants;
 		u32 define_mask;
 	};
@@ -90,7 +90,7 @@ public:
 	void setColor(const Vec4& color) { m_color = color; updateRenderData(false); }
 	float getAlphaRef() const { return m_alpha_ref; }
 	void setAlphaRef(float value) { m_alpha_ref = value; updateRenderData(false); }
-	u64 getRenderStates() const { return m_render_states; }
+	gpu::StateFlags getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
 	bool isBackfaceCulling() const;
 
@@ -145,7 +145,7 @@ private:
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	u32 m_texture_count;
 	u32 m_define_mask;
-	u64 m_render_states;
+	gpu::StateFlags m_render_states;
 	RenderData* m_render_data;
 	u8 m_layer;
 	u32 m_sort_key;

@@ -2958,16 +2958,16 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			gpu::pushDebugGroup("radiance_filter");
 			gpu::TextureHandle src = gpu::allocTextureHandle();
 			gpu::TextureHandle dst = gpu::allocTextureHandle();
-			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, (u32)gpu::TextureFlags::IS_CUBE, nullptr, "env");
+			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, nullptr, "env");
 			ASSERT(created);
 			for (u32 face = 0; face < 6; ++face) {
 				gpu::update(src, 0, face, 0, 0, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face));
 			}
 			gpu::generateMipmaps(src);
-			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, (u32)gpu::TextureFlags::IS_CUBE, nullptr, "env_filtered");
+			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, nullptr, "env_filtered");
 			ASSERT(created);
 			gpu::BufferHandle buf = gpu::allocBufferHandle();
-			gpu::createBuffer(buf, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+			gpu::createBuffer(buf, gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
 
 			const u32 roughness_levels = 5;
 			
@@ -2984,17 +2984,17 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 						u32 face;
 						u32 mip;
 					} drawcall = {roughness, face, mip};
-					gpu::setState(0);
+					gpu::setState(gpu::StateFlags::NONE);
 					gpu::viewport(0, 0, size >> mip, size >> mip);
 					gpu::update(buf, &drawcall, sizeof(drawcall));
 					gpu::drawArrays(0, 4, gpu::PrimitiveType::TRIANGLE_STRIP);
 				}
 			}
 
-			gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, 0);
+			gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 
 			gpu::TextureHandle staging = gpu::allocTextureHandle();
-			const u32 flags = u32(gpu::TextureFlags::IS_CUBE) | u32(gpu::TextureFlags::READBACK);
+			const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
 			gpu::createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, nullptr, "staging_buffer");
 			
 			u32 data_size = 0;
@@ -3356,8 +3356,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			if (use_big_buffers) {
 				big_vb = gpu::allocBufferHandle();
 				big_ib = gpu::allocBufferHandle();
-				gpu::createBuffer(big_vb, (u32)gpu::BufferFlags::IMMUTABLE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
-				gpu::createBuffer(big_ib, (u32)gpu::BufferFlags::IMMUTABLE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
+				gpu::createBuffer(big_vb, gpu::BufferFlags::IMMUTABLE, num_vertices * sizeof(ImDrawVert), cmd_list.vtx_buffer.data);
+				gpu::createBuffer(big_ib, gpu::BufferFlags::IMMUTABLE, num_indices * sizeof(ImDrawIdx), cmd_list.idx_buffer.data);
 				gpu::bindIndexBuffer(big_ib);
 				gpu::bindVertexBuffer(0, big_vb, 0, sizeof(ImDrawVert));
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -3376,8 +3376,8 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			const ImDrawCmd* pcmd_begin = cmd_list.commands.begin();
 			const ImDrawCmd* pcmd_end = cmd_list.commands.end();
 
-			const u64 blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-			gpu::setState((u64)gpu::StateFlags::SCISSOR_TEST | blend_state);
+			const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
+			gpu::setState(gpu::StateFlags::SCISSOR_TEST | blend_state);
 			for (const ImDrawCmd* pcmd = pcmd_begin; pcmd != pcmd_end; pcmd++)
 			{
 				ASSERT(!pcmd->UserCallback);
@@ -3422,9 +3422,9 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			PROFILE_FUNCTION();
 
 			if (init_render) {
-				gpu::createBuffer(ub, (u32)gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
-				gpu::createBuffer(ib, 0, 256 * 1024, nullptr);
-				gpu::createBuffer(vb, 0, 256 * 1024, nullptr);
+				gpu::createBuffer(ub, gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
+				gpu::createBuffer(ib, gpu::BufferFlags::NONE, 256 * 1024, nullptr);
+				gpu::createBuffer(vb, gpu::BufferFlags::NONE, 256 * 1024, nullptr);
 			}
 
 			gpu::pushDebugGroup("imgui");
@@ -3433,7 +3433,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			ib_offset = 0;
 			for (WindowDrawData& dd : window_draw_data) {
 				gpu::setCurrentWindow(dd.window);
-				gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, 0);
+				gpu::setFramebuffer(nullptr, 0, gpu::INVALID_TEXTURE, gpu::FramebufferFlags::NONE);
 				gpu::viewport(0, 0, dd.w, dd.h);
 				
 				Vec4 canvas_mtx[] = {
@@ -3444,7 +3444,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				gpu::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
 				Vec4 cc = {1, 0, 1, 1};
 				const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
-				gpu::clear((u32)gpu::ClearFlags::COLOR | (u32)gpu::ClearFlags::DEPTH, clear_color, 1.0);
+				gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_color, 1.0);
 				if (dd.new_program) {
 					const char* vs =
 						R"#(
@@ -3523,7 +3523,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
-		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, (u32)gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
+		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
 		ImGui::GetIO().Fonts->TexID = m_texture;
 
 		WorldEditor& editor = app.getWorldEditor();
