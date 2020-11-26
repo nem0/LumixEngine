@@ -282,6 +282,7 @@ bool getEvent(Ref<Event> event) {
 	if (!G.event_queue.empty()) {
 		event = G.event_queue.front();
 		G.event_queue.pop();
+		return true;
 	}
 
 	MSG msg;
