@@ -332,6 +332,8 @@ constexpr TextureFlags operator & (TextureFlags a, TextureFlags b) { return Text
 constexpr BufferFlags operator | (BufferFlags a, BufferFlags b) { return BufferFlags((u32)a | (u32)b); }
 constexpr BufferFlags operator & (BufferFlags a, BufferFlags b) { return BufferFlags((u32)a & (u32)b); }
 
+constexpr BindShaderBufferFlags operator & (BindShaderBufferFlags a, BindShaderBufferFlags b) { return BindShaderBufferFlags((u32)a & (u32)b); }
+
 constexpr InitFlags operator ~(InitFlags a) { return InitFlags(~(u32)a); }
 constexpr InitFlags operator | (InitFlags a, InitFlags b) { return InitFlags((u32)a | (u32)b); }
 constexpr InitFlags operator & (InitFlags a, InitFlags b) { return InitFlags((u32)a & (u32)b); }
