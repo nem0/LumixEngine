@@ -1,4 +1,4 @@
-#if 0 // set to 0 to build minimal lunex example
+#if 1 // set to 0 to build minimal lunex example
 
 #include "engine/allocators.h"
 #include "engine/command_line_parser.h"
