@@ -31,6 +31,7 @@ static struct
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	bool raw_input_registered = false;
+	u16 surrogate = 0;
 	struct {
 		HCURSOR load;
 		HCURSOR size_ns;
@@ -314,11 +315,27 @@ bool getEvent(Ref<Event> event) {
 			event->key.down = false;
 			event->key.keycode = (Keycode)msg.wParam;
 			break;
-		case WM_CHAR:
+		case WM_CHAR: {
 			event->type = Event::Type::CHAR;
 			event->text_input.utf8 = 0;
-			UTF32ToUTF8((u32)msg.wParam, (char*)&event->text_input.utf8);
+			u32 c = (u32)msg.wParam;
+			if (c >= 0xd800 && c <= 0xdbff) {
+				G.surrogate = (u16)c;
+				goto retry;
+			}
+
+			if (c >= 0xdc00 && c <= 0xdfff) {
+				if (G.surrogate) {
+					c = (G.surrogate - 0xd800) << 10;
+					c += (WCHAR)msg.wParam - 0xdc00;
+					c += 0x10000;
+				}
+			}
+			G.surrogate = 0;
+
+			UTF32ToUTF8(c, (char*)&event->text_input.utf8);
 			break;
+		}
 		case WM_INPUT: {
 			HRAWINPUT hRawInput = (HRAWINPUT)msg.lParam;
 			UINT dataSize;
