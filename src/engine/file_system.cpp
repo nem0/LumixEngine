@@ -346,7 +346,7 @@ struct PackFileSystem : FileSystemImpl {
 		OutputMemoryStream compressed(m_allocator);
 		compressed.resize(iter.value().compressed_size);
 		MutexGuard lock(m_mutex);
-		const u32 header_size = sizeof u32 + m_map.size() * (3 * sizeof u64 + sizeof u32);
+		const u32 header_size = sizeof(u32) + m_map.size() * (3 * sizeof(u64) + sizeof(u32));
 		if (!m_file.seek(iter.value().offset + header_size) || !m_file.read(compressed.getMutableData(), compressed.size())) {
 			logError("Could not read ", path);
 			return false;
