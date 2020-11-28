@@ -182,6 +182,8 @@ public:
 	const Mesh& getMesh(u32 index) const { return m_meshes[index]; }
 	int getMeshCount() const { return m_meshes.size(); }
 	int getBoneCount() const { return m_bones.size(); }
+	const char* getBoneName(u32 idx) { return m_bones[idx].name.c_str(); }
+	i32 getBoneParent(u32 idx) { return m_bones[idx].parent_idx; }
 	const Bone& getBone(u32 i) const { return m_bones[i]; }
 	int getFirstNonrootBoneIndex() const { return m_first_nonroot_bone_index; }
 	BoneMap::const_iterator getBoneIndex(u32 hash) const { return m_bone_map.find(hash); }
@@ -195,8 +197,6 @@ public:
 	bool isSkinned() const;
 	float* getLODDistances() { return m_lod_distances; }
 	const LODMeshIndices* getLODIndices() const { return m_lod_indices; }
-
-	static void registerLuaAPI(lua_State* L);
 
 public:
 	static const u32 FILE_MAGIC = 0x5f4c4d4f; // == '_LM2'

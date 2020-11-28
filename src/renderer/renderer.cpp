@@ -490,6 +490,8 @@ struct RendererImpl final : Renderer
 		, m_plugins(m_allocator)
 	{
 		LUMIX_FUNC(Model::getBoneCount);
+		LUMIX_FUNC(Model::getBoneName);
+		LUMIX_FUNC(Model::getBoneParent);
 
 		m_shader_defines.reserve(32);
 
