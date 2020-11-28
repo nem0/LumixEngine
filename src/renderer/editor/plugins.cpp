@@ -1476,6 +1476,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool split = false;
 		bool create_impostor = false;
 		bool use_mikktspace = false;
+		bool force_skin = false;
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
@@ -1521,6 +1522,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Meta meta;
 		m_app.getAssetCompiler().getMeta(path, [&](lua_State* L){
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "use_mikktspace", &meta.use_mikktspace);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "force_skin", &meta.force_skin);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "position_error", &meta.position_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "rotation_error", &meta.rotation_error);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "scale", &meta.scale);
@@ -1613,7 +1615,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		const PathInfo src_info(filepath);
-		m_fbx_importer.setSource(filepath, false, false);
+		m_fbx_importer.setSource(filepath, false, meta.force_skin);
 		if (m_fbx_importer.getMeshes().empty() && m_fbx_importer.getAnimations().empty()) {
 			if (m_fbx_importer.getOFBXScene()) {
 				if (m_fbx_importer.getOFBXScene()->getMeshCount() > 0) {
@@ -2035,6 +2037,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			ImGuiEx::Label("Mikktspace tangents");
 			ImGui::Checkbox("##mikktspace", &m_meta.use_mikktspace);
+			ImGuiEx::Label("Force skinned");
+			ImGui::Checkbox("##frcskn", &m_meta.force_skin);
 			ImGuiEx::Label("Max position error");
 			ImGui::InputFloat("##maxposer", &m_meta.position_error);
 			ImGuiEx::Label("Max rotation error");
@@ -2078,7 +2082,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				String src(m_app.getAllocator());
 				src.cat("create_impostor = ").cat(m_meta.create_impostor ? "true" : "false")
-					.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace)
+					.cat("\nuse_mikktspace = ").cat(m_meta.use_mikktspace ? "true" : "false")
+					.cat("\nforce_skin = ").cat(m_meta.force_skin ? "true" : "false")
 					.cat("\nposition_error = ").cat(m_meta.position_error)
 					.cat("\nrotation_error = ").cat(m_meta.rotation_error)
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
