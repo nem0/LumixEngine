@@ -379,7 +379,7 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 	{
 		serializer.read(m_listener.entity);
 		m_listener.entity = entity_map.get(m_listener.entity);

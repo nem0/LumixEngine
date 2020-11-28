@@ -35,7 +35,7 @@ struct LUMIX_ENGINE_API IScene
 
 	virtual void init() {}
 	virtual void serialize(struct OutputMemoryStream& serializer) = 0;
-	virtual void deserialize(struct InputMemoryStream& serialize, const struct EntityMap& entity_map) = 0;
+	virtual void deserialize(struct InputMemoryStream& serialize, const struct EntityMap& entity_map, i32 version) = 0;
 	virtual IPlugin& getPlugin() const = 0;
 	virtual void update(float time_delta, bool paused) = 0;
 	virtual void lateUpdate(float time_delta, bool paused) {}
