@@ -59,7 +59,6 @@ static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
 static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
 static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
 static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
 static const ComponentType FUR_TYPE = Reflection::getComponentType("fur");
@@ -3839,7 +3838,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		m_app.registerComponent("", "environment_probe", "Render / Environment probe");
 		m_app.registerComponent("", "reflection_probe", "Render / Reflection probe");
 		m_app.registerComponent("", "fur", "Render / Fur");
-		m_app.registerComponent(ICON_FA_ALIGN_JUSTIFY, "text_mesh", "Render / Text 3D", FontResource::TYPE, "Font");
 
 		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
 		m_app.registerComponent(ICON_FA_MAP, "terrain", *add_terrain_plugin);

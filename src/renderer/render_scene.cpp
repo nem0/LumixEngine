@@ -49,7 +49,6 @@ static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain"
 static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
 static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
-static const ComponentType TEXT_MESH_TYPE = Reflection::getComponentType("text_mesh");
 static const ComponentType FUR_TYPE = Reflection::getComponentType("fur");
 
 
@@ -71,70 +70,6 @@ struct BoneAttachment
 	EntityPtr parent_entity;
 	int bone_index;
 	LocalRigidTransform relative_transform;
-};
-
-
-struct TextMesh
-{
-	enum Flags : u32
-	{
-		CAMERA_ORIENTED = 1 << 0
-	};
-	
-	TextMesh(IAllocator& allocator) : text("", allocator) {}
-	~TextMesh() { setFontResource(nullptr); }
-
-	void setFontResource(FontResource* res)
-	{
-		if (m_font_resource)
-		{
-			if (m_font)
-			{
-				m_font_resource->removeRef(*m_font);
-				m_font = nullptr;
-			}
-			m_font_resource->getObserverCb().unbind<&TextMesh::onFontLoaded>(this);
-			m_font_resource->decRefCount();
-		}
-		m_font_resource = res;
-		if (res) res->onLoaded<&TextMesh::onFontLoaded>(this); 
-	}
-
-	void onFontLoaded(Resource::State, Resource::State new_state, Resource&)
-	{
-		if (new_state != Resource::State::READY)
-		{
-			m_font = nullptr;
-		}
-		else
-		{
-			m_font = m_font_resource->addRef(m_font_size);
-		}
-	}
-
-	void setFontSize(int value)
-	{
-		m_font_size = value;
-		if (m_font_resource && m_font_resource->isReady())
-		{
-			if(m_font) m_font_resource->removeRef(*m_font);
-			m_font = m_font_resource->addRef(m_font_size);
-		}
-	}
-
-	FontResource* getFontResource() const { return m_font_resource; }
-	Font* getFont() const { return m_font; }
-	int getFontSize() const { return m_font_size; }
-
-	String text;
-	u32 color = 0xff000000;
-	FlagSet<Flags, u32> m_flags;
-
-private:
-	int m_font_size = 13;
-	Font* m_font = nullptr;
-	FontResource* m_font_resource = nullptr;
-
 };
 
 
@@ -209,13 +144,6 @@ public:
 	{
 		auto& rm = m_engine.getResourceManager();
 		auto* material_manager = rm.get(Material::TYPE);
-
-		
-		for (TextMesh* text_mesh : m_text_meshes)
-		{
-			LUMIX_DELETE(m_allocator, text_mesh);
-		}
-		m_text_meshes.clear();
 
 		for (Decal& decal : m_decals)
 		{
@@ -583,151 +511,6 @@ public:
 		}
 	}
 
-	void setTextMeshText(EntityRef entity, const char* text) override
-	{
-		m_text_meshes.get(entity)->text = text;
-	}
-
-
-	const char* getTextMeshText(EntityRef entity) override
-	{
-		return m_text_meshes.get(entity)->text.c_str();
-	}
-
-
-	bool isTextMeshCameraOriented(EntityRef entity) override
-	{
-		TextMesh& text = *m_text_meshes.get(entity);
-		return text.m_flags.isSet(TextMesh::CAMERA_ORIENTED);
-	}
-
-
-	void setTextMeshCameraOriented(EntityRef entity, bool is_oriented) override
-	{
-		TextMesh& text = *m_text_meshes.get(entity);
-		text.m_flags.set(TextMesh::CAMERA_ORIENTED, is_oriented);
-	}
-
-
-	void setTextMeshFontSize(EntityRef entity, int value) override
-	{
-		TextMesh& text = *m_text_meshes.get(entity);
-		text.setFontSize(value);
-	}
-
-
-	int getTextMeshFontSize(EntityRef entity) override
-	{
-		return m_text_meshes.get(entity)->getFontSize();
-	}
-
-
-	static Vec4 ABGRu32ToRGBAVec4(u32 value)
-	{
-		float inv = 1 / 255.0f;
-		return {
-			((value >> 0) & 0xFF) * inv,
-			((value >> 8) & 0xFF) * inv,
-			((value >> 16) & 0xFF) * inv,
-			((value >> 24) & 0xFF) * inv,
-		};
-	}
-
-
-	static u32 RGBAVec4ToABGRu32(const Vec4& value)
-	{
-		u8 r = u8(value.x * 255 + 0.5f);
-		u8 g = u8(value.y * 255 + 0.5f);
-		u8 b = u8(value.z * 255 + 0.5f);
-		u8 a = u8(value.w * 255 + 0.5f);
-		return (a << 24) + (b << 16) + (g << 8) + r;
-	}
-
-
-	Vec4 getTextMeshColorRGBA(EntityRef entity) override
-	{
-		return ABGRu32ToRGBAVec4(m_text_meshes.get(entity)->color);
-	}
-
-
-	void setTextMeshColorRGBA(EntityRef entity, const Vec4& color) override
-	{
-		m_text_meshes.get(entity)->color = RGBAVec4ToABGRu32(color);
-	}
-
-
-	Path getTextMeshFontPath(EntityRef entity) override
-	{
-		TextMesh& text = *m_text_meshes.get(entity);
-		return text.getFontResource() == nullptr ? Path() : text.getFontResource()->getPath();
-	}
-
-	u32 getTextMeshesVerticesCount() const override {
-		u32 count = 0;
-		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j) {
-			const TextMesh& text = *m_text_meshes.at(j);
-			count += 6 * text.text.length();
-		}
-		return count;
-	}
-
-	void getTextMeshesVertices(TextMeshVertex* vertices, const DVec3& cam_pos, const Quat& cam_rot) override
-	{
-		const Vec3 cam_right = cam_rot * Vec3(1, 0, 0);
-		const Vec3 cam_up = cam_rot * Vec3(0, -1, 0);
-		u32 idx = 0;
-		for (int j = 0, nj = m_text_meshes.size(); j < nj; ++j) {
-			const TextMesh& text = *m_text_meshes.at(j);
-			const Font* font = text.getFont();
-			if (!font) continue;
-
-			const EntityRef entity = m_text_meshes.getKey(j);
-			const char* str = text.text.c_str();
-			Vec3 base = (m_universe.getPosition(entity) - cam_pos).toFloat();
-			const Quat rot = m_universe.getRotation(entity);
-			const float scale = m_universe.getScale(entity);
-			Vec3 right = rot.rotate(Vec3(1, 0, 0)) * scale;
-			Vec3 up = rot.rotate(Vec3(0, -1, 0)) * scale;
-			if (text.m_flags.isSet(TextMesh::CAMERA_ORIENTED)) {
-				right = cam_right * scale;
-				up = cam_up * scale;
-			}
-			u32 color = text.color;
-			const Vec2 text_size = measureTextA(*font, str, nullptr);
-			base += right * text_size.x * -0.5f;
-			base += up * text_size.y * -0.5f;
-			for (int i = 0, n = text.text.length(); i < n; ++i) {
-				const Glyph* glyph = findGlyph(*font, str[i]);
-				if (!glyph) continue;
-
-				const Vec3 x0y0 = base + right * float(glyph->x0) + up * float(glyph->y0);
-				const Vec3 x1y0 = base + right * float(glyph->x1) + up * float(glyph->y0);
-				const Vec3 x1y1 = base + right * float(glyph->x1) + up * float(glyph->y1);
-				const Vec3 x0y1 = base + right * float(glyph->x0) + up * float(glyph->y1);
-
-				vertices[idx + 0] = { x0y0, color, { glyph->u0, glyph->v0 } };
-				vertices[idx + 1] = { x1y0, color, { glyph->u1, glyph->v0 } };
-				vertices[idx + 2] = { x1y1, color, { glyph->u1, glyph->v1 } };
-
-				vertices[idx + 3] = { x0y0, color, { glyph->u0, glyph->v0 } };
-				vertices[idx + 4] = { x1y1, color, { glyph->u1, glyph->v1 } };
-				vertices[idx + 5] = { x0y1, color, { glyph->u0, glyph->v1 } };
-				idx += 6;
-
-				base += right * float(glyph->advance_x);
-			}
-		}
-	}
-
-
-	void setTextMeshFontPath(EntityRef entity, const Path& path) override
-	{
-		TextMesh& text = *m_text_meshes.get(entity);
-		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
-		FontResource* res = path.isValid() ? manager.load<FontResource>(path) : nullptr;
-		text.setFontResource(res);
-	}
-
 
 	int getVersion() const override { return (int)RenderSceneVersion::LATEST; }
 
@@ -813,46 +596,6 @@ public:
 			m_universe.onComponentCreated(e, FUR_TYPE, this);
 		}
 	}
-
-	void serializeTextMeshes(OutputMemoryStream& serializer)
-	{
-		serializer.write(m_text_meshes.size());
-		for (int i = 0, n = m_text_meshes.size(); i < n; ++i)
-		{
-			TextMesh& text = *m_text_meshes.at(i);
-			EntityRef e = m_text_meshes.getKey(i);
-			serializer.write(e);
-			serializer.writeString(text.getFontResource() ? text.getFontResource()->getPath().c_str() : "");
-			serializer.write(text.color);
-			serializer.write(text.getFontSize());
-			serializer.write(text.text);
-		}
-	}
-
-	void deserializeTextMeshes(InputMemoryStream& serializer, const EntityMap& entity_map)
-	{
-		u32 count;
-		serializer.read(count);
-		ResourceManagerHub& manager = m_renderer.getEngine().getResourceManager();
-		
-		for (u32 i = 0; i < count; ++i) {
-			EntityRef e;
-			serializer.read(e);
-			e = entity_map.get(e);
-			TextMesh& text = *LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
-			m_text_meshes.insert(e, &text);
-			const char* tmp = serializer.readString();
-			serializer.read(text.color);
-			int font_size;
-			serializer.read(font_size);
-			text.setFontSize(font_size);
-			serializer.read(text.text);
-			FontResource* res = tmp[0] ? manager.load<FontResource>(Path(tmp)) : nullptr;
-			text.setFontResource(res);
-			m_universe.onComponentCreated(e, TEXT_MESH_TYPE, this);
-		}
-	}
-
 
 	void deserializeDecals(InputMemoryStream& serializer, const EntityMap& entity_map)
 	{
@@ -1015,7 +758,6 @@ public:
 		serializeEnvironmentProbes(serializer);
 		serializeReflectionProbes(serializer);
 		serializeDecals(serializer);
-		serializeTextMeshes(serializer);
 		serializeFurs(serializer);
 	}
 
@@ -1139,7 +881,6 @@ public:
 		deserializeEnvironmentProbes(serializer, entity_map);
 		deserializeReflectionProbes(serializer, entity_map);
 		deserializeDecals(serializer, entity_map);
-		deserializeTextMeshes(serializer, entity_map);
 		deserializeFurs(serializer, entity_map);
 	}
 
@@ -1217,15 +958,6 @@ public:
 	}
 
 
-	void destroyTextMesh(EntityRef entity)
-	{
-		TextMesh* text = m_text_meshes[entity];
-		LUMIX_DELETE(m_allocator, text);
-		m_text_meshes.erase(entity);
-		m_universe.onComponentDestroyed(entity, TEXT_MESH_TYPE, this);
-	}
-
-
 	void destroyCamera(EntityRef entity)
 	{
 		m_cameras.erase(entity);
@@ -1254,13 +986,6 @@ public:
 	void createFur(EntityRef entity) {
 		m_furs.insert(entity, {});
 		m_universe.onComponentCreated(entity, FUR_TYPE, this);
-	}
-
-	void createTextMesh(EntityRef entity)
-	{
-		TextMesh* text = LUMIX_NEW(m_allocator, TextMesh)(m_allocator);
-		m_text_meshes.insert(entity, text);
-		m_universe.onComponentCreated(entity, TEXT_MESH_TYPE, this);
 	}
 
 
@@ -2741,7 +2466,6 @@ private:
 	HashMap<EntityRef, Environment> m_environments;
 	HashMap<EntityRef, Camera> m_cameras;
 	EntityPtr m_active_camera = INVALID_ENTITY;
-	AssociativeArray<EntityRef, TextMesh*> m_text_meshes;
 	AssociativeArray<EntityRef, BoneAttachment> m_bone_attachments;
 	AssociativeArray<EntityRef, EnvironmentProbe> m_environment_probes;
 	AssociativeArray<EntityRef, ReflectionProbe> m_reflection_probes;
@@ -2786,7 +2510,6 @@ static struct
 	COMPONENT_TYPE(ENVIRONMENT_PROBE_TYPE, EnvironmentProbe),
 	COMPONENT_TYPE(REFLECTION_PROBE_TYPE, ReflectionProbe),
 	COMPONENT_TYPE(PARTICLE_EMITTER_TYPE, ParticleEmitter),
-	COMPONENT_TYPE(TEXT_MESH_TYPE, TextMesh),
 	COMPONENT_TYPE(FUR_TYPE, Fur)
 };
 
@@ -2803,7 +2526,6 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_model_entity_map(m_allocator)
 	, m_model_instances(m_allocator)
 	, m_cameras(m_allocator)
-	, m_text_meshes(m_allocator)
 	, m_terrains(m_allocator)
 	, m_point_lights(m_allocator)
 	, m_environments(m_allocator)

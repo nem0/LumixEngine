@@ -618,7 +618,6 @@ struct PipelineImpl final : Pipeline
 		ResourceManagerHub& rm = renderer.getEngine().getResourceManager();
 		m_draw2d_shader = rm.load<Shader>(Path("pipelines/draw2d.shd"));
 		m_debug_shape_shader = rm.load<Shader>(Path("pipelines/debug_shape.shd"));
-		m_text_mesh_shader = rm.load<Shader>(Path("pipelines/text_mesh.shd"));
 		m_place_grass_shader = rm.load<Shader>(Path("pipelines/place_grass.shd"));
 		m_default_cubemap = rm.load<Texture>(Path("textures/common/default_probe.dds"));
 
@@ -689,10 +688,6 @@ struct PipelineImpl final : Pipeline
 
 		m_3D_pos_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 
-		m_text_mesh_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
-		m_text_mesh_decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
-		m_text_mesh_decl.addAttribute(2, 16, 2, gpu::AttributeType::FLOAT, 0);
-
 		m_point_light_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0); // vpos
 		m_point_light_decl.addAttribute(1, 0, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // rot
 		m_point_light_decl.addAttribute(2, 16, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED); // pos
@@ -714,7 +709,6 @@ struct PipelineImpl final : Pipeline
 
 		m_draw2d_shader->decRefCount();
 		m_debug_shape_shader->decRefCount();
-		m_text_mesh_shader->decRefCount();
 		m_place_grass_shader->decRefCount();
 		m_default_cubemap->decRefCount();
 
@@ -2270,54 +2264,6 @@ struct PipelineImpl final : Pipeline
 		for (RenderPlugin* plugin : m_renderer.getPlugins()) {
 			plugin->renderTransparent(*this);
 		}
-	}
-
-	void renderTextMeshes()
-	{
-		if (!m_text_mesh_shader->isReady()) return;
-		if (m_text_mesh_shader->m_texture_slot_count < 1) return;
-
-		struct RenderJob : Renderer::RenderJob
-		{
-			void setup() override
-			{
-				PROFILE_FUNCTION();
-				const Quat& rot = m_pipeline->m_viewport.rot;
-				const DVec3& pos = m_pipeline->m_viewport.pos;
-				const u32 count = m_pipeline->m_scene->getTextMeshesVerticesCount();
-				vb = m_pipeline->m_renderer.allocTransient(count * sizeof(TextMeshVertex));
-				m_pipeline->m_scene->getTextMeshesVertices((TextMeshVertex*)vb.ptr, pos, rot);
-			}
-
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-				if (vb.size == 0) return;
-
-				gpu::useProgram(m_program);
-				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
-				gpu::setState(gpu::StateFlags::DEPTH_WRITE | gpu::StateFlags::DEPTH_TEST | blend_state);
-				gpu::bindTextures(&m_atlas, 0, 1);
-				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
-				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, 24);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::drawArrays(0, vb.size / sizeof(TextMeshVertex), gpu::PrimitiveType::TRIANGLES);
-			}
-
-			Renderer::TransientSlice vb;
-			gpu::TextureHandle m_atlas;
-			gpu::ProgramHandle m_program;
-			PipelineImpl* m_pipeline;
-		};
-
-
-		Texture* atlas = m_renderer.getFontManager().getAtlasTexture();
-		IAllocator& allocator = m_renderer.getAllocator();
-		RenderJob& job = m_renderer.createJob<RenderJob>();
-		job.m_pipeline = this;
-		job.m_atlas = atlas ? atlas->handle : gpu::INVALID_TEXTURE;
-		job.m_program = m_text_mesh_shader->getProgram(m_text_mesh_decl, 0);
-		m_renderer.queue(job, m_profiler_link);
 	}
 
 	void renderLocalLights(const char* define, int shader_idx, CmdPage* cmds)
@@ -4465,7 +4411,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderParticles);
 		REGISTER_FUNCTION(renderReflectionVolumes);
 		REGISTER_FUNCTION(renderTerrains);
-		REGISTER_FUNCTION(renderTextMeshes);
 		REGISTER_FUNCTION(renderOpaque);
 		REGISTER_FUNCTION(renderTransparent);
 		REGISTER_FUNCTION(renderUI);
@@ -4548,7 +4493,6 @@ struct PipelineImpl final : Pipeline
 	Viewport m_viewport;
 	int m_output;
 	Shader* m_debug_shape_shader;
-	Shader* m_text_mesh_shader;
 	Shader* m_place_grass_shader;
 	Texture* m_default_cubemap;
 	Array<CustomCommandHandler> m_custom_commands_handlers;
@@ -4564,7 +4508,6 @@ struct PipelineImpl final : Pipeline
 	gpu::VertexDecl m_simple_cube_decl;
 	gpu::VertexDecl m_decal_decl;
 	gpu::VertexDecl m_3D_pos_decl;
-	gpu::VertexDecl m_text_mesh_decl;
 	gpu::VertexDecl m_point_light_decl;
 	gpu::BufferHandle m_cube_vb;
 	gpu::BufferHandle m_cube_ib;
