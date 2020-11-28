@@ -202,15 +202,6 @@ struct FurComponent {
 	bool enabled = true;
 };
 
-
-struct TextMeshVertex
-{
-	Vec3 pos;
-	u32 color;
-	Vec2 tex_coord;
-};
-
-
 struct LUMIX_RENDERER_API RenderScene : IScene
 {
 	static UniquePtr<RenderScene> createInstance(Renderer& renderer,
@@ -359,19 +350,6 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void enableEnvironmentProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isEnvironmentProbeEnabled(EntityRef entity) = 0;
 	virtual Span<const EnvironmentProbe> getEnvironmentProbes() = 0;
-
-	virtual void setTextMeshText(EntityRef entity, const char* text) = 0;
-	virtual const char* getTextMeshText(EntityRef entity) = 0;
-	virtual void setTextMeshFontSize(EntityRef entity, int value) = 0;
-	virtual int getTextMeshFontSize(EntityRef entity) = 0;
-	virtual Vec4 getTextMeshColorRGBA(EntityRef entity) = 0;
-	virtual void setTextMeshColorRGBA(EntityRef entity, const Vec4& color) = 0;
-	virtual Path getTextMeshFontPath(EntityRef entity) = 0;
-	virtual void setTextMeshFontPath(EntityRef entity, const Path& path) = 0;
-	virtual bool isTextMeshCameraOriented(EntityRef entity) = 0;
-	virtual void setTextMeshCameraOriented(EntityRef entity, bool is_oriented) = 0;
-	virtual void getTextMeshesVertices(TextMeshVertex* vertices, const DVec3& cam_pos, const Quat& rot) = 0;
-	virtual u32 getTextMeshesVerticesCount() const = 0;
 };
 
 }

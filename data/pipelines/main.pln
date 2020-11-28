@@ -407,7 +407,6 @@ function main()
 	waterPass(entities, res, gbuffer_depth)
 	transparentPass(entities, res, gbuffer_depth, shadowmap)
 	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
-	renderTextMeshes()
 
 	if PREVIEW == nil then
 		res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
