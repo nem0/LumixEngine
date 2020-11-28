@@ -1128,7 +1128,7 @@ public:
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 	{
 		deserializeCameras(serializer, entity_map);
 		deserializeModelInstances(serializer, entity_map);

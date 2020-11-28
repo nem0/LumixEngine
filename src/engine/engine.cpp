@@ -361,27 +361,6 @@ public:
 	}
 
 
-	bool hasSupportedSceneVersions(InputMemoryStream& serializer, Universe& ctx)
-	{
-		i32 count;
-		serializer.read(count);
-		for (int i = 0; i < count; ++i)
-		{
-			u32 hash;
-			serializer.read(hash);
-			auto* scene = ctx.getScene(hash);
-			int version;
-			serializer.read(version);
-			if (version != scene->getVersion())
-			{
-				logError("Plugin ", scene->getPlugin().getName(), " has incompatible version");
-				return false;
-			}
-		}
-		return true;
-	}
-
-
 	bool hasSerializedPlugins(InputMemoryStream& serializer)
 	{
 		i32 count;
@@ -444,13 +423,13 @@ public:
 		header.version = 0;
 		serializer.write(header);
 		serializePluginList(serializer);
-		serializeSceneVersions(serializer, ctx);
+		//serializeSceneVersions(serializer, ctx);
 		i32 pos = (i32)serializer.size();
 		ctx.serialize(serializer);
 		serializer.write((i32)ctx.getScenes().size());
-		for (UniquePtr<IScene>& scene : ctx.getScenes())
-		{
+		for (UniquePtr<IScene>& scene : ctx.getScenes()) {
 			serializer.writeString(scene->getPlugin().getName());
+			serializer.write(scene->getVersion());
 			scene->serialize(serializer);
 		}
 		u32 crc = crc32((const u8*)serializer.data() + pos, (i32)serializer.size() - pos);
@@ -468,7 +447,6 @@ public:
 			return false;
 		}
 		if (!hasSerializedPlugins(serializer)) return false;
-		if (!hasSupportedSceneVersions(serializer, ctx)) return false;
 
 		ctx.deserialize(serializer, entity_map);
 		i32 scene_count;
@@ -477,7 +455,8 @@ public:
 		{
 			const char* tmp = serializer.readString();
 			IScene* scene = ctx.getScene(crc32(tmp));
-			scene->deserialize(serializer, entity_map);
+			const i32 version = serializer.read<i32>();
+			scene->deserialize(serializer, entity_map, version);
 		}
 		return true;
 	}

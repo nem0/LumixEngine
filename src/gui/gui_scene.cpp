@@ -102,6 +102,7 @@ struct GUIButton
 
 struct GUICanvas {
 	EntityRef entity;
+	bool is_3d = false;
 };
 
 
@@ -204,7 +205,7 @@ struct GUISceneImpl final : GUIScene
 			, &GUISceneImpl::destroyCanvas);
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
-
+	
 	void renderTextCursor(GUIRect& rect, Draw2D& draw, const Vec2& pos)
 	{
 		if (!rect.input_field) return;
@@ -1147,12 +1148,13 @@ struct GUISceneImpl final : GUIScene
 		serializer.write(m_canvas.size());
 		
 		for (GUICanvas& c : m_canvas) {
-			serializer.write(c);
+			serializer.write(c.entity);
+			serializer.write(c.is_3d);
 		}
 	}
 
 
-	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map) override
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override
 	{
 		u32 count = serializer.read<u32>();
 		for (u32 i = 0; i < count; ++i)
@@ -1238,7 +1240,8 @@ struct GUISceneImpl final : GUIScene
 		count = serializer.read<u32>();
 		for (u32 i = 0; i < count; ++i) {
 			GUICanvas canvas;
-			serializer.read(canvas);
+			serializer.read(canvas.entity);
+			serializer.read(canvas.is_3d);
 			canvas.entity = entity_map.get(canvas.entity);
 			m_canvas.insert(canvas.entity, canvas);
 			
