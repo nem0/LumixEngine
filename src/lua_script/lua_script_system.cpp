@@ -106,7 +106,7 @@ namespace Lumix
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
 			Reflection::Variant::Type type = f->getArgType(i);
-			toVariant(type, L, i + 1, Ref(args[i]));
+			toVariant(type, L, i + 2, Ref(args[i]));
 		}
 
 		const Reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
