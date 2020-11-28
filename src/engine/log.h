@@ -35,6 +35,7 @@ LUMIX_ENGINE_API LogCallback& getLogCallback();
 namespace detail {
 	LUMIX_ENGINE_API void addLog(const char* val);
 	LUMIX_ENGINE_API void addLog(const Path& val);
+	LUMIX_ENGINE_API void addLog(u64 val);
 	LUMIX_ENGINE_API void addLog(u32 val);
 	LUMIX_ENGINE_API void addLog(i32 val);
 	LUMIX_ENGINE_API void addLog(float val);

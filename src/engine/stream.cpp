@@ -204,7 +204,7 @@ void OutputMemoryStream::write(const String& string)
 
 void* OutputMemoryStream::skip(u64 size)
 {
-	ASSERT(size > 0);
+	ASSERT(size > 0 || m_capacity > 0);
 
 	if (m_size + size > m_capacity)
 	{

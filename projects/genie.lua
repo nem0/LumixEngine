@@ -493,6 +493,7 @@ project "engine"
 	libType()
 
 	files { "../src/engine/**.h",
+			"../src/engine/**.c",
 			"../src/engine/**.cpp",
 			"genie.lua",
 			"../external/imgui/**.h",
