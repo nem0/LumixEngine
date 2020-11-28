@@ -11,6 +11,12 @@ namespace OS { enum class CursorType : u32; }
 
 template <typename T> struct DelegateList;
 
+struct GUICanvas {
+	EntityRef entity;
+	bool is_3d = false;
+	bool orient_to_camera = true;
+	Vec2 virtual_size = Vec2(1000);
+};
 
 struct GUIScene : IScene
 {
@@ -83,6 +89,8 @@ struct GUIScene : IScene
 	virtual void setImageColorRGBA(EntityRef entity, const Vec4& color) = 0;
 	virtual struct Path getImageSprite(EntityRef entity) = 0;
 	virtual void setImageSprite(EntityRef entity, const Path& path) = 0;
+
+	virtual GUICanvas& getCanvas(EntityRef entity) = 0;
 
 	virtual void setText(EntityRef entity, const char* text) = 0;
 	virtual const char* getText(EntityRef entity) = 0;

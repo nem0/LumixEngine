@@ -1075,6 +1075,36 @@ struct PipelineImpl final : Pipeline
 		return true;
 	}
 
+	void render3DUI(EntityRef e, const Draw2D& drawdata, Vec2 canvas_size, bool orient_to_cam) override {
+		if (!m_draw2d_shader->isReady()) return;
+		if (drawdata.getIndices().empty()) return;
+
+		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
+
+		IAllocator& allocator = m_renderer.getAllocator();
+		Draw2DJob& cmd = m_renderer.createJob<Draw2DJob>(allocator);
+		cmd.pipeline = this;
+		cmd.atlas_texture = atlas_texture->handle;
+		cmd.prepare(drawdata);
+		cmd.matrix = m_scene->getUniverse().getRelativeMatrix(e, m_viewport.pos);
+		cmd.is_3d = true;
+		Matrix normalize(
+			Vec4(1 / canvas_size.x, 0, 0, 0),
+			Vec4(0, -1 / canvas_size.x, 0, 0),
+			Vec4(0, 0, 1, 0),
+			Vec4(-0.5f, 0.5f * canvas_size.y / canvas_size.x, 0, 1)
+		);
+		if (orient_to_cam) {
+			const Transform tr = m_scene->getUniverse().getTransform(e);
+			cmd.matrix = m_viewport.rot.toMatrix();
+			cmd.matrix.setTranslation((tr.pos - m_viewport.pos).toFloat());
+			cmd.matrix.multiply3x3(tr.scale);
+		}
+		cmd.matrix = m_viewport.getProjection() * m_viewport.getViewRotation() * cmd.matrix * normalize;
+		m_renderer.queue(cmd, m_profiler_link);
+	}
+
+
 	bool render(bool only_2d) override
 	{
 		PROFILE_FUNCTION();
@@ -1324,8 +1354,91 @@ struct PipelineImpl final : Pipeline
 		//renderDebugPoints();
 	}
 
-	void render2D()
-	{
+	struct Draw2DJob : Renderer::RenderJob {
+		Draw2DJob(IAllocator& allocator) : cmd_buffer(allocator) {}
+
+		void prepare(const Draw2D& draw2d) {
+			PROFILE_FUNCTION();
+
+			num_indices = draw2d.getIndices().size();
+			num_vertices = draw2d.getVertices().size();
+
+			idx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getIndices().byte_size());
+			vtx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getVertices().byte_size());
+			memcpy(idx_buffer_mem.ptr, draw2d.getIndices().begin(), draw2d.getIndices().byte_size());
+			memcpy(vtx_buffer_mem.ptr, draw2d.getVertices().begin(), draw2d.getVertices().byte_size());
+			cmd_buffer.resize(draw2d.getCmds().size());
+			memcpy(&cmd_buffer[0], draw2d.getCmds().begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
+
+			program = pipeline->m_draw2d_shader->getProgram(pipeline->m_2D_decl, 0);
+		}
+
+		void setup() override {}
+
+		void execute() override {
+			PROFILE_FUNCTION();
+
+			if (cmd_buffer.empty()) return;
+
+			gpu::pushDebugGroup("draw2d");
+
+			gpu::update(pipeline->m_drawcall_ub, &matrix.columns[0].x, sizeof(matrix));
+			u32 elem_offset = 0;
+			gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
+			state = state | gpu::StateFlags::SCISSOR_TEST;
+			if (is_3d) state = state | gpu::StateFlags::DEPTH_TEST; 
+			gpu::setState(state);
+			gpu::useProgram(program);
+			gpu::bindIndexBuffer(idx_buffer_mem.buffer);
+			gpu::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
+			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
+
+			for (Draw2D::Cmd& cmd : cmd_buffer) {
+				if(cmd.clip_size.x < 0) {
+					gpu::scissor(0, 0, pipeline->m_viewport.w, pipeline->m_viewport.h);
+				}
+				else {
+					const u32 h = u32(clamp(cmd.clip_size.y, 0.f, 65535.f));
+					if (gpu::isOriginBottomLeft()) {
+						gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+							pipeline->m_viewport.h - u32(maximum(cmd.clip_pos.y, 0.0f)) - h,
+							u32(minimum(cmd.clip_size.x, 65535.0f)),
+							u32(minimum(cmd.clip_size.y, 65535.0f)));
+					}
+					else {
+						gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
+							u32(maximum(cmd.clip_pos.y, 0.0f)),
+							u32(minimum(cmd.clip_size.x, 65535.0f)),
+							u32(minimum(cmd.clip_size.y, 65535.0f)));
+					}
+				}
+			
+				gpu::TextureHandle texture_id = atlas_texture;
+				if (cmd.texture) texture_id = *cmd.texture;
+				if (!texture_id) texture_id = atlas_texture;
+
+				gpu::bindTextures(&texture_id, 0, 1);
+				gpu::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
+
+				elem_offset += cmd.indices_count;
+			}
+
+			gpu::popDebugGroup();
+		}
+
+		gpu::TextureHandle atlas_texture;
+		Renderer::TransientSlice idx_buffer_mem;
+		Renderer::TransientSlice vtx_buffer_mem;
+		int num_indices;
+		int num_vertices;
+		Array<Draw2D::Cmd> cmd_buffer;
+		PipelineImpl* pipeline;
+		gpu::ProgramHandle program;
+		Matrix matrix;
+		bool is_3d = false;
+	};
+
+	void render2D() {
 		if (!m_draw2d_shader->isReady()) {
 			m_draw2d.clear(getAtlasSize());
 			return;
@@ -1336,100 +1449,15 @@ struct PipelineImpl final : Pipeline
 			return;
 		}
 
-		struct Cmd : Renderer::RenderJob
-		{
-			Cmd(IAllocator& allocator) : cmd_buffer(allocator) {}
-
-			void setup()
-			{
-				PROFILE_FUNCTION();
-				size.set((float)pipeline->m_viewport.w, (float)pipeline->m_viewport.h);
-
-				Draw2D& draw2d = pipeline->m_draw2d;
-
-				num_indices = draw2d.getIndices().size();
-				num_vertices = draw2d.getVertices().size();
-
-				idx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getIndices().byte_size());
-				vtx_buffer_mem = pipeline->m_renderer.allocTransient(draw2d.getVertices().byte_size());
-				memcpy(idx_buffer_mem.ptr, draw2d.getIndices().begin(), draw2d.getIndices().byte_size());
-				memcpy(vtx_buffer_mem.ptr, draw2d.getVertices().begin(), draw2d.getVertices().byte_size());
-				cmd_buffer.resize(draw2d.getCmds().size());
-				memcpy(&cmd_buffer[0], draw2d.getCmds().begin(), sizeof(cmd_buffer[0]) * cmd_buffer.size());
-
-				draw2d.clear(pipeline->getAtlasSize());
-
-				program = pipeline->m_draw2d_shader->getProgram(pipeline->m_2D_decl, 0);
-			}
-
-			void execute()
-			{
-				PROFILE_FUNCTION();
-
-				if (cmd_buffer.empty()) return;
-
-				gpu::pushDebugGroup("draw2d");
-
-				gpu::update(pipeline->m_drawcall_ub, &size.x, sizeof(size));
-				u32 elem_offset = 0;
-				gpu::StateFlags state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE);
-				state = state | gpu::StateFlags::SCISSOR_TEST;
-				gpu::setState(state);
-				gpu::useProgram(program);
-				gpu::bindIndexBuffer(idx_buffer_mem.buffer);
-				gpu::bindVertexBuffer(0, vtx_buffer_mem.buffer, vtx_buffer_mem.offset, 20);
-				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-
-				for (Draw2D::Cmd& cmd : cmd_buffer) {
-					if(cmd.clip_size.x < 0) {
-						gpu::scissor(0, 0, pipeline->m_viewport.w, pipeline->m_viewport.h);
-					}
-					else {
-						const u32 h = u32(clamp(cmd.clip_size.y, 0.f, 65535.f));
-						if (gpu::isOriginBottomLeft()) {
-							gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
-								pipeline->m_viewport.h - u32(maximum(cmd.clip_pos.y, 0.0f)) - h,
-								u32(minimum(cmd.clip_size.x, 65535.0f)),
-								u32(minimum(cmd.clip_size.y, 65535.0f)));
-						}
-						else {
-							gpu::scissor(u32(maximum(cmd.clip_pos.x, 0.0f)),
-								u32(maximum(cmd.clip_pos.y, 0.0f)),
-								u32(minimum(cmd.clip_size.x, 65535.0f)),
-								u32(minimum(cmd.clip_size.y, 65535.0f)));
-						}
-					}
-			
-					gpu::TextureHandle texture_id = atlas_texture;
-					if (cmd.texture) texture_id = *cmd.texture;
-					if (!texture_id) texture_id = atlas_texture;
-
-					gpu::bindTextures(&texture_id, 0, 1);
-					gpu::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
-
-					elem_offset += cmd.indices_count;
-				}
-
-				gpu::popDebugGroup();
-			}
-
-			gpu::TextureHandle atlas_texture;
-			Renderer::TransientSlice idx_buffer_mem;
-			Renderer::TransientSlice vtx_buffer_mem;
-			int num_indices;
-			int num_vertices;
-			Array<Draw2D::Cmd> cmd_buffer;
-			Vec2 size;
-			PipelineImpl* pipeline;
-			gpu::ProgramHandle program;
-		};
-
 		const Texture* atlas_texture = m_renderer.getFontManager().getAtlasTexture();
 
 		IAllocator& allocator = m_renderer.getAllocator();
-		Cmd& cmd = m_renderer.createJob<Cmd>(allocator);
+		Draw2DJob& cmd = m_renderer.createJob<Draw2DJob>(allocator);
 		cmd.pipeline = this;
 		cmd.atlas_texture = atlas_texture->handle;
+		cmd.matrix.setOrtho(0, (float)m_viewport.w, (float)m_viewport.h, 0, 0, 1, false);
+		cmd.prepare(m_draw2d);
+		m_draw2d.clear(getAtlasSize());
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 

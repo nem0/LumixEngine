@@ -426,6 +426,7 @@ function main()
 	end
 
 	if GAME_VIEW or APP then
+		setRenderTargetsReadonlyDS(res, gbuffer_depth)
 		renderUI()
 		if renderIngameGUI ~= nil then
 			renderIngameGUI()
