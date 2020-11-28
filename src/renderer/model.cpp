@@ -9,7 +9,6 @@
 #include "engine/math.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "renderer/material.h"
@@ -579,39 +578,6 @@ bool Model::load(u64 size, const u8* mem)
 
 	logError("Error loading model ", getPath());
 	return false;
-}
-
-
-static Vec3 getBonePosition(Model* model, int bone_index)
-{
-	return model->getBone(bone_index).transform.pos;
-}
-
-
-static int getBoneParent(Model* model, int bone_index)
-{
-	return model->getBone(bone_index).parent_idx;
-}
-
-static const char* getBoneName(Model* model, int bone_index)
-{
-	return model->getBone(bone_index).name.c_str();
-}
-
-
-void Model::registerLuaAPI(lua_State* L)
-{
-	#define REGISTER_FUNCTION(F)\
-		do { \
-			auto f = &LuaWrapper::wrap<&F>; \
-			LuaWrapper::createSystemFunction(L, "Model", #F, f); \
-		} while(false) \
-
-	REGISTER_FUNCTION(getBonePosition);
-	REGISTER_FUNCTION(getBoneParent);
-	REGISTER_FUNCTION(getBoneName);
-
-	#undef REGISTER_FUNCTION
 }
 
 

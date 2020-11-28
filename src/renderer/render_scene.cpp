@@ -2851,8 +2851,6 @@ UniquePtr<RenderScene> RenderScene::createInstance(Renderer& renderer,
 
 void RenderScene::registerLuaAPI(lua_State* L)
 {
-	Model::registerLuaAPI(L);
-
 	#define REGISTER_FUNCTION(F)\
 		do { \
 			auto f = &LuaWrapper::wrapMethod<&RenderSceneImpl::F>; \
