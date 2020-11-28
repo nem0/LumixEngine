@@ -39,6 +39,7 @@ namespace detail {
 	void addLog(const char* val) { g_log.message << val; }
 	void addLog(const Path& val) { g_log.message << val.c_str(); }
 	void addLog(u32 val) { g_log.message << val; }
+	void addLog(u64 val) { g_log.message << val; }
 	void addLog(i32 val) { g_log.message << val; }
 	void addLog(float val) { g_log.message << val; }
 

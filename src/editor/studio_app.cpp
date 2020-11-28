@@ -1,7 +1,6 @@
 #include <imgui/imgui.h>
 #include <imgui/imnodes.h>
 
-#include "studio_app.h"
 #include "audio/audio_scene.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -10,19 +9,20 @@
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
 #include "editor/world_editor.h"
+#include "engine/allocators.h"
 #include "engine/associative_array.h"
+#include "engine/atomic.h"
 #include "engine/command_line_parser.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
-#include "engine/allocators.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/input_system.h"
-#include "engine/atomic.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lz4.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
@@ -33,6 +33,7 @@
 #include "profiler_ui.h"
 #include "property_grid.h"
 #include "settings.h"
+#include "studio_app.h"
 #include "utils.h"
 
 #ifdef _WIN32
@@ -2881,6 +2882,7 @@ struct StudioAppImpl final : StudioApp
 		u32 hash;
 		u64 offset;
 		u64 size;
+		u64 size_compressed;
 
 		char path[MAX_PATH_LENGTH];
 	};
@@ -3030,6 +3032,33 @@ struct StudioAppImpl final : StudioApp
 			return;
 		}
 
+		FileSystem& fs = m_engine->getFileSystem();
+		OutputMemoryStream compressed(m_allocator);
+		OutputMemoryStream src(m_allocator);
+		u64 total_size = 0;
+		for (auto& info : infos) {
+			if (!fs.getContentSync(Path(info.path), Ref(src))) {
+				logError("Could not open ", info.path);
+				return;
+			}
+
+			total_size += (u32)src.size();
+
+			info.size = src.size();
+			info.offset = compressed.size();
+			const i32 cap = LZ4_compressBound((i32)src.size());
+			compressed.reserve(compressed.size() + cap);
+			const i32 dst_size = LZ4_compress_default((const char*)src.data(), (char*)compressed.skip(0), (i32)src.size(), cap); 
+			if (dst_size == 0) {
+				logError("Could not compress ", info.path);
+				return;
+			}
+			
+			info.size_compressed = dst_size;
+			compressed.resize(compressed.size() + dst_size);
+		}
+		logInfo("Packed ", infos.size(), " files (", total_size / 1024, "KiB) in ", compressed.size() / 1024, " KiB");
+
 		bool success;
 		OS::OutputFile file;
 		if (!file.open(dest)) {
@@ -3039,42 +3068,17 @@ struct StudioAppImpl final : StudioApp
 
 		const u32 count = (u32)infos.size();
 		success = file.write(&count, sizeof(count));
-		u64 offset = sizeof(count) + (sizeof(u32) + sizeof(u64) * 2) * count;
-		for (auto& info : infos) {
-			info.offset = offset;
-			offset += info.size;
-		}
 
 		for (auto& info : infos) {
 			success = file.write(&info.hash, sizeof(info.hash)) || success;
 			success = file.write(&info.offset, sizeof(info.offset)) || success;
 			success = file.write(&info.size, sizeof(info.size)) || success;
+			success = file.write(&info.size_compressed, sizeof(info.size_compressed)) || success;
 		}
 
-		FileSystem& fs = m_engine->getFileSystem();
-		for (auto& info : infos) {
-			OS::InputFile src;
-			if (!fs.open(info.path, Ref(src))) {
-				file.close();
-				logError("Could not open ", info.path);
-				return;
-			}
-			u64 src_size = src.size();
-			u8 buf[4096];
-			for (; src_size > 0; src_size -= minimum(sizeof(buf), src_size)) {
-				size_t batch_size = minimum(sizeof(buf), src_size);
-				if (!src.read(buf, batch_size)) {
-					file.close();
-					src.close();
-					logError("Could not read ", info.path);
-					return;
-				}
-				success = file.write(buf, batch_size) || success;
-			}
-			src.close();
-		}
-
+		success = file.write(compressed.data(), compressed.size()) || success;
 		file.close();
+
 		if (!success) {
 			logError("Could not write ", dest);
 			return;
