@@ -22,6 +22,7 @@ namespace Lumix
 {
 
 static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
+static const ComponentType GUI_CANVAS_TYPE = Reflection::getComponentType("gui_canvas");
 
 
 PropertyGrid::PropertyGrid(StudioApp& app)
@@ -745,7 +746,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 			ImGuiEx::Label("Parent");
 			ImGui::Text("%s", name);
 
-			if (!universe.hasComponent(entities[0], GUI_RECT_TYPE)) {
+			if (!universe.hasComponent(entities[0], GUI_RECT_TYPE) || universe.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
 				Transform tr = universe.getLocalTransform(entities[0]);
 				DVec3 old_pos = tr.pos;
 				ImGuiEx::Label("Local position");
@@ -772,7 +773,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 	}
 
 
-	if (!universe.hasComponent(entities[0], GUI_RECT_TYPE)) {
+	if (!universe.hasComponent(entities[0], GUI_RECT_TYPE) || universe.hasComponent(entities[0], GUI_CANVAS_TYPE)) {
 		DVec3 pos = universe.getPosition(entities[0]);
 		DVec3 old_pos = pos;
 		ImGuiEx::Label("Position");

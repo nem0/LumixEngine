@@ -100,12 +100,6 @@ struct GUIButton
 };
 
 
-struct GUICanvas {
-	EntityRef entity;
-	bool is_3d = false;
-};
-
-
 struct GUIInputField
 {
 	int cursor = 0;
@@ -160,6 +154,10 @@ struct GUIRect
 
 struct GUISceneImpl final : GUIScene
 {
+	enum class Version : i32 {
+		CANVAS_3D,
+		LATEST
+	};
 	GUISceneImpl(GUISystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_universe(context)
@@ -168,6 +166,7 @@ struct GUISceneImpl final : GUIScene
 		, m_buttons(allocator)
 		, m_canvas(allocator)
 		, m_rect_hovered(allocator)
+		, m_draw_2d(allocator)
 		, m_rect_hovered_out(allocator)
 		, m_rect_mouse_down(allocator)
 		, m_unhandled_mouse_button(allocator)
@@ -206,6 +205,8 @@ struct GUISceneImpl final : GUIScene
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 	
+	i32 getVersion() const { return (i32)Version::LATEST; }
+
 	void renderTextCursor(GUIRect& rect, Draw2D& draw, const Vec2& pos)
 	{
 		if (!rect.input_field) return;
@@ -222,8 +223,7 @@ struct GUISceneImpl final : GUIScene
 			, 1);
 	}
 
-
-	void renderRect(GUIRect& rect, Pipeline& pipeline, const Rect& parent_rect, bool is_main)
+	void renderRect(GUIRect& rect, Draw2D& draw, const Rect& parent_rect, bool is_main)
 	{
 		if (!rect.flags.isSet(GUIRect::IS_VALID)) return;
 		if (!rect.flags.isSet(GUIRect::IS_ENABLED)) return;
@@ -233,7 +233,6 @@ struct GUISceneImpl final : GUIScene
 		float t = parent_rect.y + rect.top.points + parent_rect.h * rect.top.relative;
 		float b = parent_rect.y + rect.bottom.points + parent_rect.h * rect.bottom.relative;
 			 
-		Draw2D& draw = pipeline.getDraw2D();
 		if (rect.flags.isSet(GUIRect::IS_CLIP)) draw.pushClipRect({ l, t }, { r, b });
 
 		auto button_iter = m_buttons.find(rect.entity);
@@ -340,7 +339,7 @@ struct GUISceneImpl final : GUIScene
 			auto iter = m_rects.find((EntityRef)child);
 			if (iter.isValid())
 			{
-				renderRect(*iter.value(), pipeline, { l, t, r - l, b - t }, is_main);
+				renderRect(*iter.value(), draw, { l, t, r - l, b - t }, is_main);
 			}
 			child = m_universe.getNextSibling((EntityRef)child);
 		}
@@ -349,6 +348,23 @@ struct GUISceneImpl final : GUIScene
 
 	IVec2 getCursorPosition() override { return m_cursor_pos; }
 
+	void draw3D(GUICanvas& canvas, Pipeline& pipeline) {
+		m_draw_2d.clear({2, 2});
+
+		EntityPtr child = m_universe.getFirstChild(canvas.entity);
+		while (child.isValid())
+		{
+			auto iter = m_rects.find((EntityRef)child);
+			if (iter.isValid())
+			{
+				renderRect(*iter.value(), m_draw_2d, { 0, 0, canvas.virtual_size.x, canvas.virtual_size.y }, false);
+			}
+			child = m_universe.getNextSibling((EntityRef)child);
+		}
+
+		pipeline.render3DUI(canvas.entity, m_draw_2d, canvas.virtual_size, canvas.orient_to_camera);
+	}
+
 	void render(Pipeline& pipeline, const Vec2& canvas_size, bool is_main) override {
 		m_canvas_size = canvas_size;
 		if (is_main) {
@@ -356,10 +372,15 @@ struct GUISceneImpl final : GUIScene
 			m_cursor_set = false;
 		}
 		for (GUICanvas& canvas : m_canvas) {
-			auto iter = m_rects.find(canvas.entity);
-			if (iter.isValid()) {
-				GUIRect* r = iter.value();
-				renderRect(*r, pipeline, {0, 0, canvas_size.x, canvas_size.y}, is_main);
+			if (canvas.is_3d) {
+				draw3D(canvas, pipeline);
+			}
+			else {
+				auto iter = m_rects.find(canvas.entity);
+				if (iter.isValid()) {
+					GUIRect* r = iter.value();
+					renderRect(*r, pipeline.getDraw2D(), {0, 0, canvas_size.x, canvas_size.y}, is_main);
+				}
 			}
 		}
 	}
@@ -422,6 +443,9 @@ struct GUISceneImpl final : GUIScene
 		return image->sprite ? image->sprite->getPath() : Path();
 	}
 
+	GUICanvas& getCanvas(EntityRef entity) override {
+		return m_canvas[entity];
+	}
 
 	void setImageSprite(EntityRef entity, const Path& path) override
 	{
@@ -1150,6 +1174,8 @@ struct GUISceneImpl final : GUIScene
 		for (GUICanvas& c : m_canvas) {
 			serializer.write(c.entity);
 			serializer.write(c.is_3d);
+			serializer.write(c.orient_to_camera);
+			serializer.write(c.virtual_size);
 		}
 	}
 
@@ -1242,6 +1268,11 @@ struct GUISceneImpl final : GUIScene
 			GUICanvas canvas;
 			serializer.read(canvas.entity);
 			serializer.read(canvas.is_3d);
+			if (version > (i32)Version::CANVAS_3D) {
+				serializer.read(canvas.orient_to_camera);
+				serializer.read(canvas.virtual_size);
+			}
+
 			canvas.entity = entity_map.get(canvas.entity);
 			m_canvas.insert(canvas.entity, canvas);
 			
@@ -1286,6 +1317,7 @@ struct GUISceneImpl final : GUIScene
 	DelegateList<void(EntityRef)> m_rect_hovered_out;
 	DelegateList<void(EntityRef, float, float)> m_rect_mouse_down;
 	DelegateList<void(bool, i32, i32)> m_unhandled_mouse_button;
+	Draw2D m_draw_2d;
 };
 
 

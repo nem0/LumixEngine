@@ -1,10 +1,12 @@
+include "pipelines/common.glsl"
+
 vertex_shader [[
 	layout(location = 0) in vec2 a_position;
 	layout(location = 1) in vec2 a_uv;
 	layout(location = 2) in vec4 a_color;
 	
 	layout(std140, binding = 4) uniform Bones {
-		vec2 u_canvas_size;
+		mat4 u_matrix;
 	};
 
 	layout(location = 0) out vec4 v_color;
@@ -12,10 +14,9 @@ vertex_shader [[
 	
 	void main() {
 		v_color = a_color;
-		vec2 pos = a_position / u_canvas_size * 2 - 1;
-		pos.y = - pos.y;
+		vec4 pos = u_matrix * vec4(a_position, 0, 1);
 		v_uv = a_uv;
-		gl_Position = vec4(pos, 0, 1);
+		gl_Position = vec4(pos);
 	}
 ]]
 

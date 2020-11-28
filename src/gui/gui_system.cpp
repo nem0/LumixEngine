@@ -125,7 +125,11 @@ struct GUISystemImpl final : GUISystem
 				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA), ColorAttribute())
 			),
 			component("gui_input_field"),
-			component("gui_canvas"),
+			component("gui_canvas",
+				var_property("Is 3D", &GUIScene::getCanvas, &GUICanvas::is_3d),
+				var_property("Orient to camera", &GUIScene::getCanvas, &GUICanvas::orient_to_camera),
+				var_property("Virtual size", &GUIScene::getCanvas, &GUICanvas::virtual_size)
+			),
 			component("gui_button",
 				property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA), ColorAttribute()),
 				enum_property("Cursor", LUMIX_PROP(GUIScene, ButtonHoveredCursor), CursorEnum())

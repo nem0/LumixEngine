@@ -71,6 +71,7 @@ struct LUMIX_RENDERER_API Pipeline
 	virtual ~Pipeline() {}
 
 	virtual bool render(bool only_2d) = 0;
+	virtual void render3DUI(EntityRef e, const struct Draw2D& drawdata, Vec2 canvas_size, bool orient_to_cam) = 0;
 	virtual void setUniverse(struct Universe* universe) = 0;
 	virtual RenderScene* getScene() const = 0;
 	virtual CustomCommandHandler& addCustomCommandHandler(const char* name) = 0;
