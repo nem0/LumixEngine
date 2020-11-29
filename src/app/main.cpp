@@ -149,6 +149,7 @@ struct Runner final
 			OS::sleep(10);
 			m_engine->getFileSystem().processCallbacks();
 		}
+		m_engine->getFileSystem().processCallbacks();
 
 		OS::showCursor(false);
 		onResize();
