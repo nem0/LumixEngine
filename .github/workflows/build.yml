@@ -28,7 +28,7 @@ jobs:
             - name: fetch network plugin
               working-directory: plugins
               run: |
-                git.exe clone https://github.com/nem0/lumixengine_network.git net
+                git.exe clone https://github.com/nem0/lumixengine_net.git net
             - name: make project
               working-directory: projects
               run: |
