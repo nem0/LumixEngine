@@ -55,8 +55,9 @@ goto :begin
 	echo  4. GLTF importer
 	echo  5. DX11 and DX12
 	echo  6. Rml UI
+	echo  7. Network
 	echo ===============================
-	choice /C 123456 /N /M "Your choice:"
+	choice /C 1234567 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :map_plugin
@@ -64,6 +65,7 @@ goto :begin
 	if %errorlevel%==4 call :glft_import_plugin
 	if %errorlevel%==5 call :dx_plugin
 	if %errorlevel%==6 call :rml_ui_plugin
+	if %errorlevel%==7 call :network_plugin
 	pause
 goto :plugins
 
@@ -105,6 +107,18 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumixengine_rml.git rml
 	) else (
 		cd rml
+		git pull
+	)
+	popd
+exit /B 0
+
+:network_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist net (
+		git.exe clone https://github.com/nem0/lumixengine_net.git net
+	) else (
+		cd net
 		git pull
 	)
 	popd
