@@ -541,6 +541,13 @@ static int LUA_loadResource(Engine* engine, const char* path, const char* type)
 }
 
 
+static const char* LUA_getResourcePath(Engine* engine, i32 resource_handle)
+{
+	Resource* res = engine->getLuaResource(resource_handle);
+	return res->getPath().c_str();
+}
+
+
 static void LUA_setEntityLocalRotation(Universe* universe, EntityRef entity, const Quat& rotation)
 {
 	if (!universe->getParent(entity).isValid()) return;
@@ -774,6 +781,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	//REGISTER_FUNCTION(getSceneUniverse);
 	//REGISTER_FUNCTION(hasFilesystemWork);
 	REGISTER_FUNCTION(loadResource);
+	REGISTER_FUNCTION(getResourcePath);
 	REGISTER_FUNCTION(logError);
 	//REGISTER_FUNCTION(logInfo);
 	//REGISTER_FUNCTION(multMatrixVec);
