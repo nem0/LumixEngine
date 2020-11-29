@@ -22,13 +22,6 @@ static const ComponentType AMBIENT_SOUND_TYPE = Reflection::getComponentType("am
 static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
 static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
 
-
-enum class AudioSceneVersion : int
-{
-	LAST
-};
-
-
 struct Listener
 {
 	EntityPtr entity;
@@ -38,7 +31,7 @@ struct Listener
 struct AmbientSound
 {
 	EntityRef entity;
-	AudioScene::ClipInfo* clip;
+	Clip* clip = nullptr;
 	bool is_3d;
 	int playing_sound;
 };
@@ -48,17 +41,22 @@ struct PlayingSound
 {
 	AudioDevice::BufferHandle buffer_id;
 	EntityPtr entity;
-	AudioScene::ClipInfo* clip;
+	Clip* clip = nullptr;
 	bool is_3d;
 };
 
 
 struct AudioSceneImpl final : AudioScene
 {
+	enum class Version : i32 {
+		INIT,
+		CLIPS_REWORKED,
+		LATEST
+	};
+
 	AudioSceneImpl(AudioSystem& system, Universe& context, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_universe(context)
-		, m_clips(allocator)
 		, m_system(system)
 		, m_device(system.getDevice())
 		, m_ambient_sounds(allocator)
@@ -90,34 +88,20 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 
-	int getVersion() const override { return (int)AudioSceneVersion::LAST; }
+	i32 getVersion() const override { return (i32)Version::LATEST; }
 
 
 	void clear() override
 	{
-		for (auto* clip : m_clips)
-		{
-			clip->clip->decRefCount();
-			LUMIX_DELETE(m_allocator, clip);
-		}
-		m_clips.clear();
 		m_ambient_sounds.clear();
 		m_echo_zones.clear();
 		m_chorus_zones.clear();
 	}
 
 
-	int playSound(EntityRef entity, const char* clip_name, bool is_3d) override
-	{
-		auto* clip = getClipInfo(clip_name);
-		if (clip) return play(entity, clip, is_3d);
-
-		return -1;
-	}
-
 	void updateAnimationEvents()
 	{
-		if (!m_animation_scene) return;
+		/*if (!m_animation_scene) return;
 		
 		InputMemoryStream blob(m_animation_scene->getEventStream());
 		u32 sound_type = crc32("sound");
@@ -143,7 +127,7 @@ struct AudioSceneImpl final : AudioScene
 			{
 				blob.skip(size);
 			}
-		}
+		}*/
 	}
 
 	void update(float time_delta, bool paused) override
@@ -170,8 +154,8 @@ struct AudioSceneImpl final : AudioScene
 				m_device.setSourcePosition(sound.buffer_id, pos);
 			}
 
-			auto* clip_info = sound.clip;
-			if (!clip_info->looped && m_device.isEnd(sound.buffer_id))
+			Clip* clip_info = sound.clip;
+			if (!clip_info->m_looped && m_device.isEnd(sound.buffer_id))
 			{
 				m_device.stop(sound.buffer_id);
 				sound.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
@@ -231,37 +215,20 @@ struct AudioSceneImpl final : AudioScene
 	}
 
 
-	ClipInfo* getAmbientSoundClip(EntityRef entity) override
+	Path getAmbientSoundClip(EntityRef entity) override
 	{
-		return m_ambient_sounds[entity].clip;
+		AmbientSound& snd = m_ambient_sounds[entity];
+		return snd.clip ? snd.clip->getPath() : Path();
 	}
 
 
-	int getClipInfoIndex(ClipInfo* info) override
+	void setAmbientSoundClip(EntityRef entity, const Path& clip) override
 	{
-		for (int i = 0; i < m_clips.size(); ++i)
-		{
-			if (m_clips[i] == info) return i;
+		Clip* res = m_system.getEngine().getResourceManager().load<Clip>(clip);
+		if (m_ambient_sounds[entity].clip) {
+			m_ambient_sounds[entity].clip->decRefCount();
 		}
-		return -1;
-	}
-
-
-	int getAmbientSoundClipIndex(EntityRef entity) override
-	{
-		return m_clips.indexOf(m_ambient_sounds[entity].clip);
-	}
-
-
-	void setAmbientSoundClipIndex(EntityRef entity, int index) override
-	{
-		m_ambient_sounds[entity].clip = m_clips[index];
-	}
-
-
-	void setAmbientSoundClip(EntityRef entity, ClipInfo* clip) override
-	{
-		m_ambient_sounds[entity].clip = clip;
+		m_ambient_sounds[entity].clip = res;
 	}
 
 
@@ -345,22 +312,11 @@ struct AudioSceneImpl final : AudioScene
 	void serialize(OutputMemoryStream& serializer) override
 	{
 		serializer.write(m_listener.entity);
-		serializer.write(m_clips.size());
-		for (auto* clip : m_clips)
-		{
-			serializer.write(clip != nullptr);
-			if (!clip) continue;
-
-			serializer.write(clip->volume);
-			serializer.write(clip->looped);
-			serializer.writeString(clip->name);
-			serializer.writeString(clip->clip->getPath().c_str());
-		}
 
 		serializer.write(m_ambient_sounds.size());
 		for (const AmbientSound& sound : m_ambient_sounds)
 		{
-			serializer.write(m_clips.indexOf(sound.clip));
+			serializer.writeString(sound.clip ? sound.clip->getPath().c_str() : "");
 			serializer.write(sound.entity);
 			serializer.write(sound.is_3d);
 		}
@@ -387,36 +343,20 @@ struct AudioSceneImpl final : AudioScene
 			m_universe.onComponentCreated((EntityRef)m_listener.entity, LISTENER_TYPE, this);
 		}
 
-		int count = 0;
-		serializer.read(count);
-		const u32 clip_offset = m_clips.size();
-		m_clips.reserve(m_clips.size() + count);
-		for (int i = 0; i < count; ++i) {
-			bool is_valid;
-			serializer.read(is_valid);
-			if (!is_valid) {
-				m_clips.emplace() = nullptr;
-				continue;
-			}
-
-			auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
-			m_clips.emplace() = clip;
-			clip->volume = 1;
-			serializer.read(clip->volume);
-			serializer.read(clip->looped);
-			copyString(clip->name, serializer.readString());
-			clip->name_hash = crc32(clip->name);
-			const char* path = serializer.readString();
-
-			clip->clip = m_system.getEngine().getResourceManager().load<Clip>(Path(path));
+		if (version < (i32)Version::CLIPS_REWORKED) {
+			int dummy;
+			serializer.read(dummy);
+			ASSERT(dummy == 0);
 		}
 
+		i32 count;
 		serializer.read(count);
 		for (int i = 0; i < count; ++i) {
 			AmbientSound sound;
-			int clip_idx;
-			serializer.read(clip_idx);
-			if (clip_idx >= 0) sound.clip = m_clips[clip_idx + clip_offset];
+			ASSERT(version >= (i32)Version::CLIPS_REWORKED);
+			const char* path = serializer.readString();
+			Clip* res = path[0] ? m_system.getEngine().getResourceManager().load<Clip>(Path(path)) : nullptr;
+			sound.clip = res;
 			serializer.read(sound.entity);
 			sound.entity = entity_map.get(sound.entity);
 			serializer.read(sound.is_3d);
@@ -447,112 +387,22 @@ struct AudioSceneImpl final : AudioScene
 		}
 	}
 
-
-	u32 getClipCount() const override { return m_clips.size(); }
-
-
-	const char* getClipName(u32 index) override { return m_clips[index]->name; }
-
-
-	void addClip(const char* name, const Path& path) override
-	{
-		auto* clip = LUMIX_NEW(m_allocator, ClipInfo);
-		copyString(clip->name, name);
-		clip->name_hash = crc32(name);
-		clip->clip = m_system.getEngine().getResourceManager().load<Clip>(path);
-		clip->looped = false;
-		clip->volume = 1;
-		m_clips.push(clip);
+	SoundHandle play(EntityRef entity, const Path& clip, bool is_3d) override {
+		Clip* res = m_system.getEngine().getResourceManager().load<Clip>(clip);
+		return play(entity, res, is_3d);
 	}
-
-
-	void removeClip(ClipInfo* info) override
-	{
-		for (PlayingSound& i : m_playing_sounds)
-		{
-			if (i.clip == info && i.buffer_id != AudioDevice::INVALID_BUFFER_HANDLE)
-			{
-				m_device.stop(i.buffer_id);
-				i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
-			}
-		}
-
-		for (AmbientSound& sound : m_ambient_sounds)
-		{
-			if (sound.clip == info)
-			{
-				sound.clip = nullptr;
-				sound.playing_sound = -1;
-			}
-		}
-
-		Clip* clip = info->clip;
-		if (clip)
-		{
-			clip->decRefCount();
-		}
-		LUMIX_DELETE(m_allocator, info);
-		m_clips.eraseItem(info);
-	}
-
-
-	ClipInfo* getClipInfo(const char* name) override
-	{
-		auto hash = crc32(name);
-		for (auto* i : m_clips)
-		{
-			if (i->name_hash == hash) return i;
-		}
-
-		return nullptr;
-	}
-
-
-	ClipInfo* getClipInfo(u32 hash) override
-	{
-		for (auto* i : m_clips)
-		{
-			if (i->name_hash == hash) return i;
-		}
-
-		return nullptr;
-	}
-
-
-	ClipInfo* getClipInfoByIndex(u32 index) override
-	{
-		if (index >= (u32)m_clips.size()) return nullptr;
-		return m_clips[index];
-	}
-
-
-	void setClip(u32 clip_id, const Path& path) override
-	{
-		auto* clip = m_clips[clip_id]->clip;
-		if (clip)
-		{
-			clip->decRefCount();
-		}
-		auto* new_res = m_system.getEngine().getResourceManager().load<Clip>(path);
-		m_clips[clip_id]->clip = static_cast<Clip*>(new_res);
-	}
-
-
-	SoundHandle play(EntityRef entity, ClipInfo* clip_info, bool is_3d) override
-	{
-		for (PlayingSound& sound : m_playing_sounds)
-		{
-			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE)
-			{
-				auto* clip = clip_info->clip;
+	
+	SoundHandle play(EntityRef entity, Clip* clip, bool is_3d) {
+		for (PlayingSound& sound : m_playing_sounds) {
+			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) {
 				if (!clip->isReady()) return INVALID_SOUND_HANDLE;
 
 				int flags = is_3d ? (int)AudioDevice::BufferFlags::IS3D : 0;
-				auto buffer = m_device.createBuffer(
-					clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), flags);
+				auto buffer = m_device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), flags);
 				if (buffer == AudioDevice::INVALID_BUFFER_HANDLE) return INVALID_SOUND_HANDLE;
-				m_device.play(buffer, clip_info->looped);
-				m_device.setVolume(buffer, clip_info->volume);
+
+				m_device.play(buffer, clip->m_looped);
+				m_device.setVolume(buffer, clip->m_volume);
 
 				const DVec3 pos = m_universe.getPosition(entity);
 				m_device.setSourcePosition(buffer, pos);
@@ -560,10 +410,10 @@ struct AudioSceneImpl final : AudioScene
 				sound.is_3d = is_3d;
 				sound.buffer_id = buffer;
 				sound.entity = entity;
-				sound.clip = clip_info;
+				clip->incRefCount();
+				sound.clip = clip;
 
-				for (const EchoZone& zone : m_echo_zones)
-				{
+				for (const EchoZone& zone : m_echo_zones) {
 					const double dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
 					const double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
@@ -573,8 +423,7 @@ struct AudioSceneImpl final : AudioScene
 					break;
 				}
 
-				for (const ChorusZone& zone : m_chorus_zones)
-				{
+				for (const ChorusZone& zone : m_chorus_zones) {
 					const double dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
 					double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
@@ -596,6 +445,10 @@ struct AudioSceneImpl final : AudioScene
 		ASSERT(sound_id >= 0 && sound_id < (int)lengthOf(m_playing_sounds));
 		m_device.stop(m_playing_sounds[sound_id].buffer_id);
 		m_playing_sounds[sound_id].buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
+		if (m_playing_sounds[sound_id].clip) {
+			m_playing_sounds[sound_id].clip->decRefCount();
+			m_playing_sounds[sound_id].clip = nullptr;
+		}
 	}
 
 
@@ -626,7 +479,6 @@ struct AudioSceneImpl final : AudioScene
 	Listener m_listener;
 	IAllocator& m_allocator;
 	Universe& m_universe;
-	Array<ClipInfo*> m_clips;
 	AudioSystem& m_system;
 	PlayingSound m_playing_sounds[AudioDevice::MAX_PLAYING_SOUNDS];
 	AnimationScene* m_animation_scene = nullptr;

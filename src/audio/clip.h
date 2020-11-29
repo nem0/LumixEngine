@@ -13,6 +13,10 @@ namespace Lumix
 struct Clip final : Resource
 {
 public:
+	enum class Format : u8 {
+		OGG
+	};
+
 	Clip(const Path& path, ResourceManager& manager, IAllocator& allocator)
 		: Resource(path, manager, allocator)
 		, m_data(allocator)
@@ -30,6 +34,8 @@ public:
 	float getLengthSeconds() const { return m_data.size() / float(m_channels * m_sample_rate); }
 
 	static const ResourceType TYPE;
+	bool m_looped = false;
+	float m_volume = 1;
 
 private:
 	int m_channels;

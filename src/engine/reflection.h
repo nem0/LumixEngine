@@ -660,12 +660,14 @@ inline Variant::Type _getVariantType(VariantTag<EntityPtr>) { return Variant::EN
 inline Variant::Type _getVariantType(VariantTag<EntityRef>) { return Variant::ENTITY; }
 inline Variant::Type _getVariantType(VariantTag<Vec2>) { return Variant::VEC2; }
 inline Variant::Type _getVariantType(VariantTag<Vec3>) { return Variant::VEC3; }
+inline Variant::Type _getVariantType(VariantTag<Path>) { return Variant::CSTR; }
 inline Variant::Type _getVariantType(VariantTag<DVec3>) { return Variant::DVEC3; }
 template <typename T> inline Variant::Type getVariantType() { return _getVariantType(VariantTag<RemoveCVR<T>>{}); }
 
 inline bool fromVariant(int i, Span<Variant> args, VariantTag<bool>) { return args[i].b; }
 inline float fromVariant(int i, Span<Variant> args, VariantTag<float>) { return args[i].f; }
 inline const char* fromVariant(int i, Span<Variant> args, VariantTag<const char*>) { return args[i].s; }
+inline Path fromVariant(int i, Span<Variant> args, VariantTag<Path>) { return Path(args[i].s); }
 inline i32 fromVariant(int i, Span<Variant> args, VariantTag<i32>) { return args[i].i; }
 inline u32 fromVariant(int i, Span<Variant> args, VariantTag<u32>) { return args[i].u; }
 inline Vec2 fromVariant(int i, Span<Variant> args, VariantTag<Vec2>) { return args[i].v2; }

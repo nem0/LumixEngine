@@ -11,6 +11,7 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
 #include "engine/universe.h"
 
@@ -22,7 +23,7 @@ namespace
 {
 
 
-struct AssetBrowserPlugin final : AssetBrowser::IPlugin
+struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	explicit AssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
@@ -32,6 +33,36 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 		app.getAssetCompiler().registerExtension("ogg", Clip::TYPE);
 	}
 
+	struct Meta {
+		bool looped = true;
+		float volume = 1.f;
+	};
+
+	Meta getMeta(const Path& path) const {
+		Meta meta;
+		m_app.getAssetCompiler().getMeta(path, [&path, &meta](lua_State* L){
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "looped", &meta.looped);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "volume", &meta.volume);
+		});
+		return meta;
+	}
+
+	bool compile(const Path& src) override {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		OutputMemoryStream src_data(m_app.getAllocator());
+		if (!fs.getContentSync(src, Ref(src_data))) return false;
+		
+		Meta meta = getMeta(src);
+
+		OutputMemoryStream compiled(m_app.getAllocator());
+		compiled.reserve(64 + src_data.size());
+		compiled.write((u32)0);
+		compiled.write(Clip::Format::OGG);
+		compiled.write(meta.looped);
+		compiled.write(meta.volume);
+		compiled.write(src_data.data(), src_data.size());
+		return m_app.getAssetCompiler().writeCompiledResource(src.c_str(), Span(compiled.data(), (i32)compiled.size()));
+	}
 
 	static AudioDevice& getAudioDevice(Engine& engine)
 	{
@@ -56,6 +87,16 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 	{
 		if(resources.length() > 1) return;
 
+		if(resources[0]->getPath().getHash() != m_meta_res) {
+			m_meta = getMeta(resources[0]->getPath());
+			m_meta_res = resources[0]->getPath().getHash();
+		}
+
+		ImGuiEx::Label("Looped");
+		ImGui::Checkbox("##loop", &m_meta.looped);
+		ImGuiEx::Label("Volume");
+		ImGui::DragFloat("##vol", &m_meta.volume, 0.01f, 0, FLT_MAX);
+
 		auto* clip = static_cast<Clip*>(resources[0]);
 		ImGuiEx::Label("Length");
 		ImGui::Text("%f", clip->getLengthSeconds());
@@ -63,7 +104,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 
 		if (m_playing_clip >= 0)
 		{
-			if (ImGui::Button("Stop"))
+			if (ImGui::Button(ICON_FA_STOP "Stop"))
 			{
 				stopAudio();
 				return;
@@ -76,7 +117,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 			}
 		}
 
-		if (m_playing_clip < 0 && ImGui::Button("Play"))
+		if (m_playing_clip < 0 && ImGui::Button(ICON_FA_PLAY "Play"))
 		{
 			stopAudio();
 
@@ -85,6 +126,19 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 			device.play(handle, true);
 			m_playing_clip = handle;
 		}
+
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_CHECK "Apply")) {
+			const StaticString<512> src("volume = ", m_meta.volume
+				, "\nlooped = ", m_meta.looped ? "true" : "false"
+			);
+			AssetCompiler& compiler = m_app.getAssetCompiler();
+			compiler.updateMeta(resources[0]->getPath(), src);
+			if (compiler.compile(resources[0]->getPath())) {
+				resources[0]->getResourceManager().reload(*resources[0]);
+			}
+		}
+
 	}
 
 
@@ -105,119 +159,8 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin
 	int m_playing_clip;
 	StudioApp& m_app;
 	AssetBrowser& m_browser;
-};
-
-
-struct ClipManagerUI final : StudioApp::GUIPlugin
-{
-	explicit ClipManagerUI(StudioApp& app)
-		: m_app(app)
-	{
-		m_filter[0] = 0;
-		m_is_open = false;
-		m_toggle_ui.init("Clip manager", "Toggle clip manager", "clip_manager", "", true);
-		m_toggle_ui.func.bind<&ClipManagerUI::onAction>(this);
-		m_toggle_ui.is_selected.bind<&ClipManagerUI::isOpen>(this);
-		app.addWindowAction(&m_toggle_ui);
-	}
-
-	~ClipManagerUI() {
-		m_app.removeAction(&m_toggle_ui);
-	}
-
-	// TODO
-	/*
-	void pluginAdded(GUIPlugin& plugin) override
-	{
-		if (!equalStrings(plugin.getName(), "animation_editor")) return;
-
-		auto& anim_editor = (AnimEditor::IAnimationEditor&)plugin;
-		auto& event_type = anim_editor.createEventType("sound");
-		event_type.size = sizeof(SoundAnimationEvent);
-		event_type.label = "Sound";
-		event_type.editor.bind<ClipManagerUI, &ClipManagerUI::onSoundEventGUI>(this);
-	}
-
-
-	void onSoundEventGUI(u8* data, AnimEditor::Component& component) const
-	{
-		auto* ev = (SoundAnimationEvent*)data;
-		AudioScene* scene = (AudioScene*)m_app.getWorldEditor().getUniverse()->getScene(crc32("audio"));
-		auto getter = [](void* data, int idx, const char** out) -> bool {
-			auto* scene = (AudioScene*)data;
-			*out = scene->getClipName(idx);
-			return true;
-		};
-		AudioScene::ClipInfo* clip = scene->getClipInfo(ev->clip);
-		int current = clip ? scene->getClipInfoIndex(clip) : -1;
-
-		if (ImGui::Combo("Clip", &current, getter, scene, scene->getClipCount()))
-		{
-			ev->clip = scene->getClipInfo(current)->name_hash;
-		}
-	}
-	*/
-
-	const char* getName() const override { return "audio"; }
-
-
-	bool isOpen() const { return m_is_open; }
-	void onAction() { m_is_open = !m_is_open; }
-
-
-	void onWindowGUI() override
-	{
-		if (!m_is_open) return; 
-
-		if (ImGui::Begin("Clip Manager", &m_is_open)) {
-			ImGui::SetNextItemWidth(-1);
-			ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
-
-			Universe* universe = m_app.getWorldEditor().getUniverse();
-			auto* audio_scene = static_cast<AudioScene*>(universe->getScene(crc32("audio")));
-			u32 clip_count = audio_scene->getClipCount();
-			for (u32 clip_id = 0; clip_id < clip_count; ++clip_id) {
-				AudioScene::ClipInfo* clip_info = audio_scene->getClipInfoByIndex(clip_id);
-				if (!clip_info) continue;
-
-				if (m_filter[0] != 0 && stristr(clip_info->name, m_filter) == nullptr) {
-					continue;
-				}
-
-				if (ImGui::TreeNode((const void*)(uintptr)clip_id, "%s", clip_info->name)) {
-					if (ImGui::InputText("Name", clip_info->name, sizeof(clip_info->name))) {
-						clip_info->name_hash = crc32(clip_info->name);
-					}
-					char path[MAX_PATH_LENGTH];
-					copyString(path, clip_info->clip ? clip_info->clip->getPath().c_str() : "");
-					ImGuiEx::Label("Clip");
-					if (m_app.getAssetBrowser().resourceInput("clip", Span(path), Clip::TYPE)) {
-						audio_scene->setClip(clip_id, Path(path));
-					}
-					ImGuiEx::Label("Volume");
-					ImGui::InputFloat("##volume", &clip_info->volume);
-					ImGuiEx::Label("Looped");
-					ImGui::Checkbox("##looped", &clip_info->looped);
-					if (ImGui::Button("Remove")) {
-						audio_scene->removeClip(clip_info);
-						--clip_count;
-					}
-					ImGui::TreePop();
-				}
-			}
-
-			if (ImGui::Button("Add")) {
-				audio_scene->addClip("test", Path("test.ogg"));
-			}
-		}
-		ImGui::End();
-	}
-
-
-	StudioApp& m_app;
-	char m_filter[256];
-	bool m_is_open;
-	Action m_toggle_ui;
+	Meta m_meta;
+	u32 m_meta_res = 0;
 };
 
 
@@ -226,7 +169,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	explicit StudioAppPlugin(StudioApp& app)
 		: m_app(app)
 		, m_asset_browser_plugin(app)
-		, m_clip_manager_ui(app)
 	{}
 
 	const char* getName() const override { return "audio"; }
@@ -241,8 +183,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		IAllocator& allocator = m_app.getAllocator();
 
 		m_app.getAssetBrowser().addPlugin(m_asset_browser_plugin);
-
-		m_app.addPlugin(m_clip_manager_ui);
+		const char* extensions[] = { "ogg", nullptr };
+		m_app.getAssetCompiler().addPlugin(m_asset_browser_plugin, extensions);
 	}
 
 
@@ -280,13 +222,12 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	~StudioAppPlugin()
 	{
 		m_app.getAssetBrowser().removePlugin(m_asset_browser_plugin);
-		m_app.removePlugin(m_clip_manager_ui);
+		m_app.getAssetCompiler().removePlugin(m_asset_browser_plugin);
 	}
 
 
 	StudioApp& m_app;
 	AssetBrowserPlugin m_asset_browser_plugin;
-	ClipManagerUI m_clip_manager_ui;
 };
 
 
