@@ -121,10 +121,11 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		{
 			stopAudio();
 
-			auto handle =
-				device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
-			device.play(handle, true);
-			m_playing_clip = handle;
+			AudioDevice::BufferHandle handle = device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), 0);
+			if (handle != AudioDevice::INVALID_BUFFER_HANDLE) {
+				device.play(handle, true);
+				m_playing_clip = handle;
+			}
 		}
 
 		ImGui::SameLine();
