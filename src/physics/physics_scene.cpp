@@ -4111,14 +4111,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 		const void* constantBlock,
 		PxU32 constantBlockSize)
 	{
-		if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
-		{
+		if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1)) {
 			pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
 			return PxFilterFlag::eDEFAULT;
 		}
 
-		if (!(filterData0.word0 & filterData1.word1) || !(filterData1.word0 & filterData0.word1))
-		{
+		if (!(filterData0.word0 & filterData1.word1) || !(filterData1.word0 & filterData0.word1)) {
 			return PxFilterFlag::eKILL;
 		}
 		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_TOUCH_FOUND | PxPairFlag::eNOTIFY_CONTACT_POINTS;
