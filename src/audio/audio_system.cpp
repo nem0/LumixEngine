@@ -12,25 +12,23 @@
 namespace Lumix
 {
 
+namespace Reflection {
+	//inline AudioScene::SoundHandle fromVariant(int i, Span<Variant> args, VariantTag<AudioScene::SoundHandle>) { return args[i].i; }
+}
 
 static void registerProperties(IAllocator& allocator)
 {
-	struct ClipIndexEnum : Reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return ((AudioScene*)cmp.scene)->getClipCount(); }
-		const char* name(ComponentUID cmp, u32 idx) const override { return ((AudioScene*)cmp.scene)->getClipName(idx); }
-	};
-
 	using namespace Reflection;
 	static auto audio_scene = scene("audio",
 		functions(
 			LUMIX_FUNC(AudioScene::setMasterVolume),
-			LUMIX_FUNC(AudioScene::playSound),
+			LUMIX_FUNC(AudioScene::play),
 			LUMIX_FUNC(AudioScene::setVolume),
 			LUMIX_FUNC(AudioScene::setEcho)
 		),
 		component("ambient_sound",
 			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
-			property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClipIndex), ClipIndexEnum())
+			property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClip), ResourceAttribute("OGG (*.ogg)", Clip::TYPE))
 		),
 		component("audio_listener"),
 		component("echo_zone",
