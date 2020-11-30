@@ -5,6 +5,7 @@
 #include "engine/math.h"
 #include "engine/reflection.h"
 #include "engine/universe.h"
+#include "navigation/navigation_scene.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include <DetourAlloc.h>
@@ -42,8 +43,7 @@ struct Agent
 };
 
 
-struct NavigationSystem final : IPlugin
-{
+struct NavigationSystem final : IPlugin {
 	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)
 		, m_allocator(engine.getAllocator())
@@ -52,52 +52,28 @@ struct NavigationSystem final : IPlugin
 		s_instance = this;
 		dtAllocSetCustom(&detourAlloc, &detourFree);
 		rcAllocSetCustom(&recastAlloc, &recastFree);
-		registerProperties();
+		NavigationScene::reflect();
 		// register flags
 		Material::getCustomFlag("no_navigation");
 		Material::getCustomFlag("nonwalkable");
 	}
 
 
-	~NavigationSystem()
-	{
-		s_instance = nullptr;
-	}
+	~NavigationSystem() { s_instance = nullptr; }
 
 	u32 getVersion() const override { return 0; }
 	void serialize(OutputMemoryStream& stream) const override {}
 	bool deserialize(u32 version, InputMemoryStream& stream) override { return version == 0; }
 
-	static void detourFree(void* ptr)
-	{
-		s_instance->m_allocator.deallocate(ptr);
-	}
+	static void detourFree(void* ptr) { s_instance->m_allocator.deallocate(ptr); }
+	static void* detourAlloc(size_t size, dtAllocHint hint) { return s_instance->m_allocator.allocate(size); }
+	static void recastFree(void* ptr) { s_instance->m_allocator.deallocate(ptr); }
+	static void* recastAlloc(size_t size, rcAllocHint hint) { return s_instance->m_allocator.allocate(size); }
 
-
-	static void* detourAlloc(size_t size, dtAllocHint hint)
-	{
-		return s_instance->m_allocator.allocate(size);
-	}
-
-
-	static void recastFree(void* ptr)
-	{
-		s_instance->m_allocator.deallocate(ptr);
-	}
-
-
-	static void* recastAlloc(size_t size, rcAllocHint hint)
-	{
-		return s_instance->m_allocator.allocate(size);
-	}
-
-
-	static NavigationSystem* s_instance;
-
-
-	void registerProperties();
 	const char* getName() const override { return "navigation"; }
 	void createScenes(Universe& universe) override;
+
+	static NavigationSystem* s_instance;
 
 	IAllocator& m_allocator;
 	Engine& m_engine;
@@ -105,45 +81,6 @@ struct NavigationSystem final : IPlugin
 
 
 NavigationSystem* NavigationSystem::s_instance = nullptr;
-
-
-void NavigationSystem::registerProperties()
-{
-	using namespace Reflection;
-	static auto navigation_scene = scene("navigation",
-		functions(
-			LUMIX_FUNC(NavigationScene::setGeneratorParams)
-		),
-		component("navmesh_zone", 
-			functions(
-				LUMIX_FUNC_EX(NavigationScene::debugDrawContours, "drawContours"),
-				LUMIX_FUNC_EX(NavigationScene::debugDrawNavmesh, "drawNavmesh"),
-				LUMIX_FUNC_EX(NavigationScene::debugDrawCompactHeightfield, "drawCompactHeightfield"),
-				LUMIX_FUNC_EX(NavigationScene::debugDrawHeightfield, "drawHeightfield"),
-				LUMIX_FUNC(NavigationScene::save),
-				LUMIX_FUNC(NavigationScene::load),
-				LUMIX_FUNC(NavigationScene::generateNavmesh)
-			),
-			var_property("Extents", &NavigationScene::getZone, &NavmeshZone::extents)
-		),
-		component("navmesh_agent",
-			functions(
-				LUMIX_FUNC_EX(NavigationScene::setActorActive, "setActive"),
-				LUMIX_FUNC_EX(NavigationScene::navigate, "navigate"),
-				LUMIX_FUNC_EX(NavigationScene::cancelNavigation, "cancelNavigation"),
-				LUMIX_FUNC_EX(NavigationScene::getAgentSpeed, "getSpeed"),
-				LUMIX_FUNC_EX(NavigationScene::debugDrawPath, "drawPath")
-			),
-			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
-				MinAttribute(0)),
-			property("Height", LUMIX_PROP(NavigationScene, AgentHeight),
-				MinAttribute(0)),
-			property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion)
-			//property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
-		)
-	);
-	registerScene(navigation_scene);
-}
 
 
 void NavigationSystem::createScenes(Universe& universe)

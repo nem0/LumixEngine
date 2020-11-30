@@ -119,8 +119,6 @@ public:
 		m_resource_manager.init(*m_file_system);
 		m_prefab_resource_manager.create(PrefabResource::TYPE, m_resource_manager);
 
-		Reflection::init(m_allocator);
-
 		m_plugin_manager = PluginManager::create(*this);
 		m_input_system = InputSystem::create(*this);
 
@@ -152,7 +150,6 @@ public:
 			res->decRefCount();
 		}
 
-		Reflection::shutdown();
 		m_plugin_manager.reset();
 		m_input_system.reset();
 		m_file_system.reset();
@@ -216,7 +213,7 @@ public:
 
 	Universe& createUniverse(bool is_main_universe) override
 	{
-		Universe* universe = LUMIX_NEW(m_allocator, Universe)(m_allocator);
+		Universe* universe = LUMIX_NEW(m_allocator, Universe)(*this, m_allocator);
 		const Array<IPlugin*>& plugins = m_plugin_manager->getPlugins();
 		for (auto* plugin : plugins) {
 			plugin->createScenes(*universe);

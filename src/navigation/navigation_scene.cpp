@@ -10,6 +10,7 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/universe.h"
+#include "imgui/IconsFontAwesome5.h"
 #include "lua_script/lua_script_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
@@ -26,8 +27,7 @@ namespace Lumix
 {
 
 
-enum class NavigationSceneVersion : int
-{
+enum class NavigationSceneVersion : i32 {
 	LATEST
 };
 
@@ -93,14 +93,6 @@ struct NavigationSceneImpl final : NavigationScene
 	{
 		setGeneratorParams(0.3f, 0.1f, 0.3f, 2.0f, 60.0f, 0.3f);
 		m_universe.entityTransformed().bind<&NavigationSceneImpl::onEntityMoved>(this);
-		universe.registerComponentType(NAVMESH_AGENT_TYPE
-			, this
-			, &NavigationSceneImpl::createAgent
-			, &NavigationSceneImpl::destroyAgent);
-		universe.registerComponentType(NAVMESH_ZONE_TYPE
-			, this
-			, &NavigationSceneImpl::createZone
-			, &NavigationSceneImpl::destroyZone);
 	}
 
 
@@ -1542,12 +1534,44 @@ UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& syst
 	return UniquePtr<NavigationSceneImpl>::create(allocator, engine, system, universe, allocator);
 }
 
+void NavigationScene::reflect() {
+	using namespace Reflection;
+	static auto navigation_scene = scene("navigation",
+		functions(
+			LUMIX_FUNC(NavigationScene::setGeneratorParams)
+		),
+		LUMIX_CMP(NavigationSceneImpl, Zone, "navmesh_zone", "Navigation / Zone",
+			functions(
+				LUMIX_FUNC_EX(NavigationScene::debugDrawContours, "drawContours"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawNavmesh, "drawNavmesh"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawCompactHeightfield, "drawCompactHeightfield"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawHeightfield, "drawHeightfield"),
+				LUMIX_FUNC(NavigationScene::save),
+				LUMIX_FUNC(NavigationScene::load),
+				LUMIX_FUNC(NavigationScene::generateNavmesh)
+			),
+			var_property("Extents", &NavigationScene::getZone, &NavmeshZone::extents)
+		),
+		LUMIX_CMP(NavigationSceneImpl, Agent, "navmesh_agent", "Navigation / Agent",
+			functions(
+				LUMIX_FUNC_EX(NavigationScene::setActorActive, "setActive"),
+				LUMIX_FUNC_EX(NavigationScene::navigate, "navigate"),
+				LUMIX_FUNC_EX(NavigationScene::cancelNavigation, "cancelNavigation"),
+				LUMIX_FUNC_EX(NavigationScene::getAgentSpeed, "getSpeed"),
+				LUMIX_FUNC_EX(NavigationScene::debugDrawPath, "drawPath")
+			),
+			property("Radius", LUMIX_PROP(NavigationScene, AgentRadius),
+				MinAttribute(0)),
+			property("Height", LUMIX_PROP(NavigationScene, AgentHeight),
+				MinAttribute(0)),
+			property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion)
+			//property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
+		)
+	);
+	registerScene(navigation_scene);
 
-void NavigationScene::destroy(NavigationScene& scene)
-{
-	auto& scene_impl = (NavigationSceneImpl&)scene;
-	LUMIX_DELETE(scene_impl.m_allocator, &scene_impl);
+	setIcon(NAVMESH_AGENT_TYPE, ICON_FA_STREET_VIEW);
+	setIcon(NAVMESH_ZONE_TYPE, ICON_FA_MAP_MARKED_ALT);
 }
-
 
 } // namespace Lumix

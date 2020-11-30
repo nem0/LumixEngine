@@ -146,12 +146,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{}
 	
 	void init() override {
-		IAllocator& allocator = m_app.getAllocator();
-
 		m_app.getPropertyGrid().addPlugin(m_zone_pg_plugin);
-
-		m_app.registerComponent(ICON_FA_STREET_VIEW, "navmesh_agent", "Navmesh / Agent");
-		m_app.registerComponent(ICON_FA_MAP_MARKED_ALT, "navmesh_zone", "Navmesh / Zone");
 	}
 
 	~StudioAppPlugin() {

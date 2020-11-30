@@ -42,6 +42,7 @@ struct GUIScene : IScene
 	static UniquePtr<GUIScene> createInstance(struct GUISystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);
+	static void reflect();
 
 	virtual void render(struct Pipeline& pipeline, const struct Vec2& canvas_size, bool is_main) = 0;
 	virtual IVec2 getCursorPosition() = 0;

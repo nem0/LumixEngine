@@ -31,14 +31,6 @@ struct LUMIX_ENGINE_API EntityMap {
 struct LUMIX_ENGINE_API Universe
 {
 public:
-	using Create = void (IScene::*)(EntityRef);
-	using Destroy = void (IScene::*)(EntityRef);
-	struct ComponentTypeEntry {
-		IScene* scene = nullptr;
-		void (IScene::*create)(EntityRef);
-		void (IScene::*destroy)(EntityRef);
-	};
-
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
 
 	struct EntityData {
@@ -58,7 +50,7 @@ public:
 	};
 
 public:
-	explicit Universe(IAllocator& allocator);
+	explicit Universe(Engine& engine, IAllocator& allocator);
 	~Universe();
 
 	IAllocator& getAllocator() { return m_allocator; }
@@ -75,14 +67,6 @@ public:
 	ComponentUID getComponent(EntityRef entity, ComponentType type) const;
 	ComponentUID getFirstComponent(EntityRef entity) const;
 	ComponentUID getNextComponent(const ComponentUID& cmp) const;
-	ComponentTypeEntry& registerComponentType(ComponentType type) { return m_component_type_map[type.index]; }
-	template <typename T1, typename T2>
-	void registerComponentType(ComponentType type, IScene* scene, T1 create, T2 destroy)
-	{
-		m_component_type_map[type.index].scene = scene;
-		m_component_type_map[type.index].create = static_cast<Create>(create);
-		m_component_type_map[type.index].destroy = static_cast<Destroy>(destroy);
-	}
 
 	bool isValid(EntityRef e) const { return m_entities[e.index].valid; }
 	EntityPtr getFirstEntity() const;
@@ -153,8 +137,15 @@ private:
 		char name[ENTITY_NAME_MAX_LENGTH];
 	};
 
+	struct ComponentTypeEntry {
+		IScene* scene = nullptr;
+		void (*create)(IScene*, EntityRef);
+		void (*destroy)(IScene*, EntityRef);
+	};
+
 private:
 	IAllocator& m_allocator;
+	Engine& m_engine;
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
 	Array<UniquePtr<IScene>> m_scenes;
 	Array<Transform> m_transforms;

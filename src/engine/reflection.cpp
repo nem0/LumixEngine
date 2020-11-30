@@ -12,7 +12,6 @@ namespace Lumix
 namespace Reflection
 {
 
-
 template <> Path readFromStream<Path>(InputMemoryStream& stream)
 {
 	const char* c_str = (const char*)stream.getData() + stream.getPosition();
@@ -50,22 +49,9 @@ template <> void writeToStream<const char*>(OutputMemoryStream& stream, const ch
 }
 
 
-struct ComponentTypeData
-{
-	char id[50];
-	u32 id_hash;
-};
-
-struct ComponentLink
-{
-	const ComponentBase* desc;
-	ComponentLink* next;
-};
-
-
-static IAllocator* g_allocator = nullptr;
-static ComponentLink* g_first_component = nullptr;
 static SceneBase* g_first_scene = nullptr;
+static RegisteredComponent g_components[ComponentType::MAX_TYPES_COUNT];
+static u32 g_components_count = 0;
 
 Array<FunctionBase*>& allFunctions() {
 	static DefaultAllocator allocator;
@@ -73,76 +59,29 @@ Array<FunctionBase*>& allFunctions() {
 	return fncs;
 }
 
-const ComponentBase* getComponent(ComponentType cmp_type)
-{
-	ComponentLink* link = g_first_component;
-	while (link)
-	{
-		if (link->desc->component_type == cmp_type) return link->desc;
-		link = link->next;
-	}
-
-	return nullptr;
-}
-
-
-void registerComponent(const ComponentBase& desc)
-{
-	ComponentLink* link = LUMIX_NEW(*g_allocator, ComponentLink);
-	link->next = g_first_component;
-	link->desc = &desc;
-	g_first_component = link;
+const ComponentBase* getComponent(ComponentType cmp_type) {
+	return g_components[cmp_type.index].cmp;
 }
 
 SceneBase* getFirstScene() { return g_first_scene; }
 
 void registerScene(SceneBase& scene) {
-	if(g_first_scene) scene.next = g_first_scene;
+	scene.next = g_first_scene;
 	g_first_scene = &scene;
 
-	for (const ComponentBase* cmp : scene.getComponents()) {
-		registerComponent(*cmp);
+	const u32 scene_name_hash = crc32(scene.name);
+	for (ComponentBase* cmp : scene.getComponents()) {
+		g_components[cmp->component_type.index].cmp = cmp;
+		g_components[cmp->component_type.index].scene = scene_name_hash;
 	}
-}
-
-
-static Array<ComponentTypeData>& getComponentTypes()
-{
-	static DefaultAllocator allocator;
-	static Array<ComponentTypeData> types(allocator);
-	return types;
-}
-
-
-void init(IAllocator& allocator)
-{
-	g_allocator = &allocator;
-}
-
-
-static void destroy(ComponentLink* link)
-{
-	if (!link) return;
-	destroy(link->next);
-	LUMIX_DELETE(*g_allocator, link);
-}
-
-
-void shutdown()
-{
-	destroy(g_first_component);
-	g_allocator = nullptr;
 }
 
 
 ComponentType getComponentTypeFromHash(u32 hash)
 {
-	auto& types = getComponentTypes();
-	for (int i = 0, c = types.size(); i < c; ++i)
-	{
-		if (types[i].id_hash == hash)
-		{
-			return {i};
+	for (u32 i = 0, c = g_components_count; i < c; ++i) {
+		if (g_components[i].name_hash == hash) {
+			return {(i32)i};
 		}
 	}
 	ASSERT(false);
@@ -152,45 +91,38 @@ ComponentType getComponentTypeFromHash(u32 hash)
 
 u32 getComponentTypeHash(ComponentType type)
 {
-	return getComponentTypes()[type.index].id_hash;
+	return g_components[type.index].name_hash;
 }
 
 
-ComponentType getComponentType(const char* id)
+ComponentType getComponentType(const char* name)
 {
-	u32 id_hash = crc32(id);
-	auto& types = getComponentTypes();
-	for (int i = 0, c = types.size(); i < c; ++i)
-	{
-		if (types[i].id_hash == id_hash)
-		{
-			return {i};
+	u32 name_hash = crc32(name);
+	for (u32 i = 0, c = g_components_count; i < c; ++i) {
+		if (g_components[i].name_hash == name_hash) {
+			return {(i32)i};
 		}
 	}
 
-	auto& cmp_types = getComponentTypes();
-	if (types.size() == ComponentType::MAX_TYPES_COUNT)
-	{
+	static_assert(ComponentType::MAX_TYPES_COUNT == lengthOf(g_components));
+	if (g_components_count == ComponentType::MAX_TYPES_COUNT) {
 		logError("Too many component types");
 		return INVALID_COMPONENT_TYPE;
 	}
 
-	ComponentTypeData& type = cmp_types.emplace();
-	copyString(type.id, id);
-	type.id_hash = id_hash;
-	return {getComponentTypes().size() - 1};
+	RegisteredComponent& type = g_components[g_components_count];
+	type.name_hash = name_hash;
+	++g_components_count;
+	return {i32(g_components_count - 1)};
 }
 
-
-int getComponentTypesCount()
-{
-	return getComponentTypes().size();
+Span<const RegisteredComponent> getComponents() {
+	return Span(g_components, g_components_count);
 }
 
-
-const char* getComponentTypeID(int index)
-{
-	return getComponentTypes()[index].id;
+void setIcon(ComponentType type, const char* icon) {
+	ASSERT(type.index >= 0 && type.index < (i32)g_components_count);
+	g_components[type.index].icon = icon;
 }
 
 

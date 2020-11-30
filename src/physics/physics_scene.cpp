@@ -23,6 +23,7 @@
 #include "renderer/pose.h"
 #include "renderer/render_scene.h"
 #include "renderer/texture.h"
+#include "imgui/IconsFontAwesome5.h"
 
 
 using namespace physx;
@@ -45,7 +46,6 @@ static const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_join
 static const ComponentType VEHICLE_TYPE = Reflection::getComponentType("vehicle");
 static const ComponentType WHEEL_TYPE = Reflection::getComponentType("wheel");
 static const u32 RENDERER_HASH = crc32("renderer");
-
 
 enum class PhysicsSceneVersion
 {
@@ -346,53 +346,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	};
 
 
-	PhysicsSceneImpl(Universe& context, PhysicsSystem& system, IAllocator& allocator)
-		: m_allocator(allocator)
-		, m_controllers(m_allocator)
-		, m_actors(m_allocator)
-		, m_ragdolls(m_allocator)
-		, m_vehicles(m_allocator)
-		, m_wheels(m_allocator)
-		, m_terrains(m_allocator)
-		, m_dynamic_actors(m_allocator)
-		, m_universe(context)
-		, m_is_game_running(false)
-		, m_contact_callback(*this)
-		, m_contact_callbacks(m_allocator)
-		, m_joints(m_allocator)
-		, m_script_scene(nullptr)
-		, m_debug_visualization_flags(0)
-		, m_is_updating_ragdoll(false)
-		, m_update_in_progress(nullptr)
-		, m_vehicle_batch_query(nullptr)
-		, m_system(&system)
-		, m_hit_report(*this)
-		, m_layers(m_system->getCollisionLayers())
-	{
-		m_physics_cmps_mask = 0;
-
-		#define REGISTER_COMPONENT(TYPE, COMPONENT)      \
-			m_physics_cmps_mask |= (u64)1 << TYPE.index; \
-			context.registerComponentType(TYPE,          \
-				this,                                    \
-				&PhysicsSceneImpl::create##COMPONENT,    \
-				&PhysicsSceneImpl::destroy##COMPONENT);
-
-		REGISTER_COMPONENT(RIGID_ACTOR_TYPE, RigidActor);
-		REGISTER_COMPONENT(HEIGHTFIELD_TYPE, Heightfield);
-		REGISTER_COMPONENT(CONTROLLER_TYPE, Controller);
-		REGISTER_COMPONENT(DISTANCE_JOINT_TYPE, DistanceJoint);
-		REGISTER_COMPONENT(HINGE_JOINT_TYPE, HingeJoint);
-		REGISTER_COMPONENT(SPHERICAL_JOINT_TYPE, SphericalJoint);
-		REGISTER_COMPONENT(D6_JOINT_TYPE, D6Joint);
-		REGISTER_COMPONENT(VEHICLE_TYPE, Vehicle);
-		REGISTER_COMPONENT(WHEEL_TYPE, Wheel);
-		REGISTER_COMPONENT(RAGDOLL_TYPE, Ragdoll);
-
-		#undef REGISTER_COMPONENT
-
-		m_vehicle_frictions = createFrictionPairs();
-	}
+	PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSystem& system, IAllocator& allocator);
 
 
 	PxBatchQuery* createVehicleBatchQuery(u8* mem)
@@ -1446,7 +1400,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void setHeightmapSource(EntityRef entity, const Path& str) override
 	{
-		auto& resource_manager = m_engine->getResourceManager();
+		auto& resource_manager = m_engine.getResourceManager();
 		auto& terrain = m_terrains[entity];
 		auto* old_hm = terrain.m_heightmap;
 		if (old_hm)
@@ -3144,7 +3098,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 	
 	void setMeshGeomPath(EntityRef entity, const Path& path) override {
-		ResourceManagerHub& manager = m_engine->getResourceManager();
+		ResourceManagerHub& manager = m_engine.getResourceManager();
 		PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(path);
 		m_actors[entity]->setResource(geom_res);
 	}
@@ -3776,7 +3730,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 			actor->setPhysxActor(physx_actor);
 			if (path[0]) {
-				ResourceManagerHub& manager = m_engine->getResourceManager();
+				ResourceManagerHub& manager = m_engine.getResourceManager();
 				PhysicsGeometry* geom_res = manager.load<PhysicsGeometry>(Path(path));
 				actor->setResource(geom_res);
 			}
@@ -4183,9 +4137,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 	} ;
 
 	IAllocator& m_allocator;
+	Engine& m_engine;
 	Universe& m_universe;
 	HitReport m_hit_report;
-	Engine* m_engine;
 	PhysxContactCallback m_contact_callback;
 	BoneOrientation m_new_bone_orientation = BoneOrientation::X;
 	PxScene* m_scene;
@@ -4219,13 +4173,48 @@ struct PhysicsSceneImpl final : PhysicsScene
 	CollisionLayers& m_layers;
 };
 
+PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSystem& system, IAllocator& allocator)
+	: m_allocator(allocator)
+	, m_engine(engine)
+	, m_controllers(m_allocator)
+	, m_actors(m_allocator)
+	, m_ragdolls(m_allocator)
+	, m_vehicles(m_allocator)
+	, m_wheels(m_allocator)
+	, m_terrains(m_allocator)
+	, m_dynamic_actors(m_allocator)
+	, m_universe(context)
+	, m_is_game_running(false)
+	, m_contact_callback(*this)
+	, m_contact_callbacks(m_allocator)
+	, m_joints(m_allocator)
+	, m_script_scene(nullptr)
+	, m_debug_visualization_flags(0)
+	, m_is_updating_ragdoll(false)
+	, m_update_in_progress(nullptr)
+	, m_vehicle_batch_query(nullptr)
+	, m_system(&system)
+	, m_hit_report(*this)
+	, m_layers(m_system->getCollisionLayers())
+{
+	m_physics_cmps_mask = 0;
+
+	const u32 hash = crc32("physics");
+	for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+		if (cmp.scene == hash) {
+			m_physics_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
+		}
+	}
+
+	m_vehicle_frictions = createFrictionPairs();
+}
+
 
 UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator)
 {
-	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(context, system, allocator);
+	PhysicsSceneImpl* impl = LUMIX_NEW(allocator, PhysicsSceneImpl)(engine, context, system, allocator);
 	impl->m_universe.entityTransformed().bind<&PhysicsSceneImpl::onEntityMoved>(impl);
 	impl->m_universe.entityDestroyed().bind<&PhysicsSceneImpl::onEntityDestroyed>(impl);
-	impl->m_engine = &engine;
 	PxSceneDesc sceneDesc(system.getPhysics()->getTolerancesScale());
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);
 	sceneDesc.cpuDispatcher = &impl->m_cpu_dispatcher;
@@ -4250,14 +4239,163 @@ UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, Universe& co
 	return UniquePtr<PhysicsSceneImpl>(impl, &allocator);
 }
 
+void PhysicsScene::reflect() {
+	using namespace Reflection;
 
-void PhysicsScene::destroy(PhysicsScene* scene)
-{
-	PhysicsSceneImpl* impl = static_cast<PhysicsSceneImpl*>(scene);
+	struct LayerEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { 
+			return ((PhysicsScene*)cmp.scene)->getSystem().getCollisionsLayersCount();
+		}
+		const char* name(ComponentUID cmp, u32 idx) const override { 
+			PhysicsSystem& system = ((PhysicsScene*)cmp.scene)->getSystem();
+			return system.getCollisionLayerName(idx);
+		}
+	};
 
-	LUMIX_DELETE(impl->m_allocator, scene);
+	struct DynamicTypeEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return 3; }
+		const char* name(ComponentUID cmp, u32 idx) const override { 
+			switch ((PhysicsScene::DynamicType)idx) {
+				case PhysicsScene::DynamicType::DYNAMIC: return "Dynamic";
+				case PhysicsScene::DynamicType::STATIC: return "Static";
+				case PhysicsScene::DynamicType::KINEMATIC: return "Kinematic";
+				default: ASSERT(false); return "N/A";
+			}
+		}
+	};
+
+	struct D6MotionEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return 3; }
+		const char* name(ComponentUID cmp, u32 idx) const override { 
+			switch ((PhysicsScene::D6Motion)idx) {
+				case PhysicsScene::D6Motion::LOCKED: return "Locked";
+				case PhysicsScene::D6Motion::LIMITED: return "Limited";
+				case PhysicsScene::D6Motion::FREE: return "Free";
+				default: ASSERT(false); return "N/A";
+			}
+		}
+	};
+
+	struct WheelSlotEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return 4; }
+		const char* name(ComponentUID cmp, u32 idx) const override { 
+			switch ((PhysicsScene::WheelSlot)idx) {
+				case PhysicsScene::WheelSlot::FRONT_LEFT: return "Front left";
+				case PhysicsScene::WheelSlot::FRONT_RIGHT: return "Front right";
+				case PhysicsScene::WheelSlot::REAR_LEFT: return "Rear left";
+				case PhysicsScene::WheelSlot::REAR_RIGHT: return "Rear right";
+				default: ASSERT(false); return "N/A";
+			}
+		}
+	};
+
+	static auto phy_scene = scene("physics",
+		functions(
+			LUMIX_FUNC(PhysicsScene::raycast)
+			//function(LUMIX_FUNC(PhysicsScene::raycastEx))
+		),
+		LUMIX_CMP(PhysicsSceneImpl, Ragdoll, "ragdoll", "Physics / Ragdoll",
+			functions(
+				LUMIX_FUNC(PhysicsScene::setRagdollKinematic)
+			),
+			blob_property("data", LUMIX_PROP(PhysicsScene, RagdollData)),
+			property("Layer", LUMIX_PROP(PhysicsScene, RagdollLayer), LayerEnum())
+		),
+		LUMIX_CMP(PhysicsSceneImpl, D6Joint, "d6_joint", "Physics / Joint / D6",
+			property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
+			property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
+			property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
+			enum_property("X motion", LUMIX_PROP(PhysicsScene, D6JointXMotion), D6MotionEnum()),
+			enum_property("Y motion", LUMIX_PROP(PhysicsScene, D6JointYMotion), D6MotionEnum()),
+			enum_property("Z motion", LUMIX_PROP(PhysicsScene, D6JointZMotion), D6MotionEnum()),
+			enum_property("Swing 1", LUMIX_PROP(PhysicsScene, D6JointSwing1Motion), D6MotionEnum()),
+			enum_property("Swing 2", LUMIX_PROP(PhysicsScene, D6JointSwing2Motion), D6MotionEnum()),
+			enum_property("Twist", LUMIX_PROP(PhysicsScene, D6JointTwistMotion), D6MotionEnum()),
+			property("Linear limit", LUMIX_PROP(PhysicsScene, D6JointLinearLimit), MinAttribute(0)),
+			property("Swing limit", LUMIX_PROP(PhysicsScene, D6JointSwingLimit), RadiansAttribute()),
+			property("Twist limit", LUMIX_PROP(PhysicsScene, D6JointTwistLimit), RadiansAttribute()),
+			property("Damping", LUMIX_PROP(PhysicsScene, D6JointDamping)),
+			property("Stiffness", LUMIX_PROP(PhysicsScene, D6JointStiffness)),
+			property("Restitution", LUMIX_PROP(PhysicsScene, D6JointRestitution))
+		),
+		LUMIX_CMP(PhysicsSceneImpl, SphericalJoint, "spherical_joint", "Physics / Joint / Spherical",
+			property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
+			property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
+			property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
+			property("Use limit", LUMIX_PROP(PhysicsScene, SphericalJointUseLimit)),
+			property("Limit", LUMIX_PROP(PhysicsScene, SphericalJointLimit), RadiansAttribute())
+		),
+		LUMIX_CMP(PhysicsSceneImpl, DistanceJoint, "distance_joint", "Physics / Joint / Distance",
+			property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
+			property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
+			property("Damping", LUMIX_PROP(PhysicsScene, DistanceJointDamping),	MinAttribute(0)),
+			property("Stiffness", LUMIX_PROP(PhysicsScene, DistanceJointStiffness), MinAttribute(0)),
+			property("Tolerance", LUMIX_PROP(PhysicsScene, DistanceJointTolerance), MinAttribute(0)),
+			property("Limits", LUMIX_PROP(PhysicsScene, DistanceJointLimits))
+		),
+		LUMIX_CMP(PhysicsSceneImpl, HingeJoint, "hinge_joint", "Physics / Joint / Hinge",
+			property("Connected body", LUMIX_PROP(PhysicsScene, JointConnectedBody)),
+			property("Damping", LUMIX_PROP(PhysicsScene, HingeJointDamping), MinAttribute(0)),
+			property("Stiffness", LUMIX_PROP(PhysicsScene, HingeJointStiffness), MinAttribute(0)),
+			property("Axis position", LUMIX_PROP(PhysicsScene, JointAxisPosition)),
+			property("Axis direction", LUMIX_PROP(PhysicsScene, JointAxisDirection)),
+			property("Use limit", LUMIX_PROP(PhysicsScene, HingeJointUseLimit)),
+			property("Limit", LUMIX_PROP(PhysicsScene, HingeJointLimit), RadiansAttribute())
+		),
+		LUMIX_CMP(PhysicsSceneImpl, Controller, "physical_controller", "Physics / Controller",
+			functions(
+				LUMIX_FUNC_EX(PhysicsScene::moveController, "move"),
+				LUMIX_FUNC_EX(PhysicsScene::isControllerCollisionDown, "isCollisionDown")
+			),
+			property("Radius", LUMIX_PROP(PhysicsScene, ControllerRadius)),
+			property("Height", LUMIX_PROP(PhysicsScene, ControllerHeight)),
+			property("Layer", LUMIX_PROP(PhysicsScene, ControllerLayer), LayerEnum()),
+			property("Use root motion", LUMIX_PROP(PhysicsScene, ControllerUseRootMotion)),
+			property("Use custom gravity", LUMIX_PROP(PhysicsScene, ControllerCustomGravity)),
+			property("Custom gravity acceleration", LUMIX_PROP(PhysicsScene, ControllerCustomGravityAcceleration))
+		),
+		LUMIX_CMP(PhysicsSceneImpl, RigidActor, "rigid_actor", "Physics / Rigid actor",
+			functions(
+				LUMIX_FUNC_EX(PhysicsScene::putToSleep, "putToSleep"),
+				LUMIX_FUNC_EX(PhysicsScene::getActorSpeed, "getSpeed"),
+				LUMIX_FUNC_EX(PhysicsScene::getActorVelocity, "getVelocity"),
+				LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyForce"),
+				LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyImpulse"),
+				LUMIX_FUNC_EX(PhysicsScene::addForceAtPos, "addForceAtPos")
+			),
+			property("Layer", LUMIX_PROP(PhysicsScene, ActorLayer), LayerEnum()),
+			enum_property("Dynamic", LUMIX_PROP(PhysicsScene, DynamicType), DynamicTypeEnum()),
+			property("Trigger", LUMIX_PROP(PhysicsScene, IsTrigger)),
+			array("Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
+				property("Size", LUMIX_PROP(PhysicsScene, BoxGeomHalfExtents)),
+				property("Position offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetPosition)),
+				property("Rotation offset", LUMIX_PROP(PhysicsScene, BoxGeomOffsetRotation), RadiansAttribute())),
+			array("Sphere geometry", &PhysicsScene::getSphereGeometryCount, &PhysicsScene::addSphereGeometry, &PhysicsScene::removeSphereGeometry,
+				property("Radius", LUMIX_PROP(PhysicsScene, SphereGeomRadius), MinAttribute(0)),
+				property("Position offset", LUMIX_PROP(PhysicsScene, SphereGeomOffsetPosition))),
+			property("Mesh", LUMIX_PROP(PhysicsScene, MeshGeomPath), ResourceAttribute("Mesh (*.msh)", PhysicsGeometry::TYPE))
+		),
+		LUMIX_CMP(PhysicsSceneImpl, Vehicle, "vehicle", "Physics / Vehicle"),
+		LUMIX_CMP(PhysicsSceneImpl, Wheel, "wheel", "Physics / Wheel",
+			property("Radius", LUMIX_PROP(PhysicsScene, WheelRadius), MinAttribute(0)),
+			property("Width", LUMIX_PROP(PhysicsScene, WheelWidth), MinAttribute(0)),
+			property("Mass", LUMIX_PROP(PhysicsScene, WheelMass), MinAttribute(0)),
+			property("MOI", LUMIX_PROP(PhysicsScene, WheelMOI), MinAttribute(0)),
+			enum_property("Slot", LUMIX_PROP(PhysicsScene, WheelSlot), WheelSlotEnum())
+		),
+		LUMIX_CMP(PhysicsSceneImpl, Heightfield, "physical_heightfield", "Physics / Heightfield",
+			property("Layer", LUMIX_PROP(PhysicsScene, HeightfieldLayer), LayerEnum()),
+			property("Heightmap", LUMIX_PROP(PhysicsScene, HeightmapSource), ResourceAttribute("Image (*.raw)", Texture::TYPE)),
+			property("Y scale", LUMIX_PROP(PhysicsScene, HeightmapYScale), MinAttribute(0)),
+			property("XZ scale", LUMIX_PROP(PhysicsScene, HeightmapXZScale), MinAttribute(0))
+		)
+	);
+	registerScene(phy_scene);
+
+	setIcon(RIGID_ACTOR_TYPE, ICON_FA_VOLLEYBALL_BALL);
+	setIcon(VEHICLE_TYPE, ICON_FA_CAR_ALT);
+	setIcon(RAGDOLL_TYPE, ICON_FA_MALE);
 }
-
 
 void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::State new_state, Resource&)
 {

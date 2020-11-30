@@ -19,6 +19,7 @@ struct Animable {
 
 struct AnimationScene : IScene {
 	static UniquePtr<AnimationScene> create(Engine& engine, IPlugin& plugin, Universe& universe, struct IAllocator& allocator);
+	static void reflect(Engine& engine);
 
 	virtual const struct OutputMemoryStream& getEventStream() const = 0;
 	virtual struct Path getPropertyAnimation(EntityRef entity) = 0;

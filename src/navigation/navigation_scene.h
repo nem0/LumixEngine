@@ -24,7 +24,7 @@ struct NavmeshZone {
 struct NavigationScene : IScene
 {
 	static UniquePtr<NavigationScene> create(Engine& engine, IPlugin& system, Universe& universe, IAllocator& allocator);
-	static void destroy(NavigationScene& scene);
+	static void reflect();
 
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;
 	virtual bool isFinished(EntityRef entity) = 0;

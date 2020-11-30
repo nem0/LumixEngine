@@ -12,6 +12,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/universe.h"
+#include "imgui/IconsFontAwesome5.h"
 
 namespace Lumix
 {
@@ -69,27 +70,9 @@ struct AudioSceneImpl final : AudioScene
 			i.entity = INVALID_ENTITY;
 			i.buffer_id = AudioDevice::INVALID_BUFFER_HANDLE;
 		}
-		context.registerComponentType(LISTENER_TYPE
-			, this
-			, &AudioSceneImpl::createListener
-			, &AudioSceneImpl::destroyListener);
-		context.registerComponentType(AMBIENT_SOUND_TYPE
-			, this
-			, &AudioSceneImpl::createAmbientSound
-			, &AudioSceneImpl::destroyAmbientSound);
-		context.registerComponentType(ECHO_ZONE_TYPE
-			, this
-			, &AudioSceneImpl::createEchoZone
-			, &AudioSceneImpl::destroyEchoZone);
-		context.registerComponentType(CHORUS_ZONE_TYPE
-			, this
-			, &AudioSceneImpl::createChorusZone
-			, &AudioSceneImpl::destroyChorusZone);
 	}
 
-
 	i32 getVersion() const override { return (i32)Version::LATEST; }
-
 
 	void clear() override
 	{
@@ -491,6 +474,36 @@ UniquePtr<AudioScene> AudioScene::createInstance(AudioSystem& system,
 {
 	return UniquePtr<AudioSceneImpl>::create(allocator, system, universe, allocator);
 }
+
+void AudioScene::reflect(Engine& engine) {
+	using namespace Reflection;
+	static auto audio_scene = scene("audio",
+		functions(
+			LUMIX_FUNC(AudioScene::setMasterVolume),
+			LUMIX_FUNC(AudioScene::play),
+			LUMIX_FUNC(AudioScene::setVolume),
+			LUMIX_FUNC(AudioScene::setEcho)
+		),
+		LUMIX_CMP(AudioSceneImpl, AmbientSound, 
+			"ambient_sound", "Audio / Ambient sound",
+			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
+			property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClip), ResourceAttribute("OGG (*.ogg)", Clip::TYPE))
+		),
+		LUMIX_CMP(AudioSceneImpl, Listener, "audio_listener", "Audio / Listener"),
+		LUMIX_CMP(AudioSceneImpl, EchoZone, "echo_zone", "Audio / Echo zone",
+			var_property("Radius", &AudioScene::getEchoZone, &EchoZone::radius, MinAttribute(0)),
+			var_property("Delay (ms)", &AudioScene::getEchoZone, &EchoZone::delay, MinAttribute(0))
+		),
+		LUMIX_CMP(AudioSceneImpl, ChorusZone, "chorus_zone", "Audio / Chorus zone",
+			var_property("Radius", &AudioScene::getChorusZone, &ChorusZone::radius, MinAttribute(0)),
+			var_property("Delay (ms)", &AudioScene::getChorusZone, &ChorusZone::delay, MinAttribute(0))
+		)
+	);
+	registerScene(audio_scene);
+
+	setIcon(LISTENER_TYPE, ICON_FA_HEADPHONES);
+}
+
 
 
 } // namespace Lumix

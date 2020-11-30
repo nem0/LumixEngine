@@ -494,18 +494,6 @@ static int LUA_getComponentType(const char* component_type)
 }
 
 
-static int LUA_getComponentTypesCount()
-{
-	return Reflection::getComponentTypesCount();
-}
-
-
-static int LUA_getComponentTypeByIndex(int index)
-{
-	const char* id = Reflection::getComponentTypeID(index);
-	return Reflection::getComponentType(id).index;
-}
-
 
 static int LUA_setEntityRotation(lua_State* L)
 {
@@ -767,8 +755,6 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	REGISTER_FUNCTION(destroyEntity);
 	REGISTER_FUNCTION(destroyUniverse);
 	//REGISTER_FUNCTION(getComponentType);
-	//REGISTER_FUNCTION(getComponentTypeByIndex);
-	//REGISTER_FUNCTION(getComponentTypesCount);
 	//REGISTER_FUNCTION(getEntityDirection);
 	REGISTER_FUNCTION(getEntityPosition);
 	REGISTER_FUNCTION(getEntityRotation);

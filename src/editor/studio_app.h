@@ -112,9 +112,7 @@ struct LUMIX_EDITOR_API StudioApp
 	virtual Span<MousePlugin*> getMousePlugins() = 0;
 	virtual const char* getComponentTypeName(ComponentType cmp_type) const = 0;
 	virtual const char* getComponentIcon(ComponentType cmp_type) const = 0;
-	virtual void registerComponent(const char* icon, const char* id, const char* label) = 0;
 	virtual void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) = 0;
-	virtual void registerComponent(const char* icon, const char* id, const char* label, ResourceType resource_type, const char* property) = 0;
 	virtual const AddCmpTreeNode& getAddComponentTreeRoot() const = 0;
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;

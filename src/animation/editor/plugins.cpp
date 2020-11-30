@@ -392,10 +392,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponent("", "property_animator", "Animation / Property animator", PropertyAnimation::TYPE, "Animation");
-		m_app.registerComponent("", "animable", "Animation / Animable", Animation::TYPE, "Animation");
-		m_app.registerComponent("", "animator", "Animation / Animator", Anim::Controller::TYPE, "Source");
-
 		const char* act_exts[] = { "act", nullptr };
 		m_app.getAssetCompiler().addPlugin(m_anim_ctrl_plugin, act_exts);
 

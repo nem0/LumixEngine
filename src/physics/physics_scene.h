@@ -86,7 +86,7 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	using ContactCallbackHandle = int;
 
 	static UniquePtr<PhysicsScene> create(PhysicsSystem& system, Universe& context, Engine& engine, IAllocator& allocator);
-	static void destroy(PhysicsScene* scene);
+	static void reflect();
 
 	virtual ~PhysicsScene() {}
 	virtual void render() = 0;
