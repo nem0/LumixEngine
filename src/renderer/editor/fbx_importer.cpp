@@ -299,8 +299,7 @@ void FBXImporter::gatherBones(const ofbx::IScene& scene, bool force_skinned)
 void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 {
 	int anim_count = scene.getAnimationStackCount();
-	for (int i = 0; i < anim_count; ++i)
-	{
+	for (int i = 0; i < anim_count; ++i) {
 		ImportAnimation& anim = m_animations.emplace();
 		anim.scene = &scene;
 		anim.fbx = (const ofbx::AnimationStack*)scene.getAnimationStack(i);
@@ -322,8 +321,12 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 		}
 		else
 		{
-			anim.name = "anim";
+			anim.name = "";
 		}
+	}
+
+	if (m_animations.size() == 1) {
+		m_animations[0].name = "";
 	}
 }
 
@@ -1463,7 +1466,7 @@ static bool isBindPosePositionTrack(u32 count, const Array<FBXImporter::Key>& ke
 void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 {
 	PROFILE_FUNCTION();
-	for (const FBXImporter::ImportAnimation& anim : getAnimations()) { 
+	for (const FBXImporter::ImportAnimation& anim : m_animations) { 
 		ASSERT(anim.import);
 
 		const ofbx::AnimationStack* stack = anim.fbx;
