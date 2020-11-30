@@ -29,6 +29,13 @@ void Controller::destroy() {
 }
 
 void Controller::unload() {
+	for (const AnimationEntry& entry : m_animation_entries) {
+		if (entry.animation) entry.animation->decRefCount();
+	}
+	m_animation_entries.clear();
+	m_animation_slots.clear();
+	m_bone_masks.clear();
+	m_inputs = InputDecl();
 	LUMIX_DELETE(m_allocator, m_root);
 	m_root = nullptr;
 }
