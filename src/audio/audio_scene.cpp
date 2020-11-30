@@ -74,8 +74,10 @@ struct AudioSceneImpl final : AudioScene
 
 	i32 getVersion() const override { return (i32)Version::LATEST; }
 
-	void clear() override
-	{
+	void clear() override 	{
+		for (const AmbientSound& snd : m_ambient_sounds) {
+			if (snd.clip) snd.clip->decRefCount();
+		}
 		m_ambient_sounds.clear();
 		m_echo_zones.clear();
 		m_chorus_zones.clear();
