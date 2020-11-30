@@ -517,7 +517,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		auto iter = m_component_icons.find(cmp_type);
 		if (iter == m_component_icons.end()) return "";
-		return iter.value().c_str();
+		return iter.value();
 	}
 
 	const char* getComponentTypeName(ComponentType cmp_type) const override
@@ -594,17 +594,9 @@ struct StudioAppImpl final : StudioApp
 		insertAddCmpNode(*new_group, node);
 	}
 
-
-	void registerComponent(const char* icon,
-		const char* type,
-		const char* label,
-		ResourceType resource_type,
-		const char* property) override
-	{
-		struct Plugin final : IAddComponentPlugin
-		{
-			void onGUI(bool create_entity, bool from_filter) override
-			{
+	void registerComponent(const char* icon, ComponentType cmp_type, const char* label, ResourceType resource_type, const char* property) {
+		struct Plugin final : IAddComponentPlugin {
+			void onGUI(bool create_entity, bool from_filter) override {
 				ImGui::SetNextWindowSize(ImVec2(300, 300));
 				const char* last = reverseFind(label, nullptr, '/');
 				last = last && !from_filter ? last + 1 : label;
@@ -613,24 +605,16 @@ struct StudioAppImpl final : StudioApp
 				char buf[MAX_PATH_LENGTH];
 				bool create_empty = ImGui::MenuItem("Empty");
 				static u32 selected_res_hash = 0;
-				if (asset_browser->resourceList(Span(buf), Ref(selected_res_hash), resource_type, 0, true) || create_empty)
-				{
-					if (create_entity)
-					{
+				if (asset_browser->resourceList(Span(buf), Ref(selected_res_hash), resource_type, 0, true) || create_empty) {
+					if (create_entity) {
 						EntityRef entity = editor->addEntity();
 						editor->selectEntities(Span(&entity, 1), false);
 					}
 
 					const Array<EntityRef>& selected_entites = editor->getSelectedEntities();
 					editor->addComponent(selected_entites, type);
-					if (!create_empty)
-					{
-						editor->setProperty(type,
-							"",
-							-1,
-							property,
-							editor->getSelectedEntities(),
-							Path(buf));
+					if (!create_empty) {
+						editor->setProperty(type, "", -1, property, editor->getSelectedEntities(), Path(buf));
 					}
 					ImGui::CloseCurrentPopup();
 				}
@@ -653,7 +637,7 @@ struct StudioAppImpl final : StudioApp
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid.get();
 		plugin->asset_browser = m_asset_browser.get();
-		plugin->type = Reflection::getComponentType(type);
+		plugin->type = cmp_type;
 		plugin->editor = m_editor.get();
 		plugin->property = property;
 		plugin->resource_type = resource_type;
@@ -662,21 +646,19 @@ struct StudioAppImpl final : StudioApp
 
 		m_component_labels.insert(plugin->type, String(label, m_allocator));
 		if (icon && icon[0]) {
-			m_component_icons.insert(plugin->type, String(icon, m_allocator));
+			m_component_icons.insert(plugin->type, icon);
 		}
 	}
 
-	void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) override
-	{
+	void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) override {
 		addPlugin(plugin);
 		m_component_labels.insert(Reflection::getComponentType(id), String(plugin.getLabel(), m_allocator));
 		if (icon && icon[0]) {
-			m_component_icons.insert(Reflection::getComponentType(id), String(icon, m_allocator));
+			m_component_icons.insert(Reflection::getComponentType(id), icon);
 		}
 	}
 
-
-	void registerComponent(const char* icon, const char* type, const char* label) override
+	void registerComponent(const char* icon, ComponentType type, const char* label)
 	{
 		struct Plugin final : IAddComponentPlugin
 		{
@@ -697,7 +679,6 @@ struct StudioAppImpl final : StudioApp
 				}
 			}
 
-
 			const char* getLabel() const override { return label; }
 
 			WorldEditor* editor;
@@ -710,13 +691,13 @@ struct StudioAppImpl final : StudioApp
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid.get();
 		plugin->editor = m_editor.get();
-		plugin->type = Reflection::getComponentType(type);
+		plugin->type = type;
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
 
 		m_component_labels.insert(plugin->type, String(label, m_allocator));
 		if (icon && icon[0]) {
-			m_component_icons.insert(plugin->type, String(icon, m_allocator));
+			m_component_icons.insert(plugin->type, icon);
 		}
 	}
 
@@ -2477,13 +2458,10 @@ struct StudioAppImpl final : StudioApp
 
 	void initPlugins() override
 	{
-		for (int i = 1, c = m_plugins.size(); i < c; ++i)
-		{
-			for (int j = 0; j < i; ++j)
-			{
+		for (int i = 1, c = m_plugins.size(); i < c; ++i) {
+			for (int j = 0; j < i; ++j) {
 				IPlugin* p = m_plugins[i];
-				if (m_plugins[j]->dependsOn(*p))
-				{
+				if (m_plugins[j]->dependsOn(*p)) {
 					m_plugins.erase(i);
 					--i;
 					m_plugins.insert(j, p);
@@ -2491,9 +2469,39 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 
-		for (IPlugin* plugin : m_plugins)
-		{
+		for (IPlugin* plugin : m_plugins) {
 			plugin->init();
+		}
+
+		for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+			ASSERT(cmp.cmp->component_type != INVALID_COMPONENT_TYPE);
+			
+			if (m_component_labels.find(cmp.cmp->component_type).isValid()) continue;
+
+			const Reflection::ComponentBase* r = Reflection::getComponent(cmp.cmp->component_type);
+			struct : Reflection::IEmptyPropertyVisitor {
+				void visit(const Reflection::Property<Path>& prop) override {
+					for (const Reflection::IAttribute* attr : prop.getAttributes()) {
+						if (attr->getType() == Reflection::IAttribute::RESOURCE) {
+							is_res = true;
+							Reflection::ResourceAttribute* a = (Reflection::ResourceAttribute*)attr;
+							res_type = a->type;
+							prop_name = prop.name;
+						}
+					}
+				}
+				bool is_res = false;
+				const char* prop_name;
+				ResourceType res_type;
+			} visitor;
+
+			r->visit(visitor);
+			if (visitor.is_res) {
+				registerComponent(cmp.icon, r->component_type, r->label, visitor.res_type, visitor.prop_name);
+			}
+			else {
+				registerComponent(cmp.icon, r->component_type, r->label);
+			}
 		}
 	}
 
@@ -3261,7 +3269,7 @@ struct StudioAppImpl final : StudioApp
 	Array<StaticString<MAX_PATH_LENGTH>> m_universes;
 	AddCmpTreeNode m_add_cmp_root;
 	HashMap<ComponentType, String> m_component_labels;
-	HashMap<ComponentType, String> m_component_icons;
+	HashMap<ComponentType, StaticString<5>> m_component_icons;
 	UniquePtr<WorldEditor> m_editor;
 	Action m_set_pivot_action;
 	Action m_reset_pivot_action;

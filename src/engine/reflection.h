@@ -9,6 +9,7 @@
 #include "engine/universe.h"
 
 
+#define LUMIX_CMP(Scene, Component, ...) component<&Scene::create##Component, &Scene::destroy##Component>(__VA_ARGS__)
 #define LUMIX_PROP(Scene, Property) &Scene::get##Property, &Scene::set##Property
 #define LUMIX_FUNC_EX(Func, name) Reflection::function(&Func, #Func, name)
 #define LUMIX_FUNC(Func) Reflection::function(&Func, #Func, nullptr)
@@ -18,6 +19,7 @@ namespace Lumix
 
 
 template <typename T> struct Array;
+template <typename T> struct Span;
 struct IAllocator;
 struct Path;
 struct PropertyDescriptorBase;
@@ -52,19 +54,26 @@ struct IAttribute {
 struct ComponentBase;
 struct SceneBase;
 
+// we don't use method pointers here because VS has sizeof issues if IScene is forward declared
+using CreateComponent = void (*)(IScene*, EntityRef);
+using DestroyComponent = void (*)(IScene*, EntityRef);
 
-LUMIX_ENGINE_API void init(IAllocator& allocator);
-LUMIX_ENGINE_API void shutdown();
+struct RegisteredComponent {
+	u32 name_hash = 0;
+	u32 scene = 0;
+	const char* icon = "";
+	ComponentBase* cmp = nullptr;
+};
 
 LUMIX_ENGINE_API void registerScene(SceneBase& scene);
+LUMIX_ENGINE_API void setIcon(ComponentType type, const char* icon);
+
 LUMIX_ENGINE_API SceneBase* getFirstScene();
 LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
+LUMIX_ENGINE_API Span<const RegisteredComponent> getComponents();
 
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
-LUMIX_ENGINE_API u32 getComponentTypeHash(ComponentType type);
 LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(u32 hash);
-LUMIX_ENGINE_API int getComponentTypesCount();
-LUMIX_ENGINE_API const char* getComponentTypeID(int index);
 
 template <typename T> void writeToStream(OutputMemoryStream& stream, T value) {	stream.write(value); }
 template <typename T> T readFromStream(InputMemoryStream& stream) { return stream.read<T>(); }
@@ -73,7 +82,7 @@ template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputMemoryStream& stream
 template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
 template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputMemoryStream& stream);
 template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* path);
-
+	
 struct ResourceAttribute : IAttribute
 {
 	ResourceAttribute(const char* file_type, ResourceType type) { this->file_type = file_type; this->type = type; }
@@ -262,6 +271,9 @@ struct ComponentBase
 	virtual Span<const struct FunctionBase* const> getFunctions() const = 0;
 
 	const char* name;
+	const char* label;
+	CreateComponent creator;
+	DestroyComponent destroyer;
 	ComponentType component_type;
 };
 
@@ -314,6 +326,10 @@ struct TupleHolder {
 
 	Span<const Base* const> get() const {
 		return Span(static_cast<const Base*const*>(ptrs), (u32)sizeof...(T));
+	}
+
+	Span<Base* const> get() {
+		return Span(static_cast<Base*const*>(ptrs), (u32)sizeof...(T));
 	}
 
 	Tuple<T...> objects;
@@ -589,7 +605,7 @@ struct SceneBase
 	virtual ~SceneBase() {}
 
 	virtual Span<const FunctionBase* const> getFunctions() const = 0;
-	virtual Span<const ComponentBase* const> getComponents() const = 0;
+	virtual Span<ComponentBase* const> getComponents() = 0;
 
 	const char* name;
 	SceneBase* next = nullptr;
@@ -601,7 +617,7 @@ template <typename... Components, typename... Funcs>
 struct Scene<Tuple<Components...>, Tuple<Funcs...>> : SceneBase
 {
 	Span<const FunctionBase* const> getFunctions() const override {	return functions.get();	}
-	Span<const ComponentBase* const> getComponents() const override { return components.get(); }
+	Span<ComponentBase* const> getComponents() override { return components.get(); }
 
 	TupleHolder<ComponentBase, Components...> components;
 	TupleHolder<FunctionBase, Funcs...> functions;
@@ -773,11 +789,17 @@ auto functions(F... functions)
 }
 
 
-template <typename... Props, typename... Funcs>
-auto component(const char* name, Tuple<Funcs...> functions, Props... props)
+template <auto Creator, auto Destroyer, typename... Props, typename... Funcs>
+auto component(const char* name, const char* label, Tuple<Funcs...> functions, Props... props)
 {
+	auto creator = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Creator))(e); };
+	auto destroyer = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Destroyer))(e); };
+
 	Component<Tuple<Funcs...>, Tuple<Props...>> cmp;
+	cmp.creator = (CreateComponent)creator;
+	cmp.destroyer = (DestroyComponent)destroyer;
 	cmp.name = name;
+	cmp.label = label;
 	cmp.functions = functions;
 	cmp.properties = makeTuple(props...);
 	cmp.component_type = getComponentType(name);
@@ -785,10 +807,16 @@ auto component(const char* name, Tuple<Funcs...> functions, Props... props)
 }
 
 
-template <typename... Props>
-auto component(const char* name, Props... props)
+template <auto Creator, auto Destroyer, typename... Props>
+auto component(const char* name, const char* label, Props... props)
 {
+	auto creator = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Creator))(e); };
+	auto destroyer = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Destroyer))(e); };
+	
 	Component<Tuple<>, Tuple<Props...>> cmp;
+	cmp.creator = (CreateComponent)creator;
+	cmp.destroyer = (DestroyComponent)destroyer;
+	cmp.label = label;
 	cmp.name = name;
 	cmp.properties = makeTuple(props...);
 	cmp.component_type = getComponentType(name);

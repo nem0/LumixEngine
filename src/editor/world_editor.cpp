@@ -2119,7 +2119,7 @@ public:
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
-				const u32 cmp_type = Reflection::getComponentTypeHash(cmp.type);
+				const u32 cmp_type = crc32(Reflection::getComponent(cmp.type)->name);
 				serializer.write(cmp_type);
 				const Reflection::ComponentBase* cmp_desc = Reflection::getComponent(cmp.type);
 				

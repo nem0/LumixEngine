@@ -3828,17 +3828,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	{
 		IAllocator& allocator = m_app.getAllocator();
 
-		m_app.registerComponent(ICON_FA_CAMERA, "camera", "Render / Camera");
-		m_app.registerComponent(ICON_FA_GLOBE, "environment", "Render / Environment");
-		m_app.registerComponent(ICON_FA_CUBES, "model_instance", "Render / Mesh", Model::TYPE, "Source");
-		m_app.registerComponent(ICON_FA_SMOG, "particle_emitter",	"Render / Particle emitter", ParticleEmitterResource::TYPE, "Resource");
-		m_app.registerComponent(ICON_FA_LIGHTBULB, "point_light", "Render / Point light");
-		m_app.registerComponent("", "decal", "Render / Decal");
-		m_app.registerComponent(ICON_FA_BONE, "bone_attachment", "Render / Bone attachment");
-		m_app.registerComponent("", "environment_probe", "Render / Environment probe");
-		m_app.registerComponent("", "reflection_probe", "Render / Reflection probe");
-		m_app.registerComponent("", "fur", "Render / Fur");
-
 		AddTerrainComponentPlugin* add_terrain_plugin = LUMIX_NEW(allocator, AddTerrainComponentPlugin)(m_app);
 		m_app.registerComponent(ICON_FA_MAP, "terrain", *add_terrain_plugin);
 

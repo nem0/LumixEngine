@@ -209,6 +209,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 		Universe& universe,
 		IAllocator& allocator);
 	static void registerLuaAPI(lua_State* L);
+	static void reflect();
 
 	virtual RayCastModelHit castRay(const DVec3& origin, const Vec3& dir, EntityPtr ignore) = 0;
 	virtual RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) = 0;

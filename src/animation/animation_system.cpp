@@ -72,35 +72,10 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	, m_property_animation_manager(m_allocator)
 	, m_controller_manager(m_allocator)
 {
+	AnimationScene::reflect(engine);
 	m_animation_manager.create(Animation::TYPE, m_engine.getResourceManager());
 	m_property_animation_manager.create(PropertyAnimation::TYPE, m_engine.getResourceManager());
 	m_controller_manager.create(Anim::Controller::TYPE, m_engine.getResourceManager());
-
-	using namespace Reflection;
-	static auto anim_scene = scene("animation",
-		component("property_animator", 
-			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
-				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE)),
-			property("Enabled", &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator)
-		),
-		component("animator",
-			functions(
-				function((void (AnimationScene::*)(EntityRef, u32, u32))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setU32Input"),
-				function((void (AnimationScene::*)(EntityRef, u32, float))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setFloatInput"),
-				function((void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setBoolInput"),
-				LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex"),
-				LUMIX_FUNC_EX(AnimationScene::setAnimatorIK, "setIK")
-			),
-			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
-				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE)),
-			property("Default set", LUMIX_PROP(AnimationScene, AnimatorDefaultSet))
-		),
-		component("animable",
-			property("Animation", LUMIX_PROP(AnimationScene, Animation),
-				ResourceAttribute("Animation (*.ani)", Animation::TYPE))
-		)
-	);
-	registerScene(anim_scene);
 }
 
 

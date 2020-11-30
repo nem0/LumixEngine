@@ -1,8 +1,9 @@
 #include "universe.h"
 #include "engine/crc32.h"
-#include "engine/plugin.h"
+#include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/plugin.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
 
@@ -41,8 +42,9 @@ void EntityMap::set(EntityRef src, EntityRef dst) {
 Universe::~Universe() = default;
 
 
-Universe::Universe(IAllocator& allocator)
+Universe::Universe(Engine& engine, IAllocator& allocator)
 	: m_allocator(allocator)
+	, m_engine(engine)
 	, m_names(m_allocator)
 	, m_entities(m_allocator)
 	, m_component_added(m_allocator)
@@ -55,13 +57,14 @@ Universe::Universe(IAllocator& allocator)
 	, m_transforms(m_allocator)
 	, m_name(m_allocator)
 {
+
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
+	memset(m_component_type_map, 0, sizeof(m_component_type_map));
 }
 
 
-IScene* Universe::getScene(ComponentType type) const
-{
+IScene* Universe::getScene(ComponentType type) const {
 	return m_component_type_map[type.index].scene;
 }
 
@@ -87,6 +90,15 @@ Array<UniquePtr<IScene>>& Universe::getScenes()
 
 void Universe::addScene(UniquePtr<IScene>&& scene)
 {
+	const u32 hash = crc32(scene->getPlugin().getName());
+	for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+		if (cmp.scene == hash) {
+			m_component_type_map[cmp.cmp->component_type.index].scene = scene.get();
+			m_component_type_map[cmp.cmp->component_type.index].create = cmp.cmp->creator;
+			m_component_type_map[cmp.cmp->component_type.index].destroy = cmp.cmp->destroyer;
+		}
+	}
+
 	m_scenes.push(scene.move());
 }
 
@@ -378,7 +390,7 @@ void Universe::destroyEntity(EntityRef entity)
 			auto original_mask = mask;
 			IScene* scene = m_component_type_map[i].scene;
 			auto destroy_method = m_component_type_map[i].destroy;
-			(scene->*destroy_method)(entity);
+			destroy_method(scene, entity);
 			mask = entity_data.components;
 			ASSERT(original_mask != mask);
 		}
@@ -774,7 +786,7 @@ void Universe::createComponent(ComponentType type, EntityRef entity)
 {
 	IScene* scene = m_component_type_map[type.index].scene;
 	auto& create_method = m_component_type_map[type.index].create;
-	(scene->*create_method)(entity);
+	create_method(scene, entity);
 }
 
 
@@ -782,7 +794,7 @@ void Universe::destroyComponent(EntityRef entity, ComponentType type)
 {
 	IScene* scene = m_component_type_map[type.index].scene;
 	auto& destroy_method = m_component_type_map[type.index].destroy;
-	(scene->*destroy_method)(entity);
+	destroy_method(scene, entity);
 }
 
 

@@ -176,11 +176,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override 
 	{
-		m_app.registerComponent("", "ambient_sound", "Audio / Ambient sound");
-		m_app.registerComponent(ICON_FA_HEADPHONES, "audio_listener", "Audio / Listener");
-		m_app.registerComponent("", "echo_zone", "Audio / Echo zone");
-		m_app.registerComponent("", "chorus_zone", "Audio / Chorus zone");
-
 		IAllocator& allocator = m_app.getAllocator();
 
 		m_app.getAssetBrowser().addPlugin(m_asset_browser_plugin);

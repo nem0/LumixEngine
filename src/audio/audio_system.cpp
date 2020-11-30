@@ -4,44 +4,12 @@
 #include "clip.h"
 #include "engine/engine.h"
 #include "engine/plugin.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 
 
 namespace Lumix
 {
-
-namespace Reflection {
-	//inline AudioScene::SoundHandle fromVariant(int i, Span<Variant> args, VariantTag<AudioScene::SoundHandle>) { return args[i].i; }
-}
-
-static void registerProperties(IAllocator& allocator)
-{
-	using namespace Reflection;
-	static auto audio_scene = scene("audio",
-		functions(
-			LUMIX_FUNC(AudioScene::setMasterVolume),
-			LUMIX_FUNC(AudioScene::play),
-			LUMIX_FUNC(AudioScene::setVolume),
-			LUMIX_FUNC(AudioScene::setEcho)
-		),
-		component("ambient_sound",
-			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
-			property("Sound", LUMIX_PROP(AudioScene, AmbientSoundClip), ResourceAttribute("OGG (*.ogg)", Clip::TYPE))
-		),
-		component("audio_listener"),
-		component("echo_zone",
-			var_property("Radius", &AudioScene::getEchoZone, &EchoZone::radius, MinAttribute(0)),
-			var_property("Delay (ms)", &AudioScene::getEchoZone, &EchoZone::delay, MinAttribute(0))
-		),
-		component("chorus_zone",
-			var_property("Radius", &AudioScene::getChorusZone, &ChorusZone::radius, MinAttribute(0)),
-			var_property("Delay (ms)", &AudioScene::getChorusZone, &ChorusZone::delay, MinAttribute(0))
-		)
-	);
-	registerScene(audio_scene);
-}
 
 
 struct ClipManager final : ResourceManager
@@ -70,6 +38,7 @@ struct AudioSystemImpl final : AudioSystem
 		: m_engine(engine)
 		, m_manager(engine.getAllocator())
 	{
+		AudioScene::reflect(engine);
 	}
 
 
@@ -84,7 +53,6 @@ struct AudioSystemImpl final : AudioSystem
 
 	void init() override
 	{
-		registerProperties(m_engine.getAllocator());
 		m_device = AudioDevice::create(m_engine);
 		m_manager.create(Clip::TYPE, m_engine.getResourceManager());
 	}

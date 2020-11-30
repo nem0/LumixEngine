@@ -53,6 +53,7 @@ struct AudioScene : IScene
 	static UniquePtr<AudioScene> createInstance(AudioSystem& system,
 		Universe& universe,
 		struct IAllocator& allocator);
+	static void reflect(struct Engine& engine);
 
 	virtual void setMasterVolume(float volume) = 0;
 

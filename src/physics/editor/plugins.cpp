@@ -944,17 +944,6 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	void init() override
 	{
-		m_app.registerComponent("", "distance_joint", "Physics / Joints / Distance");
-		m_app.registerComponent("", "hinge_joint", "Physics / Joints / Hinge");
-		m_app.registerComponent("", "spherical_joint", "Physics / Joints / Spherical");
-		m_app.registerComponent("", "d6_joint", "Physics / Joints / D6");
-		m_app.registerComponent("", "physical_controller", "Physics / Controller");
-		m_app.registerComponent("", "physical_heightfield", "Physics / Heightfield");
-		m_app.registerComponent(ICON_FA_MALE, "ragdoll", "Physics / Ragdoll");
-		m_app.registerComponent(ICON_FA_VOLLEYBALL_BALL, "rigid_actor", "Physics / Rigid actor");
-		m_app.registerComponent(ICON_FA_CAR_ALT, "vehicle", "Physics / Vehicle");
-		m_app.registerComponent("", "wheel", "Physics / Wheel");
-
 		m_app.addPlugin(m_ui_plugin);
 		m_app.getAssetBrowser().addPlugin(m_geom_plugin);
 	}

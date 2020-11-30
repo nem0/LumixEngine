@@ -97,18 +97,6 @@ struct AnimationSceneImpl final : AnimationScene
 		, m_animator_map(allocator)
 	{
 		m_is_game_running = false;
-		universe.registerComponentType(PROPERTY_ANIMATOR_TYPE
-			, this
-			, &AnimationSceneImpl::createPropertyAnimator
-			, &AnimationSceneImpl::destroyPropertyAnimator);
-		universe.registerComponentType(ANIMABLE_TYPE
-			, this
-			, &AnimationSceneImpl::createAnimable
-			, &AnimationSceneImpl::destroyAnimable);
-		universe.registerComponentType(ANIMATOR_TYPE
-			, this
-			, &AnimationSceneImpl::createAnimator
-			, &AnimationSceneImpl::destroyAnimator);
 	}
 
 	void init() override {
@@ -961,5 +949,32 @@ UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin
 	return UniquePtr<AnimationSceneImpl>::create(allocator, engine, plugin, universe, allocator);
 }
 
-
+void AnimationScene::reflect(Engine& engine) {
+	using namespace Reflection;
+	static auto anim_scene = scene("animation",
+		LUMIX_CMP(AnimationSceneImpl, PropertyAnimator, "property_animator", "Animation / Property animator", 
+			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
+				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE)),
+			property("Enabled", &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator)
+		),
+		LUMIX_CMP(AnimationSceneImpl, Animator, "animator", "Animation / Animator",
+			functions(
+				function((void (AnimationScene::*)(EntityRef, u32, u32))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setU32Input"),
+				function((void (AnimationScene::*)(EntityRef, u32, float))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setFloatInput"),
+				function((void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setBoolInput"),
+				LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex"),
+				LUMIX_FUNC_EX(AnimationScene::setAnimatorIK, "setIK")
+			),
+			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
+				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE)),
+			property("Default set", LUMIX_PROP(AnimationScene, AnimatorDefaultSet))
+		),
+		LUMIX_CMP(AnimationSceneImpl, Animable, "animable", "Animation / Animable",
+			property("Animation", LUMIX_PROP(AnimationScene, Animation),
+				ResourceAttribute("Animation (*.ani)", Animation::TYPE))
+		)
+	);
+	registerScene(anim_scene);
 }
+
+} // namespace Lumix

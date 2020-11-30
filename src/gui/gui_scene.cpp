@@ -16,6 +16,7 @@
 #include "renderer/pipeline.h"
 #include "renderer/texture.h"
 #include "sprite.h"
+#include "imgui/IconsFontAwesome5.h"
 
 
 namespace Lumix
@@ -174,34 +175,6 @@ struct GUISceneImpl final : GUIScene
 		, m_buttons_down_count(0)
 		, m_canvas_size(800, 600)
 	{
-		context.registerComponentType(GUI_RECT_TYPE
-			, this
-			, &GUISceneImpl::createRect
-			, &GUISceneImpl::destroyRect);
-		context.registerComponentType(GUI_IMAGE_TYPE
-			, this
-			, &GUISceneImpl::createImage
-			, &GUISceneImpl::destroyImage);
-		context.registerComponentType(GUI_RENDER_TARGET_TYPE
-			, this
-			, &GUISceneImpl::createRenderTarget
-			, &GUISceneImpl::destroyRenderTarget);
-		context.registerComponentType(GUI_INPUT_FIELD_TYPE
-			, this
-			, &GUISceneImpl::createInputField
-			, &GUISceneImpl::destroyInputField);
-		context.registerComponentType(GUI_TEXT_TYPE
-			, this
-			, &GUISceneImpl::createText
-			, &GUISceneImpl::destroyText);
-		context.registerComponentType(GUI_BUTTON_TYPE
-			, this
-			, &GUISceneImpl::createButton
-			, &GUISceneImpl::destroyButton);
-		context.registerComponentType(GUI_CANVAS_TYPE
-			, this
-			, &GUISceneImpl::createCanvas
-			, &GUISceneImpl::destroyCanvas);
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 	
@@ -1328,5 +1301,97 @@ UniquePtr<GUIScene> GUIScene::createInstance(GUISystem& system,
 	return UniquePtr<GUISceneImpl>::create(allocator, system, universe, allocator);
 }
 
+void GUIScene::reflect() {
+	using namespace Reflection;
+
+	struct TextHAlignEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return 3; }
+		const char* name(ComponentUID cmp, u32 idx) const override {
+			switch((GUIScene::TextHAlign)idx) {
+				case GUIScene::TextHAlign::LEFT: return "Left";
+				case GUIScene::TextHAlign::RIGHT: return "Right";
+				case GUIScene::TextHAlign::CENTER: return "Center";
+				default: ASSERT(false); return "N/A";
+			}
+		}
+	};
+
+	struct TextVAlignEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return 3; }
+		const char* name(ComponentUID cmp, u32 idx) const override {
+			switch((GUIScene::TextVAlign)idx) {
+				case GUIScene::TextVAlign::TOP: return "Top";
+				case GUIScene::TextVAlign::MIDDLE: return "Middle";
+				case GUIScene::TextVAlign::BOTTOM: return "Bottom";
+				default: ASSERT(false); return "N/A";
+			}
+		}
+	};
+		
+	struct CursorEnum : Reflection::EnumAttribute {
+		u32 count(ComponentUID cmp) const override { return 7; }
+		const char* name(ComponentUID cmp, u32 idx) const override {
+			switch((OS::CursorType)idx) {
+				case OS::CursorType::UNDEFINED: return "Ignore";
+				case OS::CursorType::DEFAULT: return "Default";
+				case OS::CursorType::LOAD: return "Load";
+				case OS::CursorType::SIZE_NS: return "Size NS";
+				case OS::CursorType::SIZE_NWSE: return "Size NWSE";
+				case OS::CursorType::SIZE_WE: return "Size WE";
+				case OS::CursorType::TEXT_INPUT: return "Text input";
+				default: ASSERT(false); return "N/A";
+			}
+		}
+	};
+
+	static auto lua_scene = scene("gui",
+		functions(
+			LUMIX_FUNC(GUIScene::getRectAt),
+			LUMIX_FUNC(GUIScene::isOver),
+			LUMIX_FUNC(GUIScene::getSystem)
+		),
+		LUMIX_CMP(GUISceneImpl, RenderTarget, "gui_render_target", "GUI / Render taget"),
+		LUMIX_CMP(GUISceneImpl, Text, "gui_text", "GUI / Text",
+			property("Text", LUMIX_PROP(GUIScene, Text), MultilineAttribute()),
+			property("Font", LUMIX_PROP(GUIScene, TextFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
+			property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
+			enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), TextHAlignEnum()),
+			enum_property("Vertical align", LUMIX_PROP(GUIScene, TextVAlign), TextVAlignEnum()),
+			property("Color", LUMIX_PROP(GUIScene, TextColorRGBA), ColorAttribute())
+		),
+		LUMIX_CMP(GUISceneImpl, InputField, "gui_input_field", "GUI / Input field"),
+		LUMIX_CMP(GUISceneImpl, Canvas, "gui_canvas", "GUI / Canvas",
+			var_property("Is 3D", &GUIScene::getCanvas, &GUICanvas::is_3d),
+			var_property("Orient to camera", &GUIScene::getCanvas, &GUICanvas::orient_to_camera),
+			var_property("Virtual size", &GUIScene::getCanvas, &GUICanvas::virtual_size)
+		),
+		LUMIX_CMP(GUISceneImpl, Button, "gui_button", "GUI / Button",
+			property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA), ColorAttribute()),
+			enum_property("Cursor", LUMIX_PROP(GUIScene, ButtonHoveredCursor), CursorEnum())
+		),
+		LUMIX_CMP(GUISceneImpl, Image, "gui_image", "GUI / Image",
+			property("Enabled", &GUIScene::isImageEnabled, &GUIScene::enableImage),
+			property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA), ColorAttribute()),
+			property("Sprite", LUMIX_PROP(GUIScene, ImageSprite), ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
+		),
+		LUMIX_CMP(GUISceneImpl, Rect, "gui_rect", "GUI / Rect",
+			property("Enabled", &GUIScene::isRectEnabled, &GUIScene::enableRect),
+			property("Clip content", LUMIX_PROP(GUIScene, RectClip)),
+			property("Top Points", LUMIX_PROP(GUIScene, RectTopPoints)),
+			property("Top Relative", LUMIX_PROP(GUIScene, RectTopRelative)),
+			property("Right Points", LUMIX_PROP(GUIScene, RectRightPoints)),
+			property("Right Relative", LUMIX_PROP(GUIScene, RectRightRelative)),
+			property("Bottom Points", LUMIX_PROP(GUIScene, RectBottomPoints)),
+			property("Bottom Relative", LUMIX_PROP(GUIScene, RectBottomRelative)),
+			property("Left Points", LUMIX_PROP(GUIScene, RectLeftPoints)),
+			property("Left Relative", LUMIX_PROP(GUIScene, RectLeftRelative))
+		)
+	);
+	registerScene(lua_scene);
+		
+	setIcon(GUI_IMAGE_TYPE, ICON_FA_IMAGE);
+	setIcon(GUI_INPUT_FIELD_TYPE, ICON_FA_KEYBOARD);
+	setIcon(GUI_TEXT_TYPE, ICON_FA_FONT);
+}
 
 } // namespace Lumix

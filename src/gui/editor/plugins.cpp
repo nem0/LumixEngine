@@ -905,31 +905,20 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	bool dependsOn(IPlugin& plugin) const override { return equalStrings(plugin.getName(), "renderer"); }
 
 
-	void init() override
-	{
+	void init() override {
 		m_gui_editor.init();
-		m_app.registerComponent("", "gui_button", "GUI / Button");
-		m_app.registerComponent("", "gui_canvas", "GUI / Canvas");
-		m_app.registerComponent(ICON_FA_IMAGE, "gui_image", "GUI / Image", Sprite::TYPE, "Sprite");
-		m_app.registerComponent(ICON_FA_KEYBOARD, "gui_input_field", "GUI / Input field");
-		m_app.registerComponent("", "gui_rect", "GUI / Rect");
-		m_app.registerComponent("", "gui_render_target", "GUI / Render target");
-		m_app.registerComponent(ICON_FA_FONT, "gui_text", "GUI / Text");
 
-		IAllocator& allocator = m_app.getAllocator();
 		m_app.addPlugin(m_gui_editor);
 
 		m_app.getAssetBrowser().addPlugin(m_sprite_plugin);
 
-		const char* sprite_exts[] = { "spr", nullptr };
+		const char* sprite_exts[] = {"spr", nullptr};
 		m_app.getAssetCompiler().addPlugin(m_sprite_plugin, sprite_exts);
 	}
 
 	bool showGizmo(UniverseView&, ComponentUID) override { return false; }
 	
-	~StudioAppPlugin()
-	{
-		IAllocator& allocator = m_app.getAllocator();
+	~StudioAppPlugin() {
 		m_app.removePlugin(m_gui_editor);
 
 		m_app.getAssetCompiler().removePlugin(m_sprite_plugin);

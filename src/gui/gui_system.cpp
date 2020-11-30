@@ -66,102 +66,13 @@ struct GUISystemImpl final : GUISystem
 		, m_interface(nullptr)
 		, m_sprite_manager(engine.getAllocator())
 	{
+		GUIScene::reflect();
 		LUMIX_FUNC(GUISystem::enableCursor);
-
-		using namespace Reflection;
-
-		struct TextHAlignEnum : Reflection::EnumAttribute {
-			u32 count(ComponentUID cmp) const override { return 3; }
-			const char* name(ComponentUID cmp, u32 idx) const override {
-				switch((GUIScene::TextHAlign)idx) {
-					case GUIScene::TextHAlign::LEFT: return "Left";
-					case GUIScene::TextHAlign::RIGHT: return "Right";
-					case GUIScene::TextHAlign::CENTER: return "Center";
-					default: ASSERT(false); return "N/A";
-				}
-			}
-		};
-
-		struct TextVAlignEnum : Reflection::EnumAttribute {
-			u32 count(ComponentUID cmp) const override { return 3; }
-			const char* name(ComponentUID cmp, u32 idx) const override {
-				switch((GUIScene::TextVAlign)idx) {
-					case GUIScene::TextVAlign::TOP: return "Top";
-					case GUIScene::TextVAlign::MIDDLE: return "Middle";
-					case GUIScene::TextVAlign::BOTTOM: return "Bottom";
-					default: ASSERT(false); return "N/A";
-				}
-			}
-		};
-		
-		struct CursorEnum : Reflection::EnumAttribute {
-			u32 count(ComponentUID cmp) const override { return 7; }
-			const char* name(ComponentUID cmp, u32 idx) const override {
-				switch((OS::CursorType)idx) {
-					case OS::CursorType::UNDEFINED: return "Ignore";
-					case OS::CursorType::DEFAULT: return "Default";
-					case OS::CursorType::LOAD: return "Load";
-					case OS::CursorType::SIZE_NS: return "Size NS";
-					case OS::CursorType::SIZE_NWSE: return "Size NWSE";
-					case OS::CursorType::SIZE_WE: return "Size WE";
-					case OS::CursorType::TEXT_INPUT: return "Text input";
-					default: ASSERT(false); return "N/A";
-				}
-			}
-		};
-
-		static auto lua_scene = scene("gui",
-			functions(
-				LUMIX_FUNC(GUIScene::getRectAt),
-				LUMIX_FUNC(GUIScene::isOver),
-				LUMIX_FUNC(GUIScene::getSystem)
-			),
-			component("gui_text",
-				property("Text", LUMIX_PROP(GUIScene, Text), MultilineAttribute()),
-				property("Font", LUMIX_PROP(GUIScene, TextFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
-				property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
-				enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), TextHAlignEnum()),
-				enum_property("Vertical align", LUMIX_PROP(GUIScene, TextVAlign), TextVAlignEnum()),
-				property("Color", LUMIX_PROP(GUIScene, TextColorRGBA), ColorAttribute())
-			),
-			component("gui_input_field"),
-			component("gui_canvas",
-				var_property("Is 3D", &GUIScene::getCanvas, &GUICanvas::is_3d),
-				var_property("Orient to camera", &GUIScene::getCanvas, &GUICanvas::orient_to_camera),
-				var_property("Virtual size", &GUIScene::getCanvas, &GUICanvas::virtual_size)
-			),
-			component("gui_button",
-				property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA), ColorAttribute()),
-				enum_property("Cursor", LUMIX_PROP(GUIScene, ButtonHoveredCursor), CursorEnum())
-			),
-			component("gui_image",
-				property("Enabled", &GUIScene::isImageEnabled, &GUIScene::enableImage),
-				property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA), ColorAttribute()),
-				property("Sprite", LUMIX_PROP(GUIScene, ImageSprite), ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
-			),
-			component("gui_rect",
-				property("Enabled", &GUIScene::isRectEnabled, &GUIScene::enableRect),
-				property("Clip content", LUMIX_PROP(GUIScene, RectClip)),
-				property("Top Points", LUMIX_PROP(GUIScene, RectTopPoints)),
-				property("Top Relative", LUMIX_PROP(GUIScene, RectTopRelative)),
-				property("Right Points", LUMIX_PROP(GUIScene, RectRightPoints)),
-				property("Right Relative", LUMIX_PROP(GUIScene, RectRightRelative)),
-				property("Bottom Points", LUMIX_PROP(GUIScene, RectBottomPoints)),
-				property("Bottom Relative", LUMIX_PROP(GUIScene, RectBottomRelative)),
-				property("Left Points", LUMIX_PROP(GUIScene, RectLeftPoints)),
-				property("Left Relative", LUMIX_PROP(GUIScene, RectLeftRelative))
-			)
-		);
-		registerScene(lua_scene);
 		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
 
 
-	~GUISystemImpl()
-	{
-		m_sprite_manager.destroy();
-	}
-
+	~GUISystemImpl() { m_sprite_manager.destroy(); }
 
 	Engine& getEngine() override { return m_engine; }
 

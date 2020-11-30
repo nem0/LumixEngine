@@ -316,152 +316,6 @@ struct GPUProfiler
 };
 
 
-struct BoneEnum : Reflection::EnumAttribute
-{
-	u32 count(ComponentUID cmp) const override {
-		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-		EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
-		if (!model_instance.isValid()) return 0;
-
-		auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
-		if (!model || !model->isReady()) return 0;
-
-		return model->getBoneCount();
-	}
-
-	const char* name(ComponentUID cmp, u32 idx) const override {
-		RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
-		EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
-		if (!model_instance.isValid()) return "";
-
-		auto* model = render_scene->getModelInstanceModel((EntityRef)model_instance);
-		if (!model) return "";
-
-		return idx < (u32)model->getBoneCount() ? model->getBone(idx).name.c_str() : "N/A";
-	}
-
-
-	EntityPtr getModelInstance(RenderScene* render_scene, EntityRef bone_attachment) const
-	{
-		EntityPtr parent_entity = render_scene->getBoneAttachmentParent(bone_attachment);
-		if (!parent_entity.isValid()) return INVALID_ENTITY;
-		return render_scene->getUniverse().hasComponent((EntityRef)parent_entity, MODEL_INSTANCE_TYPE) ? parent_entity : INVALID_ENTITY;
-	}
-};
-
-
-static void registerProperties(IAllocator& allocator)
-{
-	using namespace Reflection;
-
-	struct RotationModeEnum : Reflection::EnumAttribute {
-		u32 count(ComponentUID cmp) const override { return 2; }
-		const char* name(ComponentUID cmp, u32 idx) const override {
-			switch((Terrain::GrassType::RotationMode)idx) {
-				case Terrain::GrassType::RotationMode::ALL_RANDOM: return "All random";
-				case Terrain::GrassType::RotationMode::Y_UP: return "Y up";
-				default: ASSERT(false); return "N/A";
-			}
-		}
-	};
-
-	static auto render_scene = scene("renderer",
-		functions(
-			LUMIX_FUNC(RenderScene::setGlobalLODMultiplier),
-			LUMIX_FUNC(RenderScene::getGlobalLODMultiplier),
-			LUMIX_FUNC(RenderScene::addDebugCross),
-			LUMIX_FUNC(RenderScene::addDebugLine)
-		),
-		component("bone_attachment",
-			property("Parent", LUMIX_PROP(RenderScene, BoneAttachmentParent)),
-			property("Relative position", LUMIX_PROP(RenderScene, BoneAttachmentPosition)),
-			property("Relative rotation", LUMIX_PROP(RenderScene, BoneAttachmentRotation), 
-				RadiansAttribute()),
-			property("Bone", LUMIX_PROP(RenderScene, BoneAttachmentBone), BoneEnum()) 
-		),
-		component("fur",
-			var_property("Layers", &RenderScene::getFur, &FurComponent::layers),
-			var_property("Scale", &RenderScene::getFur, &FurComponent::scale),
-			var_property("Gravity", &RenderScene::getFur, &FurComponent::gravity),
-			var_property("Enabled", &RenderScene::getFur, &FurComponent::enabled)
-		),
-		component("environment_probe",
-			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
-			var_property("Inner range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::inner_range),
-			var_property("Outer range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::outer_range)
-		),
-		component("reflection_probe",
-			property("Enabled", &RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe),
-			var_property("size", &RenderScene::getReflectionProbe, &ReflectionProbe::size),
-			var_property("half_extents", &RenderScene::getReflectionProbe, &ReflectionProbe::half_extents)
-		),
-		component("particle_emitter",
-			property("Emit rate", LUMIX_PROP(RenderScene, ParticleEmitterRate)),
-			property("Source", LUMIX_PROP(RenderScene, ParticleEmitterPath),
-				ResourceAttribute("Particle emitter (*.par)", ParticleEmitterResource::TYPE))
-		),
-		component("camera",
-			var_property("FOV", &RenderScene::getCamera, &Camera::fov, RadiansAttribute()),
-			var_property("Near", &RenderScene::getCamera, &Camera::near, MinAttribute(0)),
-			var_property("Far", &RenderScene::getCamera, &Camera::far, MinAttribute(0)),
-			var_property("Orthographic", &RenderScene::getCamera, &Camera::is_ortho),
-			var_property("Orthographic size", &RenderScene::getCamera, &Camera::ortho_size, MinAttribute(0))
-		),
-		component("model_instance",
-			functions(
-				LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel")
-			),
-			property("Enabled", &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance),
-			property("Material", &RenderScene::getModelInstanceMaterialOverride,&RenderScene::setModelInstanceMaterialOverride, NoUIAttribute()),
-			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath), ResourceAttribute("Mesh (*.msh)", Model::TYPE))
-		),
-		component("environment",
-			var_property("Color", &RenderScene::getEnvironment, &Environment::diffuse_color, ColorAttribute()),
-			var_property("Intensity", &RenderScene::getEnvironment, &Environment::diffuse_intensity, MinAttribute(0)),
-			var_property("Indirect intensity", &RenderScene::getEnvironment, &Environment::indirect_intensity, MinAttribute(0)),
-			property("Shadow cascades", LUMIX_PROP(RenderScene, ShadowmapCascades)),
-			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows))
-		),
-		component("point_light",
-			property("Cast shadows", LUMIX_PROP(RenderScene, PointLightCastShadows)),
-			property("Dynamic", LUMIX_PROP(RenderScene, PointLightDynamic)),
-			var_property("Intensity", &RenderScene::getPointLight, &PointLight::intensity, MinAttribute(0)),
-			var_property("FOV", &RenderScene::getPointLight, &PointLight::fov, ClampAttribute(0, 360), RadiansAttribute()),
-			var_property("Attenuation", &RenderScene::getPointLight, &PointLight::attenuation_param, ClampAttribute(0, 100)),
-			var_property("Color", &RenderScene::getPointLight, &PointLight::color, ColorAttribute()),
-			property("Range", LUMIX_PROP(RenderScene, LightRange), MinAttribute(0))
-		),
-		component("decal",
-			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE)),
-			property("Half extents", LUMIX_PROP(RenderScene, DecalHalfExtents), 
-				MinAttribute(0))
-		),
-		component("terrain",
-			functions(
-				LUMIX_FUNC(RenderScene::getTerrainNormalAt),
-				LUMIX_FUNC(RenderScene::getTerrainHeightAt)
-			),
-			property("Material", LUMIX_PROP(RenderScene, TerrainMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE)),
-			property("XZ scale", LUMIX_PROP(RenderScene, TerrainXZScale), 
-				MinAttribute(0)),
-			property("Height scale", LUMIX_PROP(RenderScene, TerrainYScale), 
-				MinAttribute(0)),
-			array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
-				property("Mesh", LUMIX_PROP(RenderScene, GrassPath),
-					ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
-				property("Distance", LUMIX_PROP(RenderScene, GrassDistance),
-					MinAttribute(1)),
-				property("Density", LUMIX_PROP(RenderScene, GrassDensity)),
-				property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), RotationModeEnum())
-			)
-		)
-	);
-	registerScene(render_scene);
-}
-
-
 struct RendererImpl final : Renderer
 {
 	explicit RendererImpl(Engine& engine)
@@ -480,6 +334,8 @@ struct RendererImpl final : Renderer
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
 	{
+		RenderScene::reflect();
+
 		LUMIX_FUNC(Model::getBoneCount);
 		LUMIX_FUNC(Model::getBoneName);
 		LUMIX_FUNC(Model::getBoneParent);
@@ -539,10 +395,7 @@ struct RendererImpl final : Renderer
 		return false;
 	}
 
-	void init() override
-	{
-		registerProperties(m_engine.getAllocator());
-		
+	void init() override {
 		struct InitData {
 			gpu::InitFlags flags = gpu::InitFlags::VSYNC;
 			RendererImpl* renderer;

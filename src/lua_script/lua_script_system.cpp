@@ -602,10 +602,6 @@ namespace Lumix
 			m_function_call.is_in_progress = false;
 			
 			registerAPI();
-			ctx.registerComponentType(LUA_SCRIPT_TYPE
-				, this
-				, &LuaScriptSceneImpl::createComponent
-				, &LuaScriptSceneImpl::destroyComponent);
 		}
 
 
@@ -1128,10 +1124,9 @@ namespace Lumix
 				scene = scene->next;
 			}
 
-			int cmps_count = Reflection::getComponentTypesCount();
-			for (int i = 0; i < cmps_count; ++i) {
-				const char* cmp_name = Reflection::getComponentTypeID(i);
-				const ComponentType cmp_type = Reflection::getComponentType(cmp_name);
+			for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+				const char* cmp_name = cmp.cmp->name;
+				const ComponentType cmp_type = cmp.cmp->component_type;
 
 				lua_newtable(L); // [ cmp ]
 				lua_getglobal(L, "Lumix"); // [ cmp, Lumix ]
@@ -2373,7 +2368,7 @@ namespace Lumix
 		using namespace Reflection;
 		
 		static auto lua_scene = scene("lua_script",
-			component("lua_script",
+			LUMIX_CMP(LuaScriptSceneImpl, Component, "lua_script", "Lua script", 
 				array("scripts", &LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript, 
 					property("Enabled", &LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript),
 					property("Path", LUMIX_PROP(LuaScriptScene, ScriptPath), ResourceAttribute("Lua script (*.lua)", LuaScript::TYPE)),
@@ -2404,4 +2399,4 @@ namespace Lumix
 	{
 		return LUMIX_NEW(engine.getAllocator(), LuaScriptSystemImpl)(engine);
 	}
-}
+} // namespace Lumix
