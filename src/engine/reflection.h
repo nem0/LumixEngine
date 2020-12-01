@@ -10,13 +10,13 @@
 
 
 #define LUMIX_CMP(Component, ...) component<&ReflScene::create##Component, &ReflScene::destroy##Component>(__VA_ARGS__)
-#define LUMIX_PROP(Property, Label, ...) property(Label, &ReflScene::get##Property, &ReflScene::set##Property, __VA_ARGS__)
+#define LUMIX_PROP(Property, Label, ...) property(Label, &ReflScene::get##Property, &ReflScene::set##Property, ##__VA_ARGS__)
 #define LUMIX_FUNC_EX(Func, Name) Reflection::function(&Func, #Func, Name)
 #define LUMIX_FUNC(Func) Reflection::function(&Func, #Func, nullptr)
 #define LUMIX_SCENE(Type, Name, ...) \
 	do { \
 		using namespace Reflection; \
-		static auto registered_scene = [](){ using ReflScene = Type; return Reflection::scene(Name, __VA_ARGS__); }(); \
+		static auto registered_scene = [](){ using ReflScene = Type; return Reflection::scene(Name, ##__VA_ARGS__); }(); \
 		Reflection::registerScene(registered_scene); \
 	} while(false)
 	
@@ -280,6 +280,8 @@ struct ComponentBase
 	ComponentType component_type;
 };
 
+struct Icon { const char* name; };
+inline Icon icon(const char* name) { return {name}; }
 
 template <typename T>
 bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const char* prop_name, Ref<T> out) {
@@ -645,6 +647,61 @@ struct Component<Tuple<Funcs...>, Props> : ComponentBase
 	TupleHolder<FunctionBase, Funcs...> functions;
 };
 
+template <typename... T>
+struct Filter {
+	template <typename B>
+	struct HasBase {
+		static u8 check(const void*) { return {}; }
+		static u32 check(const B*) { return {}; }
+
+		template <typename T2>
+		static constexpr bool has() { return sizeof(check((T2*)nullptr)) == sizeof(u32); }
+	};
+
+	static auto properties(T... t) { return makeTuple(t...); }
+	static auto functions(T... t) { return makeTuple(t...); }
+	static auto components(T... t) { return makeTuple(t...); }
+
+	template <typename... T2, typename H>
+	static auto properties(T... t, H h, T2... t2) {
+		if constexpr (HasBase<PropertyTag>::template has<H>()) {
+			return Filter<T..., H>::properties(t..., h, t2...);
+		}
+		else {
+			return Filter<T...>::properties(t..., t2...);
+		}
+	}
+
+	template <typename... T2, typename H>
+	static auto functions(T... t, H h, T2... t2) {
+		if constexpr (HasBase<FunctionBase>::template has<H>()) {
+			return Filter<T..., H>::functions(t..., h, t2...);
+		}
+		else {
+			return Filter<T...>::functions(t..., t2...);
+		}
+	}
+
+	template <typename... T2, typename H>
+	static auto components(T... t, H h, T2... t2) {
+		if constexpr (HasBase<ComponentBase>::template has<H>()) {
+			return Filter<T..., H>::components(t..., h, t2...);
+		}
+		else {
+			return Filter<T...>::components(t..., t2...);
+		}
+	}
+
+	static const char* icon() { return ""; }
+	template <typename H, typename... T2> static const char* icon(H h, T2... t) {
+		if constexpr (HasBase<Icon>::template has<H>()) {
+			return h.name;
+		}
+		else {
+			return icon(t...);
+		}
+	}
+};
 
 template <typename... Members>
 auto scene(const char* name, Members... members)
@@ -776,61 +833,6 @@ auto& function(F func, const char* decl_code, const char* name)
 	return ret;
 }
 
-template <typename... T>
-struct Filter {
-	template <typename B>
-	struct HasBase {
-		static u8 check(const void*) { return {} };
-		static u32 check(const B*) { return {} };
-
-		template <typename T2>
-		static constexpr bool type = sizeof(check((T2*)nullptr)) == sizeof(u32);
-	};
-
-	static auto properties(T... t) { return makeTuple(t...); }
-	static auto functions(T... t) { return makeTuple(t...); }
-	static auto components(T... t) { return makeTuple(t...); }
-
-	template <typename... T2, typename H>
-	static auto properties(T... t, H h, T2... t2) {
-		if constexpr (HasBase<PropertyTag>::type<H>) {
-			return Filter<T..., H>::properties(t..., h, t2...);
-		}
-		else {
-			return Filter<T...>::properties(t..., t2...);
-		}
-	}
-
-	template <typename... T2, typename H>
-	static auto functions(T... t, H h, T2... t2) {
-		if constexpr (HasBase<FunctionBase>::type<H>) {
-			return Filter<T..., H>::functions(t..., h, t2...);
-		}
-		else {
-			return Filter<T...>::functions(t..., t2...);
-		}
-	}
-
-	template <typename... T2, typename H>
-	static auto components(T... t, H h, T2... t2) {
-		if constexpr (HasBase<ComponentBase>::type<H>) {
-			return Filter<T..., H>::components(t..., h, t2...);
-		}
-		else {
-			return Filter<T...>::components(t..., t2...);
-		}
-	}
-
-	static const char* icon() { return ""; }
-	template <typename H, typename... T> static const char* icon(H h, T... t) {
-		if constexpr (HasBase<Icon>::type<H>) {
-			return h.name;
-		}
-		else {
-			return icon(t...);
-		}
-	}
-};
 
 template <auto Creator, auto Destroyer, typename... Props>
 auto component(const char* name, const char* label, Props... props)
@@ -852,9 +854,6 @@ auto component(const char* name, const char* label, Props... props)
 	cmp.component_type = getComponentType(name);
 	return cmp;
 }
-
-struct Icon { const char* name; };
-inline Icon icon(const char* name) { return {name}; }
 
 template <typename Getter, typename Setter>
 auto blob_property(const char* name, Getter getter, Setter setter)
