@@ -173,6 +173,7 @@ static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot
 	Animation* anim = ctx.animations[slot];
 	if (!anim) return;
 	if (!ctx.model->isReady()) return;
+	if (!anim->isReady()) return;
 
 	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
 
