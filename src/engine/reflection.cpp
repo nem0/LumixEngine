@@ -120,11 +120,6 @@ Span<const RegisteredComponent> getComponents() {
 	return Span(g_components, g_components_count);
 }
 
-void setIcon(ComponentType type, const char* icon) {
-	ASSERT(type.index >= 0 && type.index < (i32)g_components_count);
-	g_components[type.index].icon = icon;
-}
-
 
 } // namespace Reflection
 

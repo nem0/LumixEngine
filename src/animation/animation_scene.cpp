@@ -131,7 +131,7 @@ struct AnimationSceneImpl final : AnimationScene
 		for (Animator& animator : m_animators)
 		{
 			unloadResource(animator.resource);
-			setAnimatorSource(animator, nullptr);
+			setSource(animator, nullptr);
 		}
 		m_animators.clear();
 	}
@@ -257,7 +257,7 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 
-	void setAnimatorSource(Animator& animator, Anim::Controller* res)
+	void setSource(Animator& animator, Anim::Controller* res)
 	{
 		if (animator.resource == res) return;
 		if (animator.resource != nullptr) {
@@ -319,7 +319,7 @@ struct AnimationSceneImpl final : AnimationScene
 		const u32 idx = m_animator_map[entity];
 		Animator& animator = m_animators[idx];
 		unloadResource(animator.resource);
-		setAnimatorSource(animator, nullptr);
+		setSource(animator, nullptr);
 		const Animator& last = m_animators.back();
 		m_animator_map[last.entity] = idx;
 		m_animator_map.erase(entity);
@@ -402,7 +402,7 @@ struct AnimationSceneImpl final : AnimationScene
 			animator.entity = entity_map.get(animator.entity);
 
 			const char* tmp = serializer.readString();
-			setAnimatorSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);
+			setSource(animator, tmp[0] ? loadController(Path(tmp)) : nullptr);
 			m_animator_map.insert(animator.entity, m_animators.size());
 			m_animators.push(animator);
 			m_universe.onComponentCreated(animator.entity, ANIMATOR_TYPE, this);
@@ -414,7 +414,7 @@ struct AnimationSceneImpl final : AnimationScene
 	{
 		Animator& animator = m_animators[m_animator_map[entity]];
 		unloadResource(animator.resource);
-		setAnimatorSource(animator, path.isValid() ? loadController(path) : nullptr);
+		setSource(animator, path.isValid() ? loadController(path) : nullptr);
 		if (animator.resource && animator.resource->isReady() && m_is_game_running) {
 			animator.ctx = animator.resource->createRuntime(animator.default_set);
 		}
@@ -950,31 +950,24 @@ UniquePtr<AnimationScene> AnimationScene::create(Engine& engine, IPlugin& plugin
 }
 
 void AnimationScene::reflect(Engine& engine) {
-	using namespace Reflection;
-	static auto anim_scene = scene("animation",
-		LUMIX_CMP(AnimationSceneImpl, PropertyAnimator, "property_animator", "Animation / Property animator", 
-			property("Animation", LUMIX_PROP(AnimationScene, PropertyAnimation),
-				ResourceAttribute("Property animation (*.anp)", PropertyAnimation::TYPE)),
+	LUMIX_SCENE(AnimationSceneImpl, "animation",
+		LUMIX_CMP(PropertyAnimator, "property_animator", "Animation / Property animator", 
+			LUMIX_PROP(PropertyAnimation, "Animation", ResourceAttribute(PropertyAnimation::TYPE)),
 			property("Enabled", &AnimationScene::isPropertyAnimatorEnabled, &AnimationScene::enablePropertyAnimator)
 		),
-		LUMIX_CMP(AnimationSceneImpl, Animator, "animator", "Animation / Animator",
-			functions(
-				function((void (AnimationScene::*)(EntityRef, u32, u32))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setU32Input"),
-				function((void (AnimationScene::*)(EntityRef, u32, float))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setFloatInput"),
-				function((void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setBoolInput"),
-				LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex"),
-				LUMIX_FUNC_EX(AnimationScene::setAnimatorIK, "setIK")
-			),
-			property("Source", LUMIX_PROP(AnimationScene, AnimatorSource),
-				ResourceAttribute("Animation controller (*.act)", Anim::Controller::TYPE)),
-			property("Default set", LUMIX_PROP(AnimationScene, AnimatorDefaultSet))
+		LUMIX_CMP(Animator, "animator", "Animation / Animator",
+			function((void (AnimationScene::*)(EntityRef, u32, u32))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setU32Input"),
+			function((void (AnimationScene::*)(EntityRef, u32, float))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setFloatInput"),
+			function((void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setBoolInput"),
+			LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex"),
+			LUMIX_FUNC_EX(AnimationScene::setAnimatorIK, "setIK"),
+			LUMIX_PROP(AnimatorSource, "Source", ResourceAttribute(Anim::Controller::TYPE)),
+			LUMIX_PROP(AnimatorDefaultSet, "Default set")
 		),
-		LUMIX_CMP(AnimationSceneImpl, Animable, "animable", "Animation / Animable",
-			property("Animation", LUMIX_PROP(AnimationScene, Animation),
-				ResourceAttribute("Animation (*.ani)", Animation::TYPE))
+		LUMIX_CMP(Animable, "animable", "Animation / Animable", 
+			LUMIX_PROP(Animation, "Animation", ResourceAttribute(Animation::TYPE))
 		)
 	);
-	registerScene(anim_scene);
 }
 
 } // namespace Lumix

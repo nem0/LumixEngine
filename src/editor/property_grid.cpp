@@ -100,7 +100,7 @@ struct GridUIVisitor final : Reflection::IPropertyVisitor
 					attrs.max = ((Reflection::ClampAttribute&)*attr).max;
 					break;
 				case Reflection::IAttribute::RESOURCE:
-					attrs.resource_type = ((Reflection::ResourceAttribute&)*attr).type;
+					attrs.resource_type = ((Reflection::ResourceAttribute&)*attr).resource_type;
 					break;
 			}
 		}

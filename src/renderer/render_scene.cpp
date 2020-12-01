@@ -2486,6 +2486,7 @@ private:
 	HashMap<Material*, EntityRef> m_material_decal_map;
 };
 
+
 void RenderScene::reflect() {
 	using namespace Reflection;
 
@@ -2531,105 +2532,88 @@ void RenderScene::reflect() {
 		}
 	};
 
-	static auto render_scene = scene("renderer",
-		functions(
-			LUMIX_FUNC(RenderScene::setGlobalLODMultiplier),
-			LUMIX_FUNC(RenderScene::getGlobalLODMultiplier),
-			LUMIX_FUNC(RenderScene::addDebugCross),
-			LUMIX_FUNC(RenderScene::addDebugLine)
+	LUMIX_SCENE(RenderSceneImpl, "renderer",
+		LUMIX_FUNC(RenderScene::setGlobalLODMultiplier),
+		LUMIX_FUNC(RenderScene::getGlobalLODMultiplier),
+		LUMIX_FUNC(RenderScene::addDebugCross),
+		LUMIX_FUNC(RenderScene::addDebugLine),
+		LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment",
+			icon(ICON_FA_BONE),
+			LUMIX_PROP(BoneAttachmentParent, "Parent"),
+			LUMIX_PROP(BoneAttachmentPosition, "Relative position"),
+			LUMIX_PROP(BoneAttachmentRotation, "Relative rotation", RadiansAttribute()),
+			LUMIX_PROP(BoneAttachmentBone, "Bone", BoneEnum()) 
 		),
-		LUMIX_CMP(RenderSceneImpl, BoneAttachment, "bone_attachment", "Render / Bone attachment",
-			property("Parent", LUMIX_PROP(RenderScene, BoneAttachmentParent)),
-			property("Relative position", LUMIX_PROP(RenderScene, BoneAttachmentPosition)),
-			property("Relative rotation", LUMIX_PROP(RenderScene, BoneAttachmentRotation), 
-				RadiansAttribute()),
-			property("Bone", LUMIX_PROP(RenderScene, BoneAttachmentBone), BoneEnum()) 
-		),
-		LUMIX_CMP(RenderSceneImpl, Fur, "fur", "Render / Fur",
+		LUMIX_CMP(Fur, "fur", "Render / Fur",
 			var_property("Layers", &RenderScene::getFur, &FurComponent::layers),
 			var_property("Scale", &RenderScene::getFur, &FurComponent::scale),
 			var_property("Gravity", &RenderScene::getFur, &FurComponent::gravity),
 			var_property("Enabled", &RenderScene::getFur, &FurComponent::enabled)
 		),
-		LUMIX_CMP(RenderSceneImpl, EnvironmentProbe, "environment_probe", "Render / Environment probe",
+		LUMIX_CMP(EnvironmentProbe, "environment_probe", "Render / Environment probe",
 			property("Enabled", &RenderScene::isEnvironmentProbeEnabled, &RenderScene::enableEnvironmentProbe),
 			var_property("Inner range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::inner_range),
 			var_property("Outer range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::outer_range)
 		),
-		LUMIX_CMP(RenderSceneImpl, ReflectionProbe,"reflection_probe", "Render / Reflection probe",
+		LUMIX_CMP(ReflectionProbe,"reflection_probe", "Render / Reflection probe",
 			property("Enabled", &RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe),
 			var_property("size", &RenderScene::getReflectionProbe, &ReflectionProbe::size),
 			var_property("half_extents", &RenderScene::getReflectionProbe, &ReflectionProbe::half_extents)
 		),
-		LUMIX_CMP(RenderSceneImpl, ParticleEmitter, "particle_emitter", "Render / Particle emitter",
-			property("Emit rate", LUMIX_PROP(RenderScene, ParticleEmitterRate)),
-			property("Source", LUMIX_PROP(RenderScene, ParticleEmitterPath),
-				ResourceAttribute("Particle emitter (*.par)", ParticleEmitterResource::TYPE))
+		LUMIX_CMP(ParticleEmitter, "particle_emitter", "Render / Particle emitter",
+			LUMIX_PROP(ParticleEmitterRate, "Emit rate"),
+			LUMIX_PROP(ParticleEmitterPath, "Source", ResourceAttribute(ParticleEmitterResource::TYPE))
 		),
-		LUMIX_CMP(RenderSceneImpl, Camera, "camera", "Render / Camera",
+		LUMIX_CMP(Camera, "camera", "Render / Camera",
+			icon(ICON_FA_CAMERA),
 			var_property("FOV", &RenderScene::getCamera, &Camera::fov, RadiansAttribute()),
 			var_property("Near", &RenderScene::getCamera, &Camera::near, MinAttribute(0)),
 			var_property("Far", &RenderScene::getCamera, &Camera::far, MinAttribute(0)),
 			var_property("Orthographic", &RenderScene::getCamera, &Camera::is_ortho),
 			var_property("Orthographic size", &RenderScene::getCamera, &Camera::ortho_size, MinAttribute(0))
 		),
-		LUMIX_CMP(RenderSceneImpl, ModelInstance, "model_instance", "Render / Mesh",
-			functions(
-				LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel")
-			),
+		LUMIX_CMP(ModelInstance, "model_instance", "Render / Mesh",
+			LUMIX_FUNC_EX(RenderScene::getModelInstanceModel, "getModel"),
 			property("Enabled", &RenderScene::isModelInstanceEnabled, &RenderScene::enableModelInstance),
 			property("Material", &RenderScene::getModelInstanceMaterialOverride,&RenderScene::setModelInstanceMaterialOverride, NoUIAttribute()),
-			property("Source", LUMIX_PROP(RenderScene, ModelInstancePath), ResourceAttribute("Mesh (*.msh)", Model::TYPE))
+			LUMIX_PROP(ModelInstancePath, "Source", ResourceAttribute(Model::TYPE))
 		),
-		LUMIX_CMP(RenderSceneImpl, Environment, "environment", "Render / Environment",
+		LUMIX_CMP(Environment, "environment", "Render / Environment",
+			icon(ICON_FA_GLOBE),
 			var_property("Color", &RenderScene::getEnvironment, &Environment::diffuse_color, ColorAttribute()),
 			var_property("Intensity", &RenderScene::getEnvironment, &Environment::diffuse_intensity, MinAttribute(0)),
 			var_property("Indirect intensity", &RenderScene::getEnvironment, &Environment::indirect_intensity, MinAttribute(0)),
-			property("Shadow cascades", LUMIX_PROP(RenderScene, ShadowmapCascades)),
-			property("Cast shadows", LUMIX_PROP(RenderScene, EnvironmentCastShadows))
+			LUMIX_PROP(ShadowmapCascades, "Shadow cascades"),
+			LUMIX_PROP(EnvironmentCastShadows, "Cast shadows")
 		),
-		LUMIX_CMP(RenderSceneImpl, PointLight, "point_light", "Render / Point light",
-			property("Cast shadows", LUMIX_PROP(RenderScene, PointLightCastShadows)),
-			property("Dynamic", LUMIX_PROP(RenderScene, PointLightDynamic)),
+		LUMIX_CMP(PointLight, "point_light", "Render / Point light",
+			icon(ICON_FA_LIGHTBULB),
+			LUMIX_PROP(PointLightCastShadows, "Cast shadows"),
+			LUMIX_PROP(PointLightDynamic, "Dynamic"),
 			var_property("Intensity", &RenderScene::getPointLight, &PointLight::intensity, MinAttribute(0)),
 			var_property("FOV", &RenderScene::getPointLight, &PointLight::fov, ClampAttribute(0, 360), RadiansAttribute()),
 			var_property("Attenuation", &RenderScene::getPointLight, &PointLight::attenuation_param, ClampAttribute(0, 100)),
 			var_property("Color", &RenderScene::getPointLight, &PointLight::color, ColorAttribute()),
-			property("Range", LUMIX_PROP(RenderScene, LightRange), MinAttribute(0))
+			LUMIX_PROP(LightRange, "Range", MinAttribute(0))
 		),
-		LUMIX_CMP(RenderSceneImpl, Decal, "decal", "Render / Decal",
-			property("Material", LUMIX_PROP(RenderScene, DecalMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE)),
-			property("Half extents", LUMIX_PROP(RenderScene, DecalHalfExtents), 
-				MinAttribute(0))
+		LUMIX_CMP(Decal, "decal", "Render / Decal",
+			LUMIX_PROP(DecalMaterialPath, "Material", ResourceAttribute(Material::TYPE)),
+			LUMIX_PROP(DecalHalfExtents, "Half extents", MinAttribute(0))
 		),
-		LUMIX_CMP(RenderSceneImpl, Terrain, "terrain", "Render / Terrain",
-			functions(
-				LUMIX_FUNC(RenderScene::getTerrainNormalAt),
-				LUMIX_FUNC(RenderScene::getTerrainHeightAt)
-			),
-			property("Material", LUMIX_PROP(RenderScene, TerrainMaterialPath),
-				ResourceAttribute("Material (*.mat)", Material::TYPE)),
-			property("XZ scale", LUMIX_PROP(RenderScene, TerrainXZScale), 
-				MinAttribute(0)),
-			property("Height scale", LUMIX_PROP(RenderScene, TerrainYScale), 
-				MinAttribute(0)),
+		LUMIX_CMP(Terrain, "terrain", "Render / Terrain",
+			LUMIX_FUNC(RenderScene::getTerrainNormalAt),
+			LUMIX_FUNC(RenderScene::getTerrainHeightAt),
+			LUMIX_PROP(TerrainMaterialPath, "Material", ResourceAttribute(Material::TYPE)),
+			LUMIX_PROP(TerrainXZScale, "XZ scale", MinAttribute(0)),
+			LUMIX_PROP(TerrainYScale, "Height scale", MinAttribute(0)),
 			array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
-				property("Mesh", LUMIX_PROP(RenderScene, GrassPath),
-					ResourceAttribute("Mesh (*.msh)", Model::TYPE)),
-				property("Distance", LUMIX_PROP(RenderScene, GrassDistance),
-					MinAttribute(1)),
-				property("Density", LUMIX_PROP(RenderScene, GrassDensity)),
-				property("Mode", LUMIX_PROP(RenderScene, GrassRotationMode), RotationModeEnum())
+				LUMIX_PROP(GrassPath, "Mesh", ResourceAttribute(Model::TYPE)),
+				LUMIX_PROP(GrassDistance, "Distance", MinAttribute(1)),
+				LUMIX_PROP(GrassDensity, "Density"),
+				LUMIX_PROP(GrassRotationMode, "Mode", RotationModeEnum())
 			)
 		)
 	);
-	registerScene(render_scene);
-
-	setIcon(ENVIRONMENT_TYPE, ICON_FA_GLOBE);
-	setIcon(POINT_LIGHT_TYPE, ICON_FA_LIGHTBULB);
-	setIcon(CAMERA_TYPE, ICON_FA_CAMERA);
-	setIcon(BONE_ATTACHMENT_TYPE, ICON_FA_BONE);
 }
 
 RenderSceneImpl::RenderSceneImpl(Renderer& renderer,

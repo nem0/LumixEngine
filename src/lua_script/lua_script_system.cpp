@@ -1430,7 +1430,7 @@ namespace Lumix
 		}
 
 
-		void setScriptPath(ScriptComponent& cmp, ScriptInstance& inst, const Path& path)
+		void setPath(ScriptComponent& cmp, ScriptInstance& inst, const Path& path)
 		{
 			registerAPI();
 
@@ -1786,7 +1786,7 @@ namespace Lumix
 							prop.stored_value = tmp;
 						}
 					}
-					setScriptPath(*script, scr, Path(tmp));
+					setPath(*script, scr, Path(tmp));
 				}
 				m_universe.onComponentCreated(script->m_entity, LUA_SCRIPT_TYPE, this);
 			}
@@ -2055,7 +2055,7 @@ namespace Lumix
 		{
 			auto* script_cmp = m_scripts[entity];
 			if (script_cmp->m_scripts.size() <= scr_index) return;
-			setScriptPath(*script_cmp, script_cmp->m_scripts[scr_index], path);
+			setPath(*script_cmp, script_cmp->m_scripts[scr_index], path);
 		}
 
 
@@ -2289,8 +2289,7 @@ namespace Lumix
 			const EntityRef e = (EntityRef)cmp.entity;
 			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
 			ASSERT(type == LuaScriptScene::Property::Type::RESOURCE);
-			attr.file_type = "*.*";
-			attr.type  = scene.getPropertyResourceType(e, array_idx, idx);
+			attr.resource_type  = scene.getPropertyResourceType(e, array_idx, idx);
 			return attr;
 		}
 
@@ -2365,18 +2364,15 @@ namespace Lumix
 	{
 		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
-		using namespace Reflection;
-		
-		static auto lua_scene = scene("lua_script",
-			LUMIX_CMP(LuaScriptSceneImpl, Component, "lua_script", "Lua script", 
+		LUMIX_SCENE(LuaScriptSceneImpl, "lua_script",
+			LUMIX_CMP(Component, "lua_script", "Lua script", 
 				array("scripts", &LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript, 
 					property("Enabled", &LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript),
-					property("Path", LUMIX_PROP(LuaScriptScene, ScriptPath), ResourceAttribute("Lua script (*.lua)", LuaScript::TYPE)),
+					LUMIX_PROP(ScriptPath, "Path", ResourceAttribute(LuaScript::TYPE)),
 					LuaProperties()
 				)
 			)
 		);
-		registerScene(lua_scene);
 	}
 
 	void LuaScriptSystemImpl::init() {
