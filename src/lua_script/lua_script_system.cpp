@@ -99,9 +99,10 @@ namespace Lumix
 			return 0;
 		}
 
-		LuaWrapper::DebugGuard guard(L, 1);
-
 		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+		
+		LuaWrapper::DebugGuard guard(L, f->getReturnType() == Reflection::Variant::VOID ? 0 : 1);
+
 		Reflection::Variant args[32];
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
