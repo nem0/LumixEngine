@@ -1302,8 +1302,6 @@ UniquePtr<GUIScene> GUIScene::createInstance(GUISystem& system,
 }
 
 void GUIScene::reflect() {
-	using namespace Reflection;
-
 	struct TextHAlignEnum : Reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
@@ -1344,54 +1342,49 @@ void GUIScene::reflect() {
 		}
 	};
 
-	static auto lua_scene = scene("gui",
-		functions(
-			LUMIX_FUNC(GUIScene::getRectAt),
-			LUMIX_FUNC(GUIScene::isOver),
-			LUMIX_FUNC(GUIScene::getSystem)
+	LUMIX_SCENE(GUISceneImpl, "gui",
+		LUMIX_FUNC(GUIScene::getRectAt),
+		LUMIX_FUNC(GUIScene::isOver),
+		LUMIX_FUNC(GUIScene::getSystem),
+		LUMIX_CMP(RenderTarget, "gui_render_target", "GUI / Render taget"),
+		LUMIX_CMP(Text, "gui_text", "GUI / Text",
+			icon(ICON_FA_FONT),
+			LUMIX_PROP(Text, "Text", MultilineAttribute()),
+			LUMIX_PROP(TextFontPath, "Font", ResourceAttribute(FontResource::TYPE)),
+			LUMIX_PROP(TextFontSize, "Font Size"),
+			enum_property("Horizontal align", &GUIScene::getTextHAlign, &GUIScene::setTextHAlign, TextHAlignEnum()),
+			enum_property("Vertical align", &GUIScene::getTextVAlign, &GUIScene::setTextVAlign, TextVAlignEnum()),
+			LUMIX_PROP(TextColorRGBA, "Color", ColorAttribute())
 		),
-		LUMIX_CMP(GUISceneImpl, RenderTarget, "gui_render_target", "GUI / Render taget"),
-		LUMIX_CMP(GUISceneImpl, Text, "gui_text", "GUI / Text",
-			property("Text", LUMIX_PROP(GUIScene, Text), MultilineAttribute()),
-			property("Font", LUMIX_PROP(GUIScene, TextFontPath), ResourceAttribute("Font (*.ttf)", FontResource::TYPE)),
-			property("Font Size", LUMIX_PROP(GUIScene, TextFontSize)),
-			enum_property("Horizontal align", LUMIX_PROP(GUIScene, TextHAlign), TextHAlignEnum()),
-			enum_property("Vertical align", LUMIX_PROP(GUIScene, TextVAlign), TextVAlignEnum()),
-			property("Color", LUMIX_PROP(GUIScene, TextColorRGBA), ColorAttribute())
-		),
-		LUMIX_CMP(GUISceneImpl, InputField, "gui_input_field", "GUI / Input field"),
-		LUMIX_CMP(GUISceneImpl, Canvas, "gui_canvas", "GUI / Canvas",
+		LUMIX_CMP(InputField, "gui_input_field", "GUI / Input field", icon(ICON_FA_KEYBOARD)),
+		LUMIX_CMP(Canvas, "gui_canvas", "GUI / Canvas",
 			var_property("Is 3D", &GUIScene::getCanvas, &GUICanvas::is_3d),
 			var_property("Orient to camera", &GUIScene::getCanvas, &GUICanvas::orient_to_camera),
 			var_property("Virtual size", &GUIScene::getCanvas, &GUICanvas::virtual_size)
 		),
-		LUMIX_CMP(GUISceneImpl, Button, "gui_button", "GUI / Button",
-			property("Hovered color", LUMIX_PROP(GUIScene, ButtonHoveredColorRGBA), ColorAttribute()),
-			enum_property("Cursor", LUMIX_PROP(GUIScene, ButtonHoveredCursor), CursorEnum())
+		LUMIX_CMP(Button, "gui_button", "GUI / Button",
+			LUMIX_PROP(ButtonHoveredColorRGBA, "Hovered color", ColorAttribute()),
+			enum_property("Cursor", &GUIScene::getButtonHoveredCursor, &GUIScene::setButtonHoveredCursor, CursorEnum())
 		),
-		LUMIX_CMP(GUISceneImpl, Image, "gui_image", "GUI / Image",
+		LUMIX_CMP(Image, "gui_image", "GUI / Image",
+			icon(ICON_FA_IMAGE),
 			property("Enabled", &GUIScene::isImageEnabled, &GUIScene::enableImage),
-			property("Color", LUMIX_PROP(GUIScene, ImageColorRGBA), ColorAttribute()),
-			property("Sprite", LUMIX_PROP(GUIScene, ImageSprite), ResourceAttribute("Sprite (*.spr)", Sprite::TYPE))
+			LUMIX_PROP(ImageColorRGBA, "Color", ColorAttribute()),
+			LUMIX_PROP(ImageSprite, "Sprite", ResourceAttribute(Sprite::TYPE))
 		),
-		LUMIX_CMP(GUISceneImpl, Rect, "gui_rect", "GUI / Rect",
+		LUMIX_CMP(Rect, "gui_rect", "GUI / Rect",
 			property("Enabled", &GUIScene::isRectEnabled, &GUIScene::enableRect),
-			property("Clip content", LUMIX_PROP(GUIScene, RectClip)),
-			property("Top Points", LUMIX_PROP(GUIScene, RectTopPoints)),
-			property("Top Relative", LUMIX_PROP(GUIScene, RectTopRelative)),
-			property("Right Points", LUMIX_PROP(GUIScene, RectRightPoints)),
-			property("Right Relative", LUMIX_PROP(GUIScene, RectRightRelative)),
-			property("Bottom Points", LUMIX_PROP(GUIScene, RectBottomPoints)),
-			property("Bottom Relative", LUMIX_PROP(GUIScene, RectBottomRelative)),
-			property("Left Points", LUMIX_PROP(GUIScene, RectLeftPoints)),
-			property("Left Relative", LUMIX_PROP(GUIScene, RectLeftRelative))
+			LUMIX_PROP(RectClip, "Clip content"),
+			LUMIX_PROP(RectTopPoints, "Top Points"),
+			LUMIX_PROP(RectTopRelative, "Top Relative"),
+			LUMIX_PROP(RectRightPoints, "Right Points"),
+			LUMIX_PROP(RectRightRelative, "Right Relative"),
+			LUMIX_PROP(RectBottomPoints, "Bottom Points"),
+			LUMIX_PROP(RectBottomRelative, "Bottom Relative"),
+			LUMIX_PROP(RectLeftPoints, "Left Points"),
+			LUMIX_PROP(RectLeftRelative, "Left Relative")
 		)
 	);
-	registerScene(lua_scene);
-		
-	setIcon(GUI_IMAGE_TYPE, ICON_FA_IMAGE);
-	setIcon(GUI_INPUT_FIELD_TYPE, ICON_FA_KEYBOARD);
-	setIcon(GUI_TEXT_TYPE, ICON_FA_FONT);
 }
 
 } // namespace Lumix

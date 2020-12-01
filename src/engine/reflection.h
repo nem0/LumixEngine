@@ -9,10 +9,17 @@
 #include "engine/universe.h"
 
 
-#define LUMIX_CMP(Scene, Component, ...) component<&Scene::create##Component, &Scene::destroy##Component>(__VA_ARGS__)
-#define LUMIX_PROP(Scene, Property) &Scene::get##Property, &Scene::set##Property
-#define LUMIX_FUNC_EX(Func, name) Reflection::function(&Func, #Func, name)
+#define LUMIX_CMP(Component, ...) component<&ReflScene::create##Component, &ReflScene::destroy##Component>(__VA_ARGS__)
+#define LUMIX_PROP(Property, Label, ...) property(Label, &ReflScene::get##Property, &ReflScene::set##Property, __VA_ARGS__)
+#define LUMIX_FUNC_EX(Func, Name) Reflection::function(&Func, #Func, Name)
 #define LUMIX_FUNC(Func) Reflection::function(&Func, #Func, nullptr)
+#define LUMIX_SCENE(Type, Name, ...) \
+	do { \
+		using namespace Reflection; \
+		static auto registered_scene = [](){ using ReflScene = Type; return Reflection::scene(Name, __VA_ARGS__); }(); \
+		Reflection::registerScene(registered_scene); \
+	} while(false)
+	
 
 namespace Lumix
 {
@@ -20,15 +27,11 @@ namespace Lumix
 
 template <typename T> struct Array;
 template <typename T> struct Span;
-struct IAllocator;
 struct Path;
-struct PropertyDescriptorBase;
-struct IVec2;
 struct IVec3;
 struct Vec2;
 struct Vec3;
 struct Vec4;
-
 
 namespace Reflection
 {
@@ -61,12 +64,10 @@ using DestroyComponent = void (*)(IScene*, EntityRef);
 struct RegisteredComponent {
 	u32 name_hash = 0;
 	u32 scene = 0;
-	const char* icon = "";
 	ComponentBase* cmp = nullptr;
 };
 
 LUMIX_ENGINE_API void registerScene(SceneBase& scene);
-LUMIX_ENGINE_API void setIcon(ComponentType type, const char* icon);
 
 LUMIX_ENGINE_API SceneBase* getFirstScene();
 LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
@@ -85,13 +86,12 @@ template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputMemoryStream&
 	
 struct ResourceAttribute : IAttribute
 {
-	ResourceAttribute(const char* file_type, ResourceType type) { this->file_type = file_type; this->type = type; }
+	ResourceAttribute(ResourceType type) : resource_type(type) {}
 	ResourceAttribute() {}
 
 	int getType() const override { return RESOURCE; }
 
-	const char* file_type;
-	ResourceType type;
+	ResourceType resource_type;
 };
 
 
@@ -150,7 +150,9 @@ struct NoUIAttribute : IAttribute {
 	int getType() const override { return NO_UI; }
 };
 
-template <typename T> struct Property {
+struct PropertyTag {};
+
+template <typename T> struct Property : PropertyTag {
 	virtual Span<const IAttribute* const> getAttributes() const = 0;
 	virtual T get(ComponentUID cmp, int index) const = 0;
 	virtual void set(ComponentUID cmp, int index, T) const = 0;
@@ -158,13 +160,13 @@ template <typename T> struct Property {
 };
 
 
-struct IBlobProperty {
+struct IBlobProperty : PropertyTag  {
 	virtual void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const = 0;
 	virtual void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const = 0;
 	const char* name;
 };
 
-struct IDynamicProperties {
+struct IDynamicProperties : PropertyTag  {
 	enum Type {
 		I32,
 		FLOAT,
@@ -212,7 +214,7 @@ template <> inline void set(IDynamicProperties::Value& v, EntityPtr val) { v.e =
 template <> inline void set(IDynamicProperties::Value& v, bool val) { v.b = val; }
 template <> inline void set(IDynamicProperties::Value& v, Vec3 val) { v.v3 = val; }
 
-struct IArrayProperty
+struct IArrayProperty : PropertyTag 
 {
 	virtual void addItem(ComponentUID cmp, int index) const = 0;
 	virtual void removeItem(ComponentUID cmp, int index) const = 0;
@@ -272,6 +274,7 @@ struct ComponentBase
 
 	const char* name;
 	const char* label;
+	const char* icon = "";
 	CreateComponent creator;
 	DestroyComponent destroyer;
 	ComponentType component_type;
@@ -643,23 +646,16 @@ struct Component<Tuple<Funcs...>, Props> : ComponentBase
 };
 
 
-template <typename... Components, typename... Funcs>
-auto scene(const char* name, Tuple<Funcs...> funcs, Components... components)
+template <typename... Members>
+auto scene(const char* name, Members... members)
 {
-	Scene<Tuple<Components...>, Tuple<Funcs...>> scene;
-	scene.name = name;
-	scene.functions = funcs;
-	scene.components = makeTuple(components...);
-	return scene;
-}
+	using ComponentsTuple = decltype(Filter<>::components(members...));
+	using FunctionsTuple = decltype(Filter<>::functions(members...));
 
-
-template <typename... Components>
-auto scene(const char* name, Components... components)
-{
-	Scene<Tuple<Components...>, Tuple<>> scene;
+	Scene<ComponentsTuple, FunctionsTuple> scene;
 	scene.name = name;
-	scene.components = makeTuple(components...);
+	scene.functions = Filter<>::functions(members...);
+	scene.components = Filter<>::components(members...);
 	return scene;
 }
 
@@ -780,32 +776,61 @@ auto& function(F func, const char* decl_code, const char* name)
 	return ret;
 }
 
+template <typename... T>
+struct Filter {
+	template <typename B>
+	struct HasBase {
+		static u8 check(const void*) { return {} };
+		static u32 check(const B*) { return {} };
 
-template <typename... F>
-auto functions(F... functions)
-{
-	Tuple<F...> f = makeTuple(functions...);
-	return f;
-}
+		template <typename T2>
+		static constexpr bool type = sizeof(check((T2*)nullptr)) == sizeof(u32);
+	};
 
+	static auto properties(T... t) { return makeTuple(t...); }
+	static auto functions(T... t) { return makeTuple(t...); }
+	static auto components(T... t) { return makeTuple(t...); }
 
-template <auto Creator, auto Destroyer, typename... Props, typename... Funcs>
-auto component(const char* name, const char* label, Tuple<Funcs...> functions, Props... props)
-{
-	auto creator = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Creator))(e); };
-	auto destroyer = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Destroyer))(e); };
+	template <typename... T2, typename H>
+	static auto properties(T... t, H h, T2... t2) {
+		if constexpr (HasBase<PropertyTag>::type<H>) {
+			return Filter<T..., H>::properties(t..., h, t2...);
+		}
+		else {
+			return Filter<T...>::properties(t..., t2...);
+		}
+	}
 
-	Component<Tuple<Funcs...>, Tuple<Props...>> cmp;
-	cmp.creator = (CreateComponent)creator;
-	cmp.destroyer = (DestroyComponent)destroyer;
-	cmp.name = name;
-	cmp.label = label;
-	cmp.functions = functions;
-	cmp.properties = makeTuple(props...);
-	cmp.component_type = getComponentType(name);
-	return cmp;
-}
+	template <typename... T2, typename H>
+	static auto functions(T... t, H h, T2... t2) {
+		if constexpr (HasBase<FunctionBase>::type<H>) {
+			return Filter<T..., H>::functions(t..., h, t2...);
+		}
+		else {
+			return Filter<T...>::functions(t..., t2...);
+		}
+	}
 
+	template <typename... T2, typename H>
+	static auto components(T... t, H h, T2... t2) {
+		if constexpr (HasBase<ComponentBase>::type<H>) {
+			return Filter<T..., H>::components(t..., h, t2...);
+		}
+		else {
+			return Filter<T...>::components(t..., t2...);
+		}
+	}
+
+	static const char* icon() { return ""; }
+	template <typename H, typename... T> static const char* icon(H h, T... t) {
+		if constexpr (HasBase<Icon>::type<H>) {
+			return h.name;
+		}
+		else {
+			return icon(t...);
+		}
+	}
+};
 
 template <auto Creator, auto Destroyer, typename... Props>
 auto component(const char* name, const char* label, Props... props)
@@ -813,16 +838,23 @@ auto component(const char* name, const char* label, Props... props)
 	auto creator = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Creator))(e); };
 	auto destroyer = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Destroyer))(e); };
 	
-	Component<Tuple<>, Tuple<Props...>> cmp;
+	using PropsTuple = decltype(Filter<>::properties(props...));
+	using FuncsTuple = decltype(Filter<>::functions(props...));
+
+	Component<FuncsTuple, PropsTuple> cmp;
 	cmp.creator = (CreateComponent)creator;
 	cmp.destroyer = (DestroyComponent)destroyer;
 	cmp.label = label;
 	cmp.name = name;
-	cmp.properties = makeTuple(props...);
+	cmp.icon = Filter<>::icon(props...);
+	cmp.functions = Filter<>::functions(props...);
+	cmp.properties = Filter<>::properties(props...);
 	cmp.component_type = getComponentType(name);
 	return cmp;
 }
 
+struct Icon { const char* name; };
+inline Icon icon(const char* name) { return {name}; }
 
 template <typename Getter, typename Setter>
 auto blob_property(const char* name, Getter getter, Setter setter)
@@ -833,7 +865,6 @@ auto blob_property(const char* name, Getter getter, Setter setter)
 	p.name = name;
 	return p;
 }
-
 
 template <typename CmpGetter, typename PtrType, typename... Attributes>
 auto var_property(const char* name, CmpGetter getter, PtrType ptr, Attributes... attributes)

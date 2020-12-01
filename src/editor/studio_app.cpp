@@ -2475,17 +2475,17 @@ struct StudioAppImpl final : StudioApp
 
 		for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
 			ASSERT(cmp.cmp->component_type != INVALID_COMPONENT_TYPE);
+			const Reflection::ComponentBase* r = cmp.cmp;
 			
-			if (m_component_labels.find(cmp.cmp->component_type).isValid()) continue;
+			if (m_component_labels.find(r->component_type).isValid()) continue;
 
-			const Reflection::ComponentBase* r = Reflection::getComponent(cmp.cmp->component_type);
 			struct : Reflection::IEmptyPropertyVisitor {
 				void visit(const Reflection::Property<Path>& prop) override {
 					for (const Reflection::IAttribute* attr : prop.getAttributes()) {
 						if (attr->getType() == Reflection::IAttribute::RESOURCE) {
 							is_res = true;
 							Reflection::ResourceAttribute* a = (Reflection::ResourceAttribute*)attr;
-							res_type = a->type;
+							res_type = a->resource_type;
 							prop_name = prop.name;
 						}
 					}
@@ -2497,10 +2497,10 @@ struct StudioAppImpl final : StudioApp
 
 			r->visit(visitor);
 			if (visitor.is_res) {
-				registerComponent(cmp.icon, r->component_type, r->label, visitor.res_type, visitor.prop_name);
+				registerComponent(r->icon, r->component_type, r->label, visitor.res_type, visitor.prop_name);
 			}
 			else {
-				registerComponent(cmp.icon, r->component_type, r->label);
+				registerComponent(r->icon, r->component_type, r->label);
 			}
 		}
 	}

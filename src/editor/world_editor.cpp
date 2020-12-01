@@ -901,7 +901,7 @@ struct GatherResourcesVisitor final : Reflection::IEmptyPropertyVisitor
 		auto* resource_attr = (Reflection::ResourceAttribute*)attr;
 
 		Path path = prop.get(cmp, index);
-		Resource* resource = resource_manager->load(resource_attr->type, path);
+		Resource* resource = resource_manager->load(resource_attr->resource_type, path);
 		if(resource) resources->push(resource);
 	}
 
