@@ -50,7 +50,6 @@ struct RenderState {
 	gpu::StateFlags value;
 };
 
-using LuaTextureHandle = gpu::TextureHandle;
 using LuaBufferHandle = gpu::BufferHandle;
 
 namespace LuaWrapper {
@@ -1830,42 +1829,67 @@ struct PipelineImpl final : Pipeline
 		return buffer;
 	}
 	
-	LuaTextureHandle createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
-	{
-		Renderer::MemRef mem;
-		const gpu::TextureFormat format = getFormat(format_str);
-		const gpu::TextureHandle texture = m_renderer.createTexture(width
-			, height
-			, 1
-			, format
-			, gpu::TextureFlags::CLAMP_U | gpu::TextureFlags::CLAMP_V | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE
-			, mem
-			, debug_name.get("lua_texture"));
-		m_textures.push(texture);
-		return texture;
-	}
+	static int createTexture3D(lua_State* L) {
+		PipelineImpl* pipeline = getClosureThis(L);
 
-	LuaTextureHandle createTexture3D(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name)
-	{
+		const u32 width = LuaWrapper::checkArg<u32>(L, 1);
+		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
+		const u32 depth = LuaWrapper::checkArg<u32>(L, 3);
+		const char* format_str = LuaWrapper::checkArg<const char*>(L, 4);
+		auto debug_name = LuaWrapper::checkArg<LuaWrapper::Optional<const char*>>(L, 5);
+
 		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
-		const gpu::TextureHandle texture = m_renderer.createTexture(width
+		const gpu::TextureHandle texture = pipeline->m_renderer.createTexture(width
 			, height
 			, depth
 			, format
 			, gpu::TextureFlags::IS_3D | gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS
 			, mem
 			, debug_name.get("lua_texture"));
-		m_textures.push(texture);
-		return texture;
+		pipeline->m_textures.push(texture);
+
+		lua_newtable(L);
+		LuaWrapper::setField(L, -1, "lumix_resource", "raw_texture");
+		LuaWrapper::setField(L, -1, "value", texture);
+		return 1;
 	}
 
-	static int drawcallUniforms(lua_State* L) {
+	static int createTexture2D(lua_State* L) {
+		PipelineImpl* pipeline = getClosureThis(L);
+
+		const u32 width = LuaWrapper::checkArg<u32>(L, 1);
+		const u32 height = LuaWrapper::checkArg<u32>(L, 2);
+		const char* format_str = LuaWrapper::checkArg<const char*>(L, 3);
+		auto debug_name = LuaWrapper::checkArg<LuaWrapper::Optional<const char*>>(L, 4);
+
+		Renderer::MemRef mem;
+		const gpu::TextureFormat format = getFormat(format_str);
+		const gpu::TextureHandle texture = pipeline->m_renderer.createTexture(width
+			, height
+			, 1
+			, format
+			, gpu::TextureFlags::CLAMP_U | gpu::TextureFlags::CLAMP_V | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE
+			, mem
+			, debug_name.get("lua_texture"));
+		pipeline->m_textures.push(texture);
+
+		lua_newtable(L);
+		LuaWrapper::setField(L, -1, "lumix_resource", "raw_texture");
+		LuaWrapper::setField(L, -1, "value", texture);
+		return 1;
+	}
+
+	static PipelineImpl* getClosureThis(lua_State* L) {
 		const int pipeline_idx = lua_upvalueindex(1);
 		if (lua_type(L, pipeline_idx) != LUA_TLIGHTUSERDATA) {
 			LuaWrapper::argError<PipelineImpl*>(L, pipeline_idx);
 		}
-		PipelineImpl* pipeline = LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);
+		return LuaWrapper::toType<PipelineImpl*>(L, pipeline_idx);	
+	}
+
+	static int drawcallUniforms(lua_State* L) {
+		PipelineImpl* pipeline = getClosureThis(L);
 		const int len = lua_gettop(L);
 		float values[32];
 		if (len > (int)lengthOf(values)) {
@@ -1937,7 +1961,7 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	void bindImageTexture(LuaTextureHandle texture_handle, u32 unit) {
+	static int bindImageTexture(lua_State* L) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
@@ -1948,34 +1972,60 @@ struct PipelineImpl final : Pipeline
 			u32 unit;
 		};
 
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.texture = texture_handle;
-		cmd.unit = unit;
-		m_renderer.queue(cmd, m_profiler_link);
-	}
-
-	void bindRawTexture(LuaTextureHandle texture_handle, u32 offset)
-	{
-		struct Cmd : Renderer::RenderJob {
-			void setup() override {}
-			void execute() override
-			{
-				PROFILE_FUNCTION();
-				gpu::bindTextures(&handle, offset, 1);
+		PipelineImpl* pipeline = getClosureThis(L);
+		const u32 unit = LuaWrapper::checkArg<u32>(L, 2);
+		
+		gpu::TextureHandle handle;
+		switch(lua_type(L, 1)) {
+			case LUA_TNUMBER: {
+				Engine::LuaResourceHandle res_idx = LuaWrapper::toType<Engine::LuaResourceHandle>(L, 1);
+				const Engine& engine = pipeline->m_renderer.getEngine();				
+				Resource* res = engine.getLuaResource(res_idx);
+				if (!res || res->getType() != Texture::TYPE) {
+					return luaL_error(L, "%s", "Unknown textures in bindTextures");
+				}
+				handle = ((Texture*)res)->handle;
+				break;
 			}
+			case LUA_TTABLE:
+				handle = toRawTexture(L, 1);
+				break;
+		}
 
-			gpu::TextureHandle handle;
-			u32 offset = 0;
-		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.offset = offset;
-		cmd.handle = texture_handle;
-		m_renderer.queue(cmd, m_profiler_link);
+		Cmd& cmd = pipeline->m_renderer.createJob<Cmd>();
+		cmd.texture = handle;
+		cmd.unit = unit;
+		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+		return 0;
 	}
 
-	void bindTextures(lua_State* L, LuaWrapper::Array<i32, 16> texture_handles, LuaWrapper::Optional<u32> offset)
-	{
+	static gpu::TextureHandle toRawTexture(lua_State* L, int idx) {
+		LuaWrapper::DebugGuard guard(L);
+
+		const int type = LuaWrapper::getField(L, idx, "lumix_resource");
+		if (type != LUA_TSTRING) {
+			luaL_error(L, "%s", "Invalid values");
+			return gpu::INVALID_TEXTURE;
+		}
+		const char* restype = LuaWrapper::toType<const char*>(L, -1);
+		if (!equalStrings(restype, "raw_texture")) {
+			luaL_error(L, "Expected texture, got %s", restype);
+			return gpu::INVALID_TEXTURE;
+		}
+		lua_pop(L, 1);
+
+		LuaWrapper::getField(L, idx, "value");
+		if (!LuaWrapper::isType<gpu::TextureHandle>(L, -1)) {
+			luaL_error(L, "%s", "Invalid values");
+			return gpu::INVALID_TEXTURE;
+		}
+		
+		const gpu::TextureHandle handle = LuaWrapper::toType<gpu::TextureHandle>(L, -1);
+		lua_pop(L, 1);
+		return handle;
+	}
+
+	static int bindTextures(lua_State* L) 	{
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override
@@ -1988,23 +2038,47 @@ struct PipelineImpl final : Pipeline
 			int m_offset = 0;
 			u32 m_textures_count = 0;
 		};
-
-		Cmd& cmd = m_renderer.createJob<Cmd>();
+		
+		PipelineImpl* pipeline = getClosureThis(L);
+		LuaWrapper::DebugGuard guard(L);
+		LuaWrapper::checkTableArg(L, 1);
+		auto offset = LuaWrapper::checkArg<LuaWrapper::Optional<u32>>(L, 2);
+		Cmd& cmd = pipeline->m_renderer.createJob<Cmd>();
 		cmd.m_offset = offset.get(0);
 		
-		Engine& engine = m_renderer.getEngine();
-		for (i32 res_idx : texture_handles) {
-			Resource* res = engine.getLuaResource(res_idx);
-			if (!res || res->getType() != Texture::TYPE) {
-				m_renderer.destroyJob(cmd);
-				luaL_error(L, "%s", "Unknown textures in bindTextures");
-				return;
-			}
-			cmd.m_textures_handles[cmd.m_textures_count] = ((Texture*)res)->handle;
-			++cmd.m_textures_count;
+		Engine& engine = pipeline->m_renderer.getEngine();
+		
+		const u32 n = (u32)lua_objlen(L, 1);
+		if (n > lengthOf(cmd.m_textures_handles)) {
+			return luaL_argerror(L, 1, "too many textures");
 		}
 
-		m_renderer.queue(cmd, m_profiler_link);
+		for (u32 i = 0; i < n; ++i) {
+			lua_rawgeti(L, 1, i + 1);
+			switch(lua_type(L, -1)) {
+				case LUA_TTABLE:
+					cmd.m_textures_handles[cmd.m_textures_count] = toRawTexture(L, -1);
+					break;
+				case LUA_TNUMBER: {
+					Engine::LuaResourceHandle res_idx = LuaWrapper::toType<Engine::LuaResourceHandle>(L, -1);
+					Resource* res = engine.getLuaResource(res_idx);
+					if (!res || res->getType() != Texture::TYPE) {
+						pipeline->m_renderer.destroyJob(cmd);
+						return luaL_error(L, "%s", "Unknown textures in bindTextures");
+					}
+					cmd.m_textures_handles[cmd.m_textures_count] = ((Texture*)res)->handle;
+					break;
+				}
+				default: 
+					pipeline->m_renderer.destroyJob(cmd);
+					return luaL_error(L, "%s", "Invalid values in bindTextures");
+			}
+			++cmd.m_textures_count;
+			lua_pop(L, 1);
+		}
+
+		pipeline->m_renderer.queue(cmd, pipeline->m_profiler_link);
+		return 0;
 	};
 	
 	void bindRenderbuffers(LuaWrapper::Array<i32, 16> renderbuffers, LuaWrapper::Optional<u32> offset)
@@ -4377,19 +4451,14 @@ struct PipelineImpl final : Pipeline
 			} while(false) \
 
 		REGISTER_FUNCTION(beginBlock);
-		REGISTER_FUNCTION(bindRawTexture);
-		REGISTER_FUNCTION(bindImageTexture);
 		REGISTER_FUNCTION(bindRenderbuffers);
 		REGISTER_FUNCTION(bindShaderBuffer);
-		REGISTER_FUNCTION(bindTextures);
 		REGISTER_FUNCTION(bindUniformBuffer);
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createBucket);
 		REGISTER_FUNCTION(createBuffer);
 		REGISTER_FUNCTION(createPersistentRenderbuffer);
 		REGISTER_FUNCTION(createRenderbuffer);
-		REGISTER_FUNCTION(createTexture2D);
-		REGISTER_FUNCTION(createTexture3D);
 		REGISTER_FUNCTION(cull);
 		REGISTER_FUNCTION(dispatch);
 		REGISTER_FUNCTION(drawArray);
@@ -4431,6 +4500,10 @@ struct PipelineImpl final : Pipeline
 		registerConst("STENCIL_KEEP", (u32)gpu::StencilOps::KEEP);
 		registerConst("STENCIL_REPLACE", (u32)gpu::StencilOps::REPLACE);
 
+		registerCFunction("bindTextures", PipelineImpl::bindTextures);
+		registerCFunction("bindImageTexture", PipelineImpl::bindImageTexture);
+		registerCFunction("createTexture2D", PipelineImpl::createTexture2D);
+		registerCFunction("createTexture3D", PipelineImpl::createTexture3D);
 		registerCFunction("drawcallUniforms", PipelineImpl::drawcallUniforms);
 		registerCFunction("setRenderTargets", PipelineImpl::setRenderTargets);
 		registerCFunction("setRenderTargetsDS", PipelineImpl::setRenderTargetsDS);
