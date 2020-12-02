@@ -1975,7 +1975,7 @@ struct PipelineImpl final : Pipeline
 		PipelineImpl* pipeline = getClosureThis(L);
 		const u32 unit = LuaWrapper::checkArg<u32>(L, 2);
 		
-		gpu::TextureHandle handle;
+		gpu::TextureHandle handle = gpu::INVALID_TEXTURE;
 		switch(lua_type(L, 1)) {
 			case LUA_TNUMBER: {
 				Engine::LuaResourceHandle res_idx = LuaWrapper::toType<Engine::LuaResourceHandle>(L, 1);
@@ -1990,6 +1990,8 @@ struct PipelineImpl final : Pipeline
 			case LUA_TTABLE:
 				handle = toRawTexture(L, 1);
 				break;
+			default: 
+				return luaL_error(L, "%s", "Unknown textures in bindTextures");
 		}
 
 		Cmd& cmd = pipeline->m_renderer.createJob<Cmd>();
