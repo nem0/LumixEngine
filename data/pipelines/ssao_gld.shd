@@ -1,0 +1,72 @@
+include "pipelines/common.glsl"
+
+compute_shader [[
+    layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+    layout (r8, binding = 0) uniform writeonly image2D u_output;
+	layout (binding=1) uniform sampler2D u_depth_buffer;
+	layout (binding=2) uniform sampler2D u_normal_buffer;
+	layout(std140, binding = 4) uniform Drawcall {
+		float u_radius;
+		float u_intensity;
+        vec4 u_resolution;
+	};
+    
+    const int samples = 16;
+    const float steps = 3.0;
+
+    const float invRadSqr = 1.0/(u_radius*u_radius);
+
+	vec3 getViewNormal(vec2 tex_coord)
+	{
+		vec3 wnormal = texture(u_normal_buffer, tex_coord).xyz * 2 - 1;
+		vec4 vnormal = Global.view * vec4(wnormal, 0);
+		return vnormal.xyz;
+    }
+
+    float GetAO(vec2 tex_coord, vec2 offset, vec3 p, vec3 n, float r)
+    {
+        // ao calculation based on: https://frictionalgames.com/2014-01-tech-feature-ssao-and-temporal-blur/
+        // and also: https://www.gamedev.net/articles/programming/graphics/a-simple-and-practical-approach-to-ssao-r2753/
+
+        vec3 diff = getViewPosition(u_depth_buffer, Global.inv_projection, tex_coord + r * offset) - p;
+
+        float distSqr = dot(diff, diff);
+        float invLength = inversesqrt(distSqr);
+        float falloff = saturate(1.0 + distSqr * invLength * -(1.0-r));
+        float angle = dot(n, diff) * invLength;
+
+        return max(angle, 0.0) * falloff;
+    }
+	
+	void main()
+	{
+        vec2 mainUV = (gl_GlobalInvocationID.xy - vec2(0.5)) / (textureSize(u_depth_buffer, 0) / 2);
+
+		vec3 p = getViewPosition(u_depth_buffer, Global.inv_projection, mainUV);
+		vec3 n = getViewNormal(mainUV);
+
+        float radStep = saturate(u_radius/-p.z);
+        float ao = 0.0;
+        for (lowp int i=0; i<samples; i++)
+        {
+            float traceResult = 0.0;
+            vec2 coord = POISSON_DISK_16[i];
+
+            float rad = 0.0;
+            for (lowp float r=0; r<steps; ++r)
+            {
+                rad += radStep;
+                float occ = GetAO(mainUV, coord, p, n, rad);
+                traceResult = mix(occ, 1.0, traceResult);
+            }
+            ao += traceResult;
+        }
+
+        ao /= samples;
+        ao = clamp(ao * u_intensity, 0.0, 1.0);
+        ao = 1.0 - ao;
+
+        imageStore(u_output, ivec2(gl_GlobalInvocationID.xy), vec4(ao, 0, 0, 0));
+	}
+]]
