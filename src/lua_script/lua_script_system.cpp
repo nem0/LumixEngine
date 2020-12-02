@@ -488,7 +488,7 @@ namespace Lumix
 									const int prop_index = inst.m_properties.size();
 									if (inst.m_properties.size() < sizeof(valid_properties) * 8) {
 										auto& prop = inst.m_properties.emplace(allocator);
-										valid_properties[prop_index / 8] |=  1 << (prop_index % 8);
+										valid_properties[prop_index / 8] |= 1 << (prop_index % 8);
 										switch (lua_type(inst.m_state, -1)) {
 											case LUA_TBOOLEAN: prop.type = Property::BOOLEAN; break;
 											case LUA_TSTRING: prop.type = Property::STRING; break;
@@ -2136,52 +2136,6 @@ namespace Lumix
 		void removeScript(EntityRef entity, int scr_index) override {
 			m_scripts[entity]->m_scripts.swapAndPop(scr_index);
 		}
-
-
-		void serializeScript(EntityRef entity, int scr_index, OutputMemoryStream& blob) override
-		{
-			auto& scr = m_scripts[entity]->m_scripts[scr_index];
-			blob.writeString(scr.m_script ? scr.m_script->getPath().c_str() : "");
-			blob.write(scr.m_flags);
-			blob.write(scr.m_properties.size());
-			for (auto prop : scr.m_properties)
-			{
-				blob.write(prop.name_hash);
-				char tmp[1024];
-				const char* property_name = getPropertyName(prop.name_hash);
-				if (!property_name)
-				{
-					blob.writeString(prop.stored_value.c_str());
-				}
-				else
-				{
-					getProperty(prop, property_name, scr, Span(tmp));
-					blob.writeString(tmp);
-				}
-			}
-		}
-
-
-		void deserializeScript(EntityRef entity, int scr_index, InputMemoryStream& blob) override
-		{
-			auto& scr = m_scripts[entity]->m_scripts[scr_index];
-			int count;
-			const char* path = blob.readString();
-			blob.read(scr.m_flags);
-			blob.read(count);
-			scr.m_environment = -1;
-			scr.m_properties.clear();
-			for (int i = 0; i < count; ++i)
-			{
-				auto& prop = scr.m_properties.emplace(m_system.m_allocator);
-				prop.type = Property::ANY;
-				blob.read(prop.name_hash);
-				const char* buf = blob.readString();
-				prop.stored_value = buf;
-			}
-			setScriptPath(entity, scr_index, Path(path));
-		}
-
 
 		LuaScriptSystemImpl& m_system;
 		HashMap<EntityRef, ScriptComponent*> m_scripts;

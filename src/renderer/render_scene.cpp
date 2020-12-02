@@ -2555,7 +2555,7 @@ void RenderScene::reflect() {
 			var_property("Inner range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::inner_range),
 			var_property("Outer range", &RenderScene::getEnvironmentProbe, &EnvironmentProbe::outer_range)
 		),
-		LUMIX_CMP(ReflectionProbe,"reflection_probe", "Render / Reflection probe",
+		LUMIX_CMP(ReflectionProbe, "reflection_probe", "Render / Reflection probe",
 			property("Enabled", &RenderScene::isReflectionProbeEnabled, &RenderScene::enableReflectionProbe),
 			var_property("size", &RenderScene::getReflectionProbe, &ReflectionProbe::size),
 			var_property("half_extents", &RenderScene::getReflectionProbe, &ReflectionProbe::half_extents)
