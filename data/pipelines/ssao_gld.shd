@@ -9,13 +9,12 @@ compute_shader [[
 	layout(std140, binding = 4) uniform Drawcall {
 		float u_radius;
 		float u_intensity;
-        vec4 u_resolution;
 	};
     
     const int samples = 16;
     const float steps = 3.0;
 
-    const float invRadSqr = 1.0/(u_radius*u_radius);
+    const vec2 mainUV = vec2(gl_GlobalInvocationID.xy) / (Global.framebuffer_size / 2);
 
 	vec3 getViewNormal(vec2 tex_coord)
 	{
@@ -33,16 +32,14 @@ compute_shader [[
 
         float distSqr = dot(diff, diff);
         float invLength = inversesqrt(distSqr);
-        float falloff = saturate(1.0 + distSqr * invLength * -(1.0-r));
+        float falloff = saturate(1.0 + distSqr * -(1.0/u_radius*u_radius));
         float angle = dot(n, diff) * invLength;
 
-        return max(angle, 0.0) * falloff;
+        return max(angle, 0.0)*falloff;
     }
 	
 	void main()
 	{
-        vec2 mainUV = (gl_GlobalInvocationID.xy - vec2(0.5)) / (textureSize(u_depth_buffer, 0) / 2);
-
 		vec3 p = getViewPosition(u_depth_buffer, Global.inv_projection, mainUV);
 		vec3 n = getViewNormal(mainUV);
 
@@ -50,7 +47,6 @@ compute_shader [[
         float ao = 0.0;
         for (lowp int i=0; i<samples; i++)
         {
-            float traceResult = 0.0;
             vec2 coord = POISSON_DISK_16[i];
 
             float rad = 0.0;
@@ -58,12 +54,11 @@ compute_shader [[
             {
                 rad += radStep;
                 float occ = GetAO(mainUV, coord, p, n, rad);
-                traceResult = mix(occ, 1.0, traceResult);
+                ao += occ;
             }
-            ao += traceResult;
         }
 
-        ao /= samples;
+        ao /= samples * steps;
         ao = clamp(ao * u_intensity, 0.0, 1.0);
         ao = 1.0 - ao;
 
