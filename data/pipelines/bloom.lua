@@ -74,7 +74,7 @@ function autoexposure(env, hdr_buffer)
 	env.bindShaderBuffer(env.lum_buf, 1, true)
 	env.dispatch(env.avg_luminance_shader, 256, 1, 1, "PASS0");
 
-	env.bindRenderbuffers({ hdr_buffer }, 0)
+	env.bindTextures({ hdr_buffer }, 0)
 	env.bindShaderBuffer(env.lum_buf, 1, true)
 	env.drawcallUniforms(env.viewport_w, env.viewport_h, accomodation_speed) 
 	env.dispatch(env.avg_luminance_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1);
