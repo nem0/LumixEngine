@@ -59,9 +59,6 @@ static Context& getContext() {
 	return ctx;
 }
 
-static RegisteredComponent* allComponents() {
-}
-
 Array<FunctionBase*>& allFunctions() {
 	static DefaultAllocator allocator;
 	static Array<FunctionBase*> fncs(allocator);
