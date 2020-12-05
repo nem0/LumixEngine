@@ -48,10 +48,19 @@ template <> void writeToStream<const char*>(OutputMemoryStream& stream, const ch
 	stream.write(value, stringLength(value) + 1);
 }
 
+struct Context {
+	SceneBase* first_scene = nullptr;
+	RegisteredComponent components[ComponentType::MAX_TYPES_COUNT];
+	u32 components_count = 0;
+};
 
-static SceneBase* g_first_scene = nullptr;
-static RegisteredComponent g_components[ComponentType::MAX_TYPES_COUNT];
-static u32 g_components_count = 0;
+static Context& getContext() {
+	static Context ctx;
+	return ctx;
+}
+
+static RegisteredComponent* allComponents() {
+}
 
 Array<FunctionBase*>& allFunctions() {
 	static DefaultAllocator allocator;
@@ -60,27 +69,28 @@ Array<FunctionBase*>& allFunctions() {
 }
 
 const ComponentBase* getComponent(ComponentType cmp_type) {
-	return g_components[cmp_type.index].cmp;
+	return getContext().components[cmp_type.index].cmp;
 }
 
-SceneBase* getFirstScene() { return g_first_scene; }
+SceneBase* getFirstScene() { return getContext().first_scene; }
 
 void registerScene(SceneBase& scene) {
-	scene.next = g_first_scene;
-	g_first_scene = &scene;
+	Context& ctx = getContext();
+	scene.next = ctx.first_scene;
+	ctx.first_scene = &scene;
 
 	const u32 scene_name_hash = crc32(scene.name);
 	for (ComponentBase* cmp : scene.getComponents()) {
-		g_components[cmp->component_type.index].cmp = cmp;
-		g_components[cmp->component_type.index].scene = scene_name_hash;
+		ctx.components[cmp->component_type.index].cmp = cmp;
+		ctx.components[cmp->component_type.index].scene = scene_name_hash;
 	}
 }
 
 
 ComponentType getComponentTypeFromHash(u32 hash)
 {
-	for (u32 i = 0, c = g_components_count; i < c; ++i) {
-		if (g_components[i].name_hash == hash) {
+	for (u32 i = 0, c = getContext().components_count; i < c; ++i) {
+		if (getContext().components[i].name_hash == hash) {
 			return {(i32)i};
 		}
 	}
@@ -91,33 +101,32 @@ ComponentType getComponentTypeFromHash(u32 hash)
 
 u32 getComponentTypeHash(ComponentType type)
 {
-	return g_components[type.index].name_hash;
+	return getContext().components[type.index].name_hash;
 }
 
 
 ComponentType getComponentType(const char* name)
 {
 	u32 name_hash = crc32(name);
-	for (u32 i = 0, c = g_components_count; i < c; ++i) {
-		if (g_components[i].name_hash == name_hash) {
+	for (u32 i = 0, c = getContext().components_count; i < c; ++i) {
+		if (getContext().components[i].name_hash == name_hash) {
 			return {(i32)i};
 		}
 	}
 
-	static_assert(ComponentType::MAX_TYPES_COUNT == lengthOf(g_components));
-	if (g_components_count == ComponentType::MAX_TYPES_COUNT) {
+	if (getContext().components_count == ComponentType::MAX_TYPES_COUNT) {
 		logError("Too many component types");
 		return INVALID_COMPONENT_TYPE;
 	}
 
-	RegisteredComponent& type = g_components[g_components_count];
+	RegisteredComponent& type = getContext().components[getContext().components_count];
 	type.name_hash = name_hash;
-	++g_components_count;
-	return {i32(g_components_count - 1)};
+	++getContext().components_count;
+	return {i32(getContext().components_count - 1)};
 }
 
 Span<const RegisteredComponent> getComponents() {
-	return Span(g_components, g_components_count);
+	return Span(getContext().components, getContext().components_count);
 }
 
 
