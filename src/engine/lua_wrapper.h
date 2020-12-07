@@ -15,6 +15,7 @@ namespace Lumix
 
 struct Universe;
 struct CameraParams;
+struct PipelineTexture;
 
 namespace LuaWrapper
 {
@@ -534,6 +535,7 @@ template <typename T> inline void push(lua_State* L, T* value)
 }
 
 void push(lua_State* L, const CameraParams& value);
+void push(lua_State* L, const PipelineTexture& value);
 
 inline void push(lua_State* L, float value)
 {
