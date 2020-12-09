@@ -2,24 +2,6 @@ radius = 0.35
 intensity = 1
 debug = false
 
-function debugAO(env, rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
-	env.setRenderTargets(output)
-
-	env.drawcallUniforms( 
-		0, 0, 1, 1, 
-		r_mask[1], r_mask[2], r_mask[3], r_mask[4], 
-		g_mask[1], g_mask[2], g_mask[3], g_mask[4], 
-		b_mask[1], b_mask[2], b_mask[3], b_mask[4], 
-		a_mask[1], a_mask[2], a_mask[3], a_mask[4], 
-		offsets[1], offsets[2], offsets[3], offsets[4]
-	)
-	--env.bindTextures({rb}, 0)
-	env.drawArray(0, 3, env.textured_quad_shader
-		, { rb }
-		, { depth_test = false }
-	)
-end
-
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
