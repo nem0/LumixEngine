@@ -1,4 +1,4 @@
-radius = 0.1
+radius = 0.35
 intensity = 1
 debug = false
 
@@ -23,28 +23,25 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
 	env.beginBlock("ssao")
-	if env.ssao_shader == nil then
-		env.ssao_shader = env.preloadShader("pipelines/ssao_gld.shd")
+	if env.ssao_shader_compute == nil then
+		env.ssao_shader_compute = env.preloadShader("pipelines/ssao_gld.shd")
 	end
 	if env.ssao_blit_shader == nil then
 		env.ssao_blit_shader = env.preloadShader("pipelines/ssao_blur.shd")
 	end
-	if env.textured_quad_shader == nil then
-		env.textured_quad_shader = env.preloadShader("pipelines/textured_quad.shd")
-	end
 	local w = env.viewport_w * 0.5
 	local h = env.viewport_h * 0.5
 	local ssao_rb = env.createTexture2D(w, h, "r8", "ssao")
-	local state = {
-		depth_write = false,
-		depth_test = false
-	}
+
+	env.viewport(0, 0, w, h)
 	
+	local w_comp = 1 + w / 16;
+	local h_comp = 1 + h / 16;
 	env.beginBlock("compute_ao")
 	env.drawcallUniforms(radius, intensity)
 	env.bindImageTexture(ssao_rb, 0)
 	env.bindRenderbuffers({gbuffer_depth, gbuffer1}, 1)
-	env.dispatch(env.ssao_shader, 1 + w / 16, 1 + h / 16, 1)
+	env.dispatch(env.ssao_shader_compute, w_comp, h_comp, 1)
 	env.endBlock()
 
 	-- TODO use for indirect light
