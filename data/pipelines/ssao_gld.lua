@@ -13,8 +13,9 @@ function debugAO(env, rb, output, r_mask, g_mask, b_mask, a_mask, offsets)
 		a_mask[1], a_mask[2], a_mask[3], a_mask[4], 
 		offsets[1], offsets[2], offsets[3], offsets[4]
 	)
-	env.bindTextures({rb}, 0)
+	--env.bindTextures({rb}, 0)
 	env.drawArray(0, 3, env.textured_quad_shader
+		, { rb }
 		, { depth_test = false }
 	)
 end
@@ -40,21 +41,19 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.beginBlock("compute_ao")
 	env.drawcallUniforms(radius, intensity)
 	env.bindImageTexture(ssao_rb, 0)
-	env.bindRenderbuffers({gbuffer_depth, gbuffer1}, 1)
+	env.bindTextures({gbuffer_depth, gbuffer1}, 1)
 	env.dispatch(env.ssao_shader_compute, w_comp, h_comp, 1)
 	env.endBlock()
 
 	-- TODO use for indirect light
 	env.setRenderTargets(hdr_buffer)
-
-	env.bindTextures({ssao_rb}, 1)
 	env.drawArray(0, 3, env.ssao_blit_shader
-		, { gbuffer_depth }
+		, { gbuffer_depth, ssao_rb }
 		, { depth_test = false, depth_write = false, blending = "multiply" });
 	env.endBlock()
 
 	if debug then
-		debugAO(env, ssao_rb, hdr_buffer, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 0, 1})
+		env.debugRenderbuffer(ssao_rb, hdr_buffer, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 0, 1})
 	end
 
 	return hdr_buffer
