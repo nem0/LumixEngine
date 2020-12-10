@@ -47,7 +47,7 @@ goto :begin
 
 :plugins 
 	cls
-	echo Wut?
+	echo Wut? - you have to (re)create project if you download/upgrade plugin
 	echo ===============================
 	echo  1. Go back
 	echo  2. Maps
@@ -56,8 +56,10 @@ goto :begin
 	echo  5. DX11 and DX12
 	echo  6. Rml UI
 	echo  7. Network
+	echo  8. JS
+	echo  9. C#
 	echo ===============================
-	choice /C 1234567 /N /M "Your choice:"
+	choice /C 123456789 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
 	if %errorlevel%==2 call :map_plugin
@@ -66,6 +68,8 @@ goto :begin
 	if %errorlevel%==5 call :dx_plugin
 	if %errorlevel%==6 call :rml_ui_plugin
 	if %errorlevel%==7 call :network_plugin
+	if %errorlevel%==8 call :js_plugin
+	if %errorlevel%==9 call :cs_plugin
 	pause
 goto :plugins
 
@@ -119,6 +123,30 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumixengine_net.git net
 	) else (
 		cd net
+		git pull
+	)
+	popd
+exit /B 0
+
+:js_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist js (
+		git.exe clone https://github.com/nem0/lumixengine_js.git js
+	) else (
+		cd js
+		git pull
+	)
+	popd
+exit /B 0
+
+:cs_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist csharp (
+		git.exe clone https://github.com/nem0/lumixengine_csharp.git csharp
+	) else (
+		cd csharp
 		git pull
 	)
 	popd
@@ -200,8 +228,10 @@ exit /B 0
 	echo ===============================
 	echo  1. Go back
 	echo  2. Download
-	echo  3. Build
-	echo  4. Deploy
+	if exist "3rdparty\luajit\" (
+		echo  3. Build
+		echo  4. Deploy
+	)
 	echo ===============================
 	choice /C 1234 /N /M "Your choice:"
 	echo.
@@ -250,9 +280,11 @@ exit /B 0
 	echo ===============================
 	echo  1. Go back
 	echo  2. Download
-	echo  3. Build
-	echo  4. Deploy
-	echo  5. Open in VS
+	if exist "3rdparty\freetype\" (
+		echo  3. Build
+		echo  4. Deploy
+		echo  5. Open in VS
+	)
 	echo ===============================
 	choice /C 12345 /N /M "Your choice:"
 	echo.
@@ -283,10 +315,12 @@ exit /B 0
 	echo ===============================
 	echo  1. Go back
 	echo  2. Download
-	echo  3. Build
-	echo  4. Build and deploy static
-	echo  5. Deploy
-	echo  6. Open in VS
+	if exist "3rdparty\PhysX\" (
+		echo  3. Build
+		echo  4. Build and deploy static
+		echo  5. Deploy
+		echo  6. Open in VS
+	)
 	echo ===============================
 	choice /C 123456 /N /M "Your choice:"
 	echo.
@@ -362,9 +396,11 @@ exit /B 0
 	echo ===============================
 	echo  1. Go back
 	echo  2. Download
-	echo  3. Build
-	echo  4. Deploy
-	echo  5. Open in VS
+	if exist "3rdparty\recast\" (
+		echo  3. Build
+		echo  4. Deploy
+		echo  5. Open in VS
+	)
 	echo ===============================
 	choice /C 12345 /N /M "Your choice:"
 	echo.
@@ -399,9 +435,11 @@ exit /B 0
 	echo ===============================
 	echo  1. Go back
 	echo  2. Download
-	echo  3. Build
-	echo  4. Deploy
-	echo  5. Open in VS
+	if exist "3rdparty\nvtt\" (
+		echo  3. Build
+		echo  4. Deploy
+		echo  5. Open in VS
+	)
 	echo ===============================
 	choice /C 12345 /N /M "Your choice:"
 	if %errorlevel%==1 exit /B 0

@@ -110,7 +110,7 @@ bool CompositeTexture::loadSync(FileSystem& fs, const Path& path) {
 }
 
 bool CompositeTexture::save(FileSystem& fs, const Path& path) {
-	OS::OutputFile file;
+	os::OutputFile file;
 	if (fs.open(path.c_str(), Ref(file))) {
 		for (CompositeTexture::Layer& layer : layers) {
 			file << "layer {\n";

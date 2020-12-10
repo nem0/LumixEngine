@@ -8,7 +8,7 @@ namespace Lumix {
 
 template <typename T> struct UniquePtr;
 
-namespace Anim {
+namespace anim {
 
 
 // TODO this does not need to be hidden by interface, since it's only included once
@@ -21,5 +21,5 @@ struct ControllerEditor : StudioApp::GUIPlugin {
 };
 
 
-} // namespace Anim
+} // namespace anim
 } // namespace Lumix

@@ -10,7 +10,7 @@ struct lua_State;
 namespace Lumix
 {
 
-namespace OS { enum class MouseButton; }
+namespace os { enum class MouseButton; }
 
 template <typename T> struct Array;
 template <typename T> struct DelegateList;
@@ -50,8 +50,8 @@ struct UniverseView {
 	virtual void moveCamera(float forward, float right, float up, float speed) = 0;
 	virtual void copyTransform() = 0;
 
-	virtual bool isMouseDown(OS::MouseButton button) const = 0;
-	virtual bool isMouseClick(OS::MouseButton button) const = 0;
+	virtual bool isMouseDown(os::MouseButton button) const = 0;
+	virtual bool isMouseClick(os::MouseButton button) const = 0;
 	virtual Vec2 getMousePos() const = 0;
 	virtual void setMouseSensitivity(float x, float y) = 0;
 	virtual Vec2 getMouseSensitivity() = 0;

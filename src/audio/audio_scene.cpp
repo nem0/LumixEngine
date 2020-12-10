@@ -18,10 +18,10 @@ namespace Lumix
 {
 
 
-static const ComponentType LISTENER_TYPE = Reflection::getComponentType("audio_listener");
-static const ComponentType AMBIENT_SOUND_TYPE = Reflection::getComponentType("ambient_sound");
-static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
-static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
+static const ComponentType LISTENER_TYPE = reflection::getComponentType("audio_listener");
+static const ComponentType AMBIENT_SOUND_TYPE = reflection::getComponentType("ambient_sound");
+static const ComponentType ECHO_ZONE_TYPE = reflection::getComponentType("echo_zone");
+static const ComponentType CHORUS_ZONE_TYPE = reflection::getComponentType("chorus_zone");
 
 struct Listener
 {

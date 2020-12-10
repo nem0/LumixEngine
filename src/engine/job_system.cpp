@@ -514,7 +514,7 @@ void wait(SignalHandle handle)
 	if (!getWorker()) {
 		while (!isSignalZero(handle, false)) {
 			g_system->m_sync.exit();
-			OS::sleep(1);
+			os::sleep(1);
 			g_system->m_sync.enter();
 		}
 		g_system->m_sync.exit();

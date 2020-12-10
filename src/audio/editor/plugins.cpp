@@ -186,8 +186,8 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 	bool showGizmo(UniverseView& view, ComponentUID cmp) override
 	{
-		static const ComponentType ECHO_ZONE_TYPE = Reflection::getComponentType("echo_zone");
-		static const ComponentType CHORUS_ZONE_TYPE = Reflection::getComponentType("chorus_zone");
+		static const ComponentType ECHO_ZONE_TYPE = reflection::getComponentType("echo_zone");
+		static const ComponentType CHORUS_ZONE_TYPE = reflection::getComponentType("chorus_zone");
 
 		const EntityRef entity = (EntityRef)cmp.entity;
 		if (cmp.type == ECHO_ZONE_TYPE)

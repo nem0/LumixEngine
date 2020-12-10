@@ -10,7 +10,7 @@ namespace Lumix
 struct Model;
 struct Pose;
 
-namespace Anim
+namespace anim
 {
 
 struct Controller;
@@ -178,5 +178,5 @@ struct LayersNode final : Node {
 	Array<Layer> m_layers;
 };
 
-} // ns anim
-} // ns Lumix
+} // namespace anim
+} // namespace Lumix

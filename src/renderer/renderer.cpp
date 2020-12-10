@@ -31,7 +31,7 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 
 
 struct TransientBuffer {
@@ -59,16 +59,16 @@ struct TransientBuffer {
 		MutexGuard lock(m_mutex);
 		if (!m_overflow.buffer) {
 			m_overflow.buffer = gpu::allocBufferHandle();
-			m_overflow.data = (u8*)OS::memReserve(128 * 1024 * 1024);
+			m_overflow.data = (u8*)os::memReserve(128 * 1024 * 1024);
 			m_overflow.size = 0;
 			m_overflow.commit = 0;
 		}
 		slice.ptr = m_overflow.data + m_overflow.size;
 		m_overflow.size += size;
 		if (m_overflow.size > m_overflow.commit) {
-			const u32 page_size = OS::getMemPageSize();
+			const u32 page_size = os::getMemPageSize();
 			m_overflow.commit = (m_overflow.size + page_size - 1) & ~(page_size - 1);
-			OS::memCommit(m_overflow.data, m_overflow.commit);
+			os::memCommit(m_overflow.data, m_overflow.commit);
 		}
 		slice.offset = 0;
 		slice.buffer = m_overflow.buffer;
@@ -82,7 +82,7 @@ struct TransientBuffer {
 		if (m_overflow.buffer) {
 			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::NONE, nextPow2(m_overflow.size + m_size), nullptr);
 			gpu::update(m_overflow.buffer, m_overflow.data, m_overflow.size);
-			OS::memRelease(m_overflow.data);
+			os::memRelease(m_overflow.data);
 			m_overflow.data = nullptr;
 			m_overflow.commit = 0;
 		}
@@ -205,7 +205,7 @@ struct GPUProfiler
 
 	u64 toCPUTimestamp(u64 gpu_timestamp) const
 	{
-		return u64(gpu_timestamp * (OS::Timer::getFrequency() / double(gpu::getQueryFrequency()))) + m_gpu_to_cpu_offset;
+		return u64(gpu_timestamp * (os::Timer::getFrequency() / double(gpu::getQueryFrequency()))) + m_gpu_to_cpu_offset;
 	}
 
 
@@ -213,7 +213,7 @@ struct GPUProfiler
 	{
 		gpu::QueryHandle q = gpu::createQuery();
 		gpu::queryTimestamp(q);
-		const u64 cpu_timestamp = OS::Timer::getRawTimestamp();
+		const u64 cpu_timestamp = os::Timer::getRawTimestamp();
 
 		u32 try_num = 0;
 		while (!gpu::isQueryReady(q) && try_num < 10) {
@@ -226,7 +226,7 @@ struct GPUProfiler
 		}
 		else {
 			const u64 gpu_timestamp = gpu::getQueryResult(q);
-			m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (OS::Timer::getFrequency() / double(gpu::getQueryFrequency())));
+			m_gpu_to_cpu_offset = cpu_timestamp - u64(gpu_timestamp * (os::Timer::getFrequency() / double(gpu::getQueryFrequency())));
 			gpu::destroy(q);
 		}
 	}
@@ -385,7 +385,7 @@ struct RendererImpl final : Renderer
 
 	static bool shouldLoadRenderdoc() {
 		char cmd_line[4096];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next()) {
 			if (cmd_line_parser.currentEquals("-renderdoc")) {
@@ -403,7 +403,7 @@ struct RendererImpl final : Renderer
 		init_data.renderer = this;
 		
 		char cmd_line[4096];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 		CommandLineParser cmd_line_parser(cmd_line);
 		while (cmd_line_parser.next()) {
 			if (cmd_line_parser.currentEquals("-no_vsync")) {
@@ -422,7 +422,7 @@ struct RendererImpl final : Renderer
 			Engine& engine = renderer.getEngine();
 			void* window_handle = engine.getWindowHandle();
 			if (!gpu::init(window_handle, init_data->flags)) {
-				OS::messageBox("Failed to initialize renderer. More info in lumix.log.");
+				os::messageBox("Failed to initialize renderer. More info in lumix.log.");
 				fatal(false, "gpu::init()");
 			}
 

@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-namespace Reflection
+namespace reflection
 {
 
 template <> Path readFromStream<Path>(InputMemoryStream& stream)

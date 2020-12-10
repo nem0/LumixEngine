@@ -33,18 +33,18 @@ namespace Lumix
 {
 
 
-static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType RIGID_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
-static const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
-static const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
-static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
-static const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
-static const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
-static const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
-static const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
-static const ComponentType VEHICLE_TYPE = Reflection::getComponentType("vehicle");
-static const ComponentType WHEEL_TYPE = Reflection::getComponentType("wheel");
+static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
+static const ComponentType RAGDOLL_TYPE = reflection::getComponentType("ragdoll");
+static const ComponentType CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
+static const ComponentType HEIGHTFIELD_TYPE = reflection::getComponentType("physical_heightfield");
+static const ComponentType DISTANCE_JOINT_TYPE = reflection::getComponentType("distance_joint");
+static const ComponentType HINGE_JOINT_TYPE = reflection::getComponentType("hinge_joint");
+static const ComponentType SPHERICAL_JOINT_TYPE = reflection::getComponentType("spherical_joint");
+static const ComponentType D6_JOINT_TYPE = reflection::getComponentType("d6_joint");
+static const ComponentType VEHICLE_TYPE = reflection::getComponentType("vehicle");
+static const ComponentType WHEEL_TYPE = reflection::getComponentType("wheel");
 static const u32 RENDERER_HASH = crc32("renderer");
 
 enum class PhysicsSceneVersion
@@ -244,7 +244,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				},
 				nullptr);
 		}
-		PxU32 getWorkerCount() const override { return OS::getCPUsCount(); }
+		PxU32 getWorkerCount() const override { return os::getCPUsCount(); }
 	};
 
 
@@ -4200,7 +4200,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	m_physics_cmps_mask = 0;
 
 	const u32 hash = crc32("physics");
-	for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.scene == hash) {
 			m_physics_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
 		}
@@ -4240,7 +4240,7 @@ UniquePtr<PhysicsScene> PhysicsScene::create(PhysicsSystem& system, Universe& co
 }
 
 void PhysicsScene::reflect() {
-	struct LayerEnum : Reflection::EnumAttribute {
+	struct LayerEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { 
 			return ((PhysicsScene*)cmp.scene)->getSystem().getCollisionsLayersCount();
 		}
@@ -4250,7 +4250,7 @@ void PhysicsScene::reflect() {
 		}
 	};
 
-	struct DynamicTypeEnum : Reflection::EnumAttribute {
+	struct DynamicTypeEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override { 
 			switch ((PhysicsScene::DynamicType)idx) {
@@ -4262,7 +4262,7 @@ void PhysicsScene::reflect() {
 		}
 	};
 
-	struct D6MotionEnum : Reflection::EnumAttribute {
+	struct D6MotionEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override { 
 			switch ((PhysicsScene::D6Motion)idx) {
@@ -4274,7 +4274,7 @@ void PhysicsScene::reflect() {
 		}
 	};
 
-	struct WheelSlotEnum : Reflection::EnumAttribute {
+	struct WheelSlotEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 4; }
 		const char* name(ComponentUID cmp, u32 idx) const override { 
 			switch ((PhysicsScene::WheelSlot)idx) {

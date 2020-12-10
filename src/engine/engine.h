@@ -8,7 +8,7 @@ struct lua_State;
 namespace Lumix
 {
 
-namespace OS { using WindowHandle = void*; }
+namespace os { using WindowHandle = void*; }
 template <typename T> struct UniquePtr;
 struct FileSystem;
 
@@ -33,7 +33,7 @@ public:
 
 	virtual struct Universe& createUniverse(bool is_main_universe) = 0;
 	virtual void destroyUniverse(Universe& context) = 0;
-	virtual OS::WindowHandle getWindowHandle() = 0;
+	virtual os::WindowHandle getWindowHandle() = 0;
 
 	virtual struct FileSystem& getFileSystem() = 0;
 	virtual struct InputSystem& getInputSystem() = 0;

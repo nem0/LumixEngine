@@ -101,26 +101,26 @@ struct InputSystemImpl final : InputSystem
 	}
 
 
-	void injectEvent(const OS::Event& event, int mouse_base_x, int mouse_base_y) override
+	void injectEvent(const os::Event& event, int mouse_base_x, int mouse_base_y) override
 	{
 		switch (event.type) {
-			case OS::Event::Type::MOUSE_BUTTON: {
+			case os::Event::Type::MOUSE_BUTTON: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::BUTTON;
 				input_event.device = m_mouse_device;
 				input_event.data.button.key_id = (int)event.mouse_button.button;
 				input_event.data.button.down = event.mouse_button.down;
-				const OS::Point cp = OS::getMouseScreenPos();
+				const os::Point cp = os::getMouseScreenPos();
 				input_event.data.button.x = (float)cp.x - mouse_base_x;
 				input_event.data.button.y = (float)cp.y - mouse_base_y;
 				injectEvent(input_event);
 				break;
 			}
-			case OS::Event::Type::MOUSE_MOVE: {
+			case os::Event::Type::MOUSE_MOVE: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::AXIS;
 				input_event.device = m_mouse_device;
-				const OS::Point cp = OS::getMouseScreenPos();
+				const os::Point cp = os::getMouseScreenPos();
 				input_event.data.axis.x_abs = (float)cp.x - mouse_base_x;
 				input_event.data.axis.y_abs = (float)cp.y - mouse_base_y;
 				input_event.data.axis.x = (float)event.mouse_move.xrel;
@@ -128,7 +128,7 @@ struct InputSystemImpl final : InputSystem
 				injectEvent(input_event);
 				break;
 			}
-			case OS::Event::Type::KEY: {
+			case os::Event::Type::KEY: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::BUTTON;
 				input_event.device = m_keyboard_device;
@@ -137,7 +137,7 @@ struct InputSystemImpl final : InputSystem
 				injectEvent(input_event);
 				break;
 			}
-			case OS::Event::Type::CHAR: {
+			case os::Event::Type::CHAR: {
 				InputSystem::Event input_event;
 				input_event.type = InputSystem::Event::TEXT_INPUT;
 				input_event.device = m_keyboard_device;
@@ -179,7 +179,7 @@ void InputSystemImpl::registerLuaAPI()
 	lua_State* state = m_engine.getState();
 
 	#define REGISTER_KEYCODE(KEYCODE) \
-		LuaWrapper::createSystemVariable(state, "LumixAPI", "INPUT_KEYCODE_" #KEYCODE, (int)OS::Keycode::KEYCODE);
+		LuaWrapper::createSystemVariable(state, "LumixAPI", "INPUT_KEYCODE_" #KEYCODE, (int)os::Keycode::KEYCODE);
 
 		REGISTER_KEYCODE(LBUTTON); 
 		REGISTER_KEYCODE(RBUTTON); 

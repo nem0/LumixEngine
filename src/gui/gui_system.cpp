@@ -83,7 +83,7 @@ struct GUISystemImpl final : GUISystem
 		universe.addScene(scene.move());
 	}
 
-	void setCursor(OS::CursorType type) override {
+	void setCursor(os::CursorType type) override {
 		if (m_interface) m_interface->setCursor(type);
 	}
 

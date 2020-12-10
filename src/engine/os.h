@@ -13,7 +13,7 @@ namespace Lumix
 
 struct IAllocator;
 
-namespace OS
+namespace os
 {
 
 #ifdef _WIN32
@@ -432,7 +432,7 @@ struct LUMIX_ENGINE_API Timer
 };
 
 
-} // namespace OS
+} // namespace os
 
 } // namespace Lumix
 

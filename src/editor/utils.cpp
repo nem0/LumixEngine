@@ -63,7 +63,7 @@ void Action::init(const char* label_short, const char* label_long, const char* n
 	this->name = name;
 	this->is_global = is_global;
 	plugin = nullptr;
-	shortcut = OS::Keycode::INVALID;
+	shortcut = os::Keycode::INVALID;
 	is_selected.bind<falseConst>();
 }
 
@@ -72,7 +72,7 @@ void Action::init(const char* label_short,
 	const char* label_long,
 	const char* name,
 	const char* font_icon,
-	OS::Keycode shortcut,
+	os::Keycode shortcut,
 	u8 modifiers,
 	bool is_global)
 {
@@ -88,18 +88,18 @@ void Action::init(const char* label_short,
 }
 
 bool Action::shortcutText(Span<char> out) {
-	if (shortcut == OS::Keycode::INVALID && modifiers == 0) {
+	if (shortcut == os::Keycode::INVALID && modifiers == 0) {
 		copyString(out, "");
 		return false;
 	}
 	char tmp[32];
-	OS::getKeyName(shortcut, Span(tmp));
+	os::getKeyName(shortcut, Span(tmp));
 	
 	copyString(out, "");
 	if (modifiers & (u8)Action::Modifiers::CTRL) catString(out, "Ctrl ");
 	if (modifiers & (u8)Action::Modifiers::SHIFT) catString(out, "Shift ");
 	if (modifiers & (u8)Action::Modifiers::ALT) catString(out, "Alt ");
-	catString(out, shortcut == OS::Keycode::INVALID ? "" : tmp);
+	catString(out, shortcut == os::Keycode::INVALID ? "" : tmp);
 	const i32 len = stringLength(out.m_begin);
 	if (len > 0 && out[len - 1] == ' ') {
 		out[len - 1] = '\0';
@@ -126,13 +126,13 @@ bool Action::toolbarButton(ImFont* font)
 bool Action::isActive()
 {
 	if (ImGui::IsAnyItemFocused()) return false;
-	if (shortcut == OS::Keycode::INVALID && modifiers == 0) return false;
+	if (shortcut == os::Keycode::INVALID && modifiers == 0) return false;
 
-	if (shortcut != OS::Keycode::INVALID && !OS::isKeyDown(shortcut)) return false;
+	if (shortcut != os::Keycode::INVALID && !os::isKeyDown(shortcut)) return false;
 	
-	if ((modifiers & (u8)Modifiers::ALT) != 0 && !OS::isKeyDown(OS::Keycode::MENU)) return false;
-	if ((modifiers & (u8)Modifiers::SHIFT) != 0 && !OS::isKeyDown(OS::Keycode::SHIFT)) return false;
-	if ((modifiers & (u8)Modifiers::CTRL) != 0 && !OS::isKeyDown(OS::Keycode::CTRL)) return false;
+	if ((modifiers & (u8)Modifiers::ALT) != 0 && !os::isKeyDown(os::Keycode::MENU)) return false;
+	if ((modifiers & (u8)Modifiers::SHIFT) != 0 && !os::isKeyDown(os::Keycode::SHIFT)) return false;
+	if ((modifiers & (u8)Modifiers::CTRL) != 0 && !os::isKeyDown(os::Keycode::CTRL)) return false;
 
 	return true;
 }
@@ -144,9 +144,9 @@ void getShortcut(const Action& action, Span<char> buf) {
 	if (action.modifiers & (u8)Action::Modifiers::SHIFT) catString(buf, "SHIFT ");
 	if (action.modifiers & (u8)Action::Modifiers::ALT) catString(buf, "ALT ");
 
-	if (action.shortcut != OS::Keycode::INVALID) {
+	if (action.shortcut != os::Keycode::INVALID) {
 		char tmp[64];
-		OS::getKeyName(action.shortcut, Span(tmp));
+		os::getKeyName(action.shortcut, Span(tmp));
 		if (tmp[0] == 0) return;
 		catString(buf, " ");
 		catString(buf, tmp);
@@ -173,7 +173,7 @@ void getEntityListDisplayName(StudioApp& app, WorldEditor& editor, Span<char> bu
 
 	EntityRef e = (EntityRef)entity;
 	const char* name = editor.getUniverse()->getEntityName(e);
-	static const auto MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
+	static const auto MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 	if (editor.getUniverse()->hasComponent(e, MODEL_INSTANCE_TYPE))
 	{
 		RenderInterface* render_interface = app.getRenderInterface();

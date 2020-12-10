@@ -23,7 +23,7 @@ namespace Lumix
 
 static const float GRASS_QUAD_SIZE = 10.0f;
 static const float GRASS_QUAD_RADIUS = GRASS_QUAD_SIZE * 0.7072f;
-static const ComponentType TERRAIN_HASH = Reflection::getComponentType("terrain");
+static const ComponentType TERRAIN_HASH = reflection::getComponentType("terrain");
 
 struct Sample
 {

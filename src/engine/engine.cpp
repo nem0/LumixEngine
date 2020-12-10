@@ -78,13 +78,13 @@ public:
 		, m_paused(false)
 		, m_next_frame(false)
 	{
-		OS::init();
-		OS::InitWindowArgs init_win_args;
+		os::init();
+		os::InitWindowArgs init_win_args;
 		init_win_args.fullscreen = init_data.fullscreen;
 		init_win_args.handle_file_drops = init_data.handle_file_drops;
 		init_win_args.name = init_data.window_title;
-		m_window_handle = OS::createWindow(init_win_args);
-		if (m_window_handle == OS::INVALID_WINDOW) {
+		m_window_handle = os::createWindow(init_win_args);
+		if (m_window_handle == os::INVALID_WINDOW) {
 			logError("Failed to create main window.");
 		}
 
@@ -97,7 +97,7 @@ public:
 		getLogCallback().bind<&EngineImpl::logToFile>(this);
 		getLogCallback().bind<logToDebugOutput>();
 
-		OS::logVersion();
+		os::logVersion();
 
 		m_state = luaL_newstate();
 		luaL_openlibs(m_state);
@@ -112,7 +112,7 @@ public:
 		}
 		else {
 			char current_dir[MAX_PATH_LENGTH];
-			OS::getCurrentDirectory(Span(current_dir)); 
+			os::getCurrentDirectory(Span(current_dir)); 
 			m_file_system = FileSystem::create(current_dir, m_allocator);
 		}
 
@@ -124,7 +124,7 @@ public:
 
 		logInfo("Engine created.");
 
-		StaticPluginRegister::createAll(*this);
+		PluginManager::createAllStatic(*this);
 
 		#ifdef LUMIXENGINE_PLUGINS
 			const char* plugins[] = { LUMIXENGINE_PLUGINS };
@@ -160,16 +160,16 @@ public:
 		getLogCallback().unbind<&EngineImpl::logToFile>(this);
 		m_log_file.close();
 		m_is_log_file_open = false;
-		OS::destroyWindow(m_window_handle);
+		os::destroyWindow(m_window_handle);
 	}
 
 	static void logToDebugOutput(LogLevel level, const char* message)
 	{
 		if(level == LogLevel::ERROR) {
-			Debug::debugOutput("Error: ");
+			debug::debugOutput("Error: ");
 		}
-		Debug::debugOutput(message);
-		Debug::debugOutput("\n");
+		debug::debugOutput(message);
+		debug::debugOutput("\n");
 	}
 
 	void logToFile(LogLevel level, const char* message)
@@ -185,7 +185,7 @@ public:
 		m_log_file.flush();
 	}
 
-	OS::WindowHandle getWindowHandle() override { return m_window_handle; }
+	os::WindowHandle getWindowHandle() override { return m_window_handle; }
 	IAllocator& getAllocator() override { return m_allocator; }
 	PageAllocator& getPageAllocator() override { return m_page_allocator; }
 
@@ -505,15 +505,15 @@ private:
 	UniquePtr<PluginManager> m_plugin_manager;
 	PrefabResourceManager m_prefab_resource_manager;
 	UniquePtr<InputSystem> m_input_system;
-	OS::Timer m_timer;
+	os::Timer m_timer;
 	float m_time_multiplier;
 	float m_last_time_delta;
 	bool m_is_game_running;
 	bool m_paused;
 	bool m_next_frame;
-	OS::WindowHandle m_window_handle;
+	os::WindowHandle m_window_handle;
 	lua_State* m_state;
-	OS::OutputFile m_log_file;
+	os::OutputFile m_log_file;
 	bool m_is_log_file_open = false;
 	HashMap<int, Resource*> m_lua_resources;
 	u32 m_last_lua_resource_idx;

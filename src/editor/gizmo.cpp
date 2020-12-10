@@ -559,7 +559,7 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 		if (axis != Axis::NONE) g_gizmo_state.active_id = id;
 		else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
 		draw(view, gizmo, tr, axis, cfg);
-		if (view.isMouseClick(OS::MouseButton::LEFT) && axis != Axis::NONE) {
+		if (view.isMouseClick(os::MouseButton::LEFT) && axis != Axis::NONE) {
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
 			g_gizmo_state.prev_point = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
@@ -568,7 +568,7 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 		return false;
 	}
 
-	if (!view.isMouseDown(OS::MouseButton::LEFT)) {
+	if (!view.isMouseDown(os::MouseButton::LEFT)) {
 		g_gizmo_state.dragged_id = ~(u64)0;
 		g_gizmo_state.axis = Axis::NONE;
 		return false;
@@ -624,7 +624,7 @@ bool scale(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& c
 		if (axis != Axis::NONE) g_gizmo_state.active_id = id;
 		else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
 		draw(view, gizmo, axis, cfg);
-		if (view.isMouseClick(OS::MouseButton::LEFT) && axis != Axis::NONE) {
+		if (view.isMouseClick(os::MouseButton::LEFT) && axis != Axis::NONE) {
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
 			g_gizmo_state.prev_point = getMousePlaneIntersection(view, gizmo, axis);
@@ -632,7 +632,7 @@ bool scale(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& c
 		return false;
 	}
 
-	if (!view.isMouseDown(OS::MouseButton::LEFT)) {
+	if (!view.isMouseDown(os::MouseButton::LEFT)) {
 		g_gizmo_state.dragged_id = ~(u64)0;
 		g_gizmo_state.axis = Axis::NONE;
 		return false;
@@ -667,7 +667,7 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 		if (axis != Axis::NONE) g_gizmo_state.active_id = id;
 		else if (g_gizmo_state.active_id == id) g_gizmo_state.active_id = ~(u64)0;
 		draw(view, gizmo, axis, false, 0, cfg);
-		if (view.isMouseClick(OS::MouseButton::LEFT) && axis != Axis::NONE) {
+		if (view.isMouseClick(os::MouseButton::LEFT) && axis != Axis::NONE) {
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
 			g_gizmo_state.prev_point = getMousePlaneIntersection(view, gizmo, toPlane(axis));
@@ -676,7 +676,7 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 		return false;
 	}
 
-	if (!view.isMouseDown(OS::MouseButton::LEFT)) {
+	if (!view.isMouseDown(os::MouseButton::LEFT)) {
 		g_gizmo_state.dragged_id = ~(u64)0;
 		g_gizmo_state.axis = Axis::NONE;
 		return false;
@@ -772,7 +772,7 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 
 	if (axis != BoxAxis::NONE) g_gizmo_state.active_id = id;
 	BoxGizmo gizmo = getGizmo<BoxGizmo>(view, tr, cfg);
-	if (view.isMouseClick(OS::MouseButton::LEFT) && t >= 0) {
+	if (view.isMouseClick(os::MouseButton::LEFT) && t >= 0) {
 		switch(axis) {
 			case BoxAxis::XP:
 			case BoxAxis::XN:
@@ -796,7 +796,7 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 
 	if (none_active) return false;
 
-	if (!view.isMouseDown(OS::MouseButton::LEFT)) {
+	if (!view.isMouseDown(os::MouseButton::LEFT)) {
 		g_gizmo_state.dragged_id = ~(u64)0;
 		g_gizmo_state.axis = Axis::NONE;
 		return false;

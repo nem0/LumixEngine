@@ -7,7 +7,7 @@
 namespace Lumix
 {
 
-namespace OS { enum class CursorType : u32; }
+namespace os { enum class CursorType : u32; }
 
 template <typename T> struct DelegateList;
 
@@ -81,8 +81,8 @@ struct GUIScene : IScene
 
 	virtual Vec4 getButtonHoveredColorRGBA(EntityRef entity) = 0;
 	virtual void setButtonHoveredColorRGBA(EntityRef entity, const Vec4& color) = 0;
-	virtual OS::CursorType getButtonHoveredCursor(EntityRef entity) = 0;
-	virtual void setButtonHoveredCursor(EntityRef entity, OS::CursorType cursor) = 0;
+	virtual os::CursorType getButtonHoveredCursor(EntityRef entity) = 0;
+	virtual void setButtonHoveredCursor(EntityRef entity, os::CursorType cursor) = 0;
 
 	virtual void enableImage(EntityRef entity, bool enable) = 0;
 	virtual bool isImageEnabled(EntityRef entity) = 0;

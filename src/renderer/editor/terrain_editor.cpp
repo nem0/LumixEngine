@@ -33,9 +33,9 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
-static const ComponentType HEIGHTFIELD_TYPE = Reflection::getComponentType("physical_heightfield");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
+static const ComponentType HEIGHTFIELD_TYPE = reflection::getComponentType("physical_heightfield");
 static const char* HEIGHTMAP_SLOT_NAME = "Heightmap";
 static const char* SPLATMAP_SLOT_NAME = "Splatmap";
 static const char* DETAIL_ALBEDO_SLOT_NAME = "Detail albedo";
@@ -1151,7 +1151,7 @@ void TerrainEditor::layerGUI() {
 	if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_MASK, ImGui::GetStyle().Colors[ImGuiCol_Text], "Select brush mask"))
 	{
 		char filename[MAX_PATH_LENGTH];
-		if (OS::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
+		if (os::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
 		{
 			int image_width;
 			int image_height;

@@ -22,8 +22,8 @@ namespace
 {
 
 
-static const ComponentType NAVMESH_AGENT_TYPE = Reflection::getComponentType("navmesh_agent");
-static const ComponentType NAVMESH_ZONE_TYPE = Reflection::getComponentType("navmesh_zone");
+static const ComponentType NAVMESH_AGENT_TYPE = reflection::getComponentType("navmesh_agent");
+static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
 
 
 struct PropertyGridPlugin : PropertyGrid::IPlugin {
@@ -69,7 +69,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (ImGui::Button("Load")) {
 			char path[MAX_PATH_LENGTH];
-			if (OS::getOpenFilename(Span(path), "Navmesh\0*.nav\0", nullptr)) {
+			if (os::getOpenFilename(Span(path), "Navmesh\0*.nav\0", nullptr)) {
 				char rel[MAX_PATH_LENGTH];
 				if (fs.makeRelative(Span(rel), path)) {
 					scene->load((EntityRef)cmp.entity, rel);
@@ -84,7 +84,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
 				char path[MAX_PATH_LENGTH];
-				if (OS::getSaveFilename(Span(path), "Navmesh\0*.nav\0", "nav")) {
+				if (os::getSaveFilename(Span(path), "Navmesh\0*.nav\0", "nav")) {
 					char rel[MAX_PATH_LENGTH];
 					if (fs.makeRelative(Span(rel), path)) {
 						scene->save((EntityRef)cmp.entity, rel);

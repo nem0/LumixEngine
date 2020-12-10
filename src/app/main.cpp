@@ -24,15 +24,15 @@
 
 using namespace Lumix;
 
-static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
-static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
+static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
+static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 
 struct GUIInterface : GUISystem::Interface {
 	Pipeline* getPipeline() override { return pipeline; }
 	Vec2 getPos() const override { return Vec2(0); }
 	Vec2 getSize() const override { return size; }
-	void setCursor(OS::CursorType type) override { OS::setCursor(type); }
-	void enableCursor(bool enable) override { OS::showCursor(enable); }
+	void setCursor(os::CursorType type) override { os::setCursor(type); }
+	void enableCursor(bool enable) override { os::showCursor(enable); }
 
 	Vec2 size;
 	Pipeline* pipeline;
@@ -44,7 +44,7 @@ struct Runner final
 	Runner() 
 		: m_allocator(m_main_allocator) 
 	{
-		if (!JobSystem::init(OS::getCPUsCount(), m_allocator)) {
+		if (!JobSystem::init(os::getCPUsCount(), m_allocator)) {
 			logError("Failed to initialize job system.");
 		}
 	}
@@ -56,9 +56,9 @@ struct Runner final
 
 	void onResize() {
 		if (!m_engine.get()) return;
-		if (m_engine->getWindowHandle() == OS::INVALID_WINDOW) return;
+		if (m_engine->getWindowHandle() == os::INVALID_WINDOW) return;
 
-		const OS::Rect r = OS::getWindowClientRect(m_engine->getWindowHandle());
+		const os::Rect r = os::getWindowClientRect(m_engine->getWindowHandle());
 		m_viewport.w = r.width;
 		m_viewport.h = r.height;
 		m_gui_interface.size = Vec2((float)r.width, (float)r.height);
@@ -77,7 +77,7 @@ struct Runner final
 		m_pipeline = Pipeline::create(*m_renderer, pres, "APP", m_engine->getAllocator());
 
 		while (m_engine->getFileSystem().hasWork()) {
-			OS::sleep(100);
+			os::sleep(100);
 			m_engine->getFileSystem().processCallbacks();
 		}
 
@@ -129,7 +129,7 @@ struct Runner final
 	void onInit() {
 		Engine::InitArgs init_data;
 
-		if (OS::fileExists("main.pak")) {
+		if (os::fileExists("main.pak")) {
 			init_data.file_system = FileSystem::createPacked("main.pak", m_allocator);
 		}
 
@@ -146,12 +146,12 @@ struct Runner final
 			initDemoScene();
 		}
 		while (m_engine->getFileSystem().hasWork()) {
-			OS::sleep(10);
+			os::sleep(10);
 			m_engine->getFileSystem().processCallbacks();
 		}
 		m_engine->getFileSystem().processCallbacks();
 
-		OS::showCursor(false);
+		os::showCursor(false);
 		onResize();
 		m_engine->startGame(*m_universe);
 	}
@@ -165,18 +165,18 @@ struct Runner final
 		m_universe = nullptr;
 	}
 
-	void onEvent(const OS::Event& event) {
+	void onEvent(const os::Event& event) {
 		if (m_engine.get()) {
 			InputSystem& input = m_engine->getInputSystem();
 			input.injectEvent(event, 0, 0);
 		}
 		switch (event.type) {
-			case OS::Event::Type::QUIT:
-			case OS::Event::Type::WINDOW_CLOSE: 
+			case os::Event::Type::QUIT:
+			case os::Event::Type::WINDOW_CLOSE: 
 				m_finished = true;
 				break;
-			case OS::Event::Type::WINDOW_MOVE:
-			case OS::Event::Type::WINDOW_SIZE:
+			case os::Event::Type::WINDOW_MOVE:
+			case os::Event::Type::WINDOW_SIZE:
 				onResize();
 				break;
 		}
@@ -200,11 +200,12 @@ struct Runner final
 	}
 
 	DefaultAllocator m_main_allocator;
-	Debug::Allocator m_allocator;
+	debug::Allocator m_allocator;
 	UniquePtr<Engine> m_engine;
 	Renderer* m_renderer = nullptr;
 	Universe* m_universe = nullptr;
 	UniquePtr<Pipeline> m_pipeline;
+
 	Viewport m_viewport;
 	bool m_finished = false;
 	GUIInterface m_gui_interface;
@@ -224,8 +225,8 @@ int main(int args, char* argv[])
 
 		data->app.onInit();
 		while(!data->app.m_finished) {
-			OS::Event e;
-			while(OS::getEvent(Ref(e))) {
+			os::Event e;
+			while(os::getEvent(Ref(e))) {
 				data->app.onEvent(e);
 			}
 			data->app.onIdle();
@@ -251,7 +252,7 @@ int main(int args, char* argv[])
 using namespace Lumix;
 
 int main(int args, char* argv[]) {
-	OS::WindowHandle win = OS::createWindow({});
+	os::WindowHandle win = os::createWindow({});
 
 	DefaultAllocator allocator;
 	gpu::preinit(allocator, false);
@@ -267,11 +268,11 @@ int main(int args, char* argv[]) {
 
 	bool finished = false;
 	while (!finished) {
-		OS::Event e;
-		while (OS::getEvent(Ref(e))) {
+		os::Event e;
+		while (os::getEvent(Ref(e))) {
 			switch (e.type) {
-				case OS::Event::Type::WINDOW_CLOSE:
-				case OS::Event::Type::QUIT: finished = true; break;
+				case os::Event::Type::WINDOW_CLOSE:
+				case os::Event::Type::QUIT: finished = true; break;
 			}
 		}
 
@@ -280,7 +281,7 @@ int main(int args, char* argv[]) {
 		gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_col, 0);
 		gpu::useProgram(shader);
 		gpu::setState(gpu::StateFlags::NONE);
-		gpu::drawArrays(0, 3, gpu::PrimitiveType::TRIANGLES);
+		gpu::drawArrays(gpu::PrimitiveType::TRIANGLES, 0, 3);
 
 		u32 frame = gpu::swapBuffers();
 		gpu::waitFrame(frame);
@@ -288,7 +289,7 @@ int main(int args, char* argv[]) {
 
 	gpu::shutdown();
 
-	OS::destroyWindow(win);
+	os::destroyWindow(win);
 }
 
 #endif

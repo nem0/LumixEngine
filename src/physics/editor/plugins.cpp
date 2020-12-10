@@ -30,14 +30,14 @@ namespace
 {
 
 
-const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-const ComponentType RAGDOLL_TYPE = Reflection::getComponentType("ragdoll");
-const ComponentType CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
-const ComponentType DISTANCE_JOINT_TYPE = Reflection::getComponentType("distance_joint");
-const ComponentType HINGE_JOINT_TYPE = Reflection::getComponentType("hinge_joint");
-const ComponentType SPHERICAL_JOINT_TYPE = Reflection::getComponentType("spherical_joint");
-const ComponentType D6_JOINT_TYPE = Reflection::getComponentType("d6_joint");
-const ComponentType RIGID_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
+const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+const ComponentType RAGDOLL_TYPE = reflection::getComponentType("ragdoll");
+const ComponentType CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
+const ComponentType DISTANCE_JOINT_TYPE = reflection::getComponentType("distance_joint");
+const ComponentType HINGE_JOINT_TYPE = reflection::getComponentType("hinge_joint");
+const ComponentType SPHERICAL_JOINT_TYPE = reflection::getComponentType("spherical_joint");
+const ComponentType D6_JOINT_TYPE = reflection::getComponentType("d6_joint");
+const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 const u32 RENDERER_HASH = crc32("renderer");
 
 
@@ -329,7 +329,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	bool packData(const char* dest_dir) override
 	{
 		char exe_path[MAX_PATH_LENGTH];
-		OS::getExecutablePath(Span(exe_path));
+		os::getExecutablePath(Span(exe_path));
 		char exe_dir[MAX_PATH_LENGTH];
 
 		const char* physx_dlls[] = {
@@ -342,9 +342,9 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		{
 			Path::getDir(Span(exe_dir), exe_path);
 			StaticString<MAX_PATH_LENGTH> tmp(exe_dir, dll);
-			if (!OS::fileExists(tmp)) return false;
+			if (!os::fileExists(tmp)) return false;
 			StaticString<MAX_PATH_LENGTH> dest(dest_dir, dll);
-			if (!OS::copyFile(tmp, dest))
+			if (!os::copyFile(tmp, dest))
 			{
 				logError("Failed to copy ", tmp, " to ", dest);
 				return false;

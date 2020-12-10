@@ -8,7 +8,7 @@
 
 namespace Lumix
 {
-namespace Debug
+namespace debug
 {
 
 

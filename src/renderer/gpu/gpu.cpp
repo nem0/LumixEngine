@@ -85,7 +85,7 @@ struct GL {
 	u32 frame = 0;
 	RENDERDOC_API_1_0_2* rdoc_api;
 	WindowContext contexts[64];
-	Lumix::OS::ThreadID thread;
+	Lumix::os::ThreadID thread;
 	int instance_attributes = 0;
 	int max_vertex_attributes = 16;
 	ProgramHandle last_program = INVALID_PROGRAM;
@@ -184,7 +184,7 @@ static LoadInfo* getDXT10LoadInfo(const Header& hdr, const DXT10Header& dxt10_hd
 
 void checkThread()
 {
-	ASSERT(gl->thread == OS::getCurrentThreadID());
+	ASSERT(gl->thread == os::getCurrentThreadID());
 }
 
 void launchRenderDoc() {
@@ -196,10 +196,10 @@ void launchRenderDoc() {
 static void try_load_renderdoc()
 {
 	#ifdef _WIN32
-		void* lib = OS::loadLibrary("renderdoc.dll");
-		if (!lib) lib = OS::loadLibrary("C:\\Program Files\\RenderDoc\\renderdoc.dll");
+		void* lib = os::loadLibrary("renderdoc.dll");
+		if (!lib) lib = os::loadLibrary("C:\\Program Files\\RenderDoc\\renderdoc.dll");
 		if (!lib) return;
-		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)OS::getLibrarySymbol(lib, "RENDERDOC_GetAPI");
+		pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI)os::getLibrarySymbol(lib, "RENDERDOC_GetAPI");
 		if (RENDERDOC_GetAPI) {
 			RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_0_2, (void **)&gl->rdoc_api);
 			gl->rdoc_api->MaskOverlayBits(~RENDERDOC_OverlayBits::eRENDERDOC_Overlay_Enabled, 0);
@@ -406,13 +406,13 @@ static bool load_gl(void* platform_handle, InitFlags init_flags)
 		logVersion();
 		gl->contexts[0].hglrc = hglrc;
 		wglSwapIntervalEXT(vsync ? 1 : 0);
-		void* gl_dll = OS::loadLibrary("opengl32.dll");
+		void* gl_dll = os::loadLibrary("opengl32.dll");
 
 		#define GPU_GL_IMPORT(prototype, name) \
 			do { \
 				name = (prototype)getGLFunc(#name); \
 				if (!name && gl_dll) { \
-					name = (prototype)OS::getLibrarySymbol(gl_dll, #name); \
+					name = (prototype)os::getLibrarySymbol(gl_dll, #name); \
 					if (!name) { \
 						logError("Failed to load GL function " #name "."); \
 						return false; \
@@ -691,7 +691,7 @@ void bindIndirectBuffer(BufferHandle buffer)
 }
 
 
-void drawElements(u32 offset, u32 count, PrimitiveType primitive_type, DataType type)
+void drawElements(PrimitiveType primitive_type, u32 offset, u32 count, DataType type)
 {
 	checkThread();
 	
@@ -762,7 +762,7 @@ void drawTriangleStripArraysInstanced(u32 indices_count, u32 instances_count)
 }
 
 
-void drawArrays(u32 offset, u32 count, PrimitiveType type)
+void drawArrays(PrimitiveType type, u32 offset, u32 count)
 {
 	checkThread();
 	
@@ -1653,7 +1653,7 @@ bool init(void* window_handle, InitFlags init_flags)
 		const bool debug = u32(init_flags & InitFlags::DEBUG_OUTPUT);
 	#endif
 	
-	gl->thread = OS::getCurrentThreadID();
+	gl->thread = os::getCurrentThreadID();
 	gl->contexts[0].window_handle = window_handle;
 	#ifdef _WIN32
 		gl->contexts[0].device_context = GetDC((HWND)window_handle);

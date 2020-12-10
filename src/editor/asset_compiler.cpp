@@ -105,14 +105,14 @@ struct AssetCompilerImpl : AssetCompiler
 		m_task.create("Asset compiler", true);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
-		if (!OS::makePath(path)) logError("Could not create ", path);
+		if (!os::makePath(path)) logError("Could not create ", path);
 		ResourceManagerHub& rm = app.getEngine().getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 	}
 
 	~AssetCompilerImpl()
 	{
-		OS::OutputFile file;
+		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.open(".lumix/assets/_list.txt_tmp", Ref(file))) {
 			file << "resources = {\n";
@@ -164,7 +164,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const u32 hash = crc32(normalized);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		StaticString<MAX_PATH_LENGTH> out_path(".lumix/assets/", hash, ".res");
-		OS::OutputFile file;
+		os::OutputFile file;
 		if(!fs.open(out_path, Ref(file))) {
 			logError("Could not create ", out_path);
 			return false;
@@ -244,7 +244,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		auto* iter = fs.createFileIterator(dir);
-		OS::FileInfo info;
+		os::FileInfo info;
 		while (getNextFile(iter, &info))
 		{
 			if (info.filename[0] == '.') continue;
@@ -371,7 +371,7 @@ struct AssetCompilerImpl : AssetCompiler
 			lua_close(L);
 		}
 
-		const u64 list_last_modified = OS::getLastModified(list_path);
+		const u64 list_last_modified = os::getLastModified(list_path);
 		processDir("", list_last_modified);
 		registerLuaAPI(m_app.getEngine().getState());
 	}
@@ -445,7 +445,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void updateMeta(const Path& res, const char* src) const override
 	{
-		OS::OutputFile file;
+		os::OutputFile file;
 		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
