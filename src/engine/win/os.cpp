@@ -21,7 +21,7 @@ extern "C" {
 }
 
 
-namespace Lumix::OS
+namespace Lumix::os
 {
 
 
@@ -721,12 +721,12 @@ bool isMaximized(WindowHandle win) {
 
 void restore(WindowHandle win, WindowState state) {
 	SetWindowLongPtr((HWND)win, GWL_STYLE, state.style);
-	OS::setWindowScreenRect(win, state.rect);
+	os::setWindowScreenRect(win, state.rect);
 }
 
 WindowState setFullscreen(WindowHandle win) {
 	WindowState res;
-	res.rect = OS::getWindowScreenRect(win);
+	res.rect = os::getWindowScreenRect(win);
 	res.style = SetWindowLongPtr((HWND)win, GWL_STYLE, WS_VISIBLE | WS_POPUP);
 	int w = GetSystemMetrics(SM_CXSCREEN);
 	int h = GetSystemMetrics(SM_CYSCREEN);

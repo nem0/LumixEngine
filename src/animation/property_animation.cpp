@@ -35,7 +35,7 @@ bool PropertyAnimation::save(TextSerializer& serializer)
 	serializer.write("count", curves.size());
 	for (Curve& curve : curves)
 	{
-		serializer.write("component", Reflection::getComponent(curve.cmp_type)->name);
+		serializer.write("component", reflection::getComponent(curve.cmp_type)->name);
 		serializer.write("property", curve.property->name);
 		serializer.write("keys_count", curve.frames.size());
 		for (int i = 0; i < curve.frames.size(); ++i)
@@ -60,7 +60,7 @@ bool PropertyAnimation::load(u64 size, const u8* mem)
 		Curve& curve = curves.emplace(m_allocator);
 		char tmp[32];
 		serializer.read(Span(tmp));
-		curve.cmp_type = Reflection::getComponentType(tmp);
+		curve.cmp_type = reflection::getComponentType(tmp);
 		serializer.read(Span(tmp));
 		// TODO
 		

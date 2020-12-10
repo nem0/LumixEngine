@@ -151,7 +151,7 @@ static struct Instance
 	{
 		thread_local ThreadContext* ctx = [&](){
 			ThreadContext* new_ctx = LUMIX_NEW(allocator, ThreadContext)(allocator);
-			new_ctx->thread_id = OS::getCurrentThreadID();
+			new_ctx->thread_id = os::getCurrentThreadID();
 			MutexGuard lock(mutex);
 			contexts.push(new_ctx);
 			return new_ctx;
@@ -164,7 +164,7 @@ static struct Instance
 	DefaultAllocator allocator;
 	Array<ThreadContext*> contexts;
 	Mutex mutex;
-	OS::Timer timer;
+	os::Timer timer;
 	bool paused = false;
 	bool context_switches_enabled = false;
 	u64 paused_time = 0;
@@ -226,7 +226,7 @@ void write(ThreadContext& ctx, EventType type, const T& value)
 #pragma pack()
 	v.header.type = type;
 	v.header.size = sizeof(v);
-	v.header.time = OS::Timer::getRawTimestamp();
+	v.header.time = os::Timer::getRawTimestamp();
 	v.value = value;
 
 	MutexGuard lock(ctx.mutex);
@@ -259,7 +259,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 	header.type = type;
 	ASSERT(sizeof(header) + size <= 0xffff);
 	header.size = u16(sizeof(header) + size);
-	header.time = OS::Timer::getRawTimestamp();
+	header.time = os::Timer::getRawTimestamp();
 
 	MutexGuard lock(ctx.mutex);
 	u8* buf = ctx.buffer.getMutableData();
@@ -477,7 +477,7 @@ bool contextSwitchesEnabled()
 
 void frame()
 {
-	const u64 n = OS::Timer::getRawTimestamp();
+	const u64 n = os::Timer::getRawTimestamp();
 	if (g_instance.last_frame_time != 0) {
 		g_instance.last_frame_duration = n - g_instance.last_frame_time;
 	}
@@ -587,7 +587,7 @@ void serialize(OutputMemoryStream& blob) {
 void pause(bool paused)
 {
 	g_instance.paused = paused;
-	if (paused) g_instance.paused_time = OS::Timer::getRawTimestamp();
+	if (paused) g_instance.paused_time = os::Timer::getRawTimestamp();
 }
 
 

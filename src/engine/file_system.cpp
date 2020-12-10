@@ -99,7 +99,7 @@ struct FileSystemImpl : FileSystem {
 	}
 
 	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
-		OS::InputFile file;
+		os::InputFile file;
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path.c_str());
 
 		if (!file.open(full_path)) return false;
@@ -148,14 +148,14 @@ struct FileSystemImpl : FileSystem {
 	}
 
 
-	bool open(const char* path, Ref<OS::InputFile> file) override
+	bool open(const char* path, Ref<os::InputFile> file) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
 		return file->open(full_path);
 	}
 
 
-	bool open(const char* path, Ref<OS::OutputFile> file) override
+	bool open(const char* path, Ref<os::OutputFile> file) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
 		return file->open(full_path);
@@ -165,7 +165,7 @@ struct FileSystemImpl : FileSystem {
 	bool deleteFile(const char* path) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
-		return OS::deleteFile(full_path);
+		return os::deleteFile(full_path);
 	}
 
 
@@ -173,7 +173,7 @@ struct FileSystemImpl : FileSystem {
 	{
 		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
 		StaticString<MAX_PATH_LENGTH> full_path_to(m_base_path, to);
-		return OS::moveFile(full_path_from, full_path_to);
+		return os::moveFile(full_path_from, full_path_to);
 	}
 
 
@@ -181,28 +181,28 @@ struct FileSystemImpl : FileSystem {
 	{
 		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
 		StaticString<MAX_PATH_LENGTH> full_path_to(m_base_path, to);
-		return OS::copyFile(full_path_from, full_path_to);
+		return os::copyFile(full_path_from, full_path_to);
 	}
 
 
 	bool fileExists(const char* path) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
-		return OS::fileExists(full_path);
+		return os::fileExists(full_path);
 	}
 
 
 	u64 getLastModified(const char* path) override
 	{
 		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
-		return OS::getLastModified(full_path);
+		return os::getLastModified(full_path);
 	}
 
 
-	OS::FileIterator* createFileIterator(const char* dir) override
+	os::FileIterator* createFileIterator(const char* dir) override
 	{
 		StaticString<MAX_PATH_LENGTH> path(m_base_path, dir);
-		return OS::createFileIterator(path, m_allocator);
+		return os::createFileIterator(path, m_allocator);
 	}
 
 	void makeAbsolute(Span<char> absolute, const char* relative) const override {
@@ -231,7 +231,7 @@ struct FileSystemImpl : FileSystem {
 	{
 		PROFILE_FUNCTION();
 
-		OS::Timer timer;
+		os::Timer timer;
 		for(;;) {
 			m_mutex.enter();
 			if (m_finished.empty()) {
@@ -371,7 +371,7 @@ struct PackFileSystem : FileSystemImpl {
 	IAllocator& m_allocator;
 	HashMap<u32, PackFile> m_map;
 	Mutex m_mutex;
-	OS::InputFile m_file;
+	os::InputFile m_file;
 };
 
 

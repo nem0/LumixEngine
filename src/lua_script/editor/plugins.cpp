@@ -27,7 +27,7 @@
 using namespace Lumix;
 
 
-static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
+static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 
 
 namespace
@@ -66,7 +66,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (ImGui::Button(ICON_FA_SAVE "Save"))
 			{
 				FileSystem& fs = m_app.getEngine().getFileSystem();
-				OS::OutputFile file;
+				os::OutputFile file;
 				if (!fs.open(script->getPath().c_str(), Ref(file)))
 				{
 					logWarning("Could not save ", script->getPath());
@@ -285,9 +285,9 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 			if (ImGui::Button("Execute file"))
 			{
 				char tmp[MAX_PATH_LENGTH] = {};
-				if (OS::getOpenFilename(Span(tmp), "Scripts\0*.lua\0", nullptr))
+				if (os::getOpenFilename(Span(tmp), "Scripts\0*.lua\0", nullptr))
 				{
-					OS::InputFile file;
+					os::InputFile file;
 					IAllocator& allocator = app.getAllocator();
 					if (file.open(tmp))
 					{
@@ -385,9 +385,9 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		if (ImGui::Selectable("New"))
 		{
 			char full_path[MAX_PATH_LENGTH];
-			if (OS::getSaveFilename(Span(full_path), "Lua script\0*.lua\0", "lua"))
+			if (os::getSaveFilename(Span(full_path), "Lua script\0*.lua\0", "lua"))
 			{
-				OS::OutputFile file;
+				os::OutputFile file;
 				FileSystem& fs = app.getEngine().getFileSystem();
 				if(fs.makeRelative(Span(buf), full_path)) {
 					if (file.open(full_path))

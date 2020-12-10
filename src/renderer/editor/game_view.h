@@ -32,7 +32,7 @@ public:
 	bool isMouseCaptured() const { return m_is_mouse_captured; }
 	void captureMouse(bool capture);
 	void enableIngameCursor(bool enable);
-	void setCursor(OS::CursorType type);
+	void setCursor(os::CursorType type);
 	void forceViewport(bool enable, int w, int h);
 	const char* getName() const override { return "game_view"; }
 	bool isOpen() const { return m_is_open; }
@@ -66,7 +66,7 @@ private:
 	bool m_paused;
 	bool m_is_fullscreen;
 	bool m_show_stats;
-	OS::CursorType m_cursor_type = OS::CursorType::DEFAULT;
+	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	struct
 	{
 		bool enabled = false;

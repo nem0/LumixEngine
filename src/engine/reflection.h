@@ -11,13 +11,13 @@
 
 #define LUMIX_CMP(Component, ...) component<&ReflScene::create##Component, &ReflScene::destroy##Component>(__VA_ARGS__)
 #define LUMIX_PROP(Property, Label, ...) property(Label, &ReflScene::get##Property, &ReflScene::set##Property, ##__VA_ARGS__)
-#define LUMIX_FUNC_EX(Func, Name) Reflection::function(&Func, #Func, Name)
-#define LUMIX_FUNC(Func) Reflection::function(&Func, #Func, nullptr)
+#define LUMIX_FUNC_EX(Func, Name) reflection::function(&Func, #Func, Name)
+#define LUMIX_FUNC(Func) reflection::function(&Func, #Func, nullptr)
 #define LUMIX_SCENE(Type, Name, ...) \
 	do { \
-		using namespace Reflection; \
-		static auto registered_scene = [](){ using ReflScene = Type; return Reflection::scene(Name, ##__VA_ARGS__); }(); \
-		Reflection::registerScene(registered_scene); \
+		using namespace reflection; \
+		static auto registered_scene = [](){ using ReflScene = Type; return reflection::scene(Name, ##__VA_ARGS__); }(); \
+		reflection::registerScene(registered_scene); \
 	} while(false)
 	
 
@@ -33,7 +33,7 @@ struct Vec2;
 struct Vec3;
 struct Vec4;
 
-namespace Reflection
+namespace reflection
 {
 
 
@@ -191,7 +191,7 @@ struct IDynamicProperties : PropertyTag  {
 	virtual Type getType(ComponentUID cmp, int array_idx, u32 idx) const = 0;
 	virtual const char* getName(ComponentUID cmp, int array_idx, u32 idx) const = 0;
 	virtual Value getValue(ComponentUID cmp, int array_idx, u32 idx) const = 0;
-	virtual Reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const = 0;
+	virtual reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const = 0;
 	virtual void set(ComponentUID cmp, int array_idx, const char* name, Type type, Value value) const = 0;
 	virtual void set(ComponentUID cmp, int array_idx, u32 idx, Value value) const = 0;
 
@@ -301,7 +301,7 @@ bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const 
 	visitor.cmp.scene = &scene;
 	visitor.cmp.type = cmp_type;
 	visitor.cmp.entity = e;
-	const Reflection::ComponentBase* cmp_desc = getComponent(cmp_type);
+	const reflection::ComponentBase* cmp_desc = getComponent(cmp_type);
 	cmp_desc->visit(visitor);
 	out = visitor.value;
 	return visitor.found;
@@ -520,7 +520,7 @@ const IAttribute* getAttribute(const Property<T>& prop, IAttribute::Type type) {
 
 namespace internal
 {
-	static const unsigned int FRONT_SIZE = sizeof("Lumix::Reflection::internal::GetTypeNameHelper<") - 1u;
+	static const unsigned int FRONT_SIZE = sizeof("Lumix::reflection::internal::GetTypeNameHelper<") - 1u;
 	static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
 
 	template <typename T>

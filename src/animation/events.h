@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 	
-namespace Anim
+namespace anim
 {
 
 
@@ -47,7 +47,7 @@ struct SetInputEvent
 };
 
 
-} // namespace Anim
+} // namespace anim
 
 
 } // namespace Lumix

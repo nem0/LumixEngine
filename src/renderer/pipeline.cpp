@@ -447,8 +447,8 @@ struct MTBucketArray
 	MTBucketArray(IAllocator& allocator) 
 		: m_counts(allocator)
 		, m_allocator(allocator)
-		, m_keys_mem((u8*)OS::memReserve(1024 * 1024 * 16))
-		, m_values_mem((u8*)OS::memReserve(1024 * 1024 * 16))
+		, m_keys_mem((u8*)os::memReserve(1024 * 1024 * 16))
+		, m_values_mem((u8*)os::memReserve(1024 * 1024 * 16))
 	{
 		m_keys_end = m_keys_mem;
 		m_values_end = m_values_mem;
@@ -458,8 +458,8 @@ struct MTBucketArray
 	~MTBucketArray()
 	{
 		PROFILE_FUNCTION();
-		OS::memRelease(m_values_mem);
-		OS::memRelease(m_keys_mem);
+		os::memRelease(m_values_mem);
+		os::memRelease(m_keys_mem);
 	}
 
 	void clear() {
@@ -482,9 +482,9 @@ struct MTBucketArray
 		m_keys_end += BUCKET_SIZE;
 		m_values_end += BUCKET_SIZE;
 		m_mutex.exit();
-		ASSERT(BUCKET_SIZE % OS::getMemPageSize() == 0);
-		OS::memCommit(b.values, BUCKET_SIZE);
-		OS::memCommit(b.keys, BUCKET_SIZE);
+		ASSERT(BUCKET_SIZE % os::getMemPageSize() == 0);
+		os::memCommit(b.values, BUCKET_SIZE);
+		os::memCommit(b.keys, BUCKET_SIZE);
 		return b;
 	}
 
@@ -1331,7 +1331,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::drawArrays(0, vb.size / sizeof(BaseVertex), gpu::PrimitiveType::TRIANGLES);
+				gpu::drawArrays(gpu::PrimitiveType::TRIANGLES, 0, vb.size / sizeof(BaseVertex));
 				gpu::popDebugGroup();
 			}
 
@@ -1394,7 +1394,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset, sizeof(BaseVertex));
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 
-				gpu::drawArrays(0, vb.size / sizeof(BaseVertex), gpu::PrimitiveType::LINES);
+				gpu::drawArrays(gpu::PrimitiveType::LINES, 0, vb.size / sizeof(BaseVertex));
 				gpu::popDebugGroup();
 			}
 
@@ -1485,7 +1485,7 @@ struct PipelineImpl final : Pipeline
 				if (!texture_id) texture_id = atlas_texture;
 
 				gpu::bindTextures(&texture_id, 0, 1);
-				gpu::drawElements(idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
+				gpu::drawElements(gpu::PrimitiveType::TRIANGLES, idx_buffer_mem.offset + elem_offset * sizeof(u32), cmd.indices_count, gpu::DataType::U32);
 
 				elem_offset += cmd.indices_count;
 			}
@@ -2168,7 +2168,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 				gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::drawArrays(m_indices_offset, m_indices_count, gpu::PrimitiveType::TRIANGLE_STRIP);
+				gpu::drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, m_indices_offset, m_indices_count);
 			}
 
 			PipelineImpl* m_pipeline;
@@ -4385,7 +4385,7 @@ struct PipelineImpl final : Pipeline
 				gpu::readTexture(staging, 0, Span((u8*)pixels.begin(), pixels.byte_size()));
 				gpu::destroy(staging);
 
-				OS::OutputFile file;
+				os::OutputFile file;
 				if (fs->open(path, Ref(file))) {
 					Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)pixels.begin(), false, Path(path), allocator);
 					file.close();
@@ -4559,7 +4559,7 @@ struct PipelineImpl final : Pipeline
 	Array<ShaderRef> m_shaders;
 	Array<gpu::TextureHandle> m_textures;
 	Array<gpu::BufferHandle> m_buffers;
-	OS::Timer m_timer;
+	os::Timer m_timer;
 	gpu::BufferHandle m_global_state_buffer;
 	gpu::BufferHandle m_pass_state_buffer;
 	gpu::VertexDecl m_base_vertex_decl;

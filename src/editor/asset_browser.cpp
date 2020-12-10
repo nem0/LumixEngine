@@ -52,9 +52,9 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	const char* base_path = app.getEngine().getFileSystem().getBasePath();
 
 	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
-	bool success = OS::makePath(path);
+	bool success = os::makePath(path);
 	path << "/asset_tiles";
-	success = OS::makePath(path) || success;
+	success = os::makePath(path) || success;
 	if (!success) logError("Could not create ", path);
 
 	m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
@@ -181,14 +181,14 @@ void AssetBrowser::changeDir(const char* path)
 	}
 
 	FileSystem& fs = engine.getFileSystem();
-	OS::FileIterator* iter = fs.createFileIterator(m_dir);
-	OS::FileInfo info;
+	os::FileIterator* iter = fs.createFileIterator(m_dir);
+	os::FileInfo info;
 	m_subdirs.clear();
-	while (OS::getNextFile(iter, &info)) {
+	while (os::getNextFile(iter, &info)) {
 		if (!info.is_directory) continue;
 		if (info.filename[0] != '.') m_subdirs.emplace(info.filename);
 	}
-	OS::destroyFileIterator(iter);
+	os::destroyFileIterator(iter);
 
 	AssetCompiler& compiler = m_app.getAssetCompiler();
 	const u32 dir_hash = crc32(m_dir);
@@ -399,7 +399,7 @@ void AssetBrowser::fileColumn()
 		else if (ImGui::IsItemHovered())
 		{
 			if (ImGui::IsMouseReleased(0)) {
-				const bool additive = OS::isKeyDown(OS::Keycode::LSHIFT);
+				const bool additive = os::isKeyDown(os::Keycode::LSHIFT);
 				selectResource(Path(tile.filepath), true, additive);
 			}
 			else if(ImGui::IsMouseReleased(1)) {
@@ -445,14 +445,14 @@ void AssetBrowser::fileColumn()
 		const char* base_path = fs.getBasePath();
 		if (ImGui::MenuItem("View in explorer")) {
 			StaticString<MAX_PATH_LENGTH> dir_full_path(base_path, "/", m_dir);
-			OS::openExplorer(dir_full_path);
+			os::openExplorer(dir_full_path);
 		}
 		if (ImGui::BeginMenu("Create directory")) {
 			ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp));
 			ImGui::SameLine();
 			if (ImGui::Button("Create")) {
 				StaticString<MAX_PATH_LENGTH> path(base_path, "/", m_dir, "/", tmp);
-				if (!OS::makePath(path)) {
+				if (!os::makePath(path)) {
 					logError("Failed to create ", path);
 				}
 				changeDir(m_dir);
@@ -545,11 +545,11 @@ void AssetBrowser::fileColumn()
 			m_dropped_entity = e;
 			ImGui::OpenPopup("Save sa prefab");
 			Universe* universe = m_app.getWorldEditor().getUniverse();
-			const ComponentType model_inst_type = Reflection::getComponentType("model_instance");
+			const ComponentType model_inst_type = reflection::getComponentType("model_instance");
 			IScene* scene = universe->getScene(model_inst_type);
 			if (scene && universe->hasComponent(e, model_inst_type)) {
 				Path source;
-				if (Reflection::getPropertyValue(*scene, e, model_inst_type, "Source", Ref(source))) {
+				if (reflection::getPropertyValue(*scene, e, model_inst_type, "Source", Ref(source))) {
 					Path::getBasename(Span(m_prefab_name), source.c_str());
 				}
 			}
@@ -807,11 +807,11 @@ static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 {
 	PathInfo fi(src);
 	StaticString<MAX_PATH_LENGTH> dst_dir(dest, "/", fi.m_basename);
-	if (!OS::makePath(dst_dir)) logError("Could not create ", dst_dir);
-	OS::FileIterator* iter = OS::createFileIterator(src, allocator);
+	if (!os::makePath(dst_dir)) logError("Could not create ", dst_dir);
+	os::FileIterator* iter = os::createFileIterator(src, allocator);
 
-	OS::FileInfo cfi;
-	while(OS::getNextFile(iter, &cfi)) {
+	os::FileInfo cfi;
+	while(os::getNextFile(iter, &cfi)) {
 		if (cfi.is_directory) {
 			if (cfi.filename[0] != '.') {
 				StaticString<MAX_PATH_LENGTH> tmp_src(src, "/", cfi.filename);
@@ -822,25 +822,25 @@ static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 		else {
 			StaticString<MAX_PATH_LENGTH> tmp_src(src, "/", cfi.filename);
 			StaticString<MAX_PATH_LENGTH> tmp_dst(dest, "/", fi.m_basename, "/", cfi.filename);
-			if(!OS::copyFile(tmp_src, tmp_dst)) {
+			if(!os::copyFile(tmp_src, tmp_dst)) {
 				logError("Failed to copy ", tmp_src, " to ", tmp_dst);
 			}
 		}
 	}
-	OS::destroyFileIterator(iter);
+	os::destroyFileIterator(iter);
 }
 
 bool AssetBrowser::onDropFile(const char* path)
 {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	if (OS::dirExists(path)) {
+	if (os::dirExists(path)) {
 		StaticString<MAX_PATH_LENGTH> tmp(fs.getBasePath(), "/", m_dir, "/");
 		IAllocator& allocator = m_app.getAllocator();
 		copyDir(path, tmp, allocator);
 	}
 	PathInfo fi(path);
 	StaticString<MAX_PATH_LENGTH> dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
-	return OS::copyFile(path, dest);
+	return os::copyFile(path, dest);
 }
 
 void AssetBrowser::selectResource(const Path& path, bool record_history, bool additive)
@@ -952,7 +952,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
-	OS::OutputFile f;
+	os::OutputFile f;
 	if (!fs.open(tmp_path, Ref(f)))
 	{
 		LUMIX_DELETE(m_app.getAllocator(), &stream);
@@ -976,9 +976,9 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	src_full_path << engine.getFileSystem().getBasePath() << tmp_path;
 	dest_full_path << engine.getFileSystem().getBasePath() << resource.getPath().c_str();
 
-	OS::deleteFile(dest_full_path);
+	os::deleteFile(dest_full_path);
 
-	if (!OS::moveFile(src_full_path, dest_full_path))
+	if (!os::moveFile(src_full_path, dest_full_path))
 	{
 		logError("Could not save file ", resource.getPath());
 	}
@@ -1027,7 +1027,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	IPlugin* plugin = iter.value();
 	if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New")) {
 		char full_path[MAX_PATH_LENGTH];
-		if (OS::getSaveFilename(Span(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
+		if (os::getSaveFilename(Span(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
 			if (fs.makeRelative(buf, full_path)) {
 				if (plugin->createResource(full_path)) {
 					return true;
@@ -1094,11 +1094,11 @@ void AssetBrowser::openInExternalEditor(const char* path) const
 {
 	StaticString<MAX_PATH_LENGTH> full_path(m_app.getEngine().getFileSystem().getBasePath());
 	full_path << path;
-	const OS::ExecuteOpenResult res = OS::shellExecuteOpen(full_path);
-	if (res == OS::ExecuteOpenResult::NO_ASSOCIATION) {
+	const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path);
+	if (res == os::ExecuteOpenResult::NO_ASSOCIATION) {
 		logError(full_path << " is not associated with any app.");
 	}
-	else if (res == OS::ExecuteOpenResult::OTHER_ERROR) {
+	else if (res == os::ExecuteOpenResult::OTHER_ERROR) {
 		logError("Failed to open ", full_path, " in exeternal editor.");
 	}
 }

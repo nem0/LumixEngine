@@ -9,7 +9,7 @@ namespace Lumix
 {
 
 
-namespace Anim
+namespace anim
 {
 
 
@@ -1043,7 +1043,7 @@ int InputDecl::getConstantIdx(const char* name, int size) const
 	return -1;
 }
 
-} // namespace Anim
+} // namespace anim
 
 
 } // namespace Lumix

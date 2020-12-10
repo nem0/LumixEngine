@@ -51,18 +51,18 @@ namespace Lumix
 		lua_remove(L, -2); // [obj]
 	}
 
-	static void toVariant(Reflection::Variant::Type type, lua_State* L, int idx, Ref<Reflection::Variant> val) {
+	static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, Ref<reflection::Variant> val) {
 		switch(type) {
-			case Reflection::Variant::BOOL: val = LuaWrapper::toType<bool>(L, idx); break;
-			case Reflection::Variant::U32: val = LuaWrapper::toType<u32>(L, idx); break;
-			case Reflection::Variant::I32: val = LuaWrapper::toType<i32>(L, idx); break;
-			case Reflection::Variant::FLOAT: val = LuaWrapper::toType<float>(L, idx); break;
-			case Reflection::Variant::ENTITY: val = LuaWrapper::toType<EntityPtr>(L, idx); break;
-			case Reflection::Variant::VEC2: val = LuaWrapper::toType<Vec2>(L, idx); break;
-			case Reflection::Variant::VEC3: val = LuaWrapper::toType<Vec3>(L, idx); break;
-			case Reflection::Variant::DVEC3: val = LuaWrapper::toType<DVec3>(L, idx); break;
-			case Reflection::Variant::CSTR: val = LuaWrapper::toType<const char*>(L, idx); break;
-			case Reflection::Variant::PTR: {
+			case reflection::Variant::BOOL: val = LuaWrapper::toType<bool>(L, idx); break;
+			case reflection::Variant::U32: val = LuaWrapper::toType<u32>(L, idx); break;
+			case reflection::Variant::I32: val = LuaWrapper::toType<i32>(L, idx); break;
+			case reflection::Variant::FLOAT: val = LuaWrapper::toType<float>(L, idx); break;
+			case reflection::Variant::ENTITY: val = LuaWrapper::toType<EntityPtr>(L, idx); break;
+			case reflection::Variant::VEC2: val = LuaWrapper::toType<Vec2>(L, idx); break;
+			case reflection::Variant::VEC3: val = LuaWrapper::toType<Vec3>(L, idx); break;
+			case reflection::Variant::DVEC3: val = LuaWrapper::toType<DVec3>(L, idx); break;
+			case reflection::Variant::CSTR: val = LuaWrapper::toType<const char*>(L, idx); break;
+			case reflection::Variant::PTR: {
 				void* ptr;
 				if (!LuaWrapper::checkField(L, idx, "_value", &ptr)) {
 					luaL_argerror(L, idx, "expected object");
@@ -74,19 +74,19 @@ namespace Lumix
 		}	
 	}
 
-	static int push(lua_State* L, const Reflection::Variant& v, const char* type_name) {
+	static int push(lua_State* L, const reflection::Variant& v, const char* type_name) {
 		switch (v.type) {
-			case Reflection::Variant::ENTITY: ASSERT(false); return 0;
-			case Reflection::Variant::VOID: return 0;
-			case Reflection::Variant::BOOL: LuaWrapper::push(L, v.b); return 1;
-			case Reflection::Variant::U32: LuaWrapper::push(L, v.u); return 1;
-			case Reflection::Variant::I32: LuaWrapper::push(L, v.i); return 1;
-			case Reflection::Variant::FLOAT: LuaWrapper::push(L, v.f); return 1;
-			case Reflection::Variant::CSTR: LuaWrapper::push(L, v.s); return 1;
-			case Reflection::Variant::VEC2: LuaWrapper::push(L, v.v2); return 1;
-			case Reflection::Variant::VEC3: LuaWrapper::push(L, v.v3); return 1;
-			case Reflection::Variant::DVEC3: LuaWrapper::push(L, v.dv3); return 1;
-			case Reflection::Variant::PTR: pushObject(L, v.ptr, type_name); return 1;
+			case reflection::Variant::ENTITY: ASSERT(false); return 0;
+			case reflection::Variant::VOID: return 0;
+			case reflection::Variant::BOOL: LuaWrapper::push(L, v.b); return 1;
+			case reflection::Variant::U32: LuaWrapper::push(L, v.u); return 1;
+			case reflection::Variant::I32: LuaWrapper::push(L, v.i); return 1;
+			case reflection::Variant::FLOAT: LuaWrapper::push(L, v.f); return 1;
+			case reflection::Variant::CSTR: LuaWrapper::push(L, v.s); return 1;
+			case reflection::Variant::VEC2: LuaWrapper::push(L, v.v2); return 1;
+			case reflection::Variant::VEC3: LuaWrapper::push(L, v.v3); return 1;
+			case reflection::Variant::DVEC3: LuaWrapper::push(L, v.dv3); return 1;
+			case reflection::Variant::PTR: pushObject(L, v.ptr, type_name); return 1;
 			default: ASSERT(false); return 0;
 		}
 	}
@@ -99,18 +99,18 @@ namespace Lumix
 			return 0;
 		}
 
-		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
+		reflection::FunctionBase* f = LuaWrapper::toType<reflection::FunctionBase*>(L, lua_upvalueindex(1));
 		
-		LuaWrapper::DebugGuard guard(L, f->getReturnType() == Reflection::Variant::VOID ? 0 : 1);
+		LuaWrapper::DebugGuard guard(L, f->getReturnType() == reflection::Variant::VOID ? 0 : 1);
 
-		Reflection::Variant args[32];
+		reflection::Variant args[32];
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
-			Reflection::Variant::Type type = f->getArgType(i);
+			reflection::Variant::Type type = f->getArgType(i);
 			toVariant(type, L, i + 2, Ref(args[i]));
 		}
 
-		const Reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
+		const reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
 		return push(L, res, f->getReturnTypeName());
 	}
 
@@ -122,15 +122,15 @@ namespace Lumix
 			return 0;
 		}
 
-		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
-		Reflection::Variant args[32];
+		reflection::FunctionBase* f = LuaWrapper::toType<reflection::FunctionBase*>(L, lua_upvalueindex(1));
+		reflection::Variant args[32];
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
-			Reflection::Variant::Type type = f->getArgType(i);
+			reflection::Variant::Type type = f->getArgType(i);
 			toVariant(type, L, i + 2, Ref(args[i]));
 		}
-		const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
-		if (res.type == Reflection::Variant::ENTITY) {
+		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+		if (res.type == reflection::Variant::ENTITY) {
 			LuaWrapper::pushEntity(L, res.e, &scene->getUniverse());
 			return 1;
 		}
@@ -155,16 +155,16 @@ namespace Lumix
 		EntityRef entity = {LuaWrapper::toType<int>(L, -1)};
 		lua_pop(L, 1);
 
-		Reflection::FunctionBase* f = LuaWrapper::toType<Reflection::FunctionBase*>(L, lua_upvalueindex(1));
-		Reflection::Variant args[32];
+		reflection::FunctionBase* f = LuaWrapper::toType<reflection::FunctionBase*>(L, lua_upvalueindex(1));
+		reflection::Variant args[32];
 		ASSERT(f->getArgCount() < lengthOf(args));
 		args[0] = entity;
 		for (u32 i = 1; i < f->getArgCount(); ++i) {
-			Reflection::Variant::Type type = f->getArgType(i);
+			reflection::Variant::Type type = f->getArgType(i);
 			toVariant(type, L, i + 1, Ref(args[i]));
 		}
-		const Reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
-		if (res.type == Reflection::Variant::ENTITY) {
+		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
+		if (res.type == reflection::Variant::ENTITY) {
 			LuaWrapper::pushEntity(L, res.e, &scene->getUniverse());
 			return 1;
 		}
@@ -174,7 +174,7 @@ namespace Lumix
 	static void createClasses(lua_State* L) {
 		LuaWrapper::DebugGuard guard(L);
 		lua_getglobal(L, "LumixAPI");
-		for (auto* f : Reflection::allFunctions()) {
+		for (auto* f : reflection::allFunctions()) {
 			const char* obj_type_name = f->getThisTypeName();
 			const char* c = obj_type_name + strlen(obj_type_name);
 			while (*c != ':' && c != obj_type_name) --c;
@@ -204,7 +204,7 @@ namespace Lumix
 		lua_pop(L, 1);
 	}
 
-	static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
+	static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 
 
 	enum class LuaSceneVersion : i32
@@ -873,7 +873,7 @@ namespace Lumix
 			*dest = 0;
 		}
 
-		struct LuaPropGetterVisitor  : Reflection::IPropertyVisitor
+		struct LuaPropGetterVisitor  : reflection::IPropertyVisitor
 		{
 			static bool isSameProperty(const char* name, const char* lua_name) {
 				char tmp[50];
@@ -882,7 +882,7 @@ namespace Lumix
 			}
 
 			template <typename T>
-			void get(const Reflection::Property<T>& prop)
+			void get(const reflection::Property<T>& prop)
 			{
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
@@ -891,16 +891,16 @@ namespace Lumix
 				LuaWrapper::push(L, val);
 			}
 
-			void visit(const Reflection::Property<float>& prop) override { get(prop); }
-			void visit(const Reflection::Property<int>& prop) override { get(prop); }
-			void visit(const Reflection::Property<u32>& prop) override { get(prop); }
-			void visit(const Reflection::Property<Vec2>& prop) override { get(prop); }
-			void visit(const Reflection::Property<Vec3>& prop) override { get(prop); }
-			void visit(const Reflection::Property<IVec3>& prop) override { get(prop); }
-			void visit(const Reflection::Property<Vec4>& prop) override { get(prop); }
-			void visit(const Reflection::Property<bool>& prop) override { get(prop); }
+			void visit(const reflection::Property<float>& prop) override { get(prop); }
+			void visit(const reflection::Property<int>& prop) override { get(prop); }
+			void visit(const reflection::Property<u32>& prop) override { get(prop); }
+			void visit(const reflection::Property<Vec2>& prop) override { get(prop); }
+			void visit(const reflection::Property<Vec3>& prop) override { get(prop); }
+			void visit(const reflection::Property<IVec3>& prop) override { get(prop); }
+			void visit(const reflection::Property<Vec4>& prop) override { get(prop); }
+			void visit(const reflection::Property<bool>& prop) override { get(prop); }
 
-			void visit(const Reflection::Property<EntityPtr>& prop) override { 
+			void visit(const reflection::Property<EntityPtr>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const EntityPtr val = prop.get(cmp, idx);
@@ -908,7 +908,7 @@ namespace Lumix
 				LuaWrapper::pushEntity(L, val, &cmp.scene->getUniverse());
 			}
 
-			void visit(const Reflection::Property<Path>& prop) override { 
+			void visit(const reflection::Property<Path>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const Path p = prop.get(cmp, idx);
@@ -916,7 +916,7 @@ namespace Lumix
 				LuaWrapper::push(L, p.c_str());
 			}
 
-			void visit(const Reflection::Property<const char*>& prop) override { 
+			void visit(const reflection::Property<const char*>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const char* tmp = prop.get(cmp, idx);
@@ -924,8 +924,8 @@ namespace Lumix
 				LuaWrapper::push(L, tmp);
 			}
 
-			void visit(const Reflection::IArrayProperty& prop) override {}
-			void visit(const Reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::IArrayProperty& prop) override {}
+			void visit(const reflection::IBlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -934,7 +934,7 @@ namespace Lumix
 			lua_State* L;
 		};
 		
-		struct LuaPropSetterVisitor : Reflection::IPropertyVisitor
+		struct LuaPropSetterVisitor : reflection::IPropertyVisitor
 		{
 			bool isSameProperty(const char* name, const char* lua_name) {
 				char tmp[50];
@@ -947,7 +947,7 @@ namespace Lumix
 			}
 
 			template <typename T>
-			void set(const Reflection::Property<T>& prop)
+			void set(const reflection::Property<T>& prop)
 			{
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
@@ -955,32 +955,32 @@ namespace Lumix
 				prop.set(cmp, idx, val);
 			}
 
-			void visit(const Reflection::Property<float>& prop) override { set(prop); }
-			void visit(const Reflection::Property<int>& prop) override { set(prop); }
-			void visit(const Reflection::Property<u32>& prop) override { set(prop); }
-			void visit(const Reflection::Property<EntityPtr>& prop) override { set(prop); }
-			void visit(const Reflection::Property<Vec2>& prop) override { set(prop); }
-			void visit(const Reflection::Property<Vec3>& prop) override { set(prop); }
-			void visit(const Reflection::Property<IVec3>& prop) override { set(prop); }
-			void visit(const Reflection::Property<Vec4>& prop) override { set(prop); }
-			void visit(const Reflection::Property<bool>& prop) override { set(prop); }
+			void visit(const reflection::Property<float>& prop) override { set(prop); }
+			void visit(const reflection::Property<int>& prop) override { set(prop); }
+			void visit(const reflection::Property<u32>& prop) override { set(prop); }
+			void visit(const reflection::Property<EntityPtr>& prop) override { set(prop); }
+			void visit(const reflection::Property<Vec2>& prop) override { set(prop); }
+			void visit(const reflection::Property<Vec3>& prop) override { set(prop); }
+			void visit(const reflection::Property<IVec3>& prop) override { set(prop); }
+			void visit(const reflection::Property<Vec4>& prop) override { set(prop); }
+			void visit(const reflection::Property<bool>& prop) override { set(prop); }
 
-			void visit(const Reflection::Property<Path>& prop) override {
+			void visit(const reflection::Property<Path>& prop) override {
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
 				prop.set(cmp, idx, Path(val));
 			}
 
-			void visit(const Reflection::Property<const char*>& prop) override { 
+			void visit(const reflection::Property<const char*>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
 				prop.set(cmp, idx, val);
 			}
 
-			void visit(const Reflection::IArrayProperty& prop) override {}
-			void visit(const Reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::IArrayProperty& prop) override {}
+			void visit(const reflection::IBlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -1035,7 +1035,7 @@ namespace Lumix
 			v.L = L;
 			v.idx = -1;
 			v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
-			const Reflection::ComponentBase* cmp = Reflection::getComponent(v.cmp.type);
+			const reflection::ComponentBase* cmp = reflection::getComponent(v.cmp.type);
 
 			v.cmp.scene = scene;
 			v.cmp.entity = entity;
@@ -1064,7 +1064,7 @@ namespace Lumix
 			v.L = L;
 			v.idx = -1;
 			v.cmp.type = LuaWrapper::toType<ComponentType>(L, lua_upvalueindex(1));
-			const Reflection::ComponentBase* cmp = Reflection::getComponent(v.cmp.type);
+			const reflection::ComponentBase* cmp = reflection::getComponent(v.cmp.type);
 
 			lua_getfield(L, 1, "_scene");
 			v.cmp.scene = LuaWrapper::toType<IScene*>(L, -1);
@@ -1098,7 +1098,7 @@ namespace Lumix
 			lua_State* L = m_system.m_engine.getState();
 			LuaWrapper::DebugGuard guard(L);
 
-			Reflection::SceneBase* scene = Reflection::getFirstScene();
+			reflection::SceneBase* scene = reflection::getFirstScene();
 			while (scene) {
 				lua_newtable(L); // [ scene ]
 				lua_getglobal(L, "Lumix"); // [ scene, Lumix ]
@@ -1112,7 +1112,7 @@ namespace Lumix
 				lua_pushcfunction(L, lua_new_scene); // [ scene, fn_new_scene ]
 				lua_setfield(L, -2, "new"); // [ scene ]
 
-				for (const Reflection::FunctionBase* f :  scene->getFunctions()) {
+				for (const reflection::FunctionBase* f :  scene->getFunctions()) {
 					const char* c = f->decl_code;
 					while (*c != ':') ++c;
 					c += 2;
@@ -1125,7 +1125,7 @@ namespace Lumix
 				scene = scene->next;
 			}
 
-			for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+			for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 				const char* cmp_name = cmp.cmp->name;
 				const ComponentType cmp_type = cmp.cmp->component_type;
 
@@ -2207,7 +2207,7 @@ namespace Lumix
 	}
 
 
-	struct LuaProperties : Reflection::IDynamicProperties {
+	struct LuaProperties : reflection::IDynamicProperties {
 		LuaProperties() { name = "lua_properties"; }
 		
 		u32 getCount(ComponentUID cmp, int index) const override { 
@@ -2238,8 +2238,8 @@ namespace Lumix
 			return scene.getPropertyName(e, array_idx, idx);
 		}
 
-		Reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const override {
-			Reflection::ResourceAttribute attr;
+		reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const override {
+			reflection::ResourceAttribute attr;
 			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
 			const EntityRef e = (EntityRef)cmp.entity;
 			const LuaScriptScene::Property::Type type = scene.getPropertyType(e, array_idx, idx);
@@ -2256,20 +2256,20 @@ namespace Lumix
 			const char* name = scene.getPropertyName(e, array_idx, idx);
 			Value v = {};
 			switch(type) {
-				case LuaScriptScene::Property::Type::COLOR: Reflection::set(v, scene.getPropertyValue<Vec3>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::BOOLEAN: Reflection::set(v, scene.getPropertyValue<bool>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::INT: Reflection::set(v, scene.getPropertyValue<i32>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::FLOAT: Reflection::set(v, scene.getPropertyValue<float>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::STRING: Reflection::set(v, scene.getPropertyValue<const char*>(e, array_idx, name)); break;
-				case LuaScriptScene::Property::Type::ENTITY: Reflection::set(v, scene.getPropertyValue<EntityPtr>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::COLOR: reflection::set(v, scene.getPropertyValue<Vec3>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::BOOLEAN: reflection::set(v, scene.getPropertyValue<bool>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::INT: reflection::set(v, scene.getPropertyValue<i32>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::FLOAT: reflection::set(v, scene.getPropertyValue<float>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::STRING: reflection::set(v, scene.getPropertyValue<const char*>(e, array_idx, name)); break;
+				case LuaScriptScene::Property::Type::ENTITY: reflection::set(v, scene.getPropertyValue<EntityPtr>(e, array_idx, name)); break;
 				case LuaScriptScene::Property::Type::RESOURCE: {
 					const i32 res_idx = scene.getPropertyValue<i32>(e, array_idx, name);
 					if (res_idx < 0) {
-						Reflection::set(v, ""); 
+						reflection::set(v, ""); 
 					}
 					else {
 						Resource* res = scene.m_system.m_engine.getLuaResource(res_idx);
-						Reflection::set(v, res ? res->getPath().c_str() : ""); 
+						reflection::set(v, res ? res->getPath().c_str() : ""); 
 					}
 					break;
 				}

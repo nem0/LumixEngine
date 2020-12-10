@@ -61,7 +61,7 @@ struct AnimationSystemImpl final : IPlugin
 	Engine& m_engine;
 	AnimResourceManager<Animation> m_animation_manager;
 	AnimResourceManager<PropertyAnimation> m_property_animation_manager;
-	AnimResourceManager<Anim::Controller> m_controller_manager;
+	AnimResourceManager<anim::Controller> m_controller_manager;
 };
 
 
@@ -75,7 +75,7 @@ AnimationSystemImpl::AnimationSystemImpl(Engine& engine)
 	AnimationScene::reflect(engine);
 	m_animation_manager.create(Animation::TYPE, m_engine.getResourceManager());
 	m_property_animation_manager.create(PropertyAnimation::TYPE, m_engine.getResourceManager());
-	m_controller_manager.create(Anim::Controller::TYPE, m_engine.getResourceManager());
+	m_controller_manager.create(anim::Controller::TYPE, m_engine.getResourceManager());
 }
 
 

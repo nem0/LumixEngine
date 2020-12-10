@@ -16,12 +16,12 @@ namespace Lumix
 {
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType PHYSICAL_CONTROLLER_TYPE = Reflection::getComponentType("physical_controller");
-static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
-static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
-static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
-static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType PHYSICAL_CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
+static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
+static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
+static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
+static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
 
 
 enum class IconType

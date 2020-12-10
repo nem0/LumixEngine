@@ -190,7 +190,7 @@ static void saveTGA(Texture& texture)
 		return;
 	}
 
-	OS::OutputFile file;
+	os::OutputFile file;
 	FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
 	if (!fs.open(texture.getPath().c_str(), Ref(file))) {
 		logError("Failed to create file ", texture.getPath());
@@ -218,7 +218,7 @@ void Texture::save()
 	if (equalStrings(ext, "raw") && format == gpu::TextureFormat::R16)
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!fs.open(getPath().c_str(), Ref(file))) {
 			logError("Failed to create file ", getPath());
 			return;

@@ -214,7 +214,7 @@ void LogUI::onGUI()
 						}
 					}
 
-					OS::copyToClipboard(mem);
+					os::copyToClipboard(mem);
 					m_allocator.deallocate(mem);
 				}
 			}

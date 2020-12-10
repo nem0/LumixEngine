@@ -91,7 +91,7 @@ Array<UniquePtr<IScene>>& Universe::getScenes()
 void Universe::addScene(UniquePtr<IScene>&& scene)
 {
 	const u32 hash = crc32(scene->getPlugin().getName());
-	for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.scene == hash) {
 			m_component_type_map[cmp.cmp->component_type.index].scene = scene.get();
 			m_component_type_map[cmp.cmp->component_type.index].create = cmp.cmp->creator;

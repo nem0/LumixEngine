@@ -37,7 +37,7 @@ struct GUIInterface : GUISystem::Interface
 	Pipeline* getPipeline() override { return m_game_view.m_pipeline.get(); }
 	Vec2 getPos() const override { return m_game_view.m_pos; }
 	Vec2 getSize() const override { return m_game_view.m_size; }
-	void setCursor(OS::CursorType type) override { m_game_view.setCursor(type); }
+	void setCursor(os::CursorType type) override { m_game_view.setCursor(type); }
 	void enableCursor(bool enable) override { m_game_view.enableIngameCursor(enable); }
 
 	GameView& m_game_view;
@@ -97,7 +97,7 @@ GameView::~GameView()
 	}
 }
 
-void GameView::setCursor(OS::CursorType type)
+void GameView::setCursor(os::CursorType type)
 {
 	m_cursor_type = type;
 }
@@ -107,7 +107,7 @@ void GameView::enableIngameCursor(bool enable)
 	m_is_ingame_cursor = enable;
 	if (!m_is_mouse_captured) return;
 
-	OS::showCursor(m_is_ingame_cursor);
+	os::showCursor(m_is_ingame_cursor);
 }
 
 
@@ -117,16 +117,16 @@ void GameView::captureMouse(bool capture)
 
 	m_app.setCursorCaptured(capture);
 	m_is_mouse_captured = capture;
-	OS::showCursor(!capture || m_is_ingame_cursor);
+	os::showCursor(!capture || m_is_ingame_cursor);
 	
 	if (capture) {
-		const OS::Point cp = OS::getMouseScreenPos();
+		const os::Point cp = os::getMouseScreenPos();
 		m_captured_mouse_x = cp.x;
 		m_captured_mouse_y = cp.y;
 	}
 	else {
-		OS::unclipCursor();
-		OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
+		os::unclipCursor();
+		os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
 	}
 }
 
@@ -244,7 +244,7 @@ void GameView::processInputEvents()
 	
 	Engine& engine = m_app.getEngine();
 	InputSystem& input = engine.getInputSystem();
-	const OS::Event* events = m_app.getEvents();
+	const os::Event* events = m_app.getEvents();
 	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
 		input.injectEvent(events[i], int(m_pos.x), int(m_pos.y));
 	}
@@ -292,7 +292,7 @@ void GameView::onWindowGUI()
 	const char* window_name = ICON_FA_CAMERA "Game View###game_view";
 	if (m_is_mouse_captured) {
 		window_name = ICON_FA_CAMERA "Game View (mouse captured)###game_view";
-		OS::setCursor(m_cursor_type);
+		os::setCursor(m_cursor_type);
 	}
 	
 	if (m_is_fullscreen) {
@@ -358,7 +358,7 @@ void GameView::onWindowGUI()
 			m_size = ImGui::GetItemRectSize();
 
 			if (m_is_mouse_captured) {
-				OS::clipCursor((int)m_pos.x, (int)m_pos.y, (int)m_size.x, (int)m_size.y);
+				os::clipCursor((int)m_pos.x, (int)m_pos.y, (int)m_size.x, (int)m_size.y);
 			}
 
 			processInputEvents();
@@ -366,7 +366,7 @@ void GameView::onWindowGUI()
 		}
 
 	}
-	if (m_is_mouse_captured && OS::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
+	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) captureMouse(false);
 	ImGui::End();
 	ImGui::PopStyleVar();
 	if (is_game_view_visible) onStatsGUI(view_pos);

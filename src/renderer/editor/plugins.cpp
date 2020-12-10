@@ -52,16 +52,16 @@
 
 using namespace Lumix;
 
-static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
-static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
-static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
-static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
-static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
-static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
-static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
-static const ComponentType FUR_TYPE = Reflection::getComponentType("fur");
+static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
+static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
+static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
+static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
+static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
+static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
+static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
+static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 
 // https://www.khronos.org/opengl/wiki/Cubemap_Texture
 static const Vec3 cube_fwd[6] = {
@@ -234,7 +234,7 @@ static void flipX(Vec4* data, int texture_size)
 
 static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool generate_mipmaps) {
 	ASSERT(data);
-	OS::OutputFile file;
+	os::OutputFile file;
 	if (!file.open(path)) return false;
 	
 	nvtt::Context context;
@@ -254,7 +254,7 @@ static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool gener
 		void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
 		void endImage() override {}
 
-		OS::OutputFile* dst;
+		os::OutputFile* dst;
 	} output_handler;
 	output_handler.dst = &file;
 	output.setOutputHandler(&output_handler);
@@ -397,7 +397,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getDefaultExtension() const override { return "mat"; }
 
 	bool createResource(const char* path) override {
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(path)) {
 			logError("Failed to create ", path);
 			return false;
@@ -731,7 +731,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getFileDialogExtensions() const override { return "ltc"; }
 	bool canCreateResource() const override { return true; }
 	bool createResource(const char* path) override { 
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(path)) {
 			logError("Failed to create ", path);
 			return false;
@@ -756,7 +756,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			OutputMemoryStream resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 			if (Path::hasExtension(m_in_path, "dds")) {
-				OS::InputFile file;
+				os::InputFile file;
 				if (!file.open(m_in_path)) {
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					logError("Failed to load ", m_in_path);
@@ -1729,8 +1729,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (m_is_mouse_captured && !mouse_down)
 		{
 			m_is_mouse_captured = false;
-			OS::showCursor(true);
-			OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
+			os::showCursor(true);
+			os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
 		}
 
 		if (ImGui::GetIO().MouseClicked[1] && ImGui::IsItemHovered()) ImGui::OpenPopup("PreviewPopup");
@@ -1748,10 +1748,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (ImGui::IsItemHovered() && mouse_down)
 		{
 			Vec2 delta(0, 0);
-			const OS::Event* events = m_app.getEvents();
+			const os::Event* events = m_app.getEvents();
 			for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-				const OS::Event& e = events[i];
-				if (e.type == OS::Event::Type::MOUSE_MOVE) {
+				const os::Event& e = events[i];
+				if (e.type == os::Event::Type::MOUSE_MOVE) {
 					delta += Vec2((float)e.mouse_move.xrel, (float)e.mouse_move.yrel);
 				}
 			}
@@ -1759,8 +1759,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (!m_is_mouse_captured)
 			{
 				m_is_mouse_captured = true;
-				OS::showCursor(false);
-				const OS::Point p = OS::getMouseScreenPos();
+				os::showCursor(false);
+				const os::Point p = os::getMouseScreenPos();
 				m_captured_mouse_x = p.x;
 				m_captured_mouse_y = p.y;
 			}
@@ -2116,7 +2116,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
-				OS::OutputFile file;
+				os::OutputFile file;
 				FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
 				if (fs.open(img_path, Ref(file))) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
@@ -2473,7 +2473,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		lua_State* L = luaL_newstate();
 		luaL_openlibs(L);
 
-		OS::InputFile file;
+		os::InputFile file;
 		if (!file.open(path[0] == '/' ? path + 1 : path)) return;
 		
 		IAllocator& allocator = m_app.getAllocator();
@@ -2714,15 +2714,15 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
-		if (!OS::makePath(path) && !OS::dirExists(path)) {
+		if (!os::makePath(path) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
 		path << "/probes_tmp/";
-		if (!OS::makePath(path) && !OS::dirExists(path)) {
+		if (!os::makePath(path) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
 		path << probe_guid << ".dds";
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(path)) {
 			logError("Failed to create ", path);
 			return false;
@@ -2763,7 +2763,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
 			void endImage() override {}
 
-			OS::OutputFile* dst;
+			os::OutputFile* dst;
 		} output_handler;
 		output_handler.dst = &file;
 		output.setOutputHandler(&output_handler);
@@ -2908,11 +2908,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 			StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
-			if (!OS::dirExists(path) && !OS::makePath(path)) {
+			if (!os::dirExists(path) && !os::makePath(path)) {
 				logError("Failed to create ", path);
 			}
 			path << "/probes/";
-			if (!OS::dirExists(path) && !OS::makePath(path)) {
+			if (!os::dirExists(path) && !os::makePath(path)) {
 				logError("Failed to create ", path);
 			}
 			while (!m_probes.empty()) {
@@ -2927,8 +2927,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 					const StaticString<MAX_PATH_LENGTH> tmp_path(base_path, "/universes/", job.universe_name, "/probes_tmp/", guid, ".dds");
 					const StaticString<MAX_PATH_LENGTH> path(base_path, "/universes/", job.universe_name, "/probes/", guid, ".dds");
-					if (!OS::fileExists(tmp_path)) return;
-					if (!OS::moveFile(tmp_path, path)) {
+					if (!os::fileExists(tmp_path)) return;
+					if (!os::moveFile(tmp_path, path)) {
 						logError("Failed to move file ", tmp_path, " to ", path);
 					}
 				}
@@ -2991,7 +2991,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					gpu::setState(gpu::StateFlags::NONE);
 					gpu::viewport(0, 0, size >> mip, size >> mip);
 					gpu::update(buf, &drawcall, sizeof(drawcall));
-					gpu::drawArrays(0, 4, gpu::PrimitiveType::TRIANGLE_STRIP);
+					gpu::drawArrays(gpu::PrimitiveType::TRIANGLE_STRIP, 0, 4);
 				}
 			}
 
@@ -3154,7 +3154,7 @@ struct RenderInterfaceImpl final : RenderInterface
 	bool saveTexture(Engine& engine, const char* path_cstr, const void* pixels, int w, int h, bool upper_left_origin) override
 	{
 		Path path(path_cstr);
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(path_cstr)) return false;
 
 		if (!Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (const u8*)pixels, upper_left_origin, path, engine.getAllocator())) {
@@ -3277,7 +3277,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 			WindowDrawData(IAllocator& allocator) : cmd_lists(allocator) {}
 
 			gpu::ProgramHandle program;
-			OS::WindowHandle window;
+			os::WindowHandle window;
 			u32 w, h;
 			i32 x, y;
 			bool new_program = false;
@@ -3406,7 +3406,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 						u32(clamp(pcmd->ClipRect.w - pcmd->ClipRect.y, 0.f, 65535.f)));
 				}
 
-				gpu::drawElements(elem_offset * sizeof(u32), pcmd->ElemCount, gpu::PrimitiveType::TRIANGLES, gpu::DataType::U32);
+				gpu::drawElements(gpu::PrimitiveType::TRIANGLES, elem_offset * sizeof(u32), pcmd->ElemCount, gpu::DataType::U32);
 		
 				elem_offset += pcmd->ElemCount;
 			}
@@ -3606,7 +3606,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		StaticString<MAX_PATH_LENGTH> normal_path(info.m_dir, "normal_detail.ltc");
 		StaticString<MAX_PATH_LENGTH> splatmap_path(info.m_dir, "splatmap.tga");
 		StaticString<MAX_PATH_LENGTH> splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(hm_path))
 		{
 			logError("Failed to create heightmap ", hm_path);
@@ -3628,13 +3628,13 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		
 		if (!written) {
 			logError("Could not write ", hm_path);
-			OS::deleteFile(hm_path);
+			os::deleteFile(hm_path);
 			return false;
 		}
 
 		if (!file.open(splatmap_meta_path)) {
 			logError("Failed to create meta ", splatmap_meta_path);
-			OS::deleteFile(hm_path);
+			os::deleteFile(hm_path);
 			return false;
 		}
 
@@ -3643,8 +3643,8 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 		if (!file.open(splatmap_path)) {
 			logError("Failed to create texture ", splatmap_path);
-			OS::deleteFile(splatmap_meta_path);
-			OS::deleteFile(hm_path);
+			os::deleteFile(splatmap_meta_path);
+			os::deleteFile(hm_path);
 			return false;
 		}
 
@@ -3653,16 +3653,16 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		memset(splatmap.getMutableData(), 0, size * size * 4);
 		if (!Texture::saveTGA(&file, size, size, gpu::TextureFormat::RGBA8, splatmap.data(), true, Path(splatmap_path), app.getAllocator())) {
 			logError("Failed to create texture ", splatmap_path);
-			OS::deleteFile(hm_path);
+			os::deleteFile(hm_path);
 			return false;
 		}
 		file.close();
 
 		if (!file.open(albedo_path)) {
 			logError("Failed to create texture ", albedo_path);
-			OS::deleteFile(hm_path);
-			OS::deleteFile(splatmap_path);
-			OS::deleteFile(splatmap_meta_path);
+			os::deleteFile(hm_path);
+			os::deleteFile(splatmap_path);
+			os::deleteFile(splatmap_meta_path);
 			return false;
 		}
 		file << R"#(
@@ -3683,10 +3683,10 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 		if (!file.open(normal_path)) {
 			logError("Failed to create texture ", normal_path);
-			OS::deleteFile(albedo_path);
-			OS::deleteFile(hm_path);
-			OS::deleteFile(splatmap_path);
-			OS::deleteFile(splatmap_meta_path);
+			os::deleteFile(albedo_path);
+			os::deleteFile(hm_path);
+			os::deleteFile(splatmap_path);
+			os::deleteFile(splatmap_meta_path);
 			return false;
 		}
 		file << R"#(
@@ -3708,11 +3708,11 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		if (!file.open(normalized_material_path))
 		{
 			logError("Failed to create material ", normalized_material_path);
-			OS::deleteFile(normal_path);
-			OS::deleteFile(albedo_path);
-			OS::deleteFile(hm_path);
-			OS::deleteFile(splatmap_path);
-			OS::deleteFile(splatmap_meta_path);
+			os::deleteFile(normal_path);
+			os::deleteFile(albedo_path);
+			os::deleteFile(hm_path);
+			os::deleteFile(splatmap_path);
+			os::deleteFile(splatmap_meta_path);
 			return false;
 		}
 
@@ -3753,7 +3753,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			if (ImGui::Button("Create"))
 			{
 				char save_filename[MAX_PATH_LENGTH];
-				if (OS::getSaveFilename(Span(save_filename), "Material\0*.mat\0", "mat")) {
+				if (os::getSaveFilename(Span(save_filename), "Material\0*.mat\0", "mat")) {
 					if (fs.makeRelative(Span(buf), save_filename)) {
 						new_created = createHeightmap(buf, size);
 					}

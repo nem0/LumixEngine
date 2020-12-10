@@ -16,6 +16,7 @@ struct LUMIX_ENGINE_API PluginManager
 	virtual ~PluginManager() {}
 
 	static UniquePtr<PluginManager> create(struct Engine& engine);
+	static void createAllStatic(Engine& engine);
 	
 	virtual void initPlugins() = 0;
 	virtual void unload(struct IPlugin* plugin) = 0;
@@ -65,31 +66,12 @@ struct LUMIX_ENGINE_API IPlugin
 };
 
 
-struct LUMIX_ENGINE_API StaticPluginRegister
-{
-	using Creator = IPlugin* (*)(struct Engine& engine);
-	StaticPluginRegister(const char* name, Creator creator);
-	
-	static IPlugin* create(const char* name, Engine& engine);
-	static void createAll(Engine& engine);
-
-	StaticPluginRegister* next;
-	Creator creator;
-	const char* name;
-};
-
-
 } // namespace Lumix
 
 
 #ifdef STATIC_PLUGINS
-	#define LUMIX_PLUGIN_ENTRY(plugin_name)                                           \
-		extern "C" IPlugin* createPlugin_##plugin_name(Engine& engine); \
-		extern "C" { StaticPluginRegister LUMIX_ATTRIBUTE_USED s_##plugin_name##_plugin_register(          \
-			#plugin_name, createPlugin_##plugin_name); }                              \
-		extern "C" IPlugin* createPlugin_##plugin_name(Engine& engine)
+	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" IPlugin* createPlugin_##plugin_name(Engine& engine)
 #else
-	#define LUMIX_PLUGIN_ENTRY(plugin_name) \
-		extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
+	#define LUMIX_PLUGIN_ENTRY(plugin_name) extern "C" LUMIX_LIBRARY_EXPORT IPlugin* createPlugin(Engine& engine)
 #endif
 

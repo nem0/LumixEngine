@@ -312,14 +312,14 @@ public:
 		return root;
 	}
 
-	struct PropertyCloner : Reflection::IPropertyVisitor {
+	struct PropertyCloner : reflection::IPropertyVisitor {
 		template <typename T>
-		void clone(const Reflection::Property<T>& prop) { prop.set(dst, index, prop.get(src, index)); }
+		void clone(const reflection::Property<T>& prop) { prop.set(dst, index, prop.get(src, index)); }
 
-		void visit(const Reflection::Property<float>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<int>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<u32>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<EntityPtr>& prop) override { 
+		void visit(const reflection::Property<float>& prop) override { clone(prop); }
+		void visit(const reflection::Property<int>& prop) override { clone(prop); }
+		void visit(const reflection::Property<u32>& prop) override { clone(prop); }
+		void visit(const reflection::Property<EntityPtr>& prop) override { 
 			EntityPtr e = prop.get(src, index);
 			auto iter = map->find(e);
 			if (iter.isValid()) {
@@ -330,15 +330,15 @@ public:
 			}
 			prop.set(dst, index, e);
 		}
-		void visit(const Reflection::Property<Vec2>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<Vec3>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<IVec3>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<Vec4>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<Path>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<bool>& prop) override { clone(prop); }
-		void visit(const Reflection::Property<const char*>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Vec2>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Vec3>& prop) override { clone(prop); }
+		void visit(const reflection::Property<IVec3>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Vec4>& prop) override { clone(prop); }
+		void visit(const reflection::Property<Path>& prop) override { clone(prop); }
+		void visit(const reflection::Property<bool>& prop) override { clone(prop); }
+		void visit(const reflection::Property<const char*>& prop) override { clone(prop); }
 		
-		void visit(const Reflection::IArrayProperty& prop) override {
+		void visit(const reflection::IArrayProperty& prop) override {
 			const i32 c = prop.getCount(src);
 			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
 			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
@@ -351,12 +351,12 @@ public:
 			index = -1;
 		}
 
-		void visit(const Reflection::IDynamicProperties& prop) override { 
+		void visit(const reflection::IDynamicProperties& prop) override { 
 			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
 				const char* name = prop.getName(src, index, i);
-				Reflection::IDynamicProperties::Type type = prop.getType(src, index, i);
-				Reflection::IDynamicProperties::Value val = prop.getValue(src, index, i);
-				if (type == Reflection::IDynamicProperties::ENTITY) {
+				reflection::IDynamicProperties::Type type = prop.getType(src, index, i);
+				reflection::IDynamicProperties::Value val = prop.getValue(src, index, i);
+				if (type == reflection::IDynamicProperties::ENTITY) {
 					auto iter = map->find(val.e);
 					if (iter.isValid()) {
 						val.e = iter.value();
@@ -368,7 +368,7 @@ public:
 				prop.set(dst, index, name, type, val);
 			}
 		}
-		void visit(const Reflection::IBlobProperty& prop) override { 
+		void visit(const reflection::IBlobProperty& prop) override { 
 			OutputMemoryStream tmp(*allocator);
 			prop.getValue(src, index, tmp);
 			InputMemoryStream blob(tmp);
@@ -410,7 +410,7 @@ public:
 		for (ComponentUID cmp = src_u.getFirstComponent(src_e); cmp.isValid(); cmp = src_u.getNextComponent(cmp)) {
 			dst_u.createComponent(cmp.type, dst_e);
 
-			const Reflection::ComponentBase* cmp_tpl = Reflection::getComponent(cmp.type);
+			const reflection::ComponentBase* cmp_tpl = reflection::getComponent(cmp.type);
 	
 			PropertyCloner property_cloner;
 			property_cloner.allocator = &m_editor.getAllocator();
@@ -496,7 +496,7 @@ public:
 
 		Engine& engine = m_editor.getEngine();
 		FileSystem& fs = engine.getFileSystem();
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!fs.open(path.c_str(), Ref(file)))
 		{
 			logError("Failed to create ", path);

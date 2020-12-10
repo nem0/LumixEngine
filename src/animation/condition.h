@@ -17,7 +17,7 @@ template <typename Key> struct HashFunc;
 template <typename K, typename V, typename H> struct HashMap;
 
 
-namespace Anim
+namespace anim
 {
 
 
@@ -97,7 +97,7 @@ struct Condition
 };
 
 
-} // namespace Anim
+} // namespace anim
 
 
 } // namespace Lumix

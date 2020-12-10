@@ -8,7 +8,7 @@
 #include "engine/crt.h"
 
 
-namespace Lumix::Anim {
+namespace Lumix::anim {
 
 
 
@@ -186,16 +186,16 @@ void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32
 
 	if (m_children.empty()) return;
 	if (m_children.size() == 1) {
-		Anim::getPose(ctx, t, weight, m_children[0].slot, pose, mask, true);
+		anim::getPose(ctx, t, weight, m_children[0].slot, pose, mask, true);
 		return;
 	}
 
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
 	
-	Anim::getPose(ctx, t, weight, pair.a->slot, pose, mask, true);
+	anim::getPose(ctx, t, weight, pair.a->slot, pose, mask, true);
 	if (pair.b) {
-		Anim::getPose(ctx, t, weight * pair.t, pair.b->slot, pose, mask, true);
+		anim::getPose(ctx, t, weight * pair.t, pair.b->slot, pose, mask, true);
 	}
 }
 
@@ -253,7 +253,7 @@ void AnimationNode::skip(RuntimeContext& ctx) const {
 	
 void AnimationNode::getPose(RuntimeContext& ctx, float weight, Ref<Pose> pose, u32 mask) const {
 	const Time t = ctx.input_runtime.read<Time>();
-	Anim::getPose(ctx, t, weight, m_slot, pose, mask, m_flags & LOOPED);
+	anim::getPose(ctx, t, weight, m_slot, pose, mask, m_flags & LOOPED);
 }
 
 void AnimationNode::serialize(OutputMemoryStream& stream) const {
@@ -481,4 +481,4 @@ Node* Node::create(GroupNode* parent, Type type, IAllocator& allocator) {
 }
 
 
-} // ns Lumix::Anim
+} // namespace Lumix::anim

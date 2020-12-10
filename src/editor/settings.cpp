@@ -109,7 +109,7 @@ static void loadStyle(lua_State* L)
 		#undef LOAD_FLOAT
 		#undef LOAD_BOOL
 		#undef LOAD_VEC2
-		style.ScaleAllSizes(OS::getDPI() / 96.f);
+		style.ScaleAllSizes(os::getDPI() / 96.f);
 	}
 	lua_pop(L, 1);
 
@@ -127,7 +127,7 @@ static const char* toString(ImGuiDir dir)
 	}
 }
 
-static void saveStyle(OS::OutputFile& file)
+static void saveStyle(os::OutputFile& file)
 {
 	auto& style = ImGui::GetStyle();
 	file << "style = {";
@@ -196,24 +196,24 @@ static bool shortcutInput(Ref<Action> action, bool edit)
 	ImGui::SetNextItemWidth(-30);
 	ImGui::InputText("", button_label, sizeof(button_label), ImGuiInputTextFlags_ReadOnly);
 	if (ImGui::IsItemActive()) {
-		if (OS::isKeyDown(OS::Keycode::SHIFT)) action->modifiers |= (u8)Action::Modifiers::SHIFT;
-		if (OS::isKeyDown(OS::Keycode::MENU)) action->modifiers |= (u8)Action::Modifiers::ALT;
-		if (OS::isKeyDown(OS::Keycode::CTRL)) action->modifiers |= (u8)Action::Modifiers::CTRL;
+		if (os::isKeyDown(os::Keycode::SHIFT)) action->modifiers |= (u8)Action::Modifiers::SHIFT;
+		if (os::isKeyDown(os::Keycode::MENU)) action->modifiers |= (u8)Action::Modifiers::ALT;
+		if (os::isKeyDown(os::Keycode::CTRL)) action->modifiers |= (u8)Action::Modifiers::CTRL;
 
-		for (int i = 0; i < (int)OS::Keycode::MAX; ++i) {
-			const auto kc= (OS::Keycode)i;
-			const bool is_mouse = kc == OS::Keycode::LBUTTON || kc == OS::Keycode::RBUTTON || kc == OS::Keycode::MBUTTON;
-			const bool is_modifier = kc == OS::Keycode::SHIFT 
-				|| kc == OS::Keycode::LSHIFT 
-				|| kc == OS::Keycode::RSHIFT 
-				|| kc == OS::Keycode::MENU 
-				|| kc == OS::Keycode::LMENU 
-				|| kc == OS::Keycode::RMENU 
-				|| kc == OS::Keycode::CTRL 
-				|| kc == OS::Keycode::LCTRL 
-				|| kc == OS::Keycode::RCTRL;
-			if (OS::isKeyDown(kc) && !is_mouse && !is_modifier) {
-				action->shortcut = (OS::Keycode)i;
+		for (int i = 0; i < (int)os::Keycode::MAX; ++i) {
+			const auto kc= (os::Keycode)i;
+			const bool is_mouse = kc == os::Keycode::LBUTTON || kc == os::Keycode::RBUTTON || kc == os::Keycode::MBUTTON;
+			const bool is_modifier = kc == os::Keycode::SHIFT 
+				|| kc == os::Keycode::LSHIFT 
+				|| kc == os::Keycode::RSHIFT 
+				|| kc == os::Keycode::MENU 
+				|| kc == os::Keycode::LMENU 
+				|| kc == os::Keycode::RMENU 
+				|| kc == os::Keycode::CTRL 
+				|| kc == os::Keycode::LCTRL 
+				|| kc == os::Keycode::RCTRL;
+			if (os::isKeyDown(kc) && !is_mouse && !is_modifier) {
+				action->shortcut = (os::Keycode)i;
 				break;
 			}
 		}
@@ -221,7 +221,7 @@ static bool shortcutInput(Ref<Action> action, bool edit)
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
 		action->modifiers = 0;
-		action->shortcut = OS::Keycode::INVALID;
+		action->shortcut = os::Keycode::INVALID;
 	}
 	
 	return res;
@@ -397,7 +397,7 @@ bool Settings::load()
 			if (lua_type(L, -1) == LUA_TTABLE)
 			{
 				if (LuaWrapper::getField(L, -1, "key") == LUA_TNUMBER) {
-					actions[i]->shortcut = (OS::Keycode)lua_tointeger(L, -1);
+					actions[i]->shortcut = (os::Keycode)lua_tointeger(L, -1);
 				}
 				lua_pop(L, 1);
 				if (LuaWrapper::getField(L, -1, "modifiers") == LUA_TNUMBER) {
@@ -469,7 +469,7 @@ bool Settings::getValue(const char* name, bool default_value) const
 bool Settings::save()
 {
 	auto& actions = m_app.getActions();
-	OS::OutputFile file;
+	os::OutputFile file;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (!fs.open(SETTINGS_PATH, Ref(file))) return false;
 

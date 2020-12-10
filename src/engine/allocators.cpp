@@ -42,7 +42,7 @@ namespace Lumix
 	}
 
 	void initPage(u32 item_size, DefaultAllocator::Page* page) {
-		OS::memCommit(page, PAGE_SIZE);
+		os::memCommit(page, PAGE_SIZE);
 		page = new (NewPlaceholder(), page) DefaultAllocator::Page;
 		page->header.first_free = 0;
 		page->header.prev = nullptr;
@@ -103,7 +103,7 @@ namespace Lumix
 
 	static void* allocSmall(DefaultAllocator& allocator, size_t n) {
 		if (!allocator.m_small_allocations) {
-			allocator.m_small_allocations = (u8*)OS::memReserve(PAGE_SIZE * MAX_PAGE_COUNT);
+			allocator.m_small_allocations = (u8*)os::memReserve(PAGE_SIZE * MAX_PAGE_COUNT);
 		}
 
 		const u32 bin = sizeToBin(n);
@@ -151,7 +151,7 @@ namespace Lumix
 	}
 
 	DefaultAllocator::~DefaultAllocator() {
-		OS::memRelease(m_small_allocations);
+		os::memRelease(m_small_allocations);
 	}
 
 	void* DefaultAllocator::allocate(size_t n)

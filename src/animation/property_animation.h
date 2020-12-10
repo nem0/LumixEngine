@@ -8,7 +8,7 @@ namespace Lumix
 
 
 struct TextSerializer;
-namespace Reflection { template <typename T> struct Property; }
+namespace reflection { template <typename T> struct Property; }
 
 
 struct PropertyAnimation final : Resource
@@ -19,7 +19,7 @@ public:
 		Curve(IAllocator& allocator) : frames(allocator), values(allocator) {}
 
 		ComponentType cmp_type;
-		const Reflection::Property<float>* property;
+		const reflection::Property<float>* property;
 		
 		Array<int> frames;
 		Array<float> values;
