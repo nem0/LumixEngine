@@ -31,7 +31,7 @@
 
 #define _NET_WM_STATE_ADD           1
 
-namespace Lumix::OS
+namespace Lumix::os
 {
 
 
