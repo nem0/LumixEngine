@@ -2,9 +2,13 @@ radius = 0.35
 intensity = 1
 debug = false
 
+noise = -1
+Editor.setPropertyType(this, "noise", Editor.RESOURCE_PROPERTY, "texture")
+
 function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
+	if noise == -1 then return hdr_buffer end
 	env.beginBlock("ssao")
 	if env.ssao_shader_compute == nil then
 		env.ssao_shader_compute = env.preloadShader("pipelines/ssao_gld.shd")
@@ -23,7 +27,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.beginBlock("compute_ao")
 	env.drawcallUniforms(radius, intensity)
 	env.bindImageTexture(ssao_rb, 0)
-	env.bindTextures({gbuffer_depth, gbuffer1}, 1)
+	env.bindTextures({gbuffer_depth, gbuffer1, noise}, 1)
 	env.dispatch(env.ssao_shader_compute, w_comp, h_comp, 1)
 	env.endBlock()
 
