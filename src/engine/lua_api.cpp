@@ -458,7 +458,7 @@ static void LUA_startGame(Engine* engine, Universe* universe)
 static bool LUA_createComponent(Universe* universe, i32 entity, const char* type)
 {
 	if (!universe) return false;
-	ComponentType cmp_type = Reflection::getComponentType(type);
+	ComponentType cmp_type = reflection::getComponentType(type);
 	IScene* scene = universe->getScene(cmp_type);
 	if (!scene) return false;
 	if (universe->hasComponent({entity}, cmp_type))
@@ -475,7 +475,7 @@ static bool LUA_createComponent(Universe* universe, i32 entity, const char* type
 static bool LUA_hasComponent(Universe* universe, i32 entity, const char* type)
 {
 	if (!universe) return false;
-	ComponentType cmp_type = Reflection::getComponentType(type);
+	ComponentType cmp_type = reflection::getComponentType(type);
 	IScene* scene = universe->getScene(cmp_type);
 	if (!scene) return false;
 	return universe->hasComponent({entity}, cmp_type);
@@ -490,7 +490,7 @@ static EntityRef LUA_createEntity(Universe* universe)
 
 static int LUA_getComponentType(const char* component_type)
 {
-	return Reflection::getComponentType(component_type).index;
+	return reflection::getComponentType(component_type).index;
 }
 
 

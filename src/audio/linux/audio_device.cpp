@@ -285,21 +285,21 @@ struct AudioDeviceImpl : AudioDevice
 			LUMIX_DELETE(m_allocator, m_task);
 		}
 		if (m_device) m_api.snd_pcm_close(m_device);
-		if (m_alsa_lib) OS::unloadLibrary(m_alsa_lib);
+		if (m_alsa_lib) os::unloadLibrary(m_alsa_lib);
 	}
 
 
 	bool loadAlsa()
 	{
-		m_alsa_lib = OS::loadLibrary("libasound.so");
+		m_alsa_lib = os::loadLibrary("libasound.so");
 		if (!m_alsa_lib) return false;
 
 		#define API(func) \
 			do { \
-				m_api.func = (decltype(m_api.func))OS::getLibrarySymbol(m_alsa_lib, #func);\
+				m_api.func = (decltype(m_api.func))os::getLibrarySymbol(m_alsa_lib, #func);\
 				if(!m_api.func)\
 				{\
-					OS::unloadLibrary(m_alsa_lib);\
+					os::unloadLibrary(m_alsa_lib);\
 					m_alsa_lib = nullptr;\
 					return false;\
 				}\

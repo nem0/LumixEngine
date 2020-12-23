@@ -9,7 +9,7 @@ struct lua_State;
 namespace Lumix
 {
 
-namespace Anim { struct Controller; }
+namespace anim { struct Controller; }
 
 struct Animable {
 	Time time;
@@ -45,10 +45,10 @@ struct AnimationScene : IScene {
 	virtual void applyAnimatorSet(EntityRef entity, u32 idx) = 0;
 	virtual void setAnimatorDefaultSet(EntityRef entity, u32 idx) = 0;
 	virtual u32 getAnimatorDefaultSet(EntityRef entity) = 0;
-	virtual Anim::Controller* getAnimatorController(EntityRef entity) = 0;
+	virtual anim::Controller* getAnimatorController(EntityRef entity) = 0;
 	virtual void setAnimatorIK(EntityRef entity, u32 index, float weight, const struct Vec3& target) = 0;
 	virtual float getAnimationLength(int animation_idx) = 0;
 };
 
 
-} // ~ namespace Lumix
+} // namespace Lumix

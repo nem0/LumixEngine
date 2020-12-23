@@ -37,9 +37,9 @@
 namespace Lumix
 {
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
-static const ComponentType MESH_ACTOR_TYPE = Reflection::getComponentType("rigid_actor");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
+static const ComponentType MESH_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 
 struct UniverseViewImpl final : UniverseView {
 	enum class MouseMode
@@ -157,7 +157,7 @@ struct UniverseViewImpl final : UniverseView {
 		}
 	}
 
-	void onMouseUp(int x, int y, OS::MouseButton button)
+	void onMouseUp(int x, int y, os::MouseButton button)
 	{
 		m_mouse_pos = {(float)x, (float)y};
 		if (m_mouse_mode == MouseMode::SELECT)
@@ -289,8 +289,8 @@ struct UniverseViewImpl final : UniverseView {
 		for (auto& i : m_is_mouse_click) i = false;
 	}
 
-	bool isMouseClick(OS::MouseButton button) const override { return m_is_mouse_click[(int)button]; }
-	bool isMouseDown(OS::MouseButton button) const override { return m_is_mouse_down[(int)button]; }
+	bool isMouseClick(os::MouseButton button) const override { return m_is_mouse_click[(int)button]; }
+	bool isMouseDown(os::MouseButton button) const override { return m_is_mouse_down[(int)button]; }
 
 	void onMouseMove(int x, int y, int relx, int rely)
 	{
@@ -322,19 +322,19 @@ struct UniverseViewImpl final : UniverseView {
 		}
 	}
 
-	void onMouseDown(int x, int y, OS::MouseButton button)
+	void onMouseDown(int x, int y, os::MouseButton button)
 	{
 		m_is_mouse_click[(int)button] = true;
 		m_is_mouse_down[(int)button] = true;
-		if(button == OS::MouseButton::MIDDLE)
+		if(button == os::MouseButton::MIDDLE)
 		{
 			m_mouse_mode = MouseMode::PAN;
 		}
-		else if (button == OS::MouseButton::RIGHT)
+		else if (button == os::MouseButton::RIGHT)
 		{
 			m_mouse_mode = MouseMode::NAVIGATE;
 		}
-		else if (button == OS::MouseButton::LEFT)
+		else if (button == os::MouseButton::LEFT)
 		{
 			DVec3 origin;
 			Vec3 dir;
@@ -491,7 +491,7 @@ struct UniverseViewImpl final : UniverseView {
 		}
 		previewSnapVertex();
 		
-		if (m_is_mouse_down[(int)OS::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT) {
+		if (m_is_mouse_down[(int)os::MouseButton::LEFT] && m_mouse_mode == MouseMode::SELECT) {
 			Draw2D& d2d = m_scene_view.getPipeline()->getDraw2D();
 			d2d.addRect(m_rect_selection_start, m_mouse_pos, Color(0xfffffFFF), 1);
 			d2d.addRect(m_rect_selection_start - Vec2(1, 1), m_mouse_pos + Vec2(1, 1), Color(0, 0, 0, 0xff), 1);
@@ -574,8 +574,8 @@ struct UniverseViewImpl final : UniverseView {
 	SnapMode m_snap_mode = SnapMode::NONE;
 	Vec2 m_mouse_pos;
 	Vec2 m_mouse_sensitivity{200, 200};
-	bool m_is_mouse_down[(int)OS::MouseButton::EXTENDED] = {};
-	bool m_is_mouse_click[(int)OS::MouseButton::EXTENDED] = {};
+	bool m_is_mouse_down[(int)os::MouseButton::EXTENDED] = {};
+	bool m_is_mouse_click[(int)os::MouseButton::EXTENDED] = {};
 	StudioApp::MousePlugin* m_mouse_handling_plugin = nullptr;
 	Vec2 m_rect_selection_start;
 	float m_rect_selection_timer = 0;
@@ -994,7 +994,7 @@ void SceneView::renderGizmos()
 				gpu::bindVertexBuffer(0, vb.buffer, vb.offset + offset, sizeof(UniverseView::Vertex));
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
 				const gpu::PrimitiveType primitive_type = cmd.lines ? gpu::PrimitiveType::LINES : gpu::PrimitiveType::TRIANGLES;
-				gpu::drawArrays(0, cmd.vertex_count, primitive_type);
+				gpu::drawArrays(primitive_type, 0, cmd.vertex_count);
 
 				offset += cmd.vertex_count * sizeof(UniverseView::Vertex);
 			}
@@ -1032,15 +1032,15 @@ void SceneView::captureMouse(bool capture)
 {
 	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
-	OS::showCursor(!m_is_mouse_captured);
+	os::showCursor(!m_is_mouse_captured);
 	if (capture) {
-		const OS::Point p = OS::getMouseScreenPos();
+		const os::Point p = os::getMouseScreenPos();
 		m_captured_mouse_x = p.x;
 		m_captured_mouse_y = p.y;
 	}
 	else {
-		OS::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
-		OS::unclipCursor();
+		os::setMouseScreenPos(m_captured_mouse_x, m_captured_mouse_y);
+		os::unclipCursor();
 	}
 }
 
@@ -1208,18 +1208,18 @@ void SceneView::onToolbar()
 }
 
 void SceneView::handleEvents() {
-	const bool handle_input = m_is_mouse_captured || (ImGui::IsItemHovered() && OS::getFocused() == ImGui::GetWindowViewport()->PlatformHandle);
-	const OS::Event* events = m_app.getEvents();
+	const bool handle_input = m_is_mouse_captured || (ImGui::IsItemHovered() && os::getFocused() == ImGui::GetWindowViewport()->PlatformHandle);
+	const os::Event* events = m_app.getEvents();
 	for (int i = 0, c = m_app.getEventsCount(); i < c; ++i) {
-		const OS::Event& event = events[i];
+		const os::Event& event = events[i];
 		switch (event.type) {
-			case OS::Event::Type::MOUSE_BUTTON: {
-				const OS::Point cp = OS::getMouseScreenPos();
+			case os::Event::Type::MOUSE_BUTTON: {
+				const os::Point cp = os::getMouseScreenPos();
 				Vec2 rel_mp = { (float)cp.x, (float)cp.y };
 				rel_mp.x -= m_screen_x;
 				rel_mp.y -= m_screen_y;
 				if (handle_input) {
-					if (event.mouse_button.button == OS::MouseButton::RIGHT) {
+					if (event.mouse_button.button == os::MouseButton::RIGHT) {
 						ImGui::SetWindowFocus();
 						captureMouse(event.mouse_button.down);
 					}
@@ -1236,9 +1236,9 @@ void SceneView::handleEvents() {
 				}
 				break;
 			}
-			case OS::Event::Type::MOUSE_MOVE: 
+			case os::Event::Type::MOUSE_MOVE: 
 				if (handle_input) {
-					const OS::Point cp = OS::getMouseScreenPos();
+					const os::Point cp = os::getMouseScreenPos();
 					Vec2 rel_mp = {(float)cp.x, (float)cp.y};
 					rel_mp.x -= m_screen_x;
 					rel_mp.y -= m_screen_y;
@@ -1325,7 +1325,7 @@ void SceneView::onWindowGUI()
 			if (m_is_mouse_captured) {
 				const ImVec2 pos = ImGui::GetItemRectMin();
 				const ImVec2 size = ImGui::GetItemRectSize();
-				OS::clipCursor((int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
+				os::clipCursor((int)pos.x, (int)pos.y, (int)size.x, (int)size.y);
 			}
 
 			if (ImGui::BeginDragDropTarget()) {
@@ -1345,7 +1345,7 @@ void SceneView::onWindowGUI()
 		m_view->m_draw_cmds.clear();
 	}
 
-	if (m_is_mouse_captured && OS::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) {
+	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) {
 		captureMouse(false);
 	}
 	ImGui::End();

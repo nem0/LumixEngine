@@ -32,11 +32,11 @@ namespace
 {
 
 
-static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
-static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
-static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
-static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_button");
-static const ComponentType GUI_RENDER_TARGET_TYPE = Reflection::getComponentType("gui_render_target");
+static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
+static const ComponentType GUI_IMAGE_TYPE = reflection::getComponentType("gui_image");
+static const ComponentType GUI_TEXT_TYPE = reflection::getComponentType("gui_text");
+static const ComponentType GUI_BUTTON_TYPE = reflection::getComponentType("gui_button");
+static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType("gui_render_target");
 
 
 struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
@@ -57,7 +57,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	const char* getDefaultExtension() const override { return "spr"; }
 
 	bool createResource(const char* path) override {
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(path)) {
 			logError("Failed to create ", path);
 			return false;
@@ -351,7 +351,7 @@ private:
 
 		void set(GUIScene* scene, EntityRef e, const char* prop_name)
 		{
-			const bool found = Reflection::getPropertyValue(*scene, e, GUI_RECT_TYPE, prop_name, Ref(value));
+			const bool found = reflection::getPropertyValue(*scene, e, GUI_RECT_TYPE, prop_name, Ref(value));
 			ASSERT(found);
 			prop = prop_name;
 		}

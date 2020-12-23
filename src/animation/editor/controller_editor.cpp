@@ -18,7 +18,7 @@
 #include "../nodes.h"
 
 
-namespace Lumix::Anim {
+namespace Lumix::anim {
 
 
 
@@ -240,14 +240,14 @@ struct ControllerEditorImpl : ControllerEditor {
 		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return false;
 		Universe* universe = m_app.getWorldEditor().getUniverse();
-		return universe->hasComponent(selected[0], Reflection::getComponentType("animator"));
+		return universe->hasComponent(selected[0], reflection::getComponentType("animator"));
 	}
 
 	Path getPathFromEntity() const {
 		const Array<EntityRef>& selected = m_app.getWorldEditor().getSelectedEntities();
 		if (selected.size() != 1) return Path();
 		Universe* universe = m_app.getWorldEditor().getUniverse();
-		const ComponentType cmp_type = Reflection::getComponentType("animator");
+		const ComponentType cmp_type = reflection::getComponentType("animator");
 		if (!universe->hasComponent(selected[0], cmp_type)) return Path();
 		AnimationScene* scene = (AnimationScene*)universe->getScene(cmp_type);
 		return scene->getAnimatorSource(selected[0]);
@@ -261,7 +261,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 
 		char path[MAX_PATH_LENGTH];
-		if (!OS::getOpenFilename(Span(path), "Animation controller\0*.act", nullptr)) return;
+		if (!os::getOpenFilename(Span(path), "Animation controller\0*.act", nullptr)) return;
 		load(path);
 	}
 
@@ -418,7 +418,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			}
 
 			Universe* universe = m_app.getWorldEditor().getUniverse();
-			const ComponentType cmp_type = Reflection::getComponentType("animator");
+			const ComponentType cmp_type = reflection::getComponentType("animator");
 			if (!universe->hasComponent(selected[0], cmp_type)) {
 				ImGui::TextUnformatted("Selected entity does not have animator component");
 				ImGui::End();
@@ -472,7 +472,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	void save(const char* path) {
 		OutputMemoryStream str(m_controller->m_allocator);
 		m_controller->serialize(str);
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (file.open(path)) {
 			if (!file.write(str.data(), str.size())) {
 				logError("Failed to write ", path);
@@ -515,7 +515,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	void saveAs() {
 		char path[MAX_PATH_LENGTH];
 
-		if (OS::getSaveFilename(Span(path), "Animation controller\0*.act", "act")) {
+		if (os::getSaveFilename(Span(path), "Animation controller\0*.act", "act")) {
 			save(path);
 		}
 	}

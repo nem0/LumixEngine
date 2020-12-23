@@ -15,4 +15,4 @@ data/studio.ini
 *.unv.bak
 projects/3rdparty
 plugins/
-data/lumix.prj
+src/engine/plugins.inl

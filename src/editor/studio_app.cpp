@@ -42,6 +42,10 @@
 
 namespace Lumix
 {
+
+#define LUMIX_EDITOR_PLUGINS_DECLS
+#include "engine/plugins.inl"
+#undef LUMIX_EDITOR_PLUGINS_DECLS
 	
 
 struct TarHeader {
@@ -186,7 +190,7 @@ struct StudioAppImpl final : StudioApp
 		, m_windows(m_allocator)
 		, m_deferred_destroy_windows(m_allocator)
 	{
-		u32 cpus_count = minimum(OS::getCPUsCount(), 64);
+		u32 cpus_count = minimum(os::getCPUsCount(), 64);
 		u32 workers;
 		if (workersCountOption(Ref(workers))) {
 			cpus_count = workers;
@@ -197,14 +201,14 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void onEvent(const OS::Event& event)
+	void onEvent(const os::Event& event)
 	{
 		const bool handle_input = isFocused();
 		m_events.push(event);
 		switch (event.type) {
-			case OS::Event::Type::MOUSE_MOVE: break;
-			case OS::Event::Type::FOCUS: break;
-			case OS::Event::Type::MOUSE_BUTTON: {
+			case os::Event::Type::MOUSE_MOVE: break;
+			case os::Event::Type::FOCUS: break;
+			case os::Event::Type::MOUSE_BUTTON: {
 				ImGuiIO& io = ImGui::GetIO();
 				m_editor->getView().setSnapMode(io.KeyShift, io.KeyCtrl);
 				if (handle_input || !event.mouse_button.down) {
@@ -212,13 +216,13 @@ struct StudioAppImpl final : StudioApp
 				}
 				break;
 			}
-			case OS::Event::Type::MOUSE_WHEEL:
+			case os::Event::Type::MOUSE_WHEEL:
 				if (handle_input) {
 					ImGuiIO& io = ImGui::GetIO();
 					io.MouseWheel = event.mouse_wheel.amount;
 				}
 				break;
-			case OS::Event::Type::WINDOW_SIZE:
+			case os::Event::Type::WINDOW_SIZE:
 				if (ImGui::GetCurrentContext()) {
 					ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
 					if (vp) vp->PlatformRequestResize = true;
@@ -226,10 +230,10 @@ struct StudioAppImpl final : StudioApp
 				if (event.window == m_main_window && event.win_size.h > 0 && event.win_size.w > 0) {
 					m_settings.m_window.w = event.win_size.w;
 					m_settings.m_window.h = event.win_size.h;
-					m_settings.m_is_maximized = OS::isMaximized(m_main_window);
+					m_settings.m_is_maximized = os::isMaximized(m_main_window);
 				}
 				break;
-			case OS::Event::Type::WINDOW_MOVE:
+			case os::Event::Type::WINDOW_MOVE:
 				if (ImGui::GetCurrentContext()) {
 					ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
 					if (vp) vp->PlatformRequestMove = true;
@@ -237,19 +241,19 @@ struct StudioAppImpl final : StudioApp
 				if (event.window == m_main_window) {
 					m_settings.m_window.x = event.win_move.x;
 					m_settings.m_window.y = event.win_move.y;
-					m_settings.m_is_maximized = OS::isMaximized(m_main_window);
+					m_settings.m_is_maximized = os::isMaximized(m_main_window);
 				}
 				break;
-			case OS::Event::Type::WINDOW_CLOSE: {
+			case os::Event::Type::WINDOW_CLOSE: {
 				ImGuiViewport* vp = ImGui::FindViewportByPlatformHandle(event.window);
 				if (vp) vp->PlatformRequestClose = true;
 				if (event.window == m_main_window) exit();
 				break;
 			}
-			case OS::Event::Type::QUIT:
+			case os::Event::Type::QUIT:
 				exit();
 				break;
-			case OS::Event::Type::CHAR:
+			case os::Event::Type::CHAR:
 				if (handle_input) {
 					ImGuiIO& io = ImGui::GetIO();
 					char tmp[5] = {};
@@ -257,24 +261,24 @@ struct StudioAppImpl final : StudioApp
 					io.AddInputCharactersUTF8(tmp);
 				}
 				break;
-			case OS::Event::Type::KEY:
+			case os::Event::Type::KEY:
 				if (handle_input) {
 					ImGuiIO& io = ImGui::GetIO();
 					io.KeysDown[(int)event.key.keycode] = event.key.down;
-					io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
-					io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
-					io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
+					io.KeyShift = os::isKeyDown(os::Keycode::SHIFT);
+					io.KeyCtrl = os::isKeyDown(os::Keycode::CTRL);
+					io.KeyAlt = os::isKeyDown(os::Keycode::MENU);
 
-					if (event.key.down && event.key.keycode == OS::Keycode::F2) {
+					if (event.key.down && event.key.keycode == os::Keycode::F2) {
 						m_is_f2_pressed = true;
 					}
 					checkShortcuts();
 				}
 				break;
-			case OS::Event::Type::DROP_FILE:
-				for(int i = 0, c = OS::getDropFileCount(event); i < c; ++i) {
+			case os::Event::Type::DROP_FILE:
+				for(int i = 0, c = os::getDropFileCount(event); i < c; ++i) {
 					char tmp[MAX_PATH_LENGTH];
-					OS::getDropFile(event, i, Span(tmp));
+					os::getDropFile(event, i, Span(tmp));
 					if (!m_asset_browser->onDropFile(tmp)) {
 						for (GUIPlugin* plugin : m_gui_plugins) {
 							if (plugin->onDropFile(tmp)) break;
@@ -287,8 +291,8 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	bool isFocused() const {
-		const OS::WindowHandle focused = OS::getFocused();
-		const int idx = m_windows.find([focused](OS::WindowHandle w){ return w == focused; });
+		const os::WindowHandle focused = os::getFocused();
+		const int idx = m_windows.find([focused](os::WindowHandle w){ return w == focused; });
 		return idx >= 0;
 	}
 
@@ -302,7 +306,7 @@ struct StudioAppImpl final : StudioApp
 
 			if (frame_time < 1 / wanted_fps) {
 				PROFILE_BLOCK("sleep");
-				OS::sleep(u32(1000 / wanted_fps - frame_time * 1000));
+				os::sleep(u32(1000 / wanted_fps - frame_time * 1000));
 			}
 			m_inactive_fps_timer.tick();
 		}
@@ -325,8 +329,8 @@ struct StudioAppImpl final : StudioApp
 			Data* data = (Data*)ptr;
 			data->that->onInit();
 			while (!data->that->m_finished) {
-				OS::Event e;
-				while(OS::getEvent(Ref(e))) {
+				os::Event e;
+				while(os::getEvent(Ref(e))) {
 					data->that->onEvent(e);
 				}
 				data->that->onIdle();
@@ -353,7 +357,7 @@ struct StudioAppImpl final : StudioApp
 
 	void onInit()
 	{
-		OS::Timer init_timer;
+		os::Timer init_timer;
 
 		m_add_cmp_root.label[0] = '\0';
 		m_template_name[0] = '\0';
@@ -362,7 +366,7 @@ struct StudioAppImpl final : StudioApp
 		checkWorkingDirectory();
 
 		char saved_data_dir[MAX_PATH_LENGTH] = {};
-		OS::InputFile cfg_file;
+		os::InputFile cfg_file;
 		if (cfg_file.open(".lumixuser")) {
 			if (!cfg_file.read(saved_data_dir, minimum(lengthOf(saved_data_dir), (int)cfg_file.size()))) {
 				logError("Failed to read .lumixuser");
@@ -371,7 +375,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		char current_dir[MAX_PATH_LENGTH];
-		OS::getCurrentDirectory(Span(current_dir));
+		os::getCurrentDirectory(Span(current_dir));
 
 		char data_dir[MAX_PATH_LENGTH] = {};
 		checkDataDirCommandLine(data_dir, lengthOf(data_dir));
@@ -408,7 +412,7 @@ struct StudioAppImpl final : StudioApp
 			"Set custom pivot",
 			"set_custom_pivot",
 			"",
-			OS::Keycode::K,
+			os::Keycode::K,
 			0,
 			false);
 		addAction(&m_set_pivot_action);
@@ -417,7 +421,7 @@ struct StudioAppImpl final : StudioApp
 			"Reset pivot",
 			"reset_pivot",
 			"",
-			OS::Keycode::K,
+			os::Keycode::K,
 			(u8)Action::Modifiers::SHIFT,
 			false);
 		addAction(&m_reset_pivot_action);
@@ -497,7 +501,7 @@ struct StudioAppImpl final : StudioApp
 
 	bool makeFile(const char* path, const char* content) override
 	{
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!m_engine->getFileSystem().open(path, Ref(file))) return false;
 		file << content;
 		file.close();
@@ -652,9 +656,9 @@ struct StudioAppImpl final : StudioApp
 
 	void registerComponent(const char* icon, const char* id, IAddComponentPlugin& plugin) override {
 		addPlugin(plugin);
-		m_component_labels.insert(Reflection::getComponentType(id), String(plugin.getLabel(), m_allocator));
+		m_component_labels.insert(reflection::getComponentType(id), String(plugin.getLabel(), m_allocator));
 		if (icon && icon[0]) {
-			m_component_icons.insert(Reflection::getComponentType(id), icon);
+			m_component_icons.insert(reflection::getComponentType(id), icon);
 		}
 	}
 
@@ -715,7 +719,7 @@ struct StudioAppImpl final : StudioApp
 		ImGuiIO& io = ImGui::GetIO();
 
 		updateIMGUIMonitors();
-		const OS::Rect rect = OS::getWindowClientRect(m_main_window);
+		const os::Rect rect = os::getWindowClientRect(m_main_window);
 		if (rect.width > 0 && rect.height > 0) {
 			io.DisplaySize = ImVec2(float(rect.width), float(rect.height));
 		}
@@ -724,17 +728,17 @@ struct StudioAppImpl final : StudioApp
 			io.DisplaySize.y = 600;
 		}
 		io.DeltaTime = m_engine->getLastTimeDelta();
-		io.KeyShift = OS::isKeyDown(OS::Keycode::SHIFT);
-		io.KeyCtrl = OS::isKeyDown(OS::Keycode::CTRL);
-		io.KeyAlt = OS::isKeyDown(OS::Keycode::MENU);
+		io.KeyShift = os::isKeyDown(os::Keycode::SHIFT);
+		io.KeyCtrl = os::isKeyDown(os::Keycode::CTRL);
+		io.KeyAlt = os::isKeyDown(os::Keycode::MENU);
 
-		const OS::Point cp = OS::getMouseScreenPos();
+		const os::Point cp = os::getMouseScreenPos();
         if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 			io.MousePos.x = (float)cp.x;
 			io.MousePos.y = (float)cp.y;
 		}
 		else {
-			const OS::Rect screen_rect = OS::getWindowScreenRect(m_main_window);
+			const os::Rect screen_rect = os::getWindowScreenRect(m_main_window);
 			io.MousePos.x = (float)cp.x - screen_rect.left;
 			io.MousePos.y = (float)cp.y - screen_rect.top;
 		}
@@ -743,12 +747,12 @@ struct StudioAppImpl final : StudioApp
 		ImGui::NewFrame();
 		if (!m_cursor_captured) {
 			switch (imgui_cursor) {
-				case ImGuiMouseCursor_Arrow: OS::setCursor(OS::CursorType::DEFAULT); break;
-				case ImGuiMouseCursor_ResizeNS: OS::setCursor(OS::CursorType::SIZE_NS); break;
-				case ImGuiMouseCursor_ResizeEW: OS::setCursor(OS::CursorType::SIZE_WE); break;
-				case ImGuiMouseCursor_ResizeNWSE: OS::setCursor(OS::CursorType::SIZE_NWSE); break;
-				case ImGuiMouseCursor_TextInput: OS::setCursor(OS::CursorType::TEXT_INPUT); break;
-				default: OS::setCursor(OS::CursorType::DEFAULT); break;
+				case ImGuiMouseCursor_Arrow: os::setCursor(os::CursorType::DEFAULT); break;
+				case ImGuiMouseCursor_ResizeNS: os::setCursor(os::CursorType::SIZE_NS); break;
+				case ImGuiMouseCursor_ResizeEW: os::setCursor(os::CursorType::SIZE_WE); break;
+				case ImGuiMouseCursor_ResizeNWSE: os::setCursor(os::CursorType::SIZE_NWSE); break;
+				case ImGuiMouseCursor_TextInput: os::setCursor(os::CursorType::TEXT_INPUT); break;
+				default: os::setCursor(os::CursorType::DEFAULT); break;
 			}
 		}
 		ImGui::PushFont(m_font);
@@ -761,9 +765,9 @@ struct StudioAppImpl final : StudioApp
 									ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
 									ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | 
 									ImGuiWindowFlags_NoDocking;
-		const OS::Rect main_win_rect = OS::getWindowClientRect(m_main_window);
+		const os::Rect main_win_rect = os::getWindowClientRect(m_main_window);
 		const bool has_viewports = ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable;
-		const OS::Point p = has_viewports ? OS::toScreen(m_main_window, main_win_rect.left, main_win_rect.top) : OS::Point{0, 0};
+		const os::Point p = has_viewports ? os::toScreen(m_main_window, main_win_rect.left, main_win_rect.top) : os::Point{0, 0};
 		if (m_is_welcome_screen_open) {
 			if (main_win_rect.width > 0 && main_win_rect.height > 0) {
 				ImGui::SetNextWindowSize(ImVec2((float)main_win_rect.width, (float)main_win_rect.height));
@@ -846,7 +850,7 @@ struct StudioAppImpl final : StudioApp
 		for (i32 i = m_deferred_destroy_windows.size() - 1; i >= 0; --i) {
 			--m_deferred_destroy_windows[i].counter;
 			if (m_deferred_destroy_windows[i].counter == 0) {
-				OS::destroyWindow(m_deferred_destroy_windows[i].window);
+				os::destroyWindow(m_deferred_destroy_windows[i].window);
 				m_deferred_destroy_windows.swapAndPop(i);
 			}
 		}
@@ -913,7 +917,7 @@ struct StudioAppImpl final : StudioApp
 			GetModuleFileNameA(NULL, exe_path, MAX_PATH_LENGTH);
 
 			// TODO extract only nonexistent files
-			u64 bundled_last_modified = OS::getLastModified(exe_path);
+			u64 bundled_last_modified = os::getLastModified(exe_path);
 			InputMemoryStream str(res_mem, size);
 
 			TarHeader header;
@@ -926,9 +930,9 @@ struct StudioAppImpl final : StudioApp
 					const StaticString<MAX_PATH_LENGTH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[MAX_PATH_LENGTH];
 					Path::getDir(Span(dir), path);
-					if (!OS::makePath(dir)) logError("");
-					if (!OS::fileExists(path)) {
-						OS::OutputFile file;
+					if (!os::makePath(dir)) logError("");
+					if (!os::fileExists(path)) {
+						os::OutputFile file;
 						if (file.open(path)) {
 							if (!file.write(ptr + 512, size)) {
 								logError("Failed to write ", path);
@@ -953,8 +957,8 @@ struct StudioAppImpl final : StudioApp
 	void initDefaultUniverse() {
 		EntityRef env = m_editor->addEntity();
 		m_editor->setEntityName(env, "environment");
-		ComponentType env_cmp_type = Reflection::getComponentType("environment");
-		ComponentType lua_script_cmp_type = Reflection::getComponentType("lua_script");
+		ComponentType env_cmp_type = reflection::getComponentType("environment");
+		ComponentType lua_script_cmp_type = reflection::getComponentType("lua_script");
 		Span<EntityRef> entities(&env, 1);
 		m_editor->addComponent(entities, env_cmp_type);
 		m_editor->addComponent(entities, lua_script_cmp_type);
@@ -990,8 +994,8 @@ struct StudioAppImpl final : StudioApp
 				ImGui::SameLine();
 				if (ImGui::Button("Change...")) {
 					char dir[MAX_PATH_LENGTH];
-					if (OS::getOpenDirectory(Span(dir), m_engine->getFileSystem().getBasePath())) {
-						OS::OutputFile cfg_file;
+					if (os::getOpenDirectory(Span(dir), m_engine->getFileSystem().getBasePath())) {
+						os::OutputFile cfg_file;
 						if (cfg_file.open(".lumixuser")) {
 							cfg_file << dir;
 							cfg_file.close();
@@ -1033,22 +1037,22 @@ struct StudioAppImpl final : StudioApp
 
 				if (ImGui::Button("Wiki"))
 				{
-					OS::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
+					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/wiki");
 				}
 
 				if (ImGui::Button("Show major releases"))
 				{
-					OS::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
+					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/releases");
 				}
 
 				if (ImGui::Button("Show latest commits"))
 				{
-					OS::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
+					os::shellExecuteOpen("https://github.com/nem0/LumixEngine/commits/master");
 				}
 
 				if (ImGui::Button("Show issues"))
 				{
-					OS::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
+					os::shellExecuteOpen("https://github.com/nem0/lumixengine/issues");
 				}
 			}
 			ImGui::EndChild();
@@ -1062,7 +1066,7 @@ struct StudioAppImpl final : StudioApp
 		char tmp[100];
 		copyString(tmp, "Lumix Studio - ");
 		catString(tmp, title);
-		OS::setWindowTitle(m_main_window, tmp);
+		os::setWindowTitle(m_main_window, tmp);
 	}
 
 
@@ -1234,7 +1238,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		char filename[MAX_PATH_LENGTH];
 		char tmp[MAX_PATH_LENGTH];
-		if (OS::getSaveFilename(Span(tmp), "Prefab files\0*.fab\0", "fab"))
+		if (os::getSaveFilename(Span(tmp), "Prefab files\0*.fab\0", "fab"))
 		{
 			Path::normalize(tmp, Span(filename));
 			const char* base_path = m_engine->getFileSystem().getBasePath();
@@ -1351,7 +1355,7 @@ struct StudioAppImpl final : StudioApp
 		const char* label_long,
 		const char* name,
 		const char* font_icon,
-		OS::Keycode shortcut,
+		os::Keycode shortcut,
 		u8 modifiers)
 	{
 		Action* a = LUMIX_NEW(m_editor->getAllocator(), Action);
@@ -1852,10 +1856,10 @@ struct StudioAppImpl final : StudioApp
 	void setFullscreen(bool fullscreen) override
 	{
 		if(fullscreen) {
-			m_fullscreen_restore_state = OS::setFullscreen(m_main_window);
+			m_fullscreen_restore_state = os::setFullscreen(m_main_window);
 		}
 		else {
-			OS::restore(m_main_window, m_fullscreen_restore_state);
+			os::restore(m_main_window, m_fullscreen_restore_state);
 		}
 	}
 
@@ -1919,18 +1923,18 @@ struct StudioAppImpl final : StudioApp
 		static StudioAppImpl* that = this;
 		ASSERT(that == this);
 		pio.Platform_CreateWindow = [](ImGuiViewport* vp){
-			OS::InitWindowArgs args = {};
-			args.flags = OS::InitWindowArgs::NO_DECORATION | OS::InitWindowArgs::NO_TASKBAR_ICON;
+			os::InitWindowArgs args = {};
+			args.flags = os::InitWindowArgs::NO_DECORATION | os::InitWindowArgs::NO_TASKBAR_ICON;
 			ImGuiViewport* parent = ImGui::FindViewportByID(vp->ParentViewportId);
-			args.parent = parent ? parent->PlatformHandle : OS::INVALID_WINDOW;
+			args.parent = parent ? parent->PlatformHandle : os::INVALID_WINDOW;
 			args.name = "child";
-			vp->PlatformHandle = OS::createWindow(args);
+			vp->PlatformHandle = os::createWindow(args);
 			that->m_windows.push(vp->PlatformHandle);
 
-			ASSERT(vp->PlatformHandle != OS::INVALID_WINDOW);
+			ASSERT(vp->PlatformHandle != os::INVALID_WINDOW);
 		};
 		pio.Platform_DestroyWindow = [](ImGuiViewport* vp){
-			OS::WindowHandle w = (OS::WindowHandle)vp->PlatformHandle;
+			os::WindowHandle w = (os::WindowHandle)vp->PlatformHandle;
 			that->m_deferred_destroy_windows.push({w, 3});
 			vp->PlatformHandle = nullptr;
 			vp->PlatformUserData = nullptr;
@@ -1938,35 +1942,35 @@ struct StudioAppImpl final : StudioApp
 		};
 		pio.Platform_ShowWindow = [](ImGuiViewport* vp){};
 		pio.Platform_SetWindowPos = [](ImGuiViewport* vp, ImVec2 pos) {
-			const OS::WindowHandle h = vp->PlatformHandle;
-			OS::Rect r = OS::getWindowScreenRect(h);
+			const os::WindowHandle h = vp->PlatformHandle;
+			os::Rect r = os::getWindowScreenRect(h);
 			r.left = int(pos.x);
 			r.top = int(pos.y);
-			OS::setWindowScreenRect(h, r);
+			os::setWindowScreenRect(h, r);
 		};
 		pio.Platform_GetWindowPos = [](ImGuiViewport* vp) -> ImVec2 {
-			OS::WindowHandle win = (OS::WindowHandle)vp->PlatformHandle;
-			const OS::Rect r = OS::getWindowClientRect(win);
-			const OS::Point p = OS::toScreen(win, r.left, r.top);
+			os::WindowHandle win = (os::WindowHandle)vp->PlatformHandle;
+			const os::Rect r = os::getWindowClientRect(win);
+			const os::Point p = os::toScreen(win, r.left, r.top);
 			return {(float)p.x, (float)p.y};
 
 		};
 		pio.Platform_SetWindowSize = [](ImGuiViewport* vp, ImVec2 pos) {
-			const OS::WindowHandle h = vp->PlatformHandle;
-			OS::Rect r = OS::getWindowScreenRect(h);
+			const os::WindowHandle h = vp->PlatformHandle;
+			os::Rect r = os::getWindowScreenRect(h);
 			r.width = int(pos.x);
 			r.height = int(pos.y);
-			OS::setWindowScreenRect(h, r);
+			os::setWindowScreenRect(h, r);
 		};
 		pio.Platform_GetWindowSize = [](ImGuiViewport* vp) -> ImVec2 {
-			const OS::Rect r = OS::getWindowClientRect((OS::WindowHandle)vp->PlatformHandle);
+			const os::Rect r = os::getWindowClientRect((os::WindowHandle)vp->PlatformHandle);
 			return {(float)r.width, (float)r.height};
 		};
 		pio.Platform_SetWindowTitle = [](ImGuiViewport* vp, const char* title){
-			OS::setWindowTitle((OS::WindowHandle)vp->PlatformHandle, title);
+			os::setWindowTitle((os::WindowHandle)vp->PlatformHandle, title);
 		};
 		pio.Platform_GetWindowFocus = [](ImGuiViewport* vp){
-			return OS::getFocused() == vp->PlatformHandle;
+			return os::getFocused() == vp->PlatformHandle;
 		};
 		pio.Platform_SetWindowFocus = [](ImGuiViewport* vp){
 			ASSERT(false);
@@ -1981,12 +1985,12 @@ struct StudioAppImpl final : StudioApp
 	}
 
 	static void updateIMGUIMonitors() {
-		OS::Monitor monitors[32];
-		const u32 monitor_count = OS::getMonitors(Span(monitors));
+		os::Monitor monitors[32];
+		const u32 monitor_count = os::getMonitors(Span(monitors));
 		ImGuiPlatformIO& pio = ImGui::GetPlatformIO();
 		pio.Monitors.clear();
 		for (u32 i = 0; i < monitor_count; ++i) {
-			const OS::Monitor& m = monitors[i];
+			const os::Monitor& m = monitors[i];
 			ImGuiPlatformMonitor im;
 			im.MainPos = ImVec2((float)m.monitor_rect.left, (float)m.monitor_rect.top);
 			im.MainSize = ImVec2((float)m.monitor_rect.width, (float)m.monitor_rect.height);
@@ -2017,7 +2021,7 @@ struct StudioAppImpl final : StudioApp
 
 		initIMGUIPlatformIO();
 
-		const int dpi = OS::getDPI();
+		const int dpi = os::getDPI();
 		float font_scale = dpi / 96.f;
 		FileSystem& fs = m_engine->getFileSystem();
 		
@@ -2044,7 +2048,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		if (!m_font || !m_bold_font) {
-			OS::messageBox(
+			os::messageBox(
 				"Could not open editor/fonts/NotoSans-Regular.ttf or editor/fonts/NotoSans-Bold.ttf\n"
 				"It very likely means that data are not bundled with\n"
 				"the exe and the exe is not in the correct directory.\n"
@@ -2052,26 +2056,26 @@ struct StudioAppImpl final : StudioApp
 			);
 		}
 
-		io.KeyMap[ImGuiKey_Space] = (int)OS::Keycode::SPACE;
-		io.KeyMap[ImGuiKey_Tab] = (int)OS::Keycode::TAB;
-		io.KeyMap[ImGuiKey_LeftArrow] = (int)OS::Keycode::LEFT;
-		io.KeyMap[ImGuiKey_RightArrow] = (int)OS::Keycode::RIGHT;
-		io.KeyMap[ImGuiKey_UpArrow] = (int)OS::Keycode::UP;
-		io.KeyMap[ImGuiKey_DownArrow] = (int)OS::Keycode::DOWN;
-		io.KeyMap[ImGuiKey_PageUp] = (int)OS::Keycode::PAGEUP;
-		io.KeyMap[ImGuiKey_PageDown] = (int)OS::Keycode::PAGEDOWN;
-		io.KeyMap[ImGuiKey_Home] = (int)OS::Keycode::HOME;
-		io.KeyMap[ImGuiKey_End] = (int)OS::Keycode::END;
-		io.KeyMap[ImGuiKey_Delete] = (int)OS::Keycode::DEL;
-		io.KeyMap[ImGuiKey_Backspace] = (int)OS::Keycode::BACKSPACE;
-		io.KeyMap[ImGuiKey_Enter] = (int)OS::Keycode::RETURN;
-		io.KeyMap[ImGuiKey_Escape] = (int)OS::Keycode::ESCAPE;
-		io.KeyMap[ImGuiKey_A] = (int)OS::Keycode::A;
-		io.KeyMap[ImGuiKey_C] = (int)OS::Keycode::C;
-		io.KeyMap[ImGuiKey_V] = (int)OS::Keycode::V;
-		io.KeyMap[ImGuiKey_X] = (int)OS::Keycode::X;
-		io.KeyMap[ImGuiKey_Y] = (int)OS::Keycode::Y;
-		io.KeyMap[ImGuiKey_Z] = (int)OS::Keycode::Z;
+		io.KeyMap[ImGuiKey_Space] = (int)os::Keycode::SPACE;
+		io.KeyMap[ImGuiKey_Tab] = (int)os::Keycode::TAB;
+		io.KeyMap[ImGuiKey_LeftArrow] = (int)os::Keycode::LEFT;
+		io.KeyMap[ImGuiKey_RightArrow] = (int)os::Keycode::RIGHT;
+		io.KeyMap[ImGuiKey_UpArrow] = (int)os::Keycode::UP;
+		io.KeyMap[ImGuiKey_DownArrow] = (int)os::Keycode::DOWN;
+		io.KeyMap[ImGuiKey_PageUp] = (int)os::Keycode::PAGEUP;
+		io.KeyMap[ImGuiKey_PageDown] = (int)os::Keycode::PAGEDOWN;
+		io.KeyMap[ImGuiKey_Home] = (int)os::Keycode::HOME;
+		io.KeyMap[ImGuiKey_End] = (int)os::Keycode::END;
+		io.KeyMap[ImGuiKey_Delete] = (int)os::Keycode::DEL;
+		io.KeyMap[ImGuiKey_Backspace] = (int)os::Keycode::BACKSPACE;
+		io.KeyMap[ImGuiKey_Enter] = (int)os::Keycode::RETURN;
+		io.KeyMap[ImGuiKey_Escape] = (int)os::Keycode::ESCAPE;
+		io.KeyMap[ImGuiKey_A] = (int)os::Keycode::A;
+		io.KeyMap[ImGuiKey_C] = (int)os::Keycode::C;
+		io.KeyMap[ImGuiKey_V] = (int)os::Keycode::V;
+		io.KeyMap[ImGuiKey_X] = (int)os::Keycode::X;
+		io.KeyMap[ImGuiKey_Y] = (int)os::Keycode::Y;
+		io.KeyMap[ImGuiKey_Z] = (int)os::Keycode::Z;
 
 		ImGuiStyle& style = ImGui::GetStyle();
 		style.FramePadding.y = 0;
@@ -2090,7 +2094,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		logInfo("Loading settings...");
 		char cmd_line[2048];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2115,16 +2119,16 @@ struct StudioAppImpl final : StudioApp
 
 		if (m_settings.m_is_maximized)
 		{
-			OS::maximizeWindow(m_main_window);
+			os::maximizeWindow(m_main_window);
 		}
 		else if (m_settings.m_window.w > 0)
 		{
-			OS::Rect r;
+			os::Rect r;
 			r.left = m_settings.m_window.x;
 			r.top = m_settings.m_window.y;
 			r.width = m_settings.m_window.w;
 			r.height = m_settings.m_window.h;
-			OS::setWindowScreenRect(m_main_window, r);
+			os::setWindowScreenRect(m_main_window, r);
 		}
 	}
 
@@ -2133,21 +2137,21 @@ struct StudioAppImpl final : StudioApp
 	{
 		addAction<&StudioAppImpl::newUniverse>(ICON_FA_PLUS "New", "New universe", "newUniverse", ICON_FA_PLUS);
 		addAction<&StudioAppImpl::save>(
-			ICON_FA_SAVE "Save", "Save universe", "save", ICON_FA_SAVE, OS::Keycode::S, (u8)Action::Modifiers::CTRL);
+			ICON_FA_SAVE "Save", "Save universe", "save", ICON_FA_SAVE, os::Keycode::S, (u8)Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::saveAs>(
-			NO_ICON "Save As", "Save universe as", "saveAs", "", OS::Keycode::S, (u8)Action::Modifiers::CTRL | (u8)Action::Modifiers::SHIFT);
+			NO_ICON "Save As", "Save universe as", "saveAs", "", os::Keycode::S, (u8)Action::Modifiers::CTRL | (u8)Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::exit>(
-			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, OS::Keycode::X, (u8)Action::Modifiers::CTRL);
+			ICON_FA_SIGN_OUT_ALT "Exit", "Exit Studio", "exit", ICON_FA_SIGN_OUT_ALT, os::Keycode::X, (u8)Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::redo>(
-			ICON_FA_REDO "Redo", "Redo scene action", "redo", ICON_FA_REDO, OS::Keycode::Z, (u8)Action::Modifiers::CTRL | (u8)Action::Modifiers::SHIFT);
+			ICON_FA_REDO "Redo", "Redo scene action", "redo", ICON_FA_REDO, os::Keycode::Z, (u8)Action::Modifiers::CTRL | (u8)Action::Modifiers::SHIFT);
 		addAction<&StudioAppImpl::undo>(
-			ICON_FA_UNDO "Undo", "Undo scene action", "undo", ICON_FA_UNDO, OS::Keycode::Z, (u8)Action::Modifiers::CTRL);
+			ICON_FA_UNDO "Undo", "Undo scene action", "undo", ICON_FA_UNDO, os::Keycode::Z, (u8)Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::copy>(
-			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, OS::Keycode::C, (u8)Action::Modifiers::CTRL);
+			ICON_FA_CLIPBOARD "Copy", "Copy entity", "copy", ICON_FA_CLIPBOARD, os::Keycode::C, (u8)Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::paste>(
-			ICON_FA_PASTE "Paste", "Paste entity", "paste", ICON_FA_PASTE, OS::Keycode::V, (u8)Action::Modifiers::CTRL);
+			ICON_FA_PASTE "Paste", "Paste entity", "paste", ICON_FA_PASTE, os::Keycode::V, (u8)Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::duplicate>(
-			ICON_FA_CLONE "Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, OS::Keycode::D, (u8)Action::Modifiers::CTRL);
+			ICON_FA_CLONE "Duplicate", "Duplicate entity", "duplicate", ICON_FA_CLONE, os::Keycode::D, (u8)Action::Modifiers::CTRL);
 		addAction<&StudioAppImpl::setTranslateGizmoMode>(ICON_FA_ARROWS_ALT "Translate", "Set translate mode", "setTranslateGizmoMode", ICON_FA_ARROWS_ALT)
 			.is_selected.bind<&Gizmo::Config::isTranslateMode>(&getGizmoConfig());
 		addAction<&StudioAppImpl::setRotateGizmoMode>(ICON_FA_UNDO "Rotate", "Set rotate mode", "setRotateGizmoMode", ICON_FA_UNDO)
@@ -2168,7 +2172,7 @@ struct StudioAppImpl final : StudioApp
 			"Destroy entity",
 			"destroyEntity",
 			ICON_FA_MINUS_SQUARE,
-			OS::Keycode::DEL,
+			os::Keycode::DEL,
 			0);
 		addAction<&StudioAppImpl::savePrefab>(ICON_FA_SAVE "Save prefab", "Save selected entities as prefab", "savePrefab", ICON_FA_SAVE);
 		addAction<&StudioAppImpl::makeParent>(ICON_FA_OBJECT_GROUP "Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
@@ -2196,11 +2200,11 @@ struct StudioAppImpl final : StudioApp
 	static bool copyPlugin(const char* src, int iteration, char (&out)[MAX_PATH_LENGTH])
 	{
 		char tmp_path[MAX_PATH_LENGTH];
-		OS::getExecutablePath(Span(tmp_path));
+		os::getExecutablePath(Span(tmp_path));
 		StaticString<MAX_PATH_LENGTH> copy_path;
 		Path::getDir(Span(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
-		if (!OS::makePath(copy_path)) logError("Could not create ", copy_path);
+		if (!os::makePath(copy_path)) logError("Could not create ", copy_path);
 		Path::getBasename(Span(tmp_path), src);
 		copy_path << "/" << tmp_path << "." << getPluginExtension();
 #ifdef _WIN32
@@ -2208,8 +2212,8 @@ struct StudioAppImpl final : StudioApp
 		StaticString<MAX_PATH_LENGTH> dest_pdb(copy_path);
 		if (Path::replaceExtension(dest_pdb.data, "pdb") && Path::replaceExtension(src_pdb.data, "pda"))
 		{
-			OS::deleteFile(dest_pdb);
-			if (!OS::copyFile(src_pdb, dest_pdb))
+			os::deleteFile(dest_pdb);
+			if (!os::copyFile(src_pdb, dest_pdb))
 			{
 				copyString(out, src);
 				return false;
@@ -2217,8 +2221,8 @@ struct StudioAppImpl final : StudioApp
 		}
 #endif
 
-		OS::deleteFile(copy_path);
-		if (!OS::copyFile(src, copy_path))
+		os::deleteFile(copy_path);
+		if (!os::copyFile(src, copy_path))
 		{
 			copyString(out, src);
 			return false;
@@ -2231,7 +2235,7 @@ struct StudioAppImpl final : StudioApp
 	void loadUserPlugins()
 	{
 		char cmd_line[2048];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		auto& plugin_manager = m_engine->getPluginManager();
@@ -2361,7 +2365,7 @@ struct StudioAppImpl final : StudioApp
 
 	bool workersCountOption(Ref<u32> workers_count) {
 		char cmd_line[2048];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2383,7 +2387,7 @@ struct StudioAppImpl final : StudioApp
 
 	bool renderDocOption() {
 		char cmd_line[2048];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2397,7 +2401,7 @@ struct StudioAppImpl final : StudioApp
 	bool shouldSleepWhenInactive()
 	{
 		char cmd_line[2048];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2412,7 +2416,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		char cmd_line[2048];
 		char path[MAX_PATH_LENGTH];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2431,7 +2435,7 @@ struct StudioAppImpl final : StudioApp
 	static void checkDataDirCommandLine(char* dir, int max_size)
 	{
 		char cmd_line[2048];
-		OS::getCommandLine(Span(cmd_line));
+		os::getCommandLine(Span(cmd_line));
 
 		CommandLineParser parser(cmd_line);
 		while (parser.next())
@@ -2473,18 +2477,18 @@ struct StudioAppImpl final : StudioApp
 			plugin->init();
 		}
 
-		for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+		for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 			ASSERT(cmp.cmp->component_type != INVALID_COMPONENT_TYPE);
-			const Reflection::ComponentBase* r = cmp.cmp;
+			const reflection::ComponentBase* r = cmp.cmp;
 			
 			if (m_component_labels.find(r->component_type).isValid()) continue;
 
-			struct : Reflection::IEmptyPropertyVisitor {
-				void visit(const Reflection::Property<Path>& prop) override {
-					for (const Reflection::IAttribute* attr : prop.getAttributes()) {
-						if (attr->getType() == Reflection::IAttribute::RESOURCE) {
+			struct : reflection::IEmptyPropertyVisitor {
+				void visit(const reflection::Property<Path>& prop) override {
+					for (const reflection::IAttribute* attr : prop.getAttributes()) {
+						if (attr->getType() == reflection::IAttribute::RESOURCE) {
 							is_res = true;
-							Reflection::ResourceAttribute* a = (Reflection::ResourceAttribute*)attr;
+							reflection::ResourceAttribute* a = (reflection::ResourceAttribute*)attr;
 							res_type = a->resource_type;
 							prop_name = prop.name;
 						}
@@ -2527,20 +2531,22 @@ struct StudioAppImpl final : StudioApp
 	void setStudioApp()
 	{
 #ifdef STATIC_PLUGINS
-		StudioApp::StaticPluginRegister::create(*this);
+		#define LUMIX_EDITOR_PLUGINS
+		#include "engine/plugins.inl"
+		#undef LUMIX_EDITOR_PLUGINS
 #else
 		auto& plugin_manager = m_engine->getPluginManager();
 		for (auto* lib : plugin_manager.getLibraries())
 		{
-			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) OS::getLibrarySymbol(lib, "setStudioApp");
+			auto* f = (StudioApp::IPlugin * (*)(StudioApp&)) os::getLibrarySymbol(lib, "setStudioApp");
 			if (f)
 			{
 				StudioApp::IPlugin* plugin = f(*this);
 				addPlugin(*plugin);
 			}
 		}
-		initPlugins();
 #endif
+		initPlugins();
 		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}
 
@@ -2577,7 +2583,7 @@ struct StudioAppImpl final : StudioApp
 
 	void createComponent(EntityRef e, const char* type)
 	{
-		const ComponentType cmp_type = Reflection::getComponentType(type);
+		const ComponentType cmp_type = reflection::getComponentType(type);
 		m_editor->addComponent(Span(&e, 1), cmp_type);
 	}
 
@@ -2591,14 +2597,14 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	struct SetPropertyVisitor : Reflection::IPropertyVisitor
+	struct SetPropertyVisitor : reflection::IPropertyVisitor
 	{
-		void visit(const Reflection::Property<int>& prop) override
+		void visit(const reflection::Property<int>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isnumber(L, -1)) return;
 
-			if(Reflection::getAttribute(prop, Reflection::IAttribute::ENUM)) {
+			if(reflection::getAttribute(prop, reflection::IAttribute::ENUM)) {
 				notSupported(prop);
 			}
 
@@ -2606,7 +2612,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
-		void visit(const Reflection::Property<u32>& prop) override
+		void visit(const reflection::Property<u32>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isnumber(L, -1)) return;
@@ -2615,7 +2621,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
-		void visit(const Reflection::Property<float>& prop) override
+		void visit(const reflection::Property<float>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isnumber(L, -1)) return;
@@ -2624,7 +2630,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
-		void visit(const Reflection::Property<Vec2>& prop) override
+		void visit(const reflection::Property<Vec2>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<Vec2>(L, -1)) return;
@@ -2633,7 +2639,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
-		void visit(const Reflection::Property<Vec3>& prop) override
+		void visit(const reflection::Property<Vec3>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<Vec3>(L, -1)) return;
@@ -2642,7 +2648,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
-		void visit(const Reflection::Property<IVec3>& prop) override
+		void visit(const reflection::Property<IVec3>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<IVec3>(L, -1)) return;
@@ -2651,7 +2657,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
-		void visit(const Reflection::Property<Vec4>& prop) override
+		void visit(const reflection::Property<Vec4>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!LuaWrapper::isType<Vec4>(L, -1)) return;
@@ -2660,7 +2666,7 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 		
-		void visit(const Reflection::Property<const char*>& prop) override
+		void visit(const reflection::Property<const char*>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isstring(L, -1)) return;
@@ -2670,7 +2676,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 
-		void visit(const Reflection::Property<Path>& prop) override
+		void visit(const reflection::Property<Path>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isstring(L, -1)) return;
@@ -2680,7 +2686,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 
-		void visit(const Reflection::Property<bool>& prop) override
+		void visit(const reflection::Property<bool>& prop) override
 		{
 			if (!equalStrings(property_name, prop.name)) return;
 			if (!lua_isboolean(L, -1)) return;
@@ -2689,9 +2695,9 @@ struct StudioAppImpl final : StudioApp
 			editor->setProperty(cmp_type, "", 0, prop.name, Span(&entity, 1), val);
 		}
 
-		void visit(const Reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const Reflection::IArrayProperty& prop) override { notSupported(prop); }
-		void visit(const Reflection::IBlobProperty& prop) override { notSupported(prop); }
+		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
+		void visit(const reflection::IArrayProperty& prop) override { notSupported(prop); }
+		void visit(const reflection::IBlobProperty& prop) override { notSupported(prop); }
 
 		template <typename T>
 		void notSupported(const T& prop)
@@ -2741,14 +2747,14 @@ struct StudioAppImpl final : StudioApp
 			}
 			else
 			{
-				ComponentType cmp_type = Reflection::getComponentType(parameter_name);
+				ComponentType cmp_type = reflection::getComponentType(parameter_name);
 				editor.addComponent(Span(&e, 1), cmp_type);
 
 				IScene* scene = editor.getUniverse()->getScene(cmp_type);
 				if (scene)
 				{
 					ComponentUID cmp(e, cmp_type, scene);
-					const Reflection::ComponentBase* cmp_des = Reflection::getComponent(cmp_type);
+					const reflection::ComponentBase* cmp_des = reflection::getComponent(cmp_type);
 					if (cmp.isValid())
 					{
 						lua_pushvalue(L, -1);
@@ -2842,7 +2848,7 @@ struct StudioAppImpl final : StudioApp
 
 	void checkScriptCommandLine() {
 		char command_line[1024];
-		OS::getCommandLine(Span(command_line));
+		os::getCommandLine(Span(command_line));
 		CommandLineParser parser(command_line);
 		while (parser.next()) {
 			if (parser.currentEquals("-run_script")) {
@@ -2896,10 +2902,10 @@ struct StudioAppImpl final : StudioApp
 	};
 
 	void scanCompiled(AssociativeArray<u32, PackFileInfo>& infos) {
-		OS::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/assets");
+		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/assets");
 		const char* base_path = m_engine->getFileSystem().getBasePath();
-		OS::FileInfo info;
-		while (OS::getNextFile(iter, &info)) {
+		os::FileInfo info;
+		while (os::getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
 
 			char basename[MAX_PATH_LENGTH];
@@ -2907,13 +2913,13 @@ struct StudioAppImpl final : StudioApp
 			PackFileInfo rec;
 			fromCString(Span(basename), Ref(rec.hash));
 			rec.offset = 0;
-			rec.size = OS::getFileSize(StaticString<MAX_PATH_LENGTH>(base_path, ".lumix/assets/", info.filename));
+			rec.size = os::getFileSize(StaticString<MAX_PATH_LENGTH>(base_path, ".lumix/assets/", info.filename));
 			copyString(rec.path, ".lumix/assets/");
 			catString(rec.path, info.filename);
 			infos.insert(rec.hash, rec);
 		}
 		
-		OS::destroyFileIterator(iter);
+		os::destroyFileIterator(iter);
 
 		packDataScan("pipelines/", infos);
 		packDataScan("universes/", infos);
@@ -2923,8 +2929,8 @@ struct StudioAppImpl final : StudioApp
 	{
 		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
 		const char* base_path = m_engine->getFileSystem().getBasePath();
-		OS::FileInfo info;
-		while (OS::getNextFile(iter, &info))
+		os::FileInfo info;
+		while (os::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
 			Path::normalize(info.filename, Span(normalized_path));
@@ -2958,10 +2964,10 @@ struct StudioAppImpl final : StudioApp
 			auto& out_info = infos.emplace(hash);
 			copyString(out_info.path, out_path);
 			out_info.hash = hash;
-			out_info.size = OS::getFileSize(StaticString<MAX_PATH_LENGTH>(base_path, out_path.data));
+			out_info.size = os::getFileSize(StaticString<MAX_PATH_LENGTH>(base_path, out_path.data));
 			out_info.offset = ~0UL;
 		}
-		OS::destroyFileIterator(iter);
+		os::destroyFileIterator(iter);
 	}
 
 
@@ -2977,7 +2983,7 @@ struct StudioAppImpl final : StudioApp
 				auto& out_info = infos.emplace(hash);
 				copyString(Span(out_info.path), res->getPath().c_str());
 				out_info.hash = hash;
-				out_info.size = OS::getFileSize(res->getPath().c_str());
+				out_info.size = os::getFileSize(res->getPath().c_str());
 				out_info.offset = ~0UL;
 			}
 		}
@@ -2991,7 +2997,7 @@ struct StudioAppImpl final : StudioApp
 		auto& out_info = infos.emplace(hash);
 		copyString(Span(out_info.path), unv_path);
 		out_info.hash = hash;
-		out_info.size = OS::getFileSize(unv_path);
+		out_info.size = os::getFileSize(unv_path);
 		out_info.offset = ~0UL;
 	}
 
@@ -3005,7 +3011,7 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::Begin("Pack data", &m_is_pack_data_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
 			if (ImGui::Button(m_pack.dest_dir.empty() ? "..." : m_pack.dest_dir.data)) {
-				bool res = OS::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath());
+				bool res = os::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath());
 				(void)res;
 			}
 
@@ -3068,7 +3074,7 @@ struct StudioAppImpl final : StudioApp
 		logInfo("Packed ", infos.size(), " files (", total_size / 1024, "KiB) in ", compressed.size() / 1024, " KiB");
 
 		bool success;
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(dest)) {
 			logError("Could not create ", dest);
 			return;
@@ -3094,16 +3100,16 @@ struct StudioAppImpl final : StudioApp
 
 		const char* bin_files[] = {"app.exe", "dbghelp.dll", "dbgcore.dll"};
 		StaticString<MAX_PATH_LENGTH> src_dir("bin/");
-		if (!OS::fileExists("bin/app.exe")) {
+		if (!os::fileExists("bin/app.exe")) {
 			char tmp[MAX_PATH_LENGTH];
-			OS::getExecutablePath(Span(tmp));
+			os::getExecutablePath(Span(tmp));
 			Path::getDir(Span(src_dir.data), tmp);
 		}
 
 		for (auto& file : bin_files) {
 			StaticString<MAX_PATH_LENGTH> tmp(m_pack.dest_dir, file);
 			StaticString<MAX_PATH_LENGTH> src(src_dir, file);
-			if (!OS::copyFile(src, tmp)) {
+			if (!os::copyFile(src, tmp)) {
 				logError("Failed to copy ", src, " to ", tmp);
 			}
 		}
@@ -3136,8 +3142,8 @@ struct StudioAppImpl final : StudioApp
 	{
 		m_universes.clear();
 		auto* iter = m_engine->getFileSystem().createFileIterator("universes");
-		OS::FileInfo info;
-		while (OS::getNextFile(iter, &info))
+		os::FileInfo info;
+		while (os::getNextFile(iter, &info))
 		{
 			if (info.filename[0] == '.') continue;
 			if (!info.is_directory) continue;
@@ -3147,15 +3153,15 @@ struct StudioAppImpl final : StudioApp
 			Path::getBasename(Span(basename), info.filename);
 			m_universes.emplace(basename);
 		}
-		OS::destroyFileIterator(iter);
+		os::destroyFileIterator(iter);
 	}
 
 
 	void findLuaPlugins(const char* dir)
 	{
 		auto* iter = m_engine->getFileSystem().createFileIterator(dir);
-		OS::FileInfo info;
-		while (OS::getNextFile(iter, &info))
+		os::FileInfo info;
+		while (os::getNextFile(iter, &info))
 		{
 			char normalized_path[MAX_PATH_LENGTH];
 			Path::normalize(info.filename, Span(normalized_path));
@@ -3178,11 +3184,11 @@ struct StudioAppImpl final : StudioApp
 				}
 			}
 		}
-		OS::destroyFileIterator(iter);
+		os::destroyFileIterator(iter);
 	}
 
 
-	const OS::Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
+	const os::Event* getEvents() const override { return m_events.empty() ? nullptr : &m_events[0]; }
 
 
 	int getEventsCount() const override { return m_events.size(); }
@@ -3190,21 +3196,21 @@ struct StudioAppImpl final : StudioApp
 	
 	static void checkWorkingDirectory()
 	{
-		if (!OS::fileExists("../LumixStudio.lnk")) return;
+		if (!os::fileExists("../LumixStudio.lnk")) return;
 
-		if (!OS::dirExists("bin") && OS::dirExists("../bin") &&
-			OS::dirExists("../pipelines"))
+		if (!os::dirExists("bin") && os::dirExists("../bin") &&
+			os::dirExists("../pipelines"))
 		{
-			OS::setCurrentDirectory("../");
+			os::setCurrentDirectory("../");
 		}
 
-		if (!OS::dirExists("bin"))
+		if (!os::dirExists("bin"))
 		{
-			OS::messageBox("Bin directory not found, please check working directory.");
+			os::messageBox("Bin directory not found, please check working directory.");
 		}
-		else if (!OS::dirExists("pipelines"))
+		else if (!os::dirExists("pipelines"))
 		{
-			OS::messageBox("Pipelines directory not found, please check working directory.");
+			os::messageBox("Pipelines directory not found, please check working directory.");
 		}
 	}
 
@@ -3214,14 +3220,14 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::IsAnyItemActive()) return;
 		GUIPlugin* plugin = getFocusedPlugin();
 		u8 pressed_modifiers = 0;
-		if (OS::isKeyDown(OS::Keycode::SHIFT)) pressed_modifiers |= (u8)Action::Modifiers::SHIFT;
-		if (OS::isKeyDown(OS::Keycode::CTRL)) pressed_modifiers |= (u8)Action::Modifiers::CTRL;
-		if (OS::isKeyDown(OS::Keycode::MENU)) pressed_modifiers |= (u8)Action::Modifiers::ALT;
+		if (os::isKeyDown(os::Keycode::SHIFT)) pressed_modifiers |= (u8)Action::Modifiers::SHIFT;
+		if (os::isKeyDown(os::Keycode::CTRL)) pressed_modifiers |= (u8)Action::Modifiers::CTRL;
+		if (os::isKeyDown(os::Keycode::MENU)) pressed_modifiers |= (u8)Action::Modifiers::ALT;
 
 		for (Action* a : m_actions) {
-			if (!a->is_global || (a->shortcut == OS::Keycode::INVALID && a->modifiers ==0)) continue;
+			if (!a->is_global || (a->shortcut == os::Keycode::INVALID && a->modifiers ==0)) continue;
 			if (a->plugin != plugin) continue;
-			if (a->shortcut != OS::Keycode::INVALID && !OS::isKeyDown(a->shortcut)) continue;
+			if (a->shortcut != os::Keycode::INVALID && !os::isKeyDown(a->shortcut)) continue;
 			if (a->modifiers != pressed_modifiers) continue;
 
 			a->func.invoke();
@@ -3243,21 +3249,21 @@ struct StudioAppImpl final : StudioApp
 	ImFont* getBoldFont() override { return m_bold_font; }
 
 	struct WindowToDestroy {
-		OS::WindowHandle window;
+		os::WindowHandle window;
 		u32 counter;
 	};
 
 	DefaultAllocator m_main_allocator;
 	#ifdef LUMIX_DEBUG
-		Debug::Allocator m_allocator;
+		debug::Allocator m_allocator;
 	#else
 		IAllocator& m_allocator;
 	#endif
 	UniquePtr<Engine> m_engine;
-	Array<OS::WindowHandle> m_windows;
+	Array<os::WindowHandle> m_windows;
 	Array<WindowToDestroy> m_deferred_destroy_windows;
-	OS::WindowHandle m_main_window;
-	OS::WindowState m_fullscreen_restore_state;
+	os::WindowHandle m_main_window;
+	os::WindowState m_fullscreen_restore_state;
 	Array<Action*> m_owned_actions;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
@@ -3288,13 +3294,13 @@ struct StudioAppImpl final : StudioApp
 	Settings m_settings;
 	float m_fov = degreesToRadians(60);
 	RenderInterface* m_render_interface = nullptr;
-	Array<OS::Event> m_events;
+	Array<os::Event> m_events;
 	char m_template_name[100];
 	char m_open_filter[64];
 	char m_component_filter[32];
 	float m_fps = 0;
-	OS::Timer m_fps_timer;
-	OS::Timer m_inactive_fps_timer;
+	os::Timer m_fps_timer;
+	os::Timer m_inactive_fps_timer;
 	u32 m_fps_frame = 0;
 
 	struct PackConfig
@@ -3371,31 +3377,6 @@ void StudioApp::destroy(StudioApp& app)
 {
 	ASSERT(&app == g_studio.get());
 	g_studio.destroy();
-}
-
-
-static StudioApp::StaticPluginRegister* s_first_plugin = nullptr;
-
-
-StudioApp::StaticPluginRegister::StaticPluginRegister(const char* name, Creator creator)
-{
-	this->creator = creator;
-	this->name = name;
-	next = s_first_plugin;
-	s_first_plugin = this;
-}
-
-
-void StudioApp::StaticPluginRegister::create(StudioApp& app)
-{
-	auto* i = s_first_plugin;
-	while (i)
-	{
-		StudioApp::IPlugin* plugin = i->creator(app);
-		if (plugin) app.addPlugin(*plugin);
-		i = i->next;
-	}
-	app.initPlugins();
 }
 
 

@@ -12,43 +12,11 @@
 
 namespace Lumix
 {
+	#define LUMIX_PLUGIN_DECLS
+	#include "plugins.inl"
+	#undef LUMIX_PLUGIN_DECLS
+
 	IPlugin::~IPlugin() = default;
-
-	
-	static StaticPluginRegister* s_first_plugin = nullptr;
-
-
-	StaticPluginRegister::StaticPluginRegister(const char* name, IPlugin* (*creator)(Engine& engine))
-	{
-		this->creator = creator;
-		this->name = name;
-		next = s_first_plugin;
-		s_first_plugin = this;
-	}
-
-	void StaticPluginRegister::createAll(Engine& engine) {
-		auto* i = s_first_plugin;
-		while (i) {
-			IPlugin* p = i->creator(engine);
-			if (p) engine.getPluginManager().addPlugin(p);
-			i = i->next;
-		}
-	}
-
-	IPlugin* StaticPluginRegister::create(const char* name, Engine& engine)
-	{
-		auto* i = s_first_plugin;
-		while (i)
-		{
-			if (equalStrings(name, i->name))
-			{
-				return i->creator(engine);
-			}
-			i = i->next;
-		}
-		return nullptr;
-	}
-
 
 	struct PluginManagerImpl final : PluginManager
 	{
@@ -71,7 +39,7 @@ namespace Lumix
 
 				for (void* lib : m_libraries)
 				{
-					OS::unloadLibrary(lib);
+					os::unloadLibrary(lib);
 				}
 			}
 
@@ -141,7 +109,7 @@ namespace Lumix
 				int idx = m_plugins.indexOf(plugin);
 				ASSERT(idx >= 0);
 				LUMIX_DELETE(m_engine.getAllocator(), m_plugins[idx]);
-				OS::unloadLibrary(m_libraries[idx]);
+				os::unloadLibrary(m_libraries[idx]);
 				m_libraries.erase(idx);
 				m_plugins.erase(idx);
 			}
@@ -162,10 +130,10 @@ namespace Lumix
 				if (!Path::hasExtension(path, ext + 1)) catString(path_with_ext, ext);
 				logInfo("loading plugin ", path_with_ext);
 				using PluginCreator = IPlugin* (*)(Engine&);
-				auto* lib = OS::loadLibrary(path_with_ext);
+				auto* lib = os::loadLibrary(path_with_ext);
 				if (lib)
 				{
-					PluginCreator creator = (PluginCreator)OS::getLibrarySymbol(lib, "createPlugin");
+					PluginCreator creator = (PluginCreator)os::getLibrarySymbol(lib, "createPlugin");
 					if (creator)
 					{
 						IPlugin* plugin = creator(m_engine);
@@ -181,7 +149,7 @@ namespace Lumix
 							m_libraries.push(lib);
 							m_library_loaded.invoke(lib);
 							logInfo("Plugin loaded.");
-							Debug::StackTree::refreshModuleList();
+							debug::StackTree::refreshModuleList();
 							return plugin;
 						}
 					}
@@ -189,17 +157,9 @@ namespace Lumix
 					{
 						logError("No createPlugin function in plugin.");
 					}
-					OS::unloadLibrary(lib);
+					os::unloadLibrary(lib);
 				}
-				else
-				{
-					auto* plugin = StaticPluginRegister::create(path, m_engine);
-					if (plugin)
-					{
-						logInfo("Plugin loaded.");
-						addPlugin(plugin);
-						return plugin;
-					}
+				else {
 					logWarning("Failed to load plugin.");
 				}
 				return nullptr;
@@ -229,8 +189,11 @@ namespace Lumix
 	};
 		
 
-	UniquePtr<PluginManager> PluginManager::create(Engine& engine)
-	{
+	UniquePtr<PluginManager> PluginManager::create(Engine& engine) {
 		return UniquePtr<PluginManagerImpl>::create(engine.getAllocator(), engine, engine.getAllocator());
+	}
+
+	void PluginManager::createAllStatic(Engine& engine) {
+		#include "plugins.inl"
 	}
 }

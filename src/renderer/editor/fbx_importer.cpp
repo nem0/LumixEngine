@@ -133,9 +133,9 @@ static void extractEmbedded(const ofbx::IScene& scene, const char* src_dir)
 		const PathInfo pi(path);
 		const StaticString<MAX_PATH_LENGTH> fullpath(src_dir, pi.m_basename, ".", pi.m_extension);
 
-		if (OS::fileExists(fullpath)) return;
+		if (os::fileExists(fullpath)) return;
 
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(fullpath)) {
 			logError("Failed to save ", fullpath);
 			return;
@@ -1116,7 +1116,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 
 	const PathInfo src_info(model->getPath().c_str());
 	const StaticString<MAX_PATH_LENGTH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
-	OS::OutputFile f;
+	os::OutputFile f;
 	if (!m_filesystem.open(mat_src, Ref(f))) {
 		logError("Failed to create ", mat_src);
 	}
@@ -1154,7 +1154,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		const StaticString<MAX_PATH_LENGTH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
 		if (m_filesystem.fileExists(mat_src)) continue;
 
-		OS::OutputFile f;
+		os::OutputFile f;
 		if (!m_filesystem.open(mat_src, Ref(f)))
 		{
 			logError("Failed to create ", mat_src);
@@ -1170,7 +1170,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 			if (texture.is_valid && idx < 2) {
 				const StaticString<MAX_PATH_LENGTH> meta_path(texture.src, ".meta");
 				if (!m_filesystem.fileExists(meta_path)) {
-					OS::OutputFile file;
+					os::OutputFile file;
 					if (m_filesystem.open(meta_path, Ref(file))) {
 						
 						file << (idx == 0 ? "srgb = true\n" : "normalmap = true\n");
@@ -1211,7 +1211,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 	if (cfg.create_impostor) {
 		const StaticString<MAX_PATH_LENGTH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
 		if (!m_filesystem.fileExists(mat_src)) {
-			OS::OutputFile f;
+			os::OutputFile f;
 			if (!m_filesystem.open(mat_src, Ref(f))) {
 				logError("Failed to create ", mat_src);
 			}
@@ -2173,7 +2173,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	Universe& universe = engine.createUniverse(false);
 
 
-	OS::OutputFile file;
+	os::OutputFile file;
 	PathInfo file_info(src);
 	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
 	if (!m_filesystem.open(tmp, Ref(file))) {
@@ -2185,7 +2185,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 	
 	const EntityRef root = universe.createEntity({0, 0, 0}, Quat::IDENTITY);
 
-	static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
+	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 	for(int i  = 0; i < m_meshes.size(); ++i) {
 		const EntityRef e = universe.createEntity({0, 0, 0}, Quat::IDENTITY);
 		universe.createComponent(MODEL_INSTANCE_TYPE, e);

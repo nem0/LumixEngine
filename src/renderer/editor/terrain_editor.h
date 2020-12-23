@@ -45,7 +45,7 @@ public:
 
 	bool onMouseDown(UniverseView& view, int, int) override;
 	void onMouseMove(UniverseView& view, int x, int y, int /*rel_x*/, int /*rel_y*/) override;
-	void onMouseUp(UniverseView& view, int, int, OS::MouseButton) override {};
+	void onMouseUp(UniverseView& view, int, int, os::MouseButton) override {};
 	void onGUI();
 	void setComponent(ComponentUID cmp) { m_component = cmp; }
 

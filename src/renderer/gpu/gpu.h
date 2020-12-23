@@ -280,8 +280,8 @@ void bindIndirectBuffer(BufferHandle handle);
 void drawIndirect(DataType index_type);
 void drawTriangles(u32 byte_offset, u32 indices_count, DataType index_type);
 void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType index_type);
-void drawElements(u32 byte_offset, u32 count, PrimitiveType primitive_type, DataType index_type);
-void drawArrays(u32 offset, u32 count, PrimitiveType type);
+void drawElements(PrimitiveType primitive_type, u32 byte_offset, u32 count, DataType index_type);
+void drawArrays(PrimitiveType type, u32 offset, u32 count);
 void drawTriangleStripArraysInstanced(u32 indices_count, u32 instances_count);
 
 void pushDebugGroup(const char* msg);

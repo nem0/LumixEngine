@@ -98,14 +98,14 @@ UniquePtr<FileSystemWatcher> FileSystemWatcher::create(const char* path, Lumix::
 
 static void addWatch(FileSystemWatcherTask& task, const char* path, int root_length)
 {
-	if (!OS::dirExists(path)) return;
+	if (!os::dirExists(path)) return;
 	
     int wd = inotify_add_watch(task.fd, path, IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_CLOSE_WRITE);
     task.watched.insert(wd, path + root_length);
 
-    auto iter = OS::createFileIterator(path, task.allocator);
-    OS::FileInfo info;
-    while (OS::getNextFile(iter, &info))
+    auto iter = os::createFileIterator(path, task.allocator);
+    os::FileInfo info;
+    while (os::getNextFile(iter, &info))
     {
         if (!info.is_directory) continue;
 		if (Lumix::equalStrings(info.filename, ".")) continue;
@@ -114,7 +114,7 @@ static void addWatch(FileSystemWatcherTask& task, const char* path, int root_len
         Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(path, info.filename, "/");
         addWatch(task, tmp, root_length);
     }
-    OS::destroyFileIterator(iter);
+    os::destroyFileIterator(iter);
 }
 
 

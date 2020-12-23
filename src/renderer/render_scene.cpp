@@ -40,17 +40,17 @@ enum class RenderSceneVersion : int
 };
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType DECAL_TYPE = Reflection::getComponentType("decal");
-static const ComponentType POINT_LIGHT_TYPE = Reflection::getComponentType("point_light");
-static const ComponentType PARTICLE_EMITTER_TYPE = Reflection::getComponentType("particle_emitter");
-static const ComponentType ENVIRONMENT_TYPE = Reflection::getComponentType("environment");
-static const ComponentType CAMERA_TYPE = Reflection::getComponentType("camera");
-static const ComponentType TERRAIN_TYPE = Reflection::getComponentType("terrain");
-static const ComponentType BONE_ATTACHMENT_TYPE = Reflection::getComponentType("bone_attachment");
-static const ComponentType ENVIRONMENT_PROBE_TYPE = Reflection::getComponentType("environment_probe");
-static const ComponentType REFLECTION_PROBE_TYPE = Reflection::getComponentType("reflection_probe");
-static const ComponentType FUR_TYPE = Reflection::getComponentType("fur");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
+static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
+static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
+static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
+static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
+static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
+static const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("bone_attachment");
+static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
+static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
+static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
 
 
 struct Decal
@@ -2488,9 +2488,9 @@ private:
 
 
 void RenderScene::reflect() {
-	using namespace Reflection;
+	using namespace reflection;
 
-	struct RotationModeEnum : Reflection::EnumAttribute {
+	struct RotationModeEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 2; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
 			switch((Terrain::GrassType::RotationMode)idx) {
@@ -2501,7 +2501,7 @@ void RenderScene::reflect() {
 		}
 	};
 
-	struct BoneEnum : Reflection::EnumAttribute {
+	struct BoneEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override {
 			RenderScene* render_scene = static_cast<RenderScene*>(cmp.scene);
 			EntityPtr model_instance = getModelInstance(render_scene, (EntityRef)cmp.entity);
@@ -2657,7 +2657,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	m_render_cmps_mask = 0;
 	
 	const u32 hash = crc32("renderer");
-	for (const Reflection::RegisteredComponent& cmp : Reflection::getComponents()) {
+	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.scene == hash) {
 			m_render_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
 		}

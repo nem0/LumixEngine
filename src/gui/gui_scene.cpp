@@ -23,13 +23,13 @@ namespace Lumix
 {
 
 
-static const ComponentType GUI_CANVAS_TYPE = Reflection::getComponentType("gui_canvas");
-static const ComponentType GUI_BUTTON_TYPE = Reflection::getComponentType("gui_button");
-static const ComponentType GUI_RECT_TYPE = Reflection::getComponentType("gui_rect");
-static const ComponentType GUI_RENDER_TARGET_TYPE = Reflection::getComponentType("gui_render_target");
-static const ComponentType GUI_IMAGE_TYPE = Reflection::getComponentType("gui_image");
-static const ComponentType GUI_TEXT_TYPE = Reflection::getComponentType("gui_text");
-static const ComponentType GUI_INPUT_FIELD_TYPE = Reflection::getComponentType("gui_input_field");
+static const ComponentType GUI_CANVAS_TYPE = reflection::getComponentType("gui_canvas");
+static const ComponentType GUI_BUTTON_TYPE = reflection::getComponentType("gui_button");
+static const ComponentType GUI_RECT_TYPE = reflection::getComponentType("gui_rect");
+static const ComponentType GUI_RENDER_TARGET_TYPE = reflection::getComponentType("gui_render_target");
+static const ComponentType GUI_IMAGE_TYPE = reflection::getComponentType("gui_image");
+static const ComponentType GUI_TEXT_TYPE = reflection::getComponentType("gui_text");
+static const ComponentType GUI_INPUT_FIELD_TYPE = reflection::getComponentType("gui_input_field");
 static const float CURSOR_BLINK_PERIOD = 1.0f;
 static gpu::TextureHandle EMPTY_RENDER_TARGET = gpu::INVALID_TEXTURE;
 
@@ -97,7 +97,7 @@ private:
 struct GUIButton
 {
 	u32 hovered_color = 0xffFFffFF;
-	OS::CursorType hovered_cursor = OS::CursorType::UNDEFINED;
+	os::CursorType hovered_cursor = os::CursorType::UNDEFINED;
 };
 
 
@@ -214,7 +214,7 @@ struct GUISceneImpl final : GUIScene
 		if (is_main && button_iter.isValid()) {
 			GUIButton& button = button_iter.value();
 			if (m_cursor_pos.x >= l && m_cursor_pos.x <= r && m_cursor_pos.y >= t && m_cursor_pos.y <= b) {
-				if (button.hovered_cursor != OS::CursorType::UNDEFINED && !m_cursor_set) {
+				if (button.hovered_cursor != os::CursorType::UNDEFINED && !m_cursor_set) {
 					m_cursor_type = button_iter.value().hovered_cursor;
 					m_cursor_set = true;
 				}
@@ -341,7 +341,7 @@ struct GUISceneImpl final : GUIScene
 	void render(Pipeline& pipeline, const Vec2& canvas_size, bool is_main) override {
 		m_canvas_size = canvas_size;
 		if (is_main) {
-			m_cursor_type = OS::CursorType::DEFAULT;
+			m_cursor_type = os::CursorType::DEFAULT;
 			m_cursor_set = false;
 		}
 		for (GUICanvas& canvas : m_canvas) {
@@ -369,11 +369,11 @@ struct GUISceneImpl final : GUIScene
 		m_buttons[entity].hovered_color = RGBAVec4ToABGRu32(color);
 	}
 
-	OS::CursorType getButtonHoveredCursor(EntityRef entity) override {
+	os::CursorType getButtonHoveredCursor(EntityRef entity) override {
 		return m_buttons[entity].hovered_cursor;
 	}
 
-	void setButtonHoveredCursor(EntityRef entity, OS::CursorType cursor) override {
+	void setButtonHoveredCursor(EntityRef entity, os::CursorType cursor) override {
 		m_buttons[entity].hovered_cursor = cursor;
 	}
 
@@ -805,27 +805,27 @@ struct GUISceneImpl final : GUIScene
 
 		rect->input_field->anim = 0;
 
-		switch ((OS::Keycode)event.data.button.key_id)
+		switch ((os::Keycode)event.data.button.key_id)
 		{
-		case OS::Keycode::HOME: rect->input_field->cursor = 0; break;
-			case OS::Keycode::END: rect->input_field->cursor = rect->text->text.length(); break;
-			case OS::Keycode::BACKSPACE:
+		case os::Keycode::HOME: rect->input_field->cursor = 0; break;
+			case os::Keycode::END: rect->input_field->cursor = rect->text->text.length(); break;
+			case os::Keycode::BACKSPACE:
 				if (rect->text->text.length() > 0 && rect->input_field->cursor > 0)
 				{
 					rect->text->text.eraseAt(rect->input_field->cursor - 1);
 					--rect->input_field->cursor;
 				}
 				break;
-			case OS::Keycode::DEL:
+			case os::Keycode::DEL:
 				if (rect->input_field->cursor < rect->text->text.length())
 				{
 					rect->text->text.eraseAt(rect->input_field->cursor);
 				}
 				break;
-			case OS::Keycode::LEFT:
+			case os::Keycode::LEFT:
 				if (rect->input_field->cursor > 0) --rect->input_field->cursor;
 				break;
-			case OS::Keycode::RIGHT:
+			case os::Keycode::RIGHT:
 				if (rect->input_field->cursor < rect->text->text.length()) ++rect->input_field->cursor;
 				break;
 		}
@@ -864,7 +864,7 @@ struct GUISceneImpl final : GUIScene
 				case InputSystem::Event::BUTTON:
 					if (event.device->type == InputSystem::Device::MOUSE)
 					{
-						if (event.data.button.key_id != (u32)OS::MouseButton::LEFT) break;
+						if (event.data.button.key_id != (u32)os::MouseButton::LEFT) break;
 						if (event.data.button.down)
 						{
 							m_mouse_down_pos.x = event.data.button.x;
@@ -1280,7 +1280,7 @@ struct GUISceneImpl final : GUIScene
 	u32 m_buttons_down_count;
 	EntityPtr m_focused_entity = INVALID_ENTITY;
 	IVec2 m_cursor_pos = {-10000, -10000};
-	OS::CursorType m_cursor_type = OS::CursorType::DEFAULT;
+	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	bool m_cursor_set;
 	FontManager* m_font_manager = nullptr;
 	Vec2 m_canvas_size;
@@ -1302,7 +1302,7 @@ UniquePtr<GUIScene> GUIScene::createInstance(GUISystem& system,
 }
 
 void GUIScene::reflect() {
-	struct TextHAlignEnum : Reflection::EnumAttribute {
+	struct TextHAlignEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
 			switch((GUIScene::TextHAlign)idx) {
@@ -1314,7 +1314,7 @@ void GUIScene::reflect() {
 		}
 	};
 
-	struct TextVAlignEnum : Reflection::EnumAttribute {
+	struct TextVAlignEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 3; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
 			switch((GUIScene::TextVAlign)idx) {
@@ -1326,17 +1326,17 @@ void GUIScene::reflect() {
 		}
 	};
 		
-	struct CursorEnum : Reflection::EnumAttribute {
+	struct CursorEnum : reflection::EnumAttribute {
 		u32 count(ComponentUID cmp) const override { return 7; }
 		const char* name(ComponentUID cmp, u32 idx) const override {
-			switch((OS::CursorType)idx) {
-				case OS::CursorType::UNDEFINED: return "Ignore";
-				case OS::CursorType::DEFAULT: return "Default";
-				case OS::CursorType::LOAD: return "Load";
-				case OS::CursorType::SIZE_NS: return "Size NS";
-				case OS::CursorType::SIZE_NWSE: return "Size NWSE";
-				case OS::CursorType::SIZE_WE: return "Size WE";
-				case OS::CursorType::TEXT_INPUT: return "Text input";
+			switch((os::CursorType)idx) {
+				case os::CursorType::UNDEFINED: return "Ignore";
+				case os::CursorType::DEFAULT: return "Default";
+				case os::CursorType::LOAD: return "Load";
+				case os::CursorType::SIZE_NS: return "Size NS";
+				case os::CursorType::SIZE_NWSE: return "Size NWSE";
+				case os::CursorType::SIZE_WE: return "Size WE";
+				case os::CursorType::TEXT_INPUT: return "Text input";
 				default: ASSERT(false); return "N/A";
 			}
 		}

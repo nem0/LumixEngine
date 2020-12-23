@@ -32,10 +32,10 @@ enum class NavigationSceneVersion : i32 {
 };
 
 
-static const ComponentType LUA_SCRIPT_TYPE = Reflection::getComponentType("lua_script");
-static const ComponentType NAVMESH_ZONE_TYPE = Reflection::getComponentType("navmesh_zone");
-static const ComponentType NAVMESH_AGENT_TYPE = Reflection::getComponentType("navmesh_agent");
-static const ComponentType ANIMATOR_TYPE = Reflection::getComponentType("animator");
+static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
+static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
+static const ComponentType NAVMESH_AGENT_TYPE = reflection::getComponentType("navmesh_agent");
+static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 
@@ -685,7 +685,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 		FileSystem& fs = m_engine.getFileSystem();
 		
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!fs.open(path, Ref(file))) return false;
 
 		bool success = file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));

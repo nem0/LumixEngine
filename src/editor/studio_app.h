@@ -11,7 +11,6 @@ struct ImFont;
 #ifdef STATIC_PLUGINS
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
 		extern "C" Lumix::StudioApp::IPlugin* setStudioApp_##plugin_name(Lumix::StudioApp& app); \
-		extern "C" { Lumix::StudioApp::StaticPluginRegister s_##plugin_name##_editor_register(#plugin_name, setStudioApp_##plugin_name); } \
 		extern "C" Lumix::StudioApp::IPlugin* setStudioApp_##plugin_name(Lumix::StudioApp& app)
 #else
 	#define LUMIX_STUDIO_ENTRY(plugin_name) \
@@ -45,7 +44,7 @@ struct LUMIX_EDITOR_API StudioApp
 		virtual ~MousePlugin() {}
 
 		virtual bool onMouseDown(UniverseView& view, int x, int y) { return false; }
-		virtual void onMouseUp(UniverseView& view, int x, int y, OS::MouseButton button) {}
+		virtual void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) {}
 		virtual void onMouseMove(UniverseView& view, int x, int y, int rel_x, int rel_y) {}
 	};
 
@@ -77,18 +76,6 @@ struct LUMIX_EDITOR_API StudioApp
 		AddCmpTreeNode* child = nullptr;
 		AddCmpTreeNode* next = nullptr;
 		char label[50];
-	};
-
-	struct LUMIX_EDITOR_API StaticPluginRegister
-	{
-		using Creator = IPlugin* (*)(StudioApp& app);
-		StaticPluginRegister(const char* name, Creator creator);
-
-		static void create(StudioApp& app);
-
-		StaticPluginRegister* next;
-		Creator creator;
-		const char* name;
 	};
 
 	static StudioApp* create();
@@ -134,7 +121,7 @@ struct LUMIX_EDITOR_API StudioApp
 	virtual void setCursorCaptured(bool captured) = 0;
 	virtual void saveSettings() = 0;
 
-	virtual const OS::Event* getEvents() const = 0;
+	virtual const os::Event* getEvents() const = 0;
 	virtual int getEventsCount() const = 0;
 	virtual ~StudioApp() {}
 	virtual ImFont* getBoldFont() = 0;

@@ -166,7 +166,7 @@ static void overwrite(ThreadContextProxy& ctx, u32 p, const T& v) {
 
 struct ProfilerUIImpl final : ProfilerUI
 {
-	ProfilerUIImpl(Debug::Allocator* allocator, Engine& engine)
+	ProfilerUIImpl(debug::Allocator* allocator, Engine& engine)
 		: m_main_allocator(allocator)
 		, m_threads(m_allocator)
 		, m_data(m_allocator)
@@ -272,8 +272,8 @@ struct ProfilerUIImpl final : ProfilerUI
 
 	void load() {
 		char path[MAX_PATH_LENGTH];
-		if (OS::getOpenFilename(Span(path), "Profile data\0*.lpd", nullptr)) {
-			OS::InputFile file;
+		if (os::getOpenFilename(Span(path), "Profile data\0*.lpd", nullptr)) {
+			os::InputFile file;
 			if (file.open(path)) {
 				m_data.resize(file.size());
 				if (!file.read(m_data.getMutableData(), m_data.size())) {
@@ -312,8 +312,8 @@ struct ProfilerUIImpl final : ProfilerUI
 
 	void save() {
 		char path[MAX_PATH_LENGTH];
-		if (OS::getSaveFilename(Span(path), "Profile data\0*.lpd", "lpd")) {
-			OS::OutputFile file;
+		if (os::getSaveFilename(Span(path), "Profile data\0*.lpd", "lpd")) {
+			os::OutputFile file;
 			if (file.open(path)) {
 				if (!file.write(m_data.getMutableData(), m_data.size())) {
 					logError("Could not write ", path);
@@ -344,7 +344,7 @@ struct ProfilerUIImpl final : ProfilerUI
 
 	struct AllocationStackNode
 	{
-		explicit AllocationStackNode(Debug::StackNode* stack_node,
+		explicit AllocationStackNode(debug::StackNode* stack_node,
 			size_t inclusive_size,
 			IAllocator& allocator)
 			: m_children(allocator)
@@ -375,9 +375,9 @@ struct ProfilerUIImpl final : ProfilerUI
 
 		size_t m_inclusive_size;
 		bool m_open;
-		Debug::StackNode* m_stack_node;
+		debug::StackNode* m_stack_node;
 		Array<AllocationStackNode*> m_children;
-		Array<Debug::Allocator::AllocationInfo*> m_allocations;
+		Array<debug::Allocator::AllocationInfo*> m_allocations;
 	};
 
 
@@ -385,14 +385,14 @@ struct ProfilerUIImpl final : ProfilerUI
 	void onGUIMemoryProfiler();
 	void onGUIResources();
 	void onFrame();
-	void addToTree(Debug::Allocator::AllocationInfo* info);
+	void addToTree(debug::Allocator::AllocationInfo* info);
 	void refreshAllocations();
 	void showAllocationTree(AllocationStackNode* node, int column) const;
 	AllocationStackNode* getOrCreate(AllocationStackNode* my_node,
-		Debug::StackNode* external_node, size_t size);
+		debug::StackNode* external_node, size_t size);
 
 	DefaultAllocator m_allocator;
-	Debug::Allocator* m_main_allocator;
+	debug::Allocator* m_main_allocator;
 	ResourceManagerHub& m_resource_manager;
 	AllocationStackNode* m_allocation_root;
 	int m_allocation_size_from;
@@ -406,7 +406,7 @@ struct ProfilerUIImpl final : ProfilerUI
 	Engine& m_engine;
 	HashMap<u32, ThreadRecord> m_threads;
 	OutputMemoryStream m_data;
-	OS::Timer m_timer;
+	os::Timer m_timer;
 	float m_autopause = -33.3333f;
 	bool m_show_context_switches = false;
 	bool m_show_frames = true;
@@ -512,7 +512,7 @@ void ProfilerUIImpl::onGUIResources()
 
 
 ProfilerUIImpl::AllocationStackNode* ProfilerUIImpl::getOrCreate(AllocationStackNode* my_node,
-	Debug::StackNode* external_node,
+	debug::StackNode* external_node,
 	size_t size)
 {
 	for (auto* child : my_node->m_children)
@@ -530,10 +530,10 @@ ProfilerUIImpl::AllocationStackNode* ProfilerUIImpl::getOrCreate(AllocationStack
 }
 
 
-void ProfilerUIImpl::addToTree(Debug::Allocator::AllocationInfo* info)
+void ProfilerUIImpl::addToTree(debug::Allocator::AllocationInfo* info)
 {
-	Debug::StackNode* nodes[1024];
-	int count = Debug::StackTree::getPath(info->stack_leaf, Span(nodes));
+	debug::StackNode* nodes[1024];
+	int count = debug::StackTree::getPath(info->stack_leaf, Span(nodes));
 
 	auto node = m_allocation_root;
 	for (int i = count - 1; i >= 0; --i)
@@ -570,7 +570,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column) c
 	{
 		char fn_name[100];
 		int line;
-		if (Debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), Ref(line)))
+		if (debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), Ref(line)))
 		{
 			if (line >= 0)
 			{
@@ -1171,7 +1171,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 
 UniquePtr<ProfilerUI> ProfilerUI::create(Engine& engine)
 {
-	Debug::Allocator* allocator = engine.getAllocator().isDebug() ? static_cast<Debug::Allocator*>(&engine.getAllocator()) : nullptr;
+	debug::Allocator* allocator = engine.getAllocator().isDebug() ? static_cast<debug::Allocator*>(&engine.getAllocator()) : nullptr;
 	return UniquePtr<ProfilerUIImpl>::create(engine.getAllocator(), allocator, engine);
 }
 

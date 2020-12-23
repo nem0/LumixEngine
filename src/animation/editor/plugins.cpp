@@ -26,10 +26,10 @@
 using namespace Lumix;
 
 
-static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
-static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
-static const ComponentType ANIMATOR_TYPE = Reflection::getComponentType("animator");
-static const ComponentType RENDERABLE_TYPE = Reflection::getComponentType("model_instance");
+static const ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
+static const ComponentType PROPERTY_ANIMATOR_TYPE = reflection::getComponentType("property_animator");
+static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
+static const ComponentType RENDERABLE_TYPE = reflection::getComponentType("model_instance");
 
 
 namespace
@@ -90,7 +90,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 
 	bool createResource(const char* path) override
 	{
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (!file.open(path))
 		{
 			logError("Failed to create ", path);
@@ -118,10 +118,10 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 			const char* cmp_type_name = m_app.getComponentTypeName(cmp.type);
 			if (!ImGui::BeginMenu(cmp_type_name)) continue;
 
-			const Reflection::ComponentBase* component = Reflection::getComponent(cmp.type);
-			struct : Reflection::IEmptyPropertyVisitor
+			const reflection::ComponentBase* component = reflection::getComponent(cmp.type);
+			struct : reflection::IEmptyPropertyVisitor
 			{
-				void visit(const Reflection::Property<float>& prop) override
+				void visit(const reflection::Property<float>& prop) override
 				{
 					int idx = animation->curves.find([&](PropertyAnimation::Curve& rhs) {
 						return rhs.cmp_type == cmp.type && rhs.property == &prop;
@@ -281,7 +281,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 	explicit AnimControllerAssetBrowserPlugin(StudioApp& app)
 		: m_app(app)
 	{
-		app.getAssetCompiler().registerExtension("act", Anim::Controller::TYPE);
+		app.getAssetCompiler().registerExtension("act", anim::Controller::TYPE);
 	}
 
 	bool compile(const Path& src) override {
@@ -297,19 +297,19 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Animation Controller"; }
-	ResourceType getResourceType() const override { return Anim::Controller::TYPE; }
+	ResourceType getResourceType() const override { return anim::Controller::TYPE; }
 
 
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (type == Anim::Controller::TYPE) return fs.copyFile("models/editor/tile_animation_graph.dds", out_path);
+		if (type == anim::Controller::TYPE) return fs.copyFile("models/editor/tile_animation_graph.dds", out_path);
 		return false;
 	}
 
 
 	StudioApp& m_app;
-	Anim::ControllerEditor* m_controller_editor = nullptr;
+	anim::ControllerEditor* m_controller_editor = nullptr;
 };
 
 
@@ -402,7 +402,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		m_app.getPropertyGrid().addPlugin(m_animable_plugin);
 		
-		m_anim_editor = Anim::ControllerEditor::create(m_app);
+		m_anim_editor = anim::ControllerEditor::create(m_app);
 		m_app.addPlugin(*m_anim_editor);
 
 		m_anim_ctrl_plugin.m_controller_editor = m_anim_editor.get();
@@ -428,7 +428,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	AnimationAssetBrowserPlugin m_animation_plugin;
 	PropertyAnimationAssetBrowserPlugin m_prop_anim_plugin;
 	AnimControllerAssetBrowserPlugin m_anim_ctrl_plugin;
-	UniquePtr<Anim::ControllerEditor> m_anim_editor;
+	UniquePtr<anim::ControllerEditor> m_anim_editor;
 };
 
 

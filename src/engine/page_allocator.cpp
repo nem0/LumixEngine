@@ -16,7 +16,7 @@ PageAllocator::~PageAllocator()
 	while (p) {
 		void* tmp = p;
 		memcpy(&p, p, sizeof(p)); //-V579
-		OS::memRelease(tmp);
+		os::memRelease(tmp);
 	}
 }
 
@@ -45,9 +45,9 @@ void* PageAllocator::allocate(bool lock)
 	}
 	++reserved_count;
 	if (lock) mutex.exit();
-	void* mem = OS::memReserve(PAGE_SIZE);
+	void* mem = os::memReserve(PAGE_SIZE);
 	ASSERT(uintptr(mem) % PAGE_SIZE == 0);
-	OS::memCommit(mem, PAGE_SIZE);
+	os::memCommit(mem, PAGE_SIZE);
 	return mem;
 }
 

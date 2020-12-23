@@ -11,7 +11,7 @@ struct BoneMask;
 struct LocalRigidTransform;
 struct Pose;
 
-namespace Anim {
+namespace anim {
 
 struct GroupNode;
 struct RuntimeContext;
@@ -64,5 +64,5 @@ private:
 	bool load(u64 size, const u8* mem) override;
 };
 
-} // ns Anim
+} // namespace anim
 } // ns Lumix

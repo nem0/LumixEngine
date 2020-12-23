@@ -27,7 +27,7 @@ namespace Lumix
 {
 
 
-namespace Debug
+namespace debug
 {
 
 
@@ -737,7 +737,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 
 	HANDLE process = GetCurrentProcess();
 	SymInitialize(process, nullptr, TRUE);
-	Debug::StackTree::refreshModuleList();
+	debug::StackTree::refreshModuleList();
 
 	struct CrashInfo
 	{
@@ -755,7 +755,7 @@ static LONG WINAPI unhandledExceptionHandler(LPEXCEPTION_POINTERS info)
 			message << "\nCode: " << (u32)info->ExceptionRecord->ExceptionCode;
 			message << "\nAddress: " << (uintptr)info->ExceptionRecord->ExceptionAddress;
 			message << "\nBase: " << (uintptr)base;
-			OS::messageBox(message);
+			os::messageBox(message);
 		}
 		else
 		{

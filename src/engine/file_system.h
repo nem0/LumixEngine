@@ -9,7 +9,7 @@ template <typename T> struct Array;
 template <typename T> struct Delegate;
 template <typename T> struct UniquePtr;
 
-namespace OS
+namespace os
 {
 	struct FileIterator;
 	struct InputFile;
@@ -37,9 +37,9 @@ struct LUMIX_ENGINE_API FileSystem
 	virtual bool moveFile(const char* from, const char* to) = 0;
 	virtual bool deleteFile(const char* path) = 0;
 	virtual bool fileExists(const char* path) = 0;
-	virtual OS::FileIterator* createFileIterator(const char* dir) = 0;
-	virtual bool open(const char* path, Ref<OS::InputFile> file) = 0;
-	virtual bool open(const char* path, Ref<OS::OutputFile> file) = 0;
+	virtual os::FileIterator* createFileIterator(const char* dir) = 0;
+	virtual bool open(const char* path, Ref<os::InputFile> file) = 0;
+	virtual bool open(const char* path, Ref<os::OutputFile> file) = 0;
 
 	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;

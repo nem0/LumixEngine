@@ -7,7 +7,7 @@
 #include "renderer/pose.h"
 
 
-namespace Lumix::Anim {
+namespace Lumix::anim {
 
 const ResourceType Controller::TYPE = ResourceType("anim_controller");
 

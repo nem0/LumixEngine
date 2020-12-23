@@ -34,10 +34,10 @@ enum class AnimationSceneVersion
 };
 
 
-static const ComponentType MODEL_INSTANCE_TYPE = Reflection::getComponentType("model_instance");
-static const ComponentType ANIMABLE_TYPE = Reflection::getComponentType("animable");
-static const ComponentType PROPERTY_ANIMATOR_TYPE = Reflection::getComponentType("property_animator");
-static const ComponentType ANIMATOR_TYPE = Reflection::getComponentType("animator");
+static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static const ComponentType ANIMABLE_TYPE = reflection::getComponentType("animable");
+static const ComponentType PROPERTY_ANIMATOR_TYPE = reflection::getComponentType("property_animator");
+static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
 
 
 struct AnimationSceneImpl final : AnimationScene
@@ -47,9 +47,9 @@ struct AnimationSceneImpl final : AnimationScene
 	struct Animator
 	{
 		EntityRef entity;
-		Anim::Controller* resource = nullptr;
+		anim::Controller* resource = nullptr;
 		u32 default_set = 0;
-		Anim::RuntimeContext* ctx = nullptr;
+		anim::RuntimeContext* ctx = nullptr;
 		LocalRigidTransform root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 
 		struct IK {
@@ -149,9 +149,9 @@ struct AnimationSceneImpl final : AnimationScene
 	int getAnimatorInputIndex(EntityRef entity, const char* name) const override
 	{
 		const Animator& animator = m_animators[m_animator_map[entity]];
-		Anim::InputDecl& decl = animator.resource->m_inputs;
+		anim::InputDecl& decl = animator.resource->m_inputs;
 		for (u32 i = 0; i < lengthOf(decl.inputs); ++i) {
-			if (decl.inputs[i].type != Anim::InputDecl::EMPTY && equalStrings(decl.inputs[i].name, name)) return i;
+			if (decl.inputs[i].type != anim::InputDecl::EMPTY && equalStrings(decl.inputs[i].name, name)) return i;
 		}
 		return -1;
 	}
@@ -163,11 +163,11 @@ struct AnimationSceneImpl final : AnimationScene
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		if (input_idx >= decl.inputs_count) return;
 		if (!animator.ctx) return;
 
-		if (decl.inputs[input_idx].type == Anim::InputDecl::FLOAT) {
+		if (decl.inputs[input_idx].type == anim::InputDecl::FLOAT) {
 			memcpy(&animator.ctx->inputs[decl.inputs[input_idx].offset], &value, sizeof(value));
 		}
 		else {
@@ -182,11 +182,11 @@ struct AnimationSceneImpl final : AnimationScene
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		if (input_idx >= decl.inputs_count) return;
 		if (!animator.ctx) return;
 
-		if (decl.inputs[input_idx].type == Anim::InputDecl::U32) {
+		if (decl.inputs[input_idx].type == anim::InputDecl::U32) {
 			*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 		}
 		else {
@@ -201,11 +201,11 @@ struct AnimationSceneImpl final : AnimationScene
 		if (!iter.isValid()) return;
 
 		Animator& animator = m_animators[iter.value()];
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		if (input_idx >= decl.inputs_count) return;
 		if (!animator.ctx) return;
 
-		if (decl.inputs[input_idx].type == Anim::InputDecl::BOOL) {
+		if (decl.inputs[input_idx].type == anim::InputDecl::BOOL) {
 			*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 		}
 		else {
@@ -257,7 +257,7 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 
-	void setSource(Animator& animator, Anim::Controller* res)
+	void setSource(Animator& animator, anim::Controller* res)
 	{
 		if (animator.resource == res) return;
 		if (animator.resource != nullptr) {
@@ -420,7 +420,7 @@ struct AnimationSceneImpl final : AnimationScene
 		}
 	}
 
-	Anim::Controller* getAnimatorController(EntityRef entity) override {
+	anim::Controller* getAnimatorController(EntityRef entity) override {
 		const Animator& animator = m_animators[m_animator_map[entity]];
 		return animator.resource;
 	}
@@ -524,9 +524,9 @@ struct AnimationSceneImpl final : AnimationScene
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return;
 
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::FLOAT);
+		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::FLOAT);
 
 		*(float*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
@@ -535,9 +535,9 @@ struct AnimationSceneImpl final : AnimationScene
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return;
 
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::BOOL);
+		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::BOOL);
 
 		*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
@@ -546,9 +546,9 @@ struct AnimationSceneImpl final : AnimationScene
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return 0;
 
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::FLOAT);
+		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::FLOAT);
 
 		return *(float*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
 	}
@@ -557,9 +557,9 @@ struct AnimationSceneImpl final : AnimationScene
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return 0;
 
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::BOOL);
+		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::BOOL);
 
 		return *(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
 	}
@@ -568,9 +568,9 @@ struct AnimationSceneImpl final : AnimationScene
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return 0;
 
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::U32);
+		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::U32);
 
 		return *(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset];
 	}
@@ -579,9 +579,9 @@ struct AnimationSceneImpl final : AnimationScene
 		Animator& animator = m_animators[m_animator_map[entity]];
 		if (!animator.ctx) return;
 
-		const Anim::InputDecl& decl = animator.resource->m_inputs;
+		const anim::InputDecl& decl = animator.resource->m_inputs;
 		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == Anim::InputDecl::U32);
+		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::U32);
 
 		*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
@@ -665,12 +665,12 @@ struct AnimationSceneImpl final : AnimationScene
 		return getAbsolutePosition(pose, model, bone.parent_idx) * bone_transform;
 	}
 
-	static void updateIK(Anim::Controller::IK& res_ik, Animator::IK& ik, Pose& pose, Model& model)
+	static void updateIK(anim::Controller::IK& res_ik, Animator::IK& ik, Pose& pose, Model& model)
 	{
-		u32 indices[Anim::Controller::IK::MAX_BONES_COUNT];
-		LocalRigidTransform transforms[Anim::Controller::IK::MAX_BONES_COUNT];
-		Vec3 old_pos[Anim::Controller::IK::MAX_BONES_COUNT];
-		float len[Anim::Controller::IK::MAX_BONES_COUNT - 1];
+		u32 indices[anim::Controller::IK::MAX_BONES_COUNT];
+		LocalRigidTransform transforms[anim::Controller::IK::MAX_BONES_COUNT];
+		Vec3 old_pos[anim::Controller::IK::MAX_BONES_COUNT];
+		float len[anim::Controller::IK::MAX_BONES_COUNT - 1];
 		float len_sum = 0;
 		for (int i = 0; i < res_ik.bones_count; ++i) {
 			auto iter = model.getBoneIndex(res_ik.bones[i]);
@@ -733,7 +733,7 @@ struct AnimationSceneImpl final : AnimationScene
 		}
 
 		// convert from object space to bone space
-		LocalRigidTransform ik_out[Anim::Controller::IK::MAX_BONES_COUNT];
+		LocalRigidTransform ik_out[anim::Controller::IK::MAX_BONES_COUNT];
 		for (int i = res_ik.bones_count - 1; i > 0; --i) {
 			transforms[i] = transforms[i - 1].inverted() * transforms[i];
 			ik_out[i].pos = transforms[i].pos;
@@ -851,18 +851,18 @@ struct AnimationSceneImpl final : AnimationScene
 			blob.read(size);
 			if (type == set_input_type)
 			{
-				Anim::SetInputEvent event;
+				anim::SetInputEvent event;
 				blob.read(event);
 				Animator& ctrl = m_animators[m_animator_map[entity]];
 				if (ctrl.resource->isReady())
 				{
-					Anim::InputDecl& decl = ctrl.resource->m_inputs;
-					Anim::InputDecl::Input& input = decl.inputs[event.input_idx];
+					anim::InputDecl& decl = ctrl.resource->m_inputs;
+					anim::InputDecl::Input& input = decl.inputs[event.input_idx];
 					switch (input.type)
 					{
-						case Anim::InputDecl::BOOL: *(bool*)&ctrl.ctx->inputs[input.offset] = event.b_value; break;
-						case Anim::InputDecl::U32: *(u32*)&ctrl.ctx->inputs[input.offset] = event.i_value; break;
-						case Anim::InputDecl::FLOAT: *(float*)&ctrl.ctx->inputs[input.offset] = event.f_value; break;
+						case anim::InputDecl::BOOL: *(bool*)&ctrl.ctx->inputs[input.offset] = event.b_value; break;
+						case anim::InputDecl::U32: *(u32*)&ctrl.ctx->inputs[input.offset] = event.i_value; break;
+						case anim::InputDecl::FLOAT: *(float*)&ctrl.ctx->inputs[input.offset] = event.f_value; break;
 						default: ASSERT(false); break;
 					}
 				}
@@ -890,10 +890,10 @@ struct AnimationSceneImpl final : AnimationScene
 	}
 
 
-	Anim::Controller* loadController(const Path& path) const
+	anim::Controller* loadController(const Path& path) const
 	{
 		ResourceManagerHub& rm = m_engine.getResourceManager();
-		return rm.load<Anim::Controller>(path);
+		return rm.load<anim::Controller>(path);
 	}
 
 
@@ -961,7 +961,7 @@ void AnimationScene::reflect(Engine& engine) {
 			function((void (AnimationScene::*)(EntityRef, u32, bool))&AnimationScene::setAnimatorInput, "AnimationScene::setAnimatorInput", "setBoolInput"),
 			LUMIX_FUNC_EX(AnimationScene::getAnimatorInputIndex, "getInputIndex"),
 			LUMIX_FUNC_EX(AnimationScene::setAnimatorIK, "setIK"),
-			LUMIX_PROP(AnimatorSource, "Source", ResourceAttribute(Anim::Controller::TYPE)),
+			LUMIX_PROP(AnimatorSource, "Source", ResourceAttribute(anim::Controller::TYPE)),
 			LUMIX_PROP(AnimatorDefaultSet, "Default set")
 		),
 		LUMIX_CMP(Animable, "animable", "Animation / Animable", 

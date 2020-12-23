@@ -1166,15 +1166,15 @@ struct ParticleEditorImpl : ParticleEditor {
 		m_toggle_ui.func.bind<&ParticleEditorImpl::toggleOpen>(this);
 		m_toggle_ui.is_selected.bind<&ParticleEditorImpl::isOpen>(this);
 
-		m_undo_action.init(ICON_FA_UNDO "Undo", "Particle editor undo", "particle_editor_undo", ICON_FA_UNDO, OS::Keycode::Z, (u8)Action::Modifiers::CTRL, true);
+		m_undo_action.init(ICON_FA_UNDO "Undo", "Particle editor undo", "particle_editor_undo", ICON_FA_UNDO, os::Keycode::Z, (u8)Action::Modifiers::CTRL, true);
 		m_undo_action.func.bind<&ParticleEditorImpl::undo>(this);
 		m_undo_action.plugin = this;
 
-		m_redo_action.init(ICON_FA_REDO "Redo", "Particle editor redo", "particle_editor_redo", ICON_FA_REDO, OS::Keycode::Z, (u8)Action::Modifiers::CTRL |  (u8)Action::Modifiers::SHIFT, true);
+		m_redo_action.init(ICON_FA_REDO "Redo", "Particle editor redo", "particle_editor_redo", ICON_FA_REDO, os::Keycode::Z, (u8)Action::Modifiers::CTRL |  (u8)Action::Modifiers::SHIFT, true);
 		m_redo_action.func.bind<&ParticleEditorImpl::redo>(this);
 		m_redo_action.plugin = this;
 
-		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", OS::Keycode::E, (u8)Action::Modifiers::CTRL, true);
+		m_apply_action.init("Apply", "Particle editor apply", "particle_editor_apply", "", os::Keycode::E, (u8)Action::Modifiers::CTRL, true);
 		m_apply_action.func.bind<&ParticleEditorImpl::apply>(this);
 		m_apply_action.plugin = this;
 
@@ -1293,7 +1293,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		if (selected.size() != 1) return nullptr;
 
 		Universe* universe = editor.getUniverse();
-		ComponentType emitter_type = Reflection::getComponentType("particle_emitter");
+		ComponentType emitter_type = reflection::getComponentType("particle_emitter");
 		RenderScene* scene = (RenderScene*)universe->getScene(emitter_type);
 		const bool has = universe->hasComponent(selected[0], emitter_type);
 		EntityRef e = selected[0];
@@ -1548,7 +1548,7 @@ struct ParticleEditorImpl : ParticleEditor {
 			load();
 			return;
 		}
-		OS::InputFile file;
+		os::InputFile file;
 		if (file.open(path)) {
 			const u64 size = file.size();
 			OutputMemoryStream blob(m_allocator);
@@ -1582,13 +1582,13 @@ struct ParticleEditorImpl : ParticleEditor {
 			return;
 		}
 		char path[MAX_PATH_LENGTH];
-		if (!OS::getOpenFilename(Span(path), "Particles\0*.par\0", nullptr)) return;
+		if (!os::getOpenFilename(Span(path), "Particles\0*.par\0", nullptr)) return;
 		load(path);
 	}
 
 	void saveAs() {
 		char path[MAX_PATH_LENGTH];
-		if (!OS::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
+		if (!os::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
 
 		save(path);
 	}
@@ -1597,7 +1597,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		OutputMemoryStream blob(m_allocator);
 		m_resource->serialize(blob);
 
-		OS::OutputFile file;
+		os::OutputFile file;
 		if (file.open(path)) {
 			if (!file.write(blob.data(), blob.size())) {
 				logError("Failed to write ", path);
