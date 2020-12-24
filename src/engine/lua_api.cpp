@@ -840,6 +840,7 @@ void registerEngineAPI(lua_State* L, Engine* engine)
 	LuaImGui::registerCFunction(L, "Dummy", &LuaWrapper::wrap<&LuaImGui::Dummy>);
 	LuaImGui::registerCFunction(L, "End", &LuaWrapper::wrap<&ImGui::End>);
 	LuaImGui::registerCFunction(L, "EndChildFrame", &LuaWrapper::wrap<&ImGui::EndChildFrame>);
+	LuaImGui::registerCFunction(L, "EndCombo", &LuaWrapper::wrap<&ImGui::EndCombo>);
 	LuaImGui::registerCFunction(L, "EndPopup", &LuaWrapper::wrap<&ImGui::EndPopup>);
 	LuaImGui::registerCFunction(L, "GetColumnWidth", &LuaWrapper::wrap<&ImGui::GetColumnWidth>);
 	LuaImGui::registerCFunction(L, "GetDisplayWidth", &LuaImGui::GetDisplayWidth);
