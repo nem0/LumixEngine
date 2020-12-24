@@ -1,0 +1,57 @@
+include "pipelines/common.glsl"
+
+vertex_shader [[
+	
+	layout (location = 0) out vec2 v_uv;
+    layout (location = 1) out vec2 v_offset;
+	
+	void main()
+	{
+		gl_Position = fullscreenQuad(gl_VertexID, v_uv);
+        #ifdef BLUR_H
+            v_offset = vec2(1, 0);
+        #else
+            v_offset = vec2(0, 1);
+        #endif
+	}
+]]
+
+fragment_shader [[
+    layout (location = 0) out vec4 o_color;
+    layout (location = 0) in vec2 v_uv;
+    layout (location = 1) in vec2 v_offset;
+    layout (binding=0) uniform sampler2D u_depth_buffer;
+    layout (binding=1) uniform sampler2D u_input;
+    layout(std140, binding = 4) uniform Drawcall {
+        vec4 res;
+        float bStep;
+        float bRad;
+    };
+
+
+	void main() {
+        mediump vec2 uv = v_uv * res.xy;
+        mediump vec2 uv_ds = floor(uv*0.5) / 0.5;
+        float depth = texelFetch(u_depth_buffer, ivec2(uv), 0).x;
+
+        float totalAO = 0.0;
+        float totalW = 0.0;
+        for (lowp float i=-bRad; i<bRad; i+=bStep)
+        {
+            vec2 o = i * v_offset;
+            float d = texelFetch(u_depth_buffer, ivec2(uv_ds+o), 0).x;
+            float ao = texture(u_input, (uv+o)*res.zw).r;
+
+            const float BlurSigma = bRad * 0.5;
+            const float BlurFalloff = 1.0 / (2.0*BlurSigma*BlurSigma);
+
+            float dWeight = max(0.001, 0.1 - abs(depth - d) * 30.0);
+            float weight = exp2(-i*i*BlurFalloff) * (dWeight * dWeight);
+
+            totalW += weight;
+            totalAO += ao * weight;
+        }
+        o_color.rgb = vec3(saturate(totalAO/totalW));
+        o_color.w = 1.0;
+	}
+]]
