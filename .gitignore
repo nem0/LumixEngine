@@ -16,3 +16,4 @@ data/studio.ini
 projects/3rdparty
 plugins/
 src/engine/plugins.inl
+data/lumix.prj
