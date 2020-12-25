@@ -15,7 +15,7 @@
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/reflection.h"
-#include "engine/serializer.h"
+#include "engine/resource_manager.h"
 #include "engine/universe.h"
 #include "gui/gui_scene.h"
 #include "gui/sprite.h"
@@ -80,7 +80,7 @@ struct SpritePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) m_app.getAssetBrowser().openInExternalEditor(sprite);
 
-		char tmp[MAX_PATH_LENGTH];
+		char tmp[LUMIX_MAX_PATH];
 		Texture* tex = sprite->getTexture();
 		copyString(tmp, tex ? tex->getPath().c_str() : "");
 		ImGuiEx::Label("Texture");

@@ -7,6 +7,7 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
@@ -584,7 +585,7 @@ gpu::TextureFlags Texture::getGPUFlags() const
 bool Texture::load(u64 size, const u8* mem)
 {
 	PROFILE_FUNCTION();
-	Profiler::pushString(getPath().c_str());
+	profiler::pushString(getPath().c_str());
 	char ext[4] = {};
 	InputMemoryStream file(mem, size);
 	if (!file.read(ext, 3)) return false;

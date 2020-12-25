@@ -65,7 +65,7 @@ static DWORD WINAPI threadFunction(LPVOID ptr)
 {
 	struct ThreadImpl* impl = reinterpret_cast<ThreadImpl*>(ptr);
 	setThreadName(impl->m_thread_id, impl->m_thread_name);
-	Profiler::setThreadName(impl->m_thread_name);
+	profiler::setThreadName(impl->m_thread_name);
 	const u32 ret = impl->m_owner->task();
 	impl->m_exited = true;
 	impl->m_is_running = false;

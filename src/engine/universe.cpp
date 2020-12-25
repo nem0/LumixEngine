@@ -57,7 +57,6 @@ Universe::Universe(Engine& engine, IAllocator& allocator)
 	, m_transforms(m_allocator)
 	, m_name(m_allocator)
 {
-
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
 	memset(m_component_type_map, 0, sizeof(m_component_type_map));

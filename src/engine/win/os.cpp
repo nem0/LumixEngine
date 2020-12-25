@@ -449,7 +449,7 @@ Point toScreen(WindowHandle win, int x, int y)
 }
 
 WindowHandle createWindow(const InitWindowArgs& args) {
-	WCharStr<MAX_PATH_LENGTH> cls_name("lunex_window");
+	WCharStr<LUMIX_MAX_PATH> cls_name("lunex_window");
 	static WNDCLASS wc = [&]() -> WNDCLASS {
 		WNDCLASS wc = {};
 		auto WndProc = [](HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
@@ -505,7 +505,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 
 	HWND parent_window = (HWND)args.parent;
 
-	WCharStr<MAX_PATH_LENGTH> wname(args.name);
+	WCharStr<LUMIX_MAX_PATH> wname(args.name);
 	DWORD style =  args.flags & InitWindowArgs::NO_DECORATION ? WS_POPUP : WS_OVERLAPPEDWINDOW ;
 	DWORD ext_style = args.flags & InitWindowArgs::NO_TASKBAR_ICON ? WS_EX_TOOLWINDOW : WS_EX_APPWINDOW;
 	const HWND hwnd = CreateWindowEx(
@@ -780,11 +780,11 @@ struct FileIterator
 
 FileIterator* createFileIterator(const char* path, IAllocator& allocator)
 {
-	char tmp[MAX_PATH_LENGTH];
+	char tmp[LUMIX_MAX_PATH];
 	copyString(tmp, path);
 	catString(tmp, "/*");
 	
-	WCharStr<MAX_PATH_LENGTH> wtmp(tmp);
+	WCharStr<LUMIX_MAX_PATH> wtmp(tmp);
 	auto* iter = LUMIX_NEW(allocator, FileIterator);
 	iter->allocator = &allocator;
 	iter->handle = FindFirstFile(wtmp, &iter->ffd);
@@ -814,14 +814,14 @@ bool getNextFile(FileIterator* iterator, FileInfo* info)
 
 void setCurrentDirectory(const char* path)
 {
-	WCharStr<MAX_PATH_LENGTH> tmp(path);
+	WCharStr<LUMIX_MAX_PATH> tmp(path);
 	SetCurrentDirectory(tmp);
 }
 
 
 void getCurrentDirectory(Span<char> output)
 {
-	WCHAR tmp[MAX_PATH_LENGTH];
+	WCHAR tmp[LUMIX_MAX_PATH];
 	GetCurrentDirectory(lengthOf(tmp), tmp);
 	fromWChar(output, tmp);
 }
@@ -829,12 +829,12 @@ void getCurrentDirectory(Span<char> output)
 
 bool getSaveFilename(Span<char> out, const char* filter, const char* default_extension)
 {
-	WCharStr<MAX_PATH_LENGTH> wtmp("");
-	WCHAR wfilter[MAX_PATH_LENGTH];
+	WCharStr<LUMIX_MAX_PATH> wtmp("");
+	WCHAR wfilter[LUMIX_MAX_PATH];
 	
 	const char* c = filter;
 	WCHAR* cout = wfilter;
-	while ((*c || *(c + 1)) && (c - filter) < MAX_PATH_LENGTH - 2) {
+	while ((*c || *(c + 1)) && (c - filter) < LUMIX_MAX_PATH - 2) {
 		*cout = *c;
 		++cout;
 		++c;
@@ -843,7 +843,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 	++cout;
 	*cout = 0;
 
-	WCharStr<MAX_PATH_LENGTH> wdefault_extension(default_extension ? default_extension : "");
+	WCharStr<LUMIX_MAX_PATH> wdefault_extension(default_extension ? default_extension : "");
 	OPENFILENAME ofn;
 	ZeroMemory(&ofn, sizeof(ofn));
 	ofn.lStructSize = sizeof(ofn);
@@ -861,7 +861,7 @@ bool getSaveFilename(Span<char> out, const char* filter, const char* default_ext
 
 	bool res = GetSaveFileName(&ofn) != FALSE;
 
-	char tmp[MAX_PATH_LENGTH];
+	char tmp[LUMIX_MAX_PATH];
 	fromWChar(Span(tmp), wtmp);
 	if (res) Path::normalize(tmp, out);
 	return res;
@@ -888,12 +888,12 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 	{
 		out[0] = '\0';
 	}
-	WCHAR wout[MAX_PATH_LENGTH] = {};
-	WCHAR wfilter[MAX_PATH_LENGTH];
+	WCHAR wout[LUMIX_MAX_PATH] = {};
+	WCHAR wfilter[LUMIX_MAX_PATH];
 	
 	const char* c = filter;
 	WCHAR* cout = wfilter;
-	while ((*c || *(c + 1)) && (c - filter) < MAX_PATH_LENGTH - 2) {
+	while ((*c || *(c + 1)) && (c - filter) < LUMIX_MAX_PATH - 2) {
 		*cout = *c;
 		++cout;
 		++c;
@@ -913,7 +913,7 @@ bool getOpenFilename(Span<char> out, const char* filter, const char* starting_fi
 
 	const bool res = GetOpenFileName(&ofn) != FALSE;
 	if (res) {
-		char tmp[MAX_PATH_LENGTH];
+		char tmp[LUMIX_MAX_PATH];
 		fromWChar(Span(tmp), wout);
 		Path::normalize(tmp, out);
 	}
@@ -1012,7 +1012,7 @@ void copyToClipboard(const char* text)
 
 ExecuteOpenResult shellExecuteOpen(const char* path)
 {
-	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	const uintptr_t res = (uintptr_t)ShellExecute(NULL, NULL, wpath, NULL, NULL, SW_SHOW);
 	if (res > 32) return ExecuteOpenResult::SUCCESS;
 	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
@@ -1022,7 +1022,7 @@ ExecuteOpenResult shellExecuteOpen(const char* path)
 
 ExecuteOpenResult openExplorer(const char* path)
 {
-	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	const uintptr_t res = (uintptr_t)ShellExecute(NULL, L"explore", wpath, NULL, NULL, SW_SHOWNORMAL);
 	if (res > 32) return ExecuteOpenResult::SUCCESS;
 	if (res == SE_ERR_NOASSOC) return ExecuteOpenResult::NO_ASSOCIATION;
@@ -1032,15 +1032,15 @@ ExecuteOpenResult openExplorer(const char* path)
 
 bool deleteFile(const char* path)
 {
-	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	return DeleteFile(wpath) != FALSE;
 }
 
 
 bool moveFile(const char* from, const char* to)
 {
-	const WCharStr<MAX_PATH_LENGTH> wfrom(from);
-	const WCharStr<MAX_PATH_LENGTH> wto(to);
+	const WCharStr<LUMIX_MAX_PATH> wfrom(from);
+	const WCharStr<LUMIX_MAX_PATH> wto(to);
 	return MoveFileEx(wfrom, wto, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED) != FALSE;
 }
 
@@ -1048,7 +1048,7 @@ bool moveFile(const char* from, const char* to)
 size_t getFileSize(const char* path)
 {
 	WIN32_FILE_ATTRIBUTE_DATA fad;
-	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	if (!GetFileAttributesEx(wpath, GetFileExInfoStandard, &fad)) return -1;
 	LARGE_INTEGER size;
 	size.HighPart = fad.nFileSizeHigh;
@@ -1059,7 +1059,7 @@ size_t getFileSize(const char* path)
 
 bool fileExists(const char* path)
 {
-	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	DWORD dwAttrib = GetFileAttributes(wpath);
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
@@ -1067,7 +1067,7 @@ bool fileExists(const char* path)
 
 bool dirExists(const char* path)
 {
-	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	DWORD dwAttrib = GetFileAttributes(wpath);
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
@@ -1075,7 +1075,7 @@ bool dirExists(const char* path)
 
 u64 getLastModified(const char* path)
 {
-	const WCharStr<MAX_PATH_LENGTH> wpath(path);
+	const WCharStr<LUMIX_MAX_PATH> wpath(path);
 	FILETIME ft;
 	HANDLE handle = CreateFile(wpath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (handle == INVALID_HANDLE_VALUE) return 0;
@@ -1105,7 +1105,7 @@ bool makePath(const char* path)
 	}
 	*out = '\0';
 
-	const WCharStr<MAX_PATH_LENGTH> wpath(tmp);
+	const WCharStr<LUMIX_MAX_PATH> wpath(tmp);
 	int error_code = SHCreateDirectoryEx(NULL, wpath, NULL);
 	return error_code == ERROR_SUCCESS || error_code == ERROR_ALREADY_EXISTS;
 }

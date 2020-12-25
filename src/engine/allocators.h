@@ -25,9 +25,7 @@ struct LUMIX_ENGINE_API DefaultAllocator final : IAllocator {
 };
 
 
-struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator
-{
-public:
+struct LUMIX_ENGINE_API BaseProxyAllocator final : IAllocator {
 	explicit BaseProxyAllocator(IAllocator& source);
 	~BaseProxyAllocator();
 

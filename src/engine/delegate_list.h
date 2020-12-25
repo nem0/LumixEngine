@@ -5,13 +5,10 @@
 #include "engine/delegate.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 template <typename T> struct DelegateList;
 
-template <typename R, typename... Args> struct DelegateList<R(Args...)>
-{
-public:
+template <typename R, typename... Args> struct DelegateList<R(Args...)> {
 	explicit DelegateList(IAllocator& allocator)
 		: m_delegates(allocator)
 	{

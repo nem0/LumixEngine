@@ -1,17 +1,11 @@
 #pragma once
 
-
 #include "engine/allocator.h"
 #include "engine/crt.h"
 
+namespace Lumix {
 
-namespace Lumix
-{
-
-
-template <typename T> struct Array
-{
-public:
+template <typename T> struct Array {
 	explicit Array(IAllocator& allocator)
 		: m_allocator(allocator)
 	{
@@ -440,12 +434,10 @@ private:
 		}
 	}
 
-private:
 	IAllocator& m_allocator;
 	u32 m_capacity;
 	u32 m_size;
 	T* m_data;
 };
-
 
 } // namespace Lumix

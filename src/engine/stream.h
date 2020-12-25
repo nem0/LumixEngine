@@ -7,8 +7,7 @@ namespace Lumix
 {
 
 
-struct LUMIX_ENGINE_API IOutputStream
-{
+struct LUMIX_ENGINE_API IOutputStream {
 	virtual bool write(const void* buffer, u64 size) = 0;
 
 	IOutputStream& operator << (const char* str);
@@ -22,8 +21,7 @@ struct LUMIX_ENGINE_API IOutputStream
 };
 
 
-struct LUMIX_ENGINE_API IInputStream
-{
+struct LUMIX_ENGINE_API IInputStream {
 	virtual bool read(void* buffer, u64 size) = 0;
 	virtual const void* getBuffer() const = 0;
 	virtual u64 size() const = 0;
@@ -34,9 +32,7 @@ struct LUMIX_ENGINE_API IInputStream
 };
 
 
-struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream
-{
-public:
+struct LUMIX_ENGINE_API OutputMemoryStream final : IOutputStream {
 	explicit OutputMemoryStream(struct IAllocator& allocator);
 	OutputMemoryStream(void* data, u64 size);
 	OutputMemoryStream(OutputMemoryStream&& rhs);
@@ -83,9 +79,7 @@ template <> inline void OutputMemoryStream::write<bool>(const bool& value)
 }
 
 
-struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream
-{
-public:
+struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	InputMemoryStream(const void* data, u64 size);
 	explicit InputMemoryStream(const OutputMemoryStream& blob);
 

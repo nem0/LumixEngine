@@ -273,7 +273,7 @@ struct CullingSystemImpl final : CullingSystem
 		const Sphere* LUMIX_RESTRICT end = cell.spheres + cell.header.count;
 		const EntityPtr* LUMIX_RESTRICT sphere_to_entity_map = cell.entities;
 
-		Profiler::pushInt("objects", cell.header.count);
+		profiler::pushInt("objects", cell.header.count);
 		const float4 px = f4Load(frustum.xs);
 		const float4 py = f4Load(frustum.ys);
 		const float4 pz = f4Load(frustum.zs);
@@ -337,7 +337,7 @@ struct CullingSystemImpl final : CullingSystem
 		volatile i32 cell_idx = 0;
 		PagedList<CullResult> list(m_page_allocator);
 
-		JobSystem::runOnWorkers([&](){
+		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("cull_job");
 			const Vec3 v3_cell_size(m_cell_size);
 			const Vec3 v3_2_cell_size(2 * m_cell_size);

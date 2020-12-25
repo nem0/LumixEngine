@@ -6,31 +6,26 @@
 #include "engine/path.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
-struct LUMIX_ENGINE_API ResourceType
-{
+struct LUMIX_ENGINE_API ResourceType {
 	ResourceType() : type(0) {}
 	explicit ResourceType(const char* type_name);
 	u32 type;
 	bool operator !=(const ResourceType& rhs) const { return rhs.type != type; }
 	bool operator ==(const ResourceType& rhs) const { return rhs.type == type; }
 	bool operator <(const ResourceType& rhs) const { return rhs.type < type; }
+	bool isValid() const { return type != 0; }
 };
-inline bool isValid(ResourceType type) { return type.type != 0; }
 const ResourceType INVALID_RESOURCE_TYPE("");
 
 
-struct LUMIX_ENGINE_API Resource
-{
-public:
+struct LUMIX_ENGINE_API Resource {
 	friend struct ResourceManager;
 	friend struct ResourceManagerHub;
 
-	enum class State : u32
-	{
+	enum class State : u32 {
 		EMPTY = 0,
 		READY,
 		FAILURE,
@@ -38,7 +33,6 @@ public:
 
 	using ObserverCallback = DelegateList<void(State, State, Resource&)>;
 
-public:
 	virtual ~Resource();
 	virtual ResourceType getType() const = 0;
 	State getState() const { return m_current_state; }
@@ -48,7 +42,7 @@ public:
 	bool isFailure() const { return State::FAILURE == m_current_state; }
 	u32 getRefCount() const { return m_ref_count; }
 	ObserverCallback& getObserverCb() { return m_cb; }
-	size_t size() const { return m_size; }
+	u64 size() const { return m_size; }
 	const Path& getPath() const { return m_path; }
 	struct ResourceManager& getResourceManager() { return m_resource_manager; }
 	u32 decRefCount();
@@ -74,29 +68,24 @@ protected:
 
 	void onCreated(State state);
 	void doUnload();
-
 	void addDependency(Resource& dependent_resource);
 	void removeDependency(Resource& dependent_resource);
-
-protected:
-	State m_desired_state;
-	u16 m_empty_dep_count;
-	size_t m_size;
-	ResourceManager& m_resource_manager;
-
-protected:
 	void checkState();
 	void refresh();
+
+	State m_desired_state;
+	u16 m_empty_dep_count;
+	u64 m_size;
+	ResourceManager& m_resource_manager;
 
 private:
 	void doLoad();
 	void fileLoaded(u64 size, const u8* mem, bool success);
 	void onStateChanged(State old_state, State new_state, Resource&);
 
-	Resource(const Resource&);
-	void operator=(const Resource&);
+	Resource(const Resource&) = delete;
+	void operator=(const Resource&) = delete;
 
-private:
 	ObserverCallback m_cb;
 	Path m_path;
 	u32 m_ref_count;

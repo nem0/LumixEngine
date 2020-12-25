@@ -10,8 +10,6 @@
 #include "engine/resource_manager.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
-#include <lua.hpp>
-#include <lauxlib.h>
 
 
 namespace Lumix
@@ -215,7 +213,7 @@ int texture_slot(lua_State* L)
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
 	LuaWrapper::getOptionalStringField(L, -1, "name", Span(slot.name));
 
-	char tmp[MAX_PATH_LENGTH];
+	char tmp[LUMIX_MAX_PATH];
 	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", Span(tmp))) {
 		ResourceManagerHub& manager = shader->getResourceManager().getOwner();
 		slot.default_texture = manager.load<Texture>(Path(tmp));

@@ -2,16 +2,15 @@
 #include "engine/crc32.h"
 #include "engine/allocator.h"
 #include "engine/log.h"
+#include "engine/lua_wrapper.h"
 #include "engine/reflection.h"
-#include "engine/serializer.h"
+#include "engine/stream.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
 const ResourceType PropertyAnimation::TYPE("property_animation");
-
 
 PropertyAnimation::PropertyAnimation(const Path& path, ResourceManager& resource_manager, IAllocator& allocator)
 	: Resource(path, resource_manager, allocator)
@@ -28,52 +27,69 @@ PropertyAnimation::Curve& PropertyAnimation::addCurve()
 }
 
 
-bool PropertyAnimation::save(TextSerializer& serializer)
-{
+bool PropertyAnimation::save(OutputMemoryStream& blob) {
 	if (!isReady()) return false;
 
-	serializer.write("count", curves.size());
-	for (Curve& curve : curves)
-	{
-		serializer.write("component", reflection::getComponent(curve.cmp_type)->name);
-		serializer.write("property", curve.property->name);
-		serializer.write("keys_count", curve.frames.size());
-		for (int i = 0; i < curve.frames.size(); ++i)
-		{
-			serializer.write("frame", curve.frames[i]);
-			serializer.write("value", curve.values[i]);
+	for (Curve& curve : curves) {
+		blob << "curve {\n";
+		blob << "\t component = \"" << reflection::getComponent(curve.cmp_type)->name << "\",\n";
+		blob << "\t property = \"" << curve.property->name << "\",\n";
+		blob << "\tkeyframes = {\n";
+		for (int i = 0; i < curve.frames.size(); ++i) {
+			if (i != 0) blob << ", ";
+			blob << curve.frames[i];
 		}
+		blob << "},\n";
+		blob << "\tvalues = {\n";
+		for (int i = 0; i < curve.values.size(); ++i) {
+			if (i != 0) blob << ", ";
+			blob << curve.values[i];
+		}
+		blob << "}\n}\n\n";
 	}
 
 	return true;
 }
 
+void PropertyAnimation::LUA_curve(lua_State* L) {
+	LuaWrapper::DebugGuard guard(L);
+	LuaWrapper::checkTableArg(L, 1);
+	const char* cmp_name;
+	const char* prop_name;
+	if (!LuaWrapper::checkField<const char*>(L, 1, "component", &cmp_name)) {
+		luaL_argerror(L, 1, "`component` field must be a string");
+	}
+	if (!LuaWrapper::checkField<const char*>(L, 1, "prop_name", &prop_name)) {
+		luaL_argerror(L, 1, "`property` field must be a string");
+	}
+	Curve& curve = curves.emplace(m_allocator);
+	curve.cmp_type = reflection::getComponentType(cmp_name);
+	// TODO property
+	if (!LuaWrapper::getField(L, 1, "keyframes")) {
+		luaL_argerror(L, 1, "`keyframes` field must be an array");
+	}
+	LuaWrapper::forEachArrayItem<i32>(L, -1, "`keyframes` field must be an array of keyframes", [&](i32 v){
+		curve.frames.emplace(v);
+	});
+	lua_pop(L, 1);
+	if (!LuaWrapper::getField(L, 1, "values")) {
+		luaL_argerror(L, 1, "`values` field must be an array");
+	}
+	LuaWrapper::forEachArrayItem<float>(L, -1, "`values` field must be an array of numbers", [&](float v){
+		curve.values.emplace(v);
+	});
+	lua_pop(L, 1);
+}
 
 bool PropertyAnimation::load(u64 size, const u8* mem)
 {
-	InputMemoryStream file(mem, size);
-	TextDeserializer serializer(file);
-	
-	int count;
-	serializer.read(Ref(count));
-	for (int i = 0; i < count; ++i) {
-		Curve& curve = curves.emplace(m_allocator);
-		char tmp[32];
-		serializer.read(Span(tmp));
-		curve.cmp_type = reflection::getComponentType(tmp);
-		serializer.read(Span(tmp));
-		// TODO
-		
-		int keys_count;
-		serializer.read(Ref(keys_count));
-		curve.frames.resize(keys_count);
-		curve.values.resize(keys_count);
-		for (int j = 0; j < keys_count; ++j) {
-			serializer.read(Ref(curve.frames[j]));
-			serializer.read(Ref(curve.values[j]));
-		}
-	}
-	return true;
+	lua_State* L = luaL_newstate(); // TODO reuse
+	auto fn = &LuaWrapper::wrapMethodClosure<&PropertyAnimation::LUA_curve>;
+	lua_pushlightuserdata(L, this);
+	lua_pushcclosure(L, fn, 1);
+	lua_setglobal(L, "curve");
+
+	return LuaWrapper::execute(L, Span((const char*)mem, (u32)size), getPath().c_str(), 0);
 }
 
 

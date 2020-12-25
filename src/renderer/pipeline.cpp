@@ -1244,8 +1244,8 @@ struct PipelineImpl final : Pipeline
 		start_job.pass_state_buffer = m_pass_state_buffer;
 		m_renderer.queue(start_job, 0);
 		
-		m_buckets_ready = JobSystem::INVALID_HANDLE;
-		JobSystem::incSignal(&m_buckets_ready);
+		m_buckets_ready = jobs::INVALID_HANDLE;
+		jobs::incSignal(&m_buckets_ready);
 		m_buckets.clear();
 		m_views.clear();
 		
@@ -1912,7 +1912,7 @@ struct PipelineImpl final : Pipeline
 
 		Cmd& cmd = m_renderer.createJob<Cmd>();
 		cmd.binding_point = binding_point;
-		cmd.buffer = (gpu::BufferHandle)(uintptr_t)buffer_handle;
+		cmd.buffer = (gpu::BufferHandle)(uintptr)buffer_handle;
 		cmd.size = size;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -2893,7 +2893,7 @@ struct PipelineImpl final : Pipeline
 
 	struct RenderBucketJob : Renderer::RenderJob {
 		void setup() override {
-			JobSystem::wait(m_pipeline->m_buckets_ready);
+			jobs::wait(m_pipeline->m_buckets_ready);
 
 			m_cmds = m_pipeline->m_buckets[m_bucket_id].cmd_page;
 		}
@@ -3047,9 +3047,9 @@ struct PipelineImpl final : Pipeline
 				page = next;
 			}
 			#undef READ
-			Profiler::pushInt("drawcalls", stats.draw_call_count);
-			Profiler::pushInt("instances", stats.instance_count);
-			Profiler::pushInt("triangles", stats.triangle_count);
+			profiler::pushInt("drawcalls", stats.draw_call_count);
+			profiler::pushInt("instances", stats.instance_count);
+			profiler::pushInt("triangles", stats.triangle_count);
 			m_pipeline->m_stats.draw_call_count += stats.draw_call_count;
 			m_pipeline->m_stats.instance_count += stats.instance_count;
 			m_pipeline->m_stats.triangle_count += stats.triangle_count;		
@@ -3416,7 +3416,7 @@ struct PipelineImpl final : Pipeline
 
 		volatile i32 iter = 0;
 
-		JobSystem::runOnWorkers([&](){
+		jobs::runOnWorkers([&](){
 			for (;;) {
 				const i32 from = atomicAdd(&iter, STEP);
 				if (from >= size) return;
@@ -3472,7 +3472,7 @@ struct PipelineImpl final : Pipeline
 			MTBucketArray<u64>::freeArray(view.sort_keys);
 		}
 
-		JobSystem::decSignal(m_buckets_ready);
+		jobs::decSignal(m_buckets_ready);
 	}
 
 	void fur(u32 bucket_id) {
@@ -4004,7 +4004,7 @@ struct PipelineImpl final : Pipeline
 		if (view.renderables->header.count == 0 && !view.renderables->header.next) return;
 		PagedListIterator<const CullResult> iterator(view.renderables);
 
-		JobSystem::runOnWorkers([&](){
+		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("create keys");
 			int total = 0;
 			u32 bucket_map[255];
@@ -4130,7 +4130,7 @@ struct PipelineImpl final : Pipeline
 				}
 			}
 			result.end();
-			Profiler::pushInt("count", total);
+			profiler::pushInt("count", total);
 		});
 	}
 
@@ -4149,7 +4149,7 @@ struct PipelineImpl final : Pipeline
 			m_sorted = true;
 
 			volatile i32 counter = 0;
-			JobSystem::runOnWorkers([&](){
+			jobs::runOnWorkers([&](){
 				PROFILE_FUNCTION();
 				u32 histogram[SIZE];
 				bool sorted = true;
@@ -4185,7 +4185,7 @@ struct PipelineImpl final : Pipeline
 	void radixSort(u64* _keys, u64* _values, int size)
 	{
 		PROFILE_FUNCTION();
-		Profiler::pushInt("count", size);
+		profiler::pushInt("count", size);
 		if(size == 0) return;
 
 		Array<u64> tmp_mem(m_allocator);
@@ -4296,7 +4296,7 @@ struct PipelineImpl final : Pipeline
 		Cmd& cmd = m_renderer.createJob<Cmd>();
 		cmd.name = name;
 		cmd.renderer = &m_renderer;
-		m_profiler_link = Profiler::createNewLinkID();
+		m_profiler_link = profiler::createNewLinkID();
 		cmd.link = m_profiler_link;
 		m_renderer.queue(cmd, m_profiler_link);
 	}
@@ -4399,7 +4399,7 @@ struct PipelineImpl final : Pipeline
 			u32 w, h;
 			gpu::TextureHandle handle;
 			FileSystem* fs;
-			StaticString<MAX_PATH_LENGTH> path;
+			StaticString<LUMIX_MAX_PATH> path;
 		};
 
 		const i32 render_buffer = toRenderbufferIdx(L, 1);
@@ -4548,7 +4548,7 @@ struct PipelineImpl final : Pipeline
 	Stats m_stats; // accessed from render thread
 	Array<View> m_views;
 	Array<Bucket> m_buckets;
-	JobSystem::SignalHandle m_buckets_ready;
+	jobs::SignalHandle m_buckets_ready;
 	Viewport m_viewport;
 	int m_output;
 	Shader* m_debug_shape_shader;

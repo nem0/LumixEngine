@@ -12,11 +12,11 @@
 #include "engine/reflection.h"
 #include "engine/string.h"
 #include "engine/universe.h"
-#include "imgui/imgui.h"
-#include "imgui/imnodes.h"
 #include "renderer/material.h"
 #include "renderer/particle_system.h"
 #include "renderer/render_scene.h"
+#include <imgui/imgui.h>
+#include <imgui/imnodes.h>
 
 namespace Lumix {
 
@@ -1142,7 +1142,7 @@ struct ParticleEditorResource {
 	}
 
 	IAllocator& m_allocator;
-	StaticString<MAX_PATH_LENGTH> m_mat_path;
+	StaticString<LUMIX_MAX_PATH> m_mat_path;
 	Array<Stream> m_streams;
 	Array<Output> m_outputs;
 	Array<Constant> m_consts;
@@ -1540,7 +1540,7 @@ struct ParticleEditorImpl : ParticleEditor {
 
 		const Path& path = emitter->getResource()->getPath();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		load(StaticString<MAX_PATH_LENGTH>(fs.getBasePath(), path.c_str()));
+		load(StaticString<LUMIX_MAX_PATH>(fs.getBasePath(), path.c_str()));
 	}
 
 	void load(const char* path) {
@@ -1581,13 +1581,13 @@ struct ParticleEditorImpl : ParticleEditor {
 			m_confirm_load_path = "";
 			return;
 		}
-		char path[MAX_PATH_LENGTH];
+		char path[LUMIX_MAX_PATH];
 		if (!os::getOpenFilename(Span(path), "Particles\0*.par\0", nullptr)) return;
 		load(path);
 	}
 
 	void saveAs() {
-		char path[MAX_PATH_LENGTH];
+		char path[LUMIX_MAX_PATH];
 		if (!os::getSaveFilename(Span(path), "Particles\0*.par\0", "par")) return;
 
 		save(path);
@@ -1640,7 +1640,7 @@ struct ParticleEditorImpl : ParticleEditor {
 		}
 		
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		load(StaticString<MAX_PATH_LENGTH>(fs.getBasePath(), path));
+		load(StaticString<LUMIX_MAX_PATH>(fs.getBasePath(), path));
 	}
 
 	bool compile(InputMemoryStream& input, OutputMemoryStream& output, const char* path) override {
@@ -1680,12 +1680,12 @@ struct ParticleEditorImpl : ParticleEditor {
 
 	IAllocator& m_allocator;
 	StudioApp& m_app;
-	StaticString<MAX_PATH_LENGTH> m_path;
+	StaticString<LUMIX_MAX_PATH> m_path;
 	Array<UndoRecord> m_undo_stack;
 	bool m_dirty = false;
 	bool m_confirm_new = false;
 	bool m_confirm_load = false;
-	StaticString<MAX_PATH_LENGTH> m_confirm_load_path;
+	StaticString<LUMIX_MAX_PATH> m_confirm_load_path;
 	i32 m_undo_idx = 0;
 	UniquePtr<ParticleEditorResource> m_resource;
 	bool m_open = false;

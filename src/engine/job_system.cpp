@@ -12,11 +12,7 @@
 #include "engine/profiler.h"
 
 
-namespace Lumix
-{
-
-
-namespace JobSystem
+namespace Lumix::jobs
 {
 
 enum { 
@@ -75,7 +71,7 @@ struct System
 		m_free_queue.resize(4096);
 		for(int i = 0; i < 4096; ++i) {
 			m_free_queue[i] = i;
-			m_signals_pool[i].sibling = JobSystem::INVALID_HANDLE;
+			m_signals_pool[i].sibling = jobs::INVALID_HANDLE;
 			m_signals_pool[i].generation = 0;
 		}
 	}
@@ -120,7 +116,7 @@ struct WorkerTask : Thread
 
 	int task() override
 	{
-		Profiler::showInProfiler(true);
+		profiler::showInProfiler(true);
 		g_worker = this;
 		Fiber::initThread(start, &m_primary_fiber);
 		return 0;
@@ -163,7 +159,7 @@ static LUMIX_FORCE_INLINE SignalHandle allocateSignal()
 	const u32 handle = g_system->m_free_queue.back();
 	Signal& w = g_system->m_signals_pool[handle & HANDLE_ID_MASK];
 	w.value = 1;
-	w.sibling = JobSystem::INVALID_HANDLE;
+	w.sibling = jobs::INVALID_HANDLE;
 	w.next_job.task = nullptr;
 	g_system->m_free_queue.pop();
 
@@ -339,8 +335,8 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 	g_system->m_sync.exit();
 
 	FiberDecl* this_fiber = (FiberDecl*)data;
-	Profiler::beginBlock("job management");
-	Profiler::blockColor(0, 0, 0xff);
+	profiler::beginBlock("job management");
+	profiler::blockColor(0, 0, 0xff);
 		
 	WorkerTask* worker = getWorker();
 	while (!worker->m_finished) {
@@ -348,7 +344,7 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			MutexGuard guard(g_system->m_sync);
 			while (!worker->m_is_enabled && !worker->m_finished) {
 				PROFILE_BLOCK("disabled");
-				Profiler::blockColor(0xff, 0, 0xff);
+				profiler::blockColor(0xff, 0, 0xff);
 				worker->sleep(g_system->m_sync);
 			}
 		}
@@ -380,13 +376,13 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			}
 
 			PROFILE_BLOCK("sleeping");
-			Profiler::blockColor(0xff, 0, 0xff);
+			profiler::blockColor(0xff, 0, 0xff);
 			worker->sleep(g_system->m_job_queue_sync);
 		}
 		if (worker->m_finished) break;
 
 		if (fiber) {
-			Profiler::endBlock();
+			profiler::endBlock();
 			worker->m_current_fiber = fiber;
 
 			g_system->m_sync.enter();
@@ -395,16 +391,16 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			Fiber::switchTo(&this_fiber->fiber, fiber->fiber);
 			g_system->m_sync.exit();
 
-			Profiler::beginBlock("job management");
-			Profiler::blockColor(0, 0, 0xff);
+			profiler::beginBlock("job management");
+			profiler::blockColor(0, 0, 0xff);
 			worker = getWorker();
 			worker->m_current_fiber = this_fiber;
 		}
 		else {
-			Profiler::endBlock();
-			Profiler::beginBlock("job");
+			profiler::endBlock();
+			profiler::beginBlock("job");
 			if (isValid(job.dec_on_finish) || isValid(job.precondition)) { //-V614
-				Profiler::pushJobInfo(job.dec_on_finish, job.precondition);
+				profiler::pushJobInfo(job.dec_on_finish, job.precondition);
 			}
 			this_fiber->current_job = job;
 			job.task(job.data);
@@ -413,12 +409,12 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 				trigger(job.dec_on_finish);
 			}
 			worker = getWorker();
-			Profiler::endBlock();
-			Profiler::beginBlock("job management");
-			Profiler::blockColor(0, 0, 0xff);
+			profiler::endBlock();
+			profiler::beginBlock("job management");
+			profiler::blockColor(0, 0, 0xff);
 		}
 	}
-	Profiler::endBlock();
+	profiler::endBlock();
 	Fiber::switchTo(&this_fiber->fiber, getWorker()->m_primary_fiber);
 }
 
@@ -521,7 +517,7 @@ void wait(SignalHandle handle)
 		return;
 	}
 
-	Profiler::blockColor(0xff, 0, 0);
+	profiler::blockColor(0xff, 0, 0);
 	FiberDecl* this_fiber = getWorker()->m_current_fiber;
 
 	runInternal(this_fiber, [](void* data){
@@ -540,7 +536,7 @@ void wait(SignalHandle handle)
 		}
 	}, handle, false, nullptr, 0);
 	
-	const Profiler::FiberSwitchData& switch_data = Profiler::beginFiberWait(handle);
+	const profiler::FiberSwitchData& switch_data = profiler::beginFiberWait(handle);
 	FiberDecl* new_fiber = g_system->m_free_fibers.back();
 	g_system->m_free_fibers.pop();
 	if (!Fiber::isValid(new_fiber->fiber)) {
@@ -550,7 +546,7 @@ void wait(SignalHandle handle)
 	Fiber::switchTo(&this_fiber->fiber, new_fiber->fiber);
 	getWorker()->m_current_fiber = this_fiber;
 	g_system->m_sync.exit();
-	Profiler::endFiberWait(handle, switch_data);
+	profiler::endFiberWait(handle, switch_data);
 	
 	#ifdef LUMIX_DEBUG
 		g_system->m_sync.enter();
@@ -559,8 +555,4 @@ void wait(SignalHandle handle)
 	#endif
 }
 
-
-} // namespace JobSystem
-
-
-} // namespace Lumix
+} // namespace Lumix::jobs

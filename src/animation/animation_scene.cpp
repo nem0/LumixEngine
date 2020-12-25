@@ -811,7 +811,7 @@ struct AnimationSceneImpl final : AnimationScene
 		PROFILE_FUNCTION();
 		if (m_animables.size() == 0) return;
 
-		JobSystem::forEach(m_animables.size(), 1, [&](i32 idx, i32){
+		jobs::forEach(m_animables.size(), 1, [&](i32 idx, i32){
 			Animable& animable = m_animables.at(idx);
 			updateAnimable(animable, time_delta);
 		});
@@ -829,7 +829,7 @@ struct AnimationSceneImpl final : AnimationScene
 		updateAnimables(time_delta);
 		updatePropertyAnimators(time_delta);
 
-		JobSystem::forEach(m_animators.size(), 1, [&](i32 idx, i32){
+		jobs::forEach(m_animators.size(), 1, [&](i32 idx, i32){
 			updateAnimator(m_animators[idx], time_delta);
 		});
 

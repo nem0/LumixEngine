@@ -254,7 +254,7 @@ function defaultConfigurations()
 		
 	configuration {}
 		files { "lumix.natvis", "../.editorconfig" }
-		defines { "_ITERATOR_DEBUG_LEVEL=0" }
+		defines { "_ITERATOR_DEBUG_LEVEL=0", "STBI_NO_STDIO" }
 		flags { "FullSymbols" } -- VS can't set brekpoints from time to time, only rebuilding several times or using FullSymbols helps
 end
 

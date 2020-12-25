@@ -284,7 +284,7 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 			ImGui::SameLine();
 			if (ImGui::Button("Execute file"))
 			{
-				char tmp[MAX_PATH_LENGTH] = {};
+				char tmp[LUMIX_MAX_PATH] = {};
 				if (os::getOpenFilename(Span(tmp), "Scripts\0*.lua\0", nullptr))
 				{
 					os::InputFile file;
@@ -379,12 +379,12 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;
-		char buf[MAX_PATH_LENGTH];
+		char buf[LUMIX_MAX_PATH];
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::Selectable("New"))
 		{
-			char full_path[MAX_PATH_LENGTH];
+			char full_path[LUMIX_MAX_PATH];
 			if (os::getSaveFilename(Span(full_path), "Lua script\0*.lua\0", "lua"))
 			{
 				os::OutputFile file;

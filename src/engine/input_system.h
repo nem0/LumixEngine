@@ -1,21 +1,15 @@
 #pragma once
 
-
 #include "engine/lumix.h"
 #include "engine/os.h"
 
-
-namespace Lumix
-{
+namespace Lumix {
 
 template <typename T> struct UniquePtr;
 
-struct LUMIX_ENGINE_API InputSystem
-{
-	struct Device
-	{
-		enum Type : u32
-		{
+struct LUMIX_ENGINE_API InputSystem {
+	struct Device {
+		enum Type : u32 {
 			MOUSE,
 			KEYBOARD,
 			CONTROLLER
@@ -29,18 +23,15 @@ struct LUMIX_ENGINE_API InputSystem
 		virtual const char* getName() const = 0;
 	};
 
-	struct ButtonEvent
-	{
+	struct ButtonEvent {
 		u32 key_id;
 		float x;
 		float y;
 		bool down;
 	};
 
-	struct AxisEvent
-	{
-		enum Axis
-		{
+	struct AxisEvent {
+		enum Axis {
 			LTRIGGER,
 			RTRIGGER,
 			LTHUMB,
@@ -54,15 +45,12 @@ struct LUMIX_ENGINE_API InputSystem
 		Axis axis;
 	};
 
-	struct TextEvent
-	{
+	struct TextEvent {
 		u32 utf8;
 	};
 
-	struct Event
-	{
-		enum Type : u32
-		{
+	struct Event {
+		enum Type : u32 {
 			BUTTON,
 			AXIS,
 			TEXT_INPUT,
@@ -72,8 +60,7 @@ struct LUMIX_ENGINE_API InputSystem
 
 		Type type;
 		Device* device;
-		union EventData
-		{
+		union EventData {
 			ButtonEvent button;
 			AxisEvent axis;
 			TextEvent text;
@@ -96,7 +83,5 @@ struct LUMIX_ENGINE_API InputSystem
 	virtual int getDevicesCount() const = 0;
 	virtual Device* getDevice(int index) = 0;
 };
-
-
 
 } // namespace Lumix

@@ -6,9 +6,7 @@
 namespace Lumix
 {
 
-struct LUMIX_ENGINE_API Thread
-{
-public:
+struct LUMIX_ENGINE_API Thread {
 	explicit Thread(struct IAllocator& allocator);
 	virtual ~Thread();
 

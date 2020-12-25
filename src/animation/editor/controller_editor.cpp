@@ -260,7 +260,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			return;
 		}
 
-		char path[MAX_PATH_LENGTH];
+		char path[LUMIX_MAX_PATH];
 		if (!os::getOpenFilename(Span(path), "Animation controller\0*.act", nullptr)) return;
 		load(path);
 	}
@@ -513,7 +513,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	}
 
 	void saveAs() {
-		char path[MAX_PATH_LENGTH];
+		char path[LUMIX_MAX_PATH];
 
 		if (os::getSaveFilename(Span(path), "Animation controller\0*.act", "act")) {
 			save(path);
@@ -744,7 +744,7 @@ struct ControllerEditorImpl : ControllerEditor {
 					ImGui::PopItemWidth();
 					ImGui::NextColumn();
 					ImGui::PushItemWidth(-1);
-					char path[MAX_PATH_LENGTH];
+					char path[LUMIX_MAX_PATH];
 					copyString(path, entry.animation ? entry.animation->getPath().c_str() : "");
 					if (m_app.getAssetBrowser().resourceInput("anim", Span(path), Animation::TYPE)) {
 						if (entry.animation) entry.animation->decRefCount();
@@ -801,7 +801,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			}*/
 
 			if (ImGui::CollapsingHeader("Bone masks")) {
-				char model_path[MAX_PATH_LENGTH];
+				char model_path[LUMIX_MAX_PATH];
 				copyString(model_path, m_model ? m_model->getPath().c_str() : "");
 				ImGuiEx::Label("Model");
 				if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
@@ -837,7 +837,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			}
 
 			if (ImGui::CollapsingHeader("IK")) {
-				char model_path[MAX_PATH_LENGTH];
+				char model_path[LUMIX_MAX_PATH];
 				copyString(model_path, m_model ? m_model->getPath().c_str() : "");
 				ImGuiEx::Label("Model");
 				if (m_app.getAssetBrowser().resourceInput("model", Span(model_path), Model::TYPE)) {
@@ -940,11 +940,11 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool m_dirty = false;
 	bool m_confirm_new = false;
 	bool m_confirm_load = false;
-	StaticString<MAX_PATH_LENGTH> m_confirm_path;
+	StaticString<LUMIX_MAX_PATH> m_confirm_path;
 	Action m_toggle_ui;
 	Action m_undo_action;
 	Action m_redo_action;
-	StaticString<MAX_PATH_LENGTH> m_path;
+	StaticString<LUMIX_MAX_PATH> m_path;
 }; // ControllerEditorImpl
 
 UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {

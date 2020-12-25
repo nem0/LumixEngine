@@ -20,7 +20,7 @@ LogUI::LogUI(IAllocator& allocator)
 	, m_are_notifications_hovered(false)
 	, m_move_notifications_to_front(false)
 {
-	getLogCallback().bind<&LogUI::onLog>(this);
+	registerLogCallback<&LogUI::onLog>(this);
 
 	for (int i = 0; i < (int)LogLevel::COUNT; ++i)
 	{
@@ -31,7 +31,7 @@ LogUI::LogUI(IAllocator& allocator)
 
 LogUI::~LogUI()
 {
-	getLogCallback().unbind<&LogUI::onLog>(this);
+	unregisterLogCallback<&LogUI::onLog>(this);
 }
 
 

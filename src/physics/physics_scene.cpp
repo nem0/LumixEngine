@@ -235,7 +235,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	{
 		void submitTask(PxBaseTask& task) override
 		{
-			JobSystem::run(&task,
+			jobs::run(&task,
 				[](void* data) {
 					PxBaseTask* task = (PxBaseTask*)data;
 					PROFILE_FUNCTION();

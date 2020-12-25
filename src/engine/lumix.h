@@ -1,5 +1,4 @@
 #pragma once
-
 #ifndef _WIN32
 	#include <signal.h> // SIGTRAP
 #endif
@@ -25,33 +24,33 @@
 	#endif
 #endif
 
+enum { LUMIX_MAX_PATH = 260 };
+
 namespace Lumix
 {
 
 
-typedef char i8;
-typedef unsigned char u8;
-typedef short i16;
-typedef unsigned short u16;
-typedef int i32;
-typedef unsigned int u32;
-typedef unsigned int u32;
+using i8 = char;
+using u8 = unsigned char;
+using i16 = short;
+using u16 = unsigned short;
+using i32 = int;
+using u32 = unsigned int;
+using u32 = unsigned int;
 #ifdef _WIN32
-	typedef long long i64;	
-	typedef unsigned long long u64;	
+	using i64 = long long;
+	using u64 = unsigned long long;
 #else	
-	typedef long i64;	
-	typedef unsigned long u64;
+	using i64 = long;
+	using u64 = unsigned long;
 #endif
-typedef u64 uintptr;
+using uintptr = u64;
 
 static_assert(sizeof(uintptr) == sizeof(void*), "Incorrect size of uintptr");
 static_assert(sizeof(i64) == 8, "Incorrect size of i64");
 static_assert(sizeof(i32) == 4, "Incorrect size of i32");
 static_assert(sizeof(i16) == 2, "Incorrect size of i16");
 static_assert(sizeof(i8) == 1, "Incorrect size of i8");
-
-const u32 MAX_PATH_LENGTH = 260;
 
 struct EntityRef;
 
@@ -70,7 +69,7 @@ struct EntityPtr
 
 struct EntityRef
 {
-	int index;
+	i32 index;
 	bool operator==(const EntityRef& rhs) const { return rhs.index == index; }
 	bool operator<(const EntityRef& rhs) const { return rhs.index < index; }
 	bool operator>(const EntityRef& rhs) const { return rhs.index > index; }
@@ -82,7 +81,7 @@ struct ComponentType
 {
 	enum { MAX_TYPES_COUNT = 64 };
 
-	int index;
+	i32 index;
 	bool operator==(const ComponentType& rhs) const { return rhs.index == index; }
 	bool operator<(const ComponentType& rhs) const { return rhs.index < index; }
 	bool operator>(const ComponentType& rhs) const { return rhs.index > index; }
@@ -148,11 +147,13 @@ struct Color {
 	u8 b;
 	u8 a;
 
-	static constexpr u32 RED = 0xff0000ff;
-	static constexpr u32 GREEN = 0xff00ff00;
-	static constexpr u32 BLUE = 0xffff0000;
-	static constexpr u32 BLACK = 0xff000000;
-	static constexpr u32 WHITE = 0xffFFffFF;
+	enum {
+		RED = 0xff0000ff,
+		GREEN = 0xff00ff00,
+		BLUE = 0xffff0000,
+		BLACK = 0xff000000,
+		WHITE = 0xffFFffFF
+	};
 };
 
 #pragma pack()
@@ -174,7 +175,7 @@ struct Time {
 private:
 	Time(u32 v) : value(v) {}
 	u32 value;
-	static constexpr u32 ONE_SECOND = 1 << 15;
+	enum { ONE_SECOND = 1 << 15 };
 };
 
 #ifdef _WIN32

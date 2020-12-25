@@ -2,22 +2,18 @@
 
 #include "engine/lumix.h"
 
-namespace Lumix
-{
+namespace Lumix {
 
-template <typename T> struct Array;
 template <typename T> struct Delegate;
 template <typename T> struct UniquePtr;
 
-namespace os
-{
+namespace os {
 	struct FileIterator;
 	struct InputFile;
 	struct OutputFile;
 }
 
-struct LUMIX_ENGINE_API FileSystem
-{
+struct LUMIX_ENGINE_API FileSystem {
 	using ContentCallback = Delegate<void(u64, const u8*, bool)>;
 
 	struct LUMIX_ENGINE_API AsyncHandle {
@@ -48,10 +44,9 @@ struct LUMIX_ENGINE_API FileSystem
 	[[nodiscard]] virtual bool makeRelative(Span<char> relative, const char* absolute) const = 0;
 	virtual void makeAbsolute(Span<char> absolute, const char* relative) const = 0;
 
-	virtual bool getContentSync(const struct Path& file, Ref<struct OutputMemoryStream> content) =  0;
+	[[nodiscard]] virtual bool getContentSync(const struct Path& file, Ref<struct OutputMemoryStream> content) =  0;
 	virtual AsyncHandle getContent(const Path& file, const ContentCallback& callback) = 0;
 	virtual void cancel(AsyncHandle handle) = 0;
 };
-
 
 } // namespace Lumix
