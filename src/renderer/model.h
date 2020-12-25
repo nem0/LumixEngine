@@ -6,30 +6,25 @@
 #include "engine/geometry.h"
 #include "engine/hash_map.h"
 #include "engine/math.h"
-#include "engine/string.h"
-#include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 #include "gpu/gpu.h"
-#include "renderer.h"
 
 
 struct lua_State;
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 struct Material;
 struct Mesh;
 struct Model;
 struct Pose;
 struct Renderer;
-struct InputMemoryStream;
 
 
-struct LUMIX_RENDERER_API RayCastModelHit
-{
+struct LUMIX_RENDERER_API RayCastModelHit {
 	bool is_hit;
 	float t;
 	DVec3 origin;
@@ -40,10 +35,8 @@ struct LUMIX_RENDERER_API RayCastModelHit
 };
 
 
-struct LUMIX_RENDERER_API Mesh
-{
-	enum class AttributeSemantic : u8
-	{
+struct LUMIX_RENDERER_API Mesh {
+	enum class AttributeSemantic : u8 {
 		POSITION,
 		NORMAL,
 		TANGENT,
@@ -64,33 +57,27 @@ struct LUMIX_RENDERER_API Mesh
 		NONE = 0xff
 	};
 
-	struct RenderData
-	{
+	struct RenderData {
 		gpu::BufferHandle vertex_buffer_handle;
-		u32 vb_stride; 
+		u32 vb_stride;
 		gpu::BufferHandle index_buffer_handle;
 		gpu::DataType index_type;
 		int indices_count;
 	};
 
-	struct Skin
-	{
+	struct Skin {
 		Vec4 weights;
 		i16 indices[4];
 	};
 
-	enum Type : u8
-	{
+	enum Type : u8 {
 		RIGID,
 		SKINNED,
 
 		LAST_TYPE
 	};
 
-	enum Flags : u8
-	{
-		INDICES_16_BIT = 1 << 0
-	};
+	enum Flags : u8 { INDICES_16_BIT = 1 << 0 };
 
 	Mesh(Material* mat,
 		const gpu::VertexDecl& vertex_decl,

@@ -1,5 +1,6 @@
 #include "engine/allocator.h"
 #include "engine/crt.h"
+#include "engine/delegate.h"
 #include "engine/thread.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
@@ -40,7 +41,7 @@ struct FileSystemWatcherTask final : Thread
 	HANDLE m_handle;
 	DWORD m_received;
 	OVERLAPPED m_overlapped;
-	char m_path[MAX_PATH_LENGTH];
+	char m_path[LUMIX_MAX_PATH];
 	FileSystemWatcherPC& m_watcher;
 };
 

@@ -33,7 +33,7 @@ struct AsyncItem {
 
 	FileSystem::ContentCallback callback;
 	OutputMemoryStream data;
-	StaticString<MAX_PATH_LENGTH> path;
+	StaticString<LUMIX_MAX_PATH> path;
 	u32 id = 0;
 	FlagSet<Flags, u32> flags;
 };
@@ -85,10 +85,7 @@ struct FileSystemImpl : FileSystem {
 		return !m_queue.empty();
 	}
 
-
-
 	const char* getBasePath() const override { return m_base_path; }
-
 
 	void setBasePath(const char* dir) final
 	{ 
@@ -100,7 +97,7 @@ struct FileSystemImpl : FileSystem {
 
 	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
 		os::InputFile file;
-		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path.c_str());
+		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path.c_str());
 
 		if (!file.open(full_path)) return false;
 
@@ -150,58 +147,58 @@ struct FileSystemImpl : FileSystem {
 
 	bool open(const char* path, Ref<os::InputFile> file) override
 	{
-		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
 		return file->open(full_path);
 	}
 
 
 	bool open(const char* path, Ref<os::OutputFile> file) override
 	{
-		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
 		return file->open(full_path);
 	}
 
 
 	bool deleteFile(const char* path) override
 	{
-		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
 		return os::deleteFile(full_path);
 	}
 
 
 	bool moveFile(const char* from, const char* to) override
 	{
-		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
-		StaticString<MAX_PATH_LENGTH> full_path_to(m_base_path, to);
+		StaticString<LUMIX_MAX_PATH> full_path_from(m_base_path, from);
+		StaticString<LUMIX_MAX_PATH> full_path_to(m_base_path, to);
 		return os::moveFile(full_path_from, full_path_to);
 	}
 
 
 	bool copyFile(const char* from, const char* to) override
 	{
-		StaticString<MAX_PATH_LENGTH> full_path_from(m_base_path, from);
-		StaticString<MAX_PATH_LENGTH> full_path_to(m_base_path, to);
+		StaticString<LUMIX_MAX_PATH> full_path_from(m_base_path, from);
+		StaticString<LUMIX_MAX_PATH> full_path_to(m_base_path, to);
 		return os::copyFile(full_path_from, full_path_to);
 	}
 
 
 	bool fileExists(const char* path) override
 	{
-		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
 		return os::fileExists(full_path);
 	}
 
 
 	u64 getLastModified(const char* path) override
 	{
-		StaticString<MAX_PATH_LENGTH> full_path(m_base_path, path);
+		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
 		return os::getLastModified(full_path);
 	}
 
 
 	os::FileIterator* createFileIterator(const char* dir) override
 	{
-		StaticString<MAX_PATH_LENGTH> path(m_base_path, dir);
+		StaticString<LUMIX_MAX_PATH> path(m_base_path, dir);
 		return os::createFileIterator(path, m_allocator);
 	}
 
@@ -256,7 +253,7 @@ struct FileSystemImpl : FileSystem {
 
 	IAllocator& m_allocator;
 	Local<FSTask> m_task;
-	StaticString<MAX_PATH_LENGTH> m_base_path;
+	StaticString<LUMIX_MAX_PATH> m_base_path;
 	Array<AsyncItem> m_queue;
 	Array<AsyncItem> m_finished;
 	Mutex m_mutex;
@@ -272,7 +269,7 @@ int FSTask::task()
 		m_fs.m_semaphore.wait();
 		if (m_finish) break;
 
-		StaticString<MAX_PATH_LENGTH> path;
+		StaticString<LUMIX_MAX_PATH> path;
 		{
 			MutexGuard lock(m_fs.m_mutex);
 			ASSERT(!m_fs.m_queue.empty());
@@ -333,7 +330,7 @@ struct PackFileSystem : FileSystemImpl {
 	}
 
 	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
-		char basename[MAX_PATH_LENGTH];
+		char basename[LUMIX_MAX_PATH];
 		Path::getBasename(Span(basename), path.c_str());
 		u32 hash;
 		fromCString(Span(basename), Ref(hash));

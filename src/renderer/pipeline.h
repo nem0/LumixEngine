@@ -2,9 +2,7 @@
 
 
 #include "engine/delegate.h"
-#include "engine/math.h"
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 #include "renderer/gpu/gpu.h"
 
 
@@ -21,7 +19,6 @@ struct Path;
 struct Renderer;
 struct RenderScene;
 struct Viewport;
-template <typename T> struct Delegate;
 
 struct PassState
 {

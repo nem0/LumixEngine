@@ -5,28 +5,22 @@
 
 struct lua_State;
 
-namespace Lumix
-{
+namespace Lumix {
 
 namespace os { using WindowHandle = void*; }
-template <typename T> struct UniquePtr;
-struct FileSystem;
 
-struct LUMIX_ENGINE_API Engine
-{
-public:
+struct LUMIX_ENGINE_API Engine {
 	struct InitArgs {
 		const char* working_dir = nullptr;
 		Span<const char*> plugins;
 		bool fullscreen = false;
 		bool handle_file_drops = false;
 		const char* window_title = "Lumix App";
-		UniquePtr<FileSystem> file_system; 
+		UniquePtr<struct FileSystem> file_system; 
 	};
 
 	using LuaResourceHandle = u32;
 
-public:
 	virtual ~Engine() {}
 
 	static UniquePtr<Engine> create(InitArgs&& init_data, struct IAllocator& allocator);
@@ -68,7 +62,7 @@ public:
 
 protected:
 	Engine() {}
+	Engine(const Engine&) = delete;
 };
-
 
 } // namespace Lumix

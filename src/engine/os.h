@@ -8,13 +8,11 @@
 #endif
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 struct IAllocator;
 
-namespace os
-{
+namespace os {
 
 #ifdef _WIN32
 	using ThreadID = u32;
@@ -35,15 +33,13 @@ enum class CursorType : u32 {
 	UNDEFINED
 };
 
-enum class ExecuteOpenResult : int
-{
+enum class ExecuteOpenResult : i32 {
 	SUCCESS,
 	NO_ASSOCIATION,
 	OTHER_ERROR
 };
 
-enum class MouseButton : int 
-{
+enum class MouseButton : i32 {
     LEFT = 0,
     RIGHT = 1,
     MIDDLE = 2,
@@ -89,8 +85,7 @@ struct Event {
 };
 
 
-struct InitWindowArgs
-{
+struct InitWindowArgs {
 	enum Flags {
 		NO_DECORATION = 1 << 0,
 		NO_TASKBAR_ICON = 1 << 1
@@ -110,9 +105,7 @@ struct Monitor {
 	bool primary;
 };
 	
-struct LUMIX_ENGINE_API InputFile final : IInputStream
-{
-public:
+struct LUMIX_ENGINE_API InputFile final : IInputStream {
 	InputFile();
 	~InputFile();
 
@@ -133,9 +126,7 @@ private:
 };
 	
 
-struct LUMIX_ENGINE_API OutputFile final : IOutputStream
-{
-public:
+struct LUMIX_ENGINE_API OutputFile final : IOutputStream {
 	OutputFile();
 	~OutputFile();
 
@@ -156,7 +147,7 @@ private:
 
 struct FileInfo {
 	bool is_directory;
-	char filename[MAX_PATH_LENGTH];
+	char filename[LUMIX_MAX_PATH];
 };
 
 struct FileIterator;
@@ -238,8 +229,22 @@ LUMIX_ENGINE_API void* loadLibrary(const char* path);
 LUMIX_ENGINE_API void unloadLibrary(void* handle);
 LUMIX_ENGINE_API void* getLibrarySymbol(void* handle, const char* name);
 
-enum class Keycode : u8
-{
+struct LUMIX_ENGINE_API Timer {
+	Timer();
+
+	float tick();
+	float getTimeSinceStart();
+	float getTimeSinceTick();
+
+	static u64 getRawTimestamp();
+	static u64 getFrequency();
+
+	u64 frequency;
+	u64 last_tick;
+	u64 first_tick;
+};
+
+enum class Keycode : u8 {
 	LBUTTON = 0x01,
 	RBUTTON = 0x02,
 	CANCEL = 0x03,
@@ -413,26 +418,7 @@ enum class Keycode : u8
 	INVALID = 0,
 	MAX = 0xff
 };
-	
-
-struct LUMIX_ENGINE_API Timer
-{
-	Timer();
-
-	float tick();
-	float getTimeSinceStart();
-	float getTimeSinceTick();
-
-	static u64 getRawTimestamp();
-	static u64 getFrequency();
-
-	u64 frequency;
-	u64 last_tick;
-	u64 first_tick;
-};
-
 
 } // namespace os
-
 } // namespace Lumix
 

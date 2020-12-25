@@ -485,7 +485,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	{
 		ComponentUID cmp = getComponent();
 		const Path p = prop.get(cmp, m_index);
-		char tmp[MAX_PATH_LENGTH];
+		char tmp[LUMIX_MAX_PATH];
 		copyString(tmp, p.c_str());
 
 		Attributes attrs = getAttributes(prop);
@@ -493,7 +493,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
-		if (attrs.resource_type != INVALID_RESOURCE_TYPE)
+		if (attrs.resource_type.isValid())
 		{
 			if (m_app.getAssetBrowser().resourceInput(prop.name, Span(tmp), attrs.resource_type))
 			{
@@ -705,7 +705,7 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 
 void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 {
-	char name[256];
+	char name[Universe::ENTITY_NAME_MAX_LENGTH];
 	Universe& universe = *m_editor.getUniverse();
 	const char* tmp = universe.getEntityName(entities[0]);
 	copyString(name, tmp);

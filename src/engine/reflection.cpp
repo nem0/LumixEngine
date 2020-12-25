@@ -1,9 +1,9 @@
 #include "engine/reflection.h"
+#include "engine/allocator.h"
 #include "engine/allocators.h"
 #include "engine/crc32.h"
-#include "engine/allocator.h"
 #include "engine/log.h"
-
+#include "engine/stream.h"
 
 namespace Lumix
 {

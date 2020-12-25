@@ -1,5 +1,3 @@
-#include <imgui/imgui.h>
-
 #include "engine/atomic.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
@@ -91,11 +89,11 @@ public:
 		m_is_log_file_open = m_log_file.open("lumix.log");
 		
 		logInfo("Creating engine...");
-		Profiler::setThreadName("Worker");
+		profiler::setThreadName("Worker");
 		installUnhandledExceptionHandler();
 
-		getLogCallback().bind<&EngineImpl::logToFile>(this);
-		getLogCallback().bind<logToDebugOutput>();
+		registerLogCallback<&EngineImpl::logToFile>(this);
+		registerLogCallback<logToDebugOutput>();
 
 		os::logVersion();
 
@@ -111,7 +109,7 @@ public:
 			m_file_system = FileSystem::create(init_data.working_dir, m_allocator);
 		}
 		else {
-			char current_dir[MAX_PATH_LENGTH];
+			char current_dir[LUMIX_MAX_PATH];
 			os::getCurrentDirectory(Span(current_dir)); 
 			m_file_system = FileSystem::create(current_dir, m_allocator);
 		}
@@ -157,7 +155,7 @@ public:
 		m_prefab_resource_manager.destroy();
 		lua_close(m_state);
 
-		getLogCallback().unbind<&EngineImpl::logToFile>(this);
+		unregisterLogCallback<&EngineImpl::logToFile>(this);
 		m_log_file.close();
 		m_is_log_file_open = false;
 		os::destroyWindow(m_window_handle);
@@ -497,11 +495,8 @@ public:
 private:
 	IAllocator& m_allocator;
 	PageAllocator m_page_allocator;
-
 	UniquePtr<FileSystem> m_file_system;
-
 	ResourceManagerHub m_resource_manager;
-	
 	UniquePtr<PluginManager> m_plugin_manager;
 	PrefabResourceManager m_prefab_resource_manager;
 	UniquePtr<InputSystem> m_input_system;

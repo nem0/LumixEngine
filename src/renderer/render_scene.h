@@ -62,7 +62,7 @@ struct TerrainInfo
 
 struct Environment
 {
-	enum Flags : u32{
+	enum Flags : u32 {
 		CAST_SHADOWS = 1 << 0
 	};
 

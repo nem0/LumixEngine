@@ -4,6 +4,7 @@
 #include "file_system.h"
 #include "input_system.h"
 #include "lua_wrapper.h"
+#include "plugin.h"
 #include "prefab.h"
 #include "reflection.h"
 #include "universe.h"
@@ -385,7 +386,7 @@ void registerCFunction(lua_State* L, const char* name, lua_CFunction f)
 static int LUA_packageLoader(lua_State* L)
 {
 	const char* module = LuaWrapper::toType<const char*>(L, 1);
-	StaticString<MAX_PATH_LENGTH> tmp(module);
+	StaticString<LUMIX_MAX_PATH> tmp(module);
 	tmp << ".lua";
 	lua_getglobal(L, "LumixAPI");
 	lua_getfield(L, -1, "engine");
@@ -396,7 +397,7 @@ static int LUA_packageLoader(lua_State* L)
 	OutputMemoryStream buf(engine->getAllocator());
 	if (!fs.getContentSync(Path(tmp), Ref(buf))) {
 		logError("Failed to open file ", tmp);
-		StaticString<MAX_PATH_LENGTH + 40> msg("Failed to open file ");
+		StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
 		msg << tmp;
 		lua_pushstring(L, msg);
 	}

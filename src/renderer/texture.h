@@ -51,9 +51,7 @@ struct RawTextureHeader {
 };
 
 
-struct LUMIX_RENDERER_API Texture final : Resource
-{
-public: 
+struct LUMIX_RENDERER_API Texture final : Resource {
 	enum class Flags : u32 {
 		SRGB = 1 << 0,
 		CLAMP_U = 1 << 1,
@@ -62,7 +60,6 @@ public:
 		POINT = 1 << 4,
 	};
 
-public:
 	Texture(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Texture();
 
@@ -96,7 +93,6 @@ public:
 
 	static const ResourceType TYPE;
 
-public:
 	u32 width;
 	u32 height;
 	u32 depth;

@@ -4,13 +4,11 @@
 	#include <pthread.h>
 #endif
 
-namespace Lumix
-{
+namespace Lumix {
 
-struct alignas(8) LUMIX_ENGINE_API Mutex
-{
-friend struct ConditionVariable;
-public:
+struct alignas(8) LUMIX_ENGINE_API Mutex {
+	friend struct ConditionVariable;
+	
 	Mutex();
 	Mutex(const Mutex&) = delete;
 	~Mutex();
@@ -27,9 +25,7 @@ private:
 };
 
 
-struct LUMIX_ENGINE_API Semaphore
-{
-public:
+struct LUMIX_ENGINE_API Semaphore {
 	Semaphore(int init_count, int max_count);
 	Semaphore(const Semaphore&) = delete;
 	~Semaphore();
@@ -50,9 +46,7 @@ private:
 };
 
 
-struct ConditionVariable
-{
-public:
+struct ConditionVariable {
 	ConditionVariable();
 	ConditionVariable(const ConditionVariable&) = delete;
 	~ConditionVariable();
@@ -68,9 +62,7 @@ private:
 };
 
 
-struct MutexGuard
-{
-public:
+struct MutexGuard {
 	explicit MutexGuard(Mutex& cs)
 		: m_mutex(cs)
 	{

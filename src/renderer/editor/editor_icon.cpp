@@ -76,7 +76,7 @@ struct EditorIconsImpl final : EditorIcons
 		ResourceManagerHub& rm = engine.getResourceManager();
 		for (u32 i = 0; i < lengthOf(ICONS); ++i)
 		{
-			StaticString<MAX_PATH_LENGTH> tmp("editor/models/", ICONS[i], "_3d.fbx");
+			StaticString<LUMIX_MAX_PATH> tmp("editor/models/", ICONS[i], "_3d.fbx");
 			m_is_3d[i] = fs.fileExists(tmp);
 			if (m_is_3d[i])
 			{

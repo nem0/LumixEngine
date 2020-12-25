@@ -161,9 +161,7 @@ template <int SIZE> struct StaticString
 };
 
 
-struct LUMIX_ENGINE_API String
-{
-public:
+struct LUMIX_ENGINE_API String {
 	explicit String(IAllocator& allocator);
 	String(const String& rhs, u32 start, u32 length);
 	String(Span<const char> rhs, IAllocator& allocator);

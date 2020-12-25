@@ -3,19 +3,15 @@
 
 #include "engine/array.h"
 #include "engine/delegate_list.h"
-#include "engine/plugin.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
 #include "engine/string.h"
 
 
-namespace Lumix
-{
-
+namespace Lumix {
 
 struct ComponentUID;
 struct IScene;
-
 
 struct LUMIX_ENGINE_API EntityMap {
 	EntityMap(IAllocator& allocator);
@@ -28,16 +24,14 @@ struct LUMIX_ENGINE_API EntityMap {
 };
 
 
-struct LUMIX_ENGINE_API Universe
-{
-public:
+struct LUMIX_ENGINE_API Universe {
 	enum { ENTITY_NAME_MAX_LENGTH = 32 };
 
 	struct EntityData {
 		EntityData() {}
 
-		int hierarchy;
-		int name;
+		i32 hierarchy;
+		i32 name;
 
 		union {
 			u64 components;
@@ -49,8 +43,7 @@ public:
 		bool valid;
 	};
 
-public:
-	explicit Universe(Engine& engine, IAllocator& allocator);
+	explicit Universe(struct Engine& engine, IAllocator& allocator);
 	~Universe();
 
 	IAllocator& getAllocator() { return m_allocator; }
@@ -121,8 +114,7 @@ private:
 	void transformEntity(EntityRef entity, bool update_local);
 	void updateGlobalTransform(EntityRef entity);
 
-	struct Hierarchy
-	{
+	struct Hierarchy {
 		EntityRef entity;
 		EntityPtr parent;
 		EntityPtr first_child;
@@ -131,8 +123,7 @@ private:
 		Transform local_transform;
 	};
 
-	struct EntityName
-	{
+	struct EntityName {
 		EntityRef entity;
 		char name[ENTITY_NAME_MAX_LENGTH];
 	};
@@ -143,7 +134,6 @@ private:
 		void (*destroy)(IScene*, EntityRef);
 	};
 
-private:
 	IAllocator& m_allocator;
 	Engine& m_engine;
 	ComponentTypeEntry m_component_type_map[ComponentType::MAX_TYPES_COUNT];
@@ -160,11 +150,8 @@ private:
 	String m_name;
 };
 
-
-struct LUMIX_ENGINE_API ComponentUID final
-{
-	ComponentUID()
-	{
+struct LUMIX_ENGINE_API ComponentUID final {
+	ComponentUID() {
 		scene = nullptr;
 		entity = INVALID_ENTITY;
 		type = {-1};
@@ -173,22 +160,16 @@ struct LUMIX_ENGINE_API ComponentUID final
 	ComponentUID(EntityPtr _entity, ComponentType _type, IScene* _scene)
 		: entity(_entity)
 		, type(_type)
-		, scene(_scene)
-	{
-	}
+		, scene(_scene) {}
 
-	EntityPtr entity; 
+	EntityPtr entity;
 	ComponentType type;
 	IScene* scene;
 
 	static const ComponentUID INVALID;
 
-	bool operator==(const ComponentUID& rhs) const
-	{
-		return type == rhs.type && scene == rhs.scene && entity == rhs.entity;
-	}
+	bool operator==(const ComponentUID& rhs) const { return type == rhs.type && scene == rhs.scene && entity == rhs.entity; }
 	bool isValid() const { return entity.isValid(); }
 };
-
 
 } // namespace Lumix

@@ -2,26 +2,20 @@
 
 #include "engine/resource.h"
 
+struct lua_State;
 
-namespace Lumix
-{
+namespace Lumix {
 
-
-struct TextSerializer;
 namespace reflection { template <typename T> struct Property; }
 
-
-struct PropertyAnimation final : Resource
-{
-public:
-	struct Curve
-	{
+struct PropertyAnimation final : Resource {
+	struct Curve {
 		Curve(IAllocator& allocator) : frames(allocator), values(allocator) {}
 
 		ComponentType cmp_type;
 		const reflection::Property<float>* property;
 		
-		Array<int> frames;
+		Array<i32> frames;
 		Array<float> values;
 	};
 
@@ -29,7 +23,7 @@ public:
 
 	ResourceType getType() const override { return TYPE; }
 	Curve& addCurve();
-	bool save(TextSerializer& serializer);
+	bool save(OutputMemoryStream& blob);
 
 	IAllocator& m_allocator;
 	Array<Curve> curves;
@@ -38,7 +32,7 @@ public:
 	static const ResourceType TYPE;
 
 private:
-
+	void LUA_curve(lua_State* L);
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 };

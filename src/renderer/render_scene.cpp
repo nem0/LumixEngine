@@ -662,7 +662,7 @@ public:
 		serializer.read(count);
 		m_reflection_probes.reserve(count + m_reflection_probes.size());
 		ResourceManagerHub& manager = m_engine.getResourceManager();
-		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
+		StaticString<LUMIX_MAX_PATH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -674,7 +674,7 @@ public:
 			serializer.read(probe.size);
 			serializer.read(probe.half_extents);
 			ASSERT(probe.texture == nullptr);
-			StaticString<MAX_PATH_LENGTH> path_str(probe_dir, probe.guid, ".dds");
+			StaticString<LUMIX_MAX_PATH> path_str(probe_dir, probe.guid, ".dds");
 			probe.texture = manager.load<Texture>(Path(path_str));
 
 			m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
@@ -687,7 +687,7 @@ public:
 		serializer.read(count);
 		m_environment_probes.reserve(count + m_environment_probes.size());
 		ResourceManagerHub& manager = m_engine.getResourceManager();
-		StaticString<MAX_PATH_LENGTH> probe_dir("universes/", m_universe.getName(), "/probes/");
+		StaticString<LUMIX_MAX_PATH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
@@ -2374,7 +2374,7 @@ public:
 		ReflectionProbe& probe = m_reflection_probes.insert(entity);
 		probe.guid = randGUID();
 
-		StaticString<MAX_PATH_LENGTH> path;
+		StaticString<LUMIX_MAX_PATH> path;
 		probe.texture = nullptr;
 		probe.flags.set(ReflectionProbe::ENABLED);
 

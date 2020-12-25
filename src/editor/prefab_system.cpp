@@ -1,5 +1,3 @@
-#include <imgui/imgui.h>
-
 #include "prefab_system.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
@@ -18,7 +16,6 @@
 #include "engine/reflection.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "engine/string.h"
 #include "engine/universe.h"
 

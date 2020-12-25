@@ -184,7 +184,7 @@ bool Material::save(IOutputStream& file)
 	file << "color { " << m_color.x << ", " << m_color.y << ", " << m_color.z << ", " << m_color.w << " }\n";
 
 	for (u32 i = 0; i < m_texture_count; ++i) {
-		char path[MAX_PATH_LENGTH];
+		char path[LUMIX_MAX_PATH];
 		if (m_textures[i] && m_textures[i] != m_shader->m_texture_slots[i].default_texture) {
 			copyString(Span(path), m_textures[i]->getPath().c_str());
 			file << "texture \"/" << path << "\"\n";
@@ -620,7 +620,7 @@ int texture(lua_State* L)
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
-	char material_dir[MAX_PATH_LENGTH];
+	char material_dir[LUMIX_MAX_PATH];
 	Path::getDir(Span(material_dir), material->getPath().c_str());
 
 	if (lua_istable(L, 1)) {
@@ -629,7 +629,7 @@ int texture(lua_State* L)
 			const char* path = lua_tostring(L, -1);
 			const int idx = material->getTextureCount();
 			
-			char texture_path[MAX_PATH_LENGTH];
+			char texture_path[LUMIX_MAX_PATH];
 			if (path[0] != '/' && path[0] != '\\' && path[0] != '\0')
 			{
 				copyString(texture_path, material_dir);
@@ -661,7 +661,7 @@ int texture(lua_State* L)
 	const char* path = LuaWrapper::checkArg<const char*>(L, 1);
 	const int idx = material->getTextureCount();
 	
-	char texture_path[MAX_PATH_LENGTH];
+	char texture_path[LUMIX_MAX_PATH];
 	if (path[0] != '/' && path[0] != '\\' && path[0] != '\0')
 	{
 		copyString(texture_path, material_dir);

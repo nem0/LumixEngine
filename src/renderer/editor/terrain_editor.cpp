@@ -1123,6 +1123,17 @@ Material* TerrainEditor::getMaterial() const
 	return scene->getTerrainMaterial((EntityRef)m_component.entity);
 }
 
+static Array<u8> getFileContent(const char* path, IAllocator& allocator) {
+	Array<u8> res(allocator);
+	os::InputFile file;
+	if (!file.open(path)) return res;
+
+	res.resize((u32)file.size());
+	if (!file.read(res.begin(), res.byte_size())) res.clear();
+
+	file.close();
+	return res;
+}
 
 void TerrainEditor::layerGUI() {
 	m_mode = Mode::LAYER;
@@ -1150,13 +1161,14 @@ void TerrainEditor::layerGUI() {
 	ImGui::SameLine();
 	if (ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_MASK, ImGui::GetStyle().Colors[ImGuiCol_Text], "Select brush mask"))
 	{
-		char filename[MAX_PATH_LENGTH];
+		char filename[LUMIX_MAX_PATH];
 		if (os::getOpenFilename(Span(filename), "All\0*.*\0", nullptr))
 		{
 			int image_width;
 			int image_height;
 			int image_comp;
-			auto* data = stbi_load(filename, &image_width, &image_height, &image_comp, 4);
+			Array<u8> tmp = getFileContent(filename, m_app.getAllocator());
+			auto* data = stbi_load_from_memory(tmp.begin(), tmp.byte_size(), &image_width, &image_height, &image_comp, 4);
 			if (data)
 			{
 				m_brush_mask.resize(image_width * image_height);
@@ -1382,7 +1394,7 @@ void TerrainEditor::entityGUI() {
 			});
 			bool selected = selected_idx >= 0;
 			const char* loading_str = selected_idx >= 0 && m_selected_prefabs[selected_idx]->isEmpty() ? " - loading..." : "";
-			StaticString<MAX_PATH_LENGTH + 15> label(res.path.c_str(), loading_str);
+			StaticString<LUMIX_MAX_PATH + 15> label(res.path.c_str(), loading_str);
 			if (ImGui::Checkbox(label, &selected)) {
 				if (selected) {
 					ResourceManagerHub& manager = m_world_editor.getEngine().getResourceManager();
