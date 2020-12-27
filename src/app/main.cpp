@@ -14,6 +14,7 @@
 #include "engine/path.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
+#include "engine/resource_manager.h"
 #include "engine/thread.h"
 #include "engine/universe.h"
 #include "gui/gui_system.h"
@@ -44,13 +45,13 @@ struct Runner final
 	Runner() 
 		: m_allocator(m_main_allocator) 
 	{
-		if (!JobSystem::init(os::getCPUsCount(), m_allocator)) {
+		if (!jobs::init(os::getCPUsCount(), m_allocator)) {
 			logError("Failed to initialize job system.");
 		}
 	}
 
 	~Runner() {
-		JobSystem::shutdown();
+		jobs::shutdown();
 		ASSERT(!m_universe); 
 	}
 
@@ -213,14 +214,14 @@ struct Runner final
 
 int main(int args, char* argv[])
 {
-	Profiler::setThreadName("Main thread");
+	profiler::setThreadName("Main thread");
 	struct Data {
 		Data() : semaphore(0, 1) {}
 		Runner app;
 		Semaphore semaphore;
 	} data;
 
-	JobSystem::runEx(&data, [](void* ptr) {
+	jobs::runEx(&data, [](void* ptr) {
 		Data* data = (Data*)ptr;
 
 		data->app.onInit();
@@ -235,7 +236,7 @@ int main(int args, char* argv[])
 		data->app.shutdown();
 
 		data->semaphore.signal();
-	}, nullptr, JobSystem::INVALID_HANDLE, 0);
+	}, nullptr, jobs::INVALID_HANDLE, 0);
 	
 	PROFILE_BLOCK("sleeping");
 	data.semaphore.wait();
