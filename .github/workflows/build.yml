@@ -32,10 +32,8 @@ jobs:
               run: |
                 "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
             - name: fetch maps plugin
-              working-directory: .
+              working-directory: plugins
               run: |
-                mkdir plugins
-                cd plugins
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
             - name: fetch gltf plugin
               working-directory: plugins
