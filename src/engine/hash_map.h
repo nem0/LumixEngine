@@ -385,6 +385,16 @@ private:
 		b = static_cast<T&&>(tmp);
 	}
 
+	static u32 nextPow2(u32 v) {
+		v--;
+		v |= v >> 1;
+		v |= v >> 2;
+		v |= v >> 4;
+		v |= v >> 8;
+		v |= v >> 16;
+		v++;
+	}
+
 	void grow(u32 new_capacity) {
 		HashMap<Key, Value, Hasher> tmp(new_capacity, m_allocator);
 		if (m_size > 0) {

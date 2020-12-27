@@ -1,5 +1,6 @@
 #include "engine/hash_map.h"
 #include "engine/thread.h"
+#include "engine/delegate.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/string.h"
@@ -38,8 +39,8 @@ struct FileSystemWatcherTask : Lumix::Thread
     Lumix::IAllocator& allocator;
     FileSystemWatcherImpl& watcher;
 	volatile bool finished;
-	char path[Lumix::MAX_PATH_LENGTH];
-	Lumix::HashMap<int, Lumix::StaticString<Lumix::MAX_PATH_LENGTH> > watched;
+	char path[LUMIX_MAX_PATH];
+	Lumix::HashMap<int, Lumix::StaticString<LUMIX_MAX_PATH> > watched;
 	int fd;
 };
 
@@ -111,7 +112,7 @@ static void addWatch(FileSystemWatcherTask& task, const char* path, int root_len
 		if (Lumix::equalStrings(info.filename, ".")) continue;
 		if (Lumix::equalStrings(info.filename, "..")) continue;
 
-        Lumix::StaticString<Lumix::MAX_PATH_LENGTH> tmp(path, info.filename, "/");
+        Lumix::StaticString<LUMIX_MAX_PATH> tmp(path, info.filename, "/");
         addWatch(task, tmp, root_length);
     }
     os::destroyFileIterator(iter);
@@ -150,7 +151,7 @@ int FileSystemWatcherTask::task()
 
         while ((char*)event < buf + r)
         {
-            char tmp[Lumix::MAX_PATH_LENGTH];
+            char tmp[LUMIX_MAX_PATH];
             getName(*this, event, tmp, Lumix::lengthOf(tmp));
             if (event->mask & IN_CREATE) addWatch(*this, tmp, root_length);
             watcher.callback.invoke(tmp);
