@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine/lumix.h"
+#include "engine/delegate_list.h"
 
 #ifdef LUMIX_PVS_STUDIO_BUILD
 	#define LUMIX_FATAL(cond) { false ? (void)(cond) : (void)0; }

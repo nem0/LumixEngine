@@ -1015,7 +1015,7 @@ u64 getLastModified(const char* path)
 
 bool makePath(const char* path)
 {
-	char tmp[MAX_PATH_LENGTH];
+	char tmp[LUMIX_MAX_PATH];
 	const char* cin = path;
 	char* cout = tmp;
 

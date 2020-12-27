@@ -49,7 +49,7 @@ void destroy(Handle fiber)
 
 void switchTo(Handle* prev, Handle fiber)
 {
-	Profiler::beforeFiberSwitch();
+	profiler::beforeFiberSwitch();
 	swapcontext(prev, &fiber); 
 }
 
