@@ -393,6 +393,7 @@ private:
 		v |= v >> 8;
 		v |= v >> 16;
 		v++;
+		return v;
 	}
 
 	void grow(u32 new_capacity) {
