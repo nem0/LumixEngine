@@ -7,11 +7,33 @@ jobs:
             - uses: actions/checkout@v1
               with:
                 fetch-depth: 1
-            - name: fetch maps plugin
-              working-directory: .
+            - name: make dx11 project
+              working-directory: projects
               run: |
-                mkdir plugins
-                cd plugins
+                mkdir ..\plugins
+                pushd ..\plugins
+                git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
+                popd
+                ./genie.exe vs2019
+            - name: build dx11 engine
+              working-directory: projects
+              shell: cmd
+              run: |
+                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+            - name: make dx12 project
+              working-directory: projects
+              run: |
+                pushd ..\plugins
+                popd
+                ./genie.exe --dx12 vs2019
+            - name: build dx12 engine
+              working-directory: projects
+              shell: cmd
+              run: |
+                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+            - name: fetch maps plugin
+              working-directory: plugins
+              run: |
                 git.exe clone https://github.com/nem0/lumixengine_maps.git maps
             - name: fetch gltf plugin
               working-directory: plugins
@@ -29,34 +51,15 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_net.git net
-            - name: make project
+            - name: fetch js plugin
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumixengine_js.git js
+            - name: make gl project with plugins
               working-directory: projects
               run: |
-                ./genie.exe --with-app vs2019
-            - name: build engine
-              working-directory: projects
-              shell: cmd
-              run: |
-                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
-            - name: make dx11 project
-              working-directory: projects
-              run: |
-                pushd ..\plugins
-                git.exe clone https://github.com/nem0/lumixengine_dx11.git dx11
-                popd
-                ./genie.exe vs2019
-            - name: build dx11 engine
-              working-directory: projects
-              shell: cmd
-              run: |
-                "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe" tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
-            - name: make dx12 project
-              working-directory: projects
-              run: |
-                pushd ..\plugins
-                popd
-                ./genie.exe --dx12 vs2019
-            - name: build dx12 engine
+                ./genie.exe --nodx --with-app vs2019
+            - name: build gl engine with plugins
               working-directory: projects
               shell: cmd
               run: |

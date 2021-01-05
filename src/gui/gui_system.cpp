@@ -1,6 +1,5 @@
 ﻿#include "gui_system.h"
 #include "engine/crc32.h"
-#include "engine/delegate.h"
 #include "engine/engine.h"
 #include "engine/allocator.h"
 #include "engine/input_system.h"
@@ -16,7 +15,6 @@
 #include "renderer/pipeline.h"
 #include "renderer/renderer.h"
 #include "renderer/render_scene.h"
-#include "renderer/shader.h"
 #include "renderer/texture.h"
 
 

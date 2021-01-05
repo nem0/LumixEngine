@@ -13,8 +13,6 @@ namespace Lumix
 struct Animation;
 struct IAllocator;
 struct OutputMemoryStream;
-template <typename Key> struct HashFunc;
-template <typename K, typename V, typename H> struct HashMap;
 
 
 namespace anim

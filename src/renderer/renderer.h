@@ -3,40 +3,24 @@
 #include "engine/allocator.h"
 #include "engine/lumix.h"
 #include "engine/plugin.h"
-#include "engine/math.h"
-#include "engine/string.h"
 #include "gpu/gpu.h"
 
-
-namespace Lumix
-{
-
-
-struct Engine;
-struct FontManager;
-struct MaterialConsts;
-struct Path;
-struct Pipeline;
-struct ResourceManager;
-struct TextureManager;
+namespace Lumix {
 
 struct RenderPlugin {
-	virtual void renderUI(Pipeline& pipeline) {}
+	virtual void renderUI(struct Pipeline& pipeline) {}
 	virtual void renderOpaque(Pipeline& pipeline) {}
 	virtual void renderTransparent(Pipeline& pipeline) {}
 };
 
-struct LUMIX_RENDERER_API Renderer : IPlugin 
-{
-	struct MemRef
-	{
+struct LUMIX_RENDERER_API Renderer : IPlugin {
+	struct MemRef {
 		u32 size = 0;
 		void* data = nullptr;
 		bool own = false;
 	};
 
-	struct RenderJob
-	{
+	struct RenderJob {
 		RenderJob() {}
 		RenderJob(const RenderJob& rhs) = delete;
 
@@ -46,8 +30,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 		i64 profiler_link = 0;
 	};
 
-	struct TransientSlice
-	{
+	struct TransientSlice {
 		gpu::BufferHandle buffer;
 		u32 offset;
 		u32 size;
@@ -61,18 +44,18 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 	virtual void frame() = 0;
 	virtual void waitForRender() = 0;
 	virtual void waitForCommandSetup() = 0;
-	virtual void makeScreenshot(const Path& filename) = 0;
+	virtual void makeScreenshot(const struct Path& filename) = 0;
 	virtual u8 getShaderDefineIdx(const char* define) = 0;
 	virtual const char* getShaderDefine(int define_idx) const = 0;
 	virtual int getShaderDefinesCount() const = 0;
 	virtual gpu::ProgramHandle queueShaderCompile(struct Shader& shader, gpu::VertexDecl decl, u32 defines) = 0;
-	virtual FontManager& getFontManager() = 0;
-	virtual ResourceManager& getTextureManager() = 0;
+	virtual struct FontManager& getFontManager() = 0;
+	virtual struct ResourceManager& getTextureManager() = 0;
 	virtual void addPlugin(RenderPlugin& plugin) = 0;
 	virtual void removePlugin(RenderPlugin& plugin) = 0;
 	virtual Span<RenderPlugin*> getPlugins() = 0;
 	
-	virtual u32 createMaterialConstants(const MaterialConsts& data) = 0;
+	virtual u32 createMaterialConstants(const struct MaterialConsts& data) = 0;
 	virtual void destroyMaterialConstants(u32 id) = 0;
 	virtual gpu::BufferHandle getMaterialUniformBuffer() = 0;
 
@@ -102,7 +85,7 @@ struct LUMIX_RENDERER_API Renderer : IPlugin
 	virtual u8 getLayersCount() const = 0;
 	virtual const char* getLayerName(u8 layer) const = 0;
 
-	virtual Engine& getEngine() = 0;
+	virtual struct Engine& getEngine() = 0;
 
 	template <typename T, typename... Args> T& createJob(Args&&... args) {
 		return *new (NewPlaceholder(), allocJob(sizeof(T), alignof(T))) T(static_cast<Args&&>(args)...);

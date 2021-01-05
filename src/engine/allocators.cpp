@@ -102,13 +102,13 @@ namespace Lumix
 	}
 
 	static void* allocSmall(DefaultAllocator& allocator, size_t n) {
-		if (!allocator.m_small_allocations) {
-			allocator.m_small_allocations = (u8*)os::memReserve(PAGE_SIZE * MAX_PAGE_COUNT);
-		}
-
 		const u32 bin = sizeToBin(n);
 
 		MutexGuard guard(allocator.m_mutex);
+
+		if (!allocator.m_small_allocations) {
+			allocator.m_small_allocations = (u8*)os::memReserve(PAGE_SIZE * MAX_PAGE_COUNT);
+		}
 		DefaultAllocator::Page* p = allocator.m_free_lists[bin];
 		if (!p) {
 			if (allocator.m_page_count == MAX_PAGE_COUNT) return nullptr;

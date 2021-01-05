@@ -57,7 +57,7 @@ struct AssetCompilerTask : Thread
 void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const char* path)
 {
 	const ResourceType type = compiler.getResourceType(path);
-	if (type == INVALID_RESOURCE_TYPE) return;
+	if (!type.isValid()) return;
 	
 	compiler.addResource(type, path);
 }
@@ -104,7 +104,7 @@ struct AssetCompilerImpl : AssetCompiler
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
 		m_task.create("Asset compiler", true);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix/assets");
+		StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix/assets");
 		if (!os::makePath(path)) logError("Could not create ", path);
 		ResourceManagerHub& rm = app.getEngine().getResourceManager();
 		rm.setLoadHook(&m_load_hook);
@@ -152,18 +152,18 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	bool copyCompile(const Path& src) override {
-		const StaticString<MAX_PATH_LENGTH> dst(".lumix/assets/", src.getHash(), ".res");
+		const StaticString<LUMIX_MAX_PATH> dst(".lumix/assets/", src.getHash(), ".res");
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		return fs.copyFile(src.c_str(), dst);
 	}
 
 	bool writeCompiledResource(const char* locator, Span<const u8> data) override {
-		char normalized[MAX_PATH_LENGTH];
+		char normalized[LUMIX_MAX_PATH];
 		Path::normalize(locator, Span(normalized));
 		const u32 hash = crc32(normalized);
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		StaticString<MAX_PATH_LENGTH> out_path(".lumix/assets/", hash, ".res");
+		StaticString<LUMIX_MAX_PATH> out_path(".lumix/assets/", hash, ".res");
 		os::OutputFile file;
 		if(!fs.open(out_path, Ref(file))) {
 			logError("Could not create ", out_path);
@@ -176,7 +176,7 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	static u32 dirHash(const char* path) {
-		char dir[MAX_PATH_LENGTH];
+		char dir[LUMIX_MAX_PATH];
 		Path::getDir(Span(dir), getResourceFilePath(path));
 		int len = stringLength(dir);
 		if (len > 0 && (dir[len - 1] == '/' || dir[len - 1] == '\\')) {
@@ -251,7 +251,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 			if (info.is_directory)
 			{
-				char child_path[MAX_PATH_LENGTH];
+				char child_path[LUMIX_MAX_PATH];
 				copyString(child_path, dir);
 				if(dir[0]) catString(child_path, "/");
 				catString(child_path, info.filename);
@@ -259,7 +259,7 @@ struct AssetCompilerImpl : AssetCompiler
 			}
 			else
 			{
-				char fullpath[MAX_PATH_LENGTH];
+				char fullpath[LUMIX_MAX_PATH];
 				copyString(fullpath, dir);
 				if(dir[0]) catString(fullpath, "/");
 				catString(fullpath, info.filename);
@@ -296,7 +296,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void onInitFinished() override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		const StaticString<MAX_PATH_LENGTH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
+		const StaticString<LUMIX_MAX_PATH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
 		OutputMemoryStream content(m_app.getAllocator());
 		if (fs.getContentSync(Path(".lumix/assets/_list.txt"), Ref(content))) {
 			lua_State* L = luaL_newstate();
@@ -319,20 +319,20 @@ struct AssetCompilerImpl : AssetCompiler
 					LuaWrapper::forEachArrayItem<Path>(L, -1, "array of strings expected", [this, &fs](const Path& p){
 						const ResourceType type = getResourceType(p.c_str());
 						#ifdef CACHE_MASTER 
-							StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
-							if (type != INVALID_RESOURCE_TYPE && fs.fileExists(res_path)) {
+							StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", p.getHash(), ".res");
+							if (type.isValid() && fs.fileExists(res_path)) {
 								m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 							}
 						#else
-							if (type != INVALID_RESOURCE_TYPE) {
+							if (type.isValid()) {
 								ResourceLocator locator(Span<const char>(p.c_str(), (u32)strlen(p.c_str())));
-								char tmp[MAX_PATH_LENGTH];
+								char tmp[LUMIX_MAX_PATH];
 								copyString(Span(tmp), locator.resource);
 								if (fs.fileExists(tmp)) {
 									m_resources.insert(p.getHash(), {p, type, dirHash(p.c_str())});
 								}
 								else {
-									StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", p.getHash(), ".res");
+									StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", p.getHash(), ".res");
 									fs.deleteFile(res_path);
 								}
 							}
@@ -416,7 +416,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	bool getMeta(const Path& res, void* user_ptr, void (*callback)(void*, lua_State*)) const override
 	{
-		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
+		const StaticString<LUMIX_MAX_PATH> meta_path(res.c_str(), ".meta");
 		
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream buf(m_app.getAllocator());
@@ -446,7 +446,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void updateMeta(const Path& res, const char* src) const override
 	{
 		os::OutputFile file;
-		const StaticString<MAX_PATH_LENGTH> meta_path(res.c_str(), ".meta");
+		const StaticString<LUMIX_MAX_PATH> meta_path(res.c_str(), ".meta");
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.open(meta_path, Ref(file))) {
@@ -501,8 +501,8 @@ struct AssetCompilerImpl : AssetCompiler
 		if (startsWith(filepath, ".lumix/assets/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 		const u32 hash = res.getPath().getHash();
-		const StaticString<MAX_PATH_LENGTH> dst_path(".lumix/assets/", hash, ".res");
-		const StaticString<MAX_PATH_LENGTH> meta_path(filepath, ".meta");
+		const StaticString<LUMIX_MAX_PATH> dst_path(".lumix/assets/", hash, ".res");
+		const StaticString<LUMIX_MAX_PATH> meta_path(filepath, ".meta");
 
 		if (!fs.fileExists(dst_path)
 			|| fs.getLastModified(dst_path) < fs.getLastModified(filepath)
@@ -577,7 +577,7 @@ struct AssetCompilerImpl : AssetCompiler
 		if (ImGui::Begin("Resource compilation", nullptr, flags)) {
 			ImGui::Text("%s", "Compiling resources...");
 			ImGui::ProgressBar(((float)m_compile_batch_count - m_batch_remaining_count) / m_compile_batch_count);
-			StaticString<MAX_PATH_LENGTH> path;
+			StaticString<LUMIX_MAX_PATH> path;
 			{
 				MutexGuard lock(m_to_compile_mutex);
 				path = m_res_in_progress;
@@ -616,7 +616,7 @@ struct AssetCompilerImpl : AssetCompiler
 			}
 
 			if (Path::hasExtension(path_obj.c_str(), "meta")) {
-				char tmp[MAX_PATH_LENGTH];
+				char tmp[LUMIX_MAX_PATH];
 				copyNString(Span(tmp), path_obj.c_str(), path_obj.length() - 5);
 				path_obj = tmp;
 			}
@@ -704,7 +704,7 @@ struct AssetCompilerImpl : AssetCompiler
 
 	u32 m_compile_batch_count = 0;
 	u32 m_batch_remaining_count = 0;
-	StaticString<MAX_PATH_LENGTH> m_res_in_progress;
+	StaticString<LUMIX_MAX_PATH> m_res_in_progress;
 };
 
 
@@ -721,7 +721,7 @@ int AssetCompilerTask::task()
 		}();
 		if (p.isValid()) {
 			PROFILE_BLOCK("compile asset");
-			Profiler::pushString(p.c_str());
+			profiler::pushString(p.c_str());
 			const bool compiled = m_compiler.compile(p);
 			if (!compiled) {
 				logError("Failed to compile resource ", p);

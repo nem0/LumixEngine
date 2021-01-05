@@ -10,6 +10,8 @@
 #include "engine/hash_map.h"
 #include "engine/allocators.h"
 #include "engine/atomic.h"
+#include "engine/math.h"
+#include "engine/string.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
 #include "engine/os.h"
@@ -19,7 +21,7 @@ namespace Lumix
 {
 
 
-namespace Profiler
+namespace profiler
 {
 
 
@@ -142,7 +144,7 @@ static struct Instance
 			trace.ProcessTraceMode = PROCESS_TRACE_MODE_RAW_TIMESTAMP | PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD | PROCESS_TRACE_MODE_RAW_TIMESTAMP;
 			trace.EventRecordCallback = TraceTask::callback;
 			trace_task.open_handle = OpenTrace(&trace);
-			trace_task.create("Profiler trace", true);
+			trace_task.create("profiler trace", true);
 		#endif
 	}
 
@@ -309,7 +311,7 @@ void write(ThreadContext& ctx, EventType type, const u8* data, int size)
 		rec.new_thread_id = cs->NewThreadId;
 		rec.old_thread_id = cs->OldThreadId;
 		rec.reason = cs->OldThreadWaitReason;
-		write(g_instance.global_context, rec.timestamp, Profiler::EventType::CONTEXT_SWITCH, rec);
+		write(g_instance.global_context, rec.timestamp, profiler::EventType::CONTEXT_SWITCH, rec);
 	};
 #endif
 
@@ -525,20 +527,20 @@ static void saveStrings(OutputMemoryStream& blob) {
 		u32 p = ctx.begin;
 		const u32 end = ctx.end;
 		while (p != end) {
-			Profiler::EventHeader header;
+			profiler::EventHeader header;
 			read(ctx, p, header);
 			switch (header.type) {
-				case Profiler::EventType::BEGIN_BLOCK: {
+				case profiler::EventType::BEGIN_BLOCK: {
 					const char* name;
-					read(ctx, p + sizeof(Profiler::EventHeader), name);
+					read(ctx, p + sizeof(profiler::EventHeader), name);
 					if (!map.find(name).isValid()) {
 						map.insert(name, name);
 					}
 					break;
 				}
-				case Profiler::EventType::INT: {
+				case profiler::EventType::INT: {
 					IntRecord r;
-					read(ctx, p + sizeof(Profiler::EventHeader), r);
+					read(ctx, p + sizeof(profiler::EventHeader), r);
 					if (!map.find(r.key).isValid()) {
 						map.insert(r.key, r.key);
 					}
@@ -594,4 +596,4 @@ void pause(bool paused)
 } // namespace Lumix
 
 
-} //	namespace Profiler
+} //	namespace profiler

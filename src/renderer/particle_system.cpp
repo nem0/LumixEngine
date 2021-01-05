@@ -4,7 +4,7 @@
 #include "engine/atomic.h"
 #include "engine/debug.h"
 #include "engine/job_system.h"
-#include "engine/lua_wrapper.h"
+#include "engine/log.h"
 #include "engine/math.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
@@ -398,7 +398,7 @@ void ParticleEmitter::update(float dt)
 		}
 	}
 
-	Profiler::pushInt("particle count", m_particles_count);
+	profiler::pushInt("particle count", m_particles_count);
 	if (m_particles_count == 0) return;
 
 	m_emit_buffer.clear();
@@ -410,7 +410,7 @@ void ParticleEmitter::update(float dt)
 	volatile i32 kill_counter = 0;
 
 	volatile i32 counter = 0;
-	JobSystem::runOnWorkers([&](){
+	jobs::runOnWorkers([&](){
 		PROFILE_FUNCTION();
 		Array<float4> reg_mem(m_allocator);
 		reg_mem.resize(m_resource->getRegistersCount() * 256);
@@ -579,7 +579,7 @@ void ParticleEmitter::fillInstanceData(float* data) {
 	if (m_particles_count == 0) return;
 
 	volatile i32 counter = 0;
-	JobSystem::runOnWorkers([&](){
+	jobs::runOnWorkers([&](){
 		PROFILE_FUNCTION();
 		Array<float4> reg_mem(m_allocator);
 		reg_mem.resize(m_resource->getRegistersCount() * 256);

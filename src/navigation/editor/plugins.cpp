@@ -68,9 +68,9 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		ImGui::SameLine();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (ImGui::Button("Load")) {
-			char path[MAX_PATH_LENGTH];
+			char path[LUMIX_MAX_PATH];
 			if (os::getOpenFilename(Span(path), "Navmesh\0*.nav\0", nullptr)) {
-				char rel[MAX_PATH_LENGTH];
+				char rel[LUMIX_MAX_PATH];
 				if (fs.makeRelative(Span(rel), path)) {
 					scene->load((EntityRef)cmp.entity, rel);
 				}
@@ -83,9 +83,9 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		if(scene->isNavmeshReady((EntityRef)cmp.entity)) {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
-				char path[MAX_PATH_LENGTH];
+				char path[LUMIX_MAX_PATH];
 				if (os::getSaveFilename(Span(path), "Navmesh\0*.nav\0", "nav")) {
-					char rel[MAX_PATH_LENGTH];
+					char rel[LUMIX_MAX_PATH];
 					if (fs.makeRelative(Span(rel), path)) {
 						scene->save((EntityRef)cmp.entity, rel);
 					}

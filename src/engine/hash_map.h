@@ -3,8 +3,6 @@
 
 #include "engine/allocator.h"
 #include "engine/lumix.h"
-#include "engine/math.h"
-#include "engine/string.h"
 
 
 namespace Lumix
@@ -380,6 +378,24 @@ public:
 	}
 
 private:
+	template <typename T>
+	void swap(T& a, T& b) {
+		T tmp = static_cast<T&&>(a);
+		a = static_cast<T&&>(b);
+		b = static_cast<T&&>(tmp);
+	}
+
+	static u32 nextPow2(u32 v) {
+		v--;
+		v |= v >> 1;
+		v |= v >> 2;
+		v |= v >> 4;
+		v |= v >> 8;
+		v |= v >> 16;
+		v++;
+		return v;
+	}
+
 	void grow(u32 new_capacity) {
 		HashMap<Key, Value, Hasher> tmp(new_capacity, m_allocator);
 		if (m_size > 0) {
@@ -441,7 +457,8 @@ private:
 	}
 
 	void init(u32 capacity, bool all_invalid) {
-		ASSERT(isPowOfTwo(capacity));
+		const bool is_pow_2 = capacity && !(capacity & (capacity - 1));
+		ASSERT(is_pow_2);
 		m_size = 0;
 		m_mask = capacity - 1;
 		m_keys = (Slot*)m_allocator.allocate(sizeof(Slot) * (capacity + 1));

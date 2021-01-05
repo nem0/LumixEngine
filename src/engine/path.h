@@ -11,13 +11,11 @@ struct LUMIX_ENGINE_API PathInfo
 	explicit PathInfo(const char* path);
 
 	char m_extension[10];
-	char m_basename[MAX_PATH_LENGTH];
-	char m_dir[MAX_PATH_LENGTH];
+	char m_basename[LUMIX_MAX_PATH];
+	char m_dir[LUMIX_MAX_PATH];
 };
 
-struct LUMIX_ENGINE_API Path
-{
-public:
+struct LUMIX_ENGINE_API Path {
 	static void normalize(const char* path, Span<char> out);
 	static void getDir(Span<char> dir, const char* src);
 	static void getBasename(Span<char> basename, const char* src);
@@ -25,7 +23,6 @@ public:
 	static bool hasExtension(const char* filename, const char* ext);
 	static bool replaceExtension(char* path, const char* ext);
 
-public:
 	Path();
 	explicit Path(const char* path);
 
@@ -39,7 +36,7 @@ public:
 	bool isValid() const { return m_path[0] != '\0'; }
 
 private:
-	char m_path[MAX_PATH_LENGTH];
+	char m_path[LUMIX_MAX_PATH];
 	u32 m_hash;
 };
 

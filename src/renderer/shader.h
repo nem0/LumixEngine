@@ -2,8 +2,8 @@
 #include "engine/array.h"
 #include "engine/hash_map.h"
 #include "engine/resource.h"
+#include "engine/string.h"
 #include "gpu/gpu.h"
-#include "renderer/model.h"
 
 
 struct lua_State;

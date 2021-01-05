@@ -175,7 +175,7 @@ bool Path::hasExtension(const char* filename, const char* ext)
 }
 
 PathInfo::PathInfo(const char* path) {
-	char tmp[MAX_PATH_LENGTH];
+	char tmp[LUMIX_MAX_PATH];
 	Path::normalize(path, Span(tmp));
 	Path::getExtension(Span(m_extension), Span(tmp, stringLength(tmp)));
 	Path::getBasename(Span(m_basename), tmp);

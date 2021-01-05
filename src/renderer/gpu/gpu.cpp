@@ -9,6 +9,7 @@
 #include "engine/sync.h"
 #include "engine/os.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 #ifdef _WIN32
 	#include <Windows.h>
 #endif

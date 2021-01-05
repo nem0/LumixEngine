@@ -5,7 +5,7 @@ namespace Lumix {
 
 struct IAllocator;
 
-namespace JobSystem {
+namespace jobs {
 
 using SignalHandle = u32;
 constexpr u8 ANY_WORKER = 0xff;
@@ -29,9 +29,9 @@ LUMIX_ENGINE_API inline bool isValid(SignalHandle waitable) { return waitable !=
 template <typename F>
 void runOnWorkers(const F& f)
 {
-	SignalHandle signal = JobSystem::INVALID_HANDLE;
+	SignalHandle signal = jobs::INVALID_HANDLE;
 	for(int i = 0, c = getWorkersCount(); i < c; ++i) {
-		JobSystem::run((void*)&f, [](void* data){
+		jobs::run((void*)&f, [](void* data){
 			(*(const F*)data)();
 		}, &signal);
 	}
@@ -50,7 +50,7 @@ void forEach(i32 count, i32 step, const F& f)
 
 	volatile i32 offset = 0;
 
-	JobSystem::runOnWorkers([&](){
+	jobs::runOnWorkers([&](){
 		for(;;) {
 			const i32 idx = atomicAdd(&offset, step);
 			if (idx >= count) break;
@@ -61,6 +61,6 @@ void forEach(i32 count, i32 step, const F& f)
 	});
 }
 
-} // namespace JobSystem
+} // namespace jobs
 
 } // namespace Lumix

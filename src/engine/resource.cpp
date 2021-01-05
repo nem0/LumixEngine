@@ -4,6 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/path.h"
 #include "engine/resource_manager.h"
+#include "engine/string.h"
 
 
 namespace Lumix
@@ -174,7 +175,7 @@ void Resource::doLoad()
 	cb.bind<&Resource::fileLoaded>(this);
 
 	const u32 hash = m_path.getHash();
-	const StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", hash, ".res");
+	const StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", hash, ".res");
 
 	m_async_op = fs.getContent(Path(res_path), cb);
 }

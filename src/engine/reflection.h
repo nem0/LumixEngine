@@ -5,7 +5,6 @@
 #include "engine/metaprogramming.h"
 #include "engine/resource.h"
 #include "engine/stream.h"
-#include "engine/string.h"
 #include "engine/universe.h"
 
 
@@ -23,7 +22,6 @@
 
 namespace Lumix
 {
-
 
 template <typename T> struct Array;
 template <typename T> struct Span;
@@ -94,7 +92,6 @@ struct ResourceAttribute : IAttribute
 	ResourceType resource_type;
 };
 
-
 struct MinAttribute : IAttribute
 {
 	explicit MinAttribute(float min) { this->min = min; }
@@ -104,7 +101,6 @@ struct MinAttribute : IAttribute
 
 	float min;
 };
-
 
 struct ClampAttribute : IAttribute
 {
@@ -158,7 +154,6 @@ template <typename T> struct Property : PropertyTag {
 	virtual void set(ComponentUID cmp, int index, T) const = 0;
 	const char* name;
 };
-
 
 struct IBlobProperty : PropertyTag  {
 	virtual void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const = 0;
@@ -244,7 +239,6 @@ struct IPropertyVisitor
 	virtual void visit(const IBlobProperty& prop) = 0;
 };
 
-
 struct IEmptyPropertyVisitor : IPropertyVisitor
 {
 	void visit(const Property<float>& prop) override {}
@@ -262,7 +256,6 @@ struct IEmptyPropertyVisitor : IPropertyVisitor
 	void visit(const IBlobProperty& prop) override {}
 	void visit(const IDynamicProperties& prop) override {}
 };
-
 
 struct ComponentBase
 {
@@ -390,8 +383,28 @@ struct VarProperty : Property<T>
 	TupleHolder<IAttribute, Attributes...> attributes;
 };
 
-
 namespace detail {
+
+static const unsigned int FRONT_SIZE = sizeof("Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
+static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
+
+template <typename T>
+struct GetTypeNameHelper
+{
+	static const char* GetTypeName()
+	{
+		#if defined(_MSC_VER) && !defined(__clang__)
+			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
+			static char typeName[size] = {};
+			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u); //-V594
+		#else
+			static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
+			static char typeName[size] = {};
+			memcpy(typeName, __PRETTY_FUNCTION__ + FRONT_SIZE, size - 1u);
+		#endif
+		return typeName;
+	}
+};
 
 template <typename Getter> struct GetterProxy;
 
@@ -467,7 +480,6 @@ struct CommonProperty : Property<T>
 	Setter setter;
 };
 
-
 template <typename Counter, typename Adder, typename Remover, typename... Props>
 struct ArrayProperty : IArrayProperty
 {
@@ -509,7 +521,6 @@ struct ArrayProperty : IArrayProperty
 	Remover remover;
 };
 
-
 template <typename T>
 const IAttribute* getAttribute(const Property<T>& prop, IAttribute::Type type) {
 	for (const IAttribute* attr : prop.getAttributes()) {
@@ -518,36 +529,10 @@ const IAttribute* getAttribute(const Property<T>& prop, IAttribute::Type type) {
 	return nullptr;
 }
 
-namespace internal
-{
-	static const unsigned int FRONT_SIZE = sizeof("Lumix::reflection::internal::GetTypeNameHelper<") - 1u;
-	static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
-
-	template <typename T>
-	struct GetTypeNameHelper
-	{
-		static const char* GetTypeName()
-		{
-#if defined(_MSC_VER) && !defined(__clang__)
-			static const size_t size = sizeof(__FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-			static char typeName[size] = {};
-			memcpy(typeName, __FUNCTION__ + FRONT_SIZE, size - 1u); //-V594
-#else
-			static const size_t size = sizeof(__PRETTY_FUNCTION__) - FRONT_SIZE - BACK_SIZE;
-			static char typeName[size] = {};
-			memcpy(typeName, __PRETTY_FUNCTION__ + FRONT_SIZE, size - 1u);
-#endif
-
-			return typeName;
-		}
-	};
-}
-
-
 template <typename T>
 const char* getTypeName()
 {
-	return internal::GetTypeNameHelper<T>::GetTypeName();
+	return detail::GetTypeNameHelper<T>::GetTypeName();
 }
 
 struct Variant {

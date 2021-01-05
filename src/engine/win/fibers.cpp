@@ -31,7 +31,7 @@ void destroy(Handle fiber)
 
 void switchTo(Handle* from, Handle fiber)
 {
-	Profiler::beforeFiberSwitch();
+	profiler::beforeFiberSwitch();
 	SwitchToFiber(fiber);
 }
 

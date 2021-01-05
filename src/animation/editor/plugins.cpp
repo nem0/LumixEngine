@@ -16,7 +16,6 @@
 #include "engine/os.h"
 #include "controller_editor.h"
 #include "engine/reflection.h"
-#include "engine/serializer.h"
 #include "engine/universe.h"
 #include "renderer/model.h"
 #include "renderer/pose.h"
@@ -157,8 +156,7 @@ struct PropertyAnimationAssetBrowserPlugin : AssetBrowser::IPlugin
 		if (OutputMemoryStream* file = m_app.getAssetBrowser().beginSaveResource(anim))
 		{
 			bool success = true;
-			TextSerializer serializer(*file);
-			if (!anim.save(serializer))
+			if (!anim.save(*file))
 			{
 				success = false;
 				logError("Could not save file ", anim.getPath());

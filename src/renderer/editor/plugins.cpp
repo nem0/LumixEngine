@@ -447,7 +447,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		char buf[MAX_PATH_LENGTH];
+		char buf[LUMIX_MAX_PATH];
 		auto* first = static_cast<Material*>(resources[0]);
 
 		bool same_shader = true;
@@ -544,7 +544,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		char buf[MAX_PATH_LENGTH];
+		char buf[LUMIX_MAX_PATH];
 		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
 		ImGuiEx::Label("Shader");
 		if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
@@ -752,7 +752,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			IAllocator& allocator = m_allocator;
 
 			u32 hash = crc32(m_in_path);
-			StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", hash, ".dds");
+			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", hash, ".dds");
 			OutputMemoryStream resized_data(allocator);
 			resized_data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 			if (Path::hasExtension(m_in_path, "dds")) {
@@ -807,13 +807,29 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			{
 				int image_comp;
 				int w, h;
-				auto data = stbi_load(m_in_path, &w, &h, &image_comp, 4);
+				os::InputFile file;
+				if (!file.open(m_in_path)) {
+					logError("Failed to load ", m_in_path);
+					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					return;
+				}
+				Array<u8> tmp(m_allocator);
+				tmp.resize((u32)file.size());
+				if (!file.read(tmp.begin(), tmp.byte_size())) {
+					logError("Failed to load ", m_in_path);
+					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					return;
+				}
+				file.close();
+
+				auto data = stbi_load_from_memory(tmp.begin(), tmp.byte_size(), &w, &h, &image_comp, 4);
 				if (!data)
 				{
 					logError("Failed to load ", m_in_path);
 					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
 					return;
 				}
+
 				stbir_resize_uint8(data,
 					w,
 					h,
@@ -843,8 +859,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		IAllocator& m_allocator;
 		FileSystem& m_filesystem;
-		StaticString<MAX_PATH_LENGTH> m_in_path; 
-		StaticString<MAX_PATH_LENGTH> m_out_path; 
+		StaticString<LUMIX_MAX_PATH> m_in_path; 
+		StaticString<LUMIX_MAX_PATH> m_out_path; 
 	};
 
 
@@ -858,8 +874,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			job->m_in_path << in_path;
 			job->m_out_path = fs.getBasePath();
 			job->m_out_path << out_path;
-			JobSystem::SignalHandle signal = JobSystem::INVALID_HANDLE;
-			JobSystem::runEx(job, &TextureTileJob::execute, &signal, m_tile_signal, JobSystem::getWorkersCount() - 1);
+			jobs::SignalHandle signal = jobs::INVALID_HANDLE;
+			jobs::runEx(job, &TextureTileJob::execute, &signal, m_tile_signal, jobs::getWorkersCount() - 1);
 			m_tile_signal = signal;
 			return true;
 		}
@@ -1161,8 +1177,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_composite_tag = &texture;
 			IAllocator& allocator = m_app.getAllocator();
 			OutputMemoryStream content(allocator);
-			fs.getContentSync(texture.getPath(), Ref(content));
-			m_composite.init(Span(content.data(), (u32)content.size()), texture.getPath().c_str());
+			if (fs.getContentSync(texture.getPath(), Ref(content))) {
+				m_composite.init(Span(content.data(), (u32)content.size()), texture.getPath().c_str());
+			}
+			else {
+				logError("Could not load", texture.getPath());
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Edit")) {
@@ -1201,7 +1221,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 						break;
 					}
 
-					char tmp[MAX_PATH_LENGTH];
+					char tmp[LUMIX_MAX_PATH];
 					
 					if (show_channels) {
 						copyString(Span(tmp), layer.red.path.c_str());
@@ -1397,7 +1417,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	StudioApp& m_app;
 	Texture* m_texture;
 	gpu::TextureHandle m_texture_view = gpu::INVALID_TEXTURE;
-	JobSystem::SignalHandle m_tile_signal = JobSystem::INVALID_HANDLE;
+	jobs::SignalHandle m_tile_signal = jobs::INVALID_HANDLE;
 	Meta m_meta;
 	u32 m_meta_res = 0;
 	CompositeTexture m_composite;
@@ -1420,7 +1440,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 		const i32 count = model->getMeshCount();
 		if (count == 1) {
 			ImGuiEx::Label("Material");
-			char mat_path[MAX_PATH_LENGTH];
+			char mat_path[LUMIX_MAX_PATH];
 			Path path = scene->getModelInstanceMaterialOverride(entity);
 			if (!path.isValid()) {
 				path = model->getMesh(0).material->getPath();
@@ -1497,7 +1517,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	~ModelPlugin()
 	{
-		JobSystem::wait(m_subres_signal);
+		jobs::wait(m_subres_signal);
 		auto& engine = m_app.getEngine();
 		engine.destroyUniverse(*m_universe);
 		m_pipeline.reset();
@@ -1550,14 +1570,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		const Meta meta = getMeta(Path(path));
 		struct JobData {
 			ModelPlugin* plugin;
-			StaticString<MAX_PATH_LENGTH> path;
+			StaticString<LUMIX_MAX_PATH> path;
 			Meta meta;
 		};
 		JobData* data = LUMIX_NEW(m_app.getAllocator(), JobData);
 		data->plugin = this;
 		data->path = path;
 		data->meta = meta;
-		JobSystem::runEx(data, [](void* ptr) {
+		jobs::runEx(data, [](void* ptr) {
 			JobData* data = (JobData*)ptr;
 			ModelPlugin* plugin = data->plugin;
 			FBXImporter importer(plugin->m_app);
@@ -1571,25 +1591,25 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				for (int i = 0; i < meshes.size(); ++i) {
 					char mesh_name[256];
 					importer.getImportMeshName(meshes[i], mesh_name);
-					StaticString<MAX_PATH_LENGTH> tmp(mesh_name, ".fbx:", path);
+					StaticString<LUMIX_MAX_PATH> tmp(mesh_name, ".fbx:", path);
 					compiler.addResource(Model::TYPE, tmp);
 				}
 			}
 
 			if (data->meta.physics != FBXImporter::ImportConfig::Physics::NONE) {
-				StaticString<MAX_PATH_LENGTH> tmp(".phy:", path);
+				StaticString<LUMIX_MAX_PATH> tmp(".phy:", path);
 				ResourceType physics_geom("physics");
 				compiler.addResource(physics_geom, tmp);
 			}
 
 			const Array<FBXImporter::ImportAnimation>& animations = importer.getAnimations();
 			for (const FBXImporter::ImportAnimation& anim : animations) {
-				StaticString<MAX_PATH_LENGTH> tmp(anim.name, ".ani:", path);
+				StaticString<LUMIX_MAX_PATH> tmp(anim.name, ".ani:", path);
 				compiler.addResource(ResourceType("animation"), tmp);
 			}
 
 			LUMIX_DELETE(plugin->m_app.getAllocator(), data);
-		}, &m_subres_signal, JobSystem::INVALID_HANDLE, 2);			
+		}, &m_subres_signal, jobs::INVALID_HANDLE, 2);			
 	}
 
 	static const char* getResourceFilePath(const char* str)
@@ -2113,7 +2133,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(shadow), Ref(tile_size));
 				postprocessImpostor(Ref(gb0), Ref(gb1), tile_size, allocator);
 				const PathInfo fi(model->getPath().c_str());
-				StaticString<MAX_PATH_LENGTH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
+				StaticString<LUMIX_MAX_PATH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
 				os::OutputFile file;
@@ -2219,7 +2239,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				destroyEntityRecursive(*m_tile.universe, (EntityRef)m_tile.entity);
 				Engine& engine = m_app.getEngine();
 				FileSystem& fs = engine.getFileSystem();
-				StaticString<MAX_PATH_LENGTH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
+				StaticString<LUMIX_MAX_PATH> path(fs.getBasePath(), ".lumix/asset_tiles/", m_tile.path_hash, ".dds");
 				
 				u8* raw_tile_data = m_tile.data.getMutableData();
 				for (u32 i = 0; i < u32(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE); ++i) {
@@ -2347,7 +2367,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (material->getTextureCount() == 0) return;
 		const char* in_path = material->getTexture(0)->getPath().c_str();
 		Engine& engine = m_app.getEngine();
-		StaticString<MAX_PATH_LENGTH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".dds");
+		StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", material->getPath().getHash(), ".dds");
 
 		m_texture_plugin->createTile(in_path, out_path, Texture::TYPE);
 	}
@@ -2455,7 +2475,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	int m_captured_mouse_y;
 	TexturePlugin* m_texture_plugin;
 	FBXImporter m_fbx_importer;
-	JobSystem::SignalHandle m_subres_signal = JobSystem::INVALID_HANDLE;
+	jobs::SignalHandle m_subres_signal = jobs::INVALID_HANDLE;
 };
 
 
@@ -2713,7 +2733,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	{
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
+		StaticString<LUMIX_MAX_PATH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 		if (!os::makePath(path) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
@@ -2829,7 +2849,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			, plugin(plugin)
 		{}
 		
-		StaticString<MAX_PATH_LENGTH> universe_name;
+		StaticString<LUMIX_MAX_PATH> universe_name;
 		EntityRef entity;
 		union {
 			EnvironmentProbe env_probe;
@@ -2850,7 +2870,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
 		captureCubemap(m_app, *m_pipeline, texture_size, job.position, Ref(job.data), [&job](){
-			JobSystem::run(&job, [](void* ptr) {
+			jobs::run(&job, [](void* ptr) {
 				ProbeJob* pjob = (ProbeJob*)ptr;
 				pjob->plugin.processData(*pjob);
 			}, nullptr);
@@ -2907,7 +2927,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-			StaticString<MAX_PATH_LENGTH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
+			StaticString<LUMIX_MAX_PATH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
 			if (!os::dirExists(path) && !os::makePath(path)) {
 				logError("Failed to create ", path);
 			}
@@ -2925,8 +2945,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 					const u64 guid = job.reflection_probe.guid;
 
-					const StaticString<MAX_PATH_LENGTH> tmp_path(base_path, "/universes/", job.universe_name, "/probes_tmp/", guid, ".dds");
-					const StaticString<MAX_PATH_LENGTH> path(base_path, "/universes/", job.universe_name, "/probes/", guid, ".dds");
+					const StaticString<LUMIX_MAX_PATH> tmp_path(base_path, "/universes/", job.universe_name, "/probes_tmp/", guid, ".dds");
+					const StaticString<LUMIX_MAX_PATH> path(base_path, "/universes/", job.universe_name, "/probes/", guid, ".dds");
 					if (!os::fileExists(tmp_path)) return;
 					if (!os::moveFile(tmp_path, path)) {
 						logError("Failed to move file ", tmp_path, " to ", path);
@@ -2953,7 +2973,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			logError(m_ibl_filter_shader->getPath(), "is not ready");
 			return;
 		}
-		JobSystem::SignalHandle finished = JobSystem::INVALID_HANDLE;
+		jobs::SignalHandle finished = jobs::INVALID_HANDLE;
 		PluginManager& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
@@ -3031,11 +3051,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		};
 		
 		// TODO RenderJob
-		JobSystem::runEx(&lambda, [](void* data){
+		jobs::runEx(&lambda, [](void* data){
 			auto* l = ((decltype(lambda)*)data);
 			(*l)();
-		}, &finished, JobSystem::INVALID_HANDLE, 1);
-		JobSystem::wait(finished);
+		}, &finished, jobs::INVALID_HANDLE, 1);
+		jobs::wait(finished);
 	}
 
 	void processData(ProbeJob& job) {
@@ -3476,7 +3496,6 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 							vec4 tc = textureLod(u_texture, v_uv, 0);
 							o_color.rgb = pow(tc.rgb, vec3(1/2.2)) * v_color.rgb;
 							o_color.a = v_color.a * tc.a;
-							//o_color = vec4(v_color.rgb, 1);
 						})#";
 					const char* srcs[] = {vs, fs};
 					gpu::ShaderType types[] = {gpu::ShaderType::VERTEX, gpu::ShaderType::FRAGMENT};
@@ -3597,15 +3616,15 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 	bool createHeightmap(const char* material_path, int size)
 	{
-		char normalized_material_path[MAX_PATH_LENGTH];
+		char normalized_material_path[LUMIX_MAX_PATH];
 		Path::normalize(material_path, Span(normalized_material_path));
 
 		PathInfo info(normalized_material_path);
-		StaticString<MAX_PATH_LENGTH> hm_path(info.m_dir, info.m_basename, ".raw");
-		StaticString<MAX_PATH_LENGTH> albedo_path(info.m_dir, "albedo_detail.ltc");
-		StaticString<MAX_PATH_LENGTH> normal_path(info.m_dir, "normal_detail.ltc");
-		StaticString<MAX_PATH_LENGTH> splatmap_path(info.m_dir, "splatmap.tga");
-		StaticString<MAX_PATH_LENGTH> splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
+		StaticString<LUMIX_MAX_PATH> hm_path(info.m_dir, info.m_basename, ".raw");
+		StaticString<LUMIX_MAX_PATH> albedo_path(info.m_dir, "albedo_detail.ltc");
+		StaticString<LUMIX_MAX_PATH> normal_path(info.m_dir, "normal_detail.ltc");
+		StaticString<LUMIX_MAX_PATH> splatmap_path(info.m_dir, "splatmap.tga");
+		StaticString<LUMIX_MAX_PATH> splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
 		os::OutputFile file;
 		if (!file.open(hm_path))
 		{
@@ -3743,7 +3762,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu("Terrain")) return;
-		char buf[MAX_PATH_LENGTH];
+		char buf[LUMIX_MAX_PATH];
 		AssetBrowser& asset_browser = app.getAssetBrowser();
 		bool new_created = false;
 		if (ImGui::BeginMenu("New"))
@@ -3752,7 +3771,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			ImGui::InputInt("Size", &size);
 			if (ImGui::Button("Create"))
 			{
-				char save_filename[MAX_PATH_LENGTH];
+				char save_filename[LUMIX_MAX_PATH];
 				if (os::getSaveFilename(Span(save_filename), "Material\0*.mat\0", "mat")) {
 					if (fs.makeRelative(Span(buf), save_filename)) {
 						new_created = createHeightmap(buf, size);

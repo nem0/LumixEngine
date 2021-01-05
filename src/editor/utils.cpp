@@ -187,7 +187,7 @@ void getEntityListDisplayName(StudioApp& app, WorldEditor& editor, Span<char> bu
 				return;
 			}
 
-			char basename[MAX_PATH_LENGTH];
+			char basename[LUMIX_MAX_PATH];
 			copyString(buf, path.c_str());
 			Path::getBasename(Span(basename), path.c_str());
 			if (name && name[0] != '\0')

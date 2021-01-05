@@ -105,8 +105,8 @@ private:
 	Path m_albedo_composite_path;
 
 	struct {
-		char albedo[MAX_PATH_LENGTH] = "";
-		char normal[MAX_PATH_LENGTH] = "";
+		char albedo[LUMIX_MAX_PATH] = "";
+		char normal[LUMIX_MAX_PATH] = "";
 	} m_add_layer_popup;
 };
 

@@ -70,7 +70,7 @@ struct FBXImporter
 	{
 		const ofbx::AnimationStack* fbx = nullptr;
 		const ofbx::IScene* scene = nullptr;
-		StaticString<MAX_PATH_LENGTH> name;
+		StaticString<LUMIX_MAX_PATH> name;
 		bool import = true;
 	};
 
@@ -88,8 +88,8 @@ struct FBXImporter
 		bool import = true;
 		bool to_dds = true;
 		bool is_valid = false;
-		StaticString<MAX_PATH_LENGTH> path;
-		StaticString<MAX_PATH_LENGTH> src;
+		StaticString<LUMIX_MAX_PATH> path;
+		StaticString<LUMIX_MAX_PATH> src;
 	};
 
 	struct ImportMaterial

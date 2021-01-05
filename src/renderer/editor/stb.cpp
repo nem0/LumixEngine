@@ -1,4 +1,4 @@
-// stb_image is already implemented in cmft and nvtt
+// stb_image is already implemented in nvtt
 //#define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION

@@ -6,7 +6,7 @@ namespace Lumix {
 
 struct OutputMemoryStream;
 
-namespace Profiler {
+namespace profiler {
 // writing API
 
 LUMIX_ENGINE_API void pause(bool paused);
@@ -130,9 +130,9 @@ struct EventHeader
 #define LUMIX_CONCAT2(a, b) a ## b
 #define LUMIX_CONCAT(a, b) LUMIX_CONCAT2(a, b)
 
-#define PROFILE_FUNCTION() Profiler::Scope profile_scope(__FUNCTION__);
-#define PROFILE_BLOCK(name) Profiler::Scope LUMIX_CONCAT(profile_scope, __LINE__)(name);
+#define PROFILE_FUNCTION() profiler::Scope profile_scope(__FUNCTION__);
+#define PROFILE_BLOCK(name) profiler::Scope LUMIX_CONCAT(profile_scope, __LINE__)(name);
 
 
-} // namespace Profiler
+} // namespace profiler
 } // namespace Lumix

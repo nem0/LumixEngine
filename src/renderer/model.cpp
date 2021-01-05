@@ -5,7 +5,6 @@
 #include "engine/crt.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
-#include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
@@ -357,8 +356,8 @@ bool Model::parseBones(InputMemoryStream& file)
 		Model::Bone& b = m_bones.emplace(m_allocator);
 		int len;
 		file.read(len);
-		char tmp[MAX_PATH_LENGTH];
-		if (len >= MAX_PATH_LENGTH) {
+		char tmp[LUMIX_MAX_PATH];
+		if (len >= LUMIX_MAX_PATH) {
 			return false;
 		}
 		file.read(tmp, len);
@@ -439,7 +438,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	file.read(object_count);
 	if (object_count <= 0) return false;
 
-	char model_dir[MAX_PATH_LENGTH];
+	char model_dir[LUMIX_MAX_PATH];
 	Path::getDir(Span(model_dir), getPath().c_str());
 
 	m_meshes.reserve(object_count);
@@ -452,7 +451,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		if (!parseVertexDecl(file, &vertex_decl, semantics, Ref(vb_stride))) return false;
 
 		u32 mat_path_length;
-		char mat_path[MAX_PATH_LENGTH + 128];
+		char mat_path[LUMIX_MAX_PATH + 128];
 		file.read(mat_path_length);
 		if (mat_path_length + 1 > lengthOf(mat_path)) return false;
 		file.read(mat_path, mat_path_length);
@@ -462,7 +461,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	
 		i32 str_size;
 		file.read(str_size);
-		char mesh_name[MAX_PATH_LENGTH];
+		char mesh_name[LUMIX_MAX_PATH];
 		mesh_name[str_size] = 0;
 		file.read(mesh_name, str_size);
 

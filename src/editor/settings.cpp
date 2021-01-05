@@ -12,7 +12,6 @@
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "utils.h"
-#include <lua.hpp>
 
 
 namespace Lumix

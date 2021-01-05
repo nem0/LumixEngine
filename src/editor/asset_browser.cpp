@@ -51,7 +51,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 
 	const char* base_path = app.getEngine().getFileSystem().getBasePath();
 
-	StaticString<MAX_PATH_LENGTH> path(base_path, ".lumix");
+	StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix");
 	bool success = os::makePath(path);
 	path << "/asset_tiles";
 	success = os::makePath(path) || success;
@@ -198,7 +198,7 @@ void AssetBrowser::changeDir(const char* path)
 		if (!m_show_subresources && contains(res.path.c_str(), ':')) continue;
 
 		FileInfo tile;
-		char filename[MAX_PATH_LENGTH];
+		char filename[LUMIX_MAX_PATH];
 		Span<const char> subres = getSubresource(res.path.c_str());
 		if (*subres.end()) {
 			copyNString(Span(filename), subres.begin(), subres.length());
@@ -231,7 +231,7 @@ void AssetBrowser::changeDir(const char* path)
 void AssetBrowser::breadcrumbs()
 {
 	const char* c = m_dir.data;
-	char tmp[MAX_PATH_LENGTH];
+	char tmp[LUMIX_MAX_PATH];
 	while (*c)
 	{
 		char* c_out = tmp;
@@ -245,7 +245,7 @@ void AssetBrowser::breadcrumbs()
 		if (*c == '/') ++c;
 		if (ImGui::Button(tmp))
 		{
-			char new_dir[MAX_PATH_LENGTH];
+			char new_dir[LUMIX_MAX_PATH];
 			copyNString(Span(new_dir), m_dir, int(c - m_dir.data));
 			changeDir(new_dir);
 		}
@@ -265,7 +265,7 @@ void AssetBrowser::dirColumn()
 	bool b = false;
 	if (ImGui::Selectable("..", &b))
 	{
-		char dir[MAX_PATH_LENGTH];
+		char dir[LUMIX_MAX_PATH];
 		Path::getDir(Span(dir), m_dir);
 		changeDir(dir);
 	}
@@ -274,7 +274,7 @@ void AssetBrowser::dirColumn()
 	{
 		if (ImGui::Selectable(subdir, &b))
 		{
-			StaticString<MAX_PATH_LENGTH> new_dir(m_dir, "/", subdir);
+			StaticString<LUMIX_MAX_PATH> new_dir(m_dir, "/", subdir);
 			changeDir(new_dir);
 		}
 	}
@@ -342,7 +342,7 @@ void AssetBrowser::thumbnail(FileInfo& tile, float size)
 	else
 	{
 		ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
-		StaticString<MAX_PATH_LENGTH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
+		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (fs.fileExists(path))
 		{
@@ -371,7 +371,7 @@ void AssetBrowser::thumbnail(FileInfo& tile, float size)
 void AssetBrowser::deleteTile(u32 idx) {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	m_app.getAssetCompiler().removeResource(Path(m_file_infos[idx].filepath));
-	StaticString<MAX_PATH_LENGTH> res_path(".lumix/assets/", m_file_infos[idx].file_path_hash, ".res");
+	StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", m_file_infos[idx].file_path_hash, ".res");
 	fs.deleteFile(res_path);
 	if (!fs.deleteFile(m_file_infos[idx].filepath)) {
 		logError("Failed to delete ", m_file_infos[idx].filepath);
@@ -440,18 +440,18 @@ void AssetBrowser::fileColumn()
 
 	bool open_delete_popup = false;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	static char tmp[MAX_PATH_LENGTH] = "";
+	static char tmp[LUMIX_MAX_PATH] = "";
 	auto common_popup = [&](){
 		const char* base_path = fs.getBasePath();
 		if (ImGui::MenuItem("View in explorer")) {
-			StaticString<MAX_PATH_LENGTH> dir_full_path(base_path, "/", m_dir);
+			StaticString<LUMIX_MAX_PATH> dir_full_path(base_path, "/", m_dir);
 			os::openExplorer(dir_full_path);
 		}
 		if (ImGui::BeginMenu("Create directory")) {
 			ImGui::InputTextWithHint("##dirname", "New directory name", tmp, sizeof(tmp));
 			ImGui::SameLine();
 			if (ImGui::Button("Create")) {
-				StaticString<MAX_PATH_LENGTH> path(base_path, "/", m_dir, "/", tmp);
+				StaticString<LUMIX_MAX_PATH> path(base_path, "/", m_dir, "/", tmp);
 				if (!os::makePath(path)) {
 					logError("Failed to create ", path);
 				}
@@ -466,8 +466,8 @@ void AssetBrowser::fileColumn()
 				ImGui::InputTextWithHint("", "Name", tmp, sizeof(tmp));
 				ImGui::SameLine();
 				if (ImGui::Button("Create")) {
-					StaticString<MAX_PATH_LENGTH> rel_path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
-					StaticString<MAX_PATH_LENGTH> full_path(base_path, rel_path);
+					StaticString<LUMIX_MAX_PATH> rel_path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
+					StaticString<LUMIX_MAX_PATH> full_path(base_path, rel_path);
 					plugin->createResource(full_path);
 					changeDir(m_dir);
 					m_wanted_resource = rel_path;
@@ -501,7 +501,7 @@ void AssetBrowser::fileColumn()
 			ImGui::InputTextWithHint("##New name", "New name", tmp, sizeof(tmp));
 			if (ImGui::Button("Rename", ImVec2(100, 0))) {
 				PathInfo fi(m_file_infos[m_context_resource].filepath);
-				StaticString<MAX_PATH_LENGTH> new_path(fi.m_dir, tmp, ".", fi.m_extension);
+				StaticString<LUMIX_MAX_PATH> new_path(fi.m_dir, tmp, ".", fi.m_extension);
 				if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
 					logError("Failed to rename ", m_file_infos[m_context_resource].filepath, " to ", new_path);
 				}
@@ -561,7 +561,7 @@ void AssetBrowser::fileColumn()
 		ImGuiEx::Label("Name");
 		ImGui::InputText("##name", m_prefab_name, sizeof(m_prefab_name));
 		if (ImGui::Button(ICON_FA_SAVE "Save")) {
-			StaticString<MAX_PATH_LENGTH> path(m_dir, "/", m_prefab_name, ".fab");
+			StaticString<LUMIX_MAX_PATH> path(m_dir, "/", m_prefab_name, ".fab");
 			m_app.getWorldEditor().getPrefabSystem().savePrefab((EntityRef)m_dropped_entity, Path(path));
 			m_dropped_entity = INVALID_ENTITY;
 			changeDir(m_dir);
@@ -668,7 +668,7 @@ void AssetBrowser::detailsGUI()
 void AssetBrowser::refreshLabels()
 {
 	for(FileInfo& tile : m_file_infos) {
-		char filename[MAX_PATH_LENGTH];
+		char filename[LUMIX_MAX_PATH];
 		Span<const char> subres = getSubresource(tile.filepath.data);
 		if (*subres.end()) {
 			copyNString(Span(filename), subres.begin(), subres.length());
@@ -806,7 +806,7 @@ void AssetBrowser::addPlugin(IPlugin& plugin)
 static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 {
 	PathInfo fi(src);
-	StaticString<MAX_PATH_LENGTH> dst_dir(dest, "/", fi.m_basename);
+	StaticString<LUMIX_MAX_PATH> dst_dir(dest, "/", fi.m_basename);
 	if (!os::makePath(dst_dir)) logError("Could not create ", dst_dir);
 	os::FileIterator* iter = os::createFileIterator(src, allocator);
 
@@ -814,14 +814,14 @@ static void copyDir(const char* src, const char* dest, IAllocator& allocator)
 	while(os::getNextFile(iter, &cfi)) {
 		if (cfi.is_directory) {
 			if (cfi.filename[0] != '.') {
-				StaticString<MAX_PATH_LENGTH> tmp_src(src, "/", cfi.filename);
-				StaticString<MAX_PATH_LENGTH> tmp_dst(dest, "/", fi.m_basename);
+				StaticString<LUMIX_MAX_PATH> tmp_src(src, "/", cfi.filename);
+				StaticString<LUMIX_MAX_PATH> tmp_dst(dest, "/", fi.m_basename);
 				copyDir(tmp_src, tmp_dst, allocator);
 			}
 		}
 		else {
-			StaticString<MAX_PATH_LENGTH> tmp_src(src, "/", cfi.filename);
-			StaticString<MAX_PATH_LENGTH> tmp_dst(dest, "/", fi.m_basename, "/", cfi.filename);
+			StaticString<LUMIX_MAX_PATH> tmp_src(src, "/", cfi.filename);
+			StaticString<LUMIX_MAX_PATH> tmp_dst(dest, "/", fi.m_basename, "/", cfi.filename);
 			if(!os::copyFile(tmp_src, tmp_dst)) {
 				logError("Failed to copy ", tmp_src, " to ", tmp_dst);
 			}
@@ -834,12 +834,12 @@ bool AssetBrowser::onDropFile(const char* path)
 {
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	if (os::dirExists(path)) {
-		StaticString<MAX_PATH_LENGTH> tmp(fs.getBasePath(), "/", m_dir, "/");
+		StaticString<LUMIX_MAX_PATH> tmp(fs.getBasePath(), "/", m_dir, "/");
 		IAllocator& allocator = m_app.getAllocator();
 		copyDir(path, tmp, allocator);
 	}
 	PathInfo fi(path);
-	StaticString<MAX_PATH_LENGTH> dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
+	StaticString<LUMIX_MAX_PATH> dest(fs.getBasePath(), "/", m_dir, "/", fi.m_basename, ".", fi.m_extension);
 	return os::copyFile(path, dest);
 }
 
@@ -853,8 +853,8 @@ void AssetBrowser::selectResource(const Path& path, bool record_history, bool ad
 	if (res) selectResource(res, record_history, additive);
 }
 
-static StaticString<MAX_PATH_LENGTH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
-	StaticString<MAX_PATH_LENGTH> res("");
+static StaticString<LUMIX_MAX_PATH> getImGuiLabelID(const ResourceLocator& rl, bool hash_id) {
+	StaticString<LUMIX_MAX_PATH> res("");
 	if (rl.full.length() > 0) {
 		res << rl.subresource << (rl.subresource.length() > 0 ? ":" : "") << rl.basename << "." << rl.ext;
 	}
@@ -951,7 +951,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	// use temporary because otherwise the resource is reloaded during saving
-	StaticString<MAX_PATH_LENGTH> tmp_path(resource.getPath().c_str(), ".tmp");
+	StaticString<LUMIX_MAX_PATH> tmp_path(resource.getPath().c_str(), ".tmp");
 	os::OutputFile f;
 	if (!fs.open(tmp_path, Ref(f)))
 	{
@@ -969,8 +969,8 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	LUMIX_DELETE(m_app.getAllocator(), &stream);
 
 	auto& engine = m_app.getEngine();
-	StaticString<MAX_PATH_LENGTH> src_full_path;
-	StaticString<MAX_PATH_LENGTH> dest_full_path;
+	StaticString<LUMIX_MAX_PATH> src_full_path;
+	StaticString<LUMIX_MAX_PATH> dest_full_path;
 	src_full_path.data[0] = 0;
 	dest_full_path.data[0] = 0;
 	src_full_path << engine.getFileSystem().getBasePath() << tmp_path;
@@ -993,7 +993,7 @@ void AssetBrowser::tile(const Path& path, bool selected) {
 		fi.file_path_hash = path.getHash();
 		fi.filepath = path.c_str();
 
-		char filename[MAX_PATH_LENGTH];
+		char filename[LUMIX_MAX_PATH];
 		Span<const char> subres = getSubresource(path.c_str());
 		if (*subres.end()) {
 			copyNString(Span(filename), subres.begin(), subres.length());
@@ -1026,7 +1026,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	IPlugin* plugin = iter.value();
 	if (can_create_new && plugin->canCreateResource() && ImGui::Selectable("New")) {
-		char full_path[MAX_PATH_LENGTH];
+		char full_path[LUMIX_MAX_PATH];
 		if (os::getSaveFilename(Span(full_path), plugin->getFileDialogFilter(), plugin->getFileDialogExtensions())) {
 			if (fs.makeRelative(buf, full_path)) {
 				if (plugin->createResource(full_path)) {
@@ -1061,7 +1061,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 		if(selected) selected_path = res.path;
 		const Span span(res.path.c_str(), res.path.length());
 		const ResourceLocator rl(span);
-		StaticString<MAX_PATH_LENGTH> label = getImGuiLabelID(rl, true);
+		StaticString<LUMIX_MAX_PATH> label = getImGuiLabelID(rl, true);
 		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
 			selected_path_hash = res.path.getHash();
 			
@@ -1092,7 +1092,7 @@ void AssetBrowser::openInExternalEditor(Resource* resource) const
 
 void AssetBrowser::openInExternalEditor(const char* path) const
 {
-	StaticString<MAX_PATH_LENGTH> full_path(m_app.getEngine().getFileSystem().getBasePath());
+	StaticString<LUMIX_MAX_PATH> full_path(m_app.getEngine().getFileSystem().getBasePath());
 	full_path << path;
 	const os::ExecuteOpenResult res = os::shellExecuteOpen(full_path);
 	if (res == os::ExecuteOpenResult::NO_ASSOCIATION) {

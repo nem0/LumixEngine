@@ -71,8 +71,8 @@ public:
 private:
 	struct FileInfo
 	{
-		StaticString<MAX_PATH_LENGTH> clamped_filename;
-		StaticString<MAX_PATH_LENGTH> filepath;
+		StaticString<LUMIX_MAX_PATH> clamped_filename;
+		StaticString<LUMIX_MAX_PATH> filepath;
 		u32 file_path_hash;
 		void* tex = nullptr;
 		bool create_called = false;
@@ -103,15 +103,15 @@ private:
 
 private:
 	StudioApp& m_app;
-	StaticString<MAX_PATH_LENGTH> m_dir;
+	StaticString<LUMIX_MAX_PATH> m_dir;
 	bool m_dirty = false;
-	Array<StaticString<MAX_PATH_LENGTH> > m_subdirs;
+	Array<StaticString<LUMIX_MAX_PATH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;
 	Array<int> m_filtered_file_infos;
 	Array<Path> m_history;
 	EntityPtr m_dropped_entity = INVALID_ENTITY;
-	char m_prefab_name[MAX_PATH_LENGTH] = "";
+	char m_prefab_name[LUMIX_MAX_PATH] = "";
 	int m_history_index;
 	HashMap<ResourceType, IPlugin*> m_plugins;
 	Array<Resource*> m_selected_resources;

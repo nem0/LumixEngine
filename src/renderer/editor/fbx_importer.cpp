@@ -17,7 +17,6 @@
 #include "engine/profiler.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
-#include "engine/serializer.h"
 #include "meshoptimizer/meshoptimizer.h"
 #include "mikktspace.h"
 #include "physics/physics_geometry.h"
@@ -29,12 +28,7 @@
 #include "renderer/shader.h"
 
 
-namespace Lumix
-{
-
-
-using PathBuilder = StaticString<MAX_PATH_LENGTH>;
-
+namespace Lumix {
 
 
 static bool hasTangents(const ofbx::Geometry& geom) {
@@ -128,10 +122,10 @@ static void extractEmbedded(const ofbx::IScene& scene, const char* src_dir)
 		const ofbx::DataView embedded = scene.getEmbeddedData(i);
 
 		ofbx::DataView filename = scene.getEmbeddedFilename(i);
-		char path[MAX_PATH_LENGTH];
+		char path[LUMIX_MAX_PATH];
 		filename.toString(path);
 		const PathInfo pi(path);
-		const StaticString<MAX_PATH_LENGTH> fullpath(src_dir, pi.m_basename, ".", pi.m_extension);
+		const StaticString<LUMIX_MAX_PATH> fullpath(src_dir, pi.m_basename, ".", pi.m_extension);
 
 		if (os::fileExists(fullpath)) return;
 
@@ -200,7 +194,7 @@ void FBXImporter::gatherMaterials(const char* fbx_filename, const char* src_dir)
 				}
 			}
 
-			char tmp[MAX_PATH_LENGTH];
+			char tmp[LUMIX_MAX_PATH];
 			Path::normalize(tex.src, Span(tmp));
 			tex.src = tmp;
 
@@ -313,7 +307,7 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 			}
 			if (anim.name.empty() && take_info->filename.begin != take_info->filename.end)
 			{
-				char tmp[MAX_PATH_LENGTH];
+				char tmp[LUMIX_MAX_PATH];
 				take_info->filename.toString(tmp);
 				Path::getBasename(Span(anim.name.data), tmp);
 			}
@@ -585,7 +579,7 @@ const FBXImporter::ImportGeometry& FBXImporter::getImportGeometry(const ofbx::Ge
 
 void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 {
-	JobSystem::forEach(m_geometries.size(), 1, [&](i32 geom_idx, i32){
+	jobs::forEach(m_geometries.size(), 1, [&](i32 geom_idx, i32){
 		ImportGeometry& import_geom = m_geometries[geom_idx];
 		const ofbx::Geometry* geom = import_geom.fbx;
 		const int vertex_count = geom->getVertexCount();
@@ -616,7 +610,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		import_geom.unique_vertex_count = (u32)meshopt_generateVertexRemapMulti(import_geom.indices.begin(), nullptr, vertex_count, vertex_count, streams, stream_count);
 	});
 	
-	JobSystem::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
+	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
 		ImportMesh& import_mesh = m_meshes[mesh_idx];
 		import_mesh.vertex_data.clear();
 		import_mesh.indices.clear();
@@ -815,7 +809,7 @@ FBXImporter::FBXImporter(StudioApp& app)
 
 
 static void ofbx_job_processor(ofbx::JobFunction fn, void*, void* data, u32 size, u32 count) {
-	JobSystem::forEach(count, 1, [data, size, fn](i32 i, i32){
+	jobs::forEach(count, 1, [data, size, fn](i32 i, i32){
 		u8* ptr = (u8*)data;
 		fn(ptr + i * size);
 	});
@@ -860,7 +854,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 		case ofbx::UpVector_AxisZ: m_orientation = Orientation::Z_UP; break;
 	}
 
-	char src_dir[MAX_PATH_LENGTH];
+	char src_dir[LUMIX_MAX_PATH];
 	Path::getDir(Span(src_dir), filename);
 	if (!ignore_geometry) extractEmbedded(*scene, src_dir);
 	gatherGeometries(scene);
@@ -1115,7 +1109,7 @@ bool FBXImporter::createImpostorTextures(Model* model, Ref<Array<u32>> gb0_rgba,
 	renderer->waitForRender();
 
 	const PathInfo src_info(model->getPath().c_str());
-	const StaticString<MAX_PATH_LENGTH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
+	const StaticString<LUMIX_MAX_PATH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
 	os::OutputFile f;
 	if (!m_filesystem.open(mat_src, Ref(f))) {
 		logError("Failed to create ", mat_src);
@@ -1151,7 +1145,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 		char mat_name[128];
 		getMaterialName(material.fbx, mat_name);
 
-		const StaticString<MAX_PATH_LENGTH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
+		const StaticString<LUMIX_MAX_PATH + 128> mat_src(src_info.m_dir, mat_name, ".mat");
 		if (m_filesystem.fileExists(mat_src)) continue;
 
 		os::OutputFile f;
@@ -1168,7 +1162,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 
 		auto writeTexture = [this](const ImportTexture& texture, u32 idx) {
 			if (texture.is_valid && idx < 2) {
-				const StaticString<MAX_PATH_LENGTH> meta_path(texture.src, ".meta");
+				const StaticString<LUMIX_MAX_PATH> meta_path(texture.src, ".meta");
 				if (!m_filesystem.fileExists(meta_path)) {
 					os::OutputFile file;
 					if (m_filesystem.open(meta_path, Ref(file))) {
@@ -1209,7 +1203,7 @@ void FBXImporter::writeMaterials(const char* src, const ImportConfig& cfg)
 	}
 
 	if (cfg.create_impostor) {
-		const StaticString<MAX_PATH_LENGTH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
+		const StaticString<LUMIX_MAX_PATH> mat_src(src_info.m_dir, src_info.m_basename, "_impostor.mat");
 		if (!m_filesystem.fileExists(mat_src)) {
 			os::OutputFile f;
 			if (!m_filesystem.open(mat_src, Ref(f))) {
@@ -1634,7 +1628,7 @@ void FBXImporter::writeAnimations(const char* src, const ImportConfig& cfg)
 
 		memcpy(out_file.getMutableData() + stream_rotations_count_pos, &rotation_curves_count, sizeof(rotation_curves_count));
 
-		const StaticString<MAX_PATH_LENGTH> anim_path(anim.name, ".ani:", src);
+		const StaticString<LUMIX_MAX_PATH> anim_path(anim.name, ".ani:", src);
 		m_compiler.writeCompiledResource(anim_path, Span(out_file.data(), (i32)out_file.size()));
 	}
 }
@@ -1907,7 +1901,7 @@ void FBXImporter::writeImpostorMesh(const char* dir, const char* model_name)
 	write(gpu::AttributeType::FLOAT);
 	write((u8)2);
 
-	const StaticString<MAX_PATH_LENGTH + 10> material_name(dir, model_name, "_impostor.mat");
+	const StaticString<LUMIX_MAX_PATH + 10> material_name(dir, model_name, "_impostor.mat");
 	i32 length = stringLength(material_name);
 	write(length);
 	write(material_name, length);
@@ -1978,7 +1972,7 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 		const ofbx::Material* material = import_mesh.fbx_mat;
 		char mat[128];
 		getMaterialName(material, mat);
-		StaticString<MAX_PATH_LENGTH + 128> mat_id(src_info.m_dir, mat, ".mat");
+		StaticString<LUMIX_MAX_PATH + 128> mat_id(src_info.m_dir, mat, ".mat");
 		const i32 len = stringLength(mat_id.data);
 		write(len);
 		write(mat_id.data, len);
@@ -2162,7 +2156,7 @@ void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 
 	if (!to_convex) writePhysicsTriMesh(out_file, cfg);
 
-	const StaticString<MAX_PATH_LENGTH> phy_path(".phy:", src);
+	const StaticString<LUMIX_MAX_PATH> phy_path(".phy:", src);
 	m_compiler.writeCompiledResource(phy_path, Span(out_file.data(), (i32)out_file.size()));
 }
 
@@ -2175,7 +2169,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 
 	os::OutputFile file;
 	PathInfo file_info(src);
-	StaticString<MAX_PATH_LENGTH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
+	StaticString<LUMIX_MAX_PATH> tmp(file_info.m_dir, "/", file_info.m_basename, ".fab");
 	if (!m_filesystem.open(tmp, Ref(file))) {
 		logError("Could not create ", tmp);
 		return;
@@ -2192,7 +2186,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 		universe.setParent(root, e);
 		char mesh_name[256];
 		getImportMeshName(m_meshes[i], mesh_name);
-		StaticString<MAX_PATH_LENGTH> mesh_path(mesh_name, ".fbx:", src);
+		StaticString<LUMIX_MAX_PATH> mesh_path(mesh_name, ".fbx:", src);
 		RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
 		scene->setModelInstancePath(e, Path(mesh_path));
 	}
@@ -2237,7 +2231,7 @@ void FBXImporter::writeSubmodels(const char* src, const ImportConfig& cfg)
 		write(to_mesh);
 		write(factor);
 
-		StaticString<MAX_PATH_LENGTH> resource_locator(name, ".fbx:", src);
+		StaticString<LUMIX_MAX_PATH> resource_locator(name, ".fbx:", src);
 
 		m_compiler.writeCompiledResource(resource_locator, Span(out_file.data(), (i32)out_file.size()));
 	}
