@@ -49,7 +49,7 @@ fragment_shader [[
         float falloff = 1.0/(1.0 + distSqr);
         float angle = dot(n, diff) * invLength;
 
-        return clamp(angle * falloff, 0, 1);
+        return saturate(angle * falloff);
     }
 
 
@@ -77,7 +77,7 @@ fragment_shader [[
         ao /= samples;
         ao = pow(1.0-saturate(ao), u_intensity);
 
-        o_color.rgb = vec3(ao);
+        o_color.rgb = vec3(mix(ao, 1, saturate(-p.z * 0.02)));
 		o_color.w = 1;
 	}
 ]]
