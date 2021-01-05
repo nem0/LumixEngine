@@ -77,7 +77,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 
 	env.setRenderTargets(ssao_rb)
 	env.viewport(0, 0, w, h)
-	env.drawcallUniforms(radius, intensity)
+	env.drawcallUniforms(radius, intensity, 0, 0, w, h, 4, 4)
 	local state = {
 		depth_write = false,
 		depth_test = false
@@ -97,7 +97,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.setRenderTargets(hdr_buffer)
 	env.drawArray(0, 3, env.ssao_blit_shader
 		, { blur_rb }
-		, { depth_test = false, depth_write = false, blending = "multiply" });
+		, { depth_test = false, depth_write = false, blending = "multiply" })
 	
 	env.endBlock()
 

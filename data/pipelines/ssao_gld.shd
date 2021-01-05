@@ -19,13 +19,15 @@ fragment_shader [[
 	layout(std140, binding = 4) uniform Drawcall {
 		float u_radius;
 		float u_intensity;
+        vec4 u_res;
 	};
     
     const int samples = 4;
-    const vec2 kernel[4] = vec2[]
-    (
-        vec2(1, 0), vec2(-1, 0),
-        vec2(0, 1), vec2(0, -1)
+    const vec2 kernel[4] = vec2[](
+      vec2(-1, 0 ),
+      vec2( 0,-1 ),
+      vec2( 1, 0 ),
+      vec2( 0, 1 )
     );
 
 	vec3 getViewNormal(vec2 tex_coord)
@@ -47,7 +49,7 @@ fragment_shader [[
         float falloff = 1.0/(1.0 + distSqr);
         float angle = dot(n, diff) * invLength;
 
-        return max(angle, 0.0)*falloff;
+        return clamp(angle * falloff, 0, 1);
     }
 
 
@@ -56,7 +58,7 @@ fragment_shader [[
 	{
 		vec3 p = getViewPosition(u_depth_buffer, Global.inv_projection, v_uv);
 		vec3 n = getViewNormal(v_uv);
-        vec2 r = texture(u_noise, Global.framebuffer_size * v_uv / textureSize(u_noise, 0)).xy*2.0 - 1.0;
+        vec2 r = texture(u_noise, u_res.xy * v_uv / u_res.zw).xy*2.0 - 1.0;
 
         float rad = saturate(u_radius/-p.z);
         float ao = 0.0;
@@ -64,9 +66,11 @@ fragment_shader [[
         for (lowp int i=0; i<samples; i++)
         {
             vec2 coord1 = reflect(kernel[i], r)*rad;
-            ao += GetAO(v_uv + coord1*0.33, p, n)*0.34;
-            ao += GetAO(v_uv + coord1*0.66, p, n)*0.33;
-            ao += GetAO(v_uv + coord1, p, n)*0.33;
+            ao += GetAO(v_uv + coord1, p, n);
+            // too slow to use.
+            //ao += GetAO(v_uv + coord1*0.33, p, n)*0.34;
+            //ao += GetAO(v_uv + coord1*0.66, p, n)*0.33;
+            //ao += GetAO(v_uv + coord1, p, n)*0.33;
             
         }
 

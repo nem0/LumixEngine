@@ -45,7 +45,7 @@ fragment_shader [[
             const float BlurSigma = bRad * 0.5;
             const float BlurFalloff = 1.0 / (2.0*BlurSigma*BlurSigma);
 
-            float dWeight = max(0.001, 0.1 - abs(depth - d) * 30.0);
+            float dWeight = max(0.001, 0.5 - abs(depth - d) * 30.0);
             float weight = exp2(-i*i*BlurFalloff) * (dWeight * dWeight);
 
             totalW += weight;
