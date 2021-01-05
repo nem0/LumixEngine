@@ -58,15 +58,15 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
 	if noise == -1 then return hdr_buffer end
-	env.beginBlock("ssao")
-	if env.ssao_shader == nil then
-		env.ssao_shader = env.preloadShader("pipelines/ssao_gld.shd")
+	env.beginBlock("ssao_gld")
+	if env.ssao_gld_shader == nil then
+		env.ssao_gld_shader = env.preloadShader("pipelines/ssao_gld.shd")
 	end
-	if env.ssao_blur_shader == nil then
-		env.ssao_blur_shader = env.preloadShader("pipelines/ssao_upscale.shd")
+	if env.ssao_gld_blur_shader == nil then
+		env.ssao_gld_blur_shader = env.preloadShader("pipelines/ssao_upscale.shd")
 	end
-	if env.ssao_blit_shader == nil then
-		env.ssao_blit_shader = env.preloadShader("pipelines/ssao_blit.shd")
+	if env.ssao_gld_blit_shader == nil then
+		env.ssao_gld_blit_shader = env.preloadShader("pipelines/ssao_blit.shd")
 	end
 	local w = env.viewport_w * 0.5
 	local h = env.viewport_h * 0.5
@@ -85,17 +85,17 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 
 	env.drawArray(0
 		, 3
-		, env.ssao_shader
+		, env.ssao_gld_shader
 		, { gbuffer_depth, gbuffer1, noise}
 		, state
 	)
 	env.endBlock()
 
-	bilateralBlur(env, ssao_rb, blur_rb, gbuffer_depth, env.viewport_w, env.viewport_h, env.ssao_blur_shader)
+	bilateralBlur(env, ssao_rb, blur_rb, gbuffer_depth, env.viewport_w, env.viewport_h, env.ssao_gld_blur_shader)
 
 	-- TODO use for indirect light
 	env.setRenderTargets(hdr_buffer)
-	env.drawArray(0, 3, env.ssao_blit_shader
+	env.drawArray(0, 3, env.ssao_gld_blit_shader
 		, { blur_rb }
 		, { depth_test = false, depth_write = false, blending = "multiply" })
 	
@@ -110,9 +110,9 @@ end
 
 function awake()
 	_G["postprocesses"] = _G["postprocesses"] or {}
-	_G["postprocesses"]["ssao"] = postprocess
+	_G["postprocesses"]["ssao_gld"] = postprocess
 end
 
 function onDestroy()
-	_G["postprocesses"]["ssao"] = nil
+	_G["postprocesses"]["ssao_gld"] = nil
 end
