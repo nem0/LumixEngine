@@ -17,7 +17,7 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	end
 	local w = env.viewport_w * 0.5
 	local h = env.viewport_h * 0.5
-	local ssao_rb = env.createRenderbuffer(w, h, "r8", "ssao")
+	local ssao_rb = env.createRenderbuffer { width = w, height = h, format = "r8", debug_name = "ssao" }
 	env.setRenderTargets(ssao_rb)
 	local state = {
 		depth_write = false,

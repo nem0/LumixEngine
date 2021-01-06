@@ -105,10 +105,10 @@ end
 
 function geomPass(entities)
 	beginBlock("geom_pass")
-		local gbuffer0 = createRenderbuffer(viewport_w, viewport_h, "rgba8", "gbuffer0")
-		local gbuffer1 = createRenderbuffer(viewport_w, viewport_h, "rgba16", "gbuffer1")
-		local gbuffer2 = createRenderbuffer(viewport_w, viewport_h, "rgba8", "gbuffer2")
-		local dsbuffer = createRenderbuffer(viewport_w, viewport_h, "depth24stencil8", "gbuffer_ds")
+		local gbuffer0 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba8", debug_name = "gbuffer0" }
+		local gbuffer1 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "gbuffer1" }
+		local gbuffer2 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba8", debug_name = "gbuffer2" }
+		local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "gbuffer_ds" }
 	
 		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
 		if PREVIEW ~= nil then
@@ -138,12 +138,11 @@ function geomPass(entities)
 end
 
 function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
-	local hdr_rb = 0
+	local format = "rgba16f"
 	if PROBE ~= nil then
-		hdr_rb = createRenderbuffer(viewport_w, viewport_h, "rgba32f", "hdr")
-	else
-		hdr_rb = createRenderbuffer(viewport_w, viewport_h, "rgba16f", "hdr")
+		format = "rgba32f"
 	end
+	local hdr_rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = format, debug_name = "hdr" }
 	setRenderTargets(hdr_rb)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	
@@ -216,7 +215,7 @@ end
 
 function blur(buffer, format, w, h, tmp_rb_dbg_name) 
 	beginBlock("blur")
-	local blur_buf = createRenderbuffer(w, h, format, tmp_rb_dbg_name)
+	local blur_buf = createRenderbuffer { width = w, height = h, format = format, debug_name = tmp_rb_dbg_name }
 	setRenderTargets(blur_buf)
 	viewport(0, 0, w, h)
 	drawcallUniforms(1.0 / w, 1.0 / h, 0, 0)
@@ -236,13 +235,13 @@ end
 
 function shadowPass()
 	if not environmentCastShadows() then
-		local rb = createRenderbuffer(1, 1, "depth32", "shadowmap")
+		local rb = createRenderbuffer { width = 1, height = 1, format = "depth32", debug_name = "shadowmap" }
 		setRenderTargetsDS(rb)
 		clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 		return rb
 	else 
 		beginBlock("shadows")
-			local depthbuf = createRenderbuffer(4096, 1024, "depth32", "shadowmap_depth")
+			local depthbuf = createRenderbuffer { width = 4096, height = 1024, format = "depth32", debug_name = "shadowmap_depth" }
 			setRenderTargetsDS(depthbuf)
 			clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 			
@@ -284,12 +283,11 @@ function tonemap(hdr_buffer)
 	end
 
 	beginBlock("tonemap")
-	local rb
+	local format = "rgba16f"
 	if APP ~= nil or PREVIEW ~= nil or screenshot_request == 1 then
-		rb = createRenderbuffer(viewport_w, viewport_h, "rgba8", "tonemap")
-	else
-		rb = createRenderbuffer(viewport_w, viewport_h, "rgba16f", "tonemap")
+		format = "rgba8"
 	end
+	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = format, debug_name = "tonemap" }
 	setRenderTargets(rb)
 	drawArray(0, 3, tonemap_shader
 		, { hdr_buffer }
@@ -325,7 +323,7 @@ end
 
 
 function renderSelectionOutline(output)
-	local selection_mask = createRenderbuffer(viewport_w, viewport_h, "rgba8", "selection outline")
+local selection_mask = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba8", debug_name = "selection outline" }
 	setRenderTargets(selection_mask)
 	clear(CLEAR_COLOR, 0, 0, 0, 0, 0)
 	renderSelection()
@@ -340,7 +338,7 @@ end
 function main_shadowmap()
 	beginBlock("bake_shadow")
 
-	local depthbuf = createRenderbuffer(viewport_w, viewport_h, "depth32", "shadowmap_depth")
+	local depthbuf = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth32", debug_name = "shadowmap_depth" }
 	setRenderTargetsDS(depthbuf)
 	clear(CLEAR_ALL, 0, 0, 0, 1, 0)
 	local view_params = getCameraParams()
@@ -360,8 +358,8 @@ function render_preview()
 	local view_params = getCameraParams()
 	local entities = cull(view_params)
 	
-	local rb = createRenderbuffer(viewport_w, viewport_h, "rgba16f", "preview_rb")
-	local dsbuffer = createRenderbuffer(viewport_w, viewport_h, "depth32", "gbuffer_ds")
+	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16f", debug_name = "preview_rb" }
+	local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth32", debug_name = "gbuffer_ds" }
 	
 	setRenderTargetsDS(rb, dsbuffer)
 	clear(CLEAR_ALL, 0.9, 0.9, 0.9, 1, 0)
@@ -435,7 +433,7 @@ function main()
 	debugPass(res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local icon_ds = -1
 	if SCENE_VIEW ~= nil then
-		icon_ds = createRenderbuffer(viewport_w, viewport_h, "depth24stencil8", "icon_ds")
+		icon_ds = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "icon_ds" }
 		pass(getCameraParams())
 			setRenderTargetsDS(res, icon_ds)
 			clear(CLEAR_DEPTH, 0, 0, 0, 1, 0)

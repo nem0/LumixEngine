@@ -1602,23 +1602,29 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	PipelineTexture createPersistentRenderbuffer(u32 w, u32 h, const char* format_str, const char* debug_name) {
-		return createRenderbufferInternal(w, h, format_str, debug_name, true);
-	}
-	
-	PipelineTexture createRenderbuffer(u32 w, u32 h, const char* format_str, const char* debug_name) {
-		return createRenderbufferInternal(w, h, format_str, debug_name, false);
-	}
-	
-	PipelineTexture createRenderbufferInternal(u32 rb_w, u32 rb_h, const char* format_str, const char* debug_name, bool persistent) {
+	PipelineTexture createRenderbuffer(lua_State* L) {
 		PROFILE_FUNCTION();
 
-		const gpu::TextureFormat format = getFormat(format_str);
-
-		const gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET 
+		LuaWrapper::checkTableArg(L, 1);
+		u32 rb_w, rb_h;
+		char format_str[64];
+		char debug_name[64] = "";
+		bool persistent = false;
+		bool point_filter = false;
+		if (!LuaWrapper::checkField(L, 1, "width", &rb_w)) luaL_argerror(L, 1, "missing width");
+		if (!LuaWrapper::checkField(L, 1, "height", &rb_h)) luaL_argerror(L, 1, "missing height");
+		if (!LuaWrapper::checkStringField(L, 1, "format", Span(format_str))) luaL_argerror(L, 1, "missing format");
+		LuaWrapper::getOptionalStringField(L, 1, "debug_name", Span(debug_name));
+		LuaWrapper::getOptionalField(L, 1, "persistent", &persistent);
+		LuaWrapper::getOptionalField(L, 1, "point_filter", &point_filter);
+		gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET 
 			| gpu::TextureFlags::NO_MIPS
 			| gpu::TextureFlags::CLAMP_U
 			| gpu::TextureFlags::CLAMP_V;
+		if (point_filter) flags = flags | gpu::TextureFlags::POINT_FILTER;
+
+		const gpu::TextureFormat format = getFormat(format_str);
+
 		for (int i = 0, n = m_renderbuffers.size(); i < n; ++i)
 		{
 			Renderbuffer& rb = m_renderbuffers[i];
@@ -4182,11 +4188,10 @@ struct PipelineImpl final : Pipeline
 	};
 
 
-	void radixSort(u64* _keys, u64* _values, int size)
-	{
+	void radixSort(u64* _keys, u64* _values, int size) {
 		PROFILE_FUNCTION();
 		profiler::pushInt("count", size);
-		if(size == 0) return;
+		if (size == 0) return;
 
 		Array<u64> tmp_mem(m_allocator);
 
@@ -4237,8 +4242,7 @@ struct PipelineImpl final : Pipeline
 		}
 	}
 
-	void clear(u32 flags, float r, float g, float b, float a, float depth)
-	{
+	void clear(u32 flags, float r, float g, float b, float a, float depth) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
 			void execute() override {
@@ -4257,13 +4261,12 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	void viewport(int x, int y, int w, int h)
-	{
+	void viewport(int x, int y, int w, int h) {
 		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
-			void execute() override { 
+			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::viewport(x, y, w, h); 
+				gpu::viewport(x, y, w, h);
 			}
 			int x, y, w, h;
 		};
@@ -4277,13 +4280,10 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	void beginBlock(const char* name)
-	{
-		struct Cmd : Renderer::RenderJob
-		{
+	void beginBlock(const char* name) {
+		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
-			void execute() override 
-			{
+			void execute() override {
 				PROFILE_FUNCTION();
 				gpu::pushDebugGroup(name);
 				renderer->beginProfileBlock(name, link);
@@ -4301,13 +4301,10 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(cmd, m_profiler_link);
 	}
 
-	void endBlock()
-	{
-		struct Cmd : Renderer::RenderJob
-		{
+	void endBlock() {
+		struct Cmd : Renderer::RenderJob {
 			void setup() override {}
-			void execute() override
-			{
+			void execute() override {
 				PROFILE_FUNCTION();
 				renderer->endProfileBlock();
 				gpu::popDebugGroup();
@@ -4444,7 +4441,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(clear);
 		REGISTER_FUNCTION(createBucket);
 		REGISTER_FUNCTION(createBuffer);
-		REGISTER_FUNCTION(createPersistentRenderbuffer);
 		REGISTER_FUNCTION(createRenderbuffer);
 		REGISTER_FUNCTION(createTexture2D);
 		REGISTER_FUNCTION(createTexture3D);
