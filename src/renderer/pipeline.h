@@ -33,6 +33,16 @@ struct PassState
 	Vec4 camera_planes[6];
 };
 
+namespace UniformBuffer {
+	enum {
+		GLOBAL,
+		PASS,
+		MATERIAL,
+		SHADOW,
+		DRAWCALL
+	};
+}
+
 struct LUMIX_RENDERER_API PipelineResource : Resource
 {
 	static ResourceType TYPE;

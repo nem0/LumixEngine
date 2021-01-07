@@ -3002,7 +3002,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				const float roughness = float(mip) / (roughness_levels - 1);
 				for (u32 face = 0; face < 6; ++face) {
 					gpu::setFramebufferCube(dst, face, mip);
-					gpu::bindUniformBuffer(4, buf, 0, 256);
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, buf, 0, 256);
 					struct {
 						float roughness;
 						u32 face;
@@ -3465,7 +3465,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 					Vec4(0, -2.f / dd.h, 1 + (float)dd.y * 2.f / dd.h, 0)
 				};
 				gpu::update(ub, canvas_mtx, sizeof(canvas_mtx));
-				gpu::bindUniformBuffer(4, ub, 0, sizeof(canvas_mtx));
+				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub, 0, sizeof(canvas_mtx));
 				Vec4 cc = {1, 0, 1, 1};
 				const float clear_color[] = {0.2f, 0.2f, 0.2f, 1.f};
 				gpu::clear(gpu::ClearFlags::COLOR | gpu::ClearFlags::DEPTH, clear_color, 1.0);

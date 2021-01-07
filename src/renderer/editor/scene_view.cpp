@@ -915,7 +915,7 @@ void SceneView::renderSelection()
 					memcpy(dc.bones, item.pose.begin(), item.pose.byte_size());
 					const u32 size = item.pose.byte_size() + sizeof(Vec4);
 					gpu::update(drawcall_ub, &dc, size);
-					gpu::bindUniformBuffer(4, drawcall_ub, 0, size);
+					gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, drawcall_ub, 0, size);
 				}
 
 				gpu::bindTextures(item.material->textures, 0, item.material->textures_count);
