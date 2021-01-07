@@ -953,8 +953,8 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		gpu::createBuffer(ub, gpu::BufferFlags::UNIFORM_BUFFER, 512, nullptr);
 		const u32 pass_buf_size = (sizeof(PassState) + 255) & ~255;
 		gpu::createBuffer(pass_buf, gpu::BufferFlags::UNIFORM_BUFFER, pass_buf_size, nullptr);
-		gpu::bindUniformBuffer(1, pass_buf, 0, pass_buf_size);
-		gpu::bindUniformBuffer(4, ub, 0, 512);
+		gpu::bindUniformBuffer(UniformBuffer::PASS, pass_buf, 0, pass_buf_size);
+		gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, ub, 0, 512);
 
 		const Vec3 center = Vec3(0, (m_aabb.min + m_aabb.max).y * 0.5f, 0);
 		Vec2 min, max;
@@ -1000,7 +1000,7 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 					gpu::update(pass_buf, &pass_state, sizeof(pass_state));
 
 					gpu::useProgram(dc.program);
-					gpu::bindUniformBuffer(2, m_material_ub, dc.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, m_material_ub, dc.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 					gpu::bindIndexBuffer(rd->index_buffer_handle);
 					gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 					gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
