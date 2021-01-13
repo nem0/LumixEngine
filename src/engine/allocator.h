@@ -1,9 +1,6 @@
 #pragma once 
 
 
-#ifndef _WIN32
-	#include <new>
-#endif
 #include "engine/lumix.h"
 
 #define LUMIX_NEW(allocator, ...) new (Lumix::NewPlaceholder(), (allocator).allocate_aligned(sizeof(__VA_ARGS__), alignof(__VA_ARGS__))) __VA_ARGS__
