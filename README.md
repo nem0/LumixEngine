@@ -8,7 +8,7 @@
 
 HEAD of master is not stable, for stable version use [this](https://github.com/nem0/LumixEngine/tree/f77a0b6a899be4736f0ce26133bbe8061a3828f1)
 
-3D Game Engine
+3D Game Engine with Vulkan support.
 
 * [Getting started](https://github.com/nem0/LumixEngine/wiki/Getting-started) | [Video](https://www.youtube.com/watch?v=OjQKTA5ia2U)
 * [Features](https://github.com/nem0/LumixEngine/wiki/Features)
