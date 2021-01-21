@@ -2537,6 +2537,7 @@ void RenderScene::reflect() {
 		LUMIX_FUNC(RenderScene::getGlobalLODMultiplier),
 		LUMIX_FUNC(RenderScene::addDebugCross),
 		LUMIX_FUNC(RenderScene::addDebugLine),
+		LUMIX_FUNC(RenderScene::addDebugTriangle),
 		LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment",
 			icon(ICON_FA_BONE),
 			LUMIX_PROP(BoneAttachmentParent, "Parent"),
