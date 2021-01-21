@@ -102,11 +102,3 @@ jobs:
               cp lumixengine_linux_3rdparty_bin/nvtt/* ../external/nvtt/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/physx/* ../external/physx/lib/linux64_gmake/release
               cp lumixengine_linux_3rdparty_bin/recast/* ../external/recast/lib/linux64_gmake/release
-          - name: PVS-Studio static analysis
-            run: |
-              cd projects
-              ./genie --pvs-studio-build gmake
-              cd tmp/gmake
-              pvs-studio-analyzer trace -- make -j EXTRA_WARNINGS=1
-              pvs-studio-analyzer analyze -e ../../../src/renderer/editor/mikktspace.c -e ../../../src/renderer/editor/miniz.c -e ../../../src/engine/lz4.c -e ../../../external -l ../../../pvs-studio.lic -o pvs-studio.log
-              plog-converter -a 'GA:1,2;OP:1' -d V730,V1001,V530,V1048,V763 -t errorfile -w pvs-studio.log
