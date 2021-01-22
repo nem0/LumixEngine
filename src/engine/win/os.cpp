@@ -1,4 +1,5 @@
 #include "engine/allocator.h"
+#include "engine/allocators.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
@@ -24,10 +25,44 @@ extern "C" {
 namespace Lumix::os
 {
 
+struct EventQueue {
+	struct Rec {
+		Event e;
+		Rec* prev;
+		Rec* next = nullptr;
+	};
+
+	void pushBack(const Event& e) {
+		Rec* n = LUMIX_NEW(allocator, Rec);
+		n->prev = back;
+		if (back) back->next = n;
+		back = n;
+		if (!front) front = n;
+		n->e = e;
+	}
+
+	Event popFront() {
+		ASSERT(front);
+		Event e = front->e;
+		Rec* tmp = front;
+		front = tmp->next;
+		if (!front) back = nullptr;
+		LUMIX_DELETE(allocator, tmp);
+		return e;
+	}
+
+	bool empty() const { 
+		return !front;
+	}
+
+	Rec* front = nullptr;
+	Rec* back = nullptr;
+	DefaultAllocator allocator;
+};
 
 static struct
 {
-	Queue<Event, 64> event_queue;
+	EventQueue event_queue;
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	bool raw_input_registered = false;
@@ -281,8 +316,7 @@ static void UTF32ToUTF8(u32 utf32, char* utf8)
 
 bool getEvent(Ref<Event> event) {
 	if (!G.event_queue.empty()) {
-		event = G.event_queue.front();
-		G.event_queue.pop();
+		event = G.event_queue.popFront();
 		return true;
 	}
 
@@ -357,53 +391,53 @@ bool getEvent(Ref<Event> event) {
 			if (wheel_delta) {
 				e.mouse_wheel.amount = (float)wheel_delta / WHEEL_DELTA;
 				e.type = Event::Type::MOUSE_WHEEL;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 
 			if(flags & RI_MOUSE_LEFT_BUTTON_DOWN) {
 				e.type = Event::Type::MOUSE_BUTTON;
 				e.mouse_button.button = MouseButton::LEFT;
 				e.mouse_button.down = true;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 			if(flags & RI_MOUSE_LEFT_BUTTON_UP) {
 				e.type = Event::Type::MOUSE_BUTTON;
 				e.mouse_button.button = MouseButton::LEFT;
 				e.mouse_button.down = false;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 					
 			if(flags & RI_MOUSE_RIGHT_BUTTON_UP) {
 				e.type = Event::Type::MOUSE_BUTTON;
 				e.mouse_button.button = MouseButton::RIGHT;
 				e.mouse_button.down = false;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 			if(flags & RI_MOUSE_RIGHT_BUTTON_DOWN) {
 				e.type = Event::Type::MOUSE_BUTTON;
 				e.mouse_button.button = MouseButton::RIGHT;
 				e.mouse_button.down = true;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 
 			if(flags & RI_MOUSE_MIDDLE_BUTTON_UP) {
 				e.type = Event::Type::MOUSE_BUTTON;
 				e.mouse_button.button = MouseButton::MIDDLE;
 				e.mouse_button.down = false;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 			if(flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) {
 				e.type = Event::Type::MOUSE_BUTTON;
 				e.mouse_button.button = MouseButton::MIDDLE;
 				e.mouse_button.down = true;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 
 			if (x != 0 || y != 0) {
 				e.type = Event::Type::MOUSE_MOVE;
 				e.mouse_move.xrel = x;
 				e.mouse_move.yrel = y;
-				G.event_queue.push(e);
+				G.event_queue.pushBack(e);
 			}
 				
 			if (G.event_queue.empty()) {
@@ -412,8 +446,7 @@ bool getEvent(Ref<Event> event) {
 				return false;
 			}
 
-			event = G.event_queue.front();
-			G.event_queue.pop();
+			event = G.event_queue.popFront();
 
 			break;
 		}
@@ -461,17 +494,17 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					e.type = Event::Type::WINDOW_MOVE;
 					e.win_move.x = (i16)LOWORD(lParam);
 					e.win_move.y = (i16)HIWORD(lParam);
-					G.event_queue.push(e);
+					G.event_queue.pushBack(e);
 					return 0;
 				case WM_SIZE:
 					e.type = Event::Type::WINDOW_SIZE;
 					e.win_size.w = LOWORD(lParam);
 					e.win_size.h = HIWORD(lParam);
-					G.event_queue.push(e);
+					G.event_queue.pushBack(e);
 					return 0;
 				case WM_CLOSE:
 					e.type = Event::Type::WINDOW_CLOSE;
-					G.event_queue.push(e);
+					G.event_queue.pushBack(e);
 					return 0;
 				case WM_ACTIVATE:
 					if (wParam == WA_INACTIVE) {
@@ -480,7 +513,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 					}
 					e.type = Event::Type::FOCUS;
 					e.focus.gained = wParam != WA_INACTIVE;
-					G.event_queue.push(e);
+					G.event_queue.pushBack(e);
 					break;
 			}
 			return DefWindowProc(hWnd, Msg, wParam, lParam);
