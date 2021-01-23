@@ -125,7 +125,7 @@ namespace Lumix
 			if (!PxInitVehicleSDK(*m_physics)) {
 				LUMIX_FATAL(false);
 			}
-			physx::PxVehicleSetBasisVectors(physx::PxVec3(0, 1, 0), physx::PxVec3(0, 0, 1));
+			physx::PxVehicleSetBasisVectors(physx::PxVec3(0, 1, 0), physx::PxVec3(0, 0, -1));
 			physx::PxVehicleSetUpdateMode(physx::PxVehicleUpdateMode::eVELOCITY_CHANGE);
 		}
 
