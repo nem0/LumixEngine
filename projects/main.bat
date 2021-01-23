@@ -25,9 +25,10 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	echo   A. Plugins
 	echo   B. Create project - static physx
 	echo   C. Push to itch.io
-	echo   D. Create project with app 
+	echo   D. Push to itch.io (DX11)
+	echo   E. Create project with app 
 	echo ===============================
-	choice /C 123456789ABCD /N /M "Your choice:"
+	choice /C 123456789ABCDE /N /M "Your choice:"
 	echo.
 
 	if %errorlevel%==1 goto :EOF
@@ -42,7 +43,8 @@ if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual 
 	if %errorlevel%==10 call :plugins
 	if %errorlevel%==11 call :create_project_static_physx
 	if %errorlevel%==12 call :push_to_itch_io
-	if %errorlevel%==13 call :create_project_with_app
+	if %errorlevel%==13 call :push_to_itch_io_dx
+	if %errorlevel%==14 call :create_project_with_app
 goto :begin
 
 :plugins 
@@ -77,6 +79,13 @@ goto :plugins
 	if not exist itch_io mkdir itch_io
 	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
 	butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
+	pause
+exit /B 0
+
+:push_to_itch_io_dx
+	if not exist itch_io mkdir itch_io
+	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+	butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx
 	pause
 exit /B 0
 
