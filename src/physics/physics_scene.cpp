@@ -194,7 +194,7 @@ struct Vehicle
 {
 	PxRigidDynamic* actor = nullptr;
 	PxVehicleDrive4W* drive = nullptr;
-	float chassis_mass = 10;
+	float chassis_mass = 1'000;
 };
 
 
@@ -356,16 +356,19 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		PxBatchQueryDesc desc(maxNumQueriesInBatch, maxNumQueriesInBatch, 0);
 
-		// TODO
-
-		desc.queryMemory.userRaycastResultBuffer = (PxRaycastQueryResult*)(mem + sizeof(PxRaycastQueryResult) * 64);
+		desc.queryMemory.userRaycastResultBuffer = (PxRaycastQueryResult*)(mem + sizeof(PxRaycastHit) * 64);
 		desc.queryMemory.userRaycastTouchBuffer = (PxRaycastHit*)mem;
 		desc.queryMemory.raycastTouchBufferSize = maxNumHitResultsInBatch;
 
 		m_vehicle_results = desc.queryMemory.userRaycastResultBuffer;
 
-/*		desc.preFilterShader = vehicleSceneQueryData.mPreFilterShader;
-		desc.postFilterShader = vehicleSceneQueryData.mPostFilterShader;*/
+		auto f = [](PxFilterData queryFilterData, PxFilterData objectFilterData, const void* constantBlock, PxU32 constantBlockSize, PxHitFlags& hitFlags)->PxQueryHitType::Enum {
+			if (objectFilterData.word3 == 4) return PxQueryHitType::eNONE;
+			return PxQueryHitType::eBLOCK;
+		};
+
+		desc.preFilterShader = f;
+		//desc.postFilterShader = vehicleSceneQueryData.mPostFilterShader;
 
 		return m_scene->createBatchQuery(desc);
 	}
@@ -382,7 +385,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		auto* surfaceTirePairs = PxVehicleDrivableSurfaceToTireFrictionPairs::allocate(1, 1);
 
 		surfaceTirePairs->setup(1, 1, surfaceMaterials, surfaceTypes);
-		surfaceTirePairs->setTypePairFriction(0, 0, 1);
+		surfaceTirePairs->setTypePairFriction(0, 0, 0.1f);
 		return surfaceTirePairs;
 	}
 
@@ -1489,8 +1492,23 @@ struct PhysicsSceneImpl final : PhysicsScene
 		m_update_in_progress = nullptr;
 
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
-			const PxTransform trans = iter.value().actor->getGlobalPose();
-			m_universe.setTransform(iter.key(), fromPhysx(trans));
+			if (iter.value().actor) {
+				const PxTransform car_trans = iter.value().actor->getGlobalPose();
+				m_universe.setTransform(iter.key(), fromPhysx(car_trans));
+
+				EntityPtr wheels[4];
+				getWheels(iter.key(), Span(wheels));
+
+				PxShape* shapes[5];
+				iter.value().actor->getShapes(shapes, 5);
+				for (u32 i = 0; i < 4; ++i) {
+					if (!wheels[i].isValid()) continue;
+					const PxTransform trans = shapes[i]->getLocalPose();
+					m_universe.setTransform((EntityRef)wheels[i], fromPhysx(car_trans * trans));
+				
+				}
+
+			}
 		}
 	}
 
@@ -2083,20 +2101,57 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void updateVehicles(float time_delta)
 	{
-		PxVehicleWheels* wheels[16];
-		const u32 count = (u32)m_vehicles.size();
-		ASSERT(count <= lengthOf(wheels)); // TODO
 
-		int i = 0;
+		PxVehicleWheels* vehicles[16];
+		const u32 count = (u32)m_vehicles.size();
+		ASSERT(count <= lengthOf(vehicles)); // TODO
+
+		constexpr PxVehicleKeySmoothingData key_smoothing=
+		{
+			{
+				6.0f,	//rise rate eANALOG_INPUT_ACCEL
+				6.0f,	//rise rate eANALOG_INPUT_BRAKE		
+				6.0f,	//rise rate eANALOG_INPUT_HANDBRAKE	
+				2.5f,	//rise rate eANALOG_INPUT_STEER_LEFT
+				2.5f,	//rise rate eANALOG_INPUT_STEER_RIGHT
+			},
+			{
+				10.0f,	//fall rate eANALOG_INPUT_ACCEL
+				10.0f,	//fall rate eANALOG_INPUT_BRAKE		
+				10.0f,	//fall rate eANALOG_INPUT_HANDBRAKE	
+				5.0f,	//fall rate eANALOG_INPUT_STEER_LEFT
+				5.0f	//fall rate eANALOG_INPUT_STEER_RIGHT
+			}
+		};
+
+		PxF32 gSteerVsForwardSpeedData[2*8]=
+		{
+			0.0f,		0.75f,
+			5.0f,		0.75f,
+			30.0f,		0.125f,
+			120.0f,		0.1f,
+			PX_MAX_F32, PX_MAX_F32,
+			PX_MAX_F32, PX_MAX_F32,
+			PX_MAX_F32, PX_MAX_F32,
+			PX_MAX_F32, PX_MAX_F32
+		};
+		PxFixedSizeLookupTable<8> gSteerVsForwardSpeedTable(gSteerVsForwardSpeedData,4);
+		static PxVehicleDrive4WRawInputData raw_input;
+		raw_input.setDigitalAccel(true);
+		raw_input.setDigitalSteerLeft(true);
+
+		int valid_count = 0;
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
 			if (iter.value().drive) {
-				wheels[i] = iter.value().drive;
-				++i;
+				vehicles[valid_count] = iter.value().drive;
+				PxVehicleDrive4WSmoothDigitalRawInputsAndSetAnalogInputs(key_smoothing, gSteerVsForwardSpeedTable, raw_input, time_delta, false, *iter.value().drive);
+				++valid_count;
 			}
 		}
-		PxRaycastQueryResult query_results[lengthOf(wheels) * 4];
-		PxVehicleSuspensionRaycasts(m_vehicle_batch_query, count, wheels, count * 4, query_results);
-		PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, count, wheels, nullptr);
+		if (valid_count > 0) {
+			PxVehicleSuspensionRaycasts(m_vehicle_batch_query, valid_count, vehicles, valid_count * 4, m_vehicle_results);
+			PxVehicleUpdates(time_delta, m_scene->getGravity(), *m_vehicle_frictions, valid_count, vehicles, nullptr);
+		}
 	}
 
 	void lateUpdate(float time_delta, bool paused) override {
@@ -2202,14 +2257,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 			wheels[PxVehicleDrive4WWheelOrder::eFRONT_RIGHT].mMaxSteer = PxPi * 0.3333f;
 		}
 
-		//Set up the tires.
 		PxVehicleTireData tires[PX_MAX_NB_WHEELS];
 		{
-			//Set up the tires.
+			enum { TIRE_TYPE_NORMAL = 0 };
 			for (PxU32 i = 0; i < 4; i++)
 			{
-				// TODO
-				// tires[i].mType = TIRE_TYPE_NORMAL;
+				tires[i].mType = TIRE_TYPE_NORMAL;
 			}
 		}
 
@@ -2223,8 +2276,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			for (PxU32 i = 0; i < 4; i++) {
 				suspensions[i].mMaxCompression = 0.3f;
 				suspensions[i].mMaxDroop = 0.1f;
-				suspensions[i].mSpringStrength = 35000.0f;
-				suspensions[i].mSpringDamperRate = 4500.0f;
+				suspensions[i].mSpringStrength = 3500.0f;
+				suspensions[i].mSpringDamperRate = 450.0f;
 				suspensions[i].mSprungMass = suspSprungMasses[i];
 			}
 
@@ -2254,11 +2307,12 @@ struct PhysicsSceneImpl final : PhysicsScene
 			}
 		}
 
-		PxFilterData qryFilterData;
-		// TODO
-		// setupNonDrivableSurface(qryFilterData);
-
 		PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
+		physx::PxFilterData filter;
+		filter.word0 = 5;
+		filter.word1 = 5;
+		filter.word2 = 5;
+		filter.word3 = 4;
 		for (PxU32 i = 0; i < 4; i++) {
 			wheel_sim_data->setWheelData(i, wheels[i]);
 			wheel_sim_data->setTireData(i, tires[i]);
@@ -2267,8 +2321,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			wheel_sim_data->setWheelCentreOffset(i, wheelCentreCMOffsets[i]);
 			wheel_sim_data->setSuspForceAppPointOffset(i, suspForceAppCMOffsets[i]);
 			wheel_sim_data->setTireForceAppPointOffset(i, tireForceAppCMOffsets[i]);
-			wheel_sim_data->setSceneQueryFilterData(i, qryFilterData);
 			wheel_sim_data->setWheelShapeMapping(i, i);
+			wheel_sim_data->setSceneQueryFilterData(i, filter);
 		}
 
 		return wheel_sim_data;
@@ -2302,8 +2356,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		PxVehicleAckermannGeometryData ackermann;
 		ackermann.mAccuracy = 1.0f;
 		ackermann.mAxleSeparation =
-			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eFRONT_LEFT).z -
-			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eREAR_LEFT).z;
+			fabsf(wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eFRONT_LEFT).z - wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eREAR_LEFT).z);
 		ackermann.mFrontWidth =
 			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eFRONT_RIGHT).x -
 			wheel_sim_data.getWheelCentreOffset(PxVehicleDrive4WWheelOrder::eFRONT_LEFT).x;
@@ -2314,26 +2367,36 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	PxRigidDynamic* createVehicleActor(const PxVehicleChassisData& chassisData)
+	PxRigidDynamic* createVehicleActor(const PxVehicleChassisData& chassisData, const RigidTransform& transform, Span<const EntityRef> wheels_entities)
 	{
 		// TODO
 		PxPhysics& physics = *m_system->getPhysics();
 		PxCooking& cooking = *m_system->getCooking();
 
-		PxRigidDynamic* actor = physics.createRigidDynamic(PxTransform(PxIdentity));
+		RigidTransform wheel_transforms[4];
+		getTransforms(Span(wheels_entities), Span(wheel_transforms));
+
+		PxRigidDynamic* actor = physics.createRigidDynamic(toPhysx(transform));
 
 		//PxFilterData wheelQryFilterData;
 		//setupNonDrivableSurface(wheelQryFilterData);
 		//PxFilterData chassisQryFilterData;
 		//setupNonDrivableSurface(chassisQryFilterData);
 
-		PxConvexMesh* wheel_mesh = createWheelMesh(1, 1, physics, cooking);
 		for (int i = 0; i < 4; i++) {
+			const Wheel& w = m_wheels[wheels_entities[i]];
+			PxConvexMesh* wheel_mesh = createWheelMesh(w.width, w.radius, physics, cooking);
 			PxConvexMeshGeometry geom(wheel_mesh);
 			PxShape* wheelShape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
 			//wheelShape->setQueryFilterData(wheelQryFilterData);
-			//wheelShape->setSimulationFilterData(wheelSimFilterData);
-			wheelShape->setLocalPose(PxTransform(PxIdentity));
+			physx::PxFilterData filter;
+			filter.word0 = 4;
+			filter.word1 = 4;
+			filter.word2 = 4;
+			filter.word3 = 4;
+			wheelShape->setQueryFilterData(filter);
+			wheelShape->setSimulationFilterData(filter);
+			wheelShape->setLocalPose(toPhysx(transform.inverted() * wheel_transforms[i]));
 		}
 
 		//Add the chassis shapes to the actor.
@@ -2389,6 +2452,22 @@ struct PhysicsSceneImpl final : PhysicsScene
 		return createConvexMesh(points, 32, physics, cooking);
 	}
 
+	void getWheels(EntityRef car, Span<EntityPtr> wheels) {
+		for (EntityPtr& e : wheels) e= INVALID_ENTITY;
+		for (EntityPtr e = m_universe.getFirstChild(car); e.isValid(); e = m_universe.getNextSibling((EntityRef)e)) {
+			if (m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) {
+				const Wheel& w = m_wheels[(EntityRef)e];
+				wheels[(i32)w.slot] = e;
+			}
+		}
+	}
+
+	void getTransforms(Span<const EntityRef> entities, Span<RigidTransform> transforms) {
+		for (u32 i = 0; i < entities.length(); ++i) {
+			transforms[i] = m_universe.getTransform(entities[i]).getRigidPart();
+		}
+	}
+
 	void initVehicles()
 	{
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
@@ -2409,11 +2488,22 @@ struct PhysicsSceneImpl final : PhysicsScene
 			chassis_data.mMOI = PxVec3(0, 1, 0);
 			chassis_data.mCMOffset = PxVec3(0, .02f, 0);
 
-			veh.actor = createVehicleActor(chassis_data);
+			const RigidTransform tr = m_universe.getTransform(entity).getRigidPart();
+
+			EntityPtr wheels_ptr[4];
+			getWheels(entity, Span(wheels_ptr));
+			EntityRef wheels[4];
+			wheels[0] = (EntityRef)wheels_ptr[0];
+			wheels[1] = (EntityRef)wheels_ptr[1];
+			wheels[2] = (EntityRef)wheels_ptr[2];
+			wheels[3] = (EntityRef)wheels_ptr[3];
+
+			veh.actor = createVehicleActor(chassis_data, tr, Span(wheels));
 			m_scene->addActor(*veh.actor);
 
 			veh.drive = PxVehicleDrive4W::allocate(4);
 			veh.drive->setup(m_system->getPhysics(), veh.actor, *wheel_sim_data, drive_sim_data, 0);
+			veh.drive->mDriveDynData.setUseAutoGears(true);
 			
 			wheel_sim_data->free();
 		}
@@ -4071,7 +4161,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 
 		if (!(filterData0.word0 & filterData1.word1) || !(filterData1.word0 & filterData0.word1)) {
-			return PxFilterFlag::eKILL;
+			return PxFilterFlag::eSUPPRESS;
 		}
 		pairFlags = PxPairFlag::eCONTACT_DEFAULT | PxPairFlag::eNOTIFY_TOUCH_FOUND | PxPairFlag::eNOTIFY_CONTACT_POINTS;
 		return PxFilterFlag::eDEFAULT;
