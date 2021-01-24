@@ -260,6 +260,9 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual WheelSlot getWheelSlot(EntityRef entity) = 0;
 	virtual void setWheelSlot(EntityRef entity, WheelSlot s) = 0;
 
+	virtual void setVehicleAccel(EntityRef entity, bool accel) = 0;
+	virtual void setVehicleSteer(EntityRef entity, float value) = 0;
+
 	virtual u32 getDebugVisualizationFlags() const = 0;
 	virtual void setDebugVisualizationFlags(u32 flags) = 0;
 	virtual void setVisualizationCullingBox(const DVec3& min, const DVec3& max) = 0;
