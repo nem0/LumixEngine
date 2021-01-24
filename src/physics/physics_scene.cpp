@@ -52,6 +52,37 @@ enum class PhysicsSceneVersion
 	LATEST,
 };
 
+static constexpr PxVehiclePadSmoothingData pad_smoothing =
+{
+	{
+		6.0f,	//rise rate eANALOG_INPUT_ACCEL		
+		6.0f,	//rise rate eANALOG_INPUT_BRAKE		
+		12.0f,	//rise rate eANALOG_INPUT_HANDBRAKE	
+		2.5f,	//rise rate eANALOG_INPUT_STEER_LEFT	
+		2.5f,	//rise rate eANALOG_INPUT_STEER_RIGHT	
+	},
+	{
+		10.0f,	//fall rate eANALOG_INPUT_ACCEL		
+		10.0f,	//fall rate eANALOG_INPUT_BRAKE		
+		12.0f,	//fall rate eANALOG_INPUT_HANDBRAKE	
+		5.0f,	//fall rate eANALOG_INPUT_STEER_LEFT	
+		5.0f	//fall rate eANALOG_INPUT_STEER_RIGHT	
+	}
+};
+
+static constexpr PxF32 steer_vs_forward_speed_data[] =
+{
+	0.0f,		0.75f,
+	5.0f,		0.75f,
+	30.0f,		0.125f,
+	120.0f,		0.1f,
+	PX_MAX_F32, PX_MAX_F32,
+	PX_MAX_F32, PX_MAX_F32,
+	PX_MAX_F32, PX_MAX_F32,
+	PX_MAX_F32, PX_MAX_F32
+};
+
+static const PxFixedSizeLookupTable<8> steer_vs_forward_speed(steer_vs_forward_speed_data, 4);
 
 struct RagdollBone
 {
@@ -193,6 +224,7 @@ struct Joint
 struct Vehicle
 {
 	PxRigidDynamic* actor = nullptr;
+	PxVehicleDrive4WRawInputData raw_input;
 	PxVehicleDrive4W* drive = nullptr;
 	float chassis_mass = 1'000;
 };
@@ -385,7 +417,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		auto* surfaceTirePairs = PxVehicleDrivableSurfaceToTireFrictionPairs::allocate(1, 1);
 
 		surfaceTirePairs->setup(1, 1, surfaceMaterials, surfaceTypes);
-		surfaceTirePairs->setTypePairFriction(0, 0, 0.1f);
+		surfaceTirePairs->setTypePairFriction(0, 0, 5.0f);
 		return surfaceTirePairs;
 	}
 
@@ -616,6 +648,15 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void setWheelWidth(EntityRef entity, float w) override { m_wheels[entity].width = w; rebuildWheel(entity); }
 	float getWheelMass(EntityRef entity) override { return m_wheels[entity].mass; }
 	void setWheelMass(EntityRef entity, float m) override { m_wheels[entity].mass = m; rebuildWheel(entity); }
+
+	void setVehicleAccel(EntityRef entity, bool accel) override {
+		m_vehicles[entity].raw_input.setAnalogAccel(accel ? 1.f : 0.f);
+	}
+
+	void setVehicleSteer(EntityRef entity, float value) override {
+		m_vehicles[entity].raw_input.setAnalogSteer(value);
+	}
+
 
 	void rebuildWheel(EntityRef entity)
 	{
@@ -2098,53 +2139,16 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 
-
-	void updateVehicles(float time_delta)
-	{
-
+	void updateVehicles(float time_delta) {
 		PxVehicleWheels* vehicles[16];
 		const u32 count = (u32)m_vehicles.size();
 		ASSERT(count <= lengthOf(vehicles)); // TODO
 
-		constexpr PxVehicleKeySmoothingData key_smoothing=
-		{
-			{
-				6.0f,	//rise rate eANALOG_INPUT_ACCEL
-				6.0f,	//rise rate eANALOG_INPUT_BRAKE		
-				6.0f,	//rise rate eANALOG_INPUT_HANDBRAKE	
-				2.5f,	//rise rate eANALOG_INPUT_STEER_LEFT
-				2.5f,	//rise rate eANALOG_INPUT_STEER_RIGHT
-			},
-			{
-				10.0f,	//fall rate eANALOG_INPUT_ACCEL
-				10.0f,	//fall rate eANALOG_INPUT_BRAKE		
-				10.0f,	//fall rate eANALOG_INPUT_HANDBRAKE	
-				5.0f,	//fall rate eANALOG_INPUT_STEER_LEFT
-				5.0f	//fall rate eANALOG_INPUT_STEER_RIGHT
-			}
-		};
-
-		PxF32 gSteerVsForwardSpeedData[2*8]=
-		{
-			0.0f,		0.75f,
-			5.0f,		0.75f,
-			30.0f,		0.125f,
-			120.0f,		0.1f,
-			PX_MAX_F32, PX_MAX_F32,
-			PX_MAX_F32, PX_MAX_F32,
-			PX_MAX_F32, PX_MAX_F32,
-			PX_MAX_F32, PX_MAX_F32
-		};
-		PxFixedSizeLookupTable<8> gSteerVsForwardSpeedTable(gSteerVsForwardSpeedData,4);
-		static PxVehicleDrive4WRawInputData raw_input;
-		raw_input.setDigitalAccel(true);
-		raw_input.setDigitalSteerLeft(true);
-
-		int valid_count = 0;
+		u32 valid_count = 0;
 		for (auto iter = m_vehicles.begin(), end = m_vehicles.end(); iter != end; ++iter) {
 			if (iter.value().drive) {
 				vehicles[valid_count] = iter.value().drive;
-				PxVehicleDrive4WSmoothDigitalRawInputsAndSetAnalogInputs(key_smoothing, gSteerVsForwardSpeedTable, raw_input, time_delta, false, *iter.value().drive);
+				PxVehicleDrive4WSmoothAnalogRawInputsAndSetAnalogInputs(pad_smoothing, steer_vs_forward_speed, iter.value().raw_input, time_delta, false, *iter.value().drive);
 				++valid_count;
 			}
 		}
@@ -2388,7 +2392,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 			PxConvexMesh* wheel_mesh = createWheelMesh(w.width, w.radius, physics, cooking);
 			PxConvexMeshGeometry geom(wheel_mesh);
 			PxShape* wheelShape = PxRigidActorExt::createExclusiveShape(*actor, geom, *m_default_material);
-			//wheelShape->setQueryFilterData(wheelQryFilterData);
 			physx::PxFilterData filter;
 			filter.word0 = 4;
 			filter.word1 = 4;
@@ -2485,7 +2488,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 			PxVehicleChassisData chassis_data;
 			chassis_data.mMass = veh.chassis_mass;
-			chassis_data.mMOI = PxVec3(0, 1, 0);
+			chassis_data.mMOI = PxVec3(0, 10.01f, 0);
 			chassis_data.mCMOffset = PxVec3(0, .02f, 0);
 
 			const RigidTransform tr = m_universe.getTransform(entity).getRigidPart();
@@ -4457,7 +4460,11 @@ void PhysicsScene::reflect() {
 				LUMIX_PROP(SphereGeomOffsetPosition, "Position offset")),
 			LUMIX_PROP(MeshGeomPath, "Mesh", ResourceAttribute(PhysicsGeometry::TYPE))
 		),
-		LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle", icon(ICON_FA_CAR_ALT)),
+		LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle", 
+			icon(ICON_FA_CAR_ALT),
+			LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel"),
+			LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer")
+		),
 		LUMIX_CMP(Wheel, "wheel", "Physics / Wheel",
 			LUMIX_PROP(WheelRadius, "Radius", MinAttribute(0)),
 			LUMIX_PROP(WheelWidth, "Width", MinAttribute(0)),
