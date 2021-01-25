@@ -1027,6 +1027,7 @@ static struct {
 	{TextureFormat::RGBA32F, GL_RGBA32F, GL_RGBA, GL_FLOAT},
 	{TextureFormat::R16F, GL_R16F, GL_RED, GL_HALF_FLOAT},
 	{TextureFormat::R8, GL_R8, GL_RED, GL_UNSIGNED_BYTE},
+	{TextureFormat::RG8, GL_RG8, GL_RG, GL_UNSIGNED_BYTE},
 	{TextureFormat::R16, GL_R16, GL_RED, GL_UNSIGNED_SHORT},
 	{TextureFormat::R32F, GL_R32F, GL_RED, GL_FLOAT},
 	{TextureFormat::RG32F, GL_RG32F, GL_RG, GL_FLOAT}
