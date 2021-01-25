@@ -2361,7 +2361,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 				suspensions[i].mMaxCompression = 0.3f;
 				suspensions[i].mMaxDroop = 0.1f;
 				suspensions[i].mSpringStrength = 3500.0f;
-				suspensions[i].mSpringDamperRate = 450.0f;
+				suspensions[i].mSpringDamperRate = 4500.0f;
 				suspensions[i].mSprungMass = suspSprungMasses[i];
 			}
 

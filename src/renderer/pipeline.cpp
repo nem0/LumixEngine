@@ -1556,6 +1556,7 @@ struct PipelineImpl final : Pipeline
 			{"depth32", gpu::TextureFormat::D32},
 			{"depth24", gpu::TextureFormat::D24},
 			{"depth24stencil8", gpu::TextureFormat::D24S8},
+			{"rg8", gpu::TextureFormat::RG8},
 			{"rgba8", gpu::TextureFormat::RGBA8},
 			{"srgba", gpu::TextureFormat::SRGBA},
 			{"srgb", gpu::TextureFormat::SRGB},
