@@ -102,7 +102,7 @@ namespace Lumix
 				char tmp[3];
 				toCString(i, Span(tmp));
 				catString(m_layers.names[i], tmp);
-				m_layers.filter[i] = 0xffffFFFF;
+				m_layers.filter[i] = 1 << i;
 			}
 			
 			m_manager.create(PhysicsGeometry::TYPE, engine.getResourceManager());

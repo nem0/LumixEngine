@@ -262,6 +262,15 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 
 	virtual void setVehicleAccel(EntityRef entity, bool accel) = 0;
 	virtual void setVehicleSteer(EntityRef entity, float value) = 0;
+	virtual void setVehicleBrake(EntityRef entity, float value) = 0;
+	virtual Path getVehicleChassis(EntityRef entity) = 0;
+	virtual void setVehicleChassis(EntityRef entity, const Path& path) = 0;
+	virtual float getVehicleMass(EntityRef entity) = 0;
+	virtual void setVehicleMass(EntityRef entity, float mass) = 0;
+	virtual u32 getVehicleWheelsLayer(EntityRef entity) = 0;
+	virtual void setVehicleWheelsLayer(EntityRef entity, u32 layer) = 0;
+	virtual u32 getVehicleChassisLayer(EntityRef entity) = 0;
+	virtual void setVehicleChassisLayer(EntityRef entity, u32 layer) = 0;
 
 	virtual u32 getDebugVisualizationFlags() const = 0;
 	virtual void setDebugVisualizationFlags(u32 flags) = 0;
