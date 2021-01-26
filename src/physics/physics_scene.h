@@ -249,6 +249,14 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setRagdollLayer(EntityRef entity, u32 layer) = 0;
 	virtual u32 getRagdollLayer(EntityRef entity) = 0;
 
+	virtual float getWheelSpringStrength(EntityRef entity) = 0;
+	virtual void setWheelSpringStrength(EntityRef entity, float str) = 0;
+	virtual float getWheelSpringMaxCompression(EntityRef entity) = 0;
+	virtual void setWheelSpringMaxCompression(EntityRef entity, float str) = 0;
+	virtual float getWheelSpringMaxDroop(EntityRef entity) = 0;
+	virtual void setWheelSpringMaxDroop(EntityRef entity, float str) = 0;
+	virtual float getWheelSpringDamperRate(EntityRef entity) = 0;
+	virtual void setWheelSpringDamperRate(EntityRef entity, float rate) = 0;
 	virtual float getWheelRadius(EntityRef entity) = 0;
 	virtual void setWheelRadius(EntityRef entity, float r) = 0;
 	virtual float getWheelWidth(EntityRef entity) = 0;
