@@ -101,6 +101,7 @@ WorkerTask* getWorker()
 }
 #pragma optimize( "", on )
 
+static bool isValid(SignalHandle waitable) { return waitable != INVALID_HANDLE; }
 
 struct WorkerTask : Thread
 {

@@ -243,6 +243,10 @@ struct Wheel
 	float radius = 1;
 	float width = 0.2f;
 	float moi = 1;
+	float max_droop = 0.1f;
+	float max_compression = 0.3f;
+	float spring_strength = 3500.f;
+	float spring_damper_rate = 4500.f;
 	PhysicsScene::WheelSlot slot = PhysicsScene::WheelSlot::FRONT_LEFT;
 	
 	static_assert((int)PhysicsScene::WheelSlot::FRONT_LEFT == PxVehicleDrive4WWheelOrder::eFRONT_LEFT);
@@ -645,6 +649,14 @@ struct PhysicsSceneImpl final : PhysicsScene
 	void setWheelMOI(EntityRef entity, float moi) override { m_wheels[entity].moi = moi; }
 	WheelSlot getWheelSlot(EntityRef entity) override { return m_wheels[entity].slot; }
 	void setWheelSlot(EntityRef entity, WheelSlot s) override { m_wheels[entity].slot = s; }
+	float getWheelSpringStrength(EntityRef entity) override { return m_wheels[entity].spring_strength; }
+	void setWheelSpringStrength(EntityRef entity, float str) override { m_wheels[entity].spring_strength = str; }
+	float getWheelSpringMaxCompression(EntityRef entity) override { return m_wheels[entity].max_compression; }
+	void setWheelSpringMaxCompression(EntityRef entity, float val) override { m_wheels[entity].max_compression = val; }
+	float getWheelSpringMaxDroop(EntityRef entity) override { return m_wheels[entity].max_droop; }
+	void setWheelSpringMaxDroop(EntityRef entity, float val) override { m_wheels[entity].max_droop = val; }
+	float getWheelSpringDamperRate(EntityRef entity) override { return m_wheels[entity].spring_damper_rate; }
+	void setWheelSpringDamperRate(EntityRef entity, float rate) override { m_wheels[entity].spring_damper_rate = rate; }
 	float getWheelRadius(EntityRef entity) override { return m_wheels[entity].radius; }
 	void setWheelRadius(EntityRef entity, float r) override { m_wheels[entity].radius = r; rebuildWheel(entity); }
 	float getWheelWidth(EntityRef entity) override { return m_wheels[entity].width; }
@@ -2299,114 +2311,86 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 
 	// from physx docs
-	PxVehicleWheelsSimData* setupWheelsSimulationData(EntityRef entity) const
-	{
-		EntityPtr wheels_entities[4] = { INVALID_ENTITY, INVALID_ENTITY, INVALID_ENTITY, INVALID_ENTITY };
-
+	PxVehicleWheelsSimData* setupWheelsSimulationData(EntityRef entity) const {
 		u8 mask = 0;
+		PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
+		PxVehicleSuspensionData suspensions[PX_MAX_NB_WHEELS];
+		PxVehicleWheelData wheels[PX_MAX_NB_WHEELS];
+		PxVec3 offsets[4];
+		const Transform& chassis_tr = m_universe.getTransform(entity);
+		const PxF32 camber_angle_at_rest = 0.0;
+		const PxF32 camber_angle_at_max_droop = 0.01f;
+		const PxF32 camber_angle_at_max_compression = -0.01f;
+
+		wheels[PxVehicleDrive4WWheelOrder::eREAR_LEFT].mMaxHandBrakeTorque = 4000.0f;
+		wheels[PxVehicleDrive4WWheelOrder::eREAR_RIGHT].mMaxHandBrakeTorque = 4000.0f;
+		wheels[PxVehicleDrive4WWheelOrder::eFRONT_LEFT].mMaxSteer = PxPi * 0.3333f;
+		wheels[PxVehicleDrive4WWheelOrder::eFRONT_RIGHT].mMaxSteer = PxPi * 0.3333f;
+
 		for (EntityPtr e = m_universe.getFirstChild(entity); e.isValid(); e = m_universe.getNextSibling((EntityRef)e)) {
-			if (m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) {
-				const Wheel& w = m_wheels[(EntityRef)e];
-				wheels_entities[(int)w.slot] = e;
-				mask |= 1 << (int)w.slot;
-			}
+			if (!m_universe.hasComponent((EntityRef)e, WHEEL_TYPE)) continue;
+
+			const Wheel& w = m_wheels[(EntityRef)e];
+			const u32 idx = (u32)w.slot;
+			mask |= 1 << idx;
+
+			suspensions[idx].mMaxCompression = w.max_compression;
+			suspensions[idx].mMaxDroop = w.max_droop;
+			suspensions[idx].mSpringStrength = w.spring_strength;
+			suspensions[idx].mSpringDamperRate = w.spring_damper_rate;
+
+			PxVehicleTireData tire;
+			enum { TIRE_TYPE_NORMAL = 0 };
+			tire.mType = TIRE_TYPE_NORMAL;
+
+			wheels[idx].mMass = w.mass;
+			wheels[idx].mMOI = w.moi;
+			wheels[idx].mRadius = w.radius;
+			wheels[idx].mWidth = w.width;
+
+			const Transform& wheel_tr = m_universe.getTransform((EntityRef)e);
+			offsets[idx] = toPhysx((chassis_tr.inverted() * wheel_tr).pos);
+			
+			wheel_sim_data->setTireData(idx, tire);
+			wheel_sim_data->setSuspTravelDirection(idx, PxVec3(0, -1, 0));
+			wheel_sim_data->setWheelCentreOffset(idx, offsets[idx]);
+			wheel_sim_data->setSuspForceAppPointOffset(idx, offsets[idx] + PxVec3(0, 0.1f, 0));
+			wheel_sim_data->setTireForceAppPointOffset(idx, offsets[idx] + PxVec3(0, 0.1f, 0));
+			wheel_sim_data->setWheelShapeMapping(idx, idx);
+			// TODO
+			physx::PxFilterData filter;
+			filter.word0 = 5;
+			filter.word1 = 5;
+			filter.word2 = 5;
+			filter.word3 = 4;
+			wheel_sim_data->setSceneQueryFilterData(idx, filter);
 		}
+
 		if (mask != 0b1111) {
-			logError("Vehicle ", entity.index, " does not have exactly one wheel in each slot.");
+			logError("Vehicle ", entity.index, " does not have a wheel in each slot.");
+			wheel_sim_data->free();
 			return nullptr;
 		}
 
-		PxVec3 offsets[4];
-		const Transform& chassis_tr = m_universe.getTransform(entity);
-		for (int i = 0; i < 4; ++i) {
-			const EntityRef wheel = (EntityRef)wheels_entities[i];
-			const Transform& wheel_tr = m_universe.getTransform(wheel);
-			offsets[i] = toPhysx((chassis_tr.inverted() * wheel_tr).pos);
+		PxF32 susp_sprung_masses[PX_MAX_NB_WHEELS];
+		PxVehicleComputeSprungMasses(4, offsets, PxVec3(0), m_vehicles[entity]->mass, 1, susp_sprung_masses);
+
+		for (u32 i = 0; i < 4; ++i) {
+			suspensions[i].mSprungMass = susp_sprung_masses[i];
 		}
 
-		PxVehicleWheelData wheels[PX_MAX_NB_WHEELS];
-		{
-			for (int i = 0; i < 4; i++) {
-				const EntityRef e = (EntityRef)wheels_entities[i];
-				const Wheel& wheel = m_wheels[e];
-				wheels[(int)wheel.slot].mMass = wheel.mass;
-				wheels[(int)wheel.slot].mMOI = wheel.moi;
-				wheels[(int)wheel.slot].mRadius = wheel.radius;
-				wheels[(int)wheel.slot].mWidth = wheel.width;
-			}
-
-			wheels[PxVehicleDrive4WWheelOrder::eREAR_LEFT].mMaxHandBrakeTorque = 4000.0f;
-			wheels[PxVehicleDrive4WWheelOrder::eREAR_RIGHT].mMaxHandBrakeTorque = 4000.0f;
-			wheels[PxVehicleDrive4WWheelOrder::eFRONT_LEFT].mMaxSteer = PxPi * 0.3333f;
-			wheels[PxVehicleDrive4WWheelOrder::eFRONT_RIGHT].mMaxSteer = PxPi * 0.3333f;
+		for (PxU32 i = 0; i < 4; i += 2) {
+			suspensions[i + 0].mCamberAtRest = camber_angle_at_rest;
+			suspensions[i + 1].mCamberAtRest = -camber_angle_at_rest;
+			suspensions[i + 0].mCamberAtMaxDroop = camber_angle_at_max_droop;
+			suspensions[i + 1].mCamberAtMaxDroop = -camber_angle_at_max_droop;
+			suspensions[i + 0].mCamberAtMaxCompression = camber_angle_at_max_compression;
+			suspensions[i + 1].mCamberAtMaxCompression = -camber_angle_at_max_compression;
 		}
 
-		PxVehicleTireData tires[PX_MAX_NB_WHEELS];
-		{
-			enum { TIRE_TYPE_NORMAL = 0 };
-			for (PxU32 i = 0; i < 4; i++)
-			{
-				tires[i].mType = TIRE_TYPE_NORMAL;
-			}
-		}
-
-		//Set up the suspensions
-		PxVehicleSuspensionData suspensions[PX_MAX_NB_WHEELS];
-		{
-			PxF32 suspSprungMasses[PX_MAX_NB_WHEELS];
-			const float mass = m_vehicles[entity]->mass;
-			PxVehicleComputeSprungMasses(4, offsets, PxVec3(0), mass, 1, suspSprungMasses);
-
-			for (PxU32 i = 0; i < 4; i++) {
-				suspensions[i].mMaxCompression = 0.3f;
-				suspensions[i].mMaxDroop = 0.1f;
-				suspensions[i].mSpringStrength = 3500.0f;
-				suspensions[i].mSpringDamperRate = 4500.0f;
-				suspensions[i].mSprungMass = suspSprungMasses[i];
-			}
-
-			const PxF32 camberAngleAtRest = 0.0;
-			const PxF32 camberAngleAtMaxDroop = 0.01f;
-			const PxF32 camberAngleAtMaxCompression = -0.01f;
-			for (PxU32 i = 0; i < 4; i += 2) {
-				suspensions[i + 0].mCamberAtRest = camberAngleAtRest;
-				suspensions[i + 1].mCamberAtRest = -camberAngleAtRest;
-				suspensions[i + 0].mCamberAtMaxDroop = camberAngleAtMaxDroop;
-				suspensions[i + 1].mCamberAtMaxDroop = -camberAngleAtMaxDroop;
-				suspensions[i + 0].mCamberAtMaxCompression = camberAngleAtMaxCompression;
-				suspensions[i + 1].mCamberAtMaxCompression = -camberAngleAtMaxCompression;
-			}
-		}
-
-		PxVec3 suspTravelDirections[PX_MAX_NB_WHEELS];
-		PxVec3 wheelCentreCMOffsets[PX_MAX_NB_WHEELS];
-		PxVec3 suspForceAppCMOffsets[PX_MAX_NB_WHEELS];
-		PxVec3 tireForceAppCMOffsets[PX_MAX_NB_WHEELS];
-		{
-			for (PxU32 i = 0; i < 4; i++) {
-				suspTravelDirections[i] = PxVec3(0, -1, 0);
-				wheelCentreCMOffsets[i] = offsets[i];
-				suspForceAppCMOffsets[i] = PxVec3(wheelCentreCMOffsets[i].x, 0.3f, wheelCentreCMOffsets[i].z);
-				tireForceAppCMOffsets[i] = PxVec3(wheelCentreCMOffsets[i].x, 0.3f, wheelCentreCMOffsets[i].z);
-			}
-		}
-
-		PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
-		physx::PxFilterData filter;
-		filter.word0 = 5;
-		filter.word1 = 5;
-		filter.word2 = 5;
-		filter.word3 = 4;
 		for (PxU32 i = 0; i < 4; i++) {
 			wheel_sim_data->setWheelData(i, wheels[i]);
-			wheel_sim_data->setTireData(i, tires[i]);
 			wheel_sim_data->setSuspensionData(i, suspensions[i]);
-			wheel_sim_data->setSuspTravelDirection(i, suspTravelDirections[i]);
-			wheel_sim_data->setWheelCentreOffset(i, wheelCentreCMOffsets[i]);
-			wheel_sim_data->setSuspForceAppPointOffset(i, suspForceAppCMOffsets[i]);
-			wheel_sim_data->setTireForceAppPointOffset(i, tireForceAppCMOffsets[i]);
-			wheel_sim_data->setWheelShapeMapping(i, i);
-			wheel_sim_data->setSceneQueryFilterData(i, filter);
 		}
 
 		return wheel_sim_data;
@@ -3776,11 +3760,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		for (auto iter = m_wheels.begin(), end = m_wheels.end(); iter != end; ++iter) {
 			serializer.write(iter.key());
 			const Wheel& w = iter.value();
-			serializer.write(w.slot);
-			serializer.write(w.radius);
-			serializer.write(w.width);
-			serializer.write(w.mass);
-			serializer.write(w.moi);
+			serializer.write(w);
 		}
 	}
 
@@ -3992,11 +3972,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			EntityRef e = serializer.read<EntityRef>();
 			e = entity_map.get(e);
 			Wheel& w = m_wheels.insert(e);
-			serializer.read(w.slot);
-			serializer.read(w.radius);
-			serializer.read(w.width);
-			serializer.read(w.mass);
-			serializer.read(w.moi);
+			serializer.read(w);
 			m_universe.onComponentCreated(e, WHEEL_TYPE, this);
 		}
 	}
@@ -4573,6 +4549,10 @@ void PhysicsScene::reflect() {
 			LUMIX_PROP(WheelWidth, "Width", MinAttribute(0)),
 			LUMIX_PROP(WheelMass, "Mass", MinAttribute(0)),
 			LUMIX_PROP(WheelMOI, "MOI", MinAttribute(0)),
+			LUMIX_PROP(WheelSpringMaxCompression, "Max compression", MinAttribute(0)),
+			LUMIX_PROP(WheelSpringMaxDroop, "Max droop", MinAttribute(0)),
+			LUMIX_PROP(WheelSpringStrength, "Spring strength", MinAttribute(0)),
+			LUMIX_PROP(WheelSpringDamperRate, "Spring damper rate", MinAttribute(0)),
 			enum_property("Slot", &PhysicsSceneImpl::getWheelSlot, &PhysicsSceneImpl::setWheelSlot, WheelSlotEnum())
 		),
 		LUMIX_CMP(Heightfield, "physical_heightfield", "Physics / Heightfield",
