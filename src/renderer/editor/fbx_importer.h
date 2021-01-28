@@ -138,6 +138,7 @@ struct FBXImporter
 		float origin_radius_squared;
 		float center_radius_squared;
 		Matrix transform_matrix = Matrix::IDENTITY;
+		Vec3 origin = Vec3(0);
 	};
 
 	FBXImporter(struct StudioApp& app);

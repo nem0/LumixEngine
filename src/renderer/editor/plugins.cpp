@@ -1648,10 +1648,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		const StaticString<32> hash_str("", src.getHash());
 		if (meta.split) {
-			//cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
+			cfg.origin = FBXImporter::ImportConfig::Origin::CENTER;
 			m_fbx_importer.writeSubmodels(filepath, cfg);
 			m_fbx_importer.writePrefab(filepath, cfg);
 		}
+		cfg.origin = FBXImporter::ImportConfig::Origin::SOURCE;
 		m_fbx_importer.writeModel(src.c_str(), cfg);
 		m_fbx_importer.writeMaterials(filepath, cfg);
 		m_fbx_importer.writeAnimations(filepath, cfg);

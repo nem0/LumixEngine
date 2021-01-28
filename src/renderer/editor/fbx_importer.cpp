@@ -423,7 +423,7 @@ static int getMaterialIndex(const ofbx::Mesh& mesh, const ofbx::Material& materi
 }
 
 
-static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, FBXImporter::ImportConfig::Origin origin, Matrix* transform)
+static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, bool bottom, Ref<Matrix> transform, Ref<Vec3> center)
 {
 	if (vertices_count <= 0) return;
 
@@ -443,14 +443,15 @@ static void centerMesh(const ofbx::Vec3* vertices, int vertices_count, FBXImport
 		max.z = maximum(max.z, v.z);
 	}
 
-	Vec3 center;
-	center.x = float(min.x + max.x) * 0.5f;
-	center.y = float(min.y + max.y) * 0.5f;
-	center.z = float(min.z + max.z) * 0.5f;
+	center->x = float(min.x + max.x) * 0.5f;
+	center->y = float(min.y + max.y) * 0.5f;
+	center->z = float(min.z + max.z) * 0.5f;
 		
-	if (origin == FBXImporter::ImportConfig::Origin::BOTTOM) center.y = (float)min.y;
+	if (bottom) center->y = (float)min.y;
 
-	transform->setTranslation(-center);
+	const Vec3 p = transform->getTranslation();
+	transform->setTranslation(-center.value);
+	center.value += p;
 }
 
 
@@ -631,7 +632,8 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		transform_matrix = toLumix(mesh.getGlobalTransform()) * geometry_matrix;
 		if (cancel_mesh_transforms) transform_matrix.setTranslation({0, 0, 0});
 		if (cfg.origin != ImportConfig::Origin::SOURCE) {
-			centerMesh(vertices, vertex_count, cfg.origin, &transform_matrix);
+			const bool bottom = cfg.origin == FBXImporter::ImportConfig::Origin::BOTTOM;
+			centerMesh(vertices, vertex_count, bottom, Ref(transform_matrix), Ref(import_mesh.origin));
 		}
 		import_mesh.transform_matrix = transform_matrix.inverted();
 
@@ -2181,7 +2183,7 @@ void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 
 	static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 	for(int i  = 0; i < m_meshes.size(); ++i) {
-		const EntityRef e = universe.createEntity({0, 0, 0}, Quat::IDENTITY);
+		const EntityRef e = universe.createEntity(DVec3(fixOrientation(m_meshes[i].origin) * cfg.mesh_scale * m_fbx_scale), Quat::IDENTITY);
 		universe.createComponent(MODEL_INSTANCE_TYPE, e);
 		universe.setParent(root, e);
 		char mesh_name[256];
