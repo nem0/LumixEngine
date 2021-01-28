@@ -1245,15 +1245,29 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 	void destroyWheel(EntityRef entity)
 	{
-		ASSERT(false);
-		// TODO
+		m_wheels.erase(entity);
+		m_universe.onComponentDestroyed(entity, WHEEL_TYPE, this);
+
+		// we do not support removing wheels at runtime
+		// if you need this, you need to refresh physx part after removing the wheel
+		ASSERT(!m_is_game_running);
 	}
 
 
 	void destroyVehicle(EntityRef entity) 
 	{
-		ASSERT(false);
-		// TODO
+		const UniquePtr<Vehicle>& veh = m_vehicles[entity];
+		if (veh->actor) {
+			m_scene->removeActor(*veh->actor);
+			veh->actor->release();
+		}
+		if (veh->drive) veh->drive->free();
+		if (veh->geom) {
+			veh->geom->getObserverCb().unbind<&Vehicle::onStateChanged>(veh.get());
+			veh->geom->decRefCount();
+		}
+		m_vehicles.erase(entity);
+		m_universe.onComponentDestroyed(entity, VEHICLE_TYPE, this);
 	}
 
 
