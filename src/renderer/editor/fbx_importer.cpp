@@ -33,7 +33,7 @@ namespace Lumix {
 
 static bool hasTangents(const ofbx::Geometry& geom) {
 	if (geom.getTangents()) return true;
-	if (geom.getNormals() && geom.getUVs()) return true;
+	if (geom.getUVs()) return true;
 	return false;
 }
 
@@ -498,6 +498,45 @@ static void computeTangentsSimple(Array<ofbx::Vec3>& out, i32 vertex_count, cons
 	}
 }
 
+static void computeNormals(Array<ofbx::Vec3>& out, const ofbx::Vec3* vertices, i32 vertex_count, const u32* remap, IAllocator& allocator) {
+	out.resize(vertex_count);
+	Array<u32> count(allocator);
+	Array<Vec3> normals(allocator);
+	normals.resize(vertex_count);
+	count.resize(vertex_count);
+	memset(normals.begin(), 0, normals.byte_size());
+	memset(count.begin(), 0, count.byte_size());
+
+	auto toLumix = [](const ofbx::Vec3& a) { return Vec3{(float)a.x, (float)a.y, (float)a.z}; };
+	auto fromLumix = [](const Vec3& a) { return ofbx::Vec3{ a.x, a.y, a.z}; };
+	u32 m = 0;
+
+	for (int i = 0; i < vertex_count; i+= 3) {
+		const Vec3 v0 = toLumix(vertices[i + 0]);
+		const Vec3 v1 = toLumix(vertices[i + 1]);
+		const Vec3 v2 = toLumix(vertices[i + 2]);
+		const Vec3 n = crossProduct(v1 - v0, v2 - v0).normalized();
+		++count[remap[i + 0]];
+		++count[remap[i + 1]];
+		++count[remap[i + 2]];
+		normals[remap[i + 0]] = normals[remap[i + 0]] + n;
+		normals[remap[i + 1]] = normals[remap[i + 1]] + n;
+		normals[remap[i + 2]] = normals[remap[i + 2]] + n;
+
+		m = maximum(m ,remap[i]);
+		m = maximum(m, remap[i + 1]);
+		m = maximum(m, remap[i + 2]);
+	}
+
+	for (u32 i = 0; i < m; ++i) {
+		if (count[i] > 0) normals[i] = normals[i] / (float)count[i];
+	}
+
+	for (i32 i = 0; i < vertex_count; ++i) {
+		out[i] = fromLumix(normals[remap[i]]);
+	}
+}
+
 static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx::Vec3* vertices, const ofbx::Vec3* normals, const ofbx::Vec2* uvs, const char* path)
 {
 	out.resize(vertex_count);
@@ -609,6 +648,20 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		}
 
 		import_geom.unique_vertex_count = (u32)meshopt_generateVertexRemapMulti(import_geom.indices.begin(), nullptr, vertex_count, vertex_count, streams, stream_count);
+
+		if (!normals) {
+			computeNormals(import_geom.computed_normals, vertices, vertex_count, import_geom.indices.begin(), m_allocator);
+			normals = import_geom.computed_normals.begin();
+
+			if (!tangents && uvs) {
+				if (cfg.mikktspace_tangents) {
+					computeTangents(import_geom.computed_tangents, vertex_count, vertices, normals, uvs, path);
+				}
+				else {
+					computeTangentsSimple(import_geom.computed_tangents, vertex_count, vertices, uvs);
+				}
+			}
+		}
 	});
 	
 	jobs::forEach(m_meshes.size(), 1, [&](i32 mesh_idx, i32){
@@ -626,6 +679,8 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		const ofbx::Vec3* tangents = geom->getTangents();
 		const ofbx::Vec4* colors = cfg.import_vertex_colors ? geom->getColors() : nullptr;
 		const ofbx::Vec2* uvs = geom->getUVs();
+
+		if (!normals) normals = import_geom.computed_normals.begin();
 
 		Matrix transform_matrix = Matrix::IDENTITY;
 		Matrix geometry_matrix = toLumix(mesh.getGeometricMatrix());
@@ -655,7 +710,6 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		ASSERT(material_idx >= 0);
 
 		const int* geom_materials = geom->getMaterials();
-		Array<ofbx::Vec3> computed_tangents(m_allocator);
 		if (!tangents && import_geom.computed_tangents.size()) {
 			tangents = import_geom.computed_tangents.begin();
 		}
@@ -1643,9 +1697,8 @@ int FBXImporter::getVertexSize(const ofbx::Geometry& geom, bool is_skinned, bool
 	static const int UV_SIZE = sizeof(float) * 2;
 	static const int COLOR_SIZE = sizeof(u8) * 4;
 	static const int BONE_INDICES_WEIGHTS_SIZE = sizeof(float) * 4 + sizeof(u16) * 4;
-	int size = POSITION_SIZE;
+	int size = POSITION_SIZE + NORMAL_SIZE;
 
-	if (geom.getNormals()) size += NORMAL_SIZE;
 	if (geom.getUVs()) size += UV_SIZE;
 	if (geom.getColors() && import_vertex_colors) size += COLOR_SIZE;
 	if (hasTangents(geom)) size += TANGENT_SIZE;
@@ -1939,13 +1992,11 @@ void FBXImporter::writeMeshes(const char* src, int mesh_idx, const ImportConfig&
 		write(Mesh::AttributeSemantic::POSITION);
 		write(gpu::AttributeType::FLOAT);
 		write((u8)3);
-		const ofbx::Geometry* geom = mesh.getGeometry();
-		if (geom->getNormals()) {
-			write(Mesh::AttributeSemantic::NORMAL);
-			write(gpu::AttributeType::I8);
-			write((u8)4);
+		write(Mesh::AttributeSemantic::NORMAL);
+		write(gpu::AttributeType::I8);
+		write((u8)4);
 
-		}
+		const ofbx::Geometry* geom = mesh.getGeometry();
 		if (geom->getUVs()) {
 			write(Mesh::AttributeSemantic::TEXCOORD0);
 			write(gpu::AttributeType::FLOAT);
@@ -2075,11 +2126,8 @@ void FBXImporter::writeLODs(const ImportConfig& cfg)
 
 int FBXImporter::getAttributeCount(const ImportMesh& mesh, bool import_vertex_colors) const
 {
-	int count = 1; // position
-	const bool has_normals = mesh.fbx->getGeometry()->getNormals();
-	const bool has_uvs = mesh.fbx->getGeometry()->getUVs();
-	if (has_normals) ++count;
-	if (has_uvs) ++count;
+	int count = 2; // position & normals
+	if (mesh.fbx->getGeometry()->getUVs()) ++count;
 	if (mesh.fbx->getGeometry()->getColors() && import_vertex_colors) ++count;
 	if (hasTangents(*mesh.fbx->getGeometry())) ++count;
 	if (mesh.is_skinned) count += 2;

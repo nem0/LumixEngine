@@ -107,6 +107,7 @@ struct FBXImporter
 			: indices(allocator)
 			, vertex_data(allocator)
 			, computed_tangents(allocator)
+			, computed_normals(allocator)
 		{
 		}
 
@@ -114,6 +115,7 @@ struct FBXImporter
 		Array<u32> indices;
 		OutputMemoryStream vertex_data;
 		Array<ofbx::Vec3> computed_tangents;
+		Array<ofbx::Vec3> computed_normals;
 		u32 unique_vertex_count;
 	};
 
