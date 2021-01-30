@@ -4065,6 +4065,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			int type;
 			serializer.read(type);
 			serializer.read(joint.connected_body);
+			joint.connected_body = entity_map.get(joint.connected_body);
 			serializer.read(joint.local_frame0);
 			ComponentType cmp_type;
 			switch (PxJointConcreteType::Enum(type))
