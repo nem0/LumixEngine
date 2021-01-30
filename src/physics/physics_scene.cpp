@@ -459,6 +459,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 		m_ragdolls.clear();
 
+		for (auto& v : m_vehicles) {
+			if (v->geom) {
+				v->geom->getObserverCb().unbind<&Vehicle::onStateChanged>(v.get());
+				v->geom->decRefCount();
+			}
+		}
+
 		m_vehicles.clear();
 		m_wheels.clear();
 
