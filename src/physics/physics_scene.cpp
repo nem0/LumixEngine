@@ -228,8 +228,10 @@ struct Vehicle
 	PxVehicleDrive4W* drive = nullptr;
 	float mass = 1'500;
 	PhysicsGeometry* geom = nullptr;
-	u32 wheels_layer = 0;
-	u32 chassis_layer = 1;
+	u32 wheels_layer = 4;
+	u32 chassis_layer = 0;
+	Vec3 center_of_mass = Vec3(0);
+	float moi_multiplier = 1;
 
 	void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&) {
 
@@ -685,6 +687,33 @@ struct PhysicsSceneImpl final : PhysicsScene
 		veh->chassis_layer = layer;
 		if (veh->actor) {
 			rebuildVehicle(entity, *veh.get());
+		}
+	}
+	
+	Vec3 getVehicleCenterOfMass(EntityRef entity) override {
+		return m_vehicles[entity]->center_of_mass;
+	}
+
+	void setVehicleCenterOfMass(EntityRef entity, Vec3 center) override {
+		UniquePtr<Vehicle>& veh = m_vehicles[entity];
+		veh->center_of_mass = center;
+		if (veh->actor) veh->actor->setCMassLocalPose(PxTransform(toPhysx(center), PxQuat(PxIdentity)));
+	}
+
+	float getVehicleMOIMultiplier(EntityRef entity) override {
+		return m_vehicles[entity]->moi_multiplier;
+	}
+
+	void setVehicleMOIMultiplier(EntityRef entity, float m) override {
+		UniquePtr<Vehicle>& veh = m_vehicles[entity];
+		veh->moi_multiplier = m;
+		if (veh->actor) {
+			PxVec3 extents(1);
+			if (veh->geom && veh->geom->convex_mesh) {
+				const PxBounds3 bounds = veh->geom->convex_mesh->getLocalBounds();
+				extents = bounds.getExtents();
+			}
+			veh->actor->setMassSpaceInertiaTensor(PxVec3(extents.x, extents.z, extents.y) * veh->mass * veh->moi_multiplier);
 		}
 	}
 
@@ -2325,7 +2354,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 
 	// from physx docs
-	PxVehicleWheelsSimData* setupWheelsSimulationData(EntityRef entity) const {
+	PxVehicleWheelsSimData* setupWheelsSimulationData(EntityRef entity, const Vehicle& vehicle) const {
 		u8 mask = 0;
 		PxVehicleWheelsSimData* wheel_sim_data = PxVehicleWheelsSimData::allocate(4);
 		PxVehicleSuspensionData suspensions[PX_MAX_NB_WHEELS];
@@ -2363,7 +2392,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			wheels[idx].mWidth = w.width;
 
 			const Transform& wheel_tr = m_universe.getTransform((EntityRef)e);
-			offsets[idx] = toPhysx((chassis_tr.inverted() * wheel_tr).pos);
+			offsets[idx] = toPhysx((chassis_tr.inverted() * wheel_tr).pos - vehicle.center_of_mass);
 			
 			wheel_sim_data->setTireData(idx, tire);
 			wheel_sim_data->setSuspTravelDirection(idx, PxVec3(0, -1, 0));
@@ -2449,7 +2478,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 
-	PxRigidDynamic* createVehicleActor(const PxVehicleChassisData& chassisData, const RigidTransform& transform, Span<const EntityRef> wheels_entities, Vehicle& vehicle)
+	PxRigidDynamic* createVehicleActor(const RigidTransform& transform, Span<const EntityRef> wheels_entities, Vehicle& vehicle)
 	{
 		PxPhysics& physics = *m_system->getPhysics();
 		PxCooking& cooking = *m_system->getCooking();
@@ -2474,6 +2503,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			wheel_shape->setLocalPose(toPhysx(transform.inverted() * wheel_transforms[i]));
 		}
 
+		PxVec3 extents(1, 1, 1);
 		if (vehicle.geom && vehicle.geom->isReady()) {
 			physx::PxFilterData filter;
 			filter.word0 = 1 << vehicle.chassis_layer;
@@ -2483,14 +2513,16 @@ struct PhysicsSceneImpl final : PhysicsScene
 			PxMeshScale pxscale(1.f);
 			PxConvexMeshGeometry convex_geom(vehicle.geom->convex_mesh, pxscale);
 			PxShape* chassis_shape = PxRigidActorExt::createExclusiveShape(*actor, convex_geom, *m_default_material);
+			const PxBounds3 bounds = vehicle.geom->convex_mesh->getLocalBounds();
+			extents = bounds.getExtents();
 			chassis_shape->setQueryFilterData(filter);
 			chassis_shape->setSimulationFilterData(filter);
 			chassis_shape->setLocalPose(PxTransform(PxIdentity));
 		}
 
-		actor->setMass(chassisData.mMass);
-		actor->setMassSpaceInertiaTensor(chassisData.mMOI);
-		actor->setCMassLocalPose(PxTransform(chassisData.mCMOffset, PxQuat(PxIdentity)));
+		actor->setMass(vehicle.mass);
+		actor->setMassSpaceInertiaTensor(PxVec3(extents.x, extents.z, extents.y) * vehicle.mass * vehicle.moi_multiplier);
+		actor->setCMassLocalPose(PxTransform(toPhysx(vehicle.center_of_mass), PxQuat(PxIdentity)));
 
 		return actor;
 	}
@@ -2502,7 +2534,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			vehicle.actor->release();
 		}
 
-		PxVehicleWheelsSimData* wheel_sim_data = setupWheelsSimulationData(entity);
+		PxVehicleWheelsSimData* wheel_sim_data = setupWheelsSimulationData(entity, vehicle);
 		if (!wheel_sim_data) {
 			logError("Failed to init vehicle ", entity.index);
 			return;
@@ -2510,11 +2542,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 		PxVehicleDriveSimData4W drive_sim_data;
 		setupDriveSimData(*wheel_sim_data, drive_sim_data);
-
-		PxVehicleChassisData chassis_data;
-		chassis_data.mMass = vehicle.mass;
-		chassis_data.mMOI = PxVec3(3600, 3010, 1300);
-		chassis_data.mCMOffset = PxVec3(0, .02f, 0);
 
 		const RigidTransform tr = m_universe.getTransform(entity).getRigidPart();
 
@@ -2527,7 +2554,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		wheels[2] = (EntityRef)wheels_ptr[2];
 		wheels[3] = (EntityRef)wheels_ptr[3];
 
-		vehicle.actor = createVehicleActor(chassis_data, tr, Span(wheels), vehicle);
+		vehicle.actor = createVehicleActor(tr, Span(wheels), vehicle);
 		m_scene->addActor(*vehicle.actor);
 
 		vehicle.drive = PxVehicleDrive4W::allocate(4);
@@ -3765,6 +3792,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.write(iter.key());
 			const UniquePtr<Vehicle>& veh = iter.value();
 			serializer.write(veh->mass);
+			serializer.write(veh->center_of_mass);
+			serializer.write(veh->moi_multiplier);
 			serializer.write(veh->chassis_layer);
 			serializer.write(veh->wheels_layer);
 			serializer.writeString(veh->geom ? veh->geom->getPath().c_str() : "");
@@ -3969,6 +3998,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 			e = entity_map.get(e);
 			auto iter = m_vehicles.insert(e, UniquePtr<Vehicle>::create(m_allocator));
 			serializer.read(iter.value()->mass);
+			serializer.read(iter.value()->center_of_mass);
+			serializer.read(iter.value()->moi_multiplier);
 			serializer.read(iter.value()->chassis_layer);
 			serializer.read(iter.value()->wheels_layer);
 			const char* path = serializer.readString();
@@ -4554,6 +4585,8 @@ void PhysicsScene::reflect() {
 			LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel"),
 			LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer"),
 			LUMIX_PROP(VehicleMass, "Mass", MinAttribute(0)),
+			LUMIX_PROP(VehicleCenterOfMass, "Center of mass"),
+			LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier"),
 			LUMIX_PROP(VehicleChassis, "Chassis", ResourceAttribute(PhysicsGeometry::TYPE)),
 			LUMIX_PROP(VehicleChassisLayer, "Chassis layer", LayerEnum()),
 			LUMIX_PROP(VehicleWheelsLayer, "Wheels layer", LayerEnum())
