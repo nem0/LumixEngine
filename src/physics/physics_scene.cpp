@@ -228,7 +228,7 @@ struct Vehicle
 	PxVehicleDrive4W* drive = nullptr;
 	float mass = 1'500;
 	PhysicsGeometry* geom = nullptr;
-	u32 wheels_layer = 4;
+	u32 wheels_layer = 1;
 	u32 chassis_layer = 0;
 	Vec3 center_of_mass = Vec3(0);
 	float moi_multiplier = 1;
@@ -247,8 +247,8 @@ struct Wheel
 	float moi = 1;
 	float max_droop = 0.1f;
 	float max_compression = 0.3f;
-	float spring_strength = 3500.f;
-	float spring_damper_rate = 4500.f;
+	float spring_strength = 10'000.f;
+	float spring_damper_rate = 4'500.f;
 	PhysicsScene::WheelSlot slot = PhysicsScene::WheelSlot::FRONT_LEFT;
 	
 	static_assert((int)PhysicsScene::WheelSlot::FRONT_LEFT == PxVehicleDrive4WWheelOrder::eFRONT_LEFT);
