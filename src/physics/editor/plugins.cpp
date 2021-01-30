@@ -38,6 +38,8 @@ const ComponentType HINGE_JOINT_TYPE = reflection::getComponentType("hinge_joint
 const ComponentType SPHERICAL_JOINT_TYPE = reflection::getComponentType("spherical_joint");
 const ComponentType D6_JOINT_TYPE = reflection::getComponentType("d6_joint");
 const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
+const ComponentType VEHICLE_TYPE = reflection::getComponentType("vehicle");
+const ComponentType WHEEL_TYPE = reflection::getComponentType("wheel");
 const u32 RENDERER_HASH = crc32("renderer");
 
 
@@ -209,6 +211,39 @@ void showRigidActorGizmo(UniverseView& view, ComponentUID cmp)
 		const float r = scene->getSphereGeomRadius(e, i);
 		const Vec3 p = scene->getSphereGeomOffsetPosition(e, i);
 		addSphere(view, pos + rot.rotate(p), r, Color::BLUE);
+	}
+}
+
+void showWheelGizmo(UniverseView& view, ComponentUID cmp) {
+	Universe& universe = cmp.scene->getUniverse();
+	const EntityRef e = (EntityRef)cmp.entity;
+	PhysicsScene* scene = (PhysicsScene*)cmp.scene;
+	const Transform wheel_tr = universe.getTransform(e);
+	const float radius = scene->getWheelRadius(e);
+	const float width = scene->getWheelWidth(e);
+
+	const Vec3 wheel_axis = wheel_tr.rot.rotate(Vec3(1, 0, 0));
+	addCylinder(view, wheel_tr.pos - wheel_axis * width * 0.5f, wheel_axis , radius, width, Color::BLUE);
+}
+
+void showVehicleGizmo(UniverseView& view, ComponentUID cmp) {
+	const EntityRef e = (EntityRef)cmp.entity;
+	PhysicsScene* scene = (PhysicsScene*)cmp.scene;
+	Universe& universe = cmp.scene->getUniverse();
+	const Transform vehicle_tr = universe.getTransform(e);
+	for (EntityPtr ch_ptr = universe.getFirstChild(e); ch_ptr.isValid(); ch_ptr = universe.getNextSibling((EntityRef)ch_ptr)) {
+		const EntityRef ch = (EntityRef)ch_ptr;
+		if (!universe.hasComponent(ch, WHEEL_TYPE)) continue;
+			
+		ComponentUID wheel_cmp;
+		wheel_cmp.entity = ch;
+		wheel_cmp.scene = scene;
+		wheel_cmp.type = WHEEL_TYPE;
+		showWheelGizmo(view, wheel_cmp);
+
+		const Transform wheel_tr = universe.getTransform(ch);
+		addLine(view, vehicle_tr.pos, wheel_tr.pos, Color::BLUE);
+
 	}
 }
 
@@ -961,6 +996,16 @@ struct StudioAppPlugin : StudioApp::IPlugin
 			return true;
 		}
 		
+		if (cmp.type == VEHICLE_TYPE) {
+			showVehicleGizmo(view, cmp);
+			return true;
+		}
+		
+		if (cmp.type == WHEEL_TYPE) {
+			showWheelGizmo(view, cmp);
+			return true;
+		}
+
 		if (cmp.type == CONTROLLER_TYPE)
 		{
 			float height = phy_scene->getControllerHeight(entity);

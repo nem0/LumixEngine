@@ -117,6 +117,41 @@ void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color
 	add_line(a, b);
 }
 
+void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color) {
+	Vec3 x_vec(0, up.z, -up.y);
+	if (x_vec.squaredLength() < 0.01) {
+		x_vec = Vec3(up.y, -up.x, 0);
+	}
+	x_vec.normalize();
+	const Vec3 z_vec = crossProduct(x_vec, up).normalized();
+
+	const DVec3 top = pos + up * height;
+	UniverseView::Vertex* vertices = view.render(true, 32 * 6);
+	const DVec3 cam_pos = view.getViewport().pos;
+
+	auto add_line = [&](const DVec3& a, const DVec3& b){
+		vertices[0].pos = (a - cam_pos).toFloat();
+		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].abgr = color.abgr();
+		vertices[1].abgr = color.abgr();
+		vertices += 2;
+	};
+
+	for (int i = 0; i < 32; ++i) {
+		const float a = i / 32.0f * 2 * PI;
+		const float x = cosf(a) * radius;
+		const float z = sinf(a) * radius;
+		add_line(pos + x_vec * x + z_vec * z, top + x_vec * x + z_vec * z);
+
+		const float a_next = (i + 1) / 32.0f * 2 * PI;
+		const float x_next = cosf(a_next) * radius;
+		const float z_next = sinf(a_next) * radius;
+
+		add_line(pos + x_vec * x + z_vec * z, pos + x_vec * x_next + z_vec * z_next);
+		add_line(top + x_vec * x + z_vec * z, top + x_vec * x_next + z_vec * z_next);
+	}
+}
+
 void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color) {
 	UniverseView::Vertex* vertices = view.render(true, 2);
 	const DVec3 cam_pos = view.getViewport().pos;
