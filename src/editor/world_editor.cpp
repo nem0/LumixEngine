@@ -1046,13 +1046,16 @@ public:
 	{
 		struct : reflection::IEmptyPropertyVisitor {
 			void visit(const reflection::IArrayProperty& prop) override {
+				if (!equalStrings(prop.name, prop_name)) return;
 				prop.removeItem(cmp, index);
 			}
 			ComponentUID cmp;
 			int index;
+			const char* prop_name;
 		} v;
 		v.cmp = m_component;
 		v.index = m_index;
+		v.prop_name = m_property;
 		reflection::getComponent(m_component.type)->visit(v);
 	}
 
