@@ -67,6 +67,7 @@ LUMIX_EDITOR_API void addSphere(UniverseView& view, const DVec3& center, float r
 LUMIX_EDITOR_API void addCube(UniverseView& view, const DVec3& center, const Vec3& x, const Vec3& y, const Vec3& z, Color color);
 LUMIX_EDITOR_API void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color);
 LUMIX_EDITOR_API void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color);
+LUMIX_EDITOR_API void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color);
 LUMIX_EDITOR_API void addCone(UniverseView& view, const DVec3& vertex, const Vec3& dir, const Vec3& axis0, const Vec3& axis1, Color color);
 LUMIX_EDITOR_API void addFrustum(UniverseView& view, const struct ShiftedFrustum& frustum, Color color);
 LUMIX_EDITOR_API void addCapsule(UniverseView& view, const DVec3& position, float height, float radius, Color color);
