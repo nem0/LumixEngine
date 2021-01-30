@@ -244,6 +244,8 @@ void showVehicleGizmo(UniverseView& view, ComponentUID cmp) {
 		const Transform wheel_tr = universe.getTransform(ch);
 		addLine(view, vehicle_tr.pos, wheel_tr.pos, Color::BLUE);
 
+		const Vec3 cm = scene->getVehicleCenterOfMass(e);
+		addLine(view, vehicle_tr.pos, vehicle_tr.pos + vehicle_tr.rot.rotate(cm), Color::RED);
 	}
 }
 
