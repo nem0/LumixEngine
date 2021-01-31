@@ -51,7 +51,7 @@ fragment_shader [[
 		float m = saturate(max(max(lpos.x, lpos.y), lpos.z) * 2 - 0.5);
 		m = 1 - m * m;
 	
-		o_color.rgb *= m;
+		o_color.rgb *= m * Global.light_indirect_intensity;
 
 		o_color.a = m;
 	}
