@@ -283,6 +283,13 @@ fragment_shader [[
 				surface.N = normalize(getTBN(v_uv) * n);
 				surface.albedo.rgb = v4.w > v4_2.w + a ? v4.rgb : v4_2.rgb;
 				surface.alpha = 1;
+
+				// blend between detail and satellite
+				float m = v_dist2 / (u_detail_distance * u_detail_distance);
+				m = saturate((m - 0.8) * 5);
+				vec3 sat_color = texture(u_satellite, vec3(v_uv, 0).xy).rgb;
+				sat_color *= saturate(0.5 + texture(u_noise, v_uv * 10, -2).r * texture(u_noise, v_uv*29, -2).r * 0.5);
+				surface.albedo = mix(surface.albedo, sat_color, m);
 			}
 			else {
 				surface.N = getTBN(v_uv)[1];
