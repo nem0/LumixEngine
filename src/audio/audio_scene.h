@@ -64,6 +64,8 @@ struct AudioScene : IScene
 	virtual void setAmbientSoundClip(EntityRef entity, const Path& clip) = 0;
 	virtual bool isAmbientSound3D(EntityRef entity) = 0;
 	virtual void setAmbientSound3D(EntityRef entity, bool is_3d) = 0;
+	virtual void pauseAmbientSound(EntityRef entity) = 0;
+	virtual void resumeAmbientSound(EntityRef entity) = 0;
 
 	virtual SoundHandle play(EntityRef entity, const Path& clip, bool is_3d) = 0;
 	virtual void stop(SoundHandle sound_id) = 0;
