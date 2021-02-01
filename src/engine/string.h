@@ -37,6 +37,7 @@ inline const char* fromCString(Span<const char> input, Ref<EntityPtr> value) { r
 LUMIX_ENGINE_API bool copyString(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool copyString(Span<char> output, Span<const char> source);
 LUMIX_ENGINE_API bool copyNString(Span<char> output, const char* source, int N);
+LUMIX_ENGINE_API bool catString(Span<char> output, Span<const char> source);
 LUMIX_ENGINE_API bool catString(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool catNString(Span<char> output, const char* source, int N);
 LUMIX_ENGINE_API bool makeLowercase(Span<char> output, const char* source);

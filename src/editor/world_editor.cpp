@@ -1782,10 +1782,9 @@ public:
 
 		logInfo("Saving universe ", basename, "...");
 		
-		StaticString<LUMIX_MAX_PATH> dir(m_engine.getFileSystem().getBasePath(), "universes/", basename);
-		if (!os::makePath(dir)) logError("Could not create ", dir);
-		StaticString<LUMIX_MAX_PATH> path(dir, "/entities.unv");
-		StaticString<LUMIX_MAX_PATH> bkp_path(dir, "/entities.unv.bak");
+		if (!os::makePath("universes")) logError("Could not create directory universes/");
+		StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
+		StaticString<LUMIX_MAX_PATH> bkp_path(path, ".bak");
 		if (os::fileExists(path)) {
 			if (!os::copyFile(path, bkp_path)) {
 				logError("Could not copy ", path, " to ", bkp_path);
@@ -2257,7 +2256,7 @@ public:
 		m_universe->setName(basename);
 		logInfo("Loading universe ", basename, "...");
 		os::InputFile file;
-		const StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, "/entities.unv");
+		const StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
 		if (file.open(path)) {
 			if (!load(file)) {
 				logError("Failed to parse ", path);

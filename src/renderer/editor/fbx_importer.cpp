@@ -309,7 +309,7 @@ void FBXImporter::gatherAnimations(const ofbx::IScene& scene)
 			{
 				char tmp[LUMIX_MAX_PATH];
 				take_info->filename.toString(tmp);
-				Path::getBasename(Span(anim.name.data), tmp);
+				copyString(Span(anim.name.data), Path::getBasename(tmp));
 			}
 			if (anim.name.empty()) anim.name << "anim";
 		}

@@ -121,7 +121,7 @@ struct Runner final
 
 		m_universe->setName("main");
 		if (!m_engine->deserialize(*m_universe, tmp, Ref(entity_map))) {
-			logError("Failed to deserialize universes/main/entities.unv");
+			logError("Failed to deserialize ", path);
 			return false;
 		}
 		return true;
@@ -143,7 +143,7 @@ struct Runner final
 		m_gui_interface.pipeline = m_pipeline.get();
 		gui->setInterface(&m_gui_interface);
 
-		if (!loadUniverse("universes/main/entities.unv")) {
+		if (!loadUniverse("universes/main.unv")) {
 			initDemoScene();
 		}
 		while (m_engine->getFileSystem().hasWork()) {

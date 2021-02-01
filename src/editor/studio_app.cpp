@@ -2205,7 +2205,7 @@ struct StudioAppImpl final : StudioApp
 		Path::getDir(Span(copy_path.data), tmp_path);
 		copy_path << "plugins/" << iteration;
 		if (!os::makePath(copy_path)) logError("Could not create ", copy_path);
-		Path::getBasename(Span(tmp_path), src);
+		copyString(Span(tmp_path), Path::getBasename(src));
 		copy_path << "/" << tmp_path << "." << getPluginExtension();
 #ifdef _WIN32
 		StaticString<LUMIX_MAX_PATH> src_pdb(src);
@@ -2267,9 +2267,7 @@ struct StudioAppImpl final : StudioApp
 			else if (is_full_path && !m_watched_plugin.watcher.get())
 			{
 				char dir[LUMIX_MAX_PATH];
-				char basename[LUMIX_MAX_PATH];
-				Path::getBasename(Span(basename), src);
-				m_watched_plugin.basename = basename;
+				copyString(Span(m_watched_plugin.basename.data), Path::getBasename(src));
 				Path::getDir(Span(dir), src);
 				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
 				m_watched_plugin.watcher->getCallback().bind<&StudioAppImpl::onPluginChanged>(this);
@@ -2305,7 +2303,7 @@ struct StudioAppImpl final : StudioApp
 			return;
 
 		char basename[LUMIX_MAX_PATH];
-		Path::getBasename(Span(basename), path);
+		copyString(Span(basename), Path::getBasename(path));
 		if (!equalIStrings(basename, m_watched_plugin.basename)) return;
 
 		m_watched_plugin.reload_request = true;
@@ -2908,8 +2906,7 @@ struct StudioAppImpl final : StudioApp
 		while (os::getNextFile(iter, &info)) {
 			if (info.is_directory) continue;
 
-			char basename[LUMIX_MAX_PATH];
-			Path::getBasename(Span(basename), info.filename);
+			Span<const char> basename = Path::getBasename(info.filename);
 			PackFileInfo rec;
 			fromCString(Span(basename), Ref(rec.hash));
 			rec.offset = 0;
@@ -2988,11 +2985,8 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 		packDataScan("pipelines/", infos);
-		StaticString<LUMIX_MAX_PATH> unv_path;
-		unv_path << "universes/" << m_editor->getUniverse()->getName() << "/";
-		packDataScan(unv_path, infos);
-		unv_path.data[0] = 0;
-		unv_path << "universes/" << m_editor->getUniverse()->getName() << ".unv";
+		packDataScan("universes/probes/", infos);
+		StaticString<LUMIX_MAX_PATH> unv_path("universes/", m_editor->getUniverse()->getName(), ".unv");
 		u32 hash = crc32(unv_path);
 		auto& out_info = infos.emplace(hash);
 		copyString(Span(out_info.path), unv_path);
@@ -3146,11 +3140,11 @@ struct StudioAppImpl final : StudioApp
 		while (os::getNextFile(iter, &info))
 		{
 			if (info.filename[0] == '.') continue;
-			if (!info.is_directory) continue;
+			if (info.is_directory) continue;
 			if (startsWith(info.filename, "__")) continue;
 
 			char basename[LUMIX_MAX_PATH];
-			Path::getBasename(Span(basename), info.filename);
+			copyString(Span(basename), Path::getBasename(info.filename));
 			m_universes.emplace(basename);
 		}
 		os::destroyFileIterator(iter);

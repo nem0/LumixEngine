@@ -203,11 +203,10 @@ void AssetBrowser::changeDir(const char* path)
 		if (*subres.end()) {
 			copyNString(Span(filename), subres.begin(), subres.length());
 			catString(filename, ":");
-			const int tmp_len = stringLength(filename);
-			Path::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), res.path.c_str());
+			catString(Span(filename), Path::getBasename(res.path.c_str()));
 		}
 		else {
-			Path::getBasename(Span(filename), res.path.c_str());
+			copyString(Span(filename), Path::getBasename(res.path.c_str()));
 		}
 		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
 
@@ -550,7 +549,7 @@ void AssetBrowser::fileColumn()
 			if (scene && universe->hasComponent(e, model_inst_type)) {
 				Path source;
 				if (reflection::getPropertyValue(*scene, e, model_inst_type, "Source", Ref(source))) {
-					Path::getBasename(Span(m_prefab_name), source.c_str());
+					copyString(Span(m_prefab_name), Path::getBasename(source.c_str()));
 				}
 			}
 		}
@@ -673,11 +672,10 @@ void AssetBrowser::refreshLabels()
 		if (*subres.end()) {
 			copyNString(Span(filename), subres.begin(), subres.length());
 			catString(filename, ":");
-			const int tmp_len = stringLength(filename);
-			Path::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), tile.filepath.data);
+			catString(Span(filename), Path::getBasename(tile.filepath.data));
 		}
 		else {
-			Path::getBasename(Span(filename), tile.filepath.data);
+			copyString(Span(filename), Path::getBasename(tile.filepath.data));
 		}
 		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
 
@@ -998,11 +996,10 @@ void AssetBrowser::tile(const Path& path, bool selected) {
 		if (*subres.end()) {
 			copyNString(Span(filename), subres.begin(), subres.length());
 			catString(filename, ":");
-			const int tmp_len = stringLength(filename);
-			Path::getBasename(Span(filename + tmp_len, filename + sizeof(filename)), path.c_str());
+			catString(Span(filename), Path::getBasename(path.c_str()));
 		}
 		else {
-			Path::getBasename(Span(filename), path.c_str());
+			copyString(Span(filename), Path::getBasename(path.c_str()));
 		}
 		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
 		fi.clamped_filename = filename;

@@ -330,10 +330,9 @@ struct PackFileSystem : FileSystemImpl {
 	}
 
 	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
-		char basename[LUMIX_MAX_PATH];
-		Path::getBasename(Span(basename), path.c_str());
+		Span<const char> basename = Path::getBasename(path.c_str());
 		u32 hash;
-		fromCString(Span(basename), Ref(hash));
+		fromCString(basename, Ref(hash));
 		if (basename[0] < '0' || basename[0] > '9' || hash == 0) {
 			hash = path.getHash();
 		}

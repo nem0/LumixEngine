@@ -2734,7 +2734,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	{
 		ASSERT(data);
 		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-		StaticString<LUMIX_MAX_PATH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
+		StaticString<LUMIX_MAX_PATH> path(base_path, "universes");
 		if (!os::makePath(path) && !os::dirExists(path)) {
 			logError("Failed to create ", path);
 		}
@@ -2806,11 +2806,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		ASSERT(m_probes.empty());
 
 		Universe* universe = m_app.getWorldEditor().getUniverse();
-		if (universe->getName()[0] == '\0') {
-			logError("Universe must be saved before environment probe can be generated.");
-			return;
-		}
-		
 		m_pipeline->define("PROBE_BOUNCE", bounce);
 
 		auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
@@ -2835,7 +2830,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			job->reflection_probe = scene->getReflectionProbe(p);
 			job->is_reflection = true;
 			job->position = universe->getPosition(p);
-			job->universe_name = universe->getName();
 
 			m_probes.push(job);
 		}
@@ -2850,7 +2844,6 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			, plugin(plugin)
 		{}
 		
-		StaticString<LUMIX_MAX_PATH> universe_name;
 		EntityRef entity;
 		union {
 			EnvironmentProbe env_probe;
@@ -2928,7 +2921,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 		if (m_done_counter == m_probe_counter && !m_probes.empty()) {
 			const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
-			StaticString<LUMIX_MAX_PATH> path(base_path, "universes/", m_app.getWorldEditor().getUniverse()->getName());
+			StaticString<LUMIX_MAX_PATH> path(base_path, "universes/");
 			if (!os::dirExists(path) && !os::makePath(path)) {
 				logError("Failed to create ", path);
 			}
@@ -2946,8 +2939,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 					const u64 guid = job.reflection_probe.guid;
 
-					const StaticString<LUMIX_MAX_PATH> tmp_path(base_path, "/universes/", job.universe_name, "/probes_tmp/", guid, ".dds");
-					const StaticString<LUMIX_MAX_PATH> path(base_path, "/universes/", job.universe_name, "/probes/", guid, ".dds");
+					const StaticString<LUMIX_MAX_PATH> tmp_path(base_path, "/universes/probes_tmp/", guid, ".dds");
+					const StaticString<LUMIX_MAX_PATH> path(base_path, "/universes/probes/", guid, ".dds");
 					if (!os::fileExists(tmp_path)) return;
 					if (!os::moveFile(tmp_path, path)) {
 						logError("Failed to move file ", tmp_path, " to ", path);
