@@ -163,6 +163,18 @@ struct AudioSceneImpl final : AudioScene
 		m_ambient_sounds[entity].is_3d = is_3d;
 	}
 
+	void pauseAmbientSound(EntityRef entity) override {
+		const i32 idx = m_ambient_sounds[entity].playing_sound;
+		if (idx < 0) return;
+		m_device.pause(m_playing_sounds[idx].buffer_id);
+	}
+
+	void resumeAmbientSound(EntityRef entity) override {
+		const AmbientSound& as = m_ambient_sounds[entity];
+		const i32 idx = as.playing_sound;
+		if (idx < 0) return;
+		m_device.play(m_playing_sounds[idx].buffer_id, as.clip->m_looped);
+	}
 
 	void startGame() override
 	{
@@ -484,6 +496,8 @@ void AudioScene::reflect(Engine& engine) {
 		LUMIX_FUNC(AudioScene::setVolume),
 		LUMIX_FUNC(AudioScene::setEcho),
 		LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound",
+			LUMIX_FUNC_EX(AudioScene::pauseAmbientSound, "pause"),
+			LUMIX_FUNC_EX(AudioScene::resumeAmbientSound, "resume"),
 			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
 			LUMIX_PROP(AmbientSoundClip, "Sound", ResourceAttribute(Clip::TYPE))
 		),
