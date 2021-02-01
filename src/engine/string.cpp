@@ -519,6 +519,18 @@ bool catString(Span<char> destination, const char* source)
 	return copyString(Span(dst, length), source);
 }
 
+bool catString(Span<char> destination, Span<const char> source)
+{
+	char* dst = destination.begin();
+	u32 length = destination.length();
+	while (*dst && length)
+	{
+		--length;
+		++dst;
+	}
+	return copyString(Span(dst, length), source);
+}
+
 static void reverse(char* str, int length)
 {
 	char* beg = str;

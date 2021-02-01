@@ -662,19 +662,17 @@ public:
 		serializer.read(count);
 		m_reflection_probes.reserve(count + m_reflection_probes.size());
 		ResourceManagerHub& manager = m_engine.getResourceManager();
-		StaticString<LUMIX_MAX_PATH> probe_dir("universes/", m_universe.getName(), "/probes/");
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);
 			entity = entity_map.get(entity);
 			ReflectionProbe& probe = m_reflection_probes.insert(entity);
-			// TODO probes are stored in per-universe directory, that won't work with additive loading
 			serializer.read(probe.guid);
 			serializer.read(probe.flags.base);
 			serializer.read(probe.size);
 			serializer.read(probe.half_extents);
 			ASSERT(probe.texture == nullptr);
-			StaticString<LUMIX_MAX_PATH> path_str(probe_dir, probe.guid, ".dds");
+			StaticString<LUMIX_MAX_PATH> path_str("universes/probes/", probe.guid, ".dds");
 			probe.texture = manager.load<Texture>(Path(path_str));
 
 			m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
@@ -687,7 +685,7 @@ public:
 		serializer.read(count);
 		m_environment_probes.reserve(count + m_environment_probes.size());
 		ResourceManagerHub& manager = m_engine.getResourceManager();
-		StaticString<LUMIX_MAX_PATH> probe_dir("universes/", m_universe.getName(), "/probes/");
+		StaticString<LUMIX_MAX_PATH> probe_dir("universes/probes/");
 		for (u32 i = 0; i < count; ++i) {
 			EntityRef entity;
 			serializer.read(entity);

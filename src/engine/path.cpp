@@ -100,26 +100,24 @@ void Path::getDir(Span<char> dir, const char* src)
 	dir[0] = '\0';
 }
 
-void Path::getBasename(Span<char> basename, const char* src)
+Span<const char> Path::getBasename(const char* src)
 {
-	basename[0] = '\0';
-	for (int i = stringLength(src) - 1; i >= 0; --i)
-	{
-		if (src[i] == '\\' || src[i] == '/' || i == 0)
-		{
-			if (src[i] == '\\' || src[i] == '/')
-				++i;
-			u32 j = 0;
-			basename[j] = src[i];
-			while (j < basename.length() - 1 && src[i + j] && src[i + j] != '.')
-			{
-				++j;
-				basename[j] = src[j + i];
-			}
-			basename[j] = '\0';
-			return;
-		}
+	if (!src[0]) return Span<const char>(src, src);
+
+	Span<const char> res;
+	const char* end = src + stringLength(src);
+	res.m_end = end;
+	res.m_begin = end;
+	while (res.m_begin != src && *res.m_begin != '\\' && *res.m_begin != '/') {
+		--res.m_begin;
 	}
+
+	if (*res.m_begin == '\\' || *res.m_begin == '/') ++res.m_begin;
+	res.m_end = res.m_begin;
+
+	while (res.m_end != end && *res.m_end != '.') ++res.m_end;
+
+	return res;
 }
 
 
@@ -178,7 +176,7 @@ PathInfo::PathInfo(const char* path) {
 	char tmp[LUMIX_MAX_PATH];
 	Path::normalize(path, Span(tmp));
 	Path::getExtension(Span(m_extension), Span(tmp, stringLength(tmp)));
-	Path::getBasename(Span(m_basename), tmp);
+	copyString(Span(m_basename), Path::getBasename(tmp));
 	Path::getDir(Span(m_dir), tmp);
 }
 
