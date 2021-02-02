@@ -32,6 +32,7 @@ namespace
 
 
 const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("bone_attachment");
 const ComponentType RAGDOLL_TYPE = reflection::getComponentType("ragdoll");
 const ComponentType CONTROLLER_TYPE = reflection::getComponentType("physical_controller");
 const ComponentType DISTANCE_JOINT_TYPE = reflection::getComponentType("distance_joint");
@@ -41,7 +42,6 @@ const ComponentType D6_JOINT_TYPE = reflection::getComponentType("d6_joint");
 const ComponentType RIGID_ACTOR_TYPE = reflection::getComponentType("rigid_actor");
 const ComponentType VEHICLE_TYPE = reflection::getComponentType("vehicle");
 const ComponentType WHEEL_TYPE = reflection::getComponentType("wheel");
-const u32 RENDERER_HASH = crc32("renderer");
 
 
 Vec3 fromPhysx(const physx::PxVec3& v) { return Vec3(v.x, v.y, v.z); }
@@ -350,8 +350,6 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 {
 	explicit PhysicsUIPlugin(StudioApp& app)
 		: m_editor(app.getWorldEditor())
-		, m_selected_bone(-1)
-		, m_is_window_open(false)
 		, m_app(app)
 	{
 		m_toggle_ui.init("Physics", "Toggle physics UI", "physics", "", false);

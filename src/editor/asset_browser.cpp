@@ -893,7 +893,7 @@ bool AssetBrowser::resourceInput(const char* str_id, Span<char> buf, ResourceTyp
 			char ext[10];
 			const char* path = (const char*)payload->Data;
 			Span<const char> subres = getSubresource(path);
-			Path::getExtension(Span(ext), subres);
+			copyString(Span(ext), Path::getExtension(subres));
 			const AssetCompiler& compiler = m_app.getAssetCompiler();
 			if (compiler.acceptExtension(ext, type)) {
 				copyString(buf, path);

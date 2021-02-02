@@ -19,7 +19,7 @@ struct LUMIX_ENGINE_API Path {
 	static void normalize(const char* path, Span<char> out);
 	static Span<const char> getDir(const char* src);
 	static Span<const char> getBasename(const char* src);
-	static void getExtension(Span<char> extension, Span<const char> src);
+	static Span<const char> getExtension(Span<const char> src);
 	static bool hasExtension(const char* filename, const char* ext);
 	static bool replaceExtension(char* path, const char* ext);
 
