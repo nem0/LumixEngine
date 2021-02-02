@@ -1117,7 +1117,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool compile(const Path& src) override
 	{
 		char ext[4] = {};
-		Path::getExtension(Span(ext), Span(src.c_str(), src.length()));
+		copyString(Span(ext), Path::getExtension(Span(src.c_str(), src.length())));
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());

@@ -198,10 +198,9 @@ struct AssetCompilerImpl : AssetCompiler
 	ResourceType getResourceType(const char* path) const override
 	{
 		const Span<const char> subres = getSubresource(path);
-		char ext[16];
-		Path::getExtension(Span(ext), subres);
+		Span<const char> ext = Path::getExtension(subres);
 
-		auto iter = m_registered_extensions.find(crc32(ext));
+		auto iter = m_registered_extensions.find(crc32(ext.begin(), ext.length()));
 		if (iter.isValid()) return iter.value();
 
 		return INVALID_RESOURCE_TYPE;
@@ -228,7 +227,7 @@ struct AssetCompilerImpl : AssetCompiler
 	void addResource(const char* fullpath)
 	{
 		char ext[10];
-		Path::getExtension(Span(ext), Span(fullpath, stringLength(fullpath)));
+		copyString(Span(ext), Path::getExtension(Span(fullpath, stringLength(fullpath))));
 		makeLowercase(Span(ext), ext);
 	
 		auto iter = m_plugins.find(crc32(ext));
@@ -461,9 +460,8 @@ struct AssetCompilerImpl : AssetCompiler
 
 	bool compile(const Path& src) override
 	{
-		char ext[16];
-		Path::getExtension(Span(ext), Span(src.c_str(), src.length()));
-		const u32 hash = crc32(ext);
+		Span<const char> ext = Path::getExtension(Span(src.c_str(), src.length()));
+		const u32 hash = crc32(ext.begin(), ext.length());
 		MutexGuard lock(m_plugin_mutex);
 		auto iter = m_plugins.find(hash);
 		if (!iter.isValid()) {

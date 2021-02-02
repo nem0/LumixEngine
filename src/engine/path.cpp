@@ -120,20 +120,22 @@ Span<const char> Path::getBasename(const char* src)
 }
 
 
-void Path::getExtension(Span<char> extension, Span<const char> src)
+Span<const char> Path::getExtension(Span<const char> src)
 {
-	ASSERT(extension.length() > 0);
-	for (int i = src.length() - 1; i >= 0; --i)
-	{
-		if (src[i] == '.')
-		{
-			++i;
-			Span<const char> tmp = { src.begin() + i, src.end() };
-			copyString(extension, tmp);
-			return;
-		}
+	if (src.length() == 0) return src;
+
+	Span<const char> res;
+	res.m_end = src.m_end;
+	res.m_begin = src.m_end - 1;
+
+	while(res.m_begin != src.m_begin && *res.m_begin != '.') {
+		--res.m_begin;
 	}
-	extension[0] = '\0';
+	if (res.m_begin != src.m_begin) {
+		++res.m_begin;
+	}
+	
+	return res;
 }
 
 
@@ -165,7 +167,7 @@ bool Path::replaceExtension(char* path, const char* ext)
 bool Path::hasExtension(const char* filename, const char* ext)
 {
 	char tmp[20];
-	getExtension(Span(tmp), Span(filename, stringLength(filename)));
+	copyString(Span(tmp), getExtension(Span(filename, stringLength(filename))));
 	makeLowercase(Span(tmp), tmp);
 
 	return equalStrings(tmp, ext);
@@ -174,7 +176,7 @@ bool Path::hasExtension(const char* filename, const char* ext)
 PathInfo::PathInfo(const char* path) {
 	char tmp[LUMIX_MAX_PATH];
 	Path::normalize(path, Span(tmp));
-	Path::getExtension(Span(m_extension), Span(tmp, stringLength(tmp)));
+	copyString(Span(m_extension), Path::getExtension(Span(tmp, stringLength(tmp))));
 	copyString(Span(m_basename), Path::getBasename(tmp));
 	copyString(Span(m_dir), Path::getDir(tmp));
 }
