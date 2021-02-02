@@ -85,19 +85,18 @@ void Path::normalize(const char* path, Span<char> output)
 	(i < max_size ? *out : *(out - 1)) = '\0';
 }
 
-void Path::getDir(Span<char> dir, const char* src)
+Span<const char> Path::getDir(const char* src)
 {
-	copyString(dir, src);
-	for (int i = stringLength(dir.begin()) - 1; i >= 0; --i)
-	{
-		if (dir[i] == '\\' || dir[i] == '/')
-		{
-			++i;
-			dir[i] = '\0';
-			return;
-		}
+	if (!src[0]) return {nullptr, nullptr};
+	
+	Span<const char> dir;
+	dir.m_begin = src;
+	dir.m_end = src + stringLength(src) - 1;
+	while (dir.m_end != dir.m_begin && *dir.m_end != '\\' && *dir.m_end != '/') {
+		--dir.m_end;
 	}
-	dir[0] = '\0';
+	if (dir.m_end != dir.m_begin) ++dir.m_end;
+	return dir;
 }
 
 Span<const char> Path::getBasename(const char* src)
@@ -177,7 +176,7 @@ PathInfo::PathInfo(const char* path) {
 	Path::normalize(path, Span(tmp));
 	Path::getExtension(Span(m_extension), Span(tmp, stringLength(tmp)));
 	copyString(Span(m_basename), Path::getBasename(tmp));
-	Path::getDir(Span(m_dir), tmp);
+	copyString(Span(m_dir), Path::getDir(tmp));
 }
 
 

@@ -621,7 +621,7 @@ int texture(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 	char material_dir[LUMIX_MAX_PATH];
-	Path::getDir(Span(material_dir), material->getPath().c_str());
+	copyString(Span(material_dir), Path::getDir(material->getPath().c_str()));
 
 	if (lua_istable(L, 1)) {
 		lua_getfield(L, 1, "source");
