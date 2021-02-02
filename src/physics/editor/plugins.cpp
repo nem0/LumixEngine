@@ -5,6 +5,7 @@
 #include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
 #include "editor/property_grid.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
@@ -377,7 +378,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		};
 		for (const char* dll : physx_dlls)
 		{
-			Path::getDir(Span(exe_dir), exe_path);
+			copyString(Span(exe_dir), Path::getDir(exe_path));
 			StaticString<LUMIX_MAX_PATH> tmp(exe_dir, dll);
 			if (!os::fileExists(tmp)) return false;
 			StaticString<LUMIX_MAX_PATH> dest(dest_dir, dll);
@@ -482,8 +483,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onJointGUI()
 	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
+		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(RIGID_ACTOR_TYPE));
+		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 
 		int count = scene->getJointCount();
@@ -688,18 +689,123 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	}
 
 
-	void autogeneratePhySkeleton(PhysicsScene& scene, EntityRef entity, Model* model)
-	{
-		while (scene.getRagdollRootBone(entity))
-		{
-			scene.destroyRagdollBone(entity, scene.getRagdollRootBone(entity));
+	void setSubtreeDynamic(EntityRef entity) {
+		WorldEditor& editor = m_app.getWorldEditor();
+		Universe& universe = *editor.getUniverse();
+		auto* phy_scene = static_cast<PhysicsScene*>(universe.getScene(RIGID_ACTOR_TYPE));
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(MODEL_INSTANCE_TYPE));
+		
+		phy_scene->setDynamicType(entity, PhysicsScene::DynamicType::DYNAMIC);
+		//render_scene->setBoneAttachmentInverse(entity, true);
+
+		for (EntityPtr e = universe.getFirstChild(entity); e.isValid(); e = universe.getNextSibling((EntityRef)e)) {
+			setSubtreeDynamic((EntityRef)e);
 		}
 
-		for (int i = 0; i < model->getBoneCount(); ++i)
-		{
-			auto& bone = model->getBone(i);
-			scene.createRagdollBone(entity, crc32(bone.name.c_str()));
+	}
+
+	void autogeneratePhySkeleton(EntityRef entity) {
+		WorldEditor& editor = m_app.getWorldEditor();
+		editor.beginCommandGroup(crc32("ragdoll"));
+		Universe& universe = *editor.getUniverse();
+		auto* phy_scene = static_cast<PhysicsScene*>(universe.getScene(RIGID_ACTOR_TYPE));
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(MODEL_INSTANCE_TYPE));
+		const Transform root_tr = universe.getTransform(entity);
+		ASSERT(render_scene);
+		Model* model = render_scene->getModelInstanceModel(entity);
+		ASSERT(model && model->isReady());
+		Array<EntityRef> entities(m_app.getAllocator());
+		for (int i = 0; i < model->getBoneCount(); ++i) {
+			const Model::Bone& bone = model->getBone(i);
+
+			const Transform tr = root_tr * bone.transform;
+
+			if (bone.parent_idx >= 0) {
+				const Model::Bone& parent_bone = model->getBone(bone.parent_idx);
+				const Vec3 parent_pos = parent_bone.transform.pos;
+				const DVec3 pos = (root_tr * parent_bone.transform).pos;
+
+				Quat rot = Quat::IDENTITY;
+				if ((parent_pos - bone.transform.pos).squaredLength() > 0.01f) {
+					rot = Quat::vec3ToVec3(Vec3(0, 1, 0), (parent_pos - bone.transform.pos).normalized());
+				}
+				const EntityRef bone_e = editor.addEntityAt(pos);
+				editor.setEntitiesRotations(&bone_e, &rot, 1);
+				entities.push(bone_e);
+				Vec3 size((bone.transform.pos - parent_pos).length() * 0.5f);
+				size.x *= 0.2f;
+				size.z *= 0.2f;
+
+				if (size.y > 0) {
+					editor.addComponent(Span(&bone_e, 1), RIGID_ACTOR_TYPE);
+					ComponentUID cmp;
+					cmp.entity = bone_e;
+					cmp.scene = phy_scene;
+					cmp.type = RIGID_ACTOR_TYPE;
+					editor.addArrayPropertyItem(cmp, "Box geometry");
+					editor.addComponent(Span(&bone_e, 1), BONE_ATTACHMENT_TYPE);
+					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Parent", Span(&bone_e, 1), entity);
+					editor.setProperty(BONE_ATTACHMENT_TYPE, "", 0, "Bone", Span(&bone_e, 1), bone.parent_idx);
+					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Size", Span(&bone_e, 1), size);
+					editor.setProperty(RIGID_ACTOR_TYPE, "Box geometry", 0, "Position offset", Span(&bone_e, 1), Vec3(0, -size.y, 0));
+					editor.setProperty(RIGID_ACTOR_TYPE, "", 0, "Dynamic", Span(&bone_e, 1), (i32)PhysicsScene::DynamicType::KINEMATIC);
+
+					editor.addComponent(Span(&bone_e, 1), SPHERICAL_JOINT_TYPE);
+					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Connected body", Span(&bone_e, 1), entities[bone.parent_idx]);
+					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Axis direction", Span(&bone_e, 1), Vec3(0, -1, 0));
+					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Use limit", Span(&bone_e, 1), true);
+					editor.setProperty(SPHERICAL_JOINT_TYPE, "", 0, "Limit", Span(&bone_e, 1), Vec2(degreesToRadians(45.f)));
+				}
+				
+				editor.makeParent(entities[bone.parent_idx], bone_e);
+			}
+			else {
+				const EntityRef bone_e = editor.addEntityAt(tr.pos);
+				editor.setEntitiesRotations(&bone_e, &tr.rot, 1);
+				entities.push(bone_e);
+				editor.makeParent(entity, bone_e);
+			}
+/*
+			auto iter = model->getBoneIndex(bone_name_hash);
+			ASSERT(iter.isValid());
+
+			auto* new_bone = LUMIX_NEW(m_allocator, RagdollBone);
+			new_bone->child = new_bone->next = new_bone->prev = new_bone->parent = nullptr;
+			new_bone->parent_joint = nullptr;
+			new_bone->is_kinematic = false;
+			new_bone->pose_bone_idx = iter.value();
+
+			float bone_height;
+			RigidTransform transform = getNewBoneTransform(model, iter.value(), bone_height);
+
+			new_bone->bind_transform = transform.inverted() * model->getBone(iter.value()).transform;
+			new_bone->inv_bind_transform = new_bone->bind_transform.inverted();
+			transform = m_universe.getTransform(entity).getRigidPart() * transform;
+
+			PxCapsuleGeometry geom;
+			geom.halfHeight = bone_height * 0.3f;
+			if (geom.halfHeight < 0.001f) geom.halfHeight = 1.0f;
+			geom.radius = geom.halfHeight * 0.5f;
+
+			PxTransform px_transform = toPhysx(transform);
+			new_bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
+			new_bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);
+			new_bone->actor->userData = (void*)(intptr_t)entity.index;
+			new_bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
+			new_bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
+			m_scene->addActor(*new_bone->actor);
+			updateFilterData(new_bone->actor, 0);
+
+			auto& ragdoll = m_ragdolls[entity];
+			new_bone->next = ragdoll.root;
+			if (new_bone->next) new_bone->next->prev = new_bone;
+			setRagdollRoot(ragdoll, new_bone);
+			auto* parent = getPhyParent(entity, model, iter.value());
+			if (parent) connect(ragdoll, new_bone, parent);
+
+			findCloserChildren(ragdoll, entity, model, new_bone);*/
 		}
+		editor.endCommandGroup();
 	}
 
 
@@ -707,16 +813,19 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	{
 		if (!ImGui::CollapsingHeader("Ragdoll")) return;
 
-		if (m_editor.getSelectedEntities().size() != 1)
-		{
-			ImGui::Text("%s", "Please select an entity.");
+		if (m_editor.getSelectedEntities().size() != 1) {
+			ImGui::Text("%s", "Please select single entity.");
 			return;
 		}
-		
+
+		EntityRef entity = m_editor.getSelectedEntities()[0];
+		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(entity);
+		if (ImGui::Button("Set subtree dynamic")) setSubtreeDynamic(entity);
+
+/*		
 		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
 		if (!render_scene) return;
 
-		EntityRef entity = m_editor.getSelectedEntities()[0];
 		bool has_model_instance = render_scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE);
 		auto* phy_scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
 
@@ -778,7 +887,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				onBonePropertiesGUI(*phy_scene, entity, crc32(bone.name.c_str()));
 			}
 		}
-		ImGui::EndChild();
+		ImGui::EndChild();*/
 	}
 
 
@@ -924,6 +1033,13 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		}*/
 	}
 
+	void onSettingsLoaded() override {
+		m_is_window_open = m_app.getSettings().getValue("is_physics_ui_open", false);
+	}
+
+	void onBeforeSettingsSaved() override {
+		m_app.getSettings().setValue("is_physics_ui_open", m_is_window_open);
+	}
 
 	void onWindowGUI() override
 	{
@@ -942,8 +1058,8 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	StudioApp& m_app;
 	WorldEditor& m_editor;
-	bool m_is_window_open;
-	int m_selected_bone;
+	bool m_is_window_open = false;
+	i32 m_selected_bone = -1;
 	Action m_toggle_ui;
 };
 

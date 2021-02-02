@@ -265,7 +265,7 @@ void AssetBrowser::dirColumn()
 	if (ImGui::Selectable("..", &b))
 	{
 		char dir[LUMIX_MAX_PATH];
-		Path::getDir(Span(dir), m_dir);
+		copyString(Span(dir), Path::getDir(m_dir));
 		changeDir(dir);
 	}
 

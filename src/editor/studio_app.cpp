@@ -929,7 +929,7 @@ struct StudioAppImpl final : StudioApp
 				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
 					const StaticString<LUMIX_MAX_PATH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[LUMIX_MAX_PATH];
-					Path::getDir(Span(dir), path);
+					copyString(Span(dir), Path::getDir(path));
 					if (!os::makePath(dir)) logError("");
 					if (!os::fileExists(path)) {
 						os::OutputFile file;
@@ -2202,7 +2202,7 @@ struct StudioAppImpl final : StudioApp
 		char tmp_path[LUMIX_MAX_PATH];
 		os::getExecutablePath(Span(tmp_path));
 		StaticString<LUMIX_MAX_PATH> copy_path;
-		Path::getDir(Span(copy_path.data), tmp_path);
+		copyString(Span(copy_path.data), Path::getDir(tmp_path));
 		copy_path << "plugins/" << iteration;
 		if (!os::makePath(copy_path)) logError("Could not create ", copy_path);
 		copyString(Span(tmp_path), Path::getBasename(src));
@@ -2268,7 +2268,7 @@ struct StudioAppImpl final : StudioApp
 			{
 				char dir[LUMIX_MAX_PATH];
 				copyString(Span(m_watched_plugin.basename.data), Path::getBasename(src));
-				Path::getDir(Span(dir), src);
+				copyString(Span(dir), Path::getDir(src));
 				m_watched_plugin.watcher = FileSystemWatcher::create(dir, m_allocator);
 				m_watched_plugin.watcher->getCallback().bind<&StudioAppImpl::onPluginChanged>(this);
 				m_watched_plugin.dir = dir;
@@ -3097,7 +3097,7 @@ struct StudioAppImpl final : StudioApp
 		if (!os::fileExists("bin/app.exe")) {
 			char tmp[LUMIX_MAX_PATH];
 			os::getExecutablePath(Span(tmp));
-			Path::getDir(Span(src_dir.data), tmp);
+			copyString(Span(src_dir.data), Path::getDir(tmp));
 		}
 
 		for (auto& file : bin_files) {

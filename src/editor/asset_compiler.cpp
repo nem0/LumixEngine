@@ -176,13 +176,11 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	static u32 dirHash(const char* path) {
-		char dir[LUMIX_MAX_PATH];
-		Path::getDir(Span(dir), getResourceFilePath(path));
-		int len = stringLength(dir);
-		if (len > 0 && (dir[len - 1] == '/' || dir[len - 1] == '\\')) {
-			--len;
-		}
-		return crc32(dir, len);
+		Span<const char> dir = Path::getDir(getResourceFilePath(path));
+		if (dir.m_end > dir.m_begin && (*(dir.m_end - 1) == '\\' || *(dir.m_end - 1) == '/')) {
+			--dir.m_end;
+		} 
+		return crc32(dir.begin(), dir.length());
 	}
 
 	void addResource(ResourceType type, const char* path) override {

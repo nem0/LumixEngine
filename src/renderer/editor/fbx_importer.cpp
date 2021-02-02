@@ -911,7 +911,7 @@ bool FBXImporter::setSource(const char* filename, bool ignore_geometry, bool for
 	}
 
 	char src_dir[LUMIX_MAX_PATH];
-	Path::getDir(Span(src_dir), filename);
+	copyString(Span(src_dir), Path::getDir(filename));
 	if (!ignore_geometry) extractEmbedded(*scene, src_dir);
 	gatherGeometries(scene);
 	gatherMeshes(scene);
