@@ -3142,6 +3142,7 @@ struct StudioAppImpl final : StudioApp
 			if (info.filename[0] == '.') continue;
 			if (info.is_directory) continue;
 			if (startsWith(info.filename, "__")) continue;
+			if (!Path::hasExtension(info.filename, "unv")) continue;
 
 			char basename[LUMIX_MAX_PATH];
 			copyString(Span(basename), Path::getBasename(info.filename));
