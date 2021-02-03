@@ -1782,8 +1782,9 @@ public:
 
 		logInfo("Saving universe ", basename, "...");
 		
-		if (!os::makePath("universes")) logError("Could not create directory universes/");
-		StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes/", basename, ".unv");
+		StaticString<LUMIX_MAX_PATH> path(m_engine.getFileSystem().getBasePath(), "universes");
+		if (!os::makePath(path)) logError("Could not create directory universes/");
+		path << "/" << basename << ".unv";
 		StaticString<LUMIX_MAX_PATH> bkp_path(path, ".bak");
 		if (os::fileExists(path)) {
 			if (!os::copyFile(path, bkp_path)) {
