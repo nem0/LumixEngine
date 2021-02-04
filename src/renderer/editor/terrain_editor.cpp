@@ -25,6 +25,7 @@
 #include "renderer/model.h"
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
+#include "renderer/terrain.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
 
@@ -677,9 +678,10 @@ void TerrainEditor::decreaseBrushSize()
 }
 
 
-void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const DVec3& center)
+void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain_entity, const DVec3& center)
 {
 	PROFILE_FUNCTION();
+	Terrain* terrain = scene.getTerrain(terrain_entity);
 	constexpr int SLICE_COUNT = 30;
 	constexpr float angle_step = PI * 2 / SLICE_COUNT;
 	if (m_mode == Mode::HEIGHT && m_is_flat_height && ImGui::GetIO().KeyCtrl) {
@@ -695,16 +697,46 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain, const DVec
 		const float angle = i * angle_step;
 		const float next_angle = i * angle_step + angle_step;
 		Vec3 local_from = local_center + Vec3(cosf(angle), 0, sinf(angle)) * brush_size;
-		local_from.y = scene.getTerrainHeightAt(terrain, local_from.x, local_from.z);
+		local_from.y = terrain->getHeight(local_from.x, local_from.z);
 		local_from.y += 0.25f;
-		Vec3 local_to =
-			local_center + Vec3(cosf(next_angle), 0, sinf(next_angle)) * brush_size;
-		local_to.y = scene.getTerrainHeightAt(terrain, local_to.x, local_to.z);
+		Vec3 local_to = local_center + Vec3(cosf(next_angle), 0, sinf(next_angle)) * brush_size;
+		local_to.y = terrain->getHeight(local_to.x, local_to.z);
 		local_to.y += 0.25f;
 
 		const DVec3 from = terrain_transform.transform(local_from);
 		const DVec3 to = terrain_transform.transform(local_to);
 		scene.addDebugLine(from, to, 0xffff0000);
+	}
+
+	const Vec3 rel_pos = terrain_transform.inverted().transform(center).toFloat();
+	const i32 w = terrain->getWidth();
+	const i32 h = terrain->getHeight();
+	const float scale = terrain->getXZScale();
+	const IVec3 p = IVec3(rel_pos / scale);
+	const i32 half_extents = i32(1 + brush_size / scale);
+	for (i32 j = p.z - half_extents; j <= p.z + half_extents; ++j) {
+		for (i32 i = p.x - half_extents; i <= p.x + half_extents; ++i) {
+			DVec3 p00(i * scale, 0, j * scale);
+			DVec3 p10((i + 1) * scale, 0, j * scale);
+			DVec3 p11((i + 1) * scale, 0, (j + 1) * scale);
+			DVec3 p01(i * scale, 0, (j + 1) * scale);
+
+			p00.y = terrain->getHeight(i, j);
+			p10.y = terrain->getHeight(i + 1, j);
+			p11.y = terrain->getHeight(i + 1, j + 1);
+			p01.y = terrain->getHeight(i, j + 1);
+
+			p00 = terrain_transform.transform(p00);
+			p10 = terrain_transform.transform(p10);
+			p01 = terrain_transform.transform(p01);
+			p11 = terrain_transform.transform(p11);
+
+			scene.addDebugLine(p00, p11, 0xff800000);
+			scene.addDebugLine(p10, p11, 0xff800000);
+			scene.addDebugLine(p00, p10, 0xff800000);
+			scene.addDebugLine(p01, p11, 0xff800000);
+			scene.addDebugLine(p00, p01, 0xff800000);
+		}
 	}
 }
 

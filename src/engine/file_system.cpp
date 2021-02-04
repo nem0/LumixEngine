@@ -81,8 +81,7 @@ struct FileSystemImpl : FileSystem {
 
 	bool hasWork() override
 	{
-		MutexGuard lock(m_mutex);
-		return !m_queue.empty();
+		return m_work_counter != 0;
 	}
 
 	const char* getBasePath() const override { return m_base_path; }
@@ -116,6 +115,7 @@ struct FileSystemImpl : FileSystem {
 		if (!file.isValid()) return AsyncHandle::invalid();
 
 		MutexGuard lock(m_mutex);
+		++m_work_counter;
 		AsyncItem& item = m_queue.emplace(m_allocator);
 		++m_last_id;
 		if (m_last_id == 0) ++m_last_id;
@@ -130,6 +130,7 @@ struct FileSystemImpl : FileSystem {
 	void cancel(AsyncHandle async) override
 	{
 		MutexGuard lock(m_mutex);
+		--m_work_counter;
 		for (AsyncItem& item : m_queue) {
 			if (item.id == async.value) {
 				item.flags.set(AsyncItem::Flags::CANCELED);
@@ -238,6 +239,7 @@ struct FileSystemImpl : FileSystem {
 
 			AsyncItem item = static_cast<AsyncItem&&>(m_finished[0]);
 			m_finished.erase(0);
+			--m_work_counter;
 
 			m_mutex.exit();
 
@@ -255,6 +257,7 @@ struct FileSystemImpl : FileSystem {
 	Local<FSTask> m_task;
 	StaticString<LUMIX_MAX_PATH> m_base_path;
 	Array<AsyncItem> m_queue;
+	u32 m_work_counter = 0;
 	Array<AsyncItem> m_finished;
 	Mutex m_mutex;
 	Semaphore m_semaphore;

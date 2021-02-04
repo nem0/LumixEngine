@@ -54,7 +54,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix");
 	bool success = os::makePath(path);
 	path << "/asset_tiles";
-	success = os::makePath(path) || success;
+	success = os::makePath(path) && success;
 	if (!success) logError("Could not create ", path);
 
 	m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);

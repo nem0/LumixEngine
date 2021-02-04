@@ -9,6 +9,7 @@ namespace Lumix
 
 
 struct Vec2;
+struct Vec3;
 struct DVec3;
 struct Matrix;
 
@@ -36,6 +37,7 @@ struct LUMIX_ENGINE_API IVec3
 	IVec3() {}
 	IVec3(int x, int y, int z) : x(x), y(y), z(z) {}
 	explicit inline IVec3(const DVec3& rhs);
+	explicit inline IVec3(const Vec3& rhs);
 	bool operator==(const IVec3& rhs) const
 	{
 		return x == rhs.x && y == rhs.y && z == rhs.z;
@@ -304,7 +306,6 @@ struct LUMIX_ENGINE_API DVec3
 	void operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
 	Vec3 toFloat() const { return {(float)x, (float)y, (float)z}; }
-	void fromFloat(const Vec3& v) { x = v.x; y = v.y; z = v.z; }
 
 	double x, y, z;
 };
@@ -321,6 +322,14 @@ Vec2 IVec2::operator/(const Vec2& rhs) { return {x / rhs.x, y / rhs.y}; }
 
 
 IVec3::IVec3(const DVec3& rhs)
+	: x(int(rhs.x))
+	, y(int(rhs.y))
+	, z(int(rhs.z))
+{
+}
+
+
+IVec3::IVec3(const Vec3& rhs)
 	: x(int(rhs.x))
 	, y(int(rhs.y))
 	, z(int(rhs.z))

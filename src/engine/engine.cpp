@@ -177,8 +177,8 @@ public:
 		if (level == LogLevel::ERROR) {
 			success = m_log_file.write("Error: ", stringLength("Error :"));
 		}
-		success = m_log_file.write(message, stringLength(message)) || success ;
-		success = m_log_file.write("\n", 1) || success ;
+		success = m_log_file.write(message, stringLength(message)) && success ;
+		success = m_log_file.write("\n", 1) && success ;
 		ASSERT(success);
 		m_log_file.flush();
 	}

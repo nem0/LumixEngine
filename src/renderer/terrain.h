@@ -69,7 +69,7 @@ struct Terrain
 		float getYScale() const { return m_scale.y; }
 		Path getGrassTypePath(int index);
 		Vec3 getScale() const { return m_scale; }
-		Vec2 getSize() const { return Vec2(m_width * m_scale.x, m_height * m_scale.z); }
+		Vec2 getSize() const { return Vec2((m_width - 1) * m_scale.x, (m_height - 1) * m_scale.z); }
 		AABB getAABB() const;
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }

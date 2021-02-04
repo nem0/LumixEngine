@@ -311,12 +311,19 @@ float Terrain::getHeight(float x, float z) const
 float Terrain::getHeight(int x, int z) const
 {
 	const float DIV64K = 1.0f / 65535.0f;
+	const float DIV255 = 1.0f / 255.0f;
 	if (!m_heightmap) return 0;
 
 	Texture* t = m_heightmap;
-	ASSERT(t->format == gpu::TextureFormat::R16);
 	int idx = clamp(x, 0, m_width) + clamp(z, 0, m_height) * m_width;
-	return m_scale.y * DIV64K * ((u16*)t->getData())[idx];
+	if (t->format == gpu::TextureFormat::R16) {
+		return m_scale.y * DIV64K * ((u16*)t->getData())[idx];
+	}
+	if (t->format == gpu::TextureFormat::RGBA8) {
+		return m_scale.y * DIV255 * (((u32*)t->getData())[idx] & 0xff);
+	}
+	ASSERT(false);
+	return 0;
 }
 
 
