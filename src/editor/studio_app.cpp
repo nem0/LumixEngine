@@ -1885,7 +1885,6 @@ struct StudioAppImpl final : StudioApp
 		m_settings.save();
 	}
 
-
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
@@ -3078,13 +3077,13 @@ struct StudioAppImpl final : StudioApp
 		success = file.write(&count, sizeof(count));
 
 		for (auto& info : infos) {
-			success = file.write(&info.hash, sizeof(info.hash)) || success;
-			success = file.write(&info.offset, sizeof(info.offset)) || success;
-			success = file.write(&info.size, sizeof(info.size)) || success;
-			success = file.write(&info.size_compressed, sizeof(info.size_compressed)) || success;
+			success = file.write(&info.hash, sizeof(info.hash)) && success;
+			success = file.write(&info.offset, sizeof(info.offset)) && success;
+			success = file.write(&info.size, sizeof(info.size)) && success;
+			success = file.write(&info.size_compressed, sizeof(info.size_compressed)) && success;
 		}
 
-		success = file.write(compressed.data(), compressed.size()) || success;
+		success = file.write(compressed.data(), compressed.size()) && success;
 		file.close();
 
 		if (!success) {

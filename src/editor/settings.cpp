@@ -442,6 +442,30 @@ void Settings::setValue(const char* name, int value) const
 }
 
 
+void Settings::setValue(const char* name, const char* value) const
+{
+	lua_getglobal(m_state, "custom");
+	lua_pushstring(m_state, value);
+	lua_setfield(m_state, -2, name);
+	lua_pop(m_state, 1);
+}
+
+
+u32 Settings::getValue(const char* name, Span<char> out) const {
+	u32 res = 0;
+	lua_getglobal(m_state, "custom");
+
+	lua_getfield(m_state, -1, name);
+	if (lua_type(m_state, -1) == LUA_TSTRING) {
+		const char* s = lua_tostring(m_state, -1);
+		res = (u32)strlen(s);
+		copyString(out, s);
+	}
+	lua_pop(m_state, 1);
+	return res;
+}
+
+
 int Settings::getValue(const char* name, int default_value) const
 {
 	lua_getglobal(m_state, "custom");
@@ -519,6 +543,9 @@ bool Settings::save()
 				break;
 			case LUA_TNUMBER:
 				file << name << " = " << (int)lua_tonumber(m_state, -1);
+				break;
+			case LUA_TSTRING:
+				file << name << " = [[" << lua_tostring(m_state, -1) << "]]";
 				break;
 			default:
 				ASSERT(false);
