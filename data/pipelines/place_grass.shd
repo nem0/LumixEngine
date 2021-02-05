@@ -33,6 +33,7 @@ compute_shader [[
 		uint u_type;
 		float u_radius;
 		uint u_rotation_mode;
+		vec2 u_terrain_xz_scale;
 	};
 
 	vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
@@ -97,7 +98,8 @@ compute_shader [[
 		inst_pos.xz = (u_from + vec2(gl_GlobalInvocationID.xy)) * 0.25;
 		
 		if (any(lessThan(inst_pos.xz, vec2(0)))) return;
-		uvec4 splat = uvec4(texture(u_splatmap, (inst_pos.xz + 0.5) / u_terrain_size) * 255.0 + 0.5);
+		vec2 uv = (inst_pos.xz / (u_terrain_size + u_terrain_xz_scale)) + 0.5 / (u_terrain_size.x / u_terrain_xz_scale + 1);
+		uvec4 splat = uvec4(texture(u_splatmap, uv) * 255.0 + 0.5);
 
 		uint mask = (splat.w << 8) | splat.z;
 		
@@ -107,7 +109,9 @@ compute_shader [[
 
 			inst_pos.x += (fract(r * 2531) * 2 - 1) * 0.5;
 			inst_pos.z += (fract(r * 2819) * 2 - 1) * 0.5;
-			inst_pos.y += texture(u_heightmap, (inst_pos.xz + 0.5) / u_terrain_size).x * u_terrain_y_scale;
+			
+			vec2 uv = (inst_pos.xz / (u_terrain_size + u_terrain_xz_scale)) + 0.5 / (u_terrain_size.x / u_terrain_xz_scale + 1);
+			inst_pos.y += texture(u_heightmap, uv).x * u_terrain_y_scale;
 
 			inst_pos += u_pos.xyz;
 			float dist_t = saturate(length(inst_pos) / u_distance);

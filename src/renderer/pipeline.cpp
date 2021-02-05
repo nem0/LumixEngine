@@ -3734,6 +3734,7 @@ struct PipelineImpl final : Pipeline
 						grass.splatmap = terrain->m_splatmap ? terrain->m_splatmap->handle : gpu::INVALID_TEXTURE;
 						grass.terrain_size = terrain->getSize();
 						grass.terrain_y_scale = terrain->getYScale();
+						grass.terrain_xz_scale = Vec2(terrain->getXZScale());
 						grass.grass_height = type.m_grass_model->getAABB().max.y;
 						grass.type = u32(&type - terrain->m_grass_types.begin());
 						grass.radius = type.m_grass_model->getOriginBoundingRadius();
@@ -3779,6 +3780,7 @@ struct PipelineImpl final : Pipeline
 					u32 type;
 					float radius;
 					u32 rotation_mode;
+					Vec2 terrain_xz_scale;
 				} dc;
 				dc.pos = Vec4(grass.mtx.getTranslation(), 1);
 				dc.from = grass.from;
@@ -3792,6 +3794,7 @@ struct PipelineImpl final : Pipeline
 				dc.type = grass.type;
 				dc.radius = grass.radius;
 				dc.rotation_mode = grass.rotation_mode;
+				dc.terrain_xz_scale = grass.terrain_xz_scale;
 				gpu::update(m_pipeline->m_drawcall_ub, &dc, sizeof(dc));
 
 				Indirect indirect_dc;
@@ -3851,6 +3854,7 @@ struct PipelineImpl final : Pipeline
 			gpu::ProgramHandle program;
 			Vec2 terrain_size;
 			float terrain_y_scale;
+			Vec2 terrain_xz_scale;
 			float grass_height;
 			IVec2 from;
 			IVec2 to;
