@@ -3491,8 +3491,11 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 		unsigned char* pixels;
 		int width, height;
-		ImGuiFreeType::BuildFontAtlas(ImGui::GetIO().Fonts);
-		ImGui::GetIO().Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+		ImFontAtlas* atlas = ImGui::GetIO().Fonts;
+		atlas->FontBuilderIO = ImGuiFreeType::GetBuilderForFreeType();
+		atlas->FontBuilderFlags = 0;
+		atlas->Build();
+		atlas->GetTexDataAsRGBA32(&pixels, &width, &height);
 
 		const Renderer::MemRef mem = renderer->copy(pixels, width * height * 4);
 		m_texture = renderer->createTexture(width, height, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, mem, "editor_font_atlas");
