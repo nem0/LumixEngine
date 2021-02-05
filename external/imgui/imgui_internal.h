@@ -1241,6 +1241,7 @@ struct ImGuiDockNode
     bool                    WantHiddenTabBarUpdate  :1;
     bool                    WantHiddenTabBarToggle  :1;
     bool                    MarkedForPosSizeWrite   :1; // Update by DockNodeTreeUpdatePosSize() write-filtering
+    bool                    FirstTabBarUpdate       :1;
 
     ImGuiDockNode(ImGuiID id);
     ~ImGuiDockNode();

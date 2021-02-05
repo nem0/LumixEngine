@@ -6943,7 +6943,10 @@ void ImGui::FocusWindow(ImGuiWindow* window)
 
     // Select in dock node
     if (dock_node && dock_node->TabBar)
+    {
         dock_node->TabBar->SelectedTabId = dock_node->TabBar->NextSelectedTabId = window->ID;
+        MarkIniSettingsDirty(window);
+    }
 
     // Bring to front
     BringWindowToFocusFront(focus_front_window);
@@ -6973,6 +6976,18 @@ void ImGui::FocusTopMostWindowUnderOne(ImGuiWindow* under_this_window, ImGuiWind
                 // If A and B are docked into window and B disappear, at the NewFrame() call site window->NavLastChildNavWindow will still point to B.
                 // We might leverage the tab order implicitly stored in window->DockNodeAsHost->TabBar (essentially the 'most_recently_selected_tab' code in tab bar will do that but on next update)
                 // to tell which is the "previous" window. Or we may leverage 'LastFrameFocused/LastFrameJustFocused' and have this function handle child window itself?
+                if (window->DockNode)
+                {
+                    for (int i = 0; i < window->DockNode->Windows.Size; ++i)
+                    {
+                        if (window->DockNode->Windows[i]->ID == window->DockNode->SelectedTabId)
+                        {
+                            window = window->DockNode->Windows[i];
+                            break;
+                        }
+                    }
+                }
+
                 ImGuiWindow* focus_window = NavRestoreLastChildNavWindow(window);
                 FocusWindow(focus_window);
                 return;
@@ -12795,6 +12810,7 @@ ImGuiDockNode::ImGuiDockNode(ImGuiID id)
     IsFocused = HasCloseButton = HasWindowMenuButton = EnableCloseButton = false;
     WantCloseAll = WantLockSizeOnce = WantMouseMove = WantHiddenTabBarUpdate = WantHiddenTabBarToggle = false;
     MarkedForPosSizeWrite = false;
+	FirstTabBarUpdate = true;
 }
 
 ImGuiDockNode::~ImGuiDockNode()
@@ -13431,7 +13447,21 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
         node->IsFocused = false;
     }
     if (node->TabBar && node->TabBar->SelectedTabId)
+    {
+        // restore selected tab from previous session
+        if (node->FirstTabBarUpdate) {
+            for (int i = 0; i < node->Windows.Size; ++i)
+            {
+                if (node->SelectedTabId == node->Windows[i]->ID)
+                {
+                    FocusWindow(node->Windows[i]);
+                    break;
+                }
+            }
+            node->FirstTabBarUpdate = false;
+        }
         node->SelectedTabId = node->TabBar->SelectedTabId;
+    }
     else if (node->Windows.Size > 0)
         node->SelectedTabId = node->Windows[0]->ID;
 
