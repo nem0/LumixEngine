@@ -500,7 +500,7 @@ namespace ImGuiEx {
 			PushID(point_idx);
 			if ((flags & (int)CurveEditorFlags::NO_TANGENTS) == 0)
 			{
-				window->DrawList->AddBezierCurve(
+				window->DrawList->AddBezierCubic(
 					transform(p_prev),
 					transform(p_prev + tangent_last),
 					transform(p + tangent),
