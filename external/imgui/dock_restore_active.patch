@@ -1,0 +1,63 @@
+diff --git a/imgui.cpp b/imgui.cpp
+index 6f3e9494..1aebd03d 100644
+--- a/imgui.cpp
++++ b/imgui.cpp
+@@ -6943,7 +6943,10 @@ void ImGui::FocusWindow(ImGuiWindow* window)
+ 
+     // Select in dock node
+     if (dock_node && dock_node->TabBar)
++    {
+         dock_node->TabBar->SelectedTabId = dock_node->TabBar->NextSelectedTabId = window->ID;
++        MarkIniSettingsDirty(window);
++    }
+ 
+     // Bring to front
+     BringWindowToFocusFront(focus_front_window);
+@@ -6973,6 +6976,18 @@ void ImGui::FocusTopMostWindowUnderOne(ImGuiWindow* under_this_window, ImGuiWind
+                 // If A and B are docked into window and B disappear, at the NewFrame() call site window->NavLastChildNavWindow will still point to B.
+                 // We might leverage the tab order implicitly stored in window->DockNodeAsHost->TabBar (essentially the 'most_recently_selected_tab' code in tab bar will do that but on next update)
+                 // to tell which is the "previous" window. Or we may leverage 'LastFrameFocused/LastFrameJustFocused' and have this function handle child window itself?
++                if (window->DockNode)
++                {
++                    for (int i = 0; i < window->DockNode->Windows.Size; ++i)
++                    {
++                        if (window->DockNode->Windows[i]->ID == window->DockNode->SelectedTabId)
++                        {
++                            window = window->DockNode->Windows[i];
++                            break;
++                        }
++                    }
++                }
++
+                 ImGuiWindow* focus_window = NavRestoreLastChildNavWindow(window);
+                 FocusWindow(focus_window);
+                 return;
+@@ -13181,6 +13196,7 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
+ {
+     ImGuiContext& g = *GImGui;
+     IM_ASSERT(node->LastFrameActive != g.FrameCount);
++    bool first_time_alive = node->LastFrameAlive == -1; 
+     node->LastFrameAlive = g.FrameCount;
+     node->MarkedForPosSizeWrite = false;
+ 
+@@ -13431,7 +13447,20 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
+         node->IsFocused = false;
+     }
+     if (node->TabBar && node->TabBar->SelectedTabId)
++    {
++        // restore selected tab from previous session
++        if (first_time_alive) {
++            for (int i = 0; i < node->Windows.Size; ++i)
++            {
++                if (node->SelectedTabId == node->Windows[i]->ID)
++                {
++                    node->TabBar->SelectedTabId = node->TabBar->NextSelectedTabId = node->SelectedTabId;
++                    break;
++                }
++            }
++        }
+         node->SelectedTabId = node->TabBar->SelectedTabId;
++    }
+     else if (node->Windows.Size > 0)
+         node->SelectedTabId = node->Windows[0]->ID;
+ 
