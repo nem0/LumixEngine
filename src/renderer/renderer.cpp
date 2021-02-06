@@ -32,7 +32,7 @@ namespace Lumix
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
-static constexpr char* downscale_src = R"#(
+static const char* downscale_src = R"#(
 	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 	layout (rgba8, binding = 0) uniform readonly image2D u_src;
 	layout (rgba8, binding = 1) uniform writeonly image2D u_dst;
