@@ -438,7 +438,7 @@ bool copyString(Span<char> dst, Span<const char> src)
 {
 	if (dst.length() < 1) return false;
 	if (src.length() < 1) {
-		dst.m_begin = dst.m_end = nullptr;
+		*dst.m_begin = 0;
 		return true;
 	}
 

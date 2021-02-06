@@ -135,9 +135,6 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			);
 			AssetCompiler& compiler = m_app.getAssetCompiler();
 			compiler.updateMeta(resources[0]->getPath(), src);
-			if (compiler.compile(resources[0]->getPath())) {
-				resources[0]->getResourceManager().reload(*resources[0]);
-			}
 		}
 
 	}

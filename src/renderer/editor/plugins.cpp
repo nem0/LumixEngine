@@ -1401,9 +1401,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					, "\nfilter = \"", toString(m_meta.filter), "\""
 				);
 				compiler.updateMeta(texture->getPath(), src);
-				if (compiler.compile(texture->getPath())) {
-					texture->getResourceManager().reload(*texture);
-				}
 			}
 		}
 	}
@@ -2118,9 +2115,6 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 
 				compiler.updateMeta(model->getPath(), src.c_str());
-				if (compiler.compile(model->getPath())) {
-					model->getResourceManager().reload(*model);
-				}
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Create impostor texture")) {
