@@ -2246,6 +2246,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 				renderer->destroy(m_tile.texture);
 				m_tile.entity = INVALID_ENTITY;
+				m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			}
 			return;
 		}
@@ -2391,13 +2392,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		mtx = mtx.inverted();
 
 		Viewport viewport;
-		viewport.near = 0.f;
+		viewport.near = -4 * radius;
 		viewport.far = 4 * radius;
 		viewport.is_ortho = true;
 		viewport.ortho_size = radius * 1.1f;
 		viewport.h = AssetBrowser::TILE_SIZE;
 		viewport.w = AssetBrowser::TILE_SIZE;
-		viewport.pos = in_pos ? *in_pos : DVec3(eye);
+		viewport.pos = DVec3(center);
 		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
