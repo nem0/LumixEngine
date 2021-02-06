@@ -567,6 +567,12 @@ inline float dotProduct(const Vec3& op1, const Vec3& op2)
 }
 
 
+inline float dotProduct(const Vec2& op1, const Vec2& op2)
+{
+	return op1.x * op2.x + op1.y * op2.y;
+}
+
+
 inline Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
 {
 	return Vec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
@@ -1086,6 +1092,12 @@ template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 minimum(T1 a, T2...
 	return a < min_b ? a : min_b;
 }
 
+LUMIX_FORCE_INLINE Vec2 minimum(const Vec2& a, const Vec2& b) {
+	return {
+		minimum(a.x, b.x),
+		minimum(a.y, b.y),
+	};
+}
 
 template <typename T> LUMIX_FORCE_INLINE T maximum(T a)
 {
@@ -1099,6 +1111,12 @@ template <typename T1, typename... T2> LUMIX_FORCE_INLINE T1 maximum(T1 a, T2...
 	return a > min_b ? a : min_b;
 }
 
+LUMIX_FORCE_INLINE Vec2 maximum(const Vec2& a, const Vec2& b) {
+	return {
+		maximum(a.x, b.x),
+		maximum(a.y, b.y),
+	};
+}
 
 // converts float to u32 so it can be used in radix sort
 // float float_value = 0;
