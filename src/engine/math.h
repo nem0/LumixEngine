@@ -585,6 +585,11 @@ inline DVec3 crossProduct(const DVec3& op1, const DVec3& op2)
 }
 
 
+inline float lerp(float a, float b, float t)
+{
+	return a * (1 - t) + b * t;
+}
+
 inline Vec3 lerp(const Vec3& op1, const Vec3& op2, float t)
 {
 	Vec3 res;

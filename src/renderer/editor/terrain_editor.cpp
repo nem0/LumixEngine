@@ -731,7 +731,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain_entity, con
 			p01 = terrain_transform.transform(p01);
 			p11 = terrain_transform.transform(p11);
 
-			scene.addDebugLine(p00, p11, 0xff800000);
+			scene.addDebugLine(p10, p01, 0xff800000);
 			scene.addDebugLine(p10, p11, 0xff800000);
 			scene.addDebugLine(p00, p10, 0xff800000);
 			scene.addDebugLine(p01, p11, 0xff800000);
