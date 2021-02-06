@@ -437,7 +437,10 @@ void AssetBrowser::fileColumn()
 				{
 					if (i > 0) ImGui::SameLine();
 					int idx = getThumbnailIndex(i, j, columns);
-					if (idx < 0) break;
+					if (idx < 0) {
+						ImGui::NewLine();
+						break;
+					}
 					FileInfo& tile = m_file_infos[idx];
 					thumbnail(tile, m_thumbnail_size * TILE_SIZE);
 					callbacks(tile, idx);
