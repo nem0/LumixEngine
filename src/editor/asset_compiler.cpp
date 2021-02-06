@@ -565,7 +565,10 @@ struct AssetCompilerImpl : AssetCompiler
 		ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f + pos.x, 30 + pos.y));
 		ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
 		ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
-		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar
+			| ImGuiWindowFlags_NoFocusOnAppearing
+			| ImGuiWindowFlags_NoInputs
+			| ImGuiWindowFlags_NoNav
 			| ImGuiWindowFlags_AlwaysAutoResize
 			| ImGuiWindowFlags_NoMove
 			| ImGuiWindowFlags_NoSavedSettings;
