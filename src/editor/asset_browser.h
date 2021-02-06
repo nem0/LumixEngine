@@ -62,6 +62,7 @@ public:
 	OutputMemoryStream* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);
 	void releaseResources();
+	void reloadTile(u32 hash);
 
 public:
 	bool m_is_open;

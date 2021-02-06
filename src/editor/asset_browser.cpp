@@ -377,6 +377,16 @@ void AssetBrowser::deleteTile(u32 idx) {
 	}
 }
 
+void AssetBrowser::reloadTile(u32 hash) {
+	for (FileInfo& fi : m_file_infos) {
+		if (fi.file_path_hash == hash) {
+			m_app.getRenderInterface()->unloadTexture(fi.tex);
+			fi.tex = nullptr;
+			break;
+		}
+	}
+}
+
 void AssetBrowser::fileColumn()
 {
 	ImGui::BeginChild("main_col");
