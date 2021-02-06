@@ -2319,6 +2319,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		AABB aabb({0, 0, 0}, {0, 0, 0});
 
+		float radius = 1;
 		Universe& universe = *m_tile.universe;
 		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
 			EntityRef ent = (EntityRef)e;
@@ -2334,6 +2335,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					for (const DVec3& p : points) {
 						aabb.addPoint(p.toFloat());
 					}
+					radius = maximum(radius, model->getCenterBoundingRadius());
 				}
 			}
 		}
@@ -2341,23 +2343,26 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
 		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
 		Matrix mtx;
-		mtx.lookAt(eye, center, Vec3(-1, 1, -1).normalized());
-		mtx = mtx.inverted();
+		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
 		Viewport viewport;
-		viewport.is_ortho = false;
-		viewport.far = 10000.f;
-		viewport.near = 0.1f;
-		viewport.fov = degreesToRadians(60.f);
-		viewport.h = AssetBrowser::TILE_SIZE;
-		viewport.w = AssetBrowser::TILE_SIZE;
-		viewport.pos = DVec3(eye.x, eye.y, eye.z);
-		viewport.rot = mtx.getRotation();
+		viewport.is_ortho = true;
+		viewport.ortho_size = radius * 1.1f;
+		viewport.far = 4 * radius;
+		viewport.near = -4 * radius;
+		viewport.h = AssetBrowser::TILE_SIZE * 4;
+		viewport.w = AssetBrowser::TILE_SIZE * 4;
+		viewport.pos = DVec3(center);
+		viewport.rot = mtx.getRotation().conjugated();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
 
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		m_tile.texture = gpu::allocTextureHandle(); 
-		renderer->getTextureImage(m_tile.pipeline->getOutput()
+
+		Renderer::MemRef mem;
+		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NONE, mem, "tile_final");
+		renderer->downscale(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+
+		renderer->getTextureImage(m_tile.texture
 			, AssetBrowser::TILE_SIZE
 			, AssetBrowser::TILE_SIZE
 			, gpu::TextureFormat::RGBA8

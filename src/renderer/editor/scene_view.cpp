@@ -1088,7 +1088,17 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		ResourceManagerHub& manager = m_editor.getEngine().getResourceManager();
 		PrefabResource* prefab = manager.load<PrefabResource>(Path(path));
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
-		m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, 1);
+		if (prefab->isEmpty()) {
+			FileSystem& fs = m_editor.getEngine().getFileSystem();
+			while (fs.hasWork()) fs.processCallbacks();
+		}
+		if (prefab->isReady()) {
+			m_editor.getPrefabSystem().instantiatePrefab(*prefab, pos, Quat::IDENTITY, 1);
+		}
+		else {
+			ASSERT(prefab->isFailure());
+			logError("Failed to load ", prefab->getPath());
+		}
 	}
 	else if (Path::hasExtension(path, "phy"))
 	{
