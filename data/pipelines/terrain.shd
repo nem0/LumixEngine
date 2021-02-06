@@ -301,6 +301,7 @@ fragment_shader [[
 			surface.roughness = 0.9;
 			surface.metallic  = 0;
 			surface.emission = 0;
+			surface.translucency = 0;
 			return surface;
 		}
 	#endif

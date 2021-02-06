@@ -141,6 +141,7 @@ fragment_shader [[
 		data.N = texture(u_normalmap, v_uv).xzy * 2 - 1;
 		data.N = tbn * data.N;
 		data.emission = u_emission;
+		data.translucency = u_translucency;
 		return data;
 	}
 	

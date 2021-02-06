@@ -41,6 +41,7 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	, m_metallic(0.f)
 	, m_roughness(1.f)
 	, m_emission(0.0f)
+	, m_translucency(0.0f)
 	, m_define_mask(0)
 	, m_custom_flags(0)
 	, m_render_data(nullptr)
@@ -152,6 +153,7 @@ void Material::unload()
 	m_metallic = 0.0f;
 	m_roughness = 1.0f;
 	m_emission = 0.0f;
+	m_translucency = 0.0f;
 	m_render_states = gpu::StateFlags::CULL_BACK;
 }
 
@@ -165,6 +167,7 @@ bool Material::save(IOutputStream& file)
 	file << "backface_culling(" << (isBackfaceCulling() ? "true" : "false") << ")\n";
 	file << "layer \"" << m_renderer.getLayerName(m_layer) << "\"\n";
 
+	file << "translucency(" <<  m_translucency << ")\n";
 	file << "emission(" <<  m_emission << ")\n";
 	file << "metallic(" <<  m_metallic << ")\n";
 	file << "roughness(" <<  m_roughness << ")\n";
@@ -405,6 +408,7 @@ void Material::updateRenderData(bool on_before_ready)
 	static_assert(sizeof(cs) == 256, "Renderer::MaterialConstants must have 256B");
 	cs.color = m_color;
 	cs.emission = m_emission;
+	cs.translucency = m_translucency;
 	cs.metallic = m_metallic;
 	cs.roughness = m_roughness;
 	memset(cs.custom, 0, sizeof(cs.custom));
@@ -591,6 +595,18 @@ int emission(lua_State* L)
 }
 
 
+int translucency(lua_State* L)
+{
+	const float m = LuaWrapper::checkArg<float>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+
+	material->setTranslucency(m);
+	return 0;
+}
+
+
 int defines(lua_State* L)
 {
 	lua_getfield(L, LUA_GLOBALSINDEX, "this");
@@ -732,6 +748,7 @@ MaterialManager::MaterialManager(Renderer& renderer, IAllocator& allocator)
 	DEFINE_LUA_FUNC(custom_flag);
 	DEFINE_LUA_FUNC(defines);
 	DEFINE_LUA_FUNC(emission);
+	DEFINE_LUA_FUNC(translucency);
 	DEFINE_LUA_FUNC(layer);
 	DEFINE_LUA_FUNC(metallic);
 	DEFINE_LUA_FUNC(roughness);
