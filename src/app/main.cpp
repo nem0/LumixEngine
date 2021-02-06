@@ -92,7 +92,7 @@ struct Runner final
 		
 		RenderScene* render_scene = (RenderScene*)m_universe->getScene(crc32("renderer"));
 		Environment& environment = render_scene->getEnvironment(env);
-		environment.diffuse_intensity = 3;
+		environment.direct_intensity = 3;
 		
 		Quat rot;
 		rot.fromEuler(Vec3(degreesToRadians(45.f), 0, 0));
