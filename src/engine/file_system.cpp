@@ -130,7 +130,6 @@ struct FileSystemImpl : FileSystem {
 	void cancel(AsyncHandle async) override
 	{
 		MutexGuard lock(m_mutex);
-		--m_work_counter;
 		for (AsyncItem& item : m_queue) {
 			if (item.id == async.value) {
 				item.flags.set(AsyncItem::Flags::CANCELED);
@@ -239,6 +238,7 @@ struct FileSystemImpl : FileSystem {
 
 			AsyncItem item = static_cast<AsyncItem&&>(m_finished[0]);
 			m_finished.erase(0);
+			ASSERT(m_work_counter > 0);
 			--m_work_counter;
 
 			m_mutex.exit();
