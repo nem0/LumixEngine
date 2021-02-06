@@ -2302,8 +2302,8 @@ public:
 		Environment light;
 		light.flags.set(Environment::CAST_SHADOWS);
 		light.entity = entity;
-		light.diffuse_color.set(1, 1, 1);
-		light.diffuse_intensity = 1;
+		light.light_color.set(1, 1, 1);
+		light.direct_intensity = 1;
 		light.indirect_intensity = 1;
 		light.cascades.set(3, 8, 20, 60);
 
@@ -2579,8 +2579,8 @@ void RenderScene::reflect() {
 		),
 		LUMIX_CMP(Environment, "environment", "Render / Environment",
 			icon(ICON_FA_GLOBE),
-			var_property("Color", &RenderScene::getEnvironment, &Environment::diffuse_color, ColorAttribute()),
-			var_property("Intensity", &RenderScene::getEnvironment, &Environment::diffuse_intensity, MinAttribute(0)),
+			var_property("Color", &RenderScene::getEnvironment, &Environment::light_color, ColorAttribute()),
+			var_property("Intensity", &RenderScene::getEnvironment, &Environment::direct_intensity, MinAttribute(0)),
 			var_property("Indirect intensity", &RenderScene::getEnvironment, &Environment::indirect_intensity, MinAttribute(0)),
 			LUMIX_PROP(ShadowmapCascades, "Shadow cascades"),
 			LUMIX_PROP(EnvironmentCastShadows, "Cast shadows")

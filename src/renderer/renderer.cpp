@@ -32,6 +32,25 @@ namespace Lumix
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
+static constexpr char* downscale_src = R"#(
+	layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+	layout (rgba8, binding = 0) uniform readonly image2D u_src;
+	layout (rgba8, binding = 1) uniform writeonly image2D u_dst;
+	layout(std140, binding = 4) uniform Data {
+		ivec2 u_scale;
+	};
+	void main() {
+		vec4 accum = vec4(0);
+		for (int j = 0; j < u_scale.y; ++j) {
+			for (int i = 0; i < u_scale.x; ++i) {
+				vec4 v = imageLoad(u_src, ivec2(gl_GlobalInvocationID.xy) * u_scale + ivec2(i, j));
+				accum += v;
+			}
+		}
+		accum *= 1.0 / (u_scale.x * u_scale.y);
+		imageStore(u_dst, ivec2(gl_GlobalInvocationID.xy), accum);
+	}
+)#";
 
 
 struct TransientBuffer {
@@ -466,7 +485,13 @@ struct RendererImpl final : Renderer
 				, nullptr
 			);
 
-			;
+			renderer.m_downscale_program = gpu::allocProgramHandle();
+			const gpu::ShaderType type = gpu::ShaderType::COMPUTE;
+			const char* srcs[] = { downscale_src };
+			gpu::createProgram(renderer.m_downscale_program, {}, srcs, &type, 1, nullptr, 0, "downscale");
+
+			renderer.m_tmp_uniform_buffer = gpu::allocBufferHandle();
+			gpu::createBuffer(renderer.m_tmp_uniform_buffer, gpu::BufferFlags::UNIFORM_BUFFER, 16 * 1024, nullptr);
 
 			MaterialConsts default_mat;
 			default_mat.color = Vec4(1, 0, 1, 1);
@@ -807,6 +832,41 @@ struct RendererImpl final : Renderer
 	}
 
 
+	void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) override {
+		ASSERT(src_w % dst_w == 0);
+		ASSERT(src_h % dst_h == 0);
+		struct Cmd : RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				
+				const IVec2 scale = src_size / dst_size;
+				gpu::update(ub, &scale, sizeof(scale));
+				gpu::bindUniformBuffer(4, ub, 0, sizeof(scale));
+				gpu::bindImageTexture(src, 0);
+				gpu::bindImageTexture(dst, 1);
+				gpu::useProgram(program);
+				gpu::dispatch((dst_size.x + 15) / 16, (dst_size.y + 15) / 16, 1);
+			}
+
+			gpu::TextureHandle src;
+			gpu::TextureHandle dst;
+			gpu::ProgramHandle program;
+			gpu::BufferHandle ub;
+			IVec2 src_size;
+			IVec2 dst_size;
+		};
+		Cmd& cmd = createJob<Cmd>();
+		cmd.src = src;
+		cmd.dst = dst;
+		cmd.src_size = {(i32)src_w, (i32)src_h};
+		cmd.dst_size = {(i32)dst_w, (i32)dst_h};
+		cmd.program = m_downscale_program;
+		cmd.ub = m_tmp_uniform_buffer;
+		queue(cmd, 0);
+	}
+
+
 	gpu::TextureHandle createTexture(u32 w, u32 h, u32 depth, gpu::TextureFormat format, gpu::TextureFlags flags, const MemRef& memory, const char* debug_name) override
 	{
 		gpu::TextureHandle handle = gpu::allocTextureHandle();
@@ -1089,6 +1149,8 @@ struct RendererImpl final : Renderer
 	RenderResourceManager<PipelineResource> m_pipeline_manager;
 	RenderResourceManager<Shader> m_shader_manager;
 	RenderResourceManager<Texture> m_texture_manager;
+	gpu::ProgramHandle m_downscale_program;
+	gpu::BufferHandle m_tmp_uniform_buffer;
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[3];
