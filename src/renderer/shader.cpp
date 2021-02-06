@@ -119,6 +119,9 @@ int ignore_property(lua_State* L) {
 	else if (equalIStrings(name, "emission")) {
 		shader->ignoreProperty(Shader::EMISSION);
 	}
+	else if (equalIStrings(name, "translucency")) {
+		shader->ignoreProperty(Shader::TRANSLUCENCY);
+	}
 	else if (equalIStrings(name, "color")) {
 		shader->ignoreProperty(Shader::COLOR);
 	}
@@ -439,7 +442,7 @@ void Shader::onBeforeReady() {
 			float u_roughness;
 			float u_metallic;
 			float u_emission;
-			float padding;
+			float u_translucency;
 		)#");
 
 	for (const Uniform& u : m_uniforms) {

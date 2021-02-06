@@ -64,6 +64,7 @@ struct Surface {
 	float roughness;
 	float metallic;
 	float emission;
+	float translucency;
 	vec3 N;
 	vec3 V;
 	vec3 wpos;
@@ -356,7 +357,8 @@ vec3 computeDirectLight(Surface surface, vec3 L, vec3 light_color)
 	vec3 H = normalize(surface.V + L);
 	float ldoth = saturate(dot(L, H));
 	float ndoth = saturate(dot(surface.N, H));
-	float ndotl = saturate(dot(surface.N, L));
+	float ndotl_full = dot(surface.N, L);
+	float ndotl = saturate(ndotl_full);
 	float hdotv = saturate(dot(H, surface.V));
 	
 	// D GGX
@@ -378,7 +380,9 @@ vec3 computeDirectLight(Surface surface, vec3 L, vec3 light_color)
 	vec3 kD = vec3(1.0) - F;
 	kD *= 1.0 - surface.metallic;
 	
-	return (kD * surface.albedo / M_PI + specular) * light_color * ndotl;
+	vec3 diffuse = kD * surface.albedo / M_PI;
+	return (diffuse + specular) * light_color * ndotl
+		+ surface.translucency * diffuse * light_color * max(0, -ndotl_full);
 }	
 
 
@@ -518,7 +522,7 @@ vec3 vegetationAnim(vec3 obj_pos, vec3 vertex_pos) {
 void packSurface(Surface surface, out vec4 gbuffer0, out vec4 gbuffer1, out vec4 gbuffer2) {
 	gbuffer0 = vec4(surface.albedo.rgb, surface.roughness);
 	gbuffer1 = vec4(surface.N * 0.5 + 0.5, surface.metallic);
-	gbuffer2 = vec4(packEmission(surface.emission), 0, 0, 1);
+	gbuffer2 = vec4(packEmission(surface.emission), surface.translucency, 0, 1);
 }
 
 Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D gbuffer2, sampler2D gbuffer_depth, out float ndc_depth) {
@@ -534,6 +538,7 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 	surface.emission = unpackEmission(gb2.x);
 	surface.wpos = getViewPosition(gbuffer_depth, Global.inv_view_projection, uv, ndc_depth);
 	surface.V = normalize(-surface.wpos);
+	surface.translucency = gb2.y;
 	return surface;
 }
 

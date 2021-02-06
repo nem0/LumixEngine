@@ -171,8 +171,8 @@ fragment_shader [[
 		vec3 tangent = v_tangent;
 		#ifdef VEGETATION
 			if (!gl_FrontFacing) {
-				//N = -N;
-				//tangent = -tangent;
+				N = -N;
+				tangent = -tangent;
 			}
 		#endif
 
@@ -190,6 +190,7 @@ fragment_shader [[
 		data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 		data.N = tbn * data.N;
 		data.emission = u_emission;
+		data.translucency = u_translucency;
 		#ifdef GRASS 
 			data.N = normalize(v_normal);
 			data.N = normalize(mix(data.N, Global.light_dir.xyz, 0.2));

@@ -38,7 +38,8 @@ public:
 		COLOR,
 		ROUGHNESS,
 		METALLIC,
-		EMISSION
+		EMISSION,
+		TRANSLUCENCY
 	};
 
 	struct Uniform

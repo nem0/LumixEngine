@@ -542,6 +542,14 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					material->setEmission(emission);
 				}
 			}
+
+			if (!shader->isIgnored(Shader::TRANSLUCENCY)) {
+				float translucency = material->getTranslucency();
+				ImGuiEx::Label("Translucency");
+				if (ImGui::DragFloat("##trns", &translucency, 0.01f, 0.f, 1.f)) {
+					material->setTranslucency(translucency);
+				}
+			}
 		}
 
 		char buf[LUMIX_MAX_PATH];

@@ -24,7 +24,7 @@ struct  MaterialConsts {
 	float roughness;
 	float metallic;
 	float emission;
-	float padding;
+	float translucency;
 	float custom[56];
 };
 
@@ -86,6 +86,8 @@ public:
 	void setRoughness(float value) { m_roughness = value; updateRenderData(false); }
 	float getEmission() const { return m_emission; }
 	void setEmission(float value) { m_emission = value; updateRenderData(false); }
+	float getTranslucency() const { return m_translucency; }
+	void setTranslucency(float value) { m_translucency = value; updateRenderData(false); }
 	Vec4 getColor() const { return m_color; }
 	void setColor(const Vec4& color) { m_color = color; updateRenderData(false); }
 	float getAlphaRef() const { return m_alpha_ref; }
@@ -140,6 +142,7 @@ private:
 	float m_metallic;
 	float m_roughness;
 	float m_emission;
+	float m_translucency;
 	Vec4 m_color;
 	float m_alpha_ref;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
