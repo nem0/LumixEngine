@@ -66,8 +66,8 @@ struct Environment
 		CAST_SHADOWS = 1 << 0
 	};
 
-	Vec3 diffuse_color;
-	float diffuse_intensity;
+	Vec3 light_color;
+	float direct_intensity;
 	float indirect_intensity;
 	EntityRef entity;
 	Vec4 cascades;

@@ -100,6 +100,7 @@ private:
 	void goForward();
 	void deleteTile(u32 idx);
 	void onResourceListChanged();
+	void recreateTiles();
 
 
 private:

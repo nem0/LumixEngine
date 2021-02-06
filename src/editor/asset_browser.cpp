@@ -387,6 +387,13 @@ void AssetBrowser::reloadTile(u32 hash) {
 	}
 }
 
+void AssetBrowser::recreateTiles() {
+	for (FileInfo& fi : m_file_infos) {
+		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", fi.file_path_hash, ".res");
+		createTile(fi, path);
+	}
+}
+
 void AssetBrowser::fileColumn()
 {
 	ImGui::BeginChild("main_col");
@@ -498,6 +505,9 @@ void AssetBrowser::fileColumn()
 					selectResource(Path(m_file_infos[i].filepath), false, true);
 				}
 			}
+		}
+		if (ImGui::MenuItem("Recreate tiles")) {
+			recreateTiles();
 		}
 	};
 	if (ImGui::BeginPopup("item_ctx")) {

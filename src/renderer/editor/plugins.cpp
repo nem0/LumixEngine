@@ -1676,7 +1676,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		const EntityRef light_entity = m_tile.universe->createEntity({10, 10, 10}, mtx.getRotation());
 		m_tile.universe->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).direct_intensity = 5;
 		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 		
 		m_tile.pipeline->setUniverse(m_tile.universe);
@@ -1705,7 +1705,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		mtx.lookAt({10, 10, 10}, Vec3::ZERO, {0, 1, 0});
 		const EntityRef light_entity = m_universe->createEntity({0, 0, 0}, mtx.getRotation());
 		m_universe->createComponent(ENVIRONMENT_TYPE, light_entity);
-		render_scene->getEnvironment(light_entity).diffuse_intensity = 1;
+		render_scene->getEnvironment(light_entity).direct_intensity = 5;
 		render_scene->getEnvironment(light_entity).indirect_intensity = 1;
 
 		m_pipeline->setUniverse(m_universe);
@@ -2396,16 +2396,19 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		viewport.far = 4 * radius;
 		viewport.is_ortho = true;
 		viewport.ortho_size = radius * 1.1f;
-		viewport.h = AssetBrowser::TILE_SIZE;
-		viewport.w = AssetBrowser::TILE_SIZE;
+		viewport.h = AssetBrowser::TILE_SIZE * 4;
+		viewport.w = AssetBrowser::TILE_SIZE * 4;
 		viewport.pos = DVec3(center);
 		viewport.rot = in_rot ? *in_rot : mtx.getRotation();
 		m_tile.pipeline->setViewport(viewport);
 		m_tile.pipeline->render(false);
 
-		m_tile.texture = gpu::allocTextureHandle(); 
+		Renderer::MemRef mem;
+		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NONE, mem, "tile_final");
+		renderer->downscale(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
-		renderer->getTextureImage(m_tile.pipeline->getOutput()
+		renderer->getTextureImage(m_tile.texture 
 			, AssetBrowser::TILE_SIZE
 			, AssetBrowser::TILE_SIZE
 			, gpu::TextureFormat::RGBA8
