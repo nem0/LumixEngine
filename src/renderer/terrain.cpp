@@ -96,7 +96,7 @@ void Terrain::removeGrassType(int index)
 void Terrain::setGrassTypeDensity(int index, int density)
 {
 	GrassType& type = m_grass_types[index];
-	type.m_density = clamp(density, 0, 100);
+	type.m_density = clamp(density, 0, 5000);
 }
 
 
