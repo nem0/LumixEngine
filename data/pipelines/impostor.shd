@@ -167,8 +167,6 @@ fragment_shader [[
 			Surface surface = getSurface();
 			vec4 self_shadow = textureLod(u_selfshadow, v_uv, 0);
 			float shadow = dot(self_shadow, v_shadow_coefs);
-			shadow *= shadow;
-			shadow *= shadow;
 			
 			vec3 res = computeDirectLight(surface
 				, Global.light_dir.xyz
