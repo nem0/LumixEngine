@@ -3862,13 +3862,14 @@ struct PipelineImpl final : Pipeline
 				gpu::drawIndirect(grass.mesh->index_type);
 
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				m_pipeline->m_stats.triangle_count += size.x * size.y * grass.mesh->indices_count / 3; // TODO
+				// TODO
+				//m_pipeline->m_stats.triangle_count += size.x * size.y * grass.mesh->indices_count / 3;
 			}
 			renderer.endProfileBlock();
 			gpu::destroy(indirect);
 			gpu::destroy(data);
-			m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
-			m_pipeline->m_stats.draw_call_count += m_grass.size();
+			//m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
+			//m_pipeline->m_stats.draw_call_count += m_grass.size();
 		}
 
 		struct Grass {
