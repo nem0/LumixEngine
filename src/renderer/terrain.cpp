@@ -315,7 +315,7 @@ float Terrain::getHeight(int x, int z) const
 	if (!m_heightmap) return 0;
 
 	Texture* t = m_heightmap;
-	int idx = clamp(x, 0, m_width) + clamp(z, 0, m_height) * m_width;
+	int idx = clamp(x, 0, m_width - 1) + clamp(z, 0, m_height - 1) * m_width;
 	if (t->format == gpu::TextureFormat::R16) {
 		return m_scale.y * DIV64K * ((u16*)t->getData())[idx];
 	}

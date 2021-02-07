@@ -1538,7 +1538,7 @@ struct StudioAppImpl final : StudioApp
 		ImGui::MenuItem(ICON_FA_IMAGES "Asset browser", nullptr, &m_asset_browser->m_is_open);
 		doMenuItem(*getAction("entityList"), true);
 		ImGui::MenuItem(ICON_FA_COMMENT_ALT "Log", nullptr, &m_log_ui->m_is_open);
-		ImGui::MenuItem(ICON_FA_CHART_AREA "profiler", nullptr, &m_profiler_ui->m_is_open);
+		ImGui::MenuItem(ICON_FA_CHART_AREA "Profiler", nullptr, &m_profiler_ui->m_is_open);
 		ImGui::MenuItem(ICON_FA_INFO_CIRCLE "Inspector", nullptr, &m_property_grid->m_is_open);
 		doMenuItem(*getAction("settings"), true);
 		ImGui::Separator();
