@@ -333,7 +333,7 @@ struct ProfilerUIImpl final : ProfilerUI
 		PROFILE_FUNCTION();
 
 		if (!m_is_open) return;
-		if (ImGui::Begin(ICON_FA_CHART_AREA "profiler##profiler", &m_is_open))
+		if (ImGui::Begin(ICON_FA_CHART_AREA "Profiler##profiler", &m_is_open))
 		{
 			onGUICPUProfiler();
 			onGUIMemoryProfiler();
