@@ -83,13 +83,11 @@ vertex_shader [[
 			v_lod = i_lod;
 			#if defined GRASS && defined VEGETATION
 				p = vegetationAnim(i_pos_scale.xyz, p, 0.1);
+				v_darken = a_position.y > 0.1 ? 1 : 0.0;
 			#elif defined VEGETATION
 				p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
 			#endif
 			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
-			#ifdef GRASS
-				v_darken = a_position.y > 0.1 ? 1 : 0.0;
-			#endif
 		#elif defined SKINNED
 			mat4 model_mtx = Model.matrix * (a_weights.x * Model.bones[a_indices.x] + 
 			a_weights.y * Model.bones[a_indices.y] +
@@ -154,7 +152,7 @@ fragment_shader [[
 		vec4 c = texture(u_albedomap, v_uv, -1) * u_material_color;
 		data.albedo = c.rgb;
 		data.alpha = c.a;
-		#ifdef GRASS
+		#if defined GRASS && defined VEGETATION
 			data.albedo *= v_darken;
 		#endif
 
