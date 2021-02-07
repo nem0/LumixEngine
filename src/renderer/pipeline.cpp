@@ -3032,16 +3032,32 @@ struct PipelineImpl final : Pipeline
 							READ(gpu::BufferHandle, buffer);
 							READ(u32, offset);
 							READ(u32, count);
+							READ(u32, nonintersecting_count);
 								
 							gpu::bindTextures(material->textures, 0, material->textures_count);
-								
+							if (material_ub_idx != material->material_constants) {
+								gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+								material_ub_idx = material->material_constants;
+							}
 							gpu::useProgram(program);
-							gpu::setState(material->render_states | render_states);
 							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
 							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
-							gpu::bindVertexBuffer(1, buffer, offset, 40);
 
-							gpu::drawTrianglesInstanced(36, count, gpu::DataType::U16);
+							gpu::StateFlags state = material->render_states | render_states;
+							if (nonintersecting_count) {
+								gpu::setState(state);
+								gpu::bindVertexBuffer(1, buffer, offset, 40);
+								gpu::drawTrianglesInstanced(36, nonintersecting_count, gpu::DataType::U16);
+							}
+
+							if (count - nonintersecting_count) {
+								state = state & ~gpu::StateFlags::DEPTH_TEST;
+								//state = state | gpu::StateFlags::CULL_FRONT;
+								gpu::setState(state);
+								const u32 offs = offset + sizeof(float) * 10 * nonintersecting_count;
+								gpu::bindVertexBuffer(1, buffer, offs, 40);
+								gpu::drawTrianglesInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
+							}
 							++stats.draw_call_count;
 							stats.instance_count += count;
 							break;
@@ -3320,31 +3336,43 @@ struct PipelineImpl final : Pipeline
 						++i;
 					}
 					const u32 count = i - start_i;
-					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) * 2 + sizeof(Quat)));
+					struct DecalData {
+						Vec3 pos;
+						Quat rot;
+						Vec3 half_extents;
+					};
+					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(DecalData)));
 					const gpu::ProgramHandle prog = material->getShader()->getProgram(m_decal_decl, define_mask | material->getDefineMask());
 
 					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
 						new_page(bucket);
 					}
+					u8* mem = slice.ptr;
+					DecalData* beg = (DecalData*)slice.ptr;
+					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
+					for(u32 j = start_i; j < i; ++j) {
+						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						const Vec3 half_extents = scene->getDecalHalfExtents(e);
+						const float m = maximum(half_extents.x, half_extents.y, half_extents.z);
+						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
+						
+						DecalData* iter = intersecting ? end : beg;
+						iter->pos = lpos;
+						iter->rot = tr.rot;
+						iter->half_extents = half_extents;
+						intersecting ? --end : ++beg;
+					}
+
 					WRITE(type);
 					WRITE_FN(material->getRenderData());
 					WRITE(prog);
 					WRITE(slice.buffer);
 					WRITE(slice.offset);
 					WRITE(count);
-					u8* mem = slice.ptr;
-					for(u32 j = start_i; j < i; ++j) {
-						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
-						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-						memcpy(mem, &lpos, sizeof(lpos));
-						mem += sizeof(lpos);
-						memcpy(mem, &tr.rot, sizeof(tr.rot));
-						mem += sizeof(tr.rot);
-						const Vec3 half_extents = scene->getDecalHalfExtents(e);
-						memcpy(mem, &half_extents, sizeof(half_extents));
-						mem += sizeof(half_extents);
-					}
+					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+					WRITE(nonintersecting_count);
 					break;
 				}
 				case RenderableTypes::LOCAL_LIGHT: {
@@ -3355,7 +3383,6 @@ struct PipelineImpl final : Pipeline
 						++i;
 					}
 
-					const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(float) * 16);
 					struct LightData {
 						Quat rot;
 						Vec3 pos;
@@ -3365,9 +3392,10 @@ struct PipelineImpl final : Pipeline
 						Vec3 dir;
 						float fov;
 					};
+					const Renderer::TransientSlice slice = renderer.allocTransient((i - start_i) * sizeof(LightData));
 
 					LightData* beg = (LightData*)slice.ptr;
-					LightData* end = (LightData*)(slice.ptr + slice.size - sizeof(LightData));
+					LightData* end = (LightData*)(slice.ptr + (i - start_i - 1) - sizeof(LightData));
 
 					for (u32 j = start_i; j < i; ++j) {
 						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
