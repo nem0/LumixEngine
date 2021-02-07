@@ -88,7 +88,7 @@ vertex_shader [[
 		v_tangent = tangent_space[0];
 		v_normal = tangent_space[2];
 		#ifdef VEGETATION
-			p = vegetationAnim(i_pos_scale.xyz, p);
+			p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
 		#endif
 		v_wpos = vec4(i_pos_scale.xyz + p, 1);
 
@@ -135,7 +135,7 @@ fragment_shader [[
 				);
 		
 		data.wpos = v_wpos.xyz;
-		data.V = normalize(data.wpos);
+		data.V = normalize(-data.wpos);
 		data.roughness = texture(u_roughnessmap, v_uv).r * u_roughness;
 		data.metallic  = texture(u_metallicmap, v_uv).r * u_metallic;
 		data.N = texture(u_normalmap, v_uv).xzy * 2 - 1;
