@@ -258,6 +258,9 @@ function shadowPass()
 				renderBucket(bucket0, {})
 				renderBucket(bucket1, {})
 
+				if slice < 2 then
+					renderGrass(view_params, grass_state)
+				end
 				renderTerrains(view_params, {define = "DEPTH"})
 				endBlock()
 			end
