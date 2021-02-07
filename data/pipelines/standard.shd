@@ -81,13 +81,14 @@ vertex_shader [[
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position * i_pos_scale.w;
 			v_lod = i_lod;
-			#if defined GRASS || defined VEGETATION
-				p = vegetationAnim(i_pos_scale.xyz, p);
+			#if defined GRASS
+				p = vegetationAnim(i_pos_scale.xyz, p, 0.1);
+			#elif defined VEGETATION
+				p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
 			#endif
 			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
 			#ifdef GRASS
 				v_darken = a_position.y > 0.1 ? 1 : 0.0;
-				v_normal = rotateByQuat(i_rot_quat, normalize(a_position));
 			#endif
 		#elif defined SKINNED
 			mat4 model_mtx = Model.matrix * (a_weights.x * Model.bones[a_indices.x] + 
@@ -108,7 +109,7 @@ vertex_shader [[
 
 			vec3 p = a_position;
 			#ifdef VEGETATION
-				p = vegetationAnim(Model.matrix[3].xyz, p);
+				p = vegetationAnim(Model.matrix[3].xyz, p, 0.001);
 			#endif
 
 			v_wpos = model_mtx * vec4(p,  1);
@@ -134,7 +135,7 @@ fragment_shader [[
 	layout(location = 3) in vec4 v_wpos;
 	layout(location = 4) in float v_lod;
 	#ifdef GRASS
-		layout(location = 5) out float v_darken;
+		layout(location = 5) in float v_darken;
 	#endif
 
 	#if defined DEFERRED || defined GRASS
@@ -150,14 +151,12 @@ fragment_shader [[
 		if (ditherLOD(v_lod)) discard;
 
 		Surface data;
-		#ifdef GRASS
-			vec4 c = texture(u_albedomap, v_uv, -2) * u_material_color;
-			//data.albedo *= v_darken;
-		#else
-			vec4 c = texture(u_albedomap, v_uv) * u_material_color;
-		#endif
+		vec4 c = texture(u_albedomap, v_uv, -1) * u_material_color;
 		data.albedo = c.rgb;
 		data.alpha = c.a;
+		#ifdef GRASS
+			data.albedo *= v_darken;
+		#endif
 
 		#ifdef FUR 
 			data.alpha = saturate(data.alpha - Model.layer);
@@ -191,10 +190,6 @@ fragment_shader [[
 		data.N = tbn * data.N;
 		data.emission = u_emission;
 		data.translucency = u_translucency;
-		#ifdef GRASS 
-			data.N = normalize(v_normal);
-			data.N = normalize(mix(data.N, Global.light_dir.xyz, 0.2));
-		#endif
 		return data;
 	}
 	

@@ -2922,6 +2922,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		int width = terrain.m_heightmap->width;
 		int height = terrain.m_heightmap->height;
 		heights.resize(width * height);
+		PxHeightFieldSample* heights_ptr = heights.begin();
 		if (terrain.m_heightmap->format == gpu::TextureFormat::R16)
 		{
 			PROFILE_BLOCK("copyData");
@@ -2932,9 +2933,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 				for (int i = 0; i < width; ++i)
 				{
 					int idx2 = j + i * height;
-					heights[idx].height = PxI16((i32)data[idx2] - 0x7fff);
-					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
-					heights[idx].setTessFlag();
+					heights_ptr[idx].height = PxI16((i32)data[idx2] - 0x7fff);
+					heights_ptr[idx].materialIndex0 = heights_ptr[idx].materialIndex1 = 0;
+					heights_ptr[idx].setTessFlag();
 					++idx;
 				}
 			}
@@ -2949,9 +2950,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 				{
 					int idx = i + j * width;
 					int idx2 = j + i * height;
-					heights[idx].height = PxI16((i32)data[idx2] - 0x7f);
-					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
-					heights[idx].setTessFlag();
+					heights_ptr[idx].height = PxI16((i32)data[idx2] - 0x7f);
+					heights_ptr[idx].materialIndex0 = heights_ptr[idx].materialIndex1 = 0;
+					heights_ptr[idx].setTessFlag();
 				}
 			}
 		}
