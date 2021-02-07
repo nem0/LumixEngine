@@ -1151,6 +1151,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		else if(equalStrings(ext, "jpg") || equalStrings(ext, "png") || (equalStrings(ext, "tga") && meta.compress)) {
 			compileImage(src, src_data, out, meta);
 		}
+		else if (equalStrings(ext, "tga") && meta.is_normalmap) {
+			if (!meta.compress) {
+				logWarning("Forcing compression of ", src, " because it's a normalmap");
+			}
+			compileImage(src, src_data, out, meta);
+		}
 		else if (equalStrings(ext, "ltc")) {
 			if (!createComposite(src_data, out, meta, src.c_str())) {
 				return false;
