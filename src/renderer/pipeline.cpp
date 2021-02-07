@@ -3751,7 +3751,7 @@ struct PipelineImpl final : Pipeline
 						grass.mesh = mesh.render_data;
 						grass.material = mesh.material->getRenderData();
 						grass.distance = type.m_distance;
-						grass.density = type.m_density / 100.f;
+						grass.density = type.m_density * 0.001f;
 						grass.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
 						grass.mtx = Matrix(rel_tr.pos.toFloat(), rel_tr.rot);
 						IVec2 from = IVec2((-rel_tr.pos.toFloat().xz() - Vec2(type.m_distance)) / 16);
