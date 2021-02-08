@@ -3780,7 +3780,7 @@ struct PipelineImpl final : Pipeline
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
 			renderer.beginProfileBlock("grass", 0);
-			
+			gpu::pushDebugGroup("grass");
 			// TODO reuse
 			gpu::BufferHandle data = gpu::allocBufferHandle();
 			gpu::BufferHandle indirect = gpu::allocBufferHandle();
@@ -3840,9 +3840,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, m_pipeline->m_drawcall_ub, 0, sizeof(dc));
 				gpu::useProgram(m_compute_shader);
 				const IVec2 size =  grass.to - grass.from;
-				renderer.beginProfileBlock("grass cs", 0); // TODO remove before commit
 				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
-				renderer.endProfileBlock();
 				
 				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
 				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 1, gpu::BindShaderBufferFlags::NONE);
@@ -3865,6 +3863,7 @@ struct PipelineImpl final : Pipeline
 				// TODO
 				//m_pipeline->m_stats.triangle_count += size.x * size.y * grass.mesh->indices_count / 3;
 			}
+			gpu::popDebugGroup();
 			renderer.endProfileBlock();
 			gpu::destroy(indirect);
 			gpu::destroy(data);
@@ -3939,9 +3938,9 @@ struct PipelineImpl final : Pipeline
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 
 			gpu::StateFlags state = m_render_state;
+			Renderer& renderer = m_pipeline->m_renderer;
+			renderer.beginProfileBlock("terrain", 0);
 			for (Instance& inst : m_instances) {
-				Renderer& renderer = m_pipeline->m_renderer;
-				renderer.beginProfileBlock("terrain", 0);
 				gpu::useProgram(inst.program);
 				gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, inst.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 				
@@ -4013,8 +4012,8 @@ struct PipelineImpl final : Pipeline
 					prev_from_to = IVec4(from / 2, to / 2);
 				}
 
-				renderer.endProfileBlock();
 			}
+			renderer.endProfileBlock();
 		}
 
 		struct Instance
