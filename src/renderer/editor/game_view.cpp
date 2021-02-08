@@ -277,11 +277,6 @@ void GameView::controlsGUI() {
 void GameView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
-	if (!m_pipeline->isReady()) {
-		captureMouse(false);
-		return;
-	}
-
 	m_pipeline->setUniverse(m_editor.getUniverse());
 
 	ImGuiIO& io = ImGui::GetIO();
@@ -295,7 +290,7 @@ void GameView::onWindowGUI()
 		os::setCursor(m_cursor_type);
 	}
 	
-	if (m_is_fullscreen) {
+	if (m_is_fullscreen && m_pipeline->isReady()) {
 		onFullscreenGUI();
 		return;
 	}
@@ -304,6 +299,8 @@ void GameView::onWindowGUI()
 		captureMouse(false);
 		return;
 	}
+
+	if (!m_pipeline->isReady()) captureMouse(false);
 
 	ImVec2 view_pos;
 	bool is_game_view_visible = false;
