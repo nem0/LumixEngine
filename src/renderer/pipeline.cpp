@@ -754,6 +754,7 @@ struct PipelineImpl final : Pipeline
 		m_decal_decl.addAttribute(1, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		m_decal_decl.addAttribute(2, 12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		m_decal_decl.addAttribute(3, 28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_decal_decl.addAttribute(4, 40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
 		m_2D_decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
 		m_2D_decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
@@ -3342,6 +3343,7 @@ struct PipelineImpl final : Pipeline
 						Vec3 pos;
 						Quat rot;
 						Vec3 half_extents;
+						Vec2 uv_scale;
 					};
 					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(DecalData)));
 					const gpu::ProgramHandle prog = material->getShader()->getProgram(m_decal_decl, define_mask | material->getDefineMask());
@@ -3357,6 +3359,7 @@ struct PipelineImpl final : Pipeline
 						const Transform& tr = entity_data[e.index];
 						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
 						const Vec3 half_extents = scene->getDecalHalfExtents(e);
+						const Vec2 uv_scale = scene->getDecalUVScale(e);
 						const float m = maximum(half_extents.x, half_extents.y, half_extents.z);
 						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
 						
@@ -3364,6 +3367,7 @@ struct PipelineImpl final : Pipeline
 						iter->pos = lpos;
 						iter->rot = tr.rot;
 						iter->half_extents = half_extents;
+						iter->uv_scale = uv_scale;
 						intersecting ? --end : ++beg;
 					}
 
