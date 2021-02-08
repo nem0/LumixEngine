@@ -40,7 +40,7 @@ struct Terrain
 
 			Model* m_grass_model;
 			Terrain& m_terrain;
-			i32 m_density;
+			float m_spacing;
 			float m_distance;
 			int m_idx;
 			enum class RotationMode : int
@@ -73,7 +73,7 @@ struct Terrain
 		AABB getAABB() const;
 		int getWidth() const { return m_width; }
 		int getHeight() const { return m_height; }
-		int getGrassTypeDensity(int index) const;
+		float getGrassTypeSpacing(int index) const;
 		float getGrassTypeDistance(int index) const;
 		GrassType::RotationMode getGrassTypeRotationMode(int index) const;
 		int getGrassTypeCount() const { return m_grass_types.size(); }
@@ -83,7 +83,7 @@ struct Terrain
 		void setXZScale(float scale);
 		void setYScale(float scale);
 		void setGrassTypePath(int index, const Path& path);
-		void setGrassTypeDensity(int index, int density);
+		void setGrassTypeSpacing(int index, float spacing);
 		void setGrassTypeDistance(int index, float value);
 		void setGrassTypeRotationMode(int index, GrassType::RotationMode mode);
 		void setMaterial(Material* material);

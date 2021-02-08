@@ -3751,13 +3751,14 @@ struct PipelineImpl final : Pipeline
 						grass.mesh = mesh.render_data;
 						grass.material = mesh.material->getRenderData();
 						grass.distance = type.m_distance;
-						grass.density = type.m_density * 0.001f;
 						grass.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
 						grass.mtx = Matrix(rel_tr.pos.toFloat(), rel_tr.rot);
-						IVec2 from = IVec2((-rel_tr.pos.toFloat().xz() - Vec2(type.m_distance)) / 16);
-						IVec2 to = IVec2((-rel_tr.pos.toFloat().xz() + Vec2(type.m_distance + 15.99f)) / 16);
-						grass.from = from * 64;
-						grass.to = to * 64;
+						const i32 step_len = maximum(i32(type.m_spacing * 100), 1);
+						const i32 steps = i32(type.m_distance * 100) / step_len;
+						grass.from = IVec2(-(rel_tr.pos * 100.f).toFloat().xz() - Vec2(type.m_distance * 100.f - 1));
+						grass.from = (grass.from / step_len) * step_len;
+						grass.to = grass.from + IVec2(2 * steps * step_len);
+						grass.step = step_len;
 						grass.heightmap = terrain->m_heightmap ? terrain->m_heightmap->handle : gpu::INVALID_TEXTURE;
 						grass.splatmap = terrain->m_splatmap ? terrain->m_splatmap->handle : gpu::INVALID_TEXTURE;
 						grass.terrain_size = terrain->getSize();
@@ -3779,8 +3780,8 @@ struct PipelineImpl final : Pipeline
 			Renderer& renderer = m_pipeline->m_renderer;
 			const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
 			u32 material_ub_idx = 0xffFFffFF;
-			renderer.beginProfileBlock("grass", 0);
 			gpu::pushDebugGroup("grass");
+			renderer.beginProfileBlock("grass", 0);
 			// TODO reuse
 			gpu::BufferHandle data = gpu::allocBufferHandle();
 			gpu::BufferHandle indirect = gpu::allocBufferHandle();
@@ -3802,7 +3803,7 @@ struct PipelineImpl final : Pipeline
 					Vec2 terrain_size;
 					float terrain_y_scale;
 					float distance;
-					float density;
+					u32 step;
 					float grass_height;
 					u32 indices_count;
 					u32 type;
@@ -3816,7 +3817,7 @@ struct PipelineImpl final : Pipeline
 				dc.terrain_size = grass.terrain_size;
 				dc.terrain_y_scale = grass.terrain_y_scale;
 				dc.distance = grass.distance;
-				dc.density = grass.density;
+				dc.step = grass.step;
 				dc.grass_height = grass.grass_height;
 				dc.indices_count = grass.mesh->indices_count;
 				dc.type = grass.type;
@@ -3839,7 +3840,7 @@ struct PipelineImpl final : Pipeline
 				gpu::bindTextures(&grass.splatmap, 3, 1);
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, m_pipeline->m_drawcall_ub, 0, sizeof(dc));
 				gpu::useProgram(m_compute_shader);
-				const IVec2 size =  grass.to - grass.from;
+				const IVec2 size =  (grass.to - grass.from) / grass.step;
 				gpu::dispatch((size.x + 15) / 16, (size.y + 15) / 16, 1);
 				
 				gpu::bindShaderBuffer(gpu::INVALID_BUFFER, 0, gpu::BindShaderBufferFlags::NONE);
@@ -3863,8 +3864,8 @@ struct PipelineImpl final : Pipeline
 				// TODO
 				//m_pipeline->m_stats.triangle_count += size.x * size.y * grass.mesh->indices_count / 3;
 			}
-			gpu::popDebugGroup();
 			renderer.endProfileBlock();
+			gpu::popDebugGroup();
 			gpu::destroy(indirect);
 			gpu::destroy(data);
 			//m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
@@ -3875,7 +3876,7 @@ struct PipelineImpl final : Pipeline
 			Mesh::RenderData* mesh;
 			Material::RenderData* material;
 			float distance;
-			float density;
+			u32 step;
 			Matrix mtx;
 			gpu::TextureHandle heightmap;
 			gpu::TextureHandle splatmap;
