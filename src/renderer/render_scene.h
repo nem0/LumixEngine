@@ -322,8 +322,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void setGrassDistance(EntityRef entity, int index, float value) = 0;
 	virtual void setGrassPath(EntityRef entity, int index, const Path& path) = 0;
 	virtual Path getGrassPath(EntityRef entity, int index) = 0;
-	virtual void setGrassDensity(EntityRef entity, int index, int density) = 0;
-	virtual int getGrassDensity(EntityRef entity, int index) = 0;
+	virtual void setGrassSpacing(EntityRef entity, int index, float spacing) = 0;
+	virtual float getGrassSpacing(EntityRef entity, int index) = 0;
 	virtual int getGrassCount(EntityRef entity) = 0;
 	virtual void addGrass(EntityRef entity, int index) = 0;
 	virtual void removeGrass(EntityRef entity, int index) = 0;

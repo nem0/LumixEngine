@@ -27,7 +27,7 @@ compute_shader [[
 		vec2 u_terrain_size;
 		float u_terrain_y_scale;
 		float u_distance;
-		float u_density;
+		uint u_step;
 		float u_grass_height;
 		uint u_vertex_count;
 		uint u_type;
@@ -93,9 +93,9 @@ compute_shader [[
 	void main() {
 		uint id = gl_GlobalInvocationID.y * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
 		
-		float prob = fract(noise(vec2(u_from + gl_GlobalInvocationID.xy) * (u_type + 1)));
 		vec3 inst_pos = vec3(0);
-		inst_pos.xz = (u_from + vec2(gl_GlobalInvocationID.xy)) * 0.25;
+		uvec2 ij = u_from + gl_GlobalInvocationID.xy * u_step;
+		inst_pos.xz = vec2(ij) * 0.01;
 		
 		if (any(lessThan(inst_pos.xz, vec2(0)))) return;
 		vec2 uv = (inst_pos.xz / (u_terrain_size + u_terrain_xz_scale)) + 0.5 / (u_terrain_size.x / u_terrain_xz_scale + 1);
@@ -103,12 +103,12 @@ compute_shader [[
 
 		uint mask = (splat.w << 8) | splat.z;
 		
-		if (prob < u_density && (mask & (1 << u_type)) != 0) {
+		if ((mask & (1 << u_type)) != 0) {
 			vec4 p;
-			float r = rand(vec3(u_from + gl_GlobalInvocationID.xy, 2)) * M_PI;
+			float r = rand(vec3(ij, 2)) * M_PI;
 
-			inst_pos.x += (fract(r * 2531) * 2 - 1) * 0.5;
-			inst_pos.z += (fract(r * 2819) * 2 - 1) * 0.5;
+			inst_pos.x += (fract(r * 2531) * 2 - 1) * 0.5 * u_step * 0.01;
+			inst_pos.z += (fract(r * 2819) * 2 - 1) * 0.5 * u_step * 0.01;
 			
 			vec2 uv = (inst_pos.xz / (u_terrain_size + u_terrain_xz_scale)) + 0.5 / (u_terrain_size.x / u_terrain_xz_scale + 1);
 			inst_pos.y += texture(u_heightmap, uv).x * u_terrain_y_scale;
@@ -116,8 +116,8 @@ compute_shader [[
 			inst_pos += u_pos.xyz;
 			float dist_t = saturate(length(inst_pos) / u_distance);
 			float scale = 1 - dist_t * dist_t * dist_t;
-			scale *= snoise(vec2(u_from + gl_GlobalInvocationID.xy) * 0.01) * 0.3 + 0.7;
-			
+			scale *= snoise(vec2(ij) * 0.01) * 0.3 + 0.7;
+
 			vec4 cullp = vec4(inst_pos, 1);
 			for (int i = 0; i < 6; ++i) {
 				if (dot(Pass.camera_planes[i], cullp) < -u_radius * scale) {

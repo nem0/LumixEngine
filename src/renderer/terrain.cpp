@@ -66,7 +66,7 @@ Terrain::GrassType::GrassType(Terrain& terrain)
 	: m_terrain(terrain)
 {
 	m_grass_model = nullptr;
-	m_density = 10;
+	m_spacing = 1.f;
 	m_distance = 50;
 }
 
@@ -93,10 +93,10 @@ void Terrain::removeGrassType(int index)
 }
 
 
-void Terrain::setGrassTypeDensity(int index, int density)
+void Terrain::setGrassTypeSpacing(int index, float spacing)
 {
 	GrassType& type = m_grass_types[index];
-	type.m_density = clamp(density, 0, 5000);
+	type.m_spacing = spacing;
 }
 
 
@@ -113,10 +113,10 @@ void Terrain::setGrassTypeRotationMode(int index, Terrain::GrassType::RotationMo
 }
 
 
-int Terrain::getGrassTypeDensity(int index) const
+float Terrain::getGrassTypeSpacing(int index) const
 {
 	const GrassType& type = m_grass_types[index];
-	return type.m_density;
+	return type.m_spacing;
 }
 
 
@@ -217,7 +217,8 @@ void Terrain::deserialize(EntityRef entity, InputMemoryStream& serializer, Unive
 	for(int i = 0; i < count; ++i)
 	{
 		const char* path = serializer.readString();
-		serializer.read(m_grass_types[i].m_density);
+		serializer.read(m_grass_types[i].m_spacing);
+		m_grass_types[i].m_spacing = clamp(m_grass_types[i].m_spacing, 0.1f, 9000.f);
 		serializer.read(m_grass_types[i].m_distance);
 		serializer.read(m_grass_types[i].m_rotation_mode);
 		setGrassTypePath(i, Path(path));
@@ -237,7 +238,7 @@ void Terrain::serialize(OutputMemoryStream& serializer)
 	{
 		GrassType& type = m_grass_types[i];
 		serializer.writeString(type.m_grass_model ? type.m_grass_model->getPath().c_str() : "");
-		serializer.write(type.m_density);
+		serializer.write(type.m_spacing);
 		serializer.write(type.m_distance);
 		serializer.write(type.m_rotation_mode);
 	}

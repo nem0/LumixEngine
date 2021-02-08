@@ -1495,15 +1495,15 @@ public:
 	}
 
 
-	void setGrassDensity(EntityRef entity, int index, int density) override
+	void setGrassSpacing(EntityRef entity, int index, float spacing) override
 	{
-		m_terrains[entity]->setGrassTypeDensity(index, density);
+		m_terrains[entity]->setGrassTypeSpacing(index, spacing);
 	}
 
 
-	int getGrassDensity(EntityRef entity, int index) override
+	float getGrassSpacing(EntityRef entity, int index) override
 	{
-		return m_terrains[entity]->getGrassTypeDensity(index);
+		return m_terrains[entity]->getGrassTypeSpacing(index);
 	}
 
 
@@ -2608,7 +2608,7 @@ void RenderScene::reflect() {
 			array("grass", &RenderScene::getGrassCount, &RenderScene::addGrass, &RenderScene::removeGrass,
 				LUMIX_PROP(GrassPath, "Mesh", ResourceAttribute(Model::TYPE)),
 				LUMIX_PROP(GrassDistance, "Distance", MinAttribute(1)),
-				LUMIX_PROP(GrassDensity, "Density"),
+				LUMIX_PROP(GrassSpacing, "Spacing"),
 				LUMIX_PROP(GrassRotationMode, "Mode", RotationModeEnum())
 			)
 		)
