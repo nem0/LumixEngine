@@ -3967,14 +3967,14 @@ struct PipelineImpl final : Pipeline
 				gpu::setState(state);
 				IVec4 prev_from_to;
 
-				float s = 0.5;
+				float s = 1;
 				bool first = true;
 				for (;;) {
 					// round 
-					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(64);
+					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
-					IVec2 to = from + IVec2(128);
+					IVec2 to = from + IVec2(64);
 					// clamp
 					dc_data.from_to_sup = IVec4(from, to);
 					
@@ -4012,8 +4012,6 @@ struct PipelineImpl final : Pipeline
 					s *= 2;
 					prev_from_to = IVec4(from / 2, to / 2);
 				}
-
-
 
 				renderer.endProfileBlock();
 			}
