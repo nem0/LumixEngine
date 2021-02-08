@@ -3044,6 +3044,7 @@ struct PipelineImpl final : Pipeline
 							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
 
 							gpu::StateFlags state = material->render_states | render_states;
+							state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
 							if (nonintersecting_count) {
 								gpu::setState(state);
 								gpu::bindVertexBuffer(1, buffer, offset, 40);
@@ -3052,7 +3053,8 @@ struct PipelineImpl final : Pipeline
 
 							if (count - nonintersecting_count) {
 								state = state & ~gpu::StateFlags::DEPTH_TEST;
-								//state = state | gpu::StateFlags::CULL_FRONT;
+								state = state & ~gpu::StateFlags::CULL_BACK;
+								state = state | gpu::StateFlags::CULL_FRONT;
 								gpu::setState(state);
 								const u32 offs = offset + sizeof(float) * 10 * nonintersecting_count;
 								gpu::bindVertexBuffer(1, buffer, offs, 40);
