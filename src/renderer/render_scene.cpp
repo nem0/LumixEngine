@@ -36,6 +36,7 @@ namespace Lumix
 
 enum class RenderSceneVersion : int
 {
+	DECAL_UV_SCALE,
 	LATEST
 };
 
@@ -62,6 +63,7 @@ struct Decal
 	EntityPtr prev_decal = INVALID_ENTITY;
 	EntityPtr next_decal = INVALID_ENTITY;
 	Vec3 half_extents;
+	Vec2 uv_scale;
 };
 
 
@@ -598,7 +600,7 @@ public:
 		}
 	}
 
-	void deserializeDecals(InputMemoryStream& serializer, const EntityMap& entity_map)
+	void deserializeDecals(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version)
 	{
 		u32 count;
 		serializer.read(count);
@@ -608,6 +610,10 @@ public:
 			serializer.read(decal.entity);
 			decal.entity = entity_map.get(decal.entity);
 			serializer.read(decal.half_extents);
+			decal.uv_scale = Vec2(1);
+			if (version > (i32)RenderSceneVersion::DECAL_UV_SCALE) {
+				serializer.read(decal.uv_scale);
+			}
 			const char* tmp = serializer.readString();
 			updateDecalInfo(decal);
 			m_decals.insert(decal.entity, decal);
@@ -624,6 +630,7 @@ public:
 		{
 			serializer.write(decal.entity);
 			serializer.write(decal.half_extents);
+			serializer.write(decal.uv_scale);
 			serializer.writeString(decal.material ? decal.material->getPath().c_str() : "");
 		}
 	}
@@ -879,7 +886,7 @@ public:
 		deserializeBoneAttachments(serializer, entity_map);
 		deserializeEnvironmentProbes(serializer, entity_map);
 		deserializeReflectionProbes(serializer, entity_map);
-		deserializeDecals(serializer, entity_map);
+		deserializeDecals(serializer, entity_map, version);
 		deserializeFurs(serializer, entity_map);
 	}
 
@@ -1235,6 +1242,13 @@ public:
 		return m_decals[entity].half_extents;
 	}
 
+	void setDecalUVScale(EntityRef entity, const Vec2& value) override {
+		m_decals[entity].uv_scale = value;
+	}
+
+	Vec2 getDecalUVScale(EntityRef entity) override {
+		return m_decals[entity].uv_scale;
+	}
 
 	void setDecalMaterialPath(EntityRef entity, const Path& path) override
 	{
@@ -2347,6 +2361,7 @@ public:
 		decal.material = nullptr;
 		decal.entity = entity;
 		decal.half_extents.set(1, 1, 1);
+		decal.uv_scale = Vec2(1);
 		updateDecalInfo(decal);
 
 		m_universe.onComponentCreated(entity, DECAL_TYPE, this);
@@ -2597,7 +2612,8 @@ void RenderScene::reflect() {
 		),
 		LUMIX_CMP(Decal, "decal", "Render / Decal",
 			LUMIX_PROP(DecalMaterialPath, "Material", ResourceAttribute(Material::TYPE)),
-			LUMIX_PROP(DecalHalfExtents, "Half extents", MinAttribute(0))
+			LUMIX_PROP(DecalHalfExtents, "Half extents", MinAttribute(0)),
+			LUMIX_PROP(DecalUVScale, "UV scale", MinAttribute(0))
 		),
 		LUMIX_CMP(Terrain, "terrain", "Render / Terrain",
 			LUMIX_FUNC(RenderScene::getTerrainNormalAt),

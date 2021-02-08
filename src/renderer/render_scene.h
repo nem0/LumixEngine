@@ -296,6 +296,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual Path getDecalMaterialPath(EntityRef entity) = 0;
 	virtual void setDecalHalfExtents(EntityRef entity, const Vec3& value) = 0;
 	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;
+	virtual void setDecalUVScale(EntityRef entity, const Vec2& value) = 0;
+	virtual Vec2 getDecalUVScale(EntityRef entity) = 0;
 	virtual Material* getDecalMaterial(EntityRef entity) const = 0;
 
 	virtual Terrain* getTerrain(EntityRef entity) = 0;

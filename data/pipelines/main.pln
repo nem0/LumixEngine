@@ -16,7 +16,7 @@ local screenshot_request = 0
 local enable_icons = true
 
 local decal_state = {
-	blending = "add",
+	blending = "alpha",
 	depth_write = false
 }
 
@@ -105,7 +105,7 @@ end
 
 function geomPass(entities)
 	beginBlock("geom_pass")
-		local gbuffer0 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba8", debug_name = "gbuffer0" }
+		local gbuffer0 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "srgba", debug_name = "gbuffer0" }
 		local gbuffer1 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "gbuffer1" }
 		local gbuffer2 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba8", debug_name = "gbuffer2" }
 		local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "gbuffer_ds" }
