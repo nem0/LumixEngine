@@ -396,6 +396,8 @@ struct RendererImpl final : Renderer
 			}
 			gpu::destroy(renderer->m_material_buffer.buffer);
 			gpu::destroy(renderer->m_material_buffer.staging_buffer);
+			gpu::destroy(renderer->m_tmp_uniform_buffer);
+			gpu::destroy(renderer->m_scratch_buffer);
 			renderer->m_profiler.clear();
 			gpu::shutdown();
 		}, &signal, jobs::INVALID_HANDLE, 1);
@@ -493,6 +495,9 @@ struct RendererImpl final : Renderer
 			renderer.m_tmp_uniform_buffer = gpu::allocBufferHandle();
 			gpu::createBuffer(renderer.m_tmp_uniform_buffer, gpu::BufferFlags::UNIFORM_BUFFER, 16 * 1024, nullptr);
 
+			renderer.m_scratch_buffer = gpu::allocBufferHandle();
+			gpu::createBuffer(renderer.m_scratch_buffer, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE, SCRATCH_BUFFER_SIZE, nullptr);
+
 			MaterialConsts default_mat;
 			default_mat.color = Vec4(1, 0, 1, 1);
 			gpu::update(mb.buffer, &default_mat, sizeof(MaterialConsts));
@@ -545,6 +550,9 @@ struct RendererImpl final : Renderer
 		return ret;
 	}
 
+	gpu::BufferHandle getScratchBuffer() override {
+		return m_scratch_buffer;
+	}
 
 	void beginProfileBlock(const char* name, i64 link) override
 	{
@@ -1151,6 +1159,7 @@ struct RendererImpl final : Renderer
 	RenderResourceManager<Texture> m_texture_manager;
 	gpu::ProgramHandle m_downscale_program;
 	gpu::BufferHandle m_tmp_uniform_buffer;
+	gpu::BufferHandle m_scratch_buffer;
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[3];
