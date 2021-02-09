@@ -3780,6 +3780,7 @@ struct PipelineImpl final : Pipeline
 		}
 
 		void execute() override {
+			PROFILE_FUNCTION();
 			if (m_grass.empty()) return;
 			if (!m_compute_shader) return;
 
@@ -3789,9 +3790,8 @@ struct PipelineImpl final : Pipeline
 			gpu::pushDebugGroup("grass");
 			renderer.beginProfileBlock("grass", 0);
 			// TODO reuse
-			gpu::BufferHandle data = gpu::allocBufferHandle();
+			gpu::BufferHandle data = m_pipeline->m_renderer.getScratchBuffer();
 			gpu::BufferHandle indirect = gpu::allocBufferHandle();
-			gpu::createBuffer(data, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE, 1024 * 256 * 8, nullptr);
 			struct Indirect {
 				u32 vertex_count;
 				u32 instance_count;
@@ -3873,7 +3873,6 @@ struct PipelineImpl final : Pipeline
 			renderer.endProfileBlock();
 			gpu::popDebugGroup();
 			gpu::destroy(indirect);
-			gpu::destroy(data);
 			//m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
 			//m_pipeline->m_stats.draw_call_count += m_grass.size();
 		}
