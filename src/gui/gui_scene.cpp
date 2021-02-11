@@ -178,7 +178,7 @@ struct GUISceneImpl final : GUIScene
 		m_font_manager = (FontManager*)system.getEngine().getResourceManager().get(FontResource::TYPE);
 	}
 	
-	i32 getVersion() const { return (i32)Version::LATEST; }
+	i32 getVersion() const override { return (i32)Version::LATEST; }
 
 	void renderTextCursor(GUIRect& rect, Draw2D& draw, const Vec2& pos)
 	{
