@@ -4509,6 +4509,23 @@ void PhysicsScene::reflect() {
 		}
 	};
 
+// "temporary" hack to fix crash at startup on linux
+// last good commmit around eb0e5c9b6fc7ce3de197c5c0b2b30e9f8c9653eb
+#ifdef _WIN32
+	#define VEHICLE_CMP \
+		, \
+		LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel"), \
+		LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer"), \
+		LUMIX_PROP(VehicleMass, "Mass", MinAttribute(0)), \
+		LUMIX_PROP(VehicleCenterOfMass, "Center of mass"), \
+		LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier"), \
+		LUMIX_PROP(VehicleChassis, "Chassis", ResourceAttribute(PhysicsGeometry::TYPE)), \
+		LUMIX_PROP(VehicleChassisLayer, "Chassis layer", LayerEnum()), \
+		LUMIX_PROP(VehicleWheelsLayer, "Wheels layer", LayerEnum())
+#else 
+	#define VEHICLE_CMP
+#endif
+
 	LUMIX_SCENE(PhysicsSceneImpl, "physics",
 		LUMIX_FUNC(PhysicsSceneImpl::raycast),
 		//function(LUMIX_FUNC(PhysicsScene::raycastEx))
@@ -4591,19 +4608,7 @@ void PhysicsScene::reflect() {
 		),
 		LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle", 
 			icon(ICON_FA_CAR_ALT)
-// "temporary" hack to fix crash at startup on linux
-// last good commmit around eb0e5c9b6fc7ce3de197c5c0b2b30e9f8c9653eb
-#ifdef _WIN32
-,
-			LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel"),
-			LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer"),
-			LUMIX_PROP(VehicleMass, "Mass", MinAttribute(0)),
-			LUMIX_PROP(VehicleCenterOfMass, "Center of mass"),
-			LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier"),
-			LUMIX_PROP(VehicleChassis, "Chassis", ResourceAttribute(PhysicsGeometry::TYPE)),
-			LUMIX_PROP(VehicleChassisLayer, "Chassis layer", LayerEnum()),
-			LUMIX_PROP(VehicleWheelsLayer, "Wheels layer", LayerEnum())
-#endif
+			VEHICLE_CMP
 		),
 		LUMIX_CMP(Wheel, "wheel", "Physics / Wheel",
 			LUMIX_PROP(WheelRadius, "Radius", MinAttribute(0)),
