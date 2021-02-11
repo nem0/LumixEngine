@@ -29,11 +29,12 @@ template <typename F>
 void runOnWorkers(const F& f)
 {
 	SignalHandle signal = jobs::INVALID_HANDLE;
-	for(int i = 0, c = getWorkersCount(); i < c; ++i) {
+	for(int i = 1, c = getWorkersCount(); i < c; ++i) {
 		jobs::run((void*)&f, [](void* data){
 			(*(const F*)data)();
 		}, &signal);
 	}
+	f();
 	wait(signal);
 }
 
