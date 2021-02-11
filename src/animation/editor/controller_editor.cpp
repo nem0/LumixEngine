@@ -61,18 +61,20 @@ struct ControllerEditorImpl : ControllerEditor {
 		switch (node->type()) {
 			case Node::ANIMATION: break;
 			case Node::BLEND1D: break;
-			case Node::LAYERS: 
+			case Node::LAYERS: {
 				LayersNode* n = (LayersNode*)node;
 				for (LayersNode::Layer& layer : n->m_layers) {
 					forEachNode(f, &layer.node);
 				}
 				break;
-			case Node::GROUP: 
+			}
+			case Node::GROUP: {
 				GroupNode* g = (GroupNode*)node;
 				for (GroupNode::Child& ch : g->m_children) {
 					forEachNode(f, ch.node);
 				}
 				break;
+			}
 			default: ASSERT(false); break;
 		}
 	}
@@ -951,4 +953,4 @@ UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {
 	return UniquePtr<ControllerEditorImpl>::create(app.getAllocator(), app);
 }
 
-} // namespace Lumix::Anim
+} // namespace Lumix::Anim
