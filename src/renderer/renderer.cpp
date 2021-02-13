@@ -352,6 +352,8 @@ struct RendererImpl final : Renderer
 		, m_layers(m_allocator)
 		, m_material_buffer(m_allocator)
 		, m_plugins(m_allocator)
+		, m_free_sort_keys(m_allocator)
+		, m_sort_key_to_mesh_map(m_allocator)
 	{
 		RenderScene::reflect();
 
@@ -799,7 +801,39 @@ struct RendererImpl final : Renderer
 		queue(cmd, 0);
 	}
 
+	const Mesh** getSortKeyToMeshMap() const override {
+		return m_sort_key_to_mesh_map.begin();
+	}
+
+	u32 allocSortKey(Mesh* mesh) override {
+		if (!m_free_sort_keys.empty()) {
+			const u32 key = m_free_sort_keys.back();
+			m_free_sort_keys.pop();
+			ASSERT(key != 0);
+			if ((u32)m_sort_key_to_mesh_map.size() < key + 1)
+				m_sort_key_to_mesh_map.resize(key + 1);
+			m_sort_key_to_mesh_map[key] = mesh;
+			return key;
+		}
+		++m_max_sort_key;
+		const u32 key = m_max_sort_key;
+		ASSERT(key != 0);
+		if ((u32)m_sort_key_to_mesh_map.size() < key + 1)
+			m_sort_key_to_mesh_map.resize(key + 1);
+		m_sort_key_to_mesh_map[key] = mesh;
+		return key;
+	}
+
+	void freeSortKey(u32 key) override {
+		if (key != 0) {
+			m_free_sort_keys.push(key);
+		}
+	}
 	
+	u32 getMaxSortKey() const override {
+		return m_max_sort_key;
+	}
+
 	void destroy(gpu::ProgramHandle program) override
 	{
 		struct Cmd : RenderJob {
@@ -1160,6 +1194,9 @@ struct RendererImpl final : Renderer
 	gpu::ProgramHandle m_downscale_program;
 	gpu::BufferHandle m_tmp_uniform_buffer;
 	gpu::BufferHandle m_scratch_buffer;
+	Array<u32> m_free_sort_keys;
+	Array<const Mesh*> m_sort_key_to_mesh_map;
+	u32 m_max_sort_key = 0;
 
 	Array<RenderPlugin*> m_plugins;
 	Local<FrameData> m_frames[3];
