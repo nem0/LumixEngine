@@ -268,7 +268,6 @@ struct CullingSystemImpl final : CullingSystem
 		, PagedList<CullResult>& list
 		, u8 type)
 	{
-		PROFILE_FUNCTION();
 		const Sphere* LUMIX_RESTRICT start = cell.spheres;
 		const Sphere* LUMIX_RESTRICT end = cell.spheres + cell.header.count;
 		const EntityPtr* LUMIX_RESTRICT sphere_to_entity_map = cell.entities;
