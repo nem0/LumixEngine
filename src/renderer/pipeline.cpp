@@ -3923,7 +3923,7 @@ struct PipelineImpl final : Pipeline
 					material_ub_idx = grass.material->material_constants;
 				}
 
-				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state);
+				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
 				gpu::bindIndirectBuffer(indirect);
 				gpu::drawIndirect(grass.mesh->index_type);
 
