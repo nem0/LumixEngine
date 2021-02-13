@@ -750,6 +750,7 @@ void ProfilerUIImpl::onGUICPUProfiler()
 	}
 
 	if (m_data.empty()) return;
+	if (!m_is_paused) return;
 	ThreadContextProxy global(m_data.getMutableData() + 2 * sizeof(u32));
 
 	const u64 view_start = m_end - m_range;
