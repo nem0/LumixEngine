@@ -586,6 +586,8 @@ struct PipelineImpl final : Pipeline
 			ASSERT(first_page == nullptr);
 		}
 
+		void operator=(Sorter&&) = delete;
+
 		void pack() {
 			u32 count = 0;
 			Page* p = first_page;
@@ -665,6 +667,8 @@ struct PipelineImpl final : Pipeline
 			ASSERT(rhs.first_page == rhs.last_page);
 			rhs.last_page = rhs.first_page = nullptr;
 		}
+
+		void operator=(AutoInstancer&&) = delete;
 
 		void init(u32 count) {
 			instances.resize(count);
@@ -746,6 +750,8 @@ struct PipelineImpl final : Pipeline
 		{
 			memcpy(layer_to_bucket, rhs.layer_to_bucket, sizeof(layer_to_bucket));
 		}
+
+		void operator=(View&&) = delete;
 
 		Array<AutoInstancer> instancers;
 		Sorter sorter;
