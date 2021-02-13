@@ -86,6 +86,11 @@ struct LUMIX_RENDERER_API Renderer : IPlugin {
 	virtual void endProfileBlock() = 0;
 	virtual void runInRenderThread(void* user_ptr, void (*fnc)(Renderer& renderer, void*)) = 0;
 
+	virtual u32 allocSortKey(struct Mesh* mesh) = 0;
+	virtual void freeSortKey(u32 key) = 0;
+	virtual u32 getMaxSortKey() const = 0;
+	virtual const Mesh** getSortKeyToMeshMap() const = 0;
+
 	virtual u8 getLayerIdx(const char* name) = 0;
 	virtual u8 getLayersCount() const = 0;
 	virtual const char* getLayerName(u8 layer) const = 0;

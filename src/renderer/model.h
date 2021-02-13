@@ -86,6 +86,8 @@ struct LUMIX_RENDERER_API Mesh {
 		const AttributeSemantic* semantics,
 		Renderer& renderer,
 		IAllocator& allocator);
+	Mesh(Mesh&& rhs);
+	~Mesh();
 
 	void setMaterial(Material* material, Model& model, Renderer& renderer);
 	bool areIndices16() const { return flags.isSet(Flags::INDICES_16_BIT); }
@@ -102,8 +104,8 @@ struct LUMIX_RENDERER_API Mesh {
 	gpu::VertexDecl vertex_decl;
 	AttributeSemantic attributes_semantic[gpu::VertexDecl::MAX_ATTRIBUTES];
 	RenderData* render_data;
+	Renderer& renderer;
 	float lod = 0;
-	static u32 s_last_sort_key;
 };
 
 

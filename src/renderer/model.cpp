@@ -20,9 +20,6 @@ namespace Lumix
 {
 
 
-u32 Mesh::s_last_sort_key = 0;
-
-
 static LocalRigidTransform invert(const LocalRigidTransform& tr)
 {
 	LocalRigidTransform result;
@@ -45,6 +42,7 @@ Mesh::Mesh(Material* mat,
 	, vertices(allocator)
 	, skin(allocator)
 	, vertex_decl(vertex_decl)
+	, renderer(renderer)
 {
 	render_data = LUMIX_NEW(renderer.getAllocator(), RenderData);
 	render_data->vb_stride = vb_stride;
@@ -60,10 +58,32 @@ Mesh::Mesh(Material* mat,
 		}
 	}
 
-	sort_key = s_last_sort_key;
-	++s_last_sort_key;
+	sort_key = renderer.allocSortKey(this);
 }
 
+Mesh::Mesh(Mesh&& rhs)
+	: type(rhs.type)
+	, indices(rhs.indices)
+	, vertices(rhs.vertices.move())
+	, skin(rhs.skin.move())
+	, flags(rhs.flags)
+	, sort_key(rhs.sort_key)
+	, layer(rhs.layer)
+	, name(rhs.name)
+	, material(rhs.material)
+	, vertex_decl(rhs.vertex_decl)
+	, render_data(rhs.render_data)
+	, lod(rhs.lod)
+	, renderer(rhs.renderer)
+{
+	memmove(attributes_semantic, rhs.attributes_semantic, sizeof(attributes_semantic));
+	rhs.sort_key = 0;
+	ASSERT(false); // renderer keeps Mesh* pointer, so we should not move
+}
+
+Mesh::~Mesh() {
+	renderer.freeSortKey(sort_key);
+}
 
 static bool hasAttribute(Mesh& mesh, Mesh::AttributeSemantic attribute)
 {

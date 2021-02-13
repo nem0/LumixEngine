@@ -35,6 +35,9 @@ namespace Lumix
 {
 
 static constexpr u32 DRAWCALL_UB_SIZE = 32*1024;
+static constexpr u64 INSTANCED_FLAG = (u64)1 << 39;
+static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
+
 
 struct CameraParams
 {
@@ -378,160 +381,6 @@ struct GlobalState
 };
 
 
-template <typename T>
-struct MTBucketArray
-{
-	enum {
-		BUCKET_SIZE = 32768,
-		MAX_COUNT = BUCKET_SIZE / sizeof(T)
-	}; 
-
-	struct Bucket {
-		T* keys;
-		T* values;
-
-		int count = 0;
-		MTBucketArray* array;
-
-		void end() { array->end(*this); }
-
-		void push(const T& key, const T& value)
-		{
-			keys[count] = key;
-			values[count] = value;
-			++count;
-			if (count == MAX_COUNT) {
-				array->end(*this); 
-				*this = array->begin();
-			}
-		}
-	};
-
-	static inline MTBucketArray* s_free_arrays[64] = {};
-	static inline u32 s_num_free_arrays = 0;
-	static inline Mutex s_cs;
-
-	static MTBucketArray* allocArray(IAllocator& allocator) {
-		MutexGuard lock(s_cs);
-		if (s_num_free_arrays == 0) {
-			return LUMIX_NEW(allocator, MTBucketArray<T>)(allocator);
-		}
-
-		for (u32 i = 0; i < s_num_free_arrays; ++i) {
-			if (&s_free_arrays[i]->m_allocator == &allocator) {
-				MTBucketArray* a = s_free_arrays[i];
-				--s_num_free_arrays;
-				s_free_arrays[i] = s_free_arrays[s_num_free_arrays];
-				return a;
-			}
-		}
-
-		return LUMIX_NEW(allocator, MTBucketArray<T>)(allocator);
-	}
-
-	static void freeArray(MTBucketArray* a) {
-		MutexGuard lock(s_cs);
-		a->clear();
-		ASSERT(s_num_free_arrays < lengthOf(s_free_arrays) - 1);
-		s_free_arrays[s_num_free_arrays] = a;
-		++s_num_free_arrays;
-	}
-
-	static void cleanupArrays() {
-		for (u32 i = 0; i < s_num_free_arrays; ++i) {
-			LUMIX_DELETE(s_free_arrays[i]->m_allocator, s_free_arrays[i]);
-		}
-		s_num_free_arrays = 0;
-	}
-
-	MTBucketArray(IAllocator& allocator) 
-		: m_counts(allocator)
-		, m_allocator(allocator)
-		, m_keys_mem((u8*)os::memReserve(1024 * 1024 * 16))
-		, m_values_mem((u8*)os::memReserve(1024 * 1024 * 16))
-	{
-		m_keys_end = m_keys_mem;
-		m_values_end = m_values_mem;
-		m_counts.reserve(1024 * 1024 * 16 / BUCKET_SIZE);
-	}
-
-	~MTBucketArray()
-	{
-		PROFILE_FUNCTION();
-		os::memRelease(m_values_mem);
-		os::memRelease(m_keys_mem);
-	}
-
-	void clear() {
-		m_keys_end = m_keys_mem;
-		m_values_end = m_values_mem;
-		m_counts.clear();
-		m_total_count = 0;
-	}
-
-	Bucket begin()
-	{
-		PROFILE_FUNCTION();
-		Bucket b;
-		b.array = this;
-		
-		m_mutex.enter();
-		m_counts.emplace();
-		b.values = (T*)m_values_end;
-		b.keys = (T*)m_keys_end;
-		m_keys_end += BUCKET_SIZE;
-		m_values_end += BUCKET_SIZE;
-		m_mutex.exit();
-		ASSERT(BUCKET_SIZE % os::getMemPageSize() == 0);
-		os::memCommit(b.values, BUCKET_SIZE);
-		os::memCommit(b.keys, BUCKET_SIZE);
-		return b;
-	}
-
-	void end(const Bucket& bucket)
-	{
-		const int bucket_idx = int(((u8*)bucket.values - m_values_mem) / BUCKET_SIZE);
-		MutexGuard lock(m_mutex);
-		m_counts[bucket_idx] = bucket.count;
-	}
-
-	void merge()
-	{
-		if (m_keys_end == m_keys_mem) return;
-		int b = 0, e = int((m_keys_end - m_keys_mem) / BUCKET_SIZE) - 1;
-
-		for(;;) {
-			while (b != e && m_counts[b] == MAX_COUNT) { 
-				++b;  
-			}
-			if (b == e) {
-				for(int i = 0; i <= e; ++i) m_total_count += m_counts[i];
-				break;
-			}
-			
-			const int s = minimum(m_counts[e], MAX_COUNT - m_counts[b]);
-			memcpy(&m_keys_mem[b * BUCKET_SIZE + m_counts[b] * sizeof(T)], &m_keys_mem[e * BUCKET_SIZE + (m_counts[e] - s) * sizeof(T)], s * sizeof(T));
-			memcpy(&m_values_mem[b * BUCKET_SIZE + m_counts[b] * sizeof(T)], &m_values_mem[e * BUCKET_SIZE + (m_counts[e] - s) * sizeof(T)], s * sizeof(T));
-			m_counts[b] += s;
-			m_counts[e] -= s;
-			if (m_counts[e] == 0) --e;
-		}
-	}
-
-	int size() const { return m_total_count; }
-	T* key_ptr() const { return (T*)m_keys_mem; }
-	T* value_ptr() const { return (T*)m_values_mem; }
-
-	IAllocator& m_allocator;
-	Mutex m_mutex;
-	u8* const m_keys_mem;
-	u8* const m_values_mem;
-	u8* m_keys_end;
-	u8* m_values_end;
-	Array<int> m_counts;
-	int m_total_count = 0;
-};
-
 struct ShadowAtlas {
 	static constexpr u32 SIZE = 2048;
 	
@@ -662,9 +511,245 @@ struct PipelineImpl final : Pipeline
 		CmdPage* cmd_page = nullptr; 
 	};
 
+	struct Sorter {
+		struct alignas(4096) Page {
+			struct Header {
+				Page* next = nullptr;
+				u32 count = 0;
+			} header;
+
+			static constexpr u32 MAX_COUNT = (PageAllocator::PAGE_SIZE - sizeof(Header)) / sizeof(u64) / 2;
+			u64 keys[MAX_COUNT];
+			u64 values[MAX_COUNT];
+		};
+
+		static_assert(sizeof(Page) == PageAllocator::PAGE_SIZE);
+
+		struct Inserter {
+			Inserter(Sorter& sorter) 
+				: sorter(sorter)
+			{
+				first_page = last_page = getNewPage();
+			}
+
+			Page* getNewPage() {
+				void* mem = sorter.page_allocator.allocate(true);
+				return new (NewPlaceholder(), mem) Page;
+			}
+
+			void push(u64 key, u64 value) {
+				if (last_page->header.count == lengthOf(last_page->keys)) {
+					Page* p = getNewPage();
+					last_page->header.next = p;
+					last_page = p;
+				}
+				const u32 c = last_page->header.count;
+				last_page->keys[c] = key;
+				last_page->values[c] = value;
+				last_page->header.count = c + 1;
+			}
+
+			~Inserter() {
+				MutexGuard guard(sorter.mutex);
+				if (!sorter.first_page) {
+					sorter.first_page = first_page;
+					sorter.last_page = last_page;
+					return;
+				}
+
+				sorter.last_page->header.next = first_page;
+				sorter.last_page = last_page;
+			}
+
+			Page* first_page = nullptr;
+			Page* last_page = nullptr;
+			Sorter& sorter;
+		};
+
+		Sorter(IAllocator& allocator, PageAllocator& page_allocator)
+			: allocator(allocator)
+			, page_allocator(page_allocator)
+			, keys(allocator)
+			, values(allocator)
+		{}
+
+		Sorter(Sorter&& rhs)
+			: allocator(rhs.allocator)
+			, page_allocator(rhs.page_allocator)
+			, first_page(rhs.first_page)
+			, last_page(rhs.last_page)
+			, keys(rhs.keys.move())
+			, values(rhs.values.move())
+		{
+			// we can't move sorters after inserters have been created, since it holds reference to sorter
+			// this check does not cover all cases, but it's better than nothing
+			ASSERT(first_page == nullptr);
+		}
+
+		void pack() {
+			u32 count = 0;
+			Page* p = first_page;
+			while (p) {
+				count += p->header.count;
+				p = p->header.next;
+			}
+
+			keys.resize(count);
+			values.resize(count);
+
+			p = first_page;
+			u32 offset =0 ;
+			while (p) {
+				if (p->header.count) {
+					memcpy(&keys[offset], p->keys, sizeof(p->keys[0]) * p->header.count);
+					memcpy(&values[offset], p->values, sizeof(p->values[0]) * p->header.count);
+					offset += p->header.count;
+				}
+				p = p->header.next;
+			}
+
+			p = first_page;
+			page_allocator.lock();
+			while (p) {
+				Page* n = p->header.next;
+				page_allocator.deallocate(p, false);
+				p = n;
+			}
+			page_allocator.unlock();
+			first_page = last_page = nullptr;
+		}
+
+		IAllocator& allocator;
+		PageAllocator& page_allocator;
+		Page* first_page = nullptr;
+		Page* last_page = nullptr;
+		Mutex mutex;
+		Array<u64> keys;
+		Array<u64> values;
+	};
+
+	struct AutoInstancer {
+		struct alignas(4096) Page {
+			struct Header {
+				Page* next = nullptr;;
+				u32 count = 0;
+			};
+
+			struct Group {
+				u64 renderables[14];
+				Group* next = nullptr;
+				u32 count = 0;
+				u32 offset = 0;
+			};
+
+			Header header;
+			Group groups[(PageAllocator::PAGE_SIZE - sizeof(Header)) / sizeof(Group)];
+		};
+		
+		static_assert(sizeof(Page) == PageAllocator::PAGE_SIZE);
+
+		AutoInstancer(IAllocator& allocator, PageAllocator& page_allocator)
+			: instances(allocator)
+			, page_allocator(page_allocator)
+		{
+			void* mem = page_allocator.allocate(true);
+			last_page = first_page = getNewPage();
+		}
+
+		AutoInstancer(AutoInstancer&& rhs)
+			: instances(rhs.instances.move())
+			, last_page(rhs.last_page)
+			, first_page(rhs.first_page)
+			, page_allocator(rhs.page_allocator)
+		{
+			ASSERT(rhs.first_page == rhs.last_page);
+			rhs.last_page = rhs.first_page = nullptr;
+		}
+
+		void init(u32 count) {
+			instances.resize(count);
+			memset(instances.begin(), 0, instances.byte_size());
+		}
+
+		~AutoInstancer() {
+			Page* p = first_page;
+			page_allocator.lock();
+			while (p) {
+				Page* next = p->header.next;
+				page_allocator.deallocate(p, false);
+				p = next;
+			}
+			page_allocator.unlock();
+		}
+
+		void add(u32 sort_key, u64 renderable) {
+			Page::Group* g = instances[sort_key].end;
+			if (!g || g->count == lengthOf(g->renderables)) {
+				Page::Group* n = getNewGroup();
+				if (g) {
+					n->offset = g->offset + g->count;
+					g->next = n;
+				}
+				else {
+					ASSERT(!instances[sort_key].begin);
+					instances[sort_key].begin = n;
+				}
+				g = n;
+				instances[sort_key].end = g;
+			}
+
+			g->renderables[g->count] = renderable;
+			++g->count;
+		}
+
+		Page* getNewPage() {
+			void* mem = page_allocator.allocate(true);
+			Page* p = new (NewPlaceholder(), mem) Page;
+			return p;
+		}
+
+		Page::Group* getNewGroup() {
+			if (last_page->header.count == lengthOf(last_page->groups)) {
+				Page* p = getNewPage();
+				last_page->header.next = p;
+				last_page = p;
+			}
+			Page::Group* g = &last_page->groups[last_page->header.count];
+			++last_page->header.count;
+			return g;
+		}
+
+		struct Instances {
+			Page::Group* begin;
+			Page::Group* end;
+			Renderer::TransientSlice slice;
+		};
+
+		Array<Instances> instances;
+		Page* last_page = nullptr;
+		Page* first_page = nullptr;
+		PageAllocator& page_allocator;
+		Mutex mutex;
+	};
+
 	struct View {
+		View(IAllocator& allocator, PageAllocator& page_allocator) 
+			: sorter(allocator, page_allocator)
+			, instancers(allocator)
+		{}
+
+		View(View&& rhs)
+			: sorter(static_cast<Sorter&&>(rhs.sorter))
+			, renderables(rhs.renderables)
+			, cp(rhs.cp)
+			, instancers(rhs.instancers.move())
+		{
+			memcpy(layer_to_bucket, rhs.layer_to_bucket, sizeof(layer_to_bucket));
+		}
+
+		Array<AutoInstancer> instancers;
+		Sorter sorter;
 		CullResult* renderables = nullptr;
-		MTBucketArray<u64>* sort_keys = nullptr;
 		CameraParams cp;
 		u8 layer_to_bucket[255];
 	};
@@ -808,7 +893,6 @@ struct PipelineImpl final : Pipeline
 		m_renderer.destroy(m_cluster_buffers.probes.buffer);
 
 		clearBuffers();
-		MTBucketArray<u64>::cleanupArrays();
 	}
 
 	void callInitScene()
@@ -2892,7 +2976,7 @@ struct PipelineImpl final : Pipeline
 	}
 
 	u32 cull(CameraParams cp) {
-		View& view = m_views.emplace();
+		View& view = m_views.emplace(m_allocator, m_renderer.getEngine().getPageAllocator());
 		view.cp = cp;
 		view.renderables = m_scene->getRenderables(cp.frustum);
 		memset(view.layer_to_bucket, 0xff, sizeof(view.layer_to_bucket));
@@ -2941,7 +3025,7 @@ struct PipelineImpl final : Pipeline
 							READ(Mesh::RenderData*, mesh);
 							READ(Material::RenderData*, material);
 							READ(gpu::ProgramHandle, program);
-							READ(u16, instances_count);
+							READ(u32, instances_count);
 							READ(gpu::BufferHandle, buffer);
 							READ(u32, offset);
 
@@ -3087,7 +3171,7 @@ struct PipelineImpl final : Pipeline
 		gpu::StateFlags m_render_state;
 	};
 
-	void createCommands(const View& view
+	void createCommands(View& view
 		, CmdPage* first_page
 		, const u64* LUMIX_RESTRICT renderables
 		, const u64* LUMIX_RESTRICT sort_keys
@@ -3148,9 +3232,11 @@ struct PipelineImpl final : Pipeline
 			instance_key_mask = sort_depth ? 0xff00'0000'00ff'ffff : 0xffff'ffff'0000'0000;
 		};
 
+		const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
+
 		for (u32 i = 0, c = count; i < c; ++i) {
 			const EntityRef e = {int(renderables[i] & 0xFFffFFff)};
-			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & 0xff);
+			const RenderableTypes type = RenderableTypes((renderables[i] >> 32) & SORT_VALUE_TYPE_MASK);
 			const u8 bucket = sort_keys[i] >> 56;
 			if(bucket != cmd_page->header.bucket) {
 				new_page(bucket);
@@ -3188,7 +3274,7 @@ struct PipelineImpl final : Pipeline
 						WRITE(mesh.render_data);
 						WRITE_FN(mi->custom_material->getRenderData());
 						WRITE(prog);
-						u16 count = 1;
+						u32 count = 1;
 						WRITE(count);
 						WRITE(slice.buffer);
 						WRITE(slice.offset);
@@ -3196,94 +3282,74 @@ struct PipelineImpl final : Pipeline
 							
 					break;
 				}
+				case RenderableTypes::MESH:
 				case RenderableTypes::MESH_GROUP: {
-					const u32 mesh_idx = renderables[i] >> 40;
-					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-					const Mesh& mesh = mi->meshes[mesh_idx];
-					const float mesh_lod = mesh.lod;
-					int start_i = i;
-					const u64 key = sort_keys[i] & instance_key_mask;
-					while (i < c && (sort_keys[i] & instance_key_mask) == key) {
-						++i;
-					}
-					const u16 count = u16(i - start_i);
-					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec4) + sizeof(float)) * 2);
-					u8* instance_data = slice.ptr;
-					for (int j = start_i; j < start_i + count; ++j) {
-						const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
-						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-						instance_data += sizeof(tr.rot);
-						memcpy(instance_data, &lpos, sizeof(lpos));
-						instance_data += sizeof(lpos);
-						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-						instance_data += sizeof(tr.scale);
-						const float lod_d = model_instances[e.index].lod - mesh_lod;
-						memcpy(instance_data, &lod_d, sizeof(lod_d));
-						instance_data += sizeof(lod_d);
-					}
-					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
-						new_page(bucket);
-					}
+					if (sort_keys[i] & INSTANCED_FLAG) {
+						const u32 group_idx = renderables[i] & 0xffFF;
+						const u32 instancer_idx = (renderables[i] >> 16) & 0xffFF;
+						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
+						const u32 total_count = instances.end->offset + instances.end->count;
+						const Mesh& mesh = *sort_key_to_mesh[group_idx];
+						const float mesh_lod = mesh.lod;
+						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+							new_page(bucket);
+						}
 
-					Shader* shader = mesh.material->getShader();
-					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+						Shader* shader = mesh.material->getShader();
+						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
 
-					WRITE(type);
-					WRITE(mesh.render_data);
-					WRITE_FN(mesh.material->getRenderData());
-					WRITE(prog);
-					WRITE(count);
-					WRITE(slice.buffer);
-					WRITE(slice.offset);
+						WRITE(type);
+						WRITE(mesh.render_data);
+						WRITE_FN(mesh.material->getRenderData());
+						WRITE(prog);
+						WRITE(total_count);
+						WRITE(instances.slice.buffer);
+						WRITE(instances.slice.offset);
+					}
+					else {
+						const u32 mesh_idx = renderables[i] >> 40;
+						const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
+						const Mesh& mesh = mi->meshes[mesh_idx];
+						const float mesh_lod = mesh.lod;
+						int start_i = i;
+						const u64 key = sort_keys[i] & instance_key_mask;
+						while (i < c && (sort_keys[i] & instance_key_mask) == key) {
+							++i;
+						}
+						const u32 count = u32(i - start_i);
+						const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec3) + sizeof(Vec4) + sizeof(float)) * 2);
+						u8* instance_data = slice.ptr;
+						for (int j = start_i; j < start_i + (i32)count; ++j) {
+							const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
+							const Transform& tr = entity_data[e.index];
+							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+							instance_data += sizeof(tr.rot);
+							memcpy(instance_data, &lpos, sizeof(lpos));
+							instance_data += sizeof(lpos);
+							memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+							instance_data += sizeof(tr.scale);
+							const float lod_d = model_instances[e.index].lod - mesh_lod;
+							memcpy(instance_data, &lod_d, sizeof(lod_d));
+							instance_data += sizeof(lod_d);
+						}
+						if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
+							new_page(bucket);
+						}
+
+						Shader* shader = mesh.material->getShader();
+						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
+
+						WRITE(type);
+						WRITE(mesh.render_data);
+						WRITE_FN(mesh.material->getRenderData());
+						WRITE(prog);
+						WRITE(count);
+						WRITE(slice.buffer);
+						WRITE(slice.offset);
 							
-					--i;
-					break;
-				}
-				case RenderableTypes::MESH: {
-					const u32 mesh_idx = renderables[i] >> 40;
-					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
-					const Mesh& mesh = mi->meshes[mesh_idx];
-					const float mesh_lod = mesh.lod;
-					int start_i = i;
-					const u64 key = sort_keys[i] & instance_key_mask;
-					while (i < c && (sort_keys[i] & instance_key_mask) == key) {
-						++i;
+						--i;
 					}
-					const u16 count = u16(i - start_i);
-					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(Vec4) + sizeof(float)) * 2);
-					u8* instance_data = slice.ptr;
-					for (int j = start_i; j < start_i + count; ++j) {
-						const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
-						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
-						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
-						instance_data += sizeof(tr.rot);
-						memcpy(instance_data, &lpos, sizeof(lpos));
-						instance_data += sizeof(lpos);
-						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
-						instance_data += sizeof(tr.scale);
-						const float lod_d = 0;
-						memcpy(instance_data, &lod_d, sizeof(lod_d));
-						instance_data += sizeof(lod_d);
-					}
-					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 38) {
-						new_page(bucket);
-					}
-
-					Shader* shader = mesh.material->getShader();
-					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
-
-					WRITE(type);
-					WRITE(mesh.render_data);
-					WRITE_FN(mesh.material->getRenderData());
-					WRITE(prog);
-					WRITE(count);
-					WRITE(slice.buffer);
-					WRITE(slice.offset);
-							
-					--i;
 					break;
 				}
 				case RenderableTypes::FUR:
@@ -3379,6 +3445,7 @@ struct PipelineImpl final : Pipeline
 					WRITE(count);
 					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
 					WRITE(nonintersecting_count);
+					--i;
 					break;
 				}
 				case RenderableTypes::LOCAL_LIGHT: {
@@ -3437,17 +3504,18 @@ struct PipelineImpl final : Pipeline
 				default: ASSERT(false); break;
 			}
 		}
+
 		cmd_page->header.size = int(out - cmd_page->data);
 		#undef WRITE
 		#undef WRITE_FN
 	}
 
 
-	void createCommands(const View& view)
+	void createCommands(View& view)
 	{
-		const u64* renderables = view.sort_keys->value_ptr();
-		const u64* sort_keys = view.sort_keys->key_ptr();
-		const int size = view.sort_keys->size();
+		const u64* renderables = view.sorter.values.begin();
+		const u64* sort_keys = view.sorter.keys.begin();
+		const int size = view.sorter.keys.size();
 		constexpr i32 STEP = 4096;
 		const i32 steps = (size + STEP - 1) / STEP;
 		PageAllocator& page_allocator = m_renderer.getEngine().getPageAllocator();
@@ -3493,24 +3561,20 @@ struct PipelineImpl final : Pipeline
 
 		for (View& view : m_views) {
 			if (!view.renderables) continue;
-
-			if (!view.sort_keys) view.sort_keys = MTBucketArray<u64>::allocArray(m_allocator);
 			createSortKeys(view);
 			view.renderables->free(m_renderer.getEngine().getPageAllocator());
-			view.sort_keys->merge();
 		}
 
 		for (View& view : m_views) {
-			if (view.sort_keys && view.sort_keys->size() > 0) {
-				radixSort(view.sort_keys->key_ptr(), view.sort_keys->value_ptr(), view.sort_keys->size());
+			if (!view.sorter.keys.empty()) {
+				radixSort(view.sorter.keys.begin(), view.sorter.values.begin(), view.sorter.keys.size());
 			}
 		}
 
 		for (View& view : m_views) {
-			if (!view.sort_keys) continue;
+			if (view.sorter.keys.empty()) continue;
 
 			createCommands(view);
-			MTBucketArray<u64>::freeArray(view.sort_keys);
 		}
 
 		jobs::decSignal(m_buckets_ready);
@@ -3520,12 +3584,10 @@ struct PipelineImpl final : Pipeline
 		HashMap<EntityRef, FurComponent>& furs = m_scene->getFurs();
 		if (furs.empty()) return;
 
-
 		const Bucket& bucket = m_buckets[bucket_id];
 		View& view = m_views[bucket.view_id];
-		if (!view.sort_keys) view.sort_keys = MTBucketArray<u64>::allocArray(m_allocator);
 		Span<const ModelInstance> mi = m_scene->getModelInstances();
-		MTBucketArray<u64>::Bucket sort_keys = view.sort_keys->begin();
+		Sorter::Inserter inserter(view.sorter);
 		
 		const u64 type_mask = (u64)RenderableTypes::FUR << 32;
 		
@@ -3547,10 +3609,9 @@ struct PipelineImpl final : Pipeline
 				const u64 key = mesh.sort_key | ((u64)bucket_id << 56);
 				const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
 			
-				sort_keys.push(key, subrenderable);
+				inserter.push(key, subrenderable);
 			}
 		}
-		sort_keys.end();
 	}
 
 	u32 createBucket(u32 view_id, const char* layer_name, const char* define, LuaWrapper::Optional<const char*> sort_str) {
@@ -3789,8 +3850,8 @@ struct PipelineImpl final : Pipeline
 			u32 material_ub_idx = 0xffFFffFF;
 			gpu::pushDebugGroup("grass");
 			renderer.beginProfileBlock("grass", 0);
-			// TODO reuse
 			gpu::BufferHandle data = m_pipeline->m_renderer.getScratchBuffer();
+			// TODO reuse
 			gpu::BufferHandle indirect = gpu::allocBufferHandle();
 			struct Indirect {
 				u32 vertex_count;
@@ -4043,9 +4104,15 @@ struct PipelineImpl final : Pipeline
 	};
 
 	void createSortKeys(PipelineImpl::View& view) {
-		MTBucketArray<u64>& sort_keys = *view.sort_keys;
 		if (view.renderables->header.count == 0 && !view.renderables->header.next) return;
 		PagedListIterator<const CullResult> iterator(view.renderables);
+
+		view.instancers.reserve(jobs::getWorkersCount());
+		for (u8 i = 0; i < jobs::getWorkersCount(); ++i) {
+			view.instancers.emplace(m_allocator, m_renderer.getEngine().getPageAllocator());
+		}
+
+		volatile i32 worker_idx = 0;
 
 		jobs::runOnWorkers([&](){
 			PROFILE_BLOCK("create keys");
@@ -4063,10 +4130,14 @@ struct PipelineImpl final : Pipeline
 			RenderScene* scene = m_scene;
 			ModelInstance* LUMIX_RESTRICT model_instances = scene->getModelInstances().begin();
 			const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
-			MTBucketArray<u64>::Bucket result = sort_keys.begin();
 			const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
 			const DVec3 camera_pos = view.cp.pos;
-				
+			Sorter::Inserter inserter(view.sorter);
+
+			const i32 instancer_idx = atomicIncrement(&worker_idx) - 1;
+			AutoInstancer& instancer = view.instancers[instancer_idx];
+			instancer.init(m_renderer.getMaxSortKey() + 1);
+
 			for(;;) {
 				const CullResult* page = iterator.next();
 				if(!page) break;
@@ -4089,7 +4160,7 @@ struct PipelineImpl final : Pipeline
 							if (bucket < 0xff) {
 								// TODO material can have the same sort key as mesh
 								const u64 subrenderable = e.index | type_mask;
-								result.push(material->getSortKey() | ((u64)bucket << 56), subrenderable);
+								inserter.push(material->getSortKey() | ((u64)bucket << 56), subrenderable);
 							}
 						}
 						break;
@@ -4101,21 +4172,19 @@ struct PipelineImpl final : Pipeline
 							const u32 bucket = bucket_map[mesh.layer];
 							const u64 subrenderable = e.index | type_mask;
 							if (bucket < 0xff) {
-								const u64 key = ((u64)mesh.sort_key << 32) | ((u64)bucket << 56);
-								result.push(key, subrenderable);
+								instancer.add(mesh.sort_key, subrenderable);
 							} else if (bucket < 0xffFF) {
 								const DVec3 pos = entity_data[e.index].pos;
 								const DVec3 rel_pos = pos - camera_pos;
 								const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 								const u32 depth_bits = floatFlip(*(u32*)&squared_length);
 								const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
-								result.push(key, subrenderable);
+								inserter.push(key, subrenderable);
 							}
 						}
 						break;
 					}
 					case RenderableTypes::SKINNED:
-					case RenderableTypes::MESH_GROUP:
 					case RenderableTypes::MESH_MATERIAL_OVERRIDE: {
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
@@ -4134,15 +4203,67 @@ struct PipelineImpl final : Pipeline
 									ASSERT(!mi.custom_material || mesh_idx == 0);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
 									if (bucket < 0xff) {
-										const u64 key = ((u64)mesh_sort_key<< 32) | ((u64)bucket << 56);
-										result.push(key, subrenderable);
+										const u64 key = mesh_sort_key | ((u64)bucket << 56);
+										inserter.push(key, subrenderable);
 									} else if (bucket < 0xffFF) {
 										const DVec3 pos = entity_data[e.index].pos;
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
 										const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
-										result.push(key, subrenderable);
+										inserter.push(key, subrenderable);
+									}
+								}
+							};
+
+							if (mi.lod != lod_idx) {
+								const float d = lod_idx - mi.lod;
+								const float ad = fabsf(d);
+									
+								if (ad <= 0.01f) {
+									mi.lod = float(lod_idx);
+									create_key(mi.model->getLODIndices()[lod_idx]);
+								}
+								else {
+									mi.lod += d / ad * 0.01f;
+									const u32 cur_lod_idx = u32(mi.lod);
+									create_key(mi.model->getLODIndices()[cur_lod_idx]);
+									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+								}
+							}
+							else {
+								const LODMeshIndices& lod = mi.model->getLODIndices()[lod_idx];
+								create_key(lod);
+							}
+						}
+						break;
+					}
+					case RenderableTypes::MESH_GROUP: {
+						for (int i = 0, c = page->header.count; i < c; ++i) {
+							const EntityRef e = renderables[i];
+							const DVec3 pos = entity_data[e.index].pos;
+							ModelInstance& mi = model_instances[e.index];
+							const float squared_length = float((pos - camera_pos).squaredLength());
+								
+							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
+
+							auto create_key = [&](const LODMeshIndices& lod){
+								for (int mesh_idx = lod.from; mesh_idx <= lod.to; ++mesh_idx) {
+									const Mesh& mesh = mi.meshes[mesh_idx];
+									const u32 bucket = bucket_map[mesh.layer];
+									const u64 type_mask = (u64)type << 32;
+									const u32 mesh_sort_key = mi.custom_material ? 0x00FFffFF : mesh.sort_key;
+									ASSERT(!mi.custom_material || mesh_idx == 0);
+									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
+									if (bucket < 0xff) {
+										instancer.add(mesh.sort_key, subrenderable);
+									} else if (bucket < 0xffFF) {
+										const DVec3 pos = entity_data[e.index].pos;
+										const DVec3 rel_pos = pos - camera_pos;
+										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
+										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
+										const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+										inserter.push(key, subrenderable);
 									}
 								}
 							};
@@ -4172,9 +4293,57 @@ struct PipelineImpl final : Pipeline
 					default: ASSERT(false); break;
 				}
 			}
-			result.end();
 			profiler::pushInt("count", total);
+
+			const Mesh** sort_key_to_mesh = m_renderer.getSortKeyToMeshMap();
+			for (u32 i = 0, c = (u32)instancer.instances.size(); i < c; ++i) {
+				if (!instancer.instances[i].begin) continue;
+
+				const Mesh* mesh = sort_key_to_mesh[i];
+				const u8 bucket = view.layer_to_bucket[mesh->layer];
+				inserter.push(INSTANCED_FLAG | i | ((u64)bucket << 56), i | (instancer_idx << 16));
+			}
+
+			PROFILE_BLOCK("fill instance data");
+			for (AutoInstancer::Instances& instances : instancer.instances) {
+				const AutoInstancer::Page::Group* group = instances.begin;
+				if (!group) continue;
+
+				const u32 count = instances.end->offset + instances.end->count;
+				instances.slice = m_renderer.allocTransient(count * (sizeof(Quat) + sizeof(Vec3) + sizeof(float) * 2));
+				u8* instance_data = instances.slice.ptr;
+				const u32 sort_key = u32(&instances - instancer.instances.begin());
+				const Mesh* mesh = sort_key_to_mesh[sort_key];
+
+				#define WRITE(x) do { \
+					memcpy(out, &(x), sizeof(x)); \
+					out += sizeof(x); \
+				} while(false)
+
+				const float mesh_lod = mesh->lod;
+
+				while (group) {
+					for (u32 i = 0; i < group->count; ++i) {
+						const EntityRef e = { (i32)group->renderables[i] };
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
+						instance_data += sizeof(tr.rot);
+						memcpy(instance_data, &lpos, sizeof(lpos));
+						instance_data += sizeof(lpos);
+						memcpy(instance_data, &tr.scale, sizeof(tr.scale));
+						instance_data += sizeof(tr.scale);
+						const float lod_d = model_instances[e.index].lod - mesh_lod;
+						memcpy(instance_data, &lod_d, sizeof(lod_d));
+						instance_data += sizeof(lod_d);
+					}
+					group = group->next;
+				}
+				#undef WRITE
+			}
 		});
+
+		view.sorter.pack();
 	}
 
 	struct Histogram {
