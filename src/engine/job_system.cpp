@@ -180,6 +180,9 @@ static void pushJob(const Job& job)
 	for (WorkerTask* worker : g_system->m_workers) {
 		worker->wakeup();
 	}
+	for (WorkerTask* worker : g_system->m_backup_workers) {
+		if (worker->m_is_enabled) worker->wakeup();
+	}
 }
 
 

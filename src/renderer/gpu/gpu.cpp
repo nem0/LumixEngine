@@ -92,6 +92,7 @@ struct GL {
 	ProgramHandle last_program = INVALID_PROGRAM;
 	StateFlags last_state = StateFlags::NONE;
 	GLuint framebuffer = 0;
+	GLuint helper_indirect_buffer = 0;
 	ProgramHandle default_program = INVALID_PROGRAM;
 	bool has_gpu_mem_info_ext = false;
 };
@@ -725,7 +726,7 @@ void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType ind
 {
 	checkThread();
 	const GLenum type = index_type == DataType::U16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-	/*if (instances_count * indices_count > 4096) {
+	if (instances_count * indices_count > 4096) {
 		struct {
 			u32  indices_count;
 			u32  instances_count;
@@ -740,9 +741,11 @@ void drawTrianglesInstanced(u32 indices_count, u32 instances_count, DataType ind
 		mdi.base_vertex = 0;
 		// we use glMultiDrawElementsIndirect because of 
 		// https://devtalk.nvidia.com/default/topic/1052728/opengl/extremely-slow-gldrawelementsinstanced-compared-to-gldrawarraysinstanced-/
-		glMultiDrawElementsIndirect(GL_TRIANGLES, type, &mdi, 1, 0);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, gl->helper_indirect_buffer);
+		glBufferSubData(GL_DRAW_INDIRECT_BUFFER, 0, sizeof(mdi), &mdi);
+		glMultiDrawElementsIndirect(GL_TRIANGLES, type, nullptr, 1, 0);
 	}
-	else*/ {
+	else {
 		glDrawElementsInstanced(GL_TRIANGLES, indices_count, type, 0, instances_count);
 	}
 }
@@ -956,7 +959,6 @@ void setCurrentWindow(void* window_handle) {
 u32 swapBuffers()
 {
 	checkThread();
-	glFinish();
 	#ifdef _WIN32
 		for (WindowContext& ctx : gl->contexts) {
 			if (!ctx.window_handle) continue;
@@ -1711,6 +1713,9 @@ bool init(void* window_handle, InitFlags init_flags)
 	glAttachShader(p.gl_handle, vs);
 	glLinkProgram(p.gl_handle);
 	glDeleteShader(vs);
+
+	glCreateBuffers(1, &gl->helper_indirect_buffer);
+	glNamedBufferStorage(gl->helper_indirect_buffer, 256, nullptr, GL_DYNAMIC_STORAGE_BIT);
 
 	gl->last_state = StateFlags(1);
 	setState(StateFlags::NONE);
