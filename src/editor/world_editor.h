@@ -49,6 +49,7 @@ struct UniverseView {
 	virtual void setSideView() = 0;
 	virtual void moveCamera(float forward, float right, float up, float speed) = 0;
 	virtual void copyTransform() = 0;
+	virtual void refreshIcons() = 0;
 
 	virtual bool isMouseDown(os::MouseButton button) const = 0;
 	virtual bool isMouseClick(os::MouseButton button) const = 0;
@@ -143,6 +144,7 @@ struct LUMIX_EDITOR_API WorldEditor
 
 	virtual void loadUniverse(const char* basename) = 0;
 	virtual void saveUniverse(const char* basename, bool save_path) = 0;
+	virtual bool isLoading() const = 0;
 	virtual void newUniverse() = 0;
 	virtual void toggleGameMode() = 0;
 	

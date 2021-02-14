@@ -2248,6 +2248,8 @@ public:
 		InputMemoryStream stream(data);
 		return m_engine.deserializeProject(stream);
 	}
+	
+	bool isLoading() const override { return m_is_loading; }
 
 	void loadUniverse(const char* basename) override
 	{
@@ -2367,6 +2369,7 @@ public:
 
 			}
 			logInfo("Universe parsed in ", timer.getTimeSinceStart(), " seconds");
+			m_view->refreshIcons();
 			m_is_loading = false;
 			return true;
 		}

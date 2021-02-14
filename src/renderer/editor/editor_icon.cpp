@@ -108,15 +108,26 @@ struct EditorIconsImpl final : EditorIcons
 
 	void destroyIcon(EntityRef entity)
 	{
-		m_icons.erase(entity);
+		if (!m_editor.isLoading()) {
+			m_icons.erase(entity);
+		}
 	}
 
+	void refresh() override {
+		m_icons.clear();
+		Universe& universe = m_scene.getUniverse();
+		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
+			createIcon((EntityRef)e);
+		}
+	}
 
 	void refreshIcon(const ComponentUID& cmp)
 	{
-		ASSERT(cmp.isValid());
-		destroyIcon((EntityRef)cmp.entity);
-		createIcon((EntityRef)cmp.entity);
+		if (!m_editor.isLoading()) {
+			ASSERT(cmp.isValid());
+			destroyIcon((EntityRef)cmp.entity);
+			createIcon((EntityRef)cmp.entity);
+		}
 	}
 
 
