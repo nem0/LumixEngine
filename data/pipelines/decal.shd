@@ -56,7 +56,7 @@ fragment_shader [[
 		vec3 lpos = rotateByQuat(r, wpos - v_pos);
 		if (any(greaterThan(abs(lpos), v_half_extents))) discard;
 		
-		vec4 color = texture(u_texture, lpos.xy * v_uv_scale);
+		vec4 color = texture(u_texture, lpos.xz * v_uv_scale);
 		//if (color.a < 0.01) discard;
 		color.rgb *= u_material_color.rgb;
 
