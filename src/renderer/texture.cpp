@@ -568,6 +568,9 @@ gpu::TextureFlags Texture::getGPUFlags() const
 	if(flags & (u32)Flags::POINT) {
 		gpu_flags = gpu_flags | gpu::TextureFlags::POINT_FILTER;
 	}
+	if(flags & (u32)Flags::ANISOTROPIC) {
+		gpu_flags = gpu_flags | gpu::TextureFlags::ANISOTROPIC_FILTER;
+	}
 	if (flags & (u32)Flags::CLAMP_U) {
 		gpu_flags = gpu_flags | gpu::TextureFlags::CLAMP_U;
 	}

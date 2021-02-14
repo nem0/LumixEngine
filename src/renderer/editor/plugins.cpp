@@ -700,7 +700,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 		enum Filter : u32 {
 			LINEAR,
-			POINT
+			POINT,
+			ANISOTROPIC
 		};
 		bool srgb = false;
 		bool is_normalmap = false;
@@ -1006,6 +1007,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
 		flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
 		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+		flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 		dst.write(&flags, sizeof(flags));
 
 		nvtt::Context context;
@@ -1034,6 +1036,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
 			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
 			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 			dst.write(&flags, sizeof(flags));
 			for (int j = 0; j < h; ++j) {
 				for (int i = 0; i < w; ++i) {
@@ -1054,6 +1057,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
 		flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
 		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+		flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 		dst.write(&flags, sizeof(flags));
 
 		nvtt::Context context;
@@ -1105,6 +1109,9 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (equalIStrings(tmp, "point")) {
 					meta.filter = Meta::Filter::POINT;
 				}
+				else if (equalIStrings(tmp, "anisotropic")) {
+					meta.filter = Meta::Filter::ANISOTROPIC;
+				}
 				else {
 					meta.filter = Meta::Filter::LINEAR;
 				}
@@ -1141,6 +1148,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
 				flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
 				flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+				flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 				out.write(flags);
 				out.write(src_data.data(), src_data.size());
 			}
@@ -1173,6 +1181,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		switch (filter) {
 			case Meta::Filter::POINT: return "point";
 			case Meta::Filter::LINEAR: return "linear";
+			case Meta::Filter::ANISOTROPIC: return "anisotropic";
 			default: ASSERT(false); return "linear";
 		}
 	}
@@ -1401,7 +1410,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGuiEx::Label("W Wrap mode");
 			ImGui::Combo("##wwrp", (int*)&m_meta.wrap_mode_w, "Repeat\0Clamp\0");
 			ImGuiEx::Label("Filter");
-			ImGui::Combo("Filter", (int*)&m_meta.filter, "Linear\0Point\0");
+			ImGui::Combo("Filter", (int*)&m_meta.filter, "Linear\0Point\0Anisotropic\0");
 
 			if (ImGui::Button(ICON_FA_CHECK "Apply")) {
 				const StaticString<512> src("srgb = ", m_meta.srgb ? "true" : "false"

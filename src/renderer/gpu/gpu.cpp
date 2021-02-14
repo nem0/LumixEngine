@@ -95,6 +95,7 @@ struct GL {
 	GLuint helper_indirect_buffer = 0;
 	ProgramHandle default_program = INVALID_PROGRAM;
 	bool has_gpu_mem_info_ext = false;
+	float max_anisotropy = 0;
 };
 
 Local<GL> gl;
@@ -1148,6 +1149,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, Textur
 
 	const GLenum texture_target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	const bool is_srgb = u32(flags & TextureFlags::SRGB);
+	const bool is_anisotropic_filter = u32(flags & TextureFlags::ANISOTROPIC_FILTER);
 	const GLenum internal_format = is_srgb ? li->internalSRGBFormat : li->internalFormat;
 	const u32 mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
 
@@ -1259,6 +1261,9 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, Textur
 	glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u);
 	glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v);
 	glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w);
+	if (is_anisotropic_filter && gl->max_anisotropy > 0) {
+		glTextureParameterf(texture, GL_TEXTURE_MAX_ANISOTROPY, gl->max_anisotropy); 
+	}
 
 	Texture& t = *handle;
 	t.format = internal_format;
@@ -1325,6 +1330,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	const bool no_mips = u32(flags & TextureFlags::NO_MIPS);
 	const bool is_3d = depth > 1 && u32(flags & TextureFlags::IS_3D);
 	const bool is_cubemap = u32(flags & TextureFlags::IS_CUBE);
+	const bool is_anisotropic_filter = u32(flags & TextureFlags::ANISOTROPIC_FILTER);
 
 	ASSERT(!is_cubemap || depth == 1);
 	ASSERT(!is_cubemap || !is_3d);
@@ -1421,6 +1427,9 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 	else {
 		glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
+	}
+	if (is_anisotropic_filter && gl->max_anisotropy > 0) {
+		glTextureParameterf(texture, GL_TEXTURE_MAX_ANISOTROPY, gl->max_anisotropy); 
 	}
 
 	handle->gl_handle = texture;
@@ -1717,6 +1726,7 @@ bool init(void* window_handle, InitFlags init_flags)
 	glCreateBuffers(1, &gl->helper_indirect_buffer);
 	glNamedBufferStorage(gl->helper_indirect_buffer, 256, nullptr, GL_DYNAMIC_STORAGE_BIT);
 
+	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &gl->max_anisotropy);
 	gl->last_state = StateFlags(1);
 	setState(StateFlags::NONE);
 

@@ -58,6 +58,7 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 		CLAMP_V = 1 << 2,
 		CLAMP_W = 1 << 3,
 		POINT = 1 << 4,
+		ANISOTROPIC = 1 << 5
 	};
 
 	Texture(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
