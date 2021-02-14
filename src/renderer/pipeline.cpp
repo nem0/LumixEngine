@@ -33,10 +33,21 @@
 namespace Lumix
 {
 
-static constexpr u32 DRAWCALL_UB_SIZE = 32*1024;
-static constexpr u64 INSTANCED_FLAG = (u64)1 << 39;
-static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
 
+// sort key:
+// bucket 64-56
+// instanced_flag 55
+// depth bits 31 - 0; if bucket is depth sorted, must be not instanced
+// mesh key 31 - 8; if bucket is not depth sorted and not instanced
+// instancer 31 - 16; if instanced
+// instance group 15 - 0; if instanced
+
+static constexpr u32 DRAWCALL_UB_SIZE = 32*1024;
+static constexpr u32 SORT_VALUE_TYPE_MASK = (1 << 5) - 1;
+static constexpr u64 SORT_KEY_BUCKET_SHIFT = 56;
+static constexpr u64 SORT_KEY_INSTANCED_FLAG = (u64)1 << 55;
+static constexpr u64 SORT_KEY_DEPTH_MASK = 0xffFFffFF;
+static constexpr u64 SORT_KEY_INSTANCER_SHIFT = 16;
 
 struct CameraParams
 {
@@ -3288,7 +3299,7 @@ struct PipelineImpl final : Pipeline
 				}
 				case RenderableTypes::MESH:
 				case RenderableTypes::MESH_GROUP: {
-					if (sort_keys[i] & INSTANCED_FLAG) {
+					if (sort_keys[i] & SORT_KEY_INSTANCED_FLAG) {
 						const u32 group_idx = renderables[i] & 0xffFF;
 						const u32 instancer_idx = (renderables[i] >> 16) & 0xffFF;
 						const AutoInstancer::Instances& instances = view.instancers[instancer_idx].instances[group_idx];
@@ -3610,7 +3621,7 @@ struct PipelineImpl final : Pipeline
 				const Mesh& mesh = model->getMesh(i);
 				if (mesh.type != Mesh::SKINNED) continue;
 
-				const u64 key = mesh.sort_key | ((u64)bucket_id << 56);
+				const u64 key = mesh.sort_key | ((u64)bucket_id << SORT_KEY_BUCKET_SHIFT);
 				const u64 subrenderable = e.index | type_mask | ((u64)i << 40);
 			
 				inserter.push(key, subrenderable);
@@ -4181,7 +4192,7 @@ struct PipelineImpl final : Pipeline
 							if (bucket < 0xff) {
 								// TODO material can have the same sort key as mesh
 								const u64 subrenderable = e.index | type_mask;
-								inserter.push(material->getSortKey() | ((u64)bucket << 56), subrenderable);
+								inserter.push(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT), subrenderable);
 							}
 						}
 						break;
@@ -4199,7 +4210,7 @@ struct PipelineImpl final : Pipeline
 								const DVec3 rel_pos = pos - lod_ref_point;
 								const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 								const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-								const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+								const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | depth_bits;
 								inserter.push(key, subrenderable);
 							}
 						}
@@ -4224,14 +4235,14 @@ struct PipelineImpl final : Pipeline
 									ASSERT(!mi.custom_material || mesh_idx == 0);
 									const u64 subrenderable = e.index | type_mask | ((u64)mesh_idx << 40);
 									if (bucket < 0xff) {
-										const u64 key = mesh_sort_key | ((u64)bucket << 56);
+										const u64 key = mesh_sort_key | ((u64)bucket << SORT_KEY_BUCKET_SHIFT);
 										inserter.push(key, subrenderable);
 									} else if (bucket < 0xffFF) {
 										const DVec3 pos = entity_data[e.index].pos;
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-										const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | depth_bits;
 										inserter.push(key, subrenderable);
 									}
 								}
@@ -4283,7 +4294,7 @@ struct PipelineImpl final : Pipeline
 										const DVec3 rel_pos = pos - camera_pos;
 										const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 										const u32 depth_bits = floatFlip(*(u32*)&squared_length);
-										const u64 key = mesh_sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
+										const u64 key = ((u64)bucket << SORT_KEY_BUCKET_SHIFT) | depth_bits;
 										inserter.push(key, subrenderable);
 									}
 								}
@@ -4322,7 +4333,7 @@ struct PipelineImpl final : Pipeline
 
 				const Mesh* mesh = sort_key_to_mesh[i];
 				const u8 bucket = view.layer_to_bucket[mesh->layer];
-				inserter.push(INSTANCED_FLAG | i | ((u64)bucket << 56), i | (instancer_idx << 16));
+				inserter.push(SORT_KEY_INSTANCED_FLAG | i | ((u64)bucket << SORT_KEY_BUCKET_SHIFT), i | (instancer_idx << SORT_KEY_INSTANCER_SHIFT));
 			}
 
 			PROFILE_BLOCK("fill instance data");
