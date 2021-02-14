@@ -4005,6 +4005,7 @@ struct PipelineImpl final : Pipeline
 				
 				Instance& inst = m_instances.emplace();
 				inst.pos = (info.position - m_camera_params.pos).toFloat();
+				inst.ref_pos = (info.position - m_pipeline->m_viewport.pos).toFloat();
 				inst.rot = info.rot;
 				inst.scale = info.terrain->getScale();
 				inst.hm_size = info.terrain->getSize();
@@ -4044,6 +4045,8 @@ struct PipelineImpl final : Pipeline
 				dc_data.lpos = Vec4(inst.rot.conjugated().rotate(-inst.pos), 0);
 				dc_data.hm_size = inst.hm_size;
 
+				const Vec3 ref_pos = inst.rot.conjugated().rotate(-inst.ref_pos);
+
 				gpu::bindTextures(inst.material->textures, 0, inst.material->textures_count);
 
 				gpu::setState(state);
@@ -4053,7 +4056,7 @@ struct PipelineImpl final : Pipeline
 				bool first = true;
 				for (;;) {
 					// round 
-					IVec2 from = IVec2((dc_data.lpos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
+					IVec2 from = IVec2((ref_pos.xz() + Vec2(0.5f * s)) / float(s)) - IVec2(32);
 					from.x = from.x & ~1;
 					from.y = from.y & ~1;
 					IVec2 to = from + IVec2(64);
@@ -4103,6 +4106,7 @@ struct PipelineImpl final : Pipeline
 		{
 			Vec2 hm_size;
 			Vec3 pos;
+			Vec3 ref_pos;
 			Quat rot;
 			Vec3 scale;
 			gpu::ProgramHandle program;
@@ -4237,12 +4241,12 @@ struct PipelineImpl final : Pipeline
 								const float d = lod_idx - mi.lod;
 								const float ad = fabsf(d);
 									
-								if (ad <= 0.01f) {
+								if (ad <= 0.05f) {
 									mi.lod = float(lod_idx);
 									create_key(mi.model->getLODIndices()[lod_idx]);
 								}
 								else {
-									mi.lod += d / ad * 0.01f;
+									mi.lod += d / ad * 0.05f;
 									const u32 cur_lod_idx = u32(mi.lod);
 									create_key(mi.model->getLODIndices()[cur_lod_idx]);
 									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
@@ -4285,16 +4289,16 @@ struct PipelineImpl final : Pipeline
 								}
 							};
 
-							if (mi.lod != lod_idx && !view.cp.is_shadow) {
+							if (mi.lod != lod_idx) {
 								const float d = lod_idx - mi.lod;
 								const float ad = fabsf(d);
 									
-								if (ad <= 0.01f) {
-									mi.lod = float(lod_idx);
+								if (ad <= 0.05f) {
+									if (!view.cp.is_shadow) mi.lod = float(lod_idx);
 									create_key(mi.model->getLODIndices()[lod_idx]);
 								}
 								else {
-									mi.lod += d / ad * 0.01f;
+									mi.lod += view.cp.is_shadow ? 0 : d / ad * 0.05f;
 									const u32 cur_lod_idx = u32(mi.lod);
 									create_key(mi.model->getLODIndices()[cur_lod_idx]);
 									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);

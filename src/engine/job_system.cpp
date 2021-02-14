@@ -339,8 +339,6 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 	g_system->m_sync.exit();
 
 	FiberDecl* this_fiber = (FiberDecl*)data;
-	profiler::beginBlock("job management");
-	profiler::blockColor(0, 0, 0xff);
 		
 	WorkerTask* worker = getWorker();
 	while (!worker->m_finished) {
@@ -395,8 +393,6 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			Fiber::switchTo(&this_fiber->fiber, fiber->fiber);
 			g_system->m_sync.exit();
 
-			profiler::beginBlock("job management");
-			profiler::blockColor(0, 0, 0xff);
 			worker = getWorker();
 			worker->m_current_fiber = this_fiber;
 		}
@@ -414,8 +410,6 @@ void runEx(void* data, void(*task)(void*), SignalHandle* on_finished, SignalHand
 			}
 			worker = getWorker();
 			profiler::endBlock();
-			profiler::beginBlock("job management");
-			profiler::blockColor(0, 0, 0xff);
 		}
 	}
 	profiler::endBlock();
