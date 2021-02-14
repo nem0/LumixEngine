@@ -369,6 +369,11 @@ struct UniverseViewImpl final : UniverseView {
 	const Viewport& getViewport() const override { return m_viewport; }
 	void setViewport(const Viewport& vp) override { m_viewport = vp; }
 
+	void refreshIcons() override {
+		m_icons->refresh();
+	}
+
+
 	void copyTransform() override {
 		if (m_editor.getSelectedEntities().empty()) return;
 

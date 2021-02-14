@@ -353,15 +353,9 @@ struct PhysicsSceneImpl final : PhysicsScene
 
 
 	struct RigidActor {
-		RigidActor(PhysicsSceneImpl& _scene, EntityRef entity)
-			: resource(nullptr)
-			, physx_actor(nullptr)
-			, scene(_scene)
-			, layer(0)
+		RigidActor(PhysicsSceneImpl& scene, EntityRef entity)
+			: scene(scene)
 			, entity(entity)
-			, dynamic_type(DynamicType::STATIC)
-			, is_trigger(false)
-			, scale(1)
 		{}
 
 		~RigidActor() {
@@ -372,18 +366,18 @@ struct PhysicsSceneImpl final : PhysicsScene
 		void rescale();
 		void setResource(PhysicsGeometry* resource);
 		void setPhysxActor(PxRigidActor* actor);
-
-		EntityRef entity;
-		float scale;
-		int layer;
-		PxRigidActor* physx_actor;
-		PhysicsGeometry* resource;
-		PhysicsSceneImpl& scene;
-		DynamicType dynamic_type;
-		bool is_trigger;
-
-	private:
 		void onStateChanged(Resource::State old_state, Resource::State new_state, Resource&);
+
+		PhysicsSceneImpl& scene;
+		EntityRef entity;
+		float scale = 1;
+		int layer = 0;
+		PxRigidActor* physx_actor = nullptr;
+		PhysicsGeometry* resource = nullptr;
+		RigidActor* prev_with_resource = nullptr;
+		RigidActor* next_with_resource = nullptr;
+		DynamicType dynamic_type = DynamicType::STATIC;
+		bool is_trigger = false;
 	};
 
 
@@ -4275,7 +4269,17 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (!physx_actor) return;
 		physx_actor->addForce(toPhysx(impulse), PxForceMode::eIMPULSE);
 	}
-
+	
+	void onActorResourceStateChanged(Resource::State prev_state, Resource::State new_state, Resource& res) {
+		auto iter = m_resource_actor_map.find((PhysicsGeometry*)&res);
+		ASSERT(iter.isValid());
+		const EntityRef e = iter.value();
+		RigidActor* actor = m_actors[e];
+		while (actor) {
+			actor->onStateChanged(prev_state, new_state, res);
+			actor = actor->next_with_resource;
+		}
+	}
 
 	static PxFilterFlags filterShader(PxFilterObjectAttributes attributes0,
 		PxFilterData filterData0,
@@ -4371,6 +4375,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 	FilterCallback m_filter_callback;
 
 	HashMap<EntityRef, RigidActor*> m_actors;
+	HashMap<PhysicsGeometry*, EntityRef> m_resource_actor_map;
 	HashMap<EntityRef, Ragdoll> m_ragdolls;
 	AssociativeArray<EntityRef, Joint> m_joints;
 	HashMap<EntityRef, Controller> m_controllers;
@@ -4416,6 +4421,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	, m_system(&system)
 	, m_hit_report(*this)
 	, m_layers(m_system->getCollisionLayers())
+	, m_resource_actor_map(m_allocator)
 {
 	m_physics_cmps_mask = 0;
 
@@ -4679,7 +4685,7 @@ void PhysicsSceneImpl::RigidActor::setPhysxActor(PxRigidActor* actor)
 }
 
 
-void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
+void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* new_value)
 {
 	if (physx_actor) {
 		const i32 shape_count = physx_actor->getNbShapes();
@@ -4695,15 +4701,36 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* _resource)
 		}
 	}
 
-	if (resource)
+	if (resource) 
 	{
-		resource->getObserverCb().unbind<&RigidActor::onStateChanged>(this);
-		resource->decRefCount();
+		if (!next_with_resource && !prev_with_resource) {
+			resource->getObserverCb().unbind<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
+			scene.m_resource_actor_map.erase(resource);
+			resource->decRefCount();
+		}
+		else {
+			if (next_with_resource) next_with_resource->prev_with_resource = prev_with_resource;
+			if (prev_with_resource) prev_with_resource->next_with_resource = next_with_resource;
+		}
 	}
-	resource = _resource;
+	resource = new_value;
 	if (resource)
 	{
-		resource->onLoaded<&RigidActor::onStateChanged>(this);
+		auto iter = scene.m_resource_actor_map.find(resource);
+		if (iter.isValid()) {
+			next_with_resource = scene.m_actors[iter.value()];
+			next_with_resource->prev_with_resource = this;
+			prev_with_resource = nullptr;
+			scene.m_resource_actor_map[resource] = entity;
+			if (resource->isReady()) {
+				onStateChanged(Resource::State::READY, Resource::State::READY, *new_value);
+			}
+			resource->decRefCount();
+		}
+		else {
+			scene.m_resource_actor_map.insert(resource, entity);
+			resource->onLoaded<&PhysicsSceneImpl::onActorResourceStateChanged>(&scene);
+		}
 	}
 }
 

@@ -30,6 +30,7 @@ struct EditorIcons
 
 	virtual void getRenderData(Array<RenderData>* data) = 0;
 	virtual Hit raycast(const DVec3& origin, const Vec3& dir) = 0;
+	virtual void refresh() = 0;
 };
 
 
