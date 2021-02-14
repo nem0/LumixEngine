@@ -146,7 +146,8 @@ enum class TextureFlags : u32 {
 	IS_3D = 1 << 7,
 	IS_CUBE = 1 << 8,
 	COMPUTE_WRITE = 1 << 9,
-	RENDER_TARGET = 1 << 10
+	RENDER_TARGET = 1 << 10,
+	ANISOTROPIC_FILTER = 1 << 11
 };
 
 enum class BufferFlags : u32 {
