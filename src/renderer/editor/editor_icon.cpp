@@ -108,14 +108,7 @@ struct EditorIconsImpl final : EditorIcons
 
 	void destroyIcon(EntityRef entity)
 	{
-		for(int i = 0, c = m_icons.size(); i < c; ++i)
-		{
-			if(m_icons[i].entity == entity)
-			{
-				m_icons.swapAndPop(i);
-				return;
-			}
-		}
+		m_icons.erase(entity);
 	}
 
 
@@ -135,7 +128,7 @@ struct EditorIconsImpl final : EditorIcons
 		if (mask & ((u64)1 << (u64)MODEL_INSTANCE_TYPE.index)) return;
 		if (mask & ((u64)1 << (u64)DECAL_TYPE.index)) return;
 
-		auto& icon = m_icons.emplace();
+		auto& icon = m_icons.insert(entity);
 		icon.entity = entity;
 		icon.type = IconType::ENTITY;
 		for (ComponentUID cmp = universe.getFirstComponent(entity); cmp.isValid(); cmp = universe.getNextComponent(cmp))
@@ -250,7 +243,7 @@ struct EditorIconsImpl final : EditorIcons
 		}
 	}
 
-	Array<Icon> m_icons;
+	HashMap<EntityRef, Icon> m_icons;
 	Model* m_models[(int)IconType::COUNT];
 	bool m_is_3d[(int)IconType::COUNT];
 	WorldEditor& m_editor;
