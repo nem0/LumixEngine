@@ -4258,19 +4258,25 @@ struct PipelineImpl final : Pipeline
 								}
 							};
 
-							if (mi.lod != lod_idx && !view.cp.is_shadow) {
-								const float d = lod_idx - mi.lod;
-								const float ad = fabsf(d);
-									
-								if (ad <= 0.05f) {
-									mi.lod = float(lod_idx);
-									create_key(mi.model->getLODIndices()[lod_idx]);
+							if (mi.lod != lod_idx) {
+								if (view.cp.is_shadow) {
+									const u32 shadow_lod_idx = maximum((u32)mi.lod, lod_idx);
+									create_key(mi.model->getLODIndices()[shadow_lod_idx]);
 								}
 								else {
-									mi.lod += d / ad * 0.05f;
-									const u32 cur_lod_idx = u32(mi.lod);
-									create_key(mi.model->getLODIndices()[cur_lod_idx]);
-									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+									const float d = lod_idx - mi.lod;
+									const float ad = fabsf(d);
+									
+									if (ad <= 0.03f) {
+										mi.lod = float(lod_idx);
+										create_key(mi.model->getLODIndices()[lod_idx]);
+									}
+									else {
+										mi.lod += d / ad * 0.03f;
+										const u32 cur_lod_idx = u32(mi.lod);
+										create_key(mi.model->getLODIndices()[cur_lod_idx]);
+										create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+									}
 								}
 							}
 							else {
@@ -4311,18 +4317,24 @@ struct PipelineImpl final : Pipeline
 							};
 
 							if (mi.lod != lod_idx) {
-								const float d = lod_idx - mi.lod;
-								const float ad = fabsf(d);
-									
-								if (ad <= 0.05f) {
-									if (!view.cp.is_shadow) mi.lod = float(lod_idx);
-									create_key(mi.model->getLODIndices()[lod_idx]);
+								if (view.cp.is_shadow) {
+									const u32 shadow_lod_idx = maximum((u32)mi.lod, lod_idx);
+									create_key(mi.model->getLODIndices()[shadow_lod_idx]);
 								}
 								else {
-									mi.lod += view.cp.is_shadow ? 0 : d / ad * 0.05f;
-									const u32 cur_lod_idx = u32(mi.lod);
-									create_key(mi.model->getLODIndices()[cur_lod_idx]);
-									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+									const float d = lod_idx - mi.lod;
+									const float ad = fabsf(d);
+									
+									if (ad <= 0.03f) {
+										mi.lod = float(lod_idx);
+										create_key(mi.model->getLODIndices()[lod_idx]);
+									}
+									else {
+										mi.lod += d / ad * 0.03f;
+										const u32 cur_lod_idx = u32(mi.lod);
+										create_key(mi.model->getLODIndices()[cur_lod_idx]);
+										create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+									}
 								}
 							}
 							else {
