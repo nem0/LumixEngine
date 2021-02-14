@@ -255,7 +255,7 @@ bool loadTexture(TextureHandle handle, const void* data, int size, TextureFlags 
 void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf);
 QueryHandle createQuery();
 
-void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride_offset);
+void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
 void bindImageTexture(TextureHandle texture, u32 unit);
 void bindTextures(const TextureHandle* handles, u32 offset, u32 count);
 void bindShaderBuffer(BufferHandle buffer, u32 binding_point, BindShaderBufferFlags flags);
