@@ -596,6 +596,16 @@ struct PipelineImpl final : Pipeline
 			ASSERT(first_page == nullptr);
 		}
 
+		~Sorter() {
+			Page* p = first_page;
+			page_allocator.lock();
+			while (p) {
+				page_allocator.deallocate(p, false);
+				p = p->header.next;
+			}
+			page_allocator.unlock();
+		}
+
 		void operator=(Sorter&&) = delete;
 
 		void pack() {
@@ -664,7 +674,6 @@ struct PipelineImpl final : Pipeline
 			: instances(allocator)
 			, page_allocator(page_allocator)
 		{
-			void* mem = page_allocator.allocate(true);
 			last_page = first_page = getNewPage();
 		}
 
@@ -1382,6 +1391,8 @@ struct PipelineImpl final : Pipeline
 		m_renderer.queue(end_job, 0);
 		processBuckets();
 		m_renderer.waitForCommandSetup();
+
+		m_views.clear();
 
 		return true;
 	}
