@@ -133,6 +133,7 @@ struct FileSystemImpl : FileSystem {
 		for (AsyncItem& item : m_queue) {
 			if (item.id == async.value) {
 				item.flags.set(AsyncItem::Flags::CANCELED);
+				--m_work_counter;
 				return;
 			}
 		}

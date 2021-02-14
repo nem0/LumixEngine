@@ -272,7 +272,6 @@ struct CullingSystemImpl final : CullingSystem
 		const Sphere* LUMIX_RESTRICT end = cell.spheres + cell.header.count;
 		const EntityPtr* LUMIX_RESTRICT sphere_to_entity_map = cell.entities;
 
-		profiler::pushInt("objects", cell.header.count);
 		const float4 px = f4Load(frustum.xs);
 		const float4 py = f4Load(frustum.ys);
 		const float4 pz = f4Load(frustum.zs);
@@ -341,6 +340,7 @@ struct CullingSystemImpl final : CullingSystem
 			const Vec3 v3_cell_size(m_cell_size);
 			const Vec3 v3_2_cell_size(2 * m_cell_size);
 			CullResult* result = nullptr;
+			u32 total_count = 0;
 			for(;;) {
 				const i32 idx = atomicIncrement(&cell_idx) - 1;
 				if (idx >= m_cells.size()) return;
@@ -352,6 +352,7 @@ struct CullingSystemImpl final : CullingSystem
 					result->header.type = cell.header.indices.type;
 				}
 
+				total_count += cell.header.count;
 				if (frustum.containsAABB(cell.header.origin + v3_cell_size, v3_cell_size)) {
 					int to_cpy = cell.header.count;
 					int src_offset = 0;
@@ -372,6 +373,7 @@ struct CullingSystemImpl final : CullingSystem
 					doCulling(cell, frustum.getRelative(cell.header.origin), result, list, cell.header.indices.type);
 				}
 			}
+			profiler::pushInt("count", total_count);
 		});
 
 		return list.detach();

@@ -4187,8 +4187,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 		deserializeRagdolls(serializer, entity_map);
 		deserializeJoints(serializer, entity_map);
 		deserializeVehicles(serializer, entity_map);
-
-		updateFilterData();
 	}
 
 
