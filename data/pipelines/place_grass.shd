@@ -22,6 +22,7 @@ compute_shader [[
 
 	layout(std140, binding = 4) uniform Grass {
 		vec4 u_pos;
+		vec4 u_lod_ref_point;
 		ivec2 u_from;
 		ivec2 u_to;
 		vec2 u_terrain_size;
@@ -113,11 +114,10 @@ compute_shader [[
 			vec2 uv = (inst_pos.xz / (u_terrain_size + u_terrain_xz_scale)) + 0.5 / (u_terrain_size.x / u_terrain_xz_scale + 1);
 			inst_pos.y += texture(u_heightmap, uv).x * u_terrain_y_scale;
 
-			inst_pos += u_pos.xyz;
-			float dist_t = saturate(length(inst_pos) / u_distance);
+			float dist_t = saturate(length(inst_pos + u_lod_ref_point.xyz) / u_distance);
 			float scale = 1 - dist_t * dist_t * dist_t;
 			scale *= snoise(vec2(ij) * 0.01) * 0.3 + 0.7;
-
+			inst_pos += u_pos.xyz;
 			vec4 cullp = vec4(inst_pos, 1);
 			for (int i = 0; i < 6; ++i) {
 				if (dot(Pass.camera_planes[i], cullp) < -u_radius * scale) {
