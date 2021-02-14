@@ -3826,6 +3826,11 @@ struct PipelineImpl final : Pipeline
 			const HashMap<EntityRef, Terrain*>& terrains = m_pipeline->m_scene->getTerrains();
 			const Universe& universe = m_pipeline->m_scene->getUniverse();
 
+			float fov_multiplier = 1;
+			if (!m_pipeline->m_viewport.is_ortho) {
+				fov_multiplier = clamp(degreesToRadians(60) / m_pipeline->m_viewport.fov, 1.f, 3.f);
+			}
+
 			for (Terrain* terrain : terrains) {
 				const Transform tr = universe.getTransform(terrain->m_entity);
 				Transform rel_tr = tr;
@@ -3840,13 +3845,13 @@ struct PipelineImpl final : Pipeline
 						Grass& grass = m_grass.emplace();
 						grass.mesh = mesh.render_data;
 						grass.material = mesh.material->getRenderData();
-						grass.distance = type.m_distance;
+						grass.distance = type.m_distance * fov_multiplier;
 						grass.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
 						grass.mtx = Matrix(rel_tr.pos.toFloat(), rel_tr.rot);
 						const i32 step_len = maximum(i32(type.m_spacing * 100), 1);
-						const i32 steps = i32(type.m_distance * 100) / step_len;
+						const i32 steps = i32(grass.distance * 100) / step_len;
 						grass.lod_ref_point = (tr.pos - m_pipeline->m_viewport.pos).toFloat();
-						grass.from = IVec2(-((tr.pos - m_pipeline->m_viewport.pos) * 100.f).toFloat().xz() - Vec2(type.m_distance * 100.f - 1));
+						grass.from = IVec2(-((tr.pos - m_pipeline->m_viewport.pos) * 100.f).toFloat().xz() - Vec2(grass.distance * 100.f - 1));
 						grass.from = (grass.from / step_len) * step_len;
 						grass.to = grass.from + IVec2(2 * steps * step_len);
 						grass.step = step_len;
