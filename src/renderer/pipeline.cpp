@@ -3879,8 +3879,6 @@ struct PipelineImpl final : Pipeline
 			gpu::pushDebugGroup("grass");
 			renderer.beginProfileBlock("grass", 0);
 			gpu::BufferHandle data = m_pipeline->m_renderer.getScratchBuffer();
-			// TODO reuse
-			gpu::BufferHandle indirect = gpu::allocBufferHandle();
 			struct Indirect {
 				u32 vertex_count;
 				u32 instance_count;
@@ -3888,7 +3886,6 @@ struct PipelineImpl final : Pipeline
 				u32 base_vertex;
 				u32 base_instance;
 			};
-			gpu::createBuffer(indirect, gpu::BufferFlags::SHADER_BUFFER | gpu::BufferFlags::COMPUTE_WRITE, sizeof(Indirect), nullptr);
 
 			for (const Grass& grass : m_grass) {
 				struct {
@@ -3929,10 +3926,9 @@ struct PipelineImpl final : Pipeline
 				indirect_dc.first_index = 0;
 				indirect_dc.vertex_count = grass.mesh->indices_count;
 				indirect_dc.instance_count = 0;
-				gpu::update(indirect, &indirect_dc, sizeof(indirect_dc));
+				gpu::update(data, &indirect_dc, sizeof(indirect_dc));
 
 				gpu::bindShaderBuffer(data, 0, gpu::BindShaderBufferFlags::OUTPUT);
-				gpu::bindShaderBuffer(indirect, 1, gpu::BindShaderBufferFlags::OUTPUT);
 				gpu::bindTextures(&grass.heightmap, 2, 1);
 				gpu::bindTextures(&grass.splatmap, 3, 1);
 				gpu::bindUniformBuffer(UniformBuffer::DRAWCALL, m_pipeline->m_drawcall_ub, 0, sizeof(dc));
@@ -3947,14 +3943,14 @@ struct PipelineImpl final : Pipeline
 				gpu::bindTextures(grass.material->textures, 0, grass.material->textures_count);
 				gpu::bindIndexBuffer(grass.mesh->index_buffer_handle);
 				gpu::bindVertexBuffer(0, grass.mesh->vertex_buffer_handle, 0, grass.mesh->vb_stride);
-				gpu::bindVertexBuffer(1, data, 0, 32);
+				gpu::bindVertexBuffer(1, data, (sizeof(Indirect) + 15) & ~15, 32);
 				if (material_ub_idx != grass.material->material_constants) {
 					gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, grass.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
 					material_ub_idx = grass.material->material_constants;
 				}
 
 				gpu::setState(gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE | m_render_state | grass.material->render_states);
-				gpu::bindIndirectBuffer(indirect);
+				gpu::bindIndirectBuffer(data);
 				gpu::drawIndirect(grass.mesh->index_type);
 
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
@@ -3963,7 +3959,6 @@ struct PipelineImpl final : Pipeline
 			}
 			renderer.endProfileBlock();
 			gpu::popDebugGroup();
-			gpu::destroy(indirect);
 			//m_pipeline->m_stats.instance_count += 32 * 32 * m_grass.size();
 			//m_pipeline->m_stats.draw_call_count += m_grass.size();
 		}
