@@ -1126,15 +1126,14 @@ struct PipelineImpl final : Pipeline
 			const float bb_size = frustum_bounding_sphere.radius;
 			const Vec3 light_forward = light_mtx.getZVector();
 
-			Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
-
-			const Vec3 xvec = light_mtx.getXVector();
-			const Vec3 yvec = light_mtx.getYVector();
+			const Vec3 view_dir = m_viewport.rot * Vec3(0, 0, -1);
+			const Vec3 xvec = crossProduct(light_forward, view_dir).normalized();
+			const Vec3 yvec = crossProduct(light_forward, xvec).normalized();
 
 			Vec2 min = Vec2(FLT_MAX);
 			Vec2 max = Vec2(-FLT_MAX);
 			for (u32 i = 0; i < 8; ++i) {
-				const Vec2 proj = Vec2(dotProduct(xvec, camera_frustum.points[i] - shadow_cam_pos), dotProduct(yvec, camera_frustum.points[i] - shadow_cam_pos));
+				const Vec2 proj = Vec2(dotProduct(xvec, camera_frustum.points[i]), dotProduct(yvec, camera_frustum.points[i]));
 				min.x = minimum(min.x, proj.x);
 				min.y = minimum(min.y, proj.y);
 				max.x = maximum(max.x, proj.x);
@@ -1142,11 +1141,11 @@ struct PipelineImpl final : Pipeline
 			}
 
 			const float ortho_size = maximum(max.x - min.x, max.y - min.y) * 0.5f;
-			shadow_cam_pos -= xvec * (max.x + min.x) * 0.5f;
-			shadow_cam_pos -= yvec * (max.y + min.y) * 0.5f;
+			Vec3 shadow_cam_pos = xvec * (max.x + min.x) * 0.5f;
+			shadow_cam_pos += yvec * (max.y + min.y) * 0.5f;
 			shadow_cam_pos -= light_forward * (SHADOW_CAM_FAR - 2 * bb_size);
 			Matrix view_matrix;
-			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
+			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, yvec);
 
 			const float ymul = gpu::isOriginBottomLeft() ? 0.5f : -0.5f;
 			const Matrix bias_matrix(
