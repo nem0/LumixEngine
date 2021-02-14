@@ -1138,7 +1138,7 @@ public:
 	template <typename T2> static void set(Ref<reflection::IDynamicProperties::Value> v, T2) { ASSERT(false); }
 	static void set(Ref<reflection::IDynamicProperties::Value> v, i32 val) { reflection::set(v.value, val); }
 	static void set(Ref<reflection::IDynamicProperties::Value> v, float val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, Path val) { reflection::set(v.value, val.c_str()); }
+	static void set(Ref<reflection::IDynamicProperties::Value> v, const Path& val) { reflection::set(v.value, val.c_str()); }
 	static void set(Ref<reflection::IDynamicProperties::Value> v, const char* val) { reflection::set(v.value, val); }
 	static void set(Ref<reflection::IDynamicProperties::Value> v, EntityPtr val) { reflection::set(v.value, val); }
 	static void set(Ref<reflection::IDynamicProperties::Value> v, bool val) { reflection::set(v.value, val); }
