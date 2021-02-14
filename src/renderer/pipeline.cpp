@@ -29,7 +29,6 @@
 #include "shader.h"
 #include "terrain.h"
 #include "texture.h"
-
 //-V:WRITE:568
 namespace Lumix
 {
@@ -1117,7 +1116,6 @@ struct PipelineImpl final : Pipeline
 			const Vec3 light_forward = light_mtx.getZVector();
 
 			Vec3 shadow_cam_pos = frustum_bounding_sphere.position;
-			shadow_cam_pos = shadowmapTexelAlign(shadow_cam_pos, 0.5f * shadowmap_width - 2, bb_size, light_mtx);
 
 			const Vec3 xvec = light_mtx.getXVector();
 			const Vec3 yvec = light_mtx.getYVector();
@@ -1132,8 +1130,9 @@ struct PipelineImpl final : Pipeline
 				max.y = maximum(max.y, proj.y);
 			}
 
-			Matrix projection_matrix;
-			projection_matrix.setOrtho(min.x, max.x, min.y, max.y, 0, SHADOW_CAM_FAR, true);
+			const float ortho_size = maximum(max.x - min.x, max.y - min.y) * 0.5f;
+			shadow_cam_pos -= xvec * (max.x + min.x) * 0.5f;
+			shadow_cam_pos -= yvec * (max.y + min.y) * 0.5f;
 			shadow_cam_pos -= light_forward * (SHADOW_CAM_FAR - 2 * bb_size);
 			Matrix view_matrix;
 			view_matrix.lookAt(shadow_cam_pos, shadow_cam_pos + light_forward, light_mtx.getYVector());
@@ -1145,7 +1144,20 @@ struct PipelineImpl final : Pipeline
 				Vec4(0.0, 0.0, 1.0, 0.0),
 				Vec4(0.5, 0.5, 0.0, 1.0));
 
-			Matrix m = bias_matrix * projection_matrix * view_matrix;
+			Viewport& vp = m_shadow_camera_viewports[slice];
+			vp.is_ortho = true;
+			vp.w = shadowmap_width;
+			vp.h = shadowmap_width;
+			vp.ortho_size = ortho_size;
+			vp.pos = m_viewport.pos + shadow_cam_pos;
+			vp.rot = view_matrix.getRotation().conjugated();
+			vp.near = 0;
+			vp.far = SHADOW_CAM_FAR + 2 * bb_size;
+
+			view_matrix = vp.getView(m_viewport.pos);
+
+			const Matrix projection_matrix = vp.getProjection();
+			const Matrix m = bias_matrix * projection_matrix * view_matrix;
 
 			global_state.sm_slices[slice].world_to_slice = Matrix4x3(m).transposed();
 			global_state.sm_slices[slice].size = shadowmap_width;
@@ -1155,21 +1167,7 @@ struct PipelineImpl final : Pipeline
 			global_state.shadow_cam_depth_range = SHADOW_CAM_FAR;
 			global_state.shadow_cam_rcp_depth_range = 1.f / SHADOW_CAM_FAR;
 
-			CameraParams& cp = m_shadow_camera_params[slice];
-			cp.view = view_matrix;
-			cp.projection = projection_matrix;
-			cp.is_shadow = true;
-			cp.lod_multiplier = 1;
-			cp.pos = m_viewport.pos;
-			cp.frustum.computeOrtho(m_viewport.pos + shadow_cam_pos
-				, -light_forward
-				, light_mtx.getYVector()
-				, bb_size
-				, bb_size
-				, 0
-				, SHADOW_CAM_FAR);
-
-			findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
+			//findExtraShadowcasterPlanes(light_forward, camera_frustum, &cp.frustum);
 		}
 	}
 
@@ -3714,7 +3712,15 @@ struct PipelineImpl final : Pipeline
 
 	CameraParams getShadowCameraParams(i32 slice)
 	{
-		return m_shadow_camera_params[slice];
+		const Viewport& vp = m_shadow_camera_viewports[slice];
+		CameraParams cp;
+		cp.pos = vp.pos;
+		cp.frustum = vp.getFrustum();
+		cp.lod_multiplier = m_scene->getCameraLODMultiplier(vp.fov, vp.is_ortho);
+		cp.is_shadow = true;
+		cp.view = vp.getView(cp.pos);
+		cp.projection = vp.getProjection();
+		return cp;
 	}
 	
 	void setRenderTargets(Span<gpu::TextureHandle> renderbuffers, gpu::TextureHandle ds, bool readonly_ds, bool srgb) {
@@ -3828,7 +3834,8 @@ struct PipelineImpl final : Pipeline
 						grass.mtx = Matrix(rel_tr.pos.toFloat(), rel_tr.rot);
 						const i32 step_len = maximum(i32(type.m_spacing * 100), 1);
 						const i32 steps = i32(type.m_distance * 100) / step_len;
-						grass.from = IVec2(-(rel_tr.pos * 100.f).toFloat().xz() - Vec2(type.m_distance * 100.f - 1));
+						grass.lod_ref_point = (tr.pos - m_pipeline->m_viewport.pos).toFloat();
+						grass.from = IVec2(-((tr.pos - m_pipeline->m_viewport.pos) * 100.f).toFloat().xz() - Vec2(type.m_distance * 100.f - 1));
 						grass.from = (grass.from / step_len) * step_len;
 						grass.to = grass.from + IVec2(2 * steps * step_len);
 						grass.step = step_len;
@@ -3871,6 +3878,7 @@ struct PipelineImpl final : Pipeline
 			for (const Grass& grass : m_grass) {
 				struct {
 					Vec4 pos;
+					Vec4 lod_ref_point;
 					IVec2 from;
 					IVec2 to;
 					Vec2 terrain_size;
@@ -3885,6 +3893,7 @@ struct PipelineImpl final : Pipeline
 					Vec2 terrain_xz_scale;
 				} dc;
 				dc.pos = Vec4(grass.mtx.getTranslation(), 1);
+				dc.lod_ref_point = Vec4(grass.lod_ref_point, 1);
 				dc.from = grass.from;
 				dc.to = grass.to;
 				dc.terrain_size = grass.terrain_size;
@@ -3950,6 +3959,7 @@ struct PipelineImpl final : Pipeline
 			float distance;
 			u32 step;
 			Matrix mtx;
+			Vec3 lod_ref_point;
 			gpu::TextureHandle heightmap;
 			gpu::TextureHandle splatmap;
 			gpu::ProgramHandle program;
@@ -4138,6 +4148,7 @@ struct PipelineImpl final : Pipeline
 			const MeshSortData* LUMIX_RESTRICT mesh_data = scene->getMeshSortData();
 			const Transform* LUMIX_RESTRICT entity_data = scene->getUniverse().getTransforms();
 			const DVec3 camera_pos = view.cp.pos;
+			const DVec3 lod_ref_point = m_viewport.pos;
 			Sorter::Inserter inserter(view.sorter);
 
 			const i32 instancer_idx = atomicIncrement(&worker_idx) - 1;
@@ -4181,7 +4192,7 @@ struct PipelineImpl final : Pipeline
 								instancer.add(mesh.sort_key, subrenderable);
 							} else if (bucket < 0xffFF) {
 								const DVec3 pos = entity_data[e.index].pos;
-								const DVec3 rel_pos = pos - camera_pos;
+								const DVec3 rel_pos = pos - lod_ref_point;
 								const float squared_length = float(rel_pos.x * rel_pos.x + rel_pos.y * rel_pos.y + rel_pos.z * rel_pos.z);
 								const u32 depth_bits = floatFlip(*(u32*)&squared_length);
 								const u64 key = mesh.sort_key | ((u64)bucket << 56) | ((u64)depth_bits << 24);
@@ -4196,7 +4207,7 @@ struct PipelineImpl final : Pipeline
 							const EntityRef e = renderables[i];
 							const DVec3 pos = entity_data[e.index].pos;
 							ModelInstance& mi = model_instances[e.index];
-							const float squared_length = float((pos - camera_pos).squaredLength());
+							const float squared_length = float((pos - lod_ref_point).squaredLength());
 								
 							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
 
@@ -4222,7 +4233,7 @@ struct PipelineImpl final : Pipeline
 								}
 							};
 
-							if (mi.lod != lod_idx) {
+							if (mi.lod != lod_idx && !view.cp.is_shadow) {
 								const float d = lod_idx - mi.lod;
 								const float ad = fabsf(d);
 									
@@ -4249,7 +4260,7 @@ struct PipelineImpl final : Pipeline
 							const EntityRef e = renderables[i];
 							const DVec3 pos = entity_data[e.index].pos;
 							ModelInstance& mi = model_instances[e.index];
-							const float squared_length = float((pos - camera_pos).squaredLength());
+							const float squared_length = float((pos - lod_ref_point).squaredLength());
 								
 							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
 
@@ -4274,7 +4285,7 @@ struct PipelineImpl final : Pipeline
 								}
 							};
 
-							if (mi.lod != lod_idx) {
+							if (mi.lod != lod_idx && !view.cp.is_shadow) {
 								const float d = lod_idx - mi.lod;
 								const float ad = fabsf(d);
 									
@@ -4367,7 +4378,7 @@ struct PipelineImpl final : Pipeline
 			m_sorted = true;
 
 			volatile i32 counter = 0;
-			jobs::runOnWorkers([&](){
+			auto work = [&](){
 				PROFILE_FUNCTION();
 				u32 histogram[SIZE];
 				bool sorted = true;
@@ -4395,7 +4406,14 @@ struct PipelineImpl final : Pipeline
 				for (u32 i = 0; i < lengthOf(m_histogram); ++i) {
 					m_histogram[i] += histogram[i]; 
 				}
-			});
+			};
+
+			if (size < STEP) {
+				work();
+			}
+			else {
+				jobs::runOnWorkers(work);
+			}
 		}
 	};
 
@@ -4792,7 +4810,7 @@ struct PipelineImpl final : Pipeline
 		Buffer maps;
 		Buffer probes;
 	} m_cluster_buffers;
-	CameraParams m_shadow_camera_params[4];
+	Viewport m_shadow_camera_viewports[4];
 };
 
 
