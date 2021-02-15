@@ -3692,9 +3692,11 @@ struct PipelineImpl final : Pipeline
 				light.atlas_idx = iter.isValid() ? iter.value() : -1;
 				atlas_sorter.push(job.m_point_lights.size() - 1, computePriority(light, light_pos, cam_pos), e);
 			}
-			else if(iter.isValid()) {
+			else {
 				light.atlas_idx = -1;
-				m_shadow_atlas.remove(e);
+				if(iter.isValid()) {
+					m_shadow_atlas.remove(e);
+				}
 			}
 		});
 
