@@ -55,7 +55,8 @@ struct Light {
 struct Cluster {
 	int offset;
 	int lights_count;
-	int probes_count;
+	int env_probes_count;
+	int refl_probes_count;
 };
 
 struct Surface {
@@ -441,7 +442,7 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 	float remaining_w = 1;
 	vec3 probe_light = vec3(0);
 	int from = cluster.offset + cluster.lights_count;
-	int to = from + cluster.probes_count;
+	int to = from + cluster.env_probes_count;
 	for (int i = from; i < to; ++i) {
 		int probe_idx = b_cluster_map[i]; 
 		vec3 lpos = b_probes[probe_idx].pos.xyz - surface.wpos.xyz;

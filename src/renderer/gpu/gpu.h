@@ -126,7 +126,8 @@ enum class TextureFormat : u32 {
 	R32F,
 	RG32F,
 	SRGB,
-	SRGBA
+	SRGBA,
+	BC3
 };
 
 enum class BindShaderBufferFlags : u32 {
@@ -252,6 +253,7 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 void createTextureView(TextureHandle view, TextureHandle texture);
 void generateMipmaps(TextureHandle handle);
 bool loadTexture(TextureHandle handle, const void* data, int size, TextureFlags flags, const char* debug_name);
+bool loadLayers(TextureHandle handle, u32 layer_offset, const void* data, int size, const char* debug_name);
 void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf);
 QueryHandle createQuery();
 

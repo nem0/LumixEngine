@@ -96,6 +96,7 @@ public:
 
 	~RenderSceneImpl()
 	{
+		m_renderer.destroy(m_reflection_probes_texture);
 		m_universe.entityTransformed().unbind<&RenderSceneImpl::onEntityMoved>(this);
 		m_universe.entityDestroyed().unbind<&RenderSceneImpl::onEntityDestroyed>(this);
 		m_culling_system.reset();
@@ -681,6 +682,24 @@ public:
 			ASSERT(probe.texture == nullptr);
 			StaticString<LUMIX_MAX_PATH> path_str("universes/probes/", probe.guid, ".dds");
 			probe.texture = manager.load<Texture>(Path(path_str));
+
+			struct Job : Renderer::RenderJob {
+				Job(IAllocator& allocator) : data(allocator) {}
+
+				void setup() override {}
+				
+				void execute() override {
+					gpu::loadLayers(tex, 0, data.data(), (int)data.size(), "foo");
+				}
+
+				OutputMemoryStream data;
+				gpu::TextureHandle tex;
+			};
+			
+			Job& job = m_renderer.createJob<Job>(m_allocator);
+			(void)m_engine.getFileSystem().getContentSync(Path(path_str), Ref(job.data));
+			job.tex = m_reflection_probes_texture;
+			m_renderer.queue(job, 0);
 
 			m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
 		}
@@ -2485,6 +2504,7 @@ private:
 	AssociativeArray<EntityRef, ReflectionProbe> m_reflection_probes;
 	HashMap<EntityRef, Terrain*> m_terrains;
 	AssociativeArray<EntityRef, ParticleEmitter*> m_particle_emitters;
+	gpu::TextureHandle m_reflection_probes_texture = gpu::INVALID_TEXTURE;
 
 	Array<DebugTriangle> m_debug_triangles;
 	Array<DebugLine> m_debug_lines;
@@ -2670,7 +2690,10 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	m_mesh_sort_data.reserve(5000);
 
 	m_render_cmps_mask = 0;
-	
+
+	Renderer::MemRef mem;
+	m_reflection_probes_texture = renderer.createTexture(128, 128, 32, gpu::TextureFormat::BC3, gpu::TextureFlags::IS_CUBE, mem, "reflection_probes");
+
 	const u32 hash = crc32("renderer");
 	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 		if (cmp.scene == hash) {
