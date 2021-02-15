@@ -144,7 +144,7 @@ fragment_shader [[
 		Detail textureNoTile(float k, vec2 x, int layer, float v )
 		{
 			vec2 duvdx = dFdx( x );
-			vec2 duvdy = dFdx( x );
+			vec2 duvdy = dFdy( x );
     
 			float l = k*8;
 			float f = fract(l);
