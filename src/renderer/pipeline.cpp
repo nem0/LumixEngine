@@ -400,6 +400,7 @@ struct ShadowAtlas {
 		for (EntityPtr& e : inv_map) e = INVALID_ENTITY;
 	}
 
+	// must match getShadowAtlasResolution in shader
 	static Vec4 getUV(u32 idx) {
 		switch(getGroup(idx)) {
 			case 0: return Vec4(0, 0, 0.5f, 0.5f);

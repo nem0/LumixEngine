@@ -469,42 +469,64 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 	return remaining_w < 1 ? probe_light / (1 - remaining_w) : vec3(0);
 }
 
+// must match ShadowAtlas::getUV
+float getShadowAtlasResolution(int idx) {
+	if (idx == 0) return 1024;
+	if (idx < 5) return 512;
+	return 256;
+}
+
 vec3 pointLightsLighting(Cluster cluster, Surface surface, sampler2D shadow_atlas) {
-	vec3 res = vec3(0);
-	for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
-		int light_idx = b_cluster_map[i]; 
-		vec3 lpos = surface.wpos.xyz - b_lights[light_idx].pos_radius.xyz;
-		float dist = length(lpos);
-		float attn = pow(max(0, 1 - dist / b_lights[light_idx].pos_radius.w), b_lights[light_idx].color_attn.w);
-		vec3 L = -lpos / dist;
-		if (attn > 1e-5) {
-			vec3 direct_light = computeDirectLight(surface, L, b_lights[light_idx].color_attn.rgb);
-			int atlas_idx = b_lights[light_idx].atlas_idx;
-			if (atlas_idx >= 0) {
-				vec4 proj_pos = u_shadow_atlas_matrices[atlas_idx] * vec4(lpos, 1);
-				proj_pos /= proj_pos.w;
+	#ifdef LUMIX_FRAGMENT_SHADER
+		vec3 res = vec3(0);
+		for (int i = cluster.offset; i < cluster.offset + cluster.lights_count; ++i) {
+			int light_idx = b_cluster_map[i]; 
+			vec3 lpos = surface.wpos.xyz - b_lights[light_idx].pos_radius.xyz;
+			float dist = length(lpos);
+			float attn = pow(max(0, 1 - dist / b_lights[light_idx].pos_radius.w), b_lights[light_idx].color_attn.w);
+			vec3 L = -lpos / dist;
+			if (attn > 1e-5) {
+				vec3 direct_light = computeDirectLight(surface, L, b_lights[light_idx].color_attn.rgb);
+				int atlas_idx = b_lights[light_idx].atlas_idx;
+				if (atlas_idx >= 0) {
+					vec4 proj_pos = u_shadow_atlas_matrices[atlas_idx] * vec4(lpos, 1);
+					proj_pos /= proj_pos.w;
 
-				vec2 shadow_uv = proj_pos.xy;
-				float occluder = textureLod(shadow_atlas, shadow_uv, 0).r;
-				float receiver = proj_pos.z;
-				attn *= receiver * 1.01 > occluder ? 1 : 0;
+					vec2 shadow_uv = proj_pos.xy;
+
+					float c = random(vec2(gl_FragCoord)) * 2 - 1;
+					float s = sqrt(1 - c * c); 
+					mat2 rot = mat2(c, s, -s, c);
+					float shadow = 0;
+					float receiver = proj_pos.z;
+					for (int j = 0; j < 16; ++j) {
+						vec2 pcf_offset = POISSON_DISK_16[j] * rot;
+						vec2 uv = shadow_uv + pcf_offset * vec2(0.25, 1) / getShadowAtlasResolution(atlas_idx) * 3;
+
+						float occluder = textureLod(shadow_atlas, uv, 0).r;
+						shadow += receiver * 1.02 > occluder ? 1 : 0;
+					}
+					attn *= shadow / 16;
+				}
+
+				float fov = b_lights[light_idx].fov;
+				if (fov < M_PI) {
+					// TODO replace rot with dir
+					vec3 dir = rotateByQuat(b_lights[light_idx].rot, vec3(0, 0, -1));
+					vec3 L = lpos / max(dist, 1e-5);
+					float cosDir = dot(normalize(dir), L);
+					float cosCone = cos(fov * 0.5);
+
+					attn *= cosDir < cosCone ? 0 : (cosDir - cosCone) / (1 - cosCone);
+				}
+
+				res += direct_light * attn;
 			}
-
-			float fov = b_lights[light_idx].fov;
-			if (fov < M_PI) {
-				// TODO replace rot with dir
-				vec3 dir = rotateByQuat(b_lights[light_idx].rot, vec3(0, 0, -1));
-				vec3 L = lpos / max(dist, 1e-5);
-				float cosDir = dot(normalize(dir), L);
-				float cosCone = cos(fov * 0.5);
-
-				attn *= cosDir < cosCone ? 0 : (cosDir - cosCone) / (1 - cosCone);
-			}
-
-			res += direct_light * attn;
 		}
-	}
-	return res;
+		return res;
+	#else
+		return vec3(0);
+	#endif
 }
 
 float rand(vec3 seed)
