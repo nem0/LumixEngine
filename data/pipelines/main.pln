@@ -383,7 +383,6 @@ function main()
 		return
 	end
 
-
 	local view_params = getCameraParams()
 	local entities = cull(view_params)
 

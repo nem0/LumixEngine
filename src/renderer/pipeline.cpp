@@ -1214,6 +1214,8 @@ struct PipelineImpl final : Pipeline
 
 		LuaWrapper::DebugGuard lua_debug_guard(m_lua_state);
 		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
+		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
 		lua_getfield(m_lua_state, -1, "main_shadowmap");
 		if (lua_type(m_lua_state, -1) != LUA_TFUNCTION) {
 			lua_pop(m_lua_state, 2);
@@ -1247,6 +1249,10 @@ struct PipelineImpl final : Pipeline
 
 		m_renderer.queue(job, m_profiler_link);
 		m_viewport = backup_viewport;
+		lua_rawgeti(m_lua_state, LUA_REGISTRYINDEX, m_lua_env);
+		LuaWrapper::setField(m_lua_state, -1, "viewport_w", m_viewport.w);
+		LuaWrapper::setField(m_lua_state, -1, "viewport_h", m_viewport.h);
+		lua_pop(m_lua_state, 1);
 		return true;
 	}
 
