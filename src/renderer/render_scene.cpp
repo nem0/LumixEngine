@@ -2124,6 +2124,13 @@ public:
 		return m_reflection_probes_texture;
 	}
 
+	void reloadReflectionProbes() {
+		for (ReflectionProbe& probe : m_reflection_probes) {
+			load(probe);
+		}
+	}
+
+
 	Span<const EnvironmentProbe> getEnvironmentProbes() override {
 		return m_environment_probes.values();
 	}

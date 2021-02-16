@@ -1115,7 +1115,7 @@ static bool upload(GLuint texture
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					const u8* data_ptr = (u8*)blob.skip(size);
 					if (is_cubemap || layers > 1) {
-						glCompressedTextureSubImage3D(texture, mip, 0, 0, side + layer * 6, width, height, 1, internal_format, size, data_ptr);
+						glCompressedTextureSubImage3D(texture, mip, 0, 0, side + layer * (is_cubemap ? 6 : 1), width, height, 1, internal_format, size, data_ptr);
 					}
 					else {
 						glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, data_ptr);

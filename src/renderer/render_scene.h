@@ -348,6 +348,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual bool isReflectionProbeEnabled(EntityRef entity) = 0;
 	virtual Span<const ReflectionProbe> getReflectionProbes() = 0;
 	virtual gpu::TextureHandle getReflectionProbesTexture() = 0;
+	virtual void reloadReflectionProbes() = 0;
 
 	virtual Span<EntityRef> getEnvironmentProbesEntities() = 0;
 	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;
