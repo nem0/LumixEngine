@@ -1799,9 +1799,20 @@ struct StudioAppImpl final : StudioApp
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 				if (filter[0] == '\0')
 				{
+					u32 counter = 0;
 					for (EntityPtr e = universe->getFirstEntity(); e.isValid();
 						 e = universe->getNextEntity((EntityRef)e))
 					{
+						++counter;
+						if (counter == m_max_shown_entity_in_list) {
+							const float w = ImGui::GetContentRegionAvail().x;
+							if (ImGui::Button("Show more", ImVec2(w * 0.5f, 0))) m_max_shown_entity_in_list *= 5;
+							ImGui::SameLine();
+							if (ImGui::Button("Show less", ImVec2(w * 0.5f, 0))) m_max_shown_entity_in_list /= 5;
+							m_max_shown_entity_in_list = maximum(m_max_shown_entity_in_list, 1);
+							break;
+						}
+
 						const EntityRef e_ref = (EntityRef)e;
 						if (!universe->getParent(e_ref).isValid())
 						{
@@ -3318,6 +3329,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_is_welcome_screen_open;
 	bool m_is_pack_data_dialog_open;
 	bool m_is_entity_list_open;
+	u32 m_max_shown_entity_in_list = 1000;
 	EntityPtr m_renaming_entity = INVALID_ENTITY;
 	bool m_set_rename_focus = false;
 	char m_rename_buf[Universe::ENTITY_NAME_MAX_LENGTH];
