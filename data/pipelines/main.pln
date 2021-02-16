@@ -3,7 +3,6 @@ local textured_quad_shader = preloadShader("pipelines/textured_quad.shd")
 local debug_clusters_shader = preloadShader("pipelines/debug_clusters.shd")
 local tonemap_shader = preloadShader("pipelines/tonemap.shd")
 local selection_outline_shader = preloadShader("pipelines/selection_outline.shd")
-local indirect_specular_shader = preloadShader("pipelines/indirect_specular.shd")
 local blur_shader = preloadShader("pipelines/blur.shd")
 local debug_shadowmap = false
 local debug_normal = false
@@ -149,17 +148,6 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	local view_params = getCameraParams()
 	
 	setRenderTargetsReadonlyDS(hdr_rb, gbuffer_depth)
-	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
-		beginBlock("indirect_specular")
-			bindTextures({
-				gbuffer0,
-				gbuffer1,
-				gbuffer2,
-				gbuffer_depth
-			}, 0)
-			renderReflectionVolumes(view_params, indirect_specular_shader, 4)
-		endBlock()
-	end
 
 	beginBlock("lighting")
 	drawArray(0, 3, lighting_shader,
@@ -169,7 +157,8 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 			gbuffer2,
 			gbuffer_depth,
 			shadowmap,
-			SHADOW_ATLAS
+			SHADOW_ATLAS,
+			REFLECTION_PROBES
 		}, 
 		{ 
 			depth_test = false,

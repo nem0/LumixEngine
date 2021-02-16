@@ -27,7 +27,7 @@ const vec2 POISSON_DISK_16[16] = vec2[](
 	vec2(0.6104985,0.7838438)
 );
 
-struct Probe {
+struct EnvProbe {
 	vec4 pos;
 	vec4 rot;
 	vec4 inner_range;
@@ -41,6 +41,12 @@ struct Probe {
 	vec4 sh_coefs6;
 	vec4 sh_coefs7;
 	vec4 sh_coefs8;
+};
+
+struct ReflProbe {
+	vec4 pos_layer;
+	vec4 rot;
+	vec4 half_extents;
 };
 
 struct Light {
@@ -130,9 +136,14 @@ layout(std430, binding = 8) readonly buffer cluster_maps
 	int b_cluster_map[];
 };
 
-layout(std430, binding = 9) readonly buffer probes
+layout(std430, binding = 9) readonly buffer envprobes
 {
-	Probe b_probes[];
+	EnvProbe b_env_probes[];
+};
+
+layout(std430, binding = 10) readonly buffer reflprobes
+{
+	ReflProbe b_refl_probes[];
 };
 
 
@@ -386,14 +397,12 @@ vec3 computeDirectLight(Surface surface, vec3 L, vec3 light_color)
 		+ surface.translucency * diffuse * light_color * max(0, -ndotl_full);
 }	
 
-
-vec3 env_brdf_approx (vec3 F0, float roughness, float NoV)
-{
-	vec4 c0 = vec4(-1, -0.0275, -0.572, 0.022 );
-	vec4 c1 = vec4(1, 0.0425, 1.0, -0.04 );
+vec3 env_brdf_approx(vec3 F0, float roughness, float NoV) {
+	vec4 c0 = vec4(-1, -0.0275, -0.572, 0.022);
+	vec4 c1 = vec4(1, 0.0425, 1.0, -0.04);
 	vec4 r = roughness * c0 + c1;
-	float a004 = min( r.x * r.x, exp2( -9.28 * NoV ) ) * r.x + r.y;
-	vec2 AB = vec2( -1.04, 1.04 ) * a004 + r.zw;
+	float a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
+	vec2 AB = vec2(-1.04, 1.04) * a004 + r.zw;
 	return F0 * AB.x + AB.y;
 }
 
@@ -405,18 +414,7 @@ vec3 computeIndirectDiffuse(vec3 irradiance, Surface surface) {
 	return surface.albedo * irradiance;
 }
 
-
-vec3 computeIndirectSpecular(samplerCube radiancemap, Surface surface) {
-	float ndotv = abs(dot(surface.N , surface.V)) + 1e-5f;
-	vec3 F0 = mix(vec3(0.04), surface.albedo, surface.metallic);		
-	float lod = surface.roughness * 5;
-	vec3 RV = reflect(-surface.V, surface.N);
-	vec4 radiance_rgbm = textureLod(radiancemap, RV, lod);
-	vec3 radiance = radiance_rgbm.rgb * radiance_rgbm.a * 4;
-	return radiance * env_brdf_approx(F0, surface.roughness, ndotv);
-}
-
-vec3 evalSH(Probe probe, vec3 N) {
+vec3 evalSH(EnvProbe probe, vec3 N) {
 	return probe.sh_coefs0.rgb
 	+ probe.sh_coefs1.rgb * (N.y)
 	+ probe.sh_coefs2.rgb * (N.z)
@@ -438,6 +436,37 @@ vec3 rotateByQuat(vec4 rot, vec3 pos)
 	return pos + uv + uuv;
 }
 
+vec3 reflProbesLighting(Cluster cluster, Surface surface, samplerCubeArray reflection_probes) {
+	int from = cluster.offset + cluster.lights_count + cluster.env_probes_count;
+	int to = from + cluster.refl_probes_count;
+	float ndotv = abs(dot(surface.N , surface.V)) + 1e-5f;
+	vec3 F0 = mix(vec3(0.04), surface.albedo, surface.metallic);		
+	vec3 brdf = env_brdf_approx(F0, surface.roughness, ndotv);
+	float lod = surface.roughness * 5;
+	vec3 RV = reflect(-surface.V, surface.N);
+	
+	float remaining_w = 1;
+	vec3 res = vec3(0);
+	for (int i = from; i < to; ++i) {
+		int probe_idx = b_cluster_map[i]; 
+		vec4 rot = b_refl_probes[probe_idx].rot;
+		vec3 lpos = b_refl_probes[probe_idx].pos_layer.xyz - surface.wpos;
+		uint layer = floatBitsToUint(b_refl_probes[probe_idx].pos_layer.w);
+		vec4 radiance_rgbm = textureLod(reflection_probes, vec4(RV, layer), lod);
+		vec3 radiance = radiance_rgbm.rgb * radiance_rgbm.a * 4;
+
+		lpos = rotateByQuat(rot, lpos);
+		vec3 half_extents = b_refl_probes[probe_idx].half_extents.xyz;
+		vec3 rpos = saturate(abs(lpos) / half_extents * 2 - 1);
+		float w = 1 - max(rpos.x, max(rpos.y, rpos.z));
+		w = min(remaining_w, w);
+		remaining_w -= w;
+		res += radiance * brdf * w;
+	}
+
+	return remaining_w > 0.999 ? vec3(0) : res / (1 - remaining_w);
+}
+
 vec3 envProbesLighting(Cluster cluster, Surface surface) {
 	float remaining_w = 1;
 	vec3 probe_light = vec3(0);
@@ -445,10 +474,10 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 	int to = from + cluster.env_probes_count;
 	for (int i = from; i < to; ++i) {
 		int probe_idx = b_cluster_map[i]; 
-		vec3 lpos = b_probes[probe_idx].pos.xyz - surface.wpos.xyz;
-		vec4 rot = b_probes[probe_idx].rot;
-		vec3 outer_range = b_probes[probe_idx].outer_range.xyz;
-		vec3 inner_range = b_probes[probe_idx].inner_range.xyz;
+		vec3 lpos = b_env_probes[probe_idx].pos.xyz - surface.wpos.xyz;
+		vec4 rot = b_env_probes[probe_idx].rot;
+		vec3 outer_range = b_env_probes[probe_idx].outer_range.xyz;
+		vec3 inner_range = b_env_probes[probe_idx].inner_range.xyz;
 			
 		lpos = rotateByQuat(rot, lpos);
 		lpos = max(abs(lpos) - inner_range, vec3(0));
@@ -461,7 +490,7 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 		w = min(remaining_w, w);
 		remaining_w -= w;
 
-		vec3 irradiance = evalSH(b_probes[probe_idx], surface.N);
+		vec3 irradiance = evalSH(b_env_probes[probe_idx], surface.N);
 		irradiance = max(vec3(0), irradiance);
 		vec3 indirect = computeIndirectDiffuse(irradiance, surface);
 		probe_light += (indirect * Global.light_indirect_intensity) * w / M_PI;
@@ -565,7 +594,7 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 	return surface;
 }
 
-vec3 computeLighting(Cluster cluster, Surface surface, vec3 light_direction, vec3 light, sampler2D shadowmap, sampler2D shadow_atlas) {
+vec3 computeLighting(Cluster cluster, Surface surface, vec3 light_direction, vec3 light, sampler2D shadowmap, sampler2D shadow_atlas, samplerCubeArray reflection_probes) {
 	float shadow = getShadow(shadowmap, surface.wpos, surface.N);
 	vec3 res = computeDirectLight(surface
 		, light_direction
@@ -573,5 +602,6 @@ vec3 computeLighting(Cluster cluster, Surface surface, vec3 light_direction, vec
 	res += surface.emission * surface.albedo;
 	res += pointLightsLighting(cluster, surface, shadow_atlas);
 	res += envProbesLighting(cluster, surface);
+	res += reflProbesLighting(cluster, surface, reflection_probes);
 	return res;
 }
