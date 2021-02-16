@@ -98,11 +98,11 @@ struct ReflectionProbe
 		ENABLED = 1 << 2,
 	};
 
-	Texture* texture = nullptr;
 	u64 guid;
 	FlagSet<Flags, u32> flags;
 	u32 size = 128;
 	Vec3 half_extents = Vec3(100, 100, 100);
+	u32 texture_id = 0xffFFffFF;
 };
 
 struct EnvironmentProbe
@@ -347,6 +347,8 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual void enableReflectionProbe(EntityRef entity, bool enable) = 0;
 	virtual bool isReflectionProbeEnabled(EntityRef entity) = 0;
 	virtual Span<const ReflectionProbe> getReflectionProbes() = 0;
+	virtual gpu::TextureHandle getReflectionProbesTexture() = 0;
+	virtual void reloadReflectionProbes() = 0;
 
 	virtual Span<EntityRef> getEnvironmentProbesEntities() = 0;
 	virtual EnvironmentProbe& getEnvironmentProbe(EntityRef entity) = 0;

@@ -104,6 +104,7 @@ fragment_shader [[
 	layout (binding=2) uniform sampler2D u_roughnessmap;
 	layout (binding=3) uniform sampler2D u_metallicmap;
 	layout (binding=4) uniform sampler2D u_selfshadow;
+	layout (binding=6) uniform samplerCubeArray u_reflection_probes;
 	layout (location = 0) in vec2 v_uv;
 	layout (location = 1) in vec3 v_normal;
 	layout (location = 2) in vec3 v_tangent;
@@ -177,6 +178,7 @@ fragment_shader [[
 			Cluster cluster = getClusterLinearDepth(linear_depth);
 			//res += pointLightsLighting(cluster, surface, shadow_atlas);
 			res += envProbesLighting(cluster, surface);
+			res += reflProbesLighting(cluster, surface, u_reflection_probes);
 
 			o_color = vec4(res, surface.alpha);
 		}

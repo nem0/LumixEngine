@@ -126,6 +126,7 @@ fragment_shader [[
 	layout (binding=3) uniform sampler2D u_metallicmap;
 	layout (binding=4) uniform sampler2D u_shadowmap;
 	layout (binding=5) uniform sampler2D u_shadow_atlas;
+	layout (binding=6) uniform samplerCubeArray u_reflection_probes;
 	
 	layout(location = 0) in vec2 v_uv;
 	layout(location = 1) in vec3 v_normal;
@@ -212,8 +213,10 @@ fragment_shader [[
 			
 			float linear_depth = dot(data.wpos.xyz, Pass.view_dir.xyz);
 			Cluster cluster = getClusterLinearDepth(linear_depth);
-			o_color.rgb = computeLighting(cluster, data, Global.light_dir.xyz, Global.light_color.rgb * Global.light_intensity, u_shadowmap, u_shadow_atlas);
-			o_color.a = data.alpha;
+			o_color.rgb = computeLighting(cluster, data, Global.light_dir.xyz, Global.light_color.rgb * Global.light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes);
+	
+			float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
+			o_color.a = mix(data.alpha, 1, pow(saturate(1 - ndotv), 5));
 		}
 	#endif
 ]]
