@@ -21,6 +21,7 @@ fragment_shader [[
 	layout (binding=3) uniform sampler2D u_gbuffer_depth;
 	layout (binding=4) uniform sampler2D u_shadowmap;
 	layout (binding=5) uniform sampler2D u_shadow_atlas;
+	layout (binding=6) uniform samplerCubeArray u_reflection_probes;
 
 	void main()
 	{
@@ -33,7 +34,8 @@ fragment_shader [[
 			, Global.light_dir.xyz
 			, Global.light_color.rgb * Global.light_intensity
 			, u_shadowmap
-			, u_shadow_atlas);
+			, u_shadow_atlas
+			, u_reflection_probes);
 
 		o_color.a = 1;
 	}

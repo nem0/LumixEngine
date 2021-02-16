@@ -48,7 +48,7 @@ struct Texture {
 		if (gl_handle) glDeleteTextures(1, &gl_handle);
 	}
 
-	GLuint gl_handle;
+	GLuint gl_handle = 0;
 	GLenum target;
 	GLenum format;
 	u32 width;
@@ -1035,6 +1035,8 @@ static struct {
 	{ false, TextureFormat::R16, GL_R16, GL_RED, GL_UNSIGNED_SHORT},
 	{ false, TextureFormat::R32F, GL_R32F, GL_RED, GL_FLOAT},
 	{ false, TextureFormat::RG32F, GL_RG32F, GL_RG, GL_FLOAT},
+	{ true, TextureFormat::BC1, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT},
+	{ true, TextureFormat::BC2, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT},
 	{ true, TextureFormat::BC3, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT}
 };
 
@@ -1084,80 +1086,20 @@ void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u3
 	}
 }
 
-
-bool loadLayers(TextureHandle handle, u32 layer_offset, const void* data, int size, const char* debug_name)
+static bool upload(GLuint texture
+	, u32 layer_offset
+	, u32 layers
+	, const DDS::Header& hdr
+	, DDS::LoadInfo* li
+	, bool is_srgb
+	, InputMemoryStream& blob
+	, const char* debug_name)
 {
-	ASSERT(debug_name && debug_name[0]);
-	ASSERT(handle);
-	checkThread();
-	DDS::Header hdr;
-
-	InputMemoryStream blob(data, size);
-	blob.read(&hdr, sizeof(hdr));
-
-	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
-		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
-	{
-		logError("Wrong dds format or corrupted dds (", debug_name, ")");
-		return false;
-	}
-
-	DDS::LoadInfo* li;
-	int layers = 1;
-	bool is_dds10 = false;
-
-	if (isDXT1(hdr.pixelFormat)) {
-		li = &DDS::loadInfoDXT1;
-	}
-	else if (isDXT3(hdr.pixelFormat)) {
-		li = &DDS::loadInfoDXT3;
-	}
-	else if (isDXT5(hdr.pixelFormat)) {
-		li = &DDS::loadInfoDXT5;
-	}
-	else if (isATI1(hdr.pixelFormat)) {
-		li = &DDS::loadInfoATI1;
-	}
-	else if (isATI2(hdr.pixelFormat)) {
-		li = &DDS::loadInfoATI2;
-	}
-	else if (isBGRA8(hdr.pixelFormat)) {
-		li = &DDS::loadInfoBGRA8;
-	}
-	else if (isBGR8(hdr.pixelFormat)) {
-		li = &DDS::loadInfoBGR8;
-	}
-	else if (isBGR5A1(hdr.pixelFormat)) {
-		li = &DDS::loadInfoBGR5A1;
-	}
-	else if (isBGR565(hdr.pixelFormat)) {
-		li = &DDS::loadInfoBGR565;
-	}
-	else if (isINDEX8(hdr.pixelFormat)) {
-		li = &DDS::loadInfoIndex8;
-	}
-	else if (isDXT10(hdr.pixelFormat)) {
-		DDS::DXT10Header dxt10_hdr;
-		blob.read(dxt10_hdr);
-		is_dds10 = true;
-		li = DDS::getDXT10LoadInfo(hdr, dxt10_hdr);
-		layers = dxt10_hdr.array_size;
-	}
-	else {
-		ASSERT(false);
-		return false;
-	}
-
 	const bool is_cubemap = (hdr.caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
-
-	const TextureFlags flags = handle->flags;
-	const bool is_srgb = u32(flags & TextureFlags::SRGB);
 	const GLenum internal_format = is_srgb ? li->internalSRGBFormat : li->internalFormat;
+	const bool is_dds10 = isDXT10(hdr.pixelFormat);
 	const u32 mipMapCount = (hdr.dwFlags & DDS::DDSD_MIPMAPCOUNT) ? hdr.dwMipMapCount : 1;
-
 	OutputMemoryStream unpacked(gl->allocator);
-
-	const GLuint texture = handle->gl_handle;
 
 	for (u32 layer = layer_offset; layer < layer_offset + layers; ++layer) {
 		for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
@@ -1242,6 +1184,76 @@ bool loadLayers(TextureHandle handle, u32 layer_offset, const void* data, int si
 }
 
 
+bool loadLayers(TextureHandle handle, u32 layer_offset, const void* data, int size, const char* debug_name)
+{
+	ASSERT(handle);
+	ASSERT(handle->gl_handle != 0); // call createTexture before
+	ASSERT(debug_name && debug_name[0]);
+	checkThread();
+	DDS::Header hdr;
+
+	InputMemoryStream blob(data, size);
+	blob.read(&hdr, sizeof(hdr));
+
+	if (hdr.dwMagic != DDS::DDS_MAGIC || hdr.dwSize != 124 ||
+		!(hdr.dwFlags & DDS::DDSD_PIXELFORMAT) || !(hdr.dwFlags & DDS::DDSD_CAPS))
+	{
+		logError("Wrong dds format or corrupted dds (", debug_name, ")");
+		return false;
+	}
+
+	DDS::LoadInfo* li;
+	int layers = 1;
+	bool is_dds10 = false;
+
+	if (isDXT1(hdr.pixelFormat)) {
+		li = &DDS::loadInfoDXT1;
+	}
+	else if (isDXT3(hdr.pixelFormat)) {
+		li = &DDS::loadInfoDXT3;
+	}
+	else if (isDXT5(hdr.pixelFormat)) {
+		li = &DDS::loadInfoDXT5;
+	}
+	else if (isATI1(hdr.pixelFormat)) {
+		li = &DDS::loadInfoATI1;
+	}
+	else if (isATI2(hdr.pixelFormat)) {
+		li = &DDS::loadInfoATI2;
+	}
+	else if (isBGRA8(hdr.pixelFormat)) {
+		li = &DDS::loadInfoBGRA8;
+	}
+	else if (isBGR8(hdr.pixelFormat)) {
+		li = &DDS::loadInfoBGR8;
+	}
+	else if (isBGR5A1(hdr.pixelFormat)) {
+		li = &DDS::loadInfoBGR5A1;
+	}
+	else if (isBGR565(hdr.pixelFormat)) {
+		li = &DDS::loadInfoBGR565;
+	}
+	else if (isINDEX8(hdr.pixelFormat)) {
+		li = &DDS::loadInfoIndex8;
+	}
+	else if (isDXT10(hdr.pixelFormat)) {
+		DDS::DXT10Header dxt10_hdr;
+		blob.read(dxt10_hdr);
+		is_dds10 = true;
+		li = DDS::getDXT10LoadInfo(hdr, dxt10_hdr);
+		layers = dxt10_hdr.array_size;
+	}
+	else {
+		ASSERT(false);
+		return false;
+	}
+
+	const bool is_srgb = u32(handle->flags & TextureFlags::SRGB);
+
+	return upload(handle->gl_handle, layer_offset, layers, hdr, li, is_srgb, blob, debug_name);
+}
+
+
 bool loadTexture(TextureHandle handle, const void* input, int input_size, TextureFlags flags, const char* debug_name)
 {
 	ASSERT(debug_name && debug_name[0]);
@@ -1306,7 +1318,6 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, Textur
 	}
 
 	const bool is_cubemap = (hdr.caps2.dwCaps2 & DDS::DDSCAPS2_CUBEMAP) != 0;
-
 	const GLenum texture_target = is_cubemap ? GL_TEXTURE_CUBE_MAP : layers > 1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
 	const bool is_srgb = u32(flags & TextureFlags::SRGB);
 	const bool is_anisotropic_filter = u32(flags & TextureFlags::ANISOTROPIC_FILTER);
@@ -1328,92 +1339,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, Textur
 		glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name);
 	}
 
-	OutputMemoryStream unpacked(gl->allocator);
-
-	for (int layer = 0; layer < layers; ++layer) {
-		for(int side = 0; side < (is_cubemap ? 6 : 1); ++side) {
-			u32 width = hdr.dwWidth;
-			u32 height = hdr.dwHeight;
-
-			if (li->compressed) {
-				u32 size = DDS::sizeDXTC(width, height, internal_format);
-				if (!is_dds10 && !is_cubemap && (size != hdr.dwPitchOrLinearSize || (hdr.dwFlags & DDS::DDSD_LINEARSIZE) == 0)) {
-					logError("Unsupported format ", debug_name);
-					glDeleteTextures(1, &texture);
-					return false;
-				}
-				for (u32 mip = 0; mip < mipMapCount; ++mip) {
-					const u8* data_ptr = (u8*)blob.skip(size);
-					if(layers > 1) {
-						glCompressedTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, internal_format, size, data_ptr);
-					}
-					else if (is_cubemap) {
-						ASSERT(layer == 0);
-						glCompressedTextureSubImage3D(texture, mip, 0, 0, side, width, height, 1, internal_format, size, data_ptr);
-					}
-					else {
-						glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, data_ptr);
-					}
-					glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-					glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-					width = maximum(1, width >> 1);
-					height = maximum(1, height >> 1);
-					size = DDS::sizeDXTC(width, height, internal_format);
-				}
-			}
-			else if (li->palette) {
-				if ((hdr.dwFlags & DDS::DDSD_PITCH) == 0 || hdr.pixelFormat.dwRGBBitCount != 8) {
-					glDeleteTextures(1, &texture);
-					return false;
-				}
-				u32 size = hdr.dwPitchOrLinearSize * height;
-				if (size != width * height * li->blockBytes) {
-					glDeleteTextures(1, &texture);
-					return false;
-				}
-				unpacked.resize(size);
-				u32* unpacked_ptr = (u32*)unpacked.getMutableData();
-				const u32* palette = (u32*)blob.skip(4 * 256);
-				for (u32 mip = 0; mip < mipMapCount; ++mip) {
-					const u8* data_ptr = (u8*)blob.skip(size);
-					for (u32 zz = 0; zz < size; ++zz) {
-						unpacked_ptr[zz] = palette[data_ptr[zz]];
-					}
-					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
-					if(layers > 1) {
-						glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, unpacked_ptr);
-					}
-					else {
-						glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, unpacked_ptr);
-					}
-					width = maximum(1, width >> 1);
-					height = maximum(1, height >> 1);
-					size = width * height * li->blockBytes;
-				}
-			}
-			else {
-				if (li->swap) {
-					glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
-				}
-				u32 size = width * height * li->blockBytes;
-				for (u32 mip = 0; mip < mipMapCount; ++mip) {
-					const u8* data_ptr = (u8*)blob.skip(size);
-					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
-					if (layers > 1) {
-						glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, data_ptr);
-					}
-					else {
-						glTextureSubImage2D(texture, mip, 0, 0, width, height, li->externalFormat, li->type, data_ptr);
-					}
-					width = maximum(1, width >> 1);
-					height = maximum(1, height >> 1);
-					size = width * height * li->blockBytes;
-				}
-				glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_FALSE);
-			}
-			glTextureParameteri(texture, GL_TEXTURE_MAX_LEVEL, mipMapCount - 1);
-		}
-	}
+	if (!upload(texture, 0, layers, hdr, li, is_srgb, blob, debug_name)) return false;
 
 	const GLint wrap_u = u32(flags & TextureFlags::CLAMP_U) ? GL_CLAMP : GL_REPEAT;
 	const GLint wrap_v = u32(flags & TextureFlags::CLAMP_V) ? GL_CLAMP : GL_REPEAT;
