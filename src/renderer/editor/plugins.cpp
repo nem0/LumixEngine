@@ -2984,6 +2984,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				IAllocator& allocator = m_app.getAllocator();
 				LUMIX_DELETE(allocator, &job);
 			}
+			RenderScene* scene = (RenderScene*)m_app.getWorldEditor().getUniverse()->getScene(MODEL_INSTANCE_TYPE);
+			scene->reloadReflectionProbes();
 		}
 	}
 
