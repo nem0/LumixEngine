@@ -916,7 +916,8 @@ struct PipelineImpl final : Pipeline
 		m_renderer.destroy(m_cluster_buffers.clusters.buffer);
 		m_renderer.destroy(m_cluster_buffers.lights.buffer);
 		m_renderer.destroy(m_cluster_buffers.maps.buffer);
-		m_renderer.destroy(m_cluster_buffers.probes.buffer);
+		m_renderer.destroy(m_cluster_buffers.env_probes.buffer);
+		m_renderer.destroy(m_cluster_buffers.refl_probes.buffer);
 
 		clearBuffers();
 	}
@@ -2174,6 +2175,7 @@ struct PipelineImpl final : Pipeline
 			case PipelineTexture::RAW: return tex.raw;
 			case PipelineTexture::RESOURCE: {
 				if (tex.resource == -2) return m_shadow_atlas.texture;
+				if (tex.resource == -3) return m_scene->getReflectionProbesTexture();
 
 				Resource* res = m_renderer.getEngine().getLuaResource(tex.resource);
 				if (res->getType() != Texture::TYPE) return gpu::INVALID_TEXTURE;
@@ -2582,98 +2584,14 @@ struct PipelineImpl final : Pipeline
 		return rs;
 	}
 
-	struct RenderReflectionVolumesJob : Renderer::RenderJob {
-		RenderReflectionVolumesJob(IAllocator& allocator)
-			: m_probes(allocator)
-		{}
-
-		void setup() override {
-			PROFILE_FUNCTION();
-			RenderScene* scene = m_pipeline->m_scene;
-			Universe& universe = scene->getUniverse();
-			const Span<const ReflectionProbe> probes = scene->getReflectionProbes();
-			const Span<const EntityRef> entities = scene->getReflectionProbesEntities();
-
-			for (u32 i = 0, c = probes.length(); i < c; ++i) {
-				const ReflectionProbe& probe = probes[i];
-				if (!probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
-				if (!probe.texture) continue;
-				if (!probe.texture->isReady()) continue;
-
-				// TODO frustum culling
-				Probe& p = m_probes.emplace();
-				p.half_extents = probe.half_extents;
-				p.texture = probe.texture->handle;
-				const EntityRef e = entities[i];
-				const DVec3 pos = universe.getPosition(e);
-				p.pos = (pos - m_camera_params.pos).toFloat();
-				p.rot = universe.getRotation(e);
-				p.intersecting = m_camera_params.frustum.intersectNearPlane(pos, p.half_extents.length());
-			}
-
-			
-			if (!m_probes.empty()) {
-				qsort(m_probes.begin(), m_probes.size(), sizeof(m_probes[0]), [](const void* a, const void* b) -> int {
-					Probe* pa = (Probe*)a;
-					Probe* pb = (Probe*)b;
-					float sa = pa->half_extents.x * pa->half_extents.y * pa->half_extents.z;
-					float sb = pb->half_extents.x * pb->half_extents.y * pb->half_extents.z;
-					return sa < sb ? -1 : (sa > sb ? 1 : 0);
-				});
-			}
-		}
-
-		void execute() override {
-			PROFILE_FUNCTION();
-			if(m_probes.empty()) return;
-			
-			gpu::useProgram(m_program);
-			gpu::bindIndexBuffer(m_ib);
-			gpu::bindVertexBuffer(0, m_vb, 0, 12);
-			gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-			const DVec3 cam_pos = m_camera_params.pos;
-			for (const Probe& p : m_probes) {
-				Vec4 dc_mem[3]; 
-				dc_mem[0] = Vec4(p.pos, 0);
-				memcpy(&dc_mem[1], &p.rot, sizeof(p.rot)); 
-				dc_mem[2] = Vec4(p.half_extents, 0);
-				gpu::update(m_pipeline->m_drawcall_ub, dc_mem, sizeof(dc_mem));
-
-				gpu::bindTextures(&p.texture, m_texture_offset, 1);
-					
-				gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE, gpu::BlendFactors::ONE_MINUS_DST_ALPHA, gpu::BlendFactors::ONE);
-				const gpu::StateFlags state = p.intersecting
-					? gpu::StateFlags::CULL_FRONT
-					: gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::CULL_BACK;
-				gpu::setState(state | blend_state);
-				gpu::drawTriangles(0, 36, gpu::DataType::U16);
-			}
-		}
-
-		struct Probe {
-			gpu::TextureHandle texture;
-			Vec3 half_extents;
-			Quat rot;
-			Vec3 pos;
-			bool intersecting;
-		};
-
-		gpu::ProgramHandle m_program;
-		gpu::BufferHandle m_ib;
-		gpu::BufferHandle m_vb;
-		u32 m_texture_offset;
-		Array<Probe> m_probes;
-		PipelineImpl* m_pipeline;
-		CameraParams m_camera_params;
-	};
-
 	// TODO optimize
 	struct FillClustersJob : Renderer::RenderJob {
 		FillClustersJob(IAllocator& allocator)
 			: m_clusters(allocator)
 			, m_map(allocator)
 			, m_point_lights(allocator)
-			, m_probes(allocator)
+			, m_env_probes(allocator)
+			, m_refl_probes(allocator)
 		{}
 
 		void setup() override {
@@ -2683,13 +2601,15 @@ struct PipelineImpl final : Pipeline
 				(m_pipeline->m_viewport.h + 63) / 64,
 				16 };
 			Array<ClusterPointLight>& point_lights = m_point_lights;
-			Array<ClusterEnvProbe>& probes = m_probes;
+			Array<ClusterEnvProbe>& env_probes = m_env_probes;
+			Array<ClusterReflProbe>& refl_probes = m_refl_probes;
 			Array<Cluster>& clusters = m_clusters;
 			Array<i32>& map = m_map;
 			clusters.resize(size.x * size.y * size.z);
 			for (Cluster& cluster : clusters) {
 				cluster.point_lights_count = 0;
-				cluster.probes_count = 0;
+				cluster.env_probes_count = 0;
+				cluster.refl_probes_count = 0;
 			}
 
 			if (m_is_clear) return;
@@ -2737,13 +2657,36 @@ struct PipelineImpl final : Pipeline
 			ASSERT(lengthOf(xplanes) >= (u32)size.x);
 			ASSERT(lengthOf(yplanes) >= (u32)size.y);
 
-			const Span<const EnvironmentProbe> env_probes = scene->getEnvironmentProbes();
-			const Span<EntityRef> probe_entities = scene->getEnvironmentProbesEntities();
-			for (u32 i = 0, c = env_probes.length(); i < c; ++i) {
-					const EnvironmentProbe& env_probe = env_probes[i];
+			const Span<const ReflectionProbe> scene_refl_probes = scene->getReflectionProbes();
+			const Span<EntityRef> refl_probe_entities = scene->getReflectionProbesEntities();
+			for (u32 i = 0, c = scene_refl_probes.length(); i < c; ++i) {
+				const ReflectionProbe& refl_probe = scene_refl_probes[i];
+				if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
+				const EntityRef e = refl_probe_entities[i];
+				ClusterReflProbe& probe =  refl_probes.emplace();
+				probe.pos = (universe.getPosition(e) - cam_pos).toFloat();
+				probe.rot = universe.getRotation(e).conjugated();
+				probe.half_extents = refl_probe.half_extents;
+				probe.layer = refl_probe.texture_id;
+			}
+
+			qsort(refl_probes.begin(), refl_probes.size(), sizeof(ClusterReflProbe), [](const void* a, const void* b){
+				const ClusterReflProbe* m = (const ClusterReflProbe*)a;
+				const ClusterReflProbe* n = (const ClusterReflProbe*)b;
+				const float m3 = m->half_extents.x * m->half_extents.y * m->half_extents.z;
+				const float n3 = n->half_extents.x * n->half_extents.y * n->half_extents.z;
+				if (m3 < n3) return -1;
+				return m3 > n3 ? 1 : 0;
+			});
+
+
+			const Span<const EnvironmentProbe> scene_env_probes = scene->getEnvironmentProbes();
+			const Span<EntityRef> env_probe_entities = scene->getEnvironmentProbesEntities();
+			for (u32 i = 0, c = scene_env_probes.length(); i < c; ++i) {
+					const EnvironmentProbe& env_probe = scene_env_probes[i];
 					if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
-					const EntityRef e = probe_entities[i];
-					ClusterEnvProbe& probe =  probes.emplace();
+					const EntityRef e = env_probe_entities[i];
+					ClusterEnvProbe& probe =  env_probes.emplace();
 					probe.pos = (universe.getPosition(e) - cam_pos).toFloat();
 					probe.rot = universe.getRotation(e).conjugated();
 					probe.inner_range = env_probe.inner_range;
@@ -2753,7 +2696,7 @@ struct PipelineImpl final : Pipeline
 					}
 			}
 
-			qsort(probes.begin(), probes.size(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
+			qsort(env_probes.begin(), env_probes.size(), sizeof(ClusterEnvProbe), [](const void* a, const void* b){
 				const ClusterEnvProbe* m = (const ClusterEnvProbe*)a;
 				const ClusterEnvProbe* n = (const ClusterEnvProbe*)b;
 				const float m3 = m->outer_range.x * m->outer_range.y * m->outer_range.z;
@@ -2785,6 +2728,7 @@ struct PipelineImpl final : Pipeline
 				return range;
 			};
 
+			// TODO tighter fit
 			auto for_each_light_pair = [&](auto f){
 				for (i32 i = 0, c = point_lights.size(); i < c; ++i) {
 					ClusterPointLight& light = point_lights[i];
@@ -2806,11 +2750,32 @@ struct PipelineImpl final : Pipeline
 					}
 				}
 			};
+			
+			auto for_each_env_probe_pair = [&](auto f){
+				for (i32 i = 0, c = env_probes.size(); i < c; ++i) {
+					const Vec3 p = env_probes[i].pos;
+					const float r = env_probes[i].outer_range.length();
+				
+					const IVec2 xrange = range(p, r, size.x, xplanes);
+					const IVec2 yrange = range(p, r, size.y, yplanes);
+					const IVec2 zrange = range(p, r, size.z, zplanes);
 
-			auto for_each_probe_pair = [&](auto f){
-				for (i32 i = 0, c = probes.size(); i < c; ++i) {
-					const Vec3 p = probes[i].pos;
-					const float r = probes[i].outer_range.length();
+					for (i32 z = zrange.x; z < zrange.y; ++z) {
+						for (i32 y = yrange.x; y < yrange.y; ++y) {
+							for (i32 x = xrange.x; x < xrange.y; ++x) {
+								const u32 idx = x + y * size.x + z * size.x * size.y;
+								Cluster& cluster = clusters[idx];
+								f(cluster, i);
+							}
+						}
+					}
+				}
+			};
+
+			auto for_each_refl_probe_pair = [&](auto f){
+				for (i32 i = 0, c = refl_probes.size(); i < c; ++i) {
+					const Vec3 p = refl_probes[i].pos;
+					const float r = refl_probes[i].half_extents.length();
 				
 					const IVec2 xrange = range(p, r, size.x, xplanes);
 					const IVec2 yrange = range(p, r, size.y, yplanes);
@@ -2832,14 +2797,18 @@ struct PipelineImpl final : Pipeline
 				++cluster.point_lights_count;
 			});
 
-			for_each_probe_pair([](Cluster& cluster, i32 light_idx){
-				++cluster.probes_count;
+			for_each_env_probe_pair([](Cluster& cluster, i32){
+				++cluster.env_probes_count;
+			});
+
+			for_each_refl_probe_pair([](Cluster& cluster, i32){
+				++cluster.refl_probes_count;
 			});
 
 			u32 offset = 0;
 			for (Cluster& cluster : clusters) {
 				cluster.offset = offset;
-				offset += cluster.point_lights_count + cluster.probes_count;
+				offset += cluster.point_lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
 			
 			map.resize(offset);
@@ -2849,13 +2818,18 @@ struct PipelineImpl final : Pipeline
 				++cluster.offset;
 			});
 
-			for_each_probe_pair([&](Cluster& cluster, i32 probe_idx){
+			for_each_env_probe_pair([&](Cluster& cluster, i32 probe_idx){
+				map[cluster.offset] = probe_idx;
+				++cluster.offset;
+			});
+
+			for_each_refl_probe_pair([&](Cluster& cluster, i32 probe_idx){
 				map[cluster.offset] = probe_idx;
 				++cluster.offset;
 			});
 
 			for (Cluster& cluster : clusters) {
-				cluster.offset -= cluster.point_lights_count + cluster.probes_count;
+				cluster.offset -= cluster.point_lights_count + cluster.env_probes_count + cluster.refl_probes_count;
 			}
 		}
 
@@ -2882,14 +2856,16 @@ struct PipelineImpl final : Pipeline
 			bind(m_pipeline->m_cluster_buffers.lights, m_point_lights, 6);
 			bind(m_pipeline->m_cluster_buffers.clusters, m_clusters, 7);
 			bind(m_pipeline->m_cluster_buffers.maps, m_map, 8);
-			bind(m_pipeline->m_cluster_buffers.probes, m_probes, 9);
+			bind(m_pipeline->m_cluster_buffers.env_probes, m_env_probes, 9);
+			bind(m_pipeline->m_cluster_buffers.refl_probes, m_refl_probes, 10);
 		}
 
 
 		struct Cluster {
 			u32 offset;
 			u32 point_lights_count;
-			u32 probes_count;
+			u32 env_probes_count;
+			u32 refl_probes_count;
 		};
 
 		struct ClusterPointLight {
@@ -2914,10 +2890,19 @@ struct PipelineImpl final : Pipeline
 			Vec4 sh_coefs[9];
 		};
 
+		struct ClusterReflProbe {
+			Vec3 pos;
+			u32 layer;
+			Quat rot;
+			Vec3 half_extents;
+			float pad1;
+		};
+
 		Array<i32> m_map;
 		Array<Cluster> m_clusters;
 		Array<ClusterPointLight> m_point_lights;
-		Array<ClusterEnvProbe> m_probes;
+		Array<ClusterEnvProbe> m_env_probes;
+		Array<ClusterReflProbe> m_refl_probes;
 
 		PipelineImpl* m_pipeline;
 		CameraParams m_camera_params;
@@ -2947,32 +2932,6 @@ struct PipelineImpl final : Pipeline
 
 		Matrix view = rot.toMatrix();
 		return to_tile * bias_matrix * prj * view;
-	}
-
-	void renderReflectionVolumes(lua_State* L, CameraParams cp, i32 shader_id, u32 texture_offset) {
-		Shader* shader = [&] {
-			for (const ShaderRef& s : m_shaders) {
-				if(s.id == shader_id) {
-					return s.res;
-				}
-			}
-			return (Shader*)nullptr;
-		}();
-		if (!shader) {
-			luaL_error(L, "Unknown shader id %d in renderReflectionVolumes.", shader_id);
-			return;
-		}
-		if (!shader->isReady()) return;
-
-		RenderReflectionVolumesJob& job = m_renderer.createJob<RenderReflectionVolumesJob>(m_allocator);
-		
-		job.m_program = shader->getProgram(m_simple_cube_decl, 0);
-		job.m_ib = m_cube_ib;
-		job.m_vb = m_cube_vb;
-		job.m_pipeline = this;
-		job.m_camera_params = cp;
-		job.m_texture_offset = texture_offset;
-		m_renderer.queue(job, m_profiler_link);
 	}
 
 	struct AtlasSorter {
@@ -4739,7 +4698,6 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(renderGrass);
 		REGISTER_FUNCTION(renderLocalLights);
 		REGISTER_FUNCTION(renderParticles);
-		REGISTER_FUNCTION(renderReflectionVolumes);
 		REGISTER_FUNCTION(renderTerrains);
 		REGISTER_FUNCTION(renderOpaque);
 		REGISTER_FUNCTION(renderTransparent);
@@ -4749,6 +4707,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(viewport);
 
 		lua_pushinteger(L, -2); lua_setfield(L, -2, "SHADOW_ATLAS");
+		lua_pushinteger(L, -3); lua_setfield(L, -2, "REFLECTION_PROBES");
 
 		registerConst("CLEAR_DEPTH", (u32)gpu::ClearFlags::DEPTH);
 		registerConst("CLEAR_COLOR", (u32)gpu::ClearFlags::COLOR);
@@ -4854,7 +4813,8 @@ struct PipelineImpl final : Pipeline
 		Buffer lights;
 		Buffer clusters;
 		Buffer maps;
-		Buffer probes;
+		Buffer env_probes;
+		Buffer refl_probes;
 	} m_cluster_buffers;
 	Viewport m_shadow_camera_viewports[4];
 };

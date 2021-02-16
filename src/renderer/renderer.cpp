@@ -400,6 +400,7 @@ struct RendererImpl final : Renderer
 			gpu::destroy(renderer->m_material_buffer.staging_buffer);
 			gpu::destroy(renderer->m_tmp_uniform_buffer);
 			gpu::destroy(renderer->m_scratch_buffer);
+			gpu::destroy(renderer->m_downscale_program);
 			renderer->m_profiler.clear();
 			gpu::shutdown();
 		}, &signal, jobs::INVALID_HANDLE, 1);

@@ -2984,6 +2984,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				IAllocator& allocator = m_app.getAllocator();
 				LUMIX_DELETE(allocator, &job);
 			}
+			RenderScene* scene = (RenderScene*)m_app.getWorldEditor().getUniverse()->getScene(MODEL_INSTANCE_TYPE);
+			scene->reloadReflectionProbes();
 		}
 	}
 
@@ -3128,10 +3130,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			if (m_probe_counter) ImGui::Text("Generating...");
 			else {
 				const ReflectionProbe& probe = scene->getReflectionProbe(e);
-				if (probe.texture && probe.flags.isSet(ReflectionProbe::ENABLED)) {
+				if (probe.flags.isSet(ReflectionProbe::ENABLED)) {
+					StaticString<LUMIX_MAX_PATH> path("universes/probes/", probe.guid, ".dds");
 					ImGuiEx::Label("Path");
-					ImGui::TextUnformatted(probe.texture->getPath().c_str());
-					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(probe.texture->getPath(), true, false);
+					ImGui::TextUnformatted(path);
+					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(Path(path), true, false);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
 					if (ImGui::Button("Generate")) generateCubemaps(false);
