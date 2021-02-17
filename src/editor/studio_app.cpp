@@ -1,4 +1,5 @@
 #include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
 #include <imgui/imnodes.h>
 
 #include "audio/audio_scene.h"
@@ -1654,13 +1655,10 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities)
+	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, ImVec2 line_size)
 	{
-		char buffer[1024];
 		Universe* universe = m_editor->getUniverse();
-		getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), entity);
 		bool selected = selected_entities.indexOf(entity) >= 0;
-		ImGui::PushID(entity.index);
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_AllowItemOverlap;
 		bool has_child = universe->getFirstChild(entity).isValid();
 		if (!has_child) flags = ImGuiTreeNodeFlags_Leaf;
@@ -1690,50 +1688,71 @@ struct StudioAppImpl final : StudioApp
 			ImGui::PopStyleColor();
 		}
 		else {
-			node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
-		}
-		
-		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
-		if (ImGui::BeginPopup("entity_context_menu"))
-		{
-			if (ImGui::MenuItem("Create child"))
-			{
-				m_editor->beginCommandGroup(crc32("create_child_entity"));
-				EntityRef child = m_editor->addEntity();
-				m_editor->makeParent(entity, child);
-				const DVec3 pos = m_editor->getUniverse()->getPosition(entity);
-				m_editor->setEntitiesPositions(&child, &pos, 1);
-				m_editor->endCommandGroup();
+			const ImVec2 cp = ImGui::GetCursorPos();
+			ImGui::Dummy(line_size);
+			if (ImGui::IsItemVisible()) {
+				ImGui::SetCursorPos(cp);
+				char buffer[1024];
+				getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), entity);
+				node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
 			}
-			ImGui::EndPopup();
-		}
-		ImGui::PopID();
-		if (ImGui::BeginDragDropSource())
-		{
-			ImGui::Text("%s", buffer);
-			ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
-			ImGui::EndDragDropSource();
-		}
-		else {
-			if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-				m_editor->selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
-			}
-		}
-		if (ImGui::BeginDragDropTarget())
-		{
-			if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
-			{
-				EntityRef dropped_entity = *(EntityRef*)payload->Data;
-				if (dropped_entity != entity)
-				{
-					m_editor->makeParent(entity, dropped_entity);
-					ImGui::EndDragDropTarget();
-					if (node_open) ImGui::TreePop();
-					return;
+			else {
+				const char* dummy = "";
+				const ImGuiID id = ImGui::GetCurrentWindow()->GetID((void*)(intptr_t)entity.index);
+				if (ImGui::TreeNodeBehaviorIsOpen(id, flags)) {
+					ImGui::SetCursorPos(cp);
+					node_open = ImGui::TreeNodeBehavior(id, flags, dummy, dummy);
+				}
+				else {
+					node_open = false;
 				}
 			}
+		}
+		
+		if (ImGui::IsItemVisible()) {
+			if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
+			if (ImGui::BeginPopup("entity_context_menu"))
+			{
+				if (ImGui::MenuItem("Create child"))
+				{
+					m_editor->beginCommandGroup(crc32("create_child_entity"));
+					EntityRef child = m_editor->addEntity();
+					m_editor->makeParent(entity, child);
+					const DVec3 pos = m_editor->getUniverse()->getPosition(entity);
+					m_editor->setEntitiesPositions(&child, &pos, 1);
+					m_editor->endCommandGroup();
+				}
+				ImGui::EndPopup();
+			}
+			if (ImGui::BeginDragDropSource())
+			{
+				char buffer[1024];
+				getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), entity);
+				ImGui::Text("%s", buffer);
+				ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
+				ImGui::EndDragDropSource();
+			}
+			else {
+				if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+					m_editor->selectEntities(Span(&entity, 1), ImGui::GetIO().KeyCtrl);
+				}
+			}
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
+				{
+					EntityRef dropped_entity = *(EntityRef*)payload->Data;
+					if (dropped_entity != entity)
+					{
+						m_editor->makeParent(entity, dropped_entity);
+						ImGui::EndDragDropTarget();
+						if (node_open) ImGui::TreePop();
+						return;
+					}
+				}
 
-			ImGui::EndDragDropTarget();
+				ImGui::EndDragDropTarget();
+			}
 		}
 
 		if (node_open)
@@ -1741,7 +1760,7 @@ struct StudioAppImpl final : StudioApp
 			for (EntityPtr e_ptr = universe->getFirstChild(entity); e_ptr.isValid();
 				 e_ptr = universe->getNextSibling((EntityRef)e_ptr))
 			{
-				showHierarchy((EntityRef)e_ptr, selected_entities);
+				showHierarchy((EntityRef)e_ptr, selected_entities, line_size);
 			}
 			if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_is_f2_pressed) {
 				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
@@ -1796,29 +1815,32 @@ struct StudioAppImpl final : StudioApp
 
 			if (ImGui::BeginChild("entities"))
 			{
+				static ImGuiEx::TreeViewClipper clipper;
+
+				const ImVec2 line_size = ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing());
+
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 				if (filter[0] == '\0')
 				{
-					u32 counter = 0;
-					for (EntityPtr e = universe->getFirstEntity(); e.isValid();
-						 e = universe->getNextEntity((EntityRef)e))
-					{
-						++counter;
-						if (counter == m_max_shown_entity_in_list) {
-							const float w = ImGui::GetContentRegionAvail().x;
-							if (ImGui::Button("Show more", ImVec2(w * 0.5f, 0))) m_max_shown_entity_in_list *= 5;
-							ImGui::SameLine();
-							if (ImGui::Button("Show less", ImVec2(w * 0.5f, 0))) m_max_shown_entity_in_list /= 5;
-							m_max_shown_entity_in_list = maximum(m_max_shown_entity_in_list, 1);
-							break;
-						}
-
-						const EntityRef e_ref = (EntityRef)e;
-						if (!universe->getParent(e_ref).isValid())
-						{
-							showHierarchy(e_ref, entities);
-						}
+					u32 first = clipper.Begin(0xffFFffFF);
+					EntityPtr e = universe->getFirstEntity();
+					while (first > 0 && e.isValid()) {
+						e = universe->getNextEntity((EntityRef)e);
+						while (e.isValid() && universe->getParent((EntityRef)e).isValid())
+							e = universe->getNextEntity((EntityRef)e);
+						--first;
 					}
+
+					while (clipper.BeginNode()) {
+						while (e.isValid() && universe->getParent((EntityRef)e).isValid())
+							e = universe->getNextEntity((EntityRef)e);
+						if (!e.isValid()) break;
+						const EntityRef e_ref = (EntityRef)e;
+						showHierarchy(e_ref, entities, line_size);
+						clipper.EndNode();
+						e = universe->getNextEntity((EntityRef)e);
+					}
+					clipper.End();
 				}
 				else
 				{
@@ -3329,7 +3351,6 @@ struct StudioAppImpl final : StudioApp
 	bool m_is_welcome_screen_open;
 	bool m_is_pack_data_dialog_open;
 	bool m_is_entity_list_open;
-	u32 m_max_shown_entity_in_list = 1000;
 	EntityPtr m_renaming_entity = INVALID_ENTITY;
 	bool m_set_rename_focus = false;
 	char m_rename_buf[Universe::ENTITY_NAME_MAX_LENGTH];
