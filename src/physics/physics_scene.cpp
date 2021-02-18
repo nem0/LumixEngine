@@ -4241,11 +4241,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (!iter.isValid()) return;
 		RigidActor* actor = iter.value();
 
-		if (actor->dynamic_type != DynamicType::DYNAMIC)
-		{
-			logWarning("Trying to apply force to static object #", entity.index);
-			return;
-		}
+		if (actor->dynamic_type != DynamicType::DYNAMIC) return;
 
 		auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
 		if (!physx_actor) return;
@@ -4259,11 +4255,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (!iter.isValid()) return;
 		RigidActor* actor = iter.value();
 
-		if (actor->dynamic_type != DynamicType::DYNAMIC)
-		{
-			logWarning("Trying to apply force to static object #", entity.index);
-			return;
-		}
+		if (actor->dynamic_type != DynamicType::DYNAMIC) return;
 
 		auto* physx_actor = static_cast<PxRigidDynamic*>(actor->physx_actor);
 		if (!physx_actor) return;
