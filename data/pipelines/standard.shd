@@ -161,7 +161,8 @@ fragment_shader [[
 			data.alpha = saturate(data.alpha - Model.layer);
 		#endif
 
-		#ifdef ALPHA_CUTOUT
+		// dx shader has internal errors on this
+		#if defined ALPHA_CUTOUT && !defined LUMIX_DX_SHADER 
 			if(data.alpha < 0.1) discard;
 		#endif
 
@@ -204,6 +205,9 @@ fragment_shader [[
 		void main()
 		{
 			Surface data = getSurface();
+			#if defined ALPHA_CUTOUT && defined LUMIX_DX_SHADER
+				if(data.alpha < 0.1) discard;
+			#endif
 			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
 		}
 	#else 
