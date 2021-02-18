@@ -3257,10 +3257,10 @@ struct PipelineImpl final : Pipeline
 						new_page(bucket);
 					}
 
-					Shader* shader = mesh.material->getShader();
-					const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mesh.material->getDefineMask());
 
 					if (mi->custom_material->isReady()) {
+						Shader* shader = mi->custom_material->getShader();
+						const gpu::ProgramHandle prog = shader->getProgram(mesh.vertex_decl, instanced_define_mask | mi->custom_material->getDefineMask());
 						WRITE(type);
 						WRITE(mesh.render_data);
 						WRITE_FN(mi->custom_material->getRenderData());
