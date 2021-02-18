@@ -2853,11 +2853,11 @@ struct PipelineImpl final : Pipeline
 				}
 			};
 
-			bind(m_pipeline->m_cluster_buffers.lights, m_point_lights, 6);
-			bind(m_pipeline->m_cluster_buffers.clusters, m_clusters, 7);
-			bind(m_pipeline->m_cluster_buffers.maps, m_map, 8);
-			bind(m_pipeline->m_cluster_buffers.env_probes, m_env_probes, 9);
-			bind(m_pipeline->m_cluster_buffers.refl_probes, m_refl_probes, 10);
+			bind(m_pipeline->m_cluster_buffers.lights, m_point_lights, 7);
+			bind(m_pipeline->m_cluster_buffers.clusters, m_clusters, 8);
+			bind(m_pipeline->m_cluster_buffers.maps, m_map, 9);
+			bind(m_pipeline->m_cluster_buffers.env_probes, m_env_probes, 10);
+			bind(m_pipeline->m_cluster_buffers.refl_probes, m_refl_probes, 11);
 		}
 
 

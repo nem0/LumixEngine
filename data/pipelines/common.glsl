@@ -121,27 +121,27 @@ layout (std140, binding = 3) uniform ShadowAtlas {
 	mat4 u_shadow_atlas_matrices[128];
 };
 
-layout(std430, binding = 6) readonly buffer lights
+layout(std430, binding = 7) readonly buffer lights
 {
 	Light b_lights[];
 };
 
-layout(std430, binding = 7) readonly buffer clusters
+layout(std430, binding = 8) readonly buffer clusters
 {
 	Cluster b_clusters[];
 };
 	
-layout(std430, binding = 8) readonly buffer cluster_maps
+layout(std430, binding = 9) readonly buffer cluster_maps
 {
 	int b_cluster_map[];
 };
 
-layout(std430, binding = 9) readonly buffer envprobes
+layout(std430, binding = 10) readonly buffer envprobes
 {
 	EnvProbe b_env_probes[];
 };
 
-layout(std430, binding = 10) readonly buffer reflprobes
+layout(std430, binding = 11) readonly buffer reflprobes
 {
 	ReflProbe b_refl_probes[];
 };
