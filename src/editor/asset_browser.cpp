@@ -49,13 +49,7 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	IAllocator& allocator = app.getAllocator();
 	m_filter[0] = '\0';
 
-	const char* base_path = app.getEngine().getFileSystem().getBasePath();
-
-	StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix");
-	bool success = os::makePath(path);
-	path << "/asset_tiles";
-	success = os::makePath(path) && success;
-	if (!success) logError("Could not create ", path);
+	onBasePathChanged();
 
 	m_back_action.init("Back", "Back in asset history", "back", ICON_FA_ARROW_LEFT, false);
 	m_back_action.func.bind<&AssetBrowser::goBack>(this);
@@ -65,6 +59,14 @@ AssetBrowser::AssetBrowser(StudioApp& app)
 	m_app.addAction(&m_forward_action);
 }
 
+void AssetBrowser::onBasePathChanged() {
+	const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
+	StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix");
+	bool success = os::makePath(path);
+	path << "/asset_tiles";
+	success = os::makePath(path) && success;
+	if (!success) logError("Could not create ", path);
+}
 
 void AssetBrowser::releaseResources() {
 	unloadResources();

@@ -63,6 +63,7 @@ public:
 	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);
 	void releaseResources();
 	void reloadTile(u32 hash);
+	void onBasePathChanged();
 
 public:
 	bool m_is_open;

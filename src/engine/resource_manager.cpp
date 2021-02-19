@@ -210,6 +210,26 @@ void ResourceManagerHub::enableUnload(bool enable)
 	}
 }
 
+void ResourceManagerHub::reloadAll() {
+	while (m_file_system->hasWork()) m_file_system->processCallbacks();
+	
+	Array<Resource*> to_reload(m_allocator);
+	for (auto* manager : m_resource_managers) {
+		ResourceManager::ResourceTable& resources = manager->getResourceTable();
+		for (Resource* res : resources) {
+			if (res->isReady()) {
+				res->doUnload();
+				to_reload.push(res);
+			}
+		}
+	}
+
+	for (Resource* res : to_reload) {
+		res->doLoad();
+	}
+}
+
+
 void ResourceManagerHub::reload(const Path& path)
 {
 	for (auto* manager : m_resource_managers)

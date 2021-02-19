@@ -1005,6 +1005,8 @@ struct StudioAppImpl final : StudioApp
 						extractBundled();
 						m_editor->loadProject();
 						scanUniverses();
+						m_asset_compiler->onBasePathChanged();
+						m_engine->getResourceManager().reloadAll();
 					}
 				}
 				ImGui::Separator();
