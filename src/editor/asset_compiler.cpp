@@ -99,14 +99,15 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_changed_files(app.getAllocator())
 		, m_on_list_changed(app.getAllocator())
 	{
-		FileSystem& fs = app.getEngine().getFileSystem();
-		m_watcher = FileSystemWatcher::create(fs.getBasePath(), app.getAllocator());
+		Engine& engine = app.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+		const char* base_path = fs.getBasePath();
+		m_watcher = FileSystemWatcher::create(base_path, app.getAllocator());
 		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
 		m_task.create("Asset compiler", true);
-		const char* base_path = m_app.getEngine().getFileSystem().getBasePath();
 		StaticString<LUMIX_MAX_PATH> path(base_path, ".lumix/assets");
 		if (!os::makePath(path)) logError("Could not create ", path);
-		ResourceManagerHub& rm = app.getEngine().getResourceManager();
+		ResourceManagerHub& rm = engine.getResourceManager();
 		rm.setLoadHook(&m_load_hook);
 	}
 
@@ -147,6 +148,17 @@ struct AssetCompilerImpl : AssetCompiler
 		rm.setLoadHook(nullptr);
 	}
 	
+	void onBasePathChanged() override {
+		Engine& engine = m_app.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+		const char* base_path = fs.getBasePath();
+		m_watcher = FileSystemWatcher::create(base_path, m_app.getAllocator());
+		m_watcher->getCallback().bind<&AssetCompilerImpl::onFileChanged>(this);
+		m_dependencies.clear();
+		m_resources.clear();
+		fillDB();
+	}
+
 	DelegateList<void()>& listChanged() override {
 		return m_on_list_changed;
 	}
@@ -289,9 +301,7 @@ struct AssetCompilerImpl : AssetCompiler
 		iter.value().push(included_from);
 	}
 
-
-	void onInitFinished() override
-	{
+	void fillDB() {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const StaticString<LUMIX_MAX_PATH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
 		OutputMemoryStream content(m_app.getAllocator());
@@ -371,6 +381,11 @@ struct AssetCompilerImpl : AssetCompiler
 		const u64 list_last_modified = os::getLastModified(list_path);
 		processDir("", list_last_modified);
 		registerLuaAPI(m_app.getEngine().getState());
+	}
+
+	void onInitFinished() override
+	{
+		fillDB();
 	}
 
 

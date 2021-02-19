@@ -82,6 +82,7 @@ public:
 	void add(ResourceType type, ResourceManager* rm);
 	void remove(ResourceType type);
 	void reload(const Path& path);
+	void reloadAll();
 	void removeUnreferenced();
 	void enableUnload(bool enable);
 
