@@ -115,6 +115,7 @@ layout (std140, binding = 1) uniform PassState {
 	vec4 view_dir;
 	vec4 camera_up;
 	vec4 camera_planes[6];
+	vec4 shadow_to_camera;
 } Pass;
  
 layout (std140, binding = 3) uniform ShadowAtlas {

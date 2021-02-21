@@ -169,6 +169,8 @@ struct LUMIX_ENGINE_API Vec3
 	{
 	}
 
+	explicit inline Vec3(const DVec3& rhs);
+
 	template<typename L>
 	float& operator[](L i)
 	{
