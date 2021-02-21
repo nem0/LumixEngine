@@ -72,6 +72,7 @@ struct Surface {
 	float metallic;
 	float emission;
 	float translucency;
+	float ao;
 	vec3 N;
 	vec3 V;
 	vec3 wpos;
@@ -465,7 +466,7 @@ vec3 reflProbesLighting(Cluster cluster, Surface surface, samplerCubeArray refle
 		res += radiance * brdf * w;
 	}
 
-	return remaining_w > 0.999 ? vec3(0) : res / (1 - remaining_w);
+	return (remaining_w > 0.999 ? vec3(0) : res / (1 - remaining_w)) * surface.ao;
 }
 
 vec3 envProbesLighting(Cluster cluster, Surface surface) {
@@ -497,7 +498,7 @@ vec3 envProbesLighting(Cluster cluster, Surface surface) {
 		probe_light += (indirect * Global.light_indirect_intensity) * w / M_PI;
 		if (remaining_w <= 0) break;
 	}
-	return remaining_w < 1 ? probe_light / (1 - remaining_w) : vec3(0);
+	return (remaining_w < 1 ? probe_light / (1 - remaining_w) : vec3(0)) * surface.ao;
 }
 
 // must match ShadowAtlas::getUV
@@ -575,7 +576,7 @@ vec3 vegetationAnim(vec3 obj_pos, vec3 vertex_pos, float strength) {
 void packSurface(Surface surface, out vec4 gbuffer0, out vec4 gbuffer1, out vec4 gbuffer2) {
 	gbuffer0 = vec4(surface.albedo.rgb, surface.roughness);
 	gbuffer1 = vec4(surface.N * 0.5 + 0.5, surface.metallic);
-	gbuffer2 = vec4(packEmission(surface.emission), surface.translucency, 0, 1);
+	gbuffer2 = vec4(packEmission(surface.emission), surface.translucency, surface.ao, 1);
 }
 
 Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D gbuffer2, sampler2D gbuffer_depth, out float ndc_depth) {
@@ -592,6 +593,7 @@ Surface unpackSurface(vec2 uv, sampler2D gbuffer0, sampler2D gbuffer1, sampler2D
 	surface.wpos = getViewPosition(gbuffer_depth, Global.inv_view_projection, uv, ndc_depth);
 	surface.V = normalize(-surface.wpos);
 	surface.translucency = gb2.y;
+	surface.ao = gb2.z;
 	return surface;
 }
 
