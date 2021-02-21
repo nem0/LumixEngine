@@ -237,7 +237,11 @@ fragment_shader [[
 			float linear_depth = dot(data.wpos.xyz, Pass.view_dir.xyz);
 			Cluster cluster = getClusterLinearDepth(linear_depth);
 			o_color.rgb = computeLighting(cluster, data, Global.light_dir.xyz, Global.light_color.rgb * Global.light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes);
-	
+
+			#if defined ALPHA_CUTOUT
+				if(data.alpha < 0.1) discard;
+			#endif
+
 			float ndotv = abs(dot(data.N , data.V)) + 1e-5f;
 			o_color.a = mix(data.alpha, 1, pow(saturate(1 - ndotv), 5));
 		}
