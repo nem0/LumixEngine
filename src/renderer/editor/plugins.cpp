@@ -1769,6 +1769,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			m_viewport.rot = mtx.getRotation();
 		}
+		render_scene->setModelInstanceLOD((EntityRef)m_mesh, 0);
 		ImVec2 image_size(ImGui::GetContentRegionAvail().x, ImGui::GetContentRegionAvail().x);
 
 		m_viewport.w = (int)image_size.x;
