@@ -233,7 +233,7 @@ void Texture::save()
 		header.depth = depth;
 
 		bool success = file.write(&header, sizeof(header));
-		success = success || file.write(data.data(), data.size());
+		success = file.write(data.data(), data.size()) && success;
 		if (!success) {
 			logError("Failed to write ", getPath());
 		}
