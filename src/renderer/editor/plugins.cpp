@@ -232,7 +232,7 @@ static void flipX(Vec4* data, int texture_size)
 	}
 }
 
-static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool generate_mipmaps) {
+static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool generate_mipmaps, bool is_origin_bottom_left, IAllocator& allocator) {
 	ASSERT(data);
 	os::OutputFile file;
 	if (!file.open(path)) return false;
@@ -245,7 +245,18 @@ static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool gener
 	input.setAlphaCoverageMipScale(0.3f, 3);
 	input.setNormalMap(false);
 	input.setTextureLayout(nvtt::TextureType_2D, w, h);
-	input.setMipmapData(data, w, h);
+	if (is_origin_bottom_left) {
+		input.setMipmapData(data, w, h);
+	}
+	else {
+		Array<u8> tmp(allocator);
+		tmp.resize(w * h * 4);
+		const u32 row_size = w * 4;
+		for (i32 i = 0; i < h; ++i) {
+			memcpy(&tmp[i * row_size], data + (h - i - 1) * row_size, row_size);
+		}
+		input.setMipmapData(tmp.begin(), w, h);
+	}
 		
 	nvtt::OutputOptions output;
 	output.setSrgbFlag(false);
@@ -855,7 +866,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				stbi_image_free(data);
 			}
 
-			if (!saveAsDDS(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false)) {
+			if (!saveAsDDS(m_out_path, resized_data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, true, m_allocator)) {
 				logError("Failed to save ", m_out_path);
 			}
 		}
@@ -2265,7 +2276,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					swap(raw_tile_data[i * 4 + 0], raw_tile_data[i * 4 + 2]);
 				}
 
-				saveAsDDS(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false);
+				saveAsDDS(path, m_tile.data.data(), AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, false, gpu::isOriginBottomLeft(), m_app.getAllocator());
 				memset(m_tile.data.getMutableData(), 0, m_tile.data.size());
 				Renderer* renderer = (Renderer*)engine.getPluginManager().getPlugin("renderer");
 				renderer->destroy(m_tile.texture);
@@ -2375,15 +2386,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 
 		Renderer::MemRef mem;
-		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NONE, mem, "tile_final");
-		renderer->downscale(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_final");
+		gpu::TextureHandle tile_tmp = renderer->createTexture(AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_tmp");
+		renderer->copy(tile_tmp, m_tile.pipeline->getOutput());
+		renderer->downscale(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 
 		renderer->getTextureImage(m_tile.texture
 			, AssetBrowser::TILE_SIZE
 			, AssetBrowser::TILE_SIZE
 			, gpu::TextureFormat::RGBA8
 			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
-		
+		renderer->destroy(tile_tmp);
+
 		m_tile.frame_countdown = 2;
 	}
 
