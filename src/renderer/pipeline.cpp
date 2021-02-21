@@ -4258,6 +4258,7 @@ struct PipelineImpl final : Pipeline
 						break;
 					}
 					case RenderableTypes::MESH_GROUP: {
+						const bool is_shadow = view.cp.is_shadow;
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
 							const DVec3 pos = entity_data[e.index].pos;
@@ -4288,24 +4289,18 @@ struct PipelineImpl final : Pipeline
 							};
 
 							if (mi.lod != lod_idx) {
-								if (view.cp.is_shadow) {
-									const u32 shadow_lod_idx = maximum((u32)mi.lod, lod_idx);
-									create_key(mi.model->getLODIndices()[shadow_lod_idx]);
+								const float d = lod_idx - mi.lod;
+								const float ad = fabsf(d);
+									
+								if (ad <= 0.03f) {
+									mi.lod = float(lod_idx);
+									create_key(mi.model->getLODIndices()[lod_idx]);
 								}
 								else {
-									const float d = lod_idx - mi.lod;
-									const float ad = fabsf(d);
-									
-									if (ad <= 0.03f) {
-										mi.lod = float(lod_idx);
-										create_key(mi.model->getLODIndices()[lod_idx]);
-									}
-									else {
-										mi.lod += d / ad * 0.03f;
-										const u32 cur_lod_idx = u32(mi.lod);
-										create_key(mi.model->getLODIndices()[cur_lod_idx]);
-										create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
-									}
+									if(!is_shadow) mi.lod += d / ad * 0.03f;
+									const u32 cur_lod_idx = u32(mi.lod);
+									create_key(mi.model->getLODIndices()[cur_lod_idx]);
+									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
 								}
 							}
 							else {

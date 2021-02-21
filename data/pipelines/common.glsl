@@ -466,7 +466,7 @@ vec3 reflProbesLighting(Cluster cluster, Surface surface, samplerCubeArray refle
 		res += radiance * brdf * w;
 	}
 
-	return (remaining_w > 0.999 ? vec3(0) : res / (1 - remaining_w)) * surface.ao;
+	return (remaining_w > 0.999 ? vec3(0) : res / (1 - remaining_w)) * surface.ao * Global.light_indirect_intensity;
 }
 
 vec3 envProbesLighting(Cluster cluster, Surface surface) {
