@@ -1777,7 +1777,13 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_pipeline->setViewport(m_viewport);
 		m_pipeline->render(false);
 		m_preview = m_pipeline->getOutput();
-		ImGui::Image(m_preview, image_size);
+		if (gpu::isOriginBottomLeft()) {
+			ImGui::Image(m_preview, image_size);
+		}
+		else {
+			ImGui::Image(m_preview, image_size, ImVec2(0, 1), ImVec2(1, 0));
+		}
+		
 		bool mouse_down = ImGui::IsMouseDown(0) || ImGui::IsMouseDown(1);
 		if (m_is_mouse_captured && !mouse_down)
 		{
