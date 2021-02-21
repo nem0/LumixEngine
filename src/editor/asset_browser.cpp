@@ -733,6 +733,7 @@ void AssetBrowser::onGUI()
 		float checkbox_w = ImGui::GetCursorPosX();
 		ImGui::SetNextItemWidth(100);
 		if (ImGui::SliderFloat("##icon_size", &m_thumbnail_size, 0.3f, 3.f)) {
+			m_thumbnail_size = clamp(m_thumbnail_size, 0.3f, 3.0f);
 			refreshLabels();
 		}
 		ImGui::SameLine();

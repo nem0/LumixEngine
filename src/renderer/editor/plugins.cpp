@@ -719,6 +719,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		, m_composite(app.getAllocator())
 	{
 		app.getAssetCompiler().registerExtension("png", Texture::TYPE);
+		app.getAssetCompiler().registerExtension("jpeg", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("jpg", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("tga", Texture::TYPE);
 		app.getAssetCompiler().registerExtension("dds", Texture::TYPE);
@@ -1131,7 +1132,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 	bool compile(const Path& src) override
 	{
-		char ext[4] = {};
+		char ext[5] = {};
 		copyString(Span(ext), Path::getExtension(Span(src.c_str(), src.length())));
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
@@ -1156,7 +1157,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				compileImage(src, src_data, out, meta);
 			}
 		}
-		else if(equalStrings(ext, "jpg") || equalStrings(ext, "png") || (equalStrings(ext, "tga") && meta.compress)) {
+		else if(equalStrings(ext, "jpg") || equalStrings(ext, "jpeg") || equalStrings(ext, "png") || (equalStrings(ext, "tga") && meta.compress)) {
 			compileImage(src, src_data, out, meta);
 		}
 		else if (equalStrings(ext, "tga") && meta.is_normalmap) {
@@ -3837,7 +3838,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const char* shader_exts[] = {"shd", nullptr};
 		asset_compiler.addPlugin(m_shader_plugin, shader_exts);
 
-		const char* texture_exts[] = { "png", "jpg", "dds", "tga", "raw", "ltc", nullptr};
+		const char* texture_exts[] = { "png", "jpg", "jpeg", "dds", "tga", "raw", "ltc", nullptr};
 		asset_compiler.addPlugin(m_texture_plugin, texture_exts);
 
 		const char* pipeline_exts[] = {"pln", nullptr};
