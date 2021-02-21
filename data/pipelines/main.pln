@@ -8,6 +8,7 @@ local debug_shadowmap = false
 local debug_normal = false
 local debug_roughness = false
 local debug_metallic = false
+local debug_ao = false
 local debug_albedo = false
 local debug_clusters = false
 local debug_shadow_atlas = false
@@ -305,6 +306,9 @@ function debugPass(output, gb0, gb1, gb2, gb_depth, shadowmap)
 	if debug_metallic then
 		debugRenderbuffer(gb1, output, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 1}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
+	if debug_ao then
+		debugRenderbuffer(gb2, output, {0, 0, 1, 0}, {0, 0, 1, 0}, {0, 0, 1, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
+	end
 	if debug_shadow_atlas then
 		debugRenderbuffer(SHADOW_ATLAS, output, {1, 0, 0, 0}, {1, 0, 0, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 1})
 	end
@@ -494,6 +498,7 @@ function onGUI()
 		changed, debug_normal = ImGui.Checkbox("Normal", debug_normal)
 		changed, debug_roughness = ImGui.Checkbox("Roughness", debug_roughness)
 		changed, debug_metallic = ImGui.Checkbox("Metallic", debug_metallic)
+		changed, debug_ao = ImGui.Checkbox("AO", debug_ao)
 		changed, debug_clusters = ImGui.Checkbox("Clusters", debug_clusters)
 		changed, enable_icons = ImGui.Checkbox("Icons", enable_icons)
 		changed, default_state.wireframe = ImGui.Checkbox("wireframe", default_state.wireframe)
