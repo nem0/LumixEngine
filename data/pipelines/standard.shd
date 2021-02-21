@@ -85,7 +85,11 @@ vertex_shader [[
 				p = vegetationAnim(i_pos_scale.xyz, p, 0.1);
 				v_darken = a_position.y > 0.1 ? 1 : 0.0;
 			#elif defined VEGETATION
-				p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
+				#ifdef DEPTH
+					p = vegetationAnim(i_pos_scale.xyz - Pass.shadow_to_camera.xyz, p, 0.001);
+				#else
+					p = vegetationAnim(i_pos_scale.xyz, p, 0.001);
+				#endif
 			#endif
 			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
 		#elif defined SKINNED

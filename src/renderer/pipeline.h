@@ -31,6 +31,7 @@ struct PassState
 	Vec4 view_dir;
 	Vec4 camera_up;
 	Vec4 camera_planes[6];
+	Vec4 shadow_to_camera;
 };
 
 namespace UniformBuffer {

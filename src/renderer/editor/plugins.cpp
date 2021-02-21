@@ -2433,8 +2433,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		m_tile.pipeline->render(false);
 
 		Renderer::MemRef mem;
-		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NONE, mem, "tile_final");
-		renderer->downscale(m_tile.pipeline->getOutput(), AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
+		m_tile.texture = renderer->createTexture(AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_final");
+		gpu::TextureHandle tile_tmp = renderer->createTexture(AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::COMPUTE_WRITE, mem, "tile_tmp");
+		renderer->copy(tile_tmp, m_tile.pipeline->getOutput());
+		renderer->downscale(tile_tmp, AssetBrowser::TILE_SIZE * 4, AssetBrowser::TILE_SIZE * 4, m_tile.texture, AssetBrowser::TILE_SIZE, AssetBrowser::TILE_SIZE);
 
 		m_tile.data.resize(AssetBrowser::TILE_SIZE * AssetBrowser::TILE_SIZE * 4);
 		renderer->getTextureImage(m_tile.texture 
@@ -2443,6 +2445,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			, gpu::TextureFormat::RGBA8
 			, Span(m_tile.data.getMutableData(), (u32)m_tile.data.size()));
 		
+		renderer->destroy(tile_tmp);
 		m_tile.entity = mesh_entity;
 		m_tile.frame_countdown = 2;
 		m_tile.path_hash = model->getPath().getHash();

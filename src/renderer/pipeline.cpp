@@ -2259,6 +2259,9 @@ struct PipelineImpl final : Pipeline
 		cmd.pass_state.view_dir = Vec4(cp.view.inverted().transformVector(Vec3(0, 0, -1)), 0);
 		cmd.pass_state.camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
 		toPlanes(cp, Span(cmd.pass_state.camera_planes));
+		if (cp.is_shadow) {
+			cmd.pass_state.shadow_to_camera = Vec4((m_viewport.pos - cp.pos).toFloat(), 1);
+		}
 		
 		cmd.pass_state_buffer = m_pass_state_buffer;
 		m_renderer.queue(cmd, m_profiler_link);

@@ -874,6 +874,21 @@ struct RendererImpl final : Renderer
 		queue(cmd, 0);
 	}
 
+	void copy(gpu::TextureHandle dst, gpu::TextureHandle src) override {
+		struct Cmd : RenderJob {
+			void setup() override {}
+			void execute() override {
+				PROFILE_FUNCTION();
+				gpu::copy(dst, src, 0, 0);
+			}
+			gpu::TextureHandle src;
+			gpu::TextureHandle dst;
+		};
+		Cmd& cmd = createJob<Cmd>();
+		cmd.src = src;
+		cmd.dst = dst;
+		queue(cmd, 0);
+	}
 
 	void downscale(gpu::TextureHandle src, u32 src_w, u32 src_h, gpu::TextureHandle dst, u32 dst_w, u32 dst_h) override {
 		ASSERT(src_w % dst_w == 0);

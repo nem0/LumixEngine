@@ -98,6 +98,11 @@ double DVec3::length() const
 	return sqrt(x * x + y * y + z * z);
 }
 
+Vec3::Vec3(const DVec3& rhs)
+	: x((float)rhs.x)
+	, y((float)rhs.y)
+	, z((float)rhs.z)
+{}
 
 float Vec3::length() const
 {
