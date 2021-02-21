@@ -93,7 +93,7 @@ function transparentPass(entities, colorbuffer, dsbuffer, shadowmap)
 end
 
 function impostorPass(entities, colorbuffer, dsbuffer)
-	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
+	setRenderTargetsDS(colorbuffer, dsbuffer)
 
 	beginBlock("impostor_pass")
 	pass(getCameraParams())
