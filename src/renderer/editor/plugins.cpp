@@ -1143,7 +1143,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Meta meta = getMeta(src);
 		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress && !meta.is_normalmap)) {
 			if (meta.scale_coverage < 0 || !equalStrings(ext, "tga")) {
-				out.write(ext, sizeof(ext) - 1);
+				out.write(ext, 3);
 				u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
 				flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
 				flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
