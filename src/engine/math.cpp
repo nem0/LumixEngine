@@ -57,6 +57,7 @@ Quat normalize(const Quat& value) {
 	return Quat(x, y, z, w);
 }
 
+float length(const Vec2& value) { return sqrt(value.x * value.x + value.y * value.y); }
 float length(const Vec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
 double length(const DVec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
 float squaredLength(const Vec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }

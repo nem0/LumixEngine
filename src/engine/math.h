@@ -1157,6 +1157,7 @@ LUMIX_ENGINE_API float randFloat(float from, float to);
 LUMIX_ENGINE_API Vec2 normalize(const Vec2& value);
 LUMIX_ENGINE_API Vec3 normalize(const Vec3& value);
 LUMIX_ENGINE_API Quat normalize(const Quat& value);
+LUMIX_ENGINE_API float length(const Vec2& value);
 LUMIX_ENGINE_API float length(const Vec3& value);
 LUMIX_ENGINE_API double length(const DVec3& value);
 LUMIX_ENGINE_API float squaredLength(const Vec3& value);
