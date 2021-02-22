@@ -106,8 +106,8 @@ end
 function geomPass(entities)
 	beginBlock("geom_pass")
 		local gbuffer0 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "srgba", debug_name = "gbuffer0" }
-		local gbuffer1 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16", debug_name = "gbuffer1" }
-		local gbuffer2 = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba8", debug_name = "gbuffer2" }
+		local gbuffer1 = createRenderbuffer { width = viewport_w, height = viewport_h, compute_write = true, format = "rgba16", debug_name = "gbuffer1" }
+		local gbuffer2 = createRenderbuffer { width = viewport_w, height = viewport_h, compute_write = true, format = "rgba8", debug_name = "gbuffer2" }
 		local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "gbuffer_ds" }
 	
 		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
@@ -264,7 +264,7 @@ function postprocess(phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_de
 	local prev = hdr_buffer
 	if _G["postprocesses"] ~= nil then
 		for _, value in pairs(_G["postprocesses"]) do
-			prev = value(getfenv(1), phase, prev, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
+			prev = value(getfenv(1), phase, prev, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 		end
 	end
 	return prev
@@ -381,6 +381,8 @@ function main()
 
 	local shadowmap = shadowPass()
 	local gbuffer0, gbuffer1, gbuffer2, gbuffer_depth = geomPass(entities)
+
+	postprocess("pre_lightpass", nil, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 
 	if PROBE_BOUNCE == nil or PROBE_BOUNCE then
 		fillClusters(view_params)

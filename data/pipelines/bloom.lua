@@ -102,7 +102,7 @@ function tonemap(env, hdr_buffer)
 	return rb
 end
 
-function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
+function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	env.custom_tonemap = true
 	if transparent_phase == "tonemap" then return tonemap(env, hdr_buffer) end

@@ -1,4 +1,4 @@
-function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
+function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return ldr_buffer end
 	if transparent_phase ~= "post_tonemap" then return ldr_buffer end
 	local format = "rgba16f"

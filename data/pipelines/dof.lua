@@ -3,7 +3,7 @@ near_sharp = 3
 far_sharp = 50
 far_blur = 70
 
-function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
+function postprocess(env, phase, input, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return input end
 	if phase ~= "post" then return input end
 	env.beginBlock("dof")
