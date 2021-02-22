@@ -99,7 +99,8 @@ void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motio
 		const Model::Bone& bone = ctx.model->getBone(root_bone_idx);
 		if (m_flags.isSet(Flags::XZ_ROOT_MOTION)) {
 			root_motion->rot = Quat::IDENTITY;
-			root_motion->pos = bone.transform.rot.rotate(Vec3(root_motion->pos.x, 0, root_motion->pos.z));
+			root_motion->pos = bone.transform.rot.rotate(root_motion->pos);
+			root_motion->pos.y = 0;
 		}
 		else {
 			root_motion->rot = bone.transform.rot * root_motion->rot * bone.transform.rot.conjugated();
