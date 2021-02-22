@@ -475,13 +475,15 @@ struct ControllerEditorImpl : ControllerEditor {
 		OutputMemoryStream str(m_controller->m_allocator);
 		m_controller->serialize(str);
 		os::OutputFile file;
-		if (file.open(path)) {
+		FileSystem& fs = m_app.getEngine().getFileSystem();
+		if (fs.open(path, Ref(file))) {
 			if (!file.write(str.data(), str.size())) {
 				logError("Failed to write ", path);
 			}
 			file.close();
 			m_path = path;
 			m_dirty = false;
+			file.close();
 		}
 		else {
 			logError("Failed to create ", path);
