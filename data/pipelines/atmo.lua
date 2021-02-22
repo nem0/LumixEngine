@@ -76,7 +76,7 @@ function setDrawcallUniforms(env, x, y, z)
 	)
 end
 
-function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
+function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
 	if transparent_phase ~= "pre" then return hdr_buffer end
 	env.beginBlock("atmo")

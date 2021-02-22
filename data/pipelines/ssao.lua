@@ -2,9 +2,9 @@ radius = 0.2
 intensity = 1
 debug = false
 
-function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer_depth, shadowmap)
+function postprocess(env, phase, hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return hdr_buffer end
-	if transparent_phase ~= "pre" then return hdr_buffer end
+	if phase ~= "pre_lightpass" then return hdr_buffer end
 	env.beginBlock("ssao")
 	if env.ssao_shader == nil then
 		env.ssao_shader = env.preloadShader("pipelines/ssao.shd")
@@ -34,19 +34,18 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	)
 	env.blur(ssao_rb, "r8", w, h, "ssao_blur")
 	
-	-- TODO use for indirect light
-	env.setRenderTargets(hdr_buffer)
-	env.drawArray(0, 3, env.ssao_blit_shader
-		, { ssao_rb }
-		, { depth_test = false, depth_write = false, blending = "multiply" });
-		
+	env.setRenderTargets()
+
+	env.drawcallUniforms( env.viewport_w, env.viewport_h, 0, 0 )
+	env.bindTextures({ssao_rb}, 0)
+	env.bindImageTexture(gbuffer2, 1)
+	env.dispatch(env.ssao_blit_shader, (env.viewport_w + 15) / 16, (env.viewport_h + 15) / 16, 1)
+
 	env.endBlock()
 
 	if debug then
 		env.debugRenderbuffer(ssao_rb, hdr_buffer, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}, {0, 0, 0, 1})
 	end
-
-	return hdr_buffer
 end
 
 function awake()

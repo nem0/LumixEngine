@@ -1730,16 +1730,19 @@ struct PipelineImpl final : Pipeline
 		char debug_name[64] = "";
 		bool persistent = false;
 		bool point_filter = false;
+		bool compute_write = false;
 		if (!LuaWrapper::checkField(L, 1, "width", &rb_w)) luaL_argerror(L, 1, "missing width");
 		if (!LuaWrapper::checkField(L, 1, "height", &rb_h)) luaL_argerror(L, 1, "missing height");
 		if (!LuaWrapper::checkStringField(L, 1, "format", Span(format_str))) luaL_argerror(L, 1, "missing format");
 		LuaWrapper::getOptionalStringField(L, 1, "debug_name", Span(debug_name));
 		LuaWrapper::getOptionalField(L, 1, "persistent", &persistent);
 		LuaWrapper::getOptionalField(L, 1, "point_filter", &point_filter);
+		LuaWrapper::getOptionalField(L, 1, "compute_write", &compute_write);
 		gpu::TextureFlags flags = gpu::TextureFlags::RENDER_TARGET 
 			| gpu::TextureFlags::NO_MIPS
 			| gpu::TextureFlags::CLAMP_U
-			| gpu::TextureFlags::CLAMP_V;
+			| gpu::TextureFlags::CLAMP_V
+			| (compute_write ? gpu::TextureFlags::COMPUTE_WRITE : gpu::TextureFlags::NONE);
 		if (point_filter) flags = flags | gpu::TextureFlags::POINT_FILTER;
 
 		const gpu::TextureFormat format = getFormat(format_str);
