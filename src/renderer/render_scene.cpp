@@ -111,7 +111,7 @@ public:
 			auto map_iter = m_material_decal_map.find(&material);
 			EntityPtr e = map_iter.value();
 			while(e.isValid()) {
-				const float radius = m_decals[(EntityRef)e].half_extents.length();
+				const float radius = length(m_decals[(EntityRef)e].half_extents);
 				const DVec3 pos = m_universe.getPosition((EntityRef)e);
 				m_culling_system->add((EntityRef)e, (u8)RenderableTypes::DECAL, pos, radius);
 				e = m_decals[(EntityRef)e].next_decal;
@@ -240,8 +240,7 @@ public:
 		Vec4 p1 = inv_projection * Vec4(nx, ny, 1, 1);
 		p0 *= 1 / p0.w;
 		p1 *= 1 / p1.w;
-		dir = (p1 - p0).xyz();
-		dir.normalize();
+		dir = normalize((p1 - p0).xyz());
 		dir = view.rot * dir;
 	}
 
@@ -407,7 +406,7 @@ public:
 		inv_parent_transform = inv_parent_transform.inverted();
 		const Transform child_transform = m_universe.getTransform(attachment.entity);
 		const Transform res = inv_parent_transform * child_transform;
-		attachment.relative_transform = {res.pos.toFloat(), res.rot};
+		attachment.relative_transform = {Vec3(res.pos), res.rot};
 		unlockPose(model_instance, false);
 	}
 
@@ -1270,7 +1269,7 @@ public:
 		Decal& decal = m_decals[entity];
 		decal.half_extents = value;
 		if (decal.material && decal.material->isReady()) {
-			m_culling_system->setRadius(entity, value.length());
+			m_culling_system->setRadius(entity, length(value));
 		}
 		updateDecalInfo(decal);
 	}
@@ -1302,7 +1301,7 @@ public:
 			addToMaterialDecalMap(decal.material, entity);
 
 			if (decal.material->isReady()) {
-				const float radius = m_decals[entity].half_extents.length();
+				const float radius = length(m_decals[entity].half_extents);
 				const DVec3 pos = m_universe.getPosition(entity);
 				m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, radius);
 			}
@@ -2007,11 +2006,11 @@ public:
 			const DVec3& pos = universe.getPosition(entity);
 			float scale = universe.getScale(entity);
 			float radius = r.model->getOriginBoundingRadius() * scale;
-			const double dist = (pos - origin).length();
+			const double dist = squaredLength(pos - origin);
 			if (dist - radius > cur_dist) continue;
 			
 			float intersection_t;
-			Vec3 rel_pos = (origin - pos).toFloat();
+			Vec3 rel_pos = Vec3(origin - pos);
 			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, Ref(intersection_t)) && intersection_t >= 0) {
 				Vec3 aabb_hit;
 				const Quat rot = universe.getRotation(entity).conjugated();
@@ -2026,7 +2025,7 @@ public:
 						hit = new_hit;
 						hit.t *= scale;
 						hit.is_hit = true;
-						cur_dist = dir.length() * hit.t;
+						cur_dist = length(dir) * hit.t;
 					}
 				}
 			}
@@ -2366,7 +2365,7 @@ public:
 		Environment light;
 		light.flags.set(Environment::CAST_SHADOWS);
 		light.entity = entity;
-		light.light_color.set(1, 1, 1);
+		light.light_color = Vec3(1, 1, 1);
 		light.direct_intensity = 1;
 		light.indirect_intensity = 1;
 		light.cascades.set(3, 8, 20, 60);
@@ -2382,7 +2381,7 @@ public:
 	{
 		PointLight light;
 		light.entity = entity;
-		light.color.set(1, 1, 1);
+		light.color = Vec3(1, 1, 1);
 		light.intensity = 1;
 		light.fov = degreesToRadians(360);
 		light.flags.base = 0;
@@ -2399,7 +2398,7 @@ public:
 
 	void updateDecalInfo(Decal& decal) const
 	{
-		decal.radius = decal.half_extents.length();
+		decal.radius = length(decal.half_extents);
 		decal.transform = m_universe.getTransform(decal.entity);
 	}
 
@@ -2410,7 +2409,7 @@ public:
 		Decal& decal = m_decals[entity];
 		decal.material = nullptr;
 		decal.entity = entity;
-		decal.half_extents.set(1, 1, 1);
+		decal.half_extents = Vec3(1, 1, 1);
 		decal.uv_scale = Vec2(1);
 		updateDecalInfo(decal);
 

@@ -132,11 +132,6 @@ struct LUMIX_ENGINE_API Vec2
 	Vec2 operator -(float f) const { return Vec2(x - f, y - f); }
 	Vec2 operator -() const { return Vec2(-x, -y); }
 
-	void normalize();
-	Vec2 normalized() const;
-	float length() const;
-	float squaredLength() const;
-
 	float x, y;
 
 	static const Vec2 MAX;
@@ -145,55 +140,39 @@ struct LUMIX_ENGINE_API Vec2
 };
 
 
-struct LUMIX_ENGINE_API Vec3
-{
+struct LUMIX_ENGINE_API Vec3 {
 	Vec3() {}
 
 	Vec3(const Vec2& v, float c)
 		: x(v.x)
 		, y(v.y)
-		, z(c)
-	{}
+		, z(c) {}
 
 	explicit Vec3(float a)
 		: x(a)
 		, y(a)
-		, z(a)
-	{
-	}
+		, z(a) {}
 
 	Vec3(float a, float b, float c)
 		: x(a)
 		, y(b)
-		, z(c)
-	{
-	}
+		, z(c) {}
 
-	explicit inline Vec3(const DVec3& rhs);
+	explicit Vec3(const DVec3& rhs);
 
-	template<typename L>
-	float& operator[](L i)
-	{
+	template <typename L> float& operator[](L i) {
 		ASSERT(i >= 0 && i < 3);
 		return (&x)[i];
 	}
 
-	template<typename L>
-	float operator[](L i) const
-	{
+	template <typename L> float operator[](L i) const {
 		ASSERT(i >= 0 && i < 3);
 		return (&x)[i];
 	}
 
-	bool operator==(const Vec3& rhs) const
-	{
-		return x == rhs.x && y == rhs.y && z == rhs.z;
-	}
+	bool operator==(const Vec3& rhs) const { return x == rhs.x && y == rhs.y && z == rhs.z; }
 
-	bool operator!=(const Vec3& rhs) const
-	{
-		return x != rhs.x || y != rhs.y || z != rhs.z;
-	}
+	bool operator!=(const Vec3& rhs) const { return x != rhs.x || y != rhs.y || z != rhs.z; }
 
 	Vec3 operator+(const Vec3& rhs) const { return Vec3(x + rhs.x, y + rhs.y, z + rhs.z); }
 
@@ -201,8 +180,7 @@ struct LUMIX_ENGINE_API Vec3
 
 	Vec3 operator-(const Vec3& rhs) const { return Vec3(x - rhs.x, y - rhs.y, z - rhs.z); }
 
-	void operator+=(const Vec3& rhs)
-	{
+	void operator+=(const Vec3& rhs) {
 		float x = this->x;
 		float y = this->y;
 		float z = this->z;
@@ -214,8 +192,7 @@ struct LUMIX_ENGINE_API Vec3
 		this->z = z;
 	}
 
-	void operator-=(const Vec3& rhs)
-	{
+	void operator-=(const Vec3& rhs) {
 		float x = this->x;
 		float y = this->y;
 		float z = this->z;
@@ -232,19 +209,14 @@ struct LUMIX_ENGINE_API Vec3
 	Vec3 operator*(const IVec3& rhs) const { return Vec3(x * rhs.x, y * rhs.y, z * rhs.z); }
 	Vec3 operator/(const IVec3& rhs) const { return Vec3(x / rhs.x, y / rhs.y, z / rhs.z); }
 
-	Vec3 operator/(float s) const
-	{
+	Vec3 operator/(float s) const {
 		float tmp = 1 / s;
 		return Vec3(x * tmp, y * tmp, z * tmp);
-	}	
-	
-	void operator/=(float rhs)
-	{
-		*this *= 1.0f / rhs;
 	}
 
-	void operator*=(float rhs)
-	{
+	void operator/=(float rhs) { *this *= 1.0f / rhs; }
+
+	void operator*=(float rhs) {
 		float x = this->x;
 		float y = this->y;
 		float z = this->z;
@@ -256,27 +228,15 @@ struct LUMIX_ENGINE_API Vec3
 		this->z = z;
 	}
 
-	Vec3 normalized() const;
-
-	void normalize();
-
-	void set(float x, float y, float z)
-	{
-		this->x = x;
-		this->y = y;
-		this->z = z;
-	}
-
-	float length() const;
-
-	float squaredLength() const { return x * x + y * y + z * z; }
-	
 	Vec2 xz() const { return {x, z}; }
 
-	union
-	{
-		struct { float x, y, z; };
-		struct { float r, g, b; };
+	union {
+		struct {
+			float x, y, z;
+		};
+		struct {
+			float r, g, b;
+		};
 	};
 
 	static const Vec3 MAX;
@@ -301,14 +261,11 @@ struct LUMIX_ENGINE_API DVec3
 	DVec3 operator+(const DVec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
 	DVec3 operator-(const Vec3& rhs) const { return {x - rhs.x, y - rhs.y, z - rhs.z }; }
 	DVec3 operator+(const Vec3& rhs) const { return {x + rhs.x, y + rhs.y, z + rhs.z }; }
-	double length() const;
-	double squaredLength() const { return x * x + y * y + z * z; }
 	void operator*=(const double& rhs) { x *= rhs; y *= rhs; z *= rhs; }
 	void operator/=(const double& rhs) { x /= rhs; y /= rhs; z /= rhs; }
 	void operator+=(const DVec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
-	Vec3 toFloat() const { return {(float)x, (float)y, (float)z}; }
 
 	double x, y, z;
 };
@@ -485,9 +442,6 @@ struct LUMIX_ENGINE_API Vec4
 		this->w = w;
 	}
 
-	void normalize();
-	Vec4 normalized() const;
-
 	void set(const Vec3& v, float w)
 	{
 		this->x = v.x;
@@ -510,17 +464,6 @@ struct LUMIX_ENGINE_API Vec4
 		y = rhs.y;
 		z = rhs.z;
 		w = rhs.w;
-	}
-
-	float length() const;
-
-	float squaredLength() const
-	{
-		float x = this->x;
-		float y = this->y;
-		float z = this->z;
-		float w = this->w;
-		return x * x + y * y + z * z + w * w;
 	}
 
 	union
@@ -547,9 +490,33 @@ inline Vec4 operator*(const Vec4& v, float s)
 }
 
 
-inline float dotProduct(const Vec4& op1, const Vec4& op2)
+inline float dot(const Vec4& op1, const Vec4& op2)
 {
 	return op1.x * op2.x + op1.y * op2.y + op1.z * op2.z + op1.w * op2.w;
+}
+
+
+inline float dot(const Vec3& op1, const Vec3& op2)
+{
+	return op1.x * op2.x + op1.y * op2.y + op1.z * op2.z;
+}
+
+
+inline float dot(const Vec2& op1, const Vec2& op2)
+{
+	return op1.x * op2.x + op1.y * op2.y;
+}
+
+
+inline Vec3 cross(const Vec3& op1, const Vec3& op2)
+{
+	return Vec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
+}
+
+
+inline DVec3 cross(const DVec3& op1, const DVec3& op2)
+{
+	return DVec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
 }
 
 
@@ -560,30 +527,6 @@ inline void lerp(const Vec4& op1, const Vec4& op2, Vec4* out, float t)
 	out->y = op1.y * invt + op2.y * t;
 	out->z = op1.z * invt + op2.z * t;
 	out->w = op1.w * invt + op2.w * t;
-}
-
-
-inline float dotProduct(const Vec3& op1, const Vec3& op2)
-{
-	return op1.x * op2.x + op1.y * op2.y + op1.z * op2.z;
-}
-
-
-inline float dotProduct(const Vec2& op1, const Vec2& op2)
-{
-	return op1.x * op2.x + op1.y * op2.y;
-}
-
-
-inline Vec3 crossProduct(const Vec3& op1, const Vec3& op2)
-{
-	return Vec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
-}
-
-
-inline DVec3 crossProduct(const DVec3& op1, const DVec3& op2)
-{
-	return DVec3(op1.y * op2.z - op1.z * op2.y, op1.z * op2.x - op1.x * op2.z, op1.x * op2.y - op1.y * op2.x);
 }
 
 
@@ -635,8 +578,6 @@ struct LUMIX_ENGINE_API Quat
 	void set(float _x, float _y, float _z, float _w) { x = _x; y = _y; z = _z; w = _w; } 
 	void conjugate();
 	Quat conjugated() const;
-	void normalize();
-	Quat normalized() const;
 	Matrix toMatrix() const;
 
 	Vec3 rotate(const Vec3& v) const
@@ -644,8 +585,8 @@ struct LUMIX_ENGINE_API Quat
 		// nVidia SDK implementation
 
 		Vec3 qvec(x, y, z);
-		Vec3 uv = crossProduct(qvec, v);
-		Vec3 uuv = crossProduct(qvec, uv);
+		Vec3 uv = cross(qvec, v);
+		Vec3 uuv = cross(qvec, uv);
 		uv *= (2.0f * w);
 		uuv *= 2.0f;
 
@@ -657,8 +598,8 @@ struct LUMIX_ENGINE_API Quat
 		// nVidia SDK implementation
 
 		const DVec3 qvec(x, y, z);
-		DVec3 uv = crossProduct(qvec, v);
-		DVec3 uuv = crossProduct(qvec, uv);
+		DVec3 uv = cross(qvec, v);
+		DVec3 uuv = cross(qvec, uv);
 		uv *= (2.0 * w);
 		uuv *= 2.0;
 
@@ -965,20 +906,7 @@ struct alignas(16) LUMIX_ENGINE_API Matrix
 	void fromEuler(float yaw, float pitch, float roll);
 
 
-	void lookAt(const Vec3& eye, const Vec3& at, const Vec3& up)
-	{
-		*this = Matrix::IDENTITY;
-		Vec3 f = eye - at;
-		f.normalize();
-		Vec3 r = crossProduct(up, f);
-		r.normalize();
-		Vec3 u = crossProduct(f, r);
-		setXVector(r);
-		setYVector(u);
-		setZVector(f);
-		transpose();
-		setTranslation(Vec3(-dotProduct(r, eye), -dotProduct(u, eye), -dotProduct(f, eye)));
-	}
+	void lookAt(const Vec3& eye, const Vec3& at, const Vec3& up);
 
 
 	void normalizeScale();
@@ -1226,6 +1154,12 @@ LUMIX_ENGINE_API u32 rand(u32 from, u32 to);
 LUMIX_ENGINE_API void seedRandom(u32 seed);
 LUMIX_ENGINE_API float randFloat();
 LUMIX_ENGINE_API float randFloat(float from, float to);
-
+LUMIX_ENGINE_API Vec2 normalize(const Vec2& value);
+LUMIX_ENGINE_API Vec3 normalize(const Vec3& value);
+LUMIX_ENGINE_API Quat normalize(const Quat& value);
+LUMIX_ENGINE_API float length(const Vec3& value);
+LUMIX_ENGINE_API double length(const DVec3& value);
+LUMIX_ENGINE_API float squaredLength(const Vec3& value);
+LUMIX_ENGINE_API double squaredLength(const DVec3& value);
 
 } // namespace Lumix

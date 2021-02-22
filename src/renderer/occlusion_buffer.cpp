@@ -46,7 +46,7 @@ Vec3 OcclusionBuffer::transform(const Transform& world_transform, float x, float
 {
 	Vec3 tmp = world_transform.scale * Vec3(x, y, z);
 	tmp = world_transform.rot.rotate(tmp);
-	tmp += (world_transform.pos - m_camera_pos).toFloat();
+	tmp += Vec3(world_transform.pos - m_camera_pos);
 	return m_view_projection_matrix.transformPoint(tmp);
 }
 
@@ -149,7 +149,7 @@ void OcclusionBuffer::buildHierarchy()
 
 LUMIX_FORCE_INLINE void rasterizeProjectedTriangle(Vec3(&v)[3], int* depth)
 {
-	Vec3 n = crossProduct(v[1] - v[0], v[2] - v[0]);
+	Vec3 n = cross(v[1] - v[0], v[2] - v[0]);
 	bool is_backface = n.z <= 0;
 	if (is_backface) return;
 
@@ -267,9 +267,9 @@ static void clipTriangles(const Vec4& plane, Vec4* vertices, bool* triangles, in
 	{
 		if (!triangles[i]) continue;
 		int index = i * 3;
-		float d[3] = { dotProduct(plane, vertices[index])
-			, dotProduct(plane, vertices[index + 1])
-			, dotProduct(plane, vertices[index + 2])
+		float d[3] = { dot(plane, vertices[index])
+			, dot(plane, vertices[index + 1])
+			, dot(plane, vertices[index + 2])
 		};
 		
 		bool all_behind = d[0] < 0.0f && d[1] < 0.0f && d[2] < 0.0f;

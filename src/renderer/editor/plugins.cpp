@@ -147,12 +147,12 @@ struct SphericalHarmonics {
 		Vec3 dir(0.f);
 
 		switch(s) {
-			case 0: return Vec3(1.f, v, -u).normalized();
-			case 1: return Vec3(-1.f, v, u).normalized();
-			case 2: return Vec3(u, 1.f, -v).normalized();
-			case 3: return Vec3(u, -1.f, v).normalized();
-			case 4: return Vec3(u, v, 1.f).normalized();
-			case 5: return Vec3(-u, v, -1.f).normalized();
+			case 0: return normalize(Vec3(1.f, v, -u));
+			case 1: return normalize(Vec3(-1.f, v, u));
+			case 2: return normalize(Vec3(u, 1.f, -v));
+			case 3: return normalize(Vec3(u, -1.f, v));
+			case 4: return normalize(Vec3(u, v, 1.f));
+			case 5: return normalize(Vec3(-u, v, -1.f));
 		}
 
 		return dir;
@@ -1760,11 +1760,11 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			AABB aabb = model.getAABB();
 
 			const Vec3 center = (aabb.max + aabb.min) * 0.5f;
-			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length();
+			m_viewport.pos = DVec3(0) + center + Vec3(1, 1, 1) * length(aabb.max - aabb.min);
 			
 			Matrix mtx;
 			Vec3 eye = center + Vec3(model.getCenterBoundingRadius() * 2);
-			mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
+			mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
 			mtx = mtx.inverted();
 
 			m_viewport.rot = mtx.getRotation();
@@ -1833,20 +1833,18 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				float yaw = -signum(delta.x) * (powf(fabsf((float)delta.x / MOUSE_SENSITIVITY.x), 1.2f));
 				Quat yaw_rot(Vec3(0, 1, 0), yaw);
-				rot = yaw_rot * rot;
-				rot.normalize();
+				rot = normalize(yaw_rot * rot);
 
 				Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 				float pitch =
 					-signum(delta.y) * (powf(fabsf((float)delta.y / MOUSE_SENSITIVITY.y), 1.2f));
 				Quat pitch_rot(pitch_axis, pitch);
-				rot = pitch_rot * rot;
-				rot.normalize();
+				rot = normalize(pitch_rot * rot);
 
 				Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 				Vec3 origin = (model.getAABB().max + model.getAABB().min) * 0.5f;
 
-				float dist = (origin - pos.toFloat()).length();
+				float dist = length(origin - Vec3(pos));
 				pos = DVec3(0) + origin + dir * dist;
 
 				m_viewport.rot = rot;
@@ -2358,7 +2356,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		for (EntityPtr e = universe.getFirstEntity(); e.isValid(); e = universe.getNextEntity((EntityRef)e)) {
 			EntityRef ent = (EntityRef)e;
 			const DVec3 pos = universe.getPosition(ent);
-			aabb.addPoint(pos.toFloat());
+			aabb.addPoint(Vec3(pos));
 			if (universe.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
 				RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
 				Model* model = scene->getModelInstanceModel(ent);
@@ -2367,7 +2365,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					DVec3 points[8];
 					model->getAABB().getCorners(tr, points);
 					for (const DVec3& p : points) {
-						aabb.addPoint(p.toFloat());
+						aabb.addPoint(Vec3(p));
 					}
 					radius = maximum(radius, model->getCenterBoundingRadius());
 				}
@@ -2375,9 +2373,9 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
-		Vec3 eye = center + Vec3(1, 1, 1) * (aabb.max - aabb.min).length() / SQRT2;
+		Vec3 eye = center + Vec3(1, 1, 1) * length(aabb.max - aabb.min) / SQRT2;
 		Matrix mtx;
-		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
+		mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
 		Viewport viewport;
 		viewport.is_ortho = true;
 		viewport.ortho_size = radius * 1.1f;
@@ -2438,7 +2436,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Matrix mtx;
 		Vec3 center = (aabb.max + aabb.min) * 0.5f;
 		Vec3 eye = center + Vec3(radius * 2);
-		mtx.lookAt(eye, center, Vec3(1, -1, 1).normalized());
+		mtx.lookAt(eye, center, normalize(Vec3(1, -1, 1)));
 		mtx = mtx.inverted();
 
 		Viewport viewport;
@@ -2722,7 +2720,7 @@ void captureCubemap(StudioApp& app
 
 	const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 	for (int i = 0; i < 6; ++i) {
-		Vec3 side = crossProduct(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
+		Vec3 side = cross(ndc_bottom_left ? ups_opengl[i] : ups[i], dirs[i]);
 		Matrix mtx = Matrix::IDENTITY;
 		mtx.setZVector(dirs[i]);
 		mtx.setYVector(ndc_bottom_left ? ups_opengl[i] : ups[i]);
@@ -3308,7 +3306,7 @@ struct RenderInterfaceImpl final : RenderInterface
 			return aabb;
 		}
 
-		Vec3 pos = (universe.getPosition(entity) - base).toFloat();
+		Vec3 pos = Vec3(universe.getPosition(entity) - base);
 		aabb.set(pos, pos);
 
 		return aabb;

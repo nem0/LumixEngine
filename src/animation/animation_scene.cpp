@@ -696,7 +696,7 @@ struct AnimationSceneImpl final : AnimationScene
 			transforms[i] = parent_tr * tr;
 			old_pos[i] = transforms[i].pos;
 			if (i > 0) {
-				len[i - 1] = (transforms[i].pos - transforms[i - 1].pos).length();
+				len[i - 1] = length(transforms[i].pos - transforms[i - 1].pos);
 				len_sum += len[i - 1];
 			}
 			parent_tr = transforms[i];
@@ -704,8 +704,8 @@ struct AnimationSceneImpl final : AnimationScene
 
 		Vec3 target = ik.target;
 		Vec3 to_target = target - transforms[0].pos;
-		if (len_sum * len_sum < to_target.squaredLength()) {
-			to_target.normalize();
+		if (len_sum * len_sum < squaredLength(to_target)) {
+			to_target = normalize(to_target);
 			target = transforms[0].pos + to_target * len_sum;
 		}
 
@@ -713,12 +713,12 @@ struct AnimationSceneImpl final : AnimationScene
 			transforms[res_ik.bones_count - 1].pos = target;
 			
 			for (int i = res_ik.bones_count - 1; i > 1; --i) {
-				Vec3 dir = (transforms[i - 1].pos - transforms[i].pos).normalized();
+				Vec3 dir = normalize((transforms[i - 1].pos - transforms[i].pos));
 				transforms[i - 1].pos = transforms[i].pos + dir * len[i - 1];
 			}
 
 			for (int i = 1; i < res_ik.bones_count; ++i) {
-				Vec3 dir = (transforms[i].pos - transforms[i - 1].pos).normalized();
+				Vec3 dir = normalize((transforms[i].pos - transforms[i - 1].pos));
 				transforms[i].pos = transforms[i - 1].pos + dir * len[i - 1];
 			}
 		}

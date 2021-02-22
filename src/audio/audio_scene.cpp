@@ -411,7 +411,7 @@ struct AudioSceneImpl final : AudioScene
 				sound.clip = clip;
 
 				for (const EchoZone& zone : m_echo_zones) {
-					const double dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
+					const double dist2 = squaredLength(pos - m_universe.getPosition(zone.entity));
 					const double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
 
@@ -421,7 +421,7 @@ struct AudioSceneImpl final : AudioScene
 				}
 
 				for (const ChorusZone& zone : m_chorus_zones) {
-					const double dist2 = (pos - m_universe.getPosition(zone.entity)).squaredLength();
+					const double dist2 = squaredLength(pos - m_universe.getPosition(zone.entity));
 					double r2 = zone.radius * zone.radius;
 					if (dist2 > r2) continue;
 

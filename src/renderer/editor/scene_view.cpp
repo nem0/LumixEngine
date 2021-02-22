@@ -233,7 +233,7 @@ struct UniverseViewImpl final : UniverseView {
 		const DVec3 snap_pos = getClosestVertex(hit);
 
 		const Transform tr = m_editor.getUniverse()->getTransform(selected_entities[0]);
-		m_scene_view.m_app.getGizmoConfig().setOffset(tr.rot.conjugated() * (snap_pos - tr.pos).toFloat());
+		m_scene_view.m_app.getGizmoConfig().setOffset(tr.rot.conjugated() * Vec3(snap_pos - tr.pos));
 	}
 
 
@@ -243,7 +243,7 @@ struct UniverseViewImpl final : UniverseView {
 		const DVec3& wpos = hit.origin + hit.t * hit.dir;
 		Universe& universe = m_scene->getUniverse();
 		const Transform tr = universe.getTransform(entity);
-		const Vec3 lpos = tr.rot.conjugated() * (wpos - tr.pos).toFloat();
+		const Vec3 lpos = tr.rot.conjugated() * Vec3(wpos - tr.pos);
 		if (!universe.hasComponent(entity, MODEL_INSTANCE_TYPE)) return wpos;
 
 		Model* model = m_scene->getModelInstanceModel(entity);
@@ -251,7 +251,7 @@ struct UniverseViewImpl final : UniverseView {
 		float min_dist_squared = FLT_MAX;
 		Vec3 closest_vertex = lpos;
 		auto processVertex = [&](const Vec3& vertex) {
-			float dist_squared = (vertex - lpos).squaredLength();
+			float dist_squared = squaredLength(vertex - lpos);
 			if (dist_squared < min_dist_squared)
 			{
 				min_dist_squared = dist_squared;
@@ -389,7 +389,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_go_to_parameters.m_from = m_viewport.pos;
 		const Vec3 dir = m_viewport.rot.rotate(Vec3(0, 0, 1));
 		m_go_to_parameters.m_to = universe->getPosition(m_editor.getSelectedEntities()[0]) + dir * 10;
-		const double len = (m_go_to_parameters.m_to - m_go_to_parameters.m_from).length();
+		const double len = length(m_go_to_parameters.m_to - m_go_to_parameters.m_from);
 		m_go_to_parameters.m_speed = maximum(100.0f / (len > 0 ? float(len) : 1), 2.0f);
 		m_go_to_parameters.m_from_rot = m_go_to_parameters.m_to_rot = m_viewport.rot;
 
@@ -459,19 +459,17 @@ struct UniverseViewImpl final : UniverseView {
 		const Quat old_rot = rot;
 
 		Quat yaw_rot(Vec3(0, 1, 0), yaw);
-		rot = yaw_rot * rot;
-		rot.normalize();
+		rot = normalize(yaw_rot * rot);
 
 		Vec3 pitch_axis = rot.rotate(Vec3(1, 0, 0));
 		const Quat pitch_rot(pitch_axis, pitch);
-		rot = pitch_rot * rot;
-		rot.normalize();
+		rot = normalize(pitch_rot * rot);
 
 		if (m_scene_view.m_orbit_action.isActive() && !m_editor.getSelectedEntities().empty())
 		{
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
 			const DVec3 entity_pos = universe->getPosition(m_editor.getSelectedEntities()[0]);
-			const float dist = float((entity_pos - pos).length());
+			const float dist = float(length(entity_pos - pos));
 			pos = entity_pos + dir * dist;
 		}
 
@@ -719,7 +717,7 @@ void SceneView::manipulate() {
 			for (u32 i = 0, c = selected->size(); i < c; ++i) {
 				const Transform t = new_pivot_tr * old_pivot_tr.inverted() * universe.getTransform((*selected)[i]);
 				poss[i] = t.pos;
-				rots[i] = t.rot.normalized();
+				rots[i] = normalize(t.rot);
 			}
 			m_editor.setEntitiesPositionsAndRotations(selected->begin(), poss.begin(), rots.begin(), rots.size());
 
@@ -1213,7 +1211,7 @@ void SceneView::onToolbar()
 
 	if (m_is_measure_active) {
 		ImGui::SameLine(0, 20);
-		const double d = (m_measure_to - m_measure_from).length();
+		const double d = length(m_measure_to - m_measure_from);
 		ImGui::Text(" | Measured distance: %f", d);
 	}
 

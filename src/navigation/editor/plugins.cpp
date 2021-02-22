@@ -40,7 +40,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 				Vec3 pos = *(Vec3*)agent->npos;
 				Vec3 corner = *(Vec3*)agent->targetPos;
 
-				ImGui::LabelText("Target distance", "%f", (pos - corner).length());
+				ImGui::LabelText("Target distance", "%f", length(pos - corner));
 			}
 
 			static const char* STATES[] = { "Invalid", "Walking", "Offmesh" };
