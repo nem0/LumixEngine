@@ -116,7 +116,7 @@ void renderCube(UniverseView& view, u32 color, const Vec3& pos, float scale, con
 
 float getScale(const Viewport& viewport, const DVec3& pos, float base_scale) {
 	if (viewport.is_ortho) return 2;
-	float scale = tanf(viewport.fov * 0.5f) * (pos - viewport.pos).toFloat().length() * 2;
+	float scale = tanf(viewport.fov * 0.5f) * (float)length(pos - viewport.pos) * 2;
 	return base_scale * scale / 10;
 }
 
@@ -138,10 +138,10 @@ T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
 		gizmo.z = tr->rot.rotate(Vec3(0, 0, scale));
 	}
 
-	const Vec3 cam_dir = (tr->pos - view.getViewport().pos).toFloat().normalized();
-	if (dotProduct(cam_dir, gizmo.x) > 0) gizmo.x = -gizmo.x;
-	if (dotProduct(cam_dir, gizmo.y) > 0) gizmo.y = -gizmo.y;
-	if (dotProduct(cam_dir, gizmo.z) > 0) gizmo.z = -gizmo.z;
+	const Vec3 cam_dir = normalize(Vec3(tr->pos - view.getViewport().pos));
+	if (dot(cam_dir, gizmo.x) > 0) gizmo.x = -gizmo.x;
+	if (dot(cam_dir, gizmo.y) > 0) gizmo.y = -gizmo.y;
+	if (dot(cam_dir, gizmo.z) > 0) gizmo.z = -gizmo.z;
 
 	return gizmo;
 }
@@ -150,12 +150,12 @@ Axis collide(const ScaleGizmo& gizmo, const UniverseView& view, const Gizmo::Con
 	const Viewport vp = view.getViewport();
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 
-	const Vec3 pos = (gizmo.pos - vp.pos).toFloat();
+	const Vec3 pos(gizmo.pos - vp.pos);
 	DVec3 origin;
 	Vec3 dir;
 	const Vec2 mp = view.getMousePos();
 	vp.getRay(mp, origin, dir);
-	const Vec3 rel_origin = (origin - vp.pos).toFloat();
+	const Vec3 rel_origin = Vec3(origin - vp.pos);
 	const float x_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.x);
 	const float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.y);
 	const float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + gizmo.z);
@@ -169,7 +169,7 @@ Axis collide(const ScaleGizmo& gizmo, const UniverseView& view, const Gizmo::Con
 
 Axis collide(const RotationGizmo& gizmo, const UniverseView& view, const Gizmo::Config& cfg) { 
 	const Viewport vp = view.getViewport();
-	const Vec3 pos = (gizmo.pos - vp.pos).toFloat();
+	const Vec3 pos(gizmo.pos - vp.pos);
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
 
 	DVec3 origin;
@@ -177,29 +177,29 @@ Axis collide(const RotationGizmo& gizmo, const UniverseView& view, const Gizmo::
 	const Viewport viewport = view.getViewport();
 	const Vec2 mp = view.getMousePos();
 	viewport.getRay(mp, origin, dir);
-	const Vec3 rel_origin = (origin - vp.pos).toFloat();
+	const Vec3 rel_origin(origin - vp.pos);
 
 	float t;
 	float mint = FLT_MAX;
 	float d = FLT_MAX;
 	Axis axis = Axis::NONE;
-	if (getRayPlaneIntersecion(rel_origin, dir, pos, gizmo.x.normalized(), t) && t > 0) {
+	if (getRayPlaneIntersecion(rel_origin, dir, pos, normalize(gizmo.x), t) && t > 0) {
 		const Vec3 p = rel_origin + dir * t;
 		mint = t;
-		d = (p - pos).length();
+		d = length(p - pos);
 		axis = Axis::X;
 	}
 
-	if (getRayPlaneIntersecion(rel_origin, dir, pos, gizmo.y.normalized(), t) && t < mint && t > 0) {
+	if (getRayPlaneIntersecion(rel_origin, dir, pos, normalize(gizmo.y), t) && t < mint && t > 0) {
 		const Vec3 p = rel_origin + dir * t;
-		d = (p - pos).length();
+		d = length(p - pos);
 		mint = t;
 		axis = Axis::Y;
 	}
 
-	if (getRayPlaneIntersecion(rel_origin, dir, pos, gizmo.z.normalized(), t) && t < mint && t > 0) {
+	if (getRayPlaneIntersecion(rel_origin, dir, pos, normalize(gizmo.z), t) && t < mint && t > 0) {
 		const Vec3 p = rel_origin + dir * t;
-		d = (p - pos).length();
+		d = length(p - pos);
 		axis = Axis::Z;
 	}
 
@@ -214,9 +214,9 @@ Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const UniverseV
 	const Vec2 mp = view.getMousePos();
 	viewport.getRay(mp, origin, dir);
 
-	const Vec3 rel_origin = (origin - viewport.pos).toFloat();
+	const Vec3 rel_origin(origin - viewport.pos);
 	float t, tmin = FLT_MAX;
-	const Vec3 pos = (gizmo.pos - viewport.pos).toFloat();
+	const Vec3 pos(gizmo.pos - viewport.pos);
 	bool hit = getRayTriangleIntersection(rel_origin, dir, pos, pos + gizmo.x * 0.5f, pos + gizmo.y * 0.5f, &t);
 	Axis transform_axis = Axis::NONE;
 	if (hit) {
@@ -234,7 +234,7 @@ Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const UniverseV
 	if (transform_axis != Axis::NONE) return transform_axis;
 
 	const bool is_global = cfg.coord_system == Gizmo::Config::CoordSystem::GLOBAL;
-	const float scale = gizmo.x.length();
+	const float scale = length(gizmo.x);
 	const Vec3 x = is_global ? gizmo.x : tr.rot.rotate(Vec3(scale, 0, 0));
 	const Vec3 y = is_global ? gizmo.y : tr.rot.rotate(Vec3(0, scale, 0));
 	const Vec3 z = is_global ? gizmo.z : tr.rot.rotate(Vec3(0, 0, scale));
@@ -242,7 +242,7 @@ Axis collide(const TranslationGizmo& gizmo, const Transform& tr, const UniverseV
 	const float y_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + y);
 	const float z_dist = getLineSegmentDistance(rel_origin, dir, pos, pos + z);
 
-	const float influenced_dist = gizmo.x.length() * INFLUENCE_DISTANCE;
+	const float influenced_dist = length(gizmo.x) * INFLUENCE_DISTANCE;
 	if (x_dist < y_dist && x_dist < z_dist && x_dist < influenced_dist) return Axis::X;
 	if (y_dist < z_dist && y_dist < influenced_dist) return Axis::Y;
 	return z_dist < influenced_dist ? Axis::Z : Axis::NONE;
@@ -259,13 +259,13 @@ DVec3 getMousePlaneIntersection(const UniverseView& view, const Gizmo& gizmo, Ax
 	if (is_two_axed) {
 		Vec3 plane_normal;
 		switch (transform_axis) {
-			case Axis::XZ: plane_normal = gizmo.y.normalized(); break;
-			case Axis::XY: plane_normal = gizmo.z.normalized(); break;
-			case Axis::YZ: plane_normal = gizmo.x.normalized(); break;
+			case Axis::XZ: plane_normal = normalize(gizmo.y); break;
+			case Axis::XY: plane_normal = normalize(gizmo.z); break;
+			case Axis::YZ: plane_normal = normalize(gizmo.x); break;
 			default: ASSERT(false); break;
 		}
 		float t;
-		const Vec3 rel_origin = (origin - gizmo.pos).toFloat();
+		const Vec3 rel_origin = Vec3(origin - gizmo.pos);
 		if (getRayPlaneIntersecion(rel_origin, dir, Vec3(0), plane_normal, t)) {
 			return origin + dir * t;
 		}
@@ -274,22 +274,22 @@ DVec3 getMousePlaneIntersection(const UniverseView& view, const Gizmo& gizmo, Ax
 
 	Vec3 axis;
 	switch (transform_axis) {
-		case Axis::X: axis = gizmo.x.normalized(); break;
-		case Axis::Y: axis = gizmo.y.normalized(); break;
-		case Axis::Z: axis = gizmo.z.normalized(); break;
+		case Axis::X: axis = normalize(gizmo.x); break;
+		case Axis::Y: axis = normalize(gizmo.y); break;
+		case Axis::Z: axis = normalize(gizmo.z); break;
 		default: ASSERT(false); return DVec3(0);
 	}
-	const Vec3 normal = crossProduct(crossProduct(dir, axis), dir);
-	const float d = dotProduct((origin - gizmo.pos).toFloat(), normal) / dotProduct(axis, normal);
+	const Vec3 normal = cross(cross(dir, axis), dir);
+	const float d = dot(Vec3(origin - gizmo.pos), normal) / dot(axis, normal);
 	return gizmo.pos + axis * d;
 }
 
 void draw(UniverseView& view, const TranslationGizmo& gizmo, const Transform& tr, Axis axis, const Gizmo::Config& cfg) {
 	const DVec3 cam_pos = view.getViewport().pos;
-	const Vec3 rel_pos = (gizmo.pos - cam_pos).toFloat();
+	const Vec3 rel_pos(gizmo.pos - cam_pos);
 
 	const bool is_global = cfg.coord_system == Gizmo::Config::CoordSystem::GLOBAL;
-	const float scale = gizmo.x.length();
+	const float scale = length(gizmo.x);
 	const Vec3 x = is_global ? gizmo.x : tr.rot.rotate(Vec3(scale, 0, 0));
 	const Vec3 y = is_global ? gizmo.y : tr.rot.rotate(Vec3(0, scale, 0));
 	const Vec3 z = is_global ? gizmo.z : tr.rot.rotate(Vec3(0, 0, scale));
@@ -336,7 +336,7 @@ void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const V
 	UniverseView::Vertex* vertices = view.render(false, 25*6);
 
 	const float ANGLE_STEP = degreesToRadians(1.0f / 100.0f * 360.0f);
-	Vec3 n = crossProduct(a, b) * 0.05f / a.length();
+	Vec3 n = cross(a, b) * 0.05f / length(a);
 	int offset = -1;
 	for (int i = 0; i < 25; ++i) {
 		float angle = i * ANGLE_STEP;
@@ -406,12 +406,12 @@ void renderQuarterRing(UniverseView& view, const Vec3& p, const Vec3& a, const V
 void renderArc(UniverseView& view, const Vec3& pos, const Vec3& n, const Vec3& origin, const Vec3& dst, float scale, u32 color) {
 	UniverseView::Vertex* vertices = view.render(false, 25 * 3);
 
-	const Vec3 side = crossProduct(n.normalized(), origin);
+	const Vec3 side = cross(normalize(n), origin);
 
 	int offset = -1;
 	for (int i = 0; i < 25; ++i) {
-		const Vec3 a = scale * slerp(origin, dst, i / 25.f).normalized();
-		const Vec3 b = scale * slerp(origin, dst, (i + 1) / 25.f).normalized();
+		const Vec3 a = scale * normalize(slerp(origin, dst, i / 25.f));
+		const Vec3 b = scale * normalize(slerp(origin, dst, (i + 1) / 25.f));
 
 		++offset;
 		vertices[offset] = { pos, color };
@@ -429,7 +429,7 @@ void renderArc(UniverseView& view, const Vec3& pos, const Vec3& n, const Vec3& o
 void draw(UniverseView& view, const RotationGizmo& gizmo, Axis axis, bool active, const DVec3& current, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
 	const float scale = getScale(vp, gizmo.pos, cfg.scale);
-	const Vec3 rel_pos = (gizmo.pos - vp.pos).toFloat();
+	const Vec3 rel_pos(gizmo.pos - vp.pos);
 
 	if (!active) {
 		renderQuarterRing(view, rel_pos, gizmo.x, gizmo.y, axis == Axis::Z ? SELECTED_COLOR : Z_COLOR);
@@ -463,8 +463,8 @@ void draw(UniverseView& view, const RotationGizmo& gizmo, Axis axis, bool active
 	renderQuarterRing(view, rel_pos, -axis1, -axis2, SELECTED_COLOR);
 	renderQuarterRing(view, rel_pos, axis1, -axis2, SELECTED_COLOR);
 
-	const Vec3 origin = (g_gizmo_state.prev_point - gizmo.pos).toFloat().normalized();
-	const Vec3 d1 = (current - gizmo.pos).toFloat().normalized();
+	const Vec3 origin = normalize(Vec3(g_gizmo_state.prev_point - gizmo.pos));
+	const Vec3 d1 = normalize(Vec3(current - gizmo.pos));
 	renderArc(view, rel_pos, n, origin, d1, scale, 0x8800a5ff);
 }
 
@@ -481,21 +481,21 @@ float computeRotateAngle(UniverseView& view, const RotationGizmo& gizmo, Axis no
 	Axis plane;
 	Vec3 axis;
 	switch (normal_axis) {
-		case Axis::X: plane = Axis::YZ; axis = gizmo.x.normalized(); break;
-		case Axis::Y: plane = Axis::XZ; axis = gizmo.y.normalized(); break;
-		case Axis::Z: plane = Axis::XY; axis = gizmo.z.normalized(); break;
+		case Axis::X: plane = Axis::YZ; axis = normalize(gizmo.x); break;
+		case Axis::Y: plane = Axis::XZ; axis = normalize(gizmo.y); break;
+		case Axis::Z: plane = Axis::XY; axis = normalize(gizmo.z); break;
 		default: ASSERT(false); return 0;
 	}
 
 	const DVec3 pos = g_gizmo_state.prev_point;
 	const DVec3 start_pos = getMousePlaneIntersection(view, gizmo, plane);
-	const Vec3 delta = (pos - gizmo.pos).toFloat().normalized();
-	const Vec3 start_delta = (start_pos - gizmo.pos).toFloat().normalized();
+	const Vec3 delta = normalize(Vec3(pos - gizmo.pos));
+	const Vec3 start_delta = normalize(Vec3(start_pos - gizmo.pos));
 		
-	const Vec3 side = crossProduct(axis, start_delta);
+	const Vec3 side = cross(axis, start_delta);
 
-	const float y = clamp(dotProduct(delta, start_delta), -1.0f, 1.0f);
-	const float x = clamp(dotProduct(delta, side), -1.0f, 1.0f);
+	const float y = clamp(dot(delta, start_delta), -1.0f, 1.0f);
+	const float x = clamp(dot(delta, side), -1.0f, 1.0f);
 
 	return -atan2f(x, y);
 }
@@ -503,7 +503,7 @@ float computeRotateAngle(UniverseView& view, const RotationGizmo& gizmo, Axis no
 void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis, const Gizmo::Config& cfg) {
 	const Viewport vp = view.getViewport();
 	const float scale = getScale(vp, gizmo.pos, cfg.scale) * 0.1f;
-	const Vec3 rel_pos = (gizmo.pos - vp.pos).toFloat();
+	const Vec3 rel_pos = Vec3(gizmo.pos - vp.pos);
 
 	{
 		UniverseView::Vertex* vertices = view.render(true, 6);
@@ -522,9 +522,9 @@ void draw(UniverseView& view, const ScaleGizmo& gizmo, Axis axis, const Gizmo::C
 		vertices[5].abgr = axis == Axis::Z ? SELECTED_COLOR : Z_COLOR;
 	}
 
-	const Vec3 x = gizmo.x.normalized();
-	const Vec3 y = gizmo.y.normalized();
-	const Vec3 z = gizmo.z.normalized();
+	const Vec3 x = normalize(gizmo.x);
+	const Vec3 y = normalize(gizmo.y);
+	const Vec3 z = normalize(gizmo.z);
 
 	renderCube(view, axis == Axis::X ? SELECTED_COLOR : X_COLOR, rel_pos + gizmo.x, scale, x, y, z);
 	renderCube(view, axis == Axis::Y ? SELECTED_COLOR : Y_COLOR, rel_pos + gizmo.y, scale, x, y, z);
@@ -577,12 +577,12 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 	draw(view, gizmo, tr, g_gizmo_state.axis, cfg);
 		
 	const DVec3 pos = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
-	const Vec3 delta_vec = (pos - g_gizmo_state.prev_point).toFloat();
+	const Vec3 delta_vec = Vec3(pos - g_gizmo_state.prev_point);
 	DVec3 res = tr->pos + delta_vec;
 
 	auto print_delta = [&](){
 		const Vec2 p = view.getViewport().worldToScreenPixels(gizmo.pos);
-		const Vec3 from_start = (tr->pos - g_gizmo_state.start_pos).toFloat();
+		const Vec3 from_start = Vec3(tr->pos - g_gizmo_state.start_pos);
 		StaticString<128> tmp("", from_start.x, "; ", from_start.y, "; ", from_start.z);
 		view.addText2D(p.x + 31, p.y + 31, 0xff000000, tmp);
 		view.addText2D(p.x + 30, p.y + 30, 0xffffFFFF, tmp);
@@ -592,7 +592,7 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 		g_gizmo_state.prev_point = pos;
 		tr->pos = res;
 		print_delta();		
-		return delta_vec.squaredLength() > 0.f;
+		return squaredLength(delta_vec) > 0.f;
 	}
 
 	const float step = cfg.getStep();
@@ -639,13 +639,13 @@ bool scale(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& c
 	}
 
 	const DVec3 p = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
-	Vec3 delta = (p - g_gizmo_state.prev_point).toFloat();
-	const float sign = dotProduct(delta, (p - gizmo.pos).toFloat()) < 0 ? -1.f : 1.f;
+	const Vec3 delta = Vec3(p - g_gizmo_state.prev_point);
+	const float sign = dot(delta, Vec3(p - gizmo.pos)) < 0 ? -1.f : 1.f;
 
 	draw(view, gizmo, g_gizmo_state.axis, cfg);
-	if (delta.squaredLength() > 0) {
+	if (squaredLength(delta) > 0) {
 		g_gizmo_state.prev_point = p;
-		tr->scale += delta.length() * sign;
+		tr->scale += length(delta) * sign;
 		return true;
 	}
 	return false;
@@ -696,15 +696,13 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 		}
 
 		if (!cfg.is_step || cfg.getStep() <= 0) {
-			tr->rot = Quat(normal.normalized(), angle) * g_gizmo_state.start_rot;
-			tr->rot.normalize();
+			tr->rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
 			return true;
 		}
 
 		if (cfg.is_step && fabs(angle) > degreesToRadians(cfg.getStep())) {
 			angle = angle - fmodf(angle, degreesToRadians(cfg.getStep()));
-			tr->rot = Quat(normal.normalized(), angle) * g_gizmo_state.start_rot;
-			tr->rot.normalize();
+			tr->rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
 			return true;
 		}
 	}
@@ -739,8 +737,8 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 	u32 zp_color = X_COLOR;
 	u32 zn_color = X_COLOR;
 	
-	const Vec3 pos = (origin - tr->pos).toFloat();
-	const Vec3 center = (tr->pos - vp.pos).toFloat();
+	const Vec3 pos = Vec3(origin - tr->pos);
+	const Vec3 center = Vec3(tr->pos - vp.pos);
 	auto cube = [&](u32 color, Vec3 p, Ref<float> prev_t){
 		float t;
 		if (getRaySphereIntersection(pos, dir, p, scale * 1.414f, Ref(t)) && (prev_t.value < 0 || t < prev_t.value)) {
@@ -802,18 +800,18 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 		return false;
 	}
 
-	const Vec3 diff = (getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis) - g_gizmo_state.box.start_pos).toFloat();
+	const Vec3 diff = Vec3(getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis) - g_gizmo_state.box.start_pos);
 	switch (g_gizmo_state.box.axis) {
 		case BoxAxis::XN:
 		case BoxAxis::XP: {
 			const float sign = g_gizmo_state.box.axis == BoxAxis::XN ? -1.f : 1.f;
 			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - xn *  g_gizmo_state.box.start_half_extents.x * sign;
 			if (keep_center) {
-				const float half = g_gizmo_state.box.start_half_extents.x + dotProduct(diff, xn) * sign;
+				const float half = g_gizmo_state.box.start_half_extents.x + dot(diff, xn) * sign;
 				half_extents->x = half;
 			}
 			else {
-				const float half = g_gizmo_state.box.start_half_extents.x + dotProduct(diff, xn) * 0.5f * sign;
+				const float half = g_gizmo_state.box.start_half_extents.x + dot(diff, xn) * 0.5f * sign;
 				const DVec3 c = e0 + xn * half * sign;
 				tr->pos = c;
 				half_extents->x = half;
@@ -825,11 +823,11 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 			const float sign = g_gizmo_state.box.axis == BoxAxis::YN ? -1.f : 1.f;
 			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - yn *  g_gizmo_state.box.start_half_extents.y * sign;
 			if (keep_center) {
-				const float half = g_gizmo_state.box.start_half_extents.y + dotProduct(diff, yn) * sign;
+				const float half = g_gizmo_state.box.start_half_extents.y + dot(diff, yn) * sign;
 				half_extents->y = half;
 			}
 			else {
-				const float half = g_gizmo_state.box.start_half_extents.y + dotProduct(diff, yn) * 0.5f * sign;
+				const float half = g_gizmo_state.box.start_half_extents.y + dot(diff, yn) * 0.5f * sign;
 				const DVec3 c = e0 + yn * half * sign;
 				tr->pos = c;
 				half_extents->y = half;
@@ -841,11 +839,11 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 			const float sign = g_gizmo_state.box.axis == BoxAxis::ZN ? -1.f : 1.f;
 			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - zn *  g_gizmo_state.box.start_half_extents.z * sign;
 			if (keep_center) {
-				const float half = g_gizmo_state.box.start_half_extents.z + dotProduct(diff, zn) * sign;
+				const float half = g_gizmo_state.box.start_half_extents.z + dot(diff, zn) * sign;
 				half_extents->z = half;
 			}
 			else {
-				const float half = g_gizmo_state.box.start_half_extents.z + dotProduct(diff, zn) * 0.5f * sign;
+				const float half = g_gizmo_state.box.start_half_extents.z + dot(diff, zn) * 0.5f * sign;
 				const DVec3 c = e0 + zn * half * sign;
 				tr->pos = c;
 				half_extents->z = half;

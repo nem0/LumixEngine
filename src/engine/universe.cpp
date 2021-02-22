@@ -227,7 +227,7 @@ Matrix Universe::getRelativeMatrix(EntityRef entity, const DVec3& base_pos) cons
 {
 	const Transform& transform = m_transforms[entity.index];
 	Matrix mtx = transform.rot.toMatrix();
-	mtx.setTranslation((transform.pos - base_pos).toFloat());
+	mtx.setTranslation(Vec3(transform.pos - base_pos));
 	mtx.multiply3x3(transform.scale);
 	return mtx;
 }

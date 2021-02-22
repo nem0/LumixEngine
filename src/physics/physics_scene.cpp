@@ -209,7 +209,7 @@ static RigidTransform fromPhysx(const PxTransform& v)
 }
 static PxTransform toPhysx(const RigidTransform& v)
 {
-	return {toPhysx(v.pos.toFloat()), toPhysx(v.rot)};
+	return {toPhysx(Vec3(v.pos)), toPhysx(v.rot)};
 }
 
 
@@ -1463,7 +1463,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		c.controller = m_controller_manager->createController(cDesc);
 		c.controller->getActor()->userData = (void*)(uintptr)entity.index;
 		c.entity = entity;
-		c.frame_change.set(0, 0, 0);
+		c.frame_change = Vec3(0, 0, 0);
 		c.radius = cDesc.radius;
 		c.height = cDesc.height;
 		c.custom_gravity = false;
@@ -1709,7 +1709,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		for (auto& controller : m_controllers)
 		{
 			Vec3 dif = controller.frame_change;
-			controller.frame_change.set(0, 0, 0);
+			controller.frame_change = Vec3(0, 0, 0);
 
 			PxControllerState state;
 			controller.controller->getState(state);
@@ -3957,7 +3957,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			serializer.read(entity);
 			entity = entity_map.get(entity);
 			Controller& c = m_controllers.insert(entity);
-			c.frame_change.set(0, 0, 0);
+			c.frame_change = Vec3(0, 0, 0);
 
 			serializer.read(c.layer);
 			serializer.read(c.radius);

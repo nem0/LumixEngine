@@ -123,7 +123,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 		const DVec3 pos = m_universe.getPosition(iter.key());
 		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
-		if ((pos - *(Vec3*)dt_agent->npos).squaredLength() > 0.1f) {
+		if (squaredLength(pos - *(Vec3*)dt_agent->npos) > 0.1f) {
 			const Transform old_zone_tr = m_universe.getTransform(zone.entity);
 			const DVec3 target_pos = old_zone_tr.transform(*(Vec3*)dt_agent->targetPos);
 			float speed = dt_agent->params.maxSpeed;
@@ -184,28 +184,28 @@ struct NavigationSceneImpl final : NavigationScene
 					float z = j * scaleXZ;
 
 					const float h0 = render_scene->getTerrainHeightAt(entity, x, z);
-					const Vec3 p0 = to_zone.transform(Vec3(x, h0, z)).toFloat();
+					const Vec3 p0 = Vec3(to_zone.transform(Vec3(x, h0, z)));
 
 					x = (i + 1) * scaleXZ;
 					z = j * scaleXZ;
 					const float h1 = render_scene->getTerrainHeightAt(entity, x, z);
-					const Vec3 p1 = to_zone.transform(Vec3(x, h1, z)).toFloat();
+					const Vec3 p1 = Vec3(to_zone.transform(Vec3(x, h1, z)));
 
 					x = (i + 1) * scaleXZ;
 					z = (j + 1) * scaleXZ;
 					const float h2 = render_scene->getTerrainHeightAt(entity, x, z);
-					const Vec3 p2 = to_zone.transform(Vec3(x, h2, z)).toFloat();
+					const Vec3 p2 = Vec3(to_zone.transform(Vec3(x, h2, z)));
 
 					x = i * scaleXZ;
 					z = (j + 1) * scaleXZ;
 					const float h3 = render_scene->getTerrainHeightAt(entity, x, z);
-					const Vec3 p3 = to_zone.transform(Vec3(x, h3, z)).toFloat();
+					const Vec3 p3 = Vec3(to_zone.transform(Vec3(x, h3, z)));
 
-					Vec3 n = crossProduct(p1 - p0, p0 - p2).normalized();
+					Vec3 n = normalize(cross(p1 - p0, p0 - p2));
 					u8 area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
 					rcRasterizeTriangle(&ctx, &p0.x, &p1.x, &p2.x, area, solid);
 
-					n = crossProduct(p2 - p0, p0 - p3).normalized();
+					n = normalize(cross(p2 - p0, p0 - p3));
 					area = n.y > walkable_threshold ? RC_WALKABLE_AREA : 0;
 					rcRasterizeTriangle(&ctx, &p0.x, &p2.x, &p3.x, area, solid);
 				}
@@ -240,7 +240,7 @@ struct NavigationSceneImpl final : NavigationScene
 			AABB model_aabb = model->getAABB();
 			const Transform rel_tr = inv_zone_tr * tr;
 			Matrix mtx = rel_tr.rot.toMatrix();
-			mtx.setTranslation(rel_tr.pos.toFloat());
+			mtx.setTranslation(Vec3(rel_tr.pos));
 			mtx.multiply3x3(rel_tr.scale);
 			model_aabb.transform(mtx);
 			if (!model_aabb.overlaps(aabb)) continue;
@@ -260,7 +260,7 @@ struct NavigationSceneImpl final : NavigationScene
 						Vec3 b = mtx.transformPoint(vertices[indices16[i + 1]]);
 						Vec3 c = mtx.transformPoint(vertices[indices16[i + 2]]);
 
-						Vec3 n = crossProduct(a - b, a - c).normalized();
+						Vec3 n = normalize(cross(a - b, a - c));
 						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
@@ -272,7 +272,7 @@ struct NavigationSceneImpl final : NavigationScene
 						Vec3 b = mtx.transformPoint(vertices[indices32[i + 1]]);
 						Vec3 c = mtx.transformPoint(vertices[indices32[i + 2]]);
 
-						Vec3 n = crossProduct(a - b, a - c).normalized();
+						Vec3 n = normalize(cross(a - b, a - c));
 						u8 area = n.y > walkable_threshold && is_walkable ? RC_WALKABLE_AREA : 0;
 						rcRasterizeTriangle(&ctx, &a.x, &b.x, &c.x, area, solid);
 					}
@@ -334,14 +334,14 @@ struct NavigationSceneImpl final : NavigationScene
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			//if (dt_agent->paused) continue;
 
-			const Vec3 pos = inv_tr.transform(m_universe.getPosition(agent.entity)).toFloat();
+			const Vec3 pos(inv_tr.transform(m_universe.getPosition(agent.entity)));
 			const Quat rot = m_universe.getRotation(agent.entity);
 			const Vec3 diff = *(Vec3*)dt_agent->npos - pos;
 
 			const Vec3 velocity = *(Vec3*)dt_agent->nvel;
-			agent.speed = diff.length() / time_delta;
+			agent.speed = length(diff) / time_delta;
 			agent.yaw_diff = 0;
-			if (velocity.squaredLength() > 0) {
+			if (squaredLength(velocity) > 0) {
 				float wanted_yaw = atan2f(velocity.x, velocity.z);
 				float current_yaw = rot.toEuler().y;
 				agent.yaw_diff = angleDiff(wanted_yaw, current_yaw);
@@ -384,7 +384,7 @@ struct NavigationSceneImpl final : NavigationScene
 				}
 			}
 			if (agent.flags & Agent::USE_ROOT_MOTION) {
-				*(Vec3*)dt_agent->npos = inv_zone_tr.transform(pos + rot.rotate(agent.root_motion)).toFloat();
+				*(Vec3*)dt_agent->npos = Vec3(inv_zone_tr.transform(pos + rot.rotate(agent.root_motion)));
 				agent.root_motion = Vec3::ZERO;
 			}
 		}
@@ -404,7 +404,7 @@ struct NavigationSceneImpl final : NavigationScene
 			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0) {
 				Vec3 vel = *(Vec3*)dt_agent->nvel;
 				vel.y = 0;
-				float len = vel.length();
+				float len = length(vel);
 				if (len > 0) {
 					vel *= 1 / len;
 					float angle = atan2f(vel.x, vel.z);
@@ -430,7 +430,7 @@ struct NavigationSceneImpl final : NavigationScene
 			}
 			else if (dt_agent->ncorners == 1 && agent.stop_distance > 0) {
 				Vec3 diff = *(Vec3*)dt_agent->targetPos - *(Vec3*)dt_agent->npos;
-				if (diff.squaredLength() < agent.stop_distance * agent.stop_distance) {
+				if (squaredLength(diff) < agent.stop_distance * agent.stop_distance) {
 					zone.crowd->resetMoveTarget(agent.agent);
 					agent.is_finished = true;
 					onPathFinished(agent);
@@ -904,7 +904,7 @@ struct NavigationSceneImpl final : NavigationScene
 		if (!zone.navmesh) return;
 
 		const Transform tr = m_universe.getTransform(zone_entity);
-		const Vec3 pos = tr.inverted().transform(world_pos).toFloat();
+		const Vec3 pos(tr.inverted().transform(world_pos));
 
 		const Vec3 min = -zone.zone.extents;
 		const Vec3 max = zone.zone.extents;
@@ -977,7 +977,7 @@ struct NavigationSceneImpl final : NavigationScene
 			Agent& agent = iter.value();
 			if (agent.zone.isValid()) continue;
 
-			const Vec3 pos = inv_zone_tr.transform(m_universe.getPosition(agent.entity)).toFloat();
+			const Vec3 pos = Vec3(inv_zone_tr.transform(m_universe.getPosition(agent.entity)));
 			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
 				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
 			{
@@ -1043,7 +1043,7 @@ struct NavigationSceneImpl final : NavigationScene
 		static const float ext[] = { 1.0f, 20.0f, 1.0f };
 
 		const Transform zone_tr = m_universe.getTransform(zone.entity);
-		const Vec3 dest = zone_tr.inverted().transform(world_dest).toFloat();
+		const Vec3 dest = Vec3(zone_tr.inverted().transform(world_dest));
 
 		zone.navquery->findNearestPoly(&dest.x, ext, &filter, &end_poly_ref, 0);
 		dtCrowdAgentParams params = zone.crowd->getAgent(agent.agent)->params;
@@ -1094,7 +1094,7 @@ struct NavigationSceneImpl final : NavigationScene
 	bool generateTileAt(EntityRef zone_entity, const DVec3& world_pos, bool keep_data) override {
 		RecastZone& zone = m_zones[zone_entity];
 		const Transform tr = m_universe.getTransform(zone_entity);
-		const Vec3 pos = tr.inverted().transform(world_pos).toFloat();
+		const Vec3 pos = Vec3(tr.inverted().transform(world_pos));
 		const Vec3 min = -zone.zone.extents;
 		const int x = int((pos.x - min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		const int z = int((pos.z - min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
@@ -1315,7 +1315,7 @@ struct NavigationSceneImpl final : NavigationScene
 		ASSERT(zone.crowd);
 
 		const Transform zone_tr = m_universe.getTransform(zone.entity);
-		const Vec3 pos = zone_tr.inverted().transform(m_universe.getPosition(agent.entity)).toFloat();
+		const Vec3 pos = Vec3(zone_tr.inverted().transform(m_universe.getPosition(agent.entity)));
 		dtCrowdAgentParams params = {};
 		params.radius = agent.radius;
 		params.height = agent.height;
@@ -1361,7 +1361,7 @@ struct NavigationSceneImpl final : NavigationScene
 			const Transform inv_zone_tr = m_universe.getTransform(zone.entity).inverted();
 			const Vec3 min = -zone.zone.extents;
 			const Vec3 max = zone.zone.extents;
-			const Vec3 pos = inv_zone_tr.transform(agent_pos).toFloat();
+			const Vec3 pos = Vec3(inv_zone_tr.transform(agent_pos));
 			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
 				&& pos.x < max.x && pos.y < max.y && pos.z < max.z)
 			{

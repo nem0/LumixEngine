@@ -265,23 +265,23 @@ void showDistanceJointGizmo(UniverseView& view, ComponentUID cmp)
 
 	DVec3 pos = universe.getPosition((EntityRef)other_entity);
 	DVec3 other_pos = (universe.getTransform((EntityRef)other_entity).getRigidPart() * local_frame).pos;
-	Vec3 dir = (other_pos - pos).toFloat();
+	Vec3 dir = Vec3(other_pos - pos);
 
 	dir = dir * (1.0f / SEGMENT_COUNT);
-	float dir_len = dir.length();
+	float dir_len = length(dir);
 	Vec3 right(0, -dir.z, dir.y);
 	if (fabsf(right.y) < 0.001f && fabsf(right.z) < 0.001f)
 	{
-		right.set(dir.z, 0, -dir.x);
+		right = Vec3(dir.z, 0, -dir.x);
 	}
-	right.normalize();
-	Vec3 up = crossProduct(dir, right).normalized();
+	right = normalize(right);
+	Vec3 up = normalize(cross(dir, right));
 	right *= minimum(1.0f, 5 * dir_len);
 	up *= minimum(1.0f, 5 * dir_len);
 
 	Vec3 force = phy_scene->getDistanceJointLinearForce(entity);
 
-	float t = minimum(force.length() / 10.0f, 1.0f);
+	float t = minimum(length(force) / 10.0f, 1.0f);
 	u32 color = 0xff000000 + (u32(t * 0xff) << 16) + u32((1 - t) * 0xff);
 	addLine(view, pos + right, pos, color);
 	static const float ANGLE_STEP = PI * 2 * float(TWIST_COUNT) / SEGMENT_COUNT;
@@ -724,13 +724,13 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				const DVec3 pos = (root_tr * parent_bone.transform).pos;
 
 				Quat rot = Quat::IDENTITY;
-				if ((parent_pos - bone.transform.pos).squaredLength() > 0.01f) {
-					rot = Quat::vec3ToVec3(Vec3(0, 1, 0), (parent_pos - bone.transform.pos).normalized());
+				if (squaredLength(parent_pos - bone.transform.pos) > 0.01f) {
+					rot = Quat::vec3ToVec3(Vec3(0, 1, 0), normalize(parent_pos - bone.transform.pos));
 				}
 				const EntityRef bone_e = editor.addEntityAt(pos);
 				editor.setEntitiesRotations(&bone_e, &rot, 1);
 				entities.push(bone_e);
-				Vec3 size((bone.transform.pos - parent_pos).length() * 0.5f);
+				Vec3 size(length(bone.transform.pos - parent_pos) * 0.5f);
 				size.x *= 0.2f;
 				size.z *= 0.2f;
 

@@ -80,7 +80,7 @@ void Draw2D::addLine(const Vec2& p0, const Vec2& p1, Color color, float width) {
 
 	cmd->texture = nullptr;
 	const Vec2 uv = Vec2(0.5f) / m_atlas_size;
-	const Vec2 dir = (to - from).normalized();
+	const Vec2 dir = normalize(to - from);
 	const Vec2 n = Vec2(dir.y, -dir.x) * (width * 0.5f);
 	const u32 voff = m_vertices.size();
 	

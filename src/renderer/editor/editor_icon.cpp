@@ -180,7 +180,7 @@ struct EditorIconsImpl final : EditorIcons
 		for(auto& icon : m_icons) {
 			const Transform icon_tr = getIconTransform(icon, vp.rot, vp.is_ortho, vp.ortho_size);
 			
-			const Vec3 rel_origin = icon_tr.rot.conjugated() * (origin - icon_tr.pos).toFloat();
+			const Vec3 rel_origin = icon_tr.rot.conjugated() * Vec3(origin - icon_tr.pos);
 			const Vec3 rel_dir = icon_tr.rot.conjugated() * dir;
 			const RayCastModelHit hit = m_models[(int)icon.type]->castRay(rel_origin / icon_tr.scale, rel_dir, nullptr);
 			if (hit.is_hit && hit.t >= 0 && (hit.t < res.t || res.t < 0)) {
@@ -219,7 +219,7 @@ struct EditorIconsImpl final : EditorIcons
 		else
 		{
 			ret = camera_matrix;
-			ret.setTranslation((m_editor.getUniverse()->getPosition(icon.entity) - vp_pos).toFloat());
+			ret.setTranslation(Vec3(m_editor.getUniverse()->getPosition(icon.entity) - vp_pos));
 		}
 		if (is_ortho)
 		{
@@ -244,7 +244,7 @@ struct EditorIconsImpl final : EditorIcons
 
 		for(auto& icon : m_icons) {
 			const DVec3 position = universe.getPosition(icon.entity);
-			const float distance = (position - vp.pos).toFloat().length();
+			const float distance = (float)length(position - vp.pos);
 			float scale_factor = MIN_SCALE_FACTOR + distance;
 			scale_factor = clamp(scale_factor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR);
 			icon.scale = tanf(vp.fov * 0.5f) * distance / scale_factor;

@@ -98,7 +98,7 @@ struct PaintTerrainCommand final : IEditorCommand
 		local_pos.y = -1;
 
 		Item& item = m_items.emplace();
-		item.m_local_pos = local_pos.toFloat();
+		item.m_local_pos = Vec3(local_pos);
 		item.m_radius = radius / terrain_size;
 		item.m_amount = rel_amount;
 		item.m_color = color;
@@ -690,7 +690,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain_entity, con
 	}
 
 	float brush_size = m_terrain_brush_size;
-	const Vec3 local_center = getRelativePosition(center).toFloat();
+	const Vec3 local_center = Vec3(getRelativePosition(center));
 	const Transform terrain_transform = m_world_editor.getUniverse()->getTransform((EntityRef)m_component.entity);
 
 	for (int i = 0; i < SLICE_COUNT + 1; ++i) {
@@ -708,7 +708,7 @@ void TerrainEditor::drawCursor(RenderScene& scene, EntityRef terrain_entity, con
 		scene.addDebugLine(from, to, 0xffff0000);
 	}
 
-	const Vec3 rel_pos = terrain_transform.inverted().transform(center).toFloat();
+	const Vec3 rel_pos = Vec3(terrain_transform.inverted().transform(center));
 	const i32 w = terrain->getWidth();
 	const i32 h = terrain->getHeight();
 	const float scale = terrain->getXZScale();
@@ -829,13 +829,13 @@ static void getProjections(const Vec3& axis,
 	Ref<float> min,
 	Ref<float> max)
 {
-	max = dotProduct(vertices[0], axis);
+	max = dot(vertices[0], axis);
 	min = max;
 	for(int i = 1; i < 8; ++i)
 	{
-		float dot = dotProduct(vertices[i], axis);
-		min = minimum(dot, min);
-		max = maximum(dot, max);
+		float d = dot(vertices[i], axis);
+		min = minimum(d, min);
+		max = maximum(d, max);
 	}
 }
 
@@ -867,7 +867,7 @@ static bool testOBBCollision(const AABB& a,
 	}
 
 	Vec3 normals_b[] = {
-		mtx_b.getXVector().normalized(), mtx_b.getYVector().normalized(), mtx_b.getZVector().normalized()};
+		normalize(mtx_b.getXVector()), normalize(mtx_b.getYVector()), normalize(mtx_b.getZVector())};
 	for(int i = 0; i < 3; i++)
 	{
 		float box_a_min, box_a_max, box_b_min, box_b_max;
@@ -971,11 +971,11 @@ static bool isOBBCollision(RenderScene& scene,
 			const Transform& tr_b = transforms[mesh.index];
 			const float radius_b = model_instance.model->getOriginBoundingRadius() * tr_b.scale;
 			const float radius_squared = radius_a_squared + radius_b * radius_b;
-			if ((model_tr.pos - tr_b.pos).squaredLength() < radius_squared) {
+			if (squaredLength(model_tr.pos - tr_b.pos) < radius_squared) {
 				const Transform rel_tr = model_tr.inverted() * tr_b;
 				Matrix mtx = rel_tr.rot.toMatrix();
 				mtx.multiply3x3(rel_tr.scale);
-				mtx.setTranslation(rel_tr.pos.toFloat());
+				mtx.setTranslation(Vec3(rel_tr.pos));
 
 				if (testOBBCollision(model->getAABB(), mtx, model_instance.model->getAABB())) {
 					return true;
@@ -1031,7 +1031,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 			const float dist = randFloat(0, 1.0f) * m_terrain_brush_size;
 			const float y = randFloat(m_y_spread.x, m_y_spread.y);
 			DVec3 pos(hit_pos.x + cosf(angle) * dist, 0, hit_pos.z + sinf(angle) * dist);
-			const Vec3 terrain_pos = inv_terrain_tr.transform(pos).toFloat();
+			const Vec3 terrain_pos = Vec3(inv_terrain_tr.transform(pos));
 			if (terrain_pos.x >= 0 && terrain_pos.z >= 0 && terrain_pos.x <= size.x && terrain_pos.z <= size.y)
 			{
 				pos.y = scene->getTerrainHeightAt((EntityRef)m_component.entity, terrain_pos.x, terrain_pos.z) + y;
@@ -1041,9 +1041,9 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 				{
 					RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 					Vec3 normal = scene->getTerrainNormalAt((EntityRef)m_component.entity, terrain_pos.x, terrain_pos.z);
-					Vec3 dir = crossProduct(normal, Vec3(1, 0, 0)).normalized();
+					Vec3 dir = normalize(cross(normal, Vec3(1, 0, 0)));
 					Matrix mtx = Matrix::IDENTITY;
-					mtx.setXVector(crossProduct(normal, dir));
+					mtx.setXVector(cross(normal, dir));
 					mtx.setYVector(normal);
 					mtx.setXVector(dir);
 					rot = mtx.getRotation();

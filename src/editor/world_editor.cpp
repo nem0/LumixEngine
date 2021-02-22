@@ -43,8 +43,8 @@ void addCube(UniverseView& view, const DVec3& pos, const Vec3& right, const Vec3
 	const DVec3& cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -75,8 +75,8 @@ void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -119,19 +119,19 @@ void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color
 
 void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float radius, float height, Color color) {
 	Vec3 x_vec(0, up.z, -up.y);
-	if (x_vec.squaredLength() < 0.01) {
+	if (squaredLength(x_vec) < 0.01) {
 		x_vec = Vec3(up.y, -up.x, 0);
 	}
-	x_vec.normalize();
-	const Vec3 z_vec = crossProduct(x_vec, up).normalized();
+	x_vec = normalize(x_vec);
+	const Vec3 z_vec = normalize(cross(x_vec, up));
 
 	const DVec3 top = pos + up * height;
 	UniverseView::Vertex* vertices = view.render(true, 32 * 6);
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -155,8 +155,8 @@ void addCylinder(UniverseView& view, const DVec3& pos, const Vec3& up, float rad
 void addLine(UniverseView& view, const DVec3& a, const DVec3& b, Color color) {
 	UniverseView::Vertex* vertices = view.render(true, 2);
 	const DVec3 cam_pos = view.getViewport().pos;
-	vertices[0].pos = (a - cam_pos).toFloat();
-	vertices[1].pos = (b - cam_pos).toFloat();
+	vertices[0].pos = Vec3(a - cam_pos);
+	vertices[1].pos = Vec3(b - cam_pos);
 	vertices[0].abgr = color.abgr();
 	vertices[1].abgr = color.abgr();
 }
@@ -165,8 +165,8 @@ void addCone(UniverseView& view, const DVec3& vertex, const Vec3& dir, const Vec
 	UniverseView::Vertex* vertices = view.render(true, 32 * 4);
 	const DVec3 cam_pos = view.getViewport().pos;
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -199,8 +199,8 @@ void addHalfSphere(UniverseView& view, const DVec3& center, float radius, bool t
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -249,16 +249,14 @@ void addCapsule(UniverseView& view, const DVec3& position, float height, float r
 
 	Vec3 z_vec(0, 0, 1.0f);
 	Vec3 x_vec(1.0f, 0, 0);
-	z_vec.normalize();
-	x_vec.normalize();
 	const DVec3 bottom = position + Vec3(0, radius, 0);
 	const DVec3 top = bottom + Vec3(0, height, 0);
 	UniverseView::Vertex* vertices = view.render(true, 32 * 2);
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -279,8 +277,8 @@ void addFrustum(UniverseView& view, const struct ShiftedFrustum& frustum, Color 
 	const DVec3 cam_pos = view.getViewport().pos;
 
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -315,8 +313,8 @@ void addSphere(UniverseView& view, const DVec3& center, float radius, Color colo
 	UniverseView::Vertex* vertices = view.render(true, count * 6);
 	const DVec3& cam_pos = view.getViewport().pos;
 	auto add_line = [&](const DVec3& a, const DVec3& b){
-		vertices[0].pos = (a - cam_pos).toFloat();
-		vertices[1].pos = (b - cam_pos).toFloat();
+		vertices[0].pos = Vec3(a - cam_pos);
+		vertices[1].pos = Vec3(b - cam_pos);
 		vertices[0].abgr = color.abgr();
 		vertices[1].abgr = color.abgr();
 		vertices += 2;
@@ -1743,18 +1741,15 @@ public:
 			for(auto e : m_selected_entities)
 			{
 				const DVec3 pos = m_universe->getPosition(e);
-				Vec3 dir = (pos - hit_pos).toFloat();
-				dir.normalize();
+				Vec3 dir = normalize(Vec3(pos - hit_pos));
 				Matrix mtx = Matrix::IDENTITY;
 				Vec3 y(0, 1, 0);
-				if(dotProduct(y, dir) > 0.99f)
+				if(dot(y, dir) > 0.99f)
 				{
-					y.set(1, 0, 0);
+					y = Vec3(1, 0, 0);
 				}
-				Vec3 x = crossProduct(y, dir);
-				x.normalize();
-				y = crossProduct(dir, x);
-				y.normalize();
+				Vec3 x = normalize(cross(y, dir));
+				y = normalize(cross(dir, x));
 				mtx.setXVector(x);
 				mtx.setYVector(y);
 				mtx.setZVector(dir);

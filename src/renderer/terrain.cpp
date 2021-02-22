@@ -269,14 +269,14 @@ Vec3 Terrain::getNormal(float x, float z)
 		float h0 = getHeight(int_x, int_z);
 		float h1 = getHeight(int_x + 1, int_z);
 		float h2 = getHeight(int_x + 1, int_z + 1);
-		return crossProduct(Vec3(m_scale.x, h2 - h0, m_scale.x), Vec3(m_scale.x, h1 - h0, 0)).normalized();
+		return normalize(cross(Vec3(m_scale.x, h2 - h0, m_scale.x), Vec3(m_scale.x, h1 - h0, 0)));
 	}
 	else
 	{
 		float h0 = getHeight(int_x, int_z);
 		float h1 = getHeight(int_x + 1, int_z + 1);
 		float h2 = getHeight(int_x, int_z + 1);
-		return crossProduct(Vec3(0, h2 - h0, m_scale.x), Vec3(m_scale.x, h1 - h0, m_scale.x)).normalized();
+		return normalize(cross(Vec3(0, h2 - h0, m_scale.x), Vec3(m_scale.x, h1 - h0, m_scale.x)));
 	}
 }
 
@@ -362,7 +362,7 @@ RayCastModelHit Terrain::castRay(const DVec3& origin, const Vec3& dir)
 	const Quat rot = universe.getRotation(m_entity);
 	const DVec3 pos = universe.getPosition(m_entity);
 	const Vec3 rel_dir = rot.rotate(dir);
-	const Vec3 terrain_to_ray = (origin - pos).toFloat();
+	const Vec3 terrain_to_ray = Vec3(origin - pos);
 	const Vec3 rel_origin = rot.conjugated().rotate(terrain_to_ray);
 
 	Vec3 start;

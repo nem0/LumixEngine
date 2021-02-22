@@ -279,9 +279,9 @@ struct LUMIX_ENGINE_API Viewport
 
 
 LUMIX_FORCE_INLINE Vec4 makePlane(const Vec3& normal, const Vec3& point) {
-	ASSERT(normal.squaredLength() < 1.001f);
-	ASSERT(normal.squaredLength() > 0.999f);
-	return Vec4(normal, -dotProduct(normal, point));
+	ASSERT(squaredLength(normal) < 1.001f);
+	ASSERT(squaredLength(normal) > 0.999f);
+	return Vec4(normal, -dot(normal, point));
 }
 
 LUMIX_FORCE_INLINE float planeDist(const Vec4& plane, const Vec3& point) {

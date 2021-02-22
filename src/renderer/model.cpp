@@ -211,27 +211,27 @@ RayCastModelHit Model::castRay(const Vec3& origin, const Vec3& dir, const Pose* 
 			}
 
 
-			Vec3 normal = crossProduct(p1 - p0, p2 - p0);
-			float q = dotProduct(normal, dir);
+			Vec3 normal = cross(p1 - p0, p2 - p0);
+			float q = dot(normal, dir);
 			if (q == 0)	continue;
 
-			float d = -dotProduct(normal, p0);
-			float t = -(dotProduct(normal, origin) + d) / q;
+			float d = -dot(normal, p0);
+			float t = -(dot(normal, origin) + d) / q;
 			if (t < 0) continue;
 
 			Vec3 hit_point = origin + dir * t;
 
 			Vec3 edge0 = p1 - p0;
 			Vec3 VP0 = hit_point - p0;
-			if (dotProduct(normal, crossProduct(edge0, VP0)) < 0) continue;
+			if (dot(normal, cross(edge0, VP0)) < 0) continue;
 
 			Vec3 edge1 = p2 - p1;
 			Vec3 VP1 = hit_point - p1;
-			if (dotProduct(normal, crossProduct(edge1, VP1)) < 0) continue;
+			if (dot(normal, cross(edge1, VP1)) < 0) continue;
 
 			Vec3 edge2 = p0 - p2;
 			Vec3 VP2 = hit_point - p2;
-			if (dotProduct(normal, crossProduct(edge2, VP2)) < 0) continue;
+			if (dot(normal, cross(edge2, VP2)) < 0) continue;
 
 			if (!hit.is_hit || hit.t > t)
 			{

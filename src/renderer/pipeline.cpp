@@ -1138,13 +1138,13 @@ struct PipelineImpl final : Pipeline
 			const Vec3 light_forward = light_mtx.getZVector();
 
 			const Vec3 view_dir = m_viewport.rot * Vec3(0, 0, -1);
-			const Vec3 xvec = crossProduct(light_forward, view_dir).normalized();
-			const Vec3 yvec = crossProduct(light_forward, xvec).normalized();
+			const Vec3 xvec = normalize(cross(light_forward, view_dir));
+			const Vec3 yvec = normalize(cross(light_forward, xvec));
 
 			Vec2 min = Vec2(FLT_MAX);
 			Vec2 max = Vec2(-FLT_MAX);
 			for (u32 i = 0; i < 8; ++i) {
-				const Vec2 proj = Vec2(dotProduct(xvec, camera_frustum.points[i]), dotProduct(yvec, camera_frustum.points[i]));
+				const Vec2 proj = Vec2(dot(xvec, camera_frustum.points[i]), dot(yvec, camera_frustum.points[i]));
 				min.x = minimum(min.x, proj.x);
 				min.y = minimum(min.y, proj.y);
 				max.x = maximum(max.x, proj.x);
@@ -1280,7 +1280,7 @@ struct PipelineImpl final : Pipeline
 		if (orient_to_cam) {
 			const Transform tr = m_scene->getUniverse().getTransform(e);
 			cmd.matrix = m_viewport.rot.toMatrix();
-			cmd.matrix.setTranslation((tr.pos - m_viewport.pos).toFloat());
+			cmd.matrix.setTranslation(Vec3(tr.pos - m_viewport.pos));
 			cmd.matrix.multiply3x3(tr.scale);
 		}
 		cmd.matrix = m_viewport.getProjection() * m_viewport.getViewRotation() * cmd.matrix * normalize;
@@ -1317,14 +1317,14 @@ struct PipelineImpl final : Pipeline
 		m_timer.tick();
 		global_state.framebuffer_size.x = m_viewport.w;
 		global_state.framebuffer_size.y = m_viewport.h;
-		global_state.cam_world_pos = Vec4(m_viewport.pos.toFloat(), 1);
+		global_state.cam_world_pos = Vec4(Vec3(m_viewport.pos), 1);
 
 		if(m_scene) {
 			const EntityPtr global_light = m_scene->getActiveEnvironment();
 			if(global_light.isValid()) {
 				EntityRef gl = (EntityRef)global_light;
 				const Environment& env = m_scene->getEnvironment(gl);
-				global_state.light_direction = Vec4(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1)).normalized(), 456); 
+				global_state.light_direction = Vec4(normalize(m_scene->getUniverse().getRotation(gl).rotate(Vec3(0, 0, -1))), 456); 
 				global_state.light_color = Vec4(env.light_color, 456);
 				global_state.light_intensity = env.direct_intensity;
 				global_state.light_indirect_intensity = env.indirect_intensity;
@@ -1424,11 +1424,11 @@ struct PipelineImpl final : Pipeline
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				for (u32 i = 0, c = tris.size(); i < c; ++i) {
 					vertices[3 * i + 0].color = tris[i].color;
-					vertices[3 * i + 0].pos = (tris[i].p0 - viewport_pos).toFloat();
+					vertices[3 * i + 0].pos = Vec3(tris[i].p0 - viewport_pos);
 					vertices[3 * i + 1].color = tris[i].color;
-					vertices[3 * i + 1].pos = (tris[i].p1 - viewport_pos).toFloat();
+					vertices[3 * i + 1].pos = Vec3(tris[i].p1 - viewport_pos);
 					vertices[3 * i + 2].color = tris[i].color;
-					vertices[3 * i + 2].pos = (tris[i].p2 - viewport_pos).toFloat();
+					vertices[3 * i + 2].pos = Vec3(tris[i].p2 - viewport_pos);
 				}
 				pipeline->m_scene->clearDebugTriangles();
 			}
@@ -1489,9 +1489,9 @@ struct PipelineImpl final : Pipeline
 				BaseVertex* vertices = (BaseVertex*)vb.ptr;
 				for (u32 i = 0, c = lines.size(); i < c; ++i) {
 					vertices[2 * i + 0].color = lines[i].color;
-					vertices[2 * i + 0].pos = (lines[i].from - viewport_pos).toFloat();
+					vertices[2 * i + 0].pos = Vec3(lines[i].from - viewport_pos);
 					vertices[2 * i + 1].color = lines[i].color;
-					vertices[2 * i + 1].pos = (lines[i].to - viewport_pos).toFloat();
+					vertices[2 * i + 1].pos = Vec3(lines[i].to - viewport_pos);
 				}
 				pipeline->m_scene->clearDebugLines();
 			}
@@ -1861,7 +1861,7 @@ struct PipelineImpl final : Pipeline
 					if (size == 0) continue;
 
 					const Transform tr = universe.getTransform((EntityRef)emitter->m_entity);
-					const Vec3 lpos = (tr.pos - m_camera_params.pos).toFloat();
+					const Vec3 lpos = Vec3(tr.pos - m_camera_params.pos);
 
 					const Material* material = emitter->getResource()->getMaterial();
 					if (!material) continue;
@@ -2260,7 +2260,7 @@ struct PipelineImpl final : Pipeline
 		cmd.pass_state.camera_up = Vec4(cp.view.inverted().transformVector(Vec3(0, 1, 0)), 0);
 		toPlanes(cp, Span(cmd.pass_state.camera_planes));
 		if (cp.is_shadow) {
-			cmd.pass_state.shadow_to_camera = Vec4((m_viewport.pos - cp.pos).toFloat(), 1);
+			cmd.pass_state.shadow_to_camera = Vec4(Vec3(m_viewport.pos - cp.pos), 1);
 		}
 		
 		cmd.pass_state_buffer = m_pass_state_buffer;
@@ -2401,19 +2401,19 @@ struct PipelineImpl final : Pipeline
 	{
 		static const Frustum::Planes planes[] = {
 			Frustum::Planes::LEFT, Frustum::Planes::TOP, Frustum::Planes::RIGHT, Frustum::Planes::BOTTOM };
-		bool prev_side = dotProduct(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
+		bool prev_side = dot(light_forward, camera_frustum.getNormal(planes[lengthOf(planes) - 1])) < 0;
 		int out_plane = (int)Frustum::Planes::EXTRA0;
 		Vec3 camera_frustum_center = camera_frustum.computeBoundingSphere().position;
 		for (u32 i = 0; i < lengthOf(planes); ++i)
 		{
-			bool side = dotProduct(light_forward, camera_frustum.getNormal(planes[i])) < 0;
+			bool side = dot(light_forward, camera_frustum.getNormal(planes[i])) < 0;
 			if (prev_side != side)
 			{
 				Vec3 n0 = camera_frustum.getNormal(planes[i]);
 				Vec3 n1 = camera_frustum.getNormal(planes[(i + lengthOf(planes) - 1) % lengthOf(planes)]);
-				Vec3 line_dir = crossProduct(n1, n0);
-				Vec3 n = crossProduct(light_forward, line_dir).normalized();
-				if (dotProduct(camera_frustum_center, n) < 0) n = -n;
+				Vec3 line_dir = cross(n1, n0);
+				Vec3 n = normalize(cross(light_forward, line_dir));
+				if (dot(camera_frustum_center, n) < 0) n = -n;
 				shadow_camera_frustum->setPlane((Frustum::Planes)out_plane, n, Vec3::ZERO);
 				++out_plane;
 				if (out_plane >(int)Frustum::Planes::EXTRA1) break;
@@ -2625,7 +2625,7 @@ struct PipelineImpl final : Pipeline
 			Vec4 yplanes[65];
 			Vec4 zplanes[17];
 
-			const Vec3 cam_dir = crossProduct(frustum.points[2] - frustum.points[0], frustum.points[1] - frustum.points[0]).normalized();
+			const Vec3 cam_dir = normalize(cross(frustum.points[2] - frustum.points[0], frustum.points[1] - frustum.points[0]));
 			
 			Vec3 near = (frustum.points[0] + frustum.points[2]) * 0.5f;
 			Vec3 far = (frustum.points[4] + frustum.points[6]) * 0.5f;
@@ -2644,7 +2644,7 @@ struct PipelineImpl final : Pipeline
 				const Vec3 a = lerp(frustum.points[0], frustum.points[3], t);
 				const Vec3 b = lerp(frustum.points[1], frustum.points[2], t);
 				const Vec3 c = lerp(frustum.points[4], frustum.points[7], t);
-				const Vec3 n = crossProduct(b - a, c - a).normalized();
+				const Vec3 n = normalize(cross(b - a, c - a));
 				yplanes[i] = makePlane(n, a);
 			}
 
@@ -2653,7 +2653,7 @@ struct PipelineImpl final : Pipeline
 				const Vec3 a = lerp(frustum.points[1], frustum.points[0], t);
 				const Vec3 b = lerp(frustum.points[2], frustum.points[3], t);
 				const Vec3 c = lerp(frustum.points[5], frustum.points[4], t);
-				const Vec3 n = crossProduct(b - a, c - a).normalized();
+				const Vec3 n = normalize(cross(b - a, c - a));
 				xplanes[i] = makePlane(n, a);
 			}
 
@@ -2667,7 +2667,7 @@ struct PipelineImpl final : Pipeline
 				if (!refl_probe.flags.isSet(ReflectionProbe::ENABLED)) continue;
 				const EntityRef e = refl_probe_entities[i];
 				ClusterReflProbe& probe =  refl_probes.emplace();
-				probe.pos = (universe.getPosition(e) - cam_pos).toFloat();
+				probe.pos = Vec3(universe.getPosition(e) - cam_pos);
 				probe.rot = universe.getRotation(e).conjugated();
 				probe.half_extents = refl_probe.half_extents;
 				probe.layer = refl_probe.texture_id;
@@ -2690,7 +2690,7 @@ struct PipelineImpl final : Pipeline
 					if (!env_probe.flags.isSet(EnvironmentProbe::ENABLED)) continue;
 					const EntityRef e = env_probe_entities[i];
 					ClusterEnvProbe& probe =  env_probes.emplace();
-					probe.pos = (universe.getPosition(e) - cam_pos).toFloat();
+					probe.pos = Vec3(universe.getPosition(e) - cam_pos);
 					probe.rot = universe.getRotation(e).conjugated();
 					probe.inner_range = env_probe.inner_range;
 					probe.outer_range = env_probe.outer_range;
@@ -2757,7 +2757,7 @@ struct PipelineImpl final : Pipeline
 			auto for_each_env_probe_pair = [&](auto f){
 				for (i32 i = 0, c = env_probes.size(); i < c; ++i) {
 					const Vec3 p = env_probes[i].pos;
-					const float r = env_probes[i].outer_range.length();
+					const float r = length(env_probes[i].outer_range);
 				
 					const IVec2 xrange = range(p, r, size.x, xplanes);
 					const IVec2 yrange = range(p, r, size.y, yplanes);
@@ -2778,7 +2778,7 @@ struct PipelineImpl final : Pipeline
 			auto for_each_refl_probe_pair = [&](auto f){
 				for (i32 i = 0, c = refl_probes.size(); i < c; ++i) {
 					const Vec3 p = refl_probes[i].pos;
-					const float r = refl_probes[i].half_extents.length();
+					const float r = length(refl_probes[i].half_extents);
 				
 					const IVec2 xrange = range(p, r, size.x, xplanes);
 					const IVec2 yrange = range(p, r, size.y, yplanes);
@@ -2966,7 +2966,7 @@ struct PipelineImpl final : Pipeline
 	};
 
 	static float computePriority(const FillClustersJob::ClusterPointLight& light, const DVec3& light_pos, const DVec3& cam_pos) {
-		return float(light.radius / (cam_pos - light_pos).length());
+		return float(light.radius / length(cam_pos - light_pos));
 	}
 
 	u32 cull(CameraParams cp) {
@@ -3246,7 +3246,7 @@ struct PipelineImpl final : Pipeline
 					u8* instance_data = slice.ptr;
 					const EntityRef e = { int(renderables[i] & 0xFFffFFff) };
 					const Transform& tr = entity_data[e.index];
-					const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+					const Vec3 lpos = Vec3(tr.pos - camera_pos);
 					memcpy(instance_data, &tr.rot, sizeof(tr.rot));
 					instance_data += sizeof(tr.rot);
 					memcpy(instance_data, &lpos, sizeof(lpos));
@@ -3316,7 +3316,7 @@ struct PipelineImpl final : Pipeline
 						for (int j = start_i; j < start_i + (i32)count; ++j) {
 							const EntityRef e = { int(renderables[j] & 0xFFffFFff) };
 							const Transform& tr = entity_data[e.index];
-							const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+							const Vec3 lpos = Vec3(tr.pos - camera_pos);
 							memcpy(instance_data, &tr.rot, sizeof(tr.rot));
 							instance_data += sizeof(tr.rot);
 							memcpy(instance_data, &lpos, sizeof(lpos));
@@ -3351,7 +3351,7 @@ struct PipelineImpl final : Pipeline
 					const u32 mesh_idx = renderables[i] >> 40;
 					const ModelInstance* LUMIX_RESTRICT mi = &model_instances[e.index];
 					const Transform& tr = entity_data[e.index];
-					const Vec3 rel_pos = (tr.pos - camera_pos).toFloat();
+					const Vec3 rel_pos = Vec3(tr.pos - camera_pos);
 					const Mesh& mesh = mi->meshes[mesh_idx];
 					Shader* shader = mesh.material->getShader();
 					u32 defines = skinned_define_mask | mesh.material->getDefineMask();
@@ -3417,7 +3417,7 @@ struct PipelineImpl final : Pipeline
 					for(u32 j = start_i; j < i; ++j) {
 						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
 						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const Vec3 half_extents = scene->getDecalHalfExtents(e);
 						const Vec2 uv_scale = scene->getDecalUVScale(e);
 						const float m = maximum(half_extents.x, half_extents.y, half_extents.z);
@@ -3467,7 +3467,7 @@ struct PipelineImpl final : Pipeline
 					for (u32 j = start_i; j < i; ++j) {
 						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
 						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						const PointLight& pl = scene->getPointLight(e);
 						const bool intersecting = frustum.intersectNearPlane(tr.pos, pl.range * SQRT3);
 							
@@ -3650,7 +3650,7 @@ struct PipelineImpl final : Pipeline
 			FillClustersJob::ClusterPointLight& light = job.m_point_lights.emplace();
 			light.radius = pl.range;
 			const DVec3 light_pos = universe.getPosition(e);
-			light.pos = (light_pos - cam_pos).toFloat();
+			light.pos = Vec3(light_pos - cam_pos);
 			light.rot = universe.getRotation(e);
 			light.fov = pl.fov;
 			light.color = pl.color * pl.intensity;
@@ -3828,11 +3828,11 @@ struct PipelineImpl final : Pipeline
 						grass.material = mesh.material->getRenderData();
 						grass.distance = type.m_distance * fov_multiplier;
 						grass.program = mesh.material->getShader()->getProgram(mesh.vertex_decl, m_define_mask | grass.material->define_mask);
-						grass.mtx = Matrix(rel_tr.pos.toFloat(), rel_tr.rot);
+						grass.mtx = Matrix(Vec3(rel_tr.pos), rel_tr.rot);
 						const i32 step_len = maximum(i32(type.m_spacing * 100), 1);
 						const i32 steps = i32(grass.distance * 100) / step_len;
-						grass.lod_ref_point = (tr.pos - m_pipeline->m_viewport.pos).toFloat();
-						grass.from = IVec2(-((tr.pos - m_pipeline->m_viewport.pos) * 100.f).toFloat().xz() - Vec2(grass.distance * 100.f - 1));
+						grass.lod_ref_point = Vec3(tr.pos - m_pipeline->m_viewport.pos);
+						grass.from = IVec2(-Vec3((tr.pos - m_pipeline->m_viewport.pos) * 100.f).xz() - Vec2(grass.distance * 100.f - 1));
 						grass.from = (grass.from / step_len) * step_len;
 						grass.to = grass.from + IVec2(2 * steps * step_len);
 						grass.step = step_len;
@@ -3996,8 +3996,8 @@ struct PipelineImpl final : Pipeline
 				if (!info.terrain->m_heightmap->isReady()) continue;
 				
 				Instance& inst = m_instances.emplace();
-				inst.pos = (info.position - m_camera_params.pos).toFloat();
-				inst.ref_pos = (info.position - m_pipeline->m_viewport.pos).toFloat();
+				inst.pos = Vec3(info.position - m_camera_params.pos);
+				inst.ref_pos = Vec3(info.position - m_pipeline->m_viewport.pos);
 				inst.rot = info.rot;
 				inst.scale = info.terrain->getScale();
 				inst.hm_size = info.terrain->getSize();
@@ -4203,7 +4203,7 @@ struct PipelineImpl final : Pipeline
 							const EntityRef e = renderables[i];
 							const DVec3 pos = entity_data[e.index].pos;
 							ModelInstance& mi = model_instances[e.index];
-							const float squared_length = float((pos - lod_ref_point).squaredLength());
+							const float squared_length = float(squaredLength(pos - lod_ref_point));
 								
 							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
 
@@ -4263,7 +4263,7 @@ struct PipelineImpl final : Pipeline
 							const EntityRef e = renderables[i];
 							const DVec3 pos = entity_data[e.index].pos;
 							ModelInstance& mi = model_instances[e.index];
-							const float squared_length = float((pos - lod_ref_point).squaredLength());
+							const float squared_length = float(squaredLength(pos - lod_ref_point));
 								
 							const u32 lod_idx = mi.model->getLODMeshIndices(squared_length);
 
@@ -4346,7 +4346,7 @@ struct PipelineImpl final : Pipeline
 					for (u32 i = 0; i < group->count; ++i) {
 						const EntityRef e = { (i32)group->renderables[i] };
 						const Transform& tr = entity_data[e.index];
-						const Vec3 lpos = (tr.pos - camera_pos).toFloat();
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
 						memcpy(instance_data, &tr.rot, sizeof(tr.rot));
 						instance_data += sizeof(tr.rot);
 						memcpy(instance_data, &lpos, sizeof(lpos));

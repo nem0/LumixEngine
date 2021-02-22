@@ -1,9 +1,8 @@
 #include "math.h"
 #include "simd.h"
+#include <float.h>
 #include <random>
-#ifdef __linux__
-	#include <float.h>
-#endif
+
 
 namespace Lumix
 {
@@ -23,65 +22,21 @@ const Vec4 Vec4::ZERO = Vec4(0);
 
 const Transform Transform::IDENTITY = Transform({0, 0, 0}, {0, 0, 0, 1}, 1.f);
 
-float Vec2::squaredLength() const
-{
-	float x = this->x;
-	float y = this->y;
-	return x * x + y * y;
-}
 
-
-void Vec2::normalize()
-{
-	float x = this->x;
-	float y = this->y;
-	float inv_len = 1 / sqrt(x * x + y * y);
-	x *= inv_len;
-	y *= inv_len;
-	this->x = x;
-	this->y = y;
-}
-
-
-Lumix::Vec2 Vec2::normalized() const
-{
-	float x = this->x;
-	float y = this->y;
-	float inv_len = 1 / sqrt(x * x + y * y);
+Vec2 normalize(const Vec2& value) {
+	float x = value.x;
+	float y = value.y;
+	const float inv_len = 1 / sqrt(x * x + y * y);
 	x *= inv_len;
 	y *= inv_len;
 	return Vec2(x, y);
 }
 
 
-float Vec2::length() const
-{
-	float x = this->x;
-	float y = this->y;
-	return sqrt(x * x + y * y);
-}
-
-
-void Vec3::normalize()
-{
-	float x = this->x;
-	float y = this->y;
-	float z = this->z;
-	float inv_len = 1 / sqrt(x * x + y * y + z * z);
-	x *= inv_len;
-	y *= inv_len;
-	z *= inv_len;
-	this->x = x;
-	this->y = y;
-	this->z = z;
-}
-
-
-Vec3 Vec3::normalized() const
-{
-	float x = this->x;
-	float y = this->y;
-	float z = this->z;
+Vec3 normalize(const Vec3& value) {
+	float x = value.x;
+	float y = value.y;
+	float z = value.z;
 	const float inv_len = 1 / sqrt(x * x + y * y + z * z);
 	x *= inv_len;
 	y *= inv_len;
@@ -89,71 +44,29 @@ Vec3 Vec3::normalized() const
 	return Vec3(x, y, z);
 }
 
-
-double DVec3::length() const
-{
-	const double x = this->x;
-	const double y = this->y;
-	const double z = this->z;
-	return sqrt(x * x + y * y + z * z);
+Quat normalize(const Quat& value) {
+	float x = value.x;
+	float y = value.y;
+	float z = value.z;
+	float w = value.w;
+	const float inv_len = 1 / sqrt(x * x + y * y + z * z + w * w);
+	x *= inv_len;
+	y *= inv_len;
+	z *= inv_len;
+	w *= inv_len;
+	return Quat(x, y, z, w);
 }
+
+float length(const Vec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
+double length(const DVec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
+float squaredLength(const Vec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
+double squaredLength(const DVec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
 
 Vec3::Vec3(const DVec3& rhs)
 	: x((float)rhs.x)
 	, y((float)rhs.y)
 	, z((float)rhs.z)
 {}
-
-float Vec3::length() const
-{
-	const float x = this->x;
-	const float y = this->y;
-	const float z = this->z;
-	return sqrt(x * x + y * y + z * z);
-}
-
-
-void Vec4::normalize()
-{
-	float x = this->x;
-	float y = this->y;
-	float z = this->z;
-	float w = this->w;
-	float inv_len = 1 / sqrt(x * x + y * y + z * z + w * w);
-	x *= inv_len;
-	y *= inv_len;
-	z *= inv_len;
-	w *= inv_len;
-	this->x = x;
-	this->y = y;
-	this->z = z;
-	this->w = w;
-}
-
-
-Vec4 Vec4::normalized() const
-{
-	float x = this->x;
-	float y = this->y;
-	float z = this->z;
-	float w = this->w;
-	float inv_len = 1 / sqrt(x * x + y * y + z * z + w * w);
-	x *= inv_len;
-	y *= inv_len;
-	z *= inv_len;
-	w *= inv_len;
-	return Vec4(x, y, z, w);
-}
-
-
-float Vec4::length() const
-{
-	float x = this->x;
-	float y = this->y;
-	float z = this->z;
-	float w = this->w;
-	return sqrt(x * x + y * y + z * z + w * w);
-}
 
 
 const Quat Quat::IDENTITY = { 0, 0, 0, 1 };
@@ -172,25 +85,25 @@ Quat::Quat(const Vec3& axis, float angle)
 
 Quat Quat::vec3ToVec3(const Vec3& v0, const Vec3& v1)
 {
-	const Vec3 from = v0.normalized();
-	const Vec3 to = v1.normalized();
+	const Vec3 from = normalize(v0);
+	const Vec3 to = normalize(v1);
 	
-	float cos_angle = dotProduct(from, to);
+	float cos_angle = dot(from, to);
     Vec3 half;
 
 	
     if(cos_angle > -1.0005f && cos_angle < -0.9995f) {
-        half = crossProduct(from, Vec3(to.x + 0.3f, to.y - 0.15f, to.z - 0.15f)).normalized();
+        half = normalize(cross(from, Vec3(to.x + 0.3f, to.y - 0.15f, to.z - 0.15f)));
     }
     else
-        half = (from + to).normalized();
+        half = normalize(from + to);
 
     // http://physicsforgames.blogspot.sk/2010/03/quaternion-tricks.html
     return Quat(
         from.y * half.z - from.z * half.y,
         from.z * half.x - from.x * half.z,
         from.x * half.y - from.y * half.x,
-		dotProduct(from, half));
+		dot(from, half));
 }
 
 
@@ -246,27 +159,11 @@ Quat Quat::conjugated() const
 	return Quat(x, y, z, -w);
 }
 
-
-void Quat::normalize()
-{
-	float l = 1/sqrt(x*x + y*y + z*z + w*w);
-	x *= l;
-	y *= l;
-	z *= l;
-	w *= l;
-}
-
-
-Quat Quat::normalized() const {
-	float l = 1 / sqrt(x * x + y * y + z * z + w * w);
-	return Quat(x * l, y * l, z * l, w * l);
-}
-
 Vec3 slerp(const Vec3& a, const Vec3& b, float t) {
-     float d = dotProduct(a, b);
+     float d = dot(a, b);
      d = clamp(d, -1.f, 1.f);
      const float s = acosf(d) * t;
-     const Vec3 r = (b - a * d).normalized();
+     const Vec3 r = normalize(b - a * d);
      return a * cosf(s) + r * sinf(s);
 }
 
@@ -392,6 +289,18 @@ Matrix::Matrix(const Vec3& pos, const Quat& rot)
 	setTranslation(pos);
 }
 
+void Matrix::lookAt(const Vec3& eye, const Vec3& at, const Vec3& up)
+{
+	*this = Matrix::IDENTITY;
+	Vec3 f = normalize((eye - at));
+	Vec3 r = normalize(cross(up, f));
+	Vec3 u = cross(f, r);
+	setXVector(r);
+	setYVector(u);
+	setZVector(f);
+	transpose();
+	setTranslation(Vec3(-dot(r, eye), -dot(u, eye), -dot(f, eye)));
+}
 
 void Matrix::fromEuler(float yaw, float pitch, float roll)
 {
@@ -509,7 +418,7 @@ void Matrix::setPerspective(float fov, float ratio, float near_plane, float far_
 void Matrix::decompose(Vec3& position, Quat& rotation, float& scale) const
 {
 	position = getTranslation();
-	scale = getXVector().length();
+	scale = length(getXVector());
 	Matrix tmp = *this;
 	tmp.multiply3x3(1 / scale);
 	rotation = tmp.getRotation();
@@ -631,9 +540,9 @@ Matrix Matrix::operator *(const Matrix& rhs) const
 void Matrix::normalizeScale()
 {
 	Vec3 scale = {
-		1 / Vec3(columns[0].x, columns[1].x, columns[2].x).length(),
-		1 / Vec3(columns[0].y, columns[1].y, columns[2].y).length(),
-		1 / Vec3(columns[0].z, columns[1].z, columns[2].z).length()
+		1 / length(Vec3(columns[0].x, columns[1].x, columns[2].x)),
+		1 / length(Vec3(columns[0].y, columns[1].y, columns[2].y)),
+		1 / length(Vec3(columns[0].z, columns[1].z, columns[2].z))
 	};
 
 	columns[0].x *= scale.x;
@@ -802,12 +711,12 @@ bool getRayPlaneIntersecion(const Vec3& origin,
 	const Vec3& normal,
 	float& out)
 {
-	float d = dotProduct(dir, normal);
+	float d = dot(dir, normal);
 	if (d == 0)
 	{
 		return false;
 	}
-	d = dotProduct(plane_point - origin, normal) / d;
+	d = dot(plane_point - origin, normal) / d;
 	out = d;
 	return true;
 }
@@ -818,10 +727,10 @@ bool getRaySphereIntersection(const Vec3& origin,
 	float radius,
 	Ref<float> out)
 {
-	ASSERT(dir.length() < 1.01f && dir.length() > 0.99f);
+	ASSERT(length(dir) < 1.01f && length(dir) > 0.99f);
 	Vec3 L = center - origin;
-	float tca = dotProduct(L, dir);
-	float d2 = dotProduct(L, L) - tca * tca;
+	float tca = dot(L, dir);
+	float d2 = dot(L, L) - tca * tca;
 	if (d2 > radius * radius) return false;
 	float thc = sqrt(radius * radius - d2);
 	float t = tca - thc;
@@ -874,17 +783,17 @@ float getLineSegmentDistance(const Vec3& origin, const Vec3& dir, const Vec3& a,
 	Vec3 a_origin = origin - a;
 	Vec3 ab = b - a;
 
-	float dot1 = dotProduct(ab, a_origin);
-	float dot2 = dotProduct(ab, dir);
-	float dot3 = dotProduct(dir, a_origin);
-	float dot4 = dotProduct(ab, ab);
-	float dot5 = dotProduct(dir, dir);
+	float dot1 = dot(ab, a_origin);
+	float dot2 = dot(ab, dir);
+	float dot3 = dot(dir, a_origin);
+	float dot4 = dot(ab, ab);
+	float dot5 = dot(dir, dir);
 
 	float denom = dot4 * dot5 - dot2 * dot2;
 	if (abs(denom) < 1e-5f)
 	{
-		Vec3 X = origin + dir * dotProduct(b - origin, dir);
-		return (b - X).length();
+		Vec3 X = origin + dir * dot(b - origin, dir);
+		return length(b - X);
 	}
 
 	float numer = dot1 * dot2 - dot3 * dot4;
@@ -895,12 +804,12 @@ float getLineSegmentDistance(const Vec3& origin, const Vec3& dir, const Vec3& a,
 	{
 		param_b = clamp(param_b, 0.0f, 1.0f);
 		Vec3 B = a + ab * param_b;
-		Vec3 X = origin + dir * dotProduct(b - origin, dir);
-		return (B - X).length();
+		Vec3 X = origin + dir * dot(b - origin, dir);
+		return length(B - X);
 	}
 
 	Vec3 vec = (origin + dir * param_a) - (a + ab * param_b);
-	return vec.length();
+	return length(vec);
 }
 
 
@@ -911,33 +820,33 @@ bool getRayTriangleIntersection(const Vec3& origin,
 	const Vec3& p2,
 	float* out_t)
 {
-	Vec3 normal = crossProduct(p1 - p0, p2 - p0);
-	float q = dotProduct(normal, dir);
+	Vec3 normal = cross(p1 - p0, p2 - p0);
+	float q = dot(normal, dir);
 	if (q == 0) return false;
 
-	float d = -dotProduct(normal, p0);
-	float t = -(dotProduct(normal, origin) + d) / q;
+	float d = -dot(normal, p0);
+	float t = -(dot(normal, origin) + d) / q;
 	if (t < 0) return false;
 
 	Vec3 hit_point = origin + dir * t;
 
 	Vec3 edge0 = p1 - p0;
 	Vec3 VP0 = hit_point - p0;
-	if (dotProduct(normal, crossProduct(edge0, VP0)) < 0)
+	if (dot(normal, cross(edge0, VP0)) < 0)
 	{
 		return false;
 	}
 
 	Vec3 edge1 = p2 - p1;
 	Vec3 VP1 = hit_point - p1;
-	if (dotProduct(normal, crossProduct(edge1, VP1)) < 0)
+	if (dot(normal, cross(edge1, VP1)) < 0)
 	{
 		return false;
 	}
 
 	Vec3 edge2 = p0 - p2;
 	Vec3 VP2 = hit_point - p2;
-	if (dotProduct(normal, crossProduct(edge2, VP2)) < 0)
+	if (dot(normal, cross(edge2, VP2)) < 0)
 	{
 		return false;
 	}
@@ -953,17 +862,17 @@ LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center,
 	const Vec3& v1,
 	const Vec3& v2)
 {
-	Vec3 normal = crossProduct(v0 - v1, v2 - v1).normalized();
-	float D = -dotProduct(v0, normal);
+	Vec3 normal = normalize(cross(v0 - v1, v2 - v1));
+	float D = -dot(v0, normal);
 
-	float dist = dotProduct(center, normal) + D;
+	float dist = dot(center, normal) + D;
 
 	if (fabs(dist) > radius) return false;
 
 	float squared_radius = radius * radius;
-	if ((v0 - center).squaredLength() < squared_radius) return true;
-	if ((v1 - center).squaredLength() < squared_radius) return true;
-	if ((v2 - center).squaredLength() < squared_radius) return true;
+	if (squaredLength(v0 - center) < squared_radius) return true;
+	if (squaredLength(v1 - center) < squared_radius) return true;
+	if (squaredLength(v2 - center) < squared_radius) return true;
 
 	return false;
 }

@@ -81,7 +81,7 @@ struct CullingSystemImpl final : CullingSystem
 	
 	Sphere* addToCell(CellPage& cell, EntityPtr entity, const DVec3& pos, float radius)
 	{
-		const Vec3 rel_pos = (pos - cell.header.origin).toFloat();
+		const Vec3 rel_pos = Vec3(pos - cell.header.origin);
 		const int count = cell.header.count;
 
 		if(count < CellPage::MAX_COUNT - 1) {
@@ -189,7 +189,7 @@ struct CullingSystemImpl final : CullingSystem
 		const IVec3 new_indices(pos * (1 / m_cell_size));
 
 		if(new_indices == cell.header.indices.pos) {
-			sphere->position = (pos - cell.header.origin).toFloat();
+			sphere->position = Vec3(pos - cell.header.origin);
 			return;
 		}
 
@@ -215,7 +215,7 @@ struct CullingSystemImpl final : CullingSystem
 
 		if (was_big == is_big && new_indices == cell.header.indices.pos) {
 			sphere->radius = radius;
-			sphere->position = (pos - cell.header.origin).toFloat();
+			sphere->position = Vec3(pos - cell.header.origin);
 			return;
 		}
 

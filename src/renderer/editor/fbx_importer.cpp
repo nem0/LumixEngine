@@ -377,8 +377,7 @@ static u32 packF4u(const Vec3& vec)
 void FBXImporter::writePackedVec3(const ofbx::Vec3& vec, const Matrix& mtx, OutputMemoryStream* blob) const
 {
 	Vec3 v = toLumixVec3(vec);
-	v = (mtx * Vec4(v, 0)).xyz();
-	v.normalize();
+	v = normalize((mtx * Vec4(v, 0)).xyz());
 	v = fixOrientation(v);
 
 	u32 packed = packF4u(v);
@@ -515,7 +514,7 @@ static void computeNormals(Array<ofbx::Vec3>& out, const ofbx::Vec3* vertices, i
 		const Vec3 v0 = toLumix(vertices[i + 0]);
 		const Vec3 v1 = toLumix(vertices[i + 1]);
 		const Vec3 v2 = toLumix(vertices[i + 2]);
-		const Vec3 n = crossProduct(v1 - v0, v2 - v0).normalized();
+		const Vec3 n = normalize(cross(v1 - v0, v2 - v0));
 		++count[remap[i + 0]];
 		++count[remap[i + 1]];
 		++count[remap[i + 2]];
@@ -602,7 +601,7 @@ static void computeTangents(Array<ofbx::Vec3>& out, i32 vertex_count, const ofbx
 static bool doesFlipHandness(const Matrix& mtx) {
 	Vec3 x(1, 0, 0);
 	Vec3 y(0, 1, 0);
-	Vec3 z = mtx.inverted().transformVector(crossProduct(mtx.transformVector(x), mtx.transformVector(y)));
+	Vec3 z = mtx.inverted().transformVector(cross(mtx.transformVector(x), mtx.transformVector(y)));
 	return z.z < 0;
 }
 
@@ -732,7 +731,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			pos = fixOrientation(pos);
 			import_mesh.vertex_data.write(pos);
 
-			float sq_len = pos.squaredLength();
+			float sq_len = squaredLength(pos);
 			origin_radius_squared = maximum(origin_radius_squared, sq_len);
 
 			aabb.min.x = minimum(aabb.min.x, pos.x);
@@ -766,7 +765,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		for (u32 i = 0; i < written_idx; ++i) {
 			Vec3 p;
 			memcpy(&p, mem, sizeof(p));
-			import_mesh.center_radius_squared = maximum(import_mesh.center_radius_squared, (p - center).squaredLength());
+			import_mesh.center_radius_squared = maximum(import_mesh.center_radius_squared, squaredLength(p - center));
 			mem += vertex_size;
 		}
 
@@ -947,7 +946,7 @@ static constexpr u32 IMPOSTOR_TILE_SIZE = 512;
 static constexpr u32 IMPOSTOR_COLS = 9;
 
 static void getBBProjection(const AABB& aabb, Ref<Vec2> out_min, Ref<Vec2> out_max) {
-	const float radius = (aabb.max - aabb.min).length() * 0.5f;
+	const float radius = length(aabb.max - aabb.min) * 0.5f;
 	const Vec3 center = (aabb.min + aabb.max) * 0.5f;
 
 	Matrix proj;
@@ -1385,7 +1384,7 @@ static float getScaleX(const ofbx::Matrix& mtx)
 {
 	Vec3 v(float(mtx.m[0]), float(mtx.m[4]), float(mtx.m[8]));
 
-	return v.length();
+	return length(v);
 }
 
 static void fill(const ofbx::Object& bone, double anim_len, const ofbx::AnimationLayer& layer, Ref<Array<FBXImporter::Key>> keys) {
