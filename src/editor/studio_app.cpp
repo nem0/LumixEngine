@@ -5,6 +5,7 @@
 #include "audio/audio_scene.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/entity_folders.h"
 #include "editor/file_system_watcher.h"
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
@@ -1657,7 +1658,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities, ImVec2 line_size)
+	void showHierarchy(EntityRef entity, const Array<EntityRef>& selected_entities)
 	{
 		Universe* universe = m_editor->getUniverse();
 		bool selected = selected_entities.indexOf(entity) >= 0;
@@ -1691,7 +1692,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		else {
 			const ImVec2 cp = ImGui::GetCursorPos();
-			ImGui::Dummy(line_size);
+			ImGui::Dummy(ImVec2(1.f, ImGui::GetTextLineHeightWithSpacing()));
 			if (ImGui::IsItemVisible()) {
 				ImGui::SetCursorPos(cp);
 				char buffer[1024];
@@ -1762,7 +1763,7 @@ struct StudioAppImpl final : StudioApp
 			for (EntityPtr e_ptr = universe->getFirstChild(entity); e_ptr.isValid();
 				 e_ptr = universe->getNextSibling((EntityRef)e_ptr))
 			{
-				showHierarchy((EntityRef)e_ptr, selected_entities, line_size);
+				showHierarchy((EntityRef)e_ptr, selected_entities);
 			}
 			if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && m_is_f2_pressed) {
 				m_renaming_entity = selected_entities.empty() ? INVALID_ENTITY : selected_entities[0];
@@ -1797,6 +1798,95 @@ struct StudioAppImpl final : StudioApp
 		ImGui::End();
 	}
 
+	void folderUI(const EntityFolders::Folder& folder, const EntityFolders& folders, u32 level) {
+		ImGui::PushID(&folder);
+		bool node_open;
+		ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+		flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+		EntityFolders::FolderID folder_id = folders.getFolderID(folder);
+		if (folders.getSelectedFolder() == folder_id) flags |= ImGuiTreeNodeFlags_Selected;
+		if (m_renaming_folder == folder_id) {
+			node_open = ImGui::TreeNodeEx((void*)&folder, flags, "%s", ICON_FA_FOLDER);
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0);
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, 0);
+			if (m_set_rename_focus) {
+				ImGui::SetKeyboardFocusHere();
+				m_set_rename_focus = false;
+			}
+			if (ImGui::InputText("##renamed_val", m_rename_buf, sizeof(m_rename_buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+				m_editor->renameEntityFolder(m_renaming_folder, m_rename_buf);
+			}
+			if (ImGui::IsItemDeactivated()) {
+				m_renaming_folder = EntityFolders::INVALID_FOLDER;
+			}
+			m_set_rename_focus = false;
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor();
+		}
+		else {
+			node_open = ImGui::TreeNodeEx((void*)&folder, flags, "%s%s", ICON_FA_FOLDER, folder.name.data);
+		}
+		
+		if (ImGui::BeginDragDropTarget()) {
+			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
+				EntityRef dropped_entity = *(EntityRef*)payload->Data;
+				m_editor->beginCommandGroup(crc32("move_entity_to_folder_group"));
+				m_editor->makeParent(INVALID_ENTITY, dropped_entity);
+				m_editor->moveEntityToFolder(dropped_entity, folder_id);
+				m_editor->endCommandGroup();
+			}
+			ImGui::EndDragDropTarget();
+		}
+
+		if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
+			m_editor->getEntityFolders().selectFolder(folder_id);
+		}
+
+		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) {
+			ImGui::OpenPopup("folder_context_menu");
+		}
+		if (ImGui::BeginPopup("folder_context_menu")) {
+			if (ImGui::Selectable("New folder")) {
+				EntityFolders::FolderID new_folder = m_editor->createEntityFolder(folder_id);
+				m_renaming_folder = new_folder;
+				m_set_rename_focus = true;
+			}
+			if (ImGui::Selectable("Delete")) {
+				m_editor->destroyEntityFolder(folder_id);
+			}
+			if (level > 0 && ImGui::Selectable("Rename")) {
+				m_renaming_folder = folder_id;
+				m_set_rename_focus = true;
+			}
+			ImGui::EndPopup();
+		}
+
+		if (!node_open) {
+			ImGui::PopID();
+			return;
+		}
+
+		u16 child_id = folder.child_folder;
+		while (child_id != EntityFolders::INVALID_FOLDER) {
+			const EntityFolders::Folder& child = folders.getFolder(child_id);
+			folderUI(child, folders, level + 1);
+			child_id = child.next_folder;
+		}
+
+		EntityPtr child_e = folder.first_entity;
+		while (child_e.isValid()) {
+			if (!m_editor->getUniverse()->getParent((EntityRef)child_e).isValid()) {
+				showHierarchy((EntityRef)child_e, m_editor->getSelectedEntities());
+			}
+			child_e = folders.getNextEntity((EntityRef)child_e);
+		}
+
+		ImGui::TreePop();
+		ImGui::PopID();
+	}
 
 	void onEntityListGUI()
 	{
@@ -1815,52 +1905,24 @@ struct StudioAppImpl final : StudioApp
 				filter[0] = '\0';
 			}
 
-			if (ImGui::BeginChild("entities"))
-			{
-				static ImGuiEx::TreeViewClipper clipper;
-
-				const ImVec2 line_size = ImVec2(ImGui::GetContentRegionAvail().x, ImGui::GetTextLineHeightWithSpacing());
-
+			if (ImGui::BeginChild("entities")) {
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
-				if (filter[0] == '\0')
-				{
-					u32 first = clipper.Begin(0xffFFffFF);
-					EntityPtr e = universe->getFirstEntity();
-					while (first > 0 && e.isValid()) {
-						e = universe->getNextEntity((EntityRef)e);
-						while (e.isValid() && universe->getParent((EntityRef)e).isValid())
-							e = universe->getNextEntity((EntityRef)e);
-						--first;
-					}
-
-					while (clipper.BeginNode()) {
-						while (e.isValid() && universe->getParent((EntityRef)e).isValid())
-							e = universe->getNextEntity((EntityRef)e);
-						if (!e.isValid()) break;
-						const EntityRef e_ref = (EntityRef)e;
-						showHierarchy(e_ref, entities, line_size);
-						clipper.EndNode();
-						e = universe->getNextEntity((EntityRef)e);
-					}
-					clipper.End();
-				}
-				else
-				{
-					for (EntityPtr e = universe->getFirstEntity(); e.isValid();
-						 e = universe->getNextEntity((EntityRef)e))
-					{
+				
+				if (filter[0] == '\0') {
+					const EntityFolders& folders = m_editor->getEntityFolders();
+					folderUI(folders.getRoot(), folders, 0);
+				} else {
+					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e)) {
 						char buffer[1024];
 						getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;
 						bool selected = entities.indexOf(e_ref) >= 0;
-						if (ImGui::Selectable(buffer, &selected))
-						{
+						if (ImGui::Selectable(buffer, &selected)) {
 							m_editor->selectEntities(Span(&e_ref, 1), ImGui::GetIO().KeyCtrl);
 						}
-						if (ImGui::BeginDragDropSource())
-						{
+						if (ImGui::BeginDragDropSource()) {
 							ImGui::Text("%s", buffer);
 							ImGui::SetDragDropPayload("entity", &e, sizeof(e));
 							ImGui::EndDragDropSource();
@@ -1871,12 +1933,14 @@ struct StudioAppImpl final : StudioApp
 				ImGui::PopItemWidth();
 			}
 			ImGui::EndChild();
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (auto* payload = ImGui::AcceptDragDropPayload("entity"))
-				{
+
+			if (ImGui::BeginDragDropTarget()) {
+				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
 					EntityRef dropped_entity = *(EntityRef*)payload->Data;
+					m_editor->beginCommandGroup(crc32("move_entity_to_folder_group"));
 					m_editor->makeParent(INVALID_ENTITY, dropped_entity);
+					m_editor->moveEntityToFolder(dropped_entity, 0);
+					m_editor->endCommandGroup();
 				}
 				ImGui::EndDragDropTarget();
 			}
@@ -3354,6 +3418,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_is_pack_data_dialog_open;
 	bool m_is_entity_list_open;
 	EntityPtr m_renaming_entity = INVALID_ENTITY;
+	EntityFolders::FolderID m_renaming_folder = EntityFolders::INVALID_FOLDER;
 	bool m_set_rename_focus = false;
 	char m_rename_buf[Universe::ENTITY_NAME_MAX_LENGTH];
 	bool m_is_f2_pressed = false;

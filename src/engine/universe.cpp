@@ -51,6 +51,7 @@ Universe::Universe(Engine& engine, IAllocator& allocator)
 	, m_component_destroyed(m_allocator)
 	, m_entity_destroyed(m_allocator)
 	, m_entity_moved(m_allocator)
+	, m_entity_created(m_allocator)
 	, m_first_free_slot(-1)
 	, m_scenes(m_allocator)
 	, m_hierarchy(m_allocator)
@@ -336,6 +337,8 @@ void Universe::emplaceEntity(EntityRef entity)
 	data.hierarchy = -1;
 	data.components = 0;
 	data.valid = true;
+
+	m_entity_created.invoke(entity);
 }
 
 
@@ -365,6 +368,7 @@ EntityRef Universe::createEntity(const DVec3& position, const Quat& rotation)
 	data->hierarchy = -1;
 	data->components = 0;
 	data->valid = true;
+	m_entity_created.invoke(entity);
 
 	return entity;
 }
@@ -421,7 +425,7 @@ EntityPtr Universe::getFirstEntity() const
 {
 	for (int i = 0; i < m_entities.size(); ++i)
 	{
-		if (m_entities[i].valid) return {i};
+		if (m_entities[i].valid) return EntityPtr{i};
 	}
 	return INVALID_ENTITY;
 }
@@ -431,7 +435,7 @@ EntityPtr Universe::getNextEntity(EntityRef entity) const
 {
 	for (int i = entity.index + 1; i < m_entities.size(); ++i)
 	{
-		if (m_entities[i].valid) return {i};
+		if (m_entities[i].valid) return EntityPtr{i};
 	}
 	return INVALID_ENTITY;
 }

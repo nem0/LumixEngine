@@ -151,7 +151,13 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual DelegateList<void()>& universeCreated() = 0;
 	virtual DelegateList<void()>& universeDestroyed() = 0;
 
+	virtual u16 createEntityFolder(u16 parent) = 0;
+	virtual void destroyEntityFolder(u16 folder) = 0;
+	virtual void renameEntityFolder(u16 folder, const char* new_name) = 0;
+	virtual void moveEntityToFolder(EntityRef entity, u16 folder) = 0;
+
 	virtual struct PrefabSystem& getPrefabSystem() = 0;
+	virtual struct EntityFolders& getEntityFolders() = 0;
 	virtual void snapEntities(const DVec3& hit_pos, bool translate_mode) = 0;
 
 	virtual bool isGameMode() const = 0;
