@@ -57,7 +57,7 @@ struct EntityRef;
 struct EntityPtr
 {
 	EntityPtr() : index(-1) {}
-	EntityPtr(i32 index) : index(index) {}
+	explicit EntityPtr(i32 index) : index(index) {}
 	i32 index;
 	bool operator==(const EntityPtr& rhs) const { return rhs.index == index; }
 	bool operator<(const EntityPtr& rhs) const { return rhs.index < index; }
@@ -74,7 +74,7 @@ struct EntityRef
 	bool operator<(const EntityRef& rhs) const { return rhs.index < index; }
 	bool operator>(const EntityRef& rhs) const { return rhs.index > index; }
 	bool operator!=(const EntityRef& rhs) const { return rhs.index != index; }
-	operator EntityPtr() const { return {index}; }
+	operator EntityPtr() const { return EntityPtr{index}; }
 };
 
 struct ComponentType
@@ -88,7 +88,7 @@ struct ComponentType
 	bool operator!=(const ComponentType& rhs) const { return rhs.index != index; }
 };
 const ComponentType INVALID_COMPONENT_TYPE = {-1};
-const EntityPtr INVALID_ENTITY = {-1};
+const EntityPtr INVALID_ENTITY = EntityPtr{-1};
 
 template <typename T, u32 count> constexpr u32 lengthOf(const T (&)[count])
 {

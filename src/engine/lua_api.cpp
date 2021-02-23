@@ -605,7 +605,7 @@ static i32 LUA_getParent(Universe* universe, i32 entity)
 
 static void LUA_setParent(Universe* universe, i32 parent, i32 child)
 {
-	return universe->setParent({parent}, {child});
+	return universe->setParent(EntityPtr{parent}, EntityRef{child});
 }
 
 

@@ -4701,6 +4701,11 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* new_value)
 			resource->decRefCount();
 		}
 		else {
+			auto iter = scene.m_resource_actor_map.find(resource);
+			if (iter.value() == entity) {
+				scene.m_resource_actor_map[resource] = next_with_resource->entity;
+			}
+
 			if (next_with_resource) next_with_resource->prev_with_resource = prev_with_resource;
 			if (prev_with_resource) prev_with_resource->next_with_resource = next_with_resource;
 		}
@@ -4710,7 +4715,8 @@ void PhysicsSceneImpl::RigidActor::setResource(PhysicsGeometry* new_value)
 	{
 		auto iter = scene.m_resource_actor_map.find(resource);
 		if (iter.isValid()) {
-			next_with_resource = scene.m_actors[iter.value()];
+			EntityRef e = iter.value();
+			next_with_resource = scene.m_actors[e];
 			next_with_resource->prev_with_resource = this;
 			prev_with_resource = nullptr;
 			scene.m_resource_actor_map[resource] = entity;

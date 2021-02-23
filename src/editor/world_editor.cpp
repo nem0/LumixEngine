@@ -1,5 +1,6 @@
 #include "world_editor.h"
 
+#include "editor/entity_folders.h"
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
 #include "engine/array.h"
@@ -28,7 +29,6 @@
 
 namespace Lumix
 {
-
 
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
@@ -1249,6 +1249,126 @@ struct WorldEditorImpl final : WorldEditor
 {
 	friend struct PasteEntityCommand;
 private:
+	struct DestroyEntityFolderCommand final : IEditorCommand {
+		DestroyEntityFolderCommand(WorldEditorImpl& editor, u16 folder)
+			: m_editor(editor)
+			, m_folder(folder)
+			, m_folder_name(editor.getAllocator())
+		{
+			EntityFolders::Folder& f = editor.m_entity_folders->getFolder(folder);
+			m_parent = f.parent_folder;
+			m_folder_name = f.name;
+		}
+
+		bool execute() override {
+			m_editor.m_entity_folders->destroyFolder(m_folder);
+			return true;
+		}
+
+		void undo() override {
+			m_editor.m_entity_folders->emplaceFolder(m_folder, m_parent);
+			m_editor.m_entity_folders->getFolder(m_folder).name = m_folder_name.c_str();
+		}
+
+		const char* getType() override { return "destroy_entity_folder"; }
+		bool merge(IEditorCommand& command) override { return false; }
+
+		WorldEditorImpl& m_editor;
+		u16 m_parent;
+		u16 m_folder;
+		String m_folder_name;
+	};
+
+	struct CreateEntityFolderCommand final : IEditorCommand {
+		CreateEntityFolderCommand(WorldEditorImpl& editor, EntityFolders::FolderID parent, EntityFolders::FolderID* out)
+			: m_editor(editor)
+			, m_parent(parent)
+			, m_folder(0xffFF)
+			, m_out(out)
+		{}
+
+		bool execute() override {
+			m_folder = m_editor.m_entity_folders->emplaceFolder(m_folder, m_parent);
+			if (m_out) *m_out = m_folder;
+			m_out = nullptr;
+			return true;
+		}
+
+		void undo() override {
+			m_editor.m_entity_folders->destroyFolder(m_folder);
+		}
+
+		const char* getType() override { return "create_entity_folder"; }
+		bool merge(IEditorCommand& command) override { return false; }
+	
+		WorldEditorImpl& m_editor;
+		EntityFolders::FolderID m_parent;
+		EntityFolders::FolderID m_folder;
+		EntityFolders::FolderID* m_out;
+	};
+
+	struct RenameEntityFolderCommand final : IEditorCommand {
+		RenameEntityFolderCommand(WorldEditorImpl& editor, u16 folder, const char* new_name)
+			: m_editor(editor)
+			, m_folder(folder)
+			, m_new_name(new_name, editor.getAllocator())
+			, m_old_name(editor.getAllocator())
+		{
+			m_old_name = m_editor.m_entity_folders->getFolder(m_folder).name;
+		}
+
+		bool execute() override {
+			m_editor.m_entity_folders->getFolder(m_folder).name = m_new_name.c_str();
+			return true;
+		}
+
+		void undo() override {
+			m_editor.m_entity_folders->getFolder(m_folder).name = m_old_name.c_str();
+		}
+
+		const char* getType() override { return "rename_entity_folder"; }
+		bool merge(IEditorCommand& command) override { 
+			RenameEntityFolderCommand& cmd = (RenameEntityFolderCommand&)command;
+			if (cmd.m_folder != m_folder) return false;
+			cmd.m_new_name = m_new_name;
+			return true;
+		}
+	
+		WorldEditorImpl& m_editor;
+		u16 m_folder;
+		String m_new_name;
+		String m_old_name;
+	};
+	
+	struct MoveEntityToFolderCommand final : IEditorCommand {
+		MoveEntityToFolderCommand(WorldEditorImpl& editor, EntityRef entity, u16 folder)
+			: m_editor(editor)
+			, m_new_folder(folder)
+			, m_entity(entity)
+		{
+			m_old_folder = editor.m_entity_folders->getFolder(entity);
+		}
+
+		bool execute() override {
+			m_editor.m_entity_folders->moveToFolder(m_entity, m_new_folder);
+			return true;
+		}
+
+		void undo() override {
+			m_editor.m_entity_folders->moveToFolder(m_entity, m_old_folder);
+		}
+
+		const char* getType() override { return "move_entity_to_folder"; }
+
+		bool merge(IEditorCommand& command) override { return false; }
+	
+		WorldEditorImpl& m_editor;
+		EntityFolders::FolderID m_new_folder;
+		EntityFolders::FolderID m_old_folder;
+		EntityRef m_entity;
+	};
+
+
 	struct AddComponentCommand final : IEditorCommand
 	{
 		AddComponentCommand(WorldEditorImpl& editor,
@@ -1322,10 +1442,12 @@ private:
 
 
 		MakeParentCommand(WorldEditorImpl& editor, EntityPtr parent, EntityRef child)
-			: m_editor(static_cast<WorldEditorImpl&>(editor))
+			: m_editor(editor)
 			, m_parent(parent)
 			, m_child(child)
 		{
+			m_old_folder = editor.m_entity_folders->getFolder(child);
+			m_old_parent = m_editor.getUniverse()->getParent(m_child);
 		}
 
 
@@ -1343,10 +1465,10 @@ private:
 
 		bool execute() override
 		{
-			if(m_child.isValid()) {
-				const EntityRef e = (EntityRef)m_child;
-				m_old_parent = m_editor.getUniverse()->getParent(e);
-				m_editor.getUniverse()->setParent(m_parent, e);
+			m_editor.getUniverse()->setParent(m_parent, m_child);
+			if (m_parent.isValid()) {
+				EntityFolders::FolderID f = m_editor.m_entity_folders->getFolder((EntityRef)m_parent);
+				m_editor.m_entity_folders->moveToFolder(m_child, f);
 			}
 			return true;
 		}
@@ -1354,16 +1476,16 @@ private:
 
 		void undo() override
 		{
-			if(m_child.isValid()) {
-				m_editor.getUniverse()->setParent(m_old_parent, (EntityRef)m_child);
-			}
+			m_editor.getUniverse()->setParent(m_old_parent, m_child);
+			m_editor.m_entity_folders->moveToFolder(m_child, m_old_folder);
 		}
 
 	private:
-		WorldEditor& m_editor;
+		WorldEditorImpl& m_editor;
+		EntityFolders::FolderID m_old_folder;
 		EntityPtr m_parent;
 		EntityPtr m_old_parent;
-		EntityPtr m_child;
+		EntityRef m_child;
 	};
 
 
@@ -1436,6 +1558,8 @@ private:
 				}
 				m_old_values.writeString(universe->getEntityName(m_entities[i]));
 				EntityPtr parent = universe->getParent(m_entities[i]);
+				const EntityFolders::FolderID folder = m_editor.m_entity_folders->getFolder(m_entities[i]);
+				m_old_values.write(folder);
 				m_old_values.write(parent);
 				if (parent.isValid())
 				{
@@ -1497,6 +1621,9 @@ private:
 				const char* name = blob.readString();
 				universe->setEntityName(new_entity, name);
 				EntityPtr parent;
+				EntityFolders::FolderID folder;
+				blob.read(folder);
+				m_editor.m_entity_folders->moveToFolder(new_entity, folder);
 				blob.read(parent);
 				if (parent.isValid())
 				{
@@ -1816,6 +1943,7 @@ public:
 
 		header.engine_hash = m_engine.serialize(*m_universe, blob);
 		m_prefab_system->serialize(blob);
+		m_entity_folders->serialize(blob);
 		const Viewport& vp = getView().getViewport();
 		blob.write(vp.pos);
 		blob.write(vp.rot);
@@ -2109,9 +2237,11 @@ public:
 			m_universe_destroyed.invoke();
 			m_prefab_system->setUniverse(nullptr);
 			StaticString<64> name(m_universe->getName());
+			m_entity_folders.destroy();
 			m_engine.destroyUniverse(*m_universe);
 			
 			m_universe = &m_engine.createUniverse(true);
+			m_entity_folders.create(*m_universe, m_allocator);
 			m_prefab_system->setUniverse(m_universe);
 			m_universe_created.invoke();
 			m_universe->setName(name);
@@ -2127,7 +2257,47 @@ public:
 		}
 		m_engine.getResourceManager().enableUnload(true);
 	}
+	
+	void moveEntityToFolder(EntityRef entity, u16 folder) override {
+		UniquePtr<IEditorCommand> command = UniquePtr<MoveEntityToFolderCommand>::create(m_allocator, *this, entity, folder);
+		executeCommand(command.move());
+	}
 
+	void renameEntityFolder(u16 folder, const char* new_name) override {
+		UniquePtr<IEditorCommand> command = UniquePtr<RenameEntityFolderCommand>::create(m_allocator, *this, folder, new_name);
+		executeCommand(command.move());
+	}
+	
+	u16 createEntityFolder(u16 parent) override {
+		EntityFolders::FolderID res;
+		UniquePtr<IEditorCommand> command = UniquePtr<CreateEntityFolderCommand>::create(m_allocator, *this, parent, &res);
+		executeCommand(command.move());
+		return res;
+	}
+
+	void destroyEntityFolder(u16 folder) override {
+		const EntityFolders::Folder& f = m_entity_folders->getFolder(folder);
+
+		beginCommandGroup(crc32("destroy_entity_folder"));
+		Array<EntityRef> entities(m_allocator);
+
+		EntityPtr iter = f.first_entity;
+		while(iter.isValid()) {
+			entities.push((EntityRef)iter);
+			iter = m_entity_folders->getNextEntity((EntityRef)iter);
+		}
+
+		if (!entities.empty()) destroyEntities(entities.begin(), (i32)entities.size());
+
+		UniquePtr<IEditorCommand> command = UniquePtr<DestroyEntityFolderCommand>::create(m_allocator, *this, folder);
+		executeCommand(command.move());
+
+		endCommandGroup();
+	}
+
+	EntityFolders& getEntityFolders() override {
+		return *m_entity_folders.get();
+	}
 
 	PrefabSystem& getPrefabSystem() override
 	{
@@ -2280,6 +2450,7 @@ public:
 	enum class SerializedVersion : i32
 	{
 		CAMERA,
+		ENTITY_FOLDERS,
 		LATEST
 	};
 
@@ -2350,6 +2521,9 @@ public:
 		if (m_engine.deserialize(*m_universe, blob, Ref(entity_map)))
 		{
 			m_prefab_system->deserialize(blob, entity_map);
+			if (header.version > (i32)SerializedVersion::ENTITY_FOLDERS) {
+				m_entity_folders->deserialize(blob);
+			}
 			if (header.version > (i32)SerializedVersion::CAMERA) {
 				DVec3 pos;
 				Quat rot;
@@ -2483,6 +2657,7 @@ public:
 
 		ASSERT(m_universe);
 		destroyUndoStack();
+		m_entity_folders.destroy();
 		m_universe_destroyed.invoke();
 		m_prefab_system->setUniverse(nullptr);
 		selectEntities({}, false);
@@ -2520,6 +2695,7 @@ public:
 		Universe* universe = m_universe;
 
 		universe->entityDestroyed().bind<&WorldEditorImpl::onEntityDestroyed>(this);
+		m_entity_folders.create(*m_universe, m_allocator);
 
 		m_selected_entities.clear();
 		m_universe_created.invoke();
@@ -2604,6 +2780,7 @@ private:
 	Engine& m_engine;
 	UniverseView* m_view = nullptr;
 	UniquePtr<PrefabSystem> m_prefab_system;
+	Local<EntityFolders> m_entity_folders;
 	Universe* m_universe;
 	bool m_is_loading;
 	bool m_is_universe_changed;

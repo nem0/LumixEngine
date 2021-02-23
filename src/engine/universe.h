@@ -97,6 +97,7 @@ struct LUMIX_ENGINE_API Universe {
 	const char* getName() const { return m_name.c_str(); }
 	void setName(const char* name) { m_name = name; }
 
+	DelegateList<void(EntityRef)>& entityCreated() { return m_entity_created; }
 	DelegateList<void(EntityRef)>& entityTransformed() { return m_entity_moved; }
 	DelegateList<void(EntityRef)>& entityDestroyed() { return m_entity_destroyed; }
 	DelegateList<void(const ComponentUID&)>& componentDestroyed() { return m_component_destroyed; }
@@ -142,6 +143,7 @@ private:
 	Array<EntityData> m_entities;
 	Array<Hierarchy> m_hierarchy;
 	Array<EntityName> m_names;
+	DelegateList<void(EntityRef)> m_entity_created;
 	DelegateList<void(EntityRef)> m_entity_moved;
 	DelegateList<void(EntityRef)> m_entity_destroyed;
 	DelegateList<void(const ComponentUID&)> m_component_destroyed;

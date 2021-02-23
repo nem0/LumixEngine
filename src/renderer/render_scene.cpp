@@ -1599,7 +1599,7 @@ public:
 	{
 		for(int i = entity.index + 1; i < m_model_instances.size(); ++i)
 		{
-			if (m_model_instances[i].flags.isSet(ModelInstance::VALID)) return {i};
+			if (m_model_instances[i].flags.isSet(ModelInstance::VALID)) return EntityPtr{i};
 		}
 		return INVALID_ENTITY;
 	}
