@@ -1068,7 +1068,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	if (Path::hasExtension(path, "par")) {
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
 		
-		m_editor.beginCommandGroup(crc32("insert_particle"));
+		m_editor.beginCommandGroup("insert_particle");
 		EntityRef entity = m_editor.addEntity();
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
 		m_editor.addComponent(Span(&entity, 1), PARTICLE_EMITTER_TYPE);
@@ -1079,7 +1079,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	{
 		const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
 
-		m_editor.beginCommandGroup(crc32("insert_mesh"));
+		m_editor.beginCommandGroup("insert_mesh");
 		EntityRef entity = m_editor.addEntity();
 		m_editor.setEntitiesPositions(&entity, &pos, 1);
 		m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
@@ -1107,7 +1107,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 	{
 		if (hit.is_hit && hit.entity.isValid())
 		{
-			m_editor.beginCommandGroup(crc32("insert_phy_component"));
+			m_editor.beginCommandGroup("insert_phy_component");
 			const EntityRef e = (EntityRef)hit.entity;
 			m_editor.selectEntities(Span(&e, 1), false);
 			m_editor.addComponent(Span(&e, 1), MESH_ACTOR_TYPE);
@@ -1117,7 +1117,7 @@ void SceneView::handleDrop(const char* path, float x, float y)
 		else
 		{
 			const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 1) * hit.dir;
-			m_editor.beginCommandGroup(crc32("insert_phy"));
+			m_editor.beginCommandGroup("insert_phy");
 			EntityRef entity = m_editor.addEntity();
 			m_editor.setEntitiesPositions(&entity, &pos, 1);
 			m_editor.selectEntities(Span(&entity, 1), false);

@@ -2112,8 +2112,9 @@ public:
 	}
 
 
-	void beginCommandGroup(u32 type) override
+	void beginCommandGroup(const char* type_str) override
 	{
+		const u32 type = crc32(type_str);
 		while (m_undo_index < m_undo_stack.size() - 1)
 		{
 			for(int i = m_undo_stack.size() - 1; i > m_undo_index; --i)
@@ -2278,7 +2279,7 @@ public:
 	void destroyEntityFolder(u16 folder) override {
 		const EntityFolders::Folder& f = m_entity_folders->getFolder(folder);
 
-		beginCommandGroup(crc32("destroy_entity_folder"));
+		beginCommandGroup("destroy_entity_folder");
 		Array<EntityRef> entities(m_allocator);
 
 		EntityPtr iter = f.first_entity;
