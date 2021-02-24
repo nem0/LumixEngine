@@ -90,7 +90,7 @@ struct VirtualAllocator {
 	void dealloc(T* ptr) {
 		ptr->~T();
 		i32 idx = i32(ptr - (T*)mem);
-		i32* n = new (NewPlaceholder(), ptr);
+		i32* n = new (NewPlaceholder(), ptr) i32;
 		*n = first_free;
 		first_free = idx;
 	}
