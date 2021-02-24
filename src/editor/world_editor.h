@@ -92,7 +92,7 @@ struct LUMIX_EDITOR_API WorldEditor
 	virtual UniverseView& getView() = 0;
 	virtual void setView(UniverseView* view) = 0;
 	
-	virtual void beginCommandGroup(u32 type) = 0;
+	virtual void beginCommandGroup(const char* type) = 0;
 	virtual void endCommandGroup() = 0;
 	virtual void executeCommand(UniquePtr<IEditorCommand>&& command) = 0;
 	virtual bool isUniverseChanged() const = 0;

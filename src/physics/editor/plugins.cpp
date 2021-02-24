@@ -704,7 +704,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void autogeneratePhySkeleton(EntityRef entity) {
 		WorldEditor& editor = m_app.getWorldEditor();
-		editor.beginCommandGroup(crc32("ragdoll"));
+		editor.beginCommandGroup("ragdoll");
 		Universe& universe = *editor.getUniverse();
 		auto* phy_scene = static_cast<PhysicsScene*>(universe.getScene(RIGID_ACTOR_TYPE));
 		auto* render_scene = static_cast<RenderScene*>(universe.getScene(MODEL_INSTANCE_TYPE));

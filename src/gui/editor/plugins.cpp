@@ -396,7 +396,7 @@ private:
 
 	void paste(EntityRef e)
 	{
-		m_editor->beginCommandGroup(crc32("gui_editor_paste"));
+		m_editor->beginCommandGroup("gui_editor_paste");
 		for (int i = 0; i < m_copy_position_buffer_count; ++i)
 		{
 			CopyPositionBufferItem& item = m_copy_position_buffer[i];
@@ -437,7 +437,7 @@ private:
 				{
 					case MouseMode::RESIZE:
 					{
-						m_editor->beginCommandGroup(crc32("gui_mouse_resize"));
+						m_editor->beginCommandGroup("gui_mouse_resize");
 						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
 						setRectProperty(e, "Bottom Points", b);
 						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
@@ -447,7 +447,7 @@ private:
 					break;
 					case MouseMode::MOVE:
 					{
-						m_editor->beginCommandGroup(crc32("gui_mouse_move"));
+						m_editor->beginCommandGroup("gui_mouse_move");
 						float b = m_bottom_right_start_transform.y + ImGui::GetMouseDragDelta(0).y;
 						setRectProperty(e, "Bottom Points", b);
 						float r = m_bottom_right_start_transform.x + ImGui::GetMouseDragDelta(0).x;
@@ -613,7 +613,7 @@ private:
 		const EntityRef e = selected[0];
 
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
-		m_editor->beginCommandGroup(crc32("layout_gui"));
+		m_editor->beginCommandGroup("layout_gui");
 
 		u32 y = 0;
 		u32 col = 0;
@@ -644,7 +644,7 @@ private:
 
 	void createChild(EntityRef entity, ComponentType child_type)
 	{
-		m_editor->beginCommandGroup(crc32("create_gui_rect_child"));
+		m_editor->beginCommandGroup("create_gui_rect_child");
 		EntityRef child = m_editor->addEntity();
 		m_editor->makeParent(entity, child);
 		m_editor->selectEntities(Span(&child, 1), false);
@@ -669,7 +669,7 @@ private:
 		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
 		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
 
-		m_editor->beginCommandGroup(crc32("make_gui_rect_absolute"));
+		m_editor->beginCommandGroup("make_gui_rect_absolute");
 
 		if (mask & (u8)EdgeMask::TOP) {
 			setRectProperty(entity, "Top Relative", 0);
@@ -697,7 +697,7 @@ private:
 	void anchor(EntityRef entity, u8 mask) {
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 
-		m_editor->beginCommandGroup(crc32("anchor_gui_rect"));
+		m_editor->beginCommandGroup("anchor_gui_rect");
 
 		float br = scene->getRectBottomRelative(entity);
 		float tr = scene->getRectTopRelative(entity);
@@ -741,7 +741,7 @@ private:
 	{
 		GUIScene* scene = (GUIScene*)m_editor->getUniverse()->getScene(crc32("gui"));
 
-		m_editor->beginCommandGroup(crc32("align_gui_rect"));
+		m_editor->beginCommandGroup("align_gui_rect");
 
 		float br = scene->getRectBottomRelative(entity);
 		float bp = scene->getRectBottomPoints(entity);
@@ -805,7 +805,7 @@ private:
 
 	void expand(EntityRef entity, u8 mask)
 	{
-		m_editor->beginCommandGroup(crc32("expand_gui_rect"));
+		m_editor->beginCommandGroup("expand_gui_rect");
 
 		if (mask & (u8)EdgeMask::TOP)
 		{
@@ -844,7 +844,7 @@ private:
 		GUIScene::Rect parent_rect = scene->getRectEx(parent, canvas_size);
 		GUIScene::Rect child_rect = scene->getRectEx(entity, canvas_size);
 
-		m_editor->beginCommandGroup(crc32("make_gui_rect_relative"));
+		m_editor->beginCommandGroup("make_gui_rect_relative");
 		
 		if (mask & (u8)EdgeMask::TOP)
 		{

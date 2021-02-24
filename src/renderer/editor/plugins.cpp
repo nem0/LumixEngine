@@ -3933,13 +3933,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = m_app.getWorldEditor();
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 33), view, Ref(tr), Ref(p.inner_range), cfg, true)) {
-			editor.beginCommandGroup(crc32("env_probe_inner_range"));
+			editor.beginCommandGroup("env_probe_inner_range");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Inner range", Span(&e, 1), p.inner_range);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();
 		}
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, Ref(tr), Ref(p.outer_range), cfg, false)) {
-			editor.beginCommandGroup(crc32("env_probe_outer_range"));
+			editor.beginCommandGroup("env_probe_outer_range");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Outer range", Span(&e, 1), p.outer_range);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();
@@ -3959,7 +3959,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = m_app.getWorldEditor();
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, Ref(tr), Ref(p.half_extents), cfg, false)) {
-			editor.beginCommandGroup(crc32("refl_probe_half_ext"));
+			editor.beginCommandGroup("refl_probe_half_ext");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Half extents", Span(&e, 1), p.half_extents);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();

@@ -1718,7 +1718,7 @@ struct StudioAppImpl final : StudioApp
 			{
 				if (ImGui::MenuItem("Create child"))
 				{
-					m_editor->beginCommandGroup(crc32("create_child_entity"));
+					m_editor->beginCommandGroup("create_child_entity");
 					EntityRef child = m_editor->addEntity();
 					m_editor->makeParent(entity, child);
 					const DVec3 pos = m_editor->getUniverse()->getPosition(entity);
@@ -1833,7 +1833,7 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::BeginDragDropTarget()) {
 			if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
 				EntityRef dropped_entity = *(EntityRef*)payload->Data;
-				m_editor->beginCommandGroup(crc32("move_entity_to_folder_group"));
+				m_editor->beginCommandGroup("move_entity_to_folder_group");
 				m_editor->makeParent(INVALID_ENTITY, dropped_entity);
 				m_editor->moveEntityToFolder(dropped_entity, folder_id);
 				m_editor->endCommandGroup();
@@ -1937,7 +1937,7 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::BeginDragDropTarget()) {
 				if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
 					EntityRef dropped_entity = *(EntityRef*)payload->Data;
-					m_editor->beginCommandGroup(crc32("move_entity_to_folder_group"));
+					m_editor->beginCommandGroup("move_entity_to_folder_group");
 					m_editor->makeParent(INVALID_ENTITY, dropped_entity);
 					m_editor->moveEntityToFolder(dropped_entity, 0);
 					m_editor->endCommandGroup();
@@ -2817,7 +2817,7 @@ struct StudioAppImpl final : StudioApp
 		LuaWrapper::checkTableArg(L, 2);
 
 		WorldEditor& editor = *studio->m_editor;
-		editor.beginCommandGroup(crc32("createEntityEx"));
+		editor.beginCommandGroup("createEntityEx");
 		EntityRef e = editor.addEntity();
 		editor.selectEntities(Span(&e, 1), false);
 

@@ -425,7 +425,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 			}
 
 			const ComponentUID cmp = editor.getUniverse()->getComponent(entity, LUA_SCRIPT_TYPE);
-			editor.beginCommandGroup(crc32("add_lua_script"));
+			editor.beginCommandGroup("add_lua_script");
 			editor.addArrayPropertyItem(cmp, "scripts");
 
 			if (!create_empty) {

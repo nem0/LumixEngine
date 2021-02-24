@@ -916,8 +916,7 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 	}
 	if(!meshes) return;
 
-	const u32 REMOVE_ENTITIES_HASH = crc32("remove_entities");
-	m_world_editor.beginCommandGroup(REMOVE_ENTITIES_HASH);
+	m_world_editor.beginCommandGroup("remove_entities");
 	if (m_selected_prefabs.empty())
 	{
 		meshes->forEach([&](EntityRef entity){
@@ -1001,8 +1000,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 
 	auto& prefab_system = m_world_editor.getPrefabSystem();
 
-	static const u32 PAINT_ENTITIES_HASH = crc32("paint_entities");
-	m_world_editor.beginCommandGroup(PAINT_ENTITIES_HASH);
+	m_world_editor.beginCommandGroup("paint_entities");
 	{
 		RenderScene* scene = static_cast<RenderScene*>(m_component.scene);
 		const Transform terrain_tr = m_world_editor.getUniverse()->getTransform((EntityRef)m_component.entity);
