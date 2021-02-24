@@ -103,6 +103,7 @@ void EntityFolders::destroyFolder(FolderID folder) {
 		Folder& p = m_folder_allocator.getObject(f.prev_folder);
 		p.next_folder = f.next_folder;
 	}
+	m_folder_allocator.dealloc(&f);
 }
 
 EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID parent) {
