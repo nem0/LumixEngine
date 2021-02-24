@@ -1684,7 +1684,7 @@ namespace Lumix
 					}
 					else {
 						if (LuaWrapper::getField(scr.m_state, -1, "_entity") == LUA_TNUMBER) {
-							e = { (i32)lua_tointeger(scr.m_state, -1) };
+							e = EntityPtr{ (i32)lua_tointeger(scr.m_state, -1) };
 						}
 						lua_pop(scr.m_state, 1);
 					}

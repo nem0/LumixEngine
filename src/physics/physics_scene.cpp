@@ -2834,7 +2834,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 		if (hit.block.shape)
 		{
 			PxRigidActor* actor = hit.block.shape->getActor();
-			if (actor) result.entity = {(int)(intptr_t)actor->userData};
+			if (actor) result.entity = EntityPtr{(int)(intptr_t)actor->userData};
 		}
 		return status;
 	}
