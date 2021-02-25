@@ -244,6 +244,12 @@ struct LUMIX_ENGINE_API Vec3 {
 	static const Vec3 ZERO;
 };
 
+struct LUMIX_ENGINE_API DVec2 {
+	DVec2() {}
+	DVec2(double x, double y) : x(x), y(y) {}
+	DVec2 operator -(const DVec2& rhs) const { return {x - rhs.x, y - rhs.y}; }
+	double x, y;
+};
 
 struct LUMIX_ENGINE_API DVec3
 {
@@ -266,6 +272,7 @@ struct LUMIX_ENGINE_API DVec3
 	void operator+=(const DVec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator+=(const Vec3& rhs) { x += rhs.x; y += rhs.y; z += rhs.z; }
 	void operator-=(const Vec3& rhs) { x -= rhs.x; y -= rhs.y; z -= rhs.z; }
+	DVec2 xz() const { return DVec2(x, z); }
 
 	double x, y, z;
 };
@@ -1160,7 +1167,9 @@ LUMIX_ENGINE_API Quat normalize(const Quat& value);
 LUMIX_ENGINE_API float length(const Vec2& value);
 LUMIX_ENGINE_API float length(const Vec3& value);
 LUMIX_ENGINE_API double length(const DVec3& value);
+LUMIX_ENGINE_API float squaredLength(const Vec2& value);
 LUMIX_ENGINE_API float squaredLength(const Vec3& value);
+LUMIX_ENGINE_API double squaredLength(const DVec2& value);
 LUMIX_ENGINE_API double squaredLength(const DVec3& value);
 
 } // namespace Lumix

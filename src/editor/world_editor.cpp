@@ -2213,7 +2213,7 @@ public:
 		m_game_mode_file.clear();
 		save(m_game_mode_file);
 		m_is_game_mode = true;
-		beginCommandGroup(0);
+		beginCommandGroup("");
 		endCommandGroup();
 		m_game_mode_commands = 2;
 		m_engine.startGame(*m_universe);

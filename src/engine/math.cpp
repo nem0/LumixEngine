@@ -60,7 +60,9 @@ Quat normalize(const Quat& value) {
 float length(const Vec2& value) { return sqrt(value.x * value.x + value.y * value.y); }
 float length(const Vec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
 double length(const DVec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
+float squaredLength(const Vec2& value) { return value.x * value.x + value.y * value.y; }
 float squaredLength(const Vec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
+double squaredLength(const DVec2& value) { return value.x * value.x + value.y * value.y; }
 double squaredLength(const DVec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
 
 Vec3::Vec3(const DVec3& rhs)
