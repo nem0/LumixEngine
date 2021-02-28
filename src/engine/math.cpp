@@ -133,18 +133,16 @@ void Quat::fromEuler(const Vec3& euler)
 Vec3 Quat::toEuler() const
 {
 	// from urho3d
-	float check = 2.0f * (-y * z + w * x);
+	float check = 2.0f * (w * x - y * z);
 
-	if (check < -0.995f)
-	{
-		return Vec3(
-			-PI * 0.5f, 0.0f, -atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
+	if (check < -0.999999f) {
+		return Vec3(-PI * 0.5f, 0.0f, -atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
 	}
-	if (check > 0.995f)
-	{
-		return Vec3(
-			PI * 0.5f, 0.0f, atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
+
+	if (check > 0.999999f) {
+		return Vec3(PI * 0.5f, 0.0f, atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
 	}
+
 	return Vec3(asinf(check),
 		atan2f(2.0f * (x * z + w * y), 1.0f - 2.0f * (x * x + y * y)),
 		atan2f(2.0f * (x * y + w * z), 1.0f - 2.0f * (x * x + z * z)));

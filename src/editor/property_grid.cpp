@@ -793,7 +793,8 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 		Vec3 old_euler = rot.toEuler();
 		Vec3 euler = radiansToDegrees(old_euler);
 		ImGuiEx::Label("Rotation");
-		if (ImGui::DragFloat3("##rot", &euler.x))
+		const float rot_change_speed = ImGui::GetIO().KeyAlt ? 10.f : 1.f; // we won't have precision without this
+		if (ImGui::DragFloat3("##rot", &euler.x, rot_change_speed, 0, 0, "%.2f"))
 		{
 			if (euler.x <= -90.0f || euler.x >= 90.0f) euler.y = 0;
 			euler.x = degreesToRadians(clamp(euler.x, -90.0f, 90.0f));
@@ -806,9 +807,9 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 			{
 				Vec3 tmp = universe.getRotation(entity).toEuler();
 			
-				if (fabs(euler.x - old_euler.x) > 0.01f) tmp.x = euler.x;
-				if (fabs(euler.y - old_euler.y) > 0.01f) tmp.y = euler.y;
-				if (fabs(euler.z - old_euler.z) > 0.01f) tmp.z = euler.z;
+				if (fabs(euler.x - old_euler.x) > 0.0001f) tmp.x = euler.x;
+				if (fabs(euler.y - old_euler.y) > 0.0001f) tmp.y = euler.y;
+				if (fabs(euler.z - old_euler.z) > 0.0001f) tmp.z = euler.z;
 				rots.emplace().fromEuler(tmp);
 			}
 			m_editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
