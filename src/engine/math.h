@@ -59,11 +59,24 @@ struct LUMIX_ENGINE_API IVec4
 };
 
 
+struct LUMIX_ENGINE_API DVec2 {
+	DVec2() {}
+	DVec2(double x, double y) : x(x), y(y) {}
+	DVec2 operator -(const DVec2& rhs) const { return {x - rhs.x, y - rhs.y}; }
+	double x, y;
+};
+
 struct LUMIX_ENGINE_API Vec2
 {
 	Vec2() {}
 	
 	explicit Vec2(const IVec2& rhs)
+		: x(float(rhs.x))
+		, y(float(rhs.y))
+	{
+	}
+	
+	explicit Vec2(const DVec2& rhs)
 		: x(float(rhs.x))
 		, y(float(rhs.y))
 	{
@@ -242,13 +255,6 @@ struct LUMIX_ENGINE_API Vec3 {
 	static const Vec3 MAX;
 	static const Vec3 MIN;
 	static const Vec3 ZERO;
-};
-
-struct LUMIX_ENGINE_API DVec2 {
-	DVec2() {}
-	DVec2(double x, double y) : x(x), y(y) {}
-	DVec2 operator -(const DVec2& rhs) const { return {x - rhs.x, y - rhs.y}; }
-	double x, y;
 };
 
 struct LUMIX_ENGINE_API DVec3
