@@ -49,6 +49,29 @@ struct Camera
 	bool is_ortho;
 };
 
+struct Decal {
+	Material* material = nullptr;
+	Transform transform;
+	float radius;
+	EntityRef entity;
+	EntityPtr prev_decal = INVALID_ENTITY;
+	EntityPtr next_decal = INVALID_ENTITY;
+	Vec3 half_extents;
+	Vec2 uv_scale;
+};
+
+struct CurveDecal {
+	Material* material = nullptr;
+	Transform transform;
+	float radius;
+	EntityRef entity;
+	EntityPtr prev_decal = INVALID_ENTITY;
+	EntityPtr next_decal = INVALID_ENTITY;
+	Vec3 half_extents;
+	Vec2 uv_scale;
+	Vec2 bezier_p0;
+	Vec2 bezier_p2;
+};
 
 struct TerrainInfo
 {
@@ -190,6 +213,7 @@ enum class RenderableTypes : u8 {
 	LOCAL_LIGHT,
 	MESH_MATERIAL_OVERRIDE,
 	FUR,
+	CURVE_DECAL,
 
 	COUNT
 };
@@ -292,13 +316,23 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual EntityPtr getNextModelInstance(EntityPtr entity) = 0;
 	virtual Model* getModelInstanceModel(EntityRef entity) = 0;
 
+	virtual CurveDecal& getCurveDecal(EntityRef entity) = 0;
+	virtual void setCurveDecalMaterialPath(EntityRef entity, const Path& path) = 0;
+	virtual Path getCurveDecalMaterialPath(EntityRef entity) = 0;
+	virtual void setCurveDecalHalfExtents(EntityRef entity, float value) = 0;
+	virtual float getCurveDecalHalfExtents(EntityRef entity) = 0;
+	virtual void setCurveDecalUVScale(EntityRef entity, const Vec2& value) = 0;
+	virtual Vec2 getCurveDecalUVScale(EntityRef entity) = 0;
+	virtual void setCurveDecalBezierP0(EntityRef entity, const Vec2& value) = 0;
+	virtual Vec2 getCurveDecalBezierP0(EntityRef entity) = 0;
+	virtual void setCurveDecalBezierP2(EntityRef entity, const Vec2& value) = 0;
+	virtual Vec2 getCurveDecalBezierP2(EntityRef entity) = 0;
+
+	virtual Decal& getDecal(EntityRef entity) = 0;
 	virtual void setDecalMaterialPath(EntityRef entity, const Path& path) = 0;
 	virtual Path getDecalMaterialPath(EntityRef entity) = 0;
 	virtual void setDecalHalfExtents(EntityRef entity, const Vec3& value) = 0;
 	virtual Vec3 getDecalHalfExtents(EntityRef entity) = 0;
-	virtual void setDecalUVScale(EntityRef entity, const Vec2& value) = 0;
-	virtual Vec2 getDecalUVScale(EntityRef entity) = 0;
-	virtual Material* getDecalMaterial(EntityRef entity) const = 0;
 
 	virtual Terrain* getTerrain(EntityRef entity) = 0;
 	virtual const HashMap<EntityRef, Terrain*>& getTerrains() = 0;

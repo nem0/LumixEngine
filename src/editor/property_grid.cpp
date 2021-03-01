@@ -384,6 +384,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		ComponentUID cmp = getComponent();
 		Vec2 value = prop.get(cmp, m_index);
 		Attributes attrs = getAttributes(prop);
+		if (attrs.no_ui) return;
 
 		if (attrs.is_radians) value = radiansToDegrees(value);
 		ImGuiEx::Label(prop.name);

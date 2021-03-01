@@ -3,7 +3,6 @@
 #include <ShellScalingAPI.h>
 #include "editor/studio_app.h"
 
-
 int main(int argc, char* argv[])
 {
 	SetProcessDPIAware();
