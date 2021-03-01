@@ -22,7 +22,6 @@ static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
 static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
-static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
 
 
 enum class IconType
@@ -137,7 +136,6 @@ struct EditorIconsImpl final : EditorIcons
 		
 		const u64 mask = universe.getComponentsMask(entity);
 		if (mask & ((u64)1 << (u64)MODEL_INSTANCE_TYPE.index)) return;
-		if (mask & ((u64)1 << (u64)DECAL_TYPE.index)) return;
 
 		auto& icon = m_icons.insert(entity);
 		icon.entity = entity;

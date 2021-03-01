@@ -867,6 +867,13 @@ struct PipelineImpl final : Pipeline
 		m_decal_decl.addAttribute(3, 28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 		m_decal_decl.addAttribute(4, 40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
 
+		m_curve_decal_decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
+		m_curve_decal_decl.addAttribute(1, 0, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(2, 12, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(3, 28, 3, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(4, 40, 2, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+		m_curve_decal_decl.addAttribute(5, 48, 4, gpu::AttributeType::FLOAT, gpu::Attribute::INSTANCED);
+
 		m_2D_decl.addAttribute(0, 0, 2, gpu::AttributeType::FLOAT, 0);
 		m_2D_decl.addAttribute(1, 8, 2, gpu::AttributeType::FLOAT, 0);
 		m_2D_decl.addAttribute(2, 16, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);
@@ -3108,6 +3115,44 @@ struct PipelineImpl final : Pipeline
 							++stats.instance_count;
 							break;
 						}
+						case RenderableTypes::CURVE_DECAL: {
+							READ(Material::RenderData*, material);
+							READ(gpu::ProgramHandle, program);
+							READ(gpu::BufferHandle, buffer);
+							READ(u32, offset);
+							READ(u32, count);
+							READ(u32, nonintersecting_count);
+								
+							gpu::bindTextures(material->textures, 0, material->textures_count);
+							if (material_ub_idx != material->material_constants) {
+								gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+								material_ub_idx = material->material_constants;
+							}
+							gpu::useProgram(program);
+							gpu::bindIndexBuffer(m_pipeline->m_cube_ib);
+							gpu::bindVertexBuffer(0, m_pipeline->m_cube_vb, 0, 12);
+
+							gpu::StateFlags state = material->render_states | render_states;
+							state = state & ~gpu::StateFlags::CULL_FRONT | gpu::StateFlags::CULL_BACK;
+							if (nonintersecting_count) {
+								gpu::setState(state);
+								gpu::bindVertexBuffer(1, buffer, offset, 64);
+								gpu::drawTrianglesInstanced(36, nonintersecting_count, gpu::DataType::U16);
+							}
+
+							if (count - nonintersecting_count) {
+								state = state & ~gpu::StateFlags::DEPTH_TEST;
+								state = state & ~gpu::StateFlags::CULL_BACK;
+								state = state | gpu::StateFlags::CULL_FRONT;
+								gpu::setState(state);
+								const u32 offs = offset + sizeof(float) * 16 * nonintersecting_count;
+								gpu::bindVertexBuffer(1, buffer, offs, 64);
+								gpu::drawTrianglesInstanced(36, count - nonintersecting_count, gpu::DataType::U16);
+							}
+							++stats.draw_call_count;
+							stats.instance_count += count;
+							break;
+						}
 						case RenderableTypes::DECAL: {
 							READ(Material::RenderData*, material);
 							READ(gpu::ProgramHandle, program);
@@ -3394,7 +3439,7 @@ struct PipelineImpl final : Pipeline
 					break;
 				}
 				case RenderableTypes::DECAL: {
-					const Material* material = scene->getDecalMaterial(e);
+					const Material* material = scene->getDecal(e).material;
 
 					int start_i = i;
 					const u64 key = sort_keys[i];
@@ -3421,16 +3466,68 @@ struct PipelineImpl final : Pipeline
 						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
 						const Transform& tr = entity_data[e.index];
 						const Vec3 lpos = Vec3(tr.pos - camera_pos);
-						const Vec3 half_extents = scene->getDecalHalfExtents(e);
-						const Vec2 uv_scale = scene->getDecalUVScale(e);
-						const float m = maximum(half_extents.x, half_extents.y, half_extents.z);
+						const Decal& decal = scene->getDecal(e);
+						const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
 						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
 						
 						DecalData* iter = intersecting ? end : beg;
 						iter->pos = lpos;
 						iter->rot = tr.rot;
-						iter->half_extents = half_extents;
-						iter->uv_scale = uv_scale;
+						iter->half_extents = decal.half_extents;
+						iter->uv_scale = decal.uv_scale;
+						intersecting ? --end : ++beg;
+					}
+
+					WRITE(type);
+					WRITE_FN(material->getRenderData());
+					WRITE(prog);
+					WRITE(slice.buffer);
+					WRITE(slice.offset);
+					WRITE(count);
+					const u32 nonintersecting_count = u32(beg - (DecalData*)slice.ptr);
+					WRITE(nonintersecting_count);
+					--i;
+					break;
+				}
+				case RenderableTypes::CURVE_DECAL: {
+					const Material* material = scene->getCurveDecal(e).material;
+
+					int start_i = i;
+					const u64 key = sort_keys[i];
+					while (i < c && sort_keys[i] == key) {
+						++i;
+					}
+					const u32 count = i - start_i;
+					struct DecalData {
+						Vec3 pos;
+						Quat rot;
+						Vec3 half_extents;
+						Vec2 uv_scale;
+						Vec4 bezier;
+					};
+					const Renderer::TransientSlice slice = renderer.allocTransient(count * (sizeof(DecalData)));
+					const gpu::ProgramHandle prog = material->getShader()->getProgram(m_curve_decal_decl, define_mask | material->getDefineMask());
+
+					if ((cmd_page->data + sizeof(cmd_page->data) - out) < 21) {
+						new_page(bucket);
+					}
+					u8* mem = slice.ptr;
+					DecalData* beg = (DecalData*)slice.ptr;
+					DecalData* end = (DecalData*)(slice.ptr + (count - 1) * sizeof(DecalData));
+					for(u32 j = start_i; j < i; ++j) {
+						const EntityRef e = {int(renderables[j] & 0x00ffFFff)};
+						const Transform& tr = entity_data[e.index];
+						const Vec3 lpos = Vec3(tr.pos - camera_pos);
+						const CurveDecal& decal = scene->getCurveDecal(e);
+						const float m = maximum(decal.half_extents.x, decal.half_extents.y, decal.half_extents.z);
+						const bool intersecting = frustum.intersectNearPlane(tr.pos, m * SQRT3);
+						
+						DecalData* iter = intersecting ? end : beg;
+						iter->pos = lpos;
+						iter->rot = tr.rot;
+						iter->half_extents = decal.half_extents;
+						iter->uv_scale = decal.uv_scale;
+						iter->bezier = Vec4(decal.bezier_p0, decal.bezier_p2);
 						intersecting ? --end : ++beg;
 					}
 
@@ -4170,7 +4267,21 @@ struct PipelineImpl final : Pipeline
 					case RenderableTypes::DECAL: {
 						for (int i = 0, c = page->header.count; i < c; ++i) {
 							const EntityRef e = renderables[i];
-							const Material* material = scene->getDecalMaterial(e);
+							const Material* material = scene->getDecal(e).material;
+							const int layer = material->getLayer();
+							const u8 bucket = bucket_map[layer];
+							if (bucket < 0xff) {
+								// TODO material can have the same sort key as mesh
+								const u64 subrenderable = e.index | type_mask;
+								inserter.push(material->getSortKey() | ((u64)bucket << SORT_KEY_BUCKET_SHIFT), subrenderable);
+							}
+						}
+						break;
+					}
+					case RenderableTypes::CURVE_DECAL: {
+						for (int i = 0, c = page->header.count; i < c; ++i) {
+							const EntityRef e = renderables[i];
+							const Material* material = scene->getCurveDecal(e).material;
 							const int layer = material->getLayer();
 							const u8 bucket = bucket_map[layer];
 							if (bucket < 0xff) {
@@ -4798,6 +4909,7 @@ struct PipelineImpl final : Pipeline
 	gpu::VertexDecl m_2D_decl;
 	gpu::VertexDecl m_simple_cube_decl;
 	gpu::VertexDecl m_decal_decl;
+	gpu::VertexDecl m_curve_decal_decl;
 	gpu::VertexDecl m_3D_pos_decl;
 	gpu::VertexDecl m_point_light_decl;
 	gpu::BufferHandle m_cube_vb;

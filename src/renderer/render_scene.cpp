@@ -37,12 +37,14 @@ namespace Lumix
 enum class RenderSceneVersion : int
 {
 	DECAL_UV_SCALE,
+	CURVE_DECALS,
 	LATEST
 };
 
 
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
 static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
+static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
 static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
 static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType("particle_emitter");
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
@@ -52,19 +54,6 @@ static const ComponentType BONE_ATTACHMENT_TYPE = reflection::getComponentType("
 static const ComponentType ENVIRONMENT_PROBE_TYPE = reflection::getComponentType("environment_probe");
 static const ComponentType REFLECTION_PROBE_TYPE = reflection::getComponentType("reflection_probe");
 static const ComponentType FUR_TYPE = reflection::getComponentType("fur");
-
-
-struct Decal
-{
-	Material* material = nullptr;
-	Transform transform;
-	float radius;
-	EntityRef entity;
-	EntityPtr prev_decal = INVALID_ENTITY;
-	EntityPtr next_decal = INVALID_ENTITY;
-	Vec3 half_extents;
-	Vec2 uv_scale;
-};
 
 
 struct BoneAttachment
@@ -125,6 +114,33 @@ public:
 			while(e.isValid()) {
 				m_culling_system->remove((EntityRef)e);
 				e = m_decals[(EntityRef)e].next_decal;
+			}
+		}
+	}
+
+
+	void curveDecalMaterialStateChanged(Resource::State old_state, Resource::State new_state, Resource& resource)
+	{
+		Material& material = static_cast<Material&>(resource);
+		
+		if (new_state == Resource::State::READY) {
+			auto map_iter = m_material_curve_decal_map.find(&material);
+			EntityPtr e = map_iter.value();
+			while(e.isValid()) {
+				const float radius = length(m_curve_decals[(EntityRef)e].half_extents);
+				const DVec3 pos = m_universe.getPosition((EntityRef)e);
+				m_culling_system->add((EntityRef)e, (u8)RenderableTypes::CURVE_DECAL, pos, radius);
+				e = m_curve_decals[(EntityRef)e].next_decal;
+			}
+			return;
+		}
+		
+		if (old_state == Resource::State::READY) {
+			auto map_iter = m_material_curve_decal_map.find(&material);
+			EntityPtr e = map_iter.value();
+			while(e.isValid()) {
+				m_culling_system->remove((EntityRef)e);
+				e = m_curve_decals[(EntityRef)e].next_decal;
 			}
 		}
 	}
@@ -617,6 +633,30 @@ public:
 			m_universe.onComponentCreated(decal.entity, DECAL_TYPE, this);
 		}
 	}
+	
+	void deserializeCurveDecals(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version)
+	{
+		if (version <= (i32)RenderSceneVersion::CURVE_DECALS) return;
+		
+		u32 count;
+		serializer.read(count);
+		m_curve_decals.reserve(count + m_decals.size());
+		for (u32 i = 0; i < count; ++i) {
+			CurveDecal decal;
+			serializer.read(decal.entity);
+			decal.entity = entity_map.get(decal.entity);
+			decal.uv_scale = Vec2(1);
+			serializer.read(decal.uv_scale);
+			serializer.read(decal.half_extents.y);
+			serializer.read(decal.bezier_p0);
+			serializer.read(decal.bezier_p2);
+			const char* tmp = serializer.readString();
+			updateDecalInfo(decal);
+			m_curve_decals.insert(decal.entity, decal);
+			setCurveDecalMaterialPath(decal.entity, Path(tmp));
+			m_universe.onComponentCreated(decal.entity, CURVE_DECAL_TYPE, this);
+		}
+	}
 
 
 	void serializeDecals(OutputMemoryStream& serializer)
@@ -627,6 +667,20 @@ public:
 			serializer.write(decal.entity);
 			serializer.write(decal.half_extents);
 			serializer.write(decal.uv_scale);
+			serializer.writeString(decal.material ? decal.material->getPath().c_str() : "");
+		}
+	}
+
+	void serializeCurveDecals(OutputMemoryStream& serializer)
+	{
+		serializer.write(m_curve_decals.size());
+		for (auto& decal : m_curve_decals)
+		{
+			serializer.write(decal.entity);
+			serializer.write(decal.uv_scale);
+			serializer.write(decal.half_extents.y);
+			serializer.write(decal.bezier_p0);
+			serializer.write(decal.bezier_p2);
 			serializer.writeString(decal.material ? decal.material->getPath().c_str() : "");
 		}
 	}
@@ -803,6 +857,7 @@ public:
 		serializeEnvironmentProbes(serializer);
 		serializeReflectionProbes(serializer);
 		serializeDecals(serializer);
+		serializeCurveDecals(serializer);
 		serializeFurs(serializer);
 	}
 
@@ -926,6 +981,7 @@ public:
 		deserializeEnvironmentProbes(serializer, entity_map);
 		deserializeReflectionProbes(serializer, entity_map);
 		deserializeDecals(serializer, entity_map, version);
+		deserializeCurveDecals(serializer, entity_map, version);
 		deserializeFurs(serializer, entity_map);
 	}
 
@@ -993,6 +1049,12 @@ public:
 		m_universe.onComponentDestroyed(entity, DECAL_TYPE, this);
 	}
 
+	void destroyCurveDecal(EntityRef entity)
+	{
+		m_culling_system->remove(entity);
+		m_curve_decals.erase(entity);
+		m_universe.onComponentDestroyed(entity, CURVE_DECAL_TYPE, this);
+	}
 
 	void destroyPointLight(EntityRef entity)
 	{
@@ -1155,6 +1217,12 @@ public:
 				const DVec3 position = m_universe.getPosition(entity);
 				m_culling_system->setPosition(entity, position);
 			}
+			else if (m_universe.hasComponent(entity, CURVE_DECAL_TYPE)) {
+				auto iter = m_curve_decals.find(entity);
+				updateDecalInfo(iter.value());
+				const DVec3 position = m_universe.getPosition(entity);
+				m_culling_system->setPosition(entity, position);
+			}
 			else if (m_universe.hasComponent(entity, POINT_LIGHT_TYPE)) {
 				const DVec3 pos = m_universe.getPosition(entity);
 				m_culling_system->setPosition(entity, pos);
@@ -1280,12 +1348,81 @@ public:
 		return m_decals[entity].half_extents;
 	}
 
-	void setDecalUVScale(EntityRef entity, const Vec2& value) override {
-		m_decals[entity].uv_scale = value;
+	Decal& getDecal(EntityRef entity) override {
+		return m_decals[entity];
 	}
 
-	Vec2 getDecalUVScale(EntityRef entity) override {
-		return m_decals[entity].uv_scale;
+	CurveDecal& getCurveDecal(EntityRef entity) override {
+		return m_curve_decals[entity];
+	}
+
+	void setCurveDecalMaterialPath(EntityRef entity, const Path& path) override {
+		CurveDecal& decal = m_curve_decals[entity];
+		if (decal.material) {
+			removeFromMaterialCurveDecalMap(decal.material, entity);
+			decal.material->decRefCount();
+		}
+
+		if (path.isValid()) {
+			decal.material = m_engine.getResourceManager().load<Material>(path);
+			addToMaterialCurveDecalMap(decal.material, entity);
+
+			if (decal.material->isReady()) {
+				const float radius = length(m_curve_decals[entity].half_extents);
+				const DVec3 pos = m_universe.getPosition(entity);
+				m_culling_system->add(entity, (u8)RenderableTypes::CURVE_DECAL, pos, radius);
+			}
+		}
+		else {
+			decal.material = nullptr;
+		}
+	}
+
+	Path getCurveDecalMaterialPath(EntityRef entity) override {
+		CurveDecal& decal = m_curve_decals[entity];
+		return decal.material ? decal.material->getPath() : Path("");
+	}
+	
+	void setCurveDecalHalfExtents(EntityRef entity, float value) override
+	{
+		CurveDecal& decal = m_curve_decals[entity];
+		decal.half_extents.y = value;
+		if (decal.material && decal.material->isReady()) {
+			m_culling_system->setRadius(entity, length(decal.half_extents));
+		}
+		updateDecalInfo(decal);
+	}
+
+	void setCurveDecalBezierP0(EntityRef entity, const Vec2& value) override {
+		m_curve_decals[entity].bezier_p0 = value;
+		updateDecalInfo(m_curve_decals[entity]);
+	}
+
+	void setCurveDecalUVScale(EntityRef entity, const Vec2& value) override {
+		m_curve_decals[entity].uv_scale = value;
+		updateDecalInfo(m_curve_decals[entity]);
+	}
+
+	Vec2 getCurveDecalBezierP0(EntityRef entity) override {
+		return m_curve_decals[entity].bezier_p0;
+	}
+
+	void setCurveDecalBezierP2(EntityRef entity, const Vec2& value) override {
+		m_curve_decals[entity].bezier_p2 = value;
+		updateDecalInfo(m_curve_decals[entity]);
+	}
+
+	Vec2 getCurveDecalBezierP2(EntityRef entity) override {
+		return m_curve_decals[entity].bezier_p2;
+	}
+
+	Vec2 getCurveDecalUVScale(EntityRef entity) override {
+		return m_curve_decals[entity].uv_scale;
+	}
+
+	float getCurveDecalHalfExtents(EntityRef entity) override
+	{
+		return m_curve_decals[entity].half_extents.y;
 	}
 
 	void setDecalMaterialPath(EntityRef entity, const Path& path) override
@@ -1309,12 +1446,6 @@ public:
 		else {
 			decal.material = nullptr;
 		}
-	}
-
-	Material* getDecalMaterial(EntityRef entity) const override
-	{
-		auto iter = m_decals.find(entity);
-		return iter.value().material;
 	}
 
 	Path getDecalMaterialPath(EntityRef entity) override
@@ -2258,7 +2389,22 @@ public:
 			material->getObserverCb().bind<&RenderSceneImpl::decalMaterialStateChanged>(this);
 		}
 	}
-
+	
+	void addToMaterialCurveDecalMap(Material* material, EntityRef entity)
+	{
+		CurveDecal& d = m_curve_decals[entity];
+		d.prev_decal = INVALID_ENTITY;
+		auto map_iter = m_material_curve_decal_map.find(material);
+		if(map_iter.isValid()) {
+			d.next_decal = map_iter.value();
+			m_material_curve_decal_map[material] = entity;
+		}
+		else {
+			d.next_decal = INVALID_ENTITY;
+			m_material_curve_decal_map.insert(material, entity);
+			material->getObserverCb().bind<&RenderSceneImpl::curveDecalMaterialStateChanged>(this);
+		}
+	}
 	
 	void addToModelEntityMap(Model* model, EntityRef entity)
 	{
@@ -2295,6 +2441,28 @@ public:
 			else {
 				m_model_entity_map.erase(model);
 				model->getObserverCb().unbind<&RenderSceneImpl::modelStateChanged>(this);
+			}
+		}
+	}
+	
+
+	void removeFromMaterialCurveDecalMap(Material* material, EntityRef entity)
+	{
+		CurveDecal& d = m_curve_decals[entity];
+		if(d.prev_decal.isValid()) {
+			m_curve_decals[(EntityRef)d.prev_decal].next_decal = d.next_decal;
+		}
+		if(d.next_decal.isValid()) {
+			m_curve_decals[(EntityRef)d.next_decal].prev_decal = d.prev_decal;
+		}
+		auto map_iter = m_material_curve_decal_map.find(material);
+		if(map_iter.value() == entity) {
+			if(d.next_decal.isValid()) {
+				m_material_curve_decal_map[material] = (EntityRef)d.next_decal;
+			}
+			else {
+				m_material_curve_decal_map.erase(material);
+				material->getObserverCb().unbind<&RenderSceneImpl::curveDecalMaterialStateChanged>(this);
 			}
 		}
 	}
@@ -2403,10 +2571,18 @@ public:
 	}
 
 
+	void updateDecalInfo(CurveDecal& decal) const
+	{
+		decal.half_extents.x = maximum(fabsf(decal.bezier_p0.x), fabsf(decal.bezier_p2.x)) + decal.uv_scale.x * 0.5f;
+		decal.half_extents.z = maximum(fabsf(decal.bezier_p0.y), fabsf(decal.bezier_p2.y)) + decal.uv_scale.x * 0.5f;
+		decal.radius = length(decal.half_extents);
+		decal.transform = m_universe.getTransform(decal.entity);
+	}
+
+
 	void createDecal(EntityRef entity)
 	{
-		m_decals.insert(entity, Decal());
-		Decal& decal = m_decals[entity];
+		Decal& decal = m_decals.insert(entity);
 		decal.material = nullptr;
 		decal.entity = entity;
 		decal.half_extents = Vec3(1, 1, 1);
@@ -2416,6 +2592,18 @@ public:
 		m_universe.onComponentCreated(entity, DECAL_TYPE, this);
 	}
 
+	void createCurveDecal(EntityRef entity)
+	{
+		CurveDecal& decal = m_curve_decals.insert(entity);
+		decal.material = nullptr;
+		decal.entity = entity;
+		decal.uv_scale = Vec2(1);
+		decal.bezier_p0 = Vec2(-1, 0);
+		decal.bezier_p2 = Vec2(1, 0);
+		updateDecalInfo(decal);
+
+		m_universe.onComponentCreated(entity, CURVE_DECAL_TYPE, this);
+	}
 
 	void createEnvironmentProbe(EntityRef entity)
 	{
@@ -2523,6 +2711,7 @@ private:
 	HashMap<EntityRef, PointLight> m_point_lights;
 
 	HashMap<EntityRef, Decal> m_decals;
+	HashMap<EntityRef, CurveDecal> m_curve_decals;
 	Array<ModelInstance> m_model_instances;
 	Array<MeshSortData> m_mesh_sort_data;
 	HashMap<EntityRef, Environment> m_environments;
@@ -2546,6 +2735,7 @@ private:
 
 	HashMap<Model*, EntityRef> m_model_entity_map;
 	HashMap<Material*, EntityRef> m_material_decal_map;
+	HashMap<Material*, EntityRef> m_material_curve_decal_map;
 };
 
 
@@ -2662,7 +2852,14 @@ void RenderScene::reflect() {
 		LUMIX_CMP(Decal, "decal", "Render / Decal",
 			LUMIX_PROP(DecalMaterialPath, "Material", ResourceAttribute(Material::TYPE)),
 			LUMIX_PROP(DecalHalfExtents, "Half extents", MinAttribute(0)),
-			LUMIX_PROP(DecalUVScale, "UV scale", MinAttribute(0))
+			var_property("UV scale", &RenderScene::getDecal, &Decal::uv_scale, MinAttribute(0))
+		),
+		LUMIX_CMP(CurveDecal, "curve_decal", "Render / Curve decal",
+			LUMIX_PROP(CurveDecalMaterialPath, "Material", ResourceAttribute(Material::TYPE)),
+			LUMIX_PROP(CurveDecalHalfExtents, "Half extents", MinAttribute(0)),
+			LUMIX_PROP(CurveDecalUVScale, "UV scale", MinAttribute(0)),
+			LUMIX_PROP(CurveDecalBezierP0, "Bezier P0", NoUIAttribute()),
+			LUMIX_PROP(CurveDecalBezierP2, "Bezier P2", NoUIAttribute())
 		),
 		LUMIX_CMP(Terrain, "terrain", "Render / Terrain",
 			LUMIX_FUNC(RenderScene::getTerrainNormalAt),
@@ -2695,6 +2892,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_point_lights(m_allocator)
 	, m_environments(m_allocator)
 	, m_decals(m_allocator)
+	, m_curve_decals(m_allocator)
 	, m_debug_triangles(m_allocator)
 	, m_debug_lines(m_allocator)
 	, m_active_global_light_entity(INVALID_ENTITY)
@@ -2708,6 +2906,7 @@ RenderSceneImpl::RenderSceneImpl(Renderer& renderer,
 	, m_time(0)
 	, m_is_updating_attachments(false)
 	, m_material_decal_map(m_allocator)
+	, m_material_curve_decal_map(m_allocator)
 	, m_mesh_sort_data(m_allocator)
 	, m_furs(m_allocator)
 {

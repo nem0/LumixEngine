@@ -56,6 +56,7 @@ static const ComponentType PARTICLE_EMITTER_TYPE = reflection::getComponentType(
 static const ComponentType TERRAIN_TYPE = reflection::getComponentType("terrain");
 static const ComponentType CAMERA_TYPE = reflection::getComponentType("camera");
 static const ComponentType DECAL_TYPE = reflection::getComponentType("decal");
+static const ComponentType CURVE_DECAL_TYPE = reflection::getComponentType("curve_decal");
 static const ComponentType POINT_LIGHT_TYPE = reflection::getComponentType("point_light");
 static const ComponentType ENVIRONMENT_TYPE = reflection::getComponentType("environment");
 static const ComponentType MODEL_INSTANCE_TYPE = reflection::getComponentType("model_instance");
@@ -4027,13 +4028,45 @@ struct StudioAppPlugin : StudioApp::IPlugin
 	void showDecalGizmo(UniverseView& view, ComponentUID cmp)
 	{
 		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		const EntityRef e = (EntityRef)cmp.entity;
 		Universe& universe = scene->getUniverse();
-		Vec3 half_extents = scene->getDecalHalfExtents((EntityRef)cmp.entity);
-		const RigidTransform tr = universe.getTransform((EntityRef)cmp.entity).getRigidPart();
-		const Vec3 x = tr.rot * Vec3(1, 0, 0) * half_extents.x;
-		const Vec3 y = tr.rot * Vec3(0, 1, 0) * half_extents.y;
-		const Vec3 z = tr.rot * Vec3(0, 0, 1) * half_extents.z;
+		Decal& decal = scene->getDecal(e);
+		const Transform tr = universe.getTransform(e);
+		const Vec3 x = tr.rot * Vec3(1, 0, 0) * decal.half_extents.x;
+		const Vec3 y = tr.rot * Vec3(0, 1, 0) * decal.half_extents.y;
+		const Vec3 z = tr.rot * Vec3(0, 0, 1) * decal.half_extents.z;
 		addCube(view, tr.pos, x, y, z, Color::BLUE);
+	}
+	
+	void showCurveDecalGizmo(UniverseView& view, ComponentUID cmp)
+	{
+		RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
+		const EntityRef e = (EntityRef)cmp.entity;
+		Universe& universe = scene->getUniverse();
+		CurveDecal& decal = scene->getCurveDecal(e);
+		const Transform tr = universe.getTransform(e);
+		const Vec3 x = tr.rot * Vec3(1, 0, 0) * decal.half_extents.x;
+		const Vec3 y = tr.rot * Vec3(0, 1, 0) * decal.half_extents.y;
+		const Vec3 z = tr.rot * Vec3(0, 0, 1) * decal.half_extents.z;
+		addCube(view, tr.pos, x, y, z, Color::BLUE);
+
+		Gizmo::Config cfg;
+		const DVec3 p0 = tr.transform(DVec3(decal.bezier_p0.x, 0, decal.bezier_p0.y));
+		Transform p0_tr = { p0, Quat::IDENTITY, 1 };
+		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, Ref(p0_tr), cfg)) {
+			const Vec2 p0 = Vec2(tr.inverted().transform(p0_tr.pos).xz());
+			m_app.getWorldEditor().setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P0", Span(&e, 1), p0);
+		}
+
+		const DVec3 p2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
+		Transform p2_tr = { p2, Quat::IDENTITY, 1 };
+		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, Ref(p2_tr), cfg)) {
+			const Vec2 p2 = Vec2(tr.inverted().transform(p2_tr.pos).xz());
+			m_app.getWorldEditor().setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);
+		}
+
+		addLine(view, tr.pos, p0_tr.pos, Color::BLUE);
+		addLine(view, tr.pos, p2_tr.pos, Color::GREEN);
 	}
 
 
@@ -4055,6 +4088,11 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		if (cmp.type == DECAL_TYPE)
 		{
 			showDecalGizmo(view, cmp);
+			return true;
+		}
+		if (cmp.type == CURVE_DECAL_TYPE)
+		{
+			showCurveDecalGizmo(view, cmp);
 			return true;
 		}
 		if (cmp.type == POINT_LIGHT_TYPE)
