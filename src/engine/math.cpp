@@ -93,10 +93,14 @@ Quat Quat::vec3ToVec3(const Vec3& v0, const Vec3& v1)
 	
 	float cos_angle = dot(from, to);
     Vec3 half;
-
 	
     if(cos_angle > -1.0005f && cos_angle < -0.9995f) {
-        half = normalize(cross(from, Vec3(to.x + 0.3f, to.y - 0.15f, to.z - 0.15f)));
+		Vec3 n = Vec3(0, from.z, -from.y);
+		if (squaredLength(n) < 0.01) {
+			n = Vec3(from.y, -from.x, 0);
+		}
+		n = normalize(n);
+		return Quat(n, PI);
     }
     else
         half = normalize(from + to);
