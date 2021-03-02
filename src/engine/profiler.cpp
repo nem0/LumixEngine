@@ -1,6 +1,7 @@
 #ifdef _WIN32
 	#define INITGUID
-	#define NOGDI 
+	#define NOGDI
+	#define WIN32_LEAN_AND_MEAN
 	#include <Windows.h>
 	#include <evntcons.h>
 #endif

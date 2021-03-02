@@ -11,6 +11,7 @@
 #include "engine/stream.h"
 #include "engine/string.h"
 #ifdef _WIN32
+	#define WIN32_LEAN_AND_MEAN
 	#include <Windows.h>
 #endif
 #ifdef __linux__

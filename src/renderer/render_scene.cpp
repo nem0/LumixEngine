@@ -2533,7 +2533,7 @@ public:
 		light.light_color = Vec3(1, 1, 1);
 		light.direct_intensity = 1;
 		light.indirect_intensity = 1;
-		light.cascades.set(3, 8, 20, 60);
+		light.cascades = Vec4(3, 8, 20, 60);
 
 		if (m_environments.empty()) m_active_global_light_entity = entity;
 

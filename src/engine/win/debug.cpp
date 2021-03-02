@@ -1,4 +1,5 @@
 #define NOGDI
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #pragma warning (push)
 #pragma warning (disable: 4091) // declaration of 'xx' hides previous local declaration
