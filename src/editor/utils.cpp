@@ -177,8 +177,8 @@ void getEntityListDisplayName(StudioApp& app, WorldEditor& editor, Span<char> bu
 	if (editor.getUniverse()->hasComponent(e, MODEL_INSTANCE_TYPE))
 	{
 		RenderInterface* render_interface = app.getRenderInterface();
-		auto path = render_interface->getModelInstancePath(*editor.getUniverse(), e);
-		if (path.isValid())
+		const Path path = render_interface->getModelInstancePath(*editor.getUniverse(), e);
+		if (!path.isEmpty())
 		{
 			const char* c = path.c_str();
 			while (*c && *c != ':') ++c;

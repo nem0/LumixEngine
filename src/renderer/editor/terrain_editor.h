@@ -68,6 +68,7 @@ private:
 	u16 getHeight(const DVec3& world_pos) const;
 	Texture* getHeightmap() const;
 	DVec3 getRelativePosition(const DVec3& world_pos) const;
+	void exportToOBJ();
 
 private:
 	WorldEditor& m_world_editor;

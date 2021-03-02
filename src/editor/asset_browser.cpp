@@ -714,7 +714,7 @@ void AssetBrowser::onGUI()
 	if (m_dir.data[0] == '\0') changeDir(".");
 	if (m_dirty) changeDir(m_dir);
 
-	if (m_wanted_resource.isValid())
+	if (!m_wanted_resource.isEmpty())
 	{
 		selectResource(m_wanted_resource, true, false);
 		m_wanted_resource = "";
@@ -1099,7 +1099,7 @@ bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, Res
 	}
 	ImGui::EndChild();
 	ImGui::Separator();
-	if (selected_path.isValid()) {
+	if (!selected_path.isEmpty()) {
 		ImGui::Text("%s", selected_path.c_str());
 	}
 	compiler.unlockResources();

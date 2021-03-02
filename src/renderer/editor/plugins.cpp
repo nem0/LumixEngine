@@ -920,7 +920,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		int w = -1, h = -1;
 
 		auto prepare_source =[&](const CompositeTexture::ChannelSource& ch){
-			if (!ch.path.isValid()) return false;
+			if (ch.path.isEmpty()) return false;
 			if (sources.find(ch.path.getHash()).isValid()) return true;
 
 			tmp_src.clear();
@@ -975,7 +975,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const u32 idx = u32(&layer - tc.layers.begin());
 			for (u32 ch = 0; ch < 4; ++ch) {
 				const Path& p = layer.getChannel(ch).path;
-				if (!p.isValid()) continue;
+				if (p.isEmpty()) continue;
 				stbi_uc* from = sources[p.getHash()].data;
 				if (!from) continue;
 				u32 from_ch = layer.getChannel(ch).src_channel;
@@ -1475,7 +1475,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 			ImGuiEx::Label("Material");
 			char mat_path[LUMIX_MAX_PATH];
 			Path path = scene->getModelInstanceMaterialOverride(entity);
-			if (!path.isValid()) {
+			if (path.isEmpty()) {
 				path = model->getMesh(0).material->getPath();
 			}
 			copyString(mat_path, path.c_str());

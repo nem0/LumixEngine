@@ -170,7 +170,7 @@ void Terrain::setGrassTypePath(int index, const Path& path)
 		type.m_grass_model->decRefCount();
 		type.m_grass_model = nullptr;
 	}
-	if (path.isValid())
+	if (!path.isEmpty())
 	{
 		type.m_grass_model = m_scene.getEngine().getResourceManager().load<Model>(path);
 	}

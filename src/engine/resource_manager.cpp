@@ -42,7 +42,7 @@ Resource* ResourceManager::get(const Path& path)
 
 Resource* ResourceManager::load(const Path& path)
 {
-	if (!path.isValid()) return nullptr;
+	if (path.isEmpty()) return nullptr;
 	Resource* resource = get(path);
 
 	if(nullptr == resource)

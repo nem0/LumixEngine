@@ -607,7 +607,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		for(;;) {
 			Path p = popCompiledResource();
-			if (!p.isValid()) break;
+			if (p.isEmpty()) break;
 
 			// this can take some time, mutex is probably not the best option
 			MutexGuard lock(m_compiled_mutex);
@@ -734,7 +734,7 @@ int AssetCompilerTask::task()
 			m_compiler.m_to_compile.pop();
 			return p;
 		}();
-		if (p.isValid()) {
+		if (!p.isEmpty()) {
 			PROFILE_BLOCK("compile asset");
 			profiler::pushString(p.c_str());
 			const bool compiled = m_compiler.compile(p);

@@ -1588,16 +1588,13 @@ struct PhysicsSceneImpl final : PhysicsScene
 			cb.unbind<&Heightfield::heightmapLoaded>(&terrain);
 		}
 
-		if (str.isValid())
-		{
+		if (str.isEmpty()) {
+			terrain.m_heightmap = nullptr;
+		} else {
 			auto* new_hm = resource_manager.load<Texture>(str);
 			terrain.m_heightmap = new_hm;
 			new_hm->onLoaded<&Heightfield::heightmapLoaded>(&terrain);
 			new_hm->addDataReference();
-		}
-		else
-		{
-			terrain.m_heightmap = nullptr;
 		}
 	}
 

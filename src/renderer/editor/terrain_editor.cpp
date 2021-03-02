@@ -1500,6 +1500,98 @@ void TerrainEditor::entityGUI() {
 }
 
 
+void TerrainEditor::exportToOBJ() {
+	char filename[LUMIX_MAX_PATH];
+	if (!os::getSaveFilename(Span(filename), "Wavefront obj\0*.obj", "obj")) return;
+
+	os::OutputFile file;
+	if (!file.open(filename)) {
+		logError("Failed to open ", filename);
+		return;
+	}
+
+	char basename[LUMIX_MAX_PATH];
+	copyString(Span(basename), Path::getBasename(filename));
+
+	auto* scene = static_cast<RenderScene*>(m_component.scene);
+	const EntityRef e = (EntityRef)m_component.entity;
+	const Texture* hm = getMaterial()->getTextureByName(HEIGHTMAP_SLOT_NAME);
+
+	OutputMemoryStream blob(m_app.getAllocator());
+	blob.reserve(8 * 1024 * 1024);
+	blob << "mtllib " << basename << ".mtl\n";
+	blob << "o Terrain\n";
+	
+	const float xz_scale = scene->getTerrainXZScale(e);
+	const float y_scale = scene->getTerrainYScale(e);
+	ASSERT(hm->format == gpu::TextureFormat::R16);
+	const u16* hm_data = (const u16*)hm->getData();
+
+	for (u32 j = 0; j < hm->height; ++j) {
+		for (u32 i = 0; i < hm->width; ++i) {
+			const float height = hm_data[i + j * hm->width] / float(0xffff) * y_scale;
+			blob << "v " << i * xz_scale << " " << height << " " << j * xz_scale << "\n";
+		}
+	}
+
+	for (u32 j = 0; j < hm->height; ++j) {
+		for (u32 i = 0; i < hm->width; ++i) {
+			blob << "vt " << i / float(hm->width - 1) << " " << j / float(hm->height - 1) << "\n";
+		}
+	}
+
+	blob << "usemtl Material\n";
+
+	auto write_face_vertex = [&](u32 idx){
+		blob << idx << "/" << idx;
+	};
+
+	for (u32 j = 0; j < hm->height - 1; ++j) {
+		for (u32 i = 0; i < hm->width - 1; ++i) {
+			const u32 idx = i + j * hm->width;
+			blob << "f ";
+			write_face_vertex(idx);
+			blob << " ";
+			write_face_vertex(idx + 1);
+			blob << " ";
+			write_face_vertex(idx + 1 + hm->width);
+			blob << "\n";
+
+			blob << "f ";
+			write_face_vertex(idx);
+			blob << " ";
+			write_face_vertex(idx + 1 + hm->width);
+			blob << " ";
+			write_face_vertex(idx + hm->width);
+			blob << "\n";
+		}
+	}
+
+	if (!file.write(blob.data(), blob.size())) {
+		logError("Failed to write ", filename);
+	}
+
+	file.close();
+
+	char dir[LUMIX_MAX_PATH];
+	copyString(Span(dir), Path::getDir(filename));
+	StaticString<LUMIX_MAX_PATH> mtl_filename(dir, basename, ".mtl");
+
+	if (!file.open(mtl_filename)) {
+		logError("Failed to open ", mtl_filename);
+		return;
+	}
+
+	blob.clear();
+	blob << "newmtl Material";
+
+	if (!file.write(blob.data(), blob.size())) {
+		logError("Failed to write ", mtl_filename);
+	}
+
+	file.close();
+}
+
 void TerrainEditor::onGUI()
 {
 	auto* scene = static_cast<RenderScene*>(m_component.scene);
@@ -1523,6 +1615,8 @@ void TerrainEditor::onGUI()
 		ImGui::Text("No heightmap");
 		return;
 	}
+
+	if (ImGui::Button(ICON_FA_FILE_EXPORT)) exportToOBJ();
 
 	ImGuiEx::Label("Brush size");
 	ImGui::DragFloat("##br_size", &m_terrain_brush_size, 1, MIN_BRUSH_SIZE, FLT_MAX);

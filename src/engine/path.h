@@ -33,7 +33,7 @@ struct LUMIX_ENGINE_API Path {
 	i32 length() const;
 	u32 getHash() const { return m_hash; }
 	const char* c_str() const { return m_path; }
-	bool isValid() const { return m_path[0] != '\0'; }
+	bool isEmpty() const { return m_path[0] == '\0'; }
 
 private:
 	char m_path[LUMIX_MAX_PATH];
