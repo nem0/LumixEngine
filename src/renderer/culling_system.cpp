@@ -353,7 +353,10 @@ struct CullingSystemImpl final : CullingSystem
 				}
 
 				total_count += cell.header.count;
-				if (frustum.containsAABB(cell.header.origin + v3_cell_size, v3_cell_size)) {
+				if (cell.header.indices.is_big) {
+					doCulling(cell, frustum.getRelative(cell.header.origin), result, list, cell.header.indices.type);
+				}
+				else if (frustum.containsAABB(cell.header.origin + v3_cell_size, v3_cell_size)) {
 					int to_cpy = cell.header.count;
 					int src_offset = 0;
 					while (to_cpy > 0) {
