@@ -75,7 +75,7 @@ struct UniverseViewImpl final : UniverseView {
 		m_viewport.h = -1;
 		m_viewport.fov = view.m_app.getFOV();
 		m_viewport.near = 0.1f;
-		m_viewport.far = 10000.f;
+		m_viewport.far = 1'000'000.f;
 
 		ResourceManagerHub& rm = m_editor.getEngine().getResourceManager();
 		Path font_path("editor/fonts/NotoSans-Regular.ttf");

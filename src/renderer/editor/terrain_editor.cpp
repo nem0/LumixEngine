@@ -1548,7 +1548,7 @@ void TerrainEditor::exportToOBJ() {
 
 	for (u32 j = 0; j < hm->height - 1; ++j) {
 		for (u32 i = 0; i < hm->width - 1; ++i) {
-			const u32 idx = i + j * hm->width;
+			const u32 idx = i + j * hm->width + 1;
 			blob << "f ";
 			write_face_vertex(idx);
 			blob << " ";
