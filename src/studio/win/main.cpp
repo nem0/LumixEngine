@@ -1,3 +1,5 @@
+#define NOGDI
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <Winuser.h>
 #include <ShellScalingAPI.h>

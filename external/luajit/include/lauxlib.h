@@ -9,8 +9,8 @@
 #define lauxlib_h
 
 
-#include <stddef.h>
-#include <stdio.h>
+//#include <stddef.h>
+//#include <stdio.h>
 
 #include "lua.h"
 
@@ -131,7 +131,7 @@ LUALIB_API void (luaL_setmetatable) (lua_State *L, const char *tname);
 */
 
 
-
+#if 0
 typedef struct luaL_Buffer {
   char *p;			/* current position in buffer */
   int lvl;  /* number of strings in the stack (level) */
@@ -154,6 +154,7 @@ LUALIB_API void (luaL_addlstring) (luaL_Buffer *B, const char *s, size_t l);
 LUALIB_API void (luaL_addstring) (luaL_Buffer *B, const char *s);
 LUALIB_API void (luaL_addvalue) (luaL_Buffer *B);
 LUALIB_API void (luaL_pushresult) (luaL_Buffer *B);
+#endif
 
 
 /* }====================================================== */

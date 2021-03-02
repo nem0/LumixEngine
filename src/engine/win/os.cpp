@@ -9,7 +9,8 @@
 #define UNICODE
 #pragma warning(push)
 #pragma warning(disable : 4091)
-#include <ShlObj.h>
+#include <Shobjidl_core.h>
+#include <shlobj_core.h>
 #pragma warning(pop)
 #include <Windows.h>
 #pragma warning(disable : 4996)

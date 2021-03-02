@@ -147,7 +147,7 @@ void Material::unload()
 	setShader(nullptr);
 
 	m_alpha_ref = 0.3f;
-	m_color.set(1, 1, 1, 1);
+	m_color = Vec4(1, 1, 1, 1);
 	m_custom_flags = 0;
 	m_define_mask = 0;
 	m_metallic = 0.0f;

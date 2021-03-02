@@ -4602,7 +4602,7 @@ struct PipelineImpl final : Pipeline
 		};
 
 		Cmd& cmd = m_renderer.createJob<Cmd>();
-		cmd.color.set(r, g, b, a);
+		cmd.color = Vec4(r, g, b, a);
 		cmd.flags = (gpu::ClearFlags)flags;
 		cmd.depth = depth;
 		m_renderer.queue(cmd, m_profiler_link);

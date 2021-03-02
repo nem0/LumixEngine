@@ -295,7 +295,7 @@ struct UniverseViewImpl final : UniverseView {
 	void onMouseMove(int x, int y, int relx, int rely)
 	{
 		PROFILE_FUNCTION();
-		m_mouse_pos.set((float)x, (float)y);
+		m_mouse_pos = Vec2((float)x, (float)y);
 		
 		static const float MOUSE_MULTIPLIER = 1 / 200.0f;
 
