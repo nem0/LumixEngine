@@ -414,7 +414,7 @@ struct AnimationSceneImpl final : AnimationScene
 	{
 		Animator& animator = m_animators[m_animator_map[entity]];
 		unloadResource(animator.resource);
-		setSource(animator, path.isValid() ? loadController(path) : nullptr);
+		setSource(animator, path.isEmpty() ? nullptr : loadController(path));
 		if (animator.resource && animator.resource->isReady() && m_is_game_running) {
 			animator.ctx = animator.resource->createRuntime(animator.default_set);
 		}
@@ -877,7 +877,7 @@ struct AnimationSceneImpl final : AnimationScene
 
 	PropertyAnimation* loadPropertyAnimation(const Path& path) const
 	{
-		if (!path.isValid()) return nullptr;
+		if (path.isEmpty()) return nullptr;
 		ResourceManagerHub& rm = m_engine.getResourceManager();
 		return rm.load<PropertyAnimation>(path);
 	}

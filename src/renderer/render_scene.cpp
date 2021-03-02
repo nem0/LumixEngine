@@ -1317,14 +1317,11 @@ public:
 
 	void setTerrainMaterialPath(EntityRef entity, const Path& path) override
 	{
-		if (path.isValid())
-		{
+		if (path.isEmpty()) {
+			m_terrains[entity]->setMaterial(nullptr);
+		} else {
 			Material* material = m_engine.getResourceManager().load<Material>(path);
 			m_terrains[entity]->setMaterial(material);
-		}
-		else
-		{
-			m_terrains[entity]->setMaterial(nullptr);
 		}
 	}
 
@@ -1363,7 +1360,10 @@ public:
 			decal.material->decRefCount();
 		}
 
-		if (path.isValid()) {
+		if (path.isEmpty()) {
+			decal.material = nullptr;
+		}
+		else {
 			decal.material = m_engine.getResourceManager().load<Material>(path);
 			addToMaterialCurveDecalMap(decal.material, entity);
 
@@ -1372,9 +1372,6 @@ public:
 				const DVec3 pos = m_universe.getPosition(entity);
 				m_culling_system->add(entity, (u8)RenderableTypes::CURVE_DECAL, pos, radius);
 			}
-		}
-		else {
-			decal.material = nullptr;
 		}
 	}
 
@@ -1433,7 +1430,10 @@ public:
 			decal.material->decRefCount();
 		}
 
-		if (path.isValid()) {
+		if (path.isEmpty()) {
+			decal.material = nullptr;
+		}
+		else {
 			decal.material = m_engine.getResourceManager().load<Material>(path);
 			addToMaterialDecalMap(decal.material, entity);
 
@@ -1442,9 +1442,6 @@ public:
 				const DVec3 pos = m_universe.getPosition(entity);
 				m_culling_system->add(entity, (u8)RenderableTypes::DECAL, pos, radius);
 			}
-		}
-		else {
-			decal.material = nullptr;
 		}
 	}
 
@@ -1550,7 +1547,7 @@ public:
 
 		if (mi.mesh_count > 0 && mi.meshes[0].material->getPath() == path) return;
 
-		if (path.isValid()) {
+		if (!path.isEmpty()) {
 			Material* material = m_engine.getResourceManager().load<Material>(path);
 			mi.custom_material = material;
 		}
@@ -1581,12 +1578,12 @@ public:
 
 	void setModelInstancePath(EntityRef entity, const Path& path) override
 	{
-		if (path.isValid()) {
-			Model* model = m_engine.getResourceManager().load<Model>(path);
-			setModel(entity, model);
+		if (path.isEmpty()) {
+			setModel(entity, nullptr);
 		}
 		else {
-			setModel(entity, nullptr);
+			Model* model = m_engine.getResourceManager().load<Model>(path);
+			setModel(entity, model);
 		}
 	}
 

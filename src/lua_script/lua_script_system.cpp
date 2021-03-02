@@ -1442,7 +1442,7 @@ namespace Lumix
 			}
 
 			ResourceManagerHub& rm = m_system.m_engine.getResourceManager();
-			inst.m_script = path.isValid() ? rm.load<LuaScript>(path) : nullptr;
+			inst.m_script = path.isEmpty() ? nullptr : rm.load<LuaScript>(path);
 			if (inst.m_script) inst.m_script->onLoaded<&ScriptComponent::onScriptLoaded>(&cmp);
 		}
 

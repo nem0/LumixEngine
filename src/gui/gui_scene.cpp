@@ -423,18 +423,15 @@ struct GUISceneImpl final : GUIScene
 	void setImageSprite(EntityRef entity, const Path& path) override
 	{
 		GUIImage* image = m_rects[entity]->image;
-		if (image->sprite)
-		{
+		if (image->sprite) {
 			image->sprite->decRefCount();
 		}
+
 		ResourceManagerHub& manager = m_system.getEngine().getResourceManager();
-		if (path.isValid())
-		{
-			image->sprite = manager.load<Sprite>(path);
-		}
-		else
-		{
+		if (path.isEmpty()) {
 			image->sprite = nullptr;
+		} else {
+			image->sprite = manager.load<Sprite>(path);
 		}
 	}
 
@@ -601,7 +598,7 @@ struct GUISceneImpl final : GUIScene
 	void setTextFontPath(EntityRef entity, const Path& path) override
 	{
 		GUIText* gui_text = m_rects[entity]->text;
-		FontResource* res = path.isValid() ? m_font_manager->getOwner().load<FontResource>(path) : nullptr;
+		FontResource* res = path.isEmpty() ? nullptr : m_font_manager->getOwner().load<FontResource>(path);
 		gui_text->setFontResource(res);
 	}
 

@@ -112,7 +112,7 @@ struct FileSystemImpl : FileSystem {
 
 	AsyncHandle getContent(const Path& file, const ContentCallback& callback) override
 	{
-		if (!file.isValid()) return AsyncHandle::invalid();
+		if (file.isEmpty()) return AsyncHandle::invalid();
 
 		MutexGuard lock(m_mutex);
 		++m_work_counter;
