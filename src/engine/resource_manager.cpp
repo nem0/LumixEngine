@@ -92,6 +92,11 @@ void ResourceManager::reload(const Path& path)
 
 void ResourceManager::reload(Resource& resource)
 {
+	if (resource.isEmpty() && resource.wantReady()) {
+		logWarning("Trying to reload ", resource.getPath(), " while it's being reload");
+		return;
+	}  
+
 	resource.doUnload();
 	if (m_owner->onBeforeLoad(resource) == ResourceManagerHub::LoadHook::Action::DEFERRED)
 	{
