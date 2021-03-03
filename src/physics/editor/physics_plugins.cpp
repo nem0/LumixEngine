@@ -1,5 +1,9 @@
-#include <PxPhysicsAPI.h>
+#include <extensions/PxD6Joint.h>
+#include <foundation/PxQuat.h>
+#include <foundation/PxTransform.h>
+#include <foundation/PxVec3.h>
 #include <imgui/imgui.h>
+#include <PxVisualizationParameter.h>
 
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"

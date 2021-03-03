@@ -1,6 +1,13 @@
 #include "physics/physics_system.h"
 
-#include <PxPhysicsAPI.h>
+#include <foundation/PxAllocatorCallback.h>
+#include <foundation/PxErrorCallback.h>
+#include <pvd/PxPvd.h>
+#include <pvd/PxPvdTransport.h>
+#include <PxFoundation.h>
+#include <PxPhysics.h>
+#include <PxPhysicsVersion.h>
+#include <vehicle/PxVehicleSDK.h>
 
 #include "cooking/PxCooking.h"
 #include "engine/engine.h"
