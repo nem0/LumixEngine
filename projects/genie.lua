@@ -643,6 +643,15 @@ if has_plugin("navigation") then
 	project "navigation"
 		libType()
 
+		excludes { 
+			"../external/recast/src/DetourCrowd.cpp",
+			"../external/recast/src/DetourLocalBoundary.cpp",
+			"../external/recast/src/DetourObstacleAvoidance.cpp",
+			"../external/recast/src/DetourPathCorridor.cpp",
+			"../external/recast/src/DetourPathQueue.cpp",
+			"../external/recast/src/DetourProximityGrid.cpp",
+		}
+
 		files { "../src/navigation/**.h", "../src/navigation/**.cpp", "../external/recast/src/**.cpp" }
 		includedirs { "../src", "../src/navigation", "../external/recast/include" }
 		links { "engine", "renderer" }
