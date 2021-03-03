@@ -1,4 +1,7 @@
-#include <PxPhysicsAPI.h>
+#include <cooking/PxConvexMeshDesc.h>
+#include <cooking/PxCooking.h>
+#include <foundation/PxIO.h>
+#include <PxPhysics.h>
 
 #include "physics_geometry.h"
 #include "engine/log.h"
