@@ -3647,7 +3647,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		bool written = file.write(&header, sizeof(header));
 		u16 tmp = 0;
 		for (int i = 0; i < size * size; ++i) {
-			written = written || file.write(&tmp, sizeof(tmp));
+			written = file.write(&tmp, sizeof(tmp)) && written;
 		}
 		file.close();
 		
