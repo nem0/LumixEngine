@@ -181,9 +181,7 @@ struct Property : PropertyBase {
 	typedef void (*Setter)(IScene*, EntityRef, u32, const T&);
 	typedef T (*Getter)(IScene*, EntityRef, u32);
 
-	void visit(IPropertyVisitor& visitor) const override {
-		visitor.visit(*this);
-	}
+	void visit(IPropertyVisitor& visitor) const override;
 
 	virtual T get(ComponentUID cmp, u32 idx) const {
 		return getter(cmp.scene, (EntityRef)cmp.entity, idx);
@@ -214,6 +212,12 @@ struct IPropertyVisitor {
 	virtual void visit(const struct BlobProperty& prop) = 0;
 	virtual void visit(const DynamicProperties& prop) {}
 };
+
+template <typename T>
+void Property<T>::visit(IPropertyVisitor& visitor) const {
+	visitor.visit(*this);
+}
+
 
 struct IEmptyPropertyVisitor : IPropertyVisitor {
 	virtual ~IEmptyPropertyVisitor() {}
@@ -269,30 +273,6 @@ struct LUMIX_ENGINE_API BlobProperty : PropertyBase {
 
 struct Icon { const char* name; };
 inline Icon icon(const char* name) { return {name}; }
-
-template <typename T>
-bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const char* prop_name, Ref<T> out) {
-	struct : IEmptyPropertyVisitor {
-		void visit(const Property<T>& prop) override {
-			if (equalStrings(prop.name, prop_name)) {
-				found = true;
-				value = prop.get(cmp, -1);
-			}
-		}
-		ComponentUID cmp;
-		const char* prop_name;
-		T value = {};
-		bool found = false;
-	} visitor;
-	visitor.prop_name = prop_name;
-	visitor.cmp.scene = &scene;
-	visitor.cmp.type = cmp_type;
-	visitor.cmp.entity = e;
-	const ComponentBase* cmp_desc = getComponent(cmp_type);
-	cmp_desc->visit(visitor);
-	out = visitor.value;
-	return visitor.found;
-}
 
 namespace detail {
 
@@ -522,6 +502,30 @@ struct ComponentBase {
 	Array<PropertyBase*> props;
 	Array<FunctionBase*> functions;
 };
+
+template <typename T>
+bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const char* prop_name, Ref<T> out) {
+	struct : IEmptyPropertyVisitor {
+		void visit(const Property<T>& prop) override {
+			if (equalStrings(prop.name, prop_name)) {
+				found = true;
+				value = prop.get(cmp, -1);
+			}
+		}
+		ComponentUID cmp;
+		const char* prop_name;
+		T value = {};
+		bool found = false;
+	} visitor;
+	visitor.prop_name = prop_name;
+	visitor.cmp.scene = &scene;
+	visitor.cmp.type = cmp_type;
+	visitor.cmp.entity = e;
+	const ComponentBase* cmp_desc = getComponent(cmp_type);
+	cmp_desc->visit(visitor);
+	out = visitor.value;
+	return visitor.found;
+}
 
 struct Scene {
 	Scene(IAllocator& allocator);
