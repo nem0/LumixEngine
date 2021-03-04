@@ -4532,7 +4532,6 @@ void PhysicsScene::reflect() {
 		}
 	};
 
-	// TODO refl
 	LUMIX_SCENE(PhysicsSceneImpl, "physics")
 		.LUMIX_FUNC(PhysicsSceneImpl::raycast)
 		.LUMIX_CMP(Ragdoll, "ragdoll", "Physics / Ragdoll")

@@ -925,8 +925,7 @@ namespace Lumix
 			}
 
 			void visit(const reflection::ArrayProperty& prop) override {}
-			// TODO refl
-			//void visit(const reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::BlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -981,8 +980,7 @@ namespace Lumix
 			}
 
 			void visit(const reflection::ArrayProperty& prop) override {}
-			// TODO refl
-			//void visit(const reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::BlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -1098,9 +1096,8 @@ namespace Lumix
 		{
 			lua_State* L = m_system.m_engine.getState();
 			LuaWrapper::DebugGuard guard(L);
-			// TODO refl
-			/*
-			reflection::SceneBase* scene = reflection::getFirstScene();
+
+			reflection::Scene* scene = reflection::getFirstScene();
 			while (scene) {
 				lua_newtable(L); // [ scene ]
 				lua_getglobal(L, "Lumix"); // [ scene, Lumix ]
@@ -1114,9 +1111,10 @@ namespace Lumix
 				lua_pushcfunction(L, lua_new_scene); // [ scene, fn_new_scene ]
 				lua_setfield(L, -2, "new"); // [ scene ]
 
-				for (const reflection::FunctionBase* f :  scene->getFunctions()) {
+				for (const reflection::FunctionBase* f :  scene->functions) {
 					const char* c = f->decl_code;
-					while (*c != ':') ++c;
+					while (*c != ':' && *c) ++c;
+					ASSERT(*c == ':');
 					c += 2;
 					lua_pushlightuserdata(L, (void*)f); // [scene, f]
 					lua_pushcclosure(L, luaSceneMethodClosure, 1); // [scene, fn]
@@ -1127,7 +1125,6 @@ namespace Lumix
 				scene = scene->next;
 			}
 
-			/*
 			for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 				const char* cmp_name = cmp.cmp->name;
 				const ComponentType cmp_type = cmp.cmp->component_type;
@@ -1152,7 +1149,7 @@ namespace Lumix
 				lua_setfield(L, -2, "__newindex"); // [ cmp ]
 
 				lua_pop(L, 1);
-			}*/
+			}
 		}
 
 		void cancelTimer(int timer_func)
@@ -2210,9 +2207,9 @@ namespace Lumix
 	}
 
 
-	struct LuaProperties : reflection::IDynamicProperties {
+	struct LuaProperties : reflection::DynamicProperties {
 		LuaProperties(IAllocator& allocator)
-			: IDynamicProperties(allocator)
+			: DynamicProperties(allocator)
 		{
 			name = "lua_properties";
 		}

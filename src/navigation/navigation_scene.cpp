@@ -1537,7 +1537,7 @@ UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& syst
 
 void NavigationScene::reflect() {
 	LUMIX_SCENE(NavigationSceneImpl, "navigation")
-		.LUMIX_FUNC(setGeneratorParams)
+		.LUMIX_FUNC(NavigationSceneImpl::setGeneratorParams)
 
 		.LUMIX_CMP(Zone, "navmesh_zone", "Navigation / Zone")
 			.icon(ICON_FA_STREET_VIEW)

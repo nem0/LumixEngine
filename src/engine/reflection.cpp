@@ -13,7 +13,7 @@ namespace reflection
 {
 	
 struct Context {
-	Scene* first_refl_scene = nullptr; 
+	Scene* first_scene = nullptr; 
 	RegisteredComponent ComponentBases[ComponentType::MAX_TYPES_COUNT];
 	u32 components_count = 0;
 };
@@ -113,6 +113,11 @@ ComponentType getComponentType(const char* name)
 	return {i32(getContext().components_count - 1)};
 }
 
+Scene* getFirstScene() {
+	return getContext().first_scene;
+}
+
+
 Span<const RegisteredComponent> getComponents() {
 	return Span(getContext().ComponentBases, getContext().components_count);
 }
@@ -127,11 +132,6 @@ struct MultilineAttribute : IAttribute
 	int getType() const override { return MULTILINE; }
 };
 
-struct ColorAttribute : IAttribute
-{
-	int getType() const override { return COLOR; }
-};
-
 struct NoUIAttribute : IAttribute {
 	int getType() const override { return NO_UI; }
 };
@@ -139,8 +139,8 @@ struct NoUIAttribute : IAttribute {
 builder build_scene(const char* name) {
 	builder res(getAllocator());
 	Context& ctx = getContext();
-	res.scene->next = ctx.first_refl_scene;
-	ctx.first_refl_scene = res.scene;
+	res.scene->next = ctx.first_scene;
+	ctx.first_scene = res.scene;
 	res.scene->name = name;
 	return res;
 }
@@ -206,6 +206,22 @@ void builder::addProp(PropertyBase* p) {
 		scene->cmps.back()->props.push(p);
 	}
 	last_prop = p;
+}
+
+BlobProperty::BlobProperty(IAllocator& allocator)
+	: PropertyBase(allocator)
+{}
+
+void BlobProperty::visit(struct IPropertyVisitor& visitor) const {
+	visitor.visit(*this);
+}
+
+void BlobProperty::getValue(ComponentUID cmp, u32 idx, OutputMemoryStream& stream) const {
+	getter(cmp.scene, (EntityRef)cmp.entity, idx, stream);
+}
+
+void BlobProperty::setValue(ComponentUID cmp, u32 idx, InputMemoryStream& stream) const {
+	setter(cmp.scene, (EntityRef)cmp.entity, idx, stream);
 }
 
 ArrayProperty::ArrayProperty(IAllocator& allocator)

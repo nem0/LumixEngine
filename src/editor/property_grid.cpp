@@ -108,91 +108,92 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 	}
 
 	template <typename T>
-	void dynamicProperty(const ComponentUID& cmp, const reflection::IDynamicProperties& prop, u32 prop_index) {
-		struct : reflection::Property<T> {
-			Span<const reflection::IAttribute* const> getAttributes() const override { return {}; }
+	void dynamicProperty(const ComponentUID& cmp, const reflection::DynamicProperties& prop, u32 prop_index) {
+		struct Prop : reflection::Property<T> {
+			Prop(IAllocator& allocator) : reflection::Property<T>(allocator) {}
 
-			T get(ComponentUID cmp, int array_index) const override {
+			T get(ComponentUID cmp, u32 array_index) const override {
 				return reflection::get<T>(prop->getValue(cmp, array_index, index));
 			}
 
-			void set(ComponentUID cmp, int array_index, T value) const override {
-				reflection::IDynamicProperties::Value v;
+			void set(ComponentUID cmp, u32 array_index, T value) const override {
+				reflection::DynamicProperties::Value v;
 				reflection::set<T>(v, value);
 				prop->set(cmp, array_index, index, v);
 			}
 
-			const reflection::IDynamicProperties* prop;
+			const reflection::DynamicProperties* prop;
 			ComponentUID cmp;
 			int index;
-		} p;
+		} p(m_app.getAllocator());
+
 		p.name = prop.getName(cmp, m_index, prop_index);
 		p.prop = &prop;
 		p.index =  prop_index;
 		visit(p);
 	}
-	// TODO refl
-	/*
-	void visit(const reflection::IDynamicProperties& prop) override {
+
+	void visit(const reflection::DynamicProperties& prop) override {
 		ComponentUID cmp = getComponent();;
 		for (u32 i = 0, c = prop.getCount(cmp, m_index); i < c; ++i) {
-			const reflection::IDynamicProperties::Type type = prop.getType(cmp, m_index, i);
+			const reflection::DynamicProperties::Type type = prop.getType(cmp, m_index, i);
 			switch(type) {
-				case reflection::IDynamicProperties::FLOAT: dynamicProperty<float>(cmp, prop, i); break;
-				case reflection::IDynamicProperties::BOOLEAN: dynamicProperty<bool>(cmp, prop, i); break;
-				case reflection::IDynamicProperties::ENTITY: dynamicProperty<EntityPtr>(cmp, prop, i); break;
-				case reflection::IDynamicProperties::I32: dynamicProperty<i32>(cmp, prop, i); break;
-				case reflection::IDynamicProperties::STRING: dynamicProperty<const char*>(cmp, prop, i); break;
-				case reflection::IDynamicProperties::COLOR: {
-					struct : reflection::Property<Vec3> {
-						Span<const reflection::IAttribute* const> getAttributes() const override {
-							return Span((const reflection::IAttribute*const*)attrs, 1);
-						}
-						
-						Vec3 get(ComponentUID cmp, int array_index) const override {
+				case reflection::DynamicProperties::FLOAT: dynamicProperty<float>(cmp, prop, i); break;
+				case reflection::DynamicProperties::BOOLEAN: dynamicProperty<bool>(cmp, prop, i); break;
+				case reflection::DynamicProperties::ENTITY: dynamicProperty<EntityPtr>(cmp, prop, i); break;
+				case reflection::DynamicProperties::I32: dynamicProperty<i32>(cmp, prop, i); break;
+				case reflection::DynamicProperties::STRING: dynamicProperty<const char*>(cmp, prop, i); break;
+				case reflection::DynamicProperties::COLOR: {
+					struct Prop : reflection::Property<Vec3> {
+						Prop(IAllocator& allocator) : Property<Vec3>(allocator) {}
+
+						Vec3 get(ComponentUID cmp, u32 array_index) const override {
 							return reflection::get<Vec3>(prop->getValue(cmp, array_index, index));
 						}
-						void set(ComponentUID cmp, int array_index, Vec3 value) const override {
-							reflection::IDynamicProperties::Value v;
+						void set(ComponentUID cmp, u32 array_index, Vec3 value) const override {
+							reflection::DynamicProperties::Value v;
 							reflection::set(v, value);
 							prop->set(cmp, array_index, index, v);
 						}
-						const reflection::IDynamicProperties* prop;
+
+						const reflection::DynamicProperties* prop;
 						ComponentUID cmp;
 						int index;
 						reflection::ColorAttribute attr;
-						reflection::IAttribute* attrs[1] = { &attr };
-					} p;
+					} p(m_app.getAllocator());
+
 					p.name = prop.getName(cmp, m_index, i);
 					p.prop = &prop;
 					p.index =  i;
+					p.attributes.push(&p.attr);
 					visit(p);
 					break;
 				}
-				case reflection::IDynamicProperties::RESOURCE: {
-					struct : reflection::Property<Path> {
-						Span<const reflection::IAttribute* const> getAttributes() const override {
-							return Span((const reflection::IAttribute*const*)attrs, 1);
-						}
-						
-						Path get(ComponentUID cmp, int array_index) const override {
+				case reflection::DynamicProperties::RESOURCE: {
+					struct Prop : reflection::Property<Path> {
+						Prop(IAllocator& allocator) : Property<Path>(allocator) {}
+
+						Path get(ComponentUID cmp, u32 array_index) const override {
 							return Path(reflection::get<const char*>(prop->getValue(cmp, array_index, index)));
 						}
-						void set(ComponentUID cmp, int array_index, Path value) const override {
-							reflection::IDynamicProperties::Value v;
+
+						void set(ComponentUID cmp, u32 array_index, Path value) const override {
+							reflection::DynamicProperties::Value v;
 							reflection::set(v, value.c_str());
 							prop->set(cmp, array_index, index, v);
 						}
-						const reflection::IDynamicProperties* prop;
+
+						const reflection::DynamicProperties* prop;
 						ComponentUID cmp;
 						int index;
 						reflection::ResourceAttribute attr;
-						reflection::IAttribute* attrs[1] = { &attr };
-					} p;
+					} p(m_app.getAllocator());
+
 					p.attr = prop.getResourceAttribute(cmp, m_index, i);
 					p.name = prop.getName(cmp, m_index, i);
 					p.prop = &prop;
 					p.index =  i;
+					p.attributes.push(&p.attr);
 					visit(p);
 					break;
 				}
@@ -200,7 +201,6 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			}
 		}
 	}
-	*/
 
 	void visit(const reflection::Property<float>& prop) override
 	{
@@ -557,9 +557,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		ImGui::PopID();
 	}
 
-	// TODO refl
-	//void visit(const reflection::IBlobProperty& prop) override {}
-
+	void visit(const reflection::BlobProperty& prop) override {}
 
 	void visit(const reflection::ArrayProperty& prop) override
 	{
