@@ -1,3 +1,4 @@
+#pragma GCC diagnostic ignored "-Wsubobject-linkage"
 #include "imgui.cpp"
 #include "imgui_tables.cpp"
 #include "imgui_draw.cpp"
