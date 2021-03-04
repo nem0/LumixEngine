@@ -153,7 +153,8 @@ struct DynamicProperties : PropertyBase {
 	virtual ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const = 0;
 	virtual void set(ComponentUID cmp, int array_idx, const char* name, Type type, Value value) const = 0;
 	virtual void set(ComponentUID cmp, int array_idx, u32 idx, Value value) const = 0;
-	virtual void visit(struct IPropertyVisitor& visitor) const = 0;
+	
+	void visit(IPropertyVisitor& visitor) const override;
 };
 
 template <typename T> inline T get(DynamicProperties::Value);
@@ -581,6 +582,14 @@ struct builder {
 		addProp(p);
 		return *this;
 	}
+
+	template <typename T>
+	builder& property() {
+		auto* p = LUMIX_NEW(allocator, T)(allocator);
+		addProp(p);
+		return *this;
+	}
+
 
 	template <auto Getter, auto Setter>
 	builder& prop(const char* name) {

@@ -2328,10 +2328,8 @@ namespace Lumix
 			.begin_array<&LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript>("scripts")
 				.prop<&LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript>("Enabled")
 				.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
-				//LuaProperties()
-			.end_array()
-		// TODO refl
-		;
+				.property<LuaProperties>()
+			.end_array();
 	}
 
 	void LuaScriptSystemImpl::init() {

@@ -1199,8 +1199,7 @@ public:
 				prop.visitChildren(*this);
 				array = tmp;
 			}
-			// TODO refl
-			/*
+
 			void visit(const reflection::DynamicProperties& prop) override { 
 				for (EntityPtr entity : cmd->m_entities) {
 					const ComponentUID cmp = cmd->m_editor.getUniverse()->getComponent((EntityRef)entity, cmd->m_component_type);
@@ -1214,7 +1213,8 @@ public:
 						prop.set(cmp, cmd->m_index, i, v);
 					}
 				}
-			}*/
+			}
+
 			SetPropertyCommand<T>* cmd;
 			const char* prop_name;
 			const char* array;

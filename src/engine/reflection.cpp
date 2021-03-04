@@ -117,6 +117,7 @@ Scene* getFirstScene() {
 	return getContext().first_scene;
 }
 
+void DynamicProperties::visit(IPropertyVisitor& visitor) const { visitor.visit(*this); }
 
 Span<const RegisteredComponent> getComponents() {
 	return Span(getContext().ComponentBases, getContext().components_count);
