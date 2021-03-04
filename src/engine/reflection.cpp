@@ -49,8 +49,8 @@ template <> void writeToStream<const char*>(OutputMemoryStream& stream, const ch
 }
 
 struct Context {
-	SceneBase* first_scene = nullptr;
-	RegisteredComponent components[ComponentType::MAX_TYPES_COUNT];
+	reflscene* first_refl_scene = nullptr; 
+	RegisteredReflComponent reflcmps[ComponentType::MAX_TYPES_COUNT];
 	u32 components_count = 0;
 };
 
@@ -65,29 +65,33 @@ Array<FunctionBase*>& allFunctions() {
 	return fncs;
 }
 
-const ComponentBase* getComponent(ComponentType cmp_type) {
-	return getContext().components[cmp_type.index].cmp;
+
+const reflcmp* getReflComponent(ComponentType cmp_type) {
+	return getContext().reflcmps[cmp_type.index].cmp;
 }
 
-SceneBase* getFirstScene() { return getContext().first_scene; }
-
-void registerScene(SceneBase& scene) {
-	Context& ctx = getContext();
-	scene.next = ctx.first_scene;
-	ctx.first_scene = &scene;
-
-	const u32 scene_name_hash = crc32(scene.name);
-	for (ComponentBase* cmp : scene.getComponents()) {
-		ctx.components[cmp->component_type.index].cmp = cmp;
-		ctx.components[cmp->component_type.index].scene = scene_name_hash;
+const reflprop* getReflProp(ComponentType cmp_type, const char* prop_name) {
+	const reflcmp* cmp = getReflComponent(cmp_type);
+	for (reflprop* prop : cmp->props) {
+		if (equalStrings(prop->name, prop_name)) return prop;
 	}
+	return nullptr;
 }
 
+const ComponentBase* getComponent(ComponentType cmp_type) {
+	return nullptr;
+}
+
+void builder::registerCmp(reflcmp* cmp) {
+	getContext().reflcmps[cmp->component_type.index].cmp = cmp;
+	getContext().reflcmps[cmp->component_type.index].name_hash = crc32(cmp->name);
+	getContext().reflcmps[cmp->component_type.index].scene = crc32(scene->name);
+}
 
 ComponentType getComponentTypeFromHash(u32 hash)
 {
 	for (u32 i = 0, c = getContext().components_count; i < c; ++i) {
-		if (getContext().components[i].name_hash == hash) {
+		if (getContext().reflcmps[i].name_hash == hash) {
 			return {(i32)i};
 		}
 	}
@@ -98,32 +102,46 @@ ComponentType getComponentTypeFromHash(u32 hash)
 
 u32 getComponentTypeHash(ComponentType type)
 {
-	return getContext().components[type.index].name_hash;
+	return getContext().reflcmps[type.index].name_hash;
 }
 
 
 ComponentType getComponentType(const char* name)
 {
+	Context& ctx = getContext();
 	u32 name_hash = crc32(name);
-	for (u32 i = 0, c = getContext().components_count; i < c; ++i) {
-		if (getContext().components[i].name_hash == name_hash) {
+	for (u32 i = 0, c = ctx.components_count; i < c; ++i) {
+		if (ctx.reflcmps[i].name_hash == name_hash) {
 			return {(i32)i};
 		}
 	}
 
-	if (getContext().components_count == ComponentType::MAX_TYPES_COUNT) {
+	if (ctx.components_count == ComponentType::MAX_TYPES_COUNT) {
 		logError("Too many component types");
 		return INVALID_COMPONENT_TYPE;
 	}
 
-	RegisteredComponent& type = getContext().components[getContext().components_count];
+	RegisteredReflComponent& type = ctx.reflcmps[getContext().components_count];
 	type.name_hash = name_hash;
-	++getContext().components_count;
+	++ctx.components_count;
 	return {i32(getContext().components_count - 1)};
 }
 
-Span<const RegisteredComponent> getComponents() {
-	return Span(getContext().components, getContext().components_count);
+Span<const RegisteredReflComponent> getReflComponents() {
+	return Span(getContext().reflcmps, getContext().components_count);
+}
+
+static IAllocator& getReflAlloc() {
+	static DefaultAllocator alloc;
+	return alloc;
+}
+
+builder build_scene(const char* name) {
+	builder res(getReflAlloc());
+	res.scene->next = getContext().first_refl_scene;
+	getContext().first_refl_scene = res.scene;
+	res.scene->name = name;
+	return res;
 }
 
 

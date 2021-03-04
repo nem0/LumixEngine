@@ -1534,33 +1534,32 @@ UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& syst
 	return UniquePtr<NavigationSceneImpl>::create(allocator, engine, system, universe, allocator);
 }
 
+
 void NavigationScene::reflect() {
-	LUMIX_SCENE(NavigationSceneImpl, "navigation",
-		LUMIX_FUNC(NavigationScene::setGeneratorParams),
-		LUMIX_CMP(Zone, "navmesh_zone", "Navigation / Zone",
-			icon(ICON_FA_MAP_MARKED_ALT),
-			LUMIX_FUNC_EX(NavigationScene::debugDrawContours, "drawContours"),
-			LUMIX_FUNC_EX(NavigationScene::debugDrawNavmesh, "drawNavmesh"),
-			LUMIX_FUNC_EX(NavigationScene::debugDrawCompactHeightfield, "drawCompactHeightfield"),
-			LUMIX_FUNC_EX(NavigationScene::debugDrawHeightfield, "drawHeightfield"),
-			LUMIX_FUNC(NavigationScene::save),
-			LUMIX_FUNC(NavigationScene::load),
-			LUMIX_FUNC(NavigationScene::generateNavmesh),
-			var_property("Extents", &NavigationScene::getZone, &NavmeshZone::extents)
-		),
-		LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent",
-			icon(ICON_FA_STREET_VIEW),
-			LUMIX_FUNC_EX(NavigationScene::setActorActive, "setActive"),
-			LUMIX_FUNC_EX(NavigationScene::navigate, "navigate"),
-			LUMIX_FUNC_EX(NavigationScene::cancelNavigation, "cancelNavigation"),
-			LUMIX_FUNC_EX(NavigationScene::getAgentSpeed, "getSpeed"),
-			LUMIX_FUNC_EX(NavigationScene::debugDrawPath, "drawPath"),
-			LUMIX_PROP(AgentRadius, "Radius", MinAttribute(0)),
-			LUMIX_PROP(AgentHeight, "Height", MinAttribute(0)),
-			property("Use root motion", &NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion)
-			//property("Get root motion from animation", LUMIX_PROP_FULL(NavigationScene, isGettingRootMotionFromAnim, setIsGettingRootMotionFromAnim))
-		)
-	);
+	LUMIX_REFL_SCENE(NavigationSceneImpl, "navigation")
+		.LUMIX_REFL_FUNC(setGeneratorParams)
+
+		.LUMIX_REFL_CMP(Zone, "navmesh_zone", "Navigation / Zone")
+			.icon(ICON_FA_STREET_VIEW)
+			.LUMIX_REFL_FUNC_EX(debugDrawContours, "drawContours")
+			.LUMIX_REFL_FUNC_EX(debugDrawNavmesh, "drawNavmesh")
+			.LUMIX_REFL_FUNC_EX(debugDrawCompactHeightfield, "drawCompactHeightfield")
+			.LUMIX_REFL_FUNC_EX(debugDrawHeightfield, "drawHeightfield")
+			.LUMIX_REFL_FUNC(save)
+			.LUMIX_REFL_FUNC(load)
+			.LUMIX_REFL_FUNC(generateNavmesh)
+			.var_prop<&NavigationScene::getZone, &NavmeshZone::extents>("Extents")
+
+		.LUMIX_REFL_CMP(Agent, "navmesh_agent", "Navigation / Agent")
+			.icon(ICON_FA_MAP_MARKED_ALT)
+			.LUMIX_REFL_FUNC_EX(setActorActive, "setActive")
+			.LUMIX_REFL_FUNC_EX(navigate, "navigate")
+			.LUMIX_REFL_FUNC_EX(cancelNavigation, "cancelNavigation")
+			.LUMIX_REFL_FUNC_EX(getAgentSpeed, "getSpeed")
+			.LUMIX_REFL_FUNC_EX(debugDrawPath, "drawPath")
+			.LUMIX_REFL_PROP(AgentRadius, "Radius").minAttribute(0)
+			.LUMIX_REFL_PROP(AgentHeight, "Height").minAttribute(0)
+			.prop<&NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion>("Use root motion");
 }
 
 } // namespace Lumix

@@ -32,7 +32,7 @@ bool PropertyAnimation::save(OutputMemoryStream& blob) {
 
 	for (Curve& curve : curves) {
 		blob << "curve {\n";
-		blob << "\t component = \"" << reflection::getComponent(curve.cmp_type)->name << "\",\n";
+		blob << "\t component = \"" << reflection::getReflComponent(curve.cmp_type)->name << "\",\n";
 		blob << "\t property = \"" << curve.property->name << "\",\n";
 		blob << "\tkeyframes = {\n";
 		for (int i = 0; i < curve.frames.size(); ++i) {

@@ -1097,7 +1097,8 @@ namespace Lumix
 		{
 			lua_State* L = m_system.m_engine.getState();
 			LuaWrapper::DebugGuard guard(L);
-
+			// TODO refl
+			/*
 			reflection::SceneBase* scene = reflection::getFirstScene();
 			while (scene) {
 				lua_newtable(L); // [ scene ]
@@ -1125,6 +1126,7 @@ namespace Lumix
 				scene = scene->next;
 			}
 
+			/*
 			for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 				const char* cmp_name = cmp.cmp->name;
 				const ComponentType cmp_type = cmp.cmp->component_type;
@@ -1149,7 +1151,7 @@ namespace Lumix
 				lua_setfield(L, -2, "__newindex"); // [ cmp ]
 
 				lua_pop(L, 1);
-			}
+			}*/
 		}
 
 		void cancelTimer(int timer_func)
@@ -2319,15 +2321,15 @@ namespace Lumix
 	{
 		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
-		LUMIX_SCENE(LuaScriptSceneImpl, "lua_script",
-			LUMIX_CMP(Component, "lua_script", "Lua script", 
-				array("scripts", &LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript, 
-					property("Enabled", &LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript),
-					LUMIX_PROP(ScriptPath, "Path", ResourceAttribute(LuaScript::TYPE)),
-					LuaProperties()
-				)
-			)
-		);
+		LUMIX_REFL_SCENE(LuaScriptSceneImpl, "lua_script")
+			.LUMIX_REFL_CMP(Component, "lua_script", "Lua script") 
+			.begin_array<&LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript>("scripts")
+				.prop<&LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript>("Enabled")
+				.LUMIX_REFL_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
+				//LuaProperties()
+			.end_array()
+		// TODO refl
+		;
 	}
 
 	void LuaScriptSystemImpl::init() {
