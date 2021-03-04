@@ -924,8 +924,8 @@ namespace Lumix
 				LuaWrapper::push(L, tmp);
 			}
 
-			void visit(const reflection::IArrayProperty& prop) override {}
-			void visit(const reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::ArrayProperty& prop) override {}
+			void visit(const reflection::BlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -979,8 +979,8 @@ namespace Lumix
 				prop.set(cmp, idx, val);
 			}
 
-			void visit(const reflection::IArrayProperty& prop) override {}
-			void visit(const reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::ArrayProperty& prop) override {}
+			void visit(const reflection::BlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -1044,8 +1044,7 @@ namespace Lumix
 			if (v.found) return 1;
 
 			// TODO put this directly in table, so we don't have to look it up here every time
-			const auto& functions = cmp->getFunctions();
-			for (auto* f : functions) {
+			for (auto* f : cmp->functions) {
 				if (equalStrings(v.prop_name, f->name)) {
 					lua_pushlightuserdata(L, (void*)f);
 					lua_pushcclosure(L, luaCmpMethodClosure, 1);
@@ -1098,7 +1097,7 @@ namespace Lumix
 			lua_State* L = m_system.m_engine.getState();
 			LuaWrapper::DebugGuard guard(L);
 
-			reflection::SceneBase* scene = reflection::getFirstScene();
+			reflection::Scene* scene = reflection::getFirstScene();
 			while (scene) {
 				lua_newtable(L); // [ scene ]
 				lua_getglobal(L, "Lumix"); // [ scene, Lumix ]
@@ -1112,9 +1111,10 @@ namespace Lumix
 				lua_pushcfunction(L, lua_new_scene); // [ scene, fn_new_scene ]
 				lua_setfield(L, -2, "new"); // [ scene ]
 
-				for (const reflection::FunctionBase* f :  scene->getFunctions()) {
+				for (const reflection::FunctionBase* f :  scene->functions) {
 					const char* c = f->decl_code;
-					while (*c != ':') ++c;
+					while (*c != ':' && *c) ++c;
+					ASSERT(*c == ':');
 					c += 2;
 					lua_pushlightuserdata(L, (void*)f); // [scene, f]
 					lua_pushcclosure(L, luaSceneMethodClosure, 1); // [scene, fn]
@@ -2207,8 +2207,12 @@ namespace Lumix
 	}
 
 
-	struct LuaProperties : reflection::IDynamicProperties {
-		LuaProperties() { name = "lua_properties"; }
+	struct LuaProperties : reflection::DynamicProperties {
+		LuaProperties(IAllocator& allocator)
+			: DynamicProperties(allocator)
+		{
+			name = "lua_properties";
+		}
 		
 		u32 getCount(ComponentUID cmp, int index) const override { 
 			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
@@ -2319,15 +2323,15 @@ namespace Lumix
 	{
 		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
-		LUMIX_SCENE(LuaScriptSceneImpl, "lua_script",
-			LUMIX_CMP(Component, "lua_script", "Lua script", 
-				array("scripts", &LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript, 
-					property("Enabled", &LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript),
-					LUMIX_PROP(ScriptPath, "Path", ResourceAttribute(LuaScript::TYPE)),
-					LuaProperties()
-				)
-			)
-		);
+		LUMIX_SCENE(LuaScriptSceneImpl, "lua_script")
+			.LUMIX_CMP(Component, "lua_script", "Lua script") 
+			.begin_array<&LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript>("scripts")
+				.prop<&LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript>("Enabled")
+				.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
+				//LuaProperties()
+			.end_array()
+		// TODO refl
+		;
 	}
 
 	void LuaScriptSystemImpl::init() {

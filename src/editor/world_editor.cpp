@@ -341,6 +341,51 @@ void addSphere(UniverseView& view, const DVec3& center, float radius, Color colo
 	}
 }
 
+template <typename T> void writeToStream(OutputMemoryStream& stream, T value) {	stream.write(value); }
+template <typename T> T readFromStream(InputMemoryStream& stream) { return stream.read<T>(); }
+template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputMemoryStream& stream);
+template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputMemoryStream& stream, Path);
+template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
+template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputMemoryStream& stream);
+template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* path);
+	
+template <> Path readFromStream<Path>(InputMemoryStream& stream)
+{
+	const char* c_str = (const char*)stream.getData() + stream.getPosition();
+	Path path(c_str);
+	stream.skip(stringLength(c_str) + 1);
+	return path;
+}
+
+
+template <> void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path)
+{
+	const char* str = path.c_str();
+	stream.write(str, stringLength(str) + 1);
+}
+
+
+template <> void writeToStream<Path>(OutputMemoryStream& stream, Path path)
+{
+	const char* str = path.c_str();
+	stream.write(str, stringLength(str) + 1);
+}
+
+
+template <> const char* readFromStream<const char*>(InputMemoryStream& stream)
+{
+	const char* c_str = (const char*)stream.getData() + stream.getPosition();
+	stream.skip(stringLength(c_str) + 1);
+	return c_str;
+}
+
+
+template <> void writeToStream<const char*>(OutputMemoryStream& stream, const char* value)
+{
+	stream.write(value, stringLength(value) + 1);
+}
+
+
 struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 	PropertyDeserializeVisitor(Ref<InputMemoryStream> deserializer
 		, ComponentUID cmp
@@ -354,7 +399,7 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 
 	template <typename T>
 	void set(const reflection::Property<T>& prop) {
-		prop.set(cmp, idx, reflection::readFromStream<T>(deserializer));
+		prop.set(cmp, idx, readFromStream<T>(deserializer));
 	}
 
 	void visit(const reflection::Property<float>& prop) override { set(prop); }
@@ -365,28 +410,28 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 	void visit(const reflection::Property<IVec3>& prop) override { set(prop); }
 	void visit(const reflection::Property<Vec4>& prop) override { set(prop); }
 	void visit(const reflection::Property<bool>& prop) override { set(prop); }
-	void visit(const reflection::IBlobProperty& prop) override { prop.setValue(cmp, idx, deserializer); }
 	void visit(const reflection::Property<const char*>& prop) override { set(prop); }
 	void visit(const reflection::Property<Path>& prop) override { set(prop); }
+	void visit(const reflection::BlobProperty& prop) override { prop.setValue(cmp, idx, deserializer); }
 	
-	void visit(const reflection::IDynamicProperties& prop) override {
+	void visit(const reflection::DynamicProperties& prop) override {
 		u32 c;
 		deserializer.read(c);
 		for (u32 i = 0; i < c; ++i) {
 			const char* name = deserializer.readString();
-			reflection::IDynamicProperties::Type type;
+			reflection::DynamicProperties::Type type;
 			deserializer.read(type);
 			switch(type) {
-				case reflection::IDynamicProperties::RESOURCE:	
-				case reflection::IDynamicProperties::STRING: {
+				case reflection::DynamicProperties::RESOURCE:	
+				case reflection::DynamicProperties::STRING: {
 					const char* tmp = deserializer.readString();
-					reflection::IDynamicProperties::Value v;
+					reflection::DynamicProperties::Value v;
 					v.s = tmp;
 					prop.set(cmp, idx, name, type, v);
 					break;
 				}
 				default: {
-					reflection::IDynamicProperties::Value v;
+					reflection::DynamicProperties::Value v;
 					deserializer.read(v);
 					prop.set(cmp, idx, name, type, v);
 					break;
@@ -394,7 +439,7 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 			}
 		}
 	}
-
+	
 	void visit(const reflection::Property<EntityPtr>& prop) override { 
 		EntityPtr value;
 		deserializer.read(Ref(value));
@@ -404,8 +449,8 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 		prop.set(cmp, idx, value);
 	}
 
-	void visit(const reflection::IArrayProperty& prop) override {
-		int count;
+	void visit(const reflection::ArrayProperty& prop) override {
+		u32 count;
 		deserializer.read(Ref(count));
 		const int idx_backup = idx;
 		while (prop.getCount(cmp) > count) {
@@ -414,9 +459,9 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 		while (prop.getCount(cmp) < count) {
 			prop.addItem(cmp, -1);
 		}
-		for (int i = 0; i < count; ++i) {
+		for (u32 i = 0; i < count; ++i) {
 			idx = i;
-			prop.visit(*this);
+			prop.visitChildren(*this);
 		}
 		idx = idx_backup;
 	}
@@ -436,7 +481,7 @@ struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 
 	template <typename T>
 	void get(const reflection::Property<T>& prop) {
-		reflection::writeToStream(serializer, prop.get(cmp, idx));		
+		writeToStream(serializer, prop.get(cmp, idx));		
 	}
 
 	void visit(const reflection::Property<float>& prop) override { get(prop); }
@@ -448,22 +493,22 @@ struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 	void visit(const reflection::Property<IVec3>& prop) override { get(prop); }
 	void visit(const reflection::Property<Vec4>& prop) override { get(prop); }
 	void visit(const reflection::Property<bool>& prop) override { get(prop); }
-	void visit(const reflection::IBlobProperty& prop) override { prop.getValue(cmp, idx, serializer); }
+	void visit(const reflection::BlobProperty& prop) override { prop.getValue(cmp, idx, serializer); }
 	void visit(const reflection::Property<Path>& prop) override { get(prop); }
 	void visit(const reflection::Property<const char*>& prop) override { get(prop); }
-
-	void visit(const reflection::IDynamicProperties& prop) override {
+	
+	void visit(const reflection::DynamicProperties& prop) override {
 		const u32 c = prop.getCount(cmp, idx);
 		serializer.write(c);
 		for (u32 i = 0; i < c; ++i) {
 			const char* name = prop.getName(cmp, idx, i);
 			serializer.writeString(name);
-			const reflection::IDynamicProperties::Type type = prop.getType(cmp, idx, i);
+			const reflection::DynamicProperties::Type type = prop.getType(cmp, idx, i);
 			serializer.write(type);
-			const reflection::IDynamicProperties::Value v = prop.getValue(cmp, idx, i);
+			const reflection::DynamicProperties::Value v = prop.getValue(cmp, idx, i);
 			switch(type) {
-				case reflection::IDynamicProperties::RESOURCE:	
-				case reflection::IDynamicProperties::STRING: 
+				case reflection::DynamicProperties::RESOURCE:	
+				case reflection::DynamicProperties::STRING: 
 					serializer.writeString(v.s);
 					break;
 				default:
@@ -473,20 +518,20 @@ struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 		}
 	}
 
-	void visit(const reflection::IArrayProperty& prop) override {
+	void visit(const reflection::ArrayProperty& prop) override {
 		const int count = prop.getCount(cmp);
 		serializer.write(count);
 		const int idx_backup = idx;
 		for (int i = 0; i < count; ++i) {
 			idx = i;
-			prop.visit(*this);
+			prop.visitChildren(*this);
 		}
 		idx = idx_backup;
 	}
 
 	OutputMemoryStream& serializer;
 	ComponentUID cmp;
-	int idx;
+	int idx = -1;
 };
 
 
@@ -917,12 +962,12 @@ private:
 
 struct GatherResourcesVisitor final : reflection::IEmptyPropertyVisitor
 {
-	void visit(const reflection::IArrayProperty& prop) override
+	void visit(const reflection::ArrayProperty& prop) override
 	{
 		int count = prop.getCount(cmp);
 		for (int i = 0; i < count; ++i) {
 			index = i;
-			prop.visit(*this);
+			prop.visitChildren(*this);
 		}
 		index = -1;
 	}
@@ -966,7 +1011,7 @@ public:
 	bool execute() override
 	{
 		struct : reflection::IEmptyPropertyVisitor {
-			void visit(const reflection::IArrayProperty& prop) override {
+			void visit(const reflection::ArrayProperty& prop) override {
 				if (!equalStrings(prop.name, propname)) return;
 				prop.removeItem(cmp, index);
 			}
@@ -1022,20 +1067,9 @@ public:
 
 	bool execute() override
 	{
-		struct : reflection::IEmptyPropertyVisitor {
-			void visit(const reflection::IArrayProperty& prop) override {
-				if (!equalStrings(prop.name, prop_name)) return;
-				index = prop.getCount(cmp);
-				prop.addItem(cmp, index);
-			}
-			ComponentUID cmp;
-			int index;
-			const char* prop_name;
-		} v;
-		v.cmp = m_component;
-		v.prop_name = m_property;
-		reflection::getComponent(m_component.type)->visit(v);
-		m_index = v.index;
+		reflection::ArrayProperty* prop = (reflection::ArrayProperty*)reflection::getProperty(m_component.type, m_property);
+		m_index = prop->getCount(m_component);
+		prop->addItem(m_component, m_index);
 		return true;
 	}
 
@@ -1043,7 +1077,7 @@ public:
 	void undo() override
 	{
 		struct : reflection::IEmptyPropertyVisitor {
-			void visit(const reflection::IArrayProperty& prop) override {
+			void visit(const reflection::ArrayProperty& prop) override {
 				if (!equalStrings(prop.name, prop_name)) return;
 				prop.removeItem(cmp, index);
 			}
@@ -1133,15 +1167,15 @@ public:
 	}
 
 
-	template <typename T2> static void set(Ref<reflection::IDynamicProperties::Value> v, T2) { ASSERT(false); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, i32 val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, float val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, const Path& val) { reflection::set(v.value, val.c_str()); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, const char* val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, EntityPtr val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, bool val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, Vec3 val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::IDynamicProperties::Value> v, const String& val) { reflection::set(v.value, val.c_str()); }
+	template <typename T2> static void set(Ref<reflection::DynamicProperties::Value> v, T2) { ASSERT(false); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, i32 val) { reflection::set(v.value, val); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, float val) { reflection::set(v.value, val); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, const Path& val) { reflection::set(v.value, val.c_str()); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, const char* val) { reflection::set(v.value, val); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, EntityPtr val) { reflection::set(v.value, val); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, bool val) { reflection::set(v.value, val); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, Vec3 val) { reflection::set(v.value, val); }
+	static void set(Ref<reflection::DynamicProperties::Value> v, const String& val) { reflection::set(v.value, val.c_str()); }
 
 
 	bool execute() override
@@ -1157,16 +1191,17 @@ public:
 				}
 			}
 
-			void visit(const reflection::IArrayProperty& prop) override { 
+			void visit(const reflection::ArrayProperty& prop) override { 
 				if (!equalStrings(array, prop.name)) return;
 
 				const char* tmp = array;
 				array = "";
-				prop.visit(*this);
+				prop.visitChildren(*this);
 				array = tmp;
 			}
-
-			void visit(const reflection::IDynamicProperties& prop) override { 
+			// TODO refl
+			/*
+			void visit(const reflection::DynamicProperties& prop) override { 
 				for (EntityPtr entity : cmd->m_entities) {
 					const ComponentUID cmp = cmd->m_editor.getUniverse()->getComponent((EntityRef)entity, cmd->m_component_type);
 					const u32 c = prop.getCount(cmp, cmd->m_index);
@@ -1174,12 +1209,12 @@ public:
 						const char* name = prop.getName(cmp, cmd->m_index, i);
 						if (!equalStrings(prop_name, name)) continue;
 						found = true;
-						reflection::IDynamicProperties::Value v;
+						reflection::DynamicProperties::Value v;
 						set(Ref(v), cmd->m_new_value);
 						prop.set(cmp, cmd->m_index, i, v);
 					}
 				}
-			}
+			}*/
 			SetPropertyCommand<T>* cmd;
 			const char* prop_name;
 			const char* array;

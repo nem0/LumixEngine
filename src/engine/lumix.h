@@ -222,6 +222,8 @@ inline EntityPtr::operator EntityRef() const
 	return {index};
 }
 
+namespace reflection { LUMIX_ENGINE_API ComponentType getComponentType(const char* id); }
+
 #ifdef _MSC_VER
 	#pragma warning(disable : 4251)
 	// this is disabled because VS19 16.5.0 has false positives :(

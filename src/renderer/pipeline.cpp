@@ -3694,6 +3694,7 @@ struct PipelineImpl final : Pipeline
 			if (!iter.value().enabled) continue;
 
 			const Model* model = mi[e.index].model;
+			if (!model) continue;
 			if (!model->isReady()) continue;
 
 			for (i32 i = 0; i < model->getMeshCount(); ++i) {

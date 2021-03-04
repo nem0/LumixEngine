@@ -2581,7 +2581,7 @@ struct StudioAppImpl final : StudioApp
 
 			struct : reflection::IEmptyPropertyVisitor {
 				void visit(const reflection::Property<Path>& prop) override {
-					for (const reflection::IAttribute* attr : prop.getAttributes()) {
+					for (const reflection::IAttribute* attr : prop.attributes) {
 						if (attr->getType() == reflection::IAttribute::RESOURCE) {
 							is_res = true;
 							reflection::ResourceAttribute* a = (reflection::ResourceAttribute*)attr;
@@ -2792,8 +2792,8 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const reflection::IArrayProperty& prop) override { notSupported(prop); }
-		void visit(const reflection::IBlobProperty& prop) override { notSupported(prop); }
+		void visit(const reflection::ArrayProperty& prop) override { notSupported(prop); }
+		void visit(const reflection::BlobProperty& prop) override { notSupported(prop); }
 
 		template <typename T>
 		void notSupported(const T& prop)

@@ -490,27 +490,24 @@ UniquePtr<AudioScene> AudioScene::createInstance(AudioSystem& system,
 }
 
 void AudioScene::reflect(Engine& engine) {
-	LUMIX_SCENE(AudioSceneImpl, "audio",
-		LUMIX_FUNC(AudioScene::setMasterVolume),
-		LUMIX_FUNC(AudioScene::play),
-		LUMIX_FUNC(AudioScene::setVolume),
-		LUMIX_FUNC(AudioScene::setEcho),
-		LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound",
-			LUMIX_FUNC_EX(AudioScene::pauseAmbientSound, "pause"),
-			LUMIX_FUNC_EX(AudioScene::resumeAmbientSound, "resume"),
-			property("3D", &AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D),
-			LUMIX_PROP(AmbientSoundClip, "Sound", ResourceAttribute(Clip::TYPE))
-		),
-		LUMIX_CMP(Listener, "audio_listener", "Audio / Listener", icon(ICON_FA_HEADPHONES)),
-		LUMIX_CMP(EchoZone, "echo_zone", "Audio / Echo zone",
-			var_property("Radius", &AudioScene::getEchoZone, &EchoZone::radius, MinAttribute(0)),
-			var_property("Delay (ms)", &AudioScene::getEchoZone, &EchoZone::delay, MinAttribute(0))
-		),
-		LUMIX_CMP(ChorusZone, "chorus_zone", "Audio / Chorus zone",
-			var_property("Radius", &AudioScene::getChorusZone, &ChorusZone::radius, MinAttribute(0)),
-			var_property("Delay (ms)", &AudioScene::getChorusZone, &ChorusZone::delay, MinAttribute(0))
-		)
-	);
+	LUMIX_SCENE(AudioSceneImpl, "audio")
+		.LUMIX_FUNC(AudioScene::setMasterVolume)
+		.LUMIX_FUNC(AudioScene::play)
+		.LUMIX_FUNC(AudioScene::setVolume)
+		.LUMIX_FUNC(AudioScene::setEcho)
+		.LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound")
+			.LUMIX_FUNC_EX(AudioScene::pauseAmbientSound, "pause")
+			.LUMIX_FUNC_EX(AudioScene::resumeAmbientSound, "resume")
+			.prop<&AudioScene::isAmbientSound3D, &AudioScene::setAmbientSound3D>("3D")
+			.LUMIX_PROP(AmbientSoundClip, "Sound").resourceAttribute(Clip::TYPE)
+		.LUMIX_CMP(Listener, "audio_listener", "Audio / Listener").icon(ICON_FA_HEADPHONES)
+		.LUMIX_CMP(EchoZone, "echo_zone", "Audio / Echo zone")
+			.var_prop<&AudioScene::getEchoZone, &EchoZone::radius>("Radius").minAttribute(0)
+			.var_prop<&AudioScene::getEchoZone, &EchoZone::delay>("Delay (ms)").minAttribute(0)
+		.LUMIX_CMP(ChorusZone, "chorus_zone", "Audio / Chorus zone")
+			.var_prop<&AudioScene::getChorusZone, &ChorusZone::radius>("Radius").minAttribute(0)
+			.var_prop<&AudioScene::getChorusZone, &ChorusZone::delay>("Delay (ms)").minAttribute(0)
+	;
 }
 
 

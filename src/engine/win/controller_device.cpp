@@ -1,12 +1,6 @@
 #include "engine/controller_device.h"
 #include "engine/allocator.h"
-
-
-#define NOGDI
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <Xinput.h>
-
+#include "engine/win/simple_win.h"
 
 namespace Lumix
 {
@@ -101,13 +95,13 @@ void ControllerDevice::init(InputSystem& input_system)
 	
 	g_controllers.input = &input_system;
 	g_controllers.last_checked = 0;
-	g_controllers.lib = LoadLibrary("Xinput9_1_0.dll");
+	g_controllers.lib = os::loadLibrary("Xinput9_1_0.dll");
 	if (g_controllers.lib)
 	{
-		g_controllers.get_state = (XInputGetState_fn_ptr)GetProcAddress(g_controllers.lib, "XInputGetState");
+		g_controllers.get_state = (XInputGetState_fn_ptr)os::getLibrarySymbol(g_controllers.lib, "XInputGetState");
 		if (!g_controllers.get_state)
 		{
-			FreeLibrary(g_controllers.lib);
+			os::unloadLibrary(g_controllers.lib);
 			g_controllers.lib = nullptr;
 		}
 	}
@@ -145,7 +139,7 @@ void ControllerDevice::frame(float dt)
 
 void ControllerDevice::shutdown()
 {
-	if (g_controllers.lib) FreeLibrary(g_controllers.lib);
+	if (g_controllers.lib) os::unloadLibrary(g_controllers.lib);
 }
 
 

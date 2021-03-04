@@ -51,25 +51,9 @@ LUMIX_ENGINE_API int compareStringN(const char* lhs, const char* rhs, int length
 LUMIX_ENGINE_API int compareIStringN(const char* lhs, const char* rhs, int length);
 LUMIX_ENGINE_API const char* findSubstring(const char* str, const char* substr);
 LUMIX_ENGINE_API bool endsWith(const char* str, const char* substr);
-
-
-inline bool isLetter(char c)
-{
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-}
-
-
-inline bool isNumeric(char c)
-{
-	return c >= '0' && c <= '9';
-}
-
-
-inline bool isUpperCase(char c)
-{
-	return c >= 'A' && c <= 'Z';
-}
-
+LUMIX_ENGINE_API bool isLetter(char c);
+LUMIX_ENGINE_API bool isNumeric(char c);
+LUMIX_ENGINE_API bool isUpperCase(char c);
 
 template <int SIZE> bool copyString(char(&destination)[SIZE], const char* source)
 {

@@ -7,7 +7,6 @@
 #include "engine/log.h"
 #include "engine/math.h"
 #include "engine/profiler.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/simd.h"
 #include "engine/stream.h"

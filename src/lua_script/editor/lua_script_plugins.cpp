@@ -17,7 +17,6 @@
 #include "engine/lua_wrapper.h"
 #include "engine/os.h"
 #include "engine/path.h"
-#include "engine/reflection.h"
 #include "engine/stream.h"
 #include "engine/universe.h"
 #include "lua_script/lua_script.h"

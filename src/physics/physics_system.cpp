@@ -13,7 +13,6 @@
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 #include "physics/physics_geometry.h"
