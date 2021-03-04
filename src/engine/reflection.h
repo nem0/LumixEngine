@@ -552,7 +552,6 @@ struct builder {
 		cmp->component_type = getComponentType(name);
 		cmp->creator = creator;
 		cmp->destroyer = destroyer;
-		cmp->scene = crc32(scene->name);
 		registerCmp(cmp);
 
 		return *this;

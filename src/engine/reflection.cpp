@@ -68,6 +68,7 @@ builder::builder(IAllocator& allocator)
 }
 
 void builder::registerCmp(ComponentBase* cmp) {
+	cmp->scene = crc32(scene->name);
 	getContext().ComponentBases[cmp->component_type.index].cmp = cmp;
 	getContext().ComponentBases[cmp->component_type.index].name_hash = crc32(cmp->name);
 	getContext().ComponentBases[cmp->component_type.index].scene = crc32(scene->name);
