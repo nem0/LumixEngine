@@ -1536,29 +1536,29 @@ UniquePtr<NavigationScene> NavigationScene::create(Engine& engine, IPlugin& syst
 
 
 void NavigationScene::reflect() {
-	LUMIX_REFL_SCENE(NavigationSceneImpl, "navigation")
-		.LUMIX_REFL_FUNC(setGeneratorParams)
+	LUMIX_SCENE(NavigationSceneImpl, "navigation")
+		.LUMIX_FUNC(setGeneratorParams)
 
-		.LUMIX_REFL_CMP(Zone, "navmesh_zone", "Navigation / Zone")
+		.LUMIX_CMP(Zone, "navmesh_zone", "Navigation / Zone")
 			.icon(ICON_FA_STREET_VIEW)
-			.LUMIX_REFL_FUNC_EX(debugDrawContours, "drawContours")
-			.LUMIX_REFL_FUNC_EX(debugDrawNavmesh, "drawNavmesh")
-			.LUMIX_REFL_FUNC_EX(debugDrawCompactHeightfield, "drawCompactHeightfield")
-			.LUMIX_REFL_FUNC_EX(debugDrawHeightfield, "drawHeightfield")
-			.LUMIX_REFL_FUNC(save)
-			.LUMIX_REFL_FUNC(load)
-			.LUMIX_REFL_FUNC(generateNavmesh)
+			.LUMIX_FUNC_EX(debugDrawContours, "drawContours")
+			.LUMIX_FUNC_EX(debugDrawNavmesh, "drawNavmesh")
+			.LUMIX_FUNC_EX(debugDrawCompactHeightfield, "drawCompactHeightfield")
+			.LUMIX_FUNC_EX(debugDrawHeightfield, "drawHeightfield")
+			.LUMIX_FUNC(save)
+			.LUMIX_FUNC(load)
+			.LUMIX_FUNC(generateNavmesh)
 			.var_prop<&NavigationScene::getZone, &NavmeshZone::extents>("Extents")
 
-		.LUMIX_REFL_CMP(Agent, "navmesh_agent", "Navigation / Agent")
+		.LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent")
 			.icon(ICON_FA_MAP_MARKED_ALT)
-			.LUMIX_REFL_FUNC_EX(setActorActive, "setActive")
-			.LUMIX_REFL_FUNC_EX(navigate, "navigate")
-			.LUMIX_REFL_FUNC_EX(cancelNavigation, "cancelNavigation")
-			.LUMIX_REFL_FUNC_EX(getAgentSpeed, "getSpeed")
-			.LUMIX_REFL_FUNC_EX(debugDrawPath, "drawPath")
-			.LUMIX_REFL_PROP(AgentRadius, "Radius").minAttribute(0)
-			.LUMIX_REFL_PROP(AgentHeight, "Height").minAttribute(0)
+			.LUMIX_FUNC_EX(setActorActive, "setActive")
+			.LUMIX_FUNC_EX(navigate, "navigate")
+			.LUMIX_FUNC_EX(cancelNavigation, "cancelNavigation")
+			.LUMIX_FUNC_EX(getAgentSpeed, "getSpeed")
+			.LUMIX_FUNC_EX(debugDrawPath, "drawPath")
+			.LUMIX_PROP(AgentRadius, "Radius").minAttribute(0)
+			.LUMIX_PROP(AgentHeight, "Height").minAttribute(0)
 			.prop<&NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion>("Use root motion");
 }
 

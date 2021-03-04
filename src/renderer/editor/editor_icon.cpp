@@ -5,7 +5,6 @@
 #include "engine/geometry.h"
 #include "engine/math.h"
 #include "engine/os.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 #include "renderer/model.h"

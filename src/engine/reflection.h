@@ -4,19 +4,16 @@
 #include "engine/lumix.h"
 #include "engine/metaprogramming.h"
 #include "engine/resource.h"
-#include "engine/stream.h"
 #include "engine/universe.h"
 
 
-#define LUMIX_REFL_SCENE(Class, Label) using ReflScene = Class; reflection::build_scene(Label)
-#define LUMIX_REFL_FUNC_EX(F, Name) function<&ReflScene::F>(Name, #F)
-#define LUMIX_REFL_FUNC(F) function<&ReflScene::F>(#F, #F)
-#define LUMIX_REFL_CMP(Cmp, Name, Label) cmp<&ReflScene::create##Cmp, &ReflScene::destroy##Cmp>(Name, Label)
-#define LUMIX_REFL_PROP(Property, Label) prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
-#define LUMIX_ENUM_REFL_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
-
-#define LUMIX_FUNC_EX(Func, Name) reflection::function(&Func, #Func, Name)
-#define LUMIX_FUNC(Func) reflection::function(&Func, #Func, nullptr)
+#define LUMIX_SCENE(Class, Label) using ReflScene = Class; reflection::build_scene(Label)
+#define LUMIX_FUNC_EX(F, Name) function<&ReflScene::F>(Name, #F)
+#define LUMIX_FUNC(F) function<&ReflScene::F>(#F, #F)
+#define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflScene::create##Cmp, &ReflScene::destroy##Cmp>(Name, Label)
+#define LUMIX_PROP(Property, Label) prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
+#define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
+#define LUMIX_GLOBAL_FUNC(Func) reflection::function(&Func, #Func, nullptr)
 
 namespace Lumix
 {
@@ -50,34 +47,23 @@ struct IAttribute {
 	virtual int getType() const = 0;
 };
 
-struct ComponentBase;
-
 // we don't use method pointers here because VS has sizeof issues if IScene is forward declared
 using CreateComponent = void (*)(IScene*, EntityRef);
 using DestroyComponent = void (*)(IScene*, EntityRef);
 
-struct RegisteredReflComponent {
+struct RegisteredComponent {
 	u32 name_hash = 0;
 	u32 scene = 0;
-	struct reflcmp* cmp = nullptr;
+	struct ComponentBase* cmp = nullptr;
 };
 
-LUMIX_ENGINE_API const reflcmp* getReflComponent(ComponentType cmp_type);
 LUMIX_ENGINE_API const ComponentBase* getComponent(ComponentType cmp_type);
-LUMIX_ENGINE_API const struct reflprop* getReflProp(ComponentType cmp_type, const char* prop);
-LUMIX_ENGINE_API Span<const RegisteredReflComponent> getReflComponents();
+LUMIX_ENGINE_API const struct PropertyBase* getProperty(ComponentType cmp_type, const char* prop);
+LUMIX_ENGINE_API Span<const RegisteredComponent> getComponents();
 
 LUMIX_ENGINE_API ComponentType getComponentType(const char* id);
 LUMIX_ENGINE_API ComponentType getComponentTypeFromHash(u32 hash);
 
-template <typename T> void writeToStream(OutputMemoryStream& stream, T value) {	stream.write(value); }
-template <typename T> T readFromStream(InputMemoryStream& stream) { return stream.read<T>(); }
-template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputMemoryStream& stream);
-template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputMemoryStream& stream, Path);
-template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
-template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputMemoryStream& stream);
-template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* path);
-	
 struct ResourceAttribute : IAttribute
 {
 	ResourceAttribute(ResourceType type) : resource_type(type) {}
@@ -123,41 +109,17 @@ struct StringEnumAttribute : IAttribute {
 	int getType() const override { return STRING_ENUM; }
 };
 
-struct RadiansAttribute : IAttribute
-{
-	int getType() const override { return RADIANS; }
-};
 
-struct MultilineAttribute : IAttribute
-{
-	int getType() const override { return MULTILINE; }
-};
+struct PropertyBase {
+	PropertyBase(IAllocator& allocator) : attributes(allocator) {}
+	Array<IAttribute*> attributes;
 
-struct ColorAttribute : IAttribute
-{
-	int getType() const override { return COLOR; }
-};
-
-struct NoUIAttribute : IAttribute {
-	int getType() const override { return NO_UI; }
-};
-
-struct PropertyTag {};
-
-template <typename T> struct Property : PropertyTag {
-	virtual Span<const IAttribute* const> getAttributes() const = 0;
-	virtual T get(ComponentUID cmp, int index) const = 0;
-	virtual void set(ComponentUID cmp, int index, T) const = 0;
+	virtual void visit(struct IPropertyVisitor& visitor) const = 0;
 	const char* name;
 };
 
-struct IBlobProperty : PropertyTag  {
-	virtual void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const = 0;
-	virtual void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const = 0;
-	const char* name;
-};
 
-struct IDynamicProperties : PropertyTag  {
+struct IDynamicProperties : PropertyBase {
 	enum Type {
 		I32,
 		FLOAT,
@@ -178,15 +140,16 @@ struct IDynamicProperties : PropertyTag  {
 		bool b;
 		Vec3 v3;
 	};
+	IDynamicProperties(IAllocator& allocator) : PropertyBase(allocator) {}
+
 	virtual u32 getCount(ComponentUID cmp, int array_idx) const = 0;
 	virtual Type getType(ComponentUID cmp, int array_idx, u32 idx) const = 0;
 	virtual const char* getName(ComponentUID cmp, int array_idx, u32 idx) const = 0;
 	virtual Value getValue(ComponentUID cmp, int array_idx, u32 idx) const = 0;
-	virtual reflection::ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const = 0;
+	virtual ResourceAttribute getResourceAttribute(ComponentUID cmp, int array_idx, u32 idx) const = 0;
 	virtual void set(ComponentUID cmp, int array_idx, const char* name, Type type, Value value) const = 0;
 	virtual void set(ComponentUID cmp, int array_idx, u32 idx, Value value) const = 0;
-
-	const char* name;
+	virtual void visit(struct IPropertyVisitor& visitor) const = 0;
 };
 
 template <typename T> inline T get(IDynamicProperties::Value);
@@ -205,71 +168,15 @@ template <> inline void set(IDynamicProperties::Value& v, EntityPtr val) { v.e =
 template <> inline void set(IDynamicProperties::Value& v, bool val) { v.b = val; }
 template <> inline void set(IDynamicProperties::Value& v, Vec3 val) { v.v3 = val; }
 
-struct IArrayProperty : PropertyTag 
-{
-	virtual void addItem(ComponentUID cmp, int index) const = 0;
-	virtual void removeItem(ComponentUID cmp, int index) const = 0;
-	virtual int getCount(ComponentUID cmp) const = 0;
-	virtual void visit(struct IPropertyVisitor& visitor) const = 0;
-
-	const char* name;
-};
-
-struct reflprop {
-	reflprop(IAllocator& allocator) : attributes(allocator) {}
-	Array<reflection::IAttribute*> attributes;
-
-	virtual void visit(struct IReflPropertyVisitor& visitor) const = 0;
-	const char* name;
-};
-
 
 template <typename T>
-struct refl_typed_prop : reflprop {
-	refl_typed_prop(IAllocator& allocator) : reflprop(allocator) {}
+struct Property : PropertyBase {
+	Property(IAllocator& allocator) : PropertyBase(allocator) {}
 
-	typedef void (*setter_t)(IScene*, EntityRef, u32, const T&);
-	typedef T (*getter_t)(IScene*, EntityRef, u32);
+	typedef void (*Setter)(IScene*, EntityRef, u32, const T&);
+	typedef T (*Getter)(IScene*, EntityRef, u32);
 
-	template <auto F>
-	static void setterHelper(IScene* scene, EntityRef e, u32 idx, const T& value) {
-		using C = typename ClassOf<decltype(F)>::Type;
-		if constexpr (ArgsCount<decltype(F)>::value == 2) {
-			(static_cast<C*>(scene)->*F)(e, value);
-		}
-		else {
-			(static_cast<C*>(scene)->*F)(e, idx, value);
-		}
-	}
-
-	template <auto F>
-	static T getterHelper(IScene* scene, EntityRef e, u32 idx) {
-		using C = typename ClassOf<decltype(F)>::Type;
-		if constexpr (ArgsCount<decltype(F)>::value == 1) {
-			return (static_cast<C*>(scene)->*F)(e);
-		}
-		else {
-			return (static_cast<C*>(scene)->*F)(e, idx);
-		}
-	}
-
-	template <auto Getter, auto PropGetter>
-	static void setterVarHelper(IScene* scene, EntityRef e, u32, const T& value) {
-		using C = typename ClassOf<decltype(Getter)>::Type;
-		auto& c = (static_cast<C*>(scene)->*Getter)(e);
-		auto& v = c.*PropGetter;
-		v = value;
-	}
-
-	template <auto Getter, auto PropGetter>
-	static T getterVarHelper(IScene* scene, EntityRef e, u32) {
-		using C = typename ClassOf<decltype(Getter)>::Type;
-		auto& c = (static_cast<C*>(scene)->*Getter)(e);
-		auto& v = c.*PropGetter;
-		return static_cast<T>(v);
-	}
-
-	void visit(IReflPropertyVisitor& visitor) const override {
+	void visit(IPropertyVisitor& visitor) const override {
 		visitor.visit(*this);
 	}
 
@@ -281,84 +188,12 @@ struct refl_typed_prop : reflprop {
 		setter(cmp.scene, (EntityRef)cmp.entity, idx, val);
 	}
 
-	setter_t setter;
-	getter_t getter;
+	Setter setter;
+	Getter getter;
 };
 
-struct IReflPropertyVisitor {
-	virtual ~IReflPropertyVisitor() {}
-	virtual void visit(const refl_typed_prop<float>& prop) = 0;
-	virtual void visit(const refl_typed_prop<int>& prop) = 0;
-	virtual void visit(const refl_typed_prop<u32>& prop) = 0;
-	virtual void visit(const refl_typed_prop<EntityPtr>& prop) = 0;
-	virtual void visit(const refl_typed_prop<Vec2>& prop) = 0;
-	virtual void visit(const refl_typed_prop<Vec3>& prop) = 0;
-	virtual void visit(const refl_typed_prop<IVec3>& prop) = 0;
-	virtual void visit(const refl_typed_prop<Vec4>& prop) = 0;
-	virtual void visit(const refl_typed_prop<Path>& prop) = 0;
-	virtual void visit(const refl_typed_prop<bool>& prop) = 0;
-	virtual void visit(const refl_typed_prop<const char*>& prop) = 0;
-	virtual void visit(const struct reflarrayprop& prop) = 0;
-};
-
-struct IReflEmptyPropertyVisitor : IReflPropertyVisitor {
-	virtual ~IReflEmptyPropertyVisitor() {}
-	void visit(const refl_typed_prop<float>& prop) override {}
-	void visit(const refl_typed_prop<int>& prop) override {}
-	void visit(const refl_typed_prop<u32>& prop) override {}
-	void visit(const refl_typed_prop<EntityPtr>& prop) override {}
-	void visit(const refl_typed_prop<Vec2>& prop) override {}
-	void visit(const refl_typed_prop<Vec3>& prop) override {}
-	void visit(const refl_typed_prop<IVec3>& prop) override {}
-	void visit(const refl_typed_prop<Vec4>& prop) override {}
-	void visit(const refl_typed_prop<Path>& prop) override {}
-	void visit(const refl_typed_prop<bool>& prop) override {}
-	void visit(const refl_typed_prop<const char*>& prop) override {}
-	void visit(const reflarrayprop& prop) override {}
-};
-struct reflarrayprop : reflprop {
-	reflarrayprop(IAllocator& allocator)
-		: reflprop(allocator)
-		, children(allocator)
-	{}
-
-	u32 getCount(ComponentUID cmp) const {
-		return counter(cmp.scene, (EntityRef)cmp.entity);
-	}
-
-	void addItem(ComponentUID cmp, u32 idx) const {
-		adder(cmp.scene, (EntityRef)cmp.entity, idx);
-	}
-
-	void removeItem(ComponentUID cmp, u32 idx) const {
-		remover(cmp.scene, (EntityRef)cmp.entity, idx);
-	}
-
-	typedef u32 (*counter_t)(IScene*, EntityRef);
-	typedef void (*adder_t)(IScene*, EntityRef, u32);
-	typedef void (*remover_t)(IScene*, EntityRef, u32);
-
-	void visit(struct IReflPropertyVisitor& visitor) const override {
-		visitor.visit(*this);
-	}
-
-	void visitChildren(struct IReflPropertyVisitor& visitor) const {
-		for (reflprop* prop : children) {
-			prop->visit(visitor);
-		}
-	}
-
-	Array<reflprop*> children;
-	counter_t counter;
-	adder_t adder;
-	remover_t remover;
-};
-
-
-struct IPropertyVisitor
-{
+struct IPropertyVisitor {
 	virtual ~IPropertyVisitor() {}
-
 	virtual void visit(const Property<float>& prop) = 0;
 	virtual void visit(const Property<int>& prop) = 0;
 	virtual void visit(const Property<u32>& prop) = 0;
@@ -370,13 +205,11 @@ struct IPropertyVisitor
 	virtual void visit(const Property<Path>& prop) = 0;
 	virtual void visit(const Property<bool>& prop) = 0;
 	virtual void visit(const Property<const char*>& prop) = 0;
-	virtual void visit(const IDynamicProperties& prop) {}
-	virtual void visit(const IArrayProperty& prop) = 0;
-	virtual void visit(const IBlobProperty& prop) = 0;
+	virtual void visit(const struct ArrayProperty& prop) = 0;
 };
 
-struct IEmptyPropertyVisitor : IPropertyVisitor
-{
+struct IEmptyPropertyVisitor : IPropertyVisitor {
+	virtual ~IEmptyPropertyVisitor() {}
 	void visit(const Property<float>& prop) override {}
 	void visit(const Property<int>& prop) override {}
 	void visit(const Property<u32>& prop) override {}
@@ -388,15 +221,27 @@ struct IEmptyPropertyVisitor : IPropertyVisitor
 	void visit(const Property<Path>& prop) override {}
 	void visit(const Property<bool>& prop) override {}
 	void visit(const Property<const char*>& prop) override {}
-	void visit(const IArrayProperty& prop) override {}
-	void visit(const IBlobProperty& prop) override {}
-	void visit(const IDynamicProperties& prop) override {}
+	void visit(const ArrayProperty& prop) override {}
 };
 
-struct ComponentBase
-{
-	virtual void visit(IPropertyVisitor&) const = 0;
-	virtual Span<const struct FunctionBase* const> getFunctions() const = 0;
+struct LUMIX_ENGINE_API ArrayProperty : PropertyBase {
+	typedef u32 (*Counter)(IScene*, EntityRef);
+	typedef void (*Adder)(IScene*, EntityRef, u32);
+	typedef void (*Remover)(IScene*, EntityRef, u32);
+
+	ArrayProperty(IAllocator& allocator);
+
+	u32 getCount(ComponentUID cmp) const;
+	void addItem(ComponentUID cmp, u32 idx) const;
+	void removeItem(ComponentUID cmp, u32 idx) const;
+
+	void visit(struct IPropertyVisitor& visitor) const override;
+	void visitChildren(struct IPropertyVisitor& visitor) const;
+
+	Array<PropertyBase*> children;
+	Counter counter;
+	Adder adder;
+	Remover remover;
 };
 
 struct Icon { const char* name; };
@@ -404,8 +249,8 @@ inline Icon icon(const char* name) { return {name}; }
 
 template <typename T>
 bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const char* prop_name, Ref<T> out) {
-	struct : IReflEmptyPropertyVisitor {
-		void visit(const refl_typed_prop<T>& prop) override {
+	struct : IEmptyPropertyVisitor {
+		void visit(const Property<T>& prop) override {
 			if (equalStrings(prop.name, prop_name)) {
 				found = true;
 				value = prop.get(cmp, -1);
@@ -420,98 +265,15 @@ bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const 
 	visitor.cmp.scene = &scene;
 	visitor.cmp.type = cmp_type;
 	visitor.cmp.entity = e;
-	const reflection::reflcmp* cmp_desc = getReflComponent(cmp_type);
+	const ComponentBase* cmp_desc = getComponent(cmp_type);
 	cmp_desc->visit(visitor);
 	out = visitor.value;
 	return visitor.found;
 }
 
-template <typename Base, typename... T>
-struct TupleHolder {
-	TupleHolder() {}
-	
-	TupleHolder(Tuple<T...> tuple) { init(tuple); }
-	TupleHolder(TupleHolder&& rhs) { init(rhs.objects); }
-	TupleHolder(const TupleHolder& rhs) { init(rhs.objects); }
-
-	void init(const Tuple<T...>& tuple)
-	{
-		objects = tuple;
-		int i = 0;
-		apply([&](auto& v){
-			ptrs[i] = &v;
-			++i;
-		}, objects);
-	}
-
-	void operator =(Tuple<T...>&& tuple) { init(tuple); }
-	void operator =(const TupleHolder& rhs) { init(rhs.objects); }
-	void operator =(TupleHolder&& rhs) { init(rhs.objects); }
-
-	Span<const Base* const> get() const {
-		return Span(static_cast<const Base*const*>(ptrs), (u32)sizeof...(T));
-	}
-
-	Span<Base* const> get() {
-		return Span(static_cast<Base*const*>(ptrs), (u32)sizeof...(T));
-	}
-
-	Tuple<T...> objects;
-	Base* ptrs[sizeof...(T) + 1];
-};
-
-template <typename Getter, typename Setter>
-struct BlobProperty : IBlobProperty
-{
-	void getValue(ComponentUID cmp, int index, OutputMemoryStream& stream) const override
-	{
-		using C = typename ClassOf<Getter>::Type;
-		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*getter)((EntityRef)cmp.entity, stream);
-	}
-
-	void setValue(ComponentUID cmp, int index, InputMemoryStream& stream) const override
-	{
-		using C = typename ClassOf<Getter>::Type;
-		C* inst = static_cast<C*>(cmp.scene);
-		(inst->*setter)((EntityRef)cmp.entity, stream);
-	}
-
-	Getter getter;
-	Setter setter;
-};
-
-
-template <typename T, typename CmpGetter, typename PtrType, typename... Attributes>
-struct VarProperty : Property<T>
-{
-	Span<const IAttribute* const> getAttributes() const override { return attributes.get(); }
-
-	T get(ComponentUID cmp, int index) const override
-	{
-		using C = typename ClassOf<CmpGetter>::Type;
-		C* inst = static_cast<C*>(cmp.scene);
-		auto& c = (inst->*cmp_getter)((EntityRef)cmp.entity);
-		auto& v = c.*ptr;
-		return static_cast<T>(v);
-	}
-
-	void set(ComponentUID cmp, int index, T value) const override
-	{
-		using C = typename ClassOf<CmpGetter>::Type;
-		C* inst = static_cast<C*>(cmp.scene);
-		auto& c = (inst->*cmp_getter)((EntityRef)cmp.entity);
-		c.*ptr = value;
-	}
-
-	CmpGetter cmp_getter;
-	PtrType ptr;
-	TupleHolder<IAttribute, Attributes...> attributes;
-};
-
 namespace detail {
 
-static const unsigned int FRONT_SIZE = sizeof("Lumix::reflection::detail::GetTypeNameHelper<") - 1u;
+static const unsigned int FRONT_SIZE = sizeof("Lumix::detail::GetTypeNameHelper<") - 1u;
 static const unsigned int BACK_SIZE = sizeof(">::GetTypeName") - 1u;
 
 template <typename T>
@@ -537,14 +299,6 @@ struct GetTypeNameHelper
 
 template <typename T>
 const IAttribute* getAttribute(const Property<T>& prop, IAttribute::Type type) {
-	for (const IAttribute* attr : prop.getAttributes()) {
-		if (attr->getType() == type) return attr;
-	}
-	return nullptr;
-}
-
-template <typename T>
-const IAttribute* getAttribute(const refl_typed_prop<T>& prop, IAttribute::Type type) {
 	for (const IAttribute* attr : prop.attributes) {
 		if (attr->getType() == type) return attr;
 	}
@@ -729,18 +483,10 @@ auto& function(F func, const char* decl_code, const char* name)
 	return ret;
 }
 
+struct ComponentBase {
+	ComponentBase(IAllocator& allocator);
 
-struct reflcmp {
-	reflcmp(IAllocator& allocator)
-		: props(allocator)
-		, functions(allocator)
-	{}
-
-	void visit(IReflPropertyVisitor& visitor) const {
-		for (const reflprop* prop : props) {
-			prop->visit(visitor);
-		}
-	}
+	void visit(IPropertyVisitor& visitor) const;
 
 	const char* icon = "";
 	const char* name;
@@ -750,35 +496,28 @@ struct reflcmp {
 	CreateComponent creator;
 	DestroyComponent destroyer;
 	ComponentType component_type;
-	Array<reflprop*> props;
-	Array<reflection::FunctionBase*> functions;
+	Array<PropertyBase*> props;
+	Array<FunctionBase*> functions;
 };
 
-struct reflscene {
-	reflscene(IAllocator& allocator)
-		: cmps(allocator)
-		, functions(allocator)
-	{}
+struct Scene {
+	Scene(IAllocator& allocator);
 
-	Array<reflection::FunctionBase*> functions;
-	Array<reflcmp*> cmps;
+	Array<FunctionBase*> functions;
+	Array<ComponentBase*> cmps;
 	const char* name;
-	reflscene* next = nullptr;
+	Scene* next = nullptr;
 };
 
 struct builder {
-	builder(IAllocator& allocator)
-		: allocator(allocator)
-	{
-		scene = LUMIX_NEW(allocator, reflscene)(allocator);
-	}
+	builder(IAllocator& allocator);
 
 	template <auto Creator, auto Destroyer>
 	builder& cmp(const char* name, const char* label) {
 		auto creator = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Creator))(e); };
 		auto destroyer = [](IScene* scene, EntityRef e){ (scene->*static_cast<void (IScene::*)(EntityRef)>(Destroyer))(e); };
 	
-		reflcmp* cmp = LUMIX_NEW(allocator, reflcmp)(allocator);
+		ComponentBase* cmp = LUMIX_NEW(allocator, ComponentBase)(allocator);
 		cmp->name = name;
 		cmp->label = label;
 		cmp->component_type = getComponentType(name);
@@ -787,15 +526,12 @@ struct builder {
 		cmp->scene = crc32(scene->name);
 		registerCmp(cmp);
 
-		scene->cmps.push(cmp);
 		return *this;
 	}
 
-	void registerCmp(reflcmp* cmp);
-
 	template <auto Getter, auto Setter>
 	builder& enum_prop(const char* name) {
-		auto* p = LUMIX_NEW(allocator, refl_typed_prop<i32>)(allocator);
+		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
 		p->setter = [](IScene* scene, EntityRef e, u32 idx, const i32& value) {
 			using T = typename ResultOf<decltype(Getter)>::Type;
 			using C = typename ClassOf<decltype(Setter)>::Type;
@@ -818,71 +554,71 @@ struct builder {
 			}
 		};
 		p->name = name;
-		if (array) {
-			array->children.push(p);
-		}
-		else {
-			scene->cmps.back()->props.push(p);
-		}
-		last_prop = p;
+		addProp(p);
 		return *this;
 	}
 
 	template <auto Getter, auto Setter>
 	builder& prop(const char* name) {
 		using T = typename ResultOf<decltype(Getter)>::Type;
-		auto* p = LUMIX_NEW(allocator, refl_typed_prop<T>)(allocator);
-		p->setter = &refl_typed_prop<T>::setterHelper<Setter>;
-		p->getter = &refl_typed_prop<T>::getterHelper<Getter>;
+		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
+		
+		p->setter = [](IScene* scene, EntityRef e, u32 idx, const T& value) {
+			using C = typename ClassOf<decltype(Setter)>::Type;
+			if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
+				(static_cast<C*>(scene)->*Setter)(e, value);
+			}
+			else {
+				(static_cast<C*>(scene)->*Setter)(e, idx, value);
+			}
+		};
+
+		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> T {
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
+				return (static_cast<C*>(scene)->*Getter)(e);
+			}
+			else {
+				return (static_cast<C*>(scene)->*Getter)(e, idx);
+			}
+		};
+
 		p->name = name;
-		if (array) {
-			array->children.push(p);
-		}
-		else {
-			scene->cmps.back()->props.push(p);
-		}
-		last_prop = p;
+		addProp(p);
+		return *this;
+	}
+
+	template <auto Getter, auto PropGetter>
+	builder& blob_property(const char* name) {
+		// TODO refl
 		return *this;
 	}
 
 	template <auto Getter, auto PropGetter>
 	builder& var_prop(const char* name) {
 		using T = typename ResultOf<decltype(PropGetter)>::Type;
-		auto* p = LUMIX_NEW(allocator, refl_typed_prop<T>)(allocator);
-		p->setter = &refl_typed_prop<T>::setterVarHelper<Getter, PropGetter>;
-		p->getter = &refl_typed_prop<T>::getterVarHelper<Getter, PropGetter>;
+		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
+		p->setter = [](IScene* scene, EntityRef e, u32, const T& value) {
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& v = c.*PropGetter;
+			v = value;
+		};
+		p->getter = [](IScene* scene, EntityRef e, u32) -> T {
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			auto& c = (static_cast<C*>(scene)->*Getter)(e);
+			auto& v = c.*PropGetter;
+			return static_cast<T>(v);
+		};
 		p->name = name;
-		if (array) {
-			array->children.push(p);
-		}
-		else {
-			scene->cmps.back()->props.push(p);
-		}
-		last_prop = p;
+		addProp(p);
 		return *this;
 	}
 
-	builder& minAttribute(float value) {
-		auto* a = LUMIX_NEW(allocator, reflection::MinAttribute)(value);
-		last_prop->attributes.push(a);
-		return *this;
-	}
-
-	builder& clampAttribute(float min, float max) {
-		auto* a = LUMIX_NEW(allocator, reflection::ClampAttribute)(min, max);
-		last_prop->attributes.push(a);
-		return *this;
-	}
-
-	builder& resourceAttribute(ResourceType type) {
-		auto* a = LUMIX_NEW(allocator, reflection::ResourceAttribute)(type);
-		last_prop->attributes.push(a);
-		return *this;
-	}
 
 	template <auto Counter, auto Adder, auto Remover>
 	builder& begin_array(const char* name) {
-		reflarrayprop* prop = LUMIX_NEW(allocator, reflarrayprop)(allocator);
+		ArrayProperty* prop = LUMIX_NEW(allocator, ArrayProperty)(allocator);
 		using C = typename ClassOf<decltype(Counter)>::Type;
 		prop->counter = [](IScene* scene, EntityRef e) -> u32 {
 			return (static_cast<C*>(scene)->*Counter)(e);
@@ -900,51 +636,16 @@ struct builder {
 		return *this;
 	}
 
-	builder& end_array() {
-		array = nullptr;
-		last_prop = nullptr;
-		return *this;
-	}
-
 	template <typename T>
-	builder& enumAttribute() {
+	builder& attribute() {
 		auto* a = LUMIX_NEW(allocator, T);
 		last_prop->attributes.push(a);
 		return *this;
 	}
 
-	builder& radiansAttribute() {
-		auto* a = LUMIX_NEW(allocator, reflection::RadiansAttribute);
-		last_prop->attributes.push(a);
-		return *this;
-	}
-
-	builder& colorAttribute() {
-		auto* a = LUMIX_NEW(allocator, reflection::ColorAttribute);
-		last_prop->attributes.push(a);
-		return *this;
-	}
-
-	builder& noUIAttribute() {
-		auto* a = LUMIX_NEW(allocator, reflection::NoUIAttribute);
-		last_prop->attributes.push(a);
-		return *this;
-	}
-
-	builder& multilineAttribute() {
-		auto* a = LUMIX_NEW(allocator, reflection::MultilineAttribute);
-		last_prop->attributes.push(a);
-		return *this;
-	}
-
-	builder& icon(const char* icon) {
-		scene->cmps.back()->icon = icon;
-		return *this;
-	}
-
 	template <auto F>
 	builder& function(const char* name, const char* decl_code) {
-		auto* f = LUMIX_NEW(allocator, reflection::Function<decltype(F)>);
+		auto* f = LUMIX_NEW(allocator, Function<decltype(F)>);
 		f->function = F;
 		f->name = name;
 		f->decl_code = decl_code;
@@ -957,15 +658,28 @@ struct builder {
 		return *this;
 	}
 
+	void registerCmp(ComponentBase* cmp);
+
+	builder& minAttribute(float value);
+	builder& clampAttribute(float min, float max);
+	builder& resourceAttribute(ResourceType type);
+	builder& radiansAttribute();
+	builder& colorAttribute();
+	builder& noUIAttribute();
+	builder& multilineAttribute();
+	builder& icon(const char* icon);
+	builder& end_array();
+
+	void addProp(PropertyBase* prop);
+
 	IAllocator& allocator;
-	reflscene* scene;
-	reflarrayprop* array = nullptr;
-	reflprop* last_prop = nullptr;
+	Scene* scene;
+	ArrayProperty* array = nullptr;
+	PropertyBase* last_prop = nullptr;
 };
 
 builder build_scene(const char* scene_name);
 
-} // namespace Reflection
-
+} // namespace reflection
 
 } // namespace Lumix

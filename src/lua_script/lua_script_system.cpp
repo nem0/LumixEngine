@@ -924,8 +924,9 @@ namespace Lumix
 				LuaWrapper::push(L, tmp);
 			}
 
-			void visit(const reflection::IArrayProperty& prop) override {}
-			void visit(const reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::ArrayProperty& prop) override {}
+			// TODO refl
+			//void visit(const reflection::IBlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -979,8 +980,9 @@ namespace Lumix
 				prop.set(cmp, idx, val);
 			}
 
-			void visit(const reflection::IArrayProperty& prop) override {}
-			void visit(const reflection::IBlobProperty& prop) override {}
+			void visit(const reflection::ArrayProperty& prop) override {}
+			// TODO refl
+			//void visit(const reflection::IBlobProperty& prop) override {}
 
 			ComponentUID cmp;
 			const char* prop_name;
@@ -1044,8 +1046,7 @@ namespace Lumix
 			if (v.found) return 1;
 
 			// TODO put this directly in table, so we don't have to look it up here every time
-			const auto& functions = cmp->getFunctions();
-			for (auto* f : functions) {
+			for (auto* f : cmp->functions) {
 				if (equalStrings(v.prop_name, f->name)) {
 					lua_pushlightuserdata(L, (void*)f);
 					lua_pushcclosure(L, luaCmpMethodClosure, 1);
@@ -2210,7 +2211,11 @@ namespace Lumix
 
 
 	struct LuaProperties : reflection::IDynamicProperties {
-		LuaProperties() { name = "lua_properties"; }
+		LuaProperties(IAllocator& allocator)
+			: IDynamicProperties(allocator)
+		{
+			name = "lua_properties";
+		}
 		
 		u32 getCount(ComponentUID cmp, int index) const override { 
 			LuaScriptSceneImpl& scene = (LuaScriptSceneImpl&)*cmp.scene;
@@ -2321,11 +2326,11 @@ namespace Lumix
 	{
 		m_script_manager.create(LuaScript::TYPE, engine.getResourceManager());
 
-		LUMIX_REFL_SCENE(LuaScriptSceneImpl, "lua_script")
-			.LUMIX_REFL_CMP(Component, "lua_script", "Lua script") 
+		LUMIX_SCENE(LuaScriptSceneImpl, "lua_script")
+			.LUMIX_CMP(Component, "lua_script", "Lua script") 
 			.begin_array<&LuaScriptScene::getScriptCount, &LuaScriptScene::addScript, &LuaScriptScene::removeScript>("scripts")
 				.prop<&LuaScriptScene::isScriptEnabled, &LuaScriptScene::enableScript>("Enabled")
-				.LUMIX_REFL_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
+				.LUMIX_PROP(ScriptPath, "Path").resourceAttribute(LuaScript::TYPE)
 				//LuaProperties()
 			.end_array()
 		// TODO refl

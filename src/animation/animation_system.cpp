@@ -4,7 +4,6 @@
 #include "animation/property_animation.h"
 #include "animation/controller.h"
 #include "engine/engine.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 

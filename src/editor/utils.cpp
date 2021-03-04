@@ -3,7 +3,6 @@
 #include "utils.h"
 #include "engine/math.h"
 #include "engine/path.h"
-#include "engine/reflection.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"

@@ -1,16 +1,13 @@
-#define NOGDI
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <Winuser.h>
-#include <ShellScalingAPI.h>
+#include "engine/os.h"
+#include "engine/win/simple_win.h"
 #include "editor/studio_app.h"
 
 int main(int argc, char* argv[])
 {
 	SetProcessDPIAware();
-	HMODULE shcore = LoadLibrary("shcore.dll");
+	void* shcore = Lumix::os::loadLibrary("shcore.dll");
 	if (shcore) {
-		auto setter = (decltype(&SetProcessDpiAwareness))GetProcAddress(shcore, "SetProcessDpiAwareness");
+		auto setter = (decltype(&SetProcessDpiAwareness))Lumix::os::getLibrarySymbol(shcore, "SetProcessDpiAwareness");
 		if (setter) setter(PROCESS_PER_MONITOR_DPI_AWARE);
 	}
 
@@ -18,6 +15,6 @@ int main(int argc, char* argv[])
 	app->run();
 	const int exit_code = app->getExitCode();
 	Lumix::StudioApp::destroy(*app);
-	if(shcore) FreeLibrary(shcore);
+	if(shcore) Lumix::os::unloadLibrary(shcore);
 	return exit_code;
 }

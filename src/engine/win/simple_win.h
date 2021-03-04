@@ -4,6 +4,8 @@
 #ifndef _W64 
 	#define _W64 __w64
 #endif
+#define ERROR_SUCCESS 0L
+#define XUSER_MAX_COUNT 4
 #define MEM_COMMIT 0x00001000  
 #define MEM_RESERVE 0x00002000  
 #define MEM_RELEASE 0x00008000  
@@ -277,7 +279,25 @@ struct sockaddr_in
 
 typedef UINT_PTR SOCKET;
 typedef unsigned short WORD;
+typedef short SHORT;
 typedef struct sockaddr_in SOCKADDR_IN;
+
+typedef struct _XINPUT_GAMEPAD
+{
+    WORD                                wButtons;
+    BYTE                                bLeftTrigger;
+    BYTE                                bRightTrigger;
+    SHORT                               sThumbLX;
+    SHORT                               sThumbLY;
+    SHORT                               sThumbRX;
+    SHORT                               sThumbRY;
+} XINPUT_GAMEPAD, *PXINPUT_GAMEPAD;
+
+typedef struct _XINPUT_STATE
+{
+    DWORD                               dwPacketNumber;
+    XINPUT_GAMEPAD                      Gamepad;
+} XINPUT_STATE, *PXINPUT_STATE;
 
 typedef struct _LIST_ENTRY {
 	struct _LIST_ENTRY *Flink;
@@ -346,6 +366,11 @@ typedef struct tagWNDCLASSEXA
 } WNDCLASSEXA, *PWNDCLASSEXA, *NPWNDCLASSEXA, *LPWNDCLASSEXA;
 typedef WNDCLASSEXA WNDCLASSEX;
 typedef PWNDCLASSEXA PWNDCLASSEX;
+typedef enum PROCESS_DPI_AWARENESS {
+    PROCESS_DPI_UNAWARE = 0,
+    PROCESS_SYSTEM_DPI_AWARE = 1,
+    PROCESS_PER_MONITOR_DPI_AWARE = 2
+} PROCESS_DPI_AWARENESS;
 
 
 typedef struct _SYSTEM_INFO
@@ -369,6 +394,7 @@ typedef struct _SYSTEM_INFO
 	WORD wProcessorRevision;
 } SYSTEM_INFO, *LPSYSTEM_INFO;
 
+typedef long HRESULT;
 
 typedef struct _OVERLAPPED
 {
@@ -477,6 +503,7 @@ typedef struct _WIN32_FIND_DATAA* LPWIN32_FIND_DATAA;
 extern "C" {
 
 
+DWORD WINAPI XInputGetState(DWORD dwUserIndex, XINPUT_STATE* pState);
 int PASCAL closesocket(SOCKET s);
 int PASCAL WSAStartup(WORD wVersionRequired, LPWSADATA lpWSAData);
 SOCKET PASCAL socket(int af, int type, int protocol);
@@ -628,5 +655,7 @@ LPVOID WINAPI CreateFiber(SIZE_T dwStackSize, LPFIBER_START_ROUTINE lpStartAddre
 LPVOID WINAPI ConvertThreadToFiber(LPVOID lpParameter);
 WINBASEAPI VOID WINAPI SwitchToFiber(LPVOID lpFiber);
 WINBASEAPI VOID WINAPI DeleteFiber(PVOID lpFiber);
+HRESULT WINAPI SetProcessDpiAwareness(PROCESS_DPI_AWARENESS value);
+DECLSPEC_IMPORT BOOL WINAPI SetProcessDPIAware(VOID);
 
 } // extern "C"

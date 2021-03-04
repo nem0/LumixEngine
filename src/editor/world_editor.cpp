@@ -341,7 +341,52 @@ void addSphere(UniverseView& view, const DVec3& center, float radius, Color colo
 	}
 }
 
-struct PropertyDeserializeVisitor : reflection::IReflPropertyVisitor {
+template <typename T> void writeToStream(OutputMemoryStream& stream, T value) {	stream.write(value); }
+template <typename T> T readFromStream(InputMemoryStream& stream) { return stream.read<T>(); }
+template <> LUMIX_ENGINE_API Path readFromStream<Path>(InputMemoryStream& stream);
+template <> LUMIX_ENGINE_API void writeToStream<Path>(OutputMemoryStream& stream, Path);
+template <> LUMIX_ENGINE_API void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path);
+template <> LUMIX_ENGINE_API const char* readFromStream<const char*>(InputMemoryStream& stream);
+template <> LUMIX_ENGINE_API void writeToStream<const char*>(OutputMemoryStream& stream, const char* path);
+	
+template <> Path readFromStream<Path>(InputMemoryStream& stream)
+{
+	const char* c_str = (const char*)stream.getData() + stream.getPosition();
+	Path path(c_str);
+	stream.skip(stringLength(c_str) + 1);
+	return path;
+}
+
+
+template <> void writeToStream<const Path&>(OutputMemoryStream& stream, const Path& path)
+{
+	const char* str = path.c_str();
+	stream.write(str, stringLength(str) + 1);
+}
+
+
+template <> void writeToStream<Path>(OutputMemoryStream& stream, Path path)
+{
+	const char* str = path.c_str();
+	stream.write(str, stringLength(str) + 1);
+}
+
+
+template <> const char* readFromStream<const char*>(InputMemoryStream& stream)
+{
+	const char* c_str = (const char*)stream.getData() + stream.getPosition();
+	stream.skip(stringLength(c_str) + 1);
+	return c_str;
+}
+
+
+template <> void writeToStream<const char*>(OutputMemoryStream& stream, const char* value)
+{
+	stream.write(value, stringLength(value) + 1);
+}
+
+
+struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 	PropertyDeserializeVisitor(Ref<InputMemoryStream> deserializer
 		, ComponentUID cmp
 		, const HashMap<EntityPtr, u32>& map
@@ -353,20 +398,20 @@ struct PropertyDeserializeVisitor : reflection::IReflPropertyVisitor {
 	{}
 
 	template <typename T>
-	void set(const reflection::refl_typed_prop<T>& prop) {
-		prop.set(cmp, idx, reflection::readFromStream<T>(deserializer));
+	void set(const reflection::Property<T>& prop) {
+		prop.set(cmp, idx, readFromStream<T>(deserializer));
 	}
 
-	void visit(const reflection::refl_typed_prop<float>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<int>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<u32>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<Vec2>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<Vec3>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<IVec3>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<Vec4>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<bool>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<const char*>& prop) override { set(prop); }
-	void visit(const reflection::refl_typed_prop<Path>& prop) override { set(prop); }
+	void visit(const reflection::Property<float>& prop) override { set(prop); }
+	void visit(const reflection::Property<int>& prop) override { set(prop); }
+	void visit(const reflection::Property<u32>& prop) override { set(prop); }
+	void visit(const reflection::Property<Vec2>& prop) override { set(prop); }
+	void visit(const reflection::Property<Vec3>& prop) override { set(prop); }
+	void visit(const reflection::Property<IVec3>& prop) override { set(prop); }
+	void visit(const reflection::Property<Vec4>& prop) override { set(prop); }
+	void visit(const reflection::Property<bool>& prop) override { set(prop); }
+	void visit(const reflection::Property<const char*>& prop) override { set(prop); }
+	void visit(const reflection::Property<Path>& prop) override { set(prop); }
 	// TODO refl
 	//void visit(const reflection::IBlobProperty& prop) override { prop.setValue(cmp, idx, deserializer); }
 	/*
@@ -396,7 +441,7 @@ struct PropertyDeserializeVisitor : reflection::IReflPropertyVisitor {
 		}
 	}
 	*/
-	void visit(const reflection::refl_typed_prop<EntityPtr>& prop) override { 
+	void visit(const reflection::Property<EntityPtr>& prop) override { 
 		EntityPtr value;
 		deserializer.read(Ref(value));
 		auto iter = map.find(value);
@@ -405,7 +450,7 @@ struct PropertyDeserializeVisitor : reflection::IReflPropertyVisitor {
 		prop.set(cmp, idx, value);
 	}
 
-	void visit(const reflection::reflarrayprop& prop) override {
+	void visit(const reflection::ArrayProperty& prop) override {
 		u32 count;
 		deserializer.read(Ref(count));
 		const int idx_backup = idx;
@@ -429,30 +474,30 @@ struct PropertyDeserializeVisitor : reflection::IReflPropertyVisitor {
 	int idx;
 };
 
-struct PropertySerializeVisitor : reflection::IReflPropertyVisitor {
+struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 	PropertySerializeVisitor(Ref<OutputMemoryStream> serializer, ComponentUID cmp)
 		: serializer(serializer.value) //-V1041
 		, cmp(cmp)
 	{}
 
 	template <typename T>
-	void get(const reflection::refl_typed_prop<T>& prop) {
-		reflection::writeToStream(serializer, prop.get(cmp, idx));		
+	void get(const reflection::Property<T>& prop) {
+		writeToStream(serializer, prop.get(cmp, idx));		
 	}
 
-	void visit(const reflection::refl_typed_prop<float>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<int>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<u32>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<EntityPtr>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<Vec2>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<Vec3>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<IVec3>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<Vec4>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<bool>& prop) override { get(prop); }
+	void visit(const reflection::Property<float>& prop) override { get(prop); }
+	void visit(const reflection::Property<int>& prop) override { get(prop); }
+	void visit(const reflection::Property<u32>& prop) override { get(prop); }
+	void visit(const reflection::Property<EntityPtr>& prop) override { get(prop); }
+	void visit(const reflection::Property<Vec2>& prop) override { get(prop); }
+	void visit(const reflection::Property<Vec3>& prop) override { get(prop); }
+	void visit(const reflection::Property<IVec3>& prop) override { get(prop); }
+	void visit(const reflection::Property<Vec4>& prop) override { get(prop); }
+	void visit(const reflection::Property<bool>& prop) override { get(prop); }
 	// TODO refl
 	//void visit(const reflection::IBlobProperty& prop) override { prop.getValue(cmp, idx, serializer); }
-	void visit(const reflection::refl_typed_prop<Path>& prop) override { get(prop); }
-	void visit(const reflection::refl_typed_prop<const char*>& prop) override { get(prop); }
+	void visit(const reflection::Property<Path>& prop) override { get(prop); }
+	void visit(const reflection::Property<const char*>& prop) override { get(prop); }
 	/*
 	void visit(const reflection::IDynamicProperties& prop) override {
 		const u32 c = prop.getCount(cmp, idx);
@@ -475,7 +520,7 @@ struct PropertySerializeVisitor : reflection::IReflPropertyVisitor {
 		}
 	}*/
 
-	void visit(const reflection::reflarrayprop& prop) override {
+	void visit(const reflection::ArrayProperty& prop) override {
 		const int count = prop.getCount(cmp);
 		serializer.write(count);
 		const int idx_backup = idx;
@@ -495,7 +540,7 @@ struct PropertySerializeVisitor : reflection::IReflPropertyVisitor {
 static void save(ComponentUID cmp, Ref<OutputMemoryStream> out) {
 	PropertySerializeVisitor save(out, cmp);
 	save.idx = -1;
-	reflection::getReflComponent(cmp.type)->visit(save);
+	reflection::getComponent(cmp.type)->visit(save);
 }
 
 static void load(ComponentUID cmp, Ref<InputMemoryStream> blob)
@@ -511,7 +556,7 @@ static void load(ComponentUID cmp, Ref<InputMemoryStream> blob)
 	} alloc;
 	HashMap<EntityPtr, u32> map(alloc);
 	PropertyDeserializeVisitor v(blob, cmp, map, Span<EntityRef>(nullptr, nullptr));
-	reflection::getReflComponent(cmp.type)->visit(v);
+	reflection::getComponent(cmp.type)->visit(v);
 }
 
 
@@ -917,9 +962,9 @@ private:
 };
 
 
-struct GatherResourcesVisitor final : reflection::IReflEmptyPropertyVisitor
+struct GatherResourcesVisitor final : reflection::IEmptyPropertyVisitor
 {
-	void visit(const reflection::reflarrayprop& prop) override
+	void visit(const reflection::ArrayProperty& prop) override
 	{
 		int count = prop.getCount(cmp);
 		for (int i = 0; i < count; ++i) {
@@ -929,7 +974,7 @@ struct GatherResourcesVisitor final : reflection::IReflEmptyPropertyVisitor
 		index = -1;
 	}
 
-	void visit(const reflection::refl_typed_prop<Path>& prop) override
+	void visit(const reflection::Property<Path>& prop) override
 	{
 		auto* attr = reflection::getAttribute(prop, reflection::IAttribute::RESOURCE);
 		if (!attr) return;
@@ -967,8 +1012,8 @@ public:
 
 	bool execute() override
 	{
-		struct : reflection::IReflEmptyPropertyVisitor {
-			void visit(const reflection::reflarrayprop& prop) override {
+		struct : reflection::IEmptyPropertyVisitor {
+			void visit(const reflection::ArrayProperty& prop) override {
 				if (!equalStrings(prop.name, propname)) return;
 				prop.removeItem(cmp, index);
 			}
@@ -979,7 +1024,7 @@ public:
 		v.propname = m_property.c_str();
 		v.cmp = m_component;
 		v.index = m_index;
-		reflection::getReflComponent(m_component.type)->visit(v);
+		reflection::getComponent(m_component.type)->visit(v);
 		return true;
 	}
 
@@ -1024,7 +1069,7 @@ public:
 
 	bool execute() override
 	{
-		reflection::reflarrayprop* prop = (reflection::reflarrayprop*)reflection::getReflProp(m_component.type, m_property);
+		reflection::ArrayProperty* prop = (reflection::ArrayProperty*)reflection::getProperty(m_component.type, m_property);
 		m_index = prop->getCount(m_component);
 		prop->addItem(m_component, m_index);
 		return true;
@@ -1033,8 +1078,8 @@ public:
 
 	void undo() override
 	{
-		struct : reflection::IReflEmptyPropertyVisitor {
-			void visit(const reflection::reflarrayprop& prop) override {
+		struct : reflection::IEmptyPropertyVisitor {
+			void visit(const reflection::ArrayProperty& prop) override {
 				if (!equalStrings(prop.name, prop_name)) return;
 				prop.removeItem(cmp, index);
 			}
@@ -1045,7 +1090,7 @@ public:
 		v.cmp = m_component;
 		v.index = m_index;
 		v.prop_name = m_property;
-		reflection::getReflComponent(m_component.type)->visit(v);
+		reflection::getComponent(m_component.type)->visit(v);
 	}
 
 
@@ -1110,7 +1155,7 @@ public:
 		m_entities.reserve(entities.length());
 		Universe* universe = m_editor.getUniverse();
 
-		const reflection::reflcmp* cmp_desc = reflection::getReflComponent(component_type);
+		const reflection::ComponentBase* cmp_desc = reflection::getComponent(component_type);
 
 		for (u32 i = 0; i < entities.length(); ++i) {
 			ComponentUID component = universe->getComponent(entities[i], component_type);
@@ -1137,8 +1182,8 @@ public:
 
 	bool execute() override
 	{
-		struct : reflection::IReflEmptyPropertyVisitor {
-			void visit(const reflection::refl_typed_prop<T>& prop) override { 
+		struct : reflection::IEmptyPropertyVisitor {
+			void visit(const reflection::Property<T>& prop) override { 
 				if (array[0] != '\0') return;
 				if (!equalIStrings(prop_name, prop.name)) return;
 				found = true;
@@ -1148,7 +1193,7 @@ public:
 				}
 			}
 
-			void visit(const reflection::reflarrayprop& prop) override { 
+			void visit(const reflection::ArrayProperty& prop) override { 
 				if (!equalStrings(array, prop.name)) return;
 
 				const char* tmp = array;
@@ -1180,7 +1225,7 @@ public:
 		v.cmd = this;
 		v.prop_name = m_property_name.c_str();
 		v.array = m_array.c_str();
-		reflection::getReflComponent(m_component_type)->visit(v);
+		reflection::getComponent(m_component_type)->visit(v);
 		return v.found;
 	}
 
@@ -1188,7 +1233,7 @@ public:
 	void undo() override
 	{
 		InputMemoryStream blob(m_old_values);
-		const reflection::reflcmp* cmp_desc = reflection::getReflComponent(m_component_type);
+		const reflection::ComponentBase* cmp_desc = reflection::getComponent(m_component_type);
 		HashMap<EntityPtr, u32> map(m_editor.getAllocator());
 		Universe* universe = m_editor.getUniverse();
 		Span<const EntityRef> entities(nullptr, nullptr);
@@ -1572,7 +1617,7 @@ private:
 					cmp = universe->getNextComponent(cmp))
 				{
 					m_old_values.write(cmp.type);
-					const reflection::reflcmp* cmp_desc = reflection::getReflComponent(cmp.type);
+					const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
 
 					GatherResourcesVisitor gather;
 					gather.cmp = cmp;
@@ -1730,7 +1775,7 @@ private:
 		bool execute() override
 		{
 			ASSERT(!m_entities.empty());
-			const reflection::reflcmp* cmp_desc = reflection::getReflComponent(m_cmp_type);
+			const reflection::ComponentBase* cmp_desc = reflection::getComponent(m_cmp_type);
 			ComponentUID cmp;
 			cmp.type = m_cmp_type;
 			cmp.scene = m_editor.getUniverse()->getScene(m_cmp_type);
@@ -2315,9 +2360,9 @@ public:
 				cmp.isValid();
 				cmp = m_universe->getNextComponent(cmp))
 			{
-				const u32 cmp_type = crc32(reflection::getReflComponent(cmp.type)->name);
+				const u32 cmp_type = crc32(reflection::getComponent(cmp.type)->name);
 				serializer.write(cmp_type);
-				const reflection::reflcmp* cmp_desc = reflection::getReflComponent(cmp.type);
+				const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
 				
 				PropertySerializeVisitor visitor(Ref<OutputMemoryStream>(serializer), cmp);
 				visitor.idx = -1;
@@ -2887,7 +2932,7 @@ public:
 
 				PropertyDeserializeVisitor visitor(Ref<InputMemoryStream>(blob), cmp, m_map, m_entities);
 				visitor.idx = -1;
-				reflection::getReflComponent(cmp.type)->visit(visitor);
+				reflection::getComponent(cmp.type)->visit(visitor);
 			}
 		}
 		return true;

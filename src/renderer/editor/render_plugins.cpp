@@ -26,7 +26,6 @@
 #include "engine/prefab.h"
 #include "engine/profiler.h"
 #include "engine/queue.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 #include "fbx_importer.h"

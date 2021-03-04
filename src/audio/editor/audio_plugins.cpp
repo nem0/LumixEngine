@@ -12,7 +12,6 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/lua_wrapper.h"
-#include "engine/reflection.h"
 #include "engine/universe.h"
 
 
