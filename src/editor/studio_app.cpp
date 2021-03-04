@@ -2573,15 +2573,15 @@ struct StudioAppImpl final : StudioApp
 			plugin->init();
 		}
 
-		for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
+		for (const reflection::RegisteredReflComponent& cmp : reflection::getReflComponents()) {
 			ASSERT(cmp.cmp->component_type != INVALID_COMPONENT_TYPE);
-			const reflection::ComponentBase* r = cmp.cmp;
+			const reflection::reflcmp* r = cmp.cmp;
 			
 			if (m_component_labels.find(r->component_type).isValid()) continue;
 
-			struct : reflection::IEmptyPropertyVisitor {
-				void visit(const reflection::Property<Path>& prop) override {
-					for (const reflection::IAttribute* attr : prop.getAttributes()) {
+			struct : reflection::IReflEmptyPropertyVisitor {
+				void visit(const reflection::refl_typed_prop<Path>& prop) override {
+					for (const reflection::IAttribute* attr : prop.attributes) {
 						if (attr->getType() == reflection::IAttribute::RESOURCE) {
 							is_res = true;
 							reflection::ResourceAttribute* a = (reflection::ResourceAttribute*)attr;

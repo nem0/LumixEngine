@@ -169,4 +169,10 @@ template <typename R, typename C, typename... Args> struct ClassOf<R(C::*)(Args.
 template <typename R, typename C> struct ClassOf<R(C::*)> { using Type = C; };
 
 
+template <typename T> struct ArgsCount;
+template <typename R, typename C, typename... Args> struct ArgsCount<R(C::*)(Args...)> { static constexpr u32 value = sizeof...(Args); };
+template <typename R, typename C, typename... Args> struct ArgsCount<R(C::*)(Args...)const > { static constexpr u32 value = sizeof...(Args); };
+template <typename R, typename C> struct ArgsCount<R(C::*)> { static constexpr u32 value = 0; };
+
+
 } // namespace Lumix

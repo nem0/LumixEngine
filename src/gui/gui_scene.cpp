@@ -1339,49 +1339,44 @@ void GUIScene::reflect() {
 		}
 	};
 
-	LUMIX_SCENE(GUISceneImpl, "gui",
-		LUMIX_FUNC(GUIScene::getRectAt),
-		LUMIX_FUNC(GUIScene::isOver),
-		LUMIX_FUNC(GUIScene::getSystem),
-		LUMIX_CMP(RenderTarget, "gui_render_target", "GUI / Render taget"),
-		LUMIX_CMP(Text, "gui_text", "GUI / Text",
-			icon(ICON_FA_FONT),
-			LUMIX_PROP(Text, "Text", MultilineAttribute()),
-			LUMIX_PROP(TextFontPath, "Font", ResourceAttribute(FontResource::TYPE)),
-			LUMIX_PROP(TextFontSize, "Font Size"),
-			enum_property("Horizontal align", &GUIScene::getTextHAlign, &GUIScene::setTextHAlign, TextHAlignEnum()),
-			enum_property("Vertical align", &GUIScene::getTextVAlign, &GUIScene::setTextVAlign, TextVAlignEnum()),
-			LUMIX_PROP(TextColorRGBA, "Color", ColorAttribute())
-		),
-		LUMIX_CMP(InputField, "gui_input_field", "GUI / Input field", icon(ICON_FA_KEYBOARD)),
-		LUMIX_CMP(Canvas, "gui_canvas", "GUI / Canvas",
-			var_property("Is 3D", &GUIScene::getCanvas, &GUICanvas::is_3d),
-			var_property("Orient to camera", &GUIScene::getCanvas, &GUICanvas::orient_to_camera),
-			var_property("Virtual size", &GUIScene::getCanvas, &GUICanvas::virtual_size)
-		),
-		LUMIX_CMP(Button, "gui_button", "GUI / Button",
-			LUMIX_PROP(ButtonHoveredColorRGBA, "Hovered color", ColorAttribute()),
-			enum_property("Cursor", &GUIScene::getButtonHoveredCursor, &GUIScene::setButtonHoveredCursor, CursorEnum())
-		),
-		LUMIX_CMP(Image, "gui_image", "GUI / Image",
-			icon(ICON_FA_IMAGE),
-			property("Enabled", &GUIScene::isImageEnabled, &GUIScene::enableImage),
-			LUMIX_PROP(ImageColorRGBA, "Color", ColorAttribute()),
-			LUMIX_PROP(ImageSprite, "Sprite", ResourceAttribute(Sprite::TYPE))
-		),
-		LUMIX_CMP(Rect, "gui_rect", "GUI / Rect",
-			property("Enabled", &GUIScene::isRectEnabled, &GUIScene::enableRect),
-			LUMIX_PROP(RectClip, "Clip content"),
-			LUMIX_PROP(RectTopPoints, "Top Points"),
-			LUMIX_PROP(RectTopRelative, "Top Relative"),
-			LUMIX_PROP(RectRightPoints, "Right Points"),
-			LUMIX_PROP(RectRightRelative, "Right Relative"),
-			LUMIX_PROP(RectBottomPoints, "Bottom Points"),
-			LUMIX_PROP(RectBottomRelative, "Bottom Relative"),
-			LUMIX_PROP(RectLeftPoints, "Left Points"),
-			LUMIX_PROP(RectLeftRelative, "Left Relative")
-		)
-	);
+	LUMIX_REFL_SCENE(GUISceneImpl, "gui")
+		.LUMIX_REFL_FUNC(GUIScene::getRectAt)
+		.LUMIX_REFL_FUNC(GUIScene::isOver)
+		.LUMIX_REFL_FUNC(GUIScene::getSystem)
+		.LUMIX_REFL_CMP(RenderTarget, "gui_render_target", "GUI / Render taget")
+		.LUMIX_REFL_CMP(Text, "gui_text", "GUI / Text")
+			.icon(ICON_FA_FONT)
+			.LUMIX_REFL_PROP(Text, "Text").multilineAttribute()
+			.LUMIX_REFL_PROP(TextFontPath, "Font").resourceAttribute(FontResource::TYPE)
+			.LUMIX_REFL_PROP(TextFontSize, "Font Size")
+			.LUMIX_ENUM_REFL_PROP(TextHAlign, "Horizontal align").enumAttribute<TextHAlignEnum>()
+			.LUMIX_ENUM_REFL_PROP(TextVAlign, "Vertical align").enumAttribute<TextVAlignEnum>()
+			.LUMIX_REFL_PROP(TextColorRGBA, "Color").colorAttribute()
+		.LUMIX_REFL_CMP(InputField, "gui_input_field", "GUI / Input field").icon(ICON_FA_KEYBOARD)
+		.LUMIX_REFL_CMP(Canvas, "gui_canvas", "GUI / Canvas")
+			.var_prop<&GUIScene::getCanvas, &GUICanvas::is_3d>("Is 3D")
+			.var_prop<&GUIScene::getCanvas, &GUICanvas::orient_to_camera>("Orient to camera")
+			.var_prop<&GUIScene::getCanvas, &GUICanvas::virtual_size>("Virtual size")
+		.LUMIX_REFL_CMP(Button, "gui_button", "GUI / Button")
+			.LUMIX_REFL_PROP(ButtonHoveredColorRGBA, "Hovered color").colorAttribute()
+			.LUMIX_ENUM_REFL_PROP(ButtonHoveredCursor, "Cursor").enumAttribute<CursorEnum>()
+		.LUMIX_REFL_CMP(Image, "gui_image", "GUI / Image")
+			.icon(ICON_FA_IMAGE)
+			.prop<&GUIScene::isImageEnabled, &GUIScene::enableImage>("Enabled")
+			.LUMIX_REFL_PROP(ImageColorRGBA, "Color").colorAttribute()
+			.LUMIX_REFL_PROP(ImageSprite, "Sprite").resourceAttribute(Sprite::TYPE)
+		.LUMIX_REFL_CMP(Rect, "gui_rect", "GUI / Rect")
+			.prop<&GUIScene::isRectEnabled, &GUIScene::enableRect>("Enabled")
+			.LUMIX_REFL_PROP(RectClip, "Clip content")
+			.LUMIX_REFL_PROP(RectTopPoints, "Top Points")
+			.LUMIX_REFL_PROP(RectTopRelative, "Top Relative")
+			.LUMIX_REFL_PROP(RectRightPoints, "Right Points")
+			.LUMIX_REFL_PROP(RectRightRelative, "Right Relative")
+			.LUMIX_REFL_PROP(RectBottomPoints, "Bottom Points")
+			.LUMIX_REFL_PROP(RectBottomRelative, "Bottom Relative")
+			.LUMIX_REFL_PROP(RectLeftPoints, "Left Points")
+			.LUMIX_REFL_PROP(RectLeftRelative, "Left Relative")
+	;
 }
 
 } // namespace Lumix

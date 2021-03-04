@@ -4445,7 +4445,7 @@ PhysicsSceneImpl::PhysicsSceneImpl(Engine& engine, Universe& context, PhysicsSys
 	m_physics_cmps_mask = 0;
 
 	const u32 hash = crc32("physics");
-	for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
+	for (const reflection::RegisteredReflComponent& cmp : reflection::getReflComponents()) {
 		if (cmp.scene == hash) {
 			m_physics_cmps_mask |= (u64)1 << cmp.cmp->component_type.index;
 		}
@@ -4532,125 +4532,105 @@ void PhysicsScene::reflect() {
 		}
 	};
 
-// "temporary" hack to fix crash at startup on linux
-// last good commmit around eb0e5c9b6fc7ce3de197c5c0b2b30e9f8c9653eb
-#ifdef _WIN32
-	#define VEHICLE_CMP \
-		, \
-		LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel"), \
-		LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer"), \
-		LUMIX_PROP(VehicleMass, "Mass", MinAttribute(0)), \
-		LUMIX_PROP(VehicleCenterOfMass, "Center of mass"), \
-		LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier"), \
-		LUMIX_PROP(VehicleChassis, "Chassis", ResourceAttribute(PhysicsGeometry::TYPE)), \
-		LUMIX_PROP(VehicleChassisLayer, "Chassis layer", LayerEnum()), \
-		LUMIX_PROP(VehicleWheelsLayer, "Wheels layer", LayerEnum())
-#else 
-	#define VEHICLE_CMP
-#endif
-
-	LUMIX_SCENE(PhysicsSceneImpl, "physics",
-		LUMIX_FUNC(PhysicsSceneImpl::raycast),
-		//function(LUMIX_FUNC(PhysicsScene::raycastEx))
-		LUMIX_CMP(Ragdoll, "ragdoll", "Physics / Ragdoll",
-			icon(ICON_FA_MALE),
-			LUMIX_FUNC(PhysicsScene::setRagdollKinematic),
-			blob_property("data", &PhysicsScene::getRagdollData, &PhysicsScene::setRagdollData),
-			LUMIX_PROP(RagdollLayer, "Layer", LayerEnum())
-		),
-		LUMIX_CMP(D6Joint, "d6_joint", "Physics / Joint / D6",
-			LUMIX_PROP(JointConnectedBody, "Connected body"),
-			LUMIX_PROP(JointAxisPosition, "Axis position"),
-			LUMIX_PROP(JointAxisDirection, "Axis direction"),
-			enum_property("X motion", &PhysicsScene::getD6JointXMotion, &PhysicsScene::setD6JointXMotion, D6MotionEnum()),
-			enum_property("Y motion", &PhysicsScene::getD6JointYMotion, &PhysicsScene::setD6JointYMotion, D6MotionEnum()),
-			enum_property("Z motion", &PhysicsScene::getD6JointZMotion, &PhysicsScene::setD6JointZMotion, D6MotionEnum()),
-			enum_property("Swing 1", &PhysicsScene::getD6JointSwing1Motion, &PhysicsScene::setD6JointSwing1Motion, D6MotionEnum()),
-			enum_property("Swing 2", &PhysicsScene::getD6JointSwing2Motion, &PhysicsScene::setD6JointSwing2Motion, D6MotionEnum()),
-			enum_property("Twist", &PhysicsScene::getD6JointTwistMotion, &PhysicsScene::setD6JointTwistMotion, D6MotionEnum()),
-			LUMIX_PROP(D6JointLinearLimit, "Linear limit", MinAttribute(0)),
-			LUMIX_PROP(D6JointSwingLimit, "Swing limit", RadiansAttribute()),
-			LUMIX_PROP(D6JointTwistLimit, "Twist limit", RadiansAttribute()),
-			LUMIX_PROP(D6JointDamping, "Damping"),
-			LUMIX_PROP(D6JointStiffness, "Stiffness"),
-			LUMIX_PROP(D6JointRestitution, "Restitution")
-		),
-		LUMIX_CMP(SphericalJoint, "spherical_joint", "Physics / Joint / Spherical",
-			LUMIX_PROP(JointConnectedBody, "Connected body"),
-			LUMIX_PROP(JointAxisPosition, "Axis position"),
-			LUMIX_PROP(JointAxisDirection, "Axis direction"),
-			LUMIX_PROP(SphericalJointUseLimit, "Use limit"),
-			LUMIX_PROP(SphericalJointLimit, "Limit", RadiansAttribute())
-		),
-		LUMIX_CMP(DistanceJoint, "distance_joint", "Physics / Joint / Distance",
-			LUMIX_PROP(JointConnectedBody, "Connected body"),
-			LUMIX_PROP(JointAxisPosition, "Axis position"),
-			LUMIX_PROP(DistanceJointDamping, "Damping",	MinAttribute(0)),
-			LUMIX_PROP(DistanceJointStiffness, "Stiffness", MinAttribute(0)),
-			LUMIX_PROP(DistanceJointTolerance, "Tolerance", MinAttribute(0)),
-			LUMIX_PROP(DistanceJointLimits, "Limits")
-		),
-		LUMIX_CMP(HingeJoint, "hinge_joint", "Physics / Joint / Hinge",
-			LUMIX_PROP(JointConnectedBody, "Connected body"),
-			LUMIX_PROP(JointAxisPosition, "Axis position"),
-			LUMIX_PROP(JointAxisDirection, "Axis direction"),
-			LUMIX_PROP(HingeJointDamping, "Damping", MinAttribute(0)),
-			LUMIX_PROP(HingeJointStiffness, "Stiffness", MinAttribute(0)),
-			LUMIX_PROP(HingeJointUseLimit, "Use limit"),
-			LUMIX_PROP(HingeJointLimit, "Limit", RadiansAttribute())
-		),
-		LUMIX_CMP(Controller, "physical_controller", "Physics / Controller",
-			LUMIX_FUNC_EX(PhysicsScene::moveController, "move"),
-			LUMIX_FUNC_EX(PhysicsScene::isControllerCollisionDown, "isCollisionDown"),
-			LUMIX_PROP(ControllerRadius, "Radius"),
-			LUMIX_PROP(ControllerHeight, "Height"),
-			LUMIX_PROP(ControllerLayer, "Layer", LayerEnum()),
-			LUMIX_PROP(ControllerUseRootMotion, "Use root motion"),
-			LUMIX_PROP(ControllerCustomGravity, "Use custom gravity"),
-			LUMIX_PROP(ControllerCustomGravityAcceleration, "Custom gravity acceleration")
-		),
-		LUMIX_CMP(RigidActor, "rigid_actor", "Physics / Rigid actor",
-			icon(ICON_FA_VOLLEYBALL_BALL),
-			LUMIX_FUNC_EX(PhysicsScene::putToSleep, "putToSleep"),
-			LUMIX_FUNC_EX(PhysicsScene::getActorSpeed, "getSpeed"),
-			LUMIX_FUNC_EX(PhysicsScene::getActorVelocity, "getVelocity"),
-			LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyForce"),
-			LUMIX_FUNC_EX(PhysicsScene::applyForceToActor, "applyImpulse"),
-			LUMIX_FUNC_EX(PhysicsScene::addForceAtPos, "addForceAtPos"),
-			LUMIX_PROP(ActorLayer, "Layer", LayerEnum()),
-			enum_property("Dynamic", &PhysicsSceneImpl::getDynamicType, &PhysicsSceneImpl::setDynamicType, DynamicTypeEnum()),
-			LUMIX_PROP(IsTrigger, "Trigger"),
-			array("Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
-				LUMIX_PROP(BoxGeomHalfExtents, "Size"),
-				LUMIX_PROP(BoxGeomOffsetPosition, "Position offset"),
-				LUMIX_PROP(BoxGeomOffsetRotation, "Rotation offset", RadiansAttribute())),
+	// TODO refl
+	LUMIX_REFL_SCENE(PhysicsSceneImpl, "physics")
+		.LUMIX_REFL_FUNC(PhysicsSceneImpl::raycast)
+		.LUMIX_REFL_CMP(Ragdoll, "ragdoll", "Physics / Ragdoll")
+			.icon(ICON_FA_MALE)
+			.LUMIX_REFL_FUNC(PhysicsScene::setRagdollKinematic)
+			//blob_property("data", &PhysicsScene::getRagdollData, &PhysicsScene::setRagdollData)
+			.LUMIX_ENUM_REFL_PROP(RagdollLayer, "Layer").enumAttribute<LayerEnum>()
+		.LUMIX_REFL_CMP(D6Joint, "d6_joint", "Physics / Joint / D6")
+			.LUMIX_REFL_PROP(JointConnectedBody, "Connected body")
+			.LUMIX_REFL_PROP(JointAxisPosition, "Axis position")
+			.LUMIX_REFL_PROP(JointAxisDirection, "Axis direction")
+			.LUMIX_ENUM_REFL_PROP(D6JointXMotion, "X motion").enumAttribute<D6MotionEnum>()
+			.LUMIX_ENUM_REFL_PROP(D6JointYMotion, "Y motion").enumAttribute<D6MotionEnum>()
+			.LUMIX_ENUM_REFL_PROP(D6JointZMotion, "Z motion").enumAttribute<D6MotionEnum>()
+			.LUMIX_ENUM_REFL_PROP(D6JointSwing1Motion, "Swing 1").enumAttribute<D6MotionEnum>()
+			.LUMIX_ENUM_REFL_PROP(D6JointSwing2Motion, "Swing 2").enumAttribute<D6MotionEnum>()
+			.LUMIX_ENUM_REFL_PROP(D6JointTwistMotion, "Twist").enumAttribute<D6MotionEnum>()
+			.LUMIX_REFL_PROP(D6JointLinearLimit, "Linear limit").minAttribute(0)
+			.LUMIX_REFL_PROP(D6JointSwingLimit, "Swing limit").radiansAttribute()
+			.LUMIX_REFL_PROP(D6JointTwistLimit, "Twist limit").radiansAttribute()
+			.LUMIX_REFL_PROP(D6JointDamping, "Damping")
+			.LUMIX_REFL_PROP(D6JointStiffness, "Stiffness")
+			.LUMIX_REFL_PROP(D6JointRestitution, "Restitution")
+		.LUMIX_REFL_CMP(SphericalJoint, "spherical_joint", "Physics / Joint / Spherical")
+			.LUMIX_REFL_PROP(JointConnectedBody, "Connected body")
+			.LUMIX_REFL_PROP(JointAxisPosition, "Axis position")
+			.LUMIX_REFL_PROP(JointAxisDirection, "Axis direction")
+			.LUMIX_REFL_PROP(SphericalJointUseLimit, "Use limit")
+			.LUMIX_REFL_PROP(SphericalJointLimit, "Limit").radiansAttribute()
+		.LUMIX_REFL_CMP(DistanceJoint, "distance_joint", "Physics / Joint / Distance")
+			.LUMIX_REFL_PROP(JointConnectedBody, "Connected body")
+			.LUMIX_REFL_PROP(JointAxisPosition, "Axis position")
+			.LUMIX_REFL_PROP(DistanceJointDamping, "Damping").minAttribute(0)
+			.LUMIX_REFL_PROP(DistanceJointStiffness, "Stiffness").minAttribute(0)
+			.LUMIX_REFL_PROP(DistanceJointTolerance, "Tolerance").minAttribute(0)
+			.LUMIX_REFL_PROP(DistanceJointLimits, "Limits")
+		.LUMIX_REFL_CMP(HingeJoint, "hinge_joint", "Physics / Joint / Hinge")
+			.LUMIX_REFL_PROP(JointConnectedBody, "Connected body")
+			.LUMIX_REFL_PROP(JointAxisPosition, "Axis position")
+			.LUMIX_REFL_PROP(JointAxisDirection, "Axis direction")
+			.LUMIX_REFL_PROP(HingeJointDamping, "Damping").minAttribute(0)
+			.LUMIX_REFL_PROP(HingeJointStiffness, "Stiffness").minAttribute(0)
+			.LUMIX_REFL_PROP(HingeJointUseLimit, "Use limit")
+			.LUMIX_REFL_PROP(HingeJointLimit, "Limit").radiansAttribute()
+		.LUMIX_REFL_CMP(Controller, "physical_controller", "Physics / Controller")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::moveController, "move")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::isControllerCollisionDown, "isCollisionDown")
+			.LUMIX_REFL_PROP(ControllerRadius, "Radius")
+			.LUMIX_REFL_PROP(ControllerHeight, "Height")
+			.LUMIX_ENUM_REFL_PROP(ControllerLayer, "Layer").enumAttribute<LayerEnum>()
+			.LUMIX_REFL_PROP(ControllerUseRootMotion, "Use root motion")
+			.LUMIX_REFL_PROP(ControllerCustomGravity, "Use custom gravity")
+			.LUMIX_REFL_PROP(ControllerCustomGravityAcceleration, "Custom gravity acceleration")
+		.LUMIX_REFL_CMP(RigidActor, "rigid_actor", "Physics / Rigid actor")
+			.icon(ICON_FA_VOLLEYBALL_BALL)
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::putToSleep, "putToSleep")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::getActorSpeed, "getSpeed")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::getActorVelocity, "getVelocity")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::applyForceToActor, "applyForce")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::applyForceToActor, "applyImpulse")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::addForceAtPos, "addForceAtPos")
+			.LUMIX_ENUM_REFL_PROP(ActorLayer, "Layer").enumAttribute<LayerEnum>()
+			.LUMIX_ENUM_REFL_PROP(DynamicType, "Dynamic").enumAttribute<DynamicTypeEnum>()
+			.LUMIX_REFL_PROP(IsTrigger, "Trigger")
+			/*array("Box geometry", &PhysicsScene::getBoxGeometryCount, &PhysicsScene::addBoxGeometry, &PhysicsScene::removeBoxGeometry,
+				.LUMIX_REFL_PROP(BoxGeomHalfExtents, "Size")
+				.LUMIX_REFL_PROP(BoxGeomOffsetPosition, "Position offset")
+				.LUMIX_REFL_PROP(BoxGeomOffsetRotation, "Rotation offset").radiansAttribute())
 			array("Sphere geometry", &PhysicsScene::getSphereGeometryCount, &PhysicsScene::addSphereGeometry, &PhysicsScene::removeSphereGeometry,
-				LUMIX_PROP(SphereGeomRadius, "Radius", MinAttribute(0)),
-				LUMIX_PROP(SphereGeomOffsetPosition, "Position offset")),
-			LUMIX_PROP(MeshGeomPath, "Mesh", ResourceAttribute(PhysicsGeometry::TYPE))
-		),
-		LUMIX_CMP(Vehicle, "vehicle", "Physics / Vehicle", 
-			icon(ICON_FA_CAR_ALT)
-			VEHICLE_CMP
-		),
-		LUMIX_CMP(Wheel, "wheel", "Physics / Wheel",
-			LUMIX_PROP(WheelRadius, "Radius", MinAttribute(0)),
-			LUMIX_PROP(WheelWidth, "Width", MinAttribute(0)),
-			LUMIX_PROP(WheelMass, "Mass", MinAttribute(0)),
-			LUMIX_PROP(WheelMOI, "MOI", MinAttribute(0)),
-			LUMIX_PROP(WheelSpringMaxCompression, "Max compression", MinAttribute(0)),
-			LUMIX_PROP(WheelSpringMaxDroop, "Max droop", MinAttribute(0)),
-			LUMIX_PROP(WheelSpringStrength, "Spring strength", MinAttribute(0)),
-			LUMIX_PROP(WheelSpringDamperRate, "Spring damper rate", MinAttribute(0)),
-			enum_property("Slot", &PhysicsSceneImpl::getWheelSlot, &PhysicsSceneImpl::setWheelSlot, WheelSlotEnum())
-		),
-		LUMIX_CMP(Heightfield, "physical_heightfield", "Physics / Heightfield",
-			LUMIX_PROP(HeightfieldLayer, "Layer", LayerEnum()),
-			LUMIX_PROP(HeightmapSource, "Heightmap", ResourceAttribute(Texture::TYPE)),
-			LUMIX_PROP(HeightmapYScale, "Y scale", MinAttribute(0)),
-			LUMIX_PROP(HeightmapXZScale, "XZ scale", MinAttribute(0))
-		)
-	);
+				.LUMIX_REFL_PROP(SphereGeomRadius, "Radius").minAttribute(0)
+				.LUMIX_REFL_PROP(SphereGeomOffsetPosition, "Position offset"))*/
+			.LUMIX_REFL_PROP(MeshGeomPath, "Mesh").resourceAttribute(PhysicsGeometry::TYPE)
+		.LUMIX_REFL_CMP(Vehicle, "vehicle", "Physics / Vehicle")
+			.icon(ICON_FA_CAR_ALT)
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel")
+			.LUMIX_REFL_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer")
+			.LUMIX_REFL_PROP(VehicleMass, "Mass").minAttribute(0)
+			.LUMIX_REFL_PROP(VehicleCenterOfMass, "Center of mass")
+			.LUMIX_REFL_PROP(VehicleMOIMultiplier, "MOI multiplier")
+			.LUMIX_REFL_PROP(VehicleChassis, "Chassis").resourceAttribute(PhysicsGeometry::TYPE)
+			.LUMIX_ENUM_REFL_PROP(VehicleChassisLayer, "Chassis layer").enumAttribute<LayerEnum>()
+			.LUMIX_ENUM_REFL_PROP(VehicleWheelsLayer, "Wheels layer").enumAttribute<LayerEnum>()
+		.LUMIX_REFL_CMP(Wheel, "wheel", "Physics / Wheel")
+			.LUMIX_REFL_PROP(WheelRadius, "Radius").minAttribute(0)
+			.LUMIX_REFL_PROP(WheelWidth, "Width").minAttribute(0)
+			.LUMIX_REFL_PROP(WheelMass, "Mass").minAttribute(0)
+			.LUMIX_REFL_PROP(WheelMOI, "MOI").minAttribute(0)
+			.LUMIX_REFL_PROP(WheelSpringMaxCompression, "Max compression").minAttribute(0)
+			.LUMIX_REFL_PROP(WheelSpringMaxDroop, "Max droop").minAttribute(0)
+			.LUMIX_REFL_PROP(WheelSpringStrength, "Spring strength").minAttribute(0)
+			.LUMIX_REFL_PROP(WheelSpringDamperRate, "Spring damper rate").minAttribute(0)
+			.LUMIX_ENUM_REFL_PROP(WheelSlot, "Slot").enumAttribute<WheelSlotEnum>()
+		.LUMIX_REFL_CMP(Heightfield, "physical_heightfield", "Physics / Heightfield")
+			.LUMIX_ENUM_REFL_PROP(HeightfieldLayer, "Layer").enumAttribute<LayerEnum>()
+			.LUMIX_REFL_PROP(HeightmapSource, "Heightmap").resourceAttribute(Texture::TYPE)
+			.LUMIX_REFL_PROP(HeightmapYScale, "Y scale").minAttribute(0)
+			.LUMIX_REFL_PROP(HeightmapXZScale, "XZ scale").minAttribute(0)
+	;
 }
 
 void PhysicsSceneImpl::RigidActor::onStateChanged(Resource::State, Resource::State new_state, Resource&)
