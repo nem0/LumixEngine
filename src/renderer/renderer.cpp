@@ -357,9 +357,9 @@ struct RendererImpl final : Renderer
 	{
 		RenderScene::reflect();
 
-		LUMIX_FUNC(Model::getBoneCount);
-		LUMIX_FUNC(Model::getBoneName);
-		LUMIX_FUNC(Model::getBoneParent);
+		LUMIX_GLOBAL_FUNC(Model::getBoneCount);
+		LUMIX_GLOBAL_FUNC(Model::getBoneName);
+		LUMIX_GLOBAL_FUNC(Model::getBoneParent);
 
 		m_shader_defines.reserve(32);
 

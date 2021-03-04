@@ -335,19 +335,21 @@ public:
 		void visit(const reflection::Property<bool>& prop) override { clone(prop); }
 		void visit(const reflection::Property<const char*>& prop) override { clone(prop); }
 		
-		void visit(const reflection::IArrayProperty& prop) override {
-			const i32 c = prop.getCount(src);
+		void visit(const reflection::ArrayProperty& prop) override {
+			const u32 c = prop.getCount(src);
 			while (prop.getCount(dst) < c) { prop.addItem(dst, prop.getCount(dst) - 1); }
 			while (prop.getCount(dst) > c) { prop.removeItem(dst, prop.getCount(dst) - 1); }
 			
 			ASSERT(index == -1);
-			for (int i = 0; i < c; ++i) {
+			for (u32 i = 0; i < c; ++i) {
 				index = i;
 				prop.visit(*this);
 			}
 			index = -1;
 		}
-
+		
+		// TODO refl
+		/*
 		void visit(const reflection::IDynamicProperties& prop) override { 
 			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
 				const char* name = prop.getName(src, index, i);
@@ -365,12 +367,14 @@ public:
 				prop.set(dst, index, name, type, val);
 			}
 		}
+
 		void visit(const reflection::IBlobProperty& prop) override { 
 			OutputMemoryStream tmp(*allocator);
 			prop.getValue(src, index, tmp);
 			InputMemoryStream blob(tmp);
 			prop.setValue(dst, index, blob);
 		}
+		*/
 
 		const HashMap<EntityPtr, EntityPtr>* map; 
 		IAllocator* allocator;

@@ -3,7 +3,6 @@
 #include "engine/engine.h"
 #include "engine/lumix.h"
 #include "engine/math.h"
-#include "engine/reflection.h"
 #include "engine/universe.h"
 #include "navigation/navigation_scene.h"
 #include "renderer/material.h"

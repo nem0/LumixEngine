@@ -1,7 +1,6 @@
 #pragma once
 
 #include "engine/hash_map.h"
-#include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/string.h"
 

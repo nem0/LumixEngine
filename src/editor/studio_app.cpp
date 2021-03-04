@@ -2573,14 +2573,14 @@ struct StudioAppImpl final : StudioApp
 			plugin->init();
 		}
 
-		for (const reflection::RegisteredReflComponent& cmp : reflection::getReflComponents()) {
+		for (const reflection::RegisteredComponent& cmp : reflection::getComponents()) {
 			ASSERT(cmp.cmp->component_type != INVALID_COMPONENT_TYPE);
-			const reflection::reflcmp* r = cmp.cmp;
+			const reflection::ComponentBase* r = cmp.cmp;
 			
 			if (m_component_labels.find(r->component_type).isValid()) continue;
 
-			struct : reflection::IReflEmptyPropertyVisitor {
-				void visit(const reflection::refl_typed_prop<Path>& prop) override {
+			struct : reflection::IEmptyPropertyVisitor {
+				void visit(const reflection::Property<Path>& prop) override {
 					for (const reflection::IAttribute* attr : prop.attributes) {
 						if (attr->getType() == reflection::IAttribute::RESOURCE) {
 							is_res = true;
@@ -2792,8 +2792,9 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
-		void visit(const reflection::IArrayProperty& prop) override { notSupported(prop); }
-		void visit(const reflection::IBlobProperty& prop) override { notSupported(prop); }
+		void visit(const reflection::ArrayProperty& prop) override { notSupported(prop); }
+		// TODO refl
+		//void visit(const reflection::IBlobProperty& prop) override { notSupported(prop); }
 
 		template <typename T>
 		void notSupported(const T& prop)

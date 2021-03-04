@@ -65,7 +65,7 @@ struct GUISystemImpl final : GUISystem
 		, m_sprite_manager(engine.getAllocator())
 	{
 		GUIScene::reflect();
-		LUMIX_FUNC(GUISystem::enableCursor);
+		LUMIX_GLOBAL_FUNC(GUISystem::enableCursor);
 		m_sprite_manager.create(Sprite::TYPE, m_engine.getResourceManager());
 	}
 

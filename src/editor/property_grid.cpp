@@ -42,7 +42,7 @@ PropertyGrid::~PropertyGrid()
 }
 
 
-struct GridUIVisitor final : reflection::IReflPropertyVisitor
+struct GridUIVisitor final : reflection::IPropertyVisitor
 {
 	GridUIVisitor(StudioApp& app, int index, const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor)
 		: m_entities(entities)
@@ -75,7 +75,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	};
 
 	template <typename T>
-	static Attributes getAttributes(const reflection::refl_typed_prop<T>& prop)
+	static Attributes getAttributes(const reflection::Property<T>& prop)
 	{
 		Attributes attrs;
 		for (const reflection::IAttribute* attr : prop.attributes) {
@@ -202,7 +202,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 	*/
 
-	void visit(const reflection::refl_typed_prop<float>& prop) override
+	void visit(const reflection::Property<float>& prop) override
 	{
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
@@ -220,7 +220,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 		ImGui::PopID();
 	}
 
-	void visit(const reflection::refl_typed_prop<int>& prop) override
+	void visit(const reflection::Property<int>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		int value = prop.get(cmp, m_index);
@@ -263,7 +263,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<u32>& prop) override
+	void visit(const reflection::Property<u32>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		u32 value = prop.get(cmp, m_index);
@@ -306,7 +306,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<EntityPtr>& prop) override
+	void visit(const reflection::Property<EntityPtr>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		EntityPtr entity = prop.get(cmp, m_index);
@@ -380,7 +380,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<Vec2>& prop) override
+	void visit(const reflection::Property<Vec2>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		Vec2 value = prop.get(cmp, m_index);
@@ -399,7 +399,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<Vec3>& prop) override
+	void visit(const reflection::Property<Vec3>& prop) override
 	{
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
@@ -427,7 +427,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<IVec3>& prop) override
+	void visit(const reflection::Property<IVec3>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		IVec3 value = prop.get(cmp, m_index);
@@ -441,7 +441,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<Vec4>& prop) override
+	void visit(const reflection::Property<Vec4>& prop) override
 	{
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
@@ -467,7 +467,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<bool>& prop) override
+	void visit(const reflection::Property<bool>& prop) override
 	{
 		if (equalIStrings(prop.name, "enabled") && m_index == -1 && m_entities.size() == 1) return;
 		ComponentUID cmp = getComponent();
@@ -483,7 +483,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<Path>& prop) override
+	void visit(const reflection::Property<Path>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		const Path p = prop.get(cmp, m_index);
@@ -513,7 +513,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	}
 
 
-	void visit(const reflection::refl_typed_prop<const char*>& prop) override
+	void visit(const reflection::Property<const char*>& prop) override
 	{
 		ComponentUID cmp = getComponent();
 		const Attributes attrs = getAttributes(prop);
@@ -561,7 +561,7 @@ struct GridUIVisitor final : reflection::IReflPropertyVisitor
 	//void visit(const reflection::IBlobProperty& prop) override {}
 
 
-	void visit(const reflection::reflarrayprop& prop) override
+	void visit(const reflection::ArrayProperty& prop) override
 	{
 		ImGui::Unindent();
 		bool is_open = ImGui::TreeNodeEx(prop.name, ImGuiTreeNodeFlags_AllowItemOverlap);
@@ -686,7 +686,7 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 
 	if (!is_open) return;
 
-	const reflection::reflcmp* component = reflection::getReflComponent(cmp_type);
+	const reflection::ComponentBase* component = reflection::getComponent(cmp_type);
 	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
 	if (component) component->visit(visitor);
 

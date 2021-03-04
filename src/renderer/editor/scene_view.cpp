@@ -17,7 +17,6 @@
 #include "engine/path.h"
 #include "engine/prefab.h"
 #include "engine/profiler.h"
-#include "engine/reflection.h"
 #include "engine/resource_manager.h"
 #include "engine/string.h"
 #include "engine/universe.h"
