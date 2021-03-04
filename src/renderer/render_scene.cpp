@@ -2782,11 +2782,11 @@ void RenderScene::reflect() {
 	};
 
 	LUMIX_SCENE(RenderSceneImpl, "renderer")
-		.LUMIX_FUNC(setGlobalLODMultiplier)
-		.LUMIX_FUNC(getGlobalLODMultiplier)
-		.LUMIX_FUNC(addDebugCross)
-		.LUMIX_FUNC(addDebugLine)
-		.LUMIX_FUNC(addDebugTriangle)
+		.LUMIX_FUNC(RenderSceneImpl::setGlobalLODMultiplier)
+		.LUMIX_FUNC(RenderSceneImpl::getGlobalLODMultiplier)
+		.LUMIX_FUNC(RenderSceneImpl::addDebugCross)
+		.LUMIX_FUNC(RenderSceneImpl::addDebugLine)
+		.LUMIX_FUNC(RenderSceneImpl::addDebugTriangle)
 		.LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment")
 			.icon(ICON_FA_BONE)
 			.LUMIX_PROP(BoneAttachmentParent, "Parent")

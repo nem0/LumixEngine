@@ -348,14 +348,12 @@ public:
 			index = -1;
 		}
 		
-		// TODO refl
-		/*
-		void visit(const reflection::IDynamicProperties& prop) override { 
+		void visit(const reflection::DynamicProperties& prop) override { 
 			for (u32 i = 0, c = prop.getCount(src, index); i < c; ++i) {
 				const char* name = prop.getName(src, index, i);
-				reflection::IDynamicProperties::Type type = prop.getType(src, index, i);
-				reflection::IDynamicProperties::Value val = prop.getValue(src, index, i);
-				if (type == reflection::IDynamicProperties::ENTITY) {
+				reflection::DynamicProperties::Type type = prop.getType(src, index, i);
+				reflection::DynamicProperties::Value val = prop.getValue(src, index, i);
+				if (type == reflection::DynamicProperties::ENTITY) {
 					auto iter = map->find(val.e);
 					if (iter.isValid()) {
 						val.e = iter.value();
@@ -367,14 +365,15 @@ public:
 				prop.set(dst, index, name, type, val);
 			}
 		}
+		
 
-		void visit(const reflection::IBlobProperty& prop) override { 
+		void visit(const reflection::BlobProperty& prop) override { 
 			OutputMemoryStream tmp(*allocator);
 			prop.getValue(src, index, tmp);
 			InputMemoryStream blob(tmp);
 			prop.setValue(dst, index, blob);
 		}
-		*/
+		
 
 		const HashMap<EntityPtr, EntityPtr>* map; 
 		IAllocator* allocator;

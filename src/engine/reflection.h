@@ -9,7 +9,7 @@
 
 #define LUMIX_SCENE(Class, Label) using ReflScene = Class; reflection::build_scene(Label)
 #define LUMIX_FUNC_EX(F, Name) function<&ReflScene::F>(Name, #F)
-#define LUMIX_FUNC(F) function<&ReflScene::F>(#F, #F)
+#define LUMIX_FUNC(F) function<&F>(#F, #F)
 #define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflScene::create##Cmp, &ReflScene::destroy##Cmp>(Name, Label)
 #define LUMIX_PROP(Property, Label) prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
 #define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
@@ -95,6 +95,10 @@ struct ClampAttribute : IAttribute
 	float max;
 };
 
+struct ColorAttribute : IAttribute {
+	int getType() const override { return COLOR; }
+};
+
 struct EnumAttribute : IAttribute {
 	virtual u32 count(ComponentUID cmp) const = 0;
 	virtual const char* name(ComponentUID cmp, u32 idx) const = 0;
@@ -119,7 +123,7 @@ struct PropertyBase {
 };
 
 
-struct IDynamicProperties : PropertyBase {
+struct DynamicProperties : PropertyBase {
 	enum Type {
 		I32,
 		FLOAT,
@@ -140,7 +144,7 @@ struct IDynamicProperties : PropertyBase {
 		bool b;
 		Vec3 v3;
 	};
-	IDynamicProperties(IAllocator& allocator) : PropertyBase(allocator) {}
+	DynamicProperties(IAllocator& allocator) : PropertyBase(allocator) {}
 
 	virtual u32 getCount(ComponentUID cmp, int array_idx) const = 0;
 	virtual Type getType(ComponentUID cmp, int array_idx, u32 idx) const = 0;
@@ -152,21 +156,21 @@ struct IDynamicProperties : PropertyBase {
 	virtual void visit(struct IPropertyVisitor& visitor) const = 0;
 };
 
-template <typename T> inline T get(IDynamicProperties::Value);
-template <> inline float get(IDynamicProperties::Value v) { return v.f; }
-template <> inline i32 get(IDynamicProperties::Value v) { return v.i; }
-template <> inline const char* get(IDynamicProperties::Value v) { return v.s; }
-template <> inline EntityPtr get(IDynamicProperties::Value v) { return v.e; }
-template <> inline bool get(IDynamicProperties::Value v) { return v.b; }
-template <> inline Vec3 get(IDynamicProperties::Value v) { return v.v3; }
+template <typename T> inline T get(DynamicProperties::Value);
+template <> inline float get(DynamicProperties::Value v) { return v.f; }
+template <> inline i32 get(DynamicProperties::Value v) { return v.i; }
+template <> inline const char* get(DynamicProperties::Value v) { return v.s; }
+template <> inline EntityPtr get(DynamicProperties::Value v) { return v.e; }
+template <> inline bool get(DynamicProperties::Value v) { return v.b; }
+template <> inline Vec3 get(DynamicProperties::Value v) { return v.v3; }
 
-template <typename T> inline void set(IDynamicProperties::Value& v, T);
-template <> inline void set(IDynamicProperties::Value& v, float val) { v.f = val; }
-template <> inline void set(IDynamicProperties::Value& v, i32 val) { v.i = val; }
-template <> inline void set(IDynamicProperties::Value& v, const char* val) { v.s = val; }
-template <> inline void set(IDynamicProperties::Value& v, EntityPtr val) { v.e = val; }
-template <> inline void set(IDynamicProperties::Value& v, bool val) { v.b = val; }
-template <> inline void set(IDynamicProperties::Value& v, Vec3 val) { v.v3 = val; }
+template <typename T> inline void set(DynamicProperties::Value& v, T);
+template <> inline void set(DynamicProperties::Value& v, float val) { v.f = val; }
+template <> inline void set(DynamicProperties::Value& v, i32 val) { v.i = val; }
+template <> inline void set(DynamicProperties::Value& v, const char* val) { v.s = val; }
+template <> inline void set(DynamicProperties::Value& v, EntityPtr val) { v.e = val; }
+template <> inline void set(DynamicProperties::Value& v, bool val) { v.b = val; }
+template <> inline void set(DynamicProperties::Value& v, Vec3 val) { v.v3 = val; }
 
 
 template <typename T>
@@ -180,11 +184,11 @@ struct Property : PropertyBase {
 		visitor.visit(*this);
 	}
 
-	T get(ComponentUID cmp, u32 idx) const {
+	virtual T get(ComponentUID cmp, u32 idx) const {
 		return getter(cmp.scene, (EntityRef)cmp.entity, idx);
 	}
 
-	void set(ComponentUID cmp, u32 idx, const T& val) const {
+	virtual void set(ComponentUID cmp, u32 idx, T val) const {
 		setter(cmp.scene, (EntityRef)cmp.entity, idx, val);
 	}
 
@@ -206,6 +210,8 @@ struct IPropertyVisitor {
 	virtual void visit(const Property<bool>& prop) = 0;
 	virtual void visit(const Property<const char*>& prop) = 0;
 	virtual void visit(const struct ArrayProperty& prop) = 0;
+	virtual void visit(const struct BlobProperty& prop) = 0;
+	virtual void visit(const DynamicProperties& prop) {}
 };
 
 struct IEmptyPropertyVisitor : IPropertyVisitor {
@@ -222,6 +228,8 @@ struct IEmptyPropertyVisitor : IPropertyVisitor {
 	void visit(const Property<bool>& prop) override {}
 	void visit(const Property<const char*>& prop) override {}
 	void visit(const ArrayProperty& prop) override {}
+	void visit(const BlobProperty& prop) override {}
+	void visit(const DynamicProperties& prop) override {}
 };
 
 struct LUMIX_ENGINE_API ArrayProperty : PropertyBase {
@@ -242,6 +250,20 @@ struct LUMIX_ENGINE_API ArrayProperty : PropertyBase {
 	Counter counter;
 	Adder adder;
 	Remover remover;
+};
+
+struct LUMIX_ENGINE_API BlobProperty : PropertyBase {
+	BlobProperty(IAllocator& allocator);
+
+	void visit(struct IPropertyVisitor& visitor) const override;
+	void getValue(ComponentUID cmp, u32 idx, OutputMemoryStream& stream) const;
+	void setValue(ComponentUID cmp, u32 idx, InputMemoryStream& stream) const;
+
+	typedef void (*Getter)(IScene*, EntityRef, u32, OutputMemoryStream&);
+	typedef void (*Setter)(IScene*, EntityRef, u32, InputMemoryStream&);
+
+	Getter getter;
+	Setter setter;
 };
 
 struct Icon { const char* name; };
@@ -509,6 +531,8 @@ struct Scene {
 	Scene* next = nullptr;
 };
 
+LUMIX_ENGINE_API Scene* getFirstScene();
+
 struct builder {
 	builder(IAllocator& allocator);
 
@@ -590,7 +614,9 @@ struct builder {
 
 	template <auto Getter, auto PropGetter>
 	builder& blob_property(const char* name) {
-		// TODO refl
+		auto* p = LUMIX_NEW(allocator, BlobProperty)(allocator);
+		p->name = name;
+		addProp(p);
 		return *this;
 	}
 

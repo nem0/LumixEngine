@@ -2793,8 +2793,7 @@ struct StudioAppImpl final : StudioApp
 
 		void visit(const reflection::Property<EntityPtr>& prop) override { notSupported(prop); }
 		void visit(const reflection::ArrayProperty& prop) override { notSupported(prop); }
-		// TODO refl
-		//void visit(const reflection::IBlobProperty& prop) override { notSupported(prop); }
+		void visit(const reflection::BlobProperty& prop) override { notSupported(prop); }
 
 		template <typename T>
 		void notSupported(const T& prop)
