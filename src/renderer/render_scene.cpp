@@ -1360,6 +1360,7 @@ public:
 			decal.material->decRefCount();
 		}
 
+		m_culling_system->remove(entity);
 		if (path.isEmpty()) {
 			decal.material = nullptr;
 		}
@@ -1430,6 +1431,7 @@ public:
 			decal.material->decRefCount();
 		}
 
+		m_culling_system->remove(entity);
 		if (path.isEmpty()) {
 			decal.material = nullptr;
 		}
