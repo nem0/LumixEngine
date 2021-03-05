@@ -386,16 +386,6 @@ LUMIX_FORCE_INLINE Vec2 maximum(const Vec2& a, const Vec2& b) {
 	};
 }
 
-// converts float to u32 so it can be used in radix sort
-// float float_value = 0;
-// u32 sort_key = floatFlip(*(u32*)&float_value);
-// http://stereopsis.com/radix.html
-LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value) {
-	u32 mask = -i32(float_bits_value >> 31) | 0x80000000;
-	return float_bits_value ^ mask;
-}
-
-
 template <typename T> LUMIX_FORCE_INLINE T signum(T a) {
 	return a > 0 ? (T)1 : (a < 0 ? (T)-1 : 0);
 }

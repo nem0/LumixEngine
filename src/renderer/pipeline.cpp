@@ -780,6 +780,16 @@ struct PipelineImpl final : Pipeline
 		u8 layer_to_bucket[255];
 	};
 
+	// converts float to u32 so it can be used in radix sort
+	// float float_value = 0;
+	// u32 sort_key = floatFlip(*(u32*)&float_value);
+	// http://stereopsis.com/radix.html
+	static LUMIX_FORCE_INLINE u32 floatFlip(u32 float_bits_value) {
+		u32 mask = -i32(float_bits_value >> 31) | 0x80000000;
+		return float_bits_value ^ mask;
+	}
+
+
 	PipelineImpl(Renderer& renderer, PipelineResource* resource, const char* define, IAllocator& allocator)
 		: m_allocator(allocator)
 		, m_renderer(renderer)

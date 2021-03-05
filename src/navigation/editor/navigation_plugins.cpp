@@ -8,9 +8,9 @@
 #include "editor/world_editor.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
+#include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
-#include "engine/reflection.h"
 #include "engine/universe.h"
 #include "navigation/navigation_scene.h"
 

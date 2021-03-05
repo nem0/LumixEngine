@@ -532,8 +532,9 @@ struct AssetCompilerImpl : AssetCompiler
 				m_to_compile_subresources.insert(path, Array<Resource*>(allocator));
 				iter = m_to_compile_subresources.find(path);
 			}
-			ASSERT(iter.value().indexOf(&res) < 0);
-			iter.value().push(&res);
+			if (iter.value().indexOf(&res) < 0) {
+				iter.value().push(&res);
+			}
 			return ResourceManagerHub::LoadHook::Action::DEFERRED;
 		}
 		return ResourceManagerHub::LoadHook::Action::IMMEDIATE;

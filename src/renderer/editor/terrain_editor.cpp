@@ -3,6 +3,7 @@
 #include "terrain_editor.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/entity_folders.h"
 #include "editor/prefab_system.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
@@ -950,7 +951,10 @@ void TerrainEditor::removeEntities(const DVec3& hit_pos)
 static bool isOBBCollision(RenderScene& scene,
 	const CullResult* meshes,
 	const Transform& model_tr,
-	Model* model)
+	Model* model,
+	bool ignore_not_in_folder,
+	const EntityFolders& folders,
+	EntityFolders::FolderID folder)
 {
 	float radius_a_squared = model->getOriginBoundingRadius() * model_tr.scale;
 	radius_a_squared = radius_a_squared * radius_a_squared;
@@ -976,6 +980,9 @@ static bool isOBBCollision(RenderScene& scene,
 				mtx.setTranslation(Vec3(rel_tr.pos));
 
 				if (testOBBCollision(model->getAABB(), mtx, model_instance.model->getAABB())) {
+					if (ignore_not_in_folder && folders.getFolder(EntityRef{mesh.index}) != folder) {
+						continue;
+					}
 					return true;
 				}
 			}
@@ -1019,6 +1026,9 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 		else meshes = scene->getRenderables(frustum, RenderableTypes::MESH_GROUP);
 		if (meshes) meshes->merge(scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE));
 		else meshes = scene->getRenderables(frustum, RenderableTypes::MESH_MATERIAL_OVERRIDE);
+
+		const EntityFolders& folders = m_world_editor.getEntityFolders();
+		const EntityFolders::FolderID folder = folders.getSelectedFolder();
 
 		Vec2 size = scene->getTerrainSize((EntityRef)m_component.entity);
 		float scale = 1.0f - maximum(0.01f, m_terrain_brush_strength);
@@ -1077,7 +1087,7 @@ void TerrainEditor::paintEntities(const DVec3& hit_pos)
 					if (scene->getUniverse().hasComponent((EntityRef)entity, MODEL_INSTANCE_TYPE)) {
 						Model* model = scene->getModelInstanceModel((EntityRef)entity);
 						const Transform tr = { pos, rot, size * scale };
-						if (isOBBCollision(*scene, meshes, tr, model)) {
+						if (isOBBCollision(*scene, meshes, tr, model, m_ignore_entities_not_in_folder, folders, folder)) {
 							m_world_editor.undo();
 						}
 					}
@@ -1401,6 +1411,14 @@ void TerrainEditor::saveCompositeTexture(const Path& path, const char* channel)
 void TerrainEditor::entityGUI() {
 	m_mode = Mode::ENTITY;
 			
+	ImGuiEx::Label("Ignore other folders (?)");
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip("When placing entities, ignore collisions with "
+			"entities in other folders than the currently selected folder "
+			"in hierarchy view");
+	}
+	ImGui::Checkbox("##ignore_filter", &m_ignore_entities_not_in_folder);
+
 	static char filter[100] = {0};
 	const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 	ImGui::SetNextItemWidth(-w);

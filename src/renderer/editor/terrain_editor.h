@@ -98,6 +98,7 @@ private:
 	bool m_is_rotate_x;
 	bool m_is_rotate_y;
 	bool m_is_rotate_z;
+	bool m_ignore_entities_not_in_folder = false;
 	bool m_is_enabled;
 	Vec2 m_rotate_x_spread;
 	Vec2 m_rotate_y_spread;
