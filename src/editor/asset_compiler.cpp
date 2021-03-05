@@ -65,10 +65,15 @@ void AssetCompiler::IPlugin::addSubresources(AssetCompiler& compiler, const char
 
 struct AssetCompilerImpl : AssetCompiler
 {
-	struct CompileEntry
-	{
+	struct ResourceUpdate {
+		ResourceUpdate(IAllocator& allocator) : resources(allocator) {}
+		Array<Resource*> resources;
+		u32 generation = 0;
+	};
+
+	struct CompileJob {
+		u32 generation;
 		Path path;
-		Resource* resource;
 	};
 
 	struct LoadHook : ResourceManagerHub::LoadHook
@@ -94,7 +99,7 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_semaphore(0, 0x7fFFffFF)
 		, m_registered_extensions(app.getAllocator())
 		, m_resources(app.getAllocator())
-		, m_to_compile_subresources(app.getAllocator())
+		, m_updates(app.getAllocator())
 		, m_dependencies(app.getAllocator())
 		, m_changed_files(app.getAllocator())
 		, m_on_list_changed(app.getAllocator())
@@ -522,29 +527,37 @@ struct AssetCompilerImpl : AssetCompiler
 		{
 			MutexGuard lock(m_to_compile_mutex);
 			const Path path(filepath);
-			auto iter = m_to_compile_subresources.find(path);
+			auto iter = m_updates.find(path);
 			if (!iter.isValid()) {
-				m_to_compile.push(path);
-				++m_compile_batch_count;
-				++m_batch_remaining_count;
-				m_semaphore.signal();
 				IAllocator& allocator = m_app.getAllocator();
-				m_to_compile_subresources.insert(path, Array<Resource*>(allocator));
-				iter = m_to_compile_subresources.find(path);
+				m_updates.insert(path, ResourceUpdate(allocator));
+				iter = m_updates.find(path);
 			}
-			if (iter.value().indexOf(&res) < 0) {
-				iter.value().push(&res);
+
+			ResourceUpdate& update = iter.value();
+			++update.generation;
+			if (update.resources.indexOf(&res) < 0) {
+				update.resources.push(&res);
 			}
+
+			CompileJob job;
+			job.path = path;
+			job.generation = update.generation;
+
+			m_to_compile.push(job);
+			++m_compile_batch_count;
+			++m_batch_remaining_count;
+			m_semaphore.signal();
 			return ResourceManagerHub::LoadHook::Action::DEFERRED;
 		}
 		return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 	}
 
-	Path popCompiledResource()
+	CompileJob popCompiledResource()
 	{
 		MutexGuard lock(m_compiled_mutex);
-		if(m_compiled.empty()) return Path();
-		const Path p = m_compiled.back();
+		if (m_compiled.empty()) return {};
+		const CompileJob p = m_compiled.back();
 		m_compiled.pop();
 		--m_batch_remaining_count;
 		if (m_batch_remaining_count == 0) m_compile_batch_count = 0;
@@ -607,16 +620,18 @@ struct AssetCompilerImpl : AssetCompiler
 	void update() override
 	{
 		for(;;) {
-			Path p = popCompiledResource();
-			if (p.isEmpty()) break;
+			CompileJob p = popCompiledResource();
+			if (p.path.isEmpty()) break;
 
 			// this can take some time, mutex is probably not the best option
 			MutexGuard lock(m_compiled_mutex);
 
-			for (Resource* r : m_to_compile_subresources[p]) {
-				m_load_hook.continueLoad(*r);
+			ResourceUpdate& update = m_updates[p.path];
+			if (p.generation != update.generation) continue;
+
+			for (Resource* r : update.resources) {
+				if (r->wantReady()) m_load_hook.continueLoad(*r);
 			}
-			m_to_compile_subresources.erase(p);
 		}
 
 		bool changed = false;
@@ -703,11 +718,11 @@ struct AssetCompilerImpl : AssetCompiler
 	Mutex m_compiled_mutex;
 	Mutex m_plugin_mutex;
 	Mutex m_changed_mutex;
-	HashMap<Path, Array<Resource*>> m_to_compile_subresources; 
+	HashMap<Path, ResourceUpdate> m_updates; 
 	HashMap<Path, Array<Path>> m_dependencies;
 	Array<Path> m_changed_files;
-	Array<Path> m_to_compile;
-	Array<Path> m_compiled;
+	Array<CompileJob> m_to_compile;
+	Array<CompileJob> m_compiled;
 	StudioApp& m_app;
 	LoadHook m_load_hook;
 	HashMap<u32, IPlugin*, HashFuncDirect<u32>> m_plugins;
@@ -728,19 +743,19 @@ int AssetCompilerTask::task()
 {
 	while (!m_finished) {
 		m_compiler.m_semaphore.wait();
-		const Path p = [&]{
+		const AssetCompilerImpl::CompileJob p = [&]{
 			MutexGuard lock(m_compiler.m_to_compile_mutex);
-			Path p = m_compiler.m_to_compile.back();
-			m_compiler.m_res_in_progress = p.c_str();
+			const AssetCompilerImpl::CompileJob p = m_compiler.m_to_compile.back();
+			m_compiler.m_res_in_progress = p.path.c_str();
 			m_compiler.m_to_compile.pop();
 			return p;
 		}();
-		if (!p.isEmpty()) {
+		if (!p.path.isEmpty()) {
 			PROFILE_BLOCK("compile asset");
-			profiler::pushString(p.c_str());
-			const bool compiled = m_compiler.compile(p);
+			profiler::pushString(p.path.c_str());
+			const bool compiled = m_compiler.compile(p.path);
 			if (!compiled) {
-				logError("Failed to compile resource ", p);
+				logError("Failed to compile resource ", p.path);
 			}
 			MutexGuard lock(m_compiler.m_compiled_mutex);
 			m_compiler.m_compiled.push(p);
