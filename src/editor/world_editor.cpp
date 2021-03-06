@@ -2676,8 +2676,12 @@ public:
 				}
 			}
 		}
-
-		m_selected_entities.removeDuplicates();
+		qsort(m_selected_entities.begin(), m_selected_entities.size(), sizeof(m_selected_entities[0]), [](const void* a, const void* b){
+			return memcmp(a, b, sizeof(EntityRef));
+		});
+		for (i32 i = m_selected_entities.size() - 2; i >= 0; --i) {
+			if (m_selected_entities[i] == m_selected_entities[i + 1]) m_selected_entities.swapAndPop(i);
+		}
 	}
 
 

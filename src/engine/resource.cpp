@@ -103,6 +103,7 @@ void Resource::checkState()
 
 void Resource::fileLoaded(u64 size, const u8* mem, bool success)
 {
+	ASSERT(m_async_op.isValid());
 	m_async_op = FileSystem::AsyncHandle::invalid();
 	if (m_desired_state != State::READY) return;
 	

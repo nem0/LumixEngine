@@ -79,8 +79,8 @@ void ResourceManager::removeUnreferenced()
 
 	for (auto* i : to_remove)
 	{
-		m_resources.erase(i->getPath().getHash());
-		destroyResource(*i);
+		auto iter = m_resources.find(i->getPath().getHash());
+		if (iter.value()->isReady()) iter.value()->doUnload();
 	}
 }
 

@@ -1798,7 +1798,7 @@ struct StudioAppImpl final : StudioApp
 		ImGui::End();
 	}
 
-	void folderUI(const EntityFolders::Folder& folder, const EntityFolders& folders, u32 level) {
+	void folderUI(const EntityFolders::Folder& folder, EntityFolders& folders, u32 level) {
 		ImGui::PushID(&folder);
 		bool node_open;
 		ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
@@ -1842,7 +1842,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
-			m_editor->getEntityFolders().selectFolder(folder_id);
+			folders.selectFolder(folder_id);
 		}
 
 		if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) {
@@ -1856,6 +1856,18 @@ struct StudioAppImpl final : StudioApp
 			}
 			if (ImGui::Selectable("Delete")) {
 				m_editor->destroyEntityFolder(folder_id);
+			}
+
+			const bool has_children = folders.getFolder(folder_id).first_entity.isValid();
+			if (ImGui::Selectable("Select entities", false, has_children ? 0 : ImGuiSelectableFlags_Disabled)) {
+				Array<EntityRef> entities(m_allocator);
+				EntityPtr e = folders.getFolder(folder_id).first_entity;
+				while (e.isValid()) {
+					entities.push((EntityRef)e);
+					const EntityPtr next = folders.getNextEntity((EntityRef)e);
+					e = next;
+				}
+				m_editor->selectEntities(entities, false);
 			}
 			if (level > 0 && ImGui::Selectable("Rename")) {
 				m_renaming_folder = folder_id;
@@ -1909,7 +1921,7 @@ struct StudioAppImpl final : StudioApp
 				ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().FramePadding.x);
 				
 				if (filter[0] == '\0') {
-					const EntityFolders& folders = m_editor->getEntityFolders();
+					EntityFolders& folders = m_editor->getEntityFolders();
 					folderUI(folders.getRoot(), folders, 0);
 				} else {
 					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e)) {
