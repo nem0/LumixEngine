@@ -860,6 +860,7 @@ void SceneView::renderSelection()
 			RenderScene* scene = m_pipeline->getScene();
 			const Universe& universe = scene->getUniverse();
 			
+			if (entities.size() > 5000) return;
 			for (EntityRef e : entities) {
 				if (!scene->getUniverse().hasComponent(e, MODEL_INSTANCE_TYPE)) continue;
 

@@ -830,13 +830,14 @@ struct StudioAppImpl final : StudioApp
 		UniverseView& view = m_editor->getView();
 		const DVec3 cam_pos = view.getViewport().pos;
 		if (ents.size() > 1) {
-			AABB aabb = m_render_interface->getEntityAABB(*universe, ents[0], cam_pos);
-			for (int i = 1; i < ents.size(); ++i) {
-				const AABB entity_aabb = m_render_interface->getEntityAABB(*universe, ents[i], cam_pos);
-				aabb.merge(entity_aabb);
+			DVec3 min(FLT_MAX), max(-FLT_MAX);
+			for (EntityRef e : ents) {
+				const DVec3 p = universe->getPosition(e);
+				min = minimum(p, min);
+				max = maximum(p, max);
 			}
 
-			addCube(view, cam_pos + aabb.min, cam_pos + aabb.max, 0xffffff00);
+			addCube(view, min, max, 0xffffff00);
 			return;
 		}
 

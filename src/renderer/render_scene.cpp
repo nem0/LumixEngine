@@ -2136,7 +2136,7 @@ public:
 			const DVec3& pos = universe.getPosition(entity);
 			float scale = universe.getScale(entity);
 			float radius = r.model->getOriginBoundingRadius() * scale;
-			const double dist = squaredLength(pos - origin);
+			const double dist = length(pos - origin);
 			if (dist - radius > cur_dist) continue;
 			
 			float intersection_t;
