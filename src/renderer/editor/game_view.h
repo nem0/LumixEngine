@@ -63,7 +63,6 @@ private:
 	UniquePtr<struct GUIInterface> m_gui_interface;
 	bool m_is_mouse_captured;
 	bool m_is_ingame_cursor;
-	bool m_paused;
 	bool m_is_fullscreen;
 	bool m_show_stats;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;

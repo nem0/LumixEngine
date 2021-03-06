@@ -53,6 +53,7 @@ struct LUMIX_ENGINE_API Engine {
 	virtual float getLastTimeDelta() const = 0;
 	virtual void setTimeMultiplier(float multiplier) = 0;
 	virtual void pause(bool pause) = 0;
+	virtual bool isPaused() const = 0;
 	virtual void nextFrame() = 0;
 	virtual lua_State* getState() = 0;
 

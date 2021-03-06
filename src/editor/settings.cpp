@@ -409,17 +409,6 @@ bool Settings::load()
 	}
 	lua_pop(L, 1);
 
-	m_app.getToolbarActions().clear();
-	lua_getglobal(L, "toolbar");
-	if (lua_type(L, -1) == LUA_TTABLE)
-	{
-		LuaWrapper::forEachArrayItem<const char*>(L, -1, nullptr, [this](const char* action_name){
-			Action* action = m_app.getAction(action_name);
-			if(action) m_app.getToolbarActions().push(action);
-		});
-	}
-	lua_pop(L, 1);
-
 	return true;
 }
 
@@ -566,71 +555,9 @@ bool Settings::save()
 	}
 	file << "}\n";
 
-	file << "toolbar = {\n";
-	for (auto* action : m_app.getToolbarActions())
-	{
-		file << "\t\"" << action->name << "\",\n";
-	}
-	file << "}\n";
-
 	file.close();
 
 	return true;
-}
-
-
-
-void Settings::showToolbarSettings() const
-{
-	auto& actions = m_app.getToolbarActions();
-	static Action* dragged = nullptr;
-	
-	ImGui::PushFont(m_app.getBigIconFont());
-	for (auto* action : actions)
-	{
-		ImGui::Button(action->font_icon);
-		if (dragged && ImGui::IsItemHovered() && ImGui::IsMouseReleased(0))
-		{
-			actions.insert(actions.indexOf(action), dragged);
-			dragged = nullptr;
-			break;
-		}
-		if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-		{
-			dragged = action;
-			actions.eraseItem(action);
-			break;
-		}
-		ImGui::SameLine();
-	}
-	ImGui::NewLine();
-	ImGui::PopFont();
-
-	if (dragged) ImGui::SetTooltip("%s", dragged->label_long.data);
-	if (ImGui::IsMouseReleased(0)) dragged = nullptr;
-
-	static int tmp = 0;
-	auto getter = [](void* data, int idx, const char** out) -> bool {
-		Action** tools = (Action**)data;
-		*out = tools[idx]->label_long;
-		return true;
-	};
-	Action* tools[1024];
-	int count = 0;
-	for (auto* action : m_app.getActions())
-	{
-		if (action->font_icon[0] && action->is_global)
-		{
-			tools[count] = action;
-			++count;
-		}
-	}
-	ImGui::Combo("##tool_combo", &tmp, getter, tools, count);
-	ImGui::SameLine();
-	if (ImGui::Button("Add"))
-	{
-		actions.push(tools[tmp]);
-	}
 }
 
 
@@ -1081,10 +1008,6 @@ void Settings::onGUI()
 
 			if (ImGui::BeginTabItem("Shortcuts")) {
 				showShortcutSettings();
-				ImGui::EndTabItem();
-			}
-			if (ImGui::BeginTabItem("Toolbar")) {
-				showToolbarSettings();
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Style"))

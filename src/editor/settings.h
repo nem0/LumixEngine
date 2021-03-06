@@ -61,7 +61,6 @@ private:
 
 private:
 	void showShortcutSettings();
-	void showToolbarSettings() const;
 	void showStyleEditor() const;
 };
 

@@ -172,7 +172,6 @@ struct StudioAppImpl final : StudioApp
 		, m_actions(m_allocator)
 		, m_owned_actions(m_allocator)
 		, m_window_actions(m_allocator)
-		, m_toolbar_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
 		, m_is_pack_data_dialog_open(false)
 		, m_settings(*this)
@@ -711,9 +710,6 @@ struct StudioAppImpl final : StudioApp
 	const Array<Action*>& getActions() override { return m_actions; }
 
 
-	Array<Action*>& getToolbarActions() override { return m_toolbar_actions; }
-
-
 	void guiBeginFrame() const
 	{
 		PROFILE_FUNCTION();
@@ -1217,6 +1213,9 @@ struct StudioAppImpl final : StudioApp
 		ASSERT(m_log_ui.get());
 		return *m_log_ui;
 	}
+
+	void nextFrame() { m_engine->nextFrame(); }
+	void pauseGame() { m_engine->pause(!m_engine->isPaused()); }
 	void toggleGameMode() { m_editor->toggleGameMode(); }
 	void setTranslateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::TRANSLATE; }
 	void setRotateGizmoMode() { getGizmoConfig().mode = Gizmo::Config::ROTATE; }
@@ -1527,7 +1526,6 @@ struct StudioAppImpl final : StudioApp
 		doMenuItem(*getAction("setEditCamTransform"), true);
 		doMenuItem(*getAction("lookAtSelected"), is_any_entity_selected);
 		doMenuItem(*getAction("copyViewTransform"), is_any_entity_selected);
-		doMenuItem(*getAction("toggleGameMode"), true);
 		doMenuItem(*getAction("snapDown"), is_any_entity_selected);
 		doMenuItem(*getAction("autosnapDown"), true);
 		doMenuItem(*getAction("pack_data"), true);
@@ -1623,11 +1621,11 @@ struct StudioAppImpl final : StudioApp
 			viewMenu();
 			ImGui::PopStyleVar(2);
 
-			float w = ImGui::GetWindowContentRegionWidth() * 0.5f - m_toolbar_actions.size() * 15 - ImGui::GetCursorPosX();
+			float w = ImGui::GetWindowContentRegionWidth() * 0.5f - 30 - ImGui::GetCursorPosX();
 			ImGui::Dummy(ImVec2(w, ImGui::GetTextLineHeight()));
-			for (auto* action : m_toolbar_actions) {
-				action->toolbarButton(m_big_icon_font);
-			}
+			getAction("toggleGameMode")->toolbarButton(m_big_icon_font);
+			getAction("pauseGameMode")->toolbarButton(m_big_icon_font);
+			getAction("nextFrame")->toolbarButton(m_big_icon_font);
 
 			StaticString<200> stats("");
 			if (m_engine->getFileSystem().hasWork()) stats << ICON_FA_HOURGLASS_HALF "Loading... | ";
@@ -2289,6 +2287,9 @@ struct StudioAppImpl final : StudioApp
 		addAction<&StudioAppImpl::makeParent>(ICON_FA_OBJECT_GROUP "Make parent", "Make entity parent", "makeParent", ICON_FA_OBJECT_GROUP);
 		addAction<&StudioAppImpl::unparent>(ICON_FA_OBJECT_UNGROUP "Unparent", "Unparent entity", "unparent", ICON_FA_OBJECT_UNGROUP);
 
+		addAction<&StudioAppImpl::nextFrame>(ICON_FA_STEP_FORWARD "Next frame", "Next frame", "nextFrame", ICON_FA_STEP_FORWARD);
+		addAction<&StudioAppImpl::pauseGame>(ICON_FA_PAUSE "Pause", "Pause game mode", "pauseGameMode", ICON_FA_PAUSE)
+			.is_selected.bind<&Engine::isPaused>(m_engine.get());
 		addAction<&StudioAppImpl::toggleGameMode>(ICON_FA_PLAY "Game Mode", "Toggle game mode", "toggleGameMode", ICON_FA_PLAY)
 			.is_selected.bind<&WorldEditor::isGameMode>(m_editor.get());
 		addAction<&StudioAppImpl::autosnapDown>(NO_ICON "Autosnap down", "Toggle autosnap down", "autosnapDown")
@@ -3373,7 +3374,6 @@ struct StudioAppImpl final : StudioApp
 	Array<Action*> m_owned_actions;
 	Array<Action*> m_actions;
 	Array<Action*> m_window_actions;
-	Array<Action*> m_toolbar_actions;
 	Array<GUIPlugin*> m_gui_plugins;
 	Array<MousePlugin*> m_mouse_plugins;
 	Array<IPlugin*> m_plugins;

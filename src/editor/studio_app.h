@@ -104,7 +104,6 @@ struct LUMIX_EDITOR_API StudioApp
 	virtual int getExitCode() const = 0;
 	virtual void runScript(const char* src, const char* script_name) = 0;
 	virtual const Array<Action*>& getActions() = 0;
-	virtual Array<Action*>& getToolbarActions() = 0;
 	virtual void addAction(Action* action) = 0;
 	virtual void removeAction(Action* action) = 0;
 	virtual void addWindowAction(Action* action) = 0;

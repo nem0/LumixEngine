@@ -279,6 +279,9 @@ public:
 		}
 	}
 
+	bool isPaused() const override {
+		return m_paused;
+	}
 
 	void pause(bool pause) override
 	{

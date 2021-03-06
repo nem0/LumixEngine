@@ -51,7 +51,6 @@ GameView::GameView(StudioApp& app)
 	, m_is_mouse_captured(false)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
-	, m_paused(false)
 	, m_show_stats(false)
 	, m_editor(app.getWorldEditor())
 {
@@ -252,12 +251,6 @@ void GameView::processInputEvents()
 
 void GameView::controlsGUI() {
 	Engine& engine = m_app.getEngine();
-	if (ImGui::Checkbox("Pause", &m_paused)) engine.pause(m_paused);
-	if (m_paused) {
-		ImGui::SameLine();
-		if (ImGui::Button("Next frame")) engine.nextFrame();
-	}
-	ImGui::SameLine();
 	ImGui::PushItemWidth(50);
 	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
 		engine.setTimeMultiplier(m_time_multiplier);
