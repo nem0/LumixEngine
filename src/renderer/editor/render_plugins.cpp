@@ -2360,6 +2360,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (universe.hasComponent(ent, MODEL_INSTANCE_TYPE)) {
 				RenderScene* scene = (RenderScene*)universe.getScene(MODEL_INSTANCE_TYPE);
 				Model* model = scene->getModelInstanceModel(ent);
+				scene->setModelInstanceLOD(ent, 0);
 				if (model->isReady()) {
 					const Transform tr = universe.getTransform(ent);
 					DVec3 points[8];
