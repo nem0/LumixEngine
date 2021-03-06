@@ -2380,8 +2380,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		Viewport viewport;
 		viewport.is_ortho = true;
 		viewport.ortho_size = radius * 1.1f;
-		viewport.far = 4 * radius;
-		viewport.near = -4 * radius;
+		viewport.far = 8 * radius;
+		viewport.near = -8 * radius;
 		viewport.h = AssetBrowser::TILE_SIZE * 4;
 		viewport.w = AssetBrowser::TILE_SIZE * 4;
 		viewport.pos = DVec3(center);
