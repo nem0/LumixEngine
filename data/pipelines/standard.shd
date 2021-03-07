@@ -22,6 +22,7 @@ include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
 define "VEGETATION"
+uniform("Stiffness", "float", 10)
 
 ------------------
 
@@ -86,7 +87,7 @@ vertex_shader [[
 			vec3 p = a_position * i_pos_scale.w;
 			v_lod = i_lod;
 			#if defined GRASS && defined VEGETATION
-				p = vegetationAnim(i_pos_scale.xyz, p, 0.1);
+				p = vegetationAnim(i_pos_scale.xyz, p, 1 / (1 + u_stiffness));
 				v_darken = a_position.y > 0.1 ? 1 : 0.0;
 			#elif defined VEGETATION
 				#ifdef DEPTH

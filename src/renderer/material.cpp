@@ -329,7 +329,7 @@ void Material::onBeforeReady()
 {
 	if (!m_shader) return;
 
-	for(u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
+	for (u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
 		if (!m_textures[i] && m_shader->m_texture_slots[i].default_texture) {
 			m_textures[i] = m_shader->m_texture_slots[i].default_texture;
 			if (i >= m_texture_count) m_texture_count = i + 1;
@@ -340,40 +340,12 @@ void Material::onBeforeReady()
 		}
 	}
 
-	for(int i = 0; i < m_shader->m_uniforms.size(); ++i)
-	{
-		const Shader::Uniform& shader_uniform = m_shader->m_uniforms[i];
-		bool found = false;
-		for(int j = i; j < m_uniforms.size(); ++j)
-		{
-			if(m_uniforms[j].name_hash == shader_uniform.name_hash)
-			{
-				auto tmp = m_uniforms[i];
-				m_uniforms[i] = m_uniforms[j];
-				m_uniforms[j] = tmp;
-				found = true;
-				break;
-			}
-		}
-		if(found) continue;
-		if(i < m_uniforms.size())
-		{
-			m_uniforms.emplace(m_uniforms[i]);
-		}
-		else
-		{
-			m_uniforms.emplace();
-		}
-		m_uniforms[i].name_hash = shader_uniform.name_hash;
-	}
-
-	for(u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
+	for (u32 i = 0; i < m_shader->m_texture_slot_count; ++i) {
 		const int define_idx = m_shader->m_texture_slots[i].define_idx;
-		if(define_idx >= 0) {
-			if(m_textures[i]) {
+		if (define_idx >= 0) {
+			if (m_textures[i]) {
 				m_define_mask |= 1 << define_idx;
-			}
-			else {
+			} else {
 				m_define_mask &= ~(1 << define_idx);
 			}
 		}
@@ -413,12 +385,17 @@ void Material::updateRenderData(bool on_before_ready)
 	cs.roughness = m_roughness;
 	memset(cs.custom, 0, sizeof(cs.custom));
 	for (const Shader::Uniform& shader_uniform : m_shader->m_uniforms) {
+		bool found = false;
+		const u32 size = shader_uniform.size();
 		for (Uniform& mat_uniform : m_uniforms) {
 			if (shader_uniform.name_hash == mat_uniform.name_hash) {
-				const u32 size = shader_uniform.size();
 				memcpy((u8*)cs.custom + shader_uniform.offset, mat_uniform.matrix, size);
+				found = true;
 				break;
 			}
+		}
+		if (!found) {
+			memcpy((u8*)cs.custom + shader_uniform.offset, shader_uniform.default_value.matrix, size);
 		}
 	}
 

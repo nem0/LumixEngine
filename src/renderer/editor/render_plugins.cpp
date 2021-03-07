@@ -629,7 +629,11 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			for (int i = 0; i < shader->m_uniforms.size(); ++i) {
 				const Shader::Uniform& shader_uniform = shader->m_uniforms[i];
 				Material::Uniform* uniform = material->findUniform(shader_uniform.name_hash);
-				if (!uniform) continue;
+				if (!uniform) {
+					uniform = &material->getUniforms().emplace();
+					uniform->name_hash = shader_uniform.name_hash;
+					memcpy(uniform->matrix, shader_uniform.default_value.matrix, sizeof(uniform->matrix)); 
+				}
 
 				switch (shader_uniform.type) {
 					case Shader::Uniform::FLOAT:

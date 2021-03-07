@@ -3931,8 +3931,8 @@ struct PipelineImpl final : Pipeline
 				for (Terrain::GrassType& type : terrain->m_grass_types) {
 					if (!type.m_grass_model || !type.m_grass_model->isReady()) continue;
 
-					const i32 mesh_count = type.m_grass_model->getMeshCount();
-					for (i32 i = 0; i < 1; ++i) {
+					const i32 mesh_count = type.m_grass_model->getLODIndices()[0].to;
+					for (i32 i = 0; i <= mesh_count; ++i) {
 						const Mesh& mesh = type.m_grass_model->getMesh(i);
 						Grass& grass = m_grass.emplace();
 						grass.mesh = mesh.render_data;

@@ -151,6 +151,7 @@ int uniform(lua_State* L)
 	Shader::Uniform& u = shader->m_uniforms.emplace();
 	copyString(u.name, name);
 	u.name_hash = crc32(name);
+	memset(&u.default_value, 0, sizeof(u.default_value));
 	const struct {
 		const char* str;
 		Shader::Uniform::Type type;
@@ -177,6 +178,24 @@ int uniform(lua_State* L)
 		logError("Unknown uniform type ", type, " in ", shader->getPath());
 		shader->m_uniforms.pop();
 		return 0;
+	}
+
+	if (lua_gettop(L) > 2) {
+		switch (lua_type(L, 3)) {
+			case LUA_TNUMBER: u.default_value.float_value = LuaWrapper::toType<float>(L, 3); break;
+			case LUA_TTABLE: {
+				const size_t len = lua_objlen(L, 2);
+				switch (len) {
+					case 2:	*(Vec2*)u.default_value.vec2 = LuaWrapper::toType<Vec2>(L, 3); break;
+					case 3: *(Vec3*)u.default_value.vec3 = LuaWrapper::toType<Vec3>(L, 3); break;
+					case 4: *(Vec4*)u.default_value.vec4 = LuaWrapper::toType<Vec4>(L, 3); break;
+					case 16: *(Matrix*)u.default_value.vec4 = LuaWrapper::toType<Matrix>(L, 3); break;
+					default: luaL_error(L, "Uniform %s has unsupported type", name); break;
+				}
+				break;
+			}
+			default: luaL_error(L, "Uniform %s has unsupported type", name); break;
+		}
 	}
 
 	// TODO std140 layout

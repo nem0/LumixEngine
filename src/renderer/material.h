@@ -128,6 +128,7 @@ public:
 	static const char* getCustomFlagName(int index);
 	static int getCustomFlagCount();
 	void updateRenderData(bool on_before_ready);
+	Array<Uniform>& getUniforms() { return m_uniforms; }
 
 private:
 	void onBeforeReady() override;
