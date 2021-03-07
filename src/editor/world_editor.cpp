@@ -1550,7 +1550,9 @@ private:
 				m_entities.push(entities[i]);
 				pushChildren(entities[i]);
 			}
-			m_entities.removeDuplicates();
+			if (!m_entities.empty()) {
+				fastRemoveDuplicates(Ref(m_entities));
+			}
 			m_transformations.reserve(m_entities.size());
 		}
 
@@ -2658,6 +2660,15 @@ public:
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const Vec4& val) override { set(cmp, array, idx, prop, entities, val); }
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const IVec3& val) override { set(cmp, array, idx, prop, entities, val); }
 
+	static void fastRemoveDuplicates(Ref<Array<EntityRef>> entities) {
+		qsort(entities->begin(), entities->size(), sizeof(entities.value[0]), [](const void* a, const void* b){
+			return memcmp(a, b, sizeof(EntityRef));
+		});
+		for (i32 i = entities->size() - 2; i >= 0; --i) {
+			if (entities.value[i] == entities.value[i + 1]) entities->swapAndPop(i);
+		}
+	}
+
 	void selectEntities(Span<const EntityRef> entities, bool toggle) override {
 		if (!toggle) {
 			m_selected_entities.clear();
@@ -2676,12 +2687,7 @@ public:
 				}
 			}
 		}
-		qsort(m_selected_entities.begin(), m_selected_entities.size(), sizeof(m_selected_entities[0]), [](const void* a, const void* b){
-			return memcmp(a, b, sizeof(EntityRef));
-		});
-		for (i32 i = m_selected_entities.size() - 2; i >= 0; --i) {
-			if (m_selected_entities[i] == m_selected_entities[i + 1]) m_selected_entities.swapAndPop(i);
-		}
+		fastRemoveDuplicates(Ref(m_selected_entities));
 	}
 
 
