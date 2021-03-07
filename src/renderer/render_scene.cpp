@@ -1385,15 +1385,19 @@ public:
 	{
 		CurveDecal& decal = m_curve_decals[entity];
 		decal.half_extents.y = value;
-		if (decal.material && decal.material->isReady()) {
-			m_culling_system->setRadius(entity, length(decal.half_extents));
-		}
 		updateDecalInfo(decal);
+		if (decal.material && decal.material->isReady()) {
+			m_culling_system->setRadius(entity, decal.radius);
+		}
 	}
 
 	void setCurveDecalBezierP0(EntityRef entity, const Vec2& value) override {
-		m_curve_decals[entity].bezier_p0 = value;
-		updateDecalInfo(m_curve_decals[entity]);
+		CurveDecal& decal = m_curve_decals[entity];
+		decal.bezier_p0 = value;
+		updateDecalInfo(decal);
+		if (decal.material && decal.material->isReady()) {
+			m_culling_system->setRadius(entity, decal.radius);
+		}
 	}
 
 	void setCurveDecalUVScale(EntityRef entity, const Vec2& value) override {
@@ -1406,8 +1410,12 @@ public:
 	}
 
 	void setCurveDecalBezierP2(EntityRef entity, const Vec2& value) override {
-		m_curve_decals[entity].bezier_p2 = value;
-		updateDecalInfo(m_curve_decals[entity]);
+		CurveDecal& decal = m_curve_decals[entity];
+		decal.bezier_p2 = value;
+		updateDecalInfo(decal);
+		if (decal.material && decal.material->isReady()) {
+			m_culling_system->setRadius(entity, decal.radius);
+		}
 	}
 
 	Vec2 getCurveDecalBezierP2(EntityRef entity) override {
@@ -2597,6 +2605,7 @@ public:
 		decal.material = nullptr;
 		decal.entity = entity;
 		decal.uv_scale = Vec2(1);
+		decal.half_extents = Vec3(10);
 		decal.bezier_p0 = Vec2(-1, 0);
 		decal.bezier_p2 = Vec2(1, 0);
 		updateDecalInfo(decal);
