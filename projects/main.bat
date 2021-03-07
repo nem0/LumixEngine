@@ -52,26 +52,28 @@ goto :begin
 	echo Wut? - you have to (re)create project if you download/upgrade plugin
 	echo ===============================
 	echo  1. Go back
-	echo  2. Maps
-	echo  3. Shader editor
-	echo  4. GLTF importer
-	echo  5. DX11 and DX12
-	echo  6. Rml UI
-	echo  7. Network
-	echo  8. JS
-	echo  9. C#
+	echo  2. Empty plugin template
+	echo  3. Maps
+	echo  4. Shader editor
+	echo  5. GLTF importer
+	echo  6. DX11 and DX12
+	echo  7. Rml UI
+	echo  8. Network
+	echo  9. JS
+	echo  A. C#
 	echo ===============================
 	choice /C 123456789 /N /M "Your choice:"
 	echo.
 	if %errorlevel%==1 exit /B 0
-	if %errorlevel%==2 call :map_plugin
-	if %errorlevel%==3 call :shader_editor_plugin
-	if %errorlevel%==4 call :glft_import_plugin
-	if %errorlevel%==5 call :dx_plugin
-	if %errorlevel%==6 call :rml_ui_plugin
-	if %errorlevel%==7 call :network_plugin
-	if %errorlevel%==8 call :js_plugin
-	if %errorlevel%==9 call :cs_plugin
+	if %errorlevel%==2 call :empty_plugin
+	if %errorlevel%==3 call :map_plugin
+	if %errorlevel%==4 call :shader_editor_plugin
+	if %errorlevel%==5 call :glft_import_plugin
+	if %errorlevel%==6 call :dx_plugin
+	if %errorlevel%==7 call :rml_ui_plugin
+	if %errorlevel%==8 call :network_plugin
+	if %errorlevel%==9 call :js_plugin
+	if %errorlevel%==10 call :cs_plugin
 	pause
 goto :plugins
 
@@ -180,6 +182,18 @@ exit /B 0
 		git.exe clone https://github.com/nem0/lumixengine_maps.git maps
 	) else (
 		cd maps
+		git pull
+	)
+	popd
+exit /B 0
+
+:empty_plugin
+	if not exist ..\plugins mkdir ..\plugins
+	pushd ..\plugins
+	if not exist myplugin (
+		git.exe clone https://github.com/nem0/lumix_plugin_template.git myplugin
+	) else (
+		cd myplugin
 		git pull
 	)
 	popd

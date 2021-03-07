@@ -55,6 +55,10 @@ jobs:
               working-directory: plugins
               run: |
                 git.exe clone https://github.com/nem0/lumixengine_js.git js
+            - name: fetch empty plugin template
+              working-directory: plugins
+              run: |
+                git.exe clone https://github.com/nem0/lumix_plugin_template.git myplugin
             - name: make gl project with plugins
               working-directory: projects
               run: |
