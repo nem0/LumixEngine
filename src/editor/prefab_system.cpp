@@ -343,7 +343,7 @@ public:
 			ASSERT(index == -1);
 			for (u32 i = 0; i < c; ++i) {
 				index = i;
-				prop.visit(*this);
+				prop.visitChildren(*this);
 			}
 			index = -1;
 		}
