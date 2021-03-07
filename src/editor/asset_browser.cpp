@@ -567,7 +567,7 @@ void AssetBrowser::fileColumn()
 		if (auto* payload = ImGui::AcceptDragDropPayload("entity")) {
 			const EntityRef e = *(EntityRef*)payload->Data;
 			m_dropped_entity = e;
-			ImGui::OpenPopup("Save sa prefab");
+			ImGui::OpenPopup("Save as prefab");
 			Universe* universe = m_app.getWorldEditor().getUniverse();
 			const ComponentType model_inst_type = reflection::getComponentType("model_instance");
 			IScene* scene = universe->getScene(model_inst_type);
@@ -581,19 +581,17 @@ void AssetBrowser::fileColumn()
 		ImGui::EndDragDropTarget();
 	}
 	ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
-	if (ImGui::BeginPopupModal("Save sa prefab")) {
+	if (ImGui::BeginPopupModal("Save as prefab")) {
 		ImGuiEx::Label("Name");
 		ImGui::InputText("##name", m_prefab_name, sizeof(m_prefab_name));
-		if (ImGui::Button(ICON_FA_SAVE "Save")) {
+		if (ImGui::Selectable(ICON_FA_SAVE "Save")) {
 			StaticString<LUMIX_MAX_PATH> path(m_dir, "/", m_prefab_name, ".fab");
 			m_app.getWorldEditor().getPrefabSystem().savePrefab((EntityRef)m_dropped_entity, Path(path));
 			m_dropped_entity = INVALID_ENTITY;
 			changeDir(m_dir);
 		}
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_SAVE "Cancel")) {
+		if (ImGui::Selectable(ICON_FA_TIMES "Cancel")) {
 			m_dropped_entity = INVALID_ENTITY;
-			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
 	}
