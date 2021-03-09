@@ -1086,7 +1086,7 @@ bool AssetBrowser::resourceList(Span<char> buf, u32& selected_path_hash, Resourc
 		if (ImGui::Selectable(label, selected, ImGuiSelectableFlags_AllowDoubleClick)) {
 			selected_path_hash = res.path.getHash();
 			
-			if (selected || ImGui::IsMouseDoubleClicked(0)) {
+			if (selected || ImGui::IsMouseDoubleClicked(0)) { //-V1051
 				copyString(buf, res.path.c_str());
 				ImGui::CloseCurrentPopup();
 				ImGui::EndChild();

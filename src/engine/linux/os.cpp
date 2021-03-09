@@ -466,10 +466,10 @@ bool getEvent(Event& e) {
 				case XLookupChars:
 				case XLookupBoth:
 					if (0 != len) {
-						Event e;
-						e.type = Event::Type::CHAR;
-						e.text_input.utf8 = utf8;
-						G.event_queue.push(e);
+						Event e2;
+						e2.type = Event::Type::CHAR;
+						e2.text_input.utf8 = utf8;
+						G.event_queue.push(e2);
 					}
 				break;
 				default: break;
@@ -522,11 +522,11 @@ bool getEvent(Event& e) {
 			e.win_size.w = xevent.xconfigure.width;
 			e.win_size.h = xevent.xconfigure.height;
 
-			Event e;
-			e.type = Event::Type::WINDOW_MOVE;
-			e.win_move.x = xevent.xconfigure.x;
-			e.win_move.y = xevent.xconfigure.y;
-			G.event_queue.push(e);
+			Event e2;
+			e2.type = Event::Type::WINDOW_MOVE; //-V519
+			e2.win_move.x = xevent.xconfigure.x;
+			e2.win_move.y = xevent.xconfigure.y;
+			G.event_queue.push(e2);
 			return true;
 		}
 		case MotionNotify:
