@@ -685,7 +685,7 @@ void SceneView::manipulate() {
 		m_copy_moved = false;
 	}
 
-	if (!Gizmo::manipulate((*selected)[0].index, *m_view, Ref(tr), cfg)) return;
+	if (!Gizmo::manipulate((*selected)[0].index, *m_view, tr, cfg)) return;
 
 	if (copy_move && !m_copy_moved) {
 		m_editor.duplicateEntities();

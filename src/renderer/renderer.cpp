@@ -451,7 +451,7 @@ struct RendererImpl final : Renderer
 			}
 
 			gpu::MemoryStats mem_stats;
-			if (gpu::getMemoryStats(Ref(mem_stats))) {
+			if (gpu::getMemoryStats(mem_stats)) {
 				logInfo("Initial GPU memory stats:\n",
 					"total: ", (mem_stats.total_available_mem / (1024.f * 1024.f)), "MB\n"
 					"currect: ", (mem_stats.current_available_mem / (1024.f * 1024.f)), "MB\n"
@@ -1104,7 +1104,7 @@ struct RendererImpl final : Renderer
 		frame.transient_buffer.prepareToRender();
 		
 		gpu::MemoryStats mem_stats;
-		if (gpu::getMemoryStats(Ref(mem_stats))) {
+		if (gpu::getMemoryStats(mem_stats)) {
 			profiler::gpuMemStats(mem_stats.total_available_mem, mem_stats.current_available_mem, mem_stats.dedicated_vidmem);
 		}
 

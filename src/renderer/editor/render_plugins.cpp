@@ -368,7 +368,7 @@ struct ParticleEmitterPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlug
 	bool compile(const Path& src) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());
-		if (!fs.getContentSync(src, Ref(src_data))) return false;
+		if (!fs.getContentSync(src, src_data)) return false;
 
 		InputMemoryStream input(src_data);
 		OutputMemoryStream output(m_app.getAllocator());
@@ -927,7 +927,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (sources.find(ch.path.getHash()).isValid()) return true;
 
 			tmp_src.clear();
-			if (!fs.getContentSync(ch.path, Ref(tmp_src))) {
+			if (!fs.getContentSync(ch.path, tmp_src)) {
 				return false;
 			}
 
@@ -1152,7 +1152,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());
-		if (!fs.getContentSync(src, Ref(src_data))) return false;
+		if (!fs.getContentSync(src, src_data)) return false;
 		
 		OutputMemoryStream out(m_app.getAllocator());
 		Meta meta = getMeta(src);
@@ -1216,7 +1216,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			m_composite_tag = &texture;
 			IAllocator& allocator = m_app.getAllocator();
 			OutputMemoryStream content(allocator);
-			if (fs.getContentSync(texture.getPath(), Ref(content))) {
+			if (fs.getContentSync(texture.getPath(), content)) {
 				m_composite.init(Span(content.data(), (u32)content.size()), texture.getPath().c_str());
 			}
 			else {
@@ -1858,14 +1858,14 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	}
 
 
-	static void postprocessImpostor(Ref<Array<u32>> gb0, Ref<Array<u32>> gb1, const IVec2& tile_size, IAllocator& allocator) {
+	static void postprocessImpostor(Array<u32>& gb0, Array<u32>& gb1, const IVec2& tile_size, IAllocator& allocator) {
 		struct Cell {
 			i16 x, y;
 		};
 		const IVec2 size = tile_size * 9;
 		Array<Cell> cells(allocator);
-		cells.resize(gb0->size());
-		const u32* data = gb0->begin();
+		cells.resize(gb0.size());
+		const u32* data = gb0.begin();
 		for (i32 j = 0; j < size.y; ++j) {
 			for (i32 i = 0; i < size.x; ++i) {
 				const u32 idx = i + j * size.x;
@@ -1937,7 +1937,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		Array<u32> tmp(allocator);
-		tmp.resize(gb0->size());
+		tmp.resize(gb0.size());
 		if (cells[0].x >= 0) {
 			for (i32 j = 0; j < size.y; ++j) {
 				for (i32 i = 0; i < size.x; ++i) {
@@ -1947,21 +1947,21 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					tmp[idx] = (alpha << 24) | (tmp[idx] & 0xffFFff);
 				}
 			}
-			memcpy(gb0->begin(), tmp.begin(), tmp.byte_size());
+			memcpy(gb0.begin(), tmp.begin(), tmp.byte_size());
 
-			const u32* gb1_data = gb1->begin();
+			const u32* gb1_data = gb1.begin();
 			for (i32 j = 0; j < size.y; ++j) {
 				for (i32 i = 0; i < size.x; ++i) {
 					const u32 idx = i + j * size.x;
 					tmp[idx] = gb1_data[cells[idx].x + cells[idx].y * size.x];
 				}
 			}
-			memcpy(gb1->begin(), tmp.begin(), tmp.byte_size());
+			memcpy(gb1.begin(), tmp.begin(), tmp.byte_size());
 		}
 		else {
 			// nothing was rendered
-			memset(gb0->begin(), 0xff, gb0->byte_size());
-			memset(gb1->begin(), 0xff, gb1->byte_size());
+			memset(gb0.begin(), 0xff, gb0.byte_size());
+			memset(gb1.begin(), 0xff, gb1.byte_size());
 		}
 	}
 
@@ -2169,15 +2169,15 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				Array<u32> gb1(allocator); 
 				Array<u32> shadow(allocator); 
 				IVec2 tile_size;
-				importer.createImpostorTextures(model, Ref(gb0), Ref(gb1), Ref(shadow), Ref(tile_size));
-				postprocessImpostor(Ref(gb0), Ref(gb1), tile_size, allocator);
+				importer.createImpostorTextures(model, gb0, gb1, shadow, tile_size);
+				postprocessImpostor(gb0, gb1, tile_size, allocator);
 				const PathInfo fi(model->getPath().c_str());
 				StaticString<LUMIX_MAX_PATH> img_path(fi.m_dir, fi.m_basename, "_impostor0.tga");
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
 				os::OutputFile file;
 				FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
-				if (fs.open(img_path, Ref(file))) {
+				if (fs.open(img_path, file)) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
 				}
@@ -2187,7 +2187,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				img_path = fi.m_dir;
 				img_path << fi.m_basename << "_impostor1.tga";
-				if (fs.open(img_path, Ref(file))) {
+				if (fs.open(img_path, file)) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb1.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
 				}
@@ -2197,7 +2197,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 				img_path = fi.m_dir;
 				img_path << fi.m_basename << "_impostor2.tga";
-				if (fs.open(img_path, Ref(file))) {
+				if (fs.open(img_path, file)) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)shadow.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
 				}
@@ -2333,7 +2333,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (!renderer) return;
 
 		EntityMap entity_map(m_app.getAllocator());
-		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, Ref(entity_map))) return;
+		if (!engine.instantiatePrefab(*m_tile.universe, *prefab, DVec3(0), Quat::IDENTITY, 1, entity_map)) return;
 		if (entity_map.m_map.empty() || !entity_map.m_map[0].isValid()) return;
 
 		m_tile.path_hash = prefab->getPath().getHash();
@@ -2696,7 +2696,7 @@ void captureCubemap(StudioApp& app
 	, Pipeline& pipeline
 	, const u32 texture_size
 	, const DVec3& position
-	, Ref<Array<Vec4>> data
+	, Array<Vec4>& data
 	, F&& f) {
 	memoryBarrier();
 
@@ -2721,7 +2721,7 @@ void captureCubemap(StudioApp& app
 	Vec3 ups[] = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, 1, 0}};
 	Vec3 ups_opengl[] = { { 0, -1, 0 },{ 0, -1, 0 },{ 0, 0, 1 },{ 0, 0, -1 },{ 0, -1, 0 },{ 0, -1, 0 } };
 
-	data->resize(6 * texture_size * texture_size);
+	data.resize(6 * texture_size * texture_size);
 
 	const bool ndc_bottom_left = gpu::isOriginBottomLeft();
 	for (int i = 0; i < 6; ++i) {
@@ -2741,7 +2741,7 @@ void captureCubemap(StudioApp& app
 			, texture_size
 			, texture_size
 			, gpu::TextureFormat::RGBA32F
-			, Span((u8*)(data->begin() + (i * texture_size * texture_size)), u32(texture_size * texture_size * sizeof(*data->begin())))
+			, Span((u8*)(data.begin() + (i * texture_size * texture_size)), u32(texture_size * texture_size * sizeof(*data.begin())))
 		);
 	}
 
@@ -2917,7 +2917,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void render(ProbeJob& job) {
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
-		captureCubemap(m_app, *m_pipeline, texture_size, job.position, Ref(job.data), [&job](){
+		captureCubemap(m_app, *m_pipeline, texture_size, job.position, job.data, [&job](){
 			jobs::run(&job, [](void* ptr) {
 				ProbeJob* pjob = (ProbeJob*)ptr;
 				pjob->plugin.processData(*pjob);
@@ -3361,7 +3361,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		{
 		}
 
-		gpu::ProgramHandle getProgram(void* window_handle, Ref<bool> new_program) {
+		gpu::ProgramHandle getProgram(void* window_handle, bool& new_program) {
 			auto iter = plugin->m_programs.find(window_handle);
 			if (!iter.isValid()) {
 				plugin->m_programs.insert(window_handle, gpu::allocProgramHandle());
@@ -3388,7 +3388,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 				dd.x = i32(draw_data->DisplayPos.x);
 				dd.y = i32(draw_data->DisplayPos.y);
 				dd.window = vp->PlatformHandle;
-				dd.program = getProgram(dd.window, Ref(dd.new_program));
+				dd.program = getProgram(dd.window, dd.new_program);
 				dd.cmd_lists.reserve(draw_data->CmdListsCount);
 
 				for (int i = 0; i < draw_data->CmdListsCount; ++i) {
@@ -3795,7 +3795,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		}
 		bool create_empty = ImGui::Selectable("Empty", false);
 		static u32 selected_res_hash = 0;
-		if (asset_browser.resourceList(Span(buf), Ref(selected_res_hash), Material::TYPE, 0, false) || create_empty || new_created)
+		if (asset_browser.resourceList(Span(buf), selected_res_hash, Material::TYPE, 0, false) || create_empty || new_created)
 		{
 			if (create_entity)
 			{
@@ -3937,13 +3937,13 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = m_app.getWorldEditor();
-		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 33), view, Ref(tr), Ref(p.inner_range), cfg, true)) {
+		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 33), view, tr, p.inner_range, cfg, true)) {
 			editor.beginCommandGroup("env_probe_inner_range");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Inner range", Span(&e, 1), p.inner_range);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
 			editor.endCommandGroup();
 		}
-		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, Ref(tr), Ref(p.outer_range), cfg, false)) {
+		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, tr, p.outer_range, cfg, false)) {
 			editor.beginCommandGroup("env_probe_outer_range");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Outer range", Span(&e, 1), p.outer_range);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
@@ -3963,7 +3963,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
 		WorldEditor& editor = m_app.getWorldEditor();
-		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, Ref(tr), Ref(p.half_extents), cfg, false)) {
+		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, tr, p.half_extents, cfg, false)) {
 			editor.beginCommandGroup("refl_probe_half_ext");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Half extents", Span(&e, 1), p.half_extents);
 			editor.setEntitiesPositions(&e, &tr.pos, 1);
@@ -4057,14 +4057,14 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		Gizmo::Config cfg;
 		const DVec3 p0 = tr.transform(DVec3(decal.bezier_p0.x, 0, decal.bezier_p0.y));
 		Transform p0_tr = { p0, Quat::IDENTITY, 1 };
-		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, Ref(p0_tr), cfg)) {
+		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, p0_tr, cfg)) {
 			const Vec2 p0 = Vec2(tr.inverted().transform(p0_tr.pos).xz());
 			m_app.getWorldEditor().setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P0", Span(&e, 1), p0);
 		}
 
 		const DVec3 p2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
 		Transform p2_tr = { p2, Quat::IDENTITY, 1 };
-		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, Ref(p2_tr), cfg)) {
+		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, p2_tr, cfg)) {
 			const Vec2 p2 = Vec2(tr.inverted().transform(p2_tr.pos).xz());
 			m_app.getWorldEditor().setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);
 		}

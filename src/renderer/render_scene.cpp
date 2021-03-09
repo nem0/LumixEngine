@@ -771,7 +771,7 @@ public:
 			
 		Job& job = m_renderer.createJob<Job>(m_allocator);
 		// TODO async load
-		if (!m_engine.getFileSystem().getContentSync(Path(path_str), Ref(job.data))) {
+		if (!m_engine.getFileSystem().getContentSync(Path(path_str), job.data)) {
 			logError("Could not load ", path_str);
 		}
 		job.layer = probe.texture_id;
@@ -2149,13 +2149,13 @@ public:
 			
 			float intersection_t;
 			Vec3 rel_pos = Vec3(origin - pos);
-			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, Ref(intersection_t)) && intersection_t >= 0) {
+			if (getRaySphereIntersection(rel_pos, dir, Vec3::ZERO, radius, intersection_t) && intersection_t >= 0) {
 				Vec3 aabb_hit;
 				const Quat rot = universe.getRotation(entity).conjugated();
 				const Vec3 rel_dir = rot.rotate(dir);
 				const AABB& aabb = r.model->getAABB();
 				rel_pos = rot.rotate(rel_pos / scale);
-				if (getRayAABBIntersection(rel_pos, rel_dir, aabb.min, aabb.max - aabb.min, Ref(aabb_hit))) {
+				if (getRayAABBIntersection(rel_pos, rel_dir, aabb.min, aabb.max - aabb.min, aabb_hit)) {
 					RayCastModelHit new_hit = r.model->castRay(rel_pos, rel_dir, r.pose);
 					if (new_hit.is_hit && (!hit.is_hit || new_hit.t * scale < hit.t)) {
 						new_hit.entity = entity;

@@ -86,7 +86,7 @@ void Action::init(const char* label_short,
 	is_selected.bind<falseConst>();
 }
 
-bool Action::shortcutText(Span<char> out) {
+bool Action::shortcutText(Span<char> out) const {
 	if (shortcut == os::Keycode::INVALID && modifiers == 0) {
 		copyString(out, "");
 		return false;

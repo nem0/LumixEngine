@@ -16,7 +16,7 @@ struct EntityFolders final {
 		FolderID next_folder = INVALID_FOLDER;
 		FolderID prev_folder = INVALID_FOLDER;
 		EntityPtr first_entity = INVALID_ENTITY;
-		StaticString<116> name;
+		char name[116];
 	};
 
 	struct Entity {

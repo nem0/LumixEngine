@@ -1,4 +1,5 @@
 #include "entity_folders.h"
+#include "engine/string.h"
 
 namespace Lumix {
 
@@ -13,7 +14,7 @@ EntityFolders::EntityFolders(Universe& universe, IAllocator& allocator)
 	universe.entityCreated().bind<&EntityFolders::onEntityCreated>(this);
 
 	m_root = m_folder_allocator.alloc();
-	m_root->name = "root";
+	copyString(m_root->name, "root");
 	m_selected_folder = 0;
 }
 
@@ -117,7 +118,7 @@ EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID p
 	}
 	
 	Folder& f = m_folder_allocator.getObject(folder);
-	f.name = "Folder";
+	copyString(f.name, "Folder");
 	f.parent_folder = parent;
 	Folder& p = m_folder_allocator.getObject(parent);
 	if (p.child_folder != INVALID_FOLDER) {

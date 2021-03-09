@@ -642,7 +642,7 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 	bool is_open;
 	bool enabled = true;
 	IScene* scene = editor.getUniverse()->getScene(cmp_type);
-	if (entities_count == 1 && reflection::getPropertyValue(*scene, entities[0], cmp_type, "Enabled", Ref(enabled))) {
+	if (entities_count == 1 && reflection::getPropertyValue(*scene, entities[0], cmp_type, "Enabled", enabled)) {
 		is_open = ImGui::TreeNodeEx((void*)(uintptr)cmp_type.index, flags, "%s", "");
 		ImGui::SameLine();
 		ComponentUID cmp;

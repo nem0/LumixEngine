@@ -9,6 +9,7 @@
 #include "engine/os.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
+#include "engine/string.h"
 #include "engine/universe.h"
 #include "gui_scene.h"
 #include "gui_system.h"

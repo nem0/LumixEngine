@@ -504,7 +504,7 @@ struct ComponentBase {
 };
 
 template <typename T>
-bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const char* prop_name, Ref<T> out) {
+bool getPropertyValue(IScene& scene, EntityRef e, ComponentType cmp_type, const char* prop_name, T& out) {
 	struct : IEmptyPropertyVisitor {
 		void visit(const Property<T>& prop) override {
 			if (equalStrings(prop.name, prop_name)) {

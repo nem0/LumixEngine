@@ -28,7 +28,6 @@ struct LUMIX_ENGINE_API IInputStream {
 	
 	template <typename T> void read(T& value) { read(&value, sizeof(T)); }
 	template <typename T> T read();
-	template <typename T> void read(Ref<T> val) { val = read<T>(); }
 };
 
 

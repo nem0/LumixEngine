@@ -125,7 +125,7 @@ StackNode* StackTree::getParent(StackNode* node)
 }
 
 
-bool StackTree::getFunction(StackNode* node, Span<char> out, Ref<int> line)
+bool StackTree::getFunction(StackNode* node, Span<char> out, int& line)
 {
 	HANDLE process = GetCurrentProcess();
 	alignas(SYMBOL_INFO) u8 symbol_mem[sizeof(SYMBOL_INFO) + 256 * sizeof(char)] = {};

@@ -4741,7 +4741,7 @@ struct PipelineImpl final : Pipeline
 				gpu::destroy(staging);
 
 				os::OutputFile file;
-				if (fs->open(path, Ref(file))) {
+				if (fs->open(path, file)) {
 					Texture::saveTGA(&file, w, h, gpu::TextureFormat::RGBA8, (u8*)pixels.begin(), false, Path(path), allocator);
 					file.close();
 				}

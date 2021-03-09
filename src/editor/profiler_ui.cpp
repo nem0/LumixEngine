@@ -58,11 +58,11 @@ struct ThreadContextProxy {
 	{
 		InputMemoryStream blob(ptr, 9000);
 		name = blob.readString();
-		blob.read(Ref(thread_id));
-		blob.read(Ref(begin));
-		blob.read(Ref(end));
+		blob.read(thread_id);
+		blob.read(begin);
+		blob.read(end);
 		default_show = blob.read<u8>();
-		blob.read(Ref(buffer_size));
+		blob.read(buffer_size);
 		buffer = (u8*)blob.getData() + blob.getPosition();
 	}
 
@@ -571,7 +571,7 @@ void ProfilerUIImpl::showAllocationTree(AllocationStackNode* node, int column) c
 	{
 		char fn_name[100];
 		int line;
-		if (debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), Ref(line)))
+		if (debug::StackTree::getFunction(node->m_stack_node, Span(fn_name), line))
 		{
 			if (line >= 0)
 			{

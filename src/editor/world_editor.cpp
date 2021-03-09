@@ -23,6 +23,7 @@
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 #include "engine/universe.h"
 #include "render_interface.h"
 
@@ -387,11 +388,11 @@ template <> void writeToStream<const char*>(OutputMemoryStream& stream, const ch
 
 
 struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
-	PropertyDeserializeVisitor(Ref<InputMemoryStream> deserializer
+	PropertyDeserializeVisitor(InputMemoryStream& deserializer
 		, ComponentUID cmp
 		, const HashMap<EntityPtr, u32>& map
 		, Span<const EntityRef> entities)
-		: deserializer(deserializer.value) //-V1041
+		: deserializer(deserializer) //-V1041
 		, cmp(cmp)
 		, map(map)
 		, entities(entities)
@@ -442,7 +443,7 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 	
 	void visit(const reflection::Property<EntityPtr>& prop) override { 
 		EntityPtr value;
-		deserializer.read(Ref(value));
+		deserializer.read(value);
 		auto iter = map.find(value);
 		if (iter.isValid()) value = entities[iter.value()];
 		
@@ -451,7 +452,7 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 
 	void visit(const reflection::ArrayProperty& prop) override {
 		u32 count;
-		deserializer.read(Ref(count));
+		deserializer.read(count);
 		const int idx_backup = idx;
 		while (prop.getCount(cmp) > count) {
 			prop.removeItem(cmp, prop.getCount(cmp) - 1);
@@ -474,8 +475,8 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 };
 
 struct PropertySerializeVisitor : reflection::IPropertyVisitor {
-	PropertySerializeVisitor(Ref<OutputMemoryStream> serializer, ComponentUID cmp)
-		: serializer(serializer.value) //-V1041
+	PropertySerializeVisitor(OutputMemoryStream& serializer, ComponentUID cmp)
+		: serializer(serializer) //-V1041
 		, cmp(cmp)
 	{}
 
@@ -535,13 +536,13 @@ struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 };
 
 
-static void save(ComponentUID cmp, Ref<OutputMemoryStream> out) {
+static void save(ComponentUID cmp, OutputMemoryStream& out) {
 	PropertySerializeVisitor save(out, cmp);
 	save.idx = -1;
 	reflection::getComponent(cmp.type)->visit(save);
 }
 
-static void load(ComponentUID cmp, Ref<InputMemoryStream> blob)
+static void load(ComponentUID cmp, InputMemoryStream& blob)
 {
 	struct : IAllocator {
 		void* allocate(size_t size) override { ASSERT(false); return nullptr; }
@@ -1004,7 +1005,7 @@ public:
 		, m_property(property, editor.getAllocator())
 		, m_old_values(editor.getAllocator())
 	{
-		save(m_component, Ref(m_old_values));
+		save(m_component, m_old_values);
 	}
 
 
@@ -1030,7 +1031,7 @@ public:
 	void undo() override
 	{
 		InputMemoryStream old_values(m_old_values);
-		load(m_component, Ref(old_values));
+		load(m_component, old_values);
 	}
 
 
@@ -1159,7 +1160,7 @@ public:
 			ComponentUID component = universe->getComponent(entities[i], component_type);
 			if (!component.isValid()) continue;
 
-			PropertySerializeVisitor v(Ref<OutputMemoryStream>(m_old_values), component);
+			PropertySerializeVisitor v(m_old_values, component);
 			v.idx = -1;
 			cmp_desc->visit(v);
 			m_entities.push(entities[i]);
@@ -1167,15 +1168,15 @@ public:
 	}
 
 
-	template <typename T2> static void set(Ref<reflection::DynamicProperties::Value> v, T2) { ASSERT(false); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, i32 val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, float val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, const Path& val) { reflection::set(v.value, val.c_str()); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, const char* val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, EntityPtr val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, bool val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, Vec3 val) { reflection::set(v.value, val); }
-	static void set(Ref<reflection::DynamicProperties::Value> v, const String& val) { reflection::set(v.value, val.c_str()); }
+	template <typename T2> static void set(reflection::DynamicProperties::Value& v, T2) { ASSERT(false); }
+	static void set(reflection::DynamicProperties::Value& v, i32 val) { reflection::set(v, val); }
+	static void set(reflection::DynamicProperties::Value& v, float val) { reflection::set(v, val); }
+	static void set(reflection::DynamicProperties::Value& v, const Path& val) { reflection::set(v, val.c_str()); }
+	static void set(reflection::DynamicProperties::Value& v, const char* val) { reflection::set(v, val); }
+	static void set(reflection::DynamicProperties::Value& v, EntityPtr val) { reflection::set(v, val); }
+	static void set(reflection::DynamicProperties::Value& v, bool val) { reflection::set(v, val); }
+	static void set(reflection::DynamicProperties::Value& v, Vec3 val) { reflection::set(v, val); }
+	static void set(reflection::DynamicProperties::Value& v, const String& val) { reflection::set(v, val.c_str()); }
 
 
 	bool execute() override
@@ -1209,7 +1210,7 @@ public:
 						if (!equalStrings(prop_name, name)) continue;
 						found = true;
 						reflection::DynamicProperties::Value v;
-						set(Ref(v), cmd->m_new_value);
+						set(v, cmd->m_new_value);
 						prop.set(cmp, cmd->m_index, i, v);
 					}
 				}
@@ -1237,7 +1238,7 @@ public:
 		Span<const EntityRef> entities(nullptr, nullptr);
 		for (int i = 0; i < m_entities.size(); ++i) {
 			const ComponentUID cmp = universe->getComponent(m_entities[i], m_component_type);
-			PropertyDeserializeVisitor v(Ref<InputMemoryStream>(blob), cmp, map, entities);	
+			PropertyDeserializeVisitor v(blob, cmp, map, entities);	
 			cmp_desc->visit(v);
 		}
 	}
@@ -1302,7 +1303,8 @@ private:
 
 		void undo() override {
 			m_editor.m_entity_folders->emplaceFolder(m_folder, m_parent);
-			m_editor.m_entity_folders->getFolder(m_folder).name = m_folder_name.c_str();
+			EntityFolders::Folder& f = m_editor.m_entity_folders->getFolder(m_folder);
+			copyString(f.name, m_folder_name.c_str());
 		}
 
 		const char* getType() override { return "destroy_entity_folder"; }
@@ -1353,12 +1355,14 @@ private:
 		}
 
 		bool execute() override {
-			m_editor.m_entity_folders->getFolder(m_folder).name = m_new_name.c_str();
+			EntityFolders::Folder& f = m_editor.m_entity_folders->getFolder(m_folder);
+			copyString(f.name, m_new_name.c_str());
 			return true;
 		}
 
 		void undo() override {
-			m_editor.m_entity_folders->getFolder(m_folder).name = m_old_name.c_str();
+			EntityFolders::Folder& f = m_editor.m_entity_folders->getFolder(m_folder);
+			copyString(f.name, m_old_name.c_str());
 		}
 
 		const char* getType() override { return "rename_entity_folder"; }
@@ -1551,7 +1555,7 @@ private:
 				pushChildren(entities[i]);
 			}
 			if (!m_entities.empty()) {
-				fastRemoveDuplicates(Ref(m_entities));
+				fastRemoveDuplicates(m_entities);
 			}
 			m_transformations.reserve(m_entities.size());
 		}
@@ -1626,7 +1630,7 @@ private:
 					gather.resource_manager = &resource_manager;
 					cmp_desc->visit(gather);
 
-					Lumix::save(cmp, Ref(m_old_values));
+					Lumix::save(cmp, m_old_values);
 				}
 				const PrefabHandle prefab = m_editor.getPrefabSystem().getPrefab(m_entities[i]);
 				m_old_values.write(prefab);
@@ -1691,7 +1695,7 @@ private:
 					new_component.scene = scene;
 					new_component.type = cmp_type;
 					
-					::Lumix::load(new_component, Ref(blob));
+					::Lumix::load(new_component, blob);
 				}
 				PrefabHandle tpl;
 				blob.read(tpl);
@@ -1761,7 +1765,7 @@ private:
 			{
 				cmp.entity = entity;
 				universe->createComponent(cmp.type, entity);
-				::Lumix::load(cmp, Ref(blob));
+				::Lumix::load(cmp, blob);
 			}
 		}
 
@@ -1785,7 +1789,7 @@ private:
 
 			for (EntityRef entity : m_entities) {
 				cmp.entity = entity;
-				Lumix::save(cmp, Ref(m_old_values));
+				Lumix::save(cmp, m_old_values);
 
 				GatherResourcesVisitor gather;
 				gather.cmp = cmp;
@@ -2364,7 +2368,7 @@ public:
 				serializer.write(cmp_type);
 				const reflection::ComponentBase* cmp_desc = reflection::getComponent(cmp.type);
 				
-				PropertySerializeVisitor visitor(Ref<OutputMemoryStream>(serializer), cmp);
+				PropertySerializeVisitor visitor(serializer, cmp);
 				visitor.idx = -1;
 				cmp_desc->visit(visitor);
 			}
@@ -2372,14 +2376,14 @@ public:
 		}
 	}
 
-	void gatherHierarchy(EntityRef e, Ref<Array<EntityRef>> entities) {
-		entities->push(e);
+	void gatherHierarchy(EntityRef e, Array<EntityRef>& entities) {
+		entities.push(e);
 		for (EntityPtr child = m_universe->getFirstChild(e); 
 			child.isValid(); 
 			child = m_universe->getNextSibling((EntityRef)child)) 
 		{
 			const EntityRef ch = (EntityRef)child;
-			if (entities->indexOf(ch) < 0) {
+			if (entities.indexOf(ch) < 0) {
 				gatherHierarchy(ch, entities);
 			}
 		}
@@ -2394,7 +2398,7 @@ public:
 		Array<EntityRef> entities(m_allocator);
 		entities.reserve(m_selected_entities.size());
 		for (EntityRef e : m_selected_entities) {
-			gatherHierarchy(e, Ref(entities));
+			gatherHierarchy(e, entities);
 		}
 		copyEntities(entities, m_copy_buffer);
 	}
@@ -2446,7 +2450,7 @@ public:
 
 	bool loadProject() override {
 		OutputMemoryStream data(m_allocator);
-		if (!m_engine.getFileSystem().getContentSync(Path("lumix.prj"), Ref(data))) return false;
+		if (!m_engine.getFileSystem().getContentSync(Path("lumix.prj"), data)) return false;
 		
 		InputMemoryStream stream(data);
 		return m_engine.deserializeProject(stream);
@@ -2556,7 +2560,7 @@ public:
 		}
 
 		EntityMap entity_map(m_allocator);
-		if (m_engine.deserialize(*m_universe, blob, Ref(entity_map)))
+		if (m_engine.deserialize(*m_universe, blob, entity_map))
 		{
 			m_prefab_system->deserialize(blob, entity_map);
 			if (header.version > (i32)SerializedVersion::ENTITY_FOLDERS) {
@@ -2660,12 +2664,12 @@ public:
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const Vec4& val) override { set(cmp, array, idx, prop, entities, val); }
 	void setProperty(ComponentType cmp, const char* array, int idx, const char* prop, Span<const EntityRef> entities, const IVec3& val) override { set(cmp, array, idx, prop, entities, val); }
 
-	static void fastRemoveDuplicates(Ref<Array<EntityRef>> entities) {
-		qsort(entities->begin(), entities->size(), sizeof(entities.value[0]), [](const void* a, const void* b){
+	static void fastRemoveDuplicates(Array<EntityRef>& entities) {
+		qsort(entities.begin(), entities.size(), sizeof(entities[0]), [](const void* a, const void* b){
 			return memcmp(a, b, sizeof(EntityRef));
 		});
-		for (i32 i = entities->size() - 2; i >= 0; --i) {
-			if (entities.value[i] == entities.value[i + 1]) entities->swapAndPop(i);
+		for (i32 i = entities.size() - 2; i >= 0; --i) {
+			if (entities[i] == entities[i + 1]) entities.swapAndPop(i);
 		}
 	}
 
@@ -2687,7 +2691,7 @@ public:
 				}
 			}
 		}
-		fastRemoveDuplicates(Ref(m_selected_entities));
+		fastRemoveDuplicates(m_selected_entities);
 	}
 
 
@@ -2869,7 +2873,7 @@ public:
 
 		Universe& universe = *m_editor.getUniverse();
 		int entity_count;
-		blob.read(Ref(entity_count));
+		blob.read(entity_count);
 		bool is_redo = !m_entities.empty();
 		if (is_redo)
 		{
@@ -2892,17 +2896,17 @@ public:
 		m_map.reserve(entity_count);
 		for (int i = 0; i < entity_count; ++i) {
 			EntityRef orig_e;
-			blob.read(Ref(orig_e));
+			blob.read(orig_e);
 			if (!is_redo) m_map.insert(orig_e, i);
 		}
 		for (int i = 0; i < entity_count; ++i)
 		{
 			Transform tr;
-			blob.read(Ref(tr));
+			blob.read(tr);
 			const char* name = blob.readString();
 			if (name[0]) universe.setEntityName(m_entities[i], name);
 			EntityPtr parent;
-			blob.read(Ref(parent));
+			blob.read(parent);
 
 			auto iter = m_map.find(parent);
 			if (iter.isValid()) parent = m_entities[iter.value()];
@@ -2928,7 +2932,7 @@ public:
 			universe.setParent(parent, new_entity);
 			for (;;) {
 				u32 hash;
-				blob.read(Ref(hash));
+				blob.read(hash);
 				if (hash == 0) break;
 
 				ComponentUID cmp;
@@ -2938,7 +2942,7 @@ public:
 
 				cmp.scene->getUniverse().createComponent(cmp.type, new_entity);
 
-				PropertyDeserializeVisitor visitor(Ref<InputMemoryStream>(blob), cmp, m_map, m_entities);
+				PropertyDeserializeVisitor visitor(blob, cmp, m_map, m_entities);
 				visitor.idx = -1;
 				reflection::getComponent(cmp.type)->visit(visitor);
 			}

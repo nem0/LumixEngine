@@ -34,8 +34,8 @@ struct LUMIX_ENGINE_API FileSystem {
 	virtual bool deleteFile(const char* path) = 0;
 	virtual bool fileExists(const char* path) = 0;
 	virtual os::FileIterator* createFileIterator(const char* dir) = 0;
-	virtual bool open(const char* path, Ref<os::InputFile> file) = 0;
-	virtual bool open(const char* path, Ref<os::OutputFile> file) = 0;
+	virtual bool open(const char* path, os::InputFile& file) = 0;
+	virtual bool open(const char* path, os::OutputFile& file) = 0;
 
 	virtual void setBasePath(const char* path) = 0;
 	virtual const char* getBasePath() const = 0;
@@ -44,7 +44,7 @@ struct LUMIX_ENGINE_API FileSystem {
 	[[nodiscard]] virtual bool makeRelative(Span<char> relative, const char* absolute) const = 0;
 	virtual void makeAbsolute(Span<char> absolute, const char* relative) const = 0;
 
-	[[nodiscard]] virtual bool getContentSync(const struct Path& file, Ref<struct OutputMemoryStream> content) =  0;
+	[[nodiscard]] virtual bool getContentSync(const struct Path& file, struct OutputMemoryStream& content) =  0;
 	virtual AsyncHandle getContent(const Path& file, const ContentCallback& callback) = 0;
 	virtual void cancel(AsyncHandle handle) = 0;
 };

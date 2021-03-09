@@ -120,7 +120,7 @@ struct AssetCompilerImpl : AssetCompiler
 	{
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (fs.open(".lumix/assets/_list.txt_tmp", Ref(file))) {
+		if (fs.open(".lumix/assets/_list.txt_tmp", file)) {
 			file << "resources = {\n";
 			for (const ResourceItem& ri : m_resources) {
 				file << "\"" << ri.path.c_str() << "\",\n";
@@ -182,7 +182,7 @@ struct AssetCompilerImpl : AssetCompiler
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		StaticString<LUMIX_MAX_PATH> out_path(".lumix/assets/", hash, ".res");
 		os::OutputFile file;
-		if(!fs.open(out_path, Ref(file))) {
+		if(!fs.open(out_path, file)) {
 			logError("Could not create ", out_path);
 			return false;
 		}
@@ -310,7 +310,7 @@ struct AssetCompilerImpl : AssetCompiler
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		const StaticString<LUMIX_MAX_PATH> list_path(fs.getBasePath(), ".lumix/assets/_list.txt");
 		OutputMemoryStream content(m_app.getAllocator());
-		if (fs.getContentSync(Path(".lumix/assets/_list.txt"), Ref(content))) {
+		if (fs.getContentSync(Path(".lumix/assets/_list.txt"), content)) {
 			lua_State* L = luaL_newstate();
 			[&](){
 				if (luaL_loadbuffer(L, (const char*)content.data(), content.size(), "lumix_asset_list") != 0) {
@@ -438,7 +438,7 @@ struct AssetCompilerImpl : AssetCompiler
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream buf(m_app.getAllocator());
 		
-		if (!fs.getContentSync(Path(meta_path), Ref(buf))) return false;
+		if (!fs.getContentSync(Path(meta_path), buf)) return false;
 
 		lua_State* L = luaL_newstate();
 		if (luaL_loadbuffer(L, (const char*)buf.data(), buf.size(), meta_path) != 0) {
@@ -466,7 +466,7 @@ struct AssetCompilerImpl : AssetCompiler
 		const StaticString<LUMIX_MAX_PATH> meta_path(res.c_str(), ".meta");
 				
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (!fs.open(meta_path, Ref(file))) {
+		if (!fs.open(meta_path, file)) {
 			logError("Could not create ", meta_path);
 			return;
 		}

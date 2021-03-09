@@ -214,7 +214,7 @@ void preinit(IAllocator& allocator, bool load_renderdoc);
 bool init(void* window_handle, InitFlags flags);
 void launchRenderDoc();
 void setCurrentWindow(void* window_handle);
-bool getMemoryStats(Ref<MemoryStats> stats);
+bool getMemoryStats(MemoryStats& stats);
 u32 swapBuffers();
 void waitFrame(u32 frame);
 bool frameFinished(u32 frame);

@@ -49,7 +49,7 @@ struct AssetBrowserPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool compile(const Path& src) override {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		OutputMemoryStream src_data(m_app.getAllocator());
-		if (!fs.getContentSync(src, Ref(src_data))) return false;
+		if (!fs.getContentSync(src, src_data)) return false;
 		
 		Meta meta = getMeta(src);
 

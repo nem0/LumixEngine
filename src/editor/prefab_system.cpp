@@ -97,7 +97,7 @@ struct PrefabSystemImpl final : PrefabSystem
 			ASSERT(prefab.isReady());
 			auto& system = (PrefabSystemImpl&)editor.getPrefabSystem();
 
-			system.doInstantiatePrefabs(prefab, transforms, Ref(entities));
+			system.doInstantiatePrefabs(prefab, transforms, entities);
 			if (output) {
 				*output = entities[0];
 				output = nullptr;
@@ -222,7 +222,7 @@ public:
 	}
 	
 
-	void doInstantiatePrefabs(PrefabResource& prefab_res, const Array<Transform>& transforms, Ref<Array<EntityRef>> entities)
+	void doInstantiatePrefabs(PrefabResource& prefab_res, const Array<Transform>& transforms, Array<EntityRef>& entities)
 	{
 		ASSERT(prefab_res.isReady());
 		if (!m_resources.find(prefab_res.getPath().getHash()).isValid())
@@ -238,7 +238,7 @@ public:
 		
 		for (const Transform& tr : transforms) {
 			entity_map.m_map.clear();
-			if (!engine.instantiatePrefab(*m_universe, prefab_res, tr.pos, tr.rot, tr.scale, Ref(entity_map))) {
+			if (!engine.instantiatePrefab(*m_universe, prefab_res, tr.pos, tr.rot, tr.scale, entity_map)) {
 				logError("Failed to instantiate prefab ", prefab_res.getPath());
 				return;
 			}
@@ -249,7 +249,7 @@ public:
 
 			const EntityRef root = (EntityRef)entity_map.m_map[0];
 			m_roots.insert(root, prefab);
-			entities->push(root);
+			entities.push(root);
 		}
 	}
 
@@ -264,7 +264,7 @@ public:
 		}
 		
 		EntityMap entity_map(m_editor.getAllocator());
-		if (!m_editor.getEngine().instantiatePrefab(*m_universe, prefab_res, pos, rot, scale, Ref(entity_map))) {
+		if (!m_editor.getEngine().instantiatePrefab(*m_universe, prefab_res, pos, rot, scale, entity_map)) {
 			logError("Failed to instantiate prefab ", prefab_res.getPath());
 			return INVALID_ENTITY;
 		}
@@ -383,8 +383,8 @@ public:
 	};
 
 
-	EntityRef cloneEntity(Universe& src_u, EntityRef src_e, Universe& dst_u, EntityPtr dst_parent, Ref<Array<EntityRef>> entities, const HashMap<EntityPtr, EntityPtr>& map) {
-		entities->push(src_e);
+	EntityRef cloneEntity(Universe& src_u, EntityRef src_e, Universe& dst_u, EntityPtr dst_parent, Array<EntityRef>& entities, const HashMap<EntityPtr, EntityPtr>& map) {
+		entities.push(src_e);
 		const EntityRef dst_e = (EntityRef)map[src_e];
 		if (dst_parent.isValid()) {
 			dst_u.setParent(dst_parent, dst_e);
@@ -425,12 +425,12 @@ public:
 		return dst_e;
 	}
 
-	void cloneHierarchy(const Universe& src, EntityRef src_e, Universe& dst, bool clone_siblings, Ref<HashMap<EntityPtr, EntityPtr>> map) {
+	void cloneHierarchy(const Universe& src, EntityRef src_e, Universe& dst, bool clone_siblings, HashMap<EntityPtr, EntityPtr>& map) {
 		const EntityPtr child = src.getFirstChild(src_e);
 		const EntityPtr sibling = src.getNextSibling(src_e);
 
 		const EntityRef dst_e = dst.createEntity({0, 0, 0}, Quat::IDENTITY);
-		map->insert(src_e, dst_e);
+		map.insert(src_e, dst_e);
 
 		if (child.isValid()) {
 			cloneHierarchy(src, (EntityRef)child, dst, true, map);
@@ -440,14 +440,14 @@ public:
 		}
 	}
 
-	Universe& createPrefabUniverse(EntityRef src_e, Ref<Array<EntityRef>> entities) {
+	Universe& createPrefabUniverse(EntityRef src_e, Array<EntityRef>& entities) {
 		Engine& engine = m_editor.getEngine();
 		Universe& dst = engine.createUniverse(false);
 		Universe& src = *m_editor.getUniverse();
 
 		HashMap<EntityPtr, EntityPtr> map(m_editor.getAllocator());
 		map.reserve(256);
-		cloneHierarchy(src, src_e, dst, false, Ref(map));
+		cloneHierarchy(src, src_e, dst, false, map);
 		cloneEntity(src, src_e, dst, INVALID_ENTITY, entities, map);
 		return dst;
 	}
@@ -497,7 +497,7 @@ public:
 		Engine& engine = m_editor.getEngine();
 		FileSystem& fs = engine.getFileSystem();
 		os::OutputFile file;
-		if (!fs.open(path.c_str(), Ref(file)))
+		if (!fs.open(path.c_str(), file))
 		{
 			logError("Failed to create ", path);
 			return;
@@ -507,7 +507,7 @@ public:
 		blob.reserve(4096);
 		Array<EntityRef> src_entities(m_editor.getAllocator());
 		src_entities.reserve(256);
-		Universe& prefab_universe = createPrefabUniverse(entity, Ref(src_entities));
+		Universe& prefab_universe = createPrefabUniverse(entity, src_entities);
 		engine.serialize(prefab_universe, blob);
 		engine.destroyUniverse(prefab_universe);
 

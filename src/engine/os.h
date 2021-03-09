@@ -204,7 +204,7 @@ LUMIX_ENGINE_API void showCursor(bool show);
 LUMIX_ENGINE_API u32 getMonitors(Span<Monitor> monitors);
 LUMIX_ENGINE_API Point toScreen(WindowHandle win, int x, int y);
 LUMIX_ENGINE_API WindowHandle createWindow(const InitWindowArgs& args);
-LUMIX_ENGINE_API bool getEvent(Ref<Event> event);
+LUMIX_ENGINE_API bool getEvent(Event& event);
 LUMIX_ENGINE_API void destroyWindow(WindowHandle wnd);
 LUMIX_ENGINE_API Rect getWindowScreenRect(WindowHandle win);
 LUMIX_ENGINE_API Rect getWindowClientRect(WindowHandle win);

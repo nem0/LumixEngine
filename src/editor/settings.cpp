@@ -186,18 +186,18 @@ static void saveStyle(os::OutputFile& file)
 }
 
 
-static bool shortcutInput(Ref<Action> action, bool edit)
+static bool shortcutInput(Action& action, bool edit)
 {
 	char button_label[64];
-	action->shortcutText(Span(button_label));
+	action.shortcutText(Span(button_label));
 
 	bool res = false;
 	ImGui::SetNextItemWidth(-30);
 	ImGui::InputText("", button_label, sizeof(button_label), ImGuiInputTextFlags_ReadOnly);
 	if (ImGui::IsItemActive()) {
-		if (os::isKeyDown(os::Keycode::SHIFT)) action->modifiers |= (u8)Action::Modifiers::SHIFT;
-		if (os::isKeyDown(os::Keycode::MENU)) action->modifiers |= (u8)Action::Modifiers::ALT;
-		if (os::isKeyDown(os::Keycode::CTRL)) action->modifiers |= (u8)Action::Modifiers::CTRL;
+		if (os::isKeyDown(os::Keycode::SHIFT)) action.modifiers |= (u8)Action::Modifiers::SHIFT;
+		if (os::isKeyDown(os::Keycode::MENU)) action.modifiers |= (u8)Action::Modifiers::ALT;
+		if (os::isKeyDown(os::Keycode::CTRL)) action.modifiers |= (u8)Action::Modifiers::CTRL;
 
 		for (int i = 0; i < (int)os::Keycode::MAX; ++i) {
 			const auto kc= (os::Keycode)i;
@@ -212,15 +212,15 @@ static bool shortcutInput(Ref<Action> action, bool edit)
 				|| kc == os::Keycode::LCTRL 
 				|| kc == os::Keycode::RCTRL;
 			if (os::isKeyDown(kc) && !is_mouse && !is_modifier) {
-				action->shortcut = (os::Keycode)i;
+				action.shortcut = (os::Keycode)i;
 				break;
 			}
 		}
 	}
 	ImGui::SameLine();
 	if (ImGuiEx::IconButton(ICON_FA_TRASH, "Clear")) {
-		action->modifiers = 0;
-		action->shortcut = os::Keycode::INVALID;
+		action.modifiers = 0;
+		action.shortcut = os::Keycode::INVALID;
 	}
 	
 	return res;
@@ -320,7 +320,7 @@ bool Settings::load()
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
 	
 	OutputMemoryStream buf(m_app.getAllocator());
-	if (!fs.getContentSync(Path(path), Ref(buf))) {
+	if (!fs.getContentSync(Path(path), buf)) {
 		logError("Failed to open ", path);
 		return false;
 	}
@@ -339,7 +339,7 @@ bool Settings::load()
 	lua_pop(L, 1);
 
 	if (!valid_version) {
-		if (!fs.getContentSync(Path(DEFAULT_SETTINGS_PATH), Ref(buf))) {
+		if (!fs.getContentSync(Path(DEFAULT_SETTINGS_PATH), buf)) {
 			logError("Failed to open ", DEFAULT_SETTINGS_PATH);
 			return false;
 		}
@@ -483,7 +483,7 @@ bool Settings::save()
 	auto& actions = m_app.getActions();
 	os::OutputFile file;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
-	if (!fs.open(SETTINGS_PATH, Ref(file))) return false;
+	if (!fs.open(SETTINGS_PATH, file)) return false;
 
 	file << "version = 1\n";
 
@@ -579,7 +579,7 @@ void Settings::showShortcutSettings()
 		{
 			ImGui::PushID(&a);
 			ImGuiEx::Label(a.label_long.data);
-			if (shortcutInput(Ref(a), &a == m_edit_action)) {
+			if (shortcutInput(a, &a == m_edit_action)) {
 				m_edit_action = &a;
 			}
 			ImGui::PopID();

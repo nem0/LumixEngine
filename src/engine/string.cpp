@@ -562,15 +562,15 @@ static void reverse(char* str, int length)
 	}
 }
 
-const char* fromCString(Span<const char> input, Ref<i32> value)
+const char* fromCString(Span<const char> input, i32& value)
 {
 	i64 val;
-	const char* ret = fromCString(input, Ref(val));
+	const char* ret = fromCString(input, val);
 	value = (i32)val;
 	return ret;
 }
 
-const char* fromCString(Span<const char> input, Ref<i64> value)
+const char* fromCString(Span<const char> input, i64& value)
 {
 	u32 length = input.length();
 	if (length > 0)
@@ -602,15 +602,15 @@ const char* fromCString(Span<const char> input, Ref<i64> value)
 	return nullptr;
 }
 
-const char* fromCString(Span<const char> input, Ref<u16> value)
+const char* fromCString(Span<const char> input, u16& value)
 {
 	u32 tmp;
-	const char* ret = fromCString(input, Ref(tmp));
+	const char* ret = fromCString(input, tmp);
 	value = u16(tmp);
 	return ret;
 }
 
-const char* fromCString(Span<const char> input, Ref<u32> value)
+const char* fromCString(Span<const char> input, u32& value)
 {
 	u32 length = input.length();
 	if (length > 0)
@@ -633,7 +633,7 @@ const char* fromCString(Span<const char> input, Ref<u32> value)
 	return nullptr;
 }
 
-const char* fromCStringOctal(Span<const char> input, Ref<u32> value)
+const char* fromCStringOctal(Span<const char> input, u32& value)
 {
 	u32 length = input.length();
 	if (length > 0)
@@ -654,7 +654,7 @@ const char* fromCStringOctal(Span<const char> input, Ref<u32> value)
 	return nullptr;
 }
 
-const char* fromCString(Span<const char> input, Ref<u64> value)
+const char* fromCString(Span<const char> input, u64& value)
 {
 	u32 length = input.length();
 	if (length > 0)
@@ -677,7 +677,7 @@ const char* fromCString(Span<const char> input, Ref<u64> value)
 	return nullptr;
 }
 
-const char* fromCString(Span<const char> input, Ref<bool> value)
+const char* fromCString(Span<const char> input, bool& value)
 {
 	value = equalIStrings(input, "true");
 	return input.end();

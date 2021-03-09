@@ -193,7 +193,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		u32 cpus_count = minimum(os::getCPUsCount(), 64);
 		u32 workers;
-		if (workersCountOption(Ref(workers))) {
+		if (workersCountOption(workers)) {
 			cpus_count = workers;
 		}
 		if (!jobs::init(cpus_count, m_allocator)) {
@@ -331,7 +331,7 @@ struct StudioAppImpl final : StudioApp
 			data->that->onInit();
 			while (!data->that->m_finished) {
 				os::Event e;
-				while(os::getEvent(Ref(e))) {
+				while(os::getEvent(e)) {
 					data->that->onEvent(e);
 				}
 				data->that->onIdle();
@@ -503,7 +503,7 @@ struct StudioAppImpl final : StudioApp
 	bool makeFile(const char* path, const char* content) override
 	{
 		os::OutputFile file;
-		if (!m_engine->getFileSystem().open(path, Ref(file))) return false;
+		if (!m_engine->getFileSystem().open(path, file)) return false;
 		file << content;
 		file.close();
 		return file.isError();
@@ -610,7 +610,7 @@ struct StudioAppImpl final : StudioApp
 				char buf[LUMIX_MAX_PATH];
 				bool create_empty = ImGui::MenuItem("Empty");
 				static u32 selected_res_hash = 0;
-				if (asset_browser->resourceList(Span(buf), Ref(selected_res_hash), resource_type, 0, true) || create_empty) {
+				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, 0, true) || create_empty) {
 					if (create_entity) {
 						EntityRef entity = editor->addEntity();
 						editor->selectEntities(Span(&entity, 1), false);
@@ -924,7 +924,7 @@ struct StudioAppImpl final : StudioApp
 				const u8* ptr = (const u8*)str.getData() + str.getPosition();
 				str.read(&header, sizeof(header));
 				u32 size;
-				fromCStringOctal(Span(header.size, sizeof(header.size)), Ref(size)); 
+				fromCStringOctal(Span(header.size, sizeof(header.size)), size); 
 				if (header.name[0] && header.typeflag == 0 || header.typeflag == '0') {
 					const StaticString<LUMIX_MAX_PATH> path(m_engine->getFileSystem().getBasePath(), "/", header.name);
 					char dir[LUMIX_MAX_PATH];
@@ -1826,7 +1826,7 @@ struct StudioAppImpl final : StudioApp
 			ImGui::PopStyleColor();
 		}
 		else {
-			node_open = ImGui::TreeNodeEx((void*)&folder, flags, "%s%s", ICON_FA_FOLDER, folder.name.data);
+			node_open = ImGui::TreeNodeEx((void*)&folder, flags, "%s%s", ICON_FA_FOLDER, folder.name);
 		}
 		
 		if (ImGui::BeginDragDropTarget()) {
@@ -1998,7 +1998,7 @@ struct StudioAppImpl final : StudioApp
 	ImFont* addFontFromFile(const char* path, float size, bool merge_icons) {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path(path), Ref(data))) return nullptr;
+		if (!fs.getContentSync(Path(path), data)) return nullptr;
 		ImGuiIO& io = ImGui::GetIO();
 		ImFontConfig cfg;
 		copyString(cfg.Name, path);
@@ -2012,13 +2012,13 @@ struct StudioAppImpl final : StudioApp
 			config.GlyphMinAdvanceX = size; // Use if you want to make the icon monospaced
 			static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
 			OutputMemoryStream icons_data(m_allocator);
-			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), Ref(icons_data))) {
+			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), icons_data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
 			copyString(config.Name, "editor/fonts/fa-solid-900.ttf");
 			icons_data.clear();
-			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), Ref(icons_data))) {
+			if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), icons_data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)icons_data.data(), (i32)icons_data.size(), size * 0.75f, &config, icon_ranges);
 				ASSERT(icons_font);
 			}
@@ -2140,7 +2140,7 @@ struct StudioAppImpl final : StudioApp
 		m_bold_font = addFontFromFile("editor/fonts/NotoSans-Bold.ttf", (float)m_settings.m_font_size * font_scale, true);
 		
 		OutputMemoryStream data(m_allocator);
-		if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), Ref(data))) {
+		if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
 			const float size = (float)m_settings.m_font_size * font_scale * 1.25f;
 			ImFontConfig cfg;
 			copyString(cfg.Name, "editor/fonts/fa-solid-900.ttf");
@@ -2150,7 +2150,7 @@ struct StudioAppImpl final : StudioApp
 			m_big_icon_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 			cfg.MergeMode = true;
 			copyString(cfg.Name, "editor/fonts/fa-regular-400.ttf");
-			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), Ref(data))) {
+			if (fs.getContentSync(Path("editor/fonts/fa-regular-400.ttf"), data)) {
 				ImFont* icons_font = io.Fonts->AddFontFromMemoryTTF((void*)data.data(), (i32)data.size(), size, &cfg, icon_ranges);
 				ASSERT(icons_font);
 			}
@@ -2473,7 +2473,7 @@ struct StudioAppImpl final : StudioApp
 		ASSERT(false);
 	}
 
-	bool workersCountOption(Ref<u32> workers_count) {
+	bool workersCountOption(u32& workers_count) {
 		char cmd_line[2048];
 		os::getCommandLine(Span(cmd_line));
 
@@ -2968,7 +2968,7 @@ struct StudioAppImpl final : StudioApp
 				parser.getCurrent(tmp, lengthOf(tmp));
 				OutputMemoryStream content(m_allocator);
 				
-				if (m_engine->getFileSystem().getContentSync(Path(tmp), Ref(content))) {
+				if (m_engine->getFileSystem().getContentSync(Path(tmp), content)) {
 					content.write('\0');
 					runScript((const char*)content.data(), tmp);
 				}
@@ -3020,7 +3020,7 @@ struct StudioAppImpl final : StudioApp
 
 			Span<const char> basename = Path::getBasename(info.filename);
 			PackFileInfo rec;
-			fromCString(Span(basename), Ref(rec.hash));
+			fromCString(Span(basename), rec.hash);
 			rec.offset = 0;
 			rec.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, ".lumix/assets/", info.filename));
 			copyString(rec.path, ".lumix/assets/");
@@ -3157,7 +3157,7 @@ struct StudioAppImpl final : StudioApp
 		OutputMemoryStream src(m_allocator);
 		u64 total_size = 0;
 		for (auto& info : infos) {
-			if (!fs.getContentSync(Path(info.path), Ref(src))) {
+			if (!fs.getContentSync(Path(info.path), src)) {
 				logError("Could not open ", info.path);
 				return;
 			}
@@ -3234,7 +3234,7 @@ struct StudioAppImpl final : StudioApp
 		StaticString<LUMIX_MAX_PATH> path(dir, filename);
 
 		OutputMemoryStream src(m_engine->getAllocator());
-		if (m_engine->getFileSystem().getContentSync(Path(path), Ref(src))) {
+		if (m_engine->getFileSystem().getContentSync(Path(path), src)) {
 			LuaPlugin* plugin = LUMIX_NEW(m_editor->getAllocator(), LuaPlugin)(*this, Span((const char*)src.data(), (u32)src.size()), filename);
 			addPlugin(*plugin);
 		}

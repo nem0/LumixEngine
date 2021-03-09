@@ -51,7 +51,7 @@ namespace Lumix
 		lua_remove(L, -2); // [obj]
 	}
 
-	static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, Ref<reflection::Variant> val) {
+	static void toVariant(reflection::Variant::Type type, lua_State* L, int idx, reflection::Variant& val) {
 		switch(type) {
 			case reflection::Variant::BOOL: val = LuaWrapper::toType<bool>(L, idx); break;
 			case reflection::Variant::U32: val = LuaWrapper::toType<u32>(L, idx); break;
@@ -107,7 +107,7 @@ namespace Lumix
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
 			reflection::Variant::Type type = f->getArgType(i);
-			toVariant(type, L, i + 2, Ref(args[i]));
+			toVariant(type, L, i + 2, args[i]);
 		}
 
 		const reflection::Variant res = f->invoke(obj, Span(args, f->getArgCount()));
@@ -127,7 +127,7 @@ namespace Lumix
 		ASSERT(f->getArgCount() <= lengthOf(args));
 		for (u32 i = 0; i < f->getArgCount(); ++i) {
 			reflection::Variant::Type type = f->getArgType(i);
-			toVariant(type, L, i + 2, Ref(args[i]));
+			toVariant(type, L, i + 2, args[i]);
 		}
 		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
 		if (res.type == reflection::Variant::ENTITY) {
@@ -161,7 +161,7 @@ namespace Lumix
 		args[0] = entity;
 		for (u32 i = 1; i < f->getArgCount(); ++i) {
 			reflection::Variant::Type type = f->getArgType(i);
-			toVariant(type, L, i + 1, Ref(args[i]));
+			toVariant(type, L, i + 1, args[i]);
 		}
 		const reflection::Variant res = f->invoke(scene, Span(args, f->getArgCount()));
 		if (res.type == reflection::Variant::ENTITY) {
@@ -214,7 +214,7 @@ namespace Lumix
 
 	template <typename T> static T fromString(const char* val) {
 		T res;
-		fromCString(Span(val, stringLength(val) + 1), Ref(res));
+		fromCString(Span(val, stringLength(val) + 1), res);
 		return res;
 	}
 
@@ -232,19 +232,19 @@ namespace Lumix
 		return r;
 	}
 
-	template <typename T> static void toString(T val, Ref<String> out) {
+	template <typename T> static void toString(T val, String& out) {
 		char tmp[128];
 		toCString(val, Span(tmp));
 		out = tmp;
 	}
 
-	template <> void toString(float val, Ref<String> out) {
+	template <> void toString(float val, String& out) {
 		char tmp[128];
 		toCString(val, Span(tmp), 10);
 		out = tmp;
 	}
 
-	template <> void toString(Vec3 val, Ref<String> out) {
+	template <> void toString(Vec3 val, String& out) {
 		StaticString<512> tmp("{", val.x, ", ", val.y, ", ", val.z, "}");
 		out = tmp;
 	}
@@ -1341,7 +1341,7 @@ namespace Lumix
 			if (!script_cmp) return;
 			Property& prop = getScriptProperty(entity, scr_index, property_name);
 			if (!script_cmp->m_scripts[scr_index].m_state) {
-				toString(value, Ref(prop.stored_value));
+				toString(value, prop.stored_value);
 				return;
 			}
 
@@ -1778,7 +1778,7 @@ namespace Lumix
 						const char* tmp = serializer.readString();
 						if (type == Property::ENTITY) {
 							EntityPtr entity;
-							fromCString(Span(tmp, stringLength(tmp)), Ref(entity.index));
+							fromCString(Span(tmp, stringLength(tmp)), entity.index);
 							entity = entity_map.get(entity);
 							StaticString<64> buf(entity.index);
 							prop.stored_value = buf;

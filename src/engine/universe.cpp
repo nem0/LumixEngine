@@ -6,6 +6,7 @@
 #include "engine/plugin.h"
 #include "engine/prefab.h"
 #include "engine/reflection.h"
+#include "engine/string.h"
 
 
 namespace Lumix
@@ -56,7 +57,7 @@ Universe::Universe(Engine& engine, IAllocator& allocator)
 	, m_scenes(m_allocator)
 	, m_hierarchy(m_allocator)
 	, m_transforms(m_allocator)
-	, m_name(m_allocator)
+	, m_name("")
 {
 	m_entities.reserve(RESERVED_ENTITIES_COUNT);
 	m_transforms.reserve(RESERVED_ENTITIES_COUNT);
@@ -668,17 +669,20 @@ void Universe::serialize(OutputMemoryStream& serializer)
 	if (!m_hierarchy.empty()) serializer.write(&m_hierarchy[0], m_hierarchy.byte_size());
 }
 
+void Universe::setName(const char* name) { 
+	copyString(m_name, name);
+}
 
-void Universe::deserialize(InputMemoryStream& serializer, Ref<EntityMap> entity_map)
+void Universe::deserialize(InputMemoryStream& serializer, EntityMap& entity_map)
 {
 	u32 to_reserve;
 	serializer.read(to_reserve);
-	entity_map->reserve(to_reserve);
+	entity_map.reserve(to_reserve);
 
 	for (EntityPtr e = serializer.read<EntityPtr>(); e.isValid(); e = serializer.read<EntityPtr>()) {
 		EntityRef orig = (EntityRef)e;
 		const EntityRef new_e = createEntity({0, 0, 0}, {0, 0, 0, 1});
-		entity_map->set(orig, new_e);
+		entity_map.set(orig, new_e);
 		serializer.read(m_transforms[new_e.index]);
 	}
 
@@ -687,7 +691,7 @@ void Universe::deserialize(InputMemoryStream& serializer, Ref<EntityMap> entity_
 	for (u32 i = 0; i < count; ++i) {
 		EntityName& name = m_names.emplace();
 		serializer.read(name.entity);
-		name.entity = entity_map->get(name.entity);
+		name.entity = entity_map.get(name.entity);
 		copyString(name.name, serializer.readString());
 		m_entities[name.entity.index].name = m_names.size() - 1;
 	}
@@ -699,10 +703,10 @@ void Universe::deserialize(InputMemoryStream& serializer, Ref<EntityMap> entity_
 		serializer.read(&m_hierarchy[old_count], sizeof(m_hierarchy[0]) * count);
 
 		for (u32 i = old_count; i < count + old_count; ++i) {
-			m_hierarchy[i].entity = entity_map->get(m_hierarchy[i].entity);
-			m_hierarchy[i].first_child = entity_map->get(m_hierarchy[i].first_child);
-			m_hierarchy[i].next_sibling = entity_map->get(m_hierarchy[i].next_sibling);
-			m_hierarchy[i].parent = entity_map->get(m_hierarchy[i].parent);
+			m_hierarchy[i].entity = entity_map.get(m_hierarchy[i].entity);
+			m_hierarchy[i].first_child = entity_map.get(m_hierarchy[i].first_child);
+			m_hierarchy[i].next_sibling = entity_map.get(m_hierarchy[i].next_sibling);
+			m_hierarchy[i].parent = entity_map.get(m_hierarchy[i].parent);
 			m_entities[m_hierarchy[i].entity.index].hierarchy = i;
 		}
 	}

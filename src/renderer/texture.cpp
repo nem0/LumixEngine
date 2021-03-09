@@ -193,7 +193,7 @@ static void saveTGA(Texture& texture)
 
 	os::OutputFile file;
 	FileSystem& fs = texture.getResourceManager().getOwner().getFileSystem();
-	if (!fs.open(texture.getPath().c_str(), Ref(file))) {
+	if (!fs.open(texture.getPath().c_str(), file)) {
 		logError("Failed to create file ", texture.getPath());
 		return;
 	}
@@ -219,7 +219,7 @@ void Texture::save()
 	{
 		FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 		os::OutputFile file;
-		if (!fs.open(getPath().c_str(), Ref(file))) {
+		if (!fs.open(getPath().c_str(), file)) {
 			logError("Failed to create file ", getPath());
 			return;
 		}

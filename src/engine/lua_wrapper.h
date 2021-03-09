@@ -1,11 +1,9 @@
 #pragma once
 
 
-#include "engine/log.h"
 #include "engine/math.h"
 #include "engine/metaprogramming.h"
 #include "engine/path.h"
-#include "engine/string.h"
 #include <lua.hpp>
 #include <lauxlib.h>
 
@@ -19,33 +17,17 @@ namespace LuaWrapper {
 
 
 #ifdef LUMIX_DEBUG
-	struct DebugGuard
-	{
-		DebugGuard(lua_State* L)
-			: L(L) 
-		{
-			top = lua_gettop(L);
-		}
+	struct DebugGuard {
+		DebugGuard(lua_State* L);
+		DebugGuard(lua_State* L, int offset);
+		~DebugGuard();
 
-		DebugGuard(lua_State* L, int offset)
-			: L(L) 
-		{
-			top = lua_gettop(L) + offset;
-		}
-
-
-		~DebugGuard()
-		{
-			const int current_top = lua_gettop(L);
-			ASSERT(current_top == top);
-		}
 	private:
 		lua_State* L;
 		int top;
 	};
 #else
-	struct DebugGuard
-	{ 
+	struct DebugGuard { 
 		DebugGuard(lua_State* L) {} 
 		DebugGuard(lua_State* L, int offset) {} 
 	};
@@ -67,31 +49,10 @@ struct Optional {
 	bool valid = false;
 };
 
-int traceback (lua_State *L);
-bool pcall(lua_State* L, int nargs, int nres);
-bool execute(lua_State* L, Span<const char> content, const char* name, int nresults);
-
-inline void get_tail(lua_State* L) {}
-
-template <typename... Args>
-void get_tail(lua_State* L, const char* head, Args... tail) {
-	lua_getfield(L, -1, head);
-	lua_remove(L, -2);
-	get_tail(L, tail...);
-}
-
-
-template <typename... Args>
-void get(lua_State* L, const char* head, Args... tail) {
-	lua_getglobal(L, head);
-	get_tail(L, tail...);
-}
-
-inline int getField(lua_State* L, int idx, const char* k)
-{
-	lua_getfield(L, idx, k);
-	return lua_type(L, -1);
-}
+LUMIX_ENGINE_API int traceback (lua_State *L);
+LUMIX_ENGINE_API bool pcall(lua_State* L, int nargs, int nres);
+LUMIX_ENGINE_API bool execute(lua_State* L, Span<const char> content, const char* name, int nresults);
+LUMIX_ENGINE_API int getField(lua_State* L, int idx, const char* k);
 
 template <typename T> inline bool isType(lua_State* L, int index)
 {
@@ -185,7 +146,6 @@ template <> inline bool isType<void*>(lua_State* L, int index)
 	return lua_islightuserdata(L, index) != 0;
 }
 
-
 template <typename T> inline T toType(lua_State* L, int index)
 {
 	return (T)lua_touserdata(L, index);
@@ -193,24 +153,13 @@ template <typename T> inline T toType(lua_State* L, int index)
 
 template <> CameraParams toType(lua_State* L, int idx);
 
-template <> inline int toType(lua_State* L, int index)
-{
-	return (int)lua_tointeger(L, index);
-}
-template <> inline u16 toType(lua_State* L, int index)
-{
-	return (u16)lua_tointeger(L, index);
-}
-template <> inline Path toType(lua_State* L, int index)
-{
-	return Path(lua_tostring(L, index));
-}
-template <> inline u8 toType(lua_State* L, int index)
-{
-	return (u8)lua_tointeger(L, index);
-}
-template <> inline EntityRef toType(lua_State* L, int index)
-{
+template <> inline int toType(lua_State* L, int index) { return (int)lua_tointeger(L, index); }
+template <> inline u16 toType(lua_State* L, int index) { return (u16)lua_tointeger(L, index); }
+template <> inline Path toType(lua_State* L, int index) { return Path(lua_tostring(L, index)); }
+template <> inline u8 toType(lua_State* L, int index) { return (u8)lua_tointeger(L, index); }
+template <> inline ComponentType toType(lua_State* L, int index) { return {(int)lua_tointeger(L, index)}; }
+
+template <> inline EntityRef toType(lua_State* L, int index) {
 	if (getField(L, index, "_entity") == LUA_TNUMBER) {
 		const EntityRef e = {(i32)lua_tointeger(L, -1)};
 		lua_pop(L, 1);
@@ -220,8 +169,8 @@ template <> inline EntityRef toType(lua_State* L, int index)
 	ASSERT(false);
 	return {};
 }
-template <> inline EntityPtr toType(lua_State* L, int index)
-{
+
+template <> inline EntityPtr toType(lua_State* L, int index) {
 	if (getField(L, index, "_entity") == LUA_TNUMBER) {
 		const EntityRef e = {(i32)lua_tointeger(L, -1)};
 		lua_pop(L, 1);
@@ -230,12 +179,8 @@ template <> inline EntityPtr toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return INVALID_ENTITY;
 }
-template <> inline ComponentType toType(lua_State* L, int index)
-{
-	return { (int)lua_tointeger(L, index) };
-}
-template <> inline Vec3 toType(lua_State* L, int index)
-{
+
+template <> inline Vec3 toType(lua_State* L, int index) {
 	Vec3 v;
 	lua_rawgeti(L, index, 1);
 	v.x = (float)lua_tonumber(L, -1);
@@ -248,8 +193,8 @@ template <> inline Vec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline IVec3 toType(lua_State* L, int index)
-{
+
+template <> inline IVec3 toType(lua_State* L, int index) {
 	IVec3 v;
 	lua_rawgeti(L, index, 1);
 	v.x = (int)lua_tonumber(L, -1);
@@ -262,8 +207,8 @@ template <> inline IVec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline DVec3 toType(lua_State* L, int index)
-{
+
+template <> inline DVec3 toType(lua_State* L, int index) {
 	DVec3 v;
 	lua_rawgeti(L, index, 1);
 	v.x = (double)lua_tonumber(L, -1);
@@ -276,8 +221,8 @@ template <> inline DVec3 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline Vec4 toType(lua_State* L, int index)
-{
+
+template <> inline Vec4 toType(lua_State* L, int index) {
 	Vec4 v;
 	lua_rawgeti(L, index, 1);
 	v.x = (float)lua_tonumber(L, -1);
@@ -293,8 +238,8 @@ template <> inline Vec4 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline Quat toType(lua_State* L, int index)
-{
+
+template <> inline Quat toType(lua_State* L, int index) {
 	Quat v;
 	lua_rawgeti(L, index, 1);
 	v.x = (float)lua_tonumber(L, -1);
@@ -310,8 +255,8 @@ template <> inline Quat toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline Vec2 toType(lua_State* L, int index)
-{
+
+template <> inline Vec2 toType(lua_State* L, int index) {
 	Vec2 v;
 	lua_rawgeti(L, index, 1);
 	v.x = (float)lua_tonumber(L, -1);
@@ -321,19 +266,18 @@ template <> inline Vec2 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline Matrix toType(lua_State* L, int index)
-{
+
+template <> inline Matrix toType(lua_State* L, int index) {
 	Matrix v;
-	for (int i = 0; i < 16; ++i)
-	{
+	for (int i = 0; i < 16; ++i) {
 		lua_rawgeti(L, index, i + 1);
 		(&(v.columns[0].x))[i] = (float)lua_tonumber(L, -1);
 		lua_pop(L, 1);
 	}
 	return v;
 }
-template <> inline IVec2 toType(lua_State* L, int index)
-{
+
+template <> inline IVec2 toType(lua_State* L, int index) {
 	IVec2 v;
 	lua_rawgeti(L, index, 1);
 	v.x = (int)lua_tointeger(L, -1);
@@ -343,34 +287,16 @@ template <> inline IVec2 toType(lua_State* L, int index)
 	lua_pop(L, 1);
 	return v;
 }
-template <> inline i64 toType(lua_State* L, int index)
-{
-	return (i64)lua_tointeger(L, index);
-}
-template <> inline u32 toType(lua_State* L, int index)
-{
-	return (u32)lua_tointeger(L, index);
-}
-template <> inline u64 toType(lua_State* L, int index)
-{
-	return (u64)lua_tointeger(L, index);
-}
-template <> inline bool toType(lua_State* L, int index)
-{
-	return lua_toboolean(L, index) != 0;
-}
-template <> inline float toType(lua_State* L, int index)
-{
-	return (float)lua_tonumber(L, index);
-}
-template <> inline const char* toType(lua_State* L, int index)
-{
+
+template <> inline i64 toType(lua_State* L, int index) { return (i64)lua_tointeger(L, index); }
+template <> inline u32 toType(lua_State* L, int index) { return (u32)lua_tointeger(L, index); }
+template <> inline u64 toType(lua_State* L, int index) { return (u64)lua_tointeger(L, index); }
+template <> inline bool toType(lua_State* L, int index) { return lua_toboolean(L, index) != 0; }
+template <> inline float toType(lua_State* L, int index) { return (float)lua_tonumber(L, index); }
+template <> inline void* toType(lua_State* L, int index) { return lua_touserdata(L, index); }
+template <> inline const char* toType(lua_State* L, int index) {
 	const char* res = lua_tostring(L, index);
 	return res ? res : "";
-}
-template <> inline void* toType(lua_State* L, int index)
-{
-	return lua_touserdata(L, index);
 }
 
 template <typename T> inline bool checkField(lua_State* L, int idx, const char* k, T* out)
@@ -381,19 +307,6 @@ template <typename T> inline bool checkField(lua_State* L, int idx, const char* 
 		return false;
 	}
 	*out = toType<T>(L, -1);
-	lua_pop(L, 1);
-	return true;
-}
-
-inline bool checkStringField(lua_State* L, int idx, const char* k, Span<char> out)
-{
-	lua_getfield(L, idx, k);
-	if(!isType<const char*>(L, -1)) {
-		lua_pop(L, 1);
-		return false;
-	}
-	const char* tmp = toType<const char*>(L, -1);
-	copyString(out, tmp);
 	lua_pop(L, 1);
 	return true;
 }
@@ -423,7 +336,6 @@ template <typename T, typename F> bool forEachArrayItem(lua_State* L, int index,
 	}
 	return all_match;
 }
-
 
 template <typename T> inline const char* typeToString()
 {
@@ -479,58 +391,15 @@ template <typename T> inline void push(lua_State* L, T* value)
 void push(lua_State* L, const CameraParams& value);
 void push(lua_State* L, const PipelineTexture& value);
 
-inline void push(lua_State* L, float value)
-{
-	lua_pushnumber(L, value);
-}
 template <typename T> inline void push(lua_State* L, const T* value)
 {
 	lua_pushlightuserdata(L, (T*)value);
 }
-inline void push(lua_State* L, EntityRef value)
+
+inline void push(lua_State* L, float value)
 {
-	lua_pushinteger(L, value.index);
+	lua_pushnumber(L, value);
 }
-
-inline bool toEntity(lua_State* L, int idx, Ref<Universe*> universe, Ref<EntityRef> entity)
-{
-	if (!lua_istable(L, idx)) return false;
-	if (getField(L, 1, "_entity") != LUA_TNUMBER) {
-		lua_pop(L, 1);
-		return false;
-	}
-	entity = EntityRef {toType<i32>(L, -1)};
-	lua_pop(L, 1);
-
-	if (getField(L, 1, "_universe") != LUA_TLIGHTUSERDATA) {
-		lua_pop(L, 1);
-		return false;
-	}
-	universe = toType<Universe*>(L, -1);
-	lua_pop(L, 1);
-	
-	return true;
-}
-
-inline void pushEntity(lua_State* L, EntityPtr value, Universe* universe)
-{
-	if (!value.isValid()) {
-		lua_newtable(L); // [env, {}]
-		return;
-	}
-
-	lua_getglobal(L, "Lumix"); // [Lumix]
-	lua_getfield(L, -1, "Entity"); // [Lumix, Lumix.Entity]
-	lua_remove(L, -2); // [Lumix.Entity]
-	lua_getfield(L, -1, "new"); // [Lumix.Entity, Entity.new]
-	lua_pushvalue(L, -2); // [Lumix.Entity, Entity.new, Lumix.Entity]
-	lua_remove(L, -3); // [Entity.new, Lumix.Entity]
-	lua_pushlightuserdata(L, universe); // [Entity.new, Lumix.Entity, universe]
-	lua_pushnumber(L, value.index); // [Entity.new, Lumix.Entity, universe, entity_index]
-	const bool error = !LuaWrapper::pcall(L, 3, 1); // [entity]
-	ASSERT(!error);
-}
-
 inline void push(lua_State* L, ComponentType value)
 {
 	lua_pushinteger(L, value.index);
@@ -679,100 +548,18 @@ template <typename T> inline void setField(lua_State* L, int table_idx, const ch
 	lua_setfield(L, table_idx - 1, name);
 }
 
-inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value)
-{
-	lua_getglobal(L, system);
-	if (lua_type(L, -1) == LUA_TNIL)
-	{
-		lua_pop(L, 1);
-		lua_newtable(L);
-		lua_setglobal(L, system);
-		lua_getglobal(L, system);
-	}
-	lua_pushlightuserdata(L, value);
-	lua_setfield(L, -2, var_name);
-	lua_pop(L, 1);
-}
-
-
-inline void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value)
-{
-	lua_getglobal(L, system);
-	if (lua_type(L, -1) == LUA_TNIL)
-	{
-		lua_pop(L, 1);
-		lua_newtable(L);
-		lua_setglobal(L, system);
-		lua_getglobal(L, system);
-	}
-	lua_pushinteger(L, value);
-	lua_setfield(L, -2, var_name);
-	lua_pop(L, 1);
-}
-
-
-inline void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn)
-{
-	lua_getglobal(L, system);
-	if (lua_type(L, -1) == LUA_TNIL)
-	{
-		lua_pop(L, 1);
-		lua_newtable(L);
-		lua_setglobal(L, system);
-		lua_getglobal(L, system);
-	}
-	lua_pushcfunction(L, fn);
-	lua_setfield(L, -2, var_name);
-	lua_pop(L, 1);
-}
-
-
-inline void createSystemClosure(lua_State* L, const char* system, void* system_ptr, const char* var_name, lua_CFunction fn)
-{
-	lua_getglobal(L, system);
-	if (lua_type(L, -1) == LUA_TNIL)
-	{
-		lua_pop(L, 1);
-		lua_newtable(L);
-		lua_setglobal(L, system);
-		lua_getglobal(L, system);
-	}
-	lua_pushlightuserdata(L, system_ptr);
-	lua_pushcclosure(L, fn, 1);
-	lua_setfield(L, -2, var_name);
-	lua_pop(L, 1);
-}
-
-
-
-inline const char* luaTypeToString(int type)
-{
-	switch (type)
-	{
-		case LUA_TNUMBER: return "number";
-		case LUA_TBOOLEAN: return "boolean";
-		case LUA_TFUNCTION: return "function";
-		case LUA_TLIGHTUSERDATA: return "light userdata";
-		case LUA_TNIL: return "nil";
-		case LUA_TSTRING: return "string";
-		case LUA_TTABLE: return "table";
-		case LUA_TUSERDATA: return "userdata";
-		default: return "Unknown";
-	}
-}
-
-
-inline void argError(lua_State* L, int index, const char* expected_type)
-{
-	char buf[128];
-	copyString(buf, "expected ");
-	catString(buf, expected_type);
-	catString(buf, ", got ");
-	int type = lua_type(L, index);
-	catString(buf, LuaWrapper::luaTypeToString(type));
-	luaL_argerror(L, index, buf);
-}
-
+LUMIX_ENGINE_API void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value);
+LUMIX_ENGINE_API void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value);
+LUMIX_ENGINE_API void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn);
+LUMIX_ENGINE_API void createSystemClosure(lua_State* L, const char* system, void* system_ptr, const char* var_name, lua_CFunction fn);
+LUMIX_ENGINE_API const char* luaTypeToString(int type);
+LUMIX_ENGINE_API void argError(lua_State* L, int index, const char* expected_type);
+LUMIX_ENGINE_API void checkTableArg(lua_State* L, int index);
+LUMIX_ENGINE_API bool getOptionalStringField(lua_State* L, int idx, const char* field_name, Span<char> out);
+LUMIX_ENGINE_API void push(lua_State* L, EntityRef value);
+LUMIX_ENGINE_API bool toEntity(lua_State* L, int idx, Universe*& universe, EntityRef& entity);
+LUMIX_ENGINE_API void pushEntity(lua_State* L, EntityPtr value, Universe* universe);
+LUMIX_ENGINE_API bool checkStringField(lua_State* L, int idx, const char* k, Span<char> out);
 
 template <typename T> void argError(lua_State* L, int index)
 {
@@ -817,8 +604,7 @@ template <typename T, u32 C> Array<T, C> checkArg(lua_State* L, int index, Tag<A
 	for (u32 i = 0; i < res.size; ++i) {
 		lua_rawgeti(L, index, i + 1);
 		if (!isType<T>(L, -1)) {
-			StaticString<128> buf("expected array of ", typeToString<T>());
-			luaL_argerror(L, index, buf);
+			luaL_error(L, "expected array of %s as %d-th argument", typeToString<T>(), index);
 		}
 		res.values[i] = toType<T>(L, -1);
 		lua_pop(L, 1);
@@ -832,16 +618,8 @@ template <typename T> T checkArg(lua_State* L, int index)
 	return checkArg(L, index, Tag<T>{});
 }
 
-inline void checkTableArg(lua_State* L, int index)
-{
-	if (!lua_istable(L, index))
-	{
-		argError(L, index, "table");
-	}
-}
-
 template <typename T>
-inline void getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
+void getOptionalField(lua_State* L, int idx, const char* field_name, T* out)
 {
 	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<T>(L, -1))
 	{
@@ -850,9 +628,8 @@ inline void getOptionalField(lua_State* L, int idx, const char* field_name, T* o
 	lua_pop(L, 1);
 }
 
-
 template <typename T>
-inline void getOptionalFlagField(lua_State* L, int idx, const char* field_name, T* out, T flag, bool default_value)
+void getOptionalFlagField(lua_State* L, int idx, const char* field_name, T* out, T flag, bool default_value)
 {
 	bool value = default_value;
 	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<bool>(L, -1)) {
@@ -861,19 +638,6 @@ inline void getOptionalFlagField(lua_State* L, int idx, const char* field_name, 
 	lua_pop(L, 1);
 	if (value) *out = *out | flag;
 	else *out = *out & ~flag;
-}
-
-inline bool getOptionalStringField(lua_State* L, int idx, const char* field_name, Span<char> out)
-{
-	bool ret = false;
-	if (LuaWrapper::getField(L, idx, field_name) != LUA_TNIL && isType<const char*>(L, -1))
-	{
-		const char* src = toType<const char*>(L, -1);;
-		copyString(out, src);
-		ret = true;
-	}
-	lua_pop(L, 1);
-	return ret;
 }
 
 
@@ -1044,11 +808,9 @@ template <auto t> int wrapMethodClosure(lua_State* L)
 	using C = typename ClassOf<decltype(t)>::Type;
 	using indices = typename BuildIndices<0, details::arity(t)>::result;
 	int index = lua_upvalueindex(1);
-	if (!isType<C>(L, index))
-	{
-		logError("Invalid Lua closure");
+	if (!isType<C>(L, index)) {
 		ASSERT(false);
-		return 0;
+		return luaL_error(L, "Invalid Lua closure");
 	}
 	auto* inst = checkArg<C*>(L, index);
 	return details::Caller<indices>::callMethod(inst, t, L);

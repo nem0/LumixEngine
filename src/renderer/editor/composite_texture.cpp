@@ -3,6 +3,7 @@
 #include "engine/lua_wrapper.h"
 #include "engine/os.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 
 namespace Lumix {
 	
@@ -103,7 +104,7 @@ CompositeTexture::CompositeTexture(IAllocator& allocator)
 
 bool CompositeTexture::loadSync(FileSystem& fs, const Path& path) {
 	OutputMemoryStream data(allocator);
-	if (!fs.getContentSync(path, Ref(data))) return false;
+	if (!fs.getContentSync(path, data)) return false;
 
 	if (!init(Span(data.data(), (u32)data.size()), path.c_str())) return false;
 	return true;
@@ -111,7 +112,7 @@ bool CompositeTexture::loadSync(FileSystem& fs, const Path& path) {
 
 bool CompositeTexture::save(FileSystem& fs, const Path& path) {
 	os::OutputFile file;
-	if (fs.open(path.c_str(), Ref(file))) {
+	if (fs.open(path.c_str(), file)) {
 		for (CompositeTexture::Layer& layer : layers) {
 			file << "layer {\n";
 			file << "\tred = { \"" << layer.red.path.c_str() << "\", " << layer.red.src_channel << " },\n";

@@ -826,8 +826,8 @@ bool TerrainEditor::onMouseDown(UniverseView& view, int x, int y)
 
 static void getProjections(const Vec3& axis,
 	const Vec3 vertices[8],
-	Ref<float> min,
-	Ref<float> max)
+	float& min,
+	float& max)
 {
 	max = dot(vertices[0], axis);
 	min = max;
@@ -858,8 +858,8 @@ static bool testOBBCollision(const AABB& a,
 	for(int i = 0; i < 3; i++)
 	{
 		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals[i], box_a_points, Ref(box_a_min), Ref(box_a_max));
-		getProjections(normals[i], box_b_points, Ref(box_b_min), Ref(box_b_max));
+		getProjections(normals[i], box_a_points, box_a_min, box_a_max);
+		getProjections(normals[i], box_b_points, box_b_min, box_b_max);
 		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
 		{
 			return false;
@@ -871,8 +871,8 @@ static bool testOBBCollision(const AABB& a,
 	for(int i = 0; i < 3; i++)
 	{
 		float box_a_min, box_a_max, box_b_min, box_b_max;
-		getProjections(normals_b[i], box_a_points, Ref(box_a_min), Ref(box_a_max));
-		getProjections(normals_b[i], box_b_points, Ref(box_b_min), Ref(box_b_max));
+		getProjections(normals_b[i], box_a_points, box_a_min, box_a_max);
+		getProjections(normals_b[i], box_b_points, box_b_min, box_b_max);
 		if(!overlaps(box_a_min, box_a_max, box_b_min, box_b_max))
 		{
 			return false;

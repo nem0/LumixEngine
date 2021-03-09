@@ -57,7 +57,7 @@ public:
 	void removePlugin(IPlugin& plugin);
 	void openInExternalEditor(Resource* resource) const;
 	void openInExternalEditor(const char* path) const;
-	bool resourceList(Span<char> buf, Ref<u32> selected_idx, ResourceType type, float height, bool can_create_new) const;
+	bool resourceList(Span<char> buf, u32& selected_idx, ResourceType type, float height, bool can_create_new) const;
 	void tile(const Path& path, bool selected);
 	OutputMemoryStream* beginSaveResource(Resource& resource);
 	void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success);

@@ -14,13 +14,13 @@
 #include "engine/file_system.h"
 #include "engine/allocator.h"
 #include "engine/log.h"
-#include "engine/lua_wrapper.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/stream.h"
 #include "engine/universe.h"
 #include "lua_script/lua_script.h"
 #include "lua_script/lua_script_system.h"
+#include <lua.hpp>
 
 
 using namespace Lumix;
@@ -66,7 +66,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			{
 				FileSystem& fs = m_app.getEngine().getFileSystem();
 				os::OutputFile file;
-				if (!fs.open(script->getPath().c_str(), Ref(file)))
+				if (!fs.open(script->getPath().c_str(), file))
 				{
 					logWarning("Could not save ", script->getPath());
 					return;
@@ -407,7 +407,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		bool create_empty = ImGui::Selectable("Empty", false);
 
 		static u32 selected_res_hash = 0;
-		if (asset_browser.resourceList(Span(buf), Ref(selected_res_hash), LuaScript::TYPE, 0, false) || create_empty || new_created)
+		if (asset_browser.resourceList(Span(buf), selected_res_hash, LuaScript::TYPE, 0, false) || create_empty || new_created)
 		{
 			WorldEditor& editor = app.getWorldEditor();
 			if (create_entity)

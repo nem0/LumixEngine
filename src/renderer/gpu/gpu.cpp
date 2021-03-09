@@ -1736,18 +1736,18 @@ void preinit(IAllocator& allocator, bool load_renderdoc)
 }
 
 
-bool getMemoryStats(Ref<MemoryStats> stats) {
+bool getMemoryStats(MemoryStats& stats) {
 	if (!gl->has_gpu_mem_info_ext) return false;
 
 	GLint tmp;
 	glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, &tmp);
-	stats->total_available_mem = (u64)tmp * 1024;
+	stats.total_available_mem = (u64)tmp * 1024;
 
 	glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &tmp);
-	stats->current_available_mem = (u64)tmp * 1024;
+	stats.current_available_mem = (u64)tmp * 1024;
 
 	glGetIntegerv(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &tmp);
-	stats->dedicated_vidmem = (u64)tmp * 1024;
+	stats.dedicated_vidmem = (u64)tmp * 1024;
 	
 	return true;
 }

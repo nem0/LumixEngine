@@ -106,7 +106,7 @@ struct Runner final
 	bool loadUniverse(const char* path) {
 		FileSystem& fs = m_engine->getFileSystem();
 		OutputMemoryStream data(m_allocator);
-		if (!fs.getContentSync(Path(path), Ref(data))) return false;
+		if (!fs.getContentSync(Path(path), data)) return false;
 
 		InputMemoryStream tmp(data);
 		EntityMap entity_map(m_allocator);
@@ -117,10 +117,10 @@ struct Runner final
 			u32 engine_hash;
 		} header;
 
-		tmp.read(Ref(header));
+		tmp.read(header);
 
 		m_universe->setName("main");
-		if (!m_engine->deserialize(*m_universe, tmp, Ref(entity_map))) {
+		if (!m_engine->deserialize(*m_universe, tmp, entity_map)) {
 			logError("Failed to deserialize ", path);
 			return false;
 		}
@@ -227,7 +227,7 @@ int main(int args, char* argv[])
 		data->app.onInit();
 		while(!data->app.m_finished) {
 			os::Event e;
-			while(os::getEvent(Ref(e))) {
+			while(os::getEvent(e)) {
 				data->app.onEvent(e);
 			}
 			data->app.onIdle();

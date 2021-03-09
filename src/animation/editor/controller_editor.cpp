@@ -209,7 +209,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			for (GroupNode::Child& c : group->m_children) {
 				if (c.node != &node) continue;
 				
-				changed = conditionInput("Condition", m_controller->m_inputs, Ref(c.condition_str), Ref(c.condition)) || changed;
+				changed = conditionInput("Condition", m_controller->m_inputs, c.condition_str, c.condition) || changed;
 				break;
 			}
 		}
@@ -282,7 +282,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		IAllocator& allocator = m_app.getAllocator();
 		OutputMemoryStream data(allocator);
 
-		if (fs.getContentSync(Path(path), Ref(data))) {
+		if (fs.getContentSync(Path(path), data)) {
 			ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
 			InputMemoryStream str(data);
 			UniquePtr<Controller> new_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
@@ -301,23 +301,23 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 	}
 
-	static bool conditionInput(const char* label, InputDecl& input, Ref<String> condition_str, Ref<Condition> condition) {
+	static bool conditionInput(const char* label, InputDecl& input, String& condition_str, Condition& condition) {
 		char tmp[1024];
-		copyString(tmp, condition_str->c_str());
-		if (condition->error != Condition::Error::NONE) {
-			ImGui::TextUnformatted(Condition::errorToString(condition->error));
+		copyString(tmp, condition_str.c_str());
+		if (condition.error != Condition::Error::NONE) {
+			ImGui::TextUnformatted(Condition::errorToString(condition.error));
 		}
 		ImGuiEx::Label(label);		
 		if (ImGui::InputText(StaticString<64>("##_", label), tmp, sizeof(tmp), ImGuiInputTextFlags_EnterReturnsTrue)) {
 			condition_str = tmp;
-			condition->compile(tmp, input);
+			condition.compile(tmp, input);
 			return true;
 		}
 
 		return false;
 	}
 
-	static bool nodeInput(const char* label, Ref<u32> value, const Array<GroupNode::Child>& children) {
+	static bool nodeInput(const char* label, u32& value, const Array<GroupNode::Child>& children) {
 		ImGuiEx::Label(label);		
 		if (!ImGui::BeginCombo(StaticString<64>("##_", label), children[value].node->m_name.c_str())) return false;
 
@@ -475,7 +475,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		m_controller->serialize(str);
 		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (fs.open(path, Ref(file))) {
+		if (fs.open(path, file)) {
 			if (!file.write(str.data(), str.size())) {
 				logError("Failed to write ", path);
 			}
@@ -782,15 +782,15 @@ struct ControllerEditorImpl : ControllerEditor {
 							if (!ImGui::TreeNodeEx(&tr, 0, "%s -> %s", name_from, name_to)) continue;
 
 							u32 from = u32(&child - children.begin());
-							if (nodeInput("From", Ref(from), children)) {
+							if (nodeInput("From", from, children)) {
 								children[from].transitions.push(tr);
 								child.transitions.erase(u32(&tr - child.transitions.begin()));
 								ImGui::TreePop();
 								break;
 							}
 
-							nodeInput("To", Ref(tr.to), children);
-							conditionInput("Condition", m_controller->m_inputs, Ref(tr.condition_str), Ref(tr.condition));
+							nodeInput("To", tr.to, children);
+							conditionInput("Condition", m_controller->m_inputs, tr.condition_str, tr.condition);
 
 							ImGui::TreePop();
 						}

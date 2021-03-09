@@ -315,7 +315,7 @@ static void UTF32ToUTF8(u32 utf32, char* utf8)
 	}
 }
 
-bool getEvent(Ref<Event> event) {
+bool getEvent(Event& event) {
 	if (!G.event_queue.empty()) {
 		event = G.event_queue.popFront();
 		return true;
@@ -325,34 +325,34 @@ bool getEvent(Ref<Event> event) {
 	MSG msg;
 	if (!PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) return false;
 
-	event->window = msg.hwnd;
+	event.window = msg.hwnd;
 	switch (msg.message) {
 		case WM_DROPFILES:
-			event->type = Event::Type::DROP_FILE;
-			event->file_drop.handle = (HDROP)msg.wParam;
+			event.type = Event::Type::DROP_FILE;
+			event.file_drop.handle = (HDROP)msg.wParam;
 			break;
 		case WM_QUIT: 
-			event->type = Event::Type::QUIT; 
+			event.type = Event::Type::QUIT; 
 			break;
 		case WM_CLOSE: 
-			event->type = Event::Type::WINDOW_CLOSE; 
+			event.type = Event::Type::WINDOW_CLOSE; 
 			break;
 		case WM_SYSKEYDOWN:
 			if (msg.wParam == VK_MENU) goto retry;
 			break;
 		case WM_KEYDOWN:
-			event->type = Event::Type::KEY;
-			event->key.down = true;
-			event->key.keycode = (Keycode)msg.wParam;
+			event.type = Event::Type::KEY;
+			event.key.down = true;
+			event.key.keycode = (Keycode)msg.wParam;
 			break;
 		case WM_KEYUP:
-			event->type = Event::Type::KEY;
-			event->key.down = false;
-			event->key.keycode = (Keycode)msg.wParam;
+			event.type = Event::Type::KEY;
+			event.key.down = false;
+			event.key.keycode = (Keycode)msg.wParam;
 			break;
 		case WM_CHAR: {
-			event->type = Event::Type::CHAR;
-			event->text_input.utf8 = 0;
+			event.type = Event::Type::CHAR;
+			event.text_input.utf8 = 0;
 			u32 c = (u32)msg.wParam;
 			if (c >= 0xd800 && c <= 0xdbff) {
 				G.surrogate = (u16)c;
@@ -368,7 +368,7 @@ bool getEvent(Ref<Event> event) {
 			}
 			G.surrogate = 0;
 
-			UTF32ToUTF8(c, (char*)&event->text_input.utf8);
+			UTF32ToUTF8(c, (char*)&event.text_input.utf8);
 			break;
 		}
 		case WM_INPUT: {

@@ -338,7 +338,7 @@ int include(lua_State* L)
 	FileSystem& fs = shader->m_renderer.getEngine().getFileSystem();
 
 	OutputMemoryStream content(shader->m_allocator);
-	if (!fs.getContentSync(Path(path), Ref(content))) {
+	if (!fs.getContentSync(Path(path), content)) {
 		logError("Failed to open/read include ", path, " included from ", shader->getPath());
 		return 0;
 	}

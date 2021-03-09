@@ -351,7 +351,7 @@ private:
 
 		void set(GUIScene* scene, EntityRef e, const char* prop_name)
 		{
-			const bool found = reflection::getPropertyValue(*scene, e, GUI_RECT_TYPE, prop_name, Ref(value));
+			const bool found = reflection::getPropertyValue(*scene, e, GUI_RECT_TYPE, prop_name, value);
 			ASSERT(found);
 			prop = prop_name;
 		}

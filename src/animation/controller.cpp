@@ -84,7 +84,7 @@ RuntimeContext* Controller::createRuntime(u32 anim_set) {
 	return ctx;
 }
 
-void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motion) const {
+void Controller::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	ASSERT(&ctx.controller == this);
 	// TODO better allocation strategy
 	const Span<u8> mem = ctx.data.releaseOwnership();
@@ -98,18 +98,18 @@ void Controller::update(RuntimeContext& ctx, Ref<LocalRigidTransform> root_motio
 		const int root_bone_idx = root_bone_iter.value();
 		const Model::Bone& bone = ctx.model->getBone(root_bone_idx);
 		if (m_flags.isSet(Flags::XZ_ROOT_MOTION)) {
-			root_motion->rot = Quat::IDENTITY;
-			root_motion->pos = bone.transform.rot.rotate(root_motion->pos);
-			root_motion->pos.y = 0;
+			root_motion.rot = Quat::IDENTITY;
+			root_motion.pos = bone.transform.rot.rotate(root_motion.pos);
+			root_motion.pos.y = 0;
 		}
 		else {
-			root_motion->rot = bone.transform.rot * root_motion->rot * bone.transform.rot.conjugated();
-			root_motion->pos = bone.transform.rot.rotate(root_motion->pos);
+			root_motion.rot = bone.transform.rot * root_motion.rot * bone.transform.rot.conjugated();
+			root_motion.pos = bone.transform.rot.rotate(root_motion.pos);
 		}
 	}
 }
 
-void Controller::getPose(RuntimeContext& ctx, Ref<Pose> pose) {
+void Controller::getPose(RuntimeContext& ctx, Pose& pose) {
 	ASSERT(&ctx.controller == this);
 	ctx.input_runtime.set(ctx.data.data(), ctx.data.size());
 	
@@ -117,8 +117,8 @@ void Controller::getPose(RuntimeContext& ctx, Ref<Pose> pose) {
 	auto root_bone_iter = ctx.model->getBoneIndex(ctx.root_bone_hash);
 	if (root_bone_iter.isValid()) {
 		const int root_bone_idx = root_bone_iter.value();
-		root_bind_pose.pos = pose->positions[root_bone_idx];
-		root_bind_pose.rot = pose->rotations[root_bone_idx];
+		root_bind_pose.pos = pose.positions[root_bone_idx];
+		root_bind_pose.rot = pose.rotations[root_bone_idx];
 	}
 	
 	m_root->getPose(ctx, 1.f, pose, 0xffFFffFF);
@@ -127,12 +127,12 @@ void Controller::getPose(RuntimeContext& ctx, Ref<Pose> pose) {
 	if (root_bone_iter.isValid()) {
 		const int root_bone_idx = root_bone_iter.value();
 		if (m_flags.isSet(Flags::XZ_ROOT_MOTION)) {
-			pose->positions[root_bone_idx].x = root_bind_pose.pos.x;
-			pose->positions[root_bone_idx].z = root_bind_pose.pos.z;
+			pose.positions[root_bone_idx].x = root_bind_pose.pos.x;
+			pose.positions[root_bone_idx].z = root_bind_pose.pos.z;
 		}
 		else {
-			pose->positions[root_bone_idx] = root_bind_pose.pos;
-			pose->rotations[root_bone_idx] = root_bind_pose.rot;
+			pose.positions[root_bone_idx] = root_bind_pose.pos;
+			pose.rotations[root_bone_idx] = root_bind_pose.rot;
 		}
 	}
 }

@@ -1191,7 +1191,7 @@ bool getRaySphereIntersection(const Vec3& origin,
 	const Vec3& dir,
 	const Vec3& center,
 	float radius,
-	Ref<float> out)
+	float& out)
 {
 	ASSERT(length(dir) < 1.01f && length(dir) > 0.99f);
 	Vec3 L = center - origin;

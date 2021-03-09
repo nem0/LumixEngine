@@ -94,14 +94,14 @@ struct FileSystemImpl : FileSystem {
 		}
 	}
 
-	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
+	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		os::InputFile file;
 		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path.c_str());
 
 		if (!file.open(full_path)) return false;
 
-		content->resize((int)file.size());
-		if (!file.read(content->getMutableData(), content->size())) {
+		content.resize((int)file.size());
+		if (!file.read(content.getMutableData(), content.size())) {
 			logError("Could not read ", path);
 			file.close();
 			return false;
@@ -146,17 +146,17 @@ struct FileSystemImpl : FileSystem {
 	}
 
 
-	bool open(const char* path, Ref<os::InputFile> file) override
+	bool open(const char* path, os::InputFile& file) override
 	{
 		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
-		return file->open(full_path);
+		return file.open(full_path);
 	}
 
 
-	bool open(const char* path, Ref<os::OutputFile> file) override
+	bool open(const char* path, os::OutputFile& file) override
 	{
 		StaticString<LUMIX_MAX_PATH> full_path(m_base_path, path);
-		return file->open(full_path);
+		return file.open(full_path);
 	}
 
 
@@ -285,7 +285,7 @@ int FSTask::task()
 		}
 
 		OutputMemoryStream data(m_fs.m_allocator);
-		bool success = m_fs.getContentSync(Path(path), Ref(data));
+		bool success = m_fs.getContentSync(Path(path), data);
 
 		{
 			MutexGuard lock(m_fs.m_mutex);
@@ -333,10 +333,10 @@ struct PackFileSystem : FileSystemImpl {
 		m_file.close();
 	}
 
-	bool getContentSync(const Path& path, Ref<OutputMemoryStream> content) override {
+	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
 		Span<const char> basename = Path::getBasename(path.c_str());
 		u32 hash;
-		fromCString(basename, Ref(hash));
+		fromCString(basename, hash);
 		if (basename[0] < '0' || basename[0] > '9' || hash == 0) {
 			hash = path.getHash();
 		}
@@ -352,10 +352,10 @@ struct PackFileSystem : FileSystemImpl {
 			return false;
 		}
 
-		content->resize(iter.value().size);
-		const i32 res = LZ4_decompress_safe((const char*)compressed.data(), (char*)content->getMutableData(), (i32)iter.value().compressed_size, (i32)content->size());
+		content.resize(iter.value().size);
+		const i32 res = LZ4_decompress_safe((const char*)compressed.data(), (char*)content.getMutableData(), (i32)iter.value().compressed_size, (i32)content.size());
 		
-		if (res != content->size()) {
+		if (res != content.size()) {
 			logError("Could not decompress ", path);
 			return false;
 		}

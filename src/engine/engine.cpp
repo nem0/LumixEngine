@@ -7,7 +7,6 @@
 #include "engine/plugin.h"
 #include "engine/job_system.h"
 #include "engine/log.h"
-#include "engine/lua_wrapper.h"
 #include "engine/math.h"
 #include "engine/page_allocator.h"
 #include "engine/path.h"
@@ -15,8 +14,9 @@
 #include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
+#include "engine/string.h"
 #include "engine/universe.h"
-
+#include <lua.hpp>
 
 namespace Lumix
 {
@@ -191,7 +191,7 @@ public:
 		const struct DVec3& pos,
 		const struct Quat& rot,
 		float scale,
-		Ref<EntityMap> entity_map) override
+		EntityMap& entity_map) override
 	{
 		ASSERT(prefab.isReady());
 		InputMemoryStream blob(prefab.data);
@@ -200,8 +200,8 @@ public:
 			return false;
 		}
 
-		ASSERT(!entity_map->m_map.empty());
-		const EntityRef root = (EntityRef)entity_map->m_map[0];
+		ASSERT(!entity_map.m_map.empty());
+		const EntityRef root = (EntityRef)entity_map.m_map[0];
 		ASSERT(!universe.getParent(root).isValid());
 		ASSERT(!universe.getNextSibling(root).isValid());
 		universe.setTransform(root, pos, rot, scale);
@@ -222,7 +222,6 @@ public:
 
 		if (is_main_universe) {
 			lua_State* L = m_state;
-			LuaWrapper::DebugGuard guard(L);
 			lua_getglobal(L, "Lumix"); // [ Lumix ]
 			lua_getfield(L, -1, "Universe"); // [ Lumix, Universe ]
 			lua_getfield(L, -1, "new"); // [ Lumix, Universe, new ]
@@ -434,7 +433,7 @@ public:
 	}
 
 
-	bool deserialize(Universe& ctx, InputMemoryStream& serializer, Ref<EntityMap> entity_map) override
+	bool deserialize(Universe& ctx, InputMemoryStream& serializer, EntityMap& entity_map) override
 	{
 		SerializedEngineHeader header;
 		serializer.read(header);

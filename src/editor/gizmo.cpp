@@ -3,6 +3,7 @@
 #include "engine/geometry.h"
 #include "engine/math.h"
 #include "engine/os.h"
+#include "engine/string.h"
 #include "engine/universe.h"
 #include "render_interface.h"
 
@@ -121,24 +122,24 @@ float getScale(const Viewport& viewport, const DVec3& pos, float base_scale) {
 }
 
 template <typename T>
-T getGizmo(UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg)
+T getGizmo(UniverseView& view, Transform& tr, const Gizmo::Config& cfg)
 {
 	T gizmo;
-	gizmo.pos = tr->pos;
+	gizmo.pos = tr.pos;
 
-	const float scale = getScale(view.getViewport(), tr->pos, cfg.scale);
+	const float scale = getScale(view.getViewport(), tr.pos, cfg.scale);
 	if (cfg.coord_system == Gizmo::Config::GLOBAL) {
 		gizmo.x = Vec3(scale, 0, 0);
 		gizmo.y = Vec3(0, scale, 0);
 		gizmo.z = Vec3(0, 0, scale);
 	}
 	else {
-		gizmo.x = tr->rot.rotate(Vec3(scale, 0, 0));
-		gizmo.y = tr->rot.rotate(Vec3(0, scale, 0));
-		gizmo.z = tr->rot.rotate(Vec3(0, 0, scale));
+		gizmo.x = tr.rot.rotate(Vec3(scale, 0, 0));
+		gizmo.y = tr.rot.rotate(Vec3(0, scale, 0));
+		gizmo.z = tr.rot.rotate(Vec3(0, 0, scale));
 	}
 
-	const Vec3 cam_dir = normalize(Vec3(tr->pos - view.getViewport().pos));
+	const Vec3 cam_dir = normalize(Vec3(tr.pos - view.getViewport().pos));
 	if (dot(cam_dir, gizmo.x) > 0) gizmo.x = -gizmo.x;
 	if (dot(cam_dir, gizmo.y) > 0) gizmo.y = -gizmo.y;
 	if (dot(cam_dir, gizmo.z) > 0) gizmo.z = -gizmo.z;
@@ -543,8 +544,8 @@ void setDragged(u64 id) {
 	g_gizmo_state.dragged_id = id;
 }
 
-bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg) {
-	const float scale = getScale(view.getViewport(), tr->pos, cfg.scale);
+bool translate(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) {
+	const float scale = getScale(view.getViewport(), tr.pos, cfg.scale);
 	TranslationGizmo gizmo = getGizmo<TranslationGizmo>(view, tr, cfg);
 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -578,11 +579,11 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 		
 	const DVec3 pos = getMousePlaneIntersection(view, gizmo, g_gizmo_state.axis);
 	const Vec3 delta_vec = Vec3(pos - g_gizmo_state.prev_point);
-	DVec3 res = tr->pos + delta_vec;
+	DVec3 res = tr.pos + delta_vec;
 
 	auto print_delta = [&](){
 		const Vec2 p = view.getViewport().worldToScreenPixels(gizmo.pos);
-		const Vec3 from_start = Vec3(tr->pos - g_gizmo_state.start_pos);
+		const Vec3 from_start = Vec3(tr.pos - g_gizmo_state.start_pos);
 		StaticString<128> tmp("", from_start.x, "; ", from_start.y, "; ", from_start.z);
 		view.addText2D(p.x + 31, p.y + 31, 0xff000000, tmp);
 		view.addText2D(p.x + 30, p.y + 30, 0xffffFFFF, tmp);
@@ -590,7 +591,7 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 
 	if (!cfg.is_step || cfg.getStep() <= 0) {
 		g_gizmo_state.prev_point = pos;
-		tr->pos = res;
+		tr.pos = res;
 		print_delta();		
 		return squaredLength(delta_vec) > 0.f;
 	}
@@ -599,9 +600,9 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 	res.x = double(i64((res.x + signum(res.x) * step * 0.5f) / step)) * step;
 	res.y = double(i64((res.y + signum(res.y) * step * 0.5f) / step)) * step;
 	res.z = double(i64((res.z + signum(res.z) * step * 0.5f) / step)) * step;
-	if (res.x != tr->pos.x || res.y != tr->pos.y || res.z != tr->pos.z) {
+	if (res.x != tr.pos.x || res.y != tr.pos.y || res.z != tr.pos.z) {
 		g_gizmo_state.prev_point = res;
-		tr->pos = res;
+		tr.pos = res;
 		print_delta();
 		return true;
 	}
@@ -609,7 +610,7 @@ bool translate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Confi
 	return false;
 }
 
-bool scale(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg) {
+bool scale(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) {
 	ScaleGizmo gizmo = getGizmo<ScaleGizmo>(view, tr, cfg);
 		
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -645,14 +646,14 @@ bool scale(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& c
 	draw(view, gizmo, g_gizmo_state.axis, cfg);
 	if (squaredLength(delta) > 0) {
 		g_gizmo_state.prev_point = p;
-		tr->scale += length(delta) * sign;
+		tr.scale += length(delta) * sign;
 		return true;
 	}
 	return false;
 }
 
 
-bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& cfg) {
+bool rotate(u64 id, UniverseView& view, Transform& tr, const Gizmo::Config& cfg) {
 	RotationGizmo gizmo = getGizmo<RotationGizmo>(view, tr, cfg);
 
 	const bool none_active = g_gizmo_state.dragged_id == ~(u64)0;
@@ -671,7 +672,7 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 			g_gizmo_state.dragged_id = id;
 			g_gizmo_state.axis = axis;
 			g_gizmo_state.prev_point = getMousePlaneIntersection(view, gizmo, toPlane(axis));
-			g_gizmo_state.start_rot = tr->rot;
+			g_gizmo_state.start_rot = tr.rot;
 		}
 		return false;
 	}
@@ -696,13 +697,13 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 		}
 
 		if (!cfg.is_step || cfg.getStep() <= 0) {
-			tr->rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
+			tr.rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
 			return true;
 		}
 
 		if (cfg.is_step && fabs(angle) > degreesToRadians(cfg.getStep())) {
 			angle = angle - fmodf(angle, degreesToRadians(cfg.getStep()));
-			tr->rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
+			tr.rot = normalize(Quat(normalize(normal), angle) * g_gizmo_state.start_rot);
 			return true;
 		}
 	}
@@ -713,18 +714,18 @@ bool rotate(u64 id, UniverseView& view, Ref<Transform> tr, const Gizmo::Config& 
 bool isActive() { return g_gizmo_state.active_id != ~(u64)0 || g_gizmo_state.dragged_id != ~(u64)0; }
 
 
-bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, const Config& cfg, bool keep_center) {
+bool box(u64 id, UniverseView& view, Transform& tr, Vec3& half_extents, const Config& cfg, bool keep_center) {
 	id |= u64(0xff) << 56;
-	const Vec3 xn = tr->rot.rotate(Vec3(1, 0, 0));
-	const Vec3 yn = tr->rot.rotate(Vec3(0, 1, 0));
-	const Vec3 zn = tr->rot.rotate(Vec3(0, 0, 1));
-	const Vec3 x = xn * half_extents->x;
-	const Vec3 y = yn * half_extents->y;
-	const Vec3 z = zn * half_extents->z;
-	addCube(view, tr->pos, x, y, z, Color::BLUE);
+	const Vec3 xn = tr.rot.rotate(Vec3(1, 0, 0));
+	const Vec3 yn = tr.rot.rotate(Vec3(0, 1, 0));
+	const Vec3 zn = tr.rot.rotate(Vec3(0, 0, 1));
+	const Vec3 x = xn * half_extents.x;
+	const Vec3 y = yn * half_extents.y;
+	const Vec3 z = zn * half_extents.z;
+	addCube(view, tr.pos, x, y, z, Color::BLUE);
 	
 	const Viewport vp = view.getViewport();
-	const float scale = getScale(vp, tr->pos, cfg.scale) * 0.1f;
+	const float scale = getScale(vp, tr.pos, cfg.scale) * 0.1f;
 
 	DVec3 origin;
 	Vec3 dir;
@@ -737,11 +738,11 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 	u32 zp_color = X_COLOR;
 	u32 zn_color = X_COLOR;
 	
-	const Vec3 pos = Vec3(origin - tr->pos);
-	const Vec3 center = Vec3(tr->pos - vp.pos);
-	auto cube = [&](u32 color, Vec3 p, Ref<float> prev_t){
+	const Vec3 pos = Vec3(origin - tr.pos);
+	const Vec3 center = Vec3(tr.pos - vp.pos);
+	auto cube = [&](u32 color, Vec3 p, float& prev_t){
 		float t;
-		if (getRaySphereIntersection(pos, dir, p, scale * 1.414f, Ref(t)) && (prev_t.value < 0 || t < prev_t.value)) {
+		if (getRaySphereIntersection(pos, dir, p, scale * 1.414f, t) && (prev_t < 0 || t < prev_t)) {
 			renderCube(view, SELECTED_COLOR, center + p, scale, xn, yn, zn);
 			UniverseView::Vertex* line = view.render(true, 2);
 			line[0].pos = center;
@@ -761,12 +762,12 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 
 	BoxAxis axis = BoxAxis::NONE;
 	float t = -1;
-	if (cube(X_COLOR, x, Ref(t))) axis = BoxAxis::XP;
-	if (cube(X_COLOR, -x, Ref(t))) axis = BoxAxis::XN;
-	if (cube(Y_COLOR, y, Ref(t))) axis = BoxAxis::YP;
-	if (cube(Y_COLOR, -y, Ref(t))) axis = BoxAxis::YN;
-	if (cube(Z_COLOR, z, Ref(t))) axis = BoxAxis::ZP;
-	if (cube(Z_COLOR, -z, Ref(t))) axis = BoxAxis::ZN;
+	if (cube(X_COLOR, x, t)) axis = BoxAxis::XP;
+	if (cube(X_COLOR, -x, t)) axis = BoxAxis::XN;
+	if (cube(Y_COLOR, y, t)) axis = BoxAxis::YP;
+	if (cube(Y_COLOR, -y, t)) axis = BoxAxis::YN;
+	if (cube(Z_COLOR, z, t)) axis = BoxAxis::ZP;
+	if (cube(Z_COLOR, -z, t)) axis = BoxAxis::ZN;
 
 	if (axis != BoxAxis::NONE) g_gizmo_state.active_id = id;
 	BoxGizmo gizmo = getGizmo<BoxGizmo>(view, tr, cfg);
@@ -808,13 +809,13 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - xn *  g_gizmo_state.box.start_half_extents.x * sign;
 			if (keep_center) {
 				const float half = g_gizmo_state.box.start_half_extents.x + dot(diff, xn) * sign;
-				half_extents->x = half;
+				half_extents.x = half;
 			}
 			else {
 				const float half = g_gizmo_state.box.start_half_extents.x + dot(diff, xn) * 0.5f * sign;
 				const DVec3 c = e0 + xn * half * sign;
-				tr->pos = c;
-				half_extents->x = half;
+				tr.pos = c;
+				half_extents.x = half;
 			}
 			return true;
 		}
@@ -824,13 +825,13 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - yn *  g_gizmo_state.box.start_half_extents.y * sign;
 			if (keep_center) {
 				const float half = g_gizmo_state.box.start_half_extents.y + dot(diff, yn) * sign;
-				half_extents->y = half;
+				half_extents.y = half;
 			}
 			else {
 				const float half = g_gizmo_state.box.start_half_extents.y + dot(diff, yn) * 0.5f * sign;
 				const DVec3 c = e0 + yn * half * sign;
-				tr->pos = c;
-				half_extents->y = half;
+				tr.pos = c;
+				half_extents.y = half;
 			}
 			return true;
 		}
@@ -840,13 +841,13 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 			const DVec3 e0 = g_gizmo_state.box.start_transform.pos - zn *  g_gizmo_state.box.start_half_extents.z * sign;
 			if (keep_center) {
 				const float half = g_gizmo_state.box.start_half_extents.z + dot(diff, zn) * sign;
-				half_extents->z = half;
+				half_extents.z = half;
 			}
 			else {
 				const float half = g_gizmo_state.box.start_half_extents.z + dot(diff, zn) * 0.5f * sign;
 				const DVec3 c = e0 + zn * half * sign;
-				tr->pos = c;
-				half_extents->z = half;
+				tr.pos = c;
+				half_extents.z = half;
 			}
 			return true;
 		}
@@ -856,7 +857,7 @@ bool box(u64 id, UniverseView& view, Ref<Transform> tr, Ref<Vec3> half_extents, 
 }
 
 
-bool manipulate(u64 id, UniverseView& view, Ref<Transform> tr, const Config& cfg) {
+bool manipulate(u64 id, UniverseView& view, Transform& tr, const Config& cfg) {
 	g_gizmo_state.last_manipulate_frame = g_gizmo_state.frame;
 	switch (cfg.mode) {
 		case Gizmo::Config::TRANSLATE: return translate(id, view, tr, cfg);

@@ -28,7 +28,7 @@ public:
 
 	StackNode* record();
 	void printCallstack(StackNode* node);
-	static bool getFunction(StackNode* node, Span<char> out, Ref<int> line);
+	static bool getFunction(StackNode* node, Span<char> out, int& line);
 	static StackNode* getParent(StackNode* node);
 	static int getPath(StackNode* node, Span<StackNode*> output);
 	static void refreshModuleList();

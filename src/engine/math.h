@@ -423,7 +423,7 @@ LUMIX_ENGINE_API Vec3 cross(const Vec3& op1, const Vec3& op2);
 LUMIX_ENGINE_API DVec3 cross(const DVec3& op1, const DVec3& op2);
 
 LUMIX_ENGINE_API bool getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal, float& out);
-LUMIX_ENGINE_API bool getRaySphereIntersection(const Vec3& origin, const Vec3& dir, const Vec3& center, float radius, Ref<float> out);
+LUMIX_ENGINE_API bool getRaySphereIntersection(const Vec3& origin, const Vec3& dir, const Vec3& center, float radius, float& out);
 LUMIX_ENGINE_API bool getRayAABBIntersection(const Vec3& origin, const Vec3& dir, const Vec3& min, const Vec3& size, Vec3& out);
 LUMIX_ENGINE_API float getLineSegmentDistance(const Vec3& origin, const Vec3& dir, const Vec3& a, const Vec3& b);
 LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin, const Vec3& dir, const Vec3& a, const Vec3& b, const Vec3& c, float* out_t);

@@ -573,7 +573,7 @@ void AssetBrowser::fileColumn()
 			IScene* scene = universe->getScene(model_inst_type);
 			if (scene && universe->hasComponent(e, model_inst_type)) {
 				Path source;
-				if (reflection::getPropertyValue(*scene, e, model_inst_type, "Source", Ref(source))) {
+				if (reflection::getPropertyValue(*scene, e, model_inst_type, "Source", source)) {
 					copyString(Span(m_prefab_name), Path::getBasename(source.c_str()));
 				}
 			}
@@ -948,7 +948,7 @@ bool AssetBrowser::resourceInput(const char* str_id, Span<char> buf, ResourceTyp
 
 	if (ImGuiEx::BeginResizablePopup("popup", ImVec2(300, 300))) {
 		static u32 selected_path_hash = 0;
-		if (resourceList(buf, Ref(selected_path_hash), type, 0, true)) {
+		if (resourceList(buf, selected_path_hash, type, 0, true)) {
 			ImGui::EndPopup();
 			ImGui::PopID();
 			return true;
@@ -975,7 +975,7 @@ void AssetBrowser::endSaveResource(Resource& resource, OutputMemoryStream& strea
 	// use temporary because otherwise the resource is reloaded during saving
 	StaticString<LUMIX_MAX_PATH> tmp_path(resource.getPath().c_str(), ".tmp");
 	os::OutputFile f;
-	if (!fs.open(tmp_path, Ref(f)))
+	if (!fs.open(tmp_path, f))
 	{
 		LUMIX_DELETE(m_app.getAllocator(), &stream);
 		logError("Could not save file ", resource.getPath());
@@ -1040,7 +1040,7 @@ void AssetBrowser::tile(const Path& path, bool selected) {
 	}
 }
 
-bool AssetBrowser::resourceList(Span<char> buf, Ref<u32> selected_path_hash, ResourceType type, float height, bool can_create_new) const {
+bool AssetBrowser::resourceList(Span<char> buf, u32& selected_path_hash, ResourceType type, float height, bool can_create_new) const {
 	auto iter = m_plugins.find(type);
 	if (!iter.isValid()) return false;
 

@@ -3,10 +3,12 @@
 #include "engine.h"
 #include "file_system.h"
 #include "input_system.h"
+#include "log.h"
 #include "lua_wrapper.h"
 #include "plugin.h"
 #include "prefab.h"
 #include "reflection.h"
+#include "string.h"
 #include "universe.h"
 
 
@@ -395,7 +397,7 @@ static int LUA_packageLoader(lua_State* L)
 	lua_pop(L, 1);
 	auto& fs = engine->getFileSystem();
 	OutputMemoryStream buf(engine->getAllocator());
-	if (!fs.getContentSync(Path(tmp), Ref(buf))) {
+	if (!fs.getContentSync(Path(tmp), buf)) {
 		logError("Failed to open file ", tmp);
 		StaticString<LUMIX_MAX_PATH + 40> msg("Failed to open file ");
 		msg << tmp;
@@ -668,7 +670,7 @@ static int LUA_loadUniverse(lua_State* L)
 				blob.read(&header, sizeof(header));
 
 				EntityMap entity_map(engine->getAllocator());
-				if (!engine->deserialize(*universe, blob, Ref(entity_map)))
+				if (!engine->deserialize(*universe, blob, entity_map))
 				{
 					logError("Failed to deserialize universe ", path);
 				}
@@ -732,7 +734,7 @@ static int LUA_instantiatePrefab(lua_State* L) {
 		luaL_error(L, "Prefab '%s' is not ready, preload it.", prefab->getPath().c_str());
 	}
 	EntityMap entity_map(engine->getAllocator());
-	if (engine->instantiatePrefab(*universe, *prefab, position, {0, 0, 0, 1}, 1, Ref(entity_map))) {
+	if (engine->instantiatePrefab(*universe, *prefab, position, {0, 0, 0, 1}, 1, entity_map)) {
 		LuaWrapper::pushEntity(L, entity_map.m_map[0], universe);
 		return 1;
 	}

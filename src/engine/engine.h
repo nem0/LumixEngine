@@ -40,14 +40,14 @@ struct LUMIX_ENGINE_API Engine {
 		const struct DVec3& pos,
 		const struct Quat& rot,
 		float scale,
-		Ref<struct EntityMap> entity_map) = 0;
+		struct EntityMap& entity_map) = 0;
 
 	virtual void startGame(Universe& context) = 0;
 	virtual void stopGame(Universe& context) = 0;
 
 	virtual void update(Universe& context) = 0;
 	virtual u32 serialize(Universe& ctx, struct OutputMemoryStream& serializer) = 0;
-	virtual bool deserialize(Universe& ctx, struct InputMemoryStream& serializer, Ref<struct EntityMap> entity_map) = 0;
+	virtual bool deserialize(Universe& ctx, struct InputMemoryStream& serializer, struct EntityMap& entity_map) = 0;
 	virtual bool deserializeProject(InputMemoryStream& serializer) = 0;
 	virtual void serializeProject(OutputMemoryStream& serializer) const = 0;
 	virtual float getLastTimeDelta() const = 0;

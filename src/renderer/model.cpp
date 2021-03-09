@@ -290,7 +290,7 @@ static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
 }
 
 
-static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics, Ref<u32> vb_stride)
+static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Mesh::AttributeSemantic* semantics, u32& vb_stride)
 {
 	u32 attribute_count;
 	file.read(&attribute_count, sizeof(attribute_count));
@@ -468,7 +468,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 		Mesh::AttributeSemantic semantics[gpu::VertexDecl::MAX_ATTRIBUTES];
 		for(auto& i : semantics) i = Mesh::AttributeSemantic::NONE;
 		u32 vb_stride;
-		if (!parseVertexDecl(file, &vertex_decl, semantics, Ref(vb_stride))) return false;
+		if (!parseVertexDecl(file, &vertex_decl, semantics, vb_stride)) return false;
 
 		u32 mat_path_length;
 		char mat_path[LUMIX_MAX_PATH + 128];
