@@ -74,7 +74,7 @@ StackNode* StackTree::getParent(StackNode* node)
 }
 
 
-bool StackTree::getFunction(StackNode* node, Span<char> out, Ref<int> line)
+bool StackTree::getFunction(StackNode* node, Span<char> out, int& line)
 {
 	return false;
 }

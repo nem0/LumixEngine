@@ -434,7 +434,7 @@ static unsigned long get_window_property(Window win, Atom property, Atom type, u
     return count;
 }
 
-bool getEvent(Ref<Event> e) {
+bool getEvent(Event& e) {
 	if (!G.event_queue.empty()) {
 		e = G.event_queue.front();
 		G.event_queue.pop();
@@ -457,10 +457,10 @@ bool getEvent(Ref<Event> e) {
 			u32 utf8 = 0;
 			const int len = Xutf8LookupString(G.ic, &xevent.xkey, (char*)&utf8, sizeof(utf8), &keysym, &status);
 
-			e->type = Event::Type::KEY;
-			e->key.down = true;
-			e->key.keycode = getKeycode(keysym);
-			G.key_states[(u8)e->key.keycode] = true;
+			e.type = Event::Type::KEY;
+			e.key.down = true;
+			e.key.keycode = getKeycode(keysym);
+			G.key_states[(u8)e.key.keycode] = true;
 
 			switch (status) {
 				case XLookupChars:
@@ -478,30 +478,30 @@ bool getEvent(Ref<Event> e) {
 		}
 		case KeyRelease: {
 			const KeySym keysym = XLookupKeysym(&xevent.xkey, 0);
-			e->type = Event::Type::KEY;
-			e->key.down = false;
-			e->key.keycode = getKeycode(keysym);
-			G.key_states[(u8)e->key.keycode] = false;
+			e.type = Event::Type::KEY;
+			e.key.down = false;
+			e.key.keycode = getKeycode(keysym);
+			G.key_states[(u8)e.key.keycode] = false;
 			return true;
 		}
 		case ButtonPress:
 		case ButtonRelease:
-			e->window = (WindowHandle)xevent.xbutton.window;
+			e.window = (WindowHandle)xevent.xbutton.window;
 			if (xevent.xbutton.button <= Button3) {
-				e->type = Event::Type::MOUSE_BUTTON;
+				e.type = Event::Type::MOUSE_BUTTON;
 				switch (xevent.xbutton.button) {
-					case Button1: e->mouse_button.button = MouseButton::LEFT; break;
-					case Button2: e->mouse_button.button = MouseButton::MIDDLE; break;
-					case Button3: e->mouse_button.button = MouseButton::RIGHT; break;
-					default: e->mouse_button.button = MouseButton::EXTENDED; break;
+					case Button1: e.mouse_button.button = MouseButton::LEFT; break;
+					case Button2: e.mouse_button.button = MouseButton::MIDDLE; break;
+					case Button3: e.mouse_button.button = MouseButton::RIGHT; break;
+					default: e.mouse_button.button = MouseButton::EXTENDED; break;
 				}
-				e->mouse_button.down = xevent.type == ButtonPress;
+				e.mouse_button.down = xevent.type == ButtonPress;
 			}
 			else {
-				e->type = Event::Type::MOUSE_WHEEL;
+				e.type = Event::Type::MOUSE_WHEEL;
 				switch (xevent.xbutton.button) {
-					case 4: e->mouse_wheel.amount = 1; break;
-					case 5: e->mouse_wheel.amount = -1; break;
+					case 4: e.mouse_wheel.amount = 1; break;
+					case 5: e.mouse_wheel.amount = -1; break;
 				}
 			}
 			return true;
@@ -509,18 +509,18 @@ bool getEvent(Ref<Event> e) {
 			if (xevent.xclient.message_type == G.wm_protocols_atom) {
 				const Atom protocol = xevent.xclient.data.l[0];
 				if (protocol == G.wm_delete_window_atom) {
-					e->window = (WindowHandle)xevent.xclient.window;
-					e->type = Event::Type::WINDOW_CLOSE;
+					e.window = (WindowHandle)xevent.xclient.window;
+					e.type = Event::Type::WINDOW_CLOSE;
 					return true;
 				}
 			}
 			goto next;
 		case ConfigureNotify: {
-			e->window = (WindowHandle)xevent.xconfigure.window;
+			e.window = (WindowHandle)xevent.xconfigure.window;
 
-			e->type = Event::Type::WINDOW_SIZE;
-			e->win_size.w = xevent.xconfigure.width;
-			e->win_size.h = xevent.xconfigure.height;
+			e.type = Event::Type::WINDOW_SIZE;
+			e.win_size.w = xevent.xconfigure.width;
+			e.win_size.h = xevent.xconfigure.height;
 
 			Event e;
 			e.type = Event::Type::WINDOW_MOVE;
@@ -533,10 +533,10 @@ bool getEvent(Ref<Event> e) {
 			const IVec2 mp(xevent.xmotion.x, xevent.xmotion.y);
 			const IVec2 rel = mp - G.mouse_screen_pos;
 			G.mouse_screen_pos = mp;
-			e->window = (WindowHandle)xevent.xmotion.window;
-			e->type = Event::Type::MOUSE_MOVE;
-			e->mouse_move.xrel = rel.x;
-			e->mouse_move.yrel = rel.y;
+			e.window = (WindowHandle)xevent.xmotion.window;
+			e.type = Event::Type::MOUSE_MOVE;
+			e.mouse_move.xrel = rel.x;
+			e.mouse_move.yrel = rel.y;
 			return true;
 	}
 	return false;
@@ -626,7 +626,7 @@ WindowHandle createWindow(const InitWindowArgs& args)
 	// TODO glx context fails to create without this
 	for (int i = 0; i < 100; ++i) {
 		Event e;
-		if (getEvent(Ref(e))) {
+		if (getEvent(e)) {
 			G.event_queue.push(e);
 		} 
 	}

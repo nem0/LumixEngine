@@ -542,12 +542,6 @@ template <> inline void push(lua_State* L, void* value)
 	lua_pushlightuserdata(L, value);
 }
 
-template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)
-{
- 	push(L, value);
-	lua_setfield(L, table_idx - 1, name);
-}
-
 LUMIX_ENGINE_API void createSystemVariable(lua_State* L, const char* system, const char* var_name, void* value);
 LUMIX_ENGINE_API void createSystemVariable(lua_State* L, const char* system, const char* var_name, int value);
 LUMIX_ENGINE_API void createSystemFunction(lua_State* L, const char* system, const char* var_name, lua_CFunction fn);
@@ -560,6 +554,12 @@ LUMIX_ENGINE_API void push(lua_State* L, EntityRef value);
 LUMIX_ENGINE_API bool toEntity(lua_State* L, int idx, Universe*& universe, EntityRef& entity);
 LUMIX_ENGINE_API void pushEntity(lua_State* L, EntityPtr value, Universe* universe);
 LUMIX_ENGINE_API bool checkStringField(lua_State* L, int idx, const char* k, Span<char> out);
+
+template <typename T> inline void setField(lua_State* L, int table_idx, const char* name, T value)
+{
+ 	push(L, value);
+	lua_setfield(L, table_idx - 1, name);
+}
 
 template <typename T> void argError(lua_State* L, int index)
 {
