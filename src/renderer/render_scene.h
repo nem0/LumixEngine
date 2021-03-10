@@ -239,6 +239,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual RayCastModelHit castRayTerrain(EntityRef entity, const DVec3& origin, const Vec3& dir) = 0;
 	virtual void getRay(EntityRef entity, const Vec2& screen_pos, DVec3& origin, Vec3& dir) = 0;
 
+	virtual void setActiveCamera(EntityRef camera) = 0;
 	virtual EntityPtr getActiveCamera() const = 0;
 	virtual	struct Viewport getCameraViewport(EntityRef camera) const = 0;
 	virtual float getCameraLODMultiplier(float fov, bool is_ortho) const = 0;

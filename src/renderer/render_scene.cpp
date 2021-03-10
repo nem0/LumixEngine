@@ -260,12 +260,8 @@ public:
 		dir = view.rot * dir;
 	}
 
-	
-	EntityPtr getActiveCamera() const override
-	{
-		return m_active_camera;
-	}
-
+	void setActiveCamera(EntityRef camera) override { m_active_camera = camera; }
+	EntityPtr getActiveCamera() const override { return m_active_camera; }
 
 	Viewport getCameraViewport(EntityRef entity) const override
 	{
@@ -2798,6 +2794,7 @@ void RenderScene::reflect() {
 		.LUMIX_FUNC(RenderSceneImpl::addDebugCross)
 		.LUMIX_FUNC(RenderSceneImpl::addDebugLine)
 		.LUMIX_FUNC(RenderSceneImpl::addDebugTriangle)
+		.LUMIX_FUNC(RenderSceneImpl::setActiveCamera)
 		.LUMIX_CMP(BoneAttachment, "bone_attachment", "Render / Bone attachment")
 			.icon(ICON_FA_BONE)
 			.LUMIX_PROP(BoneAttachmentParent, "Parent")
