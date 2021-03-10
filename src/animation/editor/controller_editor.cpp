@@ -281,15 +281,16 @@ struct ControllerEditorImpl : ControllerEditor {
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		IAllocator& allocator = m_app.getAllocator();
 		OutputMemoryStream data(allocator);
-
-		if (fs.getContentSync(Path(path), data)) {
+		char relative[LUMIX_MAX_PATH];
+		(void)fs.makeRelative(Span(relative), path);
+		if (fs.getContentSync(Path(relative), data)) {
 			ResourceManager* res_manager = m_app.getEngine().getResourceManager().get(Controller::TYPE);
 			InputMemoryStream str(data);
 			UniquePtr<Controller> new_controller = UniquePtr<Controller>::create(allocator, Path("anim_editor"), *res_manager, allocator);
 			if (new_controller->deserialize(str)) {
 				m_controller = new_controller.move();
 				m_current_node = m_controller->m_root;
-				m_path = path;
+				m_path = relative;
 				m_undo_stack.clear();
 				m_undo_idx = -1;
 			}
@@ -297,7 +298,7 @@ struct ControllerEditorImpl : ControllerEditor {
 			m_dirty = false;
 		}
 		else {
-			logError("Failed to read ", path);
+			logError("Failed to read ", relative);
 		}
 	}
 
@@ -473,8 +474,10 @@ struct ControllerEditorImpl : ControllerEditor {
 	void save(const char* path) {
 		OutputMemoryStream str(m_controller->m_allocator);
 		m_controller->serialize(str);
-		os::OutputFile file;
 		FileSystem& fs = m_app.getEngine().getFileSystem();
+		os::OutputFile file;
+		char relative[LUMIX_MAX_PATH];
+		(void)fs.makeRelative(Span(relative), path);
 		if (fs.open(path, file)) {
 			if (!file.write(str.data(), str.size())) {
 				logError("Failed to write ", path);

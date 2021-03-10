@@ -525,8 +525,8 @@ struct AnimationSceneImpl final : AnimationScene
 		if (!animator.ctx) return;
 
 		const anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::FLOAT);
+		if (input_idx >= decl.inputs_count) return;
+		if (decl.inputs[input_idx].type != anim::InputDecl::FLOAT) return;
 
 		*(float*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
@@ -536,8 +536,8 @@ struct AnimationSceneImpl final : AnimationScene
 		if (!animator.ctx) return;
 
 		const anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::BOOL);
+		if (input_idx >= decl.inputs_count) return;
+		if (decl.inputs[input_idx].type != anim::InputDecl::BOOL) return;
 
 		*(bool*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
@@ -580,8 +580,8 @@ struct AnimationSceneImpl final : AnimationScene
 		if (!animator.ctx) return;
 
 		const anim::InputDecl& decl = animator.resource->m_inputs;
-		ASSERT(input_idx < lengthOf(decl.inputs));
-		ASSERT(decl.inputs[input_idx].type == anim::InputDecl::U32);
+		if (input_idx >= decl.inputs_count) return;
+		if (decl.inputs[input_idx].type != anim::InputDecl::U32) return;
 
 		*(u32*)&animator.ctx->inputs[decl.inputs[input_idx].offset] = value;
 	}
