@@ -245,7 +245,7 @@ template <typename T> struct Array {
 			if (index < m_size - 1)
 			{
 				if constexpr (__is_trivially_copyable(T)) {
-					memcpy(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
+					memmove(m_data + index, m_data + index + 1, sizeof(T) * (m_size - index - 1));
 				}
 				else {
 					for (u32 i = index; i < m_size - 1; ++i) {

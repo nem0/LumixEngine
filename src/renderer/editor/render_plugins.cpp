@@ -3396,10 +3396,10 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 					CmdList& out_cmd_list = dd.cmd_lists.emplace(allocator);
 
 					out_cmd_list.idx_buffer = renderer->allocTransient(cmd_list->IdxBuffer.size_in_bytes());
-					memcpy(out_cmd_list.idx_buffer.ptr, &cmd_list->IdxBuffer[0], out_cmd_list.idx_buffer.size);
+					memcpy(out_cmd_list.idx_buffer.ptr, &cmd_list->IdxBuffer[0], cmd_list->IdxBuffer.size_in_bytes());
 
 					out_cmd_list.vtx_buffer = renderer->allocTransient(cmd_list->VtxBuffer.size_in_bytes());
-					memcpy(out_cmd_list.vtx_buffer.ptr, &cmd_list->VtxBuffer[0], out_cmd_list.vtx_buffer.size);
+					memcpy(out_cmd_list.vtx_buffer.ptr, &cmd_list->VtxBuffer[0], cmd_list->VtxBuffer.size_in_bytes());
 			
 					out_cmd_list.commands.resize(cmd_list->CmdBuffer.size());
 					for (int i = 0, c = out_cmd_list.commands.size(); i < c; ++i) {
