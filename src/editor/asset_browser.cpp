@@ -85,7 +85,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		u32 gc_counter;
 	};
 
-	AssetBrowserImpl::AssetBrowserImpl(StudioApp& app)
+	AssetBrowserImpl(StudioApp& app)
 		: m_selected_resources(app.getAllocator())
 		, m_is_focus_requested(false)
 		, m_history(app.getAllocator())
@@ -136,7 +136,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	AssetBrowserImpl::~AssetBrowserImpl()
+	~AssetBrowserImpl()
 	{
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);

@@ -4,6 +4,7 @@
 #include "engine/lumix.h"
 #include "engine/metaprogramming.h"
 #include "engine/resource.h"
+#include "engine/string.h"
 #include "engine/universe.h"
 
 
