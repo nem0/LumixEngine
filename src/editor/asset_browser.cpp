@@ -122,7 +122,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		if (!success) logError("Could not create ", path);
 	}
 
-	void releaseResources() {
+	void releaseResources() override {
 		unloadResources();
 		RenderInterface* ri = m_app.getRenderInterface();
 		for (FileInfo& info : m_file_infos) {
@@ -136,7 +136,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	~AssetBrowserImpl()
+	~AssetBrowserImpl() override
 	{
 		m_app.removeAction(&m_back_action);
 		m_app.removeAction(&m_forward_action);
@@ -145,7 +145,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		ASSERT(m_plugins.size() == 0);
 	}
 
-	void onInitFinished() {
+	void onInitFinished() override {
 		m_app.getAssetCompiler().listChanged().bind<&AssetBrowserImpl::onResourceListChanged>(this);
 	}
 
@@ -168,7 +168,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void update()
+	void update() override
 	{
 		PROFILE_FUNCTION();
 
@@ -399,7 +399,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	void reloadTile(u32 hash) {
+	void reloadTile(u32 hash) override {
 		for (FileInfo& fi : m_file_infos) {
 			if (fi.file_path_hash == hash) {
 				m_app.getRenderInterface()->unloadTexture(fi.tex);
@@ -707,17 +707,15 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void refreshLabels()
-	{
-		for(FileInfo& tile : m_file_infos) {
+	void refreshLabels() {
+		for (FileInfo& tile : m_file_infos) {
 			char filename[LUMIX_MAX_PATH];
 			Span<const char> subres = getSubresource(tile.filepath.data);
 			if (*subres.end()) {
 				copyNString(Span(filename), subres.begin(), subres.length());
 				catString(filename, ":");
 				catString(Span(filename), Path::getBasename(tile.filepath.data));
-			}
-			else {
+			} else {
 				copyString(Span(filename), Path::getBasename(tile.filepath.data));
 			}
 			clampText(filename, int(TILE_SIZE * m_thumbnail_size));
@@ -727,13 +725,11 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void onGUI()
-	{
+	void onGUI() override {
 		if (m_dir.data[0] == '\0') changeDir(".");
 		if (m_dirty) changeDir(m_dir);
 
-		if (!m_wanted_resource.isEmpty())
-		{
+		if (!m_wanted_resource.isEmpty()) {
 			selectResource(m_wanted_resource, true, false);
 			m_wanted_resource = "";
 		}
@@ -834,13 +830,13 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void removePlugin(IPlugin& plugin)
+	void removePlugin(IPlugin& plugin) override
 	{
 		m_plugins.erase(plugin.getResourceType());
 	}
 
 
-	void addPlugin(IPlugin& plugin)
+	void addPlugin(IPlugin& plugin) override
 	{
 		m_plugins.insert(plugin.getResourceType(), &plugin);
 	}
@@ -872,7 +868,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		os::destroyFileIterator(iter);
 	}
 
-	bool onDropFile(const char* path)
+	bool onDropFile(const char* path)  override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (os::dirExists(path)) {
@@ -885,7 +881,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		return os::copyFile(path, dest);
 	}
 
-	void selectResource(const Path& path, bool record_history, bool additive)
+	void selectResource(const Path& path, bool record_history, bool additive)  override
 	{
 		m_is_focus_requested = true;
 		auto& manager = m_app.getEngine().getResourceManager();
@@ -906,7 +902,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		return res;
 	}
 
-	bool resourceInput(const char* str_id, Span<char> buf, ResourceType type)
+	bool resourceInput(const char* str_id, Span<char> buf, ResourceType type)  override
 	{
 		ImGui::PushID(str_id);
 
@@ -980,14 +976,14 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	OutputMemoryStream* beginSaveResource(Resource& resource)
+	OutputMemoryStream* beginSaveResource(Resource& resource) override
 	{
 		IAllocator& allocator = m_app.getAllocator();
 		return LUMIX_NEW(allocator, OutputMemoryStream)(allocator);
 	}
 
 
-	void endSaveResource(Resource& resource, OutputMemoryStream& stream, bool success)
+	void endSaveResource(Resource& resource, OutputMemoryStream& stream, bool success) override
 	{
 		if (!success) return;
 	
@@ -1060,7 +1056,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
-	bool resourceList(Span<char> buf, u32& selected_path_hash, ResourceType type, float height, bool can_create_new) const {
+	bool resourceList(Span<char> buf, u32& selected_path_hash, ResourceType type, float height, bool can_create_new) const override {
 		auto iter = m_plugins.find(type);
 		if (!iter.isValid()) return false;
 
@@ -1125,13 +1121,13 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void openInExternalEditor(Resource* resource) const
+	void openInExternalEditor(Resource* resource) const override
 	{
 		openInExternalEditor(resource->getPath().c_str());
 	}
 
 
-	void openInExternalEditor(const char* path) const
+	void openInExternalEditor(const char* path) const override
 	{
 		StaticString<LUMIX_MAX_PATH> full_path(m_app.getEngine().getFileSystem().getBasePath());
 		full_path << path;

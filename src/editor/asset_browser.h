@@ -47,7 +47,6 @@ struct AssetBrowser {
 	virtual void endSaveResource(Resource& resource, OutputMemoryStream& file, bool success) = 0;
 	virtual void releaseResources() = 0;
 	virtual void reloadTile(u32 hash) = 0;
-	virtual void onBasePathChanged() = 0;
 	virtual bool isOpen() const = 0;
 	virtual void setOpen(bool open) = 0;
 };
