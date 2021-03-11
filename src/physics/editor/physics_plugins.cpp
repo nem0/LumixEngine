@@ -18,6 +18,7 @@
 #include "engine/geometry.h"
 #include "engine/log.h"
 #include "engine/math.h"
+#include "engine/os.h"
 #include "engine/path.h"
 #include "engine/universe.h"
 #include "physics/physics_geometry.h"

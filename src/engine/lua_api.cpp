@@ -10,7 +10,7 @@
 #include "reflection.h"
 #include "string.h"
 #include "universe.h"
-
+#include <lua.hpp>
 
 namespace Lumix {
 

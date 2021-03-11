@@ -78,18 +78,18 @@ struct TransientBuffer {
 		MutexGuard lock(m_mutex);
 		if (!m_overflow.buffer) {
 			m_overflow.buffer = gpu::allocBufferHandle();
-			m_overflow.data = (u8*)os::memReserve(128 * 1024 * 1024);
+			m_overflow.data = (u8*)os::memReserve(512 * 1024 * 1024);
 			m_overflow.size = 0;
 			m_overflow.commit = 0;
 		}
 		slice.ptr = m_overflow.data + m_overflow.size;
+		slice.offset = m_overflow.size;
 		m_overflow.size += size;
 		if (m_overflow.size > m_overflow.commit) {
 			const u32 page_size = os::getMemPageSize();
 			m_overflow.commit = (m_overflow.size + page_size - 1) & ~(page_size - 1);
 			os::memCommit(m_overflow.data, m_overflow.commit);
 		}
-		slice.offset = 0;
 		slice.buffer = m_overflow.buffer;
 		return slice;
 	} 

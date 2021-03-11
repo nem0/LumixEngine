@@ -372,7 +372,6 @@ bool Settings::load()
 	
 	m_is_open = getBoolean(L, "settings_opened", false);
 	m_is_asset_browser_open = getBoolean(L, "asset_browser_opened", false);
-	m_asset_browser_left_column_width = getFloat(L, "asset_browser_left_column_width", 100.f);
 	m_is_entity_list_open = getBoolean(L, "entity_list_opened", false);
 	m_is_entity_template_list_open = getBoolean(L, "entity_template_list_opened", false);
 	m_is_log_open = getBoolean(L, "log_opened", false);
@@ -511,7 +510,6 @@ bool Settings::save()
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
 	file << "font_size = " << m_font_size << "\n";
-	file << "asset_browser_left_column_width = " << m_asset_browser_left_column_width << "\n";
 	
 	saveStyle(file);
 

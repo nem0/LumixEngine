@@ -18,6 +18,7 @@
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 #include "culling_system.h"
+#include "draw2d.h"
 #include "font.h"
 #include "material.h"
 #include "model.h"

@@ -1,5 +1,6 @@
 #include "entity_folders.h"
 #include "engine/string.h"
+#include "engine/stream.h"
 
 namespace Lumix {
 
@@ -7,15 +8,16 @@ namespace Lumix {
 EntityFolders::EntityFolders(Universe& universe, IAllocator& allocator)
 	: m_entities(allocator)
 	, m_universe(universe) 
-	, m_folder_allocator(0xffFF)
+	, m_folders(allocator)
 {
 	ASSERT(!universe.getFirstEntity().isValid());
 	universe.entityDestroyed().bind<&EntityFolders::onEntityDestroyed>(this);
 	universe.entityCreated().bind<&EntityFolders::onEntityCreated>(this);
 
-	m_root = m_folder_allocator.alloc();
-	copyString(m_root->name, "root");
-	m_selected_folder = 0;
+	const FolderID root_id = m_folders.alloc();
+	Folder& root = m_folders.getObject(root_id);
+	copyString(root.name, "root");
+	m_selected_folder = root_id;
 }
 
 EntityFolders::~EntityFolders() {
@@ -58,7 +60,7 @@ void EntityFolders::moveToFolder(EntityRef e, FolderID folder_id) {
 	}
 	Entity& entity = m_entities[e.index];
 	if (entity.folder != INVALID_FOLDER) {
-		Folder& f = m_folder_allocator.getObject(entity.folder);
+		Folder& f = m_folders.getObject(entity.folder);
 		if (f.first_entity == e) {
 			f.first_entity = entity.next;
 		}
@@ -83,28 +85,28 @@ void EntityFolders::moveToFolder(EntityRef e, FolderID folder_id) {
 }
 
 EntityFolders::FolderID EntityFolders::allocFolder() {
-	Folder* f = m_folder_allocator.alloc();
-	return m_folder_allocator.getID(f);
+	return m_folders.alloc();
 }
 
 void EntityFolders::destroyFolder(FolderID folder) {
 	Folder& f = getFolder(folder);
 	ASSERT(!f.first_entity.isValid());
+	ASSERT(f.child_folder == INVALID_FOLDER);
 	ASSERT(f.parent_folder != INVALID_FOLDER);
-	Folder& parent = m_folder_allocator.getObject(f.parent_folder);
+	Folder& parent = m_folders.getObject(f.parent_folder);
 	if (parent.child_folder == folder) {
 		parent.child_folder = f.next_folder;
 	}
 
 	if (f.next_folder != INVALID_FOLDER) {
-		Folder& n = m_folder_allocator.getObject(f.next_folder);
+		Folder& n = m_folders.getObject(f.next_folder);
 		n.prev_folder = f.prev_folder;
 	}
 	if (f.prev_folder != INVALID_FOLDER) {
-		Folder& p = m_folder_allocator.getObject(f.prev_folder);
+		Folder& p = m_folders.getObject(f.prev_folder);
 		p.next_folder = f.next_folder;
 	}
-	m_folder_allocator.dealloc(&f);
+	m_folders.free(folder);
 }
 
 EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID parent) {
@@ -117,10 +119,10 @@ EntityFolders::FolderID EntityFolders::emplaceFolder(FolderID folder, FolderID p
 		}
 	}
 	
-	Folder& f = m_folder_allocator.getObject(folder);
+	Folder& f = m_folders.getObject(folder);
 	copyString(f.name, "Folder");
 	f.parent_folder = parent;
-	Folder& p = m_folder_allocator.getObject(parent);
+	Folder& p = m_folders.getObject(parent);
 	if (p.child_folder != INVALID_FOLDER) {
 		f.next_folder = p.child_folder;
 		getFolder(p.child_folder).prev_folder = folder;
@@ -135,21 +137,22 @@ EntityFolders::FolderID EntityFolders::getFolder(EntityRef e) const {
 }
 
 EntityFolders::Folder& EntityFolders::getFolder(FolderID folder_id) {
-	return m_folder_allocator.getObject(folder_id);
+	return m_folders.getObject(folder_id);
 }
 
 const EntityFolders::Folder& EntityFolders::getFolder(FolderID folder_id) const {
-	return m_folder_allocator.getObject(folder_id);
+	return m_folders.getObject(folder_id);
 }
 
 void EntityFolders::serialize(OutputMemoryStream& blob) {
 	blob.write(m_entities.size());
 	blob.write(m_entities.begin(), m_entities.byte_size());
-	const u32 size = m_folder_allocator.commited * m_folder_allocator.page_size;
+	const u32 size = m_folders.data.byte_size();
 	blob.write(size);
-	blob.write(m_folder_allocator.mem, size);
-	blob.write(m_folder_allocator.commited);
-	blob.write(m_folder_allocator.first_free);
+	blob.write(m_folders.data.begin(), size);
+	u32 dummy = 0;
+	blob.write(dummy);
+	blob.write(m_folders.first_free);
 }
 
 void EntityFolders::deserialize(InputMemoryStream& blob) {
@@ -157,14 +160,47 @@ void EntityFolders::deserialize(InputMemoryStream& blob) {
 	m_entities.resize(count);
 	blob.read(m_entities.begin(), m_entities.byte_size());
 
-	os::memRelease(m_folder_allocator.mem);
-	m_folder_allocator.mem = (u8*)os::memReserve(sizeof(Folder) * m_folder_allocator.max_count);
 	const u32 size = blob.read<u32>();
-	os::memCommit(m_folder_allocator.mem, size);
-
-	blob.read(m_folder_allocator.mem, size);
-	blob.read(m_folder_allocator.commited);
-	blob.read(m_folder_allocator.first_free);
+	m_folders.data.resize(size / sizeof(Folder));
+	blob.read(m_folders.data.begin(), size);
+	u32 dummy;
+	blob.read(dummy);
+	blob.read(m_folders.first_free);
 }
+
+EntityFolders::FreeList::FreeList(IAllocator& allocator) 
+	: data(allocator)
+	, first_free(-1)
+{}
+
+EntityFolders::FolderID EntityFolders::FreeList::alloc() {
+	if (first_free < 0) {
+		ASSERT(data.size() < 0xffFF);
+		data.emplace();
+		return FolderID(data.size() - 1);
+	}
+
+	const FolderID id = (FolderID)first_free;
+	memcpy(&first_free, &data[first_free], sizeof(first_free));
+
+	new (NewPlaceholder(), &data[id]) Folder;
+
+	return id;
+}
+
+void EntityFolders::FreeList::free(FolderID folder) {
+	
+	memcpy(&data[folder], &first_free, sizeof(first_free));
+	first_free = folder;
+}
+
+EntityFolders::Folder& EntityFolders::FreeList::getObject(FolderID id) {
+	return data[id];
+}
+
+const EntityFolders::Folder& EntityFolders::FreeList::getObject(FolderID id) const {
+	return data[id];
+}
+
 
 } // namespace Lumix

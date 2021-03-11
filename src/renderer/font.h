@@ -2,10 +2,10 @@
 
 
 #include "engine/hash_map.h"
+#include "engine/math.h"
 #include "engine/resource.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
-#include "renderer/draw2d.h"
 
 
 namespace Lumix

@@ -9,6 +9,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/resource_manager.h"
 #include "engine/universe.h"
 #include "renderer/model.h"

@@ -11,6 +11,7 @@
 #include "engine/file_system.h"
 #include "engine/geometry.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/universe.h"
 #include "navigation/navigation_scene.h"
 

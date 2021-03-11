@@ -42,10 +42,8 @@ private:
 	lua_State* m_state;
 };
 
-struct LUMIX_RENDERER_API Material final : Resource
-{
-friend struct MaterialManager;
-public:
+struct LUMIX_RENDERER_API Material final : Resource {
+	friend struct MaterialManager;
 	static const int MAX_TEXTURE_COUNT = 16;
 
 	struct RenderData {
@@ -71,7 +69,6 @@ public:
 
 	static const ResourceType TYPE;
 
-public:
 	Material(const Path& path, ResourceManager& resource_manager, Renderer& renderer, IAllocator& allocator);
 	~Material();
 

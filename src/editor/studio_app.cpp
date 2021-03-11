@@ -398,7 +398,7 @@ struct StudioAppImpl final : StudioApp
 		addActions();
 
 		m_asset_compiler = AssetCompiler::create(*this);
-		m_asset_browser.create(*this);
+		m_asset_browser = AssetBrowser::create(*this);
 		m_property_grid.create(*this);
 		m_profiler_ui = ProfilerUI::create(*m_engine);
 		m_log_ui.create(m_editor->getAllocator());
@@ -479,7 +479,7 @@ struct StudioAppImpl final : StudioApp
 		m_add_cmp_plugins.clear();
 
 		m_profiler_ui.reset();
-		m_asset_browser.destroy();
+		m_asset_browser.reset();
 		m_property_grid.destroy();
 		m_log_ui.destroy();
 		ASSERT(!m_render_interface);
@@ -1190,8 +1190,8 @@ struct StudioAppImpl final : StudioApp
 	bool areSettingsOpen() const { return m_settings.m_is_open; }
 	void toggleEntityList() { m_is_entity_list_open = !m_is_entity_list_open; }
 	bool isEntityListOpen() const { return m_is_entity_list_open; }
-	void toggleAssetBrowser() { m_asset_browser->m_is_open = !m_asset_browser->m_is_open; }
-	bool isAssetBrowserOpen() const { return m_asset_browser->m_is_open; }
+	void toggleAssetBrowser() { m_asset_browser->setOpen(!m_asset_browser->isOpen()); }
+	bool isAssetBrowserOpen() const { return m_asset_browser->isOpen(); }
 	int getExitCode() const override { return m_exit_code; }
 	AssetBrowser& getAssetBrowser() override
 	{
@@ -1538,7 +1538,10 @@ struct StudioAppImpl final : StudioApp
 	{
 		if (!ImGui::BeginMenu("View")) return;
 
-		ImGui::MenuItem(ICON_FA_IMAGES "Asset browser", nullptr, &m_asset_browser->m_is_open);
+		bool is_open = m_asset_browser->isOpen();
+		if (ImGui::MenuItem(ICON_FA_IMAGES "Asset browser", nullptr, &is_open)) {
+			m_asset_browser->setOpen(is_open);		
+		}
 		doMenuItem(*getAction("entityList"), true);
 		ImGui::MenuItem(ICON_FA_COMMENT_ALT "Log", nullptr, &m_log_ui->m_is_open);
 		ImGui::MenuItem(ICON_FA_CHART_AREA "Profiler", nullptr, &m_profiler_ui->m_is_open);
@@ -1797,12 +1800,12 @@ struct StudioAppImpl final : StudioApp
 		ImGui::End();
 	}
 
-	void folderUI(const EntityFolders::Folder& folder, EntityFolders& folders, u32 level) {
+	void folderUI(EntityFolders::FolderID folder_id, EntityFolders& folders, u32 level) {
+		const EntityFolders::Folder& folder = folders.getFolder(folder_id);
 		ImGui::PushID(&folder);
 		bool node_open;
 		ImGuiTreeNodeFlags flags = level == 0 ? ImGuiTreeNodeFlags_DefaultOpen : 0;
 		flags |= ImGuiTreeNodeFlags_OpenOnArrow;
-		EntityFolders::FolderID folder_id = folders.getFolderID(folder);
 		if (folders.getSelectedFolder() == folder_id) flags |= ImGuiTreeNodeFlags_Selected;
 		if (m_renaming_folder == folder_id) {
 			node_open = ImGui::TreeNodeEx((void*)&folder, flags, "%s", ICON_FA_FOLDER);
@@ -1883,7 +1886,7 @@ struct StudioAppImpl final : StudioApp
 		u16 child_id = folder.child_folder;
 		while (child_id != EntityFolders::INVALID_FOLDER) {
 			const EntityFolders::Folder& child = folders.getFolder(child_id);
-			folderUI(child, folders, level + 1);
+			folderUI(child_id, folders, level + 1);
 			child_id = child.next_folder;
 		}
 
@@ -1981,8 +1984,7 @@ struct StudioAppImpl final : StudioApp
 			const char* data = ImGui::SaveIniSettingsToMemory();
 			m_settings.m_imgui_state = data;
 		}
-		m_settings.m_is_asset_browser_open = m_asset_browser->m_is_open;
-		m_settings.m_asset_browser_left_column_width = m_asset_browser->m_left_column_width;
+		m_settings.m_is_asset_browser_open = m_asset_browser->isOpen();
 		m_settings.m_is_entity_list_open = m_is_entity_list_open;
 		m_settings.m_is_log_open = m_log_ui->m_is_open;
 		m_settings.m_is_profiler_open = m_profiler_ui->m_is_open;
@@ -2219,8 +2221,7 @@ struct StudioAppImpl final : StudioApp
 			i->onSettingsLoaded();
 		}
 
-		m_asset_browser->m_is_open = m_settings.m_is_asset_browser_open;
-		m_asset_browser->m_left_column_width = m_settings.m_asset_browser_left_column_width;
+		m_asset_browser->setOpen(m_settings.m_is_asset_browser_open);
 		m_is_entity_list_open = m_settings.m_is_entity_list_open;
 		m_log_ui->m_is_open = m_settings.m_is_log_open;
 		m_profiler_ui->m_is_open = m_settings.m_is_profiler_open;
@@ -3392,7 +3393,7 @@ struct StudioAppImpl final : StudioApp
 	bool m_confirm_load;
 	bool m_confirm_new;
 	char m_universe_to_load[LUMIX_MAX_PATH];
-	Local<AssetBrowser> m_asset_browser;
+	UniquePtr<AssetBrowser> m_asset_browser;
 	UniquePtr<AssetCompiler> m_asset_compiler;
 	Local<PropertyGrid> m_property_grid;
 	Local<LogUI> m_log_ui;

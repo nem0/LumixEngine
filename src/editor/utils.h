@@ -2,11 +2,11 @@
 
 #include "engine/delegate.h"
 #include "engine/lumix.h"
-#include "engine/os.h"
 #include "engine/string.h"
 
-namespace Lumix
-{
+namespace Lumix {
+
+namespace os { enum class Keycode : u8; }
 
 struct LUMIX_EDITOR_API ResourceLocator {
 	ResourceLocator(const Span<const char>& path);
@@ -23,7 +23,7 @@ struct LUMIX_EDITOR_API ResourceLocator {
 
 struct LUMIX_EDITOR_API Action
 {
-	Action() {}
+	Action();
 	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, os::Keycode key0, u8 modifiers, bool is_global);
 	void init(const char* label_short, const char* label_long, const char* name, const char* font_icon, bool is_global);
 	bool toolbarButton(struct ImFont* font);
@@ -39,7 +39,7 @@ struct LUMIX_EDITOR_API Action
 	};
 
 	u8 modifiers = 0;
-	os::Keycode shortcut = os::Keycode::INVALID;
+	os::Keycode shortcut;
 	StaticString<32> name;
 	StaticString<32> label_short;
 	StaticString<64> label_long;

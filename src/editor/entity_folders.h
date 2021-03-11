@@ -1,7 +1,6 @@
 #pragma once
 
 #include "engine/array.h"
-#include "engine/allocators.h"
 #include "engine/universe.h"
 
 namespace Lumix {
@@ -28,14 +27,13 @@ struct EntityFolders final {
 	EntityFolders(Universe& universe, IAllocator& allocator);
 	~EntityFolders();
 
-	const Folder& getRoot() const { return *m_root; }
+	FolderID getRoot() const { return 0; }
 	Folder& getFolder(FolderID folder_id);
 	const Folder& getFolder(FolderID folder_id) const;
 	void moveToFolder(EntityRef e, FolderID folder);
 	EntityPtr getNextEntity(EntityRef e) const;
 	FolderID emplaceFolder(FolderID folder, FolderID parent);
 	void destroyFolder(FolderID folder);
-	FolderID getFolderID(const Folder& folder) const { return (FolderID)m_folder_allocator.getID(&folder); }
 	FolderID getFolder(EntityRef e) const;
 	void selectFolder(FolderID folder) { m_selected_folder = folder; }
 	FolderID getSelectedFolder() const { return m_selected_folder; }
@@ -43,14 +41,25 @@ struct EntityFolders final {
 	void deserialize(InputMemoryStream& blob);
 
 private:
+	struct FreeList {
+		FreeList(IAllocator& allocator);
+		
+		FolderID alloc();
+		void free(FolderID folder);
+		Folder& getObject(FolderID id);
+		const Folder& getObject(FolderID id) const;
+
+		Array<Folder> data;
+		i32 first_free;
+	};
+
 	FolderID allocFolder();
 	void onEntityCreated(EntityRef e);
 	void onEntityDestroyed(EntityRef e);
 
 	Universe& m_universe;
 	Array<Entity> m_entities;
-	Folder* m_root;
-	VirtualAllocator<Folder> m_folder_allocator;
+	FreeList m_folders;
 	FolderID m_selected_folder;
 };
 

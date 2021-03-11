@@ -3,6 +3,7 @@
 
 #include "editor/studio_app.h"
 #include "editor/utils.h"
+#include "engine/allocator.h"
 #include "engine/math.h"
 #include "engine/os.h"
 #include "renderer/gpu/gpu.h"

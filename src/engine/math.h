@@ -422,13 +422,6 @@ LUMIX_ENGINE_API float dot(const Vec2& op1, const Vec2& op2);
 LUMIX_ENGINE_API Vec3 cross(const Vec3& op1, const Vec3& op2);
 LUMIX_ENGINE_API DVec3 cross(const DVec3& op1, const DVec3& op2);
 
-LUMIX_ENGINE_API bool getRayPlaneIntersecion(const Vec3& origin, const Vec3& dir, const Vec3& plane_point, const Vec3& normal, float& out);
-LUMIX_ENGINE_API bool getRaySphereIntersection(const Vec3& origin, const Vec3& dir, const Vec3& center, float radius, float& out);
-LUMIX_ENGINE_API bool getRayAABBIntersection(const Vec3& origin, const Vec3& dir, const Vec3& min, const Vec3& size, Vec3& out);
-LUMIX_ENGINE_API float getLineSegmentDistance(const Vec3& origin, const Vec3& dir, const Vec3& a, const Vec3& b);
-LUMIX_ENGINE_API bool getRayTriangleIntersection(const Vec3& origin, const Vec3& dir, const Vec3& a, const Vec3& b, const Vec3& c, float* out_t);
-LUMIX_ENGINE_API bool getSphereTriangleIntersection(const Vec3& center, float radius, const Vec3& v0, const Vec3& v1, const Vec3& v2);
-
 LUMIX_ENGINE_API void lerp(const Vec4& op1, const Vec4& op2, Vec4* out, float t);
 LUMIX_ENGINE_API float lerp(float a, float b, float t);
 LUMIX_ENGINE_API Vec3 lerp(const Vec3& op1, const Vec3& op2, float t);

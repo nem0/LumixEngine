@@ -9,6 +9,7 @@
 #include "engine/engine.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
+#include "engine/os.h"
 #include "engine/string.h"
 #include "engine/universe.h"
 #include "renderer/material.h"

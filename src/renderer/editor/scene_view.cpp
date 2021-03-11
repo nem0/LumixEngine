@@ -13,6 +13,7 @@
 #include "engine/delegate_list.h"
 #include "engine/engine.h"
 #include "engine/geometry.h"
+#include "engine/os.h"
 #include "engine/path.h"
 #include "engine/path.h"
 #include "engine/prefab.h"

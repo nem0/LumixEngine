@@ -3,16 +3,13 @@
 
 #include "engine/array.h"
 #include "engine/resource.h"
-#include "engine/resource_manager.h"
 
 
-namespace Lumix
-{
+namespace Lumix {
 
 
 struct Clip final : Resource
 {
-public:
 	enum class Format : u8 {
 		OGG
 	};

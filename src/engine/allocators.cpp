@@ -6,8 +6,6 @@
 #ifndef _WIN32
 	#include <string.h>
 	#include <malloc.h>
-#else
-	#include <intrin.h>
 #endif
 
 

@@ -12,6 +12,7 @@
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "editor/world_editor.h"
+#include "engine/associative_array.h"
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/file_system.h"
@@ -3312,7 +3313,7 @@ struct RenderInterfaceImpl final : RenderInterface
 		}
 
 		Vec3 pos = Vec3(universe.getPosition(entity) - base);
-		aabb.set(pos, pos);
+		aabb = AABB(pos, pos);
 
 		return aabb;
 	}

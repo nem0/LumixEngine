@@ -2,8 +2,6 @@
 
 
 #include "engine/lumix.h"
-#include "engine/os.h"
-#include "engine/array.h"
 
 
 struct ImFont;
@@ -22,12 +20,16 @@ namespace Lumix
 {
 
 
+template <typename T> struct Array;
 struct Action;
 struct ComponentUID;
 struct ResourceType;
 struct Vec2;
 namespace Gizmo { struct Config; }
-
+namespace os {
+	enum class MouseButton;
+	struct Event;
+}
 
 struct LUMIX_EDITOR_API StudioApp
 {
@@ -81,7 +83,7 @@ struct LUMIX_EDITOR_API StudioApp
 	static StudioApp* create();
 	static void destroy(StudioApp& app);
 
-	virtual IAllocator& getAllocator() = 0;
+	virtual struct IAllocator& getAllocator() = 0;
 	virtual struct Engine& getEngine() = 0;
 	virtual void run() = 0;
 	virtual struct PropertyGrid& getPropertyGrid() = 0;

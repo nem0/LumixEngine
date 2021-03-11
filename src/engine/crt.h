@@ -64,7 +64,9 @@
 		LUMIX_CRT_API void __cdecl qsort(void* ptr, size_t count, size_t size, int(*cmp)(const void *, const void *));
 		LUMIX_CRT_API void* __cdecl realloc(void* ptr, size_t size);
 		LUMIX_CRT_API float __cdecl sinf(float x);
+		double __cdecl asin(double _X);
 		LUMIX_CRT_API float __cdecl sqrtf(float x);
+		double __cdecl sqrt(double _X);
 		const char* __cdecl strchr(const char* str, int val);
 		size_t __cdecl strlen(const char* str);
 		int __cdecl strcmp(const char* str, const char* str2);

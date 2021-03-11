@@ -2,6 +2,7 @@
 
 #include "utils.h"
 #include "engine/math.h"
+#include "engine/os.h"
 #include "engine/path.h"
 #include "editor/render_interface.h"
 #include "editor/studio_app.h"
@@ -54,6 +55,9 @@ ResourceLocator::ResourceLocator(const Span<const char>& path)
 	resource.m_end = ext.m_end;
 }
 
+Action::Action() {
+	shortcut = os::Keycode::INVALID;
+}
 
 void Action::init(const char* label_short, const char* label_long, const char* name, const char* font_icon, bool is_global) {
 	this->label_long = label_long;
