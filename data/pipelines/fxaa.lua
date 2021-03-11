@@ -1,11 +1,7 @@
 function postprocess(env, transparent_phase, ldr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	if not enabled then return ldr_buffer end
 	if transparent_phase ~= "post_tonemap" then return ldr_buffer end
-	local format = "rgba16f"
-	if env.APP ~= nil or env.PREVIEW ~= nil then
-		format = "rgba8"
-	end
-	local res = env.createRenderbuffer { width = env.viewport_w, height = env.viewport_h, format = format, debug_name = "fxaa" }
+	local res = env.createRenderbuffer { width = env.viewport_w, height = env.viewport_h, format = "srgba", debug_name = "fxaa" }
 	env.beginBlock("fxaa")
 	if env.fxaa_shader == nil then
 		env.fxaa_shader = env.preloadShader("pipelines/fxaa.shd")
