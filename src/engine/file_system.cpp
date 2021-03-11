@@ -341,7 +341,10 @@ struct PackFileSystem : FileSystemImpl {
 			hash = path.getHash();
 		}
 		auto iter = m_map.find(hash);
-		if (!iter.isValid()) return false;
+		if (!iter.isValid()) {
+			iter = m_map.find(path.getHash());
+			if (!iter.isValid()) return false;
+		}
 
 		OutputMemoryStream compressed(m_allocator);
 		compressed.resize(iter.value().compressed_size);
