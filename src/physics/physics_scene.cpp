@@ -791,7 +791,7 @@ struct PhysicsSceneImpl final : PhysicsScene
 			veh->geom->onLoaded<&Vehicle::onStateChanged>(veh.get());
 		}
 	}
-
+	
 	void setVehicleAccel(EntityRef entity, bool accel) override {
 		m_vehicles[entity]->raw_input.setAnalogAccel(accel ? 1.f : 0.f);
 	}
@@ -4610,6 +4610,7 @@ void PhysicsScene::reflect() {
 			.icon(ICON_FA_CAR_ALT)
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel")
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer")
+			.LUMIX_FUNC_EX(PhysicsScene::setVehicleBrake, "setBrake")
 			.LUMIX_PROP(VehicleMass, "Mass").minAttribute(0)
 			.LUMIX_PROP(VehicleCenterOfMass, "Center of mass")
 			.LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier")
