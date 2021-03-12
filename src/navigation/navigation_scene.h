@@ -17,7 +17,12 @@ template <typename T> struct DelegateList;
 
 
 struct NavmeshZone {
+	enum Flags {
+		AUTOLOAD = 1 << 0
+	};
 	Vec3 extents;
+	u64 guid;
+	u32 flags;
 };
 
 
@@ -27,6 +32,8 @@ struct NavigationScene : IScene
 	static void reflect();
 
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;
+	virtual bool isZoneAutoload(EntityRef entity) = 0;
+	virtual void setZoneAutoload(EntityRef entity, bool value) = 0;
 	virtual bool isFinished(EntityRef entity) = 0;
 	virtual bool navigate(EntityRef entity, const struct DVec3& dest, float speed, float stop_distance) = 0;
 	virtual void cancelNavigation(EntityRef entity) = 0;
@@ -44,8 +51,8 @@ struct NavigationScene : IScene
 	virtual void setIsGettingRootMotionFromAnim(EntityRef entity, bool is) = 0;
 	virtual bool generateNavmesh(EntityRef zone) = 0;
 	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;
-	virtual bool load(EntityRef zone_entity, const char* path) = 0;
-	virtual bool save(EntityRef zone_entity, const char* path) = 0;
+	virtual bool loadZone(EntityRef zone_entity) = 0;
+	virtual bool saveZone(EntityRef zone_entity) = 0;
 	virtual void debugDrawNavmesh(EntityRef zone, const DVec3& pos, bool inner_boundaries, bool outer_boundaries, bool portals) = 0;
 	virtual void debugDrawCompactHeightfield(EntityRef zone) = 0;
 	virtual void debugDrawHeightfield(EntityRef zone) = 0;

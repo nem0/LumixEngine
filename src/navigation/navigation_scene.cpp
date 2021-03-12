@@ -28,6 +28,7 @@ namespace Lumix
 
 
 enum class NavigationSceneVersion : i32 {
+	ZONE_GUID,
 	LATEST
 };
 
@@ -44,6 +45,8 @@ struct RecastZone {
 	EntityRef entity;
 	NavmeshZone zone;
 
+	u32 m_num_tiles_x = 0;
+	u32 m_num_tiles_z = 0;
 	dtNavMeshQuery* navquery = nullptr;
 	rcPolyMeshDetail* detail_mesh = nullptr;
 	rcPolyMesh* polymesh = nullptr;
@@ -84,8 +87,6 @@ struct NavigationSceneImpl final : NavigationScene
 		, m_universe(universe)
 		, m_system(system)
 		, m_engine(engine)
-		, m_num_tiles_x(0)
-		, m_num_tiles_z(0)
 		, m_agents(m_allocator)
 		, m_zones(m_allocator)
 		, m_script_scene(nullptr)
@@ -642,8 +643,8 @@ struct NavigationSceneImpl final : NavigationScene
 			}
 
 			InputMemoryStream file(mem, size);
-			file.read(&scene.m_num_tiles_x, sizeof(scene.m_num_tiles_x));
-			file.read(&scene.m_num_tiles_z, sizeof(scene.m_num_tiles_z));
+			file.read(zone.m_num_tiles_x);
+			file.read(zone.m_num_tiles_z);
 			dtNavMeshParams params;
 			file.read(&params, sizeof(params));
 			if (dtStatusFailed(zone.navmesh->init(&params))) {
@@ -651,8 +652,8 @@ struct NavigationSceneImpl final : NavigationScene
 				LUMIX_DELETE(scene.m_allocator, this);
 				return;
 			}
-			for (int j = 0; j < scene.m_num_tiles_z; ++j) {
-				for (int i = 0; i < scene.m_num_tiles_x; ++i) {
+			for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
+				for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
 					int data_size;
 					file.read(&data_size, sizeof(data_size));
 					u8* data = (u8*)dtAlloc(data_size, DT_ALLOC_PERM);
@@ -674,33 +675,35 @@ struct NavigationSceneImpl final : NavigationScene
 		EntityRef entity;
 	};
 
-	bool load(EntityRef zone_entity, const char* path) override {
+	bool loadZone(EntityRef zone_entity) override {
 		RecastZone& zone = m_zones[zone_entity];
 		clearNavmesh(zone);
 
 		LoadCallback* lcb = LUMIX_NEW(m_allocator, LoadCallback)(*this, zone_entity);
 
+		StaticString<LUMIX_MAX_PATH> path("universes/navzones/", zone.zone.guid, ".nav");
 		FileSystem::ContentCallback cb;
 		cb.bind<&LoadCallback::fileLoaded>(lcb);
 		FileSystem& fs = m_engine.getFileSystem();
 		return fs.getContent(Path(path), cb).isValid();
 	}
 
-	bool save(EntityRef zone_entity, const char* path) override {
+	bool saveZone(EntityRef zone_entity) override {
 		RecastZone& zone = m_zones[zone_entity];
 		if (!zone.navmesh) return false;
 
 		FileSystem& fs = m_engine.getFileSystem();
 		
 		os::OutputFile file;
+		StaticString<LUMIX_MAX_PATH> path("universes/navzones/", zone.zone.guid, ".nav");
 		if (!fs.open(path, file)) return false;
 
-		bool success = file.write(&m_num_tiles_x, sizeof(m_num_tiles_x));
-		success = success && file.write(&m_num_tiles_z, sizeof(m_num_tiles_z));
+		bool success = file.write(zone.m_num_tiles_x);
+		success = success && file.write(zone.m_num_tiles_z);
 		const dtNavMeshParams* params = zone.navmesh->getParams();
 		success = success && file.write(params, sizeof(*params));
-		for (int j = 0; j < m_num_tiles_z; ++j) {
-			for (int i = 0; i < m_num_tiles_x; ++i) {
+		for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
+			for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
 				const auto* tile = zone.navmesh->getTileAt(i, j, 0);
 				success = success && file.write(&tile->dataSize, sizeof(tile->dataSize));
 				success = success && file.write(tile->data, tile->dataSize);
@@ -1296,9 +1299,9 @@ struct NavigationSceneImpl final : NavigationScene
 		params.tileHeight = float(CELLS_PER_TILE_SIDE * CELL_SIZE);
 		int grid_width, grid_height;
 		rcCalcGridSize(&min.x, &max.x, CELL_SIZE, &grid_width, &grid_height);
-		m_num_tiles_x = (grid_width + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
-		m_num_tiles_z = (grid_height + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
-		params.maxTiles = m_num_tiles_x * m_num_tiles_z;
+		zone.m_num_tiles_x = (grid_width + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
+		zone.m_num_tiles_z = (grid_height + CELLS_PER_TILE_SIDE - 1) / CELLS_PER_TILE_SIDE;
+		params.maxTiles = zone.m_num_tiles_x * zone.m_num_tiles_z;
 		int tiles_bits = log2(nextPow2(params.maxTiles));
 		params.maxPolys = 1 << (22 - tiles_bits); // keep 10 bits for salt
 
@@ -1307,8 +1310,8 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
-		for (int j = 0; j < m_num_tiles_z; ++j) {
-			for (int i = 0; i < m_num_tiles_x; ++i) {
+		for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
+			for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
 				if (!generateTile(zone, zone_entity, i, j, false)) {
 					return false;
 				}
@@ -1340,6 +1343,8 @@ struct NavigationSceneImpl final : NavigationScene
 	void createZone(EntityRef entity) {
 		RecastZone zone;
 		zone.zone.extents = Vec3(1);
+		zone.zone.guid = randGUID();
+		zone.zone.flags = NavmeshZone::AUTOLOAD;
 		zone.entity = entity;
 		m_zones.insert(entity, zone);
 		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
@@ -1404,7 +1409,7 @@ struct NavigationSceneImpl final : NavigationScene
 		m_universe.onComponentDestroyed(entity, NAVMESH_AGENT_TYPE, this);
 	}
 
-	int getVersion() const override { return (int)NavigationSceneVersion::LATEST; }
+	i32 getVersion() const override { return (i32)NavigationSceneVersion::LATEST; }
 
 
 	void serialize(OutputMemoryStream& serializer) override
@@ -1413,7 +1418,10 @@ struct NavigationSceneImpl final : NavigationScene
 		serializer.write(count);
 		for (auto iter = m_zones.begin(); iter.isValid(); ++iter) {
 			serializer.write(iter.key());
-			serializer.write(iter.value().zone);
+			const NavmeshZone& zone = iter.value().zone;
+			serializer.write(zone.extents);
+			serializer.write(zone.guid);
+			serializer.write(zone.flags);
 		}
 
 		count = m_agents.size();
@@ -1437,10 +1445,21 @@ struct NavigationSceneImpl final : NavigationScene
 			EntityRef e;
 			serializer.read(e);
 			e = entity_map.get(e);
-			serializer.read(zone.zone);
+			serializer.read(zone.zone.extents);
 			zone.entity = e;
+			if (version > (i32)NavigationSceneVersion::ZONE_GUID) {
+				serializer.read(zone.zone.guid);
+				serializer.read(zone.zone.flags);
+			}
+			else {
+				zone.zone.guid = randGUID();
+				zone.zone.flags = NavmeshZone::AUTOLOAD;
+			}
 			m_zones.insert(e, zone);
 			m_universe.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
+			if (version > (i32)NavigationSceneVersion::ZONE_GUID && (zone.zone.flags & NavmeshZone::AUTOLOAD) != 0) {
+				loadZone(e);
+			}
 		}
 
 		serializer.read(count);
@@ -1517,6 +1536,15 @@ struct NavigationSceneImpl final : NavigationScene
 		return m_zones[entity].zone;
 	}
 
+	bool isZoneAutoload(EntityRef entity) override {
+		return m_zones[entity].zone.flags & NavmeshZone::AUTOLOAD;
+	}
+	
+	void setZoneAutoload(EntityRef entity, bool value) {
+		if (value) m_zones[entity].zone.flags |= NavmeshZone::AUTOLOAD;
+		else m_zones[entity].zone.flags &= ~NavmeshZone::AUTOLOAD;
+	}
+
 	IPlugin& getPlugin() const override { return m_system; }
 	Universe& getUniverse() override { return m_universe; }
 
@@ -1530,8 +1558,6 @@ struct NavigationSceneImpl final : NavigationScene
 	
 	Vec3 m_debug_tile_origin;
 	rcConfig m_config;
-	int m_num_tiles_x;
-	int m_num_tiles_z;
 	LuaScriptScene* m_script_scene;
 	DelegateList<void(float)> m_on_update;
 };
@@ -1549,15 +1575,14 @@ void NavigationScene::reflect() {
 
 		.LUMIX_CMP(Zone, "navmesh_zone", "Navigation / Zone")
 			.icon(ICON_FA_STREET_VIEW)
+			.LUMIX_FUNC_EX(loadZone, "load")
 			.LUMIX_FUNC_EX(debugDrawContours, "drawContours")
 			.LUMIX_FUNC_EX(debugDrawNavmesh, "drawNavmesh")
 			.LUMIX_FUNC_EX(debugDrawCompactHeightfield, "drawCompactHeightfield")
 			.LUMIX_FUNC_EX(debugDrawHeightfield, "drawHeightfield")
-			.LUMIX_FUNC(NavigationSceneImpl::save)
-			.LUMIX_FUNC(NavigationSceneImpl::load)
 			.LUMIX_FUNC(NavigationSceneImpl::generateNavmesh)
 			.var_prop<&NavigationScene::getZone, &NavmeshZone::extents>("Extents")
-
+			.prop<&NavigationScene::isZoneAutoload, &NavigationScene::setZoneAutoload>("Autoload")
 		.LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent")
 			.icon(ICON_FA_MAP_MARKED_ALT)
 			.LUMIX_FUNC_EX(NavigationSceneImpl::setActorActive, "setActive")

@@ -69,31 +69,17 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		ImGui::SameLine();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (ImGui::Button("Load")) {
-			char path[LUMIX_MAX_PATH];
-			if (os::getOpenFilename(Span(path), "Navmesh\0*.nav\0", nullptr)) {
-				char rel[LUMIX_MAX_PATH];
-				if (fs.makeRelative(Span(rel), path)) {
-					scene->load((EntityRef)cmp.entity, rel);
-				}
-				else {
-					logError("Can not load ", path, " because it's not in root directory.");
-				}
-			}		
+			scene->loadZone((EntityRef)cmp.entity);
 		}
 
 		if(scene->isNavmeshReady((EntityRef)cmp.entity)) {
 			ImGui::SameLine();
 			if (ImGui::Button("Save")) {
-				char path[LUMIX_MAX_PATH];
-				if (os::getSaveFilename(Span(path), "Navmesh\0*.nav\0", "nav")) {
-					char rel[LUMIX_MAX_PATH];
-					if (fs.makeRelative(Span(rel), path)) {
-						scene->save((EntityRef)cmp.entity, rel);
-					}
-					else {
-						logError("Can not save ", path, " because it's not in root directory.");
-					}
+				StaticString<LUMIX_MAX_PATH> dir(m_app.getEngine().getFileSystem().getBasePath(), "/universes/navzones/");
+				if (!os::makePath(dir) && !os::dirExists(dir)) {
+					logError("Could not create ", dir);
 				}
+				scene->saveZone((EntityRef)cmp.entity);
 			}
 		}
 		ImGui::SameLine();
