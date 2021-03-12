@@ -2090,6 +2090,24 @@ struct PipelineImpl final : Pipeline
 		res.raw = texture;
 		return res;
 	}
+	
+	PipelineTexture createTextureArray(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
+		Renderer::MemRef mem;
+		const gpu::TextureFormat format = getFormat(format_str);
+		const gpu::TextureHandle texture = m_renderer.createTexture(width
+			, height
+			, depth
+			, format
+			, gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS
+			, mem
+			, debug_name.get("lua_texture"));
+		m_textures.push(texture);
+
+		PipelineTexture res;
+		res.type = PipelineTexture::RAW;
+		res.raw = texture;
+		return res;
+	}
 
 	PipelineTexture createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
 		Renderer::MemRef mem;
@@ -4801,6 +4819,7 @@ struct PipelineImpl final : Pipeline
 		REGISTER_FUNCTION(createBucket);
 		REGISTER_FUNCTION(createBuffer);
 		REGISTER_FUNCTION(createRenderbuffer);
+		REGISTER_FUNCTION(createTextureArray);
 		REGISTER_FUNCTION(createTexture2D);
 		REGISTER_FUNCTION(createTexture3D);
 		REGISTER_FUNCTION(cull);
