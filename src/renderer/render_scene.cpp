@@ -74,10 +74,24 @@ static RenderableTypes getRenderableType(const Model& model, bool custom_materia
 	return RenderableTypes::MESH;
 }
 
+struct ReflectionProbe::LoadJob {
+	LoadJob(struct RenderSceneImpl& scene, EntityRef probe, IAllocator& allocator)
+		: m_scene(scene)
+		, m_allocator(allocator)
+		, m_entity(probe)
+	{}
 
-struct RenderSceneImpl final : RenderScene
-{
-public:
+	~LoadJob();
+
+	void callback(u64 size, const u8* data, bool success);
+
+	IAllocator& m_allocator;
+	RenderSceneImpl& m_scene;
+	EntityRef m_entity;
+	FileSystem::AsyncHandle m_handle = FileSystem::AsyncHandle::invalid();
+};
+
+struct RenderSceneImpl final : RenderScene {
 	RenderSceneImpl(Renderer& renderer,
 		Engine& engine,
 		Universe& universe,
@@ -210,6 +224,10 @@ public:
 		m_material_decal_map.clear();
 
 		m_culling_system->clear();
+
+		for (const ReflectionProbe& probe : m_reflection_probes) {
+			LUMIX_DELETE(m_allocator, probe.load_job);
+		}
 
 		m_reflection_probes.clear();
 		m_environment_probes.clear();
@@ -724,13 +742,15 @@ public:
 			serializer.read(probe.flags.base);
 			serializer.read(probe.size);
 			serializer.read(probe.half_extents);
-			load(probe);
+			load(probe, entity);
 
 			m_universe.onComponentCreated(entity, REFLECTION_PROBE_TYPE, this);
 		}
 	}
 
-	void load(ReflectionProbe& probe) {
+	void load(ReflectionProbe& probe, EntityRef entity) {
+		ASSERT(!probe.load_job);
+
 		if (probe.texture_id == 0xffFFffFF) {
 			u32 mask = 0;
 			for (auto& p : m_reflection_probes) {
@@ -751,28 +771,10 @@ public:
 			return;
 		}
 		
-		struct Job : Renderer::RenderJob {
-			Job(IAllocator& allocator) : data(allocator) {}
-
-			void setup() override {}
-				
-			void execute() override {
-				gpu::loadLayers(tex, layer, data.data(), (int)data.size(), "reflection probe");
-			}
-
-			u32 layer;
-			OutputMemoryStream data;
-			gpu::TextureHandle tex;
-		};
-			
-		Job& job = m_renderer.createJob<Job>(m_allocator);
-		// TODO async load
-		if (!m_engine.getFileSystem().getContentSync(Path(path_str), job.data)) {
-			logError("Could not load ", path_str);
-		}
-		job.layer = probe.texture_id;
-		job.tex = m_reflection_probes_texture;
-		m_renderer.queue(job, 0);
+		probe.load_job = LUMIX_NEW(m_allocator, ReflectionProbe::LoadJob)(*this, entity, m_allocator);
+		FileSystem::ContentCallback cb;
+		cb.bind<&ReflectionProbe::LoadJob::callback>(probe.load_job);
+		probe.load_job->m_handle = m_engine.getFileSystem().getContent(Path(path_str), cb);
 	}
 
 	void deserializeEnvironmentProbes(InputMemoryStream& serializer, const EntityMap& entity_map)
@@ -998,6 +1000,7 @@ public:
 	void destroyReflectionProbe(EntityRef entity)
 	{
 		ReflectionProbe& probe = m_reflection_probes[entity];
+		LUMIX_DELETE(m_allocator, probe.load_job);
 		m_reflection_probes.erase(entity);
 		m_universe.onComponentDestroyed(entity, REFLECTION_PROBE_TYPE, this);
 	}
@@ -2258,8 +2261,10 @@ public:
 	}
 
 	void reloadReflectionProbes() {
-		for (ReflectionProbe& probe : m_reflection_probes) {
-			load(probe);
+		for (i32 i = 0; i < m_reflection_probes.size(); ++i) {
+			ReflectionProbe& probe = m_reflection_probes.at(i);
+			const EntityRef e = m_reflection_probes.getKey(i);
+			load(probe, e);
 		}
 	}
 
@@ -2703,7 +2708,6 @@ public:
 		return m_particle_emitters;
 	}
 
-private:
 	IAllocator& m_allocator;
 	Universe& m_universe;
 	Renderer& m_renderer;
@@ -2742,6 +2746,44 @@ private:
 	HashMap<Material*, EntityRef> m_material_curve_decal_map;
 };
 
+ReflectionProbe::LoadJob::~LoadJob() {
+	if (m_handle.isValid()) {
+		m_scene.m_engine.getFileSystem().cancel(m_handle);
+	}
+}
+
+void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) {
+	ReflectionProbe& probe = m_scene.m_reflection_probes[m_entity];
+	probe.load_job = nullptr;
+	m_handle = FileSystem::AsyncHandle::invalid();
+
+	if (!success) {
+		logError("Failed to load probe ", probe.guid);
+		LUMIX_DELETE(m_allocator, this);
+		return;
+	}
+
+	struct Job : Renderer::RenderJob {
+		Job(IAllocator& allocator) : data(allocator) {}
+
+		void setup() override {}
+				
+		void execute() override {
+			gpu::loadLayers(tex, layer, data.data(), (int)data.size(), "reflection probe");
+		}
+
+		u32 layer;
+		OutputMemoryStream data;
+		gpu::TextureHandle tex;
+	};
+			
+	Job& job = m_scene.m_renderer.createJob<Job>(m_allocator);
+	job.layer = probe.texture_id;
+	job.tex = m_scene.m_reflection_probes_texture;
+	job.data.write(data, size);
+	m_scene.m_renderer.queue(job, 0);	
+	LUMIX_DELETE(m_allocator, this);
+}
 
 void RenderScene::reflect() {
 	using namespace reflection;

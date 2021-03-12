@@ -126,6 +126,9 @@ struct ReflectionProbe
 	u32 size = 128;
 	Vec3 half_extents = Vec3(100, 100, 100);
 	u32 texture_id = 0xffFFffFF;
+
+	struct LoadJob;
+	LoadJob* load_job = nullptr;
 };
 
 struct EnvironmentProbe
