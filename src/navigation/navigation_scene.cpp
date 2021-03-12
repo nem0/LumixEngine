@@ -163,7 +163,7 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
-	void rasterizeTerrains(const Transform& zone_tr, const AABB& aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
+	void rasterizeTerrains(const Transform& zone_tr, const AABB& zone_aabb, rcContext& ctx, rcConfig& cfg, rcHeightfield& solid)
 	{
 		PROFILE_FUNCTION();
 		const float walkable_threshold = cosf(degreesToRadians(60));
@@ -178,8 +178,15 @@ struct NavigationSceneImpl final : NavigationScene
 			const Transform to_zone = zone_tr.inverted() * terrain_tr;
 			const IVec2 res = render_scene->getTerrainResolution(entity);
 			float scaleXZ = render_scene->getTerrainXZScale(entity);
-			for (int j = 0; j < res.y; ++j) {
-				for (int i = 0; i < res.x; ++i) {
+			const Transform to_terrain = to_zone.inverted();
+			Matrix mtx = to_terrain.rot.toMatrix();
+			mtx.setTranslation(Vec3(to_terrain.pos));
+			AABB aabb = zone_aabb;
+			aabb.transform(mtx);
+			const IVec2 from = IVec2(aabb.min.xz() / scaleXZ);
+			const IVec2 to = IVec2(aabb.max.xz() / scaleXZ + Vec2(1));
+			for (int j = from.y; j < to.y; ++j) {
+				for (int i = from.x; i < to.x; ++i) {
 					float x = i * scaleXZ;
 					float z = j * scaleXZ;
 
@@ -1431,6 +1438,7 @@ struct NavigationSceneImpl final : NavigationScene
 			serializer.read(e);
 			e = entity_map.get(e);
 			serializer.read(zone.zone);
+			zone.entity = e;
 			m_zones.insert(e, zone);
 			m_universe.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
 		}

@@ -610,17 +610,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 			if (is_node_open) {
 				ImGui::Image(texture->handle, ImVec2(96, 96));
-
-				for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
-					bool b = material->isCustomFlag(1 << i);
-					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
-						if (b)
-							material->setCustomFlag(1 << i);
-						else
-							material->unsetCustomFlag(1 << i);
-					}
-				}
-
 				ImGui::TreePop();
 			}
 		}
@@ -671,6 +660,18 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				}
 			}
 			
+			if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags")) {
+				for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
+					bool b = material->isCustomFlag(1 << i);
+					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
+						if (b)
+							material->setCustomFlag(1 << i);
+						else
+							material->unsetCustomFlag(1 << i);
+					}
+				}
+			}
+
 			if (ImGui::CollapsingHeader("Defines")) {
 				for (int i = 0; i < renderer->getShaderDefinesCount(); ++i) {
 					const char* define = renderer->getShaderDefine(i);
