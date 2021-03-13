@@ -26,6 +26,11 @@ struct NavmeshZone {
 	u32 flags;
 };
 
+struct NavmeshBuildJob {
+	~NavmeshBuildJob() {}
+	virtual bool isFinished() = 0;
+	virtual float getProgress() = 0;
+};
 
 struct NavigationScene : IScene
 {
@@ -49,7 +54,8 @@ struct NavigationScene : IScene
 	virtual float getAgentHeight(EntityRef entity) = 0;
 	virtual bool getAgentMoveEntity(EntityRef entity) = 0;
 	virtual void setAgentMoveEntity(EntityRef entity, bool value) = 0;
-	virtual bool generateNavmesh(EntityRef zone) = 0;
+	virtual NavmeshBuildJob* generateNavmesh(EntityRef zone) = 0;
+	virtual void free(NavmeshBuildJob* job) = 0;
 	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;
 	virtual bool loadZone(EntityRef zone_entity) = 0;
 	virtual bool saveZone(EntityRef zone_entity) = 0;

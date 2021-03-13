@@ -99,14 +99,14 @@ struct NavigationSceneImpl final : NavigationScene
 	~NavigationSceneImpl()
 	{
 		m_universe.entityTransformed().unbind<&NavigationSceneImpl::onEntityMoved>(this);
-		for(RecastZone& zone : m_zones) {
-			clearNavmesh(zone);
-		}
 	}
 
 
 	void clear() override
 	{
+		for(RecastZone& zone : m_zones) {
+			clearNavmesh(zone);
+		}
 		m_agents.clear();
 		m_zones.clear();
 	}
@@ -1225,6 +1225,7 @@ struct NavigationSceneImpl final : NavigationScene
 		params.ch = m_config.ch;
 		params.buildBvTree = false;
 
+		MutexGuard guard(mutex);
 		if (!dtCreateNavMeshData(&params, &nav_data, &nav_data_size)) {
 			logError("Could not build Detour navmesh.");
 			return false;
@@ -1233,7 +1234,6 @@ struct NavigationSceneImpl final : NavigationScene
 		rcFreePolyMesh(polymesh);
 		if (detail_mesh) rcFreePolyMeshDetail(detail_mesh);
 
-		MutexGuard guard(mutex);
 		if (dtStatusFailed(zone.navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr))) {
 			logError("Could not add Detour tile.");
 			return false;
@@ -1265,12 +1265,72 @@ struct NavigationSceneImpl final : NavigationScene
 		return true;
 	}
 
-	bool generateNavmesh(EntityRef zone_entity) override {
+	void free(NavmeshBuildJob* job) override{
+		LUMIX_DELETE(m_allocator, job);
+	}
+
+	struct NavmeshBuildJobImpl : NavmeshBuildJob {
+		~NavmeshBuildJobImpl() {
+			jobs::wait(signal);
+		}
+
+		bool isFinished() override {
+			return done_counter + fail_counter == total;
+		}
+
+		float getProgress() override {
+			return (done_counter + fail_counter) / (float)total;
+		}
+
+		void pushJob() {
+			jobs::run(this, [](void* user_ptr){
+				NavmeshBuildJobImpl* that = (NavmeshBuildJobImpl*)user_ptr;
+				const i32 i = atomicIncrement(&that->counter) - 1;
+				if (i >= that->total) {
+					jobs::decSignal(that->signal);
+					return;
+				}
+
+				if (!that->scene->generateTile(*that->zone, that->zone_entity, i % that->zone->m_num_tiles_x, i / that->zone->m_num_tiles_x, false, that->mutex)) {
+					atomicIncrement(&that->fail_counter);
+				}
+				else {
+					atomicIncrement(&that->done_counter);
+				}
+
+				that->pushJob();
+			}, nullptr);
+		}
+
+		void run() {
+			total = zone->m_num_tiles_x * zone->m_num_tiles_z;
+			signal = jobs::INVALID_HANDLE;
+			for (u8 i = 0; i < jobs::getWorkersCount() - 1; ++i) {
+				jobs::incSignal(&signal);
+			}
+			for (u8 i = 0; i < jobs::getWorkersCount() - 1; ++i) {
+				pushJob();
+			}
+		}
+
+		i32 total;
+		volatile i32 counter = 0;
+		volatile i32 fail_counter = 0;
+		volatile i32 done_counter = 0;
+		Mutex mutex;
+		RecastZone* zone;
+		EntityRef zone_entity;
+		NavigationSceneImpl* scene;
+
+		jobs::SignalHandle signal;
+	};
+
+	NavmeshBuildJob* generateNavmesh(EntityRef zone_entity) override {
 		PROFILE_FUNCTION();
 		RecastZone& zone =  m_zones[zone_entity];
 		clearNavmesh(zone);
 
-		if (!initNavmesh(zone)) return false;
+		if (!initNavmesh(zone)) return nullptr;
 
 		dtNavMeshParams params;
 		const Vec3 min = -zone.zone.extents;
@@ -1289,7 +1349,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 		if (dtStatusFailed(zone.navmesh->init(&params))) {
 			logError("Could not init Detour navmesh");
-			return false;
+			return nullptr;
 		}
 
 		for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
@@ -1298,22 +1358,12 @@ struct NavigationSceneImpl final : NavigationScene
 			}
 		}
 
-		Mutex mutex;
-		volatile i32 counter = 0;
-		volatile i32 fail_counter = 0;
-		jobs::runOnWorkers([&](){
-			for (;;) {
-				const i32 i = atomicIncrement(&counter) - 1;
-				if (i >= i32(zone.m_num_tiles_z * zone.m_num_tiles_x)) break;
-
-				if (!generateTile(zone, zone_entity, i % zone.m_num_tiles_x, i / zone.m_num_tiles_x, false, mutex)) {
-					atomicIncrement(&fail_counter);
-					break;
-				}
-			}
-		});
-
-		return fail_counter == 0;
+		NavmeshBuildJobImpl* job = LUMIX_NEW(m_allocator, NavmeshBuildJobImpl);
+		job->zone = &zone;
+		job->zone_entity = zone_entity;
+		job->scene = this;
+		job->run();
+		return job;
 	}
 
 

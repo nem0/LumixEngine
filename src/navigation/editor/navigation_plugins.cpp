@@ -29,6 +29,9 @@ static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("nav
 
 struct PropertyGridPlugin : PropertyGrid::IPlugin {
 	PropertyGridPlugin(StudioApp& app) : m_app(app) {}
+	~PropertyGridPlugin() {
+		ASSERT(!m_job);
+	}
 
 	void onAgentGUI(EntityRef entity) {
 		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
@@ -54,8 +57,37 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		if (debug_draw_path) scene->debugDrawPath(entity);
 	}
 
+	void update() override {
+		if (!m_job) return;
+		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(NAVMESH_AGENT_TYPE));
+		if (m_job->isFinished()) {
+			scene->free(m_job);
+			m_job = nullptr;
+			return;
+		}
+		
+		const float ui_width = maximum(300.f, ImGui::GetIO().DisplaySize.x * 0.33f);
+		const ImVec2 pos = ImGui::GetMainViewport()->Pos;
+		ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x - ui_width) * 0.5f + pos.x, 30 + pos.y));
+		ImGui::SetNextWindowSize(ImVec2(ui_width, -1));
+		ImGui::SetNextWindowSizeConstraints(ImVec2(-FLT_MAX, 0), ImVec2(FLT_MAX, 200));
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar 
+			| ImGuiWindowFlags_AlwaysAutoResize
+			| ImGuiWindowFlags_NoMove
+			| ImGuiWindowFlags_NoSavedSettings;
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1);
+		if (ImGui::Begin("Navmesh building", nullptr, flags)) {
+			ImGui::Text("%s", "Building navmesh...");
+			ImGui::Text("%s", "Manipulating with entities at this time can produce incorrect results and even crashes.");
+			float progress = m_job->getProgress();
+			ImGui::ProgressBar(progress, ImVec2(-1, 0), StaticString<64>(i32(progress * 100), "%"));
+		}
+		ImGui::End();
+		ImGui::PopStyleVar();
+	}
+
 	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
-		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
+		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(NAVMESH_AGENT_TYPE));
 		if(cmp.type == NAVMESH_AGENT_TYPE) { 
 			onAgentGUI((EntityRef)cmp.entity);
 			return;
@@ -63,9 +95,13 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 
 		if (cmp.type != NAVMESH_ZONE_TYPE) return;
 		
-		if (ImGui::Button("Generate")) {
-			scene->generateNavmesh((EntityRef)cmp.entity);
+		if (m_job) {
+			ImGui::TextUnformatted("Generating...");
 		}
+		else if (ImGui::Button("Generate")) {
+			m_job = scene->generateNavmesh((EntityRef)cmp.entity);
+		}
+
 		ImGui::SameLine();
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (ImGui::Button("Load")) {
@@ -122,6 +158,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 	}
 
 	StudioApp& m_app;
+	NavmeshBuildJob* m_job = nullptr;
 };
 
 
