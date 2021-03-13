@@ -36,7 +36,6 @@ enum class NavigationSceneVersion : i32 {
 static const ComponentType LUA_SCRIPT_TYPE = reflection::getComponentType("lua_script");
 static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
 static const ComponentType NAVMESH_AGENT_TYPE = reflection::getComponentType("navmesh_agent");
-static const ComponentType ANIMATOR_TYPE = reflection::getComponentType("animator");
 static const int CELLS_PER_TILE_SIDE = 256;
 static const float CELL_SIZE = 0.3f;
 
@@ -60,10 +59,8 @@ struct RecastZone {
 
 struct Agent
 {
-	enum Flags : u32
-	{
+	enum Flags : u32 {
 		USE_ROOT_MOTION = 1 << 0,
-		GET_ROOT_MOTION_FROM_ANIM_CONTROLLER = 1 << 1
 	};
 
 	EntityPtr zone = INVALID_ENTITY;
@@ -347,7 +344,7 @@ struct NavigationSceneImpl final : NavigationScene
 			const Vec3 diff = *(Vec3*)dt_agent->npos - pos;
 
 			const Vec3 velocity = *(Vec3*)dt_agent->nvel;
-			agent.speed = length(diff) / time_delta;
+			agent.speed = length(velocity);
 			agent.yaw_diff = 0;
 			if (squaredLength(velocity) > 0) {
 				float wanted_yaw = atan2f(velocity.x, velocity.z);
@@ -372,9 +369,6 @@ struct NavigationSceneImpl final : NavigationScene
 		const Transform zone_tr = m_universe.getTransform(zone.entity);
 		const Transform inv_zone_tr = zone_tr.inverted();
 
-		static const u32 ANIMATION_HASH = crc32("animation");
-		auto* anim_scene = (AnimationScene*)m_universe.getScene(ANIMATION_HASH);
-
 		for (Agent& agent : m_agents) {
 			if (agent.agent < 0) continue;
 			if (agent.zone != zone.entity) continue;
@@ -384,13 +378,6 @@ struct NavigationSceneImpl final : NavigationScene
 
 			DVec3 pos = m_universe.getPosition(agent.entity);
 			Quat rot = m_universe.getRotation(agent.entity);
-			if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene) {
-				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIMATOR_TYPE)) {
-					LocalRigidTransform root_motion = anim_scene->getAnimatorRootMotion(agent.entity);
-					agent.root_motion = root_motion.pos;
-					//m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
-				}
-			}
 			if (agent.flags & Agent::USE_ROOT_MOTION) {
 				*(Vec3*)dt_agent->npos = Vec3(inv_zone_tr.transform(pos + rot.rotate(agent.root_motion)));
 				agent.root_motion = Vec3::ZERO;
@@ -406,10 +393,10 @@ struct NavigationSceneImpl final : NavigationScene
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			//if (dt_agent->paused) continue;
 
-			m_moving_agent = agent.entity;
-			m_universe.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
-
 			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0) {
+				m_moving_agent = agent.entity;
+				m_universe.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
+
 				Vec3 vel = *(Vec3*)dt_agent->nvel;
 				vel.y = 0;
 				float len = length(vel);
@@ -420,12 +407,6 @@ struct NavigationSceneImpl final : NavigationScene
 					Quat old_rot = m_universe.getRotation(agent.entity);
 					Quat new_rot = nlerp(wanted_rot, old_rot, 0.90f);
 					m_universe.setRotation(agent.entity, new_rot);
-				}
-			}
-			else if (agent.flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER && anim_scene) {
-				if (anim_scene->getUniverse().hasComponent(agent.entity, ANIMATOR_TYPE)) {
-					LocalRigidTransform root_motion = anim_scene->getAnimatorRootMotion(agent.entity);
-					m_universe.setRotation(agent.entity, m_universe.getRotation(agent.entity) * root_motion.rot);
 				}
 			}
 
@@ -1476,21 +1457,6 @@ struct NavigationSceneImpl final : NavigationScene
 			m_agents.insert(agent.entity, agent);
 			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
 		}
-	}
-
-
-	bool isGettingRootMotionFromAnim(EntityRef entity) override
-	{
-		return (m_agents[entity].flags & Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER) != 0;
-	}
-
-
-	void setIsGettingRootMotionFromAnim(EntityRef entity, bool is) override 
-	{
-		if (is)
-			m_agents[entity].flags |= Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
-		else
-			m_agents[entity].flags &= ~Agent::GET_ROOT_MOTION_FROM_ANIM_CONTROLLER;
 	}
 
 

@@ -47,8 +47,6 @@ struct NavigationScene : IScene
 	virtual void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) = 0;
 	virtual bool useAgentRootMotion(EntityRef entity) = 0;
 	virtual void setUseAgentRootMotion(EntityRef entity, bool use_root_motion) = 0;
-	virtual bool isGettingRootMotionFromAnim(EntityRef entity) = 0;
-	virtual void setIsGettingRootMotionFromAnim(EntityRef entity, bool is) = 0;
 	virtual bool generateNavmesh(EntityRef zone) = 0;
 	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;
 	virtual bool loadZone(EntityRef zone_entity) = 0;

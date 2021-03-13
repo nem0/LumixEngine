@@ -21,27 +21,6 @@ enum class NavigationSceneVersion : int
 };
 
 
-struct Agent
-{
-	enum Flags : u32
-	{
-		USE_ROOT_MOTION = 1 << 0,
-		GET_ROOT_MOTION_FROM_ANIM_CONTROLLER = 1 << 1
-	};
-
-	EntityRef entity;
-	float radius;
-	float height;
-	int agent;
-	bool is_finished;
-	u32 flags = 0;
-	Vec3 root_motion = {0, 0, 0};
-	float speed = 0;
-	float yaw_diff = 0;
-	float stop_distance = 0;
-};
-
-
 struct NavigationSystem final : IPlugin {
 	explicit NavigationSystem(Engine& engine)
 		: m_engine(engine)
