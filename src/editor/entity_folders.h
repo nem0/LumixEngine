@@ -38,7 +38,7 @@ struct EntityFolders final {
 	void selectFolder(FolderID folder) { m_selected_folder = folder; }
 	FolderID getSelectedFolder() const { return m_selected_folder; }
 	void serialize(OutputMemoryStream& blob);
-	void deserialize(InputMemoryStream& blob);
+	void deserialize(InputMemoryStream& blob, const struct EntityMap& entity_map);
 
 private:
 	struct FreeList {
@@ -56,6 +56,7 @@ private:
 	FolderID allocFolder();
 	void onEntityCreated(EntityRef e);
 	void onEntityDestroyed(EntityRef e);
+	void fix(Folder& folder, const EntityMap& entity_map);
 
 	Universe& m_universe;
 	Array<Entity> m_entities;

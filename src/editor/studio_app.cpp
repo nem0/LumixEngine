@@ -1715,6 +1715,7 @@ struct StudioAppImpl final : StudioApp
 		}
 		
 		if (ImGui::IsItemVisible()) {
+			ImGui::PushID(entity.index);
 			if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("entity_context_menu");
 			if (ImGui::BeginPopup("entity_context_menu"))
 			{
@@ -1729,6 +1730,7 @@ struct StudioAppImpl final : StudioApp
 				}
 				ImGui::EndPopup();
 			}
+			ImGui::PopID();
 			if (ImGui::BeginDragDropSource())
 			{
 				char buffer[1024];

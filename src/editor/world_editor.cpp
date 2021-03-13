@@ -2564,7 +2564,7 @@ public:
 		{
 			m_prefab_system->deserialize(blob, entity_map);
 			if (header.version > (i32)SerializedVersion::ENTITY_FOLDERS) {
-				m_entity_folders->deserialize(blob);
+				m_entity_folders->deserialize(blob, entity_map);
 			}
 			if (header.version > (i32)SerializedVersion::CAMERA) {
 				DVec3 pos;

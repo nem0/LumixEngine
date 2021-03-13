@@ -155,10 +155,29 @@ void EntityFolders::serialize(OutputMemoryStream& blob) {
 	blob.write(m_folders.first_free);
 }
 
-void EntityFolders::deserialize(InputMemoryStream& blob) {
+void EntityFolders::fix(Folder& f, const EntityMap& entity_map) {
+	f.first_entity = entity_map.get(f.first_entity);
+	if (f.child_folder != INVALID_FOLDER) fix(m_folders.getObject(f.child_folder), entity_map);
+	if (f.next_folder != INVALID_FOLDER) fix(m_folders.getObject(f.next_folder), entity_map);
+}
+
+void EntityFolders::deserialize(InputMemoryStream& blob, const EntityMap& entity_map) {
 	const u32 count = blob.read<u32>();
-	m_entities.resize(count);
-	blob.read(m_entities.begin(), m_entities.byte_size());
+	m_entities.reserve(count);
+
+	for (u32 i = 0; i < count; ++i) {
+		EntityPtr e = entity_map.get(EntityPtr{(i32)i});
+		if (e.isValid()) {
+			while (e.index >= m_entities.size()) m_entities.emplace();
+			blob.read(m_entities[e.index]);
+			m_entities[e.index].next = entity_map.get(m_entities[e.index].next);
+			m_entities[e.index].prev = entity_map.get(m_entities[e.index].prev);
+		}
+		else {
+			Entity tmp;
+			blob.read(tmp);
+		}
+	}
 
 	const u32 size = blob.read<u32>();
 	m_folders.data.resize(size / sizeof(Folder));
@@ -166,6 +185,8 @@ void EntityFolders::deserialize(InputMemoryStream& blob) {
 	u32 dummy;
 	blob.read(dummy);
 	blob.read(m_folders.first_free);
+	
+	fix(m_folders.getObject(0), entity_map);
 }
 
 EntityFolders::FreeList::FreeList(IAllocator& allocator) 
