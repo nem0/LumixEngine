@@ -60,7 +60,7 @@ struct RecastZone {
 struct Agent
 {
 	enum Flags : u32 {
-		USE_ROOT_MOTION = 1 << 0,
+		MOVE_ENTITY = 1 << 0,
 	};
 
 	EntityPtr zone = INVALID_ENTITY;
@@ -70,7 +70,6 @@ struct Agent
 	int agent;
 	bool is_finished;
 	u32 flags = 0;
-	Vec3 root_motion = {0, 0, 0};
 	float speed = 0;
 	float yaw_diff = 0;
 	float stop_distance = 0;
@@ -321,11 +320,6 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
-	void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) override
-	{
-		m_agents[entity].root_motion = root_motion;
-	}
-
 	void update(RecastZone& zone, float time_delta) {
 		if (!zone.crowd) return;
 		zone.crowd->update(time_delta, nullptr);
@@ -357,6 +351,7 @@ struct NavigationSceneImpl final : NavigationScene
 	void update(float time_delta, bool paused) override {
 		PROFILE_FUNCTION();
 		if (paused) return;
+		if (!m_is_game_running) return;
 		
 		for (RecastZone& zone : m_zones) {
 			update(zone, time_delta);
@@ -369,21 +364,6 @@ struct NavigationSceneImpl final : NavigationScene
 		const Transform zone_tr = m_universe.getTransform(zone.entity);
 		const Transform inv_zone_tr = zone_tr.inverted();
 
-		for (Agent& agent : m_agents) {
-			if (agent.agent < 0) continue;
-			if (agent.zone != zone.entity) continue;
-
-			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
-			//if (dt_agent->paused) continue;
-
-			DVec3 pos = m_universe.getPosition(agent.entity);
-			Quat rot = m_universe.getRotation(agent.entity);
-			if (agent.flags & Agent::USE_ROOT_MOTION) {
-				*(Vec3*)dt_agent->npos = Vec3(inv_zone_tr.transform(pos + rot.rotate(agent.root_motion)));
-				agent.root_motion = Vec3::ZERO;
-			}
-		}
-
 		zone.crowd->doMove(time_delta);
 
 		for (auto& agent : m_agents) {
@@ -393,7 +373,7 @@ struct NavigationSceneImpl final : NavigationScene
 			const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
 			//if (dt_agent->paused) continue;
 
-			if ((agent.flags & Agent::USE_ROOT_MOTION) == 0) {
+			if (agent.flags & Agent::MOVE_ENTITY) {
 				m_moving_agent = agent.entity;
 				m_universe.setPosition(agent.entity, zone_tr.transform(*(Vec3*)dt_agent->npos));
 
@@ -408,6 +388,9 @@ struct NavigationSceneImpl final : NavigationScene
 					Quat new_rot = nlerp(wanted_rot, old_rot, 0.90f);
 					m_universe.setRotation(agent.entity, new_rot);
 				}
+			}
+			else {
+				*(Vec3*)dt_agent->npos = Vec3(zone_tr.inverted().transform(m_universe.getPosition(agent.entity)));
 			}
 
 			if (dt_agent->ncorners == 0 && dt_agent->targetState != DT_CROWDAGENT_TARGET_REQUESTING) {
@@ -435,6 +418,8 @@ struct NavigationSceneImpl final : NavigationScene
 	void lateUpdate(float time_delta, bool paused) override {
 		PROFILE_FUNCTION();
 		if (paused) return;
+		if (!m_is_game_running) return;
+
 		for (RecastZone& zone : m_zones) {
 			lateUpdate(zone, time_delta);
 		}
@@ -924,6 +909,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 	void stopGame() override
 	{
+		m_is_game_running = false;
 		for (RecastZone& zone : m_zones) {
 			if (zone.crowd) {
 				for (Agent& agent : m_agents) {
@@ -941,6 +927,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 	void startGame() override
 	{
+		m_is_game_running = true;
 		auto* scene = m_universe.getScene(crc32("lua_script"));
 		m_script_scene = static_cast<LuaScriptScene*>(scene);
 		
@@ -1372,7 +1359,7 @@ struct NavigationSceneImpl final : NavigationScene
 		agent.radius = 0.5f;
 		agent.height = 2.0f;
 		agent.agent = -1;
-		agent.flags = Agent::USE_ROOT_MOTION;
+		agent.flags = Agent::MOVE_ENTITY;
 		agent.is_finished = true;
 		m_agents.insert(entity, agent);
 		assignZone(agent);
@@ -1460,18 +1447,18 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 
-	bool useAgentRootMotion(EntityRef entity) override
+	bool getAgentMoveEntity(EntityRef entity) override
 	{
-		return (m_agents[entity].flags & Agent::USE_ROOT_MOTION) != 0;
+		return (m_agents[entity].flags & Agent::MOVE_ENTITY) != 0;
 	}
 
 
-	void setUseAgentRootMotion(EntityRef entity, bool use_root_motion) override
+	void setAgentMoveEntity(EntityRef entity, bool value) override
 	{
-		if (use_root_motion)
-			m_agents[entity].flags |= Agent::USE_ROOT_MOTION;
+		if (value)
+			m_agents[entity].flags |= Agent::MOVE_ENTITY;
 		else
-			m_agents[entity].flags &= ~Agent::USE_ROOT_MOTION;
+			m_agents[entity].flags &= ~Agent::MOVE_ENTITY;
 	}
 
 
@@ -1521,6 +1508,7 @@ struct NavigationSceneImpl final : NavigationScene
 	HashMap<EntityRef, RecastZone> m_zones;
 	HashMap<EntityRef, Agent> m_agents;
 	EntityPtr m_moving_agent = INVALID_ENTITY;
+	bool m_is_game_running = false;
 	
 	Vec3 m_debug_tile_origin;
 	rcConfig m_config;
@@ -1558,7 +1546,7 @@ void NavigationScene::reflect() {
 			.LUMIX_FUNC_EX(NavigationSceneImpl::debugDrawPath, "drawPath")
 			.LUMIX_PROP(AgentRadius, "Radius").minAttribute(0)
 			.LUMIX_PROP(AgentHeight, "Height").minAttribute(0)
-			.prop<&NavigationScene::useAgentRootMotion, &NavigationScene::setUseAgentRootMotion>("Use root motion");
+			.LUMIX_PROP(AgentMoveEntity, "Move entity");
 }
 
 } // namespace Lumix

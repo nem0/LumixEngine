@@ -44,9 +44,8 @@ struct NavigationScene : IScene
 	virtual float getAgentRadius(EntityRef entity) = 0;
 	virtual void setAgentHeight(EntityRef entity, float height) = 0;
 	virtual float getAgentHeight(EntityRef entity) = 0;
-	virtual void setAgentRootMotion(EntityRef entity, const Vec3& root_motion) = 0;
-	virtual bool useAgentRootMotion(EntityRef entity) = 0;
-	virtual void setUseAgentRootMotion(EntityRef entity, bool use_root_motion) = 0;
+	virtual bool getAgentMoveEntity(EntityRef entity) = 0;
+	virtual void setAgentMoveEntity(EntityRef entity, bool value) = 0;
 	virtual bool generateNavmesh(EntityRef zone) = 0;
 	virtual bool generateTileAt(EntityRef zone, const DVec3& pos, bool keep_data) = 0;
 	virtual bool loadZone(EntityRef zone_entity) = 0;
