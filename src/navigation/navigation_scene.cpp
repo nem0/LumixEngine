@@ -1,14 +1,17 @@
 #include "navigation_scene.h"
 #include "animation/animation_scene.h"
 #include "engine/array.h"
+#include "engine/atomic.h"
 #include "engine/crc32.h"
 #include "engine/crt.h"
 #include "engine/engine.h"
+#include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
 #include "engine/os.h"
 #include "engine/profiler.h"
 #include "engine/reflection.h"
+#include "engine/sync.h"
 #include "engine/universe.h"
 #include "imgui/IconsFontAwesome5.h"
 #include "lua_script/lua_script_system.h"
@@ -29,6 +32,7 @@ namespace Lumix
 
 enum class NavigationSceneVersion : i32 {
 	ZONE_GUID,
+	DETAILED,
 	LATEST
 };
 
@@ -47,13 +51,12 @@ struct RecastZone {
 	u32 m_num_tiles_x = 0;
 	u32 m_num_tiles_z = 0;
 	dtNavMeshQuery* navquery = nullptr;
-	rcPolyMeshDetail* detail_mesh = nullptr;
-	rcPolyMesh* polymesh = nullptr;
 	dtNavMesh* navmesh = nullptr;
+	dtCrowd* crowd = nullptr;
+
 	rcCompactHeightfield* debug_compact_heightfield = nullptr;
 	rcHeightfield* debug_heightfield = nullptr;
 	rcContourSet* debug_contours = nullptr;
-	dtCrowd* crowd = nullptr;
 };
 
 
@@ -115,8 +118,10 @@ struct NavigationSceneImpl final : NavigationScene
 		if (!iter.isValid()) return;
 		if (m_moving_agent == entity) return;
 		if (iter.value().agent < 0) return;
+
 		const Agent& agent = iter.value();
 		RecastZone& zone = m_zones[(EntityRef)agent.zone];
+		if (!zone.crowd) return;
 
 		const DVec3 pos = m_universe.getPosition(iter.key());
 		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
@@ -135,15 +140,11 @@ struct NavigationSceneImpl final : NavigationScene
 
 	void clearNavmesh(RecastZone& zone) {
 		dtFreeNavMeshQuery(zone.navquery);
-		rcFreePolyMeshDetail(zone.detail_mesh);
-		rcFreePolyMesh(zone.polymesh);
 		dtFreeNavMesh(zone.navmesh);
 		rcFreeCompactHeightfield(zone.debug_compact_heightfield);
 		rcFreeHeightField(zone.debug_heightfield);
 		rcFreeContourSet(zone.debug_contours);
 		dtFreeCrowd(zone.crowd);
-		zone.detail_mesh = nullptr;
-		zone.polymesh = nullptr;
 		zone.navquery = nullptr;
 		zone.navmesh = nullptr;
 		zone.debug_compact_heightfield = nullptr;
@@ -1071,19 +1072,23 @@ struct NavigationSceneImpl final : NavigationScene
 
 	bool generateTileAt(EntityRef zone_entity, const DVec3& world_pos, bool keep_data) override {
 		RecastZone& zone = m_zones[zone_entity];
+		if (!zone.navmesh) return false;
+
 		const Transform tr = m_universe.getTransform(zone_entity);
 		const Vec3 pos = Vec3(tr.inverted().transform(world_pos));
 		const Vec3 min = -zone.zone.extents;
 		const int x = int((pos.x - min.x + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
 		const int z = int((pos.z - min.z + (1 + m_config.borderSize) * m_config.cs) / (CELLS_PER_TILE_SIDE * CELL_SIZE));
-		return generateTile(zone, zone_entity, x, z, keep_data);
+		zone.navmesh->removeTile(zone.navmesh->getTileRefAt(x, z, 0), 0, 0);
+
+		Mutex mutex;
+		return generateTile(zone, zone_entity, x, z, keep_data, mutex);
 	}
 
-	bool generateTile(RecastZone& zone, EntityRef zone_entity, int x, int z, bool keep_data) {
+	bool generateTile(RecastZone& zone, EntityRef zone_entity, int x, int z, bool keep_data, Mutex& mutex) {
 		PROFILE_FUNCTION();
-		if (!zone.navmesh) return false;
-
-		zone.navmesh->removeTile(zone.navmesh->getTileRefAt(x, z, 0), 0, 0);
+		// TODO some stuff leaks on errors
+		ASSERT(zone.navmesh);
 
 		rcContext ctx;
 		const Vec3 min = -zone.zone.extents;
@@ -1159,27 +1164,29 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
-		zone.polymesh = rcAllocPolyMesh();
-		if (!zone.polymesh) {
-			logError("Could not generate navmesh: Out of memory 'm_polymesh'.");
+		rcPolyMesh* polymesh = rcAllocPolyMesh();
+		if (!polymesh) {
+			logError("Could not generate navmesh: Out of memory 'polymesh'.");
 			return false;
 		}
-		if (!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *zone.polymesh)) {
+		if (!rcBuildPolyMesh(&ctx, *cset, m_config.maxVertsPerPoly, *polymesh)) {
 			logError("Could not generate navmesh: Could not triangulate contours.");
 			return false;
 		}
+		
+		rcPolyMeshDetail* detail_mesh = nullptr;
+		if (zone.zone.flags & NavmeshZone::DETAILED) {
+			detail_mesh = rcAllocPolyMeshDetail();
+			if (!detail_mesh) {
+				logError("Could not generate navmesh: Out of memory 'pmdtl'.");
+				return false;
+			}
 
-		zone.detail_mesh = rcAllocPolyMeshDetail();
-		if (!zone.detail_mesh) {
-			logError("Could not generate navmesh: Out of memory 'pmdtl'.");
-			return false;
-		}
-
-		if (!rcBuildPolyMeshDetail(
-				&ctx, *zone.polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *zone.detail_mesh))
-		{
-			logError("Could not generate navmesh: Could not build detail mesh.");
-			return false;
+			if (!rcBuildPolyMeshDetail(&ctx, *polymesh, *chf, m_config.detailSampleDist, m_config.detailSampleMaxError, *detail_mesh))
+			{
+				logError("Could not generate navmesh: Could not build detail mesh.");
+				return false;
+			}
 		}
 
 		if (!zone.debug_compact_heightfield) rcFreeCompactHeightfield(chf);
@@ -1188,30 +1195,32 @@ struct NavigationSceneImpl final : NavigationScene
 		unsigned char* nav_data = 0;
 		int nav_data_size = 0;
 
-		for (int i = 0; i < zone.polymesh->npolys; ++i) {
-			zone.polymesh->flags[i] = zone.polymesh->areas[i] == RC_WALKABLE_AREA ? 1 : 0;
+		for (int i = 0; i < polymesh->npolys; ++i) {
+			polymesh->flags[i] = polymesh->areas[i] == RC_WALKABLE_AREA ? 1 : 0;
 		}
 
 		dtNavMeshCreateParams params = {};
-		params.verts = zone.polymesh->verts;
-		params.vertCount = zone.polymesh->nverts;
-		params.polys = zone.polymesh->polys;
-		params.polyAreas = zone.polymesh->areas;
-		params.polyFlags = zone.polymesh->flags;
-		params.polyCount = zone.polymesh->npolys;
-		params.nvp = zone.polymesh->nvp;
-		params.detailMeshes = zone.detail_mesh->meshes;
-		params.detailVerts = zone.detail_mesh->verts;
-		params.detailVertsCount = zone.detail_mesh->nverts;
-		params.detailTris = zone.detail_mesh->tris;
-		params.detailTriCount = zone.detail_mesh->ntris;
+		params.verts = polymesh->verts;
+		params.vertCount = polymesh->nverts;
+		params.polys = polymesh->polys;
+		params.polyAreas = polymesh->areas;
+		params.polyFlags = polymesh->flags;
+		params.polyCount = polymesh->npolys;
+		params.nvp = polymesh->nvp;
+		if (detail_mesh) {
+			params.detailMeshes = detail_mesh->meshes;
+			params.detailVerts = detail_mesh->verts;
+			params.detailVertsCount = detail_mesh->nverts;
+			params.detailTris = detail_mesh->tris;
+			params.detailTriCount = detail_mesh->ntris;
+		}
 		params.walkableHeight = m_config.walkableHeight * m_config.ch;
 		params.walkableRadius = m_config.walkableRadius * m_config.cs;
 		params.walkableClimb = m_config.walkableClimb * m_config.ch;
 		params.tileX = x;
 		params.tileY = z;
-		rcVcopy(params.bmin, zone.polymesh->bmin);
-		rcVcopy(params.bmax, zone.polymesh->bmax);
+		rcVcopy(params.bmin, polymesh->bmin);
+		rcVcopy(params.bmax, polymesh->bmax);
 		params.cs = m_config.cs;
 		params.ch = m_config.ch;
 		params.buildBvTree = false;
@@ -1221,10 +1230,15 @@ struct NavigationSceneImpl final : NavigationScene
 			return false;
 		}
 
+		rcFreePolyMesh(polymesh);
+		if (detail_mesh) rcFreePolyMeshDetail(detail_mesh);
+
+		MutexGuard guard(mutex);
 		if (dtStatusFailed(zone.navmesh->addTile(nav_data, nav_data_size, DT_TILE_FREE_DATA, 0, nullptr))) {
 			logError("Could not add Detour tile.");
 			return false;
 		}
+
 		return true;
 	}
 
@@ -1280,12 +1294,26 @@ struct NavigationSceneImpl final : NavigationScene
 
 		for (u32 j = 0; j < zone.m_num_tiles_z; ++j) {
 			for (u32 i = 0; i < zone.m_num_tiles_x; ++i) {
-				if (!generateTile(zone, zone_entity, i, j, false)) {
-					return false;
-				}
+				zone.navmesh->removeTile(zone.navmesh->getTileRefAt(i, j, 0), 0, 0);
 			}
 		}
-		return true;
+
+		Mutex mutex;
+		volatile i32 counter = 0;
+		volatile i32 fail_counter = 0;
+		jobs::runOnWorkers([&](){
+			for (;;) {
+				const i32 i = atomicIncrement(&counter) - 1;
+				if (i >= i32(zone.m_num_tiles_z * zone.m_num_tiles_x)) break;
+
+				if (!generateTile(zone, zone_entity, i % zone.m_num_tiles_x, i / zone.m_num_tiles_x, false, mutex)) {
+					atomicIncrement(&fail_counter);
+					break;
+				}
+			}
+		});
+
+		return fail_counter == 0;
 	}
 
 
@@ -1312,7 +1340,7 @@ struct NavigationSceneImpl final : NavigationScene
 		RecastZone zone;
 		zone.zone.extents = Vec3(1);
 		zone.zone.guid = randGUID();
-		zone.zone.flags = NavmeshZone::AUTOLOAD;
+		zone.zone.flags = NavmeshZone::AUTOLOAD | NavmeshZone::DETAILED;
 		zone.entity = entity;
 		m_zones.insert(entity, zone);
 		m_universe.onComponentCreated(entity, NAVMESH_ZONE_TYPE, this);
@@ -1418,10 +1446,13 @@ struct NavigationSceneImpl final : NavigationScene
 			if (version > (i32)NavigationSceneVersion::ZONE_GUID) {
 				serializer.read(zone.zone.guid);
 				serializer.read(zone.zone.flags);
+				if (version <= (i32)NavigationSceneVersion::DETAILED) {
+					zone.zone.flags |= NavmeshZone::DETAILED;
+				}
 			}
 			else {
 				zone.zone.guid = randGUID();
-				zone.zone.flags = NavmeshZone::AUTOLOAD;
+				zone.zone.flags = NavmeshZone::AUTOLOAD | NavmeshZone::DETAILED;
 			}
 			m_zones.insert(e, zone);
 			m_universe.onComponentCreated(e, NAVMESH_ZONE_TYPE, this);
@@ -1489,6 +1520,15 @@ struct NavigationSceneImpl final : NavigationScene
 		return m_zones[entity].zone;
 	}
 
+	bool isZoneDetailed(EntityRef entity) override {
+		return m_zones[entity].zone.flags & NavmeshZone::DETAILED;
+	}
+
+	void setZoneDetailed(EntityRef entity, bool value) override {
+		if (value) m_zones[entity].zone.flags |= NavmeshZone::DETAILED;
+		else m_zones[entity].zone.flags &= ~NavmeshZone::DETAILED;
+	}
+
 	bool isZoneAutoload(EntityRef entity) override {
 		return m_zones[entity].zone.flags & NavmeshZone::AUTOLOAD;
 	}
@@ -1537,6 +1577,7 @@ void NavigationScene::reflect() {
 			.LUMIX_FUNC(NavigationSceneImpl::generateNavmesh)
 			.var_prop<&NavigationScene::getZone, &NavmeshZone::extents>("Extents")
 			.prop<&NavigationScene::isZoneAutoload, &NavigationScene::setZoneAutoload>("Autoload")
+			.prop<&NavigationScene::isZoneDetailed, &NavigationScene::setZoneDetailed>("Detailed")
 		.LUMIX_CMP(Agent, "navmesh_agent", "Navigation / Agent")
 			.icon(ICON_FA_MAP_MARKED_ALT)
 			.LUMIX_FUNC_EX(NavigationSceneImpl::setActorActive, "setActive")

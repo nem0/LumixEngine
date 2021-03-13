@@ -18,7 +18,8 @@ template <typename T> struct DelegateList;
 
 struct NavmeshZone {
 	enum Flags {
-		AUTOLOAD = 1 << 0
+		AUTOLOAD = 1 << 0,
+		DETAILED = 1 << 1
 	};
 	Vec3 extents;
 	u64 guid;
@@ -34,6 +35,8 @@ struct NavigationScene : IScene
 	virtual NavmeshZone& getZone(EntityRef entity) = 0;
 	virtual bool isZoneAutoload(EntityRef entity) = 0;
 	virtual void setZoneAutoload(EntityRef entity, bool value) = 0;
+	virtual bool isZoneDetailed(EntityRef entity) = 0;
+	virtual void setZoneDetailed(EntityRef entity, bool value) = 0;
 	virtual bool isFinished(EntityRef entity) = 0;
 	virtual bool navigate(EntityRef entity, const struct DVec3& dest, float speed, float stop_distance) = 0;
 	virtual void cancelNavigation(EntityRef entity) = 0;
