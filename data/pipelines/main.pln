@@ -277,7 +277,10 @@ function tonemap(hdr_buffer)
 
 	beginBlock("tonemap")
 	local format = "srgba"
-	if PREVIEW ~= nil or screenshot_request == 1 then
+	if PREVIEW ~= nil then
+		format = "rgba8"
+	end
+	if screenshot_request == 1 then
 		format = "rgba16f"
 	end
 	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = format, debug_name = "tonemap" }
