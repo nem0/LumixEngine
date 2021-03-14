@@ -143,6 +143,7 @@ public:
 
 	~EngineImpl()
 	{
+		m_prefab_resource_manager.destroy();
 		for (Resource* res : m_lua_resources) {
 			res->decRefCount();
 		}
@@ -151,7 +152,6 @@ public:
 		m_input_system.reset();
 		m_file_system.reset();
 
-		m_prefab_resource_manager.destroy();
 		lua_close(m_state);
 
 		unregisterLogCallback<&EngineImpl::logToFile>(this);

@@ -139,6 +139,7 @@ namespace Lumix
 
 		~PhysicsSystemImpl()
 		{
+			m_manager.destroy();
 			physx::PxCloseVehicleSDK();
 			m_cooking->release();
 			m_physics->release();
