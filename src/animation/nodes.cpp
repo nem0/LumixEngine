@@ -80,6 +80,7 @@ RuntimeContext::RuntimeContext(Controller& controller, IAllocator& allocator)
 	, inputs(allocator)
 	, controller(controller)
 	, animations(allocator)
+	, events(allocator)
 	, input_runtime(nullptr, 0)
 {
 }
@@ -206,8 +207,8 @@ void Blend1DNode::serialize(OutputMemoryStream& stream) const {
 	stream.write(m_children.begin(), m_children.byte_size());
 }
 
-void Blend1DNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
-	Node::deserialize(stream, ctrl);
+void Blend1DNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
 	stream.read(m_input_index);
 	u32 count;
 	stream.read(count);
@@ -219,6 +220,33 @@ AnimationNode::AnimationNode(GroupNode* parent, IAllocator& allocator)
 	: Node(parent, allocator) 
 {}
 
+void Node::emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeContext& ctx) const {
+	// TODO add emitEvents to all nodes (where applicable)
+	if (m_events.empty()) return;
+
+	InputMemoryStream blob(m_events);
+	const Time t0 = old_time % loop_length;
+	const Time t1 = new_time % loop_length;
+
+	const u16 from = u16(0xffFF * (u64)t0.raw() / loop_length.raw());
+	const u16 to = u16(0xffFF * (u64)t1.raw() / loop_length.raw());
+
+	if (t1.raw() > t0.raw()) {
+		while(blob.getPosition() < blob.size()) {
+			const u32 type = blob.read<u32>();
+			const u16 size = blob.read<u16>();
+			const u16 rel_time = blob.read<u16>();
+			if (rel_time >= from && rel_time < to) {
+				ctx.events.write((u8*)blob.getData() + blob.getPosition() - 2 * sizeof(u32), size + 2 * sizeof(u32));
+			}
+		}
+	}
+	else {
+		emitEvents(t0, loop_length, Time::fromSeconds(loop_length.seconds() + 1), ctx);
+		emitEvents(Time::fromSeconds(0), t1, loop_length, ctx);
+	}
+}
+
 void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	Time t = ctx.input_runtime.read<Time>();
 	Time prev_t = t;
@@ -228,6 +256,7 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 	if (anim) {
 		// TODO getBoneIndex is O(n)
 		
+		emitEvents(prev_t, t, anim->getLength(), ctx);
 		const int translation_idx = anim->getTranslationCurveIndex(ctx.root_bone_hash);
 		const int rotation_idx = anim->getRotationCurveIndex(ctx.root_bone_hash);
 		if (rotation_idx >= 0 || translation_idx >= 0) {
@@ -262,8 +291,8 @@ void AnimationNode::serialize(OutputMemoryStream& stream) const {
 	stream.write(m_flags);
 }
 
-void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
-	Node::deserialize(stream, ctrl);
+void AnimationNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
 	stream.read(m_slot);
 	stream.read(m_flags);
 }
@@ -318,14 +347,15 @@ void LayersNode::serialize(OutputMemoryStream& stream) const {
 	}
 }
 
-void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
+void LayersNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
 	u32 c;
 	stream.read(c);
 	for (u32 i = 0; i < c; ++i) {
 		Layer& layer = m_layers.emplace(m_parent, m_allocator);
 		layer.name = stream.readString();
 		stream.read(layer.mask);
-		layer.node.deserialize(stream, ctrl);
+		layer.node.deserialize(stream, ctrl, version);
 	}
 }
 
@@ -443,8 +473,8 @@ void GroupNode::serialize(OutputMemoryStream& stream) const {
 	}
 }
 
-void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
-	Node::deserialize(stream, ctrl);
+void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	Node::deserialize(stream, ctrl, version);
 	stream.read(m_blend_length);
 	u32 size;
 	stream.read(size);
@@ -457,17 +487,23 @@ void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl) {
 		m_children[i].condition_str = tmp;
 		m_children[i].condition.compile(tmp, ctrl.m_inputs);
 		m_children[i].node = Node::create(this, type, m_allocator);
-		m_children[i].node->deserialize(stream, ctrl);
+		m_children[i].node->deserialize(stream, ctrl, version);
 	}
 }
 
 void Node::serialize(OutputMemoryStream& stream) const {
 	stream.writeString(m_name.c_str());
+	stream.write((u32)m_events.size());
+	stream.write(m_events.data(), m_events.size());
 }
 
-void Node::deserialize(InputMemoryStream& stream, Controller& ctrl) {
-	const char* tmp = stream.readString();
- 	m_name = tmp;
+void Node::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
+	m_name = stream.readString();
+	if (version > (u32)ControllerVersion::EVENTS) {
+		const u32 size = stream.read<u32>();
+		m_events.resize(size);
+		stream.read(m_events.getMutableData(), size);
+	}
 }
 
 Node* Node::create(GroupNode* parent, Type type, IAllocator& allocator) {

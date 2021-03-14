@@ -26,13 +26,13 @@ struct RuntimeContext {
 	Array<u8> inputs;
 	Array<Animation*> animations;
 	OutputMemoryStream data;
+	OutputMemoryStream events;
 	
 	u32 root_bone_hash = 0;
 	Time time_delta;
 	Model* model = nullptr;
 	InputMemoryStream input_runtime;
 };
-
 
 struct Node {
 	enum Type : u32 {
@@ -45,6 +45,7 @@ struct Node {
 	Node(GroupNode* parent, IAllocator& allocator) 
 		: m_name("", allocator)
 		, m_parent(parent)
+		, m_events(allocator)
 	{}
 
 	virtual ~Node() {}
@@ -54,12 +55,15 @@ struct Node {
 	virtual void skip(RuntimeContext& ctx) const = 0;
 	virtual void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const = 0;
 	virtual void serialize(OutputMemoryStream& stream) const = 0;
-	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl) = 0;
+	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) = 0;
+
+	void emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeContext& ctx) const;
 
 	static Node* create(GroupNode* parent, Type type, IAllocator& allocator);
 
 	GroupNode* m_parent;
 	String m_name;
+	OutputMemoryStream m_events;
 };
 
 struct AnimationNode final : Node {
@@ -71,7 +75,7 @@ struct AnimationNode final : Node {
 	void skip(RuntimeContext& ctx) const override;
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
-	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 
 	enum Flags : u32 {
 		LOOPED = 1 << 0
@@ -90,7 +94,7 @@ struct Blend1DNode final : Node {
 	void skip(RuntimeContext& ctx) const override;
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
-	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 
 	struct Child {
 		float value = 0;
@@ -112,7 +116,7 @@ struct GroupNode final : Node {
 	void skip(RuntimeContext& ctx) const override;
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
-	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 
 	struct RuntimeData {
 		u32 from;
@@ -164,7 +168,7 @@ struct LayersNode final : Node {
 	void skip(RuntimeContext& ctx) const override;
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
-	void deserialize(InputMemoryStream& stream, Controller& ctrl) override;
+	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
 
 	struct Layer {
 		Layer(GroupNode* parent, IAllocator& allocator);

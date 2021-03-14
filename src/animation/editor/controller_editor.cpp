@@ -20,12 +20,58 @@
 
 namespace Lumix::anim {
 
+struct EventType {
+	u32 type;
+	StaticString<64> label;
+	u16 size;
 
+	virtual ~EventType() {}
+	virtual bool onGUI(u8* data, const ControllerEditor& editor) const = 0;
+};
 
 struct ControllerEditorImpl : ControllerEditor {
+	struct SetInputEventType : EventType {
+		SetInputEventType() {
+			type = crc32("set_input");
+			label = "Set input";
+			size = sizeof(u32) + sizeof(float);
+		}
+
+		bool onGUI(u8* data, const ControllerEditor& editor) const override {
+			ControllerEditorImpl& ed = (ControllerEditorImpl&)editor;
+			bool changed = ed.inputInput("Input", (u32*)data);
+			if (changed) {
+				memset(data + sizeof(u32), 0, sizeof(float));
+			}
+			const u32 input_index = *(u32*)data;
+			auto& inputs = ed.m_controller->m_inputs;
+			if (inputs.inputs_count == 0) return changed;
+			ImGuiEx::Label("Value");
+			switch (inputs.inputs[input_index].type) {
+				case InputDecl::BOOL: {
+					bool b = *(u32*)(data + sizeof(u32)) != 0;
+					if (ImGui::Checkbox("##v", &b)) {
+						changed = true;
+						*(u32*)(data + sizeof(u32)) = b;
+					}
+					break;
+				}
+				case InputDecl::FLOAT:
+					changed = ImGui::DragFloat("##v", (float*)(data + sizeof(u32))) || changed;
+					break;
+				case InputDecl::U32:
+					changed = ImGui::DragInt("##v", (i32*)(data + sizeof(u32))) || changed;
+					break;
+				default: ASSERT(false); break;
+			}
+			return changed;
+		}
+	};
+
 	ControllerEditorImpl(StudioApp& app)
 		: m_app(app)
 		, m_undo_stack(app.getAllocator())
+		, m_event_types(app.getAllocator())
 	{
 		IAllocator& allocator = app.getAllocator();
 		ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
@@ -46,12 +92,36 @@ struct ControllerEditorImpl : ControllerEditor {
 		app.addWindowAction(&m_redo_action);
 
 		newGraph();
+
+		m_event_types.push(UniquePtr<SetInputEventType>::create(m_app.getAllocator()));
 	}
 
 	~ControllerEditorImpl() {
 		m_app.removeAction(&m_toggle_ui);
 		m_app.removeAction(&m_undo_action);
 		m_app.removeAction(&m_redo_action);
+	}
+
+	bool inputInput(const char* label, u32* input_index) const {
+		ASSERT(input_index);
+		bool changed = false;
+		ImGuiEx::Label(label);
+		if (m_controller->m_inputs.inputs_count == 0) {
+			ImGui::Text("No inputs");
+			return false;
+		}
+		const InputDecl::Input& input = m_controller->m_inputs.inputs[*input_index];
+		if (ImGui::BeginCombo("##input", input.name)) {
+			for (const InputDecl::Input& input : m_controller->m_inputs.inputs) {
+				if (input.type == InputDecl::EMPTY) continue;
+				if (ImGui::Selectable(input.name)) {
+					changed = true;
+					*input_index = u32(&input - m_controller->m_inputs.inputs);
+				}
+			}
+			ImGui::EndCombo();
+		}
+		return changed;
 	}
 
 	template <typename F> void forEachNode(F f, Node* node = nullptr) {
@@ -217,11 +287,72 @@ struct ControllerEditorImpl : ControllerEditor {
 		return changed;
 	}
 
+	void addEvent(OutputMemoryStream& events, const EventType& type) {
+		events.write(type.type);
+		events.write(type.size);
+		u16 rel_time = 0;
+		events.write(rel_time);
+		const u32 ptr = (u32)events.size();
+		events.resize(events.size() + type.size);
+		memset(events.getMutableData() + ptr, 0, type.size);
+	}
+
+	const EventType& getEventType(u32 type) {
+		for (const UniquePtr<EventType>& t : m_event_types) {
+			if (t->type == type) return *t.get();
+		}
+		ASSERT(false);
+		return *m_event_types[0].get();
+	}
+
+	bool editEvents(OutputMemoryStream& events) {
+		if (!ImGui::TreeNode("Events")) return false;
+		ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_PLUS_CIRCLE).x);
+		if (ImGuiEx::IconButton(ICON_FA_PLUS_CIRCLE, "Add event")) ImGui::OpenPopup("add_event_popup");
+
+		bool changed = false;
+		if (!events.empty()) {
+			u32 i = 0;
+			InputMemoryStream blob(events);
+			while(blob.getPosition() != blob.size()) {
+				++i;
+				const u32 type = blob.read<u32>();
+				const u16 data_size = blob.read<u16>();
+				const EventType& type_obj = getEventType(type);
+				ASSERT(data_size == type_obj.size);
+				u16* rel_time = (u16*)blob.skip(sizeof(u16));
+				u8* data = (u8*)blob.skip(type_obj.size);
+				if (ImGui::TreeNode((void*)(uintptr)i, "%d", i)) {
+					ImGuiEx::Label("Time");
+					float t = *rel_time / float(0xffff);
+					if (ImGui::DragFloat("##t", &t, 0.01f, 0.f, 1.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
+						*rel_time = u16(t * 0xffFF);
+						changed = true;
+					}
+					changed = type_obj.onGUI(data, *this) || changed;
+					ImGui::TreePop();
+				}
+			}
+		}
+
+		if (ImGui::BeginPopup("add_event_popup")) {
+			for (const UniquePtr<EventType>& type : m_event_types) {
+				if (ImGui::Selectable(type->label)) {
+					addEvent(events, *type.get());
+					changed = true;
+				}
+			}
+			ImGui::EndPopup();
+		}
+		ImGui::TreePop();
+		return changed;
+	}
+
 	bool ui_dispatch(Node& node) {
 		char tmp[64];
 		copyString(tmp, node.m_name.c_str());
 		bool changed = false;
-		
+
 		ImGuiEx::Label("Name");		
 		if (ImGui::InputText("##name", tmp, sizeof(tmp))) {
 			node.m_name = tmp;
@@ -231,11 +362,14 @@ struct ControllerEditorImpl : ControllerEditor {
 		changed = child_properties_ui(node) || changed;
 
 		switch(node.type()) {
-			case Node::ANIMATION: return properties_ui((AnimationNode&)node) || changed;
-			case Node::GROUP: return properties_ui((GroupNode&)node) || changed;
-			case Node::BLEND1D: return properties_ui((Blend1DNode&)node) || changed;
-			default: ASSERT(false); return changed;
+			case Node::ANIMATION: changed = properties_ui((AnimationNode&)node) || changed; break;
+			case Node::GROUP: changed = properties_ui((GroupNode&)node) || changed; break;
+			case Node::BLEND1D: changed = properties_ui((Blend1DNode&)node) || changed; break;
+			default: ASSERT(false); break;
 		}
+
+		changed = editEvents(node.m_events) || changed;
+		return changed;
 	}
 
 	bool canLoadFromEntity() const {
@@ -952,6 +1086,7 @@ struct ControllerEditorImpl : ControllerEditor {
 	Action m_undo_action;
 	Action m_redo_action;
 	StaticString<LUMIX_MAX_PATH> m_path;
+	Array<UniquePtr<EventType>> m_event_types;
 }; // ControllerEditorImpl
 
 UniquePtr<ControllerEditor> ControllerEditor::create(StudioApp& app) {

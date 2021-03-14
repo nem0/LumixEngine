@@ -1,6 +1,7 @@
 #include "animation.h"
 #include "controller.h"
 #include "nodes.h"
+#include "engine/crc32.h"
 #include "engine/log.h"
 #include "engine/resource_manager.h"
 #include "renderer/model.h"
@@ -84,13 +85,45 @@ RuntimeContext* Controller::createRuntime(u32 anim_set) {
 	return ctx;
 }
 
+void Controller::processEvents(RuntimeContext& ctx) const {
+	if (ctx.events.empty()) return;
+	
+	static const u32 set_input_type = crc32("set_input");
+	InputMemoryStream blob(ctx.events);
+	while(blob.getPosition() < blob.size()) {
+		const u32 type = blob.read<u32>();
+		const u16 size = blob.read<u16>();
+		const u16 rel_time = blob.read<u16>();
+		const u8* data = (const u8*)blob.skip(size);
+		if (type == set_input_type) {
+			const u32 input_index = *(u32*)data;
+			data += sizeof(u32);
+			switch (m_inputs.inputs[input_index].type) {
+				case InputDecl::FLOAT: 
+					memcpy(&ctx.inputs[m_inputs.inputs[input_index].offset], data, sizeof(float));
+					break;
+				case InputDecl::U32: 
+					memcpy(&ctx.inputs[m_inputs.inputs[input_index].offset], data, sizeof(u32));
+					break;
+				case InputDecl::BOOL: 
+					memcpy(&ctx.inputs[m_inputs.inputs[input_index].offset], data, sizeof(u32));
+					break;
+				default: ASSERT(false); break;
+			}
+		}
+	}
+}
+
 void Controller::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	ASSERT(&ctx.controller == this);
 	// TODO better allocation strategy
 	const Span<u8> mem = ctx.data.releaseOwnership();
 	ctx.data.reserve(mem.length());
+	ctx.events.clear();
 	ctx.input_runtime.set(mem.begin(), mem.length());
 	m_root->update(ctx, root_motion);
+	processEvents(ctx);
+
 	m_allocator.deallocate(mem.begin());
 	
 	auto root_bone_iter = ctx.model->getBoneIndex(ctx.root_bone_hash);
@@ -138,12 +171,9 @@ void Controller::getPose(RuntimeContext& ctx, Pose& pose) {
 }
 
 struct Header {
-	enum class Version : u32 {
-		LATEST
-	};
 
 	u32 magic = MAGIC;
-	Version version = Version::LATEST;
+	ControllerVersion version = ControllerVersion::LATEST;
 
 	static constexpr u32 MAGIC = '_LAC';
 };
@@ -192,7 +222,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 		logError("Invalid animation controller file ", getPath());
 		return false;
 	}
-	if (header.version > Header::Version::LATEST) {
+	if (header.version > ControllerVersion::LATEST) {
 		logError("Version of animation controller ", getPath(), " is not supported");
 		return false;
 	}
@@ -217,7 +247,7 @@ bool Controller::deserialize(InputMemoryStream& stream) {
 
 	stream.read(m_ik);
 	stream.read(m_ik_count);
-	m_root->deserialize(stream, *this);
+	m_root->deserialize(stream, *this, (u32)header.version);
 	return true;
 }
 

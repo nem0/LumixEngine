@@ -16,6 +16,11 @@ namespace anim {
 struct GroupNode;
 struct RuntimeContext;
 
+enum class ControllerVersion : u32 {
+	EVENTS,
+	LATEST
+};
+
 struct Controller final : Resource {
 public:
 	Controller(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
@@ -60,6 +65,7 @@ public:
 	StaticString<64> m_root_motion_bone;
 
 private:
+	void processEvents(RuntimeContext& ctx) const;
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 };
