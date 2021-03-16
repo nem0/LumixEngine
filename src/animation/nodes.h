@@ -56,6 +56,8 @@ struct Node {
 	virtual void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const = 0;
 	virtual void serialize(OutputMemoryStream& stream) const = 0;
 	virtual void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) = 0;
+	virtual Time length(const RuntimeContext& ctx) const = 0;
+	virtual Time time(const RuntimeContext& ctx) const = 0;
 
 	void emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeContext& ctx) const;
 
@@ -76,6 +78,8 @@ struct AnimationNode final : Node {
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
 
 	enum Flags : u32 {
 		LOOPED = 1 << 0
@@ -95,6 +99,8 @@ struct Blend1DNode final : Node {
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
 
 	struct Child {
 		float value = 0;
@@ -117,6 +123,8 @@ struct GroupNode final : Node {
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
 
 	struct RuntimeData {
 		u32 from;
@@ -124,18 +132,14 @@ struct GroupNode final : Node {
 		Time t;
 	};
 
+	struct Transition {
+		u32 from = 0;
+		u32 to = 0;
+		float blend_length = 0.3f;
+		float exit_time = -1;
+	};
+
 	struct Child {
-		struct Transition {
-			Transition(IAllocator& allocator) 
-				: condition(allocator) 
-				, condition_str("", allocator)
-			{}
-
-			u32 to;
-			Condition condition;
-			String condition_str;
-		};
-
 		enum Flags : u32 {
 			SELECTABLE = 1 << 0
 		};
@@ -143,20 +147,18 @@ struct GroupNode final : Node {
 		Child(IAllocator& allocator) 
 			: condition(allocator) 
 			, condition_str("", allocator)
-			, transitions(allocator)
 		{}
 
 		Condition condition;
 		String condition_str;
 		Node* node;
 		u32 flags = SELECTABLE;
-		Array<Transition> transitions;
 	};
-
 
 	IAllocator& m_allocator;
 	Time m_blend_length = Time::fromSeconds(0.3f);
 	Array<Child> m_children;
+	Array<Transition> m_transitions;
 };
 
 struct LayersNode final : Node {
@@ -169,6 +171,8 @@ struct LayersNode final : Node {
 	void getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const override;
 	void serialize(OutputMemoryStream& stream) const override;
 	void deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) override;
+	Time length(const RuntimeContext& ctx) const override;
+	Time time(const RuntimeContext& ctx) const override;
 
 	struct Layer {
 		Layer(GroupNode* parent, IAllocator& allocator);

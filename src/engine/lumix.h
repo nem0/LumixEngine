@@ -153,9 +153,11 @@ struct Time {
 	}
 	float seconds() const { return float(value / double(ONE_SECOND)); }
 	Time operator+(const Time& rhs) const { return { value + rhs.value }; } 
+	Time operator-(const Time& rhs) const { return { value - rhs.value }; } 
 	void operator+=(const Time& rhs) { value += rhs.value; }
 	bool operator<(const Time& rhs) const { return value < rhs.value; }
 	bool operator<=(const Time& rhs) const { return value <= rhs.value; }
+	bool operator>=(const Time& rhs) const { return value >= rhs.value; }
 	Time operator%(const Time& rhs) const { return {value % rhs.value }; }
 	u32 raw() const { return value; }
 

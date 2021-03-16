@@ -160,6 +160,23 @@ void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 		root_motion = root_motion.interpolate(tr1, pair.t);
 	}
 }
+	
+Time Blend1DNode::length(const RuntimeContext& ctx) const {
+	const float input_val = getInputValue(ctx, m_input_index);
+	const Blend1DActivePair pair = getActivePair(*this, input_val);
+	Animation* anim_a = ctx.animations[pair.a->slot];
+	if (!anim_a) return Time::fromSeconds(1);
+	
+	Animation* anim_b = pair.b ? ctx.animations[pair.b->slot] : nullptr;
+	if (!anim_b) return anim_a->getLength();
+
+	const float t = lerp(anim_a->getLength().seconds(), anim_b->getLength().seconds(), pair.t);
+	return Time::fromSeconds(t);
+}
+
+Time Blend1DNode::time(const RuntimeContext& ctx) const {
+	return ctx.input_runtime.getAs<Time>();
+}
 
 void Blend1DNode::enter(RuntimeContext& ctx) const {
 	Time t = Time::fromSeconds(0);
@@ -271,6 +288,16 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 	ctx.data.write(t);
 }
 
+Time AnimationNode::length(const RuntimeContext& ctx) const {
+	Animation* anim = ctx.animations[m_slot];
+	if (!anim) return Time::fromSeconds(0);
+	return anim->getLength();
+}
+
+Time AnimationNode::time(const RuntimeContext& ctx) const {
+	return ctx.input_runtime.getAs<Time>();
+}
+
 void AnimationNode::enter(RuntimeContext& ctx) const {
 	Time t = Time::fromSeconds(0); 
 	ctx.data.write(t);	
@@ -320,6 +347,14 @@ void LayersNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) c
 	}
 }
 
+Time LayersNode::length(const RuntimeContext& ctx) const {
+	return Time::fromSeconds(1);
+}
+
+Time LayersNode::time(const RuntimeContext& ctx) const {
+	return Time::fromSeconds(0);
+}
+
 void LayersNode::enter(RuntimeContext& ctx) const {
 	for (const Layer& layer : m_layers) {
 		layer.node.enter(ctx);
@@ -363,6 +398,7 @@ GroupNode::GroupNode(GroupNode* parent, IAllocator& allocator)
 	: Node(parent, allocator)
 	, m_allocator(allocator)
 	, m_children(allocator)
+	, m_transitions(allocator)
 {}
 
 GroupNode::~GroupNode() {
@@ -374,11 +410,11 @@ GroupNode::~GroupNode() {
 void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
 	RuntimeData data = ctx.input_runtime.read<RuntimeData>();
 	
-	if(data.from != data.to) {
+	if (data.from != data.to) {
 		data.t += ctx.time_delta;
 
 		if (m_blend_length < data.t) {
-			// TODO root motion in data.from 
+			// TODO root motion in data.from
 			m_children[data.from].node->skip(ctx);
 			data.from = data.to;
 			data.t = Time::fromSeconds(0);
@@ -388,7 +424,7 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 		}
 
 		ctx.data.write(data);
-		
+
 		m_children[data.from].node->update(ctx, root_motion);
 		LocalRigidTransform tmp;
 		m_children[data.to].node->update(ctx, tmp);
@@ -396,10 +432,23 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 		return;
 	}
 
-	if (!m_children[data.from].condition.eval(ctx)) {
-		for (const Child::Transition& transition : m_children[data.from].transitions) {
-			if (!transition.condition.eval(ctx)) continue;
+	const bool is_current_matching = m_children[data.from].condition.eval(ctx);
+	const bool is_selectable = m_children[data.from].flags & Child::SELECTABLE;
+
+	if (!is_current_matching || !is_selectable) {
+		for (const Transition& transition : m_transitions) {
+			if (transition.from != data.from) continue;
+			if (!m_children[transition.to].condition.eval(ctx)) continue;
 			
+			if (transition.exit_time >= 0) {
+				const Time len = m_children[data.from].node->length(ctx);
+				const Time beg = m_children[data.from].node->time(ctx);
+				const Time end = beg + ctx.time_delta;
+				const Time loop_start = beg - beg % len;
+				const Time t = loop_start + Time::fromSeconds(transition.exit_time * len.seconds());
+				if (t < beg || t >= end) continue;
+			}
+
 			data.to = transition.to;
 			data.t = Time::fromSeconds(0);
 			ctx.data.write(data);
@@ -407,20 +456,21 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 			m_children[data.to].node->enter(ctx);
 			return;
 		}
+		
+		if (!is_current_matching) {
+			for (u32 i = 0, c = m_children.size(); i < c; ++i) {
+				const Child& child = m_children[i];
+				if (i == data.from) continue;
+				if ((child.flags & Child::SELECTABLE) == 0) continue;
+				if (!child.condition.eval(ctx)) continue;
 
-		for (u32 i = 0, c = m_children.size(); i < c; ++i) {
-			const Child& child = m_children[i];
-			if (i == data.from) continue;
-			if ((child.flags & Child::SELECTABLE) == 0) continue;
-			if (!child.condition.eval(ctx)) continue;
-
-
-			data.to = i;
-			data.t = Time::fromSeconds(0);
-			ctx.data.write(data);
-			m_children[data.from].node->update(ctx, root_motion);
-			m_children[data.to].node->enter(ctx);
-			return;
+				data.to = i;
+				data.t = Time::fromSeconds(0);
+				ctx.data.write(data);
+				m_children[data.from].node->update(ctx, root_motion);
+				m_children[data.to].node->enter(ctx);
+				return;
+			}
 		}
 	}
 
@@ -429,6 +479,14 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 	m_children[data.from].node->update(ctx, root_motion);
 }
 	
+Time GroupNode::length(const RuntimeContext& ctx) const {
+	return Time::fromSeconds(1);
+}
+
+Time GroupNode::time(const RuntimeContext& ctx) const {
+	return Time::fromSeconds(0);
+}
+
 void GroupNode::enter(RuntimeContext& ctx) const {
 	RuntimeData runtime_data = { 0, 0, Time::fromSeconds(0) };
 	for (u32 i = 0, c = m_children.size(); i < c; ++i) {
@@ -468,9 +526,13 @@ void GroupNode::serialize(OutputMemoryStream& stream) const {
 	stream.write((u32)m_children.size());
 	for (const Child& child : m_children) {
 		stream.write(child.node->type());
+		stream.write(child.flags);
 		stream.writeString(child.condition_str.c_str());
 		child.node->serialize(stream);
 	}
+	
+	stream.write((u32)m_transitions.size());
+	stream.write(m_transitions.begin(), m_transitions.byte_size());
 }
 
 void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 version) {
@@ -483,11 +545,20 @@ void GroupNode::deserialize(InputMemoryStream& stream, Controller& ctrl, u32 ver
 		Node::Type type;
 		stream.read(type);
 		m_children.emplace(m_allocator);
+		if (version > (u32)ControllerVersion::TRANSITIONS) {
+			stream.read(m_children[i].flags);
+		}
 		const char* tmp = stream.readString();
 		m_children[i].condition_str = tmp;
 		m_children[i].condition.compile(tmp, ctrl.m_inputs);
 		m_children[i].node = Node::create(this, type, m_allocator);
 		m_children[i].node->deserialize(stream, ctrl, version);
+	}
+
+	if (version > (u32)ControllerVersion::TRANSITIONS) {
+		stream.read(size);
+		m_transitions.resize(size);
+		stream.read(m_transitions.begin(), m_transitions.byte_size());
 	}
 }
 

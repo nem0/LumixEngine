@@ -86,7 +86,7 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	bool read(void* data, u64 size) override;
 	bool read(String& string);
 	const void* skip(u64 size);
-	const void* getData() const { return (const void*)m_data; }
+	const void* getData() const { return m_data; }
 	const void* getBuffer() const override { return m_data; }
 	u64 size() const override { return m_size; }
 	u64 getPosition() const { return m_pos; }
@@ -94,6 +94,12 @@ struct LUMIX_ENGINE_API InputMemoryStream final : IInputStream {
 	void rewind() { m_pos = 0; }
 	u8 readChar() { ++m_pos; return m_data[m_pos - 1]; }
 	const char* readString();
+
+	template <typename T>
+	T getAs() const {
+		ASSERT(m_pos + sizeof(T) < m_size);
+		return *(T*)(m_data + m_pos);
+	}
 
 	using IInputStream::read;
 private:

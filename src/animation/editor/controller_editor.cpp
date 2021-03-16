@@ -207,11 +207,56 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool properties_ui(GroupNode& node) {
 		float l = node.m_blend_length.seconds();
 		ImGuiEx::Label("Blend length");
+		bool changed = false;
 		if (ImGui::DragFloat("##bl", &l)) {
 			node.m_blend_length = Time::fromSeconds(l);
-			return true;
+			changed = true;
 		}
-		return false;
+
+		if (ImGui::TreeNode("Transitions")) {
+			for (GroupNode::Transition& tr : node.m_transitions) {
+				const char* name_from = node.m_children[tr.from].node->m_name.c_str();
+				const char* name_to = node.m_children[tr.to].node->m_name.c_str();
+				const bool open = ImGui::TreeNodeEx(&tr, 0, "%s -> %s", name_from, name_to);
+				if (ImGui::IsMouseReleased(1) && ImGui::IsItemHovered()) ImGui::OpenPopup("context_menu");
+				if (ImGui::BeginPopup("context_menu")) {
+					if (ImGui::Selectable("Remove")) {
+						changed = true;
+						node.m_transitions.erase(u32(&tr - node.m_transitions.begin()));
+						ImGui::EndPopup();
+						if (open) ImGui::TreePop();
+						break;
+					}
+					ImGui::EndPopup();
+				}
+				if (open) {
+					changed = nodeInput("From", tr.from, node.m_children) || changed;
+					changed = nodeInput("To", tr.to, node.m_children) || changed;
+					bool has_exit_time = tr.exit_time >= 0;
+					ImGuiEx::Label("Has exit time");
+					if (ImGui::Checkbox("##het", &has_exit_time)) {
+						if (has_exit_time) tr.exit_time = 0;
+						else tr.exit_time = -1;
+						changed = true;
+					}
+					if (has_exit_time) {
+						ImGuiEx::Label("Exit time");
+						changed = ImGui::DragFloat("##et", &tr.exit_time, 0.01f, 0, 1, "%.2f", ImGuiSliderFlags_AlwaysClamp) || changed;
+					}
+
+					ImGui::TreePop();
+				}
+			}
+
+			if (!node.m_children.empty() && ImGui::Button(ICON_FA_PLUS_CIRCLE "Add")) {
+				node.m_transitions.emplace();
+				changed = true;
+			}
+
+			ImGui::TreePop();
+		}
+
+		return changed;
 	}
 
 	bool properties_ui(Blend1DNode& node) {
@@ -281,6 +326,13 @@ struct ControllerEditorImpl : ControllerEditor {
 				if (c.node != &node) continue;
 				
 				changed = conditionInput("Condition", m_controller->m_inputs, c.condition_str, c.condition) || changed;
+				bool selectable = c.flags & GroupNode::Child::SELECTABLE;
+				ImGuiEx::Label("Selectable");
+				if (ImGui::Checkbox("##sel", &selectable)) {
+					if (selectable) c.flags |= GroupNode::Child::SELECTABLE;
+					else c.flags &= ~GroupNode::Child::SELECTABLE;
+					changed = true;
+				}
 				break;
 			}
 		}
@@ -455,17 +507,18 @@ struct ControllerEditorImpl : ControllerEditor {
 
 	static bool nodeInput(const char* label, u32& value, const Array<GroupNode::Child>& children) {
 		ImGuiEx::Label(label);		
+		bool changed = false;
 		if (!ImGui::BeginCombo(StaticString<64>("##_", label), children[value].node->m_name.c_str())) return false;
 
 		for (GroupNode::Child& child : children) {
 			if (ImGui::Selectable(child.node->m_name.c_str())) {
 				value = u32(&child - children.begin());
-				return true;
+				changed = true;
 			}
 		}
 
 		ImGui::EndCombo();
-		return false;
+		return changed;
 	}
 
 	static const char* toString(Node::Type type) {
@@ -488,6 +541,14 @@ struct ControllerEditorImpl : ControllerEditor {
 		}
 	}
 
+	bool isSelectable(Node& node) {
+		if (!node.m_parent) return false;
+		for (auto& c : node.m_parent->m_children) {
+			if (c.node == &node && (c.flags & GroupNode::Child::SELECTABLE)) return true;
+		}
+		return false;
+	}
+
 	bool hierarchy_ui(Node& node) {
 		bool changed = false;
 		const bool is_container = isContainer(node);
@@ -498,7 +559,10 @@ struct ControllerEditorImpl : ControllerEditor {
 		if (!is_container) flags |= ImGuiTreeNodeFlags_Leaf; 
 
 		const char* type_str = toString(node.type());
+		const bool is_selectable = isSelectable(node);
+		if (!is_selectable) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
 		if (ImGui::TreeNodeEx(&node, flags, "%s (%s)", node.m_name.c_str(), type_str)) {
+			if (!is_selectable) ImGui::PopStyleColor();
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
 				m_current_node = &node;
 			}
@@ -541,6 +605,9 @@ struct ControllerEditorImpl : ControllerEditor {
 				}
 			}
 			ImGui::TreePop();
+		}
+		else {
+			if (!is_selectable) ImGui::PopStyleColor();
 		}
 		return changed;
 	}
@@ -906,40 +973,6 @@ struct ControllerEditorImpl : ControllerEditor {
 					pushUndo();
 				}
 			}
-
-			/*if (ImGui::CollapsingHeader("Transitions")) {
-				Array<GroupNode::Child>& children = m_current_level->m_children;
-				if (children.empty()) {
-					ImGui::Text("No child nodes.");
-				}
-				else {
-					for (GroupNode::Child& child : children) {
-						for (GroupNode::Child::Transition& tr : child.transitions) {
-							const char* name_from = child.node->m_name.c_str();
-							const char* name_to = children[tr.to].node->m_name.c_str();
-							if (!ImGui::TreeNodeEx(&tr, 0, "%s -> %s", name_from, name_to)) continue;
-
-							u32 from = u32(&child - children.begin());
-							if (nodeInput("From", from, children)) {
-								children[from].transitions.push(tr);
-								child.transitions.erase(u32(&tr - child.transitions.begin()));
-								ImGui::TreePop();
-								break;
-							}
-
-							nodeInput("To", tr.to, children);
-							conditionInput("Condition", m_controller->m_inputs, tr.condition_str, tr.condition);
-
-							ImGui::TreePop();
-						}
-					}
-
-					if (ImGui::Button("Add")) {
-						GroupNode::Child::Transition& transition = children[0].transitions.emplace(m_controller->m_allocator);
-						transition.to = 0;
-					}
-				}
-			}*/
 
 			if (ImGui::CollapsingHeader("Bone masks")) {
 				char model_path[LUMIX_MAX_PATH];

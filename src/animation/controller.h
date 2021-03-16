@@ -18,6 +18,7 @@ struct RuntimeContext;
 
 enum class ControllerVersion : u32 {
 	EVENTS,
+	TRANSITIONS,
 	LATEST
 };
 
