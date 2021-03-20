@@ -13,7 +13,6 @@ struct LUMIX_ENGINE_API Engine {
 	struct InitArgs {
 		const char* working_dir = nullptr;
 		Span<const char*> plugins;
-		bool fullscreen = false;
 		bool handle_file_drops = false;
 		const char* window_title = "Lumix App";
 		UniquePtr<struct FileSystem> file_system; 

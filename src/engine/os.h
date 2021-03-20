@@ -92,7 +92,6 @@ struct InitWindowArgs {
 	};
 	const char* name = ""; 
 	bool handle_file_drops = false;
-	bool fullscreen = false;
 	u32 flags = 0;
 	WindowHandle parent = INVALID_WINDOW;
 };

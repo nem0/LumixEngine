@@ -127,14 +127,29 @@ struct Runner final
 		return true;
 	}
 
+	static bool isWindowCommandLineOption() {
+		char cmd_line[2048];
+		os::getCommandLine(Span(cmd_line));
+
+		CommandLineParser parser(cmd_line);
+		while (parser.next())
+		{
+			if (parser.currentEquals("-window")) return true;
+		}
+		return false;
+	}
+
 	void onInit() {
 		Engine::InitArgs init_data;
+		init_data.window_title = "On the hunt";
 
 		if (os::fileExists("main.pak")) {
 			init_data.file_system = FileSystem::createPacked("main.pak", m_allocator);
 		}
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
+		
+		if (!isWindowCommandLineOption()) os::setFullscreen(m_engine->getWindowHandle());
 
 		m_universe = &m_engine->createUniverse(true);
 		initRenderPipeline();
@@ -146,6 +161,7 @@ struct Runner final
 		if (!loadUniverse("universes/main.unv")) {
 			initDemoScene();
 		}
+		os::showCursor(false);
 		while (m_engine->getFileSystem().hasWork()) {
 			os::sleep(10);
 			m_engine->getFileSystem().processCallbacks();

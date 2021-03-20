@@ -77,7 +77,6 @@ public:
 	{
 		os::init();
 		os::InitWindowArgs init_win_args;
-		init_win_args.fullscreen = init_data.fullscreen;
 		init_win_args.handle_file_drops = init_data.handle_file_drops;
 		init_win_args.name = init_data.window_title;
 		m_window_handle = os::createWindow(init_win_args);
