@@ -117,14 +117,20 @@ struct NavigationSceneImpl final : NavigationScene
 		auto iter = m_agents.find(entity);
 		if (!iter.isValid()) return;
 		if (m_moving_agent == entity) return;
-		if (iter.value().agent < 0) return;
+		Agent& agent = iter.value();
+		
+		if (agent.agent < 0) {
+			assignZone(agent);
+			if (agent.agent < 0) return;
+		}
 
-		const Agent& agent = iter.value();
 		RecastZone& zone = m_zones[(EntityRef)agent.zone];
 		if (!zone.crowd) return;
 
-		const DVec3 pos = m_universe.getPosition(iter.key());
+		const DVec3 agent_pos = m_universe.getPosition(iter.key());
 		const dtCrowdAgent* dt_agent = zone.crowd->getAgent(agent.agent);
+		const Transform zone_tr = m_universe.getTransform((EntityRef)agent.zone);
+		const Vec3 pos = Vec3(zone_tr.inverted().transform(agent_pos));
 		if (squaredLength(pos - *(Vec3*)dt_agent->npos) > 0.1f) {
 			const Transform old_zone_tr = m_universe.getTransform(zone.entity);
 			const DVec3 target_pos = old_zone_tr.transform(*(Vec3*)dt_agent->targetPos);
@@ -590,7 +596,7 @@ struct NavigationSceneImpl final : NavigationScene
 			, entity(entity)
 		{}
 
-		void fileLoaded(u64 size, const u8* mem, bool success) {
+		void fileLoaded(u64 size, const u8* mem, bool success) {	
 			auto iter = scene.m_zones.find(entity);
 			if (!iter.isValid()) {
 				LUMIX_DELETE(scene.m_allocator, this);
@@ -598,7 +604,7 @@ struct NavigationSceneImpl final : NavigationScene
 			}
 
 			if (!success) {
-				logError("Could not load navmesh");
+				logError("Could not load navmesh, GUID ", iter.value().zone.guid);
 				LUMIX_DELETE(scene.m_allocator, this);
 				return;
 			}
@@ -1522,6 +1528,7 @@ struct NavigationSceneImpl final : NavigationScene
 			serializer.read(agent.flags);
 			agent.is_finished = true;
 			agent.agent = -1;
+			assignZone(agent);
 			m_agents.insert(agent.entity, agent);
 			m_universe.onComponentCreated(agent.entity, NAVMESH_AGENT_TYPE, this);
 		}
