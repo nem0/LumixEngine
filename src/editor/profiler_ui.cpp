@@ -404,6 +404,7 @@ struct ProfilerUIImpl final : ProfilerUI
 	u64 m_range = DEFAULT_RANGE;
 	char m_filter[100];
 	char m_resource_filter[100];
+	u64 m_resource_size_filter = 0;
 	Engine& m_engine;
 	HashMap<u32, ThreadRecord> m_threads;
 	OutputMemoryStream m_data;
@@ -443,9 +444,9 @@ void ProfilerUIImpl::onGUIResources()
 	ImGui::SetNextItemWidth(-w);
 	ImGui::InputTextWithHint("##resource_filter", "Filter", m_resource_filter, sizeof(m_resource_filter));
 	ImGui::SameLine();
-	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
-		m_resource_filter[0] = '\0';
-	}
+	if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) m_resource_filter[0] = '\0';
+	ImGuiEx::Label("Filter size (KB)");
+	ImGui::DragScalar("##fs", ImGuiDataType_U64, &m_resource_size_filter, 1000);
 
 	static const ResourceType RESOURCE_TYPES[] = { ResourceType("animation"),
 		ResourceType("material"),
@@ -470,43 +471,39 @@ void ProfilerUIImpl::onGUIResources()
 		auto* resource_manager = m_resource_manager.get(RESOURCE_TYPES[i]);
 		auto& resources = resource_manager->getResourceTable();
 
-		ImGui::Columns(4, "resc");
-		ImGui::Text("Path");
-		ImGui::NextColumn();
-		ImGui::Text("Size");
-		ImGui::NextColumn();
-		ImGui::Text("Status");
-		ImGui::NextColumn();
-		ImGui::Text("References");
-		ImGui::NextColumn();
-		ImGui::Separator();
-		size_t sum = 0;
-		for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter)
-		{
-			if (m_resource_filter[0] != '\0' &&
-				stristr(iter.value()->getPath().c_str(), m_resource_filter) == nullptr)
-			{
-				continue;
+		if (ImGui::BeginTable("resc", 4)) {
+            ImGui::TableSetupColumn("Path");
+            ImGui::TableSetupColumn("Size");
+            ImGui::TableSetupColumn("State");
+            ImGui::TableSetupColumn("References");
+            ImGui::TableHeadersRow();
+            
+			size_t sum = 0;
+			for (auto iter = resources.begin(), end = resources.end(); iter != end; ++iter) {
+				if (m_resource_filter[0] != '\0' && stristr(iter.value()->getPath().c_str(), m_resource_filter) == nullptr) continue;
+				if (m_resource_size_filter > iter.value()->size() / 1000) continue;
+				
+				ImGui::TableNextColumn();
+				ImGui::Text("%s", iter.value()->getPath().c_str());
+				ImGui::TableNextColumn();
+				ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
+				sum += iter.value()->size();
+				ImGui::TableNextColumn();
+				ImGui::Text("%s", getResourceStateString(iter.value()->getState()));
+				ImGui::TableNextColumn();
+				ImGui::Text("%u", iter.value()->getRefCount());
 			}
 
-			ImGui::Text("%s", iter.value()->getPath().c_str());
-			ImGui::NextColumn();
-			ImGui::Text("%.3fKB", iter.value()->size() / 1024.0f);
-			sum += iter.value()->size();
-			ImGui::NextColumn();
-			ImGui::Text("%s", getResourceStateString(iter.value()->getState()));
-			ImGui::NextColumn();
-			ImGui::Text("%u", iter.value()->getRefCount());
-			ImGui::NextColumn();
-		}
-		ImGui::Separator();
-		ImGui::Text("All");
-		ImGui::NextColumn();
-		ImGui::Text("%.3fKB", sum / 1024.0f);
-		ImGui::NextColumn();
-		ImGui::NextColumn();
+			ImGui::TableNextColumn();
+			ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImColor(ImGui::GetStyle().Colors[ImGuiCol_FrameBgHovered]));
+			ImGui::Text("All");
+			ImGui::TableNextColumn();
+			ImGui::Text("%.3fKB", sum / 1024.0f);
+			ImGui::TableNextColumn();
+			ImGui::TableNextColumn();
 
-		ImGui::Columns(1);
+			ImGui::EndTable();
+		}
 	}
 	ImGui::Unindent();
 }
