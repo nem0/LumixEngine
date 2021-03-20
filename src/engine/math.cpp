@@ -138,12 +138,19 @@ DVec3 IVec3::operator *(double i) const
     return {i * x, i * y, i * z};
 }
 
-void lerp(const Vec4& op1, const Vec4& op2, Vec4* out, float t) {
+Time lerp(Time op1, Time op2, float t) {
+	const double d = double(op1.raw()) * (1 - t) + double(op2.raw()) * t;
+	return Time(u32(d));
+}
+
+Vec4 lerp(const Vec4& op1, const Vec4& op2, float t) {
 	const float invt = 1.0f - t;
-	out->x = op1.x * invt + op2.x * t;
-	out->y = op1.y * invt + op2.y * t;
-	out->z = op1.z * invt + op2.z * t;
-	out->w = op1.w * invt + op2.w * t;
+	return {
+		op1.x * invt + op2.x * t,
+		op1.y * invt + op2.y * t,
+		op1.z * invt + op2.z * t,
+		op1.w * invt + op2.w * t
+	};
 }
 
 Vec3 Quat::rotate(const Vec3& v) const

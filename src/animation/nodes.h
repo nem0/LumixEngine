@@ -130,12 +130,13 @@ struct GroupNode final : Node {
 		u32 from;
 		u32 to;
 		Time t;
+		Time blend_length;
 	};
 
 	struct Transition {
 		u32 from = 0;
 		u32 to = 0;
-		float blend_length = 0.3f;
+		Time blend_length = Time::fromSeconds(0.3f);
 		float exit_time = -1;
 	};
 

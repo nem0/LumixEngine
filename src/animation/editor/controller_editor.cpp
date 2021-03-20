@@ -233,6 +233,12 @@ struct ControllerEditorImpl : ControllerEditor {
 					changed = nodeInput("From", tr.from, node.m_children) || changed;
 					changed = nodeInput("To", tr.to, node.m_children) || changed;
 					bool has_exit_time = tr.exit_time >= 0;
+					ImGuiEx::Label("Blend length");
+					float l = tr.blend_length.seconds();
+					if (ImGui::DragFloat("##bl", &l, 0.1f, 0.0, FLT_MAX, "%.2f")) {
+						tr.blend_length = Time::fromSeconds(l);
+						changed = true;
+					}
 					ImGuiEx::Label("Has exit time");
 					if (ImGui::Checkbox("##het", &has_exit_time)) {
 						if (has_exit_time) tr.exit_time = 0;

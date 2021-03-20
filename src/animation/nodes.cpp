@@ -45,7 +45,7 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* ani
 	if (t0 < t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
 
 	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), translation_idx, rotation_idx);
-	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time::fromSeconds(0), t1, translation_idx, rotation_idx);
+	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time(0), t1, translation_idx, rotation_idx);
 	
 	LocalRigidTransform root_motion;
 	root_motion.rot = tr_1.rot * tr_0.rot;
@@ -67,7 +67,7 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext
 	if (t0 < t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
 
 	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), translation_idx, rotation_idx);
-	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time::fromSeconds(0), t1, translation_idx, rotation_idx);
+	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time(0), t1, translation_idx, rotation_idx);
 	
 	LocalRigidTransform root_motion;
 	root_motion.rot = tr_1.rot * tr_0.rot;
@@ -146,45 +146,78 @@ static Blend1DActivePair getActivePair(const Blend1DNode& node, float input_val)
 }
 
 void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) const {
-	Time t = ctx.input_runtime.read<Time>();
-	const Time t0 = t;
-	t += ctx.time_delta;
-	ctx.data.write(t);
+	float relt = ctx.input_runtime.read<float>();
+	const float relt0 = relt;
 	
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
-	
-	root_motion = getRootMotion(ctx, pair.a->slot, t0, t);
-	if (pair.b) {
-		const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot, t0, t);
-		root_motion = root_motion.interpolate(tr1, pair.t);
+	const Animation* anim_a = ctx.animations[pair.a->slot];
+	Time len;
+	if (anim_a) {
+		len = anim_a->getLength();
+		const Time t0 = len * relt0;
+		const Time t = len * relt;
+		root_motion = getRootMotion(ctx, pair.a->slot, t0, t);
 	}
+	else {
+		len = Time(1);
+		root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
+	}
+	if (pair.b) {
+		const Animation* anim_b = ctx.animations[pair.a->slot];
+		if (anim_b) {
+			const Time len_b = anim_b->getLength();
+			const Time t0 = len_b * relt0;
+			const Time t = len_b * relt;
+			const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot, t0, t);
+			root_motion = root_motion.interpolate(tr1, pair.t);
+			len = lerp(len, len_b, pair.t);
+		}
+	}
+
+	relt += ctx.time_delta / len;
+	relt = fmodf(relt, 1);
+	ctx.data.write(relt);
 }
-	
+
 Time Blend1DNode::length(const RuntimeContext& ctx) const {
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
 	Animation* anim_a = ctx.animations[pair.a->slot];
 	if (!anim_a) return Time::fromSeconds(1);
+	if (!anim_a->isReady()) return Time::fromSeconds(1);
 	
 	Animation* anim_b = pair.b ? ctx.animations[pair.b->slot] : nullptr;
 	if (!anim_b) return anim_a->getLength();
+	if (!anim_b->isReady()) return anim_a->getLength();
 
-	const float t = lerp(anim_a->getLength().seconds(), anim_b->getLength().seconds(), pair.t);
-	return Time::fromSeconds(t);
+	return lerp(anim_a->getLength(), anim_b->getLength(), pair.t);
 }
 
 Time Blend1DNode::time(const RuntimeContext& ctx) const {
-	return ctx.input_runtime.getAs<Time>();
+	return length(ctx) * ctx.input_runtime.getAs<float>();
 }
 
 void Blend1DNode::enter(RuntimeContext& ctx) const {
-	Time t = Time::fromSeconds(0);
+	const float t = 0.f;
 	ctx.data.write(t);
 }
 
 void Blend1DNode::skip(RuntimeContext& ctx) const {
-	ctx.input_runtime.skip(sizeof(Time));
+	ctx.input_runtime.skip(sizeof(float));
+}
+
+static void getPose(const RuntimeContext& ctx, float rel_time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
+	Animation* anim = ctx.animations[slot];
+	if (!anim) return;
+	if (!ctx.model->isReady()) return;
+	if (!anim->isReady()) return;
+
+	Time time = anim->getLength() * rel_time;
+	const Time anim_time = looped ? time % anim->getLength() : minimum(time, anim->getLength());
+
+	const BoneMask* mask = mask_idx < (u32)ctx.controller.m_bone_masks.size() ? &ctx.controller.m_bone_masks[mask_idx] : nullptr;
+	anim->getRelativePose(anim_time, pose, *ctx.model, weight, mask);
 }
 
 static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot, Pose& pose, u32 mask_idx, bool looped) {
@@ -200,7 +233,7 @@ static void getPose(const RuntimeContext& ctx, Time time, float weight, u32 slot
 }
 
 void Blend1DNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask) const {
-	const Time t = ctx.input_runtime.read<Time>();
+	const float t = ctx.input_runtime.read<float>();
 
 	if (m_children.empty()) return;
 	if (m_children.size() == 1) {
@@ -260,7 +293,7 @@ void Node::emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeCon
 	}
 	else {
 		emitEvents(t0, loop_length, Time::fromSeconds(loop_length.seconds() + 1), ctx);
-		emitEvents(Time::fromSeconds(0), t1, loop_length, ctx);
+		emitEvents(Time(0), t1, loop_length, ctx);
 	}
 }
 
@@ -290,7 +323,7 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 
 Time AnimationNode::length(const RuntimeContext& ctx) const {
 	Animation* anim = ctx.animations[m_slot];
-	if (!anim) return Time::fromSeconds(0);
+	if (!anim) return Time(0);
 	return anim->getLength();
 }
 
@@ -299,7 +332,7 @@ Time AnimationNode::time(const RuntimeContext& ctx) const {
 }
 
 void AnimationNode::enter(RuntimeContext& ctx) const {
-	Time t = Time::fromSeconds(0); 
+	Time t = Time(0); 
 	ctx.data.write(t);	
 }
 
@@ -352,7 +385,7 @@ Time LayersNode::length(const RuntimeContext& ctx) const {
 }
 
 Time LayersNode::time(const RuntimeContext& ctx) const {
-	return Time::fromSeconds(0);
+	return Time(0);
 }
 
 void LayersNode::enter(RuntimeContext& ctx) const {
@@ -413,11 +446,11 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 	if (data.from != data.to) {
 		data.t += ctx.time_delta;
 
-		if (m_blend_length < data.t) {
+		if (data.blend_length < data.t) {
 			// TODO root motion in data.from
 			m_children[data.from].node->skip(ctx);
 			data.from = data.to;
-			data.t = Time::fromSeconds(0);
+			data.t = Time(0);
 			ctx.data.write(data);
 			m_children[data.to].node->update(ctx, root_motion);
 			return;
@@ -428,7 +461,7 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 		m_children[data.from].node->update(ctx, root_motion);
 		LocalRigidTransform tmp;
 		m_children[data.to].node->update(ctx, tmp);
-		root_motion = root_motion.interpolate(tmp, data.t.seconds() / m_blend_length.seconds());
+		root_motion = root_motion.interpolate(tmp, data.t.seconds() / data.blend_length.seconds());
 		return;
 	}
 
@@ -450,7 +483,8 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 			}
 
 			data.to = transition.to;
-			data.t = Time::fromSeconds(0);
+			data.blend_length = transition.blend_length;
+			data.t = Time(0);
 			ctx.data.write(data);
 			m_children[data.from].node->update(ctx, root_motion);
 			m_children[data.to].node->enter(ctx);
@@ -465,7 +499,8 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 				if (!child.condition.eval(ctx)) continue;
 
 				data.to = i;
-				data.t = Time::fromSeconds(0);
+				data.blend_length = m_blend_length;
+				data.t = Time(0);
 				ctx.data.write(data);
 				m_children[data.from].node->update(ctx, root_motion);
 				m_children[data.to].node->enter(ctx);
@@ -484,16 +519,16 @@ Time GroupNode::length(const RuntimeContext& ctx) const {
 }
 
 Time GroupNode::time(const RuntimeContext& ctx) const {
-	return Time::fromSeconds(0);
+	return Time(0);
 }
 
 void GroupNode::enter(RuntimeContext& ctx) const {
-	RuntimeData runtime_data = { 0, 0, Time::fromSeconds(0) };
+	RuntimeData runtime_data = { 0, 0, Time(0) };
 	for (u32 i = 0, c = m_children.size(); i < c; ++i) {
 		const Child& child = m_children[i];
 		
 		if (child.condition.eval(ctx)) {
-			runtime_data =  { i, i, Time::fromSeconds(0) };
+			runtime_data =  { i, i, Time(0) };
 			break;
 		}
 	}
@@ -515,7 +550,7 @@ void GroupNode::getPose(RuntimeContext& ctx, float weight, Pose& pose, u32 mask)
 
 	m_children[data.from].node->getPose(ctx, weight, pose, mask);
 	if(data.from != data.to) {
-		const float t = clamp(data.t.seconds() / m_blend_length.seconds(), 0.f, 1.f);
+		const float t = clamp(data.t.seconds() / data.blend_length.seconds(), 0.f, 1.f);
 		m_children[data.to].node->getPose(ctx, weight * t, pose, mask);
 	}
 }
