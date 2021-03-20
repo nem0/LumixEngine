@@ -20,15 +20,6 @@
 
 namespace Lumix::anim {
 
-struct EventType {
-	u32 type;
-	StaticString<64> label;
-	u16 size;
-
-	virtual ~EventType() {}
-	virtual bool onGUI(u8* data, const ControllerEditor& editor) const = 0;
-};
-
 struct ControllerEditorImpl : ControllerEditor {
 	struct SetInputEventType : EventType {
 		SetInputEventType() {
@@ -380,7 +371,7 @@ struct ControllerEditorImpl : ControllerEditor {
 				ASSERT(data_size == type_obj.size);
 				u16* rel_time = (u16*)blob.skip(sizeof(u16));
 				u8* data = (u8*)blob.skip(type_obj.size);
-				if (ImGui::TreeNode((void*)(uintptr)i, "%d", i)) {
+				if (ImGui::TreeNode((void*)(uintptr)i, "%d %s", i, type_obj.label.data)) {
 					ImGuiEx::Label("Time");
 					float t = *rel_time / float(0xffff);
 					if (ImGui::DragFloat("##t", &t, 0.01f, 0.f, 1.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
@@ -1101,6 +1092,10 @@ struct ControllerEditorImpl : ControllerEditor {
 	void show(const char* path) override {
 		m_open = true;
 		load(path);
+	}
+
+	void registerEventType(UniquePtr<EventType>&& type) override {
+		m_event_types.push(type.move());
 	}
 
 	struct UndoRecord {

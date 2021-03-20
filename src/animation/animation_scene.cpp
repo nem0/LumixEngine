@@ -92,7 +92,6 @@ struct AnimationSceneImpl final : AnimationScene
 		, m_animables(allocator)
 		, m_property_animators(allocator)
 		, m_animators(allocator)
-		, m_event_stream(allocator)
 		, m_allocator(allocator)
 		, m_animator_map(allocator)
 	{
@@ -106,12 +105,6 @@ struct AnimationSceneImpl final : AnimationScene
 
 
 	int getVersion() const override { return (int)AnimationSceneVersion::LATEST; }
-
-
-	const OutputMemoryStream& getEventStream() const override
-	{
-		return m_event_stream;
-	}
 
 
 	void clear() override
@@ -134,6 +127,13 @@ struct AnimationSceneImpl final : AnimationScene
 			setSource(animator, nullptr);
 		}
 		m_animators.clear();
+	}
+
+
+	const OutputMemoryStream* getEventStream(EntityRef entity) const override {
+		auto iter = m_animator_map.find(entity);
+		const Animator& animator = m_animators[iter.value()];
+		return animator.ctx ? &animator.ctx->events : nullptr;
 	}
 
 
@@ -516,8 +516,6 @@ struct AnimationSceneImpl final : AnimationScene
 	void updateAnimator(EntityRef entity, float time_delta) override {
 		Animator& animator = m_animators[m_animator_map[entity]];
 		updateAnimator(animator, time_delta);
-		processEventStream();
-		m_event_stream.clear();
 	}
 
 	void setAnimatorInput(EntityRef entity, u32 input_idx, float value) override {
@@ -824,54 +822,12 @@ struct AnimationSceneImpl final : AnimationScene
 		if (!m_is_game_running) return;
 		if (paused) return;
 
-		m_event_stream.clear();
-
 		updateAnimables(time_delta);
 		updatePropertyAnimators(time_delta);
 
 		jobs::forEach(m_animators.size(), 1, [&](i32 idx, i32){
 			updateAnimator(m_animators[idx], time_delta);
 		});
-
-		processEventStream();
-	}
-
-
-	void processEventStream()
-	{
-		InputMemoryStream blob(m_event_stream);
-		u32 set_input_type = crc32("set_input");
-		while (blob.getPosition() < blob.size())
-		{
-			u32 type;
-			u8 size;
-			EntityRef entity;
-			blob.read(type);
-			blob.read(entity);
-			blob.read(size);
-			if (type == set_input_type)
-			{
-				anim::SetInputEvent event;
-				blob.read(event);
-				Animator& ctrl = m_animators[m_animator_map[entity]];
-				if (ctrl.resource->isReady())
-				{
-					anim::InputDecl& decl = ctrl.resource->m_inputs;
-					anim::InputDecl::Input& input = decl.inputs[event.input_idx];
-					switch (input.type)
-					{
-						case anim::InputDecl::BOOL: *(bool*)&ctrl.ctx->inputs[input.offset] = event.b_value; break;
-						case anim::InputDecl::U32: *(u32*)&ctrl.ctx->inputs[input.offset] = event.i_value; break;
-						case anim::InputDecl::FLOAT: *(float*)&ctrl.ctx->inputs[input.offset] = event.f_value; break;
-						default: ASSERT(false); break;
-					}
-				}
-			}
-			else
-			{
-				blob.skip(size);
-			}
-		}
 	}
 
 
@@ -940,7 +896,6 @@ struct AnimationSceneImpl final : AnimationScene
 	Array<Animator> m_animators;
 	RenderScene* m_render_scene;
 	bool m_is_game_running;
-	OutputMemoryStream m_event_stream;
 };
 
 

@@ -21,7 +21,7 @@ struct AnimationScene : IScene {
 	static UniquePtr<AnimationScene> create(Engine& engine, IPlugin& plugin, Universe& universe, struct IAllocator& allocator);
 	static void reflect(Engine& engine);
 
-	virtual const struct OutputMemoryStream& getEventStream() const = 0;
+	virtual const struct OutputMemoryStream* getEventStream(EntityRef e) const = 0;
 	virtual struct Path getPropertyAnimation(EntityRef entity) = 0;
 	virtual void setPropertyAnimation(EntityRef entity, const Path& path) = 0;
 	virtual bool isPropertyAnimatorEnabled(EntityRef entity) = 0;

@@ -281,7 +281,7 @@ void Node::emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeCon
 	const u16 from = u16(0xffFF * (u64)t0.raw() / loop_length.raw());
 	const u16 to = u16(0xffFF * (u64)t1.raw() / loop_length.raw());
 
-	if (t1.raw() > t0.raw()) {
+	if (t1.raw() >= t0.raw()) {
 		while(blob.getPosition() < blob.size()) {
 			const u32 type = blob.read<u32>();
 			const u16 size = blob.read<u16>();
@@ -289,6 +289,7 @@ void Node::emitEvents(Time old_time, Time new_time, Time loop_length, RuntimeCon
 			if (rel_time >= from && rel_time < to) {
 				ctx.events.write((u8*)blob.getData() + blob.getPosition() - 2 * sizeof(u32), size + 2 * sizeof(u32));
 			}
+			blob.skip(size);
 		}
 	}
 	else {

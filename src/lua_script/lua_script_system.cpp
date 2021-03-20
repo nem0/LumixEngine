@@ -1979,49 +1979,6 @@ namespace Lumix
 				LuaWrapper::pcall(update_item.state, 1, 0);
 				lua_pop(update_item.state, 1);
 			}
-
-			processAnimationEvents();
-		}
-
-
-		void processAnimationEvents()
-		{
-			if (!m_animation_scene) return;
-
-			InputMemoryStream blob(m_animation_scene->getEventStream());
-			u32 lua_call_type = crc32("lua_call");
-			while (blob.getPosition() < blob.size())
-			{
-				u32 type;
-				u8 size;
-				EntityRef entity;
-				blob.read(type);
-				blob.read(entity);
-				blob.read(size);
-				if (type == lua_call_type)
-				{
-					char tmp[64];
-					if (size + 1 > sizeof(tmp))
-					{
-						blob.skip(size);
-						logError("Skipping lua_call animation event because it is too big.");
-					}
-					else
-					{
-						blob.read(tmp, size);
-						tmp[size] = 0;
-						ScriptComponent* scr = m_scripts[entity];
-						for (int i = 0, c = scr->m_scripts.size(); i < c; ++i)
-						{
-							if (beginFunctionCall(entity, i, tmp)) endFunctionCall();
-						}
-					}
-				}
-				else
-				{
-					blob.skip(size);
-				}
-			}
 		}
 
 
