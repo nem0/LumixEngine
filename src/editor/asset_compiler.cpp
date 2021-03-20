@@ -103,6 +103,7 @@ struct AssetCompilerImpl : AssetCompiler
 		, m_dependencies(app.getAllocator())
 		, m_changed_files(app.getAllocator())
 		, m_on_list_changed(app.getAllocator())
+		, m_on_init_load(app.getAllocator())
 	{
 		Engine& engine = app.getEngine();
 		FileSystem& fs = engine.getFileSystem();
@@ -390,6 +391,13 @@ struct AssetCompilerImpl : AssetCompiler
 
 	void onInitFinished() override
 	{
+		m_init_finished = true;
+		for (Resource* res : m_on_init_load) {
+			const char* filepath = getResourceFilePath(res->getPath().c_str());
+			pushToCompileQueue(*res, filepath);
+			res->decRefCount();
+		}
+		m_on_init_load.clear();
 		fillDB();
 	}
 
@@ -525,32 +533,42 @@ struct AssetCompilerImpl : AssetCompiler
 			|| fs.getLastModified(dst_path) < fs.getLastModified(meta_path)
 			)
 		{
-			MutexGuard lock(m_to_compile_mutex);
-			const Path path(filepath);
-			auto iter = m_updates.find(path);
-			if (!iter.isValid()) {
-				IAllocator& allocator = m_app.getAllocator();
-				m_updates.insert(path, ResourceUpdate(allocator));
-				iter = m_updates.find(path);
+			if (!m_init_finished) {
+				res.incRefCount();
+				m_on_init_load.push(&res);
+				return ResourceManagerHub::LoadHook::Action::DEFERRED;
 			}
 
-			ResourceUpdate& update = iter.value();
-			++update.generation;
-			if (update.resources.indexOf(&res) < 0) {
-				update.resources.push(&res);
-			}
-
-			CompileJob job;
-			job.path = path;
-			job.generation = update.generation;
-
-			m_to_compile.push(job);
-			++m_compile_batch_count;
-			++m_batch_remaining_count;
-			m_semaphore.signal();
+			pushToCompileQueue(res, filepath);
 			return ResourceManagerHub::LoadHook::Action::DEFERRED;
 		}
 		return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
+	}
+
+	void pushToCompileQueue(Resource& res, const char* filepath) {
+		MutexGuard lock(m_to_compile_mutex);
+		const Path path(filepath);
+		auto iter = m_updates.find(path);
+		if (!iter.isValid()) {
+			IAllocator& allocator = m_app.getAllocator();
+			m_updates.insert(path, ResourceUpdate(allocator));
+			iter = m_updates.find(path);
+		}
+
+		ResourceUpdate& update = iter.value();
+		++update.generation;
+		if (update.resources.indexOf(&res) < 0) {
+			update.resources.push(&res);
+		}
+
+		CompileJob job;
+		job.path = path;
+		job.generation = update.generation;
+
+		m_to_compile.push(job);
+		++m_compile_batch_count;
+		++m_batch_remaining_count;
+		m_semaphore.signal();
 	}
 
 	CompileJob popCompiledResource()
@@ -732,6 +750,8 @@ struct AssetCompilerImpl : AssetCompiler
 	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
 	DelegateList<void()> m_on_list_changed;
+	bool m_init_finished = false;
+	Array<Resource*> m_on_init_load;
 
 	u32 m_compile_batch_count = 0;
 	u32 m_batch_remaining_count = 0;

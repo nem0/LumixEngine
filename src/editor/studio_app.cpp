@@ -392,12 +392,12 @@ struct StudioAppImpl final : StudioApp
 		createLua();
 		extractBundled();
 
+		m_asset_compiler = AssetCompiler::create(*this);
 		m_editor = WorldEditor::create(*m_engine, m_allocator);
 		scanUniverses();
 		loadUserPlugins();
 		addActions();
 
-		m_asset_compiler = AssetCompiler::create(*this);
 		m_asset_browser = AssetBrowser::create(*this);
 		m_property_grid.create(*this);
 		m_profiler_ui = ProfilerUI::create(*m_engine);
