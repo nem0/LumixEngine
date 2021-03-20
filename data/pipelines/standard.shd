@@ -18,6 +18,11 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
+texture_slot {
+	name = "Ambient occlusion",
+	define = "HAS_AMBIENT_OCCLUSION_TEX"
+}
+
 include "pipelines/common.glsl"
 
 define "ALPHA_CUTOUT"
@@ -136,9 +141,12 @@ fragment_shader [[
 	layout (binding=1) uniform sampler2D u_normalmap;
 	layout (binding=2) uniform sampler2D u_roughnessmap;
 	layout (binding=3) uniform sampler2D u_metallicmap;
-	layout (binding=4) uniform sampler2D u_shadowmap;
-	layout (binding=5) uniform sampler2D u_shadow_atlas;
-	layout (binding=6) uniform samplerCubeArray u_reflection_probes;
+	#ifdef HAS_AMBIENT_OCCLUSION_TEX	
+		layout (binding=4) uniform sampler2D u_aomap;
+	#endif
+	layout (binding=5) uniform sampler2D u_shadowmap;
+	layout (binding=6) uniform sampler2D u_shadow_atlas;
+	layout (binding=7) uniform samplerCubeArray u_reflection_probes;
 	
 	layout(location = 0) in vec2 v_uv;
 	layout(location = 1) in vec3 v_normal;
@@ -175,6 +183,10 @@ fragment_shader [[
 			data.ao = v_color.r;
 		#else
 			data.ao = 1;
+		#endif
+
+		#ifdef HAS_AMBIENT_OCCLUSION_TEX
+			data.ao *= texture(u_aomap, v_uv).r;
 		#endif
 
 		#ifdef FUR 

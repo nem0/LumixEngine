@@ -85,7 +85,7 @@ function transparentPass(entities, colorbuffer, dsbuffer, shadowmap)
 	pass(getCameraParams())
 	local bucket = createBucket(entities, "transparent", "", "depth")
 	fur(bucket)
-	bindTextures({ shadowmap }, 4);
+	bindTextures({ shadowmap }, 5);
 	renderBucket(bucket, transparent_state)
 	local view_params = getCameraParams()
 	renderParticles(view_params)

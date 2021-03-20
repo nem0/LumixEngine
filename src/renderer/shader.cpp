@@ -234,6 +234,10 @@ int texture_slot(lua_State* L)
 
 	Shader::TextureSlot& slot = shader->m_texture_slots[shader->m_texture_slot_count];
 	LuaWrapper::getOptionalStringField(L, -1, "name", Span(slot.name));
+	char define[64];
+	if (LuaWrapper::getOptionalStringField(L, -1, "define", Span(define))) {
+		slot.define_idx = shader->m_renderer.getShaderDefineIdx(define);
+	}
 
 	char tmp[LUMIX_MAX_PATH];
 	if(LuaWrapper::getOptionalStringField(L, -1, "default_texture", Span(tmp))) {
