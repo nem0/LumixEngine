@@ -63,6 +63,7 @@ struct ControllerEditorImpl : ControllerEditor {
 		: m_app(app)
 		, m_undo_stack(app.getAllocator())
 		, m_event_types(app.getAllocator())
+		, m_copy_buffer(app.getAllocator())
 	{
 		IAllocator& allocator = app.getAllocator();
 		ResourceManager* res_manager = app.getEngine().getResourceManager().get(Controller::TYPE);
@@ -151,19 +152,20 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool isOpen() const { return m_open; }
 	void toggleOpen() { m_open = !m_open; }
 
-	void createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
+	Node* createChild(GroupNode& parent, Node::Type type, IAllocator& allocator) {
 		Node* node = nullptr;
 		switch(type) {
 			case Node::ANIMATION: node = LUMIX_NEW(allocator, AnimationNode)(&parent, allocator); break;
 			case Node::GROUP: node = LUMIX_NEW(allocator, GroupNode)(&parent, allocator); break;
 			case Node::BLEND1D: node = LUMIX_NEW(allocator, Blend1DNode)(&parent, allocator); break;
-			default: ASSERT(false); return;
+			default: ASSERT(false); return nullptr;
 		}
 
 		node->m_name = "new";
 		parent.m_children.emplace(allocator);
 		parent.m_children.back().node = node;
 		pushUndo();
+		return node;
 	}
 
 	bool properties_ui(AnimationNode& node) {
@@ -549,8 +551,9 @@ struct ControllerEditorImpl : ControllerEditor {
 	bool hierarchy_ui(Node& node) {
 		bool changed = false;
 		const bool is_container = isContainer(node);
-		bool is_parent_group = node.m_parent && node.m_parent->type() == Node::Type::GROUP;
-		bool is_layer = node.m_parent && node.m_parent->type() == Node::Type::LAYERS;
+		const bool is_parent_group = node.m_parent && node.m_parent->type() == Node::Type::GROUP;
+		const bool is_layer = node.m_parent && node.m_parent->type() == Node::Type::LAYERS;
+		const bool is_group = node.type() == Node::Type::GROUP;
 
 		ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow | (&node == m_current_node ? ImGuiTreeNodeFlags_Selected : 0);
 		if (!is_container) flags |= ImGuiTreeNodeFlags_Leaf; 
@@ -558,7 +561,50 @@ struct ControllerEditorImpl : ControllerEditor {
 		const char* type_str = toString(node.type());
 		const bool is_selectable = isSelectable(node);
 		if (!is_selectable) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-		if (ImGui::TreeNodeEx(&node, flags, "%s (%s)", node.m_name.c_str(), type_str)) {
+		const bool open = ImGui::TreeNodeEx(&node, flags, "%s (%s)", node.m_name.c_str(), type_str);
+		if (is_parent_group) {
+			if (ImGui::BeginDragDropSource()) {
+				ImGui::Text("%s", node.m_name.c_str());
+				void* ptr = &node;
+				ImGui::SetDragDropPayload("anim_node", &ptr, sizeof(ptr));
+				ImGui::EndDragDropSource();
+			}
+		}
+
+		if (is_group) {
+			if (ImGui::BeginDragDropTarget()) {
+				if (auto* payload = ImGui::AcceptDragDropPayload("anim_node")) {
+					Node* dropped_node = *(Node**)payload->Data;
+					OutputMemoryStream blob(m_app.getAllocator());
+					dropped_node->serialize(blob);
+					Node* new_node = createChild((GroupNode&)node, dropped_node->type(), m_controller->m_allocator);
+					InputMemoryStream iblob(blob);
+					new_node->deserialize(iblob, *m_controller.get(), (u32)ControllerVersion::LATEST);
+					if (dropped_node->m_parent) {
+						for (GroupNode::Child& src : dropped_node->m_parent->m_children) {
+							if (src.node == dropped_node) {
+								for (GroupNode::Child& c : new_node->m_parent->m_children) {
+									if (c.node == new_node) {
+										c.flags = src.flags;
+										c.condition_str = src.condition_str;
+										c.condition.compile(src.condition_str.c_str(), m_controller->m_inputs);
+										break;
+									}
+								}
+								break;
+							}
+						}
+					}
+					if (m_current_node == dropped_node) m_current_node = nullptr;
+					(dropped_node->m_parent)->m_children.eraseItems([dropped_node](GroupNode::Child& c){ return c.node == dropped_node; });
+					LUMIX_DELETE(m_controller->m_allocator, dropped_node);
+					ImGui::TreePop();
+					return true;
+				}
+			}
+		}
+
+		if (open) {
 			if (!is_selectable) ImGui::PopStyleColor();
 			if (ImGui::IsMouseClicked(0) && ImGui::IsItemHovered()) {
 				m_current_node = &node;
@@ -567,13 +613,37 @@ struct ControllerEditorImpl : ControllerEditor {
 			if (is_parent_group && ImGui::IsMouseClicked(1) && ImGui::IsItemHovered()) {
 				ImGui::OpenPopup("group_popup");
 			}
-			if (is_layer && ImGui::IsMouseClicked(1) && ImGui::IsItemHovered()) {
+			else if (is_layer && ImGui::IsMouseClicked(1) && ImGui::IsItemHovered()) {
 				ImGui::OpenPopup("layer_popup");
+			}
+			else if (is_group && ImGui::IsMouseClicked(1) && ImGui::IsItemHovered()) {
+				ImGui::OpenPopup("popup");
+			}
+
+			auto paste_ui = [&](GroupNode& group){
+				if (ImGui::Selectable("Paste", false, m_copy_buffer.data.empty() ? ImGuiSelectableFlags_Disabled : 0)) {
+					Node* pasted = createChild(group, m_copy_buffer.node_type, m_controller->m_allocator);
+					if (pasted) {
+						InputMemoryStream blob(m_copy_buffer.data);
+						pasted->deserialize(blob, *m_controller.get(), (u32)ControllerVersion::LATEST);
+					}
+				}
+			};
+
+			if (ImGui::BeginPopup("popup")) {
+				paste_ui((GroupNode&)node);
+				ImGui::EndPopup();
 			}
 
 			if (ImGui::BeginPopup("group_popup")) {
 				ImGui::TextUnformatted(node.m_name.c_str());
 				ImGui::Separator();
+				if (ImGui::Selectable("Copy")) {
+					m_copy_buffer.node_type = node.type();
+					m_copy_buffer.data.clear();
+					node.serialize(m_copy_buffer.data);
+				}
+				if (node.type() == Node::GROUP) paste_ui((GroupNode&)node);
 				if (ImGui::Selectable("Remove")) {
 					if (m_current_node == &node) m_current_node = nullptr;
 					((GroupNode*)node.m_parent)->m_children.eraseItems([&node](GroupNode::Child& c){ return c.node == &node; });
@@ -1103,6 +1173,12 @@ struct ControllerEditorImpl : ControllerEditor {
 		OutputMemoryStream data;
 		u64 tag;
 	};
+
+	struct CopyBuffer {
+		CopyBuffer(IAllocator& allocator) : data(allocator) {}
+		OutputMemoryStream data;
+		Node::Type node_type;
+	} m_copy_buffer;
 
 	StudioApp& m_app;
 	Array<UndoRecord> m_undo_stack;

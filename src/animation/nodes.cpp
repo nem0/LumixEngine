@@ -42,7 +42,7 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotionSimple(const Animatio
 }
 
 static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const Animation* anim, Time t0, Time t1, int translation_idx, int rotation_idx) {
-	if (t0 < t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
+	if (t0 <= t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
 
 	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), translation_idx, rotation_idx);
 	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time(0), t1, translation_idx, rotation_idx);
@@ -64,7 +64,7 @@ static LUMIX_FORCE_INLINE LocalRigidTransform getRootMotion(const RuntimeContext
 	const Time t0 = t0_abs % anim->getLength();
 	const Time t1 = t1_abs % anim->getLength();
 
-	if (t0 < t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
+	if (t0 <= t1) return getRootMotionSimple(anim, t0, t1, translation_idx, rotation_idx);
 
 	const LocalRigidTransform tr_0 = getRootMotionSimple(anim, t0, anim->getLength(), translation_idx, rotation_idx);
 	const LocalRigidTransform tr_1 = getRootMotionSimple(anim, Time(0), t1, translation_idx, rotation_idx);
@@ -152,31 +152,28 @@ void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
 	const Animation* anim_a = ctx.animations[pair.a->slot];
-	Time len;
+	const Animation* anim_b = pair.b ? ctx.animations[pair.b->slot] : nullptr;
+	const Time wlen = lerp(anim_a->getLength(), anim_b ? anim_b->getLength() : anim_a->getLength(), pair.t);
+	relt += ctx.time_delta / wlen;
+	relt = fmodf(relt, 1);
+	
 	if (anim_a) {
-		len = anim_a->getLength();
+		const Time len = anim_a->getLength();
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
 		root_motion = getRootMotion(ctx, pair.a->slot, t0, t);
 	}
 	else {
-		len = Time(1);
 		root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 	}
-	if (pair.b) {
-		const Animation* anim_b = ctx.animations[pair.a->slot];
-		if (anim_b) {
-			const Time len_b = anim_b->getLength();
-			const Time t0 = len_b * relt0;
-			const Time t = len_b * relt;
-			const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot, t0, t);
-			root_motion = root_motion.interpolate(tr1, pair.t);
-			len = lerp(len, len_b, pair.t);
-		}
+	if (anim_b) {
+		const Time len = anim_b->getLength();
+		const Time t0 = len * relt0;
+		const Time t = len * relt;
+		const LocalRigidTransform tr1 = getRootMotion(ctx, pair.b->slot, t0, t);
+		root_motion = root_motion.interpolate(tr1, pair.t);
 	}
 
-	relt += ctx.time_delta / len;
-	relt = fmodf(relt, 1);
 	ctx.data.write(relt);
 }
 
@@ -304,9 +301,15 @@ void AnimationNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion
 	t += ctx.time_delta;
 
 	Animation* anim = ctx.animations[m_slot];
-	if (anim) {
+	if (anim && anim->isReady()) {
 		// TODO getBoneIndex is O(n)
 		
+		if ((m_flags & LOOPED) == 0) {
+			const u32 len = anim->getLength().raw();
+			t = Time(minimum(t.raw(), len));
+			prev_t = Time(minimum(prev_t.raw(), len));
+		}
+
 		emitEvents(prev_t, t, anim->getLength(), ctx);
 		const int translation_idx = anim->getTranslationCurveIndex(ctx.root_bone_hash);
 		const int rotation_idx = anim->getRotationCurveIndex(ctx.root_bone_hash);
