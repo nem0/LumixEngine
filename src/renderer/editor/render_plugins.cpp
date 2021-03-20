@@ -1534,6 +1534,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool create_impostor = false;
 		bool use_mikktspace = false;
 		bool force_skin = false;
+		bool import_vertex_colors = true;
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
@@ -1586,6 +1587,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "culling_scale", &meta.culling_scale);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "split", &meta.split);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "create_impostor", &meta.create_impostor);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "import_vertex_colors", &meta.import_vertex_colors);
 			
 			char tmp[64];
 			if (LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "physics", Span(tmp))) {
@@ -1669,6 +1671,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		cfg.mesh_scale = meta.scale;
 		cfg.radius_scale = meta.culling_scale;
 		cfg.physics = meta.physics;
+		cfg.import_vertex_colors = meta.import_vertex_colors;
 		memcpy(cfg.lods_distances, meta.lods_distances, sizeof(meta.lods_distances));
 		cfg.create_impostor = meta.create_impostor;
 		const PathInfo src_info(filepath);
@@ -2119,6 +2122,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::Checkbox("##split", &m_meta.split);
 			ImGuiEx::Label("Create impostor mesh");
 			ImGui::Checkbox("##creimp", &m_meta.create_impostor);
+			ImGuiEx::Label("Import vertex colors");
+			ImGui::Checkbox("##vercol", &m_meta.import_vertex_colors);
 			
 			ImGuiEx::Label("Physics");
 			if (ImGui::BeginCombo("##phys", toString(m_meta.physics))) {
@@ -2152,7 +2157,8 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					.cat("\nphysics = \"").cat(toString(m_meta.physics)).cat("\"")
 					.cat("\nscale = ").cat(m_meta.scale)
 					.cat("\nculling_scale = ").cat(m_meta.culling_scale)
-					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n");
+					.cat("\nsplit = ").cat(m_meta.split ? "true\n" : "false\n")
+					.cat("\nimport_vertex_colors = ").cat(m_meta.import_vertex_colors ? "true\n" : "false\n");
 
 				for (u32 i = 0; i < lengthOf(m_meta.lods_distances); ++i) {
 					if (m_meta.lods_distances[i] > 0) {
