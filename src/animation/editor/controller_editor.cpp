@@ -580,23 +580,22 @@ struct ControllerEditorImpl : ControllerEditor {
 					Node* new_node = createChild((GroupNode&)node, dropped_node->type(), m_controller->m_allocator);
 					InputMemoryStream iblob(blob);
 					new_node->deserialize(iblob, *m_controller.get(), (u32)ControllerVersion::LATEST);
-					if (dropped_node->m_parent) {
-						for (GroupNode::Child& src : dropped_node->m_parent->m_children) {
-							if (src.node == dropped_node) {
-								for (GroupNode::Child& c : new_node->m_parent->m_children) {
-									if (c.node == new_node) {
-										c.flags = src.flags;
-										c.condition_str = src.condition_str;
-										c.condition.compile(src.condition_str.c_str(), m_controller->m_inputs);
-										break;
-									}
+					ASSERT(dropped_node->m_parent);
+					for (GroupNode::Child& src : dropped_node->m_parent->m_children) {
+						if (src.node == dropped_node) {
+							for (GroupNode::Child& c : new_node->m_parent->m_children) {
+								if (c.node == new_node) {
+									c.flags = src.flags;
+									c.condition_str = src.condition_str;
+									c.condition.compile(src.condition_str.c_str(), m_controller->m_inputs);
+									break;
 								}
-								break;
 							}
+							break;
 						}
 					}
 					if (m_current_node == dropped_node) m_current_node = nullptr;
-					(dropped_node->m_parent)->m_children.eraseItems([dropped_node](GroupNode::Child& c){ return c.node == dropped_node; });
+					dropped_node->m_parent->m_children.eraseItems([dropped_node](GroupNode::Child& c){ return c.node == dropped_node; });
 					LUMIX_DELETE(m_controller->m_allocator, dropped_node);
 					ImGui::TreePop();
 					return true;

@@ -151,9 +151,9 @@ void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 	
 	const float input_val = getInputValue(ctx, m_input_index);
 	const Blend1DActivePair pair = getActivePair(*this, input_val);
-	const Animation* anim_a = ctx.animations[pair.a->slot];
+	const Animation* anim_a = pair.a ? ctx.animations[pair.a->slot] : nullptr;
 	const Animation* anim_b = pair.b ? ctx.animations[pair.b->slot] : nullptr;
-	const Time wlen = lerp(anim_a->getLength(), anim_b ? anim_b->getLength() : anim_a->getLength(), pair.t);
+	const Time wlen = anim_a ? lerp(anim_a->getLength(), anim_b ? anim_b->getLength() : anim_a->getLength(), pair.t) : Time::fromSeconds(1);
 	relt += ctx.time_delta / wlen;
 	relt = fmodf(relt, 1);
 	
@@ -166,7 +166,7 @@ void Blend1DNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) 
 	else {
 		root_motion = {{0, 0, 0}, {0, 0, 0, 1}};
 	}
-	if (anim_b) {
+	if (anim_b && anim_b->isReady()) {
 		const Time len = anim_b->getLength();
 		const Time t0 = len * relt0;
 		const Time t = len * relt;
