@@ -4174,7 +4174,7 @@ struct PipelineImpl final : Pipeline
 				gpu::setState(state);
 				IVec4 prev_from_to;
 
-				float s = 1;
+				float s = inst.scale.x;
 				bool first = true;
 				for (;;) {
 					// round 

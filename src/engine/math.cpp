@@ -344,6 +344,14 @@ Vec2 normalize(const Vec2& value) {
 	return Vec2(x, y);
 }
 
+DVec2 normalize(const DVec2& value) {
+	double x = value.x;
+	double y = value.y;
+	const double inv_len = 1 / sqrt(x * x + y * y);
+	x *= inv_len;
+	y *= inv_len;
+	return DVec2(x, y);
+}
 
 Vec3 normalize(const Vec3& value) {
 	float x = value.x;

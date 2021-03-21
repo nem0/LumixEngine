@@ -53,6 +53,8 @@ struct LUMIX_ENGINE_API DVec2 {
 	DVec2() {}
 	DVec2(double x, double y) : x(x), y(y) {}
 	DVec2 operator -(const DVec2& rhs) const { return {x - rhs.x, y - rhs.y}; }
+	DVec2 operator +(const DVec2& rhs) const { return {x + rhs.x, y + rhs.y}; }
+	DVec2 operator *(double rhs) const { return {x * rhs, y * rhs}; }
 	double x, y;
 };
 
@@ -449,6 +451,7 @@ LUMIX_ENGINE_API u32 rand(u32 from, u32 to);
 LUMIX_ENGINE_API void seedRandom(u32 seed);
 LUMIX_ENGINE_API float randFloat();
 LUMIX_ENGINE_API float randFloat(float from, float to);
+LUMIX_ENGINE_API DVec2 normalize(const DVec2& value);
 LUMIX_ENGINE_API Vec2 normalize(const Vec2& value);
 LUMIX_ENGINE_API Vec3 normalize(const Vec3& value);
 LUMIX_ENGINE_API Quat normalize(const Quat& value);

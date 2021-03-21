@@ -80,16 +80,16 @@ vertex_shader [[
 		v.xz = mix(v.xz, npos.xz, rel.yx);
 		v.xz = clamp(v.xz, vec2(0), u_hm_size);
 
+		vec2 hm_uv = (v.xz + vec2(0.5 * u_terrain_scale.x)) / (u_hm_size + u_terrain_scale.x);
 		#ifndef DEPTH
 			v_uv = v.xz / u_hm_size;
 		
 			// because of float precision
 			vec2 detail_uv_offset = floor(u_rel_camera_pos.xz);
  			v_uv_detail = u_detail_scale * v_uv * u_hm_size - detail_uv_offset;
-			float h = texture(u_hm, v_uv).x * u_terrain_scale.y;
+			float h = texture(u_hm, hm_uv).x * u_terrain_scale.y;
 		#else
-			vec2 uv = v.xz / u_hm_size;
-			float h = texture(u_hm, uv).x * u_terrain_scale.y;
+			float h = texture(u_hm, hm_uv).x * u_terrain_scale.y;
 		#endif
 
 		vec4 p = Pass.view * vec4(u_position.xyz + v + vec3(0, h, 0), 1);

@@ -870,7 +870,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 					int idx2 = i + j * width;
 					heights[idx].height = PxI16((i32)data[idx2] - 0x7fff);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
-					heights[idx].setTessFlag();
 				}
 			}
 		}
@@ -886,7 +885,6 @@ struct PhysicsSceneImpl final : PhysicsScene
 					int idx2 = i + j * width;
 					heights[idx].height = PxI16((i32)data[idx2] - 0x7f);
 					heights[idx].materialIndex0 = heights[idx].materialIndex1 = 0;
-					heights[idx].setTessFlag();
 				}
 			}
 		}
