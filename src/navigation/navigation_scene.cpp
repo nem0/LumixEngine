@@ -960,7 +960,7 @@ struct NavigationSceneImpl final : NavigationScene
 
 		for (auto iter = m_agents.begin(), end = m_agents.end(); iter != end; ++iter) {
 			Agent& agent = iter.value();
-			if (agent.zone.isValid()) continue;
+			if (agent.zone.isValid() && agent.agent >= 0) continue;
 
 			const Vec3 pos = Vec3(inv_zone_tr.transform(m_universe.getPosition(agent.entity)));
 			if (pos.x > min.x && pos.y > min.y && pos.z > min.z 
