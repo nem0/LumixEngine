@@ -2209,9 +2209,8 @@ void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 
 void FBXImporter::writePrefab(const char* src, const ImportConfig& cfg)
 {
-	Engine& engine = m_app.getWorldEditor().getEngine();
+	Engine& engine = m_app.getEngine();
 	Universe& universe = engine.createUniverse(false);
-
 
 	os::OutputFile file;
 	PathInfo file_info(src);

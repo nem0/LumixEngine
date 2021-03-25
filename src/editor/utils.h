@@ -52,7 +52,7 @@ struct LUMIX_EDITOR_API Action
 
 LUMIX_EDITOR_API void getShortcut(const Action& action, Span<char> buf);
 LUMIX_EDITOR_API void doMenuItem(Action& a, bool enabled);
-LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct WorldEditor& editor, Span<char> buf, EntityPtr entity);
+LUMIX_EDITOR_API void getEntityListDisplayName(struct StudioApp& app, struct Universe& editor, Span<char> buf, EntityPtr entity);
 
 
 } // namespace Lumix

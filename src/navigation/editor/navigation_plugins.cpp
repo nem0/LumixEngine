@@ -27,14 +27,15 @@ static const ComponentType NAVMESH_AGENT_TYPE = reflection::getComponentType("na
 static const ComponentType NAVMESH_ZONE_TYPE = reflection::getComponentType("navmesh_zone");
 
 
-struct PropertyGridPlugin : PropertyGrid::IPlugin {
+struct PropertyGridPlugin final : PropertyGrid::IPlugin {
 	PropertyGridPlugin(StudioApp& app) : m_app(app) {}
 	~PropertyGridPlugin() {
 		ASSERT(!m_job);
 	}
 
-	void onAgentGUI(EntityRef entity) {
-		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(crc32("navigation")));
+	void onAgentGUI(EntityRef entity, WorldEditor& editor) {
+		Universe& universe = *editor.getUniverse();
+		auto* scene = static_cast<NavigationScene*>(universe.getScene(crc32("navigation")));
 		static bool debug_draw_path = false;
 		const dtCrowdAgent* agent = scene->getDetourAgent(entity);
 		if (agent) {
@@ -86,15 +87,15 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		ImGui::PopStyleVar();
 	}
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
-		auto* scene = static_cast<NavigationScene*>(m_app.getWorldEditor().getUniverse()->getScene(NAVMESH_AGENT_TYPE));
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
 		if(cmp.type == NAVMESH_AGENT_TYPE) { 
-			onAgentGUI((EntityRef)cmp.entity);
+			onAgentGUI((EntityRef)cmp.entity, editor);
 			return;
 		}
 
 		if (cmp.type != NAVMESH_ZONE_TYPE) return;
 		
+		auto* scene = static_cast<NavigationScene*>(cmp.scene);
 		if (m_job) {
 			ImGui::TextUnformatted("Generating...");
 		}
@@ -120,7 +121,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Debug tile")) {
-			UniverseView& view = m_app.getWorldEditor().getView();
+			UniverseView& view = editor.getView();
 			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
 			scene->generateTileAt((EntityRef)cmp.entity, hit.pos, true);
 		}
@@ -134,7 +135,7 @@ struct PropertyGridPlugin : PropertyGrid::IPlugin {
 			ImGui::Checkbox("Inner boundaries", &inner_boundaries);
 			ImGui::Checkbox("Outer boundaries", &outer_boundaries);
 			ImGui::Checkbox("Portals", &portals);
-			UniverseView& view = m_app.getWorldEditor().getView();
+			UniverseView& view = editor.getView();
 			const UniverseView::RayHit hit = view.getCameraRaycastHit(view.getViewport().w >> 1, view.getViewport().h >> 1);
 			scene->debugDrawNavmesh((EntityRef)cmp.entity, hit.pos, inner_boundaries, outer_boundaries, portals);
 		}

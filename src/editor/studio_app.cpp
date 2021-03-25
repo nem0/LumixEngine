@@ -601,7 +601,7 @@ struct StudioAppImpl final : StudioApp
 
 	void registerComponent(const char* icon, ComponentType cmp_type, const char* label, ResourceType resource_type, const char* property) {
 		struct Plugin final : IAddComponentPlugin {
-			void onGUI(bool create_entity, bool from_filter) override {
+			void onGUI(bool create_entity, bool from_filter, WorldEditor& editor) override {
 				ImGui::SetNextWindowSize(ImVec2(300, 300));
 				const char* last = reverseFind(label, nullptr, '/');
 				last = last && !from_filter ? last + 1 : label;
@@ -612,14 +612,14 @@ struct StudioAppImpl final : StudioApp
 				static u32 selected_res_hash = 0;
 				if (asset_browser->resourceList(Span(buf), selected_res_hash, resource_type, 0, true) || create_empty) {
 					if (create_entity) {
-						EntityRef entity = editor->addEntity();
-						editor->selectEntities(Span(&entity, 1), false);
+						EntityRef entity = editor.addEntity();
+						editor.selectEntities(Span(&entity, 1), false);
 					}
 
-					const Array<EntityRef>& selected_entites = editor->getSelectedEntities();
-					editor->addComponent(selected_entites, type);
+					const Array<EntityRef>& selected_entites = editor.getSelectedEntities();
+					editor.addComponent(selected_entites, type);
 					if (!create_empty) {
-						editor->setProperty(type, "", -1, property, editor->getSelectedEntities(), Path(buf));
+						editor.setProperty(type, "", -1, property, editor.getSelectedEntities(), Path(buf));
 					}
 					ImGui::CloseCurrentPopup();
 				}
@@ -631,7 +631,6 @@ struct StudioAppImpl final : StudioApp
 
 			PropertyGrid* property_grid;
 			AssetBrowser* asset_browser;
-			WorldEditor* editor;
 			ComponentType type;
 			ResourceType resource_type;
 			StaticString<64> property;
@@ -643,7 +642,6 @@ struct StudioAppImpl final : StudioApp
 		plugin->property_grid = m_property_grid.get();
 		plugin->asset_browser = m_asset_browser.get();
 		plugin->type = cmp_type;
-		plugin->editor = m_editor.get();
 		plugin->property = property;
 		plugin->resource_type = resource_type;
 		copyString(plugin->label, label);
@@ -667,7 +665,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		struct Plugin final : IAddComponentPlugin
 		{
-			void onGUI(bool create_entity, bool from_filter) override
+			void onGUI(bool create_entity, bool from_filter, WorldEditor& editor) override
 			{
 				const char* last = reverseFind(label, nullptr, '/');
 				last = last && !from_filter ? last + 1 : label;
@@ -676,17 +674,16 @@ struct StudioAppImpl final : StudioApp
 				{
 					if (create_entity)
 					{
-						EntityRef entity = editor->addEntity();
-						editor->selectEntities(Span(&entity, 1), false);
+						EntityRef entity = editor.addEntity();
+						editor.selectEntities(Span(&entity, 1), false);
 					}
 
-					editor->addComponent(editor->getSelectedEntities(), type);
+					editor.addComponent(editor.getSelectedEntities(), type);
 				}
 			}
 
 			const char* getLabel() const override { return label; }
 
-			WorldEditor* editor;
 			PropertyGrid* property_grid;
 			ComponentType type;
 			char label[64];
@@ -695,7 +692,6 @@ struct StudioAppImpl final : StudioApp
 		auto& allocator = m_editor->getAllocator();
 		auto* plugin = LUMIX_NEW(allocator, Plugin);
 		plugin->property_grid = m_property_grid.get();
-		plugin->editor = m_editor.get();
 		plugin->type = type;
 		copyString(plugin->label, label);
 		addPlugin(*plugin);
@@ -1380,24 +1376,24 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter)
+	static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, WorldEditor& editor)
 	{
 		if (!node) return;
 
 		if (filter[0])
 		{
 			if (!node->plugin)
-				showAddComponentNode(node->child, filter);
+				showAddComponentNode(node->child, filter, editor);
 			else if (stristr(node->plugin->getLabel(), filter))
-				node->plugin->onGUI(false, true);
-			showAddComponentNode(node->next, filter);
+				node->plugin->onGUI(false, true, editor);
+			showAddComponentNode(node->next, filter, editor);
 			return;
 		}
 
 		if (node->plugin)
 		{
-			node->plugin->onGUI(true, false);
-			showAddComponentNode(node->next, filter);
+			node->plugin->onGUI(true, false, editor);
+			showAddComponentNode(node->next, filter, editor);
 			return;
 		}
 
@@ -1406,10 +1402,10 @@ struct StudioAppImpl final : StudioApp
 		if (last[0] == ' ') ++last;
 		if (ImGui::BeginMenu(last))
 		{
-			showAddComponentNode(node->child, filter);
+			showAddComponentNode(node->child, filter, editor);
 			ImGui::EndMenu();
 		}
-		showAddComponentNode(node->next, filter);
+		showAddComponentNode(node->next, filter, editor);
 	}
 
 
@@ -1423,7 +1419,7 @@ struct StudioAppImpl final : StudioApp
 		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) {
 			m_component_filter[0] = '\0';
 		}
-		showAddComponentNode(m_add_cmp_root.child, m_component_filter);
+		showAddComponentNode(m_add_cmp_root.child, m_component_filter, *m_editor);
 	}
 
 
@@ -1698,7 +1694,7 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::IsItemVisible()) {
 				ImGui::SetCursorPos(cp);
 				char buffer[1024];
-				getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), entity);
+				getEntityListDisplayName(*this, *universe, Span(buffer), entity);
 				node_open = ImGui::TreeNodeEx((void*)(intptr_t)entity.index, flags, "%s", buffer);
 			}
 			else {
@@ -1734,7 +1730,7 @@ struct StudioAppImpl final : StudioApp
 			if (ImGui::BeginDragDropSource())
 			{
 				char buffer[1024];
-				getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), entity);
+				getEntityListDisplayName(*this, *universe, Span(buffer), entity);
 				ImGui::Text("%s", buffer);
 				ImGui::SetDragDropPayload("entity", &entity, sizeof(entity));
 				ImGui::EndDragDropSource();
@@ -1912,7 +1908,7 @@ struct StudioAppImpl final : StudioApp
 		if (!m_is_entity_list_open) return;
 		if (ImGui::Begin(ICON_FA_STREAM "Hierarchy##hierarchy", &m_is_entity_list_open))
 		{
-			auto* universe = m_editor->getUniverse();
+			Universe* universe = m_editor->getUniverse();
 			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 			ImGui::SetNextItemWidth(-w);
 			ImGui::InputTextWithHint("##filter", "Filter", filter, sizeof(filter));
@@ -1930,7 +1926,7 @@ struct StudioAppImpl final : StudioApp
 				} else {
 					for (EntityPtr e = universe->getFirstEntity(); e.isValid(); e = universe->getNextEntity((EntityRef)e)) {
 						char buffer[1024];
-						getEntityListDisplayName(*this, getWorldEditor(), Span(buffer), e);
+						getEntityListDisplayName(*this, *universe, Span(buffer), e);
 						if (stristr(buffer, filter) == nullptr) continue;
 						ImGui::PushID(e.index);
 						const EntityRef e_ref = (EntityRef)e;

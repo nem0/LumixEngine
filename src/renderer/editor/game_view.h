@@ -49,14 +49,13 @@ private:
 	void onBeforeSettingsSaved() override;
 	void toggleFullscreen();
 	void processInputEvents();
-	void onFullscreenGUI();
+	void onFullscreenGUI(WorldEditor& editor);
 	void setFullscreen(bool fullscreen);
 	void onStatsGUI(const ImVec2& view_pos);
-	void controlsGUI();
+	void controlsGUI(WorldEditor& editor);
 
 private:
 	UniquePtr<Pipeline> m_pipeline;
-	WorldEditor& m_editor;
 	StudioApp& m_app;
 	float m_time_multiplier;
 	Vec2 m_pos = Vec2(0);

@@ -61,6 +61,7 @@ struct UniverseViewImpl final : UniverseView {
 
 	UniverseViewImpl(SceneView& view) 
 		: m_scene_view(view)
+		, m_app(view.m_app)
 		, m_editor(view.m_editor) 
 		, m_scene(nullptr)
 		, m_draw_cmds(view.m_app.getAllocator())
@@ -90,6 +91,8 @@ struct UniverseViewImpl final : UniverseView {
 		m_editor.universeDestroyed().unbind<&UniverseViewImpl::onUniverseDestroyed>(this);
 		onUniverseDestroyed();
 	}
+	
+	WorldEditor& getEditor() override { return m_editor; }
 
 	void addCross(const DVec3& pos, float size, Color color) {
 		addLine(*this, pos - Vec3(size, 0, 0), pos + Vec3(size, 0, 0), color);
@@ -179,7 +182,7 @@ struct UniverseViewImpl final : UniverseView {
 					DVec3 snap_pos = origin + dir * hit.t;
 					if (m_snap_mode == SnapMode::VERTEX) snap_pos = getClosestVertex(hit);
 					const Quat rot = m_editor.getUniverse()->getRotation(selected_entities[0]);
-					const Gizmo::Config& gizmo_cfg = m_scene_view.m_app.getGizmoConfig();
+					const Gizmo::Config& gizmo_cfg = m_app.getGizmoConfig();
 					const Vec3 offset = rot.rotate(gizmo_cfg.getOffset());
 					m_editor.snapEntities(snap_pos - offset, gizmo_cfg.isTranslateMode());
 				}
@@ -216,7 +219,7 @@ struct UniverseViewImpl final : UniverseView {
 	Vec2 getMousePos() const override { return m_mouse_pos; }
 	
 	void resetPivot() override {
-		m_scene_view.m_app.getGizmoConfig().setOffset(Vec3::ZERO);
+		m_app.getGizmoConfig().setOffset(Vec3::ZERO);
 	}
 	
 	void setCustomPivot() override
@@ -233,7 +236,7 @@ struct UniverseViewImpl final : UniverseView {
 		const DVec3 snap_pos = getClosestVertex(hit);
 
 		const Transform tr = m_editor.getUniverse()->getTransform(selected_entities[0]);
-		m_scene_view.m_app.getGizmoConfig().setOffset(tr.rot.conjugated() * Vec3(snap_pos - tr.pos));
+		m_app.getGizmoConfig().setOffset(tr.rot.conjugated() * Vec3(snap_pos - tr.pos));
 	}
 
 
@@ -353,7 +356,7 @@ struct UniverseViewImpl final : UniverseView {
 				return;
 			}
 
-			for (StudioApp::MousePlugin* plugin : m_scene_view.m_app.getMousePlugins()) {
+			for (StudioApp::MousePlugin* plugin : m_app.getMousePlugins()) {
 				if (plugin->onMouseDown(*this, x, y)) {
 					m_mouse_handling_plugin = plugin;
 					m_mouse_mode = MouseMode::CUSTOM;
@@ -490,7 +493,7 @@ struct UniverseViewImpl final : UniverseView {
 		}
 
 		if (!m_viewport.is_ortho) {
-			m_viewport.fov = m_scene_view.m_app.getFOV();
+			m_viewport.fov = m_app.getFOV();
 		}
 		previewSnapVertex();
 		
@@ -567,6 +570,7 @@ struct UniverseViewImpl final : UniverseView {
 		float m_speed;
 	} m_go_to_parameters;
 
+	StudioApp& m_app;
 	WorldEditor& m_editor;
 	SceneView& m_scene_view;
 	Viewport m_viewport;
@@ -598,7 +602,7 @@ SceneView::SceneView(StudioApp& app)
 	m_is_mouse_captured = false;
 	m_show_stats = false;
 
-	Engine& engine = m_editor.getEngine();
+	Engine& engine = m_app.getEngine();
 	IAllocator& allocator = engine.getAllocator();
 
 
@@ -634,7 +638,7 @@ void SceneView::init() {
 	m_view = LUMIX_NEW(m_editor.getAllocator(), UniverseViewImpl)(*this);
 	m_editor.setView(m_view);
 
-	Engine& engine = m_editor.getEngine();
+	Engine& engine = m_app.getEngine();
 	auto* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	PipelineResource* pres = engine.getResourceManager().load<PipelineResource>(Path("pipelines/main.pln"));
 	m_pipeline = Pipeline::create(*renderer, pres, "SCENE_VIEW", engine.getAllocator());
@@ -836,7 +840,7 @@ void SceneView::renderIcons()
 		SceneView* m_ui;
 	};
 
-	Engine& engine = m_editor.getEngine();
+	Engine& engine = m_app.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	IAllocator& allocator = renderer->getAllocator();
@@ -950,7 +954,7 @@ void SceneView::renderSelection()
 		DVec3 m_cam_pos;
 	};
 
-	Engine& engine = m_editor.getEngine();
+	Engine& engine = m_app.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 	IAllocator& allocator = renderer->getAllocator();
 	RenderJob& job = renderer->createJob<RenderJob>(allocator);
@@ -966,15 +970,15 @@ void SceneView::renderGizmos()
 {
 	struct Cmd : Renderer::RenderJob
 	{
-		Cmd(IAllocator& allocator)
+		Cmd(Engine& engine, IAllocator& allocator)
 			: cmds(allocator)
+			, engine(engine)
 		{}
 
 		void setup() override {
 			PROFILE_FUNCTION();
 			viewport = view->m_view->getViewport();
 			cmds.swap(view->m_view->m_draw_cmds);
-			Engine& engine = view->m_editor.getEngine();
 			renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 			auto& vertices = view->m_view->m_draw_vertices;
 			vb = renderer->allocTransient(vertices.byte_size());
@@ -1007,6 +1011,7 @@ void SceneView::renderGizmos()
 			renderer->endProfileBlock();
 		}
 
+		Engine& engine;
 		Renderer* renderer;
 		Renderer::TransientSlice ib;
 		Renderer::TransientSlice vb;
@@ -1018,11 +1023,11 @@ void SceneView::renderGizmos()
 
 	if (!m_debug_shape_shader || !m_debug_shape_shader->isReady()) return;
 
-	Engine& engine = m_editor.getEngine();
+	Engine& engine = m_app.getEngine();
 	Renderer* renderer = static_cast<Renderer*>(engine.getPluginManager().getPlugin("renderer"));
 
 	IAllocator& allocator = renderer->getAllocator();
-	Cmd& cmd = renderer->createJob<Cmd>(allocator);
+	Cmd& cmd = renderer->createJob<Cmd>(engine, allocator);
 	gpu::VertexDecl decl;
 	decl.addAttribute(0, 0, 3, gpu::AttributeType::FLOAT, 0);
 	decl.addAttribute(1, 12, 4, gpu::AttributeType::U8, gpu::Attribute::NORMALIZED);

@@ -24,7 +24,7 @@ public:
 	{
 		virtual ~IPlugin() {}
 		virtual void update() {}
-		virtual void onGUI(PropertyGrid& grid, ComponentUID cmp) = 0;
+		virtual void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) = 0;
 	};
 
 public:
@@ -39,12 +39,11 @@ public:
 	bool m_is_open;
 
 private:
-	void showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type);
-	void showCoreProperties(const Array<EntityRef>& entities) const;
+	void showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor);
+	void showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const;
 
 private:
 	StudioApp& m_app;
-	WorldEditor& m_editor;
 	Array<IPlugin*> m_plugins;
 	EntityPtr m_deferred_select;
 	

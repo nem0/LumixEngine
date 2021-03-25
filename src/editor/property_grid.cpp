@@ -28,7 +28,6 @@ static const ComponentType GUI_CANVAS_TYPE = reflection::getComponentType("gui_c
 PropertyGrid::PropertyGrid(StudioApp& app)
 	: m_app(app)
 	, m_is_open(true)
-	, m_editor(app.getWorldEditor())
 	, m_plugins(app.getAllocator())
 	, m_deferred_select(INVALID_ENTITY)
 {
@@ -312,7 +311,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		EntityPtr entity = prop.get(cmp, m_index);
 
 		char buf[128];
-		getEntityListDisplayName(m_app, m_editor, Span(buf), entity);
+		getEntityListDisplayName(m_app, *m_editor.getUniverse(), Span(buf), entity);
 		ImGui::PushID(prop.name);
 		
 		ImGuiEx::Label(prop.name);
@@ -365,7 +364,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			if (ImGui::BeginChild("list", ImVec2(0, ImGui::GetContentRegionAvail().y))) {
 				for (EntityPtr i = universe.getFirstEntity(); i.isValid(); i = universe.getNextEntity((EntityRef)i))
 				{
-					getEntityListDisplayName(m_app, m_editor, Span(buf), i);
+					getEntityListDisplayName(m_app, universe, Span(buf), i);
 					bool show = entity_filter[0] == '\0' || stristr(buf, entity_filter) != 0;
 					if (show && ImGui::Selectable(buf))
 					{
@@ -663,9 +662,9 @@ static bool componentTreeNode(StudioApp& app, WorldEditor& editor, ComponentType
 }
 
 
-void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type)
+void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, ComponentType cmp_type, WorldEditor& editor)
 {
-	bool is_open = componentTreeNode(m_app, m_editor, cmp_type, &entities[0], entities.size());
+	bool is_open = componentTreeNode(m_app, editor, cmp_type, &entities[0], entities.size());
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(ICON_FA_ELLIPSIS_V).x);
 	if (ImGuiEx::IconButton(ICON_FA_ELLIPSIS_V, "Context menu"))
@@ -674,7 +673,7 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 	}
 	if (ImGui::BeginPopup("ctx")) {
 		if (ImGui::Selectable("Remove component")) {
-			m_editor.destroyComponent(entities, cmp_type);
+			editor.destroyComponent(entities, cmp_type);
 			ImGui::EndPopup();
 			if (is_open) ImGui::TreePop();
 			return;
@@ -685,32 +684,31 @@ void PropertyGrid::showComponentProperties(const Array<EntityRef>& entities, Com
 	if (!is_open) return;
 
 	const reflection::ComponentBase* component = reflection::getComponent(cmp_type);
-	GridUIVisitor visitor(m_app, -1, entities, cmp_type, m_editor);
+	GridUIVisitor visitor(m_app, -1, entities, cmp_type, editor);
 	if (component) component->visit(visitor);
 
-	if (entities.size() == 1)
-	{
+	if (entities.size() == 1) {
 		ComponentUID cmp;
 		cmp.type = cmp_type;
-		cmp.scene = m_editor.getUniverse()->getScene(cmp.type);
+		cmp.scene = editor.getUniverse()->getScene(cmp.type);
 		cmp.entity = entities[0];
-		for (auto* i : m_plugins)
+		for (IPlugin* i : m_plugins)
 		{
-			i->onGUI(*this, cmp);
+			i->onGUI(*this, cmp, editor);
 		}
 	}
 	ImGui::TreePop();
 }
 
 
-void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
+void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities, WorldEditor& editor) const
 {
 	char name[Universe::ENTITY_NAME_MAX_LENGTH];
-	Universe& universe = *m_editor.getUniverse();
+	Universe& universe = *editor.getUniverse();
 	const char* tmp = universe.getEntityName(entities[0]);
 	copyString(name, tmp);
 	ImGui::SetNextItemWidth(-1);
-	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name))) m_editor.setEntityName(entities[0], name);
+	if (ImGui::InputTextWithHint("##name", "Name", name, sizeof(name))) editor.setEntityName(entities[0], name);
 	ImGui::PushFont(m_app.getBoldFont());
 	if (!ImGui::TreeNodeEx("General", ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -720,7 +718,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 	ImGui::PopFont();
 	if (entities.size() == 1)
 	{
-		PrefabSystem& prefab_system = m_editor.getPrefabSystem();
+		PrefabSystem& prefab_system = editor.getPrefabSystem();
 		PrefabResource* prefab = prefab_system.getPrefabResource(entities[0]);
 		if (prefab)
 		{
@@ -742,7 +740,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 		EntityPtr parent = universe.getParent(entities[0]);
 		if (parent.isValid())
 		{
-			getEntityListDisplayName(m_app, m_editor, Span(name), parent);
+			getEntityListDisplayName(m_app, universe, Span(name), parent);
 			ImGuiEx::Label("Parent");
 			ImGui::Text("%s", name);
 
@@ -758,7 +756,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 					if (tr.pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
 					if (coord != WorldEditor::Coordinate::NONE)
 					{
-						m_editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
+						editor.setEntitiesLocalCoordinate(&entities[0], entities.size(), (&tr.pos.x)[(int)coord], coord);
 					}
 				}
 			}
@@ -785,7 +783,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 			if (pos.z != old_pos.z) coord = WorldEditor::Coordinate::Z;
 			if (coord != WorldEditor::Coordinate::NONE)
 			{
-				m_editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
+				editor.setEntitiesCoordinate(&entities[0], entities.size(), (&pos.x)[(int)coord], coord);
 			}
 		}
 
@@ -802,7 +800,7 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 			euler.z = degreesToRadians(fmodf(euler.z + 180, 360.0f) - 180);
 			rot.fromEuler(euler);
 		
-			Array<Quat> rots(m_editor.getAllocator());
+			Array<Quat> rots(editor.getAllocator());
 			for (EntityRef entity : entities)
 			{
 				Vec3 tmp = universe.getRotation(entity).toEuler();
@@ -812,67 +810,65 @@ void PropertyGrid::showCoreProperties(const Array<EntityRef>& entities) const
 				if (fabs(euler.z - old_euler.z) > 0.0001f) tmp.z = euler.z;
 				rots.emplace().fromEuler(tmp);
 			}
-			m_editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
+			editor.setEntitiesRotations(&entities[0], &rots[0], entities.size());
 		}
 
 		float scale = universe.getScale(entities[0]);
 		ImGuiEx::Label("Scale");
 		if (ImGui::DragFloat("##scale", &scale, 0.1f, 0, FLT_MAX))
 		{
-			m_editor.setEntitiesScale(&entities[0], entities.size(), scale);
+			editor.setEntitiesScale(&entities[0], entities.size(), scale);
 		}
 	}
 	ImGui::TreePop();
 }
 
 
-static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter)
+static void showAddComponentNode(const StudioApp::AddCmpTreeNode* node, const char* filter, WorldEditor& editor)
 {
 	if (!node) return;
 
 	if (filter[0])
 	{
-		if (!node->plugin) showAddComponentNode(node->child, filter);
-		else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true);
-		showAddComponentNode(node->next, filter);
+		if (!node->plugin) showAddComponentNode(node->child, filter, editor);
+		else if (stristr(node->plugin->getLabel(), filter)) node->plugin->onGUI(false, true, editor);
+		showAddComponentNode(node->next, filter, editor);
 		return;
 	}
 
 	if (node->plugin)
 	{
-		node->plugin->onGUI(false, false);
-		showAddComponentNode(node->next, filter);
+		node->plugin->onGUI(false, false, editor);
+		showAddComponentNode(node->next, filter, editor);
 		return;
 	}
 
 	const char* last = reverseFind(node->label, nullptr, '/');
 	if (ImGui::BeginMenu(last ? last + 1 : node->label))
 	{
-		showAddComponentNode(node->child, filter);
+		showAddComponentNode(node->child, filter, editor);
 		ImGui::EndMenu();
 	}
-	showAddComponentNode(node->next, filter);
+	showAddComponentNode(node->next, filter, editor);
 }
 
 
 void PropertyGrid::onGUI()
 {
-	for (auto* i : m_plugins) {
+	for (IPlugin* i : m_plugins) {
 		i->update();
 	}
 
 	if (!m_is_open) return;
 
-	const Array<EntityRef>& ents = m_editor.getSelectedEntities();
-	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open) && !ents.empty())
-	{
-		showCoreProperties(ents);
+	WorldEditor& editor = m_app.getWorldEditor();
+	const Array<EntityRef>& ents = editor.getSelectedEntities();
+	if (ImGui::Begin(ICON_FA_INFO_CIRCLE "Inspector##inspector", &m_is_open) && !ents.empty()) {
+		showCoreProperties(ents, editor);
 
-		Universe& universe = *m_editor.getUniverse();
-		for (ComponentUID cmp = universe.getFirstComponent(ents[0]); cmp.isValid();
-			 cmp = universe.getNextComponent(cmp))
-		{
-			showComponentProperties(ents, cmp.type);
+		Universe& universe = *editor.getUniverse();
+		for (ComponentUID cmp = universe.getFirstComponent(ents[0]); cmp.isValid(); cmp = universe.getNextComponent(cmp)) {
+			showComponentProperties(ents, cmp.type, editor);
 		}
 
 		ImGui::Separator();
@@ -881,7 +877,7 @@ void PropertyGrid::onGUI()
 		if (ImGui::Button(ICON_FA_PLUS "Add component")) {
 			ImGui::OpenPopup("AddComponentPopup");
 		}
-		
+
 		if (ImGuiEx::BeginResizablePopup("AddComponentPopup", ImVec2(300, 300))) {
 			const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 			ImGui::SetNextItemWidth(-w);
@@ -891,16 +887,15 @@ void PropertyGrid::onGUI()
 				m_component_filter[0] = '\0';
 			}
 
-			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter);
+			showAddComponentNode(m_app.getAddComponentTreeRoot().child, m_component_filter, editor);
 			ImGui::EndPopup();
 		}
 	}
 	ImGui::End();
 
-	if (m_deferred_select.isValid())
-	{
+	if (m_deferred_select.isValid()) {
 		const EntityRef e = (EntityRef)m_deferred_select;
-		m_editor.selectEntities(Span(&e, 1u), false);
+		editor.selectEntities(Span(&e, 1u), false);
 		m_deferred_select = INVALID_ENTITY;
 	}
 }

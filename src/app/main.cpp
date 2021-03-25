@@ -286,7 +286,7 @@ int main(int args, char* argv[]) {
 	bool finished = false;
 	while (!finished) {
 		os::Event e;
-		while (os::getEvent(Ref(e))) {
+		while (os::getEvent(e)) {
 			switch (e.type) {
 				case os::Event::Type::WINDOW_CLOSE:
 				case os::Event::Type::QUIT: finished = true; break;

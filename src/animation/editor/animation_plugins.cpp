@@ -311,7 +311,7 @@ struct AnimControllerAssetBrowserPlugin : AssetBrowser::IPlugin, AssetCompiler::
 };
 
 
-struct AnimablePropertyGridPlugin : PropertyGrid::IPlugin
+struct AnimablePropertyGridPlugin final : PropertyGrid::IPlugin
 {
 	explicit AnimablePropertyGridPlugin(StudioApp& app)
 		: m_app(app)
@@ -320,12 +320,12 @@ struct AnimablePropertyGridPlugin : PropertyGrid::IPlugin
 	}
 
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override
 	{
 		if (cmp.type != ANIMABLE_TYPE) return;
 
 		const EntityRef entity = (EntityRef)cmp.entity;
-		auto* scene = static_cast<AnimationScene*>(cmp.scene);
+		auto* scene = (AnimationScene*)cmp.scene;
 		auto* animation = scene->getAnimableAnimation(entity);
 		if (!animation) return;
 		if (!animation->isReady()) return;

@@ -52,7 +52,6 @@ GameView::GameView(StudioApp& app)
 	, m_is_ingame_cursor(false)
 	, m_time_multiplier(1.0f)
 	, m_show_stats(false)
-	, m_editor(app.getWorldEditor())
 {
 	Engine& engine = app.getEngine();
 	auto f = &LuaWrapper::wrapMethodClosure<&GameView::forceViewport>;
@@ -137,7 +136,7 @@ void GameView::onBeforeSettingsSaved() {
 	m_app.getSettings().setValue("is_game_view_open", m_is_open);
 }
 
-void GameView::onFullscreenGUI()
+void GameView::onFullscreenGUI(WorldEditor& editor)
 {
 	processInputEvents();
 
@@ -181,16 +180,15 @@ void GameView::onFullscreenGUI()
 
 	ImGui::End();
 
-	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode()))
+	if (m_is_fullscreen && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !editor.isGameMode()))
 	{
 		setFullscreen(false);
 	}
 }
 
 
-void GameView::toggleFullscreen()
-{
-	if (!m_editor.isGameMode()) return;
+void GameView::toggleFullscreen() {
+	if (!m_app.getWorldEditor().isGameMode()) return;
 	setFullscreen(!m_is_fullscreen);
 }
 
@@ -249,14 +247,14 @@ void GameView::processInputEvents()
 	}
 }
 
-void GameView::controlsGUI() {
+void GameView::controlsGUI(WorldEditor& editor) {
 	Engine& engine = m_app.getEngine();
 	ImGui::PushItemWidth(50);
 	if (ImGui::DragFloat("Time multiplier", &m_time_multiplier, 0.01f, 0.01f, 30.0f)) {
 		engine.setTimeMultiplier(m_time_multiplier);
 	}
 	ImGui::PopItemWidth();
-	if(m_editor.isGameMode()) {
+	if(editor.isGameMode()) {
 		ImGui::SameLine();
 		if (ImGui::Button("Fullscreen")) setFullscreen(true);
 	}
@@ -270,10 +268,11 @@ void GameView::controlsGUI() {
 void GameView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
-	m_pipeline->setUniverse(m_editor.getUniverse());
+	WorldEditor& editor = m_app.getWorldEditor();
+	m_pipeline->setUniverse(editor.getUniverse());
 
 	ImGuiIO& io = ImGui::GetIO();
-	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !m_editor.isGameMode())) {
+	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !editor.isGameMode())) {
 		captureMouse(false);
 	}
 
@@ -284,7 +283,7 @@ void GameView::onWindowGUI()
 	}
 	
 	if (m_is_fullscreen && m_pipeline->isReady()) {
-		onFullscreenGUI();
+		onFullscreenGUI(editor);
 		return;
 	}
 
@@ -343,7 +342,7 @@ void GameView::onWindowGUI()
 				ImGuiEx::Rect(size.x, size.y, 0xffFF00FF);
 			}
 			const bool is_hovered = ImGui::IsItemHovered();
-			if (is_hovered && ImGui::IsMouseClicked(0) && m_editor.isGameMode()) captureMouse(true);
+			if (is_hovered && ImGui::IsMouseClicked(0) && editor.isGameMode()) captureMouse(true);
 			m_pos = ImGui::GetItemRectMin();
 			m_size = ImGui::GetItemRectSize();
 
@@ -352,7 +351,7 @@ void GameView::onWindowGUI()
 			}
 
 			processInputEvents();
-			controlsGUI();
+			controlsGUI(editor);
 		}
 
 	}

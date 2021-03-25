@@ -325,7 +325,8 @@ struct ParticleEmitterPropertyPlugin final : PropertyGrid::IPlugin
 {
 	ParticleEmitterPropertyPlugin(StudioApp& app) : m_app(app) {}
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
+		
 		if (cmp.type != PARTICLE_EMITTER_TYPE) return;
 		RenderScene* scene = (RenderScene*)cmp.scene;
 		const i32 emitter_idx = scene->getParticleEmitters().find((EntityRef)cmp.entity);
@@ -1467,7 +1468,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 	
 	void update() {}
 	
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) {
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) {
 		if (cmp.type != MODEL_INSTANCE_TYPE) return;
 
 		RenderScene* scene = (RenderScene*)cmp.scene;
@@ -1486,7 +1487,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 			copyString(mat_path, path.c_str());
 			if (m_app.getAssetBrowser().resourceInput("##mat", Span(mat_path), Material::TYPE)) {
 				path = mat_path;
-				m_app.getWorldEditor().setProperty(MODEL_INSTANCE_TYPE, "", -1, "Material", Span(&entity, 1), path);
+				editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Material", Span(&entity, 1), path);
 			}
 			return;
 		}
@@ -2184,7 +2185,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ASSERT(gb0.size() == tile_size.x * 9 * tile_size.y * 9);
 				
 				os::OutputFile file;
-				FileSystem& fs = m_app.getWorldEditor().getEngine().getFileSystem();
+				FileSystem& fs = m_app.getEngine().getFileSystem();
 				if (fs.open(img_path, file)) {
 					Texture::saveTGA(&file, tile_size.x * 9, tile_size.y * 9, gpu::TextureFormat::RGBA8, (const u8*)gb0.begin(), gpu::isOriginBottomLeft(), Path(img_path), allocator);
 					file.close();
@@ -2701,6 +2702,7 @@ struct ShaderPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 template <typename F>
 void captureCubemap(StudioApp& app
+	, Universe& universe
 	, Pipeline& pipeline
 	, const u32 texture_size
 	, const DVec3& position
@@ -2708,7 +2710,6 @@ void captureCubemap(StudioApp& app
 	, F&& f) {
 	memoryBarrier();
 
-	WorldEditor& world_editor = app.getWorldEditor();
 	Engine& engine = app.getEngine();
 	auto& plugin_manager = engine.getPluginManager();
 
@@ -2720,8 +2721,7 @@ void captureCubemap(StudioApp& app
 	viewport.w = texture_size;
 	viewport.h = texture_size;
 
-	Universe* universe = world_editor.getUniverse();
-	pipeline.setUniverse(universe);
+	pipeline.setUniverse(&universe);
 	pipeline.setViewport(viewport);
 
 	Renderer* renderer = static_cast<Renderer*>(plugin_manager.getPlugin("renderer"));
@@ -2864,34 +2864,33 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	void generateCubemaps(bool bounce) {
+	void generateCubemaps(bool bounce, Universe& universe) {
 		ASSERT(m_probes.empty());
 
-		Universe* universe = m_app.getWorldEditor().getUniverse();
 		m_pipeline->define("PROBE_BOUNCE", bounce);
 
-		auto* scene = static_cast<RenderScene*>(universe->getScene(ENVIRONMENT_PROBE_TYPE));
+		auto* scene = (RenderScene*)universe.getScene(ENVIRONMENT_PROBE_TYPE);
 		const Span<EntityRef> env_probes = scene->getEnvironmentProbesEntities();
 		const Span<EntityRef> reflection_probes = scene->getReflectionProbesEntities();
 		m_probes.reserve(env_probes.length() + reflection_probes.length());
 		IAllocator& allocator = m_app.getAllocator();
 		for (EntityRef p : env_probes) {
-			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, p, allocator);
+			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, universe, p, allocator);
 			
 			const EntityPtr env_entity = scene->getActiveEnvironment();
 			job->env_probe = scene->getEnvironmentProbe(p);
 			job->is_reflection = false;
-			job->position = universe->getPosition(p);
+			job->position = universe.getPosition(p);
 
 			m_probes.push(job);
 		}
 
 		for (EntityRef p : reflection_probes) {
-			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, p, allocator);
+			ProbeJob* job = LUMIX_NEW(m_app.getAllocator(), ProbeJob)(*this, universe, p, allocator);
 			
 			job->reflection_probe = scene->getReflectionProbe(p);
 			job->is_reflection = true;
-			job->position = universe->getPosition(p);
+			job->position = universe.getPosition(p);
 
 			m_probes.push(job);
 		}
@@ -2900,10 +2899,11 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 	struct ProbeJob {
-		ProbeJob(EnvironmentProbePlugin& plugin, EntityRef& entity, IAllocator& allocator) 
+		ProbeJob(EnvironmentProbePlugin& plugin, Universe& universe, EntityRef& entity, IAllocator& allocator) 
 			: entity(entity)
 			, data(allocator)
 			, plugin(plugin)
+			, universe(universe)
 		{}
 		
 		EntityRef entity;
@@ -2915,6 +2915,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 		EnvironmentProbePlugin& plugin;
 		DVec3 position;
 
+		Universe& universe;
 		Array<Vec4> data;
 		SphericalHarmonics sh;
 		bool render_dispatched = false;
@@ -2925,7 +2926,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	void render(ProbeJob& job) {
 		const u32 texture_size = job.is_reflection ? job.reflection_probe.size : 128;
 
-		captureCubemap(m_app, *m_pipeline, texture_size, job.position, job.data, [&job](){
+		captureCubemap(m_app, job.universe, *m_pipeline, texture_size, job.position, job.data, [&job](){
 			jobs::run(&job, [](void* ptr) {
 				ProbeJob* pjob = (ProbeJob*)ptr;
 				pjob->plugin.processData(*pjob);
@@ -2991,6 +2992,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			if (!os::dirExists(path) && !os::makePath(path)) {
 				logError("Failed to create ", path);
 			}
+			RenderScene* scene = nullptr;
 			while (!m_probes.empty()) {
 				ProbeJob& job = *m_probes.back();
 				m_probes.pop();
@@ -3003,15 +3005,17 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 					const StaticString<LUMIX_MAX_PATH> tmp_path(base_path, "/universes/probes_tmp/", guid, ".dds");
 					const StaticString<LUMIX_MAX_PATH> path(base_path, "/universes/probes/", guid, ".dds");
-					if (!os::fileExists(tmp_path)) return;
+					if (!os::fileExists(tmp_path)) {
+						if (scene) scene->reloadReflectionProbes();
+						return;
+					}
 					if (!os::moveFile(tmp_path, path)) {
 						logError("Failed to move file ", tmp_path, " to ", path);
 					}
 				}
 
-				Universe* universe = m_app.getWorldEditor().getUniverse();
-				if (universe->hasComponent(job.entity, ENVIRONMENT_PROBE_TYPE)) {
-					RenderScene* scene = (RenderScene*)universe->getScene(ENVIRONMENT_PROBE_TYPE);
+				if (job.universe.hasComponent(job.entity, ENVIRONMENT_PROBE_TYPE)) {
+					scene = (RenderScene*)job.universe.getScene(ENVIRONMENT_PROBE_TYPE);
 					EnvironmentProbe& p = scene->getEnvironmentProbe(job.entity);
 					static_assert(sizeof(p.sh_coefs) == sizeof(job.sh.coefs));
 					memcpy(p.sh_coefs, job.sh.coefs, sizeof(p.sh_coefs));
@@ -3020,8 +3024,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 				IAllocator& allocator = m_app.getAllocator();
 				LUMIX_DELETE(allocator, &job);
 			}
-			RenderScene* scene = (RenderScene*)m_app.getWorldEditor().getUniverse()->getScene(MODEL_INSTANCE_TYPE);
-			scene->reloadReflectionProbes();
+			if (scene) scene->reloadReflectionProbes();
 		}
 	}
 
@@ -3032,7 +3035,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			return;
 		}
 		jobs::SignalHandle finished = jobs::INVALID_HANDLE;
-		PluginManager& plugin_manager = m_app.getWorldEditor().getEngine().getPluginManager();
+		PluginManager& plugin_manager = m_app.getEngine().getPluginManager();
 		Renderer* renderer = (Renderer*)plugin_manager.getPlugin("renderer");
 
 		auto lambda = [&](){
@@ -3145,7 +3148,8 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 	}
 
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
+		Universe& universe = *editor.getUniverse();
 		if (cmp.type == ENVIRONMENT_PROBE_TYPE) {
 			const EntityRef e = (EntityRef)cmp.entity;
 			auto* scene = static_cast<RenderScene*>(cmp.scene);
@@ -3153,9 +3157,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			else {
 				const EnvironmentProbe& probe = scene->getEnvironmentProbe(e);
 				if (ImGui::CollapsingHeader("Generator")) {
-					if (ImGui::Button("Generate")) generateCubemaps(false);
+					if (ImGui::Button("Generate")) generateCubemaps(false, universe);
 					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true);
+					if (ImGui::Button("Add bounce")) generateCubemaps(true, universe);
 				}
 			}
 		}
@@ -3173,9 +3177,9 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 					if (ImGui::Button("View radiance")) m_app.getAssetBrowser().selectResource(Path(path), true, false);
 				}
 				if (ImGui::CollapsingHeader("Generator")) {
-					if (ImGui::Button("Generate")) generateCubemaps(false);
+					if (ImGui::Button("Generate")) generateCubemaps(false, universe);
 					ImGui::SameLine();
-					if (ImGui::Button("Add bounce")) generateCubemaps(true);
+					if (ImGui::Button("Add bounce")) generateCubemaps(true, universe);
 				}
 			}
 		}
@@ -3197,32 +3201,24 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 struct TerrainPlugin final : PropertyGrid::IPlugin
 {
 	explicit TerrainPlugin(StudioApp& app)
-		: m_app(app)
-	{
-		WorldEditor& editor = app.getWorldEditor();
-		m_terrain_editor = UniquePtr<TerrainEditor>::create(app.getAllocator(), editor, app);
-	}
+		: m_terrain_editor(app)
+	{}
 
 
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override
-	{
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
 		if (cmp.type != TERRAIN_TYPE) return;
-
-		m_terrain_editor->setComponent(cmp);
-		m_terrain_editor->onGUI();
+		m_terrain_editor.onGUI(cmp, editor);
 	}
 
-
-	StudioApp& m_app;
-	UniquePtr<TerrainEditor> m_terrain_editor;
+	TerrainEditor m_terrain_editor;
 };
 
 
 struct RenderInterfaceImpl final : RenderInterface
 {
-	RenderInterfaceImpl(WorldEditor& editor, Renderer& renderer)
-		: m_editor(editor)
-		, m_textures(editor.getAllocator())
+	RenderInterfaceImpl(StudioApp& app, Renderer& renderer)
+		: m_app(app)
+		, m_textures(app.getAllocator())
 		, m_renderer(renderer)
 	{}
 
@@ -3247,9 +3243,9 @@ struct RenderInterfaceImpl final : RenderInterface
 
 	ImTextureID createTexture(const char* name, const void* pixels, int w, int h) override
 	{
-		Engine& engine = m_editor.getEngine();
+		Engine& engine = m_app.getEngine();
 		auto& rm = engine.getResourceManager();
-		auto& allocator = m_editor.getAllocator();
+		auto& allocator = m_app.getAllocator();
 
 		Texture* texture = LUMIX_NEW(allocator, Texture)(Path(name), *rm.get(Texture::TYPE), m_renderer, allocator);
 		texture->create(w, h, gpu::TextureFormat::RGBA8, pixels, w * h * 4);
@@ -3260,7 +3256,7 @@ struct RenderInterfaceImpl final : RenderInterface
 
 	void destroyTexture(ImTextureID handle) override
 	{
-		auto& allocator = m_editor.getAllocator();
+		auto& allocator = m_app.getAllocator();
 		auto iter = m_textures.find(handle);
 		if (iter == m_textures.end()) return;
 		auto* texture = iter.value();
@@ -3278,7 +3274,7 @@ struct RenderInterfaceImpl final : RenderInterface
 
 	ImTextureID loadTexture(const Path& path) override
 	{
-		auto& rm = m_editor.getEngine().getResourceManager();
+		auto& rm = m_app.getEngine().getResourceManager();
 		auto* texture = rm.load<Texture>(path);
 		m_textures.insert(&texture->handle, texture);
 		return &texture->handle;
@@ -3332,7 +3328,7 @@ struct RenderInterfaceImpl final : RenderInterface
 	}
 
 
-	WorldEditor& m_editor;
+	StudioApp& m_app;
 	Renderer& m_renderer;
 	HashMap<void*, Texture*> m_textures;
 };
@@ -3570,8 +3566,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 		ub_mem.size = sizeof(Vec4) * 2;
 		m_ub = renderer->createBuffer(ub_mem, gpu::BufferFlags::UNIFORM_BUFFER);
 
-		WorldEditor& editor = app.getWorldEditor();
-		m_render_interface.create(editor, *renderer);
+		m_render_interface.create(app, *renderer);
 		app.setRenderInterface(m_render_interface.get());
 	}
 
@@ -3773,9 +3768,8 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 	}
 
 
-	void onGUI(bool create_entity, bool from_filter) override
+	void onGUI(bool create_entity, bool from_filter, WorldEditor& editor) override
 	{
-		WorldEditor& editor = app.getWorldEditor();
 		FileSystem& fs = app.getEngine().getFileSystem();
 
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
@@ -3944,7 +3938,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		addCube(view, pos, x, y, z, Color::BLUE);*/
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
-		WorldEditor& editor = m_app.getWorldEditor();
+		WorldEditor& editor = view.getEditor();
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 33), view, tr, p.inner_range, cfg, true)) {
 			editor.beginCommandGroup("env_probe_inner_range");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Inner range", Span(&e, 1), p.inner_range);
@@ -3970,7 +3964,7 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		const Quat rot = universe.getRotation(e);
 
 		const Gizmo::Config& cfg = m_app.getGizmoConfig();
-		WorldEditor& editor = m_app.getWorldEditor();
+		WorldEditor& editor = view.getEditor();
 		if (Gizmo::box(u64(cmp.entity.index) | (u64(1) << 32), view, tr, p.half_extents, cfg, false)) {
 			editor.beginCommandGroup("refl_probe_half_ext");
 			editor.setProperty(ENVIRONMENT_PROBE_TYPE, "", -1, "Half extents", Span(&e, 1), p.half_extents);
@@ -4065,16 +4059,17 @@ struct StudioAppPlugin : StudioApp::IPlugin
 		Gizmo::Config cfg;
 		const DVec3 p0 = tr.transform(DVec3(decal.bezier_p0.x, 0, decal.bezier_p0.y));
 		Transform p0_tr = { p0, Quat::IDENTITY, 1 };
+		WorldEditor& editor = view.getEditor();
 		if (Gizmo::manipulate((u64(1) << 32) | cmp.entity.index, view, p0_tr, cfg)) {
 			const Vec2 p0 = Vec2(tr.inverted().transform(p0_tr.pos).xz());
-			m_app.getWorldEditor().setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P0", Span(&e, 1), p0);
+			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P0", Span(&e, 1), p0);
 		}
 
 		const DVec3 p2 = tr.transform(DVec3(decal.bezier_p2.x, 0, decal.bezier_p2.y));
 		Transform p2_tr = { p2, Quat::IDENTITY, 1 };
 		if (Gizmo::manipulate((u64(2) << 32) | cmp.entity.index, view, p2_tr, cfg)) {
 			const Vec2 p2 = Vec2(tr.inverted().transform(p2_tr.pos).xz());
-			m_app.getWorldEditor().setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);
+			editor.setProperty(CURVE_DECAL_TYPE, "", 0, "Bezier P2", Span(&e, 1), p2);
 		}
 
 		addLine(view, tr.pos, p0_tr.pos, Color::BLUE);

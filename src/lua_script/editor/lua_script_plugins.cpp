@@ -374,7 +374,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 	}
 
 
-	void onGUI(bool create_entity, bool) override
+	void onGUI(bool create_entity, bool, WorldEditor& editor) override
 	{
 		ImGui::SetNextWindowSize(ImVec2(300, 300));
 		if (!ImGui::BeginMenu(getLabel())) return;
@@ -409,7 +409,6 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 		static u32 selected_res_hash = 0;
 		if (asset_browser.resourceList(Span(buf), selected_res_hash, LuaScript::TYPE, 0, false) || create_empty || new_created)
 		{
-			WorldEditor& editor = app.getWorldEditor();
 			if (create_entity)
 			{
 				EntityRef entity = editor.addEntity();
@@ -450,7 +449,7 @@ struct AddComponentPlugin final : StudioApp::IAddComponentPlugin
 
 struct PropertyGridPlugin final : PropertyGrid::IPlugin
 {
-	void onGUI(PropertyGrid& grid, ComponentUID cmp) override {
+	void onGUI(PropertyGrid& grid, ComponentUID cmp, WorldEditor& editor) override {
 		if (cmp.type != LUA_SCRIPT_TYPE) return;
 
 		LuaScriptScene* scene = (LuaScriptScene*)cmp.scene; 

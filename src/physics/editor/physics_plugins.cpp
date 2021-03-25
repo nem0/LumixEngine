@@ -353,8 +353,7 @@ void showHingeJointGizmo(UniverseView& view, ComponentUID cmp)
 struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 {
 	explicit PhysicsUIPlugin(StudioApp& app)
-		: m_editor(app.getWorldEditor())
-		, m_app(app)
+		: m_app(app)
 	{
 		m_toggle_ui.init("Physics", "Toggle physics UI", "physics", "", false);
 		m_toggle_ui.func.bind<&PhysicsUIPlugin::onAction>(this);
@@ -402,7 +401,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onLayersGUI()
 	{
-		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_editor.getEngine().getPluginManager().getPlugin("physics"));
+		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_app.getEngine().getPluginManager().getPlugin("physics"));
 		if (ImGui::CollapsingHeader("Layers"))
 		{
 			for (int i = 0; i < system->getCollisionsLayersCount(); ++i)
@@ -434,7 +433,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	void onCollisionMatrixGUI()
 	{
-		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_editor.getEngine().getPluginManager().getPlugin("physics"));
+		PhysicsSystem* system = static_cast<PhysicsSystem*>(m_app.getEngine().getPluginManager().getPlugin("physics"));
 		if (ImGui::CollapsingHeader("Collision matrix"))
 		{
 			ImGui::Columns(1 + system->getCollisionsLayersCount(), "collision_matrix_col");
@@ -483,44 +482,43 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	}
 
 
-	void onJointGUI()
-	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(RIGID_ACTOR_TYPE));
-		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(MODEL_INSTANCE_TYPE));
+	void onJointGUI(WorldEditor& editor) {
+		Universe& universe = *editor.getUniverse();
+		auto* scene = static_cast<PhysicsScene*>(universe.getScene(RIGID_ACTOR_TYPE));
+		auto* render_scene = static_cast<RenderScene*>(universe.getScene(MODEL_INSTANCE_TYPE));
 		if (!render_scene) return;
 
 		int count = scene->getJointCount();
-		if (count > 0 && ImGui::CollapsingHeader("Joints"))
-		{
+		if (count > 0 && ImGui::CollapsingHeader("Joints")) {
 			ImGui::Columns(2);
-			ImGui::Text("From"); ImGui::NextColumn();
-			ImGui::Text("To"); ImGui::NextColumn();
+			ImGui::Text("From");
+			ImGui::NextColumn();
+			ImGui::Text("To");
+			ImGui::NextColumn();
 			ImGui::PushID("joints");
 			ImGui::Separator();
-			for (int i = 0; i < count; ++i)
-			{
+			for (int i = 0; i < count; ++i) {
 				ComponentUID cmp;
 				const EntityRef entity = scene->getJointEntity(i);
 				cmp.entity = entity;
 				cmp.scene = scene;
 				physx::PxJoint* joint = scene->getJoint(entity);
-				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(entity)->getConcreteType())
-				{
+				switch ((physx::PxJointConcreteType::Enum)scene->getJoint(entity)->getConcreteType()) {
 					case physx::PxJointConcreteType::eDISTANCE:
 						cmp.type = DISTANCE_JOINT_TYPE;
-						//showDistanceJointGizmo(cmp);
+						// showDistanceJointGizmo(cmp);
 						break;
 					case physx::PxJointConcreteType::eREVOLUTE:
 						cmp.type = HINGE_JOINT_TYPE;
-						//showHingeJointGizmo(cmp);
+						// showHingeJointGizmo(cmp);
 						break;
 					case physx::PxJointConcreteType::eSPHERICAL:
 						cmp.type = SPHERICAL_JOINT_TYPE;
-						//showSphericalJointGizmo(view, cmp); // TODO
+						// showSphericalJointGizmo(view, cmp); // TODO
 						break;
 					case physx::PxJointConcreteType::eD6:
 						cmp.type = D6_JOINT_TYPE;
-						/*showD6JointGizmo(m_editor.getUniverse()->getTransform(entity).getRigidPart(),
+						/*showD6JointGizmo(universe.getTransform(entity).getRigidPart(),
 							*render_scene,
 							static_cast<physx::PxD6Joint*>(joint));*/
 						// TODO
@@ -530,16 +528,16 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 				ImGui::PushID(i);
 				char tmp[256];
-				getEntityListDisplayName(m_app, m_app.getWorldEditor(), Span(tmp), cmp.entity);
+				getEntityListDisplayName(m_app, universe, Span(tmp), cmp.entity);
 				bool b = false;
-				if (ImGui::Selectable(tmp, &b)) m_editor.selectEntities(Span(&entity, 1), false);
+				if (ImGui::Selectable(tmp, &b)) editor.selectEntities(Span(&entity, 1), false);
 				ImGui::NextColumn();
 
 				EntityPtr other_entity = scene->getJointConnectedBody(entity);
-				getEntityListDisplayName(m_app, m_app.getWorldEditor(), Span(tmp), other_entity);
+				getEntityListDisplayName(m_app, universe, Span(tmp), other_entity);
 				if (other_entity.isValid() && ImGui::Selectable(tmp, &b)) {
 					const EntityRef e = (EntityRef)other_entity;
-					m_editor.selectEntities(Span(&e, 1), false);
+					editor.selectEntities(Span(&e, 1), false);
 				}
 				ImGui::NextColumn();
 				ImGui::PopID();
@@ -550,10 +548,10 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	}
 
 
-	void onVisualizationGUI()
+	void onVisualizationGUI(WorldEditor& editor)
 	{
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-		DVec3 camera_pos = m_editor.getView().getViewport().pos;
+		auto* scene = static_cast<PhysicsScene*>(editor.getUniverse()->getScene(crc32("physics")));
+		DVec3 camera_pos = editor.getView().getViewport().pos;
 		const Vec3 extents(20, 20, 20);
 		scene->setVisualizationCullingBox(camera_pos - extents, camera_pos + extents);
 
@@ -588,18 +586,19 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	}
 
 
-	void onActorGUI()
+	void onActorGUI(WorldEditor& editor)
 	{
 		if (!ImGui::CollapsingHeader("Actors")) return;
 
-		if (m_editor.getSelectedEntities().empty()) {
+		if (editor.getSelectedEntities().empty()) {
 			ImGui::Text("No entities selected.");
 			return;
 		}
 
-		const EntityRef e = m_editor.getSelectedEntities()[0];
+		const EntityRef e = editor.getSelectedEntities()[0];
 
-		auto* scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
+		Universe& universe = *editor.getUniverse();
+		auto* scene = static_cast<PhysicsScene*>(universe.getScene(crc32("physics")));
 
 		if(!scene->getUniverse().hasComponent(e, RIGID_ACTOR_TYPE)) {
 			ImGui::Text("Entity does not have rigid actor component.");
@@ -607,7 +606,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		};
 		
 		char tmp[255];
-		getEntityListDisplayName(m_app, m_app.getWorldEditor(), Span(tmp), e);
+		getEntityListDisplayName(m_app, universe, Span(tmp), e);
 
 		ImGui::Text("%s", tmp);
 		ImGui::SameLine();
@@ -617,97 +616,17 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		}
 	}
 
-
-	void onDebugGUI()
-	{
+	void onDebugGUI(WorldEditor& editor) {
 		if (!ImGui::CollapsingHeader("Debug")) return;
 
 		ImGui::Indent();
-
-		onVisualizationGUI();
-		onJointGUI();
-		onActorGUI();
+		onVisualizationGUI(editor);
+		onJointGUI(editor);
+		onActorGUI(editor);
 		ImGui::Unindent();
 	}
 
-
-	void showBoneListItem(RenderScene& render_scene, const Transform& tr, Model& model, int bone_index, bool visualize)
-	{
-		auto& bone = model.getBone(bone_index);
-		if (ImGui::Selectable(bone.name.c_str(), m_selected_bone == bone_index)) m_selected_bone = bone_index;
-
-		ImGui::Indent();
-		for (int i = bone_index + 1; i < model.getBoneCount(); ++i)
-		{
-			auto& child_bone = model.getBone(i);
-			if (child_bone.parent_idx != bone_index) continue;
-
-			if (visualize)
-			{
-				u32 color = m_selected_bone == i ? 0xffff0000 : 0xff0000ff;
-				render_scene.addDebugLine(tr.transform(bone.transform.pos), tr.transform(child_bone.transform.pos), color);
-			}
-			showBoneListItem(render_scene, tr, model, i, visualize);
-		}
-		ImGui::Unindent();
-	}
-
-
-	void renderBone(RenderScene& render_scene, PhysicsScene& phy_scene, RagdollBone* bone, RagdollBone* selected_bone)
-	{
-		/*if (!bone) return;
-		bool is_selected = bone == selected_bone;
-		Matrix mtx = phy_scene.getRagdollBoneTransform(bone).toMatrix();
-		float height = phy_scene.getRagdollBoneHeight(bone);
-		float radius = phy_scene.getRagdollBoneRadius(bone);
-		auto tmp = mtx.getXVector();
-		mtx.setXVector(-mtx.getYVector());
-		mtx.setYVector(tmp);
-		mtx.translate(-(radius + height * 0.5f) * mtx.getYVector());
-
-		render_scene.addDebugCapsule(mtx, height, radius, is_selected ? 0xffff0000 : 0xff00ff00, 0);
-		renderBone(render_scene, phy_scene, phy_scene.getRagdollBoneChild(bone), selected_bone);
-		renderBone(render_scene, phy_scene, phy_scene.getRagdollBoneSibling(bone), selected_bone);
-
-		physx::PxJoint* joint = phy_scene.getRagdollBoneJoint(bone);
-		if (joint && is_selected)
-		{
-			physx::PxRigidActor* a0, *a1;
-			joint->getActors(a0, a1);
-			physx::PxTransform pose = a1->getGlobalPose() * joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-			RigidTransform tr;
-			tr.rot = Quat(pose.q.x, pose.q.y, pose.q.z, pose.q.w);
-			tr.pos = DVec3(pose.p.x, pose.p.y, pose.p.z);
-			if(joint->is<physx::PxRevoluteJoint>())	{
-				GizmoPlugin::showHingeJointGizmo(phy_scene, Vec2(0, 0), false, tr);
-			}
-			if (joint->is<physx::PxD6Joint>())
-			{
-				GizmoPlugin::showD6JointGizmo(
-					fromPhysx(a0->getGlobalPose()), render_scene, static_cast<physx::PxD6Joint*>(joint));
-			}
-		}*/
-		// TODO
-	}
-
-
-	void setSubtreeDynamic(EntityRef entity) {
-		WorldEditor& editor = m_app.getWorldEditor();
-		Universe& universe = *editor.getUniverse();
-		auto* phy_scene = static_cast<PhysicsScene*>(universe.getScene(RIGID_ACTOR_TYPE));
-		auto* render_scene = static_cast<RenderScene*>(universe.getScene(MODEL_INSTANCE_TYPE));
-		
-		phy_scene->setDynamicType(entity, PhysicsScene::DynamicType::DYNAMIC);
-		//render_scene->setBoneAttachmentInverse(entity, true);
-
-		for (EntityPtr e = universe.getFirstChild(entity); e.isValid(); e = universe.getNextSibling((EntityRef)e)) {
-			setSubtreeDynamic((EntityRef)e);
-		}
-
-	}
-
-	void autogeneratePhySkeleton(EntityRef entity) {
-		WorldEditor& editor = m_app.getWorldEditor();
+	void autogeneratePhySkeleton(EntityRef entity, WorldEditor& editor) {
 		editor.beginCommandGroup("ragdoll");
 		Universe& universe = *editor.getUniverse();
 		auto* phy_scene = static_cast<PhysicsScene*>(universe.getScene(RIGID_ACTOR_TYPE));
@@ -767,272 +686,22 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 				entities.push(bone_e);
 				editor.makeParent(entity, bone_e);
 			}
-/*
-			auto iter = model->getBoneIndex(bone_name_hash);
-			ASSERT(iter.isValid());
-
-			auto* new_bone = LUMIX_NEW(m_allocator, RagdollBone);
-			new_bone->child = new_bone->next = new_bone->prev = new_bone->parent = nullptr;
-			new_bone->parent_joint = nullptr;
-			new_bone->is_kinematic = false;
-			new_bone->pose_bone_idx = iter.value();
-
-			float bone_height;
-			RigidTransform transform = getNewBoneTransform(model, iter.value(), bone_height);
-
-			new_bone->bind_transform = transform.inverted() * model->getBone(iter.value()).transform;
-			new_bone->inv_bind_transform = new_bone->bind_transform.inverted();
-			transform = m_universe.getTransform(entity).getRigidPart() * transform;
-
-			PxCapsuleGeometry geom;
-			geom.halfHeight = bone_height * 0.3f;
-			if (geom.halfHeight < 0.001f) geom.halfHeight = 1.0f;
-			geom.radius = geom.halfHeight * 0.5f;
-
-			PxTransform px_transform = toPhysx(transform);
-			new_bone->actor = PxCreateDynamic(m_scene->getPhysics(), px_transform, geom, *m_default_material, 1.0f);
-			new_bone->actor->is<PxRigidDynamic>()->setMass(0.0001f);
-			new_bone->actor->userData = (void*)(intptr_t)entity.index;
-			new_bone->actor->setActorFlag(PxActorFlag::eVISUALIZATION, true);
-			new_bone->actor->is<PxRigidDynamic>()->setSolverIterationCounts(8, 8);
-			m_scene->addActor(*new_bone->actor);
-			updateFilterData(new_bone->actor, 0);
-
-			auto& ragdoll = m_ragdolls[entity];
-			new_bone->next = ragdoll.root;
-			if (new_bone->next) new_bone->next->prev = new_bone;
-			setRagdollRoot(ragdoll, new_bone);
-			auto* parent = getPhyParent(entity, model, iter.value());
-			if (parent) connect(ragdoll, new_bone, parent);
-
-			findCloserChildren(ragdoll, entity, model, new_bone);*/
 		}
 		editor.endCommandGroup();
 	}
 
 
-	void onRagdollGUI()
+	void onRagdollGUI(WorldEditor& editor)
 	{
 		if (!ImGui::CollapsingHeader("Ragdoll")) return;
 
-		if (m_editor.getSelectedEntities().size() != 1) {
+		if (editor.getSelectedEntities().size() != 1) {
 			ImGui::Text("%s", "Please select single entity.");
 			return;
 		}
 
-		EntityRef entity = m_editor.getSelectedEntities()[0];
-		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(entity);
-		if (ImGui::Button("Set subtree dynamic")) setSubtreeDynamic(entity);
-
-/*		
-		auto* render_scene = static_cast<RenderScene*>(m_editor.getUniverse()->getScene(RENDERER_HASH));
-		if (!render_scene) return;
-
-		bool has_model_instance = render_scene->getUniverse().hasComponent(entity, MODEL_INSTANCE_TYPE);
-		auto* phy_scene = static_cast<PhysicsScene*>(m_editor.getUniverse()->getScene(crc32("physics")));
-
-		bool has_ragdoll = render_scene->getUniverse().hasComponent(entity, RAGDOLL_TYPE);
-		if (!has_ragdoll || !has_model_instance)
-		{
-			ImGui::Text("%s", "Please select an entity with ragdoll and mesh components.");
-			return;
-		}
-
-		const Transform tr = m_editor.getUniverse()->getTransform(entity);
-		Model* model = render_scene->getModelInstanceModel(entity);
-		if (!model || !model->isReady()) return;
-
-		static bool visualize = true;
-		ImGui::Checkbox("Visualize physics", &visualize);
-		ImGui::SameLine();
-		static bool visualize_bones = false;
-		ImGui::Checkbox("Visualize bones", &visualize_bones);
-		RagdollBone* selected_bone = nullptr;
-		if (m_selected_bone >= 0 && m_selected_bone < model->getBoneCount())
-		{
-			u32 hash = crc32(model->getBone(m_selected_bone).name.c_str());
-			selected_bone = phy_scene->getRagdollBoneByName(entity, hash);
-		}
-		if (visualize) renderBone(*render_scene, *phy_scene, phy_scene->getRagdollRootBone(entity), selected_bone);
-		ImGui::SameLine();
-		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(*phy_scene, entity, model);
-		ImGui::SameLine();
-		auto* root = phy_scene->getRagdollRootBone(entity);
-		if (ImGui::Button("All kinematic")) phy_scene->setRagdollBoneKinematicRecursive(root, true);
-		PhysicsScene::BoneOrientation new_bone_orientation = phy_scene->getNewBoneOrientation();
-		if (ImGui::Combo("New bone orientation", (int*)&new_bone_orientation, "X\0Y\0"))
-		{
-			phy_scene->setNewBoneOrientation(new_bone_orientation);
-		}
-
-		if (ImGui::BeginChild("bones", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f, 0)))
-		{
-			for (int i = 0; i < model->getBoneCount(); ++i)
-			{
-				auto& bone = model->getBone(i);
-				if (bone.parent_idx >= 0) continue;
-
-				showBoneListItem(*render_scene, tr, *model, i, visualize_bones);
-			}
-		}
-		ImGui::EndChild();
-		ImGui::SameLine();
-		if (ImGui::BeginChild("properties", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
-		{
-			if (m_selected_bone < 0 || m_selected_bone >= model->getBoneCount())
-			{
-				ImGui::Text("No bone selected");
-			}
-			else
-			{
-				auto& bone = model->getBone(m_selected_bone);
-				onBonePropertiesGUI(*phy_scene, entity, crc32(bone.name.c_str()));
-			}
-		}
-		ImGui::EndChild();*/
-	}
-
-
-	void onBonePropertiesGUI(PhysicsScene& scene, EntityRef entity, u32 bone_name_hash)
-	{
-		/*auto* bone_handle = scene.getRagdollBoneByName(entity, bone_name_hash);
-		if (!bone_handle)
-		{
-			if (ImGui::Button("Add"))
-			{
-				scene.createRagdollBone(entity, bone_name_hash);
-			}
-			return;
-		}
-
-		if (ImGui::Button("Remove"))
-		{
-			scene.destroyRagdollBone(entity, bone_handle);
-			return;
-		}
-
-		bool is_kinematic = scene.isRagdollBoneKinematic(bone_handle);
-		if (ImGui::Checkbox("Kinematic", &is_kinematic)) scene.setRagdollBoneKinematic(bone_handle, is_kinematic);
-
-		float height = scene.getRagdollBoneHeight(bone_handle);
-		float radius = scene.getRagdollBoneRadius(bone_handle);
-		if (ImGui::DragFloat("Height", &height)) scene.setRagdollBoneHeight(bone_handle, height);
-		if (ImGui::DragFloat("Radius", &radius)) scene.setRagdollBoneRadius(bone_handle, radius);
-
-		Transform transform = scene.getRagdollBoneTransform(bone_handle).toScaled(1);
-		bool changed_by_gizmo = m_editor.getGizmo().immediate(transform);
-		if (ImGui::DragFloat3("Position", &transform.pos.x) || changed_by_gizmo)
-		{
-			scene.setRagdollBoneTransform(bone_handle, transform.getRigidPart());
-		}
-		Vec3 euler_angles = radiansToDegrees(transform.rot.toEuler());
-		if (ImGui::DragFloat3("Rotation", &euler_angles.x))
-		{
-			transform.rot.fromEuler(degreesToRadians(euler_angles));
-			scene.setRagdollBoneTransform(bone_handle, transform.getRigidPart());
-		}
-
-		physx::PxJoint* joint = scene.getRagdollBoneJoint(bone_handle);
-		if (!joint) return;
-		int joint_type = 0;
-		switch (joint->getConcreteType())
-		{
-			case physx::PxJointType::eSPHERICAL:
-			{
-				auto* spherical = joint->is<physx::PxSphericalJoint>();
-				physx::PxJointLimitCone limit = spherical->getLimitCone();
-				bool changed = ImGui::DragFloat("Y angle", &limit.yAngle);
-				changed = ImGui::DragFloat("Z angle", &limit.zAngle) || changed;
-				changed = ImGui::DragFloat("Stiffness", &limit.stiffness) || changed;
-				changed = ImGui::DragFloat("Restitution", &limit.restitution) || changed;
-				changed = ImGui::DragFloat("Damping", &limit.damping) || changed;
-				changed = ImGui::DragFloat("Bounce threshold", &limit.bounceThreshold) || changed;
-				changed = ImGui::DragFloat("Contact distance", &limit.contactDistance) || changed;
-				if (changed) spherical->setLimitCone(limit);
-				joint_type = 2;
-				break;
-			}
-
-			case physx::PxJointType::eFIXED: joint_type = 1; break;
-			case physx::PxJointType::eREVOLUTE:
-			{
-				auto* hinge = joint->is<physx::PxRevoluteJoint>();
-				physx::PxJointAngularLimitPair limit = hinge->getLimit();
-				bool changed = ImGui::DragFloat("Lower limit", &limit.lower);
-				changed = ImGui::DragFloat("Upper limit", &limit.upper) || changed;
-				changed = ImGui::DragFloat("Stiffness", &limit.stiffness) || changed;
-				changed = ImGui::DragFloat("Damping", &limit.damping) || changed;
-				changed = ImGui::DragFloat("Bounce threshold", &limit.bounceThreshold) || changed;
-				changed = ImGui::DragFloat("Contact distance", &limit.contactDistance) || changed;
-				changed = ImGui::DragFloat("Restitution", &limit.restitution) || changed;
-				if (changed) hinge->setLimit(limit);
-				joint_type = 0;
-				break;
-			}
-			case physx::PxJointType::eD6:
-			{
-				auto* d6 = joint->is<physx::PxD6Joint>();
-				auto linear_limit = d6->getLinearLimit();
-				if (ImGui::DragFloat("Linear limit", &linear_limit.value)) d6->setLinearLimit(linear_limit);
-
-				auto swing_limit = d6->getSwingLimit();
-				Vec2 tmp = {radiansToDegrees(swing_limit.yAngle), radiansToDegrees(swing_limit.zAngle)};
-				if (ImGui::DragFloat2("Swing limit", &tmp.x))
-				{
-					swing_limit.yAngle = degreesToRadians(tmp.x);
-					swing_limit.zAngle = degreesToRadians(tmp.y);
-					d6->setSwingLimit(swing_limit);
-				}
-
-				auto twist_limit = d6->getTwistLimit();
-				tmp = {radiansToDegrees(twist_limit.lower), radiansToDegrees(twist_limit.upper)};
-				if (ImGui::DragFloat2("Twist limit", &tmp.x))
-				{
-					twist_limit.lower = degreesToRadians(tmp.x);
-					twist_limit.upper = degreesToRadians(tmp.y);
-					d6->setTwistLimit(twist_limit);
-				}
-
-				for (int i = 0; i < 6; ++i)
-				{
-					const char* labels[] = {"X motion", "Y motion", "Z motion", "Twist", "Swing 1", "Swing 2"};
-					int motion = d6->getMotion(physx::PxD6Axis::Enum(i));
-					if (ImGui::Combo(labels[i], &motion, "Locked\0Limited\0Free\0"))
-					{
-						d6->setMotion(physx::PxD6Axis::Enum(i), physx::PxD6Motion::Enum(motion));
-					}
-				}
-
-				joint_type = 3;
-				break;
-			}
-			default: ASSERT(false); break;
-		}
-		if (ImGui::Combo("Joint type", &joint_type, "Hinge\0Fixed\0Spherical\0D6\0"))
-		{
-			int px_type = physx::PxJointConcreteType::eFIXED;
-			switch (joint_type)
-			{
-				case 0: px_type = physx::PxJointConcreteType::eREVOLUTE; break;
-				case 1: px_type = physx::PxJointConcreteType::eFIXED; break;
-				case 2: px_type = physx::PxJointConcreteType::eSPHERICAL; break;
-				case 3: px_type = physx::PxJointConcreteType::eD6; break;
-				default: ASSERT(false); break;
-			}
-			scene.changeRagdollBoneJoint(bone_handle, px_type);
-			joint = scene.getRagdollBoneJoint(bone_handle);
-			if (!joint) return;
-		}
-
-		auto local_pose0 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR0);
-		auto original_pose = local_pose0;
-		if (ImGui::DragFloat3("Joint position", &local_pose0.p.x))
-		{
-			auto local_pose1 = joint->getLocalPose(physx::PxJointActorIndex::eACTOR1);
-			local_pose1 = original_pose.getInverse() * local_pose0 * local_pose1;
-			joint->setLocalPose(physx::PxJointActorIndex::eACTOR1, local_pose1);
-			joint->setLocalPose(physx::PxJointActorIndex::eACTOR0, local_pose0);
-		}*/
+		EntityRef entity = editor.getSelectedEntities()[0];
+		if (ImGui::Button("Autogenerate")) autogeneratePhySkeleton(entity, editor);
 	}
 
 	void onSettingsLoaded() override {
@@ -1048,10 +717,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		if (!m_is_window_open) return;
 		if (ImGui::Begin("Physics", &m_is_window_open))
 		{
+			WorldEditor& editor = m_app.getWorldEditor();
 			onLayersGUI();
 			onCollisionMatrixGUI();
-			onRagdollGUI();
-			onDebugGUI();
+			onRagdollGUI(editor);
+			onDebugGUI(editor);
 		}
 
 		ImGui::End();
@@ -1059,9 +729,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 
 	StudioApp& m_app;
-	WorldEditor& m_editor;
 	bool m_is_window_open = false;
-	i32 m_selected_bone = -1;
 	Action m_toggle_ui;
 };
 
