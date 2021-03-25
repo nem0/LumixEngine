@@ -1167,9 +1167,8 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 	m_mode = Mode::LAYER;
 	RenderScene* scene = static_cast<RenderScene*>(cmp.scene);
 	Material* material = scene->getTerrainMaterial((EntityRef)cmp.entity);
-	if (material
-		&& material->getTextureByName(SPLATMAP_SLOT_NAME)
-		&& ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_SAVE, ImGui::GetStyle().Colors[ImGuiCol_Text], "Save"))
+	if (!material) return;
+	if (material->getTextureByName(SPLATMAP_SLOT_NAME) && ImGuiEx::ToolbarButton(m_app.getBigIconFont(), ICON_FA_SAVE, ImGui::GetStyle().Colors[ImGuiCol_Text], "Save"))
 	{
 		material->getTextureByName(SPLATMAP_SLOT_NAME)->save();
 	}
