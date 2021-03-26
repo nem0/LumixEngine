@@ -2097,7 +2097,7 @@ struct StudioAppImpl final : StudioApp
 		os::Monitor monitors[32];
 		const u32 monitor_count = os::getMonitors(Span(monitors));
 		ImGuiPlatformIO& pio = ImGui::GetPlatformIO();
-		pio.Monitors.clear();
+		pio.Monitors.resize(0);
 		for (u32 i = 0; i < monitor_count; ++i) {
 			const os::Monitor& m = monitors[i];
 			ImGuiPlatformMonitor im;
