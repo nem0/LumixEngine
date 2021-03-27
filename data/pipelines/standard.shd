@@ -173,7 +173,7 @@ fragment_shader [[
 		if (ditherLOD(v_lod)) discard;
 
 		Surface data;
-		vec4 c = texture(u_albedomap, v_uv, -1) * u_material_color;
+		vec4 c = texture(u_albedomap, v_uv) * u_material_color;
 		data.albedo = c.rgb;
 		data.alpha = c.a;
 		#if defined GRASS && defined VEGETATION
@@ -195,7 +195,7 @@ fragment_shader [[
 
 		// dx shader has internal errors on this
 		#if defined ALPHA_CUTOUT && !defined LUMIX_DX_SHADER 
-			if(data.alpha < 0.1) discard;
+			if(data.alpha < 0.5) discard;
 		#endif
 
 		vec3 N = v_normal;
@@ -217,7 +217,7 @@ fragment_shader [[
 		data.V = normalize(-data.wpos);
 		data.roughness = texture(u_roughnessmap, v_uv).g * u_roughness;
 		data.metallic  = texture(u_metallicmap, v_uv).b * u_metallic;
-		data.N.xz = texture(u_normalmap, v_uv).wy * 2 - 1;
+		data.N.xz = texture(u_normalmap, v_uv).xy * 2 - 1;
 		data.N.y = sqrt(saturate(1 - dot(data.N.xz, data.N.xz))); 
 		data.N = tbn * data.N;
 		data.emission = u_emission;
@@ -238,7 +238,7 @@ fragment_shader [[
 		{
 			Surface data = getSurface();
 			#if defined ALPHA_CUTOUT && defined LUMIX_DX_SHADER
-				if(data.alpha < 0.1) discard;
+				if(data.alpha < 0.5) discard;
 			#endif
 			packSurface(data, o_gbuffer0, o_gbuffer1, o_gbuffer2);
 		}
@@ -252,7 +252,7 @@ fragment_shader [[
 			o_color.rgb = computeLighting(cluster, data, Global.light_dir.xyz, Global.light_color.rgb * Global.light_intensity, u_shadowmap, u_shadow_atlas, u_reflection_probes);
 
 			#if defined ALPHA_CUTOUT
-				if(data.alpha < 0.1) discard;
+				if(data.alpha < 0.5) discard;
 			#endif
 
 			float ndotv = abs(dot(data.N , data.V)) + 1e-5f;

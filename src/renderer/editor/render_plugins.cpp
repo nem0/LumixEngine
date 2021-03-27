@@ -1089,6 +1089,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		const bool has_alpha = comps == 4;
 		nvtt::InputOptions input;
+		if (meta.is_normalmap) input.setGamma(1, 1);
 		input.setMipmapGeneration(true);
 		input.setAlphaCoverageMipScale(meta.scale_coverage, comps == 4 ? 3 : 0);
 		input.setAlphaMode(has_alpha ? nvtt::AlphaMode_Transparency : nvtt::AlphaMode_None);
@@ -1110,7 +1111,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		output.setOutputHandler(&output_handler);
 
 		nvtt::CompressionOptions compression;
-		compression.setFormat(meta.is_normalmap ? nvtt::Format_DXT5n : (has_alpha ? nvtt::Format_DXT5 : nvtt::Format_DXT1));
+		compression.setFormat(meta.is_normalmap ? nvtt::Format_BC5 : (has_alpha ? nvtt::Format_BC3 : nvtt::Format_BC1));
 		compression.setQuality(toNVTT(meta.quality));
 
 		if (!context.process(input, compression, output)) {
@@ -1453,10 +1454,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				ImGui::SliderFloat("##covaref", &m_meta.scale_coverage, 0, 1);
 			}
 			if (!is_dds) {
-				ImGuiEx::Label("Is normalmap (?)");
-				if (ImGui::IsItemHovered()) {
-					ImGui::SetTooltip("%s", "Saved as DXT5 R=1, G=y, B=0, A=x");
-				}
+				ImGuiEx::Label("Is normalmap");
 				ImGui::Checkbox("##nrmmap", &m_meta.is_normalmap);
 			}
 
