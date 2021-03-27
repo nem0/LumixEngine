@@ -1617,7 +1617,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		bool create_impostor = false;
 		bool use_mikktspace = false;
 		bool force_skin = false;
-		bool import_vertex_colors = true;
+		bool import_vertex_colors = false;
 		float lods_distances[4] = { -1, -1, -1, -1 };
 		float position_error = 0.02f;
 		float rotation_error = 0.001f;
