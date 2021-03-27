@@ -273,7 +273,7 @@ static bool saveAsDDS(const char* path, const u8* data, int w, int h, bool gener
 
 	nvtt::CompressionOptions compression;
 	compression.setFormat(nvtt::Format_DXT5);
-	compression.setQuality(nvtt::Quality_Fastest);
+	compression.setQuality(nvtt::Quality_Normal);
 
 	if (!context.process(input, compression, output)) {
 		file.close();
@@ -712,6 +712,12 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
 	struct Meta
 	{
+		enum class Quality : i32 {
+			FASTEST,
+			NORMAL,
+			PRODUCTION,
+			HIGHEST
+		};
 		enum WrapMode : u32 {
 			REPEAT,
 			CLAMP
@@ -729,6 +735,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		WrapMode wrap_mode_u = WrapMode::REPEAT;
 		WrapMode wrap_mode_v = WrapMode::REPEAT;
 		WrapMode wrap_mode_w = WrapMode::REPEAT;
+		Quality quality = Quality::NORMAL;
 		Filter filter = Filter::LINEAR;
 	};
 
@@ -1018,7 +1025,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		nvtt::CompressionOptions compression;
 		// TODO format
 		compression.setFormat(nvtt::Format_BC3);
-		compression.setQuality(nvtt::Quality_Fastest);
+		compression.setQuality(toNVTT(meta.quality));
 
 		dst.write("dds", 3);
 		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
@@ -1078,7 +1085,6 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
 		flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
 		dst.write(&flags, sizeof(flags));
-
 		nvtt::Context context;
 		
 		const bool has_alpha = comps == 4;
@@ -1105,7 +1111,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		nvtt::CompressionOptions compression;
 		compression.setFormat(meta.is_normalmap ? nvtt::Format_DXT5n : (has_alpha ? nvtt::Format_DXT5 : nvtt::Format_DXT1));
-		compression.setQuality(nvtt::Quality_Normal);
+		compression.setQuality(toNVTT(meta.quality));
 
 		if (!context.process(input, compression, output)) {
 			return false;
@@ -1113,6 +1119,15 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		return true;
 	}
 
+	static nvtt::Quality toNVTT(Meta::Quality quality) {
+		switch (quality) {
+			case Meta::Quality::FASTEST: return nvtt::Quality_Fastest;
+			case Meta::Quality::NORMAL: return nvtt::Quality_Normal;
+			case Meta::Quality::PRODUCTION: return nvtt::Quality_Production;
+			case Meta::Quality::HIGHEST: return nvtt::Quality_Highest;
+			default: return nvtt::Quality_Production;
+		}
+	}
 
 	Meta getMeta(const Path& path) const
 	{
@@ -1143,6 +1158,13 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "wrap_mode_w", Span(tmp))) {
 				meta.wrap_mode_w = equalIStrings(tmp, "repeat") ? Meta::WrapMode::REPEAT : Meta::WrapMode::CLAMP;
+			}
+			
+			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "quality", Span(tmp))) {
+				if (equalIStrings(tmp, "fastest")) meta.quality = Meta::Quality::FASTEST;
+				else if (equalIStrings(tmp, "normal")) meta.quality = Meta::Quality::NORMAL;
+				else if (equalIStrings(tmp, "production")) meta.quality = Meta::Quality::PRODUCTION;
+				else if (equalIStrings(tmp, "highest")) meta.quality = Meta::Quality::HIGHEST;
 			}
 		});
 		return meta;
@@ -1210,6 +1232,16 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			case Meta::WrapMode::CLAMP: return "clamp";
 			case Meta::WrapMode::REPEAT: return "repeat";
 			default: ASSERT(false); return "repeat";
+		}
+	}
+
+	const char* toString(Meta::Quality quality) {
+		switch (quality) {
+			case Meta::Quality::FASTEST: return "fastest";
+			case Meta::Quality::NORMAL: return "normal";
+			case Meta::Quality::PRODUCTION: return "production";
+			case Meta::Quality::HIGHEST: return "highest";
+			default: ASSERT(false); return "production";
 		}
 	}
 
@@ -1398,11 +1430,17 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGuiEx::Label("SRGB");
 			ImGui::Checkbox("##srgb", &m_meta.srgb);
 			
-			if (Path::hasExtension(texture->getPath().c_str(), "tga")) {
+			bool is_tga = Path::hasExtension(texture->getPath().c_str(), "tga");
+			if (is_tga) {
 				ImGuiEx::Label("Compress");
 				ImGui::Checkbox("##cmprs", &m_meta.compress);
 			}
 			
+			if ((m_meta.compress || !is_tga) && !m_meta.convert_to_raw) {
+				ImGuiEx::Label("Compression quality");
+				ImGui::Combo("Quality", (i32*)&m_meta.quality, "Fastest\0Normal\0Production\0Highest\0");
+			}
+
 			ImGuiEx::Label("Convert to RAW");
 			ImGui::Checkbox("##cvt2raw", &m_meta.convert_to_raw);
 			bool scale_coverage = m_meta.scale_coverage >= 0;
@@ -1437,6 +1475,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					, "\nconvert_to_raw = ", m_meta.convert_to_raw ? "true" : "false"
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
+					, "\nquality = \"", toString(m_meta.quality), "\""
 					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
 					, "\nwrap_mode_v = \"", toString(m_meta.wrap_mode_v), "\""
 					, "\nwrap_mode_w = \"", toString(m_meta.wrap_mode_w), "\""
@@ -1527,8 +1566,7 @@ struct ModelPropertiesPlugin final : PropertyGrid::IPlugin {
 
 struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 {
-	struct Meta
-	{
+	struct Meta {
 		float scale = 1.f;
 		float culling_scale = 1.f;
 		bool split = false;
