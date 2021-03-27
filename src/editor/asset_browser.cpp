@@ -346,7 +346,7 @@ struct AssetBrowserImpl : AssetBrowser {
 	}
 
 
-	void thumbnail(FileInfo& tile, float size)
+	void thumbnail(FileInfo& tile, float size, bool selected)
 	{
 		ImGui::BeginGroup();
 		ImVec2 img_size(size, size);
@@ -387,6 +387,11 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::SetCursorPos(pos);
 		ImGui::Text("%s", tile.clamped_filename.data);
 		ImGui::EndGroup();
+		if (selected) {
+			ImDrawList* dl = ImGui::GetWindowDrawList();
+			const u32 color = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+			dl->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), color, 0, 0, 3.f);
+		}
 	}
 
 	void deleteTile(u32 idx) {
@@ -464,7 +469,8 @@ struct AssetBrowserImpl : AssetBrowser {
 							break;
 						}
 						FileInfo& tile = m_file_infos[idx];
-						thumbnail(tile, m_thumbnail_size * TILE_SIZE);
+						bool selected = m_selected_resources.find([&](Resource* res){ return res->getPath().getHash() == tile.file_path_hash; }) >= 0;
+						thumbnail(tile, m_thumbnail_size * TILE_SIZE, selected);
 						callbacks(tile, idx);
 					}
 				}
@@ -1048,12 +1054,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 
 		m_immediate_tiles[idx].gc_counter = 2;
-		thumbnail(m_immediate_tiles[idx], 50.f);
-		if (selected) {
-			ImDrawList* dl = ImGui::GetWindowDrawList();
-			const u32 color = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
-			dl->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), color, 0, 0, 3.f);
-		}
+		thumbnail(m_immediate_tiles[idx], 50.f, selected);
 	}
 
 	bool resourceList(Span<char> buf, u32& selected_path_hash, ResourceType type, float height, bool can_create_new) const override {
