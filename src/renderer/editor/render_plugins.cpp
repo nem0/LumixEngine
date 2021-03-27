@@ -440,7 +440,10 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 	}
 
-	void onGUIMultiple(Span<Resource*> resources) {
+	void onGUI(Span<Resource*> ress) {
+		Span<Material*> resources;
+		resources.m_begin = (Material**)ress.m_begin;
+		resources.m_end = (Material**)ress.m_end;
 		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) {
 			for (Resource* res : resources) {
 				m_app.getAssetBrowser().openInExternalEditor(res);
@@ -455,23 +458,24 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_SAVE "Save")) {
-			for (Resource* res : resources) {
-				saveMaterial(static_cast<Material*>(res));
+			for (Material* res : resources) {
+				saveMaterial(res);
 			}
 		}
 
 		char buf[LUMIX_MAX_PATH];
-		auto* first = static_cast<Material*>(resources[0]);
+		Material* first = static_cast<Material*>(resources[0]);
+		Shader* shader = first->getShader();
 
 		bool same_shader = true;
-		for (Resource* res : resources) {
-			if (static_cast<Material*>(res)->getShader() != first->getShader()) {
+		for (Material* res : resources) {
+			if (res->getShader() != shader) {
 				same_shader = false;
 			}
 		}
 
 		if (same_shader) {
-			copyString(buf, first->getShader() ? first->getShader()->getPath().c_str() : "");
+			copyString(buf, shader ? shader->getPath().c_str() : "");
 		}
 		else {
 			copyString(buf, "<different values>");
@@ -479,114 +483,87 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		ImGuiEx::Label("Shader");
 		if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
-			for (Resource* res : resources) {
-				static_cast<Material*>(res)->setShader(Path(buf));
+			for (Material* res : resources) {
+				res->setShader(Path(buf));
 			}
 		}
-	}
 
-	void onGUI(Span<Resource*> resources) override {
-		if (resources.length() > 1) {
-			onGUIMultiple(resources);
-			return;
+		multiLabel<&Material::isBackfaceCulling>("Backface culling", resources);
+		bool b = first->isBackfaceCulling();
+		if (ImGui::Checkbox("##bfcul", &b)) {
+			set<&Material::enableBackfaceCulling>(resources, b);
 		}
 
-		Material* material = static_cast<Material*>(resources[0]);
-		if (ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT "Open externally")) m_app.getAssetBrowser().openInExternalEditor(material);
-
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_SAVE "Save")) saveMaterial(material);
-
-		auto* plugin = m_app.getEngine().getPluginManager().getPlugin("renderer");
-		auto* renderer = static_cast<Renderer*>(plugin);
-
-		int alpha_cutout_define = renderer->getShaderDefineIdx("ALPHA_CUTOUT");
-
-		bool b = material->isBackfaceCulling();
-		ImGuiEx::Label("Backface culling");
-		if (ImGui::Checkbox("##bfcul", &b)) material->enableBackfaceCulling(b);
-
-		if (material->getShader() 
-			&& material->getShader()->isReady() 
-			&& material->getShader()->hasDefine(alpha_cutout_define))
-		{
-			b = material->isDefined(alpha_cutout_define);
-			ImGuiEx::Label("Is alpha cutout");
-			if (ImGui::Checkbox("##acut", &b)) material->setDefine(alpha_cutout_define, b);
-			if (b) {
-				float tmp = material->getAlphaRef();
-				ImGuiEx::Label("Alpha reference value");
-				if (ImGui::DragFloat("##acutref", &tmp, 0.01f, 0.0f, 1.0f)) {
-					material->setAlphaRef(tmp);
-				}
-			}
-		}
+		if (!same_shader) return;
+		if (!shader)
+		if (!shader->isReady()) return;
 		
-		const Shader* shader = material->getShader() && material->getShader()->isReady() ? material->getShader() : nullptr;
-		if (shader) {
-			if (!shader->isIgnored(Shader::COLOR)) {
-				Vec4 color = material->getColor();
-				ImGuiEx::Label("Color");
-				if (ImGui::ColorEdit4("##col", &color.x)) {
-					material->setColor(color);
-				}
-			}
+		Renderer& renderer = first->getRenderer();
 
-			if (!shader->isIgnored(Shader::ROUGHNESS)) {
-				float roughness = material->getRoughness();
-				ImGuiEx::Label("Roughness");
-				if (ImGui::DragFloat("##rgh", &roughness, 0.01f, 0.0f, 1.0f)) {
-					material->setRoughness(roughness);
-				}
+		const u8 alpha_cutout_idx = renderer.getShaderDefineIdx("ALPHA_CUTOUT");
+		if (shader->hasDefine(alpha_cutout_idx)) {
+			multiLabel<&Material::isAlphaCutout>("Alpha cutout", resources);
+			b = first->isAlphaCutout();
+			if (ImGui::Checkbox("##acutout", &b)) {
+				set<&Material::setAlphaCutout>(resources, b);
 			}
+		}
 
-			if (!shader->isIgnored(Shader::METALLIC)) {
-				float metallic = material->getMetallic();
-				ImGuiEx::Label("Metallic");
-				if (ImGui::DragFloat("##met", &metallic, 0.01f, 0.0f, 1.0f)) {
-					material->setMetallic(metallic);
-				}
+		if (!shader->isIgnored(Shader::COLOR)) {
+			Vec4 color = first->getColor();
+			multiLabel<&Material::getColor>("Color", resources);
+			if (ImGui::ColorEdit4("##col", &color.x)) {
+				set<&Material::setColor>(resources, color);
 			}
+		}
+
+		if (!shader->isIgnored(Shader::ROUGHNESS)) {
+			float roughness = first->getRoughness();
+			multiLabel<&Material::getRoughness>("Roughness", resources);
+			if (ImGui::DragFloat("##rgh", &roughness, 0.01f, 0.0f, 1.0f)) {
+				set<&Material::setRoughness>(resources, roughness);
+			}
+		}
+
+		if (!shader->isIgnored(Shader::METALLIC)) {
+			float metallic = first->getMetallic();
+			multiLabel<&Material::getMetallic>("Metallic", resources);
+			if (ImGui::DragFloat("##met", &metallic, 0.01f, 0.0f, 1.0f)) {
+				set<&Material::setMetallic>(resources, metallic);
+			}
+		}
 			
-			if (!shader->isIgnored(Shader::EMISSION)) {
-				float emission = material->getEmission();
-				ImGuiEx::Label("Emission");
-				if (ImGui::DragFloat("##emis", &emission, 0.01f, 0.0f)) {
-					material->setEmission(emission);
-				}
-			}
-
-			if (!shader->isIgnored(Shader::TRANSLUCENCY)) {
-				float translucency = material->getTranslucency();
-				ImGuiEx::Label("Translucency");
-				if (ImGui::DragFloat("##trns", &translucency, 0.01f, 0.f, 1.f)) {
-					material->setTranslucency(translucency);
-				}
+		if (!shader->isIgnored(Shader::EMISSION)) {
+			float emission = first->getEmission();
+			multiLabel<&Material::getEmission>("Emission", resources);
+			if (ImGui::DragFloat("##emis", &emission, 0.01f, 0.0f)) {
+				set<&Material::setEmission>(resources, emission);
 			}
 		}
 
-		char buf[LUMIX_MAX_PATH];
-		copyString(buf, material->getShader() ? material->getShader()->getPath().c_str() : "");
-		ImGuiEx::Label("Shader");
-		if (m_app.getAssetBrowser().resourceInput("shader", Span(buf), Shader::TYPE)) {
-			material->setShader(Path(buf));
+		if (!shader->isIgnored(Shader::TRANSLUCENCY)) {
+			float translucency = first->getTranslucency();
+			multiLabel<&Material::getTranslucency>("Translucency", resources);
+			if (ImGui::DragFloat("##trns", &translucency, 0.01f, 0.f, 1.f)) {
+				set<&Material::setTranslucency>(resources, translucency);
+			}
 		}
 
-		const char* current_layer_name = renderer->getLayerName(material->getLayer());
-		ImGuiEx::Label("Layer");
+		const char* current_layer_name = renderer.getLayerName(first->getLayer());
+		multiLabel<&Material::getLayer>("Layer", resources);
 		if (ImGui::BeginCombo("##layer", current_layer_name)) {
-			for (u8 i = 0, c = renderer->getLayersCount(); i < c; ++i) {
-				const char* name = renderer->getLayerName(i);
+			for (u8 i = 0, c = renderer.getLayersCount(); i < c; ++i) {
+				const char* name = renderer.getLayerName(i);
 				if (ImGui::Selectable(name)) {
-					material->setLayer(i);
+					set<&Material::setLayer>(resources, i);
 				}
 			}
 			ImGui::EndCombo();
 		}
 
-		for (u32 i = 0; material->getShader() && i < material->getShader()->m_texture_slot_count; ++i) {
-			auto& slot = material->getShader()->m_texture_slots[i];
-			Texture* texture = material->getTexture(i);
+		for (u32 i = 0; i < shader->m_texture_slot_count; ++i) {
+			auto& slot = shader->m_texture_slots[i];
+			Texture* texture = first->getTexture(i);
 			copyString(buf, texture ? texture->getPath().c_str() : "");
 			ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0, 0, 0, 0));
 			ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0, 0, 0, 0));
@@ -599,10 +576,25 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGui::PopStyleColor(4);
 			ImGui::SameLine();
 
+			bool is_same = true;
+			for (Material* res : resources) {
+				if (res->getTexture(i) != texture) {
+					is_same = false;
+					break;
+				}
+			}
+			if (!is_same) {
+				ImGui::TextUnformatted("(?)");
+				ImGui::SameLine();
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Objects have different values");
+				}
+			}
 			ImGuiEx::Label(slot.name);
-			if (m_app.getAssetBrowser().resourceInput(StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE))
-			{
-				material->setTexturePath(i, Path(buf));
+			if (m_app.getAssetBrowser().resourceInput(StaticString<30>("", (u64)&slot), Span(buf), Texture::TYPE)) { 
+				for (Material* res : resources) {
+					res->setTexturePath(i, Path(buf));
+				}
 			}
 			if (!texture && is_node_open) {
 				ImGui::TreePop();
@@ -615,89 +607,143 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		if (material->getShader() && material->isReady()) {
-			const Shader* shader = material->getShader();
+		if (first->isReady()) {
 			for (int i = 0; i < shader->m_uniforms.size(); ++i) {
 				const Shader::Uniform& shader_uniform = shader->m_uniforms[i];
-				Material::Uniform* uniform = material->findUniform(shader_uniform.name_hash);
+				Material::Uniform* uniform = first->findUniform(shader_uniform.name_hash);
 				if (!uniform) {
-					uniform = &material->getUniforms().emplace();
+					uniform = &first->getUniforms().emplace();
 					uniform->name_hash = shader_uniform.name_hash;
 					memcpy(uniform->matrix, shader_uniform.default_value.matrix, sizeof(uniform->matrix)); 
 				}
 
+				ImGuiEx::Label(shader_uniform.name);
+				bool changed = false;
 				switch (shader_uniform.type) {
 					case Shader::Uniform::FLOAT:
-						ImGuiEx::Label(shader_uniform.name);
-						if (ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value)) {
-							material->updateRenderData(false);
-						}
+						changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value);
 						break;
 					case Shader::Uniform::VEC3:
-						ImGuiEx::Label(shader_uniform.name);
-						if (ImGui::DragFloat3(StaticString<256>("##", shader_uniform.name), uniform->vec3)) {
-							material->updateRenderData(false);
-						}
+						changed = ImGui::DragFloat3(StaticString<256>("##", shader_uniform.name), uniform->vec3);
 						break;
 					case Shader::Uniform::VEC4:
-						ImGuiEx::Label(shader_uniform.name);
-						if (ImGui::DragFloat4(StaticString<256>("##", shader_uniform.name), uniform->vec4)) {
-							material->updateRenderData(false);
-						}
+						changed = ImGui::DragFloat4(StaticString<256>("##", shader_uniform.name), uniform->vec4);
 						break;
 					case Shader::Uniform::VEC2:
-						ImGuiEx::Label(shader_uniform.name);
-						if (ImGui::DragFloat2(StaticString<256>("##", shader_uniform.name), uniform->vec2)) {
-							material->updateRenderData(false);
-						}
+						changed = ImGui::DragFloat2(StaticString<256>("##", shader_uniform.name), uniform->vec2);
 						break;
 					case Shader::Uniform::COLOR:
-						ImGuiEx::Label(shader_uniform.name);
-						if (ImGui::ColorEdit3(StaticString<256>("##", shader_uniform.name), uniform->vec3)) {
-							material->updateRenderData(false);
-						}
+						changed = ImGui::ColorEdit3(StaticString<256>("##", shader_uniform.name), uniform->vec3);
 						break;
 					default: ASSERT(false); break;
 				}
-			}
-			
-			if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags")) {
-				for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
-					bool b = material->isCustomFlag(1 << i);
-					if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
-						if (b)
-							material->setCustomFlag(1 << i);
-						else
-							material->unsetCustomFlag(1 << i);
-					}
-				}
-			}
-
-			if (ImGui::CollapsingHeader("Defines")) {
-				for (int i = 0; i < renderer->getShaderDefinesCount(); ++i) {
-					const char* define = renderer->getShaderDefine(i);
-					if (!shader->hasDefine(i)) continue;
-					bool value = material->isDefined(i);
-
-					auto isBuiltinDefine = [](const char* define) {
-						const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "ALPHA_CUTOUT", "SKINNED"};
-						for (const char* builtin_define : BUILTIN_DEFINES)
-						{
-							if (equalStrings(builtin_define, define)) return true;
+				if (changed) {
+					for(Material* mat : resources) {
+						if (mat != first) {
+							Material::Uniform* u = mat->findUniform(shader_uniform.name_hash);
+							if (!u) u = &mat->getUniforms().emplace();
+							memcpy(u, uniform, sizeof(*u));
 						}
-						return false;
-					};
-
-					bool is_texture_define = material->isTextureDefine(i);
-					if (!is_texture_define && !isBuiltinDefine(define) && ImGui::Checkbox(define, &value)) {
-						material->setDefine(i, value);
+						mat->updateRenderData(false);
 					}
 				}
 			}
+		}
 
+		if (Material::getCustomFlagCount() > 0 && ImGui::CollapsingHeader("Flags")) {
+
+			for (int i = 0; i < Material::getCustomFlagCount(); ++i) {
+				bool b = first->isCustomFlag(1 << i);
+				bool is_same = true;
+				for (Material* mat : resources) {
+					if (mat->isCustomFlag(1 << i) != b) {
+						is_same = false;
+						break;
+					}
+				}
+				if (ImGui::Checkbox(Material::getCustomFlagName(i), &b)) {
+					for (Material* mat : resources) {
+						if (b)
+							mat->setCustomFlag(1 << i);
+						else
+							mat->unsetCustomFlag(1 << i);
+					}
+				}
+				if (!is_same) {
+					ImGui::SameLine();
+					ImGui::TextUnformatted("(?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("Objects have different values");
+					}
+				}
+			}
+		}
+		
+		if (ImGui::CollapsingHeader("Defines")) {
+			for (int i = 0; i < renderer.getShaderDefinesCount(); ++i) {
+				const char* define = renderer.getShaderDefine(i);
+				if (!shader->hasDefine(i)) continue;
+
+				auto isBuiltinDefine = [](const char* define) {
+					const char* BUILTIN_DEFINES[] = {"HAS_SHADOWMAP", "ALPHA_CUTOUT", "SKINNED"};
+					for (const char* builtin_define : BUILTIN_DEFINES) {
+						if (equalStrings(builtin_define, define)) return true;
+					}
+					return false;
+				};
+
+				bool is_same = true;
+				for (Material* res : resources) {
+					if (res->isDefined(i) != first->isDefined(i)) {
+						is_same = false;
+						break;
+					}
+				}
+
+				bool value = first->isDefined(i);
+				bool is_texture_define = first->isTextureDefine(i);
+				if (is_texture_define || isBuiltinDefine(define)) continue;
+				
+				if (ImGui::Checkbox(define, &value)) {
+					for (Material* res : resources) {
+						res->setDefine(i, value);
+					}
+				}
+				if (!is_same) {
+					ImGui::SameLine();
+					ImGui::TextUnformatted("(?)");
+					if (ImGui::IsItemHovered()) {
+						ImGui::SetTooltip("Objects have different values");
+					}
+				}
+			}
 		}
 	}
 
+	template <auto F, typename T>
+	static void set(Span<Material*> resources, T value) {
+		for (Material* r : resources) {
+			(r->*F)(value);
+		}
+	}
+
+	template <auto F>
+	static void multiLabel(const char* label, Span<Material*> resources) {
+		ASSERT(resources.length() > 0);
+		auto v = (resources[0]->*F)();
+		for (Material* r : resources) {
+			auto v2 = (r->*F)();
+			if (v2 != v) {
+				ImGui::TextUnformatted("(?)");
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Objects have different values");
+				}
+				ImGui::SameLine();
+				break;
+			}
+		}
+		ImGuiEx::Label(label);
+	}
 
 	void onResourceUnloaded(Resource* resource) override {}
 	const char* getName() const override { return "Material"; }

@@ -627,8 +627,10 @@ struct AssetBrowserImpl : AssetBrowser {
 	void detailsGUI()
 	{
 		if (!m_is_open) return;
+
 		if (m_is_focus_requested) ImGui::SetNextWindowFocus();
 		m_is_focus_requested = false;
+		
 		if (ImGui::Begin(ICON_FA_IMAGE  "Asset inspector##asset_inspector", &m_is_open, ImGuiWindowFlags_AlwaysVerticalScrollbar))
 		{
 			ImVec2 pos = ImGui::GetCursorScreenPos();

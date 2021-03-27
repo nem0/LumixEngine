@@ -92,6 +92,8 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	gpu::StateFlags getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
 	bool isBackfaceCulling() const;
+	bool isAlphaCutout() const;
+	void setAlphaCutout(bool enable);
 
 	void setShader(Shader* shader);
 	void setShader(const Path& path);
