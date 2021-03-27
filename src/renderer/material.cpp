@@ -17,9 +17,6 @@ namespace Lumix
 {
 
 
-static const float DEFAULT_ALPHA_REF_VALUE = 0.3f;
-
-
 static struct CustomFlags
 {
 	char flags[32][32];
@@ -49,7 +46,6 @@ Material::Material(const Path& path, ResourceManager& resource_manager, Renderer
 	static u32 last_sort_key = 0;
 	m_sort_key = ++last_sort_key;
 	m_layer = m_renderer.getLayerIdx("default");
-	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 	for (int i = 0; i < MAX_TEXTURE_COUNT; ++i)
 	{
 		m_textures[i] = nullptr;
@@ -146,7 +142,6 @@ void Material::unload()
 
 	setShader(nullptr);
 
-	m_alpha_ref = 0.3f;
 	m_color = Vec4(1, 1, 1, 1);
 	m_custom_flags = 0;
 	m_define_mask = 0;
@@ -171,7 +166,6 @@ bool Material::save(IOutputStream& file)
 	file << "emission(" <<  m_emission << ")\n";
 	file << "metallic(" <<  m_metallic << ")\n";
 	file << "roughness(" <<  m_roughness << ")\n";
-	file << "alpha_ref(" <<  m_alpha_ref << ")\n";
 
 	file << "defines {";
 	bool first_define = true;
@@ -512,7 +506,7 @@ int alpha_ref(lua_State* L)
 	Material* material = (Material*)lua_touserdata(L, -1);
 	lua_pop(L, 1);
 
-	material->setAlphaRef(r);
+	logWarning(material->getPath(), ": alpha_ref deprecated");
 	return 0;
 }
 
@@ -692,7 +686,6 @@ bool Material::load(u64 size, const u8* mem)
 	m_uniforms.clear();
 	m_render_states = gpu::StateFlags::CULL_BACK;
 	m_custom_flags = 0;
-	setAlphaRef(DEFAULT_ALPHA_REF_VALUE);
 
 	const Span<const char> content((const char*)mem, (u32)size);
 	if (!LuaWrapper::execute(L, content, getPath().c_str(), 0)) {

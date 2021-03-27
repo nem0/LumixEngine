@@ -495,7 +495,7 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		if (!same_shader) return;
-		if (!shader)
+		if (!shader) return;
 		if (!shader->isReady()) return;
 		
 		Renderer& renderer = first->getRenderer();
@@ -775,7 +775,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 		bool srgb = false;
 		bool is_normalmap = false;
-		float scale_coverage = -1;
+		float scale_coverage = -0.5f;
 		bool convert_to_raw = false;
 		bool compress = false;
 		WrapMode wrap_mode_u = WrapMode::REPEAT;

@@ -87,8 +87,6 @@ struct LUMIX_RENDERER_API Material final : Resource {
 	void setTranslucency(float value) { m_translucency = value; updateRenderData(false); }
 	Vec4 getColor() const { return m_color; }
 	void setColor(const Vec4& color) { m_color = color; updateRenderData(false); }
-	float getAlphaRef() const { return m_alpha_ref; }
-	void setAlphaRef(float value) { m_alpha_ref = value; updateRenderData(false); }
 	gpu::StateFlags getRenderStates() const { return m_render_states; }
 	void enableBackfaceCulling(bool enable);
 	bool isBackfaceCulling() const;
@@ -144,7 +142,6 @@ private:
 	float m_emission;
 	float m_translucency;
 	Vec4 m_color;
-	float m_alpha_ref;
 	Texture* m_textures[MAX_TEXTURE_COUNT];
 	u32 m_texture_count;
 	u32 m_define_mask;
