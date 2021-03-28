@@ -405,7 +405,7 @@ struct StudioAppImpl final : StudioApp
 
 		ImGui::SetAllocatorFunctions(imguiAlloc, imguiFree, this);
 		ImGui::CreateContext();
-		imnodes::Initialize();
+		imnodes::CreateContext();
 		loadSettings();
 		initIMGUI();
 

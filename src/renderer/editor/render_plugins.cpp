@@ -3678,7 +3678,7 @@ struct EditorUIRenderPlugin final : StudioApp::GUIPlugin
 
 	void shutdownImGui()
 	{
-		imnodes::Shutdown();
+		imnodes::DestroyContext();
 		ImGui::DestroyContext();
 	}
 

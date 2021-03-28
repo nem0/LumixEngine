@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+struct ImGuiContext;
 struct ImVec2;
 
 namespace imnodes
@@ -32,7 +33,17 @@ enum StyleVar
     StyleVar_GridSpacing = 0,
     StyleVar_NodeCornerRounding,
     StyleVar_NodePaddingHorizontal,
-    StyleVar_NodePaddingVertical
+    StyleVar_NodePaddingVertical,
+    StyleVar_NodeBorderThickness,
+    StyleVar_LinkThickness,
+    StyleVar_LinkLineSegmentsPerLength,
+    StyleVar_LinkHoverDistance,
+    StyleVar_PinCircleRadius,
+    StyleVar_PinQuadSideLength,
+    StyleVar_PinTriangleSideLength,
+    StyleVar_PinLineThickness,
+    StyleVar_PinHoverRadius,
+    StyleVar_PinOffset
 };
 
 enum StyleFlags
@@ -75,10 +86,12 @@ struct IO
     {
         EmulateThreeButtonMouse();
 
-        // Controls whether this feature is enabled or not.
-        bool enabled;
-        const bool* modifier; // The keyboard modifier to use with the mouse left click. Set to
-                              // &ImGuiIO::KeyAlt by default.
+        // The keyboard modifier to use in combination with mouse left click to pan the editor view.
+        // Set to NULL by default. To enable this feature, set the modifier to point to a boolean
+        // indicating the state of a modifier. For example,
+        //
+        // imnodes::GetIO().emulate_three_button_mouse.modifier = &ImGui::GetIO().KeyAlt;
+        const bool* modifier;
     } emulate_three_button_mouse;
 
     struct LinkDetachWithModifierClick
@@ -86,8 +99,10 @@ struct IO
         LinkDetachWithModifierClick();
 
         // Pointer to a boolean value indicating when the desired modifier is pressed. Set to NULL
-        // by default (i.e. this feature is disabled). To enable the feature, set the link to point
-        // to, for example, &ImGuiIO::KeyCtrl.
+        // by default. To enable the feature, set the modifier to point to a boolean indicating the
+        // state of a modifier. For example,
+        //
+        // imnodes::GetIO().link_detach_with_modifier_click.modifier = &ImGui::GetIO().KeyCtrl;
         //
         // Left-clicking a link with this modifier pressed will detach that link. NOTE: the user has
         // to actually delete the link for this to work. A deleted link can be detected by calling
@@ -105,6 +120,7 @@ struct Style
     float node_corner_rounding;
     float node_padding_horizontal;
     float node_padding_vertical;
+    float node_border_thickness;
 
     float link_thickness;
     float link_line_segments_per_length;
@@ -137,6 +153,17 @@ struct Style
     Style();
 };
 
+struct Context;
+
+// Call this function if you are compiling imnodes in to a dll, separate from ImGui. Calling this
+// function sets the GImGui global variable, which is not shared across dll boundaries.
+void SetImGuiContext(ImGuiContext* ctx);
+
+Context* CreateContext();
+void DestroyContext(Context* ctx = NULL); // NULL = destroy current context
+Context* GetCurrentContext();
+void SetCurrentContext(Context* ctx);
+
 // An editor context corresponds to a set of nodes in a single workspace (created with a single
 // Begin/EndNodeEditor pair)
 //
@@ -150,10 +177,6 @@ void EditorContextSet(EditorContext*);
 ImVec2 EditorContextGetPanning();
 void EditorContextResetPanning(const ImVec2& pos);
 void EditorContextMoveToNode(const int node_id);
-
-// Initialize the node editor system.
-void Initialize();
-void Shutdown();
 
 IO& GetIO();
 
@@ -175,6 +198,7 @@ void PopColorStyle();
 void PushStyleVar(StyleVar style_item, float value);
 void PopStyleVar();
 
+// id can be any positive or negative integer, but INT_MIN is currently reserved for internal use.
 void BeginNode(int id);
 void EndNode();
 
@@ -294,4 +318,18 @@ bool IsLinkCreated(
 // output argument link_id.
 bool IsLinkDestroyed(int* link_id);
 
+// Use the following functions to write the editor context's state to a string, or directly to a
+// file. The editor context is serialized in the INI file format.
+
+const char* SaveCurrentEditorStateToIniString(size_t* data_size = NULL);
+const char* SaveEditorStateToIniString(const EditorContext* editor, size_t* data_size = NULL);
+
+void LoadCurrentEditorStateFromIniString(const char* data, size_t data_size);
+void LoadEditorStateFromIniString(EditorContext* editor, const char* data, size_t data_size);
+
+void SaveCurrentEditorStateToIniFile(const char* file_name);
+void SaveEditorStateToIniFile(const EditorContext* editor, const char* file_name);
+
+void LoadCurrentEditorStateFromIniFile(const char* file_name);
+void LoadEditorStateFromIniFile(EditorContext* editor, const char* file_name);
 } // namespace imnodes
