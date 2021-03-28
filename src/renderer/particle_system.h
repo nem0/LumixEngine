@@ -128,6 +128,7 @@ private:
 	};
 
 	float readSingleValue(InputMemoryStream& blob) const;
+	void onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&);
 
 	IAllocator& m_allocator;
 	OutputMemoryStream m_emit_buffer;

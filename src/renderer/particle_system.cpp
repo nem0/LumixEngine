@@ -129,12 +129,27 @@ ParticleEmitter::~ParticleEmitter()
 	}
 }
 
+void ParticleEmitter::onResourceChanged(Resource::State old_state, Resource::State new_state, Resource&) {
+	m_particles_count = 0;
+	m_capacity = 0;
+	m_instances_count = 0;
+	m_emit_timer = 0;
+	for (Channel& c : m_channels) {
+		m_allocator.deallocate_aligned(c.data);
+		c.data = nullptr;
+	}
+}
+
 void ParticleEmitter::setResource(ParticleEmitterResource* res)
 {
 	if (m_resource) {
 		m_resource->decRefCount();
+		m_resource->getObserverCb().unbind<&ParticleEmitter::onResourceChanged>(this);
 	}
 	m_resource = res;
+	if (m_resource) {
+		m_resource->onLoaded<&ParticleEmitter::onResourceChanged>(this);
+	}
 }
 
 
@@ -424,6 +439,7 @@ void ParticleEmitter::update(float dt)
 
 			while (itype != InstructionType::END) {
 				switch (itype) {
+					case InstructionType::LT:
 					case InstructionType::GT: {
 						DataStream dst = ip.read<DataStream>();
 						DataStream op0 = ip.read<DataStream>();
@@ -433,26 +449,54 @@ void ParticleEmitter::update(float dt)
 						const float4* end = arg0 + stepf4;
 					
 						const InstructionType inner_type = ip.read<InstructionType>();
-						for (const float4* beg = arg0; arg0 != end; ++arg0) {
-							const float4 tmp = f4CmpGT(*arg0, arg1);
-							const int m = f4MoveMask(tmp);
-							for (int i = 0; i < 4; ++i) {
-								if ((m & (1 << i))) {
-									switch(inner_type) {
-										case InstructionType::KILL: {
-											const u32 idx = u32(from + (arg0 - beg) * 4 + i);
-											if (idx < m_particles_count) {
-												const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
-												if (kill_idx < kill_list.size()) {
-													kill_list[kill_idx] = idx;
+						if (itype == InstructionType::GT) {
+							for (const float4* beg = arg0; arg0 != end; ++arg0) {
+								const float4 tmp = f4CmpGT(*arg0, arg1);
+								const int m = f4MoveMask(tmp);
+								for (int i = 0; i < 4; ++i) {
+									if ((m & (1 << i))) {
+										switch(inner_type) {
+											case InstructionType::KILL: {
+												const u32 idx = u32(from + (arg0 - beg) * 4 + i);
+												if (idx < m_particles_count) {
+													const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
+													if (kill_idx < kill_list.size()) {
+														kill_list[kill_idx] = idx;
+													}
+													else {
+														ASSERT(false);
+													}
 												}
-												else {
-													ASSERT(false);
-												}
+												break;
 											}
-											break;
+											default: ASSERT(false); break;
 										}
-										default: ASSERT(false); break;
+									}
+								}
+							}
+						}
+						else {
+							for (const float4* beg = arg0; arg0 != end; ++arg0) {
+								const float4 tmp = f4CmpLT(*arg0, arg1);
+								const int m = f4MoveMask(tmp);
+								for (int i = 0; i < 4; ++i) {
+									if ((m & (1 << i))) {
+										switch(inner_type) {
+											case InstructionType::KILL: {
+												const u32 idx = u32(from + (arg0 - beg) * 4 + i);
+												if (idx < m_particles_count) {
+													const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
+													if (kill_idx < kill_list.size()) {
+														kill_list[kill_idx] = idx;
+													}
+													else {
+														ASSERT(false);
+													}
+												}
+												break;
+											}
+											default: ASSERT(false); break;
+										}
 									}
 								}
 							}
