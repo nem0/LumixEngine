@@ -5,6 +5,10 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
+uniform("Frames cols", "int")
+uniform("Frames rows", "int")
+
+
 vertex_shader [[
 	layout(std140, binding = 4) uniform Model {
 		mat4 u_model;
@@ -20,7 +24,7 @@ vertex_shader [[
 	void main() {
 		vec2 pos = vec2(gl_VertexID & 1, (gl_VertexID & 2) * 0.5);
 		uint frame = uint(i_frame);
-		v_uv = (pos + vec2(frame & 1, (frame & 2) >> 1)) * 0.5;
+		v_uv = (pos + vec2(frame % u_frames_cols, frame / u_frames_cols)) / vec2(u_frames_cols, u_frames_rows);
 
 		vec3 dir = normalize(i_position);
 
@@ -45,7 +49,7 @@ fragment_shader [[
 	layout (binding=0) uniform sampler2D u_texture;
 	
 	void main() {
-		vec4 c = texture(u_texture, v_uv) * saturate(v_color);
-		o_color = c;
+		o_color = texture(u_texture, v_uv) * saturate(v_color);
+		o_color.a *= o_color.r;
 	}
 ]]
