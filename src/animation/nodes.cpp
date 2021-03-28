@@ -473,11 +473,13 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 	const bool is_selectable = m_children[data.from].flags & Child::SELECTABLE;
 
 	if (!is_current_matching || !is_selectable) {
+		bool waiting_for_exit_time = false;
 		for (const Transition& transition : m_transitions) {
 			if (transition.from != data.from) continue;
 			if (!m_children[transition.to].condition.eval(ctx)) continue;
 			
 			if (transition.exit_time >= 0) {
+				waiting_for_exit_time = true;
 				const Time len = m_children[data.from].node->length(ctx);
 				const Time beg = m_children[data.from].node->time(ctx);
 				const Time end = beg + ctx.time_delta;
@@ -495,7 +497,7 @@ void GroupNode::update(RuntimeContext& ctx, LocalRigidTransform& root_motion) co
 			return;
 		}
 		
-		if (!is_current_matching) {
+		if (!is_current_matching && !waiting_for_exit_time) {
 			for (u32 i = 0, c = m_children.size(); i < c; ++i) {
 				const Child& child = m_children[i];
 				if (i == data.from) continue;
