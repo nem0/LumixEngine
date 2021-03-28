@@ -444,14 +444,13 @@ void ParticleEmitter::update(float dt)
 						DataStream dst = ip.read<DataStream>();
 						DataStream op0 = ip.read<DataStream>();
 						const float4* arg0 = getStream(*this, dst, fromf4, reg_mem.begin());
-						ASSERT(op0.type == DataStream::LITERAL);
-						const float4 arg1 = f4Splat(op0.value);
 						const float4* end = arg0 + stepf4;
-					
 						const InstructionType inner_type = ip.read<InstructionType>();
-						if (itype == InstructionType::GT) {
+
+						auto helper = [&](auto f, auto arg1_getter){
+							float4* arg1 = arg1_getter.get(*this, fromf4, stepf4, reg_mem.begin());
 							for (const float4* beg = arg0; arg0 != end; ++arg0) {
-								const float4 tmp = f4CmpGT(*arg0, arg1);
+								const float4 tmp = f(*arg0, *arg1);
 								const int m = f4MoveMask(tmp);
 								for (int i = 0; i < 4; ++i) {
 									if ((m & (1 << i))) {
@@ -473,33 +472,32 @@ void ParticleEmitter::update(float dt)
 										}
 									}
 								}
+								decltype(arg1_getter)::step(arg1);
+							}						
+						};
+					
+						switch(op0.type) {
+							case DataStream::CHANNEL: {
+								ChannelGetter getter(op0);
+								helper(itype == InstructionType::GT ? f4CmpGT : f4CmpLT, getter);
+								break;
 							}
-						}
-						else {
-							for (const float4* beg = arg0; arg0 != end; ++arg0) {
-								const float4 tmp = f4CmpLT(*arg0, arg1);
-								const int m = f4MoveMask(tmp);
-								for (int i = 0; i < 4; ++i) {
-									if ((m & (1 << i))) {
-										switch(inner_type) {
-											case InstructionType::KILL: {
-												const u32 idx = u32(from + (arg0 - beg) * 4 + i);
-												if (idx < m_particles_count) {
-													const i32 kill_idx = atomicIncrement(&kill_counter) - 1;
-													if (kill_idx < kill_list.size()) {
-														kill_list[kill_idx] = idx;
-													}
-													else {
-														ASSERT(false);
-													}
-												}
-												break;
-											}
-											default: ASSERT(false); break;
-										}
-									}
-								}
+							case DataStream::REGISTER: {
+								RegisterGetter getter(op0);
+								helper(itype == InstructionType::GT ? f4CmpGT : f4CmpLT, getter);
+								break;
 							}
+							case DataStream::LITERAL: {
+								LiteralGetter getter(op0);
+								helper(itype == InstructionType::GT ? f4CmpGT : f4CmpLT, getter);
+								break;
+							}
+							case DataStream::CONST: {
+								ConstGetter getter(op0);
+								helper(itype == InstructionType::GT ? f4CmpGT : f4CmpLT, getter);
+								break;
+							}
+							default: ASSERT(false); break;
 						}
 						break;
 					}	
