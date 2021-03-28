@@ -2702,6 +2702,12 @@ struct RenderSceneImpl final : RenderScene {
 	u32 getParticleEmitterRate(EntityRef entity) override {
 		return m_particle_emitters[entity]->m_emit_rate;
 	}
+	
+	ParticleEmitter* getParticleEmitter(EntityRef e) const override {
+		i32 idx = m_particle_emitters.find(e);
+		if (idx < 0) return nullptr;
+		return m_particle_emitters.at(idx);
+	}
 
 	const AssociativeArray<EntityRef, ParticleEmitter*>& getParticleEmitters() const override
 	{

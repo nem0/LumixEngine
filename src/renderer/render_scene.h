@@ -302,6 +302,7 @@ struct LUMIX_RENDERER_API RenderScene : IScene
 	virtual u32 getParticleEmitterRate(EntityRef entity) = 0;
 	virtual void updateParticleEmitter(EntityRef entity, float dt) = 0;
 	virtual const AssociativeArray<EntityRef, struct ParticleEmitter*>& getParticleEmitters() const = 0;
+	virtual ParticleEmitter* getParticleEmitter(EntityRef e) const = 0;
 
 	virtual void enableModelInstance(EntityRef entity, bool enable) = 0;
 	virtual bool isModelInstanceEnabled(EntityRef entity) = 0;

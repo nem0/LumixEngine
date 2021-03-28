@@ -65,6 +65,7 @@ struct EntityPtr
 	bool operator!=(const EntityPtr& rhs) const { return rhs.index != index; }
 	bool isValid() const { return index >= 0; }
 	inline explicit operator EntityRef() const;
+	inline EntityRef operator *() const;
 };
 
 struct EntityRef
@@ -208,6 +209,12 @@ private:
 #endif
 
 inline EntityPtr::operator EntityRef() const
+{
+	ASSERT(isValid());
+	return {index};
+}
+
+inline EntityRef EntityPtr::operator *() const
 {
 	ASSERT(isValid());
 	return {index};

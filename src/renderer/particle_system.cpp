@@ -412,9 +412,9 @@ void ParticleEmitter::update(float dt)
 		}
 	}
 
-	profiler::pushInt("particle count", m_particles_count);
 	if (m_particles_count == 0) return;
 
+	profiler::pushInt("particle count", m_particles_count);
 	m_emit_buffer.clear();
 	m_constants[0] = dt;
 	// TODO
