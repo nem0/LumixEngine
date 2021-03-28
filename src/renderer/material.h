@@ -59,6 +59,7 @@ struct LUMIX_RENDERER_API Material final : Resource {
 		u32 name_hash;
 		union
 		{
+			i32 int_value;
 			float float_value;
 			float vec4[4];
 			float vec3[3];
@@ -133,6 +134,7 @@ private:
 	bool load(u64 size, const u8* mem) override;
 
 	static int uniform(lua_State* L);
+	static int int_uniform(lua_State* L);
 
 private:
 	Renderer& m_renderer;

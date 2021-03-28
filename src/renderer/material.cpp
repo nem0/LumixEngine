@@ -213,18 +213,22 @@ bool Material::save(IOutputStream& file)
 	for (const Shader::Uniform& su : m_shader->m_uniforms) {
 		for (const Uniform& mu : m_uniforms) {
 			if(mu.name_hash == su.name_hash) {
-				file << "uniform(\"" << su.name << "\", ";
-				switch(su.type) {
-					case Shader::Uniform::FLOAT: file << mu.float_value; break;
-					case Shader::Uniform::INT: file << *(int*)&mu.float_value; break;
-					case Shader::Uniform::COLOR: 
-					case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
-					case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
-					case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
-					case Shader::Uniform::MATRIX4: writeArray(mu.matrix, 16); break;
-					default: ASSERT(false); break;
+				if (su.type == Shader::Uniform::INT) {
+					file << "int_uniform(\"" << su.name << "\", " << mu.int_value << ")\n";
 				}
-				file << ")\n";
+				else {
+					file << "uniform(\"" << su.name << "\", ";
+					switch(su.type) {
+						case Shader::Uniform::FLOAT: file << mu.float_value; break;
+						case Shader::Uniform::COLOR: 
+						case Shader::Uniform::VEC4: writeArray(mu.vec4, 4); break;
+						case Shader::Uniform::VEC3: writeArray(mu.vec4, 3); break;
+						case Shader::Uniform::VEC2: writeArray(mu.vec4, 2); break;
+						case Shader::Uniform::MATRIX4: writeArray(mu.matrix, 16); break;
+						default: ASSERT(false); break;
+					}
+					file << ")\n";
+				}
 				break;
 			}
 		}
@@ -254,6 +258,22 @@ int Material::uniform(lua_State* L) {
 			}
 			break;
 		}
+		default: luaL_error(L, "Uniform %s has unsupported type", name); break;
+	}
+	material->m_uniforms.push(u);
+	return 0;
+}
+
+
+int Material::int_uniform(lua_State* L) {
+	const char* name = LuaWrapper::checkArg<const char*>(L, 1);
+	lua_getfield(L, LUA_GLOBALSINDEX, "this");
+	Material* material = (Material*)lua_touserdata(L, -1);
+	lua_pop(L, 1);
+	Uniform u;
+	u.name_hash = crc32(name);
+	switch (lua_type(L, 2)) {
+		case LUA_TNUMBER: u.int_value = LuaWrapper::toType<i32>(L, 2); break;
 		default: luaL_error(L, "Uniform %s has unsupported type", name); break;
 	}
 	material->m_uniforms.push(u);
@@ -736,6 +756,9 @@ MaterialManager::MaterialManager(Renderer& renderer, IAllocator& allocator)
 
 	lua_pushcfunction(m_state, &Material::uniform);
 	lua_setfield(m_state, LUA_GLOBALSINDEX, "uniform"); 
+
+	lua_pushcfunction(m_state, &Material::int_uniform);
+	lua_setfield(m_state, LUA_GLOBALSINDEX, "int_uniform"); 
 
 	#undef DEFINE_LUA_FUNC
 

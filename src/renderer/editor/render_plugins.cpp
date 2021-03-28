@@ -623,6 +623,9 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					case Shader::Uniform::FLOAT:
 						changed = ImGui::DragFloat(StaticString<256>("##", shader_uniform.name), &uniform->float_value);
 						break;
+					case Shader::Uniform::INT:
+						changed = ImGui::DragInt(StaticString<256>("##", shader_uniform.name), &uniform->int_value);
+						break;
 					case Shader::Uniform::VEC3:
 						changed = ImGui::DragFloat3(StaticString<256>("##", shader_uniform.name), uniform->vec3);
 						break;

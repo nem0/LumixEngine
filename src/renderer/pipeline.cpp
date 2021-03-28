@@ -1907,9 +1907,17 @@ struct PipelineImpl final : Pipeline
 				
 				const gpu::StateFlags blend_state = gpu::getBlendStateBits(gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA, gpu::BlendFactors::SRC_ALPHA, gpu::BlendFactors::ONE_MINUS_SRC_ALPHA);
 				gpu::setState(blend_state | gpu::StateFlags::DEPTH_TEST);
+				const gpu::BufferHandle material_ub = m_pipeline->m_renderer.getMaterialUniformBuffer();
+				u32 material_ub_idx = 0xffFFffFF;
 				for (const Drawcall& dc : m_drawcalls) {
 					Matrix mtx = dc.rot.toMatrix();
 					mtx.setTranslation(dc.pos);
+
+					if (material_ub_idx != dc.material->material_constants) {
+						gpu::bindUniformBuffer(UniformBuffer::MATERIAL, material_ub, dc.material->material_constants * sizeof(MaterialConsts), sizeof(MaterialConsts));
+						material_ub_idx = dc.material->material_constants;
+					}
+
 					gpu::bindTextures(dc.material->textures, 0, dc.material->textures_count);
 					gpu::update(m_pipeline->m_drawcall_ub, &mtx.columns[0].x, sizeof(mtx));
 					gpu::useProgram(dc.program);

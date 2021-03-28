@@ -1090,9 +1090,17 @@ struct ParticleEditorResource {
 		m_streams.emplace().name = "pos_x";
 		m_streams.emplace().name = "pos_y";
 		m_streams.emplace().name = "pos_z";
+		m_streams.emplace().name = "life";
 		m_outputs.emplace().name = "pos_x";
 		m_outputs.emplace().name = "pos_y";
 		m_outputs.emplace().name = "pos_z";
+		m_outputs.emplace().name = "scale";
+		m_outputs.emplace().name = "color_r";
+		m_outputs.emplace().name = "color_g";
+		m_outputs.emplace().name = "color_b";
+		m_outputs.emplace().name = "color_a";
+		m_outputs.emplace().name = "rotation";
+		m_outputs.emplace().name = "frame";
 
 		m_consts.emplace().name = "delta time";
 
