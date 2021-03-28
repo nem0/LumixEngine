@@ -468,12 +468,13 @@ struct UniverseViewImpl final : UniverseView {
 		const Quat pitch_rot(pitch_axis, pitch);
 		rot = normalize(pitch_rot * rot);
 
-		if (m_scene_view.m_orbit_action.isActive() && !m_editor.getSelectedEntities().empty())
-		{
+		if (m_scene_view.m_orbit_action.isActive() && !m_editor.getSelectedEntities().empty()) {
 			const Vec3 dir = rot.rotate(Vec3(0, 0, 1));
-			const DVec3 entity_pos = universe->getPosition(m_editor.getSelectedEntities()[0]);
-			const float dist = float(length(entity_pos - pos));
-			pos = entity_pos + dir * dist;
+			const Transform tr = universe->getTransform(m_editor.getSelectedEntities()[0]);
+			Vec3 offset = m_app.getGizmoConfig().offset;
+			const DVec3 orbit_point = tr.pos + tr.rot.rotate(offset);
+			const float dist = float(length(orbit_point - pos));
+			pos = orbit_point + dir * dist;
 		}
 
 		m_viewport.pos = pos;
