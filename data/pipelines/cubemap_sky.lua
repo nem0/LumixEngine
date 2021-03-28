@@ -13,8 +13,8 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	env.bindTextures({sky}, 0)
 	local state = {
 		stencil_write_mask = 0,
-		stencil_func = env.STENCIL_NOT_EQUAL,
-		stencil_ref = 1,
+		stencil_func = env.STENCIL_EQUAL,
+		stencil_ref = 0,
 		stencil_mask = 0xff,
 		stencil_sfail = env.STENCIL_KEEP,
 		stencil_zfail = env.STENCIL_KEEP,

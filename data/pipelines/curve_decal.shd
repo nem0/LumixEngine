@@ -6,6 +6,9 @@ texture_slot {
 	default_texture = "textures/common/white.tga"
 }
 
+ignore_property "emission"
+ignore_property "translucency"
+
 ------------------
 
 vertex_shader [[

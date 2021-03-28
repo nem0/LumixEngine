@@ -101,8 +101,8 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 		depth_write = false,
 		depth_test = false,
 		stencil_write_mask = 0,
-		stencil_func = env.STENCIL_NOT_EQUAL,
-		stencil_ref = 1,
+		stencil_func = env.STENCIL_EQUAL,
+		stencil_ref = 0,
 		stencil_mask = 0xff,
 		stencil_sfail = env.STENCIL_KEEP,
 		stencil_zfail = env.STENCIL_KEEP,
@@ -110,8 +110,8 @@ function postprocess(env, transparent_phase, hdr_buffer, gbuffer0, gbuffer1, gbu
 	}
 	if object_atmo == false then
 		state.stencil_write_mask = 0
-		state.stencil_func = env.STENCIL_NOT_EQUAL
-		state.stencil_ref = 1
+		state.stencil_func = env.STENCIL_EQUAL
+		state.stencil_ref = 0
 		state.stencil_mask = 0xff
 		state.stencil_sfail = env.STENCIL_KEEP
 		state.stencil_zfail = env.STENCIL_KEEP

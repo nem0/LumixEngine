@@ -20,6 +20,18 @@ local decal_state = {
 	depth_write = false
 }
 
+local terrain_decal_state = {
+	blending = "alpha",
+	depth_write = false,
+	stencil_write_mask = 0,
+	stencil_func = STENCIL_EQUAL,
+	stencil_ref = 2,
+	stencil_mask = 0xff,
+	stencil_sfail = STENCIL_KEEP,
+	stencil_zfail = STENCIL_KEEP,
+	stencil_zpass = STENCIL_KEEP,
+}
+
 local transparent_state = {
 	blending = "alpha",
 	depth_write = false
@@ -36,20 +48,32 @@ local default_state = {
 	stencil_write_mask = 0xff,
 	stencil_ref = 1,
 	stencil_mask = 0xff, 
-	stencil_sfail = STENCIL_REPLACE,
-	stencil_zfail = STENCIL_REPLACE,
+	stencil_sfail = STENCIL_KEEP,
+	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
 	wireframe = false
 }
 
+local terrain_state = {
+	define = "DEFERRED",
+	depth_write = true,
+	stencil_func = STENCIL_ALWAYS,
+	stencil_write_mask = 0xff,
+	stencil_ref = 2,
+	stencil_mask = 0xff, 
+	stencil_sfail = STENCIL_KEEP,
+	stencil_zfail = STENCIL_KEEP,
+	stencil_zpass = STENCIL_REPLACE,
+	wireframe = false
+}
 local impostor_state = {
 	depth_write = true,
 	stencil_func = STENCIL_ALWAYS,
 	stencil_write_mask = 0xff,
 	stencil_ref = 1,
 	stencil_mask = 0xff, 
-	stencil_sfail = STENCIL_REPLACE,
-	stencil_zfail = STENCIL_REPLACE,
+	stencil_sfail = STENCIL_KEEP,
+	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
 	wireframe = false
 }
@@ -61,8 +85,8 @@ local grass_state = {
 	stencil_write_mask = 0xff,
 	stencil_ref = 1,
 	stencil_mask = 0xff, 
-	stencil_sfail = STENCIL_REPLACE,
-	stencil_zfail = STENCIL_REPLACE,
+	stencil_sfail = STENCIL_KEEP,
+	stencil_zfail = STENCIL_KEEP,
 	stencil_zpass = STENCIL_REPLACE,
 	wireframe = false
 }
@@ -119,7 +143,7 @@ function geomPass(entities)
 		end
 		local view_params = getCameraParams()
 		pass(view_params)
-		renderTerrains(view_params, default_state)
+		renderTerrains(view_params, terrain_state)
 		renderGrass(view_params, grass_state)
 		local bucket = createBucket(entities, "default", "DEFERRED")
 		renderBucket(bucket, default_state)
@@ -133,6 +157,8 @@ function geomPass(entities)
 		}, 1)
 		local bucket = createBucket(entities, "decal", "")
 		renderBucket(bucket, decal_state)
+		bucket = createBucket(entities, "terrain_decal", "")
+		renderBucket(bucket, terrain_decal_state)
 	endBlock()
 	
 	return gbuffer0, gbuffer1, gbuffer2, dsbuffer
@@ -166,8 +192,8 @@ function lightPass(gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 			depth_test = false,
 			blending = "add",
 			stencil_write_mask = 0,
-			stencil_func = STENCIL_EQUAL,
-			stencil_ref = 1,
+			stencil_func = STENCIL_NOT_EQUAL,
+			stencil_ref = 0,
 			stencil_mask = 0xff,
 			stencil_sfail = STENCIL_KEEP,
 			stencil_zfail = STENCIL_KEEP,
