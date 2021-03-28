@@ -65,7 +65,8 @@ struct ParticleEditorResource {
 			COLOR_MIX,
 			GRADIENT,
 			GRADIENT_COLOR,
-			VEC3
+			VEC3,
+			DIV
 		};
 
 		Node(ParticleEditorResource& res) 
@@ -873,6 +874,7 @@ struct ParticleEditorResource {
 		
 		Type getType() const override { 
 			switch(OP_TYPE) {
+				case InstructionType::DIV: return Type::DIV;
 				case InstructionType::MUL: return Type::MUL;
 				case InstructionType::ADD: return Type::ADD;
 				default: ASSERT(false); return Type::MUL;
@@ -914,6 +916,7 @@ struct ParticleEditorResource {
 			imnodes::BeginNodeTitleBar();
 			beginOutput();
 			switch(OP_TYPE) {
+				case InstructionType::DIV: ImGui::TextUnformatted("Divide"); break;
 				case InstructionType::MUL: ImGui::TextUnformatted("Multiply"); break;
 				case InstructionType::ADD: ImGui::TextUnformatted("Add"); break;
 				default: ASSERT(false); break;
@@ -1003,6 +1006,7 @@ struct ParticleEditorResource {
 			case Node::UPDATE: node = UniquePtr<UpdateNode>::create(m_allocator, *this); break;
 			case Node::INPUT: node = UniquePtr<InputNode>::create(m_allocator, *this); break;
 			case Node::OUTPUT: node = UniquePtr<OutputNode>::create(m_allocator, *this); break;
+			case Node::DIV: node = UniquePtr<BinaryOpNode<InstructionType::DIV>>::create(m_allocator, *this); break;
 			case Node::MUL: node = UniquePtr<BinaryOpNode<InstructionType::MUL>>::create(m_allocator, *this); break;
 			case Node::ADD: node = UniquePtr<BinaryOpNode<InstructionType::ADD>>::create(m_allocator, *this); break;
 			case Node::CONST: node = UniquePtr<ConstNode>::create(m_allocator, *this); break;
@@ -1441,6 +1445,7 @@ struct ParticleEditorImpl : ParticleEditor {
 					ImGui::EndMenu();
 				}
 				if (ImGui::Selectable("Literal")) addNode(ParticleEditorResource::Node::LITERAL);
+				if (ImGui::Selectable("Divide")) addNode(ParticleEditorResource::Node::DIV);
 				if (ImGui::Selectable("Multiply")) addNode(ParticleEditorResource::Node::MUL);
 				if (ImGui::Selectable("Multiply add")) addNode(ParticleEditorResource::Node::MADD);
 				if (ImGui::Selectable("Random")) addNode(ParticleEditorResource::Node::RANDOM);

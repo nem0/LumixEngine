@@ -510,6 +510,15 @@ void ParticleEmitter::update(float dt)
 						const DataStream dst = ip.read<DataStream>();
 						helper.run<f4Mul>(dst, ip);
 					}
+					case InstructionType::DIV: {
+						BinaryHelper helper;
+						helper.emitter = this;
+						helper.fromf4 = fromf4;
+						helper.stepf4 = stepf4;
+						helper.reg_mem = reg_mem.begin();
+						const DataStream dst = ip.read<DataStream>();
+						helper.run<f4Div>(dst, ip);
+					}
 					case InstructionType::MULTIPLY_ADD: {
 						TernaryHelper helper;
 						helper.emitter = this;
@@ -712,6 +721,17 @@ void ParticleEmitter::fillInstanceData(float* data) {
 						helper.out_mem = data;
 						DataStream dst = ip.read<DataStream>();
 						helper.run<f4Mul>(dst, ip);
+						break;
+					}
+					case InstructionType::DIV: {
+						BinaryHelper helper;
+						helper.emitter = this;
+						helper.fromf4 = fromf4;
+						helper.stepf4 = stepf4;
+						helper.reg_mem = reg_mem.begin();
+						helper.out_mem = data;
+						DataStream dst = ip.read<DataStream>();
+						helper.run<f4Div>(dst, ip);
 						break;
 					}
 					case InstructionType::ADD: {

@@ -57,7 +57,8 @@ struct ParticleEmitterResource final : Resource
 		EMIT,
 		GT,
 		MIX,
-		GRADIENT
+		GRADIENT,
+		DIV
 	};
 
 	static const ResourceType TYPE;
