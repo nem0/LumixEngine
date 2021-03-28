@@ -4398,7 +4398,7 @@ struct PipelineImpl final : Pipeline
 										mi.lod += d / ad * 0.03f;
 										const u32 cur_lod_idx = u32(mi.lod);
 										create_key(mi.model->getLODIndices()[cur_lod_idx]);
-										create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+										if (cur_lod_idx < 3) create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
 									}
 								}
 							}
@@ -4452,7 +4452,7 @@ struct PipelineImpl final : Pipeline
 									if(!is_shadow) mi.lod += d / ad * 0.03f;
 									const u32 cur_lod_idx = u32(mi.lod);
 									create_key(mi.model->getLODIndices()[cur_lod_idx]);
-									create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
+									if (cur_lod_idx < 3) create_key(mi.model->getLODIndices()[cur_lod_idx + 1]);
 								}
 							}
 							else {
