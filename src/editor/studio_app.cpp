@@ -840,8 +840,23 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
+	void updateGizmoOffset() {
+		const Array<EntityRef>& ents = m_editor->getSelectedEntities();
+		if (ents.size() != 1) {
+			m_gizmo_config.offset = Vec3::ZERO;
+			return;
+		}
+		static EntityPtr last_selected = INVALID_ENTITY;
+		if (last_selected != ents[0]) {
+			m_gizmo_config.offset = Vec3::ZERO;
+			last_selected = ents[0];
+		}
+	}
+
 	void update()
 	{
+		updateGizmoOffset();
+
 		for (i32 i = m_deferred_destroy_windows.size() - 1; i >= 0; --i) {
 			--m_deferred_destroy_windows[i].counter;
 			if (m_deferred_destroy_windows[i].counter == 0) {
