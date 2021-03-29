@@ -145,8 +145,10 @@ fragment_shader [[
 		layout (binding=4) uniform sampler2D u_aomap;
 	#endif
 	layout (binding=5) uniform sampler2D u_shadowmap;
-	layout (binding=6) uniform sampler2D u_shadow_atlas;
-	layout (binding=7) uniform samplerCubeArray u_reflection_probes;
+	#if !defined DEPTH && !defined DEFERRED && !defined GRASS
+		layout (binding=6) uniform sampler2D u_shadow_atlas;
+		layout (binding=7) uniform samplerCubeArray u_reflection_probes;
+	#endif
 	
 	layout(location = 0) in vec2 v_uv;
 	layout(location = 1) in vec3 v_normal;
