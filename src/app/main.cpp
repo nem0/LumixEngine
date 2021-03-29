@@ -184,10 +184,15 @@ struct Runner final
 
 	void onEvent(const os::Event& event) {
 		if (m_engine.get()) {
-			InputSystem& input = m_engine->getInputSystem();
-			input.injectEvent(event, 0, 0);
+			if (m_focused || event.type == os::Event::Type::MOUSE_BUTTON && !event.mouse_button.down) {
+				InputSystem& input = m_engine->getInputSystem();
+				input.injectEvent(event, 0, 0);
+			}
 		}
 		switch (event.type) {
+			case os::Event::Type::FOCUS:
+				m_focused = event.focus.gained;
+				break;
 			case os::Event::Type::QUIT:
 			case os::Event::Type::WINDOW_CLOSE: 
 				m_finished = true;
@@ -225,6 +230,7 @@ struct Runner final
 
 	Viewport m_viewport;
 	bool m_finished = false;
+	bool m_focused = true;
 	GUIInterface m_gui_interface;
 };
 
