@@ -42,6 +42,10 @@ common [[
 			mat4 bones[256];
 		} Model;
 	#endif
+
+	#if defined _HAS_ATTR6 && !defined GRASS
+		#define HAS_LOD
+	#endif
 ]]
 
 vertex_shader [[
@@ -63,7 +67,10 @@ vertex_shader [[
 	#elif defined INSTANCED || defined GRASS
 		layout(location = 4) in vec4 i_rot_quat;
 		layout(location = 5) in vec4 i_pos_scale;
-		layout(location = 6) in float i_lod;
+		#ifdef HAS_LOD
+			layout(location = 6) in float i_lod;
+			layout(location = 4) out float v_lod;
+		#endif
 		#ifdef _HAS_ATTR7
 			layout(location = 7) in vec4 a_color;
 			layout(location = 6) out vec4 v_color;
@@ -78,19 +85,22 @@ vertex_shader [[
 	layout(location = 1) out vec3 v_normal;
 	layout(location = 2) out vec3 v_tangent;
 	layout(location = 3) out vec4 v_wpos;
-	layout(location = 4) out float v_lod;
 	#ifdef GRASS
 		layout(location = 5) out float v_darken;
 	#endif
 	
 	void main() {
-		v_lod = 0;
+		#ifdef HAS_LOD
+			v_lod = 0;
+		#endif
 		v_uv = a_uv;
 		#if defined INSTANCED || defined GRASS
 			v_normal = rotateByQuat(i_rot_quat, a_normal);
 			v_tangent = rotateByQuat(i_rot_quat, a_tangent);
 			vec3 p = a_position * i_pos_scale.w;
-			v_lod = i_lod;
+			#ifdef HAS_LOD
+				v_lod = i_lod;
+			#endif
 			#if defined GRASS && defined VEGETATION
 				p = vegetationAnim(i_pos_scale.xyz, p, 1 / (1 + u_stiffness));
 				v_darken = a_position.y > 0.1 ? 1 : 0.0;
@@ -154,7 +164,9 @@ fragment_shader [[
 	layout(location = 1) in vec3 v_normal;
 	layout(location = 2) in vec3 v_tangent;
 	layout(location = 3) in vec4 v_wpos;
-	layout(location = 4) in float v_lod;
+	#ifdef HAS_LOD
+		layout(location = 4) in float v_lod;
+	#endif
 	#ifdef GRASS
 		layout(location = 5) in float v_darken;
 	#endif
@@ -172,7 +184,9 @@ fragment_shader [[
 
 	Surface getSurface()
 	{
-		if (ditherLOD(v_lod)) discard;
+		#ifdef HAS_LOD
+			if (ditherLOD(v_lod)) discard;
+		#endif
 
 		Surface data;
 		vec4 c = texture(u_albedomap, v_uv) * u_material_color;
