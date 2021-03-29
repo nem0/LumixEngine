@@ -156,7 +156,7 @@ void getShortcut(const Action& action, Span<char> buf) {
 	}
 }
 
-void doMenuItem(Action& a, bool enabled)
+void menuItem(Action& a, bool enabled)
 {
 	char buf[20];
 	getShortcut(a, Span(buf));

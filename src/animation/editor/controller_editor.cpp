@@ -903,8 +903,8 @@ struct ControllerEditorImpl : ControllerEditor {
 				}
 				
 				if (ImGui::BeginMenu("Edit")) {
-					doMenuItem(m_undo_action, canUndo());
-					doMenuItem(m_redo_action, canRedo());
+					menuItem(m_undo_action, canUndo());
+					menuItem(m_redo_action, canRedo());
 					ImGui::EndMenu();
 				}
 

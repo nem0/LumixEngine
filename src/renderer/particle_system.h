@@ -69,19 +69,19 @@ struct ParticleEmitterResource final : Resource
 	void unload() override;
 	bool load(u64 size, const u8* mem) override;
 	const OutputMemoryStream& getInstructions() const { return m_instructions; }
-	int getEmitOffset() const { return m_emit_offset; }
-	int getOutputOffset() const { return m_output_offset; }
-	int getChannelsCount() const { return m_channels_count; }
-	int getRegistersCount() const { return m_registers_count; }
-	int getOutputsCount() const { return m_outputs_count; }
+	u32 getEmitOffset() const { return m_emit_offset; }
+	u32 getOutputOffset() const { return m_output_offset; }
+	u32 getChannelsCount() const { return m_channels_count; }
+	u32 getRegistersCount() const { return m_registers_count; }
+	u32 getOutputsCount() const { return m_outputs_count; }
 	Material* getMaterial() const { return m_material; }
 	void setMaterial(const Path& path);
 	void overrideData(OutputMemoryStream&& instructions,
-		int emit_offset,
-		int output_offset,
-		int channels_count,
-		int registers_count,
-		int outputs_count
+		u32 emit_offset,
+		u32 output_offset,
+		u32 channels_count,
+		u32 registers_count,
+		u32 outputs_count
 	);
 
 private:
@@ -106,14 +106,14 @@ public:
 
 	void serialize(OutputMemoryStream& blob);
 	void deserialize(InputMemoryStream& blob, ResourceManagerHub& manager);
-	void update(float dt);
+	void update(float dt, struct PageAllocator& allocator);
 	void emit(const float* args);
 	void fillInstanceData(float* data);
-	int getInstanceDataSizeBytes() const;
+	u32 getParticlesDataSizeBytes() const;
 	ParticleEmitterResource* getResource() const { return m_resource; }
 	void setResource(ParticleEmitterResource* res);
-	int getInstancesCount() const { return m_instances_count; }
-	float* getChannelData(int idx) const { return m_channels[idx].data; }
+	u32 getParticlesCount() const { return m_particles_count; }
+	float* getChannelData(u32 idx) const { return m_channels[idx].data; }
 	void reset() { m_particles_count = 0; }
 
 	EntityPtr m_entity;
@@ -134,8 +134,7 @@ private:
 	IAllocator& m_allocator;
 	OutputMemoryStream m_emit_buffer;
 	Channel m_channels[16];
-	int m_capacity = 0;
-	int m_instances_count = 0;
+	u32 m_capacity = 0;
 	float m_emit_timer = 0;
 	ParticleEmitterResource* m_resource = nullptr;
 };

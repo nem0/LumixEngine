@@ -1878,7 +1878,7 @@ struct PipelineImpl final : Pipeline
 				for (ParticleEmitter* emitter : emitters) {
 					if (!emitter->getResource() || !emitter->getResource()->isReady()) continue;
 					
-					const int size = emitter->getInstanceDataSizeBytes();
+					const int size = emitter->getParticlesDataSizeBytes();
 					if (size == 0) continue;
 
 					const Transform tr = universe.getTransform((EntityRef)emitter->m_entity);
@@ -1893,8 +1893,8 @@ struct PipelineImpl final : Pipeline
 					dc.program = material->getShader()->getProgram(decl, 0);
 					dc.material = material->getRenderData();
 					dc.size = size;
-					dc.instances_count = emitter->getInstancesCount();
-					dc.slice = m_pipeline->m_renderer.allocTransient(emitter->getInstanceDataSizeBytes());
+					dc.particles_count = emitter->getParticlesCount();
+					dc.slice = m_pipeline->m_renderer.allocTransient(emitter->getParticlesDataSizeBytes());
 					emitter->fillInstanceData((float*)dc.slice.ptr);
 				}
 			}
@@ -1924,7 +1924,7 @@ struct PipelineImpl final : Pipeline
 					gpu::bindIndexBuffer(gpu::INVALID_BUFFER);
 					gpu::bindVertexBuffer(0, gpu::INVALID_BUFFER, 0, 0);
 					gpu::bindVertexBuffer(1, dc.slice.buffer, dc.slice.offset, 40);
-					gpu::drawTriangleStripArraysInstanced(4, dc.instances_count);
+					gpu::drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, 4, dc.particles_count);
 				}
 				gpu::popDebugGroup();
 			}
@@ -1935,7 +1935,7 @@ struct PipelineImpl final : Pipeline
 				gpu::ProgramHandle program;
 				Material::RenderData* material;
 				int size;
-				int instances_count;
+				int particles_count;
 				Renderer::TransientSlice slice; 
 			};
 
@@ -2903,11 +2903,11 @@ struct PipelineImpl final : Pipeline
 				}
 			};
 
-			bind(m_pipeline->m_cluster_buffers.lights, m_point_lights, 7);
-			bind(m_pipeline->m_cluster_buffers.clusters, m_clusters, 8);
-			bind(m_pipeline->m_cluster_buffers.maps, m_map, 9);
-			bind(m_pipeline->m_cluster_buffers.env_probes, m_env_probes, 10);
-			bind(m_pipeline->m_cluster_buffers.refl_probes, m_refl_probes, 11);
+			bind(m_pipeline->m_cluster_buffers.lights, m_point_lights, 11);
+			bind(m_pipeline->m_cluster_buffers.clusters, m_clusters, 12);
+			bind(m_pipeline->m_cluster_buffers.maps, m_map, 13);
+			bind(m_pipeline->m_cluster_buffers.env_probes, m_env_probes, 14);
+			bind(m_pipeline->m_cluster_buffers.refl_probes, m_refl_probes, 15);
 		}
 
 
@@ -4204,7 +4204,7 @@ struct PipelineImpl final : Pipeline
 						dc_data.terrain_scale = Vec4(inst.scale, 0);
 						dc_data.cell_size = s;
 						gpu::update(m_pipeline->m_drawcall_ub, &dc_data, sizeof(dc_data));
-						gpu::drawTriangleStripArraysInstanced((subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
+						gpu::drawArraysInstanced(gpu::PrimitiveType::TRIANGLE_STRIP, (subto.x - subfrom.x) * 2 + 2, subto.y - subfrom.y);
 						m_pipeline->m_stats.draw_call_count += 1;
 						m_pipeline->m_stats.instance_count += 1;
 						m_pipeline->m_stats.triangle_count += (subto.x - subfrom.x) * (subto.y - subfrom.y) * 2;

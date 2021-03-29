@@ -1426,7 +1426,7 @@ struct StudioAppImpl final : StudioApp
 
 	void onCreateEntityWithComponentGUI()
 	{
-		doMenuItem(*getAction("createEntity"), true);
+		menuItem("createEntity", true);
 		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
 		ImGui::SetNextItemWidth(-w);
 		ImGui::InputTextWithHint("##filter", "Filter", m_component_filter, sizeof(m_component_filter));
@@ -1449,39 +1449,47 @@ struct StudioAppImpl final : StudioApp
 			onCreateEntityWithComponentGUI();
 			ImGui::EndMenu();
 		}
-		doMenuItem(*getAction("destroyEntity"), is_any_entity_selected);
-		doMenuItem(*getAction("savePrefab"), selected_entities.size() == 1);
-		doMenuItem(*getAction("makeParent"), selected_entities.size() == 2);
+		menuItem("destroyEntity", is_any_entity_selected);
+		menuItem("savePrefab", selected_entities.size() == 1);
+		menuItem("makeParent", selected_entities.size() == 2);
 		bool can_unparent =
 			selected_entities.size() == 1 && m_editor->getUniverse()->getParent(selected_entities[0]).isValid();
-		doMenuItem(*getAction("unparent"), can_unparent);
+		menuItem("unparent", can_unparent);
 		ImGui::EndMenu();
 	}
 
+	void menuItem(const char* name, bool enabled) {
+		Action* action = getAction(name);
+		if (!action) {
+			ASSERT(false);
+			return;
+		}
+		Lumix::menuItem(*action, enabled);
+	}
 
 	void editMenu()
 	{
 		if (!ImGui::BeginMenu("Edit")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(*getAction("undo"), m_editor->canUndo());
-		doMenuItem(*getAction("redo"), m_editor->canRedo());
+		menuItem("undo", m_editor->canUndo());
+		menuItem("redo", m_editor->canRedo());
 		ImGui::Separator();
-		doMenuItem(*getAction("copy"), is_any_entity_selected);
-		doMenuItem(*getAction("paste"), m_editor->canPasteEntities());
-		doMenuItem(*getAction("duplicate"), is_any_entity_selected);
+		menuItem("copy", is_any_entity_selected);
+		menuItem("paste", m_editor->canPasteEntities());
+		menuItem("duplicate", is_any_entity_selected);
 		ImGui::Separator();
-		doMenuItem(*getAction("setTranslateGizmoMode"), true);
-		doMenuItem(*getAction("setRotateGizmoMode"), true);
-		doMenuItem(*getAction("setScaleGizmoMode"), true);
-		doMenuItem(*getAction("setLocalCoordSystem"), true);
-		doMenuItem(*getAction("setGlobalCoordSystem"), true);
+		menuItem("setTranslateGizmoMode", true);
+		menuItem("setRotateGizmoMode", true);
+		menuItem("setScaleGizmoMode", true);
+		menuItem("setLocalCoordSystem", true);
+		menuItem("setGlobalCoordSystem", true);
 		if (ImGui::BeginMenu(ICON_FA_CAMERA "View", true))
 		{
-			doMenuItem(*getAction("toggleProjection"), true);
-			doMenuItem(*getAction("viewTop"), true);
-			doMenuItem(*getAction("viewFront"), true);
-			doMenuItem(*getAction("viewSide"), true);
+			menuItem("toggleProjection", true);
+			menuItem("viewTop", true);
+			menuItem("viewFront", true);
+			menuItem("viewSide", true);
 			ImGui::EndMenu();
 		}
 		ImGui::EndMenu();
@@ -1492,7 +1500,7 @@ struct StudioAppImpl final : StudioApp
 	{
 		if (!ImGui::BeginMenu("File")) return;
 
-		doMenuItem(*getAction("newUniverse"), true);
+		menuItem("newUniverse", true);
 		if (ImGui::BeginMenu(NO_ICON "Open"))
 		{
 			ImGui::Dummy(ImVec2(200, 1)); // to force minimal menu size
@@ -1522,9 +1530,9 @@ struct StudioAppImpl final : StudioApp
 			}
 			ImGui::EndMenu();
 		}
-		doMenuItem(*getAction("save"), !m_editor->isGameMode());
-		doMenuItem(*getAction("saveAs"), !m_editor->isGameMode());
-		doMenuItem(*getAction("exit"), true);
+		menuItem("save", !m_editor->isGameMode());
+		menuItem("saveAs", !m_editor->isGameMode());
+		menuItem("exit", true);
 		ImGui::EndMenu();
 	}
 
@@ -1534,38 +1542,34 @@ struct StudioAppImpl final : StudioApp
 		if (!ImGui::BeginMenu("Tools")) return;
 
 		bool is_any_entity_selected = !m_editor->getSelectedEntities().empty();
-		doMenuItem(*getAction("setEditCamTransform"), true);
-		doMenuItem(*getAction("lookAtSelected"), is_any_entity_selected);
-		doMenuItem(*getAction("copyViewTransform"), is_any_entity_selected);
-		doMenuItem(*getAction("snapDown"), is_any_entity_selected);
-		doMenuItem(*getAction("autosnapDown"), true);
-		doMenuItem(*getAction("pack_data"), true);
-		if (renderDocOption()) doMenuItem(*getAction("launch_renderdoc"), true);
+		menuItem("setEditCamTransform", true);
+		menuItem("lookAtSelected", is_any_entity_selected);
+		menuItem("copyViewTransform", is_any_entity_selected);
+		menuItem("snapDown", is_any_entity_selected);
+		menuItem("autosnapDown", true);
+		menuItem("pack_data", true);
+		if (renderDocOption()) menuItem("launch_renderdoc", true);
 		ImGui::EndMenu();
 	}
 
-
-	void viewMenu()
-	{
+	void viewMenu() {
 		if (!ImGui::BeginMenu("View")) return;
 
 		bool is_open = m_asset_browser->isOpen();
 		if (ImGui::MenuItem(ICON_FA_IMAGES "Asset browser", nullptr, &is_open)) {
 			m_asset_browser->setOpen(is_open);		
 		}
-		doMenuItem(*getAction("entityList"), true);
+		menuItem("entityList", true);
 		ImGui::MenuItem(ICON_FA_COMMENT_ALT "Log", nullptr, &m_log_ui->m_is_open);
 		ImGui::MenuItem(ICON_FA_CHART_AREA "Profiler", nullptr, &m_profiler_ui->m_is_open);
 		ImGui::MenuItem(ICON_FA_INFO_CIRCLE "Inspector", nullptr, &m_property_grid->m_is_open);
-		doMenuItem(*getAction("settings"), true);
+		menuItem("settings", true);
 		ImGui::Separator();
-		for (Action* action : m_window_actions)
-		{
-			doMenuItem(*action, true);
+		for (Action* action : m_window_actions) {
+			Lumix::menuItem(*action, true);
 		}
 		ImGui::EndMenu();
 	}
-
 
 	void mainMenu()
 	{

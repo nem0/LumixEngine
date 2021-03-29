@@ -535,7 +535,7 @@ struct RenderSceneImpl final : RenderScene {
 		{
 			for (auto* emitter : m_particle_emitters)
 			{
-				emitter->update(dt);
+				emitter->update(dt, m_engine.getPageAllocator());
 			}
 		}
 	}
@@ -2673,7 +2673,7 @@ struct RenderSceneImpl final : RenderScene {
 
 	void updateParticleEmitter(EntityRef entity, float dt) override {
 		if (!m_particle_emitters[entity]) return;
-		m_particle_emitters[entity]->update(dt);
+		m_particle_emitters[entity]->update(dt, m_engine.getPageAllocator());
 	}
 
 	void setParticleEmitterPath(EntityRef entity, const Path& path) override

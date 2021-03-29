@@ -762,9 +762,17 @@ void drawTriangles(u32 indices_byte_offset, u32 indices_count, DataType index_ty
 }
 
 
-void drawTriangleStripArraysInstanced(u32 indices_count, u32 instances_count)
+void drawArraysInstanced(PrimitiveType type, u32 indices_count, u32 instances_count)
 {
-	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, indices_count, instances_count);
+	GLuint pt;
+	switch (type) {
+		case PrimitiveType::TRIANGLES: pt = GL_TRIANGLES; break;
+		case PrimitiveType::TRIANGLE_STRIP: pt = GL_TRIANGLE_STRIP; break;
+		case PrimitiveType::LINES: pt = GL_LINES; break;
+		case PrimitiveType::POINTS: pt = GL_POINTS; break;
+		default: ASSERT(0); break;
+	}
+	glDrawArraysInstanced(pt, 0, indices_count, instances_count);
 }
 
 
