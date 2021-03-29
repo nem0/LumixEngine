@@ -149,7 +149,10 @@ struct Runner final
 
 		m_engine = Engine::create(static_cast<Engine::InitArgs&&>(init_data), m_allocator);
 		
-		if (!isWindowCommandLineOption()) os::setFullscreen(m_engine->getWindowHandle());
+		if (!isWindowCommandLineOption()) {
+			os::setFullscreen(m_engine->getWindowHandle());
+			captureMouse(true);
+		}
 
 		m_universe = &m_engine->createUniverse(true);
 		initRenderPipeline();
@@ -182,9 +185,24 @@ struct Runner final
 		m_universe = nullptr;
 	}
 
+	void captureMouse(bool capture) {
+		if (m_focused) {
+			os::Rect rect = os::getWindowScreenRect(m_engine->getWindowHandle());
+			os::clipCursor(rect.left, rect.top, rect.width, rect.height);
+			os::showCursor(false);
+		}
+		else {
+			os::unclipCursor();
+			os::showCursor(true);
+		}
+	}
+
 	void onEvent(const os::Event& event) {
 		if (m_engine.get()) {
-			if (m_focused || event.type == os::Event::Type::MOUSE_BUTTON && !event.mouse_button.down) {
+			if (m_focused 
+				|| event.type == os::Event::Type::MOUSE_BUTTON && !event.mouse_button.down 
+				|| event.type == os::Event::Type::KEY && !event.key.down)
+			{
 				InputSystem& input = m_engine->getInputSystem();
 				input.injectEvent(event, 0, 0);
 			}
@@ -192,6 +210,7 @@ struct Runner final
 		switch (event.type) {
 			case os::Event::Type::FOCUS:
 				m_focused = event.focus.gained;
+				captureMouse(m_focused);
 				break;
 			case os::Event::Type::QUIT:
 			case os::Event::Type::WINDOW_CLOSE: 
@@ -200,6 +219,7 @@ struct Runner final
 			case os::Event::Type::WINDOW_MOVE:
 			case os::Event::Type::WINDOW_SIZE:
 				onResize();
+				captureMouse(m_focused);
 				break;
 		}
 	}
