@@ -102,7 +102,7 @@ vertex_shader [[
 				v_lod = i_lod;
 			#endif
 			#if defined GRASS && defined VEGETATION
-				p = vegetationAnim(i_pos_scale.xyz, p, 1 / (1 + u_stiffness));
+				p = vegetationAnim(i_pos_scale.xyz, p, 1.0 / (1.0 + u_stiffness));
 				v_darken = a_position.y > 0.1 ? 1 : 0.0;
 			#elif defined VEGETATION
 				#ifdef DEPTH

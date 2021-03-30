@@ -1129,8 +1129,6 @@ static bool upload(GLuint texture
 					else {
 						glCompressedTextureSubImage2D(texture, mip, 0, 0, width, height, internal_format, size, data_ptr);
 					}
-					glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-					glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 					width = maximum(1, width >> 1);
 					height = maximum(1, height >> 1);
 					size = DDS::sizeDXTC(width, height, internal_format);
@@ -1154,7 +1152,6 @@ static bool upload(GLuint texture
 					for (u32 zz = 0; zz < size; ++zz) {
 						unpacked_ptr[zz] = palette[data_ptr[zz]];
 					}
-					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if(layers > 1) {
 						glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, unpacked_ptr);
 					}
@@ -1173,7 +1170,6 @@ static bool upload(GLuint texture
 				u32 size = width * height * li->blockBytes;
 				for (u32 mip = 0; mip < mipMapCount; ++mip) {
 					const u8* data_ptr = (u8*)blob.skip(size);
-					//glPixelStorei(GL_UNPACK_ROW_LENGTH, height);
 					if (layers > 1) {
 						glTextureSubImage3D(texture, mip, 0, 0, layer, width, height, 1, li->externalFormat, li->type, data_ptr);
 					}
@@ -1262,6 +1258,27 @@ bool loadLayers(TextureHandle handle, u32 layer_offset, const void* data, int si
 	return upload(handle->gl_handle, layer_offset, layers, hdr, li, is_srgb, blob, debug_name);
 }
 
+static void setSampler(GLuint texture, TextureFlags flags) {
+	const GLint wrap_u = u32(flags & TextureFlags::CLAMP_U) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+	const GLint wrap_v = u32(flags & TextureFlags::CLAMP_V) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+	const GLint wrap_w = u32(flags & TextureFlags::CLAMP_W) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u);
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v);
+	glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w);
+	if (u32(flags & TextureFlags::POINT_FILTER)) {
+		glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	}
+	else {
+		const bool no_mips = u32(flags & TextureFlags::NO_MIPS);
+		glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
+	}
+	const bool is_anisotropic_filter = u32(flags & TextureFlags::ANISOTROPIC_FILTER);
+	if (is_anisotropic_filter && gl->max_anisotropy > 0) {
+		glTextureParameterf(texture, GL_TEXTURE_MAX_ANISOTROPY, gl->max_anisotropy); 
+	}
+}
 
 bool loadTexture(TextureHandle handle, const void* input, int input_size, TextureFlags flags, const char* debug_name)
 {
@@ -1350,15 +1367,7 @@ bool loadTexture(TextureHandle handle, const void* input, int input_size, Textur
 
 	if (!upload(texture, 0, layers, hdr, li, is_srgb, blob, debug_name)) return false;
 
-	const GLint wrap_u = u32(flags & TextureFlags::CLAMP_U) ? GL_CLAMP : GL_REPEAT;
-	const GLint wrap_v = u32(flags & TextureFlags::CLAMP_V) ? GL_CLAMP : GL_REPEAT;
-	const GLint wrap_w = u32(flags & TextureFlags::CLAMP_W) ? GL_CLAMP : GL_REPEAT;
-	glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u);
-	glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v);
-	glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w);
-	if (is_anisotropic_filter && gl->max_anisotropy > 0) {
-		glTextureParameterf(texture, GL_TEXTURE_MAX_ANISOTROPY, gl->max_anisotropy); 
-	}
+	setSampler(texture, flags);
 
 	Texture& t = *handle;
 	t.format = internal_format;
@@ -1395,7 +1404,6 @@ TextureHandle allocTextureHandle()
 	return t;
 }
 
-
 void createTextureView(TextureHandle view, TextureHandle texture)
 {
 	checkThread();
@@ -1412,10 +1420,11 @@ void createTextureView(TextureHandle view, TextureHandle texture)
 
 	glGenTextures(1, &view->gl_handle);
 	glTextureView(view->gl_handle, GL_TEXTURE_2D, texture->gl_handle, texture->format, 0, 1, 0, 1);
+	setSampler(view->gl_handle, texture->flags);
+
 	view->width = texture->width;
 	view->height = texture->height;
 }
-
 
 bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const void* data, const char* debug_name)
 {
@@ -1516,24 +1525,8 @@ bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat 
 		glObjectLabel(GL_TEXTURE, texture, stringLength(debug_name), debug_name);
 	}
 	glGenerateTextureMipmap(texture);
-	
-	const GLint wrap_u = u32(flags & TextureFlags::CLAMP_U) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-	const GLint wrap_v = u32(flags & TextureFlags::CLAMP_V) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-	const GLint wrap_w = u32(flags & TextureFlags::CLAMP_W) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-	glTextureParameteri(texture, GL_TEXTURE_WRAP_S, wrap_u);
-	glTextureParameteri(texture, GL_TEXTURE_WRAP_T, wrap_v);
-	glTextureParameteri(texture, GL_TEXTURE_WRAP_R, wrap_w);
-	if (u32(flags & TextureFlags::POINT_FILTER)) {
-		glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	}
-	else {
-		glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, no_mips ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
-	}
-	if (is_anisotropic_filter && gl->max_anisotropy > 0) {
-		glTextureParameterf(texture, GL_TEXTURE_MAX_ANISOTROPY, gl->max_anisotropy); 
-	}
+
+	setSampler(texture, flags);
 
 	handle->gl_handle = texture;
 	handle->target = target;

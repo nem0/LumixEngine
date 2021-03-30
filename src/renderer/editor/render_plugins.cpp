@@ -1160,8 +1160,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		output.setOutputHandler(&output_handler);
 
 		nvtt::CompressionOptions compression;
-		compression.setFormat(meta.is_normalmap ? nvtt::Format_BC5 : (has_alpha ? nvtt::Format_BC3 : nvtt::Format_BC1));
-		compression.setQuality(toNVTT(meta.quality));
+		if (w % 4 != 0 || h % 4 != 0) {
+			logWarning("Can not compress ", path, " because its size (", w, ", ", h, ") is not multiple of 4");
+			compression.setFormat(has_alpha ? nvtt::Format_RGBA : nvtt::Format_RGB);
+		}
+		else {
+			compression.setFormat(meta.is_normalmap ? nvtt::Format_BC5 : (has_alpha ? nvtt::Format_BC3 : nvtt::Format_BC1));
+			compression.setQuality(toNVTT(meta.quality));
+		}
 
 		if (!context.process(input, compression, output)) {
 			return false;
@@ -1480,7 +1486,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			ImGuiEx::Label("SRGB");
 			ImGui::Checkbox("##srgb", &m_meta.srgb);
 			
-			bool is_tga = Path::hasExtension(texture->getPath().c_str(), "tga");
+			const bool is_tga = Path::hasExtension(texture->getPath().c_str(), "tga");
 			if (is_tga) {
 				ImGuiEx::Label("Compress");
 				ImGui::Checkbox("##cmprs", &m_meta.compress);
@@ -1489,6 +1495,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if ((m_meta.compress || !is_tga) && !m_meta.convert_to_raw) {
 				ImGuiEx::Label("Compression quality");
 				ImGui::Combo("Quality", (i32*)&m_meta.quality, "Fastest\0Normal\0Production\0Highest\0");
+
+				if (texture->width % 4 != 0 || texture->height % 4 != 0) {
+					ImGui::TextUnformatted(ICON_FA_EXCLAMATION_TRIANGLE " Block compression will not be used because texture size is not multiple of 4");
+				}
 			}
 
 			ImGuiEx::Label("Convert to RAW");
