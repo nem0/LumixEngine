@@ -10,7 +10,7 @@ vertex_shader [[
 	layout (location = 0) out vec4 v_color;
 	
 	void main() {
-		v_color = vec4(pow(a_color.rgb, vec3(2.2)), a_color.a);
+		v_color = vec4(pow(abs(a_color.rgb), vec3(2.2)), a_color.a);
 		gl_Position = Pass.view_projection * u_model * vec4(a_position, 1);
 	}
 ]]

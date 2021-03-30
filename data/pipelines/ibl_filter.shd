@@ -83,7 +83,7 @@ fragment_shader [[
 	{
 		vec2 uv = v_uv * 2 - 1;
 		uv.y *= -1; 
-		vec3 N;
+		vec3 N = vec3(0);
 
 		switch(u_face) {
 			case 0: N = vec3(1, -uv.y, -uv.x); break;

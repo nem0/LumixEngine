@@ -178,7 +178,7 @@ vec4 fullscreenQuad(int vertexID, out vec2 uv) {
 
 float packEmission(float emission)
 {
-	return log2(1 + emission / 64);
+	return log2(1 + emission / 64.0);
 }
 
 
@@ -207,10 +207,10 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 			fragcoord.y = Global.framebuffer_size.y - fragcoord.y - 1;
 		#endif
 
-		cluster = ivec3(fragcoord.xy / 64, 0);
+		cluster = ivec3(fragcoord.xy / 64.0, 0);
 		float linear_depth = toLinearDepth(Global.inv_projection, ndc_depth);
 		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
-		ivec2 tiles = (Global.framebuffer_size + 63) / 64;
+		ivec2 tiles = ivec2((Global.framebuffer_size + 63) / 64.0);
 		cluster.y = tiles.y - 1 - cluster.y;
 		return b_clusters[cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y];
 	}
@@ -223,9 +223,9 @@ float toLinearDepth(mat4 inv_proj, float ndc_depth)
 			fragcoord.y = Global.framebuffer_size.y - fragcoord.y - 1;
 		#endif
 
-		cluster = ivec3(fragcoord.xy / 64, 0);
+		cluster = ivec3(fragcoord.xy / 64.0, 0);
 		cluster.z = int(log(linear_depth) * 16 / (log(10000 / 0.1)) - 16 * log(0.1) / log(10000 / 0.1));
-		ivec2 tiles = (Global.framebuffer_size + 63) / 64;
+		ivec2 tiles = ivec2((Global.framebuffer_size + 63) / 64.0);
 		cluster.y = tiles.y - 1 - cluster.y;
 		return b_clusters[cluster.x + cluster.y * tiles.x + cluster.z * tiles.x * tiles.y];
 	}
@@ -331,7 +331,7 @@ float getShadow(sampler2D shadowmap, vec3 wpos, vec3 N)
 					float occluder = textureLod(shadowmap, uv, 0).r;
 					shadow += receiver > occluder - length(pcf_offset) * bias * 3 ? 1 : 0;
 				}
-				return shadow / 16;
+				return shadow / 16.0;
 			}
 		}
 	#endif
@@ -538,7 +538,7 @@ vec3 pointLightsLighting(Cluster cluster, Surface surface, sampler2D shadow_atla
 						float occluder = textureLod(shadow_atlas, uv, 0).r;
 						shadow += receiver * 1.02 > occluder ? 1 : 0;
 					}
-					attn *= shadow / 16;
+					attn *= shadow / 16.0;
 				}
 
 				float fov = b_lights[light_idx].fov;

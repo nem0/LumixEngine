@@ -53,7 +53,7 @@ fragment_shader [[
 		float a = 3.0*(1.0-g*g);
 		float b = 2.0*(2.0+g*g);
 		float c = 1.0+alpha*alpha;
-		float d = pow(1.0+g*g-2.0*g*alpha, 1.5);
+		float d = pow(abs(1.0+g*g-2.0*g*alpha), 1.5);
 		return (a/b)*(c/d);
 	}
 
