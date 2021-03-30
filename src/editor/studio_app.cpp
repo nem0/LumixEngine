@@ -3104,13 +3104,16 @@ struct StudioAppImpl final : StudioApp
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
 		{
 			const auto& resources = iter.value()->getResourceTable();
-			for (Resource* res : resources)
-			{
+			for (Resource* res : resources) {
+				if (findSubstring(res->getPath().c_str(), ":")) continue;
+
 				u32 hash = crc32(res->getPath().c_str());
+				const StaticString<LUMIX_MAX_PATH> baked_path(".lumix/assets/", hash, ".res");
+
 				auto& out_info = infos.emplace(hash);
-				copyString(Span(out_info.path), res->getPath().c_str());
+				copyString(Span(out_info.path), baked_path);
 				out_info.hash = hash;
-				out_info.size = os::getFileSize(res->getPath().c_str());
+				out_info.size = os::getFileSize(baked_path);
 				out_info.offset = ~0UL;
 			}
 		}
