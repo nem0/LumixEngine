@@ -3105,8 +3105,6 @@ struct StudioAppImpl final : StudioApp
 		{
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
-				if (findSubstring(res->getPath().c_str(), ":")) continue;
-
 				u32 hash = crc32(res->getPath().c_str());
 				const StaticString<LUMIX_MAX_PATH> baked_path(".lumix/assets/", hash, ".res");
 
@@ -3118,7 +3116,7 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 		packDataScan("pipelines/", infos);
-		packDataScan("universes/probes/", infos);
+		packDataScan("universes/", infos);
 		StaticString<LUMIX_MAX_PATH> unv_path("universes/", m_editor->getUniverse()->getName(), ".unv");
 		u32 hash = crc32(unv_path);
 		auto& out_info = infos.emplace(hash);
