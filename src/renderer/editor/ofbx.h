@@ -9,10 +9,10 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
 #ifdef _WIN32
-	typedef long long i64;	
-	typedef unsigned long long u64;	
-#else	
-	typedef long i64;	
+	typedef long long i64;
+	typedef unsigned long long u64;
+#else
+	typedef long i64;
 	typedef unsigned long u64;
 #endif
 
@@ -83,7 +83,7 @@ struct DataView
 	u32 toU32() const;
 	double toDouble() const;
 	float toFloat() const;
-	
+
 	template <int N>
 	void toString(char(&out)[N]) const
 	{
