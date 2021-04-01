@@ -1,2 +1,2 @@
 shader "pipelines/editor_icon.shd"
-texture "/editor/models/terrain_icon.dds"
+texture "/editor/models/terrain_icon.tga"

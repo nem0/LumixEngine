@@ -687,6 +687,7 @@ struct RendererImpl final : Renderer
 		cmd.memory = memory;
 		cmd.flags = flags;
 		if (desc.is_cubemap) cmd.flags = cmd.flags | gpu::TextureFlags::IS_CUBE;
+		if (desc.mips < 2) cmd.flags = cmd.flags | gpu::TextureFlags::NO_MIPS;
 		cmd.renderer = this;
 		cmd.desc = desc;
 		queue(cmd, 0);

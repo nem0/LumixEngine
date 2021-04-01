@@ -781,6 +781,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		};
 		bool srgb = false;
 		bool is_normalmap = false;
+		bool mips = true;
 		float scale_coverage = -0.5f;
 		bool convert_to_raw = false;
 		bool compress = false;
@@ -1028,7 +1029,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		}
 
 		nvtt::InputOptions input;
-		input.setMipmapGeneration(true);
+		input.setMipmapGeneration(meta.mips);
 		input.setAlphaCoverageMipScale(meta.scale_coverage, 4);
 		input.setAlphaMode(nvtt::AlphaMode_Transparency);
 		input.setNormalMap(meta.is_normalmap);
@@ -1146,7 +1147,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			params.m_source_images[0].init(data, w, h, 4);
 			params.m_quality_level = 255;
 			params.m_perceptual = !meta.is_normalmap && meta.srgb;
-			params.m_mip_gen = true;
+			params.m_mip_gen = meta.mips;
 			if (meta.is_normalmap) {
 				params.m_mip_srgb = false;
 				params.m_no_selector_rdo = true;
@@ -1181,7 +1182,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			const bool has_alpha = comps == 4;
 			nvtt::InputOptions input;
 			if (meta.is_normalmap) input.setGamma(1, 1);
-			input.setMipmapGeneration(true);
+			input.setMipmapGeneration(meta.mips);
 			input.setAlphaCoverageMipScale(meta.scale_coverage, comps == 4 ? 3 : 0);
 			input.setAlphaMode(has_alpha ? nvtt::AlphaMode_Transparency : nvtt::AlphaMode_None);
 			input.setNormalMap(meta.is_normalmap);
@@ -1202,7 +1203,10 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			output.setOutputHandler(&output_handler);
 
 			nvtt::CompressionOptions compression;
-			if (w % 4 != 0 || h % 4 != 0) {
+			if (!meta.compress) {
+				compression.setFormat(has_alpha ? nvtt::Format_RGBA : nvtt::Format_RGB);
+			}
+			else if (w % 4 != 0 || h % 4 != 0) {
 				logWarning("Can not compress ", path, " because its size (", w, ", ", h, ") is not multiple of 4");
 				compression.setFormat(has_alpha ? nvtt::Format_RGBA : nvtt::Format_RGB);
 			}
@@ -1237,6 +1241,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "convert_to_raw", &meta.convert_to_raw);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mip_scale_coverage", &meta.scale_coverage);
 			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "normalmap", &meta.is_normalmap);
+			LuaWrapper::getOptionalField(L, LUA_GLOBALSINDEX, "mips", &meta.mips);
 			char tmp[32];
 			if(LuaWrapper::getOptionalStringField(L, LUA_GLOBALSINDEX, "filter", Span(tmp))) {
 				if (equalIStrings(tmp, "point")) {
@@ -1280,32 +1285,33 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		
 		OutputMemoryStream out(m_app.getAllocator());
 		Meta meta = getMeta(src);
-		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress && !meta.is_normalmap)) {
-			if (meta.scale_coverage < 0 || !equalStrings(ext, "tga")) {
-				out.write(ext, 3);
-				u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-				flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-				flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-				flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-				flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-				flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
-				out.write(flags);
-				out.write(src_data.data(), src_data.size());
+		if (equalStrings(ext, "dds") || equalStrings(ext, "raw") || (equalStrings(ext, "tga") && !meta.compress && !meta.is_normalmap && !meta.mips)) {
+			if (meta.scale_coverage >= 0) {
+				logError("Coverage scale on ", src, " ignored, use different format");
 			}
-			else {
-				compileImage(src, src_data, out, meta);
-			}
+			out.write(ext, 3);
+			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
+			out.write(flags);
+			out.write(src_data.data(), src_data.size());
 		}
-		else if(equalStrings(ext, "jpg") || equalStrings(ext, "jpeg") || equalStrings(ext, "png") || (equalStrings(ext, "tga") && meta.compress)) {
+		else if(equalStrings(ext, "jpg") || equalStrings(ext, "jpeg") || equalStrings(ext, "png")) {
+			meta.compress = true;
 			compileImage(src, src_data, out, meta);
 		}
-		else if (equalStrings(ext, "tga") && meta.is_normalmap) {
-			if (!meta.compress) {
+		else if (equalStrings(ext, "tga")) {
+			if (!meta.compress && meta.is_normalmap) {
+				meta.compress = true;
 				logWarning("Forcing compression of ", src, " because it's a normalmap");
 			}
 			compileImage(src, src_data, out, meta);
 		}
 		else if (equalStrings(ext, "ltc")) {
+			meta.compress = true;
 			if (!createComposite(src_data, out, meta, src.c_str())) {
 				return false;
 			}
@@ -1528,6 +1534,8 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			
 			ImGuiEx::Label("SRGB");
 			ImGui::Checkbox("##srgb", &m_meta.srgb);
+			ImGuiEx::Label("Mipmaps");
+			ImGui::Checkbox("##mip", &m_meta.mips);
 			
 			const bool is_tga = Path::hasExtension(texture->getPath().c_str(), "tga");
 			if (is_tga) {
@@ -1574,6 +1582,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 					, "\ncompress = ", m_meta.compress ? "true" : "false"
 					, "\nconvert_to_raw = ", m_meta.convert_to_raw ? "true" : "false"
 					, "\nmip_scale_coverage = ", m_meta.scale_coverage
+					, "\nmips = ", m_meta.mips ? "true" : "false"
 					, "\nnormalmap = ", m_meta.is_normalmap ? "true" : "false"
 					, "\nquality = \"", toString(m_meta.quality), "\""
 					, "\nwrap_mode_u = \"", toString(m_meta.wrap_mode_u), "\""
@@ -3808,6 +3817,8 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			return false;
 		}
 
+		file << "compress = false\n";
+		file << "mips = false\n";
 		file << "filter = \"point\"";
 		file.close();
 

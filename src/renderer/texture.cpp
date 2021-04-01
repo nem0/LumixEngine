@@ -148,10 +148,8 @@ bool Texture::saveTGA(IOutputStream* file,
 	const Path& path,
 	IAllocator& allocator)
 {
-	if (format != gpu::TextureFormat::RGBA8)
-	{
+	if (format != gpu::TextureFormat::RGBA8) {
 		logError("Texture ", path, " could not be saved, unsupported TGA format");
-		return false;
 	}
 
 	u8* data = (u8*)allocator.allocate(width * height * 4);
@@ -393,7 +391,7 @@ bool Texture::loadTGA(IInputStream& file)
 			, header.height
 			, 1
 			, format
-			, getGPUFlags() & ~gpu::TextureFlags::SRGB
+			, getGPUFlags() & ~gpu::TextureFlags::SRGB | gpu::TextureFlags::NO_MIPS
 			, mem
 			, getPath().c_str());
 		depth = 1;
@@ -508,7 +506,7 @@ bool Texture::loadTGA(IInputStream& file)
 		, header.height
 		, 1
 		, format
-		, getGPUFlags() & ~gpu::TextureFlags::SRGB
+		, getGPUFlags() & ~gpu::TextureFlags::SRGB | gpu::TextureFlags::NO_MIPS
 		, mem
 		, getPath().c_str());
 	depth = 1;
@@ -609,7 +607,7 @@ u8* Texture::getDDSInfo(const void* data, gpu::TextureDesc& desc) {
 	static bool loadBasisU(Texture& texture, IInputStream& file)
 	{
 		if(texture.data_reference > 0) {
-			logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Convert to TGA or RAW.");
+			logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Use uncompressed TGA without mipmaps or RAW.");
 			return false;
 		}
 		static bool once = []() { basist::basisu_transcoder_init(); return true; }();
@@ -686,8 +684,7 @@ u8* Texture::getDDSInfo(const void* data, gpu::TextureDesc& desc) {
 static bool loadDDS(Texture& texture, IInputStream& file)
 {
 	if(texture.data_reference > 0) {
-		logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Convert to TGA or RAW.");
-		return false;
+		logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Use uncompressed TGA without mipmaps or RAW.");
 	}
 
 	const u8* data = (const u8*)file.getBuffer();
