@@ -211,6 +211,7 @@ exit /B 0
 	echo  5. PhysX
 	echo  6. LuaJIT
 	echo  7. FreeType2
+	echo  8. Basis Universal
 	echo ===============================
 	choice /C 12345678 /N /M "Your choice:"
 	echo.
@@ -221,6 +222,7 @@ exit /B 0
 	if %errorlevel%==5 call :physx
 	if %errorlevel%==6 call :luajit
 	if %errorlevel%==7 call :freetype
+	if %errorlevel%==8 call :basisu
 goto :third_party
 
 :all_3rdparty
@@ -229,18 +231,21 @@ goto :third_party
 	call :download_recast
 	call :download_luajit
 	call :download_freetype
+	call :download_basisu
 	
 	call :build_physx
 	call :build_nvtt
 	call :build_recast
 	call :build_luajit
 	call :build_freetype
+	call :build_basisu
 	
 	call :deploy_physx
 	call :deploy_nvtt
 	call :deploy_recast
 	call :deploy_luajit
 	call :deploy_freetype
+	call :deploy_basisu
 	pause
 
 exit /B 0
@@ -297,6 +302,28 @@ exit /B 0
 	cd ..
 exit /B 0
 
+:basisu
+	cls
+	echo Basis Universal
+	echo ===============================
+	echo  1. Go back
+	echo  2. Download
+	if exist "3rdparty\basisu\" (
+		echo  3. Build
+		echo  4. Deploy
+		echo  5. Open in VS
+	)
+	echo ===============================
+	choice /C 12345 /N /M "Your choice:"
+	echo.
+	if %errorlevel%==1 exit /B 0
+	if %errorlevel%==2 call :download_basisu
+	if %errorlevel%==3 call :build_basisu
+	if %errorlevel%==4 call :deploy_basisu
+	if %errorlevel%==5 start "" %devenv_cmd% "3rdparty\basisu\lumix\vs2019\basis_lumix.sln"
+	pause
+goto :basisu
+
 :freetype
 	cls
 	echo FreeType2
@@ -323,13 +350,29 @@ goto :freetype
 	%msbuild_cmd% 3rdparty\freetype\builds\windows\vc2010\freetype.sln /p:Configuration="Release Static" /p:Platform=x64
 exit /B 0
 
+:build_basisu
+	pushd 3rdparty\basisu\lumix\
+		genie.exe vs2019
+	popd
+	%msbuild_cmd% 3rdparty\basisu\lumix\vs2019\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
+exit /B 0
+
 :deploy_freetype
-echo %CD%
+	echo %CD%
 	del /Q ..\external\freetype\lib\win64_vs2017\release\*
 	copy "3rdparty\freetype\objs\x64\Release Static\freetype.lib" ..\external\freetype\lib\win64_vs2017\release\
 	copy "3rdparty\freetype\objs\x64\Release Static\freetype.pdb" ..\external\freetype\lib\win64_vs2017\release\
 	del /Q ..\external\freetype\include\*
 	xcopy /E /Y "3rdparty\freetype\include\*" ..\external\freetype\include\
+exit /B 0
+
+:deploy_basisu
+	echo %CD%
+	del /Q ..\external\basisu\lib\win64_vs2017\release\*
+	xcopy /E /Y "3rdparty\basisu\lumix\vs2019\bin\*.*" ..\external\basisu\lib\win64_vs2017\release\
+	del /Q ..\external\basisu\include\*
+	xcopy /E /Y "3rdparty\basisu\transcoder\*.h" ..\external\basisu\include\transcoder
+	xcopy /E /Y "3rdparty\basisu\encoder\*.h" ..\external\basisu\include\encoder
 exit /B 0
 
 :physx
@@ -539,6 +582,19 @@ exit /B 0
 		git.exe clone --depth=1 https://github.com/nem0/freetype2.git freetype
 	) else (
 		cd freetype
+		git pull
+		cd ..
+	)
+	cd ..
+exit /B 0
+
+:download_basisu
+	if not exist 3rdparty mkdir 3rdparty
+	cd 3rdparty
+	if not exist basisu (
+		git.exe clone --depth=1 https://github.com/nem0/basisu.git basisu
+	) else (
+		cd basisu
 		git pull
 		cd ..
 	)

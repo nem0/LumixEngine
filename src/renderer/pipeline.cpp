@@ -1690,7 +1690,6 @@ struct PipelineImpl final : Pipeline
 			gpu::TextureFormat value;
 		} FORMATS[] = {
 			{"depth32", gpu::TextureFormat::D32},
-			{"depth24", gpu::TextureFormat::D24},
 			{"depth24stencil8", gpu::TextureFormat::D24S8},
 			{"rg8", gpu::TextureFormat::RG8},
 			{"rgba8", gpu::TextureFormat::RGBA8},
@@ -1769,7 +1768,7 @@ struct PipelineImpl final : Pipeline
 		{
 			Renderbuffer& rb = m_renderbuffers[i];
 			if (!rb.handle) {
-				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, {0, 0}, debug_name);
+				rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, Renderer::MemRef(), debug_name);
 				rb.width = rb_w;
 				rb.height = rb_h;
 				rb.format = format;
@@ -1803,7 +1802,7 @@ struct PipelineImpl final : Pipeline
 		rb.height = rb_h;
 		rb.format = format;
 		rb.persistent = persistent;
-		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, {0, 0}, debug_name);
+		rb.handle = m_renderer.createTexture(rb_w, rb_h, 1, format, flags, Renderer::MemRef(), debug_name);
 
 		PipelineTexture res;
 		res.type = PipelineTexture::RENDERBUFFER;
@@ -2082,14 +2081,13 @@ struct PipelineImpl final : Pipeline
 	}
 	
 	PipelineTexture createTexture3D(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
-		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
 		const gpu::TextureHandle texture = m_renderer.createTexture(width
 			, height
 			, depth
 			, format
 			, gpu::TextureFlags::IS_3D | gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS
-			, mem
+			, Renderer::MemRef()
 			, debug_name.get("lua_texture"));
 		m_textures.push(texture);
 
@@ -2100,14 +2098,13 @@ struct PipelineImpl final : Pipeline
 	}
 	
 	PipelineTexture createTextureArray(u32 width, u32 height, u32 depth, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
-		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
 		const gpu::TextureHandle texture = m_renderer.createTexture(width
 			, height
 			, depth
 			, format
 			, gpu::TextureFlags::COMPUTE_WRITE | gpu::TextureFlags::NO_MIPS
-			, mem
+			, Renderer::MemRef()
 			, debug_name.get("lua_texture"));
 		m_textures.push(texture);
 
@@ -2118,14 +2115,13 @@ struct PipelineImpl final : Pipeline
 	}
 
 	PipelineTexture createTexture2D(u32 width, u32 height, const char* format_str, LuaWrapper::Optional<const char*> debug_name) {
-		Renderer::MemRef mem;
 		const gpu::TextureFormat format = getFormat(format_str);
 		const gpu::TextureHandle texture = m_renderer.createTexture(width
 			, height
 			, 1
 			, format
 			, gpu::TextureFlags::CLAMP_U | gpu::TextureFlags::CLAMP_V | gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::COMPUTE_WRITE
-			, mem
+			, Renderer::MemRef()
 			, debug_name.get("lua_texture"));
 		m_textures.push(texture);
 
@@ -3816,8 +3812,7 @@ struct PipelineImpl final : Pipeline
 		}
 		
 		if (!m_shadow_atlas.texture) {
-			Renderer::MemRef mem;
-			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, mem, "shadow_atlas");
+			m_shadow_atlas.texture = m_renderer.createTexture(ShadowAtlas::SIZE, ShadowAtlas::SIZE, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS, Renderer::MemRef(), "shadow_atlas");
 		}
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
@@ -4762,7 +4757,7 @@ struct PipelineImpl final : Pipeline
 				pixels.resize(w * h);
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
 				const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, nullptr, "staging_buffer");
+				gpu::createTexture(staging, w, h, 1, gpu::TextureFormat::RGBA8, flags, "staging_buffer");
 				gpu::copy(staging, handle, 0, 0);
 				gpu::readTexture(staging, 0, Span((u8*)pixels.begin(), pixels.byte_size()));
 				gpu::destroy(staging);

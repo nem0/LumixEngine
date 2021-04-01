@@ -578,7 +578,7 @@ struct RendererImpl final : Renderer
 				gpu::pushDebugGroup("get image data");
 				gpu::TextureHandle staging = gpu::allocTextureHandle();
 				const gpu::TextureFlags flags = gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::READBACK;
-				gpu::createTexture(staging, w, h, 1, out_format, flags, nullptr, "staging_buffer");
+				gpu::createTexture(staging, w, h, 1, out_format, flags, "staging_buffer");
 				gpu::copy(staging, handle, 0, 0);
 				gpu::readTexture(staging, 0, buf);
 				gpu::destroy(staging);
@@ -612,7 +612,7 @@ struct RendererImpl final : Renderer
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::update(handle, 0, slice, x, y, w, h, format, mem.data);
+				gpu::update(handle, 0, x, y, slice, w, h, format, mem.data, mem.size);
 				if (mem.own) {
 					renderer->free(mem);
 				}
@@ -640,31 +640,44 @@ struct RendererImpl final : Renderer
 	}
 
 
-	gpu::TextureHandle loadTexture(const MemRef& memory, gpu::TextureFlags flags, gpu::TextureInfo* info, const char* debug_name) override
+	gpu::TextureHandle loadTexture(const gpu::TextureDesc& desc, const MemRef& memory, gpu::TextureFlags flags, const char* debug_name) override
 	{
 		ASSERT(memory.size > 0);
 
 		const gpu::TextureHandle handle = gpu::allocTextureHandle();
 		if (!handle) return handle;
 
-		if(info) {
-			*info = gpu::getTextureInfo(memory.data);
-		}
-
 		struct Cmd : RenderJob {
 			void setup() override {}
 			void execute() override {
 				PROFILE_FUNCTION();
-				gpu::loadTexture(handle, memory.data, memory.size, flags, debug_name);
-				if(memory.own) {
-					renderer->free(memory);
+				if (!gpu::createTexture(handle, desc.width, desc.height, desc.depth, desc.format, flags, debug_name)) {
+					if(memory.own) renderer->free(memory);
+					logError("Failed to create texture ", debug_name);
+					return;
 				}
+				
+				const u8* ptr = (const u8*)memory.data;
+				for (u32 layer = 0; layer < desc.depth; ++layer) {
+					for(int side = 0; side < (desc.is_cubemap ? 6 : 1); ++side) {
+						const u32 z = layer * (desc.is_cubemap ? 6 : 1) + side;
+						for (u32 mip = 0; mip < desc.mips; ++mip) {
+							const u32 w = maximum(desc.width >> mip, 1);
+							const u32 h = maximum(desc.height >> mip, 1);
+							const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
+							gpu::update(handle, mip, 0, 0, z, w, h, desc.format, ptr, mip_size_bytes);
+							ptr += mip_size_bytes;
+						}
+					}
+				}
+				if(memory.own) renderer->free(memory);
 			}
 
 			StaticString<LUMIX_MAX_PATH> debug_name;
 			gpu::TextureHandle handle;
 			MemRef memory;
 			gpu::TextureFlags flags;
+			gpu::TextureDesc desc;
 			RendererImpl* renderer; 
 		};
 
@@ -673,7 +686,9 @@ struct RendererImpl final : Renderer
 		cmd.handle = handle;
 		cmd.memory = memory;
 		cmd.flags = flags;
+		if (desc.is_cubemap) cmd.flags = cmd.flags | gpu::TextureFlags::IS_CUBE;
 		cmd.renderer = this;
+		cmd.desc = desc;
 		queue(cmd, 0);
 
 		return handle;
@@ -935,7 +950,13 @@ struct RendererImpl final : Renderer
 			void execute() override
 			{
 				PROFILE_FUNCTION();
-				gpu::createTexture(handle, w, h, depth, format, flags, memory.data, debug_name);
+				bool res = gpu::createTexture(handle, w, h, depth, format, flags, debug_name);
+				ASSERT(res);
+				if (memory.data && memory.size) {
+					ASSERT(depth == 1);
+					gpu::update(handle, 0, 0, 0, 0, w, h, format, memory.data, memory.size);
+					if (u32(flags & gpu::TextureFlags::NO_MIPS) == 0) gpu::generateMipmaps(handle);
+				}
 				if (memory.own) renderer->free(memory);
 			}
 

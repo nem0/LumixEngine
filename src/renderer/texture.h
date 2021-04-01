@@ -83,6 +83,7 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 	u32 getPixel(float x, float y) const;
 	gpu::TextureFlags getGPUFlags() const;
 
+	static u8* getDDSInfo(const void* data, gpu::TextureDesc& desc);
 	static bool saveTGA(IOutputStream* file,
 		int width,
 		int height,
@@ -97,7 +98,6 @@ struct LUMIX_RENDERER_API Texture final : Resource {
 	u32 width;
 	u32 height;
 	u32 depth;
-	u32 layers;
 	u32 mips;
 	gpu::TextureFormat format;
 	bool is_cubemap;

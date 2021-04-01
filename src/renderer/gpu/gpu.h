@@ -115,12 +115,12 @@ enum class TextureFormat : u32 {
 	R8,
 	RG8,
 	D32,
-	D24,
 	D24S8,
 	RGBA8,
 	RGBA16,
 	RGBA16F,
 	RGBA32F,
+	BGRA8,
 	R16F,
 	R16,
 	R32F,
@@ -129,7 +129,9 @@ enum class TextureFormat : u32 {
 	SRGBA,
 	BC1,
 	BC2,
-	BC3
+	BC3,
+	BC4,
+	BC5
 };
 
 enum class BindShaderBufferFlags : u32 {
@@ -193,12 +195,12 @@ struct VertexDecl {
 };
 
 
-struct TextureInfo {
-	int width;
-	int height;
-	int depth;
-	int layers;
-	int mips;
+struct TextureDesc {
+	TextureFormat format;
+	u32 width;
+	u32 height;
+	u32 depth;
+	u32 mips;
 	bool is_cubemap;
 };
 
@@ -224,6 +226,7 @@ void shutdown();
 void startCapture();
 void stopCapture();
 int getSize(AttributeType type);
+u32 getSize(TextureFormat format, u32 w, u32 h);
 
 
 void clear(ClearFlags flags, const float* color, float depth);
@@ -251,12 +254,10 @@ void useProgram(ProgramHandle prg);
 void dispatch(u32 num_groups_x, u32 num_groups_y, u32 num_groups_z);
 
 void createBuffer(BufferHandle handle, BufferFlags flags, size_t size, const void* data);
-bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const void* data, const char* debug_name);
+bool createTexture(TextureHandle handle, u32 w, u32 h, u32 depth, TextureFormat format, TextureFlags flags, const char* debug_name);
 void createTextureView(TextureHandle view, TextureHandle texture);
 void generateMipmaps(TextureHandle handle);
-bool loadTexture(TextureHandle handle, const void* data, int size, TextureFlags flags, const char* debug_name);
-bool loadLayers(TextureHandle handle, u32 layer_offset, const void* data, int size, const char* debug_name);
-void update(TextureHandle texture, u32 level, u32 slice, u32 x, u32 y, u32 w, u32 h, TextureFormat format, void* buf);
+void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, TextureFormat format, const void* buf, u32 size);
 QueryHandle createQuery();
 
 void bindVertexBuffer(u32 binding_idx, BufferHandle buffer, u32 buffer_offset, u32 stride);
@@ -270,7 +271,6 @@ void bindUniformBuffer(u32 ub_index, BufferHandle buffer, size_t offset, size_t 
 void copy(TextureHandle dst, TextureHandle src, u32 dst_x, u32 dst_y);
 void copy(BufferHandle dst, BufferHandle src, u32 dst_offset, u32 size);
 void readTexture(TextureHandle texture, u32 mip, Span<u8> buf);
-TextureInfo getTextureInfo(const void* data);
 void queryTimestamp(QueryHandle query);
 u64 getQueryResult(QueryHandle query);
 u64 getQueryFrequency();

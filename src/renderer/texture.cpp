@@ -8,6 +8,7 @@
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
+#include "renderer/gpu/dds.h"
 #include "renderer/renderer.h"
 #include "renderer/texture.h"
 #include "stb/stb_image.h"
@@ -25,8 +26,7 @@ Texture::Texture(const Path& path, ResourceManager& resource_manager, Renderer& 
 	, allocator(_allocator)
 	, data(_allocator)
 	, format(gpu::TextureFormat::RGBA8)
-	, depth(-1)
-	, layers(1)
+	, depth(1)
 	, width(0)
 	, height(0)
 	, mips(0)
@@ -286,8 +286,7 @@ static bool loadRaw(Texture& texture, InputMemoryStream& file, IAllocator& alloc
 
 	texture.width = header.width;
 	texture.height = header.height;
-	texture.depth = header.is_array ? 1 : header.depth;
-	texture.layers = header.is_array ? header.depth : 1;
+	texture.depth = header.depth;
 	switch(header.channel_type) {
 		case RawTextureHeader::ChannelType::FLOAT:
 			switch (header.channels_count) {
@@ -394,7 +393,6 @@ bool Texture::loadTGA(IInputStream& file)
 			, mem
 			, getPath().c_str());
 		depth = 1;
-		layers = 1;
 		return handle;
 	}
 
@@ -510,7 +508,6 @@ bool Texture::loadTGA(IInputStream& file)
 		, mem
 		, getPath().c_str());
 	depth = 1;
-	layers = 1;
 	return handle;
 }
 
@@ -534,6 +531,75 @@ void Texture::removeDataReference()
 	}
 }
 
+u8* Texture::getDDSInfo(const void* data, gpu::TextureDesc& desc) {
+	const gpu::DDS::Header* hdr = (const gpu::DDS::Header*)data;
+	
+	if (hdr->dwMagic != gpu::DDS::DDS_MAGIC || hdr->dwSize != 124 || !(hdr->dwFlags & gpu::DDS::DDSD_PIXELFORMAT) || !(hdr->dwFlags & gpu::DDS::DDSD_CAPS)) {
+		return nullptr;
+	}
+	
+	desc.width = hdr->dwWidth;
+	desc.height = hdr->dwHeight;
+	desc.is_cubemap = (hdr->caps2.dwCaps2 & gpu::DDS::DDSCAPS2_CUBEMAP) != 0;
+	desc.mips = (hdr->dwFlags & gpu::DDS::DDSD_MIPMAPCOUNT) ? hdr->dwMipMapCount : 1;
+	desc.depth = (hdr->dwFlags & gpu::DDS::DDSD_DEPTH) ? hdr->dwDepth : 1;
+	u8* data_ptr = (u8*)data + sizeof(*hdr);
+
+	if (isDXT1(hdr->pixelFormat)) {
+		desc.format = gpu::TextureFormat::BC1;
+	}
+	else if (isDXT3(hdr->pixelFormat)) {
+		desc.format = gpu::TextureFormat::BC2;
+	}
+	else if (isDXT5(hdr->pixelFormat)) {
+		desc.format = gpu::TextureFormat::BC3;
+	}
+	else if (isATI1(hdr->pixelFormat)) {
+		desc.format = gpu::TextureFormat::BC4;
+	}
+	else if (isATI2(hdr->pixelFormat)) {
+		desc.format = gpu::TextureFormat::BC5;
+	}
+	else if (isBGRA8(hdr->pixelFormat)) {
+		desc.format = gpu::TextureFormat::BGRA8;
+	}
+	else if (isDXT10(hdr->pixelFormat)) {
+		const gpu::DDS::DXT10Header* hdr_dxt10 = (const gpu::DDS::DXT10Header*)((const u8*)data + sizeof(gpu::DDS::Header));
+		switch (hdr_dxt10->dxgi_format) {
+			case gpu::DDS::DxgiFormat::BC1_UNORM_SRGB:
+			case gpu::DDS::DxgiFormat::BC1_UNORM:
+				desc.format = gpu::TextureFormat::BC1;
+				break;
+			case gpu::DDS::DxgiFormat::BC2_UNORM_SRGB:
+			case gpu::DDS::DxgiFormat::BC2_UNORM:
+				desc.format = gpu::TextureFormat::BC2;
+				break;
+			case gpu::DDS::DxgiFormat::BC3_UNORM_SRGB:
+			case gpu::DDS::DxgiFormat::BC3_UNORM:
+				desc.format = gpu::TextureFormat::BC3;
+				break;
+			case gpu::DDS::DxgiFormat::BC4_SNORM:
+			case gpu::DDS::DxgiFormat::BC4_UNORM:
+				desc.format = gpu::TextureFormat::BC4;
+				break;
+			case gpu::DDS::DxgiFormat::BC5_SNORM:
+			case gpu::DDS::DxgiFormat::BC5_UNORM:
+				desc.format = gpu::TextureFormat::BC5;
+				break;
+			default:
+				ASSERT(false);
+				return nullptr;
+		}
+		desc.depth = hdr_dxt10->array_size;
+		data_ptr = data_ptr + sizeof(*hdr_dxt10);
+	}
+	else {
+		ASSERT(false);
+		return nullptr;
+	}
+
+	return data_ptr;
+}
 
 static bool loadDDS(Texture& texture, IInputStream& file)
 {
@@ -542,17 +608,23 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 		return false;
 	}
 
-	gpu::TextureInfo info;
 	const u8* data = (const u8*)file.getBuffer();
-	Renderer::MemRef mem = texture.renderer.copy(data + 7, (int)file.size() - 7);
-	texture.handle = texture.renderer.loadTexture(mem, texture.getGPUFlags(), &info, texture.getPath().c_str());
+	gpu::TextureDesc desc;
+	const u8* image_data = Texture::getDDSInfo(data + 7, desc);
+	if (!image_data) {
+		logError("Corrupted or unsupported dds ", texture.getPath());
+		return false;
+	};
+
+	const u32 offset = u32(image_data - (const u8*)file.getBuffer());
+	Renderer::MemRef mem = texture.renderer.copy(image_data, (u32)file.size() - offset);
+	texture.handle = texture.renderer.loadTexture(desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
 	if (texture.handle) {
-		texture.width = info.width;
-		texture.height = info.height;
-		texture.mips = info.mips;
-		texture.depth = info.depth;
-		texture.layers = info.layers;
-		texture.is_cubemap = info.is_cubemap;
+		texture.width = desc.width;
+		texture.height = desc.height;
+		texture.mips = desc.mips;
+		texture.depth = desc.depth;
+		texture.is_cubemap = desc.is_cubemap;
 	}
 
 	return texture.handle;

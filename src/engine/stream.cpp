@@ -319,6 +319,7 @@ const void* InputMemoryStream::skip(u64 size)
 	m_pos += size;
 	if (m_pos > m_size)
 	{
+		ASSERT(false);
 		m_pos = m_size;
 	}
 

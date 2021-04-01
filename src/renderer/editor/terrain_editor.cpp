@@ -1279,7 +1279,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 		return;
 	}
 
-	if (albedo->layers != normal->layers) {
+	if (albedo->depth != normal->depth) {
 		ImGui::TextWrapped(ICON_FA_EXCLAMATION_TRIANGLE " albedo texture %s has different number of layers than normal texture %s"
 			, albedo->getPath().c_str()
 			, normal->getPath().c_str());
@@ -1338,7 +1338,7 @@ void TerrainEditor::layerGUI(ComponentUID cmp) {
 			ImGui::EndPopup();
 		}
 	}
-	if (albedo->layers < 255) {
+	if (albedo->depth < 255) {
 		if (ImGui::Button(ICON_FA_PLUS "Add surface")) ImGui::OpenPopup("Add surface");
 	}
 	ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));

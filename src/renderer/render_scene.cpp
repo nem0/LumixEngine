@@ -2775,7 +2775,23 @@ void ReflectionProbe::LoadJob::callback(u64 size, const u8* data, bool success) 
 		void setup() override {}
 				
 		void execute() override {
-			gpu::loadLayers(tex, layer, data.data(), (int)data.size(), "reflection probe");
+			gpu::TextureDesc desc;
+			const u8* image_data = Texture::getDDSInfo(data.data(), desc);
+			if (!image_data) return;
+
+			ASSERT(desc.depth == 1);
+			ASSERT(desc.is_cubemap);
+
+			const u32 offset = u32(image_data - data.data());
+			InputMemoryStream blob(image_data, (u32)data.size() - offset);
+			for (u32 side = 0; side < 6; ++side) {
+				for (u32 mip = 0; mip < desc.mips; ++mip) {
+					u32 w = maximum(desc.width >> mip, 1);
+					u32 h = maximum(desc.height >> mip, 1);
+					const u32 mip_size_bytes = gpu::getSize(desc.format, w, h);
+					gpu::update(tex, mip, 0, 0, layer * 6 + side, w, h, desc.format, blob.skip(mip_size_bytes), mip_size_bytes);
+				}
+			}
 		}
 
 		u32 layer;

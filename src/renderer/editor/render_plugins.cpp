@@ -3138,13 +3138,13 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 			gpu::pushDebugGroup("radiance_filter");
 			gpu::TextureHandle src = gpu::allocTextureHandle();
 			gpu::TextureHandle dst = gpu::allocTextureHandle();
-			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, nullptr, "env");
+			bool created = gpu::createTexture(src, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env");
 			ASSERT(created);
 			for (u32 face = 0; face < 6; ++face) {
-				gpu::update(src, 0, face, 0, 0, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face));
+				gpu::update(src, 0, 0, 0, face, size, size, gpu::TextureFormat::RGBA32F, (void*)(data + size * size * face), size * size * sizeof(*data));
 			}
 			gpu::generateMipmaps(src);
-			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, nullptr, "env_filtered");
+			created = gpu::createTexture(dst, size, size, 1, gpu::TextureFormat::RGBA32F, gpu::TextureFlags::IS_CUBE, "env_filtered");
 			ASSERT(created);
 			gpu::BufferHandle buf = gpu::allocBufferHandle();
 			gpu::createBuffer(buf, gpu::BufferFlags::UNIFORM_BUFFER, 256, nullptr);
@@ -3175,7 +3175,7 @@ struct EnvironmentProbePlugin final : PropertyGrid::IPlugin
 
 			gpu::TextureHandle staging = gpu::allocTextureHandle();
 			const gpu::TextureFlags flags = gpu::TextureFlags::IS_CUBE | gpu::TextureFlags::READBACK;
-			gpu::createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, nullptr, "staging_buffer");
+			gpu::createTexture(staging, size, size, 1, gpu::TextureFormat::RGBA32F, flags, "staging_buffer");
 			
 			u32 data_size = 0;
 			u32 mip_size = size;

@@ -279,7 +279,6 @@ struct AnimationSceneImpl final : AnimationScene
 		for (Animator& animator : m_animators) {
 			if (animator.resource == &resource) {
 				if(new_state == Resource::State::READY) {
-					ASSERT(!animator.ctx || old_state == Resource::State::READY);
 					if (!animator.ctx) {
 						animator.ctx = animator.resource->createRuntime(animator.default_set);
 					}
