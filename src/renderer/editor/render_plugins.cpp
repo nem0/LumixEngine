@@ -1,3 +1,7 @@
+#ifdef LUMIX_BASIS_UNIVERSAL
+	#define LUMIX_NO_CUSTOM_CRT
+	#include <encoder/basisu_comp.h>
+#endif
 #include <imgui/imgui_freetype.h>
 #include <imgui/imnodes.h>
 
@@ -48,7 +52,6 @@
 #include "stb/stb_image_resize.h"
 #include "terrain_editor.h"
 #include <nvtt.h>
-
 
 using namespace Lumix;
 
@@ -1122,57 +1125,97 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			return true;
 		}
 
-		for (u32 i = 0; i < u32(w * h); ++i) {
-			swap(data[i * 4 + 0], data[i * 4 + 2]);
-		}
+		#ifdef LUMIX_BASIS_UNIVERSAL
+			dst.write("bsu", 3);
+			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
+			dst.write(&flags, sizeof(flags));
+			gpu::TextureFormat gpu_format = meta.is_normalmap ? gpu::TextureFormat::BC5 : (comps == 4 ? gpu::TextureFormat::BC3 : gpu::TextureFormat::BC1);
+			dst.write(gpu_format);
 
-		dst.write("dds", 3);
-		u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
-		flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
-		flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
-		flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
-		flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
-		flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
-		dst.write(&flags, sizeof(flags));
-		nvtt::Context context;
+			static bool once = [](){ basisu::basisu_encoder_init(); return true; }();
+			basisu::job_pool job_pool(jobs::getWorkersCount());
+			basisu::basis_compressor c;
+			basisu::basis_compressor_params params;
+			params.m_pJob_pool = &job_pool;
+			params.m_source_images.push_back({});
+			params.m_source_images[0].init(data, w, h, 4);
+			params.m_quality_level = 255;
+			params.m_perceptual = !meta.is_normalmap && meta.srgb;
+			params.m_mip_gen = true;
+			if (meta.is_normalmap) {
+				params.m_mip_srgb = false;
+				params.m_no_selector_rdo = true;
+				params.m_no_endpoint_rdo = true;
+				params.m_swizzle[0] = 0;
+				params.m_swizzle[1] = 0;
+				params.m_swizzle[2] = 0;
+				params.m_swizzle[3] = 1;
+			}
+			if (!c.init(params)) return false;
+			basisu::basis_compressor::error_code err = c.process();
+			if (err != basisu::basis_compressor::cECSuccess) return false;
+
+			const basisu::uint8_vec& out = c.get_output_basis_file();
+			return dst.write(out.get_ptr(), out.size_in_bytes());
+		#else
+			for (u32 i = 0; i < u32(w * h); ++i) {
+				swap(data[i * 4 + 0], data[i * 4 + 2]);
+			}
+
+			dst.write("dds", 3);
+			u32 flags = meta.srgb ? (u32)Texture::Flags::SRGB : 0;
+			flags |= meta.wrap_mode_u == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_U : 0;
+			flags |= meta.wrap_mode_v == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_V : 0;
+			flags |= meta.wrap_mode_w == Meta::WrapMode::CLAMP ? (u32)Texture::Flags::CLAMP_W : 0;
+			flags |= meta.filter == Meta::Filter::POINT ? (u32)Texture::Flags::POINT : 0;
+			flags |= meta.filter == Meta::Filter::ANISOTROPIC ? (u32)Texture::Flags::ANISOTROPIC : 0;
+			dst.write(&flags, sizeof(flags));
+
+			nvtt::Context context;
 		
-		const bool has_alpha = comps == 4;
-		nvtt::InputOptions input;
-		if (meta.is_normalmap) input.setGamma(1, 1);
-		input.setMipmapGeneration(true);
-		input.setAlphaCoverageMipScale(meta.scale_coverage, comps == 4 ? 3 : 0);
-		input.setAlphaMode(has_alpha ? nvtt::AlphaMode_Transparency : nvtt::AlphaMode_None);
-		input.setNormalMap(meta.is_normalmap);
-		input.setTextureLayout(nvtt::TextureType_2D, w, h);
-		input.setMipmapData(data, w, h);
-		stbi_image_free(data);
+			const bool has_alpha = comps == 4;
+			nvtt::InputOptions input;
+			if (meta.is_normalmap) input.setGamma(1, 1);
+			input.setMipmapGeneration(true);
+			input.setAlphaCoverageMipScale(meta.scale_coverage, comps == 4 ? 3 : 0);
+			input.setAlphaMode(has_alpha ? nvtt::AlphaMode_Transparency : nvtt::AlphaMode_None);
+			input.setNormalMap(meta.is_normalmap);
+			input.setTextureLayout(nvtt::TextureType_2D, w, h);
+			input.setMipmapData(data, w, h);
+			stbi_image_free(data);
 		
-		nvtt::OutputOptions output;
-		output.setSrgbFlag(meta.srgb);
-		struct : nvtt::OutputHandler {
-			bool writeData(const void * data, int size) override { return dst->write(data, size); }
-			void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
-			void endImage() override {}
+			nvtt::OutputOptions output;
+			output.setSrgbFlag(meta.srgb);
+			struct : nvtt::OutputHandler {
+				bool writeData(const void * data, int size) override { return dst->write(data, size); }
+				void beginImage(int size, int width, int height, int depth, int face, int miplevel) override {}
+				void endImage() override {}
 
-			OutputMemoryStream* dst;
-		} output_handler;
-		output_handler.dst = &dst;
-		output.setOutputHandler(&output_handler);
+				OutputMemoryStream* dst;
+			} output_handler;
+			output_handler.dst = &dst;
+			output.setOutputHandler(&output_handler);
 
-		nvtt::CompressionOptions compression;
-		if (w % 4 != 0 || h % 4 != 0) {
-			logWarning("Can not compress ", path, " because its size (", w, ", ", h, ") is not multiple of 4");
-			compression.setFormat(has_alpha ? nvtt::Format_RGBA : nvtt::Format_RGB);
-		}
-		else {
-			compression.setFormat(meta.is_normalmap ? nvtt::Format_BC5 : (has_alpha ? nvtt::Format_BC3 : nvtt::Format_BC1));
-			compression.setQuality(toNVTT(meta.quality));
-		}
+			nvtt::CompressionOptions compression;
+			if (w % 4 != 0 || h % 4 != 0) {
+				logWarning("Can not compress ", path, " because its size (", w, ", ", h, ") is not multiple of 4");
+				compression.setFormat(has_alpha ? nvtt::Format_RGBA : nvtt::Format_RGB);
+			}
+			else {
+				compression.setFormat(meta.is_normalmap ? nvtt::Format_BC5 : (has_alpha ? nvtt::Format_BC3 : nvtt::Format_BC1));
+				compression.setQuality(toNVTT(meta.quality));
+			}
 
-		if (!context.process(input, compression, output)) {
-			return false;
-		}
-		return true;
+			if (!context.process(input, compression, output)) {
+				return false;
+			}
+			return true;
+		#endif
 	}
 
 	static nvtt::Quality toNVTT(Meta::Quality quality) {

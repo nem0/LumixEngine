@@ -19,6 +19,7 @@ end
 local ROOT_DIR = path.getabsolute("../")
 local BINARY_DIR = LOCATION .. "/bin/"
 build_app = false
+local use_basisu = false
 build_studio = true
 local working_dir = nil
 local debug_args = nil
@@ -127,6 +128,11 @@ newoption {
 }
 
 newoption {
+	trigger = "with-basis-universal",
+	description = "Use basis universal compression."
+}
+
+newoption {
 	trigger = "with-game",
 	description = "Build game plugin."
 }
@@ -213,6 +219,10 @@ end
 
 if _OPTIONS["with-app"] then
 	build_app = true
+end
+
+if _OPTIONS["with-basis-universal"] then
+	use_basisu = true
 end
 
 function detect_plugins()
@@ -560,13 +570,21 @@ if has_plugin("renderer") then
 			"../external/meshoptimizer/vfetchoptimizer.cpp"
 		}
 		
+		if use_basisu then
+			defines { "LUMIX_BASIS_UNIVERSAL" }
+			includedirs { "../external/basisu/include" }
+		end
 		includedirs { "../src", "../external/nvtt/include", "../external/freetype/include", "../external/" }
+		
 		defines { "BUILDING_RENDERER" }
 		links { "engine" }
 
 		if build_studio then
 			links { "editor" }
 			linkLib "nvtt"
+			if use_basisu then
+				linkLib "basisu"
+			end
 		end
 		linkLib "freetype"
 		linkOpenGL()
@@ -736,6 +754,9 @@ if build_app then
 			if build_studio then links {"editor"} end
 
 			links { "engine" }
+			if use_basisu then
+				linkLib "basisu"
+			end
 			linkLib "nvtt"
 			linkLib "freetype"
 			linkLib "luajit"
@@ -749,6 +770,9 @@ if build_app then
 			links { "editor", "engine" }
 		end
 		if build_studio then
+			if use_basisu then
+				linkLib "basisu"
+			end
 			linkLib "nvtt"
 		end
 		
@@ -897,6 +921,9 @@ if build_studio then
 			configuration {}
 
 			links { "editor", "engine" }
+			if use_basisu then
+				linkLib "basisu"
+			end
 			linkLib "nvtt"
 			linkLib "freetype"
 			linkLib "luajit"

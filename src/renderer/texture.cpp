@@ -1,3 +1,7 @@
+#ifdef LUMIX_BASIS_UNIVERSAL
+	#define LUMIX_NO_CUSTOM_CRT
+	#include <transcoder/basisu_transcoder.h>
+#endif
 #include "engine/crt.h"
 #include "engine/file_system.h"
 #include "engine/log.h"
@@ -601,6 +605,84 @@ u8* Texture::getDDSInfo(const void* data, gpu::TextureDesc& desc) {
 	return data_ptr;
 }
 
+#ifdef LUMIX_BASIS_UNIVERSAL
+	static bool loadBasisU(Texture& texture, IInputStream& file)
+	{
+		if(texture.data_reference > 0) {
+			logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Convert to TGA or RAW.");
+			return false;
+		}
+		static bool once = []() { basist::basisu_transcoder_init(); return true; }();
+		InputMemoryStream blob(file.getBuffer(), file.size());
+		blob.skip(7);
+		const gpu::TextureFormat gpu_format = blob.read<gpu::TextureFormat>();
+		const u32 size = u32(blob.size() - blob.getPosition());
+		const u8* data = (const u8*)blob.skip(size);
+
+		basist::basisu_transcoder transcoder(nullptr);
+		if (transcoder.validate_header(data, size)) {
+			basist::basisu_image_info info;
+			if (transcoder.get_image_info(data, size, info, 0)) {
+				basist::basisu_file_info fileInfo;
+				transcoder.get_file_info(data, size, fileInfo);
+				if (transcoder.start_transcoding(data, size)) {
+					gpu::TextureDesc desc;
+					desc.width = info.m_width;
+					desc.height = info.m_height;
+					desc.depth = 1;
+					desc.format = gpu_format;
+					desc.is_cubemap = false;
+					desc.mips = info.m_total_levels;
+				
+					OutputMemoryStream tmp(texture.allocator);
+					u32 blocks = 0;
+					for (u32 i = 0; i < info.m_total_levels; ++i) {
+						u32 w = maximum(info.m_width >> i, 1);
+						u32 h = maximum(info.m_height >> i, 1);
+						blocks += (w + 3) / 4 * (h + 3) / 4;
+					}
+				
+					basist::transcoder_texture_format format;
+					switch(gpu_format) {
+						case gpu::TextureFormat::BC1: format = basist::transcoder_texture_format::cTFBC1; break;
+						case gpu::TextureFormat::BC3: format = basist::transcoder_texture_format::cTFBC3; break;
+						case gpu::TextureFormat::BC5: format = basist::transcoder_texture_format::cTFBC5; break;
+						default: ASSERT(false); break;
+					}
+
+					const u32 block_bytes_size = (gpu_format == gpu::TextureFormat::BC1 ? 8 : 16);
+					tmp.resize(block_bytes_size * blocks);
+
+					u8* ptr = tmp.getMutableData();
+					for (u32 i = 0; i < info.m_total_levels; ++i) {
+						u32 w = maximum(info.m_width >> i, 1);
+						u32 h = maximum(info.m_height >> i, 1);
+						u32 mip_blocks = ((w + 3) / 4) * ((h + 3) / 4);
+
+						transcoder.get_image_level_desc(data, size, 0, i, w, h, mip_blocks);
+						if (!transcoder.transcode_image_level(data, size, 0, i, ptr, mip_blocks, format)) return false;
+						ptr += mip_blocks * block_bytes_size; 
+					}
+					
+					Renderer::MemRef mem = texture.renderer.copy(tmp.data(), (u32)tmp.size());
+					texture.handle = texture.renderer.loadTexture(desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
+					if (texture.handle) {
+						texture.mips = info.m_total_levels;
+						texture.width = desc.width;
+						texture.height = desc.height;
+						texture.mips = desc.mips;
+						texture.depth = desc.depth;
+						texture.is_cubemap = desc.is_cubemap;
+					}
+
+					return texture.handle;
+				}
+			}
+		}
+		return false;
+	}
+#endif
+
 static bool loadDDS(Texture& texture, IInputStream& file)
 {
 	if(texture.data_reference > 0) {
@@ -629,7 +711,6 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 
 	return texture.handle;
 }
-
 
 gpu::TextureFlags Texture::getGPUFlags() const
 {
@@ -666,6 +747,13 @@ bool Texture::load(u64 size, const u8* mem)
 	if (!file.read(&flags, sizeof(flags))) return false;
 
 	bool loaded = false;
+
+	#ifdef LUMIX_BASIS_UNIVERSAL
+		if (equalIStrings(ext, "bsu")) {
+			loaded = loadBasisU(*this, file);
+		} else 
+	#endif
+
 	if (equalIStrings(ext, "dds")) {
 		loaded = loadDDS(*this, file);
 	}
