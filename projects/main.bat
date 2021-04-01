@@ -352,7 +352,7 @@ exit /B 0
 
 :build_basisu
 	pushd 3rdparty\basisu\lumix\
-		genie.exe vs2019
+		..\..\..\genie.exe vs2019
 	popd
 	%msbuild_cmd% 3rdparty\basisu\lumix\vs2019\basis_lumix.sln /p:Configuration="Release" /p:Platform=x64
 exit /B 0
@@ -592,7 +592,7 @@ exit /B 0
 	if not exist 3rdparty mkdir 3rdparty
 	cd 3rdparty
 	if not exist basisu (
-		git.exe clone --depth=1 https://github.com/nem0/basisu.git basisu
+		git.exe clone --depth=1 https://github.com/nem0/basis_universal.git basisu
 	) else (
 		cd basisu
 		git pull
