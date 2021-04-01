@@ -9,20 +9,27 @@ where /q msbuild.exe
 if not %errorlevel%==0 set msbuild_cmd="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe"
 
 REM put butler in path or in ..\butler\
-SET PATH=%PATH%;..\butler\
+SET PATH=%PATH%;..\..\butler\
 
 REM clean everything
-git.exe clean -f -x -d
+git.exe clean -f -x -d ..\
+if not %errorlevel%==0 pause
 
 REM download physx
 mkdir 3rdparty
+if not %errorlevel%==0 pause
+
 cd 3rdparty
 git.exe clone --depth=1 https://github.com/nem0/PhysX.git physx
+if not %errorlevel%==0 pause
 
 REM build static physx
 cd PhysX\physx
 call generate_projects.bat lumix_vc16win64_static
+if not %errorlevel%==0 pause
+
 %msbuild_cmd% "compiler\vc16win64\PhysXSDK.sln" /p:Configuration=Release /p:Platform=x64
+if not %errorlevel%==0 pause
 
 REM deploy physx
 cd ..\..\..\
@@ -39,6 +46,7 @@ copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib			
 
 REM create engine project
 genie.exe --embed-resources --static-physx vs2019
+if not %errorlevel%==0 pause
 
 REM build engine.exe with bundled data
 cd ..\data
@@ -46,16 +54,19 @@ tar -cvf data.tar .
 move data.tar ../src/studio
 cd ..\projects\
 %msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+if not %errorlevel%==0 pause
 del ..\src\studio\data.tar
 
 REM push gl version
 mkdir itch_io
 copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
 butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
+if not %errorlevel%==0 pause
 
 REM download dx
 pushd ..\plugins
 git.exe clone https://github.com/nem0/lumixengine_dx.git dx
+if not %errorlevel%==0 pause
 popd
 
 REM build engine.exe with bundled data
@@ -64,6 +75,7 @@ tar -cvf data.tar .
 move data.tar ../src/studio
 cd ..\projects\
 %msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
+if not %errorlevel%==0 pause
 del ..\src\studio\data.tar
 
 REM push gl version
