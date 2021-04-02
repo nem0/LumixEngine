@@ -1,9 +1,10 @@
 shader "pipelines/standard.shd"
 backface_culling(true)
 layer "default"
+translucency(0.000000)
 emission(0.000000)
-metallic(1.000000)
-roughness(0.780000)
+metallic(0.000000)
+roughness(0.100000)
 defines {}
 color { 0.000000, 0.310755, 0.543779, 1.000000 }
 texture ""
