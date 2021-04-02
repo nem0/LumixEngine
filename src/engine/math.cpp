@@ -1,8 +1,6 @@
+#include "crt.h"
 #include "math.h"
 #include "simd.h"
-#include <float.h>
-#include <random>
-
 
 namespace Lumix
 {
@@ -338,7 +336,7 @@ void Vec4::operator*=(float rhs)
 Vec2 normalize(const Vec2& value) {
 	float x = value.x;
 	float y = value.y;
-	const float inv_len = 1 / sqrt(x * x + y * y);
+	const float inv_len = 1 / sqrtf(x * x + y * y);
 	x *= inv_len;
 	y *= inv_len;
 	return Vec2(x, y);
@@ -357,7 +355,7 @@ Vec3 normalize(const Vec3& value) {
 	float x = value.x;
 	float y = value.y;
 	float z = value.z;
-	const float inv_len = 1 / sqrt(x * x + y * y + z * z);
+	const float inv_len = 1 / sqrtf(x * x + y * y + z * z);
 	x *= inv_len;
 	y *= inv_len;
 	z *= inv_len;
@@ -369,7 +367,7 @@ Quat normalize(const Quat& value) {
 	float y = value.y;
 	float z = value.z;
 	float w = value.w;
-	const float inv_len = 1 / sqrt(x * x + y * y + z * z + w * w);
+	const float inv_len = 1 / sqrtf(x * x + y * y + z * z + w * w);
 	x *= inv_len;
 	y *= inv_len;
 	z *= inv_len;
@@ -377,8 +375,8 @@ Quat normalize(const Quat& value) {
 	return Quat(x, y, z, w);
 }
 
-float length(const Vec2& value) { return sqrt(value.x * value.x + value.y * value.y); }
-float length(const Vec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
+float length(const Vec2& value) { return sqrtf(value.x * value.x + value.y * value.y); }
+float length(const Vec3& value) { return sqrtf(value.x * value.x + value.y * value.y + value.z * value.z); }
 double length(const DVec3& value) { return sqrt(value.x * value.x + value.y * value.y + value.z * value.z); }
 float squaredLength(const Vec2& value) { return value.x * value.x + value.y * value.y; }
 float squaredLength(const Vec3& value) { return value.x * value.x + value.y * value.y + value.z * value.z; }
@@ -596,7 +594,7 @@ Vec3 Quat::toEuler() const
 		return Vec3(PI * 0.5f, 0.0f, atan2f(2.0f * (x * z - w * y), 1.0f - 2.0f * (y * y + z * z)));
 	}
 
-	return Vec3(asinf(check),
+	return Vec3((float)asin(check),
 		atan2f(2.0f * (x * z + w * y), 1.0f - 2.0f * (x * x + y * y)),
 		atan2f(2.0f * (x * y + w * z), 1.0f - 2.0f * (x * x + z * z)));
 }
@@ -630,7 +628,7 @@ Quat nlerp(const Quat& q1, const Quat& q2, float t)
 	float oy = q1.y * inv + q2.y * t;
 	float oz = q1.z * inv + q2.z * t;
 	float ow = q1.w * inv + q2.w * t;
-	float l = 1 / sqrt(ox * ox + oy * oy + oz * oz + ow * ow);
+	float l = 1 / sqrtf(ox * ox + oy * oy + oz * oz + ow * ow);
 	ox *= l;
 	oy *= l;
 	oz *= l;
@@ -1017,7 +1015,7 @@ Quat Matrix::getRotation() const {
 
 	if (tr > 0) {
 		float t = tr + 1.0f;
-		float s = 1 / sqrt(t) * 0.5f;
+		float s = 1 / sqrtf(t) * 0.5f;
 
 		rot.w = s * t;
 		rot.z = (columns[0].y - columns[1].x) * s;
@@ -1025,21 +1023,21 @@ Quat Matrix::getRotation() const {
 		rot.x = (columns[1].z - columns[2].y) * s;
 	} else if ((columns[0].x > columns[1].y) && (columns[0].x > columns[2].z)) {
 		float t = 1.0f + columns[0].x - columns[1].y - columns[2].z;
-		float s = 1 / sqrt(t) * 0.5f;
+		float s = 1 / sqrtf(t) * 0.5f;
 		rot.x = s * t;
 		rot.y = (columns[0].y + columns[1].x) * s;
 		rot.z = (columns[0].z + columns[2].x) * s;
 		rot.w = (columns[1].z - columns[2].y) * s;
 	} else if (columns[1].y > columns[2].z) {
 		float t = 1.0f + columns[1].y - columns[0].x - columns[2].z;
-		float s = 1 / sqrt(t) * 0.5f;
+		float s = 1 / sqrtf(t) * 0.5f;
 		rot.w = (columns[2].x - columns[0].z) * s;
 		rot.x = (columns[0].y + columns[1].x) * s;
 		rot.y = s * t;
 		rot.z = (columns[1].z + columns[2].y) * s;
 	} else {
 		float t = 1.0f + columns[2].z - columns[0].x - columns[1].y;
-		float s = 1 / sqrt(t) * 0.5f;
+		float s = 1 / sqrtf(t) * 0.5f;
 		rot.w = (columns[0].y - columns[1].x) * s;
 		rot.x = (columns[2].x + columns[0].z) * s;
 		rot.y = (columns[2].y + columns[1].z) * s;
@@ -1186,60 +1184,35 @@ float angleDiff(float a, float b) {
 	return delta;
 }
 
+// Marsaglia simple rng
+static thread_local u32 u = 521288629;
+static thread_local u32 v = 362436069;
 
-static std::mt19937_64& getGUIDRandomGenerator()
-{
-	static std::random_device seed;
-	static std::mt19937_64 gen(seed());
-
-	return gen;
+u32 rand() {
+	u = 36969 * (u & 65535) + (u >> 16);
+	v = 18000 * (v & 65535) + (v >> 16);
+	return (u << 16) + v;
 }
 
-static std::mt19937& getRandomGenerator()
-{
-	static std::random_device seed;
-	static std::mt19937 gen(seed());
-
-	return gen;
+u64 randGUID() {
+	return (u64(rand()) << 32) + u64(rand());
 }
 
 
-u64 randGUID()
-{
-	return getGUIDRandomGenerator()();
+u32 rand(u32 from_incl, u32 to_incl) {
+	return from_incl + rand() % (to_incl - from_incl + 1);
 }
 
 
-u32 rand()
-{
-	return getRandomGenerator()();
-}
-
-
-u32 rand(u32 from_incl, u32 to_incl)
-{
-	std::uniform_int_distribution<> dist(from_incl, to_incl);
-	return dist(getRandomGenerator());
-}
-
-
-float randFloat()
-{
-	std::uniform_real_distribution<float> dist;
-	return dist(getRandomGenerator());
-}
-
-
-void seedRandom(u32 seed)
-{
-	getRandomGenerator().seed(seed);
+float randFloat() {
+	u32 i = rand();
+    return float(i * 2.328306435996595e-10);
 }
 
 
 float randFloat(float from, float to)
 {
-	std::uniform_real_distribution<float> dist(from, to);
-	return dist(getRandomGenerator());
+	return from + float((to - from) * (rand() * 2.328306435996595e-10));
 }
 
 
