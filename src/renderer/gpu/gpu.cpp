@@ -117,7 +117,7 @@ struct FormatDesc {
 			case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT : return get(TextureFormat::BC3);
 			case GL_COMPRESSED_RED_RGTC1 : return get(TextureFormat::BC4);
 			case GL_COMPRESSED_RG_RGTC2 : return get(TextureFormat::BC5);
-			case GL_RG16 : return get(TextureFormat::R16);
+			case GL_R16 : return get(TextureFormat::R16);
 			case GL_R8 : return get(TextureFormat::R8);
 			case GL_RG8 : return get(TextureFormat::RG8);
 			case GL_SRGB8_ALPHA8 : return get(TextureFormat::SRGBA);
@@ -1026,6 +1026,7 @@ void update(TextureHandle texture, u32 mip, u32 x, u32 y, u32 z, u32 w, u32 h, T
 		}
 	}
 	else {
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		if (fd.swap) {
 			glPixelStorei(GL_UNPACK_SWAP_BYTES, GL_TRUE);
 		}
