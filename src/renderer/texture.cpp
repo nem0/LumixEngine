@@ -696,6 +696,7 @@ static bool loadDDS(Texture& texture, IInputStream& file)
 	};
 
 	const u32 offset = u32(image_data - (const u8*)file.getBuffer());
+	if (offset >= (u32)file.size()) return false;
 	Renderer::MemRef mem = texture.renderer.copy(image_data, (u32)file.size() - offset);
 	texture.handle = texture.renderer.loadTexture(desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
 	if (texture.handle) {
