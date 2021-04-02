@@ -99,8 +99,12 @@ struct TransientBuffer {
 		m_ptr = nullptr;
 
 		if (m_overflow.buffer) {
-			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::NONE, nextPow2(m_overflow.size + m_size), nullptr);
-			gpu::update(m_overflow.buffer, m_overflow.data, m_overflow.size);
+			gpu::createBuffer(m_overflow.buffer, gpu::BufferFlags::MAPPABLE, nextPow2(m_overflow.size + m_size), nullptr);
+			void* mem = gpu::map(m_overflow.buffer, m_overflow.size + m_size);
+			if (mem) {
+				memcpy(mem, m_overflow.data, m_overflow.size);
+				gpu::unmap(m_overflow.buffer);
+			}
 			os::memRelease(m_overflow.data);
 			m_overflow.data = nullptr;
 			m_overflow.commit = 0;
