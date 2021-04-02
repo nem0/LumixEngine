@@ -552,7 +552,7 @@ bool Settings::save()
 				file << name << " = " << (lua_toboolean(m_state, -1) != 0 ? "true" : "false");
 				break;
 			case LUA_TNUMBER:
-				file << name << " = " << (int)lua_tonumber(m_state, -1);
+				file << name << " = " << lua_tonumber(m_state, -1);
 				break;
 			case LUA_TSTRING:
 				file << name << " = [[" << lua_tostring(m_state, -1) << "]]";
