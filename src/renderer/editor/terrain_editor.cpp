@@ -1119,7 +1119,7 @@ void TerrainEditor::onMouseMove(UniverseView& view, int x, int y, int, int)
 					m_flat_height = getHeight(hit_pos, scene, entity);
 				}
 				else {
-					paint(hit_pos, TerrainEditor::FLAT_HEIGHT, false, selected_entities[0], editor);
+					paint(hit_pos, TerrainEditor::FLAT_HEIGHT, true, selected_entities[0], editor);
 				}
 			}
 			else {
@@ -1130,7 +1130,7 @@ void TerrainEditor::onMouseMove(UniverseView& view, int x, int y, int, int)
 				else if (m_smooth_terrain_action.isActive()) {
 					action = TerrainEditor::SMOOTH_HEIGHT;
 				}
-				paint(hit_pos, action, false, selected_entities[0], editor); break;
+				paint(hit_pos, action, true, selected_entities[0], editor); break;
 			}
 			break;
 		case Mode::LAYER:
@@ -1138,7 +1138,7 @@ void TerrainEditor::onMouseMove(UniverseView& view, int x, int y, int, int)
 			if (m_remove_grass_action.isActive()) {
 				action = TerrainEditor::REMOVE_GRASS;
 			}
-			paint(hit_pos, action, false, selected_entities[0], editor);
+			paint(hit_pos, action, true, selected_entities[0], editor);
 			break;
 	}
 }

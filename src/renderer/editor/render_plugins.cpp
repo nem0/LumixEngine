@@ -3786,7 +3786,8 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		StaticString<LUMIX_MAX_PATH> splatmap_path(info.m_dir, "splatmap.tga");
 		StaticString<LUMIX_MAX_PATH> splatmap_meta_path(info.m_dir, "splatmap.tga.meta");
 		os::OutputFile file;
-		if (!file.open(hm_path))
+		FileSystem& fs = app.getEngine().getFileSystem();
+		if (!fs.open(hm_path, file))
 		{
 			logError("Failed to create heightmap ", hm_path);
 			return false;
@@ -3811,7 +3812,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 			return false;
 		}
 
-		if (!file.open(splatmap_meta_path)) {
+		if (!fs.open(splatmap_meta_path, file)) {
 			logError("Failed to create meta ", splatmap_meta_path);
 			os::deleteFile(hm_path);
 			return false;
@@ -3822,7 +3823,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		file << "filter = \"point\"";
 		file.close();
 
-		if (!file.open(splatmap_path)) {
+		if (!fs.open(splatmap_path, file)) {
 			logError("Failed to create texture ", splatmap_path);
 			os::deleteFile(splatmap_meta_path);
 			os::deleteFile(hm_path);
@@ -3839,7 +3840,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		}
 		file.close();
 
-		if (!file.open(albedo_path)) {
+		if (!fs.open(albedo_path, file)) {
 			logError("Failed to create texture ", albedo_path);
 			os::deleteFile(hm_path);
 			os::deleteFile(splatmap_path);
@@ -3862,7 +3863,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		)#";
 		file.close();
 
-		if (!file.open(normal_path)) {
+		if (!fs.open(normal_path, file)) {
 			logError("Failed to create texture ", normal_path);
 			os::deleteFile(albedo_path);
 			os::deleteFile(hm_path);
@@ -3886,7 +3887,7 @@ struct AddTerrainComponentPlugin final : StudioApp::IAddComponentPlugin
 		)#";
 		file.close();
 
-		if (!file.open(normalized_material_path))
+		if (!fs.open(normalized_material_path, file))
 		{
 			logError("Failed to create material ", normalized_material_path);
 			os::deleteFile(normal_path);
