@@ -47,8 +47,10 @@ struct LUMIX_EDITOR_API Settings {
 	bool load();
 	void onGUI();
 	void setValue(const char* name, bool value) const;
+	void setValue(const char* name, float value) const;
 	void setValue(const char* name, int value) const;
 	void setValue(const char* name, const char* value) const;
+	float getValue(const char* name, float default_value) const;
 	int getValue(const char* name, int default_value) const;
 	bool getValue(const char* name, bool default_value) const;
 	u32 getValue(const char* name, Span<char> out) const;

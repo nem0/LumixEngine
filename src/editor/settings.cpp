@@ -430,6 +430,15 @@ void Settings::setValue(const char* name, int value) const
 }
 
 
+void Settings::setValue(const char* name, float value) const
+{
+	lua_getglobal(m_state, "custom");
+	lua_pushnumber(m_state, value);
+	lua_setfield(m_state, -2, name);
+	lua_pop(m_state, 1);
+}
+
+
 void Settings::setValue(const char* name, const char* value) const
 {
 	lua_getglobal(m_state, "custom");
@@ -459,6 +468,20 @@ int Settings::getValue(const char* name, int default_value) const
 	lua_getglobal(m_state, "custom");
 	int v = getIntegerField(m_state, name, default_value);
 	lua_pop(m_state, 1);
+	return v;
+}
+
+
+float Settings::getValue(const char* name, float default_value) const
+{
+	float v = default_value;
+	lua_getglobal(m_state, "custom");
+	lua_getfield(m_state, -1, name);
+	if (lua_type(m_state, -1) == LUA_TNUMBER)
+	{
+		v = (float)lua_tonumber(m_state, -1);
+	}
+	lua_pop(m_state, 2);
 	return v;
 }
 
