@@ -314,6 +314,7 @@ template <typename T> struct Array {
 				moveRange(m_data, old_data, idx);
 				moveRange(m_data + idx + 1, old_data + idx, m_size - idx);
 				m_allocator.deallocate_aligned(old_data);
+				m_capacity = new_capacity;
 			}
 			else {
 				moveRange(m_data + idx + 1, m_data + idx, m_size - idx);
