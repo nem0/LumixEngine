@@ -618,6 +618,8 @@ SceneView::SceneView(StudioApp& app)
 	m_move_down_action.init("Move down", "Move camera down", "moveDown", "", false);
 	m_camera_speed_action.init(ICON_FA_CAMERA "Camera speed", "Reset camera speed", "cameraSpeed", ICON_FA_CAMERA, false);
 	m_camera_speed_action.func.bind<&SceneView::resetCameraSpeed>(this);
+	m_search_action.init("Search", "Search models or actions", "search", ICON_FA_SEARCH, (os::Keycode)'Q', (u8)Action::Modifiers::CTRL, true);
+	m_search_action.func.bind<&SceneView::toggleSearch>(this);
 
 	m_app.addAction(&m_copy_move_action);
 	m_app.addAction(&m_orbit_action);
@@ -629,6 +631,7 @@ SceneView::SceneView(StudioApp& app)
 	m_app.addAction(&m_move_up_action);
 	m_app.addAction(&m_move_down_action);
 	m_app.addAction(&m_camera_speed_action);
+	m_app.addAction(&m_search_action);
 
 	const ResourceType pipeline_type("pipeline");
 	m_app.getAssetCompiler().registerExtension("pln", pipeline_type); 
@@ -669,6 +672,7 @@ SceneView::~SceneView()
 	m_app.removeAction(&m_move_up_action);
 	m_app.removeAction(&m_move_down_action);
 	m_app.removeAction(&m_camera_speed_action);
+	m_app.removeAction(&m_search_action);
 	m_editor.setView(nullptr);
 	LUMIX_DELETE(m_app.getAllocator(), m_view);
 	m_debug_shape_shader->decRefCount();
@@ -1297,6 +1301,73 @@ void SceneView::statsUI(float x, float y) {
 	ImGui::PopStyleColor();
 }
 
+void SceneView::searchUI() {
+
+	if (m_search_request) {
+		ImGui::OpenPopup("Search");
+	}
+
+	if (ImGuiEx::BeginResizablePopup("Search", ImVec2(300, 200))) {
+		if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) {
+			ImGui::CloseCurrentPopup();
+		}
+
+		if(m_search_request) ImGui::SetKeyboardFocusHere();
+		ImGui::SetNextItemWidth(-1);
+		ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_search_buf, sizeof(m_search_buf));
+		if (m_search_buf[0]) {
+			if (ImGui::BeginChild("##list")) {
+				const auto& resources = m_app.getAssetCompiler().lockResources();
+				for (const auto& res : resources) {
+					if (res.type != Model::TYPE) continue;
+
+					if (stristr(res.path.c_str(), m_search_buf) != 0) {
+						if (ImGui::Selectable(res.path.c_str())) {
+							const RayCastModelHit hit = castRay(0.5f, 0.5f);
+							const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
+
+							m_editor.beginCommandGroup("insert_mesh");
+							EntityRef entity = m_editor.addEntity();
+							m_editor.setEntitiesPositions(&entity, &pos, 1);
+							m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
+							m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), res.path);
+							m_editor.endCommandGroup();
+
+							ImGui::CloseCurrentPopup();
+						}
+					} 
+				}
+
+				ImGui::Separator();
+				ImGui::TextUnformatted("Actions:");
+				const auto& actions = m_app.getActions();
+				for (Action* act : actions) {
+					if (stristr(act->label_long, m_search_buf)) {
+						char buf[20] = " (";
+						getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
+						if (buf[2]) {
+							catString(buf, ")");
+						}
+						else { 
+							buf[0] = '\0';
+						}
+						if (ImGui::Selectable(StaticString<128>(act->label_long, buf))) {
+							ImGui::CloseCurrentPopup();
+							act->func.invoke();
+							break;
+						}
+					}
+				}
+
+				m_app.getAssetCompiler().unlockResources();
+			}
+			ImGui::EndChild();
+		}
+		ImGui::EndPopup();
+	}
+	m_search_request = false;
+}
+
 void SceneView::onWindowGUI()
 {
 	PROFILE_FUNCTION();
@@ -1368,8 +1439,12 @@ void SceneView::onWindowGUI()
 	if (m_is_mouse_captured && os::getFocused() != ImGui::GetWindowViewport()->PlatformHandle) {
 		captureMouse(false);
 	}
+
+
 	ImGui::End();
 	ImGui::PopStyleVar();
+
+	searchUI();
 
 	if (is_open) statsUI(view_pos.x, view_pos.y);
 }

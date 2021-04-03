@@ -51,9 +51,12 @@ struct SceneView : StudioApp::GUIPlugin
 		void resetCameraSpeed();
 		void handleEvents();
 		void statsUI(float x, float y);
+		void toggleSearch() { m_search_request = true; }
+		void searchUI();
 
 	private:
 		StudioApp& m_app;
+		Action m_search_action;
 		Action m_orbit_action;
 		Action m_toggle_gizmo_step_action;
 		Action m_copy_move_action;
@@ -67,6 +70,8 @@ struct SceneView : StudioApp::GUIPlugin
 		bool m_is_mouse_captured;
 		bool m_copy_moved = false;
 		bool m_show_stats;
+		bool m_search_request = false;
+		char m_search_buf[128] = "";
 		int m_screen_x;
 		int m_screen_y;
 		int m_width;

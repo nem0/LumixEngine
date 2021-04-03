@@ -151,7 +151,6 @@ void getShortcut(const Action& action, Span<char> buf) {
 		char tmp[64];
 		os::getKeyName(action.shortcut, Span(tmp));
 		if (tmp[0] == 0) return;
-		catString(buf, " ");
 		catString(buf, tmp);
 	}
 }
