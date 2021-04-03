@@ -271,6 +271,13 @@ void GameView::onWindowGUI()
 	WorldEditor& editor = m_app.getWorldEditor();
 	m_pipeline->setUniverse(editor.getUniverse());
 
+	const bool is_game_mode = m_app.getWorldEditor().isGameMode();
+	if (is_game_mode && !m_was_game_mode) {
+		ImGui::SetNextWindowFocus();
+		m_is_open = true;
+	}
+	m_was_game_mode = is_game_mode;
+
 	ImGuiIO& io = ImGui::GetIO();
 	if (m_is_mouse_captured && (io.KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)] || !editor.isGameMode())) {
 		captureMouse(false);

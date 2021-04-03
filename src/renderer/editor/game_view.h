@@ -65,6 +65,7 @@ private:
 	bool m_is_ingame_cursor;
 	bool m_is_fullscreen;
 	bool m_show_stats;
+	bool m_was_game_mode = false;
 	os::CursorType m_cursor_type = os::CursorType::DEFAULT;
 	struct
 	{
