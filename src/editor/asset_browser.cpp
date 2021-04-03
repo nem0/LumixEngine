@@ -253,6 +253,15 @@ struct AssetBrowserImpl : AssetBrowser {
 	{
 		const char* c = m_dir.data;
 		char tmp[LUMIX_MAX_PATH];
+		if (m_dir[0] != '.' || m_dir[1] != 0) {
+			if (ImGui::Button(".")) {
+				changeDir(".");
+			}
+			ImGui::SameLine();
+			ImGui::TextUnformatted("/");
+			ImGui::SameLine();
+		}
+
 		while (*c)
 		{
 			char* c_out = tmp;
@@ -270,9 +279,9 @@ struct AssetBrowserImpl : AssetBrowser {
 				copyNString(Span(new_dir), m_dir, int(c - m_dir.data));
 				changeDir(new_dir);
 			}
-			ImGui::SameLine(0, 1);
-			ImGui::Text("%s", "/");
-			ImGui::SameLine(0, 1);
+			ImGui::SameLine();
+			ImGui::TextUnformatted("/");
+			ImGui::SameLine();
 		}
 		ImGui::NewLine();
 	}
@@ -284,7 +293,7 @@ struct AssetBrowserImpl : AssetBrowser {
 		ImGui::BeginChild("left_col", size);
 		ImGui::PushItemWidth(120);
 		bool b = false;
-		if (ImGui::Selectable("..", &b))
+		if ((m_dir[0] != '.' || m_dir[1] != 0) && ImGui::Selectable("..", &b))
 		{
 			char dir[LUMIX_MAX_PATH];
 			copyString(Span(dir), Path::getDir(m_dir));
@@ -753,11 +762,19 @@ struct AssetBrowserImpl : AssetBrowser {
 			}
 
 			float checkbox_w = ImGui::GetCursorPosX();
-			ImGui::SetNextItemWidth(100);
-			if (ImGui::SliderFloat("##icon_size", &m_thumbnail_size, 0.3f, 3.f)) {
-				m_thumbnail_size = clamp(m_thumbnail_size, 0.3f, 3.0f);
-				refreshLabels();
+			if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) {
+				ImGui::OpenPopup("ab_settings");
 			}
+			if (ImGui::BeginPopup("ab_settings")) {
+				ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
+				if (ImGui::Checkbox("Subresources", &m_show_subresources)) changeDir(m_dir);
+				ImGui::SetNextItemWidth(100);
+				if (ImGui::SliderFloat("Icon size", &m_thumbnail_size, 0.3f, 3.f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
+					refreshLabels();
+				}
+				ImGui::EndPopup();
+			}
+
 			ImGui::SameLine();
 			checkbox_w = ImGui::GetCursorPosX() - checkbox_w;
 			ImGui::PushItemWidth(100);
@@ -769,13 +786,6 @@ struct AssetBrowserImpl : AssetBrowser {
 				doFilter();
 			}
 
-			ImGui::SameLine();
-			ImGui::Checkbox("Thumbnails", &m_show_thumbnails);
-			ImGui::SameLine();
-			if (ImGui::Checkbox("Subresources", &m_show_subresources)) {
-				changeDir(m_dir);
-			}
-		
 			ImGui::SameLine();
 			breadcrumbs();
 			ImGui::Separator();
