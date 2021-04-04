@@ -135,11 +135,7 @@ function geomPass(entities)
 		local dsbuffer = createRenderbuffer { width = viewport_w, height = viewport_h, format = "depth24stencil8", debug_name = "gbuffer_ds" }
 	
 		setRenderTargetsDS(gbuffer0, gbuffer1, gbuffer2, dsbuffer)
-		if PREVIEW ~= nil then
-			clear(CLEAR_ALL, 0.9, 0.9, 0.9, 1, 0)
-		else
-			clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
-		end
+		clear(CLEAR_ALL, 0.0, 0.0, 0.0, 1, 0)
 		local view_params = getCameraParams()
 		pass(view_params)
 		renderTerrains(view_params, terrain_state)
@@ -381,6 +377,7 @@ end
 
 function render_preview()
 	local view_params = getCameraParams()
+	fillClusters()
 	local entities = cull(view_params)
 	
 	local rb = createRenderbuffer { width = viewport_w, height = viewport_h, format = "rgba16f", debug_name = "preview_rb" }
@@ -424,18 +421,14 @@ function main()
 	
 	custom_tonemap = false
 	local res = hdr_buffer
-	if PREVIEW == nil then
-		res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
-	end
+	res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	
 	waterPass(entities, res, gbuffer_depth)
 	transparentPass(entities, res, gbuffer_depth, shadowmap)
 	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 
-	if PREVIEW == nil then
-		res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
-	end
-	
+	res = postprocess("post", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
+
 	if PROBE == nil then
 		if custom_tonemap == true then
 			res = postprocess("tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
@@ -444,7 +437,7 @@ function main()
 		end
 	end
 
-	if PREVIEW == nil and PROBE == nil then
+	if PROBE == nil then
 		res = postprocess("post_tonemap", res, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	end
 
