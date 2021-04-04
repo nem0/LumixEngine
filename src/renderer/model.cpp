@@ -596,7 +596,6 @@ bool Model::load(u64 size, const u8* mem)
 		return true;
 	}
 
-	logError("Error loading model ", getPath());
 	return false;
 }
 

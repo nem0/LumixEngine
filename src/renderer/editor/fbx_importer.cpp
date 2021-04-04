@@ -2298,9 +2298,9 @@ void FBXImporter::writeModel(const char* src, const ImportConfig& cfg)
 	for (const ImportMesh& m : m_meshes) {
 		if (m.import) import_any_mesh = true;
 	}
-	if (!import_any_mesh) return;
+	if (!import_any_mesh && m_animations.empty()) return;
 
-	qsort(&m_meshes[0], m_meshes.size(), sizeof(m_meshes[0]), cmpMeshes);
+	if (!m_meshes.empty()) qsort(&m_meshes[0], m_meshes.size(), sizeof(m_meshes[0]), cmpMeshes);
 	out_file.clear();
 	writeModelHeader();
 	writeMeshes(src, -1, cfg);

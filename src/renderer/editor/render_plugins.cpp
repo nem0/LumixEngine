@@ -2450,8 +2450,10 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 
 		Resource* resource = m_tile.queue.front();
 		if (resource->isFailure()) {
-			logError("Failed to load ", resource->getPath());
+			StaticString<LUMIX_MAX_PATH> out_path(".lumix/asset_tiles/", resource->getPath().getHash(), ".dds");
+			m_app.getEngine().getFileSystem().copyFile("editor/textures/tile_animation.dds", out_path);
 			popTileQueue();
+			m_app.getAssetBrowser().reloadTile(m_tile.path_hash);
 			return;
 		}
 		if (!resource->isReady()) return;
