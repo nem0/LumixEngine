@@ -52,7 +52,8 @@ fragment_shader [[
 		#ifdef ALPHA_CUTOUT
 			if(albedo.a < 0.5) discard;
 		#endif
-		o_color.rgb = albedo.rgb * saturate(dot(-Global.light_dir.xyz, v_normal) + 0.75);
+		float d = dot(Global.light_dir.xyz, v_normal);
+		o_color.rgb = albedo.rgb * saturate(max(0, -d) + 0.25 * max(0, d) + 0.25);
 		o_color.a = 1;
 		if(length(wpos) < length(v_wpos)) o_color.rgb *= 0.25;
 	}

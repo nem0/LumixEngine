@@ -215,7 +215,7 @@ void Resource::removeDependency(Resource& dependent_resource)
 	dependent_resource.m_cb.unbind<&Resource::onStateChanged>(this);
 	if (dependent_resource.isEmpty()) 
 	{
-		ASSERT(m_empty_dep_count > 0); 
+		ASSERT(m_empty_dep_count > 1 || (m_empty_dep_count == 1 && !m_async_op.isValid())); 
 		--m_empty_dep_count;
 	}
 	if (dependent_resource.isFailure())
