@@ -840,14 +840,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			if (Path::hasExtension(m_in_path, "dds")) {
 				os::InputFile file;
 				if (!file.open(m_in_path)) {
-					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
 					logError("Failed to load ", m_in_path);
 					return;
 				}
 				Array<u8> data(allocator);
 				data.resize((int)file.size());
 				if (!file.read(&data[0], data.size())) {
-					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
 					logError("Failed to read ", m_in_path);
 					file.close();
 					return;
@@ -857,7 +857,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				nvtt::Surface surface;
 				if (!surface.load(m_in_path, data.begin(), data.byte_size())) {
 					logError("Failed to load ", m_in_path);
-					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
 					return;
 				}
 
@@ -892,14 +892,14 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				os::InputFile file;
 				if (!file.open(m_in_path)) {
 					logError("Failed to load ", m_in_path);
-					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
 					return;
 				}
 				Array<u8> tmp(m_allocator);
 				tmp.resize((u32)file.size());
 				if (!file.read(tmp.begin(), tmp.byte_size())) {
 					logError("Failed to load ", m_in_path);
-					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
 					return;
 				}
 				file.close();
@@ -908,7 +908,7 @@ struct TexturePlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 				if (!data)
 				{
 					logError("Failed to load ", m_in_path);
-					m_filesystem.copyFile("models/editor/tile_texture.dds", out_path);
+					m_filesystem.copyFile("editor/textures/tile_texture.dds", out_path);
 					return;
 				}
 
@@ -2630,7 +2630,7 @@ struct ModelPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 	bool createTile(const char* in_path, const char* out_path, ResourceType type) override
 	{
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		if (type == Shader::TYPE) return fs.copyFile("models/editor/tile_shader.dds", out_path);
+		if (type == Shader::TYPE) return fs.copyFile("editor/textures/tile_shader.dds", out_path);
 
 		if (type != Model::TYPE && type != Material::TYPE && type != PrefabResource::TYPE) return false;
 

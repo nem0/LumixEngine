@@ -101,7 +101,7 @@ struct AssetPlugin : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 		if (type == LuaScript::TYPE)
 		{
 			FileSystem& fs = m_app.getEngine().getFileSystem();
-			return fs.copyFile("models/editor/tile_lua_script.dds", out_path);
+			return fs.copyFile("editor/textures/tile_lua_script.dds", out_path);
 		}
 		return false;
 	}

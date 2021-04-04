@@ -867,10 +867,10 @@ struct StudioAppImpl final : StudioApp
 
 		PROFILE_FUNCTION();
 		profiler::blockColor(0x7f, 0x7f, 0x7f);
-		m_asset_compiler->update();
 		if (m_watched_plugin.reload_request) tryReloadPlugin();
 
 		guiBeginFrame();
+		m_asset_compiler->update();
 
 		float time_delta = m_engine->getLastTimeDelta();
 
