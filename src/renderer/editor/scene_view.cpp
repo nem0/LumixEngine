@@ -828,7 +828,7 @@ void SceneView::renderIcons()
 				gpu::bindIndexBuffer(rd->index_buffer_handle);
 				gpu::bindVertexBuffer(0, rd->vertex_buffer_handle, 0, rd->vb_stride);
 				gpu::bindVertexBuffer(1, gpu::INVALID_BUFFER, 0, 0);
-				gpu::setState(item.material->render_states);
+				gpu::setState(item.material->render_states | gpu::StateFlags::DEPTH_TEST | gpu::StateFlags::DEPTH_WRITE);
 				gpu::drawTriangles(0, rd->indices_count, rd->index_type);
 			}
 		}
