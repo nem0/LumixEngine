@@ -453,12 +453,6 @@ struct MaterialPlugin final : AssetBrowser::IPlugin, AssetCompiler::IPlugin
 			}
 		}
 
-		for (Resource* res : resources) {
-			if (!res->isReady()) {
-				ImGui::Text("%s is not ready", res->getPath().c_str());
-				return;
-			}
-		}
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_SAVE "Save")) {
 			for (Material* res : resources) {

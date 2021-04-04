@@ -329,6 +329,12 @@ bool equalStrings(const char* lhs, const char* rhs)
 	return strcmp(lhs, rhs) == 0;
 }
 
+bool equalStrings(Span<const char> lhs, Span<const char> rhs)
+{
+	if (rhs.length() != lhs.length()) return false;
+	return strncmp(lhs.begin(), rhs.begin(), lhs.length()) == 0;
+}
+
 
 bool equalIStrings(const char* lhs, const char* rhs)
 {

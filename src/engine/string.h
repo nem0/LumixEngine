@@ -44,6 +44,7 @@ LUMIX_ENGINE_API bool makeLowercase(Span<char> output, const char* source);
 LUMIX_ENGINE_API bool startsWith(const char* str, const char* prefix);
 LUMIX_ENGINE_API int stringLength(const char* str);
 LUMIX_ENGINE_API bool equalStrings(const char* lhs, const char* rhs);
+LUMIX_ENGINE_API bool equalStrings(Span<const char> lhs, Span<const char> rhs);
 LUMIX_ENGINE_API bool equalIStrings(const char* lhs, const char* rhs);
 LUMIX_ENGINE_API int compareMemory(const void* lhs, const void* rhs, size_t size);
 LUMIX_ENGINE_API int compareString(const char* lhs, const char* rhs);

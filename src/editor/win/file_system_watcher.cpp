@@ -137,7 +137,11 @@ static void CALLBACK notif(DWORD status, DWORD tferred, LPOVERLAPPED over)
 				task->m_watcher.m_callback.invoke(tmp);
 			}
 			break;
-			case FILE_ACTION_RENAMED_OLD_NAME: break;
+			case FILE_ACTION_RENAMED_OLD_NAME:
+				char tmp[MAX_PATH];
+				wcharToCharArray(info->FileName, tmp, info->FileNameLength);
+				task->m_watcher.m_callback.invoke(tmp);
+				break;
 			default: ASSERT(false); break;
 		}
 		info = info->NextEntryOffset == 0

@@ -461,6 +461,7 @@ bool Model::parseMeshes(InputMemoryStream& file, FileVersion version)
 	char model_dir[LUMIX_MAX_PATH];
 	copyString(Span(model_dir), Path::getDir(getPath().c_str()));
 
+	ASSERT(m_meshes.empty());
 	m_meshes.reserve(object_count);
 	for (int i = 0; i < object_count; ++i)
 	{

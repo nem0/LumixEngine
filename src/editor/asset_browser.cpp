@@ -149,8 +149,39 @@ struct AssetBrowserImpl : AssetBrowser {
 		m_app.getAssetCompiler().listChanged().bind<&AssetBrowserImpl::onResourceListChanged>(this);
 	}
 
-	void onResourceListChanged() {
-		m_dirty = true;
+	void onResourceListChanged(const Path& path) {
+		Span<const char> dir = Path::getDir(path.c_str());
+		if (dir.length() > 0 && (*(dir.m_end - 1) == '/' || *(dir.m_end - 1) == '\\')) {
+			--dir.m_end;
+		}
+		if (!equalStrings(dir, Span<const char>(m_dir, (u32)strlen(m_dir)))) return;
+
+		Engine& engine = m_app.getEngine();
+		FileSystem& fs = engine.getFileSystem();
+		RenderInterface* ri = m_app.getRenderInterface();
+
+		for (i32 i = 0; i < m_file_infos.size(); ++i) {
+			FileInfo& info = m_file_infos[i];
+			if (info.filepath != path.c_str()) continue;
+			
+			switch (getState(info, fs)) {
+				case TileState::DELETED:
+					ri->unloadTexture(info.tex);
+					info.create_called = false;
+					m_file_infos.erase(i);
+					return;
+				case TileState::NOT_CREATED:
+				case TileState::OUTDATED:
+					ri->unloadTexture(info.tex);
+					info.create_called = false;
+					info.tex = nullptr;
+					return;
+				case TileState::OK: return;
+			}
+		}
+
+		addTile(path);
+		sortTiles();
 	}
 
 	void unloadResources()
@@ -185,10 +216,31 @@ struct AssetBrowserImpl : AssetBrowser {
 		for (auto* plugin : m_plugins) plugin->update();
 	}
 
+	void addTile(const Path& path) {
+		if (!m_show_subresources && contains(path.c_str(), ':')) return;
+
+		FileInfo tile;
+		char filename[LUMIX_MAX_PATH];
+		Span<const char> subres = getSubresource(path.c_str());
+		if (*subres.end()) {
+			copyNString(Span(filename), subres.begin(), subres.length());
+			catString(filename, ":");
+			catString(Span(filename), Path::getBasename(path.c_str()));
+		}
+		else {
+			copyString(Span(filename), Path::getBasename(path.c_str()));
+		}
+		clampText(filename, int(TILE_SIZE * m_thumbnail_size));
+
+		tile.file_path_hash = path.getHash();
+		tile.filepath = path.c_str();
+		tile.clamped_filename = filename;
+
+		m_file_infos.push(tile);
+	}
 
 	void changeDir(const char* path)
 	{
-		m_dirty = false;
 		Engine& engine = m_app.getEngine();
 		RenderInterface* ri = m_app.getRenderInterface();
 		for (FileInfo& info : m_file_infos) {
@@ -217,37 +269,21 @@ struct AssetBrowserImpl : AssetBrowser {
 		auto& resources = compiler.lockResources();
 		for (const AssetCompiler::ResourceItem& res : resources) {
 			if (res.dir_hash != dir_hash) continue;
-			if (!m_show_subresources && contains(res.path.c_str(), ':')) continue;
-
-			FileInfo tile;
-			char filename[LUMIX_MAX_PATH];
-			Span<const char> subres = getSubresource(res.path.c_str());
-			if (*subres.end()) {
-				copyNString(Span(filename), subres.begin(), subres.length());
-				catString(filename, ":");
-				catString(Span(filename), Path::getBasename(res.path.c_str()));
-			}
-			else {
-				copyString(Span(filename), Path::getBasename(res.path.c_str()));
-			}
-			clampText(filename, int(TILE_SIZE * m_thumbnail_size));
-
-			tile.file_path_hash = res.path.getHash();
-			tile.filepath = res.path.c_str();
-			tile.clamped_filename = filename;
-
-			m_file_infos.push(tile);
+			addTile(res.path);
 		}
-		qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
-			FileInfo* m = (FileInfo*)a;
-			FileInfo* n = (FileInfo*)b;
-			return strcmp(m->filepath.data, n->filepath.data);
-		});
+		sortTiles();
 		compiler.unlockResources();
 
 		doFilter();
 	}
 
+	void sortTiles() {
+		qsort(m_file_infos.begin(), m_file_infos.size(), sizeof(m_file_infos[0]), [](const void* a, const void* b){
+			FileInfo* m = (FileInfo*)a;
+			FileInfo* n = (FileInfo*)b;
+			return strcmp(m->filepath.data, n->filepath.data);
+		});
+	}
 
 	void breadcrumbs()
 	{
@@ -354,6 +390,31 @@ struct AssetBrowserImpl : AssetBrowser {
 		}
 	}
 
+	enum class TileState {
+		OK,
+		OUTDATED,
+		DELETED,
+		NOT_CREATED
+	};
+	
+	static TileState getState(const FileInfo& info, FileSystem& fs) {
+		StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", info.file_path_hash, ".dds");
+		if (!fs.fileExists(info.filepath)) return TileState::DELETED;
+		if (!fs.fileExists(path)) return TileState::NOT_CREATED;
+
+		StaticString<LUMIX_MAX_PATH> compiled_path(".lumix/assets/", info.file_path_hash, ".res");
+		const u64 last_modified = fs.getLastModified(path);
+		if (last_modified < fs.getLastModified(info.filepath) || last_modified < fs.getLastModified(compiled_path)) {
+			return TileState::OUTDATED;
+		}
+
+		StaticString<LUMIX_MAX_PATH> meta_path(info.filepath, ".meta");
+		if (fs.getLastModified(meta_path) > last_modified) {
+			return TileState::OUTDATED;
+		}
+
+		return TileState::OK;
+	}
 
 	void thumbnail(FileInfo& tile, float size, bool selected)
 	{
@@ -372,22 +433,19 @@ struct AssetBrowserImpl : AssetBrowser {
 		else
 		{
 			ImGuiEx::Rect(img_size.x, img_size.y, 0xffffFFFF);
+			StaticString<LUMIX_MAX_PATH> compiled_asset_path(".lumix/assets/", tile.file_path_hash, ".res");
 			StaticString<LUMIX_MAX_PATH> path(".lumix/asset_tiles/", tile.file_path_hash, ".dds");
 			FileSystem& fs = m_app.getEngine().getFileSystem();
-			if (fs.fileExists(path))
-			{
-				if (fs.getLastModified(path) >= fs.getLastModified(tile.filepath))
-				{
+			switch (getState(tile, fs)) {
+				case TileState::OK:
 					tile.tex = ri->loadTexture(Path(path));
-				}
-				else
-				{
+					break;
+				case TileState::NOT_CREATED:
+				case TileState::OUTDATED:
 					createTile(tile, path);
-				}
-			}
-			else
-			{
-				createTile(tile, path);
+					break;
+				case TileState::DELETED:
+					break;
 			}
 		}
 		ImVec2 text_size = ImGui::CalcTextSize(tile.clamped_filename);
@@ -525,7 +583,6 @@ struct AssetBrowserImpl : AssetBrowser {
 						StaticString<LUMIX_MAX_PATH> rel_path(m_dir, "/", tmp, ".", plugin->getDefaultExtension());
 						StaticString<LUMIX_MAX_PATH> full_path(base_path, rel_path);
 						plugin->createResource(full_path);
-						changeDir(m_dir);
 						m_wanted_resource = rel_path;
 						ImGui::CloseCurrentPopup();
 					}
@@ -564,9 +621,6 @@ struct AssetBrowserImpl : AssetBrowser {
 					if (!fs.moveFile(m_file_infos[m_context_resource].filepath, new_path)) {
 						logError("Failed to rename ", m_file_infos[m_context_resource].filepath, " to ", new_path);
 					}
-					else {
-						changeDir(m_dir);
-					}
 					ImGui::CloseCurrentPopup();
 				}
 				ImGui::EndMenu();
@@ -587,7 +641,6 @@ struct AssetBrowserImpl : AssetBrowser {
 			ImGui::Text("Are you sure? This can not be undone.");
 			if (ImGui::Button("Yes, delete", ImVec2(100, 0))) {
 				deleteTile(m_context_resource);
-				changeDir(m_dir);
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::SameLine(ImGui::GetWindowWidth() - 100 - ImGui::GetStyle().WindowPadding.x);
@@ -623,7 +676,6 @@ struct AssetBrowserImpl : AssetBrowser {
 				StaticString<LUMIX_MAX_PATH> path(m_dir, "/", m_prefab_name, ".fab");
 				m_app.getWorldEditor().getPrefabSystem().savePrefab((EntityRef)m_dropped_entity, Path(path));
 				m_dropped_entity = INVALID_ENTITY;
-				changeDir(m_dir);
 			}
 			if (ImGui::Selectable(ICON_FA_TIMES "Cancel")) {
 				m_dropped_entity = INVALID_ENTITY;
@@ -744,7 +796,6 @@ struct AssetBrowserImpl : AssetBrowser {
 
 	void onGUI() override {
 		if (m_dir.data[0] == '\0') changeDir(".");
-		if (m_dirty) changeDir(m_dir);
 
 		if (!m_wanted_resource.isEmpty()) {
 			selectResource(m_wanted_resource, true, false);
@@ -1175,7 +1226,6 @@ struct AssetBrowserImpl : AssetBrowser {
 	float m_left_column_width = 120;
 	StudioApp& m_app;
 	StaticString<LUMIX_MAX_PATH> m_dir;
-	bool m_dirty = false;
 	Array<StaticString<LUMIX_MAX_PATH> > m_subdirs;
 	Array<FileInfo> m_file_infos;
 	Array<ImmediateTile> m_immediate_tiles;

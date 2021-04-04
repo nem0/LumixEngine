@@ -165,7 +165,7 @@ struct AssetCompilerImpl : AssetCompiler
 		fillDB();
 	}
 
-	DelegateList<void()>& listChanged() override {
+	DelegateList<void(const Path&)>& listChanged() override {
 		return m_on_list_changed;
 	}
 
@@ -523,6 +523,7 @@ struct AssetCompilerImpl : AssetCompiler
 		FileSystem& fs = m_app.getEngine().getFileSystem();
 		if (!fs.fileExists(filepath)) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 		if (startsWith(filepath, ".lumix/assets/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
+		if (startsWith(filepath, ".lumix/asset_tiles/")) return ResourceManagerHub::LoadHook::Action::IMMEDIATE;
 
 		const u32 hash = res.getPath().getHash();
 		const StaticString<LUMIX_MAX_PATH> dst_path(".lumix/assets/", hash, ".res");
@@ -652,7 +653,6 @@ struct AssetCompilerImpl : AssetCompiler
 			}
 		}
 
-		bool changed = false;
 		for (;;) {
 			Path path_obj;
 			{
@@ -684,10 +684,7 @@ struct AssetCompilerImpl : AssetCompiler
 					reloadSubresources(removed_subresources);
 				}
 			}
-			changed = true;
-		}
-		if (changed) {
-			m_on_list_changed.invoke();
+			m_on_list_changed.invoke(path_obj);
 		}
 	}
 
@@ -749,7 +746,7 @@ struct AssetCompilerImpl : AssetCompiler
 	Mutex m_resources_mutex;
 	HashMap<u32, ResourceItem, HashFuncDirect<u32>> m_resources;
 	HashMap<u32, ResourceType, HashFuncDirect<u32>> m_registered_extensions;
-	DelegateList<void()> m_on_list_changed;
+	DelegateList<void(const Path& path)> m_on_list_changed;
 	bool m_init_finished = false;
 	Array<Resource*> m_on_init_load;
 

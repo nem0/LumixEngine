@@ -681,23 +681,23 @@ u8* Texture::getDDSInfo(const void* data, gpu::TextureDesc& desc) {
 	}
 #endif
 
-static bool loadDDS(Texture& texture, IInputStream& file)
+static bool loadDDS(Texture& texture, const u8* data, u32 size)
 {
 	if(texture.data_reference > 0) {
 		logError("Unsupported texture format ", texture.getPath(), " to access on CPU. Use uncompressed TGA without mipmaps or RAW.");
 	}
 
-	const u8* data = (const u8*)file.getBuffer();
 	gpu::TextureDesc desc;
-	const u8* image_data = Texture::getDDSInfo(data + 7, desc);
+	const u8* image_data = Texture::getDDSInfo(data, desc);
 	if (!image_data) {
 		logError("Corrupted or unsupported dds ", texture.getPath());
 		return false;
 	};
 
-	const u32 offset = u32(image_data - (const u8*)file.getBuffer());
-	if (offset >= (u32)file.size()) return false;
-	Renderer::MemRef mem = texture.renderer.copy(image_data, (u32)file.size() - offset);
+	const u32 offset = u32(image_data - data);
+	if (offset >= size) return false;
+
+	Renderer::MemRef mem = texture.renderer.copy(image_data, size - offset);
 	texture.handle = texture.renderer.loadTexture(desc, mem, texture.getGPUFlags(), texture.getPath().c_str());
 	if (texture.handle) {
 		texture.width = desc.width;
@@ -739,6 +739,12 @@ bool Texture::load(u64 size, const u8* mem)
 {
 	PROFILE_FUNCTION();
 	profiler::pushString(getPath().c_str());
+	
+	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
+		m_size = size;
+		return loadDDS(*this, mem, (u32)size);
+	}
+	
 	char ext[4] = {};
 	InputMemoryStream file(mem, size);
 	if (!file.read(ext, 3)) return false;
@@ -753,7 +759,7 @@ bool Texture::load(u64 size, const u8* mem)
 	#endif
 
 	if (equalIStrings(ext, "dds")) {
-		loaded = loadDDS(*this, file);
+		loaded = loadDDS(*this, (const u8*)file.getBuffer() + file.getPosition(), u32(file.size() - file.getPosition()));
 	}
 	else if (equalIStrings(ext, "raw")) {
 		loaded = loadRaw(*this, file, allocator);

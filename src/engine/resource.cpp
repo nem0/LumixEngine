@@ -75,6 +75,11 @@ void Resource::checkState()
 				return;
 			}
 
+			if (m_failed_dep_count != 0) {
+				checkState();
+				return;
+			}
+
 			m_current_state = State::READY;
 			#ifdef LUMIX_DEBUG
 				m_invoking = true;
@@ -171,14 +176,20 @@ void Resource::doLoad()
 
 	if (m_async_op.isValid()) return;
 
+	ASSERT(m_current_state != State::READY);
+
 	FileSystem& fs = m_resource_manager.getOwner().getFileSystem();
 	FileSystem::ContentCallback cb;
 	cb.bind<&Resource::fileLoaded>(this);
 
 	const u32 hash = m_path.getHash();
-	const StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", hash, ".res");
-
-	m_async_op = fs.getContent(Path(res_path), cb);
+	if (startsWith(m_path.c_str(), ".lumix/asset_tiles/")) {
+		m_async_op = fs.getContent(m_path, cb);
+	}
+	else {	
+		const StaticString<LUMIX_MAX_PATH> res_path(".lumix/assets/", hash, ".res");
+		m_async_op = fs.getContent(Path(res_path), cb);
+	}
 }
 
 
