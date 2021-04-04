@@ -335,17 +335,6 @@ public:
 	}
 
 
-	void serializeSceneVersions(OutputMemoryStream& serializer, Universe& ctx)
-	{
-		serializer.write(ctx.getScenes().size());
-		for (UniquePtr<IScene>& scene : ctx.getScenes())
-		{
-			serializer.write(crc32(scene->getPlugin().getName()));
-			serializer.write(scene->getVersion());
-		}
-	}
-
-
 	void serializePluginList(OutputMemoryStream& serializer)
 	{
 		serializer.write((i32)m_plugin_manager->getPlugins().size());
@@ -418,7 +407,6 @@ public:
 		header.version = 0;
 		serializer.write(header);
 		serializePluginList(serializer);
-		//serializeSceneVersions(serializer, ctx);
 		i32 pos = (i32)serializer.size();
 		ctx.serialize(serializer);
 		serializer.write((i32)ctx.getScenes().size());
