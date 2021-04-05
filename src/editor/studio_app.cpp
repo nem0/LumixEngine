@@ -1744,6 +1744,15 @@ struct StudioAppImpl final : StudioApp
 					m_editor->setEntitiesPositions(&child, &pos, 1);
 					m_editor->endCommandGroup();
 				}
+				if (ImGui::MenuItem("Select all children"))
+				{
+					Array<EntityRef> tmp(m_allocator);
+					Universe* universe = m_editor->getUniverse();
+					for (EntityPtr e = universe->getFirstChild(entity); e.isValid(); e = universe->getNextSibling(*e)) {
+						tmp.push(*e);
+					}
+					m_editor->selectEntities(tmp, false);
+				}
 				ImGui::EndPopup();
 			}
 			ImGui::PopID();

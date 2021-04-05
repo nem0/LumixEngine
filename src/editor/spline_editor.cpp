@@ -1,12 +1,19 @@
 #define LUMIX_NO_CUSTOM_CRT
+#include "editor/asset_compiler.h"
 #include "editor/gizmo.h"
+#include "editor/prefab_system.h"
 #include "editor/property_grid.h"
 #include "editor/spline_editor.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/core.h"
+#include "engine/engine.h"
 #include "engine/geometry.h"
+#include "engine/prefab.h"
+#include "engine/resource_manager.h"
+#include "engine/string.h"
 #include "engine/universe.h"
+#include <math.h>
 #include <imgui/imgui.h>
 
 namespace Lumix {
@@ -16,6 +23,7 @@ static const ComponentType SPLINE_TYPE = reflection::getComponentType("spline");
 struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, PropertyGrid::IPlugin {
 	SplineEditorPlugin(StudioApp& app)
 		: m_app(app)
+		, m_selected_prefabs(app.getAllocator())
 	{}
 
 	~SplineEditorPlugin() {
@@ -63,12 +71,12 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			}
 		}
 
-		float t;
-		if (getRayPlaneIntersecion(rel_pos, dir, Vec3(0), n, t)) {
+		UniverseView::RayHit hit = view.getCameraRaycastHit(x, y);
+		if (hit.is_hit) {
 			CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
 			Spline& spline = scene->getSpline(e);
 			m_selected = (i32)spline.points.size();
-			spline.points.push(rel_pos + dir * t);
+			spline.points.push(Vec3(hit.pos - tr.pos));
 		}
 	}
 
@@ -92,6 +100,116 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 		if (spline && !spline->points.empty() && ImGui::Button("Clear")) {
 			spline->points.clear();
 		}
+
+		prefabsList();
+	}
+
+	void prefabsList() {
+		static ImVec2 size(-1, 200);
+		const float w = ImGui::CalcTextSize(ICON_FA_TIMES).x + ImGui::GetStyle().ItemSpacing.x * 2;
+		ImGui::SetNextItemWidth(-w);
+		ImGui::InputTextWithHint("##filter", "Filter", m_filter, sizeof(m_filter));
+		ImGui::SameLine();
+		if (ImGuiEx::IconButton(ICON_FA_TIMES, "Clear filter")) m_filter[0] = '\0';
+
+		if (ImGui::ListBoxHeader("##prefabs", size)) {
+			auto& resources = m_app.getAssetCompiler().lockResources();
+			u32 count = 0;
+			for (const AssetCompiler::ResourceItem& res : resources) {
+				if (res.type != PrefabResource::TYPE) continue;
+				++count;
+				if (m_filter[0] != 0 && stristr(res.path.c_str(), m_filter) == nullptr) continue;
+				int selected_idx = m_selected_prefabs.find([&](PrefabResource* r) -> bool {
+					return r && r->getPath() == res.path;
+				});
+				bool selected = selected_idx >= 0;
+				const char* loading_str = selected_idx >= 0 && m_selected_prefabs[selected_idx]->isEmpty() ? " - loading..." : "";
+				StaticString<LUMIX_MAX_PATH + 15> label(res.path.c_str(), loading_str);
+				if (ImGui::Selectable(label, &selected)) {
+					if (selected) {
+						ResourceManagerHub& manager = m_app.getEngine().getResourceManager();
+						PrefabResource* prefab = manager.load<PrefabResource>(res.path);
+						if (!ImGui::GetIO().KeyShift) {
+							for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+							m_selected_prefabs.clear();
+						}
+						m_selected_prefabs.push(prefab);
+					}
+					else {
+						PrefabResource* prefab = m_selected_prefabs[selected_idx];
+						if (!ImGui::GetIO().KeyShift) {
+							for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+							m_selected_prefabs.clear();
+						}
+						else {
+							m_selected_prefabs.swapAndPop(selected_idx);
+							prefab->decRefCount();
+						}
+					}
+				}
+			}
+			if (count == 0) ImGui::TextUnformatted("No prefabs");
+			m_app.getAssetCompiler().unlockResources();
+			ImGui::ListBoxFooter();
+		}	
+		ImGuiEx::HSplitter("after_prefab", &size);
+		ImGuiEx::Label("Spacing");
+		ImGui::DragFloat("##spacing", &m_spacing);
+		ImGuiEx::Label("Rotate by 90deg");
+		ImGui::Checkbox("##rot90", &m_rotate_by_90deg);
+		ImGuiEx::Label("Place as children");
+		ImGui::Checkbox("##chil", &m_place_as_children);
+
+		if (ImGui::Button("Snap")) snap();
+		ImGui::SameLine();
+		if (ImGui::Button("Place")) {
+			Spline* spline = getSpline();
+			WorldEditor& editor = m_app.getWorldEditor();
+			const EntityRef spline_entity = *getSplineEntity();
+			const Transform tr = editor.getUniverse()->getTransform(spline_entity);
+			float f = 0;
+			float offset = 0;
+			editor.beginCommandGroup("spline_place");
+			for (i32 i = 1; i < spline->points.size(); ++i) {
+				const Vec3 p0 = spline->points[i - 1];
+				const Vec3 p1 = spline->points[i];
+				const float l = length(p0 - p1);
+				const Vec3 dir = (p1 - p0) / l;
+
+				while (f < offset + l) {
+					const EntityPtr e = place(tr.pos + lerp(p0, p1, (f - offset) / l), dir);
+					if (!e.isValid()) break;
+					if (m_place_as_children) editor.makeParent(spline_entity, *e);
+					f += m_spacing;
+				}
+
+				offset += l;
+			}
+			editor.endCommandGroup();
+		}
+	}
+
+	void snap() {
+		Spline* spline = getSpline();
+		for (i32 i = 1; i < spline->points.size(); ++i) {
+			const Vec3 d = spline->points[i] - spline->points[i - 1];
+			const float l = length(d) + 1e-5f;
+			const Vec3 dir = d / l;
+			const u32 count = u32(l / m_spacing + 0.5f);
+			spline->points[i] = spline->points[i - 1] + dir * (m_spacing * count);
+		}
+	}
+
+	EntityPtr place(const DVec3& pos, const Vec3& dir) const {
+		if (m_selected_prefabs.empty()) return INVALID_ENTITY;
+
+		PrefabSystem& prefab_system = m_app.getWorldEditor().getPrefabSystem();
+
+		PrefabResource* res = m_selected_prefabs[rand() % m_selected_prefabs.size()];
+		float a = atan2f(dir.x, dir.z);
+		Quat rot = Quat(Vec3(0, 1, 0), a);
+		if (m_rotate_by_90deg) rot = rot * Quat(0, 0.707f, 0, -0.707f);
+		return prefab_system.instantiatePrefab(*res, pos, rot, 1.f);		
 	}
 
 	void init() override {
@@ -170,7 +288,12 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 	const char* getName() const override { return "spline_editor"; }
 
 	StudioApp& m_app;
+	Array<PrefabResource*> m_selected_prefabs;
 	i32 m_selected = -1;
+	char m_filter[64] = "";
+	bool m_rotate_by_90deg = false;
+	bool m_place_as_children = true;
+	float m_spacing = 1.f;
 };
 
 StudioApp::IPlugin* createSplineEditor(StudioApp& app) {
