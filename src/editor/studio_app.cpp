@@ -10,6 +10,7 @@
 #include "editor/gizmo.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
+#include "editor/spline_editor.h"
 #include "editor/world_editor.h"
 #include "engine/allocators.h"
 #include "engine/associative_array.h"
@@ -2674,6 +2675,8 @@ struct StudioAppImpl final : StudioApp
 			}
 		}
 #endif
+		addPlugin(*createSplineEditor(*this));
+
 		initPlugins();
 		PrefabSystem::createEditorPlugins(*this, m_editor->getPrefabSystem());
 	}

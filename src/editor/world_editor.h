@@ -65,6 +65,7 @@ struct UniverseView {
 	virtual struct WorldEditor& getEditor() = 0;
 };
 
+LUMIX_EDITOR_API void addCircle(UniverseView& view, const DVec3& center, float radius, const Vec3& up, Color color);
 LUMIX_EDITOR_API void addSphere(UniverseView& view, const DVec3& center, float radius, Color color);
 LUMIX_EDITOR_API void addCube(UniverseView& view, const DVec3& center, const Vec3& x, const Vec3& y, const Vec3& z, Color color);
 LUMIX_EDITOR_API void addCube(UniverseView& view, const DVec3& min, const DVec3& max, Color color);

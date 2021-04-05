@@ -301,6 +301,25 @@ void addFrustum(UniverseView& view, const struct ShiftedFrustum& frustum, Color 
 	add_line(o + frustum.points[3], o + frustum.points[7]);
 }
 
+void addCircle(UniverseView& view, const DVec3& center, float radius, const Vec3& up, Color color) {
+	UniverseView::Vertex* vertices = view.render(true, 64);
+	const Vec3 offset = Vec3(center - view.getViewport().pos);
+	const Vec3 x = normalize(fabsf(up.x) > 0.001f ? Vec3(up.y, -up.x, 0) : Vec3(0, up.z, -up.y));
+	const Vec3 y = cross(x, up);
+	for (u32 i = 0; i < 32; ++i) {
+		const float a = i / 32.f * PI * 2;
+		const float b = a + PI * 2 / 32.f;
+		const float sa = sinf(a) * radius;
+		const float ca = cosf(a) * radius;
+		const float sb = sinf(b) * radius;
+		const float cb = cosf(b) * radius;
+		vertices[i * 2].pos = offset + x * ca + y * sa;
+		vertices[i * 2].abgr = color.abgr();
+		vertices[i * 2 + 1].pos = offset + x * cb + y * sb;
+		vertices[i * 2 + 1].abgr = color.abgr();
+	}
+}
+
 void addSphere(UniverseView& view, const DVec3& center, float radius, Color color) {
 	static const int COLS = 36;
 	static const int ROWS = COLS >> 1;
