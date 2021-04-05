@@ -1432,16 +1432,26 @@ void TerrainEditor::entityGUI() {
 			bool selected = selected_idx >= 0;
 			const char* loading_str = selected_idx >= 0 && m_selected_prefabs[selected_idx]->isEmpty() ? " - loading..." : "";
 			StaticString<LUMIX_MAX_PATH + 15> label(res.path.c_str(), loading_str);
-			if (ImGui::Checkbox(label, &selected)) {
+			if (ImGui::Selectable(label, &selected)) {
 				if (selected) {
 					ResourceManagerHub& manager = m_app.getEngine().getResourceManager();
 					PrefabResource* prefab = manager.load<PrefabResource>(res.path);
+					if (!ImGui::GetIO().KeyShift) {
+						for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+						m_selected_prefabs.clear();
+					}
 					m_selected_prefabs.push(prefab);
 				}
 				else {
 					PrefabResource* prefab = m_selected_prefabs[selected_idx];
-					m_selected_prefabs.swapAndPop(selected_idx);
-					prefab->decRefCount();
+					if (!ImGui::GetIO().KeyShift) {
+						for (PrefabResource* res : m_selected_prefabs) res->decRefCount();
+						m_selected_prefabs.clear();
+					}
+					else {
+						m_selected_prefabs.swapAndPop(selected_idx);
+						prefab->decRefCount();
+					}
 				}
 			}
 		}

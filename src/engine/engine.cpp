@@ -1,4 +1,5 @@
 #include "engine/atomic.h"
+#include "engine/core.h"
 #include "engine/crc32.h"
 #include "engine/debug.h"
 #include "engine/engine.h"
@@ -121,6 +122,8 @@ public:
 		logInfo("Engine created.");
 
 		PluginManager::createAllStatic(*this);
+
+		m_plugin_manager->addPlugin(createCorePlugin(*this));
 
 		#ifdef LUMIXENGINE_PLUGINS
 			const char* plugins[] = { LUMIXENGINE_PLUGINS };
