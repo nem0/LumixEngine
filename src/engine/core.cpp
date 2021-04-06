@@ -2,6 +2,7 @@
 #include "engine.h"
 #include "hash_map.h"
 #include "reflection.h"
+#include "stream.h"
 #include "universe.h"
 
 namespace Lumix {
@@ -20,12 +21,39 @@ struct CoreSceneImpl : CoreScene {
 		, m_splines(m_allocator)
 	{}
 
-	void serialize(struct OutputMemoryStream& serializer) override {}
-	void deserialize(struct InputMemoryStream& serialize, const struct EntityMap& entity_map, i32 version) override {}
+	void serialize(OutputMemoryStream& serializer) override {
+		serializer.write((u32)m_splines.size());
+		for (auto iter = m_splines.begin(); iter.isValid(); ++iter) {
+			const Spline& spline = iter.value();
+			serializer.write(iter.key());
+			serializer.write((u32)spline.points.size());
+			serializer.write(spline.points.begin(), spline.points.byte_size());
+		}
+	}
+
+	void deserialize(InputMemoryStream& serializer, const EntityMap& entity_map, i32 version) override {
+		u32 count;
+		serializer.read(count);
+		m_splines.reserve(m_splines.size() + count);
+		for (u32 i = 0; i < count; ++i) {
+			Spline spline(m_allocator);
+			EntityRef e;
+			serializer.read(e);
+			e = entity_map.get(e);
+			u32 pts_count;
+			serializer.read(pts_count);
+			spline.points.resize(pts_count);
+			serializer.read(spline.points.begin(), spline.points.byte_size());
+			
+			m_splines.insert(e, static_cast<Spline&&>(spline));
+			m_universe.onComponentCreated(e, SPLINE_TYPE, this);
+		}
+	}
+
 	IPlugin& getPlugin() const override { return m_plugin; }
 	void update(float time_delta, bool paused) override {}
 	Universe& getUniverse() override { return m_universe; }
-	void clear() override {}
+	void clear() override { m_splines.clear(); }
 
 	void createSpline(EntityRef e) {
 		Spline spline(m_allocator);

@@ -7,6 +7,7 @@
 #include "editor/log_ui.h"
 #include "editor/prefab_system.h"
 #include "editor/render_interface.h"
+#include "editor/settings.h"
 #include "editor/studio_app.h"
 #include "editor/utils.h"
 #include "engine/crc32.h"
@@ -1273,6 +1274,20 @@ void SceneView::handleEvents() {
 	}
 }
 
+void SceneView::onSettingsLoaded() {
+	Settings& settings = m_app.getSettings();
+	m_search_actions = settings.getValue("quicksearch_actions", true);
+	m_search_models = settings.getValue("quicksearch_models", true);
+	m_search_preview = settings.getValue("quicksearch_preview", false);
+}
+
+void SceneView::onBeforeSettingsSaved() {
+	Settings& settings = m_app.getSettings();
+	settings.setValue("quicksearch_actions", m_search_actions);
+	settings.setValue("quicksearch_models", m_search_models);
+	settings.setValue("quicksearch_preview", m_search_preview);
+}
+
 void SceneView::statsUI(float x, float y) {
 	if (!m_show_stats) return;
 
@@ -1302,59 +1317,107 @@ void SceneView::statsUI(float x, float y) {
 }
 
 void SceneView::searchUI() {
-
-	if (m_search_request) {
-		ImGui::OpenPopup("Search");
-	}
+	if (m_search_request) ImGui::OpenPopup("Search");
 
 	if (ImGuiEx::BeginResizablePopup("Search", ImVec2(300, 200))) {
-		if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) {
-			ImGui::CloseCurrentPopup();
-		}
+		if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) ImGui::CloseCurrentPopup();
 
-		if(m_search_request) ImGui::SetKeyboardFocusHere();
+		ImGui::AlignTextToFramePadding();
+		if (ImGuiEx::IconButton(ICON_FA_COG, "Settings")) ImGui::OpenPopup("settings_popup");
+		if (ImGui::BeginPopup("settings_popup")) {
+			ImGui::Checkbox("Preview", &m_search_preview);
+			ImGui::Checkbox("Actions", &m_search_actions);
+			ImGui::Checkbox("Models", &m_search_models);
+			ImGui::EndPopup();
+		}
+		ImGui::SameLine();
 		ImGui::SetNextItemWidth(-1);
-		ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_search_buf, sizeof(m_search_buf));
+		if(m_search_request) {
+			ImGui::SetKeyboardFocusHere();
+			m_search_selected = 0;
+		}
+		if (ImGui::InputTextWithHint("##search", ICON_FA_SEARCH " Search", m_search_buf, sizeof(m_search_buf), ImGuiInputTextFlags_AutoSelectAll)) {
+			m_search_selected = 0;
+		}
+		bool scroll = false;
+		const bool insert_enter= ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter));
+		if (ImGui::IsItemFocused()) {
+			if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_UpArrow)) && m_search_selected > 0) {
+				--m_search_selected;
+				scroll =  true;
+			}
+			if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_DownArrow))) {
+				++m_search_selected;
+				scroll =  true;
+			}
+		}
 		if (m_search_buf[0]) {
 			if (ImGui::BeginChild("##list")) {
+				auto insert = [&](const Path& path){
+					const RayCastModelHit hit = castRay(0.5f, 0.5f);
+					const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
+
+					m_editor.beginCommandGroup("insert_mesh");
+					EntityRef entity = m_editor.addEntity();
+					m_editor.setEntitiesPositions(&entity, &pos, 1);
+					m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
+					m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), path);
+					m_editor.endCommandGroup();
+					m_editor.selectEntities(Span(&entity, 1), false);
+
+					ImGui::CloseCurrentPopup();
+				};
+				AssetBrowser& ab = m_app.getAssetBrowser();
 				const auto& resources = m_app.getAssetCompiler().lockResources();
-				for (const auto& res : resources) {
-					if (res.type != Model::TYPE) continue;
+				if (m_search_models) {
+					u32 idx = 0;
+					for (const auto& res : resources) {
+						if (res.type != Model::TYPE) continue;
+						if (stristr(res.path.c_str(), m_search_buf) == 0) continue;
 
-					if (stristr(res.path.c_str(), m_search_buf) != 0) {
-						if (ImGui::Selectable(res.path.c_str())) {
-							const RayCastModelHit hit = castRay(0.5f, 0.5f);
-							const DVec3 pos = hit.origin + (hit.is_hit ? hit.t : 5) * hit.dir;
-
-							m_editor.beginCommandGroup("insert_mesh");
-							EntityRef entity = m_editor.addEntity();
-							m_editor.setEntitiesPositions(&entity, &pos, 1);
-							m_editor.addComponent(Span(&entity, 1), MODEL_INSTANCE_TYPE);
-							m_editor.setProperty(MODEL_INSTANCE_TYPE, "", -1, "Source", Span(&entity, 1), res.path);
-							m_editor.endCommandGroup();
-
-							ImGui::CloseCurrentPopup();
+						const bool selected = idx == m_search_selected;
+						if (m_search_preview) {
+							ImGui::SameLine();
+							if (idx == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
+							ab.tile(res.path, selected);
+							if (ImGui::IsItemClicked() || insert_enter && selected) {
+								insert(res.path);
+								break;
+							}
 						}
-					} 
+						else {
+							if (ImGui::Selectable(res.path.c_str(), selected) || insert_enter && selected) {
+								insert(res.path);
+								break;
+							}
+						}
+						if (selected && scroll) {
+							ImGui::SetScrollHereY();
+						}
+						++idx;
+					}
+					m_search_selected = idx > 0 ? minimum(m_search_selected, idx - 1) : 0;
+					if (m_search_actions) ImGui::Separator();
 				}
 
-				ImGui::Separator();
-				ImGui::TextUnformatted("Actions:");
-				const auto& actions = m_app.getActions();
-				for (Action* act : actions) {
-					if (stristr(act->label_long, m_search_buf)) {
-						char buf[20] = " (";
-						getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
-						if (buf[2]) {
-							catString(buf, ")");
-						}
-						else { 
-							buf[0] = '\0';
-						}
-						if (ImGui::Selectable(StaticString<128>(act->label_long, buf))) {
-							ImGui::CloseCurrentPopup();
-							act->func.invoke();
-							break;
+				if (m_search_actions) {
+					ImGui::TextUnformatted("Actions:");
+					const auto& actions = m_app.getActions();
+					for (Action* act : actions) {
+						if (stristr(act->label_long, m_search_buf)) {
+							char buf[20] = " (";
+							getShortcut(*act, Span(buf + 2, sizeof(buf) - 2));
+							if (buf[2]) {
+								catString(buf, ")");
+							}
+							else { 
+								buf[0] = '\0';
+							}
+							if (ImGui::Selectable(StaticString<128>(act->font_icon, act->label_long, buf))) {
+								ImGui::CloseCurrentPopup();
+								act->func.invoke();
+								break;
+							}
 						}
 					}
 				}

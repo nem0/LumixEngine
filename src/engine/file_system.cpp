@@ -100,7 +100,7 @@ struct FileSystemImpl : FileSystem {
 
 		if (!file.open(full_path)) return false;
 
-		content.resize((int)file.size());
+		content.resize(file.size());
 		if (!file.read(content.getMutableData(), content.size())) {
 			logError("Could not read ", path);
 			file.close();
@@ -143,6 +143,7 @@ struct FileSystemImpl : FileSystem {
 				return;
 			}
 		}
+		ASSERT(false);
 	}
 
 

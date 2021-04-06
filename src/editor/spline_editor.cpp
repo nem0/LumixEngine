@@ -76,7 +76,9 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			CoreScene* scene = (CoreScene*)universe->getScene(SPLINE_TYPE);
 			Spline& spline = scene->getSpline(e);
 			m_selected = (i32)spline.points.size();
-			spline.points.push(Vec3(hit.pos - tr.pos));
+			recordUndo(-1, spline, e, [&](){
+				spline.points.push(Vec3(hit.pos - tr.pos));
+			});
 		}
 	}
 
@@ -97,11 +99,69 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 		if (cmp.type != SPLINE_TYPE) return;
 
 		Spline* spline = getSpline();
-		if (spline && !spline->points.empty() && ImGui::Button("Clear")) {
-			spline->points.clear();
+		ASSERT(spline);
+
+		if (!spline->points.empty() && ImGui::Button("Clear")) {
+			recordUndo(-1, *spline, *cmp.entity, [&](){
+				spline->points.clear();
+			});
+		}
+
+		if (m_selected >= 0 && m_selected < spline->points.size() && ImGui::Button("Delete selected")) {
+			recordUndo(-1, *spline, *cmp.entity, [&](){
+				spline->points.erase(m_selected);
+			});
 		}
 
 		prefabsList();
+	}
+
+	struct EditorCommand : IEditorCommand {
+		EditorCommand(WorldEditor& editor, IAllocator& allocator)
+			: editor(editor)
+			, old_points(allocator)
+			, new_points(allocator)
+		{}
+
+		bool execute() override { 
+			CoreScene* scene = (CoreScene*)editor.getUniverse()->getScene(SPLINE_TYPE);
+			Spline& spline = scene->getSpline(e);
+			spline.points = new_points.makeCopy();
+			return true;
+		}
+
+		void undo() override {
+			CoreScene* scene = (CoreScene*)editor.getUniverse()->getScene(SPLINE_TYPE);
+			Spline& spline = scene->getSpline(e);
+			spline.points = old_points.makeCopy();
+		}
+
+		const char* getType() override { return "edit_spline"; }
+		bool merge(IEditorCommand& command) override { 
+			EditorCommand& rhs = ((EditorCommand&)command);
+			if (id == -1 || id != rhs.id) return false;
+			rhs.new_points = new_points.move();
+			return true;
+		}
+		
+		WorldEditor& editor;
+		i32 id;
+		EntityRef e;
+		Array<Vec3> old_points;
+		Array<Vec3> new_points;
+	};
+
+	template <typename T>
+	void recordUndo(i32 id, Spline& spline, EntityRef e, T&& f) {
+		WorldEditor& editor = m_app.getWorldEditor();
+		IAllocator& allocator = editor.getAllocator();
+		UniquePtr<EditorCommand> cmd = UniquePtr<EditorCommand>::create(allocator, editor, allocator);
+		cmd->old_points = spline.points.makeCopy();
+		cmd->e = e;
+		cmd->id = id;
+		f();
+		cmd->new_points = spline.points.makeCopy();
+		m_app.getWorldEditor().executeCommand(cmd.move());
 	}
 
 	void prefabsList() {
@@ -151,7 +211,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			if (count == 0) ImGui::TextUnformatted("No prefabs");
 			m_app.getAssetCompiler().unlockResources();
 			ImGui::ListBoxFooter();
-		}	
+		}
 		ImGuiEx::HSplitter("after_prefab", &size);
 		ImGuiEx::Label("Spacing");
 		ImGui::DragFloat("##spacing", &m_spacing);
@@ -159,7 +219,11 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 		ImGui::Checkbox("##rot90", &m_rotate_by_90deg);
 		ImGuiEx::Label("Place as children");
 		ImGui::Checkbox("##chil", &m_place_as_children);
-
+		ImGuiEx::Label("Random rotation");
+		ImGui::Checkbox("##randrot", &m_random_rotation);
+		ImGuiEx::Label("XZ dispersion");
+		ImGui::DragFloat("##disp", &m_dispersion);
+		
 		if (ImGui::Button("Snap")) snap();
 		ImGui::SameLine();
 		if (ImGui::Button("Place")) {
@@ -191,13 +255,24 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 
 	void snap() {
 		Spline* spline = getSpline();
-		for (i32 i = 1; i < spline->points.size(); ++i) {
-			const Vec3 d = spline->points[i] - spline->points[i - 1];
-			const float l = length(d) + 1e-5f;
-			const Vec3 dir = d / l;
-			const u32 count = u32(l / m_spacing + 0.5f);
-			spline->points[i] = spline->points[i - 1] + dir * (m_spacing * count);
-		}
+		recordUndo(-1, *spline, *getSplineEntity(), [&](){
+			for (i32 i = 1; i < spline->points.size(); ++i) {
+				const Vec3 d = spline->points[i] - spline->points[i - 1];
+				const float l = length(d) + 1e-5f;
+				const Vec3 dir = d / l;
+				const u32 count = u32(l / m_spacing + 0.5f);
+				spline->points[i] = spline->points[i - 1] + dir * (m_spacing * count);
+			}
+		});
+	}
+
+	static Vec3 randomXZVec() {
+		float a = randFloat() * 2.f * PI;
+		float d = randFloat() + randFloat();
+		d = d > 1 ? 2 - d : d;
+		float c = cosf(a) * d;
+		float s = sinf(a) * d;
+		return Vec3(c, 0, s);
 	}
 
 	EntityPtr place(const DVec3& pos, const Vec3& dir) const {
@@ -209,7 +284,9 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 		float a = atan2f(dir.x, dir.z);
 		Quat rot = Quat(Vec3(0, 1, 0), a);
 		if (m_rotate_by_90deg) rot = rot * Quat(0, 0.707f, 0, -0.707f);
-		return prefab_system.instantiatePrefab(*res, pos, rot, 1.f);		
+		if (m_random_rotation) rot = Quat(Vec3(0, 1, 0), randFloat() * PI * 2);
+		const DVec3 p = pos + m_dispersion * randomXZVec();
+		return prefab_system.instantiatePrefab(*res, p, rot, 1.f);		
 	}
 
 	void init() override {
@@ -226,7 +303,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 
 		CoreScene* scene = (CoreScene*)cmp.scene;
 		Spline& spline = scene->getSpline(e);
-		if (spline.points.size() < 2) return false;
+		if (spline.points.size() == 0) return false;
 
 		UniverseView::Vertex* vertices = view.render(true, (spline.points.size() - 1) * 2);
 		const Transform& tr = universe.getTransform(e);
@@ -278,7 +355,9 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			point_tr.pos += spline.points[m_selected];
 			Gizmo::Config cfg;
 			if (Gizmo::manipulate(u64(3) << 32 | e.index, view, point_tr, cfg)){
-				spline.points[m_selected] = Vec3(point_tr.pos - tr.pos);
+				recordUndo(m_selected, spline, e, [&](){
+					spline.points[m_selected] = Vec3(point_tr.pos - tr.pos);
+				});
 			}
 		}
 
@@ -293,6 +372,8 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 	char m_filter[64] = "";
 	bool m_rotate_by_90deg = false;
 	bool m_place_as_children = true;
+	bool m_random_rotation = false;
+	float m_dispersion = 0;
 	float m_spacing = 1.f;
 };
 

@@ -62,7 +62,6 @@ protected:
 	Resource(const Path& path, ResourceManager& resource_manager, IAllocator& allocator);
 
 	virtual void onBeforeReady() {}
-	virtual void onBeforeEmpty() {}
 	virtual void unload() = 0;
 	virtual bool load(u64 size, const u8* mem) = 0;
 
