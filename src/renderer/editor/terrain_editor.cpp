@@ -1474,7 +1474,7 @@ void TerrainEditor::entityGUI() {
 		Vec2 tmp = m_rotate_x_spread;
 		tmp.x = radiansToDegrees(tmp.x);
 		tmp.y = radiansToDegrees(tmp.y);
-		if (ImGui::DragFloat2("Rotate X spread", &tmp.x))
+		if (ImGui::DragFloatRange2("Rotate X spread", &tmp.x, &tmp.y))
 		{
 			m_rotate_x_spread.x = degreesToRadians(tmp.x);
 			m_rotate_x_spread.y = degreesToRadians(tmp.y);
@@ -1489,7 +1489,7 @@ void TerrainEditor::entityGUI() {
 		Vec2 tmp = m_rotate_y_spread;
 		tmp.x = radiansToDegrees(tmp.x);
 		tmp.y = radiansToDegrees(tmp.y);
-		if (ImGui::DragFloat2("Rotate Y spread", &tmp.x))
+		if (ImGui::DragFloatRange2("Rotate Y spread", &tmp.x, &tmp.y))
 		{
 			m_rotate_y_spread.x = degreesToRadians(tmp.x);
 			m_rotate_y_spread.y = degreesToRadians(tmp.y);
@@ -1504,15 +1504,15 @@ void TerrainEditor::entityGUI() {
 		Vec2 tmp = m_rotate_z_spread;
 		tmp.x = radiansToDegrees(tmp.x);
 		tmp.y = radiansToDegrees(tmp.y);
-		if (ImGui::DragFloat2("Rotate Z spread", &tmp.x))
+		if (ImGui::DragFloatRange2("Rotate Z spread", &tmp.x, &tmp.y))
 		{
 			m_rotate_z_spread.x = degreesToRadians(tmp.x);
 			m_rotate_z_spread.y = degreesToRadians(tmp.y);
 		}
 	}
-	ImGui::DragFloat2("Size spread", &m_size_spread.x, 0.01f);
+	ImGui::DragFloatRange2("Size spread", &m_size_spread.x, &m_size_spread.y, 0.01f);
 	m_size_spread.x = minimum(m_size_spread.x, m_size_spread.y);
-	ImGui::DragFloat2("Y spread", &m_y_spread.x, 0.01f);
+	ImGui::DragFloatRange2("Y spread", &m_y_spread.x, &m_y_spread.y, 0.01f);
 	m_y_spread.x = minimum(m_y_spread.x, m_y_spread.y);		
 }
 

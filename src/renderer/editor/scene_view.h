@@ -53,6 +53,8 @@ struct SceneView : StudioApp::GUIPlugin
 		void statsUI(float x, float y);
 		void toggleSearch() { m_search_request = true; }
 		void searchUI();
+		void onSettingsLoaded() override;
+		void onBeforeSettingsSaved() override;
 
 	private:
 		StudioApp& m_app;
@@ -71,7 +73,11 @@ struct SceneView : StudioApp::GUIPlugin
 		bool m_copy_moved = false;
 		bool m_show_stats;
 		bool m_search_request = false;
+		bool m_search_preview = false;
+		bool m_search_actions = true;
+		bool m_search_models = true;
 		char m_search_buf[128] = "";
+		i32 m_search_selected = 0;
 		int m_screen_x;
 		int m_screen_y;
 		int m_width;

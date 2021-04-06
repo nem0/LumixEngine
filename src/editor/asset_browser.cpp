@@ -1110,7 +1110,7 @@ struct AssetBrowserImpl : AssetBrowser {
 			else {
 				copyString(Span(filename), Path::getBasename(path.c_str()));
 			}
-			clampText(filename, int(TILE_SIZE * m_thumbnail_size));
+			clampText(filename, 50);
 			fi.clamped_filename = filename;
 			fi.create_called = false;
 			idx = m_immediate_tiles.size() - 1;
