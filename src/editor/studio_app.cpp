@@ -174,7 +174,7 @@ struct StudioAppImpl final : StudioApp
 		, m_owned_actions(m_allocator)
 		, m_window_actions(m_allocator)
 		, m_is_welcome_screen_open(true)
-		, m_is_pack_data_dialog_open(false)
+		, m_is_export_game_dialog_open(false)
 		, m_settings(*this)
 		, m_gui_plugins(m_allocator)
 		, m_mouse_plugins(m_allocator)
@@ -1548,7 +1548,7 @@ struct StudioAppImpl final : StudioApp
 		menuItem("copyViewTransform", is_any_entity_selected);
 		menuItem("snapDown", is_any_entity_selected);
 		menuItem("autosnapDown", true);
-		menuItem("pack_data", true);
+		menuItem("export_game", true);
 		if (renderDocOption()) menuItem("launch_renderdoc", true);
 		ImGui::EndMenu();
 	}
@@ -2333,7 +2333,7 @@ struct StudioAppImpl final : StudioApp
 			.is_selected.bind<&StudioAppImpl::isEntityListOpen>(this);
 		addAction<&StudioAppImpl::toggleSettings>(ICON_FA_COG "Settings", "Toggle settings UI", "settings", ICON_FA_COG)
 			.is_selected.bind<&StudioAppImpl::areSettingsOpen>(this);
-		addAction<&StudioAppImpl::showPackDataDialog>(ICON_FA_ARCHIVE "Pack data", "Pack data", "pack_data", ICON_FA_ARCHIVE);
+		addAction<&StudioAppImpl::showExportGameDialog>(ICON_FA_FILE_EXPORT "Export game", "Export game", "export_game", ICON_FA_FILE_EXPORT);
 	}
 
 
@@ -3110,7 +3110,7 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void packDataScanResources(AssociativeArray<u32, PackFileInfo>& infos)
+	void exportDataScanResources(AssociativeArray<u32, PackFileInfo>& infos)
 	{
 		ResourceManagerHub& rm = m_engine->getResourceManager();
 		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
@@ -3139,100 +3139,123 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void showPackDataDialog() { m_is_pack_data_dialog_open = true; }
+	void showExportGameDialog() { m_is_export_game_dialog_open = true; }
 
 
 	void onPackDataGUI()
 	{
-		if (!m_is_pack_data_dialog_open) return;
-		if (ImGui::Begin("Pack data", &m_is_pack_data_dialog_open)) {
+		if (!m_is_export_game_dialog_open) return;
+		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
-			if (ImGui::Button(m_pack.dest_dir.empty() ? "..." : m_pack.dest_dir.data)) {
-				bool res = os::getOpenDirectory(Span(m_pack.dest_dir.data), m_engine->getFileSystem().getBasePath());
+			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir.data)) {
+				bool res = os::getOpenDirectory(Span(m_export.dest_dir.data), m_engine->getFileSystem().getBasePath());
 				(void)res;
 			}
 
+			ImGuiEx::Label("Pack data");
+			ImGui::Checkbox("##pack", &m_export.pack);
 			ImGuiEx::Label("Mode");
-			ImGui::Combo("##mode", (int*)&m_pack.mode, "All files\0Loaded universe\0");
+			ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded universe\0");
 
-			if (ImGui::Button("Pack")) packData();
+			if (ImGui::Button("Export")) exportData();
 		}
 		ImGui::End();
 	}
 
 
-	void packData() {
-		if (m_pack.dest_dir.empty()) return;
+	void exportData() {
+		if (m_export.dest_dir.empty()) return;
 
-		char dest[LUMIX_MAX_PATH];
 
-		static const char* OUT_FILENAME = "main.pak";
-		copyString(dest, m_pack.dest_dir);
-		catString(dest, OUT_FILENAME);
 		AssociativeArray<u32, PackFileInfo> infos(m_allocator);
 		infos.reserve(10000);
 
-		switch (m_pack.mode) {
-			case PackConfig::Mode::ALL_FILES: scanCompiled(infos); break;
-			case PackConfig::Mode::CURRENT_UNIVERSE: packDataScanResources(infos); break;
+		switch (m_export.mode) {
+			case ExportConfig::Mode::ALL_FILES: scanCompiled(infos); break;
+			case ExportConfig::Mode::CURRENT_UNIVERSE: exportDataScanResources(infos); break;
 			default: ASSERT(false); break;
 		}
 
-		if (infos.size() == 0) {
-			logError("No files found while trying to create ", dest);
-			return;
-		}
-
 		FileSystem& fs = m_engine->getFileSystem();
-		OutputMemoryStream compressed(m_allocator);
-		OutputMemoryStream src(m_allocator);
-		u64 total_size = 0;
-		for (auto& info : infos) {
-			if (!fs.getContentSync(Path(info.path), src)) {
-				logError("Could not open ", info.path);
+		if (m_export.pack) {
+			static const char* OUT_FILENAME = "main.pak";
+			char dest[LUMIX_MAX_PATH];
+			copyString(dest, m_export.dest_dir);
+			catString(dest, OUT_FILENAME);
+			if (infos.size() == 0) {
+				logError("No files found while trying to create ", dest);
 				return;
 			}
+			OutputMemoryStream compressed(m_allocator);
+			OutputMemoryStream src(m_allocator);
+			u64 total_size = 0;
+			for (auto& info : infos) {
+				if (!fs.getContentSync(Path(info.path), src)) {
+					logError("Could not open ", info.path);
+					return;
+				}
 
-			total_size += (u32)src.size();
+				total_size += (u32)src.size();
 
-			info.size = src.size();
-			info.offset = compressed.size();
-			const i32 cap = LZ4_compressBound((i32)src.size());
-			compressed.reserve(compressed.size() + cap);
-			const i32 dst_size = LZ4_compress_default((const char*)src.data(), (char*)compressed.skip(0), (i32)src.size(), cap); 
-			if (dst_size == 0) {
-				logError("Could not compress ", info.path);
-				return;
-			}
+				info.size = src.size();
+				info.offset = compressed.size();
+				const i32 cap = LZ4_compressBound((i32)src.size());
+				compressed.reserve(compressed.size() + cap);
+				const i32 dst_size = LZ4_compress_default((const char*)src.data(), (char*)compressed.skip(0), (i32)src.size(), cap); 
+				if (dst_size == 0) {
+					logError("Could not compress ", info.path);
+					return;
+				}
 			
-			info.size_compressed = dst_size;
-			compressed.resize(compressed.size() + dst_size);
+				info.size_compressed = dst_size;
+				compressed.resize(compressed.size() + dst_size);
+			}
+			logInfo("Packed ", infos.size(), " files (", total_size / 1024, "KiB) in ", compressed.size() / 1024, " KiB");
+			bool success;
+			os::OutputFile file;
+			if (!file.open(dest)) {
+				logError("Could not create ", dest);
+				return;
+			}
+
+			const u32 count = (u32)infos.size();
+			success = file.write(&count, sizeof(count));
+
+			for (auto& info : infos) {
+				success = file.write(&info.hash, sizeof(info.hash)) && success;
+				success = file.write(&info.offset, sizeof(info.offset)) && success;
+				success = file.write(&info.size, sizeof(info.size)) && success;
+				success = file.write(&info.size_compressed, sizeof(info.size_compressed)) && success;
+			}
+
+			success = file.write(compressed.data(), compressed.size()) && success;
+			file.close();
+
+			if (!success) {
+				logError("Could not write ", dest);
+				return;
+			}
 		}
-		logInfo("Packed ", infos.size(), " files (", total_size / 1024, "KiB) in ", compressed.size() / 1024, " KiB");
+		else {
+			char dest[LUMIX_MAX_PATH];
+			copyString(dest, m_export.dest_dir);
+			const char* base_path = fs.getBasePath();
+			for (auto& info : infos) {
+				StaticString<LUMIX_MAX_PATH> src(base_path, info.path);
+				StaticString<LUMIX_MAX_PATH> dst(dest, info.path);
 
-		bool success;
-		os::OutputFile file;
-		if (!file.open(dest)) {
-			logError("Could not create ", dest);
-			return;
-		}
+				StaticString<LUMIX_MAX_PATH> dst_dir(dest, Path::getDir(info.path));
+				if (!os::makePath(dst_dir) && !os::dirExists(dst_dir)) {
+					logError("Failed to create ", dst_dir);
+					return;
+				}
 
-		const u32 count = (u32)infos.size();
-		success = file.write(&count, sizeof(count));
-
-		for (auto& info : infos) {
-			success = file.write(&info.hash, sizeof(info.hash)) && success;
-			success = file.write(&info.offset, sizeof(info.offset)) && success;
-			success = file.write(&info.size, sizeof(info.size)) && success;
-			success = file.write(&info.size_compressed, sizeof(info.size_compressed)) && success;
-		}
-
-		success = file.write(compressed.data(), compressed.size()) && success;
-		file.close();
-
-		if (!success) {
-			logError("Could not write ", dest);
-			return;
+				if (!os::copyFile(src, dst)) {
+					logError("Failed to copy ", src, " to ", dst);
+					return;
+				}
+			}
 		}
 
 		const char* bin_files[] = {"app.exe", "dbghelp.dll", "dbgcore.dll"};
@@ -3244,7 +3267,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		for (auto& file : bin_files) {
-			StaticString<LUMIX_MAX_PATH> tmp(m_pack.dest_dir, file);
+			StaticString<LUMIX_MAX_PATH> tmp(m_export.dest_dir, file);
 			StaticString<LUMIX_MAX_PATH> src(src_dir, file);
 			if (!os::copyFile(src, tmp)) {
 				logError("Failed to copy ", src, " to ", tmp);
@@ -3252,7 +3275,7 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		for (GUIPlugin* plugin : m_gui_plugins)	{
-			if (!plugin->packData(m_pack.dest_dir)) {
+			if (!plugin->packData(m_export.dest_dir)) {
 				logError("Plugin ", plugin->getName(), " failed to pack data.");
 			}
 		}
@@ -3440,26 +3463,25 @@ struct StudioAppImpl final : StudioApp
 	os::Timer m_inactive_fps_timer;
 	u32 m_fps_frame = 0;
 
-	struct PackConfig
-	{
-		enum class Mode : int
-		{
+	struct ExportConfig {
+		enum class Mode : int{
 			ALL_FILES,
 			CURRENT_UNIVERSE
 		};
 
 		Mode mode;
+		bool pack = false;
 		StaticString<LUMIX_MAX_PATH> dest_dir;
 	};
 
-	PackConfig m_pack;
+	ExportConfig m_export;
 	bool m_finished;
 	bool m_deferred_game_mode_exit;
 	int m_exit_code;
 
 	bool m_sleep_when_inactive;
 	bool m_is_welcome_screen_open;
-	bool m_is_pack_data_dialog_open;
+	bool m_is_export_game_dialog_open;
 	bool m_is_entity_list_open;
 	EntityPtr m_renaming_entity = INVALID_ENTITY;
 	EntityFolders::FolderID m_renaming_folder = EntityFolders::INVALID_FOLDER;
