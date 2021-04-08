@@ -50,7 +50,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			if (hovered) return true;
 		}
 
-		return m_hovered_gizmo;
+		return m_hovered_gizmo || ImGui::GetIO().KeyAlt;
 	}
 
 	EntityPtr getSplineEntity() {
@@ -124,11 +124,14 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 			});
 		}
 
-		if (m_selected >= 0 && m_selected < spline->points.size() && ImGui::Button("Delete selected")) {
+		ImGui::SameLine();
+		if (m_selected >= 0 && m_selected < spline->points.size() && ImGui::Button("Delete node")) {
 			recordUndo(-1, *spline, *cmp.entity, [&](){
 				spline->points.erase(m_selected);
 			});
 		}
+
+		ImGui::TextUnformatted("Alt + mouse click - create new node");
 
 		prefabsList();
 	}
