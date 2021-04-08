@@ -1403,6 +1403,9 @@ struct NavigationSceneImpl final : NavigationScene
 	}
 
 	void destroyZone(EntityRef entity) {
+		for (Agent& agent : m_agents) {
+			if (agent.zone == entity) agent.zone = INVALID_ENTITY;
+		}
 		auto iter = m_zones.find(entity);
 		const RecastZone& zone = iter.value();
 		if (zone.crowd) {
