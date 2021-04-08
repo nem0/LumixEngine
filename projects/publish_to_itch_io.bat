@@ -45,21 +45,19 @@ copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64
 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib				   ..\external\physx\lib\vs2017\win64\release_static\
 
 REM create engine project
-genie.exe --embed-resources --static-physx vs2019
+genie.exe --static-physx --with-app vs2019
 if not %errorlevel%==0 pause
 
-REM build engine.exe with bundled data
-cd ..\data
-tar -cvf data.tar .
-move data.tar ../src/studio
-cd ..\projects\
+REM build studio.exe
 %msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
 if not %errorlevel%==0 pause
-del ..\src\studio\data.tar
 
 REM push gl version
 mkdir itch_io
 copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+git clean -f -x -d ..\data
+xcopy /E /Y ..\data itch_io
 butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
 if not %errorlevel%==0 pause
 
@@ -69,17 +67,19 @@ git.exe clone https://github.com/nem0/lumixengine_dx.git dx
 if not %errorlevel%==0 pause
 popd
 
-REM build engine.exe with bundled data
-cd ..\data
-tar -cvf data.tar .
-move data.tar ../src/studio
-cd ..\projects\
+REM create engine project
+genie.exe --static-physx --with-app vs2019
+if not %errorlevel%==0 pause
+
+REM build studio.exe
 %msbuild_cmd% tmp/vs2019/LumixEngine.sln /p:Configuration=RelWithDebInfo
 if not %errorlevel%==0 pause
-del ..\src\studio\data.tar
 
 REM push gl version
 mkdir itch_io
 copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+git clean -f -x -d ..\data
+xcopy /E /Y ..\data itch_io
 butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx
 pause
