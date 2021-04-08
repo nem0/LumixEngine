@@ -44,8 +44,14 @@ copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXPvdSDK_static_64.
 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysXVehicle_static_64.lib			   ..\external\physx\lib\vs2017\win64\release_static\
 copy 3rdparty\PhysX\physx\bin\win.x86_64.vc141.md\release\PhysX_static_64.lib				   ..\external\physx\lib\vs2017\win64\release_static\
 
+REM download dx
+pushd ..\plugins
+git.exe clone https://github.com/nem0/lumixengine_dx.git dx
+if not %errorlevel%==0 pause
+popd
+
 REM create engine project
-genie.exe --static-physx --with-app vs2019
+genie.exe --static-physx --with-app --nodx vs2019
 if not %errorlevel%==0 pause
 
 REM build studio.exe
@@ -60,12 +66,6 @@ git clean -f -x -d ..\data
 xcopy /E /Y ..\data itch_io
 butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
 if not %errorlevel%==0 pause
-
-REM download dx
-pushd ..\plugins
-git.exe clone https://github.com/nem0/lumixengine_dx.git dx
-if not %errorlevel%==0 pause
-popd
 
 REM create engine project
 genie.exe --static-physx --with-app vs2019
