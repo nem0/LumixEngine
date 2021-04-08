@@ -62,6 +62,7 @@ REM push gl version
 mkdir itch_io
 copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
 copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+copy .itch.toml itch_io\
 git clean -f -x -d ..\data
 xcopy /E /Y ..\data itch_io
 butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
@@ -79,6 +80,7 @@ REM push gl version
 mkdir itch_io
 copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
 copy tmp\vs2019\bin\RelWithDebInfo\app.exe itch_io\
+copy .itch.toml itch_io\
 git clean -f -x -d ..\data
 xcopy /E /Y ..\data itch_io
 butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx

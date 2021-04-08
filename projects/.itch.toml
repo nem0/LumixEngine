@@ -3,7 +3,7 @@ name = "vcredist-2019-x64"
 
 [[actions]]
 name = "play"
-path = "LumixStudio.lnk"
+path = "studio.exe"
 
 [[actions]]
 name = "Documentation"
