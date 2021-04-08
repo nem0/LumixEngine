@@ -1380,13 +1380,13 @@ void SceneView::searchUI() {
 							ImGui::SameLine();
 							if (idx == 0 || ImGui::GetContentRegionAvail().x < 50) ImGui::NewLine();
 							ab.tile(res.path, selected);
-							if (ImGui::IsItemClicked() || insert_enter && selected) {
+							if (ImGui::IsItemClicked() || (insert_enter && selected)) {
 								insert(res.path);
 								break;
 							}
 						}
 						else {
-							if (ImGui::Selectable(res.path.c_str(), selected) || insert_enter && selected) {
+							if (ImGui::Selectable(res.path.c_str(), selected) || (insert_enter && selected)) {
 								insert(res.path);
 								break;
 							}
