@@ -126,7 +126,12 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	}
 
 	const CompiledResourceHeader* header = (const CompiledResourceHeader*)mem;
-	if (size < sizeof(*header)) {
+	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
+		if (!load(size, mem)) {
+			++m_failed_dep_count;
+		}
+	}
+	else if (size < sizeof(*header)) {
 		logError("Invalid resource file, please delete .lumix directory");
 		++m_failed_dep_count;
 	}
