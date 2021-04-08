@@ -10,6 +10,7 @@
 #include "engine/engine.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
+#include "engine/lz4.h"
 #include "engine/atomic.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
@@ -170,13 +171,32 @@ struct AssetCompilerImpl : AssetCompiler
 	}
 
 	bool copyCompile(const Path& src) override {
-		const StaticString<LUMIX_MAX_PATH> dst(".lumix/assets/", src.getHash(), ".res");
-
 		FileSystem& fs = m_app.getEngine().getFileSystem();
-		return fs.copyFile(src.c_str(), dst);
+		OutputMemoryStream tmp(m_app.getAllocator());
+		if (!fs.getContentSync(src, tmp)) {
+			logError("Failed to read ", src);
+			return false;
+		}
+
+		ASSERT(tmp.size() < 0xffFFffFF);
+		return writeCompiledResource(src.c_str(), Span(tmp.data(), (u32)tmp.size()));
 	}
 
 	bool writeCompiledResource(const char* locator, Span<const u8> data) override {
+		constexpr u32 COMPRESSION_SIZE_LIMIT = 4096;
+		OutputMemoryStream compressed(m_app.getAllocator());
+		i32 compressed_size = 0;
+		if (data.length() > COMPRESSION_SIZE_LIMIT) {
+			const i32 cap = LZ4_compressBound((i32)data.length());
+			compressed.resize(cap);
+			compressed_size = LZ4_compress_default((const char*)data.begin(), (char*)compressed.getMutableData(), (i32)data.length(), cap); 
+			if (compressed_size == 0) {
+				logError("Could not compress ", locator);
+				return false;
+			}
+			compressed.resize(compressed_size);
+		}
+
 		char normalized[LUMIX_MAX_PATH];
 		Path::normalize(locator, Span(normalized));
 		const u32 hash = crc32(normalized);
@@ -187,10 +207,20 @@ struct AssetCompilerImpl : AssetCompiler
 			logError("Could not create ", out_path);
 			return false;
 		}
-		const bool written = file.write(data.begin(), data.length());
-		if (!written) logError("Could not write ", out_path);
+		CompiledResourceHeader header;
+		header.decompressed_size = data.length();
+		if (data.length() > COMPRESSION_SIZE_LIMIT && compressed_size < i32(data.length() / 4 * 3)) {
+			header.flags |= CompiledResourceHeader::COMPRESSED;
+			(void)file.write(&header, sizeof(header));
+			(void)file.write(compressed.data(), compressed_size);
+		}
+		else {
+			(void)file.write(&header, sizeof(header));
+			(void)file.write(data.begin(), data.length());
+		}
 		file.close();
-		return written;
+		if (file.isError()) logError("Could not write ", out_path);
+		return !file.isError();
 	}
 
 	static u32 dirHash(const char* path) {

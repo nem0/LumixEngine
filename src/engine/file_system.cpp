@@ -8,7 +8,6 @@
 #include "engine/hash_map.h"
 #include "engine/metaprogramming.h"
 #include "engine/log.h"
-#include "engine/lz4.h"
 #include "engine/sync.h"
 #include "engine/thread.h"
 #include "engine/os.h"
@@ -326,7 +325,6 @@ struct PackFileSystem : FileSystemImpl {
 			PackFile& f = m_map.insert(hash);
 			f.offset = m_file.read<u64>();
 			f.size = m_file.read<u64>();
-			f.compressed_size = m_file.read<u64>();
 		}
 	}
 
@@ -335,6 +333,7 @@ struct PackFileSystem : FileSystemImpl {
 	}
 
 	bool getContentSync(const Path& path, OutputMemoryStream& content) override {
+		ASSERT(content.size() == 0);
 		Span<const char> basename = Path::getBasename(path.c_str());
 		u32 hash;
 		fromCString(basename, hash);
@@ -347,29 +346,20 @@ struct PackFileSystem : FileSystemImpl {
 			if (!iter.isValid()) return false;
 		}
 
-		OutputMemoryStream compressed(m_allocator);
-		compressed.resize(iter.value().compressed_size);
+		content.resize(iter.value().size);
 		MutexGuard lock(m_mutex);
-		const u32 header_size = sizeof(u32) + m_map.size() * (3 * sizeof(u64) + sizeof(u32));
-		if (!m_file.seek(iter.value().offset + header_size) || !m_file.read(compressed.getMutableData(), compressed.size())) {
+		const u32 header_size = sizeof(u32) + m_map.size() * (2 * sizeof(u64) + sizeof(u32));
+		if (!m_file.seek(iter.value().offset + header_size) || !m_file.read(content.getMutableData(), content.size())) {
 			logError("Could not read ", path);
 			return false;
 		}
 
-		content.resize(iter.value().size);
-		const i32 res = LZ4_decompress_safe((const char*)compressed.data(), (char*)content.getMutableData(), (i32)iter.value().compressed_size, (i32)content.size());
-		
-		if (res != content.size()) {
-			logError("Could not decompress ", path);
-			return false;
-		}
 		return true;
 	}
 	
 	struct PackFile {
 		u64 offset;
 		u64 size;
-		u64 compressed_size;
 	};
 
 	IAllocator& m_allocator;

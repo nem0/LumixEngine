@@ -394,7 +394,6 @@ bool Shader::load(u64 size, const u8* mem)
 		return false;
 	}
 
-	m_size = size;
 	lua_close(L);
 	return true;
 }

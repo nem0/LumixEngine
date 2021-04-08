@@ -32,7 +32,25 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 	}
 
 	bool onMouseDown(UniverseView& view, int x, int y) {
-		return getSplineEntity().isValid();
+		Spline* spline = getSpline();
+		if (!spline) return false;
+		
+		Universe* universe = m_app.getWorldEditor().getUniverse();
+		const EntityRef e = *getSplineEntity();
+		const Transform tr = universe->getTransform(e);
+		DVec3 origin;
+		Vec3 dir;
+		const Viewport& vp = view.getViewport();
+		vp.getRay(Vec2((float)x, (float)y), origin, dir);
+		
+		for (const Vec3& point : spline->points) {
+			const DVec3 p = tr.pos + point;
+			float t;
+			const bool hovered = getRaySphereIntersection(Vec3(0), dir, Vec3(p - vp.pos), 0.1f, t);
+			if (hovered) return true;
+		}
+
+		return m_hovered_gizmo;
 	}
 
 	EntityPtr getSplineEntity() {
@@ -42,7 +60,6 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 		
 		if (editor.getUniverse()->hasComponent(selected[0], SPLINE_TYPE)) return selected[0];
 		return INVALID_ENTITY;
-	
 	}
 
 	void onMouseUp(UniverseView& view, int x, int y, os::MouseButton button) {
@@ -295,6 +312,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 	}
 
 	bool showGizmo(struct UniverseView& view, struct ComponentUID cmp) override {
+		m_hovered_gizmo = false;
 		if (cmp.type != SPLINE_TYPE) return false;
 		
 		const EntityRef e = (EntityRef)cmp.entity;
@@ -359,6 +377,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 					spline.points[m_selected] = Vec3(point_tr.pos - tr.pos);
 				});
 			}
+			m_hovered_gizmo = Gizmo::isActive();
 		}
 
 		return true;
@@ -373,6 +392,7 @@ struct SplineEditorPlugin : StudioApp::IPlugin, StudioApp::MousePlugin, Property
 	bool m_rotate_by_90deg = false;
 	bool m_place_as_children = true;
 	bool m_random_rotation = false;
+	bool m_hovered_gizmo = false;
 	float m_dispersion = 0;
 	float m_spacing = 1.f;
 };

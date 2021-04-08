@@ -742,10 +742,8 @@ bool getRayPlaneIntersecion(const Vec3& origin,
 	float& out)
 {
 	float d = dot(dir, normal);
-	if (d == 0)
-	{
-		return false;
-	}
+	if (d == 0) return false;
+
 	d = dot(plane_point - origin, normal) / d;
 	out = d;
 	return true;
