@@ -59,7 +59,7 @@ struct LUMIX_EDITOR_API StudioApp
 		virtual void pluginAdded(GUIPlugin& plugin) {}
 		virtual const char* getName() const = 0;
 		virtual bool onDropFile(const char* file) { return false; }
-		virtual bool packData(const char* dest_dir) { return true; }
+		virtual bool exportData(const char* dest_dir) { return true; }
 		virtual void guiEndFrame() {}
 		virtual void onSettingsLoaded() {}
 		virtual void onBeforeSettingsSaved() {}

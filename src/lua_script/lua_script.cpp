@@ -30,7 +30,6 @@ void LuaScript::unload()
 bool LuaScript::load(u64 size, const u8* mem)
 {
 	m_source_code = Span((const char*)mem, (u32)size);
-	m_size = size;
 	return true;
 }
 

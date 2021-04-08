@@ -592,7 +592,6 @@ bool Model::load(u64 size, const u8* mem)
 		&& parseBones(file)
 		&& parseLODs(file))
 	{
-		m_size = file.size();
 		return true;
 	}
 

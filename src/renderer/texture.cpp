@@ -741,7 +741,6 @@ bool Texture::load(u64 size, const u8* mem)
 	profiler::pushString(getPath().c_str());
 	
 	if (startsWith(getPath().c_str(), ".lumix/asset_tiles/")) {
-		m_size = size;
 		return loadDDS(*this, mem, (u32)size);
 	}
 	
@@ -772,7 +771,6 @@ bool Texture::load(u64 size, const u8* mem)
 		return false;
 	}
 
-	m_size = file.size() - 3;
 	return true;
 }
 

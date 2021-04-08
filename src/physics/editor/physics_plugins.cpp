@@ -365,7 +365,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 		m_app.removeAction(&m_toggle_ui);
 	}
 
-	bool packData(const char* dest_dir) override
+	bool exportData(const char* dest_dir) override
 	{
 		char exe_path[LUMIX_MAX_PATH];
 		os::getExecutablePath(Span(exe_path));

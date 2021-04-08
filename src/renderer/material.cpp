@@ -717,7 +717,6 @@ bool Material::load(u64 size, const u8* mem)
 		return false;
 	}
 
-	m_size = size;
 	return true;
 }
 

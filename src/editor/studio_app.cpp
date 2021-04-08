@@ -25,7 +25,6 @@
 #include "engine/job_system.h"
 #include "engine/log.h"
 #include "engine/lua_wrapper.h"
-#include "engine/lz4.h"
 #include "engine/os.h"
 #include "engine/path.h"
 #include "engine/profiler.h"
@@ -801,7 +800,7 @@ struct StudioAppImpl final : StudioApp
 					plugin->onWindowGUI();
 				}
 				m_settings.onGUI();
-				onPackDataGUI();
+				onExportDataGUI();
 			}
 		}
 		ImGui::PopFont();
@@ -1083,20 +1082,15 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void save()
-	{
-		if (m_editor->isGameMode())
-		{
+	void save() {
+		if (m_editor->isGameMode()) {
 			logError("Could not save while the game is running");
 			return;
 		}
 
-		if (m_editor->getUniverse()->getName()[0])
-		{
+		if (m_editor->getUniverse()->getName()[0]) {
 			m_editor->saveUniverse(m_editor->getUniverse()->getName(), true);
-		}
-		else
-		{
+		} else {
 			saveAs();
 		}
 	}
@@ -2985,7 +2979,6 @@ struct StudioAppImpl final : StudioApp
 		LuaWrapper::createSystemFunction(L, "Editor", "createEntityEx", &createEntityEx);
 	}
 
-
 	void checkScriptCommandLine() {
 		char command_line[1024];
 		os::getCommandLine(Span(command_line));
@@ -3010,38 +3003,29 @@ struct StudioAppImpl final : StudioApp
 		}
 	}
 
-
-	static bool includeFileInPack(const char* filename)
-	{
+	static bool includeFileInExport(const char* filename) {
 		if (filename[0] == '.') return false;
 		if (compareStringN("bin/", filename, 4) == 0) return false;
-		if (compareStringN("bin32/", filename, 4) == 0) return false;
 		if (equalStrings("main.pak", filename)) return false;
 		if (equalStrings("error.log", filename)) return false;
 		return true;
 	}
 
-
-	static bool includeDirInPack(const char* filename)
-	{
+	static bool includeDirInExport(const char* filename) {
 		if (filename[0] == '.') return false;
 		if (compareStringN("bin", filename, 4) == 0) return false;
-		if (compareStringN("bin32", filename, 4) == 0) return false;
 		return true;
 	}
 
-
-	struct PackFileInfo
-	{
+	struct ExportFileInfo {
 		u32 hash;
 		u64 offset;
 		u64 size;
-		u64 size_compressed;
 
 		char path[LUMIX_MAX_PATH];
 	};
 
-	void scanCompiled(AssociativeArray<u32, PackFileInfo>& infos) {
+	void scanCompiled(AssociativeArray<u32, ExportFileInfo>& infos) {
 		os::FileIterator* iter = m_engine->getFileSystem().createFileIterator(".lumix/assets");
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
@@ -3049,7 +3033,7 @@ struct StudioAppImpl final : StudioApp
 			if (info.is_directory) continue;
 
 			Span<const char> basename = Path::getBasename(info.filename);
-			PackFileInfo rec;
+			ExportFileInfo rec;
 			fromCString(Span(basename), rec.hash);
 			rec.offset = 0;
 			rec.size = os::getFileSize(StaticString<LUMIX_MAX_PATH>(base_path, ".lumix/assets/", info.filename));
@@ -3060,32 +3044,31 @@ struct StudioAppImpl final : StudioApp
 		
 		os::destroyFileIterator(iter);
 
-		packDataScan("pipelines/", infos);
-		packDataScan("universes/", infos);
+		exportDataScan("pipelines/", infos);
+		exportDataScan("universes/", infos);
 	}
 
-	void packDataScan(const char* dir_path, AssociativeArray<u32, PackFileInfo>& infos)
+	void exportDataScan(const char* dir_path, AssociativeArray<u32, ExportFileInfo>& infos)
 	{
 		auto* iter = m_engine->getFileSystem().createFileIterator(dir_path);
 		const char* base_path = m_engine->getFileSystem().getBasePath();
 		os::FileInfo info;
-		while (os::getNextFile(iter, &info))
-		{
+		while (os::getNextFile(iter, &info)) {
 			char normalized_path[LUMIX_MAX_PATH];
 			Path::normalize(info.filename, Span(normalized_path));
 			if (info.is_directory)
 			{
-				if (!includeDirInPack(normalized_path)) continue;
+				if (!includeDirInExport(normalized_path)) continue;
 
 				char dir[LUMIX_MAX_PATH] = {0};
 				if (dir_path[0] != '.') copyString(dir, dir_path);
 				catString(dir, info.filename);
 				catString(dir, "/");
-				packDataScan(dir, infos);
+				exportDataScan(dir, infos);
 				continue;
 			}
 
-			if (!includeFileInPack(normalized_path)) continue;
+			if (!includeFileInExport(normalized_path)) continue;
 
 			StaticString<LUMIX_MAX_PATH> out_path;
 			if (dir_path[0] == '.')
@@ -3110,11 +3093,10 @@ struct StudioAppImpl final : StudioApp
 	}
 
 
-	void exportDataScanResources(AssociativeArray<u32, PackFileInfo>& infos)
+	void exportDataScanResources(AssociativeArray<u32, ExportFileInfo>& infos)
 	{
 		ResourceManagerHub& rm = m_engine->getResourceManager();
-		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter)
-		{
+		for (auto iter = rm.getAll().begin(), end = rm.getAll().end(); iter != end; ++iter) {
 			const auto& resources = iter.value()->getResourceTable();
 			for (Resource* res : resources) {
 				u32 hash = crc32(res->getPath().c_str());
@@ -3127,24 +3109,17 @@ struct StudioAppImpl final : StudioApp
 				out_info.offset = ~0UL;
 			}
 		}
-		packDataScan("pipelines/", infos);
-		packDataScan("universes/", infos);
-		StaticString<LUMIX_MAX_PATH> unv_path("universes/", m_editor->getUniverse()->getName(), ".unv");
-		u32 hash = crc32(unv_path);
-		auto& out_info = infos.emplace(hash);
-		copyString(Span(out_info.path), unv_path);
-		out_info.hash = hash;
-		out_info.size = os::getFileSize(unv_path);
-		out_info.offset = ~0UL;
+		exportDataScan("pipelines/", infos);
+		exportDataScan("universes/", infos);
 	}
 
 
 	void showExportGameDialog() { m_is_export_game_dialog_open = true; }
 
 
-	void onPackDataGUI()
-	{
+	void onExportDataGUI() {
 		if (!m_is_export_game_dialog_open) return;
+
 		ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
@@ -3167,8 +3142,7 @@ struct StudioAppImpl final : StudioApp
 	void exportData() {
 		if (m_export.dest_dir.empty()) return;
 
-
-		AssociativeArray<u32, PackFileInfo> infos(m_allocator);
+		AssociativeArray<u32, ExportFileInfo> infos(m_allocator);
 		infos.reserve(10000);
 
 		switch (m_export.mode) {
@@ -3187,32 +3161,12 @@ struct StudioAppImpl final : StudioApp
 				logError("No files found while trying to create ", dest);
 				return;
 			}
-			OutputMemoryStream compressed(m_allocator);
-			OutputMemoryStream src(m_allocator);
 			u64 total_size = 0;
-			for (auto& info : infos) {
-				if (!fs.getContentSync(Path(info.path), src)) {
-					logError("Could not open ", info.path);
-					return;
-				}
-
-				total_size += (u32)src.size();
-
-				info.size = src.size();
-				info.offset = compressed.size();
-				const i32 cap = LZ4_compressBound((i32)src.size());
-				compressed.reserve(compressed.size() + cap);
-				const i32 dst_size = LZ4_compress_default((const char*)src.data(), (char*)compressed.skip(0), (i32)src.size(), cap); 
-				if (dst_size == 0) {
-					logError("Could not compress ", info.path);
-					return;
-				}
-			
-				info.size_compressed = dst_size;
-				compressed.resize(compressed.size() + dst_size);
+			for (ExportFileInfo& info : infos) {
+				info.offset = total_size;
+				total_size += info.size;
 			}
-			logInfo("Packed ", infos.size(), " files (", total_size / 1024, "KiB) in ", compressed.size() / 1024, " KiB");
-			bool success;
+			
 			os::OutputFile file;
 			if (!file.open(dest)) {
 				logError("Could not create ", dest);
@@ -3220,16 +3174,24 @@ struct StudioAppImpl final : StudioApp
 			}
 
 			const u32 count = (u32)infos.size();
-			success = file.write(&count, sizeof(count));
+			bool success = file.write(&count, sizeof(count));
 
 			for (auto& info : infos) {
 				success = file.write(&info.hash, sizeof(info.hash)) && success;
 				success = file.write(&info.offset, sizeof(info.offset)) && success;
 				success = file.write(&info.size, sizeof(info.size)) && success;
-				success = file.write(&info.size_compressed, sizeof(info.size_compressed)) && success;
 			}
 
-			success = file.write(compressed.data(), compressed.size()) && success;
+			OutputMemoryStream src(m_allocator);
+			for (const ExportFileInfo& info : infos) {
+				src.clear();
+				if (!fs.getContentSync(Path(info.path), src)) {
+					logError("Could not read ", info.path);
+					file.close();
+					return;
+				}
+				success = file.write(src.data(), src.size()) && success;
+			}
 			file.close();
 
 			if (!success) {
@@ -3275,11 +3237,11 @@ struct StudioAppImpl final : StudioApp
 		}
 
 		for (GUIPlugin* plugin : m_gui_plugins)	{
-			if (!plugin->packData(m_export.dest_dir)) {
+			if (!plugin->exportData(m_export.dest_dir)) {
 				logError("Plugin ", plugin->getName(), " failed to pack data.");
 			}
 		}
-		logInfo("Packing finished.");
+		logInfo("Exporting finished.");
 	}
 
 

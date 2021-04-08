@@ -173,7 +173,6 @@ bool PhysicsGeometry::load(u64 size, const u8* mem)
 		convex_mesh = nullptr;
 	}
 
-	m_size = file.size();
 	return true;
 }
 

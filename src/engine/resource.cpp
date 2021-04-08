@@ -2,8 +2,10 @@
 #include "engine/crc32.h"
 #include "engine/log.h"
 #include "engine/lumix.h"
+#include "engine/lz4.h"
 #include "engine/path.h"
 #include "engine/resource_manager.h"
+#include "engine/stream.h"
 #include "engine/string.h"
 
 
@@ -105,8 +107,7 @@ void Resource::checkState()
 }
 
 
-void Resource::fileLoaded(u64 size, const u8* mem, bool success)
-{
+void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 	ASSERT(m_async_op.isValid());
 	m_async_op = FileSystem::AsyncHandle::invalid();
 	if (m_desired_state != State::READY) return;
@@ -114,8 +115,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success)
 	ASSERT(m_current_state != State::READY);
 	ASSERT(m_empty_dep_count == 1);
 
-	if (!success)
-	{
+	if (!success) {
 		logError("Could not open ", getPath().c_str());
 		ASSERT(m_empty_dep_count > 0);
 		--m_empty_dep_count;
@@ -125,13 +125,37 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success)
 		return;
 	}
 
-	if (!load(size, mem)) {
+	const CompiledResourceHeader* header = (const CompiledResourceHeader*)mem;
+	if (size < sizeof(*header)) {
+		logError("Invalid resource file, please delete .lumix directory");
 		++m_failed_dep_count;
 	}
+	else if (header->magic != CompiledResourceHeader::MAGIC) {
+		logError("Invalid resource file, please delete .lumix directory");
+		++m_failed_dep_count;
+	}
+	else if (header->version != 0) {
+		logError("Unsupported resource file version, please delete .lumix directory");
+		++m_failed_dep_count;
+	}
+	else if (header->flags & CompiledResourceHeader::COMPRESSED) {
+		OutputMemoryStream tmp(m_resource_manager.m_allocator);
+		tmp.resize(header->decompressed_size);
+		const i32 res = LZ4_decompress_safe((const char*)mem + sizeof(*header), (char*)tmp.getMutableData(), i32(size - sizeof(*header)), (i32)tmp.size());
+		if (res != header->decompressed_size || !load(header->decompressed_size, tmp.data())) {
+			++m_failed_dep_count;
+		}
+	}
+	else {
+		if (!load(size - sizeof(*header), mem + sizeof(*header))) {
+			++m_failed_dep_count;
+		}
+	} 
 
 	ASSERT(m_empty_dep_count > 0);
 	--m_empty_dep_count;
 	checkState();
+	m_size = header->decompressed_size;
 	m_async_op = FileSystem::AsyncHandle::invalid();
 }
 

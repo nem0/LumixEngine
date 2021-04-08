@@ -20,6 +20,19 @@ struct LUMIX_ENGINE_API ResourceType {
 };
 const ResourceType INVALID_RESOURCE_TYPE("");
 
+#pragma pack(1)
+struct CompiledResourceHeader {
+	static constexpr u32 MAGIC = 'LRES';
+	enum Flags {
+		COMPRESSED = 1 << 0
+	};
+	u32 magic = MAGIC;
+	u32 version = 0;
+	u32 flags = 0;
+	u32 padding = 0;
+	u64 decompressed_size = 0;
+};
+#pragma pack()
 
 struct LUMIX_ENGINE_API Resource {
 	friend struct ResourceManager;
@@ -74,7 +87,6 @@ protected:
 
 	State m_desired_state;
 	u16 m_empty_dep_count;
-	u64 m_size;
 	ResourceManager& m_resource_manager;
 
 private:
@@ -86,6 +98,7 @@ private:
 	void operator=(const Resource&) = delete;
 
 	ObserverCallback m_cb;
+	u64 m_size;
 	Path m_path;
 	u32 m_ref_count;
 	u16 m_failed_dep_count;

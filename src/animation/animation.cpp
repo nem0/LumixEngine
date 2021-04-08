@@ -291,7 +291,6 @@ bool Animation::load(u64 mem_size, const u8* mem)
 		curve.rot = (const Quat*)blob.skip(curve.count * sizeof(Quat));
 	}
 
-	m_size = file.size();
 	return true;
 }
 
