@@ -367,7 +367,7 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	bool exportData(const char* dest_dir) override
 	{
-		#ifndef LUMIX_STATIC_PHYSICS
+		#ifndef LUMIX_STATIC_PHYSX
 			char exe_path[LUMIX_MAX_PATH];
 			os::getExecutablePath(Span(exe_path));
 			char exe_dir[LUMIX_MAX_PATH];
