@@ -80,6 +80,8 @@ goto :plugins
 :push_to_itch_io
 	if not exist itch_io mkdir itch_io
 	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+	git clean -f -x -d ..\data
+	xcopy /E /Y ..\data itch_io
 	butler.exe push itch_io mikulasflorek/lumix-engine:win-64-gl
 	pause
 exit /B 0
@@ -87,6 +89,8 @@ exit /B 0
 :push_to_itch_io_dx
 	if not exist itch_io mkdir itch_io
 	copy tmp\vs2019\bin\RelWithDebInfo\studio.exe itch_io\
+	git clean -f -x -d ..\data
+	xcopy /E /Y ..\data itch_io
 	butler.exe push itch_io mikulasflorek/lumix-engine:win-64-dx
 	pause
 exit /B 0
