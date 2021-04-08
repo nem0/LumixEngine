@@ -367,28 +367,30 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 
 	bool exportData(const char* dest_dir) override
 	{
-		char exe_path[LUMIX_MAX_PATH];
-		os::getExecutablePath(Span(exe_path));
-		char exe_dir[LUMIX_MAX_PATH];
+		#ifndef LUMIX_STATIC_PHYSICS
+			char exe_path[LUMIX_MAX_PATH];
+			os::getExecutablePath(Span(exe_path));
+			char exe_dir[LUMIX_MAX_PATH];
 
-		const char* physx_dlls[] = {
-			"PhysX_64.dll",
-			"PhysXFoundation_64.dll",
-			"PhysXCommon_64.dll",
-			"PhysXCooking_64.dll",
-		};
-		for (const char* dll : physx_dlls)
-		{
-			copyString(Span(exe_dir), Path::getDir(exe_path));
-			StaticString<LUMIX_MAX_PATH> tmp(exe_dir, dll);
-			if (!os::fileExists(tmp)) return false;
-			StaticString<LUMIX_MAX_PATH> dest(dest_dir, dll);
-			if (!os::copyFile(tmp, dest))
+			const char* physx_dlls[] = {
+				"PhysX_64.dll",
+				"PhysXFoundation_64.dll",
+				"PhysXCommon_64.dll",
+				"PhysXCooking_64.dll",
+			};
+			for (const char* dll : physx_dlls)
 			{
-				logError("Failed to copy ", tmp, " to ", dest);
-				return false;
+				copyString(Span(exe_dir), Path::getDir(exe_path));
+				StaticString<LUMIX_MAX_PATH> tmp(exe_dir, dll);
+				if (!os::fileExists(tmp)) return false;
+				StaticString<LUMIX_MAX_PATH> dest(dest_dir, dll);
+				if (!os::copyFile(tmp, dest))
+				{
+					logError("Failed to copy ", tmp, " to ", dest);
+					return false;
+				}
 			}
-		}
+		#endif
 		return true; 
 	}
 

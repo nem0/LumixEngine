@@ -526,6 +526,10 @@ if has_plugin("physics") then
 	project "physics"
 		libType()
 
+		if _OPTIONS["static-physx"] then
+			defines { "LUMIX_STATIC_PHYSX" }
+		end
+
 		files { "../src/physics/**.h", "../src/physics/**.cpp" }
 
 		configuration { "vs*" }
