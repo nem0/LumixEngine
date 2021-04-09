@@ -143,7 +143,7 @@ struct FormatDesc {
 			case TextureFormat::R8: return {		false,		false,	1,	GL_R8,								GL_ZERO, GL_RED, GL_UNSIGNED_BYTE};
 			case TextureFormat::RG8: return {		false,		false,	2,	GL_RG8,								GL_ZERO, GL_RG, GL_UNSIGNED_BYTE};
 			case TextureFormat::BGRA8: return {		false,		false,	4,	GL_RGBA8,							GL_SRGB8_ALPHA8, GL_BGRA, GL_UNSIGNED_BYTE};
-			case TextureFormat::SRGBA:
+			case TextureFormat::SRGBA: return {		false,		false, 4,	GL_SRGB8_ALPHA8,					GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE};
 			case TextureFormat::RGBA8: return {		false,		false, 4,	GL_RGBA8,							GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE};
 			case TextureFormat::RGBA16: return {	false,		false, 8,	GL_RGBA16,							GL_ZERO, GL_RGBA, GL_UNSIGNED_SHORT};
 			case TextureFormat::RGBA16F: return {	false,		false, 8,	GL_RGBA16F,							GL_ZERO, GL_RGBA, GL_HALF_FLOAT};
