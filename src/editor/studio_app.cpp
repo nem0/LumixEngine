@@ -2261,6 +2261,9 @@ struct StudioAppImpl final : StudioApp
 			r.height = m_settings.m_window.h;
 			os::setWindowScreenRect(m_main_window, r);
 		}
+		m_export.dest_dir = "";
+		m_settings.getValue(Settings::LOCAL, "export_dir", Span(m_export.dest_dir.data));
+		m_settings.getValue(Settings::LOCAL, "export_pack", m_export.pack);
 	}
 
 
@@ -3124,14 +3127,19 @@ struct StudioAppImpl final : StudioApp
 		if (ImGui::Begin("Export game", &m_is_export_game_dialog_open)) {
 			ImGuiEx::Label("Destination dir");
 			if (ImGui::Button(m_export.dest_dir.empty() ? "..." : m_export.dest_dir.data)) {
-				bool res = os::getOpenDirectory(Span(m_export.dest_dir.data), m_engine->getFileSystem().getBasePath());
-				(void)res;
+				if (os::getOpenDirectory(Span(m_export.dest_dir.data), m_engine->getFileSystem().getBasePath())) {
+					m_settings.setValue(Settings::LOCAL, "export_dir", m_export.dest_dir);
+				}
 			}
 
 			ImGuiEx::Label("Pack data");
-			ImGui::Checkbox("##pack", &m_export.pack);
+			if (ImGui::Checkbox("##pack", &m_export.pack)) {
+				m_settings.setValue(Settings::LOCAL, "export_pack", m_export.pack);
+			}
 			ImGuiEx::Label("Mode");
-			ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded universe\0");
+			if (ImGui::Combo("##mode", (int*)&m_export.mode, "All files\0Loaded universe\0")) {
+				m_settings.setValue(Settings::LOCAL, "export_pack", (i32)m_export.mode);
+			}
 
 			if (ImGui::Button("Export")) exportData();
 		}
@@ -3426,7 +3434,7 @@ struct StudioAppImpl final : StudioApp
 	u32 m_fps_frame = 0;
 
 	struct ExportConfig {
-		enum class Mode : int{
+		enum class Mode : i32 {
 			ALL_FILES,
 			CURRENT_UNIVERSE
 		};

@@ -707,11 +707,11 @@ struct PhysicsUIPlugin final : StudioApp::GUIPlugin
 	}
 
 	void onSettingsLoaded() override {
-		m_is_window_open = m_app.getSettings().getValue("is_physics_ui_open", false);
+		m_is_window_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_physics_ui_open", false);
 	}
 
 	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue("is_physics_ui_open", m_is_window_open);
+		m_app.getSettings().setValue(Settings::GLOBAL, "is_physics_ui_open", m_is_window_open);
 	}
 
 	void onWindowGUI() override

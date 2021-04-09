@@ -132,11 +132,11 @@ struct ConsolePlugin final : StudioApp::GUIPlugin
 	}
 
 	void onSettingsLoaded() override {
-		open = app.getSettings().getValue("is_script_console_open", false);
+		open = app.getSettings().getValue(Settings::GLOBAL, "is_script_console_open", false);
 	}
 
 	void onBeforeSettingsSaved() override {
-		app.getSettings().setValue("is_script_console_open", open);
+		app.getSettings().setValue(Settings::GLOBAL, "is_script_console_open", open);
 	}
 
 	/*static const int LUA_CALL_EVENT_SIZE = 32;

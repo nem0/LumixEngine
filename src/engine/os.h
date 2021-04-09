@@ -221,6 +221,7 @@ LUMIX_ENGINE_API int getDPI();
 
 LUMIX_ENGINE_API [[nodiscard]] bool copyFile(const char* from, const char* to);
 LUMIX_ENGINE_API void getExecutablePath(Span<char> path);
+LUMIX_ENGINE_API [[nodiscard]] bool getAppDataDir(Span<char> path);
 LUMIX_ENGINE_API void messageBox(const char* text);
 LUMIX_ENGINE_API void setCommandLine(int, char**);
 LUMIX_ENGINE_API bool getCommandLine(Span<char> output);

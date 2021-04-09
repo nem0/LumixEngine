@@ -295,26 +295,43 @@ Settings::Settings(StudioApp& app)
 	, m_font_size(13)
 	, m_imgui_state(app.getAllocator())
 {
+	if (!os::getAppDataDir(Span(m_app_data_path))) {
+		m_app_data_path[0] = 0;
+		logError("Could not get app data path");
+	}
+	else {
+		catString(m_app_data_path, "\\lumixengine\\studio\\");
+		if (!os::makePath(m_app_data_path)) {
+			logError("Could not create ", m_app_data_path);
+		}
+		catString(m_app_data_path, "studio.ini");
+	}
+
 	m_filter[0] = 0;
 	m_window.x = m_window.y = 0;
 	m_window.w = m_window.h = -1;
 
-	m_state = luaL_newstate();
-	luaL_openlibs(m_state);
-	lua_newtable(m_state);
-	lua_setglobal(m_state, "custom");
+	m_global_state = luaL_newstate();
+	luaL_openlibs(m_global_state);
+	lua_newtable(m_global_state);
+	lua_setglobal(m_global_state, "custom");
+
+	m_local_state = luaL_newstate();
+	luaL_openlibs(m_local_state);
+	lua_newtable(m_local_state);
+	lua_setglobal(m_local_state, "custom");
 }
 
 
 Settings::~Settings()
 {
-	lua_close(m_state);
+	lua_close(m_global_state);
+	lua_close(m_local_state);
 }
-
 
 bool Settings::load()
 {
-	auto L = m_state;
+	lua_State* L = m_global_state;
 	FileSystem& fs = m_app.getEngine().getFileSystem();
 	const bool has_settings = fs.fileExists(SETTINGS_PATH);
 	const char* path = has_settings ? SETTINGS_PATH : DEFAULT_SETTINGS_PATH;
@@ -408,97 +425,129 @@ bool Settings::load()
 	}
 	lua_pop(L, 1);
 
-	return true;
+	return loadAppData();
 }
 
+bool Settings::loadAppData() {
+	if (!m_app_data_path[0]) return true;
+	if (!os::fileExists(m_app_data_path)) return true;
 
-void Settings::setValue(const char* name, bool value) const
+	OutputMemoryStream buf(m_app.getAllocator());
+	os::InputFile file;
+	if (!file.open(m_app_data_path)) return false;
+	buf.resize(file.size());
+
+	if (!file.read(buf.getMutableData(), buf.size())) {
+		file.close();
+		return false;
+	}
+	file.close();
+	Span<const char> content((const char*)buf.data(), (u32)buf.size());
+	return LuaWrapper::execute(m_local_state, content, "app data", 0);
+}
+
+void Settings::setValue(Storage storage, const char* name, bool value) const
 {
-	lua_getglobal(m_state, "custom");
-	lua_pushboolean(m_state, value);
-	lua_setfield(m_state, -2, name);
-	lua_pop(m_state, 1);
+	lua_State* L = getState(storage);
+	lua_getglobal(L, "custom");
+	lua_pushboolean(L, value);
+	lua_setfield(L, -2, name);
+	lua_pop(L, 1);
 }
 
 
-void Settings::setValue(const char* name, int value) const
+void Settings::setValue(Storage storage, const char* name, int value) const
 {
-	lua_getglobal(m_state, "custom");
-	lua_pushinteger(m_state, value);
-	lua_setfield(m_state, -2, name);
-	lua_pop(m_state, 1);
+	lua_State* L = getState(storage);
+	lua_getglobal(L, "custom");
+	lua_pushinteger(L, value);
+	lua_setfield(L, -2, name);
+	lua_pop(L, 1);
 }
 
 
-void Settings::setValue(const char* name, float value) const
+void Settings::setValue(Storage storage, const char* name, float value) const
 {
-	lua_getglobal(m_state, "custom");
-	lua_pushnumber(m_state, value);
-	lua_setfield(m_state, -2, name);
-	lua_pop(m_state, 1);
+	lua_State* L = getState(storage);
+	lua_getglobal(L, "custom");
+	lua_pushnumber(L, value);
+	lua_setfield(L, -2, name);
+	lua_pop(L, 1);
 }
 
 
-void Settings::setValue(const char* name, const char* value) const
+void Settings::setValue(Storage storage, const char* name, const char* value) const
 {
-	lua_getglobal(m_state, "custom");
-	lua_pushstring(m_state, value);
-	lua_setfield(m_state, -2, name);
-	lua_pop(m_state, 1);
+	lua_State* L = getState(storage);
+	lua_getglobal(L, "custom");
+	lua_pushstring(L, value);
+	lua_setfield(L, -2, name);
+	lua_pop(L, 1);
 }
 
 
-u32 Settings::getValue(const char* name, Span<char> out) const {
+u32 Settings::getValue(Storage storage, const char* name, Span<char> out) const {
+	lua_State* L = getState(storage);
 	u32 res = 0;
-	lua_getglobal(m_state, "custom");
+	lua_getglobal(L, "custom");
 
-	lua_getfield(m_state, -1, name);
-	if (lua_type(m_state, -1) == LUA_TSTRING) {
-		const char* s = lua_tostring(m_state, -1);
+	lua_getfield(L, -1, name);
+	if (lua_type(L, -1) == LUA_TSTRING) {
+		const char* s = lua_tostring(L, -1);
 		res = (u32)strlen(s);
 		copyString(out, s);
 	}
-	lua_pop(m_state, 1);
+	lua_pop(L, 1);
 	return res;
 }
 
 
-int Settings::getValue(const char* name, int default_value) const
+int Settings::getValue(Storage storage, const char* name, int default_value) const
 {
-	lua_getglobal(m_state, "custom");
-	int v = getIntegerField(m_state, name, default_value);
-	lua_pop(m_state, 1);
+	lua_State* L = getState(storage);
+	lua_getglobal(L, "custom");
+	int v = getIntegerField(L, name, default_value);
+	lua_pop(L, 1);
 	return v;
 }
 
 
-float Settings::getValue(const char* name, float default_value) const
+float Settings::getValue(Storage storage, const char* name, float default_value) const
 {
+	lua_State* L = getState(storage);
 	float v = default_value;
-	lua_getglobal(m_state, "custom");
-	lua_getfield(m_state, -1, name);
-	if (lua_type(m_state, -1) == LUA_TNUMBER)
+	lua_getglobal(L, "custom");
+	lua_getfield(L, -1, name);
+	if (lua_type(L, -1) == LUA_TNUMBER)
 	{
-		v = (float)lua_tonumber(m_state, -1);
+		v = (float)lua_tonumber(L, -1);
 	}
-	lua_pop(m_state, 2);
+	lua_pop(L, 2);
 	return v;
 }
 
 
-bool Settings::getValue(const char* name, bool default_value) const
+bool Settings::getValue(Storage storage, const char* name, bool default_value) const
 {
+	lua_State* L = getState(storage);
 	bool v = default_value;
-	lua_getglobal(m_state, "custom");
-	lua_getfield(m_state, -1, name);
-	if (lua_type(m_state, -1) == LUA_TBOOLEAN)
+	lua_getglobal(L, "custom");
+	lua_getfield(L, -1, name);
+	if (lua_type(L, -1) == LUA_TBOOLEAN)
 	{
-		v = lua_toboolean(m_state, -1) != 0;
+		v = lua_toboolean(L, -1) != 0;
 	}
-	lua_pop(m_state, 2);
+	lua_pop(L, 2);
 	return v;
 }
 
+lua_State* Settings::getState(Storage storage) const {
+	switch(storage) {
+		case GLOBAL: return m_global_state;
+		case LOCAL: return m_local_state;
+		default: ASSERT(false); return m_local_state;
+	}
+}
 
 bool Settings::save()
 {
@@ -533,39 +582,12 @@ bool Settings::save()
 	file << "mouse_sensitivity_x = " << m_mouse_sensitivity.x << "\n";
 	file << "mouse_sensitivity_y = " << m_mouse_sensitivity.y << "\n";
 	file << "font_size = " << m_font_size << "\n";
-	
+
 	saveStyle(file);
 
 	file << "imgui = [[" << m_imgui_state.c_str() << "]]\n";
 
-	file << "custom = {\n";
-	lua_getglobal(m_state, "custom");
-	lua_pushnil(m_state);
-	bool first = true;
-	while (lua_next(m_state, -2))
-	{
-		if (!first) file << ",\n";
-		const char* name = lua_tostring(m_state, -2);
-		switch (lua_type(m_state, -1))
-		{
-			case LUA_TBOOLEAN:
-				file << name << " = " << (lua_toboolean(m_state, -1) != 0 ? "true" : "false");
-				break;
-			case LUA_TNUMBER:
-				file << name << " = " << lua_tonumber(m_state, -1);
-				break;
-			case LUA_TSTRING:
-				file << name << " = [[" << lua_tostring(m_state, -1) << "]]";
-				break;
-			default:
-				ASSERT(false);
-				break;
-		}
-		lua_pop(m_state, 1);
-		first = false;
-	}
-	lua_pop(m_state, 1);
-	file << "}\n";
+	writeCustom(m_global_state, file);
 
 	file << "actions = {\n";
 	for (int i = 0; i < actions.size(); ++i)
@@ -577,10 +599,48 @@ bool Settings::save()
 	file << "}\n";
 
 	file.close();
+	if (file.isError()) return false;
 
-	return true;
+	if (m_app_data_path[0]) {
+		if (!file.open(m_app_data_path)) return false;
+		writeCustom(m_local_state, file);
+		file.close();
+	}
+
+	return file.isError();
 }
 
+
+void Settings::writeCustom(lua_State* L, IOutputStream& file) {
+	file << "custom = {\n";
+	lua_getglobal(L, "custom");
+	lua_pushnil(L);
+	bool first = true;
+	while (lua_next(L, -2))
+	{
+		if (!first) file << ",\n";
+		const char* name = lua_tostring(L, -2);
+		switch (lua_type(L, -1))
+		{
+			case LUA_TBOOLEAN:
+				file << name << " = " << (lua_toboolean(L, -1) != 0 ? "true" : "false");
+				break;
+			case LUA_TNUMBER:
+				file << name << " = " << lua_tonumber(L, -1);
+				break;
+			case LUA_TSTRING:
+				file << name << " = [[" << lua_tostring(L, -1) << "]]";
+				break;
+			default:
+				ASSERT(false);
+				break;
+		}
+		lua_pop(L, 1);
+		first = false;
+	}
+	lua_pop(L, 1);
+	file << "}\n";
+}
 
 void Settings::showShortcutSettings()
 {

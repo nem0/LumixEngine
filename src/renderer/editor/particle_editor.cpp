@@ -1207,10 +1207,10 @@ struct ParticleEditorImpl : ParticleEditor {
 	bool hasFocus() override { return m_has_focus; }
 
 	void onSettingsLoaded() override {
-		m_open = m_app.getSettings().getValue("is_particle_editor_open", false);
+		m_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_particle_editor_open", false);
 	}
 	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue("is_particle_editor_open", m_open);
+		m_app.getSettings().setValue(Settings::GLOBAL, "is_particle_editor_open", m_open);
 	}
 
 	bool isOpen() const { return m_open; }

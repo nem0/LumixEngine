@@ -129,11 +129,11 @@ void GameView::captureMouse(bool capture)
 }
 
 void GameView::onSettingsLoaded() {
-	m_is_open = m_app.getSettings().getValue("is_game_view_open", false);
+	m_is_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_game_view_open", false);
 }
 
 void GameView::onBeforeSettingsSaved() {
-	m_app.getSettings().setValue("is_game_view_open", m_is_open);
+	m_app.getSettings().setValue(Settings::GLOBAL, "is_game_view_open", m_is_open);
 }
 
 void GameView::onFullscreenGUI(WorldEditor& editor)

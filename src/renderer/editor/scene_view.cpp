@@ -1276,16 +1276,16 @@ void SceneView::handleEvents() {
 
 void SceneView::onSettingsLoaded() {
 	Settings& settings = m_app.getSettings();
-	m_search_actions = settings.getValue("quicksearch_actions", true);
-	m_search_models = settings.getValue("quicksearch_models", true);
-	m_search_preview = settings.getValue("quicksearch_preview", false);
+	m_search_actions = settings.getValue(Settings::GLOBAL, "quicksearch_actions", true);
+	m_search_models = settings.getValue(Settings::GLOBAL, "quicksearch_models", true);
+	m_search_preview = settings.getValue(Settings::GLOBAL, "quicksearch_preview", false);
 }
 
 void SceneView::onBeforeSettingsSaved() {
 	Settings& settings = m_app.getSettings();
-	settings.setValue("quicksearch_actions", m_search_actions);
-	settings.setValue("quicksearch_models", m_search_models);
-	settings.setValue("quicksearch_preview", m_search_preview);
+	settings.setValue(Settings::GLOBAL, "quicksearch_actions", m_search_actions);
+	settings.setValue(Settings::GLOBAL, "quicksearch_models", m_search_models);
+	settings.setValue(Settings::GLOBAL, "quicksearch_preview", m_search_preview);
 }
 
 void SceneView::statsUI(float x, float y) {

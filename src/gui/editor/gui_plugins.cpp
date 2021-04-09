@@ -253,18 +253,18 @@ public:
 
 
 private:
-	enum class MouseMode
-	{
+	enum class MouseMode {
 		NONE,
 		RESIZE,
 		MOVE
 	};
 
 	void onSettingsLoaded() override {
-		m_is_window_open = m_app.getSettings().getValue("is_gui_editor_open", false);
+		m_is_window_open = m_app.getSettings().getValue(Settings::GLOBAL, "is_gui_editor_open", false);
 	}
+
 	void onBeforeSettingsSaved() override {
-		m_app.getSettings().setValue("is_gui_editor_open", m_is_window_open);
+		m_app.getSettings().setValue(Settings::GLOBAL, "is_gui_editor_open", m_is_window_open);
 	}
 
 	void onAction() { m_is_window_open = !m_is_window_open; }

@@ -1183,6 +1183,12 @@ bool copyFile(const char* from, const char* to)
 	return true;
 }
 
+bool getAppDataDir(Span<char> out) {
+	WCHAR path[MAX_PATH];
+	if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, path))) return false;
+	fromWChar(out, path);
+	return true;
+}
 
 void getExecutablePath(Span<char> buffer)
 {

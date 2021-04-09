@@ -17,6 +17,11 @@ struct LUMIX_EDITOR_API Settings {
 	bool m_is_open;
 	char m_filter[100];
 
+	enum Storage {
+		GLOBAL, // shortcuts, ...
+		LOCAL // recently open files, ...
+	};
+
 	// actual settings
 	struct Rect
 	{
@@ -46,19 +51,25 @@ struct LUMIX_EDITOR_API Settings {
 	bool save();
 	bool load();
 	void onGUI();
-	void setValue(const char* name, bool value) const;
-	void setValue(const char* name, float value) const;
-	void setValue(const char* name, int value) const;
-	void setValue(const char* name, const char* value) const;
-	float getValue(const char* name, float default_value) const;
-	int getValue(const char* name, int default_value) const;
-	bool getValue(const char* name, bool default_value) const;
-	u32 getValue(const char* name, Span<char> out) const;
+	void setValue(Storage storage, const char* name, bool value) const;
+	void setValue(Storage storage, const char* name, float value) const;
+	void setValue(Storage storage, const char* name, int value) const;
+	void setValue(Storage storage, const char* name, const char* value) const;
+	float getValue(Storage storage, const char* name, float default_value) const;
+	int getValue(Storage storage, const char* name, int default_value) const;
+	bool getValue(Storage storage, const char* name, bool default_value) const;
+	u32 getValue(Storage storage, const char* name, Span<char> out) const;
 
 private:
+	static void writeCustom(lua_State* L, struct IOutputStream& file);
+	lua_State* getState(Storage storage) const;
+	bool loadAppData();
+
 	StudioApp& m_app;
 	struct Action* m_edit_action = nullptr;
-	lua_State* m_state;
+	lua_State* m_global_state;
+	lua_State* m_local_state;
+	char m_app_data_path[LUMIX_MAX_PATH];
 
 private:
 	void showShortcutSettings();
