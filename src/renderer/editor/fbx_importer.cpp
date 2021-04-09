@@ -1020,9 +1020,9 @@ struct CaptureImpostorJob : Renderer::RenderJob {
 		m_tile_size.x = (m_tile_size.x + 3) & ~3;
 		m_tile_size.y = (m_tile_size.y + 3) & ~3;
 		const IVec2 texture_size = m_tile_size * IMPOSTOR_COLS;
-		gpu::createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, "impostor_gb0");
-		gpu::createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS, "impostor_gb1");
-		gpu::createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::POINT_FILTER, "impostor_gbd");
+		gpu::createTexture(gbs[0], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb0");
+		gpu::createTexture(gbs[1], texture_size.x, texture_size.y, 1, gpu::TextureFormat::RGBA8, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gb1");
+		gpu::createTexture(gbs[2], texture_size.x, texture_size.y, 1, gpu::TextureFormat::D32, gpu::TextureFlags::NO_MIPS | gpu::TextureFlags::RENDER_TARGET, "impostor_gbd");
 		
 		gpu::setFramebuffer(gbs, 2, gbs[2], gpu::FramebufferFlags::NONE);
 		const float color[] = {0, 0, 0, 0};

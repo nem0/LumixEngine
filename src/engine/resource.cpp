@@ -130,6 +130,7 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 		if (!load(size, mem)) {
 			++m_failed_dep_count;
 		}
+		m_size = size;
 	}
 	else if (size < sizeof(*header)) {
 		logError("Invalid resource file, please delete .lumix directory");
@@ -150,17 +151,18 @@ void Resource::fileLoaded(u64 size, const u8* mem, bool success) {
 		if (res != header->decompressed_size || !load(header->decompressed_size, tmp.data())) {
 			++m_failed_dep_count;
 		}
+		m_size = header->decompressed_size;
 	}
 	else {
 		if (!load(size - sizeof(*header), mem + sizeof(*header))) {
 			++m_failed_dep_count;
 		}
+		m_size = header->decompressed_size;
 	} 
 
 	ASSERT(m_empty_dep_count > 0);
 	--m_empty_dep_count;
 	checkState();
-	m_size = header->decompressed_size;
 	m_async_op = FileSystem::AsyncHandle::invalid();
 }
 
