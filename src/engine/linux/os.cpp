@@ -61,6 +61,14 @@ static struct
 	Atom wm_delete_window_atom;
 } G;
 
+bool getAppDataDir(Span<char> path) {
+	char* home = getenv("HOME");
+	if (!home) return false;
+	copyString(path, home);
+	catString(path, "/.lumix/");
+	return true;
+}
+
 static Keycode getKeycode(KeySym keysym) {
 	auto iter = s_from_x11_keysym.find(keysym);
 	if (iter.isValid()) return iter.value();
