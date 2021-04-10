@@ -13,7 +13,9 @@
 #define LUMIX_FUNC(F) function<&F>(#F, #F)
 #define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflScene::create##Cmp, &ReflScene::destroy##Cmp>(Name, Label)
 #define LUMIX_PROP(Property, Label) prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
+#define LUMIX_READONLY_PROP(Property, Label) prop<&ReflScene::get##Property>(Label)
 #define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
+#define LUMIX_READONLY_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
 #define LUMIX_GLOBAL_FUNC(Func) reflection::function(&Func, #Func, nullptr)
 
 namespace Lumix
@@ -558,6 +560,24 @@ struct builder {
 		return *this;
 	}
 
+	template <auto Getter>
+	builder& enum_prop(const char* name) {
+		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
+		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> i32 {
+			using T = typename ResultOf<decltype(Getter)>::Type;
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
+				return static_cast<i32>((static_cast<C*>(scene)->*Getter)(e));
+			}
+			else {
+				return static_cast<i32>((static_cast<C*>(scene)->*Getter)(e, idx));
+			}
+		};
+		p->name = name;
+		addProp(p);
+		return *this;
+	}
+
 	template <auto Getter, auto Setter>
 	builder& enum_prop(const char* name) {
 		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
@@ -594,6 +614,26 @@ struct builder {
 		return *this;
 	}
 
+
+	template <auto Getter>
+	builder& prop(const char* name) {
+		using T = typename ResultOf<decltype(Getter)>::Type;
+		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
+		
+		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> T {
+			using C = typename ClassOf<decltype(Getter)>::Type;
+			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
+				return (static_cast<C*>(scene)->*Getter)(e);
+			}
+			else {
+				return (static_cast<C*>(scene)->*Getter)(e, idx);
+			}
+		};
+
+		p->name = name;
+		addProp(p);
+		return *this;
+	}
 
 	template <auto Getter, auto Setter>
 	builder& prop(const char* name) {
