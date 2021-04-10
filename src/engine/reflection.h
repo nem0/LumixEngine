@@ -563,6 +563,8 @@ struct builder {
 	template <auto Getter>
 	builder& enum_prop(const char* name) {
 		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
+		p->setter = nullptr;
+
 		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> i32 {
 			using T = typename ResultOf<decltype(Getter)>::Type;
 			using C = typename ClassOf<decltype(Getter)>::Type;
@@ -619,6 +621,8 @@ struct builder {
 	builder& prop(const char* name) {
 		using T = typename ResultOf<decltype(Getter)>::Type;
 		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
+		
+		p->setter = nullptr;
 		
 		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> T {
 			using C = typename ClassOf<decltype(Getter)>::Type;
