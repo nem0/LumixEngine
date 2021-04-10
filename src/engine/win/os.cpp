@@ -1030,7 +1030,7 @@ bool getOpenDirectory(Span<char> output, const char* starting_dir)
 void copyToClipboard(const char* text)
 {
 	if (!OpenClipboard(NULL)) return;
-	int len = stringLength(text);
+	int len = stringLength(text) + 1;
 	HGLOBAL mem_handle = GlobalAlloc(GMEM_MOVEABLE, len * sizeof(char));
 	if (!mem_handle) return;
 
