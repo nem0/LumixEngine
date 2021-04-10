@@ -196,6 +196,7 @@ void LogUI::onGUI()
 					if (filter[0] == '\0' || strstr(msg, filter) != nullptr)
 					{
 						len += stringLength(msg);
+						len += sizeof("\n");
 					}
 				}
 
