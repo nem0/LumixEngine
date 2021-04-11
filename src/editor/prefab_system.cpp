@@ -311,12 +311,17 @@ public:
 
 	struct PropertyCloner : reflection::IPropertyVisitor {
 		template <typename T>
-		void clone(const reflection::Property<T>& prop) { prop.set(dst, index, prop.get(src, index)); }
+		void clone(const reflection::Property<T>& prop) { 
+			if (!prop.setter) return;
+			prop.set(dst, index, prop.get(src, index));
+		}
 
 		void visit(const reflection::Property<float>& prop) override { clone(prop); }
 		void visit(const reflection::Property<int>& prop) override { clone(prop); }
 		void visit(const reflection::Property<u32>& prop) override { clone(prop); }
 		void visit(const reflection::Property<EntityPtr>& prop) override { 
+			if (!prop.setter) return;
+
 			EntityPtr e = prop.get(src, index);
 			auto iter = map->find(e);
 			if (iter.isValid()) {

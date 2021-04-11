@@ -419,7 +419,7 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 
 	template <typename T>
 	void set(const reflection::Property<T>& prop) {
-		prop.set(cmp, idx, readFromStream<T>(deserializer));
+		if (prop.setter) prop.set(cmp, idx, readFromStream<T>(deserializer));
 	}
 
 	void visit(const reflection::Property<float>& prop) override { set(prop); }
@@ -461,6 +461,8 @@ struct PropertyDeserializeVisitor : reflection::IPropertyVisitor {
 	}
 	
 	void visit(const reflection::Property<EntityPtr>& prop) override { 
+		if (!prop.setter) return;
+
 		EntityPtr value;
 		deserializer.read(value);
 		auto iter = map.find(value);
@@ -501,6 +503,7 @@ struct PropertySerializeVisitor : reflection::IPropertyVisitor {
 
 	template <typename T>
 	void get(const reflection::Property<T>& prop) {
+		if (prop.isReadonly()) return;
 		writeToStream(serializer, prop.get(cmp, idx));		
 	}
 
@@ -1207,6 +1210,7 @@ public:
 				found = true;
 				for (EntityPtr entity : cmd->m_entities) {
 					const ComponentUID cmp = cmd->m_editor.getUniverse()->getComponent((EntityRef)entity, cmd->m_component_type);
+					ASSERT(prop.setter);
 					prop.set(cmp, cmd->m_index, StoredType<T>::get(cmd->m_new_value));
 				}
 			}

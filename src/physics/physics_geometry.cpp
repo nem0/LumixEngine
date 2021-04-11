@@ -5,6 +5,7 @@
 
 #include "physics_geometry.h"
 #include "engine/log.h"
+#include "engine/profiler.h"
 #include "engine/resource_manager.h"
 #include "engine/stream.h"
 #include "engine/string.h"
@@ -102,6 +103,7 @@ PhysicsGeometry::~PhysicsGeometry() = default;
 
 bool PhysicsGeometry::load(u64 size, const u8* mem)
 {
+	PROFILE_FUNCTION();
 	Header header;
 	InputMemoryStream file(mem, size);
 	file.read(&header, sizeof(header));

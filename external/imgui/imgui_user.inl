@@ -73,27 +73,27 @@ namespace ImGuiEx {
 
 	bool ToolbarButton(ImFont* font, const char* font_icon, const ImVec4& bg_color, const char* tooltip)
 	{
-		auto frame_padding = ImGui::GetStyle().FramePadding;
-		ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleColor(ImGuiCol_Text, bg_color);
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, ImGui::GetStyle().FramePadding.y));
-		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
-		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
+		auto frame_padding = GetStyle().FramePadding;
+		PushStyleColor(ImGuiCol_FrameBg, ImVec4(0, 0, 0, 0));
+		PushStyleColor(ImGuiCol_Text, bg_color);
+		PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+		PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, GetStyle().FramePadding.y));
+		PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
+		PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
 
 		bool ret = false;
-		ImGui::PushFont(font);
-		if (ImGui::Button(font_icon)) {
+		PushFont(font);
+		if (Button(font_icon)) {
 			ret = true;
 		}
-		ImGui::PopFont();
-		ImGui::PopStyleColor(4);
-		ImGui::PopStyleVar(3);
-		if (ImGui::IsItemHovered()) {
-			ImGui::BeginTooltip();
-			ImGui::TextUnformatted(tooltip);
-			ImGui::EndTooltip();
+		PopFont();
+		PopStyleColor(4);
+		PopStyleVar(3);
+		if (IsItemHovered()) {
+			BeginTooltip();
+			TextUnformatted(tooltip);
+			EndTooltip();
 		}
 		return ret;
 	}
@@ -121,7 +121,7 @@ namespace ImGuiEx {
 
 	void EndToolbar()
 	{
-		auto frame_padding = ImGui::GetStyle().FramePadding;
+		auto frame_padding = GetStyle().FramePadding;
 		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		PushStyleVar(ImGuiStyleVar_WindowPadding, frame_padding);
 		PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
@@ -135,7 +135,7 @@ namespace ImGuiEx {
 
 	ImVec2 GetOsImePosRequest()
 	{
-		return ImGui::GetCurrentContext()->PlatformImePos;
+		return GetCurrentContext()->PlatformImePos;
 	}
 
 
@@ -343,21 +343,21 @@ namespace ImGuiEx {
 			}
 		}
 
-		if (ImGui::GetIO().MouseWheel != 0 && ImGui::IsItemHovered())
+		if (GetIO().MouseWheel != 0 && IsItemHovered())
 		{
-			float scale = powf(2, ImGui::GetIO().MouseWheel);
+			float scale = powf(2, GetIO().MouseWheel);
 			width *= scale;
 			height *= scale;
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::WIDTH, width);
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::HEIGHT, height);
 		}
-		if (ImGui::IsMouseReleased(2))
+		if (IsMouseReleased(2))
 		{
 			window->StateStorage.SetBool((ImGuiID)StorageValues::IS_PANNING, false);
 		}
 		if (window->StateStorage.GetBool((ImGuiID)StorageValues::IS_PANNING, false))
 		{
-			ImVec2 drag_offset = ImGui::GetMouseDragDelta(2);
+			ImVec2 drag_offset = GetMouseDragDelta(2);
 			from_x = start_pan.x;
 			from_y = start_pan.y;
 			from_x -= drag_offset.x * width / (inner_bb.Max.x - inner_bb.Min.x);
@@ -365,7 +365,7 @@ namespace ImGuiEx {
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_X, from_x);
 			window->StateStorage.SetFloat((ImGuiID)StorageValues::FROM_Y, from_y);
 		}
-		else if (ImGui::IsMouseDragging(2) && ImGui::IsItemHovered())
+		else if (IsMouseDragging(2) && IsItemHovered())
 		{
 			window->StateStorage.SetBool((ImGuiID)StorageValues::IS_PANNING, true);
 			start_pan.x = from_x;
@@ -441,7 +441,7 @@ namespace ImGuiEx {
 				{
 					pos.x = window->StateStorage.GetFloat((ImGuiID)StorageValues::POINT_START_X, pos.x);
 					pos.y = window->StateStorage.GetFloat((ImGuiID)StorageValues::POINT_START_Y, pos.y);
-					pos += ImGui::GetMouseDragDelta();
+					pos += GetMouseDragDelta();
 					ImVec2 v = invTransform(pos);
 
 					p = v;
@@ -560,9 +560,9 @@ namespace ImGuiEx {
 
 		InvisibleButton("bg", inner_bb.Max - inner_bb.Min);
 
-		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0) && new_count)
+		if (IsItemActive() && IsMouseDoubleClicked(0) && new_count)
 		{
-			ImVec2 mp = ImGui::GetMousePos();
+			ImVec2 mp = GetMousePos();
 			ImVec2 new_p = invTransform(mp);
 			ImVec2* points = (ImVec2*)values;
 
@@ -599,7 +599,7 @@ namespace ImGuiEx {
 			}
 		}
 
-		if (hovered_idx >= 0 && ImGui::IsMouseDoubleClicked(0) && new_count && points_count > 2)
+		if (hovered_idx >= 0 && IsMouseDoubleClicked(0) && new_count && points_count > 2)
 		{
 			ImVec2* points = (ImVec2*)values;
 			--*new_count;
@@ -640,10 +640,10 @@ namespace ImGuiEx {
 		char name[32];
 		ImFormatString(name, 20, "##popup_%s", str_id);
 
-		ImGui::SetNextWindowSize(size_on_first_use, ImGuiCond_FirstUseEver);
-		bool opened = ImGui::Begin(name, NULL, flags);
+		SetNextWindowSize(size_on_first_use, ImGuiCond_FirstUseEver);
+		bool opened = Begin(name, NULL, flags);
 		if (!opened)
-			ImGui::EndPopup();
+			EndPopup();
 
 		return opened;
 	}
@@ -670,9 +670,9 @@ namespace ImGuiEx {
 		ImVec4* colors = GetStyle().Colors;
 		ImU32 color = GetColorU32(IsItemActive() || IsItemHovered() ? colors[ImGuiCol_ButtonActive] : colors[ImGuiCol_Button]);
 		win->DrawList->AddRectFilled(screen_pos, end_pos, color);
-		if (ImGui::IsItemActive())
+		if (IsItemActive())
 		{
-			size->y = ImMax(1.0f, ImGui::GetIO().MouseDelta.y + size->y);
+			size->y = ImMax(1.0f, GetIO().MouseDelta.y + size->y);
 		}
 	}
 
@@ -686,81 +686,81 @@ namespace ImGuiEx {
 		ImVec4* colors = GetStyle().Colors;
 		ImU32 color = GetColorU32(IsItemActive() || IsItemHovered() ? colors[ImGuiCol_ButtonActive] : colors[ImGuiCol_Button]);
 		win->DrawList->AddRectFilled(screen_pos, end_pos, color);
-		if (ImGui::IsItemActive())
+		if (IsItemActive())
 		{
-			size->x = ImMax(1.0f, ImGui::GetIO().MouseDelta.x + size->x);
+			size->x = ImMax(1.0f, GetIO().MouseDelta.x + size->x);
 		}
 	}
 
 
 	bool IconButton(const char* icon, const char* tooltip) {
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_WindowBg]);
-		bool res = ImGui::SmallButton(icon);
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("%s", tooltip);
+		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		PushStyleColor(ImGuiCol_Button, GetStyle().Colors[ImGuiCol_WindowBg]);
+		bool res = SmallButton(icon);
+		if (IsItemHovered()) {
+			SetTooltip("%s", tooltip);
 		}
-		ImGui::PopStyleColor();
-		ImGui::PopStyleVar();
+		PopStyleColor();
+		PopStyleVar();
 		return res;
 	}
 	
 	void TextClipped(const char* text, float size) {
-		ImDrawList* dl = ImGui::GetWindowDrawList();
-		const ImVec2 min = ImGui::GetCursorScreenPos();
+		ImDrawList* dl = GetWindowDrawList();
+		const ImVec2 min = GetCursorScreenPos();
 		ImVec2 max = min;
-		max.y += ImGui::GetTextLineHeight();
+		max.y += GetTextLineHeight();
 		max.x += size;
-		ImGui::RenderTextEllipsis(dl, min, max, max.x, max.x, text, nullptr, nullptr);
+		RenderTextEllipsis(dl, min, max, max.x, max.x, text, nullptr, nullptr);
 		ImRect text_rect;
 		text_rect.Min = min;
 		text_rect.Max = max;
-		ImGui::ItemSize(text_rect);
+		ItemSize(text_rect);
 	}
 
 	void Label(const char* label) {
-		ImGuiWindow* window = ImGui::GetCurrentWindow();
-		const ImVec2 lineStart = ImGui::GetCursorScreenPos();
-		const ImGuiStyle& style = ImGui::GetStyle();
-		float fullWidth = ImGui::GetContentRegionAvail().x;
+		ImGuiWindow* window = GetCurrentWindow();
+		const ImVec2 lineStart = GetCursorScreenPos();
+		const ImGuiStyle& style = GetStyle();
+		float fullWidth = GetContentRegionAvail().x;
 		float itemWidth = fullWidth * 0.6f;
-		ImVec2 textSize = ImGui::CalcTextSize(label);
+		ImVec2 textSize = CalcTextSize(label);
 		ImRect textRect;
-		textRect.Min = ImGui::GetCursorScreenPos();
+		textRect.Min = GetCursorScreenPos();
 		textRect.Max = textRect.Min;
 		textRect.Max.x += fullWidth - itemWidth;
 		textRect.Max.y += textSize.y;
 
-		ImGui::SetCursorScreenPos(textRect.Min);
+		SetCursorScreenPos(textRect.Min);
 
-		ImGui::AlignTextToFramePadding();
+		AlignTextToFramePadding();
 		textRect.Min.y += window->DC.CurrLineTextBaseOffset;
 		textRect.Max.y += window->DC.CurrLineTextBaseOffset;
 
-		ImGui::ItemSize(textRect);
-		if (ImGui::ItemAdd(textRect, window->GetID(label)))
+		ItemSize(textRect);
+		if (ItemAdd(textRect, window->GetID(label)))
 		{
-			ImGui::RenderTextEllipsis(ImGui::GetWindowDrawList(), textRect.Min, textRect.Max, textRect.Max.x,
+			RenderTextEllipsis(GetWindowDrawList(), textRect.Min, textRect.Max, textRect.Max.x,
 				textRect.Max.x, label, nullptr, &textSize);
 
-			if (textRect.GetWidth() < textSize.x && ImGui::IsItemHovered())
-				ImGui::SetTooltip("%s", label);
+			if (textRect.GetWidth() < textSize.x && IsItemHovered())
+				SetTooltip("%s", label);
 		}
-		ImGui::SetCursorScreenPos(textRect.Max - ImVec2{0, textSize.y + window->DC.CurrLineTextBaseOffset});
-		ImGui::SameLine();
-		ImGui::SetNextItemWidth(itemWidth);
+		SetCursorScreenPos(textRect.Max - ImVec2{0, textSize.y + window->DC.CurrLineTextBaseOffset});
+		SameLine();
+		SetNextItemWidth(itemWidth);
 	}
 
 	bool Gradient4(const char* label, int max_count, int* count, float* keys, float* values) {
-		ImGui::PushID(label);
+		PushID(label);
 		IM_ASSERT(*count > 1);
 		IM_ASSERT(keys[0] >= 0 && keys[0] <= 1);
 		IM_ASSERT(max_count >= *count);
 		
-		ImDrawList* dl = ImGui::GetWindowDrawList();
-		const ImVec2 min = ImGui::GetCursorScreenPos();
-		const float w = ImGui::CalcItemWidth();
-		const ImVec2 max = min + ImVec2(w, ImGui::GetTextLineHeight());
+		ImDrawList* dl = GetWindowDrawList();
+		const ImVec2 min = GetCursorScreenPos();
+		const float w = CalcItemWidth();
+		const ImVec2 max = min + ImVec2(w, GetTextLineHeight());
 
 		ImColor c0(values[0], values[1], values[2], values[3]);
 		ImVec2 to;
@@ -793,10 +793,10 @@ namespace ImGuiEx {
 		from.y = min.y;
 		dl->AddRectFilledMultiColor(from, max, c0, c0, c0, c0);
 
-		ImGui::SetCursorScreenPos(min);
-		ImGui::InvisibleButton("gradient", max - min);
-		if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0) && *count < max_count) {
-			const float x = ImGui::GetMousePos().x;
+		SetCursorScreenPos(min);
+		InvisibleButton("gradient", max - min);
+		if (IsItemActive() && IsMouseDoubleClicked(0) && *count < max_count) {
+			const float x = GetMousePos().x;
 			const float key = (x - min.x) / (max.x - min.x);
 			bool found = false;
 			for (int i = 0; i < *count; ++i) {
@@ -829,12 +829,12 @@ namespace ImGuiEx {
 			p.x = min.x * (1 - t) + max.x * t;
 			p.y = max.y;
 
-			ImGui::PushID(i);
-			ImGui::SetCursorScreenPos(p - ImVec2(5, 9));
-			ImGui::InvisibleButton("", ImVec2(10, 15));
+			PushID(i);
+			SetCursorScreenPos(p - ImVec2(5, 9));
+			InvisibleButton("", ImVec2(10, 15));
 
-			const bool hovered = ImGui::IsItemHovered();
-			const ImU32 col = hovered ? ImGui::GetColorU32(ImGuiCol_SliderGrabActive) : ImGui::GetColorU32(ImGuiCol_SliderGrab);
+			const bool hovered = IsItemHovered();
+			const ImU32 col = hovered ? GetColorU32(ImGuiCol_SliderGrabActive) : GetColorU32(ImGuiCol_SliderGrab);
 			dl->AddRectFilled(p - ImVec2(4, 4), p + ImVec2(4, 5), col);
 			dl->AddTriangleFilled(p - ImVec2(-4, 4)
 				, p - ImVec2(4, 4)
@@ -842,30 +842,41 @@ namespace ImGuiEx {
 				, col);
 			
 			static float start_val;
-			if (ImGui::IsItemActive() && ImGui::IsMouseClicked(0)) {
+			if (IsItemActive() && IsMouseClicked(0)) {
 				start_val = keys[i];
 			}
 
-			if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
-				keys[i] = start_val + ImGui::GetMouseDragDelta().x / (max.x - min.x);
+			if (IsItemActive() && IsMouseDragging(0)) {
+				keys[i] = start_val + GetMouseDragDelta().x / (max.x - min.x);
 				keys[i] = ImClamp(keys[i], 0.f, 1.f);
 				changed = true;
 			}
-			if (ImGui::IsItemActive() && ImGui::IsMouseDoubleClicked(0)) {
-				ImGui::OpenPopup("edit");
+			if (IsItemActive() && IsMouseDoubleClicked(0)) {
+				OpenPopup("edit");
 			}
 
-			if (ImGui::BeginPopup("edit")) {
-				ImGui::ColorPicker4("Color", &values[i * 4]);
-				ImGui::EndPopup();
+			if (BeginPopup("edit")) {
+				ColorPicker4("Color", &values[i * 4]);
+				EndPopup();
 			}
 
-			ImGui::PopID();
+			PopID();
 		}
 
-		ImGui::PopID();
-		ImGui::SetCursorScreenPos(max);
-//		ImGui::NewLine();
+		PopID();
+		SetCursorScreenPos(max);
+//		NewLine();
 		return changed;
 	}
-}
+
+	void PushReadOnly() {
+		PushItemFlag(ImGuiItemFlags_ReadOnly, true);
+		PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+	}
+
+	void PopReadOnly() {
+		PopStyleColor();
+		PopItemFlag();
+	}
+
+} // namespace ImGuiEx

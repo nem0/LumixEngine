@@ -950,6 +950,10 @@ namespace Lumix
 			void set(const reflection::Property<T>& prop)
 			{
 				if (!isSameProperty(prop.name, prop_name)) return;
+				if (!prop.setter) {
+					luaL_error(L, "%s is readonly", prop_name);
+					return;
+				}
 				
 				const T val = LuaWrapper::toType<T>(L, 3);
 				prop.set(cmp, idx, val);
@@ -967,6 +971,10 @@ namespace Lumix
 
 			void visit(const reflection::Property<Path>& prop) override {
 				if (!isSameProperty(prop.name, prop_name)) return;
+				if (!prop.setter) {
+					luaL_error(L, "%s is readonly", prop_name);
+					return;
+				}
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
 				prop.set(cmp, idx, Path(val));
@@ -974,6 +982,10 @@ namespace Lumix
 
 			void visit(const reflection::Property<const char*>& prop) override { 
 				if (!isSameProperty(prop.name, prop_name)) return;
+				if (!prop.setter) {
+					luaL_error(L, "%s is readonly", prop_name);
+					return;
+				}
 				
 				const char* val = LuaWrapper::toType<const char*>(L, 3);
 				prop.set(cmp, idx, val);
