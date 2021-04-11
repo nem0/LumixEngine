@@ -3778,30 +3778,32 @@ struct PipelineImpl final : Pipeline
 		const DVec3 cam_pos = m_viewport.pos;
 
 		AtlasSorter atlas_sorter;
-		lights->forEach([&](EntityRef e){
-			PointLight& pl = m_scene->getPointLight(e);
-			i32 idx = job.m_point_lights.size();
-			FillClustersJob::ClusterPointLight& light = job.m_point_lights.emplace();
-			light.radius = pl.range;
-			const DVec3 light_pos = universe.getPosition(e);
-			light.pos = Vec3(light_pos - cam_pos);
-			light.rot = universe.getRotation(e);
-			light.fov = pl.fov;
-			light.color = pl.color * pl.intensity;
-			light.attenuation_param = pl.attenuation_param;
+		if (!lights) {
+			lights->forEach([&](EntityRef e){
+				PointLight& pl = m_scene->getPointLight(e);
+				i32 idx = job.m_point_lights.size();
+				FillClustersJob::ClusterPointLight& light = job.m_point_lights.emplace();
+				light.radius = pl.range;
+				const DVec3 light_pos = universe.getPosition(e);
+				light.pos = Vec3(light_pos - cam_pos);
+				light.rot = universe.getRotation(e);
+				light.fov = pl.fov;
+				light.color = pl.color * pl.intensity;
+				light.attenuation_param = pl.attenuation_param;
 
-			auto iter = m_shadow_atlas.map.find(e);
-			if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
-				light.atlas_idx = iter.isValid() ? iter.value() : -1;
-				atlas_sorter.push(job.m_point_lights.size() - 1, computePriority(light, light_pos, cam_pos), e);
-			}
-			else {
-				light.atlas_idx = -1;
-				if(iter.isValid()) {
-					m_shadow_atlas.remove(e);
+				auto iter = m_shadow_atlas.map.find(e);
+				if (pl.flags.isSet(PointLight::CAST_SHADOWS)) {
+					light.atlas_idx = iter.isValid() ? iter.value() : -1;
+					atlas_sorter.push(job.m_point_lights.size() - 1, computePriority(light, light_pos, cam_pos), e);
 				}
-			}
-		});
+				else {
+					light.atlas_idx = -1;
+					if(iter.isValid()) {
+						m_shadow_atlas.remove(e);
+					}
+				}
+			});
+		}
 
 		for (u32 i = 0; i < atlas_sorter.count; ++i) {
 			FillClustersJob::ClusterPointLight& light = job.m_point_lights[atlas_sorter.lights[i].idx];
@@ -3830,7 +3832,7 @@ struct PipelineImpl final : Pipeline
 			job.m_shadow_atlas_matrices[light.atlas_idx] = mtx;
 		}
 
-		lights->free(m_renderer.getEngine().getPageAllocator());
+		if (lights) lights->free(m_renderer.getEngine().getPageAllocator());
 
 		m_renderer.queue(job, m_profiler_link);
 	}
