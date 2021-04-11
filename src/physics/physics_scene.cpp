@@ -813,6 +813,8 @@ struct PhysicsSceneImpl final : PhysicsScene
 	}
 
 	float getVehicleSpeed(EntityRef entity) override {
+		if (!m_vehicles[entity]->drive) return 0.0f;
+
 		return m_vehicles[entity]->drive->computeForwardSpeed();
 	}
 
