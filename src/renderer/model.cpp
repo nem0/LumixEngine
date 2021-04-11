@@ -315,8 +315,6 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Me
 				vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
 				break;
 			case Mesh::AttributeSemantic::AO:
-				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED);
-				break;
 			case Mesh::AttributeSemantic::COLOR0:
 				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED);
 				break;

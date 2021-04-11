@@ -3778,7 +3778,7 @@ struct PipelineImpl final : Pipeline
 		const DVec3 cam_pos = m_viewport.pos;
 
 		AtlasSorter atlas_sorter;
-		if (!lights) {
+		if (lights) {
 			lights->forEach([&](EntityRef e){
 				PointLight& pl = m_scene->getPointLight(e);
 				i32 idx = job.m_point_lights.size();
