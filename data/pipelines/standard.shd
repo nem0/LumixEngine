@@ -208,7 +208,7 @@ fragment_shader [[
 		#ifdef _HAS_ATTR7
 			data.albedo.rgb *= v_color.rgb;
 		#endif
-		#ifdef _HAS_ATTR7
+		#ifdef _HAS_ATTR8
 			data.ao = v_ao;
 		#else
 			data.ao = 1;
