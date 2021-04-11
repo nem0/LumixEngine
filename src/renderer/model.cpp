@@ -283,6 +283,7 @@ static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
 		case Mesh::AttributeSemantic::TANGENT: return 3;
 		case Mesh::AttributeSemantic::INDICES: return 4;
 		case Mesh::AttributeSemantic::WEIGHTS: return 5;
+		case Mesh::AttributeSemantic::AO: return 6;
 		case Mesh::AttributeSemantic::COLOR0: return 7;
 	}
 	ASSERT(false);
@@ -312,6 +313,9 @@ static bool parseVertexDecl(IInputStream& file, gpu::VertexDecl* vertex_decl, Me
 			case Mesh::AttributeSemantic::POSITION:
 			case Mesh::AttributeSemantic::TEXCOORD0:
 				vertex_decl->addAttribute(idx, offset, cmp_count, type, 0);
+				break;
+			case Mesh::AttributeSemantic::AO:
+				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED);
 				break;
 			case Mesh::AttributeSemantic::COLOR0:
 				vertex_decl->addAttribute(idx, offset, cmp_count, type, gpu::Attribute::NORMALIZED);

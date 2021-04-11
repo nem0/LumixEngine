@@ -34,6 +34,7 @@ struct FBXImporter
 		bool create_impostor = false;
 		bool mikktspace_tangents = false;
 		bool import_vertex_colors = true;
+		bool bake_vertex_ao = false;
 		Physics physics = Physics::NONE;
 		float lods_distances[4] = {-10, -100, -1000, -10000};
 		float position_error = 0.02f;
@@ -179,7 +180,7 @@ private:
 	template <typename T> void write(const T& obj) { out_file.write(&obj, sizeof(obj)); }
 	void write(const void* ptr, size_t size) { out_file.write(ptr, size); }
 	void writeString(const char* str);
-	int getVertexSize(const ofbx::Geometry& geom, bool is_skinned, bool import_colors) const;
+	int getVertexSize(const ofbx::Geometry& geom, bool is_skinned, const ImportConfig& cfg) const;
 	void fillSkinInfo(Array<Skin>& skinning, const ImportMesh& mesh) const;
 	Vec3 fixOrientation(const Vec3& v) const;
 	Quat fixOrientation(const Quat& v) const;
@@ -190,8 +191,8 @@ private:
 	void writeMeshes(const char* src, int mesh_idx, const ImportConfig& cfg);
 	void writeSkeleton(const ImportConfig& cfg);
 	void writeLODs(const ImportConfig& cfg);
-	int getAttributeCount(const ImportMesh& mesh, bool import_vertex_colors) const;
-	bool areIndices16Bit(const ImportMesh& mesh, bool import_vertex_colors) const;
+	int getAttributeCount(const ImportMesh& mesh, const ImportConfig& cfg) const;
+	bool areIndices16Bit(const ImportMesh& mesh, const ImportConfig& cfg) const;
 	void writeModelHeader();
 	void writePhysicsTriMesh(OutputMemoryStream& file, const ImportConfig& cfg);
 
