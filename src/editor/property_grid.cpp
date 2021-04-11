@@ -203,6 +203,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 
 	void visit(const reflection::Property<float>& prop) override
 	{
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		float f = prop.get(cmp, m_index);
@@ -217,6 +218,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, f);
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 	void visit(const reflection::Property<int>& prop) override
@@ -232,6 +234,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 				return;
 			}
 
+			if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 			const int count = enum_attr->count(cmp);
 
 			const char* preview = count ? enum_attr->name(cmp, value) : "";
@@ -249,9 +252,11 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 				ImGui::EndCombo();
 			}
 			ImGui::PopID();
+			if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 			return;
 		}
 
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ImGui::PushID(prop.name);
 		ImGuiEx::Label(prop.name);
 		if (ImGui::InputInt("##v", &value))
@@ -259,6 +264,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
@@ -277,6 +283,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 
 			const int count = enum_attr->count(cmp);
 
+			if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 			const char* preview = enum_attr->name(cmp, value);
 			ImGuiEx::Label(prop.name);
 			ImGui::PushID(prop.name);
@@ -292,9 +299,11 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 				ImGui::EndCombo();
 			}
 			ImGui::PopID();
+			if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 			return;
 		}
 
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
 		if (ImGui::InputScalar("##v", ImGuiDataType_U32, &value))
@@ -302,11 +311,13 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
 	void visit(const reflection::Property<EntityPtr>& prop) override
 	{
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ComponentUID cmp = getComponent();
 		EntityPtr entity = prop.get(cmp, m_index);
 
@@ -376,11 +387,13 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			ImGui::EndPopup();
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
 	void visit(const reflection::Property<Vec2>& prop) override
 	{
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ComponentUID cmp = getComponent();
 		Vec2 value = prop.get(cmp, m_index);
 		Attributes attrs = getAttributes(prop);
@@ -395,11 +408,13 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
 	void visit(const reflection::Property<Vec3>& prop) override
 	{
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec3 value = prop.get(cmp, m_index);
@@ -423,11 +438,13 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			}
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
 	void visit(const reflection::Property<IVec3>& prop) override
 	{
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ComponentUID cmp = getComponent();
 		IVec3 value = prop.get(cmp, m_index);
 		
@@ -437,11 +454,13 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
 	void visit(const reflection::Property<Vec4>& prop) override
 	{
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		Attributes attrs = getAttributes(prop);
 		ComponentUID cmp = getComponent();
 		Vec4 value = prop.get(cmp, m_index);
@@ -463,11 +482,13 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			}
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
 	void visit(const reflection::Property<bool>& prop) override
 	{
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		if (equalIStrings(prop.name, "enabled") && m_index == -1 && m_entities.size() == 1) return;
 		ComponentUID cmp = getComponent();
 		bool value = prop.get(cmp, m_index);
@@ -479,6 +500,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			m_editor.setProperty(m_cmp_type, m_array, m_index, prop.name, m_entities, value);
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
@@ -492,6 +514,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		Attributes attrs = getAttributes(prop);
 		if (attrs.no_ui) return;
 
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
 		if (attrs.resource_type.isValid())
@@ -509,6 +532,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			}
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 
@@ -520,6 +544,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 		char tmp[1024];
 		copyString(tmp, prop.get(cmp, m_index));
 
+		if (prop.isReadonly()) ImGuiEx::PushReadOnly();
 		ImGuiEx::Label(prop.name);
 		ImGui::PushID(prop.name);
 		
@@ -528,6 +553,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			if (m_entities.size() > 1) {
 				ImGui::TextUnformatted("Multi-object editing not supported.");
 				ImGui::PopID();
+				if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 				return;
 			}
 
@@ -554,6 +580,7 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 			}
 		}
 		ImGui::PopID();
+		if (prop.isReadonly()) ImGuiEx::PopReadOnly();
 	}
 
 	void visit(const reflection::BlobProperty& prop) override {}

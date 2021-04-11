@@ -1643,11 +1643,11 @@ void NavigationScene::reflect() {
 			.LUMIX_FUNC_EX(NavigationSceneImpl::setActorActive, "setActive")
 			.LUMIX_FUNC_EX(NavigationSceneImpl::navigate, "navigate")
 			.LUMIX_FUNC_EX(NavigationSceneImpl::cancelNavigation, "cancelNavigation")
-			.LUMIX_FUNC_EX(NavigationSceneImpl::getAgentSpeed, "getSpeed")
 			.LUMIX_FUNC_EX(NavigationSceneImpl::debugDrawPath, "drawPath")
 			.LUMIX_PROP(AgentRadius, "Radius").minAttribute(0)
 			.LUMIX_PROP(AgentHeight, "Height").minAttribute(0)
-			.LUMIX_PROP(AgentMoveEntity, "Move entity");
+			.LUMIX_PROP(AgentMoveEntity, "Move entity")
+			.prop<&NavigationSceneImpl::getAgentSpeed>("Speed");
 }
 
 } // namespace Lumix

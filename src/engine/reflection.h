@@ -13,9 +13,7 @@
 #define LUMIX_FUNC(F) function<&F>(#F, #F)
 #define LUMIX_CMP(Cmp, Name, Label) cmp<&ReflScene::create##Cmp, &ReflScene::destroy##Cmp>(Name, Label)
 #define LUMIX_PROP(Property, Label) prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
-#define LUMIX_READONLY_PROP(Property, Label) prop<&ReflScene::get##Property>(Label)
 #define LUMIX_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
-#define LUMIX_READONLY_ENUM_PROP(Property, Label) enum_prop<&ReflScene::get##Property, &ReflScene::set##Property>(Label)
 #define LUMIX_GLOBAL_FUNC(Func) reflection::function(&Func, #Func, nullptr)
 
 namespace Lumix
@@ -193,6 +191,8 @@ struct Property : PropertyBase {
 	virtual void set(ComponentUID cmp, u32 idx, T val) const {
 		setter(cmp.scene, (EntityRef)cmp.entity, idx, val);
 	}
+
+	bool isReadonly() const { return setter == nullptr; }
 
 	Setter setter;
 	Getter getter;
@@ -560,39 +560,25 @@ struct builder {
 		return *this;
 	}
 
-	template <auto Getter>
+	template <auto Getter, auto Setter = nullptr>
 	builder& enum_prop(const char* name) {
 		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
-		p->setter = nullptr;
-
-		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> i32 {
-			using T = typename ResultOf<decltype(Getter)>::Type;
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return static_cast<i32>((static_cast<C*>(scene)->*Getter)(e));
-			}
-			else {
-				return static_cast<i32>((static_cast<C*>(scene)->*Getter)(e, idx));
-			}
-		};
-		p->name = name;
-		addProp(p);
-		return *this;
-	}
-
-	template <auto Getter, auto Setter>
-	builder& enum_prop(const char* name) {
-		auto* p = LUMIX_NEW(allocator, Property<i32>)(allocator);
-		p->setter = [](IScene* scene, EntityRef e, u32 idx, const i32& value) {
-			using T = typename ResultOf<decltype(Getter)>::Type;
-			using C = typename ClassOf<decltype(Setter)>::Type;
-			if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
-				(static_cast<C*>(scene)->*Setter)(e, static_cast<T>(value));
-			}
-			else {
-				(static_cast<C*>(scene)->*Setter)(e, idx, static_cast<T>(value));
-			}
-		};
+		
+		if constexpr (Setter == nullptr) {
+			p->setter = nullptr;
+		}
+		else {
+			p->setter = [](IScene* scene, EntityRef e, u32 idx, const i32& value) {
+				using T = typename ResultOf<decltype(Getter)>::Type;
+				using C = typename ClassOf<decltype(Setter)>::Type;
+				if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
+					(static_cast<C*>(scene)->*Setter)(e, static_cast<T>(value));
+				}
+				else {
+					(static_cast<C*>(scene)->*Setter)(e, idx, static_cast<T>(value));
+				}
+			};
+		}
 
 		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> i32 {
 			using T = typename ResultOf<decltype(Getter)>::Type;
@@ -616,43 +602,25 @@ struct builder {
 		return *this;
 	}
 
-
-	template <auto Getter>
+	template <auto Getter, auto Setter = nullptr>
 	builder& prop(const char* name) {
 		using T = typename ResultOf<decltype(Getter)>::Type;
 		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
 		
-		p->setter = nullptr;
-		
-		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> T {
-			using C = typename ClassOf<decltype(Getter)>::Type;
-			if constexpr (ArgsCount<decltype(Getter)>::value == 1) {
-				return (static_cast<C*>(scene)->*Getter)(e);
-			}
-			else {
-				return (static_cast<C*>(scene)->*Getter)(e, idx);
-			}
-		};
-
-		p->name = name;
-		addProp(p);
-		return *this;
-	}
-
-	template <auto Getter, auto Setter>
-	builder& prop(const char* name) {
-		using T = typename ResultOf<decltype(Getter)>::Type;
-		auto* p = LUMIX_NEW(allocator, Property<T>)(allocator);
-		
-		p->setter = [](IScene* scene, EntityRef e, u32 idx, const T& value) {
-			using C = typename ClassOf<decltype(Setter)>::Type;
-			if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
-				(static_cast<C*>(scene)->*Setter)(e, value);
-			}
-			else {
-				(static_cast<C*>(scene)->*Setter)(e, idx, value);
-			}
-		};
+		if constexpr (Setter == nullptr) {
+			p->setter = nullptr;
+		}
+		else {
+			p->setter = [](IScene* scene, EntityRef e, u32 idx, const T& value) {
+				using C = typename ClassOf<decltype(Setter)>::Type;
+				if constexpr (ArgsCount<decltype(Setter)>::value == 2) {
+					(static_cast<C*>(scene)->*Setter)(e, value);
+				}
+				else {
+					(static_cast<C*>(scene)->*Setter)(e, idx, value);
+				}
+			};
+		}
 
 		p->getter = [](IScene* scene, EntityRef e, u32 idx) -> T {
 			using C = typename ClassOf<decltype(Getter)>::Type;
