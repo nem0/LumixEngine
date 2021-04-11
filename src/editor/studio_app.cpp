@@ -2159,8 +2159,8 @@ struct StudioAppImpl final : StudioApp
 		
 		ImGui::LoadIniSettingsFromMemory(m_settings.m_imgui_state.c_str());
 
-		m_font = addFontFromFile("editor/fonts/NotoSans-Regular.ttf", (float)m_settings.m_font_size * font_scale, true);
-		m_bold_font = addFontFromFile("editor/fonts/NotoSans-Bold.ttf", (float)m_settings.m_font_size * font_scale, true);
+		m_font = addFontFromFile("editor/fonts/notosans-regular.ttf", (float)m_settings.m_font_size * font_scale, true);
+		m_bold_font = addFontFromFile("editor/fonts/notosans-bold.ttf", (float)m_settings.m_font_size * font_scale, true);
 		
 		OutputMemoryStream data(m_allocator);
 		if (fs.getContentSync(Path("editor/fonts/fa-solid-900.ttf"), data)) {
@@ -2181,7 +2181,7 @@ struct StudioAppImpl final : StudioApp
 
 		if (!m_font || !m_bold_font) {
 			os::messageBox(
-				"Could not open editor/fonts/NotoSans-Regular.ttf or editor/fonts/NotoSans-Bold.ttf\n"
+				"Could not open editor/fonts/notosans-regular.ttf or editor/fonts/NotoSans-Bold.ttf\n"
 				"It very likely means that data are not bundled with\n"
 				"the exe and the exe is not in the correct directory.\n"
 				"The program will eventually crash!"
