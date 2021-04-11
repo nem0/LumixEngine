@@ -192,10 +192,10 @@ struct Property : PropertyBase {
 		setter(cmp.scene, (EntityRef)cmp.entity, idx, val);
 	}
 
-	bool isReadonly() const { return setter == nullptr; }
+	virtual bool isReadonly() const { return setter == nullptr; }
 
-	Setter setter;
-	Getter getter;
+	Setter setter = nullptr;
+	Getter getter = nullptr;
 };
 
 struct IPropertyVisitor {

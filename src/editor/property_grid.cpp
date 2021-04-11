@@ -121,6 +121,8 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 				prop->set(cmp, array_index, index, v);
 			}
 
+			bool isReadonly() const override { return false; }
+
 			const reflection::DynamicProperties* prop;
 			ComponentUID cmp;
 			int index;
@@ -155,6 +157,8 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 							prop->set(cmp, array_index, index, v);
 						}
 
+						bool isReadonly() const override { return false; }
+
 						const reflection::DynamicProperties* prop;
 						ComponentUID cmp;
 						int index;
@@ -181,6 +185,8 @@ struct GridUIVisitor final : reflection::IPropertyVisitor
 							reflection::set(v, value.c_str());
 							prop->set(cmp, array_index, index, v);
 						}
+
+						bool isReadonly() const override { return false; }
 
 						const reflection::DynamicProperties* prop;
 						ComponentUID cmp;
