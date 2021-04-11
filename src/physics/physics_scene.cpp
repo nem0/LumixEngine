@@ -804,6 +804,10 @@ struct PhysicsSceneImpl final : PhysicsScene
 		m_vehicles[entity]->raw_input.setAnalogBrake(value);
 	}
 
+	float getVehicleSpeed(EntityRef entity) override {
+		return m_vehicles[entity]->drive->computeForwardSpeed();
+	}
+
 	void rebuildWheel(EntityRef entity)
 	{
 		if (!m_is_game_running) return;
@@ -4609,6 +4613,7 @@ void PhysicsScene::reflect() {
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleAccel, "setAccel")
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleSteer, "setSteer")
 			.LUMIX_FUNC_EX(PhysicsScene::setVehicleBrake, "setBrake")
+			.prop<&PhysicsSceneImpl::getVehicleSpeed>("Speed")
 			.LUMIX_PROP(VehicleMass, "Mass").minAttribute(0)
 			.LUMIX_PROP(VehicleCenterOfMass, "Center of mass")
 			.LUMIX_PROP(VehicleMOIMultiplier, "MOI multiplier")
