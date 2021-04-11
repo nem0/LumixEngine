@@ -792,8 +792,16 @@ struct PhysicsSceneImpl final : PhysicsScene
 		}
 	}
 	
-	void setVehicleAccel(EntityRef entity, bool accel) override {
-		m_vehicles[entity]->raw_input.setAnalogAccel(accel ? 1.f : 0.f);
+	void setVehicleAccel(EntityRef entity, float accel) override {
+		if (accel < 0.0f && m_vehicles[entity]->drive->mDriveDynData.getCurrentGear() != PxVehicleGearsData::eREVERSE) {
+			m_vehicles[entity]->drive->mDriveDynData.forceGearChange(PxVehicleGearsData::eREVERSE);
+		}
+		else if (accel > 0.0f && m_vehicles[entity]->drive->mDriveDynData.getCurrentGear() == PxVehicleGearsData::eREVERSE) {
+			
+			m_vehicles[entity]->drive->mDriveDynData.forceGearChange(PxVehicleGearsData::eFIRST);
+		}
+
+		m_vehicles[entity]->raw_input.setAnalogAccel(fabsf(accel));
 	}
 
 	void setVehicleSteer(EntityRef entity, float value) override {

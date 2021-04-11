@@ -269,7 +269,7 @@ struct LUMIX_PHYSICS_API PhysicsScene : IScene
 	virtual void setWheelSlot(EntityRef entity, WheelSlot s) = 0;
 
 	virtual float getVehicleSpeed(EntityRef entity) = 0;
-	virtual void setVehicleAccel(EntityRef entity, bool accel) = 0;
+	virtual void setVehicleAccel(EntityRef entity, float accel) = 0;
 	virtual void setVehicleSteer(EntityRef entity, float value) = 0;
 	virtual void setVehicleBrake(EntityRef entity, float value) = 0;
 	virtual Path getVehicleChassis(EntityRef entity) = 0;
