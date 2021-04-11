@@ -1,6 +1,7 @@
 #include "prefab_system.h"
 #include "editor/asset_browser.h"
 #include "editor/asset_compiler.h"
+#include "editor/entity_folders.h"
 #include "editor/studio_app.h"
 #include "editor/world_editor.h"
 #include "engine/array.h"
@@ -559,6 +560,7 @@ public:
 
 
 	void recreateInstances(PrefabHandle prefab) {
+		EntityFolders& folders = m_editor.getEntityFolders();
 		for (PrefabHandle& p : m_entity_to_prefab) {
 			if (p != prefab) continue;
 			const i32 idx = i32(&p - m_entity_to_prefab.begin());
@@ -567,8 +569,9 @@ public:
 
 			const Transform tr = m_universe->getTransform(e);
 			const EntityPtr parent = m_universe->getParent(e);
+			EntityFolders::FolderID folder = folders.getFolder(e);
 
-			m_deferred_instances.push({m_resources[prefab].resource, tr, parent});
+			m_deferred_instances.push({m_resources[prefab].resource, tr, parent, folder});
 			destroySubtree(*m_universe, m_universe->getFirstChild(e));
 			m_universe->destroyEntity(e);
 		}
@@ -598,6 +601,7 @@ public:
 			m_check_update = !all;
 		}
 
+		EntityFolders& folders = m_editor.getEntityFolders();
 		while (!m_deferred_instances.empty()) {
 			PrefabResource* res = m_deferred_instances.back().resource;
 			if (res->isFailure()) {
@@ -608,6 +612,7 @@ public:
 				DeferredInstance tmp = m_deferred_instances.back();
 				const EntityPtr root = doInstantiatePrefab(*res, tmp.transform.pos, tmp.transform.rot, tmp.transform.scale);
 				if (root.isValid()) {
+					folders.moveToFolder(*root, tmp.folder);
 					m_universe->setParent(tmp.parent, (EntityRef)root);
 				}
 				m_deferred_instances.pop();
@@ -694,6 +699,7 @@ private:
 		PrefabResource* resource;
 		Transform transform;
 		EntityPtr parent;
+		EntityFolders::FolderID folder;
 	};
 
 	struct PrefabVersion {
