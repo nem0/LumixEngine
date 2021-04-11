@@ -883,7 +883,7 @@ void memCommit(void* ptr, size_t size) {
 }
 
 void memRelease(void* ptr) {
-	free(ptr);
+	//free(ptr);
 }
 
 struct FileIterator {};

@@ -35,6 +35,10 @@ struct FileSystemWatcherTask : Lumix::Thread
 
 	int task() override;
 
+    void cancel() {
+        finished = true;
+        close(fd);
+    }
 
     Lumix::IAllocator& allocator;
     FileSystemWatcherImpl& watcher;
@@ -58,6 +62,7 @@ struct FileSystemWatcherImpl : FileSystemWatcher
     {
         if (task)
         {
+            task->cancel();
             task->destroy();
             LUMIX_DELETE(allocator, task);
         }
@@ -147,6 +152,7 @@ int FileSystemWatcherTask::task()
     {
         int r = read(fd, buf, sizeof(buf));
         if(r == -1) return 1;
+        if (finished) return 0;
         auto* event = (inotify_event*)buf;
 
         while ((char*)event < buf + r)
