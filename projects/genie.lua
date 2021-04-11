@@ -557,7 +557,7 @@ if has_plugin("renderer") then
 	project "renderer"
 		libType()
 
-		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c", "../external/meshoptimizer/**.*" }
+		files { "../src/renderer/**.h", "../src/renderer/**.cpp", "../src/renderer/**.c", "../external/meshoptimizer/**.*", "../external/aobaker/**.*" }
 		files { "../data/pipelines/**.*" }
 		excludes { 
 			"../external/meshoptimizer/clusterizer.cpp",

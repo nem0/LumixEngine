@@ -26,6 +26,7 @@
 #include "renderer/render_scene.h"
 #include "renderer/renderer.h"
 #include "renderer/shader.h"
+#include "aobaker/aobaker.h"
 
 
 namespace Lumix {
@@ -402,6 +403,17 @@ static void writeColor(const ofbx::Vec4& color, OutputMemoryStream* blob)
 	blob->write(rgba);
 }
 
+static void writeAo(float ao, OutputMemoryStream* blob) {
+
+	//u8 rgba[4];
+	//rgba[0] = u8(ao * 255);
+	//rgba[1] = u8(ao * 255);
+	//rgba[2] = u8(ao * 255);
+	//rgba[3] = u8(ao * 255);
+	//blob->write(u8(ao * 255));
+	blob->write(u8(0));
+}
+
 
 static void writeSkin(const FBXImporter::Skin& skin, OutputMemoryStream* blob)
 {
@@ -717,6 +729,15 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 		intramat_idx.resize(import_geom.unique_vertex_count);
 		memset(intramat_idx.begin(), 0xff, intramat_idx.byte_size());
 
+		float* aobrightness = nullptr;
+		if (cfg.bake_vertex_ao) {
+
+			aobrightness = new float[vertex_count];
+			ofbx::Vec4* aoColors = new ofbx::Vec4[vertex_count];
+			aobaker::config conf;
+			aobaker::BakeAoToVertices(&(geom->getVertices()->x), aobrightness, geom->getVertexCount(), sizeof(ofbx::Vec3), sizeof(float), &import_geom.indices[0], import_geom.indices.size(), conf);
+		}
+
 		u32 written_idx = 0;
 		for (int i = 0; i < vertex_count; ++i) {
 			if (geom_materials && geom_materials[i / 3] != material_idx) continue;
@@ -745,7 +766,7 @@ void FBXImporter::postprocessMeshes(const ImportConfig& cfg, const char* path)
 			if (uvs) writeUV(uvs[i], &import_mesh.vertex_data);
 			if (colors) writeColor(colors[i], &import_mesh.vertex_data);
 			if (tangents) writePackedVec3(tangents[i], transform_matrix, &import_mesh.vertex_data);
-			if (cfg.bake_vertex_ao) { /* TODO */ }
+			if (cfg.bake_vertex_ao) writeAo(aobrightness[i], &import_mesh.vertex_data);
 			if (import_mesh.is_skinned) writeSkin(skinning[i], &import_mesh.vertex_data);
 		}
 
