@@ -3,7 +3,13 @@ name = "vcredist-2019-x64"
 
 [[actions]]
 name = "play"
+platform = "windows"
 path = "studio.exe"
+
+[[actions]]
+name = "play"
+platform = "linux"
+path = "studio"
 
 [[actions]]
 name = "Documentation"

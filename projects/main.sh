@@ -180,6 +180,30 @@ thirdparty_menu()
     done
 }
 
+push_to_itch_io()
+{
+    git clean -f -x -d ../data/
+    rm -rf itch_io
+    mkdir itch_io
+    ./genie gmake
+    cd tmp/gmake 
+    make -j config=relwithdebinfo64
+    cd ../..
+    cp tmp/gmake/bin/RelWithDebInfo/studio itch_io/studio
+    chmod +x itch_io/studio
+    cp -r ../data/* itch_io/
+    cp .itch.toml itch_io/
+
+    if [ ! -f butler ]; then
+        curl -L -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+        unzip butler.zip
+        rm butler.zip
+        chmod +x butler
+    fi
+
+    ./butler push itch_io mikulasflorek/lumix-engine:linux
+}
+
 build()
 {
     cd tmp/gmake
@@ -187,11 +211,16 @@ build()
     cd ../..
 }
 
+function pause(){
+ read -s -n 1 -p "Press any key to continue . . ."
+ echo ""
+}
+
 main_menu()
 {
     clear;
     PS3="Wut? "
-    options=("create project" "build release" "build debug" "3rdparty" "exit")
+    options=("create project" "build release" "build debug" "3rdparty", "push to itch.io", "exit")
     select opt in "${options[@]}"
     do
         case "$REPLY" in
@@ -199,9 +228,11 @@ main_menu()
             2 ) build relwithdebinfo64; pause; break;;
             3 ) build debug64; pause; break;;
             4 ) thirdparty_menu; break;;
-            5 ) exit;;
+            5 ) push_to_itch_io; break;;
+            6 ) exit;;
         esac
     done
+    pause
 }
 
 while :; do main_menu; done
