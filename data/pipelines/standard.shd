@@ -75,6 +75,10 @@ vertex_shader [[
 			layout(location = 7) in vec4 a_color;
 			layout(location = 6) out vec4 v_color;
 		#endif
+		#ifdef _HAS_ATTR8
+			layout(location = 8) in float a_ao;
+			layout(location = 7) out float v_ao;
+		#endif
 	#else
 		layout(std140, binding = 4) uniform ModelState {
 			mat4 matrix;
@@ -114,6 +118,9 @@ vertex_shader [[
 			v_wpos = vec4(i_pos_scale.xyz + rotateByQuat(i_rot_quat, p), 1);
 			#ifdef _HAS_ATTR7
 				v_color = a_color;
+			#endif
+			#ifdef _HAS_ATTR8
+				v_ao = a_ao;
 			#endif
 		#elif defined SKINNED
 			mat4 model_mtx = Model.matrix * (a_weights.x * Model.bones[a_indices.x] + 
@@ -173,6 +180,9 @@ fragment_shader [[
 	#ifdef _HAS_ATTR7
 		layout(location = 6) in vec4 v_color;
 	#endif
+	#ifdef _HAS_ATTR8
+		layout(location = 7) in float v_ao;
+	#endif
 
 	#if defined DEFERRED || defined GRASS
 		layout(location = 0) out vec4 o_gbuffer0;
@@ -196,7 +206,10 @@ fragment_shader [[
 			data.albedo *= v_darken;
 		#endif
 		#ifdef _HAS_ATTR7
-			data.ao = v_color.r;
+			data.albedo.rgb *= v_color.rgb;
+		#endif
+		#ifdef _HAS_ATTR7
+			data.ao = v_ao;
 		#else
 			data.ao = 1;
 		#endif

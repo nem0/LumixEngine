@@ -283,8 +283,8 @@ static u8 getIndexBySemantic(Mesh::AttributeSemantic semantic) {
 		case Mesh::AttributeSemantic::TANGENT: return 3;
 		case Mesh::AttributeSemantic::INDICES: return 4;
 		case Mesh::AttributeSemantic::WEIGHTS: return 5;
-		case Mesh::AttributeSemantic::AO: return 6;
 		case Mesh::AttributeSemantic::COLOR0: return 7;
+		case Mesh::AttributeSemantic::AO: return 8;
 	}
 	ASSERT(false);
 	return 0;
