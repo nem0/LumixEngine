@@ -40,6 +40,8 @@ struct PhysicsSystem : IPlugin
 	virtual int getCollisionsLayersCount() const = 0;
 	virtual void addCollisionLayer() = 0;
 	virtual void removeCollisionLayer() = 0;
+	virtual bool cookTriMesh(Span<const struct Vec3> verts, Span<const u32> indices, struct IOutputStream& blob) = 0;
+	virtual bool cookConvex(Span<const Vec3> verts, IOutputStream& blob) = 0;
 };
 
 

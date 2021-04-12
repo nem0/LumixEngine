@@ -20,6 +20,7 @@
 #include "meshoptimizer/meshoptimizer.h"
 #include "mikktspace.h"
 #include "physics/physics_geometry.h"
+#include "physics/physics_system.h"
 #include "renderer/material.h"
 #include "renderer/model.h"
 #include "renderer/pipeline.h"
@@ -2157,28 +2158,6 @@ void FBXImporter::writeModelHeader()
 }
 
 
-void FBXImporter::writePhysicsTriMesh(OutputMemoryStream& file, const ImportConfig& cfg)
-{
-	i32 count = 0;
-	for (auto& mesh : m_meshes) {
-		count += mesh.indices.size();
-	}
-	file.write((const char*)&count, sizeof(count));
-	int offset = 0;
-	for (auto& mesh : m_meshes)
-	{
-		for (unsigned int j = 0, c = mesh.indices.size(); j < c; ++j)
-		{
-			u32 index = mesh.indices[j] + offset;
-			file.write((const char*)&index, sizeof(index));
-		}
-		int vertex_size = getVertexSize(*mesh.fbx->getGeometry(), mesh.is_skinned, cfg);
-		int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
-		offset += vertex_count;
-	}
-}
-
-
 void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 {
 	if (m_meshes.empty()) return;
@@ -2193,24 +2172,59 @@ void FBXImporter::writePhysics(const char* src, const ImportConfig& cfg)
 	header.m_convex = (u32)to_convex;
 	out_file.write(&header, sizeof(header));
 
+
+	PhysicsSystem* ps = (PhysicsSystem*)m_app.getEngine().getPluginManager().getPlugin("physics");
+	if (!ps) {
+		logError(src, ": no physics system found while trying to cook physics data");
+		return;
+	}
+	Array<Vec3> verts(m_allocator);
+
 	i32 count = 0;
 	for (auto& mesh : m_meshes)	{
 		count += (i32)(mesh.vertex_data.size() / getVertexSize(*mesh.fbx->getGeometry(), mesh.is_skinned, cfg));
 	}
 
-	out_file.write(&count, sizeof(count));
+	verts.reserve(count);
 	for (auto& mesh : m_meshes) {
 		int vertex_size = getVertexSize(*mesh.fbx->getGeometry(), mesh.is_skinned, cfg);
 		int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
 
-		const u8* verts = mesh.vertex_data.data();
+		const u8* src = mesh.vertex_data.data();
 
 		for (int i = 0; i < vertex_count; ++i) {
-			out_file.write(verts + i * vertex_size, sizeof(Vec3));
+			verts.push(*(Vec3*)(src + i * vertex_size));
 		}
 	}
 
-	if (!to_convex) writePhysicsTriMesh(out_file, cfg);
+	if (to_convex) {
+		if (!ps->cookConvex(verts, out_file)) {
+			logError("Failed to cook ", src);
+			return;
+		}
+	} else {
+		Array<u32> indices(m_allocator);
+		i32 count = 0;
+		for (auto& mesh : m_meshes) {
+			count += mesh.indices.size();
+		}
+		indices.reserve(count);
+		int offset = 0;
+		for (auto& mesh : m_meshes) {
+			for (unsigned int j = 0, c = mesh.indices.size(); j < c; ++j) {
+				u32 index = mesh.indices[j] + offset;
+				indices.push(index);
+			}
+			int vertex_size = getVertexSize(*mesh.fbx->getGeometry(), mesh.is_skinned, cfg);
+			int vertex_count = (i32)(mesh.vertex_data.size() / vertex_size);
+			offset += vertex_count;
+		}
+
+		if (!ps->cookTriMesh(verts, indices, out_file)) {
+			logError("Failed to cook ", src);
+			return;
+		}
+	}
 
 	const StaticString<LUMIX_MAX_PATH> phy_path(".phy:", src);
 	m_compiler.writeCompiledResource(phy_path, Span(out_file.data(), (i32)out_file.size()));

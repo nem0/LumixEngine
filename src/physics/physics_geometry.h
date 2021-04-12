@@ -34,6 +34,7 @@ struct PhysicsGeometry final : Resource
 		enum class Versions : u32
 		{
 			FIRST,
+			COOKED,
 
 			LAST
 		};

@@ -2,6 +2,7 @@
 
 #include <foundation/PxAllocatorCallback.h>
 #include <foundation/PxErrorCallback.h>
+#include <foundation/PxIO.h>
 #include <pvd/PxPvd.h>
 #include <pvd/PxPvdTransport.h>
 #include <PxFoundation.h>
@@ -23,6 +24,19 @@
 
 namespace Lumix
 {
+
+	struct OutputStream final : physx::PxOutputStream {
+		explicit OutputStream(IOutputStream& blob)
+			: blob(blob) {}
+
+		physx::PxU32 write(const void* src, physx::PxU32 count) override {
+			blob.write(src, count);
+			return count;
+		}
+
+		IOutputStream& blob;
+	};
+
 	struct CustomErrorCallback : physx::PxErrorCallback
 	{
 		void reportError(physx::PxErrorCode::Enum code, const char* message, const char* file, int line) override
@@ -174,16 +188,8 @@ namespace Lumix
 			universe.addScene(scene.move());
 		}
 
-		physx::PxPhysics* getPhysics() override
-		{
-			return m_physics;
-		}
-
-		physx::PxCooking* getCooking() override
-		{
-			return m_cooking;
-		}
-	
+		physx::PxPhysics* getPhysics() override { return m_physics; }
+		physx::PxCooking* getCooking() override { return m_cooking; }
 		CollisionLayers& getCollisionLayers() override { return m_layers; }
 
 		bool connect2VisualDebugger()
@@ -196,6 +202,31 @@ namespace Lumix
 			return m_pvd->connect(*m_pvd_transport, physx::PxPvdInstrumentationFlag::eALL);
 		}
 
+		bool cookTriMesh(Span<const Vec3> verts, Span<const u32> indices, IOutputStream& blob) override {
+
+			physx::PxTriangleMeshDesc meshDesc;
+			meshDesc.points.count = verts.length();
+			meshDesc.points.stride = sizeof(physx::PxVec3);
+			meshDesc.points.data = verts.begin();
+
+			meshDesc.triangles.count = indices.length() / 3;
+			meshDesc.triangles.stride = 3 * sizeof(physx::PxU32);
+			meshDesc.triangles.data = indices.begin();
+
+			OutputStream writeBuffer(blob);
+			return m_cooking->cookTriangleMesh(meshDesc, writeBuffer);
+		}
+
+		bool cookConvex(Span<const Vec3> verts, IOutputStream& blob) override {
+			physx::PxConvexMeshDesc meshDesc;
+			meshDesc.points.count = verts.length();
+			meshDesc.points.stride = sizeof(Vec3);
+			meshDesc.points.data = verts.begin();
+			meshDesc.flags = physx::PxConvexFlag::eCOMPUTE_CONVEX;
+
+			OutputStream writeBuffer(blob);
+			return m_cooking->cookConvexMesh(meshDesc, writeBuffer);
+		}
 
 		int getCollisionsLayersCount() const override { return m_layers.count; }
 		void addCollisionLayer() override { m_layers.count = minimum(lengthOf(m_layers.names), m_layers.count + 1); }
