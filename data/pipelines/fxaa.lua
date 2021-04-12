@@ -24,3 +24,8 @@ end
 function onDestroy()
 	_G["postprocesses"]["fxaa"] = nil
 end
+
+
+function onUnload()
+	onDestroy()
+end

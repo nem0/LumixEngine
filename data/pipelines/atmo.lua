@@ -161,6 +161,10 @@ function awake()
 	_G["postprocesses"]["atmo"] = postprocess
 end
 
+function onUnload()
+	_G["postprocesses"]["atmo"] = nil
+end
+
 function onDestroy()
 	_G["postprocesses"]["atmo"] = nil
 end

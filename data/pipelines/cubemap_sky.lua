@@ -35,3 +35,7 @@ end
 function onDestroy()
 	_G["postprocesses"]["cubemap_sky"] = nil
 end
+
+function onUnload()
+	onDestroy()
+end

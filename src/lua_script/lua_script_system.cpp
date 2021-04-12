@@ -409,6 +409,7 @@ namespace Lumix
 			}
 
 			void onScriptLoaded(LuaScriptSceneImpl& scene, ScriptComponent& cmp, int scr_index);
+			void onScriptUnloaded(LuaScriptSceneImpl& scene, ScriptComponent& cmp, int scr_index);
 
 			ScriptComponent* m_cmp;
 			LuaScript* m_script = nullptr;
@@ -516,17 +517,21 @@ namespace Lumix
 			}
 
 
-			void onScriptLoaded(Resource::State, Resource::State, Resource& resource)
-			{
+			void onScriptLoaded(Resource::State old_state, Resource::State new_state, Resource& resource) {
+				if (old_state == new_state) return;
+
 				for (int scr_index = 0, c = m_scripts.size(); scr_index < c; ++scr_index)
 				{
 					ScriptInstance& script = m_scripts[scr_index];
 					
 					if (!script.m_script) continue;
 					if (script.m_script != &resource) continue;
-					if (!script.m_script->isReady()) continue;
-					
-					script.onScriptLoaded(m_scene, *this, scr_index);
+					if (new_state == Resource::State::READY) {
+						script.onScriptLoaded(m_scene, *this, scr_index);
+					}
+					else if (new_state == Resource::State::EMPTY) {
+						script.onScriptUnloaded(m_scene, *this, scr_index);
+					}
 				}
 			}
 
@@ -2121,6 +2126,35 @@ namespace Lumix
 		GUIScene* m_gui_scene = nullptr;
 		AnimationScene* m_animation_scene;
 	};
+
+	void LuaScriptSceneImpl::ScriptInstance::onScriptUnloaded(LuaScriptSceneImpl& scene, struct ScriptComponent& cmp, int scr_index) {
+		LuaWrapper::DebugGuard guard(m_state);
+		lua_rawgeti(m_state, LUA_REGISTRYINDEX, m_environment); // [env]
+		lua_getfield(m_state, -1, "onUnload"); // [env, awake]
+		if (lua_type(m_state, -1) != LUA_TFUNCTION)
+		{
+			lua_pop(m_state, 1); // []
+		}
+		else {
+			if (lua_pcall(m_state, 0, 0, 0) != 0) { // [env] | [env, error]
+				logError(lua_tostring(m_state, -1));
+				lua_pop(m_state, 1); // [env]
+			}
+		}
+		
+		// remove reference to functions, we don't want them to be called in case 
+		// this script is reloaded and functions are not there in the new version
+		lua_pushnil(m_state);
+		while (lua_next(m_state, -2) != 0) {
+			if (lua_isfunction(m_state, -1) && lua_isstring(m_state, -2)) {
+				const char* key = lua_tostring(m_state, -2);
+			 	lua_pushnil(m_state);
+				lua_setfield(m_state, -4, key);
+			}
+			lua_pop(m_state, 1);
+		}
+		lua_pop(m_state, 1);
+	}
 
 	void LuaScriptSceneImpl::ScriptInstance::onScriptLoaded(LuaScriptSceneImpl& scene, struct ScriptComponent& cmp, int scr_index) {
 		LuaWrapper::DebugGuard guard(m_state);

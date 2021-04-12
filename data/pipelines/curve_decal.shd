@@ -126,7 +126,7 @@ fragment_shader [[
 		bezier_dist.x += 0.5 * v_uv_scale.x;
 		bezier_dist.x /= v_uv_scale.x;
 		bezier_dist.y *= v_uv_scale.y;
-		vec4 color = texture(u_texture, bezier_dist);
+		vec4 color = texture(u_texture, bezier_dist.yx);
 		color.rgb *= u_material_color.rgb;
 
 		o_gbuffer0 = vec4(color.rgb, color.a);

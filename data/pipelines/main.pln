@@ -38,7 +38,8 @@ local transparent_state = {
 }
 
 local water_state = {
-	depth_write = false
+	depth_write = false,
+	blending = "alpha"
 }
 
 local default_state = {
@@ -91,12 +92,12 @@ local grass_state = {
 	wireframe = false
 }
 
-function waterPass(entities, colorbuffer, dsbuffer)
+function waterPass(entities, colorbuffer, dsbuffer, shadowmap)
 	setRenderTargetsReadonlyDS(colorbuffer, dsbuffer)
 
 	beginBlock("water_pass")
 	pass(getCameraParams())
-	bindTextures({ dsbuffer, }, 4);
+	bindTextures({ dsbuffer, shadowmap, SHADOW_ATLAS, REFLECTION_PROBES }, 4);
 	local bucket = createBucket(entities, "water", "", "depth")
 	renderBucket(bucket, water_state)
 	endBlock()
@@ -423,7 +424,7 @@ function main()
 	local res = hdr_buffer
 	res = postprocess("pre", hdr_buffer, gbuffer0, gbuffer1, gbuffer2, gbuffer_depth, shadowmap)
 	
-	waterPass(entities, res, gbuffer_depth)
+	waterPass(entities, res, gbuffer_depth, shadowmap)
 	transparentPass(entities, res, gbuffer_depth, shadowmap)
 	setRenderTargetsReadonlyDS(hdr_buffer, gbuffer_depth)
 

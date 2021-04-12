@@ -78,3 +78,7 @@ end
 function onDestroy()
 	_G["postprocesses"]["dof"] = nil
 end
+
+function onUnload()
+	onDestroy()
+end

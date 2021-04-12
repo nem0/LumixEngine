@@ -171,3 +171,8 @@ end
 function onDestroy()
 	_G["postprocesses"]["bloom"] = nil
 end
+
+
+function onUnload()
+	onDestroy()
+end

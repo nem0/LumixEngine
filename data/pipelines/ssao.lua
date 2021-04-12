@@ -56,3 +56,8 @@ end
 function onDestroy()
 	_G["postprocesses"]["ssao"] = nil
 end
+
+
+function onUnload()
+	onDestroy()
+end

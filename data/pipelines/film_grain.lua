@@ -29,3 +29,7 @@ end
 function onDestroy()
 	_G["postprocesses"]["filmgrain"] = nil
 end
+
+function onUnload()
+	onDestroy()
+end
