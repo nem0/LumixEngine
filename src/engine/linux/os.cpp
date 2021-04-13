@@ -44,6 +44,8 @@ static struct {
 	Point relative_mode_pos = {};
 	bool relative_mouse = false;
 	WindowHandle win = INVALID_WINDOW;
+	Cursor arrow_cursor = None;
+	Cursor hidden_cursor = None;
 
 	int argc = 0;
 	char** argv = nullptr;
@@ -585,6 +587,7 @@ WindowHandle createWindow(const InitWindowArgs& args) {
 	}
 
 	WindowHandle res = (WindowHandle)win;
+	G.win = res;
 	return res;
 }
 
@@ -616,8 +619,26 @@ void setCursor(CursorType type) {
 }
 
 void showCursor(bool show) {
-	// ASSERT(false);
-	// TODO
+	if (G.arrow_cursor == None) {
+		G.arrow_cursor = XCreateFontCursor(G.display, 2);
+  
+		Pixmap cursorPixmap = XCreatePixmap(G.display, (Window)G.win, 1, 1, 1);
+		GC graphicsContext = XCreateGC(G.display, cursorPixmap, 0, NULL);
+		XDrawPoint(G.display, cursorPixmap, graphicsContext, 0, 0);
+		XFreeGC(G.display, graphicsContext);
+		XColor color;
+		color.flags = DoRed | DoGreen | DoBlue;
+		color.red = color.blue = color.green = 0;
+		G.hidden_cursor = XCreatePixmapCursor(G.display, cursorPixmap, cursorPixmap, &color, &color, 0, 0);
+		XFreePixmap(G.display, cursorPixmap);
+	}
+
+	if (show) {
+		XDefineCursor(G.display, (Window)G.win, G.arrow_cursor);
+	}
+	else {
+		XDefineCursor(G.display, (Window)G.win, G.hidden_cursor);
+	}
 }
 
 
