@@ -518,8 +518,6 @@ namespace Lumix
 
 
 			void onScriptLoaded(Resource::State old_state, Resource::State new_state, Resource& resource) {
-				if (old_state == new_state) return;
-
 				for (int scr_index = 0, c = m_scripts.size(); scr_index < c; ++scr_index)
 				{
 					ScriptInstance& script = m_scripts[scr_index];

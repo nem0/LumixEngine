@@ -7,6 +7,7 @@
 #include "engine/crc32.h"
 #include "engine/engine.h"
 #include "engine/allocator.h"
+#include "engine/log.h"
 #include "engine/math.h"
 #include "engine/reflection.h"
 #include "engine/resource_manager.h"
@@ -389,12 +390,16 @@ struct AudioSceneImpl final : AudioScene
 		return play(entity, res, is_3d);
 	}
 	
-	SoundHandle play(EntityRef entity, Clip* clip, bool is_3d) {
+	SoundHandle play(EntityRef entity, Clip* clip, bool is_3d) override {
 		for (PlayingSound& sound : m_playing_sounds) {
 			if (sound.buffer_id == AudioDevice::INVALID_BUFFER_HANDLE) {
 				if (!clip->isReady()) return INVALID_SOUND_HANDLE;
 
 				int flags = is_3d ? (int)AudioDevice::BufferFlags::IS3D : 0;
+				if (is_3d && clip->getChannels() > 1) {
+					logWarning(clip->getPath(), ": can not play sound with 2 channels as 3d");
+					flags = 0;
+				}
 				auto buffer = m_device.createBuffer(clip->getData(), clip->getSize(), clip->getChannels(), clip->getSampleRate(), flags);
 				if (buffer == AudioDevice::INVALID_BUFFER_HANDLE) return INVALID_SOUND_HANDLE;
 
@@ -492,7 +497,7 @@ UniquePtr<AudioScene> AudioScene::createInstance(AudioSystem& system,
 void AudioScene::reflect(Engine& engine) {
 	LUMIX_SCENE(AudioSceneImpl, "audio")
 		.LUMIX_FUNC(AudioScene::setMasterVolume)
-		.LUMIX_FUNC(AudioScene::play)
+		.function<(SoundHandle (AudioScene::*)(EntityRef, const Path&, bool))&AudioScene::play>("AudioScene::play", "AudioScene::play")
 		.LUMIX_FUNC(AudioScene::setVolume)
 		.LUMIX_FUNC(AudioScene::setEcho)
 		.LUMIX_CMP(AmbientSound, "ambient_sound", "Audio / Ambient sound")
