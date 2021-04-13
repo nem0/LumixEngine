@@ -727,14 +727,16 @@ struct StudioAppImpl final : StudioApp
 		io.KeyAlt = os::isKeyDown(os::Keycode::MENU);
 
 		const os::Point cp = os::getMouseScreenPos();
-        if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-			io.MousePos.x = (float)cp.x;
-			io.MousePos.y = (float)cp.y;
-		}
-		else {
-			const os::Rect screen_rect = os::getWindowScreenRect(m_main_window);
-			io.MousePos.x = (float)cp.x - screen_rect.left;
-			io.MousePos.y = (float)cp.y - screen_rect.top;
+		if (!m_cursor_captured) {
+			if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+				io.MousePos.x = (float)cp.x;
+				io.MousePos.y = (float)cp.y;
+			}
+			else {
+				const os::Rect screen_rect = os::getWindowScreenRect(m_main_window);
+				io.MousePos.x = (float)cp.x - screen_rect.left;
+				io.MousePos.y = (float)cp.y - screen_rect.top;
+			}
 		}
 
 		const ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();

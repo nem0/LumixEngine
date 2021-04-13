@@ -1047,6 +1047,7 @@ void SceneView::captureMouse(bool capture)
 {
 	if(m_is_mouse_captured == capture) return;
 	m_is_mouse_captured = capture;
+	m_app.setCursorCaptured(capture);
 	os::showCursor(!m_is_mouse_captured);
 	if (capture) {
 		os::grabMouse(ImGui::GetWindowViewport()->PlatformHandle);
