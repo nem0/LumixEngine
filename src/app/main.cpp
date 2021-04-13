@@ -187,12 +187,11 @@ struct Runner final
 
 	void captureMouse(bool capture) {
 		if (m_focused) {
-			os::Rect rect = os::getWindowScreenRect(m_engine->getWindowHandle());
-			os::clipCursor(rect.left, rect.top, rect.width, rect.height);
+			os::grabMouse(m_engine->getWindowHandle());
 			os::showCursor(false);
 		}
 		else {
-			os::unclipCursor();
+			os::grabMouse(os::INVALID_WINDOW);
 			os::showCursor(true);
 		}
 	}
